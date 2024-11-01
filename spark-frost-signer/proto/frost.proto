@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package frost;
+
+service FrostService {
+    rpc echo(EchoRequest) returns (EchoResponse) {}
+}
+
+message EchoRequest {
+    string message = 1;
+}
+
+message EchoResponse {
+    string message = 1;
+}

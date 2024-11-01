@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package frost;
+
+option go_package = "lightspark.dev/spark-go/proto/frost";
+
+service FrostService {
+    rpc echo(EchoRequest) returns (EchoResponse) {}
+}
+
+message EchoRequest {
+    string message = 1;
+}
+
+message EchoResponse {
+    string message = 1;
+}

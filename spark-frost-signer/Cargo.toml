@@ -1,0 +1,13 @@
+[package]
+name = "spark-frost-signer"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+prost = "0.13.3"
+tonic = "0.12.3"
+tokio = { version = "1.41.0", features = ["macros", "rt-multi-thread"] }
+tokio-stream = "0.1.16"
+
+[build-dependencies]
+tonic-build = "0.12.3"
