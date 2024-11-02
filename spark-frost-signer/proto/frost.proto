@@ -4,6 +4,13 @@ package frost;
 
 service FrostService {
     rpc echo(EchoRequest) returns (EchoResponse) {}
+
+    rpc dkg_round1(DkgRound1Request) returns (DkgRound1Response) {}
+    rpc dkg_round2(DkgRound2Request) returns (DkgRound2Response) {}
+    rpc dkg_round3(DkgRound3Request) returns (DkgRound3Response) {}
+
+    rpc sign_frost(SignFrostRequest) returns (SignFrostResponse) {}
+    rpc aggregate_frost(AggregateFrostRequest) returns (AggregateFrostResponse) {}
 }
 
 message EchoRequest {
@@ -11,5 +18,76 @@ message EchoRequest {
 }
 
 message EchoResponse {
+    string message = 1;
+}
+
+/*
+ * Distributed Key Generation Round 1 Request
+ *
+ * This request is sent to the server to start the Distributed Key Generation
+ * protocol. This will be a batch request, so the server will generate the
+ * keys for all participants in the batch.  
+ *
+ */
+message DkgRound1Request {
+    // Identifier of the participant, this will be used as the index of the Shamir secret share. The
+    // value should be not be 0.
+    uint64 identifier = 1;
+
+    // The maximum number of signers, this is the size of the threshold signature scheme.
+    uint64 max_signers = 2;
+
+    // The minimum number of signers, this is the threshold for the threshold signature scheme.
+    uint64 min_signers = 3;
+
+    // The number of keys to generate.
+    uint64 key_count = 4;
+}
+
+/*
+ * Distributed Key Generation Round 1 Response
+ *
+ * This response is sent from the server to the client after the Distributed Key Generation
+ * protocol has been completed.
+ */
+message DkgRound1Response {
+    // The packages for the participants. This will be sent to all participants and will be used for
+    // the next round.
+    repeated bytes round1_packages = 1;
+}
+
+message PackageMap {
+    map<uint64, bytes> packages = 1;
+}
+
+message DkgRound2Request {
+    repeated PackageMap round1_packages_maps = 1;
+}
+
+message DkgRound2Response {
+    repeated bytes round2_packages = 1;
+}
+
+message DkgRound3Request {
+    repeated PackageMap round1_packages_maps = 1;
+    repeated PackageMap round2_packages_maps = 2;
+}
+
+message DkgRound3Response {
+}
+
+message SignFrostRequest {
+    string message = 1;
+}
+
+message SignFrostResponse {
+    string message = 1;
+}
+
+message AggregateFrostRequest {
+    string message = 1;
+}
+
+message AggregateFrostResponse {
     string message = 1;
 }

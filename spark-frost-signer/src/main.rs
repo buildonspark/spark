@@ -4,6 +4,7 @@ use server::{frost::frost_service_server, FrostServer};
 use tokio::net::UnixListener;
 use tonic::transport::Server;
 
+mod dkg;
 mod server;
 
 #[tokio::main]
