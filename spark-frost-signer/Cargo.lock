@@ -1224,6 +1224,7 @@ name = "spark-frost-signer"
 version = "0.1.0"
 dependencies = [
  "frost-secp256k1-tr",
+ "hex",
  "prost",
  "rand",
  "serde",

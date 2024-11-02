@@ -31,8 +31,8 @@ message EchoResponse {
  */
 message DkgRound1Request {
     // Identifier of the participant, this will be used as the index of the Shamir secret share. The
-    // value should be not be 0.
-    uint64 identifier = 1;
+    // value should be not be 0. This is a hex string.
+    string identifier = 1;
 
     // The maximum number of signers, this is the size of the threshold signature scheme.
     uint64 max_signers = 2;
@@ -56,24 +56,61 @@ message DkgRound1Response {
     repeated bytes round1_packages = 1;
 }
 
+/*
+ * A map of participant identifiers to their serialized round1 packages.
+ */
 message PackageMap {
-    map<uint64, bytes> packages = 1;
+    // The map of participant identifiers to their serialized packages.
+    map<string, bytes> packages = 1;
 }
 
+/*
+ * Distributed Key Generation Round 2 Request
+ *
+ * This request is sent to the server for the round 2 of DKG protocol. 
+ * This will be a batch request.
+ */
 message DkgRound2Request {
+    // A map of all participants' identifiers to their serialized round1 packages.
     repeated PackageMap round1_packages_maps = 1;
 }
 
+/*
+ * Distributed Key Generation Round 2 Response
+ *
+ * This response is sent from the server to the client after the Distributed Key Generation
+ * protocol has been completed.
+ */
 message DkgRound2Response {
-    repeated bytes round2_packages = 1;
+    // The serialized round2 packages.
+    repeated PackageMap round2_packages = 1;
 }
 
+/*
+ * Distributed Key Generation Round 3 Request
+ *
+ * This request is sent to the server for the round 3 of DKG protocol.
+ */
 message DkgRound3Request {
+    // A map of all participants' identifiers to their serialized round1 packages.
     repeated PackageMap round1_packages_maps = 1;
+
+    // A map of all participants' identifiers to their serialized round2 packages.
     repeated PackageMap round2_packages_maps = 2;
 }
 
+/*
+ * Distributed Key Generation Round 3 Response
+ *
+ * This response is sent from the server to the client after the Distributed Key Generation
+ * protocol has been completed.
+ */
 message DkgRound3Response {
+    // The serialized secret packages.
+    repeated bytes secret_packages = 1;
+
+    // The serialized public packages.
+    repeated bytes public_packages = 2;
 }
 
 message SignFrostRequest {
