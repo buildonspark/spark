@@ -31,6 +31,12 @@ impl FrostService for FrostServer {
     ///
     /// This endpoint simply echoes back the received message with a prefix,
     /// allowing clients to verify the gRPC connection is working properly.
+    async fn echo(&self, request: Request<EchoRequest>) -> Result<Response<EchoResponse>, Status> {
+        let message = request.get_ref().message.clone();
+        Ok(Response::new(EchoResponse {
+            message: format!("echo: {}", message),
+        }))
+    }
 
     async fn dkg_round1(
         &self,
@@ -278,11 +284,5 @@ impl FrostService for FrostServer {
         _request: Request<AggregateFrostRequest>,
     ) -> Result<Response<AggregateFrostResponse>, Status> {
         todo!()
-    }
-    async fn echo(&self, request: Request<EchoRequest>) -> Result<Response<EchoResponse>, Status> {
-        let message = request.get_ref().message.clone();
-        Ok(Response::new(EchoResponse {
-            message: format!("echo: {}", message),
-        }))
     }
 }
