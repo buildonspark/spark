@@ -1,15 +1,17 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use frost::*;
-use frost_secp256k1_tr::Identifier;
 use tonic::{Request, Response, Status};
 
 use frost::frost_service_server::FrostService;
 use frost::EchoRequest;
 use frost::EchoResponse;
 
-use crate::dkg::DKGState;
+use crate::dkg::{
+    hex_string_to_identifier, round1_package_maps_from_package_maps,
+    round2_package_maps_from_package_maps, DKGState,
+};
 
 pub mod frost {
     tonic::include_proto!("frost");
@@ -59,12 +61,12 @@ impl FrostService for FrostServer {
             ));
         }
 
-        let id_bytes: [u8; 32] = hex::decode(req.identifier.clone())
-            .map_err(|e| Status::internal(format!("Invalid hex: {:?}", e)))?
-            .try_into()
-            .map_err(|e| Status::internal(format!("Invalid identifier: {:?}", e)))?;
-        let identifier = Identifier::deserialize(&id_bytes)
-            .map_err(|e| Status::internal(format!("Failed to deserialize identifier: {:?}", e)))?;
+        let identifier = hex_string_to_identifier(&req.identifier).map_err(|e| {
+            Status::internal(format!(
+                "Failed to convert hex string to identifier: {:?}",
+                e
+            ))
+        })?;
         let min_signers = req.min_signers as u16;
         let max_signers = req.max_signers as u16;
         let rng = &mut rand::thread_rng();
@@ -108,26 +110,10 @@ impl FrostService for FrostServer {
             DKGState::Round1(secrets) => secrets,
             _ => return Err(Status::internal("DKG state is not Round1")),
         };
-        let round1_packages_maps = req
-            .round1_packages_maps
-            .clone()
-            .iter()
-            .map(|map| {
-                map.packages
-                    .iter()
-                    .map(|(id, pkg)| {
-                        let id_bytes: [u8; 32] =
-                            hex::decode(id).expect("Invalid hex").try_into().unwrap();
-                        let identifier =
-                            Identifier::deserialize(&id_bytes).expect("Invalid identifier");
-                        let package =
-                            frost_secp256k1_tr::keys::dkg::round1::Package::deserialize(pkg)
-                                .expect("Failed to deserialize round1 package");
-                        (identifier, package)
-                    })
-                    .collect::<BTreeMap<_, _>>()
-            })
-            .collect::<Vec<_>>();
+        let round1_packages_maps = round1_package_maps_from_package_maps(&req.round1_packages_maps)
+            .map_err(|e| {
+                Status::internal(format!("Failed to parse round1 packages maps: {:?}", e))
+            })?;
 
         if round1_packages_maps.len() != round1_secrets.len() {
             return Err(Status::internal(
@@ -184,50 +170,15 @@ impl FrostService for FrostServer {
             }
         };
 
-        let round1_packages_maps: Vec<BTreeMap<_, _>> = request
-            .round1_packages_maps
-            .into_iter()
-            .map(|package_map| {
-                package_map
-                    .packages
-                    .into_iter()
-                    .map(|(identifier, package)| {
-                        let id_bytes: [u8; 32] = hex::decode(identifier)
-                            .expect("Invalid hex")
-                            .try_into()
-                            .unwrap();
-                        let id = Identifier::deserialize(&id_bytes).expect("Invalid identifier");
+        let round1_packages_maps =
+            round1_package_maps_from_package_maps(&request.round1_packages_maps).map_err(|e| {
+                Status::internal(format!("Failed to parse round1 packages maps: {:?}", e))
+            })?;
 
-                        let package =
-                            frost_secp256k1_tr::keys::dkg::round1::Package::deserialize(&package)
-                                .expect("Failed to deserialize round1 package");
-                        (id, package)
-                    })
-                    .collect::<BTreeMap<_, _>>()
-            })
-            .collect();
-
-        let round2_packages_maps: Vec<BTreeMap<_, _>> = request
-            .round2_packages_maps
-            .into_iter()
-            .map(|package_map| {
-                package_map
-                    .packages
-                    .into_iter()
-                    .map(|(identifier, package)| {
-                        let id_bytes: [u8; 32] = hex::decode(identifier)
-                            .expect("Invalid hex")
-                            .try_into()
-                            .unwrap();
-                        let id = Identifier::deserialize(&id_bytes).expect("Invalid identifier");
-                        let package =
-                            frost_secp256k1_tr::keys::dkg::round2::Package::deserialize(&package)
-                                .expect("Failed to deserialize round2 package");
-                        (id, package)
-                    })
-                    .collect::<BTreeMap<_, _>>()
-            })
-            .collect();
+        let round2_packages_maps =
+            round2_package_maps_from_package_maps(&request.round2_packages_maps).map_err(|e| {
+                Status::internal(format!("Failed to parse round2 packages maps: {:?}", e))
+            })?;
 
         if round1_packages_maps.len() != round2_secrets.len()
             || round2_packages_maps.len() != round2_secrets.len()
