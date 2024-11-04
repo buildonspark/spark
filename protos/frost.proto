@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package frost;
 
+option go_package = "github.com/lightsparkdev/spark-go/proto";
+
 service FrostService {
     rpc echo(EchoRequest) returns (EchoResponse) {}
 
