@@ -1,7 +1,6 @@
 package frost
 
 import (
-	"context"
 	"log"
 
 	frost "github.com/lightsparkdev/spark-go/proto"
@@ -10,20 +9,19 @@ import (
 )
 
 // Client represents a FROST gRPC client
-type Client struct {
+type FrostClient struct {
 	conn   *grpc.ClientConn
-	client frost.FrostServiceClient
+	Client frost.FrostServiceClient
 }
 
 // NewClient creates a new FROST client connected to the given Unix socket
-func NewClient(socketPath string) (*Client, error) {
+func NewFrostClient(socketPath string) (*FrostClient, error) {
     target := "unix://" + socketPath
     
     // Create connection with minimal options
-    conn, err := grpc.Dial(
+    conn, err := grpc.NewClient(
         target,
         grpc.WithTransportCredentials(insecure.NewCredentials()),
-        grpc.WithBlock(),
     )
     if err != nil {
         log.Fatalf("Failed to connect: %v", err)
@@ -31,24 +29,13 @@ func NewClient(socketPath string) (*Client, error) {
 
 
 	client := frost.NewFrostServiceClient(conn)
-	return &Client{
+	return &FrostClient{
 		conn:   conn,
-		client: client,
+		Client: client,
 	}, nil
 }
 
 // Close closes the client connection
-func (c *Client) Close() error {
+func (c *FrostClient) Close() error {
 	return c.conn.Close()
-}
-
-// Echo sends an echo request to test the connection
-func (c *Client) Echo(ctx context.Context, message string) (string, error) {
-	resp, err := c.client.Echo(ctx, &frost.EchoRequest{
-		Message: message,
-	})
-	if err != nil {
-		return "", err
-	}
-	return resp.Message, nil
 }
