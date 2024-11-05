@@ -38,7 +38,7 @@ pub fn round1_package_map_from_package_map(
 
 /// Convert a vector of package maps to a vector of maps of identifiers to round1 packages.
 pub fn round1_package_maps_from_package_maps(
-    package_maps: &Vec<PackageMap>,
+    package_maps: &[PackageMap],
 ) -> Result<Vec<BTreeMap<Identifier, frost_secp256k1_tr::keys::dkg::round1::Package>>, String> {
     package_maps
         .iter()
@@ -62,7 +62,7 @@ pub fn round2_package_map_from_package_map(
 
 /// Convert a vector of package maps to a vector of maps of identifiers to round2 packages.
 pub fn round2_package_maps_from_package_maps(
-    package_maps: &Vec<PackageMap>,
+    package_maps: &[PackageMap],
 ) -> Result<Vec<BTreeMap<Identifier, frost_secp256k1_tr::keys::dkg::round2::Package>>, String> {
     package_maps
         .iter()

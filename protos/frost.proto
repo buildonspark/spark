@@ -33,7 +33,7 @@ message EchoResponse {
  */
 message DkgRound1Request {
     // Identifier of the participant, this will be used as the index of the Shamir secret share. The
-    // value should be not be 0. This is a hex string.
+    // value should be not be 0. This is a 32-byte hex string.
     string identifier = 1;
 
     // The maximum number of signers, this is the size of the threshold signature scheme.
@@ -62,7 +62,8 @@ message DkgRound1Response {
  * A map of participant identifiers to their serialized round1 packages.
  */
 message PackageMap {
-    // The map of participant identifiers to their serialized packages.
+    // The map of participant identifiers to their serialized packages. The identifier is a 32-byte
+    // hex string.
     map<string, bytes> packages = 1;
 }
 
@@ -115,12 +116,77 @@ message DkgRound3Response {
     repeated bytes public_packages = 2;
 }
 
-message SignFrostRequest {
-    string message = 1;
+/*
+ * The role of the participant in the signing.
+ */
+enum SigningRole {
+    STATECHAIN = 0;
+    USER = 1;
 }
 
+/*
+ * A nonce for frost signing.
+ * It's a pair of private keys in secp256k1 sha256 field.
+ */
+message SigningNonce {
+    // The private key for hiding. 32 bytes.
+    bytes hiding = 1;
+
+    // The private key for binding. 32 bytes.
+    bytes binding = 2;
+}
+
+/*
+ * A commitment for frost signing.
+ * It's a pair of public keys (points) in secp256k1 curve.
+ */
+message SigningCommitment {
+    // The public key for hiding. 33 bytes.
+    bytes hiding = 1;
+
+    // The public key for binding. 33 bytes.
+    bytes binding = 2;
+}
+
+/*
+ * Signing request
+ *
+ * This request is sent to the server for the signing.
+ */
+message SignFrostRequest {
+    // The message to sign.
+    bytes message = 1;
+
+    // The secret package from DKG round 3.
+    bytes secret_package = 2;
+
+    // The public package from DKG round 3.
+    bytes public_package = 3;
+
+    // The verifying key. This should be the total public key for both user and StatechainEntity.
+    bytes verifying_key = 4;
+
+    // The nonce for current participant.
+    SigningNonce nonce = 5;
+
+    // The commitments for all participants of the statechain.
+    map<string, SigningCommitment> commitments = 6;
+
+    // The commitments for all participants of the user.
+    SigningCommitment user_commitments = 7;
+
+    // The role of the participant in the signing.
+    SigningRole role = 8;
+}
+
+/*
+ * Signing response
+ *
+ * This response is sent from the server to the client after the signing has been completed.
+ */
 message SignFrostResponse {
-    string message = 1;
+    // The signature share.
+    bytes signature_share = 1;
 }
 
 message AggregateFrostRequest {

@@ -6,6 +6,7 @@ use tonic::transport::Server;
 
 mod dkg;
 mod server;
+mod signing;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
