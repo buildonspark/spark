@@ -103,23 +103,34 @@ message DkgRound3Request {
 }
 
 /*
+ * A key package for frost signing.
+ */
+message KeyPackage {
+    // The identifier of the participant.
+    string identifier = 1;
+    
+    // The secret share for the participant.
+    bytes secret_share = 2;
+
+    // The public shares for each participant.
+    map<string, bytes> public_shares = 3;
+
+    // The public key for the group.
+    bytes public_key = 4;
+
+    // The minimum number of signers for the threshold signature scheme.
+    uint32 min_signers = 5;
+}
+
+/*
  * Distributed Key Generation Round 3 Response
  *
  * This response is sent from the server to the client after the Distributed Key Generation
  * protocol has been completed.
  */
 message DkgRound3Response {
-    // The serialized secret packages.
-    repeated bytes secret_packages = 1;
-
-    // The serialized public packages.
-    repeated bytes public_packages = 2;
-
-    // The raw key shares. This is the secret shares for the participants.
-    repeated bytes key_shares = 3;
-
-    // The group public keys. This is the public shares for the participants.
-    repeated bytes group_public_keys = 4;
+    // The key packages for the participants.
+    repeated KeyPackage key_packages = 1;
 }
 
 /*
@@ -164,25 +175,22 @@ message SignFrostRequest {
     bytes message = 1;
 
     // The secret package from DKG round 3.
-    bytes secret_package = 2;
-
-    // The public package from DKG round 3.
-    bytes public_package = 3;
+    KeyPackage key_package = 2;
 
     // The verifying key. This should be the total public key for both user and StatechainEntity.
-    bytes verifying_key = 4;
+    bytes verifying_key = 3;
 
     // The nonce for current participant.
-    SigningNonce nonce = 5;
+    SigningNonce nonce = 4;
 
     // The commitments for all participants of the statechain.
-    map<string, SigningCommitment> commitments = 6;
+    map<string, SigningCommitment> commitments = 5;
 
     // The commitments for all participants of the user.
-    SigningCommitment user_commitments = 7;
+    SigningCommitment user_commitments = 6;
 
     // The role of the participant in the signing.
-    SigningRole role = 8;
+    SigningRole role = 7;
 }
 
 /*

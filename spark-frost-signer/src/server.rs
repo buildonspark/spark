@@ -2,7 +2,6 @@ use std::collections::{BTreeSet, HashMap};
 use std::sync::{Arc, Mutex};
 
 use frost::*;
-use frost_core::keys::KeyPackage;
 use frost_core::Identifier;
 use frost_secp256k1_tr::aggregate_spark;
 use tonic::{Request, Response, Status};
@@ -12,13 +11,13 @@ use frost::EchoRequest;
 use frost::EchoResponse;
 
 use crate::dkg::{
-    hex_string_to_identifier, round1_package_maps_from_package_maps,
+    hex_string_to_identifier, key_package_from_dkg_result, round1_package_maps_from_package_maps,
     round2_package_maps_from_package_maps, DKGState,
 };
 use crate::signing::{
-    frost_build_signin_package, frost_commitments_from_proto, frost_nonce_from_proto,
-    frost_signature_shares_from_proto, frost_signing_commiement_map_from_proto,
-    verifying_key_from_bytes,
+    frost_build_signin_package, frost_commitments_from_proto, frost_key_package_from_proto,
+    frost_nonce_from_proto, frost_signature_shares_from_proto,
+    frost_signing_commiement_map_from_proto, verifying_key_from_bytes,
 };
 
 pub mod frost {
@@ -196,11 +195,7 @@ impl FrostService for FrostServer {
             ));
         }
 
-        let mut secret_packages = Vec::new();
-        let mut public_packages = Vec::new();
-        let mut key_shares = Vec::new();
-        let mut group_public_keys = Vec::new();
-
+        let mut key_packages = Vec::new();
         for ((round2_secret, round1_packages), round2_packages) in round2_secrets
             .iter()
             .zip(round1_packages_maps.iter())
@@ -213,28 +208,20 @@ impl FrostService for FrostServer {
             )
             .map_err(|e| Status::internal(format!("Failed to generate DKG round 3: {:?}", e)))?;
 
-            secret_packages.push(
-                secret_package
-                    .serialize()
-                    .expect("Failed to serialize secret package"),
-            );
-            public_packages.push(
-                public_package
-                    .serialize()
-                    .expect("Failed to serialize public package"),
-            );
-            key_shares.push(secret_package.signing_share().serialize().to_vec());
-            group_public_keys.push(public_package.verifying_key().serialize().to_vec());
+            let key_package =
+                key_package_from_dkg_result(secret_package, public_package).map_err(|e| {
+                    Status::internal(format!(
+                        "Failed to convert DKG result to key package: {:?}",
+                        e
+                    ))
+                })?;
+
+            key_packages.push(key_package);
         }
 
         dkg_state.state = DKGState::None;
 
-        Ok(Response::new(DkgRound3Response {
-            secret_packages,
-            public_packages,
-            key_shares,
-            group_public_keys,
-        }))
+        Ok(Response::new(DkgRound3Response { key_packages }))
     }
 
     async fn sign_frost(
@@ -274,8 +261,11 @@ impl FrostService for FrostServer {
         let verifying_key = verifying_key_from_bytes(req.verifying_key.clone())
             .map_err(|e| Status::internal(format!("Failed to parse verifying key: {:?}", e)))?;
 
-        let key_package = KeyPackage::deserialize(&req.secret_package)
-            .map_err(|e| Status::internal(format!("Failed to parse key package: {:?}", e)))?;
+        let key_package = match &req.key_package {
+            Some(key_package) => frost_key_package_from_proto(key_package)
+                .map_err(|e| Status::internal(format!("Failed to parse key package: {:?}", e)))?,
+            None => return Err(Status::internal("Key package is required")),
+        };
 
         let signing_package = frost_build_signin_package(commitments, &req.message);
         let signature_share = frost_secp256k1_tr::round2::sign_spark(

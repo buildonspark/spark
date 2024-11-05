@@ -1,8 +1,11 @@
 use std::collections::BTreeMap;
 
-use frost_secp256k1_tr::Identifier;
+use frost_secp256k1_tr::{
+    keys::{KeyPackage as FrostKeyPackage, PublicKeyPackage},
+    Identifier,
+};
 
-use crate::server::frost::PackageMap;
+use crate::server::frost::{KeyPackage, PackageMap};
 
 #[derive(Debug, Default, PartialEq)]
 pub enum DKGState {
@@ -68,4 +71,26 @@ pub fn round2_package_maps_from_package_maps(
         .iter()
         .map(round2_package_map_from_package_map)
         .collect()
+}
+
+pub fn key_package_from_dkg_result(
+    secret_package: FrostKeyPackage,
+    public_package: PublicKeyPackage,
+) -> Result<KeyPackage, String> {
+    let secret_share = secret_package.signing_share().serialize();
+    let identifier = hex::encode(secret_package.identifier().serialize());
+
+    let public_shares = public_package
+        .verifying_shares()
+        .iter()
+        .map(|(id, share)| (hex::encode(id.serialize()), share.serialize().to_vec()))
+        .collect();
+
+    Ok(KeyPackage {
+        secret_share: secret_share.to_vec(),
+        identifier,
+        min_signers: *secret_package.min_signers() as u32,
+        public_key: public_package.verifying_key().serialize().to_vec(),
+        public_shares,
+    })
 }

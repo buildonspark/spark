@@ -3,6 +3,9 @@ use std::collections::HashMap;
 
 use frost_core::round1::Nonce;
 use frost_core::round1::NonceCommitment;
+use frost_secp256k1_tr::keys::KeyPackage as FrostKeyPackage;
+use frost_secp256k1_tr::keys::SigningShare;
+use frost_secp256k1_tr::keys::VerifyingShare;
 use frost_secp256k1_tr::round1::SigningCommitments as FrostSigningCommitments;
 use frost_secp256k1_tr::round1::SigningNonces as FrostSigningNonces;
 use frost_secp256k1_tr::round2::SignatureShare;
@@ -13,6 +16,7 @@ use frost_secp256k1_tr::SigningTarget;
 use frost_secp256k1_tr::VerifyingKey;
 
 use crate::dkg::hex_string_to_identifier;
+use crate::server::frost::KeyPackage;
 use crate::server::frost::{SigningCommitment, SigningNonce};
 
 pub fn frost_nonce_from_proto(nonce: &SigningNonce) -> Result<FrostSigningNonces, String> {
@@ -106,4 +110,46 @@ pub fn frost_signature_shares_from_proto(
             Ok((identifier, share))
         })
         .collect()
+}
+
+pub fn frost_key_package_from_proto(key_package: &KeyPackage) -> Result<FrostKeyPackage, String> {
+    let signing_share = SigningShare::deserialize(
+        key_package
+            .secret_share
+            .clone()
+            .try_into()
+            .map_err(|_| "Signing share is not 32 bytes")?,
+    )
+    .map_err(|e| e.to_string())?;
+
+    let verifying_share = VerifyingShare::deserialize(
+        key_package
+            .public_shares
+            .get(&key_package.identifier)
+            .ok_or("Verifying share is not found")?
+            .as_slice()
+            .try_into()
+            .map_err(|_| "Verifying share is not 33 bytes")?,
+    )
+    .map_err(|e| e.to_string())?;
+
+    let verifying_key = VerifyingKey::deserialize(
+        key_package
+            .public_key
+            .as_slice()
+            .try_into()
+            .map_err(|_| "Verifying key is not 33 bytes")?,
+    )
+    .map_err(|e| e.to_string())?;
+
+    let identifier = hex_string_to_identifier(&key_package.identifier)?;
+
+    let result = FrostKeyPackage::new(
+        identifier,
+        signing_share,
+        verifying_share,
+        verifying_key,
+        key_package.min_signers as u16,
+    );
+    Ok(result)
 }
