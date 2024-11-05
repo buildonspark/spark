@@ -4,6 +4,7 @@ use std::sync::{Arc, Mutex};
 use frost::*;
 use frost_core::keys::KeyPackage;
 use frost_core::Identifier;
+use frost_secp256k1_tr::aggregate_spark;
 use tonic::{Request, Response, Status};
 
 use frost::frost_service_server::FrostService;
@@ -16,7 +17,8 @@ use crate::dkg::{
 };
 use crate::signing::{
     frost_build_signin_package, frost_commitments_from_proto, frost_nonce_from_proto,
-    frost_signing_commiement_map_from_proto, verifying_key_from_bytes,
+    frost_signature_shares_from_proto, frost_signing_commiement_map_from_proto,
+    verifying_key_from_bytes,
 };
 
 pub mod frost {
@@ -294,8 +296,38 @@ impl FrostService for FrostServer {
 
     async fn aggregate_frost(
         &self,
-        _request: Request<AggregateFrostRequest>,
+        request: Request<AggregateFrostRequest>,
     ) -> Result<Response<AggregateFrostResponse>, Status> {
-        todo!()
+        let req = request.get_ref();
+        let mut commitments =
+            frost_signing_commiement_map_from_proto(&req.commitments).map_err(|e| {
+                Status::internal(format!("Failed to parse signing commitments: {:?}", e))
+            })?;
+
+        let user_identifier =
+            Identifier::derive("user".as_bytes()).expect("Failed to derive user identifier");
+
+        let user_commitments = match &req.user_commitments {
+            Some(commitments) => frost_commitments_from_proto(commitments).map_err(|e| {
+                Status::internal(format!("Failed to parse user commitments: {:?}", e))
+            })?,
+            None => return Err(Status::internal("User commitments are required")),
+        };
+        commitments.insert(user_identifier, user_commitments);
+
+        let verifying_key = verifying_key_from_bytes(req.verifying_key.clone())
+            .map_err(|e| Status::internal(format!("Failed to parse verifying key: {:?}", e)))?;
+
+        let signing_package = frost_build_signin_package(commitments, &req.message);
+
+        let signature_shares = frost_signature_shares_from_proto(&req.signature_shares)
+            .map_err(|e| Status::internal(format!("Failed to parse signature shares: {:?}", e)))?;
+
+        let signature = aggregate_spark(&signing_package, &signature_shares, &verifying_key)
+            .map_err(|e| Status::internal(format!("Failed to aggregate frost: {:?}", e)))?;
+
+        Ok(Response::new(AggregateFrostResponse {
+            signature: signature.serialize().to_vec(),
+        }))
     }
 }

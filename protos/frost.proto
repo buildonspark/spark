@@ -195,10 +195,34 @@ message SignFrostResponse {
     bytes signature_share = 1;
 }
 
+/*
+ * Aggregate frost request
+ *
+ * This request is sent to the server for the aggregate signing.
+ */
 message AggregateFrostRequest {
-    string message = 1;
+    // The message to sign.
+    bytes message = 1;
+
+    // The signature shares.
+    map<string, bytes> signature_shares = 2;
+
+    // The verifying key. This should be the total public key for both user and StatechainEntity.
+    bytes verifying_key = 3;
+
+    // The commitments for all participants of the statechain.
+    map<string, SigningCommitment> commitments = 4;
+
+    // The commitments for all participants of the user.
+    SigningCommitment user_commitments = 5;
 }
 
+/*
+ * Aggregate frost response
+ *
+ * This response is sent from the server to the client after the aggregate signing has been completed.
+ */
 message AggregateFrostResponse {
-    string message = 1;
+    // The signature.
+    bytes signature = 1;
 }

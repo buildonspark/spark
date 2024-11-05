@@ -5,6 +5,7 @@ use frost_core::round1::Nonce;
 use frost_core::round1::NonceCommitment;
 use frost_secp256k1_tr::round1::SigningCommitments as FrostSigningCommitments;
 use frost_secp256k1_tr::round1::SigningNonces as FrostSigningNonces;
+use frost_secp256k1_tr::round2::SignatureShare;
 use frost_secp256k1_tr::Identifier;
 use frost_secp256k1_tr::SigningPackage;
 use frost_secp256k1_tr::SigningParameters;
@@ -86,4 +87,23 @@ pub fn frost_build_signin_package(
         },
     );
     SigningPackage::new(signing_commitments, signing_target)
+}
+
+pub fn frost_signature_shares_from_proto(
+    shares: &HashMap<String, Vec<u8>>,
+) -> Result<BTreeMap<Identifier, SignatureShare>, String> {
+    shares
+        .iter()
+        .map(|(k, v)| -> Result<(Identifier, SignatureShare), String> {
+            let identifier = hex_string_to_identifier(k)
+                .map_err(|e| format!("Failed to parse identifier: {}", e))?;
+            let share = SignatureShare::deserialize(
+                (*v).clone()
+                    .try_into()
+                    .map_err(|_| "Signature share is not 32 bytes")?,
+            )
+            .map_err(|e| e.to_string())?;
+            Ok((identifier, share))
+        })
+        .collect()
 }
