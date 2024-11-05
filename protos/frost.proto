@@ -114,6 +114,12 @@ message DkgRound3Response {
 
     // The serialized public packages.
     repeated bytes public_packages = 2;
+
+    // The raw key shares. This is the secret shares for the participants.
+    repeated bytes key_shares = 3;
+
+    // The group public keys. This is the public shares for the participants.
+    repeated bytes group_public_keys = 4;
 }
 
 /*

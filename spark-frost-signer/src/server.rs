@@ -196,6 +196,8 @@ impl FrostService for FrostServer {
 
         let mut secret_packages = Vec::new();
         let mut public_packages = Vec::new();
+        let mut key_shares = Vec::new();
+        let mut group_public_keys = Vec::new();
 
         for ((round2_secret, round1_packages), round2_packages) in round2_secrets
             .iter()
@@ -219,6 +221,8 @@ impl FrostService for FrostServer {
                     .serialize()
                     .expect("Failed to serialize public package"),
             );
+            key_shares.push(secret_package.signing_share().serialize().to_vec());
+            group_public_keys.push(public_package.verifying_key().serialize().to_vec());
         }
 
         dkg_state.state = DKGState::None;
@@ -226,6 +230,8 @@ impl FrostService for FrostServer {
         Ok(Response::new(DkgRound3Response {
             secret_packages,
             public_packages,
+            key_shares,
+            group_public_keys,
         }))
     }
 
