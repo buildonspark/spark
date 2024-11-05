@@ -38,7 +38,7 @@ func TestEcho(t *testing.T) {
 }
 
 func TestDkgRound1(t *testing.T) {
-		// Create a temporary socket file
+	// Create a temporary socket file
 	socketPath := "/tmp/frost.sock"
 
 	// Initialize client
@@ -55,9 +55,9 @@ func TestDkgRound1(t *testing.T) {
 		Identifier: "0000000000000000000000000000000000000000000000000000000000000001",
 		MaxSigners: 10,
 		MinSigners: 5,
-		KeyCount: 3,
+		KeyCount:   3,
 	}
-	
+
 	response, err := client.Client.DkgRound1(ctx, request)
 	if err != nil {
 		t.Fatalf("Echo failed: %v", err)
