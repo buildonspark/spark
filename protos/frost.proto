@@ -32,18 +32,21 @@ message EchoResponse {
  *
  */
 message DkgRound1Request {
+    // An uuid to identify the request.
+    string request_id = 1;
+
     // Identifier of the participant, this will be used as the index of the Shamir secret share. The
     // value should be not be 0. This is a 32-byte hex string.
-    string identifier = 1;
+    string identifier = 2;
 
     // The maximum number of signers, this is the size of the threshold signature scheme.
-    uint64 max_signers = 2;
+    uint64 max_signers = 3;
 
     // The minimum number of signers, this is the threshold for the threshold signature scheme.
-    uint64 min_signers = 3;
+    uint64 min_signers = 4;
 
     // The number of keys to generate.
-    uint64 key_count = 4;
+    uint64 key_count = 5;
 }
 
 /*
@@ -74,8 +77,11 @@ message PackageMap {
  * This will be a batch request.
  */
 message DkgRound2Request {
+    // An uuid to identify the request.
+    string request_id = 1;
+
     // A map of all participants' identifiers to their serialized round1 packages.
-    repeated PackageMap round1_packages_maps = 1;
+    repeated PackageMap round1_packages_maps = 2;
 }
 
 /*
@@ -95,11 +101,14 @@ message DkgRound2Response {
  * This request is sent to the server for the round 3 of DKG protocol.
  */
 message DkgRound3Request {
+    // An uuid to identify the request.
+    string request_id = 1;
+
     // A map of all participants' identifiers to their serialized round1 packages.
-    repeated PackageMap round1_packages_maps = 1;
+    repeated PackageMap round1_packages_maps = 2;
 
     // A map of all participants' identifiers to their serialized round2 packages.
-    repeated PackageMap round2_packages_maps = 2;
+    repeated PackageMap round2_packages_maps = 3;
 }
 
 /*

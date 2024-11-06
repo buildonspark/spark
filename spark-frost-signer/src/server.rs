@@ -26,7 +26,7 @@ pub mod frost {
 
 #[derive(Debug, Default)]
 pub struct FrostDKGState {
-    state: DKGState,
+    state: HashMap<String, DKGState>,
 }
 
 #[derive(Debug, Default)]
@@ -79,7 +79,8 @@ impl FrostService for FrostServer {
         let rng = &mut rand::thread_rng();
 
         let mut dkg_state = self.dkg_state.lock().unwrap();
-        if dkg_state.state != DKGState::None {
+
+        if dkg_state.state.get(&req.request_id).is_some() {
             return Err(Status::internal("DKG state is not None"));
         }
 
@@ -100,7 +101,10 @@ impl FrostService for FrostServer {
             })?);
         }
 
-        dkg_state.state = DKGState::Round1(result_secret_packages);
+        dkg_state.state.insert(
+            req.request_id.clone(),
+            DKGState::Round1(result_secret_packages),
+        );
 
         Ok(Response::new(DkgRound1Response {
             round1_packages: result_packages,
@@ -113,8 +117,8 @@ impl FrostService for FrostServer {
     ) -> Result<Response<DkgRound2Response>, Status> {
         let req = request.get_ref();
         let mut dkg_state = self.dkg_state.lock().unwrap();
-        let round1_secrets = match &dkg_state.state {
-            DKGState::Round1(secrets) => secrets,
+        let round1_secrets = match dkg_state.state.get(&req.request_id) {
+            Some(DKGState::Round1(secrets)) => secrets,
             _ => return Err(Status::internal("DKG state is not Round1")),
         };
         let round1_packages_maps = round1_package_maps_from_package_maps(&req.round1_packages_maps)
@@ -154,7 +158,10 @@ impl FrostService for FrostServer {
             });
         }
 
-        dkg_state.state = DKGState::Round2(result_secret_packages);
+        dkg_state.state.insert(
+            req.request_id.clone(),
+            DKGState::Round2(result_secret_packages),
+        );
 
         Ok(Response::new(DkgRound2Response {
             round2_packages: result_packages,
@@ -168,8 +175,8 @@ impl FrostService for FrostServer {
         let request = request.into_inner();
 
         let mut dkg_state = self.dkg_state.lock().unwrap();
-        let round2_secrets = match &dkg_state.state {
-            DKGState::Round2(secrets) => secrets.clone(),
+        let round2_secrets = match dkg_state.state.get(&request.request_id) {
+            Some(DKGState::Round2(secrets)) => secrets.clone(),
             _ => {
                 return Err(Status::internal(
                     "DKG state is not in Round2, cannot proceed with Round3",
@@ -219,7 +226,7 @@ impl FrostService for FrostServer {
             key_packages.push(key_package);
         }
 
-        dkg_state.state = DKGState::None;
+        dkg_state.state.remove(&request.request_id);
 
         Ok(Response::new(DkgRound3Response { key_packages }))
     }
