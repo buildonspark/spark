@@ -32,4 +32,4 @@ require (
 	google.golang.org/protobuf v1.34.2
 )
 
-replace github.com/lightsparkdev/spark-go/proto/frost => ./proto/frost
+replace github.com/lightsparkdev/spark-go/ => ./
