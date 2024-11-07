@@ -6,6 +6,7 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 	"sync"
+	"time"
 
 	frost "github.com/lightsparkdev/spark-go/frost"
 	pb "github.com/lightsparkdev/spark-go/proto"
@@ -22,10 +23,6 @@ const (
 	Round1Signature
 	// Round2 state after receiving round 2 packages
 	Round2
-	// Completed state when DKG process is finished
-	Completed
-	// Failed state if DKG process fails
-	Failed
 )
 
 type DkgState struct {
@@ -34,6 +31,7 @@ type DkgState struct {
 	Round1Package          [][]byte
 	ReceivedRound1Packages []map[string][]byte
 	ReceivedRound2Packages []map[string][]byte
+	CreatedAt              time.Time
 }
 
 type DkgStates struct {
@@ -68,8 +66,9 @@ func (s *DkgStates) InitiateDkg(requestId string, maxSigners uint64) error {
 	}
 
 	s.states[requestId] = &DkgState{
-		Type:        Initial,
-		MaxSigners:  maxSigners,
+		Type:       Initial,
+		MaxSigners: maxSigners,
+		CreatedAt:  time.Now(),
 	}
 
 	return nil
@@ -144,9 +143,7 @@ func (s *DkgStates) ReceivedRound1Signature(requestId string, selfIdentifier str
 	valid, validationFailures := ValidateRound1Signature(state.ReceivedRound1Packages, round1Signatures, publicKeyMap)
 	if !valid {
 		// Abort the DKG process
-		s.states[requestId] = &DkgState{
-			Type: Failed,
-		}
+		delete(s.states, requestId)
 
 		return validationFailures, nil
 	}
@@ -176,17 +173,16 @@ func (s *DkgStates) ReceivedRound2Packages(requestId string, identifier string, 
 	state.ReceivedRound2Packages = receivedRound2Packages
 
 	if int64(len(receivedRound2Packages[0])) == int64(state.MaxSigners) {
+		delete(s.states, requestId)
+
 		err := state.Round3(requestId, frostClient)
 		if err != nil {
 			return err
 		}
-
-		s.states[requestId] = &DkgState{
-			Type: Completed,
-		}
+	} else {
+		s.states[requestId] = state
 	}
 
-	s.states[requestId] = state
 	return nil
 }
 
@@ -217,4 +213,13 @@ func (s *DkgState) Round3(requestId string, frostClient *frost.FrostClient) erro
 	// TODO: store the response key in the db.
 
 	return nil
+}
+
+func (s *DkgStates) RemoveState(requestId string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, exists := s.states[requestId]; exists {
+		delete(s.states, requestId)
+	}
 }

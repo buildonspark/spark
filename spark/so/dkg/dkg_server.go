@@ -36,6 +36,7 @@ func (s *DkgServer) InitiateDkg(ctx context.Context, req *pb.InitiateDkgRequest)
 		KeyCount:   req.KeyCount,
 	})
 	if err != nil {
+		s.state.RemoveState(req.RequestId)
 		return nil, err
 	}
 
@@ -98,6 +99,7 @@ func (s *DkgServer) ReceivedRound1Signatures(ctx context.Context, req *pb.Round1
 		Round1PackagesMaps: round1PackagesMaps,
 	})
 	if err != nil {
+		s.state.RemoveState(req.RequestId)
 		return nil, err
 	}
 
