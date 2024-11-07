@@ -1,6 +1,7 @@
 package dkg
 
 import (
+	"bytes"
 	"fmt"
 	"sync"
 )
@@ -25,9 +26,9 @@ const (
 type DkgState struct {
 	Type DkgStateType
 	Round1Package [][]byte
-	ReceivedRound1Packages map[string][][]byte
+	ReceivedRound1Packages []map[string][]byte
 	Round2Package []map[string][]byte
-	ReceivedRound2Packages map[string][]map[string][]byte
+	ReceivedRound2Packages []map[string][]byte
 }
 
 type DkgStates struct {
@@ -71,6 +72,39 @@ func (s *DkgStates) ProvideRound1Package(requestId string, round1Package [][]byt
 
 	state.Round1Package = round1Package
 	state.Type = Round1
+	s.states[requestId] = state
+	return nil
+}
+
+func (s *DkgStates) ReceivedRound1Packages(requestId string, selfIdentifier string, round1Packages []map[string][]byte) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	state, ok := s.states[requestId]
+	if !ok {
+		return fmt.Errorf("dkg state does not exist for request id: %s", requestId)
+	}
+
+	if state.Type != Round1 {
+		return fmt.Errorf("dkg state is not in round 1 state for request id: %s", requestId)
+	}
+
+	if len(round1Packages) != len(state.Round1Package) {
+		return fmt.Errorf("received round 1 packages has wrong number of keys for request id: %s", requestId)
+	}
+
+	for i, p := range round1Packages {
+		selfPackage, ok := p[selfIdentifier]
+		if !ok {
+			return fmt.Errorf("self package is not included in round 1 packages for request id: %s", requestId)
+		}
+
+		if !bytes.Equal(state.Round1Package[i], selfPackage) {
+			return fmt.Errorf("round 1 package %d is not the same as the self package for request id: %s", i, requestId)
+		}
+	}
+
+	state.ReceivedRound1Packages = round1Packages
 	s.states[requestId] = state
 	return nil
 }

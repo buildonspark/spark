@@ -48,3 +48,24 @@ func (s *DkgServer) InitiateDkg(ctx context.Context, req *pb.InitiateDkgRequest)
 		Round1Package: round1Response.Round1Packages,
 	}, nil
 }
+
+func (s *DkgServer) ReceivedRound1Packages(ctx context.Context, req *pb.Round1PackagesRequest) (*pb.Round1PackagesResponse, error) {
+	round1Packages := make([]map[string][]byte, len(req.Round1Packages))
+	for i, p := range req.Round1Packages {
+		round1Packages[i] = p.Packages
+	}
+
+	if err := s.state.ReceivedRound1Packages(req.RequestId, s.config.Identifier, round1Packages); err != nil {
+		return nil, err
+	}
+
+	signature, err := SignRound1Packages(s.config.PrivateKey, round1Packages)
+	if err != nil {
+		return nil, err
+	}
+
+	return &pb.Round1PackagesResponse{
+		Identifier: s.config.Identifier,
+		Round1Signature: signature,
+	}, nil
+}
