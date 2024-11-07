@@ -296,14 +296,12 @@ func (x *DkgRound1Response) GetRound1Packages() [][]byte {
 	return nil
 }
 
-// A map of participant identifiers to their serialized round1 packages.
+// A map from a string to a bytes. It's a workaround to have map arrays in proto.
 type PackageMap struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	// The map of participant identifiers to their serialized packages. The identifier is a 32-byte
-	// hex string.
 	Packages map[string][]byte `protobuf:"bytes,1,rep,name=packages,proto3" json:"packages,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 }
 
