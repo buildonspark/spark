@@ -24,7 +24,7 @@ func NewDkgServer(frostClient frost.FrostClient, config *so.Config) *DkgServer {
 }
 
 func (s *DkgServer) InitiateDkg(ctx context.Context, req *pb.InitiateDkgRequest) (*pb.InitiateDkgResponse, error) {
-	if err := s.state.InitiateDkg(req.RequestId); err != nil {
+	if err := s.state.InitiateDkg(req.RequestId, req.MaxSigners); err != nil {
 		return nil, err
 	}
 
@@ -129,4 +129,12 @@ func (s *DkgServer) ReceivedRound1Signatures(ctx context.Context, req *pb.Round1
 	return &pb.Round1SignatureResponse{
 		Identifier: s.config.Identifier,
 	}, nil
+}
+
+func (s *DkgServer) ReceivedRound2Packages(ctx context.Context, req *pb.Round2PackagesRequest) (*pb.Round2PackagesResponse, error) {
+	if err := s.state.ReceivedRound2Packages(req.RequestId, s.config.Identifier, req.Round2Packages, req.Round2Signature, &s.frostClient); err != nil {
+		return nil, err
+	}
+
+	return &pb.Round2PackagesResponse{}, nil
 }

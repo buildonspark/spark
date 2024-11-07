@@ -2,9 +2,13 @@ package dkg
 
 import (
 	"bytes"
+	"context"
 	"crypto/ecdsa"
 	"fmt"
 	"sync"
+
+	frost "github.com/lightsparkdev/spark-go/frost"
+	pb "github.com/lightsparkdev/spark-go/proto"
 )
 
 type DkgStateType int
@@ -26,6 +30,7 @@ const (
 
 type DkgState struct {
 	Type                   DkgStateType
+	MaxSigners             uint64
 	Round1Package          [][]byte
 	ReceivedRound1Packages []map[string][]byte
 	ReceivedRound2Packages []map[string][]byte
@@ -54,7 +59,7 @@ func (s *DkgStates) GetState(requestId string) (*DkgState, error) {
 	return state, nil
 }
 
-func (s *DkgStates) InitiateDkg(requestId string) error {
+func (s *DkgStates) InitiateDkg(requestId string, maxSigners uint64) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -63,7 +68,8 @@ func (s *DkgStates) InitiateDkg(requestId string) error {
 	}
 
 	s.states[requestId] = &DkgState{
-		Type: Initial,
+		Type:        Initial,
+		MaxSigners:  maxSigners,
 	}
 
 	return nil
@@ -148,4 +154,67 @@ func (s *DkgStates) ReceivedRound1Signature(requestId string, selfIdentifier str
 	state.Type = Round2
 	s.states[requestId] = state
 	return nil, nil
+}
+
+func (s *DkgStates) ReceivedRound2Packages(requestId string, identifier string, round2Packages [][]byte, round2Signature []byte, frostClient *frost.FrostClient) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	state, ok := s.states[requestId]
+	if !ok {
+		return fmt.Errorf("dkg state does not exist for request id: %s", requestId)
+	}
+
+	if state.Type != Round2 {
+		return fmt.Errorf("dkg state is not in round 2 state for request id: %s", requestId)
+	}
+
+	receivedRound2Packages := state.ReceivedRound2Packages
+	for i, p := range round2Packages {
+		receivedRound2Packages[i][identifier] = p
+	}
+	state.ReceivedRound2Packages = receivedRound2Packages
+
+	if int64(len(receivedRound2Packages[0])) == int64(state.MaxSigners) {
+		err := state.Round3(requestId, frostClient)
+		if err != nil {
+			return err
+		}
+
+		s.states[requestId] = &DkgState{
+			Type: Completed,
+		}
+	}
+
+	s.states[requestId] = state
+	return nil
+}
+
+func (s *DkgState) Round3(requestId string, frostClient *frost.FrostClient) error {
+	round1PackagesMaps := make([]*pb.PackageMap, len(s.ReceivedRound1Packages))
+	for i, p := range s.ReceivedRound1Packages {
+		round1PackagesMaps[i] = &pb.PackageMap{
+			Packages: p,
+		}
+	}
+
+	round2PackagesMaps := make([]*pb.PackageMap, len(s.ReceivedRound2Packages))
+	for i, p := range s.ReceivedRound2Packages {
+		round2PackagesMaps[i] = &pb.PackageMap{
+			Packages: p,
+		}
+	}
+
+	_, err := frostClient.Client.DkgRound3(context.Background(), &pb.DkgRound3Request{
+		RequestId:          requestId,
+		Round1PackagesMaps: round1PackagesMaps,
+		Round2PackagesMaps: round2PackagesMaps,
+	})
+	if err != nil {
+		return err
+	}
+
+	// TODO: store the response key in the db.
+
+	return nil
 }
