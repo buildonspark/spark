@@ -2,6 +2,7 @@ package dkg
 
 import (
 	"bytes"
+	"crypto/ecdsa"
 	"fmt"
 	"sync"
 )
@@ -24,15 +25,14 @@ const (
 )
 
 type DkgState struct {
-	Type DkgStateType
-	Round1Package [][]byte
+	Type                   DkgStateType
+	Round1Package          [][]byte
 	ReceivedRound1Packages []map[string][]byte
-	Round2Package []map[string][]byte
 	ReceivedRound2Packages []map[string][]byte
 }
 
 type DkgStates struct {
-	mu sync.RWMutex
+	mu     sync.RWMutex
 	states map[string]*DkgState
 }
 
@@ -40,6 +40,18 @@ func NewDkgStates() *DkgStates {
 	return &DkgStates{
 		states: make(map[string]*DkgState),
 	}
+}
+
+func (s *DkgStates) GetState(requestId string) (*DkgState, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	state, ok := s.states[requestId]
+	if !ok {
+		return nil, fmt.Errorf("dkg state does not exist for request id: %s", requestId)
+	}
+
+	return state, nil
 }
 
 func (s *DkgStates) InitiateDkg(requestId string) error {
@@ -104,7 +116,36 @@ func (s *DkgStates) ReceivedRound1Packages(requestId string, selfIdentifier stri
 		}
 	}
 
+	state.Type = Round1Signature
 	state.ReceivedRound1Packages = round1Packages
 	s.states[requestId] = state
 	return nil
+}
+
+func (s *DkgStates) ReceivedRound1Signature(requestId string, selfIdentifier string, round1Signatures map[string][]byte, publicKeyMap map[string]ecdsa.PublicKey) ([]string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	state, ok := s.states[requestId]
+	if !ok {
+		return nil, fmt.Errorf("dkg state does not exist for request id: %s", requestId)
+	}
+
+	if state.Type != Round1Signature {
+		return nil, fmt.Errorf("dkg state is not in round 1 signature state for request id: %s", requestId)
+	}
+
+	valid, validationFailures := ValidateRound1Signature(state.ReceivedRound1Packages, round1Signatures, publicKeyMap)
+	if !valid {
+		// Abort the DKG process
+		s.states[requestId] = &DkgState{
+			Type: Failed,
+		}
+
+		return validationFailures, nil
+	}
+
+	state.Type = Round2
+	s.states[requestId] = state
+	return nil, nil
 }

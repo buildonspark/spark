@@ -11,15 +11,15 @@ import (
 type DkgServer struct {
 	pb.UnimplementedDKGServiceServer
 	frostClient frost.FrostClient
-	state      *DkgStates
-	config     *so.Config
+	state       *DkgStates
+	config      *so.Config
 }
 
 func NewDkgServer(frostClient frost.FrostClient, config *so.Config) *DkgServer {
 	return &DkgServer{
-		state:      &DkgStates{},
+		state:       &DkgStates{},
 		frostClient: frostClient,
-		config:     config,
+		config:      config,
 	}
 }
 
@@ -44,7 +44,7 @@ func (s *DkgServer) InitiateDkg(ctx context.Context, req *pb.InitiateDkgRequest)
 	}
 
 	return &pb.InitiateDkgResponse{
-		Identifier: s.config.Identifier,
+		Identifier:    s.config.Identifier,
 		Round1Package: round1Response.Round1Packages,
 	}, nil
 }
@@ -65,7 +65,68 @@ func (s *DkgServer) ReceivedRound1Packages(ctx context.Context, req *pb.Round1Pa
 	}
 
 	return &pb.Round1PackagesResponse{
-		Identifier: s.config.Identifier,
+		Identifier:      s.config.Identifier,
 		Round1Signature: signature,
+	}, nil
+}
+
+func (s *DkgServer) ReceivedRound1Signatures(ctx context.Context, req *pb.Round1SignatureRequest) (*pb.Round1SignatureResponse, error) {
+	validationFailures, err := s.state.ReceivedRound1Signature(req.RequestId, s.config.Identifier, req.Round1Signatures, s.config.PublicKeyMap)
+	if err != nil {
+		return nil, err
+	}
+
+	if validationFailures != nil && len(validationFailures) > 0 {
+		return &pb.Round1SignatureResponse{
+			Identifier:         s.config.Identifier,
+			ValidationFailures: validationFailures,
+		}, nil
+	}
+
+	state, err := s.state.GetState(req.RequestId)
+	if err != nil {
+		return nil, err
+	}
+
+	round1PackagesMaps := make([]*pb.PackageMap, len(state.ReceivedRound1Packages))
+	for i, p := range state.ReceivedRound1Packages {
+		round1PackagesMaps[i] = &pb.PackageMap{Packages: p}
+	}
+
+	round2Response, err := s.frostClient.Client.DkgRound2(ctx, &pb.DkgRound2Request{
+		RequestId:          req.RequestId,
+		Round1PackagesMaps: round1PackagesMaps,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	// Distribute the round 2 package to all participants
+	for addr := range s.config.SigningOperatorAddressMap {
+		client, err := NewDKGServiceClient(addr)
+		if err != nil {
+			return nil, err
+		}
+
+		round2Packages := make([][]byte, len(round2Response.Round2Packages))
+		for i, p := range round2Response.Round2Packages {
+			round2Packages[i] = p.Packages[s.config.Identifier]
+		}
+
+		round2Signature, err := SignRound2Packages(s.config.PrivateKey, round2Packages)
+		if err != nil {
+			return nil, err
+		}
+
+		client.Client.Round2Packages(ctx, &pb.Round2PackagesRequest{
+			RequestId:       req.RequestId,
+			Identifier:      s.config.Identifier,
+			Round2Packages:  round2Packages,
+			Round2Signature: round2Signature,
+		})
+	}
+
+	return &pb.Round1SignatureResponse{
+		Identifier: s.config.Identifier,
 	}, nil
 }

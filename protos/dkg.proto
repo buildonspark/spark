@@ -109,7 +109,7 @@ message Round1SignatureRequest {
     string request_id = 1;
 
     // The round1 package signatures from the participants.
-    repeated frost.PackageMap round1_signatures = 2;
+    map<string, bytes> round1_signatures = 2;
 }
 
 message Round1SignatureResponse {
