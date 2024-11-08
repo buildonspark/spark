@@ -5,6 +5,8 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"sort"
+
+	"github.com/lightsparkdev/spark-go/so"
 )
 
 func round1PackageHash(maps []map[string][]byte) []byte {
@@ -53,18 +55,18 @@ func SignRound1Packages(privateKey *ecdsa.PrivateKey, round1Packages []map[strin
 	return signHash(privateKey, hash)
 }
 
-func ValidateRound1Signature(round1Packages []map[string][]byte, round1Signatures map[string][]byte, publicKeyMap map[string]ecdsa.PublicKey) (bool, []string) {
+func ValidateRound1Signature(round1Packages []map[string][]byte, round1Signatures map[string][]byte, operatorMap map[string]*so.SigningOperator) (bool, []string) {
 	hash := round1PackageHash(round1Packages)
 
 	validationFailures := make([]string, 0)
-	for identifier, publicKey := range publicKeyMap {
+	for identifier, operator := range operatorMap {
 		signature, ok := round1Signatures[identifier]
 		if !ok {
 			validationFailures = append(validationFailures, identifier)
 			continue
 		}
 
-		if !ecdsa.VerifyASN1(&publicKey, hash, signature) {
+		if !ecdsa.VerifyASN1(operator.IdentityPublicKey, hash, signature) {
 			validationFailures = append(validationFailures, identifier)
 		}
 	}

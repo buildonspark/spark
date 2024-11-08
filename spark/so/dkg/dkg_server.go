@@ -2,6 +2,7 @@ package dkg
 
 import (
 	"context"
+	"sync"
 
 	frost "github.com/lightsparkdev/spark-go/frost"
 	pb "github.com/lightsparkdev/spark-go/proto"
@@ -60,7 +61,7 @@ func (s *DkgServer) ReceivedRound1Packages(ctx context.Context, req *pb.Round1Pa
 		return nil, err
 	}
 
-	signature, err := SignRound1Packages(s.config.PrivateKey, round1Packages)
+	signature, err := SignRound1Packages(s.config.IdentityPrivateKey, round1Packages)
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +73,7 @@ func (s *DkgServer) ReceivedRound1Packages(ctx context.Context, req *pb.Round1Pa
 }
 
 func (s *DkgServer) ReceivedRound1Signatures(ctx context.Context, req *pb.Round1SignatureRequest) (*pb.Round1SignatureResponse, error) {
-	validationFailures, err := s.state.ReceivedRound1Signature(req.RequestId, s.config.Identifier, req.Round1Signatures, s.config.PublicKeyMap)
+	validationFailures, err := s.state.ReceivedRound1Signature(req.RequestId, s.config.Identifier, req.Round1Signatures, s.config.SigningOperatorMap)
 	if err != nil {
 		return nil, err
 	}
@@ -103,30 +104,37 @@ func (s *DkgServer) ReceivedRound1Signatures(ctx context.Context, req *pb.Round1
 		return nil, err
 	}
 
+	var wg sync.WaitGroup
 	// Distribute the round 2 package to all participants
-	for addr := range s.config.SigningOperatorAddressMap {
-		client, err := NewDKGServiceClient(addr)
-		if err != nil {
-			return nil, err
-		}
+	for identifier, operator := range s.config.SigningOperatorMap {
+		wg.Add(1)
+		go func(identifier string, addr string) {
+			defer wg.Done()
+			client, err := NewDKGServiceClient(addr)
+			if err != nil {
+				return
+			}
 
-		round2Packages := make([][]byte, len(round2Response.Round2Packages))
-		for i, p := range round2Response.Round2Packages {
-			round2Packages[i] = p.Packages[s.config.Identifier]
-		}
+			round2Packages := make([][]byte, len(round2Response.Round2Packages))
+			for i, p := range round2Response.Round2Packages {
+				round2Packages[i] = p.Packages[identifier]
+			}
 
-		round2Signature, err := SignRound2Packages(s.config.PrivateKey, round2Packages)
-		if err != nil {
-			return nil, err
-		}
+			round2Signature, err := SignRound2Packages(s.config.IdentityPrivateKey, round2Packages)
+			if err != nil {
+				return
+			}
 
-		client.Client.Round2Packages(ctx, &pb.Round2PackagesRequest{
-			RequestId:       req.RequestId,
-			Identifier:      s.config.Identifier,
-			Round2Packages:  round2Packages,
-			Round2Signature: round2Signature,
-		})
+			go client.Client.Round2Packages(ctx, &pb.Round2PackagesRequest{
+				RequestId:       req.RequestId,
+				Identifier:      identifier,
+				Round2Packages:  round2Packages,
+				Round2Signature: round2Signature,
+			})
+		}(identifier, operator.Address)
 	}
+
+	wg.Wait()
 
 	return &pb.Round1SignatureResponse{
 		Identifier: s.config.Identifier,

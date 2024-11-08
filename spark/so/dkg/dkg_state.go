@@ -3,13 +3,13 @@ package dkg
 import (
 	"bytes"
 	"context"
-	"crypto/ecdsa"
 	"fmt"
 	"sync"
 	"time"
 
 	frost "github.com/lightsparkdev/spark-go/frost"
 	pb "github.com/lightsparkdev/spark-go/proto"
+	"github.com/lightsparkdev/spark-go/so"
 )
 
 type DkgStateType int
@@ -127,7 +127,7 @@ func (s *DkgStates) ReceivedRound1Packages(requestId string, selfIdentifier stri
 	return nil
 }
 
-func (s *DkgStates) ReceivedRound1Signature(requestId string, selfIdentifier string, round1Signatures map[string][]byte, publicKeyMap map[string]ecdsa.PublicKey) ([]string, error) {
+func (s *DkgStates) ReceivedRound1Signature(requestId string, selfIdentifier string, round1Signatures map[string][]byte, operatorMap map[string]*so.SigningOperator) ([]string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -140,7 +140,7 @@ func (s *DkgStates) ReceivedRound1Signature(requestId string, selfIdentifier str
 		return nil, fmt.Errorf("dkg state is not in round 1 signature state for request id: %s", requestId)
 	}
 
-	valid, validationFailures := ValidateRound1Signature(state.ReceivedRound1Packages, round1Signatures, publicKeyMap)
+	valid, validationFailures := ValidateRound1Signature(state.ReceivedRound1Packages, round1Signatures, operatorMap)
 	if !valid {
 		// Abort the DKG process
 		delete(s.states, requestId)
