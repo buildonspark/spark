@@ -1,11 +1,10 @@
 package dkg
 
 import (
-	"crypto/ecdsa"
-	"crypto/rand"
 	"crypto/sha256"
 	"sort"
 
+	"github.com/decred/dcrd/dcrec/secp256k1"
 	"github.com/lightsparkdev/spark-go/so"
 )
 
@@ -40,17 +39,19 @@ func round1PackageHash(maps []map[string][]byte) []byte {
 	return finalHasher.Sum(nil)
 }
 
-func signHash(privateKey *ecdsa.PrivateKey, hash []byte) ([]byte, error) {
+func signHash(privateKey []byte, hash []byte) ([]byte, error) {
+	priv, _ := secp256k1.PrivKeyFromBytes(privateKey)
+
 	// Sign the hash
-	sig, err := ecdsa.SignASN1(rand.Reader, privateKey, hash)
+	sig, err := priv.Sign(hash)
 	if err != nil {
 		return nil, err
 	}
 
-	return sig, nil
+	return sig.Serialize(), nil
 }
 
-func SignRound1Packages(privateKey *ecdsa.PrivateKey, round1Packages []map[string][]byte) ([]byte, error) {
+func SignRound1Packages(privateKey []byte, round1Packages []map[string][]byte) ([]byte, error) {
 	hash := round1PackageHash(round1Packages)
 	return signHash(privateKey, hash)
 }
@@ -66,7 +67,19 @@ func ValidateRound1Signature(round1Packages []map[string][]byte, round1Signature
 			continue
 		}
 
-		if !ecdsa.VerifyASN1(operator.IdentityPublicKey, hash, signature) {
+		pub, err := secp256k1.ParsePubKey(operator.IdentityPublicKey)
+		if err != nil {
+			validationFailures = append(validationFailures, identifier)
+			continue
+		}
+
+		sig, err := secp256k1.ParseDERSignature(signature)
+		if err != nil {
+			validationFailures = append(validationFailures, identifier)
+			continue
+		}
+
+		if !sig.Verify(hash, pub) {
 			validationFailures = append(validationFailures, identifier)
 		}
 	}
@@ -82,7 +95,7 @@ func round2PackageHash(round2Packages [][]byte) []byte {
 	return hasher.Sum(nil)
 }
 
-func SignRound2Packages(privateKey *ecdsa.PrivateKey, round2Packages [][]byte) ([]byte, error) {
+func SignRound2Packages(privateKey []byte, round2Packages [][]byte) ([]byte, error) {
 	hash := round2PackageHash(round2Packages)
 	return signHash(privateKey, hash)
 }
