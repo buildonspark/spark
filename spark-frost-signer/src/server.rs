@@ -51,6 +51,7 @@ impl FrostService for FrostServer {
         &self,
         request: Request<DkgRound1Request>,
     ) -> Result<Response<DkgRound1Response>, Status> {
+        tracing::info!("Received DKG round 1 request");
         let req = request.get_ref();
         if req.min_signers > req.max_signers {
             return Err(Status::invalid_argument(
@@ -115,6 +116,7 @@ impl FrostService for FrostServer {
         &self,
         request: Request<DkgRound2Request>,
     ) -> Result<Response<DkgRound2Response>, Status> {
+        tracing::info!("Received DKG round 2 request");
         let req = request.get_ref();
         let mut dkg_state = self.dkg_state.lock().unwrap();
         let round1_secrets = match dkg_state.state.get(&req.request_id) {
@@ -172,6 +174,7 @@ impl FrostService for FrostServer {
         &self,
         request: Request<DkgRound3Request>,
     ) -> Result<Response<DkgRound3Response>, Status> {
+        tracing::info!("Received DKG round 3 request");
         let request = request.into_inner();
 
         let mut dkg_state = self.dkg_state.lock().unwrap();
