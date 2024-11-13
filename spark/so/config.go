@@ -14,9 +14,10 @@ type Config struct {
 	SigningOperatorMap map[string]*SigningOperator
 	Threshold          uint64
 	SignerAddress      string
+	DatabasePath       string
 }
 
-func NewConfig(index uint64, identityPrivateKey string, operatorsFilePath string, threshold uint64, signerAddress string) (*Config, error) {
+func NewConfig(index uint64, identityPrivateKey string, operatorsFilePath string, threshold uint64, signerAddress string, databasePath string) (*Config, error) {
 	identityPrivateKeyBytes, err := hex.DecodeString(identityPrivateKey)
 	if err != nil {
 		return nil, err
@@ -33,6 +34,7 @@ func NewConfig(index uint64, identityPrivateKey string, operatorsFilePath string
 		SigningOperatorMap: signingOperatorMap,
 		Threshold:          threshold,
 		SignerAddress:      signerAddress,
+		DatabasePath:       databasePath,
 	}, nil
 }
 

@@ -21,6 +21,7 @@ type Args struct {
 	Threshold          uint64
 	SignerAddress      string
 	Port               uint64
+	DatabasePath       string
 }
 
 func loadArgs() (*Args, error) {
@@ -33,7 +34,7 @@ func loadArgs() (*Args, error) {
 	flag.Uint64Var(&args.Threshold, "threshold", 0, "Threshold value")
 	flag.StringVar(&args.SignerAddress, "signer", "", "Signer address")
 	flag.Uint64Var(&args.Port, "port", 0, "Port value")
-
+	flag.StringVar(&args.DatabasePath, "database", "", "Path to database file")
 	// Parse flags
 	flag.Parse()
 
@@ -53,6 +54,10 @@ func loadArgs() (*Args, error) {
 		return nil, errors.New("port is required")
 	}
 
+	if args.DatabasePath == "" {
+		return nil, errors.New("database path is required")
+	}
+
 	return args, nil
 }
 
@@ -62,7 +67,7 @@ func main() {
 		log.Fatalf("Failed to load args: %v", err)
 	}
 
-	config, err := so.NewConfig(args.Index, args.IdentityPrivateKey, args.OperatorsFilePath, args.Threshold, args.SignerAddress)
+	config, err := so.NewConfig(args.Index, args.IdentityPrivateKey, args.OperatorsFilePath, args.Threshold, args.SignerAddress, args.DatabasePath)
 	if err != nil {
 		log.Fatalf("Failed to create config: %v", err)
 	}
