@@ -9,7 +9,7 @@ import (
 
 func TestEcho(t *testing.T) {
 	// Create a temporary socket file
-	socketPath := "/tmp/frost.sock"
+	socketPath := "unix:///tmp/frost.sock"
 
 	// Initialize client
 	client, err := NewFrostClient(socketPath)

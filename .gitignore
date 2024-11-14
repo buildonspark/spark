@@ -24,3 +24,6 @@ go.work.sum
 
 # MacOS
 .DS_Store
+
+# Data directory
+_data/

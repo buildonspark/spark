@@ -15,12 +15,10 @@ type FrostClient struct {
 }
 
 // NewClient creates a new FROST client connected to the given Unix socket
-func NewFrostClient(socketPath string) (*FrostClient, error) {
-	target := "unix://" + socketPath
-
+func NewFrostClient(path string) (*FrostClient, error) {
 	// Create connection with minimal options
 	conn, err := grpc.NewClient(
-		target,
+		path,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	if err != nil {
