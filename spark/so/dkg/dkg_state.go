@@ -65,6 +65,10 @@ func (s *DkgStates) InitiateDkg(requestId string, maxSigners uint64) error {
 		return fmt.Errorf("dkg state already exists for request id: %s", requestId)
 	}
 
+	if s.states == nil {
+		s.states = make(map[string]*DkgState)
+	}
+
 	s.states[requestId] = &DkgState{
 		Type:       Initial,
 		MaxSigners: maxSigners,

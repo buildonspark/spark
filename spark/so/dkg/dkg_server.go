@@ -2,6 +2,7 @@ package dkg
 
 import (
 	"context"
+	"log"
 	"sync"
 
 	frost "github.com/lightsparkdev/spark-go/frost"
@@ -25,7 +26,9 @@ func NewDkgServer(frostClient frost.FrostClient, config *so.Config) *DkgServer {
 }
 
 func (s *DkgServer) InitiateDkg(ctx context.Context, req *pb.InitiateDkgRequest) (*pb.InitiateDkgResponse, error) {
+	log.Println("initiate dkg", req.RequestId, req.MaxSigners)
 	if err := s.state.InitiateDkg(req.RequestId, req.MaxSigners); err != nil {
+		log.Println("error initiating dkg", err)
 		return nil, err
 	}
 
@@ -37,11 +40,14 @@ func (s *DkgServer) InitiateDkg(ctx context.Context, req *pb.InitiateDkgRequest)
 		KeyCount:   req.KeyCount,
 	})
 	if err != nil {
+		log.Println("error in dkg round 1", err)
 		s.state.RemoveState(req.RequestId)
 		return nil, err
 	}
 
 	if err := s.state.ProvideRound1Package(req.RequestId, round1Response.Round1Packages); err != nil {
+		log.Println("error providing round 1 package", err)
+		s.state.RemoveState(req.RequestId)
 		return nil, err
 	}
 
@@ -51,7 +57,8 @@ func (s *DkgServer) InitiateDkg(ctx context.Context, req *pb.InitiateDkgRequest)
 	}, nil
 }
 
-func (s *DkgServer) ReceivedRound1Packages(ctx context.Context, req *pb.Round1PackagesRequest) (*pb.Round1PackagesResponse, error) {
+func (s *DkgServer) Round1Packages(ctx context.Context, req *pb.Round1PackagesRequest) (*pb.Round1PackagesResponse, error) {
+	log.Println("round 1 packages", req.RequestId, req.Round1Packages)
 	round1Packages := make([]map[string][]byte, len(req.Round1Packages))
 	for i, p := range req.Round1Packages {
 		round1Packages[i] = p.Packages
@@ -72,7 +79,8 @@ func (s *DkgServer) ReceivedRound1Packages(ctx context.Context, req *pb.Round1Pa
 	}, nil
 }
 
-func (s *DkgServer) ReceivedRound1Signatures(ctx context.Context, req *pb.Round1SignatureRequest) (*pb.Round1SignatureResponse, error) {
+func (s *DkgServer) Round1Signature(ctx context.Context, req *pb.Round1SignatureRequest) (*pb.Round1SignatureResponse, error) {
+	log.Println("round 1 signature", req.RequestId, req.Round1Signatures)
 	validationFailures, err := s.state.ReceivedRound1Signature(req.RequestId, s.config.Identifier, req.Round1Signatures, s.config.SigningOperatorMap)
 	if err != nil {
 		return nil, err
@@ -92,6 +100,7 @@ func (s *DkgServer) ReceivedRound1Signatures(ctx context.Context, req *pb.Round1
 
 	round1PackagesMaps := make([]*pb.PackageMap, len(state.ReceivedRound1Packages))
 	for i, p := range state.ReceivedRound1Packages {
+		delete(p, s.config.Identifier)
 		round1PackagesMaps[i] = &pb.PackageMap{Packages: p}
 	}
 
@@ -141,7 +150,8 @@ func (s *DkgServer) ReceivedRound1Signatures(ctx context.Context, req *pb.Round1
 	}, nil
 }
 
-func (s *DkgServer) ReceivedRound2Packages(ctx context.Context, req *pb.Round2PackagesRequest) (*pb.Round2PackagesResponse, error) {
+func (s *DkgServer) Round2Packages(ctx context.Context, req *pb.Round2PackagesRequest) (*pb.Round2PackagesResponse, error) {
+	log.Println("round 2 packages", req.RequestId, req.Round2Packages, req.Round2Signature)
 	if err := s.state.ReceivedRound2Packages(req.RequestId, s.config.Identifier, req.Round2Packages, req.Round2Signature, &s.frostClient); err != nil {
 		return nil, err
 	}

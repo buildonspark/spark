@@ -205,7 +205,7 @@ run_operators_tmux() {
        # Construct paths
        local log_file="${run_dir}/logs/operator_${i}.log"
        local db_file="${run_dir}/db/operator_${i}.sqlite"
-       local signer_socket="/tmp/frost_${i}.sock"
+       local signer_socket="unix:///tmp/frost_${i}.sock"
        
        # Construct the command with all parameters
        local cmd="${run_dir}/bin/operator \

@@ -9,7 +9,7 @@ import (
 	"github.com/lightsparkdev/spark-go/so"
 )
 
-func GenerateKeys(config *so.Config, keyCount uint64, threshold uint64) error {
+func GenerateKeys(config *so.Config, keyCount uint64) error {
 	// Init clients
 	clientMap := make(map[string]*DkgClient)
 	for identifier, operator := range config.SigningOperatorMap {
@@ -25,7 +25,7 @@ func GenerateKeys(config *so.Config, keyCount uint64, threshold uint64) error {
 	initRequest := &pb.InitiateDkgRequest{
 		RequestId:  requestId,
 		KeyCount:   keyCount,
-		MinSigners: threshold,
+		MinSigners: config.Threshold,
 		MaxSigners: uint64(len(config.SigningOperatorMap)),
 	}
 
