@@ -2,7 +2,7 @@ package dkg
 
 import (
 	"context"
-	"fmt"
+	"sync"
 
 	"github.com/google/uuid"
 	pb "github.com/lightsparkdev/spark-go/proto"
@@ -61,21 +61,29 @@ func GenerateKeys(config *so.Config, keyCount uint64) error {
 		round1Signatures[round1SignatureResponse.Identifier] = round1SignatureResponse.Round1Signature
 	}
 
+	wg := sync.WaitGroup{}
+
 	// Round 1 Signature Delivery
 	for _, client := range clientMap {
-		round1SignatureRequest := &pb.Round1SignatureRequest{
-			RequestId:        requestId,
-			Round1Signatures: round1Signatures,
-		}
-		round1SignatureResponse, err := client.Client.Round1Signature(context.Background(), round1SignatureRequest)
-		if err != nil {
-			return err
-		}
+		wg.Add(1)
+		go func(client *DkgClient) {
+			defer wg.Done()
+			round1SignatureRequest := &pb.Round1SignatureRequest{
+				RequestId:        requestId,
+				Round1Signatures: round1Signatures,
+			}
+			round1SignatureResponse, err := client.Client.Round1Signature(context.Background(), round1SignatureRequest)
+			if err != nil {
+				return
+			}
 
-		if len(round1SignatureResponse.ValidationFailures) > 0 {
-			return fmt.Errorf("validation failures: %v", round1SignatureResponse.ValidationFailures)
-		}
+			if len(round1SignatureResponse.ValidationFailures) > 0 {
+				return
+			}
+		}(client)
 	}
+
+	wg.Wait()
 
 	return nil
 }

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"log"
 	"sync"
 	"time"
 
@@ -166,17 +167,24 @@ func (s *DkgStates) ReceivedRound2Packages(requestId string, identifier string, 
 		return fmt.Errorf("dkg state does not exist for request id: %s", requestId)
 	}
 
-	if state.Type != Round2 {
-		return fmt.Errorf("dkg state is not in round 2 state for request id: %s", requestId)
+	if state.Type != Round2 && state.Type != Round1Signature {
+		return fmt.Errorf("dkg state is not in round 2 or round 1 signature state for request id: %s", requestId)
 	}
 
-	receivedRound2Packages := state.ReceivedRound2Packages
+	if len(state.ReceivedRound2Packages) == 0 {
+		log.Printf("Making new received round 2 packages")
+		state.ReceivedRound2Packages = make([]map[string][]byte, len(round2Packages))
+		for i := range state.ReceivedRound2Packages {
+			state.ReceivedRound2Packages[i] = make(map[string][]byte)
+		}
+	}
+
 	for i, p := range round2Packages {
-		receivedRound2Packages[i][identifier] = p
+		state.ReceivedRound2Packages[i][identifier] = p
 	}
-	state.ReceivedRound2Packages = receivedRound2Packages
 
-	if int64(len(receivedRound2Packages[0])) == int64(state.MaxSigners) {
+	log.Printf("Received round 2 packages: %v", len(state.ReceivedRound2Packages[0]))
+	if int64(len(state.ReceivedRound2Packages[0])) == int64(state.MaxSigners-1) {
 		delete(s.states, requestId)
 
 		err := state.Round3(requestId, frostClient)
@@ -191,6 +199,7 @@ func (s *DkgStates) ReceivedRound2Packages(requestId string, identifier string, 
 }
 
 func (s *DkgState) Round3(requestId string, frostClient *frost.FrostClient) error {
+	log.Printf("Round 3")
 	round1PackagesMaps := make([]*pb.PackageMap, len(s.ReceivedRound1Packages))
 	for i, p := range s.ReceivedRound1Packages {
 		round1PackagesMaps[i] = &pb.PackageMap{
@@ -205,13 +214,18 @@ func (s *DkgState) Round3(requestId string, frostClient *frost.FrostClient) erro
 		}
 	}
 
-	_, err := frostClient.Client.DkgRound3(context.Background(), &pb.DkgRound3Request{
+	response, err := frostClient.Client.DkgRound3(context.Background(), &pb.DkgRound3Request{
 		RequestId:          requestId,
 		Round1PackagesMaps: round1PackagesMaps,
 		Round2PackagesMaps: round2PackagesMaps,
 	})
 	if err != nil {
+		log.Printf("Error in round 3: %v", err)
 		return err
+	}
+
+	for _, key := range response.KeyPackages {
+		log.Printf("Public key: %x", key.PublicKey)
 	}
 
 	// TODO: store the response key in the db.

@@ -58,7 +58,7 @@ func (s *DkgServer) InitiateDkg(ctx context.Context, req *pb.InitiateDkgRequest)
 }
 
 func (s *DkgServer) Round1Packages(ctx context.Context, req *pb.Round1PackagesRequest) (*pb.Round1PackagesResponse, error) {
-	log.Println("round 1 packages", req.RequestId, req.Round1Packages)
+	log.Println("round 1 packages", req.RequestId)
 	round1Packages := make([]map[string][]byte, len(req.Round1Packages))
 	for i, p := range req.Round1Packages {
 		round1Packages[i] = p.Packages
@@ -80,7 +80,7 @@ func (s *DkgServer) Round1Packages(ctx context.Context, req *pb.Round1PackagesRe
 }
 
 func (s *DkgServer) Round1Signature(ctx context.Context, req *pb.Round1SignatureRequest) (*pb.Round1SignatureResponse, error) {
-	log.Println("round 1 signature", req.RequestId, req.Round1Signatures)
+	log.Println("round 1 signature", req.RequestId)
 	validationFailures, err := s.state.ReceivedRound1Signature(req.RequestId, s.config.Identifier, req.Round1Signatures, s.config.SigningOperatorMap)
 	if err != nil {
 		return nil, err
@@ -118,9 +118,11 @@ func (s *DkgServer) Round1Signature(ctx context.Context, req *pb.Round1Signature
 	for identifier, operator := range s.config.SigningOperatorMap {
 		wg.Add(1)
 		go func(identifier string, addr string) {
+			log.Println("distributing round 2 package to", identifier, addr)
 			defer wg.Done()
 			client, err := NewDKGServiceClient(addr)
 			if err != nil {
+				log.Println("error creating dkg service client", err)
 				return
 			}
 
@@ -131,15 +133,20 @@ func (s *DkgServer) Round1Signature(ctx context.Context, req *pb.Round1Signature
 
 			round2Signature, err := SignRound2Packages(s.config.IdentityPrivateKey, round2Packages)
 			if err != nil {
+				log.Println("error signing round 2 packages", err)
 				return
 			}
 
-			go client.Client.Round2Packages(ctx, &pb.Round2PackagesRequest{
+			_, err = client.Client.Round2Packages(ctx, &pb.Round2PackagesRequest{
 				RequestId:       req.RequestId,
-				Identifier:      identifier,
+				Identifier:      s.config.Identifier,
 				Round2Packages:  round2Packages,
 				Round2Signature: round2Signature,
 			})
+			if err != nil {
+				log.Println("error sending round 2 packages", err)
+				return
+			}
 		}(identifier, operator.Address)
 	}
 
@@ -151,8 +158,12 @@ func (s *DkgServer) Round1Signature(ctx context.Context, req *pb.Round1Signature
 }
 
 func (s *DkgServer) Round2Packages(ctx context.Context, req *pb.Round2PackagesRequest) (*pb.Round2PackagesResponse, error) {
-	log.Println("round 2 packages", req.RequestId, req.Round2Packages, req.Round2Signature)
-	if err := s.state.ReceivedRound2Packages(req.RequestId, s.config.Identifier, req.Round2Packages, req.Round2Signature, &s.frostClient); err != nil {
+	log.Println("round 2 packages", req.RequestId, req.Identifier)
+	if req.Identifier == s.config.Identifier {
+		return &pb.Round2PackagesResponse{}, nil
+	}
+
+	if err := s.state.ReceivedRound2Packages(req.RequestId, req.Identifier, req.Round2Packages, req.Round2Signature, &s.frostClient); err != nil {
 		return nil, err
 	}
 
