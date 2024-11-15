@@ -2,9 +2,11 @@ package dkg
 
 import (
 	"crypto/sha256"
+	"encoding/binary"
 	"sort"
 
 	"github.com/decred/dcrd/dcrec/secp256k1"
+	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/so"
 )
 
@@ -98,4 +100,11 @@ func round2PackageHash(round2Packages [][]byte) []byte {
 func SignRound2Packages(privateKey []byte, round2Packages [][]byte) ([]byte, error) {
 	hash := round2PackageHash(round2Packages)
 	return signHash(privateKey, hash)
+}
+
+func DeriveKeyIndex(batchId uuid.UUID, index uint16) uuid.UUID {
+    derivedID := batchId
+    // Write the index to the last 2 bytes
+    binary.BigEndian.PutUint16(derivedID[14:], index)
+    return derivedID
 }
