@@ -26,8 +26,8 @@ func NewDkgServer(frostClient frost.FrostClient, config *so.Config) *DkgServer {
 }
 
 func (s *DkgServer) InitiateDkg(ctx context.Context, req *pb.InitiateDkgRequest) (*pb.InitiateDkgResponse, error) {
-	log.Println("initiate dkg", req.RequestId, req.MaxSigners)
-	if err := s.state.InitiateDkg(req.RequestId, req.MaxSigners); err != nil {
+	log.Println("initiate dkg", req.RequestId, req.MaxSigners, req.MinSigners)
+	if err := s.state.InitiateDkg(req.RequestId, req.MaxSigners, req.MinSigners); err != nil {
 		log.Println("error initiating dkg", err)
 		return nil, err
 	}
@@ -113,7 +113,7 @@ func (s *DkgServer) Round1Signature(ctx context.Context, req *pb.Round1Signature
 		return nil, err
 	}
 
-	if err := s.state.ProceedToRound3(req.RequestId, &s.frostClient); err != nil {
+	if err := s.state.ProceedToRound3(req.RequestId, &s.frostClient, s.config); err != nil {
 		return nil, err
 	}
 
@@ -168,7 +168,7 @@ func (s *DkgServer) Round2Packages(ctx context.Context, req *pb.Round2PackagesRe
 		return &pb.Round2PackagesResponse{}, nil
 	}
 
-	if err := s.state.ReceivedRound2Packages(req.RequestId, req.Identifier, req.Round2Packages, req.Round2Signature, &s.frostClient); err != nil {
+	if err := s.state.ReceivedRound2Packages(req.RequestId, req.Identifier, req.Round2Packages, req.Round2Signature, &s.frostClient, s.config); err != nil {
 		return nil, err
 	}
 

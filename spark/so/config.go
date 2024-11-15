@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"os"
+	"strings"
 
 	"github.com/lightsparkdev/spark-go/so/utils"
 )
@@ -15,6 +16,14 @@ type Config struct {
 	Threshold          uint64
 	SignerAddress      string
 	DatabasePath       string
+}
+
+func (c *Config) DatabaseDriver() string {
+	if strings.HasSuffix(c.DatabasePath, ".sqlite") {
+		return "sqlite3"
+	} else {
+		return "postgres"
+	}
 }
 
 func NewConfig(index uint64, identityPrivateKey string, operatorsFilePath string, threshold uint64, signerAddress string, databasePath string) (*Config, error) {

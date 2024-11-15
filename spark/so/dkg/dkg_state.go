@@ -8,9 +8,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	frost "github.com/lightsparkdev/spark-go/frost"
 	pb "github.com/lightsparkdev/spark-go/proto"
 	"github.com/lightsparkdev/spark-go/so"
+	"github.com/lightsparkdev/spark-go/so/ent"
+	"github.com/lightsparkdev/spark-go/so/ent/schema"
+
+	_ "github.com/mattn/go-sqlite3"
 )
 
 type DkgStateType int
@@ -29,6 +34,7 @@ const (
 type DkgState struct {
 	Type                   DkgStateType
 	MaxSigners             uint64
+	MinSigners             uint64
 	Round1Package          [][]byte
 	ReceivedRound1Packages []map[string][]byte
 	ReceivedRound2Packages []map[string][]byte
@@ -58,7 +64,7 @@ func (s *DkgStates) GetState(requestId string) (*DkgState, error) {
 	return state, nil
 }
 
-func (s *DkgStates) InitiateDkg(requestId string, maxSigners uint64) error {
+func (s *DkgStates) InitiateDkg(requestId string, maxSigners uint64, minSigners uint64) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -73,6 +79,7 @@ func (s *DkgStates) InitiateDkg(requestId string, maxSigners uint64) error {
 	s.states[requestId] = &DkgState{
 		Type:       Initial,
 		MaxSigners: maxSigners,
+		MinSigners: minSigners,
 		CreatedAt:  time.Now(),
 	}
 
@@ -159,7 +166,7 @@ func (s *DkgStates) ReceivedRound1Signature(requestId string, selfIdentifier str
 	return nil, nil
 }
 
-func (s *DkgStates) ReceivedRound2Packages(requestId string, identifier string, round2Packages [][]byte, round2Signature []byte, frostClient *frost.FrostClient) error {
+func (s *DkgStates) ReceivedRound2Packages(requestId string, identifier string, round2Packages [][]byte, round2Signature []byte, frostClient *frost.FrostClient, config *so.Config) error {
 	s.mu.Lock()
 
 	state, ok := s.states[requestId]
@@ -187,7 +194,7 @@ func (s *DkgStates) ReceivedRound2Packages(requestId string, identifier string, 
 	s.states[requestId] = state
 	s.mu.Unlock()
 
-	err := s.ProceedToRound3(requestId, frostClient)
+	err := s.ProceedToRound3(requestId, frostClient, config)
 	if err != nil {
 		return err
 	}
@@ -195,7 +202,7 @@ func (s *DkgStates) ReceivedRound2Packages(requestId string, identifier string, 
 	return nil
 }
 
-func (s *DkgStates) ProceedToRound3(requestId string, frostClient *frost.FrostClient) error {
+func (s *DkgStates) ProceedToRound3(requestId string, frostClient *frost.FrostClient, config *so.Config) error {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -210,7 +217,7 @@ func (s *DkgStates) ProceedToRound3(requestId string, frostClient *frost.FrostCl
 	if int64(len(state.ReceivedRound2Packages[0])) == int64(state.MaxSigners-1) && state.Type == Round2 {
 		delete(s.states, requestId)
 
-		err := state.Round3(requestId, frostClient)
+		err := state.Round3(requestId, frostClient, config)
 		if err != nil {
 			return err
 		}
@@ -218,7 +225,7 @@ func (s *DkgStates) ProceedToRound3(requestId string, frostClient *frost.FrostCl
 	return nil
 }
 
-func (s *DkgState) Round3(requestId string, frostClient *frost.FrostClient) error {
+func (s *DkgState) Round3(requestId string, frostClient *frost.FrostClient, config *so.Config) error {
 	log.Printf("Round 3")
 	round1PackagesMaps := make([]*pb.PackageMap, len(s.ReceivedRound1Packages))
 	for i, p := range s.ReceivedRound1Packages {
@@ -244,11 +251,27 @@ func (s *DkgState) Round3(requestId string, frostClient *frost.FrostClient) erro
 		return err
 	}
 
-	for _, key := range response.KeyPackages {
-		log.Printf("Public key: %x", key.PublicKey)
+	dbClient, err := ent.Open(config.DatabaseDriver(), config.DatabasePath)
+	if err != nil {
+		return err
 	}
+	defer dbClient.Close()
 
-	// TODO: store the response key in the db.
+	for i, key := range response.KeyPackages {
+		batchID, err := uuid.Parse(requestId)
+		if err != nil {
+			return err
+		}
+		keyID := DeriveKeyIndex(batchID, uint16(i))
+		dbClient.SigningKeyshare.Create().
+			SetID(keyID).
+			SetStatus(schema.KeyshareStatusAvailable).
+			SetMinSigners(uint32(s.MinSigners)).
+			SetSecretShare(key.SecretShare).
+			SetPublicShares(key.PublicShares).
+			SetPublicKey(key.PublicKey).
+			SaveX(context.Background())
+	}
 
 	return nil
 }

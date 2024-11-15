@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	pb "github.com/lightsparkdev/spark-go/proto"
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/dkg"
+	"github.com/lightsparkdev/spark-go/so/ent"
 	"google.golang.org/grpc"
 )
 
@@ -70,6 +72,16 @@ func main() {
 	config, err := so.NewConfig(args.Index, args.IdentityPrivateKey, args.OperatorsFilePath, args.Threshold, args.SignerAddress, args.DatabasePath)
 	if err != nil {
 		log.Fatalf("Failed to create config: %v", err)
+	}
+
+	dbClient, err := ent.Open(config.DatabaseDriver(), config.DatabasePath+"?_fk=1")
+	if err != nil {
+		log.Fatalf("Failed to create database client: %v", err)
+	}
+	defer dbClient.Close()
+
+	if err := dbClient.Schema.Create(context.Background()); err != nil {
+		log.Fatalf("failed creating schema resources: %v", err)
 	}
 
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", args.Port))
