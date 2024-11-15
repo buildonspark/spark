@@ -155,12 +155,12 @@ func (s *DkgStates) ReceivedRound1Signature(requestId string, selfIdentifier str
 
 	state.Type = Round2
 	s.states[requestId] = state
+
 	return nil, nil
 }
 
 func (s *DkgStates) ReceivedRound2Packages(requestId string, identifier string, round2Packages [][]byte, round2Signature []byte, frostClient *frost.FrostClient) error {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 
 	state, ok := s.states[requestId]
 	if !ok {
@@ -184,17 +184,37 @@ func (s *DkgStates) ReceivedRound2Packages(requestId string, identifier string, 
 	}
 
 	log.Printf("Received round 2 packages: %v", len(state.ReceivedRound2Packages[0]))
-	if int64(len(state.ReceivedRound2Packages[0])) == int64(state.MaxSigners-1) {
+	s.states[requestId] = state
+	s.mu.Unlock()
+
+	err := s.ProceedToRound3(requestId, frostClient)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *DkgStates) ProceedToRound3(requestId string, frostClient *frost.FrostClient) error {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	state, ok := s.states[requestId]
+	if !ok {
+		return fmt.Errorf("dkg state does not exist for request id: %s", requestId)
+	}
+
+	if len(state.ReceivedRound2Packages) == 0 {
+		return nil
+	}
+	if int64(len(state.ReceivedRound2Packages[0])) == int64(state.MaxSigners-1) && state.Type == Round2 {
 		delete(s.states, requestId)
 
 		err := state.Round3(requestId, frostClient)
 		if err != nil {
 			return err
 		}
-	} else {
-		s.states[requestId] = state
 	}
-
 	return nil
 }
 

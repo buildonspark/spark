@@ -113,9 +113,14 @@ func (s *DkgServer) Round1Signature(ctx context.Context, req *pb.Round1Signature
 		return nil, err
 	}
 
+	if err := s.state.ProceedToRound3(req.RequestId, &s.frostClient); err != nil {
+		return nil, err
+	}
+
 	var wg sync.WaitGroup
 	// Distribute the round 2 package to all participants
-	for identifier, operator := range s.config.SigningOperatorMap {
+	for identifier, _ := range round2Response.Round2Packages[0].Packages {
+		operator := s.config.SigningOperatorMap[identifier]
 		wg.Add(1)
 		go func(identifier string, addr string) {
 			log.Println("distributing round 2 package to", identifier, addr)
