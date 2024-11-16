@@ -64,7 +64,7 @@ func TestDKG(t *testing.T) {
 		DatabasePath:  "../_data/db/operator_0.sqlite",
 	}
 
-	err = GenerateKeys(&config, 1)
+	err = GenerateKeys(&config, 100)
 	if err != nil {
 		t.Fatal(err)
 	}
