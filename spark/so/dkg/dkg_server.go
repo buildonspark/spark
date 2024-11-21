@@ -5,23 +5,24 @@ import (
 	"log"
 	"sync"
 
-	frost "github.com/lightsparkdev/spark-go/frost"
+	"github.com/lightsparkdev/spark-go/common"
 	pb "github.com/lightsparkdev/spark-go/proto"
 	"github.com/lightsparkdev/spark-go/so"
+	"google.golang.org/grpc"
 )
 
 type DkgServer struct {
 	pb.UnimplementedDKGServiceServer
-	frostClient frost.FrostClient
-	state       *DkgStates
-	config      *so.Config
+	frostConnection *grpc.ClientConn
+	state           *DkgStates
+	config          *so.Config
 }
 
-func NewDkgServer(frostClient frost.FrostClient, config *so.Config) *DkgServer {
+func NewDkgServer(frostConnection *grpc.ClientConn, config *so.Config) *DkgServer {
 	return &DkgServer{
-		state:       &DkgStates{},
-		frostClient: frostClient,
-		config:      config,
+		state:           &DkgStates{},
+		frostConnection: frostConnection,
+		config:          config,
 	}
 }
 
@@ -32,7 +33,8 @@ func (s *DkgServer) InitiateDkg(ctx context.Context, req *pb.InitiateDkgRequest)
 		return nil, err
 	}
 
-	round1Response, err := s.frostClient.Client.DkgRound1(ctx, &pb.DkgRound1Request{
+	frostClient := pb.NewFrostServiceClient(s.frostConnection)
+	round1Response, err := frostClient.DkgRound1(ctx, &pb.DkgRound1Request{
 		RequestId:  req.RequestId,
 		Identifier: s.config.Identifier,
 		MaxSigners: req.MaxSigners,
@@ -104,7 +106,8 @@ func (s *DkgServer) Round1Signature(ctx context.Context, req *pb.Round1Signature
 		round1PackagesMaps[i] = &pb.PackageMap{Packages: p}
 	}
 
-	round2Response, err := s.frostClient.Client.DkgRound2(ctx, &pb.DkgRound2Request{
+	frostClient := pb.NewFrostServiceClient(s.frostConnection)
+	round2Response, err := frostClient.DkgRound2(ctx, &pb.DkgRound2Request{
 		RequestId:          req.RequestId,
 		Round1PackagesMaps: round1PackagesMaps,
 	})
@@ -121,11 +124,14 @@ func (s *DkgServer) Round1Signature(ctx context.Context, req *pb.Round1Signature
 		go func(identifier string, addr string) {
 			log.Println("distributing round 2 package for request id", req.RequestId, "to", identifier, addr)
 			defer wg.Done()
-			client, err := NewDKGServiceClient(addr)
+			connection, err := common.NewGRPCConnection(addr)
+			defer connection.Close()
+
 			if err != nil {
-				log.Println("error creating dkg service client", err)
+				log.Println("error creating connection", err)
 				return
 			}
+			client := pb.NewDKGServiceClient(connection)
 
 			round2Packages := make([][]byte, len(round2Response.Round2Packages))
 			for i, p := range round2Response.Round2Packages {
@@ -138,7 +144,7 @@ func (s *DkgServer) Round1Signature(ctx context.Context, req *pb.Round1Signature
 				return
 			}
 
-			_, err = client.Client.Round2Packages(ctx, &pb.Round2PackagesRequest{
+			_, err = client.Round2Packages(ctx, &pb.Round2PackagesRequest{
 				RequestId:       req.RequestId,
 				Identifier:      s.config.Identifier,
 				Round2Packages:  round2Packages,
@@ -153,7 +159,7 @@ func (s *DkgServer) Round1Signature(ctx context.Context, req *pb.Round1Signature
 
 	wg.Wait()
 
-	if err := s.state.ProceedToRound3(req.RequestId, &s.frostClient, s.config); err != nil {
+	if err := s.state.ProceedToRound3(req.RequestId, s.frostConnection, s.config); err != nil {
 		log.Printf("error proceeding to round 3 for request id: %s, error: %v", req.RequestId, err)
 		return nil, err
 	}
@@ -169,11 +175,11 @@ func (s *DkgServer) Round2Packages(ctx context.Context, req *pb.Round2PackagesRe
 		return &pb.Round2PackagesResponse{}, nil
 	}
 
-	if err := s.state.ReceivedRound2Packages(req.RequestId, req.Identifier, req.Round2Packages, req.Round2Signature, &s.frostClient, s.config); err != nil {
+	if err := s.state.ReceivedRound2Packages(req.RequestId, req.Identifier, req.Round2Packages, req.Round2Signature, s.frostConnection, s.config); err != nil {
 		return nil, err
 	}
 
-	if err := s.state.ProceedToRound3(req.RequestId, &s.frostClient, s.config); err != nil {
+	if err := s.state.ProceedToRound3(req.RequestId, s.frostConnection, s.config); err != nil {
 		return nil, err
 	}
 

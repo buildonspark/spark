@@ -9,7 +9,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/lightsparkdev/spark-go/frost"
+	"github.com/lightsparkdev/spark-go/common"
 	pb "github.com/lightsparkdev/spark-go/proto"
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/dkg"
@@ -90,14 +90,14 @@ func main() {
 		log.Fatalf("Failed to listen on port %d: %v", args.Port, err)
 	}
 
-	frostClient, err := frost.NewFrostClient(args.SignerAddress)
+	frostConnection, err := common.NewGRPCConnection(args.SignerAddress)
 	if err != nil {
 		log.Fatalf("Failed to create frost client: %v", err)
 	}
 
 	go runDKGOnStartup(config)
 
-	dkgServer := dkg.NewDkgServer(*frostClient, config)
+	dkgServer := dkg.NewDkgServer(frostConnection, config)
 
 	grpcServer := grpc.NewServer()
 	pb.RegisterDKGServiceServer(grpcServer, dkgServer)

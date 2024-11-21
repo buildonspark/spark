@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go"
+	"github.com/lightsparkdev/spark-go/common"
 	pb "github.com/lightsparkdev/spark-go/proto"
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/ent"
@@ -39,12 +40,15 @@ func RunDKGIfNeeded(config *so.Config) error {
 func GenerateKeys(config *so.Config, keyCount uint64) error {
 	log.Printf("Generating %d keys", keyCount)
 	// Init clients
-	clientMap := make(map[string]*DkgClient)
+	clientMap := make(map[string]pb.DKGServiceClient)
 	for identifier, operator := range config.SigningOperatorMap {
-		client, err := NewDKGServiceClient(operator.Address)
+		connection, err := common.NewGRPCConnection(operator.Address)
+		defer connection.Close()
+
 		if err != nil {
 			return err
 		}
+		client := pb.NewDKGServiceClient(connection)
 		clientMap[identifier] = client
 	}
 
@@ -65,7 +69,7 @@ func GenerateKeys(config *so.Config, keyCount uint64) error {
 
 	for identifier, client := range clientMap {
 		log.Printf("Initiating DKG with %s", identifier)
-		round1Response, err := client.Client.InitiateDkg(context.Background(), initRequest)
+		round1Response, err := client.InitiateDkg(context.Background(), initRequest)
 		if err != nil {
 			return err
 		}
@@ -87,7 +91,7 @@ func GenerateKeys(config *so.Config, keyCount uint64) error {
 			RequestId:      requestIdString,
 			Round1Packages: round1Packages,
 		}
-		round1SignatureResponse, err := client.Client.Round1Packages(context.Background(), round1SignatureRequest)
+		round1SignatureResponse, err := client.Round1Packages(context.Background(), round1SignatureRequest)
 		if err != nil {
 			return err
 		}
@@ -99,13 +103,13 @@ func GenerateKeys(config *so.Config, keyCount uint64) error {
 	// Round 1 Signature Delivery
 	for _, client := range clientMap {
 		wg.Add(1)
-		go func(client *DkgClient) {
+		go func(client pb.DKGServiceClient) {
 			defer wg.Done()
 			round1SignatureRequest := &pb.Round1SignatureRequest{
 				RequestId:        requestIdString,
 				Round1Signatures: round1Signatures,
 			}
-			round1SignatureResponse, err := client.Client.Round1Signature(context.Background(), round1SignatureRequest)
+			round1SignatureResponse, err := client.Round1Signature(context.Background(), round1SignatureRequest)
 			if err != nil {
 				return
 			}

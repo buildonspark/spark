@@ -9,11 +9,11 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	frost "github.com/lightsparkdev/spark-go/frost"
 	pb "github.com/lightsparkdev/spark-go/proto"
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/ent"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
+	"google.golang.org/grpc"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -166,7 +166,7 @@ func (s *DkgStates) ReceivedRound1Signature(requestId string, selfIdentifier str
 	return nil, nil
 }
 
-func (s *DkgStates) ReceivedRound2Packages(requestId string, identifier string, round2Packages [][]byte, round2Signature []byte, frostClient *frost.FrostClient, config *so.Config) error {
+func (s *DkgStates) ReceivedRound2Packages(requestId string, identifier string, round2Packages [][]byte, round2Signature []byte, frostConnection *grpc.ClientConn, config *so.Config) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -196,7 +196,7 @@ func (s *DkgStates) ReceivedRound2Packages(requestId string, identifier string, 
 	return nil
 }
 
-func (s *DkgStates) ProceedToRound3(requestId string, frostClient *frost.FrostClient, config *so.Config) error {
+func (s *DkgStates) ProceedToRound3(requestId string, frostConnection *grpc.ClientConn, config *so.Config) error {
 	log.Printf("Checking if we can proceed to round 3 for request id: %s", requestId)
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -214,7 +214,7 @@ func (s *DkgStates) ProceedToRound3(requestId string, frostClient *frost.FrostCl
 		log.Printf("State deleted for request id: %s", requestId)
 		delete(s.states, requestId)
 
-		err := state.Round3(requestId, frostClient, config)
+		err := state.Round3(requestId, frostConnection, config)
 		if err != nil {
 			return err
 		}
@@ -222,7 +222,7 @@ func (s *DkgStates) ProceedToRound3(requestId string, frostClient *frost.FrostCl
 	return nil
 }
 
-func (s *DkgState) Round3(requestId string, frostClient *frost.FrostClient, config *so.Config) error {
+func (s *DkgState) Round3(requestId string, frostConnection *grpc.ClientConn, config *so.Config) error {
 	log.Printf("Round 3")
 	round1PackagesMaps := make([]*pb.PackageMap, len(s.ReceivedRound1Packages))
 	for i, p := range s.ReceivedRound1Packages {
@@ -238,7 +238,8 @@ func (s *DkgState) Round3(requestId string, frostClient *frost.FrostClient, conf
 		}
 	}
 
-	response, err := frostClient.Client.DkgRound3(context.Background(), &pb.DkgRound3Request{
+	frostClient := pb.NewFrostServiceClient(frostConnection)
+	response, err := frostClient.DkgRound3(context.Background(), &pb.DkgRound3Request{
 		RequestId:          requestId,
 		Round1PackagesMaps: round1PackagesMaps,
 		Round2PackagesMaps: round2PackagesMaps,
