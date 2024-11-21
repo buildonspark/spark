@@ -2,6 +2,7 @@ package schema
 
 import (
 	"entgo.io/ent"
+	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
 )
@@ -52,5 +53,7 @@ func (SigningKeyshare) Fields() []ent.Field {
 
 // Edges of the SigningKeyshare.
 func (SigningKeyshare) Edges() []ent.Edge {
-	return nil
+	return []ent.Edge{
+		edge.To("deposit_address", DepositAddress.Type),
+	}
 }

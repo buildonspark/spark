@@ -5,13 +5,13 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log"
-	"sync"
 
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/common"
 	pb "github.com/lightsparkdev/spark-go/proto"
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/ent_utils"
+	"github.com/lightsparkdev/spark-go/so/helper"
 )
 
 type SparkServer struct {
@@ -43,48 +43,21 @@ func (s *SparkServer) GenerateDepositAddress(ctx context.Context, req *pb.Genera
 		return nil, err
 	}
 
-	results := make(chan error, len(s.config.SigningOperatorMap)-1)
-
-	wg := sync.WaitGroup{}
-
-	for _, operator := range s.config.SigningOperatorMap {
-		if operator.Identifier == s.config.Identifier {
-			continue
-		}
-
-		wg.Add(1)
-
-		go func(operator *so.SigningOperator) {
-			defer wg.Done()
-			log.Printf("Connecting to operator: %s", operator.Address)
-			conn, err := common.NewGRPCConnection(operator.Address)
-			if err != nil {
-				results <- err
-				log.Printf("Failed to connect to operator: %v", err)
-				return
-			}
-
-			client := pb.NewSparkInternalServiceClient(conn)
-			_, err = client.MarkKeysharesAsUsed(ctx, &pb.MarkKeysharesAsUsedRequest{KeyshareId: []string{keyshare.ID.String()}})
-			results <- err
-			log.Printf("Marked keyshare as used on operator: %s", operator.Address)
-		}(operator)
-	}
-
-	log.Printf("Waiting for all operators to mark keyshare as used")
-	wg.Wait()
-	close(results)
-
-	var errors []error
-	for err := range results {
+	err = helper.ExecuteTaskWithAllOtherOperators(ctx, s.config, func(ctx context.Context, operator *so.SigningOperator) error {
+		conn, err := common.NewGRPCConnection(operator.Address)
 		if err != nil {
-			errors = append(errors, err)
+			log.Printf("Failed to connect to operator: %v", err)
+			return err
 		}
-	}
+		defer conn.Close()
 
-	if len(errors) > 0 {
-		log.Printf("Failed to mark keyshares as used on all operators: %v", errors)
-		return nil, fmt.Errorf("failed to mark keyshares as used on all operators: %v", errors)
+		client := pb.NewSparkInternalServiceClient(conn)
+		_, err = client.MarkKeysharesAsUsed(ctx, &pb.MarkKeysharesAsUsedRequest{KeyshareId: []string{keyshare.ID.String()}})
+		return err
+	})
+	if err != nil {
+		log.Printf("Failed to execute task with all operators: %v", err)
+		return nil, err
 	}
 
 	combinedPublicKey, err := common.AddPublicKeys(keyshare.PublicKey, req.PublicKey)
@@ -99,7 +72,28 @@ func (s *SparkServer) GenerateDepositAddress(ctx context.Context, req *pb.Genera
 		return nil, err
 	}
 
-	// TODO: we need to store the deposit address along with the keyshare ID.
+	_, err = ent_utils.LinkKeyshareToDepositAddress(ctx, s.config, keyshare.ID, *depositAddress)
+	if err != nil {
+		log.Printf("Failed to link keyshare to deposit address: %v", err)
+		return nil, err
+	}
+
+	err = helper.ExecuteTaskWithAllOtherOperators(ctx, s.config, func(ctx context.Context, operator *so.SigningOperator) error {
+		conn, err := common.NewGRPCConnection(operator.Address)
+		if err != nil {
+			log.Printf("Failed to connect to operator: %v", err)
+			return err
+		}
+		defer conn.Close()
+
+		client := pb.NewSparkInternalServiceClient(conn)
+		_, err = client.MarkKeyshareForDepositAddress(ctx, &pb.MarkKeyshareForDepositAddressRequest{KeyshareId: keyshare.ID.String(), Address: *depositAddress})
+		return err
+	})
+	if err != nil {
+		log.Printf("Failed to execute task with all operators: %v", err)
+		return nil, err
+	}
 
 	log.Printf("Generated deposit address: %s", depositAddress)
 	return &pb.GenerateDepositAddressResponse{Address: *depositAddress}, nil

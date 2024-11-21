@@ -20,7 +20,8 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	SparkInternalService_MarkKeysharesAsUsed_FullMethodName = "/spark.SparkInternalService/mark_keyshares_as_used"
+	SparkInternalService_MarkKeysharesAsUsed_FullMethodName           = "/spark.SparkInternalService/mark_keyshares_as_used"
+	SparkInternalService_MarkKeyshareForDepositAddress_FullMethodName = "/spark.SparkInternalService/mark_keyshare_for_deposit_address"
 )
 
 // SparkInternalServiceClient is the client API for SparkInternalService service.
@@ -28,6 +29,7 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type SparkInternalServiceClient interface {
 	MarkKeysharesAsUsed(ctx context.Context, in *MarkKeysharesAsUsedRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	MarkKeyshareForDepositAddress(ctx context.Context, in *MarkKeyshareForDepositAddressRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type sparkInternalServiceClient struct {
@@ -48,11 +50,22 @@ func (c *sparkInternalServiceClient) MarkKeysharesAsUsed(ctx context.Context, in
 	return out, nil
 }
 
+func (c *sparkInternalServiceClient) MarkKeyshareForDepositAddress(ctx context.Context, in *MarkKeyshareForDepositAddressRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, SparkInternalService_MarkKeyshareForDepositAddress_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SparkInternalServiceServer is the server API for SparkInternalService service.
 // All implementations must embed UnimplementedSparkInternalServiceServer
 // for forward compatibility.
 type SparkInternalServiceServer interface {
 	MarkKeysharesAsUsed(context.Context, *MarkKeysharesAsUsedRequest) (*emptypb.Empty, error)
+	MarkKeyshareForDepositAddress(context.Context, *MarkKeyshareForDepositAddressRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedSparkInternalServiceServer()
 }
 
@@ -65,6 +78,9 @@ type UnimplementedSparkInternalServiceServer struct{}
 
 func (UnimplementedSparkInternalServiceServer) MarkKeysharesAsUsed(context.Context, *MarkKeysharesAsUsedRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method MarkKeysharesAsUsed not implemented")
+}
+func (UnimplementedSparkInternalServiceServer) MarkKeyshareForDepositAddress(context.Context, *MarkKeyshareForDepositAddressRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method MarkKeyshareForDepositAddress not implemented")
 }
 func (UnimplementedSparkInternalServiceServer) mustEmbedUnimplementedSparkInternalServiceServer() {}
 func (UnimplementedSparkInternalServiceServer) testEmbeddedByValue()                              {}
@@ -105,6 +121,24 @@ func _SparkInternalService_MarkKeysharesAsUsed_Handler(srv interface{}, ctx cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SparkInternalService_MarkKeyshareForDepositAddress_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(MarkKeyshareForDepositAddressRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkInternalServiceServer).MarkKeyshareForDepositAddress(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkInternalService_MarkKeyshareForDepositAddress_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkInternalServiceServer).MarkKeyshareForDepositAddress(ctx, req.(*MarkKeyshareForDepositAddressRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // SparkInternalService_ServiceDesc is the grpc.ServiceDesc for SparkInternalService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -115,6 +149,10 @@ var SparkInternalService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "mark_keyshares_as_used",
 			Handler:    _SparkInternalService_MarkKeysharesAsUsed_Handler,
+		},
+		{
+			MethodName: "mark_keyshare_for_deposit_address",
+			Handler:    _SparkInternalService_MarkKeyshareForDepositAddress_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

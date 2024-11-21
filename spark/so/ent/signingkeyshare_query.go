@@ -4,6 +4,7 @@ package ent
 
 import (
 	"context"
+	"database/sql/driver"
 	"fmt"
 	"math"
 
@@ -12,6 +13,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark-go/so/ent/depositaddress"
 	"github.com/lightsparkdev/spark-go/so/ent/predicate"
 	"github.com/lightsparkdev/spark-go/so/ent/signingkeyshare"
 )
@@ -19,10 +21,11 @@ import (
 // SigningKeyshareQuery is the builder for querying SigningKeyshare entities.
 type SigningKeyshareQuery struct {
 	config
-	ctx        *QueryContext
-	order      []signingkeyshare.OrderOption
-	inters     []Interceptor
-	predicates []predicate.SigningKeyshare
+	ctx                *QueryContext
+	order              []signingkeyshare.OrderOption
+	inters             []Interceptor
+	predicates         []predicate.SigningKeyshare
+	withDepositAddress *DepositAddressQuery
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -57,6 +60,28 @@ func (skq *SigningKeyshareQuery) Unique(unique bool) *SigningKeyshareQuery {
 func (skq *SigningKeyshareQuery) Order(o ...signingkeyshare.OrderOption) *SigningKeyshareQuery {
 	skq.order = append(skq.order, o...)
 	return skq
+}
+
+// QueryDepositAddress chains the current query on the "deposit_address" edge.
+func (skq *SigningKeyshareQuery) QueryDepositAddress() *DepositAddressQuery {
+	query := (&DepositAddressClient{config: skq.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := skq.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := skq.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(signingkeyshare.Table, signingkeyshare.FieldID, selector),
+			sqlgraph.To(depositaddress.Table, depositaddress.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, signingkeyshare.DepositAddressTable, signingkeyshare.DepositAddressColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(skq.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
 }
 
 // First returns the first SigningKeyshare entity from the query.
@@ -246,15 +271,27 @@ func (skq *SigningKeyshareQuery) Clone() *SigningKeyshareQuery {
 		return nil
 	}
 	return &SigningKeyshareQuery{
-		config:     skq.config,
-		ctx:        skq.ctx.Clone(),
-		order:      append([]signingkeyshare.OrderOption{}, skq.order...),
-		inters:     append([]Interceptor{}, skq.inters...),
-		predicates: append([]predicate.SigningKeyshare{}, skq.predicates...),
+		config:             skq.config,
+		ctx:                skq.ctx.Clone(),
+		order:              append([]signingkeyshare.OrderOption{}, skq.order...),
+		inters:             append([]Interceptor{}, skq.inters...),
+		predicates:         append([]predicate.SigningKeyshare{}, skq.predicates...),
+		withDepositAddress: skq.withDepositAddress.Clone(),
 		// clone intermediate query.
 		sql:  skq.sql.Clone(),
 		path: skq.path,
 	}
+}
+
+// WithDepositAddress tells the query-builder to eager-load the nodes that are connected to
+// the "deposit_address" edge. The optional arguments are used to configure the query builder of the edge.
+func (skq *SigningKeyshareQuery) WithDepositAddress(opts ...func(*DepositAddressQuery)) *SigningKeyshareQuery {
+	query := (&DepositAddressClient{config: skq.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	skq.withDepositAddress = query
+	return skq
 }
 
 // GroupBy is used to group vertices by one or more fields/columns.
@@ -333,8 +370,11 @@ func (skq *SigningKeyshareQuery) prepareQuery(ctx context.Context) error {
 
 func (skq *SigningKeyshareQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*SigningKeyshare, error) {
 	var (
-		nodes = []*SigningKeyshare{}
-		_spec = skq.querySpec()
+		nodes       = []*SigningKeyshare{}
+		_spec       = skq.querySpec()
+		loadedTypes = [1]bool{
+			skq.withDepositAddress != nil,
+		}
 	)
 	_spec.ScanValues = func(columns []string) ([]any, error) {
 		return (*SigningKeyshare).scanValues(nil, columns)
@@ -342,6 +382,7 @@ func (skq *SigningKeyshareQuery) sqlAll(ctx context.Context, hooks ...queryHook)
 	_spec.Assign = func(columns []string, values []any) error {
 		node := &SigningKeyshare{config: skq.config}
 		nodes = append(nodes, node)
+		node.Edges.loadedTypes = loadedTypes
 		return node.assignValues(columns, values)
 	}
 	for i := range hooks {
@@ -353,7 +394,48 @@ func (skq *SigningKeyshareQuery) sqlAll(ctx context.Context, hooks ...queryHook)
 	if len(nodes) == 0 {
 		return nodes, nil
 	}
+	if query := skq.withDepositAddress; query != nil {
+		if err := skq.loadDepositAddress(ctx, query, nodes,
+			func(n *SigningKeyshare) { n.Edges.DepositAddress = []*DepositAddress{} },
+			func(n *SigningKeyshare, e *DepositAddress) {
+				n.Edges.DepositAddress = append(n.Edges.DepositAddress, e)
+			}); err != nil {
+			return nil, err
+		}
+	}
 	return nodes, nil
+}
+
+func (skq *SigningKeyshareQuery) loadDepositAddress(ctx context.Context, query *DepositAddressQuery, nodes []*SigningKeyshare, init func(*SigningKeyshare), assign func(*SigningKeyshare, *DepositAddress)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[uuid.UUID]*SigningKeyshare)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	query.withFKs = true
+	query.Where(predicate.DepositAddress(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(signingkeyshare.DepositAddressColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.signing_keyshare_deposit_address
+		if fk == nil {
+			return fmt.Errorf(`foreign-key "signing_keyshare_deposit_address" is nil for node %v`, n.ID)
+		}
+		node, ok := nodeids[*fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "signing_keyshare_deposit_address" returned %v for node %v`, *fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
 }
 
 func (skq *SigningKeyshareQuery) sqlCount(ctx context.Context) (int, error) {

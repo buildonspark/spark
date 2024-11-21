@@ -15,6 +15,8 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/sql"
+	"entgo.io/ent/dialect/sql/sqlgraph"
+	"github.com/lightsparkdev/spark-go/so/ent/depositaddress"
 	"github.com/lightsparkdev/spark-go/so/ent/signingkeyshare"
 )
 
@@ -23,6 +25,8 @@ type Client struct {
 	config
 	// Schema is the client for creating, migrating and dropping schema.
 	Schema *migrate.Schema
+	// DepositAddress is the client for interacting with the DepositAddress builders.
+	DepositAddress *DepositAddressClient
 	// SigningKeyshare is the client for interacting with the SigningKeyshare builders.
 	SigningKeyshare *SigningKeyshareClient
 }
@@ -36,6 +40,7 @@ func NewClient(opts ...Option) *Client {
 
 func (c *Client) init() {
 	c.Schema = migrate.NewSchema(c.driver)
+	c.DepositAddress = NewDepositAddressClient(c.config)
 	c.SigningKeyshare = NewSigningKeyshareClient(c.config)
 }
 
@@ -129,6 +134,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 	return &Tx{
 		ctx:             ctx,
 		config:          cfg,
+		DepositAddress:  NewDepositAddressClient(cfg),
 		SigningKeyshare: NewSigningKeyshareClient(cfg),
 	}, nil
 }
@@ -149,6 +155,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 	return &Tx{
 		ctx:             ctx,
 		config:          cfg,
+		DepositAddress:  NewDepositAddressClient(cfg),
 		SigningKeyshare: NewSigningKeyshareClient(cfg),
 	}, nil
 }
@@ -156,7 +163,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 // Debug returns a new debug-client. It's used to get verbose logging on specific operations.
 //
 //	client.Debug().
-//		SigningKeyshare.
+//		DepositAddress.
 //		Query().
 //		Count(ctx)
 func (c *Client) Debug() *Client {
@@ -178,22 +185,175 @@ func (c *Client) Close() error {
 // Use adds the mutation hooks to all the entity clients.
 // In order to add hooks to a specific client, call: `client.Node.Use(...)`.
 func (c *Client) Use(hooks ...Hook) {
+	c.DepositAddress.Use(hooks...)
 	c.SigningKeyshare.Use(hooks...)
 }
 
 // Intercept adds the query interceptors to all the entity clients.
 // In order to add interceptors to a specific client, call: `client.Node.Intercept(...)`.
 func (c *Client) Intercept(interceptors ...Interceptor) {
+	c.DepositAddress.Intercept(interceptors...)
 	c.SigningKeyshare.Intercept(interceptors...)
 }
 
 // Mutate implements the ent.Mutator interface.
 func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 	switch m := m.(type) {
+	case *DepositAddressMutation:
+		return c.DepositAddress.mutate(ctx, m)
 	case *SigningKeyshareMutation:
 		return c.SigningKeyshare.mutate(ctx, m)
 	default:
 		return nil, fmt.Errorf("ent: unknown mutation type %T", m)
+	}
+}
+
+// DepositAddressClient is a client for the DepositAddress schema.
+type DepositAddressClient struct {
+	config
+}
+
+// NewDepositAddressClient returns a client for the DepositAddress from the given config.
+func NewDepositAddressClient(c config) *DepositAddressClient {
+	return &DepositAddressClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `depositaddress.Hooks(f(g(h())))`.
+func (c *DepositAddressClient) Use(hooks ...Hook) {
+	c.hooks.DepositAddress = append(c.hooks.DepositAddress, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `depositaddress.Intercept(f(g(h())))`.
+func (c *DepositAddressClient) Intercept(interceptors ...Interceptor) {
+	c.inters.DepositAddress = append(c.inters.DepositAddress, interceptors...)
+}
+
+// Create returns a builder for creating a DepositAddress entity.
+func (c *DepositAddressClient) Create() *DepositAddressCreate {
+	mutation := newDepositAddressMutation(c.config, OpCreate)
+	return &DepositAddressCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of DepositAddress entities.
+func (c *DepositAddressClient) CreateBulk(builders ...*DepositAddressCreate) *DepositAddressCreateBulk {
+	return &DepositAddressCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *DepositAddressClient) MapCreateBulk(slice any, setFunc func(*DepositAddressCreate, int)) *DepositAddressCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &DepositAddressCreateBulk{err: fmt.Errorf("calling to DepositAddressClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*DepositAddressCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &DepositAddressCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for DepositAddress.
+func (c *DepositAddressClient) Update() *DepositAddressUpdate {
+	mutation := newDepositAddressMutation(c.config, OpUpdate)
+	return &DepositAddressUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *DepositAddressClient) UpdateOne(da *DepositAddress) *DepositAddressUpdateOne {
+	mutation := newDepositAddressMutation(c.config, OpUpdateOne, withDepositAddress(da))
+	return &DepositAddressUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *DepositAddressClient) UpdateOneID(id uuid.UUID) *DepositAddressUpdateOne {
+	mutation := newDepositAddressMutation(c.config, OpUpdateOne, withDepositAddressID(id))
+	return &DepositAddressUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for DepositAddress.
+func (c *DepositAddressClient) Delete() *DepositAddressDelete {
+	mutation := newDepositAddressMutation(c.config, OpDelete)
+	return &DepositAddressDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *DepositAddressClient) DeleteOne(da *DepositAddress) *DepositAddressDeleteOne {
+	return c.DeleteOneID(da.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *DepositAddressClient) DeleteOneID(id uuid.UUID) *DepositAddressDeleteOne {
+	builder := c.Delete().Where(depositaddress.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &DepositAddressDeleteOne{builder}
+}
+
+// Query returns a query builder for DepositAddress.
+func (c *DepositAddressClient) Query() *DepositAddressQuery {
+	return &DepositAddressQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeDepositAddress},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a DepositAddress entity by its id.
+func (c *DepositAddressClient) Get(ctx context.Context, id uuid.UUID) (*DepositAddress, error) {
+	return c.Query().Where(depositaddress.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *DepositAddressClient) GetX(ctx context.Context, id uuid.UUID) *DepositAddress {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryKeyshare queries the keyshare edge of a DepositAddress.
+func (c *DepositAddressClient) QueryKeyshare(da *DepositAddress) *SigningKeyshareQuery {
+	query := (&SigningKeyshareClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := da.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(depositaddress.Table, depositaddress.FieldID, id),
+			sqlgraph.To(signingkeyshare.Table, signingkeyshare.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, depositaddress.KeyshareTable, depositaddress.KeyshareColumn),
+		)
+		fromV = sqlgraph.Neighbors(da.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *DepositAddressClient) Hooks() []Hook {
+	return c.hooks.DepositAddress
+}
+
+// Interceptors returns the client interceptors.
+func (c *DepositAddressClient) Interceptors() []Interceptor {
+	return c.inters.DepositAddress
+}
+
+func (c *DepositAddressClient) mutate(ctx context.Context, m *DepositAddressMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&DepositAddressCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&DepositAddressUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&DepositAddressUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&DepositAddressDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown DepositAddress mutation op: %q", m.Op())
 	}
 }
 
@@ -305,6 +465,22 @@ func (c *SigningKeyshareClient) GetX(ctx context.Context, id uuid.UUID) *Signing
 	return obj
 }
 
+// QueryDepositAddress queries the deposit_address edge of a SigningKeyshare.
+func (c *SigningKeyshareClient) QueryDepositAddress(sk *SigningKeyshare) *DepositAddressQuery {
+	query := (&DepositAddressClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := sk.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(signingkeyshare.Table, signingkeyshare.FieldID, id),
+			sqlgraph.To(depositaddress.Table, depositaddress.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, signingkeyshare.DepositAddressTable, signingkeyshare.DepositAddressColumn),
+		)
+		fromV = sqlgraph.Neighbors(sk.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // Hooks returns the client hooks.
 func (c *SigningKeyshareClient) Hooks() []Hook {
 	return c.hooks.SigningKeyshare
@@ -333,9 +509,9 @@ func (c *SigningKeyshareClient) mutate(ctx context.Context, m *SigningKeyshareMu
 // hooks and interceptors per client, for fast access.
 type (
 	hooks struct {
-		SigningKeyshare []ent.Hook
+		DepositAddress, SigningKeyshare []ent.Hook
 	}
 	inters struct {
-		SigningKeyshare []ent.Interceptor
+		DepositAddress, SigningKeyshare []ent.Interceptor
 	}
 )

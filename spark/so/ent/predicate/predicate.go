@@ -6,5 +6,8 @@ import (
 	"entgo.io/ent/dialect/sql"
 )
 
+// DepositAddress is the predicate function for depositaddress builders.
+type DepositAddress func(*sql.Selector)
+
 // SigningKeyshare is the predicate function for signingkeyshare builders.
 type SigningKeyshare func(*sql.Selector)

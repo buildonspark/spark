@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"entgo.io/ent/dialect/sql"
+	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/so/ent/predicate"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
@@ -354,6 +355,29 @@ func CoordinatorIndexLT(v uint64) predicate.SigningKeyshare {
 // CoordinatorIndexLTE applies the LTE predicate on the "coordinator_index" field.
 func CoordinatorIndexLTE(v uint64) predicate.SigningKeyshare {
 	return predicate.SigningKeyshare(sql.FieldLTE(FieldCoordinatorIndex, v))
+}
+
+// HasDepositAddress applies the HasEdge predicate on the "deposit_address" edge.
+func HasDepositAddress() predicate.SigningKeyshare {
+	return predicate.SigningKeyshare(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, DepositAddressTable, DepositAddressColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasDepositAddressWith applies the HasEdge predicate on the "deposit_address" edge with a given conditions (other predicates).
+func HasDepositAddressWith(preds ...predicate.DepositAddress) predicate.SigningKeyshare {
+	return predicate.SigningKeyshare(func(s *sql.Selector) {
+		step := newDepositAddressStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
 }
 
 // And groups predicates with the AND operator between them.

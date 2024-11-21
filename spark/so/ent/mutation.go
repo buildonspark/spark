@@ -12,6 +12,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark-go/so/ent/depositaddress"
 	"github.com/lightsparkdev/spark-go/so/ent/predicate"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
 	"github.com/lightsparkdev/spark-go/so/ent/signingkeyshare"
@@ -26,29 +27,540 @@ const (
 	OpUpdateOne = ent.OpUpdateOne
 
 	// Node types.
+	TypeDepositAddress  = "DepositAddress"
 	TypeSigningKeyshare = "SigningKeyshare"
 )
+
+// DepositAddressMutation represents an operation that mutates the DepositAddress nodes in the graph.
+type DepositAddressMutation struct {
+	config
+	op              Op
+	typ             string
+	id              *uuid.UUID
+	create_time     *time.Time
+	update_time     *time.Time
+	address         *string
+	clearedFields   map[string]struct{}
+	keyshare        *uuid.UUID
+	clearedkeyshare bool
+	done            bool
+	oldValue        func(context.Context) (*DepositAddress, error)
+	predicates      []predicate.DepositAddress
+}
+
+var _ ent.Mutation = (*DepositAddressMutation)(nil)
+
+// depositaddressOption allows management of the mutation configuration using functional options.
+type depositaddressOption func(*DepositAddressMutation)
+
+// newDepositAddressMutation creates new mutation for the DepositAddress entity.
+func newDepositAddressMutation(c config, op Op, opts ...depositaddressOption) *DepositAddressMutation {
+	m := &DepositAddressMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeDepositAddress,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withDepositAddressID sets the ID field of the mutation.
+func withDepositAddressID(id uuid.UUID) depositaddressOption {
+	return func(m *DepositAddressMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *DepositAddress
+		)
+		m.oldValue = func(ctx context.Context) (*DepositAddress, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().DepositAddress.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withDepositAddress sets the old DepositAddress of the mutation.
+func withDepositAddress(node *DepositAddress) depositaddressOption {
+	return func(m *DepositAddressMutation) {
+		m.oldValue = func(context.Context) (*DepositAddress, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m DepositAddressMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m DepositAddressMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of DepositAddress entities.
+func (m *DepositAddressMutation) SetID(id uuid.UUID) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *DepositAddressMutation) ID() (id uuid.UUID, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *DepositAddressMutation) IDs(ctx context.Context) ([]uuid.UUID, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []uuid.UUID{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().DepositAddress.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetCreateTime sets the "create_time" field.
+func (m *DepositAddressMutation) SetCreateTime(t time.Time) {
+	m.create_time = &t
+}
+
+// CreateTime returns the value of the "create_time" field in the mutation.
+func (m *DepositAddressMutation) CreateTime() (r time.Time, exists bool) {
+	v := m.create_time
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreateTime returns the old "create_time" field's value of the DepositAddress entity.
+// If the DepositAddress object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DepositAddressMutation) OldCreateTime(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreateTime is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreateTime requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreateTime: %w", err)
+	}
+	return oldValue.CreateTime, nil
+}
+
+// ResetCreateTime resets all changes to the "create_time" field.
+func (m *DepositAddressMutation) ResetCreateTime() {
+	m.create_time = nil
+}
+
+// SetUpdateTime sets the "update_time" field.
+func (m *DepositAddressMutation) SetUpdateTime(t time.Time) {
+	m.update_time = &t
+}
+
+// UpdateTime returns the value of the "update_time" field in the mutation.
+func (m *DepositAddressMutation) UpdateTime() (r time.Time, exists bool) {
+	v := m.update_time
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdateTime returns the old "update_time" field's value of the DepositAddress entity.
+// If the DepositAddress object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DepositAddressMutation) OldUpdateTime(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdateTime is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdateTime requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdateTime: %w", err)
+	}
+	return oldValue.UpdateTime, nil
+}
+
+// ResetUpdateTime resets all changes to the "update_time" field.
+func (m *DepositAddressMutation) ResetUpdateTime() {
+	m.update_time = nil
+}
+
+// SetAddress sets the "address" field.
+func (m *DepositAddressMutation) SetAddress(s string) {
+	m.address = &s
+}
+
+// Address returns the value of the "address" field in the mutation.
+func (m *DepositAddressMutation) Address() (r string, exists bool) {
+	v := m.address
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAddress returns the old "address" field's value of the DepositAddress entity.
+// If the DepositAddress object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DepositAddressMutation) OldAddress(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAddress is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAddress requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAddress: %w", err)
+	}
+	return oldValue.Address, nil
+}
+
+// ResetAddress resets all changes to the "address" field.
+func (m *DepositAddressMutation) ResetAddress() {
+	m.address = nil
+}
+
+// SetKeyshareID sets the "keyshare" edge to the SigningKeyshare entity by id.
+func (m *DepositAddressMutation) SetKeyshareID(id uuid.UUID) {
+	m.keyshare = &id
+}
+
+// ClearKeyshare clears the "keyshare" edge to the SigningKeyshare entity.
+func (m *DepositAddressMutation) ClearKeyshare() {
+	m.clearedkeyshare = true
+}
+
+// KeyshareCleared reports if the "keyshare" edge to the SigningKeyshare entity was cleared.
+func (m *DepositAddressMutation) KeyshareCleared() bool {
+	return m.clearedkeyshare
+}
+
+// KeyshareID returns the "keyshare" edge ID in the mutation.
+func (m *DepositAddressMutation) KeyshareID() (id uuid.UUID, exists bool) {
+	if m.keyshare != nil {
+		return *m.keyshare, true
+	}
+	return
+}
+
+// KeyshareIDs returns the "keyshare" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// KeyshareID instead. It exists only for internal usage by the builders.
+func (m *DepositAddressMutation) KeyshareIDs() (ids []uuid.UUID) {
+	if id := m.keyshare; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetKeyshare resets all changes to the "keyshare" edge.
+func (m *DepositAddressMutation) ResetKeyshare() {
+	m.keyshare = nil
+	m.clearedkeyshare = false
+}
+
+// Where appends a list predicates to the DepositAddressMutation builder.
+func (m *DepositAddressMutation) Where(ps ...predicate.DepositAddress) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the DepositAddressMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *DepositAddressMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.DepositAddress, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *DepositAddressMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *DepositAddressMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (DepositAddress).
+func (m *DepositAddressMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *DepositAddressMutation) Fields() []string {
+	fields := make([]string, 0, 3)
+	if m.create_time != nil {
+		fields = append(fields, depositaddress.FieldCreateTime)
+	}
+	if m.update_time != nil {
+		fields = append(fields, depositaddress.FieldUpdateTime)
+	}
+	if m.address != nil {
+		fields = append(fields, depositaddress.FieldAddress)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *DepositAddressMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case depositaddress.FieldCreateTime:
+		return m.CreateTime()
+	case depositaddress.FieldUpdateTime:
+		return m.UpdateTime()
+	case depositaddress.FieldAddress:
+		return m.Address()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *DepositAddressMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case depositaddress.FieldCreateTime:
+		return m.OldCreateTime(ctx)
+	case depositaddress.FieldUpdateTime:
+		return m.OldUpdateTime(ctx)
+	case depositaddress.FieldAddress:
+		return m.OldAddress(ctx)
+	}
+	return nil, fmt.Errorf("unknown DepositAddress field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *DepositAddressMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case depositaddress.FieldCreateTime:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreateTime(v)
+		return nil
+	case depositaddress.FieldUpdateTime:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdateTime(v)
+		return nil
+	case depositaddress.FieldAddress:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAddress(v)
+		return nil
+	}
+	return fmt.Errorf("unknown DepositAddress field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *DepositAddressMutation) AddedFields() []string {
+	return nil
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *DepositAddressMutation) AddedField(name string) (ent.Value, bool) {
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *DepositAddressMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	}
+	return fmt.Errorf("unknown DepositAddress numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *DepositAddressMutation) ClearedFields() []string {
+	return nil
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *DepositAddressMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *DepositAddressMutation) ClearField(name string) error {
+	return fmt.Errorf("unknown DepositAddress nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *DepositAddressMutation) ResetField(name string) error {
+	switch name {
+	case depositaddress.FieldCreateTime:
+		m.ResetCreateTime()
+		return nil
+	case depositaddress.FieldUpdateTime:
+		m.ResetUpdateTime()
+		return nil
+	case depositaddress.FieldAddress:
+		m.ResetAddress()
+		return nil
+	}
+	return fmt.Errorf("unknown DepositAddress field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *DepositAddressMutation) AddedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.keyshare != nil {
+		edges = append(edges, depositaddress.EdgeKeyshare)
+	}
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *DepositAddressMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case depositaddress.EdgeKeyshare:
+		if id := m.keyshare; id != nil {
+			return []ent.Value{*id}
+		}
+	}
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *DepositAddressMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 1)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *DepositAddressMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *DepositAddressMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.clearedkeyshare {
+		edges = append(edges, depositaddress.EdgeKeyshare)
+	}
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *DepositAddressMutation) EdgeCleared(name string) bool {
+	switch name {
+	case depositaddress.EdgeKeyshare:
+		return m.clearedkeyshare
+	}
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *DepositAddressMutation) ClearEdge(name string) error {
+	switch name {
+	case depositaddress.EdgeKeyshare:
+		m.ClearKeyshare()
+		return nil
+	}
+	return fmt.Errorf("unknown DepositAddress unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *DepositAddressMutation) ResetEdge(name string) error {
+	switch name {
+	case depositaddress.EdgeKeyshare:
+		m.ResetKeyshare()
+		return nil
+	}
+	return fmt.Errorf("unknown DepositAddress edge %s", name)
+}
 
 // SigningKeyshareMutation represents an operation that mutates the SigningKeyshare nodes in the graph.
 type SigningKeyshareMutation struct {
 	config
-	op                   Op
-	typ                  string
-	id                   *uuid.UUID
-	create_time          *time.Time
-	update_time          *time.Time
-	status               *schema.SigningKeyshareStatus
-	secret_share         *[]byte
-	public_shares        *map[string][]uint8
-	public_key           *[]byte
-	min_signers          *uint32
-	addmin_signers       *int32
-	coordinator_index    *uint64
-	addcoordinator_index *int64
-	clearedFields        map[string]struct{}
-	done                 bool
-	oldValue             func(context.Context) (*SigningKeyshare, error)
-	predicates           []predicate.SigningKeyshare
+	op                     Op
+	typ                    string
+	id                     *uuid.UUID
+	create_time            *time.Time
+	update_time            *time.Time
+	status                 *schema.SigningKeyshareStatus
+	secret_share           *[]byte
+	public_shares          *map[string][]uint8
+	public_key             *[]byte
+	min_signers            *uint32
+	addmin_signers         *int32
+	coordinator_index      *uint64
+	addcoordinator_index   *int64
+	clearedFields          map[string]struct{}
+	deposit_address        map[uuid.UUID]struct{}
+	removeddeposit_address map[uuid.UUID]struct{}
+	cleareddeposit_address bool
+	done                   bool
+	oldValue               func(context.Context) (*SigningKeyshare, error)
+	predicates             []predicate.SigningKeyshare
 }
 
 var _ ent.Mutation = (*SigningKeyshareMutation)(nil)
@@ -483,6 +995,60 @@ func (m *SigningKeyshareMutation) ResetCoordinatorIndex() {
 	m.addcoordinator_index = nil
 }
 
+// AddDepositAddresIDs adds the "deposit_address" edge to the DepositAddress entity by ids.
+func (m *SigningKeyshareMutation) AddDepositAddresIDs(ids ...uuid.UUID) {
+	if m.deposit_address == nil {
+		m.deposit_address = make(map[uuid.UUID]struct{})
+	}
+	for i := range ids {
+		m.deposit_address[ids[i]] = struct{}{}
+	}
+}
+
+// ClearDepositAddress clears the "deposit_address" edge to the DepositAddress entity.
+func (m *SigningKeyshareMutation) ClearDepositAddress() {
+	m.cleareddeposit_address = true
+}
+
+// DepositAddressCleared reports if the "deposit_address" edge to the DepositAddress entity was cleared.
+func (m *SigningKeyshareMutation) DepositAddressCleared() bool {
+	return m.cleareddeposit_address
+}
+
+// RemoveDepositAddresIDs removes the "deposit_address" edge to the DepositAddress entity by IDs.
+func (m *SigningKeyshareMutation) RemoveDepositAddresIDs(ids ...uuid.UUID) {
+	if m.removeddeposit_address == nil {
+		m.removeddeposit_address = make(map[uuid.UUID]struct{})
+	}
+	for i := range ids {
+		delete(m.deposit_address, ids[i])
+		m.removeddeposit_address[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedDepositAddress returns the removed IDs of the "deposit_address" edge to the DepositAddress entity.
+func (m *SigningKeyshareMutation) RemovedDepositAddressIDs() (ids []uuid.UUID) {
+	for id := range m.removeddeposit_address {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// DepositAddressIDs returns the "deposit_address" edge IDs in the mutation.
+func (m *SigningKeyshareMutation) DepositAddressIDs() (ids []uuid.UUID) {
+	for id := range m.deposit_address {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetDepositAddress resets all changes to the "deposit_address" edge.
+func (m *SigningKeyshareMutation) ResetDepositAddress() {
+	m.deposit_address = nil
+	m.cleareddeposit_address = false
+	m.removeddeposit_address = nil
+}
+
 // Where appends a list predicates to the SigningKeyshareMutation builder.
 func (m *SigningKeyshareMutation) Where(ps ...predicate.SigningKeyshare) {
 	m.predicates = append(m.predicates, ps...)
@@ -762,48 +1328,84 @@ func (m *SigningKeyshareMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *SigningKeyshareMutation) AddedEdges() []string {
-	edges := make([]string, 0, 0)
+	edges := make([]string, 0, 1)
+	if m.deposit_address != nil {
+		edges = append(edges, signingkeyshare.EdgeDepositAddress)
+	}
 	return edges
 }
 
 // AddedIDs returns all IDs (to other nodes) that were added for the given edge
 // name in this mutation.
 func (m *SigningKeyshareMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case signingkeyshare.EdgeDepositAddress:
+		ids := make([]ent.Value, 0, len(m.deposit_address))
+		for id := range m.deposit_address {
+			ids = append(ids, id)
+		}
+		return ids
+	}
 	return nil
 }
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *SigningKeyshareMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 0)
+	edges := make([]string, 0, 1)
+	if m.removeddeposit_address != nil {
+		edges = append(edges, signingkeyshare.EdgeDepositAddress)
+	}
 	return edges
 }
 
 // RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
 // the given name in this mutation.
 func (m *SigningKeyshareMutation) RemovedIDs(name string) []ent.Value {
+	switch name {
+	case signingkeyshare.EdgeDepositAddress:
+		ids := make([]ent.Value, 0, len(m.removeddeposit_address))
+		for id := range m.removeddeposit_address {
+			ids = append(ids, id)
+		}
+		return ids
+	}
 	return nil
 }
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *SigningKeyshareMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 0)
+	edges := make([]string, 0, 1)
+	if m.cleareddeposit_address {
+		edges = append(edges, signingkeyshare.EdgeDepositAddress)
+	}
 	return edges
 }
 
 // EdgeCleared returns a boolean which indicates if the edge with the given name
 // was cleared in this mutation.
 func (m *SigningKeyshareMutation) EdgeCleared(name string) bool {
+	switch name {
+	case signingkeyshare.EdgeDepositAddress:
+		return m.cleareddeposit_address
+	}
 	return false
 }
 
 // ClearEdge clears the value of the edge with the given name. It returns an error
 // if that edge is not defined in the schema.
 func (m *SigningKeyshareMutation) ClearEdge(name string) error {
+	switch name {
+	}
 	return fmt.Errorf("unknown SigningKeyshare unique edge %s", name)
 }
 
 // ResetEdge resets all changes to the edge with the given name in this mutation.
 // It returns an error if the edge is not defined in the schema.
 func (m *SigningKeyshareMutation) ResetEdge(name string) error {
+	switch name {
+	case signingkeyshare.EdgeDepositAddress:
+		m.ResetDepositAddress()
+		return nil
+	}
 	return fmt.Errorf("unknown SigningKeyshare edge %s", name)
 }

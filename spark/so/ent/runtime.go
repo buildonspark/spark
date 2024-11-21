@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark-go/so/ent/depositaddress"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
 	"github.com/lightsparkdev/spark-go/so/ent/signingkeyshare"
 )
@@ -14,6 +15,29 @@ import (
 // (default values, validators, hooks and policies) and stitches it
 // to their package variables.
 func init() {
+	depositaddressMixin := schema.DepositAddress{}.Mixin()
+	depositaddressMixinFields0 := depositaddressMixin[0].Fields()
+	_ = depositaddressMixinFields0
+	depositaddressFields := schema.DepositAddress{}.Fields()
+	_ = depositaddressFields
+	// depositaddressDescCreateTime is the schema descriptor for create_time field.
+	depositaddressDescCreateTime := depositaddressMixinFields0[1].Descriptor()
+	// depositaddress.DefaultCreateTime holds the default value on creation for the create_time field.
+	depositaddress.DefaultCreateTime = depositaddressDescCreateTime.Default.(func() time.Time)
+	// depositaddressDescUpdateTime is the schema descriptor for update_time field.
+	depositaddressDescUpdateTime := depositaddressMixinFields0[2].Descriptor()
+	// depositaddress.DefaultUpdateTime holds the default value on creation for the update_time field.
+	depositaddress.DefaultUpdateTime = depositaddressDescUpdateTime.Default.(func() time.Time)
+	// depositaddress.UpdateDefaultUpdateTime holds the default value on update for the update_time field.
+	depositaddress.UpdateDefaultUpdateTime = depositaddressDescUpdateTime.UpdateDefault.(func() time.Time)
+	// depositaddressDescAddress is the schema descriptor for address field.
+	depositaddressDescAddress := depositaddressFields[0].Descriptor()
+	// depositaddress.AddressValidator is a validator for the "address" field. It is called by the builders before save.
+	depositaddress.AddressValidator = depositaddressDescAddress.Validators[0].(func(string) error)
+	// depositaddressDescID is the schema descriptor for id field.
+	depositaddressDescID := depositaddressMixinFields0[0].Descriptor()
+	// depositaddress.DefaultID holds the default value on creation for the id field.
+	depositaddress.DefaultID = depositaddressDescID.Default.(func() uuid.UUID)
 	signingkeyshareMixin := schema.SigningKeyshare{}.Mixin()
 	signingkeyshareMixinFields0 := signingkeyshareMixin[0].Fields()
 	_ = signingkeyshareMixinFields0

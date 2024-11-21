@@ -8,9 +8,11 @@ PROTO_FILES := $(wildcard $(PROTO_DIR)/*.proto)
 # Generate output file paths
 GO_OUT := $(patsubst $(PROTO_DIR)/%.proto,$(OUT_DIR)/%.pb.go,$(PROTO_FILES))
 
-.PHONY: all clean
+.PHONY: all clean ent proto
 
-all: $(GO_OUT)
+all: proto ent
+
+proto: $(GO_OUT)
 
 # Rule to compile .proto files to Go
 $(OUT_DIR)/%.pb.go: $(PROTO_DIR)/%.proto
@@ -24,3 +26,6 @@ $(OUT_DIR)/%.pb.go: $(PROTO_DIR)/%.proto
 
 clean:
 	rm -rf $(OUT_DIR)/*.pb.go
+
+ent:
+	cd spark && go generate ./so/ent

@@ -41,3 +41,21 @@ func (s *SparkInternalServer) MarkKeysharesAsUsed(ctx context.Context, req *pb.M
 
 	return &emptypb.Empty{}, nil
 }
+
+func (s *SparkInternalServer) MarkKeyshareForDepositAddress(ctx context.Context, req *pb.MarkKeyshareForDepositAddressRequest) (*emptypb.Empty, error) {
+	log.Printf("Marking keyshare for deposit address: %v", req.KeyshareId)
+
+	keyshareID, err := uuid.Parse(req.KeyshareId)
+	if err != nil {
+		log.Printf("Failed to parse keyshare ID: %v", err)
+		return nil, err
+	}
+	_, err = ent_utils.LinkKeyshareToDepositAddress(ctx, s.config, keyshareID, req.Address)
+	if err != nil {
+		log.Printf("Failed to link keyshare to deposit address: %v", err)
+		return nil, err
+	}
+
+	log.Printf("Marked keyshare for deposit address")
+	return &emptypb.Empty{}, nil
+}

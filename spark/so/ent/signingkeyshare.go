@@ -36,7 +36,28 @@ type SigningKeyshare struct {
 	MinSigners uint32 `json:"min_signers,omitempty"`
 	// CoordinatorIndex holds the value of the "coordinator_index" field.
 	CoordinatorIndex uint64 `json:"coordinator_index,omitempty"`
-	selectValues     sql.SelectValues
+	// Edges holds the relations/edges for other nodes in the graph.
+	// The values are being populated by the SigningKeyshareQuery when eager-loading is set.
+	Edges        SigningKeyshareEdges `json:"edges"`
+	selectValues sql.SelectValues
+}
+
+// SigningKeyshareEdges holds the relations/edges for other nodes in the graph.
+type SigningKeyshareEdges struct {
+	// DepositAddress holds the value of the deposit_address edge.
+	DepositAddress []*DepositAddress `json:"deposit_address,omitempty"`
+	// loadedTypes holds the information for reporting if a
+	// type was loaded (or requested) in eager-loading or not.
+	loadedTypes [1]bool
+}
+
+// DepositAddressOrErr returns the DepositAddress value or an error if the edge
+// was not loaded in eager-loading.
+func (e SigningKeyshareEdges) DepositAddressOrErr() ([]*DepositAddress, error) {
+	if e.loadedTypes[0] {
+		return e.DepositAddress, nil
+	}
+	return nil, &NotLoadedError{edge: "deposit_address"}
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -136,6 +157,11 @@ func (sk *SigningKeyshare) assignValues(columns []string, values []any) error {
 // This includes values selected through modifiers, order, etc.
 func (sk *SigningKeyshare) Value(name string) (ent.Value, error) {
 	return sk.selectValues.Get(name)
+}
+
+// QueryDepositAddress queries the "deposit_address" edge of the SigningKeyshare entity.
+func (sk *SigningKeyshare) QueryDepositAddress() *DepositAddressQuery {
+	return NewSigningKeyshareClient(sk.config).QueryDepositAddress(sk)
 }
 
 // Update returns a builder for updating this SigningKeyshare.

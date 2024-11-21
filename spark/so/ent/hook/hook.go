@@ -9,6 +9,18 @@ import (
 	"github.com/lightsparkdev/spark-go/so/ent"
 )
 
+// The DepositAddressFunc type is an adapter to allow the use of ordinary
+// function as DepositAddress mutator.
+type DepositAddressFunc func(context.Context, *ent.DepositAddressMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f DepositAddressFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.DepositAddressMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.DepositAddressMutation", m)
+}
+
 // The SigningKeyshareFunc type is an adapter to allow the use of ordinary
 // function as SigningKeyshare mutator.
 type SigningKeyshareFunc func(context.Context, *ent.SigningKeyshareMutation) (ent.Value, error)

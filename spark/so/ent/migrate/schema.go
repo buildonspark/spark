@@ -8,6 +8,35 @@ import (
 )
 
 var (
+	// DepositAddressesColumns holds the columns for the "deposit_addresses" table.
+	DepositAddressesColumns = []*schema.Column{
+		{Name: "oid", Type: field.TypeUUID},
+		{Name: "create_time", Type: field.TypeTime},
+		{Name: "update_time", Type: field.TypeTime},
+		{Name: "address", Type: field.TypeString},
+		{Name: "signing_keyshare_deposit_address", Type: field.TypeUUID, Nullable: true},
+	}
+	// DepositAddressesTable holds the schema information for the "deposit_addresses" table.
+	DepositAddressesTable = &schema.Table{
+		Name:       "deposit_addresses",
+		Columns:    DepositAddressesColumns,
+		PrimaryKey: []*schema.Column{DepositAddressesColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "deposit_addresses_signing_keyshares_deposit_address",
+				Columns:    []*schema.Column{DepositAddressesColumns[4]},
+				RefColumns: []*schema.Column{SigningKeysharesColumns[0]},
+				OnDelete:   schema.SetNull,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "depositaddress_address",
+				Unique:  false,
+				Columns: []*schema.Column{DepositAddressesColumns[3]},
+			},
+		},
+	}
 	// SigningKeysharesColumns holds the columns for the "signing_keyshares" table.
 	SigningKeysharesColumns = []*schema.Column{
 		{Name: "oid", Type: field.TypeUUID},
@@ -35,9 +64,11 @@ var (
 	}
 	// Tables holds all the tables in the schema.
 	Tables = []*schema.Table{
+		DepositAddressesTable,
 		SigningKeysharesTable,
 	}
 )
 
 func init() {
+	DepositAddressesTable.ForeignKeys[0].RefTable = SigningKeysharesTable
 }

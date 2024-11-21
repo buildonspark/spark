@@ -7,8 +7,14 @@ import "google/protobuf/empty.proto";
 
 service SparkInternalService {
     rpc mark_keyshares_as_used(MarkKeysharesAsUsedRequest) returns (google.protobuf.Empty) {}
+    rpc mark_keyshare_for_deposit_address(MarkKeyshareForDepositAddressRequest) returns (google.protobuf.Empty) {}
 }
 
 message MarkKeysharesAsUsedRequest {
     repeated string keyshare_id = 1;
+}
+
+message MarkKeyshareForDepositAddressRequest {
+    string keyshare_id = 1;
+    string address = 2;
 }
