@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package spark;
+
+option go_package = "github.com/lightsparkdev/spark-go/proto";
+
+service SparkService {
+    rpc generate_deposit_address(GenerateDepositAddressRequest) returns (GenerateDepositAddressResponse) {}
+}
+
+message GenerateDepositAddressRequest {
+    bytes public_key = 1;
+}
+
+message GenerateDepositAddressResponse {
+    string address = 1;
+}

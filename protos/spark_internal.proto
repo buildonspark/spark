@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package spark;
+
+option go_package = "github.com/lightsparkdev/spark-go/proto";
+import "google/protobuf/empty.proto";
+
+service SparkInternalService {
+    rpc mark_keyshare_as_used(MarkKeyshareAsUsedRequest) returns (google.protobuf.Empty) {}
+}
+
+message MarkKeyshareAsUsedRequest {
+    string keyshare_id = 1;
+}
