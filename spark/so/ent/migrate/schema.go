@@ -18,12 +18,20 @@ var (
 		{Name: "public_shares", Type: field.TypeJSON},
 		{Name: "public_key", Type: field.TypeBytes},
 		{Name: "min_signers", Type: field.TypeUint32},
+		{Name: "coordinator_index", Type: field.TypeUint64},
 	}
 	// SigningKeysharesTable holds the schema information for the "signing_keyshares" table.
 	SigningKeysharesTable = &schema.Table{
 		Name:       "signing_keyshares",
 		Columns:    SigningKeysharesColumns,
 		PrimaryKey: []*schema.Column{SigningKeysharesColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "signingkeyshare_coordinator_index",
+				Unique:  false,
+				Columns: []*schema.Column{SigningKeysharesColumns[8]},
+			},
+		},
 	}
 	// Tables holds all the tables in the schema.
 	Tables = []*schema.Table{

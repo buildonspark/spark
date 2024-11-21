@@ -80,6 +80,12 @@ func (skc *SigningKeyshareCreate) SetMinSigners(u uint32) *SigningKeyshareCreate
 	return skc
 }
 
+// SetCoordinatorIndex sets the "coordinator_index" field.
+func (skc *SigningKeyshareCreate) SetCoordinatorIndex(u uint64) *SigningKeyshareCreate {
+	skc.mutation.SetCoordinatorIndex(u)
+	return skc
+}
+
 // SetID sets the "id" field.
 func (skc *SigningKeyshareCreate) SetID(u uuid.UUID) *SigningKeyshareCreate {
 	skc.mutation.SetID(u)
@@ -171,6 +177,9 @@ func (skc *SigningKeyshareCreate) check() error {
 	if _, ok := skc.mutation.MinSigners(); !ok {
 		return &ValidationError{Name: "min_signers", err: errors.New(`ent: missing required field "SigningKeyshare.min_signers"`)}
 	}
+	if _, ok := skc.mutation.CoordinatorIndex(); !ok {
+		return &ValidationError{Name: "coordinator_index", err: errors.New(`ent: missing required field "SigningKeyshare.coordinator_index"`)}
+	}
 	return nil
 }
 
@@ -233,6 +242,10 @@ func (skc *SigningKeyshareCreate) createSpec() (*SigningKeyshare, *sqlgraph.Crea
 	if value, ok := skc.mutation.MinSigners(); ok {
 		_spec.SetField(signingkeyshare.FieldMinSigners, field.TypeUint32, value)
 		_node.MinSigners = value
+	}
+	if value, ok := skc.mutation.CoordinatorIndex(); ok {
+		_spec.SetField(signingkeyshare.FieldCoordinatorIndex, field.TypeUint64, value)
+		_node.CoordinatorIndex = value
 	}
 	return _node, _spec
 }

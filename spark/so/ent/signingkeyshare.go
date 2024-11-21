@@ -33,8 +33,10 @@ type SigningKeyshare struct {
 	// PublicKey holds the value of the "public_key" field.
 	PublicKey []byte `json:"public_key,omitempty"`
 	// MinSigners holds the value of the "min_signers" field.
-	MinSigners   uint32 `json:"min_signers,omitempty"`
-	selectValues sql.SelectValues
+	MinSigners uint32 `json:"min_signers,omitempty"`
+	// CoordinatorIndex holds the value of the "coordinator_index" field.
+	CoordinatorIndex uint64 `json:"coordinator_index,omitempty"`
+	selectValues     sql.SelectValues
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -44,7 +46,7 @@ func (*SigningKeyshare) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case signingkeyshare.FieldSecretShare, signingkeyshare.FieldPublicShares, signingkeyshare.FieldPublicKey:
 			values[i] = new([]byte)
-		case signingkeyshare.FieldMinSigners:
+		case signingkeyshare.FieldMinSigners, signingkeyshare.FieldCoordinatorIndex:
 			values[i] = new(sql.NullInt64)
 		case signingkeyshare.FieldStatus:
 			values[i] = new(sql.NullString)
@@ -117,6 +119,12 @@ func (sk *SigningKeyshare) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				sk.MinSigners = uint32(value.Int64)
 			}
+		case signingkeyshare.FieldCoordinatorIndex:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field coordinator_index", values[i])
+			} else if value.Valid {
+				sk.CoordinatorIndex = uint64(value.Int64)
+			}
 		default:
 			sk.selectValues.Set(columns[i], values[i])
 		}
@@ -173,6 +181,9 @@ func (sk *SigningKeyshare) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("min_signers=")
 	builder.WriteString(fmt.Sprintf("%v", sk.MinSigners))
+	builder.WriteString(", ")
+	builder.WriteString("coordinator_index=")
+	builder.WriteString(fmt.Sprintf("%v", sk.CoordinatorIndex))
 	builder.WriteByte(')')
 	return builder.String()
 }

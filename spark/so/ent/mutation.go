@@ -32,21 +32,23 @@ const (
 // SigningKeyshareMutation represents an operation that mutates the SigningKeyshare nodes in the graph.
 type SigningKeyshareMutation struct {
 	config
-	op             Op
-	typ            string
-	id             *uuid.UUID
-	create_time    *time.Time
-	update_time    *time.Time
-	status         *schema.SigningKeyshareStatus
-	secret_share   *[]byte
-	public_shares  *map[string][]uint8
-	public_key     *[]byte
-	min_signers    *uint32
-	addmin_signers *int32
-	clearedFields  map[string]struct{}
-	done           bool
-	oldValue       func(context.Context) (*SigningKeyshare, error)
-	predicates     []predicate.SigningKeyshare
+	op                   Op
+	typ                  string
+	id                   *uuid.UUID
+	create_time          *time.Time
+	update_time          *time.Time
+	status               *schema.SigningKeyshareStatus
+	secret_share         *[]byte
+	public_shares        *map[string][]uint8
+	public_key           *[]byte
+	min_signers          *uint32
+	addmin_signers       *int32
+	coordinator_index    *uint64
+	addcoordinator_index *int64
+	clearedFields        map[string]struct{}
+	done                 bool
+	oldValue             func(context.Context) (*SigningKeyshare, error)
+	predicates           []predicate.SigningKeyshare
 }
 
 var _ ent.Mutation = (*SigningKeyshareMutation)(nil)
@@ -425,6 +427,62 @@ func (m *SigningKeyshareMutation) ResetMinSigners() {
 	m.addmin_signers = nil
 }
 
+// SetCoordinatorIndex sets the "coordinator_index" field.
+func (m *SigningKeyshareMutation) SetCoordinatorIndex(u uint64) {
+	m.coordinator_index = &u
+	m.addcoordinator_index = nil
+}
+
+// CoordinatorIndex returns the value of the "coordinator_index" field in the mutation.
+func (m *SigningKeyshareMutation) CoordinatorIndex() (r uint64, exists bool) {
+	v := m.coordinator_index
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCoordinatorIndex returns the old "coordinator_index" field's value of the SigningKeyshare entity.
+// If the SigningKeyshare object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SigningKeyshareMutation) OldCoordinatorIndex(ctx context.Context) (v uint64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCoordinatorIndex is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCoordinatorIndex requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCoordinatorIndex: %w", err)
+	}
+	return oldValue.CoordinatorIndex, nil
+}
+
+// AddCoordinatorIndex adds u to the "coordinator_index" field.
+func (m *SigningKeyshareMutation) AddCoordinatorIndex(u int64) {
+	if m.addcoordinator_index != nil {
+		*m.addcoordinator_index += u
+	} else {
+		m.addcoordinator_index = &u
+	}
+}
+
+// AddedCoordinatorIndex returns the value that was added to the "coordinator_index" field in this mutation.
+func (m *SigningKeyshareMutation) AddedCoordinatorIndex() (r int64, exists bool) {
+	v := m.addcoordinator_index
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetCoordinatorIndex resets all changes to the "coordinator_index" field.
+func (m *SigningKeyshareMutation) ResetCoordinatorIndex() {
+	m.coordinator_index = nil
+	m.addcoordinator_index = nil
+}
+
 // Where appends a list predicates to the SigningKeyshareMutation builder.
 func (m *SigningKeyshareMutation) Where(ps ...predicate.SigningKeyshare) {
 	m.predicates = append(m.predicates, ps...)
@@ -459,7 +517,7 @@ func (m *SigningKeyshareMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *SigningKeyshareMutation) Fields() []string {
-	fields := make([]string, 0, 7)
+	fields := make([]string, 0, 8)
 	if m.create_time != nil {
 		fields = append(fields, signingkeyshare.FieldCreateTime)
 	}
@@ -480,6 +538,9 @@ func (m *SigningKeyshareMutation) Fields() []string {
 	}
 	if m.min_signers != nil {
 		fields = append(fields, signingkeyshare.FieldMinSigners)
+	}
+	if m.coordinator_index != nil {
+		fields = append(fields, signingkeyshare.FieldCoordinatorIndex)
 	}
 	return fields
 }
@@ -503,6 +564,8 @@ func (m *SigningKeyshareMutation) Field(name string) (ent.Value, bool) {
 		return m.PublicKey()
 	case signingkeyshare.FieldMinSigners:
 		return m.MinSigners()
+	case signingkeyshare.FieldCoordinatorIndex:
+		return m.CoordinatorIndex()
 	}
 	return nil, false
 }
@@ -526,6 +589,8 @@ func (m *SigningKeyshareMutation) OldField(ctx context.Context, name string) (en
 		return m.OldPublicKey(ctx)
 	case signingkeyshare.FieldMinSigners:
 		return m.OldMinSigners(ctx)
+	case signingkeyshare.FieldCoordinatorIndex:
+		return m.OldCoordinatorIndex(ctx)
 	}
 	return nil, fmt.Errorf("unknown SigningKeyshare field %s", name)
 }
@@ -584,6 +649,13 @@ func (m *SigningKeyshareMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetMinSigners(v)
 		return nil
+	case signingkeyshare.FieldCoordinatorIndex:
+		v, ok := value.(uint64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCoordinatorIndex(v)
+		return nil
 	}
 	return fmt.Errorf("unknown SigningKeyshare field %s", name)
 }
@@ -595,6 +667,9 @@ func (m *SigningKeyshareMutation) AddedFields() []string {
 	if m.addmin_signers != nil {
 		fields = append(fields, signingkeyshare.FieldMinSigners)
 	}
+	if m.addcoordinator_index != nil {
+		fields = append(fields, signingkeyshare.FieldCoordinatorIndex)
+	}
 	return fields
 }
 
@@ -605,6 +680,8 @@ func (m *SigningKeyshareMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
 	case signingkeyshare.FieldMinSigners:
 		return m.AddedMinSigners()
+	case signingkeyshare.FieldCoordinatorIndex:
+		return m.AddedCoordinatorIndex()
 	}
 	return nil, false
 }
@@ -620,6 +697,13 @@ func (m *SigningKeyshareMutation) AddField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.AddMinSigners(v)
+		return nil
+	case signingkeyshare.FieldCoordinatorIndex:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddCoordinatorIndex(v)
 		return nil
 	}
 	return fmt.Errorf("unknown SigningKeyshare numeric field %s", name)
@@ -668,6 +752,9 @@ func (m *SigningKeyshareMutation) ResetField(name string) error {
 		return nil
 	case signingkeyshare.FieldMinSigners:
 		m.ResetMinSigners()
+		return nil
+	case signingkeyshare.FieldCoordinatorIndex:
+		m.ResetCoordinatorIndex()
 		return nil
 	}
 	return fmt.Errorf("unknown SigningKeyshare field %s", name)

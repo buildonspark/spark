@@ -3,6 +3,7 @@ package schema
 import (
 	"entgo.io/ent"
 	"entgo.io/ent/schema/field"
+	"entgo.io/ent/schema/index"
 )
 
 type SigningKeyshareStatus string
@@ -30,6 +31,12 @@ func (SigningKeyshare) Mixin() []ent.Mixin {
 	}
 }
 
+func (SigningKeyshare) Indexes() []ent.Index {
+	return []ent.Index{
+		index.Fields("coordinator_index"),
+	}
+}
+
 // Fields of the SigningKeyshare.
 func (SigningKeyshare) Fields() []ent.Field {
 	return []ent.Field{
@@ -39,6 +46,7 @@ func (SigningKeyshare) Fields() []ent.Field {
 		field.JSON("public_shares", map[string][]byte{}),
 		field.Bytes("public_key"),
 		field.Uint32("min_signers"),
+		field.Uint64("coordinator_index"),
 	}
 }
 

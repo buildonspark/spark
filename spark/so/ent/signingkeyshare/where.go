@@ -81,6 +81,11 @@ func MinSigners(v uint32) predicate.SigningKeyshare {
 	return predicate.SigningKeyshare(sql.FieldEQ(FieldMinSigners, v))
 }
 
+// CoordinatorIndex applies equality check predicate on the "coordinator_index" field. It's identical to CoordinatorIndexEQ.
+func CoordinatorIndex(v uint64) predicate.SigningKeyshare {
+	return predicate.SigningKeyshare(sql.FieldEQ(FieldCoordinatorIndex, v))
+}
+
 // CreateTimeEQ applies the EQ predicate on the "create_time" field.
 func CreateTimeEQ(v time.Time) predicate.SigningKeyshare {
 	return predicate.SigningKeyshare(sql.FieldEQ(FieldCreateTime, v))
@@ -309,6 +314,46 @@ func MinSignersLT(v uint32) predicate.SigningKeyshare {
 // MinSignersLTE applies the LTE predicate on the "min_signers" field.
 func MinSignersLTE(v uint32) predicate.SigningKeyshare {
 	return predicate.SigningKeyshare(sql.FieldLTE(FieldMinSigners, v))
+}
+
+// CoordinatorIndexEQ applies the EQ predicate on the "coordinator_index" field.
+func CoordinatorIndexEQ(v uint64) predicate.SigningKeyshare {
+	return predicate.SigningKeyshare(sql.FieldEQ(FieldCoordinatorIndex, v))
+}
+
+// CoordinatorIndexNEQ applies the NEQ predicate on the "coordinator_index" field.
+func CoordinatorIndexNEQ(v uint64) predicate.SigningKeyshare {
+	return predicate.SigningKeyshare(sql.FieldNEQ(FieldCoordinatorIndex, v))
+}
+
+// CoordinatorIndexIn applies the In predicate on the "coordinator_index" field.
+func CoordinatorIndexIn(vs ...uint64) predicate.SigningKeyshare {
+	return predicate.SigningKeyshare(sql.FieldIn(FieldCoordinatorIndex, vs...))
+}
+
+// CoordinatorIndexNotIn applies the NotIn predicate on the "coordinator_index" field.
+func CoordinatorIndexNotIn(vs ...uint64) predicate.SigningKeyshare {
+	return predicate.SigningKeyshare(sql.FieldNotIn(FieldCoordinatorIndex, vs...))
+}
+
+// CoordinatorIndexGT applies the GT predicate on the "coordinator_index" field.
+func CoordinatorIndexGT(v uint64) predicate.SigningKeyshare {
+	return predicate.SigningKeyshare(sql.FieldGT(FieldCoordinatorIndex, v))
+}
+
+// CoordinatorIndexGTE applies the GTE predicate on the "coordinator_index" field.
+func CoordinatorIndexGTE(v uint64) predicate.SigningKeyshare {
+	return predicate.SigningKeyshare(sql.FieldGTE(FieldCoordinatorIndex, v))
+}
+
+// CoordinatorIndexLT applies the LT predicate on the "coordinator_index" field.
+func CoordinatorIndexLT(v uint64) predicate.SigningKeyshare {
+	return predicate.SigningKeyshare(sql.FieldLT(FieldCoordinatorIndex, v))
+}
+
+// CoordinatorIndexLTE applies the LTE predicate on the "coordinator_index" field.
+func CoordinatorIndexLTE(v uint64) predicate.SigningKeyshare {
+	return predicate.SigningKeyshare(sql.FieldLTE(FieldCoordinatorIndex, v))
 }
 
 // And groups predicates with the AND operator between them.

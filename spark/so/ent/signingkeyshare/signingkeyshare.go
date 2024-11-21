@@ -30,6 +30,8 @@ const (
 	FieldPublicKey = "public_key"
 	// FieldMinSigners holds the string denoting the min_signers field in the database.
 	FieldMinSigners = "min_signers"
+	// FieldCoordinatorIndex holds the string denoting the coordinator_index field in the database.
+	FieldCoordinatorIndex = "coordinator_index"
 	// Table holds the table name of the signingkeyshare in the database.
 	Table = "signing_keyshares"
 )
@@ -44,6 +46,7 @@ var Columns = []string{
 	FieldPublicShares,
 	FieldPublicKey,
 	FieldMinSigners,
+	FieldCoordinatorIndex,
 }
 
 // ValidColumn reports if the column name is valid (part of the table columns).
@@ -103,4 +106,9 @@ func ByStatus(opts ...sql.OrderTermOption) OrderOption {
 // ByMinSigners orders the results by the min_signers field.
 func ByMinSigners(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldMinSigners, opts...).ToFunc()
+}
+
+// ByCoordinatorIndex orders the results by the coordinator_index field.
+func ByCoordinatorIndex(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCoordinatorIndex, opts...).ToFunc()
 }

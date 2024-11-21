@@ -88,6 +88,27 @@ func (sku *SigningKeyshareUpdate) AddMinSigners(u int32) *SigningKeyshareUpdate 
 	return sku
 }
 
+// SetCoordinatorIndex sets the "coordinator_index" field.
+func (sku *SigningKeyshareUpdate) SetCoordinatorIndex(u uint64) *SigningKeyshareUpdate {
+	sku.mutation.ResetCoordinatorIndex()
+	sku.mutation.SetCoordinatorIndex(u)
+	return sku
+}
+
+// SetNillableCoordinatorIndex sets the "coordinator_index" field if the given value is not nil.
+func (sku *SigningKeyshareUpdate) SetNillableCoordinatorIndex(u *uint64) *SigningKeyshareUpdate {
+	if u != nil {
+		sku.SetCoordinatorIndex(*u)
+	}
+	return sku
+}
+
+// AddCoordinatorIndex adds u to the "coordinator_index" field.
+func (sku *SigningKeyshareUpdate) AddCoordinatorIndex(u int64) *SigningKeyshareUpdate {
+	sku.mutation.AddCoordinatorIndex(u)
+	return sku
+}
+
 // Mutation returns the SigningKeyshareMutation object of the builder.
 func (sku *SigningKeyshareUpdate) Mutation() *SigningKeyshareMutation {
 	return sku.mutation
@@ -172,6 +193,12 @@ func (sku *SigningKeyshareUpdate) sqlSave(ctx context.Context) (n int, err error
 	if value, ok := sku.mutation.AddedMinSigners(); ok {
 		_spec.AddField(signingkeyshare.FieldMinSigners, field.TypeUint32, value)
 	}
+	if value, ok := sku.mutation.CoordinatorIndex(); ok {
+		_spec.SetField(signingkeyshare.FieldCoordinatorIndex, field.TypeUint64, value)
+	}
+	if value, ok := sku.mutation.AddedCoordinatorIndex(); ok {
+		_spec.AddField(signingkeyshare.FieldCoordinatorIndex, field.TypeUint64, value)
+	}
 	if n, err = sqlgraph.UpdateNodes(ctx, sku.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{signingkeyshare.Label}
@@ -248,6 +275,27 @@ func (skuo *SigningKeyshareUpdateOne) SetNillableMinSigners(u *uint32) *SigningK
 // AddMinSigners adds u to the "min_signers" field.
 func (skuo *SigningKeyshareUpdateOne) AddMinSigners(u int32) *SigningKeyshareUpdateOne {
 	skuo.mutation.AddMinSigners(u)
+	return skuo
+}
+
+// SetCoordinatorIndex sets the "coordinator_index" field.
+func (skuo *SigningKeyshareUpdateOne) SetCoordinatorIndex(u uint64) *SigningKeyshareUpdateOne {
+	skuo.mutation.ResetCoordinatorIndex()
+	skuo.mutation.SetCoordinatorIndex(u)
+	return skuo
+}
+
+// SetNillableCoordinatorIndex sets the "coordinator_index" field if the given value is not nil.
+func (skuo *SigningKeyshareUpdateOne) SetNillableCoordinatorIndex(u *uint64) *SigningKeyshareUpdateOne {
+	if u != nil {
+		skuo.SetCoordinatorIndex(*u)
+	}
+	return skuo
+}
+
+// AddCoordinatorIndex adds u to the "coordinator_index" field.
+func (skuo *SigningKeyshareUpdateOne) AddCoordinatorIndex(u int64) *SigningKeyshareUpdateOne {
+	skuo.mutation.AddCoordinatorIndex(u)
 	return skuo
 }
 
@@ -364,6 +412,12 @@ func (skuo *SigningKeyshareUpdateOne) sqlSave(ctx context.Context) (_node *Signi
 	}
 	if value, ok := skuo.mutation.AddedMinSigners(); ok {
 		_spec.AddField(signingkeyshare.FieldMinSigners, field.TypeUint32, value)
+	}
+	if value, ok := skuo.mutation.CoordinatorIndex(); ok {
+		_spec.SetField(signingkeyshare.FieldCoordinatorIndex, field.TypeUint64, value)
+	}
+	if value, ok := skuo.mutation.AddedCoordinatorIndex(); ok {
+		_spec.AddField(signingkeyshare.FieldCoordinatorIndex, field.TypeUint64, value)
 	}
 	_node = &SigningKeyshare{config: skuo.config}
 	_spec.Assign = _node.assignValues
