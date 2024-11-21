@@ -35,6 +35,7 @@ type DkgState struct {
 	Type                   DkgStateType
 	MaxSigners             uint64
 	MinSigners             uint64
+	CoordinatorIndex       uint64
 	Round1Package          [][]byte
 	ReceivedRound1Packages []map[string][]byte
 	ReceivedRound2Packages []map[string][]byte
@@ -63,7 +64,7 @@ func (s *DkgStates) GetState(requestId string) (*DkgState, error) {
 	return state, nil
 }
 
-func (s *DkgStates) InitiateDkg(requestId string, maxSigners uint64, minSigners uint64) error {
+func (s *DkgStates) InitiateDkg(requestId string, maxSigners uint64, minSigners uint64, coordinatorIndex uint64) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -76,10 +77,11 @@ func (s *DkgStates) InitiateDkg(requestId string, maxSigners uint64, minSigners 
 	}
 
 	s.states[requestId] = &DkgState{
-		Type:       Initial,
-		MaxSigners: maxSigners,
-		MinSigners: minSigners,
-		CreatedAt:  time.Now(),
+		Type:             Initial,
+		MaxSigners:       maxSigners,
+		MinSigners:       minSigners,
+		CoordinatorIndex: coordinatorIndex,
+		CreatedAt:        time.Now(),
 	}
 
 	return nil
@@ -268,7 +270,7 @@ func (s *DkgState) Round3(requestId string, frostConnection *grpc.ClientConn, co
 			SetSecretShare(key.SecretShare).
 			SetPublicShares(key.PublicShares).
 			SetPublicKey(key.PublicKey).
-			SetCoordinatorIndex(config.Index).
+			SetCoordinatorIndex(s.CoordinatorIndex).
 			SaveX(context.Background())
 	}
 

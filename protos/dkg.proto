@@ -74,6 +74,9 @@ message InitiateDkgRequest {
 
     // The maximum number of signers, this is the size of the threshold signature scheme.
     uint64 max_signers = 4;
+
+    // The coordinator index.
+    uint64 coordinator_index = 5;
 }
 
 

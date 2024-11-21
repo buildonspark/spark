@@ -59,10 +59,11 @@ func GenerateKeys(config *so.Config, keyCount uint64) error {
 	}
 	requestIdString := requestId.String()
 	initRequest := &pb.InitiateDkgRequest{
-		RequestId:  requestIdString,
-		KeyCount:   keyCount,
-		MinSigners: config.Threshold,
-		MaxSigners: uint64(len(config.SigningOperatorMap)),
+		RequestId:        requestIdString,
+		KeyCount:         keyCount,
+		MinSigners:       config.Threshold,
+		MaxSigners:       uint64(len(config.SigningOperatorMap)),
+		CoordinatorIndex: config.Index,
 	}
 
 	round1Packages := make([]*pb.PackageMap, int(keyCount))

@@ -28,7 +28,7 @@ func NewDkgServer(frostConnection *grpc.ClientConn, config *so.Config) *DkgServe
 
 func (s *DkgServer) InitiateDkg(ctx context.Context, req *pb.InitiateDkgRequest) (*pb.InitiateDkgResponse, error) {
 	log.Println("initiate dkg", req.RequestId, req.MaxSigners, req.MinSigners)
-	if err := s.state.InitiateDkg(req.RequestId, req.MaxSigners, req.MinSigners); err != nil {
+	if err := s.state.InitiateDkg(req.RequestId, req.MaxSigners, req.MinSigners, req.CoordinatorIndex); err != nil {
 		log.Println("error initiating dkg", err)
 		return nil, err
 	}
