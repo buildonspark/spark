@@ -20,14 +20,14 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	SparkInternalService_MarkKeyshareAsUsed_FullMethodName = "/spark.SparkInternalService/mark_keyshare_as_used"
+	SparkInternalService_MarkKeysharesAsUsed_FullMethodName = "/spark.SparkInternalService/mark_keyshares_as_used"
 )
 
 // SparkInternalServiceClient is the client API for SparkInternalService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type SparkInternalServiceClient interface {
-	MarkKeyshareAsUsed(ctx context.Context, in *MarkKeyshareAsUsedRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	MarkKeysharesAsUsed(ctx context.Context, in *MarkKeysharesAsUsedRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type sparkInternalServiceClient struct {
@@ -38,10 +38,10 @@ func NewSparkInternalServiceClient(cc grpc.ClientConnInterface) SparkInternalSer
 	return &sparkInternalServiceClient{cc}
 }
 
-func (c *sparkInternalServiceClient) MarkKeyshareAsUsed(ctx context.Context, in *MarkKeyshareAsUsedRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+func (c *sparkInternalServiceClient) MarkKeysharesAsUsed(ctx context.Context, in *MarkKeysharesAsUsedRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(emptypb.Empty)
-	err := c.cc.Invoke(ctx, SparkInternalService_MarkKeyshareAsUsed_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, SparkInternalService_MarkKeysharesAsUsed_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -52,7 +52,7 @@ func (c *sparkInternalServiceClient) MarkKeyshareAsUsed(ctx context.Context, in 
 // All implementations must embed UnimplementedSparkInternalServiceServer
 // for forward compatibility.
 type SparkInternalServiceServer interface {
-	MarkKeyshareAsUsed(context.Context, *MarkKeyshareAsUsedRequest) (*emptypb.Empty, error)
+	MarkKeysharesAsUsed(context.Context, *MarkKeysharesAsUsedRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedSparkInternalServiceServer()
 }
 
@@ -63,8 +63,8 @@ type SparkInternalServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedSparkInternalServiceServer struct{}
 
-func (UnimplementedSparkInternalServiceServer) MarkKeyshareAsUsed(context.Context, *MarkKeyshareAsUsedRequest) (*emptypb.Empty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method MarkKeyshareAsUsed not implemented")
+func (UnimplementedSparkInternalServiceServer) MarkKeysharesAsUsed(context.Context, *MarkKeysharesAsUsedRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method MarkKeysharesAsUsed not implemented")
 }
 func (UnimplementedSparkInternalServiceServer) mustEmbedUnimplementedSparkInternalServiceServer() {}
 func (UnimplementedSparkInternalServiceServer) testEmbeddedByValue()                              {}
@@ -87,20 +87,20 @@ func RegisterSparkInternalServiceServer(s grpc.ServiceRegistrar, srv SparkIntern
 	s.RegisterService(&SparkInternalService_ServiceDesc, srv)
 }
 
-func _SparkInternalService_MarkKeyshareAsUsed_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(MarkKeyshareAsUsedRequest)
+func _SparkInternalService_MarkKeysharesAsUsed_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(MarkKeysharesAsUsedRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(SparkInternalServiceServer).MarkKeyshareAsUsed(ctx, in)
+		return srv.(SparkInternalServiceServer).MarkKeysharesAsUsed(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: SparkInternalService_MarkKeyshareAsUsed_FullMethodName,
+		FullMethod: SparkInternalService_MarkKeysharesAsUsed_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SparkInternalServiceServer).MarkKeyshareAsUsed(ctx, req.(*MarkKeyshareAsUsedRequest))
+		return srv.(SparkInternalServiceServer).MarkKeysharesAsUsed(ctx, req.(*MarkKeysharesAsUsedRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -113,8 +113,8 @@ var SparkInternalService_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*SparkInternalServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "mark_keyshare_as_used",
-			Handler:    _SparkInternalService_MarkKeyshareAsUsed_Handler,
+			MethodName: "mark_keyshares_as_used",
+			Handler:    _SparkInternalService_MarkKeysharesAsUsed_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

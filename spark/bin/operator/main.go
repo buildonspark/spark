@@ -14,6 +14,7 @@ import (
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/dkg"
 	"github.com/lightsparkdev/spark-go/so/ent"
+	sparkgrpc "github.com/lightsparkdev/spark-go/so/grpc"
 	"google.golang.org/grpc"
 )
 
@@ -101,6 +102,13 @@ func main() {
 
 	grpcServer := grpc.NewServer()
 	pb.RegisterDKGServiceServer(grpcServer, dkgServer)
+
+	sparkInternalServer := sparkgrpc.NewSparkInternalServer(config)
+	pb.RegisterSparkInternalServiceServer(grpcServer, sparkInternalServer)
+
+	sparkServer := sparkgrpc.NewSparkServer(config)
+	pb.RegisterSparkServiceServer(grpcServer, sparkServer)
+
 	log.Printf("Serving on port %d\n", args.Port)
 	if err := grpcServer.Serve(lis); err != nil {
 		log.Fatalf("Failed to serve: %v", err)

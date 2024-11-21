@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/lightsparkdev/spark-go/common"
 	"github.com/lightsparkdev/spark-go/so/utils"
 )
 
@@ -17,6 +18,7 @@ type Config struct {
 	Threshold          uint64
 	SignerAddress      string
 	DatabasePath       string
+	Network            common.Network
 }
 
 func (c *Config) DatabaseDriver() string {
@@ -46,6 +48,7 @@ func NewConfig(index uint64, identityPrivateKey string, operatorsFilePath string
 		Threshold:          threshold,
 		SignerAddress:      signerAddress,
 		DatabasePath:       databasePath,
+		Network:            common.Regtest, // TODO: load this from args
 	}, nil
 }
 
