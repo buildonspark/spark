@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"time"
 
 	"github.com/lightsparkdev/spark-go/frost"
 	pb "github.com/lightsparkdev/spark-go/proto"
@@ -94,6 +95,8 @@ func main() {
 		log.Fatalf("Failed to create frost client: %v", err)
 	}
 
+	go runDKGOnStartup(config)
+
 	dkgServer := dkg.NewDkgServer(*frostClient, config)
 
 	grpcServer := grpc.NewServer()
@@ -101,5 +104,13 @@ func main() {
 	log.Printf("Serving on port %d\n", args.Port)
 	if err := grpcServer.Serve(lis); err != nil {
 		log.Fatalf("Failed to serve: %v", err)
+	}
+}
+
+func runDKGOnStartup(config *so.Config) {
+	time.Sleep(5 * time.Second)
+	err := dkg.RunDKGIfNeeded(config)
+	if err != nil {
+		log.Fatalf("Failed to run DKG: %v", err)
 	}
 }

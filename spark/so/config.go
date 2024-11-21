@@ -10,6 +10,7 @@ import (
 )
 
 type Config struct {
+	Index              uint64
 	Identifier         string
 	IdentityPrivateKey []byte
 	SigningOperatorMap map[string]*SigningOperator
@@ -38,6 +39,7 @@ func NewConfig(index uint64, identityPrivateKey string, operatorsFilePath string
 	}
 
 	return &Config{
+		Index:              index,
 		Identifier:         utils.IndexToIdentifier(index),
 		IdentityPrivateKey: identityPrivateKeyBytes,
 		SigningOperatorMap: signingOperatorMap,

@@ -113,17 +113,13 @@ func (s *DkgServer) Round1Signature(ctx context.Context, req *pb.Round1Signature
 		return nil, err
 	}
 
-	if err := s.state.ProceedToRound3(req.RequestId, &s.frostClient, s.config); err != nil {
-		return nil, err
-	}
-
 	var wg sync.WaitGroup
 	// Distribute the round 2 package to all participants
 	for identifier, _ := range round2Response.Round2Packages[0].Packages {
 		operator := s.config.SigningOperatorMap[identifier]
 		wg.Add(1)
 		go func(identifier string, addr string) {
-			log.Println("distributing round 2 package to", identifier, addr)
+			log.Println("distributing round 2 package for request id", req.RequestId, "to", identifier, addr)
 			defer wg.Done()
 			client, err := NewDKGServiceClient(addr)
 			if err != nil {
@@ -157,6 +153,11 @@ func (s *DkgServer) Round1Signature(ctx context.Context, req *pb.Round1Signature
 
 	wg.Wait()
 
+	if err := s.state.ProceedToRound3(req.RequestId, &s.frostClient, s.config); err != nil {
+		log.Printf("error proceeding to round 3 for request id: %s, error: %v", req.RequestId, err)
+		return nil, err
+	}
+
 	return &pb.Round1SignatureResponse{
 		Identifier: s.config.Identifier,
 	}, nil
@@ -169,6 +170,10 @@ func (s *DkgServer) Round2Packages(ctx context.Context, req *pb.Round2PackagesRe
 	}
 
 	if err := s.state.ReceivedRound2Packages(req.RequestId, req.Identifier, req.Round2Packages, req.Round2Signature, &s.frostClient, s.config); err != nil {
+		return nil, err
+	}
+
+	if err := s.state.ProceedToRound3(req.RequestId, &s.frostClient, s.config); err != nil {
 		return nil, err
 	}
 

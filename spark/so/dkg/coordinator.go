@@ -2,14 +2,42 @@ package dkg
 
 import (
 	"context"
+	"log"
 	"sync"
 
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark-go"
 	pb "github.com/lightsparkdev/spark-go/proto"
 	"github.com/lightsparkdev/spark-go/so"
+	"github.com/lightsparkdev/spark-go/so/ent"
+	"github.com/lightsparkdev/spark-go/so/ent/schema"
+	"github.com/lightsparkdev/spark-go/so/ent/signingkeyshare"
 )
 
+func RunDKGIfNeeded(config *so.Config) error {
+	dbClient, err := ent.Open(config.DatabaseDriver(), config.DatabasePath+"?_fk=1")
+	if err != nil {
+		return err
+	}
+	defer dbClient.Close()
+
+	count, err := dbClient.SigningKeyshare.Query().Where(
+		signingkeyshare.StatusEQ(schema.KeyshareStatusAvailable),
+		signingkeyshare.CoordinatorIndexEQ(config.Index),
+	).Count(context.Background())
+	if err != nil {
+		return err
+	}
+	if uint64(count) >= spark.DKGThreshold {
+		return nil
+	}
+
+	log.Printf("DKG started, only %d keyshares available", count)
+	return GenerateKeys(config, spark.DKGKeyCount)
+}
+
 func GenerateKeys(config *so.Config, keyCount uint64) error {
+	log.Printf("Generating %d keys", keyCount)
 	// Init clients
 	clientMap := make(map[string]*DkgClient)
 	for identifier, operator := range config.SigningOperatorMap {
@@ -35,7 +63,8 @@ func GenerateKeys(config *so.Config, keyCount uint64) error {
 
 	round1Packages := make([]*pb.PackageMap, int(keyCount))
 
-	for _, client := range clientMap {
+	for identifier, client := range clientMap {
+		log.Printf("Initiating DKG with %s", identifier)
 		round1Response, err := client.Client.InitiateDkg(context.Background(), initRequest)
 		if err != nil {
 			return err

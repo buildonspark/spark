@@ -275,63 +275,6 @@ check_operators_ready() {
    done
 }
 
-# Function to build and run the dkg program
-build_and_run_dkg() {
-   local run_dir=$1
-   local priv_key=$2  # We'll use the first operator's private key
-   local min_signers=$3
-   
-   echo "=== Building DKG program ==="
-   
-   # Ensure bin directory exists
-   mkdir -p "${run_dir}/bin"
-   
-   # Build the dkg program
-   cd spark || {
-       echo "Failed to enter spark directory" >&2
-       return 1
-   }
-   
-   echo "Building DKG binary..."
-   go build -o "${run_dir}/bin/dkg" bin/dkg/main.go
-   
-   if [ $? -ne 0 ]; then
-       echo "Failed to build DKG program" >&2
-       cd - > /dev/null
-       return 1
-   fi
-   
-   cd - > /dev/null
-   
-   echo "=== Running DKG program ==="
-   
-   # Setup paths
-   local config_file="${run_dir}/config.json"
-   local db_file="${run_dir}/db/operator_0.sqlite"
-   local signer_socket="/tmp/frost_0.sock"
-   
-   # Run the dkg program with operator 0's parameters
-   "${run_dir}/bin/dkg" \
-       -index 0 \
-       -key "${priv_key}" \
-       -operators "${config_file}" \
-       -threshold "${min_signers}" \
-       -signer "${signer_socket}" \
-       -port 8535 \
-       -database "${db_file}" \
-       -key-count 1000
-   
-   local result=$?
-   if [ $result -ne 0 ]; then
-       echo "DKG program failed with exit code ${result}" >&2
-       return 1
-   fi
-   
-   echo "DKG program completed successfully"
-   return 0
-}
-
-
 create_data_dir
 run_dir=$(create_run_dir)
 echo "Working with directory: $run_dir"
@@ -355,6 +298,3 @@ if ! check_operators_ready "$run_dir"; then
     echo "Failed to start all operators"
     exit 1
 fi
-
-# Run DKG
-build_and_run_dkg "$run_dir" "${PRIV_KEYS[0]}" "$MIN_SIGNERS"

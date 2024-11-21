@@ -55,7 +55,6 @@ func NewDkgStates() *DkgStates {
 func (s *DkgStates) GetState(requestId string) (*DkgState, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-
 	state, ok := s.states[requestId]
 	if !ok {
 		return nil, fmt.Errorf("dkg state does not exist for request id: %s", requestId)
@@ -155,6 +154,7 @@ func (s *DkgStates) ReceivedRound1Signature(requestId string, selfIdentifier str
 	valid, validationFailures := ValidateRound1Signature(state.ReceivedRound1Packages, round1Signatures, operatorMap)
 	if !valid {
 		// Abort the DKG process
+		log.Printf("State deleted for request id: %s by validation failures", requestId)
 		delete(s.states, requestId)
 
 		return validationFailures, nil
@@ -168,6 +168,7 @@ func (s *DkgStates) ReceivedRound1Signature(requestId string, selfIdentifier str
 
 func (s *DkgStates) ReceivedRound2Packages(requestId string, identifier string, round2Packages [][]byte, round2Signature []byte, frostClient *frost.FrostClient, config *so.Config) error {
 	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	state, ok := s.states[requestId]
 	if !ok {
@@ -190,31 +191,27 @@ func (s *DkgStates) ReceivedRound2Packages(requestId string, identifier string, 
 		state.ReceivedRound2Packages[i][identifier] = p
 	}
 
-	log.Printf("Received round 2 packages: %v", len(state.ReceivedRound2Packages[0]))
+	log.Printf("Received round 2 packages: %v, for request id: %s", len(state.ReceivedRound2Packages[0]), requestId)
 	s.states[requestId] = state
-	s.mu.Unlock()
-
-	err := s.ProceedToRound3(requestId, frostClient, config)
-	if err != nil {
-		return err
-	}
-
 	return nil
 }
 
 func (s *DkgStates) ProceedToRound3(requestId string, frostClient *frost.FrostClient, config *so.Config) error {
+	log.Printf("Checking if we can proceed to round 3 for request id: %s", requestId)
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	state, ok := s.states[requestId]
 	if !ok {
-		return fmt.Errorf("dkg state does not exist for request id: %s", requestId)
+		// This call might be called twice per state. So this should not count as an error.
+		return nil
 	}
 
 	if len(state.ReceivedRound2Packages) == 0 {
 		return nil
 	}
 	if int64(len(state.ReceivedRound2Packages[0])) == int64(state.MaxSigners-1) && state.Type == Round2 {
+		log.Printf("State deleted for request id: %s", requestId)
 		delete(s.states, requestId)
 
 		err := state.Round3(requestId, frostClient, config)
@@ -270,6 +267,7 @@ func (s *DkgState) Round3(requestId string, frostClient *frost.FrostClient, conf
 			SetSecretShare(key.SecretShare).
 			SetPublicShares(key.PublicShares).
 			SetPublicKey(key.PublicKey).
+			SetCoordinatorIndex(config.Index).
 			SaveX(context.Background())
 	}
 
@@ -281,6 +279,7 @@ func (s *DkgStates) RemoveState(requestId string) {
 	defer s.mu.Unlock()
 
 	if _, exists := s.states[requestId]; exists {
+		log.Printf("State deleted for request id: %s by RemoveState", requestId)
 		delete(s.states, requestId)
 	}
 }
