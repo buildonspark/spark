@@ -23,6 +23,7 @@ const (
 	FrostService_DkgRound1_FullMethodName      = "/frost.FrostService/dkg_round1"
 	FrostService_DkgRound2_FullMethodName      = "/frost.FrostService/dkg_round2"
 	FrostService_DkgRound3_FullMethodName      = "/frost.FrostService/dkg_round3"
+	FrostService_FrostNonce_FullMethodName     = "/frost.FrostService/frost_nonce"
 	FrostService_SignFrost_FullMethodName      = "/frost.FrostService/sign_frost"
 	FrostService_AggregateFrost_FullMethodName = "/frost.FrostService/aggregate_frost"
 )
@@ -35,6 +36,7 @@ type FrostServiceClient interface {
 	DkgRound1(ctx context.Context, in *DkgRound1Request, opts ...grpc.CallOption) (*DkgRound1Response, error)
 	DkgRound2(ctx context.Context, in *DkgRound2Request, opts ...grpc.CallOption) (*DkgRound2Response, error)
 	DkgRound3(ctx context.Context, in *DkgRound3Request, opts ...grpc.CallOption) (*DkgRound3Response, error)
+	FrostNonce(ctx context.Context, in *FrostNonceRequest, opts ...grpc.CallOption) (*FrostNonceResponse, error)
 	SignFrost(ctx context.Context, in *SignFrostRequest, opts ...grpc.CallOption) (*SignFrostResponse, error)
 	AggregateFrost(ctx context.Context, in *AggregateFrostRequest, opts ...grpc.CallOption) (*AggregateFrostResponse, error)
 }
@@ -87,6 +89,16 @@ func (c *frostServiceClient) DkgRound3(ctx context.Context, in *DkgRound3Request
 	return out, nil
 }
 
+func (c *frostServiceClient) FrostNonce(ctx context.Context, in *FrostNonceRequest, opts ...grpc.CallOption) (*FrostNonceResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(FrostNonceResponse)
+	err := c.cc.Invoke(ctx, FrostService_FrostNonce_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *frostServiceClient) SignFrost(ctx context.Context, in *SignFrostRequest, opts ...grpc.CallOption) (*SignFrostResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(SignFrostResponse)
@@ -115,6 +127,7 @@ type FrostServiceServer interface {
 	DkgRound1(context.Context, *DkgRound1Request) (*DkgRound1Response, error)
 	DkgRound2(context.Context, *DkgRound2Request) (*DkgRound2Response, error)
 	DkgRound3(context.Context, *DkgRound3Request) (*DkgRound3Response, error)
+	FrostNonce(context.Context, *FrostNonceRequest) (*FrostNonceResponse, error)
 	SignFrost(context.Context, *SignFrostRequest) (*SignFrostResponse, error)
 	AggregateFrost(context.Context, *AggregateFrostRequest) (*AggregateFrostResponse, error)
 	mustEmbedUnimplementedFrostServiceServer()
@@ -138,6 +151,9 @@ func (UnimplementedFrostServiceServer) DkgRound2(context.Context, *DkgRound2Requ
 }
 func (UnimplementedFrostServiceServer) DkgRound3(context.Context, *DkgRound3Request) (*DkgRound3Response, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DkgRound3 not implemented")
+}
+func (UnimplementedFrostServiceServer) FrostNonce(context.Context, *FrostNonceRequest) (*FrostNonceResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method FrostNonce not implemented")
 }
 func (UnimplementedFrostServiceServer) SignFrost(context.Context, *SignFrostRequest) (*SignFrostResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SignFrost not implemented")
@@ -238,6 +254,24 @@ func _FrostService_DkgRound3_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
+func _FrostService_FrostNonce_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(FrostNonceRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(FrostServiceServer).FrostNonce(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: FrostService_FrostNonce_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(FrostServiceServer).FrostNonce(ctx, req.(*FrostNonceRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _FrostService_SignFrost_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(SignFrostRequest)
 	if err := dec(in); err != nil {
@@ -296,6 +330,10 @@ var FrostService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "dkg_round3",
 			Handler:    _FrostService_DkgRound3_Handler,
+		},
+		{
+			MethodName: "frost_nonce",
+			Handler:    _FrostService_FrostNonce_Handler,
 		},
 		{
 			MethodName: "sign_frost",

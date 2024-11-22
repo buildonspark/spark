@@ -234,6 +234,39 @@ impl FrostService for FrostServer {
         Ok(Response::new(DkgRound3Response { key_packages }))
     }
 
+    async fn frost_nonce(
+        &self,
+        request: Request<FrostNonceRequest>,
+    ) -> Result<Response<FrostNonceResponse>, Status> {
+        let req = request.get_ref();
+
+        let key_package = frost_key_package_from_proto(
+            &req.key_package
+                .clone()
+                .ok_or(Status::internal("Key package is required"))?,
+        )
+        .map_err(|e| Status::internal(format!("Failed to parse key package: {:?}", e)))?;
+
+        let rng = &mut rand::thread_rng();
+        let (nonce, commitment) =
+            frost_secp256k1_tr::round1::commit(&key_package.signing_share(), rng);
+
+        let pb_nonce = SigningNonce {
+            hiding: nonce.hiding().serialize().to_vec(),
+            binding: nonce.binding().serialize().to_vec(),
+        };
+
+        let pb_commitment = SigningCommitment {
+            hiding: commitment.hiding().serialize().to_vec(),
+            binding: commitment.binding().serialize().to_vec(),
+        };
+
+        Ok(Response::new(FrostNonceResponse {
+            nonces: Some(pb_nonce),
+            commitments: Some(pb_commitment),
+        }))
+    }
+
     async fn sign_frost(
         &self,
         request: Request<SignFrostRequest>,

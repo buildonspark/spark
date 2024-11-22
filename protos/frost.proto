@@ -11,6 +11,7 @@ service FrostService {
     rpc dkg_round2(DkgRound2Request) returns (DkgRound2Response) {}
     rpc dkg_round3(DkgRound3Request) returns (DkgRound3Response) {}
 
+    rpc frost_nonce(FrostNonceRequest) returns (FrostNonceResponse) {}
     rpc sign_frost(SignFrostRequest) returns (SignFrostResponse) {}
     rpc aggregate_frost(AggregateFrostRequest) returns (AggregateFrostResponse) {}
 }
@@ -170,6 +171,19 @@ message SigningCommitment {
 
     // The public key for binding. 33 bytes.
     bytes binding = 2;
+}
+
+message FrostNonceRequest {
+    // The key package for the signing, used as entropy for the nonce.
+    KeyPackage key_package = 1;
+}
+
+message FrostNonceResponse {
+    // The nonces for the signing.
+    SigningNonce nonces = 1;
+
+    // The commitments for the signing.
+    SigningCommitment commitments = 2;
 }
 
 /*

@@ -5,9 +5,11 @@ import (
 	"log"
 
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark-go/common"
 	pb "github.com/lightsparkdev/spark-go/proto"
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/ent_utils"
+	"github.com/lightsparkdev/spark-go/so/objects"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
@@ -58,4 +60,56 @@ func (s *SparkInternalServer) MarkKeyshareForDepositAddress(ctx context.Context,
 
 	log.Printf("Marked keyshare for deposit address")
 	return &emptypb.Empty{}, nil
+}
+
+func (s *SparkInternalServer) FrostRound1(ctx context.Context, req *pb.FrostRound1Request) (*pb.FrostRound1Response, error) {
+	keyshareID, err := uuid.Parse(req.KeyshareId)
+	if err != nil {
+		log.Printf("Failed to parse keyshare ID: %v", err)
+		return nil, err
+	}
+	keyPackage, err := ent_utils.GetKeyPackage(ctx, s.config, keyshareID)
+	if err != nil {
+		log.Printf("Failed to get key package: %v", err)
+		return nil, err
+	}
+
+	frostConn, err := common.NewGRPCConnection(s.config.SignerAddress)
+	if err != nil {
+		log.Printf("Failed to connect to frost: %v", err)
+		return nil, err
+	}
+	defer frostConn.Close()
+
+	frostClient := pb.NewFrostServiceClient(frostConn)
+	round1Response, err := frostClient.FrostNonce(ctx, &pb.FrostNonceRequest{
+		KeyPackage: keyPackage,
+	})
+	if err != nil {
+		log.Printf("Failed to send frost round 1: %v", err)
+		return nil, err
+	}
+
+	nonce := objects.SigningNonce{}
+	err = nonce.UnmarshalProto(round1Response.Nonces)
+	if err != nil {
+		log.Printf("Failed to unmarshal nonce: %v", err)
+		return nil, err
+	}
+	commitment := objects.SigningCommitment{}
+	err = commitment.UnmarshalProto(round1Response.Commitments)
+	if err != nil {
+		log.Printf("Failed to unmarshal commitment: %v", err)
+		return nil, err
+	}
+
+	err = ent_utils.StoreSigningNonce(ctx, s.config, nonce, commitment)
+	if err != nil {
+		log.Printf("Failed to store signing nonce: %v", err)
+		return nil, err
+	}
+
+	return &pb.FrostRound1Response{
+		SigningCommitment: round1Response.Commitments,
+	}, nil
 }

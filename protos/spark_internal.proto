@@ -4,10 +4,13 @@ package spark;
 
 option go_package = "github.com/lightsparkdev/spark-go/proto";
 import "google/protobuf/empty.proto";
+import "frost.proto";
 
 service SparkInternalService {
     rpc mark_keyshares_as_used(MarkKeysharesAsUsedRequest) returns (google.protobuf.Empty) {}
     rpc mark_keyshare_for_deposit_address(MarkKeyshareForDepositAddressRequest) returns (google.protobuf.Empty) {}
+
+    rpc frost_round1(FrostRound1Request) returns (FrostRound1Response) {}
 }
 
 message MarkKeysharesAsUsedRequest {
@@ -17,4 +20,12 @@ message MarkKeysharesAsUsedRequest {
 message MarkKeyshareForDepositAddressRequest {
     string keyshare_id = 1;
     string address = 2;
+}
+
+message FrostRound1Request {
+    string keyshare_id = 1;
+}
+
+message FrostRound1Response {   
+    frost.SigningCommitment signing_commitment = 1;
 }

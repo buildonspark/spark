@@ -22,6 +22,7 @@ const _ = grpc.SupportPackageIsVersion9
 const (
 	SparkInternalService_MarkKeysharesAsUsed_FullMethodName           = "/spark.SparkInternalService/mark_keyshares_as_used"
 	SparkInternalService_MarkKeyshareForDepositAddress_FullMethodName = "/spark.SparkInternalService/mark_keyshare_for_deposit_address"
+	SparkInternalService_FrostRound1_FullMethodName                   = "/spark.SparkInternalService/frost_round1"
 )
 
 // SparkInternalServiceClient is the client API for SparkInternalService service.
@@ -30,6 +31,7 @@ const (
 type SparkInternalServiceClient interface {
 	MarkKeysharesAsUsed(ctx context.Context, in *MarkKeysharesAsUsedRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	MarkKeyshareForDepositAddress(ctx context.Context, in *MarkKeyshareForDepositAddressRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	FrostRound1(ctx context.Context, in *FrostRound1Request, opts ...grpc.CallOption) (*FrostRound1Response, error)
 }
 
 type sparkInternalServiceClient struct {
@@ -60,12 +62,23 @@ func (c *sparkInternalServiceClient) MarkKeyshareForDepositAddress(ctx context.C
 	return out, nil
 }
 
+func (c *sparkInternalServiceClient) FrostRound1(ctx context.Context, in *FrostRound1Request, opts ...grpc.CallOption) (*FrostRound1Response, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(FrostRound1Response)
+	err := c.cc.Invoke(ctx, SparkInternalService_FrostRound1_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SparkInternalServiceServer is the server API for SparkInternalService service.
 // All implementations must embed UnimplementedSparkInternalServiceServer
 // for forward compatibility.
 type SparkInternalServiceServer interface {
 	MarkKeysharesAsUsed(context.Context, *MarkKeysharesAsUsedRequest) (*emptypb.Empty, error)
 	MarkKeyshareForDepositAddress(context.Context, *MarkKeyshareForDepositAddressRequest) (*emptypb.Empty, error)
+	FrostRound1(context.Context, *FrostRound1Request) (*FrostRound1Response, error)
 	mustEmbedUnimplementedSparkInternalServiceServer()
 }
 
@@ -81,6 +94,9 @@ func (UnimplementedSparkInternalServiceServer) MarkKeysharesAsUsed(context.Conte
 }
 func (UnimplementedSparkInternalServiceServer) MarkKeyshareForDepositAddress(context.Context, *MarkKeyshareForDepositAddressRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method MarkKeyshareForDepositAddress not implemented")
+}
+func (UnimplementedSparkInternalServiceServer) FrostRound1(context.Context, *FrostRound1Request) (*FrostRound1Response, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method FrostRound1 not implemented")
 }
 func (UnimplementedSparkInternalServiceServer) mustEmbedUnimplementedSparkInternalServiceServer() {}
 func (UnimplementedSparkInternalServiceServer) testEmbeddedByValue()                              {}
@@ -139,6 +155,24 @@ func _SparkInternalService_MarkKeyshareForDepositAddress_Handler(srv interface{}
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SparkInternalService_FrostRound1_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(FrostRound1Request)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkInternalServiceServer).FrostRound1(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkInternalService_FrostRound1_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkInternalServiceServer).FrostRound1(ctx, req.(*FrostRound1Request))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // SparkInternalService_ServiceDesc is the grpc.ServiceDesc for SparkInternalService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -153,6 +187,10 @@ var SparkInternalService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "mark_keyshare_for_deposit_address",
 			Handler:    _SparkInternalService_MarkKeyshareForDepositAddress_Handler,
+		},
+		{
+			MethodName: "frost_round1",
+			Handler:    _SparkInternalService_FrostRound1_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

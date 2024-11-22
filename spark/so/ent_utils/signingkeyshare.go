@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	pb "github.com/lightsparkdev/spark-go/proto"
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/dkg"
 	"github.com/lightsparkdev/spark-go/so/ent"
@@ -72,4 +73,27 @@ func MarkSigningKeysharesAsUsed(ctx context.Context, config *so.Config, ids []uu
 	go dkg.RunDKGIfNeeded(config)
 
 	return nil
+}
+
+func GetKeyPackage(ctx context.Context, config *so.Config, keyshareID uuid.UUID) (*pb.KeyPackage, error) {
+	db, err := ent.Open(config.DatabaseDriver(), config.DatabasePath)
+	if err != nil {
+		return nil, err
+	}
+	defer db.Close()
+
+	keyshare, err := db.SigningKeyshare.Get(ctx, keyshareID)
+	if err != nil {
+		return nil, err
+	}
+
+	keyPackage := &pb.KeyPackage{
+		Identifier:   config.Identifier,
+		SecretShare:  keyshare.SecretShare,
+		PublicShares: keyshare.PublicShares,
+		PublicKey:    keyshare.PublicKey,
+		MinSigners:   keyshare.MinSigners,
+	}
+
+	return keyPackage, nil
 }
