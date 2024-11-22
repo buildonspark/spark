@@ -11,8 +11,6 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark-go/so/ent/depositaddress"
 	"github.com/lightsparkdev/spark-go/so/ent/predicate"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
 	"github.com/lightsparkdev/spark-go/so/ent/signingkeyshare"
@@ -111,45 +109,9 @@ func (sku *SigningKeyshareUpdate) AddCoordinatorIndex(u int64) *SigningKeyshareU
 	return sku
 }
 
-// AddDepositAddresIDs adds the "deposit_address" edge to the DepositAddress entity by IDs.
-func (sku *SigningKeyshareUpdate) AddDepositAddresIDs(ids ...uuid.UUID) *SigningKeyshareUpdate {
-	sku.mutation.AddDepositAddresIDs(ids...)
-	return sku
-}
-
-// AddDepositAddress adds the "deposit_address" edges to the DepositAddress entity.
-func (sku *SigningKeyshareUpdate) AddDepositAddress(d ...*DepositAddress) *SigningKeyshareUpdate {
-	ids := make([]uuid.UUID, len(d))
-	for i := range d {
-		ids[i] = d[i].ID
-	}
-	return sku.AddDepositAddresIDs(ids...)
-}
-
 // Mutation returns the SigningKeyshareMutation object of the builder.
 func (sku *SigningKeyshareUpdate) Mutation() *SigningKeyshareMutation {
 	return sku.mutation
-}
-
-// ClearDepositAddress clears all "deposit_address" edges to the DepositAddress entity.
-func (sku *SigningKeyshareUpdate) ClearDepositAddress() *SigningKeyshareUpdate {
-	sku.mutation.ClearDepositAddress()
-	return sku
-}
-
-// RemoveDepositAddresIDs removes the "deposit_address" edge to DepositAddress entities by IDs.
-func (sku *SigningKeyshareUpdate) RemoveDepositAddresIDs(ids ...uuid.UUID) *SigningKeyshareUpdate {
-	sku.mutation.RemoveDepositAddresIDs(ids...)
-	return sku
-}
-
-// RemoveDepositAddress removes "deposit_address" edges to DepositAddress entities.
-func (sku *SigningKeyshareUpdate) RemoveDepositAddress(d ...*DepositAddress) *SigningKeyshareUpdate {
-	ids := make([]uuid.UUID, len(d))
-	for i := range d {
-		ids[i] = d[i].ID
-	}
-	return sku.RemoveDepositAddresIDs(ids...)
 }
 
 // Save executes the query and returns the number of nodes affected by the update operation.
@@ -236,51 +198,6 @@ func (sku *SigningKeyshareUpdate) sqlSave(ctx context.Context) (n int, err error
 	}
 	if value, ok := sku.mutation.AddedCoordinatorIndex(); ok {
 		_spec.AddField(signingkeyshare.FieldCoordinatorIndex, field.TypeUint64, value)
-	}
-	if sku.mutation.DepositAddressCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2M,
-			Inverse: false,
-			Table:   signingkeyshare.DepositAddressTable,
-			Columns: []string{signingkeyshare.DepositAddressColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(depositaddress.FieldID, field.TypeUUID),
-			},
-		}
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := sku.mutation.RemovedDepositAddressIDs(); len(nodes) > 0 && !sku.mutation.DepositAddressCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2M,
-			Inverse: false,
-			Table:   signingkeyshare.DepositAddressTable,
-			Columns: []string{signingkeyshare.DepositAddressColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(depositaddress.FieldID, field.TypeUUID),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := sku.mutation.DepositAddressIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2M,
-			Inverse: false,
-			Table:   signingkeyshare.DepositAddressTable,
-			Columns: []string{signingkeyshare.DepositAddressColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(depositaddress.FieldID, field.TypeUUID),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	if n, err = sqlgraph.UpdateNodes(ctx, sku.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
@@ -382,45 +299,9 @@ func (skuo *SigningKeyshareUpdateOne) AddCoordinatorIndex(u int64) *SigningKeysh
 	return skuo
 }
 
-// AddDepositAddresIDs adds the "deposit_address" edge to the DepositAddress entity by IDs.
-func (skuo *SigningKeyshareUpdateOne) AddDepositAddresIDs(ids ...uuid.UUID) *SigningKeyshareUpdateOne {
-	skuo.mutation.AddDepositAddresIDs(ids...)
-	return skuo
-}
-
-// AddDepositAddress adds the "deposit_address" edges to the DepositAddress entity.
-func (skuo *SigningKeyshareUpdateOne) AddDepositAddress(d ...*DepositAddress) *SigningKeyshareUpdateOne {
-	ids := make([]uuid.UUID, len(d))
-	for i := range d {
-		ids[i] = d[i].ID
-	}
-	return skuo.AddDepositAddresIDs(ids...)
-}
-
 // Mutation returns the SigningKeyshareMutation object of the builder.
 func (skuo *SigningKeyshareUpdateOne) Mutation() *SigningKeyshareMutation {
 	return skuo.mutation
-}
-
-// ClearDepositAddress clears all "deposit_address" edges to the DepositAddress entity.
-func (skuo *SigningKeyshareUpdateOne) ClearDepositAddress() *SigningKeyshareUpdateOne {
-	skuo.mutation.ClearDepositAddress()
-	return skuo
-}
-
-// RemoveDepositAddresIDs removes the "deposit_address" edge to DepositAddress entities by IDs.
-func (skuo *SigningKeyshareUpdateOne) RemoveDepositAddresIDs(ids ...uuid.UUID) *SigningKeyshareUpdateOne {
-	skuo.mutation.RemoveDepositAddresIDs(ids...)
-	return skuo
-}
-
-// RemoveDepositAddress removes "deposit_address" edges to DepositAddress entities.
-func (skuo *SigningKeyshareUpdateOne) RemoveDepositAddress(d ...*DepositAddress) *SigningKeyshareUpdateOne {
-	ids := make([]uuid.UUID, len(d))
-	for i := range d {
-		ids[i] = d[i].ID
-	}
-	return skuo.RemoveDepositAddresIDs(ids...)
 }
 
 // Where appends a list predicates to the SigningKeyshareUpdate builder.
@@ -537,51 +418,6 @@ func (skuo *SigningKeyshareUpdateOne) sqlSave(ctx context.Context) (_node *Signi
 	}
 	if value, ok := skuo.mutation.AddedCoordinatorIndex(); ok {
 		_spec.AddField(signingkeyshare.FieldCoordinatorIndex, field.TypeUint64, value)
-	}
-	if skuo.mutation.DepositAddressCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2M,
-			Inverse: false,
-			Table:   signingkeyshare.DepositAddressTable,
-			Columns: []string{signingkeyshare.DepositAddressColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(depositaddress.FieldID, field.TypeUUID),
-			},
-		}
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := skuo.mutation.RemovedDepositAddressIDs(); len(nodes) > 0 && !skuo.mutation.DepositAddressCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2M,
-			Inverse: false,
-			Table:   signingkeyshare.DepositAddressTable,
-			Columns: []string{signingkeyshare.DepositAddressColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(depositaddress.FieldID, field.TypeUUID),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := skuo.mutation.DepositAddressIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2M,
-			Inverse: false,
-			Table:   signingkeyshare.DepositAddressTable,
-			Columns: []string{signingkeyshare.DepositAddressColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(depositaddress.FieldID, field.TypeUUID),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	_node = &SigningKeyshare{config: skuo.config}
 	_spec.Assign = _node.assignValues

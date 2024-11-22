@@ -56,6 +56,12 @@ func (dac *DepositAddressCreate) SetAddress(s string) *DepositAddressCreate {
 	return dac
 }
 
+// SetSigningKeyshareID sets the "signing_keyshare_id" field.
+func (dac *DepositAddressCreate) SetSigningKeyshareID(u uuid.UUID) *DepositAddressCreate {
+	dac.mutation.SetSigningKeyshareID(u)
+	return dac
+}
+
 // SetID sets the "id" field.
 func (dac *DepositAddressCreate) SetID(u uuid.UUID) *DepositAddressCreate {
 	dac.mutation.SetID(u)
@@ -70,23 +76,9 @@ func (dac *DepositAddressCreate) SetNillableID(u *uuid.UUID) *DepositAddressCrea
 	return dac
 }
 
-// SetKeyshareID sets the "keyshare" edge to the SigningKeyshare entity by ID.
-func (dac *DepositAddressCreate) SetKeyshareID(id uuid.UUID) *DepositAddressCreate {
-	dac.mutation.SetKeyshareID(id)
-	return dac
-}
-
-// SetNillableKeyshareID sets the "keyshare" edge to the SigningKeyshare entity by ID if the given value is not nil.
-func (dac *DepositAddressCreate) SetNillableKeyshareID(id *uuid.UUID) *DepositAddressCreate {
-	if id != nil {
-		dac = dac.SetKeyshareID(*id)
-	}
-	return dac
-}
-
-// SetKeyshare sets the "keyshare" edge to the SigningKeyshare entity.
-func (dac *DepositAddressCreate) SetKeyshare(s *SigningKeyshare) *DepositAddressCreate {
-	return dac.SetKeyshareID(s.ID)
+// SetSigningKeyshare sets the "signing_keyshare" edge to the SigningKeyshare entity.
+func (dac *DepositAddressCreate) SetSigningKeyshare(s *SigningKeyshare) *DepositAddressCreate {
+	return dac.SetSigningKeyshareID(s.ID)
 }
 
 // Mutation returns the DepositAddressMutation object of the builder.
@@ -154,6 +146,12 @@ func (dac *DepositAddressCreate) check() error {
 			return &ValidationError{Name: "address", err: fmt.Errorf(`ent: validator failed for field "DepositAddress.address": %w`, err)}
 		}
 	}
+	if _, ok := dac.mutation.SigningKeyshareID(); !ok {
+		return &ValidationError{Name: "signing_keyshare_id", err: errors.New(`ent: missing required field "DepositAddress.signing_keyshare_id"`)}
+	}
+	if len(dac.mutation.SigningKeyshareIDs()) == 0 {
+		return &ValidationError{Name: "signing_keyshare", err: errors.New(`ent: missing required edge "DepositAddress.signing_keyshare"`)}
+	}
 	return nil
 }
 
@@ -201,12 +199,12 @@ func (dac *DepositAddressCreate) createSpec() (*DepositAddress, *sqlgraph.Create
 		_spec.SetField(depositaddress.FieldAddress, field.TypeString, value)
 		_node.Address = value
 	}
-	if nodes := dac.mutation.KeyshareIDs(); len(nodes) > 0 {
+	if nodes := dac.mutation.SigningKeyshareIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2O,
-			Inverse: true,
-			Table:   depositaddress.KeyshareTable,
-			Columns: []string{depositaddress.KeyshareColumn},
+			Inverse: false,
+			Table:   depositaddress.SigningKeyshareTable,
+			Columns: []string{depositaddress.SigningKeyshareColumn},
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(signingkeyshare.FieldID, field.TypeUUID),
@@ -215,7 +213,7 @@ func (dac *DepositAddressCreate) createSpec() (*DepositAddress, *sqlgraph.Create
 		for _, k := range nodes {
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
-		_node.signing_keyshare_deposit_address = &nodes[0]
+		_node.SigningKeyshareID = nodes[0]
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	return _node, _spec

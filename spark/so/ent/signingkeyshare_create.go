@@ -11,7 +11,6 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark-go/so/ent/depositaddress"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
 	"github.com/lightsparkdev/spark-go/so/ent/signingkeyshare"
 )
@@ -99,21 +98,6 @@ func (skc *SigningKeyshareCreate) SetNillableID(u *uuid.UUID) *SigningKeyshareCr
 		skc.SetID(*u)
 	}
 	return skc
-}
-
-// AddDepositAddresIDs adds the "deposit_address" edge to the DepositAddress entity by IDs.
-func (skc *SigningKeyshareCreate) AddDepositAddresIDs(ids ...uuid.UUID) *SigningKeyshareCreate {
-	skc.mutation.AddDepositAddresIDs(ids...)
-	return skc
-}
-
-// AddDepositAddress adds the "deposit_address" edges to the DepositAddress entity.
-func (skc *SigningKeyshareCreate) AddDepositAddress(d ...*DepositAddress) *SigningKeyshareCreate {
-	ids := make([]uuid.UUID, len(d))
-	for i := range d {
-		ids[i] = d[i].ID
-	}
-	return skc.AddDepositAddresIDs(ids...)
 }
 
 // Mutation returns the SigningKeyshareMutation object of the builder.
@@ -262,22 +246,6 @@ func (skc *SigningKeyshareCreate) createSpec() (*SigningKeyshare, *sqlgraph.Crea
 	if value, ok := skc.mutation.CoordinatorIndex(); ok {
 		_spec.SetField(signingkeyshare.FieldCoordinatorIndex, field.TypeUint64, value)
 		_node.CoordinatorIndex = value
-	}
-	if nodes := skc.mutation.DepositAddressIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2M,
-			Inverse: false,
-			Table:   signingkeyshare.DepositAddressTable,
-			Columns: []string{signingkeyshare.DepositAddressColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(depositaddress.FieldID, field.TypeUUID),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges = append(_spec.Edges, edge)
 	}
 	return _node, _spec
 }

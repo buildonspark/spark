@@ -20,12 +20,11 @@ import (
 // DepositAddressQuery is the builder for querying DepositAddress entities.
 type DepositAddressQuery struct {
 	config
-	ctx          *QueryContext
-	order        []depositaddress.OrderOption
-	inters       []Interceptor
-	predicates   []predicate.DepositAddress
-	withKeyshare *SigningKeyshareQuery
-	withFKs      bool
+	ctx                 *QueryContext
+	order               []depositaddress.OrderOption
+	inters              []Interceptor
+	predicates          []predicate.DepositAddress
+	withSigningKeyshare *SigningKeyshareQuery
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -62,8 +61,8 @@ func (daq *DepositAddressQuery) Order(o ...depositaddress.OrderOption) *DepositA
 	return daq
 }
 
-// QueryKeyshare chains the current query on the "keyshare" edge.
-func (daq *DepositAddressQuery) QueryKeyshare() *SigningKeyshareQuery {
+// QuerySigningKeyshare chains the current query on the "signing_keyshare" edge.
+func (daq *DepositAddressQuery) QuerySigningKeyshare() *SigningKeyshareQuery {
 	query := (&SigningKeyshareClient{config: daq.config}).Query()
 	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
 		if err := daq.prepareQuery(ctx); err != nil {
@@ -76,7 +75,7 @@ func (daq *DepositAddressQuery) QueryKeyshare() *SigningKeyshareQuery {
 		step := sqlgraph.NewStep(
 			sqlgraph.From(depositaddress.Table, depositaddress.FieldID, selector),
 			sqlgraph.To(signingkeyshare.Table, signingkeyshare.FieldID),
-			sqlgraph.Edge(sqlgraph.M2O, true, depositaddress.KeyshareTable, depositaddress.KeyshareColumn),
+			sqlgraph.Edge(sqlgraph.M2O, false, depositaddress.SigningKeyshareTable, depositaddress.SigningKeyshareColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(daq.driver.Dialect(), step)
 		return fromU, nil
@@ -271,26 +270,26 @@ func (daq *DepositAddressQuery) Clone() *DepositAddressQuery {
 		return nil
 	}
 	return &DepositAddressQuery{
-		config:       daq.config,
-		ctx:          daq.ctx.Clone(),
-		order:        append([]depositaddress.OrderOption{}, daq.order...),
-		inters:       append([]Interceptor{}, daq.inters...),
-		predicates:   append([]predicate.DepositAddress{}, daq.predicates...),
-		withKeyshare: daq.withKeyshare.Clone(),
+		config:              daq.config,
+		ctx:                 daq.ctx.Clone(),
+		order:               append([]depositaddress.OrderOption{}, daq.order...),
+		inters:              append([]Interceptor{}, daq.inters...),
+		predicates:          append([]predicate.DepositAddress{}, daq.predicates...),
+		withSigningKeyshare: daq.withSigningKeyshare.Clone(),
 		// clone intermediate query.
 		sql:  daq.sql.Clone(),
 		path: daq.path,
 	}
 }
 
-// WithKeyshare tells the query-builder to eager-load the nodes that are connected to
-// the "keyshare" edge. The optional arguments are used to configure the query builder of the edge.
-func (daq *DepositAddressQuery) WithKeyshare(opts ...func(*SigningKeyshareQuery)) *DepositAddressQuery {
+// WithSigningKeyshare tells the query-builder to eager-load the nodes that are connected to
+// the "signing_keyshare" edge. The optional arguments are used to configure the query builder of the edge.
+func (daq *DepositAddressQuery) WithSigningKeyshare(opts ...func(*SigningKeyshareQuery)) *DepositAddressQuery {
 	query := (&SigningKeyshareClient{config: daq.config}).Query()
 	for _, opt := range opts {
 		opt(query)
 	}
-	daq.withKeyshare = query
+	daq.withSigningKeyshare = query
 	return daq
 }
 
@@ -371,18 +370,11 @@ func (daq *DepositAddressQuery) prepareQuery(ctx context.Context) error {
 func (daq *DepositAddressQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*DepositAddress, error) {
 	var (
 		nodes       = []*DepositAddress{}
-		withFKs     = daq.withFKs
 		_spec       = daq.querySpec()
 		loadedTypes = [1]bool{
-			daq.withKeyshare != nil,
+			daq.withSigningKeyshare != nil,
 		}
 	)
-	if daq.withKeyshare != nil {
-		withFKs = true
-	}
-	if withFKs {
-		_spec.Node.Columns = append(_spec.Node.Columns, depositaddress.ForeignKeys...)
-	}
 	_spec.ScanValues = func(columns []string) ([]any, error) {
 		return (*DepositAddress).scanValues(nil, columns)
 	}
@@ -401,23 +393,20 @@ func (daq *DepositAddressQuery) sqlAll(ctx context.Context, hooks ...queryHook) 
 	if len(nodes) == 0 {
 		return nodes, nil
 	}
-	if query := daq.withKeyshare; query != nil {
-		if err := daq.loadKeyshare(ctx, query, nodes, nil,
-			func(n *DepositAddress, e *SigningKeyshare) { n.Edges.Keyshare = e }); err != nil {
+	if query := daq.withSigningKeyshare; query != nil {
+		if err := daq.loadSigningKeyshare(ctx, query, nodes, nil,
+			func(n *DepositAddress, e *SigningKeyshare) { n.Edges.SigningKeyshare = e }); err != nil {
 			return nil, err
 		}
 	}
 	return nodes, nil
 }
 
-func (daq *DepositAddressQuery) loadKeyshare(ctx context.Context, query *SigningKeyshareQuery, nodes []*DepositAddress, init func(*DepositAddress), assign func(*DepositAddress, *SigningKeyshare)) error {
+func (daq *DepositAddressQuery) loadSigningKeyshare(ctx context.Context, query *SigningKeyshareQuery, nodes []*DepositAddress, init func(*DepositAddress), assign func(*DepositAddress, *SigningKeyshare)) error {
 	ids := make([]uuid.UUID, 0, len(nodes))
 	nodeids := make(map[uuid.UUID][]*DepositAddress)
 	for i := range nodes {
-		if nodes[i].signing_keyshare_deposit_address == nil {
-			continue
-		}
-		fk := *nodes[i].signing_keyshare_deposit_address
+		fk := nodes[i].SigningKeyshareID
 		if _, ok := nodeids[fk]; !ok {
 			ids = append(ids, fk)
 		}
@@ -434,7 +423,7 @@ func (daq *DepositAddressQuery) loadKeyshare(ctx context.Context, query *Signing
 	for _, n := range neighbors {
 		nodes, ok := nodeids[n.ID]
 		if !ok {
-			return fmt.Errorf(`unexpected foreign-key "signing_keyshare_deposit_address" returned %v`, n.ID)
+			return fmt.Errorf(`unexpected foreign-key "signing_keyshare_id" returned %v`, n.ID)
 		}
 		for i := range nodes {
 			assign(nodes[i], n)
@@ -467,6 +456,9 @@ func (daq *DepositAddressQuery) querySpec() *sqlgraph.QuerySpec {
 			if fields[i] != depositaddress.FieldID {
 				_spec.Node.Columns = append(_spec.Node.Columns, fields[i])
 			}
+		}
+		if daq.withSigningKeyshare != nil {
+			_spec.Node.AddColumnOnce(depositaddress.FieldSigningKeyshareID)
 		}
 	}
 	if ps := daq.predicates; len(ps) > 0 {

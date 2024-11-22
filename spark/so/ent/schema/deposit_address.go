@@ -5,6 +5,7 @@ import (
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
+	"github.com/google/uuid"
 )
 
 type DepositAddress struct {
@@ -26,13 +27,17 @@ func (DepositAddress) Indexes() []ent.Index {
 func (DepositAddress) Fields() []ent.Field {
 	return []ent.Field{
 		field.String("address").NotEmpty(),
+		field.UUID("signing_keyshare_id", uuid.UUID{}).
+			Immutable(),
 	}
 }
 
 func (DepositAddress) Edges() []ent.Edge {
 	return []ent.Edge{
-		edge.From("keyshare", SigningKeyshare.Type).
-			Ref("deposit_address").
-			Unique(),
+		edge.To("signing_keyshare", SigningKeyshare.Type).
+			Field("signing_keyshare_id").
+			Unique().
+			Required().
+			Immutable(),
 	}
 }

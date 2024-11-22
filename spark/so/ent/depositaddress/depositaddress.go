@@ -21,17 +21,19 @@ const (
 	FieldUpdateTime = "update_time"
 	// FieldAddress holds the string denoting the address field in the database.
 	FieldAddress = "address"
-	// EdgeKeyshare holds the string denoting the keyshare edge name in mutations.
-	EdgeKeyshare = "keyshare"
+	// FieldSigningKeyshareID holds the string denoting the signing_keyshare_id field in the database.
+	FieldSigningKeyshareID = "signing_keyshare_id"
+	// EdgeSigningKeyshare holds the string denoting the signing_keyshare edge name in mutations.
+	EdgeSigningKeyshare = "signing_keyshare"
 	// Table holds the table name of the depositaddress in the database.
 	Table = "deposit_addresses"
-	// KeyshareTable is the table that holds the keyshare relation/edge.
-	KeyshareTable = "deposit_addresses"
-	// KeyshareInverseTable is the table name for the SigningKeyshare entity.
+	// SigningKeyshareTable is the table that holds the signing_keyshare relation/edge.
+	SigningKeyshareTable = "deposit_addresses"
+	// SigningKeyshareInverseTable is the table name for the SigningKeyshare entity.
 	// It exists in this package in order to avoid circular dependency with the "signingkeyshare" package.
-	KeyshareInverseTable = "signing_keyshares"
-	// KeyshareColumn is the table column denoting the keyshare relation/edge.
-	KeyshareColumn = "signing_keyshare_deposit_address"
+	SigningKeyshareInverseTable = "signing_keyshares"
+	// SigningKeyshareColumn is the table column denoting the signing_keyshare relation/edge.
+	SigningKeyshareColumn = "signing_keyshare_id"
 )
 
 // Columns holds all SQL columns for depositaddress fields.
@@ -40,23 +42,13 @@ var Columns = []string{
 	FieldCreateTime,
 	FieldUpdateTime,
 	FieldAddress,
-}
-
-// ForeignKeys holds the SQL foreign-keys that are owned by the "deposit_addresses"
-// table and are not defined as standalone fields in the schema.
-var ForeignKeys = []string{
-	"signing_keyshare_deposit_address",
+	FieldSigningKeyshareID,
 }
 
 // ValidColumn reports if the column name is valid (part of the table columns).
 func ValidColumn(column string) bool {
 	for i := range Columns {
 		if column == Columns[i] {
-			return true
-		}
-	}
-	for i := range ForeignKeys {
-		if column == ForeignKeys[i] {
 			return true
 		}
 	}
@@ -99,16 +91,21 @@ func ByAddress(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldAddress, opts...).ToFunc()
 }
 
-// ByKeyshareField orders the results by keyshare field.
-func ByKeyshareField(field string, opts ...sql.OrderTermOption) OrderOption {
+// BySigningKeyshareID orders the results by the signing_keyshare_id field.
+func BySigningKeyshareID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSigningKeyshareID, opts...).ToFunc()
+}
+
+// BySigningKeyshareField orders the results by signing_keyshare field.
+func BySigningKeyshareField(field string, opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
-		sqlgraph.OrderByNeighborTerms(s, newKeyshareStep(), sql.OrderByField(field, opts...))
+		sqlgraph.OrderByNeighborTerms(s, newSigningKeyshareStep(), sql.OrderByField(field, opts...))
 	}
 }
-func newKeyshareStep() *sqlgraph.Step {
+func newSigningKeyshareStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
-		sqlgraph.To(KeyshareInverseTable, FieldID),
-		sqlgraph.Edge(sqlgraph.M2O, true, KeyshareTable, KeyshareColumn),
+		sqlgraph.To(SigningKeyshareInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.M2O, false, SigningKeyshareTable, SigningKeyshareColumn),
 	)
 }

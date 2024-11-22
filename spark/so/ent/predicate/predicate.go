@@ -9,5 +9,11 @@ import (
 // DepositAddress is the predicate function for depositaddress builders.
 type DepositAddress func(*sql.Selector)
 
+// Leaf is the predicate function for leaf builders.
+type Leaf func(*sql.Selector)
+
 // SigningKeyshare is the predicate function for signingkeyshare builders.
 type SigningKeyshare func(*sql.Selector)
+
+// Tree is the predicate function for tree builders.
+type Tree func(*sql.Selector)

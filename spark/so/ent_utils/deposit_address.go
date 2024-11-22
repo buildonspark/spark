@@ -15,7 +15,7 @@ func LinkKeyshareToDepositAddress(ctx context.Context, config *so.Config, keysha
 	}
 	defer db.Close()
 
-	depositAddress, err := db.DepositAddress.Create().SetKeyshareID(keyshareID).SetAddress(address).Save(ctx)
+	depositAddress, err := db.DepositAddress.Create().SetSigningKeyshareID(keyshareID).SetAddress(address).Save(ctx)
 	if err != nil {
 		return nil, err
 	}

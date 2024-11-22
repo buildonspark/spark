@@ -71,6 +71,11 @@ func Address(v string) predicate.DepositAddress {
 	return predicate.DepositAddress(sql.FieldEQ(FieldAddress, v))
 }
 
+// SigningKeyshareID applies equality check predicate on the "signing_keyshare_id" field. It's identical to SigningKeyshareIDEQ.
+func SigningKeyshareID(v uuid.UUID) predicate.DepositAddress {
+	return predicate.DepositAddress(sql.FieldEQ(FieldSigningKeyshareID, v))
+}
+
 // CreateTimeEQ applies the EQ predicate on the "create_time" field.
 func CreateTimeEQ(v time.Time) predicate.DepositAddress {
 	return predicate.DepositAddress(sql.FieldEQ(FieldCreateTime, v))
@@ -216,21 +221,41 @@ func AddressContainsFold(v string) predicate.DepositAddress {
 	return predicate.DepositAddress(sql.FieldContainsFold(FieldAddress, v))
 }
 
-// HasKeyshare applies the HasEdge predicate on the "keyshare" edge.
-func HasKeyshare() predicate.DepositAddress {
+// SigningKeyshareIDEQ applies the EQ predicate on the "signing_keyshare_id" field.
+func SigningKeyshareIDEQ(v uuid.UUID) predicate.DepositAddress {
+	return predicate.DepositAddress(sql.FieldEQ(FieldSigningKeyshareID, v))
+}
+
+// SigningKeyshareIDNEQ applies the NEQ predicate on the "signing_keyshare_id" field.
+func SigningKeyshareIDNEQ(v uuid.UUID) predicate.DepositAddress {
+	return predicate.DepositAddress(sql.FieldNEQ(FieldSigningKeyshareID, v))
+}
+
+// SigningKeyshareIDIn applies the In predicate on the "signing_keyshare_id" field.
+func SigningKeyshareIDIn(vs ...uuid.UUID) predicate.DepositAddress {
+	return predicate.DepositAddress(sql.FieldIn(FieldSigningKeyshareID, vs...))
+}
+
+// SigningKeyshareIDNotIn applies the NotIn predicate on the "signing_keyshare_id" field.
+func SigningKeyshareIDNotIn(vs ...uuid.UUID) predicate.DepositAddress {
+	return predicate.DepositAddress(sql.FieldNotIn(FieldSigningKeyshareID, vs...))
+}
+
+// HasSigningKeyshare applies the HasEdge predicate on the "signing_keyshare" edge.
+func HasSigningKeyshare() predicate.DepositAddress {
 	return predicate.DepositAddress(func(s *sql.Selector) {
 		step := sqlgraph.NewStep(
 			sqlgraph.From(Table, FieldID),
-			sqlgraph.Edge(sqlgraph.M2O, true, KeyshareTable, KeyshareColumn),
+			sqlgraph.Edge(sqlgraph.M2O, false, SigningKeyshareTable, SigningKeyshareColumn),
 		)
 		sqlgraph.HasNeighbors(s, step)
 	})
 }
 
-// HasKeyshareWith applies the HasEdge predicate on the "keyshare" edge with a given conditions (other predicates).
-func HasKeyshareWith(preds ...predicate.SigningKeyshare) predicate.DepositAddress {
+// HasSigningKeyshareWith applies the HasEdge predicate on the "signing_keyshare" edge with a given conditions (other predicates).
+func HasSigningKeyshareWith(preds ...predicate.SigningKeyshare) predicate.DepositAddress {
 	return predicate.DepositAddress(func(s *sql.Selector) {
-		step := newKeyshareStep()
+		step := newSigningKeyshareStep()
 		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
 			for _, p := range preds {
 				p(s)

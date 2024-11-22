@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"entgo.io/ent/dialect/sql"
-	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
 )
@@ -33,17 +32,8 @@ const (
 	FieldMinSigners = "min_signers"
 	// FieldCoordinatorIndex holds the string denoting the coordinator_index field in the database.
 	FieldCoordinatorIndex = "coordinator_index"
-	// EdgeDepositAddress holds the string denoting the deposit_address edge name in mutations.
-	EdgeDepositAddress = "deposit_address"
 	// Table holds the table name of the signingkeyshare in the database.
 	Table = "signing_keyshares"
-	// DepositAddressTable is the table that holds the deposit_address relation/edge.
-	DepositAddressTable = "deposit_addresses"
-	// DepositAddressInverseTable is the table name for the DepositAddress entity.
-	// It exists in this package in order to avoid circular dependency with the "depositaddress" package.
-	DepositAddressInverseTable = "deposit_addresses"
-	// DepositAddressColumn is the table column denoting the deposit_address relation/edge.
-	DepositAddressColumn = "signing_keyshare_deposit_address"
 )
 
 // Columns holds all SQL columns for signingkeyshare fields.
@@ -121,25 +111,4 @@ func ByMinSigners(opts ...sql.OrderTermOption) OrderOption {
 // ByCoordinatorIndex orders the results by the coordinator_index field.
 func ByCoordinatorIndex(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldCoordinatorIndex, opts...).ToFunc()
-}
-
-// ByDepositAddressCount orders the results by deposit_address count.
-func ByDepositAddressCount(opts ...sql.OrderTermOption) OrderOption {
-	return func(s *sql.Selector) {
-		sqlgraph.OrderByNeighborsCount(s, newDepositAddressStep(), opts...)
-	}
-}
-
-// ByDepositAddress orders the results by deposit_address terms.
-func ByDepositAddress(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
-	return func(s *sql.Selector) {
-		sqlgraph.OrderByNeighborTerms(s, newDepositAddressStep(), append([]sql.OrderTerm{term}, terms...)...)
-	}
-}
-func newDepositAddressStep() *sqlgraph.Step {
-	return sqlgraph.NewStep(
-		sqlgraph.From(Table, FieldID),
-		sqlgraph.To(DepositAddressInverseTable, FieldID),
-		sqlgraph.Edge(sqlgraph.O2M, false, DepositAddressTable, DepositAddressColumn),
-	)
 }

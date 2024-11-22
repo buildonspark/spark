@@ -14,8 +14,12 @@ type Tx struct {
 	config
 	// DepositAddress is the client for interacting with the DepositAddress builders.
 	DepositAddress *DepositAddressClient
+	// Leaf is the client for interacting with the Leaf builders.
+	Leaf *LeafClient
 	// SigningKeyshare is the client for interacting with the SigningKeyshare builders.
 	SigningKeyshare *SigningKeyshareClient
+	// Tree is the client for interacting with the Tree builders.
+	Tree *TreeClient
 
 	// lazily loaded.
 	client     *Client
@@ -148,7 +152,9 @@ func (tx *Tx) Client() *Client {
 
 func (tx *Tx) init() {
 	tx.DepositAddress = NewDepositAddressClient(tx.config)
+	tx.Leaf = NewLeafClient(tx.config)
 	tx.SigningKeyshare = NewSigningKeyshareClient(tx.config)
+	tx.Tree = NewTreeClient(tx.config)
 }
 
 // txDriver wraps the given dialect.Tx with a nop dialect.Driver implementation.

@@ -13,7 +13,9 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/lightsparkdev/spark-go/so/ent/depositaddress"
+	"github.com/lightsparkdev/spark-go/so/ent/leaf"
 	"github.com/lightsparkdev/spark-go/so/ent/signingkeyshare"
+	"github.com/lightsparkdev/spark-go/so/ent/tree"
 )
 
 // ent aliases to avoid import conflicts in user's code.
@@ -75,7 +77,9 @@ func checkColumn(table, column string) error {
 	initCheck.Do(func() {
 		columnCheck = sql.NewColumnCheck(map[string]func(string) bool{
 			depositaddress.Table:  depositaddress.ValidColumn,
+			leaf.Table:            leaf.ValidColumn,
 			signingkeyshare.Table: signingkeyshare.ValidColumn,
+			tree.Table:            tree.ValidColumn,
 		})
 	})
 	return columnCheck(table, column)

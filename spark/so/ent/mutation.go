@@ -13,9 +13,11 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/so/ent/depositaddress"
+	"github.com/lightsparkdev/spark-go/so/ent/leaf"
 	"github.com/lightsparkdev/spark-go/so/ent/predicate"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
 	"github.com/lightsparkdev/spark-go/so/ent/signingkeyshare"
+	"github.com/lightsparkdev/spark-go/so/ent/tree"
 )
 
 const (
@@ -28,24 +30,26 @@ const (
 
 	// Node types.
 	TypeDepositAddress  = "DepositAddress"
+	TypeLeaf            = "Leaf"
 	TypeSigningKeyshare = "SigningKeyshare"
+	TypeTree            = "Tree"
 )
 
 // DepositAddressMutation represents an operation that mutates the DepositAddress nodes in the graph.
 type DepositAddressMutation struct {
 	config
-	op              Op
-	typ             string
-	id              *uuid.UUID
-	create_time     *time.Time
-	update_time     *time.Time
-	address         *string
-	clearedFields   map[string]struct{}
-	keyshare        *uuid.UUID
-	clearedkeyshare bool
-	done            bool
-	oldValue        func(context.Context) (*DepositAddress, error)
-	predicates      []predicate.DepositAddress
+	op                      Op
+	typ                     string
+	id                      *uuid.UUID
+	create_time             *time.Time
+	update_time             *time.Time
+	address                 *string
+	clearedFields           map[string]struct{}
+	signing_keyshare        *uuid.UUID
+	clearedsigning_keyshare bool
+	done                    bool
+	oldValue                func(context.Context) (*DepositAddress, error)
+	predicates              []predicate.DepositAddress
 }
 
 var _ ent.Mutation = (*DepositAddressMutation)(nil)
@@ -260,43 +264,67 @@ func (m *DepositAddressMutation) ResetAddress() {
 	m.address = nil
 }
 
-// SetKeyshareID sets the "keyshare" edge to the SigningKeyshare entity by id.
-func (m *DepositAddressMutation) SetKeyshareID(id uuid.UUID) {
-	m.keyshare = &id
+// SetSigningKeyshareID sets the "signing_keyshare_id" field.
+func (m *DepositAddressMutation) SetSigningKeyshareID(u uuid.UUID) {
+	m.signing_keyshare = &u
 }
 
-// ClearKeyshare clears the "keyshare" edge to the SigningKeyshare entity.
-func (m *DepositAddressMutation) ClearKeyshare() {
-	m.clearedkeyshare = true
-}
-
-// KeyshareCleared reports if the "keyshare" edge to the SigningKeyshare entity was cleared.
-func (m *DepositAddressMutation) KeyshareCleared() bool {
-	return m.clearedkeyshare
-}
-
-// KeyshareID returns the "keyshare" edge ID in the mutation.
-func (m *DepositAddressMutation) KeyshareID() (id uuid.UUID, exists bool) {
-	if m.keyshare != nil {
-		return *m.keyshare, true
+// SigningKeyshareID returns the value of the "signing_keyshare_id" field in the mutation.
+func (m *DepositAddressMutation) SigningKeyshareID() (r uuid.UUID, exists bool) {
+	v := m.signing_keyshare
+	if v == nil {
+		return
 	}
-	return
+	return *v, true
 }
 
-// KeyshareIDs returns the "keyshare" edge IDs in the mutation.
+// OldSigningKeyshareID returns the old "signing_keyshare_id" field's value of the DepositAddress entity.
+// If the DepositAddress object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DepositAddressMutation) OldSigningKeyshareID(ctx context.Context) (v uuid.UUID, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSigningKeyshareID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSigningKeyshareID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSigningKeyshareID: %w", err)
+	}
+	return oldValue.SigningKeyshareID, nil
+}
+
+// ResetSigningKeyshareID resets all changes to the "signing_keyshare_id" field.
+func (m *DepositAddressMutation) ResetSigningKeyshareID() {
+	m.signing_keyshare = nil
+}
+
+// ClearSigningKeyshare clears the "signing_keyshare" edge to the SigningKeyshare entity.
+func (m *DepositAddressMutation) ClearSigningKeyshare() {
+	m.clearedsigning_keyshare = true
+	m.clearedFields[depositaddress.FieldSigningKeyshareID] = struct{}{}
+}
+
+// SigningKeyshareCleared reports if the "signing_keyshare" edge to the SigningKeyshare entity was cleared.
+func (m *DepositAddressMutation) SigningKeyshareCleared() bool {
+	return m.clearedsigning_keyshare
+}
+
+// SigningKeyshareIDs returns the "signing_keyshare" edge IDs in the mutation.
 // Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
-// KeyshareID instead. It exists only for internal usage by the builders.
-func (m *DepositAddressMutation) KeyshareIDs() (ids []uuid.UUID) {
-	if id := m.keyshare; id != nil {
+// SigningKeyshareID instead. It exists only for internal usage by the builders.
+func (m *DepositAddressMutation) SigningKeyshareIDs() (ids []uuid.UUID) {
+	if id := m.signing_keyshare; id != nil {
 		ids = append(ids, *id)
 	}
 	return
 }
 
-// ResetKeyshare resets all changes to the "keyshare" edge.
-func (m *DepositAddressMutation) ResetKeyshare() {
-	m.keyshare = nil
-	m.clearedkeyshare = false
+// ResetSigningKeyshare resets all changes to the "signing_keyshare" edge.
+func (m *DepositAddressMutation) ResetSigningKeyshare() {
+	m.signing_keyshare = nil
+	m.clearedsigning_keyshare = false
 }
 
 // Where appends a list predicates to the DepositAddressMutation builder.
@@ -333,7 +361,7 @@ func (m *DepositAddressMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *DepositAddressMutation) Fields() []string {
-	fields := make([]string, 0, 3)
+	fields := make([]string, 0, 4)
 	if m.create_time != nil {
 		fields = append(fields, depositaddress.FieldCreateTime)
 	}
@@ -342,6 +370,9 @@ func (m *DepositAddressMutation) Fields() []string {
 	}
 	if m.address != nil {
 		fields = append(fields, depositaddress.FieldAddress)
+	}
+	if m.signing_keyshare != nil {
+		fields = append(fields, depositaddress.FieldSigningKeyshareID)
 	}
 	return fields
 }
@@ -357,6 +388,8 @@ func (m *DepositAddressMutation) Field(name string) (ent.Value, bool) {
 		return m.UpdateTime()
 	case depositaddress.FieldAddress:
 		return m.Address()
+	case depositaddress.FieldSigningKeyshareID:
+		return m.SigningKeyshareID()
 	}
 	return nil, false
 }
@@ -372,6 +405,8 @@ func (m *DepositAddressMutation) OldField(ctx context.Context, name string) (ent
 		return m.OldUpdateTime(ctx)
 	case depositaddress.FieldAddress:
 		return m.OldAddress(ctx)
+	case depositaddress.FieldSigningKeyshareID:
+		return m.OldSigningKeyshareID(ctx)
 	}
 	return nil, fmt.Errorf("unknown DepositAddress field %s", name)
 }
@@ -401,6 +436,13 @@ func (m *DepositAddressMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetAddress(v)
+		return nil
+	case depositaddress.FieldSigningKeyshareID:
+		v, ok := value.(uuid.UUID)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSigningKeyshareID(v)
 		return nil
 	}
 	return fmt.Errorf("unknown DepositAddress field %s", name)
@@ -460,6 +502,9 @@ func (m *DepositAddressMutation) ResetField(name string) error {
 	case depositaddress.FieldAddress:
 		m.ResetAddress()
 		return nil
+	case depositaddress.FieldSigningKeyshareID:
+		m.ResetSigningKeyshareID()
+		return nil
 	}
 	return fmt.Errorf("unknown DepositAddress field %s", name)
 }
@@ -467,8 +512,8 @@ func (m *DepositAddressMutation) ResetField(name string) error {
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *DepositAddressMutation) AddedEdges() []string {
 	edges := make([]string, 0, 1)
-	if m.keyshare != nil {
-		edges = append(edges, depositaddress.EdgeKeyshare)
+	if m.signing_keyshare != nil {
+		edges = append(edges, depositaddress.EdgeSigningKeyshare)
 	}
 	return edges
 }
@@ -477,8 +522,8 @@ func (m *DepositAddressMutation) AddedEdges() []string {
 // name in this mutation.
 func (m *DepositAddressMutation) AddedIDs(name string) []ent.Value {
 	switch name {
-	case depositaddress.EdgeKeyshare:
-		if id := m.keyshare; id != nil {
+	case depositaddress.EdgeSigningKeyshare:
+		if id := m.signing_keyshare; id != nil {
 			return []ent.Value{*id}
 		}
 	}
@@ -500,8 +545,8 @@ func (m *DepositAddressMutation) RemovedIDs(name string) []ent.Value {
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *DepositAddressMutation) ClearedEdges() []string {
 	edges := make([]string, 0, 1)
-	if m.clearedkeyshare {
-		edges = append(edges, depositaddress.EdgeKeyshare)
+	if m.clearedsigning_keyshare {
+		edges = append(edges, depositaddress.EdgeSigningKeyshare)
 	}
 	return edges
 }
@@ -510,8 +555,8 @@ func (m *DepositAddressMutation) ClearedEdges() []string {
 // was cleared in this mutation.
 func (m *DepositAddressMutation) EdgeCleared(name string) bool {
 	switch name {
-	case depositaddress.EdgeKeyshare:
-		return m.clearedkeyshare
+	case depositaddress.EdgeSigningKeyshare:
+		return m.clearedsigning_keyshare
 	}
 	return false
 }
@@ -520,8 +565,8 @@ func (m *DepositAddressMutation) EdgeCleared(name string) bool {
 // if that edge is not defined in the schema.
 func (m *DepositAddressMutation) ClearEdge(name string) error {
 	switch name {
-	case depositaddress.EdgeKeyshare:
-		m.ClearKeyshare()
+	case depositaddress.EdgeSigningKeyshare:
+		m.ClearSigningKeyshare()
 		return nil
 	}
 	return fmt.Errorf("unknown DepositAddress unique edge %s", name)
@@ -531,36 +576,1033 @@ func (m *DepositAddressMutation) ClearEdge(name string) error {
 // It returns an error if the edge is not defined in the schema.
 func (m *DepositAddressMutation) ResetEdge(name string) error {
 	switch name {
-	case depositaddress.EdgeKeyshare:
-		m.ResetKeyshare()
+	case depositaddress.EdgeSigningKeyshare:
+		m.ResetSigningKeyshare()
 		return nil
 	}
 	return fmt.Errorf("unknown DepositAddress edge %s", name)
 }
 
+// LeafMutation represents an operation that mutates the Leaf nodes in the graph.
+type LeafMutation struct {
+	config
+	op                      Op
+	typ                     string
+	id                      *uuid.UUID
+	create_time             *time.Time
+	update_time             *time.Time
+	value_sats              *uint64
+	addvalue_sats           *int64
+	status                  *schema.LeafStatus
+	verifying_pubkey        *[]byte
+	owner_identity_pubkey   *[]byte
+	owner_signing_pubkey    *[]byte
+	clearedFields           map[string]struct{}
+	tree                    *uuid.UUID
+	clearedtree             bool
+	parent                  *uuid.UUID
+	clearedparent           bool
+	signing_keyshare        *uuid.UUID
+	clearedsigning_keyshare bool
+	done                    bool
+	oldValue                func(context.Context) (*Leaf, error)
+	predicates              []predicate.Leaf
+}
+
+var _ ent.Mutation = (*LeafMutation)(nil)
+
+// leafOption allows management of the mutation configuration using functional options.
+type leafOption func(*LeafMutation)
+
+// newLeafMutation creates new mutation for the Leaf entity.
+func newLeafMutation(c config, op Op, opts ...leafOption) *LeafMutation {
+	m := &LeafMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeLeaf,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withLeafID sets the ID field of the mutation.
+func withLeafID(id uuid.UUID) leafOption {
+	return func(m *LeafMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *Leaf
+		)
+		m.oldValue = func(ctx context.Context) (*Leaf, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().Leaf.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withLeaf sets the old Leaf of the mutation.
+func withLeaf(node *Leaf) leafOption {
+	return func(m *LeafMutation) {
+		m.oldValue = func(context.Context) (*Leaf, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m LeafMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m LeafMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of Leaf entities.
+func (m *LeafMutation) SetID(id uuid.UUID) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *LeafMutation) ID() (id uuid.UUID, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *LeafMutation) IDs(ctx context.Context) ([]uuid.UUID, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []uuid.UUID{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().Leaf.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetCreateTime sets the "create_time" field.
+func (m *LeafMutation) SetCreateTime(t time.Time) {
+	m.create_time = &t
+}
+
+// CreateTime returns the value of the "create_time" field in the mutation.
+func (m *LeafMutation) CreateTime() (r time.Time, exists bool) {
+	v := m.create_time
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreateTime returns the old "create_time" field's value of the Leaf entity.
+// If the Leaf object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *LeafMutation) OldCreateTime(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreateTime is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreateTime requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreateTime: %w", err)
+	}
+	return oldValue.CreateTime, nil
+}
+
+// ResetCreateTime resets all changes to the "create_time" field.
+func (m *LeafMutation) ResetCreateTime() {
+	m.create_time = nil
+}
+
+// SetUpdateTime sets the "update_time" field.
+func (m *LeafMutation) SetUpdateTime(t time.Time) {
+	m.update_time = &t
+}
+
+// UpdateTime returns the value of the "update_time" field in the mutation.
+func (m *LeafMutation) UpdateTime() (r time.Time, exists bool) {
+	v := m.update_time
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdateTime returns the old "update_time" field's value of the Leaf entity.
+// If the Leaf object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *LeafMutation) OldUpdateTime(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdateTime is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdateTime requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdateTime: %w", err)
+	}
+	return oldValue.UpdateTime, nil
+}
+
+// ResetUpdateTime resets all changes to the "update_time" field.
+func (m *LeafMutation) ResetUpdateTime() {
+	m.update_time = nil
+}
+
+// SetValueSats sets the "value_sats" field.
+func (m *LeafMutation) SetValueSats(u uint64) {
+	m.value_sats = &u
+	m.addvalue_sats = nil
+}
+
+// ValueSats returns the value of the "value_sats" field in the mutation.
+func (m *LeafMutation) ValueSats() (r uint64, exists bool) {
+	v := m.value_sats
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldValueSats returns the old "value_sats" field's value of the Leaf entity.
+// If the Leaf object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *LeafMutation) OldValueSats(ctx context.Context) (v uint64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldValueSats is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldValueSats requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldValueSats: %w", err)
+	}
+	return oldValue.ValueSats, nil
+}
+
+// AddValueSats adds u to the "value_sats" field.
+func (m *LeafMutation) AddValueSats(u int64) {
+	if m.addvalue_sats != nil {
+		*m.addvalue_sats += u
+	} else {
+		m.addvalue_sats = &u
+	}
+}
+
+// AddedValueSats returns the value that was added to the "value_sats" field in this mutation.
+func (m *LeafMutation) AddedValueSats() (r int64, exists bool) {
+	v := m.addvalue_sats
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetValueSats resets all changes to the "value_sats" field.
+func (m *LeafMutation) ResetValueSats() {
+	m.value_sats = nil
+	m.addvalue_sats = nil
+}
+
+// SetStatus sets the "status" field.
+func (m *LeafMutation) SetStatus(ss schema.LeafStatus) {
+	m.status = &ss
+}
+
+// Status returns the value of the "status" field in the mutation.
+func (m *LeafMutation) Status() (r schema.LeafStatus, exists bool) {
+	v := m.status
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStatus returns the old "status" field's value of the Leaf entity.
+// If the Leaf object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *LeafMutation) OldStatus(ctx context.Context) (v schema.LeafStatus, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStatus is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStatus requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStatus: %w", err)
+	}
+	return oldValue.Status, nil
+}
+
+// ResetStatus resets all changes to the "status" field.
+func (m *LeafMutation) ResetStatus() {
+	m.status = nil
+}
+
+// SetTreeID sets the "tree_id" field.
+func (m *LeafMutation) SetTreeID(u uuid.UUID) {
+	m.tree = &u
+}
+
+// TreeID returns the value of the "tree_id" field in the mutation.
+func (m *LeafMutation) TreeID() (r uuid.UUID, exists bool) {
+	v := m.tree
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTreeID returns the old "tree_id" field's value of the Leaf entity.
+// If the Leaf object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *LeafMutation) OldTreeID(ctx context.Context) (v uuid.UUID, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTreeID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTreeID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTreeID: %w", err)
+	}
+	return oldValue.TreeID, nil
+}
+
+// ResetTreeID resets all changes to the "tree_id" field.
+func (m *LeafMutation) ResetTreeID() {
+	m.tree = nil
+}
+
+// SetParentID sets the "parent_id" field.
+func (m *LeafMutation) SetParentID(u uuid.UUID) {
+	m.parent = &u
+}
+
+// ParentID returns the value of the "parent_id" field in the mutation.
+func (m *LeafMutation) ParentID() (r uuid.UUID, exists bool) {
+	v := m.parent
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldParentID returns the old "parent_id" field's value of the Leaf entity.
+// If the Leaf object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *LeafMutation) OldParentID(ctx context.Context) (v uuid.UUID, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldParentID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldParentID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldParentID: %w", err)
+	}
+	return oldValue.ParentID, nil
+}
+
+// ResetParentID resets all changes to the "parent_id" field.
+func (m *LeafMutation) ResetParentID() {
+	m.parent = nil
+}
+
+// SetVerifyingPubkey sets the "verifying_pubkey" field.
+func (m *LeafMutation) SetVerifyingPubkey(b []byte) {
+	m.verifying_pubkey = &b
+}
+
+// VerifyingPubkey returns the value of the "verifying_pubkey" field in the mutation.
+func (m *LeafMutation) VerifyingPubkey() (r []byte, exists bool) {
+	v := m.verifying_pubkey
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldVerifyingPubkey returns the old "verifying_pubkey" field's value of the Leaf entity.
+// If the Leaf object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *LeafMutation) OldVerifyingPubkey(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldVerifyingPubkey is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldVerifyingPubkey requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldVerifyingPubkey: %w", err)
+	}
+	return oldValue.VerifyingPubkey, nil
+}
+
+// ResetVerifyingPubkey resets all changes to the "verifying_pubkey" field.
+func (m *LeafMutation) ResetVerifyingPubkey() {
+	m.verifying_pubkey = nil
+}
+
+// SetOwnerIdentityPubkey sets the "owner_identity_pubkey" field.
+func (m *LeafMutation) SetOwnerIdentityPubkey(b []byte) {
+	m.owner_identity_pubkey = &b
+}
+
+// OwnerIdentityPubkey returns the value of the "owner_identity_pubkey" field in the mutation.
+func (m *LeafMutation) OwnerIdentityPubkey() (r []byte, exists bool) {
+	v := m.owner_identity_pubkey
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOwnerIdentityPubkey returns the old "owner_identity_pubkey" field's value of the Leaf entity.
+// If the Leaf object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *LeafMutation) OldOwnerIdentityPubkey(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOwnerIdentityPubkey is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOwnerIdentityPubkey requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOwnerIdentityPubkey: %w", err)
+	}
+	return oldValue.OwnerIdentityPubkey, nil
+}
+
+// ResetOwnerIdentityPubkey resets all changes to the "owner_identity_pubkey" field.
+func (m *LeafMutation) ResetOwnerIdentityPubkey() {
+	m.owner_identity_pubkey = nil
+}
+
+// SetOwnerSigningPubkey sets the "owner_signing_pubkey" field.
+func (m *LeafMutation) SetOwnerSigningPubkey(b []byte) {
+	m.owner_signing_pubkey = &b
+}
+
+// OwnerSigningPubkey returns the value of the "owner_signing_pubkey" field in the mutation.
+func (m *LeafMutation) OwnerSigningPubkey() (r []byte, exists bool) {
+	v := m.owner_signing_pubkey
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOwnerSigningPubkey returns the old "owner_signing_pubkey" field's value of the Leaf entity.
+// If the Leaf object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *LeafMutation) OldOwnerSigningPubkey(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOwnerSigningPubkey is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOwnerSigningPubkey requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOwnerSigningPubkey: %w", err)
+	}
+	return oldValue.OwnerSigningPubkey, nil
+}
+
+// ResetOwnerSigningPubkey resets all changes to the "owner_signing_pubkey" field.
+func (m *LeafMutation) ResetOwnerSigningPubkey() {
+	m.owner_signing_pubkey = nil
+}
+
+// SetSigningKeyshareID sets the "signing_keyshare_id" field.
+func (m *LeafMutation) SetSigningKeyshareID(u uuid.UUID) {
+	m.signing_keyshare = &u
+}
+
+// SigningKeyshareID returns the value of the "signing_keyshare_id" field in the mutation.
+func (m *LeafMutation) SigningKeyshareID() (r uuid.UUID, exists bool) {
+	v := m.signing_keyshare
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSigningKeyshareID returns the old "signing_keyshare_id" field's value of the Leaf entity.
+// If the Leaf object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *LeafMutation) OldSigningKeyshareID(ctx context.Context) (v uuid.UUID, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSigningKeyshareID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSigningKeyshareID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSigningKeyshareID: %w", err)
+	}
+	return oldValue.SigningKeyshareID, nil
+}
+
+// ResetSigningKeyshareID resets all changes to the "signing_keyshare_id" field.
+func (m *LeafMutation) ResetSigningKeyshareID() {
+	m.signing_keyshare = nil
+}
+
+// ClearTree clears the "tree" edge to the Tree entity.
+func (m *LeafMutation) ClearTree() {
+	m.clearedtree = true
+	m.clearedFields[leaf.FieldTreeID] = struct{}{}
+}
+
+// TreeCleared reports if the "tree" edge to the Tree entity was cleared.
+func (m *LeafMutation) TreeCleared() bool {
+	return m.clearedtree
+}
+
+// TreeIDs returns the "tree" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// TreeID instead. It exists only for internal usage by the builders.
+func (m *LeafMutation) TreeIDs() (ids []uuid.UUID) {
+	if id := m.tree; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetTree resets all changes to the "tree" edge.
+func (m *LeafMutation) ResetTree() {
+	m.tree = nil
+	m.clearedtree = false
+}
+
+// ClearParent clears the "parent" edge to the Leaf entity.
+func (m *LeafMutation) ClearParent() {
+	m.clearedparent = true
+	m.clearedFields[leaf.FieldParentID] = struct{}{}
+}
+
+// ParentCleared reports if the "parent" edge to the Leaf entity was cleared.
+func (m *LeafMutation) ParentCleared() bool {
+	return m.clearedparent
+}
+
+// ParentIDs returns the "parent" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// ParentID instead. It exists only for internal usage by the builders.
+func (m *LeafMutation) ParentIDs() (ids []uuid.UUID) {
+	if id := m.parent; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetParent resets all changes to the "parent" edge.
+func (m *LeafMutation) ResetParent() {
+	m.parent = nil
+	m.clearedparent = false
+}
+
+// ClearSigningKeyshare clears the "signing_keyshare" edge to the SigningKeyshare entity.
+func (m *LeafMutation) ClearSigningKeyshare() {
+	m.clearedsigning_keyshare = true
+	m.clearedFields[leaf.FieldSigningKeyshareID] = struct{}{}
+}
+
+// SigningKeyshareCleared reports if the "signing_keyshare" edge to the SigningKeyshare entity was cleared.
+func (m *LeafMutation) SigningKeyshareCleared() bool {
+	return m.clearedsigning_keyshare
+}
+
+// SigningKeyshareIDs returns the "signing_keyshare" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// SigningKeyshareID instead. It exists only for internal usage by the builders.
+func (m *LeafMutation) SigningKeyshareIDs() (ids []uuid.UUID) {
+	if id := m.signing_keyshare; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetSigningKeyshare resets all changes to the "signing_keyshare" edge.
+func (m *LeafMutation) ResetSigningKeyshare() {
+	m.signing_keyshare = nil
+	m.clearedsigning_keyshare = false
+}
+
+// Where appends a list predicates to the LeafMutation builder.
+func (m *LeafMutation) Where(ps ...predicate.Leaf) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the LeafMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *LeafMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.Leaf, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *LeafMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *LeafMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (Leaf).
+func (m *LeafMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *LeafMutation) Fields() []string {
+	fields := make([]string, 0, 10)
+	if m.create_time != nil {
+		fields = append(fields, leaf.FieldCreateTime)
+	}
+	if m.update_time != nil {
+		fields = append(fields, leaf.FieldUpdateTime)
+	}
+	if m.value_sats != nil {
+		fields = append(fields, leaf.FieldValueSats)
+	}
+	if m.status != nil {
+		fields = append(fields, leaf.FieldStatus)
+	}
+	if m.tree != nil {
+		fields = append(fields, leaf.FieldTreeID)
+	}
+	if m.parent != nil {
+		fields = append(fields, leaf.FieldParentID)
+	}
+	if m.verifying_pubkey != nil {
+		fields = append(fields, leaf.FieldVerifyingPubkey)
+	}
+	if m.owner_identity_pubkey != nil {
+		fields = append(fields, leaf.FieldOwnerIdentityPubkey)
+	}
+	if m.owner_signing_pubkey != nil {
+		fields = append(fields, leaf.FieldOwnerSigningPubkey)
+	}
+	if m.signing_keyshare != nil {
+		fields = append(fields, leaf.FieldSigningKeyshareID)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *LeafMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case leaf.FieldCreateTime:
+		return m.CreateTime()
+	case leaf.FieldUpdateTime:
+		return m.UpdateTime()
+	case leaf.FieldValueSats:
+		return m.ValueSats()
+	case leaf.FieldStatus:
+		return m.Status()
+	case leaf.FieldTreeID:
+		return m.TreeID()
+	case leaf.FieldParentID:
+		return m.ParentID()
+	case leaf.FieldVerifyingPubkey:
+		return m.VerifyingPubkey()
+	case leaf.FieldOwnerIdentityPubkey:
+		return m.OwnerIdentityPubkey()
+	case leaf.FieldOwnerSigningPubkey:
+		return m.OwnerSigningPubkey()
+	case leaf.FieldSigningKeyshareID:
+		return m.SigningKeyshareID()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *LeafMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case leaf.FieldCreateTime:
+		return m.OldCreateTime(ctx)
+	case leaf.FieldUpdateTime:
+		return m.OldUpdateTime(ctx)
+	case leaf.FieldValueSats:
+		return m.OldValueSats(ctx)
+	case leaf.FieldStatus:
+		return m.OldStatus(ctx)
+	case leaf.FieldTreeID:
+		return m.OldTreeID(ctx)
+	case leaf.FieldParentID:
+		return m.OldParentID(ctx)
+	case leaf.FieldVerifyingPubkey:
+		return m.OldVerifyingPubkey(ctx)
+	case leaf.FieldOwnerIdentityPubkey:
+		return m.OldOwnerIdentityPubkey(ctx)
+	case leaf.FieldOwnerSigningPubkey:
+		return m.OldOwnerSigningPubkey(ctx)
+	case leaf.FieldSigningKeyshareID:
+		return m.OldSigningKeyshareID(ctx)
+	}
+	return nil, fmt.Errorf("unknown Leaf field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *LeafMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case leaf.FieldCreateTime:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreateTime(v)
+		return nil
+	case leaf.FieldUpdateTime:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdateTime(v)
+		return nil
+	case leaf.FieldValueSats:
+		v, ok := value.(uint64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetValueSats(v)
+		return nil
+	case leaf.FieldStatus:
+		v, ok := value.(schema.LeafStatus)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStatus(v)
+		return nil
+	case leaf.FieldTreeID:
+		v, ok := value.(uuid.UUID)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTreeID(v)
+		return nil
+	case leaf.FieldParentID:
+		v, ok := value.(uuid.UUID)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetParentID(v)
+		return nil
+	case leaf.FieldVerifyingPubkey:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetVerifyingPubkey(v)
+		return nil
+	case leaf.FieldOwnerIdentityPubkey:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOwnerIdentityPubkey(v)
+		return nil
+	case leaf.FieldOwnerSigningPubkey:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOwnerSigningPubkey(v)
+		return nil
+	case leaf.FieldSigningKeyshareID:
+		v, ok := value.(uuid.UUID)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSigningKeyshareID(v)
+		return nil
+	}
+	return fmt.Errorf("unknown Leaf field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *LeafMutation) AddedFields() []string {
+	var fields []string
+	if m.addvalue_sats != nil {
+		fields = append(fields, leaf.FieldValueSats)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *LeafMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case leaf.FieldValueSats:
+		return m.AddedValueSats()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *LeafMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case leaf.FieldValueSats:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddValueSats(v)
+		return nil
+	}
+	return fmt.Errorf("unknown Leaf numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *LeafMutation) ClearedFields() []string {
+	return nil
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *LeafMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *LeafMutation) ClearField(name string) error {
+	return fmt.Errorf("unknown Leaf nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *LeafMutation) ResetField(name string) error {
+	switch name {
+	case leaf.FieldCreateTime:
+		m.ResetCreateTime()
+		return nil
+	case leaf.FieldUpdateTime:
+		m.ResetUpdateTime()
+		return nil
+	case leaf.FieldValueSats:
+		m.ResetValueSats()
+		return nil
+	case leaf.FieldStatus:
+		m.ResetStatus()
+		return nil
+	case leaf.FieldTreeID:
+		m.ResetTreeID()
+		return nil
+	case leaf.FieldParentID:
+		m.ResetParentID()
+		return nil
+	case leaf.FieldVerifyingPubkey:
+		m.ResetVerifyingPubkey()
+		return nil
+	case leaf.FieldOwnerIdentityPubkey:
+		m.ResetOwnerIdentityPubkey()
+		return nil
+	case leaf.FieldOwnerSigningPubkey:
+		m.ResetOwnerSigningPubkey()
+		return nil
+	case leaf.FieldSigningKeyshareID:
+		m.ResetSigningKeyshareID()
+		return nil
+	}
+	return fmt.Errorf("unknown Leaf field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *LeafMutation) AddedEdges() []string {
+	edges := make([]string, 0, 3)
+	if m.tree != nil {
+		edges = append(edges, leaf.EdgeTree)
+	}
+	if m.parent != nil {
+		edges = append(edges, leaf.EdgeParent)
+	}
+	if m.signing_keyshare != nil {
+		edges = append(edges, leaf.EdgeSigningKeyshare)
+	}
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *LeafMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case leaf.EdgeTree:
+		if id := m.tree; id != nil {
+			return []ent.Value{*id}
+		}
+	case leaf.EdgeParent:
+		if id := m.parent; id != nil {
+			return []ent.Value{*id}
+		}
+	case leaf.EdgeSigningKeyshare:
+		if id := m.signing_keyshare; id != nil {
+			return []ent.Value{*id}
+		}
+	}
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *LeafMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 3)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *LeafMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *LeafMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 3)
+	if m.clearedtree {
+		edges = append(edges, leaf.EdgeTree)
+	}
+	if m.clearedparent {
+		edges = append(edges, leaf.EdgeParent)
+	}
+	if m.clearedsigning_keyshare {
+		edges = append(edges, leaf.EdgeSigningKeyshare)
+	}
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *LeafMutation) EdgeCleared(name string) bool {
+	switch name {
+	case leaf.EdgeTree:
+		return m.clearedtree
+	case leaf.EdgeParent:
+		return m.clearedparent
+	case leaf.EdgeSigningKeyshare:
+		return m.clearedsigning_keyshare
+	}
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *LeafMutation) ClearEdge(name string) error {
+	switch name {
+	case leaf.EdgeTree:
+		m.ClearTree()
+		return nil
+	case leaf.EdgeParent:
+		m.ClearParent()
+		return nil
+	case leaf.EdgeSigningKeyshare:
+		m.ClearSigningKeyshare()
+		return nil
+	}
+	return fmt.Errorf("unknown Leaf unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *LeafMutation) ResetEdge(name string) error {
+	switch name {
+	case leaf.EdgeTree:
+		m.ResetTree()
+		return nil
+	case leaf.EdgeParent:
+		m.ResetParent()
+		return nil
+	case leaf.EdgeSigningKeyshare:
+		m.ResetSigningKeyshare()
+		return nil
+	}
+	return fmt.Errorf("unknown Leaf edge %s", name)
+}
+
 // SigningKeyshareMutation represents an operation that mutates the SigningKeyshare nodes in the graph.
 type SigningKeyshareMutation struct {
 	config
-	op                     Op
-	typ                    string
-	id                     *uuid.UUID
-	create_time            *time.Time
-	update_time            *time.Time
-	status                 *schema.SigningKeyshareStatus
-	secret_share           *[]byte
-	public_shares          *map[string][]uint8
-	public_key             *[]byte
-	min_signers            *uint32
-	addmin_signers         *int32
-	coordinator_index      *uint64
-	addcoordinator_index   *int64
-	clearedFields          map[string]struct{}
-	deposit_address        map[uuid.UUID]struct{}
-	removeddeposit_address map[uuid.UUID]struct{}
-	cleareddeposit_address bool
-	done                   bool
-	oldValue               func(context.Context) (*SigningKeyshare, error)
-	predicates             []predicate.SigningKeyshare
+	op                   Op
+	typ                  string
+	id                   *uuid.UUID
+	create_time          *time.Time
+	update_time          *time.Time
+	status               *schema.SigningKeyshareStatus
+	secret_share         *[]byte
+	public_shares        *map[string][]uint8
+	public_key           *[]byte
+	min_signers          *uint32
+	addmin_signers       *int32
+	coordinator_index    *uint64
+	addcoordinator_index *int64
+	clearedFields        map[string]struct{}
+	done                 bool
+	oldValue             func(context.Context) (*SigningKeyshare, error)
+	predicates           []predicate.SigningKeyshare
 }
 
 var _ ent.Mutation = (*SigningKeyshareMutation)(nil)
@@ -995,60 +2037,6 @@ func (m *SigningKeyshareMutation) ResetCoordinatorIndex() {
 	m.addcoordinator_index = nil
 }
 
-// AddDepositAddresIDs adds the "deposit_address" edge to the DepositAddress entity by ids.
-func (m *SigningKeyshareMutation) AddDepositAddresIDs(ids ...uuid.UUID) {
-	if m.deposit_address == nil {
-		m.deposit_address = make(map[uuid.UUID]struct{})
-	}
-	for i := range ids {
-		m.deposit_address[ids[i]] = struct{}{}
-	}
-}
-
-// ClearDepositAddress clears the "deposit_address" edge to the DepositAddress entity.
-func (m *SigningKeyshareMutation) ClearDepositAddress() {
-	m.cleareddeposit_address = true
-}
-
-// DepositAddressCleared reports if the "deposit_address" edge to the DepositAddress entity was cleared.
-func (m *SigningKeyshareMutation) DepositAddressCleared() bool {
-	return m.cleareddeposit_address
-}
-
-// RemoveDepositAddresIDs removes the "deposit_address" edge to the DepositAddress entity by IDs.
-func (m *SigningKeyshareMutation) RemoveDepositAddresIDs(ids ...uuid.UUID) {
-	if m.removeddeposit_address == nil {
-		m.removeddeposit_address = make(map[uuid.UUID]struct{})
-	}
-	for i := range ids {
-		delete(m.deposit_address, ids[i])
-		m.removeddeposit_address[ids[i]] = struct{}{}
-	}
-}
-
-// RemovedDepositAddress returns the removed IDs of the "deposit_address" edge to the DepositAddress entity.
-func (m *SigningKeyshareMutation) RemovedDepositAddressIDs() (ids []uuid.UUID) {
-	for id := range m.removeddeposit_address {
-		ids = append(ids, id)
-	}
-	return
-}
-
-// DepositAddressIDs returns the "deposit_address" edge IDs in the mutation.
-func (m *SigningKeyshareMutation) DepositAddressIDs() (ids []uuid.UUID) {
-	for id := range m.deposit_address {
-		ids = append(ids, id)
-	}
-	return
-}
-
-// ResetDepositAddress resets all changes to the "deposit_address" edge.
-func (m *SigningKeyshareMutation) ResetDepositAddress() {
-	m.deposit_address = nil
-	m.cleareddeposit_address = false
-	m.removeddeposit_address = nil
-}
-
 // Where appends a list predicates to the SigningKeyshareMutation builder.
 func (m *SigningKeyshareMutation) Where(ps ...predicate.SigningKeyshare) {
 	m.predicates = append(m.predicates, ps...)
@@ -1328,20 +2316,606 @@ func (m *SigningKeyshareMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *SigningKeyshareMutation) AddedEdges() []string {
-	edges := make([]string, 0, 1)
-	if m.deposit_address != nil {
-		edges = append(edges, signingkeyshare.EdgeDepositAddress)
-	}
+	edges := make([]string, 0, 0)
 	return edges
 }
 
 // AddedIDs returns all IDs (to other nodes) that were added for the given edge
 // name in this mutation.
 func (m *SigningKeyshareMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *SigningKeyshareMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *SigningKeyshareMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *SigningKeyshareMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *SigningKeyshareMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *SigningKeyshareMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown SigningKeyshare unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *SigningKeyshareMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown SigningKeyshare edge %s", name)
+}
+
+// TreeMutation represents an operation that mutates the Tree nodes in the graph.
+type TreeMutation struct {
+	config
+	op                    Op
+	typ                   string
+	id                    *uuid.UUID
+	create_time           *time.Time
+	update_time           *time.Time
+	owner_identity_pubkey *[]byte
+	clearedFields         map[string]struct{}
+	root                  *uuid.UUID
+	clearedroot           bool
+	leaves                map[uuid.UUID]struct{}
+	removedleaves         map[uuid.UUID]struct{}
+	clearedleaves         bool
+	done                  bool
+	oldValue              func(context.Context) (*Tree, error)
+	predicates            []predicate.Tree
+}
+
+var _ ent.Mutation = (*TreeMutation)(nil)
+
+// treeOption allows management of the mutation configuration using functional options.
+type treeOption func(*TreeMutation)
+
+// newTreeMutation creates new mutation for the Tree entity.
+func newTreeMutation(c config, op Op, opts ...treeOption) *TreeMutation {
+	m := &TreeMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeTree,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withTreeID sets the ID field of the mutation.
+func withTreeID(id uuid.UUID) treeOption {
+	return func(m *TreeMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *Tree
+		)
+		m.oldValue = func(ctx context.Context) (*Tree, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().Tree.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withTree sets the old Tree of the mutation.
+func withTree(node *Tree) treeOption {
+	return func(m *TreeMutation) {
+		m.oldValue = func(context.Context) (*Tree, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m TreeMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m TreeMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of Tree entities.
+func (m *TreeMutation) SetID(id uuid.UUID) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *TreeMutation) ID() (id uuid.UUID, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *TreeMutation) IDs(ctx context.Context) ([]uuid.UUID, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []uuid.UUID{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().Tree.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetCreateTime sets the "create_time" field.
+func (m *TreeMutation) SetCreateTime(t time.Time) {
+	m.create_time = &t
+}
+
+// CreateTime returns the value of the "create_time" field in the mutation.
+func (m *TreeMutation) CreateTime() (r time.Time, exists bool) {
+	v := m.create_time
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreateTime returns the old "create_time" field's value of the Tree entity.
+// If the Tree object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TreeMutation) OldCreateTime(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreateTime is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreateTime requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreateTime: %w", err)
+	}
+	return oldValue.CreateTime, nil
+}
+
+// ResetCreateTime resets all changes to the "create_time" field.
+func (m *TreeMutation) ResetCreateTime() {
+	m.create_time = nil
+}
+
+// SetUpdateTime sets the "update_time" field.
+func (m *TreeMutation) SetUpdateTime(t time.Time) {
+	m.update_time = &t
+}
+
+// UpdateTime returns the value of the "update_time" field in the mutation.
+func (m *TreeMutation) UpdateTime() (r time.Time, exists bool) {
+	v := m.update_time
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdateTime returns the old "update_time" field's value of the Tree entity.
+// If the Tree object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TreeMutation) OldUpdateTime(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdateTime is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdateTime requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdateTime: %w", err)
+	}
+	return oldValue.UpdateTime, nil
+}
+
+// ResetUpdateTime resets all changes to the "update_time" field.
+func (m *TreeMutation) ResetUpdateTime() {
+	m.update_time = nil
+}
+
+// SetRootID sets the "root_id" field.
+func (m *TreeMutation) SetRootID(u uuid.UUID) {
+	m.root = &u
+}
+
+// RootID returns the value of the "root_id" field in the mutation.
+func (m *TreeMutation) RootID() (r uuid.UUID, exists bool) {
+	v := m.root
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRootID returns the old "root_id" field's value of the Tree entity.
+// If the Tree object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TreeMutation) OldRootID(ctx context.Context) (v uuid.UUID, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRootID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRootID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRootID: %w", err)
+	}
+	return oldValue.RootID, nil
+}
+
+// ResetRootID resets all changes to the "root_id" field.
+func (m *TreeMutation) ResetRootID() {
+	m.root = nil
+}
+
+// SetOwnerIdentityPubkey sets the "owner_identity_pubkey" field.
+func (m *TreeMutation) SetOwnerIdentityPubkey(b []byte) {
+	m.owner_identity_pubkey = &b
+}
+
+// OwnerIdentityPubkey returns the value of the "owner_identity_pubkey" field in the mutation.
+func (m *TreeMutation) OwnerIdentityPubkey() (r []byte, exists bool) {
+	v := m.owner_identity_pubkey
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOwnerIdentityPubkey returns the old "owner_identity_pubkey" field's value of the Tree entity.
+// If the Tree object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TreeMutation) OldOwnerIdentityPubkey(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOwnerIdentityPubkey is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOwnerIdentityPubkey requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOwnerIdentityPubkey: %w", err)
+	}
+	return oldValue.OwnerIdentityPubkey, nil
+}
+
+// ResetOwnerIdentityPubkey resets all changes to the "owner_identity_pubkey" field.
+func (m *TreeMutation) ResetOwnerIdentityPubkey() {
+	m.owner_identity_pubkey = nil
+}
+
+// ClearRoot clears the "root" edge to the Leaf entity.
+func (m *TreeMutation) ClearRoot() {
+	m.clearedroot = true
+	m.clearedFields[tree.FieldRootID] = struct{}{}
+}
+
+// RootCleared reports if the "root" edge to the Leaf entity was cleared.
+func (m *TreeMutation) RootCleared() bool {
+	return m.clearedroot
+}
+
+// RootIDs returns the "root" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// RootID instead. It exists only for internal usage by the builders.
+func (m *TreeMutation) RootIDs() (ids []uuid.UUID) {
+	if id := m.root; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetRoot resets all changes to the "root" edge.
+func (m *TreeMutation) ResetRoot() {
+	m.root = nil
+	m.clearedroot = false
+}
+
+// AddLeafeIDs adds the "leaves" edge to the Leaf entity by ids.
+func (m *TreeMutation) AddLeafeIDs(ids ...uuid.UUID) {
+	if m.leaves == nil {
+		m.leaves = make(map[uuid.UUID]struct{})
+	}
+	for i := range ids {
+		m.leaves[ids[i]] = struct{}{}
+	}
+}
+
+// ClearLeaves clears the "leaves" edge to the Leaf entity.
+func (m *TreeMutation) ClearLeaves() {
+	m.clearedleaves = true
+}
+
+// LeavesCleared reports if the "leaves" edge to the Leaf entity was cleared.
+func (m *TreeMutation) LeavesCleared() bool {
+	return m.clearedleaves
+}
+
+// RemoveLeafeIDs removes the "leaves" edge to the Leaf entity by IDs.
+func (m *TreeMutation) RemoveLeafeIDs(ids ...uuid.UUID) {
+	if m.removedleaves == nil {
+		m.removedleaves = make(map[uuid.UUID]struct{})
+	}
+	for i := range ids {
+		delete(m.leaves, ids[i])
+		m.removedleaves[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedLeaves returns the removed IDs of the "leaves" edge to the Leaf entity.
+func (m *TreeMutation) RemovedLeavesIDs() (ids []uuid.UUID) {
+	for id := range m.removedleaves {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// LeavesIDs returns the "leaves" edge IDs in the mutation.
+func (m *TreeMutation) LeavesIDs() (ids []uuid.UUID) {
+	for id := range m.leaves {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetLeaves resets all changes to the "leaves" edge.
+func (m *TreeMutation) ResetLeaves() {
+	m.leaves = nil
+	m.clearedleaves = false
+	m.removedleaves = nil
+}
+
+// Where appends a list predicates to the TreeMutation builder.
+func (m *TreeMutation) Where(ps ...predicate.Tree) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the TreeMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *TreeMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.Tree, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *TreeMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *TreeMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (Tree).
+func (m *TreeMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *TreeMutation) Fields() []string {
+	fields := make([]string, 0, 4)
+	if m.create_time != nil {
+		fields = append(fields, tree.FieldCreateTime)
+	}
+	if m.update_time != nil {
+		fields = append(fields, tree.FieldUpdateTime)
+	}
+	if m.root != nil {
+		fields = append(fields, tree.FieldRootID)
+	}
+	if m.owner_identity_pubkey != nil {
+		fields = append(fields, tree.FieldOwnerIdentityPubkey)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *TreeMutation) Field(name string) (ent.Value, bool) {
 	switch name {
-	case signingkeyshare.EdgeDepositAddress:
-		ids := make([]ent.Value, 0, len(m.deposit_address))
-		for id := range m.deposit_address {
+	case tree.FieldCreateTime:
+		return m.CreateTime()
+	case tree.FieldUpdateTime:
+		return m.UpdateTime()
+	case tree.FieldRootID:
+		return m.RootID()
+	case tree.FieldOwnerIdentityPubkey:
+		return m.OwnerIdentityPubkey()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *TreeMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case tree.FieldCreateTime:
+		return m.OldCreateTime(ctx)
+	case tree.FieldUpdateTime:
+		return m.OldUpdateTime(ctx)
+	case tree.FieldRootID:
+		return m.OldRootID(ctx)
+	case tree.FieldOwnerIdentityPubkey:
+		return m.OldOwnerIdentityPubkey(ctx)
+	}
+	return nil, fmt.Errorf("unknown Tree field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *TreeMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case tree.FieldCreateTime:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreateTime(v)
+		return nil
+	case tree.FieldUpdateTime:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdateTime(v)
+		return nil
+	case tree.FieldRootID:
+		v, ok := value.(uuid.UUID)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRootID(v)
+		return nil
+	case tree.FieldOwnerIdentityPubkey:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOwnerIdentityPubkey(v)
+		return nil
+	}
+	return fmt.Errorf("unknown Tree field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *TreeMutation) AddedFields() []string {
+	return nil
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *TreeMutation) AddedField(name string) (ent.Value, bool) {
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *TreeMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	}
+	return fmt.Errorf("unknown Tree numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *TreeMutation) ClearedFields() []string {
+	return nil
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *TreeMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *TreeMutation) ClearField(name string) error {
+	return fmt.Errorf("unknown Tree nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *TreeMutation) ResetField(name string) error {
+	switch name {
+	case tree.FieldCreateTime:
+		m.ResetCreateTime()
+		return nil
+	case tree.FieldUpdateTime:
+		m.ResetUpdateTime()
+		return nil
+	case tree.FieldRootID:
+		m.ResetRootID()
+		return nil
+	case tree.FieldOwnerIdentityPubkey:
+		m.ResetOwnerIdentityPubkey()
+		return nil
+	}
+	return fmt.Errorf("unknown Tree field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *TreeMutation) AddedEdges() []string {
+	edges := make([]string, 0, 2)
+	if m.root != nil {
+		edges = append(edges, tree.EdgeRoot)
+	}
+	if m.leaves != nil {
+		edges = append(edges, tree.EdgeLeaves)
+	}
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *TreeMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case tree.EdgeRoot:
+		if id := m.root; id != nil {
+			return []ent.Value{*id}
+		}
+	case tree.EdgeLeaves:
+		ids := make([]ent.Value, 0, len(m.leaves))
+		for id := range m.leaves {
 			ids = append(ids, id)
 		}
 		return ids
@@ -1350,21 +2924,21 @@ func (m *SigningKeyshareMutation) AddedIDs(name string) []ent.Value {
 }
 
 // RemovedEdges returns all edge names that were removed in this mutation.
-func (m *SigningKeyshareMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 1)
-	if m.removeddeposit_address != nil {
-		edges = append(edges, signingkeyshare.EdgeDepositAddress)
+func (m *TreeMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 2)
+	if m.removedleaves != nil {
+		edges = append(edges, tree.EdgeLeaves)
 	}
 	return edges
 }
 
 // RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
 // the given name in this mutation.
-func (m *SigningKeyshareMutation) RemovedIDs(name string) []ent.Value {
+func (m *TreeMutation) RemovedIDs(name string) []ent.Value {
 	switch name {
-	case signingkeyshare.EdgeDepositAddress:
-		ids := make([]ent.Value, 0, len(m.removeddeposit_address))
-		for id := range m.removeddeposit_address {
+	case tree.EdgeLeaves:
+		ids := make([]ent.Value, 0, len(m.removedleaves))
+		for id := range m.removedleaves {
 			ids = append(ids, id)
 		}
 		return ids
@@ -1373,39 +2947,50 @@ func (m *SigningKeyshareMutation) RemovedIDs(name string) []ent.Value {
 }
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
-func (m *SigningKeyshareMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 1)
-	if m.cleareddeposit_address {
-		edges = append(edges, signingkeyshare.EdgeDepositAddress)
+func (m *TreeMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 2)
+	if m.clearedroot {
+		edges = append(edges, tree.EdgeRoot)
+	}
+	if m.clearedleaves {
+		edges = append(edges, tree.EdgeLeaves)
 	}
 	return edges
 }
 
 // EdgeCleared returns a boolean which indicates if the edge with the given name
 // was cleared in this mutation.
-func (m *SigningKeyshareMutation) EdgeCleared(name string) bool {
+func (m *TreeMutation) EdgeCleared(name string) bool {
 	switch name {
-	case signingkeyshare.EdgeDepositAddress:
-		return m.cleareddeposit_address
+	case tree.EdgeRoot:
+		return m.clearedroot
+	case tree.EdgeLeaves:
+		return m.clearedleaves
 	}
 	return false
 }
 
 // ClearEdge clears the value of the edge with the given name. It returns an error
 // if that edge is not defined in the schema.
-func (m *SigningKeyshareMutation) ClearEdge(name string) error {
+func (m *TreeMutation) ClearEdge(name string) error {
 	switch name {
+	case tree.EdgeRoot:
+		m.ClearRoot()
+		return nil
 	}
-	return fmt.Errorf("unknown SigningKeyshare unique edge %s", name)
+	return fmt.Errorf("unknown Tree unique edge %s", name)
 }
 
 // ResetEdge resets all changes to the edge with the given name in this mutation.
 // It returns an error if the edge is not defined in the schema.
-func (m *SigningKeyshareMutation) ResetEdge(name string) error {
+func (m *TreeMutation) ResetEdge(name string) error {
 	switch name {
-	case signingkeyshare.EdgeDepositAddress:
-		m.ResetDepositAddress()
+	case tree.EdgeRoot:
+		m.ResetRoot()
+		return nil
+	case tree.EdgeLeaves:
+		m.ResetLeaves()
 		return nil
 	}
-	return fmt.Errorf("unknown SigningKeyshare edge %s", name)
+	return fmt.Errorf("unknown Tree edge %s", name)
 }

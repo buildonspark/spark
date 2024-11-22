@@ -11,10 +11,8 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/so/ent/depositaddress"
 	"github.com/lightsparkdev/spark-go/so/ent/predicate"
-	"github.com/lightsparkdev/spark-go/so/ent/signingkeyshare"
 )
 
 // DepositAddressUpdate is the builder for updating DepositAddress entities.
@@ -50,34 +48,9 @@ func (dau *DepositAddressUpdate) SetNillableAddress(s *string) *DepositAddressUp
 	return dau
 }
 
-// SetKeyshareID sets the "keyshare" edge to the SigningKeyshare entity by ID.
-func (dau *DepositAddressUpdate) SetKeyshareID(id uuid.UUID) *DepositAddressUpdate {
-	dau.mutation.SetKeyshareID(id)
-	return dau
-}
-
-// SetNillableKeyshareID sets the "keyshare" edge to the SigningKeyshare entity by ID if the given value is not nil.
-func (dau *DepositAddressUpdate) SetNillableKeyshareID(id *uuid.UUID) *DepositAddressUpdate {
-	if id != nil {
-		dau = dau.SetKeyshareID(*id)
-	}
-	return dau
-}
-
-// SetKeyshare sets the "keyshare" edge to the SigningKeyshare entity.
-func (dau *DepositAddressUpdate) SetKeyshare(s *SigningKeyshare) *DepositAddressUpdate {
-	return dau.SetKeyshareID(s.ID)
-}
-
 // Mutation returns the DepositAddressMutation object of the builder.
 func (dau *DepositAddressUpdate) Mutation() *DepositAddressMutation {
 	return dau.mutation
-}
-
-// ClearKeyshare clears the "keyshare" edge to the SigningKeyshare entity.
-func (dau *DepositAddressUpdate) ClearKeyshare() *DepositAddressUpdate {
-	dau.mutation.ClearKeyshare()
-	return dau
 }
 
 // Save executes the query and returns the number of nodes affected by the update operation.
@@ -123,6 +96,9 @@ func (dau *DepositAddressUpdate) check() error {
 			return &ValidationError{Name: "address", err: fmt.Errorf(`ent: validator failed for field "DepositAddress.address": %w`, err)}
 		}
 	}
+	if dau.mutation.SigningKeyshareCleared() && len(dau.mutation.SigningKeyshareIDs()) > 0 {
+		return errors.New(`ent: clearing a required unique edge "DepositAddress.signing_keyshare"`)
+	}
 	return nil
 }
 
@@ -143,35 +119,6 @@ func (dau *DepositAddressUpdate) sqlSave(ctx context.Context) (n int, err error)
 	}
 	if value, ok := dau.mutation.Address(); ok {
 		_spec.SetField(depositaddress.FieldAddress, field.TypeString, value)
-	}
-	if dau.mutation.KeyshareCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: true,
-			Table:   depositaddress.KeyshareTable,
-			Columns: []string{depositaddress.KeyshareColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(signingkeyshare.FieldID, field.TypeUUID),
-			},
-		}
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := dau.mutation.KeyshareIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: true,
-			Table:   depositaddress.KeyshareTable,
-			Columns: []string{depositaddress.KeyshareColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(signingkeyshare.FieldID, field.TypeUUID),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	if n, err = sqlgraph.UpdateNodes(ctx, dau.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
@@ -213,34 +160,9 @@ func (dauo *DepositAddressUpdateOne) SetNillableAddress(s *string) *DepositAddre
 	return dauo
 }
 
-// SetKeyshareID sets the "keyshare" edge to the SigningKeyshare entity by ID.
-func (dauo *DepositAddressUpdateOne) SetKeyshareID(id uuid.UUID) *DepositAddressUpdateOne {
-	dauo.mutation.SetKeyshareID(id)
-	return dauo
-}
-
-// SetNillableKeyshareID sets the "keyshare" edge to the SigningKeyshare entity by ID if the given value is not nil.
-func (dauo *DepositAddressUpdateOne) SetNillableKeyshareID(id *uuid.UUID) *DepositAddressUpdateOne {
-	if id != nil {
-		dauo = dauo.SetKeyshareID(*id)
-	}
-	return dauo
-}
-
-// SetKeyshare sets the "keyshare" edge to the SigningKeyshare entity.
-func (dauo *DepositAddressUpdateOne) SetKeyshare(s *SigningKeyshare) *DepositAddressUpdateOne {
-	return dauo.SetKeyshareID(s.ID)
-}
-
 // Mutation returns the DepositAddressMutation object of the builder.
 func (dauo *DepositAddressUpdateOne) Mutation() *DepositAddressMutation {
 	return dauo.mutation
-}
-
-// ClearKeyshare clears the "keyshare" edge to the SigningKeyshare entity.
-func (dauo *DepositAddressUpdateOne) ClearKeyshare() *DepositAddressUpdateOne {
-	dauo.mutation.ClearKeyshare()
-	return dauo
 }
 
 // Where appends a list predicates to the DepositAddressUpdate builder.
@@ -299,6 +221,9 @@ func (dauo *DepositAddressUpdateOne) check() error {
 			return &ValidationError{Name: "address", err: fmt.Errorf(`ent: validator failed for field "DepositAddress.address": %w`, err)}
 		}
 	}
+	if dauo.mutation.SigningKeyshareCleared() && len(dauo.mutation.SigningKeyshareIDs()) > 0 {
+		return errors.New(`ent: clearing a required unique edge "DepositAddress.signing_keyshare"`)
+	}
 	return nil
 }
 
@@ -336,35 +261,6 @@ func (dauo *DepositAddressUpdateOne) sqlSave(ctx context.Context) (_node *Deposi
 	}
 	if value, ok := dauo.mutation.Address(); ok {
 		_spec.SetField(depositaddress.FieldAddress, field.TypeString, value)
-	}
-	if dauo.mutation.KeyshareCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: true,
-			Table:   depositaddress.KeyshareTable,
-			Columns: []string{depositaddress.KeyshareColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(signingkeyshare.FieldID, field.TypeUUID),
-			},
-		}
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := dauo.mutation.KeyshareIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: true,
-			Table:   depositaddress.KeyshareTable,
-			Columns: []string{depositaddress.KeyshareColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(signingkeyshare.FieldID, field.TypeUUID),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	_node = &DepositAddress{config: dauo.config}
 	_spec.Assign = _node.assignValues

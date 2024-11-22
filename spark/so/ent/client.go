@@ -17,7 +17,9 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/lightsparkdev/spark-go/so/ent/depositaddress"
+	"github.com/lightsparkdev/spark-go/so/ent/leaf"
 	"github.com/lightsparkdev/spark-go/so/ent/signingkeyshare"
+	"github.com/lightsparkdev/spark-go/so/ent/tree"
 )
 
 // Client is the client that holds all ent builders.
@@ -27,8 +29,12 @@ type Client struct {
 	Schema *migrate.Schema
 	// DepositAddress is the client for interacting with the DepositAddress builders.
 	DepositAddress *DepositAddressClient
+	// Leaf is the client for interacting with the Leaf builders.
+	Leaf *LeafClient
 	// SigningKeyshare is the client for interacting with the SigningKeyshare builders.
 	SigningKeyshare *SigningKeyshareClient
+	// Tree is the client for interacting with the Tree builders.
+	Tree *TreeClient
 }
 
 // NewClient creates a new client configured with the given options.
@@ -41,7 +47,9 @@ func NewClient(opts ...Option) *Client {
 func (c *Client) init() {
 	c.Schema = migrate.NewSchema(c.driver)
 	c.DepositAddress = NewDepositAddressClient(c.config)
+	c.Leaf = NewLeafClient(c.config)
 	c.SigningKeyshare = NewSigningKeyshareClient(c.config)
+	c.Tree = NewTreeClient(c.config)
 }
 
 type (
@@ -135,7 +143,9 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		ctx:             ctx,
 		config:          cfg,
 		DepositAddress:  NewDepositAddressClient(cfg),
+		Leaf:            NewLeafClient(cfg),
 		SigningKeyshare: NewSigningKeyshareClient(cfg),
+		Tree:            NewTreeClient(cfg),
 	}, nil
 }
 
@@ -156,7 +166,9 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		ctx:             ctx,
 		config:          cfg,
 		DepositAddress:  NewDepositAddressClient(cfg),
+		Leaf:            NewLeafClient(cfg),
 		SigningKeyshare: NewSigningKeyshareClient(cfg),
+		Tree:            NewTreeClient(cfg),
 	}, nil
 }
 
@@ -186,14 +198,18 @@ func (c *Client) Close() error {
 // In order to add hooks to a specific client, call: `client.Node.Use(...)`.
 func (c *Client) Use(hooks ...Hook) {
 	c.DepositAddress.Use(hooks...)
+	c.Leaf.Use(hooks...)
 	c.SigningKeyshare.Use(hooks...)
+	c.Tree.Use(hooks...)
 }
 
 // Intercept adds the query interceptors to all the entity clients.
 // In order to add interceptors to a specific client, call: `client.Node.Intercept(...)`.
 func (c *Client) Intercept(interceptors ...Interceptor) {
 	c.DepositAddress.Intercept(interceptors...)
+	c.Leaf.Intercept(interceptors...)
 	c.SigningKeyshare.Intercept(interceptors...)
+	c.Tree.Intercept(interceptors...)
 }
 
 // Mutate implements the ent.Mutator interface.
@@ -201,8 +217,12 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 	switch m := m.(type) {
 	case *DepositAddressMutation:
 		return c.DepositAddress.mutate(ctx, m)
+	case *LeafMutation:
+		return c.Leaf.mutate(ctx, m)
 	case *SigningKeyshareMutation:
 		return c.SigningKeyshare.mutate(ctx, m)
+	case *TreeMutation:
+		return c.Tree.mutate(ctx, m)
 	default:
 		return nil, fmt.Errorf("ent: unknown mutation type %T", m)
 	}
@@ -316,15 +336,15 @@ func (c *DepositAddressClient) GetX(ctx context.Context, id uuid.UUID) *DepositA
 	return obj
 }
 
-// QueryKeyshare queries the keyshare edge of a DepositAddress.
-func (c *DepositAddressClient) QueryKeyshare(da *DepositAddress) *SigningKeyshareQuery {
+// QuerySigningKeyshare queries the signing_keyshare edge of a DepositAddress.
+func (c *DepositAddressClient) QuerySigningKeyshare(da *DepositAddress) *SigningKeyshareQuery {
 	query := (&SigningKeyshareClient{config: c.config}).Query()
 	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
 		id := da.ID
 		step := sqlgraph.NewStep(
 			sqlgraph.From(depositaddress.Table, depositaddress.FieldID, id),
 			sqlgraph.To(signingkeyshare.Table, signingkeyshare.FieldID),
-			sqlgraph.Edge(sqlgraph.M2O, true, depositaddress.KeyshareTable, depositaddress.KeyshareColumn),
+			sqlgraph.Edge(sqlgraph.M2O, false, depositaddress.SigningKeyshareTable, depositaddress.SigningKeyshareColumn),
 		)
 		fromV = sqlgraph.Neighbors(da.driver.Dialect(), step)
 		return fromV, nil
@@ -354,6 +374,187 @@ func (c *DepositAddressClient) mutate(ctx context.Context, m *DepositAddressMuta
 		return (&DepositAddressDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown DepositAddress mutation op: %q", m.Op())
+	}
+}
+
+// LeafClient is a client for the Leaf schema.
+type LeafClient struct {
+	config
+}
+
+// NewLeafClient returns a client for the Leaf from the given config.
+func NewLeafClient(c config) *LeafClient {
+	return &LeafClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `leaf.Hooks(f(g(h())))`.
+func (c *LeafClient) Use(hooks ...Hook) {
+	c.hooks.Leaf = append(c.hooks.Leaf, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `leaf.Intercept(f(g(h())))`.
+func (c *LeafClient) Intercept(interceptors ...Interceptor) {
+	c.inters.Leaf = append(c.inters.Leaf, interceptors...)
+}
+
+// Create returns a builder for creating a Leaf entity.
+func (c *LeafClient) Create() *LeafCreate {
+	mutation := newLeafMutation(c.config, OpCreate)
+	return &LeafCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of Leaf entities.
+func (c *LeafClient) CreateBulk(builders ...*LeafCreate) *LeafCreateBulk {
+	return &LeafCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *LeafClient) MapCreateBulk(slice any, setFunc func(*LeafCreate, int)) *LeafCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &LeafCreateBulk{err: fmt.Errorf("calling to LeafClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*LeafCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &LeafCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for Leaf.
+func (c *LeafClient) Update() *LeafUpdate {
+	mutation := newLeafMutation(c.config, OpUpdate)
+	return &LeafUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *LeafClient) UpdateOne(l *Leaf) *LeafUpdateOne {
+	mutation := newLeafMutation(c.config, OpUpdateOne, withLeaf(l))
+	return &LeafUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *LeafClient) UpdateOneID(id uuid.UUID) *LeafUpdateOne {
+	mutation := newLeafMutation(c.config, OpUpdateOne, withLeafID(id))
+	return &LeafUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for Leaf.
+func (c *LeafClient) Delete() *LeafDelete {
+	mutation := newLeafMutation(c.config, OpDelete)
+	return &LeafDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *LeafClient) DeleteOne(l *Leaf) *LeafDeleteOne {
+	return c.DeleteOneID(l.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *LeafClient) DeleteOneID(id uuid.UUID) *LeafDeleteOne {
+	builder := c.Delete().Where(leaf.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &LeafDeleteOne{builder}
+}
+
+// Query returns a query builder for Leaf.
+func (c *LeafClient) Query() *LeafQuery {
+	return &LeafQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeLeaf},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a Leaf entity by its id.
+func (c *LeafClient) Get(ctx context.Context, id uuid.UUID) (*Leaf, error) {
+	return c.Query().Where(leaf.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *LeafClient) GetX(ctx context.Context, id uuid.UUID) *Leaf {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryTree queries the tree edge of a Leaf.
+func (c *LeafClient) QueryTree(l *Leaf) *TreeQuery {
+	query := (&TreeClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := l.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(leaf.Table, leaf.FieldID, id),
+			sqlgraph.To(tree.Table, tree.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, leaf.TreeTable, leaf.TreeColumn),
+		)
+		fromV = sqlgraph.Neighbors(l.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryParent queries the parent edge of a Leaf.
+func (c *LeafClient) QueryParent(l *Leaf) *LeafQuery {
+	query := (&LeafClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := l.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(leaf.Table, leaf.FieldID, id),
+			sqlgraph.To(leaf.Table, leaf.FieldID),
+			sqlgraph.Edge(sqlgraph.O2O, false, leaf.ParentTable, leaf.ParentColumn),
+		)
+		fromV = sqlgraph.Neighbors(l.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QuerySigningKeyshare queries the signing_keyshare edge of a Leaf.
+func (c *LeafClient) QuerySigningKeyshare(l *Leaf) *SigningKeyshareQuery {
+	query := (&SigningKeyshareClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := l.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(leaf.Table, leaf.FieldID, id),
+			sqlgraph.To(signingkeyshare.Table, signingkeyshare.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, leaf.SigningKeyshareTable, leaf.SigningKeyshareColumn),
+		)
+		fromV = sqlgraph.Neighbors(l.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *LeafClient) Hooks() []Hook {
+	return c.hooks.Leaf
+}
+
+// Interceptors returns the client interceptors.
+func (c *LeafClient) Interceptors() []Interceptor {
+	return c.inters.Leaf
+}
+
+func (c *LeafClient) mutate(ctx context.Context, m *LeafMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&LeafCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&LeafUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&LeafUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&LeafDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown Leaf mutation op: %q", m.Op())
 	}
 }
 
@@ -465,22 +666,6 @@ func (c *SigningKeyshareClient) GetX(ctx context.Context, id uuid.UUID) *Signing
 	return obj
 }
 
-// QueryDepositAddress queries the deposit_address edge of a SigningKeyshare.
-func (c *SigningKeyshareClient) QueryDepositAddress(sk *SigningKeyshare) *DepositAddressQuery {
-	query := (&DepositAddressClient{config: c.config}).Query()
-	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
-		id := sk.ID
-		step := sqlgraph.NewStep(
-			sqlgraph.From(signingkeyshare.Table, signingkeyshare.FieldID, id),
-			sqlgraph.To(depositaddress.Table, depositaddress.FieldID),
-			sqlgraph.Edge(sqlgraph.O2M, false, signingkeyshare.DepositAddressTable, signingkeyshare.DepositAddressColumn),
-		)
-		fromV = sqlgraph.Neighbors(sk.driver.Dialect(), step)
-		return fromV, nil
-	}
-	return query
-}
-
 // Hooks returns the client hooks.
 func (c *SigningKeyshareClient) Hooks() []Hook {
 	return c.hooks.SigningKeyshare
@@ -506,12 +691,177 @@ func (c *SigningKeyshareClient) mutate(ctx context.Context, m *SigningKeyshareMu
 	}
 }
 
+// TreeClient is a client for the Tree schema.
+type TreeClient struct {
+	config
+}
+
+// NewTreeClient returns a client for the Tree from the given config.
+func NewTreeClient(c config) *TreeClient {
+	return &TreeClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `tree.Hooks(f(g(h())))`.
+func (c *TreeClient) Use(hooks ...Hook) {
+	c.hooks.Tree = append(c.hooks.Tree, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `tree.Intercept(f(g(h())))`.
+func (c *TreeClient) Intercept(interceptors ...Interceptor) {
+	c.inters.Tree = append(c.inters.Tree, interceptors...)
+}
+
+// Create returns a builder for creating a Tree entity.
+func (c *TreeClient) Create() *TreeCreate {
+	mutation := newTreeMutation(c.config, OpCreate)
+	return &TreeCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of Tree entities.
+func (c *TreeClient) CreateBulk(builders ...*TreeCreate) *TreeCreateBulk {
+	return &TreeCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *TreeClient) MapCreateBulk(slice any, setFunc func(*TreeCreate, int)) *TreeCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &TreeCreateBulk{err: fmt.Errorf("calling to TreeClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*TreeCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &TreeCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for Tree.
+func (c *TreeClient) Update() *TreeUpdate {
+	mutation := newTreeMutation(c.config, OpUpdate)
+	return &TreeUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *TreeClient) UpdateOne(t *Tree) *TreeUpdateOne {
+	mutation := newTreeMutation(c.config, OpUpdateOne, withTree(t))
+	return &TreeUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *TreeClient) UpdateOneID(id uuid.UUID) *TreeUpdateOne {
+	mutation := newTreeMutation(c.config, OpUpdateOne, withTreeID(id))
+	return &TreeUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for Tree.
+func (c *TreeClient) Delete() *TreeDelete {
+	mutation := newTreeMutation(c.config, OpDelete)
+	return &TreeDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *TreeClient) DeleteOne(t *Tree) *TreeDeleteOne {
+	return c.DeleteOneID(t.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *TreeClient) DeleteOneID(id uuid.UUID) *TreeDeleteOne {
+	builder := c.Delete().Where(tree.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &TreeDeleteOne{builder}
+}
+
+// Query returns a query builder for Tree.
+func (c *TreeClient) Query() *TreeQuery {
+	return &TreeQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeTree},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a Tree entity by its id.
+func (c *TreeClient) Get(ctx context.Context, id uuid.UUID) (*Tree, error) {
+	return c.Query().Where(tree.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *TreeClient) GetX(ctx context.Context, id uuid.UUID) *Tree {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryRoot queries the root edge of a Tree.
+func (c *TreeClient) QueryRoot(t *Tree) *LeafQuery {
+	query := (&LeafClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := t.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(tree.Table, tree.FieldID, id),
+			sqlgraph.To(leaf.Table, leaf.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, tree.RootTable, tree.RootColumn),
+		)
+		fromV = sqlgraph.Neighbors(t.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryLeaves queries the leaves edge of a Tree.
+func (c *TreeClient) QueryLeaves(t *Tree) *LeafQuery {
+	query := (&LeafClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := t.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(tree.Table, tree.FieldID, id),
+			sqlgraph.To(leaf.Table, leaf.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, tree.LeavesTable, tree.LeavesColumn),
+		)
+		fromV = sqlgraph.Neighbors(t.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *TreeClient) Hooks() []Hook {
+	return c.hooks.Tree
+}
+
+// Interceptors returns the client interceptors.
+func (c *TreeClient) Interceptors() []Interceptor {
+	return c.inters.Tree
+}
+
+func (c *TreeClient) mutate(ctx context.Context, m *TreeMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&TreeCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&TreeUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&TreeUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&TreeDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown Tree mutation op: %q", m.Op())
+	}
+}
+
 // hooks and interceptors per client, for fast access.
 type (
 	hooks struct {
-		DepositAddress, SigningKeyshare []ent.Hook
+		DepositAddress, Leaf, SigningKeyshare, Tree []ent.Hook
 	}
 	inters struct {
-		DepositAddress, SigningKeyshare []ent.Interceptor
+		DepositAddress, Leaf, SigningKeyshare, Tree []ent.Interceptor
 	}
 )

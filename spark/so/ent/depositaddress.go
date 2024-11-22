@@ -25,31 +25,32 @@ type DepositAddress struct {
 	UpdateTime time.Time `json:"update_time,omitempty"`
 	// Address holds the value of the "address" field.
 	Address string `json:"address,omitempty"`
+	// SigningKeyshareID holds the value of the "signing_keyshare_id" field.
+	SigningKeyshareID uuid.UUID `json:"signing_keyshare_id,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the DepositAddressQuery when eager-loading is set.
-	Edges                            DepositAddressEdges `json:"edges"`
-	signing_keyshare_deposit_address *uuid.UUID
-	selectValues                     sql.SelectValues
+	Edges        DepositAddressEdges `json:"edges"`
+	selectValues sql.SelectValues
 }
 
 // DepositAddressEdges holds the relations/edges for other nodes in the graph.
 type DepositAddressEdges struct {
-	// Keyshare holds the value of the keyshare edge.
-	Keyshare *SigningKeyshare `json:"keyshare,omitempty"`
+	// SigningKeyshare holds the value of the signing_keyshare edge.
+	SigningKeyshare *SigningKeyshare `json:"signing_keyshare,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
 	loadedTypes [1]bool
 }
 
-// KeyshareOrErr returns the Keyshare value or an error if the edge
+// SigningKeyshareOrErr returns the SigningKeyshare value or an error if the edge
 // was not loaded in eager-loading, or loaded but was not found.
-func (e DepositAddressEdges) KeyshareOrErr() (*SigningKeyshare, error) {
-	if e.Keyshare != nil {
-		return e.Keyshare, nil
+func (e DepositAddressEdges) SigningKeyshareOrErr() (*SigningKeyshare, error) {
+	if e.SigningKeyshare != nil {
+		return e.SigningKeyshare, nil
 	} else if e.loadedTypes[0] {
 		return nil, &NotFoundError{label: signingkeyshare.Label}
 	}
-	return nil, &NotLoadedError{edge: "keyshare"}
+	return nil, &NotLoadedError{edge: "signing_keyshare"}
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -61,10 +62,8 @@ func (*DepositAddress) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullString)
 		case depositaddress.FieldCreateTime, depositaddress.FieldUpdateTime:
 			values[i] = new(sql.NullTime)
-		case depositaddress.FieldID:
+		case depositaddress.FieldID, depositaddress.FieldSigningKeyshareID:
 			values[i] = new(uuid.UUID)
-		case depositaddress.ForeignKeys[0]: // signing_keyshare_deposit_address
-			values[i] = &sql.NullScanner{S: new(uuid.UUID)}
 		default:
 			values[i] = new(sql.UnknownType)
 		}
@@ -104,12 +103,11 @@ func (da *DepositAddress) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				da.Address = value.String
 			}
-		case depositaddress.ForeignKeys[0]:
-			if value, ok := values[i].(*sql.NullScanner); !ok {
-				return fmt.Errorf("unexpected type %T for field signing_keyshare_deposit_address", values[i])
-			} else if value.Valid {
-				da.signing_keyshare_deposit_address = new(uuid.UUID)
-				*da.signing_keyshare_deposit_address = *value.S.(*uuid.UUID)
+		case depositaddress.FieldSigningKeyshareID:
+			if value, ok := values[i].(*uuid.UUID); !ok {
+				return fmt.Errorf("unexpected type %T for field signing_keyshare_id", values[i])
+			} else if value != nil {
+				da.SigningKeyshareID = *value
 			}
 		default:
 			da.selectValues.Set(columns[i], values[i])
@@ -124,9 +122,9 @@ func (da *DepositAddress) Value(name string) (ent.Value, error) {
 	return da.selectValues.Get(name)
 }
 
-// QueryKeyshare queries the "keyshare" edge of the DepositAddress entity.
-func (da *DepositAddress) QueryKeyshare() *SigningKeyshareQuery {
-	return NewDepositAddressClient(da.config).QueryKeyshare(da)
+// QuerySigningKeyshare queries the "signing_keyshare" edge of the DepositAddress entity.
+func (da *DepositAddress) QuerySigningKeyshare() *SigningKeyshareQuery {
+	return NewDepositAddressClient(da.config).QuerySigningKeyshare(da)
 }
 
 // Update returns a builder for updating this DepositAddress.
@@ -160,6 +158,9 @@ func (da *DepositAddress) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("address=")
 	builder.WriteString(da.Address)
+	builder.WriteString(", ")
+	builder.WriteString("signing_keyshare_id=")
+	builder.WriteString(fmt.Sprintf("%v", da.SigningKeyshareID))
 	builder.WriteByte(')')
 	return builder.String()
 }
