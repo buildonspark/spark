@@ -15,6 +15,7 @@ import (
 	"github.com/lightsparkdev/spark-go/so/ent/depositaddress"
 	"github.com/lightsparkdev/spark-go/so/ent/leaf"
 	"github.com/lightsparkdev/spark-go/so/ent/signingkeyshare"
+	"github.com/lightsparkdev/spark-go/so/ent/signingnonce"
 	"github.com/lightsparkdev/spark-go/so/ent/tree"
 )
 
@@ -79,6 +80,7 @@ func checkColumn(table, column string) error {
 			depositaddress.Table:  depositaddress.ValidColumn,
 			leaf.Table:            leaf.ValidColumn,
 			signingkeyshare.Table: signingkeyshare.ValidColumn,
+			signingnonce.Table:    signingnonce.ValidColumn,
 			tree.Table:            tree.ValidColumn,
 		})
 	})

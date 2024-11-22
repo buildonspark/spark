@@ -17,6 +17,7 @@ import (
 	"github.com/lightsparkdev/spark-go/so/ent/predicate"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
 	"github.com/lightsparkdev/spark-go/so/ent/signingkeyshare"
+	"github.com/lightsparkdev/spark-go/so/ent/signingnonce"
 	"github.com/lightsparkdev/spark-go/so/ent/tree"
 )
 
@@ -32,6 +33,7 @@ const (
 	TypeDepositAddress  = "DepositAddress"
 	TypeLeaf            = "Leaf"
 	TypeSigningKeyshare = "SigningKeyshare"
+	TypeSigningNonce    = "SigningNonce"
 	TypeTree            = "Tree"
 )
 
@@ -2360,6 +2362,500 @@ func (m *SigningKeyshareMutation) ClearEdge(name string) error {
 // It returns an error if the edge is not defined in the schema.
 func (m *SigningKeyshareMutation) ResetEdge(name string) error {
 	return fmt.Errorf("unknown SigningKeyshare edge %s", name)
+}
+
+// SigningNonceMutation represents an operation that mutates the SigningNonce nodes in the graph.
+type SigningNonceMutation struct {
+	config
+	op               Op
+	typ              string
+	id               *uuid.UUID
+	create_time      *time.Time
+	update_time      *time.Time
+	nonce            *[]byte
+	nonce_commitment *[]byte
+	clearedFields    map[string]struct{}
+	done             bool
+	oldValue         func(context.Context) (*SigningNonce, error)
+	predicates       []predicate.SigningNonce
+}
+
+var _ ent.Mutation = (*SigningNonceMutation)(nil)
+
+// signingnonceOption allows management of the mutation configuration using functional options.
+type signingnonceOption func(*SigningNonceMutation)
+
+// newSigningNonceMutation creates new mutation for the SigningNonce entity.
+func newSigningNonceMutation(c config, op Op, opts ...signingnonceOption) *SigningNonceMutation {
+	m := &SigningNonceMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeSigningNonce,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withSigningNonceID sets the ID field of the mutation.
+func withSigningNonceID(id uuid.UUID) signingnonceOption {
+	return func(m *SigningNonceMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *SigningNonce
+		)
+		m.oldValue = func(ctx context.Context) (*SigningNonce, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().SigningNonce.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withSigningNonce sets the old SigningNonce of the mutation.
+func withSigningNonce(node *SigningNonce) signingnonceOption {
+	return func(m *SigningNonceMutation) {
+		m.oldValue = func(context.Context) (*SigningNonce, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m SigningNonceMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m SigningNonceMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of SigningNonce entities.
+func (m *SigningNonceMutation) SetID(id uuid.UUID) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *SigningNonceMutation) ID() (id uuid.UUID, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *SigningNonceMutation) IDs(ctx context.Context) ([]uuid.UUID, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []uuid.UUID{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().SigningNonce.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetCreateTime sets the "create_time" field.
+func (m *SigningNonceMutation) SetCreateTime(t time.Time) {
+	m.create_time = &t
+}
+
+// CreateTime returns the value of the "create_time" field in the mutation.
+func (m *SigningNonceMutation) CreateTime() (r time.Time, exists bool) {
+	v := m.create_time
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreateTime returns the old "create_time" field's value of the SigningNonce entity.
+// If the SigningNonce object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SigningNonceMutation) OldCreateTime(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreateTime is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreateTime requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreateTime: %w", err)
+	}
+	return oldValue.CreateTime, nil
+}
+
+// ResetCreateTime resets all changes to the "create_time" field.
+func (m *SigningNonceMutation) ResetCreateTime() {
+	m.create_time = nil
+}
+
+// SetUpdateTime sets the "update_time" field.
+func (m *SigningNonceMutation) SetUpdateTime(t time.Time) {
+	m.update_time = &t
+}
+
+// UpdateTime returns the value of the "update_time" field in the mutation.
+func (m *SigningNonceMutation) UpdateTime() (r time.Time, exists bool) {
+	v := m.update_time
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdateTime returns the old "update_time" field's value of the SigningNonce entity.
+// If the SigningNonce object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SigningNonceMutation) OldUpdateTime(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdateTime is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdateTime requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdateTime: %w", err)
+	}
+	return oldValue.UpdateTime, nil
+}
+
+// ResetUpdateTime resets all changes to the "update_time" field.
+func (m *SigningNonceMutation) ResetUpdateTime() {
+	m.update_time = nil
+}
+
+// SetNonce sets the "nonce" field.
+func (m *SigningNonceMutation) SetNonce(b []byte) {
+	m.nonce = &b
+}
+
+// Nonce returns the value of the "nonce" field in the mutation.
+func (m *SigningNonceMutation) Nonce() (r []byte, exists bool) {
+	v := m.nonce
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldNonce returns the old "nonce" field's value of the SigningNonce entity.
+// If the SigningNonce object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SigningNonceMutation) OldNonce(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldNonce is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldNonce requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldNonce: %w", err)
+	}
+	return oldValue.Nonce, nil
+}
+
+// ResetNonce resets all changes to the "nonce" field.
+func (m *SigningNonceMutation) ResetNonce() {
+	m.nonce = nil
+}
+
+// SetNonceCommitment sets the "nonce_commitment" field.
+func (m *SigningNonceMutation) SetNonceCommitment(b []byte) {
+	m.nonce_commitment = &b
+}
+
+// NonceCommitment returns the value of the "nonce_commitment" field in the mutation.
+func (m *SigningNonceMutation) NonceCommitment() (r []byte, exists bool) {
+	v := m.nonce_commitment
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldNonceCommitment returns the old "nonce_commitment" field's value of the SigningNonce entity.
+// If the SigningNonce object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SigningNonceMutation) OldNonceCommitment(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldNonceCommitment is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldNonceCommitment requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldNonceCommitment: %w", err)
+	}
+	return oldValue.NonceCommitment, nil
+}
+
+// ResetNonceCommitment resets all changes to the "nonce_commitment" field.
+func (m *SigningNonceMutation) ResetNonceCommitment() {
+	m.nonce_commitment = nil
+}
+
+// Where appends a list predicates to the SigningNonceMutation builder.
+func (m *SigningNonceMutation) Where(ps ...predicate.SigningNonce) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the SigningNonceMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *SigningNonceMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.SigningNonce, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *SigningNonceMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *SigningNonceMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (SigningNonce).
+func (m *SigningNonceMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *SigningNonceMutation) Fields() []string {
+	fields := make([]string, 0, 4)
+	if m.create_time != nil {
+		fields = append(fields, signingnonce.FieldCreateTime)
+	}
+	if m.update_time != nil {
+		fields = append(fields, signingnonce.FieldUpdateTime)
+	}
+	if m.nonce != nil {
+		fields = append(fields, signingnonce.FieldNonce)
+	}
+	if m.nonce_commitment != nil {
+		fields = append(fields, signingnonce.FieldNonceCommitment)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *SigningNonceMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case signingnonce.FieldCreateTime:
+		return m.CreateTime()
+	case signingnonce.FieldUpdateTime:
+		return m.UpdateTime()
+	case signingnonce.FieldNonce:
+		return m.Nonce()
+	case signingnonce.FieldNonceCommitment:
+		return m.NonceCommitment()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *SigningNonceMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case signingnonce.FieldCreateTime:
+		return m.OldCreateTime(ctx)
+	case signingnonce.FieldUpdateTime:
+		return m.OldUpdateTime(ctx)
+	case signingnonce.FieldNonce:
+		return m.OldNonce(ctx)
+	case signingnonce.FieldNonceCommitment:
+		return m.OldNonceCommitment(ctx)
+	}
+	return nil, fmt.Errorf("unknown SigningNonce field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *SigningNonceMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case signingnonce.FieldCreateTime:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreateTime(v)
+		return nil
+	case signingnonce.FieldUpdateTime:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdateTime(v)
+		return nil
+	case signingnonce.FieldNonce:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetNonce(v)
+		return nil
+	case signingnonce.FieldNonceCommitment:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetNonceCommitment(v)
+		return nil
+	}
+	return fmt.Errorf("unknown SigningNonce field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *SigningNonceMutation) AddedFields() []string {
+	return nil
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *SigningNonceMutation) AddedField(name string) (ent.Value, bool) {
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *SigningNonceMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	}
+	return fmt.Errorf("unknown SigningNonce numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *SigningNonceMutation) ClearedFields() []string {
+	return nil
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *SigningNonceMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *SigningNonceMutation) ClearField(name string) error {
+	return fmt.Errorf("unknown SigningNonce nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *SigningNonceMutation) ResetField(name string) error {
+	switch name {
+	case signingnonce.FieldCreateTime:
+		m.ResetCreateTime()
+		return nil
+	case signingnonce.FieldUpdateTime:
+		m.ResetUpdateTime()
+		return nil
+	case signingnonce.FieldNonce:
+		m.ResetNonce()
+		return nil
+	case signingnonce.FieldNonceCommitment:
+		m.ResetNonceCommitment()
+		return nil
+	}
+	return fmt.Errorf("unknown SigningNonce field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *SigningNonceMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *SigningNonceMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *SigningNonceMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *SigningNonceMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *SigningNonceMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *SigningNonceMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *SigningNonceMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown SigningNonce unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *SigningNonceMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown SigningNonce edge %s", name)
 }
 
 // TreeMutation represents an operation that mutates the Tree nodes in the graph.

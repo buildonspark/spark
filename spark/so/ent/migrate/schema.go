@@ -102,6 +102,27 @@ var (
 			},
 		},
 	}
+	// SigningNoncesColumns holds the columns for the "signing_nonces" table.
+	SigningNoncesColumns = []*schema.Column{
+		{Name: "oid", Type: field.TypeUUID},
+		{Name: "create_time", Type: field.TypeTime},
+		{Name: "update_time", Type: field.TypeTime},
+		{Name: "nonce", Type: field.TypeBytes},
+		{Name: "nonce_commitment", Type: field.TypeBytes},
+	}
+	// SigningNoncesTable holds the schema information for the "signing_nonces" table.
+	SigningNoncesTable = &schema.Table{
+		Name:       "signing_nonces",
+		Columns:    SigningNoncesColumns,
+		PrimaryKey: []*schema.Column{SigningNoncesColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "signingnonce_nonce_commitment",
+				Unique:  false,
+				Columns: []*schema.Column{SigningNoncesColumns[4]},
+			},
+		},
+	}
 	// TreesColumns holds the columns for the "trees" table.
 	TreesColumns = []*schema.Column{
 		{Name: "oid", Type: field.TypeUUID},
@@ -129,6 +150,7 @@ var (
 		DepositAddressesTable,
 		LeafsTable,
 		SigningKeysharesTable,
+		SigningNoncesTable,
 		TreesTable,
 	}
 )

@@ -15,5 +15,8 @@ type Leaf func(*sql.Selector)
 // SigningKeyshare is the predicate function for signingkeyshare builders.
 type SigningKeyshare func(*sql.Selector)
 
+// SigningNonce is the predicate function for signingnonce builders.
+type SigningNonce func(*sql.Selector)
+
 // Tree is the predicate function for tree builders.
 type Tree func(*sql.Selector)

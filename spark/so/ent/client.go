@@ -19,6 +19,7 @@ import (
 	"github.com/lightsparkdev/spark-go/so/ent/depositaddress"
 	"github.com/lightsparkdev/spark-go/so/ent/leaf"
 	"github.com/lightsparkdev/spark-go/so/ent/signingkeyshare"
+	"github.com/lightsparkdev/spark-go/so/ent/signingnonce"
 	"github.com/lightsparkdev/spark-go/so/ent/tree"
 )
 
@@ -33,6 +34,8 @@ type Client struct {
 	Leaf *LeafClient
 	// SigningKeyshare is the client for interacting with the SigningKeyshare builders.
 	SigningKeyshare *SigningKeyshareClient
+	// SigningNonce is the client for interacting with the SigningNonce builders.
+	SigningNonce *SigningNonceClient
 	// Tree is the client for interacting with the Tree builders.
 	Tree *TreeClient
 }
@@ -49,6 +52,7 @@ func (c *Client) init() {
 	c.DepositAddress = NewDepositAddressClient(c.config)
 	c.Leaf = NewLeafClient(c.config)
 	c.SigningKeyshare = NewSigningKeyshareClient(c.config)
+	c.SigningNonce = NewSigningNonceClient(c.config)
 	c.Tree = NewTreeClient(c.config)
 }
 
@@ -145,6 +149,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		DepositAddress:  NewDepositAddressClient(cfg),
 		Leaf:            NewLeafClient(cfg),
 		SigningKeyshare: NewSigningKeyshareClient(cfg),
+		SigningNonce:    NewSigningNonceClient(cfg),
 		Tree:            NewTreeClient(cfg),
 	}, nil
 }
@@ -168,6 +173,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		DepositAddress:  NewDepositAddressClient(cfg),
 		Leaf:            NewLeafClient(cfg),
 		SigningKeyshare: NewSigningKeyshareClient(cfg),
+		SigningNonce:    NewSigningNonceClient(cfg),
 		Tree:            NewTreeClient(cfg),
 	}, nil
 }
@@ -200,6 +206,7 @@ func (c *Client) Use(hooks ...Hook) {
 	c.DepositAddress.Use(hooks...)
 	c.Leaf.Use(hooks...)
 	c.SigningKeyshare.Use(hooks...)
+	c.SigningNonce.Use(hooks...)
 	c.Tree.Use(hooks...)
 }
 
@@ -209,6 +216,7 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 	c.DepositAddress.Intercept(interceptors...)
 	c.Leaf.Intercept(interceptors...)
 	c.SigningKeyshare.Intercept(interceptors...)
+	c.SigningNonce.Intercept(interceptors...)
 	c.Tree.Intercept(interceptors...)
 }
 
@@ -221,6 +229,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.Leaf.mutate(ctx, m)
 	case *SigningKeyshareMutation:
 		return c.SigningKeyshare.mutate(ctx, m)
+	case *SigningNonceMutation:
+		return c.SigningNonce.mutate(ctx, m)
 	case *TreeMutation:
 		return c.Tree.mutate(ctx, m)
 	default:
@@ -691,6 +701,139 @@ func (c *SigningKeyshareClient) mutate(ctx context.Context, m *SigningKeyshareMu
 	}
 }
 
+// SigningNonceClient is a client for the SigningNonce schema.
+type SigningNonceClient struct {
+	config
+}
+
+// NewSigningNonceClient returns a client for the SigningNonce from the given config.
+func NewSigningNonceClient(c config) *SigningNonceClient {
+	return &SigningNonceClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `signingnonce.Hooks(f(g(h())))`.
+func (c *SigningNonceClient) Use(hooks ...Hook) {
+	c.hooks.SigningNonce = append(c.hooks.SigningNonce, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `signingnonce.Intercept(f(g(h())))`.
+func (c *SigningNonceClient) Intercept(interceptors ...Interceptor) {
+	c.inters.SigningNonce = append(c.inters.SigningNonce, interceptors...)
+}
+
+// Create returns a builder for creating a SigningNonce entity.
+func (c *SigningNonceClient) Create() *SigningNonceCreate {
+	mutation := newSigningNonceMutation(c.config, OpCreate)
+	return &SigningNonceCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of SigningNonce entities.
+func (c *SigningNonceClient) CreateBulk(builders ...*SigningNonceCreate) *SigningNonceCreateBulk {
+	return &SigningNonceCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *SigningNonceClient) MapCreateBulk(slice any, setFunc func(*SigningNonceCreate, int)) *SigningNonceCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &SigningNonceCreateBulk{err: fmt.Errorf("calling to SigningNonceClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*SigningNonceCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &SigningNonceCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for SigningNonce.
+func (c *SigningNonceClient) Update() *SigningNonceUpdate {
+	mutation := newSigningNonceMutation(c.config, OpUpdate)
+	return &SigningNonceUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *SigningNonceClient) UpdateOne(sn *SigningNonce) *SigningNonceUpdateOne {
+	mutation := newSigningNonceMutation(c.config, OpUpdateOne, withSigningNonce(sn))
+	return &SigningNonceUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *SigningNonceClient) UpdateOneID(id uuid.UUID) *SigningNonceUpdateOne {
+	mutation := newSigningNonceMutation(c.config, OpUpdateOne, withSigningNonceID(id))
+	return &SigningNonceUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for SigningNonce.
+func (c *SigningNonceClient) Delete() *SigningNonceDelete {
+	mutation := newSigningNonceMutation(c.config, OpDelete)
+	return &SigningNonceDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *SigningNonceClient) DeleteOne(sn *SigningNonce) *SigningNonceDeleteOne {
+	return c.DeleteOneID(sn.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *SigningNonceClient) DeleteOneID(id uuid.UUID) *SigningNonceDeleteOne {
+	builder := c.Delete().Where(signingnonce.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &SigningNonceDeleteOne{builder}
+}
+
+// Query returns a query builder for SigningNonce.
+func (c *SigningNonceClient) Query() *SigningNonceQuery {
+	return &SigningNonceQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeSigningNonce},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a SigningNonce entity by its id.
+func (c *SigningNonceClient) Get(ctx context.Context, id uuid.UUID) (*SigningNonce, error) {
+	return c.Query().Where(signingnonce.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *SigningNonceClient) GetX(ctx context.Context, id uuid.UUID) *SigningNonce {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *SigningNonceClient) Hooks() []Hook {
+	return c.hooks.SigningNonce
+}
+
+// Interceptors returns the client interceptors.
+func (c *SigningNonceClient) Interceptors() []Interceptor {
+	return c.inters.SigningNonce
+}
+
+func (c *SigningNonceClient) mutate(ctx context.Context, m *SigningNonceMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&SigningNonceCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&SigningNonceUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&SigningNonceUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&SigningNonceDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown SigningNonce mutation op: %q", m.Op())
+	}
+}
+
 // TreeClient is a client for the Tree schema.
 type TreeClient struct {
 	config
@@ -859,9 +1002,9 @@ func (c *TreeClient) mutate(ctx context.Context, m *TreeMutation) (Value, error)
 // hooks and interceptors per client, for fast access.
 type (
 	hooks struct {
-		DepositAddress, Leaf, SigningKeyshare, Tree []ent.Hook
+		DepositAddress, Leaf, SigningKeyshare, SigningNonce, Tree []ent.Hook
 	}
 	inters struct {
-		DepositAddress, Leaf, SigningKeyshare, Tree []ent.Interceptor
+		DepositAddress, Leaf, SigningKeyshare, SigningNonce, Tree []ent.Interceptor
 	}
 )

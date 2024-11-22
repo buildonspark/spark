@@ -10,6 +10,7 @@ import (
 	"github.com/lightsparkdev/spark-go/so/ent/leaf"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
 	"github.com/lightsparkdev/spark-go/so/ent/signingkeyshare"
+	"github.com/lightsparkdev/spark-go/so/ent/signingnonce"
 	"github.com/lightsparkdev/spark-go/so/ent/tree"
 )
 
@@ -90,6 +91,25 @@ func init() {
 	signingkeyshareDescID := signingkeyshareMixinFields0[0].Descriptor()
 	// signingkeyshare.DefaultID holds the default value on creation for the id field.
 	signingkeyshare.DefaultID = signingkeyshareDescID.Default.(func() uuid.UUID)
+	signingnonceMixin := schema.SigningNonce{}.Mixin()
+	signingnonceMixinFields0 := signingnonceMixin[0].Fields()
+	_ = signingnonceMixinFields0
+	signingnonceFields := schema.SigningNonce{}.Fields()
+	_ = signingnonceFields
+	// signingnonceDescCreateTime is the schema descriptor for create_time field.
+	signingnonceDescCreateTime := signingnonceMixinFields0[1].Descriptor()
+	// signingnonce.DefaultCreateTime holds the default value on creation for the create_time field.
+	signingnonce.DefaultCreateTime = signingnonceDescCreateTime.Default.(func() time.Time)
+	// signingnonceDescUpdateTime is the schema descriptor for update_time field.
+	signingnonceDescUpdateTime := signingnonceMixinFields0[2].Descriptor()
+	// signingnonce.DefaultUpdateTime holds the default value on creation for the update_time field.
+	signingnonce.DefaultUpdateTime = signingnonceDescUpdateTime.Default.(func() time.Time)
+	// signingnonce.UpdateDefaultUpdateTime holds the default value on update for the update_time field.
+	signingnonce.UpdateDefaultUpdateTime = signingnonceDescUpdateTime.UpdateDefault.(func() time.Time)
+	// signingnonceDescID is the schema descriptor for id field.
+	signingnonceDescID := signingnonceMixinFields0[0].Descriptor()
+	// signingnonce.DefaultID holds the default value on creation for the id field.
+	signingnonce.DefaultID = signingnonceDescID.Default.(func() uuid.UUID)
 	treeMixin := schema.Tree{}.Mixin()
 	treeMixinFields0 := treeMixin[0].Fields()
 	_ = treeMixinFields0

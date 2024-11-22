@@ -18,6 +18,8 @@ type Tx struct {
 	Leaf *LeafClient
 	// SigningKeyshare is the client for interacting with the SigningKeyshare builders.
 	SigningKeyshare *SigningKeyshareClient
+	// SigningNonce is the client for interacting with the SigningNonce builders.
+	SigningNonce *SigningNonceClient
 	// Tree is the client for interacting with the Tree builders.
 	Tree *TreeClient
 
@@ -154,6 +156,7 @@ func (tx *Tx) init() {
 	tx.DepositAddress = NewDepositAddressClient(tx.config)
 	tx.Leaf = NewLeafClient(tx.config)
 	tx.SigningKeyshare = NewSigningKeyshareClient(tx.config)
+	tx.SigningNonce = NewSigningNonceClient(tx.config)
 	tx.Tree = NewTreeClient(tx.config)
 }
 
