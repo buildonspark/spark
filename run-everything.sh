@@ -275,6 +275,49 @@ check_operators_ready() {
    done
 }
 
+# Function to check if signers are running by checking log file existence
+check_signers_ready() {
+   local run_dir=$1
+   local timeout=30  # Maximum seconds to wait
+   
+   echo "Checking signers startup status..."
+   
+   # Start timer
+   local start_time=$(date +%s)
+   
+   while true; do
+       local all_ready=true
+       local current_time=$(date +%s)
+       local elapsed=$((current_time - start_time))
+       
+       # Check if we've exceeded timeout
+       if [ $elapsed -gt $timeout ]; then
+           echo "Timeout after ${timeout} seconds waiting for signers"
+           return 1
+       fi
+       
+       # Check each signer's log file existence
+       for i in {0..4}; do
+           local log_file="${run_dir}/logs/signer_${i}.log"
+           
+           if [ ! -f "$log_file" ]; then
+               all_ready=false
+               break
+           fi
+       done
+       
+       # If all log files exist, break the loop
+       if $all_ready; then
+           echo "All signer log files created!"
+           return 0
+       fi
+       
+       # Wait a bit before next check
+       sleep 1
+       echo -n "."  # Show progress
+   done
+}
+
 create_data_dir
 run_dir=$(create_run_dir)
 echo "Working with directory: $run_dir"
@@ -290,6 +333,11 @@ build_go_operator "$run_dir" || {
 
 # Create operator config
 create_operator_config "$run_dir" "${PUB_KEYS[@]}"
+
+if ! check_signers_ready "$run_dir"; then
+    echo "Failed to start all signers"
+    exit 1
+fi
 
 # Run operators
 run_operators_tmux "$run_dir" "$MIN_SIGNERS" "${PRIV_KEYS[@]}"
