@@ -13,7 +13,7 @@ import (
 
 // FrostRound1 performs the first round of the Frost signing. It gathers the signing commitments from all operators.
 func FrostRound1(ctx context.Context, config *so.Config, signingKeyshareID uuid.UUID) (map[string]objects.SigningCommitment, error) {
-	return ExecuteTaskWithAllOperators(ctx, config, func(ctx context.Context, operator *so.SigningOperator) (objects.SigningCommitment, error) {
+	return ExecuteTaskWithAllOperators(ctx, config, true, func(ctx context.Context, operator *so.SigningOperator) (objects.SigningCommitment, error) {
 		conn, err := common.NewGRPCConnection(operator.Address)
 		if err != nil {
 			return objects.SigningCommitment{}, err
@@ -33,7 +33,7 @@ func FrostRound1(ctx context.Context, config *so.Config, signingKeyshareID uuid.
 		}
 
 		return commitment, nil
-	}, true)
+	})
 }
 
 func FrostRound2(
@@ -45,7 +45,7 @@ func FrostRound2(
 	commitments map[string]objects.SigningCommitment,
 	userCommitment objects.SigningCommitment,
 ) (map[string][]byte, error) {
-	return ExecuteTaskWithAllOperators(ctx, config, func(ctx context.Context, operator *so.SigningOperator) ([]byte, error) {
+	return ExecuteTaskWithAllOperators(ctx, config, true, func(ctx context.Context, operator *so.SigningOperator) ([]byte, error) {
 		conn, err := common.NewGRPCConnection(operator.Address)
 		if err != nil {
 			return nil, err
@@ -78,7 +78,7 @@ func FrostRound2(
 		}
 
 		return response.SignatureShare, nil
-	}, true)
+	})
 }
 
 func SignFrost(

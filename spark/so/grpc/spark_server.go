@@ -43,7 +43,7 @@ func (s *SparkServer) GenerateDepositAddress(ctx context.Context, req *pb.Genera
 		return nil, err
 	}
 
-	_, err = helper.ExecuteTaskWithAllOperators(ctx, s.config, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
+	_, err = helper.ExecuteTaskWithAllOperators(ctx, s.config, false, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
 		conn, err := common.NewGRPCConnection(operator.Address)
 		if err != nil {
 			log.Printf("Failed to connect to operator: %v", err)
@@ -54,7 +54,7 @@ func (s *SparkServer) GenerateDepositAddress(ctx context.Context, req *pb.Genera
 		client := pb.NewSparkInternalServiceClient(conn)
 		_, err = client.MarkKeysharesAsUsed(ctx, &pb.MarkKeysharesAsUsedRequest{KeyshareId: []string{keyshare.ID.String()}})
 		return nil, err
-	}, false)
+	})
 	if err != nil {
 		log.Printf("Failed to execute task with all operators: %v", err)
 		return nil, err
@@ -78,7 +78,7 @@ func (s *SparkServer) GenerateDepositAddress(ctx context.Context, req *pb.Genera
 		return nil, err
 	}
 
-	_, err = helper.ExecuteTaskWithAllOperators(ctx, s.config, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
+	_, err = helper.ExecuteTaskWithAllOperators(ctx, s.config, false, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
 		conn, err := common.NewGRPCConnection(operator.Address)
 		if err != nil {
 			log.Printf("Failed to connect to operator: %v", err)
@@ -89,7 +89,7 @@ func (s *SparkServer) GenerateDepositAddress(ctx context.Context, req *pb.Genera
 		client := pb.NewSparkInternalServiceClient(conn)
 		_, err = client.MarkKeyshareForDepositAddress(ctx, &pb.MarkKeyshareForDepositAddressRequest{KeyshareId: keyshare.ID.String(), Address: *depositAddress})
 		return nil, err
-	}, false)
+	})
 	if err != nil {
 		log.Printf("Failed to execute task with all operators: %v", err)
 		return nil, err

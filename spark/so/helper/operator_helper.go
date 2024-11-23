@@ -18,7 +18,7 @@ type TaskResult[V any] struct {
 // If includeSelf is true, the task will also be executed with the current operator.
 // This will run goroutines for each operator and wait for all of them to complete before returning.
 // It returns an error if any of the tasks fail.
-func ExecuteTaskWithAllOperators[V any](ctx context.Context, config *so.Config, task func(ctx context.Context, operator *so.SigningOperator) (V, error), includeSelf bool) (map[string]V, error) {
+func ExecuteTaskWithAllOperators[V any](ctx context.Context, config *so.Config, includeSelf bool, task func(ctx context.Context, operator *so.SigningOperator) (V, error)) (map[string]V, error) {
 	wg := sync.WaitGroup{}
 	var results chan TaskResult[V]
 	if includeSelf {
