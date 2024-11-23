@@ -11,6 +11,7 @@ service SparkInternalService {
     rpc mark_keyshare_for_deposit_address(MarkKeyshareForDepositAddressRequest) returns (google.protobuf.Empty) {}
 
     rpc frost_round1(FrostRound1Request) returns (FrostRound1Response) {}
+    rpc frost_round2(FrostRound2Request) returns (FrostRound2Response) {}
 }
 
 message MarkKeysharesAsUsedRequest {
@@ -28,4 +29,25 @@ message FrostRound1Request {
 
 message FrostRound1Response {   
     frost.SigningCommitment signing_commitment = 1;
+}
+
+message FrostRound2Request {
+    // The message to sign.
+    bytes message = 1;
+
+    // The secret package from DKG round 3.
+    string keyshare_id = 2;
+
+    // The verifying key. This should be the total public key for both user and StatechainEntity.
+    bytes verifying_key = 3;
+
+    // The commitments for all participants of the statechain.
+    map<string, frost.SigningCommitment> commitments = 4;
+
+    // The commitments for all participants of the user.
+    frost.SigningCommitment user_commitments = 5;
+}
+
+message FrostRound2Response {
+    bytes signature_share = 1;
 }

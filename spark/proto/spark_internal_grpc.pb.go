@@ -23,6 +23,7 @@ const (
 	SparkInternalService_MarkKeysharesAsUsed_FullMethodName           = "/spark.SparkInternalService/mark_keyshares_as_used"
 	SparkInternalService_MarkKeyshareForDepositAddress_FullMethodName = "/spark.SparkInternalService/mark_keyshare_for_deposit_address"
 	SparkInternalService_FrostRound1_FullMethodName                   = "/spark.SparkInternalService/frost_round1"
+	SparkInternalService_FrostRound2_FullMethodName                   = "/spark.SparkInternalService/frost_round2"
 )
 
 // SparkInternalServiceClient is the client API for SparkInternalService service.
@@ -32,6 +33,7 @@ type SparkInternalServiceClient interface {
 	MarkKeysharesAsUsed(ctx context.Context, in *MarkKeysharesAsUsedRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	MarkKeyshareForDepositAddress(ctx context.Context, in *MarkKeyshareForDepositAddressRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	FrostRound1(ctx context.Context, in *FrostRound1Request, opts ...grpc.CallOption) (*FrostRound1Response, error)
+	FrostRound2(ctx context.Context, in *FrostRound2Request, opts ...grpc.CallOption) (*FrostRound2Response, error)
 }
 
 type sparkInternalServiceClient struct {
@@ -72,6 +74,16 @@ func (c *sparkInternalServiceClient) FrostRound1(ctx context.Context, in *FrostR
 	return out, nil
 }
 
+func (c *sparkInternalServiceClient) FrostRound2(ctx context.Context, in *FrostRound2Request, opts ...grpc.CallOption) (*FrostRound2Response, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(FrostRound2Response)
+	err := c.cc.Invoke(ctx, SparkInternalService_FrostRound2_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SparkInternalServiceServer is the server API for SparkInternalService service.
 // All implementations must embed UnimplementedSparkInternalServiceServer
 // for forward compatibility.
@@ -79,6 +91,7 @@ type SparkInternalServiceServer interface {
 	MarkKeysharesAsUsed(context.Context, *MarkKeysharesAsUsedRequest) (*emptypb.Empty, error)
 	MarkKeyshareForDepositAddress(context.Context, *MarkKeyshareForDepositAddressRequest) (*emptypb.Empty, error)
 	FrostRound1(context.Context, *FrostRound1Request) (*FrostRound1Response, error)
+	FrostRound2(context.Context, *FrostRound2Request) (*FrostRound2Response, error)
 	mustEmbedUnimplementedSparkInternalServiceServer()
 }
 
@@ -97,6 +110,9 @@ func (UnimplementedSparkInternalServiceServer) MarkKeyshareForDepositAddress(con
 }
 func (UnimplementedSparkInternalServiceServer) FrostRound1(context.Context, *FrostRound1Request) (*FrostRound1Response, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method FrostRound1 not implemented")
+}
+func (UnimplementedSparkInternalServiceServer) FrostRound2(context.Context, *FrostRound2Request) (*FrostRound2Response, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method FrostRound2 not implemented")
 }
 func (UnimplementedSparkInternalServiceServer) mustEmbedUnimplementedSparkInternalServiceServer() {}
 func (UnimplementedSparkInternalServiceServer) testEmbeddedByValue()                              {}
@@ -173,6 +189,24 @@ func _SparkInternalService_FrostRound1_Handler(srv interface{}, ctx context.Cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SparkInternalService_FrostRound2_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(FrostRound2Request)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkInternalServiceServer).FrostRound2(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkInternalService_FrostRound2_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkInternalServiceServer).FrostRound2(ctx, req.(*FrostRound2Request))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // SparkInternalService_ServiceDesc is the grpc.ServiceDesc for SparkInternalService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -191,6 +225,10 @@ var SparkInternalService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "frost_round1",
 			Handler:    _SparkInternalService_FrostRound1_Handler,
+		},
+		{
+			MethodName: "frost_round2",
+			Handler:    _SparkInternalService_FrostRound2_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

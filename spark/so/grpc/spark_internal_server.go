@@ -113,3 +113,60 @@ func (s *SparkInternalServer) FrostRound1(ctx context.Context, req *pb.FrostRoun
 		SigningCommitment: round1Response.Commitments,
 	}, nil
 }
+
+func (s *SparkInternalServer) FrostRound2(ctx context.Context, req *pb.FrostRound2Request) (*pb.FrostRound2Response, error) {
+	keyshareID, err := uuid.Parse(req.KeyshareId)
+	if err != nil {
+		log.Printf("Failed to parse keyshare ID: %v", err)
+		return nil, err
+	}
+	keyPackage, err := ent_utils.GetKeyPackage(ctx, s.config, keyshareID)
+	if err != nil {
+		log.Printf("Failed to get key package: %v", err)
+		return nil, err
+	}
+
+	selfCommitment := objects.SigningCommitment{}
+	err = selfCommitment.UnmarshalProto(req.Commitments[s.config.Identifier])
+	if err != nil {
+		log.Printf("Failed to unmarshal self commitment: %v", err)
+		return nil, err
+	}
+	nonce, err := ent_utils.GetSigningNonceFromCommitment(ctx, s.config, selfCommitment)
+	if err != nil {
+		log.Printf("Failed to get signing nonce from commitment: %v", err)
+		return nil, err
+	}
+	nonceProto, err := nonce.MarshalProto()
+	if err != nil {
+		log.Printf("Failed to marshal nonce: %v", err)
+		return nil, err
+	}
+
+	frostConn, err := common.NewGRPCConnection(s.config.SignerAddress)
+	if err != nil {
+		log.Printf("Failed to connect to frost: %v", err)
+		return nil, err
+	}
+	defer frostConn.Close()
+	frostClient := pb.NewFrostServiceClient(frostConn)
+
+	round2Request := &pb.SignFrostRequest{
+		Message:         req.Message,
+		KeyPackage:      keyPackage,
+		VerifyingKey:    req.VerifyingKey,
+		Nonce:           nonceProto,
+		Commitments:     req.Commitments,
+		UserCommitments: req.UserCommitments,
+		Role:            pb.SigningRole_STATECHAIN,
+	}
+	round2Response, err := frostClient.SignFrost(ctx, round2Request)
+	if err != nil {
+		log.Printf("Failed to send frost round 2: %v", err)
+		return nil, err
+	}
+
+	return &pb.FrostRound2Response{
+		SignatureShare: round2Response.SignatureShare,
+	}, nil
+}
