@@ -16,8 +16,7 @@ type BaseMixin struct {
 func (BaseMixin) Fields() []ent.Field {
 	return []ent.Field{
 		field.UUID("id", uuid.UUID{}).
-			Default(uuid.New).
-			StorageKey("oid"),
+			Default(uuid.New),
 		field.Time("create_time").
 			Default(time.Now).
 			Immutable(),

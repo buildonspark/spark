@@ -66,11 +66,6 @@ func UpdateTime(v time.Time) predicate.Tree {
 	return predicate.Tree(sql.FieldEQ(FieldUpdateTime, v))
 }
 
-// RootID applies equality check predicate on the "root_id" field. It's identical to RootIDEQ.
-func RootID(v uuid.UUID) predicate.Tree {
-	return predicate.Tree(sql.FieldEQ(FieldRootID, v))
-}
-
 // OwnerIdentityPubkey applies equality check predicate on the "owner_identity_pubkey" field. It's identical to OwnerIdentityPubkeyEQ.
 func OwnerIdentityPubkey(v []byte) predicate.Tree {
 	return predicate.Tree(sql.FieldEQ(FieldOwnerIdentityPubkey, v))
@@ -156,26 +151,6 @@ func UpdateTimeLTE(v time.Time) predicate.Tree {
 	return predicate.Tree(sql.FieldLTE(FieldUpdateTime, v))
 }
 
-// RootIDEQ applies the EQ predicate on the "root_id" field.
-func RootIDEQ(v uuid.UUID) predicate.Tree {
-	return predicate.Tree(sql.FieldEQ(FieldRootID, v))
-}
-
-// RootIDNEQ applies the NEQ predicate on the "root_id" field.
-func RootIDNEQ(v uuid.UUID) predicate.Tree {
-	return predicate.Tree(sql.FieldNEQ(FieldRootID, v))
-}
-
-// RootIDIn applies the In predicate on the "root_id" field.
-func RootIDIn(vs ...uuid.UUID) predicate.Tree {
-	return predicate.Tree(sql.FieldIn(FieldRootID, vs...))
-}
-
-// RootIDNotIn applies the NotIn predicate on the "root_id" field.
-func RootIDNotIn(vs ...uuid.UUID) predicate.Tree {
-	return predicate.Tree(sql.FieldNotIn(FieldRootID, vs...))
-}
-
 // OwnerIdentityPubkeyEQ applies the EQ predicate on the "owner_identity_pubkey" field.
 func OwnerIdentityPubkeyEQ(v []byte) predicate.Tree {
 	return predicate.Tree(sql.FieldEQ(FieldOwnerIdentityPubkey, v))
@@ -228,7 +203,7 @@ func HasRoot() predicate.Tree {
 }
 
 // HasRootWith applies the HasEdge predicate on the "root" edge with a given conditions (other predicates).
-func HasRootWith(preds ...predicate.Leaf) predicate.Tree {
+func HasRootWith(preds ...predicate.TreeNode) predicate.Tree {
 	return predicate.Tree(func(s *sql.Selector) {
 		step := newRootStep()
 		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
@@ -239,21 +214,21 @@ func HasRootWith(preds ...predicate.Leaf) predicate.Tree {
 	})
 }
 
-// HasLeaves applies the HasEdge predicate on the "leaves" edge.
-func HasLeaves() predicate.Tree {
+// HasNodes applies the HasEdge predicate on the "nodes" edge.
+func HasNodes() predicate.Tree {
 	return predicate.Tree(func(s *sql.Selector) {
 		step := sqlgraph.NewStep(
 			sqlgraph.From(Table, FieldID),
-			sqlgraph.Edge(sqlgraph.O2M, false, LeavesTable, LeavesColumn),
+			sqlgraph.Edge(sqlgraph.O2M, true, NodesTable, NodesColumn),
 		)
 		sqlgraph.HasNeighbors(s, step)
 	})
 }
 
-// HasLeavesWith applies the HasEdge predicate on the "leaves" edge with a given conditions (other predicates).
-func HasLeavesWith(preds ...predicate.Leaf) predicate.Tree {
+// HasNodesWith applies the HasEdge predicate on the "nodes" edge with a given conditions (other predicates).
+func HasNodesWith(preds ...predicate.TreeNode) predicate.Tree {
 	return predicate.Tree(func(s *sql.Selector) {
-		step := newLeavesStep()
+		step := newNodesStep()
 		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
 			for _, p := range preds {
 				p(s)

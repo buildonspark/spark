@@ -10,8 +10,8 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark-go/so/ent/leaf"
 	"github.com/lightsparkdev/spark-go/so/ent/tree"
+	"github.com/lightsparkdev/spark-go/so/ent/treenode"
 )
 
 // Tree is the model entity for the Tree schema.
@@ -23,22 +23,21 @@ type Tree struct {
 	CreateTime time.Time `json:"create_time,omitempty"`
 	// UpdateTime holds the value of the "update_time" field.
 	UpdateTime time.Time `json:"update_time,omitempty"`
-	// RootID holds the value of the "root_id" field.
-	RootID uuid.UUID `json:"root_id,omitempty"`
 	// OwnerIdentityPubkey holds the value of the "owner_identity_pubkey" field.
 	OwnerIdentityPubkey []byte `json:"owner_identity_pubkey,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the TreeQuery when eager-loading is set.
 	Edges        TreeEdges `json:"edges"`
+	tree_root    *uuid.UUID
 	selectValues sql.SelectValues
 }
 
 // TreeEdges holds the relations/edges for other nodes in the graph.
 type TreeEdges struct {
 	// Root holds the value of the root edge.
-	Root *Leaf `json:"root,omitempty"`
-	// Leaves holds the value of the leaves edge.
-	Leaves []*Leaf `json:"leaves,omitempty"`
+	Root *TreeNode `json:"root,omitempty"`
+	// Nodes holds the value of the nodes edge.
+	Nodes []*TreeNode `json:"nodes,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
 	loadedTypes [2]bool
@@ -46,22 +45,22 @@ type TreeEdges struct {
 
 // RootOrErr returns the Root value or an error if the edge
 // was not loaded in eager-loading, or loaded but was not found.
-func (e TreeEdges) RootOrErr() (*Leaf, error) {
+func (e TreeEdges) RootOrErr() (*TreeNode, error) {
 	if e.Root != nil {
 		return e.Root, nil
 	} else if e.loadedTypes[0] {
-		return nil, &NotFoundError{label: leaf.Label}
+		return nil, &NotFoundError{label: treenode.Label}
 	}
 	return nil, &NotLoadedError{edge: "root"}
 }
 
-// LeavesOrErr returns the Leaves value or an error if the edge
+// NodesOrErr returns the Nodes value or an error if the edge
 // was not loaded in eager-loading.
-func (e TreeEdges) LeavesOrErr() ([]*Leaf, error) {
+func (e TreeEdges) NodesOrErr() ([]*TreeNode, error) {
 	if e.loadedTypes[1] {
-		return e.Leaves, nil
+		return e.Nodes, nil
 	}
-	return nil, &NotLoadedError{edge: "leaves"}
+	return nil, &NotLoadedError{edge: "nodes"}
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -73,8 +72,10 @@ func (*Tree) scanValues(columns []string) ([]any, error) {
 			values[i] = new([]byte)
 		case tree.FieldCreateTime, tree.FieldUpdateTime:
 			values[i] = new(sql.NullTime)
-		case tree.FieldID, tree.FieldRootID:
+		case tree.FieldID:
 			values[i] = new(uuid.UUID)
+		case tree.ForeignKeys[0]: // tree_root
+			values[i] = &sql.NullScanner{S: new(uuid.UUID)}
 		default:
 			values[i] = new(sql.UnknownType)
 		}
@@ -108,17 +109,18 @@ func (t *Tree) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				t.UpdateTime = value.Time
 			}
-		case tree.FieldRootID:
-			if value, ok := values[i].(*uuid.UUID); !ok {
-				return fmt.Errorf("unexpected type %T for field root_id", values[i])
-			} else if value != nil {
-				t.RootID = *value
-			}
 		case tree.FieldOwnerIdentityPubkey:
 			if value, ok := values[i].(*[]byte); !ok {
 				return fmt.Errorf("unexpected type %T for field owner_identity_pubkey", values[i])
 			} else if value != nil {
 				t.OwnerIdentityPubkey = *value
+			}
+		case tree.ForeignKeys[0]:
+			if value, ok := values[i].(*sql.NullScanner); !ok {
+				return fmt.Errorf("unexpected type %T for field tree_root", values[i])
+			} else if value.Valid {
+				t.tree_root = new(uuid.UUID)
+				*t.tree_root = *value.S.(*uuid.UUID)
 			}
 		default:
 			t.selectValues.Set(columns[i], values[i])
@@ -134,13 +136,13 @@ func (t *Tree) Value(name string) (ent.Value, error) {
 }
 
 // QueryRoot queries the "root" edge of the Tree entity.
-func (t *Tree) QueryRoot() *LeafQuery {
+func (t *Tree) QueryRoot() *TreeNodeQuery {
 	return NewTreeClient(t.config).QueryRoot(t)
 }
 
-// QueryLeaves queries the "leaves" edge of the Tree entity.
-func (t *Tree) QueryLeaves() *LeafQuery {
-	return NewTreeClient(t.config).QueryLeaves(t)
+// QueryNodes queries the "nodes" edge of the Tree entity.
+func (t *Tree) QueryNodes() *TreeNodeQuery {
+	return NewTreeClient(t.config).QueryNodes(t)
 }
 
 // Update returns a builder for updating this Tree.
@@ -171,9 +173,6 @@ func (t *Tree) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("update_time=")
 	builder.WriteString(t.UpdateTime.Format(time.ANSIC))
-	builder.WriteString(", ")
-	builder.WriteString("root_id=")
-	builder.WriteString(fmt.Sprintf("%v", t.RootID))
 	builder.WriteString(", ")
 	builder.WriteString("owner_identity_pubkey=")
 	builder.WriteString(fmt.Sprintf("%v", t.OwnerIdentityPubkey))

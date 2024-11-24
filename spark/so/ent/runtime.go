@@ -7,11 +7,11 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/so/ent/depositaddress"
-	"github.com/lightsparkdev/spark-go/so/ent/leaf"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
 	"github.com/lightsparkdev/spark-go/so/ent/signingkeyshare"
 	"github.com/lightsparkdev/spark-go/so/ent/signingnonce"
 	"github.com/lightsparkdev/spark-go/so/ent/tree"
+	"github.com/lightsparkdev/spark-go/so/ent/treenode"
 )
 
 // The init function reads all schema descriptors with runtime code
@@ -37,41 +37,14 @@ func init() {
 	depositaddressDescAddress := depositaddressFields[0].Descriptor()
 	// depositaddress.AddressValidator is a validator for the "address" field. It is called by the builders before save.
 	depositaddress.AddressValidator = depositaddressDescAddress.Validators[0].(func(string) error)
+	// depositaddressDescOwnerIdentityPubkey is the schema descriptor for owner_identity_pubkey field.
+	depositaddressDescOwnerIdentityPubkey := depositaddressFields[1].Descriptor()
+	// depositaddress.OwnerIdentityPubkeyValidator is a validator for the "owner_identity_pubkey" field. It is called by the builders before save.
+	depositaddress.OwnerIdentityPubkeyValidator = depositaddressDescOwnerIdentityPubkey.Validators[0].(func([]byte) error)
 	// depositaddressDescID is the schema descriptor for id field.
 	depositaddressDescID := depositaddressMixinFields0[0].Descriptor()
 	// depositaddress.DefaultID holds the default value on creation for the id field.
 	depositaddress.DefaultID = depositaddressDescID.Default.(func() uuid.UUID)
-	leafMixin := schema.Leaf{}.Mixin()
-	leafMixinFields0 := leafMixin[0].Fields()
-	_ = leafMixinFields0
-	leafFields := schema.Leaf{}.Fields()
-	_ = leafFields
-	// leafDescCreateTime is the schema descriptor for create_time field.
-	leafDescCreateTime := leafMixinFields0[1].Descriptor()
-	// leaf.DefaultCreateTime holds the default value on creation for the create_time field.
-	leaf.DefaultCreateTime = leafDescCreateTime.Default.(func() time.Time)
-	// leafDescUpdateTime is the schema descriptor for update_time field.
-	leafDescUpdateTime := leafMixinFields0[2].Descriptor()
-	// leaf.DefaultUpdateTime holds the default value on creation for the update_time field.
-	leaf.DefaultUpdateTime = leafDescUpdateTime.Default.(func() time.Time)
-	// leaf.UpdateDefaultUpdateTime holds the default value on update for the update_time field.
-	leaf.UpdateDefaultUpdateTime = leafDescUpdateTime.UpdateDefault.(func() time.Time)
-	// leafDescVerifyingPubkey is the schema descriptor for verifying_pubkey field.
-	leafDescVerifyingPubkey := leafFields[4].Descriptor()
-	// leaf.VerifyingPubkeyValidator is a validator for the "verifying_pubkey" field. It is called by the builders before save.
-	leaf.VerifyingPubkeyValidator = leafDescVerifyingPubkey.Validators[0].(func([]byte) error)
-	// leafDescOwnerIdentityPubkey is the schema descriptor for owner_identity_pubkey field.
-	leafDescOwnerIdentityPubkey := leafFields[5].Descriptor()
-	// leaf.OwnerIdentityPubkeyValidator is a validator for the "owner_identity_pubkey" field. It is called by the builders before save.
-	leaf.OwnerIdentityPubkeyValidator = leafDescOwnerIdentityPubkey.Validators[0].(func([]byte) error)
-	// leafDescOwnerSigningPubkey is the schema descriptor for owner_signing_pubkey field.
-	leafDescOwnerSigningPubkey := leafFields[6].Descriptor()
-	// leaf.OwnerSigningPubkeyValidator is a validator for the "owner_signing_pubkey" field. It is called by the builders before save.
-	leaf.OwnerSigningPubkeyValidator = leafDescOwnerSigningPubkey.Validators[0].(func([]byte) error)
-	// leafDescID is the schema descriptor for id field.
-	leafDescID := leafMixinFields0[0].Descriptor()
-	// leaf.DefaultID holds the default value on creation for the id field.
-	leaf.DefaultID = leafDescID.Default.(func() uuid.UUID)
 	signingkeyshareMixin := schema.SigningKeyshare{}.Mixin()
 	signingkeyshareMixinFields0 := signingkeyshareMixin[0].Fields()
 	_ = signingkeyshareMixinFields0
@@ -126,11 +99,42 @@ func init() {
 	// tree.UpdateDefaultUpdateTime holds the default value on update for the update_time field.
 	tree.UpdateDefaultUpdateTime = treeDescUpdateTime.UpdateDefault.(func() time.Time)
 	// treeDescOwnerIdentityPubkey is the schema descriptor for owner_identity_pubkey field.
-	treeDescOwnerIdentityPubkey := treeFields[1].Descriptor()
+	treeDescOwnerIdentityPubkey := treeFields[0].Descriptor()
 	// tree.OwnerIdentityPubkeyValidator is a validator for the "owner_identity_pubkey" field. It is called by the builders before save.
 	tree.OwnerIdentityPubkeyValidator = treeDescOwnerIdentityPubkey.Validators[0].(func([]byte) error)
 	// treeDescID is the schema descriptor for id field.
 	treeDescID := treeMixinFields0[0].Descriptor()
 	// tree.DefaultID holds the default value on creation for the id field.
 	tree.DefaultID = treeDescID.Default.(func() uuid.UUID)
+	treenodeMixin := schema.TreeNode{}.Mixin()
+	treenodeMixinFields0 := treenodeMixin[0].Fields()
+	_ = treenodeMixinFields0
+	treenodeFields := schema.TreeNode{}.Fields()
+	_ = treenodeFields
+	// treenodeDescCreateTime is the schema descriptor for create_time field.
+	treenodeDescCreateTime := treenodeMixinFields0[1].Descriptor()
+	// treenode.DefaultCreateTime holds the default value on creation for the create_time field.
+	treenode.DefaultCreateTime = treenodeDescCreateTime.Default.(func() time.Time)
+	// treenodeDescUpdateTime is the schema descriptor for update_time field.
+	treenodeDescUpdateTime := treenodeMixinFields0[2].Descriptor()
+	// treenode.DefaultUpdateTime holds the default value on creation for the update_time field.
+	treenode.DefaultUpdateTime = treenodeDescUpdateTime.Default.(func() time.Time)
+	// treenode.UpdateDefaultUpdateTime holds the default value on update for the update_time field.
+	treenode.UpdateDefaultUpdateTime = treenodeDescUpdateTime.UpdateDefault.(func() time.Time)
+	// treenodeDescVerifyingPubkey is the schema descriptor for verifying_pubkey field.
+	treenodeDescVerifyingPubkey := treenodeFields[2].Descriptor()
+	// treenode.VerifyingPubkeyValidator is a validator for the "verifying_pubkey" field. It is called by the builders before save.
+	treenode.VerifyingPubkeyValidator = treenodeDescVerifyingPubkey.Validators[0].(func([]byte) error)
+	// treenodeDescOwnerIdentityPubkey is the schema descriptor for owner_identity_pubkey field.
+	treenodeDescOwnerIdentityPubkey := treenodeFields[3].Descriptor()
+	// treenode.OwnerIdentityPubkeyValidator is a validator for the "owner_identity_pubkey" field. It is called by the builders before save.
+	treenode.OwnerIdentityPubkeyValidator = treenodeDescOwnerIdentityPubkey.Validators[0].(func([]byte) error)
+	// treenodeDescOwnerSigningPubkey is the schema descriptor for owner_signing_pubkey field.
+	treenodeDescOwnerSigningPubkey := treenodeFields[4].Descriptor()
+	// treenode.OwnerSigningPubkeyValidator is a validator for the "owner_signing_pubkey" field. It is called by the builders before save.
+	treenode.OwnerSigningPubkeyValidator = treenodeDescOwnerSigningPubkey.Validators[0].(func([]byte) error)
+	// treenodeDescID is the schema descriptor for id field.
+	treenodeDescID := treenodeMixinFields0[0].Descriptor()
+	// treenode.DefaultID holds the default value on creation for the id field.
+	treenode.DefaultID = treenodeDescID.Default.(func() uuid.UUID)
 }

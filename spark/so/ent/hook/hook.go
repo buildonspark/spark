@@ -21,18 +21,6 @@ func (f DepositAddressFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Val
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.DepositAddressMutation", m)
 }
 
-// The LeafFunc type is an adapter to allow the use of ordinary
-// function as Leaf mutator.
-type LeafFunc func(context.Context, *ent.LeafMutation) (ent.Value, error)
-
-// Mutate calls f(ctx, m).
-func (f LeafFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
-	if mv, ok := m.(*ent.LeafMutation); ok {
-		return f(ctx, mv)
-	}
-	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.LeafMutation", m)
-}
-
 // The SigningKeyshareFunc type is an adapter to allow the use of ordinary
 // function as SigningKeyshare mutator.
 type SigningKeyshareFunc func(context.Context, *ent.SigningKeyshareMutation) (ent.Value, error)
@@ -67,6 +55,18 @@ func (f TreeFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error)
 		return f(ctx, mv)
 	}
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.TreeMutation", m)
+}
+
+// The TreeNodeFunc type is an adapter to allow the use of ordinary
+// function as TreeNode mutator.
+type TreeNodeFunc func(context.Context, *ent.TreeNodeMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f TreeNodeFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.TreeNodeMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.TreeNodeMutation", m)
 }
 
 // Condition is a hook condition function.

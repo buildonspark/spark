@@ -13,9 +13,9 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark-go/so/ent/leaf"
 	"github.com/lightsparkdev/spark-go/so/ent/predicate"
 	"github.com/lightsparkdev/spark-go/so/ent/tree"
+	"github.com/lightsparkdev/spark-go/so/ent/treenode"
 )
 
 // TreeQuery is the builder for querying Tree entities.
@@ -25,8 +25,9 @@ type TreeQuery struct {
 	order      []tree.OrderOption
 	inters     []Interceptor
 	predicates []predicate.Tree
-	withRoot   *LeafQuery
-	withLeaves *LeafQuery
+	withRoot   *TreeNodeQuery
+	withNodes  *TreeNodeQuery
+	withFKs    bool
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -64,8 +65,8 @@ func (tq *TreeQuery) Order(o ...tree.OrderOption) *TreeQuery {
 }
 
 // QueryRoot chains the current query on the "root" edge.
-func (tq *TreeQuery) QueryRoot() *LeafQuery {
-	query := (&LeafClient{config: tq.config}).Query()
+func (tq *TreeQuery) QueryRoot() *TreeNodeQuery {
+	query := (&TreeNodeClient{config: tq.config}).Query()
 	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
 		if err := tq.prepareQuery(ctx); err != nil {
 			return nil, err
@@ -76,7 +77,7 @@ func (tq *TreeQuery) QueryRoot() *LeafQuery {
 		}
 		step := sqlgraph.NewStep(
 			sqlgraph.From(tree.Table, tree.FieldID, selector),
-			sqlgraph.To(leaf.Table, leaf.FieldID),
+			sqlgraph.To(treenode.Table, treenode.FieldID),
 			sqlgraph.Edge(sqlgraph.M2O, false, tree.RootTable, tree.RootColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(tq.driver.Dialect(), step)
@@ -85,9 +86,9 @@ func (tq *TreeQuery) QueryRoot() *LeafQuery {
 	return query
 }
 
-// QueryLeaves chains the current query on the "leaves" edge.
-func (tq *TreeQuery) QueryLeaves() *LeafQuery {
-	query := (&LeafClient{config: tq.config}).Query()
+// QueryNodes chains the current query on the "nodes" edge.
+func (tq *TreeQuery) QueryNodes() *TreeNodeQuery {
+	query := (&TreeNodeClient{config: tq.config}).Query()
 	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
 		if err := tq.prepareQuery(ctx); err != nil {
 			return nil, err
@@ -98,8 +99,8 @@ func (tq *TreeQuery) QueryLeaves() *LeafQuery {
 		}
 		step := sqlgraph.NewStep(
 			sqlgraph.From(tree.Table, tree.FieldID, selector),
-			sqlgraph.To(leaf.Table, leaf.FieldID),
-			sqlgraph.Edge(sqlgraph.O2M, false, tree.LeavesTable, tree.LeavesColumn),
+			sqlgraph.To(treenode.Table, treenode.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, true, tree.NodesTable, tree.NodesColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(tq.driver.Dialect(), step)
 		return fromU, nil
@@ -300,7 +301,7 @@ func (tq *TreeQuery) Clone() *TreeQuery {
 		inters:     append([]Interceptor{}, tq.inters...),
 		predicates: append([]predicate.Tree{}, tq.predicates...),
 		withRoot:   tq.withRoot.Clone(),
-		withLeaves: tq.withLeaves.Clone(),
+		withNodes:  tq.withNodes.Clone(),
 		// clone intermediate query.
 		sql:  tq.sql.Clone(),
 		path: tq.path,
@@ -309,8 +310,8 @@ func (tq *TreeQuery) Clone() *TreeQuery {
 
 // WithRoot tells the query-builder to eager-load the nodes that are connected to
 // the "root" edge. The optional arguments are used to configure the query builder of the edge.
-func (tq *TreeQuery) WithRoot(opts ...func(*LeafQuery)) *TreeQuery {
-	query := (&LeafClient{config: tq.config}).Query()
+func (tq *TreeQuery) WithRoot(opts ...func(*TreeNodeQuery)) *TreeQuery {
+	query := (&TreeNodeClient{config: tq.config}).Query()
 	for _, opt := range opts {
 		opt(query)
 	}
@@ -318,14 +319,14 @@ func (tq *TreeQuery) WithRoot(opts ...func(*LeafQuery)) *TreeQuery {
 	return tq
 }
 
-// WithLeaves tells the query-builder to eager-load the nodes that are connected to
-// the "leaves" edge. The optional arguments are used to configure the query builder of the edge.
-func (tq *TreeQuery) WithLeaves(opts ...func(*LeafQuery)) *TreeQuery {
-	query := (&LeafClient{config: tq.config}).Query()
+// WithNodes tells the query-builder to eager-load the nodes that are connected to
+// the "nodes" edge. The optional arguments are used to configure the query builder of the edge.
+func (tq *TreeQuery) WithNodes(opts ...func(*TreeNodeQuery)) *TreeQuery {
+	query := (&TreeNodeClient{config: tq.config}).Query()
 	for _, opt := range opts {
 		opt(query)
 	}
-	tq.withLeaves = query
+	tq.withNodes = query
 	return tq
 }
 
@@ -406,12 +407,19 @@ func (tq *TreeQuery) prepareQuery(ctx context.Context) error {
 func (tq *TreeQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Tree, error) {
 	var (
 		nodes       = []*Tree{}
+		withFKs     = tq.withFKs
 		_spec       = tq.querySpec()
 		loadedTypes = [2]bool{
 			tq.withRoot != nil,
-			tq.withLeaves != nil,
+			tq.withNodes != nil,
 		}
 	)
+	if tq.withRoot != nil {
+		withFKs = true
+	}
+	if withFKs {
+		_spec.Node.Columns = append(_spec.Node.Columns, tree.ForeignKeys...)
+	}
 	_spec.ScanValues = func(columns []string) ([]any, error) {
 		return (*Tree).scanValues(nil, columns)
 	}
@@ -432,25 +440,28 @@ func (tq *TreeQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Tree, e
 	}
 	if query := tq.withRoot; query != nil {
 		if err := tq.loadRoot(ctx, query, nodes, nil,
-			func(n *Tree, e *Leaf) { n.Edges.Root = e }); err != nil {
+			func(n *Tree, e *TreeNode) { n.Edges.Root = e }); err != nil {
 			return nil, err
 		}
 	}
-	if query := tq.withLeaves; query != nil {
-		if err := tq.loadLeaves(ctx, query, nodes,
-			func(n *Tree) { n.Edges.Leaves = []*Leaf{} },
-			func(n *Tree, e *Leaf) { n.Edges.Leaves = append(n.Edges.Leaves, e) }); err != nil {
+	if query := tq.withNodes; query != nil {
+		if err := tq.loadNodes(ctx, query, nodes,
+			func(n *Tree) { n.Edges.Nodes = []*TreeNode{} },
+			func(n *Tree, e *TreeNode) { n.Edges.Nodes = append(n.Edges.Nodes, e) }); err != nil {
 			return nil, err
 		}
 	}
 	return nodes, nil
 }
 
-func (tq *TreeQuery) loadRoot(ctx context.Context, query *LeafQuery, nodes []*Tree, init func(*Tree), assign func(*Tree, *Leaf)) error {
+func (tq *TreeQuery) loadRoot(ctx context.Context, query *TreeNodeQuery, nodes []*Tree, init func(*Tree), assign func(*Tree, *TreeNode)) error {
 	ids := make([]uuid.UUID, 0, len(nodes))
 	nodeids := make(map[uuid.UUID][]*Tree)
 	for i := range nodes {
-		fk := nodes[i].RootID
+		if nodes[i].tree_root == nil {
+			continue
+		}
+		fk := *nodes[i].tree_root
 		if _, ok := nodeids[fk]; !ok {
 			ids = append(ids, fk)
 		}
@@ -459,7 +470,7 @@ func (tq *TreeQuery) loadRoot(ctx context.Context, query *LeafQuery, nodes []*Tr
 	if len(ids) == 0 {
 		return nil
 	}
-	query.Where(leaf.IDIn(ids...))
+	query.Where(treenode.IDIn(ids...))
 	neighbors, err := query.All(ctx)
 	if err != nil {
 		return err
@@ -467,7 +478,7 @@ func (tq *TreeQuery) loadRoot(ctx context.Context, query *LeafQuery, nodes []*Tr
 	for _, n := range neighbors {
 		nodes, ok := nodeids[n.ID]
 		if !ok {
-			return fmt.Errorf(`unexpected foreign-key "root_id" returned %v`, n.ID)
+			return fmt.Errorf(`unexpected foreign-key "tree_root" returned %v`, n.ID)
 		}
 		for i := range nodes {
 			assign(nodes[i], n)
@@ -475,7 +486,7 @@ func (tq *TreeQuery) loadRoot(ctx context.Context, query *LeafQuery, nodes []*Tr
 	}
 	return nil
 }
-func (tq *TreeQuery) loadLeaves(ctx context.Context, query *LeafQuery, nodes []*Tree, init func(*Tree), assign func(*Tree, *Leaf)) error {
+func (tq *TreeQuery) loadNodes(ctx context.Context, query *TreeNodeQuery, nodes []*Tree, init func(*Tree), assign func(*Tree, *TreeNode)) error {
 	fks := make([]driver.Value, 0, len(nodes))
 	nodeids := make(map[uuid.UUID]*Tree)
 	for i := range nodes {
@@ -485,21 +496,22 @@ func (tq *TreeQuery) loadLeaves(ctx context.Context, query *LeafQuery, nodes []*
 			init(nodes[i])
 		}
 	}
-	if len(query.ctx.Fields) > 0 {
-		query.ctx.AppendFieldOnce(leaf.FieldTreeID)
-	}
-	query.Where(predicate.Leaf(func(s *sql.Selector) {
-		s.Where(sql.InValues(s.C(tree.LeavesColumn), fks...))
+	query.withFKs = true
+	query.Where(predicate.TreeNode(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(tree.NodesColumn), fks...))
 	}))
 	neighbors, err := query.All(ctx)
 	if err != nil {
 		return err
 	}
 	for _, n := range neighbors {
-		fk := n.TreeID
-		node, ok := nodeids[fk]
+		fk := n.tree_node_tree
+		if fk == nil {
+			return fmt.Errorf(`foreign-key "tree_node_tree" is nil for node %v`, n.ID)
+		}
+		node, ok := nodeids[*fk]
 		if !ok {
-			return fmt.Errorf(`unexpected referenced foreign-key "tree_id" returned %v for node %v`, fk, n.ID)
+			return fmt.Errorf(`unexpected referenced foreign-key "tree_node_tree" returned %v for node %v`, *fk, n.ID)
 		}
 		assign(node, n)
 	}
@@ -530,9 +542,6 @@ func (tq *TreeQuery) querySpec() *sqlgraph.QuerySpec {
 			if fields[i] != tree.FieldID {
 				_spec.Node.Columns = append(_spec.Node.Columns, fields[i])
 			}
-		}
-		if tq.withRoot != nil {
-			_spec.Node.AddColumnOnce(tree.FieldRootID)
 		}
 	}
 	if ps := tq.predicates; len(ps) > 0 {

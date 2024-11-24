@@ -15,7 +15,7 @@ const (
 	// Label holds the string label denoting the signingkeyshare type in the database.
 	Label = "signing_keyshare"
 	// FieldID holds the string denoting the id field in the database.
-	FieldID = "oid"
+	FieldID = "id"
 	// FieldCreateTime holds the string denoting the create_time field in the database.
 	FieldCreateTime = "create_time"
 	// FieldUpdateTime holds the string denoting the update_time field in the database.

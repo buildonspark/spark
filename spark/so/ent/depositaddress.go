@@ -25,12 +25,13 @@ type DepositAddress struct {
 	UpdateTime time.Time `json:"update_time,omitempty"`
 	// Address holds the value of the "address" field.
 	Address string `json:"address,omitempty"`
-	// SigningKeyshareID holds the value of the "signing_keyshare_id" field.
-	SigningKeyshareID uuid.UUID `json:"signing_keyshare_id,omitempty"`
+	// OwnerIdentityPubkey holds the value of the "owner_identity_pubkey" field.
+	OwnerIdentityPubkey []byte `json:"owner_identity_pubkey,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the DepositAddressQuery when eager-loading is set.
-	Edges        DepositAddressEdges `json:"edges"`
-	selectValues sql.SelectValues
+	Edges                            DepositAddressEdges `json:"edges"`
+	deposit_address_signing_keyshare *uuid.UUID
+	selectValues                     sql.SelectValues
 }
 
 // DepositAddressEdges holds the relations/edges for other nodes in the graph.
@@ -58,12 +59,16 @@ func (*DepositAddress) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
+		case depositaddress.FieldOwnerIdentityPubkey:
+			values[i] = new([]byte)
 		case depositaddress.FieldAddress:
 			values[i] = new(sql.NullString)
 		case depositaddress.FieldCreateTime, depositaddress.FieldUpdateTime:
 			values[i] = new(sql.NullTime)
-		case depositaddress.FieldID, depositaddress.FieldSigningKeyshareID:
+		case depositaddress.FieldID:
 			values[i] = new(uuid.UUID)
+		case depositaddress.ForeignKeys[0]: // deposit_address_signing_keyshare
+			values[i] = &sql.NullScanner{S: new(uuid.UUID)}
 		default:
 			values[i] = new(sql.UnknownType)
 		}
@@ -103,11 +108,18 @@ func (da *DepositAddress) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				da.Address = value.String
 			}
-		case depositaddress.FieldSigningKeyshareID:
-			if value, ok := values[i].(*uuid.UUID); !ok {
-				return fmt.Errorf("unexpected type %T for field signing_keyshare_id", values[i])
+		case depositaddress.FieldOwnerIdentityPubkey:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field owner_identity_pubkey", values[i])
 			} else if value != nil {
-				da.SigningKeyshareID = *value
+				da.OwnerIdentityPubkey = *value
+			}
+		case depositaddress.ForeignKeys[0]:
+			if value, ok := values[i].(*sql.NullScanner); !ok {
+				return fmt.Errorf("unexpected type %T for field deposit_address_signing_keyshare", values[i])
+			} else if value.Valid {
+				da.deposit_address_signing_keyshare = new(uuid.UUID)
+				*da.deposit_address_signing_keyshare = *value.S.(*uuid.UUID)
 			}
 		default:
 			da.selectValues.Set(columns[i], values[i])
@@ -159,8 +171,8 @@ func (da *DepositAddress) String() string {
 	builder.WriteString("address=")
 	builder.WriteString(da.Address)
 	builder.WriteString(", ")
-	builder.WriteString("signing_keyshare_id=")
-	builder.WriteString(fmt.Sprintf("%v", da.SigningKeyshareID))
+	builder.WriteString("owner_identity_pubkey=")
+	builder.WriteString(fmt.Sprintf("%v", da.OwnerIdentityPubkey))
 	builder.WriteByte(')')
 	return builder.String()
 }

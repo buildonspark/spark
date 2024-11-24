@@ -34,20 +34,6 @@ func (dau *DepositAddressUpdate) SetUpdateTime(t time.Time) *DepositAddressUpdat
 	return dau
 }
 
-// SetAddress sets the "address" field.
-func (dau *DepositAddressUpdate) SetAddress(s string) *DepositAddressUpdate {
-	dau.mutation.SetAddress(s)
-	return dau
-}
-
-// SetNillableAddress sets the "address" field if the given value is not nil.
-func (dau *DepositAddressUpdate) SetNillableAddress(s *string) *DepositAddressUpdate {
-	if s != nil {
-		dau.SetAddress(*s)
-	}
-	return dau
-}
-
 // Mutation returns the DepositAddressMutation object of the builder.
 func (dau *DepositAddressUpdate) Mutation() *DepositAddressMutation {
 	return dau.mutation
@@ -91,11 +77,6 @@ func (dau *DepositAddressUpdate) defaults() {
 
 // check runs all checks and user-defined validators on the builder.
 func (dau *DepositAddressUpdate) check() error {
-	if v, ok := dau.mutation.Address(); ok {
-		if err := depositaddress.AddressValidator(v); err != nil {
-			return &ValidationError{Name: "address", err: fmt.Errorf(`ent: validator failed for field "DepositAddress.address": %w`, err)}
-		}
-	}
 	if dau.mutation.SigningKeyshareCleared() && len(dau.mutation.SigningKeyshareIDs()) > 0 {
 		return errors.New(`ent: clearing a required unique edge "DepositAddress.signing_keyshare"`)
 	}
@@ -116,9 +97,6 @@ func (dau *DepositAddressUpdate) sqlSave(ctx context.Context) (n int, err error)
 	}
 	if value, ok := dau.mutation.UpdateTime(); ok {
 		_spec.SetField(depositaddress.FieldUpdateTime, field.TypeTime, value)
-	}
-	if value, ok := dau.mutation.Address(); ok {
-		_spec.SetField(depositaddress.FieldAddress, field.TypeString, value)
 	}
 	if n, err = sqlgraph.UpdateNodes(ctx, dau.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
@@ -143,20 +121,6 @@ type DepositAddressUpdateOne struct {
 // SetUpdateTime sets the "update_time" field.
 func (dauo *DepositAddressUpdateOne) SetUpdateTime(t time.Time) *DepositAddressUpdateOne {
 	dauo.mutation.SetUpdateTime(t)
-	return dauo
-}
-
-// SetAddress sets the "address" field.
-func (dauo *DepositAddressUpdateOne) SetAddress(s string) *DepositAddressUpdateOne {
-	dauo.mutation.SetAddress(s)
-	return dauo
-}
-
-// SetNillableAddress sets the "address" field if the given value is not nil.
-func (dauo *DepositAddressUpdateOne) SetNillableAddress(s *string) *DepositAddressUpdateOne {
-	if s != nil {
-		dauo.SetAddress(*s)
-	}
 	return dauo
 }
 
@@ -216,11 +180,6 @@ func (dauo *DepositAddressUpdateOne) defaults() {
 
 // check runs all checks and user-defined validators on the builder.
 func (dauo *DepositAddressUpdateOne) check() error {
-	if v, ok := dauo.mutation.Address(); ok {
-		if err := depositaddress.AddressValidator(v); err != nil {
-			return &ValidationError{Name: "address", err: fmt.Errorf(`ent: validator failed for field "DepositAddress.address": %w`, err)}
-		}
-	}
 	if dauo.mutation.SigningKeyshareCleared() && len(dauo.mutation.SigningKeyshareIDs()) > 0 {
 		return errors.New(`ent: clearing a required unique edge "DepositAddress.signing_keyshare"`)
 	}
@@ -258,9 +217,6 @@ func (dauo *DepositAddressUpdateOne) sqlSave(ctx context.Context) (_node *Deposi
 	}
 	if value, ok := dauo.mutation.UpdateTime(); ok {
 		_spec.SetField(depositaddress.FieldUpdateTime, field.TypeTime, value)
-	}
-	if value, ok := dauo.mutation.Address(); ok {
-		_spec.SetField(depositaddress.FieldAddress, field.TypeString, value)
 	}
 	_node = &DepositAddress{config: dauo.config}
 	_spec.Assign = _node.assignValues

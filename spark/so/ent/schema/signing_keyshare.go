@@ -42,11 +42,11 @@ func (SigningKeyshare) Fields() []ent.Field {
 	return []ent.Field{
 		field.Enum("status").
 			GoType(SigningKeyshareStatus("")),
-		field.Bytes("secret_share"),
-		field.JSON("public_shares", map[string][]byte{}),
-		field.Bytes("public_key"),
-		field.Uint32("min_signers"),
-		field.Uint64("coordinator_index"),
+		field.Bytes("secret_share").Immutable(),
+		field.JSON("public_shares", map[string][]byte{}).Immutable(),
+		field.Bytes("public_key").Immutable().Unique(),
+		field.Uint32("min_signers").Immutable(),
+		field.Uint64("coordinator_index").Immutable(),
 	}
 }
 

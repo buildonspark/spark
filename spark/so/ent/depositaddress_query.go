@@ -25,6 +25,7 @@ type DepositAddressQuery struct {
 	inters              []Interceptor
 	predicates          []predicate.DepositAddress
 	withSigningKeyshare *SigningKeyshareQuery
+	withFKs             bool
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -370,11 +371,18 @@ func (daq *DepositAddressQuery) prepareQuery(ctx context.Context) error {
 func (daq *DepositAddressQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*DepositAddress, error) {
 	var (
 		nodes       = []*DepositAddress{}
+		withFKs     = daq.withFKs
 		_spec       = daq.querySpec()
 		loadedTypes = [1]bool{
 			daq.withSigningKeyshare != nil,
 		}
 	)
+	if daq.withSigningKeyshare != nil {
+		withFKs = true
+	}
+	if withFKs {
+		_spec.Node.Columns = append(_spec.Node.Columns, depositaddress.ForeignKeys...)
+	}
 	_spec.ScanValues = func(columns []string) ([]any, error) {
 		return (*DepositAddress).scanValues(nil, columns)
 	}
@@ -406,7 +414,10 @@ func (daq *DepositAddressQuery) loadSigningKeyshare(ctx context.Context, query *
 	ids := make([]uuid.UUID, 0, len(nodes))
 	nodeids := make(map[uuid.UUID][]*DepositAddress)
 	for i := range nodes {
-		fk := nodes[i].SigningKeyshareID
+		if nodes[i].deposit_address_signing_keyshare == nil {
+			continue
+		}
+		fk := *nodes[i].deposit_address_signing_keyshare
 		if _, ok := nodeids[fk]; !ok {
 			ids = append(ids, fk)
 		}
@@ -423,7 +434,7 @@ func (daq *DepositAddressQuery) loadSigningKeyshare(ctx context.Context, query *
 	for _, n := range neighbors {
 		nodes, ok := nodeids[n.ID]
 		if !ok {
-			return fmt.Errorf(`unexpected foreign-key "signing_keyshare_id" returned %v`, n.ID)
+			return fmt.Errorf(`unexpected foreign-key "deposit_address_signing_keyshare" returned %v`, n.ID)
 		}
 		for i := range nodes {
 			assign(nodes[i], n)
@@ -456,9 +467,6 @@ func (daq *DepositAddressQuery) querySpec() *sqlgraph.QuerySpec {
 			if fields[i] != depositaddress.FieldID {
 				_spec.Node.Columns = append(_spec.Node.Columns, fields[i])
 			}
-		}
-		if daq.withSigningKeyshare != nil {
-			_spec.Node.AddColumnOnce(depositaddress.FieldSigningKeyshareID)
 		}
 	}
 	if ps := daq.predicates; len(ps) > 0 {

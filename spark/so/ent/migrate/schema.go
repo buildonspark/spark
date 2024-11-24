@@ -10,11 +10,12 @@ import (
 var (
 	// DepositAddressesColumns holds the columns for the "deposit_addresses" table.
 	DepositAddressesColumns = []*schema.Column{
-		{Name: "oid", Type: field.TypeUUID},
+		{Name: "id", Type: field.TypeUUID},
 		{Name: "create_time", Type: field.TypeTime},
 		{Name: "update_time", Type: field.TypeTime},
 		{Name: "address", Type: field.TypeString},
-		{Name: "signing_keyshare_id", Type: field.TypeUUID},
+		{Name: "owner_identity_pubkey", Type: field.TypeBytes},
+		{Name: "deposit_address_signing_keyshare", Type: field.TypeUUID},
 	}
 	// DepositAddressesTable holds the schema information for the "deposit_addresses" table.
 	DepositAddressesTable = &schema.Table{
@@ -24,7 +25,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "deposit_addresses_signing_keyshares_signing_keyshare",
-				Columns:    []*schema.Column{DepositAddressesColumns[4]},
+				Columns:    []*schema.Column{DepositAddressesColumns[5]},
 				RefColumns: []*schema.Column{SigningKeysharesColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -37,55 +38,15 @@ var (
 			},
 		},
 	}
-	// LeafsColumns holds the columns for the "leafs" table.
-	LeafsColumns = []*schema.Column{
-		{Name: "oid", Type: field.TypeUUID},
-		{Name: "create_time", Type: field.TypeTime},
-		{Name: "update_time", Type: field.TypeTime},
-		{Name: "value_sats", Type: field.TypeUint64},
-		{Name: "status", Type: field.TypeEnum, Enums: []string{"AVAILABLE", "FROZEN_BY_ISSUER", "TRANSFER_LOCKED", "SPLIT_LOCKED", "SPLITTED", "AGGREGATED", "ON_CHAIN"}},
-		{Name: "verifying_pubkey", Type: field.TypeBytes},
-		{Name: "owner_identity_pubkey", Type: field.TypeBytes},
-		{Name: "owner_signing_pubkey", Type: field.TypeBytes},
-		{Name: "parent_id", Type: field.TypeUUID, Unique: true, Nullable: true},
-		{Name: "signing_keyshare_id", Type: field.TypeUUID},
-		{Name: "tree_id", Type: field.TypeUUID},
-	}
-	// LeafsTable holds the schema information for the "leafs" table.
-	LeafsTable = &schema.Table{
-		Name:       "leafs",
-		Columns:    LeafsColumns,
-		PrimaryKey: []*schema.Column{LeafsColumns[0]},
-		ForeignKeys: []*schema.ForeignKey{
-			{
-				Symbol:     "leafs_leafs_parent",
-				Columns:    []*schema.Column{LeafsColumns[8]},
-				RefColumns: []*schema.Column{LeafsColumns[0]},
-				OnDelete:   schema.SetNull,
-			},
-			{
-				Symbol:     "leafs_signing_keyshares_signing_keyshare",
-				Columns:    []*schema.Column{LeafsColumns[9]},
-				RefColumns: []*schema.Column{SigningKeysharesColumns[0]},
-				OnDelete:   schema.NoAction,
-			},
-			{
-				Symbol:     "leafs_trees_leaves",
-				Columns:    []*schema.Column{LeafsColumns[10]},
-				RefColumns: []*schema.Column{TreesColumns[0]},
-				OnDelete:   schema.NoAction,
-			},
-		},
-	}
 	// SigningKeysharesColumns holds the columns for the "signing_keyshares" table.
 	SigningKeysharesColumns = []*schema.Column{
-		{Name: "oid", Type: field.TypeUUID},
+		{Name: "id", Type: field.TypeUUID},
 		{Name: "create_time", Type: field.TypeTime},
 		{Name: "update_time", Type: field.TypeTime},
 		{Name: "status", Type: field.TypeEnum, Enums: []string{"AVAILABLE", "IN_USE"}},
 		{Name: "secret_share", Type: field.TypeBytes},
 		{Name: "public_shares", Type: field.TypeJSON},
-		{Name: "public_key", Type: field.TypeBytes},
+		{Name: "public_key", Type: field.TypeBytes, Unique: true},
 		{Name: "min_signers", Type: field.TypeUint32},
 		{Name: "coordinator_index", Type: field.TypeUint64},
 	}
@@ -104,7 +65,7 @@ var (
 	}
 	// SigningNoncesColumns holds the columns for the "signing_nonces" table.
 	SigningNoncesColumns = []*schema.Column{
-		{Name: "oid", Type: field.TypeUUID},
+		{Name: "id", Type: field.TypeUUID},
 		{Name: "create_time", Type: field.TypeTime},
 		{Name: "update_time", Type: field.TypeTime},
 		{Name: "nonce", Type: field.TypeBytes},
@@ -125,11 +86,11 @@ var (
 	}
 	// TreesColumns holds the columns for the "trees" table.
 	TreesColumns = []*schema.Column{
-		{Name: "oid", Type: field.TypeUUID},
+		{Name: "id", Type: field.TypeUUID},
 		{Name: "create_time", Type: field.TypeTime},
 		{Name: "update_time", Type: field.TypeTime},
 		{Name: "owner_identity_pubkey", Type: field.TypeBytes},
-		{Name: "root_id", Type: field.TypeUUID},
+		{Name: "tree_root", Type: field.TypeUUID},
 	}
 	// TreesTable holds the schema information for the "trees" table.
 	TreesTable = &schema.Table{
@@ -138,27 +99,84 @@ var (
 		PrimaryKey: []*schema.Column{TreesColumns[0]},
 		ForeignKeys: []*schema.ForeignKey{
 			{
-				Symbol:     "trees_leafs_root",
+				Symbol:     "trees_tree_nodes_root",
 				Columns:    []*schema.Column{TreesColumns[4]},
-				RefColumns: []*schema.Column{LeafsColumns[0]},
+				RefColumns: []*schema.Column{TreeNodesColumns[0]},
 				OnDelete:   schema.NoAction,
+			},
+		},
+	}
+	// TreeNodesColumns holds the columns for the "tree_nodes" table.
+	TreeNodesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUUID},
+		{Name: "create_time", Type: field.TypeTime},
+		{Name: "update_time", Type: field.TypeTime},
+		{Name: "value_sats", Type: field.TypeUint64},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"AVAILABLE", "FROZEN_BY_ISSUER", "TRANSFER_LOCKED", "SPLIT_LOCKED", "SPLITTED", "AGGREGATED", "ON_CHAIN"}},
+		{Name: "verifying_pubkey", Type: field.TypeBytes},
+		{Name: "owner_identity_pubkey", Type: field.TypeBytes},
+		{Name: "owner_signing_pubkey", Type: field.TypeBytes},
+		{Name: "tree_node_tree", Type: field.TypeUUID},
+		{Name: "tree_node_parent", Type: field.TypeUUID, Nullable: true},
+		{Name: "tree_node_signing_keyshare", Type: field.TypeUUID},
+	}
+	// TreeNodesTable holds the schema information for the "tree_nodes" table.
+	TreeNodesTable = &schema.Table{
+		Name:       "tree_nodes",
+		Columns:    TreeNodesColumns,
+		PrimaryKey: []*schema.Column{TreeNodesColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "tree_nodes_trees_tree",
+				Columns:    []*schema.Column{TreeNodesColumns[8]},
+				RefColumns: []*schema.Column{TreesColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "tree_nodes_tree_nodes_parent",
+				Columns:    []*schema.Column{TreeNodesColumns[9]},
+				RefColumns: []*schema.Column{TreeNodesColumns[0]},
+				OnDelete:   schema.SetNull,
+			},
+			{
+				Symbol:     "tree_nodes_signing_keyshares_signing_keyshare",
+				Columns:    []*schema.Column{TreeNodesColumns[10]},
+				RefColumns: []*schema.Column{SigningKeysharesColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "treenode_tree_node_parent",
+				Unique:  false,
+				Columns: []*schema.Column{TreeNodesColumns[9]},
+			},
+			{
+				Name:    "treenode_tree_node_tree",
+				Unique:  false,
+				Columns: []*schema.Column{TreeNodesColumns[8]},
+			},
+			{
+				Name:    "treenode_owner_identity_pubkey",
+				Unique:  false,
+				Columns: []*schema.Column{TreeNodesColumns[6]},
 			},
 		},
 	}
 	// Tables holds all the tables in the schema.
 	Tables = []*schema.Table{
 		DepositAddressesTable,
-		LeafsTable,
 		SigningKeysharesTable,
 		SigningNoncesTable,
 		TreesTable,
+		TreeNodesTable,
 	}
 )
 
 func init() {
 	DepositAddressesTable.ForeignKeys[0].RefTable = SigningKeysharesTable
-	LeafsTable.ForeignKeys[0].RefTable = LeafsTable
-	LeafsTable.ForeignKeys[1].RefTable = SigningKeysharesTable
-	LeafsTable.ForeignKeys[2].RefTable = TreesTable
-	TreesTable.ForeignKeys[0].RefTable = LeafsTable
+	TreesTable.ForeignKeys[0].RefTable = TreeNodesTable
+	TreeNodesTable.ForeignKeys[0].RefTable = TreesTable
+	TreeNodesTable.ForeignKeys[1].RefTable = TreeNodesTable
+	TreeNodesTable.ForeignKeys[2].RefTable = SigningKeysharesTable
 }

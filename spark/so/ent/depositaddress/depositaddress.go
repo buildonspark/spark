@@ -14,15 +14,15 @@ const (
 	// Label holds the string label denoting the depositaddress type in the database.
 	Label = "deposit_address"
 	// FieldID holds the string denoting the id field in the database.
-	FieldID = "oid"
+	FieldID = "id"
 	// FieldCreateTime holds the string denoting the create_time field in the database.
 	FieldCreateTime = "create_time"
 	// FieldUpdateTime holds the string denoting the update_time field in the database.
 	FieldUpdateTime = "update_time"
 	// FieldAddress holds the string denoting the address field in the database.
 	FieldAddress = "address"
-	// FieldSigningKeyshareID holds the string denoting the signing_keyshare_id field in the database.
-	FieldSigningKeyshareID = "signing_keyshare_id"
+	// FieldOwnerIdentityPubkey holds the string denoting the owner_identity_pubkey field in the database.
+	FieldOwnerIdentityPubkey = "owner_identity_pubkey"
 	// EdgeSigningKeyshare holds the string denoting the signing_keyshare edge name in mutations.
 	EdgeSigningKeyshare = "signing_keyshare"
 	// Table holds the table name of the depositaddress in the database.
@@ -33,7 +33,7 @@ const (
 	// It exists in this package in order to avoid circular dependency with the "signingkeyshare" package.
 	SigningKeyshareInverseTable = "signing_keyshares"
 	// SigningKeyshareColumn is the table column denoting the signing_keyshare relation/edge.
-	SigningKeyshareColumn = "signing_keyshare_id"
+	SigningKeyshareColumn = "deposit_address_signing_keyshare"
 )
 
 // Columns holds all SQL columns for depositaddress fields.
@@ -42,13 +42,24 @@ var Columns = []string{
 	FieldCreateTime,
 	FieldUpdateTime,
 	FieldAddress,
-	FieldSigningKeyshareID,
+	FieldOwnerIdentityPubkey,
+}
+
+// ForeignKeys holds the SQL foreign-keys that are owned by the "deposit_addresses"
+// table and are not defined as standalone fields in the schema.
+var ForeignKeys = []string{
+	"deposit_address_signing_keyshare",
 }
 
 // ValidColumn reports if the column name is valid (part of the table columns).
 func ValidColumn(column string) bool {
 	for i := range Columns {
 		if column == Columns[i] {
+			return true
+		}
+	}
+	for i := range ForeignKeys {
+		if column == ForeignKeys[i] {
 			return true
 		}
 	}
@@ -64,6 +75,8 @@ var (
 	UpdateDefaultUpdateTime func() time.Time
 	// AddressValidator is a validator for the "address" field. It is called by the builders before save.
 	AddressValidator func(string) error
+	// OwnerIdentityPubkeyValidator is a validator for the "owner_identity_pubkey" field. It is called by the builders before save.
+	OwnerIdentityPubkeyValidator func([]byte) error
 	// DefaultID holds the default value on creation for the "id" field.
 	DefaultID func() uuid.UUID
 )
@@ -89,11 +102,6 @@ func ByUpdateTime(opts ...sql.OrderTermOption) OrderOption {
 // ByAddress orders the results by the address field.
 func ByAddress(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldAddress, opts...).ToFunc()
-}
-
-// BySigningKeyshareID orders the results by the signing_keyshare_id field.
-func BySigningKeyshareID(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldSigningKeyshareID, opts...).ToFunc()
 }
 
 // BySigningKeyshareField orders the results by signing_keyshare field.

@@ -12,9 +12,9 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark-go/so/ent/leaf"
 	"github.com/lightsparkdev/spark-go/so/ent/predicate"
 	"github.com/lightsparkdev/spark-go/so/ent/tree"
+	"github.com/lightsparkdev/spark-go/so/ent/treenode"
 )
 
 // TreeUpdate is the builder for updating Tree entities.
@@ -36,44 +36,36 @@ func (tu *TreeUpdate) SetUpdateTime(t time.Time) *TreeUpdate {
 	return tu
 }
 
-// SetRootID sets the "root_id" field.
-func (tu *TreeUpdate) SetRootID(u uuid.UUID) *TreeUpdate {
-	tu.mutation.SetRootID(u)
-	return tu
-}
-
-// SetNillableRootID sets the "root_id" field if the given value is not nil.
-func (tu *TreeUpdate) SetNillableRootID(u *uuid.UUID) *TreeUpdate {
-	if u != nil {
-		tu.SetRootID(*u)
-	}
-	return tu
-}
-
 // SetOwnerIdentityPubkey sets the "owner_identity_pubkey" field.
 func (tu *TreeUpdate) SetOwnerIdentityPubkey(b []byte) *TreeUpdate {
 	tu.mutation.SetOwnerIdentityPubkey(b)
 	return tu
 }
 
-// SetRoot sets the "root" edge to the Leaf entity.
-func (tu *TreeUpdate) SetRoot(l *Leaf) *TreeUpdate {
-	return tu.SetRootID(l.ID)
-}
-
-// AddLeafeIDs adds the "leaves" edge to the Leaf entity by IDs.
-func (tu *TreeUpdate) AddLeafeIDs(ids ...uuid.UUID) *TreeUpdate {
-	tu.mutation.AddLeafeIDs(ids...)
+// SetRootID sets the "root" edge to the TreeNode entity by ID.
+func (tu *TreeUpdate) SetRootID(id uuid.UUID) *TreeUpdate {
+	tu.mutation.SetRootID(id)
 	return tu
 }
 
-// AddLeaves adds the "leaves" edges to the Leaf entity.
-func (tu *TreeUpdate) AddLeaves(l ...*Leaf) *TreeUpdate {
-	ids := make([]uuid.UUID, len(l))
-	for i := range l {
-		ids[i] = l[i].ID
+// SetRoot sets the "root" edge to the TreeNode entity.
+func (tu *TreeUpdate) SetRoot(t *TreeNode) *TreeUpdate {
+	return tu.SetRootID(t.ID)
+}
+
+// AddNodeIDs adds the "nodes" edge to the TreeNode entity by IDs.
+func (tu *TreeUpdate) AddNodeIDs(ids ...uuid.UUID) *TreeUpdate {
+	tu.mutation.AddNodeIDs(ids...)
+	return tu
+}
+
+// AddNodes adds the "nodes" edges to the TreeNode entity.
+func (tu *TreeUpdate) AddNodes(t ...*TreeNode) *TreeUpdate {
+	ids := make([]uuid.UUID, len(t))
+	for i := range t {
+		ids[i] = t[i].ID
 	}
-	return tu.AddLeafeIDs(ids...)
+	return tu.AddNodeIDs(ids...)
 }
 
 // Mutation returns the TreeMutation object of the builder.
@@ -81,31 +73,31 @@ func (tu *TreeUpdate) Mutation() *TreeMutation {
 	return tu.mutation
 }
 
-// ClearRoot clears the "root" edge to the Leaf entity.
+// ClearRoot clears the "root" edge to the TreeNode entity.
 func (tu *TreeUpdate) ClearRoot() *TreeUpdate {
 	tu.mutation.ClearRoot()
 	return tu
 }
 
-// ClearLeaves clears all "leaves" edges to the Leaf entity.
-func (tu *TreeUpdate) ClearLeaves() *TreeUpdate {
-	tu.mutation.ClearLeaves()
+// ClearNodes clears all "nodes" edges to the TreeNode entity.
+func (tu *TreeUpdate) ClearNodes() *TreeUpdate {
+	tu.mutation.ClearNodes()
 	return tu
 }
 
-// RemoveLeafeIDs removes the "leaves" edge to Leaf entities by IDs.
-func (tu *TreeUpdate) RemoveLeafeIDs(ids ...uuid.UUID) *TreeUpdate {
-	tu.mutation.RemoveLeafeIDs(ids...)
+// RemoveNodeIDs removes the "nodes" edge to TreeNode entities by IDs.
+func (tu *TreeUpdate) RemoveNodeIDs(ids ...uuid.UUID) *TreeUpdate {
+	tu.mutation.RemoveNodeIDs(ids...)
 	return tu
 }
 
-// RemoveLeaves removes "leaves" edges to Leaf entities.
-func (tu *TreeUpdate) RemoveLeaves(l ...*Leaf) *TreeUpdate {
-	ids := make([]uuid.UUID, len(l))
-	for i := range l {
-		ids[i] = l[i].ID
+// RemoveNodes removes "nodes" edges to TreeNode entities.
+func (tu *TreeUpdate) RemoveNodes(t ...*TreeNode) *TreeUpdate {
+	ids := make([]uuid.UUID, len(t))
+	for i := range t {
+		ids[i] = t[i].ID
 	}
-	return tu.RemoveLeafeIDs(ids...)
+	return tu.RemoveNodeIDs(ids...)
 }
 
 // Save executes the query and returns the number of nodes affected by the update operation.
@@ -183,7 +175,7 @@ func (tu *TreeUpdate) sqlSave(ctx context.Context) (n int, err error) {
 			Columns: []string{tree.RootColumn},
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(leaf.FieldID, field.TypeUUID),
+				IDSpec: sqlgraph.NewFieldSpec(treenode.FieldID, field.TypeUUID),
 			},
 		}
 		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
@@ -196,7 +188,7 @@ func (tu *TreeUpdate) sqlSave(ctx context.Context) (n int, err error) {
 			Columns: []string{tree.RootColumn},
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(leaf.FieldID, field.TypeUUID),
+				IDSpec: sqlgraph.NewFieldSpec(treenode.FieldID, field.TypeUUID),
 			},
 		}
 		for _, k := range nodes {
@@ -204,28 +196,28 @@ func (tu *TreeUpdate) sqlSave(ctx context.Context) (n int, err error) {
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
-	if tu.mutation.LeavesCleared() {
+	if tu.mutation.NodesCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.O2M,
-			Inverse: false,
-			Table:   tree.LeavesTable,
-			Columns: []string{tree.LeavesColumn},
+			Inverse: true,
+			Table:   tree.NodesTable,
+			Columns: []string{tree.NodesColumn},
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(leaf.FieldID, field.TypeUUID),
+				IDSpec: sqlgraph.NewFieldSpec(treenode.FieldID, field.TypeUUID),
 			},
 		}
 		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
 	}
-	if nodes := tu.mutation.RemovedLeavesIDs(); len(nodes) > 0 && !tu.mutation.LeavesCleared() {
+	if nodes := tu.mutation.RemovedNodesIDs(); len(nodes) > 0 && !tu.mutation.NodesCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.O2M,
-			Inverse: false,
-			Table:   tree.LeavesTable,
-			Columns: []string{tree.LeavesColumn},
+			Inverse: true,
+			Table:   tree.NodesTable,
+			Columns: []string{tree.NodesColumn},
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(leaf.FieldID, field.TypeUUID),
+				IDSpec: sqlgraph.NewFieldSpec(treenode.FieldID, field.TypeUUID),
 			},
 		}
 		for _, k := range nodes {
@@ -233,15 +225,15 @@ func (tu *TreeUpdate) sqlSave(ctx context.Context) (n int, err error) {
 		}
 		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
 	}
-	if nodes := tu.mutation.LeavesIDs(); len(nodes) > 0 {
+	if nodes := tu.mutation.NodesIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.O2M,
-			Inverse: false,
-			Table:   tree.LeavesTable,
-			Columns: []string{tree.LeavesColumn},
+			Inverse: true,
+			Table:   tree.NodesTable,
+			Columns: []string{tree.NodesColumn},
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(leaf.FieldID, field.TypeUUID),
+				IDSpec: sqlgraph.NewFieldSpec(treenode.FieldID, field.TypeUUID),
 			},
 		}
 		for _, k := range nodes {
@@ -275,44 +267,36 @@ func (tuo *TreeUpdateOne) SetUpdateTime(t time.Time) *TreeUpdateOne {
 	return tuo
 }
 
-// SetRootID sets the "root_id" field.
-func (tuo *TreeUpdateOne) SetRootID(u uuid.UUID) *TreeUpdateOne {
-	tuo.mutation.SetRootID(u)
-	return tuo
-}
-
-// SetNillableRootID sets the "root_id" field if the given value is not nil.
-func (tuo *TreeUpdateOne) SetNillableRootID(u *uuid.UUID) *TreeUpdateOne {
-	if u != nil {
-		tuo.SetRootID(*u)
-	}
-	return tuo
-}
-
 // SetOwnerIdentityPubkey sets the "owner_identity_pubkey" field.
 func (tuo *TreeUpdateOne) SetOwnerIdentityPubkey(b []byte) *TreeUpdateOne {
 	tuo.mutation.SetOwnerIdentityPubkey(b)
 	return tuo
 }
 
-// SetRoot sets the "root" edge to the Leaf entity.
-func (tuo *TreeUpdateOne) SetRoot(l *Leaf) *TreeUpdateOne {
-	return tuo.SetRootID(l.ID)
-}
-
-// AddLeafeIDs adds the "leaves" edge to the Leaf entity by IDs.
-func (tuo *TreeUpdateOne) AddLeafeIDs(ids ...uuid.UUID) *TreeUpdateOne {
-	tuo.mutation.AddLeafeIDs(ids...)
+// SetRootID sets the "root" edge to the TreeNode entity by ID.
+func (tuo *TreeUpdateOne) SetRootID(id uuid.UUID) *TreeUpdateOne {
+	tuo.mutation.SetRootID(id)
 	return tuo
 }
 
-// AddLeaves adds the "leaves" edges to the Leaf entity.
-func (tuo *TreeUpdateOne) AddLeaves(l ...*Leaf) *TreeUpdateOne {
-	ids := make([]uuid.UUID, len(l))
-	for i := range l {
-		ids[i] = l[i].ID
+// SetRoot sets the "root" edge to the TreeNode entity.
+func (tuo *TreeUpdateOne) SetRoot(t *TreeNode) *TreeUpdateOne {
+	return tuo.SetRootID(t.ID)
+}
+
+// AddNodeIDs adds the "nodes" edge to the TreeNode entity by IDs.
+func (tuo *TreeUpdateOne) AddNodeIDs(ids ...uuid.UUID) *TreeUpdateOne {
+	tuo.mutation.AddNodeIDs(ids...)
+	return tuo
+}
+
+// AddNodes adds the "nodes" edges to the TreeNode entity.
+func (tuo *TreeUpdateOne) AddNodes(t ...*TreeNode) *TreeUpdateOne {
+	ids := make([]uuid.UUID, len(t))
+	for i := range t {
+		ids[i] = t[i].ID
 	}
-	return tuo.AddLeafeIDs(ids...)
+	return tuo.AddNodeIDs(ids...)
 }
 
 // Mutation returns the TreeMutation object of the builder.
@@ -320,31 +304,31 @@ func (tuo *TreeUpdateOne) Mutation() *TreeMutation {
 	return tuo.mutation
 }
 
-// ClearRoot clears the "root" edge to the Leaf entity.
+// ClearRoot clears the "root" edge to the TreeNode entity.
 func (tuo *TreeUpdateOne) ClearRoot() *TreeUpdateOne {
 	tuo.mutation.ClearRoot()
 	return tuo
 }
 
-// ClearLeaves clears all "leaves" edges to the Leaf entity.
-func (tuo *TreeUpdateOne) ClearLeaves() *TreeUpdateOne {
-	tuo.mutation.ClearLeaves()
+// ClearNodes clears all "nodes" edges to the TreeNode entity.
+func (tuo *TreeUpdateOne) ClearNodes() *TreeUpdateOne {
+	tuo.mutation.ClearNodes()
 	return tuo
 }
 
-// RemoveLeafeIDs removes the "leaves" edge to Leaf entities by IDs.
-func (tuo *TreeUpdateOne) RemoveLeafeIDs(ids ...uuid.UUID) *TreeUpdateOne {
-	tuo.mutation.RemoveLeafeIDs(ids...)
+// RemoveNodeIDs removes the "nodes" edge to TreeNode entities by IDs.
+func (tuo *TreeUpdateOne) RemoveNodeIDs(ids ...uuid.UUID) *TreeUpdateOne {
+	tuo.mutation.RemoveNodeIDs(ids...)
 	return tuo
 }
 
-// RemoveLeaves removes "leaves" edges to Leaf entities.
-func (tuo *TreeUpdateOne) RemoveLeaves(l ...*Leaf) *TreeUpdateOne {
-	ids := make([]uuid.UUID, len(l))
-	for i := range l {
-		ids[i] = l[i].ID
+// RemoveNodes removes "nodes" edges to TreeNode entities.
+func (tuo *TreeUpdateOne) RemoveNodes(t ...*TreeNode) *TreeUpdateOne {
+	ids := make([]uuid.UUID, len(t))
+	for i := range t {
+		ids[i] = t[i].ID
 	}
-	return tuo.RemoveLeafeIDs(ids...)
+	return tuo.RemoveNodeIDs(ids...)
 }
 
 // Where appends a list predicates to the TreeUpdate builder.
@@ -452,7 +436,7 @@ func (tuo *TreeUpdateOne) sqlSave(ctx context.Context) (_node *Tree, err error) 
 			Columns: []string{tree.RootColumn},
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(leaf.FieldID, field.TypeUUID),
+				IDSpec: sqlgraph.NewFieldSpec(treenode.FieldID, field.TypeUUID),
 			},
 		}
 		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
@@ -465,7 +449,7 @@ func (tuo *TreeUpdateOne) sqlSave(ctx context.Context) (_node *Tree, err error) 
 			Columns: []string{tree.RootColumn},
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(leaf.FieldID, field.TypeUUID),
+				IDSpec: sqlgraph.NewFieldSpec(treenode.FieldID, field.TypeUUID),
 			},
 		}
 		for _, k := range nodes {
@@ -473,28 +457,28 @@ func (tuo *TreeUpdateOne) sqlSave(ctx context.Context) (_node *Tree, err error) 
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
-	if tuo.mutation.LeavesCleared() {
+	if tuo.mutation.NodesCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.O2M,
-			Inverse: false,
-			Table:   tree.LeavesTable,
-			Columns: []string{tree.LeavesColumn},
+			Inverse: true,
+			Table:   tree.NodesTable,
+			Columns: []string{tree.NodesColumn},
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(leaf.FieldID, field.TypeUUID),
+				IDSpec: sqlgraph.NewFieldSpec(treenode.FieldID, field.TypeUUID),
 			},
 		}
 		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
 	}
-	if nodes := tuo.mutation.RemovedLeavesIDs(); len(nodes) > 0 && !tuo.mutation.LeavesCleared() {
+	if nodes := tuo.mutation.RemovedNodesIDs(); len(nodes) > 0 && !tuo.mutation.NodesCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.O2M,
-			Inverse: false,
-			Table:   tree.LeavesTable,
-			Columns: []string{tree.LeavesColumn},
+			Inverse: true,
+			Table:   tree.NodesTable,
+			Columns: []string{tree.NodesColumn},
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(leaf.FieldID, field.TypeUUID),
+				IDSpec: sqlgraph.NewFieldSpec(treenode.FieldID, field.TypeUUID),
 			},
 		}
 		for _, k := range nodes {
@@ -502,15 +486,15 @@ func (tuo *TreeUpdateOne) sqlSave(ctx context.Context) (_node *Tree, err error) 
 		}
 		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
 	}
-	if nodes := tuo.mutation.LeavesIDs(); len(nodes) > 0 {
+	if nodes := tuo.mutation.NodesIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.O2M,
-			Inverse: false,
-			Table:   tree.LeavesTable,
-			Columns: []string{tree.LeavesColumn},
+			Inverse: true,
+			Table:   tree.NodesTable,
+			Columns: []string{tree.NodesColumn},
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(leaf.FieldID, field.TypeUUID),
+				IDSpec: sqlgraph.NewFieldSpec(treenode.FieldID, field.TypeUUID),
 			},
 		}
 		for _, k := range nodes {

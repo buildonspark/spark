@@ -11,8 +11,8 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark-go/so/ent/leaf"
 	"github.com/lightsparkdev/spark-go/so/ent/tree"
+	"github.com/lightsparkdev/spark-go/so/ent/treenode"
 )
 
 // TreeCreate is the builder for creating a Tree entity.
@@ -50,12 +50,6 @@ func (tc *TreeCreate) SetNillableUpdateTime(t *time.Time) *TreeCreate {
 	return tc
 }
 
-// SetRootID sets the "root_id" field.
-func (tc *TreeCreate) SetRootID(u uuid.UUID) *TreeCreate {
-	tc.mutation.SetRootID(u)
-	return tc
-}
-
 // SetOwnerIdentityPubkey sets the "owner_identity_pubkey" field.
 func (tc *TreeCreate) SetOwnerIdentityPubkey(b []byte) *TreeCreate {
 	tc.mutation.SetOwnerIdentityPubkey(b)
@@ -76,24 +70,30 @@ func (tc *TreeCreate) SetNillableID(u *uuid.UUID) *TreeCreate {
 	return tc
 }
 
-// SetRoot sets the "root" edge to the Leaf entity.
-func (tc *TreeCreate) SetRoot(l *Leaf) *TreeCreate {
-	return tc.SetRootID(l.ID)
-}
-
-// AddLeafeIDs adds the "leaves" edge to the Leaf entity by IDs.
-func (tc *TreeCreate) AddLeafeIDs(ids ...uuid.UUID) *TreeCreate {
-	tc.mutation.AddLeafeIDs(ids...)
+// SetRootID sets the "root" edge to the TreeNode entity by ID.
+func (tc *TreeCreate) SetRootID(id uuid.UUID) *TreeCreate {
+	tc.mutation.SetRootID(id)
 	return tc
 }
 
-// AddLeaves adds the "leaves" edges to the Leaf entity.
-func (tc *TreeCreate) AddLeaves(l ...*Leaf) *TreeCreate {
-	ids := make([]uuid.UUID, len(l))
-	for i := range l {
-		ids[i] = l[i].ID
+// SetRoot sets the "root" edge to the TreeNode entity.
+func (tc *TreeCreate) SetRoot(t *TreeNode) *TreeCreate {
+	return tc.SetRootID(t.ID)
+}
+
+// AddNodeIDs adds the "nodes" edge to the TreeNode entity by IDs.
+func (tc *TreeCreate) AddNodeIDs(ids ...uuid.UUID) *TreeCreate {
+	tc.mutation.AddNodeIDs(ids...)
+	return tc
+}
+
+// AddNodes adds the "nodes" edges to the TreeNode entity.
+func (tc *TreeCreate) AddNodes(t ...*TreeNode) *TreeCreate {
+	ids := make([]uuid.UUID, len(t))
+	for i := range t {
+		ids[i] = t[i].ID
 	}
-	return tc.AddLeafeIDs(ids...)
+	return tc.AddNodeIDs(ids...)
 }
 
 // Mutation returns the TreeMutation object of the builder.
@@ -152,9 +152,6 @@ func (tc *TreeCreate) check() error {
 	}
 	if _, ok := tc.mutation.UpdateTime(); !ok {
 		return &ValidationError{Name: "update_time", err: errors.New(`ent: missing required field "Tree.update_time"`)}
-	}
-	if _, ok := tc.mutation.RootID(); !ok {
-		return &ValidationError{Name: "root_id", err: errors.New(`ent: missing required field "Tree.root_id"`)}
 	}
 	if _, ok := tc.mutation.OwnerIdentityPubkey(); !ok {
 		return &ValidationError{Name: "owner_identity_pubkey", err: errors.New(`ent: missing required field "Tree.owner_identity_pubkey"`)}
@@ -222,24 +219,24 @@ func (tc *TreeCreate) createSpec() (*Tree, *sqlgraph.CreateSpec) {
 			Columns: []string{tree.RootColumn},
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(leaf.FieldID, field.TypeUUID),
+				IDSpec: sqlgraph.NewFieldSpec(treenode.FieldID, field.TypeUUID),
 			},
 		}
 		for _, k := range nodes {
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
-		_node.RootID = nodes[0]
+		_node.tree_root = &nodes[0]
 		_spec.Edges = append(_spec.Edges, edge)
 	}
-	if nodes := tc.mutation.LeavesIDs(); len(nodes) > 0 {
+	if nodes := tc.mutation.NodesIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.O2M,
-			Inverse: false,
-			Table:   tree.LeavesTable,
-			Columns: []string{tree.LeavesColumn},
+			Inverse: true,
+			Table:   tree.NodesTable,
+			Columns: []string{tree.NodesColumn},
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(leaf.FieldID, field.TypeUUID),
+				IDSpec: sqlgraph.NewFieldSpec(treenode.FieldID, field.TypeUUID),
 			},
 		}
 		for _, k := range nodes {

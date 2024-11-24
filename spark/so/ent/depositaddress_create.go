@@ -56,9 +56,9 @@ func (dac *DepositAddressCreate) SetAddress(s string) *DepositAddressCreate {
 	return dac
 }
 
-// SetSigningKeyshareID sets the "signing_keyshare_id" field.
-func (dac *DepositAddressCreate) SetSigningKeyshareID(u uuid.UUID) *DepositAddressCreate {
-	dac.mutation.SetSigningKeyshareID(u)
+// SetOwnerIdentityPubkey sets the "owner_identity_pubkey" field.
+func (dac *DepositAddressCreate) SetOwnerIdentityPubkey(b []byte) *DepositAddressCreate {
+	dac.mutation.SetOwnerIdentityPubkey(b)
 	return dac
 }
 
@@ -73,6 +73,12 @@ func (dac *DepositAddressCreate) SetNillableID(u *uuid.UUID) *DepositAddressCrea
 	if u != nil {
 		dac.SetID(*u)
 	}
+	return dac
+}
+
+// SetSigningKeyshareID sets the "signing_keyshare" edge to the SigningKeyshare entity by ID.
+func (dac *DepositAddressCreate) SetSigningKeyshareID(id uuid.UUID) *DepositAddressCreate {
+	dac.mutation.SetSigningKeyshareID(id)
 	return dac
 }
 
@@ -146,8 +152,13 @@ func (dac *DepositAddressCreate) check() error {
 			return &ValidationError{Name: "address", err: fmt.Errorf(`ent: validator failed for field "DepositAddress.address": %w`, err)}
 		}
 	}
-	if _, ok := dac.mutation.SigningKeyshareID(); !ok {
-		return &ValidationError{Name: "signing_keyshare_id", err: errors.New(`ent: missing required field "DepositAddress.signing_keyshare_id"`)}
+	if _, ok := dac.mutation.OwnerIdentityPubkey(); !ok {
+		return &ValidationError{Name: "owner_identity_pubkey", err: errors.New(`ent: missing required field "DepositAddress.owner_identity_pubkey"`)}
+	}
+	if v, ok := dac.mutation.OwnerIdentityPubkey(); ok {
+		if err := depositaddress.OwnerIdentityPubkeyValidator(v); err != nil {
+			return &ValidationError{Name: "owner_identity_pubkey", err: fmt.Errorf(`ent: validator failed for field "DepositAddress.owner_identity_pubkey": %w`, err)}
+		}
 	}
 	if len(dac.mutation.SigningKeyshareIDs()) == 0 {
 		return &ValidationError{Name: "signing_keyshare", err: errors.New(`ent: missing required edge "DepositAddress.signing_keyshare"`)}
@@ -199,6 +210,10 @@ func (dac *DepositAddressCreate) createSpec() (*DepositAddress, *sqlgraph.Create
 		_spec.SetField(depositaddress.FieldAddress, field.TypeString, value)
 		_node.Address = value
 	}
+	if value, ok := dac.mutation.OwnerIdentityPubkey(); ok {
+		_spec.SetField(depositaddress.FieldOwnerIdentityPubkey, field.TypeBytes, value)
+		_node.OwnerIdentityPubkey = value
+	}
 	if nodes := dac.mutation.SigningKeyshareIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2O,
@@ -213,7 +228,7 @@ func (dac *DepositAddressCreate) createSpec() (*DepositAddress, *sqlgraph.Create
 		for _, k := range nodes {
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
-		_node.SigningKeyshareID = nodes[0]
+		_node.deposit_address_signing_keyshare = &nodes[0]
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	return _node, _spec

@@ -14,35 +14,33 @@ const (
 	// Label holds the string label denoting the tree type in the database.
 	Label = "tree"
 	// FieldID holds the string denoting the id field in the database.
-	FieldID = "oid"
+	FieldID = "id"
 	// FieldCreateTime holds the string denoting the create_time field in the database.
 	FieldCreateTime = "create_time"
 	// FieldUpdateTime holds the string denoting the update_time field in the database.
 	FieldUpdateTime = "update_time"
-	// FieldRootID holds the string denoting the root_id field in the database.
-	FieldRootID = "root_id"
 	// FieldOwnerIdentityPubkey holds the string denoting the owner_identity_pubkey field in the database.
 	FieldOwnerIdentityPubkey = "owner_identity_pubkey"
 	// EdgeRoot holds the string denoting the root edge name in mutations.
 	EdgeRoot = "root"
-	// EdgeLeaves holds the string denoting the leaves edge name in mutations.
-	EdgeLeaves = "leaves"
+	// EdgeNodes holds the string denoting the nodes edge name in mutations.
+	EdgeNodes = "nodes"
 	// Table holds the table name of the tree in the database.
 	Table = "trees"
 	// RootTable is the table that holds the root relation/edge.
 	RootTable = "trees"
-	// RootInverseTable is the table name for the Leaf entity.
-	// It exists in this package in order to avoid circular dependency with the "leaf" package.
-	RootInverseTable = "leafs"
+	// RootInverseTable is the table name for the TreeNode entity.
+	// It exists in this package in order to avoid circular dependency with the "treenode" package.
+	RootInverseTable = "tree_nodes"
 	// RootColumn is the table column denoting the root relation/edge.
-	RootColumn = "root_id"
-	// LeavesTable is the table that holds the leaves relation/edge.
-	LeavesTable = "leafs"
-	// LeavesInverseTable is the table name for the Leaf entity.
-	// It exists in this package in order to avoid circular dependency with the "leaf" package.
-	LeavesInverseTable = "leafs"
-	// LeavesColumn is the table column denoting the leaves relation/edge.
-	LeavesColumn = "tree_id"
+	RootColumn = "tree_root"
+	// NodesTable is the table that holds the nodes relation/edge.
+	NodesTable = "tree_nodes"
+	// NodesInverseTable is the table name for the TreeNode entity.
+	// It exists in this package in order to avoid circular dependency with the "treenode" package.
+	NodesInverseTable = "tree_nodes"
+	// NodesColumn is the table column denoting the nodes relation/edge.
+	NodesColumn = "tree_node_tree"
 )
 
 // Columns holds all SQL columns for tree fields.
@@ -50,14 +48,24 @@ var Columns = []string{
 	FieldID,
 	FieldCreateTime,
 	FieldUpdateTime,
-	FieldRootID,
 	FieldOwnerIdentityPubkey,
+}
+
+// ForeignKeys holds the SQL foreign-keys that are owned by the "trees"
+// table and are not defined as standalone fields in the schema.
+var ForeignKeys = []string{
+	"tree_root",
 }
 
 // ValidColumn reports if the column name is valid (part of the table columns).
 func ValidColumn(column string) bool {
 	for i := range Columns {
 		if column == Columns[i] {
+			return true
+		}
+	}
+	for i := range ForeignKeys {
+		if column == ForeignKeys[i] {
 			return true
 		}
 	}
@@ -95,11 +103,6 @@ func ByUpdateTime(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldUpdateTime, opts...).ToFunc()
 }
 
-// ByRootID orders the results by the root_id field.
-func ByRootID(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldRootID, opts...).ToFunc()
-}
-
 // ByRootField orders the results by root field.
 func ByRootField(field string, opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -107,17 +110,17 @@ func ByRootField(field string, opts ...sql.OrderTermOption) OrderOption {
 	}
 }
 
-// ByLeavesCount orders the results by leaves count.
-func ByLeavesCount(opts ...sql.OrderTermOption) OrderOption {
+// ByNodesCount orders the results by nodes count.
+func ByNodesCount(opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
-		sqlgraph.OrderByNeighborsCount(s, newLeavesStep(), opts...)
+		sqlgraph.OrderByNeighborsCount(s, newNodesStep(), opts...)
 	}
 }
 
-// ByLeaves orders the results by leaves terms.
-func ByLeaves(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+// ByNodes orders the results by nodes terms.
+func ByNodes(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 	return func(s *sql.Selector) {
-		sqlgraph.OrderByNeighborTerms(s, newLeavesStep(), append([]sql.OrderTerm{term}, terms...)...)
+		sqlgraph.OrderByNeighborTerms(s, newNodesStep(), append([]sql.OrderTerm{term}, terms...)...)
 	}
 }
 func newRootStep() *sqlgraph.Step {
@@ -127,10 +130,10 @@ func newRootStep() *sqlgraph.Step {
 		sqlgraph.Edge(sqlgraph.M2O, false, RootTable, RootColumn),
 	)
 }
-func newLeavesStep() *sqlgraph.Step {
+func newNodesStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
-		sqlgraph.To(LeavesInverseTable, FieldID),
-		sqlgraph.Edge(sqlgraph.O2M, false, LeavesTable, LeavesColumn),
+		sqlgraph.To(NodesInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, true, NodesTable, NodesColumn),
 	)
 }
