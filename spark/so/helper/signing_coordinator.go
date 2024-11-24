@@ -13,7 +13,8 @@ import (
 
 // FrostRound1 performs the first round of the Frost signing. It gathers the signing commitments from all operators.
 func FrostRound1(ctx context.Context, config *so.Config, signingKeyshareID uuid.UUID) (map[string]objects.SigningCommitment, error) {
-	return ExecuteTaskWithAllOperators(ctx, config, true, func(ctx context.Context, operator *so.SigningOperator) (objects.SigningCommitment, error) {
+	selection := OperatorSelection{Option: OperatorSelectionOptionThreshold, Threshold: int(config.Threshold)}
+	return ExecuteTaskWithAllOperators(ctx, config, selection, func(ctx context.Context, operator *so.SigningOperator) (objects.SigningCommitment, error) {
 		conn, err := common.NewGRPCConnection(operator.Address)
 		if err != nil {
 			return objects.SigningCommitment{}, err
@@ -45,7 +46,8 @@ func FrostRound2(
 	commitments map[string]objects.SigningCommitment,
 	userCommitment objects.SigningCommitment,
 ) (map[string][]byte, error) {
-	return ExecuteTaskWithAllOperators(ctx, config, true, func(ctx context.Context, operator *so.SigningOperator) ([]byte, error) {
+	selection := OperatorSelection{Option: OperatorSelectionOptionThreshold, Threshold: int(config.Threshold)}
+	return ExecuteTaskWithAllOperators(ctx, config, selection, func(ctx context.Context, operator *so.SigningOperator) ([]byte, error) {
 		conn, err := common.NewGRPCConnection(operator.Address)
 		if err != nil {
 			return nil, err
