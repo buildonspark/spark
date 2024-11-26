@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"flag"
 	"fmt"
@@ -15,6 +16,7 @@ import (
 	"github.com/lightsparkdev/spark-go/so/dkg"
 	"github.com/lightsparkdev/spark-go/so/ent"
 	sparkgrpc "github.com/lightsparkdev/spark-go/so/grpc"
+	_ "github.com/mattn/go-sqlite3"
 	"google.golang.org/grpc"
 )
 
@@ -76,11 +78,23 @@ func main() {
 		log.Fatalf("Failed to create config: %v", err)
 	}
 
-	dbClient, err := ent.Open(config.DatabaseDriver(), config.DatabasePath+"?_fk=1")
+	dbDriver := config.DatabaseDriver()
+	dbClient, err := ent.Open(dbDriver, config.DatabasePath+"?_fk=1")
 	if err != nil {
 		log.Fatalf("Failed to create database client: %v", err)
 	}
 	defer dbClient.Close()
+
+	if dbDriver == "sqlite3" {
+		sqliteDb, _ := sql.Open("sqlite3", config.DatabasePath)
+		if _, err := sqliteDb.ExecContext(context.Background(), "PRAGMA journal_mode=WAL;"); err != nil {
+			log.Fatalf("Failed to set journal_mode: %v", err)
+		}
+		if _, err := sqliteDb.ExecContext(context.Background(), "PRAGMA busy_timeout=5000;"); err != nil {
+			log.Fatalf("Failed to set busy_timeout: %v", err)
+		}
+		sqliteDb.Close()
+	}
 
 	if err := dbClient.Schema.Create(context.Background()); err != nil {
 		log.Fatalf("failed creating schema resources: %v", err)
@@ -96,11 +110,11 @@ func main() {
 		log.Fatalf("Failed to create frost client: %v", err)
 	}
 
-	go runDKGOnStartup(config)
+	go runDKGOnStartup(dbClient, config)
 
 	dkgServer := dkg.NewDkgServer(frostConnection, config)
 
-	grpcServer := grpc.NewServer()
+	grpcServer := grpc.NewServer(grpc.UnaryInterceptor(common.DbSessionMiddleware(dbClient)))
 	pb.RegisterDKGServiceServer(grpcServer, dkgServer)
 
 	sparkInternalServer := sparkgrpc.NewSparkInternalServer(config)
@@ -115,9 +129,26 @@ func main() {
 	}
 }
 
-func runDKGOnStartup(config *so.Config) {
+func runDKGOnStartup(dbClient *ent.Client, config *so.Config) {
 	time.Sleep(5 * time.Second)
-	err := dkg.RunDKGIfNeeded(config)
+
+	ctx := context.Background()
+	tx, err := dbClient.Tx(ctx)
+	if err != nil {
+		log.Fatalf("Failed to create db transaction: %v", err)
+	}
+	defer func() {
+		if p := recover(); p != nil {
+			tx.Rollback()
+			panic(p)
+		} else if err != nil {
+			tx.Rollback()
+		} else {
+			err = tx.Commit()
+		}
+	}()
+
+	err = dkg.RunDKGIfNeeded(tx, config)
 	if err != nil {
 		log.Fatalf("Failed to run DKG: %v", err)
 	}

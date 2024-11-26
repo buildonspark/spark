@@ -15,14 +15,8 @@ import (
 	"github.com/lightsparkdev/spark-go/so/ent/signingkeyshare"
 )
 
-func RunDKGIfNeeded(config *so.Config) error {
-	dbClient, err := ent.Open(config.DatabaseDriver(), config.DatabasePath+"?_fk=1")
-	if err != nil {
-		return err
-	}
-	defer dbClient.Close()
-
-	count, err := dbClient.SigningKeyshare.Query().Where(
+func RunDKGIfNeeded(db *ent.Tx, config *so.Config) error {
+	count, err := db.SigningKeyshare.Query().Where(
 		signingkeyshare.StatusEQ(schema.KeyshareStatusAvailable),
 		signingkeyshare.CoordinatorIndexEQ(config.Index),
 	).Count(context.Background())
@@ -43,11 +37,10 @@ func GenerateKeys(config *so.Config, keyCount uint64) error {
 	clientMap := make(map[string]pb.DKGServiceClient)
 	for identifier, operator := range config.SigningOperatorMap {
 		connection, err := common.NewGRPCConnection(operator.Address)
-		defer connection.Close()
-
 		if err != nil {
 			return err
 		}
+		defer connection.Close()
 		client := pb.NewDKGServiceClient(connection)
 		clientMap[identifier] = client
 	}

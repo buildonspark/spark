@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark-go/common"
 	pb "github.com/lightsparkdev/spark-go/proto"
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/dkg"
@@ -15,13 +16,7 @@ import (
 
 // GetUnusedSigningKeyshares returns the available keyshares for the given coordinator index.
 func GetUnusedSigningKeyshares(ctx context.Context, config *so.Config, keyshareCount int) ([]*ent.SigningKeyshare, error) {
-	db, err := ent.Open(config.DatabaseDriver(), config.DatabasePath)
-	if err != nil {
-		return nil, err
-	}
-	defer db.Close()
-
-	signingKeyshares, err := db.SigningKeyshare.Query().Where(
+	signingKeyshares, err := common.GetDbFromContext(ctx).SigningKeyshare.Query().Where(
 		signingkeyshare.StatusEQ(schema.KeyshareStatusAvailable),
 		signingkeyshare.CoordinatorIndexEQ(config.Index),
 	).Limit(keyshareCount).All(ctx)
@@ -39,11 +34,7 @@ func GetUnusedSigningKeyshares(ctx context.Context, config *so.Config, keyshareC
 // MarkSigningKeysharesAsUsed marks the given keyshares as used. If any of the keyshares are not
 // found or not available, it returns an error.
 func MarkSigningKeysharesAsUsed(ctx context.Context, config *so.Config, ids []uuid.UUID) error {
-	db, err := ent.Open(config.DatabaseDriver(), config.DatabasePath)
-	if err != nil {
-		return err
-	}
-	defer db.Close()
+	db := common.GetDbFromContext(ctx)
 
 	signingKeyshares, err := db.SigningKeyshare.
 		Query().
@@ -70,19 +61,13 @@ func MarkSigningKeysharesAsUsed(ctx context.Context, config *so.Config, ids []uu
 	}
 
 	// Check if we need to generate more keyshares after marking some as used
-	go dkg.RunDKGIfNeeded(config)
+	go dkg.RunDKGIfNeeded(db, config)
 
 	return nil
 }
 
 func GetKeyPackage(ctx context.Context, config *so.Config, keyshareID uuid.UUID) (*pb.KeyPackage, error) {
-	db, err := ent.Open(config.DatabaseDriver(), config.DatabasePath)
-	if err != nil {
-		return nil, err
-	}
-	defer db.Close()
-
-	keyshare, err := db.SigningKeyshare.Get(ctx, keyshareID)
+	keyshare, err := common.GetDbFromContext(ctx).SigningKeyshare.Get(ctx, keyshareID)
 	if err != nil {
 		return nil, err
 	}

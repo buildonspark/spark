@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark-go/common"
 	pb "github.com/lightsparkdev/spark-go/proto"
 	"github.com/lightsparkdev/spark-go/so"
-	"github.com/lightsparkdev/spark-go/so/ent"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
 	"google.golang.org/grpc"
 
@@ -198,7 +198,7 @@ func (s *DkgStates) ReceivedRound2Packages(requestId string, identifier string, 
 	return nil
 }
 
-func (s *DkgStates) ProceedToRound3(requestId string, frostConnection *grpc.ClientConn, config *so.Config) error {
+func (s *DkgStates) ProceedToRound3(ctx context.Context, requestId string, frostConnection *grpc.ClientConn, config *so.Config) error {
 	log.Printf("Checking if we can proceed to round 3 for request id: %s", requestId)
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -216,7 +216,7 @@ func (s *DkgStates) ProceedToRound3(requestId string, frostConnection *grpc.Clie
 		log.Printf("State deleted for request id: %s", requestId)
 		delete(s.states, requestId)
 
-		err := state.Round3(requestId, frostConnection, config)
+		err := state.Round3(ctx, requestId, frostConnection, config)
 		if err != nil {
 			return err
 		}
@@ -224,7 +224,7 @@ func (s *DkgStates) ProceedToRound3(requestId string, frostConnection *grpc.Clie
 	return nil
 }
 
-func (s *DkgState) Round3(requestId string, frostConnection *grpc.ClientConn, config *so.Config) error {
+func (s *DkgState) Round3(ctx context.Context, requestId string, frostConnection *grpc.ClientConn, config *so.Config) error {
 	log.Printf("Round 3")
 	round1PackagesMaps := make([]*pb.PackageMap, len(s.ReceivedRound1Packages))
 	for i, p := range s.ReceivedRound1Packages {
@@ -251,19 +251,14 @@ func (s *DkgState) Round3(requestId string, frostConnection *grpc.ClientConn, co
 		return err
 	}
 
-	dbClient, err := ent.Open(config.DatabaseDriver(), config.DatabasePath)
-	if err != nil {
-		return err
-	}
-	defer dbClient.Close()
-
+	db := common.GetDbFromContext(ctx)
 	for i, key := range response.KeyPackages {
 		batchID, err := uuid.Parse(requestId)
 		if err != nil {
 			return err
 		}
 		keyID := DeriveKeyIndex(batchID, uint16(i))
-		dbClient.SigningKeyshare.Create().
+		db.SigningKeyshare.Create().
 			SetID(keyID).
 			SetStatus(schema.KeyshareStatusAvailable).
 			SetMinSigners(uint32(s.MinSigners)).

@@ -159,7 +159,7 @@ func (s *DkgServer) Round1Signature(ctx context.Context, req *pb.Round1Signature
 
 	wg.Wait()
 
-	if err := s.state.ProceedToRound3(req.RequestId, s.frostConnection, s.config); err != nil {
+	if err := s.state.ProceedToRound3(ctx, req.RequestId, s.frostConnection, s.config); err != nil {
 		log.Printf("error proceeding to round 3 for request id: %s, error: %v", req.RequestId, err)
 		return nil, err
 	}
@@ -179,7 +179,7 @@ func (s *DkgServer) Round2Packages(ctx context.Context, req *pb.Round2PackagesRe
 		return nil, err
 	}
 
-	if err := s.state.ProceedToRound3(req.RequestId, s.frostConnection, s.config); err != nil {
+	if err := s.state.ProceedToRound3(ctx, req.RequestId, s.frostConnection, s.config); err != nil {
 		return nil, err
 	}
 

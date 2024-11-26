@@ -73,7 +73,7 @@ func (s *SparkServer) GenerateDepositAddress(ctx context.Context, req *pb.Genera
 		return nil, err
 	}
 
-	_, err = ent_utils.LinkKeyshareToDepositAddress(ctx, s.config, keyshare.ID, *depositAddress)
+	_, err = common.GetDbFromContext(ctx).DepositAddress.Create().SetSigningKeyshareID(keyshare.ID).SetAddress(*depositAddress).Save(ctx)
 	if err != nil {
 		log.Printf("Failed to link keyshare to deposit address: %v", err)
 		return nil, err
@@ -96,6 +96,6 @@ func (s *SparkServer) GenerateDepositAddress(ctx context.Context, req *pb.Genera
 		return nil, err
 	}
 
-	log.Printf("Generated deposit address: %s", depositAddress)
+	log.Printf("Generated deposit address: %s", *depositAddress)
 	return &pb.GenerateDepositAddressResponse{Address: *depositAddress}, nil
 }
