@@ -112,7 +112,10 @@ pub fn frost_signature_shares_from_proto(
         .collect()
 }
 
-pub fn frost_key_package_from_proto(key_package: &KeyPackage) -> Result<FrostKeyPackage, String> {
+pub fn frost_key_package_from_proto(
+    key_package: &KeyPackage,
+    identifier_override: Option<Identifier>,
+) -> Result<FrostKeyPackage, String> {
     let signing_share = SigningShare::deserialize(
         key_package
             .secret_share
@@ -142,7 +145,8 @@ pub fn frost_key_package_from_proto(key_package: &KeyPackage) -> Result<FrostKey
     )
     .map_err(|e| e.to_string())?;
 
-    let identifier = hex_string_to_identifier(&key_package.identifier)?;
+    let identifier =
+        identifier_override.unwrap_or(hex_string_to_identifier(&key_package.identifier)?);
 
     let result = FrostKeyPackage::new(
         identifier,

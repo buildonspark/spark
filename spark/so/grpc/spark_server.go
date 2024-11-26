@@ -44,7 +44,7 @@ func (s *SparkServer) GenerateDepositAddress(ctx context.Context, req *pb.Genera
 	}
 
 	selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
-	_, err = helper.ExecuteTaskWithAllOperators(ctx, s.config, selection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
+	_, err = helper.ExecuteTaskWithAllOperators(ctx, s.config, &selection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
 		conn, err := common.NewGRPCConnection(operator.Address)
 		if err != nil {
 			log.Printf("Failed to connect to operator: %v", err)
@@ -79,7 +79,7 @@ func (s *SparkServer) GenerateDepositAddress(ctx context.Context, req *pb.Genera
 		return nil, err
 	}
 
-	_, err = helper.ExecuteTaskWithAllOperators(ctx, s.config, selection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
+	_, err = helper.ExecuteTaskWithAllOperators(ctx, s.config, &selection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
 		conn, err := common.NewGRPCConnection(operator.Address)
 		if err != nil {
 			log.Printf("Failed to connect to operator: %v", err)

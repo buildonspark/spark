@@ -23,6 +23,8 @@ const (
 type OperatorSelection struct {
 	Option    OperatorSelectionOption
 	Threshold int
+
+	operatorList *[]*so.SigningOperator
 }
 
 func (o OperatorSelection) OperatorCount(config *so.Config) int {
@@ -38,14 +40,18 @@ func (o OperatorSelection) OperatorCount(config *so.Config) int {
 	return 0
 }
 
-func (o OperatorSelection) OperatorList(config *so.Config) ([]*so.SigningOperator, error) {
+func (o *OperatorSelection) OperatorList(config *so.Config) ([]*so.SigningOperator, error) {
+	if o.operatorList != nil {
+		return *o.operatorList, nil
+	}
+
 	switch o.Option {
 	case OperatorSelectionOptionAll:
 		operators := make([]*so.SigningOperator, 0, len(config.SigningOperatorMap))
 		for _, operator := range config.SigningOperatorMap {
 			operators = append(operators, operator)
 		}
-		return operators, nil
+		o.operatorList = &operators
 	case OperatorSelectionOptionExcludeSelf:
 		operators := make([]*so.SigningOperator, 0, len(config.SigningOperatorMap)-1)
 		for _, operator := range config.SigningOperatorMap {
@@ -53,11 +59,11 @@ func (o OperatorSelection) OperatorList(config *so.Config) ([]*so.SigningOperato
 				operators = append(operators, operator)
 			}
 		}
-		return operators, nil
+		o.operatorList = &operators
 	case OperatorSelectionOptionThreshold:
 		operators := make([]*so.SigningOperator, 0, o.Threshold)
 		// Create a random array of indices
-		indices := make([]string, len(config.SigningOperatorMap))
+		indices := make([]string, 0)
 		for key, _ := range config.SigningOperatorMap {
 			indices = append(indices, key)
 		}
@@ -74,10 +80,14 @@ func (o OperatorSelection) OperatorList(config *so.Config) ([]*so.SigningOperato
 		for _, index := range indices {
 			operators = append(operators, config.SigningOperatorMap[index])
 		}
-		return operators, nil
+		o.operatorList = &operators
 	}
 
-	return nil, errors.New("invalid operator selection option")
+	if o.operatorList == nil {
+		return nil, errors.New("invalid operator selection option")
+	}
+
+	return *o.operatorList, nil
 }
 
 type TaskResult[V any] struct {
@@ -90,7 +100,7 @@ type TaskResult[V any] struct {
 // If includeSelf is true, the task will also be executed with the current operator.
 // This will run goroutines for each operator and wait for all of them to complete before returning.
 // It returns an error if any of the tasks fail.
-func ExecuteTaskWithAllOperators[V any](ctx context.Context, config *so.Config, selection OperatorSelection, task func(ctx context.Context, operator *so.SigningOperator) (V, error)) (map[string]V, error) {
+func ExecuteTaskWithAllOperators[V any](ctx context.Context, config *so.Config, selection *OperatorSelection, task func(ctx context.Context, operator *so.SigningOperator) (V, error)) (map[string]V, error) {
 	wg := sync.WaitGroup{}
 	results := make(chan TaskResult[V], selection.OperatorCount(config))
 

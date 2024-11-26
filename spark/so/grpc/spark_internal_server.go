@@ -115,6 +115,7 @@ func (s *SparkInternalServer) FrostRound1(ctx context.Context, req *pb.FrostRoun
 }
 
 func (s *SparkInternalServer) FrostRound2(ctx context.Context, req *pb.FrostRound2Request) (*pb.FrostRound2Response, error) {
+	log.Printf("Round2 request received for operator: %s", req)
 	keyshareID, err := uuid.Parse(req.KeyshareId)
 	if err != nil {
 		log.Printf("Failed to parse keyshare ID: %v", err)

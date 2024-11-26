@@ -244,6 +244,7 @@ impl FrostService for FrostServer {
             &req.key_package
                 .clone()
                 .ok_or(Status::internal("Key package is required"))?,
+            None,
         )
         .map_err(|e| Status::internal(format!("Failed to parse key package: {:?}", e)))?;
 
@@ -271,6 +272,7 @@ impl FrostService for FrostServer {
         &self,
         request: Request<SignFrostRequest>,
     ) -> Result<Response<SignFrostResponse>, Status> {
+        tracing::info!("Received frost sign request");
         let req = request.get_ref();
 
         let mut commitments =
@@ -294,6 +296,7 @@ impl FrostService for FrostServer {
             None => return Err(Status::internal("User commitments are required")),
         };
         commitments.insert(user_identifier, user_commitments);
+        tracing::debug!("There are {} commitments", commitments.len());
 
         let nonce = match &req.nonce {
             Some(nonce) => frost_nonce_from_proto(nonce)
@@ -304,13 +307,20 @@ impl FrostService for FrostServer {
         let verifying_key = verifying_key_from_bytes(req.verifying_key.clone())
             .map_err(|e| Status::internal(format!("Failed to parse verifying key: {:?}", e)))?;
 
+        let identifier_override = match req.role {
+            0 => None,
+            1 => Some(user_identifier),
+            _ => return Err(Status::invalid_argument("Invalid signing role")),
+        };
+
         let key_package = match &req.key_package {
-            Some(key_package) => frost_key_package_from_proto(key_package)
+            Some(key_package) => frost_key_package_from_proto(key_package, identifier_override)
                 .map_err(|e| Status::internal(format!("Failed to parse key package: {:?}", e)))?,
             None => return Err(Status::internal("Key package is required")),
         };
 
         let signing_package = frost_build_signin_package(commitments, &req.message);
+        tracing::info!("Building signing package completed");
         let signature_share = frost_secp256k1_tr::round2::sign_spark(
             &signing_package,
             &nonce,
@@ -321,6 +331,7 @@ impl FrostService for FrostServer {
             &verifying_key,
         )
         .map_err(|e| Status::internal(format!("Failed to sign frost: {:?}", e)))?;
+        tracing::info!("Signing frost completed");
 
         Ok(Response::new(SignFrostResponse {
             signature_share: signature_share.serialize().to_vec(),
