@@ -7,18 +7,27 @@ import (
 	"entgo.io/ent/schema/index"
 )
 
+// TreeNodeStatus is the status of a tree node.
 type TreeNodeStatus string
 
 const (
-	TreeNodeStatusAvailable      TreeNodeStatus = "AVAILABLE"
+	// TreeNodeStatusAvailable is the status of a tree node that is available.
+	TreeNodeStatusAvailable TreeNodeStatus = "AVAILABLE"
+	// TreeNodeStatusFrozenByIssuer is the status of a tree node that is frozen by the issuer.
 	TreeNodeStatusFrozenByIssuer TreeNodeStatus = "FROZEN_BY_ISSUER"
+	// TreeNodeStatusTransferLocked is the status of a tree node that is transfer locked.
 	TreeNodeStatusTransferLocked TreeNodeStatus = "TRANSFER_LOCKED"
-	TreeNodeStatusSplitLocked    TreeNodeStatus = "SPLIT_LOCKED"
-	TreeNodeStatusSplitted       TreeNodeStatus = "SPLITTED"
-	TreeNodeStatusAggregated     TreeNodeStatus = "AGGREGATED"
-	TreeNodeStatusOnChain        TreeNodeStatus = "ON_CHAIN"
+	// TreeNodeStatusSplitLocked is the status of a tree node that is split locked.
+	TreeNodeStatusSplitLocked TreeNodeStatus = "SPLIT_LOCKED"
+	// TreeNodeStatusSplitted is the status of a tree node that is splitted.
+	TreeNodeStatusSplitted TreeNodeStatus = "SPLITTED"
+	// TreeNodeStatusAggregated is the status of a tree node that is aggregated, this is a terminal state.
+	TreeNodeStatusAggregated TreeNodeStatus = "AGGREGATED"
+	// TreeNodeStatusOnChain is the status of a tree node that is on chain, this is a terminal state.
+	TreeNodeStatusOnChain TreeNodeStatus = "ON_CHAIN"
 )
 
+// Values returns the values of the tree node status.
 func (TreeNodeStatus) Values() []string {
 	return []string{
 		string(TreeNodeStatusAvailable),
@@ -31,16 +40,19 @@ func (TreeNodeStatus) Values() []string {
 	}
 }
 
+// TreeNode is the schema for the tree nodes table.
 type TreeNode struct {
 	ent.Schema
 }
 
+// Mixin is the mixin for the tree nodes table.
 func (TreeNode) Mixin() []ent.Mixin {
 	return []ent.Mixin{
 		BaseMixin{},
 	}
 }
 
+// Fields are the fields for the tree nodes table.
 func (TreeNode) Fields() []ent.Field {
 	return []ent.Field{
 		field.Uint64("value_sats").Immutable(),
@@ -51,6 +63,7 @@ func (TreeNode) Fields() []ent.Field {
 	}
 }
 
+// Edges are the edges for the tree nodes table.
 func (TreeNode) Edges() []ent.Edge {
 	return []ent.Edge{
 		edge.To("tree", Tree.Type).
@@ -65,6 +78,7 @@ func (TreeNode) Edges() []ent.Edge {
 	}
 }
 
+// Indexes are the indexes for the tree nodes table.
 func (TreeNode) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Edges("parent"),

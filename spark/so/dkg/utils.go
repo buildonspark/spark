@@ -102,8 +102,8 @@ func signRound2Packages(privateKey []byte, round2Packages [][]byte) ([]byte, err
 	return signHash(privateKey, hash)
 }
 
-func deriveKeyIndex(batchId uuid.UUID, index uint16) uuid.UUID {
-	derivedID := batchId
+func deriveKeyIndex(batchID uuid.UUID, index uint16) uuid.UUID {
+	derivedID := batchID
 	// Write the index to the last 2 bytes
 	binary.BigEndian.PutUint16(derivedID[14:], index)
 	return derivedID

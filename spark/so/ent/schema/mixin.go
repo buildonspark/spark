@@ -9,10 +9,12 @@ import (
 	"github.com/google/uuid"
 )
 
+// BaseMixin is the mixin for the base schema.
 type BaseMixin struct {
 	mixin.Schema
 }
 
+// Fields are the fields for the base schema.
 func (BaseMixin) Fields() []ent.Field {
 	return []ent.Field{
 		field.UUID("id", uuid.UUID{}).

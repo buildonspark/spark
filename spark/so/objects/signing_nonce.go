@@ -99,6 +99,7 @@ func (n *SigningCommitment) UnmarshalBinary(data []byte) error {
 	return nil
 }
 
+// Key returns the key for a map for the SigningCommitment.
 func (n *SigningCommitment) Key() [66]byte {
 	return [66]byte(n.MarshalBinary())
 }

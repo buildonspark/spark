@@ -1,4 +1,4 @@
-package ent_utils
+package entutils
 
 import (
 	"context"
@@ -66,6 +66,7 @@ func MarkSigningKeysharesAsUsed(ctx context.Context, config *so.Config, ids []uu
 	return nil
 }
 
+// GetKeyPackage returns the key package for the given keyshare ID.
 func GetKeyPackage(ctx context.Context, config *so.Config, keyshareID uuid.UUID) (*pb.KeyPackage, error) {
 	keyshare, err := common.GetDbFromContext(ctx).SigningKeyshare.Get(ctx, keyshareID)
 	if err != nil {
@@ -83,6 +84,7 @@ func GetKeyPackage(ctx context.Context, config *so.Config, keyshareID uuid.UUID)
 	return keyPackage, nil
 }
 
+// GetKeyPackages returns the key packages for the given keyshare IDs.
 func GetKeyPackages(ctx context.Context, config *so.Config, keyshareIDs []uuid.UUID) (map[uuid.UUID]*pb.KeyPackage, error) {
 	keyshares, err := common.GetDbFromContext(ctx).SigningKeyshare.Query().Where(
 		signingkeyshare.IDIn(keyshareIDs...),

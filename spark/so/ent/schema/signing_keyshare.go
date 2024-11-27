@@ -6,13 +6,17 @@ import (
 	"entgo.io/ent/schema/index"
 )
 
+// SigningKeyshareStatus is the status of a signing keyshare.
 type SigningKeyshareStatus string
 
 const (
+	// KeyshareStatusAvailable is the status of a signing keyshare that is available.
 	KeyshareStatusAvailable SigningKeyshareStatus = "AVAILABLE"
-	KeyshareStatusInUse     SigningKeyshareStatus = "IN_USE"
+	// KeyshareStatusInUse is the status of a signing keyshare that is in use.
+	KeyshareStatusInUse SigningKeyshareStatus = "IN_USE"
 )
 
+// Values returns the values of the signing keyshare status.
 func (SigningKeyshareStatus) Values() []string {
 	return []string{
 		string(KeyshareStatusAvailable),
@@ -25,19 +29,21 @@ type SigningKeyshare struct {
 	ent.Schema
 }
 
+// Mixin is the mixin for the signing keyshares table.
 func (SigningKeyshare) Mixin() []ent.Mixin {
 	return []ent.Mixin{
 		BaseMixin{},
 	}
 }
 
+// Indexes are the indexes for the signing keyshares table.
 func (SigningKeyshare) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("coordinator_index"),
 	}
 }
 
-// Fields of the SigningKeyshare.
+// Fields are the fields for the signing keyshares table.
 func (SigningKeyshare) Fields() []ent.Field {
 	return []ent.Field{
 		field.Enum("status").
@@ -50,7 +56,7 @@ func (SigningKeyshare) Fields() []ent.Field {
 	}
 }
 
-// Edges of the SigningKeyshare.
+// Edges are the edges for the signing keyshares table.
 func (SigningKeyshare) Edges() []ent.Edge {
 	return nil
 }

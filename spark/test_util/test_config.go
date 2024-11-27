@@ -48,6 +48,7 @@ func findLatestRun(dirPath string) (int, error) {
 	return maxNum, nil
 }
 
+// TestConfig returns a test configuration that can be used for testing.
 func TestConfig() (*so.Config, error) {
 	identityPrivateKeyBytes, err := hex.DecodeString("5eaae81bcf1fd43fbb92432b82dbafc8273bb3287b42cb4cf3c851fcee2212a5")
 	if err != nil {

@@ -12,21 +12,31 @@ import (
 	"github.com/lightsparkdev/spark-go/so"
 )
 
+// OperatorSelectionOption is the option for selecting operators.
 type OperatorSelectionOption int
 
 const (
+	// OperatorSelectionOptionAll selects all operators.
 	OperatorSelectionOptionAll OperatorSelectionOption = iota
+	// OperatorSelectionOptionExcludeSelf selects all operators except the current operator.
 	OperatorSelectionOptionExcludeSelf
+	// OperatorSelectionOptionThreshold selects a random subset of operators with the given threshold.
 	OperatorSelectionOptionThreshold
 )
 
+// OperatorSelection is the selection of operators.
+// It will return a list of operators based on the option and threshold.
+// The list it returns will be the same for the same OperatorSelection object.
 type OperatorSelection struct {
-	Option    OperatorSelectionOption
+	// Option is the option for selecting operators.
+	Option OperatorSelectionOption
+	// Threshold is the threshold for selecting operators.
 	Threshold int
 
 	operatorList *[]*so.SigningOperator
 }
 
+// OperatorCount returns the number of operators based on the option.
 func (o OperatorSelection) OperatorCount(config *so.Config) int {
 	switch o.Option {
 	case OperatorSelectionOptionAll:
@@ -40,6 +50,8 @@ func (o OperatorSelection) OperatorCount(config *so.Config) int {
 	return 0
 }
 
+// OperatorList returns the list of operators based on the option.
+// Lazily creates the list of operators and stores it in the OperatorSelection object.
 func (o *OperatorSelection) OperatorList(config *so.Config) ([]*so.SigningOperator, error) {
 	if o.operatorList != nil {
 		return *o.operatorList, nil
@@ -64,7 +76,7 @@ func (o *OperatorSelection) OperatorList(config *so.Config) ([]*so.SigningOperat
 		operators := make([]*so.SigningOperator, 0, o.Threshold)
 		// Create a random array of indices
 		indices := make([]string, 0)
-		for key, _ := range config.SigningOperatorMap {
+		for key := range config.SigningOperatorMap {
 			indices = append(indices, key)
 		}
 		// Fisher-Yates shuffle
@@ -90,14 +102,17 @@ func (o *OperatorSelection) OperatorList(config *so.Config) ([]*so.SigningOperat
 	return *o.operatorList, nil
 }
 
+// TaskResult is the result of a task.
 type TaskResult[V any] struct {
+	// OperatorIdentifier is the identifier of the operator that executed the task.
 	OperatorIdentifier string
-	Result             V
-	Error              error
+	// Result is the result of the task.
+	Result V
+	// Error is the error that occurred during the task.
+	Error error
 }
 
-// ExecuteTaskWithAllOperators executes the given task with all operators.
-// If includeSelf is true, the task will also be executed with the current operator.
+// ExecuteTaskWithAllOperators executes the given task with a list of operators.
 // This will run goroutines for each operator and wait for all of them to complete before returning.
 // It returns an error if any of the tasks fail.
 func ExecuteTaskWithAllOperators[V any](ctx context.Context, config *so.Config, selection *OperatorSelection, task func(ctx context.Context, operator *so.SigningOperator) (V, error)) (map[string]V, error) {

@@ -8,20 +8,25 @@ import (
 	"github.com/lightsparkdev/spark-go/common"
 	pb "github.com/lightsparkdev/spark-go/proto"
 	"github.com/lightsparkdev/spark-go/so"
-	"github.com/lightsparkdev/spark-go/so/ent_utils"
+	"github.com/lightsparkdev/spark-go/so/entutils"
 	"github.com/lightsparkdev/spark-go/so/objects"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
+// SparkInternalServer is the grpc server for internal spark services.
+// This server is only used by the operator.
 type SparkInternalServer struct {
 	pb.UnimplementedSparkInternalServiceServer
 	config *so.Config
 }
 
+// NewSparkInternalServer creates a new SparkInternalServer.
 func NewSparkInternalServer(config *so.Config) *SparkInternalServer {
 	return &SparkInternalServer{config: config}
 }
 
+// MarkKeysharesAsUsed marks the keyshares as used.
+// It will return an error if the key is not found or the key is already used.
 func (s *SparkInternalServer) MarkKeysharesAsUsed(ctx context.Context, req *pb.MarkKeysharesAsUsedRequest) (*emptypb.Empty, error) {
 	log.Printf("Marking keyshares as used: %v", req.KeyshareId)
 	ids := make([]uuid.UUID, len(req.KeyshareId))
@@ -33,7 +38,7 @@ func (s *SparkInternalServer) MarkKeysharesAsUsed(ctx context.Context, req *pb.M
 		}
 		ids[i] = uuid
 	}
-	err := ent_utils.MarkSigningKeysharesAsUsed(ctx, s.config, ids)
+	err := entutils.MarkSigningKeysharesAsUsed(ctx, s.config, ids)
 	if err != nil {
 		log.Printf("Failed to mark keyshares as used: %v", err)
 		return nil, err
@@ -44,6 +49,7 @@ func (s *SparkInternalServer) MarkKeysharesAsUsed(ctx context.Context, req *pb.M
 	return &emptypb.Empty{}, nil
 }
 
+// MarkKeyshareForDepositAddress links the keyshare to a deposit address.
 func (s *SparkInternalServer) MarkKeyshareForDepositAddress(ctx context.Context, req *pb.MarkKeyshareForDepositAddressRequest) (*emptypb.Empty, error) {
 	log.Printf("Marking keyshare for deposit address: %v", req.KeyshareId)
 
@@ -67,6 +73,7 @@ func (s *SparkInternalServer) MarkKeyshareForDepositAddress(ctx context.Context,
 	return &emptypb.Empty{}, nil
 }
 
+// FrostRound1 handles the FROST nonce generation.
 func (s *SparkInternalServer) FrostRound1(ctx context.Context, req *pb.FrostRound1Request) (*pb.FrostRound1Response, error) {
 	uuids := make([]uuid.UUID, len(req.KeyshareIds))
 	for i, id := range req.KeyshareIds {
@@ -78,7 +85,7 @@ func (s *SparkInternalServer) FrostRound1(ctx context.Context, req *pb.FrostRoun
 		uuids[i] = uuid
 	}
 
-	keyPackages, err := ent_utils.GetKeyPackages(ctx, s.config, uuids)
+	keyPackages, err := entutils.GetKeyPackages(ctx, s.config, uuids)
 	if err != nil {
 		log.Printf("Failed to get key packages: %v", err)
 		return nil, err
@@ -118,7 +125,7 @@ func (s *SparkInternalServer) FrostRound1(ctx context.Context, req *pb.FrostRoun
 			return nil, err
 		}
 
-		err = ent_utils.StoreSigningNonce(ctx, s.config, nonce, commitment)
+		err = entutils.StoreSigningNonce(ctx, s.config, nonce, commitment)
 		if err != nil {
 			log.Printf("Failed to store signing nonce: %v", err)
 			return nil, err
@@ -135,6 +142,7 @@ func (s *SparkInternalServer) FrostRound1(ctx context.Context, req *pb.FrostRoun
 	}, nil
 }
 
+// FrostRound2 handles FROST signing.
 func (s *SparkInternalServer) FrostRound2(ctx context.Context, req *pb.FrostRound2Request) (*pb.FrostRound2Response, error) {
 	log.Printf("Round2 request received for operator: %s", req)
 
@@ -149,7 +157,7 @@ func (s *SparkInternalServer) FrostRound2(ctx context.Context, req *pb.FrostRoun
 		uuids[i] = uuid
 	}
 
-	keyPackages, err := ent_utils.GetKeyPackages(ctx, s.config, uuids)
+	keyPackages, err := entutils.GetKeyPackages(ctx, s.config, uuids)
 	if err != nil {
 		log.Printf("Failed to get key packages: %v", err)
 		return nil, err
@@ -165,7 +173,7 @@ func (s *SparkInternalServer) FrostRound2(ctx context.Context, req *pb.FrostRoun
 			return nil, err
 		}
 	}
-	nonces, err := ent_utils.GetSigningNonces(ctx, s.config, commitments)
+	nonces, err := entutils.GetSigningNonces(ctx, s.config, commitments)
 	if err != nil {
 		log.Printf("Failed to get signing nonces: %v", err)
 		return nil, err

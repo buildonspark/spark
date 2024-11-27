@@ -15,14 +15,16 @@ import (
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
 	"google.golang.org/grpc"
 
+	// Import the sqlite driver
 	_ "github.com/mattn/go-sqlite3"
 )
 
-type DkgStateType int
+// StateType is the name for each different state of the DKG state machine.
+type StateType int
 
 const (
 	// Initial state when DKG process starts
-	Initial DkgStateType = iota
+	Initial StateType = iota
 	// Round1 state after receiving round 1 packages
 	Round1
 	// Round1Signature state after receiving round 1 signatures
@@ -31,52 +33,67 @@ const (
 	Round2
 )
 
-type DkgState struct {
-	Type                   DkgStateType
-	MaxSigners             uint64
-	MinSigners             uint64
-	CoordinatorIndex       uint64
-	Round1Package          [][]byte
+// State is the state machine for the DKG protocol.
+type State struct {
+	// Type is the current state of the DKG state machine.
+	Type StateType
+	// MaxSigners is the maximum number of signers.
+	MaxSigners uint64
+	// MinSigners is the minimum number of signers.
+	MinSigners uint64
+	// CoordinatorIndex is the index of the coordinator.
+	CoordinatorIndex uint64
+	// Round1Package is the round 1 package.
+	Round1Package [][]byte
+	// ReceivedRound1Packages is the round 1 packages received from other operators.
 	ReceivedRound1Packages []map[string][]byte
+	// ReceivedRound2Packages is the round 2 packages received from other operators.
 	ReceivedRound2Packages []map[string][]byte
-	CreatedAt              time.Time
+	// CreatedAt is the time when the DKG state was created.
+	CreatedAt time.Time
 }
 
-type DkgStates struct {
+// States is a collection of DKG states with a mutex for concurrent access.
+type States struct {
 	mu     sync.RWMutex
-	states map[string]*DkgState
+	states map[string]*State
 }
 
-func NewDkgStates() *DkgStates {
-	return &DkgStates{
-		states: make(map[string]*DkgState),
+// NewStates creates a new DKG states collection.
+func NewStates() *States {
+	return &States{
+		states: make(map[string]*State),
 	}
 }
 
-func (s *DkgStates) GetState(requestId string) (*DkgState, error) {
+// GetState returns the DKG state for the given request id.
+// If the state does not exist, it returns an error.
+func (s *States) GetState(requestID string) (*State, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	state, ok := s.states[requestId]
+	state, ok := s.states[requestID]
 	if !ok {
-		return nil, fmt.Errorf("dkg state does not exist for request id: %s", requestId)
+		return nil, fmt.Errorf("dkg state does not exist for request id: %s", requestID)
 	}
 
 	return state, nil
 }
 
-func (s *DkgStates) InitiateDkg(requestId string, maxSigners uint64, minSigners uint64, coordinatorIndex uint64) error {
+// InitiateDkg initializes a new DKG state for the given request id.
+// If the state already exists, it returns an error.
+func (s *States) InitiateDkg(requestID string, maxSigners uint64, minSigners uint64, coordinatorIndex uint64) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if _, ok := s.states[requestId]; ok {
-		return fmt.Errorf("dkg state already exists for request id: %s", requestId)
+	if _, ok := s.states[requestID]; ok {
+		return fmt.Errorf("dkg state already exists for request id: %s", requestID)
 	}
 
 	if s.states == nil {
-		s.states = make(map[string]*DkgState)
+		s.states = make(map[string]*State)
 	}
 
-	s.states[requestId] = &DkgState{
+	s.states[requestID] = &State{
 		Type:             Initial,
 		MaxSigners:       maxSigners,
 		MinSigners:       minSigners,
@@ -87,98 +104,106 @@ func (s *DkgStates) InitiateDkg(requestId string, maxSigners uint64, minSigners 
 	return nil
 }
 
-func (s *DkgStates) ProvideRound1Package(requestId string, round1Package [][]byte) error {
+// ProvideRound1Package provides the round 1 package for the given request id.
+// If the state is not in the initial state, it returns an error.
+func (s *States) ProvideRound1Package(requestID string, round1Package [][]byte) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	state, ok := s.states[requestId]
+	state, ok := s.states[requestID]
 	if !ok {
-		return fmt.Errorf("dkg state does not exist for request id: %s", requestId)
+		return fmt.Errorf("dkg state does not exist for request id: %s", requestID)
 	}
 
 	if state.Type != Initial {
-		return fmt.Errorf("dkg state is not in initial state for request id: %s", requestId)
+		return fmt.Errorf("dkg state is not in initial state for request id: %s", requestID)
 	}
 
 	state.Round1Package = round1Package
 	state.Type = Round1
-	s.states[requestId] = state
+	s.states[requestID] = state
 	return nil
 }
 
-func (s *DkgStates) ReceivedRound1Packages(requestId string, selfIdentifier string, round1Packages []map[string][]byte) error {
+// ReceivedRound1Packages receives the round 1 packages from other operators.
+// If the state is not in the round 1 state, it returns an error.
+func (s *States) ReceivedRound1Packages(requestID string, selfIdentifier string, round1Packages []map[string][]byte) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	state, ok := s.states[requestId]
+	state, ok := s.states[requestID]
 	if !ok {
-		return fmt.Errorf("dkg state does not exist for request id: %s", requestId)
+		return fmt.Errorf("dkg state does not exist for request id: %s", requestID)
 	}
 
 	if state.Type != Round1 {
-		return fmt.Errorf("dkg state is not in round 1 state for request id: %s", requestId)
+		return fmt.Errorf("dkg state is not in round 1 state for request id: %s", requestID)
 	}
 
 	if len(round1Packages) != len(state.Round1Package) {
-		return fmt.Errorf("received round 1 packages has wrong number of keys for request id: %s", requestId)
+		return fmt.Errorf("received round 1 packages has wrong number of keys for request id: %s", requestID)
 	}
 
 	for i, p := range round1Packages {
 		selfPackage, ok := p[selfIdentifier]
 		if !ok {
-			return fmt.Errorf("self package is not included in round 1 packages for request id: %s", requestId)
+			return fmt.Errorf("self package is not included in round 1 packages for request id: %s", requestID)
 		}
 
 		if !bytes.Equal(state.Round1Package[i], selfPackage) {
-			return fmt.Errorf("round 1 package %d is not the same as the self package for request id: %s", i, requestId)
+			return fmt.Errorf("round 1 package %d is not the same as the self package for request id: %s", i, requestID)
 		}
 	}
 
 	state.Type = Round1Signature
 	state.ReceivedRound1Packages = round1Packages
-	s.states[requestId] = state
+	s.states[requestID] = state
 	return nil
 }
 
-func (s *DkgStates) ReceivedRound1Signature(requestId string, selfIdentifier string, round1Signatures map[string][]byte, operatorMap map[string]*so.SigningOperator) ([]string, error) {
+// ReceivedRound1Signature receives the round 1 signatures from other operators.
+// If the state is not in the round 1 signature state, it returns an error.
+func (s *States) ReceivedRound1Signature(requestID string, selfIdentifier string, round1Signatures map[string][]byte, operatorMap map[string]*so.SigningOperator) ([]string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	state, ok := s.states[requestId]
+	state, ok := s.states[requestID]
 	if !ok {
-		return nil, fmt.Errorf("dkg state does not exist for request id: %s", requestId)
+		return nil, fmt.Errorf("dkg state does not exist for request id: %s", requestID)
 	}
 
 	if state.Type != Round1Signature {
-		return nil, fmt.Errorf("dkg state is not in round 1 signature state for request id: %s", requestId)
+		return nil, fmt.Errorf("dkg state is not in round 1 signature state for request id: %s", requestID)
 	}
 
 	valid, validationFailures := validateRound1Signature(state.ReceivedRound1Packages, round1Signatures, operatorMap)
 	if !valid {
 		// Abort the DKG process
-		log.Printf("State deleted for request id: %s by validation failures", requestId)
-		delete(s.states, requestId)
+		log.Printf("State deleted for request id: %s by validation failures", requestID)
+		delete(s.states, requestID)
 
 		return validationFailures, nil
 	}
 
 	state.Type = Round2
-	s.states[requestId] = state
+	s.states[requestID] = state
 
 	return nil, nil
 }
 
-func (s *DkgStates) ReceivedRound2Packages(requestId string, identifier string, round2Packages [][]byte, round2Signature []byte, frostConnection *grpc.ClientConn, config *so.Config) error {
+// ReceivedRound2Packages receives the round 2 packages from other operators.
+// If the state is not in the round 1 signature or round 2 state, it returns an error.
+func (s *States) ReceivedRound2Packages(requestID string, identifier string, round2Packages [][]byte, round2Signature []byte, frostConnection *grpc.ClientConn, config *so.Config) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	state, ok := s.states[requestId]
+	state, ok := s.states[requestID]
 	if !ok {
-		return fmt.Errorf("dkg state does not exist for request id: %s", requestId)
+		return fmt.Errorf("dkg state does not exist for request id: %s", requestID)
 	}
 
 	if state.Type != Round2 && state.Type != Round1Signature {
-		return fmt.Errorf("dkg state is not in round 2 or round 1 signature state for request id: %s", requestId)
+		return fmt.Errorf("dkg state is not in round 2 or round 1 signature state for request id: %s", requestID)
 	}
 
 	if len(state.ReceivedRound2Packages) == 0 {
@@ -193,17 +218,20 @@ func (s *DkgStates) ReceivedRound2Packages(requestId string, identifier string, 
 		state.ReceivedRound2Packages[i][identifier] = p
 	}
 
-	log.Printf("Received round 2 packages: %v, for request id: %s", len(state.ReceivedRound2Packages[0]), requestId)
-	s.states[requestId] = state
+	log.Printf("Received round 2 packages: %v, for request id: %s", len(state.ReceivedRound2Packages[0]), requestID)
+	s.states[requestID] = state
 	return nil
 }
 
-func (s *DkgStates) ProceedToRound3(ctx context.Context, requestId string, frostConnection *grpc.ClientConn, config *so.Config) error {
-	log.Printf("Checking if we can proceed to round 3 for request id: %s", requestId)
+// ProceedToRound3 checks if we can proceed to round 3 for the given request id.
+// We can proceed to round 3 if we have received the round 2 packages from all operators as well as we got our own round 2 package.
+// If we can, it will perform the round 3.
+func (s *States) ProceedToRound3(ctx context.Context, requestID string, frostConnection *grpc.ClientConn, config *so.Config) error {
+	log.Printf("Checking if we can proceed to round 3 for request id: %s", requestID)
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	state, ok := s.states[requestId]
+	state, ok := s.states[requestID]
 	if !ok {
 		// This call might be called twice per state. So this should not count as an error.
 		return nil
@@ -213,10 +241,10 @@ func (s *DkgStates) ProceedToRound3(ctx context.Context, requestId string, frost
 		return nil
 	}
 	if int64(len(state.ReceivedRound2Packages[0])) == int64(state.MaxSigners-1) && state.Type == Round2 {
-		log.Printf("State deleted for request id: %s", requestId)
-		delete(s.states, requestId)
+		log.Printf("State deleted for request id: %s", requestID)
+		delete(s.states, requestID)
 
-		err := state.Round3(ctx, requestId, frostConnection, config)
+		err := state.Round3(ctx, requestID, frostConnection, config)
 		if err != nil {
 			return err
 		}
@@ -224,7 +252,9 @@ func (s *DkgStates) ProceedToRound3(ctx context.Context, requestId string, frost
 	return nil
 }
 
-func (s *DkgState) Round3(ctx context.Context, requestId string, frostConnection *grpc.ClientConn, config *so.Config) error {
+// Round3 performs the round 3 of the DKG protocol.
+// This will generate the keyshares and store them in the database.
+func (s *State) Round3(ctx context.Context, requestID string, frostConnection *grpc.ClientConn, config *so.Config) error {
 	log.Printf("Round 3")
 	round1PackagesMaps := make([]*pb.PackageMap, len(s.ReceivedRound1Packages))
 	for i, p := range s.ReceivedRound1Packages {
@@ -242,7 +272,7 @@ func (s *DkgState) Round3(ctx context.Context, requestId string, frostConnection
 
 	frostClient := pb.NewFrostServiceClient(frostConnection)
 	response, err := frostClient.DkgRound3(context.Background(), &pb.DkgRound3Request{
-		RequestId:          requestId,
+		RequestId:          requestID,
 		Round1PackagesMaps: round1PackagesMaps,
 		Round2PackagesMaps: round2PackagesMaps,
 	})
@@ -253,7 +283,7 @@ func (s *DkgState) Round3(ctx context.Context, requestId string, frostConnection
 
 	db := common.GetDbFromContext(ctx)
 	for i, key := range response.KeyPackages {
-		batchID, err := uuid.Parse(requestId)
+		batchID, err := uuid.Parse(requestID)
 		if err != nil {
 			return err
 		}
@@ -272,12 +302,13 @@ func (s *DkgState) Round3(ctx context.Context, requestId string, frostConnection
 	return nil
 }
 
-func (s *DkgStates) RemoveState(requestId string) {
+// RemoveState removes the DKG state for the given request id.
+func (s *States) RemoveState(requestID string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if _, exists := s.states[requestId]; exists {
-		log.Printf("State deleted for request id: %s by RemoveState", requestId)
-		delete(s.states, requestId)
+	if _, exists := s.states[requestID]; exists {
+		log.Printf("State deleted for request id: %s by RemoveState", requestID)
+		delete(s.states, requestID)
 	}
 }

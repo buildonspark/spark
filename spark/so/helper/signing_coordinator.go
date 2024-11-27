@@ -12,9 +12,13 @@ import (
 	pb "github.com/lightsparkdev/spark-go/proto"
 )
 
+// SigningResult is the result of a signing job.
 type SigningResult struct {
-	JobID              string
-	SignatureShares    map[string][]byte
+	// JobID is the ID of the signing job.
+	JobID string
+	// SignatureShares is the signature shares from all operators.
+	SignatureShares map[string][]byte
+	// SigningCommitments is the signing commitments from all operators.
 	SigningCommitments map[string]objects.SigningCommitment
 }
 
@@ -126,14 +130,21 @@ func frostRound2(
 	return result, nil
 }
 
+// SigningJob is a job for signing.
 type SigningJob struct {
-	JobID             string
+	// JobID is the ID of the signing job.
+	JobID string
+	// SigningKeyshareID is the ID of the keyshare to use for signing.
 	SigningKeyshareID uuid.UUID
-	Message           []byte
-	VerifyingKey      []byte
-	UserCommitment    objects.SigningCommitment
+	// Message is the message to sign.
+	Message []byte
+	// VerifyingKey is the verifying key for the message.
+	VerifyingKey []byte
+	// UserCommitment is the user commitment for the message.
+	UserCommitment objects.SigningCommitment
 }
 
+// SigningKeyshareIDsFromSigningJobs returns the IDs of the keyshares used for signing.
 func SigningKeyshareIDsFromSigningJobs(jobs []*SigningJob) []uuid.UUID {
 	ids := make([]uuid.UUID, len(jobs))
 	for i, job := range jobs {

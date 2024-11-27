@@ -48,13 +48,13 @@ func GenerateKeys(config *so.Config, keyCount uint64) error {
 	}
 
 	// Initiate DKG
-	requestId, err := uuid.NewV7()
+	requestID, err := uuid.NewV7()
 	if err != nil {
 		return err
 	}
-	requestIdString := requestId.String()
+	requestIDString := requestID.String()
 	initRequest := &pb.InitiateDkgRequest{
-		RequestId:        requestIdString,
+		RequestId:        requestIDString,
 		KeyCount:         keyCount,
 		MinSigners:       config.Threshold,
 		MaxSigners:       uint64(len(config.SigningOperatorMap)),
@@ -84,7 +84,7 @@ func GenerateKeys(config *so.Config, keyCount uint64) error {
 
 	for _, client := range clientMap {
 		round1SignatureRequest := &pb.Round1PackagesRequest{
-			RequestId:      requestIdString,
+			RequestId:      requestIDString,
 			Round1Packages: round1Packages,
 		}
 		round1SignatureResponse, err := client.Round1Packages(context.Background(), round1SignatureRequest)
@@ -102,7 +102,7 @@ func GenerateKeys(config *so.Config, keyCount uint64) error {
 		go func(client pb.DKGServiceClient) {
 			defer wg.Done()
 			round1SignatureRequest := &pb.Round1SignatureRequest{
-				RequestId:        requestIdString,
+				RequestId:        requestIDString,
 				Round1Signatures: round1Signatures,
 			}
 			round1SignatureResponse, err := client.Round1Signature(context.Background(), round1SignatureRequest)

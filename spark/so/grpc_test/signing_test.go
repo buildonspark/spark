@@ -7,7 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/common"
 	pb "github.com/lightsparkdev/spark-go/proto"
-	"github.com/lightsparkdev/spark-go/so/ent_utils"
+	"github.com/lightsparkdev/spark-go/so/entutils"
 	"github.com/lightsparkdev/spark-go/so/helper"
 	"github.com/lightsparkdev/spark-go/so/objects"
 	testutil "github.com/lightsparkdev/spark-go/test_util"
@@ -31,7 +31,7 @@ func TestFrostSign(t *testing.T) {
 	msg := []byte("hello")
 
 	// Step 2: Get operator key share
-	operatorKeyShares, err := ent_utils.GetUnusedSigningKeyshares(ctx, config, 1)
+	operatorKeyShares, err := entutils.GetUnusedSigningKeyshares(ctx, config, 1)
 	if err != nil {
 		t.Fatal(err)
 	}

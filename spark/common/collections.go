@@ -14,7 +14,7 @@ func getAny[K comparable, V any](m map[K]V) (K, V) {
 //
 // Example:
 // MapOfArrayToArrayOfMap(map[string][]int{"a": {1, 2}, "b": {3, 4}})
-// Returns: []map[string]int{{"a": 1, "b": 2}, {"a": 2, "b": 4}}
+// Returns: []map[string]int{{"a": 1, "b": 3}, {"a": 2, "b": 4}}
 func MapOfArrayToArrayOfMap[K comparable, V any](mapOfArray map[K][]V) []map[K]V {
 	_, arrObject := getAny(mapOfArray)
 	results := make([]map[K]V, len(arrObject))

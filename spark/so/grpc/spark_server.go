@@ -10,22 +10,26 @@ import (
 	"github.com/lightsparkdev/spark-go/common"
 	pb "github.com/lightsparkdev/spark-go/proto"
 	"github.com/lightsparkdev/spark-go/so"
-	"github.com/lightsparkdev/spark-go/so/ent_utils"
+	"github.com/lightsparkdev/spark-go/so/entutils"
 	"github.com/lightsparkdev/spark-go/so/helper"
 )
 
+// SparkServer is the grpc server for the Spark protocol.
+// It will be used by the user or Spark service provider.
 type SparkServer struct {
 	pb.UnimplementedSparkServiceServer
 	config *so.Config
 }
 
+// NewSparkServer creates a new SparkServer.
 func NewSparkServer(config *so.Config) *SparkServer {
 	return &SparkServer{config: config}
 }
 
+// GenerateDepositAddress generates a deposit address for the given public key.
 func (s *SparkServer) GenerateDepositAddress(ctx context.Context, req *pb.GenerateDepositAddressRequest) (*pb.GenerateDepositAddressResponse, error) {
 	log.Printf("Generating deposit address for public key: %s", hex.EncodeToString(req.SigningPublicKey))
-	keyshares, err := ent_utils.GetUnusedSigningKeyshares(ctx, s.config, 1)
+	keyshares, err := entutils.GetUnusedSigningKeyshares(ctx, s.config, 1)
 	if err != nil {
 		return nil, err
 	}
@@ -37,7 +41,7 @@ func (s *SparkServer) GenerateDepositAddress(ctx context.Context, req *pb.Genera
 
 	keyshare := keyshares[0]
 
-	err = ent_utils.MarkSigningKeysharesAsUsed(ctx, s.config, []uuid.UUID{keyshare.ID})
+	err = entutils.MarkSigningKeysharesAsUsed(ctx, s.config, []uuid.UUID{keyshare.ID})
 	if err != nil {
 		log.Printf("Failed to mark keyshare as used: %v", err)
 		return nil, err

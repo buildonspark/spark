@@ -112,7 +112,7 @@ func main() {
 
 	go runDKGOnStartup(dbClient, config)
 
-	dkgServer := dkg.NewDkgServer(frostConnection, config)
+	dkgServer := dkg.NewServer(frostConnection, config)
 
 	grpcServer := grpc.NewServer(grpc.UnaryInterceptor(common.DbSessionMiddleware(dbClient)))
 	pb.RegisterDKGServiceServer(grpcServer, dkgServer)

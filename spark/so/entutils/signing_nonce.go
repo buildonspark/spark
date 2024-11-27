@@ -1,4 +1,4 @@
-package ent_utils
+package entutils
 
 import (
 	"context"
@@ -9,6 +9,7 @@ import (
 	"github.com/lightsparkdev/spark-go/so/objects"
 )
 
+// StoreSigningNonce stores the given signing nonce and commitment in the database.
 func StoreSigningNonce(ctx context.Context, config *so.Config, nonce objects.SigningNonce, commitment objects.SigningCommitment) error {
 	nonceBytes, err := nonce.MarshalBinary()
 	if err != nil {
@@ -23,6 +24,7 @@ func StoreSigningNonce(ctx context.Context, config *so.Config, nonce objects.Sig
 	return err
 }
 
+// GetSigningNonceFromCommitment returns the signing nonce associated with the given commitment.
 func GetSigningNonceFromCommitment(ctx context.Context, config *so.Config, commitment objects.SigningCommitment) (*objects.SigningNonce, error) {
 	commitmentBytes := commitment.MarshalBinary()
 
@@ -40,6 +42,7 @@ func GetSigningNonceFromCommitment(ctx context.Context, config *so.Config, commi
 	return &signingNonce, nil
 }
 
+// GetSigningNonces returns the signing nonces associated with the given commitments.
 func GetSigningNonces(ctx context.Context, config *so.Config, commitments []objects.SigningCommitment) (map[[66]byte]*objects.SigningNonce, error) {
 	commitmentBytes := make([][]byte, len(commitments))
 	for i, commitment := range commitments {
