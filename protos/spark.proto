@@ -9,7 +9,8 @@ service SparkService {
 }
 
 message GenerateDepositAddressRequest {
-    bytes public_key = 1;
+    bytes signing_public_key = 1;
+    bytes identity_public_key = 2;
 }
 
 message GenerateDepositAddressResponse {

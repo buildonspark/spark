@@ -21,6 +21,7 @@ message MarkKeysharesAsUsedRequest {
 message MarkKeyshareForDepositAddressRequest {
     string keyshare_id = 1;
     string address = 2;
+    bytes owner_identity_public_key = 3;
 }
 
 message FrostRound1Request {

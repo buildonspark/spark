@@ -24,7 +24,8 @@ func TestGenerateDepositAddress(t *testing.T) {
 	}
 
 	resp, err := client.GenerateDepositAddress(context.Background(), &pb.GenerateDepositAddressRequest{
-		PublicKey: pubkey,
+		SigningPublicKey:  pubkey,
+		IdentityPublicKey: pubkey,
 	})
 	if err != nil {
 		t.Fatalf("failed to generate deposit address: %v", err)

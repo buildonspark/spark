@@ -24,7 +24,7 @@ func NewSparkServer(config *so.Config) *SparkServer {
 }
 
 func (s *SparkServer) GenerateDepositAddress(ctx context.Context, req *pb.GenerateDepositAddressRequest) (*pb.GenerateDepositAddressResponse, error) {
-	log.Printf("Generating deposit address for public key: %s", hex.EncodeToString(req.PublicKey))
+	log.Printf("Generating deposit address for public key: %s", hex.EncodeToString(req.SigningPublicKey))
 	keyshares, err := ent_utils.GetUnusedSigningKeyshares(ctx, s.config, 1)
 	if err != nil {
 		return nil, err
@@ -61,7 +61,7 @@ func (s *SparkServer) GenerateDepositAddress(ctx context.Context, req *pb.Genera
 		return nil, err
 	}
 
-	combinedPublicKey, err := common.AddPublicKeys(keyshare.PublicKey, req.PublicKey)
+	combinedPublicKey, err := common.AddPublicKeys(keyshare.PublicKey, req.SigningPublicKey)
 	if err != nil {
 		log.Printf("Failed to add public keys: %v", err)
 		return nil, err
@@ -73,7 +73,11 @@ func (s *SparkServer) GenerateDepositAddress(ctx context.Context, req *pb.Genera
 		return nil, err
 	}
 
-	_, err = common.GetDbFromContext(ctx).DepositAddress.Create().SetSigningKeyshareID(keyshare.ID).SetAddress(*depositAddress).Save(ctx)
+	_, err = common.GetDbFromContext(ctx).DepositAddress.Create().
+		SetSigningKeyshareID(keyshare.ID).
+		SetOwnerIdentityPubkey(req.IdentityPublicKey).
+		SetAddress(*depositAddress).
+		Save(ctx)
 	if err != nil {
 		log.Printf("Failed to link keyshare to deposit address: %v", err)
 		return nil, err
@@ -88,7 +92,11 @@ func (s *SparkServer) GenerateDepositAddress(ctx context.Context, req *pb.Genera
 		defer conn.Close()
 
 		client := pb.NewSparkInternalServiceClient(conn)
-		_, err = client.MarkKeyshareForDepositAddress(ctx, &pb.MarkKeyshareForDepositAddressRequest{KeyshareId: keyshare.ID.String(), Address: *depositAddress})
+		_, err = client.MarkKeyshareForDepositAddress(ctx, &pb.MarkKeyshareForDepositAddressRequest{
+			KeyshareId:             keyshare.ID.String(),
+			Address:                *depositAddress,
+			OwnerIdentityPublicKey: req.IdentityPublicKey,
+		})
 		return nil, err
 	})
 	if err != nil {

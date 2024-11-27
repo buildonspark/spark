@@ -53,7 +53,11 @@ func (s *SparkInternalServer) MarkKeyshareForDepositAddress(ctx context.Context,
 		return nil, err
 	}
 
-	_, err = common.GetDbFromContext(ctx).DepositAddress.Create().SetSigningKeyshareID(keyshareID).SetAddress(req.Address).Save(ctx)
+	_, err = common.GetDbFromContext(ctx).DepositAddress.Create().
+		SetSigningKeyshareID(keyshareID).
+		SetOwnerIdentityPubkey(req.OwnerIdentityPublicKey).
+		SetAddress(req.Address).
+		Save(ctx)
 	if err != nil {
 		log.Printf("Failed to link keyshare to deposit address: %v", err)
 		return nil, err

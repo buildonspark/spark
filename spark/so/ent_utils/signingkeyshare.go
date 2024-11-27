@@ -48,7 +48,7 @@ func MarkSigningKeysharesAsUsed(ctx context.Context, config *so.Config, ids []uu
 	}
 
 	if len(signingKeyshares) != len(ids) {
-		return fmt.Errorf("some keyshares are not available")
+		return fmt.Errorf("some keyshares are not available in ", ids)
 	}
 
 	_, err = db.SigningKeyshare.
