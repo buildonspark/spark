@@ -13,35 +13,43 @@ import (
 )
 
 type SigningResult struct {
+	JobID              string
 	SignatureShares    map[string][]byte
 	SigningCommitments map[string]objects.SigningCommitment
 }
 
 // frostRound1 performs the first round of the Frost signing. It gathers the signing commitments from all operators.
-func frostRound1(ctx context.Context, config *so.Config, signingKeyshareID uuid.UUID, operatorSelection *OperatorSelection) (map[string]objects.SigningCommitment, error) {
-	return ExecuteTaskWithAllOperators(ctx, config, operatorSelection, func(ctx context.Context, operator *so.SigningOperator) (objects.SigningCommitment, error) {
+func frostRound1(ctx context.Context, config *so.Config, signingKeyshareIDs []uuid.UUID, operatorSelection *OperatorSelection) (map[string][]objects.SigningCommitment, error) {
+	return ExecuteTaskWithAllOperators(ctx, config, operatorSelection, func(ctx context.Context, operator *so.SigningOperator) ([]objects.SigningCommitment, error) {
 		conn, err := common.NewGRPCConnection(operator.Address)
 		if err != nil {
-			return objects.SigningCommitment{}, err
+			return nil, err
 		}
 		defer conn.Close()
 
+		keyshareIDs := make([]string, len(signingKeyshareIDs))
+		for i, id := range signingKeyshareIDs {
+			keyshareIDs[i] = id.String()
+		}
+
 		client := pb.NewSparkInternalServiceClient(conn)
 		response, err := client.FrostRound1(ctx, &pb.FrostRound1Request{
-			KeyshareId: signingKeyshareID.String(),
+			KeyshareIds: keyshareIDs,
 		})
 		if err != nil {
-			return objects.SigningCommitment{}, err
+			return nil, err
 		}
 
-		commitment := objects.SigningCommitment{}
-		err = commitment.UnmarshalProto(response.SigningCommitment)
-		if err != nil {
-			log.Println("FrostRound1 UnmarshalProto failed:", err)
-			return objects.SigningCommitment{}, err
+		commitments := make([]objects.SigningCommitment, len(response.SigningCommitments))
+		for i, commitment := range response.SigningCommitments {
+			err = commitments[i].UnmarshalProto(commitment)
+			if err != nil {
+				log.Println("FrostRound1 UnmarshalProto failed:", err)
+				return nil, err
+			}
 		}
 
-		return commitment, nil
+		return commitments, nil
 	})
 }
 
@@ -49,14 +57,11 @@ func frostRound1(ctx context.Context, config *so.Config, signingKeyshareID uuid.
 func frostRound2(
 	ctx context.Context,
 	config *so.Config,
-	signingKeyshareID uuid.UUID,
-	message []byte,
-	verifyingKey []byte,
-	commitments map[string]objects.SigningCommitment,
-	userCommitment objects.SigningCommitment,
+	jobs []*SigningJob,
+	round1 map[string][]objects.SigningCommitment,
 	operatorSelection *OperatorSelection,
-) (map[string][]byte, error) {
-	return ExecuteTaskWithAllOperators(ctx, config, operatorSelection, func(ctx context.Context, operator *so.SigningOperator) ([]byte, error) {
+) (map[string]map[string][]byte, error) {
+	operatorResult, err := ExecuteTaskWithAllOperators(ctx, config, operatorSelection, func(ctx context.Context, operator *so.SigningOperator) (map[string][]byte, error) {
 		log.Println("FrostRound2 started for operator:", operator.Identifier)
 		conn, err := common.NewGRPCConnection(operator.Address)
 		if err != nil {
@@ -64,37 +69,77 @@ func frostRound2(
 		}
 		defer conn.Close()
 
-		commitmentsMap := make(map[string]*pb.SigningCommitment)
-		for operatorID, commitment := range commitments {
-			commitmentProto, err := commitment.MarshalProto()
+		commitmentsArray := common.MapOfArrayToArrayOfMap(round1)
+
+		signingJobs := make([]*pb.SigningJob, len(jobs))
+		for i, job := range jobs {
+			commitments := make(map[string]*pb.SigningCommitment)
+			for operatorID, commitment := range commitmentsArray[i] {
+				commitmentProto, err := commitment.MarshalProto()
+				if err != nil {
+					log.Println("Round2 MarshalProto failed:", err)
+					return nil, err
+				}
+				commitments[operatorID] = commitmentProto
+			}
+			userCommitmentProto, err := job.UserCommitment.MarshalProto()
 			if err != nil {
 				log.Println("Round2 MarshalProto failed:", err)
 				return nil, err
 			}
-			commitmentsMap[operatorID] = commitmentProto
-		}
+			signingJobs[i] = &pb.SigningJob{
+				JobId:           job.JobID,
+				Message:         job.Message,
+				KeyshareId:      job.SigningKeyshareID.String(),
+				VerifyingKey:    job.VerifyingKey,
+				Commitments:     commitments,
+				UserCommitments: userCommitmentProto,
+			}
 
-		userCommitmentProto, err := userCommitment.MarshalProto()
-		if err != nil {
-			log.Println("MarshalProto failed:", err)
-			return nil, err
+			log.Println("FrostRound2 signing job:", signingJobs[i])
 		}
 
 		client := pb.NewSparkInternalServiceClient(conn)
 		response, err := client.FrostRound2(ctx, &pb.FrostRound2Request{
-			Message:         message,
-			KeyshareId:      signingKeyshareID.String(),
-			VerifyingKey:    verifyingKey,
-			Commitments:     commitmentsMap,
-			UserCommitments: userCommitmentProto,
+			SigningJobs: signingJobs,
 		})
 		if err != nil {
 			log.Println("FrostRound2 failed:", err)
 			return nil, err
 		}
 
-		return response.SignatureShare, nil
+		results := make(map[string][]byte)
+		for operatorID, result := range response.Results {
+			results[operatorID] = result.SignatureShare
+		}
+
+		return results, nil
 	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	log.Println("FrostRound2 operator result:", operatorResult)
+
+	result := common.SwapMapKeys(operatorResult)
+	return result, nil
+}
+
+type SigningJob struct {
+	JobID             string
+	SigningKeyshareID uuid.UUID
+	Message           []byte
+	VerifyingKey      []byte
+	UserCommitment    objects.SigningCommitment
+}
+
+func SigningKeyshareIDsFromSigningJobs(jobs []*SigningJob) []uuid.UUID {
+	ids := make([]uuid.UUID, len(jobs))
+	for i, job := range jobs {
+		ids[i] = job.SigningKeyshareID
+	}
+	return ids
 }
 
 // SignFrost performs the Frost signing.
@@ -116,26 +161,32 @@ func frostRound2(
 func SignFrost(
 	ctx context.Context,
 	config *so.Config,
-	signingKeyshareID uuid.UUID,
-	message []byte,
-	verifyingKey []byte,
-	userCommitment objects.SigningCommitment,
-) (*SigningResult, error) {
+	jobs []*SigningJob,
+) ([]*SigningResult, error) {
 	selection := OperatorSelection{Option: OperatorSelectionOptionThreshold, Threshold: int(config.Threshold)}
-	round1, err := frostRound1(ctx, config, signingKeyshareID, &selection)
+	signingKeyshareIDs := SigningKeyshareIDsFromSigningJobs(jobs)
+	round1, err := frostRound1(ctx, config, signingKeyshareIDs, &selection)
 	if err != nil {
 		log.Println("FrostRound1 failed:", err)
 		return nil, err
 	}
 
-	round2, err := frostRound2(ctx, config, signingKeyshareID, message, verifyingKey, round1, userCommitment, &selection)
+	round2, err := frostRound2(ctx, config, jobs, round1, &selection)
 	if err != nil {
 		log.Println("FrostRound2 failed:", err)
 		return nil, err
 	}
 
-	return &SigningResult{
-		SignatureShares:    round2,
-		SigningCommitments: round1,
-	}, nil
+	round1Array := common.MapOfArrayToArrayOfMap(round1)
+
+	results := make([]*SigningResult, len(jobs))
+	for i, job := range jobs {
+		results[i] = &SigningResult{
+			JobID:              job.JobID,
+			SignatureShares:    round2[job.JobID],
+			SigningCommitments: round1Array[i],
+		}
+	}
+
+	return results, nil
 }

@@ -14,10 +14,7 @@ func StoreSigningNonce(ctx context.Context, config *so.Config, nonce objects.Sig
 	if err != nil {
 		return err
 	}
-	commitmentBytes, err := commitment.MarshalBinary()
-	if err != nil {
-		return err
-	}
+	commitmentBytes := commitment.MarshalBinary()
 
 	_, err = common.GetDbFromContext(ctx).SigningNonce.Create().
 		SetNonce(nonceBytes).
@@ -27,10 +24,7 @@ func StoreSigningNonce(ctx context.Context, config *so.Config, nonce objects.Sig
 }
 
 func GetSigningNonceFromCommitment(ctx context.Context, config *so.Config, commitment objects.SigningCommitment) (*objects.SigningNonce, error) {
-	commitmentBytes, err := commitment.MarshalBinary()
-	if err != nil {
-		return nil, err
-	}
+	commitmentBytes := commitment.MarshalBinary()
 
 	nonce, err := common.GetDbFromContext(ctx).SigningNonce.Query().Where(signingnonce.NonceCommitment(commitmentBytes)).First(ctx)
 	if err != nil {
@@ -44,4 +38,26 @@ func GetSigningNonceFromCommitment(ctx context.Context, config *so.Config, commi
 	}
 
 	return &signingNonce, nil
+}
+
+func GetSigningNonces(ctx context.Context, config *so.Config, commitments []objects.SigningCommitment) (map[[66]byte]*objects.SigningNonce, error) {
+	commitmentBytes := make([][]byte, len(commitments))
+	for i, commitment := range commitments {
+		commitmentBytes[i] = commitment.MarshalBinary()
+	}
+	noncesResult, err := common.GetDbFromContext(ctx).SigningNonce.Query().Where(signingnonce.NonceCommitmentIn(commitmentBytes...)).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make(map[[66]byte]*objects.SigningNonce)
+	for _, nonce := range noncesResult {
+		signingNonce := objects.SigningNonce{}
+		err = signingNonce.UnmarshalBinary(nonce.Nonce)
+		if err != nil {
+			return nil, err
+		}
+		result[[66]byte(nonce.NonceCommitment)] = &signingNonce
+	}
+	return result, nil
 }

@@ -240,32 +240,33 @@ impl FrostService for FrostServer {
     ) -> Result<Response<FrostNonceResponse>, Status> {
         let req = request.get_ref();
 
-        let key_package = frost_key_package_from_proto(
-            &req.key_package
-                .clone()
-                .ok_or(Status::internal("Key package is required"))?,
-            None,
-        )
-        .map_err(|e| Status::internal(format!("Failed to parse key package: {:?}", e)))?;
+        let mut results = Vec::new();
 
-        let rng = &mut rand::thread_rng();
-        let (nonce, commitment) =
-            frost_secp256k1_tr::round1::commit(&key_package.signing_share(), rng);
+        for key_package in req.key_packages.iter() {
+            let key_package = frost_key_package_from_proto(key_package, None)
+                .map_err(|e| Status::internal(format!("Failed to parse key package: {:?}", e)))?;
 
-        let pb_nonce = SigningNonce {
-            hiding: nonce.hiding().serialize().to_vec(),
-            binding: nonce.binding().serialize().to_vec(),
-        };
+            let rng = &mut rand::thread_rng();
+            let (nonce, commitment) =
+                frost_secp256k1_tr::round1::commit(&key_package.signing_share(), rng);
 
-        let pb_commitment = SigningCommitment {
-            hiding: commitment.hiding().serialize().to_vec(),
-            binding: commitment.binding().serialize().to_vec(),
-        };
+            let pb_nonce = SigningNonce {
+                hiding: nonce.hiding().serialize().to_vec(),
+                binding: nonce.binding().serialize().to_vec(),
+            };
 
-        Ok(Response::new(FrostNonceResponse {
-            nonces: Some(pb_nonce),
-            commitments: Some(pb_commitment),
-        }))
+            let pb_commitment = SigningCommitment {
+                hiding: commitment.hiding().serialize().to_vec(),
+                binding: commitment.binding().serialize().to_vec(),
+            };
+
+            results.push(SigningNonceResult {
+                nonces: Some(pb_nonce),
+                commitments: Some(pb_commitment),
+            });
+        }
+
+        Ok(Response::new(FrostNonceResponse { results }))
     }
 
     async fn sign_frost(
@@ -275,67 +276,80 @@ impl FrostService for FrostServer {
         tracing::info!("Received frost sign request");
         let req = request.get_ref();
 
-        let mut commitments =
-            frost_signing_commiement_map_from_proto(&req.commitments).map_err(|e| {
-                Status::internal(format!("Failed to parse signing commitments: {:?}", e))
-            })?;
+        let mut results = HashMap::new();
 
-        let user_identifier =
-            Identifier::derive("user".as_bytes()).expect("Failed to derive user identifier");
+        for job in req.signing_jobs.iter() {
+            let mut commitments = frost_signing_commiement_map_from_proto(&job.commitments)
+                .map_err(|e| {
+                    Status::internal(format!("Failed to parse signing commitments: {:?}", e))
+                })?;
 
-        let signing_participants = match req.role {
-            0 => commitments.keys().cloned().collect(),
-            1 => BTreeSet::from([user_identifier]),
-            _ => return Err(Status::invalid_argument("Invalid signing role")),
-        };
+            let user_identifier =
+                Identifier::derive("user".as_bytes()).expect("Failed to derive user identifier");
 
-        let user_commitments = match &req.user_commitments {
-            Some(commitments) => frost_commitments_from_proto(commitments).map_err(|e| {
-                Status::internal(format!("Failed to parse user commitments: {:?}", e))
-            })?,
-            None => return Err(Status::internal("User commitments are required")),
-        };
-        commitments.insert(user_identifier, user_commitments);
-        tracing::debug!("There are {} commitments", commitments.len());
+            let signing_participants = match req.role {
+                0 => commitments.keys().cloned().collect(),
+                1 => BTreeSet::from([user_identifier]),
+                _ => return Err(Status::invalid_argument("Invalid signing role")),
+            };
 
-        let nonce = match &req.nonce {
-            Some(nonce) => frost_nonce_from_proto(nonce)
-                .map_err(|e| Status::internal(format!("Failed to parse nonce: {:?}", e)))?,
-            None => return Err(Status::internal("Nonce is required")),
-        };
+            tracing::debug!("User commitments: {:?}", job.user_commitments);
 
-        let verifying_key = verifying_key_from_bytes(req.verifying_key.clone())
-            .map_err(|e| Status::internal(format!("Failed to parse verifying key: {:?}", e)))?;
+            let user_commitments = match &job.user_commitments {
+                Some(commitments) => frost_commitments_from_proto(commitments).map_err(|e| {
+                    Status::internal(format!("Failed to parse user commitments: {:?}", e))
+                })?,
+                None => return Err(Status::internal("")),
+            };
+            commitments.insert(user_identifier, user_commitments);
+            tracing::debug!("There are {} commitments", commitments.len());
 
-        let identifier_override = match req.role {
-            0 => None,
-            1 => Some(user_identifier),
-            _ => return Err(Status::invalid_argument("Invalid signing role")),
-        };
+            let nonce = match &job.nonce {
+                Some(nonce) => frost_nonce_from_proto(nonce)
+                    .map_err(|e| Status::internal(format!("Failed to parse nonce: {:?}", e)))?,
+                None => return Err(Status::internal("Nonce is required")),
+            };
 
-        let key_package = match &req.key_package {
-            Some(key_package) => frost_key_package_from_proto(key_package, identifier_override)
-                .map_err(|e| Status::internal(format!("Failed to parse key package: {:?}", e)))?,
-            None => return Err(Status::internal("Key package is required")),
-        };
+            let verifying_key = verifying_key_from_bytes(job.verifying_key.clone())
+                .map_err(|e| Status::internal(format!("Failed to parse verifying key: {:?}", e)))?;
 
-        let signing_package = frost_build_signin_package(commitments, &req.message);
-        tracing::info!("Building signing package completed");
-        let signature_share = frost_secp256k1_tr::round2::sign_spark(
-            &signing_package,
-            &nonce,
-            &key_package,
-            &signing_participants,
-            None,
-            None,
-            &verifying_key,
-        )
-        .map_err(|e| Status::internal(format!("Failed to sign frost: {:?}", e)))?;
-        tracing::info!("Signing frost completed");
+            let identifier_override = match req.role {
+                0 => None,
+                1 => Some(user_identifier),
+                _ => return Err(Status::invalid_argument("Invalid signing role")),
+            };
 
-        Ok(Response::new(SignFrostResponse {
-            signature_share: signature_share.serialize().to_vec(),
-        }))
+            let key_package = match &job.key_package {
+                Some(key_package) => frost_key_package_from_proto(key_package, identifier_override)
+                    .map_err(|e| {
+                        Status::internal(format!("Failed to parse key package: {:?}", e))
+                    })?,
+                None => return Err(Status::internal("Key package is required")),
+            };
+
+            let signing_package = frost_build_signin_package(commitments, &job.message);
+            tracing::info!("Building signing package completed");
+            let signature_share = frost_secp256k1_tr::round2::sign_spark(
+                &signing_package,
+                &nonce,
+                &key_package,
+                &signing_participants,
+                None,
+                None,
+                &verifying_key,
+            )
+            .map_err(|e| Status::internal(format!("Failed to sign frost: {:?}", e)))?;
+            tracing::info!("Signing frost completed");
+
+            results.insert(
+                job.job_id.clone(),
+                SigningResult {
+                    signature_share: signature_share.serialize().to_vec(),
+                },
+            );
+        }
+
+        Ok(Response::new(SignFrostResponse { results }))
     }
 
     async fn aggregate_frost(

@@ -25,30 +25,37 @@ message MarkKeyshareForDepositAddressRequest {
 }
 
 message FrostRound1Request {
-    string keyshare_id = 1;
+    repeated string keyshare_ids = 1;
 }
 
 message FrostRound1Response {   
-    frost.SigningCommitment signing_commitment = 1;
+    repeated frost.SigningCommitment signing_commitments = 1;
+}
+
+message SigningJob {
+    // The unique identifier for the signing job.
+    string job_id = 1;
+    
+    // The message to sign.
+    bytes message = 2;
+
+    // The secret package from DKG round 3.
+    string keyshare_id = 3;
+
+    // The verifying key. This should be the total public key for both user and StatechainEntity.
+    bytes verifying_key = 4;
+
+    // The commitments for all participants of the statechain.
+    map<string, frost.SigningCommitment> commitments = 5;
+
+    // The commitments for all participants of the user.
+    frost.SigningCommitment user_commitments = 6;
 }
 
 message FrostRound2Request {
-    // The message to sign.
-    bytes message = 1;
-
-    // The secret package from DKG round 3.
-    string keyshare_id = 2;
-
-    // The verifying key. This should be the total public key for both user and StatechainEntity.
-    bytes verifying_key = 3;
-
-    // The commitments for all participants of the statechain.
-    map<string, frost.SigningCommitment> commitments = 4;
-
-    // The commitments for all participants of the user.
-    frost.SigningCommitment user_commitments = 5;
+    repeated SigningJob signing_jobs = 1;
 }
 
 message FrostRound2Response {
-    bytes signature_share = 1;
+    map<string, frost.SigningResult> results = 1;
 }

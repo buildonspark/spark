@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/decred/dcrd/dcrec/secp256k1"
+	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/common"
 	pb "github.com/lightsparkdev/spark-go/proto"
 	"github.com/lightsparkdev/spark-go/so/ent_utils"
@@ -92,11 +93,19 @@ func TestFrostSign(t *testing.T) {
 	}
 
 	// Step 6: Operator signing
-	signingResult, err := helper.SignFrost(ctx, config, operatorKeyShare.ID, msg, verifyingKeyBytes, *userNonceCommitment)
+	signingJobs := make([]*helper.SigningJob, 0)
+	signingJobs = append(signingJobs, &helper.SigningJob{
+		JobID:             uuid.New().String(),
+		SigningKeyshareID: operatorKeyShare.ID,
+		Message:           msg,
+		VerifyingKey:      verifyingKeyBytes,
+		UserCommitment:    *userNonceCommitment,
+	})
+	signingResult, err := helper.SignFrost(ctx, config, signingJobs)
 	if err != nil {
 		t.Fatal(err)
 	}
-	operatorCommitments := signingResult.SigningCommitments
+	operatorCommitments := signingResult[0].SigningCommitments
 	operatorCommitmentsProto := make(map[string]*pb.SigningCommitment)
 	for id, commitment := range operatorCommitments {
 		commitmentProto, err := commitment.MarshalProto()
@@ -113,22 +122,28 @@ func TestFrostSign(t *testing.T) {
 	}
 	defer conn.Close()
 	client := pb.NewFrostServiceClient(conn)
-	userSignatures, err := client.SignFrost(ctx, &pb.SignFrostRequest{
+	userSigningJobs := make([]*pb.FrostSigningJob, 0)
+	userJobID := uuid.New().String()
+	userSigningJobs = append(userSigningJobs, &pb.FrostSigningJob{
+		JobId:           userJobID,
 		Message:         msg,
 		KeyPackage:      &userKeyPackage,
 		VerifyingKey:    verifyingKeyBytes,
 		Nonce:           userNonceProto,
 		Commitments:     operatorCommitmentsProto,
 		UserCommitments: userNonceCommitmentProto,
-		Role:            pb.SigningRole_USER,
+	})
+	userSignatures, err := client.SignFrost(ctx, &pb.SignFrostRequest{
+		SigningJobs: userSigningJobs,
+		Role:        pb.SigningRole_USER,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Step 8: Signature aggregation - The aggregation is successful only if the signature is valid.
-	signatureShares := signingResult.SignatureShares
-	signatureShares[userIdentifier] = userSignatures.SignatureShare
+	signatureShares := signingResult[0].SignatureShares
+	signatureShares[userIdentifier] = userSignatures.Results[userJobID].SignatureShare
 	_, err = client.AggregateFrost(ctx, &pb.AggregateFrostRequest{
 		Message:         msg,
 		SignatureShares: signatureShares,

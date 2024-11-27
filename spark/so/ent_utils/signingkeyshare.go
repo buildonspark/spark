@@ -82,3 +82,25 @@ func GetKeyPackage(ctx context.Context, config *so.Config, keyshareID uuid.UUID)
 
 	return keyPackage, nil
 }
+
+func GetKeyPackages(ctx context.Context, config *so.Config, keyshareIDs []uuid.UUID) (map[uuid.UUID]*pb.KeyPackage, error) {
+	keyshares, err := common.GetDbFromContext(ctx).SigningKeyshare.Query().Where(
+		signingkeyshare.IDIn(keyshareIDs...),
+	).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	keyPackages := make(map[uuid.UUID]*pb.KeyPackage, len(keyshares))
+	for _, keyshare := range keyshares {
+		keyPackages[keyshare.ID] = &pb.KeyPackage{
+			Identifier:   config.Identifier,
+			SecretShare:  keyshare.SecretShare,
+			PublicShares: keyshare.PublicShares,
+			PublicKey:    keyshare.PublicKey,
+			MinSigners:   keyshare.MinSigners,
+		}
+	}
+
+	return keyPackages, nil
+}

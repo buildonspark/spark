@@ -82,11 +82,11 @@ func NewSigningCommitment(binding, hiding []byte) (*SigningCommitment, error) {
 }
 
 // MarshalBinary serializes the SigningCommitment into a byte slice.
-func (n SigningCommitment) MarshalBinary() ([]byte, error) {
+func (n SigningCommitment) MarshalBinary() []byte {
 	bytes := make([]byte, 66)
 	copy(bytes[0:33], n.Binding)
 	copy(bytes[33:66], n.Hiding)
-	return bytes, nil
+	return bytes
 }
 
 // UnmarshalBinary deserializes the SigningCommitment from a byte slice.
@@ -97,6 +97,10 @@ func (n *SigningCommitment) UnmarshalBinary(data []byte) error {
 	n.Binding = data[0:33]
 	n.Hiding = data[33:66]
 	return nil
+}
+
+func (n *SigningCommitment) Key() [66]byte {
+	return [66]byte(n.MarshalBinary())
 }
 
 // MarshalProto serializes the SigningCommitment into a proto.SigningCommitment.

@@ -174,16 +174,43 @@ message SigningCommitment {
 }
 
 message FrostNonceRequest {
-    // The key package for the signing, used as entropy for the nonce.
-    KeyPackage key_package = 1;
+    // The key packages for the signing, used as entropy for the nonce.
+    repeated KeyPackage key_packages = 1;
 }
 
-message FrostNonceResponse {
+message SigningNonceResult {
     // The nonces for the signing.
     SigningNonce nonces = 1;
 
     // The commitments for the signing.
     SigningCommitment commitments = 2;
+}
+
+message FrostNonceResponse {
+    repeated SigningNonceResult results = 1;
+}
+
+message FrostSigningJob {
+    // The unique identifier for the signing job.
+    string job_id = 1;
+
+    // The message to sign.
+    bytes message = 2;
+
+    // The secret package from DKG round 3.
+    KeyPackage key_package = 3;
+
+    // The verifying key. This should be the total public key for both user and StatechainEntity.
+    bytes verifying_key = 4;
+
+    // The nonce for current participant.
+    SigningNonce nonce = 5;
+
+    // The commitments for all participants of the statechain.
+    map<string, SigningCommitment> commitments = 6;
+
+    // The commitments for all participants of the user.
+    SigningCommitment user_commitments = 7;
 }
 
 /*
@@ -192,26 +219,15 @@ message FrostNonceResponse {
  * This request is sent to the server for the signing.
  */
 message SignFrostRequest {
-    // The message to sign.
-    bytes message = 1;
-
-    // The secret package from DKG round 3.
-    KeyPackage key_package = 2;
-
-    // The verifying key. This should be the total public key for both user and StatechainEntity.
-    bytes verifying_key = 3;
-
-    // The nonce for current participant.
-    SigningNonce nonce = 4;
-
-    // The commitments for all participants of the statechain.
-    map<string, SigningCommitment> commitments = 5;
-
-    // The commitments for all participants of the user.
-    SigningCommitment user_commitments = 6;
+    // The signing jobs.
+    repeated FrostSigningJob signing_jobs = 1;
 
     // The role of the participant in the signing.
-    SigningRole role = 7;
+    SigningRole role = 2;
+}
+
+message SigningResult {
+    bytes signature_share = 1;
 }
 
 /*
@@ -220,8 +236,8 @@ message SignFrostRequest {
  * This response is sent from the server to the client after the signing has been completed.
  */
 message SignFrostResponse {
-    // The signature share.
-    bytes signature_share = 1;
+    // The signature shares.
+    map<string, SigningResult> results = 1;
 }
 
 /*
