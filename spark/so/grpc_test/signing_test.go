@@ -1,7 +1,6 @@
 package grpctest
 
 import (
-	"context"
 	"testing"
 
 	"github.com/decred/dcrd/dcrec/secp256k1"
@@ -23,7 +22,11 @@ func TestFrostSign(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ctx := context.Background()
+	ctx, err := test_util.TestContext(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	msg := []byte("hello")
 
 	// Step 2: Get operator key share

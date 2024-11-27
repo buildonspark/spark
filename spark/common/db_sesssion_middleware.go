@@ -8,9 +8,9 @@ import (
 	"google.golang.org/grpc"
 )
 
-type contextKey string
+type ContextKey string
 
-const txKey contextKey = "tx"
+const TxKey ContextKey = "tx"
 
 // Middleware to manage database sessions for each gRPC call.
 func DbSessionMiddleware(dbClient *ent.Client) grpc.UnaryServerInterceptor {
@@ -22,7 +22,7 @@ func DbSessionMiddleware(dbClient *ent.Client) grpc.UnaryServerInterceptor {
 		}
 
 		// Attach the transaction to the context
-		ctx = context.WithValue(ctx, txKey, tx)
+		ctx = context.WithValue(ctx, TxKey, tx)
 
 		// Call the handler (the actual RPC method)
 		resp, err := handler(ctx, req)
@@ -45,5 +45,5 @@ func DbSessionMiddleware(dbClient *ent.Client) grpc.UnaryServerInterceptor {
 }
 
 func GetDbFromContext(ctx context.Context) *ent.Tx {
-	return ctx.Value(txKey).(*ent.Tx)
+	return ctx.Value(TxKey).(*ent.Tx)
 }
