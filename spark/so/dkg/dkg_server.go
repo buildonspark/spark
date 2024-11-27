@@ -11,6 +11,8 @@ import (
 	"google.golang.org/grpc"
 )
 
+// DkgServer is the grpc server for the DKG protocol.
+// It is only used by the signing operators.
 type DkgServer struct {
 	pb.UnimplementedDKGServiceServer
 	frostConnection *grpc.ClientConn
@@ -18,6 +20,7 @@ type DkgServer struct {
 	config          *so.Config
 }
 
+// NewDkgServer creates a new DKG server based on the given config.
 func NewDkgServer(frostConnection *grpc.ClientConn, config *so.Config) *DkgServer {
 	return &DkgServer{
 		state:           &DkgStates{},
@@ -26,6 +29,8 @@ func NewDkgServer(frostConnection *grpc.ClientConn, config *so.Config) *DkgServe
 	}
 }
 
+// InitiateDkg initiates the DKG protocol.
+// It will be called by the coordinator. It will start the DKG round 1 and deliver the round 1 package to the coordinator.
 func (s *DkgServer) InitiateDkg(ctx context.Context, req *pb.InitiateDkgRequest) (*pb.InitiateDkgResponse, error) {
 	log.Println("initiate dkg", req.RequestId, req.MaxSigners, req.MinSigners)
 	if err := s.state.InitiateDkg(req.RequestId, req.MaxSigners, req.MinSigners, req.CoordinatorIndex); err != nil {
@@ -59,6 +64,10 @@ func (s *DkgServer) InitiateDkg(ctx context.Context, req *pb.InitiateDkgRequest)
 	}, nil
 }
 
+// Round1Packages receives the round 1 packages from the coordinator.
+// It will be called by the coordinator. This function will deliver the round 1 packages from the other operators.
+// The packages will be signed with this operator's identity key and sent the signature back to the coordinator.
+// It is used as a confirmation that the operator has received the round 1 packages.
 func (s *DkgServer) Round1Packages(ctx context.Context, req *pb.Round1PackagesRequest) (*pb.Round1PackagesResponse, error) {
 	log.Println("round 1 packages", req.RequestId)
 	round1Packages := make([]map[string][]byte, len(req.Round1Packages))
@@ -70,7 +79,7 @@ func (s *DkgServer) Round1Packages(ctx context.Context, req *pb.Round1PackagesRe
 		return nil, err
 	}
 
-	signature, err := SignRound1Packages(s.config.IdentityPrivateKey, round1Packages)
+	signature, err := signRound1Packages(s.config.IdentityPrivateKey, round1Packages)
 	if err != nil {
 		return nil, err
 	}
@@ -81,6 +90,9 @@ func (s *DkgServer) Round1Packages(ctx context.Context, req *pb.Round1PackagesRe
 	}, nil
 }
 
+// Round1Signature receives the round 1 signatures from the coordinator.
+// It will be called by the coordinator. This function will validate the round 1 signatures of all other operators to make sure everyone receives the same round 1 packages.
+// Then it will start the DKG round 2, and distribute the round 2 package to the corresponding operators.
 func (s *DkgServer) Round1Signature(ctx context.Context, req *pb.Round1SignatureRequest) (*pb.Round1SignatureResponse, error) {
 	log.Println("round 1 signature", req.RequestId)
 	validationFailures, err := s.state.ReceivedRound1Signature(req.RequestId, s.config.Identifier, req.Round1Signatures, s.config.SigningOperatorMap)
@@ -118,7 +130,7 @@ func (s *DkgServer) Round1Signature(ctx context.Context, req *pb.Round1Signature
 
 	var wg sync.WaitGroup
 	// Distribute the round 2 package to all participants
-	for identifier, _ := range round2Response.Round2Packages[0].Packages {
+	for identifier := range round2Response.Round2Packages[0].Packages {
 		operator := s.config.SigningOperatorMap[identifier]
 		wg.Add(1)
 		go func(identifier string, addr string) {
@@ -138,7 +150,7 @@ func (s *DkgServer) Round1Signature(ctx context.Context, req *pb.Round1Signature
 				round2Packages[i] = p.Packages[identifier]
 			}
 
-			round2Signature, err := SignRound2Packages(s.config.IdentityPrivateKey, round2Packages)
+			round2Signature, err := signRound2Packages(s.config.IdentityPrivateKey, round2Packages)
 			if err != nil {
 				log.Println("error signing round 2 packages", err)
 				return
@@ -169,6 +181,8 @@ func (s *DkgServer) Round1Signature(ctx context.Context, req *pb.Round1Signature
 	}, nil
 }
 
+// Round2Packages receives the round 2 packages from other operators.
+// Once all operators have sent their round 2 packages, it will start the DKG round 3 and store the key shares in the database.
 func (s *DkgServer) Round2Packages(ctx context.Context, req *pb.Round2PackagesRequest) (*pb.Round2PackagesResponse, error) {
 	log.Println("round 2 packages", req.RequestId, req.Identifier)
 	if req.Identifier == s.config.Identifier {

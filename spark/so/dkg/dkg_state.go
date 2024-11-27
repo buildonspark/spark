@@ -153,7 +153,7 @@ func (s *DkgStates) ReceivedRound1Signature(requestId string, selfIdentifier str
 		return nil, fmt.Errorf("dkg state is not in round 1 signature state for request id: %s", requestId)
 	}
 
-	valid, validationFailures := ValidateRound1Signature(state.ReceivedRound1Packages, round1Signatures, operatorMap)
+	valid, validationFailures := validateRound1Signature(state.ReceivedRound1Packages, round1Signatures, operatorMap)
 	if !valid {
 		// Abort the DKG process
 		log.Printf("State deleted for request id: %s by validation failures", requestId)
@@ -257,7 +257,7 @@ func (s *DkgState) Round3(ctx context.Context, requestId string, frostConnection
 		if err != nil {
 			return err
 		}
-		keyID := DeriveKeyIndex(batchID, uint16(i))
+		keyID := deriveKeyIndex(batchID, uint16(i))
 		db.SigningKeyshare.Create().
 			SetID(keyID).
 			SetStatus(schema.KeyshareStatusAvailable).

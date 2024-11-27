@@ -10,12 +10,15 @@ import (
 	"github.com/btcsuite/btcd/txscript"
 )
 
+// Network is the type for Bitcoin networks used with the operator.
 type Network int
 
 const (
-	// Network constants for Bitcoin networks
+	// Mainnet is the main Bitcoin network.
 	Mainnet Network = iota
+	// Regtest is the regression test network.
 	Regtest
+	// Testnet is the test network.
 	Testnet
 )
 

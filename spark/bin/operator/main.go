@@ -20,7 +20,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-type Args struct {
+type args struct {
 	Index              uint64
 	IdentityPrivateKey string
 	OperatorsFilePath  string
@@ -30,8 +30,8 @@ type Args struct {
 	DatabasePath       string
 }
 
-func loadArgs() (*Args, error) {
-	args := &Args{}
+func loadArgs() (*args, error) {
+	args := &args{}
 
 	// Define flags
 	flag.Uint64Var(&args.Index, "index", 0, "Index value")

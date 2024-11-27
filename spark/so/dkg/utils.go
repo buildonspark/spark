@@ -53,12 +53,12 @@ func signHash(privateKey []byte, hash []byte) ([]byte, error) {
 	return sig.Serialize(), nil
 }
 
-func SignRound1Packages(privateKey []byte, round1Packages []map[string][]byte) ([]byte, error) {
+func signRound1Packages(privateKey []byte, round1Packages []map[string][]byte) ([]byte, error) {
 	hash := round1PackageHash(round1Packages)
 	return signHash(privateKey, hash)
 }
 
-func ValidateRound1Signature(round1Packages []map[string][]byte, round1Signatures map[string][]byte, operatorMap map[string]*so.SigningOperator) (bool, []string) {
+func validateRound1Signature(round1Packages []map[string][]byte, round1Signatures map[string][]byte, operatorMap map[string]*so.SigningOperator) (bool, []string) {
 	hash := round1PackageHash(round1Packages)
 
 	validationFailures := make([]string, 0)
@@ -97,12 +97,12 @@ func round2PackageHash(round2Packages [][]byte) []byte {
 	return hasher.Sum(nil)
 }
 
-func SignRound2Packages(privateKey []byte, round2Packages [][]byte) ([]byte, error) {
+func signRound2Packages(privateKey []byte, round2Packages [][]byte) ([]byte, error) {
 	hash := round2PackageHash(round2Packages)
 	return signHash(privateKey, hash)
 }
 
-func DeriveKeyIndex(batchId uuid.UUID, index uint16) uuid.UUID {
+func deriveKeyIndex(batchId uuid.UUID, index uint16) uuid.UUID {
 	derivedID := batchId
 	// Write the index to the last 2 bytes
 	binary.BigEndian.PutUint16(derivedID[14:], index)

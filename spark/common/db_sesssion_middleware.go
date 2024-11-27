@@ -8,11 +8,13 @@ import (
 	"google.golang.org/grpc"
 )
 
+// ContextKey is a type for context keys.
 type ContextKey string
 
+// TxKey is the context key for the database transaction.
 const TxKey ContextKey = "tx"
 
-// Middleware to manage database sessions for each gRPC call.
+// DbSessionMiddleware is a middleware to manage database sessions for each gRPC call.
 func DbSessionMiddleware(dbClient *ent.Client) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 		// Start a transaction or session
@@ -44,6 +46,7 @@ func DbSessionMiddleware(dbClient *ent.Client) grpc.UnaryServerInterceptor {
 	}
 }
 
+// GetDbFromContext returns the database transaction from the context.
 func GetDbFromContext(ctx context.Context) *ent.Tx {
 	return ctx.Value(TxKey).(*ent.Tx)
 }

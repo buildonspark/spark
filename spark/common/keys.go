@@ -7,7 +7,9 @@ import (
 	"github.com/decred/dcrd/dcrec/secp256k1/v2"
 )
 
-// Utility function to add two 33 bytes pubkeys.
+// AddPublicKeys adds two secp256k1 public keys using group addition.
+// The input public keys must be 33 bytes.
+// The result is a 33 byte compressed secp256k1 public key.
 func AddPublicKeys(a, b []byte) ([]byte, error) {
 	if len(a) != 33 || len(b) != 33 {
 		return nil, fmt.Errorf("pubkeys must be 33 bytes")
@@ -29,7 +31,9 @@ func AddPublicKeys(a, b []byte) ([]byte, error) {
 	return sum.SerializeCompressed(), nil
 }
 
-// Utility function to add two private keys.
+// AddPrivateKeys adds two secp256k1 private keys using field addition.
+// The input private keys must be 32 bytes.
+// The result is a 32 byte private key.
 func AddPrivateKeys(a, b []byte) ([]byte, error) {
 	if len(a) != 32 || len(b) != 32 {
 		return nil, fmt.Errorf("private keys must be 32 bytes")

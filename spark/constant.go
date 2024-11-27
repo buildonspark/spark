@@ -1,6 +1,9 @@
 package spark
 
 const (
-	DKGThreshold = 300
-	DKGKeyCount  = 500
+	// DKGKeyThreshold is the number of keyshares required to start the DKG.
+	DKGKeyThreshold = 300
+
+	// DKGKeyCount is the number of keyshares to generate during the DKG.
+	DKGKeyCount = 500
 )

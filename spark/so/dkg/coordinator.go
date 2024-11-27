@@ -15,6 +15,7 @@ import (
 	"github.com/lightsparkdev/spark-go/so/ent/signingkeyshare"
 )
 
+// RunDKGIfNeeded checks if the keyshare count is below the threshold and runs DKG if needed.
 func RunDKGIfNeeded(db *ent.Tx, config *so.Config) error {
 	count, err := db.SigningKeyshare.Query().Where(
 		signingkeyshare.StatusEQ(schema.KeyshareStatusAvailable),
@@ -23,7 +24,7 @@ func RunDKGIfNeeded(db *ent.Tx, config *so.Config) error {
 	if err != nil {
 		return err
 	}
-	if uint64(count) >= spark.DKGThreshold {
+	if uint64(count) >= spark.DKGKeyThreshold {
 		return nil
 	}
 
@@ -31,6 +32,7 @@ func RunDKGIfNeeded(db *ent.Tx, config *so.Config) error {
 	return GenerateKeys(config, spark.DKGKeyCount)
 }
 
+// GenerateKeys runs the DKG protocol to generate the keys.
 func GenerateKeys(config *so.Config, keyCount uint64) error {
 	log.Printf("Generating %d keys", keyCount)
 	// Init clients

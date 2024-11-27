@@ -3,11 +3,11 @@ package dkg
 import (
 	"testing"
 
-	"github.com/lightsparkdev/spark-go/test_util"
+	testutil "github.com/lightsparkdev/spark-go/test_util"
 )
 
 func TestDKG(t *testing.T) {
-	config, err := test_util.TestConfig()
+	config, err := testutil.TestConfig()
 	if err != nil {
 		t.Fatal(err)
 	}

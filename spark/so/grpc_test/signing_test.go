@@ -10,7 +10,7 @@ import (
 	"github.com/lightsparkdev/spark-go/so/ent_utils"
 	"github.com/lightsparkdev/spark-go/so/helper"
 	"github.com/lightsparkdev/spark-go/so/objects"
-	"github.com/lightsparkdev/spark-go/test_util"
+	testutil "github.com/lightsparkdev/spark-go/test_util"
 )
 
 // TestFrostSign tests the frost signing process.
@@ -18,12 +18,12 @@ import (
 // Since the FROST signer is a stateless signer except for DKG, it is reused for both the user and the operator.
 func TestFrostSign(t *testing.T) {
 	// Step 1: Setup config
-	config, err := test_util.TestConfig()
+	config, err := testutil.TestConfig()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	ctx, err := test_util.TestContext(config)
+	ctx, err := testutil.TestContext(config)
 	if err != nil {
 		t.Fatal(err)
 	}
