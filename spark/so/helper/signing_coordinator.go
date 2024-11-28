@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/common"
 	"github.com/lightsparkdev/spark-go/so"
+	"github.com/lightsparkdev/spark-go/so/entutils"
 	"github.com/lightsparkdev/spark-go/so/objects"
 
 	pb "github.com/lightsparkdev/spark-go/proto"
@@ -20,6 +21,8 @@ type SigningResult struct {
 	SignatureShares map[string][]byte
 	// SigningCommitments is the signing commitments from all operators.
 	SigningCommitments map[string]objects.SigningCommitment
+	// PublicKeys is the public keys from all operators.
+	PublicKeys map[string][]byte
 }
 
 // frostRound1 performs the first round of the Frost signing. It gathers the signing commitments from all operators.
@@ -176,6 +179,11 @@ func SignFrost(
 ) ([]*SigningResult, error) {
 	selection := OperatorSelection{Option: OperatorSelectionOptionThreshold, Threshold: int(config.Threshold)}
 	signingKeyshareIDs := SigningKeyshareIDsFromSigningJobs(jobs)
+	signingKeyshares, err := entutils.GetKeyPackages(ctx, config, signingKeyshareIDs)
+	if err != nil {
+		log.Println("GetKeyPackages failed:", err)
+		return nil, err
+	}
 	round1, err := frostRound1(ctx, config, signingKeyshareIDs, &selection)
 	if err != nil {
 		log.Println("FrostRound1 failed:", err)
@@ -191,11 +199,23 @@ func SignFrost(
 	round1Array := common.MapOfArrayToArrayOfMap(round1)
 
 	results := make([]*SigningResult, len(jobs))
+	signingParticipants, err := selection.OperatorList(config)
+	if err != nil {
+		log.Println("OperatorList failed:", err)
+		return nil, err
+	}
 	for i, job := range jobs {
+		allPublicShares := signingKeyshares[job.SigningKeyshareID].PublicShares
+		publicShares := make(map[string][]byte)
+		for _, participant := range signingParticipants {
+			publicShares[participant.Identifier] = allPublicShares[participant.Identifier]
+		}
+
 		results[i] = &SigningResult{
 			JobID:              job.JobID,
 			SignatureShares:    round2[job.JobID],
 			SigningCommitments: round1Array[i],
+			PublicKeys:         publicShares,
 		}
 	}
 

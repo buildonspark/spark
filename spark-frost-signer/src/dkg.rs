@@ -81,14 +81,22 @@ pub fn key_package_from_dkg_result(
     let public_shares = public_package
         .verifying_shares()
         .iter()
-        .map(|(id, share)| (hex::encode(id.serialize()), share.serialize().to_vec()))
+        .map(|(id, share)| {
+            (
+                hex::encode(id.serialize()),
+                share.serialize().expect("failed to serialize share"),
+            )
+        })
         .collect();
 
     Ok(KeyPackage {
         secret_share: secret_share.to_vec(),
         identifier,
         min_signers: *secret_package.min_signers() as u32,
-        public_key: public_package.verifying_key().serialize().to_vec(),
+        public_key: public_package
+            .verifying_key()
+            .serialize()
+            .expect("failed to serialize public key"),
         public_shares,
     })
 }

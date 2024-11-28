@@ -27,3 +27,6 @@ go.work.sum
 
 # Data directory
 _data/
+
+# VSCode
+.vscode/

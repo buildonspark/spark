@@ -7,6 +7,7 @@ use tonic::transport::Server;
 use tracing::Level;
 
 mod dkg;
+mod frost_test;
 mod server;
 mod signing;
 

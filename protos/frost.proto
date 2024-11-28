@@ -249,17 +249,26 @@ message AggregateFrostRequest {
     // The message to sign.
     bytes message = 1;
 
-    // The signature shares.
+    // The signature shares for each participant of the statechain.
     map<string, bytes> signature_shares = 2;
 
+    // The public shares for each participant of the statechain.
+    map<string, bytes> public_shares = 3;
+
     // The verifying key. This should be the total public key for both user and StatechainEntity.
-    bytes verifying_key = 3;
+    bytes verifying_key = 4;
 
     // The commitments for all participants of the statechain.
-    map<string, SigningCommitment> commitments = 4;
+    map<string, SigningCommitment> commitments = 5;
 
     // The commitments for all participants of the user.
-    SigningCommitment user_commitments = 5;
+    SigningCommitment user_commitments = 6;
+
+    // The user's public key.
+    bytes user_public_key = 7;
+
+    // The user's signature share.
+    bytes user_signature_share = 8;
 }
 
 /*

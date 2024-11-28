@@ -143,13 +143,16 @@ func TestFrostSign(t *testing.T) {
 
 	// Step 8: Signature aggregation - The aggregation is successful only if the signature is valid.
 	signatureShares := signingResult[0].SignatureShares
-	signatureShares[userIdentifier] = userSignatures.Results[userJobID].SignatureShare
+	publicKeys := signingResult[0].PublicKeys
 	_, err = client.AggregateFrost(ctx, &pb.AggregateFrostRequest{
-		Message:         msg,
-		SignatureShares: signatureShares,
-		VerifyingKey:    verifyingKeyBytes,
-		Commitments:     operatorCommitmentsProto,
-		UserCommitments: userNonceCommitmentProto,
+		Message:            msg,
+		SignatureShares:    signatureShares,
+		PublicShares:       publicKeys,
+		VerifyingKey:       verifyingKeyBytes,
+		Commitments:        operatorCommitmentsProto,
+		UserCommitments:    userNonceCommitmentProto,
+		UserPublicKey:      userPubKeyBytes,
+		UserSignatureShare: userSignatures.Results[userJobID].SignatureShare,
 	})
 	if err != nil {
 		t.Fatal(err)

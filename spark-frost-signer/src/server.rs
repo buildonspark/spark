@@ -3,7 +3,6 @@ use std::sync::{Arc, Mutex};
 
 use frost::*;
 use frost_core::Identifier;
-use frost_secp256k1_tr::aggregate_spark;
 use tonic::{Request, Response, Status};
 
 use frost::frost_service_server::FrostService;
@@ -16,7 +15,7 @@ use crate::dkg::{
 };
 use crate::signing::{
     frost_build_signin_package, frost_commitments_from_proto, frost_key_package_from_proto,
-    frost_nonce_from_proto, frost_signature_shares_from_proto,
+    frost_nonce_from_proto, frost_public_package_from_proto, frost_signature_shares_from_proto,
     frost_signing_commiement_map_from_proto, verifying_key_from_bytes,
 };
 
@@ -243,7 +242,9 @@ impl FrostService for FrostServer {
         let mut results = Vec::new();
 
         for key_package in req.key_packages.iter() {
-            let key_package = frost_key_package_from_proto(key_package, None)
+            let verifying_key = verifying_key_from_bytes(key_package.public_key.clone())
+                .map_err(|e| Status::internal(format!("Failed to parse verifying key: {:?}", e)))?;
+            let key_package = frost_key_package_from_proto(key_package, None, verifying_key, 0)
                 .map_err(|e| Status::internal(format!("Failed to parse key package: {:?}", e)))?;
 
             let rng = &mut rand::thread_rng();
@@ -256,8 +257,12 @@ impl FrostService for FrostServer {
             };
 
             let pb_commitment = SigningCommitment {
-                hiding: commitment.hiding().serialize().to_vec(),
-                binding: commitment.binding().serialize().to_vec(),
+                hiding: commitment.hiding().serialize().map_err(|e| {
+                    Status::internal(format!("Failed to serialize hiding commitment: {:?}", e))
+                })?,
+                binding: commitment.binding().serialize().map_err(|e| {
+                    Status::internal(format!("Failed to serialize binding commitment: {:?}", e))
+                })?,
             };
 
             results.push(SigningNonceResult {
@@ -299,7 +304,7 @@ impl FrostService for FrostServer {
                 Some(commitments) => frost_commitments_from_proto(commitments).map_err(|e| {
                     Status::internal(format!("Failed to parse user commitments: {:?}", e))
                 })?,
-                None => return Err(Status::internal("")),
+                None => return Err(Status::internal("User commitments are required")),
             };
             commitments.insert(user_identifier, user_commitments);
             tracing::debug!("There are {} commitments", commitments.len());
@@ -320,25 +325,31 @@ impl FrostService for FrostServer {
             };
 
             let key_package = match &job.key_package {
-                Some(key_package) => frost_key_package_from_proto(key_package, identifier_override)
-                    .map_err(|e| {
-                        Status::internal(format!("Failed to parse key package: {:?}", e))
-                    })?,
+                Some(key_package) => frost_key_package_from_proto(
+                    key_package,
+                    identifier_override,
+                    verifying_key,
+                    req.role,
+                )
+                .map_err(|e| Status::internal(format!("Failed to parse key package: {:?}", e)))?,
                 None => return Err(Status::internal("Key package is required")),
             };
 
-            let signing_package = frost_build_signin_package(commitments, &job.message);
+            let signing_package =
+                frost_build_signin_package(commitments, &job.message, Some(signing_participants));
             tracing::info!("Building signing package completed");
-            let signature_share = frost_secp256k1_tr::round2::sign_spark(
-                &signing_package,
-                &nonce,
-                &key_package,
-                &signing_participants,
-                None,
-                None,
-                &verifying_key,
-            )
-            .map_err(|e| Status::internal(format!("Failed to sign frost: {:?}", e)))?;
+            let tweak = vec![];
+            let signature_share = match req.role {
+                0 => frost_secp256k1_tr::round2::sign_with_tweak(
+                    &signing_package,
+                    &nonce,
+                    &key_package,
+                    Some(tweak.as_slice()),
+                )
+                .map_err(|e| Status::internal(format!("Failed to sign frost: {:?}", e)))?,
+                _ => frost_secp256k1_tr::round2::sign(&signing_package, &nonce, &key_package)
+                    .map_err(|e| Status::internal(format!("Failed to sign frost: {:?}", e)))?,
+            };
             tracing::info!("Signing frost completed");
 
             results.insert(
@@ -376,16 +387,41 @@ impl FrostService for FrostServer {
         let verifying_key = verifying_key_from_bytes(req.verifying_key.clone())
             .map_err(|e| Status::internal(format!("Failed to parse verifying key: {:?}", e)))?;
 
-        let signing_package = frost_build_signin_package(commitments, &req.message);
+        let signing_package = frost_build_signin_package(commitments, &req.message, None);
 
-        let signature_shares = frost_signature_shares_from_proto(&req.signature_shares)
-            .map_err(|e| Status::internal(format!("Failed to parse signature shares: {:?}", e)))?;
+        let signature_shares = frost_signature_shares_from_proto(
+            &req.signature_shares,
+            user_identifier,
+            &req.user_signature_share,
+        )
+        .map_err(|e| Status::internal(format!("Failed to parse signature shares: {:?}", e)))?;
 
-        let signature = aggregate_spark(&signing_package, &signature_shares, &verifying_key)
-            .map_err(|e| Status::internal(format!("Failed to aggregate frost: {:?}", e)))?;
+        let public_package = frost_public_package_from_proto(
+            &req.public_shares,
+            user_identifier,
+            req.user_public_key.clone(),
+            verifying_key,
+        )
+        .map_err(|e| Status::internal(format!("Failed to parse public package: {:?}", e)))?;
+
+        let tweak = vec![];
+
+        tracing::info!("signing_package: {:?}", signing_package);
+        tracing::info!("signature_shares: {:?}", signature_shares);
+        tracing::info!("public_package: {:?}", public_package);
+
+        let signature = frost_secp256k1_tr::aggregate_with_tweak(
+            &signing_package,
+            &signature_shares,
+            &public_package,
+            Some(&tweak),
+        )
+        .map_err(|e| Status::internal(format!("Failed to aggregate frost: {:?}", e)))?;
 
         Ok(Response::new(AggregateFrostResponse {
-            signature: signature.serialize().to_vec(),
+            signature: signature
+                .serialize()
+                .map_err(|e| Status::internal(format!("Failed to serialize signature: {:?}", e)))?,
         }))
     }
 }
