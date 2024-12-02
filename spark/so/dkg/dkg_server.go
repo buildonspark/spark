@@ -6,7 +6,9 @@ import (
 	"sync"
 
 	"github.com/lightsparkdev/spark-go/common"
-	pb "github.com/lightsparkdev/spark-go/proto"
+	pbcommon "github.com/lightsparkdev/spark-go/proto/common"
+	pbdkg "github.com/lightsparkdev/spark-go/proto/dkg"
+	pbfrost "github.com/lightsparkdev/spark-go/proto/frost"
 	"github.com/lightsparkdev/spark-go/so"
 	"google.golang.org/grpc"
 )
@@ -14,7 +16,7 @@ import (
 // Server is the grpc server for the DKG protocol.
 // It is only used by the signing operators.
 type Server struct {
-	pb.UnimplementedDKGServiceServer
+	pbdkg.UnimplementedDKGServiceServer
 	frostConnection *grpc.ClientConn
 	state           *States
 	config          *so.Config
@@ -31,15 +33,15 @@ func NewServer(frostConnection *grpc.ClientConn, config *so.Config) *Server {
 
 // InitiateDkg initiates the DKG protocol.
 // It will be called by the coordinator. It will start the DKG round 1 and deliver the round 1 package to the coordinator.
-func (s *Server) InitiateDkg(ctx context.Context, req *pb.InitiateDkgRequest) (*pb.InitiateDkgResponse, error) {
+func (s *Server) InitiateDkg(ctx context.Context, req *pbdkg.InitiateDkgRequest) (*pbdkg.InitiateDkgResponse, error) {
 	log.Println("initiate dkg", req.RequestId, req.MaxSigners, req.MinSigners)
 	if err := s.state.InitiateDkg(req.RequestId, req.MaxSigners, req.MinSigners, req.CoordinatorIndex); err != nil {
 		log.Println("error initiating dkg", err)
 		return nil, err
 	}
 
-	frostClient := pb.NewFrostServiceClient(s.frostConnection)
-	round1Response, err := frostClient.DkgRound1(ctx, &pb.DkgRound1Request{
+	frostClient := pbfrost.NewFrostServiceClient(s.frostConnection)
+	round1Response, err := frostClient.DkgRound1(ctx, &pbfrost.DkgRound1Request{
 		RequestId:  req.RequestId,
 		Identifier: s.config.Identifier,
 		MaxSigners: req.MaxSigners,
@@ -58,7 +60,7 @@ func (s *Server) InitiateDkg(ctx context.Context, req *pb.InitiateDkgRequest) (*
 		return nil, err
 	}
 
-	return &pb.InitiateDkgResponse{
+	return &pbdkg.InitiateDkgResponse{
 		Identifier:    s.config.Identifier,
 		Round1Package: round1Response.Round1Packages,
 	}, nil
@@ -68,7 +70,7 @@ func (s *Server) InitiateDkg(ctx context.Context, req *pb.InitiateDkgRequest) (*
 // It will be called by the coordinator. This function will deliver the round 1 packages from the other operators.
 // The packages will be signed with this operator's identity key and sent the signature back to the coordinator.
 // It is used as a confirmation that the operator has received the round 1 packages.
-func (s *Server) Round1Packages(ctx context.Context, req *pb.Round1PackagesRequest) (*pb.Round1PackagesResponse, error) {
+func (s *Server) Round1Packages(ctx context.Context, req *pbdkg.Round1PackagesRequest) (*pbdkg.Round1PackagesResponse, error) {
 	log.Println("round 1 packages", req.RequestId)
 	round1Packages := make([]map[string][]byte, len(req.Round1Packages))
 	for i, p := range req.Round1Packages {
@@ -84,7 +86,7 @@ func (s *Server) Round1Packages(ctx context.Context, req *pb.Round1PackagesReque
 		return nil, err
 	}
 
-	return &pb.Round1PackagesResponse{
+	return &pbdkg.Round1PackagesResponse{
 		Identifier:      s.config.Identifier,
 		Round1Signature: signature,
 	}, nil
@@ -93,7 +95,7 @@ func (s *Server) Round1Packages(ctx context.Context, req *pb.Round1PackagesReque
 // Round1Signature receives the round 1 signatures from the coordinator.
 // It will be called by the coordinator. This function will validate the round 1 signatures of all other operators to make sure everyone receives the same round 1 packages.
 // Then it will start the DKG round 2, and distribute the round 2 package to the corresponding operators.
-func (s *Server) Round1Signature(ctx context.Context, req *pb.Round1SignatureRequest) (*pb.Round1SignatureResponse, error) {
+func (s *Server) Round1Signature(ctx context.Context, req *pbdkg.Round1SignatureRequest) (*pbdkg.Round1SignatureResponse, error) {
 	log.Println("round 1 signature", req.RequestId)
 	validationFailures, err := s.state.ReceivedRound1Signature(req.RequestId, s.config.Identifier, req.Round1Signatures, s.config.SigningOperatorMap)
 	if err != nil {
@@ -101,7 +103,7 @@ func (s *Server) Round1Signature(ctx context.Context, req *pb.Round1SignatureReq
 	}
 
 	if validationFailures != nil && len(validationFailures) > 0 {
-		return &pb.Round1SignatureResponse{
+		return &pbdkg.Round1SignatureResponse{
 			Identifier:         s.config.Identifier,
 			ValidationFailures: validationFailures,
 		}, nil
@@ -112,14 +114,14 @@ func (s *Server) Round1Signature(ctx context.Context, req *pb.Round1SignatureReq
 		return nil, err
 	}
 
-	round1PackagesMaps := make([]*pb.PackageMap, len(state.ReceivedRound1Packages))
+	round1PackagesMaps := make([]*pbcommon.PackageMap, len(state.ReceivedRound1Packages))
 	for i, p := range state.ReceivedRound1Packages {
 		delete(p, s.config.Identifier)
-		round1PackagesMaps[i] = &pb.PackageMap{Packages: p}
+		round1PackagesMaps[i] = &pbcommon.PackageMap{Packages: p}
 	}
 
-	frostClient := pb.NewFrostServiceClient(s.frostConnection)
-	round2Response, err := frostClient.DkgRound2(ctx, &pb.DkgRound2Request{
+	frostClient := pbfrost.NewFrostServiceClient(s.frostConnection)
+	round2Response, err := frostClient.DkgRound2(ctx, &pbfrost.DkgRound2Request{
 		RequestId:          req.RequestId,
 		Round1PackagesMaps: round1PackagesMaps,
 	})
@@ -143,7 +145,7 @@ func (s *Server) Round1Signature(ctx context.Context, req *pb.Round1SignatureReq
 				log.Println("error creating connection", err)
 				return
 			}
-			client := pb.NewDKGServiceClient(connection)
+			client := pbdkg.NewDKGServiceClient(connection)
 
 			round2Packages := make([][]byte, len(round2Response.Round2Packages))
 			for i, p := range round2Response.Round2Packages {
@@ -156,7 +158,7 @@ func (s *Server) Round1Signature(ctx context.Context, req *pb.Round1SignatureReq
 				return
 			}
 
-			_, err = client.Round2Packages(ctx, &pb.Round2PackagesRequest{
+			_, err = client.Round2Packages(ctx, &pbdkg.Round2PackagesRequest{
 				RequestId:       req.RequestId,
 				Identifier:      s.config.Identifier,
 				Round2Packages:  round2Packages,
@@ -176,17 +178,17 @@ func (s *Server) Round1Signature(ctx context.Context, req *pb.Round1SignatureReq
 		return nil, err
 	}
 
-	return &pb.Round1SignatureResponse{
+	return &pbdkg.Round1SignatureResponse{
 		Identifier: s.config.Identifier,
 	}, nil
 }
 
 // Round2Packages receives the round 2 packages from other operators.
 // Once all operators have sent their round 2 packages, it will start the DKG round 3 and store the key shares in the database.
-func (s *Server) Round2Packages(ctx context.Context, req *pb.Round2PackagesRequest) (*pb.Round2PackagesResponse, error) {
+func (s *Server) Round2Packages(ctx context.Context, req *pbdkg.Round2PackagesRequest) (*pbdkg.Round2PackagesResponse, error) {
 	log.Println("round 2 packages", req.RequestId, req.Identifier)
 	if req.Identifier == s.config.Identifier {
-		return &pb.Round2PackagesResponse{}, nil
+		return &pbdkg.Round2PackagesResponse{}, nil
 	}
 
 	if err := s.state.ReceivedRound2Packages(req.RequestId, req.Identifier, req.Round2Packages, req.Round2Signature, s.frostConnection, s.config); err != nil {
@@ -197,5 +199,5 @@ func (s *Server) Round2Packages(ctx context.Context, req *pb.Round2PackagesReque
 		return nil, err
 	}
 
-	return &pb.Round2PackagesResponse{}, nil
+	return &pbdkg.Round2PackagesResponse{}, nil
 }

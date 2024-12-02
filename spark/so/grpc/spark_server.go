@@ -8,7 +8,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/common"
-	pb "github.com/lightsparkdev/spark-go/proto"
+	pb "github.com/lightsparkdev/spark-go/proto/spark"
+	pbinternal "github.com/lightsparkdev/spark-go/proto/spark_internal"
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/entutils"
 	"github.com/lightsparkdev/spark-go/so/helper"
@@ -56,8 +57,8 @@ func (s *SparkServer) GenerateDepositAddress(ctx context.Context, req *pb.Genera
 		}
 		defer conn.Close()
 
-		client := pb.NewSparkInternalServiceClient(conn)
-		_, err = client.MarkKeysharesAsUsed(ctx, &pb.MarkKeysharesAsUsedRequest{KeyshareId: []string{keyshare.ID.String()}})
+		client := pbinternal.NewSparkInternalServiceClient(conn)
+		_, err = client.MarkKeysharesAsUsed(ctx, &pbinternal.MarkKeysharesAsUsedRequest{KeyshareId: []string{keyshare.ID.String()}})
 		return nil, err
 	})
 	if err != nil {
@@ -95,8 +96,8 @@ func (s *SparkServer) GenerateDepositAddress(ctx context.Context, req *pb.Genera
 		}
 		defer conn.Close()
 
-		client := pb.NewSparkInternalServiceClient(conn)
-		_, err = client.MarkKeyshareForDepositAddress(ctx, &pb.MarkKeyshareForDepositAddressRequest{
+		client := pbinternal.NewSparkInternalServiceClient(conn)
+		_, err = client.MarkKeyshareForDepositAddress(ctx, &pbinternal.MarkKeyshareForDepositAddressRequest{
 			KeyshareId:             keyshare.ID.String(),
 			Address:                *depositAddress,
 			OwnerIdentityPublicKey: req.IdentityPublicKey,

@@ -6,7 +6,9 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/common"
-	pb "github.com/lightsparkdev/spark-go/proto"
+	pbcommon "github.com/lightsparkdev/spark-go/proto/common"
+	pbfrost "github.com/lightsparkdev/spark-go/proto/frost"
+	pb "github.com/lightsparkdev/spark-go/proto/spark_internal"
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/entutils"
 	"github.com/lightsparkdev/spark-go/so/objects"
@@ -90,7 +92,7 @@ func (s *SparkInternalServer) FrostRound1(ctx context.Context, req *pb.FrostRoun
 		log.Printf("Failed to get key packages: %v", err)
 		return nil, err
 	}
-	keyPackagesArray := make([]*pb.KeyPackage, 0)
+	keyPackagesArray := make([]*pbfrost.KeyPackage, 0)
 	for _, uuid := range uuids {
 		keyPackagesArray = append(keyPackagesArray, keyPackages[uuid])
 	}
@@ -102,8 +104,8 @@ func (s *SparkInternalServer) FrostRound1(ctx context.Context, req *pb.FrostRoun
 	}
 	defer frostConn.Close()
 
-	frostClient := pb.NewFrostServiceClient(frostConn)
-	round1Response, err := frostClient.FrostNonce(ctx, &pb.FrostNonceRequest{
+	frostClient := pbfrost.NewFrostServiceClient(frostConn)
+	round1Response, err := frostClient.FrostNonce(ctx, &pbfrost.FrostNonceRequest{
 		KeyPackages: keyPackagesArray,
 	})
 	if err != nil {
@@ -132,7 +134,7 @@ func (s *SparkInternalServer) FrostRound1(ctx context.Context, req *pb.FrostRoun
 		}
 	}
 
-	commitments := make([]*pb.SigningCommitment, len(round1Response.Results))
+	commitments := make([]*pbcommon.SigningCommitment, len(round1Response.Results))
 	for i, result := range round1Response.Results {
 		commitments[i] = result.Commitments
 	}
@@ -179,7 +181,7 @@ func (s *SparkInternalServer) FrostRound2(ctx context.Context, req *pb.FrostRoun
 		return nil, err
 	}
 
-	signingJobProtos := make([]*pb.FrostSigningJob, 0)
+	signingJobProtos := make([]*pbfrost.FrostSigningJob, 0)
 
 	for _, job := range req.SigningJobs {
 		keyshareID, err := uuid.Parse(job.KeyshareId)
@@ -198,7 +200,7 @@ func (s *SparkInternalServer) FrostRound2(ctx context.Context, req *pb.FrostRoun
 			log.Printf("Failed to marshal nonce: %v", err)
 			return nil, err
 		}
-		signingJobProto := &pb.FrostSigningJob{
+		signingJobProto := &pbfrost.FrostSigningJob{
 			JobId:           job.JobId,
 			Message:         job.Message,
 			KeyPackage:      keyPackages[keyshareID],
@@ -216,11 +218,11 @@ func (s *SparkInternalServer) FrostRound2(ctx context.Context, req *pb.FrostRoun
 		return nil, err
 	}
 	defer frostConn.Close()
-	frostClient := pb.NewFrostServiceClient(frostConn)
+	frostClient := pbfrost.NewFrostServiceClient(frostConn)
 
-	round2Request := &pb.SignFrostRequest{
+	round2Request := &pbfrost.SignFrostRequest{
 		SigningJobs: signingJobProtos,
-		Role:        pb.SigningRole_STATECHAIN,
+		Role:        pbfrost.SigningRole_STATECHAIN,
 	}
 	round2Response, err := frostClient.SignFrost(ctx, round2Request)
 	if err != nil {

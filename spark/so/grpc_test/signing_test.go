@@ -6,7 +6,8 @@ import (
 	"github.com/decred/dcrd/dcrec/secp256k1"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/common"
-	pb "github.com/lightsparkdev/spark-go/proto"
+	pbcommon "github.com/lightsparkdev/spark-go/proto/common"
+	pbfrost "github.com/lightsparkdev/spark-go/proto/frost"
 	"github.com/lightsparkdev/spark-go/so/entutils"
 	"github.com/lightsparkdev/spark-go/so/helper"
 	"github.com/lightsparkdev/spark-go/so/objects"
@@ -54,7 +55,7 @@ func TestFrostSign(t *testing.T) {
 
 	// User identifier will not be used in this test, so we can use any string.
 	userIdentifier := "0000000000000000000000000000000000000000000000000000000000000063"
-	userKeyPackage := pb.KeyPackage{
+	userKeyPackage := pbfrost.KeyPackage{
 		Identifier:  userIdentifier,
 		SecretShare: privKey.Serialize(),
 		PublicShares: map[string][]byte{
@@ -113,7 +114,7 @@ func TestFrostSign(t *testing.T) {
 		t.Fatal(err)
 	}
 	operatorCommitments := signingResult[0].SigningCommitments
-	operatorCommitmentsProto := make(map[string]*pb.SigningCommitment)
+	operatorCommitmentsProto := make(map[string]*pbcommon.SigningCommitment)
 	for id, commitment := range operatorCommitments {
 		commitmentProto, err := commitment.MarshalProto()
 		if err != nil {
@@ -128,10 +129,10 @@ func TestFrostSign(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer conn.Close()
-	client := pb.NewFrostServiceClient(conn)
-	userSigningJobs := make([]*pb.FrostSigningJob, 0)
+	client := pbfrost.NewFrostServiceClient(conn)
+	userSigningJobs := make([]*pbfrost.FrostSigningJob, 0)
 	userJobID := uuid.New().String()
-	userSigningJobs = append(userSigningJobs, &pb.FrostSigningJob{
+	userSigningJobs = append(userSigningJobs, &pbfrost.FrostSigningJob{
 		JobId:           userJobID,
 		Message:         msg,
 		KeyPackage:      &userKeyPackage,
@@ -140,9 +141,9 @@ func TestFrostSign(t *testing.T) {
 		Commitments:     operatorCommitmentsProto,
 		UserCommitments: userNonceCommitmentProto,
 	})
-	userSignatures, err := client.SignFrost(ctx, &pb.SignFrostRequest{
+	userSignatures, err := client.SignFrost(ctx, &pbfrost.SignFrostRequest{
 		SigningJobs: userSigningJobs,
-		Role:        pb.SigningRole_USER,
+		Role:        pbfrost.SigningRole_USER,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -151,7 +152,7 @@ func TestFrostSign(t *testing.T) {
 	// Step 8: Signature aggregation - The aggregation is successful only if the signature is valid.
 	signatureShares := signingResult[0].SignatureShares
 	publicKeys := signingResult[0].PublicKeys
-	_, err = client.AggregateFrost(ctx, &pb.AggregateFrostRequest{
+	_, err = client.AggregateFrost(ctx, &pbfrost.AggregateFrostRequest{
 		Message:            msg,
 		SignatureShares:    signatureShares,
 		PublicShares:       publicKeys,

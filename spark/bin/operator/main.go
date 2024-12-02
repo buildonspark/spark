@@ -11,7 +11,9 @@ import (
 	"time"
 
 	"github.com/lightsparkdev/spark-go/common"
-	pb "github.com/lightsparkdev/spark-go/proto"
+	pbdkg "github.com/lightsparkdev/spark-go/proto/dkg"
+	pbspark "github.com/lightsparkdev/spark-go/proto/spark"
+	pbinternal "github.com/lightsparkdev/spark-go/proto/spark_internal"
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/dkg"
 	"github.com/lightsparkdev/spark-go/so/ent"
@@ -115,13 +117,13 @@ func main() {
 	dkgServer := dkg.NewServer(frostConnection, config)
 
 	grpcServer := grpc.NewServer(grpc.UnaryInterceptor(common.DbSessionMiddleware(dbClient)))
-	pb.RegisterDKGServiceServer(grpcServer, dkgServer)
+	pbdkg.RegisterDKGServiceServer(grpcServer, dkgServer)
 
 	sparkInternalServer := sparkgrpc.NewSparkInternalServer(config)
-	pb.RegisterSparkInternalServiceServer(grpcServer, sparkInternalServer)
+	pbinternal.RegisterSparkInternalServiceServer(grpcServer, sparkInternalServer)
 
 	sparkServer := sparkgrpc.NewSparkServer(config)
-	pb.RegisterSparkServiceServer(grpcServer, sparkServer)
+	pbspark.RegisterSparkServiceServer(grpcServer, sparkServer)
 
 	log.Printf("Serving on port %d\n", args.Port)
 	if err := grpcServer.Serve(lis); err != nil {

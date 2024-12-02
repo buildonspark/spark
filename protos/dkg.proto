@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package dkg;
 
-option go_package = "github.com/lightsparkdev/spark-go/proto";
+option go_package = "github.com/lightsparkdev/spark-go/proto/dkg";
 
-import "frost.proto";
+import "common.proto";
 
 /*
  * Distributed Key Generation Service
@@ -96,7 +96,7 @@ message Round1PackagesRequest {
     string request_id = 1;
 
     // The round1 packages from the participants.
-    repeated frost.PackageMap round1_packages = 2;
+    repeated common.PackageMap round1_packages = 2;
 }
 
 message Round1PackagesResponse {

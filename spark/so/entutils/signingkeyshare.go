@@ -6,7 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/common"
-	pb "github.com/lightsparkdev/spark-go/proto"
+	pbfrost "github.com/lightsparkdev/spark-go/proto/frost"
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/dkg"
 	"github.com/lightsparkdev/spark-go/so/ent"
@@ -67,13 +67,13 @@ func MarkSigningKeysharesAsUsed(ctx context.Context, config *so.Config, ids []uu
 }
 
 // GetKeyPackage returns the key package for the given keyshare ID.
-func GetKeyPackage(ctx context.Context, config *so.Config, keyshareID uuid.UUID) (*pb.KeyPackage, error) {
+func GetKeyPackage(ctx context.Context, config *so.Config, keyshareID uuid.UUID) (*pbfrost.KeyPackage, error) {
 	keyshare, err := common.GetDbFromContext(ctx).SigningKeyshare.Get(ctx, keyshareID)
 	if err != nil {
 		return nil, err
 	}
 
-	keyPackage := &pb.KeyPackage{
+	keyPackage := &pbfrost.KeyPackage{
 		Identifier:   config.Identifier,
 		SecretShare:  keyshare.SecretShare,
 		PublicShares: keyshare.PublicShares,
@@ -85,7 +85,7 @@ func GetKeyPackage(ctx context.Context, config *so.Config, keyshareID uuid.UUID)
 }
 
 // GetKeyPackages returns the key packages for the given keyshare IDs.
-func GetKeyPackages(ctx context.Context, config *so.Config, keyshareIDs []uuid.UUID) (map[uuid.UUID]*pb.KeyPackage, error) {
+func GetKeyPackages(ctx context.Context, config *so.Config, keyshareIDs []uuid.UUID) (map[uuid.UUID]*pbfrost.KeyPackage, error) {
 	keyshares, err := common.GetDbFromContext(ctx).SigningKeyshare.Query().Where(
 		signingkeyshare.IDIn(keyshareIDs...),
 	).All(ctx)
@@ -93,9 +93,9 @@ func GetKeyPackages(ctx context.Context, config *so.Config, keyshareIDs []uuid.U
 		return nil, err
 	}
 
-	keyPackages := make(map[uuid.UUID]*pb.KeyPackage, len(keyshares))
+	keyPackages := make(map[uuid.UUID]*pbfrost.KeyPackage, len(keyshares))
 	for _, keyshare := range keyshares {
-		keyPackages[keyshare.ID] = &pb.KeyPackage{
+		keyPackages[keyshare.ID] = &pbfrost.KeyPackage{
 			Identifier:   config.Identifier,
 			SecretShare:  keyshare.SecretShare,
 			PublicShares: keyshare.PublicShares,

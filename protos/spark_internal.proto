@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package spark;
 
-option go_package = "github.com/lightsparkdev/spark-go/proto";
+option go_package = "github.com/lightsparkdev/spark-go/proto/spark_internal";
 import "google/protobuf/empty.proto";
-import "frost.proto";
+import "common.proto";
 
 service SparkInternalService {
     rpc mark_keyshares_as_used(MarkKeysharesAsUsedRequest) returns (google.protobuf.Empty) {}
@@ -29,7 +29,7 @@ message FrostRound1Request {
 }
 
 message FrostRound1Response {   
-    repeated frost.SigningCommitment signing_commitments = 1;
+    repeated common.SigningCommitment signing_commitments = 1;
 }
 
 message SigningJob {
@@ -46,10 +46,10 @@ message SigningJob {
     bytes verifying_key = 4;
 
     // The commitments for all participants of the statechain.
-    map<string, frost.SigningCommitment> commitments = 5;
+    map<string, common.SigningCommitment> commitments = 5;
 
     // The commitments for all participants of the user.
-    frost.SigningCommitment user_commitments = 6;
+    common.SigningCommitment user_commitments = 6;
 }
 
 message FrostRound2Request {
@@ -57,5 +57,5 @@ message FrostRound2Request {
 }
 
 message FrostRound2Response {
-    map<string, frost.SigningResult> results = 1;
+    map<string, common.SigningResult> results = 1;
 }

@@ -10,7 +10,8 @@ import (
 	"github.com/lightsparkdev/spark-go/so/entutils"
 	"github.com/lightsparkdev/spark-go/so/objects"
 
-	pb "github.com/lightsparkdev/spark-go/proto"
+	pbcommon "github.com/lightsparkdev/spark-go/proto/common"
+	pbinternal "github.com/lightsparkdev/spark-go/proto/spark_internal"
 )
 
 // SigningResult is the result of a signing job.
@@ -39,8 +40,8 @@ func frostRound1(ctx context.Context, config *so.Config, signingKeyshareIDs []uu
 			keyshareIDs[i] = id.String()
 		}
 
-		client := pb.NewSparkInternalServiceClient(conn)
-		response, err := client.FrostRound1(ctx, &pb.FrostRound1Request{
+		client := pbinternal.NewSparkInternalServiceClient(conn)
+		response, err := client.FrostRound1(ctx, &pbinternal.FrostRound1Request{
 			KeyshareIds: keyshareIDs,
 		})
 		if err != nil {
@@ -78,9 +79,9 @@ func frostRound2(
 
 		commitmentsArray := common.MapOfArrayToArrayOfMap(round1)
 
-		signingJobs := make([]*pb.SigningJob, len(jobs))
+		signingJobs := make([]*pbinternal.SigningJob, len(jobs))
 		for i, job := range jobs {
-			commitments := make(map[string]*pb.SigningCommitment)
+			commitments := make(map[string]*pbcommon.SigningCommitment)
 			for operatorID, commitment := range commitmentsArray[i] {
 				commitmentProto, err := commitment.MarshalProto()
 				if err != nil {
@@ -94,7 +95,7 @@ func frostRound2(
 				log.Println("Round2 MarshalProto failed:", err)
 				return nil, err
 			}
-			signingJobs[i] = &pb.SigningJob{
+			signingJobs[i] = &pbinternal.SigningJob{
 				JobId:           job.JobID,
 				Message:         job.Message,
 				KeyshareId:      job.SigningKeyshareID.String(),
@@ -106,8 +107,8 @@ func frostRound2(
 			log.Println("FrostRound2 signing job:", signingJobs[i])
 		}
 
-		client := pb.NewSparkInternalServiceClient(conn)
-		response, err := client.FrostRound2(ctx, &pb.FrostRound2Request{
+		client := pbinternal.NewSparkInternalServiceClient(conn)
+		response, err := client.FrostRound2(ctx, &pbinternal.FrostRound2Request{
 			SigningJobs: signingJobs,
 		})
 		if err != nil {

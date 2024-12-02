@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/lightsparkdev/spark-go/common"
-	pb "github.com/lightsparkdev/spark-go/proto"
+	pb "github.com/lightsparkdev/spark-go/proto/spark"
 )
 
 func TestGenerateDepositAddress(t *testing.T) {

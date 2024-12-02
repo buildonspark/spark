@@ -10,7 +10,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/common"
-	pb "github.com/lightsparkdev/spark-go/proto"
+	pbcommon "github.com/lightsparkdev/spark-go/proto/common"
+	pbfrost "github.com/lightsparkdev/spark-go/proto/frost"
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
 	"google.golang.org/grpc"
@@ -256,22 +257,22 @@ func (s *States) ProceedToRound3(ctx context.Context, requestID string, frostCon
 // This will generate the keyshares and store them in the database.
 func (s *State) Round3(ctx context.Context, requestID string, frostConnection *grpc.ClientConn, config *so.Config) error {
 	log.Printf("Round 3")
-	round1PackagesMaps := make([]*pb.PackageMap, len(s.ReceivedRound1Packages))
+	round1PackagesMaps := make([]*pbcommon.PackageMap, len(s.ReceivedRound1Packages))
 	for i, p := range s.ReceivedRound1Packages {
-		round1PackagesMaps[i] = &pb.PackageMap{
+		round1PackagesMaps[i] = &pbcommon.PackageMap{
 			Packages: p,
 		}
 	}
 
-	round2PackagesMaps := make([]*pb.PackageMap, len(s.ReceivedRound2Packages))
+	round2PackagesMaps := make([]*pbcommon.PackageMap, len(s.ReceivedRound2Packages))
 	for i, p := range s.ReceivedRound2Packages {
-		round2PackagesMaps[i] = &pb.PackageMap{
+		round2PackagesMaps[i] = &pbcommon.PackageMap{
 			Packages: p,
 		}
 	}
 
-	frostClient := pb.NewFrostServiceClient(frostConnection)
-	response, err := frostClient.DkgRound3(context.Background(), &pb.DkgRound3Request{
+	frostClient := pbfrost.NewFrostServiceClient(frostConnection)
+	response, err := frostClient.DkgRound3(context.Background(), &pbfrost.DkgRound3Request{
 		RequestId:          requestID,
 		Round1PackagesMaps: round1PackagesMaps,
 		Round2PackagesMaps: round2PackagesMaps,

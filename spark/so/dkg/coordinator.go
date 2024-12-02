@@ -8,7 +8,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go"
 	"github.com/lightsparkdev/spark-go/common"
-	pb "github.com/lightsparkdev/spark-go/proto"
+	pbcommon "github.com/lightsparkdev/spark-go/proto/common"
+	pbdkg "github.com/lightsparkdev/spark-go/proto/dkg"
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/ent"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
@@ -36,14 +37,14 @@ func RunDKGIfNeeded(db *ent.Tx, config *so.Config) error {
 func GenerateKeys(config *so.Config, keyCount uint64) error {
 	log.Printf("Generating %d keys", keyCount)
 	// Init clients
-	clientMap := make(map[string]pb.DKGServiceClient)
+	clientMap := make(map[string]pbdkg.DKGServiceClient)
 	for identifier, operator := range config.SigningOperatorMap {
 		connection, err := common.NewGRPCConnection(operator.Address)
 		if err != nil {
 			return err
 		}
 		defer connection.Close()
-		client := pb.NewDKGServiceClient(connection)
+		client := pbdkg.NewDKGServiceClient(connection)
 		clientMap[identifier] = client
 	}
 
@@ -53,7 +54,7 @@ func GenerateKeys(config *so.Config, keyCount uint64) error {
 		return err
 	}
 	requestIDString := requestID.String()
-	initRequest := &pb.InitiateDkgRequest{
+	initRequest := &pbdkg.InitiateDkgRequest{
 		RequestId:        requestIDString,
 		KeyCount:         keyCount,
 		MinSigners:       config.Threshold,
@@ -61,7 +62,7 @@ func GenerateKeys(config *so.Config, keyCount uint64) error {
 		CoordinatorIndex: config.Index,
 	}
 
-	round1Packages := make([]*pb.PackageMap, int(keyCount))
+	round1Packages := make([]*pbcommon.PackageMap, int(keyCount))
 
 	for identifier, client := range clientMap {
 		log.Printf("Initiating DKG with %s", identifier)
@@ -71,7 +72,7 @@ func GenerateKeys(config *so.Config, keyCount uint64) error {
 		}
 		for i, p := range round1Response.Round1Package {
 			if round1Packages[i] == nil {
-				round1Packages[i] = &pb.PackageMap{
+				round1Packages[i] = &pbcommon.PackageMap{
 					Packages: make(map[string][]byte),
 				}
 			}
@@ -83,7 +84,7 @@ func GenerateKeys(config *so.Config, keyCount uint64) error {
 	round1Signatures := make(map[string][]byte)
 
 	for _, client := range clientMap {
-		round1SignatureRequest := &pb.Round1PackagesRequest{
+		round1SignatureRequest := &pbdkg.Round1PackagesRequest{
 			RequestId:      requestIDString,
 			Round1Packages: round1Packages,
 		}
@@ -99,9 +100,9 @@ func GenerateKeys(config *so.Config, keyCount uint64) error {
 	// Round 1 Signature Delivery
 	for _, client := range clientMap {
 		wg.Add(1)
-		go func(client pb.DKGServiceClient) {
+		go func(client pbdkg.DKGServiceClient) {
 			defer wg.Done()
-			round1SignatureRequest := &pb.Round1SignatureRequest{
+			round1SignatureRequest := &pbdkg.Round1SignatureRequest{
 				RequestId:        requestIDString,
 				Round1Signatures: round1Signatures,
 			}

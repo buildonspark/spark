@@ -3,7 +3,8 @@ package objects
 import (
 	"fmt"
 
-	pb "github.com/lightsparkdev/spark-go/proto"
+	pbcommon "github.com/lightsparkdev/spark-go/proto/common"
+	pbfrost "github.com/lightsparkdev/spark-go/proto/frost"
 )
 
 // SigningNonce is the private part of a signing nonce.
@@ -42,15 +43,15 @@ func (n *SigningNonce) UnmarshalBinary(data []byte) error {
 }
 
 // MarshalProto serializes the SigningNonce into a proto.SigningNonce.
-func (n SigningNonce) MarshalProto() (*pb.SigningNonce, error) {
-	return &pb.SigningNonce{
+func (n SigningNonce) MarshalProto() (*pbfrost.SigningNonce, error) {
+	return &pbfrost.SigningNonce{
 		Binding: n.Binding,
 		Hiding:  n.Hiding,
 	}, nil
 }
 
 // UnmarshalProto deserializes the SigningNonce from a proto.SigningNonce.
-func (n *SigningNonce) UnmarshalProto(proto *pb.SigningNonce) error {
+func (n *SigningNonce) UnmarshalProto(proto *pbfrost.SigningNonce) error {
 	if proto == nil {
 		return fmt.Errorf("nil proto")
 	}
@@ -105,15 +106,15 @@ func (n *SigningCommitment) Key() [66]byte {
 }
 
 // MarshalProto serializes the SigningCommitment into a proto.SigningCommitment.
-func (n SigningCommitment) MarshalProto() (*pb.SigningCommitment, error) {
-	return &pb.SigningCommitment{
+func (n SigningCommitment) MarshalProto() (*pbcommon.SigningCommitment, error) {
+	return &pbcommon.SigningCommitment{
 		Binding: n.Binding,
 		Hiding:  n.Hiding,
 	}, nil
 }
 
 // UnmarshalProto deserializes the SigningCommitment from a proto.SigningCommitment.
-func (n *SigningCommitment) UnmarshalProto(proto *pb.SigningCommitment) error {
+func (n *SigningCommitment) UnmarshalProto(proto *pbcommon.SigningCommitment) error {
 	if proto == nil {
 		return fmt.Errorf("nil proto")
 	}
