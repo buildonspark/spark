@@ -52,9 +52,9 @@ func (tnc *TreeNodeCreate) SetNillableUpdateTime(t *time.Time) *TreeNodeCreate {
 	return tnc
 }
 
-// SetValueSats sets the "value_sats" field.
-func (tnc *TreeNodeCreate) SetValueSats(u uint64) *TreeNodeCreate {
-	tnc.mutation.SetValueSats(u)
+// SetValue sets the "value" field.
+func (tnc *TreeNodeCreate) SetValue(u uint64) *TreeNodeCreate {
+	tnc.mutation.SetValue(u)
 	return tnc
 }
 
@@ -209,8 +209,8 @@ func (tnc *TreeNodeCreate) check() error {
 	if _, ok := tnc.mutation.UpdateTime(); !ok {
 		return &ValidationError{Name: "update_time", err: errors.New(`ent: missing required field "TreeNode.update_time"`)}
 	}
-	if _, ok := tnc.mutation.ValueSats(); !ok {
-		return &ValidationError{Name: "value_sats", err: errors.New(`ent: missing required field "TreeNode.value_sats"`)}
+	if _, ok := tnc.mutation.Value(); !ok {
+		return &ValidationError{Name: "value", err: errors.New(`ent: missing required field "TreeNode.value"`)}
 	}
 	if _, ok := tnc.mutation.Status(); !ok {
 		return &ValidationError{Name: "status", err: errors.New(`ent: missing required field "TreeNode.status"`)}
@@ -293,9 +293,9 @@ func (tnc *TreeNodeCreate) createSpec() (*TreeNode, *sqlgraph.CreateSpec) {
 		_spec.SetField(treenode.FieldUpdateTime, field.TypeTime, value)
 		_node.UpdateTime = value
 	}
-	if value, ok := tnc.mutation.ValueSats(); ok {
-		_spec.SetField(treenode.FieldValueSats, field.TypeUint64, value)
-		_node.ValueSats = value
+	if value, ok := tnc.mutation.Value(); ok {
+		_spec.SetField(treenode.FieldValue, field.TypeUint64, value)
+		_node.Value = value
 	}
 	if value, ok := tnc.mutation.Status(); ok {
 		_spec.SetField(treenode.FieldStatus, field.TypeEnum, value)

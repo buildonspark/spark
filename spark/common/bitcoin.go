@@ -1,6 +1,8 @@
 package common
 
 import (
+	"bytes"
+	"encoding/hex"
 	"fmt"
 
 	"github.com/btcsuite/btcd/btcec/v2"
@@ -8,6 +10,7 @@ import (
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/txscript"
+	"github.com/btcsuite/btcd/wire"
 )
 
 // Network is the type for Bitcoin networks used with the operator.
@@ -60,4 +63,56 @@ func P2TRAddressFromPublicKey(pubKey []byte, network Network) (*string, error) {
 
 	addr := taprootAddress.EncodeAddress()
 	return &addr, nil
+}
+
+// P2TRAddressFromPkScript returns a P2TR address from a public script.
+func P2TRAddressFromPkScript(pkScript []byte, network Network) (*string, error) {
+	parsedScript, err := txscript.ParsePkScript(pkScript)
+	if err != nil {
+		return nil, err
+	}
+
+	networkParams := NetworkParams(network)
+	if parsedScript.Class() == txscript.WitnessV1TaprootTy {
+		address, err := parsedScript.Address(networkParams)
+		if err != nil {
+			return nil, err
+		}
+		taprootAddress, err := btcutil.NewAddressTaproot(address.ScriptAddress(), networkParams)
+		if err != nil {
+			return nil, err
+		}
+		p2trAddress := taprootAddress.String()
+		return &p2trAddress, nil
+	}
+
+	return nil, fmt.Errorf("not a Taproot address")
+}
+
+// TxFromTxHex returns a btcd MsgTx from a raw tx hex.
+func TxFromTxHex(txHex string) (*wire.MsgTx, error) {
+	txBytes, err := hex.DecodeString(txHex)
+	if err != nil {
+		return nil, err
+	}
+	var tx wire.MsgTx
+	err = tx.Deserialize(bytes.NewReader(txBytes))
+	if err != nil {
+		return nil, err
+	}
+	return &tx, nil
+}
+
+// SigHashFromTx returns sighash from a tx.
+func SigHashFromTx(tx *wire.MsgTx, inputIndex int, prevOutput *wire.TxOut) ([]byte, error) {
+	prevOutputFetcher := txscript.NewCannedPrevOutputFetcher(
+		prevOutput.PkScript, prevOutput.Value,
+	)
+	sighashes := txscript.NewTxSigHashes(tx, prevOutputFetcher)
+
+	sigHash, err := txscript.CalcTaprootSignatureHash(sighashes, txscript.SigHashDefault, tx, inputIndex, prevOutputFetcher)
+	if err != nil {
+		return nil, err
+	}
+	return sigHash, nil
 }

@@ -23,6 +23,8 @@ const (
 	FieldAddress = "address"
 	// FieldOwnerIdentityPubkey holds the string denoting the owner_identity_pubkey field in the database.
 	FieldOwnerIdentityPubkey = "owner_identity_pubkey"
+	// FieldOwnerSigningPubkey holds the string denoting the owner_signing_pubkey field in the database.
+	FieldOwnerSigningPubkey = "owner_signing_pubkey"
 	// EdgeSigningKeyshare holds the string denoting the signing_keyshare edge name in mutations.
 	EdgeSigningKeyshare = "signing_keyshare"
 	// Table holds the table name of the depositaddress in the database.
@@ -43,6 +45,7 @@ var Columns = []string{
 	FieldUpdateTime,
 	FieldAddress,
 	FieldOwnerIdentityPubkey,
+	FieldOwnerSigningPubkey,
 }
 
 // ForeignKeys holds the SQL foreign-keys that are owned by the "deposit_addresses"
@@ -77,6 +80,8 @@ var (
 	AddressValidator func(string) error
 	// OwnerIdentityPubkeyValidator is a validator for the "owner_identity_pubkey" field. It is called by the builders before save.
 	OwnerIdentityPubkeyValidator func([]byte) error
+	// OwnerSigningPubkeyValidator is a validator for the "owner_signing_pubkey" field. It is called by the builders before save.
+	OwnerSigningPubkeyValidator func([]byte) error
 	// DefaultID holds the default value on creation for the "id" field.
 	DefaultID func() uuid.UUID
 )

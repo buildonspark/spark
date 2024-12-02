@@ -3,9 +3,11 @@ syntax = "proto3";
 package spark;
 
 option go_package = "github.com/lightsparkdev/spark-go/proto/spark";
+import "common.proto";
 
 service SparkService {
     rpc generate_deposit_address(GenerateDepositAddressRequest) returns (GenerateDepositAddressResponse) {}
+    rpc start_tree_creation(StartTreeCreationRequest) returns (StartTreeCreationResponse) {}
 }
 
 message GenerateDepositAddressRequest {
@@ -15,4 +17,31 @@ message GenerateDepositAddressRequest {
 
 message GenerateDepositAddressResponse {
     string address = 1;
+}
+
+message UTXO {
+    string txid = 1;
+    uint32 vout = 2;
+}
+
+message SigningJob {
+    bytes signing_public_key = 1;
+    string raw_tx_hex = 2;
+    common.SigningCommitment signing_nonce_commitment = 3;
+}
+
+message StartTreeCreationRequest {
+    bytes identity_public_key = 1;
+    UTXO on_chain_utxo = 2;
+    SigningJob root_tx_signing_job = 3;
+    SigningJob refund_tx_signing_job = 4;
+}
+
+
+message StartTreeCreationResponse {
+    string tree_id = 1;
+    map<string, common.SigningCommitment> root_tx_signing_commitments = 2;
+    map<string, bytes> root_tx_signature_shares = 3;
+    map<string, common.SigningCommitment> refund_tx_signing_commitments = 4;
+    map<string, bytes> refund_tx_signature_shares = 5;
 }

@@ -21,8 +21,8 @@ const (
 	FieldCreateTime = "create_time"
 	// FieldUpdateTime holds the string denoting the update_time field in the database.
 	FieldUpdateTime = "update_time"
-	// FieldValueSats holds the string denoting the value_sats field in the database.
-	FieldValueSats = "value_sats"
+	// FieldValue holds the string denoting the value field in the database.
+	FieldValue = "value"
 	// FieldStatus holds the string denoting the status field in the database.
 	FieldStatus = "status"
 	// FieldVerifyingPubkey holds the string denoting the verifying_pubkey field in the database.
@@ -70,7 +70,7 @@ var Columns = []string{
 	FieldID,
 	FieldCreateTime,
 	FieldUpdateTime,
-	FieldValueSats,
+	FieldValue,
 	FieldStatus,
 	FieldVerifyingPubkey,
 	FieldOwnerIdentityPubkey,
@@ -120,7 +120,7 @@ var (
 // StatusValidator is a validator for the "status" field enum values. It is called by the builders before save.
 func StatusValidator(s schema.TreeNodeStatus) error {
 	switch s {
-	case "AVAILABLE", "FROZEN_BY_ISSUER", "TRANSFER_LOCKED", "SPLIT_LOCKED", "SPLITTED", "AGGREGATED", "ON_CHAIN":
+	case "CREATING", "AVAILABLE", "FROZEN_BY_ISSUER", "TRANSFER_LOCKED", "SPLIT_LOCKED", "SPLITTED", "AGGREGATED", "ON_CHAIN":
 		return nil
 	default:
 		return fmt.Errorf("treenode: invalid enum value for status field: %q", s)
@@ -145,9 +145,9 @@ func ByUpdateTime(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldUpdateTime, opts...).ToFunc()
 }
 
-// ByValueSats orders the results by the value_sats field.
-func ByValueSats(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldValueSats, opts...).ToFunc()
+// ByValue orders the results by the value field.
+func ByValue(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldValue, opts...).ToFunc()
 }
 
 // ByStatus orders the results by the status field.

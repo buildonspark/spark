@@ -48,6 +48,14 @@ func (tu *TreeUpdate) SetRootID(id uuid.UUID) *TreeUpdate {
 	return tu
 }
 
+// SetNillableRootID sets the "root" edge to the TreeNode entity by ID if the given value is not nil.
+func (tu *TreeUpdate) SetNillableRootID(id *uuid.UUID) *TreeUpdate {
+	if id != nil {
+		tu = tu.SetRootID(*id)
+	}
+	return tu
+}
+
 // SetRoot sets the "root" edge to the TreeNode entity.
 func (tu *TreeUpdate) SetRoot(t *TreeNode) *TreeUpdate {
 	return tu.SetRootID(t.ID)
@@ -142,9 +150,6 @@ func (tu *TreeUpdate) check() error {
 		if err := tree.OwnerIdentityPubkeyValidator(v); err != nil {
 			return &ValidationError{Name: "owner_identity_pubkey", err: fmt.Errorf(`ent: validator failed for field "Tree.owner_identity_pubkey": %w`, err)}
 		}
-	}
-	if tu.mutation.RootCleared() && len(tu.mutation.RootIDs()) > 0 {
-		return errors.New(`ent: clearing a required unique edge "Tree.root"`)
 	}
 	return nil
 }
@@ -279,6 +284,14 @@ func (tuo *TreeUpdateOne) SetRootID(id uuid.UUID) *TreeUpdateOne {
 	return tuo
 }
 
+// SetNillableRootID sets the "root" edge to the TreeNode entity by ID if the given value is not nil.
+func (tuo *TreeUpdateOne) SetNillableRootID(id *uuid.UUID) *TreeUpdateOne {
+	if id != nil {
+		tuo = tuo.SetRootID(*id)
+	}
+	return tuo
+}
+
 // SetRoot sets the "root" edge to the TreeNode entity.
 func (tuo *TreeUpdateOne) SetRoot(t *TreeNode) *TreeUpdateOne {
 	return tuo.SetRootID(t.ID)
@@ -386,9 +399,6 @@ func (tuo *TreeUpdateOne) check() error {
 		if err := tree.OwnerIdentityPubkeyValidator(v); err != nil {
 			return &ValidationError{Name: "owner_identity_pubkey", err: fmt.Errorf(`ent: validator failed for field "Tree.owner_identity_pubkey": %w`, err)}
 		}
-	}
-	if tuo.mutation.RootCleared() && len(tuo.mutation.RootIDs()) > 0 {
-		return errors.New(`ent: clearing a required unique edge "Tree.root"`)
 	}
 	return nil
 }

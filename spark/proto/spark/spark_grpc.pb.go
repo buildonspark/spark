@@ -20,6 +20,7 @@ const _ = grpc.SupportPackageIsVersion9
 
 const (
 	SparkService_GenerateDepositAddress_FullMethodName = "/spark.SparkService/generate_deposit_address"
+	SparkService_StartTreeCreation_FullMethodName      = "/spark.SparkService/start_tree_creation"
 )
 
 // SparkServiceClient is the client API for SparkService service.
@@ -27,6 +28,7 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type SparkServiceClient interface {
 	GenerateDepositAddress(ctx context.Context, in *GenerateDepositAddressRequest, opts ...grpc.CallOption) (*GenerateDepositAddressResponse, error)
+	StartTreeCreation(ctx context.Context, in *StartTreeCreationRequest, opts ...grpc.CallOption) (*StartTreeCreationResponse, error)
 }
 
 type sparkServiceClient struct {
@@ -47,11 +49,22 @@ func (c *sparkServiceClient) GenerateDepositAddress(ctx context.Context, in *Gen
 	return out, nil
 }
 
+func (c *sparkServiceClient) StartTreeCreation(ctx context.Context, in *StartTreeCreationRequest, opts ...grpc.CallOption) (*StartTreeCreationResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(StartTreeCreationResponse)
+	err := c.cc.Invoke(ctx, SparkService_StartTreeCreation_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SparkServiceServer is the server API for SparkService service.
 // All implementations must embed UnimplementedSparkServiceServer
 // for forward compatibility.
 type SparkServiceServer interface {
 	GenerateDepositAddress(context.Context, *GenerateDepositAddressRequest) (*GenerateDepositAddressResponse, error)
+	StartTreeCreation(context.Context, *StartTreeCreationRequest) (*StartTreeCreationResponse, error)
 	mustEmbedUnimplementedSparkServiceServer()
 }
 
@@ -64,6 +77,9 @@ type UnimplementedSparkServiceServer struct{}
 
 func (UnimplementedSparkServiceServer) GenerateDepositAddress(context.Context, *GenerateDepositAddressRequest) (*GenerateDepositAddressResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GenerateDepositAddress not implemented")
+}
+func (UnimplementedSparkServiceServer) StartTreeCreation(context.Context, *StartTreeCreationRequest) (*StartTreeCreationResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method StartTreeCreation not implemented")
 }
 func (UnimplementedSparkServiceServer) mustEmbedUnimplementedSparkServiceServer() {}
 func (UnimplementedSparkServiceServer) testEmbeddedByValue()                      {}
@@ -104,6 +120,24 @@ func _SparkService_GenerateDepositAddress_Handler(srv interface{}, ctx context.C
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SparkService_StartTreeCreation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StartTreeCreationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkServiceServer).StartTreeCreation(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkService_StartTreeCreation_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkServiceServer).StartTreeCreation(ctx, req.(*StartTreeCreationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // SparkService_ServiceDesc is the grpc.ServiceDesc for SparkService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -114,6 +148,10 @@ var SparkService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "generate_deposit_address",
 			Handler:    _SparkService_GenerateDepositAddress_Handler,
+		},
+		{
+			MethodName: "start_tree_creation",
+			Handler:    _SparkService_StartTreeCreation_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

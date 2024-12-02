@@ -29,8 +29,9 @@ func (DepositAddress) Indexes() []ent.Index {
 // Fields are the fields for the deposit addresses table.
 func (DepositAddress) Fields() []ent.Field {
 	return []ent.Field{
-		field.String("address").NotEmpty().Immutable(),
+		field.String("address").NotEmpty().Immutable().Unique(),
 		field.Bytes("owner_identity_pubkey").NotEmpty().Immutable(),
+		field.Bytes("owner_signing_pubkey").NotEmpty().Immutable(),
 	}
 }
 

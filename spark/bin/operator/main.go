@@ -10,6 +10,7 @@ import (
 	"net"
 	"time"
 
+	_ "github.com/lib/pq"
 	"github.com/lightsparkdev/spark-go/common"
 	pbdkg "github.com/lightsparkdev/spark-go/proto/dkg"
 	pbspark "github.com/lightsparkdev/spark-go/proto/spark"
@@ -81,7 +82,7 @@ func main() {
 	}
 
 	dbDriver := config.DatabaseDriver()
-	dbClient, err := ent.Open(dbDriver, config.DatabasePath+"?_fk=1")
+	dbClient, err := ent.Open(dbDriver, config.DatabasePath)
 	if err != nil {
 		log.Fatalf("Failed to create database client: %v", err)
 	}

@@ -81,6 +81,7 @@ func (s *SparkServer) GenerateDepositAddress(ctx context.Context, req *pb.Genera
 	_, err = common.GetDbFromContext(ctx).DepositAddress.Create().
 		SetSigningKeyshareID(keyshare.ID).
 		SetOwnerIdentityPubkey(req.IdentityPublicKey).
+		SetOwnerSigningPubkey(req.SigningPublicKey).
 		SetAddress(*depositAddress).
 		Save(ctx)
 	if err != nil {
@@ -101,6 +102,7 @@ func (s *SparkServer) GenerateDepositAddress(ctx context.Context, req *pb.Genera
 			KeyshareId:             keyshare.ID.String(),
 			Address:                *depositAddress,
 			OwnerIdentityPublicKey: req.IdentityPublicKey,
+			OwnerSigningPublicKey:  req.SigningPublicKey,
 		})
 		return nil, err
 	})
@@ -111,4 +113,10 @@ func (s *SparkServer) GenerateDepositAddress(ctx context.Context, req *pb.Genera
 
 	log.Printf("Generated deposit address: %s", *depositAddress)
 	return &pb.GenerateDepositAddressResponse{Address: *depositAddress}, nil
+}
+
+// StartTreeCreation verifies the on chain utxo, and then verifies and signs the offchain root and refund transactions.
+func (s *SparkServer) StartTreeCreation(ctx context.Context, req *pb.StartTreeCreationRequest) (*pb.StartTreeCreationResponse, error) {
+	depositHandler := helper.DepositHandler{}
+	return depositHandler.StartTreeCreation(ctx, s.config, req)
 }

@@ -29,8 +29,7 @@ func (Tree) Fields() []ent.Field {
 func (Tree) Edges() []ent.Edge {
 	return []ent.Edge{
 		edge.To("root", TreeNode.Type).
-			Unique().
-			Required(),
+			Unique(),
 		edge.From("nodes", TreeNode.Type).Ref("tree"),
 	}
 }

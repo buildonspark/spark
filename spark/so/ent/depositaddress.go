@@ -27,6 +27,8 @@ type DepositAddress struct {
 	Address string `json:"address,omitempty"`
 	// OwnerIdentityPubkey holds the value of the "owner_identity_pubkey" field.
 	OwnerIdentityPubkey []byte `json:"owner_identity_pubkey,omitempty"`
+	// OwnerSigningPubkey holds the value of the "owner_signing_pubkey" field.
+	OwnerSigningPubkey []byte `json:"owner_signing_pubkey,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the DepositAddressQuery when eager-loading is set.
 	Edges                            DepositAddressEdges `json:"edges"`
@@ -59,7 +61,7 @@ func (*DepositAddress) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case depositaddress.FieldOwnerIdentityPubkey:
+		case depositaddress.FieldOwnerIdentityPubkey, depositaddress.FieldOwnerSigningPubkey:
 			values[i] = new([]byte)
 		case depositaddress.FieldAddress:
 			values[i] = new(sql.NullString)
@@ -113,6 +115,12 @@ func (da *DepositAddress) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field owner_identity_pubkey", values[i])
 			} else if value != nil {
 				da.OwnerIdentityPubkey = *value
+			}
+		case depositaddress.FieldOwnerSigningPubkey:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field owner_signing_pubkey", values[i])
+			} else if value != nil {
+				da.OwnerSigningPubkey = *value
 			}
 		case depositaddress.ForeignKeys[0]:
 			if value, ok := values[i].(*sql.NullScanner); !ok {
@@ -173,6 +181,9 @@ func (da *DepositAddress) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("owner_identity_pubkey=")
 	builder.WriteString(fmt.Sprintf("%v", da.OwnerIdentityPubkey))
+	builder.WriteString(", ")
+	builder.WriteString("owner_signing_pubkey=")
+	builder.WriteString(fmt.Sprintf("%v", da.OwnerSigningPubkey))
 	builder.WriteByte(')')
 	return builder.String()
 }

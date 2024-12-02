@@ -33,10 +33,10 @@ type Config struct {
 
 // DatabaseDriver returns the database driver based on the database path.
 func (c *Config) DatabaseDriver() string {
-	if strings.HasSuffix(c.DatabasePath, ".sqlite") {
-		return "sqlite3"
+	if strings.HasPrefix(c.DatabasePath, "postgresql") {
+		return "postgres"
 	}
-	return "postgres"
+	return "sqlite3"
 }
 
 // NewConfig creates a new config for the signing operator.

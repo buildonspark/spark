@@ -67,9 +67,9 @@ func UpdateTime(v time.Time) predicate.TreeNode {
 	return predicate.TreeNode(sql.FieldEQ(FieldUpdateTime, v))
 }
 
-// ValueSats applies equality check predicate on the "value_sats" field. It's identical to ValueSatsEQ.
-func ValueSats(v uint64) predicate.TreeNode {
-	return predicate.TreeNode(sql.FieldEQ(FieldValueSats, v))
+// Value applies equality check predicate on the "value" field. It's identical to ValueEQ.
+func Value(v uint64) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldEQ(FieldValue, v))
 }
 
 // VerifyingPubkey applies equality check predicate on the "verifying_pubkey" field. It's identical to VerifyingPubkeyEQ.
@@ -167,44 +167,44 @@ func UpdateTimeLTE(v time.Time) predicate.TreeNode {
 	return predicate.TreeNode(sql.FieldLTE(FieldUpdateTime, v))
 }
 
-// ValueSatsEQ applies the EQ predicate on the "value_sats" field.
-func ValueSatsEQ(v uint64) predicate.TreeNode {
-	return predicate.TreeNode(sql.FieldEQ(FieldValueSats, v))
+// ValueEQ applies the EQ predicate on the "value" field.
+func ValueEQ(v uint64) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldEQ(FieldValue, v))
 }
 
-// ValueSatsNEQ applies the NEQ predicate on the "value_sats" field.
-func ValueSatsNEQ(v uint64) predicate.TreeNode {
-	return predicate.TreeNode(sql.FieldNEQ(FieldValueSats, v))
+// ValueNEQ applies the NEQ predicate on the "value" field.
+func ValueNEQ(v uint64) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldNEQ(FieldValue, v))
 }
 
-// ValueSatsIn applies the In predicate on the "value_sats" field.
-func ValueSatsIn(vs ...uint64) predicate.TreeNode {
-	return predicate.TreeNode(sql.FieldIn(FieldValueSats, vs...))
+// ValueIn applies the In predicate on the "value" field.
+func ValueIn(vs ...uint64) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldIn(FieldValue, vs...))
 }
 
-// ValueSatsNotIn applies the NotIn predicate on the "value_sats" field.
-func ValueSatsNotIn(vs ...uint64) predicate.TreeNode {
-	return predicate.TreeNode(sql.FieldNotIn(FieldValueSats, vs...))
+// ValueNotIn applies the NotIn predicate on the "value" field.
+func ValueNotIn(vs ...uint64) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldNotIn(FieldValue, vs...))
 }
 
-// ValueSatsGT applies the GT predicate on the "value_sats" field.
-func ValueSatsGT(v uint64) predicate.TreeNode {
-	return predicate.TreeNode(sql.FieldGT(FieldValueSats, v))
+// ValueGT applies the GT predicate on the "value" field.
+func ValueGT(v uint64) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldGT(FieldValue, v))
 }
 
-// ValueSatsGTE applies the GTE predicate on the "value_sats" field.
-func ValueSatsGTE(v uint64) predicate.TreeNode {
-	return predicate.TreeNode(sql.FieldGTE(FieldValueSats, v))
+// ValueGTE applies the GTE predicate on the "value" field.
+func ValueGTE(v uint64) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldGTE(FieldValue, v))
 }
 
-// ValueSatsLT applies the LT predicate on the "value_sats" field.
-func ValueSatsLT(v uint64) predicate.TreeNode {
-	return predicate.TreeNode(sql.FieldLT(FieldValueSats, v))
+// ValueLT applies the LT predicate on the "value" field.
+func ValueLT(v uint64) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldLT(FieldValue, v))
 }
 
-// ValueSatsLTE applies the LTE predicate on the "value_sats" field.
-func ValueSatsLTE(v uint64) predicate.TreeNode {
-	return predicate.TreeNode(sql.FieldLTE(FieldValueSats, v))
+// ValueLTE applies the LTE predicate on the "value" field.
+func ValueLTE(v uint64) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldLTE(FieldValue, v))
 }
 
 // StatusEQ applies the EQ predicate on the "status" field.

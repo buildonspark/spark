@@ -13,8 +13,9 @@ var (
 		{Name: "id", Type: field.TypeUUID},
 		{Name: "create_time", Type: field.TypeTime},
 		{Name: "update_time", Type: field.TypeTime},
-		{Name: "address", Type: field.TypeString},
+		{Name: "address", Type: field.TypeString, Unique: true},
 		{Name: "owner_identity_pubkey", Type: field.TypeBytes},
+		{Name: "owner_signing_pubkey", Type: field.TypeBytes},
 		{Name: "deposit_address_signing_keyshare", Type: field.TypeUUID},
 	}
 	// DepositAddressesTable holds the schema information for the "deposit_addresses" table.
@@ -25,7 +26,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "deposit_addresses_signing_keyshares_signing_keyshare",
-				Columns:    []*schema.Column{DepositAddressesColumns[5]},
+				Columns:    []*schema.Column{DepositAddressesColumns[6]},
 				RefColumns: []*schema.Column{SigningKeysharesColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -90,7 +91,7 @@ var (
 		{Name: "create_time", Type: field.TypeTime},
 		{Name: "update_time", Type: field.TypeTime},
 		{Name: "owner_identity_pubkey", Type: field.TypeBytes},
-		{Name: "tree_root", Type: field.TypeUUID},
+		{Name: "tree_root", Type: field.TypeUUID, Nullable: true},
 	}
 	// TreesTable holds the schema information for the "trees" table.
 	TreesTable = &schema.Table{
@@ -102,7 +103,7 @@ var (
 				Symbol:     "trees_tree_nodes_root",
 				Columns:    []*schema.Column{TreesColumns[4]},
 				RefColumns: []*schema.Column{TreeNodesColumns[0]},
-				OnDelete:   schema.NoAction,
+				OnDelete:   schema.SetNull,
 			},
 		},
 	}
@@ -111,8 +112,8 @@ var (
 		{Name: "id", Type: field.TypeUUID},
 		{Name: "create_time", Type: field.TypeTime},
 		{Name: "update_time", Type: field.TypeTime},
-		{Name: "value_sats", Type: field.TypeUint64},
-		{Name: "status", Type: field.TypeEnum, Enums: []string{"AVAILABLE", "FROZEN_BY_ISSUER", "TRANSFER_LOCKED", "SPLIT_LOCKED", "SPLITTED", "AGGREGATED", "ON_CHAIN"}},
+		{Name: "value", Type: field.TypeUint64},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"CREATING", "AVAILABLE", "FROZEN_BY_ISSUER", "TRANSFER_LOCKED", "SPLIT_LOCKED", "SPLITTED", "AGGREGATED", "ON_CHAIN"}},
 		{Name: "verifying_pubkey", Type: field.TypeBytes},
 		{Name: "owner_identity_pubkey", Type: field.TypeBytes},
 		{Name: "owner_signing_pubkey", Type: field.TypeBytes},

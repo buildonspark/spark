@@ -11,6 +11,8 @@ import (
 type TreeNodeStatus string
 
 const (
+	// TreeNodeStatusCreating is the status of a tree node that is under creation.
+	TreeNodeStatusCreating TreeNodeStatus = "CREATING"
 	// TreeNodeStatusAvailable is the status of a tree node that is available.
 	TreeNodeStatusAvailable TreeNodeStatus = "AVAILABLE"
 	// TreeNodeStatusFrozenByIssuer is the status of a tree node that is frozen by the issuer.
@@ -30,6 +32,7 @@ const (
 // Values returns the values of the tree node status.
 func (TreeNodeStatus) Values() []string {
 	return []string{
+		string(TreeNodeStatusCreating),
 		string(TreeNodeStatusAvailable),
 		string(TreeNodeStatusFrozenByIssuer),
 		string(TreeNodeStatusTransferLocked),
@@ -55,7 +58,7 @@ func (TreeNode) Mixin() []ent.Mixin {
 // Fields are the fields for the tree nodes table.
 func (TreeNode) Fields() []ent.Field {
 	return []ent.Field{
-		field.Uint64("value_sats").Immutable(),
+		field.Uint64("value").Immutable(),
 		field.Enum("status").GoType(TreeNodeStatus("")),
 		field.Bytes("verifying_pubkey").NotEmpty().Immutable(),
 		field.Bytes("owner_identity_pubkey").NotEmpty(),

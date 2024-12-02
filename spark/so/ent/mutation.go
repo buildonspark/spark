@@ -47,6 +47,7 @@ type DepositAddressMutation struct {
 	update_time             *time.Time
 	address                 *string
 	owner_identity_pubkey   *[]byte
+	owner_signing_pubkey    *[]byte
 	clearedFields           map[string]struct{}
 	signing_keyshare        *uuid.UUID
 	clearedsigning_keyshare bool
@@ -303,6 +304,42 @@ func (m *DepositAddressMutation) ResetOwnerIdentityPubkey() {
 	m.owner_identity_pubkey = nil
 }
 
+// SetOwnerSigningPubkey sets the "owner_signing_pubkey" field.
+func (m *DepositAddressMutation) SetOwnerSigningPubkey(b []byte) {
+	m.owner_signing_pubkey = &b
+}
+
+// OwnerSigningPubkey returns the value of the "owner_signing_pubkey" field in the mutation.
+func (m *DepositAddressMutation) OwnerSigningPubkey() (r []byte, exists bool) {
+	v := m.owner_signing_pubkey
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOwnerSigningPubkey returns the old "owner_signing_pubkey" field's value of the DepositAddress entity.
+// If the DepositAddress object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DepositAddressMutation) OldOwnerSigningPubkey(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOwnerSigningPubkey is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOwnerSigningPubkey requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOwnerSigningPubkey: %w", err)
+	}
+	return oldValue.OwnerSigningPubkey, nil
+}
+
+// ResetOwnerSigningPubkey resets all changes to the "owner_signing_pubkey" field.
+func (m *DepositAddressMutation) ResetOwnerSigningPubkey() {
+	m.owner_signing_pubkey = nil
+}
+
 // SetSigningKeyshareID sets the "signing_keyshare" edge to the SigningKeyshare entity by id.
 func (m *DepositAddressMutation) SetSigningKeyshareID(id uuid.UUID) {
 	m.signing_keyshare = &id
@@ -376,7 +413,7 @@ func (m *DepositAddressMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *DepositAddressMutation) Fields() []string {
-	fields := make([]string, 0, 4)
+	fields := make([]string, 0, 5)
 	if m.create_time != nil {
 		fields = append(fields, depositaddress.FieldCreateTime)
 	}
@@ -388,6 +425,9 @@ func (m *DepositAddressMutation) Fields() []string {
 	}
 	if m.owner_identity_pubkey != nil {
 		fields = append(fields, depositaddress.FieldOwnerIdentityPubkey)
+	}
+	if m.owner_signing_pubkey != nil {
+		fields = append(fields, depositaddress.FieldOwnerSigningPubkey)
 	}
 	return fields
 }
@@ -405,6 +445,8 @@ func (m *DepositAddressMutation) Field(name string) (ent.Value, bool) {
 		return m.Address()
 	case depositaddress.FieldOwnerIdentityPubkey:
 		return m.OwnerIdentityPubkey()
+	case depositaddress.FieldOwnerSigningPubkey:
+		return m.OwnerSigningPubkey()
 	}
 	return nil, false
 }
@@ -422,6 +464,8 @@ func (m *DepositAddressMutation) OldField(ctx context.Context, name string) (ent
 		return m.OldAddress(ctx)
 	case depositaddress.FieldOwnerIdentityPubkey:
 		return m.OldOwnerIdentityPubkey(ctx)
+	case depositaddress.FieldOwnerSigningPubkey:
+		return m.OldOwnerSigningPubkey(ctx)
 	}
 	return nil, fmt.Errorf("unknown DepositAddress field %s", name)
 }
@@ -458,6 +502,13 @@ func (m *DepositAddressMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetOwnerIdentityPubkey(v)
+		return nil
+	case depositaddress.FieldOwnerSigningPubkey:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOwnerSigningPubkey(v)
 		return nil
 	}
 	return fmt.Errorf("unknown DepositAddress field %s", name)
@@ -519,6 +570,9 @@ func (m *DepositAddressMutation) ResetField(name string) error {
 		return nil
 	case depositaddress.FieldOwnerIdentityPubkey:
 		m.ResetOwnerIdentityPubkey()
+		return nil
+	case depositaddress.FieldOwnerSigningPubkey:
+		m.ResetOwnerSigningPubkey()
 		return nil
 	}
 	return fmt.Errorf("unknown DepositAddress field %s", name)
@@ -2471,8 +2525,8 @@ type TreeNodeMutation struct {
 	id                      *uuid.UUID
 	create_time             *time.Time
 	update_time             *time.Time
-	value_sats              *uint64
-	addvalue_sats           *int64
+	value                   *uint64
+	addvalue                *int64
 	status                  *schema.TreeNodeStatus
 	verifying_pubkey        *[]byte
 	owner_identity_pubkey   *[]byte
@@ -2668,60 +2722,60 @@ func (m *TreeNodeMutation) ResetUpdateTime() {
 	m.update_time = nil
 }
 
-// SetValueSats sets the "value_sats" field.
-func (m *TreeNodeMutation) SetValueSats(u uint64) {
-	m.value_sats = &u
-	m.addvalue_sats = nil
+// SetValue sets the "value" field.
+func (m *TreeNodeMutation) SetValue(u uint64) {
+	m.value = &u
+	m.addvalue = nil
 }
 
-// ValueSats returns the value of the "value_sats" field in the mutation.
-func (m *TreeNodeMutation) ValueSats() (r uint64, exists bool) {
-	v := m.value_sats
+// Value returns the value of the "value" field in the mutation.
+func (m *TreeNodeMutation) Value() (r uint64, exists bool) {
+	v := m.value
 	if v == nil {
 		return
 	}
 	return *v, true
 }
 
-// OldValueSats returns the old "value_sats" field's value of the TreeNode entity.
+// OldValue returns the old "value" field's value of the TreeNode entity.
 // If the TreeNode object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *TreeNodeMutation) OldValueSats(ctx context.Context) (v uint64, err error) {
+func (m *TreeNodeMutation) OldValue(ctx context.Context) (v uint64, err error) {
 	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldValueSats is only allowed on UpdateOne operations")
+		return v, errors.New("OldValue is only allowed on UpdateOne operations")
 	}
 	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldValueSats requires an ID field in the mutation")
+		return v, errors.New("OldValue requires an ID field in the mutation")
 	}
 	oldValue, err := m.oldValue(ctx)
 	if err != nil {
-		return v, fmt.Errorf("querying old value for OldValueSats: %w", err)
+		return v, fmt.Errorf("querying old value for OldValue: %w", err)
 	}
-	return oldValue.ValueSats, nil
+	return oldValue.Value, nil
 }
 
-// AddValueSats adds u to the "value_sats" field.
-func (m *TreeNodeMutation) AddValueSats(u int64) {
-	if m.addvalue_sats != nil {
-		*m.addvalue_sats += u
+// AddValue adds u to the "value" field.
+func (m *TreeNodeMutation) AddValue(u int64) {
+	if m.addvalue != nil {
+		*m.addvalue += u
 	} else {
-		m.addvalue_sats = &u
+		m.addvalue = &u
 	}
 }
 
-// AddedValueSats returns the value that was added to the "value_sats" field in this mutation.
-func (m *TreeNodeMutation) AddedValueSats() (r int64, exists bool) {
-	v := m.addvalue_sats
+// AddedValue returns the value that was added to the "value" field in this mutation.
+func (m *TreeNodeMutation) AddedValue() (r int64, exists bool) {
+	v := m.addvalue
 	if v == nil {
 		return
 	}
 	return *v, true
 }
 
-// ResetValueSats resets all changes to the "value_sats" field.
-func (m *TreeNodeMutation) ResetValueSats() {
-	m.value_sats = nil
-	m.addvalue_sats = nil
+// ResetValue resets all changes to the "value" field.
+func (m *TreeNodeMutation) ResetValue() {
+	m.value = nil
+	m.addvalue = nil
 }
 
 // SetStatus sets the "status" field.
@@ -3080,8 +3134,8 @@ func (m *TreeNodeMutation) Fields() []string {
 	if m.update_time != nil {
 		fields = append(fields, treenode.FieldUpdateTime)
 	}
-	if m.value_sats != nil {
-		fields = append(fields, treenode.FieldValueSats)
+	if m.value != nil {
+		fields = append(fields, treenode.FieldValue)
 	}
 	if m.status != nil {
 		fields = append(fields, treenode.FieldStatus)
@@ -3107,8 +3161,8 @@ func (m *TreeNodeMutation) Field(name string) (ent.Value, bool) {
 		return m.CreateTime()
 	case treenode.FieldUpdateTime:
 		return m.UpdateTime()
-	case treenode.FieldValueSats:
-		return m.ValueSats()
+	case treenode.FieldValue:
+		return m.Value()
 	case treenode.FieldStatus:
 		return m.Status()
 	case treenode.FieldVerifyingPubkey:
@@ -3130,8 +3184,8 @@ func (m *TreeNodeMutation) OldField(ctx context.Context, name string) (ent.Value
 		return m.OldCreateTime(ctx)
 	case treenode.FieldUpdateTime:
 		return m.OldUpdateTime(ctx)
-	case treenode.FieldValueSats:
-		return m.OldValueSats(ctx)
+	case treenode.FieldValue:
+		return m.OldValue(ctx)
 	case treenode.FieldStatus:
 		return m.OldStatus(ctx)
 	case treenode.FieldVerifyingPubkey:
@@ -3163,12 +3217,12 @@ func (m *TreeNodeMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetUpdateTime(v)
 		return nil
-	case treenode.FieldValueSats:
+	case treenode.FieldValue:
 		v, ok := value.(uint64)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
-		m.SetValueSats(v)
+		m.SetValue(v)
 		return nil
 	case treenode.FieldStatus:
 		v, ok := value.(schema.TreeNodeStatus)
@@ -3206,8 +3260,8 @@ func (m *TreeNodeMutation) SetField(name string, value ent.Value) error {
 // this mutation.
 func (m *TreeNodeMutation) AddedFields() []string {
 	var fields []string
-	if m.addvalue_sats != nil {
-		fields = append(fields, treenode.FieldValueSats)
+	if m.addvalue != nil {
+		fields = append(fields, treenode.FieldValue)
 	}
 	return fields
 }
@@ -3217,8 +3271,8 @@ func (m *TreeNodeMutation) AddedFields() []string {
 // was not set, or was not defined in the schema.
 func (m *TreeNodeMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
-	case treenode.FieldValueSats:
-		return m.AddedValueSats()
+	case treenode.FieldValue:
+		return m.AddedValue()
 	}
 	return nil, false
 }
@@ -3228,12 +3282,12 @@ func (m *TreeNodeMutation) AddedField(name string) (ent.Value, bool) {
 // type.
 func (m *TreeNodeMutation) AddField(name string, value ent.Value) error {
 	switch name {
-	case treenode.FieldValueSats:
+	case treenode.FieldValue:
 		v, ok := value.(int64)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
-		m.AddValueSats(v)
+		m.AddValue(v)
 		return nil
 	}
 	return fmt.Errorf("unknown TreeNode numeric field %s", name)
@@ -3268,8 +3322,8 @@ func (m *TreeNodeMutation) ResetField(name string) error {
 	case treenode.FieldUpdateTime:
 		m.ResetUpdateTime()
 		return nil
-	case treenode.FieldValueSats:
-		m.ResetValueSats()
+	case treenode.FieldValue:
+		m.ResetValue()
 		return nil
 	case treenode.FieldStatus:
 		m.ResetStatus()

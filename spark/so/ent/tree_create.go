@@ -76,6 +76,14 @@ func (tc *TreeCreate) SetRootID(id uuid.UUID) *TreeCreate {
 	return tc
 }
 
+// SetNillableRootID sets the "root" edge to the TreeNode entity by ID if the given value is not nil.
+func (tc *TreeCreate) SetNillableRootID(id *uuid.UUID) *TreeCreate {
+	if id != nil {
+		tc = tc.SetRootID(*id)
+	}
+	return tc
+}
+
 // SetRoot sets the "root" edge to the TreeNode entity.
 func (tc *TreeCreate) SetRoot(t *TreeNode) *TreeCreate {
 	return tc.SetRootID(t.ID)
@@ -160,9 +168,6 @@ func (tc *TreeCreate) check() error {
 		if err := tree.OwnerIdentityPubkeyValidator(v); err != nil {
 			return &ValidationError{Name: "owner_identity_pubkey", err: fmt.Errorf(`ent: validator failed for field "Tree.owner_identity_pubkey": %w`, err)}
 		}
-	}
-	if len(tc.mutation.RootIDs()) == 0 {
-		return &ValidationError{Name: "root", err: errors.New(`ent: missing required edge "Tree.root"`)}
 	}
 	return nil
 }

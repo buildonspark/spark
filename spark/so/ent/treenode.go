@@ -25,8 +25,8 @@ type TreeNode struct {
 	CreateTime time.Time `json:"create_time,omitempty"`
 	// UpdateTime holds the value of the "update_time" field.
 	UpdateTime time.Time `json:"update_time,omitempty"`
-	// ValueSats holds the value of the "value_sats" field.
-	ValueSats uint64 `json:"value_sats,omitempty"`
+	// Value holds the value of the "value" field.
+	Value uint64 `json:"value,omitempty"`
 	// Status holds the value of the "status" field.
 	Status schema.TreeNodeStatus `json:"status,omitempty"`
 	// VerifyingPubkey holds the value of the "verifying_pubkey" field.
@@ -108,7 +108,7 @@ func (*TreeNode) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case treenode.FieldVerifyingPubkey, treenode.FieldOwnerIdentityPubkey, treenode.FieldOwnerSigningPubkey:
 			values[i] = new([]byte)
-		case treenode.FieldValueSats:
+		case treenode.FieldValue:
 			values[i] = new(sql.NullInt64)
 		case treenode.FieldStatus:
 			values[i] = new(sql.NullString)
@@ -155,11 +155,11 @@ func (tn *TreeNode) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				tn.UpdateTime = value.Time
 			}
-		case treenode.FieldValueSats:
+		case treenode.FieldValue:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
-				return fmt.Errorf("unexpected type %T for field value_sats", values[i])
+				return fmt.Errorf("unexpected type %T for field value", values[i])
 			} else if value.Valid {
-				tn.ValueSats = uint64(value.Int64)
+				tn.Value = uint64(value.Int64)
 			}
 		case treenode.FieldStatus:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -213,9 +213,9 @@ func (tn *TreeNode) assignValues(columns []string, values []any) error {
 	return nil
 }
 
-// Value returns the ent.Value that was dynamically selected and assigned to the TreeNode.
+// GetValue returns the ent.Value that was dynamically selected and assigned to the TreeNode.
 // This includes values selected through modifiers, order, etc.
-func (tn *TreeNode) Value(name string) (ent.Value, error) {
+func (tn *TreeNode) GetValue(name string) (ent.Value, error) {
 	return tn.selectValues.Get(name)
 }
 
@@ -268,8 +268,8 @@ func (tn *TreeNode) String() string {
 	builder.WriteString("update_time=")
 	builder.WriteString(tn.UpdateTime.Format(time.ANSIC))
 	builder.WriteString(", ")
-	builder.WriteString("value_sats=")
-	builder.WriteString(fmt.Sprintf("%v", tn.ValueSats))
+	builder.WriteString("value=")
+	builder.WriteString(fmt.Sprintf("%v", tn.Value))
 	builder.WriteString(", ")
 	builder.WriteString("status=")
 	builder.WriteString(fmt.Sprintf("%v", tn.Status))
