@@ -101,6 +101,13 @@ func TestFrostSign(t *testing.T) {
 		VerifyingKey:      verifyingKeyBytes,
 		UserCommitment:    *userNonceCommitment,
 	})
+	signingJobs = append(signingJobs, &helper.SigningJob{
+		JobID:             uuid.New().String(),
+		SigningKeyshareID: operatorKeyShare.ID,
+		Message:           msg,
+		VerifyingKey:      verifyingKeyBytes,
+		UserCommitment:    *userNonceCommitment,
+	})
 	signingResult, err := helper.SignFrost(ctx, config, signingJobs)
 	if err != nil {
 		t.Fatal(err)

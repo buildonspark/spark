@@ -91,8 +91,8 @@ func (s *SparkInternalServer) FrostRound1(ctx context.Context, req *pb.FrostRoun
 		return nil, err
 	}
 	keyPackagesArray := make([]*pb.KeyPackage, 0)
-	for _, keyPackage := range keyPackages {
-		keyPackagesArray = append(keyPackagesArray, keyPackage)
+	for _, uuid := range uuids {
+		keyPackagesArray = append(keyPackagesArray, keyPackages[uuid])
 	}
 
 	frostConn, err := common.NewGRPCConnection(s.config.SignerAddress)
