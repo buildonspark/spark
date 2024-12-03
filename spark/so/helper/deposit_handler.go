@@ -149,11 +149,14 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 	tree = tree.Update().SetRoot(root).SaveX(ctx)
 
 	return &pb.StartTreeCreationResponse{
-		TreeId:                     tree.ID.String(),
-		RootTxSigningCommitments:   rootTxSigningCommitments,
-		RootTxSignatureShares:      rootTxSignatureShare,
-		RefundTxSigningCommitments: refundTxSigningCommitments,
-		RefundTxSignatureShares:    refundTxSignatureShare,
+		TreeId: tree.ID.String(),
+		RootNodeSignatureShares: &pb.NodeSignatureShares{
+			NodeId:                     root.ID.String(),
+			NodeTxSigningCommitments:   rootTxSigningCommitments,
+			NodeTxSignatureShares:      rootTxSignatureShare,
+			RefundTxSigningCommitments: refundTxSigningCommitments,
+			RefundTxSignatureShares:    refundTxSignatureShare,
+		},
 	}, nil
 }
 

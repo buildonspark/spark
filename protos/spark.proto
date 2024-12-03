@@ -8,6 +8,9 @@ import "common.proto";
 service SparkService {
     rpc generate_deposit_address(GenerateDepositAddressRequest) returns (GenerateDepositAddressResponse) {}
     rpc start_tree_creation(StartTreeCreationRequest) returns (StartTreeCreationResponse) {}
+
+    rpc split_node(SplitNodeRequest) returns (SplitNodeResponse) {}
+    rpc finalize_split(FinalizeSplitRequest) returns (FinalizeSplitResponse) {}
 }
 
 message GenerateDepositAddressRequest {
@@ -30,6 +33,20 @@ message SigningJob {
     common.SigningCommitment signing_nonce_commitment = 3;
 }
 
+message NodeSignatureShares {
+    string node_id = 1;
+    map<string, common.SigningCommitment> node_tx_signing_commitments = 2;
+    map<string, bytes> node_tx_signature_shares = 3;
+    map<string, common.SigningCommitment> refund_tx_signing_commitments = 4;
+    map<string, bytes> refund_tx_signature_shares = 5;
+}
+
+message NodeSignatures {
+    string node_id = 1;
+    bytes node_tx_signature = 2;
+    bytes refund_tx_signature = 3;
+}
+
 message StartTreeCreationRequest {
     bytes identity_public_key = 1;
     UTXO on_chain_utxo = 2;
@@ -40,8 +57,28 @@ message StartTreeCreationRequest {
 
 message StartTreeCreationResponse {
     string tree_id = 1;
-    map<string, common.SigningCommitment> root_tx_signing_commitments = 2;
-    map<string, bytes> root_tx_signature_shares = 3;
-    map<string, common.SigningCommitment> refund_tx_signing_commitments = 4;
-    map<string, bytes> refund_tx_signature_shares = 5;
+    NodeSignatureShares root_node_signature_shares = 2;
+}
+
+message Split {
+    bytes signing_public_key = 1;
+    SigningJob node_signing_job = 2;
+    SigningJob refund_signing_job = 3;
+}
+
+message SplitNodeRequest {
+    string node_id = 1;
+    repeated Split splits = 2;
+}
+
+message SplitNodeResponse {
+    repeated NodeSignatureShares split_results = 1;
+}
+
+message FinalizeSplitRequest {
+    string splitted_node_id = 1;
+    repeated NodeSignatures split_signatures = 2;
+}
+
+message FinalizeSplitResponse {
 }
