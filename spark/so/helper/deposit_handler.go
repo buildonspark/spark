@@ -243,11 +243,17 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 	return &pb.StartTreeCreationResponse{
 		TreeId: tree.ID.String(),
 		RootNodeSignatureShares: &pb.NodeSignatureShares{
-			NodeId:                     root.ID.String(),
-			NodeTxSigningCommitments:   rootTxSigningCommitments,
-			NodeTxSignatureShares:      rootTxSignatureShare,
-			RefundTxSigningCommitments: refundTxSigningCommitments,
-			RefundTxSignatureShares:    refundTxSignatureShare,
+			NodeId: root.ID.String(),
+			NodeTxSigningResult: &pb.SigningResult{
+				PublicKeys:              signingKeyShare.PublicShares,
+				SignatureShares:         rootTxSignatureShare,
+				SigningNonceCommitments: rootTxSigningCommitments,
+			},
+			RefundTxSigningResult: &pb.SigningResult{
+				PublicKeys:              signingKeyShare.PublicShares,
+				SignatureShares:         refundTxSignatureShare,
+				SigningNonceCommitments: refundTxSigningCommitments,
+			},
 		},
 	}, nil
 }

@@ -33,12 +33,17 @@ message SigningJob {
     common.SigningCommitment signing_nonce_commitment = 3;
 }
 
+
+message SigningResult {
+    map<string, bytes> public_keys = 1;
+    map<string, common.SigningCommitment> signing_nonce_commitments = 2;
+    map<string, bytes> signature_shares = 3;
+}
+
 message NodeSignatureShares {
     string node_id = 1;
-    map<string, common.SigningCommitment> node_tx_signing_commitments = 2;
-    map<string, bytes> node_tx_signature_shares = 3;
-    map<string, common.SigningCommitment> refund_tx_signing_commitments = 4;
-    map<string, bytes> refund_tx_signature_shares = 5;
+    SigningResult node_tx_signing_result = 2;
+    SigningResult refund_tx_signing_result = 3;
 }
 
 message NodeSignatures {
