@@ -18,8 +18,8 @@ use frost_secp256k1_tr::SigningPackage;
 use frost_secp256k1_tr::VerifyingKey;
 
 use crate::dkg::hex_string_to_identifier;
-use crate::server::frost::KeyPackage;
-use crate::server::frost::{SigningCommitment, SigningNonce};
+use crate::proto::common::SigningCommitment;
+use crate::proto::frost::{KeyPackage, SigningNonce};
 
 pub fn frost_nonce_from_proto(nonce: &SigningNonce) -> Result<FrostSigningNonces, String> {
     let hiding_bytes = nonce.hiding.as_slice();

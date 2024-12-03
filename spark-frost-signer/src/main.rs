@@ -1,13 +1,15 @@
 use std::fs;
 
 use clap::{arg, Parser};
-use server::{frost::frost_service_server, FrostServer};
+use proto::frost::frost_service_server;
+use server::FrostServer;
 use tokio::net::{TcpListener, UnixListener};
 use tonic::transport::Server;
 use tracing::Level;
 
 mod dkg;
 mod frost_test;
+mod proto;
 mod server;
 mod signing;
 

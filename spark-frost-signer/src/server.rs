@@ -1,27 +1,25 @@
 use std::collections::{BTreeSet, HashMap};
 use std::sync::{Arc, Mutex};
 
-use frost::*;
 use frost_core::Identifier;
 use tonic::{Request, Response, Status};
 
-use frost::frost_service_server::FrostService;
-use frost::EchoRequest;
-use frost::EchoResponse;
+use proto::frost::frost_service_server::FrostService;
+use proto::frost::EchoRequest;
+use proto::frost::EchoResponse;
 
 use crate::dkg::{
     hex_string_to_identifier, key_package_from_dkg_result, round1_package_maps_from_package_maps,
     round2_package_maps_from_package_maps, DKGState,
 };
+use crate::proto;
+use crate::proto::common::{PackageMap, SigningCommitment, SigningResult};
+use crate::proto::frost::*;
 use crate::signing::{
     frost_build_signin_package, frost_commitments_from_proto, frost_key_package_from_proto,
     frost_nonce_from_proto, frost_public_package_from_proto, frost_signature_shares_from_proto,
     frost_signing_commiement_map_from_proto, verifying_key_from_bytes,
 };
-
-pub mod frost {
-    tonic::include_proto!("frost");
-}
 
 #[derive(Debug, Default)]
 pub struct FrostDKGState {
