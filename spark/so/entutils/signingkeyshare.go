@@ -3,7 +3,9 @@ package entutils
 import (
 	"context"
 	"fmt"
+	"math/big"
 
+	"github.com/decred/dcrd/dcrec/secp256k1"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/common"
 	pbfrost "github.com/lightsparkdev/spark-go/proto/frost"
@@ -105,4 +107,80 @@ func GetKeyPackages(ctx context.Context, config *so.Config, keyshareIDs []uuid.U
 	}
 
 	return keyPackages, nil
+}
+
+// GetKeyPackagesArray returns the keyshares for the given keyshare IDs.
+// The order of the keyshares in the result is the same as the order of the keyshare IDs.
+func GetKeyPackagesArray(ctx context.Context, keyshareIDs []uuid.UUID) ([]*ent.SigningKeyshare, error) {
+	keyshares, err := common.GetDbFromContext(ctx).SigningKeyshare.Query().Where(
+		signingkeyshare.IDIn(keyshareIDs...),
+	).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	keysharesMap := make(map[uuid.UUID]*ent.SigningKeyshare, len(keyshares))
+	for _, keyshare := range keyshares {
+		keysharesMap[keyshare.ID] = keyshare
+	}
+
+	result := make([]*ent.SigningKeyshare, len(keyshareIDs))
+	for i, id := range keyshareIDs {
+		result[i] = keysharesMap[id]
+	}
+
+	return result, nil
+}
+
+// CalculateAndStoreLastKey calculates the last key from the given keyshares and stores it in the database.
+// The target = sum(keyshares) + last_key
+func CalculateAndStoreLastKey(ctx context.Context, config *so.Config, target *ent.SigningKeyshare, keyshares []*ent.SigningKeyshare, id uuid.UUID) (*ent.SigningKeyshare, error) {
+	privateShares := make([][]byte, len(keyshares))
+	for i, keyshare := range keyshares {
+		privateShares[i] = keyshare.SecretShare
+	}
+
+	sum, err := common.SumOfPrivateKeys(privateShares)
+	if err != nil {
+		return nil, err
+	}
+
+	tweak := new(big.Int).Neg(sum)
+	tweakPriv, _ := secp256k1.PrivKeyFromBytes(tweak.Bytes())
+	tweakBytes := tweakPriv.Serialize()
+
+	lastSecretShare, err := common.AddPrivateKeys(target.SecretShare, tweakBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	verifyingKey, err := common.ApplyTweakToPublicKey(target.PublicKey, tweakBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	publicShares := make(map[string][]byte)
+	for i, publicShare := range target.PublicShares {
+		newShare, err := common.ApplyTweakToPublicKey(publicShare, tweakBytes)
+		if err != nil {
+			return nil, err
+		}
+		publicShares[i] = newShare
+	}
+
+	db := common.GetDbFromContext(ctx)
+	lastKey, err := db.SigningKeyshare.Create().
+		SetID(id).
+		SetSecretShare(lastSecretShare).
+		SetPublicShares(publicShares).
+		SetPublicKey(verifyingKey).
+		SetStatus(schema.KeyshareStatusInUse).
+		SetCoordinatorIndex(0).
+		SetMinSigners(target.MinSigners).
+		Save(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return lastKey, nil
 }

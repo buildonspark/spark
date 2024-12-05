@@ -4,13 +4,16 @@ import (
 	"context"
 	"log"
 
+	"github.com/btcsuite/btcd/wire"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/common"
 	"github.com/lightsparkdev/spark-go/so"
+	"github.com/lightsparkdev/spark-go/so/ent"
 	"github.com/lightsparkdev/spark-go/so/entutils"
 	"github.com/lightsparkdev/spark-go/so/objects"
 
 	pbcommon "github.com/lightsparkdev/spark-go/proto/common"
+	pbspark "github.com/lightsparkdev/spark-go/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark-go/proto/spark_internal"
 )
 
@@ -146,6 +149,37 @@ type SigningJob struct {
 	VerifyingKey []byte
 	// UserCommitment is the user commitment for the message.
 	UserCommitment objects.SigningCommitment
+}
+
+// NewSigningJob creates a new signing job from signing job proto and the keyshare.
+func NewSigningJob(keyshare *ent.SigningKeyshare, proto *pbspark.SigningJob, prevOutput *wire.TxOut) (*SigningJob, *wire.MsgTx, error) {
+	verifyingKey, err := common.AddPublicKeys(proto.SigningPublicKey, keyshare.PublicKey)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	tx, err := common.TxFromTxHex(proto.RawTxHex)
+	if err != nil {
+		return nil, nil, err
+	}
+	txSigHash, err := common.SigHashFromTx(tx, 0, prevOutput)
+	if err != nil {
+		return nil, nil, err
+	}
+	userCommitment := objects.SigningCommitment{}
+	err = userCommitment.UnmarshalProto(proto.SigningNonceCommitment)
+	if err != nil {
+		return nil, nil, err
+	}
+	job := &SigningJob{
+		JobID:             uuid.New().String(),
+		SigningKeyshareID: keyshare.ID,
+		Message:           txSigHash,
+		VerifyingKey:      verifyingKey,
+		UserCommitment:    userCommitment,
+	}
+
+	return job, tx, nil
 }
 
 // SigningKeyshareIDsFromSigningJobs returns the IDs of the keyshares used for signing.

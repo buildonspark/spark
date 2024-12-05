@@ -1,5 +1,7 @@
 package common
 
+import "google.golang.org/protobuf/proto"
+
 func getAny[K comparable, V any](m map[K]V) (K, V) {
 	for k, v := range m {
 		return k, v
@@ -45,4 +47,17 @@ func SwapMapKeys[K1 comparable, K2 comparable, V any](m map[K1]map[K2]V) map[K2]
 		}
 	}
 	return results
+}
+
+// ConvertObjectMapToProtoMap converts a map of V to a map of T, where V is a ProtoConvertable[T].
+func ConvertObjectMapToProtoMap[K comparable, V ProtoConvertable[T], T proto.Message](m map[K]V) (map[K]T, error) {
+	results := make(map[K]T)
+	for k, v := range m {
+		proto, err := v.MarshalProto()
+		if err != nil {
+			return nil, err
+		}
+		results[k] = proto
+	}
+	return results, nil
 }

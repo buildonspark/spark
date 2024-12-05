@@ -31,3 +31,9 @@ func (s *SparkServer) StartTreeCreation(ctx context.Context, req *pb.StartTreeCr
 	depositHandler := helper.DepositHandler{}
 	return depositHandler.StartTreeCreation(ctx, s.config, req)
 }
+
+// SplitNode splits the given node into the given splits.
+func (s *SparkServer) SplitNode(ctx context.Context, req *pb.SplitNodeRequest) (*pb.SplitNodeResponse, error) {
+	splitHandler := helper.SplitHandler{}
+	return splitHandler.SplitNode(ctx, s.config, req)
+}

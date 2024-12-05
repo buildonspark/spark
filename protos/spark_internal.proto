@@ -12,6 +12,8 @@ service SparkInternalService {
 
     rpc frost_round1(FrostRound1Request) returns (FrostRound1Response) {}
     rpc frost_round2(FrostRound2Request) returns (FrostRound2Response) {}
+
+    rpc prepare_split_keyshares(PrepareSplitKeysharesRequest) returns (google.protobuf.Empty) {}
 }
 
 message MarkKeysharesAsUsedRequest {
@@ -59,4 +61,10 @@ message FrostRound2Request {
 
 message FrostRound2Response {
     map<string, common.SigningResult> results = 1;
+}
+
+message PrepareSplitKeysharesRequest {
+    string target_keyshare_id = 1;
+    repeated string selected_keyshare_ids = 2;
+    string last_keyshare_id = 3;
 }

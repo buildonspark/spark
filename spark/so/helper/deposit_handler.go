@@ -10,7 +10,6 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/common"
-	pbcommon "github.com/lightsparkdev/spark-go/proto/common"
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark-go/proto/spark_internal"
 	"github.com/lightsparkdev/spark-go/so"
@@ -205,23 +204,15 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 	if err != nil {
 		return nil, err
 	}
-	rootTxSigningCommitments := make(map[string]*pbcommon.SigningCommitment)
-	for id, commitment := range signingResult[0].SigningCommitments {
-		commitmentProto, err := commitment.MarshalProto()
-		if err != nil {
-			return nil, err
-		}
-		rootTxSigningCommitments[id] = commitmentProto
+	rootTxSigningCommitments, err := common.ConvertObjectMapToProtoMap(signingResult[0].SigningCommitments)
+	if err != nil {
+		return nil, err
 	}
 	rootTxSignatureShare := signingResult[0].SignatureShares
 
-	refundTxSigningCommitments := make(map[string]*pbcommon.SigningCommitment)
-	for id, commitment := range signingResult[1].SigningCommitments {
-		commitmentProto, err := commitment.MarshalProto()
-		if err != nil {
-			return nil, err
-		}
-		refundTxSigningCommitments[id] = commitmentProto
+	refundTxSigningCommitments, err := common.ConvertObjectMapToProtoMap(signingResult[1].SigningCommitments)
+	if err != nil {
+		return nil, err
 	}
 	refundTxSignatureShare := signingResult[1].SignatureShares
 

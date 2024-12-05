@@ -76,8 +76,15 @@ message SplitNodeRequest {
     repeated Split splits = 2;
 }
 
+message SplitResult {
+    string node_id = 1;
+    NodeSignatureShares node_signatures = 2;
+    bytes verifying_key = 3;
+    bytes user_public_key = 4;
+}
+
 message SplitNodeResponse {
-    repeated NodeSignatureShares split_results = 1;
+    repeated SplitResult split_results = 1;
 }
 
 message FinalizeSplitRequest {

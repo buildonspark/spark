@@ -36,3 +36,59 @@ func TestKeyAdditions(t *testing.T) {
 		t.Fatal("public key of private key addition does not equal the public key addition")
 	}
 }
+
+func TestSumOfPrivateKeys(t *testing.T) {
+	keys := make([][]byte, 10)
+	for i := 0; i < 10; i++ {
+		key, _, _, err := secp256k1.GenerateKey(rand.Reader)
+		if err != nil {
+			t.Fatal(err)
+		}
+		keys[i] = key
+	}
+	sum, err := SumOfPrivateKeys(keys)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sumBytes := sum.Bytes()
+
+	sum2 := keys[0]
+	for i := 1; i < len(keys); i++ {
+		sum2, _ = AddPrivateKeys(sum2, keys[i])
+	}
+
+	if !bytes.Equal(sumBytes, sum2) {
+		t.Fatal("sum of private keys does not match")
+	}
+}
+
+func TestPrivateKeyTweakWithTarget(t *testing.T) {
+	target, _, _, err := secp256k1.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	keys := make([][]byte, 10)
+	for i := 0; i < 10; i++ {
+		key, _, _, err := secp256k1.GenerateKey(rand.Reader)
+		if err != nil {
+			t.Fatal(err)
+		}
+		keys[i] = key
+	}
+
+	tweak, err := LastKeyWithTarget(target, keys)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	keys = append(keys, tweak)
+
+	sum, err := SumOfPrivateKeys(keys)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(sum.Bytes(), target) {
+		t.Fatal("private key tweak with target does not match")
+	}
+}

@@ -235,3 +235,49 @@ func (s *SparkInternalServer) FrostRound2(ctx context.Context, req *pb.FrostRoun
 		Results: round2Response.Results,
 	}, nil
 }
+
+// PrepareSplitKeyshares prepares the keyshares for a split.
+func (s *SparkInternalServer) PrepareSplitKeyshares(ctx context.Context, req *pb.PrepareSplitKeysharesRequest) (*emptypb.Empty, error) {
+	selectedKeyshares := make([]uuid.UUID, len(req.SelectedKeyshareIds)+1)
+	u, err := uuid.Parse(req.TargetKeyshareId)
+	if err != nil {
+		log.Printf("Failed to parse target keyshare ID: %v", err)
+		return nil, err
+	}
+	selectedKeyshares[0] = u
+
+	for i, id := range req.SelectedKeyshareIds {
+		u, err := uuid.Parse(id)
+		if err != nil {
+			log.Printf("Failed to parse keyshare ID: %v", err)
+			return nil, err
+		}
+		selectedKeyshares[i+1] = u
+	}
+
+	err = entutils.MarkSigningKeysharesAsUsed(ctx, s.config, selectedKeyshares)
+	if err != nil {
+		log.Printf("Failed to mark keyshares as used: %v", err)
+		return nil, err
+	}
+
+	keyShares, err := entutils.GetKeyPackagesArray(ctx, selectedKeyshares)
+	if err != nil {
+		log.Printf("Failed to get key shares: %v", err)
+		return nil, err
+	}
+
+	lastKeyshareID, err := uuid.Parse(req.LastKeyshareId)
+	if err != nil {
+		log.Printf("Failed to parse last keyshare ID: %v", err)
+		return nil, err
+	}
+
+	_, err = entutils.CalculateAndStoreLastKey(ctx, s.config, keyShares[0], keyShares[1:], lastKeyshareID)
+	if err != nil {
+		log.Printf("Failed to calculate and store last key share: %v", err)
+		return nil, err
+	}
+
+	return &emptypb.Empty{}, nil
+}
