@@ -31,9 +31,9 @@ func AddPublicKeys(a, b []byte) ([]byte, error) {
 	return sum.SerializeCompressed(), nil
 }
 
-// ApplyTweakToPublicKey applies a tweak to a public key.
+// ApplyAdditiveTweakToPublicKey applies a tweak to a public key.
 // The result key is pubkey + tweak * G.
-func ApplyTweakToPublicKey(pubkey []byte, tweak []byte) ([]byte, error) {
+func ApplyAdditiveTweakToPublicKey(pubkey []byte, tweak []byte) ([]byte, error) {
 	if len(pubkey) != 33 {
 		return nil, fmt.Errorf("pubkey must be 33 bytes")
 	}
@@ -49,7 +49,7 @@ func ApplyTweakToPublicKey(pubkey []byte, tweak []byte) ([]byte, error) {
 
 	_, tweakPub := secp256k1.PrivKeyFromBytes(tweak)
 
-	curve.Add(pub.X, pub.Y, tweakPub.X, tweakPub.Y)
+	pub.X, pub.Y = curve.Add(pub.X, pub.Y, tweakPub.X, tweakPub.Y)
 
 	return pub.SerializeCompressed(), nil
 }

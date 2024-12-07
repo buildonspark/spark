@@ -74,7 +74,8 @@ func TestPrivateKeyTweakWithTarget(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		keys[i] = key
+		privKey, _ := secp256k1.PrivKeyFromBytes(key)
+		keys[i] = privKey.Serialize()
 	}
 
 	tweak, err := LastKeyWithTarget(target, keys)
@@ -90,5 +91,33 @@ func TestPrivateKeyTweakWithTarget(t *testing.T) {
 	}
 	if !bytes.Equal(sum.Bytes(), target) {
 		t.Fatal("private key tweak with target does not match")
+	}
+}
+
+func TestApplyAdditiveTweakToPublicKey(t *testing.T) {
+	privKey, _, _, err := secp256k1.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, pubKey := secp256k1.PrivKeyFromBytes(privKey)
+
+	tweak, _, _, err := secp256k1.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	newPriv, err := AddPrivateKeys(privKey, tweak)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, target := secp256k1.PrivKeyFromBytes(newPriv)
+
+	newPubKey, err := ApplyAdditiveTweakToPublicKey(pubKey.SerializeCompressed(), tweak)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !bytes.Equal(newPubKey, target.SerializeCompressed()) {
+		t.Fatal("apply additive tweak to public key does not match")
 	}
 }

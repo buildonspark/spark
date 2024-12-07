@@ -154,14 +154,14 @@ func CalculateAndStoreLastKey(ctx context.Context, config *so.Config, target *en
 		return nil, err
 	}
 
-	verifyingKey, err := common.ApplyTweakToPublicKey(target.PublicKey, tweakBytes)
+	verifyingKey, err := common.ApplyAdditiveTweakToPublicKey(target.PublicKey, tweakBytes)
 	if err != nil {
 		return nil, err
 	}
 
 	publicShares := make(map[string][]byte)
 	for i, publicShare := range target.PublicShares {
-		newShare, err := common.ApplyTweakToPublicKey(publicShare, tweakBytes)
+		newShare, err := common.ApplyAdditiveTweakToPublicKey(publicShare, tweakBytes)
 		if err != nil {
 			return nil, err
 		}
