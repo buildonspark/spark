@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package spark;
+package spark_internal;
 
 option go_package = "github.com/lightsparkdev/spark-go/proto/spark_internal";
 import "google/protobuf/empty.proto";

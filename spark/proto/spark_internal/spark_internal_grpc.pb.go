@@ -20,11 +20,11 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	SparkInternalService_MarkKeysharesAsUsed_FullMethodName           = "/spark.SparkInternalService/mark_keyshares_as_used"
-	SparkInternalService_MarkKeyshareForDepositAddress_FullMethodName = "/spark.SparkInternalService/mark_keyshare_for_deposit_address"
-	SparkInternalService_FrostRound1_FullMethodName                   = "/spark.SparkInternalService/frost_round1"
-	SparkInternalService_FrostRound2_FullMethodName                   = "/spark.SparkInternalService/frost_round2"
-	SparkInternalService_PrepareSplitKeyshares_FullMethodName         = "/spark.SparkInternalService/prepare_split_keyshares"
+	SparkInternalService_MarkKeysharesAsUsed_FullMethodName           = "/spark_internal.SparkInternalService/mark_keyshares_as_used"
+	SparkInternalService_MarkKeyshareForDepositAddress_FullMethodName = "/spark_internal.SparkInternalService/mark_keyshare_for_deposit_address"
+	SparkInternalService_FrostRound1_FullMethodName                   = "/spark_internal.SparkInternalService/frost_round1"
+	SparkInternalService_FrostRound2_FullMethodName                   = "/spark_internal.SparkInternalService/frost_round2"
+	SparkInternalService_PrepareSplitKeyshares_FullMethodName         = "/spark_internal.SparkInternalService/prepare_split_keyshares"
 )
 
 // SparkInternalServiceClient is the client API for SparkInternalService service.
@@ -245,7 +245,7 @@ func _SparkInternalService_PrepareSplitKeyshares_Handler(srv interface{}, ctx co
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var SparkInternalService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "spark.SparkInternalService",
+	ServiceName: "spark_internal.SparkInternalService",
 	HandlerType: (*SparkInternalServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
