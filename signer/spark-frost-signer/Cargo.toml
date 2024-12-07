@@ -1,0 +1,22 @@
+[package]
+name = "spark-frost-signer"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+spark-frost = { path = "../spark-frost" }
+prost = { workspace = true }
+tonic = { workspace = true }
+tokio = { workspace = true }
+tokio-stream = { workspace = true }
+frost-secp256k1-tr = { workspace = true }
+frost-core = { workspace = true }
+rand = { workspace = true }
+serde = { workspace = true }
+hex = { workspace = true }
+clap = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+[build-dependencies]
+tonic-build = { workspace = true }

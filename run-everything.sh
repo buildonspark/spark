@@ -98,7 +98,7 @@ run_frost_signers_tmux() {
 
         # Construct the command properly with escaped paths
         local log_file="${run_dir}/logs/signer_${i}.log"
-        local cmd="cd spark-frost-signer && cargo run --release -- -u /tmp/frost_${i}.sock 2>&1 | tee '${log_file}'"
+        local cmd="cd signer && cargo run --bin spark-frost-signer --release -- -u /tmp/frost_${i}.sock 2>&1 | tee '${log_file}'"
         # Send the command to tmux
         tmux send-keys -t "$session_name.$i" "$cmd" C-m
     done

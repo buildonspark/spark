@@ -1,17 +1,14 @@
 use std::fs;
 
 use clap::{arg, Parser};
-use proto::frost::frost_service_server;
 use server::FrostServer;
+use spark_frost::proto::frost::frost_service_server;
 use tokio::net::{TcpListener, UnixListener};
 use tonic::transport::Server;
 use tracing::Level;
 
 mod dkg;
-mod frost_test;
-mod proto;
 mod server;
-mod signing;
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]

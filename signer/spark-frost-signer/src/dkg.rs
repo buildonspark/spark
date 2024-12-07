@@ -5,7 +5,7 @@ use frost_secp256k1_tr::{
     Identifier,
 };
 
-use crate::proto::{common::PackageMap, frost::KeyPackage};
+use spark_frost::proto::{common::PackageMap, frost::KeyPackage};
 
 #[derive(Debug, PartialEq)]
 pub enum DKGState {
