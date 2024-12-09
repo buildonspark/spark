@@ -534,9 +534,9 @@ dependencies = [
 
 [[package]]
 name = "fastrand"
-version = "2.2.0"
+version = "2.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "486f806e73c5707928240ddc295403b1b93c96a02038563881c4a2fd84b81ac4"
+checksum = "37909eebbb50d72f9059c3b6d82c0463f2ff062c9e95845c43a6c9c0355411be"
 
 [[package]]
 name = "ff"
@@ -563,7 +563,7 @@ checksum = "3f9eec918d3f24069decb9af1554cad7c880e2da24a9afd88aca000531ab82c1"
 [[package]]
 name = "frost-core"
 version = "2.0.0"
-source = "git+ssh://git@github.com/lightsparkdev/frost?branch=nested-signing#6626579af2808dc937cc3129a865ab64918bfb85"
+source = "git+https://github.com/lightsparkdev/frost?branch=nested-signing#6626579af2808dc937cc3129a865ab64918bfb85"
 dependencies = [
  "byteorder",
  "const-crc32-nostd",
@@ -576,7 +576,7 @@ dependencies = [
  "rand_core",
  "serde",
  "serdect",
- "thiserror 2.0.4",
+ "thiserror 2.0.6",
  "thiserror-nostd-notrait",
  "visibility",
  "zeroize",
@@ -585,7 +585,7 @@ dependencies = [
 [[package]]
 name = "frost-rerandomized"
 version = "2.0.0"
-source = "git+ssh://git@github.com/lightsparkdev/frost?branch=nested-signing#6626579af2808dc937cc3129a865ab64918bfb85"
+source = "git+https://github.com/lightsparkdev/frost?branch=nested-signing#6626579af2808dc937cc3129a865ab64918bfb85"
 dependencies = [
  "derive-getters",
  "document-features",
@@ -597,7 +597,7 @@ dependencies = [
 [[package]]
 name = "frost-secp256k1-tr"
 version = "2.0.0"
-source = "git+ssh://git@github.com/lightsparkdev/frost?branch=nested-signing#6626579af2808dc937cc3129a865ab64918bfb85"
+source = "git+https://github.com/lightsparkdev/frost?branch=nested-signing#6626579af2808dc937cc3129a865ab64918bfb85"
 dependencies = [
  "document-features",
  "frost-core",
@@ -1306,15 +1306,15 @@ dependencies = [
 
 [[package]]
 name = "rustix"
-version = "0.38.41"
+version = "0.38.42"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d7f649912bc1495e167a6edee79151c84b1bad49748cb4f1f1167f459f6224f6"
+checksum = "f93dc38ecbab2eb790ff964bb77fa94faf256fd3e73285fd7ba0903b76bedb85"
 dependencies = [
  "bitflags",
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -1610,11 +1610,11 @@ dependencies = [
 
 [[package]]
 name = "thiserror"
-version = "2.0.4"
+version = "2.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2f49a1853cf82743e3b7950f77e0f4d622ca36cf4317cba00c767838bac8d490"
+checksum = "8fec2a1820ebd077e2b90c4df007bebf344cd394098a13c563957d0afc83ea47"
 dependencies = [
- "thiserror-impl 2.0.4",
+ "thiserror-impl 2.0.6",
 ]
 
 [[package]]
@@ -1630,9 +1630,9 @@ dependencies = [
 
 [[package]]
 name = "thiserror-impl"
-version = "2.0.4"
+version = "2.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8381894bb3efe0c4acac3ded651301ceee58a15d47c2e34885ed1908ad667061"
+checksum = "d65750cab40f4ff1929fb1ba509e9914eb756131cef4210da8d5d700d26f6312"
 dependencies = [
  "proc-macro2",
  "quote",

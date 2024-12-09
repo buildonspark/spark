@@ -27,6 +27,9 @@ jobs:
         with:
           toolchain: stable
 
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v3
+
       - name: "Install Python"
         uses: actions/setup-python@v4
         with:
@@ -63,6 +66,9 @@ jobs:
         with:
           toolchain: stable
 
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v3
+
       - name: "Install Python"
         uses: actions/setup-python@v4
         with:
@@ -94,6 +100,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v3
+
       - name: "Install Python"
         uses: actions/setup-python@v4
         with:
@@ -124,6 +133,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
+
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v3
 
       - name: "Install Python"
         uses: actions/setup-python@v4
@@ -159,7 +171,7 @@ jobs:
         uses: ncipollo/release-action@2c591bcc8ecdcd2db72b97d6147f871fcd833ba5
         with:
           artifacts: ./dist/*.whl
-          tag: ${{ inputs.version }}
+          tag: "python-signer-${{ inputs.version }}"
           token: ${{ secrets.GITHUB_TOKEN }}
-          name: ${{ inputs.version }}
+          name: "python-signer-${{ inputs.version }}"
           prerelease: true
