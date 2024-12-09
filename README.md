@@ -21,3 +21,13 @@ After modifying the proto files, you can generate the Go files with the followin
 ```
 make
 ```
+
+## Developer tips
+
+If spark_frost.udl file has issue with VSCode, you can add the following to your settings.json file:
+
+```
+"files.associations": {
+    "spark_frost.udl": "plaintext"
+}
+```

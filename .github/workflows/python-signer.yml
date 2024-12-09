@@ -1,0 +1,165 @@
+name: "Python Signer"
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'New release version, eg. 0.MINOR.PATCH'
+        required: true
+        type: string
+
+jobs:
+  build-manylinux2014-x86_64-wheels:
+    name: "Build Manylinux 2014 x86_64 wheel"
+    runs-on: ubuntu-20.04
+    defaults:
+      run:
+        working-directory: signer/spark-frost-uniffi/spark-frost-python
+    strategy:
+      matrix:
+        target: [x86_64]
+        python:
+          - "3.12"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: "Install Python"
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python }}
+      
+      - name: "Generate py source and binaries"
+        run: bash ./scripts/generate-linux.sh
+
+      - name: "Build wheel"
+        run: python setup.py bdist_wheel --plat-name manylinux_2_17_x86_64 --verbose
+
+      - name: "Upload artifacts"
+        uses: actions/upload-artifact@v3
+        with:
+          name: spark_frost_python-manylinux2014-x86_64-${{ matrix.python }}
+          path: /home/runner/work/spark-go/spark-go/signer/spark-frost-uniffi/spark-frost-python/dist/*.whl
+
+  build-manylinux2014-aarch64-wheels:
+    name: "Build linux aarch64 wheel"
+    runs-on: ubuntu-20.04
+    defaults:
+      run:
+        working-directory: signer/spark-frost-uniffi/spark-frost-python
+    strategy:
+      matrix:
+        target: [aarch64]
+        python:
+          - "3.12"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: "Install Python"
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: "Generate py source and binaries"
+        run: bash ./scripts/generate-linux.sh
+
+      - name: "Build wheel"
+        run: python setup.py bdist_wheel --plat-name manylinux_2_17_aarch64 --verbose
+
+      - name: "Upload artifacts"
+        uses: actions/upload-artifact@v3
+        with:
+          name: spark_frost_python-manylinux2014-aarch64-${{ matrix.python }}
+          path: /home/runner/work/spark-go/spark-go/signer/spark-frost-uniffi/spark-frost-python/dist/*.whl
+
+  build-macos-arm64-wheels:
+    name: "Build macOS arm64 wheel"
+    runs-on: macos-13
+    defaults:
+      run:
+        working-directory: signer/spark-frost-uniffi/spark-frost-python
+    strategy:
+      matrix:
+        python:
+          - "3.12"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: "Install Python"
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python }}
+      
+      - name: "Generate py source and binaries"
+        run: bash ./scripts/generate-macos-arm64.sh
+
+      - name: "Build wheel"
+        run: python3 setup.py bdist_wheel --plat-name macosx_11_0_arm64 --verbose
+
+      - name: "Upload artifacts"
+        uses: actions/upload-artifact@v3
+        with:
+          name: spark_frost_python-macos-arm64-${{ matrix.python }}
+          path: /Users/runner/work/spark-go/spark-go/signer/spark-frost-uniffi/spark-frost-python/dist/*.whl
+
+  build-macos-x86_64-wheels:
+    name: "Build macOS x86_64 wheel"
+    runs-on: macos-13
+    defaults:
+      run:
+        working-directory: signer/spark-frost-uniffi/spark-frost-python
+    strategy:
+      matrix:
+        python:
+          - "3.12"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: "Install Python"
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python }}
+      
+      - name: "Generate py source and binaries"
+        run: bash ./scripts/generate-macos-x86_64.sh
+
+      - name: "Build wheel"
+        run: python3 setup.py bdist_wheel --plat-name macosx_11_0_x86_64 --verbose
+
+      - name: "Upload artifacts"
+        uses: actions/upload-artifact@v3
+        with:
+          name: spark_frost_python-macos-x86_64-${{ matrix.python }}
+          path: /Users/runner/work/spark-go/spark-go/signer/spark-frost-uniffi/spark-frost-python/dist/*.whl
+
+  create-release:
+    name: Create release and tag
+    needs: [build-manylinux2014-x86_64-wheels, build-manylinux2014-aarch64-wheels, build-macos-arm64-wheels, build-macos-x86_64-wheels]
+    runs-on: ubuntu-22.04
+    steps:
+      - name: "Checkout"
+        uses: actions/checkout@v3
+
+      - name: "Download artifacts in dist/ directory"
+        uses: actions/download-artifact@v3
+        with:
+          path: dist/
+
+      - name: Create release
+        uses: ncipollo/release-action@2c591bcc8ecdcd2db72b97d6147f871fcd833ba5
+        with:
+          artifacts: ./dist/*.whl
+          tag: ${{ inputs.version }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          name: ${{ inputs.version }}
+          prerelease: true

@@ -16,8 +16,6 @@ use frost_secp256k1_tr::round2::SignatureShare;
 use frost_secp256k1_tr::Identifier;
 use frost_secp256k1_tr::SigningPackage;
 use frost_secp256k1_tr::VerifyingKey;
-use tonic::Request;
-use tonic::Response;
 
 use crate::hex_string_to_identifier;
 use crate::proto::common::*;
@@ -172,11 +170,7 @@ pub fn frost_key_package_from_proto(
     }
 }
 
-pub fn frost_nonce(
-    request: Request<FrostNonceRequest>,
-) -> Result<Response<FrostNonceResponse>, String> {
-    let req = request.get_ref();
-
+pub fn frost_nonce(req: &FrostNonceRequest) -> Result<FrostNonceResponse, String> {
     let mut results = Vec::new();
 
     for key_package in req.key_packages.iter() {
@@ -211,13 +205,10 @@ pub fn frost_nonce(
         });
     }
 
-    Ok(Response::new(FrostNonceResponse { results }))
+    Ok(FrostNonceResponse { results })
 }
 
-pub fn sign_frost(
-    request: Request<SignFrostRequest>,
-) -> Result<Response<SignFrostResponse>, String> {
-    let req = request.get_ref();
+pub fn sign_frost(req: &SignFrostRequest) -> Result<SignFrostResponse, String> {
     let mut results = HashMap::new();
     for job in req.signing_jobs.iter() {
         let mut commitments = frost_signing_commiement_map_from_proto(&job.commitments)
@@ -293,13 +284,10 @@ pub fn sign_frost(
         );
     }
 
-    Ok(Response::new(SignFrostResponse { results }))
+    Ok(SignFrostResponse { results })
 }
 
-pub fn aggregate_frost(
-    request: Request<AggregateFrostRequest>,
-) -> Result<Response<AggregateFrostResponse>, String> {
-    let req = request.get_ref();
+pub fn aggregate_frost(req: &AggregateFrostRequest) -> Result<AggregateFrostResponse, String> {
     let mut commitments = frost_signing_commiement_map_from_proto(&req.commitments)
         .map_err(|e| format!("Failed to parse signing commitments: {:?}", e))?;
 
@@ -347,9 +335,9 @@ pub fn aggregate_frost(
     )
     .map_err(|e| format!("Failed to aggregate frost: {:?}", e))?;
 
-    Ok(Response::new(AggregateFrostResponse {
+    Ok(AggregateFrostResponse {
         signature: signature
             .serialize()
             .map_err(|e| format!("Failed to serialize signature: {:?}", e))?,
-    }))
+    })
 }

@@ -1,0 +1,36 @@
+namespace spark_frost { 
+    [Throws=Error]
+    SigningNonceResult frost_nonce(KeyPackage key_package);
+
+    [Throws=Error]
+    bytes frost_sign(bytes msg, KeyPackage key_package, SigningNonce nonce, SigningCommitment self_commitment, record<string, SigningCommitment> statechain_commitments);
+
+    [Throws=Error]
+    bytes frost_aggregate(bytes msg, record<string, SigningCommitment> statechain_commitments, SigningCommitment self_commitment, record<string, bytes> statechain_signatures, bytes self_signature, record<string, bytes> statechain_public_keys, bytes self_public_key, bytes verifying_key);
+};
+
+[Error]
+enum Error {
+    "Frost",
+};
+
+dictionary SigningNonce {
+    bytes hiding;
+    bytes binding;
+};
+
+dictionary SigningCommitment {
+    bytes hiding;
+    bytes binding;
+};
+
+dictionary SigningNonceResult {
+    SigningNonce nonce;
+    SigningCommitment commitment;
+};
+
+dictionary KeyPackage {
+    bytes secret_key;
+    bytes public_key;
+    bytes verifying_key;
+};

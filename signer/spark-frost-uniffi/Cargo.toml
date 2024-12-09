@@ -1,0 +1,25 @@
+[package]
+name = "spark-frost-uniffi"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+spark-frost = { path = "../spark-frost" }
+frost-secp256k1-tr = { workspace = true }
+hex = { workspace = true }
+uuid = { workspace = true }
+uniffi = "0.28.3"
+
+[build-dependencies]
+uniffi = { version = "0.28.3", features = [ "build" ] }
+
+[features]
+default = ["uniffi/cli"]
+
+[lib]
+crate-type = ["cdylib", "staticlib"]
+name = "spark_frost"
+
+[[bin]]
+name = "uniffi-bindgen"
+path = "uniffi-bindgen.rs"

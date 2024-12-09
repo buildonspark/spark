@@ -2,12 +2,13 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use frost_service_server::FrostService;
+use spark_frost::hex_string_to_identifier;
 use spark_frost::proto::common::*;
 use spark_frost::proto::frost::*;
 use tonic::{Request, Response, Status};
 
 use crate::dkg::{
-    hex_string_to_identifier, key_package_from_dkg_result, round1_package_maps_from_package_maps,
+    key_package_from_dkg_result, round1_package_maps_from_package_maps,
     round2_package_maps_from_package_maps, DKGState,
 };
 
@@ -226,7 +227,9 @@ impl FrostService for FrostServer {
         request: Request<FrostNonceRequest>,
     ) -> Result<Response<FrostNonceResponse>, Status> {
         tracing::info!("Received frost nonce request");
-        spark_frost::signing::frost_nonce(request).map_err(|e| Status::internal(e))
+        let response = spark_frost::signing::frost_nonce(&request.get_ref())
+            .map_err(|e| Status::internal(e))?;
+        Ok(Response::new(response))
     }
 
     async fn sign_frost(
@@ -234,7 +237,9 @@ impl FrostService for FrostServer {
         request: Request<SignFrostRequest>,
     ) -> Result<Response<SignFrostResponse>, Status> {
         tracing::info!("Received frost sign request");
-        spark_frost::signing::sign_frost(request).map_err(|e| Status::internal(e))
+        let response = spark_frost::signing::sign_frost(&request.get_ref())
+            .map_err(|e| Status::internal(e))?;
+        Ok(Response::new(response))
     }
 
     async fn aggregate_frost(
@@ -242,6 +247,8 @@ impl FrostService for FrostServer {
         request: Request<AggregateFrostRequest>,
     ) -> Result<Response<AggregateFrostResponse>, Status> {
         tracing::info!("Received frost aggregate request");
-        spark_frost::signing::aggregate_frost(request).map_err(|e| Status::internal(e))
+        let response = spark_frost::signing::aggregate_frost(&request.get_ref())
+            .map_err(|e| Status::internal(e))?;
+        Ok(Response::new(response))
     }
 }

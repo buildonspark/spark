@@ -2,7 +2,7 @@
 resolver = "2"
 members = [
     "spark-frost",
-    "spark-frost-signer",
+    "spark-frost-signer", "spark-frost-uniffi",
     # "spark-frost-uniffi",
 ]
 
@@ -20,3 +20,12 @@ clap = { version = "4.5.20", features = ["derive"] }
 tracing = "0.1.40"
 tracing-subscriber = "0.3.18"
 tonic-build = "0.12.3"
+uuid = { version = "1.1.2", features = ["v4"] }
+
+[profile.release-smaller]
+inherits = "release"
+opt-level = 'z'     # Optimize for size.
+lto = true          # Enable Link Time Optimization
+codegen-units = 1   # Reduce number of codegen units to increase optimizations.
+panic = 'abort'     # Abort on panic
+strip = true        # Strip symbols from binary*
