@@ -15,6 +15,7 @@ import (
 	pbdkg "github.com/lightsparkdev/spark-go/proto/dkg"
 	pbspark "github.com/lightsparkdev/spark-go/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark-go/proto/spark_internal"
+	pbtree "github.com/lightsparkdev/spark-go/proto/spark_tree"
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/dkg"
 	"github.com/lightsparkdev/spark-go/so/ent"
@@ -125,6 +126,9 @@ func main() {
 
 	sparkServer := sparkgrpc.NewSparkServer(config)
 	pbspark.RegisterSparkServiceServer(grpcServer, sparkServer)
+
+	treeServer := sparkgrpc.NewSparkTreeServer(config)
+	pbtree.RegisterSparkTreeServiceServer(grpcServer, treeServer)
 
 	log.Printf("Serving on port %d\n", args.Port)
 	if err := grpcServer.Serve(lis); err != nil {
