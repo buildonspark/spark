@@ -8,10 +8,8 @@ import "common.proto";
 service SparkService {
     rpc generate_deposit_address(GenerateDepositAddressRequest) returns (GenerateDepositAddressResponse) {}
     rpc start_tree_creation(StartTreeCreationRequest) returns (StartTreeCreationResponse) {}
-    rpc complete_tree_creation(CompleteTreeCreationRequest) returns (CompleteTreeCreationResponse) {}
-
     rpc split_node(SplitNodeRequest) returns (SplitNodeResponse) {}
-    rpc finalize_split(FinalizeSplitRequest) returns (FinalizeSplitResponse) {}
+    rpc finalize_node_signatures(FinalizeNodeSignaturesRequest) returns (FinalizeNodeSignaturesResponse) {}
 }
 
 message GenerateDepositAddressRequest {
@@ -66,14 +64,6 @@ message StartTreeCreationResponse {
     NodeSignatureShares root_node_signature_shares = 2;
 }
 
-message CompleteTreeCreationRequest {
-    bytes identity_public_key = 1;
-    string tree_id = 2;
-    bytes root_tx_signature = 3;
-    bytes refund_tx_signature = 4;
-}
-
-
 message TreeNode {
     string id = 1;
     string tree_id = 2;
@@ -82,11 +72,6 @@ message TreeNode {
     string raw_root_tx_hex = 5;
     string raw_refund_tx_hex = 6;
 }
-
-message CompleteTreeCreationResponse {
-    TreeNode tree_root = 1;
-}
-
 
 message Split {
     bytes signing_public_key = 1;
@@ -110,10 +95,11 @@ message SplitNodeResponse {
     repeated SplitResult split_results = 1;
 }
 
-message FinalizeSplitRequest {
-    string splitted_node_id = 1;
-    repeated NodeSignatures split_signatures = 2;
+message FinalizeNodeSignaturesRequest {
+    common.SignatureIntent intent = 1;
+    repeated NodeSignatures node_signatures = 2;
 }
 
-message FinalizeSplitResponse {
+message FinalizeNodeSignaturesResponse {
+    repeated TreeNode nodes = 1;
 }

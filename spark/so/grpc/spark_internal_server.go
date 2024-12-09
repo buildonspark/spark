@@ -10,7 +10,6 @@ import (
 	pbfrost "github.com/lightsparkdev/spark-go/proto/frost"
 	pb "github.com/lightsparkdev/spark-go/proto/spark_internal"
 	"github.com/lightsparkdev/spark-go/so"
-	"github.com/lightsparkdev/spark-go/so/ent/schema"
 	"github.com/lightsparkdev/spark-go/so/entutils"
 	"github.com/lightsparkdev/spark-go/so/handler"
 	"github.com/lightsparkdev/spark-go/so/objects"
@@ -244,23 +243,8 @@ func (s *SparkInternalServer) PrepareSplitKeyshares(ctx context.Context, req *pb
 	return splitHandler.PrepareSplitKeyshares(ctx, req)
 }
 
-// SyncTreeCreation syncs the tree creation.
-func (s *SparkInternalServer) SyncTreeCreation(ctx context.Context, req *pb.SyncTreeCreationRequest) (*emptypb.Empty, error) {
-	db := common.GetDbFromContext(ctx)
-	tree := db.Tree.Create().SetID(uuid.MustParse(req.TreeRoot.TreeId)).SetOwnerIdentityPubkey(req.TreeRoot.OwnerIdentityPubkey).SaveX(ctx)
-	root := db.TreeNode.
-		Create().
-		SetID(uuid.MustParse(req.TreeRoot.Id)).
-		SetTree(tree).
-		SetStatus(schema.TreeNodeStatusAvailable).
-		SetOwnerIdentityPubkey(req.TreeRoot.OwnerIdentityPubkey).
-		SetOwnerSigningPubkey(req.TreeRoot.OwnerSigningPubkey).
-		SetValue(req.TreeRoot.Value).
-		SetVerifyingPubkey(req.TreeRoot.VerifyingPubkey).
-		SetSigningKeyshareID(uuid.MustParse(req.TreeRoot.SigningKeyshareId)).
-		SetRawTx(req.TreeRoot.RawTx).
-		SetRawRefundTx(req.TreeRoot.RawRefundTx).
-		SaveX(ctx)
-	tree.Update().SetRoot(root).SaveX(ctx)
-	return &emptypb.Empty{}, nil
+// InternalFinalizeNodeSignatures syncs the tree creation.
+func (s *SparkInternalServer) InternalFinalizeNodeSignatures(ctx context.Context, req *pb.InternalFinalizeNodeSignaturesRequest) (*emptypb.Empty, error) {
+	finalizeHandler := handler.NewInternalFinalizeSignatureHandler(s.config)
+	return finalizeHandler.InternalFinalizeNodeSignatures(ctx, req)
 }

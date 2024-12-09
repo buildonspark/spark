@@ -20,12 +20,12 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	SparkInternalService_MarkKeysharesAsUsed_FullMethodName           = "/spark_internal.SparkInternalService/mark_keyshares_as_used"
-	SparkInternalService_MarkKeyshareForDepositAddress_FullMethodName = "/spark_internal.SparkInternalService/mark_keyshare_for_deposit_address"
-	SparkInternalService_SyncTreeCreation_FullMethodName              = "/spark_internal.SparkInternalService/sync_tree_creation"
-	SparkInternalService_FrostRound1_FullMethodName                   = "/spark_internal.SparkInternalService/frost_round1"
-	SparkInternalService_FrostRound2_FullMethodName                   = "/spark_internal.SparkInternalService/frost_round2"
-	SparkInternalService_PrepareSplitKeyshares_FullMethodName         = "/spark_internal.SparkInternalService/prepare_split_keyshares"
+	SparkInternalService_MarkKeysharesAsUsed_FullMethodName            = "/spark_internal.SparkInternalService/mark_keyshares_as_used"
+	SparkInternalService_MarkKeyshareForDepositAddress_FullMethodName  = "/spark_internal.SparkInternalService/mark_keyshare_for_deposit_address"
+	SparkInternalService_InternalFinalizeNodeSignatures_FullMethodName = "/spark_internal.SparkInternalService/internal_finalize_node_signatures"
+	SparkInternalService_FrostRound1_FullMethodName                    = "/spark_internal.SparkInternalService/frost_round1"
+	SparkInternalService_FrostRound2_FullMethodName                    = "/spark_internal.SparkInternalService/frost_round2"
+	SparkInternalService_PrepareSplitKeyshares_FullMethodName          = "/spark_internal.SparkInternalService/prepare_split_keyshares"
 )
 
 // SparkInternalServiceClient is the client API for SparkInternalService service.
@@ -34,7 +34,7 @@ const (
 type SparkInternalServiceClient interface {
 	MarkKeysharesAsUsed(ctx context.Context, in *MarkKeysharesAsUsedRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	MarkKeyshareForDepositAddress(ctx context.Context, in *MarkKeyshareForDepositAddressRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
-	SyncTreeCreation(ctx context.Context, in *SyncTreeCreationRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	InternalFinalizeNodeSignatures(ctx context.Context, in *InternalFinalizeNodeSignaturesRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	FrostRound1(ctx context.Context, in *FrostRound1Request, opts ...grpc.CallOption) (*FrostRound1Response, error)
 	FrostRound2(ctx context.Context, in *FrostRound2Request, opts ...grpc.CallOption) (*FrostRound2Response, error)
 	PrepareSplitKeyshares(ctx context.Context, in *PrepareSplitKeysharesRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
@@ -68,10 +68,10 @@ func (c *sparkInternalServiceClient) MarkKeyshareForDepositAddress(ctx context.C
 	return out, nil
 }
 
-func (c *sparkInternalServiceClient) SyncTreeCreation(ctx context.Context, in *SyncTreeCreationRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+func (c *sparkInternalServiceClient) InternalFinalizeNodeSignatures(ctx context.Context, in *InternalFinalizeNodeSignaturesRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(emptypb.Empty)
-	err := c.cc.Invoke(ctx, SparkInternalService_SyncTreeCreation_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, SparkInternalService_InternalFinalizeNodeSignatures_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -114,7 +114,7 @@ func (c *sparkInternalServiceClient) PrepareSplitKeyshares(ctx context.Context, 
 type SparkInternalServiceServer interface {
 	MarkKeysharesAsUsed(context.Context, *MarkKeysharesAsUsedRequest) (*emptypb.Empty, error)
 	MarkKeyshareForDepositAddress(context.Context, *MarkKeyshareForDepositAddressRequest) (*emptypb.Empty, error)
-	SyncTreeCreation(context.Context, *SyncTreeCreationRequest) (*emptypb.Empty, error)
+	InternalFinalizeNodeSignatures(context.Context, *InternalFinalizeNodeSignaturesRequest) (*emptypb.Empty, error)
 	FrostRound1(context.Context, *FrostRound1Request) (*FrostRound1Response, error)
 	FrostRound2(context.Context, *FrostRound2Request) (*FrostRound2Response, error)
 	PrepareSplitKeyshares(context.Context, *PrepareSplitKeysharesRequest) (*emptypb.Empty, error)
@@ -134,8 +134,8 @@ func (UnimplementedSparkInternalServiceServer) MarkKeysharesAsUsed(context.Conte
 func (UnimplementedSparkInternalServiceServer) MarkKeyshareForDepositAddress(context.Context, *MarkKeyshareForDepositAddressRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method MarkKeyshareForDepositAddress not implemented")
 }
-func (UnimplementedSparkInternalServiceServer) SyncTreeCreation(context.Context, *SyncTreeCreationRequest) (*emptypb.Empty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method SyncTreeCreation not implemented")
+func (UnimplementedSparkInternalServiceServer) InternalFinalizeNodeSignatures(context.Context, *InternalFinalizeNodeSignaturesRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method InternalFinalizeNodeSignatures not implemented")
 }
 func (UnimplementedSparkInternalServiceServer) FrostRound1(context.Context, *FrostRound1Request) (*FrostRound1Response, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method FrostRound1 not implemented")
@@ -203,20 +203,20 @@ func _SparkInternalService_MarkKeyshareForDepositAddress_Handler(srv interface{}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _SparkInternalService_SyncTreeCreation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(SyncTreeCreationRequest)
+func _SparkInternalService_InternalFinalizeNodeSignatures_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(InternalFinalizeNodeSignaturesRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(SparkInternalServiceServer).SyncTreeCreation(ctx, in)
+		return srv.(SparkInternalServiceServer).InternalFinalizeNodeSignatures(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: SparkInternalService_SyncTreeCreation_FullMethodName,
+		FullMethod: SparkInternalService_InternalFinalizeNodeSignatures_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SparkInternalServiceServer).SyncTreeCreation(ctx, req.(*SyncTreeCreationRequest))
+		return srv.(SparkInternalServiceServer).InternalFinalizeNodeSignatures(ctx, req.(*InternalFinalizeNodeSignaturesRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -291,8 +291,8 @@ var SparkInternalService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _SparkInternalService_MarkKeyshareForDepositAddress_Handler,
 		},
 		{
-			MethodName: "sync_tree_creation",
-			Handler:    _SparkInternalService_SyncTreeCreation_Handler,
+			MethodName: "internal_finalize_node_signatures",
+			Handler:    _SparkInternalService_InternalFinalizeNodeSignatures_Handler,
 		},
 		{
 			MethodName: "frost_round1",

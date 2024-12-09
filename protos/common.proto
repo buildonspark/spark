@@ -26,3 +26,9 @@ message PackageMap {
 message SigningResult {
     bytes signature_share = 1;
 }
+
+enum SignatureIntent {
+    CREATION = 0;
+    SPLIT = 1;
+    TRANSFER = 2;
+}
