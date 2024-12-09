@@ -110,12 +110,12 @@ func ComputeLagrangeCoefficients[T LagrangeInterpolatable](index *big.Int, point
 
 // generatePolynomialForSecretSharing generates a polynomial for secret sharing.
 func generatePolynomialForSecretSharing(fieldModulus *big.Int, secret *big.Int, degree int) (*Polynomial, error) {
-	coefficients := make([]*big.Int, degree+1)
-	proofs := make([][]byte, degree+1)
+	coefficients := make([]*big.Int, degree)
+	proofs := make([][]byte, degree)
 
 	coefficients[0] = secret
 	proofs[0] = secp256k1.NewPrivateKey(secret).PubKey().SerializeCompressed()
-	for i := 1; i <= degree; i++ {
+	for i := 1; i < degree; i++ {
 		randomInt, err := rand.Int(rand.Reader, fieldModulus)
 		if err != nil {
 			return nil, err
@@ -132,7 +132,7 @@ func generatePolynomialForSecretSharing(fieldModulus *big.Int, secret *big.Int, 
 
 // SplitSecret splits a secret into a set of shares.
 func SplitSecret(secret *big.Int, fieldModulus *big.Int, threshold int, numberOfShares int) ([]*SecretShare, error) {
-	polynomial, err := generatePolynomialForSecretSharing(fieldModulus, secret, threshold-1)
+	polynomial, err := generatePolynomialForSecretSharing(fieldModulus, secret, threshold)
 	if err != nil {
 		return nil, err
 	}
