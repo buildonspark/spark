@@ -64,6 +64,18 @@ func (tnu *TreeNodeUpdate) SetOwnerSigningPubkey(b []byte) *TreeNodeUpdate {
 	return tnu
 }
 
+// SetRawTx sets the "raw_tx" field.
+func (tnu *TreeNodeUpdate) SetRawTx(b []byte) *TreeNodeUpdate {
+	tnu.mutation.SetRawTx(b)
+	return tnu
+}
+
+// SetRawRefundTx sets the "raw_refund_tx" field.
+func (tnu *TreeNodeUpdate) SetRawRefundTx(b []byte) *TreeNodeUpdate {
+	tnu.mutation.SetRawRefundTx(b)
+	return tnu
+}
+
 // SetTreeID sets the "tree" edge to the Tree entity by ID.
 func (tnu *TreeNodeUpdate) SetTreeID(id uuid.UUID) *TreeNodeUpdate {
 	tnu.mutation.SetTreeID(id)
@@ -217,6 +229,16 @@ func (tnu *TreeNodeUpdate) check() error {
 			return &ValidationError{Name: "owner_signing_pubkey", err: fmt.Errorf(`ent: validator failed for field "TreeNode.owner_signing_pubkey": %w`, err)}
 		}
 	}
+	if v, ok := tnu.mutation.RawTx(); ok {
+		if err := treenode.RawTxValidator(v); err != nil {
+			return &ValidationError{Name: "raw_tx", err: fmt.Errorf(`ent: validator failed for field "TreeNode.raw_tx": %w`, err)}
+		}
+	}
+	if v, ok := tnu.mutation.RawRefundTx(); ok {
+		if err := treenode.RawRefundTxValidator(v); err != nil {
+			return &ValidationError{Name: "raw_refund_tx", err: fmt.Errorf(`ent: validator failed for field "TreeNode.raw_refund_tx": %w`, err)}
+		}
+	}
 	if tnu.mutation.TreeCleared() && len(tnu.mutation.TreeIDs()) > 0 {
 		return errors.New(`ent: clearing a required unique edge "TreeNode.tree"`)
 	}
@@ -249,6 +271,12 @@ func (tnu *TreeNodeUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if value, ok := tnu.mutation.OwnerSigningPubkey(); ok {
 		_spec.SetField(treenode.FieldOwnerSigningPubkey, field.TypeBytes, value)
+	}
+	if value, ok := tnu.mutation.RawTx(); ok {
+		_spec.SetField(treenode.FieldRawTx, field.TypeBytes, value)
+	}
+	if value, ok := tnu.mutation.RawRefundTx(); ok {
+		_spec.SetField(treenode.FieldRawRefundTx, field.TypeBytes, value)
 	}
 	if tnu.mutation.TreeCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -434,6 +462,18 @@ func (tnuo *TreeNodeUpdateOne) SetOwnerSigningPubkey(b []byte) *TreeNodeUpdateOn
 	return tnuo
 }
 
+// SetRawTx sets the "raw_tx" field.
+func (tnuo *TreeNodeUpdateOne) SetRawTx(b []byte) *TreeNodeUpdateOne {
+	tnuo.mutation.SetRawTx(b)
+	return tnuo
+}
+
+// SetRawRefundTx sets the "raw_refund_tx" field.
+func (tnuo *TreeNodeUpdateOne) SetRawRefundTx(b []byte) *TreeNodeUpdateOne {
+	tnuo.mutation.SetRawRefundTx(b)
+	return tnuo
+}
+
 // SetTreeID sets the "tree" edge to the Tree entity by ID.
 func (tnuo *TreeNodeUpdateOne) SetTreeID(id uuid.UUID) *TreeNodeUpdateOne {
 	tnuo.mutation.SetTreeID(id)
@@ -600,6 +640,16 @@ func (tnuo *TreeNodeUpdateOne) check() error {
 			return &ValidationError{Name: "owner_signing_pubkey", err: fmt.Errorf(`ent: validator failed for field "TreeNode.owner_signing_pubkey": %w`, err)}
 		}
 	}
+	if v, ok := tnuo.mutation.RawTx(); ok {
+		if err := treenode.RawTxValidator(v); err != nil {
+			return &ValidationError{Name: "raw_tx", err: fmt.Errorf(`ent: validator failed for field "TreeNode.raw_tx": %w`, err)}
+		}
+	}
+	if v, ok := tnuo.mutation.RawRefundTx(); ok {
+		if err := treenode.RawRefundTxValidator(v); err != nil {
+			return &ValidationError{Name: "raw_refund_tx", err: fmt.Errorf(`ent: validator failed for field "TreeNode.raw_refund_tx": %w`, err)}
+		}
+	}
 	if tnuo.mutation.TreeCleared() && len(tnuo.mutation.TreeIDs()) > 0 {
 		return errors.New(`ent: clearing a required unique edge "TreeNode.tree"`)
 	}
@@ -649,6 +699,12 @@ func (tnuo *TreeNodeUpdateOne) sqlSave(ctx context.Context) (_node *TreeNode, er
 	}
 	if value, ok := tnuo.mutation.OwnerSigningPubkey(); ok {
 		_spec.SetField(treenode.FieldOwnerSigningPubkey, field.TypeBytes, value)
+	}
+	if value, ok := tnuo.mutation.RawTx(); ok {
+		_spec.SetField(treenode.FieldRawTx, field.TypeBytes, value)
+	}
+	if value, ok := tnuo.mutation.RawRefundTx(); ok {
+		_spec.SetField(treenode.FieldRawRefundTx, field.TypeBytes, value)
 	}
 	if tnuo.mutation.TreeCleared() {
 		edge := &sqlgraph.EdgeSpec{

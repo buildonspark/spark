@@ -63,6 +63,8 @@ func (TreeNode) Fields() []ent.Field {
 		field.Bytes("verifying_pubkey").NotEmpty().Immutable(),
 		field.Bytes("owner_identity_pubkey").NotEmpty(),
 		field.Bytes("owner_signing_pubkey").NotEmpty(),
+		field.Bytes("raw_tx").NotEmpty(),
+		field.Bytes("raw_refund_tx").NotEmpty(),
 	}
 }
 

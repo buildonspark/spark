@@ -31,6 +31,10 @@ const (
 	FieldOwnerIdentityPubkey = "owner_identity_pubkey"
 	// FieldOwnerSigningPubkey holds the string denoting the owner_signing_pubkey field in the database.
 	FieldOwnerSigningPubkey = "owner_signing_pubkey"
+	// FieldRawTx holds the string denoting the raw_tx field in the database.
+	FieldRawTx = "raw_tx"
+	// FieldRawRefundTx holds the string denoting the raw_refund_tx field in the database.
+	FieldRawRefundTx = "raw_refund_tx"
 	// EdgeTree holds the string denoting the tree edge name in mutations.
 	EdgeTree = "tree"
 	// EdgeParent holds the string denoting the parent edge name in mutations.
@@ -75,6 +79,8 @@ var Columns = []string{
 	FieldVerifyingPubkey,
 	FieldOwnerIdentityPubkey,
 	FieldOwnerSigningPubkey,
+	FieldRawTx,
+	FieldRawRefundTx,
 }
 
 // ForeignKeys holds the SQL foreign-keys that are owned by the "tree_nodes"
@@ -113,6 +119,10 @@ var (
 	OwnerIdentityPubkeyValidator func([]byte) error
 	// OwnerSigningPubkeyValidator is a validator for the "owner_signing_pubkey" field. It is called by the builders before save.
 	OwnerSigningPubkeyValidator func([]byte) error
+	// RawTxValidator is a validator for the "raw_tx" field. It is called by the builders before save.
+	RawTxValidator func([]byte) error
+	// RawRefundTxValidator is a validator for the "raw_refund_tx" field. It is called by the builders before save.
+	RawRefundTxValidator func([]byte) error
 	// DefaultID holds the default value on creation for the "id" field.
 	DefaultID func() uuid.UUID
 )

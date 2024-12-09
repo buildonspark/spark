@@ -117,6 +117,8 @@ var (
 		{Name: "verifying_pubkey", Type: field.TypeBytes},
 		{Name: "owner_identity_pubkey", Type: field.TypeBytes},
 		{Name: "owner_signing_pubkey", Type: field.TypeBytes},
+		{Name: "raw_tx", Type: field.TypeBytes},
+		{Name: "raw_refund_tx", Type: field.TypeBytes},
 		{Name: "tree_node_tree", Type: field.TypeUUID},
 		{Name: "tree_node_parent", Type: field.TypeUUID, Nullable: true},
 		{Name: "tree_node_signing_keyshare", Type: field.TypeUUID},
@@ -129,19 +131,19 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "tree_nodes_trees_tree",
-				Columns:    []*schema.Column{TreeNodesColumns[8]},
+				Columns:    []*schema.Column{TreeNodesColumns[10]},
 				RefColumns: []*schema.Column{TreesColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "tree_nodes_tree_nodes_parent",
-				Columns:    []*schema.Column{TreeNodesColumns[9]},
+				Columns:    []*schema.Column{TreeNodesColumns[11]},
 				RefColumns: []*schema.Column{TreeNodesColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "tree_nodes_signing_keyshares_signing_keyshare",
-				Columns:    []*schema.Column{TreeNodesColumns[10]},
+				Columns:    []*schema.Column{TreeNodesColumns[12]},
 				RefColumns: []*schema.Column{SigningKeysharesColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -150,12 +152,12 @@ var (
 			{
 				Name:    "treenode_tree_node_parent",
 				Unique:  false,
-				Columns: []*schema.Column{TreeNodesColumns[9]},
+				Columns: []*schema.Column{TreeNodesColumns[11]},
 			},
 			{
 				Name:    "treenode_tree_node_tree",
 				Unique:  false,
-				Columns: []*schema.Column{TreeNodesColumns[8]},
+				Columns: []*schema.Column{TreeNodesColumns[10]},
 			},
 			{
 				Name:    "treenode_owner_identity_pubkey",

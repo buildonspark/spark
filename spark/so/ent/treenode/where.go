@@ -87,6 +87,16 @@ func OwnerSigningPubkey(v []byte) predicate.TreeNode {
 	return predicate.TreeNode(sql.FieldEQ(FieldOwnerSigningPubkey, v))
 }
 
+// RawTx applies equality check predicate on the "raw_tx" field. It's identical to RawTxEQ.
+func RawTx(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldEQ(FieldRawTx, v))
+}
+
+// RawRefundTx applies equality check predicate on the "raw_refund_tx" field. It's identical to RawRefundTxEQ.
+func RawRefundTx(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldEQ(FieldRawRefundTx, v))
+}
+
 // CreateTimeEQ applies the EQ predicate on the "create_time" field.
 func CreateTimeEQ(v time.Time) predicate.TreeNode {
 	return predicate.TreeNode(sql.FieldEQ(FieldCreateTime, v))
@@ -355,6 +365,86 @@ func OwnerSigningPubkeyLT(v []byte) predicate.TreeNode {
 // OwnerSigningPubkeyLTE applies the LTE predicate on the "owner_signing_pubkey" field.
 func OwnerSigningPubkeyLTE(v []byte) predicate.TreeNode {
 	return predicate.TreeNode(sql.FieldLTE(FieldOwnerSigningPubkey, v))
+}
+
+// RawTxEQ applies the EQ predicate on the "raw_tx" field.
+func RawTxEQ(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldEQ(FieldRawTx, v))
+}
+
+// RawTxNEQ applies the NEQ predicate on the "raw_tx" field.
+func RawTxNEQ(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldNEQ(FieldRawTx, v))
+}
+
+// RawTxIn applies the In predicate on the "raw_tx" field.
+func RawTxIn(vs ...[]byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldIn(FieldRawTx, vs...))
+}
+
+// RawTxNotIn applies the NotIn predicate on the "raw_tx" field.
+func RawTxNotIn(vs ...[]byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldNotIn(FieldRawTx, vs...))
+}
+
+// RawTxGT applies the GT predicate on the "raw_tx" field.
+func RawTxGT(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldGT(FieldRawTx, v))
+}
+
+// RawTxGTE applies the GTE predicate on the "raw_tx" field.
+func RawTxGTE(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldGTE(FieldRawTx, v))
+}
+
+// RawTxLT applies the LT predicate on the "raw_tx" field.
+func RawTxLT(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldLT(FieldRawTx, v))
+}
+
+// RawTxLTE applies the LTE predicate on the "raw_tx" field.
+func RawTxLTE(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldLTE(FieldRawTx, v))
+}
+
+// RawRefundTxEQ applies the EQ predicate on the "raw_refund_tx" field.
+func RawRefundTxEQ(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldEQ(FieldRawRefundTx, v))
+}
+
+// RawRefundTxNEQ applies the NEQ predicate on the "raw_refund_tx" field.
+func RawRefundTxNEQ(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldNEQ(FieldRawRefundTx, v))
+}
+
+// RawRefundTxIn applies the In predicate on the "raw_refund_tx" field.
+func RawRefundTxIn(vs ...[]byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldIn(FieldRawRefundTx, vs...))
+}
+
+// RawRefundTxNotIn applies the NotIn predicate on the "raw_refund_tx" field.
+func RawRefundTxNotIn(vs ...[]byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldNotIn(FieldRawRefundTx, vs...))
+}
+
+// RawRefundTxGT applies the GT predicate on the "raw_refund_tx" field.
+func RawRefundTxGT(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldGT(FieldRawRefundTx, v))
+}
+
+// RawRefundTxGTE applies the GTE predicate on the "raw_refund_tx" field.
+func RawRefundTxGTE(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldGTE(FieldRawRefundTx, v))
+}
+
+// RawRefundTxLT applies the LT predicate on the "raw_refund_tx" field.
+func RawRefundTxLT(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldLT(FieldRawRefundTx, v))
+}
+
+// RawRefundTxLTE applies the LTE predicate on the "raw_refund_tx" field.
+func RawRefundTxLTE(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldLTE(FieldRawRefundTx, v))
 }
 
 // HasTree applies the HasEdge predicate on the "tree" edge.

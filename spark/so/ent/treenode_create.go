@@ -82,6 +82,18 @@ func (tnc *TreeNodeCreate) SetOwnerSigningPubkey(b []byte) *TreeNodeCreate {
 	return tnc
 }
 
+// SetRawTx sets the "raw_tx" field.
+func (tnc *TreeNodeCreate) SetRawTx(b []byte) *TreeNodeCreate {
+	tnc.mutation.SetRawTx(b)
+	return tnc
+}
+
+// SetRawRefundTx sets the "raw_refund_tx" field.
+func (tnc *TreeNodeCreate) SetRawRefundTx(b []byte) *TreeNodeCreate {
+	tnc.mutation.SetRawRefundTx(b)
+	return tnc
+}
+
 // SetID sets the "id" field.
 func (tnc *TreeNodeCreate) SetID(u uuid.UUID) *TreeNodeCreate {
 	tnc.mutation.SetID(u)
@@ -244,6 +256,22 @@ func (tnc *TreeNodeCreate) check() error {
 			return &ValidationError{Name: "owner_signing_pubkey", err: fmt.Errorf(`ent: validator failed for field "TreeNode.owner_signing_pubkey": %w`, err)}
 		}
 	}
+	if _, ok := tnc.mutation.RawTx(); !ok {
+		return &ValidationError{Name: "raw_tx", err: errors.New(`ent: missing required field "TreeNode.raw_tx"`)}
+	}
+	if v, ok := tnc.mutation.RawTx(); ok {
+		if err := treenode.RawTxValidator(v); err != nil {
+			return &ValidationError{Name: "raw_tx", err: fmt.Errorf(`ent: validator failed for field "TreeNode.raw_tx": %w`, err)}
+		}
+	}
+	if _, ok := tnc.mutation.RawRefundTx(); !ok {
+		return &ValidationError{Name: "raw_refund_tx", err: errors.New(`ent: missing required field "TreeNode.raw_refund_tx"`)}
+	}
+	if v, ok := tnc.mutation.RawRefundTx(); ok {
+		if err := treenode.RawRefundTxValidator(v); err != nil {
+			return &ValidationError{Name: "raw_refund_tx", err: fmt.Errorf(`ent: validator failed for field "TreeNode.raw_refund_tx": %w`, err)}
+		}
+	}
 	if len(tnc.mutation.TreeIDs()) == 0 {
 		return &ValidationError{Name: "tree", err: errors.New(`ent: missing required edge "TreeNode.tree"`)}
 	}
@@ -312,6 +340,14 @@ func (tnc *TreeNodeCreate) createSpec() (*TreeNode, *sqlgraph.CreateSpec) {
 	if value, ok := tnc.mutation.OwnerSigningPubkey(); ok {
 		_spec.SetField(treenode.FieldOwnerSigningPubkey, field.TypeBytes, value)
 		_node.OwnerSigningPubkey = value
+	}
+	if value, ok := tnc.mutation.RawTx(); ok {
+		_spec.SetField(treenode.FieldRawTx, field.TypeBytes, value)
+		_node.RawTx = value
+	}
+	if value, ok := tnc.mutation.RawRefundTx(); ok {
+		_spec.SetField(treenode.FieldRawRefundTx, field.TypeBytes, value)
+		_node.RawRefundTx = value
 	}
 	if nodes := tnc.mutation.TreeIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{

@@ -158,7 +158,7 @@ func NewSigningJob(keyshare *ent.SigningKeyshare, proto *pbspark.SigningJob, pre
 		return nil, nil, err
 	}
 
-	tx, err := common.TxFromTxHex(proto.RawTxHex)
+	tx, err := common.TxFromRawTxHex(proto.RawTxHex)
 	if err != nil {
 		return nil, nil, err
 	}

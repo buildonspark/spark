@@ -2531,6 +2531,8 @@ type TreeNodeMutation struct {
 	verifying_pubkey        *[]byte
 	owner_identity_pubkey   *[]byte
 	owner_signing_pubkey    *[]byte
+	raw_tx                  *[]byte
+	raw_refund_tx           *[]byte
 	clearedFields           map[string]struct{}
 	tree                    *uuid.UUID
 	clearedtree             bool
@@ -2922,6 +2924,78 @@ func (m *TreeNodeMutation) ResetOwnerSigningPubkey() {
 	m.owner_signing_pubkey = nil
 }
 
+// SetRawTx sets the "raw_tx" field.
+func (m *TreeNodeMutation) SetRawTx(b []byte) {
+	m.raw_tx = &b
+}
+
+// RawTx returns the value of the "raw_tx" field in the mutation.
+func (m *TreeNodeMutation) RawTx() (r []byte, exists bool) {
+	v := m.raw_tx
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRawTx returns the old "raw_tx" field's value of the TreeNode entity.
+// If the TreeNode object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TreeNodeMutation) OldRawTx(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRawTx is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRawTx requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRawTx: %w", err)
+	}
+	return oldValue.RawTx, nil
+}
+
+// ResetRawTx resets all changes to the "raw_tx" field.
+func (m *TreeNodeMutation) ResetRawTx() {
+	m.raw_tx = nil
+}
+
+// SetRawRefundTx sets the "raw_refund_tx" field.
+func (m *TreeNodeMutation) SetRawRefundTx(b []byte) {
+	m.raw_refund_tx = &b
+}
+
+// RawRefundTx returns the value of the "raw_refund_tx" field in the mutation.
+func (m *TreeNodeMutation) RawRefundTx() (r []byte, exists bool) {
+	v := m.raw_refund_tx
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRawRefundTx returns the old "raw_refund_tx" field's value of the TreeNode entity.
+// If the TreeNode object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TreeNodeMutation) OldRawRefundTx(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRawRefundTx is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRawRefundTx requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRawRefundTx: %w", err)
+	}
+	return oldValue.RawRefundTx, nil
+}
+
+// ResetRawRefundTx resets all changes to the "raw_refund_tx" field.
+func (m *TreeNodeMutation) ResetRawRefundTx() {
+	m.raw_refund_tx = nil
+}
+
 // SetTreeID sets the "tree" edge to the Tree entity by id.
 func (m *TreeNodeMutation) SetTreeID(id uuid.UUID) {
 	m.tree = &id
@@ -3127,7 +3201,7 @@ func (m *TreeNodeMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *TreeNodeMutation) Fields() []string {
-	fields := make([]string, 0, 7)
+	fields := make([]string, 0, 9)
 	if m.create_time != nil {
 		fields = append(fields, treenode.FieldCreateTime)
 	}
@@ -3148,6 +3222,12 @@ func (m *TreeNodeMutation) Fields() []string {
 	}
 	if m.owner_signing_pubkey != nil {
 		fields = append(fields, treenode.FieldOwnerSigningPubkey)
+	}
+	if m.raw_tx != nil {
+		fields = append(fields, treenode.FieldRawTx)
+	}
+	if m.raw_refund_tx != nil {
+		fields = append(fields, treenode.FieldRawRefundTx)
 	}
 	return fields
 }
@@ -3171,6 +3251,10 @@ func (m *TreeNodeMutation) Field(name string) (ent.Value, bool) {
 		return m.OwnerIdentityPubkey()
 	case treenode.FieldOwnerSigningPubkey:
 		return m.OwnerSigningPubkey()
+	case treenode.FieldRawTx:
+		return m.RawTx()
+	case treenode.FieldRawRefundTx:
+		return m.RawRefundTx()
 	}
 	return nil, false
 }
@@ -3194,6 +3278,10 @@ func (m *TreeNodeMutation) OldField(ctx context.Context, name string) (ent.Value
 		return m.OldOwnerIdentityPubkey(ctx)
 	case treenode.FieldOwnerSigningPubkey:
 		return m.OldOwnerSigningPubkey(ctx)
+	case treenode.FieldRawTx:
+		return m.OldRawTx(ctx)
+	case treenode.FieldRawRefundTx:
+		return m.OldRawRefundTx(ctx)
 	}
 	return nil, fmt.Errorf("unknown TreeNode field %s", name)
 }
@@ -3251,6 +3339,20 @@ func (m *TreeNodeMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetOwnerSigningPubkey(v)
+		return nil
+	case treenode.FieldRawTx:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRawTx(v)
+		return nil
+	case treenode.FieldRawRefundTx:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRawRefundTx(v)
 		return nil
 	}
 	return fmt.Errorf("unknown TreeNode field %s", name)
@@ -3336,6 +3438,12 @@ func (m *TreeNodeMutation) ResetField(name string) error {
 		return nil
 	case treenode.FieldOwnerSigningPubkey:
 		m.ResetOwnerSigningPubkey()
+		return nil
+	case treenode.FieldRawTx:
+		m.ResetRawTx()
+		return nil
+	case treenode.FieldRawRefundTx:
+		m.ResetRawRefundTx()
 		return nil
 	}
 	return fmt.Errorf("unknown TreeNode field %s", name)

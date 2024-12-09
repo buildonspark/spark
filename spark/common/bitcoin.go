@@ -89,14 +89,19 @@ func P2TRAddressFromPkScript(pkScript []byte, network Network) (*string, error) 
 	return nil, fmt.Errorf("not a Taproot address")
 }
 
-// TxFromTxHex returns a btcd MsgTx from a raw tx hex.
-func TxFromTxHex(txHex string) (*wire.MsgTx, error) {
-	txBytes, err := hex.DecodeString(txHex)
+// TxFromRawTxHex returns a btcd MsgTx from a raw tx hex.
+func TxFromRawTxHex(rawTxHex string) (*wire.MsgTx, error) {
+	txBytes, err := hex.DecodeString(rawTxHex)
 	if err != nil {
 		return nil, err
 	}
+	return TxFromRawTxBytes(txBytes)
+}
+
+// TxFromRawTxBytes returns a btcd MsgTx from a raw tx bytes.
+func TxFromRawTxBytes(rawTxBytes []byte) (*wire.MsgTx, error) {
 	var tx wire.MsgTx
-	err = tx.Deserialize(bytes.NewReader(txBytes))
+	err := tx.Deserialize(bytes.NewReader(rawTxBytes))
 	if err != nil {
 		return nil, err
 	}

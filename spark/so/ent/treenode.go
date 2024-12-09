@@ -35,6 +35,10 @@ type TreeNode struct {
 	OwnerIdentityPubkey []byte `json:"owner_identity_pubkey,omitempty"`
 	// OwnerSigningPubkey holds the value of the "owner_signing_pubkey" field.
 	OwnerSigningPubkey []byte `json:"owner_signing_pubkey,omitempty"`
+	// RawTx holds the value of the "raw_tx" field.
+	RawTx []byte `json:"raw_tx,omitempty"`
+	// RawRefundTx holds the value of the "raw_refund_tx" field.
+	RawRefundTx []byte `json:"raw_refund_tx,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the TreeNodeQuery when eager-loading is set.
 	Edges                      TreeNodeEdges `json:"edges"`
@@ -106,7 +110,7 @@ func (*TreeNode) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case treenode.FieldVerifyingPubkey, treenode.FieldOwnerIdentityPubkey, treenode.FieldOwnerSigningPubkey:
+		case treenode.FieldVerifyingPubkey, treenode.FieldOwnerIdentityPubkey, treenode.FieldOwnerSigningPubkey, treenode.FieldRawTx, treenode.FieldRawRefundTx:
 			values[i] = new([]byte)
 		case treenode.FieldValue:
 			values[i] = new(sql.NullInt64)
@@ -184,6 +188,18 @@ func (tn *TreeNode) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field owner_signing_pubkey", values[i])
 			} else if value != nil {
 				tn.OwnerSigningPubkey = *value
+			}
+		case treenode.FieldRawTx:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field raw_tx", values[i])
+			} else if value != nil {
+				tn.RawTx = *value
+			}
+		case treenode.FieldRawRefundTx:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field raw_refund_tx", values[i])
+			} else if value != nil {
+				tn.RawRefundTx = *value
 			}
 		case treenode.ForeignKeys[0]:
 			if value, ok := values[i].(*sql.NullScanner); !ok {
@@ -282,6 +298,12 @@ func (tn *TreeNode) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("owner_signing_pubkey=")
 	builder.WriteString(fmt.Sprintf("%v", tn.OwnerSigningPubkey))
+	builder.WriteString(", ")
+	builder.WriteString("raw_tx=")
+	builder.WriteString(fmt.Sprintf("%v", tn.RawTx))
+	builder.WriteString(", ")
+	builder.WriteString("raw_refund_tx=")
+	builder.WriteString(fmt.Sprintf("%v", tn.RawRefundTx))
 	builder.WriteByte(')')
 	return builder.String()
 }

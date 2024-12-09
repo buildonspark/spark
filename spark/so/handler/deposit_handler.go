@@ -141,7 +141,7 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 	}
 
 	// Verify the root transaction
-	rootTx, err := common.TxFromTxHex(req.RootTxSigningJob.RawTxHex)
+	rootTx, err := common.TxFromRawTxHex(req.RootTxSigningJob.RawTxHex)
 	if err != nil {
 		return nil, err
 	}
@@ -155,7 +155,7 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 	}
 
 	// Verify the refund transaction
-	refundTx, err := common.TxFromTxHex(req.RefundTxSigningJob.RawTxHex)
+	refundTx, err := common.TxFromRawTxHex(req.RefundTxSigningJob.RawTxHex)
 	if err != nil {
 		return nil, err
 	}
@@ -218,6 +218,8 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 	refundTxSignatureShare := signingResult[1].SignatureShares
 
 	// Create the tree
+	rawRootTxBytes, _ := hex.DecodeString(req.RootTxSigningJob.RawTxHex)
+	rawRefundTxBytes, _ := hex.DecodeString(req.RefundTxSigningJob.RawTxHex)
 	db := common.GetDbFromContext(ctx)
 	tree := db.Tree.Create().SetOwnerIdentityPubkey(depositAddress.OwnerIdentityPubkey).SaveX(ctx)
 	root := db.TreeNode.
@@ -229,6 +231,8 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 		SetValue(uint64(onChainOutput.Value)).
 		SetVerifyingPubkey(verifyingKeyBytes).
 		SetSigningKeyshare(signingKeyShare).
+		SetRawTx(rawRootTxBytes).
+		SetRawRefundTx(rawRefundTxBytes).
 		SaveX(ctx)
 	tree = tree.Update().SetRoot(root).SaveX(ctx)
 
@@ -293,4 +297,79 @@ func (o *DepositHandler) verifyRefundTransaction(tx *wire.MsgTx, refundTx *wire.
 	}
 
 	return fmt.Errorf("refund transaction should have the node tx as input")
+}
+
+// CompleteTreeCreation verifies the user signature, completes the tree creation and broadcasts the new tree.
+func (o *DepositHandler) CompleteTreeCreation(ctx context.Context, config *so.Config, req *pb.CompleteTreeCreationRequest) (*pb.CompleteTreeCreationResponse, error) {
+	db := common.GetDbFromContext(ctx)
+
+	// Read the tree
+	tree, err := db.Tree.Get(ctx, uuid.MustParse(req.TreeId))
+	if err != nil {
+		return nil, err
+	}
+	if tree == nil {
+		return nil, fmt.Errorf("tree not found")
+	}
+	if !bytes.Equal(tree.OwnerIdentityPubkey, req.IdentityPublicKey) {
+		return nil, fmt.Errorf("unexpected identity public key")
+	}
+
+	// Read the tree root
+	root, err := tree.QueryRoot().Only(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if root == nil {
+		return nil, fmt.Errorf("tree root not found")
+	}
+
+	// Verify the user signatures and update the transactions
+	rootTxBytes, err := o.verifySignatureAndUpdateTx(root.RawTx, req.RootTxSignature)
+	if err != nil {
+		return nil, err
+	}
+	refundTxBytes, err := o.verifySignatureAndUpdateTx(root.RawTx, req.RefundTxSignature)
+	if err != nil {
+		return nil, err
+	}
+
+	// Update the tree root
+	root = root.Update().
+		SetRawTx(rootTxBytes).
+		SetRawRefundTx(refundTxBytes).
+		SetStatus(schema.TreeNodeStatusAvailable).
+		SaveX(ctx)
+
+	// Sync with all other SOs
+	selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
+	_, err = helper.ExecuteTaskWithAllOperators(ctx, config, &selection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
+		conn, err := common.NewGRPCConnection(operator.Address)
+		if err != nil {
+			return nil, err
+		}
+		defer conn.Close()
+
+		client := pbinternal.NewSparkInternalServiceClient(conn)
+		_, err = client.SyncTreeCreation(ctx, &pbinternal.SyncTreeCreationRequest{TreeRoot: root.MarshalInternalProto()})
+		return nil, err
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &pb.CompleteTreeCreationResponse{TreeRoot: root.MarshalSparkProto()}, nil
+}
+
+func (o *DepositHandler) verifySignatureAndUpdateTx(rawTx []byte, signature []byte) ([]byte, error) {
+	tx, err := common.TxFromRawTxBytes(rawTx)
+	if err != nil {
+		return nil, err
+	}
+	// TODO: Verify the signature
+
+	tx.TxIn[0].Witness = wire.TxWitness{signature}
+	var buf bytes.Buffer
+	tx.Serialize(&buf)
+	return buf.Bytes(), nil
 }

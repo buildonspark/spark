@@ -37,3 +37,9 @@ func (s *SparkServer) SplitNode(ctx context.Context, req *pb.SplitNodeRequest) (
 	splitHandler := handler.SplitHandler{}
 	return splitHandler.SplitNode(ctx, s.config, req)
 }
+
+// CompleteTreeCreation verifies the user signature, completes the tree creation and broadcasts the new tree.
+func (s *SparkServer) CompleteTreeCreation(ctx context.Context, req *pb.CompleteTreeCreationRequest) (*pb.CompleteTreeCreationResponse, error) {
+	depositHandler := handler.DepositHandler{}
+	return depositHandler.CompleteTreeCreation(ctx, s.config, req)
+}

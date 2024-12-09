@@ -9,6 +9,7 @@ import "common.proto";
 service SparkInternalService {
     rpc mark_keyshares_as_used(MarkKeysharesAsUsedRequest) returns (google.protobuf.Empty) {}
     rpc mark_keyshare_for_deposit_address(MarkKeyshareForDepositAddressRequest) returns (google.protobuf.Empty) {}
+    rpc sync_tree_creation(SyncTreeCreationRequest) returns (google.protobuf.Empty) {}
 
     rpc frost_round1(FrostRound1Request) returns (FrostRound1Response) {}
     rpc frost_round2(FrostRound2Request) returns (FrostRound2Response) {}
@@ -68,4 +69,21 @@ message PrepareSplitKeysharesRequest {
     string target_keyshare_id = 2;
     repeated string selected_keyshare_ids = 3;
     string last_keyshare_id = 4;
+}
+
+message SyncTreeCreationRequest {
+    TreeNode tree_root = 1;
+}
+
+message TreeNode {
+    string id = 1;
+    uint64 value = 2;
+    bytes verifying_pubkey = 3;
+    bytes owner_identity_pubkey = 4;
+    bytes owner_signing_pubkey = 5;
+    bytes raw_tx = 6;
+    bytes raw_refund_tx = 7;
+    string tree_id = 8;
+    optional string parent_node_id = 9;
+    string signing_keyshare_id = 10;
 }

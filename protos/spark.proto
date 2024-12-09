@@ -8,6 +8,7 @@ import "common.proto";
 service SparkService {
     rpc generate_deposit_address(GenerateDepositAddressRequest) returns (GenerateDepositAddressResponse) {}
     rpc start_tree_creation(StartTreeCreationRequest) returns (StartTreeCreationResponse) {}
+    rpc complete_tree_creation(CompleteTreeCreationRequest) returns (CompleteTreeCreationResponse) {}
 
     rpc split_node(SplitNodeRequest) returns (SplitNodeResponse) {}
     rpc finalize_split(FinalizeSplitRequest) returns (FinalizeSplitResponse) {}
@@ -64,6 +65,28 @@ message StartTreeCreationResponse {
     string tree_id = 1;
     NodeSignatureShares root_node_signature_shares = 2;
 }
+
+message CompleteTreeCreationRequest {
+    bytes identity_public_key = 1;
+    string tree_id = 2;
+    bytes root_tx_signature = 3;
+    bytes refund_tx_signature = 4;
+}
+
+
+message TreeNode {
+    string id = 1;
+    string tree_id = 2;
+    uint64 value = 3;
+    optional string parent_node_id = 4;
+    string raw_root_tx_hex = 5;
+    string raw_refund_tx_hex = 6;
+}
+
+message CompleteTreeCreationResponse {
+    TreeNode tree_root = 1;
+}
+
 
 message Split {
     bytes signing_public_key = 1;

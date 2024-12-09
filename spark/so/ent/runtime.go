@@ -137,6 +137,14 @@ func init() {
 	treenodeDescOwnerSigningPubkey := treenodeFields[4].Descriptor()
 	// treenode.OwnerSigningPubkeyValidator is a validator for the "owner_signing_pubkey" field. It is called by the builders before save.
 	treenode.OwnerSigningPubkeyValidator = treenodeDescOwnerSigningPubkey.Validators[0].(func([]byte) error)
+	// treenodeDescRawTx is the schema descriptor for raw_tx field.
+	treenodeDescRawTx := treenodeFields[5].Descriptor()
+	// treenode.RawTxValidator is a validator for the "raw_tx" field. It is called by the builders before save.
+	treenode.RawTxValidator = treenodeDescRawTx.Validators[0].(func([]byte) error)
+	// treenodeDescRawRefundTx is the schema descriptor for raw_refund_tx field.
+	treenodeDescRawRefundTx := treenodeFields[6].Descriptor()
+	// treenode.RawRefundTxValidator is a validator for the "raw_refund_tx" field. It is called by the builders before save.
+	treenode.RawRefundTxValidator = treenodeDescRawRefundTx.Validators[0].(func([]byte) error)
 	// treenodeDescID is the schema descriptor for id field.
 	treenodeDescID := treenodeMixinFields0[0].Descriptor()
 	// treenode.DefaultID holds the default value on creation for the id field.

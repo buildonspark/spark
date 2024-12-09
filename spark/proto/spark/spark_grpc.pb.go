@@ -21,6 +21,7 @@ const _ = grpc.SupportPackageIsVersion9
 const (
 	SparkService_GenerateDepositAddress_FullMethodName = "/spark.SparkService/generate_deposit_address"
 	SparkService_StartTreeCreation_FullMethodName      = "/spark.SparkService/start_tree_creation"
+	SparkService_CompleteTreeCreation_FullMethodName   = "/spark.SparkService/complete_tree_creation"
 	SparkService_SplitNode_FullMethodName              = "/spark.SparkService/split_node"
 	SparkService_FinalizeSplit_FullMethodName          = "/spark.SparkService/finalize_split"
 )
@@ -31,6 +32,7 @@ const (
 type SparkServiceClient interface {
 	GenerateDepositAddress(ctx context.Context, in *GenerateDepositAddressRequest, opts ...grpc.CallOption) (*GenerateDepositAddressResponse, error)
 	StartTreeCreation(ctx context.Context, in *StartTreeCreationRequest, opts ...grpc.CallOption) (*StartTreeCreationResponse, error)
+	CompleteTreeCreation(ctx context.Context, in *CompleteTreeCreationRequest, opts ...grpc.CallOption) (*CompleteTreeCreationResponse, error)
 	SplitNode(ctx context.Context, in *SplitNodeRequest, opts ...grpc.CallOption) (*SplitNodeResponse, error)
 	FinalizeSplit(ctx context.Context, in *FinalizeSplitRequest, opts ...grpc.CallOption) (*FinalizeSplitResponse, error)
 }
@@ -63,6 +65,16 @@ func (c *sparkServiceClient) StartTreeCreation(ctx context.Context, in *StartTre
 	return out, nil
 }
 
+func (c *sparkServiceClient) CompleteTreeCreation(ctx context.Context, in *CompleteTreeCreationRequest, opts ...grpc.CallOption) (*CompleteTreeCreationResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CompleteTreeCreationResponse)
+	err := c.cc.Invoke(ctx, SparkService_CompleteTreeCreation_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *sparkServiceClient) SplitNode(ctx context.Context, in *SplitNodeRequest, opts ...grpc.CallOption) (*SplitNodeResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(SplitNodeResponse)
@@ -89,6 +101,7 @@ func (c *sparkServiceClient) FinalizeSplit(ctx context.Context, in *FinalizeSpli
 type SparkServiceServer interface {
 	GenerateDepositAddress(context.Context, *GenerateDepositAddressRequest) (*GenerateDepositAddressResponse, error)
 	StartTreeCreation(context.Context, *StartTreeCreationRequest) (*StartTreeCreationResponse, error)
+	CompleteTreeCreation(context.Context, *CompleteTreeCreationRequest) (*CompleteTreeCreationResponse, error)
 	SplitNode(context.Context, *SplitNodeRequest) (*SplitNodeResponse, error)
 	FinalizeSplit(context.Context, *FinalizeSplitRequest) (*FinalizeSplitResponse, error)
 	mustEmbedUnimplementedSparkServiceServer()
@@ -106,6 +119,9 @@ func (UnimplementedSparkServiceServer) GenerateDepositAddress(context.Context, *
 }
 func (UnimplementedSparkServiceServer) StartTreeCreation(context.Context, *StartTreeCreationRequest) (*StartTreeCreationResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method StartTreeCreation not implemented")
+}
+func (UnimplementedSparkServiceServer) CompleteTreeCreation(context.Context, *CompleteTreeCreationRequest) (*CompleteTreeCreationResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CompleteTreeCreation not implemented")
 }
 func (UnimplementedSparkServiceServer) SplitNode(context.Context, *SplitNodeRequest) (*SplitNodeResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SplitNode not implemented")
@@ -170,6 +186,24 @@ func _SparkService_StartTreeCreation_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SparkService_CompleteTreeCreation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CompleteTreeCreationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkServiceServer).CompleteTreeCreation(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkService_CompleteTreeCreation_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkServiceServer).CompleteTreeCreation(ctx, req.(*CompleteTreeCreationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _SparkService_SplitNode_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(SplitNodeRequest)
 	if err := dec(in); err != nil {
@@ -220,6 +254,10 @@ var SparkService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "start_tree_creation",
 			Handler:    _SparkService_StartTreeCreation_Handler,
+		},
+		{
+			MethodName: "complete_tree_creation",
+			Handler:    _SparkService_CompleteTreeCreation_Handler,
 		},
 		{
 			MethodName: "split_node",
