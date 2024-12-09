@@ -29,6 +29,8 @@ jobs:
 
       - name: Install Protoc
         uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: "Install Python"
         uses: actions/setup-python@v4
@@ -158,6 +160,8 @@ jobs:
     name: Create release and tag
     needs: [build-manylinux2014-x86_64-wheels, build-manylinux2014-aarch64-wheels, build-macos-arm64-wheels, build-macos-x86_64-wheels]
     runs-on: ubuntu-22.04
+    permissions:
+      contents: write
     steps:
       - name: "Checkout"
         uses: actions/checkout@v3
@@ -168,10 +172,9 @@ jobs:
           path: dist/
 
       - name: Create release
-        uses: ncipollo/release-action@2c591bcc8ecdcd2db72b97d6147f871fcd833ba5
+        uses: ncipollo/release-action@v1
         with:
-          artifacts: ./dist/*.whl
+          artifacts: ./dist/*/*
           tag: "python-signer-${{ inputs.version }}"
-          token: ${{ secrets.GITHUB_TOKEN }}
           name: "python-signer-${{ inputs.version }}"
           prerelease: true

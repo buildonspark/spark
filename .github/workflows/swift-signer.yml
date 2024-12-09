@@ -19,6 +19,8 @@ jobs:
 
       - name: Install Protoc
         uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and package swift
         working-directory: build/signer/spark-frost-uniffi
@@ -40,16 +42,17 @@ jobs:
     name: Create release and tag
     needs: [build-swift]
     runs-on: ubuntu-22.04
+    permissions:
+      contents: write
     steps:
       - name: Download ios artifacts
         uses: actions/download-artifact@v3
         with:
           name: spark-frost-uniffi-xcframework
       - name: Create release
-        uses: ncipollo/release-action@2c591bcc8ecdcd2db72b97d6147f871fcd833ba5
+        uses: ncipollo/release-action@v1
         with:
           artifacts: "./spark-frost-uniffi*"
           tag: "swift-signer-${{ inputs.version }}"
-          token: ${{ secrets.GITHUB_TOKEN }}
           name: "swift-signer-${{ inputs.version }}"
           prerelease: true
