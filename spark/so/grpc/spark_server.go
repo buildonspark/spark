@@ -5,7 +5,7 @@ import (
 
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
 	"github.com/lightsparkdev/spark-go/so"
-	"github.com/lightsparkdev/spark-go/so/helper"
+	"github.com/lightsparkdev/spark-go/so/handler"
 )
 
 // SparkServer is the grpc server for the Spark protocol.
@@ -22,18 +22,18 @@ func NewSparkServer(config *so.Config) *SparkServer {
 
 // GenerateDepositAddress generates a deposit address for the given public key.
 func (s *SparkServer) GenerateDepositAddress(ctx context.Context, req *pb.GenerateDepositAddressRequest) (*pb.GenerateDepositAddressResponse, error) {
-	depositHandler := helper.DepositHandler{}
+	depositHandler := handler.DepositHandler{}
 	return depositHandler.GenerateDepositAddress(ctx, s.config, req)
 }
 
 // StartTreeCreation verifies the on chain utxo, and then verifies and signs the offchain root and refund transactions.
 func (s *SparkServer) StartTreeCreation(ctx context.Context, req *pb.StartTreeCreationRequest) (*pb.StartTreeCreationResponse, error) {
-	depositHandler := helper.DepositHandler{}
+	depositHandler := handler.DepositHandler{}
 	return depositHandler.StartTreeCreation(ctx, s.config, req)
 }
 
 // SplitNode splits the given node into the given splits.
 func (s *SparkServer) SplitNode(ctx context.Context, req *pb.SplitNodeRequest) (*pb.SplitNodeResponse, error) {
-	splitHandler := helper.SplitHandler{}
+	splitHandler := handler.SplitHandler{}
 	return splitHandler.SplitNode(ctx, s.config, req)
 }

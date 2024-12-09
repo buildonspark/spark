@@ -1,4 +1,4 @@
-package helper
+package handler
 
 import (
 	"bytes"
@@ -16,6 +16,7 @@ import (
 	"github.com/lightsparkdev/spark-go/so/ent/depositaddress"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
 	"github.com/lightsparkdev/spark-go/so/entutils"
+	"github.com/lightsparkdev/spark-go/so/helper"
 	"github.com/lightsparkdev/spark-go/so/objects"
 )
 
@@ -43,8 +44,8 @@ func (o *DepositHandler) GenerateDepositAddress(ctx context.Context, config *so.
 		return nil, err
 	}
 
-	selection := OperatorSelection{Option: OperatorSelectionOptionExcludeSelf}
-	_, err = ExecuteTaskWithAllOperators(ctx, config, &selection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
+	selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
+	_, err = helper.ExecuteTaskWithAllOperators(ctx, config, &selection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
 		conn, err := common.NewGRPCConnection(operator.Address)
 		if err != nil {
 			log.Printf("Failed to connect to operator: %v", err)
@@ -84,7 +85,7 @@ func (o *DepositHandler) GenerateDepositAddress(ctx context.Context, config *so.
 		return nil, err
 	}
 
-	_, err = ExecuteTaskWithAllOperators(ctx, config, &selection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
+	_, err = helper.ExecuteTaskWithAllOperators(ctx, config, &selection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
 		conn, err := common.NewGRPCConnection(operator.Address)
 		if err != nil {
 			log.Printf("Failed to connect to operator: %v", err)
@@ -113,7 +114,7 @@ func (o *DepositHandler) GenerateDepositAddress(ctx context.Context, config *so.
 // StartTreeCreation verifies the on chain utxo, and then verifies and signs the offchain root and refund transactions.
 func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Config, req *pb.StartTreeCreationRequest) (*pb.StartTreeCreationResponse, error) {
 	// Get the on chain tx
-	onChainHelper := &OnChainHelper{}
+	onChainHelper := &helper.OnChainHelper{}
 	onChainTx, err := onChainHelper.GetTxOnChain(ctx, req.OnChainUtxo.Txid)
 	if err != nil {
 		return nil, err
@@ -174,7 +175,7 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 		return nil, err
 	}
 
-	signingJobs := make([]*SigningJob, 0)
+	signingJobs := make([]*helper.SigningJob, 0)
 	userRootTxNonceCommitment, err := objects.NewSigningCommitment(req.RootTxSigningJob.SigningNonceCommitment.Binding, req.RootTxSigningJob.SigningNonceCommitment.Hiding)
 	if err != nil {
 		return nil, err
@@ -185,14 +186,14 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 	}
 	signingJobs = append(
 		signingJobs,
-		&SigningJob{
+		&helper.SigningJob{
 			JobID:             uuid.New().String(),
 			SigningKeyshareID: signingKeyShare.ID,
 			Message:           rootTxSigHash,
 			VerifyingKey:      verifyingKeyBytes,
 			UserCommitment:    *userRootTxNonceCommitment,
 		},
-		&SigningJob{
+		&helper.SigningJob{
 			JobID:             uuid.New().String(),
 			SigningKeyshareID: signingKeyShare.ID,
 			Message:           refundTxSigHash,
@@ -200,7 +201,7 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 			UserCommitment:    *userRefundTxNonceCommitment,
 		},
 	)
-	signingResult, err := SignFrost(ctx, config, signingJobs)
+	signingResult, err := helper.SignFrost(ctx, config, signingJobs)
 	if err != nil {
 		return nil, err
 	}

@@ -1,4 +1,4 @@
-package helper
+package handler
 
 import (
 	"context"
@@ -11,7 +11,9 @@ import (
 	pbinternal "github.com/lightsparkdev/spark-go/proto/spark_internal"
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/ent"
+	"github.com/lightsparkdev/spark-go/so/ent/schema"
 	"github.com/lightsparkdev/spark-go/so/entutils"
+	"github.com/lightsparkdev/spark-go/so/helper"
 )
 
 // SplitHandler is a helper struct to handle the split node request.
@@ -23,6 +25,15 @@ func (h *SplitHandler) verifySplitRequest(req *pb.SplitNodeRequest) error {
 }
 
 func (h *SplitHandler) prepareKeys(ctx context.Context, config *so.Config, req *pb.SplitNodeRequest) ([]*ent.SigningKeyshare, error) {
+	nodeID, err := uuid.Parse(req.NodeId)
+	if err != nil {
+		return nil, err
+	}
+	err = entutils.MarkNodeAsLocked(ctx, nodeID, schema.TreeNodeStatusSplitLocked)
+	if err != nil {
+		return nil, err
+	}
+
 	keyshares, err := entutils.GetUnusedSigningKeyshares(ctx, config, len(req.Splits)-1)
 	if err != nil {
 		return nil, err
@@ -35,10 +46,6 @@ func (h *SplitHandler) prepareKeys(ctx context.Context, config *so.Config, req *
 		keyshareIDStrings[i] = keyshare.ID.String()
 	}
 
-	nodeID, err := uuid.Parse(req.NodeId)
-	if err != nil {
-		return nil, err
-	}
 	targetKeyshare, err := entutils.GetNodeKeyshare(ctx, config, nodeID)
 	if err != nil {
 		return nil, err
@@ -46,10 +53,10 @@ func (h *SplitHandler) prepareKeys(ctx context.Context, config *so.Config, req *
 
 	lastKeyshareID := uuid.New()
 
-	operatorSelection := &OperatorSelection{
-		Option: OperatorSelectionOptionExcludeSelf,
+	operatorSelection := &helper.OperatorSelection{
+		Option: helper.OperatorSelectionOptionExcludeSelf,
 	}
-	_, err = ExecuteTaskWithAllOperators(ctx, config, operatorSelection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
+	_, err = helper.ExecuteTaskWithAllOperators(ctx, config, operatorSelection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
 		conn, err := common.NewGRPCConnection(operator.Address)
 		if err != nil {
 			return nil, err
@@ -96,20 +103,20 @@ func (h *SplitHandler) prepareSplitResults(ctx context.Context, config *so.Confi
 	return splitResults, nil
 }
 
-func prepareSigningJob(split *pb.Split, keyshare *ent.SigningKeyshare, prevOutput *wire.TxOut) (*SigningJob, *SigningJob, error) {
-	nodeSigningJob, nodeTx, err := NewSigningJob(keyshare, split.NodeSigningJob, prevOutput)
+func prepareSigningJob(split *pb.Split, keyshare *ent.SigningKeyshare, prevOutput *wire.TxOut) (*helper.SigningJob, *helper.SigningJob, error) {
+	nodeSigningJob, nodeTx, err := helper.NewSigningJob(keyshare, split.NodeSigningJob, prevOutput)
 	if err != nil {
 		return nil, nil, err
 	}
-	refundSigningJob, _, err := NewSigningJob(keyshare, split.RefundSigningJob, nodeTx.TxOut[0])
+	refundSigningJob, _, err := helper.NewSigningJob(keyshare, split.RefundSigningJob, nodeTx.TxOut[0])
 	if err != nil {
 		return nil, nil, err
 	}
 	return nodeSigningJob, refundSigningJob, nil
 }
 
-func (h *SplitHandler) prepareSigningJobs(ctx context.Context, config *so.Config, req *pb.SplitNodeRequest, keyshares []*ent.SigningKeyshare) ([]*SigningJob, error) {
-	signingJobs := make([]*SigningJob, 0)
+func (h *SplitHandler) prepareSigningJobs(ctx context.Context, config *so.Config, req *pb.SplitNodeRequest, keyshares []*ent.SigningKeyshare) ([]*helper.SigningJob, error) {
+	signingJobs := make([]*helper.SigningJob, 0)
 	for i, split := range req.Splits {
 		// TODO(zhenlu): Use the previous output of the parent node after #72 is merged.
 		nodeTxSigningJob, refundTxSigningJob, err := prepareSigningJob(split, keyshares[i], nil)
@@ -121,7 +128,7 @@ func (h *SplitHandler) prepareSigningJobs(ctx context.Context, config *so.Config
 	return signingJobs, nil
 }
 
-func (h *SplitHandler) finalizeSplitResults(ctx context.Context, config *so.Config, req *pb.SplitNodeRequest, signingResults []*SigningResult, splitResults []*pb.SplitResult) ([]*pb.SplitResult, error) {
+func (h *SplitHandler) finalizeSplitResults(ctx context.Context, config *so.Config, req *pb.SplitNodeRequest, signingResults []*helper.SigningResult, splitResults []*pb.SplitResult) ([]*pb.SplitResult, error) {
 	if len(signingResults) != 2*len(splitResults) {
 		return nil, fmt.Errorf("number of signing results does not match number of split results")
 	}
@@ -176,7 +183,7 @@ func (h *SplitHandler) SplitNode(ctx context.Context, config *so.Config, req *pb
 		return nil, err
 	}
 
-	signingResults, err := SignFrost(ctx, config, signingJobs)
+	signingResults, err := helper.SignFrost(ctx, config, signingJobs)
 	if err != nil {
 		return nil, err
 	}
