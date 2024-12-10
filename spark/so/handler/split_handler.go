@@ -117,13 +117,43 @@ func prepareSigningJob(split *pb.Split, keyshare *ent.SigningKeyshare, prevOutpu
 
 func (h *SplitHandler) prepareSigningJobs(ctx context.Context, config *so.Config, req *pb.SplitNodeRequest, keyshares []*ent.SigningKeyshare) ([]*helper.SigningJob, error) {
 	signingJobs := make([]*helper.SigningJob, 0)
+	nodeID, err := uuid.Parse(req.NodeId)
+	if err != nil {
+		return nil, err
+	}
+	db := common.GetDbFromContext(ctx)
+	node, err := db.TreeNode.Get(ctx, nodeID)
+	if err != nil {
+		return nil, err
+	}
+	parentTx, err := common.TxFromRawTxBytes(node.RawTx)
+	if err != nil {
+		return nil, err
+	}
 	for i, split := range req.Splits {
-		// TODO(zhenlu): Use the previous output of the parent node after #72 is merged.
-		nodeTxSigningJob, refundTxSigningJob, err := prepareSigningJob(split, keyshares[i], nil)
+		nodeTxSigningJob, refundTxSigningJob, err := prepareSigningJob(split, keyshares[i], parentTx.TxOut[0])
 		if err != nil {
 			return nil, err
 		}
 		signingJobs = append(signingJobs, nodeTxSigningJob, refundTxSigningJob)
+
+		verifyingKey, err := common.AddPublicKeys(split.SigningPublicKey, keyshares[i].PublicKey)
+		if err != nil {
+			return nil, err
+		}
+
+		db.TreeNode.
+			Create().
+			SetTree(node.Edges.Tree).
+			SetStatus(schema.TreeNodeStatusCreating).
+			SetOwnerIdentityPubkey(split.SigningPublicKey).
+			SetOwnerSigningPubkey(split.SigningPublicKey).
+			SetValue(uint64(split.Value)).
+			SetVerifyingPubkey(verifyingKey).
+			SetSigningKeyshare(keyshares[i]).
+			SetRawTx(split.NodeSigningJob.RawTx).
+			SetRawRefundTx(split.RefundSigningJob.RawTx).
+			SaveX(ctx)
 	}
 	return signingJobs, nil
 }

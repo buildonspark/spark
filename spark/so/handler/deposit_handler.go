@@ -141,7 +141,7 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 	}
 
 	// Verify the root transaction
-	rootTx, err := common.TxFromRawTxHex(req.RootTxSigningJob.RawTxHex)
+	rootTx, err := common.TxFromRawTxBytes(req.RootTxSigningJob.RawTx)
 	if err != nil {
 		return nil, err
 	}
@@ -155,7 +155,7 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 	}
 
 	// Verify the refund transaction
-	refundTx, err := common.TxFromRawTxHex(req.RefundTxSigningJob.RawTxHex)
+	refundTx, err := common.TxFromRawTxBytes(req.RefundTxSigningJob.RawTx)
 	if err != nil {
 		return nil, err
 	}
@@ -218,8 +218,6 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 	refundTxSignatureShare := signingResult[1].SignatureShares
 
 	// Create the tree
-	rawRootTxBytes, _ := hex.DecodeString(req.RootTxSigningJob.RawTxHex)
-	rawRefundTxBytes, _ := hex.DecodeString(req.RefundTxSigningJob.RawTxHex)
 	db := common.GetDbFromContext(ctx)
 	tree := db.Tree.Create().SetOwnerIdentityPubkey(depositAddress.OwnerIdentityPubkey).SaveX(ctx)
 	root := db.TreeNode.
@@ -231,8 +229,8 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 		SetValue(uint64(onChainOutput.Value)).
 		SetVerifyingPubkey(verifyingKeyBytes).
 		SetSigningKeyshare(signingKeyShare).
-		SetRawTx(rawRootTxBytes).
-		SetRawRefundTx(rawRefundTxBytes).
+		SetRawTx(req.RootTxSigningJob.RawTx).
+		SetRawRefundTx(req.RefundTxSigningJob.RawTx).
 		SaveX(ctx)
 	tree = tree.Update().SetRoot(root).SaveX(ctx)
 

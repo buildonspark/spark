@@ -28,7 +28,7 @@ message UTXO {
 
 message SigningJob {
     bytes signing_public_key = 1;
-    string raw_tx_hex = 2;
+    bytes raw_tx = 2;
     common.SigningCommitment signing_nonce_commitment = 3;
 }
 
@@ -77,6 +77,7 @@ message Split {
     bytes signing_public_key = 1;
     SigningJob node_signing_job = 2;
     SigningJob refund_signing_job = 3;
+    uint64 value = 4;
 }
 
 message SplitNodeRequest {

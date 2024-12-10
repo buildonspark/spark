@@ -102,12 +102,12 @@ func TestStartTreeCreation(t *testing.T) {
 			Vout: uint32(vout),
 		},
 		RootTxSigningJob: &pb.SigningJob{
-			RawTxHex:               hex.EncodeToString(rootBuf.Bytes()),
+			RawTx:                  rootBuf.Bytes(),
 			SigningPublicKey:       userPubkey,
 			SigningNonceCommitment: &rootNonceCommitment,
 		},
 		RefundTxSigningJob: &pb.SigningJob{
-			RawTxHex:               hex.EncodeToString(refundBuf.Bytes()),
+			RawTx:                  refundBuf.Bytes(),
 			SigningPublicKey:       userPubkey,
 			SigningNonceCommitment: &refundNonceCommitment,
 		},
