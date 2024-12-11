@@ -95,7 +95,7 @@ func TestStartTreeCreation(t *testing.T) {
 		Binding: refundNonceBidingPriv.PubKey().SerializeCompressed(),
 	}
 
-	treeResponse, _ := client.StartTreeCreation(context.Background(), &pb.StartTreeCreationRequest{
+	treeResponse, err := client.StartTreeCreation(context.Background(), &pb.StartTreeCreationRequest{
 		IdentityPublicKey: userPubkey,
 		OnChainUtxo: &pb.UTXO{
 			Txid: depositTx.TxID(),
@@ -112,6 +112,9 @@ func TestStartTreeCreation(t *testing.T) {
 			SigningNonceCommitment: &refundNonceCommitment,
 		},
 	})
+	if err != nil {
+		t.Fatalf("failed to start tree creation with error: %v", err)
+	}
 	if treeResponse.TreeId == "" {
 		t.Fatalf("failed to start tree creation")
 	}

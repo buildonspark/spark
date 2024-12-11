@@ -31,14 +31,14 @@ func DbSessionMiddleware(dbClient *ent.Client) grpc.UnaryServerInterceptor {
 
 		// If there was an error, rollback the transaction, otherwise commit
 		if err != nil {
-			err = tx.Rollback()
-			if err != nil {
-				log.Printf("Failed to rollback in %s: %s.\n", info.FullMethod, err)
+			dberr := tx.Rollback()
+			if dberr != nil {
+				log.Printf("Failed to rollback in %s: %s.\n", info.FullMethod, dberr)
 			}
 		} else {
-			err = tx.Commit()
-			if err != nil {
-				log.Printf("Failed to commit in %s: %s.\n", info.FullMethod, err)
+			dberr := tx.Commit()
+			if dberr != nil {
+				log.Printf("Failed to commit in %s: %s.\n", info.FullMethod, dberr)
 			}
 		}
 
