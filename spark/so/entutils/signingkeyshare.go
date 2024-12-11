@@ -184,3 +184,38 @@ func CalculateAndStoreLastKey(ctx context.Context, config *so.Config, target *en
 
 	return lastKey, nil
 }
+
+// TweakKeyShare tweaks the given keyshare with the given tweak, updates the keyshare in the database and returns the updated keyshare.
+func TweakKeyShare(ctx context.Context, config *so.Config, keyshare *ent.SigningKeyshare, shareTweak []byte, pubkeyTweak []byte, pubkeySharesTweak map[string][]byte) (*ent.SigningKeyshare, error) {
+	tweakPriv, _ := secp256k1.PrivKeyFromBytes(shareTweak)
+	tweakBytes := tweakPriv.Serialize()
+
+	newSecretShare, err := common.AddPrivateKeys(keyshare.SecretShare, tweakBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	newPublicKey, err := common.AddPublicKeys(keyshare.PublicKey, pubkeyTweak)
+	if err != nil {
+		return nil, err
+	}
+
+	newPublicShares := make(map[string][]byte)
+	for i, publicShare := range keyshare.PublicShares {
+		newPublicShares[i], err = common.AddPublicKeys(publicShare, pubkeySharesTweak[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	keyshare, err = keyshare.Update().
+		SetSecretShare(newSecretShare).
+		SetPublicKey(newPublicKey).
+		SetPublicShares(newPublicShares).
+		Save(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return keyshare, nil
+}

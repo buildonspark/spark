@@ -49,6 +49,66 @@ func (sku *SigningKeyshareUpdate) SetNillableStatus(sks *schema.SigningKeyshareS
 	return sku
 }
 
+// SetSecretShare sets the "secret_share" field.
+func (sku *SigningKeyshareUpdate) SetSecretShare(b []byte) *SigningKeyshareUpdate {
+	sku.mutation.SetSecretShare(b)
+	return sku
+}
+
+// SetPublicShares sets the "public_shares" field.
+func (sku *SigningKeyshareUpdate) SetPublicShares(m map[string][]uint8) *SigningKeyshareUpdate {
+	sku.mutation.SetPublicShares(m)
+	return sku
+}
+
+// SetPublicKey sets the "public_key" field.
+func (sku *SigningKeyshareUpdate) SetPublicKey(b []byte) *SigningKeyshareUpdate {
+	sku.mutation.SetPublicKey(b)
+	return sku
+}
+
+// SetMinSigners sets the "min_signers" field.
+func (sku *SigningKeyshareUpdate) SetMinSigners(u uint32) *SigningKeyshareUpdate {
+	sku.mutation.ResetMinSigners()
+	sku.mutation.SetMinSigners(u)
+	return sku
+}
+
+// SetNillableMinSigners sets the "min_signers" field if the given value is not nil.
+func (sku *SigningKeyshareUpdate) SetNillableMinSigners(u *uint32) *SigningKeyshareUpdate {
+	if u != nil {
+		sku.SetMinSigners(*u)
+	}
+	return sku
+}
+
+// AddMinSigners adds u to the "min_signers" field.
+func (sku *SigningKeyshareUpdate) AddMinSigners(u int32) *SigningKeyshareUpdate {
+	sku.mutation.AddMinSigners(u)
+	return sku
+}
+
+// SetCoordinatorIndex sets the "coordinator_index" field.
+func (sku *SigningKeyshareUpdate) SetCoordinatorIndex(u uint64) *SigningKeyshareUpdate {
+	sku.mutation.ResetCoordinatorIndex()
+	sku.mutation.SetCoordinatorIndex(u)
+	return sku
+}
+
+// SetNillableCoordinatorIndex sets the "coordinator_index" field if the given value is not nil.
+func (sku *SigningKeyshareUpdate) SetNillableCoordinatorIndex(u *uint64) *SigningKeyshareUpdate {
+	if u != nil {
+		sku.SetCoordinatorIndex(*u)
+	}
+	return sku
+}
+
+// AddCoordinatorIndex adds u to the "coordinator_index" field.
+func (sku *SigningKeyshareUpdate) AddCoordinatorIndex(u int64) *SigningKeyshareUpdate {
+	sku.mutation.AddCoordinatorIndex(u)
+	return sku
+}
+
 // Mutation returns the SigningKeyshareMutation object of the builder.
 func (sku *SigningKeyshareUpdate) Mutation() *SigningKeyshareMutation {
 	return sku.mutation
@@ -118,6 +178,27 @@ func (sku *SigningKeyshareUpdate) sqlSave(ctx context.Context) (n int, err error
 	if value, ok := sku.mutation.Status(); ok {
 		_spec.SetField(signingkeyshare.FieldStatus, field.TypeEnum, value)
 	}
+	if value, ok := sku.mutation.SecretShare(); ok {
+		_spec.SetField(signingkeyshare.FieldSecretShare, field.TypeBytes, value)
+	}
+	if value, ok := sku.mutation.PublicShares(); ok {
+		_spec.SetField(signingkeyshare.FieldPublicShares, field.TypeJSON, value)
+	}
+	if value, ok := sku.mutation.PublicKey(); ok {
+		_spec.SetField(signingkeyshare.FieldPublicKey, field.TypeBytes, value)
+	}
+	if value, ok := sku.mutation.MinSigners(); ok {
+		_spec.SetField(signingkeyshare.FieldMinSigners, field.TypeUint32, value)
+	}
+	if value, ok := sku.mutation.AddedMinSigners(); ok {
+		_spec.AddField(signingkeyshare.FieldMinSigners, field.TypeUint32, value)
+	}
+	if value, ok := sku.mutation.CoordinatorIndex(); ok {
+		_spec.SetField(signingkeyshare.FieldCoordinatorIndex, field.TypeUint64, value)
+	}
+	if value, ok := sku.mutation.AddedCoordinatorIndex(); ok {
+		_spec.AddField(signingkeyshare.FieldCoordinatorIndex, field.TypeUint64, value)
+	}
 	if n, err = sqlgraph.UpdateNodes(ctx, sku.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{signingkeyshare.Label}
@@ -155,6 +236,66 @@ func (skuo *SigningKeyshareUpdateOne) SetNillableStatus(sks *schema.SigningKeysh
 	if sks != nil {
 		skuo.SetStatus(*sks)
 	}
+	return skuo
+}
+
+// SetSecretShare sets the "secret_share" field.
+func (skuo *SigningKeyshareUpdateOne) SetSecretShare(b []byte) *SigningKeyshareUpdateOne {
+	skuo.mutation.SetSecretShare(b)
+	return skuo
+}
+
+// SetPublicShares sets the "public_shares" field.
+func (skuo *SigningKeyshareUpdateOne) SetPublicShares(m map[string][]uint8) *SigningKeyshareUpdateOne {
+	skuo.mutation.SetPublicShares(m)
+	return skuo
+}
+
+// SetPublicKey sets the "public_key" field.
+func (skuo *SigningKeyshareUpdateOne) SetPublicKey(b []byte) *SigningKeyshareUpdateOne {
+	skuo.mutation.SetPublicKey(b)
+	return skuo
+}
+
+// SetMinSigners sets the "min_signers" field.
+func (skuo *SigningKeyshareUpdateOne) SetMinSigners(u uint32) *SigningKeyshareUpdateOne {
+	skuo.mutation.ResetMinSigners()
+	skuo.mutation.SetMinSigners(u)
+	return skuo
+}
+
+// SetNillableMinSigners sets the "min_signers" field if the given value is not nil.
+func (skuo *SigningKeyshareUpdateOne) SetNillableMinSigners(u *uint32) *SigningKeyshareUpdateOne {
+	if u != nil {
+		skuo.SetMinSigners(*u)
+	}
+	return skuo
+}
+
+// AddMinSigners adds u to the "min_signers" field.
+func (skuo *SigningKeyshareUpdateOne) AddMinSigners(u int32) *SigningKeyshareUpdateOne {
+	skuo.mutation.AddMinSigners(u)
+	return skuo
+}
+
+// SetCoordinatorIndex sets the "coordinator_index" field.
+func (skuo *SigningKeyshareUpdateOne) SetCoordinatorIndex(u uint64) *SigningKeyshareUpdateOne {
+	skuo.mutation.ResetCoordinatorIndex()
+	skuo.mutation.SetCoordinatorIndex(u)
+	return skuo
+}
+
+// SetNillableCoordinatorIndex sets the "coordinator_index" field if the given value is not nil.
+func (skuo *SigningKeyshareUpdateOne) SetNillableCoordinatorIndex(u *uint64) *SigningKeyshareUpdateOne {
+	if u != nil {
+		skuo.SetCoordinatorIndex(*u)
+	}
+	return skuo
+}
+
+// AddCoordinatorIndex adds u to the "coordinator_index" field.
+func (skuo *SigningKeyshareUpdateOne) AddCoordinatorIndex(u int64) *SigningKeyshareUpdateOne {
+	skuo.mutation.AddCoordinatorIndex(u)
 	return skuo
 }
 
@@ -256,6 +397,27 @@ func (skuo *SigningKeyshareUpdateOne) sqlSave(ctx context.Context) (_node *Signi
 	}
 	if value, ok := skuo.mutation.Status(); ok {
 		_spec.SetField(signingkeyshare.FieldStatus, field.TypeEnum, value)
+	}
+	if value, ok := skuo.mutation.SecretShare(); ok {
+		_spec.SetField(signingkeyshare.FieldSecretShare, field.TypeBytes, value)
+	}
+	if value, ok := skuo.mutation.PublicShares(); ok {
+		_spec.SetField(signingkeyshare.FieldPublicShares, field.TypeJSON, value)
+	}
+	if value, ok := skuo.mutation.PublicKey(); ok {
+		_spec.SetField(signingkeyshare.FieldPublicKey, field.TypeBytes, value)
+	}
+	if value, ok := skuo.mutation.MinSigners(); ok {
+		_spec.SetField(signingkeyshare.FieldMinSigners, field.TypeUint32, value)
+	}
+	if value, ok := skuo.mutation.AddedMinSigners(); ok {
+		_spec.AddField(signingkeyshare.FieldMinSigners, field.TypeUint32, value)
+	}
+	if value, ok := skuo.mutation.CoordinatorIndex(); ok {
+		_spec.SetField(signingkeyshare.FieldCoordinatorIndex, field.TypeUint64, value)
+	}
+	if value, ok := skuo.mutation.AddedCoordinatorIndex(); ok {
+		_spec.AddField(signingkeyshare.FieldCoordinatorIndex, field.TypeUint64, value)
 	}
 	_node = &SigningKeyshare{config: skuo.config}
 	_spec.Assign = _node.assignValues
