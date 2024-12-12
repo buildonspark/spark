@@ -1,6 +1,7 @@
 package ent
 
 import (
+	"context"
 	"encoding/hex"
 
 	pbspark "github.com/lightsparkdev/spark-go/proto/spark"
@@ -8,19 +9,19 @@ import (
 )
 
 // MarshalSparkProto converts a TreeNode to a spark protobuf TreeNode.
-func (tn *TreeNode) MarshalSparkProto() *pbspark.TreeNode {
+func (tn *TreeNode) MarshalSparkProto(ctx context.Context) *pbspark.TreeNode {
 	return &pbspark.TreeNode{
 		Id:             tn.ID.String(),
-		TreeId:         tn.Edges.Tree.ID.String(),
+		TreeId:         tn.QueryTree().FirstIDX(ctx).String(),
 		Value:          tn.Value,
-		ParentNodeId:   tn.getParentNodeID(),
+		ParentNodeId:   tn.getParentNodeID(ctx),
 		RawRootTxHex:   hex.EncodeToString(tn.RawTx),
 		RawRefundTxHex: hex.EncodeToString(tn.RawRefundTx),
 	}
 }
 
 // MarshalInternalProto converts a TreeNode to a spark internal protobuf TreeNode.
-func (tn *TreeNode) MarshalInternalProto() *pbinternal.TreeNode {
+func (tn *TreeNode) MarshalInternalProto(ctx context.Context) *pbinternal.TreeNode {
 	return &pbinternal.TreeNode{
 		Id:                  tn.ID.String(),
 		Value:               tn.Value,
@@ -29,17 +30,17 @@ func (tn *TreeNode) MarshalInternalProto() *pbinternal.TreeNode {
 		OwnerSigningPubkey:  tn.OwnerSigningPubkey,
 		RawTx:               tn.RawTx,
 		RawRefundTx:         tn.RawRefundTx,
-		TreeId:              tn.Edges.Tree.ID.String(),
-		ParentNodeId:        tn.getParentNodeID(),
-		SigningKeyshareId:   tn.Edges.SigningKeyshare.ID.String(),
+		TreeId:              tn.QueryTree().FirstIDX(ctx).String(),
+		ParentNodeId:        tn.getParentNodeID(ctx),
+		SigningKeyshareId:   tn.QuerySigningKeyshare().FirstIDX(ctx).String(),
 	}
 }
 
-func (tn *TreeNode) getParentNodeID() *string {
-	parentNode := tn.Edges.Parent
-	if parentNode != nil {
-		parentNodeIDStr := parentNode.ID.String()
-		return &parentNodeIDStr
+func (tn *TreeNode) getParentNodeID(ctx context.Context) *string {
+	parentNode, err := tn.QueryParent().Only(ctx)
+	if err != nil {
+		return nil
 	}
-	return nil
+	parentNodeIDStr := parentNode.ID.String()
+	return &parentNodeIDStr
 }

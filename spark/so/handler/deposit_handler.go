@@ -115,7 +115,11 @@ func (o *DepositHandler) GenerateDepositAddress(ctx context.Context, config *so.
 	}
 
 	log.Printf("Generated deposit address: %s", *depositAddress)
-	return &pb.GenerateDepositAddressResponse{Address: *depositAddress}, nil
+	verifyingKeyBytes, err := common.AddPublicKeys(keyshare.PublicKey, req.SigningPublicKey)
+	if err != nil {
+		return nil, err
+	}
+	return &pb.GenerateDepositAddressResponse{Address: *depositAddress, VerifyingKey: verifyingKeyBytes}, nil
 }
 
 // StartTreeCreation verifies the on chain utxo, and then verifies and signs the offchain root and refund transactions.
@@ -254,6 +258,7 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 				SignatureShares:         refundTxSignatureShare,
 				SigningNonceCommitments: refundTxSigningCommitments,
 			},
+			VerifyingKey: verifyingKeyBytes,
 		},
 	}, nil
 }

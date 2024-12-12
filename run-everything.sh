@@ -204,8 +204,8 @@ run_operators_tmux() {
        
        # Construct paths
        local log_file="${run_dir}/logs/operator_${i}.log"
-       # local db_file="postgresql://:@127.0.0.1:5432/operator_${i}?sslmode=disable"
-       local db_file="${run_dir}/db/operator_${i}.sqlite?_fk=1"
+       local db_file="postgresql://:@127.0.0.1:5432/operator_${i}?sslmode=disable"
+    #    local db_file="${run_dir}/db/operator_${i}.sqlite?_fk=1"
        local signer_socket="unix:///tmp/frost_${i}.sock"
        
        # Construct the command with all parameters

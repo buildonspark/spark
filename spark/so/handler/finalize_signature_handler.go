@@ -99,7 +99,7 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 		SetStatus(schema.TreeNodeStatusAvailable).
 		SaveX(ctx)
 
-	return node.MarshalSparkProto(), node.MarshalInternalProto(), nil
+	return node.MarshalSparkProto(ctx), node.MarshalInternalProto(ctx), nil
 }
 
 func (o *FinalizeSignatureHandler) verifySignatureAndUpdateTx(rawTx []byte, signature []byte) ([]byte, error) {

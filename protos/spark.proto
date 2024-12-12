@@ -19,6 +19,7 @@ message GenerateDepositAddressRequest {
 
 message GenerateDepositAddressResponse {
     string address = 1;
+    bytes verifying_key = 2;
 }
 
 message UTXO {
@@ -43,6 +44,7 @@ message NodeSignatureShares {
     string node_id = 1;
     SigningResult node_tx_signing_result = 2;
     SigningResult refund_tx_signing_result = 3;
+    bytes verifying_key = 4;
 }
 
 message NodeSignatures {

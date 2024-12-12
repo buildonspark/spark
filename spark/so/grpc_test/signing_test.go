@@ -1,8 +1,12 @@
 package grpctest
 
 import (
+	"crypto/sha256"
 	"testing"
 
+	"github.com/btcsuite/btcd/btcec/v2"
+	"github.com/btcsuite/btcd/btcec/v2/schnorr"
+	"github.com/btcsuite/btcd/txscript"
 	"github.com/decred/dcrd/dcrec/secp256k1"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/common"
@@ -30,6 +34,7 @@ func TestFrostSign(t *testing.T) {
 	}
 
 	msg := []byte("hello")
+	msgHash := sha256.Sum256(msg)
 
 	// Step 2: Get operator key share
 	operatorKeyShares, err := entutils.GetUnusedSigningKeyshares(ctx, config, 1)
@@ -98,14 +103,14 @@ func TestFrostSign(t *testing.T) {
 	signingJobs = append(signingJobs, &helper.SigningJob{
 		JobID:             uuid.New().String(),
 		SigningKeyshareID: operatorKeyShare.ID,
-		Message:           msg,
+		Message:           msgHash[:],
 		VerifyingKey:      verifyingKeyBytes,
 		UserCommitment:    *userNonceCommitment,
 	})
 	signingJobs = append(signingJobs, &helper.SigningJob{
 		JobID:             uuid.New().String(),
 		SigningKeyshareID: operatorKeyShare.ID,
-		Message:           msg,
+		Message:           msgHash[:],
 		VerifyingKey:      verifyingKeyBytes,
 		UserCommitment:    *userNonceCommitment,
 	})
@@ -134,7 +139,7 @@ func TestFrostSign(t *testing.T) {
 	userJobID := uuid.New().String()
 	userSigningJobs = append(userSigningJobs, &pbfrost.FrostSigningJob{
 		JobId:           userJobID,
-		Message:         msg,
+		Message:         msgHash[:],
 		KeyPackage:      &userKeyPackage,
 		VerifyingKey:    verifyingKeyBytes,
 		Nonce:           userNonceProto,
@@ -152,8 +157,8 @@ func TestFrostSign(t *testing.T) {
 	// Step 8: Signature aggregation - The aggregation is successful only if the signature is valid.
 	signatureShares := signingResult[0].SignatureShares
 	publicKeys := signingResult[0].PublicKeys
-	_, err = client.AggregateFrost(ctx, &pbfrost.AggregateFrostRequest{
-		Message:            msg,
+	signatureResult, err := client.AggregateFrost(ctx, &pbfrost.AggregateFrostRequest{
+		Message:            msgHash[:],
 		SignatureShares:    signatureShares,
 		PublicShares:       publicKeys,
 		VerifyingKey:       verifyingKeyBytes,
@@ -164,5 +169,22 @@ func TestFrostSign(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	// Step 9: Verify signature using go lib.
+	sig, err := schnorr.ParseSignature(signatureResult.Signature)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	pubKey, err := btcec.ParsePubKey(verifyingKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	taprootKey := txscript.ComputeTaprootKeyNoScript(pubKey)
+
+	verified := sig.Verify(msgHash[:], taprootKey)
+	if !verified {
+		t.Fatal("signature verification failed")
 	}
 }
