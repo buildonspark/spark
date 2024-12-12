@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package mock;
+
+option go_package = "github.com/lightsparkdev/spark-go/proto/mock";
+import "google/protobuf/empty.proto";
+
+service MockService {
+    rpc set_mock_onchain_tx(SetMockOnchainTxRequest) returns (google.protobuf.Empty) {}
+}
+
+message SetMockOnchainTxRequest {
+    string txid = 1;
+    string tx = 2;
+}

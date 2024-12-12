@@ -21,7 +21,14 @@ import (
 )
 
 // The DepositHandler is responsible for handling deposit related requests.
-type DepositHandler struct{}
+type DepositHandler struct {
+	onchainHelper helper.OnChainHelper
+}
+
+// NewDepositHandler creates a new DepositHandler.
+func NewDepositHandler(onchainHelper helper.OnChainHelper) *DepositHandler {
+	return &DepositHandler{onchainHelper: onchainHelper}
+}
 
 // GenerateDepositAddress generates a deposit address for the given public key.
 func (o *DepositHandler) GenerateDepositAddress(ctx context.Context, config *so.Config, req *pb.GenerateDepositAddressRequest) (*pb.GenerateDepositAddressResponse, error) {
@@ -114,8 +121,7 @@ func (o *DepositHandler) GenerateDepositAddress(ctx context.Context, config *so.
 // StartTreeCreation verifies the on chain utxo, and then verifies and signs the offchain root and refund transactions.
 func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Config, req *pb.StartTreeCreationRequest) (*pb.StartTreeCreationResponse, error) {
 	// Get the on chain tx
-	onChainHelper := &helper.OnChainHelper{}
-	onChainTx, err := onChainHelper.GetTxOnChain(ctx, req.OnChainUtxo.Txid)
+	onChainTx, err := o.onchainHelper.GetTxOnChain(ctx, req.OnChainUtxo.Txid)
 	if err != nil {
 		return nil, err
 	}

@@ -13,6 +13,7 @@ import (
 	_ "github.com/lib/pq"
 	"github.com/lightsparkdev/spark-go/common"
 	pbdkg "github.com/lightsparkdev/spark-go/proto/dkg"
+	pbmock "github.com/lightsparkdev/spark-go/proto/mock"
 	pbspark "github.com/lightsparkdev/spark-go/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark-go/proto/spark_internal"
 	pbtree "github.com/lightsparkdev/spark-go/proto/spark_tree"
@@ -20,6 +21,7 @@ import (
 	"github.com/lightsparkdev/spark-go/so/dkg"
 	"github.com/lightsparkdev/spark-go/so/ent"
 	sparkgrpc "github.com/lightsparkdev/spark-go/so/grpc"
+	"github.com/lightsparkdev/spark-go/so/helper"
 	_ "github.com/mattn/go-sqlite3"
 	"google.golang.org/grpc"
 )
@@ -32,6 +34,7 @@ type args struct {
 	SignerAddress      string
 	Port               uint64
 	DatabasePath       string
+	MockOnchain        bool
 }
 
 func loadArgs() (*args, error) {
@@ -45,6 +48,7 @@ func loadArgs() (*args, error) {
 	flag.StringVar(&args.SignerAddress, "signer", "", "Signer address")
 	flag.Uint64Var(&args.Port, "port", 0, "Port value")
 	flag.StringVar(&args.DatabasePath, "database", "", "Path to database file")
+	flag.BoolVar(&args.MockOnchain, "mock-onchain", false, "Mock onchain tx")
 	// Parse flags
 	flag.Parse()
 
@@ -121,10 +125,16 @@ func main() {
 	grpcServer := grpc.NewServer(grpc.UnaryInterceptor(common.DbSessionMiddleware(dbClient)))
 	pbdkg.RegisterDKGServiceServer(grpcServer, dkgServer)
 
+	var onchainHelper helper.OnChainHelper = &helper.DemoOnChainHelper{}
+	if args.MockOnchain {
+		onchainHelper = helper.NewMockOnChainHelper()
+		mockServer := sparkgrpc.NewMockServer(config, onchainHelper.(*helper.MockOnChainHelper))
+		pbmock.RegisterMockServiceServer(grpcServer, mockServer)
+	}
 	sparkInternalServer := sparkgrpc.NewSparkInternalServer(config)
 	pbinternal.RegisterSparkInternalServiceServer(grpcServer, sparkInternalServer)
 
-	sparkServer := sparkgrpc.NewSparkServer(config)
+	sparkServer := sparkgrpc.NewSparkServer(config, onchainHelper)
 	pbspark.RegisterSparkServiceServer(grpcServer, sparkServer)
 
 	treeServer := sparkgrpc.NewSparkTreeServer(config)

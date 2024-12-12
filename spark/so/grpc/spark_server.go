@@ -6,29 +6,31 @@ import (
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/handler"
+	"github.com/lightsparkdev/spark-go/so/helper"
 )
 
 // SparkServer is the grpc server for the Spark protocol.
 // It will be used by the user or Spark service provider.
 type SparkServer struct {
 	pb.UnimplementedSparkServiceServer
-	config *so.Config
+	config        *so.Config
+	onchainHelper helper.OnChainHelper
 }
 
 // NewSparkServer creates a new SparkServer.
-func NewSparkServer(config *so.Config) *SparkServer {
-	return &SparkServer{config: config}
+func NewSparkServer(config *so.Config, onchainHelper helper.OnChainHelper) *SparkServer {
+	return &SparkServer{config: config, onchainHelper: onchainHelper}
 }
 
 // GenerateDepositAddress generates a deposit address for the given public key.
 func (s *SparkServer) GenerateDepositAddress(ctx context.Context, req *pb.GenerateDepositAddressRequest) (*pb.GenerateDepositAddressResponse, error) {
-	depositHandler := handler.DepositHandler{}
+	depositHandler := handler.NewDepositHandler(s.onchainHelper)
 	return depositHandler.GenerateDepositAddress(ctx, s.config, req)
 }
 
 // StartTreeCreation verifies the on chain utxo, and then verifies and signs the offchain root and refund transactions.
 func (s *SparkServer) StartTreeCreation(ctx context.Context, req *pb.StartTreeCreationRequest) (*pb.StartTreeCreationResponse, error) {
-	depositHandler := handler.DepositHandler{}
+	depositHandler := handler.NewDepositHandler(s.onchainHelper)
 	return depositHandler.StartTreeCreation(ctx, s.config, req)
 }
 

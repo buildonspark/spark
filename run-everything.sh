@@ -217,6 +217,7 @@ run_operators_tmux() {
            -signer '${signer_socket}' \
            -port ${port} \
            -database '${db_file}' \
+           -mock-onchain true \
            2>&1 | tee '${log_file}'"
        
        # Send the command to tmux
