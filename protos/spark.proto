@@ -73,29 +73,33 @@ message TreeNode {
     optional string parent_node_id = 4;
     string raw_root_tx_hex = 5;
     string raw_refund_tx_hex = 6;
+    uint32 vout = 7;
 }
 
 message Split {
     bytes signing_public_key = 1;
-    SigningJob node_signing_job = 2;
-    SigningJob refund_signing_job = 3;
-    uint64 value = 4;
+    SigningJob refund_signing_job = 2;
+    uint64 value = 3;
+    uint32 vout = 4;
 }
 
 message SplitNodeRequest {
     string node_id = 1;
-    repeated Split splits = 2;
+    SigningJob parent_tx_signing_job = 2;
+    repeated Split splits = 3;
 }
 
 message SplitResult {
     string node_id = 1;
-    NodeSignatureShares node_signatures = 2;
+    SigningResult refund_tx_signing_result = 2;
     bytes verifying_key = 3;
     bytes user_public_key = 4;
 }
 
 message SplitNodeResponse {
-    repeated SplitResult split_results = 1;
+    string parent_node_id = 1;
+    SigningResult parent_tx_signing_result = 2;
+    repeated SplitResult split_results = 3;
 }
 
 message FinalizeNodeSignaturesRequest {

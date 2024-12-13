@@ -241,6 +241,7 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 		SetSigningKeyshare(signingKeyShare).
 		SetRawTx(req.RootTxSigningJob.RawTx).
 		SetRawRefundTx(req.RefundTxSigningJob.RawTx).
+		SetVout(uint16(req.OnChainUtxo.Vout)).
 		SaveX(ctx)
 	tree = tree.Update().SetRoot(root).SaveX(ctx)
 

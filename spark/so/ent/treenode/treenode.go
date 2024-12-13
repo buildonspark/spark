@@ -33,6 +33,8 @@ const (
 	FieldOwnerSigningPubkey = "owner_signing_pubkey"
 	// FieldRawTx holds the string denoting the raw_tx field in the database.
 	FieldRawTx = "raw_tx"
+	// FieldVout holds the string denoting the vout field in the database.
+	FieldVout = "vout"
 	// FieldRawRefundTx holds the string denoting the raw_refund_tx field in the database.
 	FieldRawRefundTx = "raw_refund_tx"
 	// EdgeTree holds the string denoting the tree edge name in mutations.
@@ -80,6 +82,7 @@ var Columns = []string{
 	FieldOwnerIdentityPubkey,
 	FieldOwnerSigningPubkey,
 	FieldRawTx,
+	FieldVout,
 	FieldRawRefundTx,
 }
 
@@ -163,6 +166,11 @@ func ByValue(opts ...sql.OrderTermOption) OrderOption {
 // ByStatus orders the results by the status field.
 func ByStatus(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldStatus, opts...).ToFunc()
+}
+
+// ByVout orders the results by the vout field.
+func ByVout(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldVout, opts...).ToFunc()
 }
 
 // ByTreeField orders the results by tree field.

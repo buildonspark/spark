@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/btcsuite/btcd/wire"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/common"
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
@@ -24,19 +23,19 @@ func (h *SplitHandler) verifySplitRequest(req *pb.SplitNodeRequest) error {
 	return nil
 }
 
-func (h *SplitHandler) prepareKeys(ctx context.Context, config *so.Config, req *pb.SplitNodeRequest) ([]*ent.SigningKeyshare, error) {
+func (h *SplitHandler) prepareKeys(ctx context.Context, config *so.Config, req *pb.SplitNodeRequest) (*ent.SigningKeyshare, []*ent.SigningKeyshare, error) {
 	nodeID, err := uuid.Parse(req.NodeId)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	err = entutils.MarkNodeAsLocked(ctx, nodeID, schema.TreeNodeStatusSplitLocked)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	keyshares, err := entutils.GetUnusedSigningKeyshares(ctx, config, len(req.Splits)-1)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	keyshareIDs := make([]uuid.UUID, len(keyshares))
@@ -48,7 +47,7 @@ func (h *SplitHandler) prepareKeys(ctx context.Context, config *so.Config, req *
 
 	targetKeyshare, err := entutils.GetNodeKeyshare(ctx, config, nodeID)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	lastKeyshareID := uuid.New()
@@ -70,21 +69,21 @@ func (h *SplitHandler) prepareKeys(ctx context.Context, config *so.Config, req *
 		})
 	})
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	err = entutils.MarkSigningKeysharesAsUsed(ctx, config, keyshareIDs)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	lastKeyshare, err := entutils.CalculateAndStoreLastKey(ctx, config, targetKeyshare, keyshares, lastKeyshareID)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	keyshares = append(keyshares, lastKeyshare)
-	return keyshares, nil
+	return targetKeyshare, keyshares, nil
 }
 
 func (h *SplitHandler) prepareSplitResults(ctx context.Context, config *so.Config, req *pb.SplitNodeRequest, keyshares []*ent.SigningKeyshare) ([]*pb.SplitResult, error) {
@@ -103,19 +102,13 @@ func (h *SplitHandler) prepareSplitResults(ctx context.Context, config *so.Confi
 	return splitResults, nil
 }
 
-func prepareSigningJob(split *pb.Split, keyshare *ent.SigningKeyshare, prevOutput *wire.TxOut) (*helper.SigningJob, *helper.SigningJob, error) {
-	nodeSigningJob, nodeTx, err := helper.NewSigningJob(keyshare, split.NodeSigningJob, prevOutput)
-	if err != nil {
-		return nil, nil, err
-	}
-	refundSigningJob, _, err := helper.NewSigningJob(keyshare, split.RefundSigningJob, nodeTx.TxOut[0])
-	if err != nil {
-		return nil, nil, err
-	}
-	return nodeSigningJob, refundSigningJob, nil
-}
-
-func (h *SplitHandler) prepareSigningJobs(ctx context.Context, config *so.Config, req *pb.SplitNodeRequest, keyshares []*ent.SigningKeyshare) ([]*helper.SigningJob, error) {
+func (h *SplitHandler) prepareSigningJobs(
+	ctx context.Context,
+	config *so.Config,
+	req *pb.SplitNodeRequest,
+	parentKeyshare *ent.SigningKeyshare,
+	childrenKeyshares []*ent.SigningKeyshare,
+) ([]*helper.SigningJob, error) {
 	signingJobs := make([]*helper.SigningJob, 0)
 	nodeID, err := uuid.Parse(req.NodeId)
 	if err != nil {
@@ -130,14 +123,21 @@ func (h *SplitHandler) prepareSigningJobs(ctx context.Context, config *so.Config
 	if err != nil {
 		return nil, err
 	}
+
+	parentTxSigningJob, splitTx, err := helper.NewSigningJob(parentKeyshare, req.ParentTxSigningJob, parentTx.TxOut[node.Vout])
+	if err != nil {
+		return nil, err
+	}
+	signingJobs = append(signingJobs, parentTxSigningJob)
+
 	for i, split := range req.Splits {
-		nodeTxSigningJob, refundTxSigningJob, err := prepareSigningJob(split, keyshares[i], parentTx.TxOut[0])
+		refundSigningJob, _, err := helper.NewSigningJob(childrenKeyshares[i], split.RefundSigningJob, splitTx.TxOut[split.Vout])
 		if err != nil {
 			return nil, err
 		}
-		signingJobs = append(signingJobs, nodeTxSigningJob, refundTxSigningJob)
+		signingJobs = append(signingJobs, refundSigningJob)
 
-		verifyingKey, err := common.AddPublicKeys(split.SigningPublicKey, keyshares[i].PublicKey)
+		verifyingKey, err := common.AddPublicKeys(split.SigningPublicKey, childrenKeyshares[i].PublicKey)
 		if err != nil {
 			return nil, err
 		}
@@ -150,8 +150,9 @@ func (h *SplitHandler) prepareSigningJobs(ctx context.Context, config *so.Config
 			SetOwnerSigningPubkey(split.SigningPublicKey).
 			SetValue(uint64(split.Value)).
 			SetVerifyingPubkey(verifyingKey).
-			SetSigningKeyshare(keyshares[i]).
-			SetRawTx(split.NodeSigningJob.RawTx).
+			SetSigningKeyshare(childrenKeyshares[i]).
+			SetRawTx(req.ParentTxSigningJob.RawTx).
+			SetVout(uint16(split.Vout)).
 			SetRawRefundTx(split.RefundSigningJob.RawTx).
 			SaveX(ctx)
 	}
@@ -164,28 +165,15 @@ func (h *SplitHandler) finalizeSplitResults(ctx context.Context, config *so.Conf
 	}
 
 	for i, splitResult := range splitResults {
-		nodeTxIndex := i * 2
-		refundTxIndex := i*2 + 1
-		nodeTxSigningCommitments, err := common.ConvertObjectMapToProtoMap(signingResults[nodeTxIndex].SigningCommitments)
-		if err != nil {
-			return nil, err
-		}
+		refundTxIndex := i + 1
 		refundTxSigningCommitments, err := common.ConvertObjectMapToProtoMap(signingResults[refundTxIndex].SigningCommitments)
 		if err != nil {
 			return nil, err
 		}
-		splitResult.NodeSignatures = &pb.NodeSignatureShares{
-			NodeId: splitResult.NodeId,
-			NodeTxSigningResult: &pb.SigningResult{
-				PublicKeys:              signingResults[nodeTxIndex].PublicKeys,
-				SigningNonceCommitments: nodeTxSigningCommitments,
-				SignatureShares:         signingResults[nodeTxIndex].SignatureShares,
-			},
-			RefundTxSigningResult: &pb.SigningResult{
-				PublicKeys:              signingResults[refundTxIndex].PublicKeys,
-				SigningNonceCommitments: refundTxSigningCommitments,
-				SignatureShares:         signingResults[refundTxIndex].SignatureShares,
-			},
+		splitResult.RefundTxSigningResult = &pb.SigningResult{
+			PublicKeys:              signingResults[refundTxIndex].PublicKeys,
+			SigningNonceCommitments: refundTxSigningCommitments,
+			SignatureShares:         signingResults[refundTxIndex].SignatureShares,
 		}
 	}
 
@@ -198,17 +186,17 @@ func (h *SplitHandler) SplitNode(ctx context.Context, config *so.Config, req *pb
 		return nil, err
 	}
 
-	keyshares, err := h.prepareKeys(ctx, config, req)
+	parentKeyshare, childrenKeyshares, err := h.prepareKeys(ctx, config, req)
 	if err != nil {
 		return nil, err
 	}
 
-	splitResults, err := h.prepareSplitResults(ctx, config, req, keyshares)
+	splitResults, err := h.prepareSplitResults(ctx, config, req, childrenKeyshares)
 	if err != nil {
 		return nil, err
 	}
 
-	signingJobs, err := h.prepareSigningJobs(ctx, config, req, keyshares)
+	signingJobs, err := h.prepareSigningJobs(ctx, config, req, parentKeyshare, childrenKeyshares)
 	if err != nil {
 		return nil, err
 	}
@@ -224,6 +212,7 @@ func (h *SplitHandler) SplitNode(ctx context.Context, config *so.Config, req *pb
 	}
 
 	return &pb.SplitNodeResponse{
+		ParentNodeId: req.NodeId,
 		SplitResults: splitResults,
 	}, nil
 }

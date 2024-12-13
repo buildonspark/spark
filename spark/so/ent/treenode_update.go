@@ -70,6 +70,27 @@ func (tnu *TreeNodeUpdate) SetRawTx(b []byte) *TreeNodeUpdate {
 	return tnu
 }
 
+// SetVout sets the "vout" field.
+func (tnu *TreeNodeUpdate) SetVout(u uint16) *TreeNodeUpdate {
+	tnu.mutation.ResetVout()
+	tnu.mutation.SetVout(u)
+	return tnu
+}
+
+// SetNillableVout sets the "vout" field if the given value is not nil.
+func (tnu *TreeNodeUpdate) SetNillableVout(u *uint16) *TreeNodeUpdate {
+	if u != nil {
+		tnu.SetVout(*u)
+	}
+	return tnu
+}
+
+// AddVout adds u to the "vout" field.
+func (tnu *TreeNodeUpdate) AddVout(u int16) *TreeNodeUpdate {
+	tnu.mutation.AddVout(u)
+	return tnu
+}
+
 // SetRawRefundTx sets the "raw_refund_tx" field.
 func (tnu *TreeNodeUpdate) SetRawRefundTx(b []byte) *TreeNodeUpdate {
 	tnu.mutation.SetRawRefundTx(b)
@@ -275,6 +296,12 @@ func (tnu *TreeNodeUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if value, ok := tnu.mutation.RawTx(); ok {
 		_spec.SetField(treenode.FieldRawTx, field.TypeBytes, value)
 	}
+	if value, ok := tnu.mutation.Vout(); ok {
+		_spec.SetField(treenode.FieldVout, field.TypeUint16, value)
+	}
+	if value, ok := tnu.mutation.AddedVout(); ok {
+		_spec.AddField(treenode.FieldVout, field.TypeUint16, value)
+	}
 	if value, ok := tnu.mutation.RawRefundTx(); ok {
 		_spec.SetField(treenode.FieldRawRefundTx, field.TypeBytes, value)
 	}
@@ -465,6 +492,27 @@ func (tnuo *TreeNodeUpdateOne) SetOwnerSigningPubkey(b []byte) *TreeNodeUpdateOn
 // SetRawTx sets the "raw_tx" field.
 func (tnuo *TreeNodeUpdateOne) SetRawTx(b []byte) *TreeNodeUpdateOne {
 	tnuo.mutation.SetRawTx(b)
+	return tnuo
+}
+
+// SetVout sets the "vout" field.
+func (tnuo *TreeNodeUpdateOne) SetVout(u uint16) *TreeNodeUpdateOne {
+	tnuo.mutation.ResetVout()
+	tnuo.mutation.SetVout(u)
+	return tnuo
+}
+
+// SetNillableVout sets the "vout" field if the given value is not nil.
+func (tnuo *TreeNodeUpdateOne) SetNillableVout(u *uint16) *TreeNodeUpdateOne {
+	if u != nil {
+		tnuo.SetVout(*u)
+	}
+	return tnuo
+}
+
+// AddVout adds u to the "vout" field.
+func (tnuo *TreeNodeUpdateOne) AddVout(u int16) *TreeNodeUpdateOne {
+	tnuo.mutation.AddVout(u)
 	return tnuo
 }
 
@@ -702,6 +750,12 @@ func (tnuo *TreeNodeUpdateOne) sqlSave(ctx context.Context) (_node *TreeNode, er
 	}
 	if value, ok := tnuo.mutation.RawTx(); ok {
 		_spec.SetField(treenode.FieldRawTx, field.TypeBytes, value)
+	}
+	if value, ok := tnuo.mutation.Vout(); ok {
+		_spec.SetField(treenode.FieldVout, field.TypeUint16, value)
+	}
+	if value, ok := tnuo.mutation.AddedVout(); ok {
+		_spec.AddField(treenode.FieldVout, field.TypeUint16, value)
 	}
 	if value, ok := tnuo.mutation.RawRefundTx(); ok {
 		_spec.SetField(treenode.FieldRawRefundTx, field.TypeBytes, value)

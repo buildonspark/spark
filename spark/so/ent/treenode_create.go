@@ -88,6 +88,12 @@ func (tnc *TreeNodeCreate) SetRawTx(b []byte) *TreeNodeCreate {
 	return tnc
 }
 
+// SetVout sets the "vout" field.
+func (tnc *TreeNodeCreate) SetVout(u uint16) *TreeNodeCreate {
+	tnc.mutation.SetVout(u)
+	return tnc
+}
+
 // SetRawRefundTx sets the "raw_refund_tx" field.
 func (tnc *TreeNodeCreate) SetRawRefundTx(b []byte) *TreeNodeCreate {
 	tnc.mutation.SetRawRefundTx(b)
@@ -264,6 +270,9 @@ func (tnc *TreeNodeCreate) check() error {
 			return &ValidationError{Name: "raw_tx", err: fmt.Errorf(`ent: validator failed for field "TreeNode.raw_tx": %w`, err)}
 		}
 	}
+	if _, ok := tnc.mutation.Vout(); !ok {
+		return &ValidationError{Name: "vout", err: errors.New(`ent: missing required field "TreeNode.vout"`)}
+	}
 	if _, ok := tnc.mutation.RawRefundTx(); !ok {
 		return &ValidationError{Name: "raw_refund_tx", err: errors.New(`ent: missing required field "TreeNode.raw_refund_tx"`)}
 	}
@@ -344,6 +353,10 @@ func (tnc *TreeNodeCreate) createSpec() (*TreeNode, *sqlgraph.CreateSpec) {
 	if value, ok := tnc.mutation.RawTx(); ok {
 		_spec.SetField(treenode.FieldRawTx, field.TypeBytes, value)
 		_node.RawTx = value
+	}
+	if value, ok := tnc.mutation.Vout(); ok {
+		_spec.SetField(treenode.FieldVout, field.TypeUint16, value)
+		_node.Vout = value
 	}
 	if value, ok := tnc.mutation.RawRefundTx(); ok {
 		_spec.SetField(treenode.FieldRawRefundTx, field.TypeBytes, value)

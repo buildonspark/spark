@@ -92,6 +92,11 @@ func RawTx(v []byte) predicate.TreeNode {
 	return predicate.TreeNode(sql.FieldEQ(FieldRawTx, v))
 }
 
+// Vout applies equality check predicate on the "vout" field. It's identical to VoutEQ.
+func Vout(v uint16) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldEQ(FieldVout, v))
+}
+
 // RawRefundTx applies equality check predicate on the "raw_refund_tx" field. It's identical to RawRefundTxEQ.
 func RawRefundTx(v []byte) predicate.TreeNode {
 	return predicate.TreeNode(sql.FieldEQ(FieldRawRefundTx, v))
@@ -405,6 +410,46 @@ func RawTxLT(v []byte) predicate.TreeNode {
 // RawTxLTE applies the LTE predicate on the "raw_tx" field.
 func RawTxLTE(v []byte) predicate.TreeNode {
 	return predicate.TreeNode(sql.FieldLTE(FieldRawTx, v))
+}
+
+// VoutEQ applies the EQ predicate on the "vout" field.
+func VoutEQ(v uint16) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldEQ(FieldVout, v))
+}
+
+// VoutNEQ applies the NEQ predicate on the "vout" field.
+func VoutNEQ(v uint16) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldNEQ(FieldVout, v))
+}
+
+// VoutIn applies the In predicate on the "vout" field.
+func VoutIn(vs ...uint16) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldIn(FieldVout, vs...))
+}
+
+// VoutNotIn applies the NotIn predicate on the "vout" field.
+func VoutNotIn(vs ...uint16) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldNotIn(FieldVout, vs...))
+}
+
+// VoutGT applies the GT predicate on the "vout" field.
+func VoutGT(v uint16) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldGT(FieldVout, v))
+}
+
+// VoutGTE applies the GTE predicate on the "vout" field.
+func VoutGTE(v uint16) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldGTE(FieldVout, v))
+}
+
+// VoutLT applies the LT predicate on the "vout" field.
+func VoutLT(v uint16) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldLT(FieldVout, v))
+}
+
+// VoutLTE applies the LTE predicate on the "vout" field.
+func VoutLTE(v uint16) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldLTE(FieldVout, v))
 }
 
 // RawRefundTxEQ applies the EQ predicate on the "raw_refund_tx" field.

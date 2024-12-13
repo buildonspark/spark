@@ -37,6 +37,8 @@ type TreeNode struct {
 	OwnerSigningPubkey []byte `json:"owner_signing_pubkey,omitempty"`
 	// RawTx holds the value of the "raw_tx" field.
 	RawTx []byte `json:"raw_tx,omitempty"`
+	// Vout holds the value of the "vout" field.
+	Vout uint16 `json:"vout,omitempty"`
 	// RawRefundTx holds the value of the "raw_refund_tx" field.
 	RawRefundTx []byte `json:"raw_refund_tx,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
@@ -112,7 +114,7 @@ func (*TreeNode) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case treenode.FieldVerifyingPubkey, treenode.FieldOwnerIdentityPubkey, treenode.FieldOwnerSigningPubkey, treenode.FieldRawTx, treenode.FieldRawRefundTx:
 			values[i] = new([]byte)
-		case treenode.FieldValue:
+		case treenode.FieldValue, treenode.FieldVout:
 			values[i] = new(sql.NullInt64)
 		case treenode.FieldStatus:
 			values[i] = new(sql.NullString)
@@ -194,6 +196,12 @@ func (tn *TreeNode) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field raw_tx", values[i])
 			} else if value != nil {
 				tn.RawTx = *value
+			}
+		case treenode.FieldVout:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field vout", values[i])
+			} else if value.Valid {
+				tn.Vout = uint16(value.Int64)
 			}
 		case treenode.FieldRawRefundTx:
 			if value, ok := values[i].(*[]byte); !ok {
@@ -301,6 +309,9 @@ func (tn *TreeNode) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("raw_tx=")
 	builder.WriteString(fmt.Sprintf("%v", tn.RawTx))
+	builder.WriteString(", ")
+	builder.WriteString("vout=")
+	builder.WriteString(fmt.Sprintf("%v", tn.Vout))
 	builder.WriteString(", ")
 	builder.WriteString("raw_refund_tx=")
 	builder.WriteString(fmt.Sprintf("%v", tn.RawRefundTx))

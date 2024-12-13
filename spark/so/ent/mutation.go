@@ -2532,6 +2532,8 @@ type TreeNodeMutation struct {
 	owner_identity_pubkey   *[]byte
 	owner_signing_pubkey    *[]byte
 	raw_tx                  *[]byte
+	vout                    *uint16
+	addvout                 *int16
 	raw_refund_tx           *[]byte
 	clearedFields           map[string]struct{}
 	tree                    *uuid.UUID
@@ -2960,6 +2962,62 @@ func (m *TreeNodeMutation) ResetRawTx() {
 	m.raw_tx = nil
 }
 
+// SetVout sets the "vout" field.
+func (m *TreeNodeMutation) SetVout(u uint16) {
+	m.vout = &u
+	m.addvout = nil
+}
+
+// Vout returns the value of the "vout" field in the mutation.
+func (m *TreeNodeMutation) Vout() (r uint16, exists bool) {
+	v := m.vout
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldVout returns the old "vout" field's value of the TreeNode entity.
+// If the TreeNode object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TreeNodeMutation) OldVout(ctx context.Context) (v uint16, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldVout is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldVout requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldVout: %w", err)
+	}
+	return oldValue.Vout, nil
+}
+
+// AddVout adds u to the "vout" field.
+func (m *TreeNodeMutation) AddVout(u int16) {
+	if m.addvout != nil {
+		*m.addvout += u
+	} else {
+		m.addvout = &u
+	}
+}
+
+// AddedVout returns the value that was added to the "vout" field in this mutation.
+func (m *TreeNodeMutation) AddedVout() (r int16, exists bool) {
+	v := m.addvout
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetVout resets all changes to the "vout" field.
+func (m *TreeNodeMutation) ResetVout() {
+	m.vout = nil
+	m.addvout = nil
+}
+
 // SetRawRefundTx sets the "raw_refund_tx" field.
 func (m *TreeNodeMutation) SetRawRefundTx(b []byte) {
 	m.raw_refund_tx = &b
@@ -3201,7 +3259,7 @@ func (m *TreeNodeMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *TreeNodeMutation) Fields() []string {
-	fields := make([]string, 0, 9)
+	fields := make([]string, 0, 10)
 	if m.create_time != nil {
 		fields = append(fields, treenode.FieldCreateTime)
 	}
@@ -3225,6 +3283,9 @@ func (m *TreeNodeMutation) Fields() []string {
 	}
 	if m.raw_tx != nil {
 		fields = append(fields, treenode.FieldRawTx)
+	}
+	if m.vout != nil {
+		fields = append(fields, treenode.FieldVout)
 	}
 	if m.raw_refund_tx != nil {
 		fields = append(fields, treenode.FieldRawRefundTx)
@@ -3253,6 +3314,8 @@ func (m *TreeNodeMutation) Field(name string) (ent.Value, bool) {
 		return m.OwnerSigningPubkey()
 	case treenode.FieldRawTx:
 		return m.RawTx()
+	case treenode.FieldVout:
+		return m.Vout()
 	case treenode.FieldRawRefundTx:
 		return m.RawRefundTx()
 	}
@@ -3280,6 +3343,8 @@ func (m *TreeNodeMutation) OldField(ctx context.Context, name string) (ent.Value
 		return m.OldOwnerSigningPubkey(ctx)
 	case treenode.FieldRawTx:
 		return m.OldRawTx(ctx)
+	case treenode.FieldVout:
+		return m.OldVout(ctx)
 	case treenode.FieldRawRefundTx:
 		return m.OldRawRefundTx(ctx)
 	}
@@ -3347,6 +3412,13 @@ func (m *TreeNodeMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetRawTx(v)
 		return nil
+	case treenode.FieldVout:
+		v, ok := value.(uint16)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetVout(v)
+		return nil
 	case treenode.FieldRawRefundTx:
 		v, ok := value.([]byte)
 		if !ok {
@@ -3365,6 +3437,9 @@ func (m *TreeNodeMutation) AddedFields() []string {
 	if m.addvalue != nil {
 		fields = append(fields, treenode.FieldValue)
 	}
+	if m.addvout != nil {
+		fields = append(fields, treenode.FieldVout)
+	}
 	return fields
 }
 
@@ -3375,6 +3450,8 @@ func (m *TreeNodeMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
 	case treenode.FieldValue:
 		return m.AddedValue()
+	case treenode.FieldVout:
+		return m.AddedVout()
 	}
 	return nil, false
 }
@@ -3390,6 +3467,13 @@ func (m *TreeNodeMutation) AddField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.AddValue(v)
+		return nil
+	case treenode.FieldVout:
+		v, ok := value.(int16)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddVout(v)
 		return nil
 	}
 	return fmt.Errorf("unknown TreeNode numeric field %s", name)
@@ -3441,6 +3525,9 @@ func (m *TreeNodeMutation) ResetField(name string) error {
 		return nil
 	case treenode.FieldRawTx:
 		m.ResetRawTx()
+		return nil
+	case treenode.FieldVout:
+		m.ResetVout()
 		return nil
 	case treenode.FieldRawRefundTx:
 		m.ResetRawRefundTx()

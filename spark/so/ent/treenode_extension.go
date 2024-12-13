@@ -17,6 +17,7 @@ func (tn *TreeNode) MarshalSparkProto(ctx context.Context) *pbspark.TreeNode {
 		ParentNodeId:   tn.getParentNodeID(ctx),
 		RawRootTxHex:   hex.EncodeToString(tn.RawTx),
 		RawRefundTxHex: hex.EncodeToString(tn.RawRefundTx),
+		Vout:           uint32(tn.Vout),
 	}
 }
 
@@ -33,6 +34,7 @@ func (tn *TreeNode) MarshalInternalProto(ctx context.Context) *pbinternal.TreeNo
 		TreeId:              tn.QueryTree().FirstIDX(ctx).String(),
 		ParentNodeId:        tn.getParentNodeID(ctx),
 		SigningKeyshareId:   tn.QuerySigningKeyshare().FirstIDX(ctx).String(),
+		Vout:                uint32(tn.Vout),
 	}
 }
 

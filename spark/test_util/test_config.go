@@ -7,7 +7,9 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/lightsparkdev/spark-go/common"
 	"github.com/lightsparkdev/spark-go/so"
+	"github.com/lightsparkdev/spark-go/wallet"
 )
 
 func findLatestRun(dirPath string) (int, error) {
@@ -111,4 +113,13 @@ func TestConfig() (*so.Config, error) {
 		DatabasePath:  fmt.Sprintf("../../../_data/run_%d/db/operator_0.sqlite", latestRun),
 	}
 	return &config, nil
+}
+
+// TestWalletConfig returns a wallet configuration that can be used for testing.
+func TestWalletConfig() *wallet.Config {
+	return &wallet.Config{
+		Network:             common.Mainnet,
+		SparkServiceAddress: "localhost:8535",
+		FrostSignerAddress:  "unix:///tmp/frost_0.sock",
+	}
 }

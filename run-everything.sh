@@ -320,6 +320,65 @@ check_signers_ready() {
    done
 }
 
+reset_databases() {
+    local force_reset=$1
+    local max_count=4  # Optional parameter for number of DBs, defaults to 5
+
+    if [ "$force_reset" = true ]; then
+        echo "Force reset: dropping and recreating all databases (0 to $max_count)..."
+        
+        # Terminate all relevant connections first
+        for i in $(seq 0 $max_count); do
+            db="operator_$i"
+            psql postgres -c "
+            SELECT pg_terminate_backend(pid) 
+            FROM pg_stat_activity 
+            WHERE datname = '$db' 
+            AND pid <> pg_backend_pid();" > /dev/null 2>&1
+        done
+
+        # Drop and recreate
+        for i in $(seq 0 $max_count); do
+            db="operator_$i"
+            echo "Resetting $db..."
+            dropdb --if-exists "$db" > /dev/null 2>&1
+            createdb "$db" > /dev/null 2>&1
+        done
+    else
+        echo "Soft reset: creating databases only if they don't exist (0 to $max_count)..."
+        
+        for i in $(seq 0 $max_count); do
+            db="operator_$i"
+            if ! psql -lqt | cut -d \| -f 1 | grep -qw "$db"; then
+                echo "Creating $db as it doesn't exist..."
+                createdb "$db" > /dev/null 2>&1
+            else
+                echo "Database $db already exists, skipping..."
+            fi
+        done
+    fi
+
+    echo "Database operation complete!"
+}
+
+# Initialize wipe flag
+WIPE=false
+
+# Parse command line arguments
+for arg in "$@"; do
+    case $arg in
+        --wipe)
+            WIPE=true
+            shift # Remove --wipe from processing
+            ;;
+    esac
+done
+
+# Call reset_databases based on wipe flag
+reset_databases $WIPE
+
+
+
 create_data_dir
 run_dir=$(create_run_dir)
 echo "Working with directory: $run_dir"

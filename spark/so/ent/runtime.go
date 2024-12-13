@@ -142,7 +142,7 @@ func init() {
 	// treenode.RawTxValidator is a validator for the "raw_tx" field. It is called by the builders before save.
 	treenode.RawTxValidator = treenodeDescRawTx.Validators[0].(func([]byte) error)
 	// treenodeDescRawRefundTx is the schema descriptor for raw_refund_tx field.
-	treenodeDescRawRefundTx := treenodeFields[6].Descriptor()
+	treenodeDescRawRefundTx := treenodeFields[7].Descriptor()
 	// treenode.RawRefundTxValidator is a validator for the "raw_refund_tx" field. It is called by the builders before save.
 	treenode.RawRefundTxValidator = treenodeDescRawRefundTx.Validators[0].(func([]byte) error)
 	// treenodeDescID is the schema descriptor for id field.

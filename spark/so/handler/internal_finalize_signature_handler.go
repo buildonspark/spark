@@ -69,6 +69,7 @@ func (h *InternalFinalizeSignatureHandler) updateNode(ctx context.Context, node 
 			SetValue(node.Value).
 			SetVerifyingPubkey(node.VerifyingPubkey).
 			SetSigningKeyshareID(signingKeyshareID).
+			SetVout(uint16(node.Vout)).
 			SetRawTx(node.RawTx).
 			SetRawRefundTx(node.RawRefundTx).
 			SaveX(ctx)
