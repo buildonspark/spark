@@ -27,7 +27,7 @@ func TestGenerateDepositAddress(t *testing.T) {
 		t.Fatalf("failed to generate deposit address: %v", err)
 	}
 
-	if resp.Address == "" {
+	if resp.DepositAddress.Address == "" {
 		t.Fatalf("deposit address is empty")
 	}
 }
@@ -56,7 +56,7 @@ func TestStartTreeCreation(t *testing.T) {
 		t.Fatalf("failed to generate deposit address: %v", err)
 	}
 
-	depositTx, err := testutil.CreateTestP2TRTransaction(depositResp.Address, 100_000)
+	depositTx, err := testutil.CreateTestP2TRTransaction(depositResp.DepositAddress.Address, 100_000)
 	if err != nil {
 		t.Fatalf("failed to create deposit tx: %v", err)
 	}
@@ -82,7 +82,7 @@ func TestStartTreeCreation(t *testing.T) {
 		Tx:   depositTxHex,
 	})
 
-	resp, err := wallet.CreateTree(context.Background(), config, userPubKeyBytes, privKey.Serialize(), depositResp.VerifyingKey, depositTx, vout)
+	resp, err := wallet.CreateTree(context.Background(), config, userPubKeyBytes, privKey.Serialize(), depositResp.DepositAddress.VerifyingKey, depositTx, vout)
 	if err != nil {
 		t.Fatalf("failed to create tree: %v", err)
 	}

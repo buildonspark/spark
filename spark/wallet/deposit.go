@@ -14,6 +14,7 @@ import (
 	pbcommon "github.com/lightsparkdev/spark-go/proto/common"
 	pbfrost "github.com/lightsparkdev/spark-go/proto/frost"
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
+	"github.com/lightsparkdev/spark-go/so/objects"
 )
 
 // GenerateDepositAddress generates a deposit address for a given identity and signing public key.
@@ -60,11 +61,17 @@ func CreateTree(
 	rootTx.AddTxOut(wire.NewTxOut(100_000, depositTx.TxOut[0].PkScript))
 	var rootBuf bytes.Buffer
 	rootTx.Serialize(&rootBuf)
-	rootNonceHidingPriv, _ := secp256k1.GeneratePrivateKey()
-	rootNonceBidingPriv, _ := secp256k1.GeneratePrivateKey()
-	rootNonceCommitment := pbcommon.SigningCommitment{
-		Hiding:  rootNonceHidingPriv.PubKey().SerializeCompressed(),
-		Binding: rootNonceBidingPriv.PubKey().SerializeCompressed(),
+	rootNonce, err := objects.RandomSigningNonce()
+	if err != nil {
+		return nil, err
+	}
+	rootNonceProto, err := rootNonce.MarshalProto()
+	if err != nil {
+		return nil, err
+	}
+	rootNonceCommitmentProto, err := rootNonce.SigningCommitment().MarshalProto()
+	if err != nil {
+		return nil, err
 	}
 	rootTxSighash, err := common.SigHashFromTx(rootTx, 0, depositTx.TxOut[0])
 	if err != nil {
@@ -81,16 +88,19 @@ func CreateTree(
 	refundP2trAddress, _ := common.P2TRAddressFromPublicKey(signingPubkeyBytes, config.Network)
 	refundAddress, _ := btcutil.DecodeAddress(*refundP2trAddress, common.NetworkParams(config.Network))
 	refundPkScript, _ := txscript.PayToAddrScript(refundAddress)
-	refundTx.AddTxOut(wire.NewTxOut(100_000, refundPkScript))
+	refundTx.AddTxOut(wire.NewTxOut(rootTx.TxOut[0].Value, refundPkScript))
 	refundTx.LockTime = 60000
 	var refundBuf bytes.Buffer
 	refundTx.Serialize(&refundBuf)
-	refundNonceHidingPriv, _ := secp256k1.GeneratePrivateKey()
-	refundNonceBidingPriv, _ := secp256k1.GeneratePrivateKey()
-	refundNonceCommitment := pbcommon.SigningCommitment{
-		Hiding:  refundNonceHidingPriv.PubKey().SerializeCompressed(),
-		Binding: refundNonceBidingPriv.PubKey().SerializeCompressed(),
+	refundNonce, err := objects.RandomSigningNonce()
+	if err != nil {
+		return nil, err
 	}
+	refundNonceProto, err := refundNonce.MarshalProto()
+	if err != nil {
+		return nil, err
+	}
+	refundNonceCommitmentProto, err := refundNonce.SigningCommitment().MarshalProto()
 	refundTxSighash, err := common.SigHashFromTx(refundTx, 0, rootTx.TxOut[0])
 	if err != nil {
 		return nil, err
@@ -112,12 +122,12 @@ func CreateTree(
 		RootTxSigningJob: &pb.SigningJob{
 			RawTx:                  rootBuf.Bytes(),
 			SigningPublicKey:       signingPubkeyBytes,
-			SigningNonceCommitment: &rootNonceCommitment,
+			SigningNonceCommitment: rootNonceCommitmentProto,
 		},
 		RefundTxSigningJob: &pb.SigningJob{
 			RawTx:                  refundBuf.Bytes(),
 			SigningPublicKey:       signingPubkeyBytes,
-			SigningNonceCommitment: &refundNonceCommitment,
+			SigningNonceCommitment: refundNonceCommitmentProto,
 		},
 	})
 	if err != nil {
@@ -143,28 +153,22 @@ func CreateTree(
 	nodeJobID := uuid.NewString()
 	refundJobID := uuid.NewString()
 	userSigningJobs = append(userSigningJobs, &pbfrost.FrostSigningJob{
-		JobId:        nodeJobID,
-		Message:      rootTxSighash,
-		KeyPackage:   &userKeyPackage,
-		VerifyingKey: verifyingKey,
-		Nonce: &pbfrost.SigningNonce{
-			Hiding:  rootNonceHidingPriv.Serialize(),
-			Binding: rootNonceBidingPriv.Serialize(),
-		},
+		JobId:           nodeJobID,
+		Message:         rootTxSighash,
+		KeyPackage:      &userKeyPackage,
+		VerifyingKey:    verifyingKey,
+		Nonce:           rootNonceProto,
 		Commitments:     treeResponse.RootNodeSignatureShares.NodeTxSigningResult.SigningNonceCommitments,
-		UserCommitments: &rootNonceCommitment,
+		UserCommitments: rootNonceCommitmentProto,
 	})
 	userSigningJobs = append(userSigningJobs, &pbfrost.FrostSigningJob{
-		JobId:        refundJobID,
-		Message:      refundTxSighash,
-		KeyPackage:   &userKeyPackage,
-		VerifyingKey: treeResponse.RootNodeSignatureShares.VerifyingKey,
-		Nonce: &pbfrost.SigningNonce{
-			Hiding:  refundNonceHidingPriv.Serialize(),
-			Binding: refundNonceBidingPriv.Serialize(),
-		},
+		JobId:           refundJobID,
+		Message:         refundTxSighash,
+		KeyPackage:      &userKeyPackage,
+		VerifyingKey:    treeResponse.RootNodeSignatureShares.VerifyingKey,
+		Nonce:           refundNonceProto,
 		Commitments:     treeResponse.RootNodeSignatureShares.RefundTxSigningResult.SigningNonceCommitments,
-		UserCommitments: &refundNonceCommitment,
+		UserCommitments: refundNonceCommitmentProto,
 	})
 
 	frostConn, err := common.NewGRPCConnection(config.FrostSignerAddress)
@@ -189,7 +193,7 @@ func CreateTree(
 		PublicShares:       treeResponse.RootNodeSignatureShares.NodeTxSigningResult.PublicKeys,
 		VerifyingKey:       verifyingKey,
 		Commitments:        treeResponse.RootNodeSignatureShares.NodeTxSigningResult.SigningNonceCommitments,
-		UserCommitments:    &rootNonceCommitment,
+		UserCommitments:    rootNonceCommitmentProto,
 		UserPublicKey:      signingPubkeyBytes,
 		UserSignatureShare: userSignatures.Results[nodeJobID].SignatureShare,
 	})
@@ -203,7 +207,7 @@ func CreateTree(
 		PublicShares:       treeResponse.RootNodeSignatureShares.RefundTxSigningResult.PublicKeys,
 		VerifyingKey:       verifyingKey,
 		Commitments:        treeResponse.RootNodeSignatureShares.RefundTxSigningResult.SigningNonceCommitments,
-		UserCommitments:    &refundNonceCommitment,
+		UserCommitments:    refundNonceCommitmentProto,
 		UserPublicKey:      signingPubkeyBytes,
 		UserSignatureShare: userSignatures.Results[refundJobID].SignatureShare,
 	})

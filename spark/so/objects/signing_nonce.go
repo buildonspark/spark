@@ -3,6 +3,7 @@ package objects
 import (
 	"fmt"
 
+	"github.com/decred/dcrd/dcrec/secp256k1"
 	pbcommon "github.com/lightsparkdev/spark-go/proto/common"
 	pbfrost "github.com/lightsparkdev/spark-go/proto/frost"
 )
@@ -15,12 +16,32 @@ type SigningNonce struct {
 	Hiding []byte
 }
 
+// RandomSigningNonce generates a random signing nonce.
+func RandomSigningNonce() (*SigningNonce, error) {
+	binding, err := secp256k1.GeneratePrivateKey()
+	if err != nil {
+		return nil, err
+	}
+	hiding, err := secp256k1.GeneratePrivateKey()
+	if err != nil {
+		return nil, err
+	}
+	return NewSigningNonce(binding.Serialize(), hiding.Serialize())
+}
+
 // NewSigningNonce creates a new SigningNonce from the given binding and hiding values.
 func NewSigningNonce(binding, hiding []byte) (*SigningNonce, error) {
 	if len(binding) != 32 || len(hiding) != 32 {
 		return nil, fmt.Errorf("invalid nonce length")
 	}
 	return &SigningNonce{Binding: binding, Hiding: hiding}, nil
+}
+
+// SigningCommitment returns the signing commitment for the nonce.
+func (n *SigningNonce) SigningCommitment() *SigningCommitment {
+	_, bindingPubKey := secp256k1.PrivKeyFromBytes(n.Binding)
+	_, hidingPubKey := secp256k1.PrivKeyFromBytes(n.Hiding)
+	return &SigningCommitment{Binding: bindingPubKey.SerializeCompressed(), Hiding: hidingPubKey.SerializeCompressed()}
 }
 
 // MarshalBinary serializes the SigningNonce into a byte slice.

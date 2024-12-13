@@ -2,7 +2,6 @@ package ent
 
 import (
 	"context"
-	"encoding/hex"
 
 	pbspark "github.com/lightsparkdev/spark-go/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark-go/proto/spark_internal"
@@ -11,13 +10,13 @@ import (
 // MarshalSparkProto converts a TreeNode to a spark protobuf TreeNode.
 func (tn *TreeNode) MarshalSparkProto(ctx context.Context) *pbspark.TreeNode {
 	return &pbspark.TreeNode{
-		Id:             tn.ID.String(),
-		TreeId:         tn.QueryTree().FirstIDX(ctx).String(),
-		Value:          tn.Value,
-		ParentNodeId:   tn.getParentNodeID(ctx),
-		RawRootTxHex:   hex.EncodeToString(tn.RawTx),
-		RawRefundTxHex: hex.EncodeToString(tn.RawRefundTx),
-		Vout:           uint32(tn.Vout),
+		Id:           tn.ID.String(),
+		TreeId:       tn.QueryTree().FirstIDX(ctx).String(),
+		Value:        tn.Value,
+		ParentNodeId: tn.getParentNodeID(ctx),
+		NodeTx:       tn.RawTx,
+		RefundTx:     tn.RawRefundTx,
+		Vout:         uint32(tn.Vout),
 	}
 }
 

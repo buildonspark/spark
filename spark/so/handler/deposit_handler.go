@@ -119,7 +119,7 @@ func (o *DepositHandler) GenerateDepositAddress(ctx context.Context, config *so.
 	if err != nil {
 		return nil, err
 	}
-	return &pb.GenerateDepositAddressResponse{Address: *depositAddress, VerifyingKey: verifyingKeyBytes}, nil
+	return &pb.GenerateDepositAddressResponse{DepositAddress: &pb.Address{Address: *depositAddress, VerifyingKey: verifyingKeyBytes}}, nil
 }
 
 // StartTreeCreation verifies the on chain utxo, and then verifies and signs the offchain root and refund transactions.

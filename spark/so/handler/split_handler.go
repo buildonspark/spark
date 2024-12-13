@@ -10,6 +10,7 @@ import (
 	pbinternal "github.com/lightsparkdev/spark-go/proto/spark_internal"
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/ent"
+	"github.com/lightsparkdev/spark-go/so/ent/depositaddress"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
 	"github.com/lightsparkdev/spark-go/so/entutils"
 	"github.com/lightsparkdev/spark-go/so/helper"
@@ -18,24 +19,37 @@ import (
 // SplitHandler is a helper struct to handle the split node request.
 type SplitHandler struct{}
 
+func (h *SplitHandler) verifyPrepareSplitAddressRequest(req *pb.PrepareSplitAddressRequest) error {
+	// TODO(zhenlu): Implement validation for sum of the split values and proof of posession on pubkeys.
+	return nil
+}
+
 func (h *SplitHandler) verifySplitRequest(req *pb.SplitNodeRequest) error {
 	// TODO(zhenlu): Implement validation when tree leaf is created.
 	return nil
 }
 
-func (h *SplitHandler) prepareKeys(ctx context.Context, config *so.Config, req *pb.SplitNodeRequest) (*ent.SigningKeyshare, []*ent.SigningKeyshare, error) {
+func (h *SplitHandler) prepareSplitAddress(
+	ctx context.Context,
+	config *so.Config,
+	req *pb.PrepareSplitAddressRequest,
+) (*pb.PrepareSplitAddressResponse, error) {
 	nodeID, err := uuid.Parse(req.NodeId)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
+	}
+	node, err := common.GetDbFromContext(ctx).TreeNode.Get(ctx, nodeID)
+	if err != nil {
+		return nil, err
 	}
 	err = entutils.MarkNodeAsLocked(ctx, nodeID, schema.TreeNodeStatusSplitLocked)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	keyshares, err := entutils.GetUnusedSigningKeyshares(ctx, config, len(req.Splits)-1)
+	keyshares, err := entutils.GetUnusedSigningKeyshares(ctx, config, len(req.SigningPublicKeys)-1)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	keyshareIDs := make([]uuid.UUID, len(keyshares))
@@ -47,7 +61,7 @@ func (h *SplitHandler) prepareKeys(ctx context.Context, config *so.Config, req *
 
 	targetKeyshare, err := entutils.GetNodeKeyshare(ctx, config, nodeID)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	lastKeyshareID := uuid.New()
@@ -69,21 +83,57 @@ func (h *SplitHandler) prepareKeys(ctx context.Context, config *so.Config, req *
 		})
 	})
 	if err != nil {
-		return nil, nil, err
-	}
-
-	err = entutils.MarkSigningKeysharesAsUsed(ctx, config, keyshareIDs)
-	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	lastKeyshare, err := entutils.CalculateAndStoreLastKey(ctx, config, targetKeyshare, keyshares, lastKeyshareID)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	keyshares = append(keyshares, lastKeyshare)
-	return targetKeyshare, keyshares, nil
+
+	depositAddresses := make([]*pb.Address, 0)
+	for i, keyshare := range keyshares {
+		userPublicKey := req.SigningPublicKeys[i]
+		combinedPublicKey, err := common.AddPublicKeys(keyshare.PublicKey, userPublicKey)
+		if err != nil {
+			return nil, err
+		}
+		depositAddress, err := common.P2TRAddressFromPublicKey(combinedPublicKey, config.Network)
+		if err != nil {
+			return nil, err
+		}
+		depositAddresses = append(depositAddresses, &pb.Address{
+			Address:      *depositAddress,
+			VerifyingKey: combinedPublicKey,
+		})
+
+		common.GetDbFromContext(ctx).DepositAddress.Create().
+			SetAddress(*depositAddress).
+			SetOwnerIdentityPubkey(node.OwnerIdentityPubkey).
+			SetOwnerSigningPubkey(userPublicKey).
+			SetSigningKeyshareID(keyshare.ID).
+			SaveX(ctx)
+	}
+
+	err = entutils.MarkSigningKeysharesAsUsed(ctx, config, keyshareIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	return &pb.PrepareSplitAddressResponse{
+		Addresses: depositAddresses,
+	}, nil
+}
+
+// PrepareSplitAddress is the entrypoint for the prepare split address request.
+func (h *SplitHandler) PrepareSplitAddress(ctx context.Context, config *so.Config, req *pb.PrepareSplitAddressRequest) (*pb.PrepareSplitAddressResponse, error) {
+	if err := h.verifyPrepareSplitAddressRequest(req); err != nil {
+		return nil, err
+	}
+
+	return h.prepareSplitAddress(ctx, config, req)
 }
 
 func (h *SplitHandler) prepareSplitResults(ctx context.Context, config *so.Config, req *pb.SplitNodeRequest, keyshares []*ent.SigningKeyshare) ([]*pb.SplitResult, error) {
@@ -178,6 +228,43 @@ func (h *SplitHandler) finalizeSplitResults(ctx context.Context, config *so.Conf
 	}
 
 	return splitResults, nil
+}
+
+func (h *SplitHandler) prepareKeys(ctx context.Context, config *so.Config, req *pb.SplitNodeRequest) (*ent.SigningKeyshare, []*ent.SigningKeyshare, error) {
+	nodeID, err := uuid.Parse(req.NodeId)
+	if err != nil {
+		return nil, nil, err
+	}
+	node, err := common.GetDbFromContext(ctx).TreeNode.Get(ctx, nodeID)
+	if err != nil {
+		return nil, nil, err
+	}
+	parentKeyshare, err := entutils.GetNodeKeyshare(ctx, config, nodeID)
+	if err != nil {
+		return nil, nil, err
+	}
+	parentTx, err := common.TxFromRawTxBytes(node.RawTx)
+	if err != nil {
+		return nil, nil, err
+	}
+	childrenKeyshares := make([]*ent.SigningKeyshare, 0)
+	for _, split := range req.Splits {
+		output := parentTx.TxOut[split.Vout]
+		utxoAddress, err := common.P2TRAddressFromPublicKey(output.PkScript, config.Network)
+		if err != nil {
+			return nil, nil, err
+		}
+		depositAddress, err := common.GetDbFromContext(ctx).DepositAddress.Query().Where(depositaddress.Address(*utxoAddress)).First(ctx)
+		if err != nil {
+			return nil, nil, err
+		}
+		keyshare, err := depositAddress.QuerySigningKeyshare().First(ctx)
+		if err != nil {
+			return nil, nil, err
+		}
+		childrenKeyshares = append(childrenKeyshares, keyshare)
+	}
+	return parentKeyshare, childrenKeyshares, nil
 }
 
 // SplitNode handles the split node request.

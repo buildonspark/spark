@@ -8,6 +8,7 @@ import "common.proto";
 service SparkService {
     rpc generate_deposit_address(GenerateDepositAddressRequest) returns (GenerateDepositAddressResponse) {}
     rpc start_tree_creation(StartTreeCreationRequest) returns (StartTreeCreationResponse) {}
+    rpc prepare_split_address(PrepareSplitAddressRequest) returns (PrepareSplitAddressResponse) {}
     rpc split_node(SplitNodeRequest) returns (SplitNodeResponse) {}
     rpc finalize_node_signatures(FinalizeNodeSignaturesRequest) returns (FinalizeNodeSignaturesResponse) {}
 }
@@ -17,9 +18,13 @@ message GenerateDepositAddressRequest {
     bytes identity_public_key = 2;
 }
 
-message GenerateDepositAddressResponse {
+message Address {
     string address = 1;
     bytes verifying_key = 2;
+}
+
+message GenerateDepositAddressResponse {
+    Address deposit_address = 1;
 }
 
 message UTXO {
@@ -71,8 +76,8 @@ message TreeNode {
     string tree_id = 2;
     uint64 value = 3;
     optional string parent_node_id = 4;
-    string raw_root_tx_hex = 5;
-    string raw_refund_tx_hex = 6;
+    bytes node_tx = 5;
+    bytes refund_tx = 6;
     uint32 vout = 7;
 }
 
@@ -109,4 +114,13 @@ message FinalizeNodeSignaturesRequest {
 
 message FinalizeNodeSignaturesResponse {
     repeated TreeNode nodes = 1;
+}
+
+message PrepareSplitAddressRequest {
+    string node_id = 1;
+    repeated bytes signing_public_keys = 2;
+}
+
+message PrepareSplitAddressResponse {
+    repeated Address addresses = 1;
 }
