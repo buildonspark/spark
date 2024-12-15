@@ -1,16 +1,16 @@
 package entutils
 
 import (
+	"bytes"
 	"context"
 	"fmt"
-	"math/big"
+	"log"
 
 	"github.com/decred/dcrd/dcrec/secp256k1"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/common"
 	pbfrost "github.com/lightsparkdev/spark-go/proto/frost"
 	"github.com/lightsparkdev/spark-go/so"
-	"github.com/lightsparkdev/spark-go/so/dkg"
 	"github.com/lightsparkdev/spark-go/so/ent"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
 	"github.com/lightsparkdev/spark-go/so/ent/signingkeyshare"
@@ -30,6 +30,10 @@ func GetUnusedSigningKeyshares(ctx context.Context, config *so.Config, keyshareC
 		return nil, fmt.Errorf("not enough keyshares available")
 	}
 
+	for _, keyshare := range signingKeyshares {
+		log.Printf("Keyshare: %v, status: %v", keyshare.ID, keyshare.Status)
+	}
+
 	return signingKeyshares, nil
 }
 
@@ -37,23 +41,9 @@ func GetUnusedSigningKeyshares(ctx context.Context, config *so.Config, keyshareC
 // found or not available, it returns an error.
 func MarkSigningKeysharesAsUsed(ctx context.Context, config *so.Config, ids []uuid.UUID) error {
 	db := common.GetDbFromContext(ctx)
+	log.Printf("Marking keyshares as used: %v", ids)
 
-	signingKeyshares, err := db.SigningKeyshare.
-		Query().
-		Where(
-			signingkeyshare.IDIn(ids...),
-			signingkeyshare.StatusEQ(schema.KeyshareStatusAvailable),
-		).
-		All(ctx)
-	if err != nil {
-		return err
-	}
-
-	if len(signingKeyshares) != len(ids) {
-		return fmt.Errorf("some keyshares are not available in ", ids)
-	}
-
-	_, err = db.SigningKeyshare.
+	count, err := db.SigningKeyshare.
 		Update().
 		Where(signingkeyshare.IDIn(ids...)).
 		SetStatus(schema.KeyshareStatusInUse).
@@ -62,8 +52,9 @@ func MarkSigningKeysharesAsUsed(ctx context.Context, config *so.Config, ids []uu
 		return err
 	}
 
-	// Check if we need to generate more keyshares after marking some as used
-	go dkg.RunDKGIfNeeded(db, config)
+	if count != len(ids) {
+		return fmt.Errorf("some keyshares are not available in %v", ids)
+	}
 
 	return nil
 }
@@ -132,36 +123,73 @@ func GetKeyPackagesArray(ctx context.Context, keyshareIDs []uuid.UUID) ([]*ent.S
 	return result, nil
 }
 
+func sumOfSigningKeyshares(keyshares []*ent.SigningKeyshare) (*ent.SigningKeyshare, error) {
+	resultKeyshares := *keyshares[0]
+	for i, keyshare := range keyshares {
+		if i == 0 {
+			continue
+		}
+		sum, err := common.AddPrivateKeys(resultKeyshares.SecretShare, keyshare.SecretShare)
+		if err != nil {
+			return nil, err
+		}
+		resultKeyshares.SecretShare = sum
+
+		verifySum, err := common.AddPublicKeys(resultKeyshares.PublicKey, keyshare.PublicKey)
+		if err != nil {
+			return nil, err
+		}
+		resultKeyshares.PublicKey = verifySum
+
+		for i, publicShare := range resultKeyshares.PublicShares {
+			newShare, err := common.AddPublicKeys(publicShare, keyshare.PublicShares[i])
+			if err != nil {
+				return nil, err
+			}
+			resultKeyshares.PublicShares[i] = newShare
+		}
+	}
+
+	return &resultKeyshares, nil
+}
+
 // CalculateAndStoreLastKey calculates the last key from the given keyshares and stores it in the database.
 // The target = sum(keyshares) + last_key
 func CalculateAndStoreLastKey(ctx context.Context, config *so.Config, target *ent.SigningKeyshare, keyshares []*ent.SigningKeyshare, id uuid.UUID) (*ent.SigningKeyshare, error) {
-	privateShares := make([][]byte, len(keyshares))
-	for i, keyshare := range keyshares {
-		privateShares[i] = keyshare.SecretShare
-	}
-
-	sum, err := common.SumOfPrivateKeys(privateShares)
+	log.Printf("Calculating last key for keyshares: %v", keyshares)
+	sumKeyshare, err := sumOfSigningKeyshares(keyshares)
 	if err != nil {
 		return nil, err
 	}
 
-	tweak := new(big.Int).Neg(sum)
-	tweakPriv, _ := secp256k1.PrivKeyFromBytes(tweak.Bytes())
-	tweakBytes := tweakPriv.Serialize()
+	lastSecretShare, err := common.SubtractPrivateKeys(target.SecretShare, sumKeyshare.SecretShare)
+	if err != nil {
+		return nil, err
+	}
+	verifyLastKey, err := common.AddPrivateKeys(sumKeyshare.SecretShare, lastSecretShare)
+	if err != nil {
+		return nil, err
+	}
+	if bytes.Compare(verifyLastKey, target.SecretShare) != 0 {
+		return nil, fmt.Errorf("last key verification failed")
+	}
 
-	lastSecretShare, err := common.AddPrivateKeys(target.SecretShare, tweakBytes)
+	verifyingKey, err := common.SubtractPublicKeys(target.PublicKey, sumKeyshare.PublicKey)
 	if err != nil {
 		return nil, err
 	}
 
-	verifyingKey, err := common.ApplyAdditiveTweakToPublicKey(target.PublicKey, tweakBytes)
+	verifyVerifyingKey, err := common.AddPublicKeys(keyshares[0].PublicKey, verifyingKey)
 	if err != nil {
 		return nil, err
+	}
+	if bytes.Compare(verifyVerifyingKey, target.PublicKey) != 0 {
+		return nil, fmt.Errorf("verifying key verification failed")
 	}
 
 	publicShares := make(map[string][]byte)
 	for i, publicShare := range target.PublicShares {
-		newShare, err := common.ApplyAdditiveTweakToPublicKey(publicShare, tweakBytes)
+		newShare, err := common.SubtractPublicKeys(publicShare, sumKeyshare.PublicShares[i])
 		if err != nil {
 			return nil, err
 		}

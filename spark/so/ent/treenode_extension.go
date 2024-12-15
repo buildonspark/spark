@@ -17,6 +17,7 @@ func (tn *TreeNode) MarshalSparkProto(ctx context.Context) *pbspark.TreeNode {
 		NodeTx:       tn.RawTx,
 		RefundTx:     tn.RawRefundTx,
 		Vout:         uint32(tn.Vout),
+		VerifyingKey: tn.VerifyingPubkey,
 	}
 }
 

@@ -2,7 +2,9 @@ package handler
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
+	"log"
 
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/common"
@@ -59,7 +61,7 @@ func (h *SplitHandler) prepareSplitAddress(
 		keyshareIDStrings[i] = keyshare.ID.String()
 	}
 
-	targetKeyshare, err := entutils.GetNodeKeyshare(ctx, config, nodeID)
+	targetKeyshare, err := node.QuerySigningKeyshare().First(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -77,6 +79,7 @@ func (h *SplitHandler) prepareSplitAddress(
 		client := pbinternal.NewSparkInternalServiceClient(conn)
 
 		return client.PrepareSplitKeyshares(ctx, &pbinternal.PrepareSplitKeysharesRequest{
+			NodeId:              nodeID.String(),
 			TargetKeyshareId:    targetKeyshare.ID.String(),
 			SelectedKeyshareIds: keyshareIDStrings,
 			LastKeyshareId:      lastKeyshareID.String(),
@@ -102,6 +105,7 @@ func (h *SplitHandler) prepareSplitAddress(
 		}
 		depositAddress, err := common.P2TRAddressFromPublicKey(combinedPublicKey, config.Network)
 		if err != nil {
+			log.Printf("failed to get p2tr address: %v", err)
 			return nil, err
 		}
 		depositAddresses = append(depositAddresses, &pb.Address{
@@ -158,43 +162,52 @@ func (h *SplitHandler) prepareSigningJobs(
 	req *pb.SplitNodeRequest,
 	parentKeyshare *ent.SigningKeyshare,
 	childrenKeyshares []*ent.SigningKeyshare,
-) ([]*helper.SigningJob, error) {
+) ([]*helper.SigningJob, []*ent.TreeNode, error) {
 	signingJobs := make([]*helper.SigningJob, 0)
 	nodeID, err := uuid.Parse(req.NodeId)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	db := common.GetDbFromContext(ctx)
 	node, err := db.TreeNode.Get(ctx, nodeID)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	parentTx, err := common.TxFromRawTxBytes(node.RawTx)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	parentTxSigningJob, splitTx, err := helper.NewSigningJob(parentKeyshare, req.ParentTxSigningJob, parentTx.TxOut[node.Vout])
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	signingJobs = append(signingJobs, parentTxSigningJob)
 
+	nodes := make([]*ent.TreeNode, 0)
 	for i, split := range req.Splits {
 		refundSigningJob, _, err := helper.NewSigningJob(childrenKeyshares[i], split.RefundSigningJob, splitTx.TxOut[split.Vout])
+		log.Printf("refund signing job %d message: %v", i, hex.EncodeToString(refundSigningJob.Message))
+		log.Printf("refund signing job %d user commitments: %v", i, hex.EncodeToString(refundSigningJob.UserCommitment.MarshalBinary()))
+		log.Printf("refund signing job %d verifying key: %v", i, hex.EncodeToString(refundSigningJob.VerifyingKey))
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		signingJobs = append(signingJobs, refundSigningJob)
 
 		verifyingKey, err := common.AddPublicKeys(split.SigningPublicKey, childrenKeyshares[i].PublicKey)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
-		db.TreeNode.
+		tree, err := node.QueryTree().First(ctx)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		node, err := db.TreeNode.
 			Create().
-			SetTree(node.Edges.Tree).
+			SetTree(tree).
 			SetStatus(schema.TreeNodeStatusCreating).
 			SetOwnerIdentityPubkey(split.SigningPublicKey).
 			SetOwnerSigningPubkey(split.SigningPublicKey).
@@ -204,13 +217,17 @@ func (h *SplitHandler) prepareSigningJobs(
 			SetRawTx(req.ParentTxSigningJob.RawTx).
 			SetVout(uint16(split.Vout)).
 			SetRawRefundTx(split.RefundSigningJob.RawTx).
-			SaveX(ctx)
+			Save(ctx)
+		if err != nil {
+			return nil, nil, err
+		}
+		nodes = append(nodes, node)
 	}
-	return signingJobs, nil
+	return signingJobs, nodes, nil
 }
 
-func (h *SplitHandler) finalizeSplitResults(ctx context.Context, config *so.Config, req *pb.SplitNodeRequest, signingResults []*helper.SigningResult, splitResults []*pb.SplitResult) ([]*pb.SplitResult, error) {
-	if len(signingResults) != 2*len(splitResults) {
+func (h *SplitHandler) finalizeSplitResults(ctx context.Context, config *so.Config, req *pb.SplitNodeRequest, signingResults []*helper.SigningResult, nodes []*ent.TreeNode, splitResults []*pb.SplitResult) ([]*pb.SplitResult, error) {
+	if len(signingResults) != len(splitResults)+1 {
 		return nil, fmt.Errorf("number of signing results does not match number of split results")
 	}
 
@@ -220,6 +237,7 @@ func (h *SplitHandler) finalizeSplitResults(ctx context.Context, config *so.Conf
 		if err != nil {
 			return nil, err
 		}
+		splitResult.NodeId = nodes[i].ID.String()
 		splitResult.RefundTxSigningResult = &pb.SigningResult{
 			PublicKeys:              signingResults[refundTxIndex].PublicKeys,
 			SigningNonceCommitments: refundTxSigningCommitments,
@@ -239,22 +257,13 @@ func (h *SplitHandler) prepareKeys(ctx context.Context, config *so.Config, req *
 	if err != nil {
 		return nil, nil, err
 	}
-	parentKeyshare, err := entutils.GetNodeKeyshare(ctx, config, nodeID)
-	if err != nil {
-		return nil, nil, err
-	}
-	parentTx, err := common.TxFromRawTxBytes(node.RawTx)
+	parentKeyshare, err := node.QuerySigningKeyshare().First(ctx)
 	if err != nil {
 		return nil, nil, err
 	}
 	childrenKeyshares := make([]*ent.SigningKeyshare, 0)
 	for _, split := range req.Splits {
-		output := parentTx.TxOut[split.Vout]
-		utxoAddress, err := common.P2TRAddressFromPublicKey(output.PkScript, config.Network)
-		if err != nil {
-			return nil, nil, err
-		}
-		depositAddress, err := common.GetDbFromContext(ctx).DepositAddress.Query().Where(depositaddress.Address(*utxoAddress)).First(ctx)
+		depositAddress, err := common.GetDbFromContext(ctx).DepositAddress.Query().Where(depositaddress.OwnerSigningPubkey(split.SigningPublicKey)).First(ctx)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -283,7 +292,7 @@ func (h *SplitHandler) SplitNode(ctx context.Context, config *so.Config, req *pb
 		return nil, err
 	}
 
-	signingJobs, err := h.prepareSigningJobs(ctx, config, req, parentKeyshare, childrenKeyshares)
+	signingJobs, nodes, err := h.prepareSigningJobs(ctx, config, req, parentKeyshare, childrenKeyshares)
 	if err != nil {
 		return nil, err
 	}
@@ -293,13 +302,25 @@ func (h *SplitHandler) SplitNode(ctx context.Context, config *so.Config, req *pb
 		return nil, err
 	}
 
-	splitResults, err = h.finalizeSplitResults(ctx, config, req, signingResults, splitResults)
+	parentSigningCommitments, err := common.ConvertObjectMapToProtoMap(signingResults[0].SigningCommitments)
+	if err != nil {
+		return nil, err
+	}
+
+	parentSigningResult := &pb.SigningResult{
+		PublicKeys:              signingResults[0].PublicKeys,
+		SigningNonceCommitments: parentSigningCommitments,
+		SignatureShares:         signingResults[0].SignatureShares,
+	}
+
+	splitResults, err = h.finalizeSplitResults(ctx, config, req, signingResults, nodes, splitResults)
 	if err != nil {
 		return nil, err
 	}
 
 	return &pb.SplitNodeResponse{
-		ParentNodeId: req.NodeId,
-		SplitResults: splitResults,
+		ParentNodeId:          req.NodeId,
+		ParentTxSigningResult: parentSigningResult,
+		SplitResults:          splitResults,
 	}, nil
 }

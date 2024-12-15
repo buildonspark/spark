@@ -76,6 +76,8 @@ func loadArgs() (*args, error) {
 }
 
 func main() {
+	log.SetFlags(log.Lshortfile | log.Llongfile | log.Ldate | log.Ltime)
+
 	args, err := loadArgs()
 	if err != nil {
 		log.Fatalf("Failed to load args: %v", err)
