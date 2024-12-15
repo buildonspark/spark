@@ -1,4 +1,4 @@
-package entutils
+package ent
 
 import (
 	"bytes"
@@ -11,14 +11,43 @@ import (
 	"github.com/lightsparkdev/spark-go/common"
 	pbfrost "github.com/lightsparkdev/spark-go/proto/frost"
 	"github.com/lightsparkdev/spark-go/so"
-	"github.com/lightsparkdev/spark-go/so/ent"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
 	"github.com/lightsparkdev/spark-go/so/ent/signingkeyshare"
 )
 
+// TweakKeyShare tweaks the given keyshare with the given tweak, updates the keyshare in the database and returns the updated keyshare.
+func (keyshare *SigningKeyshare) TweakKeyShare(ctx context.Context, shareTweak []byte, pubkeyTweak []byte, pubkeySharesTweak map[string][]byte) (*SigningKeyshare, error) {
+	tweakPriv, _ := secp256k1.PrivKeyFromBytes(shareTweak)
+	tweakBytes := tweakPriv.Serialize()
+
+	newSecretShare, err := common.AddPrivateKeys(keyshare.SecretShare, tweakBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	newPublicKey, err := common.AddPublicKeys(keyshare.PublicKey, pubkeyTweak)
+	if err != nil {
+		return nil, err
+	}
+
+	newPublicShares := make(map[string][]byte)
+	for i, publicShare := range keyshare.PublicShares {
+		newPublicShares[i], err = common.AddPublicKeys(publicShare, pubkeySharesTweak[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return keyshare.Update().
+		SetSecretShare(newSecretShare).
+		SetPublicKey(newPublicKey).
+		SetPublicShares(newPublicShares).
+		Save(ctx)
+}
+
 // GetUnusedSigningKeyshares returns the available keyshares for the given coordinator index.
-func GetUnusedSigningKeyshares(ctx context.Context, config *so.Config, keyshareCount int) ([]*ent.SigningKeyshare, error) {
-	signingKeyshares, err := common.GetDbFromContext(ctx).SigningKeyshare.Query().Where(
+func GetUnusedSigningKeyshares(ctx context.Context, config *so.Config, keyshareCount int) ([]*SigningKeyshare, error) {
+	signingKeyshares, err := GetDbFromContext(ctx).SigningKeyshare.Query().Where(
 		signingkeyshare.StatusEQ(schema.KeyshareStatusAvailable),
 		signingkeyshare.CoordinatorIndexEQ(config.Index),
 	).Limit(keyshareCount).All(ctx)
@@ -40,7 +69,7 @@ func GetUnusedSigningKeyshares(ctx context.Context, config *so.Config, keyshareC
 // MarkSigningKeysharesAsUsed marks the given keyshares as used. If any of the keyshares are not
 // found or not available, it returns an error.
 func MarkSigningKeysharesAsUsed(ctx context.Context, config *so.Config, ids []uuid.UUID) error {
-	db := common.GetDbFromContext(ctx)
+	db := GetDbFromContext(ctx)
 	log.Printf("Marking keyshares as used: %v", ids)
 
 	count, err := db.SigningKeyshare.
@@ -61,7 +90,7 @@ func MarkSigningKeysharesAsUsed(ctx context.Context, config *so.Config, ids []uu
 
 // GetKeyPackage returns the key package for the given keyshare ID.
 func GetKeyPackage(ctx context.Context, config *so.Config, keyshareID uuid.UUID) (*pbfrost.KeyPackage, error) {
-	keyshare, err := common.GetDbFromContext(ctx).SigningKeyshare.Get(ctx, keyshareID)
+	keyshare, err := GetDbFromContext(ctx).SigningKeyshare.Get(ctx, keyshareID)
 	if err != nil {
 		return nil, err
 	}
@@ -79,7 +108,7 @@ func GetKeyPackage(ctx context.Context, config *so.Config, keyshareID uuid.UUID)
 
 // GetKeyPackages returns the key packages for the given keyshare IDs.
 func GetKeyPackages(ctx context.Context, config *so.Config, keyshareIDs []uuid.UUID) (map[uuid.UUID]*pbfrost.KeyPackage, error) {
-	keyshares, err := common.GetDbFromContext(ctx).SigningKeyshare.Query().Where(
+	keyshares, err := GetDbFromContext(ctx).SigningKeyshare.Query().Where(
 		signingkeyshare.IDIn(keyshareIDs...),
 	).All(ctx)
 	if err != nil {
@@ -102,20 +131,20 @@ func GetKeyPackages(ctx context.Context, config *so.Config, keyshareIDs []uuid.U
 
 // GetKeyPackagesArray returns the keyshares for the given keyshare IDs.
 // The order of the keyshares in the result is the same as the order of the keyshare IDs.
-func GetKeyPackagesArray(ctx context.Context, keyshareIDs []uuid.UUID) ([]*ent.SigningKeyshare, error) {
-	keyshares, err := common.GetDbFromContext(ctx).SigningKeyshare.Query().Where(
+func GetKeyPackagesArray(ctx context.Context, keyshareIDs []uuid.UUID) ([]*SigningKeyshare, error) {
+	keyshares, err := GetDbFromContext(ctx).SigningKeyshare.Query().Where(
 		signingkeyshare.IDIn(keyshareIDs...),
 	).All(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	keysharesMap := make(map[uuid.UUID]*ent.SigningKeyshare, len(keyshares))
+	keysharesMap := make(map[uuid.UUID]*SigningKeyshare, len(keyshares))
 	for _, keyshare := range keyshares {
 		keysharesMap[keyshare.ID] = keyshare
 	}
 
-	result := make([]*ent.SigningKeyshare, len(keyshareIDs))
+	result := make([]*SigningKeyshare, len(keyshareIDs))
 	for i, id := range keyshareIDs {
 		result[i] = keysharesMap[id]
 	}
@@ -123,7 +152,7 @@ func GetKeyPackagesArray(ctx context.Context, keyshareIDs []uuid.UUID) ([]*ent.S
 	return result, nil
 }
 
-func sumOfSigningKeyshares(keyshares []*ent.SigningKeyshare) (*ent.SigningKeyshare, error) {
+func sumOfSigningKeyshares(keyshares []*SigningKeyshare) (*SigningKeyshare, error) {
 	resultKeyshares := *keyshares[0]
 	for i, keyshare := range keyshares {
 		if i == 0 {
@@ -155,7 +184,7 @@ func sumOfSigningKeyshares(keyshares []*ent.SigningKeyshare) (*ent.SigningKeysha
 
 // CalculateAndStoreLastKey calculates the last key from the given keyshares and stores it in the database.
 // The target = sum(keyshares) + last_key
-func CalculateAndStoreLastKey(ctx context.Context, config *so.Config, target *ent.SigningKeyshare, keyshares []*ent.SigningKeyshare, id uuid.UUID) (*ent.SigningKeyshare, error) {
+func CalculateAndStoreLastKey(ctx context.Context, config *so.Config, target *SigningKeyshare, keyshares []*SigningKeyshare, id uuid.UUID) (*SigningKeyshare, error) {
 	log.Printf("Calculating last key for keyshares: %v", keyshares)
 	sumKeyshare, err := sumOfSigningKeyshares(keyshares)
 	if err != nil {
@@ -196,7 +225,7 @@ func CalculateAndStoreLastKey(ctx context.Context, config *so.Config, target *en
 		publicShares[i] = newShare
 	}
 
-	db := common.GetDbFromContext(ctx)
+	db := GetDbFromContext(ctx)
 	lastKey, err := db.SigningKeyshare.Create().
 		SetID(id).
 		SetSecretShare(lastSecretShare).
@@ -211,39 +240,4 @@ func CalculateAndStoreLastKey(ctx context.Context, config *so.Config, target *en
 	}
 
 	return lastKey, nil
-}
-
-// TweakKeyShare tweaks the given keyshare with the given tweak, updates the keyshare in the database and returns the updated keyshare.
-func TweakKeyShare(ctx context.Context, config *so.Config, keyshare *ent.SigningKeyshare, shareTweak []byte, pubkeyTweak []byte, pubkeySharesTweak map[string][]byte) (*ent.SigningKeyshare, error) {
-	tweakPriv, _ := secp256k1.PrivKeyFromBytes(shareTweak)
-	tweakBytes := tweakPriv.Serialize()
-
-	newSecretShare, err := common.AddPrivateKeys(keyshare.SecretShare, tweakBytes)
-	if err != nil {
-		return nil, err
-	}
-
-	newPublicKey, err := common.AddPublicKeys(keyshare.PublicKey, pubkeyTweak)
-	if err != nil {
-		return nil, err
-	}
-
-	newPublicShares := make(map[string][]byte)
-	for i, publicShare := range keyshare.PublicShares {
-		newPublicShares[i], err = common.AddPublicKeys(publicShare, pubkeySharesTweak[i])
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	keyshare, err = keyshare.Update().
-		SetSecretShare(newSecretShare).
-		SetPublicKey(newPublicKey).
-		SetPublicShares(newPublicShares).
-		Save(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	return keyshare, nil
 }

@@ -3,7 +3,6 @@ package testutil
 import (
 	"context"
 
-	"github.com/lightsparkdev/spark-go/common"
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/ent"
 )
@@ -22,5 +21,5 @@ func TestContext(config *so.Config) (context.Context, error) {
 		return nil, err
 	}
 
-	return context.WithValue(ctx, common.TxKey, tx), nil
+	return context.WithValue(ctx, ent.TxKey, tx), nil
 }

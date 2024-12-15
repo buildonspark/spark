@@ -7,8 +7,8 @@ import (
 	"github.com/google/uuid"
 	pbinternal "github.com/lightsparkdev/spark-go/proto/spark_internal"
 	"github.com/lightsparkdev/spark-go/so"
+	"github.com/lightsparkdev/spark-go/so/ent"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
-	"github.com/lightsparkdev/spark-go/so/entutils"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
@@ -29,7 +29,7 @@ func (h *InternalSplitHandler) PrepareSplitKeyshares(ctx context.Context, req *p
 		log.Printf("Failed to parse node ID: %v", err)
 		return nil, err
 	}
-	err = entutils.MarkNodeAsLocked(ctx, nodeID, schema.TreeNodeStatusSplitLocked)
+	err = ent.MarkNodeAsLocked(ctx, nodeID, schema.TreeNodeStatusSplitLocked)
 	if err != nil {
 		log.Printf("Failed to mark node as locked: %v", err)
 		return nil, err
@@ -51,13 +51,13 @@ func (h *InternalSplitHandler) PrepareSplitKeyshares(ctx context.Context, req *p
 		selectedKeyshares[i+1] = u
 	}
 
-	err = entutils.MarkSigningKeysharesAsUsed(ctx, h.config, selectedKeyshares)
+	err = ent.MarkSigningKeysharesAsUsed(ctx, h.config, selectedKeyshares)
 	if err != nil {
 		log.Printf("Failed to mark keyshares as used: %v", err)
 		return nil, err
 	}
 
-	keyShares, err := entutils.GetKeyPackagesArray(ctx, selectedKeyshares)
+	keyShares, err := ent.GetKeyPackagesArray(ctx, selectedKeyshares)
 	if err != nil {
 		log.Printf("Failed to get key shares: %v", err)
 		return nil, err
@@ -69,7 +69,7 @@ func (h *InternalSplitHandler) PrepareSplitKeyshares(ctx context.Context, req *p
 		return nil, err
 	}
 
-	_, err = entutils.CalculateAndStoreLastKey(ctx, h.config, keyShares[0], keyShares[1:], lastKeyshareID)
+	_, err = ent.CalculateAndStoreLastKey(ctx, h.config, keyShares[0], keyShares[1:], lastKeyshareID)
 	if err != nil {
 		log.Printf("Failed to calculate and store last key share: %v", err)
 		return nil, err

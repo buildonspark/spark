@@ -13,9 +13,9 @@ import (
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark-go/proto/spark_internal"
 	"github.com/lightsparkdev/spark-go/so"
+	"github.com/lightsparkdev/spark-go/so/ent"
 	"github.com/lightsparkdev/spark-go/so/ent/depositaddress"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
-	"github.com/lightsparkdev/spark-go/so/entutils"
 	"github.com/lightsparkdev/spark-go/so/helper"
 	"github.com/lightsparkdev/spark-go/so/objects"
 )
@@ -33,7 +33,7 @@ func NewDepositHandler(onchainHelper helper.OnChainHelper) *DepositHandler {
 // GenerateDepositAddress generates a deposit address for the given public key.
 func (o *DepositHandler) GenerateDepositAddress(ctx context.Context, config *so.Config, req *pb.GenerateDepositAddressRequest) (*pb.GenerateDepositAddressResponse, error) {
 	log.Printf("Generating deposit address for public key: %s", hex.EncodeToString(req.SigningPublicKey))
-	keyshares, err := entutils.GetUnusedSigningKeyshares(ctx, config, 1)
+	keyshares, err := ent.GetUnusedSigningKeyshares(ctx, config, 1)
 	if err != nil {
 		return nil, err
 	}
@@ -45,7 +45,7 @@ func (o *DepositHandler) GenerateDepositAddress(ctx context.Context, config *so.
 
 	keyshare := keyshares[0]
 
-	err = entutils.MarkSigningKeysharesAsUsed(ctx, config, []uuid.UUID{keyshare.ID})
+	err = ent.MarkSigningKeysharesAsUsed(ctx, config, []uuid.UUID{keyshare.ID})
 	if err != nil {
 		log.Printf("Failed to mark keyshare as used: %v", err)
 		return nil, err
@@ -81,7 +81,7 @@ func (o *DepositHandler) GenerateDepositAddress(ctx context.Context, config *so.
 		return nil, err
 	}
 
-	_, err = common.GetDbFromContext(ctx).DepositAddress.Create().
+	_, err = ent.GetDbFromContext(ctx).DepositAddress.Create().
 		SetSigningKeyshareID(keyshare.ID).
 		SetOwnerIdentityPubkey(req.IdentityPublicKey).
 		SetOwnerSigningPubkey(req.SigningPublicKey).
@@ -139,7 +139,7 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 	if err != nil {
 		return nil, err
 	}
-	depositAddress, err := common.GetDbFromContext(ctx).DepositAddress.Query().Where(depositaddress.Address(*utxoAddress)).First(ctx)
+	depositAddress, err := ent.GetDbFromContext(ctx).DepositAddress.Query().Where(depositaddress.Address(*utxoAddress)).First(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -228,7 +228,7 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 	refundTxSignatureShare := signingResult[1].SignatureShares
 
 	// Create the tree
-	db := common.GetDbFromContext(ctx)
+	db := ent.GetDbFromContext(ctx)
 	tree := db.Tree.Create().SetOwnerIdentityPubkey(depositAddress.OwnerIdentityPubkey).SaveX(ctx)
 	root := db.TreeNode.
 		Create().

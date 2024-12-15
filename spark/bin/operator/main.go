@@ -124,7 +124,7 @@ func main() {
 
 	dkgServer := dkg.NewServer(frostConnection, config)
 
-	grpcServer := grpc.NewServer(grpc.UnaryInterceptor(common.DbSessionMiddleware(dbClient)))
+	grpcServer := grpc.NewServer(grpc.UnaryInterceptor(ent.DbSessionMiddleware(dbClient)))
 	pbdkg.RegisterDKGServiceServer(grpcServer, dkgServer)
 
 	var onchainHelper helper.OnChainHelper = &helper.DemoOnChainHelper{}

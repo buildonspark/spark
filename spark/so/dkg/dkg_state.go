@@ -9,10 +9,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark-go/common"
 	pbcommon "github.com/lightsparkdev/spark-go/proto/common"
 	pbfrost "github.com/lightsparkdev/spark-go/proto/frost"
 	"github.com/lightsparkdev/spark-go/so"
+	"github.com/lightsparkdev/spark-go/so/ent"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
 	"google.golang.org/grpc"
 
@@ -282,7 +282,7 @@ func (s *State) Round3(ctx context.Context, requestID string, frostConnection *g
 		return err
 	}
 
-	db := common.GetDbFromContext(ctx)
+	db := ent.GetDbFromContext(ctx)
 	for i, key := range response.KeyPackages {
 		batchID, err := uuid.Parse(requestID)
 		if err != nil {

@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark-go/common"
 	pb "github.com/lightsparkdev/spark-go/proto/spark_tree"
 	"github.com/lightsparkdev/spark-go/so/ent"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
@@ -37,7 +36,7 @@ func MakeChange(amount uint64) []uint64 {
 
 // GetLeafDenominationCounts returns the counts of each leaf denomination for a given owner.
 func GetLeafDenominationCounts(ctx context.Context, req *pb.GetLeafDenominationCountsRequest) (*pb.GetLeafDenominationCountsResponse, error) {
-	db := common.GetDbFromContext(ctx)
+	db := ent.GetDbFromContext(ctx)
 	leaves, err := db.TreeNode.Query().
 		Where(treenode.OwnerIdentityPubkey(req.OwnerIdentityPublicKey)).
 		Where(treenode.StatusEQ(schema.TreeNodeStatusAvailable)).
@@ -58,7 +57,7 @@ func GetLeafDenominationCounts(ctx context.Context, req *pb.GetLeafDenominationC
 
 // FindLeavesToGiveUser is called to figure out which leaves to give to a user when they deposit funds or receive a lightning payment.
 func FindLeavesToGiveUser(ctx context.Context, req *pb.FindLeavesToGiveUserRequest) (*pb.FindLeavesToGiveUserResponse, error) {
-	db := common.GetDbFromContext(ctx)
+	db := ent.GetDbFromContext(ctx)
 	// TODO: Sort on the polarity score as well.
 	leaves, err := db.TreeNode.Query().
 		Where(treenode.OwnerIdentityPubkey(req.SspIdentityPublicKey)).
@@ -93,7 +92,7 @@ func FindLeavesToGiveUser(ctx context.Context, req *pb.FindLeavesToGiveUserReque
 
 // FindLeavesToTakeFromUser is called to obtain a plan for how to enable the user to send the specified amount of sats to the SSP (i.e. for a lightning payment).
 func FindLeavesToTakeFromUser(ctx context.Context, req *pb.FindLeavesToTakeFromUserRequest) (*pb.FindLeavesToTakeFromUserResponse, error) {
-	db := common.GetDbFromContext(ctx)
+	db := ent.GetDbFromContext(ctx)
 
 	// TODO: Sort on the polarity score as well.
 	leaves, err := db.TreeNode.Query().Where(treenode.OwnerIdentityPubkey(req.UserIdentityPublicKey)).

@@ -2,9 +2,12 @@ package ent
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/google/uuid"
 	pbspark "github.com/lightsparkdev/spark-go/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark-go/proto/spark_internal"
+	"github.com/lightsparkdev/spark-go/so/ent/schema"
 )
 
 // MarshalSparkProto converts a TreeNode to a spark protobuf TreeNode.
@@ -45,4 +48,23 @@ func (tn *TreeNode) getParentNodeID(ctx context.Context) *string {
 	}
 	parentNodeIDStr := parentNode.ID.String()
 	return &parentNodeIDStr
+}
+
+// MarkNodeAsLocked marks the node as locked.
+// It will only update the node status if it is in a state to be locked.
+func MarkNodeAsLocked(ctx context.Context, nodeID uuid.UUID, nodeStatus schema.TreeNodeStatus) error {
+	db := GetDbFromContext(ctx)
+	if nodeStatus != schema.TreeNodeStatusSplitLocked && nodeStatus != schema.TreeNodeStatusTransferLocked {
+		return fmt.Errorf("not updating node status to a locked state: %s", nodeStatus)
+	}
+
+	node, err := db.TreeNode.Get(ctx, nodeID)
+	if err != nil {
+		return err
+	}
+	if node.Status != schema.TreeNodeStatusAvailable {
+		return fmt.Errorf("node not in a state to be locked: %s", node.Status)
+	}
+
+	return db.TreeNode.UpdateOne(node).SetStatus(nodeStatus).Exec(ctx)
 }

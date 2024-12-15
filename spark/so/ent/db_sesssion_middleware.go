@@ -1,10 +1,9 @@
-package common
+package ent
 
 import (
 	"context"
 	"log"
 
-	"github.com/lightsparkdev/spark-go/so/ent"
 	"google.golang.org/grpc"
 )
 
@@ -15,7 +14,7 @@ type ContextKey string
 const TxKey ContextKey = "tx"
 
 // DbSessionMiddleware is a middleware to manage database sessions for each gRPC call.
-func DbSessionMiddleware(dbClient *ent.Client) grpc.UnaryServerInterceptor {
+func DbSessionMiddleware(dbClient *Client) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 		// Start a transaction or session
 		tx, err := dbClient.Tx(ctx)
@@ -47,6 +46,6 @@ func DbSessionMiddleware(dbClient *ent.Client) grpc.UnaryServerInterceptor {
 }
 
 // GetDbFromContext returns the database transaction from the context.
-func GetDbFromContext(ctx context.Context) *ent.Tx {
-	return ctx.Value(TxKey).(*ent.Tx)
+func GetDbFromContext(ctx context.Context) *Tx {
+	return ctx.Value(TxKey).(*Tx)
 }

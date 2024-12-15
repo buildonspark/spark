@@ -12,7 +12,7 @@ import (
 	"github.com/lightsparkdev/spark-go/common"
 	pbcommon "github.com/lightsparkdev/spark-go/proto/common"
 	pbfrost "github.com/lightsparkdev/spark-go/proto/frost"
-	"github.com/lightsparkdev/spark-go/so/entutils"
+	"github.com/lightsparkdev/spark-go/so/ent"
 	"github.com/lightsparkdev/spark-go/so/helper"
 	"github.com/lightsparkdev/spark-go/so/objects"
 	testutil "github.com/lightsparkdev/spark-go/test_util"
@@ -37,7 +37,7 @@ func TestFrostSign(t *testing.T) {
 	msgHash := sha256.Sum256(msg)
 
 	// Step 2: Get operator key share
-	operatorKeyShares, err := entutils.GetUnusedSigningKeyshares(ctx, config, 1)
+	operatorKeyShares, err := ent.GetUnusedSigningKeyshares(ctx, config, 1)
 	if err != nil {
 		t.Fatal(err)
 	}

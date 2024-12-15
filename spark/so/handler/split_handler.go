@@ -14,7 +14,6 @@ import (
 	"github.com/lightsparkdev/spark-go/so/ent"
 	"github.com/lightsparkdev/spark-go/so/ent/depositaddress"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
-	"github.com/lightsparkdev/spark-go/so/entutils"
 	"github.com/lightsparkdev/spark-go/so/helper"
 )
 
@@ -40,16 +39,16 @@ func (h *SplitHandler) prepareSplitAddress(
 	if err != nil {
 		return nil, err
 	}
-	node, err := common.GetDbFromContext(ctx).TreeNode.Get(ctx, nodeID)
+	node, err := ent.GetDbFromContext(ctx).TreeNode.Get(ctx, nodeID)
 	if err != nil {
 		return nil, err
 	}
-	err = entutils.MarkNodeAsLocked(ctx, nodeID, schema.TreeNodeStatusSplitLocked)
+	err = ent.MarkNodeAsLocked(ctx, nodeID, schema.TreeNodeStatusSplitLocked)
 	if err != nil {
 		return nil, err
 	}
 
-	keyshares, err := entutils.GetUnusedSigningKeyshares(ctx, config, len(req.SigningPublicKeys)-1)
+	keyshares, err := ent.GetUnusedSigningKeyshares(ctx, config, len(req.SigningPublicKeys)-1)
 	if err != nil {
 		return nil, err
 	}
@@ -89,7 +88,7 @@ func (h *SplitHandler) prepareSplitAddress(
 		return nil, err
 	}
 
-	lastKeyshare, err := entutils.CalculateAndStoreLastKey(ctx, config, targetKeyshare, keyshares, lastKeyshareID)
+	lastKeyshare, err := ent.CalculateAndStoreLastKey(ctx, config, targetKeyshare, keyshares, lastKeyshareID)
 	if err != nil {
 		return nil, err
 	}
@@ -113,7 +112,7 @@ func (h *SplitHandler) prepareSplitAddress(
 			VerifyingKey: combinedPublicKey,
 		})
 
-		common.GetDbFromContext(ctx).DepositAddress.Create().
+		ent.GetDbFromContext(ctx).DepositAddress.Create().
 			SetAddress(*depositAddress).
 			SetOwnerIdentityPubkey(node.OwnerIdentityPubkey).
 			SetOwnerSigningPubkey(userPublicKey).
@@ -121,7 +120,7 @@ func (h *SplitHandler) prepareSplitAddress(
 			SaveX(ctx)
 	}
 
-	err = entutils.MarkSigningKeysharesAsUsed(ctx, config, keyshareIDs)
+	err = ent.MarkSigningKeysharesAsUsed(ctx, config, keyshareIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -168,7 +167,7 @@ func (h *SplitHandler) prepareSigningJobs(
 	if err != nil {
 		return nil, nil, err
 	}
-	db := common.GetDbFromContext(ctx)
+	db := ent.GetDbFromContext(ctx)
 	node, err := db.TreeNode.Get(ctx, nodeID)
 	if err != nil {
 		return nil, nil, err
@@ -253,7 +252,7 @@ func (h *SplitHandler) prepareKeys(ctx context.Context, config *so.Config, req *
 	if err != nil {
 		return nil, nil, err
 	}
-	node, err := common.GetDbFromContext(ctx).TreeNode.Get(ctx, nodeID)
+	node, err := ent.GetDbFromContext(ctx).TreeNode.Get(ctx, nodeID)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -263,7 +262,7 @@ func (h *SplitHandler) prepareKeys(ctx context.Context, config *so.Config, req *
 	}
 	childrenKeyshares := make([]*ent.SigningKeyshare, 0)
 	for _, split := range req.Splits {
-		depositAddress, err := common.GetDbFromContext(ctx).DepositAddress.Query().Where(depositaddress.OwnerSigningPubkey(split.SigningPublicKey)).First(ctx)
+		depositAddress, err := ent.GetDbFromContext(ctx).DepositAddress.Query().Where(depositaddress.OwnerSigningPubkey(split.SigningPublicKey)).First(ctx)
 		if err != nil {
 			return nil, nil, err
 		}

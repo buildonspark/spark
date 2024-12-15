@@ -13,6 +13,7 @@ import (
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark-go/proto/spark_internal"
 	"github.com/lightsparkdev/spark-go/so"
+	"github.com/lightsparkdev/spark-go/so/ent"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
 	"github.com/lightsparkdev/spark-go/so/helper"
 )
@@ -63,7 +64,7 @@ func (o *FinalizeSignatureHandler) FinalizeNodeSignatures(ctx context.Context, r
 // CompleteTreeCreation verifies the user signature, completes the tree creation and broadcasts the new tree.
 func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignatures *pb.NodeSignatures, intent pbcommon.SignatureIntent) (*pb.TreeNode, *pbinternal.TreeNode, error) {
 	log.Printf("finalizing node signatures for node %s", nodeSignatures.NodeId)
-	db := common.GetDbFromContext(ctx)
+	db := ent.GetDbFromContext(ctx)
 
 	nodeID, err := uuid.Parse(nodeSignatures.NodeId)
 	if err != nil {

@@ -10,7 +10,7 @@ import (
 	pbfrost "github.com/lightsparkdev/spark-go/proto/frost"
 	pb "github.com/lightsparkdev/spark-go/proto/spark_internal"
 	"github.com/lightsparkdev/spark-go/so"
-	"github.com/lightsparkdev/spark-go/so/entutils"
+	"github.com/lightsparkdev/spark-go/so/ent"
 	"github.com/lightsparkdev/spark-go/so/handler"
 	"github.com/lightsparkdev/spark-go/so/objects"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -41,7 +41,7 @@ func (s *SparkInternalServer) MarkKeysharesAsUsed(ctx context.Context, req *pb.M
 		}
 		ids[i] = uuid
 	}
-	err := entutils.MarkSigningKeysharesAsUsed(ctx, s.config, ids)
+	err := ent.MarkSigningKeysharesAsUsed(ctx, s.config, ids)
 	if err != nil {
 		log.Printf("Failed to mark keyshares as used: %v", err)
 		return nil, err
@@ -62,7 +62,7 @@ func (s *SparkInternalServer) MarkKeyshareForDepositAddress(ctx context.Context,
 		return nil, err
 	}
 
-	_, err = common.GetDbFromContext(ctx).DepositAddress.Create().
+	_, err = ent.GetDbFromContext(ctx).DepositAddress.Create().
 		SetSigningKeyshareID(keyshareID).
 		SetOwnerIdentityPubkey(req.OwnerIdentityPublicKey).
 		SetOwnerSigningPubkey(req.OwnerSigningPublicKey).
@@ -89,7 +89,7 @@ func (s *SparkInternalServer) FrostRound1(ctx context.Context, req *pb.FrostRoun
 		uuids[i] = uuid
 	}
 
-	keyPackages, err := entutils.GetKeyPackages(ctx, s.config, uuids)
+	keyPackages, err := ent.GetKeyPackages(ctx, s.config, uuids)
 	if err != nil {
 		log.Printf("Failed to get key packages: %v", err)
 		return nil, err
@@ -129,7 +129,7 @@ func (s *SparkInternalServer) FrostRound1(ctx context.Context, req *pb.FrostRoun
 			return nil, err
 		}
 
-		err = entutils.StoreSigningNonce(ctx, s.config, nonce, commitment)
+		err = ent.StoreSigningNonce(ctx, s.config, nonce, commitment)
 		if err != nil {
 			log.Printf("Failed to store signing nonce: %v", err)
 			return nil, err
@@ -161,7 +161,7 @@ func (s *SparkInternalServer) FrostRound2(ctx context.Context, req *pb.FrostRoun
 		uuids[i] = uuid
 	}
 
-	keyPackages, err := entutils.GetKeyPackages(ctx, s.config, uuids)
+	keyPackages, err := ent.GetKeyPackages(ctx, s.config, uuids)
 	if err != nil {
 		log.Printf("Failed to get key packages: %v", err)
 		return nil, err
@@ -177,7 +177,7 @@ func (s *SparkInternalServer) FrostRound2(ctx context.Context, req *pb.FrostRoun
 			return nil, err
 		}
 	}
-	nonces, err := entutils.GetSigningNonces(ctx, s.config, commitments)
+	nonces, err := ent.GetSigningNonces(ctx, s.config, commitments)
 	if err != nil {
 		log.Printf("Failed to get signing nonces: %v", err)
 		return nil, err

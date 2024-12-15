@@ -1,9 +1,8 @@
-package entutils
+package ent
 
 import (
 	"context"
 
-	"github.com/lightsparkdev/spark-go/common"
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/ent/signingnonce"
 	"github.com/lightsparkdev/spark-go/so/objects"
@@ -17,7 +16,7 @@ func StoreSigningNonce(ctx context.Context, config *so.Config, nonce objects.Sig
 	}
 	commitmentBytes := commitment.MarshalBinary()
 
-	_, err = common.GetDbFromContext(ctx).SigningNonce.Create().
+	_, err = GetDbFromContext(ctx).SigningNonce.Create().
 		SetNonce(nonceBytes).
 		SetNonceCommitment(commitmentBytes).
 		Save(ctx)
@@ -28,7 +27,7 @@ func StoreSigningNonce(ctx context.Context, config *so.Config, nonce objects.Sig
 func GetSigningNonceFromCommitment(ctx context.Context, config *so.Config, commitment objects.SigningCommitment) (*objects.SigningNonce, error) {
 	commitmentBytes := commitment.MarshalBinary()
 
-	nonce, err := common.GetDbFromContext(ctx).SigningNonce.Query().Where(signingnonce.NonceCommitment(commitmentBytes)).First(ctx)
+	nonce, err := GetDbFromContext(ctx).SigningNonce.Query().Where(signingnonce.NonceCommitment(commitmentBytes)).First(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -48,7 +47,7 @@ func GetSigningNonces(ctx context.Context, config *so.Config, commitments []obje
 	for i, commitment := range commitments {
 		commitmentBytes[i] = commitment.MarshalBinary()
 	}
-	noncesResult, err := common.GetDbFromContext(ctx).SigningNonce.Query().Where(signingnonce.NonceCommitmentIn(commitmentBytes...)).All(ctx)
+	noncesResult, err := GetDbFromContext(ctx).SigningNonce.Query().Where(signingnonce.NonceCommitmentIn(commitmentBytes...)).All(ctx)
 	if err != nil {
 		return nil, err
 	}

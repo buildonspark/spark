@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark-go/common"
 	pbcommon "github.com/lightsparkdev/spark-go/proto/common"
 	pbinternal "github.com/lightsparkdev/spark-go/proto/spark_internal"
 	"github.com/lightsparkdev/spark-go/so"
@@ -36,7 +35,7 @@ func (h *InternalFinalizeSignatureHandler) InternalFinalizeNodeSignatures(ctx co
 }
 
 func (h *InternalFinalizeSignatureHandler) updateNode(ctx context.Context, node *pbinternal.TreeNode, intent pbcommon.SignatureIntent) error {
-	db := common.GetDbFromContext(ctx)
+	db := ent.GetDbFromContext(ctx)
 	treeID, err := uuid.Parse(node.TreeId)
 	if err != nil {
 		return err

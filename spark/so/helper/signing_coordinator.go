@@ -9,7 +9,6 @@ import (
 	"github.com/lightsparkdev/spark-go/common"
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/ent"
-	"github.com/lightsparkdev/spark-go/so/entutils"
 	"github.com/lightsparkdev/spark-go/so/objects"
 
 	pbcommon "github.com/lightsparkdev/spark-go/proto/common"
@@ -214,7 +213,7 @@ func SignFrost(
 ) ([]*SigningResult, error) {
 	selection := OperatorSelection{Option: OperatorSelectionOptionThreshold, Threshold: int(config.Threshold)}
 	signingKeyshareIDs := SigningKeyshareIDsFromSigningJobs(jobs)
-	signingKeyshares, err := entutils.GetKeyPackages(ctx, config, signingKeyshareIDs)
+	signingKeyshares, err := ent.GetKeyPackages(ctx, config, signingKeyshareIDs)
 	if err != nil {
 		log.Println("GetKeyPackages failed:", err)
 		return nil, err
