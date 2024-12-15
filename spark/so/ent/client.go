@@ -19,6 +19,8 @@ import (
 	"github.com/lightsparkdev/spark-go/so/ent/depositaddress"
 	"github.com/lightsparkdev/spark-go/so/ent/signingkeyshare"
 	"github.com/lightsparkdev/spark-go/so/ent/signingnonce"
+	"github.com/lightsparkdev/spark-go/so/ent/transfer"
+	"github.com/lightsparkdev/spark-go/so/ent/transferleaf"
 	"github.com/lightsparkdev/spark-go/so/ent/tree"
 	"github.com/lightsparkdev/spark-go/so/ent/treenode"
 )
@@ -34,6 +36,10 @@ type Client struct {
 	SigningKeyshare *SigningKeyshareClient
 	// SigningNonce is the client for interacting with the SigningNonce builders.
 	SigningNonce *SigningNonceClient
+	// Transfer is the client for interacting with the Transfer builders.
+	Transfer *TransferClient
+	// TransferLeaf is the client for interacting with the TransferLeaf builders.
+	TransferLeaf *TransferLeafClient
 	// Tree is the client for interacting with the Tree builders.
 	Tree *TreeClient
 	// TreeNode is the client for interacting with the TreeNode builders.
@@ -52,6 +58,8 @@ func (c *Client) init() {
 	c.DepositAddress = NewDepositAddressClient(c.config)
 	c.SigningKeyshare = NewSigningKeyshareClient(c.config)
 	c.SigningNonce = NewSigningNonceClient(c.config)
+	c.Transfer = NewTransferClient(c.config)
+	c.TransferLeaf = NewTransferLeafClient(c.config)
 	c.Tree = NewTreeClient(c.config)
 	c.TreeNode = NewTreeNodeClient(c.config)
 }
@@ -149,6 +157,8 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		DepositAddress:  NewDepositAddressClient(cfg),
 		SigningKeyshare: NewSigningKeyshareClient(cfg),
 		SigningNonce:    NewSigningNonceClient(cfg),
+		Transfer:        NewTransferClient(cfg),
+		TransferLeaf:    NewTransferLeafClient(cfg),
 		Tree:            NewTreeClient(cfg),
 		TreeNode:        NewTreeNodeClient(cfg),
 	}, nil
@@ -173,6 +183,8 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		DepositAddress:  NewDepositAddressClient(cfg),
 		SigningKeyshare: NewSigningKeyshareClient(cfg),
 		SigningNonce:    NewSigningNonceClient(cfg),
+		Transfer:        NewTransferClient(cfg),
+		TransferLeaf:    NewTransferLeafClient(cfg),
 		Tree:            NewTreeClient(cfg),
 		TreeNode:        NewTreeNodeClient(cfg),
 	}, nil
@@ -203,21 +215,23 @@ func (c *Client) Close() error {
 // Use adds the mutation hooks to all the entity clients.
 // In order to add hooks to a specific client, call: `client.Node.Use(...)`.
 func (c *Client) Use(hooks ...Hook) {
-	c.DepositAddress.Use(hooks...)
-	c.SigningKeyshare.Use(hooks...)
-	c.SigningNonce.Use(hooks...)
-	c.Tree.Use(hooks...)
-	c.TreeNode.Use(hooks...)
+	for _, n := range []interface{ Use(...Hook) }{
+		c.DepositAddress, c.SigningKeyshare, c.SigningNonce, c.Transfer, c.TransferLeaf,
+		c.Tree, c.TreeNode,
+	} {
+		n.Use(hooks...)
+	}
 }
 
 // Intercept adds the query interceptors to all the entity clients.
 // In order to add interceptors to a specific client, call: `client.Node.Intercept(...)`.
 func (c *Client) Intercept(interceptors ...Interceptor) {
-	c.DepositAddress.Intercept(interceptors...)
-	c.SigningKeyshare.Intercept(interceptors...)
-	c.SigningNonce.Intercept(interceptors...)
-	c.Tree.Intercept(interceptors...)
-	c.TreeNode.Intercept(interceptors...)
+	for _, n := range []interface{ Intercept(...Interceptor) }{
+		c.DepositAddress, c.SigningKeyshare, c.SigningNonce, c.Transfer, c.TransferLeaf,
+		c.Tree, c.TreeNode,
+	} {
+		n.Intercept(interceptors...)
+	}
 }
 
 // Mutate implements the ent.Mutator interface.
@@ -229,6 +243,10 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.SigningKeyshare.mutate(ctx, m)
 	case *SigningNonceMutation:
 		return c.SigningNonce.mutate(ctx, m)
+	case *TransferMutation:
+		return c.Transfer.mutate(ctx, m)
+	case *TransferLeafMutation:
+		return c.TransferLeaf.mutate(ctx, m)
 	case *TreeMutation:
 		return c.Tree.mutate(ctx, m)
 	case *TreeNodeMutation:
@@ -653,6 +671,320 @@ func (c *SigningNonceClient) mutate(ctx context.Context, m *SigningNonceMutation
 	}
 }
 
+// TransferClient is a client for the Transfer schema.
+type TransferClient struct {
+	config
+}
+
+// NewTransferClient returns a client for the Transfer from the given config.
+func NewTransferClient(c config) *TransferClient {
+	return &TransferClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `transfer.Hooks(f(g(h())))`.
+func (c *TransferClient) Use(hooks ...Hook) {
+	c.hooks.Transfer = append(c.hooks.Transfer, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `transfer.Intercept(f(g(h())))`.
+func (c *TransferClient) Intercept(interceptors ...Interceptor) {
+	c.inters.Transfer = append(c.inters.Transfer, interceptors...)
+}
+
+// Create returns a builder for creating a Transfer entity.
+func (c *TransferClient) Create() *TransferCreate {
+	mutation := newTransferMutation(c.config, OpCreate)
+	return &TransferCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of Transfer entities.
+func (c *TransferClient) CreateBulk(builders ...*TransferCreate) *TransferCreateBulk {
+	return &TransferCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *TransferClient) MapCreateBulk(slice any, setFunc func(*TransferCreate, int)) *TransferCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &TransferCreateBulk{err: fmt.Errorf("calling to TransferClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*TransferCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &TransferCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for Transfer.
+func (c *TransferClient) Update() *TransferUpdate {
+	mutation := newTransferMutation(c.config, OpUpdate)
+	return &TransferUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *TransferClient) UpdateOne(t *Transfer) *TransferUpdateOne {
+	mutation := newTransferMutation(c.config, OpUpdateOne, withTransfer(t))
+	return &TransferUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *TransferClient) UpdateOneID(id uuid.UUID) *TransferUpdateOne {
+	mutation := newTransferMutation(c.config, OpUpdateOne, withTransferID(id))
+	return &TransferUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for Transfer.
+func (c *TransferClient) Delete() *TransferDelete {
+	mutation := newTransferMutation(c.config, OpDelete)
+	return &TransferDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *TransferClient) DeleteOne(t *Transfer) *TransferDeleteOne {
+	return c.DeleteOneID(t.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *TransferClient) DeleteOneID(id uuid.UUID) *TransferDeleteOne {
+	builder := c.Delete().Where(transfer.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &TransferDeleteOne{builder}
+}
+
+// Query returns a query builder for Transfer.
+func (c *TransferClient) Query() *TransferQuery {
+	return &TransferQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeTransfer},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a Transfer entity by its id.
+func (c *TransferClient) Get(ctx context.Context, id uuid.UUID) (*Transfer, error) {
+	return c.Query().Where(transfer.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *TransferClient) GetX(ctx context.Context, id uuid.UUID) *Transfer {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryTransferLeaves queries the transfer_leaves edge of a Transfer.
+func (c *TransferClient) QueryTransferLeaves(t *Transfer) *TransferLeafQuery {
+	query := (&TransferLeafClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := t.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(transfer.Table, transfer.FieldID, id),
+			sqlgraph.To(transferleaf.Table, transferleaf.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, true, transfer.TransferLeavesTable, transfer.TransferLeavesColumn),
+		)
+		fromV = sqlgraph.Neighbors(t.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *TransferClient) Hooks() []Hook {
+	return c.hooks.Transfer
+}
+
+// Interceptors returns the client interceptors.
+func (c *TransferClient) Interceptors() []Interceptor {
+	return c.inters.Transfer
+}
+
+func (c *TransferClient) mutate(ctx context.Context, m *TransferMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&TransferCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&TransferUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&TransferUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&TransferDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown Transfer mutation op: %q", m.Op())
+	}
+}
+
+// TransferLeafClient is a client for the TransferLeaf schema.
+type TransferLeafClient struct {
+	config
+}
+
+// NewTransferLeafClient returns a client for the TransferLeaf from the given config.
+func NewTransferLeafClient(c config) *TransferLeafClient {
+	return &TransferLeafClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `transferleaf.Hooks(f(g(h())))`.
+func (c *TransferLeafClient) Use(hooks ...Hook) {
+	c.hooks.TransferLeaf = append(c.hooks.TransferLeaf, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `transferleaf.Intercept(f(g(h())))`.
+func (c *TransferLeafClient) Intercept(interceptors ...Interceptor) {
+	c.inters.TransferLeaf = append(c.inters.TransferLeaf, interceptors...)
+}
+
+// Create returns a builder for creating a TransferLeaf entity.
+func (c *TransferLeafClient) Create() *TransferLeafCreate {
+	mutation := newTransferLeafMutation(c.config, OpCreate)
+	return &TransferLeafCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of TransferLeaf entities.
+func (c *TransferLeafClient) CreateBulk(builders ...*TransferLeafCreate) *TransferLeafCreateBulk {
+	return &TransferLeafCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *TransferLeafClient) MapCreateBulk(slice any, setFunc func(*TransferLeafCreate, int)) *TransferLeafCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &TransferLeafCreateBulk{err: fmt.Errorf("calling to TransferLeafClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*TransferLeafCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &TransferLeafCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for TransferLeaf.
+func (c *TransferLeafClient) Update() *TransferLeafUpdate {
+	mutation := newTransferLeafMutation(c.config, OpUpdate)
+	return &TransferLeafUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *TransferLeafClient) UpdateOne(tl *TransferLeaf) *TransferLeafUpdateOne {
+	mutation := newTransferLeafMutation(c.config, OpUpdateOne, withTransferLeaf(tl))
+	return &TransferLeafUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *TransferLeafClient) UpdateOneID(id uuid.UUID) *TransferLeafUpdateOne {
+	mutation := newTransferLeafMutation(c.config, OpUpdateOne, withTransferLeafID(id))
+	return &TransferLeafUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for TransferLeaf.
+func (c *TransferLeafClient) Delete() *TransferLeafDelete {
+	mutation := newTransferLeafMutation(c.config, OpDelete)
+	return &TransferLeafDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *TransferLeafClient) DeleteOne(tl *TransferLeaf) *TransferLeafDeleteOne {
+	return c.DeleteOneID(tl.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *TransferLeafClient) DeleteOneID(id uuid.UUID) *TransferLeafDeleteOne {
+	builder := c.Delete().Where(transferleaf.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &TransferLeafDeleteOne{builder}
+}
+
+// Query returns a query builder for TransferLeaf.
+func (c *TransferLeafClient) Query() *TransferLeafQuery {
+	return &TransferLeafQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeTransferLeaf},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a TransferLeaf entity by its id.
+func (c *TransferLeafClient) Get(ctx context.Context, id uuid.UUID) (*TransferLeaf, error) {
+	return c.Query().Where(transferleaf.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *TransferLeafClient) GetX(ctx context.Context, id uuid.UUID) *TransferLeaf {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryTransfer queries the transfer edge of a TransferLeaf.
+func (c *TransferLeafClient) QueryTransfer(tl *TransferLeaf) *TransferQuery {
+	query := (&TransferClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := tl.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(transferleaf.Table, transferleaf.FieldID, id),
+			sqlgraph.To(transfer.Table, transfer.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, transferleaf.TransferTable, transferleaf.TransferColumn),
+		)
+		fromV = sqlgraph.Neighbors(tl.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryLeaf queries the leaf edge of a TransferLeaf.
+func (c *TransferLeafClient) QueryLeaf(tl *TransferLeaf) *TreeNodeQuery {
+	query := (&TreeNodeClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := tl.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(transferleaf.Table, transferleaf.FieldID, id),
+			sqlgraph.To(treenode.Table, treenode.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, transferleaf.LeafTable, transferleaf.LeafColumn),
+		)
+		fromV = sqlgraph.Neighbors(tl.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *TransferLeafClient) Hooks() []Hook {
+	return c.hooks.TransferLeaf
+}
+
+// Interceptors returns the client interceptors.
+func (c *TransferLeafClient) Interceptors() []Interceptor {
+	return c.inters.TransferLeaf
+}
+
+func (c *TransferLeafClient) mutate(ctx context.Context, m *TransferLeafMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&TransferLeafCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&TransferLeafUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&TransferLeafUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&TransferLeafDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown TransferLeaf mutation op: %q", m.Op())
+	}
+}
+
 // TreeClient is a client for the Tree schema.
 type TreeClient struct {
 	config
@@ -1018,9 +1350,11 @@ func (c *TreeNodeClient) mutate(ctx context.Context, m *TreeNodeMutation) (Value
 // hooks and interceptors per client, for fast access.
 type (
 	hooks struct {
-		DepositAddress, SigningKeyshare, SigningNonce, Tree, TreeNode []ent.Hook
+		DepositAddress, SigningKeyshare, SigningNonce, Transfer, TransferLeaf, Tree,
+		TreeNode []ent.Hook
 	}
 	inters struct {
-		DepositAddress, SigningKeyshare, SigningNonce, Tree, TreeNode []ent.Interceptor
+		DepositAddress, SigningKeyshare, SigningNonce, Transfer, TransferLeaf, Tree,
+		TreeNode []ent.Interceptor
 	}
 )

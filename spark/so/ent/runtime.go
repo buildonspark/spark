@@ -10,6 +10,8 @@ import (
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
 	"github.com/lightsparkdev/spark-go/so/ent/signingkeyshare"
 	"github.com/lightsparkdev/spark-go/so/ent/signingnonce"
+	"github.com/lightsparkdev/spark-go/so/ent/transfer"
+	"github.com/lightsparkdev/spark-go/so/ent/transferleaf"
 	"github.com/lightsparkdev/spark-go/so/ent/tree"
 	"github.com/lightsparkdev/spark-go/so/ent/treenode"
 )
@@ -87,6 +89,60 @@ func init() {
 	signingnonceDescID := signingnonceMixinFields0[0].Descriptor()
 	// signingnonce.DefaultID holds the default value on creation for the id field.
 	signingnonce.DefaultID = signingnonceDescID.Default.(func() uuid.UUID)
+	transferMixin := schema.Transfer{}.Mixin()
+	transferMixinFields0 := transferMixin[0].Fields()
+	_ = transferMixinFields0
+	transferFields := schema.Transfer{}.Fields()
+	_ = transferFields
+	// transferDescCreateTime is the schema descriptor for create_time field.
+	transferDescCreateTime := transferMixinFields0[1].Descriptor()
+	// transfer.DefaultCreateTime holds the default value on creation for the create_time field.
+	transfer.DefaultCreateTime = transferDescCreateTime.Default.(func() time.Time)
+	// transferDescUpdateTime is the schema descriptor for update_time field.
+	transferDescUpdateTime := transferMixinFields0[2].Descriptor()
+	// transfer.DefaultUpdateTime holds the default value on creation for the update_time field.
+	transfer.DefaultUpdateTime = transferDescUpdateTime.Default.(func() time.Time)
+	// transfer.UpdateDefaultUpdateTime holds the default value on update for the update_time field.
+	transfer.UpdateDefaultUpdateTime = transferDescUpdateTime.UpdateDefault.(func() time.Time)
+	// transferDescInitiatorIdentityPubkey is the schema descriptor for initiator_identity_pubkey field.
+	transferDescInitiatorIdentityPubkey := transferFields[0].Descriptor()
+	// transfer.InitiatorIdentityPubkeyValidator is a validator for the "initiator_identity_pubkey" field. It is called by the builders before save.
+	transfer.InitiatorIdentityPubkeyValidator = transferDescInitiatorIdentityPubkey.Validators[0].(func([]byte) error)
+	// transferDescReceiverIdentityPubkey is the schema descriptor for receiver_identity_pubkey field.
+	transferDescReceiverIdentityPubkey := transferFields[1].Descriptor()
+	// transfer.ReceiverIdentityPubkeyValidator is a validator for the "receiver_identity_pubkey" field. It is called by the builders before save.
+	transfer.ReceiverIdentityPubkeyValidator = transferDescReceiverIdentityPubkey.Validators[0].(func([]byte) error)
+	// transferDescID is the schema descriptor for id field.
+	transferDescID := transferMixinFields0[0].Descriptor()
+	// transfer.DefaultID holds the default value on creation for the id field.
+	transfer.DefaultID = transferDescID.Default.(func() uuid.UUID)
+	transferleafMixin := schema.TransferLeaf{}.Mixin()
+	transferleafMixinFields0 := transferleafMixin[0].Fields()
+	_ = transferleafMixinFields0
+	transferleafFields := schema.TransferLeaf{}.Fields()
+	_ = transferleafFields
+	// transferleafDescCreateTime is the schema descriptor for create_time field.
+	transferleafDescCreateTime := transferleafMixinFields0[1].Descriptor()
+	// transferleaf.DefaultCreateTime holds the default value on creation for the create_time field.
+	transferleaf.DefaultCreateTime = transferleafDescCreateTime.Default.(func() time.Time)
+	// transferleafDescUpdateTime is the schema descriptor for update_time field.
+	transferleafDescUpdateTime := transferleafMixinFields0[2].Descriptor()
+	// transferleaf.DefaultUpdateTime holds the default value on creation for the update_time field.
+	transferleaf.DefaultUpdateTime = transferleafDescUpdateTime.Default.(func() time.Time)
+	// transferleaf.UpdateDefaultUpdateTime holds the default value on update for the update_time field.
+	transferleaf.UpdateDefaultUpdateTime = transferleafDescUpdateTime.UpdateDefault.(func() time.Time)
+	// transferleafDescSecretCipher is the schema descriptor for secret_cipher field.
+	transferleafDescSecretCipher := transferleafFields[0].Descriptor()
+	// transferleaf.SecretCipherValidator is a validator for the "secret_cipher" field. It is called by the builders before save.
+	transferleaf.SecretCipherValidator = transferleafDescSecretCipher.Validators[0].(func([]byte) error)
+	// transferleafDescSignature is the schema descriptor for signature field.
+	transferleafDescSignature := transferleafFields[1].Descriptor()
+	// transferleaf.SignatureValidator is a validator for the "signature" field. It is called by the builders before save.
+	transferleaf.SignatureValidator = transferleafDescSignature.Validators[0].(func([]byte) error)
+	// transferleafDescID is the schema descriptor for id field.
+	transferleafDescID := transferleafMixinFields0[0].Descriptor()
+	// transferleaf.DefaultID holds the default value on creation for the id field.
+	transferleaf.DefaultID = transferleafDescID.Default.(func() uuid.UUID)
 	treeMixin := schema.Tree{}.Mixin()
 	treeMixinFields0 := treeMixin[0].Fields()
 	_ = treeMixinFields0

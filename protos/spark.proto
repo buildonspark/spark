@@ -3,6 +3,7 @@ syntax = "proto3";
 package spark;
 
 option go_package = "github.com/lightsparkdev/spark-go/proto/spark";
+import "google/protobuf/timestamp.proto";
 import "common.proto";
 
 service SparkService {
@@ -11,6 +12,7 @@ service SparkService {
     rpc prepare_split_address(PrepareSplitAddressRequest) returns (PrepareSplitAddressResponse) {}
     rpc split_node(SplitNodeRequest) returns (SplitNodeResponse) {}
     rpc finalize_node_signatures(FinalizeNodeSignaturesRequest) returns (FinalizeNodeSignaturesResponse) {}
+    rpc send_transfer(SendTransferRequest) returns (SendTransferResponse) {}
 }
 
 message GenerateDepositAddressRequest {
@@ -124,4 +126,46 @@ message PrepareSplitAddressRequest {
 
 message PrepareSplitAddressResponse {
     repeated Address addresses = 1;
+}
+
+message SecretShareTweak {
+    bytes tweak = 1;
+    repeated bytes proofs = 2;
+}
+
+message LeafTransferRequest {
+    string leaf_id = 1;
+    SecretShareTweak secret_share_tweak = 2;
+    map<string, bytes> pubkey_shares_tweak = 3;
+    bytes secret_cipher = 4;
+    // Signature over Sha256(leaf_id||current_user_pubkey||cipher_text) using identity key
+    bytes signature = 5;
+}
+
+message SendTransferRequest {
+    string transfer_id = 1;
+    bytes owner_identity_public_key = 2;
+    repeated LeafTransferRequest tranfers = 3;
+    bytes receiver_identity_public_key = 4;
+    google.protobuf.Timestamp expiry_time = 5;
+}
+
+enum TransferStatus {
+    TRANSFER_STATUS_INITIATED = 0; 
+    TRANSFER_STATUS_COMPLETED = 1;
+    TRANSFER_STATUS_CLAIMING = 2;
+    TRANSFER_STATUS_EXPIRED = 3;
+}
+
+message Transfer {
+    string id = 1;
+    bytes receiver_identity_public_key = 2;
+    TransferStatus status = 3;
+    uint64 total_value = 4;
+    google.protobuf.Timestamp expiry_time = 5;
+    repeated string leaf_ids = 6;
+}
+
+message SendTransferResponse {
+    Transfer transfer = 1;
 }

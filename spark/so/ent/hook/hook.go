@@ -45,6 +45,30 @@ func (f SigningNonceFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.SigningNonceMutation", m)
 }
 
+// The TransferFunc type is an adapter to allow the use of ordinary
+// function as Transfer mutator.
+type TransferFunc func(context.Context, *ent.TransferMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f TransferFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.TransferMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.TransferMutation", m)
+}
+
+// The TransferLeafFunc type is an adapter to allow the use of ordinary
+// function as TransferLeaf mutator.
+type TransferLeafFunc func(context.Context, *ent.TransferLeafMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f TransferLeafFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.TransferLeafMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.TransferLeafMutation", m)
+}
+
 // The TreeFunc type is an adapter to allow the use of ordinary
 // function as Tree mutator.
 type TreeFunc func(context.Context, *ent.TreeMutation) (ent.Value, error)

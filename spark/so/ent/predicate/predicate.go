@@ -15,6 +15,12 @@ type SigningKeyshare func(*sql.Selector)
 // SigningNonce is the predicate function for signingnonce builders.
 type SigningNonce func(*sql.Selector)
 
+// Transfer is the predicate function for transfer builders.
+type Transfer func(*sql.Selector)
+
+// TransferLeaf is the predicate function for transferleaf builders.
+type TransferLeaf func(*sql.Selector)
+
 // Tree is the predicate function for tree builders.
 type Tree func(*sql.Selector)
 

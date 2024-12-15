@@ -85,6 +85,77 @@ var (
 			},
 		},
 	}
+	// TransfersColumns holds the columns for the "transfers" table.
+	TransfersColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUUID},
+		{Name: "create_time", Type: field.TypeTime},
+		{Name: "update_time", Type: field.TypeTime},
+		{Name: "initiator_identity_pubkey", Type: field.TypeBytes},
+		{Name: "receiver_identity_pubkey", Type: field.TypeBytes},
+		{Name: "total_value", Type: field.TypeUint64},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"INITIATED", "CLAIMING", "COMPLETED", "EXPIRED"}},
+		{Name: "expiry_time", Type: field.TypeTime},
+	}
+	// TransfersTable holds the schema information for the "transfers" table.
+	TransfersTable = &schema.Table{
+		Name:       "transfers",
+		Columns:    TransfersColumns,
+		PrimaryKey: []*schema.Column{TransfersColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "transfer_initiator_identity_pubkey",
+				Unique:  false,
+				Columns: []*schema.Column{TransfersColumns[3]},
+			},
+			{
+				Name:    "transfer_receiver_identity_pubkey",
+				Unique:  false,
+				Columns: []*schema.Column{TransfersColumns[4]},
+			},
+			{
+				Name:    "transfer_status",
+				Unique:  false,
+				Columns: []*schema.Column{TransfersColumns[6]},
+			},
+		},
+	}
+	// TransferLeafsColumns holds the columns for the "transfer_leafs" table.
+	TransferLeafsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUUID},
+		{Name: "create_time", Type: field.TypeTime},
+		{Name: "update_time", Type: field.TypeTime},
+		{Name: "secret_cipher", Type: field.TypeBytes},
+		{Name: "signature", Type: field.TypeBytes},
+		{Name: "transfer_leaf_transfer", Type: field.TypeUUID},
+		{Name: "transfer_leaf_leaf", Type: field.TypeUUID},
+	}
+	// TransferLeafsTable holds the schema information for the "transfer_leafs" table.
+	TransferLeafsTable = &schema.Table{
+		Name:       "transfer_leafs",
+		Columns:    TransferLeafsColumns,
+		PrimaryKey: []*schema.Column{TransferLeafsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "transfer_leafs_transfers_transfer",
+				Columns:    []*schema.Column{TransferLeafsColumns[5]},
+				RefColumns: []*schema.Column{TransfersColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "transfer_leafs_tree_nodes_leaf",
+				Columns:    []*schema.Column{TransferLeafsColumns[6]},
+				RefColumns: []*schema.Column{TreeNodesColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "transferleaf_transfer_leaf_transfer",
+				Unique:  false,
+				Columns: []*schema.Column{TransferLeafsColumns[5]},
+			},
+		},
+	}
 	// TreesColumns holds the columns for the "trees" table.
 	TreesColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeUUID},
@@ -172,6 +243,8 @@ var (
 		DepositAddressesTable,
 		SigningKeysharesTable,
 		SigningNoncesTable,
+		TransfersTable,
+		TransferLeafsTable,
 		TreesTable,
 		TreeNodesTable,
 	}
@@ -179,6 +252,8 @@ var (
 
 func init() {
 	DepositAddressesTable.ForeignKeys[0].RefTable = SigningKeysharesTable
+	TransferLeafsTable.ForeignKeys[0].RefTable = TransfersTable
+	TransferLeafsTable.ForeignKeys[1].RefTable = TreeNodesTable
 	TreesTable.ForeignKeys[0].RefTable = TreeNodesTable
 	TreeNodesTable.ForeignKeys[0].RefTable = TreesTable
 	TreeNodesTable.ForeignKeys[1].RefTable = TreeNodesTable
