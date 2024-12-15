@@ -2,14 +2,22 @@ package wallet
 
 import (
 	"github.com/lightsparkdev/spark-go/common"
+	"github.com/lightsparkdev/spark-go/so"
 )
 
 // Config is the configuration for the wallet.
 type Config struct {
 	// Network is the network to use for the wallet.
 	Network common.Network
-	// SparkServiceAddress is the address of the Spark service.
-	SparkServiceAddress string
+	// SigningOperators contains all the signing operators using identifier as key.
+	SigningOperators map[string]*so.SigningOperator
+	// CoodinatorIdentifier is the identifier of the signing operator as the coodinator.
+	CoodinatorIdentifier string
 	// FrostSignerAddress is the address of the Frost signer.
 	FrostSignerAddress string
+}
+
+// CoodinatorAddress returns coodinator address.
+func (c *Config) CoodinatorAddress() string {
+	return c.SigningOperators[c.CoodinatorIdentifier].Address
 }

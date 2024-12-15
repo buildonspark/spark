@@ -138,7 +138,7 @@ func SplitTreeNode(
 		childrenPubKeys = append(childrenPubKeys, pubkey.SerializeCompressed())
 	}
 
-	sparkConn, err := common.NewGRPCConnection(config.SparkServiceAddress)
+	sparkConn, err := common.NewGRPCConnection(config.CoodinatorAddress())
 	if err != nil {
 		return nil, err
 	}

@@ -15,7 +15,10 @@ import (
 )
 
 func TestGenerateDepositAddress(t *testing.T) {
-	config := testutil.TestWalletConfig()
+	config, err := testutil.TestWalletConfig()
+	if err != nil {
+		t.Fatalf("failed to create wallet config: %v", err)
+	}
 
 	pubkey, err := hex.DecodeString("0330d50fd2e26d274e15f3dcea34a8bb611a9d0f14d1a9b1211f3608b3b7cd56c7")
 	if err != nil {
@@ -33,10 +36,13 @@ func TestGenerateDepositAddress(t *testing.T) {
 }
 
 func TestStartTreeCreation(t *testing.T) {
-	config := testutil.TestWalletConfig()
+	config, err := testutil.TestWalletConfig()
+	if err != nil {
+		t.Fatalf("failed to create wallet config: %v", err)
+	}
 
 	// Setup Mock tx
-	conn, err := common.NewGRPCConnection(config.SparkServiceAddress)
+	conn, err := common.NewGRPCConnection(config.CoodinatorAddress())
 	if err != nil {
 		t.Fatalf("failed to connect to operator: %v", err)
 	}

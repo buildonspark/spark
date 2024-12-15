@@ -138,7 +138,7 @@ message LeafTransferRequest {
     SecretShareTweak secret_share_tweak = 2;
     map<string, bytes> pubkey_shares_tweak = 3;
     bytes secret_cipher = 4;
-    // Signature over Sha256(leaf_id||current_user_pubkey||cipher_text) using identity key
+    // Signature over Sha256(leaf_id||user_pubkey||cipher_text)
     bytes signature = 5;
 }
 

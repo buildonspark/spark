@@ -15,10 +15,13 @@ import (
 )
 
 func TestSplit(t *testing.T) {
-	config := testutil.TestWalletConfig()
+	config, err := testutil.TestWalletConfig()
+	if err != nil {
+		t.Fatalf("failed to create wallet config: %v", err)
+	}
 
 	// Setup Mock tx
-	conn, err := common.NewGRPCConnection(config.SparkServiceAddress)
+	conn, err := common.NewGRPCConnection(config.CoodinatorAddress())
 	if err != nil {
 		t.Fatalf("failed to connect to operator: %v", err)
 	}
