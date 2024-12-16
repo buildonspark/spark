@@ -1,6 +1,7 @@
 package wallet
 
 import (
+	"github.com/decred/dcrd/dcrec/secp256k1"
 	"github.com/lightsparkdev/spark-go/common"
 	"github.com/lightsparkdev/spark-go/so"
 )
@@ -15,9 +16,16 @@ type Config struct {
 	CoodinatorIdentifier string
 	// FrostSignerAddress is the address of the Frost signer.
 	FrostSignerAddress string
+	// FrostSignerAddress is the address of the Frost signer.
+	IdentityPrivateKey secp256k1.PrivateKey
 }
 
 // CoodinatorAddress returns coodinator address.
 func (c *Config) CoodinatorAddress() string {
 	return c.SigningOperators[c.CoodinatorIdentifier].Address
+}
+
+// IdentityPublicKey returns the identity public key.
+func (c *Config) IdentityPublicKey() []byte {
+	return c.IdentityPrivateKey.PubKey().SerializeCompressed()
 }

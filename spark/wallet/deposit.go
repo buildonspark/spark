@@ -21,7 +21,7 @@ import (
 func GenerateDepositAddress(
 	ctx context.Context,
 	config *Config,
-	identityPubkey, signingPubkey []byte,
+	signingPubkey []byte,
 ) (*pb.GenerateDepositAddressResponse, error) {
 	sparkConn, err := common.NewGRPCConnection(config.CoodinatorAddress())
 	if err != nil {
@@ -31,7 +31,7 @@ func GenerateDepositAddress(
 	sparkClient := pb.NewSparkServiceClient(sparkConn)
 	depositResp, err := sparkClient.GenerateDepositAddress(ctx, &pb.GenerateDepositAddressRequest{
 		SigningPublicKey:  signingPubkey,
-		IdentityPublicKey: identityPubkey,
+		IdentityPublicKey: config.IdentityPublicKey(),
 	})
 	if err != nil {
 		return nil, err
@@ -43,7 +43,6 @@ func GenerateDepositAddress(
 func CreateTree(
 	ctx context.Context,
 	config *Config,
-	identityPubkey,
 	signingPrivKey,
 	verifyingKey []byte,
 	depositTx *wire.MsgTx,
@@ -114,7 +113,7 @@ func CreateTree(
 	sparkClient := pb.NewSparkServiceClient(sparkConn)
 
 	treeResponse, err := sparkClient.StartTreeCreation(ctx, &pb.StartTreeCreationRequest{
-		IdentityPublicKey: identityPubkey,
+		IdentityPublicKey: config.IdentityPublicKey(),
 		OnChainUtxo: &pb.UTXO{
 			Txid: depositTx.TxID(),
 			Vout: uint32(vout),

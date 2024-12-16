@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/decred/dcrd/dcrec/secp256k1"
 	"github.com/lightsparkdev/spark-go/common"
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/wallet"
@@ -127,6 +128,10 @@ func TestConfig() (*so.Config, error) {
 
 // TestWalletConfig returns a wallet configuration that can be used for testing.
 func TestWalletConfig() (*wallet.Config, error) {
+	identityPrivKey, err := secp256k1.GeneratePrivateKey()
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate identity private key: %w", err)
+	}
 	signingOperators, err := getAllSigningOperators()
 	if err != nil {
 		return nil, err
@@ -136,5 +141,6 @@ func TestWalletConfig() (*wallet.Config, error) {
 		SigningOperators:     signingOperators,
 		CoodinatorIdentifier: "0000000000000000000000000000000000000000000000000000000000000001",
 		FrostSignerAddress:   "unix:///tmp/frost_0.sock",
+		IdentityPrivateKey:   *identityPrivKey,
 	}, nil
 }

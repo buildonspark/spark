@@ -25,7 +25,7 @@ func TestGenerateDepositAddress(t *testing.T) {
 		t.Fatalf("failed to decode public key: %v", err)
 	}
 
-	resp, err := wallet.GenerateDepositAddress(context.Background(), config, pubkey, pubkey)
+	resp, err := wallet.GenerateDepositAddress(context.Background(), config, pubkey)
 	if err != nil {
 		t.Fatalf("failed to generate deposit address: %v", err)
 	}
@@ -57,7 +57,7 @@ func TestStartTreeCreation(t *testing.T) {
 	userPubKey := privKey.PubKey()
 	userPubKeyBytes := userPubKey.SerializeCompressed()
 
-	depositResp, err := wallet.GenerateDepositAddress(context.Background(), config, userPubKeyBytes, userPubKeyBytes)
+	depositResp, err := wallet.GenerateDepositAddress(context.Background(), config, userPubKeyBytes)
 	if err != nil {
 		t.Fatalf("failed to generate deposit address: %v", err)
 	}
@@ -88,7 +88,7 @@ func TestStartTreeCreation(t *testing.T) {
 		Tx:   depositTxHex,
 	})
 
-	resp, err := wallet.CreateTree(context.Background(), config, userPubKeyBytes, privKey.Serialize(), depositResp.DepositAddress.VerifyingKey, depositTx, vout)
+	resp, err := wallet.CreateTree(context.Background(), config, privKey.Serialize(), depositResp.DepositAddress.VerifyingKey, depositTx, vout)
 	if err != nil {
 		t.Fatalf("failed to create tree: %v", err)
 	}
