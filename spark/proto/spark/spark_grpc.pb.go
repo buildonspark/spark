@@ -11,6 +11,7 @@ import (
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 // This is a compile-time assertion to ensure that this generated file
@@ -26,6 +27,7 @@ const (
 	SparkService_FinalizeNodeSignatures_FullMethodName = "/spark.SparkService/finalize_node_signatures"
 	SparkService_SendTransfer_FullMethodName           = "/spark.SparkService/send_transfer"
 	SparkService_QueryPendingTransfers_FullMethodName  = "/spark.SparkService/query_pending_transfers"
+	SparkService_ClaimTransferTweakKey_FullMethodName  = "/spark.SparkService/claim_transfer_tweak_key"
 )
 
 // SparkServiceClient is the client API for SparkService service.
@@ -39,6 +41,7 @@ type SparkServiceClient interface {
 	FinalizeNodeSignatures(ctx context.Context, in *FinalizeNodeSignaturesRequest, opts ...grpc.CallOption) (*FinalizeNodeSignaturesResponse, error)
 	SendTransfer(ctx context.Context, in *SendTransferRequest, opts ...grpc.CallOption) (*SendTransferResponse, error)
 	QueryPendingTransfers(ctx context.Context, in *QueryPendingTransfersRequest, opts ...grpc.CallOption) (*QueryPendingTransfersResponse, error)
+	ClaimTransferTweakKey(ctx context.Context, in *ClaimTransferTweakKeyRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type sparkServiceClient struct {
@@ -119,6 +122,16 @@ func (c *sparkServiceClient) QueryPendingTransfers(ctx context.Context, in *Quer
 	return out, nil
 }
 
+func (c *sparkServiceClient) ClaimTransferTweakKey(ctx context.Context, in *ClaimTransferTweakKeyRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, SparkService_ClaimTransferTweakKey_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SparkServiceServer is the server API for SparkService service.
 // All implementations must embed UnimplementedSparkServiceServer
 // for forward compatibility.
@@ -130,6 +143,7 @@ type SparkServiceServer interface {
 	FinalizeNodeSignatures(context.Context, *FinalizeNodeSignaturesRequest) (*FinalizeNodeSignaturesResponse, error)
 	SendTransfer(context.Context, *SendTransferRequest) (*SendTransferResponse, error)
 	QueryPendingTransfers(context.Context, *QueryPendingTransfersRequest) (*QueryPendingTransfersResponse, error)
+	ClaimTransferTweakKey(context.Context, *ClaimTransferTweakKeyRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedSparkServiceServer()
 }
 
@@ -160,6 +174,9 @@ func (UnimplementedSparkServiceServer) SendTransfer(context.Context, *SendTransf
 }
 func (UnimplementedSparkServiceServer) QueryPendingTransfers(context.Context, *QueryPendingTransfersRequest) (*QueryPendingTransfersResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method QueryPendingTransfers not implemented")
+}
+func (UnimplementedSparkServiceServer) ClaimTransferTweakKey(context.Context, *ClaimTransferTweakKeyRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ClaimTransferTweakKey not implemented")
 }
 func (UnimplementedSparkServiceServer) mustEmbedUnimplementedSparkServiceServer() {}
 func (UnimplementedSparkServiceServer) testEmbeddedByValue()                      {}
@@ -308,6 +325,24 @@ func _SparkService_QueryPendingTransfers_Handler(srv interface{}, ctx context.Co
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SparkService_ClaimTransferTweakKey_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ClaimTransferTweakKeyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkServiceServer).ClaimTransferTweakKey(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkService_ClaimTransferTweakKey_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkServiceServer).ClaimTransferTweakKey(ctx, req.(*ClaimTransferTweakKeyRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // SparkService_ServiceDesc is the grpc.ServiceDesc for SparkService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -342,6 +377,10 @@ var SparkService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "query_pending_transfers",
 			Handler:    _SparkService_QueryPendingTransfers_Handler,
+		},
+		{
+			MethodName: "claim_transfer_tweak_key",
+			Handler:    _SparkService_ClaimTransferTweakKey_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

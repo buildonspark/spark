@@ -52,10 +52,10 @@ func (h *TransferHandler) SendTransfer(ctx context.Context, req *pb.SendTransfer
 		return nil, fmt.Errorf("unable to create transfer: %v", err)
 	}
 
-	for _, transferReq := range req.Tranfers {
-		transfer, err = h.initLeafTransfer(ctx, transfer, transferReq)
+	for _, leaf := range req.LeavesToSend {
+		transfer, err = h.initLeafTransfer(ctx, transfer, leaf)
 		if err != nil {
-			return nil, fmt.Errorf("unable to init transfer for leaf %s: %v", transferReq.LeafId, err)
+			return nil, fmt.Errorf("unable to init transfer for leaf %s: %v", leaf.LeafId, err)
 		}
 	}
 
@@ -66,7 +66,7 @@ func (h *TransferHandler) SendTransfer(ctx context.Context, req *pb.SendTransfer
 	return &pb.SendTransferResponse{Transfer: transferProto}, nil
 }
 
-func (h *TransferHandler) initLeafTransfer(ctx context.Context, transfer *ent.Transfer, req *pb.LeafTransferRequest) (*ent.Transfer, error) {
+func (h *TransferHandler) initLeafTransfer(ctx context.Context, transfer *ent.Transfer, req *pb.SendLeafKeyTweak) (*ent.Transfer, error) {
 	// Use Feldman's verifiable secret sharing to verify the share.
 	err := secretsharing.ValidateShare(
 		&secretsharing.VerifiableSecretShare{
@@ -158,4 +158,102 @@ func (h *TransferHandler) QueryPendingTransfers(ctx context.Context, req *pb.Que
 		transferProtos = append(transferProtos, transferProto)
 	}
 	return &pb.QueryPendingTransfersResponse{Transfers: transferProtos}, nil
+}
+
+// ClaimTransferTweakKey starts claiming a pending transfer by tweaking keys of leaves.
+func (h *TransferHandler) ClaimTransferTweakKey(ctx context.Context, req *pb.ClaimTransferTweakKeyRequest) error {
+	transferID, err := uuid.Parse(req.TransferId)
+	if err != nil {
+		return fmt.Errorf("unable to parse transfer_id as a uuid %s: %v", req.TransferId, err)
+	}
+	db := ent.GetDbFromContext(ctx)
+	transfer, err := db.Transfer.Get(ctx, transferID)
+	if err != nil {
+		return fmt.Errorf("unable to find pending transfer %s: %v", req.TransferId, err)
+	}
+	// TODO (yun): Check with other SO if expires
+	if !bytes.Equal(transfer.ReceiverIdentityPubkey, req.OwnerIdentityPublicKey) || transfer.Status != schema.TransferStatusInitiated || transfer.ExpiryTime.Before(time.Now()) {
+		return fmt.Errorf("transfer cannot be claimed %s", req.TransferId)
+	}
+	// Update transfer status
+	_, err = transfer.Update().SetStatus(schema.TransferStatusClaiming).Save(ctx)
+	if err != nil {
+		return fmt.Errorf("unable to update transfer status %s: %v", transfer.ID.String(), err)
+	}
+
+	// Validate leaves count
+	leaves, err := h.getLeavesFromTransfer(ctx, transfer)
+	if err != nil {
+		return fmt.Errorf("unable to get leaves from transfer %s: %v", req.TransferId, err)
+	}
+	if len(*leaves) != len(req.LeavesToReceive) {
+		return fmt.Errorf("inconsistent leaves to claim for transfer %s", req.TransferId)
+	}
+
+	// Tweak keys
+	for _, req := range req.LeavesToReceive {
+		leaf, exists := (*leaves)[req.LeafId]
+		if !exists {
+			return fmt.Errorf("unexpected leaf id %s", req.LeafId)
+		}
+		err = h.claimLeafTweakKey(ctx, leaf, req)
+		if err != nil {
+			return fmt.Errorf("unable to tweak key for leaf %s: %v", req.LeafId, err)
+		}
+	}
+
+	return nil
+}
+
+func (h *TransferHandler) claimLeafTweakKey(ctx context.Context, leaf *ent.TreeNode, req *pb.ClaimLeafKeyTweak) error {
+	err := secretsharing.ValidateShare(
+		&secretsharing.VerifiableSecretShare{
+			SecretShare: secretsharing.SecretShare{
+				FieldModulus: secp256k1.S256().N,
+				Threshold:    int(h.config.Threshold),
+				Index:        big.NewInt(int64(h.config.Index + 1)),
+				Share:        new(big.Int).SetBytes(req.SecretShareTweak.Tweak),
+			},
+			Proofs: req.SecretShareTweak.Proofs,
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("unable to validate share: %v", err)
+	}
+
+	if leaf.Status != schema.TreeNodeStatusTransferLocked {
+		return fmt.Errorf("unable to transfer leaf %s", leaf.ID.String())
+	}
+
+	// Tweak keyshare
+	keyshare, err := leaf.QuerySigningKeyshare().First(ctx)
+	if err != nil {
+		return fmt.Errorf("unable to load keyshare for leaf %s: %v", leaf.ID.String(), err)
+	}
+	_, err = keyshare.TweakKeyShare(
+		ctx,
+		req.SecretShareTweak.Tweak,
+		req.SecretShareTweak.Proofs[0],
+		req.PubkeySharesTweak,
+	)
+	if err != nil {
+		return fmt.Errorf("unable to tweak keyshare %s for leaf %s: %v", keyshare.ID.String(), leaf.ID.String(), err)
+	}
+	return nil
+}
+
+func (h *TransferHandler) getLeavesFromTransfer(ctx context.Context, transfer *ent.Transfer) (*map[string]*ent.TreeNode, error) {
+	transferLeaves, err := transfer.QueryTransferLeaves().All(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get leaves for transfer %s: %v", transfer.ID.String(), err)
+	}
+	leaves := make(map[string]*ent.TreeNode)
+	for _, transferLeaf := range transferLeaves {
+		leaf, err := transferLeaf.QueryLeaf().First(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("unable to get leaf %s: %v", transferLeaf.ID.String(), err)
+		}
+		leaves[leaf.ID.String()] = leaf
+	}
+	return &leaves, nil
 }

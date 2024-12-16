@@ -7,6 +7,7 @@ import (
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/handler"
 	"github.com/lightsparkdev/spark-go/so/helper"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 // SparkServer is the grpc server for the Spark protocol.
@@ -62,4 +63,14 @@ func (s *SparkServer) SendTransfer(ctx context.Context, req *pb.SendTransferRequ
 func (s *SparkServer) QueryPendingTransfers(ctx context.Context, req *pb.QueryPendingTransfersRequest) (*pb.QueryPendingTransfersResponse, error) {
 	transferHander := handler.NewTransferHandler(s.config)
 	return transferHander.QueryPendingTransfers(ctx, req)
+}
+
+// ClaimTransferTweakKey starts claiming a pending transfer by tweaking keys of leaves.
+func (s *SparkServer) ClaimTransferTweakKey(ctx context.Context, req *pb.ClaimTransferTweakKeyRequest) (*emptypb.Empty, error) {
+	transferHander := handler.NewTransferHandler(s.config)
+	err := transferHander.ClaimTransferTweakKey(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	return &emptypb.Empty{}, nil
 }

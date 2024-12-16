@@ -4,6 +4,7 @@ package spark;
 
 option go_package = "github.com/lightsparkdev/spark-go/proto/spark";
 import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
 import "common.proto";
 
 service SparkService {
@@ -14,6 +15,7 @@ service SparkService {
     rpc finalize_node_signatures(FinalizeNodeSignaturesRequest) returns (FinalizeNodeSignaturesResponse) {}
     rpc send_transfer(SendTransferRequest) returns (SendTransferResponse) {}
     rpc query_pending_transfers(QueryPendingTransfersRequest) returns (QueryPendingTransfersResponse) {}
+    rpc claim_transfer_tweak_key(ClaimTransferTweakKeyRequest) returns (google.protobuf.Empty) {}
 }
 
 message GenerateDepositAddressRequest {
@@ -134,7 +136,7 @@ message SecretShareTweak {
     repeated bytes proofs = 2;
 }
 
-message LeafTransferRequest {
+message SendLeafKeyTweak {
     string leaf_id = 1;
     SecretShareTweak secret_share_tweak = 2;
     map<string, bytes> pubkey_shares_tweak = 3;
@@ -146,7 +148,7 @@ message LeafTransferRequest {
 message SendTransferRequest {
     string transfer_id = 1;
     bytes owner_identity_public_key = 2;
-    repeated LeafTransferRequest tranfers = 3;
+    repeated SendLeafKeyTweak leaves_to_send = 3;
     bytes receiver_identity_public_key = 4;
     google.protobuf.Timestamp expiry_time = 5;
 }
@@ -177,4 +179,16 @@ message QueryPendingTransfersRequest {
 
 message QueryPendingTransfersResponse {
     repeated Transfer transfers = 1;
+}
+
+message ClaimLeafKeyTweak {
+    string leaf_id = 1;
+    SecretShareTweak secret_share_tweak = 2;
+    map<string, bytes> pubkey_shares_tweak = 3;
+}
+
+message ClaimTransferTweakKeyRequest {
+    string transfer_id = 1;
+    bytes owner_identity_public_key = 2;
+    repeated ClaimLeafKeyTweak leaves_to_receive = 3;
 }

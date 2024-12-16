@@ -39,7 +39,7 @@ func SendTransfer(
 		return nil, fmt.Errorf("failed to generate transfer id: %v", err)
 	}
 
-	requests, err := prepareLeavesTransfer(config, transferID, leaves, receiverIdentityPubkey)
+	soSendingLeavesMap, err := prepareLeavesTransfer(config, transferID, leaves, receiverIdentityPubkey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare transfer data: %v", err)
 	}
@@ -57,7 +57,7 @@ func SendTransfer(
 			OwnerIdentityPublicKey:    config.IdentityPublicKey(),
 			ReceiverIdentityPublicKey: receiverIdentityPubkey,
 			ExpiryTime:                timestamppb.New(expiryTime),
-			Tranfers:                  (*requests)[identifier],
+			LeavesToSend:              (*soSendingLeavesMap)[identifier],
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to call SendTransfer: %v", err)
@@ -82,7 +82,7 @@ func compareTransfers(transfer1, transfer2 *pb.Transfer) bool {
 		reflect.DeepEqual(transfer1.LeafIds, transfer1.LeafIds)
 }
 
-func prepareLeavesTransfer(config *Config, transferID uuid.UUID, leaves []LeafToTransfer, receiverIdentityPubkey []byte) (*map[string][]*pb.LeafTransferRequest, error) {
+func prepareLeavesTransfer(config *Config, transferID uuid.UUID, leaves []LeafToTransfer, receiverIdentityPubkey []byte) (*map[string][]*pb.SendLeafKeyTweak, error) {
 	receiverSecpPubkey, err := secp256k1.ParsePubKey(receiverIdentityPubkey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse receiver public key: %v", err)
@@ -90,20 +90,20 @@ func prepareLeavesTransfer(config *Config, transferID uuid.UUID, leaves []LeafTo
 	receiverEcdsaPubkey, _ := crypto.UnmarshalPubkey(receiverSecpPubkey.SerializeUncompressed())
 	receiverEciesPubKey := ecies.ImportECDSAPublic(receiverEcdsaPubkey)
 
-	transferRequests := make(map[string][]*pb.LeafTransferRequest)
+	soSendingLeavesMap := make(map[string][]*pb.SendLeafKeyTweak)
 	for _, leaf := range leaves {
-		requests, err := prepareSingleLeafTransfer(config, transferID, leaf, receiverEciesPubKey)
+		soSendingLeafMap, err := prepareSingleLeafTransfer(config, transferID, leaf, receiverEciesPubKey)
 		if err != nil {
 			return nil, fmt.Errorf("failed to prepare single leaf transfer: %v", err)
 		}
-		for identifier, request := range *requests {
-			transferRequests[identifier] = append(transferRequests[identifier], request)
+		for identifier, sendingLeaf := range *soSendingLeafMap {
+			soSendingLeavesMap[identifier] = append(soSendingLeavesMap[identifier], sendingLeaf)
 		}
 	}
-	return &transferRequests, nil
+	return &soSendingLeavesMap, nil
 }
 
-func prepareSingleLeafTransfer(config *Config, transferID uuid.UUID, leaf LeafToTransfer, receiverEciesPubKey *ecies.PublicKey) (*map[string]*pb.LeafTransferRequest, error) {
+func prepareSingleLeafTransfer(config *Config, transferID uuid.UUID, leaf LeafToTransfer, receiverEciesPubKey *ecies.PublicKey) (*map[string]*pb.SendLeafKeyTweak, error) {
 	privKeyTweak, err := common.SubtractPrivateKeys(leaf.NewSigningPrivKey, leaf.SigningPrivKey)
 	if err != nil {
 		return nil, fmt.Errorf("fail to calculate private key tweak: %v", err)
@@ -145,13 +145,13 @@ func prepareSingleLeafTransfer(config *Config, transferID uuid.UUID, leaf LeafTo
 
 	}
 
-	transferRequests := make(map[string]*pb.LeafTransferRequest)
+	soSendingLeafMap := make(map[string]*pb.SendLeafKeyTweak)
 	for identifier, operator := range config.SigningOperators {
 		share := findShare(shares, operator.ID)
 		if share == nil {
 			return nil, fmt.Errorf("failed to find share for operator %d", operator.ID)
 		}
-		transferRequests[identifier] = &pb.LeafTransferRequest{
+		soSendingLeafMap[identifier] = &pb.SendLeafKeyTweak{
 			LeafId: leaf.LeafID,
 			SecretShareTweak: &pb.SecretShareTweak{
 				Tweak:  share.Share.Bytes(),
@@ -162,7 +162,7 @@ func prepareSingleLeafTransfer(config *Config, transferID uuid.UUID, leaf LeafTo
 			Signature:         signature.Serialize(),
 		}
 	}
-	return &transferRequests, nil
+	return &soSendingLeafMap, nil
 }
 
 func findShare(shares []*secretsharing.VerifiableSecretShare, operatorID uint64) *secretsharing.VerifiableSecretShare {
