@@ -125,11 +125,11 @@ func SplitTreeNode(
 	node *pb.TreeNode,
 	leftAmount int64,
 	parentSigningPrivKey []byte,
-) (*pb.FinalizeNodeSignaturesResponse, error) {
+) (*pb.FinalizeNodeSignaturesResponse, [][]byte, error) {
 	_, parentPubkey := secp256k1.PrivKeyFromBytes(parentSigningPrivKey)
 	childrenKeys, err := prepareKeys(parentSigningPrivKey)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	childrenPubKeys := make([][]byte, 0)
@@ -140,7 +140,7 @@ func SplitTreeNode(
 
 	sparkConn, err := common.NewGRPCConnection(config.CoodinatorAddress())
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer sparkConn.Close()
 	sparkClient := pb.NewSparkServiceClient(sparkConn)
@@ -150,25 +150,25 @@ func SplitTreeNode(
 		SigningPublicKeys: childrenPubKeys,
 	})
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	amounts := []int64{leftAmount, int64(node.Value) - leftAmount}
 	splitTx, splitTxSighash, err := createSplitTx(config, node, addrResp, amounts)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	splitTxNonce, err := objects.RandomSigningNonce()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	splitTxNonceProto, err := splitTxNonce.MarshalProto()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	splitTxNonceCommitmentProto, err := splitTxNonce.SigningCommitment().MarshalProto()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	var splitBuf bytes.Buffer
 	splitTx.Serialize(&splitBuf)
@@ -181,7 +181,7 @@ func SplitTreeNode(
 
 	splits, sighashes, signingNonces, err := prepareSplits(config, splitTx, childrenPubKeys)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	splitResp, err := sparkClient.SplitNode(ctx, &pb.SplitNodeRequest{
@@ -190,7 +190,7 @@ func SplitTreeNode(
 		Splits:             splits,
 	})
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	log.Println("splitResp", splitResp)
@@ -220,11 +220,11 @@ func SplitTreeNode(
 	for i, splitResult := range splitResp.SplitResults {
 		nonceProto, err := signingNonces[i].MarshalProto()
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		commitmentProto, err := signingNonces[i].SigningCommitment().MarshalProto()
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		userKeyPackage := pbfrost.KeyPackage{
 			Identifier:  userIdentifier,
@@ -248,7 +248,7 @@ func SplitTreeNode(
 
 	frostConn, err := common.NewGRPCConnection(config.FrostSignerAddress)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer frostConn.Close()
 	frostClient := pbfrost.NewFrostServiceClient(frostConn)
@@ -258,7 +258,7 @@ func SplitTreeNode(
 		Role:        pbfrost.SigningRole_USER,
 	})
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	nodeSignature, err := frostClient.AggregateFrost(context.Background(), &pbfrost.AggregateFrostRequest{
@@ -272,7 +272,7 @@ func SplitTreeNode(
 		UserSignatureShare: frostResp.Results[signingJobs[0].JobId].SignatureShare,
 	})
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	nodeSignatures := make([]*pb.NodeSignatures, 0)
@@ -282,7 +282,7 @@ func SplitTreeNode(
 
 		commitmentProto, err := signingNonces[i].SigningCommitment().MarshalProto()
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		refundSignature, err := frostClient.AggregateFrost(context.Background(), &pbfrost.AggregateFrostRequest{
 			Message:            sighashes[i],
@@ -296,7 +296,7 @@ func SplitTreeNode(
 		})
 		if err != nil {
 			log.Printf("refund signature error: %v", err)
-			return nil, err
+			return nil, nil, err
 		}
 		refundSignatures = append(refundSignatures, refundSignature.Signature)
 		nodeSignatures = append(nodeSignatures, &pb.NodeSignatures{
@@ -306,8 +306,12 @@ func SplitTreeNode(
 		})
 	}
 
-	return sparkClient.FinalizeNodeSignatures(ctx, &pb.FinalizeNodeSignaturesRequest{
+	resp, err := sparkClient.FinalizeNodeSignatures(ctx, &pb.FinalizeNodeSignaturesRequest{
 		Intent:         pbcommon.SignatureIntent_SPLIT,
 		NodeSignatures: nodeSignatures,
 	})
+	if err != nil {
+		return nil, nil, err
+	}
+	return resp, childrenKeys, nil
 }
