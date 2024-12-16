@@ -41,7 +41,7 @@ func prepareKeys(targetKey []byte) ([][]byte, error) {
 	return keys, nil
 }
 
-func createSplitTx(ctx context.Context, config *Config, node *pb.TreeNode, addrResp *pb.PrepareSplitAddressResponse, amounts []int64) (*wire.MsgTx, []byte, error) {
+func createSplitTx(config *Config, node *pb.TreeNode, addrResp *pb.PrepareSplitAddressResponse, amounts []int64) (*wire.MsgTx, []byte, error) {
 	if len(amounts) != len(addrResp.Addresses) {
 		return nil, nil, fmt.Errorf("amounts and addresses length mismatch")
 	}
@@ -68,7 +68,7 @@ func createSplitTx(ctx context.Context, config *Config, node *pb.TreeNode, addrR
 	return splitTx, splitTxSighash, nil
 }
 
-func prepareSplits(ctx context.Context, config *Config, node *pb.TreeNode, splitTx *wire.MsgTx, childrenPubkeys [][]byte) ([]*pb.Split, [][]byte, []*objects.SigningNonce, error) {
+func prepareSplits(config *Config, splitTx *wire.MsgTx, childrenPubkeys [][]byte) ([]*pb.Split, [][]byte, []*objects.SigningNonce, error) {
 	splits := make([]*pb.Split, 0)
 	signingNonces := make([]*objects.SigningNonce, 0)
 	sighashes := make([][]byte, 0)
@@ -154,7 +154,7 @@ func SplitTreeNode(
 	}
 
 	amounts := []int64{leftAmount, int64(node.Value) - leftAmount}
-	splitTx, splitTxSighash, err := createSplitTx(ctx, config, node, addrResp, amounts)
+	splitTx, splitTxSighash, err := createSplitTx(config, node, addrResp, amounts)
 	if err != nil {
 		return nil, err
 	}
@@ -179,7 +179,7 @@ func SplitTreeNode(
 		SigningNonceCommitment: splitTxNonceCommitmentProto,
 	}
 
-	splits, sighashes, signingNonces, err := prepareSplits(ctx, config, node, splitTx, childrenPubKeys)
+	splits, sighashes, signingNonces, err := prepareSplits(config, splitTx, childrenPubKeys)
 	if err != nil {
 		return nil, err
 	}

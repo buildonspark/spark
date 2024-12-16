@@ -18,6 +18,8 @@ type Config struct {
 	FrostSignerAddress string
 	// FrostSignerAddress is the address of the Frost signer.
 	IdentityPrivateKey secp256k1.PrivateKey
+	// Threshold is the min signing operators.
+	Threshold int
 }
 
 // CoodinatorAddress returns coodinator address.

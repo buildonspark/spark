@@ -72,7 +72,7 @@ func (h *TransferHandler) initLeafTransfer(ctx context.Context, transfer *ent.Tr
 			SecretShare: secretsharing.SecretShare{
 				FieldModulus: secp256k1.S256().N,
 				Threshold:    int(h.config.Threshold),
-				Index:        big.NewInt(int64(h.config.Index)),
+				Index:        big.NewInt(int64(h.config.Index + 1)),
 				Share:        new(big.Int).SetBytes(req.SecretShareTweak.Tweak),
 			},
 			Proofs: req.SecretShareTweak.Proofs,

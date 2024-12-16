@@ -100,6 +100,9 @@ func CreateTree(
 		return nil, err
 	}
 	refundNonceCommitmentProto, err := refundNonce.SigningCommitment().MarshalProto()
+	if err != nil {
+		return nil, err
+	}
 	refundTxSighash, err := common.SigHashFromTx(refundTx, 0, rootTx.TxOut[0])
 	if err != nil {
 		return nil, err

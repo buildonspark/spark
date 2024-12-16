@@ -1271,7 +1271,7 @@ type LeafTransferRequest struct {
 	SecretShareTweak  *SecretShareTweak `protobuf:"bytes,2,opt,name=secret_share_tweak,json=secretShareTweak,proto3" json:"secret_share_tweak,omitempty"`
 	PubkeySharesTweak map[string][]byte `protobuf:"bytes,3,rep,name=pubkey_shares_tweak,json=pubkeySharesTweak,proto3" json:"pubkey_shares_tweak,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 	SecretCipher      []byte            `protobuf:"bytes,4,opt,name=secret_cipher,json=secretCipher,proto3" json:"secret_cipher,omitempty"`
-	// Signature over Sha256(leaf_id||user_pubkey||cipher_text)
+	// Signature over Sha256(leaf_id||transfer_id||secret_cipher)
 	Signature []byte `protobuf:"bytes,5,opt,name=signature,proto3" json:"signature,omitempty"`
 }
 
