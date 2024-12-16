@@ -21,8 +21,8 @@ const (
 	FieldCreateTime = "create_time"
 	// FieldUpdateTime holds the string denoting the update_time field in the database.
 	FieldUpdateTime = "update_time"
-	// FieldInitiatorIdentityPubkey holds the string denoting the initiator_identity_pubkey field in the database.
-	FieldInitiatorIdentityPubkey = "initiator_identity_pubkey"
+	// FieldSenderIdentityPubkey holds the string denoting the sender_identity_pubkey field in the database.
+	FieldSenderIdentityPubkey = "sender_identity_pubkey"
 	// FieldReceiverIdentityPubkey holds the string denoting the receiver_identity_pubkey field in the database.
 	FieldReceiverIdentityPubkey = "receiver_identity_pubkey"
 	// FieldTotalValue holds the string denoting the total_value field in the database.
@@ -49,7 +49,7 @@ var Columns = []string{
 	FieldID,
 	FieldCreateTime,
 	FieldUpdateTime,
-	FieldInitiatorIdentityPubkey,
+	FieldSenderIdentityPubkey,
 	FieldReceiverIdentityPubkey,
 	FieldTotalValue,
 	FieldStatus,
@@ -73,8 +73,8 @@ var (
 	DefaultUpdateTime func() time.Time
 	// UpdateDefaultUpdateTime holds the default value on update for the "update_time" field.
 	UpdateDefaultUpdateTime func() time.Time
-	// InitiatorIdentityPubkeyValidator is a validator for the "initiator_identity_pubkey" field. It is called by the builders before save.
-	InitiatorIdentityPubkeyValidator func([]byte) error
+	// SenderIdentityPubkeyValidator is a validator for the "sender_identity_pubkey" field. It is called by the builders before save.
+	SenderIdentityPubkeyValidator func([]byte) error
 	// ReceiverIdentityPubkeyValidator is a validator for the "receiver_identity_pubkey" field. It is called by the builders before save.
 	ReceiverIdentityPubkeyValidator func([]byte) error
 	// DefaultID holds the default value on creation for the "id" field.

@@ -42,7 +42,7 @@ func (h *TransferHandler) SendTransfer(ctx context.Context, req *pb.SendTransfer
 	db := ent.GetDbFromContext(ctx)
 	transfer, err := db.Transfer.Create().
 		SetID(transferID).
-		SetInitiatorIdentityPubkey(req.OwnerIdentityPublicKey).
+		SetSenderIdentityPubkey(req.OwnerIdentityPublicKey).
 		SetReceiverIdentityPubkey(req.ReceiverIdentityPublicKey).
 		SetStatus(schema.TransferStatusInitiated).
 		SetTotalValue(0).
@@ -96,7 +96,7 @@ func (h *TransferHandler) initLeafTransfer(ctx context.Context, transfer *ent.Tr
 	if err != nil || leaf == nil {
 		return nil, fmt.Errorf("unable to find leaf %s: %v", req.LeafId, err)
 	}
-	if leaf.Status != schema.TreeNodeStatusAvailable || !bytes.Equal(leaf.OwnerIdentityPubkey, transfer.InitiatorIdentityPubkey) {
+	if leaf.Status != schema.TreeNodeStatusAvailable || !bytes.Equal(leaf.OwnerIdentityPubkey, transfer.SenderIdentityPubkey) {
 		return nil, fmt.Errorf("leaf %s is not available to transfer", req.LeafId)
 	}
 

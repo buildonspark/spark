@@ -1932,24 +1932,24 @@ func (m *SigningNonceMutation) ResetEdge(name string) error {
 // TransferMutation represents an operation that mutates the Transfer nodes in the graph.
 type TransferMutation struct {
 	config
-	op                        Op
-	typ                       string
-	id                        *uuid.UUID
-	create_time               *time.Time
-	update_time               *time.Time
-	initiator_identity_pubkey *[]byte
-	receiver_identity_pubkey  *[]byte
-	total_value               *uint64
-	addtotal_value            *int64
-	status                    *schema.TransferStatus
-	expiry_time               *time.Time
-	clearedFields             map[string]struct{}
-	transfer_leaves           map[uuid.UUID]struct{}
-	removedtransfer_leaves    map[uuid.UUID]struct{}
-	clearedtransfer_leaves    bool
-	done                      bool
-	oldValue                  func(context.Context) (*Transfer, error)
-	predicates                []predicate.Transfer
+	op                       Op
+	typ                      string
+	id                       *uuid.UUID
+	create_time              *time.Time
+	update_time              *time.Time
+	sender_identity_pubkey   *[]byte
+	receiver_identity_pubkey *[]byte
+	total_value              *uint64
+	addtotal_value           *int64
+	status                   *schema.TransferStatus
+	expiry_time              *time.Time
+	clearedFields            map[string]struct{}
+	transfer_leaves          map[uuid.UUID]struct{}
+	removedtransfer_leaves   map[uuid.UUID]struct{}
+	clearedtransfer_leaves   bool
+	done                     bool
+	oldValue                 func(context.Context) (*Transfer, error)
+	predicates               []predicate.Transfer
 }
 
 var _ ent.Mutation = (*TransferMutation)(nil)
@@ -2128,40 +2128,40 @@ func (m *TransferMutation) ResetUpdateTime() {
 	m.update_time = nil
 }
 
-// SetInitiatorIdentityPubkey sets the "initiator_identity_pubkey" field.
-func (m *TransferMutation) SetInitiatorIdentityPubkey(b []byte) {
-	m.initiator_identity_pubkey = &b
+// SetSenderIdentityPubkey sets the "sender_identity_pubkey" field.
+func (m *TransferMutation) SetSenderIdentityPubkey(b []byte) {
+	m.sender_identity_pubkey = &b
 }
 
-// InitiatorIdentityPubkey returns the value of the "initiator_identity_pubkey" field in the mutation.
-func (m *TransferMutation) InitiatorIdentityPubkey() (r []byte, exists bool) {
-	v := m.initiator_identity_pubkey
+// SenderIdentityPubkey returns the value of the "sender_identity_pubkey" field in the mutation.
+func (m *TransferMutation) SenderIdentityPubkey() (r []byte, exists bool) {
+	v := m.sender_identity_pubkey
 	if v == nil {
 		return
 	}
 	return *v, true
 }
 
-// OldInitiatorIdentityPubkey returns the old "initiator_identity_pubkey" field's value of the Transfer entity.
+// OldSenderIdentityPubkey returns the old "sender_identity_pubkey" field's value of the Transfer entity.
 // If the Transfer object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *TransferMutation) OldInitiatorIdentityPubkey(ctx context.Context) (v []byte, err error) {
+func (m *TransferMutation) OldSenderIdentityPubkey(ctx context.Context) (v []byte, err error) {
 	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldInitiatorIdentityPubkey is only allowed on UpdateOne operations")
+		return v, errors.New("OldSenderIdentityPubkey is only allowed on UpdateOne operations")
 	}
 	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldInitiatorIdentityPubkey requires an ID field in the mutation")
+		return v, errors.New("OldSenderIdentityPubkey requires an ID field in the mutation")
 	}
 	oldValue, err := m.oldValue(ctx)
 	if err != nil {
-		return v, fmt.Errorf("querying old value for OldInitiatorIdentityPubkey: %w", err)
+		return v, fmt.Errorf("querying old value for OldSenderIdentityPubkey: %w", err)
 	}
-	return oldValue.InitiatorIdentityPubkey, nil
+	return oldValue.SenderIdentityPubkey, nil
 }
 
-// ResetInitiatorIdentityPubkey resets all changes to the "initiator_identity_pubkey" field.
-func (m *TransferMutation) ResetInitiatorIdentityPubkey() {
-	m.initiator_identity_pubkey = nil
+// ResetSenderIdentityPubkey resets all changes to the "sender_identity_pubkey" field.
+func (m *TransferMutation) ResetSenderIdentityPubkey() {
+	m.sender_identity_pubkey = nil
 }
 
 // SetReceiverIdentityPubkey sets the "receiver_identity_pubkey" field.
@@ -2423,8 +2423,8 @@ func (m *TransferMutation) Fields() []string {
 	if m.update_time != nil {
 		fields = append(fields, transfer.FieldUpdateTime)
 	}
-	if m.initiator_identity_pubkey != nil {
-		fields = append(fields, transfer.FieldInitiatorIdentityPubkey)
+	if m.sender_identity_pubkey != nil {
+		fields = append(fields, transfer.FieldSenderIdentityPubkey)
 	}
 	if m.receiver_identity_pubkey != nil {
 		fields = append(fields, transfer.FieldReceiverIdentityPubkey)
@@ -2450,8 +2450,8 @@ func (m *TransferMutation) Field(name string) (ent.Value, bool) {
 		return m.CreateTime()
 	case transfer.FieldUpdateTime:
 		return m.UpdateTime()
-	case transfer.FieldInitiatorIdentityPubkey:
-		return m.InitiatorIdentityPubkey()
+	case transfer.FieldSenderIdentityPubkey:
+		return m.SenderIdentityPubkey()
 	case transfer.FieldReceiverIdentityPubkey:
 		return m.ReceiverIdentityPubkey()
 	case transfer.FieldTotalValue:
@@ -2473,8 +2473,8 @@ func (m *TransferMutation) OldField(ctx context.Context, name string) (ent.Value
 		return m.OldCreateTime(ctx)
 	case transfer.FieldUpdateTime:
 		return m.OldUpdateTime(ctx)
-	case transfer.FieldInitiatorIdentityPubkey:
-		return m.OldInitiatorIdentityPubkey(ctx)
+	case transfer.FieldSenderIdentityPubkey:
+		return m.OldSenderIdentityPubkey(ctx)
 	case transfer.FieldReceiverIdentityPubkey:
 		return m.OldReceiverIdentityPubkey(ctx)
 	case transfer.FieldTotalValue:
@@ -2506,12 +2506,12 @@ func (m *TransferMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetUpdateTime(v)
 		return nil
-	case transfer.FieldInitiatorIdentityPubkey:
+	case transfer.FieldSenderIdentityPubkey:
 		v, ok := value.([]byte)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
-		m.SetInitiatorIdentityPubkey(v)
+		m.SetSenderIdentityPubkey(v)
 		return nil
 	case transfer.FieldReceiverIdentityPubkey:
 		v, ok := value.([]byte)
@@ -2611,8 +2611,8 @@ func (m *TransferMutation) ResetField(name string) error {
 	case transfer.FieldUpdateTime:
 		m.ResetUpdateTime()
 		return nil
-	case transfer.FieldInitiatorIdentityPubkey:
-		m.ResetInitiatorIdentityPubkey()
+	case transfer.FieldSenderIdentityPubkey:
+		m.ResetSenderIdentityPubkey()
 		return nil
 	case transfer.FieldReceiverIdentityPubkey:
 		m.ResetReceiverIdentityPubkey()

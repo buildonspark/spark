@@ -46,7 +46,7 @@ func (Transfer) Mixin() []ent.Mixin {
 // Fields are the fields for the tree nodes table.
 func (Transfer) Fields() []ent.Field {
 	return []ent.Field{
-		field.Bytes("initiator_identity_pubkey").NotEmpty().Immutable(),
+		field.Bytes("sender_identity_pubkey").NotEmpty().Immutable(),
 		field.Bytes("receiver_identity_pubkey").NotEmpty().Immutable(),
 		field.Uint64("total_value"),
 		field.Enum("status").GoType(TransferStatus("")),
@@ -64,7 +64,7 @@ func (Transfer) Edges() []ent.Edge {
 // Indexes are the indexes for the tree nodes table.
 func (Transfer) Indexes() []ent.Index {
 	return []ent.Index{
-		index.Fields("initiator_identity_pubkey"),
+		index.Fields("sender_identity_pubkey"),
 		index.Fields("receiver_identity_pubkey"),
 		index.Fields("status"),
 	}

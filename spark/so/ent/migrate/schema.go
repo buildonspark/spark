@@ -90,7 +90,7 @@ var (
 		{Name: "id", Type: field.TypeUUID},
 		{Name: "create_time", Type: field.TypeTime},
 		{Name: "update_time", Type: field.TypeTime},
-		{Name: "initiator_identity_pubkey", Type: field.TypeBytes},
+		{Name: "sender_identity_pubkey", Type: field.TypeBytes},
 		{Name: "receiver_identity_pubkey", Type: field.TypeBytes},
 		{Name: "total_value", Type: field.TypeUint64},
 		{Name: "status", Type: field.TypeEnum, Enums: []string{"INITIATED", "CLAIMING", "COMPLETED", "EXPIRED"}},
@@ -103,7 +103,7 @@ var (
 		PrimaryKey: []*schema.Column{TransfersColumns[0]},
 		Indexes: []*schema.Index{
 			{
-				Name:    "transfer_initiator_identity_pubkey",
+				Name:    "transfer_sender_identity_pubkey",
 				Unique:  false,
 				Columns: []*schema.Column{TransfersColumns[3]},
 			},

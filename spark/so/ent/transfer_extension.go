@@ -15,22 +15,27 @@ func (t *Transfer) MarshalProto(ctx context.Context) (*pb.Transfer, error) {
 	if err != nil {
 		return nil, fmt.Errorf("unable to query transfer leaves for transfer %s: %v", t.ID.String(), err)
 	}
-	leafIds := []string{}
+	leavesProto := []*pb.TransferLeaf{}
 	for _, leaf := range leaves {
-		leafIds = append(leafIds, leaf.ID.String())
+		leafProto, err := leaf.MarshalProto(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("unable to marshal transfer leaf %s: %v", leaf.ID.String(), err)
+		}
+		leavesProto = append(leavesProto, leafProto)
 	}
+
 	status, err := t.getProtoStatus()
 	if err != nil {
 		return nil, err
 	}
-
 	return &pb.Transfer{
 		Id:                        t.ID.String(),
+		SenderIdentityPublicKey:   t.SenderIdentityPubkey,
 		ReceiverIdentityPublicKey: t.ReceiverIdentityPubkey,
 		Status:                    *status,
 		TotalValue:                t.TotalValue,
 		ExpiryTime:                timestamppb.New(t.ExpiryTime),
-		LeafIds:                   leafIds,
+		Leaves:                    leavesProto,
 	}, nil
 }
 

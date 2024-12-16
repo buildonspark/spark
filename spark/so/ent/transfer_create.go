@@ -51,9 +51,9 @@ func (tc *TransferCreate) SetNillableUpdateTime(t *time.Time) *TransferCreate {
 	return tc
 }
 
-// SetInitiatorIdentityPubkey sets the "initiator_identity_pubkey" field.
-func (tc *TransferCreate) SetInitiatorIdentityPubkey(b []byte) *TransferCreate {
-	tc.mutation.SetInitiatorIdentityPubkey(b)
+// SetSenderIdentityPubkey sets the "sender_identity_pubkey" field.
+func (tc *TransferCreate) SetSenderIdentityPubkey(b []byte) *TransferCreate {
+	tc.mutation.SetSenderIdentityPubkey(b)
 	return tc
 }
 
@@ -167,12 +167,12 @@ func (tc *TransferCreate) check() error {
 	if _, ok := tc.mutation.UpdateTime(); !ok {
 		return &ValidationError{Name: "update_time", err: errors.New(`ent: missing required field "Transfer.update_time"`)}
 	}
-	if _, ok := tc.mutation.InitiatorIdentityPubkey(); !ok {
-		return &ValidationError{Name: "initiator_identity_pubkey", err: errors.New(`ent: missing required field "Transfer.initiator_identity_pubkey"`)}
+	if _, ok := tc.mutation.SenderIdentityPubkey(); !ok {
+		return &ValidationError{Name: "sender_identity_pubkey", err: errors.New(`ent: missing required field "Transfer.sender_identity_pubkey"`)}
 	}
-	if v, ok := tc.mutation.InitiatorIdentityPubkey(); ok {
-		if err := transfer.InitiatorIdentityPubkeyValidator(v); err != nil {
-			return &ValidationError{Name: "initiator_identity_pubkey", err: fmt.Errorf(`ent: validator failed for field "Transfer.initiator_identity_pubkey": %w`, err)}
+	if v, ok := tc.mutation.SenderIdentityPubkey(); ok {
+		if err := transfer.SenderIdentityPubkeyValidator(v); err != nil {
+			return &ValidationError{Name: "sender_identity_pubkey", err: fmt.Errorf(`ent: validator failed for field "Transfer.sender_identity_pubkey": %w`, err)}
 		}
 	}
 	if _, ok := tc.mutation.ReceiverIdentityPubkey(); !ok {
@@ -240,9 +240,9 @@ func (tc *TransferCreate) createSpec() (*Transfer, *sqlgraph.CreateSpec) {
 		_spec.SetField(transfer.FieldUpdateTime, field.TypeTime, value)
 		_node.UpdateTime = value
 	}
-	if value, ok := tc.mutation.InitiatorIdentityPubkey(); ok {
-		_spec.SetField(transfer.FieldInitiatorIdentityPubkey, field.TypeBytes, value)
-		_node.InitiatorIdentityPubkey = value
+	if value, ok := tc.mutation.SenderIdentityPubkey(); ok {
+		_spec.SetField(transfer.FieldSenderIdentityPubkey, field.TypeBytes, value)
+		_node.SenderIdentityPubkey = value
 	}
 	if value, ok := tc.mutation.ReceiverIdentityPubkey(); ok {
 		_spec.SetField(transfer.FieldReceiverIdentityPubkey, field.TypeBytes, value)

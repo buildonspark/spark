@@ -162,11 +162,18 @@ enum TransferStatus {
 
 message Transfer {
     string id = 1;
-    bytes receiver_identity_public_key = 2;
-    TransferStatus status = 3;
-    uint64 total_value = 4;
-    google.protobuf.Timestamp expiry_time = 5;
-    repeated string leaf_ids = 6;
+    bytes sender_identity_public_key = 2;
+    bytes receiver_identity_public_key = 3;
+    TransferStatus status = 4;
+    uint64 total_value = 5;
+    google.protobuf.Timestamp expiry_time = 6;
+    repeated TransferLeaf leaves = 7;
+}
+
+message TransferLeaf {
+    string leaf_id = 1;
+    bytes secret_cipher = 2;
+    bytes signature = 3;
 }
 
 message SendTransferResponse {

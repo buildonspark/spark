@@ -104,10 +104,10 @@ func init() {
 	transfer.DefaultUpdateTime = transferDescUpdateTime.Default.(func() time.Time)
 	// transfer.UpdateDefaultUpdateTime holds the default value on update for the update_time field.
 	transfer.UpdateDefaultUpdateTime = transferDescUpdateTime.UpdateDefault.(func() time.Time)
-	// transferDescInitiatorIdentityPubkey is the schema descriptor for initiator_identity_pubkey field.
-	transferDescInitiatorIdentityPubkey := transferFields[0].Descriptor()
-	// transfer.InitiatorIdentityPubkeyValidator is a validator for the "initiator_identity_pubkey" field. It is called by the builders before save.
-	transfer.InitiatorIdentityPubkeyValidator = transferDescInitiatorIdentityPubkey.Validators[0].(func([]byte) error)
+	// transferDescSenderIdentityPubkey is the schema descriptor for sender_identity_pubkey field.
+	transferDescSenderIdentityPubkey := transferFields[0].Descriptor()
+	// transfer.SenderIdentityPubkeyValidator is a validator for the "sender_identity_pubkey" field. It is called by the builders before save.
+	transfer.SenderIdentityPubkeyValidator = transferDescSenderIdentityPubkey.Validators[0].(func([]byte) error)
 	// transferDescReceiverIdentityPubkey is the schema descriptor for receiver_identity_pubkey field.
 	transferDescReceiverIdentityPubkey := transferFields[1].Descriptor()
 	// transfer.ReceiverIdentityPubkeyValidator is a validator for the "receiver_identity_pubkey" field. It is called by the builders before save.

@@ -23,8 +23,8 @@ type Transfer struct {
 	CreateTime time.Time `json:"create_time,omitempty"`
 	// UpdateTime holds the value of the "update_time" field.
 	UpdateTime time.Time `json:"update_time,omitempty"`
-	// InitiatorIdentityPubkey holds the value of the "initiator_identity_pubkey" field.
-	InitiatorIdentityPubkey []byte `json:"initiator_identity_pubkey,omitempty"`
+	// SenderIdentityPubkey holds the value of the "sender_identity_pubkey" field.
+	SenderIdentityPubkey []byte `json:"sender_identity_pubkey,omitempty"`
 	// ReceiverIdentityPubkey holds the value of the "receiver_identity_pubkey" field.
 	ReceiverIdentityPubkey []byte `json:"receiver_identity_pubkey,omitempty"`
 	// TotalValue holds the value of the "total_value" field.
@@ -62,7 +62,7 @@ func (*Transfer) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case transfer.FieldInitiatorIdentityPubkey, transfer.FieldReceiverIdentityPubkey:
+		case transfer.FieldSenderIdentityPubkey, transfer.FieldReceiverIdentityPubkey:
 			values[i] = new([]byte)
 		case transfer.FieldTotalValue:
 			values[i] = new(sql.NullInt64)
@@ -105,11 +105,11 @@ func (t *Transfer) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				t.UpdateTime = value.Time
 			}
-		case transfer.FieldInitiatorIdentityPubkey:
+		case transfer.FieldSenderIdentityPubkey:
 			if value, ok := values[i].(*[]byte); !ok {
-				return fmt.Errorf("unexpected type %T for field initiator_identity_pubkey", values[i])
+				return fmt.Errorf("unexpected type %T for field sender_identity_pubkey", values[i])
 			} else if value != nil {
-				t.InitiatorIdentityPubkey = *value
+				t.SenderIdentityPubkey = *value
 			}
 		case transfer.FieldReceiverIdentityPubkey:
 			if value, ok := values[i].(*[]byte); !ok {
@@ -182,8 +182,8 @@ func (t *Transfer) String() string {
 	builder.WriteString("update_time=")
 	builder.WriteString(t.UpdateTime.Format(time.ANSIC))
 	builder.WriteString(", ")
-	builder.WriteString("initiator_identity_pubkey=")
-	builder.WriteString(fmt.Sprintf("%v", t.InitiatorIdentityPubkey))
+	builder.WriteString("sender_identity_pubkey=")
+	builder.WriteString(fmt.Sprintf("%v", t.SenderIdentityPubkey))
 	builder.WriteString(", ")
 	builder.WriteString("receiver_identity_pubkey=")
 	builder.WriteString(fmt.Sprintf("%v", t.ReceiverIdentityPubkey))

@@ -6,7 +6,6 @@ import (
 	"crypto/rand"
 	"fmt"
 	"math/big"
-	"reflect"
 	"time"
 
 	"github.com/decred/dcrd/dcrec/secp256k1"
@@ -79,7 +78,7 @@ func compareTransfers(transfer1, transfer2 *pb.Transfer) bool {
 		transfer1.Status == transfer2.Status &&
 		transfer1.TotalValue == transfer2.TotalValue &&
 		transfer1.ExpiryTime.AsTime().Equal(transfer2.ExpiryTime.AsTime()) &&
-		reflect.DeepEqual(transfer1.LeafIds, transfer1.LeafIds)
+		len(transfer1.Leaves) == len(transfer2.Leaves)
 }
 
 func prepareLeavesTransfer(config *Config, transferID uuid.UUID, leaves []LeafToTransfer, receiverIdentityPubkey []byte) (*map[string][]*pb.SendLeafKeyTweak, error) {
