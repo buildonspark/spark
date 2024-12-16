@@ -48,17 +48,16 @@ func (h *InternalFinalizeSignatureHandler) updateNode(ctx context.Context, node 
 	if err != nil {
 		return err
 	}
-	if intent == pbcommon.SignatureIntent_CREATION || intent == pbcommon.SignatureIntent_SPLIT {
-		var tree *ent.Tree
-		if intent == pbcommon.SignatureIntent_CREATION {
-			tree = db.Tree.Create().SetID(treeID).SetOwnerIdentityPubkey(node.OwnerIdentityPubkey).SaveX(ctx)
-		} else {
-			tree, err = db.Tree.Get(ctx, treeID)
-			if err != nil {
-				return err
-			}
+	if intent == pbcommon.SignatureIntent_CREATION {
+		tree, err := db.Tree.
+			Create().
+			SetID(treeID).
+			SetOwnerIdentityPubkey(node.OwnerIdentityPubkey).
+			Save(ctx)
+		if err != nil {
+			return err
 		}
-		root := db.TreeNode.
+		root, err := db.TreeNode.
 			Create().
 			SetID(nodeID).
 			SetTree(tree).
@@ -71,8 +70,49 @@ func (h *InternalFinalizeSignatureHandler) updateNode(ctx context.Context, node 
 			SetVout(uint16(node.Vout)).
 			SetRawTx(node.RawTx).
 			SetRawRefundTx(node.RawRefundTx).
-			SaveX(ctx)
-		tree.Update().SetRoot(root).SaveX(ctx)
+			Save(ctx)
+		if err != nil {
+			return err
+		}
+		tree, err = tree.Update().SetRoot(root).Save(ctx)
+		if err != nil {
+			return err
+		}
+	} else if intent == pbcommon.SignatureIntent_SPLIT {
+		tree, err := db.Tree.Get(ctx, treeID)
+		if err != nil {
+			return err
+		}
+		parentID, err := uuid.Parse(*node.ParentNodeId)
+		if err != nil {
+			return err
+		}
+		_, err = db.TreeNode.
+			Create().
+			SetID(nodeID).
+			SetTree(tree).
+			SetParentID(parentID).
+			SetStatus(schema.TreeNodeStatusAvailable).
+			SetOwnerIdentityPubkey(node.OwnerIdentityPubkey).
+			SetOwnerSigningPubkey(node.OwnerSigningPubkey).
+			SetValue(node.Value).
+			SetVerifyingPubkey(node.VerifyingPubkey).
+			SetSigningKeyshareID(signingKeyshareID).
+			SetVout(uint16(node.Vout)).
+			SetRawTx(node.RawTx).
+			SetRawRefundTx(node.RawRefundTx).
+			Save(ctx)
+		if err != nil {
+			return err
+		}
+		parent, err := db.TreeNode.Get(ctx, parentID)
+		if err != nil {
+			return err
+		}
+		parent, err = parent.Update().SetStatus(schema.TreeNodeStatusSplitted).Save(ctx)
+		if err != nil {
+			return err
+		}
 	} else {
 		node, err := db.TreeNode.Get(ctx, nodeID)
 		if err != nil {
@@ -81,11 +121,14 @@ func (h *InternalFinalizeSignatureHandler) updateNode(ctx context.Context, node 
 		if node == nil {
 			return fmt.Errorf("node not found")
 		}
-		node = node.Update().
+		node, err = node.Update().
 			SetRawTx(node.RawTx).
 			SetRawRefundTx(node.RawRefundTx).
 			SetStatus(schema.TreeNodeStatusAvailable).
-			SaveX(ctx)
+			Save(ctx)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }

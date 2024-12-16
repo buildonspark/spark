@@ -207,6 +207,7 @@ func (h *SplitHandler) prepareSigningJobs(
 		node, err := db.TreeNode.
 			Create().
 			SetTree(tree).
+			SetParentID(nodeID).
 			SetStatus(schema.TreeNodeStatusCreating).
 			SetOwnerIdentityPubkey(split.SigningPublicKey).
 			SetOwnerSigningPubkey(split.SigningPublicKey).

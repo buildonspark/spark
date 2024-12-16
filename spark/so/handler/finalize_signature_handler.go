@@ -96,11 +96,27 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 	}
 
 	// Update the tree root
-	node = node.Update().
+	node, err = node.Update().
 		SetRawTx(rootTxBytes).
 		SetRawRefundTx(refundTxBytes).
 		SetStatus(schema.TreeNodeStatusAvailable).
-		SaveX(ctx)
+		Save(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if intent == pbcommon.SignatureIntent_SPLIT {
+		parent, err := node.QueryParent().Only(ctx)
+		if err != nil {
+			log.Printf("failed to get parent node: %v", err)
+			return nil, nil, err
+		}
+		parent, err = parent.Update().SetStatus(schema.TreeNodeStatusSplitted).Save(ctx)
+		if err != nil {
+			log.Printf("failed to update parent node: %v", err)
+			return nil, nil, err
+		}
+	}
 
 	return node.MarshalSparkProto(ctx), node.MarshalInternalProto(ctx), nil
 }
