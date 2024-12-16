@@ -25,6 +25,7 @@ const (
 	SparkService_SplitNode_FullMethodName              = "/spark.SparkService/split_node"
 	SparkService_FinalizeNodeSignatures_FullMethodName = "/spark.SparkService/finalize_node_signatures"
 	SparkService_SendTransfer_FullMethodName           = "/spark.SparkService/send_transfer"
+	SparkService_QueryPendingTransfers_FullMethodName  = "/spark.SparkService/query_pending_transfers"
 )
 
 // SparkServiceClient is the client API for SparkService service.
@@ -37,6 +38,7 @@ type SparkServiceClient interface {
 	SplitNode(ctx context.Context, in *SplitNodeRequest, opts ...grpc.CallOption) (*SplitNodeResponse, error)
 	FinalizeNodeSignatures(ctx context.Context, in *FinalizeNodeSignaturesRequest, opts ...grpc.CallOption) (*FinalizeNodeSignaturesResponse, error)
 	SendTransfer(ctx context.Context, in *SendTransferRequest, opts ...grpc.CallOption) (*SendTransferResponse, error)
+	QueryPendingTransfers(ctx context.Context, in *QueryPendingTransfersRequest, opts ...grpc.CallOption) (*QueryPendingTransfersResponse, error)
 }
 
 type sparkServiceClient struct {
@@ -107,6 +109,16 @@ func (c *sparkServiceClient) SendTransfer(ctx context.Context, in *SendTransferR
 	return out, nil
 }
 
+func (c *sparkServiceClient) QueryPendingTransfers(ctx context.Context, in *QueryPendingTransfersRequest, opts ...grpc.CallOption) (*QueryPendingTransfersResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(QueryPendingTransfersResponse)
+	err := c.cc.Invoke(ctx, SparkService_QueryPendingTransfers_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SparkServiceServer is the server API for SparkService service.
 // All implementations must embed UnimplementedSparkServiceServer
 // for forward compatibility.
@@ -117,6 +129,7 @@ type SparkServiceServer interface {
 	SplitNode(context.Context, *SplitNodeRequest) (*SplitNodeResponse, error)
 	FinalizeNodeSignatures(context.Context, *FinalizeNodeSignaturesRequest) (*FinalizeNodeSignaturesResponse, error)
 	SendTransfer(context.Context, *SendTransferRequest) (*SendTransferResponse, error)
+	QueryPendingTransfers(context.Context, *QueryPendingTransfersRequest) (*QueryPendingTransfersResponse, error)
 	mustEmbedUnimplementedSparkServiceServer()
 }
 
@@ -144,6 +157,9 @@ func (UnimplementedSparkServiceServer) FinalizeNodeSignatures(context.Context, *
 }
 func (UnimplementedSparkServiceServer) SendTransfer(context.Context, *SendTransferRequest) (*SendTransferResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SendTransfer not implemented")
+}
+func (UnimplementedSparkServiceServer) QueryPendingTransfers(context.Context, *QueryPendingTransfersRequest) (*QueryPendingTransfersResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method QueryPendingTransfers not implemented")
 }
 func (UnimplementedSparkServiceServer) mustEmbedUnimplementedSparkServiceServer() {}
 func (UnimplementedSparkServiceServer) testEmbeddedByValue()                      {}
@@ -274,6 +290,24 @@ func _SparkService_SendTransfer_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SparkService_QueryPendingTransfers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QueryPendingTransfersRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkServiceServer).QueryPendingTransfers(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkService_QueryPendingTransfers_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkServiceServer).QueryPendingTransfers(ctx, req.(*QueryPendingTransfersRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // SparkService_ServiceDesc is the grpc.ServiceDesc for SparkService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -304,6 +338,10 @@ var SparkService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "send_transfer",
 			Handler:    _SparkService_SendTransfer_Handler,
+		},
+		{
+			MethodName: "query_pending_transfers",
+			Handler:    _SparkService_QueryPendingTransfers_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

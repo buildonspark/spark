@@ -57,3 +57,9 @@ func (s *SparkServer) SendTransfer(ctx context.Context, req *pb.SendTransferRequ
 	transferHander := handler.NewTransferHandler(s.config)
 	return transferHander.SendTransfer(ctx, req)
 }
+
+// QueryPendingTransfers queries the pending transfers to claim.
+func (s *SparkServer) QueryPendingTransfers(ctx context.Context, req *pb.QueryPendingTransfersRequest) (*pb.QueryPendingTransfersResponse, error) {
+	transferHander := handler.NewTransferHandler(s.config)
+	return transferHander.QueryPendingTransfers(ctx, req)
+}

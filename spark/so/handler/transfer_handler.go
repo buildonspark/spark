@@ -14,6 +14,7 @@ import (
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/ent"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
+	"github.com/lightsparkdev/spark-go/so/ent/transfer"
 )
 
 // TransferHandler is a helper struct to handle leaves transfer request.
@@ -131,4 +132,30 @@ func (h *TransferHandler) initLeafTransfer(ctx context.Context, transfer *ent.Tr
 		return nil, fmt.Errorf("unable to create transfer leaf: %v", err)
 	}
 	return db.Transfer.UpdateOne(transfer).SetTotalValue(transfer.TotalValue + leaf.Value).Save(ctx)
+}
+
+// QueryPendingTransfers queries the pending transfers to claim.
+func (h *TransferHandler) QueryPendingTransfers(ctx context.Context, req *pb.QueryPendingTransfersRequest) (*pb.QueryPendingTransfersResponse, error) {
+	db := ent.GetDbFromContext(ctx)
+	transfers, err := db.Transfer.Query().
+		Where(
+			transfer.And(
+				transfer.ReceiverIdentityPubkeyEQ(req.ReceiverIdentityPublicKey),
+				transfer.StatusEQ(schema.TransferStatusInitiated),
+				transfer.ExpiryTimeGT(time.Now()),
+			),
+		).All(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to query pending transfers: %v", err)
+	}
+
+	transferProtos := []*pb.Transfer{}
+	for _, transfer := range transfers {
+		transferProto, err := transfer.MarshalProto(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("unable to marshal transfer: %v", err)
+		}
+		transferProtos = append(transferProtos, transferProto)
+	}
+	return &pb.QueryPendingTransfersResponse{Transfers: transferProtos}, nil
 }

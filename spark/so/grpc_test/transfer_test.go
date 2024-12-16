@@ -10,24 +10,25 @@ import (
 	"github.com/lightsparkdev/spark-go/wallet"
 )
 
-func TestSendTransfer(t *testing.T) {
-	config, err := testutil.TestWalletConfig()
+func TestTransfer(t *testing.T) {
+	// Sender initiates transfer
+	senderConfig, err := testutil.TestWalletConfig()
 	if err != nil {
-		t.Fatalf("failed to create wallet config: %v", err)
+		t.Fatalf("failed to create sender wallet config: %v", err)
 	}
 
 	leafPrivKey, err := secp256k1.GeneratePrivateKey()
 	if err != nil {
-		t.Fatalf("failed to create private key: %v", err)
+		t.Fatalf("failed to create node signing private key: %v", err)
 	}
-	rootNode, err := testutil.CreateNewTree(config, leafPrivKey)
+	rootNode, err := testutil.CreateNewTree(senderConfig, leafPrivKey)
 	if err != nil {
 		t.Fatalf("failed to create new tree: %v", err)
 	}
 
 	newLeafPrivKey, err := secp256k1.GeneratePrivateKey()
 	if err != nil {
-		t.Fatalf("failed to create new private key: %v", err)
+		t.Fatalf("failed to create new node signing private key: %v", err)
 	}
 
 	receiverPrivKey, err := secp256k1.GeneratePrivateKey()
@@ -41,14 +42,31 @@ func TestSendTransfer(t *testing.T) {
 		NewSigningPrivKey: newLeafPrivKey.Serialize(),
 	}
 	leavesToTransfer := [1]wallet.LeafToTransfer{transferNode}
-	_, err = wallet.SendTransfer(
+	senderTransfer, err := wallet.SendTransfer(
 		context.Background(),
-		config,
+		senderConfig,
 		leavesToTransfer[:],
 		receiverPrivKey.PubKey().SerializeCompressed(),
 		time.Now().Add(10*time.Minute),
 	)
 	if err != nil {
 		t.Fatalf("failed to transfer tree node: %v", err)
+	}
+
+	// Receiver queries pending transfer
+	receiverConfig, err := testutil.TestWalletConfigWithIdentityKey(*receiverPrivKey)
+	if err != nil {
+		t.Fatalf("failed to create wallet config: %v", err)
+	}
+	pendingTransfer, err := wallet.QueryPendingTransfers(context.Background(), receiverConfig)
+	if err != nil {
+		t.Fatalf("failed to query pending transfers: %v", err)
+	}
+	if len(pendingTransfer.Transfers) != 1 {
+		t.Fatalf("expected 1 pending transfer, got %d", len(pendingTransfer.Transfers))
+	}
+	receiverTransfer := pendingTransfer.Transfers[0]
+	if receiverTransfer.Id != senderTransfer.Id {
+		t.Fatalf("expected transfer id %s, got %s", senderTransfer.Id, receiverTransfer.Id)
 	}
 }

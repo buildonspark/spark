@@ -15,7 +15,7 @@ func (t *Transfer) MarshalProto(ctx context.Context) (*pb.Transfer, error) {
 	if err != nil {
 		return nil, fmt.Errorf("unable to query transfer leaves for transfer %s: %v", t.ID.String(), err)
 	}
-	leafIds := make([]string, len(leaves))
+	leafIds := []string{}
 	for _, leaf := range leaves {
 		leafIds = append(leafIds, leaf.ID.String())
 	}

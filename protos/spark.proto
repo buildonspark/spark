@@ -13,6 +13,7 @@ service SparkService {
     rpc split_node(SplitNodeRequest) returns (SplitNodeResponse) {}
     rpc finalize_node_signatures(FinalizeNodeSignaturesRequest) returns (FinalizeNodeSignaturesResponse) {}
     rpc send_transfer(SendTransferRequest) returns (SendTransferResponse) {}
+    rpc query_pending_transfers(QueryPendingTransfersRequest) returns (QueryPendingTransfersResponse) {}
 }
 
 message GenerateDepositAddressRequest {
@@ -168,4 +169,12 @@ message Transfer {
 
 message SendTransferResponse {
     Transfer transfer = 1;
+}
+
+message QueryPendingTransfersRequest {
+    bytes receiver_identity_public_key = 1;
+}
+
+message QueryPendingTransfersResponse {
+    repeated Transfer transfers = 1;
 }

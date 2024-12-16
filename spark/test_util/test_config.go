@@ -134,9 +134,14 @@ func TestConfig() (*so.Config, error) {
 // TestWalletConfig returns a wallet configuration that can be used for testing.
 func TestWalletConfig() (*wallet.Config, error) {
 	identityPrivKey, err := secp256k1.GeneratePrivateKey()
-	if err != nil {
+	if err != nil || identityPrivKey == nil {
 		return nil, fmt.Errorf("failed to generate identity private key: %w", err)
 	}
+	return TestWalletConfigWithIdentityKey(*identityPrivKey)
+}
+
+// TestWalletConfigWithIdentityKey returns a wallet configuration with specified identity key that can be used for testing.
+func TestWalletConfigWithIdentityKey(identityPrivKey secp256k1.PrivateKey) (*wallet.Config, error) {
 	signingOperators, err := getAllSigningOperators()
 	if err != nil {
 		return nil, err
@@ -146,7 +151,7 @@ func TestWalletConfig() (*wallet.Config, error) {
 		SigningOperators:     signingOperators,
 		CoodinatorIdentifier: "0000000000000000000000000000000000000000000000000000000000000001",
 		FrostSignerAddress:   "unix:///tmp/frost_0.sock",
-		IdentityPrivateKey:   *identityPrivKey,
+		IdentityPrivateKey:   identityPrivKey,
 		Threshold:            3,
 	}, nil
 }

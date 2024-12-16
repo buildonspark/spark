@@ -1,10 +1,12 @@
 package wallet
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"fmt"
 	"math/big"
+	"reflect"
 	"time"
 
 	"github.com/decred/dcrd/dcrec/secp256k1"
@@ -31,7 +33,7 @@ func SendTransfer(
 	leaves []LeafToTransfer,
 	receiverIdentityPubkey []byte,
 	expiryTime time.Time,
-) (*map[string]*pb.SendTransferResponse, error) {
+) (*pb.Transfer, error) {
 	transferID, err := uuid.NewRandom()
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate transfer id: %v", err)
@@ -42,7 +44,7 @@ func SendTransfer(
 		return nil, fmt.Errorf("failed to prepare transfer data: %v", err)
 	}
 
-	responses := make(map[string]*pb.SendTransferResponse)
+	var transfer *pb.Transfer
 	for identifier, operator := range config.SigningOperators {
 		sparkConn, err := common.NewGRPCConnection(operator.Address)
 		if err != nil {
@@ -60,9 +62,24 @@ func SendTransfer(
 		if err != nil {
 			return nil, fmt.Errorf("failed to call SendTransfer: %v", err)
 		}
-		responses[identifier] = transferResp
+		if transfer == nil {
+			transfer = transferResp.Transfer
+		} else {
+			if !compareTransfers(transfer, transferResp.Transfer) {
+				return nil, fmt.Errorf("inconsistent transfer response from operators")
+			}
+		}
 	}
-	return &responses, nil
+	return transfer, nil
+}
+
+func compareTransfers(transfer1, transfer2 *pb.Transfer) bool {
+	return transfer1.Id == transfer2.Id &&
+		bytes.Equal(transfer1.ReceiverIdentityPublicKey, transfer2.ReceiverIdentityPublicKey) &&
+		transfer1.Status == transfer2.Status &&
+		transfer1.TotalValue == transfer2.TotalValue &&
+		transfer1.ExpiryTime.AsTime().Equal(transfer2.ExpiryTime.AsTime()) &&
+		reflect.DeepEqual(transfer1.LeafIds, transfer1.LeafIds)
 }
 
 func prepareLeavesTransfer(config *Config, transferID uuid.UUID, leaves []LeafToTransfer, receiverIdentityPubkey []byte) (*map[string][]*pb.LeafTransferRequest, error) {
@@ -156,4 +173,20 @@ func findShare(shares []*secretsharing.VerifiableSecretShare, operatorID uint64)
 		}
 	}
 	return nil
+}
+
+// QueryPendingTransfers queries pending transfers to claim.
+func QueryPendingTransfers(
+	ctx context.Context,
+	config *Config,
+) (*pb.QueryPendingTransfersResponse, error) {
+	sparkConn, err := common.NewGRPCConnection(config.CoodinatorAddress())
+	if err != nil {
+		return nil, err
+	}
+	defer sparkConn.Close()
+	sparkClient := pb.NewSparkServiceClient(sparkConn)
+	return sparkClient.QueryPendingTransfers(ctx, &pb.QueryPendingTransfersRequest{
+		ReceiverIdentityPublicKey: config.IdentityPublicKey(),
+	})
 }
