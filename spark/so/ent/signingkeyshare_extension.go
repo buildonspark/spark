@@ -241,3 +241,23 @@ func CalculateAndStoreLastKey(ctx context.Context, config *so.Config, target *Si
 
 	return lastKey, nil
 }
+
+// AggregateKeyshares aggregates the given keyshares and updates the keyshare in the database.
+func AggregateKeyshares(ctx context.Context, config *so.Config, keyshares []*SigningKeyshare, updateKeyshareID uuid.UUID) (*SigningKeyshare, error) {
+	sumKeyshare, err := sumOfSigningKeyshares(keyshares)
+	if err != nil {
+		return nil, err
+	}
+
+	db := GetDbFromContext(ctx)
+	updateKeyshare, err := db.SigningKeyshare.UpdateOneID(updateKeyshareID).
+		SetSecretShare(sumKeyshare.SecretShare).
+		SetPublicKey(sumKeyshare.PublicKey).
+		SetPublicShares(sumKeyshare.PublicShares).
+		Save(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return updateKeyshare, nil
+}

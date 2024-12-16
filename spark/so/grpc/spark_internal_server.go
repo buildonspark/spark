@@ -8,6 +8,7 @@ import (
 	"github.com/lightsparkdev/spark-go/common"
 	pbcommon "github.com/lightsparkdev/spark-go/proto/common"
 	pbfrost "github.com/lightsparkdev/spark-go/proto/frost"
+	pbspark "github.com/lightsparkdev/spark-go/proto/spark"
 	pb "github.com/lightsparkdev/spark-go/proto/spark_internal"
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/ent"
@@ -247,4 +248,10 @@ func (s *SparkInternalServer) PrepareSplitKeyshares(ctx context.Context, req *pb
 func (s *SparkInternalServer) InternalFinalizeNodeSignatures(ctx context.Context, req *pb.InternalFinalizeNodeSignaturesRequest) (*emptypb.Empty, error) {
 	finalizeHandler := handler.NewInternalFinalizeSignatureHandler(s.config)
 	return finalizeHandler.InternalFinalizeNodeSignatures(ctx, req)
+}
+
+// AggregateNodes aggregates the given nodes.
+func (s *SparkInternalServer) AggregateNodes(ctx context.Context, req *pbspark.AggregateNodesRequest) (*emptypb.Empty, error) {
+	aggregateHandler := handler.NewAggregateHandler(s.config)
+	return aggregateHandler.InternalAggregateNodes(ctx, req)
 }

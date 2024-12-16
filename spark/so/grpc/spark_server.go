@@ -74,3 +74,9 @@ func (s *SparkServer) ClaimTransferTweakKey(ctx context.Context, req *pb.ClaimTr
 	}
 	return &emptypb.Empty{}, nil
 }
+
+// AggregateNodes aggregates the given nodes.
+func (s *SparkServer) AggregateNodes(ctx context.Context, req *pb.AggregateNodesRequest) (*pb.AggregateNodesResponse, error) {
+	aggregateHandler := handler.NewAggregateHandler(s.config)
+	return aggregateHandler.AggregateNodes(ctx, req)
+}

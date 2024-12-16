@@ -16,6 +16,7 @@ service SparkService {
     rpc send_transfer(SendTransferRequest) returns (SendTransferResponse) {}
     rpc query_pending_transfers(QueryPendingTransfersRequest) returns (QueryPendingTransfersResponse) {}
     rpc claim_transfer_tweak_key(ClaimTransferTweakKeyRequest) returns (google.protobuf.Empty) {}
+    rpc aggregate_nodes(AggregateNodesRequest) returns (AggregateNodesResponse) {}
 }
 
 message GenerateDepositAddressRequest {
@@ -198,4 +199,16 @@ message ClaimTransferTweakKeyRequest {
     string transfer_id = 1;
     bytes owner_identity_public_key = 2;
     repeated ClaimLeafKeyTweak leaves_to_receive = 3;
+}
+
+
+message AggregateNodesRequest {
+    repeated string node_ids = 1;
+    SigningJob signing_job = 2;
+    // Serves as a temporary identity public key, this should be get from auth process.
+    bytes owner_identity_public_key = 3;
+}
+
+message AggregateNodesResponse {
+    SigningResult aggregate_signature = 1;
 }

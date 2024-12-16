@@ -27,6 +27,8 @@ const (
 	TreeNodeStatusAggregated TreeNodeStatus = "AGGREGATED"
 	// TreeNodeStatusOnChain is the status of a tree node that is on chain, this is a terminal state.
 	TreeNodeStatusOnChain TreeNodeStatus = "ON_CHAIN"
+	// TreeNodeStatusAggregateLock is the status of a tree node that is aggregate locked.
+	TreeNodeStatusAggregateLock TreeNodeStatus = "AGGREGATE_LOCK"
 )
 
 // Values returns the values of the tree node status.

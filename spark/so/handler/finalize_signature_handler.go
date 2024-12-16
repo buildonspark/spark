@@ -81,8 +81,7 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 	}
 
 	var rootTxBytes []byte
-	// Transfer doesn't have a node tx.
-	if intent != pbcommon.SignatureIntent_TRANSFER {
+	if intent == pbcommon.SignatureIntent_CREATION || intent == pbcommon.SignatureIntent_SPLIT {
 		rootTxBytes, err = o.verifySignatureAndUpdateTx(node.RawTx, nodeSignatures.NodeTxSignature)
 		if err != nil {
 			return nil, nil, err
