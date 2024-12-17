@@ -1,6 +1,7 @@
 package grpctest
 
 import (
+	"bytes"
 	"context"
 	"testing"
 	"time"
@@ -68,5 +69,13 @@ func TestTransfer(t *testing.T) {
 	receiverTransfer := pendingTransfer.Transfers[0]
 	if receiverTransfer.Id != senderTransfer.Id {
 		t.Fatalf("expected transfer id %s, got %s", senderTransfer.Id, receiverTransfer.Id)
+	}
+
+	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(context.Background(), receiverConfig, receiverTransfer)
+	if err != nil {
+		t.Fatalf("unable to verify pending transfer: %v", err)
+	}
+	if !bytes.Equal((*leafPrivKeyMap)[rootNode.Id], newLeafPrivKey.Serialize()) {
+		t.Fatalf("wrong leaf signing private key")
 	}
 }

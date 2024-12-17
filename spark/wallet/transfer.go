@@ -3,14 +3,13 @@ package wallet
 import (
 	"bytes"
 	"context"
-	"crypto/rand"
+	"crypto/sha256"
 	"fmt"
 	"math/big"
 	"time"
 
 	"github.com/decred/dcrd/dcrec/secp256k1"
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/crypto/ecies"
+	eciesgo "github.com/ecies/go/v2"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/common"
 	secretsharing "github.com/lightsparkdev/spark-go/common/secret_sharing"
@@ -82,12 +81,10 @@ func compareTransfers(transfer1, transfer2 *pb.Transfer) bool {
 }
 
 func prepareLeavesTransfer(config *Config, transferID uuid.UUID, leaves []LeafToTransfer, receiverIdentityPubkey []byte) (*map[string][]*pb.SendLeafKeyTweak, error) {
-	receiverSecpPubkey, err := secp256k1.ParsePubKey(receiverIdentityPubkey)
+	receiverEciesPubKey, err := eciesgo.NewPublicKeyFromBytes(receiverIdentityPubkey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse receiver public key: %v", err)
 	}
-	receiverEcdsaPubkey, _ := crypto.UnmarshalPubkey(receiverSecpPubkey.SerializeUncompressed())
-	receiverEciesPubKey := ecies.ImportECDSAPublic(receiverEcdsaPubkey)
 
 	soSendingLeavesMap := make(map[string][]*pb.SendLeafKeyTweak)
 	for _, leaf := range leaves {
@@ -102,7 +99,7 @@ func prepareLeavesTransfer(config *Config, transferID uuid.UUID, leaves []LeafTo
 	return &soSendingLeavesMap, nil
 }
 
-func prepareSingleLeafTransfer(config *Config, transferID uuid.UUID, leaf LeafToTransfer, receiverEciesPubKey *ecies.PublicKey) (*map[string]*pb.SendLeafKeyTweak, error) {
+func prepareSingleLeafTransfer(config *Config, transferID uuid.UUID, leaf LeafToTransfer, receiverEciesPubKey *eciesgo.PublicKey) (*map[string]*pb.SendLeafKeyTweak, error) {
 	privKeyTweak, err := common.SubtractPrivateKeys(leaf.NewSigningPrivKey, leaf.SigningPrivKey)
 	if err != nil {
 		return nil, fmt.Errorf("fail to calculate private key tweak: %v", err)
@@ -131,14 +128,15 @@ func prepareSingleLeafTransfer(config *Config, transferID uuid.UUID, leaf LeafTo
 		pubkeySharesTweak[identifier] = pubkeyTweak.SerializeCompressed()
 	}
 
-	secretCipher, err := ecies.Encrypt(rand.Reader, receiverEciesPubKey, leaf.NewSigningPrivKey, nil, nil)
+	secretCipher, err := eciesgo.Encrypt(receiverEciesPubKey, leaf.NewSigningPrivKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to encrypt new signing private key: %v", err)
 	}
 
 	// Generate signature over Sha256(leaf_id||transfer_id||secret_cipher)
-	payload := append(append([]byte(leaf.LeafID), transferID[:]...), secretCipher...)
-	signature, err := config.IdentityPrivateKey.Sign(payload)
+	payload := append(append([]byte(leaf.LeafID), []byte(transferID.String())...), secretCipher...)
+	payloadHash := sha256.Sum256(payload)
+	signature, err := config.IdentityPrivateKey.Sign(payloadHash[:])
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign payload: %v", err)
 
@@ -188,4 +186,40 @@ func QueryPendingTransfers(
 	return sparkClient.QueryPendingTransfers(ctx, &pb.QueryPendingTransfersRequest{
 		ReceiverIdentityPublicKey: config.IdentityPublicKey(),
 	})
+}
+
+// VerifyPendingTransfer verifies signature and decrypt secret cipher for all leaves in the transfer.
+func VerifyPendingTransfer(
+	ctx context.Context,
+	config *Config,
+	transfer *pb.Transfer,
+) (*map[string][]byte, error) {
+	leafPrivKeyMap := make(map[string][]byte)
+	senderPubkey, err := secp256k1.ParsePubKey(transfer.SenderIdentityPublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse sender public key: %v", err)
+	}
+
+	receiverEciesPrivKey := eciesgo.NewPrivateKeyFromBytes(config.IdentityPrivateKey.Serialize())
+	for _, leaf := range transfer.Leaves {
+		// Verify signature
+		signature, err := secp256k1.ParseSignature(leaf.Signature)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse signature: %v", err)
+		}
+		payload := append(append([]byte(leaf.LeafId), []byte(transfer.Id)...), leaf.SecretCipher...)
+		payloadHash := sha256.Sum256(payload)
+		if !signature.Verify(payloadHash[:], senderPubkey) {
+			return nil, fmt.Errorf("failed to verify signature: %v", err)
+		}
+
+		// Decrypt secret cipher
+		leafSecret, err := eciesgo.Decrypt(receiverEciesPrivKey, leaf.SecretCipher)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decrypt secret cipher: %v", err)
+		}
+		leafPrivKeyMap[leaf.LeafId] = leafSecret
+
+	}
+	return &leafPrivKeyMap, nil
 }
