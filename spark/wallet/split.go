@@ -196,21 +196,12 @@ func SplitTreeNode(
 	log.Println("splitResp", splitResp)
 
 	signingJobs := make([]*pbfrost.FrostSigningJob, 0)
-	userIdentifier := "0000000000000000000000000000000000000000000000000000000000000063"
-	userKeyPackage := pbfrost.KeyPackage{
-		Identifier:  userIdentifier,
-		SecretShare: parentSigningPrivKey,
-		PublicShares: map[string][]byte{
-			userIdentifier: parentPubkey.SerializeCompressed(),
-		},
-		PublicKey:  parentPubkey.SerializeCompressed(),
-		MinSigners: 1,
-	}
+	userKeyPackage := CreateUserKeyPackage(parentSigningPrivKey)
 
 	parentSigningJob := &pbfrost.FrostSigningJob{
 		JobId:           uuid.NewString(),
 		Message:         splitTxSighash,
-		KeyPackage:      &userKeyPackage,
+		KeyPackage:      userKeyPackage,
 		VerifyingKey:    node.VerifyingKey,
 		Nonce:           splitTxNonceProto,
 		Commitments:     splitResp.ParentTxSigningResult.SigningNonceCommitments,
@@ -226,19 +217,11 @@ func SplitTreeNode(
 		if err != nil {
 			return nil, nil, err
 		}
-		userKeyPackage := pbfrost.KeyPackage{
-			Identifier:  userIdentifier,
-			SecretShare: childrenKeys[i],
-			PublicShares: map[string][]byte{
-				userIdentifier: childrenPubKeys[i],
-			},
-			PublicKey:  childrenPubKeys[i],
-			MinSigners: 1,
-		}
+		userKeyPackage := CreateUserKeyPackage(childrenKeys[i])
 		signingJobs = append(signingJobs, &pbfrost.FrostSigningJob{
 			JobId:           uuid.NewString(),
 			Message:         sighashes[i],
-			KeyPackage:      &userKeyPackage,
+			KeyPackage:      userKeyPackage,
 			VerifyingKey:    addrResp.Addresses[i].VerifyingKey,
 			Nonce:           nonceProto,
 			Commitments:     splitResult.RefundTxSigningResult.SigningNonceCommitments,

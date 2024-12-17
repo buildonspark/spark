@@ -140,16 +140,7 @@ func CreateTree(
 		return nil, fmt.Errorf("verifying key does not match")
 	}
 
-	userIdentifier := "0000000000000000000000000000000000000000000000000000000000000063"
-	userKeyPackage := pbfrost.KeyPackage{
-		Identifier:  userIdentifier,
-		SecretShare: signingPrivKey,
-		PublicShares: map[string][]byte{
-			userIdentifier: signingPubkeyBytes,
-		},
-		PublicKey:  treeResponse.RootNodeSignatureShares.VerifyingKey,
-		MinSigners: 1,
-	}
+	userKeyPackage := CreateUserKeyPackage(signingPrivKey)
 
 	userSigningJobs := make([]*pbfrost.FrostSigningJob, 0)
 	nodeJobID := uuid.NewString()
@@ -157,7 +148,7 @@ func CreateTree(
 	userSigningJobs = append(userSigningJobs, &pbfrost.FrostSigningJob{
 		JobId:           nodeJobID,
 		Message:         rootTxSighash,
-		KeyPackage:      &userKeyPackage,
+		KeyPackage:      userKeyPackage,
 		VerifyingKey:    verifyingKey,
 		Nonce:           rootNonceProto,
 		Commitments:     treeResponse.RootNodeSignatureShares.NodeTxSigningResult.SigningNonceCommitments,
@@ -166,7 +157,7 @@ func CreateTree(
 	userSigningJobs = append(userSigningJobs, &pbfrost.FrostSigningJob{
 		JobId:           refundJobID,
 		Message:         refundTxSighash,
-		KeyPackage:      &userKeyPackage,
+		KeyPackage:      userKeyPackage,
 		VerifyingKey:    treeResponse.RootNodeSignatureShares.VerifyingKey,
 		Nonce:           refundNonceProto,
 		Commitments:     treeResponse.RootNodeSignatureShares.RefundTxSigningResult.SigningNonceCommitments,

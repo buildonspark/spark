@@ -97,17 +97,7 @@ func AggregateTreeNodes(
 		return nil, err
 	}
 
-	userIdentifier := "0000000000000000000000000000000000000000000000000000000000000063"
-	userKeyPackage := pbfrost.KeyPackage{
-		Identifier:  userIdentifier,
-		SecretShare: aggregatedSigningKey,
-		PublicShares: map[string][]byte{
-			userIdentifier: aggregatedSigningPublicKey.SerializeCompressed(),
-		},
-		PublicKey:  aggregatedSigningPublicKey.SerializeCompressed(),
-		MinSigners: 1,
-	}
-
+	userKeyPackage := CreateUserKeyPackage(aggregatedSigningKey)
 	parentTx, err := common.TxFromRawTxBytes(aggResp.ParentNodeTx)
 	if err != nil {
 		return nil, err
@@ -126,7 +116,7 @@ func AggregateTreeNodes(
 	userSigningJobs = append(userSigningJobs, &pbfrost.FrostSigningJob{
 		JobId:           nodeJobID,
 		Message:         refundSighash,
-		KeyPackage:      &userKeyPackage,
+		KeyPackage:      userKeyPackage,
 		VerifyingKey:    aggResp.VerifyingKey,
 		Nonce:           signingNonceProto,
 		Commitments:     aggResp.AggregateSignature.SigningNonceCommitments,
