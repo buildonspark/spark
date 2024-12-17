@@ -13,8 +13,10 @@ type TransferStatus string
 const (
 	// TransferStatusInitiated is the status of a transfer that has been initiated.
 	TransferStatusInitiated TransferStatus = "INITIATED"
-	// TransferStatusClaiming is the status of transfer that is being claimed by the receiver.
-	TransferStatusClaiming TransferStatus = "CLAIMING"
+	// TransferStatusKeyTweaked is the status of transfer where key has been tweaked.
+	TransferStatusKeyTweaked TransferStatus = "KEY_TWEAKED"
+	// TransferStatusRefundSigned is the status of transfer where refund transaction has been signed.
+	TransferStatusRefundSigned TransferStatus = "REFUND_SIGNED"
 	// TransferStatusCompleted is the status of transfer that has completed.
 	TransferStatusCompleted TransferStatus = "COMPLETED"
 	// TransferStatusExpired is the status of transfer that has expired and ownership has been returned to the transfer issuer.
@@ -25,7 +27,8 @@ const (
 func (TransferStatus) Values() []string {
 	return []string{
 		string(TransferStatusInitiated),
-		string(TransferStatusClaiming),
+		string(TransferStatusKeyTweaked),
+		string(TransferStatusRefundSigned),
 		string(TransferStatusCompleted),
 		string(TransferStatusExpired),
 	}

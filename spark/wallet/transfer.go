@@ -243,7 +243,7 @@ func ClaimTransfer(
 		}
 		defer sparkConn.Close()
 		sparkClient := pb.NewSparkServiceClient(sparkConn)
-		_, err = sparkClient.ClaimTransferTweakKey(ctx, &pb.ClaimTransferTweakKeyRequest{
+		_, err = sparkClient.ClaimTransferTweakKeys(ctx, &pb.ClaimTransferTweakKeysRequest{
 			TransferId:             transferID,
 			OwnerIdentityPublicKey: config.IdentityPublicKey(),
 			LeavesToReceive:        (*leavesTweaksMap)[identifier],

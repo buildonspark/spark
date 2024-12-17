@@ -43,8 +43,10 @@ func (t *Transfer) getProtoStatus() (*pb.TransferStatus, error) {
 	switch t.Status {
 	case schema.TransferStatusInitiated:
 		return pb.TransferStatus_TRANSFER_STATUS_INITIATED.Enum(), nil
-	case schema.TransferStatusClaiming:
-		return pb.TransferStatus_TRANSFER_STATUS_CLAIMING.Enum(), nil
+	case schema.TransferStatusKeyTweaked:
+		return pb.TransferStatus_TRANSFER_STATUS_KEY_TWEAKED.Enum().Enum(), nil
+	case schema.TransferStatusRefundSigned:
+		return pb.TransferStatus_TRANSFER_STATUSR_REFUND_SIGNED.Enum().Enum().Enum(), nil
 	case schema.TransferStatusCompleted:
 		return pb.TransferStatus_TRANSFER_STATUS_COMPLETED.Enum(), nil
 	case schema.TransferStatusExpired:

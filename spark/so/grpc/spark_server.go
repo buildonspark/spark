@@ -65,14 +65,20 @@ func (s *SparkServer) QueryPendingTransfers(ctx context.Context, req *pb.QueryPe
 	return transferHander.QueryPendingTransfers(ctx, req)
 }
 
-// ClaimTransferTweakKey starts claiming a pending transfer by tweaking keys of leaves.
-func (s *SparkServer) ClaimTransferTweakKey(ctx context.Context, req *pb.ClaimTransferTweakKeyRequest) (*emptypb.Empty, error) {
+// ClaimTransferTweakKeys starts claiming a pending transfer by tweaking keys of leaves.
+func (s *SparkServer) ClaimTransferTweakKeys(ctx context.Context, req *pb.ClaimTransferTweakKeysRequest) (*emptypb.Empty, error) {
 	transferHander := handler.NewTransferHandler(s.config)
-	err := transferHander.ClaimTransferTweakKey(ctx, req)
+	err := transferHander.ClaimTransferTweakKeys(ctx, req)
 	if err != nil {
 		return nil, err
 	}
 	return &emptypb.Empty{}, nil
+}
+
+// ClaimTransferSignRefunds signs new refund transactions as part of the transfer.
+func (s *SparkServer) ClaimTransferSignRefunds(ctx context.Context, req *pb.ClaimTransferSignRefundsRequest) (*pb.ClaimTransferSignRefundsResponse, error) {
+	transferHander := handler.NewTransferHandler(s.config)
+	return transferHander.ClaimTransferSignRefunds(ctx, req)
 }
 
 // AggregateNodes aggregates the given nodes.

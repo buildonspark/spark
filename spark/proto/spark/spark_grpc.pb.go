@@ -20,15 +20,16 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	SparkService_GenerateDepositAddress_FullMethodName = "/spark.SparkService/generate_deposit_address"
-	SparkService_StartTreeCreation_FullMethodName      = "/spark.SparkService/start_tree_creation"
-	SparkService_PrepareSplitAddress_FullMethodName    = "/spark.SparkService/prepare_split_address"
-	SparkService_SplitNode_FullMethodName              = "/spark.SparkService/split_node"
-	SparkService_FinalizeNodeSignatures_FullMethodName = "/spark.SparkService/finalize_node_signatures"
-	SparkService_SendTransfer_FullMethodName           = "/spark.SparkService/send_transfer"
-	SparkService_QueryPendingTransfers_FullMethodName  = "/spark.SparkService/query_pending_transfers"
-	SparkService_ClaimTransferTweakKey_FullMethodName  = "/spark.SparkService/claim_transfer_tweak_key"
-	SparkService_AggregateNodes_FullMethodName         = "/spark.SparkService/aggregate_nodes"
+	SparkService_GenerateDepositAddress_FullMethodName   = "/spark.SparkService/generate_deposit_address"
+	SparkService_StartTreeCreation_FullMethodName        = "/spark.SparkService/start_tree_creation"
+	SparkService_PrepareSplitAddress_FullMethodName      = "/spark.SparkService/prepare_split_address"
+	SparkService_SplitNode_FullMethodName                = "/spark.SparkService/split_node"
+	SparkService_FinalizeNodeSignatures_FullMethodName   = "/spark.SparkService/finalize_node_signatures"
+	SparkService_SendTransfer_FullMethodName             = "/spark.SparkService/send_transfer"
+	SparkService_QueryPendingTransfers_FullMethodName    = "/spark.SparkService/query_pending_transfers"
+	SparkService_ClaimTransferTweakKeys_FullMethodName   = "/spark.SparkService/claim_transfer_tweak_keys"
+	SparkService_ClaimTransferSignRefunds_FullMethodName = "/spark.SparkService/claim_transfer_sign_refunds"
+	SparkService_AggregateNodes_FullMethodName           = "/spark.SparkService/aggregate_nodes"
 )
 
 // SparkServiceClient is the client API for SparkService service.
@@ -42,7 +43,8 @@ type SparkServiceClient interface {
 	FinalizeNodeSignatures(ctx context.Context, in *FinalizeNodeSignaturesRequest, opts ...grpc.CallOption) (*FinalizeNodeSignaturesResponse, error)
 	SendTransfer(ctx context.Context, in *SendTransferRequest, opts ...grpc.CallOption) (*SendTransferResponse, error)
 	QueryPendingTransfers(ctx context.Context, in *QueryPendingTransfersRequest, opts ...grpc.CallOption) (*QueryPendingTransfersResponse, error)
-	ClaimTransferTweakKey(ctx context.Context, in *ClaimTransferTweakKeyRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	ClaimTransferTweakKeys(ctx context.Context, in *ClaimTransferTweakKeysRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	ClaimTransferSignRefunds(ctx context.Context, in *ClaimTransferSignRefundsRequest, opts ...grpc.CallOption) (*ClaimTransferSignRefundsResponse, error)
 	AggregateNodes(ctx context.Context, in *AggregateNodesRequest, opts ...grpc.CallOption) (*AggregateNodesResponse, error)
 }
 
@@ -124,10 +126,20 @@ func (c *sparkServiceClient) QueryPendingTransfers(ctx context.Context, in *Quer
 	return out, nil
 }
 
-func (c *sparkServiceClient) ClaimTransferTweakKey(ctx context.Context, in *ClaimTransferTweakKeyRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+func (c *sparkServiceClient) ClaimTransferTweakKeys(ctx context.Context, in *ClaimTransferTweakKeysRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(emptypb.Empty)
-	err := c.cc.Invoke(ctx, SparkService_ClaimTransferTweakKey_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, SparkService_ClaimTransferTweakKeys_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *sparkServiceClient) ClaimTransferSignRefunds(ctx context.Context, in *ClaimTransferSignRefundsRequest, opts ...grpc.CallOption) (*ClaimTransferSignRefundsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ClaimTransferSignRefundsResponse)
+	err := c.cc.Invoke(ctx, SparkService_ClaimTransferSignRefunds_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -155,7 +167,8 @@ type SparkServiceServer interface {
 	FinalizeNodeSignatures(context.Context, *FinalizeNodeSignaturesRequest) (*FinalizeNodeSignaturesResponse, error)
 	SendTransfer(context.Context, *SendTransferRequest) (*SendTransferResponse, error)
 	QueryPendingTransfers(context.Context, *QueryPendingTransfersRequest) (*QueryPendingTransfersResponse, error)
-	ClaimTransferTweakKey(context.Context, *ClaimTransferTweakKeyRequest) (*emptypb.Empty, error)
+	ClaimTransferTweakKeys(context.Context, *ClaimTransferTweakKeysRequest) (*emptypb.Empty, error)
+	ClaimTransferSignRefunds(context.Context, *ClaimTransferSignRefundsRequest) (*ClaimTransferSignRefundsResponse, error)
 	AggregateNodes(context.Context, *AggregateNodesRequest) (*AggregateNodesResponse, error)
 	mustEmbedUnimplementedSparkServiceServer()
 }
@@ -188,8 +201,11 @@ func (UnimplementedSparkServiceServer) SendTransfer(context.Context, *SendTransf
 func (UnimplementedSparkServiceServer) QueryPendingTransfers(context.Context, *QueryPendingTransfersRequest) (*QueryPendingTransfersResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method QueryPendingTransfers not implemented")
 }
-func (UnimplementedSparkServiceServer) ClaimTransferTweakKey(context.Context, *ClaimTransferTweakKeyRequest) (*emptypb.Empty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ClaimTransferTweakKey not implemented")
+func (UnimplementedSparkServiceServer) ClaimTransferTweakKeys(context.Context, *ClaimTransferTweakKeysRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ClaimTransferTweakKeys not implemented")
+}
+func (UnimplementedSparkServiceServer) ClaimTransferSignRefunds(context.Context, *ClaimTransferSignRefundsRequest) (*ClaimTransferSignRefundsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ClaimTransferSignRefunds not implemented")
 }
 func (UnimplementedSparkServiceServer) AggregateNodes(context.Context, *AggregateNodesRequest) (*AggregateNodesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AggregateNodes not implemented")
@@ -341,20 +357,38 @@ func _SparkService_QueryPendingTransfers_Handler(srv interface{}, ctx context.Co
 	return interceptor(ctx, in, info, handler)
 }
 
-func _SparkService_ClaimTransferTweakKey_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ClaimTransferTweakKeyRequest)
+func _SparkService_ClaimTransferTweakKeys_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ClaimTransferTweakKeysRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(SparkServiceServer).ClaimTransferTweakKey(ctx, in)
+		return srv.(SparkServiceServer).ClaimTransferTweakKeys(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: SparkService_ClaimTransferTweakKey_FullMethodName,
+		FullMethod: SparkService_ClaimTransferTweakKeys_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SparkServiceServer).ClaimTransferTweakKey(ctx, req.(*ClaimTransferTweakKeyRequest))
+		return srv.(SparkServiceServer).ClaimTransferTweakKeys(ctx, req.(*ClaimTransferTweakKeysRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SparkService_ClaimTransferSignRefunds_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ClaimTransferSignRefundsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkServiceServer).ClaimTransferSignRefunds(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkService_ClaimTransferSignRefunds_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkServiceServer).ClaimTransferSignRefunds(ctx, req.(*ClaimTransferSignRefundsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -413,8 +447,12 @@ var SparkService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _SparkService_QueryPendingTransfers_Handler,
 		},
 		{
-			MethodName: "claim_transfer_tweak_key",
-			Handler:    _SparkService_ClaimTransferTweakKey_Handler,
+			MethodName: "claim_transfer_tweak_keys",
+			Handler:    _SparkService_ClaimTransferTweakKeys_Handler,
+		},
+		{
+			MethodName: "claim_transfer_sign_refunds",
+			Handler:    _SparkService_ClaimTransferSignRefunds_Handler,
 		},
 		{
 			MethodName: "aggregate_nodes",

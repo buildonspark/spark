@@ -93,7 +93,7 @@ var (
 		{Name: "sender_identity_pubkey", Type: field.TypeBytes},
 		{Name: "receiver_identity_pubkey", Type: field.TypeBytes},
 		{Name: "total_value", Type: field.TypeUint64},
-		{Name: "status", Type: field.TypeEnum, Enums: []string{"INITIATED", "CLAIMING", "COMPLETED", "EXPIRED"}},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"INITIATED", "KEY_TWEAKED", "REFUND_SIGNED", "COMPLETED", "EXPIRED"}},
 		{Name: "expiry_time", Type: field.TypeTime},
 	}
 	// TransfersTable holds the schema information for the "transfers" table.

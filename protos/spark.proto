@@ -15,7 +15,8 @@ service SparkService {
     rpc finalize_node_signatures(FinalizeNodeSignaturesRequest) returns (FinalizeNodeSignaturesResponse) {}
     rpc send_transfer(SendTransferRequest) returns (SendTransferResponse) {}
     rpc query_pending_transfers(QueryPendingTransfersRequest) returns (QueryPendingTransfersResponse) {}
-    rpc claim_transfer_tweak_key(ClaimTransferTweakKeyRequest) returns (google.protobuf.Empty) {}
+    rpc claim_transfer_tweak_keys(ClaimTransferTweakKeysRequest) returns (google.protobuf.Empty) {}
+    rpc claim_transfer_sign_refunds(ClaimTransferSignRefundsRequest) returns (ClaimTransferSignRefundsResponse) {}
     rpc aggregate_nodes(AggregateNodesRequest) returns (AggregateNodesResponse) {}
 }
 
@@ -156,9 +157,10 @@ message SendTransferRequest {
 
 enum TransferStatus {
     TRANSFER_STATUS_INITIATED = 0; 
-    TRANSFER_STATUS_COMPLETED = 1;
-    TRANSFER_STATUS_CLAIMING = 2;
-    TRANSFER_STATUS_EXPIRED = 3;
+    TRANSFER_STATUS_KEY_TWEAKED = 1;
+    TRANSFER_STATUSR_REFUND_SIGNED = 2;
+    TRANSFER_STATUS_COMPLETED = 3;
+    TRANSFER_STATUS_EXPIRED = 4;
 }
 
 message Transfer {
@@ -195,10 +197,31 @@ message ClaimLeafKeyTweak {
     map<string, bytes> pubkey_shares_tweak = 3;
 }
 
-message ClaimTransferTweakKeyRequest {
+message ClaimTransferTweakKeysRequest {
     string transfer_id = 1;
     bytes owner_identity_public_key = 2;
     repeated ClaimLeafKeyTweak leaves_to_receive = 3;
+}
+
+message ClaimLeafSigningJob {
+    string leaf_id = 1;
+    SigningJob refund_tx_signing_job = 2;
+}
+
+message ClaimTransferSignRefundsRequest {
+    string transfer_id = 1;
+    bytes owner_identity_public_key = 2;
+    repeated ClaimLeafSigningJob signing_jobs = 3;
+}
+
+message ClaimLeafSigningResult {
+    string leaf_id = 1;
+    SigningResult refund_tx_signing_result = 2;
+    bytes verifying_key = 3;
+}
+
+message ClaimTransferSignRefundsResponse {
+    repeated ClaimLeafSigningResult signing_results = 1;
 }
 
 
