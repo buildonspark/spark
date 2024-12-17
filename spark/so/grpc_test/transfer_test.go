@@ -37,12 +37,12 @@ func TestTransfer(t *testing.T) {
 		t.Fatalf("failed to create receiver private key: %v", err)
 	}
 
-	transferNode := wallet.LeafToTransfer{
+	transferNode := wallet.LeafKeyTweak{
 		LeafID:            rootNode.Id,
 		SigningPrivKey:    leafPrivKey.Serialize(),
 		NewSigningPrivKey: newLeafPrivKey.Serialize(),
 	}
-	leavesToTransfer := [1]wallet.LeafToTransfer{transferNode}
+	leavesToTransfer := [1]wallet.LeafKeyTweak{transferNode}
 	senderTransfer, err := wallet.SendTransfer(
 		context.Background(),
 		senderConfig,
@@ -75,7 +75,30 @@ func TestTransfer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unable to verify pending transfer: %v", err)
 	}
+	if len(*leafPrivKeyMap) != 1 {
+		t.Fatalf("Expected 1 leaf to transfer, got %d", len(*leafPrivKeyMap))
+	}
 	if !bytes.Equal((*leafPrivKeyMap)[rootNode.Id], newLeafPrivKey.Serialize()) {
 		t.Fatalf("wrong leaf signing private key")
+	}
+
+	finalLeafPrivKey, err := secp256k1.GeneratePrivateKey()
+	if err != nil {
+		t.Fatalf("failed to create new node signing private key: %v", err)
+	}
+	claimingNode := wallet.LeafKeyTweak{
+		LeafID:            rootNode.Id,
+		SigningPrivKey:    newLeafPrivKey.Serialize(),
+		NewSigningPrivKey: finalLeafPrivKey.Serialize(),
+	}
+	leavesToClaim := [1]wallet.LeafKeyTweak{claimingNode}
+	err = wallet.ClaimTransfer(
+		context.Background(),
+		receiverTransfer.Id,
+		receiverConfig,
+		leavesToClaim[:],
+	)
+	if err != nil {
+		t.Fatalf("failed to ClaimTransfer: %v", err)
 	}
 }

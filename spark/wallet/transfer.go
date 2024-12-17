@@ -17,8 +17,8 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-// LeafToTransfer is a struct to hold leaf data to transfer.
-type LeafToTransfer struct {
+// LeafKeyTweak is a struct to hold leaf key to tweak.
+type LeafKeyTweak struct {
 	LeafID            string
 	SigningPrivKey    []byte
 	NewSigningPrivKey []byte
@@ -28,7 +28,7 @@ type LeafToTransfer struct {
 func SendTransfer(
 	ctx context.Context,
 	config *Config,
-	leaves []LeafToTransfer,
+	leaves []LeafKeyTweak,
 	receiverIdentityPubkey []byte,
 	expiryTime time.Time,
 ) (*pb.Transfer, error) {
@@ -80,26 +80,26 @@ func compareTransfers(transfer1, transfer2 *pb.Transfer) bool {
 		len(transfer1.Leaves) == len(transfer2.Leaves)
 }
 
-func prepareLeavesTransfer(config *Config, transferID uuid.UUID, leaves []LeafToTransfer, receiverIdentityPubkey []byte) (*map[string][]*pb.SendLeafKeyTweak, error) {
+func prepareLeavesTransfer(config *Config, transferID uuid.UUID, leaves []LeafKeyTweak, receiverIdentityPubkey []byte) (*map[string][]*pb.SendLeafKeyTweak, error) {
 	receiverEciesPubKey, err := eciesgo.NewPublicKeyFromBytes(receiverIdentityPubkey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse receiver public key: %v", err)
 	}
 
-	soSendingLeavesMap := make(map[string][]*pb.SendLeafKeyTweak)
+	leavesTweaksMap := make(map[string][]*pb.SendLeafKeyTweak)
 	for _, leaf := range leaves {
-		soSendingLeafMap, err := prepareSingleLeafTransfer(config, transferID, leaf, receiverEciesPubKey)
+		leafTweaksMap, err := prepareSingleLeafTransfer(config, transferID, leaf, receiverEciesPubKey)
 		if err != nil {
 			return nil, fmt.Errorf("failed to prepare single leaf transfer: %v", err)
 		}
-		for identifier, sendingLeaf := range *soSendingLeafMap {
-			soSendingLeavesMap[identifier] = append(soSendingLeavesMap[identifier], sendingLeaf)
+		for identifier, leafTweak := range *leafTweaksMap {
+			leavesTweaksMap[identifier] = append(leavesTweaksMap[identifier], leafTweak)
 		}
 	}
-	return &soSendingLeavesMap, nil
+	return &leavesTweaksMap, nil
 }
 
-func prepareSingleLeafTransfer(config *Config, transferID uuid.UUID, leaf LeafToTransfer, receiverEciesPubKey *eciesgo.PublicKey) (*map[string]*pb.SendLeafKeyTweak, error) {
+func prepareSingleLeafTransfer(config *Config, transferID uuid.UUID, leaf LeafKeyTweak, receiverEciesPubKey *eciesgo.PublicKey) (*map[string]*pb.SendLeafKeyTweak, error) {
 	privKeyTweak, err := common.SubtractPrivateKeys(leaf.NewSigningPrivKey, leaf.SigningPrivKey)
 	if err != nil {
 		return nil, fmt.Errorf("fail to calculate private key tweak: %v", err)
@@ -142,13 +142,13 @@ func prepareSingleLeafTransfer(config *Config, transferID uuid.UUID, leaf LeafTo
 
 	}
 
-	soSendingLeafMap := make(map[string]*pb.SendLeafKeyTweak)
+	leafTweaksMap := make(map[string]*pb.SendLeafKeyTweak)
 	for identifier, operator := range config.SigningOperators {
 		share := findShare(shares, operator.ID)
 		if share == nil {
 			return nil, fmt.Errorf("failed to find share for operator %d", operator.ID)
 		}
-		soSendingLeafMap[identifier] = &pb.SendLeafKeyTweak{
+		leafTweaksMap[identifier] = &pb.SendLeafKeyTweak{
 			LeafId: leaf.LeafID,
 			SecretShareTweak: &pb.SecretShareTweak{
 				Tweak:  share.Share.Bytes(),
@@ -159,7 +159,7 @@ func prepareSingleLeafTransfer(config *Config, transferID uuid.UUID, leaf LeafTo
 			Signature:         signature.Serialize(),
 		}
 	}
-	return &soSendingLeafMap, nil
+	return &leafTweaksMap, nil
 }
 
 func findShare(shares []*secretsharing.VerifiableSecretShare, operatorID uint64) *secretsharing.VerifiableSecretShare {
@@ -222,4 +222,96 @@ func VerifyPendingTransfer(
 
 	}
 	return &leafPrivKeyMap, nil
+}
+
+// ClaimTransfer claims a pending transfer.
+func ClaimTransfer(
+	ctx context.Context,
+	transferID string,
+	config *Config,
+	leaves []LeafKeyTweak,
+) error {
+	leavesTweaksMap, err := prepareLeavesClaim(config, leaves)
+	if err != nil {
+		return fmt.Errorf("failed to prepare transfer data: %v", err)
+	}
+
+	for identifier, operator := range config.SigningOperators {
+		sparkConn, err := common.NewGRPCConnection(operator.Address)
+		if err != nil {
+			return err
+		}
+		defer sparkConn.Close()
+		sparkClient := pb.NewSparkServiceClient(sparkConn)
+		_, err = sparkClient.ClaimTransferTweakKey(ctx, &pb.ClaimTransferTweakKeyRequest{
+			TransferId:             transferID,
+			OwnerIdentityPublicKey: config.IdentityPublicKey(),
+			LeavesToReceive:        (*leavesTweaksMap)[identifier],
+		})
+		if err != nil {
+			return fmt.Errorf("failed to call ClaimTransferTweakKey: %v", err)
+		}
+	}
+	return nil
+}
+
+func prepareLeavesClaim(config *Config, leaves []LeafKeyTweak) (*map[string][]*pb.ClaimLeafKeyTweak, error) {
+	leavesTweaksMap := make(map[string][]*pb.ClaimLeafKeyTweak)
+	for _, leaf := range leaves {
+		leafTweaksMap, err := prepareSingleLeafClaim(config, leaf)
+		if err != nil {
+			return nil, fmt.Errorf("failed to prepare single leaf transfer: %v", err)
+		}
+		for identifier, leafTweak := range *leafTweaksMap {
+			leavesTweaksMap[identifier] = append(leavesTweaksMap[identifier], leafTweak)
+		}
+	}
+	return &leavesTweaksMap, nil
+}
+
+func prepareSingleLeafClaim(config *Config, leaf LeafKeyTweak) (*map[string]*pb.ClaimLeafKeyTweak, error) {
+	privKeyTweak, err := common.SubtractPrivateKeys(leaf.NewSigningPrivKey, leaf.SigningPrivKey)
+	if err != nil {
+		return nil, fmt.Errorf("fail to calculate private key tweak: %v", err)
+
+	}
+
+	// Calculate secret tweak shares
+	shares, err := secretsharing.SplitSecretWithProofs(
+		new(big.Int).SetBytes(privKeyTweak),
+		secp256k1.S256().N,
+		config.Threshold,
+		len(config.SigningOperators),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("fail to split private key tweak: %v", err)
+	}
+
+	// Calculate pubkey shares tweak
+	pubkeySharesTweak := make(map[string][]byte)
+	for identifier, operator := range config.SigningOperators {
+		share := findShare(shares, operator.ID)
+		if share == nil {
+			return nil, fmt.Errorf("failed to find share for operator %d", operator.ID)
+		}
+		pubkeyTweak := secp256k1.NewPrivateKey(share.Share).PubKey()
+		pubkeySharesTweak[identifier] = pubkeyTweak.SerializeCompressed()
+	}
+
+	leafTweaksMap := make(map[string]*pb.ClaimLeafKeyTweak)
+	for identifier, operator := range config.SigningOperators {
+		share := findShare(shares, operator.ID)
+		if share == nil {
+			return nil, fmt.Errorf("failed to find share for operator %d", operator.ID)
+		}
+		leafTweaksMap[identifier] = &pb.ClaimLeafKeyTweak{
+			LeafId: leaf.LeafID,
+			SecretShareTweak: &pb.SecretShareTweak{
+				Tweak:  share.Share.Bytes(),
+				Proofs: share.Proofs,
+			},
+			PubkeySharesTweak: pubkeySharesTweak,
+		}
+	}
+	return &leafTweaksMap, nil
 }
