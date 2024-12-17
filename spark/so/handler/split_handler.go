@@ -2,7 +2,6 @@ package handler
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
 	"log"
 
@@ -186,9 +185,6 @@ func (h *SplitHandler) prepareSigningJobs(
 	nodes := make([]*ent.TreeNode, 0)
 	for i, split := range req.Splits {
 		refundSigningJob, _, err := helper.NewSigningJob(childrenKeyshares[i], split.RefundSigningJob, splitTx.TxOut[split.Vout])
-		log.Printf("refund signing job %d message: %v", i, hex.EncodeToString(refundSigningJob.Message))
-		log.Printf("refund signing job %d user commitments: %v", i, hex.EncodeToString(refundSigningJob.UserCommitment.MarshalBinary()))
-		log.Printf("refund signing job %d verifying key: %v", i, hex.EncodeToString(refundSigningJob.VerifyingKey))
 		if err != nil {
 			return nil, nil, err
 		}
@@ -209,7 +205,7 @@ func (h *SplitHandler) prepareSigningJobs(
 			SetTree(tree).
 			SetParentID(nodeID).
 			SetStatus(schema.TreeNodeStatusCreating).
-			SetOwnerIdentityPubkey(split.SigningPublicKey).
+			SetOwnerIdentityPubkey(node.OwnerIdentityPubkey).
 			SetOwnerSigningPubkey(split.SigningPublicKey).
 			SetValue(uint64(split.Value)).
 			SetVerifyingPubkey(verifyingKey).

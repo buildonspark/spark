@@ -55,6 +55,7 @@ func (o *FinalizeSignatureHandler) FinalizeNodeSignatures(ctx context.Context, r
 		return nil, err
 	})
 	if err != nil {
+		log.Printf("failed to sync with other SOs: %v", err)
 		return nil, err
 	}
 

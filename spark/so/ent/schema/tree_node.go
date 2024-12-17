@@ -42,6 +42,7 @@ func (TreeNodeStatus) Values() []string {
 		string(TreeNodeStatusSplitted),
 		string(TreeNodeStatusAggregated),
 		string(TreeNodeStatusOnChain),
+		string(TreeNodeStatusAggregateLock),
 	}
 }
 

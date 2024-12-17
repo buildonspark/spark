@@ -211,4 +211,7 @@ message AggregateNodesRequest {
 
 message AggregateNodesResponse {
     SigningResult aggregate_signature = 1;
+    bytes verifying_key = 2;
+    bytes parent_node_tx = 3;
+    uint32 parent_node_vout = 4;
 }

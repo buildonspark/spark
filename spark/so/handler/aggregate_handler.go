@@ -86,10 +86,16 @@ func (h *AggregateHandler) prepareSigningJob(ctx context.Context, parentNode *en
 
 func (h *AggregateHandler) markNodesAggregatedStatus(ctx context.Context, parentNode *ent.TreeNode, nodes []*ent.TreeNode) error {
 	for _, node := range nodes {
-		node.Update().SetStatus(schema.TreeNodeStatusAggregated)
+		_, err := node.Update().SetStatus(schema.TreeNodeStatusAggregated).Save(ctx)
+		if err != nil {
+			return err
+		}
 	}
 
-	parentNode.Update().SetStatus(schema.TreeNodeStatusAggregateLock)
+	_, err := parentNode.Update().SetStatus(schema.TreeNodeStatusAggregateLock).Save(ctx)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -178,11 +184,19 @@ func (h *AggregateHandler) AggregateNodes(ctx context.Context, req *pb.Aggregate
 		return nil, err
 	}
 
+	verifyingKey, err := common.AddPublicKeys(req.SigningJob.SigningPublicKey, updatedKeyshare.PublicKey)
+	if err != nil {
+		return nil, err
+	}
+
 	return &pb.AggregateNodesResponse{
 		AggregateSignature: &pb.SigningResult{
 			PublicKeys:              signingResult[0].PublicKeys,
 			SignatureShares:         signingResult[0].SignatureShares,
 			SigningNonceCommitments: signingCommitmentsMap,
 		},
+		VerifyingKey:   verifyingKey,
+		ParentNodeTx:   parentNode.RawTx,
+		ParentNodeVout: uint32(parentNode.Vout),
 	}, nil
 }

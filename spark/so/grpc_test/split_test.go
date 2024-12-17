@@ -12,7 +12,7 @@ import (
 	"github.com/lightsparkdev/spark-go/wallet"
 )
 
-func TestSplit(t *testing.T) {
+func TestSplitAndAggregate(t *testing.T) {
 	config, err := testutil.TestWalletConfig()
 	if err != nil {
 		t.Fatalf("failed to create wallet config: %v", err)
@@ -48,4 +48,13 @@ func TestSplit(t *testing.T) {
 	if !bytes.Equal(sum, privKey.Serialize()) {
 		t.Fatalf("sum of node signing keys is not equal to parent private key")
 	}
+
+	splitNodes := splitResp.Nodes
+
+	aggregateResp, err := wallet.AggregateTreeNodes(context.Background(), config, splitNodes, sum)
+	if err != nil {
+		t.Fatalf("failed to aggregate nodes: %v", err)
+	}
+
+	log.Printf("aggregate response: %v", aggregateResp)
 }

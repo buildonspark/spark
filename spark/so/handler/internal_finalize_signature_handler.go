@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"fmt"
+	"log"
 
 	"github.com/google/uuid"
 	pbcommon "github.com/lightsparkdev/spark-go/proto/common"
@@ -127,6 +128,7 @@ func (h *InternalFinalizeSignatureHandler) updateNode(ctx context.Context, node 
 			SetStatus(schema.TreeNodeStatusAvailable).
 			Save(ctx)
 		if err != nil {
+			log.Printf("failed to update node: %v", err)
 			return err
 		}
 	}
