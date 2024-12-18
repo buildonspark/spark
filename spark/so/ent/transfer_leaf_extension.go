@@ -9,13 +9,14 @@ import (
 
 // MarshalProto converts a Transfer to a spark protobuf Transfer.
 func (t *TransferLeaf) MarshalProto(ctx context.Context) (*pb.TransferLeaf, error) {
-	leafID, err := t.QueryLeaf().OnlyID(ctx)
+	leaf, err := t.QueryLeaf().Only(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to query leaf for transfer leaf %s: %v", t.ID.String(), err)
 	}
 	return &pb.TransferLeaf{
-		LeafId:       leafID.String(),
+		LeafId:       leaf.ID.String(),
 		SecretCipher: t.SecretCipher,
 		Signature:    t.Signature,
+		RawTx:        leaf.RawTx,
 	}, nil
 }

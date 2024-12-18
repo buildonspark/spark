@@ -94,7 +94,7 @@ func TestTransfer(t *testing.T) {
 	leavesToClaim := [1]wallet.LeafKeyTweak{claimingNode}
 	err = wallet.ClaimTransfer(
 		context.Background(),
-		receiverTransfer.Id,
+		receiverTransfer,
 		receiverConfig,
 		leavesToClaim[:],
 	)

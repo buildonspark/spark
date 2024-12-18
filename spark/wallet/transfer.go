@@ -8,12 +8,17 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/btcsuite/btcd/btcutil"
+	"github.com/btcsuite/btcd/txscript"
+	"github.com/btcsuite/btcd/wire"
 	"github.com/decred/dcrd/dcrec/secp256k1"
 	eciesgo "github.com/ecies/go/v2"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/common"
 	secretsharing "github.com/lightsparkdev/spark-go/common/secret_sharing"
+	pbfrost "github.com/lightsparkdev/spark-go/proto/frost"
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
+	"github.com/lightsparkdev/spark-go/so/objects"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -100,7 +105,7 @@ func prepareLeavesTransfer(config *Config, transferID uuid.UUID, leaves []LeafKe
 }
 
 func prepareSingleLeafTransfer(config *Config, transferID uuid.UUID, leaf LeafKeyTweak, receiverEciesPubKey *eciesgo.PublicKey) (*map[string]*pb.SendLeafKeyTweak, error) {
-	privKeyTweak, err := common.SubtractPrivateKeys(leaf.NewSigningPrivKey, leaf.SigningPrivKey)
+	privKeyTweak, err := common.SubtractPrivateKeys(leaf.SigningPrivKey, leaf.NewSigningPrivKey)
 	if err != nil {
 		return nil, fmt.Errorf("fail to calculate private key tweak: %v", err)
 
@@ -227,11 +232,29 @@ func VerifyPendingTransfer(
 // ClaimTransfer claims a pending transfer.
 func ClaimTransfer(
 	ctx context.Context,
-	transferID string,
+	transfer *pb.Transfer,
 	config *Config,
 	leaves []LeafKeyTweak,
 ) error {
-	leavesTweaksMap, err := prepareLeavesClaim(config, leaves)
+	err := claimTransferTweakKeys(ctx, transfer, config, leaves)
+	if err != nil {
+		return fmt.Errorf("failed to tweak keys when claiming leaves: %v", err)
+	}
+
+	err = claimTransferSignRefunds(ctx, transfer, config, leaves)
+	if err != nil {
+		return fmt.Errorf("failed to sign refunds when claiming leaves: %v", err)
+	}
+	return nil
+}
+
+func claimTransferTweakKeys(
+	ctx context.Context,
+	transfer *pb.Transfer,
+	config *Config,
+	leaves []LeafKeyTweak,
+) error {
+	leavesTweaksMap, err := prepareClaimLeavesKeyTweaks(config, leaves)
 	if err != nil {
 		return fmt.Errorf("failed to prepare transfer data: %v", err)
 	}
@@ -244,21 +267,21 @@ func ClaimTransfer(
 		defer sparkConn.Close()
 		sparkClient := pb.NewSparkServiceClient(sparkConn)
 		_, err = sparkClient.ClaimTransferTweakKeys(ctx, &pb.ClaimTransferTweakKeysRequest{
-			TransferId:             transferID,
+			TransferId:             transfer.Id,
 			OwnerIdentityPublicKey: config.IdentityPublicKey(),
 			LeavesToReceive:        (*leavesTweaksMap)[identifier],
 		})
 		if err != nil {
-			return fmt.Errorf("failed to call ClaimTransferTweakKey: %v", err)
+			return fmt.Errorf("failed to call ClaimTransferTweakKeys: %v", err)
 		}
 	}
 	return nil
 }
 
-func prepareLeavesClaim(config *Config, leaves []LeafKeyTweak) (*map[string][]*pb.ClaimLeafKeyTweak, error) {
+func prepareClaimLeavesKeyTweaks(config *Config, leaves []LeafKeyTweak) (*map[string][]*pb.ClaimLeafKeyTweak, error) {
 	leavesTweaksMap := make(map[string][]*pb.ClaimLeafKeyTweak)
 	for _, leaf := range leaves {
-		leafTweaksMap, err := prepareSingleLeafClaim(config, leaf)
+		leafTweaksMap, err := prepareClaimLeafKeyTweaks(config, leaf)
 		if err != nil {
 			return nil, fmt.Errorf("failed to prepare single leaf transfer: %v", err)
 		}
@@ -269,8 +292,8 @@ func prepareLeavesClaim(config *Config, leaves []LeafKeyTweak) (*map[string][]*p
 	return &leavesTweaksMap, nil
 }
 
-func prepareSingleLeafClaim(config *Config, leaf LeafKeyTweak) (*map[string]*pb.ClaimLeafKeyTweak, error) {
-	privKeyTweak, err := common.SubtractPrivateKeys(leaf.NewSigningPrivKey, leaf.SigningPrivKey)
+func prepareClaimLeafKeyTweaks(config *Config, leaf LeafKeyTweak) (*map[string]*pb.ClaimLeafKeyTweak, error) {
+	privKeyTweak, err := common.SubtractPrivateKeys(leaf.SigningPrivKey, leaf.NewSigningPrivKey)
 	if err != nil {
 		return nil, fmt.Errorf("fail to calculate private key tweak: %v", err)
 
@@ -314,4 +337,158 @@ func prepareSingleLeafClaim(config *Config, leaf LeafKeyTweak) (*map[string]*pb.
 		}
 	}
 	return &leafTweaksMap, nil
+}
+
+type claimLeafData struct {
+	SigningPrivKey *secp256k1.PrivateKey
+	Tx             *wire.MsgTx
+	RefundTx       *wire.MsgTx
+	Nonce          *objects.SigningNonce
+}
+
+func claimTransferSignRefunds(
+	ctx context.Context,
+	transfer *pb.Transfer,
+	config *Config,
+	leafKeys []LeafKeyTweak,
+) error {
+	leafDataMap := make(map[string]*claimLeafData)
+	for _, leafKey := range leafKeys {
+		privKey, _ := secp256k1.PrivKeyFromBytes(leafKey.NewSigningPrivKey)
+		nonce, _ := objects.RandomSigningNonce()
+		leafData := &claimLeafData{
+			SigningPrivKey: privKey,
+			Nonce:          nonce,
+		}
+		for _, leaf := range transfer.Leaves {
+			if leaf.LeafId == leafKey.LeafID {
+				tx, _ := common.TxFromRawTxBytes(leaf.RawTx)
+				leafData.Tx = tx
+			}
+		}
+		leafDataMap[leafKey.LeafID] = leafData
+	}
+
+	signingJobs, err := prepareClaimTransferOperatorsSigningJobs(transfer, config, leafDataMap)
+	if err != nil {
+		return fmt.Errorf("failed to prepare signing jobs for claiming transfer: %v", err)
+	}
+	sparkConn, err := common.NewGRPCConnection(config.CoodinatorAddress())
+	if err != nil {
+		return err
+	}
+	defer sparkConn.Close()
+	sparkClient := pb.NewSparkServiceClient(sparkConn)
+	response, err := sparkClient.ClaimTransferSignRefunds(ctx, &pb.ClaimTransferSignRefundsRequest{
+		TransferId:             transfer.Id,
+		OwnerIdentityPublicKey: config.IdentityPublicKey(),
+		SigningJobs:            signingJobs,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to call ClaimTransferSignRefunds: %v", err)
+	}
+
+	return signRefunds(config, leafDataMap, response.SigningResults)
+}
+
+func signRefunds(
+	config *Config,
+	leafDataMap map[string]*claimLeafData,
+	operatorSigningResults []*pb.ClaimLeafSigningResult,
+) error {
+	userSigningJobs := []*pbfrost.FrostSigningJob{}
+	jobToAggregateRequestMap := make(map[string]*pbfrost.AggregateFrostRequest)
+	jobToLeafMap := make(map[string]string)
+	for _, operatorSigningResult := range operatorSigningResults {
+		leafData := leafDataMap[operatorSigningResult.LeafId]
+		refundTxSighash, _ := common.SigHashFromTx(leafData.RefundTx, 0, leafData.Tx.TxOut[0])
+		nonceProto, _ := leafData.Nonce.MarshalProto()
+		nonceCommitmentProto, _ := leafData.Nonce.SigningCommitment().MarshalProto()
+		userKeyPackage := CreateUserKeyPackage(leafData.SigningPrivKey.Serialize())
+
+		userSigningJobID := uuid.NewString()
+		jobToLeafMap[userSigningJobID] = operatorSigningResult.LeafId
+		userSigningJobs = append(userSigningJobs, &pbfrost.FrostSigningJob{
+			JobId:           userSigningJobID,
+			Message:         refundTxSighash,
+			KeyPackage:      userKeyPackage,
+			VerifyingKey:    operatorSigningResult.VerifyingKey,
+			Nonce:           nonceProto,
+			Commitments:     operatorSigningResult.RefundTxSigningResult.SigningNonceCommitments,
+			UserCommitments: nonceCommitmentProto,
+		})
+
+		jobToAggregateRequestMap[userSigningJobID] = &pbfrost.AggregateFrostRequest{
+			Message:         refundTxSighash,
+			SignatureShares: operatorSigningResult.RefundTxSigningResult.SignatureShares,
+			PublicShares:    operatorSigningResult.RefundTxSigningResult.PublicKeys,
+			VerifyingKey:    operatorSigningResult.VerifyingKey,
+			Commitments:     operatorSigningResult.RefundTxSigningResult.SigningNonceCommitments,
+			UserCommitments: nonceCommitmentProto,
+			UserPublicKey:   leafData.SigningPrivKey.PubKey().SerializeCompressed(),
+		}
+	}
+
+	frostConn, _ := common.NewGRPCConnection(config.FrostSignerAddress)
+	defer frostConn.Close()
+	frostClient := pbfrost.NewFrostServiceClient(frostConn)
+	userSignatures, err := frostClient.SignFrost(context.Background(), &pbfrost.SignFrostRequest{
+		SigningJobs: userSigningJobs,
+		Role:        pbfrost.SigningRole_USER,
+	})
+	if err != nil {
+		return err
+	}
+
+	for jobID, userSignature := range userSignatures.Results {
+		request := jobToAggregateRequestMap[jobID]
+		request.UserSignatureShare = userSignature.SignatureShare
+		_, err := frostClient.AggregateFrost(context.Background(), request)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func prepareClaimTransferOperatorsSigningJobs(
+	transfer *pb.Transfer,
+	config *Config,
+	leafDataMap map[string]*claimLeafData,
+) ([]*pb.ClaimLeafSigningJob, error) {
+	signingJobs := []*pb.ClaimLeafSigningJob{}
+	for _, leaf := range transfer.Leaves {
+		leafData := leafDataMap[leaf.LeafId]
+		signingPubkey := leafData.SigningPrivKey.PubKey().SerializeCompressed()
+		tx, err := common.TxFromRawTxBytes(leaf.RawTx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse raw tx: %v", err)
+		}
+		// Creat refund tx
+		refundTx := wire.NewMsgTx(2)
+		refundTx.AddTxIn(wire.NewTxIn(
+			&wire.OutPoint{Hash: tx.TxHash(), Index: 0},
+			tx.TxOut[0].PkScript,
+			nil, // witness
+		))
+		refundP2trAddress, _ := common.P2TRAddressFromPublicKey(signingPubkey, config.Network)
+		refundAddress, _ := btcutil.DecodeAddress(*refundP2trAddress, common.NetworkParams(config.Network))
+		refundPkScript, _ := txscript.PayToAddrScript(refundAddress)
+		refundTx.AddTxOut(wire.NewTxOut(tx.TxOut[0].Value, refundPkScript))
+		refundTx.LockTime = 60000
+		leafData.RefundTx = refundTx
+		var refundBuf bytes.Buffer
+		refundTx.Serialize(&refundBuf)
+		refundNonceCommitmentProto, _ := leafData.Nonce.SigningCommitment().MarshalProto()
+
+		signingJobs = append(signingJobs, &pb.ClaimLeafSigningJob{
+			LeafId: leaf.LeafId,
+			RefundTxSigningJob: &pb.SigningJob{
+				SigningPublicKey:       signingPubkey,
+				RawTx:                  refundBuf.Bytes(),
+				SigningNonceCommitment: refundNonceCommitmentProto,
+			},
+		})
+	}
+	return signingJobs, nil
 }
