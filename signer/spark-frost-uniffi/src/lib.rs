@@ -1,3 +1,5 @@
+uniffi::include_scaffolding!("spark_frost");
+
 use std::collections::HashMap;
 
 use frost_secp256k1_tr::Identifier;
@@ -5,6 +7,7 @@ use frost_secp256k1_tr::Identifier;
 /// A uniffi library for the Spark Frost signing protocol on client side.
 /// This only signs as the required participant in the signing protocol.
 ///
+#[derive(Debug, Clone)]
 pub enum Error {
     Frost(String),
 }
@@ -12,6 +15,12 @@ pub enum Error {
 impl From<String> for Error {
     fn from(s: String) -> Self {
         Error::Frost(s)
+    }
+}
+
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self)
     }
 }
 
