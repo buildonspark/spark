@@ -3,13 +3,15 @@ package testutil
 import (
 	"context"
 
+	_ "github.com/lib/pq" // postgres driver
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/ent"
 )
 
 // TestContext returns a context with a database client that can be used for testing.
 func TestContext(config *so.Config) (context.Context, error) {
-	dbClient, err := ent.Open(config.DatabaseDriver(), config.DatabasePath+"?_fk=1")
+	dbDriver := config.DatabaseDriver()
+	dbClient, err := ent.Open(dbDriver, config.DatabasePath)
 	if err != nil {
 		return nil, err
 	}

@@ -51,7 +51,8 @@ func findLatestRun(dirPath string) (int, error) {
 	return maxNum, nil
 }
 
-func getAllSigningOperators() (map[string]*so.SigningOperator, error) {
+// GetAllSigningOperators returns all signing operator configurations.
+func GetAllSigningOperators() (map[string]*so.SigningOperator, error) {
 	pubkeys := []string{
 		"0322ca18fc489ae25418a0e768273c2c61cabb823edfb14feb891e9bec62016510",
 		"0341727a6c41b168f07eb50865ab8c397a53c7eef628ac1020956b705e43b6cb27",
@@ -110,12 +111,7 @@ func TestConfig() (*so.Config, error) {
 		return nil, err
 	}
 
-	latestRun, err := findLatestRun("../../../_data")
-	if err != nil {
-		return nil, err
-	}
-
-	signingOperators, err := getAllSigningOperators()
+	signingOperators, err := GetAllSigningOperators()
 	if err != nil {
 		return nil, err
 	}
@@ -126,7 +122,7 @@ func TestConfig() (*so.Config, error) {
 		SigningOperatorMap: signingOperators,
 		Threshold:          3,
 		SignerAddress:      "unix:///tmp/frost_0.sock",
-		DatabasePath:       fmt.Sprintf("../../../_data/run_%d/db/operator_0.sqlite", latestRun),
+		DatabasePath:       "postgresql://:@127.0.0.1:5432/operator_0?sslmode=disable",
 	}
 	return &config, nil
 }
@@ -142,7 +138,7 @@ func TestWalletConfig() (*wallet.Config, error) {
 
 // TestWalletConfigWithIdentityKey returns a wallet configuration with specified identity key that can be used for testing.
 func TestWalletConfigWithIdentityKey(identityPrivKey secp256k1.PrivateKey) (*wallet.Config, error) {
-	signingOperators, err := getAllSigningOperators()
+	signingOperators, err := GetAllSigningOperators()
 	if err != nil {
 		return nil, err
 	}
