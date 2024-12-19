@@ -62,7 +62,6 @@ func (o *FinalizeSignatureHandler) FinalizeNodeSignatures(ctx context.Context, r
 	return &pb.FinalizeNodeSignaturesResponse{Nodes: nodes}, nil
 }
 
-// CompleteTreeCreation verifies the user signature, completes the tree creation and broadcasts the new tree.
 func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignatures *pb.NodeSignatures, intent pbcommon.SignatureIntent) (*pb.TreeNode, *pbinternal.TreeNode, error) {
 	log.Printf("finalizing node signatures for node %s", nodeSignatures.NodeId)
 	db := ent.GetDbFromContext(ctx)
@@ -72,7 +71,7 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 		return nil, nil, err
 	}
 
-	// Read the tree root
+	// Read the tree node
 	node, err := db.TreeNode.Get(ctx, nodeID)
 	if err != nil {
 		return nil, nil, err
@@ -111,7 +110,7 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 			log.Printf("failed to get parent node: %v", err)
 			return nil, nil, err
 		}
-		parent, err = parent.Update().SetStatus(schema.TreeNodeStatusSplitted).Save(ctx)
+		_, err = parent.Update().SetStatus(schema.TreeNodeStatusSplitted).Save(ctx)
 		if err != nil {
 			log.Printf("failed to update parent node: %v", err)
 			return nil, nil, err

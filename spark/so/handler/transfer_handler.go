@@ -117,10 +117,18 @@ func (h *TransferHandler) initLeafTransfer(ctx context.Context, transfer *ent.Tr
 		return nil, fmt.Errorf("unable to tweak keyshare %s for leaf %s: %v", keyshare.ID.String(), req.LeafId, err)
 	}
 
-	// Lock leaf
-	leaf, err = leaf.Update().SetStatus(schema.TreeNodeStatusTransferLocked).Save(ctx)
+	// Update leaf
+	signingPubkey, err := common.SubtractPublicKeys(leaf.VerifyingPubkey, keyshare.PublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("unable to calculate new signing pubkey for leaf %s: %v", req.LeafId, err)
+	}
+	leaf, err = leaf.
+		Update().
+		SetOwnerSigningPubkey(signingPubkey).
+		SetStatus(schema.TreeNodeStatusTransferLocked).
+		Save(ctx)
 	if err != nil || leaf == nil {
-		return nil, fmt.Errorf("unable to lock leaf %s: %v", req.LeafId, err)
+		return nil, fmt.Errorf("unable to update leaf %s: %v", req.LeafId, err)
 	}
 
 	// Create TransferLeaf and update Transfer.TotalValue
@@ -193,21 +201,21 @@ func (h *TransferHandler) ClaimTransferTweakKeys(ctx context.Context, req *pb.Cl
 	}
 
 	// Tweak keys
-	for _, req := range req.LeavesToReceive {
-		leaf, exists := (*leaves)[req.LeafId]
+	for _, leafTweak := range req.LeavesToReceive {
+		leaf, exists := (*leaves)[leafTweak.LeafId]
 		if !exists {
-			return fmt.Errorf("unexpected leaf id %s", req.LeafId)
+			return fmt.Errorf("unexpected leaf id %s", leafTweak.LeafId)
 		}
-		err = h.claimLeafTweakKey(ctx, leaf, req)
+		err = h.claimLeafTweakKey(ctx, leaf, leafTweak, req.OwnerIdentityPublicKey)
 		if err != nil {
-			return fmt.Errorf("unable to tweak key for leaf %s: %v", req.LeafId, err)
+			return fmt.Errorf("unable to tweak key for leaf %s: %v", leafTweak.LeafId, err)
 		}
 	}
 
 	return nil
 }
 
-func (h *TransferHandler) claimLeafTweakKey(ctx context.Context, leaf *ent.TreeNode, req *pb.ClaimLeafKeyTweak) error {
+func (h *TransferHandler) claimLeafTweakKey(ctx context.Context, leaf *ent.TreeNode, req *pb.ClaimLeafKeyTweak, ownerIdentityPubkey []byte) error {
 	err := secretsharing.ValidateShare(
 		&secretsharing.VerifiableSecretShare{
 			SecretShare: secretsharing.SecretShare{
@@ -240,6 +248,19 @@ func (h *TransferHandler) claimLeafTweakKey(ctx context.Context, leaf *ent.TreeN
 	)
 	if err != nil {
 		return fmt.Errorf("unable to tweak keyshare %s for leaf %s: %v", keyshare.ID.String(), leaf.ID.String(), err)
+	}
+
+	signingPubkey, err := common.SubtractPublicKeys(leaf.VerifyingPubkey, keyshare.PublicKey)
+	if err != nil {
+		return fmt.Errorf("unable to calculate new signing pubkey for leaf %s: %v", req.LeafId, err)
+	}
+	_, err = leaf.
+		Update().
+		SetOwnerIdentityPubkey(ownerIdentityPubkey).
+		SetOwnerSigningPubkey(signingPubkey).
+		Save(ctx)
+	if err != nil {
+		return fmt.Errorf("unable to update leaf %s: %v", req.LeafId, err)
 	}
 	return nil
 }

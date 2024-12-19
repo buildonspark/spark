@@ -75,7 +75,7 @@ func (h *InternalFinalizeSignatureHandler) updateNode(ctx context.Context, node 
 		if err != nil {
 			return err
 		}
-		tree, err = tree.Update().SetRoot(root).Save(ctx)
+		_, err = tree.Update().SetRoot(root).Save(ctx)
 		if err != nil {
 			return err
 		}
@@ -110,7 +110,7 @@ func (h *InternalFinalizeSignatureHandler) updateNode(ctx context.Context, node 
 		if err != nil {
 			return err
 		}
-		parent, err = parent.Update().SetStatus(schema.TreeNodeStatusSplitted).Save(ctx)
+		_, err = parent.Update().SetStatus(schema.TreeNodeStatusSplitted).Save(ctx)
 		if err != nil {
 			return err
 		}
@@ -122,7 +122,7 @@ func (h *InternalFinalizeSignatureHandler) updateNode(ctx context.Context, node 
 		if node == nil {
 			return fmt.Errorf("node not found")
 		}
-		node, err = node.Update().
+		_, err = node.Update().
 			SetRawTx(node.RawTx).
 			SetRawRefundTx(node.RawRefundTx).
 			SetStatus(schema.TreeNodeStatusAvailable).
