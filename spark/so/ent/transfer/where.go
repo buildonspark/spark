@@ -87,6 +87,11 @@ func ExpiryTime(v time.Time) predicate.Transfer {
 	return predicate.Transfer(sql.FieldEQ(FieldExpiryTime, v))
 }
 
+// CompletionTime applies equality check predicate on the "completion_time" field. It's identical to CompletionTimeEQ.
+func CompletionTime(v time.Time) predicate.Transfer {
+	return predicate.Transfer(sql.FieldEQ(FieldCompletionTime, v))
+}
+
 // CreateTimeEQ applies the EQ predicate on the "create_time" field.
 func CreateTimeEQ(v time.Time) predicate.Transfer {
 	return predicate.Transfer(sql.FieldEQ(FieldCreateTime, v))
@@ -355,6 +360,46 @@ func ExpiryTimeLT(v time.Time) predicate.Transfer {
 // ExpiryTimeLTE applies the LTE predicate on the "expiry_time" field.
 func ExpiryTimeLTE(v time.Time) predicate.Transfer {
 	return predicate.Transfer(sql.FieldLTE(FieldExpiryTime, v))
+}
+
+// CompletionTimeEQ applies the EQ predicate on the "completion_time" field.
+func CompletionTimeEQ(v time.Time) predicate.Transfer {
+	return predicate.Transfer(sql.FieldEQ(FieldCompletionTime, v))
+}
+
+// CompletionTimeNEQ applies the NEQ predicate on the "completion_time" field.
+func CompletionTimeNEQ(v time.Time) predicate.Transfer {
+	return predicate.Transfer(sql.FieldNEQ(FieldCompletionTime, v))
+}
+
+// CompletionTimeIn applies the In predicate on the "completion_time" field.
+func CompletionTimeIn(vs ...time.Time) predicate.Transfer {
+	return predicate.Transfer(sql.FieldIn(FieldCompletionTime, vs...))
+}
+
+// CompletionTimeNotIn applies the NotIn predicate on the "completion_time" field.
+func CompletionTimeNotIn(vs ...time.Time) predicate.Transfer {
+	return predicate.Transfer(sql.FieldNotIn(FieldCompletionTime, vs...))
+}
+
+// CompletionTimeGT applies the GT predicate on the "completion_time" field.
+func CompletionTimeGT(v time.Time) predicate.Transfer {
+	return predicate.Transfer(sql.FieldGT(FieldCompletionTime, v))
+}
+
+// CompletionTimeGTE applies the GTE predicate on the "completion_time" field.
+func CompletionTimeGTE(v time.Time) predicate.Transfer {
+	return predicate.Transfer(sql.FieldGTE(FieldCompletionTime, v))
+}
+
+// CompletionTimeLT applies the LT predicate on the "completion_time" field.
+func CompletionTimeLT(v time.Time) predicate.Transfer {
+	return predicate.Transfer(sql.FieldLT(FieldCompletionTime, v))
+}
+
+// CompletionTimeLTE applies the LTE predicate on the "completion_time" field.
+func CompletionTimeLTE(v time.Time) predicate.Transfer {
+	return predicate.Transfer(sql.FieldLTE(FieldCompletionTime, v))
 }
 
 // HasTransferLeaves applies the HasEdge predicate on the "transfer_leaves" edge.

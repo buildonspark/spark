@@ -31,6 +31,8 @@ const (
 	FieldStatus = "status"
 	// FieldExpiryTime holds the string denoting the expiry_time field in the database.
 	FieldExpiryTime = "expiry_time"
+	// FieldCompletionTime holds the string denoting the completion_time field in the database.
+	FieldCompletionTime = "completion_time"
 	// EdgeTransferLeaves holds the string denoting the transfer_leaves edge name in mutations.
 	EdgeTransferLeaves = "transfer_leaves"
 	// Table holds the table name of the transfer in the database.
@@ -54,6 +56,7 @@ var Columns = []string{
 	FieldTotalValue,
 	FieldStatus,
 	FieldExpiryTime,
+	FieldCompletionTime,
 }
 
 // ValidColumn reports if the column name is valid (part of the table columns).
@@ -122,6 +125,11 @@ func ByStatus(opts ...sql.OrderTermOption) OrderOption {
 // ByExpiryTime orders the results by the expiry_time field.
 func ByExpiryTime(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldExpiryTime, opts...).ToFunc()
+}
+
+// ByCompletionTime orders the results by the completion_time field.
+func ByCompletionTime(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCompletionTime, opts...).ToFunc()
 }
 
 // ByTransferLeavesCount orders the results by transfer_leaves count.

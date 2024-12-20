@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/btcsuite/btcd/wire"
 	"github.com/google/uuid"
@@ -15,6 +16,9 @@ import (
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/ent"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
+	enttransfer "github.com/lightsparkdev/spark-go/so/ent/transfer"
+	"github.com/lightsparkdev/spark-go/so/ent/transferleaf"
+	"github.com/lightsparkdev/spark-go/so/ent/treenode"
 	"github.com/lightsparkdev/spark-go/so/helper"
 )
 
@@ -30,6 +34,14 @@ func NewFinalizeSignatureHandler(config *so.Config) *FinalizeSignatureHandler {
 
 // FinalizeNodeSignatures verifies the node signatures and updates the node.
 func (o *FinalizeSignatureHandler) FinalizeNodeSignatures(ctx context.Context, req *pb.FinalizeNodeSignaturesRequest) (*pb.FinalizeNodeSignaturesResponse, error) {
+	switch req.Intent {
+	case pbcommon.SignatureIntent_TRANSFER:
+		err := o.verifyAndUpdateTransfer(ctx, req)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	nodes := make([]*pb.TreeNode, 0)
 	internalNodes := make([]*pbinternal.TreeNode, 0)
 	for _, nodeSignatures := range req.NodeSignatures {
@@ -60,6 +72,48 @@ func (o *FinalizeSignatureHandler) FinalizeNodeSignatures(ctx context.Context, r
 	}
 
 	return &pb.FinalizeNodeSignaturesResponse{Nodes: nodes}, nil
+}
+
+func (o *FinalizeSignatureHandler) verifyAndUpdateTransfer(ctx context.Context, req *pb.FinalizeNodeSignaturesRequest) error {
+	db := ent.GetDbFromContext(ctx)
+	var transfer *ent.Transfer
+	for _, nodeSignatures := range req.NodeSignatures {
+		leafID, err := uuid.Parse(nodeSignatures.NodeId)
+		if err != nil {
+			return fmt.Errorf("invalid node id: %v", err)
+		}
+		leafTransfer, err := db.Transfer.Query().
+			Where(
+				enttransfer.StatusEQ(schema.TransferStatusRefundSigned),
+				enttransfer.HasTransferLeavesWith(
+					transferleaf.HasLeafWith(
+						treenode.IDEQ(leafID),
+					),
+				),
+			).
+			Only(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to find pending transfer for leaf %s: %v", leafID.String(), err)
+		}
+		if transfer == nil {
+			transfer = leafTransfer
+		} else if transfer.ID != leafTransfer.ID {
+			return fmt.Errorf("expect all leaves to belong to the same transfer")
+		}
+	}
+	numTransferLeaves, err := transfer.QueryTransferLeaves().Count(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get the number of transfer leaves for transfer %s: %v", transfer.ID.String(), err)
+	}
+	if len(req.NodeSignatures) != numTransferLeaves {
+		return fmt.Errorf("missing signatures for transfer %s", transfer.ID.String())
+	}
+
+	_, err = transfer.Update().SetStatus(schema.TransferStatusCompleted).SetCompletionTime(time.Now()).Save(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to update transfer %s: %v", transfer.ID.String(), err)
+	}
+	return nil
 }
 
 func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignatures *pb.NodeSignatures, intent pbcommon.SignatureIntent) (*pb.TreeNode, *pbinternal.TreeNode, error) {

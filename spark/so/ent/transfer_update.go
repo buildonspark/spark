@@ -72,6 +72,20 @@ func (tu *TransferUpdate) SetNillableStatus(ss *schema.TransferStatus) *Transfer
 	return tu
 }
 
+// SetCompletionTime sets the "completion_time" field.
+func (tu *TransferUpdate) SetCompletionTime(t time.Time) *TransferUpdate {
+	tu.mutation.SetCompletionTime(t)
+	return tu
+}
+
+// SetNillableCompletionTime sets the "completion_time" field if the given value is not nil.
+func (tu *TransferUpdate) SetNillableCompletionTime(t *time.Time) *TransferUpdate {
+	if t != nil {
+		tu.SetCompletionTime(*t)
+	}
+	return tu
+}
+
 // AddTransferLeafeIDs adds the "transfer_leaves" edge to the TransferLeaf entity by IDs.
 func (tu *TransferUpdate) AddTransferLeafeIDs(ids ...uuid.UUID) *TransferUpdate {
 	tu.mutation.AddTransferLeafeIDs(ids...)
@@ -183,6 +197,9 @@ func (tu *TransferUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if value, ok := tu.mutation.Status(); ok {
 		_spec.SetField(transfer.FieldStatus, field.TypeEnum, value)
 	}
+	if value, ok := tu.mutation.CompletionTime(); ok {
+		_spec.SetField(transfer.FieldCompletionTime, field.TypeTime, value)
+	}
 	if tu.mutation.TransferLeavesCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.O2M,
@@ -285,6 +302,20 @@ func (tuo *TransferUpdateOne) SetStatus(ss schema.TransferStatus) *TransferUpdat
 func (tuo *TransferUpdateOne) SetNillableStatus(ss *schema.TransferStatus) *TransferUpdateOne {
 	if ss != nil {
 		tuo.SetStatus(*ss)
+	}
+	return tuo
+}
+
+// SetCompletionTime sets the "completion_time" field.
+func (tuo *TransferUpdateOne) SetCompletionTime(t time.Time) *TransferUpdateOne {
+	tuo.mutation.SetCompletionTime(t)
+	return tuo
+}
+
+// SetNillableCompletionTime sets the "completion_time" field if the given value is not nil.
+func (tuo *TransferUpdateOne) SetNillableCompletionTime(t *time.Time) *TransferUpdateOne {
+	if t != nil {
+		tuo.SetCompletionTime(*t)
 	}
 	return tuo
 }
@@ -429,6 +460,9 @@ func (tuo *TransferUpdateOne) sqlSave(ctx context.Context) (_node *Transfer, err
 	}
 	if value, ok := tuo.mutation.Status(); ok {
 		_spec.SetField(transfer.FieldStatus, field.TypeEnum, value)
+	}
+	if value, ok := tuo.mutation.CompletionTime(); ok {
+		_spec.SetField(transfer.FieldCompletionTime, field.TypeTime, value)
 	}
 	if tuo.mutation.TransferLeavesCleared() {
 		edge := &sqlgraph.EdgeSpec{

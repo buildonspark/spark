@@ -81,6 +81,12 @@ func (tc *TransferCreate) SetExpiryTime(t time.Time) *TransferCreate {
 	return tc
 }
 
+// SetCompletionTime sets the "completion_time" field.
+func (tc *TransferCreate) SetCompletionTime(t time.Time) *TransferCreate {
+	tc.mutation.SetCompletionTime(t)
+	return tc
+}
+
 // SetID sets the "id" field.
 func (tc *TransferCreate) SetID(u uuid.UUID) *TransferCreate {
 	tc.mutation.SetID(u)
@@ -197,6 +203,9 @@ func (tc *TransferCreate) check() error {
 	if _, ok := tc.mutation.ExpiryTime(); !ok {
 		return &ValidationError{Name: "expiry_time", err: errors.New(`ent: missing required field "Transfer.expiry_time"`)}
 	}
+	if _, ok := tc.mutation.CompletionTime(); !ok {
+		return &ValidationError{Name: "completion_time", err: errors.New(`ent: missing required field "Transfer.completion_time"`)}
+	}
 	return nil
 }
 
@@ -259,6 +268,10 @@ func (tc *TransferCreate) createSpec() (*Transfer, *sqlgraph.CreateSpec) {
 	if value, ok := tc.mutation.ExpiryTime(); ok {
 		_spec.SetField(transfer.FieldExpiryTime, field.TypeTime, value)
 		_node.ExpiryTime = value
+	}
+	if value, ok := tc.mutation.CompletionTime(); ok {
+		_spec.SetField(transfer.FieldCompletionTime, field.TypeTime, value)
+		_node.CompletionTime = value
 	}
 	if nodes := tc.mutation.TransferLeavesIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
