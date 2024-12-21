@@ -1,0 +1,6 @@
+framework module spark_frostFFI {
+  umbrella header "spark_frostFFI-umbrella.h"
+
+  export *
+  module * { export * }
+}
