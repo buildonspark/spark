@@ -9,6 +9,7 @@ frost-secp256k1-tr = { workspace = true }
 hex = { workspace = true }
 uuid = { workspace = true }
 uniffi = "0.28.3"
+bitcoin = "0.32.5"
 
 [build-dependencies]
 uniffi = { version = "0.28.3", features = [ "build" ] }

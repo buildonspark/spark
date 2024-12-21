@@ -1,7 +1,16 @@
 uniffi::include_scaffolding!("spark_frost");
 
-use std::collections::HashMap;
+use std::{collections::HashMap, str::FromStr};
 
+use bitcoin::{
+    absolute::LockTime,
+    consensus::deserialize,
+    hashes::Hash,
+    key::Secp256k1,
+    sighash::{Prevouts, SighashCache},
+    transaction::Version,
+    Address, OutPoint, ScriptBuf, Sequence, TapSighashType, Transaction, TxIn, TxOut, Witness,
+};
 use frost_secp256k1_tr::Identifier;
 
 /// A uniffi library for the Spark Frost signing protocol on client side.
@@ -9,12 +18,12 @@ use frost_secp256k1_tr::Identifier;
 ///
 #[derive(Debug, Clone)]
 pub enum Error {
-    Frost(String),
+    Spark(String),
 }
 
 impl From<String> for Error {
     fn from(s: String) -> Self {
-        Error::Frost(s)
+        Error::Spark(s)
     }
 }
 
@@ -120,11 +129,11 @@ pub fn frost_nonce(key_package: KeyPackage) -> Result<NonceResult, Error> {
     let request = spark_frost::proto::frost::FrostNonceRequest {
         key_packages: vec![key_package_proto],
     };
-    let response = spark_frost::signing::frost_nonce(&request).map_err(|e| Error::Frost(e))?;
+    let response = spark_frost::signing::frost_nonce(&request).map_err(|e| Error::Spark(e))?;
     let nonce = response
         .results
         .first()
-        .ok_or(Error::Frost("No nonce generated".to_owned()))?
+        .ok_or(Error::Spark("No nonce generated".to_owned()))?
         .clone();
     Ok(nonce.into())
 }
@@ -152,12 +161,12 @@ pub fn sign_frost(
         signing_jobs: vec![signing_job],
         role: spark_frost::proto::frost::SigningRole::User.into(),
     };
-    let response = spark_frost::signing::sign_frost(&request).map_err(|e| Error::Frost(e))?;
+    let response = spark_frost::signing::sign_frost(&request).map_err(|e| Error::Spark(e))?;
     let result = response
         .results
         .iter()
         .next()
-        .ok_or(Error::Frost("No result".to_owned()))?
+        .ok_or(Error::Spark("No result".to_owned()))?
         .1;
     Ok(result.signature_share.clone())
 }
@@ -191,6 +200,207 @@ pub fn aggregate_frost(
         verifying_key: verifying_key.clone(),
         user_signature_share: self_signature.clone(),
     };
-    let response = spark_frost::signing::aggregate_frost(&request).map_err(|e| Error::Frost(e))?;
+    let response = spark_frost::signing::aggregate_frost(&request).map_err(|e| Error::Spark(e))?;
     Ok(response.signature)
+}
+
+#[derive(Debug, Clone)]
+pub struct TransactionResult {
+    tx: Vec<u8>,
+    sighash: Vec<u8>,
+}
+
+// Construct a tx that pays from the tx.out[vout] to the address.
+pub fn construct_node_tx(
+    tx: Vec<u8>,
+    vout: u32,
+    address: String,
+    locktime: u16,
+) -> Result<TransactionResult, Error> {
+    // Decode the input transaction
+    let prev_tx: Transaction = deserialize(&tx).map_err(|e| Error::Spark(e.to_string()))?;
+
+    // Verify that vout index is valid
+    if vout as usize >= prev_tx.output.len() {
+        return Err(Error::Spark("Invalid vout index".to_owned()));
+    }
+
+    // Get the previous output we'll be spending
+    let prev_output = &prev_tx.output[vout as usize];
+    let prev_amount = prev_output.value;
+
+    // Create the outpoint (reference to the UTXO we're spending)
+    let outpoint = OutPoint::new(prev_tx.compute_txid(), vout);
+
+    // Create the input
+    let input = TxIn {
+        previous_output: outpoint,
+        script_sig: ScriptBuf::new(), // Empty for now, will be filled by the signing process
+        sequence: Sequence::from_height(locktime), // Default sequence number
+        witness: Witness::new(),      // Empty witness for now
+    };
+
+    let dest_address = Address::from_str(&address)
+        .map_err(|e| Error::Spark(e.to_string()))?
+        .assume_checked();
+
+    // Create the P2TR output
+    let output = TxOut {
+        value: prev_amount,
+        script_pubkey: dest_address.script_pubkey(),
+    };
+
+    // Construct the transaction with version 2 for Taproot support
+    let new_tx = Transaction {
+        version: Version::TWO,
+        lock_time: LockTime::from_height(locktime as u32).unwrap(),
+        input: vec![input],
+        output: vec![output],
+    };
+
+    let sighash = SighashCache::new(&new_tx)
+        .taproot_key_spend_signature_hash(0, &Prevouts::All(&[prev_output]), TapSighashType::All)
+        .unwrap();
+
+    // Serialize the transaction
+    Ok(TransactionResult {
+        tx: bitcoin::consensus::serialize(&new_tx),
+        sighash: sighash.as_raw_hash().to_byte_array().to_vec(),
+    })
+}
+
+// Construct a tx that pays from the tx.out[vout] to the address.
+pub fn construct_refund_tx(
+    tx: Vec<u8>,
+    vout: u32,
+    pubkey: Vec<u8>,
+    network: String,
+    locktime: u16,
+) -> Result<TransactionResult, Error> {
+    // Decode the input transaction
+    let prev_tx: Transaction = deserialize(&tx).map_err(|e| Error::Spark(e.to_string()))?;
+
+    // Verify that vout index is valid
+    if vout as usize >= prev_tx.output.len() {
+        return Err(Error::Spark("Invalid vout index".to_owned()));
+    }
+
+    // Get the previous output we'll be spending
+    let prev_output = &prev_tx.output[vout as usize];
+    let prev_amount = prev_output.value;
+
+    // Create the outpoint (reference to the UTXO we're spending)
+    let outpoint = OutPoint::new(prev_tx.compute_txid(), vout);
+
+    // Create the input
+    let input = TxIn {
+        previous_output: outpoint,
+        script_sig: ScriptBuf::new(), // Empty for now, will be filled by the signing process
+        sequence: Sequence::from_height(locktime), // Default sequence number
+        witness: Witness::new(),      // Empty witness for now
+    };
+
+    let x_only_key = {
+        let full_key =
+            bitcoin::PublicKey::from_slice(&pubkey).map_err(|e| Error::Spark(e.to_string()))?;
+        full_key.inner.x_only_public_key().0
+    };
+
+    let network = match network.as_str() {
+        "mainnet" => bitcoin::Network::Bitcoin,
+        "testnet" => bitcoin::Network::Testnet,
+        "signet" => bitcoin::Network::Signet,
+        "regtest" => bitcoin::Network::Regtest,
+        _ => return Err(Error::Spark("Invalid network".to_owned())),
+    };
+
+    let secp = Secp256k1::new();
+
+    let p2tr_address = bitcoin::Address::p2tr(&secp, x_only_key, None, network);
+
+    // Create the P2TR output
+    let output = TxOut {
+        value: prev_amount,
+        script_pubkey: p2tr_address.script_pubkey(),
+    };
+
+    // Construct the transaction with version 2 for Taproot support
+    let new_tx = Transaction {
+        version: Version::TWO,
+        lock_time: LockTime::from_height(locktime as u32).unwrap(),
+        input: vec![input],
+        output: vec![output],
+    };
+
+    let sighash = SighashCache::new(&new_tx)
+        .taproot_key_spend_signature_hash(0, &Prevouts::All(&[prev_output]), TapSighashType::All)
+        .unwrap();
+
+    // Serialize the transaction
+    Ok(TransactionResult {
+        tx: bitcoin::consensus::serialize(&new_tx),
+        sighash: sighash.as_raw_hash().to_byte_array().to_vec(),
+    })
+}
+
+// Construct a tx that pays from the tx.out[vout] to the address.
+pub fn construct_split_tx(
+    tx: Vec<u8>,
+    vout: u32,
+    addresses: Vec<String>,
+    locktime: u16,
+) -> Result<TransactionResult, Error> {
+    // Decode the input transaction
+    let prev_tx: Transaction = deserialize(&tx).map_err(|e| Error::Spark(e.to_string()))?;
+
+    // Verify that vout index is valid
+    if vout as usize >= prev_tx.output.len() {
+        return Err(Error::Spark("Invalid vout index".to_owned()));
+    }
+
+    // Get the previous output we'll be spending
+    let prev_output = &prev_tx.output[vout as usize];
+    let prev_amount = prev_output.value;
+
+    // Create the outpoint (reference to the UTXO we're spending)
+    let outpoint = OutPoint::new(prev_tx.compute_txid(), vout);
+
+    // Create the input
+    let input = TxIn {
+        previous_output: outpoint,
+        script_sig: ScriptBuf::new(), // Empty for now, will be filled by the signing process
+        sequence: Sequence::from_height(locktime), // Default sequence number
+        witness: Witness::new(),      // Empty witness for now
+    };
+
+    let mut outputs = vec![];
+
+    for address in addresses {
+        let dest_address = Address::from_str(&address)
+            .map_err(|e| Error::Spark(e.to_string()))?
+            .assume_checked();
+
+        outputs.push(TxOut {
+            value: prev_amount,
+            script_pubkey: dest_address.script_pubkey(),
+        });
+    }
+
+    // Construct the transaction with version 2 for Taproot support
+    let new_tx = Transaction {
+        version: Version::TWO,
+        lock_time: LockTime::from_height(locktime as u32).unwrap(),
+        input: vec![input],
+        output: outputs,
+    };
+
+    let sighash = SighashCache::new(&new_tx)
+        .taproot_key_spend_signature_hash(0, &Prevouts::All(&[prev_output]), TapSighashType::All)
+        .unwrap();
+
+    // Serialize the transaction
+    Ok(TransactionResult {
+        tx: bitcoin::consensus::serialize(&new_tx),
+        sighash: sighash.as_raw_hash().to_byte_array().to_vec(),
+    })
 }
