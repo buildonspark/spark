@@ -43,7 +43,7 @@ public class Wallet {
         guard let signingPrivateKey = self.addressKeyMap[address.address] else {
             throw SparkError(message: "Invalid address")
         }
-        return try await Spark.createTree(
+        let response = try await Spark.createTree(
             client: self.walletClient,
             onchainTx: onchainTx,
             onchainTxId: onchainTxId,
@@ -53,5 +53,10 @@ public class Wallet {
             signingPrivateKey: signingPrivateKey.dataRepresentation,
             identityPublicKey: self.identityPrivateKey.publicKey.dataRepresentation,
             verifyingPublicKey: address.verifyingKey)
+
+        for node in response.nodes {
+            self.nodeIDKeyMap[node.id] = signingPrivateKey
+        }
+        return response
     }
 }
