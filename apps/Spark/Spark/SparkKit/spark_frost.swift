@@ -430,6 +430,22 @@ private struct FfiConverterUInt32: FfiConverterPrimitive {
 #if swift(>=5.8)
     @_documentation(visibility: private)
 #endif
+private struct FfiConverterUInt64: FfiConverterPrimitive {
+    typealias FfiType = UInt64
+    typealias SwiftType = UInt64
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> UInt64 {
+        return try lift(readInt(&buf))
+    }
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(value))
+    }
+}
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
 private struct FfiConverterString: FfiConverter {
     typealias SwiftType = String
     typealias FfiType = RustBuffer
@@ -484,6 +500,67 @@ private struct FfiConverterData: FfiConverterRustBuffer {
         writeInt(&buf, len)
         writeBytes(&buf, value)
     }
+}
+
+public struct DummyTx {
+    public var tx: Data
+    public var txid: String
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(tx: Data, txid: String) {
+        self.tx = tx
+        self.txid = txid
+    }
+}
+
+extension DummyTx: Equatable, Hashable {
+    public static func == (lhs: DummyTx, rhs: DummyTx) -> Bool {
+        if lhs.tx != rhs.tx {
+            return false
+        }
+        if lhs.txid != rhs.txid {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(tx)
+        hasher.combine(txid)
+    }
+}
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeDummyTx: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> DummyTx {
+        return
+            try DummyTx(
+                tx: FfiConverterData.read(from: &buf),
+                txid: FfiConverterString.read(from: &buf)
+            )
+    }
+
+    public static func write(_ value: DummyTx, into buf: inout [UInt8]) {
+        FfiConverterData.write(value.tx, into: &buf)
+        FfiConverterString.write(value.txid, into: &buf)
+    }
+}
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+public func FfiConverterTypeDummyTx_lift(_ buf: RustBuffer) throws -> DummyTx {
+    return try FfiConverterTypeDummyTx.lift(buf)
+}
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+public func FfiConverterTypeDummyTx_lower(_ value: DummyTx) -> RustBuffer {
+    return FfiConverterTypeDummyTx.lower(value)
 }
 
 public struct KeyPackage {
@@ -962,6 +1039,15 @@ public func constructSplitTx(tx: Data, vout: UInt32, addresses: [String], lockti
     })
 }
 
+public func createDummyTx(address: String, amountSats: UInt64) throws -> DummyTx {
+    return try FfiConverterTypeDummyTx.lift(rustCallWithError(FfiConverterTypeError.lift) {
+        uniffi_spark_frost_fn_func_create_dummy_tx(
+            FfiConverterString.lower(address),
+            FfiConverterUInt64.lower(amountSats), $0
+        )
+    })
+}
+
 public func frostNonce(keyPackage: KeyPackage) throws -> NonceResult {
     return try FfiConverterTypeNonceResult.lift(rustCallWithError(FfiConverterTypeError.lift) {
         uniffi_spark_frost_fn_func_frost_nonce(
@@ -1008,6 +1094,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if uniffi_spark_frost_checksum_func_construct_split_tx() != 55511 {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if uniffi_spark_frost_checksum_func_create_dummy_tx() != 14929 {
         return InitializationResult.apiChecksumMismatch
     }
     if uniffi_spark_frost_checksum_func_frost_nonce() != 5111 {

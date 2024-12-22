@@ -271,6 +271,11 @@ RustBuffer uniffi_spark_frost_fn_func_construct_refund_tx(RustBuffer tx, uint32_
 RustBuffer uniffi_spark_frost_fn_func_construct_split_tx(RustBuffer tx, uint32_t vout, RustBuffer addresses, uint16_t locktime, RustCallStatus *_Nonnull out_status
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPARK_FROST_FN_FUNC_CREATE_DUMMY_TX
+#define UNIFFI_FFIDEF_UNIFFI_SPARK_FROST_FN_FUNC_CREATE_DUMMY_TX
+RustBuffer uniffi_spark_frost_fn_func_create_dummy_tx(RustBuffer address, uint64_t amount_sats, RustCallStatus *_Nonnull out_status
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_SPARK_FROST_FN_FUNC_FROST_NONCE
 #define UNIFFI_FFIDEF_UNIFFI_SPARK_FROST_FN_FUNC_FROST_NONCE
 RustBuffer uniffi_spark_frost_fn_func_frost_nonce(RustBuffer key_package, RustCallStatus *_Nonnull out_status
@@ -582,6 +587,12 @@ uint16_t uniffi_spark_frost_checksum_func_construct_refund_tx(void
 #ifndef UNIFFI_FFIDEF_UNIFFI_SPARK_FROST_CHECKSUM_FUNC_CONSTRUCT_SPLIT_TX
 #define UNIFFI_FFIDEF_UNIFFI_SPARK_FROST_CHECKSUM_FUNC_CONSTRUCT_SPLIT_TX
 uint16_t uniffi_spark_frost_checksum_func_construct_split_tx(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPARK_FROST_CHECKSUM_FUNC_CREATE_DUMMY_TX
+#define UNIFFI_FFIDEF_UNIFFI_SPARK_FROST_CHECKSUM_FUNC_CREATE_DUMMY_TX
+uint16_t uniffi_spark_frost_checksum_func_create_dummy_tx(void
     
 );
 #endif

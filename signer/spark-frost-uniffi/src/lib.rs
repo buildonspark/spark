@@ -1,6 +1,7 @@
 uniffi::include_scaffolding!("spark_frost");
 
-use std::{collections::HashMap, str::FromStr};
+use std::io::Write;
+use std::{collections::HashMap, fs::OpenOptions, str::FromStr};
 
 use bitcoin::{
     absolute::LockTime,
@@ -9,7 +10,8 @@ use bitcoin::{
     key::Secp256k1,
     sighash::{Prevouts, SighashCache},
     transaction::Version,
-    Address, OutPoint, ScriptBuf, Sequence, TapSighashType, Transaction, TxIn, TxOut, Witness,
+    Address, Amount, OutPoint, ScriptBuf, Sequence, TapSighashType, Transaction, TxIn, TxOut, Txid,
+    Witness,
 };
 use frost_secp256k1_tr::Identifier;
 
@@ -145,6 +147,7 @@ pub fn sign_frost(
     self_commitment: SigningCommitment,
     statechain_commitments: HashMap<String, SigningCommitment>,
 ) -> Result<Vec<u8>, Error> {
+    log_to_file("Entering sign_frost");
     let signing_job = spark_frost::proto::frost::FrostSigningJob {
         job_id: uuid::Uuid::new_v4().to_string(),
         message: msg,
@@ -181,6 +184,7 @@ pub fn aggregate_frost(
     self_public_key: Vec<u8>,
     verifying_key: Vec<u8>,
 ) -> Result<Vec<u8>, Error> {
+    log_to_file("Entering aggregate_frost");
     let request = spark_frost::proto::frost::AggregateFrostRequest {
         message: msg,
         commitments: statechain_commitments
@@ -200,7 +204,9 @@ pub fn aggregate_frost(
         verifying_key: verifying_key.clone(),
         user_signature_share: self_signature.clone(),
     };
+    log_to_file("Aggregating frost protobuf constructed");
     let response = spark_frost::signing::aggregate_frost(&request).map_err(|e| Error::Spark(e))?;
+    log_to_file("Aggregating frost response received");
     Ok(response.signature)
 }
 
@@ -259,7 +265,11 @@ pub fn construct_node_tx(
     };
 
     let sighash = SighashCache::new(&new_tx)
-        .taproot_key_spend_signature_hash(0, &Prevouts::All(&[prev_output]), TapSighashType::All)
+        .taproot_key_spend_signature_hash(
+            0,
+            &Prevouts::All(&[prev_output]),
+            TapSighashType::Default,
+        )
         .unwrap();
 
     // Serialize the transaction
@@ -333,7 +343,11 @@ pub fn construct_refund_tx(
     };
 
     let sighash = SighashCache::new(&new_tx)
-        .taproot_key_spend_signature_hash(0, &Prevouts::All(&[prev_output]), TapSighashType::All)
+        .taproot_key_spend_signature_hash(
+            0,
+            &Prevouts::All(&[prev_output]),
+            TapSighashType::Default,
+        )
         .unwrap();
 
     // Serialize the transaction
@@ -395,7 +409,11 @@ pub fn construct_split_tx(
     };
 
     let sighash = SighashCache::new(&new_tx)
-        .taproot_key_spend_signature_hash(0, &Prevouts::All(&[prev_output]), TapSighashType::All)
+        .taproot_key_spend_signature_hash(
+            0,
+            &Prevouts::All(&[prev_output]),
+            TapSighashType::Default,
+        )
         .unwrap();
 
     // Serialize the transaction
@@ -403,4 +421,56 @@ pub fn construct_split_tx(
         tx: bitcoin::consensus::serialize(&new_tx),
         sighash: sighash.as_raw_hash().to_byte_array().to_vec(),
     })
+}
+
+#[derive(Debug, Clone)]
+pub struct DummyTx {
+    pub tx: Vec<u8>,
+    pub txid: String,
+}
+
+pub fn create_dummy_tx(address: String, amount_sats: u64) -> Result<DummyTx, Error> {
+    // Create the input
+    let input = TxIn {
+        previous_output: OutPoint {
+            txid: Txid::from_slice(&[0; 32]).unwrap(),
+            vout: 0,
+        },
+        script_sig: ScriptBuf::new(), // Empty for now, will be filled by the signing process
+        sequence: Sequence::from_height(0), // Default sequence number
+        witness: Witness::new(),      // Empty witness for now
+    };
+
+    let dest_address = Address::from_str(&address)
+        .map_err(|e| Error::Spark(e.to_string()))?
+        .assume_checked();
+
+    // Create the P2TR output
+    let output = TxOut {
+        value: Amount::from_sat(amount_sats),
+        script_pubkey: dest_address.script_pubkey(),
+    };
+
+    // Construct the transaction with version 2 for Taproot support
+    let new_tx = Transaction {
+        version: Version::TWO,
+        lock_time: LockTime::from_height(0).unwrap(),
+        input: vec![input],
+        output: vec![output],
+    };
+
+    Ok(DummyTx {
+        tx: bitcoin::consensus::serialize(&new_tx),
+        txid: new_tx.compute_txid().to_string(),
+    })
+}
+
+fn log_to_file(message: &str) {
+    if let Ok(mut file) = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open("/Users/zhenlu/rust.log")
+    {
+        writeln!(file, "{}", message).ok();
+    }
 }

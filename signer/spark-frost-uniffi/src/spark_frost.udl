@@ -16,6 +16,9 @@ namespace spark_frost {
 
     [Throws=Error]
     TransactionResult construct_split_tx(bytes tx, u32 vout, sequence<string> addresses, u16 locktime);
+
+    [Throws=Error]
+    DummyTx create_dummy_tx(string address, u64 amount_sats);
 };
 
 [Error]
@@ -47,4 +50,9 @@ dictionary KeyPackage {
 dictionary TransactionResult {
     bytes tx;
     bytes sighash;
+};
+
+dictionary DummyTx {
+    bytes tx;
+    string txid;
 };

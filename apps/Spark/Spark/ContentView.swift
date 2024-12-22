@@ -22,7 +22,7 @@ struct ContentView: View {
             let eventLoopGroup = PlatformSupport.makeEventLoopGroup(loopCount: 1)
             let channel = try! GRPCChannelPool.with(target: .host("localhost", port: 8535), transportSecurity: .plaintext, eventLoopGroup: eventLoopGroup)
             let client = Spark_SparkServiceAsyncClient(channel: channel)
-            let wallet = Wallet(walletClient: client)
+            let wallet = try! Wallet(walletClient: client)
             let address = try! await wallet.generateDepositAddress()
             self.text = address.address
         }
