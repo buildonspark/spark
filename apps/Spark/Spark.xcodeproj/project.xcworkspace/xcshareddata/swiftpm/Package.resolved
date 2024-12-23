@@ -1,6 +1,15 @@
 {
-  "originHash" : "5a9d8dd96de69c6b0e63c1d8f105690d2cb46a3346ac28e15a1b0e1cf30ff36e",
+  "originHash" : "4fcfce0dddb3b50b1ebb5cd2d46c08eb366b8d0ddf84538937450e6de7eeb56a",
   "pins" : [
+    {
+      "identity" : "bigint",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/attaswift/BigInt.git",
+      "state" : {
+        "revision" : "114343a705df4725dfe7ab8a2a326b8883cfd79c",
+        "version" : "5.5.1"
+      }
+    },
     {
       "identity" : "grpc-swift",
       "kind" : "remoteSourceControl",

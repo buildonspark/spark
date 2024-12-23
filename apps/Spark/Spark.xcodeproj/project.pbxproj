@@ -11,6 +11,7 @@
 		F758F4442D1639C200CD44A1 /* secp256k1 in Frameworks */ = {isa = PBXBuildFile; productRef = F758F4432D1639C200CD44A1 /* secp256k1 */; };
 		F758F4462D163A8400CD44A1 /* SwiftProtobuf in Frameworks */ = {isa = PBXBuildFile; productRef = F758F4452D163A8400CD44A1 /* SwiftProtobuf */; };
 		F78E44E02D163BE000EB538A /* GRPC in Frameworks */ = {isa = PBXBuildFile; productRef = F78E44DF2D163BE000EB538A /* GRPC */; };
+		F7A8FA552D18ACF10071A3DC /* BigInt in Frameworks */ = {isa = PBXBuildFile; productRef = F7A8FA542D18ACF10071A3DC /* BigInt */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -60,6 +61,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F7A8FA552D18ACF10071A3DC /* BigInt in Frameworks */,
 				F78E44E02D163BE000EB538A /* GRPC in Frameworks */,
 				F758F4442D1639C200CD44A1 /* secp256k1 in Frameworks */,
 				F754C5F12D13403D00F3D40B /* spark_frostFFI.xcframework in Frameworks */,
@@ -136,6 +138,7 @@
 				F758F4432D1639C200CD44A1 /* secp256k1 */,
 				F758F4452D163A8400CD44A1 /* SwiftProtobuf */,
 				F78E44DF2D163BE000EB538A /* GRPC */,
+				F7A8FA542D18ACF10071A3DC /* BigInt */,
 			);
 			productName = Spark;
 			productReference = F754C5BF2D133DD200F3D40B /* Spark.app */;
@@ -223,6 +226,7 @@
 				F758F4372D1631A900CD44A1 /* XCRemoteSwiftPackageReference "swift-secp256k1" */,
 				F758F4402D16399E00CD44A1 /* XCRemoteSwiftPackageReference "swift-protobuf" */,
 				F758F4472D163AC100CD44A1 /* XCRemoteSwiftPackageReference "grpc-swift" */,
+				F7A8FA532D18ABEA0071A3DC /* XCRemoteSwiftPackageReference "BigInt" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = F754C5C02D133DD200F3D40B /* Products */;
@@ -648,6 +652,14 @@
 				minimumVersion = 1.24.2;
 			};
 		};
+		F7A8FA532D18ABEA0071A3DC /* XCRemoteSwiftPackageReference "BigInt" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/attaswift/BigInt.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 5.1.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -665,6 +677,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = F758F4472D163AC100CD44A1 /* XCRemoteSwiftPackageReference "grpc-swift" */;
 			productName = GRPC;
+		};
+		F7A8FA542D18ACF10071A3DC /* BigInt */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = F7A8FA532D18ABEA0071A3DC /* XCRemoteSwiftPackageReference "BigInt" */;
+			productName = BigInt;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
