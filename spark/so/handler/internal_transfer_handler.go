@@ -57,11 +57,11 @@ func (h *InternalTransferHandler) FinalizeTransfer(ctx context.Context, req *pbi
 		if err != nil {
 			return err
 		}
-		node, err := db.TreeNode.Get(ctx, nodeID)
+		dbNode, err := db.TreeNode.Get(ctx, nodeID)
 		if err != nil {
 			return err
 		}
-		_, err = node.Update().
+		_, err = dbNode.Update().
 			SetRawTx(node.RawTx).
 			SetRawRefundTx(node.RawRefundTx).
 			SetStatus(schema.TreeNodeStatusAvailable).

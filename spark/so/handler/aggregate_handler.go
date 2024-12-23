@@ -210,14 +210,14 @@ func (h *AggregateHandler) InternalFinalizeNodesAggregation(ctx context.Context,
 		if err != nil {
 			return err
 		}
-		node, err := db.TreeNode.Get(ctx, nodeID)
+		dbNode, err := db.TreeNode.Get(ctx, nodeID)
 		if err != nil {
 			return err
 		}
-		if node == nil {
+		if dbNode == nil {
 			return fmt.Errorf("node not found")
 		}
-		_, err = node.Update().
+		_, err = dbNode.Update().
 			SetRawTx(node.RawTx).
 			SetRawRefundTx(node.RawRefundTx).
 			SetStatus(schema.TreeNodeStatusAvailable).

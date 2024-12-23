@@ -86,6 +86,12 @@ func (tu *TransferUpdate) SetNillableCompletionTime(t *time.Time) *TransferUpdat
 	return tu
 }
 
+// ClearCompletionTime clears the value of the "completion_time" field.
+func (tu *TransferUpdate) ClearCompletionTime() *TransferUpdate {
+	tu.mutation.ClearCompletionTime()
+	return tu
+}
+
 // AddTransferLeafeIDs adds the "transfer_leaves" edge to the TransferLeaf entity by IDs.
 func (tu *TransferUpdate) AddTransferLeafeIDs(ids ...uuid.UUID) *TransferUpdate {
 	tu.mutation.AddTransferLeafeIDs(ids...)
@@ -199,6 +205,9 @@ func (tu *TransferUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if value, ok := tu.mutation.CompletionTime(); ok {
 		_spec.SetField(transfer.FieldCompletionTime, field.TypeTime, value)
+	}
+	if tu.mutation.CompletionTimeCleared() {
+		_spec.ClearField(transfer.FieldCompletionTime, field.TypeTime)
 	}
 	if tu.mutation.TransferLeavesCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -317,6 +326,12 @@ func (tuo *TransferUpdateOne) SetNillableCompletionTime(t *time.Time) *TransferU
 	if t != nil {
 		tuo.SetCompletionTime(*t)
 	}
+	return tuo
+}
+
+// ClearCompletionTime clears the value of the "completion_time" field.
+func (tuo *TransferUpdateOne) ClearCompletionTime() *TransferUpdateOne {
+	tuo.mutation.ClearCompletionTime()
 	return tuo
 }
 
@@ -463,6 +478,9 @@ func (tuo *TransferUpdateOne) sqlSave(ctx context.Context) (_node *Transfer, err
 	}
 	if value, ok := tuo.mutation.CompletionTime(); ok {
 		_spec.SetField(transfer.FieldCompletionTime, field.TypeTime, value)
+	}
+	if tuo.mutation.CompletionTimeCleared() {
+		_spec.ClearField(transfer.FieldCompletionTime, field.TypeTime)
 	}
 	if tuo.mutation.TransferLeavesCleared() {
 		edge := &sqlgraph.EdgeSpec{

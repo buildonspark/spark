@@ -16,6 +16,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/common"
 	secretsharing "github.com/lightsparkdev/spark-go/common/secret_sharing"
+	pbcommon "github.com/lightsparkdev/spark-go/proto/common"
 	pbfrost "github.com/lightsparkdev/spark-go/proto/frost"
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
 	"github.com/lightsparkdev/spark-go/so/objects"
@@ -241,11 +242,12 @@ func ClaimTransfer(
 		return fmt.Errorf("failed to tweak keys when claiming leaves: %v", err)
 	}
 
-	err = claimTransferSignRefunds(ctx, transfer, config, leaves)
+	signatures, err := claimTransferSignRefunds(ctx, transfer, config, leaves)
 	if err != nil {
 		return fmt.Errorf("failed to sign refunds when claiming leaves: %v", err)
 	}
-	return nil
+
+	return finalizeTransfer(ctx, config, signatures)
 }
 
 func claimTransferTweakKeys(
@@ -351,7 +353,7 @@ func claimTransferSignRefunds(
 	transfer *pb.Transfer,
 	config *Config,
 	leafKeys []LeafKeyTweak,
-) error {
+) ([]*pb.NodeSignatures, error) {
 	leafDataMap := make(map[string]*claimLeafData)
 	for _, leafKey := range leafKeys {
 		privKey, _ := secp256k1.PrivKeyFromBytes(leafKey.NewSigningPrivKey)
@@ -371,11 +373,11 @@ func claimTransferSignRefunds(
 
 	signingJobs, err := prepareClaimTransferOperatorsSigningJobs(transfer, config, leafDataMap)
 	if err != nil {
-		return fmt.Errorf("failed to prepare signing jobs for claiming transfer: %v", err)
+		return nil, fmt.Errorf("failed to prepare signing jobs for claiming transfer: %v", err)
 	}
 	sparkConn, err := common.NewGRPCConnection(config.CoodinatorAddress())
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer sparkConn.Close()
 	sparkClient := pb.NewSparkServiceClient(sparkConn)
@@ -385,17 +387,35 @@ func claimTransferSignRefunds(
 		SigningJobs:            signingJobs,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to call ClaimTransferSignRefunds: %v", err)
+		return nil, fmt.Errorf("failed to call ClaimTransferSignRefunds: %v", err)
 	}
 
 	return signRefunds(config, leafDataMap, response.SigningResults)
+}
+
+func finalizeTransfer(
+	ctx context.Context,
+	config *Config,
+	signatures []*pb.NodeSignatures,
+) error {
+	sparkConn, err := common.NewGRPCConnection(config.CoodinatorAddress())
+	if err != nil {
+		return err
+	}
+	defer sparkConn.Close()
+	sparkClient := pb.NewSparkServiceClient(sparkConn)
+	_, err = sparkClient.FinalizeNodeSignatures(ctx, &pb.FinalizeNodeSignaturesRequest{
+		Intent:         pbcommon.SignatureIntent_TRANSFER,
+		NodeSignatures: signatures,
+	})
+	return err
 }
 
 func signRefunds(
 	config *Config,
 	leafDataMap map[string]*claimLeafData,
 	operatorSigningResults []*pb.ClaimLeafSigningResult,
-) error {
+) ([]*pb.NodeSignatures, error) {
 	userSigningJobs := []*pbfrost.FrostSigningJob{}
 	jobToAggregateRequestMap := make(map[string]*pbfrost.AggregateFrostRequest)
 	jobToLeafMap := make(map[string]string)
@@ -437,18 +457,23 @@ func signRefunds(
 		Role:        pbfrost.SigningRole_USER,
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
+	nodeSignatures := []*pb.NodeSignatures{}
 	for jobID, userSignature := range userSignatures.Results {
 		request := jobToAggregateRequestMap[jobID]
 		request.UserSignatureShare = userSignature.SignatureShare
-		_, err := frostClient.AggregateFrost(context.Background(), request)
+		response, err := frostClient.AggregateFrost(context.Background(), request)
 		if err != nil {
-			return err
+			return nil, err
 		}
+		nodeSignatures = append(nodeSignatures, &pb.NodeSignatures{
+			NodeId:            jobToLeafMap[jobID],
+			RefundTxSignature: response.Signature,
+		})
 	}
-	return nil
+	return nodeSignatures, nil
 }
 
 func prepareClaimTransferOperatorsSigningJobs(

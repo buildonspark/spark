@@ -34,7 +34,7 @@ type Transfer struct {
 	// ExpiryTime holds the value of the "expiry_time" field.
 	ExpiryTime time.Time `json:"expiry_time,omitempty"`
 	// CompletionTime holds the value of the "completion_time" field.
-	CompletionTime time.Time `json:"completion_time,omitempty"`
+	CompletionTime *time.Time `json:"completion_time,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the TransferQuery when eager-loading is set.
 	Edges        TransferEdges `json:"edges"`
@@ -141,7 +141,8 @@ func (t *Transfer) assignValues(columns []string, values []any) error {
 			if value, ok := values[i].(*sql.NullTime); !ok {
 				return fmt.Errorf("unexpected type %T for field completion_time", values[i])
 			} else if value.Valid {
-				t.CompletionTime = value.Time
+				t.CompletionTime = new(time.Time)
+				*t.CompletionTime = value.Time
 			}
 		default:
 			t.selectValues.Set(columns[i], values[i])
@@ -205,8 +206,10 @@ func (t *Transfer) String() string {
 	builder.WriteString("expiry_time=")
 	builder.WriteString(t.ExpiryTime.Format(time.ANSIC))
 	builder.WriteString(", ")
-	builder.WriteString("completion_time=")
-	builder.WriteString(t.CompletionTime.Format(time.ANSIC))
+	if v := t.CompletionTime; v != nil {
+		builder.WriteString("completion_time=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
 	builder.WriteByte(')')
 	return builder.String()
 }

@@ -402,6 +402,16 @@ func CompletionTimeLTE(v time.Time) predicate.Transfer {
 	return predicate.Transfer(sql.FieldLTE(FieldCompletionTime, v))
 }
 
+// CompletionTimeIsNil applies the IsNil predicate on the "completion_time" field.
+func CompletionTimeIsNil() predicate.Transfer {
+	return predicate.Transfer(sql.FieldIsNull(FieldCompletionTime))
+}
+
+// CompletionTimeNotNil applies the NotNil predicate on the "completion_time" field.
+func CompletionTimeNotNil() predicate.Transfer {
+	return predicate.Transfer(sql.FieldNotNull(FieldCompletionTime))
+}
+
 // HasTransferLeaves applies the HasEdge predicate on the "transfer_leaves" edge.
 func HasTransferLeaves() predicate.Transfer {
 	return predicate.Transfer(func(s *sql.Selector) {

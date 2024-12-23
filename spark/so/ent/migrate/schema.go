@@ -95,7 +95,7 @@ var (
 		{Name: "total_value", Type: field.TypeUint64},
 		{Name: "status", Type: field.TypeEnum, Enums: []string{"INITIATED", "KEY_TWEAKED", "REFUND_SIGNED", "COMPLETED", "EXPIRED"}},
 		{Name: "expiry_time", Type: field.TypeTime},
-		{Name: "completion_time", Type: field.TypeTime},
+		{Name: "completion_time", Type: field.TypeTime, Nullable: true},
 	}
 	// TransfersTable holds the schema information for the "transfers" table.
 	TransfersTable = &schema.Table{

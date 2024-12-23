@@ -2346,7 +2346,7 @@ func (m *TransferMutation) CompletionTime() (r time.Time, exists bool) {
 // OldCompletionTime returns the old "completion_time" field's value of the Transfer entity.
 // If the Transfer object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *TransferMutation) OldCompletionTime(ctx context.Context) (v time.Time, err error) {
+func (m *TransferMutation) OldCompletionTime(ctx context.Context) (v *time.Time, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldCompletionTime is only allowed on UpdateOne operations")
 	}
@@ -2360,9 +2360,22 @@ func (m *TransferMutation) OldCompletionTime(ctx context.Context) (v time.Time, 
 	return oldValue.CompletionTime, nil
 }
 
+// ClearCompletionTime clears the value of the "completion_time" field.
+func (m *TransferMutation) ClearCompletionTime() {
+	m.completion_time = nil
+	m.clearedFields[transfer.FieldCompletionTime] = struct{}{}
+}
+
+// CompletionTimeCleared returns if the "completion_time" field was cleared in this mutation.
+func (m *TransferMutation) CompletionTimeCleared() bool {
+	_, ok := m.clearedFields[transfer.FieldCompletionTime]
+	return ok
+}
+
 // ResetCompletionTime resets all changes to the "completion_time" field.
 func (m *TransferMutation) ResetCompletionTime() {
 	m.completion_time = nil
+	delete(m.clearedFields, transfer.FieldCompletionTime)
 }
 
 // AddTransferLeafeIDs adds the "transfer_leaves" edge to the TransferLeaf entity by ids.
@@ -2636,7 +2649,11 @@ func (m *TransferMutation) AddField(name string, value ent.Value) error {
 // ClearedFields returns all nullable fields that were cleared during this
 // mutation.
 func (m *TransferMutation) ClearedFields() []string {
-	return nil
+	var fields []string
+	if m.FieldCleared(transfer.FieldCompletionTime) {
+		fields = append(fields, transfer.FieldCompletionTime)
+	}
+	return fields
 }
 
 // FieldCleared returns a boolean indicating if a field with the given name was
@@ -2649,6 +2666,11 @@ func (m *TransferMutation) FieldCleared(name string) bool {
 // ClearField clears the value of the field with the given name. It returns an
 // error if the field is not defined in the schema.
 func (m *TransferMutation) ClearField(name string) error {
+	switch name {
+	case transfer.FieldCompletionTime:
+		m.ClearCompletionTime()
+		return nil
+	}
 	return fmt.Errorf("unknown Transfer nullable field %s", name)
 }
 

@@ -35,6 +35,16 @@ func NewFinalizeSignatureHandler(config *so.Config) *FinalizeSignatureHandler {
 
 // FinalizeNodeSignatures verifies the node signatures and updates the node.
 func (o *FinalizeSignatureHandler) FinalizeNodeSignatures(ctx context.Context, req *pb.FinalizeNodeSignaturesRequest) (*pb.FinalizeNodeSignaturesResponse, error) {
+	var transfer *ent.Transfer
+	switch req.Intent {
+	case pbcommon.SignatureIntent_TRANSFER:
+		var err error
+		transfer, err = o.verifyAndUpdateTransfer(ctx, req)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	nodes := make([]*pb.TreeNode, 0)
 	internalNodes := make([]*pbinternal.TreeNode, 0)
 	for _, nodeSignatures := range req.NodeSignatures {
@@ -71,11 +81,7 @@ func (o *FinalizeSignatureHandler) FinalizeNodeSignatures(ctx context.Context, r
 			_, err = client.FinalizeNodesAggregation(ctx, &pbinternal.FinalizeNodesAggregationRequest{Nodes: internalNodes})
 			return nil, err
 		case pbcommon.SignatureIntent_TRANSFER:
-			transfer, err := o.verifyAndUpdateTransfer(ctx, req)
-			if err != nil {
-				return nil, err
-			}
-			_, err = client.FinalizeTransfer(ctx, &pbinternal.FinalizeTransferRequest{TransferId: transfer.ID.String(), Nodes: internalNodes, Timestamp: timestamppb.New(transfer.CompletionTime)})
+			_, err = client.FinalizeTransfer(ctx, &pbinternal.FinalizeTransferRequest{TransferId: transfer.ID.String(), Nodes: internalNodes, Timestamp: timestamppb.New(*transfer.CompletionTime)})
 			return nil, err
 		}
 		return nil, err

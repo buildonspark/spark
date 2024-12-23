@@ -54,7 +54,7 @@ func (Transfer) Fields() []ent.Field {
 		field.Uint64("total_value"),
 		field.Enum("status").GoType(TransferStatus("")),
 		field.Time("expiry_time").Immutable(),
-		field.Time("completion_time"),
+		field.Time("completion_time").Optional().Nillable(),
 	}
 }
 
