@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"log"
 
 	"github.com/google/uuid"
@@ -199,4 +200,32 @@ func (h *AggregateHandler) AggregateNodes(ctx context.Context, req *pb.Aggregate
 		ParentNodeTx:   parentNode.RawTx,
 		ParentNodeVout: uint32(parentNode.Vout),
 	}, nil
+}
+
+// InternalFinalizeNodesAggregation syncs final nodes aggregation.
+func (h *AggregateHandler) InternalFinalizeNodesAggregation(ctx context.Context, req *pbinternal.FinalizeNodesAggregationRequest) error {
+	db := ent.GetDbFromContext(ctx)
+	for _, node := range req.Nodes {
+		nodeID, err := uuid.Parse(node.Id)
+		if err != nil {
+			return err
+		}
+		node, err := db.TreeNode.Get(ctx, nodeID)
+		if err != nil {
+			return err
+		}
+		if node == nil {
+			return fmt.Errorf("node not found")
+		}
+		_, err = node.Update().
+			SetRawTx(node.RawTx).
+			SetRawRefundTx(node.RawRefundTx).
+			SetStatus(schema.TreeNodeStatusAvailable).
+			Save(ctx)
+		if err != nil {
+			log.Printf("failed to update node: %v", err)
+			return err
+		}
+	}
+	return nil
 }

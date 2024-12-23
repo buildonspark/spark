@@ -55,26 +55,11 @@ func (s *SparkInternalServer) MarkKeysharesAsUsed(ctx context.Context, req *pb.M
 
 // MarkKeyshareForDepositAddress links the keyshare to a deposit address.
 func (s *SparkInternalServer) MarkKeyshareForDepositAddress(ctx context.Context, req *pb.MarkKeyshareForDepositAddressRequest) (*emptypb.Empty, error) {
-	log.Printf("Marking keyshare for deposit address: %v", req.KeyshareId)
-
-	keyshareID, err := uuid.Parse(req.KeyshareId)
+	depositHandler := handler.NewInternalDepositHandler(s.config)
+	err := depositHandler.MarkKeyshareForDepositAddress(ctx, req)
 	if err != nil {
-		log.Printf("Failed to parse keyshare ID: %v", err)
 		return nil, err
 	}
-
-	_, err = ent.GetDbFromContext(ctx).DepositAddress.Create().
-		SetSigningKeyshareID(keyshareID).
-		SetOwnerIdentityPubkey(req.OwnerIdentityPublicKey).
-		SetOwnerSigningPubkey(req.OwnerSigningPublicKey).
-		SetAddress(req.Address).
-		Save(ctx)
-	if err != nil {
-		log.Printf("Failed to link keyshare to deposit address: %v", err)
-		return nil, err
-	}
-
-	log.Printf("Marked keyshare for deposit address")
 	return &emptypb.Empty{}, nil
 }
 
@@ -244,14 +229,48 @@ func (s *SparkInternalServer) PrepareSplitKeyshares(ctx context.Context, req *pb
 	return splitHandler.PrepareSplitKeyshares(ctx, req)
 }
 
-// InternalFinalizeNodeSignatures syncs the tree creation.
-func (s *SparkInternalServer) InternalFinalizeNodeSignatures(ctx context.Context, req *pb.InternalFinalizeNodeSignaturesRequest) (*emptypb.Empty, error) {
-	finalizeHandler := handler.NewInternalFinalizeSignatureHandler(s.config)
-	return finalizeHandler.InternalFinalizeNodeSignatures(ctx, req)
+// FinalizeNodeSplit finalizes the node split.
+func (s *SparkInternalServer) FinalizeNodeSplit(ctx context.Context, req *pb.FinalizeNodeSplitRequest) (*emptypb.Empty, error) {
+	splitHandler := handler.NewInternalSplitHandler(s.config)
+	err := splitHandler.FinalizeNodeSplit(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	return &emptypb.Empty{}, nil
+}
+
+// FinalizeTreeCreation syncs final tree creation.
+func (s *SparkInternalServer) FinalizeTreeCreation(ctx context.Context, req *pb.FinalizeTreeCreationRequest) (*emptypb.Empty, error) {
+	depositHandler := handler.NewInternalDepositHandler(s.config)
+	err := depositHandler.FinalizeTreeCreation(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	return &emptypb.Empty{}, nil
 }
 
 // AggregateNodes aggregates the given nodes.
 func (s *SparkInternalServer) AggregateNodes(ctx context.Context, req *pbspark.AggregateNodesRequest) (*emptypb.Empty, error) {
 	aggregateHandler := handler.NewAggregateHandler(s.config)
 	return aggregateHandler.InternalAggregateNodes(ctx, req)
+}
+
+// FinalizeNodesAggregation finalizes nodes aggregation.
+func (s *SparkInternalServer) FinalizeNodesAggregation(ctx context.Context, req *pb.FinalizeNodesAggregationRequest) (*emptypb.Empty, error) {
+	aggregateHandler := handler.NewAggregateHandler(s.config)
+	err := aggregateHandler.InternalFinalizeNodesAggregation(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	return &emptypb.Empty{}, nil
+}
+
+// FinalizeTransfer finalizes a transfer
+func (s *SparkInternalServer) FinalizeTransfer(ctx context.Context, req *pb.FinalizeTransferRequest) (*emptypb.Empty, error) {
+	transferHandler := handler.NewInternalTransferHandler(s.config)
+	err := transferHandler.FinalizeTransfer(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	return &emptypb.Empty{}, nil
 }

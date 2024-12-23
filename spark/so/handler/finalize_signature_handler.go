@@ -20,6 +20,7 @@ import (
 	"github.com/lightsparkdev/spark-go/so/ent/transferleaf"
 	"github.com/lightsparkdev/spark-go/so/ent/treenode"
 	"github.com/lightsparkdev/spark-go/so/helper"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // FinalizeSignatureHandler is the handler for the FinalizeNodeSignatures RPC.
@@ -34,14 +35,6 @@ func NewFinalizeSignatureHandler(config *so.Config) *FinalizeSignatureHandler {
 
 // FinalizeNodeSignatures verifies the node signatures and updates the node.
 func (o *FinalizeSignatureHandler) FinalizeNodeSignatures(ctx context.Context, req *pb.FinalizeNodeSignaturesRequest) (*pb.FinalizeNodeSignaturesResponse, error) {
-	switch req.Intent {
-	case pbcommon.SignatureIntent_TRANSFER:
-		err := o.verifyAndUpdateTransfer(ctx, req)
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	nodes := make([]*pb.TreeNode, 0)
 	internalNodes := make([]*pbinternal.TreeNode, 0)
 	for _, nodeSignatures := range req.NodeSignatures {
@@ -63,7 +56,28 @@ func (o *FinalizeSignatureHandler) FinalizeNodeSignatures(ctx context.Context, r
 		defer conn.Close()
 
 		client := pbinternal.NewSparkInternalServiceClient(conn)
-		_, err = client.InternalFinalizeNodeSignatures(ctx, &pbinternal.InternalFinalizeNodeSignaturesRequest{Intent: req.Intent, Nodes: internalNodes})
+
+		switch req.Intent {
+		case pbcommon.SignatureIntent_CREATION:
+			if len(internalNodes) > 1 {
+				return nil, fmt.Errorf("expect only one node for creation")
+			}
+			_, err = client.FinalizeTreeCreation(ctx, &pbinternal.FinalizeTreeCreationRequest{RootNode: internalNodes[0]})
+			return nil, err
+		case pbcommon.SignatureIntent_SPLIT:
+			_, err = client.FinalizeNodeSplit(ctx, &pbinternal.FinalizeNodeSplitRequest{ParentNodeId: *internalNodes[0].ParentNodeId, ChildNodes: internalNodes})
+			return nil, err
+		case pbcommon.SignatureIntent_AGGREGATE:
+			_, err = client.FinalizeNodesAggregation(ctx, &pbinternal.FinalizeNodesAggregationRequest{Nodes: internalNodes})
+			return nil, err
+		case pbcommon.SignatureIntent_TRANSFER:
+			transfer, err := o.verifyAndUpdateTransfer(ctx, req)
+			if err != nil {
+				return nil, err
+			}
+			_, err = client.FinalizeTransfer(ctx, &pbinternal.FinalizeTransferRequest{TransferId: transfer.ID.String(), Nodes: internalNodes, Timestamp: timestamppb.New(transfer.CompletionTime)})
+			return nil, err
+		}
 		return nil, err
 	})
 	if err != nil {
@@ -74,13 +88,13 @@ func (o *FinalizeSignatureHandler) FinalizeNodeSignatures(ctx context.Context, r
 	return &pb.FinalizeNodeSignaturesResponse{Nodes: nodes}, nil
 }
 
-func (o *FinalizeSignatureHandler) verifyAndUpdateTransfer(ctx context.Context, req *pb.FinalizeNodeSignaturesRequest) error {
+func (o *FinalizeSignatureHandler) verifyAndUpdateTransfer(ctx context.Context, req *pb.FinalizeNodeSignaturesRequest) (*ent.Transfer, error) {
 	db := ent.GetDbFromContext(ctx)
 	var transfer *ent.Transfer
 	for _, nodeSignatures := range req.NodeSignatures {
 		leafID, err := uuid.Parse(nodeSignatures.NodeId)
 		if err != nil {
-			return fmt.Errorf("invalid node id: %v", err)
+			return nil, fmt.Errorf("invalid node id: %v", err)
 		}
 		leafTransfer, err := db.Transfer.Query().
 			Where(
@@ -93,27 +107,27 @@ func (o *FinalizeSignatureHandler) verifyAndUpdateTransfer(ctx context.Context, 
 			).
 			Only(ctx)
 		if err != nil {
-			return fmt.Errorf("failed to find pending transfer for leaf %s: %v", leafID.String(), err)
+			return nil, fmt.Errorf("failed to find pending transfer for leaf %s: %v", leafID.String(), err)
 		}
 		if transfer == nil {
 			transfer = leafTransfer
 		} else if transfer.ID != leafTransfer.ID {
-			return fmt.Errorf("expect all leaves to belong to the same transfer")
+			return nil, fmt.Errorf("expect all leaves to belong to the same transfer")
 		}
 	}
 	numTransferLeaves, err := transfer.QueryTransferLeaves().Count(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to get the number of transfer leaves for transfer %s: %v", transfer.ID.String(), err)
+		return nil, fmt.Errorf("failed to get the number of transfer leaves for transfer %s: %v", transfer.ID.String(), err)
 	}
 	if len(req.NodeSignatures) != numTransferLeaves {
-		return fmt.Errorf("missing signatures for transfer %s", transfer.ID.String())
+		return nil, fmt.Errorf("missing signatures for transfer %s", transfer.ID.String())
 	}
 
-	_, err = transfer.Update().SetStatus(schema.TransferStatusCompleted).SetCompletionTime(time.Now()).Save(ctx)
+	transfer, err = transfer.Update().SetStatus(schema.TransferStatusCompleted).SetCompletionTime(time.Now()).Save(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to update transfer %s: %v", transfer.ID.String(), err)
+		return nil, fmt.Errorf("failed to update transfer %s: %v", transfer.ID.String(), err)
 	}
-	return nil
+	return transfer, nil
 }
 
 func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignatures *pb.NodeSignatures, intent pbcommon.SignatureIntent) (*pb.TreeNode, *pbinternal.TreeNode, error) {
@@ -134,23 +148,23 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 		return nil, nil, fmt.Errorf("node not found")
 	}
 
-	var rootTxBytes []byte
+	var nodeTxBytes []byte
 	if intent == pbcommon.SignatureIntent_CREATION || intent == pbcommon.SignatureIntent_SPLIT {
-		rootTxBytes, err = o.verifySignatureAndUpdateTx(node.RawTx, nodeSignatures.NodeTxSignature)
+		nodeTxBytes, err = o.verifySignatureAndUpdateTx(node.RawTx, nodeSignatures.NodeTxSignature)
 		if err != nil {
 			return nil, nil, err
 		}
 	} else {
-		rootTxBytes = node.RawTx
+		nodeTxBytes = node.RawTx
 	}
 	refundTxBytes, err := o.verifySignatureAndUpdateTx(node.RawRefundTx, nodeSignatures.RefundTxSignature)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	// Update the tree root
+	// Update the tree node
 	node, err = node.Update().
-		SetRawTx(rootTxBytes).
+		SetRawTx(nodeTxBytes).
 		SetRawRefundTx(refundTxBytes).
 		SetStatus(schema.TreeNodeStatusAvailable).
 		Save(ctx)

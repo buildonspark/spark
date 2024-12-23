@@ -21,13 +21,16 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	SparkInternalService_MarkKeysharesAsUsed_FullMethodName            = "/spark_internal.SparkInternalService/mark_keyshares_as_used"
-	SparkInternalService_MarkKeyshareForDepositAddress_FullMethodName  = "/spark_internal.SparkInternalService/mark_keyshare_for_deposit_address"
-	SparkInternalService_InternalFinalizeNodeSignatures_FullMethodName = "/spark_internal.SparkInternalService/internal_finalize_node_signatures"
-	SparkInternalService_FrostRound1_FullMethodName                    = "/spark_internal.SparkInternalService/frost_round1"
-	SparkInternalService_FrostRound2_FullMethodName                    = "/spark_internal.SparkInternalService/frost_round2"
-	SparkInternalService_PrepareSplitKeyshares_FullMethodName          = "/spark_internal.SparkInternalService/prepare_split_keyshares"
-	SparkInternalService_AggregateNodes_FullMethodName                 = "/spark_internal.SparkInternalService/aggregate_nodes"
+	SparkInternalService_MarkKeysharesAsUsed_FullMethodName           = "/spark_internal.SparkInternalService/mark_keyshares_as_used"
+	SparkInternalService_MarkKeyshareForDepositAddress_FullMethodName = "/spark_internal.SparkInternalService/mark_keyshare_for_deposit_address"
+	SparkInternalService_FinalizeTreeCreation_FullMethodName          = "/spark_internal.SparkInternalService/finalize_tree_creation"
+	SparkInternalService_FrostRound1_FullMethodName                   = "/spark_internal.SparkInternalService/frost_round1"
+	SparkInternalService_FrostRound2_FullMethodName                   = "/spark_internal.SparkInternalService/frost_round2"
+	SparkInternalService_PrepareSplitKeyshares_FullMethodName         = "/spark_internal.SparkInternalService/prepare_split_keyshares"
+	SparkInternalService_FinalizeNodeSplit_FullMethodName             = "/spark_internal.SparkInternalService/finalize_node_split"
+	SparkInternalService_AggregateNodes_FullMethodName                = "/spark_internal.SparkInternalService/aggregate_nodes"
+	SparkInternalService_FinalizeNodesAggregation_FullMethodName      = "/spark_internal.SparkInternalService/finalize_nodes_aggregation"
+	SparkInternalService_FinalizeTransfer_FullMethodName              = "/spark_internal.SparkInternalService/finalize_transfer"
 )
 
 // SparkInternalServiceClient is the client API for SparkInternalService service.
@@ -36,11 +39,14 @@ const (
 type SparkInternalServiceClient interface {
 	MarkKeysharesAsUsed(ctx context.Context, in *MarkKeysharesAsUsedRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	MarkKeyshareForDepositAddress(ctx context.Context, in *MarkKeyshareForDepositAddressRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
-	InternalFinalizeNodeSignatures(ctx context.Context, in *InternalFinalizeNodeSignaturesRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	FinalizeTreeCreation(ctx context.Context, in *FinalizeTreeCreationRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	FrostRound1(ctx context.Context, in *FrostRound1Request, opts ...grpc.CallOption) (*FrostRound1Response, error)
 	FrostRound2(ctx context.Context, in *FrostRound2Request, opts ...grpc.CallOption) (*FrostRound2Response, error)
 	PrepareSplitKeyshares(ctx context.Context, in *PrepareSplitKeysharesRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	FinalizeNodeSplit(ctx context.Context, in *FinalizeNodeSplitRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	AggregateNodes(ctx context.Context, in *spark.AggregateNodesRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	FinalizeNodesAggregation(ctx context.Context, in *FinalizeNodesAggregationRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	FinalizeTransfer(ctx context.Context, in *FinalizeTransferRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type sparkInternalServiceClient struct {
@@ -71,10 +77,10 @@ func (c *sparkInternalServiceClient) MarkKeyshareForDepositAddress(ctx context.C
 	return out, nil
 }
 
-func (c *sparkInternalServiceClient) InternalFinalizeNodeSignatures(ctx context.Context, in *InternalFinalizeNodeSignaturesRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+func (c *sparkInternalServiceClient) FinalizeTreeCreation(ctx context.Context, in *FinalizeTreeCreationRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(emptypb.Empty)
-	err := c.cc.Invoke(ctx, SparkInternalService_InternalFinalizeNodeSignatures_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, SparkInternalService_FinalizeTreeCreation_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -111,10 +117,40 @@ func (c *sparkInternalServiceClient) PrepareSplitKeyshares(ctx context.Context, 
 	return out, nil
 }
 
+func (c *sparkInternalServiceClient) FinalizeNodeSplit(ctx context.Context, in *FinalizeNodeSplitRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, SparkInternalService_FinalizeNodeSplit_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *sparkInternalServiceClient) AggregateNodes(ctx context.Context, in *spark.AggregateNodesRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(emptypb.Empty)
 	err := c.cc.Invoke(ctx, SparkInternalService_AggregateNodes_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *sparkInternalServiceClient) FinalizeNodesAggregation(ctx context.Context, in *FinalizeNodesAggregationRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, SparkInternalService_FinalizeNodesAggregation_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *sparkInternalServiceClient) FinalizeTransfer(ctx context.Context, in *FinalizeTransferRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, SparkInternalService_FinalizeTransfer_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -127,11 +163,14 @@ func (c *sparkInternalServiceClient) AggregateNodes(ctx context.Context, in *spa
 type SparkInternalServiceServer interface {
 	MarkKeysharesAsUsed(context.Context, *MarkKeysharesAsUsedRequest) (*emptypb.Empty, error)
 	MarkKeyshareForDepositAddress(context.Context, *MarkKeyshareForDepositAddressRequest) (*emptypb.Empty, error)
-	InternalFinalizeNodeSignatures(context.Context, *InternalFinalizeNodeSignaturesRequest) (*emptypb.Empty, error)
+	FinalizeTreeCreation(context.Context, *FinalizeTreeCreationRequest) (*emptypb.Empty, error)
 	FrostRound1(context.Context, *FrostRound1Request) (*FrostRound1Response, error)
 	FrostRound2(context.Context, *FrostRound2Request) (*FrostRound2Response, error)
 	PrepareSplitKeyshares(context.Context, *PrepareSplitKeysharesRequest) (*emptypb.Empty, error)
+	FinalizeNodeSplit(context.Context, *FinalizeNodeSplitRequest) (*emptypb.Empty, error)
 	AggregateNodes(context.Context, *spark.AggregateNodesRequest) (*emptypb.Empty, error)
+	FinalizeNodesAggregation(context.Context, *FinalizeNodesAggregationRequest) (*emptypb.Empty, error)
+	FinalizeTransfer(context.Context, *FinalizeTransferRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedSparkInternalServiceServer()
 }
 
@@ -148,8 +187,8 @@ func (UnimplementedSparkInternalServiceServer) MarkKeysharesAsUsed(context.Conte
 func (UnimplementedSparkInternalServiceServer) MarkKeyshareForDepositAddress(context.Context, *MarkKeyshareForDepositAddressRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method MarkKeyshareForDepositAddress not implemented")
 }
-func (UnimplementedSparkInternalServiceServer) InternalFinalizeNodeSignatures(context.Context, *InternalFinalizeNodeSignaturesRequest) (*emptypb.Empty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method InternalFinalizeNodeSignatures not implemented")
+func (UnimplementedSparkInternalServiceServer) FinalizeTreeCreation(context.Context, *FinalizeTreeCreationRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method FinalizeTreeCreation not implemented")
 }
 func (UnimplementedSparkInternalServiceServer) FrostRound1(context.Context, *FrostRound1Request) (*FrostRound1Response, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method FrostRound1 not implemented")
@@ -160,8 +199,17 @@ func (UnimplementedSparkInternalServiceServer) FrostRound2(context.Context, *Fro
 func (UnimplementedSparkInternalServiceServer) PrepareSplitKeyshares(context.Context, *PrepareSplitKeysharesRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method PrepareSplitKeyshares not implemented")
 }
+func (UnimplementedSparkInternalServiceServer) FinalizeNodeSplit(context.Context, *FinalizeNodeSplitRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method FinalizeNodeSplit not implemented")
+}
 func (UnimplementedSparkInternalServiceServer) AggregateNodes(context.Context, *spark.AggregateNodesRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AggregateNodes not implemented")
+}
+func (UnimplementedSparkInternalServiceServer) FinalizeNodesAggregation(context.Context, *FinalizeNodesAggregationRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method FinalizeNodesAggregation not implemented")
+}
+func (UnimplementedSparkInternalServiceServer) FinalizeTransfer(context.Context, *FinalizeTransferRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method FinalizeTransfer not implemented")
 }
 func (UnimplementedSparkInternalServiceServer) mustEmbedUnimplementedSparkInternalServiceServer() {}
 func (UnimplementedSparkInternalServiceServer) testEmbeddedByValue()                              {}
@@ -220,20 +268,20 @@ func _SparkInternalService_MarkKeyshareForDepositAddress_Handler(srv interface{}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _SparkInternalService_InternalFinalizeNodeSignatures_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(InternalFinalizeNodeSignaturesRequest)
+func _SparkInternalService_FinalizeTreeCreation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(FinalizeTreeCreationRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(SparkInternalServiceServer).InternalFinalizeNodeSignatures(ctx, in)
+		return srv.(SparkInternalServiceServer).FinalizeTreeCreation(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: SparkInternalService_InternalFinalizeNodeSignatures_FullMethodName,
+		FullMethod: SparkInternalService_FinalizeTreeCreation_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SparkInternalServiceServer).InternalFinalizeNodeSignatures(ctx, req.(*InternalFinalizeNodeSignaturesRequest))
+		return srv.(SparkInternalServiceServer).FinalizeTreeCreation(ctx, req.(*FinalizeTreeCreationRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -292,6 +340,24 @@ func _SparkInternalService_PrepareSplitKeyshares_Handler(srv interface{}, ctx co
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SparkInternalService_FinalizeNodeSplit_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(FinalizeNodeSplitRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkInternalServiceServer).FinalizeNodeSplit(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkInternalService_FinalizeNodeSplit_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkInternalServiceServer).FinalizeNodeSplit(ctx, req.(*FinalizeNodeSplitRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _SparkInternalService_AggregateNodes_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(spark.AggregateNodesRequest)
 	if err := dec(in); err != nil {
@@ -306,6 +372,42 @@ func _SparkInternalService_AggregateNodes_Handler(srv interface{}, ctx context.C
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(SparkInternalServiceServer).AggregateNodes(ctx, req.(*spark.AggregateNodesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SparkInternalService_FinalizeNodesAggregation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(FinalizeNodesAggregationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkInternalServiceServer).FinalizeNodesAggregation(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkInternalService_FinalizeNodesAggregation_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkInternalServiceServer).FinalizeNodesAggregation(ctx, req.(*FinalizeNodesAggregationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SparkInternalService_FinalizeTransfer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(FinalizeTransferRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkInternalServiceServer).FinalizeTransfer(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkInternalService_FinalizeTransfer_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkInternalServiceServer).FinalizeTransfer(ctx, req.(*FinalizeTransferRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -326,8 +428,8 @@ var SparkInternalService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _SparkInternalService_MarkKeyshareForDepositAddress_Handler,
 		},
 		{
-			MethodName: "internal_finalize_node_signatures",
-			Handler:    _SparkInternalService_InternalFinalizeNodeSignatures_Handler,
+			MethodName: "finalize_tree_creation",
+			Handler:    _SparkInternalService_FinalizeTreeCreation_Handler,
 		},
 		{
 			MethodName: "frost_round1",
@@ -342,8 +444,20 @@ var SparkInternalService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _SparkInternalService_PrepareSplitKeyshares_Handler,
 		},
 		{
+			MethodName: "finalize_node_split",
+			Handler:    _SparkInternalService_FinalizeNodeSplit_Handler,
+		},
+		{
 			MethodName: "aggregate_nodes",
 			Handler:    _SparkInternalService_AggregateNodes_Handler,
+		},
+		{
+			MethodName: "finalize_nodes_aggregation",
+			Handler:    _SparkInternalService_FinalizeNodesAggregation_Handler,
+		},
+		{
+			MethodName: "finalize_transfer",
+			Handler:    _SparkInternalService_FinalizeTransfer_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
