@@ -90,10 +90,12 @@ pub fn frost_signature_shares_from_proto(
         })
         .collect::<Result<BTreeMap<_, _>, String>>()?;
 
-    shares_map.insert(
-        user_identifier,
-        SignatureShare::deserialize(user_signature_share).map_err(|e| e.to_string())?,
-    );
+    if user_signature_share.len() > 0 {
+        shares_map.insert(
+            user_identifier,
+            SignatureShare::deserialize(user_signature_share).map_err(|e| e.to_string())?,
+        );
+    }
     Ok(shares_map)
 }
 
@@ -111,10 +113,13 @@ pub fn frost_public_package_from_proto(
             Ok((identifier, share))
         })
         .collect::<Result<BTreeMap<_, _>, String>>()?;
-    final_shares.insert(
-        user_identifier,
-        VerifyingShare::deserialize(user_public_key.as_slice()).map_err(|e| e.to_string())?,
-    );
+
+    if user_public_key.len() > 0 {
+        final_shares.insert(
+            user_identifier,
+            VerifyingShare::deserialize(user_public_key.as_slice()).map_err(|e| e.to_string())?,
+        );
+    }
     tracing::info!("final_shares: {:?}", final_shares);
     let public_key_package = PublicKeyPackage::new(final_shares, verifying_key);
     Ok(public_key_package)
@@ -225,12 +230,14 @@ pub fn sign_frost(req: &SignFrostRequest) -> Result<SignFrostResponse, String> {
 
         tracing::debug!("User commitments: {:?}", job.user_commitments);
 
-        let user_commitments = match &job.user_commitments {
-            Some(commitments) => frost_commitments_from_proto(commitments)
-                .map_err(|e| format!("Failed to parse user commitments: {:?}", e))?,
-            None => return Err(format!("User commitments are required")),
+        match &job.user_commitments {
+            Some(c) => {
+                let user_commitments = frost_commitments_from_proto(c)
+                    .map_err(|e| format!("Failed to parse user commitments: {:?}", e))?;
+                commitments.insert(user_identifier, user_commitments);
+            }
+            None => {}
         };
-        commitments.insert(user_identifier, user_commitments);
         tracing::debug!("There are {} commitments", commitments.len());
 
         let nonce = match &job.nonce {
@@ -294,12 +301,14 @@ pub fn aggregate_frost(req: &AggregateFrostRequest) -> Result<AggregateFrostResp
     let user_identifier =
         Identifier::derive("user".as_bytes()).expect("Failed to derive user identifier");
 
-    let user_commitments = match &req.user_commitments {
-        Some(commitments) => frost_commitments_from_proto(commitments)
-            .map_err(|e| format!("Failed to parse user commitments: {:?}", e))?,
-        None => return Err(format!("User commitments are required")),
+    match &req.user_commitments {
+        Some(c) => {
+            let user_commitments = frost_commitments_from_proto(c)
+                .map_err(|e| format!("Failed to parse user commitments: {:?}", e))?;
+            commitments.insert(user_identifier, user_commitments);
+        }
+        None => {}
     };
-    commitments.insert(user_identifier, user_commitments);
 
     let verifying_key = verifying_key_from_bytes(req.verifying_key.clone())
         .map_err(|e| format!("Failed to parse verifying key: {:?}", e))?;

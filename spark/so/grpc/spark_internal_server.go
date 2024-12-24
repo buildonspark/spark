@@ -54,13 +54,9 @@ func (s *SparkInternalServer) MarkKeysharesAsUsed(ctx context.Context, req *pb.M
 }
 
 // MarkKeyshareForDepositAddress links the keyshare to a deposit address.
-func (s *SparkInternalServer) MarkKeyshareForDepositAddress(ctx context.Context, req *pb.MarkKeyshareForDepositAddressRequest) (*emptypb.Empty, error) {
+func (s *SparkInternalServer) MarkKeyshareForDepositAddress(ctx context.Context, req *pb.MarkKeyshareForDepositAddressRequest) (*pb.MarkKeyshareForDepositAddressResponse, error) {
 	depositHandler := handler.NewInternalDepositHandler(s.config)
-	err := depositHandler.MarkKeyshareForDepositAddress(ctx, req)
-	if err != nil {
-		return nil, err
-	}
-	return &emptypb.Empty{}, nil
+	return depositHandler.MarkKeyshareForDepositAddress(ctx, req)
 }
 
 // FrostRound1 handles the FROST nonce generation.

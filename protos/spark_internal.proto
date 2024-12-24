@@ -10,7 +10,7 @@ import "spark.proto";
 
 service SparkInternalService {
     rpc mark_keyshares_as_used(MarkKeysharesAsUsedRequest) returns (google.protobuf.Empty) {}
-    rpc mark_keyshare_for_deposit_address(MarkKeyshareForDepositAddressRequest) returns (google.protobuf.Empty) {}
+    rpc mark_keyshare_for_deposit_address(MarkKeyshareForDepositAddressRequest) returns (MarkKeyshareForDepositAddressResponse) {}
     rpc finalize_tree_creation(FinalizeTreeCreationRequest) returns (google.protobuf.Empty) {}
 
     rpc frost_round1(FrostRound1Request) returns (FrostRound1Response) {}
@@ -34,6 +34,10 @@ message MarkKeyshareForDepositAddressRequest {
     string address = 2;
     bytes owner_identity_public_key = 3;
     bytes owner_signing_public_key = 4;
+}
+
+message MarkKeyshareForDepositAddressResponse {
+    bytes address_signature = 1;
 }
 
 message FrostRound1Request {

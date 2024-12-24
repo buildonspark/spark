@@ -92,10 +92,13 @@ func frostRound2(
 				}
 				commitments[operatorID] = commitmentProto
 			}
-			userCommitmentProto, err := job.UserCommitment.MarshalProto()
-			if err != nil {
-				log.Println("Round2 MarshalProto failed:", err)
-				return nil, err
+			var userCommitmentProto *pbcommon.SigningCommitment
+			if job.UserCommitment != nil {
+				userCommitmentProto, err = job.UserCommitment.MarshalProto()
+				if err != nil {
+					log.Println("Round2 MarshalProto failed:", err)
+					return nil, err
+				}
 			}
 			signingJobs[i] = &pbinternal.SigningJob{
 				JobId:           job.JobID,
@@ -147,7 +150,7 @@ type SigningJob struct {
 	// VerifyingKey is the verifying key for the message.
 	VerifyingKey []byte
 	// UserCommitment is the user commitment for the message.
-	UserCommitment objects.SigningCommitment
+	UserCommitment *objects.SigningCommitment
 }
 
 // NewSigningJob creates a new signing job from signing job proto and the keyshare.
@@ -175,7 +178,7 @@ func NewSigningJob(keyshare *ent.SigningKeyshare, proto *pbspark.SigningJob, pre
 		SigningKeyshareID: keyshare.ID,
 		Message:           txSigHash,
 		VerifyingKey:      verifyingKey,
-		UserCommitment:    userCommitment,
+		UserCommitment:    &userCommitment,
 	}
 
 	return job, tx, nil

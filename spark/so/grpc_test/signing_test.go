@@ -105,14 +105,14 @@ func TestFrostSign(t *testing.T) {
 		SigningKeyshareID: operatorKeyShare.ID,
 		Message:           msgHash[:],
 		VerifyingKey:      verifyingKeyBytes,
-		UserCommitment:    *userNonceCommitment,
+		UserCommitment:    userNonceCommitment,
 	})
 	signingJobs = append(signingJobs, &helper.SigningJob{
 		JobID:             uuid.New().String(),
 		SigningKeyshareID: operatorKeyShare.ID,
 		Message:           msgHash[:],
 		VerifyingKey:      verifyingKeyBytes,
-		UserCommitment:    *userNonceCommitment,
+		UserCommitment:    userNonceCommitment,
 	})
 	signingResult, err := helper.SignFrost(ctx, config, signingJobs)
 	if err != nil {
@@ -186,5 +186,72 @@ func TestFrostSign(t *testing.T) {
 	verified := sig.Verify(msgHash[:], taprootKey)
 	if !verified {
 		t.Fatal("signature verification failed")
+	}
+}
+
+func TestFrostWithoutUserSign(t *testing.T) {
+	// Step 1: Setup config
+	config, err := testutil.TestConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ctx, err := testutil.TestContext(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	msg := []byte("hello")
+	msgHash := sha256.Sum256(msg)
+
+	// Step 2: Get operator key share
+	operatorKeyShares, err := ent.GetUnusedSigningKeyshares(ctx, config, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	operatorKeyShare := operatorKeyShares[0]
+	operatorPubKeyBytes := operatorKeyShare.PublicKey
+
+	// Step 3: Operator signing
+	signingJobs := make([]*helper.SigningJob, 0)
+	signingJobs = append(signingJobs, &helper.SigningJob{
+		JobID:             uuid.New().String(),
+		SigningKeyshareID: operatorKeyShare.ID,
+		Message:           msgHash[:],
+		VerifyingKey:      operatorPubKeyBytes,
+		UserCommitment:    nil,
+	})
+	signingResult, err := helper.SignFrost(ctx, config, signingJobs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	operatorCommitments := signingResult[0].SigningCommitments
+	operatorCommitmentsProto := make(map[string]*pbcommon.SigningCommitment)
+	for id, commitment := range operatorCommitments {
+		commitmentProto, err := commitment.MarshalProto()
+		if err != nil {
+			t.Fatal(err)
+		}
+		operatorCommitmentsProto[id] = commitmentProto
+	}
+
+	// Step 5: Signature aggregation
+	conn, err := common.NewGRPCConnection(config.SignerAddress)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	client := pbfrost.NewFrostServiceClient(conn)
+	signatureShares := signingResult[0].SignatureShares
+	publicKeys := signingResult[0].PublicKeys
+	_, err = client.AggregateFrost(ctx, &pbfrost.AggregateFrostRequest{
+		Message:         msgHash[:],
+		SignatureShares: signatureShares,
+		PublicShares:    publicKeys,
+		VerifyingKey:    operatorPubKeyBytes,
+		Commitments:     operatorCommitmentsProto,
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 }

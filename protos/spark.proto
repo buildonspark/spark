@@ -20,6 +20,11 @@ service SparkService {
     rpc aggregate_nodes(AggregateNodesRequest) returns (AggregateNodesResponse) {}
 }
 
+message DepositAddressProof {
+    map<string, bytes> address_signatures = 1;
+    bytes proof_of_possession_signature = 2;
+}
+
 message GenerateDepositAddressRequest {
     bytes signing_public_key = 1;
     bytes identity_public_key = 2;
@@ -28,6 +33,7 @@ message GenerateDepositAddressRequest {
 message Address {
     string address = 1;
     bytes verifying_key = 2;
+    DepositAddressProof deposit_address_proof = 3;
 }
 
 message GenerateDepositAddressResponse {

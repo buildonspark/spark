@@ -3,8 +3,11 @@ package wallet
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"fmt"
 
+	"github.com/btcsuite/btcd/btcec/v2"
+	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
@@ -16,6 +19,63 @@ import (
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
 	"github.com/lightsparkdev/spark-go/so/objects"
 )
+
+func validateDepositAddress(ctx context.Context, config *Config, address *pb.Address, userPubkey []byte) error {
+	if address.DepositAddressProof.ProofOfPossessionSignature == nil {
+		return fmt.Errorf("proof of possession signature is nil")
+	}
+
+	operatorPubkey, err := common.SubtractPublicKeys(address.VerifyingKey, userPubkey)
+	if err != nil {
+		return err
+	}
+	msg := common.ProofOfPossessionMessageHashForDepositAddress(userPubkey, operatorPubkey, []byte(address.Address))
+	sig, err := schnorr.ParseSignature(address.DepositAddressProof.ProofOfPossessionSignature)
+	if err != nil {
+		return err
+	}
+
+	pubKey, err := btcec.ParsePubKey(operatorPubkey)
+	if err != nil {
+		return err
+	}
+	taprootKey := txscript.ComputeTaprootKeyNoScript(pubKey)
+
+	verified := sig.Verify(msg[:], taprootKey)
+	if !verified {
+		return fmt.Errorf("signature verification failed")
+	}
+
+	if address.DepositAddressProof.AddressSignatures == nil {
+		return fmt.Errorf("address signatures is nil")
+	}
+
+	addrHash := sha256.Sum256([]byte(address.Address))
+	for _, operator := range config.SigningOperators {
+		if operator.Identifier == config.CoodinatorIdentifier {
+			continue
+		}
+		operatorPubkey, err := secp256k1.ParsePubKey(operator.IdentityPublicKey)
+		if err != nil {
+			return err
+		}
+
+		operatorSig, ok := address.DepositAddressProof.AddressSignatures[operator.Identifier]
+		if !ok {
+			return fmt.Errorf("address signature for operator %s is nil", operator.Identifier)
+		}
+
+		sig, err := secp256k1.ParseDERSignature(operatorSig)
+		if err != nil {
+			return err
+		}
+
+		if !sig.Verify(addrHash[:], operatorPubkey) {
+			return fmt.Errorf("signature verification failed for operator %s", operator.Identifier)
+		}
+	}
+	return nil
+}
 
 // GenerateDepositAddress generates a deposit address for a given identity and signing public key.
 func GenerateDepositAddress(
@@ -34,6 +94,9 @@ func GenerateDepositAddress(
 		IdentityPublicKey: config.IdentityPublicKey(),
 	})
 	if err != nil {
+		return nil, err
+	}
+	if err := validateDepositAddress(ctx, config, depositResp.DepositAddress, signingPubkey); err != nil {
 		return nil, err
 	}
 	return depositResp, nil
