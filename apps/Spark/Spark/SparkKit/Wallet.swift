@@ -6,8 +6,8 @@
 //  Copyright © 2024 Lightspark Group, Inc. All rights reserved.
 //
 
-import secp256k1
 import Foundation
+import secp256k1
 
 public class Wallet {
     let walletClient: Spark_SparkServiceAsyncClient
@@ -52,7 +52,8 @@ public class Wallet {
             network: network,
             signingPrivateKey: signingPrivateKey.dataRepresentation,
             identityPublicKey: self.identityPrivateKey.publicKey.dataRepresentation,
-            verifyingPublicKey: address.verifyingKey)
+            verifyingPublicKey: address.verifyingKey
+        )
 
         for node in response.nodes {
             self.nodeIDKeyMap[node.id] = signingPrivateKey

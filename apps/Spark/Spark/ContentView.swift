@@ -6,9 +6,8 @@
 //  Copyright © 2024 Lightspark Group, Inc. All rights reserved.
 //
 
-
-import SwiftUI
 import GRPC
+import SwiftUI
 
 struct ContentView: View {
     @State var text = ""
@@ -20,7 +19,11 @@ struct ContentView: View {
         .padding()
         .task {
             let eventLoopGroup = PlatformSupport.makeEventLoopGroup(loopCount: 1)
-            let channel = try! GRPCChannelPool.with(target: .host("localhost", port: 8535), transportSecurity: .plaintext, eventLoopGroup: eventLoopGroup)
+            let channel = try! GRPCChannelPool.with(
+                target: .host("localhost", port: 8535),
+                transportSecurity: .plaintext,
+                eventLoopGroup: eventLoopGroup
+            )
             let client = Spark_SparkServiceAsyncClient(channel: channel)
             let wallet = try! Wallet(walletClient: client)
             let address = try! await wallet.generateDepositAddress()
@@ -29,6 +32,6 @@ struct ContentView: View {
     }
 }
 
-#Preview {
+#Preview{
     ContentView()
 }

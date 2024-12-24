@@ -6,8 +6,8 @@
 //  Copyright © 2024 Lightspark Group, Inc. All rights reserved.
 //
 
-import secp256k1
 import Foundation
+import secp256k1
 
 func generateDepositAddress(
     client: Spark_SparkServiceAsyncClient,
@@ -35,9 +35,19 @@ func createTree(
 ) async throws -> Spark_FinalizeNodeSignaturesResponse {
     let signingPublicKey = try secp256k1.Signing.PrivateKey(dataRepresentation: signingPrivateKey).publicKey
     let nodeTxResult = try constructNodeTx(tx: onchainTx, vout: vout, address: address, locktime: 0)
-    let refundTxResult = try constructRefundTx(tx: nodeTxResult.tx, vout: 0, pubkey: signingPublicKey.dataRepresentation, network: network, locktime: 60000)
+    let refundTxResult = try constructRefundTx(
+        tx: nodeTxResult.tx,
+        vout: 0,
+        pubkey: signingPublicKey.dataRepresentation,
+        network: network,
+        locktime: 60000
+    )
 
-    let keyPackage = KeyPackage(secretKey: signingPrivateKey, publicKey: signingPublicKey.dataRepresentation, verifyingKey: verifyingPublicKey)
+    let keyPackage = KeyPackage(
+        secretKey: signingPrivateKey,
+        publicKey: signingPublicKey.dataRepresentation,
+        verifyingKey: verifyingPublicKey
+    )
     let rootNonce = try frostNonce(keyPackage: keyPackage)
     let refundNonce = try frostNonce(keyPackage: keyPackage)
 
@@ -58,7 +68,8 @@ func createTree(
     request.refundTxSigningJob.signingNonceCommitment.binding = refundNonce.commitment.binding
     let response = try await client.start_tree_creation(request)
 
-    let rootSECommitments = response.rootNodeSignatureShares.nodeTxSigningResult.signingNonceCommitments.mapValues { value in
+    let rootSECommitments = response.rootNodeSignatureShares.nodeTxSigningResult.signingNonceCommitments.mapValues {
+        value in
         SigningCommitment(hiding: value.hiding, binding: value.binding)
     }
 
@@ -81,7 +92,8 @@ func createTree(
         verifyingKey: verifyingPublicKey
     )
 
-    let refundSECommitments = response.rootNodeSignatureShares.refundTxSigningResult.signingNonceCommitments.mapValues { value in
+    let refundSECommitments = response.rootNodeSignatureShares.refundTxSigningResult.signingNonceCommitments.mapValues {
+        value in
         SigningCommitment(hiding: value.hiding, binding: value.binding)
     }
 
@@ -114,4 +126,3 @@ func createTree(
 
     return try await client.finalize_node_signatures(finalizeRequest)
 }
-

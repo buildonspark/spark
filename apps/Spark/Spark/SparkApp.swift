@@ -6,7 +6,6 @@
 //  Copyright © 2024 Lightspark Group, Inc. All rights reserved.
 //
 
-
 import SwiftUI
 
 @main
