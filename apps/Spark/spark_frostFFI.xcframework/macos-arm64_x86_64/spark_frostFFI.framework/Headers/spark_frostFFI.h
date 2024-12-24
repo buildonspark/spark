@@ -276,6 +276,16 @@ RustBuffer uniffi_spark_frost_fn_func_construct_split_tx(RustBuffer tx, uint32_t
 RustBuffer uniffi_spark_frost_fn_func_create_dummy_tx(RustBuffer address, uint64_t amount_sats, RustCallStatus *_Nonnull out_status
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPARK_FROST_FN_FUNC_DECRYPT_ECIES
+#define UNIFFI_FFIDEF_UNIFFI_SPARK_FROST_FN_FUNC_DECRYPT_ECIES
+RustBuffer uniffi_spark_frost_fn_func_decrypt_ecies(RustBuffer encrypted_msg, RustBuffer private_key, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPARK_FROST_FN_FUNC_ENCRYPT_ECIES
+#define UNIFFI_FFIDEF_UNIFFI_SPARK_FROST_FN_FUNC_ENCRYPT_ECIES
+RustBuffer uniffi_spark_frost_fn_func_encrypt_ecies(RustBuffer msg, RustBuffer public_key, RustCallStatus *_Nonnull out_status
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_SPARK_FROST_FN_FUNC_FROST_NONCE
 #define UNIFFI_FFIDEF_UNIFFI_SPARK_FROST_FN_FUNC_FROST_NONCE
 RustBuffer uniffi_spark_frost_fn_func_frost_nonce(RustBuffer key_package, RustCallStatus *_Nonnull out_status
@@ -593,6 +603,18 @@ uint16_t uniffi_spark_frost_checksum_func_construct_split_tx(void
 #ifndef UNIFFI_FFIDEF_UNIFFI_SPARK_FROST_CHECKSUM_FUNC_CREATE_DUMMY_TX
 #define UNIFFI_FFIDEF_UNIFFI_SPARK_FROST_CHECKSUM_FUNC_CREATE_DUMMY_TX
 uint16_t uniffi_spark_frost_checksum_func_create_dummy_tx(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPARK_FROST_CHECKSUM_FUNC_DECRYPT_ECIES
+#define UNIFFI_FFIDEF_UNIFFI_SPARK_FROST_CHECKSUM_FUNC_DECRYPT_ECIES
+uint16_t uniffi_spark_frost_checksum_func_decrypt_ecies(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPARK_FROST_CHECKSUM_FUNC_ENCRYPT_ECIES
+#define UNIFFI_FFIDEF_UNIFFI_SPARK_FROST_CHECKSUM_FUNC_ENCRYPT_ECIES
+uint16_t uniffi_spark_frost_checksum_func_encrypt_ecies(void
     
 );
 #endif

@@ -13,6 +13,7 @@ use bitcoin::{
     Address, Amount, OutPoint, ScriptBuf, Sequence, TapSighashType, Transaction, TxIn, TxOut, Txid,
     Witness,
 };
+use ecies::{decrypt, encrypt};
 use frost_secp256k1_tr::Identifier;
 
 /// A uniffi library for the Spark Frost signing protocol on client side.
@@ -473,4 +474,12 @@ fn log_to_file(message: &str) {
     {
         writeln!(file, "{}", message).ok();
     }
+}
+
+pub fn encrypt_ecies(msg: Vec<u8>, public_key_bytes: Vec<u8>) -> Result<Vec<u8>, Error> {
+    encrypt(&public_key_bytes, &msg).map_err(|e| Error::Spark(e.to_string()))
+}
+
+pub fn decrypt_ecies(encrypted_msg: Vec<u8>, private_key_bytes: Vec<u8>) -> Result<Vec<u8>, Error> {
+    decrypt(&private_key_bytes, &encrypted_msg).map_err(|e| Error::Spark(e.to_string()))
 }

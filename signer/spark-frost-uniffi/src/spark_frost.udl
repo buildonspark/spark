@@ -19,6 +19,12 @@ namespace spark_frost {
 
     [Throws=Error]
     DummyTx create_dummy_tx(string address, u64 amount_sats);
+
+    [Throws=Error]
+    bytes encrypt_ecies(bytes msg, bytes public_key);
+
+    [Throws=Error]
+    bytes decrypt_ecies(bytes encrypted_msg, bytes private_key);
 };
 
 [Error]

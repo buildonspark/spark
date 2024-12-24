@@ -1048,6 +1048,24 @@ public func createDummyTx(address: String, amountSats: UInt64) throws -> DummyTx
     })
 }
 
+public func decryptEcies(encryptedMsg: Data, privateKey: Data) throws -> Data {
+    return try FfiConverterData.lift(rustCallWithError(FfiConverterTypeError.lift) {
+        uniffi_spark_frost_fn_func_decrypt_ecies(
+            FfiConverterData.lower(encryptedMsg),
+            FfiConverterData.lower(privateKey), $0
+        )
+    })
+}
+
+public func encryptEcies(msg: Data, publicKey: Data) throws -> Data {
+    return try FfiConverterData.lift(rustCallWithError(FfiConverterTypeError.lift) {
+        uniffi_spark_frost_fn_func_encrypt_ecies(
+            FfiConverterData.lower(msg),
+            FfiConverterData.lower(publicKey), $0
+        )
+    })
+}
+
 public func frostNonce(keyPackage: KeyPackage) throws -> NonceResult {
     return try FfiConverterTypeNonceResult.lift(rustCallWithError(FfiConverterTypeError.lift) {
         uniffi_spark_frost_fn_func_frost_nonce(
@@ -1097,6 +1115,12 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if uniffi_spark_frost_checksum_func_create_dummy_tx() != 14929 {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if uniffi_spark_frost_checksum_func_decrypt_ecies() != 30948 {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if uniffi_spark_frost_checksum_func_encrypt_ecies() != 55565 {
         return InitializationResult.apiChecksumMismatch
     }
     if uniffi_spark_frost_checksum_func_frost_nonce() != 5111 {

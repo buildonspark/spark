@@ -8,6 +8,7 @@ spark-frost = { path = "../spark-frost" }
 frost-secp256k1-tr = { workspace = true }
 hex = { workspace = true }
 uuid = { workspace = true }
+ecies = { workspace = true }
 uniffi = "0.28.3"
 bitcoin = "0.32.5"
 
