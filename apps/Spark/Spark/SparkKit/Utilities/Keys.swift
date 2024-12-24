@@ -20,6 +20,6 @@ extension secp256k1.Signing.PrivateKey {
         let resultInt =
             (BigInt(sign: .plus, magnitude: aMag) - BigInt(sign: .plus, magnitude: bMag) + SECP256K1_CURVE_N)
             & SECP256K1_CURVE_N;
-        return try secp256k1.Signing.PrivateKey(dataRepresentation: resultInt.serialize().padTo32Bytes())
+        return try secp256k1.Signing.PrivateKey(dataRepresentation: resultInt.magnitude.serialize().padTo32Bytes())
     }
 }
