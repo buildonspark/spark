@@ -18,14 +18,16 @@ struct ContentView: View {
         }
         .padding()
         .task {
-            let eventLoopGroup = PlatformSupport.makeEventLoopGroup(loopCount: 1)
-            let channel = try! GRPCChannelPool.with(
-                target: .host("localhost", port: 8535),
-                transportSecurity: .plaintext,
-                eventLoopGroup: eventLoopGroup
-            )
-            let client = Spark_SparkServiceAsyncClient(channel: channel)
-            let wallet = try! Wallet(walletClient: client)
+            var signingOperators: [SigningOperator] = []
+            for i in 0...4 {
+                signingOperators.append(
+                    try! SigningOperator(
+                        operatorId: UInt32(i),
+                        identifier: "000000000000000000000000000000000000000000000000000000000000000" + String(i + 1)
+                    )
+                )
+            }
+            let wallet = try! Wallet(signingOperators: signingOperators)
             let address = try! await wallet.generateDepositAddress()
             self.text = address.address
         }

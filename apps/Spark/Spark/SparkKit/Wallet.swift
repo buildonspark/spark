@@ -7,25 +7,47 @@
 //
 
 import Foundation
+import GRPC
 import secp256k1
 
-public class Wallet {
-    let walletClient: Spark_SparkServiceAsyncClient
+public class SigningOperator {
+    let id: UInt32
+    let identifier: String
+    let client: Spark_SparkServiceAsyncClient
 
+    public init(operatorId: UInt32, identifier: String) throws {
+        self.id = operatorId
+        self.identifier = identifier
+        let eventLoopGroup = PlatformSupport.makeEventLoopGroup(loopCount: 1)
+        let channel = try GRPCChannelPool.with(
+            target: .host("localhost", port: 8535 + Int(operatorId)),
+            transportSecurity: .plaintext,
+            eventLoopGroup: eventLoopGroup
+        )
+        self.client = Spark_SparkServiceAsyncClient(channel: channel)
+    }
+}
+
+public class Wallet {
+    let signingOperatorMap: [String: SigningOperator]
+    var coordinator: SigningOperator
     let identityPrivateKey: secp256k1.Signing.PrivateKey
+    let threshold: uint32
 
     var addressKeyMap: [String: secp256k1.Signing.PrivateKey] = [:]
     var nodeIDKeyMap: [String: secp256k1.Signing.PrivateKey] = [:]
 
-    public init(walletClient: Spark_SparkServiceAsyncClient) throws {
-        self.walletClient = walletClient
+    public init(signingOperators: [SigningOperator]) throws {
+        self.signingOperatorMap = Dictionary(uniqueKeysWithValues: signingOperators.map { ($0.identifier, $0) })
         self.identityPrivateKey = try secp256k1.Signing.PrivateKey()
+        self.coordinator = signingOperators[0]
+        self.threshold = 3
     }
 
     public func generateDepositAddress() async throws -> Spark_Address {
         let signingKey = try secp256k1.Signing.PrivateKey()
         let address = try await Spark.generateDepositAddress(
-            client: self.walletClient,
+            client: self.coordinator.client,
             identityPublicKey: self.identityPrivateKey.publicKey.dataRepresentation,
             signingPublicKey: signingKey.publicKey.dataRepresentation
         )
@@ -44,7 +66,7 @@ public class Wallet {
             throw SparkError(message: "Invalid address")
         }
         let response = try await Spark.createTree(
-            client: self.walletClient,
+            client: self.coordinator.client,
             onchainTx: onchainTx,
             onchainTxId: onchainTxId,
             vout: vout,
@@ -59,5 +81,38 @@ public class Wallet {
             self.nodeIDKeyMap[node.id] = signingPrivateKey
         }
         return response
+    }
+
+    public func sendTransfer(
+        receiverIdentityPublicKey: Data,
+        leafIds: [String],
+        expiryTime: Date
+    ) async throws -> Spark_Transfer {
+        var leafKeyTweaks: [LeafKeyTweak] = []
+        for leafId in leafIds {
+            guard let signingPrivateKey = self.nodeIDKeyMap[leafId] else {
+                throw SparkError(message: "Invalid leaf id " + leafId)
+            }
+            let newSigningPrivateKey = try secp256k1.Signing.PrivateKey()
+            leafKeyTweaks.append(
+                LeafKeyTweak(
+                    leafId: leafId,
+                    signingPrivateKey: signingPrivateKey,
+                    newSigningPrivateKey: newSigningPrivateKey
+                )
+            )
+        }
+        let transfer = try await Spark.sendTransfer(
+            signingOperatorMap: self.signingOperatorMap,
+            leaves: leafKeyTweaks,
+            expiryTime: expiryTime,
+            receiverIdentityPublicKey: receiverIdentityPublicKey,
+            identityPrivateKey: self.identityPrivateKey,
+            threshold: self.threshold
+        )
+        for leafKeyTweak in leafKeyTweaks {
+            self.nodeIDKeyMap[leafKeyTweak.leafId] = leafKeyTweak.newSigningPrivateKey
+        }
+        return transfer
     }
 }

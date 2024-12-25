@@ -38,7 +38,7 @@ struct Polynomial {
     public func eval(_ x: BigInt) throws -> BigInt {
         var result = BigInt(0)
         for (i, coef) in coefficients.enumerated() {
-            result += (coef * x.power(BigInt(i), modulus: fieldModulus)) % fieldModulus
+            result = (result + (coef * x.power(BigInt(i), modulus: fieldModulus)) % fieldModulus) % fieldModulus
         }
         return result;
     }
