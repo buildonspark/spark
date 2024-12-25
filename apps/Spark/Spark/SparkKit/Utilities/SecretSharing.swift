@@ -11,13 +11,13 @@ import Foundation
 import secp256k1
 
 struct Polynomial {
-    let fieldModulus: BigInt
-    let coefficients: [BigInt]
+    let fieldModulus: BigUInt
+    let coefficients: [BigUInt]
     let proofs: [Data]
 
-    init(fieldModulus: BigInt, secret: BigInt, degree: UInt32) throws {
+    init(fieldModulus: BigUInt, secret: BigUInt, degree: UInt32) throws {
         self.fieldModulus = fieldModulus
-        var coefficients: [BigInt] = []
+        var coefficients: [BigUInt] = []
         var proofs: [Data] = []
         coefficients.append(secret)
         proofs.append(
@@ -27,46 +27,45 @@ struct Polynomial {
 
         for _ in 1..<degree {
             let coefficient = try secp256k1.Signing.PrivateKey()
-            let mag = BigUInt(coefficient.dataRepresentation)
-            coefficients.append(BigInt(sign: .plus, magnitude: mag))
+            coefficients.append(BigUInt(coefficient.dataRepresentation))
             proofs.append(coefficient.publicKey.dataRepresentation)
         }
         self.coefficients = coefficients
         self.proofs = proofs
     }
 
-    public func eval(_ x: BigInt) throws -> BigInt {
-        var result = BigInt(0)
+    public func eval(_ x: BigUInt) throws -> BigUInt {
+        var result = BigUInt(0)
         for (i, coef) in coefficients.enumerated() {
-            result = (result + (coef * x.power(BigInt(i), modulus: fieldModulus)) % fieldModulus) % fieldModulus
+            result = (result + (coef * x.power(BigUInt(i), modulus: fieldModulus)) % fieldModulus) % fieldModulus
         }
         return result;
     }
 }
 
 public struct VerifiableSecretShare {
-    let fieldModulus: BigInt
+    let fieldModulus: BigUInt
     let threshold: UInt32
-    let index: BigInt
-    let share: BigInt
+    let index: BigUInt
+    let share: BigUInt
     let proof: [Data]
 }
 
 public func splitSecret(
-    fieldModulus: BigInt,
-    secret: BigInt,
+    fieldModulus: BigUInt,
+    secret: BigUInt,
     threshold: UInt32,
     numberOfShares: UInt32
 ) throws -> [VerifiableSecretShare] {
     let poly = try Polynomial(fieldModulus: fieldModulus, secret: secret, degree: threshold)
     var result: [VerifiableSecretShare] = []
     for i in 1...numberOfShares {
-        let share = try poly.eval(BigInt(i))
+        let share = try poly.eval(BigUInt(i))
         result.append(
             VerifiableSecretShare(
                 fieldModulus: fieldModulus,
                 threshold: threshold,
-                index: BigInt(i),
+                index: BigUInt(i),
                 share: share,
                 proof: poly.proofs
             )
@@ -75,9 +74,9 @@ public func splitSecret(
     return result
 }
 
-func computeLagrangeCoefficients(index: BigInt, shares: [VerifiableSecretShare]) throws -> BigInt {
-    var numerator = BigInt(1)
-    var denominator = BigInt(1)
+func computeLagrangeCoefficients(index: BigUInt, shares: [VerifiableSecretShare]) throws -> BigUInt {
+    var numerator = BigUInt(1)
+    var denominator = BigUInt(1)
     guard let fieldModulus = shares.first?.fieldModulus else {
         throw SparkError(message: "Not enough shares")
     }
@@ -87,7 +86,7 @@ func computeLagrangeCoefficients(index: BigInt, shares: [VerifiableSecretShare])
         }
         numerator = (numerator * share.index) % share.fieldModulus
         denominator =
-            (denominator * ((share.index - index + share.fieldModulus) % share.fieldModulus)) % share.fieldModulus
+            (denominator * ((share.index + (share.fieldModulus - index)) % share.fieldModulus)) % share.fieldModulus
     }
     guard let inversion = denominator.inverse(fieldModulus) else {
         throw SparkError(message: "Error computing inverse")
@@ -95,12 +94,12 @@ func computeLagrangeCoefficients(index: BigInt, shares: [VerifiableSecretShare])
     return (numerator * inversion) % fieldModulus
 }
 
-public func recoverSecret(shares: [VerifiableSecretShare]) throws -> BigInt {
+public func recoverSecret(shares: [VerifiableSecretShare]) throws -> BigUInt {
     if shares.first?.threshold ?? UInt32.max > shares.count {
         throw SparkError(message: "Not enough shares")
     }
 
-    var result = BigInt(0)
+    var result = BigUInt(0)
     for share in shares {
         let coef = try computeLagrangeCoefficients(index: share.index, shares: shares)
         result = (result + coef * share.share) % share.fieldModulus

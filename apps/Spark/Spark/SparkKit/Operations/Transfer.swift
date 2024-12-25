@@ -133,7 +133,7 @@ private func prepareSingleSendLeafKeyTweak(
 
     let shares = try splitSecret(
         fieldModulus: SECP256K1_CURVE_N,
-        secret: BigInt(privateKeyTweak.dataRepresentation),
+        secret: BigUInt(privateKeyTweak.dataRepresentation),
         threshold: threshold,
         numberOfShares: UInt32(signingOperatorMap.count)
     )
@@ -163,7 +163,7 @@ private func prepareSingleSendLeafKeyTweak(
     message.append(transferIdData)
     message.append(secretCipher)
     let digest = SHA256.hash(data: message)
-    let signature = try! identityPrivateKey.signature(for: Data(digest))
+    let signature = try identityPrivateKey.signature(for: Data(digest))
 
     var leafTweaksMap: [String: Spark_SendLeafKeyTweak] = [:]
     for (identifier, signingOperator) in signingOperatorMap {

@@ -13,10 +13,12 @@ import BigInt
 
 struct SecretSharingTests {
     @Test func testSecretSharing() throws {
-        let shares = try Spark.splitSecret(fieldModulus: SECP256K1_CURVE_N, secret: BigInt(100), threshold: 3, numberOfShares: 5)
-        #expect(shares.count == 5)
+        for i in 1...1000 {
+            let shares = try Spark.splitSecret(fieldModulus: SECP256K1_CURVE_N, secret: BigUInt(i), threshold: 3, numberOfShares: 5)
+            #expect(shares.count == 5)
 
-        let recovered = try Spark.recoverSecret(shares: shares)
-        #expect(recovered == BigInt(100))
+            let recovered = try Spark.recoverSecret(shares: shares)
+            #expect(recovered == BigInt(i))
+        }
     }
 }
