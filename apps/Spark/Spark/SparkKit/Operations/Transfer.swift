@@ -52,7 +52,7 @@ func sendTransfer(
             transfer = response.transfer
         } else {
             if let existingTransfer = transfer {
-                if !compareTransfers(existingTransfer, response.transfer) {
+                if existingTransfer != response.transfer {
                     throw SparkError(message: "Inconsistent send transfer responses from different signing operators")
                 }
             }
@@ -64,27 +64,6 @@ func sendTransfer(
     } else {
         throw SparkError(message: "No valid transfer found")
     }
-}
-
-private func compareTransfers(_ transfer1: Spark_Transfer, _ transfer2: Spark_Transfer) -> Bool {
-    return transfer1.id == transfer2.id && transfer1.senderIdentityPublicKey == transfer2.senderIdentityPublicKey
-        && transfer1.receiverIdentityPublicKey == transfer2.receiverIdentityPublicKey
-        && transfer1.status == transfer2.status && transfer1.totalValue == transfer2.totalValue
-        && transfer1.expiryTime == transfer2.expiryTime && compareTransferLeaves(transfer1.leaves, transfer2.leaves)
-}
-
-private func compareTransferLeaves(_ leaves1: [Spark_TransferLeaf], _ leaves2: [Spark_TransferLeaf]) -> Bool {
-    if leaves1.count != leaves2.count {
-        return false
-    }
-    for (leaf1, leaf2) in zip(leaves1, leaves2) {
-        if leaf1.leafID != leaf2.leafID || leaf1.secretCipher != leaf2.secretCipher
-            || leaf1.signature != leaf2.signature || leaf1.rawTx != leaf2.rawTx
-        {
-            return false
-        }
-    }
-    return true
 }
 
 private func convertToProtobufTimestamp(date: Date) -> Google_Protobuf_Timestamp {
