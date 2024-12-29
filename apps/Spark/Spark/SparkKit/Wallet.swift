@@ -44,6 +44,10 @@ public class Wallet {
         self.threshold = 3
     }
 
+    public func getIdentityPublicKey() -> secp256k1.Signing.PublicKey {
+        return self.identityPrivateKey.publicKey
+    }
+
     public func generateDepositAddress() async throws -> Spark_Address {
         let signingKey = try secp256k1.Signing.PrivateKey()
         let address = try await Spark.generateDepositAddress(
@@ -114,5 +118,12 @@ public class Wallet {
             self.nodeIDKeyMap[leafKeyTweak.leafId] = leafKeyTweak.newSigningPrivateKey
         }
         return transfer
+    }
+
+    public func queryPendingTransfers() async throws -> [Spark_Transfer] {
+        var request = Spark_QueryPendingTransfersRequest()
+        request.receiverIdentityPublicKey = self.identityPrivateKey.publicKey.dataRepresentation
+        let response = try await self.coordinator.client.query_pending_transfers(request)
+        return response.transfers
     }
 }

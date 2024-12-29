@@ -71,6 +71,22 @@ struct SparkTests {
     
     @Test func testSendTransfer() async throws {
         let wallet = try createTestWallet()
+        let root = try await createTestTree(wallet: wallet)
+        
+        let receiverIdentityPrivateKey = try secp256k1.Signing.PrivateKey()
+        guard let expiryTime = Calendar.current.date(byAdding: .hour, value: 1, to: Date()) else {
+            print("Failed to create expiry time")
+            return
+        }
+        let transfer = try await wallet.sendTransfer(
+            receiverIdentityPublicKey: receiverIdentityPrivateKey.publicKey.dataRepresentation,
+            leafIds: [root.id],
+            expiryTime: expiryTime
+        )
+        print(transfer)
+    }
+    
+    private func createTestTree(wallet: Wallet) async throws -> Spark_TreeNode{
         let address = try await wallet.generateDepositAddress()
         let dummyTx = try createDummyTx(address: address.address, amountSats: 32768)
         try await mockDummyTx(dummyTx: dummyTx)
@@ -81,20 +97,27 @@ struct SparkTests {
             address: address,
             network: "regtest"
         )
+        return response.nodes.first!
+    }
+
+    @Test func testReceiveTransfer() async throws {
+        let senderWallet = try createTestWallet()
+        let root = try await createTestTree(wallet: senderWallet)
         
-        let nodeId = response.nodes.first!.id
-        
-        let receiverIdentityPrivateKey = try secp256k1.Signing.PrivateKey()
+        let receiverWallet = try createTestWallet()
         guard let expiryTime = Calendar.current.date(byAdding: .hour, value: 1, to: Date()) else {
             print("Failed to create expiry time")
             return
         }
-        let transfer = try await wallet.sendTransfer(
-            receiverIdentityPublicKey: receiverIdentityPrivateKey.publicKey.dataRepresentation,
-            leafIds: [nodeId],
+        let senderTransfer = try await senderWallet.sendTransfer(
+            receiverIdentityPublicKey: receiverWallet.getIdentityPublicKey().dataRepresentation,
+            leafIds: [root.id],
             expiryTime: expiryTime
         )
-        print(transfer)
+        
+        let receiverTransfers = try await receiverWallet.queryPendingTransfers()
+        #expect(receiverTransfers.count == 1)
+        #expect(receiverTransfers[0].id == senderTransfer.id)
     }
 }
 
