@@ -17,7 +17,9 @@ struct SecretSharingTests {
             let shares = try Spark.splitSecret(fieldModulus: SECP256K1_CURVE_N, secret: BigUInt(i), threshold: 3, numberOfShares: 5)
             #expect(shares.count == 5)
 
-            let recovered = try Spark.recoverSecret(shares: shares)
+            let values = shares.values.map { $0 }
+
+            let recovered = try Spark.recoverSecret(shares: values)
             #expect(recovered == BigInt(i))
         }
     }

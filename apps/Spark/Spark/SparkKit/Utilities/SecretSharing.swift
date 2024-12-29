@@ -56,12 +56,12 @@ public func splitSecret(
     secret: BigUInt,
     threshold: UInt32,
     numberOfShares: UInt32
-) throws -> [VerifiableSecretShare] {
+) throws -> [UInt32: VerifiableSecretShare] {
     let poly = try Polynomial(fieldModulus: fieldModulus, secret: secret, degree: threshold)
-    var result: [VerifiableSecretShare] = []
+    var result: [UInt32: VerifiableSecretShare] = [:]
     for i in 1...numberOfShares {
         let share = try poly.eval(BigUInt(i))
-        result.append(
+        result[i] =
             VerifiableSecretShare(
                 fieldModulus: fieldModulus,
                 threshold: threshold,
@@ -69,7 +69,6 @@ public func splitSecret(
                 share: share,
                 proof: poly.proofs
             )
-        )
     }
     return result
 }

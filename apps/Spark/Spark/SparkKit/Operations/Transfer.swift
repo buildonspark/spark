@@ -139,7 +139,9 @@ private func prepareSingleSendLeafKeyTweak(
     )
     var pubkeySharesTweak: [String: Data] = [:]
     for (identifier, signingOperator) in signingOperatorMap {
-        let share = try findShare(shares: shares, operatorId: signingOperator.id)
+        guard let share = shares[signingOperator.id + 1] else {
+            throw SparkError(message: "Cannot find share for identifier: \(signingOperator.id))")
+        }
         let privateKeyTweak = try secp256k1.Signing.PrivateKey(
             dataRepresentation: share.share.magnitude.serialize().padTo32Bytes()
         )
@@ -167,7 +169,9 @@ private func prepareSingleSendLeafKeyTweak(
 
     var leafTweaksMap: [String: Spark_SendLeafKeyTweak] = [:]
     for (identifier, signingOperator) in signingOperatorMap {
-        let share = try findShare(shares: shares, operatorId: signingOperator.id)
+        guard let share = shares[signingOperator.id + 1] else {
+            throw SparkError(message: "Cannot find share for identifier: \(signingOperator.id))")
+        }
         var secretShareTweak = Spark_SecretShareTweak()
         secretShareTweak.tweak = share.share.serialize()
         secretShareTweak.proofs = share.proof
@@ -182,12 +186,4 @@ private func prepareSingleSendLeafKeyTweak(
         leafTweaksMap[identifier] = sendLeafKeyTweak
     }
     return leafTweaksMap
-}
-
-private func findShare(shares: [VerifiableSecretShare], operatorId: UInt32) throws -> VerifiableSecretShare {
-    let targetShareIndex = BigInt(operatorId + 1)
-    guard let share = shares.first(where: { $0.index == targetShareIndex }) else {
-        throw SparkError(message: "Cannot find share")
-    }
-    return share
 }
