@@ -46,7 +46,6 @@ func sendTransfer(
         request.expiryTime = convertToProtobufTimestamp(date: expiryTime)
         request.leavesToSend = leafKeyTweaks
         request.receiverIdentityPublicKey = receiverIdentityPublicKey
-
         let response = try await signingOperator.client.send_transfer(request)
         if transfer == nil {
             transfer = response.transfer
@@ -132,19 +131,12 @@ private func prepareSingleSendLeafKeyTweak(
         msg: leaf.newSigningPrivateKey.dataRepresentation,
         publicKey: receiverIdentityPublicKey
     )
-
-    // Generate signature over Sha256(leaf_id||transfer_id||secret_cipher)
-    guard let leafIdData = leaf.leafId.data(using: .utf8),
-        let transferIdData = transferId.uuidString.data(using: .utf8)
-    else {
-        throw SparkError(message: "Cannot encode leaf id or transfer id")
-    }
-    var message = Data()
-    message.append(leafIdData)
-    message.append(transferIdData)
-    message.append(secretCipher)
-    let digest = SHA256.hash(data: message)
-    let signature = try identityPrivateKey.signature(for: Data(digest))
+    let signingHash = try getLeafSigningMessageHash(
+        transferId: transferId.uuidString,
+        leafId: leaf.leafId,
+        secretCipher: secretCipher
+    )
+    let signature = try identityPrivateKey.signature(for: signingHash)
 
     var leafTweaksMap: [String: Spark_SendLeafKeyTweak] = [:]
     for (identifier, signingOperator) in signingOperatorMap {
@@ -165,4 +157,51 @@ private func prepareSingleSendLeafKeyTweak(
         leafTweaksMap[identifier] = sendLeafKeyTweak
     }
     return leafTweaksMap
+}
+
+private func getLeafSigningMessageHash(
+    transferId: String,
+    leafId: String,
+    secretCipher: Data
+) throws -> Data {
+    // Generate signing message over Sha256(leaf_id||transfer_id||secret_cipher)
+    guard let leafIdData = leafId.lowercased().data(using: .utf8),
+        let transferIdData = transferId.lowercased().data(using: .utf8)
+    else {
+        throw SparkError(message: "Cannot encode leaf id or transfer id")
+    }
+    var message = Data()
+    message.append(leafIdData)
+    message.append(transferIdData)
+    message.append(secretCipher)
+    return Data(SHA256.hash(data: message))
+}
+
+func decryptPendingTransferLeavesSecrets(
+    identityPrivateKey: secp256k1.Signing.PrivateKey,
+    transfer: Spark_Transfer
+) throws -> [String: Data] {
+    var leafSecretMap: [String: Data] = [:]
+    let senderIdentityPublicKey = transfer.senderIdentityPublicKey
+    let senderPubkey = try secp256k1.Signing.PublicKey(
+        dataRepresentation: transfer.senderIdentityPublicKey,
+        format: secp256k1.Format.compressed
+    )
+    for leaf in transfer.leaves {
+        let signingHash = try getLeafSigningMessageHash(
+            transferId: transfer.id,
+            leafId: leaf.leafID,
+            secretCipher: leaf.secretCipher
+        )
+        let signature = try secp256k1.Signing.ECDSASignature(dataRepresentation: leaf.signature)
+        if !senderPubkey.isValidSignature(signature, for: signingHash) {
+            throw SparkError(message: "Cannot verify signature of leaf \(leaf.leafID))")
+        }
+        let secret = try decryptEcies(
+            encryptedMsg: leaf.secretCipher,
+            privateKey: identityPrivateKey.dataRepresentation
+        )
+        leafSecretMap[leaf.leafID] = secret
+    }
+    return leafSecretMap
 }

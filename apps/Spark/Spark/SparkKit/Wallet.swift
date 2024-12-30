@@ -126,4 +126,11 @@ public class Wallet {
         let response = try await self.coordinator.client.query_pending_transfers(request)
         return response.transfers
     }
+
+    public func claimTransfer(_ transfer: Spark_Transfer) throws {
+        let _ = try Spark.decryptPendingTransferLeavesSecrets(
+            identityPrivateKey: self.identityPrivateKey,
+            transfer: transfer
+        )
+    }
 }

@@ -118,6 +118,8 @@ struct SparkTests {
         let receiverTransfers = try await receiverWallet.queryPendingTransfers()
         #expect(receiverTransfers.count == 1)
         #expect(receiverTransfers[0].id == senderTransfer.id)
+        
+        try receiverWallet.claimTransfer(receiverTransfers[0])
     }
 }
 
