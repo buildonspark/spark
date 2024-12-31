@@ -134,13 +134,14 @@ public class Wallet {
         )
         var leafKeyTweaks: [LeafKeyTweak] = []
         for leaf in transfer.leaves {
-            guard let signingPrivateKey = leafSecretMap[leaf.leafID] else {
-                throw SparkError(message: "Unable to find signing private key for leaf " + leaf.leafID)
+            let leafId = leaf.leaf.id
+            guard let signingPrivateKey = leafSecretMap[leafId] else {
+                throw SparkError(message: "Unable to find signing private key for leaf " + leafId)
             }
             let newSigningPrivateKey = try secp256k1.Signing.PrivateKey()
             leafKeyTweaks.append(
                 LeafKeyTweak(
-                    leafId: leaf.leafID,
+                    leafId: leafId,
                     signingPrivateKey: signingPrivateKey,
                     newSigningPrivateKey: newSigningPrivateKey
                 )

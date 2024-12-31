@@ -187,20 +187,21 @@ func decryptPendingTransferLeavesSecrets(
         format: secp256k1.Format.compressed
     )
     for leaf in transfer.leaves {
+        let leafId = leaf.leaf.id
         let signingHash = try getLeafSigningMessageHash(
             transferId: transfer.id,
-            leafId: leaf.leafID,
+            leafId: leafId,
             secretCipher: leaf.secretCipher
         )
         let signature = try secp256k1.Signing.ECDSASignature(dataRepresentation: leaf.signature)
         if !senderPubkey.isValidSignature(signature, for: signingHash) {
-            throw SparkError(message: "Cannot verify signature of leaf \(leaf.leafID))")
+            throw SparkError(message: "Cannot verify signature of leaf \(leafId))")
         }
         let secret = try decryptEcies(
             encryptedMsg: leaf.secretCipher,
             privateKey: identityPrivateKey.dataRepresentation
         )
-        leafSecretMap[leaf.leafID] = try secp256k1.Signing.PrivateKey(dataRepresentation: secret)
+        leafSecretMap[leafId] = try secp256k1.Signing.PrivateKey(dataRepresentation: secret)
     }
     return leafSecretMap
 }

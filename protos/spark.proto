@@ -180,10 +180,9 @@ message Transfer {
 }
 
 message TransferLeaf {
-    string leaf_id = 1;
+    TreeNode leaf = 1;
     bytes secret_cipher = 2;
     bytes signature = 3;
-    bytes raw_tx = 4;
 }
 
 message SendTransferResponse {

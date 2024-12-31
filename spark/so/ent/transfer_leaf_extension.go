@@ -14,9 +14,8 @@ func (t *TransferLeaf) MarshalProto(ctx context.Context) (*pb.TransferLeaf, erro
 		return nil, fmt.Errorf("unable to query leaf for transfer leaf %s: %v", t.ID.String(), err)
 	}
 	return &pb.TransferLeaf{
-		LeafId:       leaf.ID.String(),
+		Leaf:         leaf.MarshalSparkProto(ctx),
 		SecretCipher: t.SecretCipher,
 		Signature:    t.Signature,
-		RawTx:        leaf.RawTx,
 	}, nil
 }

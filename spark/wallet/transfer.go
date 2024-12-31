@@ -213,7 +213,7 @@ func VerifyPendingTransfer(
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse signature: %v", err)
 		}
-		payload := append(append([]byte(leaf.LeafId), []byte(transfer.Id)...), leaf.SecretCipher...)
+		payload := append(append([]byte(leaf.Leaf.Id), []byte(transfer.Id)...), leaf.SecretCipher...)
 		payloadHash := sha256.Sum256(payload)
 		if !signature.Verify(payloadHash[:], senderPubkey) {
 			return nil, fmt.Errorf("failed to verify signature: %v", err)
@@ -224,7 +224,7 @@ func VerifyPendingTransfer(
 		if err != nil {
 			return nil, fmt.Errorf("failed to decrypt secret cipher: %v", err)
 		}
-		leafPrivKeyMap[leaf.LeafId] = leafSecret
+		leafPrivKeyMap[leaf.Leaf.Id] = leafSecret
 
 	}
 	return &leafPrivKeyMap, nil
@@ -363,8 +363,8 @@ func claimTransferSignRefunds(
 			Nonce:          nonce,
 		}
 		for _, leaf := range transfer.Leaves {
-			if leaf.LeafId == leafKey.LeafID {
-				tx, _ := common.TxFromRawTxBytes(leaf.RawTx)
+			if leaf.Leaf.Id == leafKey.LeafID {
+				tx, _ := common.TxFromRawTxBytes(leaf.Leaf.NodeTx)
 				leafData.Tx = tx
 			}
 		}
@@ -483,9 +483,9 @@ func prepareClaimTransferOperatorsSigningJobs(
 ) ([]*pb.ClaimLeafSigningJob, error) {
 	signingJobs := []*pb.ClaimLeafSigningJob{}
 	for _, leaf := range transfer.Leaves {
-		leafData := leafDataMap[leaf.LeafId]
+		leafData := leafDataMap[leaf.Leaf.Id]
 		signingPubkey := leafData.SigningPrivKey.PubKey().SerializeCompressed()
-		tx, err := common.TxFromRawTxBytes(leaf.RawTx)
+		tx, err := common.TxFromRawTxBytes(leaf.Leaf.NodeTx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse raw tx: %v", err)
 		}
@@ -507,7 +507,7 @@ func prepareClaimTransferOperatorsSigningJobs(
 		refundNonceCommitmentProto, _ := leafData.Nonce.SigningCommitment().MarshalProto()
 
 		signingJobs = append(signingJobs, &pb.ClaimLeafSigningJob{
-			LeafId: leaf.LeafId,
+			LeafId: leaf.Leaf.Id,
 			RefundTxSigningJob: &pb.SigningJob{
 				SigningPublicKey:       signingPubkey,
 				RawTx:                  refundBuf.Bytes(),
