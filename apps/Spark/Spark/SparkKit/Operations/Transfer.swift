@@ -84,7 +84,7 @@ private func prepareSendLeafKeyTweaks(
 ) throws -> [String: [Spark_SendLeafKeyTweak]] {
     var leafKeyTweaksMap: [String: [Spark_SendLeafKeyTweak]] = [:]
     for leaf in leaves {
-        let leafTweaksMap = try prepareSingleSendLeafKeyTweak(
+        let leafKeyTweakMap = try prepareSingleSendLeafKeyTweak(
             signingOperatorMap: signingOperatorMap,
             transferId: transferId,
             leaf: leaf,
@@ -92,7 +92,7 @@ private func prepareSendLeafKeyTweaks(
             identityPrivateKey: identityPrivateKey,
             threshold: threshold
         )
-        for (identifier, leafTweak) in leafTweaksMap {
+        for (identifier, leafTweak) in leafKeyTweakMap {
             leafKeyTweaksMap[identifier, default: []].append(leafTweak)
         }
     }
@@ -138,7 +138,7 @@ private func prepareSingleSendLeafKeyTweak(
     )
     let signature = try identityPrivateKey.signature(for: signingHash)
 
-    var leafTweaksMap: [String: Spark_SendLeafKeyTweak] = [:]
+    var leafKeyTweakMap: [String: Spark_SendLeafKeyTweak] = [:]
     for (identifier, signingOperator) in signingOperatorMap {
         guard let share = shares[signingOperator.id + 1] else {
             throw SparkError(message: "Cannot find share for identifier: \(signingOperator.id))")
@@ -154,9 +154,9 @@ private func prepareSingleSendLeafKeyTweak(
         sendLeafKeyTweak.secretCipher = secretCipher
         sendLeafKeyTweak.signature = signature.dataRepresentation
 
-        leafTweaksMap[identifier] = sendLeafKeyTweak
+        leafKeyTweakMap[identifier] = sendLeafKeyTweak
     }
-    return leafTweaksMap
+    return leafKeyTweakMap
 }
 
 private func getLeafSigningMessageHash(
@@ -180,9 +180,8 @@ private func getLeafSigningMessageHash(
 func decryptPendingTransferLeavesSecrets(
     identityPrivateKey: secp256k1.Signing.PrivateKey,
     transfer: Spark_Transfer
-) throws -> [String: Data] {
-    var leafSecretMap: [String: Data] = [:]
-    let senderIdentityPublicKey = transfer.senderIdentityPublicKey
+) throws -> [String: secp256k1.Signing.PrivateKey] {
+    var leafSecretMap: [String: secp256k1.Signing.PrivateKey] = [:]
     let senderPubkey = try secp256k1.Signing.PublicKey(
         dataRepresentation: transfer.senderIdentityPublicKey,
         format: secp256k1.Format.compressed
@@ -201,7 +200,110 @@ func decryptPendingTransferLeavesSecrets(
             encryptedMsg: leaf.secretCipher,
             privateKey: identityPrivateKey.dataRepresentation
         )
-        leafSecretMap[leaf.leafID] = secret
+        leafSecretMap[leaf.leafID] = try secp256k1.Signing.PrivateKey(dataRepresentation: secret)
     }
     return leafSecretMap
+}
+
+func claimTransfer(
+    signingOperatorMap: [String: SigningOperator],
+    transfer: Spark_Transfer,
+    leaves: [LeafKeyTweak],
+    identityPrivateKey: secp256k1.Signing.PrivateKey,
+    threshold: UInt32
+) async throws {
+    try await claimTransferTweakKeys(
+        signingOperatorMap: signingOperatorMap,
+        transfer: transfer,
+        leaves: leaves,
+        identityPrivateKey: identityPrivateKey,
+        threshold: threshold
+    )
+}
+
+private func claimTransferTweakKeys(
+    signingOperatorMap: [String: SigningOperator],
+    transfer: Spark_Transfer,
+    leaves: [LeafKeyTweak],
+    identityPrivateKey: secp256k1.Signing.PrivateKey,
+    threshold: UInt32
+) async throws {
+    let leafKeyTweaksMap = try prepareClaimLeafKeyTweaks(
+        signingOperatorMap: signingOperatorMap,
+        leaves: leaves,
+        threshold: threshold
+    )
+    for (identifier, signingOperator) in signingOperatorMap {
+        guard let leafKeyTweaks = leafKeyTweaksMap[identifier] else {
+            throw SparkError(message: "Cannot find leaf key tweaks to claim")
+        }
+
+        var request = Spark_ClaimTransferTweakKeysRequest()
+        request.transferID = transfer.id
+        request.ownerIdentityPublicKey = identityPrivateKey.publicKey.dataRepresentation
+        request.leavesToReceive = leafKeyTweaks
+        let _ = try await signingOperator.client.claim_transfer_tweak_keys(request)
+    }
+}
+
+private func prepareClaimLeafKeyTweaks(
+    signingOperatorMap: [String: SigningOperator],
+    leaves: [LeafKeyTweak],
+    threshold: UInt32
+) throws -> [String: [Spark_ClaimLeafKeyTweak]] {
+    var leafKeyTweaksMap: [String: [Spark_ClaimLeafKeyTweak]] = [:]
+    for leaf in leaves {
+        let leafKeyTweakMap = try prepareSingleClaimLeafKeyTweak(
+            signingOperatorMap: signingOperatorMap,
+            leaf: leaf,
+            threshold: threshold
+        )
+        for (identifier, leafTweak) in leafKeyTweakMap {
+            leafKeyTweaksMap[identifier, default: []].append(leafTweak)
+        }
+    }
+    return leafKeyTweaksMap
+}
+
+func prepareSingleClaimLeafKeyTweak(
+    signingOperatorMap: [String: SigningOperator],
+    leaf: LeafKeyTweak,
+    threshold: UInt32
+) throws -> [String: Spark_ClaimLeafKeyTweak] {
+    let privateKeyTweak = try leaf.signingPrivateKey.subtract(leaf.newSigningPrivateKey)
+
+    let shares = try splitSecret(
+        fieldModulus: SECP256K1_CURVE_N,
+        secret: BigUInt(privateKeyTweak.dataRepresentation),
+        threshold: threshold,
+        numberOfShares: UInt32(signingOperatorMap.count)
+    )
+    var pubkeySharesTweak: [String: Data] = [:]
+    for (identifier, signingOperator) in signingOperatorMap {
+        guard let share = shares[signingOperator.id + 1] else {
+            throw SparkError(message: "Cannot find share for identifier: \(signingOperator.id))")
+        }
+        let privateKeyTweak = try secp256k1.Signing.PrivateKey(
+            dataRepresentation: share.share.magnitude.serialize().padTo32Bytes()
+        )
+        pubkeySharesTweak[identifier] = privateKeyTweak.publicKey.dataRepresentation
+    }
+
+    var leafKeyTweakMap: [String: Spark_ClaimLeafKeyTweak] = [:]
+    for (identifier, signingOperator) in signingOperatorMap {
+        guard let share = shares[signingOperator.id + 1] else {
+            throw SparkError(message: "Cannot find share for identifier: \(signingOperator.id))")
+        }
+        var secretShareTweak = Spark_SecretShareTweak()
+        secretShareTweak.tweak = share.share.serialize()
+        secretShareTweak.proofs = share.proof
+
+        var claimLeafKeyTweak = Spark_ClaimLeafKeyTweak()
+        claimLeafKeyTweak.leafID = leaf.leafId
+        claimLeafKeyTweak.secretShareTweak = secretShareTweak
+        claimLeafKeyTweak.pubkeySharesTweak = pubkeySharesTweak
+
+        leafKeyTweakMap[identifier] = claimLeafKeyTweak
+    }
+    return leafKeyTweakMap
 }

@@ -119,7 +119,7 @@ struct SparkTests {
         #expect(receiverTransfers.count == 1)
         #expect(receiverTransfers[0].id == senderTransfer.id)
         
-        try receiverWallet.claimTransfer(receiverTransfers[0])
+        try await receiverWallet.claimTransfer(receiverTransfers[0])
     }
 }
 

@@ -127,10 +127,32 @@ public class Wallet {
         return response.transfers
     }
 
-    public func claimTransfer(_ transfer: Spark_Transfer) throws {
-        let _ = try Spark.decryptPendingTransferLeavesSecrets(
+    public func claimTransfer(_ transfer: Spark_Transfer) async throws {
+        let leafSecretMap = try Spark.decryptPendingTransferLeavesSecrets(
             identityPrivateKey: self.identityPrivateKey,
             transfer: transfer
         )
+        var leafKeyTweaks: [LeafKeyTweak] = []
+        for leaf in transfer.leaves {
+            guard let signingPrivateKey = leafSecretMap[leaf.leafID] else {
+                throw SparkError(message: "Unable to find signing private key for leaf " + leaf.leafID)
+            }
+            let newSigningPrivateKey = try secp256k1.Signing.PrivateKey()
+            leafKeyTweaks.append(
+                LeafKeyTweak(
+                    leafId: leaf.leafID,
+                    signingPrivateKey: signingPrivateKey,
+                    newSigningPrivateKey: newSigningPrivateKey
+                )
+            )
+        }
+        try await Spark.claimTransfer(
+            signingOperatorMap: self.signingOperatorMap,
+            transfer: transfer,
+            leaves: leafKeyTweaks,
+            identityPrivateKey: self.identityPrivateKey,
+            threshold: self.threshold
+        )
+        self.nodeIDKeyMap.merge(leafSecretMap) { (_, new) in new }
     }
 }
