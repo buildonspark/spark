@@ -127,7 +127,7 @@ public class Wallet {
         return response.transfers
     }
 
-    public func claimTransfer(_ transfer: Spark_Transfer) async throws {
+    public func claimTransfer(_ transfer: Spark_Transfer) async throws -> [Spark_TreeNode] {
         let leafSecretMap = try Spark.decryptPendingTransferLeavesSecrets(
             identityPrivateKey: self.identityPrivateKey,
             transfer: transfer
@@ -145,7 +145,7 @@ public class Wallet {
                 newSigningPrivateKey: newSigningPrivateKey
             )
         }
-        try await Spark.claimTransfer(
+        let claimedNodes = try await Spark.claimTransfer(
             signingCoordinator: self.coordinator,
             signingOperatorMap: self.signingOperatorMap,
             transfer: transfer,
@@ -154,5 +154,6 @@ public class Wallet {
             threshold: self.threshold
         )
         self.nodeIDKeyMap.merge(leafSecretMap) { (_, new) in new }
+        return claimedNodes
     }
 }

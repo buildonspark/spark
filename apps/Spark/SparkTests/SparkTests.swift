@@ -113,7 +113,10 @@ struct SparkTests {
         #expect(receiverTransfers.count == 1)
         #expect(receiverTransfers[0].id == senderTransfer.id)
         
-        try await receiverWallet.claimTransfer(receiverTransfers[0])
+        let claimedNodes = try await receiverWallet.claimTransfer(receiverTransfers[0])
+        #expect(claimedNodes.count == 1)
+        #expect(claimedNodes[0].id == root.id)
+        #expect(claimedNodes[0].ownerIdentityPublicKey == receiverWallet.getIdentityPublicKey().dataRepresentation)
     }
 }
 

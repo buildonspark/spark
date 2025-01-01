@@ -13,14 +13,15 @@ import (
 // MarshalSparkProto converts a TreeNode to a spark protobuf TreeNode.
 func (tn *TreeNode) MarshalSparkProto(ctx context.Context) *pbspark.TreeNode {
 	return &pbspark.TreeNode{
-		Id:           tn.ID.String(),
-		TreeId:       tn.QueryTree().FirstIDX(ctx).String(),
-		Value:        tn.Value,
-		ParentNodeId: tn.getParentNodeID(ctx),
-		NodeTx:       tn.RawTx,
-		RefundTx:     tn.RawRefundTx,
-		Vout:         uint32(tn.Vout),
-		VerifyingKey: tn.VerifyingPubkey,
+		Id:                     tn.ID.String(),
+		TreeId:                 tn.QueryTree().FirstIDX(ctx).String(),
+		Value:                  tn.Value,
+		ParentNodeId:           tn.getParentNodeID(ctx),
+		NodeTx:                 tn.RawTx,
+		RefundTx:               tn.RawRefundTx,
+		Vout:                   uint32(tn.Vout),
+		VerifyingPublicKey:     tn.VerifyingPubkey,
+		OwnerIdentityPublicKey: tn.OwnerIdentityPubkey,
 	}
 }
 

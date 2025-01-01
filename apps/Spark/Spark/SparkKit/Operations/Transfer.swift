@@ -213,7 +213,7 @@ func claimTransfer(
     leafKeyTweakMap: [String: LeafKeyTweak],
     identityPrivateKey: secp256k1.Signing.PrivateKey,
     threshold: UInt32
-) async throws {
+) async throws -> [Spark_TreeNode] {
     try await claimTransferTweakKeys(
         signingOperatorMap: signingOperatorMap,
         transfer: transfer,
@@ -221,11 +221,16 @@ func claimTransfer(
         identityPrivateKey: identityPrivateKey,
         threshold: threshold
     )
-    let _ = try await claimTransferSignRefunds(
+    let signatureMap = try await claimTransferSignRefunds(
         signingCoordinator: signingCoordinator,
         transfer: transfer,
         leafKeyTweakMap: leafKeyTweakMap,
         identityPrivateKey: identityPrivateKey
+    )
+
+    return try await claimTransferFinalize(
+        signingCoordinator: signingCoordinator,
+        signatureMap: signatureMap
     )
 }
 
@@ -368,7 +373,7 @@ private func prepareClaimTransferOperatorsSigningJobs(
         let keyPackage = KeyPackage(
             secretKey: signingPrivateKey.dataRepresentation,
             publicKey: signingPrivateKey.publicKey.dataRepresentation,
-            verifyingKey: leaf.verifyingKey
+            verifyingKey: leaf.verifyingPublicKey
         )
         let nonce = try frostNonce(keyPackage: keyPackage)
 
@@ -391,7 +396,7 @@ private func prepareClaimTransferOperatorsSigningJobs(
     return (signingJobs, signingDataMap)
 }
 
-func signRefunds(
+private func signRefunds(
     operatorSigningResults: [Spark_ClaimLeafSigningResult],
     signingDataMap: [String: LeafTransferSigningData]
 ) throws -> [String: Data] {
@@ -426,4 +431,22 @@ func signRefunds(
         signatureMap[operatorSigningResult.leafID] = aggregatedSignature
     }
     return signatureMap
+}
+
+private func claimTransferFinalize(
+    signingCoordinator: SigningOperator,
+    signatureMap: [String: Data]
+) async throws -> [Spark_TreeNode] {
+    let nodeSignatures: [Spark_NodeSignatures] = signatureMap.map { (leafId, signature) in
+        var nodeSignature = Spark_NodeSignatures()
+        nodeSignature.nodeID = leafId
+        nodeSignature.refundTxSignature = signature
+        return nodeSignature
+    }
+
+    var request = Spark_FinalizeNodeSignaturesRequest()
+    request.intent = Common_SignatureIntent.transfer
+    request.nodeSignatures = nodeSignatures
+    let response = try await signingCoordinator.client.finalize_node_signatures(request)
+    return response.nodes
 }

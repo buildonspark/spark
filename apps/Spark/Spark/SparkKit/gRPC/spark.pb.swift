@@ -339,7 +339,9 @@ public struct Spark_TreeNode: @unchecked Sendable {
 
   public var vout: UInt32 = 0
 
-  public var verifyingKey: Data = Data()
+  public var verifyingPublicKey: Data = Data()
+
+  public var ownerIdentityPublicKey: Data = Data()
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -1358,7 +1360,8 @@ extension Spark_TreeNode: SwiftProtobuf.Message, SwiftProtobuf._MessageImplement
     5: .standard(proto: "node_tx"),
     6: .standard(proto: "refund_tx"),
     7: .same(proto: "vout"),
-    8: .standard(proto: "verifying_key"),
+    8: .standard(proto: "verifying_public_key"),
+    9: .standard(proto: "owner_identity_public_key"),
   ]
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -1374,7 +1377,8 @@ extension Spark_TreeNode: SwiftProtobuf.Message, SwiftProtobuf._MessageImplement
       case 5: try { try decoder.decodeSingularBytesField(value: &self.nodeTx) }()
       case 6: try { try decoder.decodeSingularBytesField(value: &self.refundTx) }()
       case 7: try { try decoder.decodeSingularUInt32Field(value: &self.vout) }()
-      case 8: try { try decoder.decodeSingularBytesField(value: &self.verifyingKey) }()
+      case 8: try { try decoder.decodeSingularBytesField(value: &self.verifyingPublicKey) }()
+      case 9: try { try decoder.decodeSingularBytesField(value: &self.ownerIdentityPublicKey) }()
       default: break
       }
     }
@@ -1406,8 +1410,11 @@ extension Spark_TreeNode: SwiftProtobuf.Message, SwiftProtobuf._MessageImplement
     if self.vout != 0 {
       try visitor.visitSingularUInt32Field(value: self.vout, fieldNumber: 7)
     }
-    if !self.verifyingKey.isEmpty {
-      try visitor.visitSingularBytesField(value: self.verifyingKey, fieldNumber: 8)
+    if !self.verifyingPublicKey.isEmpty {
+      try visitor.visitSingularBytesField(value: self.verifyingPublicKey, fieldNumber: 8)
+    }
+    if !self.ownerIdentityPublicKey.isEmpty {
+      try visitor.visitSingularBytesField(value: self.ownerIdentityPublicKey, fieldNumber: 9)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -1420,7 +1427,8 @@ extension Spark_TreeNode: SwiftProtobuf.Message, SwiftProtobuf._MessageImplement
     if lhs.nodeTx != rhs.nodeTx {return false}
     if lhs.refundTx != rhs.refundTx {return false}
     if lhs.vout != rhs.vout {return false}
-    if lhs.verifyingKey != rhs.verifyingKey {return false}
+    if lhs.verifyingPublicKey != rhs.verifyingPublicKey {return false}
+    if lhs.ownerIdentityPublicKey != rhs.ownerIdentityPublicKey {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
