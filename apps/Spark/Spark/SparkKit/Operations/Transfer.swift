@@ -207,31 +207,38 @@ func decryptPendingTransferLeavesSecrets(
 }
 
 func claimTransfer(
+    signingCoordinator: SigningOperator,
     signingOperatorMap: [String: SigningOperator],
     transfer: Spark_Transfer,
-    leaves: [LeafKeyTweak],
+    leafKeyTweakMap: [String: LeafKeyTweak],
     identityPrivateKey: secp256k1.Signing.PrivateKey,
     threshold: UInt32
 ) async throws {
     try await claimTransferTweakKeys(
         signingOperatorMap: signingOperatorMap,
         transfer: transfer,
-        leaves: leaves,
+        leafKeyTweakMap: leafKeyTweakMap,
         identityPrivateKey: identityPrivateKey,
         threshold: threshold
+    )
+    let _ = try await claimTransferSignRefunds(
+        signingCoordinator: signingCoordinator,
+        transfer: transfer,
+        leafKeyTweakMap: leafKeyTweakMap,
+        identityPrivateKey: identityPrivateKey
     )
 }
 
 private func claimTransferTweakKeys(
     signingOperatorMap: [String: SigningOperator],
     transfer: Spark_Transfer,
-    leaves: [LeafKeyTweak],
+    leafKeyTweakMap: [String: LeafKeyTweak],
     identityPrivateKey: secp256k1.Signing.PrivateKey,
     threshold: UInt32
 ) async throws {
     let leafKeyTweaksMap = try prepareClaimLeafKeyTweaks(
         signingOperatorMap: signingOperatorMap,
-        leaves: leaves,
+        leafKeyTweakMap: leafKeyTweakMap,
         threshold: threshold
     )
     for (identifier, signingOperator) in signingOperatorMap {
@@ -249,11 +256,11 @@ private func claimTransferTweakKeys(
 
 private func prepareClaimLeafKeyTweaks(
     signingOperatorMap: [String: SigningOperator],
-    leaves: [LeafKeyTweak],
+    leafKeyTweakMap: [String: LeafKeyTweak],
     threshold: UInt32
 ) throws -> [String: [Spark_ClaimLeafKeyTweak]] {
     var leafKeyTweaksMap: [String: [Spark_ClaimLeafKeyTweak]] = [:]
-    for leaf in leaves {
+    for leaf in leafKeyTweakMap.values {
         let leafKeyTweakMap = try prepareSingleClaimLeafKeyTweak(
             signingOperatorMap: signingOperatorMap,
             leaf: leaf,
@@ -266,7 +273,7 @@ private func prepareClaimLeafKeyTweaks(
     return leafKeyTweaksMap
 }
 
-func prepareSingleClaimLeafKeyTweak(
+private func prepareSingleClaimLeafKeyTweak(
     signingOperatorMap: [String: SigningOperator],
     leaf: LeafKeyTweak,
     threshold: UInt32
@@ -307,4 +314,116 @@ func prepareSingleClaimLeafKeyTweak(
         leafKeyTweakMap[identifier] = claimLeafKeyTweak
     }
     return leafKeyTweakMap
+}
+
+struct LeafTransferSigningData {
+    let signingPrivateKey: secp256k1.Signing.PrivateKey
+    let refundTx: TransactionResult
+    let nonce: NonceResult
+    let keyPackage: KeyPackage
+}
+
+private func claimTransferSignRefunds(
+    signingCoordinator: SigningOperator,
+    transfer: Spark_Transfer,
+    leafKeyTweakMap: [String: LeafKeyTweak],
+    identityPrivateKey: secp256k1.Signing.PrivateKey
+) async throws -> [String: Data] {
+    let (signingJobs, signingDataMap) = try prepareClaimTransferOperatorsSigningJobs(
+        transfer: transfer,
+        leafKeyTweakMap: leafKeyTweakMap
+    )
+    var request = Spark_ClaimTransferSignRefundsRequest()
+    request.transferID = transfer.id
+    request.ownerIdentityPublicKey = identityPrivateKey.publicKey.dataRepresentation
+    request.signingJobs = signingJobs
+
+    let response = try await signingCoordinator.client.claim_transfer_sign_refunds(request)
+    return try signRefunds(
+        operatorSigningResults: response.signingResults,
+        signingDataMap: signingDataMap
+    )
+}
+
+private func prepareClaimTransferOperatorsSigningJobs(
+    transfer: Spark_Transfer,
+    leafKeyTweakMap: [String: LeafKeyTweak]
+) throws -> ([Spark_ClaimLeafSigningJob], [String: LeafTransferSigningData]) {
+    var signingJobs: [Spark_ClaimLeafSigningJob] = []
+    var signingDataMap: [String: LeafTransferSigningData] = [:]
+    for transferLeaf in transfer.leaves {
+        let leaf = transferLeaf.leaf
+        guard let signingPrivateKey = leafKeyTweakMap[leaf.id]?.newSigningPrivateKey else {
+            throw SparkError(message: "Cannot find leaf key tweaks")
+        }
+        // TODO: replace hardcoded network
+        let refundTx = try constructRefundTx(
+            tx: leaf.nodeTx,
+            vout: 0,
+            pubkey: signingPrivateKey.publicKey.dataRepresentation,
+            network: "regtest",
+            locktime: 60000
+        )
+
+        let keyPackage = KeyPackage(
+            secretKey: signingPrivateKey.dataRepresentation,
+            publicKey: signingPrivateKey.publicKey.dataRepresentation,
+            verifyingKey: leaf.verifyingKey
+        )
+        let nonce = try frostNonce(keyPackage: keyPackage)
+
+        var signingJob = Spark_ClaimLeafSigningJob()
+        signingJob.leafID = leaf.id
+
+        signingJob.refundTxSigningJob.signingPublicKey = signingPrivateKey.publicKey.dataRepresentation
+        signingJob.refundTxSigningJob.rawTx = refundTx.tx
+        signingJob.refundTxSigningJob.signingNonceCommitment.binding = nonce.commitment.binding
+        signingJob.refundTxSigningJob.signingNonceCommitment.hiding = nonce.commitment.hiding
+
+        signingJobs.append(signingJob)
+        signingDataMap[leaf.id] = LeafTransferSigningData(
+            signingPrivateKey: signingPrivateKey,
+            refundTx: refundTx,
+            nonce: nonce,
+            keyPackage: keyPackage
+        )
+    }
+    return (signingJobs, signingDataMap)
+}
+
+func signRefunds(
+    operatorSigningResults: [Spark_ClaimLeafSigningResult],
+    signingDataMap: [String: LeafTransferSigningData]
+) throws -> [String: Data] {
+    var signatureMap: [String: Data] = [:]
+    for operatorSigningResult in operatorSigningResults {
+        guard let signingData = signingDataMap[operatorSigningResult.leafID] else {
+            throw SparkError(message: "Cannot find signing data for leaf ID \(operatorSigningResult.leafID)")
+        }
+        let operatorCommitments = operatorSigningResult.refundTxSigningResult.signingNonceCommitments.mapValues {
+            value in
+            SigningCommitment(hiding: value.hiding, binding: value.binding)
+        }
+
+        let selfSignature = try signFrost(
+            msg: signingData.refundTx.sighash,
+            keyPackage: signingData.keyPackage,
+            nonce: signingData.nonce.nonce,
+            selfCommitment: signingData.nonce.commitment,
+            statechainCommitments: operatorCommitments
+        )
+
+        let aggregatedSignature = try aggregateFrost(
+            msg: signingData.refundTx.sighash,
+            statechainCommitments: operatorCommitments,
+            selfCommitment: signingData.nonce.commitment,
+            statechainSignatures: operatorSigningResult.refundTxSigningResult.signatureShares,
+            selfSignature: selfSignature,
+            statechainPublicKeys: operatorSigningResult.refundTxSigningResult.publicKeys,
+            selfPublicKey: signingData.signingPrivateKey.publicKey.dataRepresentation,
+            verifyingKey: signingData.keyPackage.verifyingKey
+        )
+        signatureMap[operatorSigningResult.leafID] = aggregatedSignature
+    }
+    return signatureMap
 }

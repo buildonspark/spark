@@ -17,7 +17,7 @@ extension secp256k1.Signing.PrivateKey {
     public func subtract(_ other: secp256k1.Signing.PrivateKey) throws -> secp256k1.Signing.PrivateKey {
         let resultInt =
             (BigUInt(self.dataRepresentation) + SECP256K1_CURVE_N - BigUInt(other.dataRepresentation))
-            & SECP256K1_CURVE_N;
+            % SECP256K1_CURVE_N
         return try secp256k1.Signing.PrivateKey(dataRepresentation: resultInt.magnitude.serialize().padTo32Bytes())
     }
 }

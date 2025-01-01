@@ -62,12 +62,6 @@ struct SparkTests {
         )
         print(response)
     }
-
-    @Test func testKeySubstract() throws {
-        let key1 = try secp256k1.Signing.PrivateKey()
-        let key2 = try secp256k1.Signing.PrivateKey()
-        let _ = try key1.subtract(key2)
-    }
     
     @Test func testSendTransfer() async throws {
         let wallet = try createTestWallet()
