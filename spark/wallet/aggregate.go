@@ -11,6 +11,7 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/decred/dcrd/dcrec/secp256k1"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark-go"
 	"github.com/lightsparkdev/spark-go/common"
 	pbcommon "github.com/lightsparkdev/spark-go/proto/common"
 	pbfrost "github.com/lightsparkdev/spark-go/proto/frost"
@@ -23,6 +24,7 @@ func AggregateTreeNodes(
 	ctx context.Context,
 	config *Config,
 	nodes []*pb.TreeNode,
+	parentNode *pb.TreeNode,
 	aggregatedSigningKey []byte,
 ) (*pb.FinalizeNodeSignaturesResponse, error) {
 	sparkConn, err := common.NewGRPCConnection(config.CoodinatorAddress())
@@ -32,19 +34,15 @@ func AggregateTreeNodes(
 	defer sparkConn.Close()
 	sparkClient := pb.NewSparkServiceClient(sparkConn)
 
-	rawTx := nodes[0].NodeTx
-	parentID := *nodes[0].ParentNodeId
+	rawTx := parentNode.NodeTx
+	parentID := parentNode.Id
 	for _, node := range nodes {
-		if !bytes.Equal(rawTx, node.NodeTx) {
-			return nil, fmt.Errorf("node txs are not the same")
-		}
-		log.Printf("node parent id: %s, parent id: %s", node.ParentNodeId, parentID)
 		if node.ParentNodeId != nil && *node.ParentNodeId != parentID {
 			return nil, fmt.Errorf("node parent ids are not the same")
 		}
 	}
 
-	nodeTx, err := common.TxFromRawTxBytes(rawTx)
+	parentTx, err := common.TxFromRawTxBytes(rawTx)
 	if err != nil {
 		return nil, err
 	}
@@ -52,17 +50,18 @@ func AggregateTreeNodes(
 	_, aggregatedSigningPublicKey := secp256k1.PrivKeyFromBytes(aggregatedSigningKey)
 
 	newRefundTx := wire.NewMsgTx(2)
-	newRefundTx.AddTxIn(wire.NewTxIn(
-		&nodeTx.TxIn[0].PreviousOutPoint,
-		nodeTx.TxIn[0].SignatureScript,
-		nil, // witness
-	))
+	// TODO(zhenlu): Handle the case where refund timelock is below 0
+	sequence := uint32((1 << 30) | parentNode.RefundTimelock - spark.TimeLockInterval)
+	newRefundTx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{Hash: parentTx.TxHash(), Index: uint32(parentNode.Vout)},
+		SignatureScript:  parentTx.TxOut[parentNode.Vout].PkScript,
+		Witness:          nil,
+		Sequence:         sequence,
+	})
 	refundP2trAddress, _ := common.P2TRAddressFromPublicKey(aggregatedSigningPublicKey.SerializeCompressed(), config.Network)
 	refundAddress, _ := btcutil.DecodeAddress(*refundP2trAddress, common.NetworkParams(config.Network))
 	refundPkScript, _ := txscript.PayToAddrScript(refundAddress)
-	newRefundTx.AddTxOut(wire.NewTxOut(nodeTx.TxOut[0].Value, refundPkScript))
-	// TODO(zhenlu): Lock time should be from parent node
-	newRefundTx.LockTime = 60000
+	newRefundTx.AddTxOut(wire.NewTxOut(parentTx.TxOut[parentNode.Vout].Value, refundPkScript))
 	var refundBuf bytes.Buffer
 	newRefundTx.Serialize(&refundBuf)
 
@@ -98,11 +97,7 @@ func AggregateTreeNodes(
 	}
 
 	userKeyPackage := CreateUserKeyPackage(aggregatedSigningKey)
-	parentTx, err := common.TxFromRawTxBytes(aggResp.ParentNodeTx)
-	if err != nil {
-		return nil, err
-	}
-	refundSighash, err := common.SigHashFromTx(newRefundTx, 0, parentTx.TxOut[aggResp.ParentNodeVout])
+	refundSighash, err := common.SigHashFromTx(newRefundTx, 0, parentTx.TxOut[parentNode.Vout])
 	if err != nil {
 		return nil, err
 	}

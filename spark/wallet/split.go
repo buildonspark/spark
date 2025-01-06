@@ -11,6 +11,7 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/decred/dcrd/dcrec/secp256k1"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark-go"
 	"github.com/lightsparkdev/spark-go/common"
 	pbcommon "github.com/lightsparkdev/spark-go/proto/common"
 	pbfrost "github.com/lightsparkdev/spark-go/proto/frost"
@@ -77,13 +78,14 @@ func prepareSplits(config *Config, splitTx *wire.MsgTx, childrenPubkeys [][]byte
 		refundP2trAddress, _ := common.P2TRAddressFromPublicKey(childrenPubkeys[i], config.Network)
 		refundAddress, _ := btcutil.DecodeAddress(*refundP2trAddress, common.NetworkParams(config.Network))
 		refundPkScript, _ := txscript.PayToAddrScript(refundAddress)
-		refundTx.AddTxIn(wire.NewTxIn(
-			&wire.OutPoint{Hash: splitTx.TxHash(), Index: uint32(i)},
-			refundPkScript,
-			nil, // witness
-		))
+		sequence := uint32((1 << 30) | spark.InitialTimeLock)
+		refundTx.AddTxIn(&wire.TxIn{
+			PreviousOutPoint: wire.OutPoint{Hash: splitTx.TxHash(), Index: uint32(i)},
+			SignatureScript:  refundPkScript,
+			Witness:          nil,
+			Sequence:         sequence,
+		})
 		refundTx.AddTxOut(wire.NewTxOut(output.Value, output.PkScript))
-		refundTx.LockTime = 60000
 		var refundBuf bytes.Buffer
 		refundTx.Serialize(&refundBuf)
 		sigHash, err := common.SigHashFromTx(refundTx, 0, output)

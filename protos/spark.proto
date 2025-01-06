@@ -95,6 +95,7 @@ message TreeNode {
     uint32 vout = 7;
     bytes verifying_public_key = 8;
     bytes owner_identity_public_key = 9;
+    uint32 refund_timelock = 10;
 }
 
 message Split {

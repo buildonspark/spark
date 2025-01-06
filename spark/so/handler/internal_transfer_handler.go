@@ -65,6 +65,7 @@ func (h *InternalTransferHandler) FinalizeTransfer(ctx context.Context, req *pbi
 			SetRawTx(node.RawTx).
 			SetRawRefundTx(node.RawRefundTx).
 			SetStatus(schema.TreeNodeStatusAvailable).
+			SetRefundTimelock(node.RefundTimelock).
 			Save(ctx)
 		if err != nil {
 			return err

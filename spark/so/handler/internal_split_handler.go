@@ -127,6 +127,7 @@ func (h *InternalSplitHandler) FinalizeNodeSplit(ctx context.Context, req *pbint
 			SetVout(uint16(node.Vout)).
 			SetRawTx(node.RawTx).
 			SetRawRefundTx(node.RawRefundTx).
+			SetRefundTimelock(node.RefundTimelock).
 			Save(ctx)
 		if err != nil {
 			return err

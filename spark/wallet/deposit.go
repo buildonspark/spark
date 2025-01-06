@@ -13,6 +13,7 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/decred/dcrd/dcrec/secp256k1"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark-go"
 	"github.com/lightsparkdev/spark-go/common"
 	pbcommon "github.com/lightsparkdev/spark-go/proto/common"
 	pbfrost "github.com/lightsparkdev/spark-go/proto/frost"
@@ -142,16 +143,17 @@ func CreateTree(
 
 	// Creat refund tx
 	refundTx := wire.NewMsgTx(2)
-	refundTx.AddTxIn(wire.NewTxIn(
-		&wire.OutPoint{Hash: rootTx.TxHash(), Index: 0},
-		rootTx.TxOut[0].PkScript,
-		nil, // witness
-	))
+	sequence := uint32((1 << 30) | spark.InitialTimeLock)
+	refundTx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{Hash: rootTx.TxHash(), Index: 0},
+		SignatureScript:  rootTx.TxOut[0].PkScript,
+		Witness:          nil,
+		Sequence:         sequence,
+	})
 	refundP2trAddress, _ := common.P2TRAddressFromPublicKey(signingPubkeyBytes, config.Network)
 	refundAddress, _ := btcutil.DecodeAddress(*refundP2trAddress, common.NetworkParams(config.Network))
 	refundPkScript, _ := txscript.PayToAddrScript(refundAddress)
 	refundTx.AddTxOut(wire.NewTxOut(rootTx.TxOut[0].Value, refundPkScript))
-	refundTx.LockTime = 60000
 	var refundBuf bytes.Buffer
 	refundTx.Serialize(&refundBuf)
 	refundNonce, err := objects.RandomSigningNonce()

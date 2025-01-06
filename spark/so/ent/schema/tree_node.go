@@ -69,6 +69,7 @@ func (TreeNode) Fields() []ent.Field {
 		field.Bytes("raw_tx").NotEmpty(),
 		field.Uint16("vout"),
 		field.Bytes("raw_refund_tx").NotEmpty(),
+		field.Uint32("refund_timelock"),
 	}
 }
 

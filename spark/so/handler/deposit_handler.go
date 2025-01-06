@@ -244,6 +244,8 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 		return nil, err
 	}
 
+	timeLock := refundTx.TxIn[0].Sequence & 0xFFFF
+
 	// Sign the root and refund transactions
 	signingKeyShare := depositAddress.QuerySigningKeyshare().OnlyX(ctx)
 	verifyingKeyBytes, err := common.AddPublicKeys(signingKeyShare.PublicKey, depositAddress.OwnerSigningPubkey)
@@ -308,6 +310,7 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 		SetRawTx(req.RootTxSigningJob.RawTx).
 		SetRawRefundTx(req.RefundTxSigningJob.RawTx).
 		SetVout(uint16(req.OnChainUtxo.Vout)).
+		SetRefundTimelock(timeLock).
 		SaveX(ctx)
 	tree = tree.Update().SetRoot(root).SaveX(ctx)
 
@@ -351,19 +354,10 @@ func (o *DepositHandler) verifyRootTransaction(rootTx *wire.MsgTx, onChainTx *wi
 		return fmt.Errorf("root transaction has wrong value")
 	}
 
-	// Root transaction should not have timelock
-	if rootTx.LockTime != 0 {
-		return fmt.Errorf("root transaction must not have timelock")
-	}
 	return nil
 }
 
 func (o *DepositHandler) verifyRefundTransaction(tx *wire.MsgTx, refundTx *wire.MsgTx) error {
-	// Refund transaction should have timelock
-	if refundTx.LockTime == 0 {
-		return fmt.Errorf("refund transaction must have timelock")
-	}
-
 	// Refund transaction should have the given tx as input
 	previousTxid := tx.TxHash()
 	for _, refundTxIn := range refundTx.TxIn {

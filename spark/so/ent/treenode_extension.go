@@ -22,6 +22,7 @@ func (tn *TreeNode) MarshalSparkProto(ctx context.Context) *pbspark.TreeNode {
 		Vout:                   uint32(tn.Vout),
 		VerifyingPublicKey:     tn.VerifyingPubkey,
 		OwnerIdentityPublicKey: tn.OwnerIdentityPubkey,
+		RefundTimelock:         tn.RefundTimelock,
 	}
 }
 
@@ -39,6 +40,7 @@ func (tn *TreeNode) MarshalInternalProto(ctx context.Context) *pbinternal.TreeNo
 		ParentNodeId:        tn.getParentNodeID(ctx),
 		SigningKeyshareId:   tn.QuerySigningKeyshare().FirstIDX(ctx).String(),
 		Vout:                uint32(tn.Vout),
+		RefundTimelock:      tn.RefundTimelock,
 	}
 }
 

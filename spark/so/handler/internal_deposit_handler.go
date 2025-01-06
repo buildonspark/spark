@@ -94,6 +94,7 @@ func (h *InternalDepositHandler) FinalizeTreeCreation(ctx context.Context, req *
 		SetVout(uint16(req.RootNode.Vout)).
 		SetRawTx(req.RootNode.RawTx).
 		SetRawRefundTx(req.RootNode.RawRefundTx).
+		SetRefundTimelock(req.RootNode.RefundTimelock).
 		Save(ctx)
 	if err != nil {
 		return err

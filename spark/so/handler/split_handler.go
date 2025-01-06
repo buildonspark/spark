@@ -190,6 +190,12 @@ func (h *SplitHandler) prepareSigningJobs(
 		}
 		signingJobs = append(signingJobs, refundSigningJob)
 
+		refundTx, err := common.TxFromRawTxBytes(split.RefundSigningJob.RawTx)
+		if err != nil {
+			return nil, nil, err
+		}
+		timeLock := refundTx.TxIn[0].Sequence & 0xFFFF
+
 		verifyingKey, err := common.AddPublicKeys(split.SigningPublicKey, childrenKeyshares[i].PublicKey)
 		if err != nil {
 			return nil, nil, err
@@ -213,6 +219,7 @@ func (h *SplitHandler) prepareSigningJobs(
 			SetRawTx(req.ParentTxSigningJob.RawTx).
 			SetVout(uint16(split.Vout)).
 			SetRawRefundTx(split.RefundSigningJob.RawTx).
+			SetRefundTimelock(timeLock).
 			Save(ctx)
 		if err != nil {
 			return nil, nil, err

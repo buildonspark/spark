@@ -51,7 +51,7 @@ func TestSplitAndAggregate(t *testing.T) {
 
 	splitNodes := splitResp.Nodes
 
-	aggregateResp, err := wallet.AggregateTreeNodes(context.Background(), config, splitNodes, sum)
+	aggregateResp, err := wallet.AggregateTreeNodes(context.Background(), config, splitNodes, rootNode, sum)
 	if err != nil {
 		t.Fatalf("failed to aggregate nodes: %v", err)
 	}

@@ -114,4 +114,5 @@ message TreeNode {
     optional string parent_node_id = 9;
     string signing_keyshare_id = 10;
     uint32 vout = 11;
+    uint32 refund_timelock = 12;
 }

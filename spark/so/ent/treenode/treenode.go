@@ -37,6 +37,8 @@ const (
 	FieldVout = "vout"
 	// FieldRawRefundTx holds the string denoting the raw_refund_tx field in the database.
 	FieldRawRefundTx = "raw_refund_tx"
+	// FieldRefundTimelock holds the string denoting the refund_timelock field in the database.
+	FieldRefundTimelock = "refund_timelock"
 	// EdgeTree holds the string denoting the tree edge name in mutations.
 	EdgeTree = "tree"
 	// EdgeParent holds the string denoting the parent edge name in mutations.
@@ -84,6 +86,7 @@ var Columns = []string{
 	FieldRawTx,
 	FieldVout,
 	FieldRawRefundTx,
+	FieldRefundTimelock,
 }
 
 // ForeignKeys holds the SQL foreign-keys that are owned by the "tree_nodes"
@@ -171,6 +174,11 @@ func ByStatus(opts ...sql.OrderTermOption) OrderOption {
 // ByVout orders the results by the vout field.
 func ByVout(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldVout, opts...).ToFunc()
+}
+
+// ByRefundTimelock orders the results by the refund_timelock field.
+func ByRefundTimelock(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldRefundTimelock, opts...).ToFunc()
 }
 
 // ByTreeField orders the results by tree field.

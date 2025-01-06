@@ -97,6 +97,27 @@ func (tnu *TreeNodeUpdate) SetRawRefundTx(b []byte) *TreeNodeUpdate {
 	return tnu
 }
 
+// SetRefundTimelock sets the "refund_timelock" field.
+func (tnu *TreeNodeUpdate) SetRefundTimelock(u uint32) *TreeNodeUpdate {
+	tnu.mutation.ResetRefundTimelock()
+	tnu.mutation.SetRefundTimelock(u)
+	return tnu
+}
+
+// SetNillableRefundTimelock sets the "refund_timelock" field if the given value is not nil.
+func (tnu *TreeNodeUpdate) SetNillableRefundTimelock(u *uint32) *TreeNodeUpdate {
+	if u != nil {
+		tnu.SetRefundTimelock(*u)
+	}
+	return tnu
+}
+
+// AddRefundTimelock adds u to the "refund_timelock" field.
+func (tnu *TreeNodeUpdate) AddRefundTimelock(u int32) *TreeNodeUpdate {
+	tnu.mutation.AddRefundTimelock(u)
+	return tnu
+}
+
 // SetTreeID sets the "tree" edge to the Tree entity by ID.
 func (tnu *TreeNodeUpdate) SetTreeID(id uuid.UUID) *TreeNodeUpdate {
 	tnu.mutation.SetTreeID(id)
@@ -304,6 +325,12 @@ func (tnu *TreeNodeUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if value, ok := tnu.mutation.RawRefundTx(); ok {
 		_spec.SetField(treenode.FieldRawRefundTx, field.TypeBytes, value)
+	}
+	if value, ok := tnu.mutation.RefundTimelock(); ok {
+		_spec.SetField(treenode.FieldRefundTimelock, field.TypeUint32, value)
+	}
+	if value, ok := tnu.mutation.AddedRefundTimelock(); ok {
+		_spec.AddField(treenode.FieldRefundTimelock, field.TypeUint32, value)
 	}
 	if tnu.mutation.TreeCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -519,6 +546,27 @@ func (tnuo *TreeNodeUpdateOne) AddVout(u int16) *TreeNodeUpdateOne {
 // SetRawRefundTx sets the "raw_refund_tx" field.
 func (tnuo *TreeNodeUpdateOne) SetRawRefundTx(b []byte) *TreeNodeUpdateOne {
 	tnuo.mutation.SetRawRefundTx(b)
+	return tnuo
+}
+
+// SetRefundTimelock sets the "refund_timelock" field.
+func (tnuo *TreeNodeUpdateOne) SetRefundTimelock(u uint32) *TreeNodeUpdateOne {
+	tnuo.mutation.ResetRefundTimelock()
+	tnuo.mutation.SetRefundTimelock(u)
+	return tnuo
+}
+
+// SetNillableRefundTimelock sets the "refund_timelock" field if the given value is not nil.
+func (tnuo *TreeNodeUpdateOne) SetNillableRefundTimelock(u *uint32) *TreeNodeUpdateOne {
+	if u != nil {
+		tnuo.SetRefundTimelock(*u)
+	}
+	return tnuo
+}
+
+// AddRefundTimelock adds u to the "refund_timelock" field.
+func (tnuo *TreeNodeUpdateOne) AddRefundTimelock(u int32) *TreeNodeUpdateOne {
+	tnuo.mutation.AddRefundTimelock(u)
 	return tnuo
 }
 
@@ -759,6 +807,12 @@ func (tnuo *TreeNodeUpdateOne) sqlSave(ctx context.Context) (_node *TreeNode, er
 	}
 	if value, ok := tnuo.mutation.RawRefundTx(); ok {
 		_spec.SetField(treenode.FieldRawRefundTx, field.TypeBytes, value)
+	}
+	if value, ok := tnuo.mutation.RefundTimelock(); ok {
+		_spec.SetField(treenode.FieldRefundTimelock, field.TypeUint32, value)
+	}
+	if value, ok := tnuo.mutation.AddedRefundTimelock(); ok {
+		_spec.AddField(treenode.FieldRefundTimelock, field.TypeUint32, value)
 	}
 	if tnuo.mutation.TreeCleared() {
 		edge := &sqlgraph.EdgeSpec{

@@ -14,6 +14,7 @@ import (
 	"github.com/decred/dcrd/dcrec/secp256k1"
 	eciesgo "github.com/ecies/go/v2"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark-go"
 	"github.com/lightsparkdev/spark-go/common"
 	secretsharing "github.com/lightsparkdev/spark-go/common/secret_sharing"
 	pbcommon "github.com/lightsparkdev/spark-go/proto/common"
@@ -491,16 +492,18 @@ func prepareClaimTransferOperatorsSigningJobs(
 		}
 		// Creat refund tx
 		refundTx := wire.NewMsgTx(2)
-		refundTx.AddTxIn(wire.NewTxIn(
-			&wire.OutPoint{Hash: tx.TxHash(), Index: 0},
-			tx.TxOut[0].PkScript,
-			nil, // witness
-		))
+		// TODO(zhenlu): Handle the case where refund timelock is below 0
+		sequence := uint32((1 << 30) | leaf.Leaf.RefundTimelock - spark.TimeLockInterval)
+		refundTx.AddTxIn(&wire.TxIn{
+			PreviousOutPoint: wire.OutPoint{Hash: tx.TxHash(), Index: 0},
+			SignatureScript:  tx.TxOut[0].PkScript,
+			Witness:          nil,
+			Sequence:         sequence,
+		})
 		refundP2trAddress, _ := common.P2TRAddressFromPublicKey(signingPubkey, config.Network)
 		refundAddress, _ := btcutil.DecodeAddress(*refundP2trAddress, common.NetworkParams(config.Network))
 		refundPkScript, _ := txscript.PayToAddrScript(refundAddress)
 		refundTx.AddTxOut(wire.NewTxOut(tx.TxOut[0].Value, refundPkScript))
-		refundTx.LockTime = 60000
 		leafData.RefundTx = refundTx
 		var refundBuf bytes.Buffer
 		refundTx.Serialize(&refundBuf)
