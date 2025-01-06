@@ -29,7 +29,7 @@ func validateDepositAddress(ctx context.Context, config *Config, address *pb.Add
 	if err != nil {
 		return err
 	}
-	msg := common.ProofOfPossessionMessageHashForDepositAddress(userPubkey, operatorPubkey, []byte(address.Address))
+	msg := common.ProofOfPossessionMessageHashForDepositAddress(config.IdentityPublicKey(), operatorPubkey, []byte(address.Address))
 	sig, err := schnorr.ParseSignature(address.DepositAddressProof.ProofOfPossessionSignature)
 	if err != nil {
 		return err
