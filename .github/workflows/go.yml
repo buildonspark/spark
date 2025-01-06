@@ -35,6 +35,9 @@ jobs:
     - name: Build
       run: go build -v ./...
 
+    - name: Run unit tests
+      run: go test $(go list ./... | grep -v -E "so/grpc_test|so/tree")
+
     - name: Run go fmt
       run: |
         if [ -n "$(gofmt -l .)" ]; then

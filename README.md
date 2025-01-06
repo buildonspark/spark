@@ -31,3 +31,29 @@ If spark_frost.udl file has issue with VSCode, you can add the following to your
     "spark_frost.udl": "plaintext"
 }
 ```
+
+## Run tests
+
+### Unit tests
+
+In spark folder, run:
+
+```
+go test $(go list ./... | grep -v -E "so/grpc_test|so/tree")
+```
+
+### E2E tests
+
+All E2E tests live in the spark/so/grpc_test folder.
+
+In spark folder, run:
+
+```
+./run-everything.sh
+```
+
+Then:
+
+```
+go test ./so/grpc_test/...
+```
