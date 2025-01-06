@@ -13,6 +13,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/lightsparkdev/spark-go/so/ent/depositaddress"
+	"github.com/lightsparkdev/spark-go/so/ent/preimageshare"
 	"github.com/lightsparkdev/spark-go/so/ent/signingkeyshare"
 	"github.com/lightsparkdev/spark-go/so/ent/signingnonce"
 	"github.com/lightsparkdev/spark-go/so/ent/transfer"
@@ -80,6 +81,7 @@ func checkColumn(table, column string) error {
 	initCheck.Do(func() {
 		columnCheck = sql.NewColumnCheck(map[string]func(string) bool{
 			depositaddress.Table:  depositaddress.ValidColumn,
+			preimageshare.Table:   preimageshare.ValidColumn,
 			signingkeyshare.Table: signingkeyshare.ValidColumn,
 			signingnonce.Table:    signingnonce.ValidColumn,
 			transfer.Table:        transfer.ValidColumn,

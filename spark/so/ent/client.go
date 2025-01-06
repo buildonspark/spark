@@ -17,6 +17,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/lightsparkdev/spark-go/so/ent/depositaddress"
+	"github.com/lightsparkdev/spark-go/so/ent/preimageshare"
 	"github.com/lightsparkdev/spark-go/so/ent/signingkeyshare"
 	"github.com/lightsparkdev/spark-go/so/ent/signingnonce"
 	"github.com/lightsparkdev/spark-go/so/ent/transfer"
@@ -32,6 +33,8 @@ type Client struct {
 	Schema *migrate.Schema
 	// DepositAddress is the client for interacting with the DepositAddress builders.
 	DepositAddress *DepositAddressClient
+	// PreimageShare is the client for interacting with the PreimageShare builders.
+	PreimageShare *PreimageShareClient
 	// SigningKeyshare is the client for interacting with the SigningKeyshare builders.
 	SigningKeyshare *SigningKeyshareClient
 	// SigningNonce is the client for interacting with the SigningNonce builders.
@@ -56,6 +59,7 @@ func NewClient(opts ...Option) *Client {
 func (c *Client) init() {
 	c.Schema = migrate.NewSchema(c.driver)
 	c.DepositAddress = NewDepositAddressClient(c.config)
+	c.PreimageShare = NewPreimageShareClient(c.config)
 	c.SigningKeyshare = NewSigningKeyshareClient(c.config)
 	c.SigningNonce = NewSigningNonceClient(c.config)
 	c.Transfer = NewTransferClient(c.config)
@@ -155,6 +159,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		ctx:             ctx,
 		config:          cfg,
 		DepositAddress:  NewDepositAddressClient(cfg),
+		PreimageShare:   NewPreimageShareClient(cfg),
 		SigningKeyshare: NewSigningKeyshareClient(cfg),
 		SigningNonce:    NewSigningNonceClient(cfg),
 		Transfer:        NewTransferClient(cfg),
@@ -181,6 +186,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		ctx:             ctx,
 		config:          cfg,
 		DepositAddress:  NewDepositAddressClient(cfg),
+		PreimageShare:   NewPreimageShareClient(cfg),
 		SigningKeyshare: NewSigningKeyshareClient(cfg),
 		SigningNonce:    NewSigningNonceClient(cfg),
 		Transfer:        NewTransferClient(cfg),
@@ -216,8 +222,8 @@ func (c *Client) Close() error {
 // In order to add hooks to a specific client, call: `client.Node.Use(...)`.
 func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
-		c.DepositAddress, c.SigningKeyshare, c.SigningNonce, c.Transfer, c.TransferLeaf,
-		c.Tree, c.TreeNode,
+		c.DepositAddress, c.PreimageShare, c.SigningKeyshare, c.SigningNonce,
+		c.Transfer, c.TransferLeaf, c.Tree, c.TreeNode,
 	} {
 		n.Use(hooks...)
 	}
@@ -227,8 +233,8 @@ func (c *Client) Use(hooks ...Hook) {
 // In order to add interceptors to a specific client, call: `client.Node.Intercept(...)`.
 func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
-		c.DepositAddress, c.SigningKeyshare, c.SigningNonce, c.Transfer, c.TransferLeaf,
-		c.Tree, c.TreeNode,
+		c.DepositAddress, c.PreimageShare, c.SigningKeyshare, c.SigningNonce,
+		c.Transfer, c.TransferLeaf, c.Tree, c.TreeNode,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -239,6 +245,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 	switch m := m.(type) {
 	case *DepositAddressMutation:
 		return c.DepositAddress.mutate(ctx, m)
+	case *PreimageShareMutation:
+		return c.PreimageShare.mutate(ctx, m)
 	case *SigningKeyshareMutation:
 		return c.SigningKeyshare.mutate(ctx, m)
 	case *SigningNonceMutation:
@@ -402,6 +410,139 @@ func (c *DepositAddressClient) mutate(ctx context.Context, m *DepositAddressMuta
 		return (&DepositAddressDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown DepositAddress mutation op: %q", m.Op())
+	}
+}
+
+// PreimageShareClient is a client for the PreimageShare schema.
+type PreimageShareClient struct {
+	config
+}
+
+// NewPreimageShareClient returns a client for the PreimageShare from the given config.
+func NewPreimageShareClient(c config) *PreimageShareClient {
+	return &PreimageShareClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `preimageshare.Hooks(f(g(h())))`.
+func (c *PreimageShareClient) Use(hooks ...Hook) {
+	c.hooks.PreimageShare = append(c.hooks.PreimageShare, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `preimageshare.Intercept(f(g(h())))`.
+func (c *PreimageShareClient) Intercept(interceptors ...Interceptor) {
+	c.inters.PreimageShare = append(c.inters.PreimageShare, interceptors...)
+}
+
+// Create returns a builder for creating a PreimageShare entity.
+func (c *PreimageShareClient) Create() *PreimageShareCreate {
+	mutation := newPreimageShareMutation(c.config, OpCreate)
+	return &PreimageShareCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of PreimageShare entities.
+func (c *PreimageShareClient) CreateBulk(builders ...*PreimageShareCreate) *PreimageShareCreateBulk {
+	return &PreimageShareCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *PreimageShareClient) MapCreateBulk(slice any, setFunc func(*PreimageShareCreate, int)) *PreimageShareCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &PreimageShareCreateBulk{err: fmt.Errorf("calling to PreimageShareClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*PreimageShareCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &PreimageShareCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for PreimageShare.
+func (c *PreimageShareClient) Update() *PreimageShareUpdate {
+	mutation := newPreimageShareMutation(c.config, OpUpdate)
+	return &PreimageShareUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *PreimageShareClient) UpdateOne(ps *PreimageShare) *PreimageShareUpdateOne {
+	mutation := newPreimageShareMutation(c.config, OpUpdateOne, withPreimageShare(ps))
+	return &PreimageShareUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *PreimageShareClient) UpdateOneID(id uuid.UUID) *PreimageShareUpdateOne {
+	mutation := newPreimageShareMutation(c.config, OpUpdateOne, withPreimageShareID(id))
+	return &PreimageShareUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for PreimageShare.
+func (c *PreimageShareClient) Delete() *PreimageShareDelete {
+	mutation := newPreimageShareMutation(c.config, OpDelete)
+	return &PreimageShareDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *PreimageShareClient) DeleteOne(ps *PreimageShare) *PreimageShareDeleteOne {
+	return c.DeleteOneID(ps.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *PreimageShareClient) DeleteOneID(id uuid.UUID) *PreimageShareDeleteOne {
+	builder := c.Delete().Where(preimageshare.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &PreimageShareDeleteOne{builder}
+}
+
+// Query returns a query builder for PreimageShare.
+func (c *PreimageShareClient) Query() *PreimageShareQuery {
+	return &PreimageShareQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypePreimageShare},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a PreimageShare entity by its id.
+func (c *PreimageShareClient) Get(ctx context.Context, id uuid.UUID) (*PreimageShare, error) {
+	return c.Query().Where(preimageshare.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *PreimageShareClient) GetX(ctx context.Context, id uuid.UUID) *PreimageShare {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *PreimageShareClient) Hooks() []Hook {
+	return c.hooks.PreimageShare
+}
+
+// Interceptors returns the client interceptors.
+func (c *PreimageShareClient) Interceptors() []Interceptor {
+	return c.inters.PreimageShare
+}
+
+func (c *PreimageShareClient) mutate(ctx context.Context, m *PreimageShareMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&PreimageShareCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&PreimageShareUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&PreimageShareUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&PreimageShareDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown PreimageShare mutation op: %q", m.Op())
 	}
 }
 
@@ -1350,11 +1491,11 @@ func (c *TreeNodeClient) mutate(ctx context.Context, m *TreeNodeMutation) (Value
 // hooks and interceptors per client, for fast access.
 type (
 	hooks struct {
-		DepositAddress, SigningKeyshare, SigningNonce, Transfer, TransferLeaf, Tree,
-		TreeNode []ent.Hook
+		DepositAddress, PreimageShare, SigningKeyshare, SigningNonce, Transfer,
+		TransferLeaf, Tree, TreeNode []ent.Hook
 	}
 	inters struct {
-		DepositAddress, SigningKeyshare, SigningNonce, Transfer, TransferLeaf, Tree,
-		TreeNode []ent.Interceptor
+		DepositAddress, PreimageShare, SigningKeyshare, SigningNonce, Transfer,
+		TransferLeaf, Tree, TreeNode []ent.Interceptor
 	}
 )

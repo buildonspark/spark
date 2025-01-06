@@ -86,3 +86,13 @@ func (s *SparkServer) AggregateNodes(ctx context.Context, req *pb.AggregateNodes
 	aggregateHandler := handler.NewAggregateHandler(s.config)
 	return aggregateHandler.AggregateNodes(ctx, req)
 }
+
+// StorePreimageShare stores the preimage share for the given payment hash.
+func (s *SparkServer) StorePreimageShare(ctx context.Context, req *pb.StorePreimageShareRequest) (*emptypb.Empty, error) {
+	lightningHandler := handler.NewLightningHandler(s.config)
+	err := lightningHandler.StorePreimageShare(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	return &emptypb.Empty{}, nil
+}

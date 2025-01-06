@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/so/ent/depositaddress"
 	"github.com/lightsparkdev/spark-go/so/ent/predicate"
+	"github.com/lightsparkdev/spark-go/so/ent/preimageshare"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
 	"github.com/lightsparkdev/spark-go/so/ent/signingkeyshare"
 	"github.com/lightsparkdev/spark-go/so/ent/signingnonce"
@@ -33,6 +34,7 @@ const (
 
 	// Node types.
 	TypeDepositAddress  = "DepositAddress"
+	TypePreimageShare   = "PreimageShare"
 	TypeSigningKeyshare = "SigningKeyshare"
 	TypeSigningNonce    = "SigningNonce"
 	TypeTransfer        = "Transfer"
@@ -654,6 +656,554 @@ func (m *DepositAddressMutation) ResetEdge(name string) error {
 		return nil
 	}
 	return fmt.Errorf("unknown DepositAddress edge %s", name)
+}
+
+// PreimageShareMutation represents an operation that mutates the PreimageShare nodes in the graph.
+type PreimageShareMutation struct {
+	config
+	op             Op
+	typ            string
+	id             *uuid.UUID
+	create_time    *time.Time
+	update_time    *time.Time
+	payment_hash   *[]byte
+	preimage_share *[]byte
+	threshold      *[]byte
+	clearedFields  map[string]struct{}
+	done           bool
+	oldValue       func(context.Context) (*PreimageShare, error)
+	predicates     []predicate.PreimageShare
+}
+
+var _ ent.Mutation = (*PreimageShareMutation)(nil)
+
+// preimageshareOption allows management of the mutation configuration using functional options.
+type preimageshareOption func(*PreimageShareMutation)
+
+// newPreimageShareMutation creates new mutation for the PreimageShare entity.
+func newPreimageShareMutation(c config, op Op, opts ...preimageshareOption) *PreimageShareMutation {
+	m := &PreimageShareMutation{
+		config:        c,
+		op:            op,
+		typ:           TypePreimageShare,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withPreimageShareID sets the ID field of the mutation.
+func withPreimageShareID(id uuid.UUID) preimageshareOption {
+	return func(m *PreimageShareMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *PreimageShare
+		)
+		m.oldValue = func(ctx context.Context) (*PreimageShare, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().PreimageShare.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withPreimageShare sets the old PreimageShare of the mutation.
+func withPreimageShare(node *PreimageShare) preimageshareOption {
+	return func(m *PreimageShareMutation) {
+		m.oldValue = func(context.Context) (*PreimageShare, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m PreimageShareMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m PreimageShareMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of PreimageShare entities.
+func (m *PreimageShareMutation) SetID(id uuid.UUID) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *PreimageShareMutation) ID() (id uuid.UUID, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *PreimageShareMutation) IDs(ctx context.Context) ([]uuid.UUID, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []uuid.UUID{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().PreimageShare.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetCreateTime sets the "create_time" field.
+func (m *PreimageShareMutation) SetCreateTime(t time.Time) {
+	m.create_time = &t
+}
+
+// CreateTime returns the value of the "create_time" field in the mutation.
+func (m *PreimageShareMutation) CreateTime() (r time.Time, exists bool) {
+	v := m.create_time
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreateTime returns the old "create_time" field's value of the PreimageShare entity.
+// If the PreimageShare object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PreimageShareMutation) OldCreateTime(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreateTime is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreateTime requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreateTime: %w", err)
+	}
+	return oldValue.CreateTime, nil
+}
+
+// ResetCreateTime resets all changes to the "create_time" field.
+func (m *PreimageShareMutation) ResetCreateTime() {
+	m.create_time = nil
+}
+
+// SetUpdateTime sets the "update_time" field.
+func (m *PreimageShareMutation) SetUpdateTime(t time.Time) {
+	m.update_time = &t
+}
+
+// UpdateTime returns the value of the "update_time" field in the mutation.
+func (m *PreimageShareMutation) UpdateTime() (r time.Time, exists bool) {
+	v := m.update_time
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdateTime returns the old "update_time" field's value of the PreimageShare entity.
+// If the PreimageShare object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PreimageShareMutation) OldUpdateTime(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdateTime is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdateTime requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdateTime: %w", err)
+	}
+	return oldValue.UpdateTime, nil
+}
+
+// ResetUpdateTime resets all changes to the "update_time" field.
+func (m *PreimageShareMutation) ResetUpdateTime() {
+	m.update_time = nil
+}
+
+// SetPaymentHash sets the "payment_hash" field.
+func (m *PreimageShareMutation) SetPaymentHash(b []byte) {
+	m.payment_hash = &b
+}
+
+// PaymentHash returns the value of the "payment_hash" field in the mutation.
+func (m *PreimageShareMutation) PaymentHash() (r []byte, exists bool) {
+	v := m.payment_hash
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPaymentHash returns the old "payment_hash" field's value of the PreimageShare entity.
+// If the PreimageShare object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PreimageShareMutation) OldPaymentHash(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPaymentHash is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPaymentHash requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPaymentHash: %w", err)
+	}
+	return oldValue.PaymentHash, nil
+}
+
+// ResetPaymentHash resets all changes to the "payment_hash" field.
+func (m *PreimageShareMutation) ResetPaymentHash() {
+	m.payment_hash = nil
+}
+
+// SetPreimageShare sets the "preimage_share" field.
+func (m *PreimageShareMutation) SetPreimageShare(b []byte) {
+	m.preimage_share = &b
+}
+
+// PreimageShare returns the value of the "preimage_share" field in the mutation.
+func (m *PreimageShareMutation) PreimageShare() (r []byte, exists bool) {
+	v := m.preimage_share
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPreimageShare returns the old "preimage_share" field's value of the PreimageShare entity.
+// If the PreimageShare object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PreimageShareMutation) OldPreimageShare(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPreimageShare is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPreimageShare requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPreimageShare: %w", err)
+	}
+	return oldValue.PreimageShare, nil
+}
+
+// ResetPreimageShare resets all changes to the "preimage_share" field.
+func (m *PreimageShareMutation) ResetPreimageShare() {
+	m.preimage_share = nil
+}
+
+// SetThreshold sets the "threshold" field.
+func (m *PreimageShareMutation) SetThreshold(b []byte) {
+	m.threshold = &b
+}
+
+// Threshold returns the value of the "threshold" field in the mutation.
+func (m *PreimageShareMutation) Threshold() (r []byte, exists bool) {
+	v := m.threshold
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldThreshold returns the old "threshold" field's value of the PreimageShare entity.
+// If the PreimageShare object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PreimageShareMutation) OldThreshold(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldThreshold is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldThreshold requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldThreshold: %w", err)
+	}
+	return oldValue.Threshold, nil
+}
+
+// ResetThreshold resets all changes to the "threshold" field.
+func (m *PreimageShareMutation) ResetThreshold() {
+	m.threshold = nil
+}
+
+// Where appends a list predicates to the PreimageShareMutation builder.
+func (m *PreimageShareMutation) Where(ps ...predicate.PreimageShare) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the PreimageShareMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *PreimageShareMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.PreimageShare, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *PreimageShareMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *PreimageShareMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (PreimageShare).
+func (m *PreimageShareMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *PreimageShareMutation) Fields() []string {
+	fields := make([]string, 0, 5)
+	if m.create_time != nil {
+		fields = append(fields, preimageshare.FieldCreateTime)
+	}
+	if m.update_time != nil {
+		fields = append(fields, preimageshare.FieldUpdateTime)
+	}
+	if m.payment_hash != nil {
+		fields = append(fields, preimageshare.FieldPaymentHash)
+	}
+	if m.preimage_share != nil {
+		fields = append(fields, preimageshare.FieldPreimageShare)
+	}
+	if m.threshold != nil {
+		fields = append(fields, preimageshare.FieldThreshold)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *PreimageShareMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case preimageshare.FieldCreateTime:
+		return m.CreateTime()
+	case preimageshare.FieldUpdateTime:
+		return m.UpdateTime()
+	case preimageshare.FieldPaymentHash:
+		return m.PaymentHash()
+	case preimageshare.FieldPreimageShare:
+		return m.PreimageShare()
+	case preimageshare.FieldThreshold:
+		return m.Threshold()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *PreimageShareMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case preimageshare.FieldCreateTime:
+		return m.OldCreateTime(ctx)
+	case preimageshare.FieldUpdateTime:
+		return m.OldUpdateTime(ctx)
+	case preimageshare.FieldPaymentHash:
+		return m.OldPaymentHash(ctx)
+	case preimageshare.FieldPreimageShare:
+		return m.OldPreimageShare(ctx)
+	case preimageshare.FieldThreshold:
+		return m.OldThreshold(ctx)
+	}
+	return nil, fmt.Errorf("unknown PreimageShare field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *PreimageShareMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case preimageshare.FieldCreateTime:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreateTime(v)
+		return nil
+	case preimageshare.FieldUpdateTime:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdateTime(v)
+		return nil
+	case preimageshare.FieldPaymentHash:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPaymentHash(v)
+		return nil
+	case preimageshare.FieldPreimageShare:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPreimageShare(v)
+		return nil
+	case preimageshare.FieldThreshold:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetThreshold(v)
+		return nil
+	}
+	return fmt.Errorf("unknown PreimageShare field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *PreimageShareMutation) AddedFields() []string {
+	return nil
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *PreimageShareMutation) AddedField(name string) (ent.Value, bool) {
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *PreimageShareMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	}
+	return fmt.Errorf("unknown PreimageShare numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *PreimageShareMutation) ClearedFields() []string {
+	return nil
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *PreimageShareMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *PreimageShareMutation) ClearField(name string) error {
+	return fmt.Errorf("unknown PreimageShare nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *PreimageShareMutation) ResetField(name string) error {
+	switch name {
+	case preimageshare.FieldCreateTime:
+		m.ResetCreateTime()
+		return nil
+	case preimageshare.FieldUpdateTime:
+		m.ResetUpdateTime()
+		return nil
+	case preimageshare.FieldPaymentHash:
+		m.ResetPaymentHash()
+		return nil
+	case preimageshare.FieldPreimageShare:
+		m.ResetPreimageShare()
+		return nil
+	case preimageshare.FieldThreshold:
+		m.ResetThreshold()
+		return nil
+	}
+	return fmt.Errorf("unknown PreimageShare field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *PreimageShareMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *PreimageShareMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *PreimageShareMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *PreimageShareMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *PreimageShareMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *PreimageShareMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *PreimageShareMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown PreimageShare unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *PreimageShareMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown PreimageShare edge %s", name)
 }
 
 // SigningKeyshareMutation represents an operation that mutates the SigningKeyshare nodes in the graph.

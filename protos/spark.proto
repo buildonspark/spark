@@ -18,6 +18,7 @@ service SparkService {
     rpc claim_transfer_tweak_keys(ClaimTransferTweakKeysRequest) returns (google.protobuf.Empty) {}
     rpc claim_transfer_sign_refunds(ClaimTransferSignRefundsRequest) returns (ClaimTransferSignRefundsResponse) {}
     rpc aggregate_nodes(AggregateNodesRequest) returns (AggregateNodesResponse) {}
+    rpc store_preimage_share(StorePreimageShareRequest) returns (google.protobuf.Empty) {}
 }
 
 message DepositAddressProof {
@@ -244,4 +245,10 @@ message AggregateNodesResponse {
     bytes verifying_key = 2;
     bytes parent_node_tx = 3;
     uint32 parent_node_vout = 4;
+}
+
+message StorePreimageShareRequest {
+    bytes payment_hash = 1;
+    bytes preimage_share = 2;
+    bytes threshold = 3;
 }

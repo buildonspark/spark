@@ -39,6 +39,28 @@ var (
 			},
 		},
 	}
+	// PreimageSharesColumns holds the columns for the "preimage_shares" table.
+	PreimageSharesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUUID},
+		{Name: "create_time", Type: field.TypeTime},
+		{Name: "update_time", Type: field.TypeTime},
+		{Name: "payment_hash", Type: field.TypeBytes},
+		{Name: "preimage_share", Type: field.TypeBytes},
+		{Name: "threshold", Type: field.TypeBytes},
+	}
+	// PreimageSharesTable holds the schema information for the "preimage_shares" table.
+	PreimageSharesTable = &schema.Table{
+		Name:       "preimage_shares",
+		Columns:    PreimageSharesColumns,
+		PrimaryKey: []*schema.Column{PreimageSharesColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "preimageshare_payment_hash",
+				Unique:  false,
+				Columns: []*schema.Column{PreimageSharesColumns[3]},
+			},
+		},
+	}
 	// SigningKeysharesColumns holds the columns for the "signing_keyshares" table.
 	SigningKeysharesColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeUUID},
@@ -242,6 +264,7 @@ var (
 	// Tables holds all the tables in the schema.
 	Tables = []*schema.Table{
 		DepositAddressesTable,
+		PreimageSharesTable,
 		SigningKeysharesTable,
 		SigningNoncesTable,
 		TransfersTable,

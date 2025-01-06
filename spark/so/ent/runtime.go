@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/so/ent/depositaddress"
+	"github.com/lightsparkdev/spark-go/so/ent/preimageshare"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
 	"github.com/lightsparkdev/spark-go/so/ent/signingkeyshare"
 	"github.com/lightsparkdev/spark-go/so/ent/signingnonce"
@@ -51,6 +52,37 @@ func init() {
 	depositaddressDescID := depositaddressMixinFields0[0].Descriptor()
 	// depositaddress.DefaultID holds the default value on creation for the id field.
 	depositaddress.DefaultID = depositaddressDescID.Default.(func() uuid.UUID)
+	preimageshareMixin := schema.PreimageShare{}.Mixin()
+	preimageshareMixinFields0 := preimageshareMixin[0].Fields()
+	_ = preimageshareMixinFields0
+	preimageshareFields := schema.PreimageShare{}.Fields()
+	_ = preimageshareFields
+	// preimageshareDescCreateTime is the schema descriptor for create_time field.
+	preimageshareDescCreateTime := preimageshareMixinFields0[1].Descriptor()
+	// preimageshare.DefaultCreateTime holds the default value on creation for the create_time field.
+	preimageshare.DefaultCreateTime = preimageshareDescCreateTime.Default.(func() time.Time)
+	// preimageshareDescUpdateTime is the schema descriptor for update_time field.
+	preimageshareDescUpdateTime := preimageshareMixinFields0[2].Descriptor()
+	// preimageshare.DefaultUpdateTime holds the default value on creation for the update_time field.
+	preimageshare.DefaultUpdateTime = preimageshareDescUpdateTime.Default.(func() time.Time)
+	// preimageshare.UpdateDefaultUpdateTime holds the default value on update for the update_time field.
+	preimageshare.UpdateDefaultUpdateTime = preimageshareDescUpdateTime.UpdateDefault.(func() time.Time)
+	// preimageshareDescPaymentHash is the schema descriptor for payment_hash field.
+	preimageshareDescPaymentHash := preimageshareFields[0].Descriptor()
+	// preimageshare.PaymentHashValidator is a validator for the "payment_hash" field. It is called by the builders before save.
+	preimageshare.PaymentHashValidator = preimageshareDescPaymentHash.Validators[0].(func([]byte) error)
+	// preimageshareDescPreimageShare is the schema descriptor for preimage_share field.
+	preimageshareDescPreimageShare := preimageshareFields[1].Descriptor()
+	// preimageshare.PreimageShareValidator is a validator for the "preimage_share" field. It is called by the builders before save.
+	preimageshare.PreimageShareValidator = preimageshareDescPreimageShare.Validators[0].(func([]byte) error)
+	// preimageshareDescThreshold is the schema descriptor for threshold field.
+	preimageshareDescThreshold := preimageshareFields[2].Descriptor()
+	// preimageshare.ThresholdValidator is a validator for the "threshold" field. It is called by the builders before save.
+	preimageshare.ThresholdValidator = preimageshareDescThreshold.Validators[0].(func([]byte) error)
+	// preimageshareDescID is the schema descriptor for id field.
+	preimageshareDescID := preimageshareMixinFields0[0].Descriptor()
+	// preimageshare.DefaultID holds the default value on creation for the id field.
+	preimageshare.DefaultID = preimageshareDescID.Default.(func() uuid.UUID)
 	signingkeyshareMixin := schema.SigningKeyshare{}.Mixin()
 	signingkeyshareMixinFields0 := signingkeyshareMixin[0].Fields()
 	_ = signingkeyshareMixinFields0
