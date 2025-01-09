@@ -258,3 +258,13 @@ func SignFrost(
 
 	return results, nil
 }
+
+// GetSigningCommitments gets the signing commitments for the given keyshare ids.
+func GetSigningCommitments(ctx context.Context, config *so.Config, keyshareIDs []uuid.UUID) (map[string][]objects.SigningCommitment, error) {
+	selection := OperatorSelection{Option: OperatorSelectionOptionThreshold, Threshold: int(config.Threshold)}
+	round1, err := frostRound1(ctx, config, keyshareIDs, &selection)
+	if err != nil {
+		return nil, err
+	}
+	return round1, nil
+}

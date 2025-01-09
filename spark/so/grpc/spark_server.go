@@ -96,3 +96,9 @@ func (s *SparkServer) StorePreimageShare(ctx context.Context, req *pb.StorePreim
 	}
 	return &emptypb.Empty{}, nil
 }
+
+// GetSigningCommitments gets the signing commitments for the given node ids.
+func (s *SparkServer) GetSigningCommitments(ctx context.Context, req *pb.GetSigningCommitmentsRequest) (*pb.GetSigningCommitmentsResponse, error) {
+	lightningHandler := handler.NewLightningHandler(s.config)
+	return lightningHandler.GetSigningCommitments(ctx, req)
+}
