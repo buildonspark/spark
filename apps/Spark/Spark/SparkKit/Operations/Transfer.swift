@@ -364,7 +364,7 @@ private func prepareClaimTransferOperatorsSigningJobs(
         // TODO: replace hardcoded network
         let refundTx = try constructRefundTx(
             tx: leaf.nodeTx,
-            vout: 0,
+            vout: leaf.vout,
             pubkey: signingPrivateKey.publicKey.dataRepresentation,
             network: "regtest",
             locktime: 60000
