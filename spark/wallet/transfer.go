@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"math/big"
+	"sync"
 	"time"
 
 	"github.com/btcsuite/btcd/btcutil"
@@ -20,6 +21,7 @@ import (
 	pbcommon "github.com/lightsparkdev/spark-go/proto/common"
 	pbfrost "github.com/lightsparkdev/spark-go/proto/frost"
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
+	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/objects"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -50,29 +52,45 @@ func SendTransfer(
 	}
 
 	var transfer *pb.Transfer
+	wg := sync.WaitGroup{}
+	results := make(chan error, len(config.SigningOperators))
 	for identifier, operator := range config.SigningOperators {
-		sparkConn, err := common.NewGRPCConnection(operator.Address)
-		if err != nil {
-			return nil, err
-		}
-		defer sparkConn.Close()
-		sparkClient := pb.NewSparkServiceClient(sparkConn)
-		transferResp, err := sparkClient.SendTransfer(ctx, &pb.SendTransferRequest{
-			TransferId:                transferID.String(),
-			OwnerIdentityPublicKey:    config.IdentityPublicKey(),
-			ReceiverIdentityPublicKey: receiverIdentityPubkey,
-			ExpiryTime:                timestamppb.New(expiryTime),
-			LeavesToSend:              (*soSendingLeavesMap)[identifier],
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to call SendTransfer: %v", err)
-		}
-		if transfer == nil {
-			transfer = transferResp.Transfer
-		} else {
-			if !compareTransfers(transfer, transferResp.Transfer) {
-				return nil, fmt.Errorf("inconsistent transfer response from operators")
+		wg.Add(1)
+		go func(identifier string, operator *so.SigningOperator) {
+			defer wg.Done()
+			sparkConn, err := common.NewGRPCConnection(operator.Address)
+			if err != nil {
+				results <- err
+				return
 			}
+			defer sparkConn.Close()
+			sparkClient := pb.NewSparkServiceClient(sparkConn)
+			transferResp, err := sparkClient.SendTransfer(ctx, &pb.SendTransferRequest{
+				TransferId:                transferID.String(),
+				OwnerIdentityPublicKey:    config.IdentityPublicKey(),
+				ReceiverIdentityPublicKey: receiverIdentityPubkey,
+				ExpiryTime:                timestamppb.New(expiryTime),
+				LeavesToSend:              (*soSendingLeavesMap)[identifier],
+			})
+			if err != nil {
+				results <- fmt.Errorf("failed to call SendTransfer: %v", err)
+				return
+			}
+			if transfer == nil {
+				transfer = transferResp.Transfer
+			} else {
+				if !compareTransfers(transfer, transferResp.Transfer) {
+					results <- fmt.Errorf("inconsistent transfer response from operators")
+					return
+				}
+			}
+		}(identifier, operator)
+	}
+	wg.Wait()
+	close(results)
+	for result := range results {
+		if result != nil {
+			return nil, result
 		}
 	}
 	return transfer, nil
@@ -262,20 +280,35 @@ func claimTransferTweakKeys(
 		return fmt.Errorf("failed to prepare transfer data: %v", err)
 	}
 
+	wg := sync.WaitGroup{}
+	results := make(chan error, len(config.SigningOperators))
+
 	for identifier, operator := range config.SigningOperators {
-		sparkConn, err := common.NewGRPCConnection(operator.Address)
-		if err != nil {
-			return err
-		}
-		defer sparkConn.Close()
-		sparkClient := pb.NewSparkServiceClient(sparkConn)
-		_, err = sparkClient.ClaimTransferTweakKeys(ctx, &pb.ClaimTransferTweakKeysRequest{
-			TransferId:             transfer.Id,
-			OwnerIdentityPublicKey: config.IdentityPublicKey(),
-			LeavesToReceive:        (*leavesTweaksMap)[identifier],
-		})
-		if err != nil {
-			return fmt.Errorf("failed to call ClaimTransferTweakKeys: %v", err)
+		wg.Add(1)
+		go func(identifier string, operator *so.SigningOperator) {
+			defer wg.Done()
+			sparkConn, err := common.NewGRPCConnection(operator.Address)
+			if err != nil {
+				results <- err
+				return
+			}
+			defer sparkConn.Close()
+			sparkClient := pb.NewSparkServiceClient(sparkConn)
+			_, err = sparkClient.ClaimTransferTweakKeys(ctx, &pb.ClaimTransferTweakKeysRequest{
+				TransferId:             transfer.Id,
+				OwnerIdentityPublicKey: config.IdentityPublicKey(),
+				LeavesToReceive:        (*leavesTweaksMap)[identifier],
+			})
+			if err != nil {
+				results <- fmt.Errorf("failed to call ClaimTransferTweakKeys: %v", err)
+			}
+		}(identifier, operator)
+	}
+	wg.Wait()
+	close(results)
+	for result := range results {
+		if result != nil {
+			return result
 		}
 	}
 	return nil
