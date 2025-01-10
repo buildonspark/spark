@@ -380,6 +380,7 @@ type claimLeafData struct {
 	Tx             *wire.MsgTx
 	RefundTx       *wire.MsgTx
 	Nonce          *objects.SigningNonce
+	Vout           int
 }
 
 func claimTransferSignRefunds(
@@ -400,6 +401,7 @@ func claimTransferSignRefunds(
 			if leaf.Leaf.Id == leafKey.LeafID {
 				tx, _ := common.TxFromRawTxBytes(leaf.Leaf.NodeTx)
 				leafData.Tx = tx
+				leafData.Vout = int(leaf.Leaf.Vout)
 			}
 		}
 		leafDataMap[leafKey.LeafID] = leafData
@@ -455,7 +457,7 @@ func signRefunds(
 	jobToLeafMap := make(map[string]string)
 	for _, operatorSigningResult := range operatorSigningResults {
 		leafData := leafDataMap[operatorSigningResult.LeafId]
-		refundTxSighash, _ := common.SigHashFromTx(leafData.RefundTx, 0, leafData.Tx.TxOut[0])
+		refundTxSighash, _ := common.SigHashFromTx(leafData.RefundTx, 0, leafData.Tx.TxOut[leafData.Vout])
 		nonceProto, _ := leafData.Nonce.MarshalProto()
 		nonceCommitmentProto, _ := leafData.Nonce.SigningCommitment().MarshalProto()
 		userKeyPackage := CreateUserKeyPackage(leafData.SigningPrivKey.Serialize())
