@@ -20,6 +20,7 @@ service SparkService {
     rpc aggregate_nodes(AggregateNodesRequest) returns (AggregateNodesResponse) {}
     rpc store_preimage_share(StorePreimageShareRequest) returns (google.protobuf.Empty) {}
     rpc get_signing_commitments(GetSigningCommitmentsRequest) returns (GetSigningCommitmentsResponse) {}
+    rpc get_preimage(GetPreimageRequest) returns (GetPreimageResponse) {}
 }
 
 message DepositAddressProof {
@@ -253,6 +254,8 @@ message StorePreimageShareRequest {
     bytes payment_hash = 1;
     SecretShare preimage_share = 2;
     bytes threshold = 3;
+    // TODO: This should be removed once we have a proper auth process.
+    bytes user_identity_public_key = 4;
 }
 
 message RequestedSigningCommitments {
@@ -265,4 +268,30 @@ message GetSigningCommitmentsRequest {
 
 message GetSigningCommitmentsResponse {
     repeated RequestedSigningCommitments signing_commitments = 1;
+}
+
+message UserSignedRefund {
+    string node_id = 1;
+    bytes refund_tx = 2;
+    bytes user_signature = 3;
+    map<string, common.SigningCommitment> signing_commitments = 4;
+}
+
+message InvoiceAmountProof {
+    string bolt11_invoice = 1;
+}
+
+message InvoiceAmount {
+    uint64 value_sats = 1;
+    InvoiceAmountProof invoice_amount_proof = 2;
+}
+
+message GetPreimageRequest {
+    bytes payment_hash = 1;
+    repeated UserSignedRefund user_signed_refunds = 2;
+    InvoiceAmount invoice_amount = 3;
+}
+
+message GetPreimageResponse {
+    bytes preimage = 1;
 }

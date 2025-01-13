@@ -32,6 +32,7 @@ const (
 	SparkService_AggregateNodes_FullMethodName           = "/spark.SparkService/aggregate_nodes"
 	SparkService_StorePreimageShare_FullMethodName       = "/spark.SparkService/store_preimage_share"
 	SparkService_GetSigningCommitments_FullMethodName    = "/spark.SparkService/get_signing_commitments"
+	SparkService_GetPreimage_FullMethodName              = "/spark.SparkService/get_preimage"
 )
 
 // SparkServiceClient is the client API for SparkService service.
@@ -50,6 +51,7 @@ type SparkServiceClient interface {
 	AggregateNodes(ctx context.Context, in *AggregateNodesRequest, opts ...grpc.CallOption) (*AggregateNodesResponse, error)
 	StorePreimageShare(ctx context.Context, in *StorePreimageShareRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	GetSigningCommitments(ctx context.Context, in *GetSigningCommitmentsRequest, opts ...grpc.CallOption) (*GetSigningCommitmentsResponse, error)
+	GetPreimage(ctx context.Context, in *GetPreimageRequest, opts ...grpc.CallOption) (*GetPreimageResponse, error)
 }
 
 type sparkServiceClient struct {
@@ -180,6 +182,16 @@ func (c *sparkServiceClient) GetSigningCommitments(ctx context.Context, in *GetS
 	return out, nil
 }
 
+func (c *sparkServiceClient) GetPreimage(ctx context.Context, in *GetPreimageRequest, opts ...grpc.CallOption) (*GetPreimageResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetPreimageResponse)
+	err := c.cc.Invoke(ctx, SparkService_GetPreimage_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SparkServiceServer is the server API for SparkService service.
 // All implementations must embed UnimplementedSparkServiceServer
 // for forward compatibility.
@@ -196,6 +208,7 @@ type SparkServiceServer interface {
 	AggregateNodes(context.Context, *AggregateNodesRequest) (*AggregateNodesResponse, error)
 	StorePreimageShare(context.Context, *StorePreimageShareRequest) (*emptypb.Empty, error)
 	GetSigningCommitments(context.Context, *GetSigningCommitmentsRequest) (*GetSigningCommitmentsResponse, error)
+	GetPreimage(context.Context, *GetPreimageRequest) (*GetPreimageResponse, error)
 	mustEmbedUnimplementedSparkServiceServer()
 }
 
@@ -241,6 +254,9 @@ func (UnimplementedSparkServiceServer) StorePreimageShare(context.Context, *Stor
 }
 func (UnimplementedSparkServiceServer) GetSigningCommitments(context.Context, *GetSigningCommitmentsRequest) (*GetSigningCommitmentsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetSigningCommitments not implemented")
+}
+func (UnimplementedSparkServiceServer) GetPreimage(context.Context, *GetPreimageRequest) (*GetPreimageResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetPreimage not implemented")
 }
 func (UnimplementedSparkServiceServer) mustEmbedUnimplementedSparkServiceServer() {}
 func (UnimplementedSparkServiceServer) testEmbeddedByValue()                      {}
@@ -479,6 +495,24 @@ func _SparkService_GetSigningCommitments_Handler(srv interface{}, ctx context.Co
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SparkService_GetPreimage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetPreimageRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkServiceServer).GetPreimage(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkService_GetPreimage_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkServiceServer).GetPreimage(ctx, req.(*GetPreimageRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // SparkService_ServiceDesc is the grpc.ServiceDesc for SparkService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -533,6 +567,10 @@ var SparkService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "get_signing_commitments",
 			Handler:    _SparkService_GetSigningCommitments_Handler,
+		},
+		{
+			MethodName: "get_preimage",
+			Handler:    _SparkService_GetPreimage_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
