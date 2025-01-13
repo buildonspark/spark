@@ -76,7 +76,7 @@ func (h *TransferHandler) initLeafTransfer(ctx context.Context, transfer *ent.Tr
 				FieldModulus: secp256k1.S256().N,
 				Threshold:    int(h.config.Threshold),
 				Index:        big.NewInt(int64(h.config.Index + 1)),
-				Share:        new(big.Int).SetBytes(req.SecretShareTweak.Tweak),
+				Share:        new(big.Int).SetBytes(req.SecretShareTweak.SecretShare),
 			},
 			Proofs: req.SecretShareTweak.Proofs,
 		},
@@ -109,7 +109,7 @@ func (h *TransferHandler) initLeafTransfer(ctx context.Context, transfer *ent.Tr
 	}
 	keyshare, err = keyshare.TweakKeyShare(
 		ctx,
-		req.SecretShareTweak.Tweak,
+		req.SecretShareTweak.SecretShare,
 		req.SecretShareTweak.Proofs[0],
 		req.PubkeySharesTweak,
 	)
@@ -222,7 +222,7 @@ func (h *TransferHandler) claimLeafTweakKey(ctx context.Context, leaf *ent.TreeN
 				FieldModulus: secp256k1.S256().N,
 				Threshold:    int(h.config.Threshold),
 				Index:        big.NewInt(int64(h.config.Index + 1)),
-				Share:        new(big.Int).SetBytes(req.SecretShareTweak.Tweak),
+				Share:        new(big.Int).SetBytes(req.SecretShareTweak.SecretShare),
 			},
 			Proofs: req.SecretShareTweak.Proofs,
 		},
@@ -242,7 +242,7 @@ func (h *TransferHandler) claimLeafTweakKey(ctx context.Context, leaf *ent.TreeN
 	}
 	_, err = keyshare.TweakKeyShare(
 		ctx,
-		req.SecretShareTweak.Tweak,
+		req.SecretShareTweak.SecretShare,
 		req.SecretShareTweak.Proofs[0],
 		req.PubkeySharesTweak,
 	)

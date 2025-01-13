@@ -3,9 +3,12 @@ package handler
 import (
 	"context"
 	"fmt"
+	"math/big"
 
+	"github.com/decred/dcrd/dcrec/secp256k1"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/common"
+	secretsharing "github.com/lightsparkdev/spark-go/common/secret_sharing"
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/ent"
@@ -26,10 +29,25 @@ func NewLightningHandler(config *so.Config) *LightningHandler {
 
 // StorePreimageShare stores the preimage share for the given payment hash.
 func (h *LightningHandler) StorePreimageShare(ctx context.Context, req *pb.StorePreimageShareRequest) error {
+	err := secretsharing.ValidateShare(
+		&secretsharing.VerifiableSecretShare{
+			SecretShare: secretsharing.SecretShare{
+				FieldModulus: secp256k1.S256().N,
+				Threshold:    int(h.config.Threshold),
+				Index:        big.NewInt(int64(h.config.Index + 1)),
+				Share:        new(big.Int).SetBytes(req.PreimageShare.SecretShare),
+			},
+			Proofs: req.PreimageShare.Proofs,
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("unable to validate share: %v", err)
+	}
+
 	db := ent.GetDbFromContext(ctx)
-	_, err := db.PreimageShare.Create().
+	_, err = db.PreimageShare.Create().
 		SetPaymentHash(req.PaymentHash).
-		SetPreimageShare(req.PreimageShare).
+		SetPreimageShare(req.PreimageShare.SecretShare).
 		SetThreshold(req.Threshold).
 		Save(ctx)
 	if err != nil {

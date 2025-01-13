@@ -143,14 +143,14 @@ message PrepareSplitAddressResponse {
     repeated Address addresses = 1;
 }
 
-message SecretShareTweak {
-    bytes tweak = 1;
+message SecretShare {
+    bytes secret_share = 1;
     repeated bytes proofs = 2;
 }
 
 message SendLeafKeyTweak {
     string leaf_id = 1;
-    SecretShareTweak secret_share_tweak = 2;
+    SecretShare secret_share_tweak = 2;
     map<string, bytes> pubkey_shares_tweak = 3;
     bytes secret_cipher = 4;
     // Signature over Sha256(leaf_id||transfer_id||secret_cipher)
@@ -203,7 +203,7 @@ message QueryPendingTransfersResponse {
 
 message ClaimLeafKeyTweak {
     string leaf_id = 1;
-    SecretShareTweak secret_share_tweak = 2;
+    SecretShare secret_share_tweak = 2;
     map<string, bytes> pubkey_shares_tweak = 3;
 }
 
@@ -251,7 +251,7 @@ message AggregateNodesResponse {
 
 message StorePreimageShareRequest {
     bytes payment_hash = 1;
-    bytes preimage_share = 2;
+    SecretShare preimage_share = 2;
     bytes threshold = 3;
 }
 

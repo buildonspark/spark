@@ -175,9 +175,9 @@ func prepareSingleLeafTransfer(config *Config, transferID uuid.UUID, leaf LeafKe
 		}
 		leafTweaksMap[identifier] = &pb.SendLeafKeyTweak{
 			LeafId: leaf.LeafID,
-			SecretShareTweak: &pb.SecretShareTweak{
-				Tweak:  share.Share.Bytes(),
-				Proofs: share.Proofs,
+			SecretShareTweak: &pb.SecretShare{
+				SecretShare: share.Share.Bytes(),
+				Proofs:      share.Proofs,
 			},
 			PubkeySharesTweak: pubkeySharesTweak,
 			SecretCipher:      secretCipher,
@@ -365,9 +365,9 @@ func prepareClaimLeafKeyTweaks(config *Config, leaf LeafKeyTweak) (*map[string]*
 		}
 		leafTweaksMap[identifier] = &pb.ClaimLeafKeyTweak{
 			LeafId: leaf.LeafID,
-			SecretShareTweak: &pb.SecretShareTweak{
-				Tweak:  share.Share.Bytes(),
-				Proofs: share.Proofs,
+			SecretShareTweak: &pb.SecretShare{
+				SecretShare: share.Share.Bytes(),
+				Proofs:      share.Proofs,
 			},
 			PubkeySharesTweak: pubkeySharesTweak,
 		}
