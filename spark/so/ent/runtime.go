@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/so/ent/depositaddress"
+	"github.com/lightsparkdev/spark-go/so/ent/preimagerequest"
 	"github.com/lightsparkdev/spark-go/so/ent/preimageshare"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
 	"github.com/lightsparkdev/spark-go/so/ent/signingkeyshare"
@@ -15,6 +16,7 @@ import (
 	"github.com/lightsparkdev/spark-go/so/ent/transferleaf"
 	"github.com/lightsparkdev/spark-go/so/ent/tree"
 	"github.com/lightsparkdev/spark-go/so/ent/treenode"
+	"github.com/lightsparkdev/spark-go/so/ent/usersignedtransaction"
 )
 
 // The init function reads all schema descriptors with runtime code
@@ -52,6 +54,25 @@ func init() {
 	depositaddressDescID := depositaddressMixinFields0[0].Descriptor()
 	// depositaddress.DefaultID holds the default value on creation for the id field.
 	depositaddress.DefaultID = depositaddressDescID.Default.(func() uuid.UUID)
+	preimagerequestMixin := schema.PreimageRequest{}.Mixin()
+	preimagerequestMixinFields0 := preimagerequestMixin[0].Fields()
+	_ = preimagerequestMixinFields0
+	preimagerequestFields := schema.PreimageRequest{}.Fields()
+	_ = preimagerequestFields
+	// preimagerequestDescCreateTime is the schema descriptor for create_time field.
+	preimagerequestDescCreateTime := preimagerequestMixinFields0[1].Descriptor()
+	// preimagerequest.DefaultCreateTime holds the default value on creation for the create_time field.
+	preimagerequest.DefaultCreateTime = preimagerequestDescCreateTime.Default.(func() time.Time)
+	// preimagerequestDescUpdateTime is the schema descriptor for update_time field.
+	preimagerequestDescUpdateTime := preimagerequestMixinFields0[2].Descriptor()
+	// preimagerequest.DefaultUpdateTime holds the default value on creation for the update_time field.
+	preimagerequest.DefaultUpdateTime = preimagerequestDescUpdateTime.Default.(func() time.Time)
+	// preimagerequest.UpdateDefaultUpdateTime holds the default value on update for the update_time field.
+	preimagerequest.UpdateDefaultUpdateTime = preimagerequestDescUpdateTime.UpdateDefault.(func() time.Time)
+	// preimagerequestDescID is the schema descriptor for id field.
+	preimagerequestDescID := preimagerequestMixinFields0[0].Descriptor()
+	// preimagerequest.DefaultID holds the default value on creation for the id field.
+	preimagerequest.DefaultID = preimagerequestDescID.Default.(func() uuid.UUID)
 	preimageshareMixin := schema.PreimageShare{}.Mixin()
 	preimageshareMixinFields0 := preimageshareMixin[0].Fields()
 	_ = preimageshareMixinFields0
@@ -79,6 +100,10 @@ func init() {
 	preimageshareDescThreshold := preimageshareFields[2].Descriptor()
 	// preimageshare.ThresholdValidator is a validator for the "threshold" field. It is called by the builders before save.
 	preimageshare.ThresholdValidator = preimageshareDescThreshold.Validators[0].(func([]byte) error)
+	// preimageshareDescOwnerIdentityPubkey is the schema descriptor for owner_identity_pubkey field.
+	preimageshareDescOwnerIdentityPubkey := preimageshareFields[3].Descriptor()
+	// preimageshare.OwnerIdentityPubkeyValidator is a validator for the "owner_identity_pubkey" field. It is called by the builders before save.
+	preimageshare.OwnerIdentityPubkeyValidator = preimageshareDescOwnerIdentityPubkey.Validators[0].(func([]byte) error)
 	// preimageshareDescID is the schema descriptor for id field.
 	preimageshareDescID := preimageshareMixinFields0[0].Descriptor()
 	// preimageshare.DefaultID holds the default value on creation for the id field.
@@ -237,4 +262,35 @@ func init() {
 	treenodeDescID := treenodeMixinFields0[0].Descriptor()
 	// treenode.DefaultID holds the default value on creation for the id field.
 	treenode.DefaultID = treenodeDescID.Default.(func() uuid.UUID)
+	usersignedtransactionMixin := schema.UserSignedTransaction{}.Mixin()
+	usersignedtransactionMixinFields0 := usersignedtransactionMixin[0].Fields()
+	_ = usersignedtransactionMixinFields0
+	usersignedtransactionFields := schema.UserSignedTransaction{}.Fields()
+	_ = usersignedtransactionFields
+	// usersignedtransactionDescCreateTime is the schema descriptor for create_time field.
+	usersignedtransactionDescCreateTime := usersignedtransactionMixinFields0[1].Descriptor()
+	// usersignedtransaction.DefaultCreateTime holds the default value on creation for the create_time field.
+	usersignedtransaction.DefaultCreateTime = usersignedtransactionDescCreateTime.Default.(func() time.Time)
+	// usersignedtransactionDescUpdateTime is the schema descriptor for update_time field.
+	usersignedtransactionDescUpdateTime := usersignedtransactionMixinFields0[2].Descriptor()
+	// usersignedtransaction.DefaultUpdateTime holds the default value on creation for the update_time field.
+	usersignedtransaction.DefaultUpdateTime = usersignedtransactionDescUpdateTime.Default.(func() time.Time)
+	// usersignedtransaction.UpdateDefaultUpdateTime holds the default value on update for the update_time field.
+	usersignedtransaction.UpdateDefaultUpdateTime = usersignedtransactionDescUpdateTime.UpdateDefault.(func() time.Time)
+	// usersignedtransactionDescTransaction is the schema descriptor for transaction field.
+	usersignedtransactionDescTransaction := usersignedtransactionFields[0].Descriptor()
+	// usersignedtransaction.TransactionValidator is a validator for the "transaction" field. It is called by the builders before save.
+	usersignedtransaction.TransactionValidator = usersignedtransactionDescTransaction.Validators[0].(func([]byte) error)
+	// usersignedtransactionDescUserSignature is the schema descriptor for user_signature field.
+	usersignedtransactionDescUserSignature := usersignedtransactionFields[1].Descriptor()
+	// usersignedtransaction.UserSignatureValidator is a validator for the "user_signature" field. It is called by the builders before save.
+	usersignedtransaction.UserSignatureValidator = usersignedtransactionDescUserSignature.Validators[0].(func([]byte) error)
+	// usersignedtransactionDescSigningCommitments is the schema descriptor for signing_commitments field.
+	usersignedtransactionDescSigningCommitments := usersignedtransactionFields[2].Descriptor()
+	// usersignedtransaction.SigningCommitmentsValidator is a validator for the "signing_commitments" field. It is called by the builders before save.
+	usersignedtransaction.SigningCommitmentsValidator = usersignedtransactionDescSigningCommitments.Validators[0].(func([]byte) error)
+	// usersignedtransactionDescID is the schema descriptor for id field.
+	usersignedtransactionDescID := usersignedtransactionMixinFields0[0].Descriptor()
+	// usersignedtransaction.DefaultID holds the default value on creation for the id field.
+	usersignedtransaction.DefaultID = usersignedtransactionDescID.Default.(func() uuid.UUID)
 }

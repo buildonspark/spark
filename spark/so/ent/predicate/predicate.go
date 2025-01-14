@@ -9,6 +9,9 @@ import (
 // DepositAddress is the predicate function for depositaddress builders.
 type DepositAddress func(*sql.Selector)
 
+// PreimageRequest is the predicate function for preimagerequest builders.
+type PreimageRequest func(*sql.Selector)
+
 // PreimageShare is the predicate function for preimageshare builders.
 type PreimageShare func(*sql.Selector)
 
@@ -29,3 +32,6 @@ type Tree func(*sql.Selector)
 
 // TreeNode is the predicate function for treenode builders.
 type TreeNode func(*sql.Selector)
+
+// UserSignedTransaction is the predicate function for usersignedtransaction builders.
+type UserSignedTransaction func(*sql.Selector)

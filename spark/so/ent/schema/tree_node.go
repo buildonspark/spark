@@ -29,6 +29,8 @@ const (
 	TreeNodeStatusOnChain TreeNodeStatus = "ON_CHAIN"
 	// TreeNodeStatusAggregateLock is the status of a tree node that is aggregate locked.
 	TreeNodeStatusAggregateLock TreeNodeStatus = "AGGREGATE_LOCK"
+	// TreeNodeStatusDestinationLock is the status of a tree node that is locked, but allows transfer to the destination.
+	TreeNodeStatusDestinationLock TreeNodeStatus = "DESTINATION_LOCK"
 )
 
 // Values returns the values of the tree node status.
@@ -70,6 +72,7 @@ func (TreeNode) Fields() []ent.Field {
 		field.Uint16("vout"),
 		field.Bytes("raw_refund_tx").NotEmpty(),
 		field.Uint32("refund_timelock"),
+		field.Bytes("destination_lock_identity_pubkey").Optional(),
 	}
 }
 

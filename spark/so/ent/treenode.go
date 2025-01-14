@@ -43,6 +43,8 @@ type TreeNode struct {
 	RawRefundTx []byte `json:"raw_refund_tx,omitempty"`
 	// RefundTimelock holds the value of the "refund_timelock" field.
 	RefundTimelock uint32 `json:"refund_timelock,omitempty"`
+	// DestinationLockIdentityPubkey holds the value of the "destination_lock_identity_pubkey" field.
+	DestinationLockIdentityPubkey []byte `json:"destination_lock_identity_pubkey,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the TreeNodeQuery when eager-loading is set.
 	Edges                      TreeNodeEdges `json:"edges"`
@@ -114,7 +116,7 @@ func (*TreeNode) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case treenode.FieldVerifyingPubkey, treenode.FieldOwnerIdentityPubkey, treenode.FieldOwnerSigningPubkey, treenode.FieldRawTx, treenode.FieldRawRefundTx:
+		case treenode.FieldVerifyingPubkey, treenode.FieldOwnerIdentityPubkey, treenode.FieldOwnerSigningPubkey, treenode.FieldRawTx, treenode.FieldRawRefundTx, treenode.FieldDestinationLockIdentityPubkey:
 			values[i] = new([]byte)
 		case treenode.FieldValue, treenode.FieldVout, treenode.FieldRefundTimelock:
 			values[i] = new(sql.NullInt64)
@@ -216,6 +218,12 @@ func (tn *TreeNode) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field refund_timelock", values[i])
 			} else if value.Valid {
 				tn.RefundTimelock = uint32(value.Int64)
+			}
+		case treenode.FieldDestinationLockIdentityPubkey:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field destination_lock_identity_pubkey", values[i])
+			} else if value != nil {
+				tn.DestinationLockIdentityPubkey = *value
 			}
 		case treenode.ForeignKeys[0]:
 			if value, ok := values[i].(*sql.NullScanner); !ok {
@@ -326,6 +334,9 @@ func (tn *TreeNode) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("refund_timelock=")
 	builder.WriteString(fmt.Sprintf("%v", tn.RefundTimelock))
+	builder.WriteString(", ")
+	builder.WriteString("destination_lock_identity_pubkey=")
+	builder.WriteString(fmt.Sprintf("%v", tn.DestinationLockIdentityPubkey))
 	builder.WriteByte(')')
 	return builder.String()
 }

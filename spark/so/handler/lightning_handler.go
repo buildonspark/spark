@@ -49,6 +49,7 @@ func (h *LightningHandler) StorePreimageShare(ctx context.Context, req *pb.Store
 		SetPaymentHash(req.PaymentHash).
 		SetPreimageShare(req.PreimageShare.SecretShare).
 		SetThreshold(req.Threshold).
+		SetOwnerIdentityPubkey(req.UserIdentityPublicKey).
 		Save(ctx)
 	if err != nil {
 		return fmt.Errorf("unable to store preimage share: %v", err)

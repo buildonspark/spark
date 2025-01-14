@@ -13,6 +13,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/lightsparkdev/spark-go/so/ent/depositaddress"
+	"github.com/lightsparkdev/spark-go/so/ent/preimagerequest"
 	"github.com/lightsparkdev/spark-go/so/ent/preimageshare"
 	"github.com/lightsparkdev/spark-go/so/ent/signingkeyshare"
 	"github.com/lightsparkdev/spark-go/so/ent/signingnonce"
@@ -20,6 +21,7 @@ import (
 	"github.com/lightsparkdev/spark-go/so/ent/transferleaf"
 	"github.com/lightsparkdev/spark-go/so/ent/tree"
 	"github.com/lightsparkdev/spark-go/so/ent/treenode"
+	"github.com/lightsparkdev/spark-go/so/ent/usersignedtransaction"
 )
 
 // ent aliases to avoid import conflicts in user's code.
@@ -80,14 +82,16 @@ var (
 func checkColumn(table, column string) error {
 	initCheck.Do(func() {
 		columnCheck = sql.NewColumnCheck(map[string]func(string) bool{
-			depositaddress.Table:  depositaddress.ValidColumn,
-			preimageshare.Table:   preimageshare.ValidColumn,
-			signingkeyshare.Table: signingkeyshare.ValidColumn,
-			signingnonce.Table:    signingnonce.ValidColumn,
-			transfer.Table:        transfer.ValidColumn,
-			transferleaf.Table:    transferleaf.ValidColumn,
-			tree.Table:            tree.ValidColumn,
-			treenode.Table:        treenode.ValidColumn,
+			depositaddress.Table:        depositaddress.ValidColumn,
+			preimagerequest.Table:       preimagerequest.ValidColumn,
+			preimageshare.Table:         preimageshare.ValidColumn,
+			signingkeyshare.Table:       signingkeyshare.ValidColumn,
+			signingnonce.Table:          signingnonce.ValidColumn,
+			transfer.Table:              transfer.ValidColumn,
+			transferleaf.Table:          transferleaf.ValidColumn,
+			tree.Table:                  tree.ValidColumn,
+			treenode.Table:              treenode.ValidColumn,
+			usersignedtransaction.Table: usersignedtransaction.ValidColumn,
 		})
 	})
 	return columnCheck(table, column)

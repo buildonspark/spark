@@ -39,20 +39,42 @@ var (
 			},
 		},
 	}
+	// PreimageRequestsColumns holds the columns for the "preimage_requests" table.
+	PreimageRequestsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUUID},
+		{Name: "create_time", Type: field.TypeTime},
+		{Name: "update_time", Type: field.TypeTime},
+	}
+	// PreimageRequestsTable holds the schema information for the "preimage_requests" table.
+	PreimageRequestsTable = &schema.Table{
+		Name:       "preimage_requests",
+		Columns:    PreimageRequestsColumns,
+		PrimaryKey: []*schema.Column{PreimageRequestsColumns[0]},
+	}
 	// PreimageSharesColumns holds the columns for the "preimage_shares" table.
 	PreimageSharesColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeUUID},
 		{Name: "create_time", Type: field.TypeTime},
 		{Name: "update_time", Type: field.TypeTime},
-		{Name: "payment_hash", Type: field.TypeBytes},
+		{Name: "payment_hash", Type: field.TypeBytes, Unique: true},
 		{Name: "preimage_share", Type: field.TypeBytes},
 		{Name: "threshold", Type: field.TypeBytes},
+		{Name: "owner_identity_pubkey", Type: field.TypeBytes},
+		{Name: "preimage_request_preimage_shares", Type: field.TypeUUID, Unique: true, Nullable: true},
 	}
 	// PreimageSharesTable holds the schema information for the "preimage_shares" table.
 	PreimageSharesTable = &schema.Table{
 		Name:       "preimage_shares",
 		Columns:    PreimageSharesColumns,
 		PrimaryKey: []*schema.Column{PreimageSharesColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "preimage_shares_preimage_requests_preimage_shares",
+				Columns:    []*schema.Column{PreimageSharesColumns[7]},
+				RefColumns: []*schema.Column{PreimageRequestsColumns[0]},
+				OnDelete:   schema.SetNull,
+			},
+		},
 		Indexes: []*schema.Index{
 			{
 				Name:    "preimageshare_payment_hash",
@@ -215,6 +237,7 @@ var (
 		{Name: "vout", Type: field.TypeUint16},
 		{Name: "raw_refund_tx", Type: field.TypeBytes},
 		{Name: "refund_timelock", Type: field.TypeUint32},
+		{Name: "destination_lock_identity_pubkey", Type: field.TypeBytes, Nullable: true},
 		{Name: "tree_node_tree", Type: field.TypeUUID},
 		{Name: "tree_node_parent", Type: field.TypeUUID, Nullable: true},
 		{Name: "tree_node_signing_keyshare", Type: field.TypeUUID},
@@ -227,19 +250,19 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "tree_nodes_trees_tree",
-				Columns:    []*schema.Column{TreeNodesColumns[12]},
+				Columns:    []*schema.Column{TreeNodesColumns[13]},
 				RefColumns: []*schema.Column{TreesColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "tree_nodes_tree_nodes_parent",
-				Columns:    []*schema.Column{TreeNodesColumns[13]},
+				Columns:    []*schema.Column{TreeNodesColumns[14]},
 				RefColumns: []*schema.Column{TreeNodesColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "tree_nodes_signing_keyshares_signing_keyshare",
-				Columns:    []*schema.Column{TreeNodesColumns[14]},
+				Columns:    []*schema.Column{TreeNodesColumns[15]},
 				RefColumns: []*schema.Column{SigningKeysharesColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -248,12 +271,12 @@ var (
 			{
 				Name:    "treenode_tree_node_parent",
 				Unique:  false,
-				Columns: []*schema.Column{TreeNodesColumns[13]},
+				Columns: []*schema.Column{TreeNodesColumns[14]},
 			},
 			{
 				Name:    "treenode_tree_node_tree",
 				Unique:  false,
-				Columns: []*schema.Column{TreeNodesColumns[12]},
+				Columns: []*schema.Column{TreeNodesColumns[13]},
 			},
 			{
 				Name:    "treenode_owner_identity_pubkey",
@@ -262,9 +285,41 @@ var (
 			},
 		},
 	}
+	// UserSignedTransactionsColumns holds the columns for the "user_signed_transactions" table.
+	UserSignedTransactionsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUUID},
+		{Name: "create_time", Type: field.TypeTime},
+		{Name: "update_time", Type: field.TypeTime},
+		{Name: "transaction", Type: field.TypeBytes},
+		{Name: "user_signature", Type: field.TypeBytes},
+		{Name: "signing_commitments", Type: field.TypeBytes},
+		{Name: "user_signed_transaction_tree_node", Type: field.TypeUUID},
+		{Name: "user_signed_transaction_preimage_request", Type: field.TypeUUID},
+	}
+	// UserSignedTransactionsTable holds the schema information for the "user_signed_transactions" table.
+	UserSignedTransactionsTable = &schema.Table{
+		Name:       "user_signed_transactions",
+		Columns:    UserSignedTransactionsColumns,
+		PrimaryKey: []*schema.Column{UserSignedTransactionsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "user_signed_transactions_tree_nodes_tree_node",
+				Columns:    []*schema.Column{UserSignedTransactionsColumns[6]},
+				RefColumns: []*schema.Column{TreeNodesColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "user_signed_transactions_preimage_requests_preimage_request",
+				Columns:    []*schema.Column{UserSignedTransactionsColumns[7]},
+				RefColumns: []*schema.Column{PreimageRequestsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+	}
 	// Tables holds all the tables in the schema.
 	Tables = []*schema.Table{
 		DepositAddressesTable,
+		PreimageRequestsTable,
 		PreimageSharesTable,
 		SigningKeysharesTable,
 		SigningNoncesTable,
@@ -272,15 +327,19 @@ var (
 		TransferLeafsTable,
 		TreesTable,
 		TreeNodesTable,
+		UserSignedTransactionsTable,
 	}
 )
 
 func init() {
 	DepositAddressesTable.ForeignKeys[0].RefTable = SigningKeysharesTable
+	PreimageSharesTable.ForeignKeys[0].RefTable = PreimageRequestsTable
 	TransferLeafsTable.ForeignKeys[0].RefTable = TransfersTable
 	TransferLeafsTable.ForeignKeys[1].RefTable = TreeNodesTable
 	TreesTable.ForeignKeys[0].RefTable = TreeNodesTable
 	TreeNodesTable.ForeignKeys[0].RefTable = TreesTable
 	TreeNodesTable.ForeignKeys[1].RefTable = TreeNodesTable
 	TreeNodesTable.ForeignKeys[2].RefTable = SigningKeysharesTable
+	UserSignedTransactionsTable.ForeignKeys[0].RefTable = TreeNodesTable
+	UserSignedTransactionsTable.ForeignKeys[1].RefTable = PreimageRequestsTable
 }

@@ -118,6 +118,18 @@ func (tnu *TreeNodeUpdate) AddRefundTimelock(u int32) *TreeNodeUpdate {
 	return tnu
 }
 
+// SetDestinationLockIdentityPubkey sets the "destination_lock_identity_pubkey" field.
+func (tnu *TreeNodeUpdate) SetDestinationLockIdentityPubkey(b []byte) *TreeNodeUpdate {
+	tnu.mutation.SetDestinationLockIdentityPubkey(b)
+	return tnu
+}
+
+// ClearDestinationLockIdentityPubkey clears the value of the "destination_lock_identity_pubkey" field.
+func (tnu *TreeNodeUpdate) ClearDestinationLockIdentityPubkey() *TreeNodeUpdate {
+	tnu.mutation.ClearDestinationLockIdentityPubkey()
+	return tnu
+}
+
 // SetTreeID sets the "tree" edge to the Tree entity by ID.
 func (tnu *TreeNodeUpdate) SetTreeID(id uuid.UUID) *TreeNodeUpdate {
 	tnu.mutation.SetTreeID(id)
@@ -331,6 +343,12 @@ func (tnu *TreeNodeUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if value, ok := tnu.mutation.AddedRefundTimelock(); ok {
 		_spec.AddField(treenode.FieldRefundTimelock, field.TypeUint32, value)
+	}
+	if value, ok := tnu.mutation.DestinationLockIdentityPubkey(); ok {
+		_spec.SetField(treenode.FieldDestinationLockIdentityPubkey, field.TypeBytes, value)
+	}
+	if tnu.mutation.DestinationLockIdentityPubkeyCleared() {
+		_spec.ClearField(treenode.FieldDestinationLockIdentityPubkey, field.TypeBytes)
 	}
 	if tnu.mutation.TreeCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -567,6 +585,18 @@ func (tnuo *TreeNodeUpdateOne) SetNillableRefundTimelock(u *uint32) *TreeNodeUpd
 // AddRefundTimelock adds u to the "refund_timelock" field.
 func (tnuo *TreeNodeUpdateOne) AddRefundTimelock(u int32) *TreeNodeUpdateOne {
 	tnuo.mutation.AddRefundTimelock(u)
+	return tnuo
+}
+
+// SetDestinationLockIdentityPubkey sets the "destination_lock_identity_pubkey" field.
+func (tnuo *TreeNodeUpdateOne) SetDestinationLockIdentityPubkey(b []byte) *TreeNodeUpdateOne {
+	tnuo.mutation.SetDestinationLockIdentityPubkey(b)
+	return tnuo
+}
+
+// ClearDestinationLockIdentityPubkey clears the value of the "destination_lock_identity_pubkey" field.
+func (tnuo *TreeNodeUpdateOne) ClearDestinationLockIdentityPubkey() *TreeNodeUpdateOne {
+	tnuo.mutation.ClearDestinationLockIdentityPubkey()
 	return tnuo
 }
 
@@ -813,6 +843,12 @@ func (tnuo *TreeNodeUpdateOne) sqlSave(ctx context.Context) (_node *TreeNode, er
 	}
 	if value, ok := tnuo.mutation.AddedRefundTimelock(); ok {
 		_spec.AddField(treenode.FieldRefundTimelock, field.TypeUint32, value)
+	}
+	if value, ok := tnuo.mutation.DestinationLockIdentityPubkey(); ok {
+		_spec.SetField(treenode.FieldDestinationLockIdentityPubkey, field.TypeBytes, value)
+	}
+	if tnuo.mutation.DestinationLockIdentityPubkeyCleared() {
+		_spec.ClearField(treenode.FieldDestinationLockIdentityPubkey, field.TypeBytes)
 	}
 	if tnuo.mutation.TreeCleared() {
 		edge := &sqlgraph.EdgeSpec{

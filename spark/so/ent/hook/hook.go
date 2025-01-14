@@ -21,6 +21,18 @@ func (f DepositAddressFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Val
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.DepositAddressMutation", m)
 }
 
+// The PreimageRequestFunc type is an adapter to allow the use of ordinary
+// function as PreimageRequest mutator.
+type PreimageRequestFunc func(context.Context, *ent.PreimageRequestMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f PreimageRequestFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.PreimageRequestMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.PreimageRequestMutation", m)
+}
+
 // The PreimageShareFunc type is an adapter to allow the use of ordinary
 // function as PreimageShare mutator.
 type PreimageShareFunc func(context.Context, *ent.PreimageShareMutation) (ent.Value, error)
@@ -103,6 +115,18 @@ func (f TreeNodeFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, er
 		return f(ctx, mv)
 	}
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.TreeNodeMutation", m)
+}
+
+// The UserSignedTransactionFunc type is an adapter to allow the use of ordinary
+// function as UserSignedTransaction mutator.
+type UserSignedTransactionFunc func(context.Context, *ent.UserSignedTransactionMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f UserSignedTransactionFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.UserSignedTransactionMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.UserSignedTransactionMutation", m)
 }
 
 // Condition is a hook condition function.

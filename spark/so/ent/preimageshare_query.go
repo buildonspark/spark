@@ -13,16 +13,19 @@ import (
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/so/ent/predicate"
+	"github.com/lightsparkdev/spark-go/so/ent/preimagerequest"
 	"github.com/lightsparkdev/spark-go/so/ent/preimageshare"
 )
 
 // PreimageShareQuery is the builder for querying PreimageShare entities.
 type PreimageShareQuery struct {
 	config
-	ctx        *QueryContext
-	order      []preimageshare.OrderOption
-	inters     []Interceptor
-	predicates []predicate.PreimageShare
+	ctx                 *QueryContext
+	order               []preimageshare.OrderOption
+	inters              []Interceptor
+	predicates          []predicate.PreimageShare
+	withPreimageRequest *PreimageRequestQuery
+	withFKs             bool
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -57,6 +60,28 @@ func (psq *PreimageShareQuery) Unique(unique bool) *PreimageShareQuery {
 func (psq *PreimageShareQuery) Order(o ...preimageshare.OrderOption) *PreimageShareQuery {
 	psq.order = append(psq.order, o...)
 	return psq
+}
+
+// QueryPreimageRequest chains the current query on the "preimage_request" edge.
+func (psq *PreimageShareQuery) QueryPreimageRequest() *PreimageRequestQuery {
+	query := (&PreimageRequestClient{config: psq.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := psq.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := psq.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(preimageshare.Table, preimageshare.FieldID, selector),
+			sqlgraph.To(preimagerequest.Table, preimagerequest.FieldID),
+			sqlgraph.Edge(sqlgraph.O2O, true, preimageshare.PreimageRequestTable, preimageshare.PreimageRequestColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(psq.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
 }
 
 // First returns the first PreimageShare entity from the query.
@@ -246,15 +271,27 @@ func (psq *PreimageShareQuery) Clone() *PreimageShareQuery {
 		return nil
 	}
 	return &PreimageShareQuery{
-		config:     psq.config,
-		ctx:        psq.ctx.Clone(),
-		order:      append([]preimageshare.OrderOption{}, psq.order...),
-		inters:     append([]Interceptor{}, psq.inters...),
-		predicates: append([]predicate.PreimageShare{}, psq.predicates...),
+		config:              psq.config,
+		ctx:                 psq.ctx.Clone(),
+		order:               append([]preimageshare.OrderOption{}, psq.order...),
+		inters:              append([]Interceptor{}, psq.inters...),
+		predicates:          append([]predicate.PreimageShare{}, psq.predicates...),
+		withPreimageRequest: psq.withPreimageRequest.Clone(),
 		// clone intermediate query.
 		sql:  psq.sql.Clone(),
 		path: psq.path,
 	}
+}
+
+// WithPreimageRequest tells the query-builder to eager-load the nodes that are connected to
+// the "preimage_request" edge. The optional arguments are used to configure the query builder of the edge.
+func (psq *PreimageShareQuery) WithPreimageRequest(opts ...func(*PreimageRequestQuery)) *PreimageShareQuery {
+	query := (&PreimageRequestClient{config: psq.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	psq.withPreimageRequest = query
+	return psq
 }
 
 // GroupBy is used to group vertices by one or more fields/columns.
@@ -333,15 +370,26 @@ func (psq *PreimageShareQuery) prepareQuery(ctx context.Context) error {
 
 func (psq *PreimageShareQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*PreimageShare, error) {
 	var (
-		nodes = []*PreimageShare{}
-		_spec = psq.querySpec()
+		nodes       = []*PreimageShare{}
+		withFKs     = psq.withFKs
+		_spec       = psq.querySpec()
+		loadedTypes = [1]bool{
+			psq.withPreimageRequest != nil,
+		}
 	)
+	if psq.withPreimageRequest != nil {
+		withFKs = true
+	}
+	if withFKs {
+		_spec.Node.Columns = append(_spec.Node.Columns, preimageshare.ForeignKeys...)
+	}
 	_spec.ScanValues = func(columns []string) ([]any, error) {
 		return (*PreimageShare).scanValues(nil, columns)
 	}
 	_spec.Assign = func(columns []string, values []any) error {
 		node := &PreimageShare{config: psq.config}
 		nodes = append(nodes, node)
+		node.Edges.loadedTypes = loadedTypes
 		return node.assignValues(columns, values)
 	}
 	for i := range hooks {
@@ -353,7 +401,46 @@ func (psq *PreimageShareQuery) sqlAll(ctx context.Context, hooks ...queryHook) (
 	if len(nodes) == 0 {
 		return nodes, nil
 	}
+	if query := psq.withPreimageRequest; query != nil {
+		if err := psq.loadPreimageRequest(ctx, query, nodes, nil,
+			func(n *PreimageShare, e *PreimageRequest) { n.Edges.PreimageRequest = e }); err != nil {
+			return nil, err
+		}
+	}
 	return nodes, nil
+}
+
+func (psq *PreimageShareQuery) loadPreimageRequest(ctx context.Context, query *PreimageRequestQuery, nodes []*PreimageShare, init func(*PreimageShare), assign func(*PreimageShare, *PreimageRequest)) error {
+	ids := make([]uuid.UUID, 0, len(nodes))
+	nodeids := make(map[uuid.UUID][]*PreimageShare)
+	for i := range nodes {
+		if nodes[i].preimage_request_preimage_shares == nil {
+			continue
+		}
+		fk := *nodes[i].preimage_request_preimage_shares
+		if _, ok := nodeids[fk]; !ok {
+			ids = append(ids, fk)
+		}
+		nodeids[fk] = append(nodeids[fk], nodes[i])
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	query.Where(preimagerequest.IDIn(ids...))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		nodes, ok := nodeids[n.ID]
+		if !ok {
+			return fmt.Errorf(`unexpected foreign-key "preimage_request_preimage_shares" returned %v`, n.ID)
+		}
+		for i := range nodes {
+			assign(nodes[i], n)
+		}
+	}
+	return nil
 }
 
 func (psq *PreimageShareQuery) sqlCount(ctx context.Context) (int, error) {

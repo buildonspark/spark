@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"entgo.io/ent/dialect/sql"
+	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/so/ent/predicate"
 )
@@ -78,6 +79,11 @@ func PreimageShare(v []byte) predicate.PreimageShare {
 // Threshold applies equality check predicate on the "threshold" field. It's identical to ThresholdEQ.
 func Threshold(v []byte) predicate.PreimageShare {
 	return predicate.PreimageShare(sql.FieldEQ(FieldThreshold, v))
+}
+
+// OwnerIdentityPubkey applies equality check predicate on the "owner_identity_pubkey" field. It's identical to OwnerIdentityPubkeyEQ.
+func OwnerIdentityPubkey(v []byte) predicate.PreimageShare {
+	return predicate.PreimageShare(sql.FieldEQ(FieldOwnerIdentityPubkey, v))
 }
 
 // CreateTimeEQ applies the EQ predicate on the "create_time" field.
@@ -278,6 +284,69 @@ func ThresholdLT(v []byte) predicate.PreimageShare {
 // ThresholdLTE applies the LTE predicate on the "threshold" field.
 func ThresholdLTE(v []byte) predicate.PreimageShare {
 	return predicate.PreimageShare(sql.FieldLTE(FieldThreshold, v))
+}
+
+// OwnerIdentityPubkeyEQ applies the EQ predicate on the "owner_identity_pubkey" field.
+func OwnerIdentityPubkeyEQ(v []byte) predicate.PreimageShare {
+	return predicate.PreimageShare(sql.FieldEQ(FieldOwnerIdentityPubkey, v))
+}
+
+// OwnerIdentityPubkeyNEQ applies the NEQ predicate on the "owner_identity_pubkey" field.
+func OwnerIdentityPubkeyNEQ(v []byte) predicate.PreimageShare {
+	return predicate.PreimageShare(sql.FieldNEQ(FieldOwnerIdentityPubkey, v))
+}
+
+// OwnerIdentityPubkeyIn applies the In predicate on the "owner_identity_pubkey" field.
+func OwnerIdentityPubkeyIn(vs ...[]byte) predicate.PreimageShare {
+	return predicate.PreimageShare(sql.FieldIn(FieldOwnerIdentityPubkey, vs...))
+}
+
+// OwnerIdentityPubkeyNotIn applies the NotIn predicate on the "owner_identity_pubkey" field.
+func OwnerIdentityPubkeyNotIn(vs ...[]byte) predicate.PreimageShare {
+	return predicate.PreimageShare(sql.FieldNotIn(FieldOwnerIdentityPubkey, vs...))
+}
+
+// OwnerIdentityPubkeyGT applies the GT predicate on the "owner_identity_pubkey" field.
+func OwnerIdentityPubkeyGT(v []byte) predicate.PreimageShare {
+	return predicate.PreimageShare(sql.FieldGT(FieldOwnerIdentityPubkey, v))
+}
+
+// OwnerIdentityPubkeyGTE applies the GTE predicate on the "owner_identity_pubkey" field.
+func OwnerIdentityPubkeyGTE(v []byte) predicate.PreimageShare {
+	return predicate.PreimageShare(sql.FieldGTE(FieldOwnerIdentityPubkey, v))
+}
+
+// OwnerIdentityPubkeyLT applies the LT predicate on the "owner_identity_pubkey" field.
+func OwnerIdentityPubkeyLT(v []byte) predicate.PreimageShare {
+	return predicate.PreimageShare(sql.FieldLT(FieldOwnerIdentityPubkey, v))
+}
+
+// OwnerIdentityPubkeyLTE applies the LTE predicate on the "owner_identity_pubkey" field.
+func OwnerIdentityPubkeyLTE(v []byte) predicate.PreimageShare {
+	return predicate.PreimageShare(sql.FieldLTE(FieldOwnerIdentityPubkey, v))
+}
+
+// HasPreimageRequest applies the HasEdge predicate on the "preimage_request" edge.
+func HasPreimageRequest() predicate.PreimageShare {
+	return predicate.PreimageShare(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2O, true, PreimageRequestTable, PreimageRequestColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasPreimageRequestWith applies the HasEdge predicate on the "preimage_request" edge with a given conditions (other predicates).
+func HasPreimageRequestWith(preds ...predicate.PreimageRequest) predicate.PreimageShare {
+	return predicate.PreimageShare(func(s *sql.Selector) {
+		step := newPreimageRequestStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
 }
 
 // And groups predicates with the AND operator between them.

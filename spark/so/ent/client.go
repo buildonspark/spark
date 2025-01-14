@@ -17,6 +17,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/lightsparkdev/spark-go/so/ent/depositaddress"
+	"github.com/lightsparkdev/spark-go/so/ent/preimagerequest"
 	"github.com/lightsparkdev/spark-go/so/ent/preimageshare"
 	"github.com/lightsparkdev/spark-go/so/ent/signingkeyshare"
 	"github.com/lightsparkdev/spark-go/so/ent/signingnonce"
@@ -24,6 +25,7 @@ import (
 	"github.com/lightsparkdev/spark-go/so/ent/transferleaf"
 	"github.com/lightsparkdev/spark-go/so/ent/tree"
 	"github.com/lightsparkdev/spark-go/so/ent/treenode"
+	"github.com/lightsparkdev/spark-go/so/ent/usersignedtransaction"
 )
 
 // Client is the client that holds all ent builders.
@@ -33,6 +35,8 @@ type Client struct {
 	Schema *migrate.Schema
 	// DepositAddress is the client for interacting with the DepositAddress builders.
 	DepositAddress *DepositAddressClient
+	// PreimageRequest is the client for interacting with the PreimageRequest builders.
+	PreimageRequest *PreimageRequestClient
 	// PreimageShare is the client for interacting with the PreimageShare builders.
 	PreimageShare *PreimageShareClient
 	// SigningKeyshare is the client for interacting with the SigningKeyshare builders.
@@ -47,6 +51,8 @@ type Client struct {
 	Tree *TreeClient
 	// TreeNode is the client for interacting with the TreeNode builders.
 	TreeNode *TreeNodeClient
+	// UserSignedTransaction is the client for interacting with the UserSignedTransaction builders.
+	UserSignedTransaction *UserSignedTransactionClient
 }
 
 // NewClient creates a new client configured with the given options.
@@ -59,6 +65,7 @@ func NewClient(opts ...Option) *Client {
 func (c *Client) init() {
 	c.Schema = migrate.NewSchema(c.driver)
 	c.DepositAddress = NewDepositAddressClient(c.config)
+	c.PreimageRequest = NewPreimageRequestClient(c.config)
 	c.PreimageShare = NewPreimageShareClient(c.config)
 	c.SigningKeyshare = NewSigningKeyshareClient(c.config)
 	c.SigningNonce = NewSigningNonceClient(c.config)
@@ -66,6 +73,7 @@ func (c *Client) init() {
 	c.TransferLeaf = NewTransferLeafClient(c.config)
 	c.Tree = NewTreeClient(c.config)
 	c.TreeNode = NewTreeNodeClient(c.config)
+	c.UserSignedTransaction = NewUserSignedTransactionClient(c.config)
 }
 
 type (
@@ -156,16 +164,18 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 	cfg := c.config
 	cfg.driver = tx
 	return &Tx{
-		ctx:             ctx,
-		config:          cfg,
-		DepositAddress:  NewDepositAddressClient(cfg),
-		PreimageShare:   NewPreimageShareClient(cfg),
-		SigningKeyshare: NewSigningKeyshareClient(cfg),
-		SigningNonce:    NewSigningNonceClient(cfg),
-		Transfer:        NewTransferClient(cfg),
-		TransferLeaf:    NewTransferLeafClient(cfg),
-		Tree:            NewTreeClient(cfg),
-		TreeNode:        NewTreeNodeClient(cfg),
+		ctx:                   ctx,
+		config:                cfg,
+		DepositAddress:        NewDepositAddressClient(cfg),
+		PreimageRequest:       NewPreimageRequestClient(cfg),
+		PreimageShare:         NewPreimageShareClient(cfg),
+		SigningKeyshare:       NewSigningKeyshareClient(cfg),
+		SigningNonce:          NewSigningNonceClient(cfg),
+		Transfer:              NewTransferClient(cfg),
+		TransferLeaf:          NewTransferLeafClient(cfg),
+		Tree:                  NewTreeClient(cfg),
+		TreeNode:              NewTreeNodeClient(cfg),
+		UserSignedTransaction: NewUserSignedTransactionClient(cfg),
 	}, nil
 }
 
@@ -183,16 +193,18 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 	cfg := c.config
 	cfg.driver = &txDriver{tx: tx, drv: c.driver}
 	return &Tx{
-		ctx:             ctx,
-		config:          cfg,
-		DepositAddress:  NewDepositAddressClient(cfg),
-		PreimageShare:   NewPreimageShareClient(cfg),
-		SigningKeyshare: NewSigningKeyshareClient(cfg),
-		SigningNonce:    NewSigningNonceClient(cfg),
-		Transfer:        NewTransferClient(cfg),
-		TransferLeaf:    NewTransferLeafClient(cfg),
-		Tree:            NewTreeClient(cfg),
-		TreeNode:        NewTreeNodeClient(cfg),
+		ctx:                   ctx,
+		config:                cfg,
+		DepositAddress:        NewDepositAddressClient(cfg),
+		PreimageRequest:       NewPreimageRequestClient(cfg),
+		PreimageShare:         NewPreimageShareClient(cfg),
+		SigningKeyshare:       NewSigningKeyshareClient(cfg),
+		SigningNonce:          NewSigningNonceClient(cfg),
+		Transfer:              NewTransferClient(cfg),
+		TransferLeaf:          NewTransferLeafClient(cfg),
+		Tree:                  NewTreeClient(cfg),
+		TreeNode:              NewTreeNodeClient(cfg),
+		UserSignedTransaction: NewUserSignedTransactionClient(cfg),
 	}, nil
 }
 
@@ -222,8 +234,9 @@ func (c *Client) Close() error {
 // In order to add hooks to a specific client, call: `client.Node.Use(...)`.
 func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
-		c.DepositAddress, c.PreimageShare, c.SigningKeyshare, c.SigningNonce,
-		c.Transfer, c.TransferLeaf, c.Tree, c.TreeNode,
+		c.DepositAddress, c.PreimageRequest, c.PreimageShare, c.SigningKeyshare,
+		c.SigningNonce, c.Transfer, c.TransferLeaf, c.Tree, c.TreeNode,
+		c.UserSignedTransaction,
 	} {
 		n.Use(hooks...)
 	}
@@ -233,8 +246,9 @@ func (c *Client) Use(hooks ...Hook) {
 // In order to add interceptors to a specific client, call: `client.Node.Intercept(...)`.
 func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
-		c.DepositAddress, c.PreimageShare, c.SigningKeyshare, c.SigningNonce,
-		c.Transfer, c.TransferLeaf, c.Tree, c.TreeNode,
+		c.DepositAddress, c.PreimageRequest, c.PreimageShare, c.SigningKeyshare,
+		c.SigningNonce, c.Transfer, c.TransferLeaf, c.Tree, c.TreeNode,
+		c.UserSignedTransaction,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -245,6 +259,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 	switch m := m.(type) {
 	case *DepositAddressMutation:
 		return c.DepositAddress.mutate(ctx, m)
+	case *PreimageRequestMutation:
+		return c.PreimageRequest.mutate(ctx, m)
 	case *PreimageShareMutation:
 		return c.PreimageShare.mutate(ctx, m)
 	case *SigningKeyshareMutation:
@@ -259,6 +275,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.Tree.mutate(ctx, m)
 	case *TreeNodeMutation:
 		return c.TreeNode.mutate(ctx, m)
+	case *UserSignedTransactionMutation:
+		return c.UserSignedTransaction.mutate(ctx, m)
 	default:
 		return nil, fmt.Errorf("ent: unknown mutation type %T", m)
 	}
@@ -413,6 +431,171 @@ func (c *DepositAddressClient) mutate(ctx context.Context, m *DepositAddressMuta
 	}
 }
 
+// PreimageRequestClient is a client for the PreimageRequest schema.
+type PreimageRequestClient struct {
+	config
+}
+
+// NewPreimageRequestClient returns a client for the PreimageRequest from the given config.
+func NewPreimageRequestClient(c config) *PreimageRequestClient {
+	return &PreimageRequestClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `preimagerequest.Hooks(f(g(h())))`.
+func (c *PreimageRequestClient) Use(hooks ...Hook) {
+	c.hooks.PreimageRequest = append(c.hooks.PreimageRequest, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `preimagerequest.Intercept(f(g(h())))`.
+func (c *PreimageRequestClient) Intercept(interceptors ...Interceptor) {
+	c.inters.PreimageRequest = append(c.inters.PreimageRequest, interceptors...)
+}
+
+// Create returns a builder for creating a PreimageRequest entity.
+func (c *PreimageRequestClient) Create() *PreimageRequestCreate {
+	mutation := newPreimageRequestMutation(c.config, OpCreate)
+	return &PreimageRequestCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of PreimageRequest entities.
+func (c *PreimageRequestClient) CreateBulk(builders ...*PreimageRequestCreate) *PreimageRequestCreateBulk {
+	return &PreimageRequestCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *PreimageRequestClient) MapCreateBulk(slice any, setFunc func(*PreimageRequestCreate, int)) *PreimageRequestCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &PreimageRequestCreateBulk{err: fmt.Errorf("calling to PreimageRequestClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*PreimageRequestCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &PreimageRequestCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for PreimageRequest.
+func (c *PreimageRequestClient) Update() *PreimageRequestUpdate {
+	mutation := newPreimageRequestMutation(c.config, OpUpdate)
+	return &PreimageRequestUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *PreimageRequestClient) UpdateOne(pr *PreimageRequest) *PreimageRequestUpdateOne {
+	mutation := newPreimageRequestMutation(c.config, OpUpdateOne, withPreimageRequest(pr))
+	return &PreimageRequestUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *PreimageRequestClient) UpdateOneID(id uuid.UUID) *PreimageRequestUpdateOne {
+	mutation := newPreimageRequestMutation(c.config, OpUpdateOne, withPreimageRequestID(id))
+	return &PreimageRequestUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for PreimageRequest.
+func (c *PreimageRequestClient) Delete() *PreimageRequestDelete {
+	mutation := newPreimageRequestMutation(c.config, OpDelete)
+	return &PreimageRequestDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *PreimageRequestClient) DeleteOne(pr *PreimageRequest) *PreimageRequestDeleteOne {
+	return c.DeleteOneID(pr.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *PreimageRequestClient) DeleteOneID(id uuid.UUID) *PreimageRequestDeleteOne {
+	builder := c.Delete().Where(preimagerequest.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &PreimageRequestDeleteOne{builder}
+}
+
+// Query returns a query builder for PreimageRequest.
+func (c *PreimageRequestClient) Query() *PreimageRequestQuery {
+	return &PreimageRequestQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypePreimageRequest},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a PreimageRequest entity by its id.
+func (c *PreimageRequestClient) Get(ctx context.Context, id uuid.UUID) (*PreimageRequest, error) {
+	return c.Query().Where(preimagerequest.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *PreimageRequestClient) GetX(ctx context.Context, id uuid.UUID) *PreimageRequest {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryTransactions queries the transactions edge of a PreimageRequest.
+func (c *PreimageRequestClient) QueryTransactions(pr *PreimageRequest) *UserSignedTransactionQuery {
+	query := (&UserSignedTransactionClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := pr.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(preimagerequest.Table, preimagerequest.FieldID, id),
+			sqlgraph.To(usersignedtransaction.Table, usersignedtransaction.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, true, preimagerequest.TransactionsTable, preimagerequest.TransactionsColumn),
+		)
+		fromV = sqlgraph.Neighbors(pr.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryPreimageShares queries the preimage_shares edge of a PreimageRequest.
+func (c *PreimageRequestClient) QueryPreimageShares(pr *PreimageRequest) *PreimageShareQuery {
+	query := (&PreimageShareClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := pr.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(preimagerequest.Table, preimagerequest.FieldID, id),
+			sqlgraph.To(preimageshare.Table, preimageshare.FieldID),
+			sqlgraph.Edge(sqlgraph.O2O, false, preimagerequest.PreimageSharesTable, preimagerequest.PreimageSharesColumn),
+		)
+		fromV = sqlgraph.Neighbors(pr.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *PreimageRequestClient) Hooks() []Hook {
+	return c.hooks.PreimageRequest
+}
+
+// Interceptors returns the client interceptors.
+func (c *PreimageRequestClient) Interceptors() []Interceptor {
+	return c.inters.PreimageRequest
+}
+
+func (c *PreimageRequestClient) mutate(ctx context.Context, m *PreimageRequestMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&PreimageRequestCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&PreimageRequestUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&PreimageRequestUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&PreimageRequestDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown PreimageRequest mutation op: %q", m.Op())
+	}
+}
+
 // PreimageShareClient is a client for the PreimageShare schema.
 type PreimageShareClient struct {
 	config
@@ -519,6 +702,22 @@ func (c *PreimageShareClient) GetX(ctx context.Context, id uuid.UUID) *PreimageS
 		panic(err)
 	}
 	return obj
+}
+
+// QueryPreimageRequest queries the preimage_request edge of a PreimageShare.
+func (c *PreimageShareClient) QueryPreimageRequest(ps *PreimageShare) *PreimageRequestQuery {
+	query := (&PreimageRequestClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := ps.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(preimageshare.Table, preimageshare.FieldID, id),
+			sqlgraph.To(preimagerequest.Table, preimagerequest.FieldID),
+			sqlgraph.Edge(sqlgraph.O2O, true, preimageshare.PreimageRequestTable, preimageshare.PreimageRequestColumn),
+		)
+		fromV = sqlgraph.Neighbors(ps.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
 }
 
 // Hooks returns the client hooks.
@@ -1488,14 +1687,179 @@ func (c *TreeNodeClient) mutate(ctx context.Context, m *TreeNodeMutation) (Value
 	}
 }
 
+// UserSignedTransactionClient is a client for the UserSignedTransaction schema.
+type UserSignedTransactionClient struct {
+	config
+}
+
+// NewUserSignedTransactionClient returns a client for the UserSignedTransaction from the given config.
+func NewUserSignedTransactionClient(c config) *UserSignedTransactionClient {
+	return &UserSignedTransactionClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `usersignedtransaction.Hooks(f(g(h())))`.
+func (c *UserSignedTransactionClient) Use(hooks ...Hook) {
+	c.hooks.UserSignedTransaction = append(c.hooks.UserSignedTransaction, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `usersignedtransaction.Intercept(f(g(h())))`.
+func (c *UserSignedTransactionClient) Intercept(interceptors ...Interceptor) {
+	c.inters.UserSignedTransaction = append(c.inters.UserSignedTransaction, interceptors...)
+}
+
+// Create returns a builder for creating a UserSignedTransaction entity.
+func (c *UserSignedTransactionClient) Create() *UserSignedTransactionCreate {
+	mutation := newUserSignedTransactionMutation(c.config, OpCreate)
+	return &UserSignedTransactionCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of UserSignedTransaction entities.
+func (c *UserSignedTransactionClient) CreateBulk(builders ...*UserSignedTransactionCreate) *UserSignedTransactionCreateBulk {
+	return &UserSignedTransactionCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *UserSignedTransactionClient) MapCreateBulk(slice any, setFunc func(*UserSignedTransactionCreate, int)) *UserSignedTransactionCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &UserSignedTransactionCreateBulk{err: fmt.Errorf("calling to UserSignedTransactionClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*UserSignedTransactionCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &UserSignedTransactionCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for UserSignedTransaction.
+func (c *UserSignedTransactionClient) Update() *UserSignedTransactionUpdate {
+	mutation := newUserSignedTransactionMutation(c.config, OpUpdate)
+	return &UserSignedTransactionUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *UserSignedTransactionClient) UpdateOne(ust *UserSignedTransaction) *UserSignedTransactionUpdateOne {
+	mutation := newUserSignedTransactionMutation(c.config, OpUpdateOne, withUserSignedTransaction(ust))
+	return &UserSignedTransactionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *UserSignedTransactionClient) UpdateOneID(id uuid.UUID) *UserSignedTransactionUpdateOne {
+	mutation := newUserSignedTransactionMutation(c.config, OpUpdateOne, withUserSignedTransactionID(id))
+	return &UserSignedTransactionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for UserSignedTransaction.
+func (c *UserSignedTransactionClient) Delete() *UserSignedTransactionDelete {
+	mutation := newUserSignedTransactionMutation(c.config, OpDelete)
+	return &UserSignedTransactionDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *UserSignedTransactionClient) DeleteOne(ust *UserSignedTransaction) *UserSignedTransactionDeleteOne {
+	return c.DeleteOneID(ust.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *UserSignedTransactionClient) DeleteOneID(id uuid.UUID) *UserSignedTransactionDeleteOne {
+	builder := c.Delete().Where(usersignedtransaction.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &UserSignedTransactionDeleteOne{builder}
+}
+
+// Query returns a query builder for UserSignedTransaction.
+func (c *UserSignedTransactionClient) Query() *UserSignedTransactionQuery {
+	return &UserSignedTransactionQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeUserSignedTransaction},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a UserSignedTransaction entity by its id.
+func (c *UserSignedTransactionClient) Get(ctx context.Context, id uuid.UUID) (*UserSignedTransaction, error) {
+	return c.Query().Where(usersignedtransaction.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *UserSignedTransactionClient) GetX(ctx context.Context, id uuid.UUID) *UserSignedTransaction {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryTreeNode queries the tree_node edge of a UserSignedTransaction.
+func (c *UserSignedTransactionClient) QueryTreeNode(ust *UserSignedTransaction) *TreeNodeQuery {
+	query := (&TreeNodeClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := ust.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(usersignedtransaction.Table, usersignedtransaction.FieldID, id),
+			sqlgraph.To(treenode.Table, treenode.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, usersignedtransaction.TreeNodeTable, usersignedtransaction.TreeNodeColumn),
+		)
+		fromV = sqlgraph.Neighbors(ust.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryPreimageRequest queries the preimage_request edge of a UserSignedTransaction.
+func (c *UserSignedTransactionClient) QueryPreimageRequest(ust *UserSignedTransaction) *PreimageRequestQuery {
+	query := (&PreimageRequestClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := ust.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(usersignedtransaction.Table, usersignedtransaction.FieldID, id),
+			sqlgraph.To(preimagerequest.Table, preimagerequest.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, usersignedtransaction.PreimageRequestTable, usersignedtransaction.PreimageRequestColumn),
+		)
+		fromV = sqlgraph.Neighbors(ust.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *UserSignedTransactionClient) Hooks() []Hook {
+	return c.hooks.UserSignedTransaction
+}
+
+// Interceptors returns the client interceptors.
+func (c *UserSignedTransactionClient) Interceptors() []Interceptor {
+	return c.inters.UserSignedTransaction
+}
+
+func (c *UserSignedTransactionClient) mutate(ctx context.Context, m *UserSignedTransactionMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&UserSignedTransactionCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&UserSignedTransactionUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&UserSignedTransactionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&UserSignedTransactionDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown UserSignedTransaction mutation op: %q", m.Op())
+	}
+}
+
 // hooks and interceptors per client, for fast access.
 type (
 	hooks struct {
-		DepositAddress, PreimageShare, SigningKeyshare, SigningNonce, Transfer,
-		TransferLeaf, Tree, TreeNode []ent.Hook
+		DepositAddress, PreimageRequest, PreimageShare, SigningKeyshare, SigningNonce,
+		Transfer, TransferLeaf, Tree, TreeNode, UserSignedTransaction []ent.Hook
 	}
 	inters struct {
-		DepositAddress, PreimageShare, SigningKeyshare, SigningNonce, Transfer,
-		TransferLeaf, Tree, TreeNode []ent.Interceptor
+		DepositAddress, PreimageRequest, PreimageShare, SigningKeyshare, SigningNonce,
+		Transfer, TransferLeaf, Tree, TreeNode, UserSignedTransaction []ent.Interceptor
 	}
 )

@@ -11,7 +11,9 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/so/ent/predicate"
+	"github.com/lightsparkdev/spark-go/so/ent/preimagerequest"
 	"github.com/lightsparkdev/spark-go/so/ent/preimageshare"
 )
 
@@ -34,9 +36,34 @@ func (psu *PreimageShareUpdate) SetUpdateTime(t time.Time) *PreimageShareUpdate 
 	return psu
 }
 
+// SetPreimageRequestID sets the "preimage_request" edge to the PreimageRequest entity by ID.
+func (psu *PreimageShareUpdate) SetPreimageRequestID(id uuid.UUID) *PreimageShareUpdate {
+	psu.mutation.SetPreimageRequestID(id)
+	return psu
+}
+
+// SetNillablePreimageRequestID sets the "preimage_request" edge to the PreimageRequest entity by ID if the given value is not nil.
+func (psu *PreimageShareUpdate) SetNillablePreimageRequestID(id *uuid.UUID) *PreimageShareUpdate {
+	if id != nil {
+		psu = psu.SetPreimageRequestID(*id)
+	}
+	return psu
+}
+
+// SetPreimageRequest sets the "preimage_request" edge to the PreimageRequest entity.
+func (psu *PreimageShareUpdate) SetPreimageRequest(p *PreimageRequest) *PreimageShareUpdate {
+	return psu.SetPreimageRequestID(p.ID)
+}
+
 // Mutation returns the PreimageShareMutation object of the builder.
 func (psu *PreimageShareUpdate) Mutation() *PreimageShareMutation {
 	return psu.mutation
+}
+
+// ClearPreimageRequest clears the "preimage_request" edge to the PreimageRequest entity.
+func (psu *PreimageShareUpdate) ClearPreimageRequest() *PreimageShareUpdate {
+	psu.mutation.ClearPreimageRequest()
+	return psu
 }
 
 // Save executes the query and returns the number of nodes affected by the update operation.
@@ -87,6 +114,35 @@ func (psu *PreimageShareUpdate) sqlSave(ctx context.Context) (n int, err error) 
 	if value, ok := psu.mutation.UpdateTime(); ok {
 		_spec.SetField(preimageshare.FieldUpdateTime, field.TypeTime, value)
 	}
+	if psu.mutation.PreimageRequestCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2O,
+			Inverse: true,
+			Table:   preimageshare.PreimageRequestTable,
+			Columns: []string{preimageshare.PreimageRequestColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(preimagerequest.FieldID, field.TypeUUID),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := psu.mutation.PreimageRequestIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2O,
+			Inverse: true,
+			Table:   preimageshare.PreimageRequestTable,
+			Columns: []string{preimageshare.PreimageRequestColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(preimagerequest.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
 	if n, err = sqlgraph.UpdateNodes(ctx, psu.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{preimageshare.Label}
@@ -113,9 +169,34 @@ func (psuo *PreimageShareUpdateOne) SetUpdateTime(t time.Time) *PreimageShareUpd
 	return psuo
 }
 
+// SetPreimageRequestID sets the "preimage_request" edge to the PreimageRequest entity by ID.
+func (psuo *PreimageShareUpdateOne) SetPreimageRequestID(id uuid.UUID) *PreimageShareUpdateOne {
+	psuo.mutation.SetPreimageRequestID(id)
+	return psuo
+}
+
+// SetNillablePreimageRequestID sets the "preimage_request" edge to the PreimageRequest entity by ID if the given value is not nil.
+func (psuo *PreimageShareUpdateOne) SetNillablePreimageRequestID(id *uuid.UUID) *PreimageShareUpdateOne {
+	if id != nil {
+		psuo = psuo.SetPreimageRequestID(*id)
+	}
+	return psuo
+}
+
+// SetPreimageRequest sets the "preimage_request" edge to the PreimageRequest entity.
+func (psuo *PreimageShareUpdateOne) SetPreimageRequest(p *PreimageRequest) *PreimageShareUpdateOne {
+	return psuo.SetPreimageRequestID(p.ID)
+}
+
 // Mutation returns the PreimageShareMutation object of the builder.
 func (psuo *PreimageShareUpdateOne) Mutation() *PreimageShareMutation {
 	return psuo.mutation
+}
+
+// ClearPreimageRequest clears the "preimage_request" edge to the PreimageRequest entity.
+func (psuo *PreimageShareUpdateOne) ClearPreimageRequest() *PreimageShareUpdateOne {
+	psuo.mutation.ClearPreimageRequest()
+	return psuo
 }
 
 // Where appends a list predicates to the PreimageShareUpdate builder.
@@ -195,6 +276,35 @@ func (psuo *PreimageShareUpdateOne) sqlSave(ctx context.Context) (_node *Preimag
 	}
 	if value, ok := psuo.mutation.UpdateTime(); ok {
 		_spec.SetField(preimageshare.FieldUpdateTime, field.TypeTime, value)
+	}
+	if psuo.mutation.PreimageRequestCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2O,
+			Inverse: true,
+			Table:   preimageshare.PreimageRequestTable,
+			Columns: []string{preimageshare.PreimageRequestColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(preimagerequest.FieldID, field.TypeUUID),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := psuo.mutation.PreimageRequestIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2O,
+			Inverse: true,
+			Table:   preimageshare.PreimageRequestTable,
+			Columns: []string{preimageshare.PreimageRequestColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(preimagerequest.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	_node = &PreimageShare{config: psuo.config}
 	_spec.Assign = _node.assignValues

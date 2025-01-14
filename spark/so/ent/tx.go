@@ -14,6 +14,8 @@ type Tx struct {
 	config
 	// DepositAddress is the client for interacting with the DepositAddress builders.
 	DepositAddress *DepositAddressClient
+	// PreimageRequest is the client for interacting with the PreimageRequest builders.
+	PreimageRequest *PreimageRequestClient
 	// PreimageShare is the client for interacting with the PreimageShare builders.
 	PreimageShare *PreimageShareClient
 	// SigningKeyshare is the client for interacting with the SigningKeyshare builders.
@@ -28,6 +30,8 @@ type Tx struct {
 	Tree *TreeClient
 	// TreeNode is the client for interacting with the TreeNode builders.
 	TreeNode *TreeNodeClient
+	// UserSignedTransaction is the client for interacting with the UserSignedTransaction builders.
+	UserSignedTransaction *UserSignedTransactionClient
 
 	// lazily loaded.
 	client     *Client
@@ -160,6 +164,7 @@ func (tx *Tx) Client() *Client {
 
 func (tx *Tx) init() {
 	tx.DepositAddress = NewDepositAddressClient(tx.config)
+	tx.PreimageRequest = NewPreimageRequestClient(tx.config)
 	tx.PreimageShare = NewPreimageShareClient(tx.config)
 	tx.SigningKeyshare = NewSigningKeyshareClient(tx.config)
 	tx.SigningNonce = NewSigningNonceClient(tx.config)
@@ -167,6 +172,7 @@ func (tx *Tx) init() {
 	tx.TransferLeaf = NewTransferLeafClient(tx.config)
 	tx.Tree = NewTreeClient(tx.config)
 	tx.TreeNode = NewTreeNodeClient(tx.config)
+	tx.UserSignedTransaction = NewUserSignedTransactionClient(tx.config)
 }
 
 // txDriver wraps the given dialect.Tx with a nop dialect.Driver implementation.

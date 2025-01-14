@@ -11,6 +11,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark-go/so/ent/preimagerequest"
 	"github.com/lightsparkdev/spark-go/so/ent/preimageshare"
 )
 
@@ -67,6 +68,12 @@ func (psc *PreimageShareCreate) SetThreshold(b []byte) *PreimageShareCreate {
 	return psc
 }
 
+// SetOwnerIdentityPubkey sets the "owner_identity_pubkey" field.
+func (psc *PreimageShareCreate) SetOwnerIdentityPubkey(b []byte) *PreimageShareCreate {
+	psc.mutation.SetOwnerIdentityPubkey(b)
+	return psc
+}
+
 // SetID sets the "id" field.
 func (psc *PreimageShareCreate) SetID(u uuid.UUID) *PreimageShareCreate {
 	psc.mutation.SetID(u)
@@ -79,6 +86,25 @@ func (psc *PreimageShareCreate) SetNillableID(u *uuid.UUID) *PreimageShareCreate
 		psc.SetID(*u)
 	}
 	return psc
+}
+
+// SetPreimageRequestID sets the "preimage_request" edge to the PreimageRequest entity by ID.
+func (psc *PreimageShareCreate) SetPreimageRequestID(id uuid.UUID) *PreimageShareCreate {
+	psc.mutation.SetPreimageRequestID(id)
+	return psc
+}
+
+// SetNillablePreimageRequestID sets the "preimage_request" edge to the PreimageRequest entity by ID if the given value is not nil.
+func (psc *PreimageShareCreate) SetNillablePreimageRequestID(id *uuid.UUID) *PreimageShareCreate {
+	if id != nil {
+		psc = psc.SetPreimageRequestID(*id)
+	}
+	return psc
+}
+
+// SetPreimageRequest sets the "preimage_request" edge to the PreimageRequest entity.
+func (psc *PreimageShareCreate) SetPreimageRequest(p *PreimageRequest) *PreimageShareCreate {
+	return psc.SetPreimageRequestID(p.ID)
 }
 
 // Mutation returns the PreimageShareMutation object of the builder.
@@ -162,6 +188,14 @@ func (psc *PreimageShareCreate) check() error {
 			return &ValidationError{Name: "threshold", err: fmt.Errorf(`ent: validator failed for field "PreimageShare.threshold": %w`, err)}
 		}
 	}
+	if _, ok := psc.mutation.OwnerIdentityPubkey(); !ok {
+		return &ValidationError{Name: "owner_identity_pubkey", err: errors.New(`ent: missing required field "PreimageShare.owner_identity_pubkey"`)}
+	}
+	if v, ok := psc.mutation.OwnerIdentityPubkey(); ok {
+		if err := preimageshare.OwnerIdentityPubkeyValidator(v); err != nil {
+			return &ValidationError{Name: "owner_identity_pubkey", err: fmt.Errorf(`ent: validator failed for field "PreimageShare.owner_identity_pubkey": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -216,6 +250,27 @@ func (psc *PreimageShareCreate) createSpec() (*PreimageShare, *sqlgraph.CreateSp
 	if value, ok := psc.mutation.Threshold(); ok {
 		_spec.SetField(preimageshare.FieldThreshold, field.TypeBytes, value)
 		_node.Threshold = value
+	}
+	if value, ok := psc.mutation.OwnerIdentityPubkey(); ok {
+		_spec.SetField(preimageshare.FieldOwnerIdentityPubkey, field.TypeBytes, value)
+		_node.OwnerIdentityPubkey = value
+	}
+	if nodes := psc.mutation.PreimageRequestIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2O,
+			Inverse: true,
+			Table:   preimageshare.PreimageRequestTable,
+			Columns: []string{preimageshare.PreimageRequestColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(preimagerequest.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_node.preimage_request_preimage_shares = &nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
 	}
 	return _node, _spec
 }

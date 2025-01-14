@@ -10,6 +10,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark-go/so/ent/preimagerequest"
 	"github.com/lightsparkdev/spark-go/so/ent/preimageshare"
 )
 
@@ -27,8 +28,34 @@ type PreimageShare struct {
 	// PreimageShare holds the value of the "preimage_share" field.
 	PreimageShare []byte `json:"preimage_share,omitempty"`
 	// Threshold holds the value of the "threshold" field.
-	Threshold    []byte `json:"threshold,omitempty"`
-	selectValues sql.SelectValues
+	Threshold []byte `json:"threshold,omitempty"`
+	// OwnerIdentityPubkey holds the value of the "owner_identity_pubkey" field.
+	OwnerIdentityPubkey []byte `json:"owner_identity_pubkey,omitempty"`
+	// Edges holds the relations/edges for other nodes in the graph.
+	// The values are being populated by the PreimageShareQuery when eager-loading is set.
+	Edges                            PreimageShareEdges `json:"edges"`
+	preimage_request_preimage_shares *uuid.UUID
+	selectValues                     sql.SelectValues
+}
+
+// PreimageShareEdges holds the relations/edges for other nodes in the graph.
+type PreimageShareEdges struct {
+	// PreimageRequest holds the value of the preimage_request edge.
+	PreimageRequest *PreimageRequest `json:"preimage_request,omitempty"`
+	// loadedTypes holds the information for reporting if a
+	// type was loaded (or requested) in eager-loading or not.
+	loadedTypes [1]bool
+}
+
+// PreimageRequestOrErr returns the PreimageRequest value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e PreimageShareEdges) PreimageRequestOrErr() (*PreimageRequest, error) {
+	if e.PreimageRequest != nil {
+		return e.PreimageRequest, nil
+	} else if e.loadedTypes[0] {
+		return nil, &NotFoundError{label: preimagerequest.Label}
+	}
+	return nil, &NotLoadedError{edge: "preimage_request"}
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -36,12 +63,14 @@ func (*PreimageShare) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case preimageshare.FieldPaymentHash, preimageshare.FieldPreimageShare, preimageshare.FieldThreshold:
+		case preimageshare.FieldPaymentHash, preimageshare.FieldPreimageShare, preimageshare.FieldThreshold, preimageshare.FieldOwnerIdentityPubkey:
 			values[i] = new([]byte)
 		case preimageshare.FieldCreateTime, preimageshare.FieldUpdateTime:
 			values[i] = new(sql.NullTime)
 		case preimageshare.FieldID:
 			values[i] = new(uuid.UUID)
+		case preimageshare.ForeignKeys[0]: // preimage_request_preimage_shares
+			values[i] = &sql.NullScanner{S: new(uuid.UUID)}
 		default:
 			values[i] = new(sql.UnknownType)
 		}
@@ -93,6 +122,19 @@ func (ps *PreimageShare) assignValues(columns []string, values []any) error {
 			} else if value != nil {
 				ps.Threshold = *value
 			}
+		case preimageshare.FieldOwnerIdentityPubkey:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field owner_identity_pubkey", values[i])
+			} else if value != nil {
+				ps.OwnerIdentityPubkey = *value
+			}
+		case preimageshare.ForeignKeys[0]:
+			if value, ok := values[i].(*sql.NullScanner); !ok {
+				return fmt.Errorf("unexpected type %T for field preimage_request_preimage_shares", values[i])
+			} else if value.Valid {
+				ps.preimage_request_preimage_shares = new(uuid.UUID)
+				*ps.preimage_request_preimage_shares = *value.S.(*uuid.UUID)
+			}
 		default:
 			ps.selectValues.Set(columns[i], values[i])
 		}
@@ -104,6 +146,11 @@ func (ps *PreimageShare) assignValues(columns []string, values []any) error {
 // This includes values selected through modifiers, order, etc.
 func (ps *PreimageShare) Value(name string) (ent.Value, error) {
 	return ps.selectValues.Get(name)
+}
+
+// QueryPreimageRequest queries the "preimage_request" edge of the PreimageShare entity.
+func (ps *PreimageShare) QueryPreimageRequest() *PreimageRequestQuery {
+	return NewPreimageShareClient(ps.config).QueryPreimageRequest(ps)
 }
 
 // Update returns a builder for updating this PreimageShare.
@@ -143,6 +190,9 @@ func (ps *PreimageShare) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("threshold=")
 	builder.WriteString(fmt.Sprintf("%v", ps.Threshold))
+	builder.WriteString(", ")
+	builder.WriteString("owner_identity_pubkey=")
+	builder.WriteString(fmt.Sprintf("%v", ps.OwnerIdentityPubkey))
 	builder.WriteByte(')')
 	return builder.String()
 }
