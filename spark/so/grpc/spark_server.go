@@ -102,3 +102,9 @@ func (s *SparkServer) GetSigningCommitments(ctx context.Context, req *pb.GetSign
 	lightningHandler := handler.NewLightningHandler(s.config)
 	return lightningHandler.GetSigningCommitments(ctx, req)
 }
+
+// GetPreimage gets the preimage for the given payment hash.
+func (s *SparkServer) GetPreimage(ctx context.Context, req *pb.GetPreimageRequest) (*pb.GetPreimageResponse, error) {
+	lightningHandler := handler.NewLightningHandler(s.config)
+	return lightningHandler.GetPreimage(ctx, req)
+}

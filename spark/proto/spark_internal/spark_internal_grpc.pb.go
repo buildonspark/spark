@@ -31,6 +31,7 @@ const (
 	SparkInternalService_AggregateNodes_FullMethodName                = "/spark_internal.SparkInternalService/aggregate_nodes"
 	SparkInternalService_FinalizeNodesAggregation_FullMethodName      = "/spark_internal.SparkInternalService/finalize_nodes_aggregation"
 	SparkInternalService_FinalizeTransfer_FullMethodName              = "/spark_internal.SparkInternalService/finalize_transfer"
+	SparkInternalService_GetPreimageShare_FullMethodName              = "/spark_internal.SparkInternalService/get_preimage_share"
 )
 
 // SparkInternalServiceClient is the client API for SparkInternalService service.
@@ -47,6 +48,7 @@ type SparkInternalServiceClient interface {
 	AggregateNodes(ctx context.Context, in *spark.AggregateNodesRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	FinalizeNodesAggregation(ctx context.Context, in *FinalizeNodesAggregationRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	FinalizeTransfer(ctx context.Context, in *FinalizeTransferRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	GetPreimageShare(ctx context.Context, in *GetPreimageShareRequest, opts ...grpc.CallOption) (*GetPreimageShareResponse, error)
 }
 
 type sparkInternalServiceClient struct {
@@ -157,6 +159,16 @@ func (c *sparkInternalServiceClient) FinalizeTransfer(ctx context.Context, in *F
 	return out, nil
 }
 
+func (c *sparkInternalServiceClient) GetPreimageShare(ctx context.Context, in *GetPreimageShareRequest, opts ...grpc.CallOption) (*GetPreimageShareResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetPreimageShareResponse)
+	err := c.cc.Invoke(ctx, SparkInternalService_GetPreimageShare_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SparkInternalServiceServer is the server API for SparkInternalService service.
 // All implementations must embed UnimplementedSparkInternalServiceServer
 // for forward compatibility.
@@ -171,6 +183,7 @@ type SparkInternalServiceServer interface {
 	AggregateNodes(context.Context, *spark.AggregateNodesRequest) (*emptypb.Empty, error)
 	FinalizeNodesAggregation(context.Context, *FinalizeNodesAggregationRequest) (*emptypb.Empty, error)
 	FinalizeTransfer(context.Context, *FinalizeTransferRequest) (*emptypb.Empty, error)
+	GetPreimageShare(context.Context, *GetPreimageShareRequest) (*GetPreimageShareResponse, error)
 	mustEmbedUnimplementedSparkInternalServiceServer()
 }
 
@@ -210,6 +223,9 @@ func (UnimplementedSparkInternalServiceServer) FinalizeNodesAggregation(context.
 }
 func (UnimplementedSparkInternalServiceServer) FinalizeTransfer(context.Context, *FinalizeTransferRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method FinalizeTransfer not implemented")
+}
+func (UnimplementedSparkInternalServiceServer) GetPreimageShare(context.Context, *GetPreimageShareRequest) (*GetPreimageShareResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetPreimageShare not implemented")
 }
 func (UnimplementedSparkInternalServiceServer) mustEmbedUnimplementedSparkInternalServiceServer() {}
 func (UnimplementedSparkInternalServiceServer) testEmbeddedByValue()                              {}
@@ -412,6 +428,24 @@ func _SparkInternalService_FinalizeTransfer_Handler(srv interface{}, ctx context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SparkInternalService_GetPreimageShare_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetPreimageShareRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkInternalServiceServer).GetPreimageShare(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkInternalService_GetPreimageShare_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkInternalServiceServer).GetPreimageShare(ctx, req.(*GetPreimageShareRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // SparkInternalService_ServiceDesc is the grpc.ServiceDesc for SparkInternalService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -458,6 +492,10 @@ var SparkInternalService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "finalize_transfer",
 			Handler:    _SparkInternalService_FinalizeTransfer_Handler,
+		},
+		{
+			MethodName: "get_preimage_share",
+			Handler:    _SparkInternalService_GetPreimageShare_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

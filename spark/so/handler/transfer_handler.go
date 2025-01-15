@@ -98,7 +98,9 @@ func (h *TransferHandler) initLeafTransfer(ctx context.Context, transfer *ent.Tr
 	if err != nil || leaf == nil {
 		return nil, fmt.Errorf("unable to find leaf %s: %v", req.LeafId, err)
 	}
-	if leaf.Status != schema.TreeNodeStatusAvailable || !bytes.Equal(leaf.OwnerIdentityPubkey, transfer.SenderIdentityPubkey) {
+	if (leaf.Status != schema.TreeNodeStatusAvailable &&
+		(leaf.Status != schema.TreeNodeStatusDestinationLock || !bytes.Equal(leaf.DestinationLockIdentityPubkey, transfer.ReceiverIdentityPubkey))) ||
+		!bytes.Equal(leaf.OwnerIdentityPubkey, transfer.SenderIdentityPubkey) {
 		return nil, fmt.Errorf("leaf %s is not available to transfer", req.LeafId)
 	}
 

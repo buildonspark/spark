@@ -270,11 +270,15 @@ message GetSigningCommitmentsResponse {
     repeated RequestedSigningCommitments signing_commitments = 1;
 }
 
+message SigningCommitments {
+    map<string, common.SigningCommitment> signing_commitments = 1;
+}
+
 message UserSignedRefund {
     string node_id = 1;
     bytes refund_tx = 2;
     bytes user_signature = 3;
-    map<string, common.SigningCommitment> signing_commitments = 4;
+    SigningCommitments signing_commitments = 4;
 }
 
 message InvoiceAmountProof {

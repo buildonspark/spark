@@ -1,7 +1,9 @@
 package handler
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"math/big"
 
@@ -10,11 +12,15 @@ import (
 	"github.com/lightsparkdev/spark-go/common"
 	secretsharing "github.com/lightsparkdev/spark-go/common/secret_sharing"
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
+	pbinternal "github.com/lightsparkdev/spark-go/proto/spark_internal"
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/ent"
+	"github.com/lightsparkdev/spark-go/so/ent/preimageshare"
+	"github.com/lightsparkdev/spark-go/so/ent/schema"
 	"github.com/lightsparkdev/spark-go/so/ent/treenode"
 	"github.com/lightsparkdev/spark-go/so/helper"
 	"github.com/lightsparkdev/spark-go/so/objects"
+	"google.golang.org/protobuf/proto"
 )
 
 // LightningHandler is the handler for the lightning service.
@@ -101,4 +107,138 @@ func (h *LightningHandler) GetSigningCommitments(ctx context.Context, req *pb.Ge
 	}
 
 	return &pb.GetSigningCommitmentsResponse{SigningCommitments: requestedCommitments}, nil
+}
+
+func (h *LightningHandler) validateGetPreimageRequest(ctx context.Context, transactions []*pb.UserSignedRefund, amount *pb.InvoiceAmount) error {
+	// TODO: This validation requires validate partial signature.
+	return nil
+}
+
+func (h *LightningHandler) storeUserSignedTransactions(ctx context.Context, preimageShare *ent.PreimageShare, transactions []*pb.UserSignedRefund, userIdentityPubkey []byte) error {
+	db := ent.GetDbFromContext(ctx)
+	preimageRequest, err := db.PreimageRequest.Create().
+		SetPreimageShares(preimageShare).
+		Save(ctx)
+	if err != nil {
+		return fmt.Errorf("unable to create preimage request: %v", err)
+	}
+
+	for _, transaction := range transactions {
+		commitmentsBytes, err := proto.Marshal(transaction.SigningCommitments)
+		if err != nil {
+			return fmt.Errorf("unable to marshal signing commitments: %v", err)
+		}
+		_, err = db.UserSignedTransaction.Create().
+			SetTransaction(transaction.RefundTx).
+			SetUserSignature(transaction.UserSignature).
+			SetSigningCommitments(commitmentsBytes).
+			SetPreimageRequest(preimageRequest).
+			Save(ctx)
+		if err != nil {
+			return fmt.Errorf("unable to store user signed transaction: %v", err)
+		}
+
+		nodeID, err := uuid.Parse(transaction.NodeId)
+		if err != nil {
+			return fmt.Errorf("unable to parse node id: %v", err)
+		}
+		node, err := db.TreeNode.Get(ctx, nodeID)
+		if err != nil {
+			return fmt.Errorf("unable to get node: %v", err)
+		}
+		db.TreeNode.UpdateOne(node).
+			SetStatus(schema.TreeNodeStatusDestinationLock).
+			SetDestinationLockIdentityPubkey(userIdentityPubkey).
+			Exec(ctx)
+	}
+	return nil
+}
+
+// GetPreimageShare gets the preimage share for the given payment hash.
+func (h *LightningHandler) GetPreimageShare(ctx context.Context, req *pbinternal.GetPreimageShareRequest) ([]byte, error) {
+	err := h.validateGetPreimageRequest(ctx, req.UserSignedRefunds, req.InvoiceAmount)
+	if err != nil {
+		return nil, fmt.Errorf("unable to validate request: %v", err)
+	}
+
+	db := ent.GetDbFromContext(ctx)
+	preimageShare, err := db.PreimageShare.Query().Where(preimageshare.PaymentHash(req.PaymentHash)).First(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get preimage share: %v", err)
+	}
+
+	err = h.storeUserSignedTransactions(ctx, preimageShare, req.UserSignedRefunds, preimageShare.OwnerIdentityPubkey)
+	if err != nil {
+		return nil, fmt.Errorf("unable to store user signed transactions: %v", err)
+	}
+
+	return preimageShare.PreimageShare, nil
+}
+
+// GetPreimage gets the preimage for the given payment hash.
+func (h *LightningHandler) GetPreimage(ctx context.Context, req *pb.GetPreimageRequest) (*pb.GetPreimageResponse, error) {
+	err := h.validateGetPreimageRequest(ctx, req.UserSignedRefunds, req.InvoiceAmount)
+	if err != nil {
+		return nil, fmt.Errorf("unable to validate request: %v", err)
+	}
+
+	db := ent.GetDbFromContext(ctx)
+	preimageShare, err := db.PreimageShare.Query().Where(preimageshare.PaymentHash(req.PaymentHash)).First(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get preimage share: %v", err)
+	}
+
+	err = h.storeUserSignedTransactions(ctx, preimageShare, req.UserSignedRefunds, preimageShare.OwnerIdentityPubkey)
+	if err != nil {
+		return nil, fmt.Errorf("unable to store user signed transactions: %v", err)
+	}
+
+	selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
+	result, err := helper.ExecuteTaskWithAllOperators(ctx, h.config, &selection, func(ctx context.Context, operator *so.SigningOperator) ([]byte, error) {
+		conn, err := common.NewGRPCConnection(operator.Address)
+		if err != nil {
+			return nil, err
+		}
+		defer conn.Close()
+
+		client := pbinternal.NewSparkInternalServiceClient(conn)
+		response, err := client.GetPreimageShare(ctx, &pbinternal.GetPreimageShareRequest{
+			PaymentHash:       req.PaymentHash,
+			UserSignedRefunds: req.UserSignedRefunds,
+			InvoiceAmount:     req.InvoiceAmount,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("unable to get preimage shares: %v", err)
+		}
+		return response.PreimageShare, nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("unable to execute task with all operators: %v", err)
+	}
+
+	shares := make([]*secretsharing.SecretShare, 0)
+	for identifier, share := range result {
+		index, ok := new(big.Int).SetString(identifier, 16)
+		if !ok {
+			return nil, fmt.Errorf("unable to parse index: %v", identifier)
+		}
+		shares = append(shares, &secretsharing.SecretShare{
+			FieldModulus: secp256k1.S256().N,
+			Threshold:    int(h.config.Threshold),
+			Index:        index,
+			Share:        new(big.Int).SetBytes(share),
+		})
+	}
+
+	secretShare, err := secretsharing.RecoverSecret(shares)
+	if err != nil {
+		return nil, fmt.Errorf("unable to recover secret: %v", err)
+	}
+
+	hash := sha256.Sum256(secretShare.Bytes())
+	if !bytes.Equal(hash[:], req.PaymentHash) {
+		return nil, fmt.Errorf("invalid preimage")
+	}
+
+	return &pb.GetPreimageResponse{Preimage: hash[:]}, nil
 }
