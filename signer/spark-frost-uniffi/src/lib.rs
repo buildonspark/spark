@@ -15,6 +15,9 @@ use bitcoin::{
 };
 use ecies::{decrypt, encrypt};
 use frost_secp256k1_tr::Identifier;
+use gloo_utils::format::JsValueSerdeExt;
+use serde::{Deserialize, Serialize};
+use wasm_bindgen::prelude::*;
 
 /// A uniffi library for the Spark Frost signing protocol on client side.
 /// This only signs as the required participant in the signing protocol.
@@ -35,11 +38,27 @@ impl std::fmt::Display for Error {
         write!(f, "{}", self)
     }
 }
+impl Into<JsValue> for Error {
+    fn into(self) -> JsValue {
+        JsValue::from_str(&self.to_string())
+    }
+}
 
+#[wasm_bindgen]
 #[derive(Debug, Clone)]
 pub struct SigningNonce {
+    #[wasm_bindgen(getter_with_clone)]
     pub hiding: Vec<u8>,
+    #[wasm_bindgen(getter_with_clone)]
     pub binding: Vec<u8>,
+}
+
+#[wasm_bindgen]
+impl SigningNonce {
+    #[wasm_bindgen(constructor)]
+    pub fn new(hiding: Vec<u8>, binding: Vec<u8>) -> Self {
+        SigningNonce { hiding, binding }
+    }
 }
 
 impl Into<spark_frost::proto::frost::SigningNonce> for SigningNonce {
@@ -60,10 +79,21 @@ impl From<spark_frost::proto::frost::SigningNonce> for SigningNonce {
     }
 }
 
-#[derive(Debug, Clone)]
+#[wasm_bindgen]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SigningCommitment {
+    #[wasm_bindgen(getter_with_clone)]
     pub hiding: Vec<u8>,
+    #[wasm_bindgen(getter_with_clone)]
     pub binding: Vec<u8>,
+}
+
+#[wasm_bindgen]
+impl SigningCommitment {
+    #[wasm_bindgen(constructor)]
+    pub fn new(hiding: Vec<u8>, binding: Vec<u8>) -> Self {
+        SigningCommitment { hiding, binding }
+    }
 }
 
 impl Into<spark_frost::proto::common::SigningCommitment> for SigningCommitment {
@@ -84,9 +114,12 @@ impl From<spark_frost::proto::common::SigningCommitment> for SigningCommitment {
     }
 }
 
+#[wasm_bindgen]
 #[derive(Debug, Clone)]
 pub struct NonceResult {
+    #[wasm_bindgen(getter_with_clone)]
     pub nonce: SigningNonce,
+    #[wasm_bindgen(getter_with_clone)]
     pub commitment: SigningCommitment,
 }
 
@@ -99,14 +132,30 @@ impl From<spark_frost::proto::frost::SigningNonceResult> for NonceResult {
     }
 }
 
+#[wasm_bindgen(js_name = KeyPackage)]
 #[derive(Debug, Clone)]
 pub struct KeyPackage {
-    // The secret key for the user.
+    // The secret key for the user
+    #[wasm_bindgen(getter_with_clone)]
     pub secret_key: Vec<u8>,
-    // The public key for the user.
+    // The public key for the user
+    #[wasm_bindgen(getter_with_clone)]
     pub public_key: Vec<u8>,
-    // The verifying key for the user + SE.
+    // The verifying key for the user + SE
+    #[wasm_bindgen(getter_with_clone)]
     pub verifying_key: Vec<u8>,
+}
+
+#[wasm_bindgen]
+impl KeyPackage {
+    #[wasm_bindgen(constructor)]
+    pub fn new(secret_key: Vec<u8>, public_key: Vec<u8>, verifying_key: Vec<u8>) -> KeyPackage {
+        Self {
+            secret_key,
+            public_key,
+            verifying_key,
+        }
+    }
 }
 
 impl Into<spark_frost::proto::frost::KeyPackage> for KeyPackage {
@@ -127,6 +176,7 @@ impl Into<spark_frost::proto::frost::KeyPackage> for KeyPackage {
     }
 }
 
+#[wasm_bindgen]
 pub fn frost_nonce(key_package: KeyPackage) -> Result<NonceResult, Error> {
     let key_package_proto: spark_frost::proto::frost::KeyPackage = key_package.into();
     let request = spark_frost::proto::frost::FrostNonceRequest {
@@ -175,6 +225,19 @@ pub fn sign_frost(
     Ok(result.signature_share.clone())
 }
 
+#[wasm_bindgen]
+pub fn wasm_sign_frost(
+    msg: Vec<u8>,
+    key_package: KeyPackage,
+    nonce: SigningNonce,
+    self_commitment: SigningCommitment,
+    statechain_commitments: JsValue,
+) -> Result<Vec<u8>, Error> {
+    let statechain_commitments: HashMap<String, SigningCommitment> =
+        JsValue::into_serde(&statechain_commitments).map_err(|e| Error::Spark(e.to_string()))?;
+    sign_frost(msg, key_package, nonce, self_commitment, statechain_commitments)
+}
+
 pub fn aggregate_frost(
     msg: Vec<u8>,
     statechain_commitments: HashMap<String, SigningCommitment>,
@@ -211,13 +274,38 @@ pub fn aggregate_frost(
     Ok(response.signature)
 }
 
-#[derive(Debug, Clone)]
-pub struct TransactionResult {
-    tx: Vec<u8>,
-    sighash: Vec<u8>,
+#[wasm_bindgen]
+pub fn wasm_aggregate_frost(
+    msg: Vec<u8>,
+    statechain_commitments: JsValue,
+    self_commitment: SigningCommitment,
+    statechain_signatures: JsValue,
+    self_signature: Vec<u8>,
+    statechain_public_keys: JsValue,
+    self_public_key: Vec<u8>,
+    verifying_key: Vec<u8>,
+) -> Result<Vec<u8>, Error> {
+    let statechain_commitments: HashMap<String, SigningCommitment> =
+        JsValue::into_serde(&statechain_commitments).map_err(|e| Error::Spark(e.to_string()))?;
+    let statechain_signatures: HashMap<String, Vec<u8>> =
+        JsValue::into_serde(&statechain_signatures).map_err(|e| Error::Spark(e.to_string()))?;
+    let statechain_public_keys: HashMap<String, Vec<u8>> =
+        JsValue::into_serde(&statechain_public_keys).map_err(|e| Error::Spark(e.to_string()))?;
+    aggregate_frost(msg, statechain_commitments, self_commitment, statechain_signatures, self_signature, statechain_public_keys, self_public_key, verifying_key)
 }
 
+#[wasm_bindgen]
+#[derive(Debug, Clone)]
+pub struct TransactionResult {
+    #[wasm_bindgen(getter_with_clone)]
+    pub tx: Vec<u8>,
+    #[wasm_bindgen(getter_with_clone)]
+    pub sighash: Vec<u8>,
+}
+
+
 // Construct a tx that pays from the tx.out[vout] to the address.
+#[wasm_bindgen]
 pub fn construct_node_tx(
     tx: Vec<u8>,
     vout: u32,
@@ -281,6 +369,7 @@ pub fn construct_node_tx(
 }
 
 // Construct a tx that pays from the tx.out[vout] to the address.
+#[wasm_bindgen]
 pub fn construct_refund_tx(
     tx: Vec<u8>,
     vout: u32,
@@ -359,6 +448,7 @@ pub fn construct_refund_tx(
 }
 
 // Construct a tx that pays from the tx.out[vout] to the address.
+#[wasm_bindgen]
 pub fn construct_split_tx(
     tx: Vec<u8>,
     vout: u32,
@@ -424,12 +514,16 @@ pub fn construct_split_tx(
     })
 }
 
+#[wasm_bindgen]
 #[derive(Debug, Clone)]
 pub struct DummyTx {
+    #[wasm_bindgen(getter_with_clone)]
     pub tx: Vec<u8>,
+    #[wasm_bindgen(getter_with_clone)]
     pub txid: String,
 }
 
+#[wasm_bindgen]
 pub fn create_dummy_tx(address: String, amount_sats: u64) -> Result<DummyTx, Error> {
     // Create the input
     let input = TxIn {
@@ -476,10 +570,12 @@ fn log_to_file(message: &str) {
     }
 }
 
+#[wasm_bindgen]
 pub fn encrypt_ecies(msg: Vec<u8>, public_key_bytes: Vec<u8>) -> Result<Vec<u8>, Error> {
     encrypt(&public_key_bytes, &msg).map_err(|e| Error::Spark(e.to_string()))
 }
 
+#[wasm_bindgen]
 pub fn decrypt_ecies(encrypted_msg: Vec<u8>, private_key_bytes: Vec<u8>) -> Result<Vec<u8>, Error> {
     decrypt(&private_key_bytes, &encrypted_msg).map_err(|e| Error::Spark(e.to_string()))
 }
