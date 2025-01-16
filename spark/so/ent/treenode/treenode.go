@@ -130,8 +130,6 @@ var (
 	OwnerSigningPubkeyValidator func([]byte) error
 	// RawTxValidator is a validator for the "raw_tx" field. It is called by the builders before save.
 	RawTxValidator func([]byte) error
-	// RawRefundTxValidator is a validator for the "raw_refund_tx" field. It is called by the builders before save.
-	RawRefundTxValidator func([]byte) error
 	// DefaultID holds the default value on creation for the "id" field.
 	DefaultID func() uuid.UUID
 )

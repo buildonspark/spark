@@ -196,6 +196,10 @@ func init() {
 	transferleafDescSignature := transferleafFields[1].Descriptor()
 	// transferleaf.SignatureValidator is a validator for the "signature" field. It is called by the builders before save.
 	transferleaf.SignatureValidator = transferleafDescSignature.Validators[0].(func([]byte) error)
+	// transferleafDescPreviousRefundTx is the schema descriptor for previous_refund_tx field.
+	transferleafDescPreviousRefundTx := transferleafFields[2].Descriptor()
+	// transferleaf.PreviousRefundTxValidator is a validator for the "previous_refund_tx" field. It is called by the builders before save.
+	transferleaf.PreviousRefundTxValidator = transferleafDescPreviousRefundTx.Validators[0].(func([]byte) error)
 	// transferleafDescID is the schema descriptor for id field.
 	transferleafDescID := transferleafMixinFields0[0].Descriptor()
 	// transferleaf.DefaultID holds the default value on creation for the id field.
@@ -254,10 +258,6 @@ func init() {
 	treenodeDescRawTx := treenodeFields[5].Descriptor()
 	// treenode.RawTxValidator is a validator for the "raw_tx" field. It is called by the builders before save.
 	treenode.RawTxValidator = treenodeDescRawTx.Validators[0].(func([]byte) error)
-	// treenodeDescRawRefundTx is the schema descriptor for raw_refund_tx field.
-	treenodeDescRawRefundTx := treenodeFields[7].Descriptor()
-	// treenode.RawRefundTxValidator is a validator for the "raw_refund_tx" field. It is called by the builders before save.
-	treenode.RawRefundTxValidator = treenodeDescRawRefundTx.Validators[0].(func([]byte) error)
 	// treenodeDescID is the schema descriptor for id field.
 	treenodeDescID := treenodeMixinFields0[0].Descriptor()
 	// treenode.DefaultID holds the default value on creation for the id field.

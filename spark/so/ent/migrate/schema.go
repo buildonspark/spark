@@ -171,6 +171,7 @@ var (
 		{Name: "update_time", Type: field.TypeTime},
 		{Name: "secret_cipher", Type: field.TypeBytes},
 		{Name: "signature", Type: field.TypeBytes},
+		{Name: "previous_refund_tx", Type: field.TypeBytes},
 		{Name: "transfer_leaf_transfer", Type: field.TypeUUID},
 		{Name: "transfer_leaf_leaf", Type: field.TypeUUID},
 	}
@@ -182,13 +183,13 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "transfer_leafs_transfers_transfer",
-				Columns:    []*schema.Column{TransferLeafsColumns[5]},
+				Columns:    []*schema.Column{TransferLeafsColumns[6]},
 				RefColumns: []*schema.Column{TransfersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "transfer_leafs_tree_nodes_leaf",
-				Columns:    []*schema.Column{TransferLeafsColumns[6]},
+				Columns:    []*schema.Column{TransferLeafsColumns[7]},
 				RefColumns: []*schema.Column{TreeNodesColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -197,7 +198,7 @@ var (
 			{
 				Name:    "transferleaf_transfer_leaf_transfer",
 				Unique:  false,
-				Columns: []*schema.Column{TransferLeafsColumns[5]},
+				Columns: []*schema.Column{TransferLeafsColumns[6]},
 			},
 		},
 	}
@@ -235,7 +236,7 @@ var (
 		{Name: "owner_signing_pubkey", Type: field.TypeBytes},
 		{Name: "raw_tx", Type: field.TypeBytes},
 		{Name: "vout", Type: field.TypeUint16},
-		{Name: "raw_refund_tx", Type: field.TypeBytes},
+		{Name: "raw_refund_tx", Type: field.TypeBytes, Nullable: true},
 		{Name: "refund_timelock", Type: field.TypeUint32},
 		{Name: "destination_lock_identity_pubkey", Type: field.TypeBytes, Nullable: true},
 		{Name: "tree_node_tree", Type: field.TypeUUID},

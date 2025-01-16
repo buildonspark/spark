@@ -63,6 +63,12 @@ func (tlc *TransferLeafCreate) SetSignature(b []byte) *TransferLeafCreate {
 	return tlc
 }
 
+// SetPreviousRefundTx sets the "previous_refund_tx" field.
+func (tlc *TransferLeafCreate) SetPreviousRefundTx(b []byte) *TransferLeafCreate {
+	tlc.mutation.SetPreviousRefundTx(b)
+	return tlc
+}
+
 // SetID sets the "id" field.
 func (tlc *TransferLeafCreate) SetID(u uuid.UUID) *TransferLeafCreate {
 	tlc.mutation.SetID(u)
@@ -172,6 +178,14 @@ func (tlc *TransferLeafCreate) check() error {
 			return &ValidationError{Name: "signature", err: fmt.Errorf(`ent: validator failed for field "TransferLeaf.signature": %w`, err)}
 		}
 	}
+	if _, ok := tlc.mutation.PreviousRefundTx(); !ok {
+		return &ValidationError{Name: "previous_refund_tx", err: errors.New(`ent: missing required field "TransferLeaf.previous_refund_tx"`)}
+	}
+	if v, ok := tlc.mutation.PreviousRefundTx(); ok {
+		if err := transferleaf.PreviousRefundTxValidator(v); err != nil {
+			return &ValidationError{Name: "previous_refund_tx", err: fmt.Errorf(`ent: validator failed for field "TransferLeaf.previous_refund_tx": %w`, err)}
+		}
+	}
 	if len(tlc.mutation.TransferIDs()) == 0 {
 		return &ValidationError{Name: "transfer", err: errors.New(`ent: missing required edge "TransferLeaf.transfer"`)}
 	}
@@ -228,6 +242,10 @@ func (tlc *TransferLeafCreate) createSpec() (*TransferLeaf, *sqlgraph.CreateSpec
 	if value, ok := tlc.mutation.Signature(); ok {
 		_spec.SetField(transferleaf.FieldSignature, field.TypeBytes, value)
 		_node.Signature = value
+	}
+	if value, ok := tlc.mutation.PreviousRefundTx(); ok {
+		_spec.SetField(transferleaf.FieldPreviousRefundTx, field.TypeBytes, value)
+		_node.PreviousRefundTx = value
 	}
 	if nodes := tlc.mutation.TransferIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{

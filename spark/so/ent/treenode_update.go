@@ -97,6 +97,12 @@ func (tnu *TreeNodeUpdate) SetRawRefundTx(b []byte) *TreeNodeUpdate {
 	return tnu
 }
 
+// ClearRawRefundTx clears the value of the "raw_refund_tx" field.
+func (tnu *TreeNodeUpdate) ClearRawRefundTx() *TreeNodeUpdate {
+	tnu.mutation.ClearRawRefundTx()
+	return tnu
+}
+
 // SetRefundTimelock sets the "refund_timelock" field.
 func (tnu *TreeNodeUpdate) SetRefundTimelock(u uint32) *TreeNodeUpdate {
 	tnu.mutation.ResetRefundTimelock()
@@ -288,11 +294,6 @@ func (tnu *TreeNodeUpdate) check() error {
 			return &ValidationError{Name: "raw_tx", err: fmt.Errorf(`ent: validator failed for field "TreeNode.raw_tx": %w`, err)}
 		}
 	}
-	if v, ok := tnu.mutation.RawRefundTx(); ok {
-		if err := treenode.RawRefundTxValidator(v); err != nil {
-			return &ValidationError{Name: "raw_refund_tx", err: fmt.Errorf(`ent: validator failed for field "TreeNode.raw_refund_tx": %w`, err)}
-		}
-	}
 	if tnu.mutation.TreeCleared() && len(tnu.mutation.TreeIDs()) > 0 {
 		return errors.New(`ent: clearing a required unique edge "TreeNode.tree"`)
 	}
@@ -337,6 +338,9 @@ func (tnu *TreeNodeUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if value, ok := tnu.mutation.RawRefundTx(); ok {
 		_spec.SetField(treenode.FieldRawRefundTx, field.TypeBytes, value)
+	}
+	if tnu.mutation.RawRefundTxCleared() {
+		_spec.ClearField(treenode.FieldRawRefundTx, field.TypeBytes)
 	}
 	if value, ok := tnu.mutation.RefundTimelock(); ok {
 		_spec.SetField(treenode.FieldRefundTimelock, field.TypeUint32, value)
@@ -567,6 +571,12 @@ func (tnuo *TreeNodeUpdateOne) SetRawRefundTx(b []byte) *TreeNodeUpdateOne {
 	return tnuo
 }
 
+// ClearRawRefundTx clears the value of the "raw_refund_tx" field.
+func (tnuo *TreeNodeUpdateOne) ClearRawRefundTx() *TreeNodeUpdateOne {
+	tnuo.mutation.ClearRawRefundTx()
+	return tnuo
+}
+
 // SetRefundTimelock sets the "refund_timelock" field.
 func (tnuo *TreeNodeUpdateOne) SetRefundTimelock(u uint32) *TreeNodeUpdateOne {
 	tnuo.mutation.ResetRefundTimelock()
@@ -771,11 +781,6 @@ func (tnuo *TreeNodeUpdateOne) check() error {
 			return &ValidationError{Name: "raw_tx", err: fmt.Errorf(`ent: validator failed for field "TreeNode.raw_tx": %w`, err)}
 		}
 	}
-	if v, ok := tnuo.mutation.RawRefundTx(); ok {
-		if err := treenode.RawRefundTxValidator(v); err != nil {
-			return &ValidationError{Name: "raw_refund_tx", err: fmt.Errorf(`ent: validator failed for field "TreeNode.raw_refund_tx": %w`, err)}
-		}
-	}
 	if tnuo.mutation.TreeCleared() && len(tnuo.mutation.TreeIDs()) > 0 {
 		return errors.New(`ent: clearing a required unique edge "TreeNode.tree"`)
 	}
@@ -837,6 +842,9 @@ func (tnuo *TreeNodeUpdateOne) sqlSave(ctx context.Context) (_node *TreeNode, er
 	}
 	if value, ok := tnuo.mutation.RawRefundTx(); ok {
 		_spec.SetField(treenode.FieldRawRefundTx, field.TypeBytes, value)
+	}
+	if tnuo.mutation.RawRefundTxCleared() {
+		_spec.ClearField(treenode.FieldRawRefundTx, field.TypeBytes)
 	}
 	if value, ok := tnuo.mutation.RefundTimelock(); ok {
 		_spec.SetField(treenode.FieldRefundTimelock, field.TypeUint32, value)

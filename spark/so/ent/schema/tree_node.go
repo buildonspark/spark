@@ -70,8 +70,7 @@ func (TreeNode) Fields() []ent.Field {
 		field.Bytes("owner_signing_pubkey").NotEmpty(),
 		field.Bytes("raw_tx").NotEmpty(),
 		field.Uint16("vout"),
-		field.Bytes("raw_refund_tx").NotEmpty(),
-		field.Uint32("refund_timelock"),
+		field.Bytes("raw_refund_tx").Optional(),
 		field.Bytes("destination_lock_identity_pubkey").Optional(),
 	}
 }

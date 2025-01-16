@@ -285,14 +285,6 @@ func (tnc *TreeNodeCreate) check() error {
 	if _, ok := tnc.mutation.Vout(); !ok {
 		return &ValidationError{Name: "vout", err: errors.New(`ent: missing required field "TreeNode.vout"`)}
 	}
-	if _, ok := tnc.mutation.RawRefundTx(); !ok {
-		return &ValidationError{Name: "raw_refund_tx", err: errors.New(`ent: missing required field "TreeNode.raw_refund_tx"`)}
-	}
-	if v, ok := tnc.mutation.RawRefundTx(); ok {
-		if err := treenode.RawRefundTxValidator(v); err != nil {
-			return &ValidationError{Name: "raw_refund_tx", err: fmt.Errorf(`ent: validator failed for field "TreeNode.raw_refund_tx": %w`, err)}
-		}
-	}
 	if _, ok := tnc.mutation.RefundTimelock(); !ok {
 		return &ValidationError{Name: "refund_timelock", err: errors.New(`ent: missing required field "TreeNode.refund_timelock"`)}
 	}

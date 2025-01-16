@@ -24,6 +24,7 @@ func (TransferLeaf) Fields() []ent.Field {
 	return []ent.Field{
 		field.Bytes("secret_cipher").NotEmpty().Immutable(),
 		field.Bytes("signature").NotEmpty().Immutable(),
+		field.Bytes("previous_refund_tx").NotEmpty().Immutable(),
 	}
 }
 

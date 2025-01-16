@@ -502,6 +502,16 @@ func RawRefundTxLTE(v []byte) predicate.TreeNode {
 	return predicate.TreeNode(sql.FieldLTE(FieldRawRefundTx, v))
 }
 
+// RawRefundTxIsNil applies the IsNil predicate on the "raw_refund_tx" field.
+func RawRefundTxIsNil() predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldIsNull(FieldRawRefundTx))
+}
+
+// RawRefundTxNotNil applies the NotNil predicate on the "raw_refund_tx" field.
+func RawRefundTxNotNil() predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldNotNull(FieldRawRefundTx))
+}
+
 // RefundTimelockEQ applies the EQ predicate on the "refund_timelock" field.
 func RefundTimelockEQ(v uint32) predicate.TreeNode {
 	return predicate.TreeNode(sql.FieldEQ(FieldRefundTimelock, v))

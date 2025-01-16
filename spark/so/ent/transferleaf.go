@@ -28,6 +28,8 @@ type TransferLeaf struct {
 	SecretCipher []byte `json:"secret_cipher,omitempty"`
 	// Signature holds the value of the "signature" field.
 	Signature []byte `json:"signature,omitempty"`
+	// PreviousRefundTx holds the value of the "previous_refund_tx" field.
+	PreviousRefundTx []byte `json:"previous_refund_tx,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the TransferLeafQuery when eager-loading is set.
 	Edges                  TransferLeafEdges `json:"edges"`
@@ -74,7 +76,7 @@ func (*TransferLeaf) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case transferleaf.FieldSecretCipher, transferleaf.FieldSignature:
+		case transferleaf.FieldSecretCipher, transferleaf.FieldSignature, transferleaf.FieldPreviousRefundTx:
 			values[i] = new([]byte)
 		case transferleaf.FieldCreateTime, transferleaf.FieldUpdateTime:
 			values[i] = new(sql.NullTime)
@@ -128,6 +130,12 @@ func (tl *TransferLeaf) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field signature", values[i])
 			} else if value != nil {
 				tl.Signature = *value
+			}
+		case transferleaf.FieldPreviousRefundTx:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field previous_refund_tx", values[i])
+			} else if value != nil {
+				tl.PreviousRefundTx = *value
 			}
 		case transferleaf.ForeignKeys[0]:
 			if value, ok := values[i].(*sql.NullScanner); !ok {
@@ -200,6 +208,9 @@ func (tl *TransferLeaf) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("signature=")
 	builder.WriteString(fmt.Sprintf("%v", tl.Signature))
+	builder.WriteString(", ")
+	builder.WriteString("previous_refund_tx=")
+	builder.WriteString(fmt.Sprintf("%v", tl.PreviousRefundTx))
 	builder.WriteByte(')')
 	return builder.String()
 }

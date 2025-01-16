@@ -4006,21 +4006,22 @@ func (m *TransferMutation) ResetEdge(name string) error {
 // TransferLeafMutation represents an operation that mutates the TransferLeaf nodes in the graph.
 type TransferLeafMutation struct {
 	config
-	op              Op
-	typ             string
-	id              *uuid.UUID
-	create_time     *time.Time
-	update_time     *time.Time
-	secret_cipher   *[]byte
-	signature       *[]byte
-	clearedFields   map[string]struct{}
-	transfer        *uuid.UUID
-	clearedtransfer bool
-	leaf            *uuid.UUID
-	clearedleaf     bool
-	done            bool
-	oldValue        func(context.Context) (*TransferLeaf, error)
-	predicates      []predicate.TransferLeaf
+	op                 Op
+	typ                string
+	id                 *uuid.UUID
+	create_time        *time.Time
+	update_time        *time.Time
+	secret_cipher      *[]byte
+	signature          *[]byte
+	previous_refund_tx *[]byte
+	clearedFields      map[string]struct{}
+	transfer           *uuid.UUID
+	clearedtransfer    bool
+	leaf               *uuid.UUID
+	clearedleaf        bool
+	done               bool
+	oldValue           func(context.Context) (*TransferLeaf, error)
+	predicates         []predicate.TransferLeaf
 }
 
 var _ ent.Mutation = (*TransferLeafMutation)(nil)
@@ -4271,6 +4272,42 @@ func (m *TransferLeafMutation) ResetSignature() {
 	m.signature = nil
 }
 
+// SetPreviousRefundTx sets the "previous_refund_tx" field.
+func (m *TransferLeafMutation) SetPreviousRefundTx(b []byte) {
+	m.previous_refund_tx = &b
+}
+
+// PreviousRefundTx returns the value of the "previous_refund_tx" field in the mutation.
+func (m *TransferLeafMutation) PreviousRefundTx() (r []byte, exists bool) {
+	v := m.previous_refund_tx
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPreviousRefundTx returns the old "previous_refund_tx" field's value of the TransferLeaf entity.
+// If the TransferLeaf object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TransferLeafMutation) OldPreviousRefundTx(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPreviousRefundTx is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPreviousRefundTx requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPreviousRefundTx: %w", err)
+	}
+	return oldValue.PreviousRefundTx, nil
+}
+
+// ResetPreviousRefundTx resets all changes to the "previous_refund_tx" field.
+func (m *TransferLeafMutation) ResetPreviousRefundTx() {
+	m.previous_refund_tx = nil
+}
+
 // SetTransferID sets the "transfer" edge to the Transfer entity by id.
 func (m *TransferLeafMutation) SetTransferID(id uuid.UUID) {
 	m.transfer = &id
@@ -4383,7 +4420,7 @@ func (m *TransferLeafMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *TransferLeafMutation) Fields() []string {
-	fields := make([]string, 0, 4)
+	fields := make([]string, 0, 5)
 	if m.create_time != nil {
 		fields = append(fields, transferleaf.FieldCreateTime)
 	}
@@ -4395,6 +4432,9 @@ func (m *TransferLeafMutation) Fields() []string {
 	}
 	if m.signature != nil {
 		fields = append(fields, transferleaf.FieldSignature)
+	}
+	if m.previous_refund_tx != nil {
+		fields = append(fields, transferleaf.FieldPreviousRefundTx)
 	}
 	return fields
 }
@@ -4412,6 +4452,8 @@ func (m *TransferLeafMutation) Field(name string) (ent.Value, bool) {
 		return m.SecretCipher()
 	case transferleaf.FieldSignature:
 		return m.Signature()
+	case transferleaf.FieldPreviousRefundTx:
+		return m.PreviousRefundTx()
 	}
 	return nil, false
 }
@@ -4429,6 +4471,8 @@ func (m *TransferLeafMutation) OldField(ctx context.Context, name string) (ent.V
 		return m.OldSecretCipher(ctx)
 	case transferleaf.FieldSignature:
 		return m.OldSignature(ctx)
+	case transferleaf.FieldPreviousRefundTx:
+		return m.OldPreviousRefundTx(ctx)
 	}
 	return nil, fmt.Errorf("unknown TransferLeaf field %s", name)
 }
@@ -4465,6 +4509,13 @@ func (m *TransferLeafMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetSignature(v)
+		return nil
+	case transferleaf.FieldPreviousRefundTx:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPreviousRefundTx(v)
 		return nil
 	}
 	return fmt.Errorf("unknown TransferLeaf field %s", name)
@@ -4526,6 +4577,9 @@ func (m *TransferLeafMutation) ResetField(name string) error {
 		return nil
 	case transferleaf.FieldSignature:
 		m.ResetSignature()
+		return nil
+	case transferleaf.FieldPreviousRefundTx:
+		m.ResetPreviousRefundTx()
 		return nil
 	}
 	return fmt.Errorf("unknown TransferLeaf field %s", name)
@@ -5750,9 +5804,22 @@ func (m *TreeNodeMutation) OldRawRefundTx(ctx context.Context) (v []byte, err er
 	return oldValue.RawRefundTx, nil
 }
 
+// ClearRawRefundTx clears the value of the "raw_refund_tx" field.
+func (m *TreeNodeMutation) ClearRawRefundTx() {
+	m.raw_refund_tx = nil
+	m.clearedFields[treenode.FieldRawRefundTx] = struct{}{}
+}
+
+// RawRefundTxCleared returns if the "raw_refund_tx" field was cleared in this mutation.
+func (m *TreeNodeMutation) RawRefundTxCleared() bool {
+	_, ok := m.clearedFields[treenode.FieldRawRefundTx]
+	return ok
+}
+
 // ResetRawRefundTx resets all changes to the "raw_refund_tx" field.
 func (m *TreeNodeMutation) ResetRawRefundTx() {
 	m.raw_refund_tx = nil
+	delete(m.clearedFields, treenode.FieldRawRefundTx)
 }
 
 // SetRefundTimelock sets the "refund_timelock" field.
@@ -6329,6 +6396,9 @@ func (m *TreeNodeMutation) AddField(name string, value ent.Value) error {
 // mutation.
 func (m *TreeNodeMutation) ClearedFields() []string {
 	var fields []string
+	if m.FieldCleared(treenode.FieldRawRefundTx) {
+		fields = append(fields, treenode.FieldRawRefundTx)
+	}
 	if m.FieldCleared(treenode.FieldDestinationLockIdentityPubkey) {
 		fields = append(fields, treenode.FieldDestinationLockIdentityPubkey)
 	}
@@ -6346,6 +6416,9 @@ func (m *TreeNodeMutation) FieldCleared(name string) bool {
 // error if the field is not defined in the schema.
 func (m *TreeNodeMutation) ClearField(name string) error {
 	switch name {
+	case treenode.FieldRawRefundTx:
+		m.ClearRawRefundTx()
+		return nil
 	case treenode.FieldDestinationLockIdentityPubkey:
 		m.ClearDestinationLockIdentityPubkey()
 		return nil
