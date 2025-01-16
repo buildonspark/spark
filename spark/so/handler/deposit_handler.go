@@ -10,8 +10,6 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/common"
-	pbcommon "github.com/lightsparkdev/spark-go/proto/common"
-	pbfrost "github.com/lightsparkdev/spark-go/proto/frost"
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark-go/proto/spark_internal"
 	"github.com/lightsparkdev/spark-go/so"
@@ -30,51 +28,6 @@ type DepositHandler struct {
 // NewDepositHandler creates a new DepositHandler.
 func NewDepositHandler(onchainHelper helper.OnChainHelper) *DepositHandler {
 	return &DepositHandler{onchainHelper: onchainHelper}
-}
-
-func (o *DepositHandler) generateProofOfPossessionSignature(ctx context.Context, config *so.Config, message []byte, keyshare *ent.SigningKeyshare) ([]byte, error) {
-	jobID := uuid.New().String()
-	signingJob := helper.SigningJob{
-		JobID:             jobID,
-		SigningKeyshareID: keyshare.ID,
-		Message:           message,
-		VerifyingKey:      keyshare.PublicKey,
-		UserCommitment:    nil,
-	}
-	signingResult, err := helper.SignFrost(ctx, config, []*helper.SigningJob{&signingJob})
-	if err != nil {
-		return nil, err
-	}
-
-	operatorCommitments := signingResult[0].SigningCommitments
-	operatorCommitmentsProto := make(map[string]*pbcommon.SigningCommitment)
-	for id, commitment := range operatorCommitments {
-		commitmentProto, err := commitment.MarshalProto()
-		if err != nil {
-			return nil, err
-		}
-		operatorCommitmentsProto[id] = commitmentProto
-	}
-
-	conn, err := common.NewGRPCConnection(config.SignerAddress)
-	if err != nil {
-		return nil, err
-	}
-	defer conn.Close()
-	client := pbfrost.NewFrostServiceClient(conn)
-	signatureShares := signingResult[0].SignatureShares
-	publicKeys := signingResult[0].PublicKeys
-	signature, err := client.AggregateFrost(ctx, &pbfrost.AggregateFrostRequest{
-		Message:         message,
-		SignatureShares: signatureShares,
-		PublicShares:    publicKeys,
-		VerifyingKey:    keyshare.PublicKey,
-		Commitments:     operatorCommitmentsProto,
-	})
-	if err != nil {
-		return nil, err
-	}
-	return signature.Signature, nil
 }
 
 // GenerateDepositAddress generates a deposit address for the given public key.
@@ -172,7 +125,7 @@ func (o *DepositHandler) GenerateDepositAddress(ctx context.Context, config *so.
 	}
 
 	msg := common.ProofOfPossessionMessageHashForDepositAddress(req.IdentityPublicKey, keyshare.PublicKey, []byte(*depositAddress))
-	proofOfPossessionSignature, err := o.generateProofOfPossessionSignature(ctx, config, msg, keyshare)
+	proofOfPossessionSignature, err := helper.GenerateProofOfPossessionSignatures(ctx, config, [][]byte{msg}, []*ent.SigningKeyshare{keyshare})
 	if err != nil {
 		return nil, err
 	}
@@ -182,7 +135,7 @@ func (o *DepositHandler) GenerateDepositAddress(ctx context.Context, config *so.
 			VerifyingKey: verifyingKeyBytes,
 			DepositAddressProof: &pb.DepositAddressProof{
 				AddressSignatures:          response,
-				ProofOfPossessionSignature: proofOfPossessionSignature,
+				ProofOfPossessionSignature: proofOfPossessionSignature[0],
 			},
 		},
 	}, nil
