@@ -33,6 +33,8 @@ const (
 	SparkService_StorePreimageShare_FullMethodName       = "/spark.SparkService/store_preimage_share"
 	SparkService_GetSigningCommitments_FullMethodName    = "/spark.SparkService/get_signing_commitments"
 	SparkService_GetPreimage_FullMethodName              = "/spark.SparkService/get_preimage"
+	SparkService_PrepareTreeAddress_FullMethodName       = "/spark.SparkService/prepare_tree_address"
+	SparkService_CreateTree_FullMethodName               = "/spark.SparkService/create_tree"
 )
 
 // SparkServiceClient is the client API for SparkService service.
@@ -52,6 +54,8 @@ type SparkServiceClient interface {
 	StorePreimageShare(ctx context.Context, in *StorePreimageShareRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	GetSigningCommitments(ctx context.Context, in *GetSigningCommitmentsRequest, opts ...grpc.CallOption) (*GetSigningCommitmentsResponse, error)
 	GetPreimage(ctx context.Context, in *GetPreimageRequest, opts ...grpc.CallOption) (*GetPreimageResponse, error)
+	PrepareTreeAddress(ctx context.Context, in *PrepareTreeAddressRequest, opts ...grpc.CallOption) (*PrepareTreeAddressResponse, error)
+	CreateTree(ctx context.Context, in *CreateTreeRequest, opts ...grpc.CallOption) (*CreateTreeResponse, error)
 }
 
 type sparkServiceClient struct {
@@ -192,6 +196,26 @@ func (c *sparkServiceClient) GetPreimage(ctx context.Context, in *GetPreimageReq
 	return out, nil
 }
 
+func (c *sparkServiceClient) PrepareTreeAddress(ctx context.Context, in *PrepareTreeAddressRequest, opts ...grpc.CallOption) (*PrepareTreeAddressResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PrepareTreeAddressResponse)
+	err := c.cc.Invoke(ctx, SparkService_PrepareTreeAddress_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *sparkServiceClient) CreateTree(ctx context.Context, in *CreateTreeRequest, opts ...grpc.CallOption) (*CreateTreeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateTreeResponse)
+	err := c.cc.Invoke(ctx, SparkService_CreateTree_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SparkServiceServer is the server API for SparkService service.
 // All implementations must embed UnimplementedSparkServiceServer
 // for forward compatibility.
@@ -209,6 +233,8 @@ type SparkServiceServer interface {
 	StorePreimageShare(context.Context, *StorePreimageShareRequest) (*emptypb.Empty, error)
 	GetSigningCommitments(context.Context, *GetSigningCommitmentsRequest) (*GetSigningCommitmentsResponse, error)
 	GetPreimage(context.Context, *GetPreimageRequest) (*GetPreimageResponse, error)
+	PrepareTreeAddress(context.Context, *PrepareTreeAddressRequest) (*PrepareTreeAddressResponse, error)
+	CreateTree(context.Context, *CreateTreeRequest) (*CreateTreeResponse, error)
 	mustEmbedUnimplementedSparkServiceServer()
 }
 
@@ -257,6 +283,12 @@ func (UnimplementedSparkServiceServer) GetSigningCommitments(context.Context, *G
 }
 func (UnimplementedSparkServiceServer) GetPreimage(context.Context, *GetPreimageRequest) (*GetPreimageResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetPreimage not implemented")
+}
+func (UnimplementedSparkServiceServer) PrepareTreeAddress(context.Context, *PrepareTreeAddressRequest) (*PrepareTreeAddressResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method PrepareTreeAddress not implemented")
+}
+func (UnimplementedSparkServiceServer) CreateTree(context.Context, *CreateTreeRequest) (*CreateTreeResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreateTree not implemented")
 }
 func (UnimplementedSparkServiceServer) mustEmbedUnimplementedSparkServiceServer() {}
 func (UnimplementedSparkServiceServer) testEmbeddedByValue()                      {}
@@ -513,6 +545,42 @@ func _SparkService_GetPreimage_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SparkService_PrepareTreeAddress_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PrepareTreeAddressRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkServiceServer).PrepareTreeAddress(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkService_PrepareTreeAddress_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkServiceServer).PrepareTreeAddress(ctx, req.(*PrepareTreeAddressRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SparkService_CreateTree_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateTreeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkServiceServer).CreateTree(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkService_CreateTree_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkServiceServer).CreateTree(ctx, req.(*CreateTreeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // SparkService_ServiceDesc is the grpc.ServiceDesc for SparkService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -571,6 +639,14 @@ var SparkService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "get_preimage",
 			Handler:    _SparkService_GetPreimage_Handler,
+		},
+		{
+			MethodName: "prepare_tree_address",
+			Handler:    _SparkService_PrepareTreeAddress_Handler,
+		},
+		{
+			MethodName: "create_tree",
+			Handler:    _SparkService_CreateTree_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -21,6 +21,9 @@ service SparkService {
     rpc store_preimage_share(StorePreimageShareRequest) returns (google.protobuf.Empty) {}
     rpc get_signing_commitments(GetSigningCommitmentsRequest) returns (GetSigningCommitmentsResponse) {}
     rpc get_preimage(GetPreimageRequest) returns (GetPreimageResponse) {}
+
+    rpc prepare_tree_address(PrepareTreeAddressRequest) returns (PrepareTreeAddressResponse) {}
+    rpc create_tree(CreateTreeRequest) returns (CreateTreeResponse) {}
 }
 
 message DepositAddressProof {
@@ -298,4 +301,55 @@ message GetPreimageRequest {
 
 message GetPreimageResponse {
     bytes preimage = 1;
+}
+
+message AddressRequestNode {
+    bytes user_public_key = 1;
+    uint32 vout = 2;
+    repeated AddressRequestNode children = 3;
+}
+
+message PrepareTreeAddressRequest {
+    oneof source {
+        string parent_node_id = 1;
+        UTXO on_chain_utxo = 2;
+    }
+    repeated AddressRequestNode nodes = 3;
+}
+
+message AddressNode {
+    Address address = 1;
+    repeated AddressNode children = 2;
+}
+
+message PrepareTreeAddressResponse {
+    repeated AddressNode nodes = 1;
+}
+
+message CreationNode {
+    SigningJob root_tx_signing_job = 1;
+    SigningJob refund_tx_signing_job = 2;
+    repeated CreationNode children = 3;
+}
+
+message CreateTreeRequest {
+    oneof source {
+        string parent_node_id = 1;
+        UTXO on_chain_utxo = 2;
+    }
+    repeated CreationNode nodes = 3;    
+    
+    // TODO: This should be removed once we have a proper auth process.
+    bytes user_identity_public_key = 4;
+}
+
+message CreationResponseNode {
+    string node_id = 1;
+    NodeSignatures node_signatures = 2;
+    repeated CreationResponseNode children = 3;
+}
+
+message CreateTreeResponse {
+    string tree_id = 1;
+    repeated CreationResponseNode nodes = 2;
 }
