@@ -45,8 +45,6 @@ type ConstructNodeTxParams = {
   locktime: number;
 };
 
-export type Network = "mainnet" | "regtest" | "testnet";
-
 type SigningOperator = {
   id: number;
   identifier: string;
