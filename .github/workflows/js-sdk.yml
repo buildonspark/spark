@@ -1,0 +1,39 @@
+name: "JS SDK Checks"
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "sdks/spark-js-sdk/**"
+      - ".github/workflows/js-sdk.yml"
+  pull_request:
+    paths:
+      - "sdks/spark-js-sdk/**"
+      - ".github/workflows/js-sdk.yml"
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sdks/spark-js-sdk
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "yarn"
+          cache-dependency-path: sdks/spark-js-sdk/yarn.lock
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Run tests
+        run: yarn test
