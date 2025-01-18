@@ -139,6 +139,7 @@ func (h *TransferHandler) initLeafTransfer(ctx context.Context, transfer *ent.Tr
 		SetLeaf(leaf).
 		SetSecretCipher(req.SecretCipher).
 		SetSignature(req.Signature).
+		SetPreviousRefundTx(leaf.RawRefundTx).
 		Save(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create transfer leaf: %v", err)
