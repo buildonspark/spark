@@ -280,3 +280,9 @@ func (s *SparkInternalServer) GetPreimageShare(ctx context.Context, req *pb.GetP
 	}
 	return &pb.GetPreimageShareResponse{PreimageShare: preimageShare}, nil
 }
+
+// PrepareTreeAddress prepares the tree address.
+func (s *SparkInternalServer) PrepareTreeAddress(ctx context.Context, req *pb.PrepareTreeAddressRequest) (*pb.PrepareTreeAddressResponse, error) {
+	treeCreationHandler := handler.NewInternalTreeCreationHandler(s.config)
+	return treeCreationHandler.PrepareTreeAddress(ctx, req)
+}

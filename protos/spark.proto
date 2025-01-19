@@ -51,6 +51,11 @@ message UTXO {
     uint32 vout = 2;
 }
 
+message NodeOutput {
+    string node_id = 1;
+    uint32 vout = 2;
+}
+
 message SigningJob {
     bytes signing_public_key = 1;
     bytes raw_tx = 2;
@@ -311,10 +316,13 @@ message AddressRequestNode {
 
 message PrepareTreeAddressRequest {
     oneof source {
-        string parent_node_id = 1;
+        NodeOutput parent_node_output = 1;
         UTXO on_chain_utxo = 2;
     }
     repeated AddressRequestNode nodes = 3;
+    
+    // TODO: This should be removed once we have a proper auth process.
+    bytes user_identity_public_key = 4;
 }
 
 message AddressNode {
@@ -334,7 +342,7 @@ message CreationNode {
 
 message CreateTreeRequest {
     oneof source {
-        string parent_node_id = 1;
+        NodeOutput parent_node_output = 1;
         UTXO on_chain_utxo = 2;
     }
     repeated CreationNode nodes = 3;    

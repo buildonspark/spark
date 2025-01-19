@@ -25,6 +25,8 @@ service SparkInternalService {
     rpc finalize_transfer(FinalizeTransferRequest) returns (google.protobuf.Empty) {}
 
     rpc get_preimage_share(GetPreimageShareRequest) returns (GetPreimageShareResponse) {}
+
+    rpc prepare_tree_address(PrepareTreeAddressRequest) returns (PrepareTreeAddressResponse) {}
 }
 
 message MarkKeysharesAsUsedRequest {
@@ -127,4 +129,22 @@ message GetPreimageShareRequest {
 
 message GetPreimageShareResponse {
     bytes preimage_share = 1;
+}
+
+message PrepareTreeAddressNode {
+    string signing_keyshare_id = 1;
+    bytes user_public_key = 2;
+    repeated PrepareTreeAddressNode children = 3;
+}
+
+message PrepareTreeAddressRequest {
+    string target_keyshare_id = 1;
+    repeated PrepareTreeAddressNode nodes = 2;
+
+    // TODO: This should be removed once we have a proper auth process.
+    bytes user_identity_public_key = 3;
+}
+
+message PrepareTreeAddressResponse {
+    map<string, bytes> signatures = 1;
 }

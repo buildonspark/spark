@@ -108,3 +108,9 @@ func (s *SparkServer) GetPreimage(ctx context.Context, req *pb.GetPreimageReques
 	lightningHandler := handler.NewLightningHandler(s.config)
 	return lightningHandler.GetPreimage(ctx, req)
 }
+
+// PrepareTreeAddress prepares the tree address for the given public key.
+func (s *SparkServer) PrepareTreeAddress(ctx context.Context, req *pb.PrepareTreeAddressRequest) (*pb.PrepareTreeAddressResponse, error) {
+	treeHandler := handler.NewTreeCreationHandler(s.config, s.onchainHelper)
+	return treeHandler.PrepareTreeAddress(ctx, req)
+}

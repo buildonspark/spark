@@ -31,6 +31,33 @@ func AddPublicKeys(a, b []byte) ([]byte, error) {
 	return sum.SerializeCompressed(), nil
 }
 
+// AddPublicKeysList adds a list of secp256k1 public keys using group addition.
+// The input public keys must be 33 bytes.
+// The result is a 33 byte compressed secp256k1 public key.
+func AddPublicKeysList(keys [][]byte) ([]byte, error) {
+	if len(keys) == 0 {
+		return nil, fmt.Errorf("no keys to add")
+	}
+
+	if len(keys) == 1 {
+		return keys[0], nil
+	}
+
+	sum, err := AddPublicKeys(keys[0], keys[1])
+	if err != nil {
+		return nil, err
+	}
+
+	for _, key := range keys[2:] {
+		sum, err = AddPublicKeys(sum, key)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return sum, nil
+}
+
 // ApplyAdditiveTweakToPublicKey applies a tweak to a public key.
 // The result key is pubkey + tweak * G.
 func ApplyAdditiveTweakToPublicKey(pubkey []byte, tweak []byte) ([]byte, error) {

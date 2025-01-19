@@ -132,6 +132,22 @@ func GetKeyPackages(ctx context.Context, config *so.Config, keyshareIDs []uuid.U
 // GetKeyPackagesArray returns the keyshares for the given keyshare IDs.
 // The order of the keyshares in the result is the same as the order of the keyshare IDs.
 func GetKeyPackagesArray(ctx context.Context, keyshareIDs []uuid.UUID) ([]*SigningKeyshare, error) {
+	keysharesMap, err := GetSigningKeysharesMap(ctx, keyshareIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]*SigningKeyshare, len(keyshareIDs))
+	for i, id := range keyshareIDs {
+		result[i] = keysharesMap[id]
+	}
+
+	return result, nil
+}
+
+// GetSigningKeysharesMap returns the keyshares for the given keyshare IDs.
+// The order of the keyshares in the result is the same as the order of the keyshare IDs.
+func GetSigningKeysharesMap(ctx context.Context, keyshareIDs []uuid.UUID) (map[uuid.UUID]*SigningKeyshare, error) {
 	keyshares, err := GetDbFromContext(ctx).SigningKeyshare.Query().Where(
 		signingkeyshare.IDIn(keyshareIDs...),
 	).All(ctx)
@@ -144,12 +160,7 @@ func GetKeyPackagesArray(ctx context.Context, keyshareIDs []uuid.UUID) ([]*Signi
 		keysharesMap[keyshare.ID] = keyshare
 	}
 
-	result := make([]*SigningKeyshare, len(keyshareIDs))
-	for i, id := range keyshareIDs {
-		result[i] = keysharesMap[id]
-	}
-
-	return result, nil
+	return keysharesMap, nil
 }
 
 func sumOfSigningKeyshares(keyshares []*SigningKeyshare) (*SigningKeyshare, error) {
