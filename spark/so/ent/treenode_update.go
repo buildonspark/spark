@@ -103,27 +103,6 @@ func (tnu *TreeNodeUpdate) ClearRawRefundTx() *TreeNodeUpdate {
 	return tnu
 }
 
-// SetRefundTimelock sets the "refund_timelock" field.
-func (tnu *TreeNodeUpdate) SetRefundTimelock(u uint32) *TreeNodeUpdate {
-	tnu.mutation.ResetRefundTimelock()
-	tnu.mutation.SetRefundTimelock(u)
-	return tnu
-}
-
-// SetNillableRefundTimelock sets the "refund_timelock" field if the given value is not nil.
-func (tnu *TreeNodeUpdate) SetNillableRefundTimelock(u *uint32) *TreeNodeUpdate {
-	if u != nil {
-		tnu.SetRefundTimelock(*u)
-	}
-	return tnu
-}
-
-// AddRefundTimelock adds u to the "refund_timelock" field.
-func (tnu *TreeNodeUpdate) AddRefundTimelock(u int32) *TreeNodeUpdate {
-	tnu.mutation.AddRefundTimelock(u)
-	return tnu
-}
-
 // SetDestinationLockIdentityPubkey sets the "destination_lock_identity_pubkey" field.
 func (tnu *TreeNodeUpdate) SetDestinationLockIdentityPubkey(b []byte) *TreeNodeUpdate {
 	tnu.mutation.SetDestinationLockIdentityPubkey(b)
@@ -341,12 +320,6 @@ func (tnu *TreeNodeUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if tnu.mutation.RawRefundTxCleared() {
 		_spec.ClearField(treenode.FieldRawRefundTx, field.TypeBytes)
-	}
-	if value, ok := tnu.mutation.RefundTimelock(); ok {
-		_spec.SetField(treenode.FieldRefundTimelock, field.TypeUint32, value)
-	}
-	if value, ok := tnu.mutation.AddedRefundTimelock(); ok {
-		_spec.AddField(treenode.FieldRefundTimelock, field.TypeUint32, value)
 	}
 	if value, ok := tnu.mutation.DestinationLockIdentityPubkey(); ok {
 		_spec.SetField(treenode.FieldDestinationLockIdentityPubkey, field.TypeBytes, value)
@@ -574,27 +547,6 @@ func (tnuo *TreeNodeUpdateOne) SetRawRefundTx(b []byte) *TreeNodeUpdateOne {
 // ClearRawRefundTx clears the value of the "raw_refund_tx" field.
 func (tnuo *TreeNodeUpdateOne) ClearRawRefundTx() *TreeNodeUpdateOne {
 	tnuo.mutation.ClearRawRefundTx()
-	return tnuo
-}
-
-// SetRefundTimelock sets the "refund_timelock" field.
-func (tnuo *TreeNodeUpdateOne) SetRefundTimelock(u uint32) *TreeNodeUpdateOne {
-	tnuo.mutation.ResetRefundTimelock()
-	tnuo.mutation.SetRefundTimelock(u)
-	return tnuo
-}
-
-// SetNillableRefundTimelock sets the "refund_timelock" field if the given value is not nil.
-func (tnuo *TreeNodeUpdateOne) SetNillableRefundTimelock(u *uint32) *TreeNodeUpdateOne {
-	if u != nil {
-		tnuo.SetRefundTimelock(*u)
-	}
-	return tnuo
-}
-
-// AddRefundTimelock adds u to the "refund_timelock" field.
-func (tnuo *TreeNodeUpdateOne) AddRefundTimelock(u int32) *TreeNodeUpdateOne {
-	tnuo.mutation.AddRefundTimelock(u)
 	return tnuo
 }
 
@@ -845,12 +797,6 @@ func (tnuo *TreeNodeUpdateOne) sqlSave(ctx context.Context) (_node *TreeNode, er
 	}
 	if tnuo.mutation.RawRefundTxCleared() {
 		_spec.ClearField(treenode.FieldRawRefundTx, field.TypeBytes)
-	}
-	if value, ok := tnuo.mutation.RefundTimelock(); ok {
-		_spec.SetField(treenode.FieldRefundTimelock, field.TypeUint32, value)
-	}
-	if value, ok := tnuo.mutation.AddedRefundTimelock(); ok {
-		_spec.AddField(treenode.FieldRefundTimelock, field.TypeUint32, value)
 	}
 	if value, ok := tnuo.mutation.DestinationLockIdentityPubkey(); ok {
 		_spec.SetField(treenode.FieldDestinationLockIdentityPubkey, field.TypeBytes, value)

@@ -237,7 +237,6 @@ var (
 		{Name: "raw_tx", Type: field.TypeBytes},
 		{Name: "vout", Type: field.TypeUint16},
 		{Name: "raw_refund_tx", Type: field.TypeBytes, Nullable: true},
-		{Name: "refund_timelock", Type: field.TypeUint32},
 		{Name: "destination_lock_identity_pubkey", Type: field.TypeBytes, Nullable: true},
 		{Name: "tree_node_tree", Type: field.TypeUUID},
 		{Name: "tree_node_parent", Type: field.TypeUUID, Nullable: true},
@@ -251,19 +250,19 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "tree_nodes_trees_tree",
-				Columns:    []*schema.Column{TreeNodesColumns[13]},
+				Columns:    []*schema.Column{TreeNodesColumns[12]},
 				RefColumns: []*schema.Column{TreesColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "tree_nodes_tree_nodes_parent",
-				Columns:    []*schema.Column{TreeNodesColumns[14]},
+				Columns:    []*schema.Column{TreeNodesColumns[13]},
 				RefColumns: []*schema.Column{TreeNodesColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "tree_nodes_signing_keyshares_signing_keyshare",
-				Columns:    []*schema.Column{TreeNodesColumns[15]},
+				Columns:    []*schema.Column{TreeNodesColumns[14]},
 				RefColumns: []*schema.Column{SigningKeysharesColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -272,12 +271,12 @@ var (
 			{
 				Name:    "treenode_tree_node_parent",
 				Unique:  false,
-				Columns: []*schema.Column{TreeNodesColumns[14]},
+				Columns: []*schema.Column{TreeNodesColumns[13]},
 			},
 			{
 				Name:    "treenode_tree_node_tree",
 				Unique:  false,
-				Columns: []*schema.Column{TreeNodesColumns[13]},
+				Columns: []*schema.Column{TreeNodesColumns[12]},
 			},
 			{
 				Name:    "treenode_owner_identity_pubkey",

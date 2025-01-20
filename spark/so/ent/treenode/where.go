@@ -102,11 +102,6 @@ func RawRefundTx(v []byte) predicate.TreeNode {
 	return predicate.TreeNode(sql.FieldEQ(FieldRawRefundTx, v))
 }
 
-// RefundTimelock applies equality check predicate on the "refund_timelock" field. It's identical to RefundTimelockEQ.
-func RefundTimelock(v uint32) predicate.TreeNode {
-	return predicate.TreeNode(sql.FieldEQ(FieldRefundTimelock, v))
-}
-
 // DestinationLockIdentityPubkey applies equality check predicate on the "destination_lock_identity_pubkey" field. It's identical to DestinationLockIdentityPubkeyEQ.
 func DestinationLockIdentityPubkey(v []byte) predicate.TreeNode {
 	return predicate.TreeNode(sql.FieldEQ(FieldDestinationLockIdentityPubkey, v))
@@ -510,46 +505,6 @@ func RawRefundTxIsNil() predicate.TreeNode {
 // RawRefundTxNotNil applies the NotNil predicate on the "raw_refund_tx" field.
 func RawRefundTxNotNil() predicate.TreeNode {
 	return predicate.TreeNode(sql.FieldNotNull(FieldRawRefundTx))
-}
-
-// RefundTimelockEQ applies the EQ predicate on the "refund_timelock" field.
-func RefundTimelockEQ(v uint32) predicate.TreeNode {
-	return predicate.TreeNode(sql.FieldEQ(FieldRefundTimelock, v))
-}
-
-// RefundTimelockNEQ applies the NEQ predicate on the "refund_timelock" field.
-func RefundTimelockNEQ(v uint32) predicate.TreeNode {
-	return predicate.TreeNode(sql.FieldNEQ(FieldRefundTimelock, v))
-}
-
-// RefundTimelockIn applies the In predicate on the "refund_timelock" field.
-func RefundTimelockIn(vs ...uint32) predicate.TreeNode {
-	return predicate.TreeNode(sql.FieldIn(FieldRefundTimelock, vs...))
-}
-
-// RefundTimelockNotIn applies the NotIn predicate on the "refund_timelock" field.
-func RefundTimelockNotIn(vs ...uint32) predicate.TreeNode {
-	return predicate.TreeNode(sql.FieldNotIn(FieldRefundTimelock, vs...))
-}
-
-// RefundTimelockGT applies the GT predicate on the "refund_timelock" field.
-func RefundTimelockGT(v uint32) predicate.TreeNode {
-	return predicate.TreeNode(sql.FieldGT(FieldRefundTimelock, v))
-}
-
-// RefundTimelockGTE applies the GTE predicate on the "refund_timelock" field.
-func RefundTimelockGTE(v uint32) predicate.TreeNode {
-	return predicate.TreeNode(sql.FieldGTE(FieldRefundTimelock, v))
-}
-
-// RefundTimelockLT applies the LT predicate on the "refund_timelock" field.
-func RefundTimelockLT(v uint32) predicate.TreeNode {
-	return predicate.TreeNode(sql.FieldLT(FieldRefundTimelock, v))
-}
-
-// RefundTimelockLTE applies the LTE predicate on the "refund_timelock" field.
-func RefundTimelockLTE(v uint32) predicate.TreeNode {
-	return predicate.TreeNode(sql.FieldLTE(FieldRefundTimelock, v))
 }
 
 // DestinationLockIdentityPubkeyEQ applies the EQ predicate on the "destination_lock_identity_pubkey" field.

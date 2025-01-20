@@ -100,12 +100,6 @@ func (tnc *TreeNodeCreate) SetRawRefundTx(b []byte) *TreeNodeCreate {
 	return tnc
 }
 
-// SetRefundTimelock sets the "refund_timelock" field.
-func (tnc *TreeNodeCreate) SetRefundTimelock(u uint32) *TreeNodeCreate {
-	tnc.mutation.SetRefundTimelock(u)
-	return tnc
-}
-
 // SetDestinationLockIdentityPubkey sets the "destination_lock_identity_pubkey" field.
 func (tnc *TreeNodeCreate) SetDestinationLockIdentityPubkey(b []byte) *TreeNodeCreate {
 	tnc.mutation.SetDestinationLockIdentityPubkey(b)
@@ -285,9 +279,6 @@ func (tnc *TreeNodeCreate) check() error {
 	if _, ok := tnc.mutation.Vout(); !ok {
 		return &ValidationError{Name: "vout", err: errors.New(`ent: missing required field "TreeNode.vout"`)}
 	}
-	if _, ok := tnc.mutation.RefundTimelock(); !ok {
-		return &ValidationError{Name: "refund_timelock", err: errors.New(`ent: missing required field "TreeNode.refund_timelock"`)}
-	}
 	if len(tnc.mutation.TreeIDs()) == 0 {
 		return &ValidationError{Name: "tree", err: errors.New(`ent: missing required edge "TreeNode.tree"`)}
 	}
@@ -368,10 +359,6 @@ func (tnc *TreeNodeCreate) createSpec() (*TreeNode, *sqlgraph.CreateSpec) {
 	if value, ok := tnc.mutation.RawRefundTx(); ok {
 		_spec.SetField(treenode.FieldRawRefundTx, field.TypeBytes, value)
 		_node.RawRefundTx = value
-	}
-	if value, ok := tnc.mutation.RefundTimelock(); ok {
-		_spec.SetField(treenode.FieldRefundTimelock, field.TypeUint32, value)
-		_node.RefundTimelock = value
 	}
 	if value, ok := tnc.mutation.DestinationLockIdentityPubkey(); ok {
 		_spec.SetField(treenode.FieldDestinationLockIdentityPubkey, field.TypeBytes, value)

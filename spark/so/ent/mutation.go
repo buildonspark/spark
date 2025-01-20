@@ -5287,8 +5287,6 @@ type TreeNodeMutation struct {
 	vout                             *uint16
 	addvout                          *int16
 	raw_refund_tx                    *[]byte
-	refund_timelock                  *uint32
-	addrefund_timelock               *int32
 	destination_lock_identity_pubkey *[]byte
 	clearedFields                    map[string]struct{}
 	tree                             *uuid.UUID
@@ -5822,62 +5820,6 @@ func (m *TreeNodeMutation) ResetRawRefundTx() {
 	delete(m.clearedFields, treenode.FieldRawRefundTx)
 }
 
-// SetRefundTimelock sets the "refund_timelock" field.
-func (m *TreeNodeMutation) SetRefundTimelock(u uint32) {
-	m.refund_timelock = &u
-	m.addrefund_timelock = nil
-}
-
-// RefundTimelock returns the value of the "refund_timelock" field in the mutation.
-func (m *TreeNodeMutation) RefundTimelock() (r uint32, exists bool) {
-	v := m.refund_timelock
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldRefundTimelock returns the old "refund_timelock" field's value of the TreeNode entity.
-// If the TreeNode object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *TreeNodeMutation) OldRefundTimelock(ctx context.Context) (v uint32, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldRefundTimelock is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldRefundTimelock requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldRefundTimelock: %w", err)
-	}
-	return oldValue.RefundTimelock, nil
-}
-
-// AddRefundTimelock adds u to the "refund_timelock" field.
-func (m *TreeNodeMutation) AddRefundTimelock(u int32) {
-	if m.addrefund_timelock != nil {
-		*m.addrefund_timelock += u
-	} else {
-		m.addrefund_timelock = &u
-	}
-}
-
-// AddedRefundTimelock returns the value that was added to the "refund_timelock" field in this mutation.
-func (m *TreeNodeMutation) AddedRefundTimelock() (r int32, exists bool) {
-	v := m.addrefund_timelock
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// ResetRefundTimelock resets all changes to the "refund_timelock" field.
-func (m *TreeNodeMutation) ResetRefundTimelock() {
-	m.refund_timelock = nil
-	m.addrefund_timelock = nil
-}
-
 // SetDestinationLockIdentityPubkey sets the "destination_lock_identity_pubkey" field.
 func (m *TreeNodeMutation) SetDestinationLockIdentityPubkey(b []byte) {
 	m.destination_lock_identity_pubkey = &b
@@ -6132,7 +6074,7 @@ func (m *TreeNodeMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *TreeNodeMutation) Fields() []string {
-	fields := make([]string, 0, 12)
+	fields := make([]string, 0, 11)
 	if m.create_time != nil {
 		fields = append(fields, treenode.FieldCreateTime)
 	}
@@ -6162,9 +6104,6 @@ func (m *TreeNodeMutation) Fields() []string {
 	}
 	if m.raw_refund_tx != nil {
 		fields = append(fields, treenode.FieldRawRefundTx)
-	}
-	if m.refund_timelock != nil {
-		fields = append(fields, treenode.FieldRefundTimelock)
 	}
 	if m.destination_lock_identity_pubkey != nil {
 		fields = append(fields, treenode.FieldDestinationLockIdentityPubkey)
@@ -6197,8 +6136,6 @@ func (m *TreeNodeMutation) Field(name string) (ent.Value, bool) {
 		return m.Vout()
 	case treenode.FieldRawRefundTx:
 		return m.RawRefundTx()
-	case treenode.FieldRefundTimelock:
-		return m.RefundTimelock()
 	case treenode.FieldDestinationLockIdentityPubkey:
 		return m.DestinationLockIdentityPubkey()
 	}
@@ -6230,8 +6167,6 @@ func (m *TreeNodeMutation) OldField(ctx context.Context, name string) (ent.Value
 		return m.OldVout(ctx)
 	case treenode.FieldRawRefundTx:
 		return m.OldRawRefundTx(ctx)
-	case treenode.FieldRefundTimelock:
-		return m.OldRefundTimelock(ctx)
 	case treenode.FieldDestinationLockIdentityPubkey:
 		return m.OldDestinationLockIdentityPubkey(ctx)
 	}
@@ -6313,13 +6248,6 @@ func (m *TreeNodeMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetRawRefundTx(v)
 		return nil
-	case treenode.FieldRefundTimelock:
-		v, ok := value.(uint32)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetRefundTimelock(v)
-		return nil
 	case treenode.FieldDestinationLockIdentityPubkey:
 		v, ok := value.([]byte)
 		if !ok {
@@ -6341,9 +6269,6 @@ func (m *TreeNodeMutation) AddedFields() []string {
 	if m.addvout != nil {
 		fields = append(fields, treenode.FieldVout)
 	}
-	if m.addrefund_timelock != nil {
-		fields = append(fields, treenode.FieldRefundTimelock)
-	}
 	return fields
 }
 
@@ -6356,8 +6281,6 @@ func (m *TreeNodeMutation) AddedField(name string) (ent.Value, bool) {
 		return m.AddedValue()
 	case treenode.FieldVout:
 		return m.AddedVout()
-	case treenode.FieldRefundTimelock:
-		return m.AddedRefundTimelock()
 	}
 	return nil, false
 }
@@ -6380,13 +6303,6 @@ func (m *TreeNodeMutation) AddField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.AddVout(v)
-		return nil
-	case treenode.FieldRefundTimelock:
-		v, ok := value.(int32)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.AddRefundTimelock(v)
 		return nil
 	}
 	return fmt.Errorf("unknown TreeNode numeric field %s", name)
@@ -6459,9 +6375,6 @@ func (m *TreeNodeMutation) ResetField(name string) error {
 		return nil
 	case treenode.FieldRawRefundTx:
 		m.ResetRawRefundTx()
-		return nil
-	case treenode.FieldRefundTimelock:
-		m.ResetRefundTimelock()
 		return nil
 	case treenode.FieldDestinationLockIdentityPubkey:
 		m.ResetDestinationLockIdentityPubkey()
