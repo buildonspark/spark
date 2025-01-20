@@ -1,4 +1,4 @@
-import { numberToBytesBE } from "@noble/curves/abstract/utils";
+import { equalBytes } from "@noble/curves/abstract/utils";
 import { secp256k1 } from "@noble/curves/secp256k1";
 import crypto from "crypto";
 
@@ -40,8 +40,10 @@ export function getRandomBigInt(max: bigint): bigint {
 }
 
 // Modular inverse using extended euclidean algorithm
-// https://en.wikipedia.org/wiki/Extended_Euclidean_algorithm
 export function modInverse(a: bigint, m: bigint): bigint {
+  // Handle negative numbers by making them positive
+  a = ((a % m) + m) % m;
+
   let [old_r, r] = [a, m];
   let [old_s, s] = [1n, 0n];
   let [old_t, t] = [0n, 1n];
@@ -68,7 +70,7 @@ export function evaluatePolynomial(polynomial: Polynomial, x: bigint): bigint {
 
     const xPow = x ** BigInt(i) % polynomial.fieldModulus;
 
-    result = result + ((xPow * coeff) % polynomial.fieldModulus);
+    result = (result + xPow * coeff) % polynomial.fieldModulus;
   }
   return result;
 }
@@ -114,20 +116,18 @@ export function generatePolynomialForSecretSharing(
   secret: bigint,
   degree: number
 ): Polynomial {
-  const coefficients: bigint[] = [];
-  const proofs: Uint8Array[] = [];
+  const coefficients: bigint[] = new Array(degree);
+  const proofs: Uint8Array[] = new Array(degree);
 
   coefficients[0] = secret;
-  proofs[0] = secp256k1.getPublicKey(numberToBytesBE(secret, 32), true);
+  proofs[0] = secp256k1.ProjectivePoint.fromPrivateKey(secret).toRawBytes(true);
 
   for (let i = 1; i < degree; i++) {
     coefficients[i] = getRandomBigInt(fieldModulus);
-    proofs[i] = secp256k1.getPublicKey(
-      numberToBytesBE(coefficients[i], 32),
-      true
-    );
+    proofs[i] = secp256k1.ProjectivePoint.fromPrivateKey(
+      coefficients[i]
+    ).toRawBytes(true);
   }
-
   return {
     fieldModulus,
     coefficients,
@@ -200,6 +200,7 @@ export function recoverSecret(shares: VerifiableSecretShare[]) {
   for (const share of shares) {
     const coeff = computerLagrangeCoefficients(share.index, shares);
     const item = (share.share * coeff) % shares[0].fieldModulus;
+
     result = (result + item) % shares[0].fieldModulus;
   }
 
@@ -208,14 +209,14 @@ export function recoverSecret(shares: VerifiableSecretShare[]) {
 
 // Validates a share of a secret
 export function validateShare(share: VerifiableSecretShare) {
-  const targetPubkey = secp256k1.getPublicKey(
-    numberToBytesBE(share.share, 32),
-    true
-  );
-  let resultPubkey = secp256k1.getPublicKey(share.proof[0], true);
+  const targetPubkey = secp256k1.ProjectivePoint.fromPrivateKey(
+    share.share
+  ).toRawBytes(true);
+
+  let resultPubkey = share.proof[0];
 
   for (let i = 1; i < share.proof.length; i++) {
-    const pubkey = secp256k1.getPublicKey(share.proof[i], true);
+    const pubkey = share.proof[i];
     const value = share.index ** BigInt(i) % share.fieldModulus;
 
     const scaledPoint =
@@ -225,7 +226,19 @@ export function validateShare(share: VerifiableSecretShare) {
       .toRawBytes(true);
   }
 
-  if (resultPubkey !== targetPubkey) {
+  if (!equalBytes(resultPubkey, targetPubkey)) {
     throw new Error("Share is not valid");
   }
+}
+
+// Converts a bigint to a private key since imported package doesn't support bigint
+export function bigIntToPrivateKey(value: bigint): Uint8Array {
+  const hex = value.toString(16).padStart(64, "0");
+
+  const bytes = new Uint8Array(32);
+  for (let i = 0; i < 32; i++) {
+    bytes[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+  }
+
+  return bytes;
 }
