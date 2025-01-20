@@ -167,18 +167,12 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 	if err != nil {
 		return nil, nil, err
 	}
-	refundTx, err := common.TxFromRawTxBytes(refundTxBytes)
-	if err != nil {
-		return nil, nil, err
-	}
-	timeLock := refundTx.TxIn[0].Sequence & 0xFFFF
 
 	// Update the tree node
 	node, err = node.Update().
 		SetRawTx(nodeTxBytes).
 		SetRawRefundTx(refundTxBytes).
 		SetStatus(schema.TreeNodeStatusAvailable).
-		SetRefundTimelock(timeLock).
 		Save(ctx)
 	if err != nil {
 		return nil, nil, err
