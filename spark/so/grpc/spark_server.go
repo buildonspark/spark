@@ -2,6 +2,7 @@ package grpc
 
 import (
 	"context"
+	"log"
 
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
 	"github.com/lightsparkdev/spark-go/so"
@@ -112,5 +113,9 @@ func (s *SparkServer) GetPreimage(ctx context.Context, req *pb.GetPreimageReques
 // PrepareTreeAddress prepares the tree address for the given public key.
 func (s *SparkServer) PrepareTreeAddress(ctx context.Context, req *pb.PrepareTreeAddressRequest) (*pb.PrepareTreeAddressResponse, error) {
 	treeHandler := handler.NewTreeCreationHandler(s.config, s.onchainHelper)
-	return treeHandler.PrepareTreeAddress(ctx, req)
+	result, err := treeHandler.PrepareTreeAddress(ctx, req)
+	if err != nil {
+		log.Printf("failed to prepare tree address: %v", err)
+	}
+	return result, err
 }

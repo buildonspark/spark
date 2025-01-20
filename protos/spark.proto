@@ -310,8 +310,7 @@ message GetPreimageResponse {
 
 message AddressRequestNode {
     bytes user_public_key = 1;
-    uint32 vout = 2;
-    repeated AddressRequestNode children = 3;
+    repeated AddressRequestNode children = 2;
 }
 
 message PrepareTreeAddressRequest {

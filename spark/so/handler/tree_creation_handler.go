@@ -58,7 +58,7 @@ func (h *TreeCreationHandler) findParentPublicKeys(ctx context.Context, req *pb.
 			}
 		}
 
-		addressString, err := common.P2TRAddressFromPkScript(tx.TxOut[req.GetParentNodeOutput().Vout].PkScript, h.config.Network)
+		addressString, err := common.P2TRAddressFromPkScript(tx.TxOut[req.GetOnChainUtxo().Vout].PkScript, h.config.Network)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -160,6 +160,10 @@ func (h *TreeCreationHandler) applyKeysharesToTree(ctx context.Context, targetKe
 
 		selectedKeyshares := make([]*ent.SigningKeyshare, 0)
 
+		if len(currentElement.children) == 0 {
+			continue
+		}
+
 		for _, child := range currentElement.children[:len(currentElement.children)-1] {
 			electedKeyShare := keyshares[keyshareIndex]
 			child.SigningKeyshareId = electedKeyShare.ID.String()
@@ -187,18 +191,18 @@ func (h *TreeCreationHandler) applyKeysharesToTree(ctx context.Context, targetKe
 	return nodes, keysharesMap, nil
 }
 
-func (h *TreeCreationHandler) createAddressNodeFromPrepareTreeAddressNode(ctx context.Context, node *pbinternal.PrepareTreeAddressNode, keysharesMap map[string]*ent.SigningKeyshare, userIdentityPublicKey []byte) (addressNode *pb.AddressNode, err error) {
-	if len(node.Children) == 0 {
-		combinedPublicKey, err := common.AddPublicKeys(keysharesMap[node.SigningKeyshareId].PublicKey, node.UserPublicKey)
-		if err != nil {
-			return nil, err
-		}
+func (h *TreeCreationHandler) createAddressNodeFromPrepareTreeAddressNode(ctx context.Context, node *pbinternal.PrepareTreeAddressNode, keysharesMap map[string]*ent.SigningKeyshare, userIdentityPublicKey []byte, save bool) (addressNode *pb.AddressNode, err error) {
+	combinedPublicKey, err := common.AddPublicKeys(keysharesMap[node.SigningKeyshareId].PublicKey, node.UserPublicKey)
+	if err != nil {
+		return nil, err
+	}
 
-		depositAddress, err := common.P2TRAddressFromPublicKey(combinedPublicKey, h.config.Network)
-		if err != nil {
-			return nil, err
-		}
+	depositAddress, err := common.P2TRAddressFromPublicKey(combinedPublicKey, h.config.Network)
+	if err != nil {
+		return nil, err
+	}
 
+	if save {
 		_, err = ent.GetDbFromContext(ctx).DepositAddress.Create().
 			SetSigningKeyshareID(keysharesMap[node.SigningKeyshareId].ID).
 			SetOwnerIdentityPubkey(userIdentityPublicKey).
@@ -208,7 +212,8 @@ func (h *TreeCreationHandler) createAddressNodeFromPrepareTreeAddressNode(ctx co
 		if err != nil {
 			return nil, err
 		}
-
+	}
+	if len(node.Children) == 0 {
 		return &pb.AddressNode{
 			Address: &pb.Address{
 				Address:      *depositAddress,
@@ -218,18 +223,24 @@ func (h *TreeCreationHandler) createAddressNodeFromPrepareTreeAddressNode(ctx co
 	}
 	children := make([]*pb.AddressNode, len(node.Children))
 	for i, child := range node.Children {
-		children[i], err = h.createAddressNodeFromPrepareTreeAddressNode(ctx, child, keysharesMap, userIdentityPublicKey)
+		children[i], err = h.createAddressNodeFromPrepareTreeAddressNode(ctx, child, keysharesMap, userIdentityPublicKey, len(node.Children) > 1)
 		if err != nil {
 			return nil, err
 		}
 	}
-	return nil, nil
+	return &pb.AddressNode{
+		Address: &pb.Address{
+			Address:      *depositAddress,
+			VerifyingKey: combinedPublicKey,
+		},
+		Children: children,
+	}, nil
 }
 
 func (h *TreeCreationHandler) createAddressNodesFromPrepareTreeAddressNodes(ctx context.Context, nodes []*pbinternal.PrepareTreeAddressNode, keysharesMap map[string]*ent.SigningKeyshare, userIdentityPublicKey []byte) (addressNodes []*pb.AddressNode, err error) {
 	addressNodes = make([]*pb.AddressNode, len(nodes))
 	for i, node := range nodes {
-		addressNodes[i], err = h.createAddressNodeFromPrepareTreeAddressNode(ctx, node, keysharesMap, userIdentityPublicKey)
+		addressNodes[i], err = h.createAddressNodeFromPrepareTreeAddressNode(ctx, node, keysharesMap, userIdentityPublicKey, len(nodes) > 1)
 		if err != nil {
 			return nil, err
 		}
@@ -250,6 +261,15 @@ func (h *TreeCreationHandler) PrepareTreeAddress(ctx context.Context, req *pb.Pr
 	}
 
 	keyshares, err := ent.GetUnusedSigningKeyshares(ctx, h.config, keyCount)
+	if err != nil {
+		return nil, err
+	}
+
+	keysharesToMark := make([]uuid.UUID, 0)
+	for _, keyshare := range keyshares {
+		keysharesToMark = append(keysharesToMark, keyshare.ID)
+	}
+	err = ent.MarkSigningKeysharesAsUsed(ctx, h.config, keysharesToMark)
 	if err != nil {
 		return nil, err
 	}
@@ -276,8 +296,9 @@ func (h *TreeCreationHandler) PrepareTreeAddress(ctx context.Context, req *pb.Pr
 		client := pbinternal.NewSparkInternalServiceClient(conn)
 
 		return client.PrepareTreeAddress(ctx, &pbinternal.PrepareTreeAddressRequest{
-			TargetKeyshareId: signingKeyshare.ID.String(),
-			Nodes:            addressNodes,
+			TargetKeyshareId:      signingKeyshare.ID.String(),
+			Nodes:                 addressNodes,
+			UserIdentityPublicKey: req.UserIdentityPublicKey,
 		})
 	})
 	if err != nil {

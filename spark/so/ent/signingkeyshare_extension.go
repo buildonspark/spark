@@ -196,6 +196,10 @@ func sumOfSigningKeyshares(keyshares []*SigningKeyshare) (*SigningKeyshare, erro
 // CalculateAndStoreLastKey calculates the last key from the given keyshares and stores it in the database.
 // The target = sum(keyshares) + last_key
 func CalculateAndStoreLastKey(ctx context.Context, config *so.Config, target *SigningKeyshare, keyshares []*SigningKeyshare, id uuid.UUID) (*SigningKeyshare, error) {
+	if len(keyshares) == 0 {
+		return target, nil
+	}
+
 	log.Printf("Calculating last key for keyshares: %v", keyshares)
 	sumKeyshare, err := sumOfSigningKeyshares(keyshares)
 	if err != nil {

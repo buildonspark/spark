@@ -43,6 +43,8 @@ func (h *InternalTreeCreationHandler) markExistingSigningKeysharesAsUsed(ctx con
 		nodeQueue = append(nodeQueue, node)
 	}
 
+	nodeQueue = append(nodeQueue, req.Nodes[len(req.Nodes)-1])
+
 	for len(nodeQueue) > 0 {
 		node := nodeQueue[0]
 		nodeQueue = nodeQueue[1:]
@@ -59,6 +61,8 @@ func (h *InternalTreeCreationHandler) markExistingSigningKeysharesAsUsed(ctx con
 			keyshareIDs = append(keyshareIDs, keyshareID)
 			nodeQueue = append(nodeQueue, childNode)
 		}
+
+		nodeQueue = append(nodeQueue, node.Children[len(node.Children)-1])
 	}
 
 	err = ent.MarkSigningKeysharesAsUsed(ctx, h.config, keyshareIDs)
@@ -79,7 +83,7 @@ func (h *InternalTreeCreationHandler) markExistingSigningKeysharesAsUsed(ctx con
 	return result, nil
 }
 
-func (h *InternalTreeCreationHandler) generateAndStoreDepositAddress(ctx context.Context, seKeyshare *ent.SigningKeyshare, userPubkey, identityPubkey []byte) (string, []byte, error) {
+func (h *InternalTreeCreationHandler) generateAndStoreDepositAddress(ctx context.Context, seKeyshare *ent.SigningKeyshare, userPubkey, identityPubkey []byte, save bool) (string, []byte, error) {
 	combinedPublicKey, err := common.AddPublicKeys(seKeyshare.PublicKey, userPubkey)
 	if err != nil {
 		return "", nil, err
@@ -88,14 +92,16 @@ func (h *InternalTreeCreationHandler) generateAndStoreDepositAddress(ctx context
 	if err != nil {
 		return "", nil, err
 	}
-	_, err = ent.GetDbFromContext(ctx).DepositAddress.Create().
-		SetSigningKeyshareID(seKeyshare.ID).
-		SetOwnerIdentityPubkey(identityPubkey).
-		SetOwnerSigningPubkey(userPubkey).
-		SetAddress(*address).
-		Save(ctx)
-	if err != nil {
-		return "", nil, err
+	if save {
+		_, err = ent.GetDbFromContext(ctx).DepositAddress.Create().
+			SetSigningKeyshareID(seKeyshare.ID).
+			SetOwnerIdentityPubkey(identityPubkey).
+			SetOwnerSigningPubkey(userPubkey).
+			SetAddress(*address).
+			Save(ctx)
+		if err != nil {
+			return "", nil, err
+		}
 	}
 
 	addressHash := sha256.Sum256([]byte(*address))
@@ -123,6 +129,10 @@ func (h *InternalTreeCreationHandler) prepareDepositAddress(ctx context.Context,
 		currentElement := queue[0]
 		queue = queue[1:]
 
+		if len(currentElement.nodes) == 0 {
+			continue
+		}
+
 		selectedSigningKeyshares := make([]*ent.SigningKeyshare, 0)
 		for _, node := range currentElement.nodes[:len(currentElement.nodes)-1] {
 			selectedSigningKeyshare, ok := existingSigningKeyshares[node.SigningKeyshareId]
@@ -131,7 +141,7 @@ func (h *InternalTreeCreationHandler) prepareDepositAddress(ctx context.Context,
 			}
 			selectedSigningKeyshares = append(selectedSigningKeyshares, selectedSigningKeyshare)
 
-			address, signature, err := h.generateAndStoreDepositAddress(ctx, selectedSigningKeyshare, node.UserPublicKey, req.UserIdentityPublicKey)
+			address, signature, err := h.generateAndStoreDepositAddress(ctx, selectedSigningKeyshare, node.UserPublicKey, req.UserIdentityPublicKey, true)
 			if err != nil {
 				return nil, err
 			}
@@ -152,7 +162,7 @@ func (h *InternalTreeCreationHandler) prepareDepositAddress(ctx context.Context,
 			return nil, err
 		}
 
-		address, signature, err := h.generateAndStoreDepositAddress(ctx, lastKeyShare, lastNode.UserPublicKey, req.UserIdentityPublicKey)
+		address, signature, err := h.generateAndStoreDepositAddress(ctx, lastKeyShare, lastNode.UserPublicKey, req.UserIdentityPublicKey, len(currentElement.nodes) > 1)
 		if err != nil {
 			return nil, err
 		}
