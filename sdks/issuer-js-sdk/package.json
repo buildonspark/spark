@@ -1,0 +1,30 @@
+{
+  "name": "@lightsparkdev/issuer-sdk",
+  "version": "1.0.0",
+  "module": "index.ts",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "bun build ./index.ts --outdir ./dist",
+    "dev": "bun build ./index.ts --outdir ./dist --watch",
+    "format": "prettier src --check",
+    "format:fix": "prettier src --write",
+    "test": "bun test",
+    "proto": "protoc --plugin=./node_modules/.bin/protoc-gen-ts_proto --ts_proto_out=./src/proto ./proto/*.proto"
+  },
+  "dependencies": {
+    "spark-js-sdk": "file:../spark-js-sdk",
+    "lrc20": "file:../../../lrc20/js-sdk"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "prettier": "^3.0.0",
+    "typescript": "^5.7.3",
+    "ts-proto": "^1.166.2"
+  }
+}
