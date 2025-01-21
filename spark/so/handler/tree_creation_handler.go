@@ -427,11 +427,10 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 			rawRefundTx = currentElement.node.RefundTxSigningJob.RawTx
 		}
 
-		node, err := db.
+		createNode := db.
 			TreeNode.
 			Create().
 			SetTree(tree).
-			SetParentID(*parentNodeID).
 			SetStatus(schema.TreeNodeStatusCreating).
 			SetOwnerIdentityPubkey(req.UserIdentityPublicKey).
 			SetOwnerSigningPubkey(currentElement.userPublicKey).
@@ -440,8 +439,13 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 			SetSigningKeyshare(currentElement.keyshare).
 			SetRawTx(currentElement.node.NodeTxSigningJob.RawTx).
 			SetRawRefundTx(rawRefundTx).
-			SetVout(uint16(currentElement.vout)).
-			Save(ctx)
+			SetVout(uint16(currentElement.vout))
+
+		if parentNodeID != nil {
+			createNode.SetParentID(*parentNodeID)
+		}
+
+		node, err := createNode.Save(ctx)
 		if err != nil {
 			return nil, nil, err
 		}

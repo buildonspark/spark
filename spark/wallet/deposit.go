@@ -103,8 +103,8 @@ func GenerateDepositAddress(
 	return depositResp, nil
 }
 
-// CreateTree creates a tree for a given deposit transaction.
-func CreateTree(
+// CreateTreeRoot creates a tree root for a given deposit transaction.
+func CreateTreeRoot(
 	ctx context.Context,
 	config *Config,
 	signingPrivKey,

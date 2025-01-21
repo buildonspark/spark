@@ -88,7 +88,7 @@ func TestStartTreeCreation(t *testing.T) {
 		Tx:   depositTxHex,
 	})
 
-	resp, err := wallet.CreateTree(context.Background(), config, privKey.Serialize(), depositResp.DepositAddress.VerifyingKey, depositTx, vout)
+	resp, err := wallet.CreateTreeRoot(context.Background(), config, privKey.Serialize(), depositResp.DepositAddress.VerifyingKey, depositTx, vout)
 	if err != nil {
 		t.Fatalf("failed to create tree: %v", err)
 	}

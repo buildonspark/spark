@@ -8,8 +8,8 @@ const (
 	DKGKeyCount = 500
 
 	// InitialTimeLock is the initial time lock for the deposit.
-	InitialTimeLock = 200
+	InitialTimeLock = 2000
 
 	// TimeLockInterval is the interval between time locks.
-	TimeLockInterval = 10
+	TimeLockInterval = 100
 )

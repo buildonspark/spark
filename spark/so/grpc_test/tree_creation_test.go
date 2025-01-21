@@ -67,10 +67,18 @@ func TestOneNodeTreeCreationAddressGeneration(t *testing.T) {
 		Tx:   depositTxHex,
 	})
 
-	trees, err := wallet.GenerateDepositAddressesForTree(config, depositTx, nil, uint32(vout), privKey.Serialize(), 3)
+	log.Printf("deposit public key: %x", hex.EncodeToString(privKey.PubKey().SerializeCompressed()))
+	tree, err := wallet.GenerateDepositAddressesForTree(config, depositTx, nil, uint32(vout), privKey.Serialize(), 3)
 	if err != nil {
 		t.Fatalf("failed to create tree: %v", err)
 	}
 
-	log.Printf("tree created: %v", trees)
+	log.Printf("tree created: %v", tree)
+
+	treeNodes, err := wallet.CreateTree(config, depositTx, nil, uint32(vout), tree, false)
+	if err != nil {
+		t.Fatalf("failed to create tree: %v", err)
+	}
+
+	log.Printf("tree nodes created: %v", treeNodes)
 }
