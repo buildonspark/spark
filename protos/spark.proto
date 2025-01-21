@@ -337,8 +337,12 @@ message PrepareTreeAddressResponse {
 }
 
 message CreationNode {
-    SigningJob root_tx_signing_job = 1;
+    // This is the tx that spends the parent node's output.
+    SigningJob node_tx_signing_job = 1;
+    // The refund tx can only exist if there's no children.
     SigningJob refund_tx_signing_job = 2;
+
+    // The children will spend the output of the node's tx. Vout is the index of the child.
     repeated CreationNode children = 3;
 }
 
@@ -347,7 +351,8 @@ message CreateTreeRequest {
         NodeOutput parent_node_output = 1;
         UTXO on_chain_utxo = 2;
     }
-    CreationNode node = 3;    
+    // The node should contain the tx that spends the source's utxo.
+    CreationNode node = 3;
     
     // TODO: This should be removed once we have a proper auth process.
     bytes user_identity_public_key = 4;
@@ -355,8 +360,9 @@ message CreateTreeRequest {
 
 message CreationResponseNode {
     string node_id = 1;
-    NodeSignatures node_signatures = 2;
-    repeated CreationResponseNode children = 3;
+    SigningResult node_tx_signing_result = 2;
+    SigningResult refund_tx_signing_result = 3; 
+    repeated CreationResponseNode children = 4;
 }
 
 message CreateTreeResponse {

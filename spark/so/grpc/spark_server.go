@@ -119,3 +119,13 @@ func (s *SparkServer) PrepareTreeAddress(ctx context.Context, req *pb.PrepareTre
 	}
 	return result, err
 }
+
+// CreateTree creates a tree from user input and signs the transactions in the tree.
+func (s *SparkServer) CreateTree(ctx context.Context, req *pb.CreateTreeRequest) (*pb.CreateTreeResponse, error) {
+	treeHandler := handler.NewTreeCreationHandler(s.config, s.onchainHelper)
+	result, err := treeHandler.CreateTree(ctx, req)
+	if err != nil {
+		log.Printf("failed to create tree: %v", err)
+	}
+	return result, err
+}

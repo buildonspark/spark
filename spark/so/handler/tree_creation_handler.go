@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/btcsuite/btcd/wire"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/common"
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
@@ -12,6 +13,7 @@ import (
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/ent"
 	"github.com/lightsparkdev/spark-go/so/ent/depositaddress"
+	"github.com/lightsparkdev/spark-go/so/ent/schema"
 	"github.com/lightsparkdev/spark-go/so/helper"
 )
 
@@ -26,39 +28,57 @@ func NewTreeCreationHandler(config *so.Config, onchainHelper helper.OnChainHelpe
 	return &TreeCreationHandler{config: config, onchainHelper: onchainHelper}
 }
 
-func (h *TreeCreationHandler) findParentPublicKeys(ctx context.Context, req *pb.PrepareTreeAddressRequest) ([]byte, *ent.SigningKeyshare, error) {
-	var addressString *string
+func (h *TreeCreationHandler) findParentOutputFromUtxo(ctx context.Context, utxo *pb.UTXO) (*wire.TxOut, error) {
+	tx, err := h.onchainHelper.GetTxOnChain(ctx, utxo.Txid)
+	if err != nil {
+		return nil, err
+	}
+	return tx.TxOut[utxo.Vout], nil
+}
+
+func (h *TreeCreationHandler) findParentOutputFromNodeOutput(ctx context.Context, nodeOutput *pb.NodeOutput) (*wire.TxOut, error) {
+	db := ent.GetDbFromContext(ctx)
+	nodeID, err := uuid.Parse(nodeOutput.NodeId)
+	if err != nil {
+		return nil, err
+	}
+	node, err := db.TreeNode.Get(ctx, nodeID)
+	if err != nil {
+		return nil, err
+	}
+	tx, err := common.TxFromRawTxBytes(node.RawTx)
+	if err != nil {
+		return nil, err
+	}
+	return tx.TxOut[nodeOutput.Vout], nil
+}
+
+func (h *TreeCreationHandler) findParentOutputFromPrepareTreeAddressRequest(ctx context.Context, req *pb.PrepareTreeAddressRequest) (*wire.TxOut, error) {
 	switch req.Source.(type) {
 	case *pb.PrepareTreeAddressRequest_ParentNodeOutput:
-		db := ent.GetDbFromContext(ctx)
-		nodeID, err := uuid.Parse(req.GetParentNodeOutput().NodeId)
-		if err != nil {
-			return nil, nil, err
-		}
-		node, err := db.TreeNode.Get(ctx, nodeID)
-		if err != nil {
-			return nil, nil, err
-		}
-		tx, err := common.TxFromRawTxBytes(node.RawTx)
-		if err != nil {
-			return nil, nil, err
-		}
-		addressString, err = common.P2TRAddressFromPkScript(tx.TxOut[req.GetParentNodeOutput().Vout].PkScript, h.config.Network)
-		if err != nil {
-			return nil, nil, err
-		}
+		return h.findParentOutputFromNodeOutput(ctx, req.GetParentNodeOutput())
 	case *pb.PrepareTreeAddressRequest_OnChainUtxo:
-		tx, err := h.onchainHelper.GetTxOnChain(ctx, req.GetOnChainUtxo().Txid)
-		if err != nil {
-			return nil, nil, err
-		}
-		addressString, err = common.P2TRAddressFromPkScript(tx.TxOut[req.GetOnChainUtxo().Vout].PkScript, h.config.Network)
-		if err != nil {
-			return nil, nil, err
-		}
-
+		return h.findParentOutputFromUtxo(ctx, req.GetOnChainUtxo())
 	default:
-		return nil, nil, errors.New("invalid source")
+		return nil, errors.New("invalid source")
+	}
+}
+
+func (h *TreeCreationHandler) findParentOutputFromCreateTreeRequest(ctx context.Context, req *pb.CreateTreeRequest) (*wire.TxOut, error) {
+	switch req.Source.(type) {
+	case *pb.CreateTreeRequest_ParentNodeOutput:
+		return h.findParentOutputFromNodeOutput(ctx, req.GetParentNodeOutput())
+	case *pb.CreateTreeRequest_OnChainUtxo:
+		return h.findParentOutputFromUtxo(ctx, req.GetOnChainUtxo())
+	default:
+		return nil, errors.New("invalid source")
+	}
+}
+
+func (h *TreeCreationHandler) getSigningKeyshareFromOutput(ctx context.Context, output *wire.TxOut) ([]byte, *ent.SigningKeyshare, error) {
+	addressString, err := common.P2TRAddressFromPkScript(output.PkScript, h.config.Network)
+	if err != nil {
+		return nil, nil, err
 	}
 
 	db := ent.GetDbFromContext(ctx)
@@ -73,6 +93,15 @@ func (h *TreeCreationHandler) findParentPublicKeys(ctx context.Context, req *pb.
 	}
 
 	return depositAddress.OwnerSigningPubkey, keyshare, nil
+}
+
+func (h *TreeCreationHandler) findParentPublicKeys(ctx context.Context, req *pb.PrepareTreeAddressRequest) ([]byte, *ent.SigningKeyshare, error) {
+	parentOutput, err := h.findParentOutputFromPrepareTreeAddressRequest(ctx, req)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return h.getSigningKeyshareFromOutput(ctx, parentOutput)
 }
 
 func (h *TreeCreationHandler) validateAndCountTreeAddressNodes(ctx context.Context, parentUserPublicKey []byte, nodes []*pb.AddressRequestNode) (int, error) {
@@ -301,4 +330,244 @@ func (h *TreeCreationHandler) PrepareTreeAddress(ctx context.Context, req *pb.Pr
 	}
 
 	return response, nil
+}
+
+func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.CreateTreeRequest) ([]*helper.SigningJob, []*ent.TreeNode, error) {
+	parentOutput, err := h.findParentOutputFromCreateTreeRequest(ctx, req)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	db := ent.GetDbFromContext(ctx)
+	var parentNode *ent.TreeNode
+	var vout uint32
+	switch req.Source.(type) {
+	case *pb.CreateTreeRequest_ParentNodeOutput:
+		uuid, err := uuid.Parse(req.GetParentNodeOutput().NodeId)
+		if err != nil {
+			return nil, nil, err
+		}
+		parentNode, err = db.TreeNode.Get(ctx, uuid)
+		if err != nil {
+			return nil, nil, err
+		}
+		vout = req.GetParentNodeOutput().Vout
+	case *pb.CreateTreeRequest_OnChainUtxo:
+		parentNode = nil
+		vout = req.GetOnChainUtxo().Vout
+	default:
+		return nil, nil, errors.New("invalid source")
+	}
+
+	type element struct {
+		output        *wire.TxOut
+		node          *pb.CreationNode
+		userPublicKey []byte
+		keyshare      *ent.SigningKeyshare
+		parentNode    *ent.TreeNode
+		vout          uint32
+	}
+
+	userPublicKey, keyshare, err := h.getSigningKeyshareFromOutput(ctx, parentOutput)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	queue := []*element{}
+	queue = append(queue, &element{
+		output:        parentOutput,
+		node:          req.Node,
+		userPublicKey: userPublicKey,
+		keyshare:      keyshare,
+		parentNode:    parentNode,
+		vout:          vout,
+	})
+
+	signingJobs := make([]*helper.SigningJob, 0)
+
+	nodes := make([]*ent.TreeNode, 0)
+
+	for len(queue) > 0 {
+		currentElement := queue[0]
+		queue = queue[1:]
+
+		if currentElement.node.Children != nil && len(currentElement.node.Children) > 0 && currentElement.node.RefundTxSigningJob != nil {
+			return nil, nil, errors.New("refund tx should be on leaf node")
+		}
+
+		signingJob, tx, err := helper.NewSigningJob(currentElement.keyshare, currentElement.node.NodeTxSigningJob, currentElement.output)
+		if err != nil {
+			return nil, nil, err
+		}
+		signingJobs = append(signingJobs, signingJob)
+
+		var tree *ent.Tree
+		var parentNodeID *uuid.UUID
+		if currentElement.parentNode == nil {
+			tree, err = db.Tree.Create().SetOwnerIdentityPubkey(req.UserIdentityPublicKey).Save(ctx)
+			if err != nil {
+				return nil, nil, err
+			}
+			parentNodeID = nil
+		} else {
+			tree, err = currentElement.parentNode.QueryTree().Only(ctx)
+			if err != nil {
+				return nil, nil, err
+			}
+			parentNodeID = &currentElement.parentNode.ID
+		}
+
+		verifyingKey, err := common.AddPublicKeys(currentElement.keyshare.PublicKey, currentElement.userPublicKey)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		var rawRefundTx []byte = nil
+		if currentElement.node.RefundTxSigningJob != nil {
+			rawRefundTx = currentElement.node.RefundTxSigningJob.RawTx
+		}
+
+		node, err := db.
+			TreeNode.
+			Create().
+			SetTree(tree).
+			SetParentID(*parentNodeID).
+			SetStatus(schema.TreeNodeStatusCreating).
+			SetOwnerIdentityPubkey(req.UserIdentityPublicKey).
+			SetOwnerSigningPubkey(currentElement.userPublicKey).
+			SetValue(uint64(currentElement.output.Value)).
+			SetVerifyingPubkey(verifyingKey).
+			SetSigningKeyshare(currentElement.keyshare).
+			SetRawTx(currentElement.node.NodeTxSigningJob.RawTx).
+			SetRawRefundTx(rawRefundTx).
+			SetVout(uint16(currentElement.vout)).
+			Save(ctx)
+		if err != nil {
+			return nil, nil, err
+		}
+		nodes = append(nodes, node)
+		if currentElement.node.RefundTxSigningJob != nil {
+			refundSigningJob, _, err := helper.NewSigningJob(currentElement.keyshare, currentElement.node.RefundTxSigningJob, tx.TxOut[0])
+			if err != nil {
+				return nil, nil, err
+			}
+			signingJobs = append(signingJobs, refundSigningJob)
+		} else if currentElement.node.Children != nil && len(currentElement.node.Children) > 0 {
+			userPublicKeys := [][]byte{}
+			statechainPublicKeys := [][]byte{}
+			for i, child := range currentElement.node.Children {
+				userSigningKey, keyshare, err := h.getSigningKeyshareFromOutput(ctx, tx.TxOut[i])
+				if err != nil {
+					return nil, nil, err
+				}
+				userPublicKeys = append(userPublicKeys, userSigningKey)
+				statechainPublicKeys = append(statechainPublicKeys, keyshare.PublicKey)
+				queue = append(queue, &element{
+					output:        tx.TxOut[i],
+					node:          child,
+					userPublicKey: userSigningKey,
+					keyshare:      keyshare,
+					parentNode:    node,
+					vout:          uint32(i),
+				})
+			}
+
+			userPublicKeySum, err := common.AddPublicKeysList(userPublicKeys)
+			if err != nil {
+				return nil, nil, err
+			}
+			if bytes.Compare(userPublicKeySum, currentElement.userPublicKey) != 0 {
+				return nil, nil, errors.New("user public key does not add up")
+			}
+
+			statechainPublicKeySum, err := common.AddPublicKeysList(statechainPublicKeys)
+			if err != nil {
+				return nil, nil, err
+			}
+			if bytes.Compare(statechainPublicKeySum, currentElement.keyshare.PublicKey) != 0 {
+				return nil, nil, errors.New("statechain public key does not add up")
+			}
+		}
+	}
+
+	return signingJobs, nodes, nil
+}
+
+func (h *TreeCreationHandler) createTreeResponseNodesFromSigningResults(ctx context.Context, req *pb.CreateTreeRequest, signingResults []*helper.SigningResult, nodes []*ent.TreeNode) (*pb.CreationResponseNode, error) {
+	signingResultIndex := 0
+	nodesIndex := 0
+	root := &pb.CreationResponseNode{}
+
+	type element struct {
+		node         *pb.CreationResponseNode
+		creationNode *pb.CreationNode
+	}
+
+	queue := []*element{}
+	queue = append(queue, &element{
+		node:         root,
+		creationNode: req.Node,
+	})
+
+	for len(queue) > 0 {
+		currentElement := queue[0]
+		queue = queue[1:]
+
+		signingResult := signingResults[signingResultIndex]
+		signingResultIndex++
+
+		signingResultProto, err := signingResult.MarshalProto()
+		if err != nil {
+			return nil, err
+		}
+		currentElement.node.NodeTxSigningResult = signingResultProto
+
+		if currentElement.creationNode.RefundTxSigningJob != nil {
+			signingResult = signingResults[signingResultIndex]
+			signingResultIndex++
+
+			refundSigningResultProto, err := signingResult.MarshalProto()
+			if err != nil {
+				return nil, err
+			}
+			currentElement.node.RefundTxSigningResult = refundSigningResultProto
+		} else if currentElement.creationNode.Children != nil && len(currentElement.creationNode.Children) > 0 {
+			children := make([]*pb.CreationResponseNode, len(currentElement.creationNode.Children))
+			for i, child := range currentElement.creationNode.Children {
+				children[i] = &pb.CreationResponseNode{}
+				queue = append(queue, &element{
+					node:         children[i],
+					creationNode: child,
+				})
+			}
+			currentElement.node.Children = children
+		}
+
+		currentElement.node.NodeId = nodes[nodesIndex].ID.String()
+		nodesIndex++
+	}
+
+	return root, nil
+}
+
+// CreateTree creates a tree from user input and signs the transactions in the tree.
+func (h *TreeCreationHandler) CreateTree(ctx context.Context, req *pb.CreateTreeRequest) (*pb.CreateTreeResponse, error) {
+	signingJobs, nodes, err := h.prepareSigningJobs(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	signingResults, err := helper.SignFrost(ctx, h.config, signingJobs)
+	if err != nil {
+		return nil, err
+	}
+
+	node, err := h.createTreeResponseNodesFromSigningResults(ctx, req, signingResults, nodes)
+	if err != nil {
+		return nil, err
+	}
+
+	return &pb.CreateTreeResponse{
+		Node: node,
+	}, nil
 }

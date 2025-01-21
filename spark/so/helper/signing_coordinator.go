@@ -28,6 +28,20 @@ type SigningResult struct {
 	PublicKeys map[string][]byte
 }
 
+// MarshalProto marshals the signing result to a proto.
+func (s *SigningResult) MarshalProto() (*pbspark.SigningResult, error) {
+	signingCommitments, err := common.ConvertObjectMapToProtoMap(s.SigningCommitments)
+	if err != nil {
+		return nil, err
+	}
+
+	return &pbspark.SigningResult{
+		SigningNonceCommitments: signingCommitments,
+		SignatureShares:         s.SignatureShares,
+		PublicKeys:              s.PublicKeys,
+	}, nil
+}
+
 // frostRound1 performs the first round of the Frost signing. It gathers the signing commitments from all operators.
 func frostRound1(ctx context.Context, config *so.Config, signingKeyshareIDs []uuid.UUID, operatorSelection *OperatorSelection) (map[string][]objects.SigningCommitment, error) {
 	return ExecuteTaskWithAllOperators(ctx, config, operatorSelection, func(ctx context.Context, operator *so.SigningOperator) ([]objects.SigningCommitment, error) {
