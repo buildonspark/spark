@@ -60,47 +60,73 @@ func (h *InternalDepositHandler) MarkKeyshareForDepositAddress(ctx context.Conte
 // FinalizeTreeCreation finalizes a tree creation during deposit
 func (h *InternalDepositHandler) FinalizeTreeCreation(ctx context.Context, req *pbinternal.FinalizeTreeCreationRequest) error {
 	db := ent.GetDbFromContext(ctx)
-	treeID, err := uuid.Parse(req.RootNode.TreeId)
-	if err != nil {
-		return err
-	}
-	tree, err := db.Tree.
-		Create().
-		SetID(treeID).
-		SetOwnerIdentityPubkey(req.RootNode.OwnerIdentityPubkey).
-		Save(ctx)
-	if err != nil {
-		return err
+	var tree *ent.Tree = nil
+	if req.Nodes[0].ParentNodeId == nil {
+		treeID, err := uuid.Parse(req.Nodes[0].TreeId)
+		if err != nil {
+			return err
+		}
+		tree, err = db.Tree.
+			Create().
+			SetID(treeID).
+			SetOwnerIdentityPubkey(req.Nodes[0].OwnerIdentityPubkey).
+			Save(ctx)
+		if err != nil {
+			return err
+		}
+	} else {
+		treeID, err := uuid.Parse(req.Nodes[0].TreeId)
+		if err != nil {
+			return err
+		}
+		tree, err = db.Tree.Get(ctx, treeID)
+		if err != nil {
+			return err
+		}
 	}
 
-	nodeID, err := uuid.Parse(req.RootNode.Id)
-	if err != nil {
-		return err
-	}
-	signingKeyshareID, err := uuid.Parse(req.RootNode.SigningKeyshareId)
-	if err != nil {
-		return err
-	}
-	root, err := db.TreeNode.
-		Create().
-		SetID(nodeID).
-		SetTree(tree).
-		SetStatus(schema.TreeNodeStatusAvailable).
-		SetOwnerIdentityPubkey(req.RootNode.OwnerIdentityPubkey).
-		SetOwnerSigningPubkey(req.RootNode.OwnerSigningPubkey).
-		SetValue(req.RootNode.Value).
-		SetVerifyingPubkey(req.RootNode.VerifyingPubkey).
-		SetSigningKeyshareID(signingKeyshareID).
-		SetVout(uint16(req.RootNode.Vout)).
-		SetRawTx(req.RootNode.RawTx).
-		SetRawRefundTx(req.RootNode.RawRefundTx).
-		Save(ctx)
-	if err != nil {
-		return err
-	}
-	_, err = tree.Update().SetRoot(root).Save(ctx)
-	if err != nil {
-		return err
+	for _, node := range req.Nodes {
+		nodeID, err := uuid.Parse(node.Id)
+		if err != nil {
+			return err
+		}
+		signingKeyshareID, err := uuid.Parse(node.SigningKeyshareId)
+		if err != nil {
+			return err
+		}
+		mutatedNode := db.TreeNode.
+			Create().
+			SetID(nodeID).
+			SetTree(tree).
+			SetStatus(schema.TreeNodeStatusAvailable).
+			SetOwnerIdentityPubkey(node.OwnerIdentityPubkey).
+			SetOwnerSigningPubkey(node.OwnerSigningPubkey).
+			SetValue(node.Value).
+			SetVerifyingPubkey(node.VerifyingPubkey).
+			SetSigningKeyshareID(signingKeyshareID).
+			SetVout(uint16(node.Vout)).
+			SetRawTx(node.RawTx).
+			SetRawRefundTx(node.RawRefundTx)
+
+		if node.ParentNodeId != nil {
+			parentID, err := uuid.Parse(*node.ParentNodeId)
+			if err != nil {
+				return err
+			}
+			mutatedNode.SetParentID(parentID)
+		}
+
+		entNode, err := mutatedNode.Save(ctx)
+		if err != nil {
+			return err
+		}
+
+		if node.ParentNodeId == nil {
+			_, err = entNode.Update().SetStatus(schema.TreeNodeStatusAvailable).Save(ctx)
+			if err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }

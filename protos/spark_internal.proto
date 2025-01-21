@@ -88,7 +88,7 @@ message PrepareSplitKeysharesRequest {
 }
 
 message FinalizeTreeCreationRequest {
-    TreeNode root_node = 1;
+    repeated TreeNode nodes = 1;
 }
 
 message FinalizeNodeSplitRequest {

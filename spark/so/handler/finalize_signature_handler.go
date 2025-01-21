@@ -69,7 +69,7 @@ func (o *FinalizeSignatureHandler) FinalizeNodeSignatures(ctx context.Context, r
 
 		switch req.Intent {
 		case pbcommon.SignatureIntent_CREATION:
-			_, err = client.FinalizeTreeCreation(ctx, &pbinternal.FinalizeTreeCreationRequest{RootNode: internalNodes[0]})
+			_, err = client.FinalizeTreeCreation(ctx, &pbinternal.FinalizeTreeCreationRequest{Nodes: internalNodes})
 			return nil, err
 		case pbcommon.SignatureIntent_SPLIT:
 			_, err = client.FinalizeNodeSplit(ctx, &pbinternal.FinalizeNodeSplitRequest{ParentNodeId: *internalNodes[0].ParentNodeId, ChildNodes: internalNodes})

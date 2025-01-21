@@ -68,7 +68,7 @@ func TestTreeCreationAddressGeneration(t *testing.T) {
 	})
 
 	log.Printf("deposit public key: %x", hex.EncodeToString(privKey.PubKey().SerializeCompressed()))
-	tree, err := wallet.GenerateDepositAddressesForTree(config, depositTx, nil, uint32(vout), privKey.Serialize(), 2)
+	tree, err := wallet.GenerateDepositAddressesForTree(config, depositTx, nil, uint32(vout), privKey.Serialize(), 3)
 	if err != nil {
 		t.Fatalf("failed to create tree: %v", err)
 	}
