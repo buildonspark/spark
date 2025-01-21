@@ -100,7 +100,7 @@ run_frost_signers_tmux() {
         local log_file="${run_dir}/logs/signer_${i}.log"
         local cmd="cd signer && cargo run --bin spark-frost-signer --release -- -u /tmp/frost_${i}.sock 2>&1 | tee '${log_file}'"
         # Send the command to tmux
-        tmux send-keys -t "$session_name.$i" "$cmd" C-m
+        tmux send-keys -t "$session_name" "$cmd" C-m
     done
 
     echo ""
@@ -221,7 +221,7 @@ run_operators_tmux() {
            2>&1 | tee '${log_file}'"
        
        # Send the command to tmux
-       tmux send-keys -t "$session_name.$i" "$cmd" C-m
+       tmux send-keys -t "$session_name" "$cmd" C-m
    done
    
    echo ""
@@ -399,6 +399,8 @@ if ! check_signers_ready "$run_dir"; then
     echo "Failed to start all signers"
     exit 1
 fi
+
+echo "All signers are ready"
 
 # Run operators
 run_operators_tmux "$run_dir" "$MIN_SIGNERS" "${PRIV_KEYS[@]}"

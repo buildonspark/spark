@@ -46,13 +46,13 @@ go test $(go list ./... | grep -v -E "so/grpc_test|so/tree")
 
 All E2E tests live in the spark/so/grpc_test folder.
 
-In spark folder, run:
+In the root folder, run:
 
 ```
 ./run-everything.sh
 ```
 
-Then:
+Then in the spark folder:
 
 ```
 go test ./so/grpc_test/...
