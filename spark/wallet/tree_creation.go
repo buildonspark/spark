@@ -126,7 +126,6 @@ func GenerateDepositAddressesForTree(
 				Vout:   uint32(vout),
 			},
 		}
-		request.Nodes = addressRequestNodes
 	} else if parentTx != nil {
 		request.Source = &pb.PrepareTreeAddressRequest_OnChainUtxo{
 			OnChainUtxo: &pb.UTXO{
@@ -134,23 +133,20 @@ func GenerateDepositAddressesForTree(
 				Vout: uint32(vout),
 			},
 		}
-		_, pubkey := secp256k1.PrivKeyFromBytes(parentSigningPrivateKey)
-		request.Nodes = []*pb.AddressRequestNode{
-			{
-				UserPublicKey: pubkey.Serialize(),
-				Children:      addressRequestNodes,
-			},
-		}
-		tree = []*DepositAddressTree{
-			{
-				Address:           nil,
-				SigningPrivateKey: parentSigningPrivateKey,
-				VerificationKey:   pubkey.Serialize(),
-				Children:          tree,
-			},
-		}
 	} else {
 		return nil, errors.New("no parent node or parent tx provided")
+	}
+
+	_, pubkey := secp256k1.PrivKeyFromBytes(parentSigningPrivateKey)
+	request.Node = &pb.AddressRequestNode{
+		UserPublicKey: pubkey.Serialize(),
+		Children:      addressRequestNodes,
+	}
+	root := &DepositAddressTree{
+		Address:           nil,
+		SigningPrivateKey: parentSigningPrivateKey,
+		VerificationKey:   pubkey.Serialize(),
+		Children:          tree,
 	}
 	response, err := client.PrepareTreeAddress(context.Background(), request)
 	if err != nil {
@@ -159,7 +155,7 @@ func GenerateDepositAddressesForTree(
 
 	log.Printf("response: %v", response)
 
-	applyAddressNodesToTree(tree, response.Nodes)
+	applyAddressNodesToTree([]*DepositAddressTree{root}, []*pb.AddressNode{response.Node})
 
 	return tree, nil
 }

@@ -34,16 +34,7 @@ func (h *InternalTreeCreationHandler) markExistingSigningKeysharesAsUsed(ctx con
 	keyshareIDs = append(keyshareIDs, parentKeyshardID)
 
 	nodeQueue := make([]*pbinternal.PrepareTreeAddressNode, 0)
-	for _, node := range req.Nodes[:len(req.Nodes)-1] {
-		keyshareID, err := uuid.Parse(node.SigningKeyshareId)
-		if err != nil {
-			return nil, err
-		}
-		keyshareIDs = append(keyshareIDs, keyshareID)
-		nodeQueue = append(nodeQueue, node)
-	}
-
-	nodeQueue = append(nodeQueue, req.Nodes[len(req.Nodes)-1])
+	nodeQueue = append(nodeQueue, req.Node)
 
 	for len(nodeQueue) > 0 {
 		node := nodeQueue[0]
@@ -121,7 +112,7 @@ func (h *InternalTreeCreationHandler) prepareDepositAddress(ctx context.Context,
 	queue := make([]element, 0)
 	queue = append(queue, element{
 		targetKeyshare: existingSigningKeyshares[req.TargetKeyshareId],
-		nodes:          req.Nodes,
+		nodes:          []*pbinternal.PrepareTreeAddressNode{req.Node},
 	})
 
 	depositAddressSignatures := make(map[string][]byte)

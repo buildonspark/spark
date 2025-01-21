@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 
-	"github.com/btcsuite/btcd/wire"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/common"
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
@@ -28,56 +27,52 @@ func NewTreeCreationHandler(config *so.Config, onchainHelper helper.OnChainHelpe
 }
 
 func (h *TreeCreationHandler) findParentPublicKeys(ctx context.Context, req *pb.PrepareTreeAddressRequest) ([]byte, *ent.SigningKeyshare, error) {
-	var tx *wire.MsgTx
+	var addressString *string
 	switch req.Source.(type) {
 	case *pb.PrepareTreeAddressRequest_ParentNodeOutput:
-		{
-			db := ent.GetDbFromContext(ctx)
-			nodeID, err := uuid.Parse(req.GetParentNodeOutput().NodeId)
-			if err != nil {
-				return nil, nil, err
-			}
-			node, err := db.TreeNode.Get(ctx, nodeID)
-			if err != nil {
-				return nil, nil, err
-			}
-
-			keyshare, err := node.QuerySigningKeyshare().First(ctx)
-			if err != nil {
-				return nil, nil, err
-			}
-
-			return node.OwnerSigningPubkey, keyshare, nil
+		db := ent.GetDbFromContext(ctx)
+		nodeID, err := uuid.Parse(req.GetParentNodeOutput().NodeId)
+		if err != nil {
+			return nil, nil, err
+		}
+		node, err := db.TreeNode.Get(ctx, nodeID)
+		if err != nil {
+			return nil, nil, err
+		}
+		tx, err := common.TxFromRawTxBytes(node.RawTx)
+		if err != nil {
+			return nil, nil, err
+		}
+		addressString, err = common.P2TRAddressFromPkScript(tx.TxOut[req.GetParentNodeOutput().Vout].PkScript, h.config.Network)
+		if err != nil {
+			return nil, nil, err
 		}
 	case *pb.PrepareTreeAddressRequest_OnChainUtxo:
-		{
-			var err error
-			tx, err = h.onchainHelper.GetTxOnChain(ctx, req.GetOnChainUtxo().Txid)
-			if err != nil {
-				return nil, nil, err
-			}
+		tx, err := h.onchainHelper.GetTxOnChain(ctx, req.GetOnChainUtxo().Txid)
+		if err != nil {
+			return nil, nil, err
 		}
-
-		addressString, err := common.P2TRAddressFromPkScript(tx.TxOut[req.GetOnChainUtxo().Vout].PkScript, h.config.Network)
+		addressString, err = common.P2TRAddressFromPkScript(tx.TxOut[req.GetOnChainUtxo().Vout].PkScript, h.config.Network)
 		if err != nil {
 			return nil, nil, err
 		}
 
-		db := ent.GetDbFromContext(ctx)
-		depositAddress, err := db.DepositAddress.Query().Where(depositaddress.Address(*addressString)).Only(ctx)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		keyshare, err := depositAddress.QuerySigningKeyshare().First(ctx)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		return depositAddress.OwnerSigningPubkey, keyshare, nil
 	default:
 		return nil, nil, errors.New("invalid source")
 	}
+
+	db := ent.GetDbFromContext(ctx)
+	depositAddress, err := db.DepositAddress.Query().Where(depositaddress.Address(*addressString)).Only(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	keyshare, err := depositAddress.QuerySigningKeyshare().First(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return depositAddress.OwnerSigningPubkey, keyshare, nil
 }
 
 func (h *TreeCreationHandler) validateAndCountTreeAddressNodes(ctx context.Context, parentUserPublicKey []byte, nodes []*pb.AddressRequestNode) (int, error) {
@@ -127,18 +122,7 @@ func (h *TreeCreationHandler) createPrepareTreeAddressNodeFromAddressNode(ctx co
 	}, nil
 }
 
-func (h *TreeCreationHandler) createPrepareAddressNodes(ctx context.Context, nodes []*pb.AddressRequestNode) (addressNodes []*pbinternal.PrepareTreeAddressNode, err error) {
-	addressNodes = make([]*pbinternal.PrepareTreeAddressNode, len(nodes))
-	for i, node := range nodes {
-		addressNodes[i], err = h.createPrepareTreeAddressNodeFromAddressNode(ctx, node)
-		if err != nil {
-			return nil, err
-		}
-	}
-	return addressNodes, nil
-}
-
-func (h *TreeCreationHandler) applyKeysharesToTree(ctx context.Context, targetKeyshare *ent.SigningKeyshare, nodes []*pbinternal.PrepareTreeAddressNode, keyshares []*ent.SigningKeyshare) ([]*pbinternal.PrepareTreeAddressNode, map[string]*ent.SigningKeyshare, error) {
+func (h *TreeCreationHandler) applyKeysharesToTree(ctx context.Context, targetKeyshare *ent.SigningKeyshare, node *pbinternal.PrepareTreeAddressNode, keyshares []*ent.SigningKeyshare) (*pbinternal.PrepareTreeAddressNode, map[string]*ent.SigningKeyshare, error) {
 	keyshareIndex := 0
 
 	type element struct {
@@ -149,7 +133,7 @@ func (h *TreeCreationHandler) applyKeysharesToTree(ctx context.Context, targetKe
 	queue := []*element{}
 	queue = append(queue, &element{
 		keyshare: targetKeyshare,
-		children: nodes,
+		children: []*pbinternal.PrepareTreeAddressNode{node},
 	})
 
 	keysharesMap := make(map[string]*ent.SigningKeyshare)
@@ -188,7 +172,7 @@ func (h *TreeCreationHandler) applyKeysharesToTree(ctx context.Context, targetKe
 		})
 	}
 
-	return nodes, keysharesMap, nil
+	return node, keysharesMap, nil
 }
 
 func (h *TreeCreationHandler) createAddressNodeFromPrepareTreeAddressNode(ctx context.Context, node *pbinternal.PrepareTreeAddressNode, keysharesMap map[string]*ent.SigningKeyshare, userIdentityPublicKey []byte, save bool) (addressNode *pb.AddressNode, err error) {
@@ -255,7 +239,7 @@ func (h *TreeCreationHandler) PrepareTreeAddress(ctx context.Context, req *pb.Pr
 		return nil, err
 	}
 
-	keyCount, err := h.validateAndCountTreeAddressNodes(ctx, parentUserPublicKey, req.Nodes)
+	keyCount, err := h.validateAndCountTreeAddressNodes(ctx, parentUserPublicKey, []*pb.AddressRequestNode{req.Node})
 	if err != nil {
 		return nil, err
 	}
@@ -274,12 +258,12 @@ func (h *TreeCreationHandler) PrepareTreeAddress(ctx context.Context, req *pb.Pr
 		return nil, err
 	}
 
-	addressNodes, err := h.createPrepareAddressNodes(ctx, req.Nodes)
+	addressNode, err := h.createPrepareTreeAddressNodeFromAddressNode(ctx, req.Node)
 	if err != nil {
 		return nil, err
 	}
 
-	addressNodes, keysharesMap, err := h.applyKeysharesToTree(ctx, signingKeyshare, addressNodes, keyshares)
+	addressNode, keysharesMap, err := h.applyKeysharesToTree(ctx, signingKeyshare, addressNode, keyshares)
 	if err != nil {
 		return nil, err
 	}
@@ -297,7 +281,7 @@ func (h *TreeCreationHandler) PrepareTreeAddress(ctx context.Context, req *pb.Pr
 
 		return client.PrepareTreeAddress(ctx, &pbinternal.PrepareTreeAddressRequest{
 			TargetKeyshareId:      signingKeyshare.ID.String(),
-			Nodes:                 addressNodes,
+			Node:                  addressNode,
 			UserIdentityPublicKey: req.UserIdentityPublicKey,
 		})
 	})
@@ -305,7 +289,7 @@ func (h *TreeCreationHandler) PrepareTreeAddress(ctx context.Context, req *pb.Pr
 		return nil, err
 	}
 
-	resultAddressNodes, err := h.createAddressNodesFromPrepareTreeAddressNodes(ctx, addressNodes, keysharesMap, req.UserIdentityPublicKey)
+	resultRootNode, err := h.createAddressNodeFromPrepareTreeAddressNode(ctx, addressNode, keysharesMap, req.UserIdentityPublicKey, false)
 	if err != nil {
 		return nil, err
 	}
@@ -313,7 +297,7 @@ func (h *TreeCreationHandler) PrepareTreeAddress(ctx context.Context, req *pb.Pr
 	// TODO: Sign proof of possession for all signing keyshares.
 
 	response := &pb.PrepareTreeAddressResponse{
-		Nodes: resultAddressNodes,
+		Node: resultRootNode,
 	}
 
 	return response, nil

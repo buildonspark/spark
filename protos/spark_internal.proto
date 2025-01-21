@@ -139,7 +139,7 @@ message PrepareTreeAddressNode {
 
 message PrepareTreeAddressRequest {
     string target_keyshare_id = 1;
-    repeated PrepareTreeAddressNode nodes = 2;
+    PrepareTreeAddressNode node = 2;
 
     // TODO: This should be removed once we have a proper auth process.
     bytes user_identity_public_key = 3;

@@ -318,7 +318,10 @@ message PrepareTreeAddressRequest {
         NodeOutput parent_node_output = 1;
         UTXO on_chain_utxo = 2;
     }
-    repeated AddressRequestNode nodes = 3;
+
+    // The tx on this node is to spend the source's utxo.
+    // The user's public key should already be registered with the SE for the root node.
+    AddressRequestNode node = 3;
     
     // TODO: This should be removed once we have a proper auth process.
     bytes user_identity_public_key = 4;
@@ -330,7 +333,7 @@ message AddressNode {
 }
 
 message PrepareTreeAddressResponse {
-    repeated AddressNode nodes = 1;
+    AddressNode node = 1;
 }
 
 message CreationNode {
@@ -344,7 +347,7 @@ message CreateTreeRequest {
         NodeOutput parent_node_output = 1;
         UTXO on_chain_utxo = 2;
     }
-    repeated CreationNode nodes = 3;    
+    CreationNode node = 3;    
     
     // TODO: This should be removed once we have a proper auth process.
     bytes user_identity_public_key = 4;
@@ -357,6 +360,5 @@ message CreationResponseNode {
 }
 
 message CreateTreeResponse {
-    string tree_id = 1;
-    repeated CreationResponseNode nodes = 2;
+    CreationResponseNode node = 1;
 }
