@@ -2,6 +2,7 @@ package helper
 
 import (
 	"context"
+	"encoding/hex"
 	"log"
 
 	"github.com/btcsuite/btcd/wire"
@@ -85,6 +86,10 @@ func frostRound2(
 	round1 map[string][]objects.SigningCommitment,
 	operatorSelection *OperatorSelection,
 ) (map[string]map[string][]byte, error) {
+	for _, job := range jobs {
+		log.Println("FrostRound2 signing job message:", hex.EncodeToString(job.Message))
+		log.Println("FrostRound2 signing job verifying key:", hex.EncodeToString(job.VerifyingKey))
+	}
 	operatorResult, err := ExecuteTaskWithAllOperators(ctx, config, operatorSelection, func(ctx context.Context, operator *so.SigningOperator) (map[string][]byte, error) {
 		log.Println("FrostRound2 started for operator:", operator.Identifier)
 		conn, err := common.NewGRPCConnection(operator.Address)
@@ -122,8 +127,6 @@ func frostRound2(
 				Commitments:     commitments,
 				UserCommitments: userCommitmentProto,
 			}
-
-			log.Println("FrostRound2 signing job:", signingJobs[i])
 		}
 
 		client := pbinternal.NewSparkInternalServiceClient(conn)
@@ -194,6 +197,9 @@ func NewSigningJob(keyshare *ent.SigningKeyshare, proto *pbspark.SigningJob, pre
 		VerifyingKey:      verifyingKey,
 		UserCommitment:    &userCommitment,
 	}
+
+	log.Println("NewSigningJob message:", hex.EncodeToString(job.Message))
+	log.Println("NewSigningJob verifying key:", hex.EncodeToString(job.VerifyingKey))
 
 	return job, tx, nil
 }

@@ -14,7 +14,7 @@ import (
 	"github.com/lightsparkdev/spark-go/wallet"
 )
 
-func TestOneNodeTreeCreationAddressGeneration(t *testing.T) {
+func TestTreeCreationAddressGeneration(t *testing.T) {
 	config, err := testutil.TestWalletConfig()
 	if err != nil {
 		t.Fatalf("failed to create wallet config: %v", err)
@@ -68,14 +68,14 @@ func TestOneNodeTreeCreationAddressGeneration(t *testing.T) {
 	})
 
 	log.Printf("deposit public key: %x", hex.EncodeToString(privKey.PubKey().SerializeCompressed()))
-	tree, err := wallet.GenerateDepositAddressesForTree(config, depositTx, nil, uint32(vout), privKey.Serialize(), 3)
+	tree, err := wallet.GenerateDepositAddressesForTree(config, depositTx, nil, uint32(vout), privKey.Serialize(), 2)
 	if err != nil {
 		t.Fatalf("failed to create tree: %v", err)
 	}
 
 	log.Printf("tree created: %v", tree)
 
-	treeNodes, err := wallet.CreateTree(config, depositTx, nil, uint32(vout), tree, false)
+	treeNodes, err := wallet.CreateTree(config, depositTx, nil, uint32(vout), tree, true)
 	if err != nil {
 		t.Fatalf("failed to create tree: %v", err)
 	}

@@ -69,9 +69,6 @@ func (o *FinalizeSignatureHandler) FinalizeNodeSignatures(ctx context.Context, r
 
 		switch req.Intent {
 		case pbcommon.SignatureIntent_CREATION:
-			if len(internalNodes) > 1 {
-				return nil, fmt.Errorf("expect only one node for creation")
-			}
 			_, err = client.FinalizeTreeCreation(ctx, &pbinternal.FinalizeTreeCreationRequest{RootNode: internalNodes[0]})
 			return nil, err
 		case pbcommon.SignatureIntent_SPLIT:
@@ -163,9 +160,12 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 	} else {
 		nodeTxBytes = node.RawTx
 	}
-	refundTxBytes, err := o.verifySignatureAndUpdateTx(node.RawRefundTx, nodeSignatures.RefundTxSignature)
-	if err != nil {
-		return nil, nil, err
+	var refundTxBytes []byte
+	if nodeSignatures.RefundTxSignature != nil {
+		refundTxBytes, err = o.verifySignatureAndUpdateTx(node.RawRefundTx, nodeSignatures.RefundTxSignature)
+		if err != nil {
+			return nil, nil, err
+		}
 	}
 
 	// Update the tree node

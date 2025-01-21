@@ -11,8 +11,10 @@ import (
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/decred/dcrd/dcrec/secp256k1"
+	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go"
 	"github.com/lightsparkdev/spark-go/common"
+	pbfrost "github.com/lightsparkdev/spark-go/proto/frost"
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
 	"github.com/lightsparkdev/spark-go/so/objects"
 )
@@ -45,7 +47,6 @@ func createDepositAddressBinaryTree(
 	leftNode := &DepositAddressTree{
 		Address:           nil,
 		SigningPrivateKey: leftKeyBytes,
-		VerificationKey:   leftKeyBytes,
 		Children:          nil,
 	}
 	leftNode.Children, err = createDepositAddressBinaryTree(config, splitLevel-1, leftKeyBytes)
@@ -62,7 +63,6 @@ func createDepositAddressBinaryTree(
 	rightNode := &DepositAddressTree{
 		Address:           nil,
 		SigningPrivateKey: rightKeyBytes,
-		VerificationKey:   rightKeyBytes,
 		Children:          nil,
 	}
 	rightNode.Children, err = createDepositAddressBinaryTree(config, splitLevel-1, rightKeyBytes)
@@ -94,6 +94,7 @@ func applyAddressNodesToTree(
 ) {
 	for i, node := range tree {
 		node.Address = &addressNodes[i].Address.Address
+		node.VerificationKey = addressNodes[i].Address.VerifyingKey
 		applyAddressNodesToTree(node.Children, addressNodes[i].Children)
 	}
 }
@@ -151,7 +152,6 @@ func GenerateDepositAddressesForTree(
 	root := &DepositAddressTree{
 		Address:           nil,
 		SigningPrivateKey: parentSigningPrivateKey,
-		VerificationKey:   pubkey.Serialize(),
 		Children:          tree,
 	}
 	response, err := client.PrepareTreeAddress(context.Background(), request)
@@ -164,7 +164,13 @@ func GenerateDepositAddressesForTree(
 	return root, nil
 }
 
-func buildCreationNodesFromTree(parentTx *wire.MsgTx, vout uint32, root *DepositAddressTree, createLeaves bool, network common.Network) (*pb.CreationNode, []*objects.SigningNonce, error) {
+func buildCreationNodesFromTree(
+	parentTx *wire.MsgTx,
+	vout uint32,
+	root *DepositAddressTree,
+	createLeaves bool,
+	network common.Network,
+) (*pb.CreationNode, []*objects.SigningNonce, error) {
 	type element struct {
 		parentTx     *wire.MsgTx
 		vout         uint32
@@ -176,7 +182,13 @@ func buildCreationNodesFromTree(parentTx *wire.MsgTx, vout uint32, root *Deposit
 	rootCreationNode := &pb.CreationNode{}
 
 	elements := []element{}
-	elements = append(elements, element{parentTx: parentTx, vout: vout, node: root, creationNode: rootCreationNode, leafNode: false})
+	elements = append(elements, element{
+		parentTx:     parentTx,
+		vout:         vout,
+		node:         root,
+		creationNode: rootCreationNode,
+		leafNode:     false,
+	})
 
 	signingNonces := make([]*objects.SigningNonce, 0)
 
@@ -199,11 +211,17 @@ func buildCreationNodesFromTree(parentTx *wire.MsgTx, vout uint32, root *Deposit
 			for i, child := range currentElement.node.Children {
 				childAddress, _ := btcutil.DecodeAddress(*child.Address, common.NetworkParams(network))
 				childPkScript, _ := txscript.PayToAddrScript(childAddress)
-				tx.AddTxOut(wire.NewTxOut(currentElement.parentTx.TxOut[currentElement.vout].Value, childPkScript))
+				tx.AddTxOut(wire.NewTxOut(int64(currentElement.parentTx.TxOut[currentElement.vout].Value)/2, childPkScript))
 				if shouldAddToQueue {
 					childCreationNode := &pb.CreationNode{}
 					childrenArray = append(childrenArray, childCreationNode)
-					elements = append(elements, element{parentTx: tx, vout: uint32(i), node: child, creationNode: childCreationNode, leafNode: false})
+					elements = append(elements, element{
+						parentTx:     tx,
+						vout:         uint32(i),
+						node:         child,
+						creationNode: childCreationNode,
+						leafNode:     false,
+					})
 				}
 			}
 			if shouldAddToQueue {
@@ -212,7 +230,6 @@ func buildCreationNodesFromTree(parentTx *wire.MsgTx, vout uint32, root *Deposit
 			var txBuf bytes.Buffer
 			tx.Serialize(&txBuf)
 			_, pubkey := secp256k1.PrivKeyFromBytes(currentElement.node.SigningPrivateKey)
-			log.Printf("node pubkey: %x", hex.EncodeToString(pubkey.Serialize()))
 			signingNonce, err := objects.RandomSigningNonce()
 			if err != nil {
 				return nil, nil, err
@@ -326,6 +343,186 @@ func buildCreationNodesFromTree(parentTx *wire.MsgTx, vout uint32, root *Deposit
 	return rootCreationNode, signingNonces, nil
 }
 
+func signTreeCreation(
+	config *Config,
+	tx *wire.MsgTx,
+	vout uint32,
+	internalTreeRoot *DepositAddressTree,
+	requestTreeRoot *pb.CreationNode,
+	creationResultTreeRoot *pb.CreationResponseNode,
+	signingNonces []*objects.SigningNonce,
+) ([]*pb.NodeSignatures, error) {
+	signingNonceIndex := 0
+	type element struct {
+		parentTx             *wire.MsgTx
+		vout                 uint32
+		internalNode         *DepositAddressTree
+		creationNode         *pb.CreationNode
+		creationResponseNode *pb.CreationResponseNode
+	}
+	elements := []element{}
+	elements = append(elements, element{
+		parentTx:             tx,
+		vout:                 vout,
+		internalNode:         internalTreeRoot,
+		creationNode:         requestTreeRoot,
+		creationResponseNode: creationResultTreeRoot,
+	})
+
+	conn, err := common.NewGRPCConnection(config.FrostSignerAddress)
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+
+	frostClient := pbfrost.NewFrostServiceClient(conn)
+
+	nodeSignatures := []*pb.NodeSignatures{}
+	for len(elements) > 0 {
+		currentElement := elements[0]
+		elements = elements[1:]
+
+		keyPackage := CreateUserKeyPackage(currentElement.internalNode.SigningPrivateKey)
+		nodeTx, err := common.TxFromRawTxBytes(currentElement.creationNode.NodeTxSigningJob.RawTx)
+		if err != nil {
+			return nil, err
+		}
+		nodeTxSighash, err := common.SigHashFromTx(nodeTx, 0, currentElement.parentTx.TxOut[currentElement.vout])
+		if err != nil {
+			return nil, err
+		}
+
+		signingNonce := signingNonces[signingNonceIndex]
+		signingNonceIndex++
+
+		signingNonceCommitment, err := signingNonce.SigningCommitment().MarshalProto()
+		if err != nil {
+			return nil, err
+		}
+
+		signingNonceProto, err := signingNonce.MarshalProto()
+		if err != nil {
+			return nil, err
+		}
+
+		log.Printf("nodeTxSighash: %s", hex.EncodeToString(nodeTxSighash))
+		log.Printf("verifying key: %s", hex.EncodeToString(currentElement.internalNode.VerificationKey))
+		nodeTxSigningJob := &pbfrost.FrostSigningJob{
+			JobId:           uuid.NewString(),
+			Message:         nodeTxSighash,
+			KeyPackage:      keyPackage,
+			VerifyingKey:    currentElement.internalNode.VerificationKey,
+			Nonce:           signingNonceProto,
+			Commitments:     currentElement.creationResponseNode.NodeTxSigningResult.SigningNonceCommitments,
+			UserCommitments: signingNonceCommitment,
+		}
+
+		response, err := frostClient.SignFrost(context.Background(), &pbfrost.SignFrostRequest{
+			SigningJobs: []*pbfrost.FrostSigningJob{nodeTxSigningJob},
+			Role:        pbfrost.SigningRole_USER,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		aggResponse, err := frostClient.AggregateFrost(context.Background(), &pbfrost.AggregateFrostRequest{
+			Message:            nodeTxSighash,
+			SignatureShares:    currentElement.creationResponseNode.NodeTxSigningResult.SignatureShares,
+			PublicShares:       currentElement.creationResponseNode.NodeTxSigningResult.PublicKeys,
+			VerifyingKey:       currentElement.internalNode.VerificationKey,
+			Commitments:        currentElement.creationResponseNode.NodeTxSigningResult.SigningNonceCommitments,
+			UserCommitments:    signingNonceCommitment,
+			UserPublicKey:      currentElement.internalNode.VerificationKey,
+			UserSignatureShare: response.Results[nodeTxSigningJob.JobId].SignatureShare,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		nodeSignature := &pb.NodeSignatures{
+			NodeId:          currentElement.creationResponseNode.NodeId,
+			NodeTxSignature: aggResponse.Signature,
+		}
+
+		if currentElement.creationResponseNode.RefundTxSigningResult != nil {
+			refundTx, err := common.TxFromRawTxBytes(currentElement.creationNode.RefundTxSigningJob.RawTx)
+			if err != nil {
+				return nil, err
+			}
+			refundTxSighash, err := common.SigHashFromTx(refundTx, 0, nodeTx.TxOut[0])
+			if err != nil {
+				return nil, err
+			}
+
+			signingNonce = signingNonces[signingNonceIndex]
+			signingNonceIndex++
+
+			signingNonceCommitment, err := signingNonce.SigningCommitment().MarshalProto()
+			if err != nil {
+				return nil, err
+			}
+
+			signingNonceProto, err = signingNonce.MarshalProto()
+			if err != nil {
+				return nil, err
+			}
+
+			refundNodeTxSigningJob := &pbfrost.FrostSigningJob{
+				JobId:           uuid.NewString(),
+				Message:         refundTxSighash,
+				KeyPackage:      keyPackage,
+				VerifyingKey:    currentElement.internalNode.VerificationKey,
+				Nonce:           signingNonceProto,
+				Commitments:     currentElement.creationResponseNode.RefundTxSigningResult.SigningNonceCommitments,
+				UserCommitments: signingNonceCommitment,
+			}
+
+			response, err := frostClient.SignFrost(context.Background(), &pbfrost.SignFrostRequest{
+				SigningJobs: []*pbfrost.FrostSigningJob{refundNodeTxSigningJob},
+				Role:        pbfrost.SigningRole_USER,
+			})
+			if err != nil {
+				return nil, err
+			}
+
+			aggResponse, err := frostClient.AggregateFrost(context.Background(), &pbfrost.AggregateFrostRequest{
+				Message:            refundTxSighash,
+				SignatureShares:    currentElement.creationResponseNode.RefundTxSigningResult.SignatureShares,
+				PublicShares:       currentElement.creationResponseNode.RefundTxSigningResult.PublicKeys,
+				VerifyingKey:       currentElement.internalNode.VerificationKey,
+				Commitments:        currentElement.creationResponseNode.RefundTxSigningResult.SigningNonceCommitments,
+				UserCommitments:    signingNonceCommitment,
+				UserPublicKey:      currentElement.internalNode.VerificationKey,
+				UserSignatureShare: response.Results[refundNodeTxSigningJob.JobId].SignatureShare,
+			})
+			if err != nil {
+				return nil, err
+			}
+			nodeSignature.RefundTxSignature = aggResponse.Signature
+		}
+
+		nodeSignatures = append(nodeSignatures, nodeSignature)
+
+		for i, child := range currentElement.creationNode.Children {
+			var newInternalNode *DepositAddressTree
+			if currentElement.internalNode.Children != nil {
+				newInternalNode = currentElement.internalNode.Children[i]
+			} else {
+				newInternalNode = currentElement.internalNode
+			}
+			elements = append(elements, element{
+				parentTx:             nodeTx,
+				vout:                 uint32(i),
+				internalNode:         newInternalNode,
+				creationNode:         child,
+				creationResponseNode: currentElement.creationResponseNode.Children[i],
+			})
+		}
+	}
+
+	return nodeSignatures, nil
+}
+
 // CreateTree creates the tree.
 func CreateTree(
 	config *Config,
@@ -334,7 +531,7 @@ func CreateTree(
 	vout uint32,
 	root *DepositAddressTree,
 	createLeaves bool,
-) ([]*pb.TreeNode, error) {
+) (*pb.FinalizeNodeSignaturesResponse, error) {
 	request := pb.CreateTreeRequest{
 		UserIdentityPublicKey: config.IdentityPublicKey(),
 	}
@@ -364,7 +561,8 @@ func CreateTree(
 		return nil, errors.New("no parent tx or parent node provided")
 	}
 
-	rootNode, _, err := buildCreationNodesFromTree(tx, vout, root, createLeaves, config.Network)
+	rootNode, signingNonces, err := buildCreationNodesFromTree(tx, vout, root, createLeaves, config.Network)
+	log.Printf("signingNonces count: %d", len(signingNonces))
 	if err != nil {
 		return nil, err
 	}
@@ -379,10 +577,18 @@ func CreateTree(
 
 	client := pb.NewSparkServiceClient(conn)
 
-	_, err = client.CreateTree(context.Background(), &request)
+	response, err := client.CreateTree(context.Background(), &request)
+	if err != nil {
+		return nil, err
+	}
+	creationResultTreeRoot := response.Node
+
+	nodeSignatures, err := signTreeCreation(config, tx, vout, root, rootNode, creationResultTreeRoot, signingNonces)
 	if err != nil {
 		return nil, err
 	}
 
-	return nil, nil
+	return client.FinalizeNodeSignatures(context.Background(), &pb.FinalizeNodeSignaturesRequest{
+		NodeSignatures: nodeSignatures,
+	})
 }
