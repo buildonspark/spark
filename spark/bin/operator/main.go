@@ -10,6 +10,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/go-co-op/gocron/v2"
 	_ "github.com/lib/pq"
 	"github.com/lightsparkdev/spark-go/common"
 	pbdkg "github.com/lightsparkdev/spark-go/proto/dkg"
@@ -22,6 +23,7 @@ import (
 	"github.com/lightsparkdev/spark-go/so/ent"
 	sparkgrpc "github.com/lightsparkdev/spark-go/so/grpc"
 	"github.com/lightsparkdev/spark-go/so/helper"
+	"github.com/lightsparkdev/spark-go/so/task"
 	_ "github.com/mattn/go-sqlite3"
 	"google.golang.org/grpc"
 )
@@ -119,6 +121,20 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to create frost client: %v", err)
 	}
+
+	s, err := gocron.NewScheduler()
+	if err != nil {
+		log.Fatalf("Failed to create scheduler: %v", err)
+	}
+
+	for _, task := range task.AllTasks() {
+		_, err := s.NewJob(gocron.DurationJob(task.Duration), gocron.NewTask(task.Task, config))
+		if err != nil {
+			log.Fatalf("Failed to create job: %v", err)
+		}
+	}
+
+	s.Start()
 
 	go runDKGOnStartup(dbClient, config)
 
