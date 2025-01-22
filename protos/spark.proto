@@ -13,6 +13,7 @@ service SparkService {
     rpc prepare_split_address(PrepareSplitAddressRequest) returns (PrepareSplitAddressResponse) {}
     rpc split_node(SplitNodeRequest) returns (SplitNodeResponse) {}
     rpc finalize_node_signatures(FinalizeNodeSignaturesRequest) returns (FinalizeNodeSignaturesResponse) {}
+    rpc start_send_transfer(StartSendTransferRequest) returns (StartSendTransferResponse) {}
     rpc send_transfer(SendTransferRequest) returns (SendTransferResponse) {}
     rpc query_pending_transfers(QueryPendingTransfersRequest) returns (QueryPendingTransfersResponse) {}
     rpc claim_transfer_tweak_keys(ClaimTransferTweakKeysRequest) returns (google.protobuf.Empty) {}
@@ -157,6 +158,30 @@ message SecretShare {
     repeated bytes proofs = 2;
 }
 
+message LeafRefundTxSigningJob {
+    string leaf_id = 1;
+    SigningJob refund_tx_signing_job = 2;
+}
+
+message LeafRefundTxSigningResult {
+    string leaf_id = 1;
+    SigningResult refund_tx_signing_result = 2;
+    bytes verifying_key = 3;
+}
+
+message StartSendTransferRequest {
+    string transfer_id = 1;
+    bytes owner_identity_public_key = 2;
+    repeated LeafRefundTxSigningJob leaves_to_send = 3;
+    bytes receiver_identity_public_key = 4;
+    google.protobuf.Timestamp expiry_time = 5;
+}
+
+message StartSendTransferResponse {
+    Transfer transfer = 1;
+    repeated LeafRefundTxSigningResult signing_results = 2;
+}
+
 message SendLeafKeyTweak {
     string leaf_id = 1;
     SecretShare secret_share_tweak = 2;
@@ -222,25 +247,16 @@ message ClaimTransferTweakKeysRequest {
     repeated ClaimLeafKeyTweak leaves_to_receive = 3;
 }
 
-message ClaimLeafSigningJob {
-    string leaf_id = 1;
-    SigningJob refund_tx_signing_job = 2;
-}
 
 message ClaimTransferSignRefundsRequest {
     string transfer_id = 1;
     bytes owner_identity_public_key = 2;
-    repeated ClaimLeafSigningJob signing_jobs = 3;
+    repeated LeafRefundTxSigningJob signing_jobs = 3;
 }
 
-message ClaimLeafSigningResult {
-    string leaf_id = 1;
-    SigningResult refund_tx_signing_result = 2;
-    bytes verifying_key = 3;
-}
 
 message ClaimTransferSignRefundsResponse {
-    repeated ClaimLeafSigningResult signing_results = 1;
+    repeated LeafRefundTxSigningResult signing_results = 1;
 }
 
 

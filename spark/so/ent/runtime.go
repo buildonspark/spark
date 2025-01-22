@@ -188,18 +188,14 @@ func init() {
 	transferleaf.DefaultUpdateTime = transferleafDescUpdateTime.Default.(func() time.Time)
 	// transferleaf.UpdateDefaultUpdateTime holds the default value on update for the update_time field.
 	transferleaf.UpdateDefaultUpdateTime = transferleafDescUpdateTime.UpdateDefault.(func() time.Time)
-	// transferleafDescSecretCipher is the schema descriptor for secret_cipher field.
-	transferleafDescSecretCipher := transferleafFields[0].Descriptor()
-	// transferleaf.SecretCipherValidator is a validator for the "secret_cipher" field. It is called by the builders before save.
-	transferleaf.SecretCipherValidator = transferleafDescSecretCipher.Validators[0].(func([]byte) error)
-	// transferleafDescSignature is the schema descriptor for signature field.
-	transferleafDescSignature := transferleafFields[1].Descriptor()
-	// transferleaf.SignatureValidator is a validator for the "signature" field. It is called by the builders before save.
-	transferleaf.SignatureValidator = transferleafDescSignature.Validators[0].(func([]byte) error)
 	// transferleafDescPreviousRefundTx is the schema descriptor for previous_refund_tx field.
 	transferleafDescPreviousRefundTx := transferleafFields[2].Descriptor()
 	// transferleaf.PreviousRefundTxValidator is a validator for the "previous_refund_tx" field. It is called by the builders before save.
 	transferleaf.PreviousRefundTxValidator = transferleafDescPreviousRefundTx.Validators[0].(func([]byte) error)
+	// transferleafDescIntermediateRefundTx is the schema descriptor for intermediate_refund_tx field.
+	transferleafDescIntermediateRefundTx := transferleafFields[3].Descriptor()
+	// transferleaf.IntermediateRefundTxValidator is a validator for the "intermediate_refund_tx" field. It is called by the builders before save.
+	transferleaf.IntermediateRefundTxValidator = transferleafDescIntermediateRefundTx.Validators[0].(func([]byte) error)
 	// transferleafDescID is the schema descriptor for id field.
 	transferleafDescID := transferleafMixinFields0[0].Descriptor()
 	// transferleaf.DefaultID holds the default value on creation for the id field.

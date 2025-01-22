@@ -69,6 +69,12 @@ func (tlc *TransferLeafCreate) SetPreviousRefundTx(b []byte) *TransferLeafCreate
 	return tlc
 }
 
+// SetIntermediateRefundTx sets the "intermediate_refund_tx" field.
+func (tlc *TransferLeafCreate) SetIntermediateRefundTx(b []byte) *TransferLeafCreate {
+	tlc.mutation.SetIntermediateRefundTx(b)
+	return tlc
+}
+
 // SetID sets the "id" field.
 func (tlc *TransferLeafCreate) SetID(u uuid.UUID) *TransferLeafCreate {
 	tlc.mutation.SetID(u)
@@ -165,18 +171,8 @@ func (tlc *TransferLeafCreate) check() error {
 	if _, ok := tlc.mutation.SecretCipher(); !ok {
 		return &ValidationError{Name: "secret_cipher", err: errors.New(`ent: missing required field "TransferLeaf.secret_cipher"`)}
 	}
-	if v, ok := tlc.mutation.SecretCipher(); ok {
-		if err := transferleaf.SecretCipherValidator(v); err != nil {
-			return &ValidationError{Name: "secret_cipher", err: fmt.Errorf(`ent: validator failed for field "TransferLeaf.secret_cipher": %w`, err)}
-		}
-	}
 	if _, ok := tlc.mutation.Signature(); !ok {
 		return &ValidationError{Name: "signature", err: errors.New(`ent: missing required field "TransferLeaf.signature"`)}
-	}
-	if v, ok := tlc.mutation.Signature(); ok {
-		if err := transferleaf.SignatureValidator(v); err != nil {
-			return &ValidationError{Name: "signature", err: fmt.Errorf(`ent: validator failed for field "TransferLeaf.signature": %w`, err)}
-		}
 	}
 	if _, ok := tlc.mutation.PreviousRefundTx(); !ok {
 		return &ValidationError{Name: "previous_refund_tx", err: errors.New(`ent: missing required field "TransferLeaf.previous_refund_tx"`)}
@@ -184,6 +180,14 @@ func (tlc *TransferLeafCreate) check() error {
 	if v, ok := tlc.mutation.PreviousRefundTx(); ok {
 		if err := transferleaf.PreviousRefundTxValidator(v); err != nil {
 			return &ValidationError{Name: "previous_refund_tx", err: fmt.Errorf(`ent: validator failed for field "TransferLeaf.previous_refund_tx": %w`, err)}
+		}
+	}
+	if _, ok := tlc.mutation.IntermediateRefundTx(); !ok {
+		return &ValidationError{Name: "intermediate_refund_tx", err: errors.New(`ent: missing required field "TransferLeaf.intermediate_refund_tx"`)}
+	}
+	if v, ok := tlc.mutation.IntermediateRefundTx(); ok {
+		if err := transferleaf.IntermediateRefundTxValidator(v); err != nil {
+			return &ValidationError{Name: "intermediate_refund_tx", err: fmt.Errorf(`ent: validator failed for field "TransferLeaf.intermediate_refund_tx": %w`, err)}
 		}
 	}
 	if len(tlc.mutation.TransferIDs()) == 0 {
@@ -246,6 +250,10 @@ func (tlc *TransferLeafCreate) createSpec() (*TransferLeaf, *sqlgraph.CreateSpec
 	if value, ok := tlc.mutation.PreviousRefundTx(); ok {
 		_spec.SetField(transferleaf.FieldPreviousRefundTx, field.TypeBytes, value)
 		_node.PreviousRefundTx = value
+	}
+	if value, ok := tlc.mutation.IntermediateRefundTx(); ok {
+		_spec.SetField(transferleaf.FieldIntermediateRefundTx, field.TypeBytes, value)
+		_node.IntermediateRefundTx = value
 	}
 	if nodes := tlc.mutation.TransferIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{

@@ -450,7 +450,7 @@ func finalizeTransfer(
 func signRefunds(
 	config *Config,
 	leafDataMap map[string]*claimLeafData,
-	operatorSigningResults []*pb.ClaimLeafSigningResult,
+	operatorSigningResults []*pb.LeafRefundTxSigningResult,
 ) ([]*pb.NodeSignatures, error) {
 	userSigningJobs := []*pbfrost.FrostSigningJob{}
 	jobToAggregateRequestMap := make(map[string]*pbfrost.AggregateFrostRequest)
@@ -516,8 +516,8 @@ func prepareClaimTransferOperatorsSigningJobs(
 	transfer *pb.Transfer,
 	config *Config,
 	leafDataMap map[string]*claimLeafData,
-) ([]*pb.ClaimLeafSigningJob, error) {
-	signingJobs := []*pb.ClaimLeafSigningJob{}
+) ([]*pb.LeafRefundTxSigningJob, error) {
+	signingJobs := []*pb.LeafRefundTxSigningJob{}
 	for _, leaf := range transfer.Leaves {
 		leafData := leafDataMap[leaf.Leaf.Id]
 		signingPubkey := leafData.SigningPrivKey.PubKey().SerializeCompressed()
@@ -544,7 +544,7 @@ func prepareClaimTransferOperatorsSigningJobs(
 		refundTx.Serialize(&refundBuf)
 		refundNonceCommitmentProto, _ := leafData.Nonce.SigningCommitment().MarshalProto()
 
-		signingJobs = append(signingJobs, &pb.ClaimLeafSigningJob{
+		signingJobs = append(signingJobs, &pb.LeafRefundTxSigningJob{
 			LeafId: leaf.Leaf.Id,
 			RefundTxSigningJob: &pb.SigningJob{
 				SigningPublicKey:       signingPubkey,

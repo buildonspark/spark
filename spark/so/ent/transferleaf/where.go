@@ -81,6 +81,11 @@ func PreviousRefundTx(v []byte) predicate.TransferLeaf {
 	return predicate.TransferLeaf(sql.FieldEQ(FieldPreviousRefundTx, v))
 }
 
+// IntermediateRefundTx applies equality check predicate on the "intermediate_refund_tx" field. It's identical to IntermediateRefundTxEQ.
+func IntermediateRefundTx(v []byte) predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldEQ(FieldIntermediateRefundTx, v))
+}
+
 // CreateTimeEQ applies the EQ predicate on the "create_time" field.
 func CreateTimeEQ(v time.Time) predicate.TransferLeaf {
 	return predicate.TransferLeaf(sql.FieldEQ(FieldCreateTime, v))
@@ -279,6 +284,46 @@ func PreviousRefundTxLT(v []byte) predicate.TransferLeaf {
 // PreviousRefundTxLTE applies the LTE predicate on the "previous_refund_tx" field.
 func PreviousRefundTxLTE(v []byte) predicate.TransferLeaf {
 	return predicate.TransferLeaf(sql.FieldLTE(FieldPreviousRefundTx, v))
+}
+
+// IntermediateRefundTxEQ applies the EQ predicate on the "intermediate_refund_tx" field.
+func IntermediateRefundTxEQ(v []byte) predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldEQ(FieldIntermediateRefundTx, v))
+}
+
+// IntermediateRefundTxNEQ applies the NEQ predicate on the "intermediate_refund_tx" field.
+func IntermediateRefundTxNEQ(v []byte) predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldNEQ(FieldIntermediateRefundTx, v))
+}
+
+// IntermediateRefundTxIn applies the In predicate on the "intermediate_refund_tx" field.
+func IntermediateRefundTxIn(vs ...[]byte) predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldIn(FieldIntermediateRefundTx, vs...))
+}
+
+// IntermediateRefundTxNotIn applies the NotIn predicate on the "intermediate_refund_tx" field.
+func IntermediateRefundTxNotIn(vs ...[]byte) predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldNotIn(FieldIntermediateRefundTx, vs...))
+}
+
+// IntermediateRefundTxGT applies the GT predicate on the "intermediate_refund_tx" field.
+func IntermediateRefundTxGT(v []byte) predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldGT(FieldIntermediateRefundTx, v))
+}
+
+// IntermediateRefundTxGTE applies the GTE predicate on the "intermediate_refund_tx" field.
+func IntermediateRefundTxGTE(v []byte) predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldGTE(FieldIntermediateRefundTx, v))
+}
+
+// IntermediateRefundTxLT applies the LT predicate on the "intermediate_refund_tx" field.
+func IntermediateRefundTxLT(v []byte) predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldLT(FieldIntermediateRefundTx, v))
+}
+
+// IntermediateRefundTxLTE applies the LTE predicate on the "intermediate_refund_tx" field.
+func IntermediateRefundTxLTE(v []byte) predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldLTE(FieldIntermediateRefundTx, v))
 }
 
 // HasTransfer applies the HasEdge predicate on the "transfer" edge.

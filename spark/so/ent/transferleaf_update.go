@@ -37,6 +37,24 @@ func (tlu *TransferLeafUpdate) SetUpdateTime(t time.Time) *TransferLeafUpdate {
 	return tlu
 }
 
+// SetSecretCipher sets the "secret_cipher" field.
+func (tlu *TransferLeafUpdate) SetSecretCipher(b []byte) *TransferLeafUpdate {
+	tlu.mutation.SetSecretCipher(b)
+	return tlu
+}
+
+// SetSignature sets the "signature" field.
+func (tlu *TransferLeafUpdate) SetSignature(b []byte) *TransferLeafUpdate {
+	tlu.mutation.SetSignature(b)
+	return tlu
+}
+
+// SetIntermediateRefundTx sets the "intermediate_refund_tx" field.
+func (tlu *TransferLeafUpdate) SetIntermediateRefundTx(b []byte) *TransferLeafUpdate {
+	tlu.mutation.SetIntermediateRefundTx(b)
+	return tlu
+}
+
 // SetTransferID sets the "transfer" edge to the Transfer entity by ID.
 func (tlu *TransferLeafUpdate) SetTransferID(id uuid.UUID) *TransferLeafUpdate {
 	tlu.mutation.SetTransferID(id)
@@ -114,6 +132,11 @@ func (tlu *TransferLeafUpdate) defaults() {
 
 // check runs all checks and user-defined validators on the builder.
 func (tlu *TransferLeafUpdate) check() error {
+	if v, ok := tlu.mutation.IntermediateRefundTx(); ok {
+		if err := transferleaf.IntermediateRefundTxValidator(v); err != nil {
+			return &ValidationError{Name: "intermediate_refund_tx", err: fmt.Errorf(`ent: validator failed for field "TransferLeaf.intermediate_refund_tx": %w`, err)}
+		}
+	}
 	if tlu.mutation.TransferCleared() && len(tlu.mutation.TransferIDs()) > 0 {
 		return errors.New(`ent: clearing a required unique edge "TransferLeaf.transfer"`)
 	}
@@ -137,6 +160,15 @@ func (tlu *TransferLeafUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if value, ok := tlu.mutation.UpdateTime(); ok {
 		_spec.SetField(transferleaf.FieldUpdateTime, field.TypeTime, value)
+	}
+	if value, ok := tlu.mutation.SecretCipher(); ok {
+		_spec.SetField(transferleaf.FieldSecretCipher, field.TypeBytes, value)
+	}
+	if value, ok := tlu.mutation.Signature(); ok {
+		_spec.SetField(transferleaf.FieldSignature, field.TypeBytes, value)
+	}
+	if value, ok := tlu.mutation.IntermediateRefundTx(); ok {
+		_spec.SetField(transferleaf.FieldIntermediateRefundTx, field.TypeBytes, value)
 	}
 	if tlu.mutation.TransferCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -219,6 +251,24 @@ type TransferLeafUpdateOne struct {
 // SetUpdateTime sets the "update_time" field.
 func (tluo *TransferLeafUpdateOne) SetUpdateTime(t time.Time) *TransferLeafUpdateOne {
 	tluo.mutation.SetUpdateTime(t)
+	return tluo
+}
+
+// SetSecretCipher sets the "secret_cipher" field.
+func (tluo *TransferLeafUpdateOne) SetSecretCipher(b []byte) *TransferLeafUpdateOne {
+	tluo.mutation.SetSecretCipher(b)
+	return tluo
+}
+
+// SetSignature sets the "signature" field.
+func (tluo *TransferLeafUpdateOne) SetSignature(b []byte) *TransferLeafUpdateOne {
+	tluo.mutation.SetSignature(b)
+	return tluo
+}
+
+// SetIntermediateRefundTx sets the "intermediate_refund_tx" field.
+func (tluo *TransferLeafUpdateOne) SetIntermediateRefundTx(b []byte) *TransferLeafUpdateOne {
+	tluo.mutation.SetIntermediateRefundTx(b)
 	return tluo
 }
 
@@ -312,6 +362,11 @@ func (tluo *TransferLeafUpdateOne) defaults() {
 
 // check runs all checks and user-defined validators on the builder.
 func (tluo *TransferLeafUpdateOne) check() error {
+	if v, ok := tluo.mutation.IntermediateRefundTx(); ok {
+		if err := transferleaf.IntermediateRefundTxValidator(v); err != nil {
+			return &ValidationError{Name: "intermediate_refund_tx", err: fmt.Errorf(`ent: validator failed for field "TransferLeaf.intermediate_refund_tx": %w`, err)}
+		}
+	}
 	if tluo.mutation.TransferCleared() && len(tluo.mutation.TransferIDs()) > 0 {
 		return errors.New(`ent: clearing a required unique edge "TransferLeaf.transfer"`)
 	}
@@ -352,6 +407,15 @@ func (tluo *TransferLeafUpdateOne) sqlSave(ctx context.Context) (_node *Transfer
 	}
 	if value, ok := tluo.mutation.UpdateTime(); ok {
 		_spec.SetField(transferleaf.FieldUpdateTime, field.TypeTime, value)
+	}
+	if value, ok := tluo.mutation.SecretCipher(); ok {
+		_spec.SetField(transferleaf.FieldSecretCipher, field.TypeBytes, value)
+	}
+	if value, ok := tluo.mutation.Signature(); ok {
+		_spec.SetField(transferleaf.FieldSignature, field.TypeBytes, value)
+	}
+	if value, ok := tluo.mutation.IntermediateRefundTx(); ok {
+		_spec.SetField(transferleaf.FieldIntermediateRefundTx, field.TypeBytes, value)
 	}
 	if tluo.mutation.TransferCleared() {
 		edge := &sqlgraph.EdgeSpec{

@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark-go/common"
 	pbspark "github.com/lightsparkdev/spark-go/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark-go/proto/spark_internal"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
@@ -40,6 +41,19 @@ func (tn *TreeNode) MarshalInternalProto(ctx context.Context) *pbinternal.TreeNo
 		SigningKeyshareId:   tn.QuerySigningKeyshare().FirstIDX(ctx).String(),
 		Vout:                uint32(tn.Vout),
 	}
+}
+
+// GetRefundTxTimeLock get the time lock of the refund tx.
+func (tn *TreeNode) GetRefundTxTimeLock() (*uint32, error) {
+	if tn.RawRefundTx == nil {
+		return nil, nil
+	}
+	refundTx, err := common.TxFromRawTxBytes(tn.RawRefundTx)
+	if err != nil {
+		return nil, err
+	}
+	timelock := refundTx.TxIn[0].Sequence & 0xFFFF
+	return &timelock, nil
 }
 
 func (tn *TreeNode) getParentNodeID(ctx context.Context) *string {

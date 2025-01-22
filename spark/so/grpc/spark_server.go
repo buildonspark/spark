@@ -54,6 +54,12 @@ func (s *SparkServer) FinalizeNodeSignatures(ctx context.Context, req *pb.Finali
 	return finalizeSignatureHandler.FinalizeNodeSignatures(ctx, req)
 }
 
+// StartSendTransfer initiates a transfer from sender.
+func (s *SparkServer) StartSendTransfer(ctx context.Context, req *pb.StartSendTransferRequest) (*pb.StartSendTransferResponse, error) {
+	transferHander := handler.NewTransferHandler(s.config)
+	return transferHander.StartSendTransfer(ctx, req)
+}
+
 // SendTransfer initiates a transfer.
 func (s *SparkServer) SendTransfer(ctx context.Context, req *pb.SendTransferRequest) (*pb.SendTransferResponse, error) {
 	transferHander := handler.NewTransferHandler(s.config)

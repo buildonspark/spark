@@ -4006,22 +4006,23 @@ func (m *TransferMutation) ResetEdge(name string) error {
 // TransferLeafMutation represents an operation that mutates the TransferLeaf nodes in the graph.
 type TransferLeafMutation struct {
 	config
-	op                 Op
-	typ                string
-	id                 *uuid.UUID
-	create_time        *time.Time
-	update_time        *time.Time
-	secret_cipher      *[]byte
-	signature          *[]byte
-	previous_refund_tx *[]byte
-	clearedFields      map[string]struct{}
-	transfer           *uuid.UUID
-	clearedtransfer    bool
-	leaf               *uuid.UUID
-	clearedleaf        bool
-	done               bool
-	oldValue           func(context.Context) (*TransferLeaf, error)
-	predicates         []predicate.TransferLeaf
+	op                     Op
+	typ                    string
+	id                     *uuid.UUID
+	create_time            *time.Time
+	update_time            *time.Time
+	secret_cipher          *[]byte
+	signature              *[]byte
+	previous_refund_tx     *[]byte
+	intermediate_refund_tx *[]byte
+	clearedFields          map[string]struct{}
+	transfer               *uuid.UUID
+	clearedtransfer        bool
+	leaf                   *uuid.UUID
+	clearedleaf            bool
+	done                   bool
+	oldValue               func(context.Context) (*TransferLeaf, error)
+	predicates             []predicate.TransferLeaf
 }
 
 var _ ent.Mutation = (*TransferLeafMutation)(nil)
@@ -4308,6 +4309,42 @@ func (m *TransferLeafMutation) ResetPreviousRefundTx() {
 	m.previous_refund_tx = nil
 }
 
+// SetIntermediateRefundTx sets the "intermediate_refund_tx" field.
+func (m *TransferLeafMutation) SetIntermediateRefundTx(b []byte) {
+	m.intermediate_refund_tx = &b
+}
+
+// IntermediateRefundTx returns the value of the "intermediate_refund_tx" field in the mutation.
+func (m *TransferLeafMutation) IntermediateRefundTx() (r []byte, exists bool) {
+	v := m.intermediate_refund_tx
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldIntermediateRefundTx returns the old "intermediate_refund_tx" field's value of the TransferLeaf entity.
+// If the TransferLeaf object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TransferLeafMutation) OldIntermediateRefundTx(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldIntermediateRefundTx is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldIntermediateRefundTx requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldIntermediateRefundTx: %w", err)
+	}
+	return oldValue.IntermediateRefundTx, nil
+}
+
+// ResetIntermediateRefundTx resets all changes to the "intermediate_refund_tx" field.
+func (m *TransferLeafMutation) ResetIntermediateRefundTx() {
+	m.intermediate_refund_tx = nil
+}
+
 // SetTransferID sets the "transfer" edge to the Transfer entity by id.
 func (m *TransferLeafMutation) SetTransferID(id uuid.UUID) {
 	m.transfer = &id
@@ -4420,7 +4457,7 @@ func (m *TransferLeafMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *TransferLeafMutation) Fields() []string {
-	fields := make([]string, 0, 5)
+	fields := make([]string, 0, 6)
 	if m.create_time != nil {
 		fields = append(fields, transferleaf.FieldCreateTime)
 	}
@@ -4435,6 +4472,9 @@ func (m *TransferLeafMutation) Fields() []string {
 	}
 	if m.previous_refund_tx != nil {
 		fields = append(fields, transferleaf.FieldPreviousRefundTx)
+	}
+	if m.intermediate_refund_tx != nil {
+		fields = append(fields, transferleaf.FieldIntermediateRefundTx)
 	}
 	return fields
 }
@@ -4454,6 +4494,8 @@ func (m *TransferLeafMutation) Field(name string) (ent.Value, bool) {
 		return m.Signature()
 	case transferleaf.FieldPreviousRefundTx:
 		return m.PreviousRefundTx()
+	case transferleaf.FieldIntermediateRefundTx:
+		return m.IntermediateRefundTx()
 	}
 	return nil, false
 }
@@ -4473,6 +4515,8 @@ func (m *TransferLeafMutation) OldField(ctx context.Context, name string) (ent.V
 		return m.OldSignature(ctx)
 	case transferleaf.FieldPreviousRefundTx:
 		return m.OldPreviousRefundTx(ctx)
+	case transferleaf.FieldIntermediateRefundTx:
+		return m.OldIntermediateRefundTx(ctx)
 	}
 	return nil, fmt.Errorf("unknown TransferLeaf field %s", name)
 }
@@ -4516,6 +4560,13 @@ func (m *TransferLeafMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetPreviousRefundTx(v)
+		return nil
+	case transferleaf.FieldIntermediateRefundTx:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetIntermediateRefundTx(v)
 		return nil
 	}
 	return fmt.Errorf("unknown TransferLeaf field %s", name)
@@ -4580,6 +4631,9 @@ func (m *TransferLeafMutation) ResetField(name string) error {
 		return nil
 	case transferleaf.FieldPreviousRefundTx:
 		m.ResetPreviousRefundTx()
+		return nil
+	case transferleaf.FieldIntermediateRefundTx:
+		m.ResetIntermediateRefundTx()
 		return nil
 	}
 	return fmt.Errorf("unknown TransferLeaf field %s", name)

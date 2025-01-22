@@ -25,6 +25,8 @@ const (
 	FieldSignature = "signature"
 	// FieldPreviousRefundTx holds the string denoting the previous_refund_tx field in the database.
 	FieldPreviousRefundTx = "previous_refund_tx"
+	// FieldIntermediateRefundTx holds the string denoting the intermediate_refund_tx field in the database.
+	FieldIntermediateRefundTx = "intermediate_refund_tx"
 	// EdgeTransfer holds the string denoting the transfer edge name in mutations.
 	EdgeTransfer = "transfer"
 	// EdgeLeaf holds the string denoting the leaf edge name in mutations.
@@ -55,6 +57,7 @@ var Columns = []string{
 	FieldSecretCipher,
 	FieldSignature,
 	FieldPreviousRefundTx,
+	FieldIntermediateRefundTx,
 }
 
 // ForeignKeys holds the SQL foreign-keys that are owned by the "transfer_leafs"
@@ -86,12 +89,10 @@ var (
 	DefaultUpdateTime func() time.Time
 	// UpdateDefaultUpdateTime holds the default value on update for the "update_time" field.
 	UpdateDefaultUpdateTime func() time.Time
-	// SecretCipherValidator is a validator for the "secret_cipher" field. It is called by the builders before save.
-	SecretCipherValidator func([]byte) error
-	// SignatureValidator is a validator for the "signature" field. It is called by the builders before save.
-	SignatureValidator func([]byte) error
 	// PreviousRefundTxValidator is a validator for the "previous_refund_tx" field. It is called by the builders before save.
 	PreviousRefundTxValidator func([]byte) error
+	// IntermediateRefundTxValidator is a validator for the "intermediate_refund_tx" field. It is called by the builders before save.
+	IntermediateRefundTxValidator func([]byte) error
 	// DefaultID holds the default value on creation for the "id" field.
 	DefaultID func() uuid.UUID
 )

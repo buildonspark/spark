@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/btcsuite/btcd/wire"
 	"github.com/decred/dcrd/dcrec/secp256k1"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/common"
@@ -17,6 +18,7 @@ import (
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
 	"github.com/lightsparkdev/spark-go/so/ent/transfer"
 	"github.com/lightsparkdev/spark-go/so/helper"
+	"github.com/lightsparkdev/spark-go/so/objects"
 )
 
 // TransferHandler is a helper struct to handle leaves transfer request.
@@ -27,6 +29,186 @@ type TransferHandler struct {
 // NewTransferHandler creates a new TransferHandler.
 func NewTransferHandler(config *so.Config) *TransferHandler {
 	return &TransferHandler{config: config}
+}
+
+// StartSendTransfer initiates a transfer from sender.
+func (h *TransferHandler) StartSendTransfer(ctx context.Context, req *pb.StartSendTransferRequest) (*pb.StartSendTransferResponse, error) {
+	transferID, err := uuid.Parse(req.TransferId)
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse transfer_id as a uuid %s: %v", req.TransferId, err)
+	}
+
+	expiryTime := req.ExpiryTime.AsTime()
+	if expiryTime.Before(time.Now()) {
+		return nil, fmt.Errorf("invalid expiry_time %s: %v", expiryTime.String(), err)
+	}
+
+	db := ent.GetDbFromContext(ctx)
+	transfer, err := db.Transfer.Create().
+		SetID(transferID).
+		SetSenderIdentityPubkey(req.OwnerIdentityPublicKey).
+		SetReceiverIdentityPubkey(req.ReceiverIdentityPublicKey).
+		SetStatus(schema.TransferStatusInitiated).
+		SetTotalValue(0).
+		SetExpiryTime(expiryTime).
+		Save(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to create transfer: %v", err)
+	}
+
+	leafMap := make(map[string]*ent.TreeNode)
+	totalAmount := uint64(0)
+	for _, req := range req.LeavesToSend {
+		// Find leaves in db
+		leafID, err := uuid.Parse(req.LeafId)
+		if err != nil {
+			return nil, fmt.Errorf("unable to parse leaf_id %s: %v", req.LeafId, err)
+		}
+
+		db := ent.GetDbFromContext(ctx)
+		leaf, err := db.TreeNode.Get(ctx, leafID)
+		if err != nil || leaf == nil {
+			return nil, fmt.Errorf("unable to find leaf %s: %v", req.LeafId, err)
+		}
+		if (leaf.Status != schema.TreeNodeStatusAvailable &&
+			(leaf.Status != schema.TreeNodeStatusDestinationLock || !bytes.Equal(leaf.DestinationLockIdentityPubkey, transfer.ReceiverIdentityPubkey))) ||
+			!bytes.Equal(leaf.OwnerIdentityPubkey, transfer.SenderIdentityPubkey) {
+			return nil, fmt.Errorf("leaf %s is not available to transfer", req.LeafId)
+		}
+		totalAmount += leaf.Value
+
+		leafMap[req.LeafId] = leaf
+		_, err = db.TransferLeaf.Create().
+			SetTransfer(transfer).
+			SetLeaf(leaf).
+			SetPreviousRefundTx(leaf.RawRefundTx).
+			SetIntermediateRefundTx(req.RefundTxSigningJob.RawTx).
+			Save(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("unable to create transfer leaf: %v", err)
+		}
+	}
+	transfer, err = db.Transfer.UpdateOne(transfer).SetTotalValue(totalAmount).Save(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to update transfer total value: %v", err)
+	}
+	transferProto, err := transfer.MarshalProto(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to marshal transfer: %v", err)
+	}
+
+	signingResults, err := h.sendTransferSignRefunds(ctx, transfer, req.LeavesToSend, leafMap)
+	if err != nil {
+		return nil, err
+	}
+
+	// Ask all other SOs to create transfer and transfer_leaf
+	return &pb.StartSendTransferResponse{Transfer: transferProto, SigningResults: signingResults}, nil
+}
+
+func (h *TransferHandler) sendTransferSignRefunds(ctx context.Context, transfer *ent.Transfer, requests []*pb.LeafRefundTxSigningJob, leafMap map[string]*ent.TreeNode) ([]*pb.LeafRefundTxSigningResult, error) {
+	signingJobs := make([]*helper.SigningJob, 0)
+	jobToLeafMap := make(map[string]*ent.TreeNode)
+	for _, req := range requests {
+		leaf := leafMap[req.LeafId]
+		refundTx, err := h.validateSendLeafRefundTx(leaf, req.RefundTxSigningJob.RawTx, transfer.ReceiverIdentityPubkey)
+		if err != nil {
+			return nil, err
+		}
+
+		leafTx, err := common.TxFromRawTxBytes(leaf.RawTx)
+		if err != nil {
+			return nil, fmt.Errorf("unable to load leaf tx: %v", err)
+		}
+		refundTxSigHash, err := common.SigHashFromTx(refundTx, 0, leafTx.TxOut[0])
+		if err != nil {
+			return nil, fmt.Errorf("unable to calculate sighash from refund tx: %v", err)
+		}
+
+		userNonceCommitment, err := objects.NewSigningCommitment(req.RefundTxSigningJob.SigningNonceCommitment.Binding, req.RefundTxSigningJob.SigningNonceCommitment.Hiding)
+		if err != nil {
+			return nil, err
+		}
+		jobID := uuid.New().String()
+		signingJobs = append(
+			signingJobs,
+			&helper.SigningJob{
+				JobID:             jobID,
+				SigningKeyshareID: leaf.QuerySigningKeyshare().FirstIDX(ctx),
+				Message:           refundTxSigHash,
+				VerifyingKey:      leaf.VerifyingPubkey,
+				UserCommitment:    userNonceCommitment,
+			},
+		)
+		jobToLeafMap[jobID] = leaf
+	}
+
+	signingResults, err := helper.SignFrost(ctx, h.config, signingJobs)
+	if err != nil {
+		return nil, err
+	}
+	pbSigningResults := make([]*pb.LeafRefundTxSigningResult, 0)
+	for _, signingResult := range signingResults {
+		leaf := jobToLeafMap[signingResult.JobID]
+		signingKeyShare, err := leaf.QuerySigningKeyshare().First(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("unable to load keyshare for leaf %s: %v", leaf.ID.String(), err)
+		}
+		signingCommitments, err := common.ConvertObjectMapToProtoMap(signingResult.SigningCommitments)
+		if err != nil {
+			return nil, err
+		}
+		pbSigningResults = append(pbSigningResults, &pb.LeafRefundTxSigningResult{
+			LeafId: leaf.ID.String(),
+			RefundTxSigningResult: &pb.SigningResult{
+				PublicKeys:              signingKeyShare.PublicShares,
+				SignatureShares:         signingResult.SignatureShares,
+				SigningNonceCommitments: signingCommitments,
+			},
+			VerifyingKey: leaf.VerifyingPubkey,
+		})
+	}
+	return pbSigningResults, nil
+}
+
+func (h *TransferHandler) validateSendLeafRefundTx(leaf *ent.TreeNode, rawTx []byte, receiverIdentityKey []byte) (*wire.MsgTx, error) {
+	newRefundTx, err := common.TxFromRawTxBytes(rawTx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to load new refund tx: %v", err)
+	}
+	if len(newRefundTx.TxIn) != 1 {
+		return nil, fmt.Errorf("expected 1 input in refund tx")
+	}
+	newRefundTxIn := newRefundTx.TxIn[0]
+
+	oldRefundTx, err := common.TxFromRawTxBytes(leaf.RawRefundTx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to load old refund tx: %v", err)
+	}
+	oldRefundTxIn := oldRefundTx.TxIn[0]
+
+	if !newRefundTxIn.PreviousOutPoint.Hash.IsEqual(&oldRefundTxIn.PreviousOutPoint.Hash) || newRefundTxIn.PreviousOutPoint.Index != oldRefundTxIn.PreviousOutPoint.Index {
+		return nil, fmt.Errorf("Unexpected input in new refund tx")
+	}
+	newTimeLock := newRefundTx.TxIn[0].Sequence & 0xFFFF
+	oldTimeLock := oldRefundTx.TxIn[0].Sequence & 0xFFFF
+	if newTimeLock >= oldTimeLock {
+		return nil, fmt.Errorf("time lock on the new refund tx must be less than the old one")
+	}
+
+	receiverP2trAddress, err := common.P2TRAddressFromPublicKey(receiverIdentityKey, h.config.Network)
+	if err != nil {
+		return nil, fmt.Errorf("unable to generate p2tr address from receiver pubkey: %v", err)
+	}
+	refundP2trAddress, err := common.P2TRAddressFromPkScript(newRefundTx.TxOut[0].PkScript, h.config.Network)
+	if err != nil {
+		return nil, fmt.Errorf("unable to generate p2tr address from refund pkscript: %v", err)
+	}
+	if *receiverP2trAddress != *refundP2trAddress {
+		return nil, fmt.Errorf("refund tx is expected to send to receiver identity pubkey")
+	}
+
+	return newRefundTx, nil
 }
 
 // SendTransfer handles a request to initiate a transfer of leaves.
@@ -338,7 +520,7 @@ func (h *TransferHandler) ClaimTransferSignRefunds(ctx context.Context, req *pb.
 	if err != nil {
 		return nil, err
 	}
-	signingResultProtos := []*pb.ClaimLeafSigningResult{}
+	signingResultProtos := []*pb.LeafRefundTxSigningResult{}
 	for _, signingResult := range signingResults {
 		leafID := jobToLeafMap[signingResult.JobID]
 		leaf := (*leaves)[leafID.String()]
@@ -346,7 +528,7 @@ func (h *TransferHandler) ClaimTransferSignRefunds(ctx context.Context, req *pb.
 		if err != nil {
 			return nil, err
 		}
-		signingResultProtos = append(signingResultProtos, &pb.ClaimLeafSigningResult{
+		signingResultProtos = append(signingResultProtos, &pb.LeafRefundTxSigningResult{
 			LeafId: leafID.String(),
 			RefundTxSigningResult: &pb.SigningResult{
 				PublicKeys:              signingResult.PublicKeys,
