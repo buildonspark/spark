@@ -290,3 +290,13 @@ func (s *SparkInternalServer) PrepareTreeAddress(ctx context.Context, req *pb.Pr
 	}
 	return result, err
 }
+
+// InitiateTransfer initiates a transfer by creating transfer and transfer_leaf
+func (s *SparkInternalServer) InitiateTransfer(ctx context.Context, req *pb.InitiateTransferRequest) (*emptypb.Empty, error) {
+	transferHandler := handler.NewInternalTransferHandler(s.config)
+	err := transferHandler.InitiateTransfer(ctx, req)
+	if err != nil {
+		log.Printf("failed to initiate transfer: %v", err)
+	}
+	return &emptypb.Empty{}, nil
+}

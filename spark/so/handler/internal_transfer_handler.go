@@ -13,12 +13,13 @@ import (
 
 // InternalTransferHandler is the transfer handler for so internal
 type InternalTransferHandler struct {
+	BaseTransferHandler
 	config *so.Config
 }
 
 // NewInternalTransferHandler creates a new InternalTransferHandler.
 func NewInternalTransferHandler(config *so.Config) *InternalTransferHandler {
-	return &InternalTransferHandler{config: config}
+	return &InternalTransferHandler{BaseTransferHandler: BaseTransferHandler{config}, config: config}
 }
 
 // FinalizeTransfer finalizes a transfer.
@@ -76,4 +77,14 @@ func (h *InternalTransferHandler) FinalizeTransfer(ctx context.Context, req *pbi
 		return err
 	}
 	return nil
+}
+
+// InitiateTransfer initiates a transfer by creating transfer and transfer_leaf
+func (h *InternalTransferHandler) InitiateTransfer(ctx context.Context, req *pbinternal.InitiateTransferRequest) error {
+	leafRefundMap := make(map[string][]byte)
+	for _, leaf := range req.Leaves {
+		leafRefundMap[leaf.LeafId] = leaf.RawRefundTx
+	}
+	_, _, err := h.createTransfer(ctx, req.TransferId, req.ExpiryTime.AsTime(), req.SenderIdentityPublicKey, req.ReceiverIdentityPublicKey, leafRefundMap)
+	return err
 }

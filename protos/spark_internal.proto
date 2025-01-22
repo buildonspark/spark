@@ -27,6 +27,8 @@ service SparkInternalService {
     rpc get_preimage_share(GetPreimageShareRequest) returns (GetPreimageShareResponse) {}
 
     rpc prepare_tree_address(PrepareTreeAddressRequest) returns (PrepareTreeAddressResponse) {}
+
+    rpc initiate_transfer(InitiateTransferRequest) returns (google.protobuf.Empty) {}
 }
 
 message MarkKeysharesAsUsedRequest {
@@ -147,4 +149,18 @@ message PrepareTreeAddressRequest {
 
 message PrepareTreeAddressResponse {
     map<string, bytes> signatures = 1;
+}
+
+
+message InitiateTransferLeaf {
+    string leaf_id = 1;
+    bytes raw_refund_tx = 2;
+}
+
+message InitiateTransferRequest {
+    string transfer_id = 1;
+    bytes sender_identity_public_key = 2;
+    bytes receiver_identity_public_key = 3;
+    google.protobuf.Timestamp expiry_time = 4;
+    repeated InitiateTransferLeaf leaves = 5;
 }

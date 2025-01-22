@@ -125,8 +125,8 @@ func (h *TreeCreationHandler) validateAndCountTreeAddressNodes(ctx context.Conte
 		return 0, err
 	}
 
-	if bytes.Compare(sum, parentUserPublicKey) != 0 {
-		return 0, errors.New("User public key does not add up to the parent public key")
+	if !bytes.Equal(sum, parentUserPublicKey) {
+		return 0, errors.New("user public key does not add up to the parent public key")
 	}
 	return count, nil
 }
@@ -248,17 +248,6 @@ func (h *TreeCreationHandler) createAddressNodeFromPrepareTreeAddressNode(ctx co
 		},
 		Children: children,
 	}, nil
-}
-
-func (h *TreeCreationHandler) createAddressNodesFromPrepareTreeAddressNodes(ctx context.Context, nodes []*pbinternal.PrepareTreeAddressNode, keysharesMap map[string]*ent.SigningKeyshare, userIdentityPublicKey []byte) (addressNodes []*pb.AddressNode, err error) {
-	addressNodes = make([]*pb.AddressNode, len(nodes))
-	for i, node := range nodes {
-		addressNodes[i], err = h.createAddressNodeFromPrepareTreeAddressNode(ctx, node, keysharesMap, userIdentityPublicKey, len(nodes) > 1)
-		if err != nil {
-			return nil, err
-		}
-	}
-	return addressNodes, nil
 }
 
 // PrepareTreeAddress prepares a tree address for creation.
@@ -391,7 +380,7 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 		currentElement := queue[0]
 		queue = queue[1:]
 
-		if currentElement.node.Children != nil && len(currentElement.node.Children) > 0 && currentElement.node.RefundTxSigningJob != nil {
+		if len(currentElement.node.Children) > 0 && currentElement.node.RefundTxSigningJob != nil {
 			return nil, nil, errors.New("refund tx should be on leaf node")
 		}
 
@@ -456,7 +445,7 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 				return nil, nil, err
 			}
 			signingJobs = append(signingJobs, refundSigningJob)
-		} else if currentElement.node.Children != nil && len(currentElement.node.Children) > 0 {
+		} else if len(currentElement.node.Children) > 0 {
 			userPublicKeys := [][]byte{}
 			statechainPublicKeys := [][]byte{}
 			for i, child := range currentElement.node.Children {
@@ -480,7 +469,7 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 			if err != nil {
 				return nil, nil, err
 			}
-			if bytes.Compare(userPublicKeySum, currentElement.userPublicKey) != 0 {
+			if !bytes.Equal(userPublicKeySum, currentElement.userPublicKey) {
 				return nil, nil, errors.New("user public key does not add up")
 			}
 
@@ -488,7 +477,7 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 			if err != nil {
 				return nil, nil, err
 			}
-			if bytes.Compare(statechainPublicKeySum, currentElement.keyshare.PublicKey) != 0 {
+			if !bytes.Equal(statechainPublicKeySum, currentElement.keyshare.PublicKey) {
 				return nil, nil, errors.New("statechain public key does not add up")
 			}
 		}
@@ -497,7 +486,7 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 	return signingJobs, nodes, nil
 }
 
-func (h *TreeCreationHandler) createTreeResponseNodesFromSigningResults(ctx context.Context, req *pb.CreateTreeRequest, signingResults []*helper.SigningResult, nodes []*ent.TreeNode) (*pb.CreationResponseNode, error) {
+func (h *TreeCreationHandler) createTreeResponseNodesFromSigningResults(req *pb.CreateTreeRequest, signingResults []*helper.SigningResult, nodes []*ent.TreeNode) (*pb.CreationResponseNode, error) {
 	signingResultIndex := 0
 	nodesIndex := 0
 	root := &pb.CreationResponseNode{}
@@ -535,7 +524,7 @@ func (h *TreeCreationHandler) createTreeResponseNodesFromSigningResults(ctx cont
 				return nil, err
 			}
 			currentElement.node.RefundTxSigningResult = refundSigningResultProto
-		} else if currentElement.creationNode.Children != nil && len(currentElement.creationNode.Children) > 0 {
+		} else if len(currentElement.creationNode.Children) > 0 {
 			children := make([]*pb.CreationResponseNode, len(currentElement.creationNode.Children))
 			for i, child := range currentElement.creationNode.Children {
 				children[i] = &pb.CreationResponseNode{}
@@ -566,7 +555,7 @@ func (h *TreeCreationHandler) CreateTree(ctx context.Context, req *pb.CreateTree
 		return nil, err
 	}
 
-	node, err := h.createTreeResponseNodesFromSigningResults(ctx, req, signingResults, nodes)
+	node, err := h.createTreeResponseNodesFromSigningResults(req, signingResults, nodes)
 	if err != nil {
 		return nil, err
 	}

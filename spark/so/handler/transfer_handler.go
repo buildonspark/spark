@@ -4,15 +4,16 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"log"
 	"math/big"
 	"time"
 
-	"github.com/btcsuite/btcd/wire"
 	"github.com/decred/dcrd/dcrec/secp256k1"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/common"
 	secretsharing "github.com/lightsparkdev/spark-go/common/secret_sharing"
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
+	pbinternal "github.com/lightsparkdev/spark-go/proto/spark_internal"
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/ent"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
@@ -23,97 +24,84 @@ import (
 
 // TransferHandler is a helper struct to handle leaves transfer request.
 type TransferHandler struct {
+	BaseTransferHandler
 	config *so.Config
 }
 
 // NewTransferHandler creates a new TransferHandler.
 func NewTransferHandler(config *so.Config) *TransferHandler {
-	return &TransferHandler{config: config}
+	return &TransferHandler{BaseTransferHandler: BaseTransferHandler{config}, config: config}
 }
 
 // StartSendTransfer initiates a transfer from sender.
 func (h *TransferHandler) StartSendTransfer(ctx context.Context, req *pb.StartSendTransferRequest) (*pb.StartSendTransferResponse, error) {
-	transferID, err := uuid.Parse(req.TransferId)
+	leafRefundMap := make(map[string][]byte)
+	for _, leaf := range req.LeavesToSend {
+		leafRefundMap[leaf.LeafId] = leaf.RefundTxSigningJob.RawTx
+	}
+	transfer, leafMap, err := h.createTransfer(ctx, req.TransferId, req.ExpiryTime.AsTime(), req.OwnerIdentityPublicKey, req.ReceiverIdentityPublicKey, leafRefundMap)
 	if err != nil {
-		return nil, fmt.Errorf("unable to parse transfer_id as a uuid %s: %v", req.TransferId, err)
+		return nil, err
 	}
 
-	expiryTime := req.ExpiryTime.AsTime()
-	if expiryTime.Before(time.Now()) {
-		return nil, fmt.Errorf("invalid expiry_time %s: %v", expiryTime.String(), err)
-	}
-
-	db := ent.GetDbFromContext(ctx)
-	transfer, err := db.Transfer.Create().
-		SetID(transferID).
-		SetSenderIdentityPubkey(req.OwnerIdentityPublicKey).
-		SetReceiverIdentityPubkey(req.ReceiverIdentityPublicKey).
-		SetStatus(schema.TransferStatusInitiated).
-		SetTotalValue(0).
-		SetExpiryTime(expiryTime).
-		Save(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("unable to create transfer: %v", err)
-	}
-
-	leafMap := make(map[string]*ent.TreeNode)
-	totalAmount := uint64(0)
-	for _, req := range req.LeavesToSend {
-		// Find leaves in db
-		leafID, err := uuid.Parse(req.LeafId)
-		if err != nil {
-			return nil, fmt.Errorf("unable to parse leaf_id %s: %v", req.LeafId, err)
-		}
-
-		db := ent.GetDbFromContext(ctx)
-		leaf, err := db.TreeNode.Get(ctx, leafID)
-		if err != nil || leaf == nil {
-			return nil, fmt.Errorf("unable to find leaf %s: %v", req.LeafId, err)
-		}
-		if (leaf.Status != schema.TreeNodeStatusAvailable &&
-			(leaf.Status != schema.TreeNodeStatusDestinationLock || !bytes.Equal(leaf.DestinationLockIdentityPubkey, transfer.ReceiverIdentityPubkey))) ||
-			!bytes.Equal(leaf.OwnerIdentityPubkey, transfer.SenderIdentityPubkey) {
-			return nil, fmt.Errorf("leaf %s is not available to transfer", req.LeafId)
-		}
-		totalAmount += leaf.Value
-
-		leafMap[req.LeafId] = leaf
-		_, err = db.TransferLeaf.Create().
-			SetTransfer(transfer).
-			SetLeaf(leaf).
-			SetPreviousRefundTx(leaf.RawRefundTx).
-			SetIntermediateRefundTx(req.RefundTxSigningJob.RawTx).
-			Save(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("unable to create transfer leaf: %v", err)
-		}
-	}
-	transfer, err = db.Transfer.UpdateOne(transfer).SetTotalValue(totalAmount).Save(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("unable to update transfer total value: %v", err)
-	}
 	transferProto, err := transfer.MarshalProto(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to marshal transfer: %v", err)
 	}
 
-	signingResults, err := h.sendTransferSignRefunds(ctx, transfer, req.LeavesToSend, leafMap)
+	signingResults, err := h.sendTransferSignRefunds(ctx, req.LeavesToSend, leafMap)
 	if err != nil {
 		return nil, err
 	}
 
-	// Ask all other SOs to create transfer and transfer_leaf
+	err = h.syncTransferInit(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
 	return &pb.StartSendTransferResponse{Transfer: transferProto, SigningResults: signingResults}, nil
 }
 
-func (h *TransferHandler) sendTransferSignRefunds(ctx context.Context, transfer *ent.Transfer, requests []*pb.LeafRefundTxSigningJob, leafMap map[string]*ent.TreeNode) ([]*pb.LeafRefundTxSigningResult, error) {
+func (h *TransferHandler) syncTransferInit(ctx context.Context, req *pb.StartSendTransferRequest) error {
+	leaves := make([]*pbinternal.InitiateTransferLeaf, 0)
+	for _, leaf := range req.LeavesToSend {
+		leaves = append(leaves, &pbinternal.InitiateTransferLeaf{
+			LeafId:      leaf.LeafId,
+			RawRefundTx: leaf.RefundTxSigningJob.RawTx,
+		})
+	}
+	initTransferRequest := &pbinternal.InitiateTransferRequest{
+		TransferId:                req.TransferId,
+		SenderIdentityPublicKey:   req.OwnerIdentityPublicKey,
+		ReceiverIdentityPublicKey: req.ReceiverIdentityPublicKey,
+		ExpiryTime:                req.ExpiryTime,
+		Leaves:                    leaves,
+	}
+	selection := helper.OperatorSelection{
+		Option: helper.OperatorSelectionOptionExcludeSelf,
+	}
+	_, err := helper.ExecuteTaskWithAllOperators(ctx, h.config, &selection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
+		conn, err := common.NewGRPCConnection(operator.Address)
+		if err != nil {
+			log.Printf("Failed to connect to operator: %v", err)
+			return nil, err
+		}
+		defer conn.Close()
+
+		client := pbinternal.NewSparkInternalServiceClient(conn)
+		return client.InitiateTransfer(ctx, initTransferRequest)
+	})
+	return err
+}
+
+func (h *TransferHandler) sendTransferSignRefunds(ctx context.Context, requests []*pb.LeafRefundTxSigningJob, leafMap map[string]*ent.TreeNode) ([]*pb.LeafRefundTxSigningResult, error) {
 	signingJobs := make([]*helper.SigningJob, 0)
 	jobToLeafMap := make(map[string]*ent.TreeNode)
 	for _, req := range requests {
 		leaf := leafMap[req.LeafId]
-		refundTx, err := h.validateSendLeafRefundTx(leaf, req.RefundTxSigningJob.RawTx, transfer.ReceiverIdentityPubkey)
+		refundTx, err := common.TxFromRawTxBytes(req.RefundTxSigningJob.RawTx)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("unable to load new refund tx: %v", err)
 		}
 
 		leafTx, err := common.TxFromRawTxBytes(leaf.RawTx)
@@ -169,46 +157,6 @@ func (h *TransferHandler) sendTransferSignRefunds(ctx context.Context, transfer 
 		})
 	}
 	return pbSigningResults, nil
-}
-
-func (h *TransferHandler) validateSendLeafRefundTx(leaf *ent.TreeNode, rawTx []byte, receiverIdentityKey []byte) (*wire.MsgTx, error) {
-	newRefundTx, err := common.TxFromRawTxBytes(rawTx)
-	if err != nil {
-		return nil, fmt.Errorf("unable to load new refund tx: %v", err)
-	}
-	if len(newRefundTx.TxIn) != 1 {
-		return nil, fmt.Errorf("expected 1 input in refund tx")
-	}
-	newRefundTxIn := newRefundTx.TxIn[0]
-
-	oldRefundTx, err := common.TxFromRawTxBytes(leaf.RawRefundTx)
-	if err != nil {
-		return nil, fmt.Errorf("unable to load old refund tx: %v", err)
-	}
-	oldRefundTxIn := oldRefundTx.TxIn[0]
-
-	if !newRefundTxIn.PreviousOutPoint.Hash.IsEqual(&oldRefundTxIn.PreviousOutPoint.Hash) || newRefundTxIn.PreviousOutPoint.Index != oldRefundTxIn.PreviousOutPoint.Index {
-		return nil, fmt.Errorf("Unexpected input in new refund tx")
-	}
-	newTimeLock := newRefundTx.TxIn[0].Sequence & 0xFFFF
-	oldTimeLock := oldRefundTx.TxIn[0].Sequence & 0xFFFF
-	if newTimeLock >= oldTimeLock {
-		return nil, fmt.Errorf("time lock on the new refund tx must be less than the old one")
-	}
-
-	receiverP2trAddress, err := common.P2TRAddressFromPublicKey(receiverIdentityKey, h.config.Network)
-	if err != nil {
-		return nil, fmt.Errorf("unable to generate p2tr address from receiver pubkey: %v", err)
-	}
-	refundP2trAddress, err := common.P2TRAddressFromPkScript(newRefundTx.TxOut[0].PkScript, h.config.Network)
-	if err != nil {
-		return nil, fmt.Errorf("unable to generate p2tr address from refund pkscript: %v", err)
-	}
-	if *receiverP2trAddress != *refundP2trAddress {
-		return nil, fmt.Errorf("refund tx is expected to send to receiver identity pubkey")
-	}
-
-	return newRefundTx, nil
 }
 
 // SendTransfer handles a request to initiate a transfer of leaves.
