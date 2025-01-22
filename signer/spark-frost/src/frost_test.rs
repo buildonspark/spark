@@ -104,10 +104,16 @@ mod frost_test {
             .filter(|participant_identifier| *participant_identifier != &user_identifier)
             .cloned()
             .collect();
+        let mut user_set = BTreeSet::new();
+        user_set.insert(user_identifier);
 
-        let operator_signing_package = frost::SigningPackage::new_with_participants(
+        let mut signing_participants_groups = Vec::new();
+        signing_participants_groups.push(participant_keys.clone());
+        signing_participants_groups.push(user_set.clone());
+
+        let signing_package = frost::SigningPackage::new_with_participants_groups(
             commitments_map.clone(),
-            participant_keys.clone(),
+            signing_participants_groups,
             &message,
         );
 
@@ -118,27 +124,36 @@ mod frost_test {
 
             // Each participant generates their signature share.
             let signature_share =
-                frost::round2::sign(&operator_signing_package, nonces, key_package).unwrap();
+                frost::round2::sign(&signing_package, nonces, key_package).unwrap();
 
             // In practice, the signature share must be sent to the Coordinator
             // using an authenticated channel.
             signature_shares.insert(participant_identifier, signature_share);
+
+            frost::verify_signature_share(
+                participant_identifier,
+                &key_package.verifying_share(),
+                &signature_share,
+                &signing_package,
+                &user_key_package_tweaked.verifying_key(),
+            )
+            .unwrap();
         }
 
-        let mut user_set = BTreeSet::new();
-        user_set.insert(user_identifier);
-
-        let user_signing_package = frost::SigningPackage::new_with_participants(
-            commitments_map.clone(),
-            user_set,
-            &message,
-        );
-
         let user_signature_shard = frost::round2::sign_with_tweak(
-            &user_signing_package,
+            &signing_package,
             &nonces_map[&user_identifier],
             &user_key_package,
             Some(&merkle_root),
+        )
+        .unwrap();
+
+        frost::verify_signature_share(
+            user_identifier,
+            &user_key_package_tweaked.verifying_share(),
+            &user_signature_shard,
+            &signing_package,
+            &user_key_package_tweaked.verifying_key(),
         )
         .unwrap();
 

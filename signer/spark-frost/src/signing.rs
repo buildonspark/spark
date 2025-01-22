@@ -66,10 +66,14 @@ pub fn verifying_key_from_bytes(bytes: Vec<u8>) -> Result<VerifyingKey, String> 
 pub fn frost_build_signin_package(
     signing_commitments: BTreeMap<Identifier, FrostSigningCommitments>,
     message: &[u8],
-    signing_participants: Option<BTreeSet<Identifier>>,
+    signing_participants_groups: Option<Vec<BTreeSet<Identifier>>>,
 ) -> SigningPackage {
-    if let Some(signing_participants) = signing_participants {
-        SigningPackage::new_with_participants(signing_commitments, signing_participants, message)
+    if let Some(signing_participants_groups) = signing_participants_groups {
+        SigningPackage::new_with_participants_groups(
+            signing_commitments,
+            signing_participants_groups,
+            message,
+        )
     } else {
         SigningPackage::new(signing_commitments, message)
     }
@@ -222,11 +226,9 @@ pub fn sign_frost(req: &SignFrostRequest) -> Result<SignFrostResponse, String> {
         let user_identifier =
             Identifier::derive("user".as_bytes()).expect("Failed to derive user identifier");
 
-        let signing_participants = match req.role {
-            0 => commitments.keys().cloned().collect(),
-            1 => BTreeSet::from([user_identifier]),
-            _ => return Err(format!("Invalid signing role")),
-        };
+        let mut signing_participants_groups = Vec::new();
+        signing_participants_groups.push(commitments.keys().cloned().collect());
+        signing_participants_groups.push(BTreeSet::from([user_identifier]));
 
         tracing::debug!("User commitments: {:?}", job.user_commitments);
 
@@ -266,8 +268,11 @@ pub fn sign_frost(req: &SignFrostRequest) -> Result<SignFrostResponse, String> {
             None => return Err(format!("Key package is required")),
         };
 
-        let signing_package =
-            frost_build_signin_package(commitments, &job.message, Some(signing_participants));
+        let signing_package = frost_build_signin_package(
+            commitments,
+            &job.message,
+            Some(signing_participants_groups),
+        );
         tracing::info!("Building signing package completed");
         let tweak = vec![];
         let signature_share = match req.role {
