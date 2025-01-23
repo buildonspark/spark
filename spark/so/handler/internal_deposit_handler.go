@@ -5,7 +5,8 @@ import (
 	"crypto/sha256"
 	"log"
 
-	"github.com/decred/dcrd/dcrec/secp256k1"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 	"github.com/google/uuid"
 	pbinternal "github.com/lightsparkdev/spark-go/proto/spark_internal"
 	"github.com/lightsparkdev/spark-go/so"
@@ -46,12 +47,9 @@ func (h *InternalDepositHandler) MarkKeyshareForDepositAddress(ctx context.Conte
 
 	log.Printf("Marked keyshare for deposit address")
 
-	signingKey, _ := secp256k1.PrivKeyFromBytes(h.config.IdentityPrivateKey)
+	signingKey := secp256k1.PrivKeyFromBytes(h.config.IdentityPrivateKey)
 	addrHash := sha256.Sum256([]byte(req.Address))
-	addressSignature, err := signingKey.Sign(addrHash[:])
-	if err != nil {
-		return nil, err
-	}
+	addressSignature := ecdsa.Sign(signingKey, addrHash[:])
 	return &pbinternal.MarkKeyshareForDepositAddressResponse{
 		AddressSignature: addressSignature.Serialize(),
 	}, nil

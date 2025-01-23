@@ -9,7 +9,7 @@ import (
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/decred/dcrd/dcrec/secp256k1"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go"
 	"github.com/lightsparkdev/spark-go/common"
@@ -47,7 +47,7 @@ func AggregateTreeNodes(
 		return nil, err
 	}
 
-	_, aggregatedSigningPublicKey := secp256k1.PrivKeyFromBytes(aggregatedSigningKey)
+	aggregatedSigningPublicKey := secp256k1.PrivKeyFromBytes(aggregatedSigningKey).PubKey()
 
 	newRefundTx := wire.NewMsgTx(2)
 	// TODO(zhenlu): Handle the case where refund timelock is below 0

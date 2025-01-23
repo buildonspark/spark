@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/decred/dcrd/dcrec/secp256k1"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lightsparkdev/spark-go/common"
 	pbmock "github.com/lightsparkdev/spark-go/proto/mock"
 	pb "github.com/lightsparkdev/spark-go/proto/spark"

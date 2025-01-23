@@ -9,7 +9,7 @@ import (
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/decred/dcrd/dcrec/secp256k1"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go"
 	"github.com/lightsparkdev/spark-go/common"
@@ -128,7 +128,7 @@ func SplitTreeNode(
 	leftAmount int64,
 	parentSigningPrivKey []byte,
 ) (*pb.FinalizeNodeSignaturesResponse, [][]byte, error) {
-	_, parentPubkey := secp256k1.PrivKeyFromBytes(parentSigningPrivKey)
+	parentPubkey := secp256k1.PrivKeyFromBytes(parentSigningPrivKey).PubKey()
 	childrenKeys, err := prepareKeys(parentSigningPrivKey)
 	if err != nil {
 		return nil, nil, err
@@ -136,7 +136,7 @@ func SplitTreeNode(
 
 	childrenPubKeys := make([][]byte, 0)
 	for _, key := range childrenKeys {
-		_, pubkey := secp256k1.PrivKeyFromBytes(key)
+		pubkey := secp256k1.PrivKeyFromBytes(key).PubKey()
 		childrenPubKeys = append(childrenPubKeys, pubkey.SerializeCompressed())
 	}
 

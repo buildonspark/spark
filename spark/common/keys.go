@@ -4,8 +4,24 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/decred/dcrd/dcrec/secp256k1/v2"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 )
+
+// PublicKeyFromInts creates a secp256k1 public key from x and y big integers.
+func PublicKeyFromInts(x, y *big.Int) *secp256k1.PublicKey {
+	xFieldVal := secp256k1.FieldVal{}
+	xFieldVal.SetByteSlice(x.Bytes())
+	yFieldVal := secp256k1.FieldVal{}
+	yFieldVal.SetByteSlice(y.Bytes())
+	return secp256k1.NewPublicKey(&xFieldVal, &yFieldVal)
+}
+
+// AddPublicKeysRaw adds two secp256k1 public keys using group addition.
+func AddPublicKeysRaw(a, b *secp256k1.PublicKey) *secp256k1.PublicKey {
+	curve := secp256k1.S256()
+	sumX, sumY := curve.Add(a.X(), a.Y(), b.X(), b.Y())
+	return PublicKeyFromInts(sumX, sumY)
+}
 
 // AddPublicKeys adds two secp256k1 public keys using group addition.
 // The input public keys must be 33 bytes.
@@ -15,7 +31,6 @@ func AddPublicKeys(a, b []byte) ([]byte, error) {
 		return nil, fmt.Errorf("pubkeys must be 33 bytes")
 	}
 
-	curve := secp256k1.S256()
 	pubkeyA, err := secp256k1.ParsePubKey(a)
 	if err != nil {
 		return nil, err
@@ -25,8 +40,7 @@ func AddPublicKeys(a, b []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	sum := new(secp256k1.PublicKey)
-	sum.X, sum.Y = curve.Add(pubkeyA.X, pubkeyA.Y, pubkeyB.X, pubkeyB.Y)
+	sum := AddPublicKeysRaw(pubkeyA, pubkeyB)
 
 	return sum.SerializeCompressed(), nil
 }
@@ -68,15 +82,14 @@ func ApplyAdditiveTweakToPublicKey(pubkey []byte, tweak []byte) ([]byte, error) 
 		return nil, fmt.Errorf("tweak must be 32 bytes")
 	}
 
-	curve := secp256k1.S256()
 	pub, err := secp256k1.ParsePubKey(pubkey)
 	if err != nil {
 		return nil, err
 	}
 
-	_, tweakPub := secp256k1.PrivKeyFromBytes(tweak)
+	tweakPub := secp256k1.PrivKeyFromBytes(tweak).PubKey()
 
-	pub.X, pub.Y = curve.Add(pub.X, pub.Y, tweakPub.X, tweakPub.Y)
+	pub = AddPublicKeysRaw(pub, tweakPub)
 
 	return pub.SerializeCompressed(), nil
 }
@@ -89,7 +102,6 @@ func SubtractPublicKeys(a, b []byte) ([]byte, error) {
 		return nil, fmt.Errorf("pubkeys must be 33 bytes")
 	}
 
-	curve := secp256k1.S256()
 	pubkeyA, err := secp256k1.ParsePubKey(a)
 	if err != nil {
 		return nil, err
@@ -99,11 +111,21 @@ func SubtractPublicKeys(a, b []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	negBY := new(big.Int).Sub(secp256k1.S256().P, pubkeyB.Y)
-	pubkeyB.Y = negBY
+	negBY := new(big.Int).Sub(secp256k1.S256().P, pubkeyB.Y())
+	pubkeyB = PublicKeyFromInts(pubkeyB.X(), negBY)
 
-	pubkeyA.X, pubkeyA.Y = curve.Add(pubkeyA.X, pubkeyA.Y, pubkeyB.X, pubkeyB.Y)
+	pubkeyA = AddPublicKeysRaw(pubkeyA, pubkeyB)
 	return pubkeyA.SerializeCompressed(), nil
+}
+
+// AddPrivateKeysRaw adds two secp256k1 private keys using field addition.
+func AddPrivateKeysRaw(a, b *secp256k1.PrivateKey) *secp256k1.PrivateKey {
+	curve := secp256k1.S256()
+	aInt := new(big.Int).SetBytes(a.Serialize())
+	bInt := new(big.Int).SetBytes(b.Serialize())
+	sum := new(big.Int).Add(aInt, bInt)
+	sum.Mod(sum, curve.N)
+	return secp256k1.PrivKeyFromBytes(sum.Bytes())
 }
 
 // AddPrivateKeys adds two secp256k1 private keys using field addition.
@@ -114,15 +136,10 @@ func AddPrivateKeys(a, b []byte) ([]byte, error) {
 		return nil, fmt.Errorf("private keys must be 32 bytes")
 	}
 
-	privA, _ := secp256k1.PrivKeyFromBytes(a)
-	privB, _ := secp256k1.PrivKeyFromBytes(b)
+	privA := secp256k1.PrivKeyFromBytes(a)
+	privB := secp256k1.PrivKeyFromBytes(b)
 
-	N := secp256k1.S256().N
-
-	sum := new(big.Int).Add(privA.D, privB.D)
-	sum.Mod(sum, N)
-
-	privKey, _ := secp256k1.PrivKeyFromBytes(sum.Bytes())
+	privKey := AddPrivateKeysRaw(privA, privB)
 
 	return privKey.Serialize(), nil
 }
@@ -135,16 +152,18 @@ func SubtractPrivateKeys(a, b []byte) ([]byte, error) {
 		return nil, fmt.Errorf("private keys must be 32 bytes")
 	}
 
-	privA, _ := secp256k1.PrivKeyFromBytes(a)
-	privB, _ := secp256k1.PrivKeyFromBytes(b)
+	privA := secp256k1.PrivKeyFromBytes(a)
+	privB := secp256k1.PrivKeyFromBytes(b)
 
 	N := secp256k1.S256().N
 
-	negB := new(big.Int).Sub(N, privB.D)
-	sum := new(big.Int).Add(privA.D, negB)
+	privAInt := new(big.Int).SetBytes(privA.Serialize())
+	privBInt := new(big.Int).SetBytes(privB.Serialize())
+	negB := new(big.Int).Sub(N, privBInt)
+	sum := new(big.Int).Add(privAInt, negB)
 	sum.Mod(sum, N)
 
-	privKey, _ := secp256k1.PrivKeyFromBytes(sum.Bytes())
+	privKey := secp256k1.PrivKeyFromBytes(sum.Bytes())
 
 	return privKey.Serialize(), nil
 }
@@ -157,8 +176,9 @@ func SumOfPrivateKeys(keys [][]byte) (*big.Int, error) {
 		if len(key) != 32 {
 			return nil, fmt.Errorf("private keys must be 32 bytes")
 		}
-		priv, _ := secp256k1.PrivKeyFromBytes(key)
-		sum.Add(sum, priv.D)
+		priv := secp256k1.PrivKeyFromBytes(key)
+		privInt := new(big.Int).SetBytes(priv.Serialize())
+		sum.Add(sum, privInt)
 		sum.Mod(sum, N)
 	}
 	return sum, nil
@@ -178,6 +198,6 @@ func LastKeyWithTarget(target []byte, keys [][]byte) ([]byte, error) {
 	diff := new(big.Int).Sub(targetInt, sum)
 	diff.Mod(diff, secp256k1.S256().N)
 
-	privKey, _ := secp256k1.PrivKeyFromBytes(diff.Bytes())
+	privKey := secp256k1.PrivKeyFromBytes(diff.Bytes())
 	return privKey.Serialize(), nil
 }

@@ -5,7 +5,8 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/decred/dcrd/dcrec/secp256k1/v2"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
+	"github.com/lightsparkdev/spark-go/common"
 )
 
 // Polynomial is a polynomial used for secret sharing.
@@ -55,6 +56,13 @@ func (s *SecretShare) GetFieldModulus() *big.Int {
 // GetShare returns the share of the secret.
 func (s *SecretShare) GetShare() *big.Int {
 	return s.Share
+}
+
+// IntToScalar converts a big.Int to a secp256k1 ModNScalar.
+func IntToScalar(value *big.Int) *secp256k1.ModNScalar {
+	var scalar secp256k1.ModNScalar
+	scalar.SetByteSlice(value.Bytes())
+	return &scalar
 }
 
 // GetThreshold returns the threshold of the secret.
@@ -114,14 +122,18 @@ func generatePolynomialForSecretSharing(fieldModulus *big.Int, secret *big.Int, 
 	proofs := make([][]byte, degree)
 
 	coefficients[0] = secret
-	proofs[0] = secp256k1.NewPrivateKey(secret).PubKey().SerializeCompressed()
+	var secretScalar secp256k1.ModNScalar
+	secretScalar.SetByteSlice(secret.Bytes())
+	proofs[0] = secp256k1.NewPrivateKey(&secretScalar).PubKey().SerializeCompressed()
 	for i := 1; i < degree; i++ {
 		randomInt, err := rand.Int(rand.Reader, fieldModulus)
 		if err != nil {
 			return nil, err
 		}
 		coefficients[i] = randomInt
-		proofs[i] = secp256k1.NewPrivateKey(coefficients[i]).PubKey().SerializeCompressed()
+		var coefScalar secp256k1.ModNScalar
+		coefScalar.SetByteSlice(randomInt.Bytes())
+		proofs[i] = secp256k1.NewPrivateKey(&coefScalar).PubKey().SerializeCompressed()
 	}
 	return &Polynomial{
 		FieldModulus: fieldModulus,
@@ -196,7 +208,7 @@ func RecoverSecret[T LagrangeInterpolatable](shares []T) (*big.Int, error) {
 
 // ValidateShare validates a share of a secret.
 func ValidateShare(share *VerifiableSecretShare) error {
-	targetPubkey := secp256k1.NewPrivateKey(share.Share).PubKey()
+	targetPubkey := secp256k1.NewPrivateKey(IntToScalar(share.Share)).PubKey()
 	resultPubkey, err := secp256k1.ParsePubKey(share.Proofs[0])
 	if err != nil {
 		return err
@@ -212,11 +224,13 @@ func ValidateShare(share *VerifiableSecretShare) error {
 
 		value := new(big.Int).Exp(share.Index, big.NewInt(int64(i)), share.FieldModulus)
 		curve := secp256k1.S256()
-		resX, resY := curve.ScalarMult(pubkey.X, pubkey.Y, value.Bytes())
-		resultPubkey.X, resultPubkey.Y = curve.Add(resultPubkey.X, resultPubkey.Y, resX, resY)
+		resX, resY := curve.ScalarMult(pubkey.X(), pubkey.Y(), value.Bytes())
+		resPubkey := common.PublicKeyFromInts(resX, resY)
+
+		resultPubkey = common.AddPublicKeysRaw(resultPubkey, resPubkey)
 	}
 
-	if resultPubkey.X.Cmp(targetPubkey.X) != 0 || resultPubkey.Y.Cmp(targetPubkey.Y) != 0 {
+	if resultPubkey.X().Cmp(targetPubkey.X()) != 0 || resultPubkey.Y().Cmp(targetPubkey.Y()) != 0 {
 		return fmt.Errorf("share is not valid")
 	}
 

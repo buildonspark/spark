@@ -4,7 +4,7 @@ import (
 	"crypto/rand"
 	"testing"
 
-	"github.com/decred/dcrd/dcrec/secp256k1/v2"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	secretsharing "github.com/lightsparkdev/spark-go/common/secret_sharing"
 )
 

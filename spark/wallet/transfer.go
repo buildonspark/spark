@@ -12,7 +12,8 @@ import (
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/decred/dcrd/dcrec/secp256k1"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 	eciesgo "github.com/ecies/go/v2"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go"
@@ -146,7 +147,9 @@ func prepareSingleLeafTransfer(config *Config, transferID uuid.UUID, leaf LeafKe
 		if share == nil {
 			return nil, fmt.Errorf("failed to find share for operator %d", operator.ID)
 		}
-		pubkeyTweak := secp256k1.NewPrivateKey(share.Share).PubKey()
+		var shareScalar secp256k1.ModNScalar
+		shareScalar.SetByteSlice(share.Share.Bytes())
+		pubkeyTweak := secp256k1.NewPrivateKey(&shareScalar).PubKey()
 		pubkeySharesTweak[identifier] = pubkeyTweak.SerializeCompressed()
 	}
 
@@ -158,7 +161,7 @@ func prepareSingleLeafTransfer(config *Config, transferID uuid.UUID, leaf LeafKe
 	// Generate signature over Sha256(leaf_id||transfer_id||secret_cipher)
 	payload := append(append([]byte(leaf.LeafID), []byte(transferID.String())...), secretCipher...)
 	payloadHash := sha256.Sum256(payload)
-	signature, err := config.IdentityPrivateKey.Sign(payloadHash[:])
+	signature := ecdsa.Sign(&config.IdentityPrivateKey, payloadHash[:])
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign payload: %v", err)
 
@@ -225,7 +228,7 @@ func VerifyPendingTransfer(
 	receiverEciesPrivKey := eciesgo.NewPrivateKeyFromBytes(config.IdentityPrivateKey.Serialize())
 	for _, leaf := range transfer.Leaves {
 		// Verify signature
-		signature, err := secp256k1.ParseSignature(leaf.Signature)
+		signature, err := ecdsa.ParseDERSignature(leaf.Signature)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse signature: %v", err)
 		}
@@ -350,7 +353,9 @@ func prepareClaimLeafKeyTweaks(config *Config, leaf LeafKeyTweak) (*map[string]*
 		if share == nil {
 			return nil, fmt.Errorf("failed to find share for operator %d", operator.ID)
 		}
-		pubkeyTweak := secp256k1.NewPrivateKey(share.Share).PubKey()
+		var shareScalar secp256k1.ModNScalar
+		shareScalar.SetByteSlice(share.Share.Bytes())
+		pubkeyTweak := secp256k1.NewPrivateKey(&shareScalar).PubKey()
 		pubkeySharesTweak[identifier] = pubkeyTweak.SerializeCompressed()
 	}
 
@@ -388,7 +393,7 @@ func claimTransferSignRefunds(
 ) ([]*pb.NodeSignatures, error) {
 	leafDataMap := make(map[string]*claimLeafData)
 	for _, leafKey := range leafKeys {
-		privKey, _ := secp256k1.PrivKeyFromBytes(leafKey.NewSigningPrivKey)
+		privKey := secp256k1.PrivKeyFromBytes(leafKey.NewSigningPrivKey)
 		nonce, _ := objects.RandomSigningNonce()
 		leafData := &claimLeafData{
 			SigningPrivKey: privKey,

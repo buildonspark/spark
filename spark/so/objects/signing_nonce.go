@@ -3,7 +3,7 @@ package objects
 import (
 	"fmt"
 
-	"github.com/decred/dcrd/dcrec/secp256k1"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	pbcommon "github.com/lightsparkdev/spark-go/proto/common"
 	pbfrost "github.com/lightsparkdev/spark-go/proto/frost"
 )
@@ -39,8 +39,8 @@ func NewSigningNonce(binding, hiding []byte) (*SigningNonce, error) {
 
 // SigningCommitment returns the signing commitment for the nonce.
 func (n *SigningNonce) SigningCommitment() *SigningCommitment {
-	_, bindingPubKey := secp256k1.PrivKeyFromBytes(n.Binding)
-	_, hidingPubKey := secp256k1.PrivKeyFromBytes(n.Hiding)
+	bindingPubKey := secp256k1.PrivKeyFromBytes(n.Binding).PubKey()
+	hidingPubKey := secp256k1.PrivKeyFromBytes(n.Hiding).PubKey()
 	return &SigningCommitment{Binding: bindingPubKey.SerializeCompressed(), Hiding: hidingPubKey.SerializeCompressed()}
 }
 

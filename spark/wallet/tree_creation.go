@@ -10,7 +10,7 @@ import (
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/decred/dcrd/dcrec/secp256k1"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go"
 	"github.com/lightsparkdev/spark-go/common"
@@ -77,9 +77,9 @@ func createAddressRequestNodeFromTreeNodes(
 ) []*pb.AddressRequestNode {
 	results := []*pb.AddressRequestNode{}
 	for _, node := range treeNodes {
-		_, pubkey := secp256k1.PrivKeyFromBytes(node.SigningPrivateKey)
+		pubkey := secp256k1.PrivKeyFromBytes(node.SigningPrivateKey).PubKey()
 		result := &pb.AddressRequestNode{
-			UserPublicKey: pubkey.Serialize(),
+			UserPublicKey: pubkey.SerializeCompressed(),
 			Children:      nil,
 		}
 		result.Children = createAddressRequestNodeFromTreeNodes(node.Children)
@@ -144,9 +144,9 @@ func GenerateDepositAddressesForTree(
 		return nil, errors.New("no parent node or parent tx provided")
 	}
 
-	_, pubkey := secp256k1.PrivKeyFromBytes(parentSigningPrivateKey)
+	pubkey := secp256k1.PrivKeyFromBytes(parentSigningPrivateKey).PubKey()
 	request.Node = &pb.AddressRequestNode{
-		UserPublicKey: pubkey.Serialize(),
+		UserPublicKey: pubkey.SerializeCompressed(),
 		Children:      addressRequestNodes,
 	}
 	root := &DepositAddressTree{
@@ -229,7 +229,7 @@ func buildCreationNodesFromTree(
 			}
 			var txBuf bytes.Buffer
 			tx.Serialize(&txBuf)
-			_, pubkey := secp256k1.PrivKeyFromBytes(currentElement.node.SigningPrivateKey)
+			pubkey := secp256k1.PrivKeyFromBytes(currentElement.node.SigningPrivateKey).PubKey()
 			signingNonce, err := objects.RandomSigningNonce()
 			if err != nil {
 				return nil, nil, err
@@ -240,7 +240,7 @@ func buildCreationNodesFromTree(
 			}
 			signingNonces = append(signingNonces, signingNonce)
 			signingJob := &pb.SigningJob{
-				SigningPublicKey:       pubkey.Serialize(),
+				SigningPublicKey:       pubkey.SerializeCompressed(),
 				RawTx:                  txBuf.Bytes(),
 				SigningNonceCommitment: signingNonceCommitment,
 			}
@@ -260,7 +260,7 @@ func buildCreationNodesFromTree(
 				var txBuf bytes.Buffer
 				tx.Serialize(&txBuf)
 
-				_, pubkey := secp256k1.PrivKeyFromBytes(currentElement.node.SigningPrivateKey)
+				pubkey := secp256k1.PrivKeyFromBytes(currentElement.node.SigningPrivateKey).PubKey()
 				signingNonce, err := objects.RandomSigningNonce()
 				if err != nil {
 					return nil, nil, err
@@ -271,7 +271,7 @@ func buildCreationNodesFromTree(
 				}
 				signingNonces = append(signingNonces, signingNonce)
 				signingJob := &pb.SigningJob{
-					SigningPublicKey:       pubkey.Serialize(),
+					SigningPublicKey:       pubkey.SerializeCompressed(),
 					RawTx:                  txBuf.Bytes(),
 					SigningNonceCommitment: signingNonceCommitment,
 				}
@@ -285,7 +285,7 @@ func buildCreationNodesFromTree(
 					Sequence:         sequence,
 				})
 
-				refundP2trAddress, _ := common.P2TRAddressFromPublicKey(pubkey.Serialize(), network)
+				refundP2trAddress, _ := common.P2TRAddressFromPublicKey(pubkey.SerializeCompressed(), network)
 				refundAddress, _ := btcutil.DecodeAddress(*refundP2trAddress, common.NetworkParams(network))
 				refundPkScript, _ := txscript.PayToAddrScript(refundAddress)
 				refundTx.AddTxOut(wire.NewTxOut(tx.TxOut[0].Value, refundPkScript))
@@ -301,7 +301,7 @@ func buildCreationNodesFromTree(
 				}
 				signingNonces = append(signingNonces, refundSigningNonce)
 				refundSigningJob := &pb.SigningJob{
-					SigningPublicKey:       pubkey.Serialize(),
+					SigningPublicKey:       pubkey.SerializeCompressed(),
 					RawTx:                  refundTxBuf.Bytes(),
 					SigningNonceCommitment: refundSigningNonceCommitment,
 				}
@@ -317,7 +317,7 @@ func buildCreationNodesFromTree(
 				var txBuf bytes.Buffer
 				tx.Serialize(&txBuf)
 
-				_, pubkey := secp256k1.PrivKeyFromBytes(currentElement.node.SigningPrivateKey)
+				pubkey := secp256k1.PrivKeyFromBytes(currentElement.node.SigningPrivateKey).PubKey()
 				signingNonce, err := objects.RandomSigningNonce()
 				if err != nil {
 					return nil, nil, err
@@ -328,7 +328,7 @@ func buildCreationNodesFromTree(
 				}
 				signingNonces = append(signingNonces, signingNonce)
 				signingJob := &pb.SigningJob{
-					SigningPublicKey:       pubkey.Serialize(),
+					SigningPublicKey:       pubkey.SerializeCompressed(),
 					RawTx:                  txBuf.Bytes(),
 					SigningNonceCommitment: signingNonceCommitment,
 				}

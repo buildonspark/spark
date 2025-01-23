@@ -6,7 +6,7 @@ import (
 	"log"
 	"testing"
 
-	"github.com/decred/dcrd/dcrec/secp256k1"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lightsparkdev/spark-go/common"
 	testutil "github.com/lightsparkdev/spark-go/test_util"
 	"github.com/lightsparkdev/spark-go/wallet"

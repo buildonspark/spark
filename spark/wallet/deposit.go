@@ -11,7 +11,8 @@ import (
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/decred/dcrd/dcrec/secp256k1"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go"
 	"github.com/lightsparkdev/spark-go/common"
@@ -66,7 +67,7 @@ func validateDepositAddress(ctx context.Context, config *Config, address *pb.Add
 			return fmt.Errorf("address signature for operator %s is nil", operator.Identifier)
 		}
 
-		sig, err := secp256k1.ParseDERSignature(operatorSig)
+		sig, err := ecdsa.ParseDERSignature(operatorSig)
 		if err != nil {
 			return err
 		}
@@ -112,7 +113,7 @@ func CreateTreeRoot(
 	depositTx *wire.MsgTx,
 	vout int,
 ) (*pb.FinalizeNodeSignaturesResponse, error) {
-	_, signingPubkey := secp256k1.PrivKeyFromBytes(signingPrivKey)
+	signingPubkey := secp256k1.PrivKeyFromBytes(signingPrivKey).PubKey()
 	signingPubkeyBytes := signingPubkey.SerializeCompressed()
 	// Creat root tx
 	rootTx := wire.NewMsgTx(2)

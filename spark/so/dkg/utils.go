@@ -5,7 +5,8 @@ import (
 	"encoding/binary"
 	"sort"
 
-	"github.com/decred/dcrd/dcrec/secp256k1"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/so"
 )
@@ -42,13 +43,10 @@ func round1PackageHash(maps []map[string][]byte) []byte {
 }
 
 func signHash(privateKey []byte, hash []byte) ([]byte, error) {
-	priv, _ := secp256k1.PrivKeyFromBytes(privateKey)
+	priv := secp256k1.PrivKeyFromBytes(privateKey)
 
 	// Sign the hash
-	sig, err := priv.Sign(hash)
-	if err != nil {
-		return nil, err
-	}
+	sig := ecdsa.Sign(priv, hash)
 
 	return sig.Serialize(), nil
 }
@@ -75,7 +73,7 @@ func validateRound1Signature(round1Packages []map[string][]byte, round1Signature
 			continue
 		}
 
-		sig, err := secp256k1.ParseDERSignature(signature)
+		sig, err := ecdsa.ParseDERSignature(signature)
 		if err != nil {
 			validationFailures = append(validationFailures, identifier)
 			continue

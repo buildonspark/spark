@@ -8,7 +8,7 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/decred/dcrd/dcrec/secp256k1"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/common"
 	secretsharing "github.com/lightsparkdev/spark-go/common/secret_sharing"

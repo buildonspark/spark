@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/decred/dcrd/dcrec/secp256k1"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lightsparkdev/spark-go/common"
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/wallet"
