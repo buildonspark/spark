@@ -8,6 +8,12 @@ Protobuf needs to be installed in order to build the project.
 brew install protobuf
 ```
 
+Go protobuf tools need to be installed as well:
+```
+go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+```
+
 To run the run-everything.sh script, you need to have tmux installed.
 
 ```
@@ -30,6 +36,11 @@ If spark_frost.udl file has issue with VSCode, you can add the following to your
 "files.associations": {
     "spark_frost.udl": "plaintext"
 }
+```
+
+Linting uses `golint`, install it with:
+```
+go install golang.org/x/lint/golint@latest
 ```
 
 ## Run tests
