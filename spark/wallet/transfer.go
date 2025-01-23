@@ -23,7 +23,6 @@ import (
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/objects"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // LeafKeyTweak is a struct to hold leaf key to tweak.
@@ -65,12 +64,10 @@ func SendTransfer(
 			}
 			defer sparkConn.Close()
 			sparkClient := pb.NewSparkServiceClient(sparkConn)
-			transferResp, err := sparkClient.SendTransfer(ctx, &pb.SendTransferRequest{
-				TransferId:                transferID.String(),
-				OwnerIdentityPublicKey:    config.IdentityPublicKey(),
-				ReceiverIdentityPublicKey: receiverIdentityPubkey,
-				ExpiryTime:                timestamppb.New(expiryTime),
-				LeavesToSend:              (*soSendingLeavesMap)[identifier],
+			transferResp, err := sparkClient.CompleteSendTransfer(ctx, &pb.CompleteSendTransferRequest{
+				TransferId:             transferID.String(),
+				OwnerIdentityPublicKey: config.IdentityPublicKey(),
+				LeavesToSend:           (*soSendingLeavesMap)[identifier],
 			})
 			if err != nil {
 				results <- fmt.Errorf("failed to call SendTransfer: %v", err)

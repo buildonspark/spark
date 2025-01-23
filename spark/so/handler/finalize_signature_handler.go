@@ -1,13 +1,11 @@
 package handler
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"log"
 	"time"
 
-	"github.com/btcsuite/btcd/wire"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/common"
 	pbcommon "github.com/lightsparkdev/spark-go/proto/common"
@@ -101,7 +99,7 @@ func (o *FinalizeSignatureHandler) verifyAndUpdateTransfer(ctx context.Context, 
 		}
 		leafTransfer, err := db.Transfer.Query().
 			Where(
-				enttransfer.StatusEQ(schema.TransferStatusRefundSigned),
+				enttransfer.StatusEQ(schema.TransferStatusReceiverRefundSigned),
 				enttransfer.HasTransferLeavesWith(
 					transferleaf.HasLeafWith(
 						treenode.IDEQ(leafID),
@@ -153,7 +151,7 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 
 	var nodeTxBytes []byte
 	if intent == pbcommon.SignatureIntent_CREATION || intent == pbcommon.SignatureIntent_SPLIT {
-		nodeTxBytes, err = o.verifySignatureAndUpdateTx(node.RawTx, nodeSignatures.NodeTxSignature)
+		nodeTxBytes, err = common.UpdateTxWithSignature(node.RawTx, 0, nodeSignatures.NodeTxSignature)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -162,7 +160,7 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 	}
 	var refundTxBytes []byte
 	if nodeSignatures.RefundTxSignature != nil {
-		refundTxBytes, err = o.verifySignatureAndUpdateTx(node.RawRefundTx, nodeSignatures.RefundTxSignature)
+		refundTxBytes, err = common.UpdateTxWithSignature(node.RawRefundTx, 0, nodeSignatures.RefundTxSignature)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -192,17 +190,4 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 	}
 
 	return node.MarshalSparkProto(ctx), node.MarshalInternalProto(ctx), nil
-}
-
-func (o *FinalizeSignatureHandler) verifySignatureAndUpdateTx(rawTx []byte, signature []byte) ([]byte, error) {
-	tx, err := common.TxFromRawTxBytes(rawTx)
-	if err != nil {
-		return nil, err
-	}
-	// TODO: Verify the signature
-
-	tx.TxIn[0].Witness = wire.TxWitness{signature}
-	var buf bytes.Buffer
-	tx.Serialize(&buf)
-	return buf.Bytes(), nil
 }

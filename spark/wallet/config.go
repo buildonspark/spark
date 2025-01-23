@@ -16,7 +16,7 @@ type Config struct {
 	CoodinatorIdentifier string
 	// FrostSignerAddress is the address of the Frost signer.
 	FrostSignerAddress string
-	// FrostSignerAddress is the address of the Frost signer.
+	// IdentityPrivateKey is the identity private key of the wallet.
 	IdentityPrivateKey secp256k1.PrivateKey
 	// Threshold is the min signing operators.
 	Threshold int

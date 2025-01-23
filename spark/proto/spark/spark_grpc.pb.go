@@ -26,7 +26,7 @@ const (
 	SparkService_SplitNode_FullMethodName                = "/spark.SparkService/split_node"
 	SparkService_FinalizeNodeSignatures_FullMethodName   = "/spark.SparkService/finalize_node_signatures"
 	SparkService_StartSendTransfer_FullMethodName        = "/spark.SparkService/start_send_transfer"
-	SparkService_SendTransfer_FullMethodName             = "/spark.SparkService/send_transfer"
+	SparkService_CompleteSendTransfer_FullMethodName     = "/spark.SparkService/complete_send_transfer"
 	SparkService_QueryPendingTransfers_FullMethodName    = "/spark.SparkService/query_pending_transfers"
 	SparkService_ClaimTransferTweakKeys_FullMethodName   = "/spark.SparkService/claim_transfer_tweak_keys"
 	SparkService_ClaimTransferSignRefunds_FullMethodName = "/spark.SparkService/claim_transfer_sign_refunds"
@@ -48,7 +48,7 @@ type SparkServiceClient interface {
 	SplitNode(ctx context.Context, in *SplitNodeRequest, opts ...grpc.CallOption) (*SplitNodeResponse, error)
 	FinalizeNodeSignatures(ctx context.Context, in *FinalizeNodeSignaturesRequest, opts ...grpc.CallOption) (*FinalizeNodeSignaturesResponse, error)
 	StartSendTransfer(ctx context.Context, in *StartSendTransferRequest, opts ...grpc.CallOption) (*StartSendTransferResponse, error)
-	SendTransfer(ctx context.Context, in *SendTransferRequest, opts ...grpc.CallOption) (*SendTransferResponse, error)
+	CompleteSendTransfer(ctx context.Context, in *CompleteSendTransferRequest, opts ...grpc.CallOption) (*CompleteSendTransferResponse, error)
 	QueryPendingTransfers(ctx context.Context, in *QueryPendingTransfersRequest, opts ...grpc.CallOption) (*QueryPendingTransfersResponse, error)
 	ClaimTransferTweakKeys(ctx context.Context, in *ClaimTransferTweakKeysRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	ClaimTransferSignRefunds(ctx context.Context, in *ClaimTransferSignRefundsRequest, opts ...grpc.CallOption) (*ClaimTransferSignRefundsResponse, error)
@@ -128,10 +128,10 @@ func (c *sparkServiceClient) StartSendTransfer(ctx context.Context, in *StartSen
 	return out, nil
 }
 
-func (c *sparkServiceClient) SendTransfer(ctx context.Context, in *SendTransferRequest, opts ...grpc.CallOption) (*SendTransferResponse, error) {
+func (c *sparkServiceClient) CompleteSendTransfer(ctx context.Context, in *CompleteSendTransferRequest, opts ...grpc.CallOption) (*CompleteSendTransferResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(SendTransferResponse)
-	err := c.cc.Invoke(ctx, SparkService_SendTransfer_FullMethodName, in, out, cOpts...)
+	out := new(CompleteSendTransferResponse)
+	err := c.cc.Invoke(ctx, SparkService_CompleteSendTransfer_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -238,7 +238,7 @@ type SparkServiceServer interface {
 	SplitNode(context.Context, *SplitNodeRequest) (*SplitNodeResponse, error)
 	FinalizeNodeSignatures(context.Context, *FinalizeNodeSignaturesRequest) (*FinalizeNodeSignaturesResponse, error)
 	StartSendTransfer(context.Context, *StartSendTransferRequest) (*StartSendTransferResponse, error)
-	SendTransfer(context.Context, *SendTransferRequest) (*SendTransferResponse, error)
+	CompleteSendTransfer(context.Context, *CompleteSendTransferRequest) (*CompleteSendTransferResponse, error)
 	QueryPendingTransfers(context.Context, *QueryPendingTransfersRequest) (*QueryPendingTransfersResponse, error)
 	ClaimTransferTweakKeys(context.Context, *ClaimTransferTweakKeysRequest) (*emptypb.Empty, error)
 	ClaimTransferSignRefunds(context.Context, *ClaimTransferSignRefundsRequest) (*ClaimTransferSignRefundsResponse, error)
@@ -276,8 +276,8 @@ func (UnimplementedSparkServiceServer) FinalizeNodeSignatures(context.Context, *
 func (UnimplementedSparkServiceServer) StartSendTransfer(context.Context, *StartSendTransferRequest) (*StartSendTransferResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method StartSendTransfer not implemented")
 }
-func (UnimplementedSparkServiceServer) SendTransfer(context.Context, *SendTransferRequest) (*SendTransferResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method SendTransfer not implemented")
+func (UnimplementedSparkServiceServer) CompleteSendTransfer(context.Context, *CompleteSendTransferRequest) (*CompleteSendTransferResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CompleteSendTransfer not implemented")
 }
 func (UnimplementedSparkServiceServer) QueryPendingTransfers(context.Context, *QueryPendingTransfersRequest) (*QueryPendingTransfersResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method QueryPendingTransfers not implemented")
@@ -435,20 +435,20 @@ func _SparkService_StartSendTransfer_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
-func _SparkService_SendTransfer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(SendTransferRequest)
+func _SparkService_CompleteSendTransfer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CompleteSendTransferRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(SparkServiceServer).SendTransfer(ctx, in)
+		return srv.(SparkServiceServer).CompleteSendTransfer(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: SparkService_SendTransfer_FullMethodName,
+		FullMethod: SparkService_CompleteSendTransfer_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SparkServiceServer).SendTransfer(ctx, req.(*SendTransferRequest))
+		return srv.(SparkServiceServer).CompleteSendTransfer(ctx, req.(*CompleteSendTransferRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -647,8 +647,8 @@ var SparkService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _SparkService_StartSendTransfer_Handler,
 		},
 		{
-			MethodName: "send_transfer",
-			Handler:    _SparkService_SendTransfer_Handler,
+			MethodName: "complete_send_transfer",
+			Handler:    _SparkService_CompleteSendTransfer_Handler,
 		},
 		{
 			MethodName: "query_pending_transfers",

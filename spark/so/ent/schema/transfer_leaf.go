@@ -45,5 +45,6 @@ func (TransferLeaf) Edges() []ent.Edge {
 func (TransferLeaf) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Edges("transfer"),
+		index.Edges("leaf"),
 	}
 }

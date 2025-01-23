@@ -60,10 +60,10 @@ func (s *SparkServer) StartSendTransfer(ctx context.Context, req *pb.StartSendTr
 	return transferHander.StartSendTransfer(ctx, req)
 }
 
-// SendTransfer initiates a transfer.
-func (s *SparkServer) SendTransfer(ctx context.Context, req *pb.SendTransferRequest) (*pb.SendTransferResponse, error) {
+// CompleteSendTransfer completes a transfer from sender.
+func (s *SparkServer) CompleteSendTransfer(ctx context.Context, req *pb.CompleteSendTransferRequest) (*pb.CompleteSendTransferResponse, error) {
 	transferHander := handler.NewTransferHandler(s.config)
-	return transferHander.SendTransfer(ctx, req)
+	return transferHander.CompleteSendTransfer(ctx, req)
 }
 
 // QueryPendingTransfers queries the pending transfers to claim.

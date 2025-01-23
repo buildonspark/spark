@@ -121,3 +121,17 @@ func SigHashFromTx(tx *wire.MsgTx, inputIndex int, prevOutput *wire.TxOut) ([]by
 	}
 	return sigHash, nil
 }
+
+// UpdateTxWithSignature verifies the signature and update the transaction with the signature.
+func UpdateTxWithSignature(rawTxBytes []byte, vin int, signature []byte) ([]byte, error) {
+	tx, err := TxFromRawTxBytes(rawTxBytes)
+	if err != nil {
+		return nil, err
+	}
+	// TODO: Verify the signature
+
+	tx.TxIn[vin].Witness = wire.TxWitness{signature}
+	var buf bytes.Buffer
+	tx.Serialize(&buf)
+	return buf.Bytes(), nil
+}

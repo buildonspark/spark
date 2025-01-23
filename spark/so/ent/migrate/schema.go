@@ -137,7 +137,7 @@ var (
 		{Name: "sender_identity_pubkey", Type: field.TypeBytes},
 		{Name: "receiver_identity_pubkey", Type: field.TypeBytes},
 		{Name: "total_value", Type: field.TypeUint64},
-		{Name: "status", Type: field.TypeEnum, Enums: []string{"INITIATED", "KEY_TWEAKED", "REFUND_SIGNED", "COMPLETED", "EXPIRED"}},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"SENDER_INITIATED", "SENDER_KEY_TWEAKED", "RECEIVER_KEY_TWEAKED", "RECEIVER_REFUND_SIGNED", "COMPLETED", "EXPIRED"}},
 		{Name: "expiry_time", Type: field.TypeTime},
 		{Name: "completion_time", Type: field.TypeTime, Nullable: true},
 	}
@@ -200,6 +200,11 @@ var (
 				Name:    "transferleaf_transfer_leaf_transfer",
 				Unique:  false,
 				Columns: []*schema.Column{TransferLeafsColumns[7]},
+			},
+			{
+				Name:    "transferleaf_transfer_leaf_leaf",
+				Unique:  false,
+				Columns: []*schema.Column{TransferLeafsColumns[8]},
 			},
 		},
 	}

@@ -11,12 +11,14 @@ import (
 type TransferStatus string
 
 const (
-	// TransferStatusInitiated is the status of a transfer that has been initiated.
-	TransferStatusInitiated TransferStatus = "INITIATED"
-	// TransferStatusKeyTweaked is the status of transfer where key has been tweaked.
-	TransferStatusKeyTweaked TransferStatus = "KEY_TWEAKED"
-	// TransferStatusRefundSigned is the status of transfer where refund transaction has been signed.
-	TransferStatusRefundSigned TransferStatus = "REFUND_SIGNED"
+	// TransferStatusSenderInitiated is the status of a transfer that has been initiated by sender.
+	TransferStatusSenderInitiated TransferStatus = "SENDER_INITIATED"
+	// TransferStatusSenderKeyTweaked is the status of a transfer that sender has tweaked the key.
+	TransferStatusSenderKeyTweaked TransferStatus = "SENDER_KEY_TWEAKED"
+	// TransferStatusReceiverKeyTweaked is the status of transfer where key has been tweaked.
+	TransferStatusReceiverKeyTweaked TransferStatus = "RECEIVER_KEY_TWEAKED"
+	// TransferStatusReceiverRefundSigned is the status of transfer where refund transaction has been signed.
+	TransferStatusReceiverRefundSigned TransferStatus = "RECEIVER_REFUND_SIGNED"
 	// TransferStatusCompleted is the status of transfer that has completed.
 	TransferStatusCompleted TransferStatus = "COMPLETED"
 	// TransferStatusExpired is the status of transfer that has expired and ownership has been returned to the transfer issuer.
@@ -26,9 +28,10 @@ const (
 // Values returns the values of the transfer status.
 func (TransferStatus) Values() []string {
 	return []string{
-		string(TransferStatusInitiated),
-		string(TransferStatusKeyTweaked),
-		string(TransferStatusRefundSigned),
+		string(TransferStatusSenderInitiated),
+		string(TransferStatusSenderKeyTweaked),
+		string(TransferStatusReceiverKeyTweaked),
+		string(TransferStatusReceiverRefundSigned),
 		string(TransferStatusCompleted),
 		string(TransferStatusExpired),
 	}

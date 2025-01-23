@@ -73,7 +73,7 @@ func (h *BaseTransferHandler) createTransfer(ctx context.Context, transferID str
 		SetID(transferUUID).
 		SetSenderIdentityPubkey(senderIdentityPublicKey).
 		SetReceiverIdentityPubkey(receiverIdentityPublicKey).
-		SetStatus(schema.TransferStatusInitiated).
+		SetStatus(schema.TransferStatusSenderInitiated).
 		SetTotalValue(0).
 		SetExpiryTime(expiryTime).
 		Save(ctx)

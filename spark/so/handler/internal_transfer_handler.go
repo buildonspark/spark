@@ -33,8 +33,8 @@ func (h *InternalTransferHandler) FinalizeTransfer(ctx context.Context, req *pbi
 	if err != nil {
 		return err
 	}
-	if transfer.Status != schema.TransferStatusKeyTweaked {
-		return fmt.Errorf("transfer is not in key tweaked status")
+	if transfer.Status != schema.TransferStatusReceiverKeyTweaked {
+		return fmt.Errorf("transfer is not in receiver key tweaked status")
 	}
 
 	transferNodes, err := transfer.QueryTransferLeaves().QueryLeaf().All(ctx)

@@ -17,7 +17,9 @@ import (
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/ent"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
-	"github.com/lightsparkdev/spark-go/so/ent/transfer"
+	enttransfer "github.com/lightsparkdev/spark-go/so/ent/transfer"
+	enttransferleaf "github.com/lightsparkdev/spark-go/so/ent/transferleaf"
+	enttreenode "github.com/lightsparkdev/spark-go/so/ent/treenode"
 	"github.com/lightsparkdev/spark-go/so/helper"
 	"github.com/lightsparkdev/spark-go/so/objects"
 )
@@ -159,46 +161,42 @@ func (h *TransferHandler) sendTransferSignRefunds(ctx context.Context, requests 
 	return pbSigningResults, nil
 }
 
-// SendTransfer handles a request to initiate a transfer of leaves.
-func (h *TransferHandler) SendTransfer(ctx context.Context, req *pb.SendTransferRequest) (*pb.SendTransferResponse, error) {
+// CompleteSendTransfer completes a transfer from sender.
+func (h *TransferHandler) CompleteSendTransfer(ctx context.Context, req *pb.CompleteSendTransferRequest) (*pb.CompleteSendTransferResponse, error) {
 	transferID, err := uuid.Parse(req.TransferId)
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse transfer_id as a uuid %s: %v", req.TransferId, err)
 	}
 
-	expiryTime := req.ExpiryTime.AsTime()
-	if expiryTime.Before(time.Now()) {
-		return nil, fmt.Errorf("invalid expiry_time %s: %v", expiryTime.String(), err)
-	}
-
 	db := ent.GetDbFromContext(ctx)
-	transfer, err := db.Transfer.Create().
-		SetID(transferID).
-		SetSenderIdentityPubkey(req.OwnerIdentityPublicKey).
-		SetReceiverIdentityPubkey(req.ReceiverIdentityPublicKey).
-		SetStatus(schema.TransferStatusInitiated).
-		SetTotalValue(0).
-		SetExpiryTime(expiryTime).
-		Save(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("unable to create transfer: %v", err)
+	transfer, err := db.Transfer.Get(ctx, transferID)
+	if err != nil || transfer == nil {
+		return nil, fmt.Errorf("unable to find transfer %s: %v", transferID, err)
+	}
+	if !bytes.Equal(transfer.SenderIdentityPubkey, req.OwnerIdentityPublicKey) || transfer.Status != schema.TransferStatusSenderInitiated {
+		return nil, fmt.Errorf("send transfer cannot be completed %s", req.TransferId)
 	}
 
 	for _, leaf := range req.LeavesToSend {
-		transfer, err = h.initLeafTransfer(ctx, transfer, leaf)
+		err = h.completeSendLeaf(ctx, transfer, leaf)
 		if err != nil {
-			return nil, fmt.Errorf("unable to init transfer for leaf %s: %v", leaf.LeafId, err)
+			return nil, fmt.Errorf("unable to complete send leaf transfer for leaf %s: %v", leaf.LeafId, err)
 		}
 	}
 
+	// Update transfer status
+	transfer, err = transfer.Update().SetStatus(schema.TransferStatusSenderKeyTweaked).Save(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to update transfer status %s: %v", transfer.ID.String(), err)
+	}
 	transferProto, err := transfer.MarshalProto(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to marshal transfer: %v", err)
 	}
-	return &pb.SendTransferResponse{Transfer: transferProto}, nil
+	return &pb.CompleteSendTransferResponse{Transfer: transferProto}, nil
 }
 
-func (h *TransferHandler) initLeafTransfer(ctx context.Context, transfer *ent.Transfer, req *pb.SendLeafKeyTweak) (*ent.Transfer, error) {
+func (h *TransferHandler) completeSendLeaf(ctx context.Context, transfer *ent.Transfer, req *pb.SendLeafKeyTweak) error {
 	// Use Feldman's verifiable secret sharing to verify the share.
 	err := secretsharing.ValidateShare(
 		&secretsharing.VerifiableSecretShare{
@@ -212,7 +210,7 @@ func (h *TransferHandler) initLeafTransfer(ctx context.Context, transfer *ent.Tr
 		},
 	)
 	if err != nil {
-		return nil, fmt.Errorf("unable to validate share: %v", err)
+		return fmt.Errorf("unable to validate share: %v", err)
 	}
 
 	// TODO (zhen): Verify possession
@@ -220,24 +218,50 @@ func (h *TransferHandler) initLeafTransfer(ctx context.Context, transfer *ent.Tr
 	// Find leaves in db
 	leafID, err := uuid.Parse(req.LeafId)
 	if err != nil {
-		return nil, fmt.Errorf("unable to parse leaf_id %s: %v", req.LeafId, err)
+		return fmt.Errorf("unable to parse leaf_id %s: %v", req.LeafId, err)
 	}
 
 	db := ent.GetDbFromContext(ctx)
 	leaf, err := db.TreeNode.Get(ctx, leafID)
 	if err != nil || leaf == nil {
-		return nil, fmt.Errorf("unable to find leaf %s: %v", req.LeafId, err)
+		return fmt.Errorf("unable to find leaf %s: %v", req.LeafId, err)
 	}
 	if (leaf.Status != schema.TreeNodeStatusAvailable &&
 		(leaf.Status != schema.TreeNodeStatusDestinationLock || !bytes.Equal(leaf.DestinationLockIdentityPubkey, transfer.ReceiverIdentityPubkey))) ||
 		!bytes.Equal(leaf.OwnerIdentityPubkey, transfer.SenderIdentityPubkey) {
-		return nil, fmt.Errorf("leaf %s is not available to transfer", req.LeafId)
+		return fmt.Errorf("leaf %s is not available to transfer", req.LeafId)
+	}
+
+	transferLeaf, err := db.TransferLeaf.
+		Query().
+		Where(
+			enttransferleaf.HasTransferWith(enttransfer.IDEQ(transfer.ID)),
+			enttransferleaf.HasLeafWith(enttreenode.IDEQ(leafID)),
+		).
+		Only(ctx)
+	if err != nil || transferLeaf == nil {
+		return fmt.Errorf("unable to get transfer leaf %s: %v", req.LeafId, err)
+	}
+
+	refundTx, err := common.UpdateTxWithSignature(transferLeaf.IntermediateRefundTx, 0, req.RefundSignature)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.TransferLeaf.
+		UpdateOne(transferLeaf).
+		SetIntermediateRefundTx(refundTx).
+		SetSecretCipher(req.SecretCipher).
+		SetSignature(req.Signature).
+		Save(ctx)
+	if err != nil {
+		return fmt.Errorf("unable to update transfer leaf: %v", err)
 	}
 
 	// Tweak keyshare
 	keyshare, err := leaf.QuerySigningKeyshare().First(ctx)
 	if err != nil || keyshare == nil {
-		return nil, fmt.Errorf("unable to load keyshare for leaf %s: %v", req.LeafId, err)
+		return fmt.Errorf("unable to load keyshare for leaf %s: %v", req.LeafId, err)
 	}
 	keyshare, err = keyshare.TweakKeyShare(
 		ctx,
@@ -246,35 +270,25 @@ func (h *TransferHandler) initLeafTransfer(ctx context.Context, transfer *ent.Tr
 		req.PubkeySharesTweak,
 	)
 	if err != nil || keyshare == nil {
-		return nil, fmt.Errorf("unable to tweak keyshare %s for leaf %s: %v", keyshare.ID.String(), req.LeafId, err)
+		return fmt.Errorf("unable to tweak keyshare %s for leaf %s: %v", keyshare.ID.String(), req.LeafId, err)
 	}
 
 	// Update leaf
 	signingPubkey, err := common.SubtractPublicKeys(leaf.VerifyingPubkey, keyshare.PublicKey)
 	if err != nil {
-		return nil, fmt.Errorf("unable to calculate new signing pubkey for leaf %s: %v", req.LeafId, err)
+		return fmt.Errorf("unable to calculate new signing pubkey for leaf %s: %v", req.LeafId, err)
 	}
 	leaf, err = leaf.
 		Update().
 		SetOwnerSigningPubkey(signingPubkey).
 		SetStatus(schema.TreeNodeStatusTransferLocked).
+		SetRawRefundTx(refundTx).
 		Save(ctx)
 	if err != nil || leaf == nil {
-		return nil, fmt.Errorf("unable to update leaf %s: %v", req.LeafId, err)
+		return fmt.Errorf("unable to update leaf %s: %v", req.LeafId, err)
 	}
 
-	// Create TransferLeaf and update Transfer.TotalValue
-	_, err = db.TransferLeaf.Create().
-		SetTransfer(transfer).
-		SetLeaf(leaf).
-		SetSecretCipher(req.SecretCipher).
-		SetSignature(req.Signature).
-		SetPreviousRefundTx(leaf.RawRefundTx).
-		Save(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("unable to create transfer leaf: %v", err)
-	}
-	return db.Transfer.UpdateOne(transfer).SetTotalValue(transfer.TotalValue + leaf.Value).Save(ctx)
+	return nil
 }
 
 // QueryPendingTransfers queries the pending transfers to claim.
@@ -282,10 +296,10 @@ func (h *TransferHandler) QueryPendingTransfers(ctx context.Context, req *pb.Que
 	db := ent.GetDbFromContext(ctx)
 	transfers, err := db.Transfer.Query().
 		Where(
-			transfer.And(
-				transfer.ReceiverIdentityPubkeyEQ(req.ReceiverIdentityPublicKey),
-				transfer.StatusEQ(schema.TransferStatusInitiated),
-				transfer.ExpiryTimeGT(time.Now()),
+			enttransfer.And(
+				enttransfer.ReceiverIdentityPubkeyEQ(req.ReceiverIdentityPublicKey),
+				enttransfer.StatusEQ(schema.TransferStatusSenderKeyTweaked),
+				enttransfer.ExpiryTimeGT(time.Now()),
 			),
 		).All(ctx)
 	if err != nil {
@@ -315,13 +329,8 @@ func (h *TransferHandler) ClaimTransferTweakKeys(ctx context.Context, req *pb.Cl
 		return fmt.Errorf("unable to find pending transfer %s: %v", req.TransferId, err)
 	}
 	// TODO (yun): Check with other SO if expires
-	if !bytes.Equal(transfer.ReceiverIdentityPubkey, req.OwnerIdentityPublicKey) || transfer.Status != schema.TransferStatusInitiated || transfer.ExpiryTime.Before(time.Now()) {
+	if !bytes.Equal(transfer.ReceiverIdentityPubkey, req.OwnerIdentityPublicKey) || transfer.Status != schema.TransferStatusSenderKeyTweaked || transfer.ExpiryTime.Before(time.Now()) {
 		return fmt.Errorf("transfer cannot be claimed %s", req.TransferId)
-	}
-	// Update transfer status
-	_, err = transfer.Update().SetStatus(schema.TransferStatusKeyTweaked).Save(ctx)
-	if err != nil {
-		return fmt.Errorf("unable to update transfer status %s: %v", transfer.ID.String(), err)
 	}
 
 	// Validate leaves count
@@ -343,6 +352,12 @@ func (h *TransferHandler) ClaimTransferTweakKeys(ctx context.Context, req *pb.Cl
 		if err != nil {
 			return fmt.Errorf("unable to tweak key for leaf %s: %v", leafTweak.LeafId, err)
 		}
+	}
+
+	// Update transfer status
+	_, err = transfer.Update().SetStatus(schema.TransferStatusReceiverKeyTweaked).Save(ctx)
+	if err != nil {
+		return fmt.Errorf("unable to update transfer status %s: %v", transfer.ID.String(), err)
 	}
 
 	return nil
@@ -425,7 +440,7 @@ func (h *TransferHandler) ClaimTransferSignRefunds(ctx context.Context, req *pb.
 	if err != nil {
 		return nil, fmt.Errorf("unable to find pending transfer %s: %v", req.TransferId, err)
 	}
-	if !bytes.Equal(transfer.ReceiverIdentityPubkey, req.OwnerIdentityPublicKey) || transfer.Status != schema.TransferStatusKeyTweaked {
+	if !bytes.Equal(transfer.ReceiverIdentityPubkey, req.OwnerIdentityPublicKey) || transfer.Status != schema.TransferStatusReceiverKeyTweaked {
 		return nil, fmt.Errorf("transfer %s is expected to be at status TransferStatusKeyTweaked but %s found", req.TransferId, transfer.Status)
 	}
 
@@ -488,7 +503,7 @@ func (h *TransferHandler) ClaimTransferSignRefunds(ctx context.Context, req *pb.
 	}
 
 	// Update transfer status
-	_, err = transfer.Update().SetStatus(schema.TransferStatusRefundSigned).Save(ctx)
+	_, err = transfer.Update().SetStatus(schema.TransferStatusReceiverRefundSigned).Save(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to update transfer status %s: %v", transfer.ID.String(), err)
 	}
