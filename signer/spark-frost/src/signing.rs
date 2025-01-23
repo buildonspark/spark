@@ -228,7 +228,6 @@ pub fn sign_frost(req: &SignFrostRequest) -> Result<SignFrostResponse, String> {
 
         let mut signing_participants_groups = Vec::new();
         signing_participants_groups.push(commitments.keys().cloned().collect());
-        signing_participants_groups.push(BTreeSet::from([user_identifier]));
 
         tracing::debug!("User commitments: {:?}", job.user_commitments);
 
@@ -237,6 +236,7 @@ pub fn sign_frost(req: &SignFrostRequest) -> Result<SignFrostResponse, String> {
                 let user_commitments = frost_commitments_from_proto(c)
                     .map_err(|e| format!("Failed to parse user commitments: {:?}", e))?;
                 commitments.insert(user_identifier, user_commitments);
+                signing_participants_groups.push(BTreeSet::from([user_identifier]));
             }
             None => {}
         };
@@ -273,6 +273,7 @@ pub fn sign_frost(req: &SignFrostRequest) -> Result<SignFrostResponse, String> {
             &job.message,
             Some(signing_participants_groups),
         );
+
         tracing::info!("Building signing package completed");
         let tweak = vec![];
         let signature_share = match req.role {
@@ -354,4 +355,75 @@ pub fn aggregate_frost(req: &AggregateFrostRequest) -> Result<AggregateFrostResp
             .serialize()
             .map_err(|e| format!("Failed to serialize signature: {:?}", e))?,
     })
+}
+
+pub fn validate_signature_share(req: &ValidateSignatureShareRequest) -> Result<(), String> {
+    let identifier = hex_string_to_identifier(&req.identifier)
+        .map_err(|e| format!("Failed to parse identifier: {:?}", e))?;
+
+    let signature_share = SignatureShare::deserialize(req.signature_share.as_slice())
+        .map_err(|e| format!("Failed to parse signature share: {:?}", e))?;
+    let verifying_key = verifying_key_from_bytes(req.verifying_key.clone())
+        .map_err(|e| format!("Failed to parse verifying key: {:?}", e))?;
+
+    let mut commitments = frost_signing_commiement_map_from_proto(&req.commitments)
+        .map_err(|e| format!("Failed to parse signing commitments: {:?}", e))?;
+
+    let user_identifier =
+        Identifier::derive("user".as_bytes()).expect("Failed to derive user identifier");
+
+    let mut signing_participants_groups = Vec::new();
+    signing_participants_groups.push(commitments.keys().cloned().collect());
+
+    if let Some(c) = &req.user_commitments {
+        let user_commitments = frost_commitments_from_proto(c)
+            .map_err(|e| format!("Failed to parse user commitments: {:?}", e))?;
+        commitments.insert(user_identifier, user_commitments);
+        signing_participants_groups.push(BTreeSet::from([user_identifier]));
+    }
+
+    let public_share = VerifyingShare::deserialize(req.public_share.as_slice())
+        .map_err(|e| format!("Failed to parse public share: {:?}", e))?;
+
+    let signing_package =
+        frost_build_signin_package(commitments, &req.message, Some(signing_participants_groups));
+
+    let dummy_signing_share = SigningShare::deserialize(&[0; 32])
+        .map_err(|e| format!("Failed to parse dummy signing share: {:?}", e))?;
+
+    let result = FrostKeyPackage::new(
+        identifier,
+        dummy_signing_share,
+        public_share,
+        verifying_key,
+        2,
+    );
+    let merkle_root = vec![];
+    let result_tweaked = result.clone().tweak(Some(&merkle_root));
+    let result_even_y = result.clone().into_even_y(Some(verifying_key.has_even_y()));
+
+    let verifying_share = match req.role {
+        0 => result_tweaked.verifying_share(),
+        1 => result_even_y.verifying_share(),
+        _ => return Err(format!("Invalid signing role")),
+    };
+
+    let verify_identifier = match req.role {
+        0 => identifier,
+        1 => user_identifier,
+        _ => return Err(format!("Invalid signing role")),
+    };
+
+    frost_secp256k1_tr::verify_signature_share(
+        verify_identifier,
+        &verifying_share,
+        &signature_share,
+        &signing_package,
+        &result_tweaked.verifying_key(),
+    )
+    .map_err(|e| format!("Failed to verify signature share: {:?}", e))?;
+
+    tracing::info!("Signature share is valid");
+
+    Ok(())
 }

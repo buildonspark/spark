@@ -251,4 +251,14 @@ impl FrostService for FrostServer {
             .map_err(|e| Status::internal(e))?;
         Ok(Response::new(response))
     }
+
+    async fn validate_signature_share(
+        &self,
+        request: Request<ValidateSignatureShareRequest>,
+    ) -> Result<Response<()>, Status> {
+        tracing::info!("Received frost validate signature share request");
+        spark_frost::signing::validate_signature_share(&request.get_ref())
+            .map_err(|e| Status::internal(e))
+            .map(|_| Response::new(()))
+    }
 }

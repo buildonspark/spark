@@ -3,6 +3,7 @@ syntax = "proto3";
 package frost;
 
 option go_package = "github.com/lightsparkdev/spark-go/proto/frost";
+import "google/protobuf/empty.proto";
 import "common.proto";
 
 service FrostService {
@@ -15,6 +16,7 @@ service FrostService {
     rpc frost_nonce(FrostNonceRequest) returns (FrostNonceResponse) {}
     rpc sign_frost(SignFrostRequest) returns (SignFrostResponse) {}
     rpc aggregate_frost(AggregateFrostRequest) returns (AggregateFrostResponse) {}
+    rpc validate_signature_share(ValidateSignatureShareRequest) returns (google.protobuf.Empty) {}
 }
 
 message EchoRequest {
@@ -257,4 +259,30 @@ message AggregateFrostRequest {
 message AggregateFrostResponse {
     // The signature.
     bytes signature = 1;
+}
+
+message ValidateSignatureShareRequest {
+    // The identifier of the participant.
+    string identifier = 1;
+
+    // The role of the participant in the signing.
+    SigningRole role = 2;
+
+    // The message to sign.
+    bytes message = 3;
+
+    // The signature share to validate.
+    bytes signature_share = 4;
+
+    // The public share for the participant.
+    bytes public_share = 5;
+
+    // The verifying key. This should be the total public key for both user and StatechainEntity.
+    bytes verifying_key = 6;
+
+    // The commitments for all participants of the statechain.
+    map<string, common.SigningCommitment> commitments = 7;
+
+    // The commitments for all participants of the user.
+    common.SigningCommitment user_commitments = 8;
 }

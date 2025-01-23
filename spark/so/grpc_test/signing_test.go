@@ -154,6 +154,39 @@ func TestFrostSign(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Step 7.5: Validate all signature shares
+	// SE part
+	for identifier, signature := range signingResult[0].SignatureShares {
+		_, err = client.ValidateSignatureShare(ctx, &pbfrost.ValidateSignatureShareRequest{
+			Identifier:      identifier,
+			Role:            pbfrost.SigningRole_STATECHAIN,
+			Message:         msgHash[:],
+			SignatureShare:  signature,
+			PublicShare:     signingResult[0].PublicKeys[identifier],
+			VerifyingKey:    verifyingKeyBytes,
+			Commitments:     operatorCommitmentsProto,
+			UserCommitments: userNonceCommitmentProto,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// User part
+	_, err = client.ValidateSignatureShare(ctx, &pbfrost.ValidateSignatureShareRequest{
+		Identifier:      userIdentifier,
+		Role:            pbfrost.SigningRole_USER,
+		Message:         msgHash[:],
+		SignatureShare:  userSignatures.Results[userJobID].SignatureShare,
+		PublicShare:     userPubKeyBytes,
+		VerifyingKey:    verifyingKeyBytes,
+		Commitments:     operatorCommitmentsProto,
+		UserCommitments: userNonceCommitmentProto,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	// Step 8: Signature aggregation - The aggregation is successful only if the signature is valid.
 	signatureShares := signingResult[0].SignatureShares
 	publicKeys := signingResult[0].PublicKeys
