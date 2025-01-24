@@ -18,7 +18,7 @@ jobs:
       matrix:
         target: [x86_64]
         python:
-          - "3.12"
+          - "3.11"
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -59,7 +59,7 @@ jobs:
       matrix:
         target: [aarch64]
         python:
-          - "3.12"
+          - "3.11"
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -97,7 +97,7 @@ jobs:
     strategy:
       matrix:
         python:
-          - "3.12"
+          - "3.11"
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -131,7 +131,7 @@ jobs:
     strategy:
       matrix:
         python:
-          - "3.12"
+          - "3.11"
     steps:
       - name: Checkout
         uses: actions/checkout@v3
