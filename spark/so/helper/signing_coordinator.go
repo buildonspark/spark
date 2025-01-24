@@ -267,10 +267,12 @@ func SignFrost(
 	for i, job := range jobs {
 		allPublicShares := signingKeyshares[job.SigningKeyshareID].PublicShares
 		publicShares := make(map[string][]byte)
-		keyshareOwnerIdentifiers := make([]string, len(signingParticipants))
+		keyshareOwnerIdentifiers := make([]string, 0)
+		for i := range allPublicShares {
+			keyshareOwnerIdentifiers = append(keyshareOwnerIdentifiers, i)
+		}
 		for _, participant := range signingParticipants {
 			publicShares[participant.Identifier] = allPublicShares[participant.Identifier]
-			keyshareOwnerIdentifiers[i] = participant.Identifier
 		}
 
 		results[i] = &SigningResult{
