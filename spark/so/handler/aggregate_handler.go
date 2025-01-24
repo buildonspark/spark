@@ -180,25 +180,21 @@ func (h *AggregateHandler) AggregateNodes(ctx context.Context, req *pb.Aggregate
 		return nil, err
 	}
 
-	signingCommitmentsMap, err := common.ConvertObjectMapToProtoMap(signingResult[0].SigningCommitments)
-	if err != nil {
-		return nil, err
-	}
-
 	verifyingKey, err := common.AddPublicKeys(req.SigningJob.SigningPublicKey, updatedKeyshare.PublicKey)
 	if err != nil {
 		return nil, err
 	}
 
+	signingResultProto, err := signingResult[0].MarshalProto()
+	if err != nil {
+		return nil, err
+	}
+
 	return &pb.AggregateNodesResponse{
-		AggregateSignature: &pb.SigningResult{
-			PublicKeys:              signingResult[0].PublicKeys,
-			SignatureShares:         signingResult[0].SignatureShares,
-			SigningNonceCommitments: signingCommitmentsMap,
-		},
-		VerifyingKey:   verifyingKey,
-		ParentNodeTx:   parentNode.RawTx,
-		ParentNodeVout: uint32(parentNode.Vout),
+		AggregateSignature: signingResultProto,
+		VerifyingKey:       verifyingKey,
+		ParentNodeTx:       parentNode.RawTx,
+		ParentNodeVout:     uint32(parentNode.Vout),
 	}, nil
 }
 

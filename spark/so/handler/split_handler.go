@@ -229,15 +229,11 @@ func (h *SplitHandler) finalizeSplitResults(ctx context.Context, config *so.Conf
 
 	for i, splitResult := range splitResults {
 		refundTxIndex := i + 1
-		refundTxSigningCommitments, err := common.ConvertObjectMapToProtoMap(signingResults[refundTxIndex].SigningCommitments)
+		splitResult.NodeId = nodes[i].ID.String()
+		var err error
+		splitResult.RefundTxSigningResult, err = signingResults[refundTxIndex].MarshalProto()
 		if err != nil {
 			return nil, err
-		}
-		splitResult.NodeId = nodes[i].ID.String()
-		splitResult.RefundTxSigningResult = &pb.SigningResult{
-			PublicKeys:              signingResults[refundTxIndex].PublicKeys,
-			SigningNonceCommitments: refundTxSigningCommitments,
-			SignatureShares:         signingResults[refundTxIndex].SignatureShares,
 		}
 	}
 
@@ -298,15 +294,9 @@ func (h *SplitHandler) SplitNode(ctx context.Context, config *so.Config, req *pb
 		return nil, err
 	}
 
-	parentSigningCommitments, err := common.ConvertObjectMapToProtoMap(signingResults[0].SigningCommitments)
+	parentSigningResult, err := signingResults[0].MarshalProto()
 	if err != nil {
 		return nil, err
-	}
-
-	parentSigningResult := &pb.SigningResult{
-		PublicKeys:              signingResults[0].PublicKeys,
-		SigningNonceCommitments: parentSigningCommitments,
-		SignatureShares:         signingResults[0].SignatureShares,
 	}
 
 	splitResults, err = h.finalizeSplitResults(ctx, config, req, signingResults, nodes, splitResults)

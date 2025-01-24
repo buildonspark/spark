@@ -230,22 +230,19 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 			UserCommitment:    userRefundTxNonceCommitment,
 		},
 	)
-	signingResult, err := helper.SignFrost(ctx, config, signingJobs)
+	signingResults, err := helper.SignFrost(ctx, config, signingJobs)
 	if err != nil {
 		return nil, err
 	}
-	rootTxSigningCommitments, err := common.ConvertObjectMapToProtoMap(signingResult[0].SigningCommitments)
-	if err != nil {
-		return nil, err
-	}
-	rootTxSignatureShare := signingResult[0].SignatureShares
 
-	refundTxSigningCommitments, err := common.ConvertObjectMapToProtoMap(signingResult[1].SigningCommitments)
+	nodeTxSigningResult, err := signingResults[0].MarshalProto()
 	if err != nil {
 		return nil, err
 	}
-	refundTxSignatureShare := signingResult[1].SignatureShares
-
+	refundTxSigningResult, err := signingResults[1].MarshalProto()
+	if err != nil {
+		return nil, err
+	}
 	// Create the tree
 	db := ent.GetDbFromContext(ctx)
 	tree := db.Tree.Create().SetOwnerIdentityPubkey(depositAddress.OwnerIdentityPubkey).SaveX(ctx)
@@ -267,18 +264,10 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 	return &pb.StartTreeCreationResponse{
 		TreeId: tree.ID.String(),
 		RootNodeSignatureShares: &pb.NodeSignatureShares{
-			NodeId: root.ID.String(),
-			NodeTxSigningResult: &pb.SigningResult{
-				PublicKeys:              signingKeyShare.PublicShares,
-				SignatureShares:         rootTxSignatureShare,
-				SigningNonceCommitments: rootTxSigningCommitments,
-			},
-			RefundTxSigningResult: &pb.SigningResult{
-				PublicKeys:              signingKeyShare.PublicShares,
-				SignatureShares:         refundTxSignatureShare,
-				SigningNonceCommitments: refundTxSigningCommitments,
-			},
-			VerifyingKey: verifyingKeyBytes,
+			NodeId:                root.ID.String(),
+			NodeTxSigningResult:   nodeTxSigningResult,
+			RefundTxSigningResult: refundTxSigningResult,
+			VerifyingKey:          verifyingKeyBytes,
 		},
 	}, nil
 }

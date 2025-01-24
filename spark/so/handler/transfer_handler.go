@@ -140,22 +140,14 @@ func (h *TransferHandler) sendTransferSignRefunds(ctx context.Context, requests 
 	pbSigningResults := make([]*pb.LeafRefundTxSigningResult, 0)
 	for _, signingResult := range signingResults {
 		leaf := jobToLeafMap[signingResult.JobID]
-		signingKeyShare, err := leaf.QuerySigningKeyshare().First(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("unable to load keyshare for leaf %s: %v", leaf.ID.String(), err)
-		}
-		signingCommitments, err := common.ConvertObjectMapToProtoMap(signingResult.SigningCommitments)
+		signingResultProto, err := signingResult.MarshalProto()
 		if err != nil {
 			return nil, err
 		}
 		pbSigningResults = append(pbSigningResults, &pb.LeafRefundTxSigningResult{
-			LeafId: leaf.ID.String(),
-			RefundTxSigningResult: &pb.SigningResult{
-				PublicKeys:              signingKeyShare.PublicShares,
-				SignatureShares:         signingResult.SignatureShares,
-				SigningNonceCommitments: signingCommitments,
-			},
-			VerifyingKey: leaf.VerifyingPubkey,
+			LeafId:                leaf.ID.String(),
+			RefundTxSigningResult: signingResultProto,
+			VerifyingKey:          leaf.VerifyingPubkey,
 		})
 	}
 	return pbSigningResults, nil
@@ -487,18 +479,14 @@ func (h *TransferHandler) ClaimTransferSignRefunds(ctx context.Context, req *pb.
 	for _, signingResult := range signingResults {
 		leafID := jobToLeafMap[signingResult.JobID]
 		leaf := (*leaves)[leafID.String()]
-		signingCommitments, err := common.ConvertObjectMapToProtoMap(signingResult.SigningCommitments)
+		signingResultProto, err := signingResult.MarshalProto()
 		if err != nil {
 			return nil, err
 		}
 		signingResultProtos = append(signingResultProtos, &pb.LeafRefundTxSigningResult{
-			LeafId: leafID.String(),
-			RefundTxSigningResult: &pb.SigningResult{
-				PublicKeys:              signingResult.PublicKeys,
-				SigningNonceCommitments: signingCommitments,
-				SignatureShares:         signingResult.SignatureShares,
-			},
-			VerifyingKey: leaf.VerifyingPubkey,
+			LeafId:                leafID.String(),
+			RefundTxSigningResult: signingResultProto,
+			VerifyingKey:          leaf.VerifyingPubkey,
 		})
 	}
 
