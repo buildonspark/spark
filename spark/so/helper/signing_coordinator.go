@@ -27,6 +27,8 @@ type SigningResult struct {
 	SigningCommitments map[string]objects.SigningCommitment
 	// PublicKeys is the public keys from all operators.
 	PublicKeys map[string][]byte
+	// KeyshareOwnerIdentifiers is the identifiers of the keyshare owners.
+	KeyshareOwnerIdentifiers []string
 }
 
 // MarshalProto marshals the signing result to a proto.
@@ -37,9 +39,10 @@ func (s *SigningResult) MarshalProto() (*pbspark.SigningResult, error) {
 	}
 
 	return &pbspark.SigningResult{
-		SigningNonceCommitments: signingCommitments,
-		SignatureShares:         s.SignatureShares,
-		PublicKeys:              s.PublicKeys,
+		SigningNonceCommitments:  signingCommitments,
+		SignatureShares:          s.SignatureShares,
+		PublicKeys:               s.PublicKeys,
+		KeyshareOwnerIdentifiers: s.KeyshareOwnerIdentifiers,
 	}, nil
 }
 
@@ -264,15 +267,18 @@ func SignFrost(
 	for i, job := range jobs {
 		allPublicShares := signingKeyshares[job.SigningKeyshareID].PublicShares
 		publicShares := make(map[string][]byte)
+		keyshareOwnerIdentifiers := make([]string, len(signingParticipants))
 		for _, participant := range signingParticipants {
 			publicShares[participant.Identifier] = allPublicShares[participant.Identifier]
+			keyshareOwnerIdentifiers[i] = participant.Identifier
 		}
 
 		results[i] = &SigningResult{
-			JobID:              job.JobID,
-			SignatureShares:    round2[job.JobID],
-			SigningCommitments: round1Array[i],
-			PublicKeys:         publicShares,
+			JobID:                    job.JobID,
+			SignatureShares:          round2[job.JobID],
+			SigningCommitments:       round1Array[i],
+			PublicKeys:               publicShares,
+			KeyshareOwnerIdentifiers: keyshareOwnerIdentifiers,
 		}
 	}
 

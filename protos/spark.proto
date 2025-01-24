@@ -69,6 +69,7 @@ message SigningResult {
     map<string, bytes> public_keys = 1;
     map<string, common.SigningCommitment> signing_nonce_commitments = 2;
     map<string, bytes> signature_shares = 3;
+    repeated string keyshare_owner_identifiers = 4;
 }
 
 message NodeSignatureShares {
