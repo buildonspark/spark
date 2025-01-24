@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	pb "github.com/lightsparkdev/spark-go/proto/spark"
 	"github.com/lightsparkdev/spark-go/so/utils"
 )
 
@@ -45,4 +46,13 @@ func (s *SigningOperator) UnmarshalJSON(data []byte) error {
 	s.Address = js.Address
 	s.IdentityPublicKey = pubKey
 	return nil
+}
+
+// MarshalProto marshals the signing operator to a protobuf message.
+func (s *SigningOperator) MarshalProto() *pb.SigningOperatorInfo {
+	return &pb.SigningOperatorInfo{
+		Identifier: s.Identifier,
+		PublicKey:  s.IdentityPublicKey,
+		Address:    s.Address,
+	}
 }

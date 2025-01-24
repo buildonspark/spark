@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/lightsparkdev/spark-go/common"
+	pb "github.com/lightsparkdev/spark-go/proto/spark"
 	"github.com/lightsparkdev/spark-go/so/utils"
 )
 
@@ -80,4 +81,13 @@ func LoadOperators(filePath string) (map[string]*SigningOperator, error) {
 		operators[operator.Identifier] = operator
 	}
 	return operators, nil
+}
+
+// GetSigningOperatorList returns the list of signing operators.
+func (c *Config) GetSigningOperatorList() map[string]*pb.SigningOperatorInfo {
+	operatorList := make(map[string]*pb.SigningOperatorInfo)
+	for _, operator := range c.SigningOperatorMap {
+		operatorList[operator.Identifier] = operator.MarshalProto()
+	}
+	return operatorList
 }

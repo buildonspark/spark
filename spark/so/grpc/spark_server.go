@@ -135,3 +135,8 @@ func (s *SparkServer) CreateTree(ctx context.Context, req *pb.CreateTreeRequest)
 	}
 	return result, err
 }
+
+// GetSigningOperatorList gets the list of signing operators.
+func (s *SparkServer) GetSigningOperatorList(ctx context.Context, req *emptypb.Empty) (*pb.GetSigningOperatorListResponse, error) {
+	return &pb.GetSigningOperatorListResponse{SigningOperators: s.config.GetSigningOperatorList()}, nil
+}
