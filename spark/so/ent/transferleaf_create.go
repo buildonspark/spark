@@ -168,12 +168,6 @@ func (tlc *TransferLeafCreate) check() error {
 	if _, ok := tlc.mutation.UpdateTime(); !ok {
 		return &ValidationError{Name: "update_time", err: errors.New(`ent: missing required field "TransferLeaf.update_time"`)}
 	}
-	if _, ok := tlc.mutation.SecretCipher(); !ok {
-		return &ValidationError{Name: "secret_cipher", err: errors.New(`ent: missing required field "TransferLeaf.secret_cipher"`)}
-	}
-	if _, ok := tlc.mutation.Signature(); !ok {
-		return &ValidationError{Name: "signature", err: errors.New(`ent: missing required field "TransferLeaf.signature"`)}
-	}
 	if _, ok := tlc.mutation.PreviousRefundTx(); !ok {
 		return &ValidationError{Name: "previous_refund_tx", err: errors.New(`ent: missing required field "TransferLeaf.previous_refund_tx"`)}
 	}

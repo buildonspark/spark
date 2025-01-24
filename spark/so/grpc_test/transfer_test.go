@@ -38,7 +38,7 @@ func TestTransfer(t *testing.T) {
 	}
 
 	transferNode := wallet.LeafKeyTweak{
-		LeafID:            rootNode.Id,
+		Leaf:              rootNode,
 		SigningPrivKey:    leafPrivKey.Serialize(),
 		NewSigningPrivKey: newLeafPrivKey.Serialize(),
 	}
@@ -87,7 +87,7 @@ func TestTransfer(t *testing.T) {
 		t.Fatalf("failed to create new node signing private key: %v", err)
 	}
 	claimingNode := wallet.LeafKeyTweak{
-		LeafID:            rootNode.Id,
+		Leaf:              receiverTransfer.Leaves[0].Leaf,
 		SigningPrivKey:    newLeafPrivKey.Serialize(),
 		NewSigningPrivKey: finalLeafPrivKey.Serialize(),
 	}

@@ -24,11 +24,12 @@ import (
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/objects"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // LeafKeyTweak is a struct to hold leaf key to tweak.
 type LeafKeyTweak struct {
-	LeafID            string
+	Leaf              *pb.TreeNode
 	SigningPrivKey    []byte
 	NewSigningPrivKey []byte
 }
@@ -41,17 +42,30 @@ func SendTransfer(
 	receiverIdentityPubkey []byte,
 	expiryTime time.Time,
 ) (*pb.Transfer, error) {
-	transferID, err := uuid.NewRandom()
+	transfer, refundSignatureMap, err := sendTransferSignRefund(ctx, config, leaves, receiverIdentityPubkey, expiryTime)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate transfer id: %v", err)
+		return nil, fmt.Errorf("failed to sign refund: %v", err)
 	}
+	transfer, err = sendTransferTweakKey(ctx, config, transfer, leaves, refundSignatureMap)
+	if err != nil {
+		return nil, fmt.Errorf("failed to tweak key: %v", err)
+	}
+	return transfer, nil
+}
 
-	soSendingLeavesMap, err := prepareLeavesTransfer(config, transferID, leaves, receiverIdentityPubkey)
+func sendTransferTweakKey(
+	ctx context.Context,
+	config *Config,
+	transfer *pb.Transfer,
+	leaves []LeafKeyTweak,
+	refundSignatureMap map[string][]byte,
+) (*pb.Transfer, error) {
+	keyTweakInputMap, err := prepareSendTransferKeyTweaks(config, transfer, leaves, refundSignatureMap)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare transfer data: %v", err)
 	}
 
-	var transfer *pb.Transfer
+	var updatedTransfer *pb.Transfer
 	wg := sync.WaitGroup{}
 	results := make(chan error, len(config.SigningOperators))
 	for identifier, operator := range config.SigningOperators {
@@ -66,18 +80,18 @@ func SendTransfer(
 			defer sparkConn.Close()
 			sparkClient := pb.NewSparkServiceClient(sparkConn)
 			transferResp, err := sparkClient.CompleteSendTransfer(ctx, &pb.CompleteSendTransferRequest{
-				TransferId:             transferID.String(),
+				TransferId:             transfer.Id,
 				OwnerIdentityPublicKey: config.IdentityPublicKey(),
-				LeavesToSend:           (*soSendingLeavesMap)[identifier],
+				LeavesToSend:           (*keyTweakInputMap)[identifier],
 			})
 			if err != nil {
 				results <- fmt.Errorf("failed to call SendTransfer: %v", err)
 				return
 			}
-			if transfer == nil {
-				transfer = transferResp.Transfer
+			if updatedTransfer == nil {
+				updatedTransfer = transferResp.Transfer
 			} else {
-				if !compareTransfers(transfer, transferResp.Transfer) {
+				if !compareTransfers(updatedTransfer, transferResp.Transfer) {
 					results <- fmt.Errorf("inconsistent transfer response from operators")
 					return
 				}
@@ -91,7 +105,66 @@ func SendTransfer(
 			return nil, result
 		}
 	}
-	return transfer, nil
+	return updatedTransfer, nil
+}
+
+func sendTransferSignRefund(
+	ctx context.Context,
+	config *Config,
+	leaves []LeafKeyTweak,
+	receiverIdentityPubkey []byte,
+	expiryTime time.Time,
+) (*pb.Transfer, map[string][]byte, error) {
+	transferID, err := uuid.NewRandom()
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to generate transfer id: %v", err)
+	}
+
+	leafDataMap := make(map[string]*leafRefundSigningData)
+	for _, leafKey := range leaves {
+		privKey := secp256k1.PrivKeyFromBytes(leafKey.SigningPrivKey)
+		nonce, _ := objects.RandomSigningNonce()
+		tx, _ := common.TxFromRawTxBytes(leafKey.Leaf.NodeTx)
+		leafDataMap[leafKey.Leaf.Id] = &leafRefundSigningData{
+			SigningPrivKey:  privKey,
+			ReceivingPubkey: receiverIdentityPubkey,
+			Nonce:           nonce,
+			Tx:              tx,
+			Vout:            int(leafKey.Leaf.Vout),
+		}
+	}
+
+	signingJobs, err := prepareRefundSoSigningJobs(leaves, config, leafDataMap)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to prepare signing jobs for sending transfer: %v", err)
+	}
+
+	sparkConn, err := common.NewGRPCConnection(config.CoodinatorAddress())
+	if err != nil {
+		return nil, nil, err
+	}
+	defer sparkConn.Close()
+	sparkClient := pb.NewSparkServiceClient(sparkConn)
+	response, err := sparkClient.StartSendTransfer(ctx, &pb.StartSendTransferRequest{
+		TransferId:                transferID.String(),
+		LeavesToSend:              signingJobs,
+		OwnerIdentityPublicKey:    config.IdentityPublicKey(),
+		ReceiverIdentityPublicKey: receiverIdentityPubkey,
+		ExpiryTime:                timestamppb.New(expiryTime),
+	})
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to start send transfer: %v", err)
+	}
+
+	signatures, err := signRefunds(config, leafDataMap, response.SigningResults)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to sign refunds for send: %v", err)
+	}
+	signatureMap := make(map[string][]byte)
+	for _, signature := range signatures {
+		signatureMap[signature.NodeId] = signature.RefundTxSignature
+	}
+	return response.Transfer, signatureMap, nil
 }
 
 func compareTransfers(transfer1, transfer2 *pb.Transfer) bool {
@@ -103,15 +176,15 @@ func compareTransfers(transfer1, transfer2 *pb.Transfer) bool {
 		len(transfer1.Leaves) == len(transfer2.Leaves)
 }
 
-func prepareLeavesTransfer(config *Config, transferID uuid.UUID, leaves []LeafKeyTweak, receiverIdentityPubkey []byte) (*map[string][]*pb.SendLeafKeyTweak, error) {
-	receiverEciesPubKey, err := eciesgo.NewPublicKeyFromBytes(receiverIdentityPubkey)
+func prepareSendTransferKeyTweaks(config *Config, transfer *pb.Transfer, leaves []LeafKeyTweak, refundSignatureMap map[string][]byte) (*map[string][]*pb.SendLeafKeyTweak, error) {
+	receiverEciesPubKey, err := eciesgo.NewPublicKeyFromBytes(transfer.ReceiverIdentityPublicKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse receiver public key: %v", err)
 	}
 
 	leavesTweaksMap := make(map[string][]*pb.SendLeafKeyTweak)
 	for _, leaf := range leaves {
-		leafTweaksMap, err := prepareSingleLeafTransfer(config, transferID, leaf, receiverEciesPubKey)
+		leafTweaksMap, err := prepareSingleSendTransferKeyTweak(config, transfer.Id, leaf, receiverEciesPubKey, refundSignatureMap[leaf.Leaf.Id])
 		if err != nil {
 			return nil, fmt.Errorf("failed to prepare single leaf transfer: %v", err)
 		}
@@ -122,7 +195,7 @@ func prepareLeavesTransfer(config *Config, transferID uuid.UUID, leaves []LeafKe
 	return &leavesTweaksMap, nil
 }
 
-func prepareSingleLeafTransfer(config *Config, transferID uuid.UUID, leaf LeafKeyTweak, receiverEciesPubKey *eciesgo.PublicKey) (*map[string]*pb.SendLeafKeyTweak, error) {
+func prepareSingleSendTransferKeyTweak(config *Config, transferID string, leaf LeafKeyTweak, receiverEciesPubKey *eciesgo.PublicKey, refundSignature []byte) (*map[string]*pb.SendLeafKeyTweak, error) {
 	privKeyTweak, err := common.SubtractPrivateKeys(leaf.SigningPrivKey, leaf.NewSigningPrivKey)
 	if err != nil {
 		return nil, fmt.Errorf("fail to calculate private key tweak: %v", err)
@@ -159,7 +232,7 @@ func prepareSingleLeafTransfer(config *Config, transferID uuid.UUID, leaf LeafKe
 	}
 
 	// Generate signature over Sha256(leaf_id||transfer_id||secret_cipher)
-	payload := append(append([]byte(leaf.LeafID), []byte(transferID.String())...), secretCipher...)
+	payload := append(append([]byte(leaf.Leaf.Id), []byte(transferID)...), secretCipher...)
 	payloadHash := sha256.Sum256(payload)
 	signature := ecdsa.Sign(&config.IdentityPrivateKey, payloadHash[:])
 	if err != nil {
@@ -174,7 +247,7 @@ func prepareSingleLeafTransfer(config *Config, transferID uuid.UUID, leaf LeafKe
 			return nil, fmt.Errorf("failed to find share for operator %d", operator.ID)
 		}
 		leafTweaksMap[identifier] = &pb.SendLeafKeyTweak{
-			LeafId: leaf.LeafID,
+			LeafId: leaf.Leaf.Id,
 			SecretShareTweak: &pb.SecretShare{
 				SecretShare: share.Share.Bytes(),
 				Proofs:      share.Proofs,
@@ -182,6 +255,7 @@ func prepareSingleLeafTransfer(config *Config, transferID uuid.UUID, leaf LeafKe
 			PubkeySharesTweak: pubkeySharesTweak,
 			SecretCipher:      secretCipher,
 			Signature:         signature.Serialize(),
+			RefundSignature:   refundSignature,
 		}
 	}
 	return &leafTweaksMap, nil
@@ -366,7 +440,7 @@ func prepareClaimLeafKeyTweaks(config *Config, leaf LeafKeyTweak) (*map[string]*
 			return nil, fmt.Errorf("failed to find share for operator %d", operator.ID)
 		}
 		leafTweaksMap[identifier] = &pb.ClaimLeafKeyTweak{
-			LeafId: leaf.LeafID,
+			LeafId: leaf.Leaf.Id,
 			SecretShareTweak: &pb.SecretShare{
 				SecretShare: share.Share.Bytes(),
 				Proofs:      share.Proofs,
@@ -377,12 +451,13 @@ func prepareClaimLeafKeyTweaks(config *Config, leaf LeafKeyTweak) (*map[string]*
 	return &leafTweaksMap, nil
 }
 
-type claimLeafData struct {
-	SigningPrivKey *secp256k1.PrivateKey
-	Tx             *wire.MsgTx
-	RefundTx       *wire.MsgTx
-	Nonce          *objects.SigningNonce
-	Vout           int
+type leafRefundSigningData struct {
+	SigningPrivKey  *secp256k1.PrivateKey
+	ReceivingPubkey []byte
+	Tx              *wire.MsgTx
+	RefundTx        *wire.MsgTx
+	Nonce           *objects.SigningNonce
+	Vout            int
 }
 
 func claimTransferSignRefunds(
@@ -391,25 +466,21 @@ func claimTransferSignRefunds(
 	config *Config,
 	leafKeys []LeafKeyTweak,
 ) ([]*pb.NodeSignatures, error) {
-	leafDataMap := make(map[string]*claimLeafData)
+	leafDataMap := make(map[string]*leafRefundSigningData)
 	for _, leafKey := range leafKeys {
 		privKey := secp256k1.PrivKeyFromBytes(leafKey.NewSigningPrivKey)
 		nonce, _ := objects.RandomSigningNonce()
-		leafData := &claimLeafData{
-			SigningPrivKey: privKey,
-			Nonce:          nonce,
+		tx, _ := common.TxFromRawTxBytes(leafKey.Leaf.NodeTx)
+		leafDataMap[leafKey.Leaf.Id] = &leafRefundSigningData{
+			SigningPrivKey:  privKey,
+			ReceivingPubkey: privKey.PubKey().SerializeCompressed(),
+			Nonce:           nonce,
+			Tx:              tx,
+			Vout:            int(leafKey.Leaf.Vout),
 		}
-		for _, leaf := range transfer.Leaves {
-			if leaf.Leaf.Id == leafKey.LeafID {
-				tx, _ := common.TxFromRawTxBytes(leaf.Leaf.NodeTx)
-				leafData.Tx = tx
-				leafData.Vout = int(leaf.Leaf.Vout)
-			}
-		}
-		leafDataMap[leafKey.LeafID] = leafData
 	}
 
-	signingJobs, err := prepareClaimTransferOperatorsSigningJobs(transfer, config, leafDataMap)
+	signingJobs, err := prepareRefundSoSigningJobs(leafKeys, config, leafDataMap)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare signing jobs for claiming transfer: %v", err)
 	}
@@ -451,7 +522,7 @@ func finalizeTransfer(
 
 func signRefunds(
 	config *Config,
-	leafDataMap map[string]*claimLeafData,
+	leafDataMap map[string]*leafRefundSigningData,
 	operatorSigningResults []*pb.LeafRefundTxSigningResult,
 ) ([]*pb.NodeSignatures, error) {
 	userSigningJobs := []*pbfrost.FrostSigningJob{}
@@ -514,37 +585,23 @@ func signRefunds(
 	return nodeSignatures, nil
 }
 
-func prepareClaimTransferOperatorsSigningJobs(
-	transfer *pb.Transfer,
+func prepareRefundSoSigningJobs(
+	leaves []LeafKeyTweak,
 	config *Config,
-	leafDataMap map[string]*claimLeafData,
+	leafDataMap map[string]*leafRefundSigningData,
 ) ([]*pb.LeafRefundTxSigningJob, error) {
 	signingJobs := []*pb.LeafRefundTxSigningJob{}
-	for _, leaf := range transfer.Leaves {
-		leafData := leafDataMap[leaf.Leaf.Id]
-		signingPubkey := leafData.SigningPrivKey.PubKey().SerializeCompressed()
-		tx, err := common.TxFromRawTxBytes(leaf.Leaf.NodeTx)
+	for _, leaf := range leaves {
+		refundSigningData := leafDataMap[leaf.Leaf.Id]
+		signingPubkey := refundSigningData.SigningPrivKey.PubKey().SerializeCompressed()
+		refundTx, err := createRefundTx(config, leaf.Leaf, refundSigningData.ReceivingPubkey)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse raw tx: %v", err)
+			return nil, fmt.Errorf("failed to create refund tx: %v", err)
 		}
-		// Creat refund tx
-		refundTx := wire.NewMsgTx(2)
-		// TODO(zhenlu): Handle the case where refund timelock is below 0
-		sequence := uint32((1 << 30) | leaf.Leaf.RefundTimelock - spark.TimeLockInterval)
-		refundTx.AddTxIn(&wire.TxIn{
-			PreviousOutPoint: wire.OutPoint{Hash: tx.TxHash(), Index: 0},
-			SignatureScript:  tx.TxOut[0].PkScript,
-			Witness:          nil,
-			Sequence:         sequence,
-		})
-		refundP2trAddress, _ := common.P2TRAddressFromPublicKey(signingPubkey, config.Network)
-		refundAddress, _ := btcutil.DecodeAddress(*refundP2trAddress, common.NetworkParams(config.Network))
-		refundPkScript, _ := txscript.PayToAddrScript(refundAddress)
-		refundTx.AddTxOut(wire.NewTxOut(tx.TxOut[0].Value, refundPkScript))
-		leafData.RefundTx = refundTx
+		refundSigningData.RefundTx = refundTx
 		var refundBuf bytes.Buffer
 		refundTx.Serialize(&refundBuf)
-		refundNonceCommitmentProto, _ := leafData.Nonce.SigningCommitment().MarshalProto()
+		refundNonceCommitmentProto, _ := refundSigningData.Nonce.SigningCommitment().MarshalProto()
 
 		signingJobs = append(signingJobs, &pb.LeafRefundTxSigningJob{
 			LeafId: leaf.Leaf.Id,
@@ -556,4 +613,44 @@ func prepareClaimTransferOperatorsSigningJobs(
 		})
 	}
 	return signingJobs, nil
+}
+
+func createRefundTx(
+	config *Config,
+	leaf *pb.TreeNode,
+	receivingPubkey []byte,
+) (*wire.MsgTx, error) {
+	tx, err := common.TxFromRawTxBytes(leaf.NodeTx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse leaf tx: %v", err)
+	}
+	refundTx, err := common.TxFromRawTxBytes(leaf.RefundTx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse leaf tx: %v", err)
+	}
+
+	newRefundTx := wire.NewMsgTx(2)
+	// TODO(zhenlu): Handle the case where refund timelock is below 0
+
+	sequence := uint32((1 << 30) | (refundTx.TxIn[0].Sequence&0xFFFF - spark.TimeLockInterval))
+	newRefundTx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{Hash: tx.TxHash(), Index: 0},
+		SignatureScript:  tx.TxOut[0].PkScript,
+		Witness:          nil,
+		Sequence:         sequence,
+	})
+	refundP2trAddress, err := common.P2TRAddressFromPublicKey(receivingPubkey, config.Network)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create p2tr address from pubkey: %v", err)
+	}
+	refundAddress, _ := btcutil.DecodeAddress(*refundP2trAddress, common.NetworkParams(config.Network))
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode p2tr address: %v", err)
+	}
+	refundPkScript, _ := txscript.PayToAddrScript(refundAddress)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create pk script: %v", err)
+	}
+	newRefundTx.AddTxOut(wire.NewTxOut(tx.TxOut[0].Value, refundPkScript))
+	return newRefundTx, nil
 }

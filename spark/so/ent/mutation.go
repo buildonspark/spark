@@ -4232,9 +4232,22 @@ func (m *TransferLeafMutation) OldSecretCipher(ctx context.Context) (v []byte, e
 	return oldValue.SecretCipher, nil
 }
 
+// ClearSecretCipher clears the value of the "secret_cipher" field.
+func (m *TransferLeafMutation) ClearSecretCipher() {
+	m.secret_cipher = nil
+	m.clearedFields[transferleaf.FieldSecretCipher] = struct{}{}
+}
+
+// SecretCipherCleared returns if the "secret_cipher" field was cleared in this mutation.
+func (m *TransferLeafMutation) SecretCipherCleared() bool {
+	_, ok := m.clearedFields[transferleaf.FieldSecretCipher]
+	return ok
+}
+
 // ResetSecretCipher resets all changes to the "secret_cipher" field.
 func (m *TransferLeafMutation) ResetSecretCipher() {
 	m.secret_cipher = nil
+	delete(m.clearedFields, transferleaf.FieldSecretCipher)
 }
 
 // SetSignature sets the "signature" field.
@@ -4268,9 +4281,22 @@ func (m *TransferLeafMutation) OldSignature(ctx context.Context) (v []byte, err 
 	return oldValue.Signature, nil
 }
 
+// ClearSignature clears the value of the "signature" field.
+func (m *TransferLeafMutation) ClearSignature() {
+	m.signature = nil
+	m.clearedFields[transferleaf.FieldSignature] = struct{}{}
+}
+
+// SignatureCleared returns if the "signature" field was cleared in this mutation.
+func (m *TransferLeafMutation) SignatureCleared() bool {
+	_, ok := m.clearedFields[transferleaf.FieldSignature]
+	return ok
+}
+
 // ResetSignature resets all changes to the "signature" field.
 func (m *TransferLeafMutation) ResetSignature() {
 	m.signature = nil
+	delete(m.clearedFields, transferleaf.FieldSignature)
 }
 
 // SetPreviousRefundTx sets the "previous_refund_tx" field.
@@ -4597,7 +4623,14 @@ func (m *TransferLeafMutation) AddField(name string, value ent.Value) error {
 // ClearedFields returns all nullable fields that were cleared during this
 // mutation.
 func (m *TransferLeafMutation) ClearedFields() []string {
-	return nil
+	var fields []string
+	if m.FieldCleared(transferleaf.FieldSecretCipher) {
+		fields = append(fields, transferleaf.FieldSecretCipher)
+	}
+	if m.FieldCleared(transferleaf.FieldSignature) {
+		fields = append(fields, transferleaf.FieldSignature)
+	}
+	return fields
 }
 
 // FieldCleared returns a boolean indicating if a field with the given name was
@@ -4610,6 +4643,14 @@ func (m *TransferLeafMutation) FieldCleared(name string) bool {
 // ClearField clears the value of the field with the given name. It returns an
 // error if the field is not defined in the schema.
 func (m *TransferLeafMutation) ClearField(name string) error {
+	switch name {
+	case transferleaf.FieldSecretCipher:
+		m.ClearSecretCipher()
+		return nil
+	case transferleaf.FieldSignature:
+		m.ClearSignature()
+		return nil
+	}
 	return fmt.Errorf("unknown TransferLeaf nullable field %s", name)
 }
 

@@ -22,8 +22,8 @@ func (TransferLeaf) Mixin() []ent.Mixin {
 // Fields are the fields for the TransferLeaf table.
 func (TransferLeaf) Fields() []ent.Field {
 	return []ent.Field{
-		field.Bytes("secret_cipher"),
-		field.Bytes("signature"),
+		field.Bytes("secret_cipher").Optional(),
+		field.Bytes("signature").Optional(),
 		field.Bytes("previous_refund_tx").NotEmpty().Immutable(),
 		field.Bytes("intermediate_refund_tx").NotEmpty(),
 	}

@@ -43,9 +43,21 @@ func (tlu *TransferLeafUpdate) SetSecretCipher(b []byte) *TransferLeafUpdate {
 	return tlu
 }
 
+// ClearSecretCipher clears the value of the "secret_cipher" field.
+func (tlu *TransferLeafUpdate) ClearSecretCipher() *TransferLeafUpdate {
+	tlu.mutation.ClearSecretCipher()
+	return tlu
+}
+
 // SetSignature sets the "signature" field.
 func (tlu *TransferLeafUpdate) SetSignature(b []byte) *TransferLeafUpdate {
 	tlu.mutation.SetSignature(b)
+	return tlu
+}
+
+// ClearSignature clears the value of the "signature" field.
+func (tlu *TransferLeafUpdate) ClearSignature() *TransferLeafUpdate {
+	tlu.mutation.ClearSignature()
 	return tlu
 }
 
@@ -164,8 +176,14 @@ func (tlu *TransferLeafUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if value, ok := tlu.mutation.SecretCipher(); ok {
 		_spec.SetField(transferleaf.FieldSecretCipher, field.TypeBytes, value)
 	}
+	if tlu.mutation.SecretCipherCleared() {
+		_spec.ClearField(transferleaf.FieldSecretCipher, field.TypeBytes)
+	}
 	if value, ok := tlu.mutation.Signature(); ok {
 		_spec.SetField(transferleaf.FieldSignature, field.TypeBytes, value)
+	}
+	if tlu.mutation.SignatureCleared() {
+		_spec.ClearField(transferleaf.FieldSignature, field.TypeBytes)
 	}
 	if value, ok := tlu.mutation.IntermediateRefundTx(); ok {
 		_spec.SetField(transferleaf.FieldIntermediateRefundTx, field.TypeBytes, value)
@@ -260,9 +278,21 @@ func (tluo *TransferLeafUpdateOne) SetSecretCipher(b []byte) *TransferLeafUpdate
 	return tluo
 }
 
+// ClearSecretCipher clears the value of the "secret_cipher" field.
+func (tluo *TransferLeafUpdateOne) ClearSecretCipher() *TransferLeafUpdateOne {
+	tluo.mutation.ClearSecretCipher()
+	return tluo
+}
+
 // SetSignature sets the "signature" field.
 func (tluo *TransferLeafUpdateOne) SetSignature(b []byte) *TransferLeafUpdateOne {
 	tluo.mutation.SetSignature(b)
+	return tluo
+}
+
+// ClearSignature clears the value of the "signature" field.
+func (tluo *TransferLeafUpdateOne) ClearSignature() *TransferLeafUpdateOne {
+	tluo.mutation.ClearSignature()
 	return tluo
 }
 
@@ -411,8 +441,14 @@ func (tluo *TransferLeafUpdateOne) sqlSave(ctx context.Context) (_node *Transfer
 	if value, ok := tluo.mutation.SecretCipher(); ok {
 		_spec.SetField(transferleaf.FieldSecretCipher, field.TypeBytes, value)
 	}
+	if tluo.mutation.SecretCipherCleared() {
+		_spec.ClearField(transferleaf.FieldSecretCipher, field.TypeBytes)
+	}
 	if value, ok := tluo.mutation.Signature(); ok {
 		_spec.SetField(transferleaf.FieldSignature, field.TypeBytes, value)
+	}
+	if tluo.mutation.SignatureCleared() {
+		_spec.ClearField(transferleaf.FieldSignature, field.TypeBytes)
 	}
 	if value, ok := tluo.mutation.IntermediateRefundTx(); ok {
 		_spec.SetField(transferleaf.FieldIntermediateRefundTx, field.TypeBytes, value)

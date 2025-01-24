@@ -206,6 +206,16 @@ func SecretCipherLTE(v []byte) predicate.TransferLeaf {
 	return predicate.TransferLeaf(sql.FieldLTE(FieldSecretCipher, v))
 }
 
+// SecretCipherIsNil applies the IsNil predicate on the "secret_cipher" field.
+func SecretCipherIsNil() predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldIsNull(FieldSecretCipher))
+}
+
+// SecretCipherNotNil applies the NotNil predicate on the "secret_cipher" field.
+func SecretCipherNotNil() predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldNotNull(FieldSecretCipher))
+}
+
 // SignatureEQ applies the EQ predicate on the "signature" field.
 func SignatureEQ(v []byte) predicate.TransferLeaf {
 	return predicate.TransferLeaf(sql.FieldEQ(FieldSignature, v))
@@ -244,6 +254,16 @@ func SignatureLT(v []byte) predicate.TransferLeaf {
 // SignatureLTE applies the LTE predicate on the "signature" field.
 func SignatureLTE(v []byte) predicate.TransferLeaf {
 	return predicate.TransferLeaf(sql.FieldLTE(FieldSignature, v))
+}
+
+// SignatureIsNil applies the IsNil predicate on the "signature" field.
+func SignatureIsNil() predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldIsNull(FieldSignature))
+}
+
+// SignatureNotNil applies the NotNil predicate on the "signature" field.
+func SignatureNotNil() predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldNotNull(FieldSignature))
 }
 
 // PreviousRefundTxEQ applies the EQ predicate on the "previous_refund_tx" field.
