@@ -16,9 +16,11 @@ import (
 	pbdkg "github.com/lightsparkdev/spark-go/proto/dkg"
 	pbmock "github.com/lightsparkdev/spark-go/proto/mock"
 	pbspark "github.com/lightsparkdev/spark-go/proto/spark"
+	pbauthn "github.com/lightsparkdev/spark-go/proto/spark_authn"
 	pbinternal "github.com/lightsparkdev/spark-go/proto/spark_internal"
 	pbtree "github.com/lightsparkdev/spark-go/proto/spark_tree"
 	"github.com/lightsparkdev/spark-go/so"
+	"github.com/lightsparkdev/spark-go/so/authn"
 	"github.com/lightsparkdev/spark-go/so/dkg"
 	"github.com/lightsparkdev/spark-go/so/ent"
 	sparkgrpc "github.com/lightsparkdev/spark-go/so/grpc"
@@ -37,6 +39,8 @@ type args struct {
 	Port               uint64
 	DatabasePath       string
 	MockOnchain        bool
+	ChallengeTimeout   time.Duration
+	SessionDuration    time.Duration
 }
 
 func loadArgs() (*args, error) {
@@ -51,6 +55,8 @@ func loadArgs() (*args, error) {
 	flag.Uint64Var(&args.Port, "port", 0, "Port value")
 	flag.StringVar(&args.DatabasePath, "database", "", "Path to database file")
 	flag.BoolVar(&args.MockOnchain, "mock-onchain", false, "Mock onchain tx")
+	flag.DurationVar(&args.ChallengeTimeout, "challenge-timeout", time.Duration(time.Minute), "Challenge timeout")
+	flag.DurationVar(&args.SessionDuration, "session-duration", time.Duration(time.Minute*15), "Session duration")
 	// Parse flags
 	flag.Parse()
 
@@ -157,6 +163,20 @@ func main() {
 
 	treeServer := sparkgrpc.NewSparkTreeServer(config)
 	pbtree.RegisterSparkTreeServiceServer(grpcServer, treeServer)
+
+	sessionTokenCreatorVerifier, err := authn.NewSessionTokenCreatorVerifier(config.IdentityPrivateKey, nil)
+	if err != nil {
+		log.Fatalf("Failed to create token verifier: %v", err)
+	}
+	authnServer, err := sparkgrpc.NewAuthnServer(sparkgrpc.AuthnServerConfig{
+		IdentityPrivateKey: config.IdentityPrivateKey,
+		ChallengeTimeout:   args.ChallengeTimeout,
+		SessionDuration:    args.SessionDuration,
+	}, sessionTokenCreatorVerifier)
+	if err != nil {
+		log.Fatalf("Failed to create authentication server: %v", err)
+	}
+	pbauthn.RegisterSparkAuthnServiceServer(grpcServer, authnServer)
 
 	log.Printf("Serving on port %d\n", args.Port)
 	if err := grpcServer.Serve(lis); err != nil {
