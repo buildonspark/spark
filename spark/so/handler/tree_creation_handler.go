@@ -384,7 +384,7 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 			return nil, nil, errors.New("refund tx should be on leaf node")
 		}
 
-		signingJob, tx, err := helper.NewSigningJob(currentElement.keyshare, currentElement.node.NodeTxSigningJob, currentElement.output)
+		signingJob, tx, err := helper.NewSigningJob(currentElement.keyshare, currentElement.node.NodeTxSigningJob, currentElement.output, nil)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -440,7 +440,7 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 		}
 		nodes = append(nodes, node)
 		if currentElement.node.RefundTxSigningJob != nil {
-			refundSigningJob, _, err := helper.NewSigningJob(currentElement.keyshare, currentElement.node.RefundTxSigningJob, tx.TxOut[0])
+			refundSigningJob, _, err := helper.NewSigningJob(currentElement.keyshare, currentElement.node.RefundTxSigningJob, tx.TxOut[0], nil)
 			if err != nil {
 				return nil, nil, err
 			}

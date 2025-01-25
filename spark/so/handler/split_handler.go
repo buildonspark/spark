@@ -176,7 +176,7 @@ func (h *SplitHandler) prepareSigningJobs(
 		return nil, nil, err
 	}
 
-	parentTxSigningJob, splitTx, err := helper.NewSigningJob(parentKeyshare, req.ParentTxSigningJob, parentTx.TxOut[node.Vout])
+	parentTxSigningJob, splitTx, err := helper.NewSigningJob(parentKeyshare, req.ParentTxSigningJob, parentTx.TxOut[node.Vout], nil)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -184,7 +184,7 @@ func (h *SplitHandler) prepareSigningJobs(
 
 	nodes := make([]*ent.TreeNode, 0)
 	for i, split := range req.Splits {
-		refundSigningJob, _, err := helper.NewSigningJob(childrenKeyshares[i], split.RefundSigningJob, splitTx.TxOut[split.Vout])
+		refundSigningJob, _, err := helper.NewSigningJob(childrenKeyshares[i], split.RefundSigningJob, splitTx.TxOut[split.Vout], nil)
 		if err != nil {
 			return nil, nil, err
 		}

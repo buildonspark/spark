@@ -78,7 +78,7 @@ func (h *AggregateHandler) prepareSigningJob(ctx context.Context, parentNode *en
 	if err != nil {
 		return nil, err
 	}
-	signingJob, _, err := helper.NewSigningJob(keyshare, req.SigningJob, parentNodeTx.TxOut[parentNode.Vout])
+	signingJob, _, err := helper.NewSigningJob(keyshare, req.SigningJob, parentNodeTx.TxOut[parentNode.Vout], nil)
 	if err != nil {
 		return nil, err
 	}

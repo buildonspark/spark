@@ -123,12 +123,13 @@ func frostRound2(
 				}
 			}
 			signingJobs[i] = &pbinternal.SigningJob{
-				JobId:           job.JobID,
-				Message:         job.Message,
-				KeyshareId:      job.SigningKeyshareID.String(),
-				VerifyingKey:    job.VerifyingKey,
-				Commitments:     commitments,
-				UserCommitments: userCommitmentProto,
+				JobId:            job.JobID,
+				Message:          job.Message,
+				KeyshareId:       job.SigningKeyshareID.String(),
+				VerifyingKey:     job.VerifyingKey,
+				Commitments:      commitments,
+				UserCommitments:  userCommitmentProto,
+				AdaptorPublicKey: job.AdaptorPublicKey,
 			}
 		}
 
@@ -171,10 +172,12 @@ type SigningJob struct {
 	VerifyingKey []byte
 	// UserCommitment is the user commitment for the message.
 	UserCommitment *objects.SigningCommitment
+	// AdaptorPublicKey is the adaptor public key for the message.
+	AdaptorPublicKey []byte
 }
 
 // NewSigningJob creates a new signing job from signing job proto and the keyshare.
-func NewSigningJob(keyshare *ent.SigningKeyshare, proto *pbspark.SigningJob, prevOutput *wire.TxOut) (*SigningJob, *wire.MsgTx, error) {
+func NewSigningJob(keyshare *ent.SigningKeyshare, proto *pbspark.SigningJob, prevOutput *wire.TxOut, adaptorPublicKey []byte) (*SigningJob, *wire.MsgTx, error) {
 	verifyingKey, err := common.AddPublicKeys(proto.SigningPublicKey, keyshare.PublicKey)
 	if err != nil {
 		return nil, nil, err
@@ -199,10 +202,8 @@ func NewSigningJob(keyshare *ent.SigningKeyshare, proto *pbspark.SigningJob, pre
 		Message:           txSigHash,
 		VerifyingKey:      verifyingKey,
 		UserCommitment:    &userCommitment,
+		AdaptorPublicKey:  adaptorPublicKey,
 	}
-
-	log.Println("NewSigningJob message:", hex.EncodeToString(job.Message))
-	log.Println("NewSigningJob verifying key:", hex.EncodeToString(job.VerifyingKey))
 
 	return job, tx, nil
 }

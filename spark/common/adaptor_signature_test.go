@@ -28,8 +28,16 @@ func TestAdaptorSignature(t *testing.T) {
 
 		_, adaptorPub := btcec.PrivKeyFromBytes(adaptorPrivKey)
 
-		err = ValidateAdaptorSignature(pubkey, hash[:], adaptorSig, adaptorPub.SerializeCompressed())
+		err = ValidateOutboundAdaptorSignature(pubkey, hash[:], adaptorSig, adaptorPub.SerializeCompressed())
 		assert.NoError(t, err)
+
+		adaptorSig, err = ApplyAdaptorToSignature(pubkey, hash[:], adaptorSig, adaptorPrivKey)
+		assert.NoError(t, err)
+
+		newSig, err := schnorr.ParseSignature(adaptorSig)
+		assert.NoError(t, err)
+
+		assert.True(t, newSig.Verify(hash[:], pubkey))
 	}
 
 	assert.Zero(t, failures)

@@ -72,6 +72,9 @@ message SigningJob {
 
     // The commitments for all participants of the user.
     common.SigningCommitment user_commitments = 6;
+
+    // The adaptor for the message.
+    bytes adaptor_public_key = 7;
 }
 
 message FrostRound2Request {

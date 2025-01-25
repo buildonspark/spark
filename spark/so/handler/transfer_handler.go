@@ -507,7 +507,7 @@ func (h *TransferHandler) getRefundTxSigningJob(ctx context.Context, leaf *ent.T
 	if err != nil {
 		return nil, fmt.Errorf("unable to load leaf tx for leaf %s: %v", leaf.ID.String(), err)
 	}
-	refundSigningJob, _, err := helper.NewSigningJob(keyshare, job, leafTx.TxOut[leaf.Vout])
+	refundSigningJob, _, err := helper.NewSigningJob(keyshare, job, leafTx.TxOut[leaf.Vout], nil)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create signing job for leaf %s: %v", leaf.ID.String(), err)
 	}

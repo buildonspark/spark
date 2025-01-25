@@ -185,13 +185,14 @@ func (s *SparkInternalServer) FrostRound2(ctx context.Context, req *pb.FrostRoun
 			return nil, err
 		}
 		signingJobProto := &pbfrost.FrostSigningJob{
-			JobId:           job.JobId,
-			Message:         job.Message,
-			KeyPackage:      keyPackages[keyshareID],
-			VerifyingKey:    job.VerifyingKey,
-			Nonce:           nonceProto,
-			Commitments:     job.Commitments,
-			UserCommitments: job.UserCommitments,
+			JobId:            job.JobId,
+			Message:          job.Message,
+			KeyPackage:       keyPackages[keyshareID],
+			VerifyingKey:     job.VerifyingKey,
+			Nonce:            nonceProto,
+			Commitments:      job.Commitments,
+			UserCommitments:  job.UserCommitments,
+			AdaptorPublicKey: job.AdaptorPublicKey,
 		}
 		signingJobProtos = append(signingJobProtos, signingJobProto)
 	}

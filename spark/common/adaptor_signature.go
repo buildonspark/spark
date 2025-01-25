@@ -31,8 +31,8 @@ func GenerateAdaptorFromSignature(signature []byte) ([]byte, []byte, error) {
 	return newSig.serialize(), adaptorPrivateKey.Serialize(), nil
 }
 
-// ValidateAdaptorSignature validates an adaptor signature.
-func ValidateAdaptorSignature(pubkey *btcec.PublicKey, hash []byte, signature []byte, adaptorPubkey []byte) error {
+// ValidateOutboundAdaptorSignature validates a adaptor signature from creator of the adaptor.
+func ValidateOutboundAdaptorSignature(pubkey *btcec.PublicKey, hash []byte, signature []byte, adaptorPubkey []byte) error {
 	sig, err := parseSignature(signature)
 	if err != nil {
 		return err
@@ -40,7 +40,38 @@ func ValidateAdaptorSignature(pubkey *btcec.PublicKey, hash []byte, signature []
 
 	pubkeyBytes := schnorr.SerializePubKey(pubkey)
 
-	return schnorrVerifyWithAdaptor(sig, hash, pubkeyBytes, adaptorPubkey)
+	return schnorrVerifyWithAdaptor(sig, hash, pubkeyBytes, adaptorPubkey, false)
+}
+
+// ApplyAdaptorToSignature applies an adaptor to a signature.
+func ApplyAdaptorToSignature(pubkey *btcec.PublicKey, hash []byte, signature []byte, adaptorPrivateKeyBytes []byte) ([]byte, error) {
+	sig, err := parseSignature(signature)
+	if err != nil {
+		return nil, err
+	}
+
+	adaptorPrivateKey, _ := btcec.PrivKeyFromBytes(adaptorPrivateKeyBytes)
+
+	t := adaptorPrivateKey.Key
+	newS := sig.s
+	newS.Add(&t)
+
+	newSig := schnorr.NewSignature(&sig.r, &newS)
+
+	if newSig.Verify(hash, pubkey) {
+		return newSig.Serialize(), nil
+	}
+
+	t.Negate()
+	newS = sig.s
+	newS.Add(&t)
+
+	newSig = schnorr.NewSignature(&sig.r, &newS)
+	if !newSig.Verify(hash, pubkey) {
+		return nil, fmt.Errorf("Cannot apply adaptor to signature")
+	}
+
+	return newSig.Serialize(), nil
 }
 
 // Signature is a type representing a Schnorr signature.
@@ -106,7 +137,7 @@ func parseSignature(sig []byte) (*signature, error) {
 }
 
 // This is copied and modified with adaptor from the schnorrVerify function in the btcd library.
-func schnorrVerifyWithAdaptor(sig *signature, hash []byte, pubKeyBytes []byte, adaptorPubkey []byte) error {
+func schnorrVerifyWithAdaptor(sig *signature, hash []byte, pubKeyBytes []byte, adaptorPubkey []byte, inbound bool) error {
 	// The algorithm for producing a BIP-340 signature is described in
 	// README.md and is reproduced here for reference:
 	//
@@ -199,8 +230,10 @@ func schnorrVerifyWithAdaptor(sig *signature, hash []byte, pubKeyBytes []byte, a
 	// Step 7.
 	//
 	// Fail if R is the point at infinity
-	if (newR.X.IsZero() && newR.Y.IsZero()) || newR.Z.IsZero() {
-		return fmt.Errorf("calculated R point is the point at infinity")
+	if !inbound {
+		if (newR.X.IsZero() && newR.Y.IsZero()) || newR.Z.IsZero() {
+			return fmt.Errorf("calculated R point is the point at infinity")
+		}
 	}
 
 	// Step 8.
