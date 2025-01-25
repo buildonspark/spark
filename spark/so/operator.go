@@ -51,6 +51,7 @@ func (s *SigningOperator) UnmarshalJSON(data []byte) error {
 // MarshalProto marshals the signing operator to a protobuf message.
 func (s *SigningOperator) MarshalProto() *pb.SigningOperatorInfo {
 	return &pb.SigningOperatorInfo{
+		Index:      s.ID,
 		Identifier: s.Identifier,
 		PublicKey:  s.IdentityPublicKey,
 		Address:    s.Address,
