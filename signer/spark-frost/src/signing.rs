@@ -67,16 +67,15 @@ pub fn frost_build_signin_package(
     signing_commitments: BTreeMap<Identifier, FrostSigningCommitments>,
     message: &[u8],
     signing_participants_groups: Option<Vec<BTreeSet<Identifier>>>,
+    adaptor_public_key: &[u8],
 ) -> SigningPackage {
-    if let Some(signing_participants_groups) = signing_participants_groups {
-        SigningPackage::new_with_participants_groups(
-            signing_commitments,
-            signing_participants_groups,
-            message,
-        )
-    } else {
-        SigningPackage::new(signing_commitments, message)
-    }
+    let adaptor_public_key = VerifyingKey::deserialize(adaptor_public_key).ok();
+    SigningPackage::new_with_adaptor(
+        signing_commitments,
+        signing_participants_groups,
+        message,
+        adaptor_public_key,
+    )
 }
 
 pub fn frost_signature_shares_from_proto(
@@ -272,6 +271,7 @@ pub fn sign_frost(req: &SignFrostRequest) -> Result<SignFrostResponse, String> {
             commitments,
             &job.message,
             Some(signing_participants_groups),
+            &job.adaptor_public_key,
         );
 
         tracing::info!("Building signing package completed");
@@ -319,7 +319,8 @@ pub fn aggregate_frost(req: &AggregateFrostRequest) -> Result<AggregateFrostResp
     let verifying_key = verifying_key_from_bytes(req.verifying_key.clone())
         .map_err(|e| format!("Failed to parse verifying key: {:?}", e))?;
 
-    let signing_package = frost_build_signin_package(commitments, &req.message, None);
+    let signing_package =
+        frost_build_signin_package(commitments, &req.message, None, &req.adaptor_public_key);
 
     let signature_shares = frost_signature_shares_from_proto(
         &req.signature_shares,
@@ -385,8 +386,14 @@ pub fn validate_signature_share(req: &ValidateSignatureShareRequest) -> Result<(
     let public_share = VerifyingShare::deserialize(req.public_share.as_slice())
         .map_err(|e| format!("Failed to parse public share: {:?}", e))?;
 
-    let signing_package =
-        frost_build_signin_package(commitments, &req.message, Some(signing_participants_groups));
+    let adaptor_key: Vec<u8> = vec![];
+
+    let signing_package = frost_build_signin_package(
+        commitments,
+        &req.message,
+        Some(signing_participants_groups),
+        &adaptor_key,
+    );
 
     let dummy_signing_share = SigningShare::deserialize(&[0; 32])
         .map_err(|e| format!("Failed to parse dummy signing share: {:?}", e))?;

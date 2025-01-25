@@ -542,9 +542,9 @@ checksum = "c2459377285ad874054d797f3ccebf984978aa39129f6eafde5cdc8315b612f8"
 
 [[package]]
 name = "cpufeatures"
-version = "0.2.16"
+version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "16b80225097f2e5ae4e7179dd2266824648f3e2f49d9134d584b76389d31c4c3"
+checksum = "59ed5838eebb26a2bb2e58f6d5b5316989ae9d08bab10e0e6d103e656d1b0280"
 dependencies = [
  "libc",
 ]
@@ -749,7 +749,7 @@ checksum = "3f9eec918d3f24069decb9af1554cad7c880e2da24a9afd88aca000531ab82c1"
 [[package]]
 name = "frost-core"
 version = "2.1.0"
-source = "git+https://github.com/lightsparkdev/frost?branch=nested-signing#f5a336bea9e6bc253794fa4f801add7b46a7ce69"
+source = "git+https://github.com/lightsparkdev/frost?branch=nested-signing#9aaf1b6b9fa3c2c3c2c7c70da83061deda1a9180"
 dependencies = [
  "byteorder",
  "const-crc32-nostd",
@@ -771,7 +771,7 @@ dependencies = [
 [[package]]
 name = "frost-rerandomized"
 version = "2.1.0"
-source = "git+https://github.com/lightsparkdev/frost?branch=nested-signing#f5a336bea9e6bc253794fa4f801add7b46a7ce69"
+source = "git+https://github.com/lightsparkdev/frost?branch=nested-signing#9aaf1b6b9fa3c2c3c2c7c70da83061deda1a9180"
 dependencies = [
  "derive-getters",
  "document-features",
@@ -783,7 +783,7 @@ dependencies = [
 [[package]]
 name = "frost-secp256k1-tr"
 version = "2.1.0"
-source = "git+https://github.com/lightsparkdev/frost?branch=nested-signing#f5a336bea9e6bc253794fa4f801add7b46a7ce69"
+source = "git+https://github.com/lightsparkdev/frost?branch=nested-signing#9aaf1b6b9fa3c2c3c2c7c70da83061deda1a9180"
 dependencies = [
  "document-features",
  "frost-core",
@@ -2403,9 +2403,9 @@ checksum = "75b844d17643ee918803943289730bec8aac480150456169e647ed0b576ba539"
 
 [[package]]
 name = "unicode-ident"
-version = "1.0.14"
+version = "1.0.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "adb9e6ca4f869e1180728b7950e35922a7fc6397f7b641499e8f3ef06e50dc83"
+checksum = "11cd88e12b17c6494200a9c1b683a04fcac9573ed74cd1b62aeb2727c5592243"
 
 [[package]]
 name = "uniffi"

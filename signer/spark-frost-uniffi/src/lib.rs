@@ -197,6 +197,7 @@ pub fn sign_frost(
     nonce: SigningNonce,
     self_commitment: SigningCommitment,
     statechain_commitments: HashMap<String, SigningCommitment>,
+    adaptor_public_key: Option<Vec<u8>>,
 ) -> Result<Vec<u8>, Error> {
     log_to_file("Entering sign_frost");
     let signing_job = spark_frost::proto::frost::FrostSigningJob {
@@ -210,6 +211,7 @@ pub fn sign_frost(
             .into_iter()
             .map(|(k, v)| (k, v.into()))
             .collect(),
+        adaptor_public_key: adaptor_public_key.unwrap_or(vec![]),
     };
     let request = spark_frost::proto::frost::SignFrostRequest {
         signing_jobs: vec![signing_job],
@@ -235,7 +237,14 @@ pub fn wasm_sign_frost(
 ) -> Result<Vec<u8>, Error> {
     let statechain_commitments: HashMap<String, SigningCommitment> =
         JsValue::into_serde(&statechain_commitments).map_err(|e| Error::Spark(e.to_string()))?;
-    sign_frost(msg, key_package, nonce, self_commitment, statechain_commitments)
+    sign_frost(
+        msg,
+        key_package,
+        nonce,
+        self_commitment,
+        statechain_commitments,
+        None,
+    )
 }
 
 pub fn aggregate_frost(
@@ -267,6 +276,7 @@ pub fn aggregate_frost(
             .collect(),
         verifying_key: verifying_key.clone(),
         user_signature_share: self_signature.clone(),
+        adaptor_public_key: vec![],
     };
     log_to_file("Aggregating frost protobuf constructed");
     let response = spark_frost::signing::aggregate_frost(&request).map_err(|e| Error::Spark(e))?;
@@ -291,7 +301,16 @@ pub fn wasm_aggregate_frost(
         JsValue::into_serde(&statechain_signatures).map_err(|e| Error::Spark(e.to_string()))?;
     let statechain_public_keys: HashMap<String, Vec<u8>> =
         JsValue::into_serde(&statechain_public_keys).map_err(|e| Error::Spark(e.to_string()))?;
-    aggregate_frost(msg, statechain_commitments, self_commitment, statechain_signatures, self_signature, statechain_public_keys, self_public_key, verifying_key)
+    aggregate_frost(
+        msg,
+        statechain_commitments,
+        self_commitment,
+        statechain_signatures,
+        self_signature,
+        statechain_public_keys,
+        self_public_key,
+        verifying_key,
+    )
 }
 
 #[wasm_bindgen]
@@ -302,7 +321,6 @@ pub struct TransactionResult {
     #[wasm_bindgen(getter_with_clone)]
     pub sighash: Vec<u8>,
 }
-
 
 // Construct a tx that pays from the tx.out[vout] to the address.
 #[wasm_bindgen]

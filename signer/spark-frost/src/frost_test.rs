@@ -113,7 +113,7 @@ mod frost_test {
 
         let signing_package = frost::SigningPackage::new_with_participants_groups(
             commitments_map.clone(),
-            signing_participants_groups,
+            Some(signing_participants_groups),
             &message,
         );
 

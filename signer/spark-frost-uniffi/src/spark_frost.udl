@@ -3,7 +3,7 @@ namespace spark_frost {
     NonceResult frost_nonce(KeyPackage key_package);
 
     [Throws=Error]
-    bytes sign_frost(bytes msg, KeyPackage key_package, SigningNonce nonce, SigningCommitment self_commitment, record<string, SigningCommitment> statechain_commitments);
+    bytes sign_frost(bytes msg, KeyPackage key_package, SigningNonce nonce, SigningCommitment self_commitment, record<string, SigningCommitment> statechain_commitments, bytes? adaptor_public_key);
 
     [Throws=Error]
     bytes aggregate_frost(bytes msg, record<string, SigningCommitment> statechain_commitments, SigningCommitment self_commitment, record<string, bytes> statechain_signatures, bytes self_signature, record<string, bytes> statechain_public_keys, bytes self_public_key, bytes verifying_key);

@@ -195,6 +195,9 @@ message FrostSigningJob {
 
     // The commitments for all participants of the user.
     common.SigningCommitment user_commitments = 7;
+
+    // Adaptor public key for adaptor signature
+    bytes adaptor_public_key = 8;
 }
 
 /*
@@ -249,6 +252,9 @@ message AggregateFrostRequest {
 
     // The user's signature share.
     bytes user_signature_share = 8;
+
+    // Adaptor public key for adaptor signature
+    bytes adaptor_public_key = 9;
 }
 
 /*
