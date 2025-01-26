@@ -1,0 +1,8 @@
+linters:
+  enable:
+    - gofumpt
+    - revive
+
+issues:
+  new: true
+  new-from-rev: 4463971

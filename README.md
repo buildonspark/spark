@@ -32,9 +32,16 @@ If spark_frost.udl file has issue with VSCode, you can add the following to your
 }
 ```
 
-Linting uses `golint`, install it with:
+Linting uses `golang-ci`, install it [according to your platform](https://golangci-lint.run/welcome/install/). Note that it is discouraged to install from sources via `go install`.
 ```
-go install golang.org/x/lint/golint@latest
+# MacOS
+brew install golangci-lint
+
+```
+
+To run the linters, use
+``
+`golangci-lint run
 ```
 
 ## Run tests
