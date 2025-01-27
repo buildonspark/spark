@@ -234,6 +234,7 @@ pub fn wasm_sign_frost(
     nonce: SigningNonce,
     self_commitment: SigningCommitment,
     statechain_commitments: JsValue,
+    adaptor_public_key: Option<Vec<u8>>,
 ) -> Result<Vec<u8>, Error> {
     let statechain_commitments: HashMap<String, SigningCommitment> =
         JsValue::into_serde(&statechain_commitments).map_err(|e| Error::Spark(e.to_string()))?;
@@ -243,7 +244,7 @@ pub fn wasm_sign_frost(
         nonce,
         self_commitment,
         statechain_commitments,
-        None,
+        adaptor_public_key,
     )
 }
 
@@ -256,6 +257,7 @@ pub fn aggregate_frost(
     statechain_public_keys: HashMap<String, Vec<u8>>,
     self_public_key: Vec<u8>,
     verifying_key: Vec<u8>,
+    adaptor_public_key: Option<Vec<u8>>,
 ) -> Result<Vec<u8>, Error> {
     log_to_file("Entering aggregate_frost");
     let request = spark_frost::proto::frost::AggregateFrostRequest {
@@ -276,7 +278,7 @@ pub fn aggregate_frost(
             .collect(),
         verifying_key: verifying_key.clone(),
         user_signature_share: self_signature.clone(),
-        adaptor_public_key: vec![],
+        adaptor_public_key: adaptor_public_key.unwrap_or(vec![]),
     };
     log_to_file("Aggregating frost protobuf constructed");
     let response = spark_frost::signing::aggregate_frost(&request).map_err(|e| Error::Spark(e))?;
@@ -294,6 +296,7 @@ pub fn wasm_aggregate_frost(
     statechain_public_keys: JsValue,
     self_public_key: Vec<u8>,
     verifying_key: Vec<u8>,
+    adaptor_public_key: Option<Vec<u8>>,
 ) -> Result<Vec<u8>, Error> {
     let statechain_commitments: HashMap<String, SigningCommitment> =
         JsValue::into_serde(&statechain_commitments).map_err(|e| Error::Spark(e.to_string()))?;
@@ -310,6 +313,7 @@ pub fn wasm_aggregate_frost(
         statechain_public_keys,
         self_public_key,
         verifying_key,
+        adaptor_public_key,
     )
 }
 
