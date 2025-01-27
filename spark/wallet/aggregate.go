@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/btcsuite/btcd/btcec/v2"
+	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
@@ -54,7 +56,7 @@ func AggregateTreeNodes(
 	sequence := uint32((1 << 30) | parentNode.RefundTimelock - spark.TimeLockInterval)
 	newRefundTx.AddTxIn(&wire.TxIn{
 		PreviousOutPoint: wire.OutPoint{Hash: parentTx.TxHash(), Index: uint32(parentNode.Vout)},
-		SignatureScript:  parentTx.TxOut[parentNode.Vout].PkScript,
+		SignatureScript:  nil,
 		Witness:          nil,
 		Sequence:         sequence,
 	})
@@ -146,6 +148,22 @@ func AggregateTreeNodes(
 	})
 	if err != nil {
 		return nil, err
+	}
+
+	sig, err := schnorr.ParseSignature(refundSignature.Signature)
+	if err != nil {
+		return nil, err
+	}
+
+	pubKey, err := btcec.ParsePubKey(aggResp.VerifyingKey)
+	if err != nil {
+		return nil, err
+	}
+	taprootKey := txscript.ComputeTaprootKeyNoScript(pubKey)
+
+	verified := sig.Verify(refundSighash, taprootKey)
+	if !verified {
+		return nil, fmt.Errorf("signature verification failed")
 	}
 
 	return sparkClient.FinalizeNodeSignatures(context.Background(), &pb.FinalizeNodeSignaturesRequest{

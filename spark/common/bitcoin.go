@@ -123,15 +123,32 @@ func SigHashFromTx(tx *wire.MsgTx, inputIndex int, prevOutput *wire.TxOut) ([]by
 }
 
 // UpdateTxWithSignature verifies the signature and update the transaction with the signature.
+// Callsites should verify the signature using `VerifySignature` after calling this function.
 func UpdateTxWithSignature(rawTxBytes []byte, vin int, signature []byte) ([]byte, error) {
 	tx, err := TxFromRawTxBytes(rawTxBytes)
 	if err != nil {
 		return nil, err
 	}
-	// TODO: Verify the signature
-
 	tx.TxIn[vin].Witness = wire.TxWitness{signature}
 	var buf bytes.Buffer
 	tx.Serialize(&buf)
 	return buf.Bytes(), nil
+}
+
+// VerifySignature verifies that a signed transaction's input
+// properly spends the prevOutput provided.
+func VerifySignature(signedTx *wire.MsgTx, vin int, prevOutput *wire.TxOut) error {
+	prevOutputFetcher := txscript.NewCannedPrevOutputFetcher(
+		prevOutput.PkScript, prevOutput.Value,
+	)
+	hashCache := txscript.NewTxSigHashes(signedTx, prevOutputFetcher)
+	vm, err := txscript.NewEngine(prevOutput.PkScript, signedTx, vin, txscript.StandardVerifyFlags,
+		nil, hashCache, prevOutput.Value, prevOutputFetcher)
+	if err != nil {
+		return err
+	}
+	if err := vm.Execute(); err != nil {
+		return err
+	}
+	return nil
 }

@@ -235,14 +235,28 @@ func (h *TransferHandler) completeSendLeaf(ctx context.Context, transfer *ent.Tr
 		return fmt.Errorf("unable to get transfer leaf %s: %v", req.LeafId, err)
 	}
 
-	refundTx, err := common.UpdateTxWithSignature(transferLeaf.IntermediateRefundTx, 0, req.RefundSignature)
+	refundTxBytes, err := common.UpdateTxWithSignature(transferLeaf.IntermediateRefundTx, 0, req.RefundSignature)
 	if err != nil {
-		return err
+		return fmt.Errorf("unable to update refund tx with signature: %v", err)
+	}
+
+	// Verify signature
+	refundTx, err := common.TxFromRawTxBytes(refundTxBytes)
+	if err != nil {
+		return fmt.Errorf("unable to deserialize refund tx: %v", err)
+	}
+	leafNodeTx, err := common.TxFromRawTxBytes(leaf.RawTx)
+	if err != nil {
+		return fmt.Errorf("unable to deserialize leaf tx: %v", err)
+	}
+	err = common.VerifySignature(refundTx, 0, leafNodeTx.TxOut[leaf.Vout])
+	if err != nil {
+		return fmt.Errorf("unable to verify refund tx signature: %v", err)
 	}
 
 	_, err = db.TransferLeaf.
 		UpdateOne(transferLeaf).
-		SetIntermediateRefundTx(refundTx).
+		SetIntermediateRefundTx(refundTxBytes).
 		SetSecretCipher(req.SecretCipher).
 		SetSignature(req.Signature).
 		Save(ctx)
@@ -274,7 +288,7 @@ func (h *TransferHandler) completeSendLeaf(ctx context.Context, transfer *ent.Tr
 		Update().
 		SetOwnerSigningPubkey(signingPubkey).
 		SetStatus(schema.TreeNodeStatusTransferLocked).
-		SetRawRefundTx(refundTx).
+		SetRawRefundTx(refundTxBytes).
 		Save(ctx)
 	if err != nil || leaf == nil {
 		return fmt.Errorf("unable to update leaf %s: %v", req.LeafId, err)

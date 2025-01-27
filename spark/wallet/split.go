@@ -53,7 +53,7 @@ func createSplitTx(config *Config, node *pb.TreeNode, addrResp *pb.PrepareSplitA
 	}
 	splitTx.AddTxIn(wire.NewTxIn(
 		&wire.OutPoint{Hash: nodeTx.TxHash(), Index: node.Vout},
-		nodeTx.TxOut[node.Vout].PkScript,
+		nil,
 		nil, // witness
 	))
 	for i, amount := range amounts {
@@ -75,13 +75,10 @@ func prepareSplits(config *Config, splitTx *wire.MsgTx, childrenPubkeys [][]byte
 	sighashes := make([][]byte, 0)
 	for i, output := range splitTx.TxOut {
 		refundTx := wire.NewMsgTx(2)
-		refundP2trAddress, _ := common.P2TRAddressFromPublicKey(childrenPubkeys[i], config.Network)
-		refundAddress, _ := btcutil.DecodeAddress(*refundP2trAddress, common.NetworkParams(config.Network))
-		refundPkScript, _ := txscript.PayToAddrScript(refundAddress)
 		sequence := uint32((1 << 30) | spark.InitialTimeLock)
 		refundTx.AddTxIn(&wire.TxIn{
 			PreviousOutPoint: wire.OutPoint{Hash: splitTx.TxHash(), Index: uint32(i)},
-			SignatureScript:  refundPkScript,
+			SignatureScript:  nil,
 			Witness:          nil,
 			Sequence:         sequence,
 		})

@@ -635,7 +635,7 @@ func createRefundTx(
 	sequence := uint32((1 << 30) | (refundTx.TxIn[0].Sequence&0xFFFF - spark.TimeLockInterval))
 	newRefundTx.AddTxIn(&wire.TxIn{
 		PreviousOutPoint: wire.OutPoint{Hash: tx.TxHash(), Index: 0},
-		SignatureScript:  tx.TxOut[0].PkScript,
+		SignatureScript:  nil,
 		Witness:          nil,
 		Sequence:         sequence,
 	})

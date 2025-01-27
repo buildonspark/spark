@@ -119,7 +119,7 @@ func CreateTreeRoot(
 	rootTx := wire.NewMsgTx(2)
 	rootTx.AddTxIn(wire.NewTxIn(
 		&wire.OutPoint{Hash: depositTx.TxHash(), Index: uint32(vout)},
-		depositTx.TxOut[0].PkScript,
+		nil,
 		nil, // witness
 	))
 	rootTx.AddTxOut(wire.NewTxOut(100_000, depositTx.TxOut[0].PkScript))
@@ -155,7 +155,7 @@ func CreateTreeRoot(
 	sequence := uint32((1 << 30) | spark.InitialTimeLock)
 	refundTx.AddTxIn(&wire.TxIn{
 		PreviousOutPoint: wire.OutPoint{Hash: rootTx.TxHash(), Index: 0},
-		SignatureScript:  rootTx.TxOut[0].PkScript,
+		SignatureScript:  nil,
 		Witness:          nil,
 		Sequence:         sequence,
 	})

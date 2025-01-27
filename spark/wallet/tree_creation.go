@@ -202,7 +202,7 @@ func buildCreationNodesFromTree(
 			tx := wire.NewMsgTx(2)
 			tx.AddTxIn(wire.NewTxIn(
 				&wire.OutPoint{Hash: currentElement.parentTx.TxHash(), Index: currentElement.vout},
-				currentElement.parentTx.TxOut[currentElement.vout].PkScript,
+				nil,
 				nil, // witness
 			))
 
@@ -252,7 +252,7 @@ func buildCreationNodesFromTree(
 				sequence := uint32((1 << 30) | spark.InitialTimeLock)
 				tx.AddTxIn(&wire.TxIn{
 					PreviousOutPoint: wire.OutPoint{Hash: currentElement.parentTx.TxHash(), Index: currentElement.vout},
-					SignatureScript:  currentElement.parentTx.TxOut[currentElement.vout].PkScript,
+					SignatureScript:  nil,
 					Witness:          nil,
 					Sequence:         sequence,
 				})
@@ -280,7 +280,7 @@ func buildCreationNodesFromTree(
 				refundTx := wire.NewMsgTx(2)
 				refundTx.AddTxIn(&wire.TxIn{
 					PreviousOutPoint: wire.OutPoint{Hash: tx.TxHash(), Index: 0},
-					SignatureScript:  tx.TxOut[0].PkScript,
+					SignatureScript:  nil,
 					Witness:          nil,
 					Sequence:         sequence,
 				})
@@ -310,7 +310,7 @@ func buildCreationNodesFromTree(
 				tx := wire.NewMsgTx(2)
 				tx.AddTxIn(wire.NewTxIn(
 					&wire.OutPoint{Hash: currentElement.parentTx.TxHash(), Index: currentElement.vout},
-					currentElement.parentTx.TxOut[currentElement.vout].PkScript,
+					nil,
 					nil, // witness
 				))
 				tx.AddTxOut(wire.NewTxOut(currentElement.parentTx.TxOut[currentElement.vout].Value, currentElement.parentTx.TxOut[currentElement.vout].PkScript))

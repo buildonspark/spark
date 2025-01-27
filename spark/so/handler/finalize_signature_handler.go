@@ -155,6 +155,22 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 		if err != nil {
 			return nil, nil, err
 		}
+		// Node may not have parent if it is the root node
+		nodeParent, err := node.QueryParent().Only(ctx)
+		if err == nil && nodeParent != nil {
+			treeNodeTx, err := common.TxFromRawTxBytes(nodeTxBytes)
+			if err != nil {
+				return nil, nil, fmt.Errorf("unable to deserialize node tx: %v", err)
+			}
+			treeNodeParentTx, err := common.TxFromRawTxBytes(nodeParent.RawTx)
+			if err != nil {
+				return nil, nil, fmt.Errorf("unable to deserialize parent tx: %v", err)
+			}
+			err = common.VerifySignature(treeNodeTx, 0, treeNodeParentTx.TxOut[nodeParent.Vout])
+			if err != nil {
+				return nil, nil, fmt.Errorf("unable to verify node tx signature: %v", err)
+			}
+		}
 	} else {
 		nodeTxBytes = node.RawTx
 	}
@@ -163,6 +179,19 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 		refundTxBytes, err = common.UpdateTxWithSignature(node.RawRefundTx, 0, nodeSignatures.RefundTxSignature)
 		if err != nil {
 			return nil, nil, err
+		}
+
+		refundTx, err := common.TxFromRawTxBytes(refundTxBytes)
+		if err != nil {
+			return nil, nil, fmt.Errorf("unable to deserialize refund tx: %v", err)
+		}
+		treeNodeTx, err := common.TxFromRawTxBytes(nodeTxBytes)
+		if err != nil {
+			return nil, nil, fmt.Errorf("unable to deserialize leaf tx: %v", err)
+		}
+		err = common.VerifySignature(refundTx, 0, treeNodeTx.TxOut[node.Vout])
+		if err != nil {
+			return nil, nil, fmt.Errorf("unable to verify refund tx signature: %v", err)
 		}
 	}
 
