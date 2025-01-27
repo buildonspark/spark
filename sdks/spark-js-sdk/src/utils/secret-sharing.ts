@@ -15,8 +15,8 @@ type SecretShare = {
   share: bigint;
 };
 
-type VerifiableSecretShare = SecretShare & {
-  proof: Uint8Array[];
+export type VerifiableSecretShare = SecretShare & {
+  proofs: Uint8Array[];
 };
 
 // Generate a secure random bigint using crypto.getRandomValues
@@ -183,7 +183,7 @@ export function splitSecretWithProofs(
       threshold,
       index: BigInt(i),
       share,
-      proof: polynomial.proofs,
+      proofs: polynomial.proofs,
     });
   }
 
@@ -213,10 +213,10 @@ export function validateShare(share: VerifiableSecretShare) {
     share.share
   ).toRawBytes(true);
 
-  let resultPubkey = share.proof[0];
+  let resultPubkey = share.proofs[0];
 
-  for (let i = 1; i < share.proof.length; i++) {
-    const pubkey = share.proof[i];
+  for (let i = 1; i < share.proofs.length; i++) {
+    const pubkey = share.proofs[i];
     const value = share.index ** BigInt(i) % share.fieldModulus;
 
     const scaledPoint =

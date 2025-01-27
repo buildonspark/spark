@@ -1,11 +1,11 @@
 /* tslint:disable */
 /* eslint-disable */
 export function frost_nonce(key_package: KeyPackage): NonceResult;
-export function wasm_sign_frost(msg: Uint8Array, key_package: KeyPackage, nonce: SigningNonce, self_commitment: SigningCommitment, statechain_commitments: any): Uint8Array;
-export function wasm_aggregate_frost(msg: Uint8Array, statechain_commitments: any, self_commitment: SigningCommitment, statechain_signatures: any, self_signature: Uint8Array, statechain_public_keys: any, self_public_key: Uint8Array, verifying_key: Uint8Array): Uint8Array;
+export function wasm_sign_frost(msg: Uint8Array, key_package: KeyPackage, nonce: SigningNonce, self_commitment: SigningCommitment, statechain_commitments: any, adaptor_public_key?: Uint8Array | null): Uint8Array;
+export function wasm_aggregate_frost(msg: Uint8Array, statechain_commitments: any, self_commitment: SigningCommitment, statechain_signatures: any, self_signature: Uint8Array, statechain_public_keys: any, self_public_key: Uint8Array, verifying_key: Uint8Array, adaptor_public_key?: Uint8Array | null): Uint8Array;
 export function construct_node_tx(tx: Uint8Array, vout: number, address: string, locktime: number): TransactionResult;
 export function construct_refund_tx(tx: Uint8Array, vout: number, pubkey: Uint8Array, network: string, locktime: number): TransactionResult;
-export function construct_split_tx(tx: Uint8Array, vout: number, addresses: (string)[], locktime: number): TransactionResult;
+export function construct_split_tx(tx: Uint8Array, vout: number, addresses: string[], locktime: number): TransactionResult;
 export function create_dummy_tx(address: string, amount_sats: bigint): DummyTx;
 export function encrypt_ecies(msg: Uint8Array, public_key_bytes: Uint8Array): Uint8Array;
 export function decrypt_ecies(encrypted_msg: Uint8Array, private_key_bytes: Uint8Array): Uint8Array;
@@ -117,7 +117,7 @@ export interface InitOutput {
   readonly ffi_spark_frost_rust_future_cancel_void: (a: bigint) => void;
   readonly ffi_spark_frost_rust_future_complete_void: (a: bigint, b: number) => void;
   readonly ffi_spark_frost_rust_future_free_void: (a: bigint) => void;
-  readonly uniffi_spark_frost_fn_func_aggregate_frost: (a: number, b: bigint, c: bigint, d: number, e: number, f: bigint, g: bigint, h: number, i: number, j: bigint, k: bigint, l: number, m: number, n: bigint, o: bigint, p: number, q: number, r: bigint, s: bigint, t: number, u: number, v: bigint, w: bigint, x: number, y: number, z: bigint, a1: bigint, b1: number, c1: number, d1: bigint, e1: bigint, f1: number, g1: number, h1: number) => void;
+  readonly uniffi_spark_frost_fn_func_aggregate_frost: (a: number, b: bigint, c: bigint, d: number, e: number, f: bigint, g: bigint, h: number, i: number, j: bigint, k: bigint, l: number, m: number, n: bigint, o: bigint, p: number, q: number, r: bigint, s: bigint, t: number, u: number, v: bigint, w: bigint, x: number, y: number, z: bigint, a1: bigint, b1: number, c1: number, d1: bigint, e1: bigint, f1: number, g1: number, h1: bigint, i1: bigint, j1: number, k1: number, l1: number) => void;
   readonly uniffi_spark_frost_fn_func_construct_node_tx: (a: number, b: bigint, c: bigint, d: number, e: number, f: number, g: bigint, h: bigint, i: number, j: number, k: number, l: number) => void;
   readonly uniffi_spark_frost_fn_func_construct_refund_tx: (a: number, b: bigint, c: bigint, d: number, e: number, f: number, g: bigint, h: bigint, i: number, j: number, k: bigint, l: bigint, m: number, n: number, o: number, p: number) => void;
   readonly uniffi_spark_frost_fn_func_construct_split_tx: (a: number, b: bigint, c: bigint, d: number, e: number, f: number, g: bigint, h: bigint, i: number, j: number, k: number, l: number) => void;
@@ -125,7 +125,7 @@ export interface InitOutput {
   readonly uniffi_spark_frost_fn_func_decrypt_ecies: (a: number, b: bigint, c: bigint, d: number, e: number, f: bigint, g: bigint, h: number, i: number, j: number) => void;
   readonly uniffi_spark_frost_fn_func_encrypt_ecies: (a: number, b: bigint, c: bigint, d: number, e: number, f: bigint, g: bigint, h: number, i: number, j: number) => void;
   readonly uniffi_spark_frost_fn_func_frost_nonce: (a: number, b: bigint, c: bigint, d: number, e: number, f: number) => void;
-  readonly uniffi_spark_frost_fn_func_sign_frost: (a: number, b: bigint, c: bigint, d: number, e: number, f: bigint, g: bigint, h: number, i: number, j: bigint, k: bigint, l: number, m: number, n: bigint, o: bigint, p: number, q: number, r: bigint, s: bigint, t: number, u: number, v: number) => void;
+  readonly uniffi_spark_frost_fn_func_sign_frost: (a: number, b: bigint, c: bigint, d: number, e: number, f: bigint, g: bigint, h: number, i: number, j: bigint, k: bigint, l: number, m: number, n: bigint, o: bigint, p: number, q: number, r: bigint, s: bigint, t: number, u: number, v: bigint, w: bigint, x: number, y: number, z: number) => void;
   readonly __wbg_signingnonce_free: (a: number, b: number) => void;
   readonly __wbg_signingcommitment_free: (a: number, b: number) => void;
   readonly signingcommitment_new: (a: number, b: number, c: number, d: number) => number;
@@ -140,8 +140,8 @@ export interface InitOutput {
   readonly __wbg_set_keypackage_verifying_key: (a: number, b: number, c: number) => void;
   readonly keypackage_new: (a: number, b: number, c: number, d: number, e: number, f: number) => number;
   readonly frost_nonce: (a: number) => [number, number, number];
-  readonly wasm_sign_frost: (a: number, b: number, c: number, d: number, e: number, f: any) => [number, number, number, number];
-  readonly wasm_aggregate_frost: (a: number, b: number, c: any, d: number, e: any, f: number, g: number, h: any, i: number, j: number, k: number, l: number) => [number, number, number, number];
+  readonly wasm_sign_frost: (a: number, b: number, c: number, d: number, e: number, f: any, g: number, h: number) => [number, number, number, number];
+  readonly wasm_aggregate_frost: (a: number, b: number, c: any, d: number, e: any, f: number, g: number, h: any, i: number, j: number, k: number, l: number, m: number, n: number) => [number, number, number, number];
   readonly __wbg_transactionresult_free: (a: number, b: number) => void;
   readonly construct_node_tx: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number];
   readonly construct_refund_tx: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => [number, number, number];
@@ -174,11 +174,11 @@ export interface InitOutput {
   readonly rustsecp256k1_v0_10_0_context_destroy: (a: number) => void;
   readonly rustsecp256k1_v0_10_0_default_illegal_callback_fn: (a: number, b: number) => void;
   readonly rustsecp256k1_v0_10_0_default_error_callback_fn: (a: number, b: number) => void;
-  readonly __wbindgen_exn_store: (a: number) => void;
-  readonly __externref_table_alloc: () => number;
-  readonly __wbindgen_export_2: WebAssembly.Table;
   readonly __wbindgen_malloc: (a: number, b: number) => number;
   readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
+  readonly __wbindgen_exn_store: (a: number) => void;
+  readonly __externref_table_alloc: () => number;
+  readonly __wbindgen_export_4: WebAssembly.Table;
   readonly __wbindgen_free: (a: number, b: number, c: number) => void;
   readonly __externref_table_dealloc: (a: number) => void;
   readonly __wbindgen_start: () => void;

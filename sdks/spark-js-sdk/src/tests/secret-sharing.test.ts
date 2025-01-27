@@ -43,8 +43,8 @@ describe("Secret Sharing", () => {
     const fieldModulus = secp256k1.CURVE.n;
     const secret =
       56223216183876340914672117764605975762373003965917245943571257601961255596156n;
-    const threshold = 3;
-    const numberOfShares = 5;
+    const threshold = 1;
+    const numberOfShares = 1000;
 
     const shares = splitSecretWithProofs(
       secret,

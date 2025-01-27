@@ -7,6 +7,13 @@ module.exports = {
     "^(\\.{1,2}/.*)\\.js$": "$1",
   },
   transform: {
+    "^.+\\.js$": [
+      "babel-jest",
+      {
+        presets: ["@babel/preset-env"],
+        plugins: ["@babel/plugin-syntax-import-meta"],
+      },
+    ],
     "^.+\\.tsx?$": [
       "ts-jest",
       {

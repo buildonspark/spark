@@ -15,9 +15,9 @@ use bitcoin::{
 };
 use ecies::{decrypt, encrypt};
 use frost_secp256k1_tr::Identifier;
-use gloo_utils::format::JsValueSerdeExt;
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
+use serde_wasm_bindgen;
 
 /// A uniffi library for the Spark Frost signing protocol on client side.
 /// This only signs as the required participant in the signing protocol.
@@ -35,12 +35,15 @@ impl From<String> for Error {
 
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self)
+        match self {
+            Error::Spark(s) => write!(f, "Spark error: {}", s)
+        }
     }
 }
+
 impl Into<JsValue> for Error {
     fn into(self) -> JsValue {
-        JsValue::from_str(&self.to_string())
+        JsValue::from_str(&format!("{}", self))
     }
 }
 
@@ -56,7 +59,7 @@ pub struct SigningNonce {
 #[wasm_bindgen]
 impl SigningNonce {
     #[wasm_bindgen(constructor)]
-    pub fn new(hiding: Vec<u8>, binding: Vec<u8>) -> Self {
+    pub fn new(hiding: Vec<u8>, binding: Vec<u8>) -> SigningNonce {
         SigningNonce { hiding, binding }
     }
 }
@@ -132,17 +135,14 @@ impl From<spark_frost::proto::frost::SigningNonceResult> for NonceResult {
     }
 }
 
-#[wasm_bindgen(js_name = KeyPackage)]
+#[wasm_bindgen(getter_with_clone)]
 #[derive(Debug, Clone)]
 pub struct KeyPackage {
     // The secret key for the user
-    #[wasm_bindgen(getter_with_clone)]
     pub secret_key: Vec<u8>,
     // The public key for the user
-    #[wasm_bindgen(getter_with_clone)]
     pub public_key: Vec<u8>,
     // The verifying key for the user + SE
-    #[wasm_bindgen(getter_with_clone)]
     pub verifying_key: Vec<u8>,
 }
 
@@ -150,7 +150,7 @@ pub struct KeyPackage {
 impl KeyPackage {
     #[wasm_bindgen(constructor)]
     pub fn new(secret_key: Vec<u8>, public_key: Vec<u8>, verifying_key: Vec<u8>) -> KeyPackage {
-        Self {
+        KeyPackage {
             secret_key,
             public_key,
             verifying_key,
@@ -200,8 +200,11 @@ pub fn sign_frost(
     adaptor_public_key: Option<Vec<u8>>,
 ) -> Result<Vec<u8>, Error> {
     log_to_file("Entering sign_frost");
+    // Using a fixed UUID instead of generating a random one
+    let job_id = "00000000-0000-0000-0000-000000000000".to_string();
+
     let signing_job = spark_frost::proto::frost::FrostSigningJob {
-        job_id: uuid::Uuid::new_v4().to_string(),
+        job_id,
         message: msg,
         key_package: Some(key_package.clone().into()),
         nonce: Some(nonce.into()),
@@ -236,8 +239,11 @@ pub fn wasm_sign_frost(
     statechain_commitments: JsValue,
     adaptor_public_key: Option<Vec<u8>>,
 ) -> Result<Vec<u8>, Error> {
-    let statechain_commitments: HashMap<String, SigningCommitment> =
-        JsValue::into_serde(&statechain_commitments).map_err(|e| Error::Spark(e.to_string()))?;
+    let statechain_commitments: HashMap<String, SigningCommitment> = serde_wasm_bindgen::from_value(statechain_commitments)
+        .map_err(|e| {
+            log_to_file(&format!("Deserialization error: {:?}", e));
+            Error::Spark(format!("Failed to deserialize commitments: {}", e))
+        })?;
     sign_frost(
         msg,
         key_package,
@@ -280,9 +286,8 @@ pub fn aggregate_frost(
         user_signature_share: self_signature.clone(),
         adaptor_public_key: adaptor_public_key.unwrap_or(vec![]),
     };
-    log_to_file("Aggregating frost protobuf constructed");
-    let response = spark_frost::signing::aggregate_frost(&request).map_err(|e| Error::Spark(e))?;
-    log_to_file("Aggregating frost response received");
+    let response = spark_frost::signing::aggregate_frost(&request)
+        .map_err(|e| Error::Spark(e.to_string()))?;  // Convert the error to String first
     Ok(response.signature)
 }
 
@@ -299,11 +304,15 @@ pub fn wasm_aggregate_frost(
     adaptor_public_key: Option<Vec<u8>>,
 ) -> Result<Vec<u8>, Error> {
     let statechain_commitments: HashMap<String, SigningCommitment> =
-        JsValue::into_serde(&statechain_commitments).map_err(|e| Error::Spark(e.to_string()))?;
+        serde_wasm_bindgen::from_value(statechain_commitments)
+            .map_err(|e| Error::Spark(e.to_string()))?;
     let statechain_signatures: HashMap<String, Vec<u8>> =
-        JsValue::into_serde(&statechain_signatures).map_err(|e| Error::Spark(e.to_string()))?;
+        serde_wasm_bindgen::from_value(statechain_signatures)
+            .map_err(|e| Error::Spark(e.to_string()))?;
     let statechain_public_keys: HashMap<String, Vec<u8>> =
-        JsValue::into_serde(&statechain_public_keys).map_err(|e| Error::Spark(e.to_string()))?;
+        serde_wasm_bindgen::from_value(statechain_public_keys)
+            .map_err(|e| Error::Spark(e.to_string()))?;
+
     aggregate_frost(
         msg,
         statechain_commitments,

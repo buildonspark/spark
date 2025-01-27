@@ -1,9 +1,10 @@
-import { hexToBytes } from "@noble/curves/abstract/utils";
+import { bytesToHex, hexToBytes } from "@noble/curves/abstract/utils";
 import { secp256k1 } from "@noble/curves/secp256k1";
 
 import * as btc from "@scure/btc-signer";
 import { TransactionOutput } from "@scure/btc-signer/psbt";
 import { Network, NetworkConfig } from "./network";
+import { sha256 } from "@scure/btc-signer/utils";
 
 export function getP2TRAddressFromPublicKey(
   pubKey: Uint8Array,
@@ -12,7 +13,7 @@ export function getP2TRAddressFromPublicKey(
   if (pubKey.length !== 33) {
     throw new Error("Public key must be 33 bytes");
   }
-  secp256k1.utils;
+
   const internalKey = secp256k1.ProjectivePoint.fromHex(pubKey);
   const address = btc.p2tr(
     internalKey.toRawBytes().slice(1, 33),
@@ -75,4 +76,8 @@ export function getSigHashFromTx(
   return tx.preimageWitnessV1(inputIndex, [prevScript], btc.SigHash.DEFAULT, [
     amount,
   ]);
+}
+
+export function getTxId(tx: btc.Transaction): string {
+  return bytesToHex(sha256(sha256(tx.unsignedTx)).reverse());
 }
