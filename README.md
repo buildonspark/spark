@@ -40,8 +40,8 @@ brew install golangci-lint
 ```
 
 To run the linters, use
-``
-`golangci-lint run
+```
+golangci-lint run
 ```
 
 ## Run tests
