@@ -95,3 +95,56 @@ func TestStartTreeCreation(t *testing.T) {
 
 	log.Printf("tree created: %v", resp)
 }
+
+func TestStartTreeCreationOffchain(t *testing.T) {
+	config, err := testutil.TestWalletConfig()
+	if err != nil {
+		t.Fatalf("failed to create wallet config: %v", err)
+	}
+
+	// Setup Mock tx
+	conn, err := common.NewGRPCConnection(config.CoodinatorAddress())
+	if err != nil {
+		t.Fatalf("failed to connect to operator: %v", err)
+	}
+	defer conn.Close()
+
+	privKey, err := secp256k1.GeneratePrivateKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	userPubKey := privKey.PubKey()
+	userPubKeyBytes := userPubKey.SerializeCompressed()
+
+	depositResp, err := wallet.GenerateDepositAddress(context.Background(), config, userPubKeyBytes)
+	if err != nil {
+		t.Fatalf("failed to generate deposit address: %v", err)
+	}
+
+	depositTx, err := testutil.CreateTestP2TRTransaction(depositResp.DepositAddress.Address, 100_000)
+	if err != nil {
+		t.Fatalf("failed to create deposit tx: %v", err)
+	}
+	vout := 0
+	var buf bytes.Buffer
+	err = depositTx.Serialize(&buf)
+	if err != nil {
+		t.Fatalf("failed to serialize deposit tx: %v", err)
+	}
+	depositTxHex := hex.EncodeToString(buf.Bytes())
+	decodedBytes, err := hex.DecodeString(depositTxHex)
+	if err != nil {
+		t.Fatalf("failed to decode deposit tx hex: %v", err)
+	}
+	depositTx, err = common.TxFromRawTxBytes(decodedBytes)
+	if err != nil {
+		t.Fatalf("failed to deserilize deposit tx: %v", err)
+	}
+
+	resp, err := wallet.CreateTreeRoot(context.Background(), config, privKey.Serialize(), depositResp.DepositAddress.VerifyingKey, depositTx, vout)
+	if err != nil {
+		t.Fatalf("failed to create tree: %v", err)
+	}
+
+	log.Printf("tree created: %v", resp)
+}

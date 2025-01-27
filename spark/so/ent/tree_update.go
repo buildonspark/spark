@@ -13,6 +13,7 @@ import (
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/so/ent/predicate"
+	"github.com/lightsparkdev/spark-go/so/ent/schema"
 	"github.com/lightsparkdev/spark-go/so/ent/tree"
 	"github.com/lightsparkdev/spark-go/so/ent/treenode"
 )
@@ -39,6 +40,20 @@ func (tu *TreeUpdate) SetUpdateTime(t time.Time) *TreeUpdate {
 // SetOwnerIdentityPubkey sets the "owner_identity_pubkey" field.
 func (tu *TreeUpdate) SetOwnerIdentityPubkey(b []byte) *TreeUpdate {
 	tu.mutation.SetOwnerIdentityPubkey(b)
+	return tu
+}
+
+// SetStatus sets the "status" field.
+func (tu *TreeUpdate) SetStatus(ss schema.TreeStatus) *TreeUpdate {
+	tu.mutation.SetStatus(ss)
+	return tu
+}
+
+// SetNillableStatus sets the "status" field if the given value is not nil.
+func (tu *TreeUpdate) SetNillableStatus(ss *schema.TreeStatus) *TreeUpdate {
+	if ss != nil {
+		tu.SetStatus(*ss)
+	}
 	return tu
 }
 
@@ -151,6 +166,11 @@ func (tu *TreeUpdate) check() error {
 			return &ValidationError{Name: "owner_identity_pubkey", err: fmt.Errorf(`ent: validator failed for field "Tree.owner_identity_pubkey": %w`, err)}
 		}
 	}
+	if v, ok := tu.mutation.Status(); ok {
+		if err := tree.StatusValidator(v); err != nil {
+			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "Tree.status": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -171,6 +191,9 @@ func (tu *TreeUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if value, ok := tu.mutation.OwnerIdentityPubkey(); ok {
 		_spec.SetField(tree.FieldOwnerIdentityPubkey, field.TypeBytes, value)
+	}
+	if value, ok := tu.mutation.Status(); ok {
+		_spec.SetField(tree.FieldStatus, field.TypeEnum, value)
 	}
 	if tu.mutation.RootCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -275,6 +298,20 @@ func (tuo *TreeUpdateOne) SetUpdateTime(t time.Time) *TreeUpdateOne {
 // SetOwnerIdentityPubkey sets the "owner_identity_pubkey" field.
 func (tuo *TreeUpdateOne) SetOwnerIdentityPubkey(b []byte) *TreeUpdateOne {
 	tuo.mutation.SetOwnerIdentityPubkey(b)
+	return tuo
+}
+
+// SetStatus sets the "status" field.
+func (tuo *TreeUpdateOne) SetStatus(ss schema.TreeStatus) *TreeUpdateOne {
+	tuo.mutation.SetStatus(ss)
+	return tuo
+}
+
+// SetNillableStatus sets the "status" field if the given value is not nil.
+func (tuo *TreeUpdateOne) SetNillableStatus(ss *schema.TreeStatus) *TreeUpdateOne {
+	if ss != nil {
+		tuo.SetStatus(*ss)
+	}
 	return tuo
 }
 
@@ -400,6 +437,11 @@ func (tuo *TreeUpdateOne) check() error {
 			return &ValidationError{Name: "owner_identity_pubkey", err: fmt.Errorf(`ent: validator failed for field "Tree.owner_identity_pubkey": %w`, err)}
 		}
 	}
+	if v, ok := tuo.mutation.Status(); ok {
+		if err := tree.StatusValidator(v); err != nil {
+			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "Tree.status": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -437,6 +479,9 @@ func (tuo *TreeUpdateOne) sqlSave(ctx context.Context) (_node *Tree, err error) 
 	}
 	if value, ok := tuo.mutation.OwnerIdentityPubkey(); ok {
 		_spec.SetField(tree.FieldOwnerIdentityPubkey, field.TypeBytes, value)
+	}
+	if value, ok := tuo.mutation.Status(); ok {
+		_spec.SetField(tree.FieldStatus, field.TypeEnum, value)
 	}
 	if tuo.mutation.RootCleared() {
 		edge := &sqlgraph.EdgeSpec{

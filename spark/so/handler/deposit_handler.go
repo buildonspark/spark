@@ -143,10 +143,15 @@ func (o *DepositHandler) GenerateDepositAddress(ctx context.Context, config *so.
 
 // StartTreeCreation verifies the on chain utxo, and then verifies and signs the offchain root and refund transactions.
 func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Config, req *pb.StartTreeCreationRequest) (*pb.StartTreeCreationResponse, error) {
+	txBroadcasted := true
 	// Get the on chain tx
 	onChainTx, err := o.onchainHelper.GetTxOnChain(ctx, req.OnChainUtxo.Txid)
-	if err != nil {
-		return nil, err
+	if onChainTx == nil || err != nil {
+		onChainTx, err = common.TxFromRawTxBytes(req.OnChainUtxo.RawTx)
+		if err != nil {
+			return nil, fmt.Errorf("onchain tx not found and not provided in raw tx: %w", err)
+		}
+		txBroadcasted = false
 	}
 	if len(onChainTx.TxOut) <= int(req.OnChainUtxo.Vout) {
 		return nil, fmt.Errorf("utxo index out of bounds")
@@ -245,8 +250,17 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 	}
 	// Create the tree
 	db := ent.GetDbFromContext(ctx)
-	tree := db.Tree.Create().SetOwnerIdentityPubkey(depositAddress.OwnerIdentityPubkey).SaveX(ctx)
-	root := db.TreeNode.
+	treeMutator := db.Tree.Create().SetOwnerIdentityPubkey(depositAddress.OwnerIdentityPubkey)
+	if txBroadcasted {
+		treeMutator.SetStatus(schema.TreeStatusAvailable)
+	} else {
+		treeMutator.SetStatus(schema.TreeStatusPending)
+	}
+	tree, err := treeMutator.Save(ctx)
+	if err != nil {
+		return nil, err
+	}
+	root, err := db.TreeNode.
 		Create().
 		SetTree(tree).
 		SetStatus(schema.TreeNodeStatusCreating).
@@ -258,8 +272,14 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 		SetRawTx(req.RootTxSigningJob.RawTx).
 		SetRawRefundTx(req.RefundTxSigningJob.RawTx).
 		SetVout(uint16(req.OnChainUtxo.Vout)).
-		SaveX(ctx)
-	tree = tree.Update().SetRoot(root).SaveX(ctx)
+		Save(ctx)
+	if err != nil {
+		return nil, err
+	}
+	tree, err = tree.Update().SetRoot(root).Save(ctx)
+	if err != nil {
+		return nil, err
+	}
 
 	return &pb.StartTreeCreationResponse{
 		TreeId: tree.ID.String(),

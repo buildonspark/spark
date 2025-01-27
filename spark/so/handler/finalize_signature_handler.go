@@ -166,12 +166,20 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 		}
 	}
 
+	tree, err := node.QueryTree().Only(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	// Update the tree node
-	node, err = node.Update().
+	nodeMutator := node.Update().
 		SetRawTx(nodeTxBytes).
 		SetRawRefundTx(refundTxBytes).
-		SetStatus(schema.TreeNodeStatusAvailable).
-		Save(ctx)
+		SetStatus(schema.TreeNodeStatusAvailable)
+	if tree.Status == schema.TreeStatusAvailable {
+		nodeMutator.SetStatus(schema.TreeNodeStatusOnChain)
+	}
+	node, err = nodeMutator.Save(ctx)
 	if err != nil {
 		return nil, nil, err
 	}

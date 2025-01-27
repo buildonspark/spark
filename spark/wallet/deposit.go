@@ -124,7 +124,10 @@ func CreateTreeRoot(
 	))
 	rootTx.AddTxOut(wire.NewTxOut(100_000, depositTx.TxOut[0].PkScript))
 	var rootBuf bytes.Buffer
-	rootTx.Serialize(&rootBuf)
+	err := rootTx.Serialize(&rootBuf)
+	if err != nil {
+		return nil, err
+	}
 	rootNonce, err := objects.RandomSigningNonce()
 	if err != nil {
 		return nil, err
@@ -138,6 +141,11 @@ func CreateTreeRoot(
 		return nil, err
 	}
 	rootTxSighash, err := common.SigHashFromTx(rootTx, 0, depositTx.TxOut[0])
+	if err != nil {
+		return nil, err
+	}
+	var depositBuf bytes.Buffer
+	err = depositTx.Serialize(&depositBuf)
 	if err != nil {
 		return nil, err
 	}
@@ -156,7 +164,10 @@ func CreateTreeRoot(
 	refundPkScript, _ := txscript.PayToAddrScript(refundAddress)
 	refundTx.AddTxOut(wire.NewTxOut(rootTx.TxOut[0].Value, refundPkScript))
 	var refundBuf bytes.Buffer
-	refundTx.Serialize(&refundBuf)
+	err = refundTx.Serialize(&refundBuf)
+	if err != nil {
+		return nil, err
+	}
 	refundNonce, err := objects.RandomSigningNonce()
 	if err != nil {
 		return nil, err
@@ -184,8 +195,9 @@ func CreateTreeRoot(
 	treeResponse, err := sparkClient.StartTreeCreation(ctx, &pb.StartTreeCreationRequest{
 		IdentityPublicKey: config.IdentityPublicKey(),
 		OnChainUtxo: &pb.UTXO{
-			Txid: depositTx.TxID(),
-			Vout: uint32(vout),
+			Txid:  depositTx.TxID(),
+			Vout:  uint32(vout),
+			RawTx: depositBuf.Bytes(),
 		},
 		RootTxSigningJob: &pb.SigningJob{
 			RawTx:                  rootBuf.Bytes(),

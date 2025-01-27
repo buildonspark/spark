@@ -9,6 +9,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/so/ent/predicate"
+	"github.com/lightsparkdev/spark-go/so/ent/schema"
 )
 
 // ID filters vertices based on their ID field.
@@ -189,6 +190,36 @@ func OwnerIdentityPubkeyLT(v []byte) predicate.Tree {
 // OwnerIdentityPubkeyLTE applies the LTE predicate on the "owner_identity_pubkey" field.
 func OwnerIdentityPubkeyLTE(v []byte) predicate.Tree {
 	return predicate.Tree(sql.FieldLTE(FieldOwnerIdentityPubkey, v))
+}
+
+// StatusEQ applies the EQ predicate on the "status" field.
+func StatusEQ(v schema.TreeStatus) predicate.Tree {
+	vc := v
+	return predicate.Tree(sql.FieldEQ(FieldStatus, vc))
+}
+
+// StatusNEQ applies the NEQ predicate on the "status" field.
+func StatusNEQ(v schema.TreeStatus) predicate.Tree {
+	vc := v
+	return predicate.Tree(sql.FieldNEQ(FieldStatus, vc))
+}
+
+// StatusIn applies the In predicate on the "status" field.
+func StatusIn(vs ...schema.TreeStatus) predicate.Tree {
+	v := make([]any, len(vs))
+	for i := range v {
+		v[i] = vs[i]
+	}
+	return predicate.Tree(sql.FieldIn(FieldStatus, v...))
+}
+
+// StatusNotIn applies the NotIn predicate on the "status" field.
+func StatusNotIn(vs ...schema.TreeStatus) predicate.Tree {
+	v := make([]any, len(vs))
+	for i := range v {
+		v[i] = vs[i]
+	}
+	return predicate.Tree(sql.FieldNotIn(FieldStatus, v...))
 }
 
 // HasRoot applies the HasEdge predicate on the "root" edge.

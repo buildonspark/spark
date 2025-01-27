@@ -155,7 +155,7 @@ func main() {
 		mockServer := sparkgrpc.NewMockServer(config, onchainHelper.(*helper.MockOnChainHelper))
 		pbmock.RegisterMockServiceServer(grpcServer, mockServer)
 	}
-	sparkInternalServer := sparkgrpc.NewSparkInternalServer(config)
+	sparkInternalServer := sparkgrpc.NewSparkInternalServer(config, onchainHelper)
 	pbinternal.RegisterSparkInternalServiceServer(grpcServer, sparkInternalServer)
 
 	sparkServer := sparkgrpc.NewSparkServer(config, onchainHelper)

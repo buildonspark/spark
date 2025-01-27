@@ -13,6 +13,7 @@ import (
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/ent"
 	"github.com/lightsparkdev/spark-go/so/handler"
+	"github.com/lightsparkdev/spark-go/so/helper"
 	"github.com/lightsparkdev/spark-go/so/objects"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
@@ -21,12 +22,13 @@ import (
 // This server is only used by the operator.
 type SparkInternalServer struct {
 	pb.UnimplementedSparkInternalServiceServer
-	config *so.Config
+	config        *so.Config
+	onchainHelper helper.OnChainHelper
 }
 
 // NewSparkInternalServer creates a new SparkInternalServer.
-func NewSparkInternalServer(config *so.Config) *SparkInternalServer {
-	return &SparkInternalServer{config: config}
+func NewSparkInternalServer(config *so.Config, onchainHelper helper.OnChainHelper) *SparkInternalServer {
+	return &SparkInternalServer{config: config, onchainHelper: onchainHelper}
 }
 
 // MarkKeysharesAsUsed marks the keyshares as used.
@@ -55,7 +57,7 @@ func (s *SparkInternalServer) MarkKeysharesAsUsed(ctx context.Context, req *pb.M
 
 // MarkKeyshareForDepositAddress links the keyshare to a deposit address.
 func (s *SparkInternalServer) MarkKeyshareForDepositAddress(ctx context.Context, req *pb.MarkKeyshareForDepositAddressRequest) (*pb.MarkKeyshareForDepositAddressResponse, error) {
-	depositHandler := handler.NewInternalDepositHandler(s.config)
+	depositHandler := handler.NewInternalDepositHandler(s.config, s.onchainHelper)
 	return depositHandler.MarkKeyshareForDepositAddress(ctx, req)
 }
 
@@ -238,7 +240,7 @@ func (s *SparkInternalServer) FinalizeNodeSplit(ctx context.Context, req *pb.Fin
 
 // FinalizeTreeCreation syncs final tree creation.
 func (s *SparkInternalServer) FinalizeTreeCreation(ctx context.Context, req *pb.FinalizeTreeCreationRequest) (*emptypb.Empty, error) {
-	depositHandler := handler.NewInternalDepositHandler(s.config)
+	depositHandler := handler.NewInternalDepositHandler(s.config, s.onchainHelper)
 	err := depositHandler.FinalizeTreeCreation(ctx, req)
 	if err != nil {
 		return nil, err

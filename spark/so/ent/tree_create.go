@@ -11,6 +11,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark-go/so/ent/schema"
 	"github.com/lightsparkdev/spark-go/so/ent/tree"
 	"github.com/lightsparkdev/spark-go/so/ent/treenode"
 )
@@ -53,6 +54,12 @@ func (tc *TreeCreate) SetNillableUpdateTime(t *time.Time) *TreeCreate {
 // SetOwnerIdentityPubkey sets the "owner_identity_pubkey" field.
 func (tc *TreeCreate) SetOwnerIdentityPubkey(b []byte) *TreeCreate {
 	tc.mutation.SetOwnerIdentityPubkey(b)
+	return tc
+}
+
+// SetStatus sets the "status" field.
+func (tc *TreeCreate) SetStatus(ss schema.TreeStatus) *TreeCreate {
+	tc.mutation.SetStatus(ss)
 	return tc
 }
 
@@ -169,6 +176,14 @@ func (tc *TreeCreate) check() error {
 			return &ValidationError{Name: "owner_identity_pubkey", err: fmt.Errorf(`ent: validator failed for field "Tree.owner_identity_pubkey": %w`, err)}
 		}
 	}
+	if _, ok := tc.mutation.Status(); !ok {
+		return &ValidationError{Name: "status", err: errors.New(`ent: missing required field "Tree.status"`)}
+	}
+	if v, ok := tc.mutation.Status(); ok {
+		if err := tree.StatusValidator(v); err != nil {
+			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "Tree.status": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -215,6 +230,10 @@ func (tc *TreeCreate) createSpec() (*Tree, *sqlgraph.CreateSpec) {
 	if value, ok := tc.mutation.OwnerIdentityPubkey(); ok {
 		_spec.SetField(tree.FieldOwnerIdentityPubkey, field.TypeBytes, value)
 		_node.OwnerIdentityPubkey = value
+	}
+	if value, ok := tc.mutation.Status(); ok {
+		_spec.SetField(tree.FieldStatus, field.TypeEnum, value)
+		_node.Status = value
 	}
 	if nodes := tc.mutation.RootIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{

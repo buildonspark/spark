@@ -214,6 +214,7 @@ var (
 		{Name: "create_time", Type: field.TypeTime},
 		{Name: "update_time", Type: field.TypeTime},
 		{Name: "owner_identity_pubkey", Type: field.TypeBytes},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"PENDING", "AVAILABLE"}},
 		{Name: "tree_root", Type: field.TypeUUID, Nullable: true},
 	}
 	// TreesTable holds the schema information for the "trees" table.
@@ -224,7 +225,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "trees_tree_nodes_root",
-				Columns:    []*schema.Column{TreesColumns[4]},
+				Columns:    []*schema.Column{TreesColumns[5]},
 				RefColumns: []*schema.Column{TreeNodesColumns[0]},
 				OnDelete:   schema.SetNull,
 			},

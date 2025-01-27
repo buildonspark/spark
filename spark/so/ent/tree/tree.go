@@ -3,11 +3,13 @@
 package tree
 
 import (
+	"fmt"
 	"time"
 
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark-go/so/ent/schema"
 )
 
 const (
@@ -21,6 +23,8 @@ const (
 	FieldUpdateTime = "update_time"
 	// FieldOwnerIdentityPubkey holds the string denoting the owner_identity_pubkey field in the database.
 	FieldOwnerIdentityPubkey = "owner_identity_pubkey"
+	// FieldStatus holds the string denoting the status field in the database.
+	FieldStatus = "status"
 	// EdgeRoot holds the string denoting the root edge name in mutations.
 	EdgeRoot = "root"
 	// EdgeNodes holds the string denoting the nodes edge name in mutations.
@@ -49,6 +53,7 @@ var Columns = []string{
 	FieldCreateTime,
 	FieldUpdateTime,
 	FieldOwnerIdentityPubkey,
+	FieldStatus,
 }
 
 // ForeignKeys holds the SQL foreign-keys that are owned by the "trees"
@@ -85,6 +90,16 @@ var (
 	DefaultID func() uuid.UUID
 )
 
+// StatusValidator is a validator for the "status" field enum values. It is called by the builders before save.
+func StatusValidator(s schema.TreeStatus) error {
+	switch s {
+	case "PENDING", "AVAILABLE":
+		return nil
+	default:
+		return fmt.Errorf("tree: invalid enum value for status field: %q", s)
+	}
+}
+
 // OrderOption defines the ordering options for the Tree queries.
 type OrderOption func(*sql.Selector)
 
@@ -101,6 +116,11 @@ func ByCreateTime(opts ...sql.OrderTermOption) OrderOption {
 // ByUpdateTime orders the results by the update_time field.
 func ByUpdateTime(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldUpdateTime, opts...).ToFunc()
+}
+
+// ByStatus orders the results by the status field.
+func ByStatus(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldStatus, opts...).ToFunc()
 }
 
 // ByRootField orders the results by root field.

@@ -4781,6 +4781,7 @@ type TreeMutation struct {
 	create_time           *time.Time
 	update_time           *time.Time
 	owner_identity_pubkey *[]byte
+	status                *schema.TreeStatus
 	clearedFields         map[string]struct{}
 	root                  *uuid.UUID
 	clearedroot           bool
@@ -5004,6 +5005,42 @@ func (m *TreeMutation) ResetOwnerIdentityPubkey() {
 	m.owner_identity_pubkey = nil
 }
 
+// SetStatus sets the "status" field.
+func (m *TreeMutation) SetStatus(ss schema.TreeStatus) {
+	m.status = &ss
+}
+
+// Status returns the value of the "status" field in the mutation.
+func (m *TreeMutation) Status() (r schema.TreeStatus, exists bool) {
+	v := m.status
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStatus returns the old "status" field's value of the Tree entity.
+// If the Tree object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TreeMutation) OldStatus(ctx context.Context) (v schema.TreeStatus, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStatus is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStatus requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStatus: %w", err)
+	}
+	return oldValue.Status, nil
+}
+
+// ResetStatus resets all changes to the "status" field.
+func (m *TreeMutation) ResetStatus() {
+	m.status = nil
+}
+
 // SetRootID sets the "root" edge to the TreeNode entity by id.
 func (m *TreeMutation) SetRootID(id uuid.UUID) {
 	m.root = &id
@@ -5131,7 +5168,7 @@ func (m *TreeMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *TreeMutation) Fields() []string {
-	fields := make([]string, 0, 3)
+	fields := make([]string, 0, 4)
 	if m.create_time != nil {
 		fields = append(fields, tree.FieldCreateTime)
 	}
@@ -5140,6 +5177,9 @@ func (m *TreeMutation) Fields() []string {
 	}
 	if m.owner_identity_pubkey != nil {
 		fields = append(fields, tree.FieldOwnerIdentityPubkey)
+	}
+	if m.status != nil {
+		fields = append(fields, tree.FieldStatus)
 	}
 	return fields
 }
@@ -5155,6 +5195,8 @@ func (m *TreeMutation) Field(name string) (ent.Value, bool) {
 		return m.UpdateTime()
 	case tree.FieldOwnerIdentityPubkey:
 		return m.OwnerIdentityPubkey()
+	case tree.FieldStatus:
+		return m.Status()
 	}
 	return nil, false
 }
@@ -5170,6 +5212,8 @@ func (m *TreeMutation) OldField(ctx context.Context, name string) (ent.Value, er
 		return m.OldUpdateTime(ctx)
 	case tree.FieldOwnerIdentityPubkey:
 		return m.OldOwnerIdentityPubkey(ctx)
+	case tree.FieldStatus:
+		return m.OldStatus(ctx)
 	}
 	return nil, fmt.Errorf("unknown Tree field %s", name)
 }
@@ -5199,6 +5243,13 @@ func (m *TreeMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetOwnerIdentityPubkey(v)
+		return nil
+	case tree.FieldStatus:
+		v, ok := value.(schema.TreeStatus)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStatus(v)
 		return nil
 	}
 	return fmt.Errorf("unknown Tree field %s", name)
@@ -5257,6 +5308,9 @@ func (m *TreeMutation) ResetField(name string) error {
 		return nil
 	case tree.FieldOwnerIdentityPubkey:
 		m.ResetOwnerIdentityPubkey()
+		return nil
+	case tree.FieldStatus:
+		m.ResetStatus()
 		return nil
 	}
 	return fmt.Errorf("unknown Tree field %s", name)

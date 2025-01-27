@@ -3,25 +3,29 @@ package handler
 import (
 	"context"
 	"crypto/sha256"
+	"fmt"
 	"log"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark-go/common"
 	pbinternal "github.com/lightsparkdev/spark-go/proto/spark_internal"
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/ent"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
+	"github.com/lightsparkdev/spark-go/so/helper"
 )
 
 // InternalDepositHandler is the deposit handler for so internal
 type InternalDepositHandler struct {
-	config *so.Config
+	config        *so.Config
+	onchainHelper helper.OnChainHelper
 }
 
 // NewInternalDepositHandler creates a new InternalDepositHandler.
-func NewInternalDepositHandler(config *so.Config) *InternalDepositHandler {
-	return &InternalDepositHandler{config: config}
+func NewInternalDepositHandler(config *so.Config, onchainHelper helper.OnChainHelper) *InternalDepositHandler {
+	return &InternalDepositHandler{config: config, onchainHelper: onchainHelper}
 }
 
 // MarkKeyshareForDepositAddress links the keyshare to a deposit address.
@@ -55,25 +59,60 @@ func (h *InternalDepositHandler) MarkKeyshareForDepositAddress(ctx context.Conte
 	}, nil
 }
 
+func (h *InternalDepositHandler) checkTransactionOnchain(ctx context.Context, txid string) bool {
+	utxo, err := h.onchainHelper.GetTxOnChain(ctx, txid)
+	if err != nil {
+		return false
+	}
+	return utxo != nil
+}
+
 // FinalizeTreeCreation finalizes a tree creation during deposit
 func (h *InternalDepositHandler) FinalizeTreeCreation(ctx context.Context, req *pbinternal.FinalizeTreeCreationRequest) error {
 	db := ent.GetDbFromContext(ctx)
 	var tree *ent.Tree = nil
-	if req.Nodes[0].ParentNodeId == nil {
-		treeID, err := uuid.Parse(req.Nodes[0].TreeId)
+	var selectedNode *pbinternal.TreeNode
+	for _, node := range req.Nodes {
+		if node.ParentNodeId == nil {
+			selectedNode = node
+			break
+		}
+		selectedNode = node
+	}
+
+	if selectedNode == nil {
+		return fmt.Errorf("no node in the request")
+	}
+	markNodAsAvailalbe := false
+	if selectedNode.ParentNodeId == nil {
+		treeID, err := uuid.Parse(selectedNode.TreeId)
 		if err != nil {
 			return err
 		}
-		tree, err = db.Tree.
+		nodeTx, err := common.TxFromRawTxBytes(selectedNode.RawTx)
+		if err != nil {
+			return err
+		}
+		txid := nodeTx.TxIn[0].PreviousOutPoint.Hash.String()
+		markNodAsAvailalbe = h.checkTransactionOnchain(ctx, txid)
+
+		treeMutator := db.Tree.
 			Create().
 			SetID(treeID).
-			SetOwnerIdentityPubkey(req.Nodes[0].OwnerIdentityPubkey).
-			Save(ctx)
+			SetOwnerIdentityPubkey(selectedNode.OwnerIdentityPubkey)
+
+		if markNodAsAvailalbe {
+			treeMutator.SetStatus(schema.TreeStatusAvailable)
+		} else {
+			treeMutator.SetStatus(schema.TreeStatusPending)
+		}
+
+		tree, err = treeMutator.Save(ctx)
 		if err != nil {
 			return err
 		}
 	} else {
-		treeID, err := uuid.Parse(req.Nodes[0].TreeId)
+		treeID, err := uuid.Parse(selectedNode.TreeId)
 		if err != nil {
 			return err
 		}
@@ -92,11 +131,10 @@ func (h *InternalDepositHandler) FinalizeTreeCreation(ctx context.Context, req *
 		if err != nil {
 			return err
 		}
-		mutatedNode := db.TreeNode.
+		nodeMutator := db.TreeNode.
 			Create().
 			SetID(nodeID).
 			SetTree(tree).
-			SetStatus(schema.TreeNodeStatusAvailable).
 			SetOwnerIdentityPubkey(node.OwnerIdentityPubkey).
 			SetOwnerSigningPubkey(node.OwnerSigningPubkey).
 			SetValue(node.Value).
@@ -111,10 +149,16 @@ func (h *InternalDepositHandler) FinalizeTreeCreation(ctx context.Context, req *
 			if err != nil {
 				return err
 			}
-			mutatedNode.SetParentID(parentID)
+			nodeMutator.SetParentID(parentID)
 		}
 
-		entNode, err := mutatedNode.Save(ctx)
+		if markNodAsAvailalbe {
+			nodeMutator.SetStatus(schema.TreeNodeStatusAvailable)
+		} else {
+			nodeMutator.SetStatus(schema.TreeNodeStatusCreating)
+		}
+
+		entNode, err := nodeMutator.Save(ctx)
 		if err != nil {
 			return err
 		}
