@@ -393,7 +393,7 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 		var tree *ent.Tree
 		var parentNodeID *uuid.UUID
 		if currentElement.parentNode == nil {
-			tree, err = db.Tree.Create().SetOwnerIdentityPubkey(req.UserIdentityPublicKey).Save(ctx)
+			tree, err = db.Tree.Create().SetStatus(schema.TreeStatusAvailable).SetOwnerIdentityPubkey(req.UserIdentityPublicKey).Save(ctx)
 			if err != nil {
 				return nil, nil, err
 			}
