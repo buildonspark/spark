@@ -15,6 +15,7 @@ require (
 	github.com/ecies/go/v2 v2.0.10
 	github.com/ethereum/go-ethereum v1.14.12
 	github.com/google/uuid v1.6.0
+	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
 	github.com/lib/pq v1.10.9
 	github.com/mattn/go-sqlite3 v1.14.24
 	github.com/stretchr/testify v1.10.0

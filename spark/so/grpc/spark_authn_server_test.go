@@ -1,4 +1,4 @@
-package grpctest
+package grpc
 
 import (
 	"context"
@@ -15,12 +15,16 @@ import (
 	pb "github.com/lightsparkdev/spark-go/proto/spark_authn"
 	pb_authn_internal "github.com/lightsparkdev/spark-go/proto/spark_authn_internal"
 	"github.com/lightsparkdev/spark-go/so/authn"
-	"github.com/lightsparkdev/spark-go/so/grpc"
+	"github.com/lightsparkdev/spark-go/so/authninternal"
+	grpc "google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/proto"
 )
 
-var testIdentityKey, _ = secp256k1.GeneratePrivateKey()
-var testIdentityKeyBytes = testIdentityKey.Serialize()
+var (
+	testIdentityKey, _   = secp256k1.GeneratePrivateKey()
+	testIdentityKeyBytes = testIdentityKey.Serialize()
+)
 
 const (
 	testChallengeTimeout = time.Minute
@@ -28,16 +32,16 @@ const (
 )
 
 type testServerConfig struct {
-	clock authn.Clock
+	clock authninternal.Clock
 }
 
 // newTestServerAndTokenVerifier creates an AuthenticationServer and SessionTokenCreatorVerifier with default test configuration
 func newTestServerAndTokenVerifier(
 	t *testing.T,
 	opts ...func(*testServerConfig),
-) (*grpc.AuthnServer, *authn.SessionTokenCreatorVerifier) {
+) (*AuthnServer, *authninternal.SessionTokenCreatorVerifier) {
 	cfg := &testServerConfig{
-		clock: authn.RealClock{},
+		clock: authninternal.RealClock{},
 	}
 
 	// Apply options
@@ -45,23 +49,23 @@ func newTestServerAndTokenVerifier(
 		opt(cfg)
 	}
 
-	tokenVerifier, err := authn.NewSessionTokenCreatorVerifier(testIdentityKeyBytes, cfg.clock)
+	tokenVerifier, err := authninternal.NewSessionTokenCreatorVerifier(testIdentityKeyBytes, cfg.clock)
 	require.NoError(t, err)
 
-	config := grpc.AuthnServerConfig{
+	config := AuthnServerConfig{
 		IdentityPrivateKey: testIdentityKeyBytes,
 		ChallengeTimeout:   testChallengeTimeout,
 		SessionDuration:    testSessionDuration,
 		Clock:              cfg.clock,
 	}
 
-	server, err := grpc.NewAuthnServer(config, tokenVerifier)
+	server, err := NewAuthnServer(config, tokenVerifier)
 	require.NoError(t, err)
 
 	return server, tokenVerifier
 }
 
-func withClock(clock authn.Clock) func(*testServerConfig) {
+func withClock(clock authninternal.Clock) func(*testServerConfig) {
 	return func(cfg *testServerConfig) {
 		cfg.clock = clock
 	}
@@ -90,13 +94,14 @@ func TestSparkAuthnServer_GetChallenge_InvalidPublicKey(t *testing.T) {
 				PublicKey: tt.pubkey,
 			})
 
-			assert.ErrorIs(t, err, grpc.ErrInvalidPublicKeyFormat)
+			assert.ErrorIs(t, err, ErrInvalidPublicKeyFormat)
 		})
 	}
 }
 
 func TestSparkAuthnServer_VerifyChallenge_ValidToken(t *testing.T) {
-	server, tokenVerifier := newTestServerAndTokenVerifier(t)
+	clock := authninternal.NewTestClock(time.Now())
+	server, tokenVerifier := newTestServerAndTokenVerifier(t, withClock(clock))
 	privKey, pubKey := createTestKeyPair()
 
 	challengeResp, signature := createSignedChallenge(t, server, privKey)
@@ -105,9 +110,23 @@ func TestSparkAuthnServer_VerifyChallenge_ValidToken(t *testing.T) {
 	assert.NotNil(t, verifyResp)
 	assert.NotEmpty(t, verifyResp.SessionToken)
 
-	session, err := tokenVerifier.VerifyToken(verifyResp.SessionToken)
+	authnInterceptor := authn.NewAuthnInterceptor(tokenVerifier)
+
+	// Make a request with the expired token
+	ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs(
+		"authorization", "Bearer "+verifyResp.SessionToken,
+	))
+	var capturedCtx context.Context
+	authnInterceptor.AuthnInterceptor(ctx, nil, &grpc.UnaryServerInfo{}, func(ctx context.Context, _ interface{}) (interface{}, error) { //nolint:errcheck
+		capturedCtx = ctx
+		return nil, nil
+	})
+
+	session, err := authn.GetSessionFromContext(capturedCtx)
 	require.NoError(t, err)
-	assert.Equal(t, session.PublicKey, pubKey.SerializeCompressed())
+	assert.Equal(t, session.IdentityPublicKey(), pubKey)
+	assert.Equal(t, session.IdentityPublicKeyBytes(), pubKey.SerializeCompressed())
+	assert.Equal(t, session.ExpirationTimestamp(), clock.Now().Add(testSessionDuration).Unix())
 }
 
 func TestSparkAuthnServer_VerifyChallenge_InvalidSignature(t *testing.T) {
@@ -130,12 +149,12 @@ func TestSparkAuthnServer_VerifyChallenge_InvalidSignature(t *testing.T) {
 		},
 	)
 
-	assert.ErrorIs(t, err, grpc.ErrInvalidSignature)
+	assert.ErrorIs(t, err, ErrInvalidSignature)
 	assert.Nil(t, resp)
 }
 
 func TestSparkAuthnServer_VerifyChallenge_ExpiredSessionToken(t *testing.T) {
-	clock := authn.NewTestClock(time.Now())
+	clock := authninternal.NewTestClock(time.Now())
 	server, tokenVerifier := newTestServerAndTokenVerifier(t, withClock(clock))
 	privKey, pubKey := createTestKeyPair()
 
@@ -144,14 +163,23 @@ func TestSparkAuthnServer_VerifyChallenge_ExpiredSessionToken(t *testing.T) {
 
 	clock.Advance(testSessionDuration + time.Second)
 
-	session, err := tokenVerifier.VerifyToken(resp.SessionToken)
+	authnInterceptor := authn.NewAuthnInterceptor(tokenVerifier)
 
-	assert.ErrorIs(t, err, authn.ErrTokenExpired)
-	assert.Nil(t, session)
+	// Make a request with the expired token
+	ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs(
+		"authorization", "Bearer "+resp.SessionToken,
+	))
+	authnInterceptor.AuthnInterceptor(ctx, nil, &grpc.UnaryServerInfo{}, func(_ context.Context, _ interface{}) (interface{}, error) { //nolint:errcheck
+		return nil, nil
+	})
+
+	noSession, err := authn.GetSessionFromContext(ctx)
+	assert.Error(t, err)
+	assert.Nil(t, noSession)
 }
 
 func TestSparkAuthnServer_VerifyChallenge_ExpiredChallenge(t *testing.T) {
-	clock := authn.NewTestClock(time.Now())
+	clock := authninternal.NewTestClock(time.Now())
 	server, _ := newTestServerAndTokenVerifier(t, withClock(clock))
 	privKey, pubKey := createTestKeyPair()
 
@@ -168,7 +196,7 @@ func TestSparkAuthnServer_VerifyChallenge_ExpiredChallenge(t *testing.T) {
 		},
 	)
 
-	assert.ErrorIs(t, err, grpc.ErrChallengeExpired)
+	assert.ErrorIs(t, err, ErrChallengeExpired)
 	assert.Nil(t, resp)
 }
 
@@ -183,7 +211,7 @@ func TestSparkAuthnServer_VerifyChallenge_TamperedToken(t *testing.T) {
 	protectedBytes, _ := base64.URLEncoding.DecodeString(sessionToken)
 
 	protected := &pb_authn_internal.ProtectedSession{}
-	proto.Unmarshal(protectedBytes, protected)
+	proto.Unmarshal(protectedBytes, protected) //nolint:errcheck
 
 	tests := []struct {
 		name        string
@@ -195,28 +223,28 @@ func TestSparkAuthnServer_VerifyChallenge_TamperedToken(t *testing.T) {
 			tamper: func(protected *pb_authn_internal.ProtectedSession) {
 				protected.Session.Nonce = []byte("tampered nonce")
 			},
-			wantErrType: authn.ErrInvalidTokenHmac,
+			wantErrType: authninternal.ErrInvalidTokenHmac,
 		},
 		{
 			name: "change key",
 			tamper: func(protected *pb_authn_internal.ProtectedSession) {
 				protected.Session.PublicKey = []byte("tampered key")
 			},
-			wantErrType: authn.ErrInvalidTokenHmac,
+			wantErrType: authninternal.ErrInvalidTokenHmac,
 		},
 		{
 			name: "tampered session protection version",
 			tamper: func(protected *pb_authn_internal.ProtectedSession) {
 				protected.Version = 999
 			},
-			wantErrType: authn.ErrUnsupportedProtectionVersion,
+			wantErrType: authninternal.ErrUnsupportedProtectionVersion,
 		},
 		{
 			name: "tampered session version",
 			tamper: func(protected *pb_authn_internal.ProtectedSession) {
 				protected.Session.Version = 999
 			},
-			wantErrType: authn.ErrUnsupportedSessionVersion,
+			wantErrType: authninternal.ErrUnsupportedSessionVersion,
 		},
 	}
 
@@ -241,7 +269,7 @@ func createTestKeyPair() (*secp256k1.PrivateKey, *secp256k1.PublicKey) {
 	return privKey, privKey.PubKey()
 }
 
-func createSignedChallenge(t *testing.T, server *grpc.AuthnServer, privKey *secp256k1.PrivateKey) (*pb.GetChallengeResponse, []byte) {
+func createSignedChallenge(t *testing.T, server *AuthnServer, privKey *secp256k1.PrivateKey) (*pb.GetChallengeResponse, []byte) {
 	pubKey := privKey.PubKey()
 
 	challengeResp, err := server.GetChallenge(context.Background(), &pb.GetChallengeRequest{
@@ -258,7 +286,7 @@ func createSignedChallenge(t *testing.T, server *grpc.AuthnServer, privKey *secp
 	return challengeResp, signature.Serialize()
 }
 
-func verifyChallenge(t *testing.T, server *grpc.AuthnServer, challengeResp *pb.GetChallengeResponse, pubKey *secp256k1.PublicKey, signature []byte) *pb.VerifyChallengeResponse {
+func verifyChallenge(t *testing.T, server *AuthnServer, challengeResp *pb.GetChallengeResponse, pubKey *secp256k1.PublicKey, signature []byte) *pb.VerifyChallengeResponse {
 	resp, err := server.VerifyChallenge(
 		context.Background(),
 		&pb.VerifyChallengeRequest{
@@ -269,4 +297,85 @@ func verifyChallenge(t *testing.T, server *grpc.AuthnServer, challengeResp *pb.G
 	)
 	require.NoError(t, err)
 	return resp
+}
+
+func assertNoSessionInContext(ctx context.Context, t *testing.T) {
+	t.Helper()
+	var capturedCtx context.Context
+	authnInterceptor := authn.NewAuthnInterceptor(newTestTokenVerifier(t))
+
+	_, err := authnInterceptor.AuthnInterceptor(ctx, nil, &grpc.UnaryServerInfo{}, func(ctx context.Context, _ interface{}) (interface{}, error) {
+		capturedCtx = ctx
+		return nil, nil
+	})
+
+	require.NoError(t, err)
+	noSession, err := authn.GetSessionFromContext(capturedCtx)
+	assert.Nil(t, noSession)
+	assert.Error(t, err)
+}
+
+// Helper to create a test token verifier
+func newTestTokenVerifier(t *testing.T) *authninternal.SessionTokenCreatorVerifier {
+	tokenVerifier, err := authninternal.NewSessionTokenCreatorVerifier(testIdentityKeyBytes, authninternal.RealClock{})
+	require.NoError(t, err)
+	return tokenVerifier
+}
+
+func TestSparkAuthnServer_VerifyChallenge_InvalidAuth(t *testing.T) {
+	tests := []struct {
+		name string
+		ctx  context.Context
+	}{
+		{
+			name: "no metadata",
+			ctx:  context.Background(),
+		},
+		{
+			name: "empty metadata",
+			ctx:  metadata.NewIncomingContext(context.Background(), metadata.MD{}),
+		},
+		{
+			name: "empty auth header",
+			ctx: metadata.NewIncomingContext(context.Background(), metadata.Pairs(
+				"authorization", "",
+			)),
+		},
+		{
+			name: "missing bearer prefix",
+			ctx: metadata.NewIncomingContext(context.Background(), metadata.Pairs(
+				"authorization", "INVALID_SESSION_TOKEN",
+			)),
+		},
+		{
+			name: "invalid token format",
+			ctx: metadata.NewIncomingContext(context.Background(), metadata.Pairs(
+				"authorization", "Bearer INVALID_SESSION_TOKEN",
+			)),
+		},
+		{
+			name: "malformed base64",
+			ctx: metadata.NewIncomingContext(context.Background(), metadata.Pairs(
+				"authorization", "Bearer not-base64!@#$",
+			)),
+		},
+		{
+			name: "empty bearer token",
+			ctx: metadata.NewIncomingContext(context.Background(), metadata.Pairs(
+				"authorization", "Bearer ",
+			)),
+		},
+		{
+			name: "valid base64 but invalid proto",
+			ctx: metadata.NewIncomingContext(context.Background(), metadata.Pairs(
+				"authorization", "Bearer "+base64.URLEncoding.EncodeToString([]byte("not-a-proto")),
+			)),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assertNoSessionInContext(tt.ctx, t)
+		})
+	}
 }

@@ -15,6 +15,7 @@ import (
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark-go/proto/spark_internal"
 	"github.com/lightsparkdev/spark-go/so"
+	"github.com/lightsparkdev/spark-go/so/authn"
 	"github.com/lightsparkdev/spark-go/so/ent"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
 	enttransfer "github.com/lightsparkdev/spark-go/so/ent/transfer"
@@ -22,6 +23,8 @@ import (
 	enttreenode "github.com/lightsparkdev/spark-go/so/ent/treenode"
 	"github.com/lightsparkdev/spark-go/so/helper"
 	"github.com/lightsparkdev/spark-go/so/objects"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // TransferHandler is a helper struct to handle leaves transfer request.
@@ -37,6 +40,17 @@ func NewTransferHandler(config *so.Config) *TransferHandler {
 
 // StartSendTransfer initiates a transfer from sender.
 func (h *TransferHandler) StartSendTransfer(ctx context.Context, req *pb.StartSendTransferRequest) (*pb.StartSendTransferResponse, error) {
+	if h.config.AuthzEnforced {
+		session, err := authn.GetSessionFromContext(ctx)
+		if err != nil {
+			return nil, status.Errorf(codes.Unauthenticated, "no valid session found: %v", err)
+		}
+
+		if !bytes.Equal(session.IdentityPublicKeyBytes(), req.OwnerIdentityPublicKey) {
+			return nil, status.Errorf(codes.PermissionDenied, "session identity does not match request identity")
+		}
+	}
+
 	leafRefundMap := make(map[string][]byte)
 	for _, leaf := range req.LeavesToSend {
 		leafRefundMap[leaf.LeafId] = leaf.RefundTxSigningJob.RawTx

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/go-co-op/gocron/v2"
+	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
 	_ "github.com/lib/pq"
 	"github.com/lightsparkdev/spark-go/common"
 	pbdkg "github.com/lightsparkdev/spark-go/proto/dkg"
@@ -21,6 +22,7 @@ import (
 	pbtree "github.com/lightsparkdev/spark-go/proto/spark_tree"
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/authn"
+	"github.com/lightsparkdev/spark-go/so/authninternal"
 	"github.com/lightsparkdev/spark-go/so/dkg"
 	"github.com/lightsparkdev/spark-go/so/ent"
 	sparkgrpc "github.com/lightsparkdev/spark-go/so/grpc"
@@ -41,6 +43,7 @@ type args struct {
 	MockOnchain        bool
 	ChallengeTimeout   time.Duration
 	SessionDuration    time.Duration
+	AuthzEnforced      bool
 }
 
 func loadArgs() (*args, error) {
@@ -57,6 +60,7 @@ func loadArgs() (*args, error) {
 	flag.BoolVar(&args.MockOnchain, "mock-onchain", false, "Mock onchain tx")
 	flag.DurationVar(&args.ChallengeTimeout, "challenge-timeout", time.Duration(time.Minute), "Challenge timeout")
 	flag.DurationVar(&args.SessionDuration, "session-duration", time.Duration(time.Minute*15), "Session duration")
+	flag.BoolVar(&args.AuthzEnforced, "authz-enforced", true, "Enforce authorization checks")
 	// Parse flags
 	flag.Parse()
 
@@ -91,7 +95,15 @@ func main() {
 		log.Fatalf("Failed to load args: %v", err)
 	}
 
-	config, err := so.NewConfig(args.Index, args.IdentityPrivateKey, args.OperatorsFilePath, args.Threshold, args.SignerAddress, args.DatabasePath)
+	config, err := so.NewConfig(
+		args.Index,
+		args.IdentityPrivateKey,
+		args.OperatorsFilePath,
+		args.Threshold,
+		args.SignerAddress,
+		args.DatabasePath,
+		args.AuthzEnforced,
+	)
 	if err != nil {
 		log.Fatalf("Failed to create config: %v", err)
 	}
@@ -146,7 +158,15 @@ func main() {
 
 	dkgServer := dkg.NewServer(frostConnection, config)
 
-	grpcServer := grpc.NewServer(grpc.UnaryInterceptor(ent.DbSessionMiddleware(dbClient)))
+	sessionTokenCreatorVerifier, err := authninternal.NewSessionTokenCreatorVerifier(config.IdentityPrivateKey, nil)
+	if err != nil {
+		log.Fatalf("Failed to create token verifier: %v", err)
+	}
+
+	grpcServer := grpc.NewServer(grpc.UnaryInterceptor(grpc_middleware.ChainUnaryServer(
+		ent.DbSessionMiddleware(dbClient),
+		authn.NewAuthnInterceptor(sessionTokenCreatorVerifier).AuthnInterceptor,
+	)))
 	pbdkg.RegisterDKGServiceServer(grpcServer, dkgServer)
 
 	var onchainHelper helper.OnChainHelper = &helper.DemoOnChainHelper{}
@@ -164,10 +184,6 @@ func main() {
 	treeServer := sparkgrpc.NewSparkTreeServer(config)
 	pbtree.RegisterSparkTreeServiceServer(grpcServer, treeServer)
 
-	sessionTokenCreatorVerifier, err := authn.NewSessionTokenCreatorVerifier(config.IdentityPrivateKey, nil)
-	if err != nil {
-		log.Fatalf("Failed to create token verifier: %v", err)
-	}
 	authnServer, err := sparkgrpc.NewAuthnServer(sparkgrpc.AuthnServerConfig{
 		IdentityPrivateKey: config.IdentityPrivateKey,
 		ChallengeTimeout:   args.ChallengeTimeout,

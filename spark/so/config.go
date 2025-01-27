@@ -30,6 +30,8 @@ type Config struct {
 	DatabasePath string
 	// Network is the network of the signing operator.
 	Network common.Network
+	// AuthzEnforced determines if authorization checks are enforced
+	AuthzEnforced bool
 }
 
 // DatabaseDriver returns the database driver based on the database path.
@@ -41,7 +43,7 @@ func (c *Config) DatabaseDriver() string {
 }
 
 // NewConfig creates a new config for the signing operator.
-func NewConfig(index uint64, identityPrivateKey string, operatorsFilePath string, threshold uint64, signerAddress string, databasePath string) (*Config, error) {
+func NewConfig(index uint64, identityPrivateKey string, operatorsFilePath string, threshold uint64, signerAddress string, databasePath string, authzEnforced bool) (*Config, error) {
 	identityPrivateKeyBytes, err := hex.DecodeString(identityPrivateKey)
 	if err != nil {
 		return nil, err
@@ -61,6 +63,7 @@ func NewConfig(index uint64, identityPrivateKey string, operatorsFilePath string
 		SignerAddress:      signerAddress,
 		DatabasePath:       databasePath,
 		Network:            common.Regtest, // TODO: load this from args
+		AuthzEnforced:      authzEnforced,
 	}, nil
 }
 

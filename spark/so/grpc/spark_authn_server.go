@@ -13,7 +13,7 @@ import (
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 	pb "github.com/lightsparkdev/spark-go/proto/spark_authn"
-	"github.com/lightsparkdev/spark-go/so/authn"
+	"github.com/lightsparkdev/spark-go/so/authninternal"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -32,7 +32,7 @@ type AuthnServerConfig struct {
 	// Session duration
 	SessionDuration time.Duration
 	// Clock to use for time-based operations
-	Clock authn.Clock
+	Clock authninternal.Clock
 }
 
 // AuthnServer implements the SparkAuthnServiceServer interface
@@ -40,8 +40,8 @@ type AuthnServer struct {
 	pb.UnimplementedSparkAuthnServiceServer
 	config                      AuthnServerConfig
 	challengeHmacKey            []byte
-	sessionTokenCreatorVerifier *authn.SessionTokenCreatorVerifier
-	clock                       authn.Clock
+	sessionTokenCreatorVerifier *authninternal.SessionTokenCreatorVerifier
+	clock                       authninternal.Clock
 }
 
 var (
@@ -65,10 +65,10 @@ var (
 // If the clock is nil, it will use the real clock.
 func NewAuthnServer(
 	config AuthnServerConfig,
-	sessionTokenCreatorVerifier *authn.SessionTokenCreatorVerifier,
+	sessionTokenCreatorVerifier *authninternal.SessionTokenCreatorVerifier,
 ) (*AuthnServer, error) {
 	if config.Clock == nil {
-		config.Clock = authn.RealClock{}
+		config.Clock = authninternal.RealClock{}
 	}
 
 	if len(config.IdentityPrivateKey) == 0 {

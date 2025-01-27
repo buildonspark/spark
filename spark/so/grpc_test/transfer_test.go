@@ -18,6 +18,13 @@ func TestTransfer(t *testing.T) {
 		t.Fatalf("failed to create sender wallet config: %v", err)
 	}
 
+	token, err := wallet.AuthenticateWithServer(context.Background(), senderConfig)
+	if err != nil {
+		t.Fatalf("failed to authenticate sender: %v", err)
+	}
+
+	ctx := wallet.ContextWithToken(context.Background(), token)
+
 	leafPrivKey, err := secp256k1.GeneratePrivateKey()
 	if err != nil {
 		t.Fatalf("failed to create node signing private key: %v", err)
@@ -44,7 +51,7 @@ func TestTransfer(t *testing.T) {
 	}
 	leavesToTransfer := [1]wallet.LeafKeyTweak{transferNode}
 	senderTransfer, err := wallet.SendTransfer(
-		context.Background(),
+		ctx,
 		senderConfig,
 		leavesToTransfer[:],
 		receiverPrivKey.PubKey().SerializeCompressed(),
