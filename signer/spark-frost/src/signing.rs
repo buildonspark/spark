@@ -304,6 +304,9 @@ pub fn aggregate_frost(req: &AggregateFrostRequest) -> Result<AggregateFrostResp
     let mut commitments = frost_signing_commiement_map_from_proto(&req.commitments)
         .map_err(|e| format!("Failed to parse signing commitments: {:?}", e))?;
 
+    let mut signing_participants_groups = Vec::new();
+    signing_participants_groups.push(commitments.keys().cloned().collect());
+
     let user_identifier =
         Identifier::derive("user".as_bytes()).expect("Failed to derive user identifier");
 
@@ -319,8 +322,14 @@ pub fn aggregate_frost(req: &AggregateFrostRequest) -> Result<AggregateFrostResp
     let verifying_key = verifying_key_from_bytes(req.verifying_key.clone())
         .map_err(|e| format!("Failed to parse verifying key: {:?}", e))?;
 
-    let signing_package =
-        frost_build_signin_package(commitments, &req.message, None, &req.adaptor_public_key);
+    signing_participants_groups.push(BTreeSet::from([user_identifier]));
+
+    let signing_package = frost_build_signin_package(
+        commitments,
+        &req.message,
+        Some(signing_participants_groups),
+        &req.adaptor_public_key,
+    );
 
     let signature_shares = frost_signature_shares_from_proto(
         &req.signature_shares,

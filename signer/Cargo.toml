@@ -11,8 +11,8 @@ prost = "0.13.3"
 tonic = "0.12.3"
 tokio = { version = "1.41.0", features = ["macros", "rt-multi-thread"] }
 tokio-stream = "0.1.16"
-frost-secp256k1-tr = { git = "https://github.com/lightsparkdev/frost", branch = "nested-signing", default-features = false, features = ["serialization", "std"] }
-frost-core = { git = "https://github.com/lightsparkdev/frost", branch = "nested-signing", default-features = false, features = ["serialization", "std"] }
+frost-secp256k1-tr = { git = "https://github.com/lightsparkdev/frost", branch = "nested-signing" }
+frost-core = { git = "https://github.com/lightsparkdev/frost", branch = "nested-signing" }
 rand = "0.8.5"
 serde = "1.0.214"
 hex = "0.4.3"
