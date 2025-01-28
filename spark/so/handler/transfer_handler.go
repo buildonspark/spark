@@ -55,7 +55,7 @@ func (h *TransferHandler) StartSendTransfer(ctx context.Context, req *pb.StartSe
 	for _, leaf := range req.LeavesToSend {
 		leafRefundMap[leaf.LeafId] = leaf.RefundTxSigningJob.RawTx
 	}
-	transfer, leafMap, err := h.createTransfer(ctx, req.TransferId, req.ExpiryTime.AsTime(), req.OwnerIdentityPublicKey, req.ReceiverIdentityPublicKey, leafRefundMap)
+	transfer, leafMap, err := h.createTransfer(ctx, req.TransferId, req.ExpiryTime.AsTime(), req.OwnerIdentityPublicKey, req.ReceiverIdentityPublicKey, leafRefundMap, false)
 	if err != nil {
 		return nil, err
 	}
@@ -116,7 +116,7 @@ func (h *TransferHandler) sendTransferSignRefunds(ctx context.Context, requests 
 
 func signRefunds(ctx context.Context, config *so.Config, requests []*pb.LeafRefundTxSigningJob, leafMap map[string]*ent.TreeNode) ([]*pb.LeafRefundTxSigningResult, error) {
 	signingJobs := make([]*helper.SigningJob, 0)
-	jobToLeafMap := make(map[string]*ent.TreeNode)
+	leafJobMap := make(map[string]*ent.TreeNode)
 	for _, req := range requests {
 		leaf := leafMap[req.LeafId]
 		refundTx, err := common.TxFromRawTxBytes(req.RefundTxSigningJob.RawTx)
@@ -148,7 +148,7 @@ func signRefunds(ctx context.Context, config *so.Config, requests []*pb.LeafRefu
 				UserCommitment:    userNonceCommitment,
 			},
 		)
-		jobToLeafMap[jobID] = leaf
+		leafJobMap[jobID] = leaf
 	}
 
 	signingResults, err := helper.SignFrost(ctx, config, signingJobs)
@@ -157,7 +157,7 @@ func signRefunds(ctx context.Context, config *so.Config, requests []*pb.LeafRefu
 	}
 	pbSigningResults := make([]*pb.LeafRefundTxSigningResult, 0)
 	for _, signingResult := range signingResults {
-		leaf := jobToLeafMap[signingResult.JobID]
+		leaf := leafJobMap[signingResult.JobID]
 		signingResultProto, err := signingResult.MarshalProto()
 		if err != nil {
 			return nil, err

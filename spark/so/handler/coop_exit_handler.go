@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 
@@ -9,7 +8,6 @@ import (
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/ent"
-	"github.com/lightsparkdev/spark-go/so/ent/schema"
 )
 
 // CooperativeExitHandler tracks transfers
@@ -26,40 +24,36 @@ func NewCooperativeExitHandler(config *so.Config) *CooperativeExitHandler {
 	}
 }
 
-func leafAvailableToExit(leaf *ent.TreeNode, leafUUID uuid.UUID, ownerIdentityPubkey []byte) error {
-	if leaf.Status != schema.TreeNodeStatusAvailable {
-		return fmt.Errorf("leaf %s is not available to transfer, status is %s", leafUUID, leaf.Status)
-	}
-	if !bytes.Equal(leaf.OwnerIdentityPubkey, ownerIdentityPubkey) {
-		return fmt.Errorf("leaf %s is not owned by the owner", leafUUID)
-	}
-	return nil
-}
-
 // CooperativeExit signs refund transactions for leaves, spending connector outputs.
 // It will lock the transferred leaves based on seeing a txid confirming on-chain.
 func (h *CooperativeExitHandler) CooperativeExit(ctx context.Context, req *pb.CooperativeExitRequest) (*pb.CooperativeExitResponse, error) {
-	// TODO(alec): combine this with StartSendTransfer handler since it's so similar
-	jobToLeafMap := make(map[string]*ent.TreeNode)
-	for _, job := range req.SigningJobs {
-		leafUUID, err := uuid.Parse(job.LeafId)
-		if err != nil {
-			return nil, fmt.Errorf("unable to parse leaf_id %s: %v", job.LeafId, err)
-		}
-
-		db := ent.GetDbFromContext(ctx)
-		leaf, err := db.TreeNode.Get(ctx, leafUUID)
-		if err != nil || leaf == nil {
-			return nil, fmt.Errorf("unable to find leaf %s: %v", leafUUID, err)
-		}
-		err = leafAvailableToExit(leaf, leafUUID, req.OwnerIdentityPublicKey)
-		if err != nil {
-			return nil, err
-		}
-		jobToLeafMap[job.LeafId] = leaf
+	transferHandler := BaseTransferHandler{config: h.config}
+	leafRefundMap := make(map[string][]byte)
+	for _, job := range req.Transfer.LeavesToSend {
+		leafRefundMap[job.LeafId] = job.RefundTxSigningJob.RawTx
 	}
 
-	signingResults, err := signRefunds(ctx, h.config, req.SigningJobs, jobToLeafMap)
+	transfer, leafMap, err := transferHandler.createTransfer(ctx, req.Transfer.TransferId, req.Transfer.ExpiryTime.AsTime(), req.Transfer.OwnerIdentityPublicKey, req.Transfer.ReceiverIdentityPublicKey, leafRefundMap, true)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create transfer: %v", err)
+	}
+
+	exitUUID, err := uuid.Parse(req.ExitId)
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse exit_id %s: %v", req.ExitId, err)
+	}
+
+	db := ent.GetDbFromContext(ctx)
+	_, err = db.CooperativeExit.Create().
+		SetID(exitUUID).
+		SetTransfer(transfer).
+		SetExitTxid(req.ExitTxid).
+		Save(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create cooperative exit: %v", err)
+	}
+
+	signingResults, err := signRefunds(ctx, h.config, req.Transfer.LeavesToSend, leafMap)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign refund transactions: %v", err)
 	}

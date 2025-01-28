@@ -16,6 +16,7 @@ import (
 	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
+	"github.com/lightsparkdev/spark-go/so/ent/cooperativeexit"
 	"github.com/lightsparkdev/spark-go/so/ent/depositaddress"
 	"github.com/lightsparkdev/spark-go/so/ent/preimagerequest"
 	"github.com/lightsparkdev/spark-go/so/ent/preimageshare"
@@ -33,6 +34,8 @@ type Client struct {
 	config
 	// Schema is the client for creating, migrating and dropping schema.
 	Schema *migrate.Schema
+	// CooperativeExit is the client for interacting with the CooperativeExit builders.
+	CooperativeExit *CooperativeExitClient
 	// DepositAddress is the client for interacting with the DepositAddress builders.
 	DepositAddress *DepositAddressClient
 	// PreimageRequest is the client for interacting with the PreimageRequest builders.
@@ -64,6 +67,7 @@ func NewClient(opts ...Option) *Client {
 
 func (c *Client) init() {
 	c.Schema = migrate.NewSchema(c.driver)
+	c.CooperativeExit = NewCooperativeExitClient(c.config)
 	c.DepositAddress = NewDepositAddressClient(c.config)
 	c.PreimageRequest = NewPreimageRequestClient(c.config)
 	c.PreimageShare = NewPreimageShareClient(c.config)
@@ -166,6 +170,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 	return &Tx{
 		ctx:                   ctx,
 		config:                cfg,
+		CooperativeExit:       NewCooperativeExitClient(cfg),
 		DepositAddress:        NewDepositAddressClient(cfg),
 		PreimageRequest:       NewPreimageRequestClient(cfg),
 		PreimageShare:         NewPreimageShareClient(cfg),
@@ -195,6 +200,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 	return &Tx{
 		ctx:                   ctx,
 		config:                cfg,
+		CooperativeExit:       NewCooperativeExitClient(cfg),
 		DepositAddress:        NewDepositAddressClient(cfg),
 		PreimageRequest:       NewPreimageRequestClient(cfg),
 		PreimageShare:         NewPreimageShareClient(cfg),
@@ -211,7 +217,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 // Debug returns a new debug-client. It's used to get verbose logging on specific operations.
 //
 //	client.Debug().
-//		DepositAddress.
+//		CooperativeExit.
 //		Query().
 //		Count(ctx)
 func (c *Client) Debug() *Client {
@@ -234,9 +240,9 @@ func (c *Client) Close() error {
 // In order to add hooks to a specific client, call: `client.Node.Use(...)`.
 func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
-		c.DepositAddress, c.PreimageRequest, c.PreimageShare, c.SigningKeyshare,
-		c.SigningNonce, c.Transfer, c.TransferLeaf, c.Tree, c.TreeNode,
-		c.UserSignedTransaction,
+		c.CooperativeExit, c.DepositAddress, c.PreimageRequest, c.PreimageShare,
+		c.SigningKeyshare, c.SigningNonce, c.Transfer, c.TransferLeaf, c.Tree,
+		c.TreeNode, c.UserSignedTransaction,
 	} {
 		n.Use(hooks...)
 	}
@@ -246,9 +252,9 @@ func (c *Client) Use(hooks ...Hook) {
 // In order to add interceptors to a specific client, call: `client.Node.Intercept(...)`.
 func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
-		c.DepositAddress, c.PreimageRequest, c.PreimageShare, c.SigningKeyshare,
-		c.SigningNonce, c.Transfer, c.TransferLeaf, c.Tree, c.TreeNode,
-		c.UserSignedTransaction,
+		c.CooperativeExit, c.DepositAddress, c.PreimageRequest, c.PreimageShare,
+		c.SigningKeyshare, c.SigningNonce, c.Transfer, c.TransferLeaf, c.Tree,
+		c.TreeNode, c.UserSignedTransaction,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -257,6 +263,8 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 // Mutate implements the ent.Mutator interface.
 func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 	switch m := m.(type) {
+	case *CooperativeExitMutation:
+		return c.CooperativeExit.mutate(ctx, m)
 	case *DepositAddressMutation:
 		return c.DepositAddress.mutate(ctx, m)
 	case *PreimageRequestMutation:
@@ -279,6 +287,155 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.UserSignedTransaction.mutate(ctx, m)
 	default:
 		return nil, fmt.Errorf("ent: unknown mutation type %T", m)
+	}
+}
+
+// CooperativeExitClient is a client for the CooperativeExit schema.
+type CooperativeExitClient struct {
+	config
+}
+
+// NewCooperativeExitClient returns a client for the CooperativeExit from the given config.
+func NewCooperativeExitClient(c config) *CooperativeExitClient {
+	return &CooperativeExitClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `cooperativeexit.Hooks(f(g(h())))`.
+func (c *CooperativeExitClient) Use(hooks ...Hook) {
+	c.hooks.CooperativeExit = append(c.hooks.CooperativeExit, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `cooperativeexit.Intercept(f(g(h())))`.
+func (c *CooperativeExitClient) Intercept(interceptors ...Interceptor) {
+	c.inters.CooperativeExit = append(c.inters.CooperativeExit, interceptors...)
+}
+
+// Create returns a builder for creating a CooperativeExit entity.
+func (c *CooperativeExitClient) Create() *CooperativeExitCreate {
+	mutation := newCooperativeExitMutation(c.config, OpCreate)
+	return &CooperativeExitCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of CooperativeExit entities.
+func (c *CooperativeExitClient) CreateBulk(builders ...*CooperativeExitCreate) *CooperativeExitCreateBulk {
+	return &CooperativeExitCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *CooperativeExitClient) MapCreateBulk(slice any, setFunc func(*CooperativeExitCreate, int)) *CooperativeExitCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &CooperativeExitCreateBulk{err: fmt.Errorf("calling to CooperativeExitClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*CooperativeExitCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &CooperativeExitCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for CooperativeExit.
+func (c *CooperativeExitClient) Update() *CooperativeExitUpdate {
+	mutation := newCooperativeExitMutation(c.config, OpUpdate)
+	return &CooperativeExitUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *CooperativeExitClient) UpdateOne(ce *CooperativeExit) *CooperativeExitUpdateOne {
+	mutation := newCooperativeExitMutation(c.config, OpUpdateOne, withCooperativeExit(ce))
+	return &CooperativeExitUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *CooperativeExitClient) UpdateOneID(id uuid.UUID) *CooperativeExitUpdateOne {
+	mutation := newCooperativeExitMutation(c.config, OpUpdateOne, withCooperativeExitID(id))
+	return &CooperativeExitUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for CooperativeExit.
+func (c *CooperativeExitClient) Delete() *CooperativeExitDelete {
+	mutation := newCooperativeExitMutation(c.config, OpDelete)
+	return &CooperativeExitDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *CooperativeExitClient) DeleteOne(ce *CooperativeExit) *CooperativeExitDeleteOne {
+	return c.DeleteOneID(ce.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *CooperativeExitClient) DeleteOneID(id uuid.UUID) *CooperativeExitDeleteOne {
+	builder := c.Delete().Where(cooperativeexit.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &CooperativeExitDeleteOne{builder}
+}
+
+// Query returns a query builder for CooperativeExit.
+func (c *CooperativeExitClient) Query() *CooperativeExitQuery {
+	return &CooperativeExitQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeCooperativeExit},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a CooperativeExit entity by its id.
+func (c *CooperativeExitClient) Get(ctx context.Context, id uuid.UUID) (*CooperativeExit, error) {
+	return c.Query().Where(cooperativeexit.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *CooperativeExitClient) GetX(ctx context.Context, id uuid.UUID) *CooperativeExit {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryTransfer queries the transfer edge of a CooperativeExit.
+func (c *CooperativeExitClient) QueryTransfer(ce *CooperativeExit) *TransferQuery {
+	query := (&TransferClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := ce.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(cooperativeexit.Table, cooperativeexit.FieldID, id),
+			sqlgraph.To(transfer.Table, transfer.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, cooperativeexit.TransferTable, cooperativeexit.TransferColumn),
+		)
+		fromV = sqlgraph.Neighbors(ce.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *CooperativeExitClient) Hooks() []Hook {
+	return c.hooks.CooperativeExit
+}
+
+// Interceptors returns the client interceptors.
+func (c *CooperativeExitClient) Interceptors() []Interceptor {
+	return c.inters.CooperativeExit
+}
+
+func (c *CooperativeExitClient) mutate(ctx context.Context, m *CooperativeExitMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&CooperativeExitCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&CooperativeExitUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&CooperativeExitUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&CooperativeExitDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown CooperativeExit mutation op: %q", m.Op())
 	}
 }
 
@@ -1855,11 +2012,13 @@ func (c *UserSignedTransactionClient) mutate(ctx context.Context, m *UserSignedT
 // hooks and interceptors per client, for fast access.
 type (
 	hooks struct {
-		DepositAddress, PreimageRequest, PreimageShare, SigningKeyshare, SigningNonce,
-		Transfer, TransferLeaf, Tree, TreeNode, UserSignedTransaction []ent.Hook
+		CooperativeExit, DepositAddress, PreimageRequest, PreimageShare,
+		SigningKeyshare, SigningNonce, Transfer, TransferLeaf, Tree, TreeNode,
+		UserSignedTransaction []ent.Hook
 	}
 	inters struct {
-		DepositAddress, PreimageRequest, PreimageShare, SigningKeyshare, SigningNonce,
-		Transfer, TransferLeaf, Tree, TreeNode, UserSignedTransaction []ent.Interceptor
+		CooperativeExit, DepositAddress, PreimageRequest, PreimageShare,
+		SigningKeyshare, SigningNonce, Transfer, TransferLeaf, Tree, TreeNode,
+		UserSignedTransaction []ent.Interceptor
 	}
 )

@@ -9,6 +9,18 @@ import (
 	"github.com/lightsparkdev/spark-go/so/ent"
 )
 
+// The CooperativeExitFunc type is an adapter to allow the use of ordinary
+// function as CooperativeExit mutator.
+type CooperativeExitFunc func(context.Context, *ent.CooperativeExitMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f CooperativeExitFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.CooperativeExitMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.CooperativeExitMutation", m)
+}
+
 // The DepositAddressFunc type is an adapter to allow the use of ordinary
 // function as DepositAddress mutator.
 type DepositAddressFunc func(context.Context, *ent.DepositAddressMutation) (ent.Value, error)

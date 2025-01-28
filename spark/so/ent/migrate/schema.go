@@ -8,6 +8,35 @@ import (
 )
 
 var (
+	// CooperativeExitsColumns holds the columns for the "cooperative_exits" table.
+	CooperativeExitsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUUID},
+		{Name: "create_time", Type: field.TypeTime},
+		{Name: "update_time", Type: field.TypeTime},
+		{Name: "exit_txid", Type: field.TypeBytes, Nullable: true},
+		{Name: "cooperative_exit_transfer", Type: field.TypeUUID},
+	}
+	// CooperativeExitsTable holds the schema information for the "cooperative_exits" table.
+	CooperativeExitsTable = &schema.Table{
+		Name:       "cooperative_exits",
+		Columns:    CooperativeExitsColumns,
+		PrimaryKey: []*schema.Column{CooperativeExitsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "cooperative_exits_transfers_transfer",
+				Columns:    []*schema.Column{CooperativeExitsColumns[4]},
+				RefColumns: []*schema.Column{TransfersColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "cooperativeexit_cooperative_exit_transfer",
+				Unique:  false,
+				Columns: []*schema.Column{CooperativeExitsColumns[4]},
+			},
+		},
+	}
 	// DepositAddressesColumns holds the columns for the "deposit_addresses" table.
 	DepositAddressesColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeUUID},
@@ -326,6 +355,7 @@ var (
 	}
 	// Tables holds all the tables in the schema.
 	Tables = []*schema.Table{
+		CooperativeExitsTable,
 		DepositAddressesTable,
 		PreimageRequestsTable,
 		PreimageSharesTable,
@@ -340,6 +370,7 @@ var (
 )
 
 func init() {
+	CooperativeExitsTable.ForeignKeys[0].RefTable = TransfersTable
 	DepositAddressesTable.ForeignKeys[0].RefTable = SigningKeysharesTable
 	PreimageSharesTable.ForeignKeys[0].RefTable = PreimageRequestsTable
 	TransferLeafsTable.ForeignKeys[0].RefTable = TransfersTable

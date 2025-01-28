@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark-go/so/ent/cooperativeexit"
 	"github.com/lightsparkdev/spark-go/so/ent/depositaddress"
 	"github.com/lightsparkdev/spark-go/so/ent/preimagerequest"
 	"github.com/lightsparkdev/spark-go/so/ent/preimageshare"
@@ -23,6 +24,25 @@ import (
 // (default values, validators, hooks and policies) and stitches it
 // to their package variables.
 func init() {
+	cooperativeexitMixin := schema.CooperativeExit{}.Mixin()
+	cooperativeexitMixinFields0 := cooperativeexitMixin[0].Fields()
+	_ = cooperativeexitMixinFields0
+	cooperativeexitFields := schema.CooperativeExit{}.Fields()
+	_ = cooperativeexitFields
+	// cooperativeexitDescCreateTime is the schema descriptor for create_time field.
+	cooperativeexitDescCreateTime := cooperativeexitMixinFields0[1].Descriptor()
+	// cooperativeexit.DefaultCreateTime holds the default value on creation for the create_time field.
+	cooperativeexit.DefaultCreateTime = cooperativeexitDescCreateTime.Default.(func() time.Time)
+	// cooperativeexitDescUpdateTime is the schema descriptor for update_time field.
+	cooperativeexitDescUpdateTime := cooperativeexitMixinFields0[2].Descriptor()
+	// cooperativeexit.DefaultUpdateTime holds the default value on creation for the update_time field.
+	cooperativeexit.DefaultUpdateTime = cooperativeexitDescUpdateTime.Default.(func() time.Time)
+	// cooperativeexit.UpdateDefaultUpdateTime holds the default value on update for the update_time field.
+	cooperativeexit.UpdateDefaultUpdateTime = cooperativeexitDescUpdateTime.UpdateDefault.(func() time.Time)
+	// cooperativeexitDescID is the schema descriptor for id field.
+	cooperativeexitDescID := cooperativeexitMixinFields0[0].Descriptor()
+	// cooperativeexit.DefaultID holds the default value on creation for the id field.
+	cooperativeexit.DefaultID = cooperativeexitDescID.Default.(func() uuid.UUID)
 	depositaddressMixin := schema.DepositAddress{}.Mixin()
 	depositaddressMixinFields0 := depositaddressMixin[0].Fields()
 	_ = depositaddressMixinFields0

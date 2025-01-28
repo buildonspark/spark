@@ -81,7 +81,7 @@ func validateSendLeafRefundTx(leaf *ent.TreeNode, rawTx []byte, receiverIdentity
 	return nil
 }
 
-func (h *BaseTransferHandler) createTransfer(ctx context.Context, transferID string, expiryTime time.Time, senderIdentityPublicKey []byte, receiverIdentityPublicKey []byte, leafRefundMap map[string][]byte) (*ent.Transfer, map[string]*ent.TreeNode, error) {
+func (h *BaseTransferHandler) createTransfer(ctx context.Context, transferID string, expiryTime time.Time, senderIdentityPublicKey []byte, receiverIdentityPublicKey []byte, leafRefundMap map[string][]byte, forCoopExit bool) (*ent.Transfer, map[string]*ent.TreeNode, error) {
 	transferUUID, err := uuid.Parse(transferID)
 	if err != nil {
 		return nil, nil, fmt.Errorf("unable to parse transfer_id as a uuid %s: %v", transferID, err)
@@ -109,7 +109,11 @@ func (h *BaseTransferHandler) createTransfer(ctx context.Context, transferID str
 		return nil, nil, fmt.Errorf("unable to load leaves: %v", err)
 	}
 
-	err = validateTransferLeaves(transfer, leaves, leafRefundMap, receiverIdentityPublicKey)
+	if forCoopExit {
+		err = validateCooperativeExitLeaves(transfer, leaves, leafRefundMap, receiverIdentityPublicKey)
+	} else {
+		err = validateTransferLeaves(transfer, leaves, leafRefundMap, receiverIdentityPublicKey)
+	}
 	if err != nil {
 		return nil, nil, fmt.Errorf("unable to validate transfer leaves: %v", err)
 	}
@@ -147,6 +151,21 @@ func loadLeaves(ctx context.Context, db *ent.Tx, leafRefundMap map[string][]byte
 		leaves = append(leaves, leaf)
 	}
 	return leaves, nil
+}
+
+func validateCooperativeExitLeaves(transfer *ent.Transfer, leaves []*ent.TreeNode, leafRefundMap map[string][]byte, receiverIdentityPublicKey []byte) error {
+	for _, leaf := range leaves {
+		rawRefundTx := leafRefundMap[leaf.ID.String()]
+		err := validateSendLeafRefundTx(leaf, rawRefundTx, receiverIdentityPublicKey, 2)
+		if err != nil {
+			return fmt.Errorf("unable to validate refund tx for leaf %s: %v", leaf.ID, err)
+		}
+		err = leafAvailableToTransfer(leaf, transfer.SenderIdentityPubkey, transfer.ReceiverIdentityPubkey)
+		if err != nil {
+			return fmt.Errorf("unable to validate leaf %s: %v", leaf.ID, err)
+		}
+	}
+	return nil
 }
 
 func validateTransferLeaves(transfer *ent.Transfer, leaves []*ent.TreeNode, leafRefundMap map[string][]byte, receiverIdentityPublicKey []byte) error {

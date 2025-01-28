@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/btcsuite/btcd/wire"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/google/uuid"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/lightsparkdev/spark-go/common"
 	"github.com/lightsparkdev/spark-go/proto/spark"
@@ -38,10 +40,6 @@ func GetConnectorRefundSignatures(
 	connectorOutputs []*wire.OutPoint,
 	receiverPubKey *secp256k1.PublicKey,
 ) ([]*pb.NodeSignatures, error) {
-	exitID, err := uuid.NewRandom()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create exit id: %v", err)
-	}
 	if len(leaves) != len(connectorOutputs) {
 		return nil, fmt.Errorf("number of leaves and connector outputs must match")
 	}
@@ -82,10 +80,15 @@ func GetConnectorRefundSignatures(
 	defer sparkConn.Close()
 	sparkClient := pb.NewSparkServiceClient(sparkConn)
 	response, err := sparkClient.CooperativeExit(ctx, &pb.CooperativeExitRequest{
-		ExitId:                 exitID.String(),
-		OwnerIdentityPublicKey: config.IdentityPublicKey(),
-		SigningJobs:            signingJobs,
-		ExitTxid:               exitTxid,
+		Transfer: &pb.StartSendTransferRequest{
+			TransferId:                uuid.New().String(),
+			OwnerIdentityPublicKey:    config.IdentityPublicKey(),
+			LeavesToSend:              signingJobs,
+			ReceiverIdentityPublicKey: receiverPubKey.SerializeCompressed(),
+			ExpiryTime:                timestamppb.New(time.Now().Add(24 * time.Hour)),
+		},
+		ExitId:   uuid.New().String(),
+		ExitTxid: exitTxid,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to initiate cooperative exit: %v", err)
@@ -103,7 +106,7 @@ func createConnectorRefundTransaction(
 	refundTx := wire.NewMsgTx(2)
 	refundTx.AddTxIn(&wire.TxIn{
 		PreviousOutPoint: *nodeOutPoint,
-		SignatureScript:  nil, // TODO? SO should know what to put here
+		SignatureScript:  nil,
 		Witness:          nil,
 		Sequence:         sequence,
 	})

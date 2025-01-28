@@ -6,6 +6,9 @@ import (
 	"entgo.io/ent/dialect/sql"
 )
 
+// CooperativeExit is the predicate function for cooperativeexit builders.
+type CooperativeExit func(*sql.Selector)
+
 // DepositAddress is the predicate function for depositaddress builders.
 type DepositAddress func(*sql.Selector)
 
