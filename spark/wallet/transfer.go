@@ -199,7 +199,6 @@ func prepareSingleSendTransferKeyTweak(config *Config, transferID string, leaf L
 	privKeyTweak, err := common.SubtractPrivateKeys(leaf.SigningPrivKey, leaf.NewSigningPrivKey)
 	if err != nil {
 		return nil, fmt.Errorf("fail to calculate private key tweak: %v", err)
-
 	}
 
 	// Calculate secret tweak shares
@@ -237,7 +236,6 @@ func prepareSingleSendTransferKeyTweak(config *Config, transferID string, leaf L
 	signature := ecdsa.Sign(&config.IdentityPrivateKey, payloadHash[:])
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign payload: %v", err)
-
 	}
 
 	leafTweaksMap := make(map[string]*pb.SendLeafKeyTweak)
@@ -406,7 +404,6 @@ func prepareClaimLeafKeyTweaks(config *Config, leaf LeafKeyTweak) (*map[string]*
 	privKeyTweak, err := common.SubtractPrivateKeys(leaf.SigningPrivKey, leaf.NewSigningPrivKey)
 	if err != nil {
 		return nil, fmt.Errorf("fail to calculate private key tweak: %v", err)
-
 	}
 
 	// Calculate secret tweak shares

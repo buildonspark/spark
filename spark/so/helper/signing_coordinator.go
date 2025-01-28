@@ -149,7 +149,6 @@ func frostRound2(
 
 		return results, nil
 	})
-
 	if err != nil {
 		return nil, err
 	}

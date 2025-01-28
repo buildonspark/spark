@@ -280,9 +280,10 @@ message AggregateNodesResponse {
 message StorePreimageShareRequest {
     bytes payment_hash = 1;
     SecretShare preimage_share = 2;
-    bytes threshold = 3;
+    uint32 threshold = 3;
+    string invoice_string = 4;
     // TODO: This should be removed once we have a proper auth process.
-    bytes user_identity_public_key = 4;
+    bytes user_identity_public_key = 5;
 }
 
 message RequestedSigningCommitments {

@@ -77,13 +77,18 @@ func PreimageShare(v []byte) predicate.PreimageShare {
 }
 
 // Threshold applies equality check predicate on the "threshold" field. It's identical to ThresholdEQ.
-func Threshold(v []byte) predicate.PreimageShare {
+func Threshold(v uint32) predicate.PreimageShare {
 	return predicate.PreimageShare(sql.FieldEQ(FieldThreshold, v))
 }
 
 // OwnerIdentityPubkey applies equality check predicate on the "owner_identity_pubkey" field. It's identical to OwnerIdentityPubkeyEQ.
 func OwnerIdentityPubkey(v []byte) predicate.PreimageShare {
 	return predicate.PreimageShare(sql.FieldEQ(FieldOwnerIdentityPubkey, v))
+}
+
+// InvoiceString applies equality check predicate on the "invoice_string" field. It's identical to InvoiceStringEQ.
+func InvoiceString(v string) predicate.PreimageShare {
+	return predicate.PreimageShare(sql.FieldEQ(FieldInvoiceString, v))
 }
 
 // CreateTimeEQ applies the EQ predicate on the "create_time" field.
@@ -247,42 +252,42 @@ func PreimageShareLTE(v []byte) predicate.PreimageShare {
 }
 
 // ThresholdEQ applies the EQ predicate on the "threshold" field.
-func ThresholdEQ(v []byte) predicate.PreimageShare {
+func ThresholdEQ(v uint32) predicate.PreimageShare {
 	return predicate.PreimageShare(sql.FieldEQ(FieldThreshold, v))
 }
 
 // ThresholdNEQ applies the NEQ predicate on the "threshold" field.
-func ThresholdNEQ(v []byte) predicate.PreimageShare {
+func ThresholdNEQ(v uint32) predicate.PreimageShare {
 	return predicate.PreimageShare(sql.FieldNEQ(FieldThreshold, v))
 }
 
 // ThresholdIn applies the In predicate on the "threshold" field.
-func ThresholdIn(vs ...[]byte) predicate.PreimageShare {
+func ThresholdIn(vs ...uint32) predicate.PreimageShare {
 	return predicate.PreimageShare(sql.FieldIn(FieldThreshold, vs...))
 }
 
 // ThresholdNotIn applies the NotIn predicate on the "threshold" field.
-func ThresholdNotIn(vs ...[]byte) predicate.PreimageShare {
+func ThresholdNotIn(vs ...uint32) predicate.PreimageShare {
 	return predicate.PreimageShare(sql.FieldNotIn(FieldThreshold, vs...))
 }
 
 // ThresholdGT applies the GT predicate on the "threshold" field.
-func ThresholdGT(v []byte) predicate.PreimageShare {
+func ThresholdGT(v uint32) predicate.PreimageShare {
 	return predicate.PreimageShare(sql.FieldGT(FieldThreshold, v))
 }
 
 // ThresholdGTE applies the GTE predicate on the "threshold" field.
-func ThresholdGTE(v []byte) predicate.PreimageShare {
+func ThresholdGTE(v uint32) predicate.PreimageShare {
 	return predicate.PreimageShare(sql.FieldGTE(FieldThreshold, v))
 }
 
 // ThresholdLT applies the LT predicate on the "threshold" field.
-func ThresholdLT(v []byte) predicate.PreimageShare {
+func ThresholdLT(v uint32) predicate.PreimageShare {
 	return predicate.PreimageShare(sql.FieldLT(FieldThreshold, v))
 }
 
 // ThresholdLTE applies the LTE predicate on the "threshold" field.
-func ThresholdLTE(v []byte) predicate.PreimageShare {
+func ThresholdLTE(v uint32) predicate.PreimageShare {
 	return predicate.PreimageShare(sql.FieldLTE(FieldThreshold, v))
 }
 
@@ -324,6 +329,71 @@ func OwnerIdentityPubkeyLT(v []byte) predicate.PreimageShare {
 // OwnerIdentityPubkeyLTE applies the LTE predicate on the "owner_identity_pubkey" field.
 func OwnerIdentityPubkeyLTE(v []byte) predicate.PreimageShare {
 	return predicate.PreimageShare(sql.FieldLTE(FieldOwnerIdentityPubkey, v))
+}
+
+// InvoiceStringEQ applies the EQ predicate on the "invoice_string" field.
+func InvoiceStringEQ(v string) predicate.PreimageShare {
+	return predicate.PreimageShare(sql.FieldEQ(FieldInvoiceString, v))
+}
+
+// InvoiceStringNEQ applies the NEQ predicate on the "invoice_string" field.
+func InvoiceStringNEQ(v string) predicate.PreimageShare {
+	return predicate.PreimageShare(sql.FieldNEQ(FieldInvoiceString, v))
+}
+
+// InvoiceStringIn applies the In predicate on the "invoice_string" field.
+func InvoiceStringIn(vs ...string) predicate.PreimageShare {
+	return predicate.PreimageShare(sql.FieldIn(FieldInvoiceString, vs...))
+}
+
+// InvoiceStringNotIn applies the NotIn predicate on the "invoice_string" field.
+func InvoiceStringNotIn(vs ...string) predicate.PreimageShare {
+	return predicate.PreimageShare(sql.FieldNotIn(FieldInvoiceString, vs...))
+}
+
+// InvoiceStringGT applies the GT predicate on the "invoice_string" field.
+func InvoiceStringGT(v string) predicate.PreimageShare {
+	return predicate.PreimageShare(sql.FieldGT(FieldInvoiceString, v))
+}
+
+// InvoiceStringGTE applies the GTE predicate on the "invoice_string" field.
+func InvoiceStringGTE(v string) predicate.PreimageShare {
+	return predicate.PreimageShare(sql.FieldGTE(FieldInvoiceString, v))
+}
+
+// InvoiceStringLT applies the LT predicate on the "invoice_string" field.
+func InvoiceStringLT(v string) predicate.PreimageShare {
+	return predicate.PreimageShare(sql.FieldLT(FieldInvoiceString, v))
+}
+
+// InvoiceStringLTE applies the LTE predicate on the "invoice_string" field.
+func InvoiceStringLTE(v string) predicate.PreimageShare {
+	return predicate.PreimageShare(sql.FieldLTE(FieldInvoiceString, v))
+}
+
+// InvoiceStringContains applies the Contains predicate on the "invoice_string" field.
+func InvoiceStringContains(v string) predicate.PreimageShare {
+	return predicate.PreimageShare(sql.FieldContains(FieldInvoiceString, v))
+}
+
+// InvoiceStringHasPrefix applies the HasPrefix predicate on the "invoice_string" field.
+func InvoiceStringHasPrefix(v string) predicate.PreimageShare {
+	return predicate.PreimageShare(sql.FieldHasPrefix(FieldInvoiceString, v))
+}
+
+// InvoiceStringHasSuffix applies the HasSuffix predicate on the "invoice_string" field.
+func InvoiceStringHasSuffix(v string) predicate.PreimageShare {
+	return predicate.PreimageShare(sql.FieldHasSuffix(FieldInvoiceString, v))
+}
+
+// InvoiceStringEqualFold applies the EqualFold predicate on the "invoice_string" field.
+func InvoiceStringEqualFold(v string) predicate.PreimageShare {
+	return predicate.PreimageShare(sql.FieldEqualFold(FieldInvoiceString, v))
+}
+
+// InvoiceStringContainsFold applies the ContainsFold predicate on the "invoice_string" field.
+func InvoiceStringContainsFold(v string) predicate.PreimageShare {
+	return predicate.PreimageShare(sql.FieldContainsFold(FieldInvoiceString, v))
 }
 
 // HasPreimageRequest applies the HasEdge predicate on the "preimage_request" edge.

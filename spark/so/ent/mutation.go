@@ -1210,8 +1210,10 @@ type PreimageShareMutation struct {
 	update_time             *time.Time
 	payment_hash            *[]byte
 	preimage_share          *[]byte
-	threshold               *[]byte
+	threshold               *uint32
+	addthreshold            *int32
 	owner_identity_pubkey   *[]byte
+	invoice_string          *string
 	clearedFields           map[string]struct{}
 	preimage_request        *uuid.UUID
 	clearedpreimage_request bool
@@ -1469,12 +1471,13 @@ func (m *PreimageShareMutation) ResetPreimageShare() {
 }
 
 // SetThreshold sets the "threshold" field.
-func (m *PreimageShareMutation) SetThreshold(b []byte) {
-	m.threshold = &b
+func (m *PreimageShareMutation) SetThreshold(u uint32) {
+	m.threshold = &u
+	m.addthreshold = nil
 }
 
 // Threshold returns the value of the "threshold" field in the mutation.
-func (m *PreimageShareMutation) Threshold() (r []byte, exists bool) {
+func (m *PreimageShareMutation) Threshold() (r uint32, exists bool) {
 	v := m.threshold
 	if v == nil {
 		return
@@ -1485,7 +1488,7 @@ func (m *PreimageShareMutation) Threshold() (r []byte, exists bool) {
 // OldThreshold returns the old "threshold" field's value of the PreimageShare entity.
 // If the PreimageShare object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PreimageShareMutation) OldThreshold(ctx context.Context) (v []byte, err error) {
+func (m *PreimageShareMutation) OldThreshold(ctx context.Context) (v uint32, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldThreshold is only allowed on UpdateOne operations")
 	}
@@ -1499,9 +1502,28 @@ func (m *PreimageShareMutation) OldThreshold(ctx context.Context) (v []byte, err
 	return oldValue.Threshold, nil
 }
 
+// AddThreshold adds u to the "threshold" field.
+func (m *PreimageShareMutation) AddThreshold(u int32) {
+	if m.addthreshold != nil {
+		*m.addthreshold += u
+	} else {
+		m.addthreshold = &u
+	}
+}
+
+// AddedThreshold returns the value that was added to the "threshold" field in this mutation.
+func (m *PreimageShareMutation) AddedThreshold() (r int32, exists bool) {
+	v := m.addthreshold
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
 // ResetThreshold resets all changes to the "threshold" field.
 func (m *PreimageShareMutation) ResetThreshold() {
 	m.threshold = nil
+	m.addthreshold = nil
 }
 
 // SetOwnerIdentityPubkey sets the "owner_identity_pubkey" field.
@@ -1538,6 +1560,42 @@ func (m *PreimageShareMutation) OldOwnerIdentityPubkey(ctx context.Context) (v [
 // ResetOwnerIdentityPubkey resets all changes to the "owner_identity_pubkey" field.
 func (m *PreimageShareMutation) ResetOwnerIdentityPubkey() {
 	m.owner_identity_pubkey = nil
+}
+
+// SetInvoiceString sets the "invoice_string" field.
+func (m *PreimageShareMutation) SetInvoiceString(s string) {
+	m.invoice_string = &s
+}
+
+// InvoiceString returns the value of the "invoice_string" field in the mutation.
+func (m *PreimageShareMutation) InvoiceString() (r string, exists bool) {
+	v := m.invoice_string
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldInvoiceString returns the old "invoice_string" field's value of the PreimageShare entity.
+// If the PreimageShare object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PreimageShareMutation) OldInvoiceString(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldInvoiceString is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldInvoiceString requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldInvoiceString: %w", err)
+	}
+	return oldValue.InvoiceString, nil
+}
+
+// ResetInvoiceString resets all changes to the "invoice_string" field.
+func (m *PreimageShareMutation) ResetInvoiceString() {
+	m.invoice_string = nil
 }
 
 // SetPreimageRequestID sets the "preimage_request" edge to the PreimageRequest entity by id.
@@ -1613,7 +1671,7 @@ func (m *PreimageShareMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *PreimageShareMutation) Fields() []string {
-	fields := make([]string, 0, 6)
+	fields := make([]string, 0, 7)
 	if m.create_time != nil {
 		fields = append(fields, preimageshare.FieldCreateTime)
 	}
@@ -1631,6 +1689,9 @@ func (m *PreimageShareMutation) Fields() []string {
 	}
 	if m.owner_identity_pubkey != nil {
 		fields = append(fields, preimageshare.FieldOwnerIdentityPubkey)
+	}
+	if m.invoice_string != nil {
+		fields = append(fields, preimageshare.FieldInvoiceString)
 	}
 	return fields
 }
@@ -1652,6 +1713,8 @@ func (m *PreimageShareMutation) Field(name string) (ent.Value, bool) {
 		return m.Threshold()
 	case preimageshare.FieldOwnerIdentityPubkey:
 		return m.OwnerIdentityPubkey()
+	case preimageshare.FieldInvoiceString:
+		return m.InvoiceString()
 	}
 	return nil, false
 }
@@ -1673,6 +1736,8 @@ func (m *PreimageShareMutation) OldField(ctx context.Context, name string) (ent.
 		return m.OldThreshold(ctx)
 	case preimageshare.FieldOwnerIdentityPubkey:
 		return m.OldOwnerIdentityPubkey(ctx)
+	case preimageshare.FieldInvoiceString:
+		return m.OldInvoiceString(ctx)
 	}
 	return nil, fmt.Errorf("unknown PreimageShare field %s", name)
 }
@@ -1711,7 +1776,7 @@ func (m *PreimageShareMutation) SetField(name string, value ent.Value) error {
 		m.SetPreimageShare(v)
 		return nil
 	case preimageshare.FieldThreshold:
-		v, ok := value.([]byte)
+		v, ok := value.(uint32)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
@@ -1724,6 +1789,13 @@ func (m *PreimageShareMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetOwnerIdentityPubkey(v)
 		return nil
+	case preimageshare.FieldInvoiceString:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetInvoiceString(v)
+		return nil
 	}
 	return fmt.Errorf("unknown PreimageShare field %s", name)
 }
@@ -1731,13 +1803,21 @@ func (m *PreimageShareMutation) SetField(name string, value ent.Value) error {
 // AddedFields returns all numeric fields that were incremented/decremented during
 // this mutation.
 func (m *PreimageShareMutation) AddedFields() []string {
-	return nil
+	var fields []string
+	if m.addthreshold != nil {
+		fields = append(fields, preimageshare.FieldThreshold)
+	}
+	return fields
 }
 
 // AddedField returns the numeric value that was incremented/decremented on a field
 // with the given name. The second boolean return value indicates that this field
 // was not set, or was not defined in the schema.
 func (m *PreimageShareMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case preimageshare.FieldThreshold:
+		return m.AddedThreshold()
+	}
 	return nil, false
 }
 
@@ -1746,6 +1826,13 @@ func (m *PreimageShareMutation) AddedField(name string) (ent.Value, bool) {
 // type.
 func (m *PreimageShareMutation) AddField(name string, value ent.Value) error {
 	switch name {
+	case preimageshare.FieldThreshold:
+		v, ok := value.(int32)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddThreshold(v)
+		return nil
 	}
 	return fmt.Errorf("unknown PreimageShare numeric field %s", name)
 }
@@ -1790,6 +1877,9 @@ func (m *PreimageShareMutation) ResetField(name string) error {
 		return nil
 	case preimageshare.FieldOwnerIdentityPubkey:
 		m.ResetOwnerIdentityPubkey()
+		return nil
+	case preimageshare.FieldInvoiceString:
+		m.ResetInvoiceString()
 		return nil
 	}
 	return fmt.Errorf("unknown PreimageShare field %s", name)

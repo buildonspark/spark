@@ -55,6 +55,7 @@ func (h *LightningHandler) StorePreimageShare(ctx context.Context, req *pb.Store
 		SetPaymentHash(req.PaymentHash).
 		SetPreimageShare(req.PreimageShare.SecretShare).
 		SetThreshold(req.Threshold).
+		SetInvoiceString(req.InvoiceString).
 		SetOwnerIdentityPubkey(req.UserIdentityPublicKey).
 		Save(ctx)
 	if err != nil {

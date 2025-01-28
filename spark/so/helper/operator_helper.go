@@ -2,12 +2,11 @@ package helper
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"log"
 	"math/big"
 	"sync"
-
-	"crypto/rand"
 
 	"github.com/lightsparkdev/spark-go/so"
 )

@@ -28,9 +28,11 @@ type PreimageShare struct {
 	// PreimageShare holds the value of the "preimage_share" field.
 	PreimageShare []byte `json:"preimage_share,omitempty"`
 	// Threshold holds the value of the "threshold" field.
-	Threshold []byte `json:"threshold,omitempty"`
+	Threshold uint32 `json:"threshold,omitempty"`
 	// OwnerIdentityPubkey holds the value of the "owner_identity_pubkey" field.
 	OwnerIdentityPubkey []byte `json:"owner_identity_pubkey,omitempty"`
+	// InvoiceString holds the value of the "invoice_string" field.
+	InvoiceString string `json:"invoice_string,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the PreimageShareQuery when eager-loading is set.
 	Edges                            PreimageShareEdges `json:"edges"`
@@ -63,8 +65,12 @@ func (*PreimageShare) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case preimageshare.FieldPaymentHash, preimageshare.FieldPreimageShare, preimageshare.FieldThreshold, preimageshare.FieldOwnerIdentityPubkey:
+		case preimageshare.FieldPaymentHash, preimageshare.FieldPreimageShare, preimageshare.FieldOwnerIdentityPubkey:
 			values[i] = new([]byte)
+		case preimageshare.FieldThreshold:
+			values[i] = new(sql.NullInt64)
+		case preimageshare.FieldInvoiceString:
+			values[i] = new(sql.NullString)
 		case preimageshare.FieldCreateTime, preimageshare.FieldUpdateTime:
 			values[i] = new(sql.NullTime)
 		case preimageshare.FieldID:
@@ -117,16 +123,22 @@ func (ps *PreimageShare) assignValues(columns []string, values []any) error {
 				ps.PreimageShare = *value
 			}
 		case preimageshare.FieldThreshold:
-			if value, ok := values[i].(*[]byte); !ok {
+			if value, ok := values[i].(*sql.NullInt64); !ok {
 				return fmt.Errorf("unexpected type %T for field threshold", values[i])
-			} else if value != nil {
-				ps.Threshold = *value
+			} else if value.Valid {
+				ps.Threshold = uint32(value.Int64)
 			}
 		case preimageshare.FieldOwnerIdentityPubkey:
 			if value, ok := values[i].(*[]byte); !ok {
 				return fmt.Errorf("unexpected type %T for field owner_identity_pubkey", values[i])
 			} else if value != nil {
 				ps.OwnerIdentityPubkey = *value
+			}
+		case preimageshare.FieldInvoiceString:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field invoice_string", values[i])
+			} else if value.Valid {
+				ps.InvoiceString = value.String
 			}
 		case preimageshare.ForeignKeys[0]:
 			if value, ok := values[i].(*sql.NullScanner); !ok {
@@ -193,6 +205,9 @@ func (ps *PreimageShare) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("owner_identity_pubkey=")
 	builder.WriteString(fmt.Sprintf("%v", ps.OwnerIdentityPubkey))
+	builder.WriteString(", ")
+	builder.WriteString("invoice_string=")
+	builder.WriteString(ps.InvoiceString)
 	builder.WriteByte(')')
 	return builder.String()
 }

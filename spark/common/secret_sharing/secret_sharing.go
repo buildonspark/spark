@@ -7,6 +7,7 @@ import (
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lightsparkdev/spark-go/common"
+	pb "github.com/lightsparkdev/spark-go/proto/spark"
 )
 
 // Polynomial is a polynomial used for secret sharing.
@@ -74,6 +75,14 @@ func (s *SecretShare) GetThreshold() int {
 type VerifiableSecretShare struct {
 	SecretShare
 	Proofs [][]byte
+}
+
+// MarshalProto marshals the VerifiableSecretShare to a protobuf message.
+func (v *VerifiableSecretShare) MarshalProto() *pb.SecretShare {
+	return &pb.SecretShare{
+		SecretShare: v.Share.Bytes(),
+		Proofs:      v.Proofs,
+	}
 }
 
 // Evaluate evaluates the polynomial at a given point.

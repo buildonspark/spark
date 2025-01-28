@@ -58,8 +58,9 @@ var (
 		{Name: "update_time", Type: field.TypeTime},
 		{Name: "payment_hash", Type: field.TypeBytes, Unique: true},
 		{Name: "preimage_share", Type: field.TypeBytes},
-		{Name: "threshold", Type: field.TypeBytes},
+		{Name: "threshold", Type: field.TypeUint32},
 		{Name: "owner_identity_pubkey", Type: field.TypeBytes},
+		{Name: "invoice_string", Type: field.TypeString},
 		{Name: "preimage_request_preimage_shares", Type: field.TypeUUID, Unique: true, Nullable: true},
 	}
 	// PreimageSharesTable holds the schema information for the "preimage_shares" table.
@@ -70,7 +71,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "preimage_shares_preimage_requests_preimage_shares",
-				Columns:    []*schema.Column{PreimageSharesColumns[7]},
+				Columns:    []*schema.Column{PreimageSharesColumns[8]},
 				RefColumns: []*schema.Column{PreimageRequestsColumns[0]},
 				OnDelete:   schema.SetNull,
 			},

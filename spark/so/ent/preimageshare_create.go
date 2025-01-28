@@ -63,14 +63,20 @@ func (psc *PreimageShareCreate) SetPreimageShare(b []byte) *PreimageShareCreate 
 }
 
 // SetThreshold sets the "threshold" field.
-func (psc *PreimageShareCreate) SetThreshold(b []byte) *PreimageShareCreate {
-	psc.mutation.SetThreshold(b)
+func (psc *PreimageShareCreate) SetThreshold(u uint32) *PreimageShareCreate {
+	psc.mutation.SetThreshold(u)
 	return psc
 }
 
 // SetOwnerIdentityPubkey sets the "owner_identity_pubkey" field.
 func (psc *PreimageShareCreate) SetOwnerIdentityPubkey(b []byte) *PreimageShareCreate {
 	psc.mutation.SetOwnerIdentityPubkey(b)
+	return psc
+}
+
+// SetInvoiceString sets the "invoice_string" field.
+func (psc *PreimageShareCreate) SetInvoiceString(s string) *PreimageShareCreate {
+	psc.mutation.SetInvoiceString(s)
 	return psc
 }
 
@@ -183,17 +189,20 @@ func (psc *PreimageShareCreate) check() error {
 	if _, ok := psc.mutation.Threshold(); !ok {
 		return &ValidationError{Name: "threshold", err: errors.New(`ent: missing required field "PreimageShare.threshold"`)}
 	}
-	if v, ok := psc.mutation.Threshold(); ok {
-		if err := preimageshare.ThresholdValidator(v); err != nil {
-			return &ValidationError{Name: "threshold", err: fmt.Errorf(`ent: validator failed for field "PreimageShare.threshold": %w`, err)}
-		}
-	}
 	if _, ok := psc.mutation.OwnerIdentityPubkey(); !ok {
 		return &ValidationError{Name: "owner_identity_pubkey", err: errors.New(`ent: missing required field "PreimageShare.owner_identity_pubkey"`)}
 	}
 	if v, ok := psc.mutation.OwnerIdentityPubkey(); ok {
 		if err := preimageshare.OwnerIdentityPubkeyValidator(v); err != nil {
 			return &ValidationError{Name: "owner_identity_pubkey", err: fmt.Errorf(`ent: validator failed for field "PreimageShare.owner_identity_pubkey": %w`, err)}
+		}
+	}
+	if _, ok := psc.mutation.InvoiceString(); !ok {
+		return &ValidationError{Name: "invoice_string", err: errors.New(`ent: missing required field "PreimageShare.invoice_string"`)}
+	}
+	if v, ok := psc.mutation.InvoiceString(); ok {
+		if err := preimageshare.InvoiceStringValidator(v); err != nil {
+			return &ValidationError{Name: "invoice_string", err: fmt.Errorf(`ent: validator failed for field "PreimageShare.invoice_string": %w`, err)}
 		}
 	}
 	return nil
@@ -248,12 +257,16 @@ func (psc *PreimageShareCreate) createSpec() (*PreimageShare, *sqlgraph.CreateSp
 		_node.PreimageShare = value
 	}
 	if value, ok := psc.mutation.Threshold(); ok {
-		_spec.SetField(preimageshare.FieldThreshold, field.TypeBytes, value)
+		_spec.SetField(preimageshare.FieldThreshold, field.TypeUint32, value)
 		_node.Threshold = value
 	}
 	if value, ok := psc.mutation.OwnerIdentityPubkey(); ok {
 		_spec.SetField(preimageshare.FieldOwnerIdentityPubkey, field.TypeBytes, value)
 		_node.OwnerIdentityPubkey = value
+	}
+	if value, ok := psc.mutation.InvoiceString(); ok {
+		_spec.SetField(preimageshare.FieldInvoiceString, field.TypeString, value)
+		_node.InvoiceString = value
 	}
 	if nodes := psc.mutation.PreimageRequestIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{

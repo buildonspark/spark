@@ -27,6 +27,8 @@ const (
 	FieldThreshold = "threshold"
 	// FieldOwnerIdentityPubkey holds the string denoting the owner_identity_pubkey field in the database.
 	FieldOwnerIdentityPubkey = "owner_identity_pubkey"
+	// FieldInvoiceString holds the string denoting the invoice_string field in the database.
+	FieldInvoiceString = "invoice_string"
 	// EdgePreimageRequest holds the string denoting the preimage_request edge name in mutations.
 	EdgePreimageRequest = "preimage_request"
 	// Table holds the table name of the preimageshare in the database.
@@ -49,6 +51,7 @@ var Columns = []string{
 	FieldPreimageShare,
 	FieldThreshold,
 	FieldOwnerIdentityPubkey,
+	FieldInvoiceString,
 }
 
 // ForeignKeys holds the SQL foreign-keys that are owned by the "preimage_shares"
@@ -83,10 +86,10 @@ var (
 	PaymentHashValidator func([]byte) error
 	// PreimageShareValidator is a validator for the "preimage_share" field. It is called by the builders before save.
 	PreimageShareValidator func([]byte) error
-	// ThresholdValidator is a validator for the "threshold" field. It is called by the builders before save.
-	ThresholdValidator func([]byte) error
 	// OwnerIdentityPubkeyValidator is a validator for the "owner_identity_pubkey" field. It is called by the builders before save.
 	OwnerIdentityPubkeyValidator func([]byte) error
+	// InvoiceStringValidator is a validator for the "invoice_string" field. It is called by the builders before save.
+	InvoiceStringValidator func(string) error
 	// DefaultID holds the default value on creation for the "id" field.
 	DefaultID func() uuid.UUID
 )
@@ -107,6 +110,16 @@ func ByCreateTime(opts ...sql.OrderTermOption) OrderOption {
 // ByUpdateTime orders the results by the update_time field.
 func ByUpdateTime(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldUpdateTime, opts...).ToFunc()
+}
+
+// ByThreshold orders the results by the threshold field.
+func ByThreshold(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldThreshold, opts...).ToFunc()
+}
+
+// ByInvoiceString orders the results by the invoice_string field.
+func ByInvoiceString(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldInvoiceString, opts...).ToFunc()
 }
 
 // ByPreimageRequestField orders the results by preimage_request field.
