@@ -1,4 +1,8 @@
-import { GenerateDepositAddressResponse } from "./proto/spark";
+import {
+  GenerateDepositAddressResponse,
+  QueryPendingTransfersResponse,
+  Transfer,
+} from "./proto/spark";
 import { initWasm } from "./utils/wasm-wrapper";
 
 import * as btc from "@scure/btc-signer";
@@ -11,16 +15,27 @@ import {
 import { createNewGrpcConnection } from "./utils/connection";
 import { Network, NetworkConfig } from "./utils/network";
 import { secp256k1 } from "@noble/curves/secp256k1";
-import { equalBytes } from "@noble/curves/abstract/utils";
+import * as ecies from "eciesjs";
+import { bytesToHex, equalBytes } from "@noble/curves/abstract/utils";
+import { sha256 } from "@scure/btc-signer/utils";
 import { SigningOperator, validateDepositAddress } from "./utils/deposit";
 import { Transaction } from "@scure/btc-signer";
+import {
+  finalizeTransfer,
+  sendTransferSignRefund,
+  sendTransferTweakKey,
+} from "./utils/transfer";
 import {
   getP2TRAddressFromPublicKey,
   getSigHashFromTx,
   getTxId,
 } from "./utils/bitcoin";
 import { SignatureIntent } from "./proto/common";
-
+import {
+  claimTransferSignRefunds,
+  claimTransferTweakKeys,
+  LeafKeyTweak,
+} from "./utils/transfer";
 import {
   copySigningCommitment,
   copySigningNonce,
@@ -75,6 +90,88 @@ export class SparkWallet {
   }): Promise<NonceResult> {
     await this.ensureInitialized();
     return frost_nonce(keyPackage);
+  }
+
+  async sendTransfer(
+    leaves: LeafKeyTweak[],
+    receiverIdentityPubkey: Uint8Array,
+    expiryTime: Date
+  ): Promise<Transfer> {
+    const { transfer, signatureMap } = await sendTransferSignRefund(
+      this.config,
+      leaves,
+      receiverIdentityPubkey,
+      expiryTime
+    );
+
+    const transferWithTweakedKeys = await sendTransferTweakKey(
+      this.config,
+      transfer,
+      leaves,
+      signatureMap
+    );
+
+    return transferWithTweakedKeys;
+  }
+
+  async claimTransfer(transfer: Transfer, leaves: LeafKeyTweak[]) {
+    await claimTransferTweakKeys(transfer, leaves, this.config);
+
+    const signatures = await claimTransferSignRefunds(
+      transfer,
+      leaves,
+      this.config
+    );
+
+    return await finalizeTransfer(signatures, this.getCoordinatorAddress());
+  }
+
+  async queryPendingTransfers(): Promise<QueryPendingTransfersResponse> {
+    const sparkClient = createNewGrpcConnection(this.getCoordinatorAddress());
+    const pendingTransfersResp = await sparkClient.query_pending_transfers({
+      receiverIdentityPublicKey: this.getIdentityPublicKey(),
+    });
+    sparkClient.close?.();
+    return pendingTransfersResp;
+  }
+
+  async verifyPendingTransfer(
+    transfer: Transfer
+  ): Promise<Map<string, Uint8Array>> {
+    const leafPrivKeyMap = new Map<string, Uint8Array>();
+    const receiverEciesPrivKey = ecies.PrivateKey.fromHex(
+      bytesToHex(this.config.identityPrivateKey)
+    );
+    for (const leaf of transfer.leaves) {
+      if (!leaf.leaf) {
+        throw new Error("Leaf is undefined");
+      }
+      const encoder = new TextEncoder();
+      const leafIdBytes = encoder.encode(leaf.leaf.id);
+      const transferIdBytes = encoder.encode(transfer.id);
+      const payload = new Uint8Array([
+        ...leafIdBytes,
+        ...transferIdBytes,
+        ...leaf.secretCipher,
+      ]);
+      const payloadHash = sha256(payload);
+      if (
+        !secp256k1.verify(
+          leaf.signature,
+          payloadHash,
+          transfer.senderIdentityPublicKey
+        )
+      ) {
+        throw new Error("Signature verification failed");
+      }
+
+      const leafSecret = ecies.decrypt(
+        receiverEciesPrivKey.toHex(),
+        leaf.secretCipher
+      );
+      leafPrivKeyMap.set(leaf.leaf.id, leafSecret);
+    }
+    return leafPrivKeyMap;
   }
 
   async generateDepositAddress(
@@ -180,6 +277,7 @@ export class SparkWallet {
       onChainUtxo: {
         txid: getTxId(depositTx),
         vout: vout,
+        rawTx: depositTx.toBytes(),
       },
       rootTxSigningJob: {
         rawTx: rootTx.toBytes(),

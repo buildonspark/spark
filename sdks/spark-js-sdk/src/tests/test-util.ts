@@ -81,16 +81,13 @@ export async function createNewTree(
   wallet: SparkWallet,
   privKey: Uint8Array
 ): Promise<TreeNode> {
-  const config = getTestWalletConfig();
-  const sdk = new SparkWallet(config);
-
   const mockClient = createMockGrpcConnection(wallet.getCoordinatorAddress());
 
   // Generate private/public key pair
-  const pubKey = secp256k1.getPublicKey(privKey);
+  const pubKey = secp256k1.getPublicKey(privKey, true);
 
   // Generate deposit address
-  const depositResp = await sdk.generateDepositAddress(pubKey);
+  const depositResp = await wallet.generateDepositAddress(pubKey);
   if (!depositResp.depositAddress) {
     throw new Error("deposit address not found");
   }
@@ -116,7 +113,7 @@ export async function createNewTree(
   });
 
   // Create tree root
-  const treeResp = await sdk.createTreeRoot(
+  const treeResp = await wallet.createTreeRoot(
     privKey,
     depositResp.depositAddress.verifyingKey,
     depositTx,
