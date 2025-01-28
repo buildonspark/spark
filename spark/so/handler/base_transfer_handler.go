@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/btcsuite/btcd/wire"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/common"
 	"github.com/lightsparkdev/spark-go/so"
@@ -18,41 +20,62 @@ type BaseTransferHandler struct {
 	config *so.Config
 }
 
-func (h *BaseTransferHandler) validateSendLeafRefundTx(leaf *ent.TreeNode, rawTx []byte, receiverIdentityKey []byte) error {
+func validateLeafRefundTxOutput(refundTx *wire.MsgTx, receiverIdentityPublicKey []byte) error {
+	if len(refundTx.TxOut) != 1 {
+		return fmt.Errorf("refund tx must have exactly 1 output")
+	}
+	receiverIdentityPubkey, err := secp256k1.ParsePubKey(receiverIdentityPublicKey)
+	if err != nil {
+		return fmt.Errorf("unable to parse receiver pubkey: %v", err)
+	}
+	recieverP2trScript, err := common.P2TRScriptFromPubKey(receiverIdentityPubkey)
+	if err != nil {
+		return fmt.Errorf("unable to generate p2tr script from receiver pubkey: %v", err)
+	}
+	if !bytes.Equal(recieverP2trScript, refundTx.TxOut[0].PkScript) {
+		return fmt.Errorf("refund tx is expected to send to receiver identity pubkey")
+	}
+	return nil
+}
+
+func validateLeafRefundTxInput(refundTx *wire.MsgTx, oldSequence uint32, leafOutPoint *wire.OutPoint, expectedInputCount uint32) error {
+	newTimeLock := refundTx.TxIn[0].Sequence & 0xFFFF
+	oldTimeLock := oldSequence & 0xFFFF
+	if newTimeLock >= oldTimeLock {
+		return fmt.Errorf("time lock on the new refund tx must be less than the old one")
+	}
+	if len(refundTx.TxIn) != int(expectedInputCount) {
+		return fmt.Errorf("refund tx should have %d inputs, but has %d", expectedInputCount, len(refundTx.TxIn))
+	}
+	if !refundTx.TxIn[0].PreviousOutPoint.Hash.IsEqual(&leafOutPoint.Hash) || refundTx.TxIn[0].PreviousOutPoint.Index != leafOutPoint.Index {
+		return fmt.Errorf("unexpected input in refund tx")
+	}
+	return nil
+}
+
+func validateSendLeafRefundTx(leaf *ent.TreeNode, rawTx []byte, receiverIdentityKey []byte, expectedInputCount uint32) error {
 	newRefundTx, err := common.TxFromRawTxBytes(rawTx)
 	if err != nil {
 		return fmt.Errorf("unable to load new refund tx: %v", err)
 	}
-	if len(newRefundTx.TxIn) != 1 {
-		return fmt.Errorf("expected 1 input in refund tx")
-	}
-	newRefundTxIn := newRefundTx.TxIn[0]
-
 	oldRefundTx, err := common.TxFromRawTxBytes(leaf.RawRefundTx)
 	if err != nil {
 		return fmt.Errorf("unable to load old refund tx: %v", err)
 	}
 	oldRefundTxIn := oldRefundTx.TxIn[0]
-
-	if !newRefundTxIn.PreviousOutPoint.Hash.IsEqual(&oldRefundTxIn.PreviousOutPoint.Hash) || newRefundTxIn.PreviousOutPoint.Index != oldRefundTxIn.PreviousOutPoint.Index {
-		return fmt.Errorf("unexpected input in new refund tx")
-	}
-	newTimeLock := newRefundTx.TxIn[0].Sequence & 0xFFFF
-	oldTimeLock := oldRefundTx.TxIn[0].Sequence & 0xFFFF
-	if newTimeLock >= oldTimeLock {
-		return fmt.Errorf("time lock on the new refund tx must be less than the old one")
+	leafOutPoint := wire.OutPoint{
+		Hash:  oldRefundTxIn.PreviousOutPoint.Hash,
+		Index: oldRefundTxIn.PreviousOutPoint.Index,
 	}
 
-	receiverP2trAddress, err := common.P2TRAddressFromPublicKey(receiverIdentityKey, h.config.Network)
+	err = validateLeafRefundTxInput(newRefundTx, oldRefundTxIn.Sequence, &leafOutPoint, expectedInputCount)
 	if err != nil {
-		return fmt.Errorf("unable to generate p2tr address from receiver pubkey: %v", err)
+		return fmt.Errorf("unable to validate refund tx inputs: %v", err)
 	}
-	refundP2trAddress, err := common.P2TRAddressFromPkScript(newRefundTx.TxOut[0].PkScript, h.config.Network)
+
+	err = validateLeafRefundTxOutput(newRefundTx, receiverIdentityKey)
 	if err != nil {
-		return fmt.Errorf("unable to generate p2tr address from refund pkscript: %v", err)
-	}
-	if *receiverP2trAddress != *refundP2trAddress {
-		return fmt.Errorf("refund tx is expected to send to receiver identity pubkey")
+		return fmt.Errorf("unable to validate refund tx output: %v", err)
 	}
 
 	return nil
@@ -81,46 +104,101 @@ func (h *BaseTransferHandler) createTransfer(ctx context.Context, transferID str
 		return nil, nil, fmt.Errorf("unable to create transfer: %v", err)
 	}
 
-	leafMap := make(map[string]*ent.TreeNode)
-	totalAmount := uint64(0)
+	leaves, err := loadLeaves(ctx, db, leafRefundMap)
+	if err != nil {
+		return nil, nil, fmt.Errorf("unable to load leaves: %v", err)
+	}
 
-	for leafID, rawRefundTx := range leafRefundMap {
-		// Find leaf in db
+	err = validateTransferLeaves(transfer, leaves, leafRefundMap, receiverIdentityPublicKey)
+	if err != nil {
+		return nil, nil, fmt.Errorf("unable to validate transfer leaves: %v", err)
+	}
+
+	err = createTransferLeaves(ctx, db, transfer, leaves, leafRefundMap)
+	if err != nil {
+		return nil, nil, fmt.Errorf("unable to create transfer leaves: %v", err)
+	}
+
+	err = setTotalTransferValue(ctx, db, transfer, leaves)
+	if err != nil {
+		return nil, nil, fmt.Errorf("unable to update transfer total value: %v", err)
+	}
+
+	leafMap := make(map[string]*ent.TreeNode)
+	for _, leaf := range leaves {
+		leafMap[leaf.ID.String()] = leaf
+	}
+
+	return transfer, leafMap, nil
+}
+
+func loadLeaves(ctx context.Context, db *ent.Tx, leafRefundMap map[string][]byte) ([]*ent.TreeNode, error) {
+	leaves := make([]*ent.TreeNode, 0)
+	for leafID := range leafRefundMap {
 		leafUUID, err := uuid.Parse(leafID)
 		if err != nil {
-			return nil, nil, fmt.Errorf("unable to parse leaf_id %s: %v", leafID, err)
+			return nil, fmt.Errorf("unable to parse leaf_id %s: %v", leafID, err)
 		}
 
-		db := ent.GetDbFromContext(ctx)
 		leaf, err := db.TreeNode.Get(ctx, leafUUID)
 		if err != nil || leaf == nil {
-			return nil, nil, fmt.Errorf("unable to find leaf %s: %v", leafID, err)
+			return nil, fmt.Errorf("unable to find leaf %s: %v", leafID, err)
 		}
-		if (leaf.Status != schema.TreeNodeStatusAvailable &&
-			(leaf.Status != schema.TreeNodeStatusDestinationLock || !bytes.Equal(leaf.DestinationLockIdentityPubkey, transfer.ReceiverIdentityPubkey))) ||
-			!bytes.Equal(leaf.OwnerIdentityPubkey, transfer.SenderIdentityPubkey) {
-			return nil, nil, fmt.Errorf("leaf %s is not available to transfer", leafID)
-		}
-		totalAmount += leaf.Value
-		leafMap[leafID] = leaf
+		leaves = append(leaves, leaf)
+	}
+	return leaves, nil
+}
 
-		err = h.validateSendLeafRefundTx(leaf, rawRefundTx, receiverIdentityPublicKey)
+func validateTransferLeaves(transfer *ent.Transfer, leaves []*ent.TreeNode, leafRefundMap map[string][]byte, receiverIdentityPublicKey []byte) error {
+	for _, leaf := range leaves {
+		rawRefundTx := leafRefundMap[leaf.ID.String()]
+		err := validateSendLeafRefundTx(leaf, rawRefundTx, receiverIdentityPublicKey, 1)
 		if err != nil {
-			return nil, nil, fmt.Errorf("unable to validate refund tx for leaf %s: %v", leafID, err)
+			return fmt.Errorf("unable to validate refund tx for leaf %s: %v", leaf.ID, err)
 		}
-		_, err = db.TransferLeaf.Create().
+		err = leafAvailableToTransfer(leaf, transfer.SenderIdentityPubkey, transfer.ReceiverIdentityPubkey)
+		if err != nil {
+			return fmt.Errorf("unable to validate leaf %s: %v", leaf.ID, err)
+		}
+	}
+	return nil
+}
+
+func leafAvailableToTransfer(leaf *ent.TreeNode, senderIdentityPublicKey []byte, receiverIdentityPubkey []byte) error {
+	if leaf.Status != schema.TreeNodeStatusAvailable &&
+		(leaf.Status != schema.TreeNodeStatusDestinationLock || !bytes.Equal(leaf.DestinationLockIdentityPubkey, receiverIdentityPubkey)) {
+		return fmt.Errorf("leaf %s is not available to transfer", leaf.ID.String())
+	}
+	if !bytes.Equal(leaf.OwnerIdentityPubkey, senderIdentityPublicKey) {
+		return fmt.Errorf("leaf %s is not owned by sender", leaf.ID.String())
+	}
+	return nil
+}
+
+func createTransferLeaves(ctx context.Context, db *ent.Tx, transfer *ent.Transfer, leaves []*ent.TreeNode, leafRefundMap map[string][]byte) error {
+	for _, leaf := range leaves {
+		rawRefundTx := leafRefundMap[leaf.ID.String()]
+		_, err := db.TransferLeaf.Create().
 			SetTransfer(transfer).
 			SetLeaf(leaf).
 			SetPreviousRefundTx(leaf.RawRefundTx).
 			SetIntermediateRefundTx(rawRefundTx).
 			Save(ctx)
 		if err != nil {
-			return nil, nil, fmt.Errorf("unable to create transfer leaf: %v", err)
+			return fmt.Errorf("unable to create transfer leaf: %v", err)
 		}
 	}
-	transfer, err = db.Transfer.UpdateOne(transfer).SetTotalValue(totalAmount).Save(ctx)
-	if err != nil {
-		return nil, nil, fmt.Errorf("unable to update transfer total value: %v", err)
+	return nil
+}
+
+func setTotalTransferValue(ctx context.Context, db *ent.Tx, transfer *ent.Transfer, leaves []*ent.TreeNode) error {
+	totalAmount := uint64(0)
+	for _, leaf := range leaves {
+		totalAmount += leaf.Value
 	}
-	return transfer, leafMap, nil
+	_, err := db.Transfer.UpdateOne(transfer).SetTotalValue(totalAmount).Save(ctx)
+	if err != nil {
+		return fmt.Errorf("unable to update transfer total value: %v", err)
+	}
+	return nil
 }

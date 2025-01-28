@@ -11,6 +11,7 @@ import (
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 )
 
 // Network is the type for Bitcoin networks used with the operator.
@@ -37,6 +38,12 @@ func NetworkParams(network Network) *chaincfg.Params {
 	default:
 		return &chaincfg.MainNetParams
 	}
+}
+
+// P2TRScriptFromPubKey returns a P2TR script from a public key.
+func P2TRScriptFromPubKey(pubKey *secp256k1.PublicKey) ([]byte, error) {
+	taprootKey := txscript.ComputeTaprootKeyNoScript(pubKey)
+	return txscript.PayToTaprootScript(taprootKey)
 }
 
 // P2TRAddressFromPublicKey returns a P2TR address from a public key.
