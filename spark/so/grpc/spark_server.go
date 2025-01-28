@@ -104,6 +104,13 @@ func (s *SparkServer) GetPreimage(ctx context.Context, req *pb.GetPreimageReques
 	return lightningHandler.GetPreimage(ctx, req)
 }
 
+// CooperativeExit asks for signatures for refund transactions spending leaves
+// and connector outputs on another user's L1 transaction.
+func (s *SparkServer) CooperativeExit(ctx context.Context, req *pb.CooperativeExitRequest) (*pb.CooperativeExitResponse, error) {
+	coopExitHandler := handler.NewCooperativeExitHandler(s.config)
+	return coopExitHandler.CooperativeExit(ctx, req)
+}
+
 // PrepareTreeAddress prepares the tree address for the given public key.
 func (s *SparkServer) PrepareTreeAddress(ctx context.Context, req *pb.PrepareTreeAddressRequest) (*pb.PrepareTreeAddressResponse, error) {
 	treeHandler := handler.NewTreeCreationHandler(s.config, s.onchainHelper)

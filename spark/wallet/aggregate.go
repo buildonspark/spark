@@ -13,7 +13,6 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark-go"
 	"github.com/lightsparkdev/spark-go/common"
 	pbcommon "github.com/lightsparkdev/spark-go/proto/common"
 	pbfrost "github.com/lightsparkdev/spark-go/proto/frost"
@@ -52,8 +51,7 @@ func AggregateTreeNodes(
 	aggregatedSigningPublicKey := secp256k1.PrivKeyFromBytes(aggregatedSigningKey).PubKey()
 
 	newRefundTx := wire.NewMsgTx(2)
-	// TODO(zhenlu): Handle the case where refund timelock is below 0
-	sequence := uint32((1 << 30) | parentNode.RefundTimelock - spark.TimeLockInterval)
+	sequence := nextSequence(parentNode.RefundTimelock)
 	newRefundTx.AddTxIn(&wire.TxIn{
 		PreviousOutPoint: wire.OutPoint{Hash: parentTx.TxHash(), Index: uint32(parentNode.Vout)},
 		SignatureScript:  nil,

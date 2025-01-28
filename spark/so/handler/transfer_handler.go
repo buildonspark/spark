@@ -111,6 +111,10 @@ func (h *TransferHandler) syncTransferInit(ctx context.Context, req *pb.StartSen
 }
 
 func (h *TransferHandler) sendTransferSignRefunds(ctx context.Context, requests []*pb.LeafRefundTxSigningJob, leafMap map[string]*ent.TreeNode) ([]*pb.LeafRefundTxSigningResult, error) {
+	return signRefunds(ctx, h.config, requests, leafMap)
+}
+
+func signRefunds(ctx context.Context, config *so.Config, requests []*pb.LeafRefundTxSigningJob, leafMap map[string]*ent.TreeNode) ([]*pb.LeafRefundTxSigningResult, error) {
 	signingJobs := make([]*helper.SigningJob, 0)
 	jobToLeafMap := make(map[string]*ent.TreeNode)
 	for _, req := range requests {
@@ -147,7 +151,7 @@ func (h *TransferHandler) sendTransferSignRefunds(ctx context.Context, requests 
 		jobToLeafMap[jobID] = leaf
 	}
 
-	signingResults, err := helper.SignFrost(ctx, h.config, signingJobs)
+	signingResults, err := helper.SignFrost(ctx, config, signingJobs)
 	if err != nil {
 		return nil, err
 	}

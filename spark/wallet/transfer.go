@@ -612,6 +612,11 @@ func prepareRefundSoSigningJobs(
 	return signingJobs, nil
 }
 
+// TODO(zhenlu): Handle the case where refund timelock is below 0
+func nextSequence(currSequence uint32) uint32 {
+	return uint32((1 << 30) | (currSequence&0xFFFF - spark.TimeLockInterval))
+}
+
 func createRefundTx(
 	config *Config,
 	leaf *pb.TreeNode,
@@ -627,9 +632,8 @@ func createRefundTx(
 	}
 
 	newRefundTx := wire.NewMsgTx(2)
-	// TODO(zhenlu): Handle the case where refund timelock is below 0
 
-	sequence := uint32((1 << 30) | (refundTx.TxIn[0].Sequence&0xFFFF - spark.TimeLockInterval))
+	sequence := nextSequence(refundTx.TxIn[0].Sequence)
 	newRefundTx.AddTxIn(&wire.TxIn{
 		PreviousOutPoint: wire.OutPoint{Hash: tx.TxHash(), Index: 0},
 		SignatureScript:  nil,
