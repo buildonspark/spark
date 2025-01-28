@@ -224,6 +224,7 @@ message TransferLeaf {
     TreeNode leaf = 1;
     bytes secret_cipher = 2;
     bytes signature = 3;
+    bytes intermediate_refund_tx = 4;
 }
 
 message CompleteSendTransferResponse {
