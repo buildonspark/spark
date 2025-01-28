@@ -29,6 +29,8 @@ type SigningResult struct {
 	PublicKeys map[string][]byte
 	// KeyshareOwnerIdentifiers is the identifiers of the keyshare owners.
 	KeyshareOwnerIdentifiers []string
+	// KeyshareThreshold is the threshold of the keyshare.
+	KeyshareThreshold uint32
 }
 
 // MarshalProto marshals the signing result to a proto.
@@ -43,6 +45,7 @@ func (s *SigningResult) MarshalProto() (*pbspark.SigningResult, error) {
 		SignatureShares:          s.SignatureShares,
 		PublicKeys:               s.PublicKeys,
 		KeyshareOwnerIdentifiers: s.KeyshareOwnerIdentifiers,
+		KeyshareThreshold:        s.KeyshareThreshold,
 	}, nil
 }
 
@@ -281,6 +284,7 @@ func SignFrost(
 			SigningCommitments:       round1Array[i],
 			PublicKeys:               publicShares,
 			KeyshareOwnerIdentifiers: keyshareOwnerIdentifiers,
+			KeyshareThreshold:        signingKeyshares[job.SigningKeyshareID].MinSigners,
 		}
 	}
 
