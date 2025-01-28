@@ -138,6 +138,114 @@ build_go_operator() {
     fi
 }
 
+clone_or_pull_lrcd() {
+    if [ ! -d "lrc20.dev" ]; then
+        echo "Cloning LRC-20 git repo"
+        git clone https://github.com/lightsparkdev/lrc20.git lrc20.dev
+    else
+        echo "Entering existing LRC-20 directory and pulling latest changes"
+        cd lrc20.dev || {
+            echo "Failed to enter lrc20 directory" >&2
+            return 1
+        }
+        git pull
+        cd - > /dev/null
+    fi
+}
+
+run_lrcd_tmux() {
+    local run_dir=$1
+    local session_name="lrcd"
+
+    clone_or_pull_lrcd 
+    
+    # Kill existing session if it exists
+    if tmux has-session -t "$session_name" 2>/dev/null; then
+        echo "Killing existing lrcd session..."
+        tmux kill-session -t "$session_name"
+    fi
+
+    # Create new tmux session
+    tmux new-session -d -s "$session_name"
+
+    for i in {0..4}; do
+        if [ $i -ne 0 ]; then
+            # Split window horizontally for additional panes
+            tmux split-window -t "$session_name" -v
+            # Arrange panes evenly
+            tmux select-layout -t "$session_name" tiled
+        fi
+
+        rpc_address="127.0.0.1:1833${i}"
+        p2p_address="0.0.0.0:800${i}"
+        storage_path="./.yuvd/node_$i"
+
+        # Create a temporary config file for this instance
+        local temp_config_file="temp_config_$i.dev.toml"
+        sed -e "s|{RPC_ADDRESS}|$rpc_address|g" \
+            -e "s|{P2P_ADDRESS}|$p2p_address|g" \
+            -e "s|{STORAGE_PATH}|$storage_path|g" \
+            lrcd.template.config.toml >"$temp_config_file"
+        local log_file="${run_dir}/logs/lrcd_${i}.log"
+
+        local cmd="cd lrc20.dev && cargo run -p yuvd --release -- run --config ../$temp_config_file 2>&1 | tee '${log_file}'"
+
+        tmux send-keys -t "$session_name" "$cmd" C-m
+    done
+    
+    echo ""
+    echo "================================================"
+    echo "Started lrcd in tmux session: $session_name"
+    echo "To attach to the session: tmux attach -t $session_name"
+    echo "To detach from session: Press Ctrl-b then d"
+    echo "To kill the session: tmux kill-session -t $session_name"
+    echo "================================================"
+    echo ""
+}
+
+# Function to check if lrc nodes are running by checking log file existence
+check_lrc_nodes_ready() {
+   local run_dir=$1
+   local timeout=30  # Maximum seconds to wait
+   
+   echo "Checking LRC-20 nodes startup status..."
+   
+   # Start timer
+   local start_time=$(date +%s)
+   
+   while true; do
+       local all_ready=true
+       local current_time=$(date +%s)
+       local elapsed=$((current_time - start_time))
+       
+       # Check if we've exceeded timeout
+       if [ $elapsed -gt $timeout ]; then
+           echo "Timeout after ${timeout} seconds waiting for LRC-20 nodes"
+           return 1
+       fi
+       
+       # Check each operator's log file existence
+       for i in {0..4}; do
+           local log_file="${run_dir}/logs/lrcd_${i}.log"
+           
+           if [ ! -f "$log_file" ]; then
+               all_ready=false
+               break
+           fi
+       done
+       
+       # If all log files exist, break the loop
+       if $all_ready; then
+           echo "All LRC-20 log files created!"
+           return 0
+       fi
+       
+       # Wait a bit before next check
+       sleep 1
+       echo -n "."  # Show progress
+   done
+}
+
 # Function to create operator config JSON
 create_operator_config() {
     local run_dir=$1
@@ -377,11 +485,16 @@ done
 # Call reset_databases based on wipe flag
 reset_databases $WIPE
 
-
-
 create_data_dir
 run_dir=$(create_run_dir)
 echo "Working with directory: $run_dir"
+
+run_lrcd_tmux "$run_dir"
+
+if ! check_lrc_nodes_ready "$run_dir"; then
+    echo "Failed to start all LRC-20 nodes"
+    exit 1
+fi
 
 # For all 5 instances
 run_frost_signers_tmux "$run_dir"

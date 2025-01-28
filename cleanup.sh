@@ -2,6 +2,7 @@
 
 tmux kill-session -t frost-signers
 tmux kill-session -t operators
+tmux kill-session -t lrcd
 
 # Terminate all relevant connections first
 for i in $(seq 0 4); do
@@ -21,3 +22,4 @@ for i in $(seq 0 4); do
     createdb "$db" > /dev/null 2>&1
 done
 rm -rf _data
+rm -rf temp_config_*
