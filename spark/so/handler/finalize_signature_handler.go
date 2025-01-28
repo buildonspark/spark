@@ -69,9 +69,6 @@ func (o *FinalizeSignatureHandler) FinalizeNodeSignatures(ctx context.Context, r
 		case pbcommon.SignatureIntent_CREATION:
 			_, err = client.FinalizeTreeCreation(ctx, &pbinternal.FinalizeTreeCreationRequest{Nodes: internalNodes})
 			return nil, err
-		case pbcommon.SignatureIntent_SPLIT:
-			_, err = client.FinalizeNodeSplit(ctx, &pbinternal.FinalizeNodeSplitRequest{ParentNodeId: *internalNodes[0].ParentNodeId, ChildNodes: internalNodes})
-			return nil, err
 		case pbcommon.SignatureIntent_AGGREGATE:
 			_, err = client.FinalizeNodesAggregation(ctx, &pbinternal.FinalizeNodesAggregationRequest{Nodes: internalNodes})
 			return nil, err
@@ -150,7 +147,7 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 	}
 
 	var nodeTxBytes []byte
-	if intent == pbcommon.SignatureIntent_CREATION || intent == pbcommon.SignatureIntent_SPLIT {
+	if intent == pbcommon.SignatureIntent_CREATION {
 		nodeTxBytes, err = common.UpdateTxWithSignature(node.RawTx, 0, nodeSignatures.NodeTxSignature)
 		if err != nil {
 			return nil, nil, err
@@ -210,19 +207,6 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 	node, err = nodeMutator.Save(ctx)
 	if err != nil {
 		return nil, nil, err
-	}
-
-	if intent == pbcommon.SignatureIntent_SPLIT {
-		parent, err := node.QueryParent().Only(ctx)
-		if err != nil {
-			log.Printf("failed to get parent node: %v", err)
-			return nil, nil, err
-		}
-		_, err = parent.Update().SetStatus(schema.TreeNodeStatusSplitted).Save(ctx)
-		if err != nil {
-			log.Printf("failed to update parent node: %v", err)
-			return nil, nil, err
-		}
 	}
 
 	return node.MarshalSparkProto(ctx), node.MarshalInternalProto(ctx), nil

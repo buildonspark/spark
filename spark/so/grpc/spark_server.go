@@ -36,18 +36,6 @@ func (s *SparkServer) StartTreeCreation(ctx context.Context, req *pb.StartTreeCr
 	return depositHandler.StartTreeCreation(ctx, s.config, req)
 }
 
-// PrepareSplitAddress prepares the split addresses for the given public keys.
-func (s *SparkServer) PrepareSplitAddress(ctx context.Context, req *pb.PrepareSplitAddressRequest) (*pb.PrepareSplitAddressResponse, error) {
-	splitHandler := handler.SplitHandler{}
-	return splitHandler.PrepareSplitAddress(ctx, s.config, req)
-}
-
-// SplitNode splits the given node into the given splits.
-func (s *SparkServer) SplitNode(ctx context.Context, req *pb.SplitNodeRequest) (*pb.SplitNodeResponse, error) {
-	splitHandler := handler.SplitHandler{}
-	return splitHandler.SplitNode(ctx, s.config, req)
-}
-
 // FinalizeNodeSignatures verifies the node signatures and updates the node.
 func (s *SparkServer) FinalizeNodeSignatures(ctx context.Context, req *pb.FinalizeNodeSignaturesRequest) (*pb.FinalizeNodeSignaturesResponse, error) {
 	finalizeSignatureHandler := handler.NewFinalizeSignatureHandler(s.config)

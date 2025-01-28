@@ -29,7 +29,6 @@ message SigningResult {
 
 enum SignatureIntent {
     CREATION = 0;
-    SPLIT = 1;
-    TRANSFER = 2;
-    AGGREGATE = 3;
+    TRANSFER = 1;
+    AGGREGATE = 2;
 }

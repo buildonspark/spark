@@ -10,8 +10,6 @@ import "common.proto";
 service SparkService {
     rpc generate_deposit_address(GenerateDepositAddressRequest) returns (GenerateDepositAddressResponse) {}
     rpc start_tree_creation(StartTreeCreationRequest) returns (StartTreeCreationResponse) {}
-    rpc prepare_split_address(PrepareSplitAddressRequest) returns (PrepareSplitAddressResponse) {}
-    rpc split_node(SplitNodeRequest) returns (SplitNodeResponse) {}
     rpc finalize_node_signatures(FinalizeNodeSignaturesRequest) returns (FinalizeNodeSignaturesResponse) {}
     rpc start_send_transfer(StartSendTransferRequest) returns (StartSendTransferResponse) {}
     rpc complete_send_transfer(CompleteSendTransferRequest) returns (CompleteSendTransferResponse) {}
@@ -112,32 +110,6 @@ message TreeNode {
     uint32 refund_timelock = 10;
 }
 
-message Split {
-    bytes signing_public_key = 1;
-    SigningJob refund_signing_job = 2;
-    uint64 value = 3;
-    uint32 vout = 4;
-}
-
-message SplitNodeRequest {
-    string node_id = 1;
-    SigningJob parent_tx_signing_job = 2;
-    repeated Split splits = 3;
-}
-
-message SplitResult {
-    string node_id = 1;
-    SigningResult refund_tx_signing_result = 2;
-    bytes verifying_key = 3;
-    bytes user_public_key = 4;
-}
-
-message SplitNodeResponse {
-    string parent_node_id = 1;
-    SigningResult parent_tx_signing_result = 2;
-    repeated SplitResult split_results = 3;
-}
-
 message FinalizeNodeSignaturesRequest {
     common.SignatureIntent intent = 1;
     repeated NodeSignatures node_signatures = 2;
@@ -145,15 +117,6 @@ message FinalizeNodeSignaturesRequest {
 
 message FinalizeNodeSignaturesResponse {
     repeated TreeNode nodes = 1;
-}
-
-message PrepareSplitAddressRequest {
-    string node_id = 1;
-    repeated bytes signing_public_keys = 2;
-}
-
-message PrepareSplitAddressResponse {
-    repeated Address addresses = 1;
 }
 
 message SecretShare {

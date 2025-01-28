@@ -228,16 +228,6 @@ func (s *SparkInternalServer) PrepareSplitKeyshares(ctx context.Context, req *pb
 	return splitHandler.PrepareSplitKeyshares(ctx, req)
 }
 
-// FinalizeNodeSplit finalizes the node split.
-func (s *SparkInternalServer) FinalizeNodeSplit(ctx context.Context, req *pb.FinalizeNodeSplitRequest) (*emptypb.Empty, error) {
-	splitHandler := handler.NewInternalSplitHandler(s.config)
-	err := splitHandler.FinalizeNodeSplit(ctx, req)
-	if err != nil {
-		return nil, err
-	}
-	return &emptypb.Empty{}, nil
-}
-
 // FinalizeTreeCreation syncs final tree creation.
 func (s *SparkInternalServer) FinalizeTreeCreation(ctx context.Context, req *pb.FinalizeTreeCreationRequest) (*emptypb.Empty, error) {
 	depositHandler := handler.NewInternalDepositHandler(s.config, s.onchainHelper)

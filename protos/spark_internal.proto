@@ -17,7 +17,6 @@ service SparkInternalService {
     rpc frost_round2(FrostRound2Request) returns (FrostRound2Response) {}
 
     rpc prepare_split_keyshares(PrepareSplitKeysharesRequest) returns (google.protobuf.Empty) {}
-    rpc finalize_node_split(FinalizeNodeSplitRequest) returns (google.protobuf.Empty) {}
 
     rpc aggregate_nodes(spark.AggregateNodesRequest) returns (google.protobuf.Empty) {}
     rpc finalize_nodes_aggregation(FinalizeNodesAggregationRequest) returns (google.protobuf.Empty) {}
@@ -94,11 +93,6 @@ message PrepareSplitKeysharesRequest {
 
 message FinalizeTreeCreationRequest {
     repeated TreeNode nodes = 1;
-}
-
-message FinalizeNodeSplitRequest {
-    string parent_node_id = 1;
-    repeated TreeNode child_nodes = 2;
 }
 
 message FinalizeNodesAggregationRequest {

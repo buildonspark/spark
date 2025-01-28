@@ -2,7 +2,6 @@ package handler
 
 import (
 	"context"
-	"fmt"
 	"log"
 
 	"github.com/google/uuid"
@@ -77,65 +76,4 @@ func (h *InternalSplitHandler) PrepareSplitKeyshares(ctx context.Context, req *p
 	}
 
 	return &emptypb.Empty{}, nil
-}
-
-// FinalizeNodeSplit finalizes the node split.
-func (h *InternalSplitHandler) FinalizeNodeSplit(ctx context.Context, req *pbinternal.FinalizeNodeSplitRequest) error {
-	db := ent.GetDbFromContext(ctx)
-	parentNodeID, err := uuid.Parse(req.ParentNodeId)
-	if err != nil {
-		return err
-	}
-	parentNode, err := db.TreeNode.Get(ctx, parentNodeID)
-	if err != nil {
-		return err
-	}
-	if parentNode.Status != schema.TreeNodeStatusSplitLocked {
-		return fmt.Errorf("parent node is not locked for split")
-	}
-
-	treeID, err := parentNode.QueryTree().OnlyID(ctx)
-	if err != nil {
-		return err
-	}
-
-	for _, node := range req.ChildNodes {
-		if *(node.ParentNodeId) != req.ParentNodeId {
-			return fmt.Errorf("parent node ID mismatch")
-		}
-		nodeID, err := uuid.Parse(node.Id)
-		if err != nil {
-			return err
-		}
-
-		signingKeyshareID, err := uuid.Parse(node.SigningKeyshareId)
-		if err != nil {
-			return err
-		}
-
-		_, err = db.TreeNode.
-			Create().
-			SetID(nodeID).
-			SetTreeID(treeID).
-			SetParentID(parentNodeID).
-			SetStatus(schema.TreeNodeStatusAvailable).
-			SetOwnerIdentityPubkey(node.OwnerIdentityPubkey).
-			SetOwnerSigningPubkey(node.OwnerSigningPubkey).
-			SetValue(node.Value).
-			SetVerifyingPubkey(node.VerifyingPubkey).
-			SetSigningKeyshareID(signingKeyshareID).
-			SetVout(uint16(node.Vout)).
-			SetRawTx(node.RawTx).
-			SetRawRefundTx(node.RawRefundTx).
-			Save(ctx)
-		if err != nil {
-			return err
-		}
-	}
-
-	_, err = parentNode.Update().SetStatus(schema.TreeNodeStatusSplitted).Save(ctx)
-	if err != nil {
-		return err
-	}
-	return nil
 }
