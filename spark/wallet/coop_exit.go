@@ -34,66 +34,24 @@ type Leaf struct {
 func GetConnectorRefundSignatures(
 	ctx context.Context,
 	config *Config,
-	signingPrivKey *secp256k1.PrivateKey,
-	leaves []*Leaf,
+	leaves []LeafKeyTweak,
 	exitTxid []byte,
 	connectorOutputs []*wire.OutPoint,
 	receiverPubKey *secp256k1.PublicKey,
-) ([]*pb.NodeSignatures, error) {
-	if len(leaves) != len(connectorOutputs) {
-		return nil, fmt.Errorf("number of leaves and connector outputs must match")
-	}
-	signingJobs := make([]*pb.LeafRefundTxSigningJob, 0)
-	leafDataMap := make(map[string]*leafRefundSigningData)
-	for i, leaf := range leaves {
-		connectorOutput := connectorOutputs[i]
-		refundTx, err := createConnectorRefundTransaction(
-			leaf.RefundTimeLock, leaf.OutPoint, connectorOutput, leaf.AmountSats, receiverPubKey,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create refund transaction: %v", err)
-		}
-		nonce, _ := objects.RandomSigningNonce()
-		signingJob, err := createConnectorRefundTransactionSigningJob(
-			leaf.LeafID, leaf.SigningPubKey.SerializeCompressed(), nonce, refundTx,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create signing job: %v", err)
-		}
-		signingJobs = append(signingJobs, signingJob)
-
-		tx, _ := common.TxFromRawTxBytes(leaf.TreeNode.NodeTx)
-
-		leafDataMap[leaf.LeafID] = &leafRefundSigningData{
-			SigningPrivKey: signingPrivKey,
-			Tx:             tx,
-			RefundTx:       refundTx,
-			Nonce:          nonce,
-			Vout:           0,
-		}
-	}
-
-	sparkConn, err := common.NewGRPCConnection(config.CoodinatorAddress())
+) (*pb.Transfer, map[string][]byte, error) {
+	transfer, signaturesMap, err := signCoopExitRefunds(
+		ctx, config, leaves, exitTxid, connectorOutputs, receiverPubKey,
+	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create grpc connection: %v", err)
+		return nil, nil, fmt.Errorf("failed to sign refund transactions: %v", err)
 	}
-	defer sparkConn.Close()
-	sparkClient := pb.NewSparkServiceClient(sparkConn)
-	response, err := sparkClient.CooperativeExit(ctx, &pb.CooperativeExitRequest{
-		Transfer: &pb.StartSendTransferRequest{
-			TransferId:                uuid.New().String(),
-			OwnerIdentityPublicKey:    config.IdentityPublicKey(),
-			LeavesToSend:              signingJobs,
-			ReceiverIdentityPublicKey: receiverPubKey.SerializeCompressed(),
-			ExpiryTime:                timestamppb.New(time.Now().Add(24 * time.Hour)),
-		},
-		ExitId:   uuid.New().String(),
-		ExitTxid: exitTxid,
-	})
+
+	transfer, err = sendTransferTweakKey(ctx, config, transfer, leaves, signaturesMap)
 	if err != nil {
-		return nil, fmt.Errorf("failed to initiate cooperative exit: %v", err)
+		return nil, nil, fmt.Errorf("failed to send transfer: %v", err)
 	}
-	return signRefunds(config, leafDataMap, response.SigningResults)
+
+	return transfer, signaturesMap, nil
 }
 
 func createConnectorRefundTransaction(
@@ -142,4 +100,89 @@ func createConnectorRefundTransactionSigningJob(
 			SigningNonceCommitment: refundNonceCommitmentProto,
 		},
 	}, nil
+}
+
+func signCoopExitRefunds(
+	ctx context.Context,
+	config *Config,
+	leaves []LeafKeyTweak,
+	exitTxid []byte,
+	connectorOutputs []*wire.OutPoint,
+	receiverPubKey *secp256k1.PublicKey,
+) (*pb.Transfer, map[string][]byte, error) {
+	if len(leaves) != len(connectorOutputs) {
+		return nil, nil, fmt.Errorf("number of leaves and connector outputs must match")
+	}
+	signingJobs := make([]*pb.LeafRefundTxSigningJob, 0)
+	leafDataMap := make(map[string]*leafRefundSigningData)
+	for i, leaf := range leaves {
+		connectorOutput := connectorOutputs[i]
+		currentRefundTx, err := common.TxFromRawTxBytes(leaf.Leaf.RefundTx)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to parse refund tx: %v", err)
+		}
+		refundTx, err := createConnectorRefundTransaction(
+			nextSequence(currentRefundTx.TxIn[0].Sequence), &currentRefundTx.TxIn[0].PreviousOutPoint, connectorOutput, int64(leaf.Leaf.Value), receiverPubKey,
+		)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to create refund transaction: %v", err)
+		}
+		nonce, _ := objects.RandomSigningNonce()
+		signingPrivKey := secp256k1.PrivKeyFromBytes(leaf.SigningPrivKey)
+		signingPubKey := signingPrivKey.PubKey()
+		signingJob, err := createConnectorRefundTransactionSigningJob(
+			leaf.Leaf.Id, signingPubKey.SerializeCompressed(), nonce, refundTx,
+		)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to create signing job: %v", err)
+		}
+		signingJobs = append(signingJobs, signingJob)
+
+		tx, _ := common.TxFromRawTxBytes(leaf.Leaf.NodeTx)
+
+		leafDataMap[leaf.Leaf.Id] = &leafRefundSigningData{
+			SigningPrivKey: signingPrivKey,
+			RefundTx:       refundTx,
+			Nonce:          nonce,
+			Tx:             tx,
+			Vout:           int(leaf.Leaf.Vout),
+		}
+	}
+
+	sparkConn, err := common.NewGRPCConnection(config.CoodinatorAddress())
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create grpc connection: %v", err)
+	}
+	defer sparkConn.Close()
+	sparkClient := pb.NewSparkServiceClient(sparkConn)
+	token, err := AuthenticateWithConnection(ctx, config, sparkConn)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to authenticate with coordinator: %v", err)
+	}
+	tmpCtx := ContextWithToken(ctx, token)
+	response, err := sparkClient.CooperativeExit(tmpCtx, &pb.CooperativeExitRequest{
+		Transfer: &pb.StartSendTransferRequest{
+			TransferId:                uuid.New().String(),
+			LeavesToSend:              signingJobs,
+			OwnerIdentityPublicKey:    config.IdentityPublicKey(),
+			ReceiverIdentityPublicKey: receiverPubKey.SerializeCompressed(),
+			ExpiryTime:                timestamppb.New(time.Now().Add(24 * time.Hour)),
+		},
+		ExitId:   uuid.New().String(),
+		ExitTxid: exitTxid,
+	})
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to initiate cooperative exit: %v", err)
+	}
+	signatures, err := signRefunds(config, leafDataMap, response.SigningResults)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to sign refund transactions: %v", err)
+	}
+
+	signaturesMap := make(map[string][]byte)
+	for _, signature := range signatures {
+		signaturesMap[signature.NodeId] = signature.RefundTxSignature
+	}
+
+	return response.Transfer, signaturesMap, nil
 }

@@ -3,12 +3,16 @@ package handler
 import (
 	"context"
 	"fmt"
+	"log"
 
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark-go/common"
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
+	pbinternal "github.com/lightsparkdev/spark-go/proto/spark_internal"
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/authz"
 	"github.com/lightsparkdev/spark-go/so/ent"
+	"github.com/lightsparkdev/spark-go/so/helper"
 )
 
 // CooperativeExitHandler tracks transfers
@@ -32,7 +36,7 @@ func (h *CooperativeExitHandler) CooperativeExit(ctx context.Context, req *pb.Co
 		return nil, err
 	}
 
-	transferHandler := BaseTransferHandler{config: h.config}
+	transferHandler := NewTransferHandler(h.config)
 	leafRefundMap := make(map[string][]byte)
 	for _, job := range req.Transfer.LeavesToSend {
 		leafRefundMap[job.LeafId] = job.RefundTxSigningJob.RawTx
@@ -58,13 +62,62 @@ func (h *CooperativeExitHandler) CooperativeExit(ctx context.Context, req *pb.Co
 		return nil, fmt.Errorf("failed to create cooperative exit: %v", err)
 	}
 
+	transferProto, err := transfer.MarshalProto(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal transfer: %v", err)
+	}
+
 	signingResults, err := signRefunds(ctx, h.config, req.Transfer.LeavesToSend, leafMap)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign refund transactions: %v", err)
 	}
 
+	err = transferHandler.syncCoopExitInit(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to sync transfer init: %v", err)
+	}
+
 	response := &pb.CooperativeExitResponse{
+		Transfer:       transferProto,
 		SigningResults: signingResults,
 	}
 	return response, nil
+}
+
+func (h *TransferHandler) syncCoopExitInit(ctx context.Context, req *pb.CooperativeExitRequest) error {
+	transfer := req.Transfer
+	leaves := make([]*pbinternal.InitiateTransferLeaf, 0)
+	for _, leaf := range transfer.LeavesToSend {
+		leaves = append(leaves, &pbinternal.InitiateTransferLeaf{
+			LeafId:      leaf.LeafId,
+			RawRefundTx: leaf.RefundTxSigningJob.RawTx,
+		})
+	}
+	initTransferRequest := &pbinternal.InitiateTransferRequest{
+		TransferId:                transfer.TransferId,
+		SenderIdentityPublicKey:   transfer.OwnerIdentityPublicKey,
+		ReceiverIdentityPublicKey: transfer.ReceiverIdentityPublicKey,
+		ExpiryTime:                transfer.ExpiryTime,
+		Leaves:                    leaves,
+	}
+	coopExitRequest := &pbinternal.InitiateCooperativeExitRequest{
+		Transfer: initTransferRequest,
+		ExitId:   req.ExitId,
+		ExitTxid: req.ExitTxid,
+	}
+	selection := helper.OperatorSelection{
+		Option: helper.OperatorSelectionOptionExcludeSelf,
+	}
+	_, err := helper.ExecuteTaskWithAllOperators(ctx, h.config, &selection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
+		conn, err := common.NewGRPCConnection(operator.Address)
+		if err != nil {
+			log.Printf("Failed to connect to operator: %v", err)
+			return nil, err
+		}
+		defer conn.Close()
+
+		client := pbinternal.NewSparkInternalServiceClient(conn)
+		return client.InitiateCooperativeExit(ctx, coopExitRequest)
+	})
+	return err
 }

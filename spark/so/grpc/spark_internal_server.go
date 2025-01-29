@@ -293,3 +293,13 @@ func (s *SparkInternalServer) InitiateTransfer(ctx context.Context, req *pb.Init
 	}
 	return &emptypb.Empty{}, nil
 }
+
+// InitiateCooperativeExit initiates a cooperative exit.
+func (s *SparkInternalServer) InitiateCooperativeExit(ctx context.Context, req *pb.InitiateCooperativeExitRequest) (*emptypb.Empty, error) {
+	transferHandler := handler.NewInternalTransferHandler(s.config)
+	err := transferHandler.InitiateCooperativeExit(ctx, req)
+	if err != nil {
+		log.Printf("failed to initiate cooperative exit: %v", err)
+	}
+	return &emptypb.Empty{}, nil
+}

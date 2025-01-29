@@ -37,6 +37,10 @@ func TestCoopExit(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create ssp address: %v", err)
 	}
+	sspConfig, err := testutil.TestWalletConfigWithIdentityKey(*sspPrivKey)
+	if err != nil {
+		t.Fatalf("failed to create ssp config: %v", err)
+	}
 
 	// Initiate exit - SSP is just another user, providing a service external to the SO
 	amountSats := int64(100_000) // TODO: this should match the amount from the leaves
@@ -81,43 +85,51 @@ func TestCoopExit(t *testing.T) {
 		t.Fatalf("failed to create test transaction: %v", err)
 	}
 
-	// Call wallet function to get signatures
-	nodeTx, err := common.TxFromRawTxBytes(rootNode.GetNodeTx())
-	if err != nil {
-		t.Fatalf("failed to parse node tx: %v", err)
-	}
-	nodeTxHash := nodeTx.TxHash()
-	leafOutPoint := wire.NewOutPoint(&nodeTxHash, 0)
-	leaf := &wallet.Leaf{
-		LeafID:        rootNode.Id,
-		OutPoint:      leafOutPoint,
-		SigningPubKey: leafPrivKey.PubKey(),
-		AmountSats:    int64(rootNode.Value),
-		TreeNode:      rootNode,
-	}
 	connectorOutputs := make([]*wire.OutPoint, 0)
 	for i := range connectorTx.TxOut[:len(connectorTx.TxOut)-1] {
 		txHash := connectorTx.TxHash()
 		connectorOutputs = append(connectorOutputs, wire.NewOutPoint(&txHash, uint32(i)))
 	}
 
-	token, err := wallet.AuthenticateWithServer(context.Background(), config)
+	newLeafPrivKey, err := secp256k1.GeneratePrivateKey()
 	if err != nil {
-		t.Fatalf("failed to authenticate: %v", err)
+		t.Fatalf("failed to create new node signing private key: %v", err)
 	}
-	ctx := wallet.ContextWithToken(context.Background(), token)
 
-	_, err = wallet.GetConnectorRefundSignatures(
-		ctx,
+	transferNode := wallet.LeafKeyTweak{
+		Leaf:              rootNode,
+		SigningPrivKey:    leafPrivKey.Serialize(),
+		NewSigningPrivKey: newLeafPrivKey.Serialize(),
+	}
+
+	senderTransfer, _, err := wallet.GetConnectorRefundSignatures(
+		context.Background(),
 		config,
-		leafPrivKey,
-		[]*wallet.Leaf{leaf},
+		[]wallet.LeafKeyTweak{transferNode},
 		exitTxHash.CloneBytes(),
 		connectorOutputs,
 		sspPubkey,
 	)
 	if err != nil {
 		t.Fatalf("failed to get connector refund signatures: %v", err)
+	}
+
+	sspToken, err := wallet.AuthenticateWithServer(context.Background(), sspConfig)
+	if err != nil {
+		t.Fatalf("failed to authenticate receiver: %v", err)
+	}
+	sspCtx := wallet.ContextWithToken(context.Background(), sspToken)
+
+	pendingTransfer, err := wallet.QueryPendingTransfers(sspCtx, sspConfig)
+	if err != nil {
+		t.Fatalf("failed to query pending transfers: %v", err)
+	}
+	if len(pendingTransfer.Transfers) != 1 {
+		t.Fatalf("expected 1 pending transfer, got %d", len(pendingTransfer.Transfers))
+	}
+	receiverTransfer := pendingTransfer.Transfers[0]
+	if receiverTransfer.Id != senderTransfer.Id {
+		t.Fatalf("expected transfer id %s, got %s", senderTransfer.Id, receiverTransfer.Id)
 	}
 
 	// TODO: verify signatures, "broadcast" exit tx, claim leaves

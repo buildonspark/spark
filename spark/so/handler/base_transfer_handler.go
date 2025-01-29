@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/btcsuite/btcd/wire"
@@ -13,6 +14,9 @@ import (
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/ent"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
+	enttransfer "github.com/lightsparkdev/spark-go/so/ent/transfer"
+	enttransferleaf "github.com/lightsparkdev/spark-go/so/ent/transferleaf"
+	enttreenode "github.com/lightsparkdev/spark-go/so/ent/treenode"
 )
 
 // BaseTransferHandler is the base transfer handler that is shared for internal and external transfer handlers.
@@ -195,16 +199,30 @@ func leafAvailableToTransfer(leaf *ent.TreeNode, senderIdentityPublicKey []byte,
 }
 
 func createTransferLeaves(ctx context.Context, db *ent.Tx, transfer *ent.Transfer, leaves []*ent.TreeNode, leafRefundMap map[string][]byte) error {
+	log.Println("Transferid:", transfer.ID.String())
 	for _, leaf := range leaves {
+		log.Println("creating leaf id:", leaf.ID.String())
 		rawRefundTx := leafRefundMap[leaf.ID.String()]
-		_, err := db.TransferLeaf.Create().
+		leafEnt, err := db.TransferLeaf.Create().
 			SetTransfer(transfer).
 			SetLeaf(leaf).
 			SetPreviousRefundTx(leaf.RawRefundTx).
 			SetIntermediateRefundTx(rawRefundTx).
 			Save(ctx)
+		log.Println("created leafEnt id:", leafEnt.ID.String())
 		if err != nil {
 			return fmt.Errorf("unable to create transfer leaf: %v", err)
+		}
+
+		_, err = db.TransferLeaf.
+			Query().
+			Where(
+				enttransferleaf.HasTransferWith(enttransfer.IDEQ(transfer.ID)),
+				enttransferleaf.HasLeafWith(enttreenode.IDEQ(leaf.ID)),
+			).
+			Only(ctx)
+		if err != nil {
+			return fmt.Errorf("unable to find transfer leaf right after writing: %v", err)
 		}
 	}
 	return nil

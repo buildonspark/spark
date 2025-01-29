@@ -312,7 +312,8 @@ message CooperativeExitRequest {
 }
 
 message CooperativeExitResponse {
-    repeated LeafRefundTxSigningResult signing_results = 1;
+    Transfer transfer = 1;
+    repeated LeafRefundTxSigningResult signing_results = 2;
 }
 
 message AddressRequestNode {

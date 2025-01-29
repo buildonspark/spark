@@ -33,6 +33,7 @@ const (
 	SparkInternalService_InitiatePreimageSwap_FullMethodName          = "/spark_internal.SparkInternalService/initiate_preimage_swap"
 	SparkInternalService_PrepareTreeAddress_FullMethodName            = "/spark_internal.SparkInternalService/prepare_tree_address"
 	SparkInternalService_InitiateTransfer_FullMethodName              = "/spark_internal.SparkInternalService/initiate_transfer"
+	SparkInternalService_InitiateCooperativeExit_FullMethodName       = "/spark_internal.SparkInternalService/initiate_cooperative_exit"
 )
 
 // SparkInternalServiceClient is the client API for SparkInternalService service.
@@ -51,6 +52,7 @@ type SparkInternalServiceClient interface {
 	InitiatePreimageSwap(ctx context.Context, in *spark.InitiatePreimageSwapRequest, opts ...grpc.CallOption) (*InitiatePreimageSwapResponse, error)
 	PrepareTreeAddress(ctx context.Context, in *PrepareTreeAddressRequest, opts ...grpc.CallOption) (*PrepareTreeAddressResponse, error)
 	InitiateTransfer(ctx context.Context, in *InitiateTransferRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	InitiateCooperativeExit(ctx context.Context, in *InitiateCooperativeExitRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type sparkInternalServiceClient struct {
@@ -181,6 +183,16 @@ func (c *sparkInternalServiceClient) InitiateTransfer(ctx context.Context, in *I
 	return out, nil
 }
 
+func (c *sparkInternalServiceClient) InitiateCooperativeExit(ctx context.Context, in *InitiateCooperativeExitRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, SparkInternalService_InitiateCooperativeExit_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SparkInternalServiceServer is the server API for SparkInternalService service.
 // All implementations must embed UnimplementedSparkInternalServiceServer
 // for forward compatibility.
@@ -197,6 +209,7 @@ type SparkInternalServiceServer interface {
 	InitiatePreimageSwap(context.Context, *spark.InitiatePreimageSwapRequest) (*InitiatePreimageSwapResponse, error)
 	PrepareTreeAddress(context.Context, *PrepareTreeAddressRequest) (*PrepareTreeAddressResponse, error)
 	InitiateTransfer(context.Context, *InitiateTransferRequest) (*emptypb.Empty, error)
+	InitiateCooperativeExit(context.Context, *InitiateCooperativeExitRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedSparkInternalServiceServer()
 }
 
@@ -242,6 +255,9 @@ func (UnimplementedSparkInternalServiceServer) PrepareTreeAddress(context.Contex
 }
 func (UnimplementedSparkInternalServiceServer) InitiateTransfer(context.Context, *InitiateTransferRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method InitiateTransfer not implemented")
+}
+func (UnimplementedSparkInternalServiceServer) InitiateCooperativeExit(context.Context, *InitiateCooperativeExitRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method InitiateCooperativeExit not implemented")
 }
 func (UnimplementedSparkInternalServiceServer) mustEmbedUnimplementedSparkInternalServiceServer() {}
 func (UnimplementedSparkInternalServiceServer) testEmbeddedByValue()                              {}
@@ -480,6 +496,24 @@ func _SparkInternalService_InitiateTransfer_Handler(srv interface{}, ctx context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SparkInternalService_InitiateCooperativeExit_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(InitiateCooperativeExitRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkInternalServiceServer).InitiateCooperativeExit(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkInternalService_InitiateCooperativeExit_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkInternalServiceServer).InitiateCooperativeExit(ctx, req.(*InitiateCooperativeExitRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // SparkInternalService_ServiceDesc is the grpc.ServiceDesc for SparkInternalService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -534,6 +568,10 @@ var SparkInternalService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "initiate_transfer",
 			Handler:    _SparkInternalService_InitiateTransfer_Handler,
+		},
+		{
+			MethodName: "initiate_cooperative_exit",
+			Handler:    _SparkInternalService_InitiateCooperativeExit_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

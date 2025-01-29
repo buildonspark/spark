@@ -28,6 +28,8 @@ service SparkInternalService {
     rpc prepare_tree_address(PrepareTreeAddressRequest) returns (PrepareTreeAddressResponse) {}
 
     rpc initiate_transfer(InitiateTransferRequest) returns (google.protobuf.Empty) {}
+
+    rpc initiate_cooperative_exit(InitiateCooperativeExitRequest) returns (google.protobuf.Empty) {}
 }
 
 message MarkKeysharesAsUsedRequest {
@@ -154,4 +156,10 @@ message InitiateTransferRequest {
     bytes receiver_identity_public_key = 3;
     google.protobuf.Timestamp expiry_time = 4;
     repeated InitiateTransferLeaf leaves = 5;
+}
+
+message InitiateCooperativeExitRequest {
+    InitiateTransferRequest transfer = 1;
+    string exit_id = 2;
+    bytes exit_txid = 3;
 }

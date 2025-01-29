@@ -88,3 +88,33 @@ func (h *InternalTransferHandler) InitiateTransfer(ctx context.Context, req *pbi
 	_, _, err := h.createTransfer(ctx, req.TransferId, req.ExpiryTime.AsTime(), req.SenderIdentityPublicKey, req.ReceiverIdentityPublicKey, leafRefundMap, false)
 	return err
 }
+
+// InitiateCooperativeExit initiates a cooperative exit by creating transfer and transfer_leaf,
+// and saving the exit txid.
+func (h *InternalTransferHandler) InitiateCooperativeExit(ctx context.Context, req *pbinternal.InitiateCooperativeExitRequest) error {
+	transferReq := req.Transfer
+	leafRefundMap := make(map[string][]byte)
+	for _, leaf := range transferReq.Leaves {
+		leafRefundMap[leaf.LeafId] = leaf.RawRefundTx
+	}
+	transfer, _, err := h.createTransfer(ctx, transferReq.TransferId, transferReq.ExpiryTime.AsTime(), transferReq.SenderIdentityPublicKey, transferReq.ReceiverIdentityPublicKey, leafRefundMap, true)
+	if err != nil {
+		return err
+	}
+
+	exitID, err := uuid.Parse(req.ExitId)
+	if err != nil {
+		return err
+	}
+
+	db := ent.GetDbFromContext(ctx)
+	_, err = db.CooperativeExit.Create().
+		SetID(exitID).
+		SetTransfer(transfer).
+		SetExitTxid(req.ExitTxid).
+		Save(ctx)
+	if err != nil {
+		return err
+	}
+	return err
+}
