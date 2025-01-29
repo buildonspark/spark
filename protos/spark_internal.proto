@@ -30,6 +30,9 @@ service SparkInternalService {
     rpc initiate_transfer(InitiateTransferRequest) returns (google.protobuf.Empty) {}
 
     rpc initiate_cooperative_exit(InitiateCooperativeExitRequest) returns (google.protobuf.Empty) {}
+    
+    rpc mark_keyshare_for_revocation_public_key(MarkKeyshareForRevocationPublicKeyRequest) returns (google.protobuf.Empty) {}
+    rpc mark_keyshare_for_token_transaction(MarkKeyshareForTokenTransactionRequest) returns (MarkKeyshareForTokenTransactionResponse) {}
 }
 
 message MarkKeysharesAsUsedRequest {
@@ -162,4 +165,20 @@ message InitiateCooperativeExitRequest {
     InitiateTransferRequest transfer = 1;
     string exit_id = 2;
     bytes exit_txid = 3;
+}
+
+message MarkKeyshareForRevocationPublicKeyRequest {
+    string keyshare_id = 1;
+    bytes revocation_public_key = 2;
+}
+
+message MarkKeyshareForTokenTransactionRequest {
+    string keyshare_id = 1;
+    bytes token_transaction_hash = 2;
+    bytes user_identity_public_key = 3;
+    bytes user_signing_public_key = 4;    
+}
+
+message MarkKeyshareForTokenTransactionResponse {
+    bytes token_transaction_hash_signature = 1;
 }

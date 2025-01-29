@@ -21,19 +21,21 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	SparkInternalService_MarkKeysharesAsUsed_FullMethodName           = "/spark_internal.SparkInternalService/mark_keyshares_as_used"
-	SparkInternalService_MarkKeyshareForDepositAddress_FullMethodName = "/spark_internal.SparkInternalService/mark_keyshare_for_deposit_address"
-	SparkInternalService_FinalizeTreeCreation_FullMethodName          = "/spark_internal.SparkInternalService/finalize_tree_creation"
-	SparkInternalService_FrostRound1_FullMethodName                   = "/spark_internal.SparkInternalService/frost_round1"
-	SparkInternalService_FrostRound2_FullMethodName                   = "/spark_internal.SparkInternalService/frost_round2"
-	SparkInternalService_PrepareSplitKeyshares_FullMethodName         = "/spark_internal.SparkInternalService/prepare_split_keyshares"
-	SparkInternalService_AggregateNodes_FullMethodName                = "/spark_internal.SparkInternalService/aggregate_nodes"
-	SparkInternalService_FinalizeNodesAggregation_FullMethodName      = "/spark_internal.SparkInternalService/finalize_nodes_aggregation"
-	SparkInternalService_FinalizeTransfer_FullMethodName              = "/spark_internal.SparkInternalService/finalize_transfer"
-	SparkInternalService_InitiatePreimageSwap_FullMethodName          = "/spark_internal.SparkInternalService/initiate_preimage_swap"
-	SparkInternalService_PrepareTreeAddress_FullMethodName            = "/spark_internal.SparkInternalService/prepare_tree_address"
-	SparkInternalService_InitiateTransfer_FullMethodName              = "/spark_internal.SparkInternalService/initiate_transfer"
-	SparkInternalService_InitiateCooperativeExit_FullMethodName       = "/spark_internal.SparkInternalService/initiate_cooperative_exit"
+	SparkInternalService_MarkKeysharesAsUsed_FullMethodName                = "/spark_internal.SparkInternalService/mark_keyshares_as_used"
+	SparkInternalService_MarkKeyshareForDepositAddress_FullMethodName      = "/spark_internal.SparkInternalService/mark_keyshare_for_deposit_address"
+	SparkInternalService_FinalizeTreeCreation_FullMethodName               = "/spark_internal.SparkInternalService/finalize_tree_creation"
+	SparkInternalService_FrostRound1_FullMethodName                        = "/spark_internal.SparkInternalService/frost_round1"
+	SparkInternalService_FrostRound2_FullMethodName                        = "/spark_internal.SparkInternalService/frost_round2"
+	SparkInternalService_PrepareSplitKeyshares_FullMethodName              = "/spark_internal.SparkInternalService/prepare_split_keyshares"
+	SparkInternalService_AggregateNodes_FullMethodName                     = "/spark_internal.SparkInternalService/aggregate_nodes"
+	SparkInternalService_FinalizeNodesAggregation_FullMethodName           = "/spark_internal.SparkInternalService/finalize_nodes_aggregation"
+	SparkInternalService_FinalizeTransfer_FullMethodName                   = "/spark_internal.SparkInternalService/finalize_transfer"
+	SparkInternalService_InitiatePreimageSwap_FullMethodName               = "/spark_internal.SparkInternalService/initiate_preimage_swap"
+	SparkInternalService_PrepareTreeAddress_FullMethodName                 = "/spark_internal.SparkInternalService/prepare_tree_address"
+	SparkInternalService_InitiateTransfer_FullMethodName                   = "/spark_internal.SparkInternalService/initiate_transfer"
+	SparkInternalService_InitiateCooperativeExit_FullMethodName            = "/spark_internal.SparkInternalService/initiate_cooperative_exit"
+	SparkInternalService_MarkKeyshareForRevocationPublicKey_FullMethodName = "/spark_internal.SparkInternalService/mark_keyshare_for_revocation_public_key"
+	SparkInternalService_MarkKeyshareForTokenTransaction_FullMethodName    = "/spark_internal.SparkInternalService/mark_keyshare_for_token_transaction"
 )
 
 // SparkInternalServiceClient is the client API for SparkInternalService service.
@@ -53,6 +55,8 @@ type SparkInternalServiceClient interface {
 	PrepareTreeAddress(ctx context.Context, in *PrepareTreeAddressRequest, opts ...grpc.CallOption) (*PrepareTreeAddressResponse, error)
 	InitiateTransfer(ctx context.Context, in *InitiateTransferRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	InitiateCooperativeExit(ctx context.Context, in *InitiateCooperativeExitRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	MarkKeyshareForRevocationPublicKey(ctx context.Context, in *MarkKeyshareForRevocationPublicKeyRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	MarkKeyshareForTokenTransaction(ctx context.Context, in *MarkKeyshareForTokenTransactionRequest, opts ...grpc.CallOption) (*MarkKeyshareForTokenTransactionResponse, error)
 }
 
 type sparkInternalServiceClient struct {
@@ -193,6 +197,26 @@ func (c *sparkInternalServiceClient) InitiateCooperativeExit(ctx context.Context
 	return out, nil
 }
 
+func (c *sparkInternalServiceClient) MarkKeyshareForRevocationPublicKey(ctx context.Context, in *MarkKeyshareForRevocationPublicKeyRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, SparkInternalService_MarkKeyshareForRevocationPublicKey_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *sparkInternalServiceClient) MarkKeyshareForTokenTransaction(ctx context.Context, in *MarkKeyshareForTokenTransactionRequest, opts ...grpc.CallOption) (*MarkKeyshareForTokenTransactionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(MarkKeyshareForTokenTransactionResponse)
+	err := c.cc.Invoke(ctx, SparkInternalService_MarkKeyshareForTokenTransaction_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SparkInternalServiceServer is the server API for SparkInternalService service.
 // All implementations must embed UnimplementedSparkInternalServiceServer
 // for forward compatibility.
@@ -210,6 +234,8 @@ type SparkInternalServiceServer interface {
 	PrepareTreeAddress(context.Context, *PrepareTreeAddressRequest) (*PrepareTreeAddressResponse, error)
 	InitiateTransfer(context.Context, *InitiateTransferRequest) (*emptypb.Empty, error)
 	InitiateCooperativeExit(context.Context, *InitiateCooperativeExitRequest) (*emptypb.Empty, error)
+	MarkKeyshareForRevocationPublicKey(context.Context, *MarkKeyshareForRevocationPublicKeyRequest) (*emptypb.Empty, error)
+	MarkKeyshareForTokenTransaction(context.Context, *MarkKeyshareForTokenTransactionRequest) (*MarkKeyshareForTokenTransactionResponse, error)
 	mustEmbedUnimplementedSparkInternalServiceServer()
 }
 
@@ -258,6 +284,12 @@ func (UnimplementedSparkInternalServiceServer) InitiateTransfer(context.Context,
 }
 func (UnimplementedSparkInternalServiceServer) InitiateCooperativeExit(context.Context, *InitiateCooperativeExitRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method InitiateCooperativeExit not implemented")
+}
+func (UnimplementedSparkInternalServiceServer) MarkKeyshareForRevocationPublicKey(context.Context, *MarkKeyshareForRevocationPublicKeyRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method MarkKeyshareForRevocationPublicKey not implemented")
+}
+func (UnimplementedSparkInternalServiceServer) MarkKeyshareForTokenTransaction(context.Context, *MarkKeyshareForTokenTransactionRequest) (*MarkKeyshareForTokenTransactionResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method MarkKeyshareForTokenTransaction not implemented")
 }
 func (UnimplementedSparkInternalServiceServer) mustEmbedUnimplementedSparkInternalServiceServer() {}
 func (UnimplementedSparkInternalServiceServer) testEmbeddedByValue()                              {}
@@ -514,6 +546,42 @@ func _SparkInternalService_InitiateCooperativeExit_Handler(srv interface{}, ctx 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SparkInternalService_MarkKeyshareForRevocationPublicKey_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(MarkKeyshareForRevocationPublicKeyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkInternalServiceServer).MarkKeyshareForRevocationPublicKey(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkInternalService_MarkKeyshareForRevocationPublicKey_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkInternalServiceServer).MarkKeyshareForRevocationPublicKey(ctx, req.(*MarkKeyshareForRevocationPublicKeyRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SparkInternalService_MarkKeyshareForTokenTransaction_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(MarkKeyshareForTokenTransactionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkInternalServiceServer).MarkKeyshareForTokenTransaction(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkInternalService_MarkKeyshareForTokenTransaction_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkInternalServiceServer).MarkKeyshareForTokenTransaction(ctx, req.(*MarkKeyshareForTokenTransactionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // SparkInternalService_ServiceDesc is the grpc.ServiceDesc for SparkInternalService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -572,6 +640,14 @@ var SparkInternalService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "initiate_cooperative_exit",
 			Handler:    _SparkInternalService_InitiateCooperativeExit_Handler,
+		},
+		{
+			MethodName: "mark_keyshare_for_revocation_public_key",
+			Handler:    _SparkInternalService_MarkKeyshareForRevocationPublicKey_Handler,
+		},
+		{
+			MethodName: "mark_keyshare_for_token_transaction",
+			Handler:    _SparkInternalService_MarkKeyshareForTokenTransaction_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
