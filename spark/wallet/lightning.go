@@ -55,16 +55,22 @@ func CreateLightningInvoice(ctx context.Context, config *Config, creator Lightni
 		shareProto := share.MarshalProto()
 
 		wg.Add(1)
-		results := make(chan error, len(config.SigningOperators))
 		go func(operator *so.SigningOperator) {
 			defer wg.Done()
 			sparkConn, err := common.NewGRPCConnection(operator.Address)
 			if err != nil {
+				results <- err
 				return
 			}
 			defer sparkConn.Close()
 			sparkClient := pb.NewSparkServiceClient(sparkConn)
-			_, err = sparkClient.StorePreimageShare(ctx, &pb.StorePreimageShareRequest{
+			token, err := AuthenticateWithConnection(ctx, config, sparkConn)
+			if err != nil {
+				results <- err
+				return
+			}
+			tmpCtx := ContextWithToken(ctx, token)
+			_, err = sparkClient.StorePreimageShare(tmpCtx, &pb.StorePreimageShareRequest{
 				PaymentHash:           paymentHash[:],
 				PreimageShare:         shareProto,
 				Threshold:             uint32(config.Threshold),

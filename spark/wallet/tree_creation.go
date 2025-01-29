@@ -101,6 +101,7 @@ func applyAddressNodesToTree(
 
 // GenerateDepositAddressesForTree generates the deposit addresses for the tree.
 func GenerateDepositAddressesForTree(
+	ctx context.Context,
 	config *Config,
 	parentTx *wire.MsgTx,
 	parentNode *pb.TreeNode,
@@ -154,7 +155,7 @@ func GenerateDepositAddressesForTree(
 		SigningPrivateKey: parentSigningPrivateKey,
 		Children:          tree,
 	}
-	response, err := client.PrepareTreeAddress(context.Background(), request)
+	response, err := client.PrepareTreeAddress(ctx, request)
 	if err != nil {
 		return nil, err
 	}
@@ -525,6 +526,7 @@ func signTreeCreation(
 
 // CreateTree creates the tree.
 func CreateTree(
+	ctx context.Context,
 	config *Config,
 	parentTx *wire.MsgTx,
 	parentNode *pb.TreeNode,
@@ -577,7 +579,7 @@ func CreateTree(
 
 	client := pb.NewSparkServiceClient(conn)
 
-	response, err := client.CreateTree(context.Background(), &request)
+	response, err := client.CreateTree(ctx, &request)
 	if err != nil {
 		return nil, err
 	}

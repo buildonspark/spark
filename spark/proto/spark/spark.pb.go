@@ -3077,7 +3077,7 @@ type CreateTreeRequest struct {
 	Source isCreateTreeRequest_Source `protobuf_oneof:"source"`
 	// The node should contain the tx that spends the source's utxo.
 	Node *CreationNode `protobuf:"bytes,3,opt,name=node,proto3" json:"node,omitempty"`
-	// TODO: This should be removed once we have a proper auth process.
+	// The owner of the tree.
 	UserIdentityPublicKey []byte `protobuf:"bytes,4,opt,name=user_identity_public_key,json=userIdentityPublicKey,proto3" json:"user_identity_public_key,omitempty"`
 	unknownFields         protoimpl.UnknownFields
 	sizeCache             protoimpl.SizeCache

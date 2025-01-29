@@ -20,12 +20,18 @@ func TestGenerateDepositAddress(t *testing.T) {
 		t.Fatalf("failed to create wallet config: %v", err)
 	}
 
+	token, err := wallet.AuthenticateWithServer(context.Background(), config)
+	if err != nil {
+		t.Fatalf("failed to authenticate: %v", err)
+	}
+	ctx := wallet.ContextWithToken(context.Background(), token)
+
 	pubkey, err := hex.DecodeString("0330d50fd2e26d274e15f3dcea34a8bb611a9d0f14d1a9b1211f3608b3b7cd56c7")
 	if err != nil {
 		t.Fatalf("failed to decode public key: %v", err)
 	}
 
-	resp, err := wallet.GenerateDepositAddress(context.Background(), config, pubkey)
+	resp, err := wallet.GenerateDepositAddress(ctx, config, pubkey)
 	if err != nil {
 		t.Fatalf("failed to generate deposit address: %v", err)
 	}
@@ -48,6 +54,12 @@ func TestStartTreeCreation(t *testing.T) {
 	}
 	defer conn.Close()
 
+	token, err := wallet.AuthenticateWithConnection(context.Background(), config, conn)
+	if err != nil {
+		t.Fatalf("failed to authenticate: %v", err)
+	}
+	ctx := wallet.ContextWithToken(context.Background(), token)
+
 	mockClient := pbmock.NewMockServiceClient(conn)
 
 	privKey, err := secp256k1.GeneratePrivateKey()
@@ -57,7 +69,7 @@ func TestStartTreeCreation(t *testing.T) {
 	userPubKey := privKey.PubKey()
 	userPubKeyBytes := userPubKey.SerializeCompressed()
 
-	depositResp, err := wallet.GenerateDepositAddress(context.Background(), config, userPubKeyBytes)
+	depositResp, err := wallet.GenerateDepositAddress(ctx, config, userPubKeyBytes)
 	if err != nil {
 		t.Fatalf("failed to generate deposit address: %v", err)
 	}
@@ -88,7 +100,7 @@ func TestStartTreeCreation(t *testing.T) {
 		Tx:   depositTxHex,
 	})
 
-	resp, err := wallet.CreateTreeRoot(context.Background(), config, privKey.Serialize(), depositResp.DepositAddress.VerifyingKey, depositTx, vout)
+	resp, err := wallet.CreateTreeRoot(ctx, config, privKey.Serialize(), depositResp.DepositAddress.VerifyingKey, depositTx, vout)
 	if err != nil {
 		t.Fatalf("failed to create tree: %v", err)
 	}
@@ -109,6 +121,12 @@ func TestStartTreeCreationOffchain(t *testing.T) {
 	}
 	defer conn.Close()
 
+	token, err := wallet.AuthenticateWithConnection(context.Background(), config, conn)
+	if err != nil {
+		t.Fatalf("failed to authenticate: %v", err)
+	}
+	ctx := wallet.ContextWithToken(context.Background(), token)
+
 	privKey, err := secp256k1.GeneratePrivateKey()
 	if err != nil {
 		t.Fatal(err)
@@ -116,7 +134,7 @@ func TestStartTreeCreationOffchain(t *testing.T) {
 	userPubKey := privKey.PubKey()
 	userPubKeyBytes := userPubKey.SerializeCompressed()
 
-	depositResp, err := wallet.GenerateDepositAddress(context.Background(), config, userPubKeyBytes)
+	depositResp, err := wallet.GenerateDepositAddress(ctx, config, userPubKeyBytes)
 	if err != nil {
 		t.Fatalf("failed to generate deposit address: %v", err)
 	}
@@ -141,7 +159,7 @@ func TestStartTreeCreationOffchain(t *testing.T) {
 		t.Fatalf("failed to deserilize deposit tx: %v", err)
 	}
 
-	resp, err := wallet.CreateTreeRoot(context.Background(), config, privKey.Serialize(), depositResp.DepositAddress.VerifyingKey, depositTx, vout)
+	resp, err := wallet.CreateTreeRoot(ctx, config, privKey.Serialize(), depositResp.DepositAddress.VerifyingKey, depositTx, vout)
 	if err != nil {
 		t.Fatalf("failed to create tree: %v", err)
 	}

@@ -19,6 +19,8 @@ type SparkServer struct {
 	onchainHelper helper.OnChainHelper
 }
 
+var emptyResponse = &emptypb.Empty{}
+
 // NewSparkServer creates a new SparkServer.
 func NewSparkServer(config *so.Config, onchainHelper helper.OnChainHelper) *SparkServer {
 	return &SparkServer{config: config, onchainHelper: onchainHelper}
@@ -26,14 +28,14 @@ func NewSparkServer(config *so.Config, onchainHelper helper.OnChainHelper) *Spar
 
 // GenerateDepositAddress generates a deposit address for the given public key.
 func (s *SparkServer) GenerateDepositAddress(ctx context.Context, req *pb.GenerateDepositAddressRequest) (*pb.GenerateDepositAddressResponse, error) {
-	depositHandler := handler.NewDepositHandler(s.onchainHelper)
-	return depositHandler.GenerateDepositAddress(ctx, s.config, req)
+	depositHandler := handler.NewDepositHandler(s.onchainHelper, s.config)
+	return wrapWithGRPCError(depositHandler.GenerateDepositAddress(ctx, s.config, req))
 }
 
 // StartTreeCreation verifies the on chain utxo, and then verifies and signs the offchain root and refund transactions.
 func (s *SparkServer) StartTreeCreation(ctx context.Context, req *pb.StartTreeCreationRequest) (*pb.StartTreeCreationResponse, error) {
-	depositHandler := handler.NewDepositHandler(s.onchainHelper)
-	return depositHandler.StartTreeCreation(ctx, s.config, req)
+	depositHandler := handler.NewDepositHandler(s.onchainHelper, s.config)
+	return wrapWithGRPCError(depositHandler.StartTreeCreation(ctx, s.config, req))
 }
 
 // FinalizeNodeSignatures verifies the node signatures and updates the node.
@@ -51,70 +53,62 @@ func (s *SparkServer) StartSendTransfer(ctx context.Context, req *pb.StartSendTr
 // CompleteSendTransfer completes a transfer from sender.
 func (s *SparkServer) CompleteSendTransfer(ctx context.Context, req *pb.CompleteSendTransferRequest) (*pb.CompleteSendTransferResponse, error) {
 	transferHander := handler.NewTransferHandler(s.config)
-	return transferHander.CompleteSendTransfer(ctx, req)
+	return wrapWithGRPCError(transferHander.CompleteSendTransfer(ctx, req))
 }
 
 // QueryPendingTransfers queries the pending transfers to claim.
 func (s *SparkServer) QueryPendingTransfers(ctx context.Context, req *pb.QueryPendingTransfersRequest) (*pb.QueryPendingTransfersResponse, error) {
 	transferHander := handler.NewTransferHandler(s.config)
-	return transferHander.QueryPendingTransfers(ctx, req)
+	return wrapWithGRPCError(transferHander.QueryPendingTransfers(ctx, req))
 }
 
 // ClaimTransferTweakKeys starts claiming a pending transfer by tweaking keys of leaves.
 func (s *SparkServer) ClaimTransferTweakKeys(ctx context.Context, req *pb.ClaimTransferTweakKeysRequest) (*emptypb.Empty, error) {
 	transferHander := handler.NewTransferHandler(s.config)
-	err := transferHander.ClaimTransferTweakKeys(ctx, req)
-	if err != nil {
-		return nil, err
-	}
-	return &emptypb.Empty{}, nil
+	return wrapWithGRPCError(emptyResponse, transferHander.ClaimTransferTweakKeys(ctx, req))
 }
 
 // ClaimTransferSignRefunds signs new refund transactions as part of the transfer.
 func (s *SparkServer) ClaimTransferSignRefunds(ctx context.Context, req *pb.ClaimTransferSignRefundsRequest) (*pb.ClaimTransferSignRefundsResponse, error) {
 	transferHander := handler.NewTransferHandler(s.config)
-	return transferHander.ClaimTransferSignRefunds(ctx, req)
+	return wrapWithGRPCError(transferHander.ClaimTransferSignRefunds(ctx, req))
 }
 
 // AggregateNodes aggregates the given nodes.
 func (s *SparkServer) AggregateNodes(ctx context.Context, req *pb.AggregateNodesRequest) (*pb.AggregateNodesResponse, error) {
 	aggregateHandler := handler.NewAggregateHandler(s.config)
-	return aggregateHandler.AggregateNodes(ctx, req)
+	return wrapWithGRPCError(aggregateHandler.AggregateNodes(ctx, req))
 }
 
 // StorePreimageShare stores the preimage share for the given payment hash.
 func (s *SparkServer) StorePreimageShare(ctx context.Context, req *pb.StorePreimageShareRequest) (*emptypb.Empty, error) {
 	lightningHandler := handler.NewLightningHandler(s.config)
-	err := lightningHandler.StorePreimageShare(ctx, req)
-	if err != nil {
-		return nil, err
-	}
-	return &emptypb.Empty{}, nil
+	return wrapWithGRPCError(emptyResponse, lightningHandler.StorePreimageShare(ctx, req))
 }
 
 // GetSigningCommitments gets the signing commitments for the given node ids.
 func (s *SparkServer) GetSigningCommitments(ctx context.Context, req *pb.GetSigningCommitmentsRequest) (*pb.GetSigningCommitmentsResponse, error) {
 	lightningHandler := handler.NewLightningHandler(s.config)
-	return lightningHandler.GetSigningCommitments(ctx, req)
+	return wrapWithGRPCError(lightningHandler.GetSigningCommitments(ctx, req))
 }
 
 // GetPreimage gets the preimage for the given payment hash.
 func (s *SparkServer) GetPreimage(ctx context.Context, req *pb.GetPreimageRequest) (*pb.GetPreimageResponse, error) {
 	lightningHandler := handler.NewLightningHandler(s.config)
-	return lightningHandler.GetPreimage(ctx, req)
+	return wrapWithGRPCError(lightningHandler.GetPreimage(ctx, req))
 }
 
 // CooperativeExit asks for signatures for refund transactions spending leaves
 // and connector outputs on another user's L1 transaction.
 func (s *SparkServer) CooperativeExit(ctx context.Context, req *pb.CooperativeExitRequest) (*pb.CooperativeExitResponse, error) {
 	coopExitHandler := handler.NewCooperativeExitHandler(s.config)
-	return coopExitHandler.CooperativeExit(ctx, req)
+	return wrapWithGRPCError(coopExitHandler.CooperativeExit(ctx, req))
 }
 
 // PrepareTreeAddress prepares the tree address for the given public key.
 func (s *SparkServer) PrepareTreeAddress(ctx context.Context, req *pb.PrepareTreeAddressRequest) (*pb.PrepareTreeAddressResponse, error) {
 	treeHandler := handler.NewTreeCreationHandler(s.config, s.onchainHelper)
-	result, err := treeHandler.PrepareTreeAddress(ctx, req)
+	result, err := wrapWithGRPCError(treeHandler.PrepareTreeAddress(ctx, req))
 	if err != nil {
 		log.Printf("failed to prepare tree address: %v", err)
 	}
@@ -124,7 +118,7 @@ func (s *SparkServer) PrepareTreeAddress(ctx context.Context, req *pb.PrepareTre
 // CreateTree creates a tree from user input and signs the transactions in the tree.
 func (s *SparkServer) CreateTree(ctx context.Context, req *pb.CreateTreeRequest) (*pb.CreateTreeResponse, error) {
 	treeHandler := handler.NewTreeCreationHandler(s.config, s.onchainHelper)
-	result, err := treeHandler.CreateTree(ctx, req)
+	result, err := wrapWithGRPCError(treeHandler.CreateTree(ctx, req))
 	if err != nil {
 		log.Printf("failed to create tree: %v", err)
 	}

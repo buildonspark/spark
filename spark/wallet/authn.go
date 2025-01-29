@@ -8,18 +8,23 @@ import (
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 	"github.com/lightsparkdev/spark-go/common"
 	pbauthn "github.com/lightsparkdev/spark-go/proto/spark_authn"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/proto"
 )
 
-// AuthenticateWithServer authenticates the user with the server and returns a session token.
+// AuthenticateWithServer authenticates with the coordinator and returns a session token.
 func AuthenticateWithServer(ctx context.Context, config *Config) (string, error) {
 	conn, err := common.NewGRPCConnection(config.CoodinatorAddress())
 	if err != nil {
 		return "", fmt.Errorf("failed to connect to coordinator: %v", err)
 	}
 	defer conn.Close()
+	return AuthenticateWithConnection(ctx, config, conn)
+}
 
+// AuthenticateWithConnection authenticates to the server using an existing GRPC connection.
+func AuthenticateWithConnection(ctx context.Context, config *Config, conn *grpc.ClientConn) (string, error) {
 	client := pbauthn.NewSparkAuthnServiceClient(conn)
 
 	challengeResp, err := client.GetChallenge(ctx, &pbauthn.GetChallengeRequest{
@@ -49,7 +54,17 @@ func AuthenticateWithServer(ctx context.Context, config *Config) (string, error)
 	return verifyResp.SessionToken, nil
 }
 
-// ContextWithToken adds the session token to the context.
+// ContextWithToken adds the session token to the context. If there is an existing session token, it will be replaced.
 func ContextWithToken(ctx context.Context, token string) context.Context {
-	return metadata.AppendToOutgoingContext(ctx, "authorization", "Bearer "+token)
+	const authKey = "authorization"
+	authValue := "Bearer " + token
+
+	md, ok := metadata.FromOutgoingContext(ctx)
+	if !ok {
+		md = metadata.MD{}
+	}
+
+	newMd := md.Copy()
+	newMd.Set(authKey, authValue)
+	return metadata.NewOutgoingContext(ctx, newMd)
 }

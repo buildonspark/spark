@@ -79,7 +79,13 @@ func sendTransferTweakKey(
 			}
 			defer sparkConn.Close()
 			sparkClient := pb.NewSparkServiceClient(sparkConn)
-			transferResp, err := sparkClient.CompleteSendTransfer(ctx, &pb.CompleteSendTransferRequest{
+			token, err := AuthenticateWithConnection(ctx, config, sparkConn)
+			if err != nil {
+				results <- fmt.Errorf("failed to authenticate with server: %v", err)
+				return
+			}
+			tmpCtx := ContextWithToken(ctx, token)
+			transferResp, err := sparkClient.CompleteSendTransfer(tmpCtx, &pb.CompleteSendTransferRequest{
 				TransferId:             transfer.Id,
 				OwnerIdentityPublicKey: config.IdentityPublicKey(),
 				LeavesToSend:           (*keyTweakInputMap)[identifier],
@@ -144,8 +150,15 @@ func sendTransferSignRefund(
 		return nil, nil, err
 	}
 	defer sparkConn.Close()
+
+	token, err := AuthenticateWithConnection(ctx, config, sparkConn)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to authenticate with server: %v", err)
+	}
+	tmpCtx := ContextWithToken(ctx, token)
+
 	sparkClient := pb.NewSparkServiceClient(sparkConn)
-	response, err := sparkClient.StartSendTransfer(ctx, &pb.StartSendTransferRequest{
+	response, err := sparkClient.StartSendTransfer(tmpCtx, &pb.StartSendTransferRequest{
 		TransferId:                transferID.String(),
 		LeavesToSend:              signingJobs,
 		OwnerIdentityPublicKey:    config.IdentityPublicKey(),
@@ -279,6 +292,7 @@ func QueryPendingTransfers(
 		return nil, err
 	}
 	defer sparkConn.Close()
+
 	sparkClient := pb.NewSparkServiceClient(sparkConn)
 	return sparkClient.QueryPendingTransfers(ctx, &pb.QueryPendingTransfersRequest{
 		ReceiverIdentityPublicKey: config.IdentityPublicKey(),
@@ -365,8 +379,14 @@ func claimTransferTweakKeys(
 				return
 			}
 			defer sparkConn.Close()
+			token, err := AuthenticateWithConnection(ctx, config, sparkConn)
+			if err != nil {
+				results <- err
+				return
+			}
+			tmpCtx := ContextWithToken(ctx, token)
 			sparkClient := pb.NewSparkServiceClient(sparkConn)
-			_, err = sparkClient.ClaimTransferTweakKeys(ctx, &pb.ClaimTransferTweakKeysRequest{
+			_, err = sparkClient.ClaimTransferTweakKeys(tmpCtx, &pb.ClaimTransferTweakKeysRequest{
 				TransferId:             transfer.Id,
 				OwnerIdentityPublicKey: config.IdentityPublicKey(),
 				LeavesToReceive:        (*leavesTweaksMap)[identifier],

@@ -30,8 +30,8 @@ type Config struct {
 	DatabasePath string
 	// Network is the network of the signing operator.
 	Network common.Network
-	// AuthzEnforced determines if authorization checks are enforced
-	AuthzEnforced bool
+	// authzEnforced determines if authorization checks are enforced
+	authzEnforced bool
 }
 
 // DatabaseDriver returns the database driver based on the database path.
@@ -63,7 +63,7 @@ func NewConfig(index uint64, identityPrivateKey string, operatorsFilePath string
 		SignerAddress:      signerAddress,
 		DatabasePath:       databasePath,
 		Network:            common.Regtest, // TODO: load this from args
-		AuthzEnforced:      authzEnforced,
+		authzEnforced:      authzEnforced,
 	}, nil
 }
 
@@ -93,4 +93,9 @@ func (c *Config) GetSigningOperatorList() map[string]*pb.SigningOperatorInfo {
 		operatorList[operator.Identifier] = operator.MarshalProto()
 	}
 	return operatorList
+}
+
+// AuthzEnforced returns whether authorization is enforced
+func (c *Config) AuthzEnforced() bool {
+	return c.authzEnforced
 }

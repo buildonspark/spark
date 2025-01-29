@@ -11,6 +11,7 @@ import (
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark-go/proto/spark_internal"
 	"github.com/lightsparkdev/spark-go/so"
+	"github.com/lightsparkdev/spark-go/so/authz"
 	"github.com/lightsparkdev/spark-go/so/ent"
 	"github.com/lightsparkdev/spark-go/so/ent/depositaddress"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
@@ -250,8 +251,12 @@ func (h *TreeCreationHandler) createAddressNodeFromPrepareTreeAddressNode(ctx co
 	}, nil
 }
 
-// PrepareTreeAddress prepares a tree address for creation.
+// PrepareTreeAddress prepares the tree address for the given public key.
 func (h *TreeCreationHandler) PrepareTreeAddress(ctx context.Context, req *pb.PrepareTreeAddressRequest) (*pb.PrepareTreeAddressResponse, error) {
+	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, req.UserIdentityPublicKey); err != nil {
+		return nil, err
+	}
+
 	parentUserPublicKey, signingKeyshare, err := h.findParentPublicKeys(ctx, req)
 	if err != nil {
 		return nil, err
@@ -545,6 +550,10 @@ func (h *TreeCreationHandler) createTreeResponseNodesFromSigningResults(req *pb.
 
 // CreateTree creates a tree from user input and signs the transactions in the tree.
 func (h *TreeCreationHandler) CreateTree(ctx context.Context, req *pb.CreateTreeRequest) (*pb.CreateTreeResponse, error) {
+	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, req.UserIdentityPublicKey); err != nil {
+		return nil, err
+	}
+
 	signingJobs, nodes, err := h.prepareSigningJobs(ctx, req)
 	if err != nil {
 		return nil, err

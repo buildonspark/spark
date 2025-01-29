@@ -101,8 +101,14 @@ func TestCoopExit(t *testing.T) {
 		connectorOutputs = append(connectorOutputs, wire.NewOutPoint(&txHash, uint32(i)))
 	}
 
+	token, err := wallet.AuthenticateWithServer(context.Background(), config)
+	if err != nil {
+		t.Fatalf("failed to authenticate: %v", err)
+	}
+	ctx := wallet.ContextWithToken(context.Background(), token)
+
 	_, err = wallet.GetConnectorRefundSignatures(
-		context.Background(),
+		ctx,
 		config,
 		leafPrivKey,
 		[]*wallet.Leaf{leaf},

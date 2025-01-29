@@ -356,7 +356,7 @@ message CreateTreeRequest {
     // The node should contain the tx that spends the source's utxo.
     CreationNode node = 3;
     
-    // TODO: This should be removed once we have a proper auth process.
+    // The owner of the tree.
     bytes user_identity_public_key = 4;
 }
 

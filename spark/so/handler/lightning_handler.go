@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"math/big"
+	"strings"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/google/uuid"
@@ -14,6 +15,8 @@ import (
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark-go/proto/spark_internal"
 	"github.com/lightsparkdev/spark-go/so"
+	"github.com/lightsparkdev/spark-go/so/authn"
+	"github.com/lightsparkdev/spark-go/so/authz"
 	"github.com/lightsparkdev/spark-go/so/ent"
 	"github.com/lightsparkdev/spark-go/so/ent/preimageshare"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
@@ -35,6 +38,9 @@ func NewLightningHandler(config *so.Config) *LightningHandler {
 
 // StorePreimageShare stores the preimage share for the given payment hash.
 func (h *LightningHandler) StorePreimageShare(ctx context.Context, req *pb.StorePreimageShareRequest) error {
+	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, req.UserIdentityPublicKey); err != nil {
+		return err
+	}
 	err := secretsharing.ValidateShare(
 		&secretsharing.VerifiableSecretShare{
 			SecretShare: secretsharing.SecretShare{
@@ -64,8 +70,52 @@ func (h *LightningHandler) StorePreimageShare(ctx context.Context, req *pb.Store
 	return nil
 }
 
+func (h *LightningHandler) validateNodeOwnership(ctx context.Context, nodes []*ent.TreeNode) error {
+	if !h.config.AuthzEnforced() {
+		return nil
+	}
+
+	session, err := authn.GetSessionFromContext(ctx)
+	if err != nil {
+		return err
+	}
+	sessionIdentityPubkeyBytes := session.IdentityPublicKeyBytes()
+
+	var mismatchedNodes []string
+	for _, node := range nodes {
+		if !bytes.Equal(node.OwnerIdentityPubkey, sessionIdentityPubkeyBytes) {
+			mismatchedNodes = append(mismatchedNodes, node.ID.String())
+		}
+	}
+
+	if len(mismatchedNodes) > 0 {
+		return &authz.Error{
+			Code: authz.ErrorCodeIdentityMismatch,
+			Message: fmt.Sprintf("nodes [%s] are not owned by the authenticated identity public key %x",
+				strings.Join(mismatchedNodes, ", "),
+				sessionIdentityPubkeyBytes),
+			Cause: nil,
+		}
+	}
+	return nil
+}
+
+func (h *LightningHandler) validateHasSession(ctx context.Context) error {
+	if h.config.AuthzEnforced() {
+		_, err := authn.GetSessionFromContext(ctx)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // GetSigningCommitments gets the signing commitments for the given node ids.
 func (h *LightningHandler) GetSigningCommitments(ctx context.Context, req *pb.GetSigningCommitmentsRequest) (*pb.GetSigningCommitmentsResponse, error) {
+	if err := h.validateHasSession(ctx); err != nil {
+		return nil, err
+	}
+
 	db := ent.GetDbFromContext(ctx)
 	nodeIds := make([]uuid.UUID, len(req.NodeIds))
 	for i, nodeID := range req.NodeIds {
@@ -75,9 +125,14 @@ func (h *LightningHandler) GetSigningCommitments(ctx context.Context, req *pb.Ge
 		}
 		nodeIds[i] = nodeID
 	}
+
 	nodes, err := db.TreeNode.Query().Where(treenode.IDIn(nodeIds...)).All(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get nodes: %v", err)
+	}
+
+	if err := h.validateNodeOwnership(ctx, nodes); err != nil {
+		return nil, err
 	}
 
 	keyshareIDs := make([]uuid.UUID, len(nodes))
@@ -187,6 +242,9 @@ func (h *LightningHandler) GetPreimage(ctx context.Context, req *pb.GetPreimageR
 	preimageShare, err := db.PreimageShare.Query().Where(preimageshare.PaymentHash(req.PaymentHash)).First(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get preimage share: %v", err)
+	}
+	if err = authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, preimageShare.OwnerIdentityPubkey); err != nil {
+		return nil, err
 	}
 
 	err = h.storeUserSignedTransactions(ctx, preimageShare, req.UserSignedRefunds, preimageShare.OwnerIdentityPubkey)

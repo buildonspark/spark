@@ -12,6 +12,7 @@ import (
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark-go/proto/spark_internal"
 	"github.com/lightsparkdev/spark-go/so"
+	"github.com/lightsparkdev/spark-go/so/authz"
 	"github.com/lightsparkdev/spark-go/so/ent"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
 	"github.com/lightsparkdev/spark-go/so/ent/treenode"
@@ -145,6 +146,10 @@ func (h *AggregateHandler) InternalAggregateNodes(ctx context.Context, req *pb.A
 
 // AggregateNodes is the handler for the aggregate nodes request.
 func (h *AggregateHandler) AggregateNodes(ctx context.Context, req *pb.AggregateNodesRequest) (*pb.AggregateNodesResponse, error) {
+	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, req.OwnerIdentityPublicKey); err != nil {
+		return nil, err
+	}
+
 	parentNode, _, updatedKeyshare, err := h.validateAndAggregateKeyshares(ctx, req)
 	if err != nil {
 		return nil, err

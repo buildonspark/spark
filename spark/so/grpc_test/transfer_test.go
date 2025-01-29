@@ -18,13 +18,6 @@ func TestTransfer(t *testing.T) {
 		t.Fatalf("failed to create sender wallet config: %v", err)
 	}
 
-	token, err := wallet.AuthenticateWithServer(context.Background(), senderConfig)
-	if err != nil {
-		t.Fatalf("failed to authenticate sender: %v", err)
-	}
-
-	ctx := wallet.ContextWithToken(context.Background(), token)
-
 	leafPrivKey, err := secp256k1.GeneratePrivateKey()
 	if err != nil {
 		t.Fatalf("failed to create node signing private key: %v", err)
@@ -51,7 +44,7 @@ func TestTransfer(t *testing.T) {
 	}
 	leavesToTransfer := [1]wallet.LeafKeyTweak{transferNode}
 	senderTransfer, err := wallet.SendTransfer(
-		ctx,
+		context.Background(),
 		senderConfig,
 		leavesToTransfer[:],
 		receiverPrivKey.PubKey().SerializeCompressed(),
@@ -66,7 +59,12 @@ func TestTransfer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create wallet config: %v", err)
 	}
-	pendingTransfer, err := wallet.QueryPendingTransfers(context.Background(), receiverConfig)
+	receiverToken, err := wallet.AuthenticateWithServer(context.Background(), receiverConfig)
+	if err != nil {
+		t.Fatalf("failed to authenticate receiver: %v", err)
+	}
+	receiverCtx := wallet.ContextWithToken(context.Background(), receiverToken)
+	pendingTransfer, err := wallet.QueryPendingTransfers(receiverCtx, receiverConfig)
 	if err != nil {
 		t.Fatalf("failed to query pending transfers: %v", err)
 	}
@@ -100,7 +98,7 @@ func TestTransfer(t *testing.T) {
 	}
 	leavesToClaim := [1]wallet.LeafKeyTweak{claimingNode}
 	err = wallet.ClaimTransfer(
-		context.Background(),
+		receiverCtx,
 		receiverTransfer,
 		receiverConfig,
 		leavesToClaim[:],

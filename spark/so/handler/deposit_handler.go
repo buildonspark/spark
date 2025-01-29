@@ -13,6 +13,7 @@ import (
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark-go/proto/spark_internal"
 	"github.com/lightsparkdev/spark-go/so"
+	"github.com/lightsparkdev/spark-go/so/authz"
 	"github.com/lightsparkdev/spark-go/so/ent"
 	"github.com/lightsparkdev/spark-go/so/ent/depositaddress"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
@@ -23,15 +24,22 @@ import (
 // The DepositHandler is responsible for handling deposit related requests.
 type DepositHandler struct {
 	onchainHelper helper.OnChainHelper
+	config        authz.Config
 }
 
 // NewDepositHandler creates a new DepositHandler.
-func NewDepositHandler(onchainHelper helper.OnChainHelper) *DepositHandler {
-	return &DepositHandler{onchainHelper: onchainHelper}
+func NewDepositHandler(onchainHelper helper.OnChainHelper, config authz.Config) *DepositHandler {
+	return &DepositHandler{
+		onchainHelper: onchainHelper,
+		config:        config,
+	}
 }
 
 // GenerateDepositAddress generates a deposit address for the given public key.
 func (o *DepositHandler) GenerateDepositAddress(ctx context.Context, config *so.Config, req *pb.GenerateDepositAddressRequest) (*pb.GenerateDepositAddressResponse, error) {
+	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, o.config, req.IdentityPublicKey); err != nil {
+		return nil, err
+	}
 	log.Printf("Generating deposit address for public key: %s", hex.EncodeToString(req.SigningPublicKey))
 	keyshares, err := ent.GetUnusedSigningKeyshares(ctx, config, 1)
 	if err != nil {
@@ -143,6 +151,10 @@ func (o *DepositHandler) GenerateDepositAddress(ctx context.Context, config *so.
 
 // StartTreeCreation verifies the on chain utxo, and then verifies and signs the offchain root and refund transactions.
 func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Config, req *pb.StartTreeCreationRequest) (*pb.StartTreeCreationResponse, error) {
+	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, o.config, req.IdentityPublicKey); err != nil {
+		return nil, err
+	}
+
 	txBroadcasted := true
 	// Get the on chain tx
 	onChainTx, err := o.onchainHelper.GetTxOnChain(ctx, req.OnChainUtxo.Txid)

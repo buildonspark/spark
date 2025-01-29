@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
 	"github.com/lightsparkdev/spark-go/so"
+	"github.com/lightsparkdev/spark-go/so/authz"
 	"github.com/lightsparkdev/spark-go/so/ent"
 )
 
@@ -27,6 +28,10 @@ func NewCooperativeExitHandler(config *so.Config) *CooperativeExitHandler {
 // CooperativeExit signs refund transactions for leaves, spending connector outputs.
 // It will lock the transferred leaves based on seeing a txid confirming on-chain.
 func (h *CooperativeExitHandler) CooperativeExit(ctx context.Context, req *pb.CooperativeExitRequest) (*pb.CooperativeExitResponse, error) {
+	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, req.Transfer.OwnerIdentityPublicKey); err != nil {
+		return nil, err
+	}
+
 	transferHandler := BaseTransferHandler{config: h.config}
 	leafRefundMap := make(map[string][]byte)
 	for _, job := range req.Transfer.LeavesToSend {

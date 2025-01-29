@@ -33,6 +33,11 @@ func AggregateTreeNodes(
 		return nil, err
 	}
 	defer sparkConn.Close()
+	token, err := AuthenticateWithConnection(ctx, config, sparkConn)
+	if err != nil {
+		return nil, err
+	}
+	ctx = ContextWithToken(ctx, token)
 	sparkClient := pb.NewSparkServiceClient(sparkConn)
 
 	rawTx := parentNode.NodeTx

@@ -15,7 +15,7 @@ import (
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark-go/proto/spark_internal"
 	"github.com/lightsparkdev/spark-go/so"
-	"github.com/lightsparkdev/spark-go/so/authn"
+	"github.com/lightsparkdev/spark-go/so/authz"
 	"github.com/lightsparkdev/spark-go/so/ent"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
 	enttransfer "github.com/lightsparkdev/spark-go/so/ent/transfer"
@@ -23,8 +23,6 @@ import (
 	enttreenode "github.com/lightsparkdev/spark-go/so/ent/treenode"
 	"github.com/lightsparkdev/spark-go/so/helper"
 	"github.com/lightsparkdev/spark-go/so/objects"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 // TransferHandler is a helper struct to handle leaves transfer request.
@@ -40,15 +38,8 @@ func NewTransferHandler(config *so.Config) *TransferHandler {
 
 // StartSendTransfer initiates a transfer from sender.
 func (h *TransferHandler) StartSendTransfer(ctx context.Context, req *pb.StartSendTransferRequest) (*pb.StartSendTransferResponse, error) {
-	if h.config.AuthzEnforced {
-		session, err := authn.GetSessionFromContext(ctx)
-		if err != nil {
-			return nil, status.Errorf(codes.Unauthenticated, "no valid session found: %v", err)
-		}
-
-		if !bytes.Equal(session.IdentityPublicKeyBytes(), req.OwnerIdentityPublicKey) {
-			return nil, status.Errorf(codes.PermissionDenied, "session identity does not match request identity")
-		}
+	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, req.OwnerIdentityPublicKey); err != nil {
+		return nil, err
 	}
 
 	leafRefundMap := make(map[string][]byte)
@@ -173,6 +164,10 @@ func signRefunds(ctx context.Context, config *so.Config, requests []*pb.LeafRefu
 
 // CompleteSendTransfer completes a transfer from sender.
 func (h *TransferHandler) CompleteSendTransfer(ctx context.Context, req *pb.CompleteSendTransferRequest) (*pb.CompleteSendTransferResponse, error) {
+	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, req.OwnerIdentityPublicKey); err != nil {
+		return nil, err
+	}
+
 	transferID, err := uuid.Parse(req.TransferId)
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse transfer_id as a uuid %s: %v", req.TransferId, err)
@@ -317,6 +312,10 @@ func (h *TransferHandler) completeSendLeaf(ctx context.Context, transfer *ent.Tr
 
 // QueryPendingTransfers queries the pending transfers to claim.
 func (h *TransferHandler) QueryPendingTransfers(ctx context.Context, req *pb.QueryPendingTransfersRequest) (*pb.QueryPendingTransfersResponse, error) {
+	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, req.ReceiverIdentityPublicKey); err != nil {
+		return nil, err
+	}
+
 	db := ent.GetDbFromContext(ctx)
 	transfers, err := db.Transfer.Query().
 		Where(
@@ -343,6 +342,10 @@ func (h *TransferHandler) QueryPendingTransfers(ctx context.Context, req *pb.Que
 
 // ClaimTransferTweakKeys starts claiming a pending transfer by tweaking keys of leaves.
 func (h *TransferHandler) ClaimTransferTweakKeys(ctx context.Context, req *pb.ClaimTransferTweakKeysRequest) error {
+	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, req.OwnerIdentityPublicKey); err != nil {
+		return err
+	}
+
 	transferID, err := uuid.Parse(req.TransferId)
 	if err != nil {
 		return fmt.Errorf("unable to parse transfer_id as a uuid %s: %v", req.TransferId, err)
@@ -455,6 +458,10 @@ func (h *TransferHandler) getLeavesFromTransfer(ctx context.Context, transfer *e
 
 // ClaimTransferSignRefunds signs new refund transactions as part of the transfer.
 func (h *TransferHandler) ClaimTransferSignRefunds(ctx context.Context, req *pb.ClaimTransferSignRefundsRequest) (*pb.ClaimTransferSignRefundsResponse, error) {
+	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, req.OwnerIdentityPublicKey); err != nil {
+		return nil, err
+	}
+
 	transferID, err := uuid.Parse(req.TransferId)
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse transfer_id as a uuid %s: %v", req.TransferId, err)

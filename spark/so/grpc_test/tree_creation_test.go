@@ -27,6 +27,12 @@ func TestTreeCreationAddressGeneration(t *testing.T) {
 	}
 	defer conn.Close()
 
+	token, err := wallet.AuthenticateWithConnection(context.Background(), config, conn)
+	if err != nil {
+		t.Fatalf("failed to authenticate: %v", err)
+	}
+	ctx := wallet.ContextWithToken(context.Background(), token)
+
 	mockClient := pbmock.NewMockServiceClient(conn)
 
 	privKey, err := secp256k1.GeneratePrivateKey()
@@ -36,7 +42,7 @@ func TestTreeCreationAddressGeneration(t *testing.T) {
 	userPubKey := privKey.PubKey()
 	userPubKeyBytes := userPubKey.SerializeCompressed()
 
-	depositResp, err := wallet.GenerateDepositAddress(context.Background(), config, userPubKeyBytes)
+	depositResp, err := wallet.GenerateDepositAddress(ctx, config, userPubKeyBytes)
 	if err != nil {
 		t.Fatalf("failed to generate deposit address: %v", err)
 	}
@@ -68,14 +74,14 @@ func TestTreeCreationAddressGeneration(t *testing.T) {
 	})
 
 	log.Printf("deposit public key: %x", hex.EncodeToString(privKey.PubKey().SerializeCompressed()))
-	tree, err := wallet.GenerateDepositAddressesForTree(config, depositTx, nil, uint32(vout), privKey.Serialize(), 3)
+	tree, err := wallet.GenerateDepositAddressesForTree(ctx, config, depositTx, nil, uint32(vout), privKey.Serialize(), 3)
 	if err != nil {
 		t.Fatalf("failed to create tree: %v", err)
 	}
 
 	log.Printf("tree created: %v", tree)
 
-	treeNodes, err := wallet.CreateTree(config, depositTx, nil, uint32(vout), tree, true)
+	treeNodes, err := wallet.CreateTree(ctx, config, depositTx, nil, uint32(vout), tree, true)
 	if err != nil {
 		t.Fatalf("failed to create tree: %v", err)
 	}
