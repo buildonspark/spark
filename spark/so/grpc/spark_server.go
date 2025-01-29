@@ -92,10 +92,10 @@ func (s *SparkServer) GetSigningCommitments(ctx context.Context, req *pb.GetSign
 	return wrapWithGRPCError(lightningHandler.GetSigningCommitments(ctx, req))
 }
 
-// GetPreimage gets the preimage for the given payment hash.
-func (s *SparkServer) GetPreimage(ctx context.Context, req *pb.GetPreimageRequest) (*pb.GetPreimageResponse, error) {
+// InitiatePreimageSwap initiates a preimage swap for the given payment hash.
+func (s *SparkServer) InitiatePreimageSwap(ctx context.Context, req *pb.InitiatePreimageSwapRequest) (*pb.InitiatePreimageSwapResponse, error) {
 	lightningHandler := handler.NewLightningHandler(s.config)
-	return wrapWithGRPCError(lightningHandler.GetPreimage(ctx, req))
+	return wrapWithGRPCError(lightningHandler.InitiatePreimageSwap(ctx, req))
 }
 
 // CooperativeExit asks for signatures for refund transactions spending leaves

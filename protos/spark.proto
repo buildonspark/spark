@@ -19,8 +19,8 @@ service SparkService {
     rpc aggregate_nodes(AggregateNodesRequest) returns (AggregateNodesResponse) {}
     rpc store_preimage_share(StorePreimageShareRequest) returns (google.protobuf.Empty) {}
     rpc get_signing_commitments(GetSigningCommitmentsRequest) returns (GetSigningCommitmentsResponse) {}
-    rpc get_preimage(GetPreimageRequest) returns (GetPreimageResponse) {}
     rpc cooperative_exit(CooperativeExitRequest) returns (CooperativeExitResponse) {}
+    rpc initiate_preimage_swap(InitiatePreimageSwapRequest) returns (InitiatePreimageSwapResponse) {}
 
     rpc prepare_tree_address(PrepareTreeAddressRequest) returns (PrepareTreeAddressResponse) {}
     rpc create_tree(CreateTreeRequest) returns (CreateTreeResponse) {}
@@ -284,13 +284,18 @@ message InvoiceAmount {
     InvoiceAmountProof invoice_amount_proof = 2;
 }
 
-message GetPreimageRequest {
+message InitiatePreimageSwapRequest {
     bytes payment_hash = 1;
     repeated UserSignedRefund user_signed_refunds = 2;
     InvoiceAmount invoice_amount = 3;
+    enum Reason {
+        REASON_SEND = 0;
+        REASON_RECEIVE = 1;
+    }
+    Reason reason = 4;
 }
 
-message GetPreimageResponse {
+message InitiatePreimageSwapResponse {
     bytes preimage = 1;
 }
 

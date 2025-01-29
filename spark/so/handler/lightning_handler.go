@@ -211,16 +211,19 @@ func (h *LightningHandler) storeUserSignedTransactions(ctx context.Context, prei
 }
 
 // GetPreimageShare gets the preimage share for the given payment hash.
-func (h *LightningHandler) GetPreimageShare(ctx context.Context, req *pbinternal.GetPreimageShareRequest) ([]byte, error) {
+func (h *LightningHandler) GetPreimageShare(ctx context.Context, req *pb.InitiatePreimageSwapRequest) ([]byte, error) {
 	err := h.validateGetPreimageRequest(ctx, req.UserSignedRefunds, req.InvoiceAmount)
 	if err != nil {
 		return nil, fmt.Errorf("unable to validate request: %v", err)
 	}
 
-	db := ent.GetDbFromContext(ctx)
-	preimageShare, err := db.PreimageShare.Query().Where(preimageshare.PaymentHash(req.PaymentHash)).First(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("unable to get preimage share: %v", err)
+	var preimageShare *ent.PreimageShare
+	if req.Reason == pb.InitiatePreimageSwapRequest_REASON_RECEIVE {
+		db := ent.GetDbFromContext(ctx)
+		preimageShare, err = db.PreimageShare.Query().Where(preimageshare.PaymentHash(req.PaymentHash)).First(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("unable to get preimage share: %v", err)
+		}
 	}
 
 	err = h.storeUserSignedTransactions(ctx, preimageShare, req.UserSignedRefunds, preimageShare.OwnerIdentityPubkey)
@@ -231,17 +234,20 @@ func (h *LightningHandler) GetPreimageShare(ctx context.Context, req *pbinternal
 	return preimageShare.PreimageShare, nil
 }
 
-// GetPreimage gets the preimage for the given payment hash.
-func (h *LightningHandler) GetPreimage(ctx context.Context, req *pb.GetPreimageRequest) (*pb.GetPreimageResponse, error) {
+// InitiatePreimageSwap initiates a preimage swap for the given payment hash.
+func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pb.InitiatePreimageSwapRequest) (*pb.InitiatePreimageSwapResponse, error) {
 	err := h.validateGetPreimageRequest(ctx, req.UserSignedRefunds, req.InvoiceAmount)
 	if err != nil {
 		return nil, fmt.Errorf("unable to validate request: %v", err)
 	}
 
-	db := ent.GetDbFromContext(ctx)
-	preimageShare, err := db.PreimageShare.Query().Where(preimageshare.PaymentHash(req.PaymentHash)).First(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("unable to get preimage share: %v", err)
+	var preimageShare *ent.PreimageShare
+	if req.Reason == pb.InitiatePreimageSwapRequest_REASON_RECEIVE {
+		db := ent.GetDbFromContext(ctx)
+		preimageShare, err = db.PreimageShare.Query().Where(preimageshare.PaymentHash(req.PaymentHash)).First(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("unable to get preimage share: %v", err)
+		}
 	}
 	if err = authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, preimageShare.OwnerIdentityPubkey); err != nil {
 		return nil, err
@@ -261,13 +267,9 @@ func (h *LightningHandler) GetPreimage(ctx context.Context, req *pb.GetPreimageR
 		defer conn.Close()
 
 		client := pbinternal.NewSparkInternalServiceClient(conn)
-		response, err := client.GetPreimageShare(ctx, &pbinternal.GetPreimageShareRequest{
-			PaymentHash:       req.PaymentHash,
-			UserSignedRefunds: req.UserSignedRefunds,
-			InvoiceAmount:     req.InvoiceAmount,
-		})
+		response, err := client.InitiatePreimageSwap(ctx, req)
 		if err != nil {
-			return nil, fmt.Errorf("unable to get preimage shares: %v", err)
+			return nil, fmt.Errorf("unable to initiate preimage swap: %v", err)
 		}
 		return response.PreimageShare, nil
 	})
@@ -275,8 +277,16 @@ func (h *LightningHandler) GetPreimage(ctx context.Context, req *pb.GetPreimageR
 		return nil, fmt.Errorf("unable to execute task with all operators: %v", err)
 	}
 
+	// Recover secret if necessary
+	if req.Reason == pb.InitiatePreimageSwapRequest_REASON_SEND {
+		return &pb.InitiatePreimageSwapResponse{}, nil
+	}
+
 	shares := make([]*secretsharing.SecretShare, 0)
 	for identifier, share := range result {
+		if share == nil {
+			continue
+		}
 		index, ok := new(big.Int).SetString(identifier, 16)
 		if !ok {
 			return nil, fmt.Errorf("unable to parse index: %v", identifier)
@@ -299,5 +309,5 @@ func (h *LightningHandler) GetPreimage(ctx context.Context, req *pb.GetPreimageR
 		return nil, fmt.Errorf("invalid preimage")
 	}
 
-	return &pb.GetPreimageResponse{Preimage: hash[:]}, nil
+	return &pb.InitiatePreimageSwapResponse{Preimage: hash[:]}, nil
 }

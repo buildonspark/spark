@@ -30,7 +30,7 @@ const (
 	SparkInternalService_AggregateNodes_FullMethodName                = "/spark_internal.SparkInternalService/aggregate_nodes"
 	SparkInternalService_FinalizeNodesAggregation_FullMethodName      = "/spark_internal.SparkInternalService/finalize_nodes_aggregation"
 	SparkInternalService_FinalizeTransfer_FullMethodName              = "/spark_internal.SparkInternalService/finalize_transfer"
-	SparkInternalService_GetPreimageShare_FullMethodName              = "/spark_internal.SparkInternalService/get_preimage_share"
+	SparkInternalService_InitiatePreimageSwap_FullMethodName          = "/spark_internal.SparkInternalService/initiate_preimage_swap"
 	SparkInternalService_PrepareTreeAddress_FullMethodName            = "/spark_internal.SparkInternalService/prepare_tree_address"
 	SparkInternalService_InitiateTransfer_FullMethodName              = "/spark_internal.SparkInternalService/initiate_transfer"
 )
@@ -48,7 +48,7 @@ type SparkInternalServiceClient interface {
 	AggregateNodes(ctx context.Context, in *spark.AggregateNodesRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	FinalizeNodesAggregation(ctx context.Context, in *FinalizeNodesAggregationRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	FinalizeTransfer(ctx context.Context, in *FinalizeTransferRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
-	GetPreimageShare(ctx context.Context, in *GetPreimageShareRequest, opts ...grpc.CallOption) (*GetPreimageShareResponse, error)
+	InitiatePreimageSwap(ctx context.Context, in *spark.InitiatePreimageSwapRequest, opts ...grpc.CallOption) (*InitiatePreimageSwapResponse, error)
 	PrepareTreeAddress(ctx context.Context, in *PrepareTreeAddressRequest, opts ...grpc.CallOption) (*PrepareTreeAddressResponse, error)
 	InitiateTransfer(ctx context.Context, in *InitiateTransferRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
@@ -151,10 +151,10 @@ func (c *sparkInternalServiceClient) FinalizeTransfer(ctx context.Context, in *F
 	return out, nil
 }
 
-func (c *sparkInternalServiceClient) GetPreimageShare(ctx context.Context, in *GetPreimageShareRequest, opts ...grpc.CallOption) (*GetPreimageShareResponse, error) {
+func (c *sparkInternalServiceClient) InitiatePreimageSwap(ctx context.Context, in *spark.InitiatePreimageSwapRequest, opts ...grpc.CallOption) (*InitiatePreimageSwapResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(GetPreimageShareResponse)
-	err := c.cc.Invoke(ctx, SparkInternalService_GetPreimageShare_FullMethodName, in, out, cOpts...)
+	out := new(InitiatePreimageSwapResponse)
+	err := c.cc.Invoke(ctx, SparkInternalService_InitiatePreimageSwap_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -194,7 +194,7 @@ type SparkInternalServiceServer interface {
 	AggregateNodes(context.Context, *spark.AggregateNodesRequest) (*emptypb.Empty, error)
 	FinalizeNodesAggregation(context.Context, *FinalizeNodesAggregationRequest) (*emptypb.Empty, error)
 	FinalizeTransfer(context.Context, *FinalizeTransferRequest) (*emptypb.Empty, error)
-	GetPreimageShare(context.Context, *GetPreimageShareRequest) (*GetPreimageShareResponse, error)
+	InitiatePreimageSwap(context.Context, *spark.InitiatePreimageSwapRequest) (*InitiatePreimageSwapResponse, error)
 	PrepareTreeAddress(context.Context, *PrepareTreeAddressRequest) (*PrepareTreeAddressResponse, error)
 	InitiateTransfer(context.Context, *InitiateTransferRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedSparkInternalServiceServer()
@@ -234,8 +234,8 @@ func (UnimplementedSparkInternalServiceServer) FinalizeNodesAggregation(context.
 func (UnimplementedSparkInternalServiceServer) FinalizeTransfer(context.Context, *FinalizeTransferRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method FinalizeTransfer not implemented")
 }
-func (UnimplementedSparkInternalServiceServer) GetPreimageShare(context.Context, *GetPreimageShareRequest) (*GetPreimageShareResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetPreimageShare not implemented")
+func (UnimplementedSparkInternalServiceServer) InitiatePreimageSwap(context.Context, *spark.InitiatePreimageSwapRequest) (*InitiatePreimageSwapResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method InitiatePreimageSwap not implemented")
 }
 func (UnimplementedSparkInternalServiceServer) PrepareTreeAddress(context.Context, *PrepareTreeAddressRequest) (*PrepareTreeAddressResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method PrepareTreeAddress not implemented")
@@ -426,20 +426,20 @@ func _SparkInternalService_FinalizeTransfer_Handler(srv interface{}, ctx context
 	return interceptor(ctx, in, info, handler)
 }
 
-func _SparkInternalService_GetPreimageShare_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetPreimageShareRequest)
+func _SparkInternalService_InitiatePreimageSwap_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(spark.InitiatePreimageSwapRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(SparkInternalServiceServer).GetPreimageShare(ctx, in)
+		return srv.(SparkInternalServiceServer).InitiatePreimageSwap(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: SparkInternalService_GetPreimageShare_FullMethodName,
+		FullMethod: SparkInternalService_InitiatePreimageSwap_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SparkInternalServiceServer).GetPreimageShare(ctx, req.(*GetPreimageShareRequest))
+		return srv.(SparkInternalServiceServer).InitiatePreimageSwap(ctx, req.(*spark.InitiatePreimageSwapRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -524,8 +524,8 @@ var SparkInternalService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _SparkInternalService_FinalizeTransfer_Handler,
 		},
 		{
-			MethodName: "get_preimage_share",
-			Handler:    _SparkInternalService_GetPreimageShare_Handler,
+			MethodName: "initiate_preimage_swap",
+			Handler:    _SparkInternalService_InitiatePreimageSwap_Handler,
 		},
 		{
 			MethodName: "prepare_tree_address",

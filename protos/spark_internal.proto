@@ -23,7 +23,7 @@ service SparkInternalService {
 
     rpc finalize_transfer(FinalizeTransferRequest) returns (google.protobuf.Empty) {}
 
-    rpc get_preimage_share(GetPreimageShareRequest) returns (GetPreimageShareResponse) {}
+    rpc initiate_preimage_swap(spark.InitiatePreimageSwapRequest) returns (InitiatePreimageSwapResponse) {}
 
     rpc prepare_tree_address(PrepareTreeAddressRequest) returns (PrepareTreeAddressResponse) {}
 
@@ -120,13 +120,7 @@ message TreeNode {
     uint32 refund_timelock = 12;
 }
 
-message GetPreimageShareRequest {
-    bytes payment_hash = 1;
-    repeated spark.UserSignedRefund user_signed_refunds = 2;
-    spark.InvoiceAmount invoice_amount = 3;
-}
-
-message GetPreimageShareResponse {
+message InitiatePreimageSwapResponse {
     bytes preimage_share = 1;
 }
 

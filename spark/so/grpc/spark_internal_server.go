@@ -264,14 +264,14 @@ func (s *SparkInternalServer) FinalizeTransfer(ctx context.Context, req *pb.Fina
 	return &emptypb.Empty{}, nil
 }
 
-// GetPreimageShare gets the preimage share for the given payment hash.
-func (s *SparkInternalServer) GetPreimageShare(ctx context.Context, req *pb.GetPreimageShareRequest) (*pb.GetPreimageShareResponse, error) {
+// InitiatePreimageSwap initiates a preimage swap for the given payment hash.
+func (s *SparkInternalServer) InitiatePreimageSwap(ctx context.Context, req *pbspark.InitiatePreimageSwapRequest) (*pb.InitiatePreimageSwapResponse, error) {
 	lightningHandler := handler.NewLightningHandler(s.config)
 	preimageShare, err := lightningHandler.GetPreimageShare(ctx, req)
 	if err != nil {
 		return nil, err
 	}
-	return &pb.GetPreimageShareResponse{PreimageShare: preimageShare}, nil
+	return &pb.InitiatePreimageSwapResponse{PreimageShare: preimageShare}, nil
 }
 
 // PrepareTreeAddress prepares the tree address.

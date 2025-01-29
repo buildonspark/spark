@@ -31,8 +31,8 @@ const (
 	SparkService_AggregateNodes_FullMethodName           = "/spark.SparkService/aggregate_nodes"
 	SparkService_StorePreimageShare_FullMethodName       = "/spark.SparkService/store_preimage_share"
 	SparkService_GetSigningCommitments_FullMethodName    = "/spark.SparkService/get_signing_commitments"
-	SparkService_GetPreimage_FullMethodName              = "/spark.SparkService/get_preimage"
 	SparkService_CooperativeExit_FullMethodName          = "/spark.SparkService/cooperative_exit"
+	SparkService_InitiatePreimageSwap_FullMethodName     = "/spark.SparkService/initiate_preimage_swap"
 	SparkService_PrepareTreeAddress_FullMethodName       = "/spark.SparkService/prepare_tree_address"
 	SparkService_CreateTree_FullMethodName               = "/spark.SparkService/create_tree"
 	SparkService_GetSigningOperatorList_FullMethodName   = "/spark.SparkService/get_signing_operator_list"
@@ -53,8 +53,8 @@ type SparkServiceClient interface {
 	AggregateNodes(ctx context.Context, in *AggregateNodesRequest, opts ...grpc.CallOption) (*AggregateNodesResponse, error)
 	StorePreimageShare(ctx context.Context, in *StorePreimageShareRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	GetSigningCommitments(ctx context.Context, in *GetSigningCommitmentsRequest, opts ...grpc.CallOption) (*GetSigningCommitmentsResponse, error)
-	GetPreimage(ctx context.Context, in *GetPreimageRequest, opts ...grpc.CallOption) (*GetPreimageResponse, error)
 	CooperativeExit(ctx context.Context, in *CooperativeExitRequest, opts ...grpc.CallOption) (*CooperativeExitResponse, error)
+	InitiatePreimageSwap(ctx context.Context, in *InitiatePreimageSwapRequest, opts ...grpc.CallOption) (*InitiatePreimageSwapResponse, error)
 	PrepareTreeAddress(ctx context.Context, in *PrepareTreeAddressRequest, opts ...grpc.CallOption) (*PrepareTreeAddressResponse, error)
 	CreateTree(ctx context.Context, in *CreateTreeRequest, opts ...grpc.CallOption) (*CreateTreeResponse, error)
 	GetSigningOperatorList(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetSigningOperatorListResponse, error)
@@ -178,20 +178,20 @@ func (c *sparkServiceClient) GetSigningCommitments(ctx context.Context, in *GetS
 	return out, nil
 }
 
-func (c *sparkServiceClient) GetPreimage(ctx context.Context, in *GetPreimageRequest, opts ...grpc.CallOption) (*GetPreimageResponse, error) {
+func (c *sparkServiceClient) CooperativeExit(ctx context.Context, in *CooperativeExitRequest, opts ...grpc.CallOption) (*CooperativeExitResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(GetPreimageResponse)
-	err := c.cc.Invoke(ctx, SparkService_GetPreimage_FullMethodName, in, out, cOpts...)
+	out := new(CooperativeExitResponse)
+	err := c.cc.Invoke(ctx, SparkService_CooperativeExit_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *sparkServiceClient) CooperativeExit(ctx context.Context, in *CooperativeExitRequest, opts ...grpc.CallOption) (*CooperativeExitResponse, error) {
+func (c *sparkServiceClient) InitiatePreimageSwap(ctx context.Context, in *InitiatePreimageSwapRequest, opts ...grpc.CallOption) (*InitiatePreimageSwapResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(CooperativeExitResponse)
-	err := c.cc.Invoke(ctx, SparkService_CooperativeExit_FullMethodName, in, out, cOpts...)
+	out := new(InitiatePreimageSwapResponse)
+	err := c.cc.Invoke(ctx, SparkService_InitiatePreimageSwap_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -243,8 +243,8 @@ type SparkServiceServer interface {
 	AggregateNodes(context.Context, *AggregateNodesRequest) (*AggregateNodesResponse, error)
 	StorePreimageShare(context.Context, *StorePreimageShareRequest) (*emptypb.Empty, error)
 	GetSigningCommitments(context.Context, *GetSigningCommitmentsRequest) (*GetSigningCommitmentsResponse, error)
-	GetPreimage(context.Context, *GetPreimageRequest) (*GetPreimageResponse, error)
 	CooperativeExit(context.Context, *CooperativeExitRequest) (*CooperativeExitResponse, error)
+	InitiatePreimageSwap(context.Context, *InitiatePreimageSwapRequest) (*InitiatePreimageSwapResponse, error)
 	PrepareTreeAddress(context.Context, *PrepareTreeAddressRequest) (*PrepareTreeAddressResponse, error)
 	CreateTree(context.Context, *CreateTreeRequest) (*CreateTreeResponse, error)
 	GetSigningOperatorList(context.Context, *emptypb.Empty) (*GetSigningOperatorListResponse, error)
@@ -291,11 +291,11 @@ func (UnimplementedSparkServiceServer) StorePreimageShare(context.Context, *Stor
 func (UnimplementedSparkServiceServer) GetSigningCommitments(context.Context, *GetSigningCommitmentsRequest) (*GetSigningCommitmentsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetSigningCommitments not implemented")
 }
-func (UnimplementedSparkServiceServer) GetPreimage(context.Context, *GetPreimageRequest) (*GetPreimageResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetPreimage not implemented")
-}
 func (UnimplementedSparkServiceServer) CooperativeExit(context.Context, *CooperativeExitRequest) (*CooperativeExitResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CooperativeExit not implemented")
+}
+func (UnimplementedSparkServiceServer) InitiatePreimageSwap(context.Context, *InitiatePreimageSwapRequest) (*InitiatePreimageSwapResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method InitiatePreimageSwap not implemented")
 }
 func (UnimplementedSparkServiceServer) PrepareTreeAddress(context.Context, *PrepareTreeAddressRequest) (*PrepareTreeAddressResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method PrepareTreeAddress not implemented")
@@ -525,24 +525,6 @@ func _SparkService_GetSigningCommitments_Handler(srv interface{}, ctx context.Co
 	return interceptor(ctx, in, info, handler)
 }
 
-func _SparkService_GetPreimage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetPreimageRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(SparkServiceServer).GetPreimage(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: SparkService_GetPreimage_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SparkServiceServer).GetPreimage(ctx, req.(*GetPreimageRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _SparkService_CooperativeExit_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(CooperativeExitRequest)
 	if err := dec(in); err != nil {
@@ -557,6 +539,24 @@ func _SparkService_CooperativeExit_Handler(srv interface{}, ctx context.Context,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(SparkServiceServer).CooperativeExit(ctx, req.(*CooperativeExitRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SparkService_InitiatePreimageSwap_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(InitiatePreimageSwapRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkServiceServer).InitiatePreimageSwap(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkService_InitiatePreimageSwap_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkServiceServer).InitiatePreimageSwap(ctx, req.(*InitiatePreimageSwapRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -667,12 +667,12 @@ var SparkService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _SparkService_GetSigningCommitments_Handler,
 		},
 		{
-			MethodName: "get_preimage",
-			Handler:    _SparkService_GetPreimage_Handler,
-		},
-		{
 			MethodName: "cooperative_exit",
 			Handler:    _SparkService_CooperativeExit_Handler,
+		},
+		{
+			MethodName: "initiate_preimage_swap",
+			Handler:    _SparkService_InitiatePreimageSwap_Handler,
 		},
 		{
 			MethodName: "prepare_tree_address",
