@@ -141,7 +141,7 @@ build_go_operator() {
 clone_or_pull_lrcd() {
     if [ ! -d "lrc20.dev" ]; then
         echo "Cloning LRC-20 git repo"
-        git clone https://github.com/lightsparkdev/lrc20.git lrc20.dev
+        git clone git@github.com:lightsparkdev/lrc20.git lrc20.dev
     else
         echo "Entering existing LRC-20 directory and pulling latest changes"
         cd lrc20.dev || {
