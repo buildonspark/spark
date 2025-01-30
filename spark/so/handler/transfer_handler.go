@@ -348,7 +348,7 @@ func checkCoopExitTxBroadcasted(ctx context.Context, db *ent.Tx, transferID uuid
 	coopExit, err := db.CooperativeExit.Query().Where(
 		cooperativeexit.HasTransferWith(enttransfer.ID(transferID)),
 	).Only(ctx)
-	if err != nil {
+	if err != nil && !ent.IsNotFound(err) {
 		return fmt.Errorf("failed to find coop exit for transfer %s: %v", transferID.String(), err)
 	}
 	if coopExit == nil {
