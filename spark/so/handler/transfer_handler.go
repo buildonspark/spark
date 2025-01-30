@@ -3,11 +3,13 @@ package handler
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"fmt"
 	"log"
 	"math/big"
 	"time"
 
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/common"
@@ -17,6 +19,7 @@ import (
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/authz"
 	"github.com/lightsparkdev/spark-go/so/ent"
+	"github.com/lightsparkdev/spark-go/so/ent/cooperativeexit"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
 	enttransfer "github.com/lightsparkdev/spark-go/so/ent/transfer"
 	enttransferleaf "github.com/lightsparkdev/spark-go/so/ent/transferleaf"
@@ -28,12 +31,13 @@ import (
 // TransferHandler is a helper struct to handle leaves transfer request.
 type TransferHandler struct {
 	BaseTransferHandler
-	config *so.Config
+	onchainHelper helper.OnChainHelper
+	config        *so.Config
 }
 
 // NewTransferHandler creates a new TransferHandler.
-func NewTransferHandler(config *so.Config) *TransferHandler {
-	return &TransferHandler{BaseTransferHandler: BaseTransferHandler{config}, config: config}
+func NewTransferHandler(onchainHelper helper.OnChainHelper, config *so.Config) *TransferHandler {
+	return &TransferHandler{BaseTransferHandler: BaseTransferHandler{config}, onchainHelper: onchainHelper, config: config}
 }
 
 // StartSendTransfer initiates a transfer from sender.
@@ -343,6 +347,30 @@ func (h *TransferHandler) QueryPendingTransfers(ctx context.Context, req *pb.Que
 	return &pb.QueryPendingTransfersResponse{Transfers: transferProtos}, nil
 }
 
+func checkCoopExitTxBroadcasted(ctx context.Context, db *ent.Tx, transferID uuid.UUID, onchainHelper helper.OnChainHelper) error {
+	coopExit, err := db.CooperativeExit.Query().Where(
+		cooperativeexit.HasTransferWith(enttransfer.ID(transferID)),
+	).Only(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to find coop exit for transfer %s: %v", transferID.String(), err)
+	}
+	if coopExit == nil {
+		return nil
+	}
+	txid, err := chainhash.NewHash(coopExit.ExitTxid)
+	if err != nil {
+		return fmt.Errorf("unable to parse exit txid %s: %v", hex.EncodeToString(coopExit.ExitTxid), err)
+	}
+	tx, err := onchainHelper.GetTxOnChain(context.Background(), txid.String())
+	if err != nil {
+		return err
+	}
+	if tx == nil {
+		return fmt.Errorf("exit tx not found on chain")
+	}
+	return nil
+}
+
 // ClaimTransferTweakKeys starts claiming a pending transfer by tweaking keys of leaves.
 func (h *TransferHandler) ClaimTransferTweakKeys(ctx context.Context, req *pb.ClaimTransferTweakKeysRequest) error {
 	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, req.OwnerIdentityPublicKey); err != nil {
@@ -361,6 +389,10 @@ func (h *TransferHandler) ClaimTransferTweakKeys(ctx context.Context, req *pb.Cl
 	// TODO (yun): Check with other SO if expires
 	if !bytes.Equal(transfer.ReceiverIdentityPubkey, req.OwnerIdentityPublicKey) || transfer.Status != schema.TransferStatusSenderKeyTweaked || transfer.ExpiryTime.Before(time.Now()) {
 		return fmt.Errorf("transfer cannot be claimed %s", req.TransferId)
+	}
+
+	if err := checkCoopExitTxBroadcasted(ctx, db, transferID, h.onchainHelper); err != nil {
+		return fmt.Errorf("failed to unlock transfer %s: %v", req.TransferId, err)
 	}
 
 	// Validate leaves count

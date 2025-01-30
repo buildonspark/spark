@@ -9,17 +9,19 @@ import (
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/ent"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
+	"github.com/lightsparkdev/spark-go/so/helper"
 )
 
 // InternalTransferHandler is the transfer handler for so internal
 type InternalTransferHandler struct {
 	BaseTransferHandler
-	config *so.Config
+	onchainHelper helper.OnChainHelper
+	config        *so.Config
 }
 
 // NewInternalTransferHandler creates a new InternalTransferHandler.
-func NewInternalTransferHandler(config *so.Config) *InternalTransferHandler {
-	return &InternalTransferHandler{BaseTransferHandler: BaseTransferHandler{config}, config: config}
+func NewInternalTransferHandler(onchainHelper helper.OnChainHelper, config *so.Config) *InternalTransferHandler {
+	return &InternalTransferHandler{BaseTransferHandler: BaseTransferHandler{config}, onchainHelper: onchainHelper, config: config}
 }
 
 // FinalizeTransfer finalizes a transfer.
@@ -35,6 +37,9 @@ func (h *InternalTransferHandler) FinalizeTransfer(ctx context.Context, req *pbi
 	}
 	if transfer.Status != schema.TransferStatusReceiverKeyTweaked {
 		return fmt.Errorf("transfer is not in receiver key tweaked status")
+	}
+	if err := checkCoopExitTxBroadcasted(ctx, db, transferID, h.onchainHelper); err != nil {
+		return fmt.Errorf("failed to unlock transfer %s: %v", req.TransferId, err)
 	}
 
 	transferNodes, err := transfer.QueryTransferLeaves().QueryLeaf().All(ctx)

@@ -46,31 +46,31 @@ func (s *SparkServer) FinalizeNodeSignatures(ctx context.Context, req *pb.Finali
 
 // StartSendTransfer initiates a transfer from sender.
 func (s *SparkServer) StartSendTransfer(ctx context.Context, req *pb.StartSendTransferRequest) (*pb.StartSendTransferResponse, error) {
-	transferHander := handler.NewTransferHandler(s.config)
+	transferHander := handler.NewTransferHandler(s.onchainHelper, s.config)
 	return transferHander.StartSendTransfer(ctx, req)
 }
 
 // CompleteSendTransfer completes a transfer from sender.
 func (s *SparkServer) CompleteSendTransfer(ctx context.Context, req *pb.CompleteSendTransferRequest) (*pb.CompleteSendTransferResponse, error) {
-	transferHander := handler.NewTransferHandler(s.config)
+	transferHander := handler.NewTransferHandler(s.onchainHelper, s.config)
 	return wrapWithGRPCError(transferHander.CompleteSendTransfer(ctx, req))
 }
 
 // QueryPendingTransfers queries the pending transfers to claim.
 func (s *SparkServer) QueryPendingTransfers(ctx context.Context, req *pb.QueryPendingTransfersRequest) (*pb.QueryPendingTransfersResponse, error) {
-	transferHander := handler.NewTransferHandler(s.config)
+	transferHander := handler.NewTransferHandler(s.onchainHelper, s.config)
 	return wrapWithGRPCError(transferHander.QueryPendingTransfers(ctx, req))
 }
 
 // ClaimTransferTweakKeys starts claiming a pending transfer by tweaking keys of leaves.
 func (s *SparkServer) ClaimTransferTweakKeys(ctx context.Context, req *pb.ClaimTransferTweakKeysRequest) (*emptypb.Empty, error) {
-	transferHander := handler.NewTransferHandler(s.config)
+	transferHander := handler.NewTransferHandler(s.onchainHelper, s.config)
 	return wrapWithGRPCError(emptyResponse, transferHander.ClaimTransferTweakKeys(ctx, req))
 }
 
 // ClaimTransferSignRefunds signs new refund transactions as part of the transfer.
 func (s *SparkServer) ClaimTransferSignRefunds(ctx context.Context, req *pb.ClaimTransferSignRefundsRequest) (*pb.ClaimTransferSignRefundsResponse, error) {
-	transferHander := handler.NewTransferHandler(s.config)
+	transferHander := handler.NewTransferHandler(s.onchainHelper, s.config)
 	return wrapWithGRPCError(transferHander.ClaimTransferSignRefunds(ctx, req))
 }
 
@@ -101,7 +101,7 @@ func (s *SparkServer) InitiatePreimageSwap(ctx context.Context, req *pb.Initiate
 // CooperativeExit asks for signatures for refund transactions spending leaves
 // and connector outputs on another user's L1 transaction.
 func (s *SparkServer) CooperativeExit(ctx context.Context, req *pb.CooperativeExitRequest) (*pb.CooperativeExitResponse, error) {
-	coopExitHandler := handler.NewCooperativeExitHandler(s.config)
+	coopExitHandler := handler.NewCooperativeExitHandler(s.onchainHelper, s.config)
 	return wrapWithGRPCError(coopExitHandler.CooperativeExit(ctx, req))
 }
 

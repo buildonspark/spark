@@ -256,7 +256,7 @@ func (s *SparkInternalServer) FinalizeNodesAggregation(ctx context.Context, req 
 
 // FinalizeTransfer finalizes a transfer
 func (s *SparkInternalServer) FinalizeTransfer(ctx context.Context, req *pb.FinalizeTransferRequest) (*emptypb.Empty, error) {
-	transferHandler := handler.NewInternalTransferHandler(s.config)
+	transferHandler := handler.NewInternalTransferHandler(s.onchainHelper, s.config)
 	err := transferHandler.FinalizeTransfer(ctx, req)
 	if err != nil {
 		return nil, err
@@ -286,7 +286,7 @@ func (s *SparkInternalServer) PrepareTreeAddress(ctx context.Context, req *pb.Pr
 
 // InitiateTransfer initiates a transfer by creating transfer and transfer_leaf
 func (s *SparkInternalServer) InitiateTransfer(ctx context.Context, req *pb.InitiateTransferRequest) (*emptypb.Empty, error) {
-	transferHandler := handler.NewInternalTransferHandler(s.config)
+	transferHandler := handler.NewInternalTransferHandler(s.onchainHelper, s.config)
 	err := transferHandler.InitiateTransfer(ctx, req)
 	if err != nil {
 		log.Printf("failed to initiate transfer: %v", err)
@@ -296,7 +296,7 @@ func (s *SparkInternalServer) InitiateTransfer(ctx context.Context, req *pb.Init
 
 // InitiateCooperativeExit initiates a cooperative exit.
 func (s *SparkInternalServer) InitiateCooperativeExit(ctx context.Context, req *pb.InitiateCooperativeExitRequest) (*emptypb.Empty, error) {
-	transferHandler := handler.NewInternalTransferHandler(s.config)
+	transferHandler := handler.NewInternalTransferHandler(s.onchainHelper, s.config)
 	err := transferHandler.InitiateCooperativeExit(ctx, req)
 	if err != nil {
 		log.Printf("failed to initiate cooperative exit: %v", err)

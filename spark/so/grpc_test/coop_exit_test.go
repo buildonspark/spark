@@ -1,12 +1,15 @@
 package grpctest
 
 import (
+	"bytes"
 	"context"
+	"encoding/hex"
 	"testing"
 
 	"github.com/btcsuite/btcd/wire"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lightsparkdev/spark-go/common"
+	pbmock "github.com/lightsparkdev/spark-go/proto/mock"
 	testutil "github.com/lightsparkdev/spark-go/test_util"
 	"github.com/lightsparkdev/spark-go/wallet"
 )
@@ -132,5 +135,68 @@ func TestCoopExit(t *testing.T) {
 		t.Fatalf("expected transfer id %s, got %s", senderTransfer.Id, receiverTransfer.Id)
 	}
 
-	// TODO: verify signatures, "broadcast" exit tx, claim leaves
+	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(context.Background(), sspConfig, receiverTransfer)
+	if err != nil {
+		t.Fatalf("unable to verify pending transfer: %v", err)
+	}
+	if len(*leafPrivKeyMap) != 1 {
+		t.Fatalf("Expected 1 leaf to transfer, got %d", len(*leafPrivKeyMap))
+	}
+	if !bytes.Equal((*leafPrivKeyMap)[rootNode.Id], newLeafPrivKey.Serialize()) {
+		t.Fatalf("wrong leaf signing private key")
+	}
+
+	// Try to claim leaf before exit tx confirms -> should fail
+	finalLeafPrivKey, err := secp256k1.GeneratePrivateKey()
+	if err != nil {
+		t.Fatalf("failed to create new node signing private key: %v", err)
+	}
+	claimingNode := wallet.LeafKeyTweak{
+		Leaf:              receiverTransfer.Leaves[0].Leaf,
+		SigningPrivKey:    newLeafPrivKey.Serialize(),
+		NewSigningPrivKey: finalLeafPrivKey.Serialize(),
+	}
+	leavesToClaim := [1]wallet.LeafKeyTweak{claimingNode}
+	err = wallet.ClaimTransfer(
+		sspCtx,
+		receiverTransfer,
+		sspConfig,
+		leavesToClaim[:],
+	)
+	if err == nil {
+		t.Fatalf("expected error claiming transfer before exit tx confirms")
+	}
+
+	// Broadcast/confirm exit tx
+	var buf bytes.Buffer
+	err = exitTx.Serialize(&buf)
+	if err != nil {
+		t.Fatalf("failed to serialize exit tx: %v", err)
+	}
+	for _, signingOperator := range config.SigningOperators {
+		conn, err := common.NewGRPCConnection(signingOperator.Address)
+		if err != nil {
+			t.Fatalf("failed to connect to operator: %v", err)
+		}
+		defer conn.Close()
+		mockClient := pbmock.NewMockServiceClient(conn)
+		_, err = mockClient.SetMockOnchainTx(context.Background(), &pbmock.SetMockOnchainTxRequest{
+			Txid: exitTx.TxID(),
+			Tx:   hex.EncodeToString(buf.Bytes()),
+		})
+		if err != nil {
+			t.Fatalf("failed to set mock onchain tx: %v", err)
+		}
+	}
+
+	// Claim leaf
+	err = wallet.ClaimTransfer(
+		sspCtx,
+		receiverTransfer,
+		sspConfig,
+		leavesToClaim[:],
+	)
+	if err != nil {
+		t.Fatalf("failed to ClaimTransfer: %v", err)
+	}
 }
