@@ -14,7 +14,7 @@ import {
   SigningCommitment,
 } from "../wasm/spark_bindings";
 
-export type FrostSignParams = {
+export type SignFrostParams = {
   msg: Uint8Array;
   keyPackage: KeyPackage;
   nonce: SigningNonce;
@@ -46,7 +46,7 @@ export function signFrost({
   nonce,
   selfCommitment,
   statechainCommitments,
-}: FrostSignParams): Uint8Array {
+}: SignFrostParams): Uint8Array {
   return wasm_sign_frost(
     msg,
     keyPackage,

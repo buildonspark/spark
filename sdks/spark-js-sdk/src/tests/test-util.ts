@@ -1,11 +1,11 @@
 import { bytesToHex, hexToBytes } from "@noble/curves/abstract/utils";
 import { secp256k1 } from "@noble/curves/secp256k1";
-import { Config, SparkWallet } from "../spark-sdk";
-import { SigningOperator } from "../utils/deposit";
+import { SparkWallet } from "../spark-sdk";
 import { TreeNode } from "../proto/spark";
-import { createMockGrpcConnection } from "../utils/connection";
 import { createDummyTx } from "../utils/wasm";
 import { getTxFromRawTxBytes, getTxId } from "../utils/bitcoin";
+import { SigningOperator, WalletConfig } from "../services/config";
+import { ConnectionManager } from "../services/connection";
 
 export function getAllSigningOperators(): Record<string, SigningOperator> {
   const pubkeys = [
@@ -57,14 +57,14 @@ export function getAllSigningOperators(): Record<string, SigningOperator> {
   };
 }
 
-export function getTestWalletConfig(): Config {
+export function getTestWalletConfig(): WalletConfig {
   const identityPrivateKey = secp256k1.utils.randomPrivateKey();
   return getTestWalletConfigWithIdentityKey(identityPrivateKey);
 }
 
 export function getTestWalletConfigWithIdentityKey(
   identityPrivateKey: Uint8Array
-): Config {
+): WalletConfig {
   const signingOperators = getAllSigningOperators();
   return {
     network: "regtest",
@@ -81,7 +81,9 @@ export async function createNewTree(
   wallet: SparkWallet,
   privKey: Uint8Array
 ): Promise<TreeNode> {
-  const mockClient = createMockGrpcConnection(wallet.getCoordinatorAddress());
+  const mockClient = ConnectionManager.createMockClient(
+    wallet.config.getCoordinatorAddress()
+  );
 
   // Generate private/public key pair
   const pubKey = secp256k1.getPublicKey(privKey, true);

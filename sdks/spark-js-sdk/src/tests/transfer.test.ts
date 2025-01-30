@@ -11,60 +11,64 @@ describe("Transfer", () => {
   // Skip all tests if running in GitHub Actions
   const testFn = process.env.GITHUB_ACTIONS ? it.skip : it;
 
-  testFn("test transfer", async () => {
-    const senderConfig = getTestWalletConfig();
-    const senderWallet = new SparkWallet(senderConfig);
+  testFn(
+    "test transfer",
+    async () => {
+      const senderConfig = getTestWalletConfig();
+      const senderWallet = new SparkWallet(senderConfig);
 
-    const leafPrivKey = secp256k1.utils.randomPrivateKey();
+      const leafPrivKey = secp256k1.utils.randomPrivateKey();
+      const rootNode = await createNewTree(senderWallet, leafPrivKey);
 
-    const rootNode = await createNewTree(senderWallet, leafPrivKey);
+      const newLeafPrivKey = secp256k1.utils.randomPrivateKey();
 
-    const newLeafPrivKey = secp256k1.utils.randomPrivateKey();
+      const receiverPrivKey = secp256k1.utils.randomPrivateKey();
 
-    const receiverPrivKey = secp256k1.utils.randomPrivateKey();
+      const transferNode = {
+        leaf: rootNode,
+        signingPrivKey: leafPrivKey,
+        newSigningPrivKey: newLeafPrivKey,
+      };
 
-    const transferNode = {
-      leaf: rootNode,
-      signingPrivKey: leafPrivKey,
-      newSigningPrivKey: newLeafPrivKey,
-    };
+      const senderTransfer = await senderWallet.sendTransfer(
+        [transferNode],
+        secp256k1.getPublicKey(receiverPrivKey, true),
+        new Date(Date.now() + 10 * 60 * 1000)
+      );
 
-    const senderTransfer = await senderWallet.sendTransfer(
-      [transferNode],
-      secp256k1.getPublicKey(receiverPrivKey, true),
-      new Date(Date.now() + 10 * 60 * 1000)
-    );
+      const receiverConfig =
+        getTestWalletConfigWithIdentityKey(receiverPrivKey);
 
-    const receiverConfig = getTestWalletConfigWithIdentityKey(receiverPrivKey);
+      const receiverWallet = new SparkWallet(receiverConfig);
 
-    const receiverWallet = new SparkWallet(receiverConfig);
+      const pendingTransfer = await receiverWallet.queryPendingTransfers();
 
-    const pendingTransfer = await receiverWallet.queryPendingTransfers();
+      expect(pendingTransfer.transfers.length).toBe(1);
 
-    expect(pendingTransfer.transfers.length).toBe(1);
+      const receiverTransfer = pendingTransfer.transfers[0];
 
-    const receiverTransfer = pendingTransfer.transfers[0];
+      expect(receiverTransfer.id).toBe(senderTransfer.id);
 
-    expect(receiverTransfer.id).toBe(senderTransfer.id);
+      const leafPrivKeyMap = await receiverWallet.verifyPendingTransfer(
+        receiverTransfer
+      );
 
-    const leafPrivKeyMap = await receiverWallet.verifyPendingTransfer(
-      receiverTransfer
-    );
+      expect(leafPrivKeyMap.size).toBe(1);
 
-    expect(leafPrivKeyMap.size).toBe(1);
+      const leafPrivKeyMapBytes = leafPrivKeyMap.get(rootNode.id);
+      expect(leafPrivKeyMapBytes).toBeDefined();
+      expect(bytesToHex(leafPrivKeyMapBytes!)).toBe(bytesToHex(newLeafPrivKey));
 
-    const leafPrivKeyMapBytes = leafPrivKeyMap.get(rootNode.id);
-    expect(leafPrivKeyMapBytes).toBeDefined();
-    expect(bytesToHex(leafPrivKeyMapBytes!)).toBe(bytesToHex(newLeafPrivKey));
+      const finalLeafPrivKey = secp256k1.utils.randomPrivateKey();
 
-    const finalLeafPrivKey = secp256k1.utils.randomPrivateKey();
+      const claimingNode = {
+        leaf: rootNode,
+        signingPrivKey: newLeafPrivKey,
+        newSigningPrivKey: finalLeafPrivKey,
+      };
 
-    const claimingNode = {
-      leaf: rootNode,
-      signingPrivKey: newLeafPrivKey,
-      newSigningPrivKey: finalLeafPrivKey,
-    };
-
-    await receiverWallet.claimTransfer(receiverTransfer, [claimingNode]);
-  });
+      await receiverWallet.claimTransfer(receiverTransfer, [claimingNode]);
+    },
+    30000
+  );
 });

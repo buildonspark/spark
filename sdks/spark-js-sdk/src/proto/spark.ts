@@ -117,6 +117,7 @@ export interface SigningResult {
   signingNonceCommitments: { [key: string]: SigningCommitment };
   signatureShares: { [key: string]: Uint8Array };
   keyshareOwnerIdentifiers: string[];
+  keyshareThreshold: number;
 }
 
 export interface SigningResult_PublicKeysEntry {
@@ -172,32 +173,6 @@ export interface TreeNode {
   refundTimelock: number;
 }
 
-export interface Split {
-  signingPublicKey: Uint8Array;
-  refundSigningJob: SigningJob | undefined;
-  value: number;
-  vout: number;
-}
-
-export interface SplitNodeRequest {
-  nodeId: string;
-  parentTxSigningJob: SigningJob | undefined;
-  splits: Split[];
-}
-
-export interface SplitResult {
-  nodeId: string;
-  refundTxSigningResult: SigningResult | undefined;
-  verifyingKey: Uint8Array;
-  userPublicKey: Uint8Array;
-}
-
-export interface SplitNodeResponse {
-  parentNodeId: string;
-  parentTxSigningResult: SigningResult | undefined;
-  splitResults: SplitResult[];
-}
-
 export interface FinalizeNodeSignaturesRequest {
   intent: SignatureIntent;
   nodeSignatures: NodeSignatures[];
@@ -205,15 +180,6 @@ export interface FinalizeNodeSignaturesRequest {
 
 export interface FinalizeNodeSignaturesResponse {
   nodes: TreeNode[];
-}
-
-export interface PrepareSplitAddressRequest {
-  nodeId: string;
-  signingPublicKeys: Uint8Array[];
-}
-
-export interface PrepareSplitAddressResponse {
-  addresses: Address[];
 }
 
 export interface SecretShare {
@@ -280,6 +246,7 @@ export interface TransferLeaf {
   leaf: TreeNode | undefined;
   secretCipher: Uint8Array;
   signature: Uint8Array;
+  intermediateRefundTx: Uint8Array;
 }
 
 export interface CompleteSendTransferResponse {
@@ -340,7 +307,8 @@ export interface AggregateNodesResponse {
 export interface StorePreimageShareRequest {
   paymentHash: Uint8Array;
   preimageShare: SecretShare | undefined;
-  threshold: Uint8Array;
+  threshold: number;
+  invoiceString: string;
   /** TODO: This should be removed once we have a proper auth process. */
   userIdentityPublicKey: Uint8Array;
 }
@@ -395,6 +363,23 @@ export interface GetPreimageRequest {
 
 export interface GetPreimageResponse {
   preimage: Uint8Array;
+}
+
+export interface OutPoint {
+  txid: Uint8Array;
+  vout: number;
+}
+
+export interface CooperativeExitRequest {
+  exitId: string;
+  ownerIdentityPublicKey: Uint8Array;
+  signingJobs: LeafRefundTxSigningJob[];
+  connectorOutputs: OutPoint[];
+  exitTxid: Uint8Array;
+}
+
+export interface CooperativeExitResponse {
+  signingResults: LeafRefundTxSigningResult[];
 }
 
 export interface AddressRequestNode {
@@ -1158,7 +1143,13 @@ export const SigningJob: MessageFns<SigningJob> = {
 };
 
 function createBaseSigningResult(): SigningResult {
-  return { publicKeys: {}, signingNonceCommitments: {}, signatureShares: {}, keyshareOwnerIdentifiers: [] };
+  return {
+    publicKeys: {},
+    signingNonceCommitments: {},
+    signatureShares: {},
+    keyshareOwnerIdentifiers: [],
+    keyshareThreshold: 0,
+  };
 }
 
 export const SigningResult: MessageFns<SigningResult> = {
@@ -1174,6 +1165,9 @@ export const SigningResult: MessageFns<SigningResult> = {
     });
     for (const v of message.keyshareOwnerIdentifiers) {
       writer.uint32(34).string(v!);
+    }
+    if (message.keyshareThreshold !== 0) {
+      writer.uint32(40).uint32(message.keyshareThreshold);
     }
     return writer;
   },
@@ -1226,6 +1220,14 @@ export const SigningResult: MessageFns<SigningResult> = {
           message.keyshareOwnerIdentifiers.push(reader.string());
           continue;
         }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.keyshareThreshold = reader.uint32();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1261,6 +1263,7 @@ export const SigningResult: MessageFns<SigningResult> = {
       keyshareOwnerIdentifiers: globalThis.Array.isArray(object?.keyshareOwnerIdentifiers)
         ? object.keyshareOwnerIdentifiers.map((e: any) => globalThis.String(e))
         : [],
+      keyshareThreshold: isSet(object.keyshareThreshold) ? globalThis.Number(object.keyshareThreshold) : 0,
     };
   },
 
@@ -1295,6 +1298,9 @@ export const SigningResult: MessageFns<SigningResult> = {
     }
     if (message.keyshareOwnerIdentifiers?.length) {
       obj.keyshareOwnerIdentifiers = message.keyshareOwnerIdentifiers;
+    }
+    if (message.keyshareThreshold !== 0) {
+      obj.keyshareThreshold = Math.round(message.keyshareThreshold);
     }
     return obj;
   },
@@ -1331,6 +1337,7 @@ export const SigningResult: MessageFns<SigningResult> = {
       {},
     );
     message.keyshareOwnerIdentifiers = object.keyshareOwnerIdentifiers?.map((e) => e) || [];
+    message.keyshareThreshold = object.keyshareThreshold ?? 0;
     return message;
   },
 };
@@ -2204,427 +2211,6 @@ export const TreeNode: MessageFns<TreeNode> = {
   },
 };
 
-function createBaseSplit(): Split {
-  return { signingPublicKey: new Uint8Array(0), refundSigningJob: undefined, value: 0, vout: 0 };
-}
-
-export const Split: MessageFns<Split> = {
-  encode(message: Split, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.signingPublicKey.length !== 0) {
-      writer.uint32(10).bytes(message.signingPublicKey);
-    }
-    if (message.refundSigningJob !== undefined) {
-      SigningJob.encode(message.refundSigningJob, writer.uint32(18).fork()).join();
-    }
-    if (message.value !== 0) {
-      writer.uint32(24).uint64(message.value);
-    }
-    if (message.vout !== 0) {
-      writer.uint32(32).uint32(message.vout);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): Split {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseSplit();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.signingPublicKey = reader.bytes();
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.refundSigningJob = SigningJob.decode(reader, reader.uint32());
-          continue;
-        }
-        case 3: {
-          if (tag !== 24) {
-            break;
-          }
-
-          message.value = longToNumber(reader.uint64());
-          continue;
-        }
-        case 4: {
-          if (tag !== 32) {
-            break;
-          }
-
-          message.vout = reader.uint32();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): Split {
-    return {
-      signingPublicKey: isSet(object.signingPublicKey) ? bytesFromBase64(object.signingPublicKey) : new Uint8Array(0),
-      refundSigningJob: isSet(object.refundSigningJob) ? SigningJob.fromJSON(object.refundSigningJob) : undefined,
-      value: isSet(object.value) ? globalThis.Number(object.value) : 0,
-      vout: isSet(object.vout) ? globalThis.Number(object.vout) : 0,
-    };
-  },
-
-  toJSON(message: Split): unknown {
-    const obj: any = {};
-    if (message.signingPublicKey.length !== 0) {
-      obj.signingPublicKey = base64FromBytes(message.signingPublicKey);
-    }
-    if (message.refundSigningJob !== undefined) {
-      obj.refundSigningJob = SigningJob.toJSON(message.refundSigningJob);
-    }
-    if (message.value !== 0) {
-      obj.value = Math.round(message.value);
-    }
-    if (message.vout !== 0) {
-      obj.vout = Math.round(message.vout);
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<Split>): Split {
-    return Split.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<Split>): Split {
-    const message = createBaseSplit();
-    message.signingPublicKey = object.signingPublicKey ?? new Uint8Array(0);
-    message.refundSigningJob = (object.refundSigningJob !== undefined && object.refundSigningJob !== null)
-      ? SigningJob.fromPartial(object.refundSigningJob)
-      : undefined;
-    message.value = object.value ?? 0;
-    message.vout = object.vout ?? 0;
-    return message;
-  },
-};
-
-function createBaseSplitNodeRequest(): SplitNodeRequest {
-  return { nodeId: "", parentTxSigningJob: undefined, splits: [] };
-}
-
-export const SplitNodeRequest: MessageFns<SplitNodeRequest> = {
-  encode(message: SplitNodeRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.nodeId !== "") {
-      writer.uint32(10).string(message.nodeId);
-    }
-    if (message.parentTxSigningJob !== undefined) {
-      SigningJob.encode(message.parentTxSigningJob, writer.uint32(18).fork()).join();
-    }
-    for (const v of message.splits) {
-      Split.encode(v!, writer.uint32(26).fork()).join();
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): SplitNodeRequest {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseSplitNodeRequest();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.nodeId = reader.string();
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.parentTxSigningJob = SigningJob.decode(reader, reader.uint32());
-          continue;
-        }
-        case 3: {
-          if (tag !== 26) {
-            break;
-          }
-
-          message.splits.push(Split.decode(reader, reader.uint32()));
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): SplitNodeRequest {
-    return {
-      nodeId: isSet(object.nodeId) ? globalThis.String(object.nodeId) : "",
-      parentTxSigningJob: isSet(object.parentTxSigningJob) ? SigningJob.fromJSON(object.parentTxSigningJob) : undefined,
-      splits: globalThis.Array.isArray(object?.splits) ? object.splits.map((e: any) => Split.fromJSON(e)) : [],
-    };
-  },
-
-  toJSON(message: SplitNodeRequest): unknown {
-    const obj: any = {};
-    if (message.nodeId !== "") {
-      obj.nodeId = message.nodeId;
-    }
-    if (message.parentTxSigningJob !== undefined) {
-      obj.parentTxSigningJob = SigningJob.toJSON(message.parentTxSigningJob);
-    }
-    if (message.splits?.length) {
-      obj.splits = message.splits.map((e) => Split.toJSON(e));
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<SplitNodeRequest>): SplitNodeRequest {
-    return SplitNodeRequest.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<SplitNodeRequest>): SplitNodeRequest {
-    const message = createBaseSplitNodeRequest();
-    message.nodeId = object.nodeId ?? "";
-    message.parentTxSigningJob = (object.parentTxSigningJob !== undefined && object.parentTxSigningJob !== null)
-      ? SigningJob.fromPartial(object.parentTxSigningJob)
-      : undefined;
-    message.splits = object.splits?.map((e) => Split.fromPartial(e)) || [];
-    return message;
-  },
-};
-
-function createBaseSplitResult(): SplitResult {
-  return {
-    nodeId: "",
-    refundTxSigningResult: undefined,
-    verifyingKey: new Uint8Array(0),
-    userPublicKey: new Uint8Array(0),
-  };
-}
-
-export const SplitResult: MessageFns<SplitResult> = {
-  encode(message: SplitResult, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.nodeId !== "") {
-      writer.uint32(10).string(message.nodeId);
-    }
-    if (message.refundTxSigningResult !== undefined) {
-      SigningResult.encode(message.refundTxSigningResult, writer.uint32(18).fork()).join();
-    }
-    if (message.verifyingKey.length !== 0) {
-      writer.uint32(26).bytes(message.verifyingKey);
-    }
-    if (message.userPublicKey.length !== 0) {
-      writer.uint32(34).bytes(message.userPublicKey);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): SplitResult {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseSplitResult();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.nodeId = reader.string();
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.refundTxSigningResult = SigningResult.decode(reader, reader.uint32());
-          continue;
-        }
-        case 3: {
-          if (tag !== 26) {
-            break;
-          }
-
-          message.verifyingKey = reader.bytes();
-          continue;
-        }
-        case 4: {
-          if (tag !== 34) {
-            break;
-          }
-
-          message.userPublicKey = reader.bytes();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): SplitResult {
-    return {
-      nodeId: isSet(object.nodeId) ? globalThis.String(object.nodeId) : "",
-      refundTxSigningResult: isSet(object.refundTxSigningResult)
-        ? SigningResult.fromJSON(object.refundTxSigningResult)
-        : undefined,
-      verifyingKey: isSet(object.verifyingKey) ? bytesFromBase64(object.verifyingKey) : new Uint8Array(0),
-      userPublicKey: isSet(object.userPublicKey) ? bytesFromBase64(object.userPublicKey) : new Uint8Array(0),
-    };
-  },
-
-  toJSON(message: SplitResult): unknown {
-    const obj: any = {};
-    if (message.nodeId !== "") {
-      obj.nodeId = message.nodeId;
-    }
-    if (message.refundTxSigningResult !== undefined) {
-      obj.refundTxSigningResult = SigningResult.toJSON(message.refundTxSigningResult);
-    }
-    if (message.verifyingKey.length !== 0) {
-      obj.verifyingKey = base64FromBytes(message.verifyingKey);
-    }
-    if (message.userPublicKey.length !== 0) {
-      obj.userPublicKey = base64FromBytes(message.userPublicKey);
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<SplitResult>): SplitResult {
-    return SplitResult.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<SplitResult>): SplitResult {
-    const message = createBaseSplitResult();
-    message.nodeId = object.nodeId ?? "";
-    message.refundTxSigningResult =
-      (object.refundTxSigningResult !== undefined && object.refundTxSigningResult !== null)
-        ? SigningResult.fromPartial(object.refundTxSigningResult)
-        : undefined;
-    message.verifyingKey = object.verifyingKey ?? new Uint8Array(0);
-    message.userPublicKey = object.userPublicKey ?? new Uint8Array(0);
-    return message;
-  },
-};
-
-function createBaseSplitNodeResponse(): SplitNodeResponse {
-  return { parentNodeId: "", parentTxSigningResult: undefined, splitResults: [] };
-}
-
-export const SplitNodeResponse: MessageFns<SplitNodeResponse> = {
-  encode(message: SplitNodeResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.parentNodeId !== "") {
-      writer.uint32(10).string(message.parentNodeId);
-    }
-    if (message.parentTxSigningResult !== undefined) {
-      SigningResult.encode(message.parentTxSigningResult, writer.uint32(18).fork()).join();
-    }
-    for (const v of message.splitResults) {
-      SplitResult.encode(v!, writer.uint32(26).fork()).join();
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): SplitNodeResponse {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseSplitNodeResponse();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.parentNodeId = reader.string();
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.parentTxSigningResult = SigningResult.decode(reader, reader.uint32());
-          continue;
-        }
-        case 3: {
-          if (tag !== 26) {
-            break;
-          }
-
-          message.splitResults.push(SplitResult.decode(reader, reader.uint32()));
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): SplitNodeResponse {
-    return {
-      parentNodeId: isSet(object.parentNodeId) ? globalThis.String(object.parentNodeId) : "",
-      parentTxSigningResult: isSet(object.parentTxSigningResult)
-        ? SigningResult.fromJSON(object.parentTxSigningResult)
-        : undefined,
-      splitResults: globalThis.Array.isArray(object?.splitResults)
-        ? object.splitResults.map((e: any) => SplitResult.fromJSON(e))
-        : [],
-    };
-  },
-
-  toJSON(message: SplitNodeResponse): unknown {
-    const obj: any = {};
-    if (message.parentNodeId !== "") {
-      obj.parentNodeId = message.parentNodeId;
-    }
-    if (message.parentTxSigningResult !== undefined) {
-      obj.parentTxSigningResult = SigningResult.toJSON(message.parentTxSigningResult);
-    }
-    if (message.splitResults?.length) {
-      obj.splitResults = message.splitResults.map((e) => SplitResult.toJSON(e));
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<SplitNodeResponse>): SplitNodeResponse {
-    return SplitNodeResponse.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<SplitNodeResponse>): SplitNodeResponse {
-    const message = createBaseSplitNodeResponse();
-    message.parentNodeId = object.parentNodeId ?? "";
-    message.parentTxSigningResult =
-      (object.parentTxSigningResult !== undefined && object.parentTxSigningResult !== null)
-        ? SigningResult.fromPartial(object.parentTxSigningResult)
-        : undefined;
-    message.splitResults = object.splitResults?.map((e) => SplitResult.fromPartial(e)) || [];
-    return message;
-  },
-};
-
 function createBaseFinalizeNodeSignaturesRequest(): FinalizeNodeSignaturesRequest {
   return { intent: 0, nodeSignatures: [] };
 }
@@ -2757,146 +2343,6 @@ export const FinalizeNodeSignaturesResponse: MessageFns<FinalizeNodeSignaturesRe
   fromPartial(object: DeepPartial<FinalizeNodeSignaturesResponse>): FinalizeNodeSignaturesResponse {
     const message = createBaseFinalizeNodeSignaturesResponse();
     message.nodes = object.nodes?.map((e) => TreeNode.fromPartial(e)) || [];
-    return message;
-  },
-};
-
-function createBasePrepareSplitAddressRequest(): PrepareSplitAddressRequest {
-  return { nodeId: "", signingPublicKeys: [] };
-}
-
-export const PrepareSplitAddressRequest: MessageFns<PrepareSplitAddressRequest> = {
-  encode(message: PrepareSplitAddressRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.nodeId !== "") {
-      writer.uint32(10).string(message.nodeId);
-    }
-    for (const v of message.signingPublicKeys) {
-      writer.uint32(18).bytes(v!);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): PrepareSplitAddressRequest {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBasePrepareSplitAddressRequest();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.nodeId = reader.string();
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.signingPublicKeys.push(reader.bytes());
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): PrepareSplitAddressRequest {
-    return {
-      nodeId: isSet(object.nodeId) ? globalThis.String(object.nodeId) : "",
-      signingPublicKeys: globalThis.Array.isArray(object?.signingPublicKeys)
-        ? object.signingPublicKeys.map((e: any) => bytesFromBase64(e))
-        : [],
-    };
-  },
-
-  toJSON(message: PrepareSplitAddressRequest): unknown {
-    const obj: any = {};
-    if (message.nodeId !== "") {
-      obj.nodeId = message.nodeId;
-    }
-    if (message.signingPublicKeys?.length) {
-      obj.signingPublicKeys = message.signingPublicKeys.map((e) => base64FromBytes(e));
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<PrepareSplitAddressRequest>): PrepareSplitAddressRequest {
-    return PrepareSplitAddressRequest.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<PrepareSplitAddressRequest>): PrepareSplitAddressRequest {
-    const message = createBasePrepareSplitAddressRequest();
-    message.nodeId = object.nodeId ?? "";
-    message.signingPublicKeys = object.signingPublicKeys?.map((e) => e) || [];
-    return message;
-  },
-};
-
-function createBasePrepareSplitAddressResponse(): PrepareSplitAddressResponse {
-  return { addresses: [] };
-}
-
-export const PrepareSplitAddressResponse: MessageFns<PrepareSplitAddressResponse> = {
-  encode(message: PrepareSplitAddressResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    for (const v of message.addresses) {
-      Address.encode(v!, writer.uint32(10).fork()).join();
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): PrepareSplitAddressResponse {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBasePrepareSplitAddressResponse();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.addresses.push(Address.decode(reader, reader.uint32()));
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): PrepareSplitAddressResponse {
-    return {
-      addresses: globalThis.Array.isArray(object?.addresses)
-        ? object.addresses.map((e: any) => Address.fromJSON(e))
-        : [],
-    };
-  },
-
-  toJSON(message: PrepareSplitAddressResponse): unknown {
-    const obj: any = {};
-    if (message.addresses?.length) {
-      obj.addresses = message.addresses.map((e) => Address.toJSON(e));
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<PrepareSplitAddressResponse>): PrepareSplitAddressResponse {
-    return PrepareSplitAddressResponse.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<PrepareSplitAddressResponse>): PrepareSplitAddressResponse {
-    const message = createBasePrepareSplitAddressResponse();
-    message.addresses = object.addresses?.map((e) => Address.fromPartial(e)) || [];
     return message;
   },
 };
@@ -3880,7 +3326,12 @@ export const Transfer: MessageFns<Transfer> = {
 };
 
 function createBaseTransferLeaf(): TransferLeaf {
-  return { leaf: undefined, secretCipher: new Uint8Array(0), signature: new Uint8Array(0) };
+  return {
+    leaf: undefined,
+    secretCipher: new Uint8Array(0),
+    signature: new Uint8Array(0),
+    intermediateRefundTx: new Uint8Array(0),
+  };
 }
 
 export const TransferLeaf: MessageFns<TransferLeaf> = {
@@ -3893,6 +3344,9 @@ export const TransferLeaf: MessageFns<TransferLeaf> = {
     }
     if (message.signature.length !== 0) {
       writer.uint32(26).bytes(message.signature);
+    }
+    if (message.intermediateRefundTx.length !== 0) {
+      writer.uint32(34).bytes(message.intermediateRefundTx);
     }
     return writer;
   },
@@ -3928,6 +3382,14 @@ export const TransferLeaf: MessageFns<TransferLeaf> = {
           message.signature = reader.bytes();
           continue;
         }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.intermediateRefundTx = reader.bytes();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -3942,6 +3404,9 @@ export const TransferLeaf: MessageFns<TransferLeaf> = {
       leaf: isSet(object.leaf) ? TreeNode.fromJSON(object.leaf) : undefined,
       secretCipher: isSet(object.secretCipher) ? bytesFromBase64(object.secretCipher) : new Uint8Array(0),
       signature: isSet(object.signature) ? bytesFromBase64(object.signature) : new Uint8Array(0),
+      intermediateRefundTx: isSet(object.intermediateRefundTx)
+        ? bytesFromBase64(object.intermediateRefundTx)
+        : new Uint8Array(0),
     };
   },
 
@@ -3956,6 +3421,9 @@ export const TransferLeaf: MessageFns<TransferLeaf> = {
     if (message.signature.length !== 0) {
       obj.signature = base64FromBytes(message.signature);
     }
+    if (message.intermediateRefundTx.length !== 0) {
+      obj.intermediateRefundTx = base64FromBytes(message.intermediateRefundTx);
+    }
     return obj;
   },
 
@@ -3967,6 +3435,7 @@ export const TransferLeaf: MessageFns<TransferLeaf> = {
     message.leaf = (object.leaf !== undefined && object.leaf !== null) ? TreeNode.fromPartial(object.leaf) : undefined;
     message.secretCipher = object.secretCipher ?? new Uint8Array(0);
     message.signature = object.signature ?? new Uint8Array(0);
+    message.intermediateRefundTx = object.intermediateRefundTx ?? new Uint8Array(0);
     return message;
   },
 };
@@ -4818,7 +4287,8 @@ function createBaseStorePreimageShareRequest(): StorePreimageShareRequest {
   return {
     paymentHash: new Uint8Array(0),
     preimageShare: undefined,
-    threshold: new Uint8Array(0),
+    threshold: 0,
+    invoiceString: "",
     userIdentityPublicKey: new Uint8Array(0),
   };
 }
@@ -4831,11 +4301,14 @@ export const StorePreimageShareRequest: MessageFns<StorePreimageShareRequest> = 
     if (message.preimageShare !== undefined) {
       SecretShare.encode(message.preimageShare, writer.uint32(18).fork()).join();
     }
-    if (message.threshold.length !== 0) {
-      writer.uint32(26).bytes(message.threshold);
+    if (message.threshold !== 0) {
+      writer.uint32(24).uint32(message.threshold);
+    }
+    if (message.invoiceString !== "") {
+      writer.uint32(34).string(message.invoiceString);
     }
     if (message.userIdentityPublicKey.length !== 0) {
-      writer.uint32(34).bytes(message.userIdentityPublicKey);
+      writer.uint32(42).bytes(message.userIdentityPublicKey);
     }
     return writer;
   },
@@ -4864,15 +4337,23 @@ export const StorePreimageShareRequest: MessageFns<StorePreimageShareRequest> = 
           continue;
         }
         case 3: {
-          if (tag !== 26) {
+          if (tag !== 24) {
             break;
           }
 
-          message.threshold = reader.bytes();
+          message.threshold = reader.uint32();
           continue;
         }
         case 4: {
           if (tag !== 34) {
+            break;
+          }
+
+          message.invoiceString = reader.string();
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
             break;
           }
 
@@ -4892,7 +4373,8 @@ export const StorePreimageShareRequest: MessageFns<StorePreimageShareRequest> = 
     return {
       paymentHash: isSet(object.paymentHash) ? bytesFromBase64(object.paymentHash) : new Uint8Array(0),
       preimageShare: isSet(object.preimageShare) ? SecretShare.fromJSON(object.preimageShare) : undefined,
-      threshold: isSet(object.threshold) ? bytesFromBase64(object.threshold) : new Uint8Array(0),
+      threshold: isSet(object.threshold) ? globalThis.Number(object.threshold) : 0,
+      invoiceString: isSet(object.invoiceString) ? globalThis.String(object.invoiceString) : "",
       userIdentityPublicKey: isSet(object.userIdentityPublicKey)
         ? bytesFromBase64(object.userIdentityPublicKey)
         : new Uint8Array(0),
@@ -4907,8 +4389,11 @@ export const StorePreimageShareRequest: MessageFns<StorePreimageShareRequest> = 
     if (message.preimageShare !== undefined) {
       obj.preimageShare = SecretShare.toJSON(message.preimageShare);
     }
-    if (message.threshold.length !== 0) {
-      obj.threshold = base64FromBytes(message.threshold);
+    if (message.threshold !== 0) {
+      obj.threshold = Math.round(message.threshold);
+    }
+    if (message.invoiceString !== "") {
+      obj.invoiceString = message.invoiceString;
     }
     if (message.userIdentityPublicKey.length !== 0) {
       obj.userIdentityPublicKey = base64FromBytes(message.userIdentityPublicKey);
@@ -4925,7 +4410,8 @@ export const StorePreimageShareRequest: MessageFns<StorePreimageShareRequest> = 
     message.preimageShare = (object.preimageShare !== undefined && object.preimageShare !== null)
       ? SecretShare.fromPartial(object.preimageShare)
       : undefined;
-    message.threshold = object.threshold ?? new Uint8Array(0);
+    message.threshold = object.threshold ?? 0;
+    message.invoiceString = object.invoiceString ?? "";
     message.userIdentityPublicKey = object.userIdentityPublicKey ?? new Uint8Array(0);
     return message;
   },
@@ -5792,6 +5278,280 @@ export const GetPreimageResponse: MessageFns<GetPreimageResponse> = {
   fromPartial(object: DeepPartial<GetPreimageResponse>): GetPreimageResponse {
     const message = createBaseGetPreimageResponse();
     message.preimage = object.preimage ?? new Uint8Array(0);
+    return message;
+  },
+};
+
+function createBaseOutPoint(): OutPoint {
+  return { txid: new Uint8Array(0), vout: 0 };
+}
+
+export const OutPoint: MessageFns<OutPoint> = {
+  encode(message: OutPoint, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.txid.length !== 0) {
+      writer.uint32(10).bytes(message.txid);
+    }
+    if (message.vout !== 0) {
+      writer.uint32(16).uint32(message.vout);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): OutPoint {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseOutPoint();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.txid = reader.bytes();
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.vout = reader.uint32();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): OutPoint {
+    return {
+      txid: isSet(object.txid) ? bytesFromBase64(object.txid) : new Uint8Array(0),
+      vout: isSet(object.vout) ? globalThis.Number(object.vout) : 0,
+    };
+  },
+
+  toJSON(message: OutPoint): unknown {
+    const obj: any = {};
+    if (message.txid.length !== 0) {
+      obj.txid = base64FromBytes(message.txid);
+    }
+    if (message.vout !== 0) {
+      obj.vout = Math.round(message.vout);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<OutPoint>): OutPoint {
+    return OutPoint.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<OutPoint>): OutPoint {
+    const message = createBaseOutPoint();
+    message.txid = object.txid ?? new Uint8Array(0);
+    message.vout = object.vout ?? 0;
+    return message;
+  },
+};
+
+function createBaseCooperativeExitRequest(): CooperativeExitRequest {
+  return {
+    exitId: "",
+    ownerIdentityPublicKey: new Uint8Array(0),
+    signingJobs: [],
+    connectorOutputs: [],
+    exitTxid: new Uint8Array(0),
+  };
+}
+
+export const CooperativeExitRequest: MessageFns<CooperativeExitRequest> = {
+  encode(message: CooperativeExitRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.exitId !== "") {
+      writer.uint32(10).string(message.exitId);
+    }
+    if (message.ownerIdentityPublicKey.length !== 0) {
+      writer.uint32(18).bytes(message.ownerIdentityPublicKey);
+    }
+    for (const v of message.signingJobs) {
+      LeafRefundTxSigningJob.encode(v!, writer.uint32(26).fork()).join();
+    }
+    for (const v of message.connectorOutputs) {
+      OutPoint.encode(v!, writer.uint32(34).fork()).join();
+    }
+    if (message.exitTxid.length !== 0) {
+      writer.uint32(42).bytes(message.exitTxid);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): CooperativeExitRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseCooperativeExitRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.exitId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.ownerIdentityPublicKey = reader.bytes();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.signingJobs.push(LeafRefundTxSigningJob.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.connectorOutputs.push(OutPoint.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.exitTxid = reader.bytes();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): CooperativeExitRequest {
+    return {
+      exitId: isSet(object.exitId) ? globalThis.String(object.exitId) : "",
+      ownerIdentityPublicKey: isSet(object.ownerIdentityPublicKey)
+        ? bytesFromBase64(object.ownerIdentityPublicKey)
+        : new Uint8Array(0),
+      signingJobs: globalThis.Array.isArray(object?.signingJobs)
+        ? object.signingJobs.map((e: any) => LeafRefundTxSigningJob.fromJSON(e))
+        : [],
+      connectorOutputs: globalThis.Array.isArray(object?.connectorOutputs)
+        ? object.connectorOutputs.map((e: any) => OutPoint.fromJSON(e))
+        : [],
+      exitTxid: isSet(object.exitTxid) ? bytesFromBase64(object.exitTxid) : new Uint8Array(0),
+    };
+  },
+
+  toJSON(message: CooperativeExitRequest): unknown {
+    const obj: any = {};
+    if (message.exitId !== "") {
+      obj.exitId = message.exitId;
+    }
+    if (message.ownerIdentityPublicKey.length !== 0) {
+      obj.ownerIdentityPublicKey = base64FromBytes(message.ownerIdentityPublicKey);
+    }
+    if (message.signingJobs?.length) {
+      obj.signingJobs = message.signingJobs.map((e) => LeafRefundTxSigningJob.toJSON(e));
+    }
+    if (message.connectorOutputs?.length) {
+      obj.connectorOutputs = message.connectorOutputs.map((e) => OutPoint.toJSON(e));
+    }
+    if (message.exitTxid.length !== 0) {
+      obj.exitTxid = base64FromBytes(message.exitTxid);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<CooperativeExitRequest>): CooperativeExitRequest {
+    return CooperativeExitRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<CooperativeExitRequest>): CooperativeExitRequest {
+    const message = createBaseCooperativeExitRequest();
+    message.exitId = object.exitId ?? "";
+    message.ownerIdentityPublicKey = object.ownerIdentityPublicKey ?? new Uint8Array(0);
+    message.signingJobs = object.signingJobs?.map((e) => LeafRefundTxSigningJob.fromPartial(e)) || [];
+    message.connectorOutputs = object.connectorOutputs?.map((e) => OutPoint.fromPartial(e)) || [];
+    message.exitTxid = object.exitTxid ?? new Uint8Array(0);
+    return message;
+  },
+};
+
+function createBaseCooperativeExitResponse(): CooperativeExitResponse {
+  return { signingResults: [] };
+}
+
+export const CooperativeExitResponse: MessageFns<CooperativeExitResponse> = {
+  encode(message: CooperativeExitResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.signingResults) {
+      LeafRefundTxSigningResult.encode(v!, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): CooperativeExitResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseCooperativeExitResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.signingResults.push(LeafRefundTxSigningResult.decode(reader, reader.uint32()));
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): CooperativeExitResponse {
+    return {
+      signingResults: globalThis.Array.isArray(object?.signingResults)
+        ? object.signingResults.map((e: any) => LeafRefundTxSigningResult.fromJSON(e))
+        : [],
+    };
+  },
+
+  toJSON(message: CooperativeExitResponse): unknown {
+    const obj: any = {};
+    if (message.signingResults?.length) {
+      obj.signingResults = message.signingResults.map((e) => LeafRefundTxSigningResult.toJSON(e));
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<CooperativeExitResponse>): CooperativeExitResponse {
+    return CooperativeExitResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<CooperativeExitResponse>): CooperativeExitResponse {
+    const message = createBaseCooperativeExitResponse();
+    message.signingResults = object.signingResults?.map((e) => LeafRefundTxSigningResult.fromPartial(e)) || [];
     return message;
   },
 };
@@ -6834,22 +6594,6 @@ export const SparkServiceDefinition = {
       responseStream: false,
       options: {},
     },
-    prepare_split_address: {
-      name: "prepare_split_address",
-      requestType: PrepareSplitAddressRequest,
-      requestStream: false,
-      responseType: PrepareSplitAddressResponse,
-      responseStream: false,
-      options: {},
-    },
-    split_node: {
-      name: "split_node",
-      requestType: SplitNodeRequest,
-      requestStream: false,
-      responseType: SplitNodeResponse,
-      responseStream: false,
-      options: {},
-    },
     finalize_node_signatures: {
       name: "finalize_node_signatures",
       requestType: FinalizeNodeSignaturesRequest,
@@ -6930,6 +6674,14 @@ export const SparkServiceDefinition = {
       responseStream: false,
       options: {},
     },
+    cooperative_exit: {
+      name: "cooperative_exit",
+      requestType: CooperativeExitRequest,
+      requestStream: false,
+      responseType: CooperativeExitResponse,
+      responseStream: false,
+      options: {},
+    },
     prepare_tree_address: {
       name: "prepare_tree_address",
       requestType: PrepareTreeAddressRequest,
@@ -6966,11 +6718,6 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
     request: StartTreeCreationRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<StartTreeCreationResponse>>;
-  prepare_split_address(
-    request: PrepareSplitAddressRequest,
-    context: CallContext & CallContextExt,
-  ): Promise<DeepPartial<PrepareSplitAddressResponse>>;
-  split_node(request: SplitNodeRequest, context: CallContext & CallContextExt): Promise<DeepPartial<SplitNodeResponse>>;
   finalize_node_signatures(
     request: FinalizeNodeSignaturesRequest,
     context: CallContext & CallContextExt,
@@ -7011,6 +6758,10 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
     request: GetPreimageRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<GetPreimageResponse>>;
+  cooperative_exit(
+    request: CooperativeExitRequest,
+    context: CallContext & CallContextExt,
+  ): Promise<DeepPartial<CooperativeExitResponse>>;
   prepare_tree_address(
     request: PrepareTreeAddressRequest,
     context: CallContext & CallContextExt,
@@ -7034,14 +6785,6 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
     request: DeepPartial<StartTreeCreationRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<StartTreeCreationResponse>;
-  prepare_split_address(
-    request: DeepPartial<PrepareSplitAddressRequest>,
-    options?: CallOptions & CallOptionsExt,
-  ): Promise<PrepareSplitAddressResponse>;
-  split_node(
-    request: DeepPartial<SplitNodeRequest>,
-    options?: CallOptions & CallOptionsExt,
-  ): Promise<SplitNodeResponse>;
   finalize_node_signatures(
     request: DeepPartial<FinalizeNodeSignaturesRequest>,
     options?: CallOptions & CallOptionsExt,
@@ -7082,6 +6825,10 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
     request: DeepPartial<GetPreimageRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<GetPreimageResponse>;
+  cooperative_exit(
+    request: DeepPartial<CooperativeExitRequest>,
+    options?: CallOptions & CallOptionsExt,
+  ): Promise<CooperativeExitResponse>;
   prepare_tree_address(
     request: DeepPartial<PrepareTreeAddressRequest>,
     options?: CallOptions & CallOptionsExt,

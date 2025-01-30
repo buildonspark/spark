@@ -11,9 +11,8 @@ export const protobufPackage = "common";
 
 export enum SignatureIntent {
   CREATION = 0,
-  SPLIT = 1,
-  TRANSFER = 2,
-  AGGREGATE = 3,
+  TRANSFER = 1,
+  AGGREGATE = 2,
   UNRECOGNIZED = -1,
 }
 
@@ -23,12 +22,9 @@ export function signatureIntentFromJSON(object: any): SignatureIntent {
     case "CREATION":
       return SignatureIntent.CREATION;
     case 1:
-    case "SPLIT":
-      return SignatureIntent.SPLIT;
-    case 2:
     case "TRANSFER":
       return SignatureIntent.TRANSFER;
-    case 3:
+    case 2:
     case "AGGREGATE":
       return SignatureIntent.AGGREGATE;
     case -1:
@@ -42,8 +38,6 @@ export function signatureIntentToJSON(object: SignatureIntent): string {
   switch (object) {
     case SignatureIntent.CREATION:
       return "CREATION";
-    case SignatureIntent.SPLIT:
-      return "SPLIT";
     case SignatureIntent.TRANSFER:
       return "TRANSFER";
     case SignatureIntent.AGGREGATE:

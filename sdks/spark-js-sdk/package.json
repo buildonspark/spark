@@ -22,7 +22,7 @@
     "test:integration": "yarn test-cmd src/tests/integration/*.test.ts",
     "types:watch": "tsc-absolute --watch",
     "types": "tsc",
-    "generate:proto": "protoc --ts_proto_out=./src/proto --ts_proto_opt=outputServices=nice-grpc,outputServices=generic-definitions,useExactTypes=false --proto_path=../../protos spark.proto mock.proto"
+    "generate:proto": "protoc --ts_proto_out=./src/proto --ts_proto_opt=outputServices=nice-grpc,outputServices=generic-definitions,useExactTypes=false --proto_path=../../protos spark.proto mock.proto spark_authn.proto"
   },
   "author": "",
   "license": "ISC",
@@ -51,6 +51,7 @@
     "@noble/curves": "^1.8.0",
     "@noble/secp256k1": "^2.2.3",
     "@scure/base": "^1.2.1",
+    "@scure/bip39": "^1.5.4",
     "@scure/btc-signer": "^1.5.0",
     "crypto-js": "^4.2.0",
     "eciesjs": "^0.4.13",
