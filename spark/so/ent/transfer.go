@@ -31,6 +31,8 @@ type Transfer struct {
 	TotalValue uint64 `json:"total_value,omitempty"`
 	// Status holds the value of the "status" field.
 	Status schema.TransferStatus `json:"status,omitempty"`
+	// Type holds the value of the "type" field.
+	Type schema.TransferType `json:"type,omitempty"`
 	// ExpiryTime holds the value of the "expiry_time" field.
 	ExpiryTime time.Time `json:"expiry_time,omitempty"`
 	// CompletionTime holds the value of the "completion_time" field.
@@ -68,7 +70,7 @@ func (*Transfer) scanValues(columns []string) ([]any, error) {
 			values[i] = new([]byte)
 		case transfer.FieldTotalValue:
 			values[i] = new(sql.NullInt64)
-		case transfer.FieldStatus:
+		case transfer.FieldStatus, transfer.FieldType:
 			values[i] = new(sql.NullString)
 		case transfer.FieldCreateTime, transfer.FieldUpdateTime, transfer.FieldExpiryTime, transfer.FieldCompletionTime:
 			values[i] = new(sql.NullTime)
@@ -130,6 +132,12 @@ func (t *Transfer) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field status", values[i])
 			} else if value.Valid {
 				t.Status = schema.TransferStatus(value.String)
+			}
+		case transfer.FieldType:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field type", values[i])
+			} else if value.Valid {
+				t.Type = schema.TransferType(value.String)
 			}
 		case transfer.FieldExpiryTime:
 			if value, ok := values[i].(*sql.NullTime); !ok {
@@ -202,6 +210,9 @@ func (t *Transfer) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("status=")
 	builder.WriteString(fmt.Sprintf("%v", t.Status))
+	builder.WriteString(", ")
+	builder.WriteString("type=")
+	builder.WriteString(fmt.Sprintf("%v", t.Type))
 	builder.WriteString(", ")
 	builder.WriteString("expiry_time=")
 	builder.WriteString(t.ExpiryTime.Format(time.ANSIC))

@@ -192,6 +192,29 @@ func HasPreimageSharesWith(preds ...predicate.PreimageShare) predicate.PreimageR
 	})
 }
 
+// HasTransfers applies the HasEdge predicate on the "transfers" edge.
+func HasTransfers() predicate.PreimageRequest {
+	return predicate.PreimageRequest(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, TransfersTable, TransfersColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasTransfersWith applies the HasEdge predicate on the "transfers" edge with a given conditions (other predicates).
+func HasTransfersWith(preds ...predicate.Transfer) predicate.PreimageRequest {
+	return predicate.PreimageRequest(func(s *sql.Selector) {
+		step := newTransfersStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
 // And groups predicates with the AND operator between them.
 func And(predicates ...predicate.PreimageRequest) predicate.PreimageRequest {
 	return predicate.PreimageRequest(sql.AndPredicates(predicates...))

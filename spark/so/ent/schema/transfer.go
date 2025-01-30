@@ -13,6 +13,8 @@ type TransferStatus string
 const (
 	// TransferStatusSenderInitiated is the status of a transfer that has been initiated by sender.
 	TransferStatusSenderInitiated TransferStatus = "SENDER_INITIATED"
+	// TransferStatusSenderKeyTweakPending is the status of a transfer that has been initiated by sender but the key tweak is pending.
+	TransferStatusSenderKeyTweakPending TransferStatus = "SENDER_KEY_TWEAK_PENDING"
 	// TransferStatusSenderKeyTweaked is the status of a transfer that sender has tweaked the key.
 	TransferStatusSenderKeyTweaked TransferStatus = "SENDER_KEY_TWEAKED"
 	// TransferStatusReceiverKeyTweaked is the status of transfer where key has been tweaked.
@@ -29,11 +31,33 @@ const (
 func (TransferStatus) Values() []string {
 	return []string{
 		string(TransferStatusSenderInitiated),
+		string(TransferStatusSenderKeyTweakPending),
 		string(TransferStatusSenderKeyTweaked),
 		string(TransferStatusReceiverKeyTweaked),
 		string(TransferStatusReceiverRefundSigned),
 		string(TransferStatusCompleted),
 		string(TransferStatusExpired),
+	}
+}
+
+// TransferType is the type of transfer
+type TransferType string
+
+const (
+	// TransferTypePreimageSwap is the type of transfer that is a preimage swap
+	TransferTypePreimageSwap TransferType = "PREIMAGE_SWAP"
+	// TransferTypeCooperativeExit is the type of transfer that is a cooperative exit
+	TransferTypeCooperativeExit TransferType = "COOPERATIVE_EXIT"
+	// TransferTypeTransfer is the type of transfer that is a normal transfer
+	TransferTypeTransfer TransferType = "TRANSFER"
+)
+
+// Values returns the values of the transfer type.
+func (TransferType) Values() []string {
+	return []string{
+		string(TransferTypePreimageSwap),
+		string(TransferTypeCooperativeExit),
+		string(TransferTypeTransfer),
 	}
 }
 
@@ -56,6 +80,7 @@ func (Transfer) Fields() []ent.Field {
 		field.Bytes("receiver_identity_pubkey").NotEmpty().Immutable(),
 		field.Uint64("total_value"),
 		field.Enum("status").GoType(TransferStatus("")),
+		field.Enum("type").GoType(TransferType("")),
 		field.Time("expiry_time").Immutable(),
 		field.Time("completion_time").Optional().Nillable(),
 	}

@@ -32,6 +32,8 @@ type TransferLeaf struct {
 	PreviousRefundTx []byte `json:"previous_refund_tx,omitempty"`
 	// IntermediateRefundTx holds the value of the "intermediate_refund_tx" field.
 	IntermediateRefundTx []byte `json:"intermediate_refund_tx,omitempty"`
+	// KeyTweak holds the value of the "key_tweak" field.
+	KeyTweak []byte `json:"key_tweak,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the TransferLeafQuery when eager-loading is set.
 	Edges                  TransferLeafEdges `json:"edges"`
@@ -78,7 +80,7 @@ func (*TransferLeaf) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case transferleaf.FieldSecretCipher, transferleaf.FieldSignature, transferleaf.FieldPreviousRefundTx, transferleaf.FieldIntermediateRefundTx:
+		case transferleaf.FieldSecretCipher, transferleaf.FieldSignature, transferleaf.FieldPreviousRefundTx, transferleaf.FieldIntermediateRefundTx, transferleaf.FieldKeyTweak:
 			values[i] = new([]byte)
 		case transferleaf.FieldCreateTime, transferleaf.FieldUpdateTime:
 			values[i] = new(sql.NullTime)
@@ -144,6 +146,12 @@ func (tl *TransferLeaf) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field intermediate_refund_tx", values[i])
 			} else if value != nil {
 				tl.IntermediateRefundTx = *value
+			}
+		case transferleaf.FieldKeyTweak:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field key_tweak", values[i])
+			} else if value != nil {
+				tl.KeyTweak = *value
 			}
 		case transferleaf.ForeignKeys[0]:
 			if value, ok := values[i].(*sql.NullScanner); !ok {
@@ -222,6 +230,9 @@ func (tl *TransferLeaf) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("intermediate_refund_tx=")
 	builder.WriteString(fmt.Sprintf("%v", tl.IntermediateRefundTx))
+	builder.WriteString(", ")
+	builder.WriteString("key_tweak=")
+	builder.WriteString(fmt.Sprintf("%v", tl.KeyTweak))
 	builder.WriteByte(')')
 	return builder.String()
 }

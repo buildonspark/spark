@@ -72,6 +72,20 @@ func (tu *TransferUpdate) SetNillableStatus(ss *schema.TransferStatus) *Transfer
 	return tu
 }
 
+// SetType sets the "type" field.
+func (tu *TransferUpdate) SetType(st schema.TransferType) *TransferUpdate {
+	tu.mutation.SetType(st)
+	return tu
+}
+
+// SetNillableType sets the "type" field if the given value is not nil.
+func (tu *TransferUpdate) SetNillableType(st *schema.TransferType) *TransferUpdate {
+	if st != nil {
+		tu.SetType(*st)
+	}
+	return tu
+}
+
 // SetCompletionTime sets the "completion_time" field.
 func (tu *TransferUpdate) SetCompletionTime(t time.Time) *TransferUpdate {
 	tu.mutation.SetCompletionTime(t)
@@ -176,6 +190,11 @@ func (tu *TransferUpdate) check() error {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "Transfer.status": %w`, err)}
 		}
 	}
+	if v, ok := tu.mutation.GetType(); ok {
+		if err := transfer.TypeValidator(v); err != nil {
+			return &ValidationError{Name: "type", err: fmt.Errorf(`ent: validator failed for field "Transfer.type": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -202,6 +221,9 @@ func (tu *TransferUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if value, ok := tu.mutation.Status(); ok {
 		_spec.SetField(transfer.FieldStatus, field.TypeEnum, value)
+	}
+	if value, ok := tu.mutation.GetType(); ok {
+		_spec.SetField(transfer.FieldType, field.TypeEnum, value)
 	}
 	if value, ok := tu.mutation.CompletionTime(); ok {
 		_spec.SetField(transfer.FieldCompletionTime, field.TypeTime, value)
@@ -311,6 +333,20 @@ func (tuo *TransferUpdateOne) SetStatus(ss schema.TransferStatus) *TransferUpdat
 func (tuo *TransferUpdateOne) SetNillableStatus(ss *schema.TransferStatus) *TransferUpdateOne {
 	if ss != nil {
 		tuo.SetStatus(*ss)
+	}
+	return tuo
+}
+
+// SetType sets the "type" field.
+func (tuo *TransferUpdateOne) SetType(st schema.TransferType) *TransferUpdateOne {
+	tuo.mutation.SetType(st)
+	return tuo
+}
+
+// SetNillableType sets the "type" field if the given value is not nil.
+func (tuo *TransferUpdateOne) SetNillableType(st *schema.TransferType) *TransferUpdateOne {
+	if st != nil {
+		tuo.SetType(*st)
 	}
 	return tuo
 }
@@ -432,6 +468,11 @@ func (tuo *TransferUpdateOne) check() error {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "Transfer.status": %w`, err)}
 		}
 	}
+	if v, ok := tuo.mutation.GetType(); ok {
+		if err := transfer.TypeValidator(v); err != nil {
+			return &ValidationError{Name: "type", err: fmt.Errorf(`ent: validator failed for field "Transfer.type": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -475,6 +516,9 @@ func (tuo *TransferUpdateOne) sqlSave(ctx context.Context) (_node *Transfer, err
 	}
 	if value, ok := tuo.mutation.Status(); ok {
 		_spec.SetField(transfer.FieldStatus, field.TypeEnum, value)
+	}
+	if value, ok := tuo.mutation.GetType(); ok {
+		_spec.SetField(transfer.FieldType, field.TypeEnum, value)
 	}
 	if value, ok := tuo.mutation.CompletionTime(); ok {
 		_spec.SetField(transfer.FieldCompletionTime, field.TypeTime, value)

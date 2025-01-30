@@ -46,7 +46,7 @@ func (h *TransferHandler) StartSendTransfer(ctx context.Context, req *pb.StartSe
 	for _, leaf := range req.LeavesToSend {
 		leafRefundMap[leaf.LeafId] = leaf.RefundTxSigningJob.RawTx
 	}
-	transfer, leafMap, err := h.createTransfer(ctx, req.TransferId, req.ExpiryTime.AsTime(), req.OwnerIdentityPublicKey, req.ReceiverIdentityPublicKey, leafRefundMap, false)
+	transfer, leafMap, err := h.createTransfer(ctx, req.TransferId, schema.TransferTypeTransfer, req.ExpiryTime.AsTime(), req.OwnerIdentityPublicKey, req.ReceiverIdentityPublicKey, leafRefundMap, false)
 	if err != nil {
 		return nil, err
 	}

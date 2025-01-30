@@ -67,6 +67,18 @@ func (tlu *TransferLeafUpdate) SetIntermediateRefundTx(b []byte) *TransferLeafUp
 	return tlu
 }
 
+// SetKeyTweak sets the "key_tweak" field.
+func (tlu *TransferLeafUpdate) SetKeyTweak(b []byte) *TransferLeafUpdate {
+	tlu.mutation.SetKeyTweak(b)
+	return tlu
+}
+
+// ClearKeyTweak clears the value of the "key_tweak" field.
+func (tlu *TransferLeafUpdate) ClearKeyTweak() *TransferLeafUpdate {
+	tlu.mutation.ClearKeyTweak()
+	return tlu
+}
+
 // SetTransferID sets the "transfer" edge to the Transfer entity by ID.
 func (tlu *TransferLeafUpdate) SetTransferID(id uuid.UUID) *TransferLeafUpdate {
 	tlu.mutation.SetTransferID(id)
@@ -188,6 +200,12 @@ func (tlu *TransferLeafUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if value, ok := tlu.mutation.IntermediateRefundTx(); ok {
 		_spec.SetField(transferleaf.FieldIntermediateRefundTx, field.TypeBytes, value)
 	}
+	if value, ok := tlu.mutation.KeyTweak(); ok {
+		_spec.SetField(transferleaf.FieldKeyTweak, field.TypeBytes, value)
+	}
+	if tlu.mutation.KeyTweakCleared() {
+		_spec.ClearField(transferleaf.FieldKeyTweak, field.TypeBytes)
+	}
 	if tlu.mutation.TransferCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2O,
@@ -299,6 +317,18 @@ func (tluo *TransferLeafUpdateOne) ClearSignature() *TransferLeafUpdateOne {
 // SetIntermediateRefundTx sets the "intermediate_refund_tx" field.
 func (tluo *TransferLeafUpdateOne) SetIntermediateRefundTx(b []byte) *TransferLeafUpdateOne {
 	tluo.mutation.SetIntermediateRefundTx(b)
+	return tluo
+}
+
+// SetKeyTweak sets the "key_tweak" field.
+func (tluo *TransferLeafUpdateOne) SetKeyTweak(b []byte) *TransferLeafUpdateOne {
+	tluo.mutation.SetKeyTweak(b)
+	return tluo
+}
+
+// ClearKeyTweak clears the value of the "key_tweak" field.
+func (tluo *TransferLeafUpdateOne) ClearKeyTweak() *TransferLeafUpdateOne {
+	tluo.mutation.ClearKeyTweak()
 	return tluo
 }
 
@@ -452,6 +482,12 @@ func (tluo *TransferLeafUpdateOne) sqlSave(ctx context.Context) (_node *Transfer
 	}
 	if value, ok := tluo.mutation.IntermediateRefundTx(); ok {
 		_spec.SetField(transferleaf.FieldIntermediateRefundTx, field.TypeBytes, value)
+	}
+	if value, ok := tluo.mutation.KeyTweak(); ok {
+		_spec.SetField(transferleaf.FieldKeyTweak, field.TypeBytes, value)
+	}
+	if tluo.mutation.KeyTweakCleared() {
+		_spec.ClearField(transferleaf.FieldKeyTweak, field.TypeBytes)
 	}
 	if tluo.mutation.TransferCleared() {
 		edge := &sqlgraph.EdgeSpec{

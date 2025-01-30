@@ -15,6 +15,7 @@ import (
 	"github.com/lightsparkdev/spark-go/so/ent/predicate"
 	"github.com/lightsparkdev/spark-go/so/ent/preimagerequest"
 	"github.com/lightsparkdev/spark-go/so/ent/preimageshare"
+	"github.com/lightsparkdev/spark-go/so/ent/transfer"
 	"github.com/lightsparkdev/spark-go/so/ent/usersignedtransaction"
 )
 
@@ -71,6 +72,25 @@ func (pru *PreimageRequestUpdate) SetPreimageShares(p *PreimageShare) *PreimageR
 	return pru.SetPreimageSharesID(p.ID)
 }
 
+// SetTransfersID sets the "transfers" edge to the Transfer entity by ID.
+func (pru *PreimageRequestUpdate) SetTransfersID(id uuid.UUID) *PreimageRequestUpdate {
+	pru.mutation.SetTransfersID(id)
+	return pru
+}
+
+// SetNillableTransfersID sets the "transfers" edge to the Transfer entity by ID if the given value is not nil.
+func (pru *PreimageRequestUpdate) SetNillableTransfersID(id *uuid.UUID) *PreimageRequestUpdate {
+	if id != nil {
+		pru = pru.SetTransfersID(*id)
+	}
+	return pru
+}
+
+// SetTransfers sets the "transfers" edge to the Transfer entity.
+func (pru *PreimageRequestUpdate) SetTransfers(t *Transfer) *PreimageRequestUpdate {
+	return pru.SetTransfersID(t.ID)
+}
+
 // Mutation returns the PreimageRequestMutation object of the builder.
 func (pru *PreimageRequestUpdate) Mutation() *PreimageRequestMutation {
 	return pru.mutation
@@ -100,6 +120,12 @@ func (pru *PreimageRequestUpdate) RemoveTransactions(u ...*UserSignedTransaction
 // ClearPreimageShares clears the "preimage_shares" edge to the PreimageShare entity.
 func (pru *PreimageRequestUpdate) ClearPreimageShares() *PreimageRequestUpdate {
 	pru.mutation.ClearPreimageShares()
+	return pru
+}
+
+// ClearTransfers clears the "transfers" edge to the Transfer entity.
+func (pru *PreimageRequestUpdate) ClearTransfers() *PreimageRequestUpdate {
+	pru.mutation.ClearTransfers()
 	return pru
 }
 
@@ -225,6 +251,35 @@ func (pru *PreimageRequestUpdate) sqlSave(ctx context.Context) (n int, err error
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	if pru.mutation.TransfersCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   preimagerequest.TransfersTable,
+			Columns: []string{preimagerequest.TransfersColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(transfer.FieldID, field.TypeUUID),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := pru.mutation.TransfersIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   preimagerequest.TransfersTable,
+			Columns: []string{preimagerequest.TransfersColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(transfer.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
 	if n, err = sqlgraph.UpdateNodes(ctx, pru.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{preimagerequest.Label}
@@ -285,6 +340,25 @@ func (pruo *PreimageRequestUpdateOne) SetPreimageShares(p *PreimageShare) *Preim
 	return pruo.SetPreimageSharesID(p.ID)
 }
 
+// SetTransfersID sets the "transfers" edge to the Transfer entity by ID.
+func (pruo *PreimageRequestUpdateOne) SetTransfersID(id uuid.UUID) *PreimageRequestUpdateOne {
+	pruo.mutation.SetTransfersID(id)
+	return pruo
+}
+
+// SetNillableTransfersID sets the "transfers" edge to the Transfer entity by ID if the given value is not nil.
+func (pruo *PreimageRequestUpdateOne) SetNillableTransfersID(id *uuid.UUID) *PreimageRequestUpdateOne {
+	if id != nil {
+		pruo = pruo.SetTransfersID(*id)
+	}
+	return pruo
+}
+
+// SetTransfers sets the "transfers" edge to the Transfer entity.
+func (pruo *PreimageRequestUpdateOne) SetTransfers(t *Transfer) *PreimageRequestUpdateOne {
+	return pruo.SetTransfersID(t.ID)
+}
+
 // Mutation returns the PreimageRequestMutation object of the builder.
 func (pruo *PreimageRequestUpdateOne) Mutation() *PreimageRequestMutation {
 	return pruo.mutation
@@ -314,6 +388,12 @@ func (pruo *PreimageRequestUpdateOne) RemoveTransactions(u ...*UserSignedTransac
 // ClearPreimageShares clears the "preimage_shares" edge to the PreimageShare entity.
 func (pruo *PreimageRequestUpdateOne) ClearPreimageShares() *PreimageRequestUpdateOne {
 	pruo.mutation.ClearPreimageShares()
+	return pruo
+}
+
+// ClearTransfers clears the "transfers" edge to the Transfer entity.
+func (pruo *PreimageRequestUpdateOne) ClearTransfers() *PreimageRequestUpdateOne {
+	pruo.mutation.ClearTransfers()
 	return pruo
 }
 
@@ -462,6 +542,35 @@ func (pruo *PreimageRequestUpdateOne) sqlSave(ctx context.Context) (_node *Preim
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(preimageshare.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if pruo.mutation.TransfersCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   preimagerequest.TransfersTable,
+			Columns: []string{preimagerequest.TransfersColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(transfer.FieldID, field.TypeUUID),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := pruo.mutation.TransfersIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   preimagerequest.TransfersTable,
+			Columns: []string{preimagerequest.TransfersColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(transfer.FieldID, field.TypeUUID),
 			},
 		}
 		for _, k := range nodes {

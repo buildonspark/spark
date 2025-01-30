@@ -23,6 +23,8 @@ const (
 	EdgeTransactions = "transactions"
 	// EdgePreimageShares holds the string denoting the preimage_shares edge name in mutations.
 	EdgePreimageShares = "preimage_shares"
+	// EdgeTransfers holds the string denoting the transfers edge name in mutations.
+	EdgeTransfers = "transfers"
 	// Table holds the table name of the preimagerequest in the database.
 	Table = "preimage_requests"
 	// TransactionsTable is the table that holds the transactions relation/edge.
@@ -39,6 +41,13 @@ const (
 	PreimageSharesInverseTable = "preimage_shares"
 	// PreimageSharesColumn is the table column denoting the preimage_shares relation/edge.
 	PreimageSharesColumn = "preimage_request_preimage_shares"
+	// TransfersTable is the table that holds the transfers relation/edge.
+	TransfersTable = "preimage_requests"
+	// TransfersInverseTable is the table name for the Transfer entity.
+	// It exists in this package in order to avoid circular dependency with the "transfer" package.
+	TransfersInverseTable = "transfers"
+	// TransfersColumn is the table column denoting the transfers relation/edge.
+	TransfersColumn = "preimage_request_transfers"
 )
 
 // Columns holds all SQL columns for preimagerequest fields.
@@ -48,10 +57,21 @@ var Columns = []string{
 	FieldUpdateTime,
 }
 
+// ForeignKeys holds the SQL foreign-keys that are owned by the "preimage_requests"
+// table and are not defined as standalone fields in the schema.
+var ForeignKeys = []string{
+	"preimage_request_transfers",
+}
+
 // ValidColumn reports if the column name is valid (part of the table columns).
 func ValidColumn(column string) bool {
 	for i := range Columns {
 		if column == Columns[i] {
+			return true
+		}
+	}
+	for i := range ForeignKeys {
+		if column == ForeignKeys[i] {
 			return true
 		}
 	}
@@ -107,6 +127,13 @@ func ByPreimageSharesField(field string, opts ...sql.OrderTermOption) OrderOptio
 		sqlgraph.OrderByNeighborTerms(s, newPreimageSharesStep(), sql.OrderByField(field, opts...))
 	}
 }
+
+// ByTransfersField orders the results by transfers field.
+func ByTransfersField(field string, opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newTransfersStep(), sql.OrderByField(field, opts...))
+	}
+}
 func newTransactionsStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
@@ -119,5 +146,12 @@ func newPreimageSharesStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(PreimageSharesInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.O2O, false, PreimageSharesTable, PreimageSharesColumn),
+	)
+}
+func newTransfersStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(TransfersInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.M2O, false, TransfersTable, TransfersColumn),
 	)
 }

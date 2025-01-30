@@ -322,6 +322,36 @@ func StatusNotIn(vs ...schema.TransferStatus) predicate.Transfer {
 	return predicate.Transfer(sql.FieldNotIn(FieldStatus, v...))
 }
 
+// TypeEQ applies the EQ predicate on the "type" field.
+func TypeEQ(v schema.TransferType) predicate.Transfer {
+	vc := v
+	return predicate.Transfer(sql.FieldEQ(FieldType, vc))
+}
+
+// TypeNEQ applies the NEQ predicate on the "type" field.
+func TypeNEQ(v schema.TransferType) predicate.Transfer {
+	vc := v
+	return predicate.Transfer(sql.FieldNEQ(FieldType, vc))
+}
+
+// TypeIn applies the In predicate on the "type" field.
+func TypeIn(vs ...schema.TransferType) predicate.Transfer {
+	v := make([]any, len(vs))
+	for i := range v {
+		v[i] = vs[i]
+	}
+	return predicate.Transfer(sql.FieldIn(FieldType, v...))
+}
+
+// TypeNotIn applies the NotIn predicate on the "type" field.
+func TypeNotIn(vs ...schema.TransferType) predicate.Transfer {
+	v := make([]any, len(vs))
+	for i := range v {
+		v[i] = vs[i]
+	}
+	return predicate.Transfer(sql.FieldNotIn(FieldType, v...))
+}
+
 // ExpiryTimeEQ applies the EQ predicate on the "expiry_time" field.
 func ExpiryTimeEQ(v time.Time) predicate.Transfer {
 	return predicate.Transfer(sql.FieldEQ(FieldExpiryTime, v))

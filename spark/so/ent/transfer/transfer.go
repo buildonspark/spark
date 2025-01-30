@@ -29,6 +29,8 @@ const (
 	FieldTotalValue = "total_value"
 	// FieldStatus holds the string denoting the status field in the database.
 	FieldStatus = "status"
+	// FieldType holds the string denoting the type field in the database.
+	FieldType = "type"
 	// FieldExpiryTime holds the string denoting the expiry_time field in the database.
 	FieldExpiryTime = "expiry_time"
 	// FieldCompletionTime holds the string denoting the completion_time field in the database.
@@ -55,6 +57,7 @@ var Columns = []string{
 	FieldReceiverIdentityPubkey,
 	FieldTotalValue,
 	FieldStatus,
+	FieldType,
 	FieldExpiryTime,
 	FieldCompletionTime,
 }
@@ -87,10 +90,20 @@ var (
 // StatusValidator is a validator for the "status" field enum values. It is called by the builders before save.
 func StatusValidator(s schema.TransferStatus) error {
 	switch s {
-	case "SENDER_INITIATED", "SENDER_KEY_TWEAKED", "RECEIVER_KEY_TWEAKED", "RECEIVER_REFUND_SIGNED", "COMPLETED", "EXPIRED":
+	case "SENDER_INITIATED", "SENDER_KEY_TWEAK_PENDING", "SENDER_KEY_TWEAKED", "RECEIVER_KEY_TWEAKED", "RECEIVER_REFUND_SIGNED", "COMPLETED", "EXPIRED":
 		return nil
 	default:
 		return fmt.Errorf("transfer: invalid enum value for status field: %q", s)
+	}
+}
+
+// TypeValidator is a validator for the "type" field enum values. It is called by the builders before save.
+func TypeValidator(_type schema.TransferType) error {
+	switch _type {
+	case "PREIMAGE_SWAP", "COOPERATIVE_EXIT", "TRANSFER":
+		return nil
+	default:
+		return fmt.Errorf("transfer: invalid enum value for type field: %q", _type)
 	}
 }
 
@@ -120,6 +133,11 @@ func ByTotalValue(opts ...sql.OrderTermOption) OrderOption {
 // ByStatus orders the results by the status field.
 func ByStatus(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldStatus, opts...).ToFunc()
+}
+
+// ByType orders the results by the type field.
+func ByType(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldType, opts...).ToFunc()
 }
 
 // ByExpiryTime orders the results by the expiry_time field.

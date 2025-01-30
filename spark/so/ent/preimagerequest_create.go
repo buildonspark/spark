@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/so/ent/preimagerequest"
 	"github.com/lightsparkdev/spark-go/so/ent/preimageshare"
+	"github.com/lightsparkdev/spark-go/so/ent/transfer"
 	"github.com/lightsparkdev/spark-go/so/ent/usersignedtransaction"
 )
 
@@ -97,6 +98,25 @@ func (prc *PreimageRequestCreate) SetNillablePreimageSharesID(id *uuid.UUID) *Pr
 // SetPreimageShares sets the "preimage_shares" edge to the PreimageShare entity.
 func (prc *PreimageRequestCreate) SetPreimageShares(p *PreimageShare) *PreimageRequestCreate {
 	return prc.SetPreimageSharesID(p.ID)
+}
+
+// SetTransfersID sets the "transfers" edge to the Transfer entity by ID.
+func (prc *PreimageRequestCreate) SetTransfersID(id uuid.UUID) *PreimageRequestCreate {
+	prc.mutation.SetTransfersID(id)
+	return prc
+}
+
+// SetNillableTransfersID sets the "transfers" edge to the Transfer entity by ID if the given value is not nil.
+func (prc *PreimageRequestCreate) SetNillableTransfersID(id *uuid.UUID) *PreimageRequestCreate {
+	if id != nil {
+		prc = prc.SetTransfersID(*id)
+	}
+	return prc
+}
+
+// SetTransfers sets the "transfers" edge to the Transfer entity.
+func (prc *PreimageRequestCreate) SetTransfers(t *Transfer) *PreimageRequestCreate {
+	return prc.SetTransfersID(t.ID)
 }
 
 // Mutation returns the PreimageRequestMutation object of the builder.
@@ -229,6 +249,23 @@ func (prc *PreimageRequestCreate) createSpec() (*PreimageRequest, *sqlgraph.Crea
 		for _, k := range nodes {
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := prc.mutation.TransfersIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   preimagerequest.TransfersTable,
+			Columns: []string{preimagerequest.TransfersColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(transfer.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_node.preimage_request_transfers = &nodes[0]
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	return _node, _spec

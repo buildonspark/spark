@@ -73,12 +73,21 @@ var (
 		{Name: "id", Type: field.TypeUUID},
 		{Name: "create_time", Type: field.TypeTime},
 		{Name: "update_time", Type: field.TypeTime},
+		{Name: "preimage_request_transfers", Type: field.TypeUUID, Nullable: true},
 	}
 	// PreimageRequestsTable holds the schema information for the "preimage_requests" table.
 	PreimageRequestsTable = &schema.Table{
 		Name:       "preimage_requests",
 		Columns:    PreimageRequestsColumns,
 		PrimaryKey: []*schema.Column{PreimageRequestsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "preimage_requests_transfers_transfers",
+				Columns:    []*schema.Column{PreimageRequestsColumns[3]},
+				RefColumns: []*schema.Column{TransfersColumns[0]},
+				OnDelete:   schema.SetNull,
+			},
+		},
 	}
 	// PreimageSharesColumns holds the columns for the "preimage_shares" table.
 	PreimageSharesColumns = []*schema.Column{
@@ -167,7 +176,8 @@ var (
 		{Name: "sender_identity_pubkey", Type: field.TypeBytes},
 		{Name: "receiver_identity_pubkey", Type: field.TypeBytes},
 		{Name: "total_value", Type: field.TypeUint64},
-		{Name: "status", Type: field.TypeEnum, Enums: []string{"SENDER_INITIATED", "SENDER_KEY_TWEAKED", "RECEIVER_KEY_TWEAKED", "RECEIVER_REFUND_SIGNED", "COMPLETED", "EXPIRED"}},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"SENDER_INITIATED", "SENDER_KEY_TWEAK_PENDING", "SENDER_KEY_TWEAKED", "RECEIVER_KEY_TWEAKED", "RECEIVER_REFUND_SIGNED", "COMPLETED", "EXPIRED"}},
+		{Name: "type", Type: field.TypeEnum, Enums: []string{"PREIMAGE_SWAP", "COOPERATIVE_EXIT", "TRANSFER"}},
 		{Name: "expiry_time", Type: field.TypeTime},
 		{Name: "completion_time", Type: field.TypeTime, Nullable: true},
 	}
@@ -203,6 +213,7 @@ var (
 		{Name: "signature", Type: field.TypeBytes, Nullable: true},
 		{Name: "previous_refund_tx", Type: field.TypeBytes},
 		{Name: "intermediate_refund_tx", Type: field.TypeBytes},
+		{Name: "key_tweak", Type: field.TypeBytes, Nullable: true},
 		{Name: "transfer_leaf_transfer", Type: field.TypeUUID},
 		{Name: "transfer_leaf_leaf", Type: field.TypeUUID},
 	}
@@ -214,13 +225,13 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "transfer_leafs_transfers_transfer",
-				Columns:    []*schema.Column{TransferLeafsColumns[7]},
+				Columns:    []*schema.Column{TransferLeafsColumns[8]},
 				RefColumns: []*schema.Column{TransfersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "transfer_leafs_tree_nodes_leaf",
-				Columns:    []*schema.Column{TransferLeafsColumns[8]},
+				Columns:    []*schema.Column{TransferLeafsColumns[9]},
 				RefColumns: []*schema.Column{TreeNodesColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -229,12 +240,12 @@ var (
 			{
 				Name:    "transferleaf_transfer_leaf_transfer",
 				Unique:  false,
-				Columns: []*schema.Column{TransferLeafsColumns[7]},
+				Columns: []*schema.Column{TransferLeafsColumns[8]},
 			},
 			{
 				Name:    "transferleaf_transfer_leaf_leaf",
 				Unique:  false,
-				Columns: []*schema.Column{TransferLeafsColumns[8]},
+				Columns: []*schema.Column{TransferLeafsColumns[9]},
 			},
 		},
 	}
@@ -372,6 +383,7 @@ var (
 func init() {
 	CooperativeExitsTable.ForeignKeys[0].RefTable = TransfersTable
 	DepositAddressesTable.ForeignKeys[0].RefTable = SigningKeysharesTable
+	PreimageRequestsTable.ForeignKeys[0].RefTable = TransfersTable
 	PreimageSharesTable.ForeignKeys[0].RefTable = PreimageRequestsTable
 	TransferLeafsTable.ForeignKeys[0].RefTable = TransfersTable
 	TransferLeafsTable.ForeignKeys[1].RefTable = TreeNodesTable

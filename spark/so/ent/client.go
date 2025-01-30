@@ -728,6 +728,22 @@ func (c *PreimageRequestClient) QueryPreimageShares(pr *PreimageRequest) *Preima
 	return query
 }
 
+// QueryTransfers queries the transfers edge of a PreimageRequest.
+func (c *PreimageRequestClient) QueryTransfers(pr *PreimageRequest) *TransferQuery {
+	query := (&TransferClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := pr.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(preimagerequest.Table, preimagerequest.FieldID, id),
+			sqlgraph.To(transfer.Table, transfer.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, preimagerequest.TransfersTable, preimagerequest.TransfersColumn),
+		)
+		fromV = sqlgraph.Neighbors(pr.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // Hooks returns the client hooks.
 func (c *PreimageRequestClient) Hooks() []Hook {
 	return c.hooks.PreimageRequest

@@ -86,6 +86,11 @@ func IntermediateRefundTx(v []byte) predicate.TransferLeaf {
 	return predicate.TransferLeaf(sql.FieldEQ(FieldIntermediateRefundTx, v))
 }
 
+// KeyTweak applies equality check predicate on the "key_tweak" field. It's identical to KeyTweakEQ.
+func KeyTweak(v []byte) predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldEQ(FieldKeyTweak, v))
+}
+
 // CreateTimeEQ applies the EQ predicate on the "create_time" field.
 func CreateTimeEQ(v time.Time) predicate.TransferLeaf {
 	return predicate.TransferLeaf(sql.FieldEQ(FieldCreateTime, v))
@@ -344,6 +349,56 @@ func IntermediateRefundTxLT(v []byte) predicate.TransferLeaf {
 // IntermediateRefundTxLTE applies the LTE predicate on the "intermediate_refund_tx" field.
 func IntermediateRefundTxLTE(v []byte) predicate.TransferLeaf {
 	return predicate.TransferLeaf(sql.FieldLTE(FieldIntermediateRefundTx, v))
+}
+
+// KeyTweakEQ applies the EQ predicate on the "key_tweak" field.
+func KeyTweakEQ(v []byte) predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldEQ(FieldKeyTweak, v))
+}
+
+// KeyTweakNEQ applies the NEQ predicate on the "key_tweak" field.
+func KeyTweakNEQ(v []byte) predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldNEQ(FieldKeyTweak, v))
+}
+
+// KeyTweakIn applies the In predicate on the "key_tweak" field.
+func KeyTweakIn(vs ...[]byte) predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldIn(FieldKeyTweak, vs...))
+}
+
+// KeyTweakNotIn applies the NotIn predicate on the "key_tweak" field.
+func KeyTweakNotIn(vs ...[]byte) predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldNotIn(FieldKeyTweak, vs...))
+}
+
+// KeyTweakGT applies the GT predicate on the "key_tweak" field.
+func KeyTweakGT(v []byte) predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldGT(FieldKeyTweak, v))
+}
+
+// KeyTweakGTE applies the GTE predicate on the "key_tweak" field.
+func KeyTweakGTE(v []byte) predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldGTE(FieldKeyTweak, v))
+}
+
+// KeyTweakLT applies the LT predicate on the "key_tweak" field.
+func KeyTweakLT(v []byte) predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldLT(FieldKeyTweak, v))
+}
+
+// KeyTweakLTE applies the LTE predicate on the "key_tweak" field.
+func KeyTweakLTE(v []byte) predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldLTE(FieldKeyTweak, v))
+}
+
+// KeyTweakIsNil applies the IsNil predicate on the "key_tweak" field.
+func KeyTweakIsNil() predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldIsNull(FieldKeyTweak))
+}
+
+// KeyTweakNotNil applies the NotNil predicate on the "key_tweak" field.
+func KeyTweakNotNil() predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldNotNull(FieldKeyTweak))
 }
 
 // HasTransfer applies the HasEdge predicate on the "transfer" edge.

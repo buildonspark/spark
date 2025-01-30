@@ -75,6 +75,12 @@ func (tlc *TransferLeafCreate) SetIntermediateRefundTx(b []byte) *TransferLeafCr
 	return tlc
 }
 
+// SetKeyTweak sets the "key_tweak" field.
+func (tlc *TransferLeafCreate) SetKeyTweak(b []byte) *TransferLeafCreate {
+	tlc.mutation.SetKeyTweak(b)
+	return tlc
+}
+
 // SetID sets the "id" field.
 func (tlc *TransferLeafCreate) SetID(u uuid.UUID) *TransferLeafCreate {
 	tlc.mutation.SetID(u)
@@ -248,6 +254,10 @@ func (tlc *TransferLeafCreate) createSpec() (*TransferLeaf, *sqlgraph.CreateSpec
 	if value, ok := tlc.mutation.IntermediateRefundTx(); ok {
 		_spec.SetField(transferleaf.FieldIntermediateRefundTx, field.TypeBytes, value)
 		_node.IntermediateRefundTx = value
+	}
+	if value, ok := tlc.mutation.KeyTweak(); ok {
+		_spec.SetField(transferleaf.FieldKeyTweak, field.TypeBytes, value)
+		_node.KeyTweak = value
 	}
 	if nodes := tlc.mutation.TransferIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{

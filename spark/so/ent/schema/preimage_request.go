@@ -34,5 +34,7 @@ func (PreimageRequest) Edges() []ent.Edge {
 			Ref("preimage_request"),
 		edge.To("preimage_shares", PreimageShare.Type).
 			Unique(),
+		edge.To("transfers", Transfer.Type).
+			Unique(),
 	}
 }

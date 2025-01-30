@@ -12,6 +12,7 @@ import (
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/authz"
 	"github.com/lightsparkdev/spark-go/so/ent"
+	"github.com/lightsparkdev/spark-go/so/ent/schema"
 	"github.com/lightsparkdev/spark-go/so/helper"
 )
 
@@ -42,7 +43,7 @@ func (h *CooperativeExitHandler) CooperativeExit(ctx context.Context, req *pb.Co
 		leafRefundMap[job.LeafId] = job.RefundTxSigningJob.RawTx
 	}
 
-	transfer, leafMap, err := transferHandler.createTransfer(ctx, req.Transfer.TransferId, req.Transfer.ExpiryTime.AsTime(), req.Transfer.OwnerIdentityPublicKey, req.Transfer.ReceiverIdentityPublicKey, leafRefundMap, true)
+	transfer, leafMap, err := transferHandler.createTransfer(ctx, req.Transfer.TransferId, schema.TransferTypeCooperativeExit, req.Transfer.ExpiryTime.AsTime(), req.Transfer.OwnerIdentityPublicKey, req.Transfer.ReceiverIdentityPublicKey, leafRefundMap, true)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create transfer: %v", err)
 	}

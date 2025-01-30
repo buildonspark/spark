@@ -16,6 +16,7 @@ import (
 	"github.com/lightsparkdev/spark-go/so/ent/predicate"
 	"github.com/lightsparkdev/spark-go/so/ent/preimagerequest"
 	"github.com/lightsparkdev/spark-go/so/ent/preimageshare"
+	"github.com/lightsparkdev/spark-go/so/ent/transfer"
 	"github.com/lightsparkdev/spark-go/so/ent/usersignedtransaction"
 )
 
@@ -28,6 +29,8 @@ type PreimageRequestQuery struct {
 	predicates         []predicate.PreimageRequest
 	withTransactions   *UserSignedTransactionQuery
 	withPreimageShares *PreimageShareQuery
+	withTransfers      *TransferQuery
+	withFKs            bool
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -101,6 +104,28 @@ func (prq *PreimageRequestQuery) QueryPreimageShares() *PreimageShareQuery {
 			sqlgraph.From(preimagerequest.Table, preimagerequest.FieldID, selector),
 			sqlgraph.To(preimageshare.Table, preimageshare.FieldID),
 			sqlgraph.Edge(sqlgraph.O2O, false, preimagerequest.PreimageSharesTable, preimagerequest.PreimageSharesColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(prq.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryTransfers chains the current query on the "transfers" edge.
+func (prq *PreimageRequestQuery) QueryTransfers() *TransferQuery {
+	query := (&TransferClient{config: prq.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := prq.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := prq.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(preimagerequest.Table, preimagerequest.FieldID, selector),
+			sqlgraph.To(transfer.Table, transfer.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, preimagerequest.TransfersTable, preimagerequest.TransfersColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(prq.driver.Dialect(), step)
 		return fromU, nil
@@ -302,6 +327,7 @@ func (prq *PreimageRequestQuery) Clone() *PreimageRequestQuery {
 		predicates:         append([]predicate.PreimageRequest{}, prq.predicates...),
 		withTransactions:   prq.withTransactions.Clone(),
 		withPreimageShares: prq.withPreimageShares.Clone(),
+		withTransfers:      prq.withTransfers.Clone(),
 		// clone intermediate query.
 		sql:  prq.sql.Clone(),
 		path: prq.path,
@@ -327,6 +353,17 @@ func (prq *PreimageRequestQuery) WithPreimageShares(opts ...func(*PreimageShareQ
 		opt(query)
 	}
 	prq.withPreimageShares = query
+	return prq
+}
+
+// WithTransfers tells the query-builder to eager-load the nodes that are connected to
+// the "transfers" edge. The optional arguments are used to configure the query builder of the edge.
+func (prq *PreimageRequestQuery) WithTransfers(opts ...func(*TransferQuery)) *PreimageRequestQuery {
+	query := (&TransferClient{config: prq.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	prq.withTransfers = query
 	return prq
 }
 
@@ -407,12 +444,20 @@ func (prq *PreimageRequestQuery) prepareQuery(ctx context.Context) error {
 func (prq *PreimageRequestQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*PreimageRequest, error) {
 	var (
 		nodes       = []*PreimageRequest{}
+		withFKs     = prq.withFKs
 		_spec       = prq.querySpec()
-		loadedTypes = [2]bool{
+		loadedTypes = [3]bool{
 			prq.withTransactions != nil,
 			prq.withPreimageShares != nil,
+			prq.withTransfers != nil,
 		}
 	)
+	if prq.withTransfers != nil {
+		withFKs = true
+	}
+	if withFKs {
+		_spec.Node.Columns = append(_spec.Node.Columns, preimagerequest.ForeignKeys...)
+	}
 	_spec.ScanValues = func(columns []string) ([]any, error) {
 		return (*PreimageRequest).scanValues(nil, columns)
 	}
@@ -443,6 +488,12 @@ func (prq *PreimageRequestQuery) sqlAll(ctx context.Context, hooks ...queryHook)
 	if query := prq.withPreimageShares; query != nil {
 		if err := prq.loadPreimageShares(ctx, query, nodes, nil,
 			func(n *PreimageRequest, e *PreimageShare) { n.Edges.PreimageShares = e }); err != nil {
+			return nil, err
+		}
+	}
+	if query := prq.withTransfers; query != nil {
+		if err := prq.loadTransfers(ctx, query, nodes, nil,
+			func(n *PreimageRequest, e *Transfer) { n.Edges.Transfers = e }); err != nil {
 			return nil, err
 		}
 	}
@@ -505,6 +556,38 @@ func (prq *PreimageRequestQuery) loadPreimageShares(ctx context.Context, query *
 			return fmt.Errorf(`unexpected referenced foreign-key "preimage_request_preimage_shares" returned %v for node %v`, *fk, n.ID)
 		}
 		assign(node, n)
+	}
+	return nil
+}
+func (prq *PreimageRequestQuery) loadTransfers(ctx context.Context, query *TransferQuery, nodes []*PreimageRequest, init func(*PreimageRequest), assign func(*PreimageRequest, *Transfer)) error {
+	ids := make([]uuid.UUID, 0, len(nodes))
+	nodeids := make(map[uuid.UUID][]*PreimageRequest)
+	for i := range nodes {
+		if nodes[i].preimage_request_transfers == nil {
+			continue
+		}
+		fk := *nodes[i].preimage_request_transfers
+		if _, ok := nodeids[fk]; !ok {
+			ids = append(ids, fk)
+		}
+		nodeids[fk] = append(nodeids[fk], nodes[i])
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	query.Where(transfer.IDIn(ids...))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		nodes, ok := nodeids[n.ID]
+		if !ok {
+			return fmt.Errorf(`unexpected foreign-key "preimage_request_transfers" returned %v`, n.ID)
+		}
+		for i := range nodes {
+			assign(nodes[i], n)
+		}
 	}
 	return nil
 }

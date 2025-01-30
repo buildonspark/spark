@@ -85,7 +85,16 @@ func validateSendLeafRefundTx(leaf *ent.TreeNode, rawTx []byte, receiverIdentity
 	return nil
 }
 
-func (h *BaseTransferHandler) createTransfer(ctx context.Context, transferID string, expiryTime time.Time, senderIdentityPublicKey []byte, receiverIdentityPublicKey []byte, leafRefundMap map[string][]byte, forCoopExit bool) (*ent.Transfer, map[string]*ent.TreeNode, error) {
+func (h *BaseTransferHandler) createTransfer(
+	ctx context.Context,
+	transferID string,
+	transferType schema.TransferType,
+	expiryTime time.Time,
+	senderIdentityPublicKey []byte,
+	receiverIdentityPublicKey []byte,
+	leafRefundMap map[string][]byte,
+	forCoopExit bool,
+) (*ent.Transfer, map[string]*ent.TreeNode, error) {
 	transferUUID, err := uuid.Parse(transferID)
 	if err != nil {
 		return nil, nil, fmt.Errorf("unable to parse transfer_id as a uuid %s: %v", transferID, err)
@@ -103,6 +112,7 @@ func (h *BaseTransferHandler) createTransfer(ctx context.Context, transferID str
 		SetStatus(schema.TransferStatusSenderInitiated).
 		SetTotalValue(0).
 		SetExpiryTime(expiryTime).
+		SetType(transferType).
 		Save(ctx)
 	if err != nil {
 		return nil, nil, fmt.Errorf("unable to create transfer: %v", err)

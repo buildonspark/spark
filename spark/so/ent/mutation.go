@@ -1207,6 +1207,8 @@ type PreimageRequestMutation struct {
 	clearedtransactions    bool
 	preimage_shares        *uuid.UUID
 	clearedpreimage_shares bool
+	transfers              *uuid.UUID
+	clearedtransfers       bool
 	done                   bool
 	oldValue               func(context.Context) (*PreimageRequest, error)
 	predicates             []predicate.PreimageRequest
@@ -1481,6 +1483,45 @@ func (m *PreimageRequestMutation) ResetPreimageShares() {
 	m.clearedpreimage_shares = false
 }
 
+// SetTransfersID sets the "transfers" edge to the Transfer entity by id.
+func (m *PreimageRequestMutation) SetTransfersID(id uuid.UUID) {
+	m.transfers = &id
+}
+
+// ClearTransfers clears the "transfers" edge to the Transfer entity.
+func (m *PreimageRequestMutation) ClearTransfers() {
+	m.clearedtransfers = true
+}
+
+// TransfersCleared reports if the "transfers" edge to the Transfer entity was cleared.
+func (m *PreimageRequestMutation) TransfersCleared() bool {
+	return m.clearedtransfers
+}
+
+// TransfersID returns the "transfers" edge ID in the mutation.
+func (m *PreimageRequestMutation) TransfersID() (id uuid.UUID, exists bool) {
+	if m.transfers != nil {
+		return *m.transfers, true
+	}
+	return
+}
+
+// TransfersIDs returns the "transfers" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// TransfersID instead. It exists only for internal usage by the builders.
+func (m *PreimageRequestMutation) TransfersIDs() (ids []uuid.UUID) {
+	if id := m.transfers; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetTransfers resets all changes to the "transfers" edge.
+func (m *PreimageRequestMutation) ResetTransfers() {
+	m.transfers = nil
+	m.clearedtransfers = false
+}
+
 // Where appends a list predicates to the PreimageRequestMutation builder.
 func (m *PreimageRequestMutation) Where(ps ...predicate.PreimageRequest) {
 	m.predicates = append(m.predicates, ps...)
@@ -1631,12 +1672,15 @@ func (m *PreimageRequestMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *PreimageRequestMutation) AddedEdges() []string {
-	edges := make([]string, 0, 2)
+	edges := make([]string, 0, 3)
 	if m.transactions != nil {
 		edges = append(edges, preimagerequest.EdgeTransactions)
 	}
 	if m.preimage_shares != nil {
 		edges = append(edges, preimagerequest.EdgePreimageShares)
+	}
+	if m.transfers != nil {
+		edges = append(edges, preimagerequest.EdgeTransfers)
 	}
 	return edges
 }
@@ -1655,13 +1699,17 @@ func (m *PreimageRequestMutation) AddedIDs(name string) []ent.Value {
 		if id := m.preimage_shares; id != nil {
 			return []ent.Value{*id}
 		}
+	case preimagerequest.EdgeTransfers:
+		if id := m.transfers; id != nil {
+			return []ent.Value{*id}
+		}
 	}
 	return nil
 }
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *PreimageRequestMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 2)
+	edges := make([]string, 0, 3)
 	if m.removedtransactions != nil {
 		edges = append(edges, preimagerequest.EdgeTransactions)
 	}
@@ -1684,12 +1732,15 @@ func (m *PreimageRequestMutation) RemovedIDs(name string) []ent.Value {
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *PreimageRequestMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 2)
+	edges := make([]string, 0, 3)
 	if m.clearedtransactions {
 		edges = append(edges, preimagerequest.EdgeTransactions)
 	}
 	if m.clearedpreimage_shares {
 		edges = append(edges, preimagerequest.EdgePreimageShares)
+	}
+	if m.clearedtransfers {
+		edges = append(edges, preimagerequest.EdgeTransfers)
 	}
 	return edges
 }
@@ -1702,6 +1753,8 @@ func (m *PreimageRequestMutation) EdgeCleared(name string) bool {
 		return m.clearedtransactions
 	case preimagerequest.EdgePreimageShares:
 		return m.clearedpreimage_shares
+	case preimagerequest.EdgeTransfers:
+		return m.clearedtransfers
 	}
 	return false
 }
@@ -1712,6 +1765,9 @@ func (m *PreimageRequestMutation) ClearEdge(name string) error {
 	switch name {
 	case preimagerequest.EdgePreimageShares:
 		m.ClearPreimageShares()
+		return nil
+	case preimagerequest.EdgeTransfers:
+		m.ClearTransfers()
 		return nil
 	}
 	return fmt.Errorf("unknown PreimageRequest unique edge %s", name)
@@ -1726,6 +1782,9 @@ func (m *PreimageRequestMutation) ResetEdge(name string) error {
 		return nil
 	case preimagerequest.EdgePreimageShares:
 		m.ResetPreimageShares()
+		return nil
+	case preimagerequest.EdgeTransfers:
+		m.ResetTransfers()
 		return nil
 	}
 	return fmt.Errorf("unknown PreimageRequest edge %s", name)
@@ -3776,6 +3835,7 @@ type TransferMutation struct {
 	total_value              *uint64
 	addtotal_value           *int64
 	status                   *schema.TransferStatus
+	_type                    *schema.TransferType
 	expiry_time              *time.Time
 	completion_time          *time.Time
 	clearedFields            map[string]struct{}
@@ -4127,6 +4187,42 @@ func (m *TransferMutation) ResetStatus() {
 	m.status = nil
 }
 
+// SetType sets the "type" field.
+func (m *TransferMutation) SetType(st schema.TransferType) {
+	m._type = &st
+}
+
+// GetType returns the value of the "type" field in the mutation.
+func (m *TransferMutation) GetType() (r schema.TransferType, exists bool) {
+	v := m._type
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldType returns the old "type" field's value of the Transfer entity.
+// If the Transfer object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TransferMutation) OldType(ctx context.Context) (v schema.TransferType, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldType is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldType requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldType: %w", err)
+	}
+	return oldValue.Type, nil
+}
+
+// ResetType resets all changes to the "type" field.
+func (m *TransferMutation) ResetType() {
+	m._type = nil
+}
+
 // SetExpiryTime sets the "expiry_time" field.
 func (m *TransferMutation) SetExpiryTime(t time.Time) {
 	m.expiry_time = &t
@@ -4300,7 +4396,7 @@ func (m *TransferMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *TransferMutation) Fields() []string {
-	fields := make([]string, 0, 8)
+	fields := make([]string, 0, 9)
 	if m.create_time != nil {
 		fields = append(fields, transfer.FieldCreateTime)
 	}
@@ -4318,6 +4414,9 @@ func (m *TransferMutation) Fields() []string {
 	}
 	if m.status != nil {
 		fields = append(fields, transfer.FieldStatus)
+	}
+	if m._type != nil {
+		fields = append(fields, transfer.FieldType)
 	}
 	if m.expiry_time != nil {
 		fields = append(fields, transfer.FieldExpiryTime)
@@ -4345,6 +4444,8 @@ func (m *TransferMutation) Field(name string) (ent.Value, bool) {
 		return m.TotalValue()
 	case transfer.FieldStatus:
 		return m.Status()
+	case transfer.FieldType:
+		return m.GetType()
 	case transfer.FieldExpiryTime:
 		return m.ExpiryTime()
 	case transfer.FieldCompletionTime:
@@ -4370,6 +4471,8 @@ func (m *TransferMutation) OldField(ctx context.Context, name string) (ent.Value
 		return m.OldTotalValue(ctx)
 	case transfer.FieldStatus:
 		return m.OldStatus(ctx)
+	case transfer.FieldType:
+		return m.OldType(ctx)
 	case transfer.FieldExpiryTime:
 		return m.OldExpiryTime(ctx)
 	case transfer.FieldCompletionTime:
@@ -4424,6 +4527,13 @@ func (m *TransferMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetStatus(v)
+		return nil
+	case transfer.FieldType:
+		v, ok := value.(schema.TransferType)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetType(v)
 		return nil
 	case transfer.FieldExpiryTime:
 		v, ok := value.(time.Time)
@@ -4529,6 +4639,9 @@ func (m *TransferMutation) ResetField(name string) error {
 		return nil
 	case transfer.FieldStatus:
 		m.ResetStatus()
+		return nil
+	case transfer.FieldType:
+		m.ResetType()
 		return nil
 	case transfer.FieldExpiryTime:
 		m.ResetExpiryTime()
@@ -4636,6 +4749,7 @@ type TransferLeafMutation struct {
 	signature              *[]byte
 	previous_refund_tx     *[]byte
 	intermediate_refund_tx *[]byte
+	key_tweak              *[]byte
 	clearedFields          map[string]struct{}
 	transfer               *uuid.UUID
 	clearedtransfer        bool
@@ -4992,6 +5106,55 @@ func (m *TransferLeafMutation) ResetIntermediateRefundTx() {
 	m.intermediate_refund_tx = nil
 }
 
+// SetKeyTweak sets the "key_tweak" field.
+func (m *TransferLeafMutation) SetKeyTweak(b []byte) {
+	m.key_tweak = &b
+}
+
+// KeyTweak returns the value of the "key_tweak" field in the mutation.
+func (m *TransferLeafMutation) KeyTweak() (r []byte, exists bool) {
+	v := m.key_tweak
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldKeyTweak returns the old "key_tweak" field's value of the TransferLeaf entity.
+// If the TransferLeaf object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TransferLeafMutation) OldKeyTweak(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldKeyTweak is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldKeyTweak requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldKeyTweak: %w", err)
+	}
+	return oldValue.KeyTweak, nil
+}
+
+// ClearKeyTweak clears the value of the "key_tweak" field.
+func (m *TransferLeafMutation) ClearKeyTweak() {
+	m.key_tweak = nil
+	m.clearedFields[transferleaf.FieldKeyTweak] = struct{}{}
+}
+
+// KeyTweakCleared returns if the "key_tweak" field was cleared in this mutation.
+func (m *TransferLeafMutation) KeyTweakCleared() bool {
+	_, ok := m.clearedFields[transferleaf.FieldKeyTweak]
+	return ok
+}
+
+// ResetKeyTweak resets all changes to the "key_tweak" field.
+func (m *TransferLeafMutation) ResetKeyTweak() {
+	m.key_tweak = nil
+	delete(m.clearedFields, transferleaf.FieldKeyTweak)
+}
+
 // SetTransferID sets the "transfer" edge to the Transfer entity by id.
 func (m *TransferLeafMutation) SetTransferID(id uuid.UUID) {
 	m.transfer = &id
@@ -5104,7 +5267,7 @@ func (m *TransferLeafMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *TransferLeafMutation) Fields() []string {
-	fields := make([]string, 0, 6)
+	fields := make([]string, 0, 7)
 	if m.create_time != nil {
 		fields = append(fields, transferleaf.FieldCreateTime)
 	}
@@ -5122,6 +5285,9 @@ func (m *TransferLeafMutation) Fields() []string {
 	}
 	if m.intermediate_refund_tx != nil {
 		fields = append(fields, transferleaf.FieldIntermediateRefundTx)
+	}
+	if m.key_tweak != nil {
+		fields = append(fields, transferleaf.FieldKeyTweak)
 	}
 	return fields
 }
@@ -5143,6 +5309,8 @@ func (m *TransferLeafMutation) Field(name string) (ent.Value, bool) {
 		return m.PreviousRefundTx()
 	case transferleaf.FieldIntermediateRefundTx:
 		return m.IntermediateRefundTx()
+	case transferleaf.FieldKeyTweak:
+		return m.KeyTweak()
 	}
 	return nil, false
 }
@@ -5164,6 +5332,8 @@ func (m *TransferLeafMutation) OldField(ctx context.Context, name string) (ent.V
 		return m.OldPreviousRefundTx(ctx)
 	case transferleaf.FieldIntermediateRefundTx:
 		return m.OldIntermediateRefundTx(ctx)
+	case transferleaf.FieldKeyTweak:
+		return m.OldKeyTweak(ctx)
 	}
 	return nil, fmt.Errorf("unknown TransferLeaf field %s", name)
 }
@@ -5215,6 +5385,13 @@ func (m *TransferLeafMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetIntermediateRefundTx(v)
 		return nil
+	case transferleaf.FieldKeyTweak:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetKeyTweak(v)
+		return nil
 	}
 	return fmt.Errorf("unknown TransferLeaf field %s", name)
 }
@@ -5251,6 +5428,9 @@ func (m *TransferLeafMutation) ClearedFields() []string {
 	if m.FieldCleared(transferleaf.FieldSignature) {
 		fields = append(fields, transferleaf.FieldSignature)
 	}
+	if m.FieldCleared(transferleaf.FieldKeyTweak) {
+		fields = append(fields, transferleaf.FieldKeyTweak)
+	}
 	return fields
 }
 
@@ -5270,6 +5450,9 @@ func (m *TransferLeafMutation) ClearField(name string) error {
 		return nil
 	case transferleaf.FieldSignature:
 		m.ClearSignature()
+		return nil
+	case transferleaf.FieldKeyTweak:
+		m.ClearKeyTweak()
 		return nil
 	}
 	return fmt.Errorf("unknown TransferLeaf nullable field %s", name)
@@ -5296,6 +5479,9 @@ func (m *TransferLeafMutation) ResetField(name string) error {
 		return nil
 	case transferleaf.FieldIntermediateRefundTx:
 		m.ResetIntermediateRefundTx()
+		return nil
+	case transferleaf.FieldKeyTweak:
+		m.ResetKeyTweak()
 		return nil
 	}
 	return fmt.Errorf("unknown TransferLeaf field %s", name)

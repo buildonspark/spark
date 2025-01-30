@@ -75,6 +75,12 @@ func (tc *TransferCreate) SetStatus(ss schema.TransferStatus) *TransferCreate {
 	return tc
 }
 
+// SetType sets the "type" field.
+func (tc *TransferCreate) SetType(st schema.TransferType) *TransferCreate {
+	tc.mutation.SetType(st)
+	return tc
+}
+
 // SetExpiryTime sets the "expiry_time" field.
 func (tc *TransferCreate) SetExpiryTime(t time.Time) *TransferCreate {
 	tc.mutation.SetExpiryTime(t)
@@ -208,6 +214,14 @@ func (tc *TransferCreate) check() error {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "Transfer.status": %w`, err)}
 		}
 	}
+	if _, ok := tc.mutation.GetType(); !ok {
+		return &ValidationError{Name: "type", err: errors.New(`ent: missing required field "Transfer.type"`)}
+	}
+	if v, ok := tc.mutation.GetType(); ok {
+		if err := transfer.TypeValidator(v); err != nil {
+			return &ValidationError{Name: "type", err: fmt.Errorf(`ent: validator failed for field "Transfer.type": %w`, err)}
+		}
+	}
 	if _, ok := tc.mutation.ExpiryTime(); !ok {
 		return &ValidationError{Name: "expiry_time", err: errors.New(`ent: missing required field "Transfer.expiry_time"`)}
 	}
@@ -269,6 +283,10 @@ func (tc *TransferCreate) createSpec() (*Transfer, *sqlgraph.CreateSpec) {
 	if value, ok := tc.mutation.Status(); ok {
 		_spec.SetField(transfer.FieldStatus, field.TypeEnum, value)
 		_node.Status = value
+	}
+	if value, ok := tc.mutation.GetType(); ok {
+		_spec.SetField(transfer.FieldType, field.TypeEnum, value)
+		_node.Type = value
 	}
 	if value, ok := tc.mutation.ExpiryTime(); ok {
 		_spec.SetField(transfer.FieldExpiryTime, field.TypeTime, value)

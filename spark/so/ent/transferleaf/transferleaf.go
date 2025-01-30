@@ -27,6 +27,8 @@ const (
 	FieldPreviousRefundTx = "previous_refund_tx"
 	// FieldIntermediateRefundTx holds the string denoting the intermediate_refund_tx field in the database.
 	FieldIntermediateRefundTx = "intermediate_refund_tx"
+	// FieldKeyTweak holds the string denoting the key_tweak field in the database.
+	FieldKeyTweak = "key_tweak"
 	// EdgeTransfer holds the string denoting the transfer edge name in mutations.
 	EdgeTransfer = "transfer"
 	// EdgeLeaf holds the string denoting the leaf edge name in mutations.
@@ -58,6 +60,7 @@ var Columns = []string{
 	FieldSignature,
 	FieldPreviousRefundTx,
 	FieldIntermediateRefundTx,
+	FieldKeyTweak,
 }
 
 // ForeignKeys holds the SQL foreign-keys that are owned by the "transfer_leafs"

@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/so/ent/preimagerequest"
 	"github.com/lightsparkdev/spark-go/so/ent/preimageshare"
+	"github.com/lightsparkdev/spark-go/so/ent/transfer"
 )
 
 // PreimageRequest is the model entity for the PreimageRequest schema.
@@ -25,8 +26,9 @@ type PreimageRequest struct {
 	UpdateTime time.Time `json:"update_time,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the PreimageRequestQuery when eager-loading is set.
-	Edges        PreimageRequestEdges `json:"edges"`
-	selectValues sql.SelectValues
+	Edges                      PreimageRequestEdges `json:"edges"`
+	preimage_request_transfers *uuid.UUID
+	selectValues               sql.SelectValues
 }
 
 // PreimageRequestEdges holds the relations/edges for other nodes in the graph.
@@ -35,9 +37,11 @@ type PreimageRequestEdges struct {
 	Transactions []*UserSignedTransaction `json:"transactions,omitempty"`
 	// PreimageShares holds the value of the preimage_shares edge.
 	PreimageShares *PreimageShare `json:"preimage_shares,omitempty"`
+	// Transfers holds the value of the transfers edge.
+	Transfers *Transfer `json:"transfers,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [2]bool
+	loadedTypes [3]bool
 }
 
 // TransactionsOrErr returns the Transactions value or an error if the edge
@@ -60,6 +64,17 @@ func (e PreimageRequestEdges) PreimageSharesOrErr() (*PreimageShare, error) {
 	return nil, &NotLoadedError{edge: "preimage_shares"}
 }
 
+// TransfersOrErr returns the Transfers value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e PreimageRequestEdges) TransfersOrErr() (*Transfer, error) {
+	if e.Transfers != nil {
+		return e.Transfers, nil
+	} else if e.loadedTypes[2] {
+		return nil, &NotFoundError{label: transfer.Label}
+	}
+	return nil, &NotLoadedError{edge: "transfers"}
+}
+
 // scanValues returns the types for scanning values from sql.Rows.
 func (*PreimageRequest) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
@@ -69,6 +84,8 @@ func (*PreimageRequest) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullTime)
 		case preimagerequest.FieldID:
 			values[i] = new(uuid.UUID)
+		case preimagerequest.ForeignKeys[0]: // preimage_request_transfers
+			values[i] = &sql.NullScanner{S: new(uuid.UUID)}
 		default:
 			values[i] = new(sql.UnknownType)
 		}
@@ -102,6 +119,13 @@ func (pr *PreimageRequest) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				pr.UpdateTime = value.Time
 			}
+		case preimagerequest.ForeignKeys[0]:
+			if value, ok := values[i].(*sql.NullScanner); !ok {
+				return fmt.Errorf("unexpected type %T for field preimage_request_transfers", values[i])
+			} else if value.Valid {
+				pr.preimage_request_transfers = new(uuid.UUID)
+				*pr.preimage_request_transfers = *value.S.(*uuid.UUID)
+			}
 		default:
 			pr.selectValues.Set(columns[i], values[i])
 		}
@@ -123,6 +147,11 @@ func (pr *PreimageRequest) QueryTransactions() *UserSignedTransactionQuery {
 // QueryPreimageShares queries the "preimage_shares" edge of the PreimageRequest entity.
 func (pr *PreimageRequest) QueryPreimageShares() *PreimageShareQuery {
 	return NewPreimageRequestClient(pr.config).QueryPreimageShares(pr)
+}
+
+// QueryTransfers queries the "transfers" edge of the PreimageRequest entity.
+func (pr *PreimageRequest) QueryTransfers() *TransferQuery {
+	return NewPreimageRequestClient(pr.config).QueryTransfers(pr)
 }
 
 // Update returns a builder for updating this PreimageRequest.
