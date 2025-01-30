@@ -3,7 +3,26 @@ package schema
 import (
 	"entgo.io/ent"
 	"entgo.io/ent/schema/edge"
+	"entgo.io/ent/schema/field"
 )
+
+// PreimageRequestStatus is the status of the preimage request
+type PreimageRequestStatus string
+
+const (
+	// PreimageRequestStatusWaitingForPreimage is the status of the preimage request when it is waiting for preimage
+	PreimageRequestStatusWaitingForPreimage PreimageRequestStatus = "WAITING_FOR_PREIMAGE"
+	// PreimageRequestStatusPreimageShared is the status of the preimage request when it is preimage shared
+	PreimageRequestStatusPreimageShared PreimageRequestStatus = "PREIMAGE_SHARED"
+)
+
+// Values returns the values of the preimage request status
+func (PreimageRequestStatus) Values() []string {
+	return []string{
+		string(PreimageRequestStatusWaitingForPreimage),
+		string(PreimageRequestStatusPreimageShared),
+	}
+}
 
 // PreimageRequest is the schema for the preimage request table.
 type PreimageRequest struct {
@@ -24,7 +43,13 @@ func (PreimageRequest) Indexes() []ent.Index {
 
 // Fields returns the fields for the preimage request table.
 func (PreimageRequest) Fields() []ent.Field {
-	return []ent.Field{}
+	return []ent.Field{
+		field.Bytes("payment_hash").
+			NotEmpty().
+			Unique(),
+		field.Enum("status").
+			GoType(PreimageRequestStatus("")),
+	}
 }
 
 // Edges returns the edges for the preimage request table.

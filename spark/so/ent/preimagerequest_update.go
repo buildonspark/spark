@@ -15,6 +15,7 @@ import (
 	"github.com/lightsparkdev/spark-go/so/ent/predicate"
 	"github.com/lightsparkdev/spark-go/so/ent/preimagerequest"
 	"github.com/lightsparkdev/spark-go/so/ent/preimageshare"
+	"github.com/lightsparkdev/spark-go/so/ent/schema"
 	"github.com/lightsparkdev/spark-go/so/ent/transfer"
 	"github.com/lightsparkdev/spark-go/so/ent/usersignedtransaction"
 )
@@ -35,6 +36,26 @@ func (pru *PreimageRequestUpdate) Where(ps ...predicate.PreimageRequest) *Preima
 // SetUpdateTime sets the "update_time" field.
 func (pru *PreimageRequestUpdate) SetUpdateTime(t time.Time) *PreimageRequestUpdate {
 	pru.mutation.SetUpdateTime(t)
+	return pru
+}
+
+// SetPaymentHash sets the "payment_hash" field.
+func (pru *PreimageRequestUpdate) SetPaymentHash(b []byte) *PreimageRequestUpdate {
+	pru.mutation.SetPaymentHash(b)
+	return pru
+}
+
+// SetStatus sets the "status" field.
+func (pru *PreimageRequestUpdate) SetStatus(srs schema.PreimageRequestStatus) *PreimageRequestUpdate {
+	pru.mutation.SetStatus(srs)
+	return pru
+}
+
+// SetNillableStatus sets the "status" field if the given value is not nil.
+func (pru *PreimageRequestUpdate) SetNillableStatus(srs *schema.PreimageRequestStatus) *PreimageRequestUpdate {
+	if srs != nil {
+		pru.SetStatus(*srs)
+	}
 	return pru
 }
 
@@ -165,7 +186,25 @@ func (pru *PreimageRequestUpdate) defaults() {
 	}
 }
 
+// check runs all checks and user-defined validators on the builder.
+func (pru *PreimageRequestUpdate) check() error {
+	if v, ok := pru.mutation.PaymentHash(); ok {
+		if err := preimagerequest.PaymentHashValidator(v); err != nil {
+			return &ValidationError{Name: "payment_hash", err: fmt.Errorf(`ent: validator failed for field "PreimageRequest.payment_hash": %w`, err)}
+		}
+	}
+	if v, ok := pru.mutation.Status(); ok {
+		if err := preimagerequest.StatusValidator(v); err != nil {
+			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "PreimageRequest.status": %w`, err)}
+		}
+	}
+	return nil
+}
+
 func (pru *PreimageRequestUpdate) sqlSave(ctx context.Context) (n int, err error) {
+	if err := pru.check(); err != nil {
+		return n, err
+	}
 	_spec := sqlgraph.NewUpdateSpec(preimagerequest.Table, preimagerequest.Columns, sqlgraph.NewFieldSpec(preimagerequest.FieldID, field.TypeUUID))
 	if ps := pru.mutation.predicates; len(ps) > 0 {
 		_spec.Predicate = func(selector *sql.Selector) {
@@ -176,6 +215,12 @@ func (pru *PreimageRequestUpdate) sqlSave(ctx context.Context) (n int, err error
 	}
 	if value, ok := pru.mutation.UpdateTime(); ok {
 		_spec.SetField(preimagerequest.FieldUpdateTime, field.TypeTime, value)
+	}
+	if value, ok := pru.mutation.PaymentHash(); ok {
+		_spec.SetField(preimagerequest.FieldPaymentHash, field.TypeBytes, value)
+	}
+	if value, ok := pru.mutation.Status(); ok {
+		_spec.SetField(preimagerequest.FieldStatus, field.TypeEnum, value)
 	}
 	if pru.mutation.TransactionsCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -303,6 +348,26 @@ type PreimageRequestUpdateOne struct {
 // SetUpdateTime sets the "update_time" field.
 func (pruo *PreimageRequestUpdateOne) SetUpdateTime(t time.Time) *PreimageRequestUpdateOne {
 	pruo.mutation.SetUpdateTime(t)
+	return pruo
+}
+
+// SetPaymentHash sets the "payment_hash" field.
+func (pruo *PreimageRequestUpdateOne) SetPaymentHash(b []byte) *PreimageRequestUpdateOne {
+	pruo.mutation.SetPaymentHash(b)
+	return pruo
+}
+
+// SetStatus sets the "status" field.
+func (pruo *PreimageRequestUpdateOne) SetStatus(srs schema.PreimageRequestStatus) *PreimageRequestUpdateOne {
+	pruo.mutation.SetStatus(srs)
+	return pruo
+}
+
+// SetNillableStatus sets the "status" field if the given value is not nil.
+func (pruo *PreimageRequestUpdateOne) SetNillableStatus(srs *schema.PreimageRequestStatus) *PreimageRequestUpdateOne {
+	if srs != nil {
+		pruo.SetStatus(*srs)
+	}
 	return pruo
 }
 
@@ -446,7 +511,25 @@ func (pruo *PreimageRequestUpdateOne) defaults() {
 	}
 }
 
+// check runs all checks and user-defined validators on the builder.
+func (pruo *PreimageRequestUpdateOne) check() error {
+	if v, ok := pruo.mutation.PaymentHash(); ok {
+		if err := preimagerequest.PaymentHashValidator(v); err != nil {
+			return &ValidationError{Name: "payment_hash", err: fmt.Errorf(`ent: validator failed for field "PreimageRequest.payment_hash": %w`, err)}
+		}
+	}
+	if v, ok := pruo.mutation.Status(); ok {
+		if err := preimagerequest.StatusValidator(v); err != nil {
+			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "PreimageRequest.status": %w`, err)}
+		}
+	}
+	return nil
+}
+
 func (pruo *PreimageRequestUpdateOne) sqlSave(ctx context.Context) (_node *PreimageRequest, err error) {
+	if err := pruo.check(); err != nil {
+		return _node, err
+	}
 	_spec := sqlgraph.NewUpdateSpec(preimagerequest.Table, preimagerequest.Columns, sqlgraph.NewFieldSpec(preimagerequest.FieldID, field.TypeUUID))
 	id, ok := pruo.mutation.ID()
 	if !ok {
@@ -474,6 +557,12 @@ func (pruo *PreimageRequestUpdateOne) sqlSave(ctx context.Context) (_node *Preim
 	}
 	if value, ok := pruo.mutation.UpdateTime(); ok {
 		_spec.SetField(preimagerequest.FieldUpdateTime, field.TypeTime, value)
+	}
+	if value, ok := pruo.mutation.PaymentHash(); ok {
+		_spec.SetField(preimagerequest.FieldPaymentHash, field.TypeBytes, value)
+	}
+	if value, ok := pruo.mutation.Status(); ok {
+		_spec.SetField(preimagerequest.FieldStatus, field.TypeEnum, value)
 	}
 	if pruo.mutation.TransactionsCleared() {
 		edge := &sqlgraph.EdgeSpec{

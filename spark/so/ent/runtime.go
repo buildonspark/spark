@@ -89,6 +89,10 @@ func init() {
 	preimagerequest.DefaultUpdateTime = preimagerequestDescUpdateTime.Default.(func() time.Time)
 	// preimagerequest.UpdateDefaultUpdateTime holds the default value on update for the update_time field.
 	preimagerequest.UpdateDefaultUpdateTime = preimagerequestDescUpdateTime.UpdateDefault.(func() time.Time)
+	// preimagerequestDescPaymentHash is the schema descriptor for payment_hash field.
+	preimagerequestDescPaymentHash := preimagerequestFields[0].Descriptor()
+	// preimagerequest.PaymentHashValidator is a validator for the "payment_hash" field. It is called by the builders before save.
+	preimagerequest.PaymentHashValidator = preimagerequestDescPaymentHash.Validators[0].(func([]byte) error)
 	// preimagerequestDescID is the schema descriptor for id field.
 	preimagerequestDescID := preimagerequestMixinFields0[0].Descriptor()
 	// preimagerequest.DefaultID holds the default value on creation for the id field.

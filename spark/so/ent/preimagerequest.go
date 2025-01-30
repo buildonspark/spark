@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/so/ent/preimagerequest"
 	"github.com/lightsparkdev/spark-go/so/ent/preimageshare"
+	"github.com/lightsparkdev/spark-go/so/ent/schema"
 	"github.com/lightsparkdev/spark-go/so/ent/transfer"
 )
 
@@ -24,6 +25,10 @@ type PreimageRequest struct {
 	CreateTime time.Time `json:"create_time,omitempty"`
 	// UpdateTime holds the value of the "update_time" field.
 	UpdateTime time.Time `json:"update_time,omitempty"`
+	// PaymentHash holds the value of the "payment_hash" field.
+	PaymentHash []byte `json:"payment_hash,omitempty"`
+	// Status holds the value of the "status" field.
+	Status schema.PreimageRequestStatus `json:"status,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the PreimageRequestQuery when eager-loading is set.
 	Edges                      PreimageRequestEdges `json:"edges"`
@@ -80,6 +85,10 @@ func (*PreimageRequest) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
+		case preimagerequest.FieldPaymentHash:
+			values[i] = new([]byte)
+		case preimagerequest.FieldStatus:
+			values[i] = new(sql.NullString)
 		case preimagerequest.FieldCreateTime, preimagerequest.FieldUpdateTime:
 			values[i] = new(sql.NullTime)
 		case preimagerequest.FieldID:
@@ -118,6 +127,18 @@ func (pr *PreimageRequest) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field update_time", values[i])
 			} else if value.Valid {
 				pr.UpdateTime = value.Time
+			}
+		case preimagerequest.FieldPaymentHash:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field payment_hash", values[i])
+			} else if value != nil {
+				pr.PaymentHash = *value
+			}
+		case preimagerequest.FieldStatus:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field status", values[i])
+			} else if value.Valid {
+				pr.Status = schema.PreimageRequestStatus(value.String)
 			}
 		case preimagerequest.ForeignKeys[0]:
 			if value, ok := values[i].(*sql.NullScanner); !ok {
@@ -182,6 +203,12 @@ func (pr *PreimageRequest) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("update_time=")
 	builder.WriteString(pr.UpdateTime.Format(time.ANSIC))
+	builder.WriteString(", ")
+	builder.WriteString("payment_hash=")
+	builder.WriteString(fmt.Sprintf("%v", pr.PaymentHash))
+	builder.WriteString(", ")
+	builder.WriteString("status=")
+	builder.WriteString(fmt.Sprintf("%v", pr.Status))
 	builder.WriteByte(')')
 	return builder.String()
 }

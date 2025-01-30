@@ -50,7 +50,7 @@ func (h *TransferHandler) StartSendTransfer(ctx context.Context, req *pb.StartSe
 	for _, leaf := range req.LeavesToSend {
 		leafRefundMap[leaf.LeafId] = leaf.RefundTxSigningJob.RawTx
 	}
-	transfer, leafMap, err := h.createTransfer(ctx, req.TransferId, schema.TransferTypeTransfer, req.ExpiryTime.AsTime(), req.OwnerIdentityPublicKey, req.ReceiverIdentityPublicKey, leafRefundMap, false)
+	transfer, leafMap, err := h.createTransfer(ctx, req.TransferId, schema.TransferTypeTransfer, req.ExpiryTime.AsTime(), req.OwnerIdentityPublicKey, req.ReceiverIdentityPublicKey, leafRefundMap)
 	if err != nil {
 		return nil, err
 	}
@@ -384,7 +384,7 @@ func (h *TransferHandler) ClaimTransferTweakKeys(ctx context.Context, req *pb.Cl
 		return fmt.Errorf("unable to find pending transfer %s: %v", req.TransferId, err)
 	}
 	// TODO (yun): Check with other SO if expires
-	if !bytes.Equal(transfer.ReceiverIdentityPubkey, req.OwnerIdentityPublicKey) || transfer.Status != schema.TransferStatusSenderKeyTweaked || transfer.ExpiryTime.Before(time.Now()) {
+	if !bytes.Equal(transfer.ReceiverIdentityPubkey, req.OwnerIdentityPublicKey) || transfer.Status != schema.TransferStatusSenderKeyTweaked || (!transfer.ExpiryTime.IsZero() && transfer.ExpiryTime.Before(time.Now())) {
 		return fmt.Errorf("transfer cannot be claimed %s", req.TransferId)
 	}
 

@@ -1201,6 +1201,8 @@ type PreimageRequestMutation struct {
 	id                     *uuid.UUID
 	create_time            *time.Time
 	update_time            *time.Time
+	payment_hash           *[]byte
+	status                 *schema.PreimageRequestStatus
 	clearedFields          map[string]struct{}
 	transactions           map[uuid.UUID]struct{}
 	removedtransactions    map[uuid.UUID]struct{}
@@ -1390,6 +1392,78 @@ func (m *PreimageRequestMutation) ResetUpdateTime() {
 	m.update_time = nil
 }
 
+// SetPaymentHash sets the "payment_hash" field.
+func (m *PreimageRequestMutation) SetPaymentHash(b []byte) {
+	m.payment_hash = &b
+}
+
+// PaymentHash returns the value of the "payment_hash" field in the mutation.
+func (m *PreimageRequestMutation) PaymentHash() (r []byte, exists bool) {
+	v := m.payment_hash
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPaymentHash returns the old "payment_hash" field's value of the PreimageRequest entity.
+// If the PreimageRequest object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PreimageRequestMutation) OldPaymentHash(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPaymentHash is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPaymentHash requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPaymentHash: %w", err)
+	}
+	return oldValue.PaymentHash, nil
+}
+
+// ResetPaymentHash resets all changes to the "payment_hash" field.
+func (m *PreimageRequestMutation) ResetPaymentHash() {
+	m.payment_hash = nil
+}
+
+// SetStatus sets the "status" field.
+func (m *PreimageRequestMutation) SetStatus(srs schema.PreimageRequestStatus) {
+	m.status = &srs
+}
+
+// Status returns the value of the "status" field in the mutation.
+func (m *PreimageRequestMutation) Status() (r schema.PreimageRequestStatus, exists bool) {
+	v := m.status
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStatus returns the old "status" field's value of the PreimageRequest entity.
+// If the PreimageRequest object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PreimageRequestMutation) OldStatus(ctx context.Context) (v schema.PreimageRequestStatus, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStatus is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStatus requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStatus: %w", err)
+	}
+	return oldValue.Status, nil
+}
+
+// ResetStatus resets all changes to the "status" field.
+func (m *PreimageRequestMutation) ResetStatus() {
+	m.status = nil
+}
+
 // AddTransactionIDs adds the "transactions" edge to the UserSignedTransaction entity by ids.
 func (m *PreimageRequestMutation) AddTransactionIDs(ids ...uuid.UUID) {
 	if m.transactions == nil {
@@ -1556,12 +1630,18 @@ func (m *PreimageRequestMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *PreimageRequestMutation) Fields() []string {
-	fields := make([]string, 0, 2)
+	fields := make([]string, 0, 4)
 	if m.create_time != nil {
 		fields = append(fields, preimagerequest.FieldCreateTime)
 	}
 	if m.update_time != nil {
 		fields = append(fields, preimagerequest.FieldUpdateTime)
+	}
+	if m.payment_hash != nil {
+		fields = append(fields, preimagerequest.FieldPaymentHash)
+	}
+	if m.status != nil {
+		fields = append(fields, preimagerequest.FieldStatus)
 	}
 	return fields
 }
@@ -1575,6 +1655,10 @@ func (m *PreimageRequestMutation) Field(name string) (ent.Value, bool) {
 		return m.CreateTime()
 	case preimagerequest.FieldUpdateTime:
 		return m.UpdateTime()
+	case preimagerequest.FieldPaymentHash:
+		return m.PaymentHash()
+	case preimagerequest.FieldStatus:
+		return m.Status()
 	}
 	return nil, false
 }
@@ -1588,6 +1672,10 @@ func (m *PreimageRequestMutation) OldField(ctx context.Context, name string) (en
 		return m.OldCreateTime(ctx)
 	case preimagerequest.FieldUpdateTime:
 		return m.OldUpdateTime(ctx)
+	case preimagerequest.FieldPaymentHash:
+		return m.OldPaymentHash(ctx)
+	case preimagerequest.FieldStatus:
+		return m.OldStatus(ctx)
 	}
 	return nil, fmt.Errorf("unknown PreimageRequest field %s", name)
 }
@@ -1610,6 +1698,20 @@ func (m *PreimageRequestMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetUpdateTime(v)
+		return nil
+	case preimagerequest.FieldPaymentHash:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPaymentHash(v)
+		return nil
+	case preimagerequest.FieldStatus:
+		v, ok := value.(schema.PreimageRequestStatus)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStatus(v)
 		return nil
 	}
 	return fmt.Errorf("unknown PreimageRequest field %s", name)
@@ -1665,6 +1767,12 @@ func (m *PreimageRequestMutation) ResetField(name string) error {
 		return nil
 	case preimagerequest.FieldUpdateTime:
 		m.ResetUpdateTime()
+		return nil
+	case preimagerequest.FieldPaymentHash:
+		m.ResetPaymentHash()
+		return nil
+	case preimagerequest.FieldStatus:
+		m.ResetStatus()
 		return nil
 	}
 	return fmt.Errorf("unknown PreimageRequest field %s", name)

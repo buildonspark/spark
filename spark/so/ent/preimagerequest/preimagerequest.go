@@ -3,11 +3,13 @@
 package preimagerequest
 
 import (
+	"fmt"
 	"time"
 
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark-go/so/ent/schema"
 )
 
 const (
@@ -19,6 +21,10 @@ const (
 	FieldCreateTime = "create_time"
 	// FieldUpdateTime holds the string denoting the update_time field in the database.
 	FieldUpdateTime = "update_time"
+	// FieldPaymentHash holds the string denoting the payment_hash field in the database.
+	FieldPaymentHash = "payment_hash"
+	// FieldStatus holds the string denoting the status field in the database.
+	FieldStatus = "status"
 	// EdgeTransactions holds the string denoting the transactions edge name in mutations.
 	EdgeTransactions = "transactions"
 	// EdgePreimageShares holds the string denoting the preimage_shares edge name in mutations.
@@ -55,6 +61,8 @@ var Columns = []string{
 	FieldID,
 	FieldCreateTime,
 	FieldUpdateTime,
+	FieldPaymentHash,
+	FieldStatus,
 }
 
 // ForeignKeys holds the SQL foreign-keys that are owned by the "preimage_requests"
@@ -85,9 +93,21 @@ var (
 	DefaultUpdateTime func() time.Time
 	// UpdateDefaultUpdateTime holds the default value on update for the "update_time" field.
 	UpdateDefaultUpdateTime func() time.Time
+	// PaymentHashValidator is a validator for the "payment_hash" field. It is called by the builders before save.
+	PaymentHashValidator func([]byte) error
 	// DefaultID holds the default value on creation for the "id" field.
 	DefaultID func() uuid.UUID
 )
+
+// StatusValidator is a validator for the "status" field enum values. It is called by the builders before save.
+func StatusValidator(s schema.PreimageRequestStatus) error {
+	switch s {
+	case "WAITING_FOR_PREIMAGE", "PREIMAGE_SHARED":
+		return nil
+	default:
+		return fmt.Errorf("preimagerequest: invalid enum value for status field: %q", s)
+	}
+}
 
 // OrderOption defines the ordering options for the PreimageRequest queries.
 type OrderOption func(*sql.Selector)
@@ -105,6 +125,11 @@ func ByCreateTime(opts ...sql.OrderTermOption) OrderOption {
 // ByUpdateTime orders the results by the update_time field.
 func ByUpdateTime(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldUpdateTime, opts...).ToFunc()
+}
+
+// ByStatus orders the results by the status field.
+func ByStatus(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldStatus, opts...).ToFunc()
 }
 
 // ByTransactionsCount orders the results by transactions count.

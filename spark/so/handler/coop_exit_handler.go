@@ -44,7 +44,7 @@ func (h *CooperativeExitHandler) CooperativeExit(ctx context.Context, req *pb.Co
 		leafRefundMap[job.LeafId] = job.RefundTxSigningJob.RawTx
 	}
 
-	transfer, leafMap, err := transferHandler.createTransfer(ctx, req.Transfer.TransferId, schema.TransferTypeCooperativeExit, req.Transfer.ExpiryTime.AsTime(), req.Transfer.OwnerIdentityPublicKey, req.Transfer.ReceiverIdentityPublicKey, leafRefundMap, true)
+	transfer, leafMap, err := transferHandler.createTransfer(ctx, req.Transfer.TransferId, schema.TransferTypeCooperativeExit, req.Transfer.ExpiryTime.AsTime(), req.Transfer.OwnerIdentityPublicKey, req.Transfer.ReceiverIdentityPublicKey, leafRefundMap)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create transfer: %v", err)
 	}

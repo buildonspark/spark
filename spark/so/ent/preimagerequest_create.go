@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/so/ent/preimagerequest"
 	"github.com/lightsparkdev/spark-go/so/ent/preimageshare"
+	"github.com/lightsparkdev/spark-go/so/ent/schema"
 	"github.com/lightsparkdev/spark-go/so/ent/transfer"
 	"github.com/lightsparkdev/spark-go/so/ent/usersignedtransaction"
 )
@@ -49,6 +50,18 @@ func (prc *PreimageRequestCreate) SetNillableUpdateTime(t *time.Time) *PreimageR
 	if t != nil {
 		prc.SetUpdateTime(*t)
 	}
+	return prc
+}
+
+// SetPaymentHash sets the "payment_hash" field.
+func (prc *PreimageRequestCreate) SetPaymentHash(b []byte) *PreimageRequestCreate {
+	prc.mutation.SetPaymentHash(b)
+	return prc
+}
+
+// SetStatus sets the "status" field.
+func (prc *PreimageRequestCreate) SetStatus(srs schema.PreimageRequestStatus) *PreimageRequestCreate {
+	prc.mutation.SetStatus(srs)
 	return prc
 }
 
@@ -176,6 +189,22 @@ func (prc *PreimageRequestCreate) check() error {
 	if _, ok := prc.mutation.UpdateTime(); !ok {
 		return &ValidationError{Name: "update_time", err: errors.New(`ent: missing required field "PreimageRequest.update_time"`)}
 	}
+	if _, ok := prc.mutation.PaymentHash(); !ok {
+		return &ValidationError{Name: "payment_hash", err: errors.New(`ent: missing required field "PreimageRequest.payment_hash"`)}
+	}
+	if v, ok := prc.mutation.PaymentHash(); ok {
+		if err := preimagerequest.PaymentHashValidator(v); err != nil {
+			return &ValidationError{Name: "payment_hash", err: fmt.Errorf(`ent: validator failed for field "PreimageRequest.payment_hash": %w`, err)}
+		}
+	}
+	if _, ok := prc.mutation.Status(); !ok {
+		return &ValidationError{Name: "status", err: errors.New(`ent: missing required field "PreimageRequest.status"`)}
+	}
+	if v, ok := prc.mutation.Status(); ok {
+		if err := preimagerequest.StatusValidator(v); err != nil {
+			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "PreimageRequest.status": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -218,6 +247,14 @@ func (prc *PreimageRequestCreate) createSpec() (*PreimageRequest, *sqlgraph.Crea
 	if value, ok := prc.mutation.UpdateTime(); ok {
 		_spec.SetField(preimagerequest.FieldUpdateTime, field.TypeTime, value)
 		_node.UpdateTime = value
+	}
+	if value, ok := prc.mutation.PaymentHash(); ok {
+		_spec.SetField(preimagerequest.FieldPaymentHash, field.TypeBytes, value)
+		_node.PaymentHash = value
+	}
+	if value, ok := prc.mutation.Status(); ok {
+		_spec.SetField(preimagerequest.FieldStatus, field.TypeEnum, value)
+		_node.Status = value
 	}
 	if nodes := prc.mutation.TransactionsIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{

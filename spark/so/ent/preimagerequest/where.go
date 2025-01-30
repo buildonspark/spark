@@ -9,6 +9,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/so/ent/predicate"
+	"github.com/lightsparkdev/spark-go/so/ent/schema"
 )
 
 // ID filters vertices based on their ID field.
@@ -64,6 +65,11 @@ func CreateTime(v time.Time) predicate.PreimageRequest {
 // UpdateTime applies equality check predicate on the "update_time" field. It's identical to UpdateTimeEQ.
 func UpdateTime(v time.Time) predicate.PreimageRequest {
 	return predicate.PreimageRequest(sql.FieldEQ(FieldUpdateTime, v))
+}
+
+// PaymentHash applies equality check predicate on the "payment_hash" field. It's identical to PaymentHashEQ.
+func PaymentHash(v []byte) predicate.PreimageRequest {
+	return predicate.PreimageRequest(sql.FieldEQ(FieldPaymentHash, v))
 }
 
 // CreateTimeEQ applies the EQ predicate on the "create_time" field.
@@ -144,6 +150,76 @@ func UpdateTimeLT(v time.Time) predicate.PreimageRequest {
 // UpdateTimeLTE applies the LTE predicate on the "update_time" field.
 func UpdateTimeLTE(v time.Time) predicate.PreimageRequest {
 	return predicate.PreimageRequest(sql.FieldLTE(FieldUpdateTime, v))
+}
+
+// PaymentHashEQ applies the EQ predicate on the "payment_hash" field.
+func PaymentHashEQ(v []byte) predicate.PreimageRequest {
+	return predicate.PreimageRequest(sql.FieldEQ(FieldPaymentHash, v))
+}
+
+// PaymentHashNEQ applies the NEQ predicate on the "payment_hash" field.
+func PaymentHashNEQ(v []byte) predicate.PreimageRequest {
+	return predicate.PreimageRequest(sql.FieldNEQ(FieldPaymentHash, v))
+}
+
+// PaymentHashIn applies the In predicate on the "payment_hash" field.
+func PaymentHashIn(vs ...[]byte) predicate.PreimageRequest {
+	return predicate.PreimageRequest(sql.FieldIn(FieldPaymentHash, vs...))
+}
+
+// PaymentHashNotIn applies the NotIn predicate on the "payment_hash" field.
+func PaymentHashNotIn(vs ...[]byte) predicate.PreimageRequest {
+	return predicate.PreimageRequest(sql.FieldNotIn(FieldPaymentHash, vs...))
+}
+
+// PaymentHashGT applies the GT predicate on the "payment_hash" field.
+func PaymentHashGT(v []byte) predicate.PreimageRequest {
+	return predicate.PreimageRequest(sql.FieldGT(FieldPaymentHash, v))
+}
+
+// PaymentHashGTE applies the GTE predicate on the "payment_hash" field.
+func PaymentHashGTE(v []byte) predicate.PreimageRequest {
+	return predicate.PreimageRequest(sql.FieldGTE(FieldPaymentHash, v))
+}
+
+// PaymentHashLT applies the LT predicate on the "payment_hash" field.
+func PaymentHashLT(v []byte) predicate.PreimageRequest {
+	return predicate.PreimageRequest(sql.FieldLT(FieldPaymentHash, v))
+}
+
+// PaymentHashLTE applies the LTE predicate on the "payment_hash" field.
+func PaymentHashLTE(v []byte) predicate.PreimageRequest {
+	return predicate.PreimageRequest(sql.FieldLTE(FieldPaymentHash, v))
+}
+
+// StatusEQ applies the EQ predicate on the "status" field.
+func StatusEQ(v schema.PreimageRequestStatus) predicate.PreimageRequest {
+	vc := v
+	return predicate.PreimageRequest(sql.FieldEQ(FieldStatus, vc))
+}
+
+// StatusNEQ applies the NEQ predicate on the "status" field.
+func StatusNEQ(v schema.PreimageRequestStatus) predicate.PreimageRequest {
+	vc := v
+	return predicate.PreimageRequest(sql.FieldNEQ(FieldStatus, vc))
+}
+
+// StatusIn applies the In predicate on the "status" field.
+func StatusIn(vs ...schema.PreimageRequestStatus) predicate.PreimageRequest {
+	v := make([]any, len(vs))
+	for i := range v {
+		v[i] = vs[i]
+	}
+	return predicate.PreimageRequest(sql.FieldIn(FieldStatus, v...))
+}
+
+// StatusNotIn applies the NotIn predicate on the "status" field.
+func StatusNotIn(vs ...schema.PreimageRequestStatus) predicate.PreimageRequest {
+	v := make([]any, len(vs))
+	for i := range v {
+		v[i] = vs[i]
+	}
+	return predicate.PreimageRequest(sql.FieldNotIn(FieldStatus, v...))
 }
 
 // HasTransactions applies the HasEdge predicate on the "transactions" edge.

@@ -384,6 +384,7 @@ message InitiatePreimageSwapRequest {
         REASON_RECEIVE = 1;
     }
     Reason reason = 4;
+    StartSendTransferRequest transfer = 5;
 }
 
 message InitiatePreimageSwapResponse {

@@ -266,12 +266,22 @@ func (s *SparkInternalServer) FinalizeTransfer(ctx context.Context, req *pb.Fina
 
 // InitiatePreimageSwap initiates a preimage swap for the given payment hash.
 func (s *SparkInternalServer) InitiatePreimageSwap(ctx context.Context, req *pbspark.InitiatePreimageSwapRequest) (*pb.InitiatePreimageSwapResponse, error) {
-	lightningHandler := handler.NewLightningHandler(s.config)
+	lightningHandler := handler.NewLightningHandler(s.config, s.onchainHelper)
 	preimageShare, err := lightningHandler.GetPreimageShare(ctx, req)
 	if err != nil {
 		return nil, err
 	}
 	return &pb.InitiatePreimageSwapResponse{PreimageShare: preimageShare}, nil
+}
+
+// UpdatePreimageRequest updates the preimage request.
+func (s *SparkInternalServer) UpdatePreimageRequest(ctx context.Context, req *pb.UpdatePreimageRequestRequest) (*emptypb.Empty, error) {
+	lightningHandler := handler.NewLightningHandler(s.config, s.onchainHelper)
+	err := lightningHandler.UpdatePreimageRequest(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	return &emptypb.Empty{}, nil
 }
 
 // PrepareTreeAddress prepares the tree address.

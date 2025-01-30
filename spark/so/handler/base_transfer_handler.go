@@ -89,14 +89,13 @@ func (h *BaseTransferHandler) createTransfer(
 	senderIdentityPublicKey []byte,
 	receiverIdentityPublicKey []byte,
 	leafRefundMap map[string][]byte,
-	forCoopExit bool,
 ) (*ent.Transfer, map[string]*ent.TreeNode, error) {
 	transferUUID, err := uuid.Parse(transferID)
 	if err != nil {
 		return nil, nil, fmt.Errorf("unable to parse transfer_id as a uuid %s: %v", transferID, err)
 	}
 
-	if expiryTime.Before(time.Now()) {
+	if !expiryTime.IsZero() && expiryTime.Before(time.Now()) {
 		return nil, nil, fmt.Errorf("invalid expiry_time %s: %v", expiryTime.String(), err)
 	}
 
@@ -119,9 +118,10 @@ func (h *BaseTransferHandler) createTransfer(
 		return nil, nil, fmt.Errorf("unable to load leaves: %v", err)
 	}
 
-	if forCoopExit {
+	switch transferType {
+	case schema.TransferTypeCooperativeExit:
 		err = validateCooperativeExitLeaves(transfer, leaves, leafRefundMap, receiverIdentityPublicKey)
-	} else {
+	case schema.TransferTypeTransfer:
 		err = validateTransferLeaves(transfer, leaves, leafRefundMap, receiverIdentityPublicKey)
 	}
 	if err != nil {

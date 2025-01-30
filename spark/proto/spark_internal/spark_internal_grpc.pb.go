@@ -31,6 +31,7 @@ const (
 	SparkInternalService_FinalizeNodesAggregation_FullMethodName           = "/spark_internal.SparkInternalService/finalize_nodes_aggregation"
 	SparkInternalService_FinalizeTransfer_FullMethodName                   = "/spark_internal.SparkInternalService/finalize_transfer"
 	SparkInternalService_InitiatePreimageSwap_FullMethodName               = "/spark_internal.SparkInternalService/initiate_preimage_swap"
+	SparkInternalService_UpdatePreimageRequest_FullMethodName              = "/spark_internal.SparkInternalService/update_preimage_request"
 	SparkInternalService_PrepareTreeAddress_FullMethodName                 = "/spark_internal.SparkInternalService/prepare_tree_address"
 	SparkInternalService_InitiateTransfer_FullMethodName                   = "/spark_internal.SparkInternalService/initiate_transfer"
 	SparkInternalService_InitiateCooperativeExit_FullMethodName            = "/spark_internal.SparkInternalService/initiate_cooperative_exit"
@@ -52,6 +53,7 @@ type SparkInternalServiceClient interface {
 	FinalizeNodesAggregation(ctx context.Context, in *FinalizeNodesAggregationRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	FinalizeTransfer(ctx context.Context, in *FinalizeTransferRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	InitiatePreimageSwap(ctx context.Context, in *spark.InitiatePreimageSwapRequest, opts ...grpc.CallOption) (*InitiatePreimageSwapResponse, error)
+	UpdatePreimageRequest(ctx context.Context, in *UpdatePreimageRequestRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	PrepareTreeAddress(ctx context.Context, in *PrepareTreeAddressRequest, opts ...grpc.CallOption) (*PrepareTreeAddressResponse, error)
 	InitiateTransfer(ctx context.Context, in *InitiateTransferRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	InitiateCooperativeExit(ctx context.Context, in *InitiateCooperativeExitRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
@@ -167,6 +169,16 @@ func (c *sparkInternalServiceClient) InitiatePreimageSwap(ctx context.Context, i
 	return out, nil
 }
 
+func (c *sparkInternalServiceClient) UpdatePreimageRequest(ctx context.Context, in *UpdatePreimageRequestRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, SparkInternalService_UpdatePreimageRequest_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *sparkInternalServiceClient) PrepareTreeAddress(ctx context.Context, in *PrepareTreeAddressRequest, opts ...grpc.CallOption) (*PrepareTreeAddressResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(PrepareTreeAddressResponse)
@@ -231,6 +243,7 @@ type SparkInternalServiceServer interface {
 	FinalizeNodesAggregation(context.Context, *FinalizeNodesAggregationRequest) (*emptypb.Empty, error)
 	FinalizeTransfer(context.Context, *FinalizeTransferRequest) (*emptypb.Empty, error)
 	InitiatePreimageSwap(context.Context, *spark.InitiatePreimageSwapRequest) (*InitiatePreimageSwapResponse, error)
+	UpdatePreimageRequest(context.Context, *UpdatePreimageRequestRequest) (*emptypb.Empty, error)
 	PrepareTreeAddress(context.Context, *PrepareTreeAddressRequest) (*PrepareTreeAddressResponse, error)
 	InitiateTransfer(context.Context, *InitiateTransferRequest) (*emptypb.Empty, error)
 	InitiateCooperativeExit(context.Context, *InitiateCooperativeExitRequest) (*emptypb.Empty, error)
@@ -275,6 +288,9 @@ func (UnimplementedSparkInternalServiceServer) FinalizeTransfer(context.Context,
 }
 func (UnimplementedSparkInternalServiceServer) InitiatePreimageSwap(context.Context, *spark.InitiatePreimageSwapRequest) (*InitiatePreimageSwapResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method InitiatePreimageSwap not implemented")
+}
+func (UnimplementedSparkInternalServiceServer) UpdatePreimageRequest(context.Context, *UpdatePreimageRequestRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdatePreimageRequest not implemented")
 }
 func (UnimplementedSparkInternalServiceServer) PrepareTreeAddress(context.Context, *PrepareTreeAddressRequest) (*PrepareTreeAddressResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method PrepareTreeAddress not implemented")
@@ -492,6 +508,24 @@ func _SparkInternalService_InitiatePreimageSwap_Handler(srv interface{}, ctx con
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SparkInternalService_UpdatePreimageRequest_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdatePreimageRequestRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkInternalServiceServer).UpdatePreimageRequest(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkInternalService_UpdatePreimageRequest_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkInternalServiceServer).UpdatePreimageRequest(ctx, req.(*UpdatePreimageRequestRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _SparkInternalService_PrepareTreeAddress_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(PrepareTreeAddressRequest)
 	if err := dec(in); err != nil {
@@ -628,6 +662,10 @@ var SparkInternalService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "initiate_preimage_swap",
 			Handler:    _SparkInternalService_InitiatePreimageSwap_Handler,
+		},
+		{
+			MethodName: "update_preimage_request",
+			Handler:    _SparkInternalService_UpdatePreimageRequest_Handler,
 		},
 		{
 			MethodName: "prepare_tree_address",

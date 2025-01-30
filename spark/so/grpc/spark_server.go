@@ -82,19 +82,19 @@ func (s *SparkServer) AggregateNodes(ctx context.Context, req *pb.AggregateNodes
 
 // StorePreimageShare stores the preimage share for the given payment hash.
 func (s *SparkServer) StorePreimageShare(ctx context.Context, req *pb.StorePreimageShareRequest) (*emptypb.Empty, error) {
-	lightningHandler := handler.NewLightningHandler(s.config)
+	lightningHandler := handler.NewLightningHandler(s.config, s.onchainHelper)
 	return wrapWithGRPCError(emptyResponse, lightningHandler.StorePreimageShare(ctx, req))
 }
 
 // GetSigningCommitments gets the signing commitments for the given node ids.
 func (s *SparkServer) GetSigningCommitments(ctx context.Context, req *pb.GetSigningCommitmentsRequest) (*pb.GetSigningCommitmentsResponse, error) {
-	lightningHandler := handler.NewLightningHandler(s.config)
+	lightningHandler := handler.NewLightningHandler(s.config, s.onchainHelper)
 	return wrapWithGRPCError(lightningHandler.GetSigningCommitments(ctx, req))
 }
 
 // InitiatePreimageSwap initiates a preimage swap for the given payment hash.
 func (s *SparkServer) InitiatePreimageSwap(ctx context.Context, req *pb.InitiatePreimageSwapRequest) (*pb.InitiatePreimageSwapResponse, error) {
-	lightningHandler := handler.NewLightningHandler(s.config)
+	lightningHandler := handler.NewLightningHandler(s.config, s.onchainHelper)
 	return wrapWithGRPCError(lightningHandler.InitiatePreimageSwap(ctx, req))
 }
 
