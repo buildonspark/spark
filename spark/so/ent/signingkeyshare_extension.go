@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/common"
 	pbfrost "github.com/lightsparkdev/spark-go/proto/frost"
+	pb "github.com/lightsparkdev/spark-go/proto/spark"
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
 	"github.com/lightsparkdev/spark-go/so/ent/signingkeyshare"
@@ -43,6 +44,19 @@ func (keyshare *SigningKeyshare) TweakKeyShare(ctx context.Context, shareTweak [
 		SetPublicKey(newPublicKey).
 		SetPublicShares(newPublicShares).
 		Save(ctx)
+}
+
+// MarshalProto converts a SigningKeyshare to a spark protobuf SigningKeyshare.
+func (keyshare *SigningKeyshare) MarshalProto() *pb.SigningKeyshare {
+	ownerIdentifiers := make([]string, 0)
+	for identifier := range keyshare.PublicShares {
+		ownerIdentifiers = append(ownerIdentifiers, identifier)
+	}
+
+	return &pb.SigningKeyshare{
+		OwnerIdentifiers: ownerIdentifiers,
+		Threshold:        keyshare.MinSigners,
+	}
 }
 
 // GetUnusedSigningKeyshares returns the available keyshares for the given coordinator index.

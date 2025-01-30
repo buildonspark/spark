@@ -40,12 +40,15 @@ func (s *SigningResult) MarshalProto() (*pbspark.SigningResult, error) {
 		return nil, err
 	}
 
+	signingKeyshare := &pbspark.SigningKeyshare{
+		OwnerIdentifiers: s.KeyshareOwnerIdentifiers,
+		Threshold:        s.KeyshareThreshold,
+	}
 	return &pbspark.SigningResult{
-		SigningNonceCommitments:  signingCommitments,
-		SignatureShares:          s.SignatureShares,
-		PublicKeys:               s.PublicKeys,
-		KeyshareOwnerIdentifiers: s.KeyshareOwnerIdentifiers,
-		KeyshareThreshold:        s.KeyshareThreshold,
+		SigningNonceCommitments: signingCommitments,
+		SignatureShares:         s.SignatureShares,
+		PublicKeys:              s.PublicKeys,
+		SigningKeyshare:         signingKeyshare,
 	}, nil
 }
 
