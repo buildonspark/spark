@@ -241,8 +241,6 @@ func (h *TransferHandler) completeSendLeaf(ctx context.Context, transfer *ent.Tr
 		return fmt.Errorf("leaf %s is not available to transfer", req.LeafId)
 	}
 
-	log.Println("leafId:", leaf.ID.String())
-	log.Println("TransferId:", transfer.ID.String())
 	transferLeaf, err := db.TransferLeaf.
 		Query().
 		Where(
@@ -251,7 +249,6 @@ func (h *TransferHandler) completeSendLeaf(ctx context.Context, transfer *ent.Tr
 		).
 		Only(ctx)
 	if err != nil || transferLeaf == nil {
-		log.Println("transferLeaf:", transferLeaf)
 		return fmt.Errorf("unable to get transfer leaf %s: %v", req.LeafId, err)
 	}
 
