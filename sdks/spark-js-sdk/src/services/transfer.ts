@@ -66,8 +66,8 @@ export type LeafRefundSigningData = {
 };
 
 export class TransferService {
-  private config: WalletConfigService;
-  private connectionManager: ConnectionManager;
+  private readonly config: WalletConfigService;
+  private readonly connectionManager: ConnectionManager;
 
   constructor(
     config: WalletConfigService,

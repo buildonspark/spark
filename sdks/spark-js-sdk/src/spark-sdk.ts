@@ -5,12 +5,7 @@ import {
   TreeNode,
 } from "./proto/spark";
 import { initWasm } from "./utils/wasm-wrapper";
-import {
-  frost_nonce,
-  InitOutput,
-  KeyPackage,
-  NonceResult,
-} from "./wasm/spark_bindings";
+import { InitOutput } from "./wasm/spark_bindings";
 import { Transaction } from "@scure/btc-signer";
 
 import { WalletConfig, WalletConfigService } from "./services/config";

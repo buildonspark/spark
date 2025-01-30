@@ -41,8 +41,8 @@ export type CreateTreeRootParams = {
 const INITIAL_TIME_LOCK = 100;
 
 export class DepositService {
-  private config: WalletConfigService;
-  private connectionManager: ConnectionManager;
+  private readonly config: WalletConfigService;
+  private readonly connectionManager: ConnectionManager;
 
   constructor(
     config: WalletConfigService,

@@ -43,8 +43,8 @@ export type CreationNodeWithNonces = CreationNode & {
 const INITIAL_TIME_LOCK = 200;
 
 export class TreeCreationService {
-  private config: WalletConfigService;
-  private connectionManager: ConnectionManager;
+  private readonly config: WalletConfigService;
+  private readonly connectionManager: ConnectionManager;
 
   constructor(
     config: WalletConfigService,
