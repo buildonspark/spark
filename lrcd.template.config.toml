@@ -8,6 +8,7 @@ bootnodes = []
 
 [rpc]
 address = "{RPC_ADDRESS}"
+grpc_address = "{GRPC_ADDRESS}"
 max_items_per_request = 1
 max_request_size_kb = 20480
 
@@ -35,3 +36,6 @@ inv_sharing_interval = 10
 [graph_builder]
 cleanup_period = { secs = 3600, nanos = 0 }
 tx_outdated_duration = { secs = 86400, nanos = 0 }
+
+[spark]
+database_url = "postgresql://postgres:postgres@postgres:5432/postgres" # mocked value for now

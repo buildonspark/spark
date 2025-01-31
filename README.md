@@ -65,6 +65,10 @@ go test $(go list ./... | grep -v -E "so/grpc_test|so/tree")
 
 `brew install tmux`
 
+##### bitcoind
+
+`brew install bitcoin`
+
 ##### postgres
 
 A local version `postgres` with access for your local user.

@@ -177,12 +177,14 @@ run_lrcd_tmux() {
         fi
 
         rpc_address="127.0.0.1:1833${i}"
+        grpc_address="127.0.0.1:1853${i}"
         p2p_address="0.0.0.0:800${i}"
         storage_path="./.yuvd/node_$i"
 
         # Create a temporary config file for this instance
         local temp_config_file="temp_config_$i.dev.toml"
         sed -e "s|{RPC_ADDRESS}|$rpc_address|g" \
+            -e "s|{GRPC_ADDRESS}|$grpc_address|g" \
             -e "s|{P2P_ADDRESS}|$p2p_address|g" \
             -e "s|{STORAGE_PATH}|$storage_path|g" \
             lrcd.template.config.toml >"$temp_config_file"
@@ -244,6 +246,40 @@ check_lrc_nodes_ready() {
        sleep 1
        echo -n "."  # Show progress
    done
+}
+
+run_bitcoind_tmux() {
+    local run_dir=$1
+    local session_name="bitcoind"
+    local datadir="$run_dir/bitcoind"
+    
+    # Ensure data directory exists
+    mkdir -p "$datadir"
+    cp bitcoin_regtest.conf "$datadir/bitcoin_regtest.conf"
+    
+    # Kill existing session if it exists
+    if tmux has-session -t "$session_name" 2>/dev/null; then
+        echo "Killing existing bitcoind session..."
+        tmux kill-session -t "$session_name"
+    fi
+    
+    # Create new tmux session
+    tmux new-session -d -s "$session_name"
+    
+    local log_file="$run_dir/logs/bitcoind.log"
+    local cmd="bitcoind -regtest -datadir=$datadir -conf=./bitcoin_regtest.conf -debug=1 2>&1 | tee '$log_file'"
+    
+    # Send the command to tmux
+    tmux send-keys -t "$session_name" "$cmd" C-m
+    
+    echo ""
+    echo "================================================"
+    echo "Started bitcoind in tmux session: $session_name"
+    echo "To attach to the session: tmux attach -t $session_name"
+    echo "To detach from session: Press Ctrl-b then d"
+    echo "To kill the session: tmux kill-session -t $session_name"
+    echo "================================================"
+    echo ""
 }
 
 # Function to create operator config JSON
@@ -489,6 +525,7 @@ create_data_dir
 run_dir=$(create_run_dir)
 echo "Working with directory: $run_dir"
 
+run_bitcoind_tmux "$run_dir"
 run_lrcd_tmux "$run_dir"
 
 if ! check_lrc_nodes_ready "$run_dir"; then

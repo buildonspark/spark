@@ -3,6 +3,7 @@
 tmux kill-session -t frost-signers
 tmux kill-session -t operators
 tmux kill-session -t lrcd
+tmux kill-session -t bitcoind
 
 # Terminate all relevant connections first
 for i in $(seq 0 4); do
