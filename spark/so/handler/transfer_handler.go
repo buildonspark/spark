@@ -73,6 +73,40 @@ func (h *TransferHandler) StartSendTransfer(ctx context.Context, req *pb.StartSe
 	return &pb.StartSendTransferResponse{Transfer: transferProto, SigningResults: signingResults}, nil
 }
 
+// StartSendTransfer initiates a transfer from sender.
+func (h *TransferHandler) InitiateLeafSwap(ctx context.Context, req *pb.LeafSwapRequest) (*pb.LeafSwapResponse, error) {
+	reqTransfer := req.Transfer
+	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, reqTransfer.OwnerIdentityPublicKey); err != nil {
+		return nil, err
+	}
+
+	leafRefundMap := make(map[string][]byte)
+	for _, leaf := range reqTransfer.LeavesToSend {
+		leafRefundMap[leaf.LeafId] = leaf.RefundTxSigningJob.RawTx
+	}
+	transfer, leafMap, err := h.createTransfer(ctx, reqTransfer.TransferId, schema.TransferTypeTransfer, reqTransfer.ExpiryTime.AsTime(), reqTransfer.OwnerIdentityPublicKey, reqTransfer.ReceiverIdentityPublicKey, leafRefundMap)
+	if err != nil {
+		return nil, err
+	}
+
+	transferProto, err := transfer.MarshalProto(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to marshal transfer: %v", err)
+	}
+
+	signingResults, err := signRefunds(ctx, h.config, reqTransfer.LeavesToSend, leafMap, req.AdaptorPublicKey)
+	if err != nil {
+		return nil, err
+	}
+
+	err = h.syncTransferInit(ctx, reqTransfer)
+	if err != nil {
+		return nil, err
+	}
+
+	return &pb.LeafSwapResponse{Transfer: transferProto, SigningResults: signingResults}, nil
+}
+
 func (h *TransferHandler) syncTransferInit(ctx context.Context, req *pb.StartSendTransferRequest) error {
 	leaves := make([]*pbinternal.InitiateTransferLeaf, 0)
 	for _, leaf := range req.LeavesToSend {
@@ -106,10 +140,10 @@ func (h *TransferHandler) syncTransferInit(ctx context.Context, req *pb.StartSen
 }
 
 func (h *TransferHandler) sendTransferSignRefunds(ctx context.Context, requests []*pb.LeafRefundTxSigningJob, leafMap map[string]*ent.TreeNode) ([]*pb.LeafRefundTxSigningResult, error) {
-	return signRefunds(ctx, h.config, requests, leafMap)
+	return signRefunds(ctx, h.config, requests, leafMap, nil)
 }
 
-func signRefunds(ctx context.Context, config *so.Config, requests []*pb.LeafRefundTxSigningJob, leafMap map[string]*ent.TreeNode) ([]*pb.LeafRefundTxSigningResult, error) {
+func signRefunds(ctx context.Context, config *so.Config, requests []*pb.LeafRefundTxSigningJob, leafMap map[string]*ent.TreeNode, adaptorPubKey []byte) ([]*pb.LeafRefundTxSigningResult, error) {
 	signingJobs := make([]*helper.SigningJob, 0)
 	leafJobMap := make(map[string]*ent.TreeNode)
 	for _, req := range requests {
@@ -141,6 +175,7 @@ func signRefunds(ctx context.Context, config *so.Config, requests []*pb.LeafRefu
 				Message:           refundTxSigHash,
 				VerifyingKey:      leaf.VerifyingPubkey,
 				UserCommitment:    userNonceCommitment,
+				AdaptorPublicKey:  adaptorPubKey,
 			},
 		)
 		leafJobMap[jobID] = leaf

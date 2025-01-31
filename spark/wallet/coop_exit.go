@@ -46,7 +46,7 @@ func GetConnectorRefundSignatures(
 		return nil, nil, fmt.Errorf("failed to sign refund transactions: %v", err)
 	}
 
-	transfer, err = sendTransferTweakKey(ctx, config, transfer, leaves, signaturesMap)
+	transfer, err = SendTransferTweakKey(ctx, config, transfer, leaves, signaturesMap)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to send transfer: %v", err)
 	}
@@ -114,7 +114,7 @@ func signCoopExitRefunds(
 		return nil, nil, fmt.Errorf("number of leaves and connector outputs must match")
 	}
 	signingJobs := make([]*pb.LeafRefundTxSigningJob, 0)
-	leafDataMap := make(map[string]*leafRefundSigningData)
+	leafDataMap := make(map[string]*LeafRefundSigningData)
 	for i, leaf := range leaves {
 		connectorOutput := connectorOutputs[i]
 		currentRefundTx, err := common.TxFromRawTxBytes(leaf.Leaf.RefundTx)
@@ -140,7 +140,7 @@ func signCoopExitRefunds(
 
 		tx, _ := common.TxFromRawTxBytes(leaf.Leaf.NodeTx)
 
-		leafDataMap[leaf.Leaf.Id] = &leafRefundSigningData{
+		leafDataMap[leaf.Leaf.Id] = &LeafRefundSigningData{
 			SigningPrivKey: signingPrivKey,
 			RefundTx:       refundTx,
 			Nonce:          nonce,
@@ -174,7 +174,7 @@ func signCoopExitRefunds(
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to initiate cooperative exit: %v", err)
 	}
-	signatures, err := signRefunds(config, leafDataMap, response.SigningResults)
+	signatures, err := signRefunds(config, leafDataMap, response.SigningResults, nil)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to sign refund transactions: %v", err)
 	}

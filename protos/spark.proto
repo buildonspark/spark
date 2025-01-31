@@ -21,6 +21,7 @@ service SparkService {
     rpc get_signing_commitments(GetSigningCommitmentsRequest) returns (GetSigningCommitmentsResponse) {}
     rpc cooperative_exit(CooperativeExitRequest) returns (CooperativeExitResponse) {}
     rpc initiate_preimage_swap(InitiatePreimageSwapRequest) returns (InitiatePreimageSwapResponse) {}
+    rpc leaf_swap(LeafSwapRequest) returns (LeafSwapResponse) {}
 
     rpc prepare_tree_address(PrepareTreeAddressRequest) returns (PrepareTreeAddressResponse) {}
     rpc create_tree(CreateTreeRequest) returns (CreateTreeResponse) {}
@@ -409,6 +410,17 @@ message CooperativeExitRequest {
 }
 
 message CooperativeExitResponse {
+    Transfer transfer = 1;
+    repeated LeafRefundTxSigningResult signing_results = 2;
+}
+
+message LeafSwapRequest {
+    StartSendTransferRequest transfer = 1;
+    string swap_id = 2;
+    bytes adaptor_public_key = 3;
+}
+
+message LeafSwapResponse {
     Transfer transfer = 1;
     repeated LeafRefundTxSigningResult signing_results = 2;
 }

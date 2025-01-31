@@ -69,7 +69,7 @@ func (h *CooperativeExitHandler) CooperativeExit(ctx context.Context, req *pb.Co
 		return nil, fmt.Errorf("failed to marshal transfer: %v", err)
 	}
 
-	signingResults, err := signRefunds(ctx, h.config, req.Transfer.LeavesToSend, leafMap)
+	signingResults, err := signRefunds(ctx, h.config, req.Transfer.LeavesToSend, leafMap, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign refund transactions: %v", err)
 	}

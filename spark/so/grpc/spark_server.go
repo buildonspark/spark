@@ -105,6 +105,12 @@ func (s *SparkServer) CooperativeExit(ctx context.Context, req *pb.CooperativeEx
 	return wrapWithGRPCError(coopExitHandler.CooperativeExit(ctx, req))
 }
 
+// StartSendTransfer initiates a transfer from sender.
+func (s *SparkServer) LeafSwap(ctx context.Context, req *pb.LeafSwapRequest) (*pb.LeafSwapResponse, error) {
+	transferHander := handler.NewTransferHandler(s.onchainHelper, s.config)
+	return transferHander.InitiateLeafSwap(ctx, req)
+}
+
 // PrepareTreeAddress prepares the tree address for the given public key.
 func (s *SparkServer) PrepareTreeAddress(ctx context.Context, req *pb.PrepareTreeAddressRequest) (*pb.PrepareTreeAddressResponse, error) {
 	treeHandler := handler.NewTreeCreationHandler(s.config, s.onchainHelper)
