@@ -1,11 +1,11 @@
 import { bytesToHex, hexToBytes } from "@noble/curves/abstract/utils";
 import { secp256k1 } from "@noble/curves/secp256k1";
-import { SparkWallet } from "../spark-sdk";
 import { TreeNode } from "../proto/spark";
-import { createDummyTx } from "../utils/wasm";
-import { getTxFromRawTxBytes, getTxId } from "../utils/bitcoin";
 import { SigningOperator, WalletConfig } from "../services/config";
 import { ConnectionManager } from "../services/connection";
+import { SparkWallet } from "../spark-sdk";
+import { getTxFromRawTxBytes, getTxId } from "../utils/bitcoin";
+import { createDummyTx } from "../utils/wasm";
 
 export function getAllSigningOperators(): Record<string, SigningOperator> {
   const pubkeys = [
@@ -78,6 +78,7 @@ export function getTestWalletConfigWithIdentityKey(
 }
 
 export async function createNewTree(
+  // TODO: Fix this so wallet doesn't have to be passed in
   wallet: SparkWallet,
   privKey: Uint8Array
 ): Promise<TreeNode> {

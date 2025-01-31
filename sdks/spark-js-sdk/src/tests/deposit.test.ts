@@ -1,10 +1,10 @@
-import { SparkWallet } from "../spark-sdk";
-import { getTestWalletConfig } from "./test-util";
 import { bytesToHex, hexToBytes } from "@noble/curves/abstract/utils";
 import { secp256k1 } from "@noble/curves/secp256k1";
+import { ConnectionManager } from "../services/connection";
+import { SparkWallet } from "../spark-sdk";
 import { getTxFromRawTxBytes, getTxId } from "../utils/bitcoin";
 import { createDummyTx } from "../utils/wasm";
-import { ConnectionManager } from "../services/connection";
+import { getTestWalletConfig } from "./test-util";
 
 describe("deposit", () => {
   // Skip all tests if running in GitHub Actions

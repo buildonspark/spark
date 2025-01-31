@@ -1,13 +1,13 @@
-import { hexToBytes } from "@noble/curves/abstract/utils";
+import { bytesToHex, hexToBytes } from "@noble/curves/abstract/utils";
+import { Transaction } from "@scure/btc-signer";
+import { Network } from "utils/network";
 import {
   getP2TRAddressFromPkScript,
   getP2TRAddressFromPublicKey,
-  getTxFromRawTxHex,
+  getP2TRScriptFromPublicKey,
   getSigHashFromTx,
+  getTxFromRawTxHex,
 } from "../utils/bitcoin";
-import { bytesToHex } from "@noble/curves/abstract/utils";
-import { Transaction } from "@scure/btc-signer";
-import { Network } from "utils/network";
 
 describe("bitcoin", () => {
   it("test p2tr address from public key", () => {
@@ -103,6 +103,15 @@ describe("bitcoin", () => {
 
     expect(bytesToHex(sighash)).toBe(
       "8da5e7aa2b03491d7c2f4359ea4968dd58f69adf9af1a2c6881be0295591c293"
+    );
+  });
+
+  it("test script from pubkey", () => {
+    const pubKey =
+      "03ef261da8259f5ea86abe1b7d658ebd13fe2b2ce2418dabe854ccec67bdb9ba87";
+    const script = getP2TRScriptFromPublicKey(hexToBytes(pubKey), "mainnet");
+    expect(bytesToHex(script)).toEqual(
+      "51208af8e5e92783248418d5c68007dc8659a2100261b5bb561efc28dde94ec8cb93"
     );
   });
 });

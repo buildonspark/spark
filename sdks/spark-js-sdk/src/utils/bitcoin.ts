@@ -3,8 +3,28 @@ import { secp256k1 } from "@noble/curves/secp256k1";
 
 import * as btc from "@scure/btc-signer";
 import { TransactionOutput } from "@scure/btc-signer/psbt";
-import { Network, NetworkConfig } from "./network";
 import { sha256 } from "@scure/btc-signer/utils";
+import { Network, NetworkConfig } from "./network";
+
+export function getP2TRScriptFromPublicKey(
+  pubKey: Uint8Array,
+  network: Network
+): Uint8Array {
+  if (pubKey.length !== 33) {
+    throw new Error("Public key must be 33 bytes");
+  }
+
+  const internalKey = secp256k1.ProjectivePoint.fromHex(pubKey);
+  const script = btc.p2tr(
+    internalKey.toRawBytes().slice(1, 33),
+    undefined,
+    NetworkConfig[network]
+  ).script;
+  if (!script) {
+    throw new Error("Failed to get P2TR address");
+  }
+  return script;
+}
 
 export function getP2TRAddressFromPublicKey(
   pubKey: Uint8Array,
@@ -73,11 +93,18 @@ export function getSigHashFromTx(
     throw new Error("No amount found in prevOutput");
   }
 
-  return tx.preimageWitnessV1(inputIndex, [prevScript], btc.SigHash.DEFAULT, [
-    amount,
-  ]);
+  return tx.preimageWitnessV1(
+    inputIndex,
+    new Array(tx.inputsLength).fill(prevScript),
+    btc.SigHash.DEFAULT,
+    new Array(tx.inputsLength).fill(amount)
+  );
 }
 
 export function getTxId(tx: btc.Transaction): string {
   return bytesToHex(sha256(sha256(tx.unsignedTx)).reverse());
+}
+
+export function getTxIdNoReverse(tx: btc.Transaction): string {
+  return bytesToHex(sha256(sha256(tx.unsignedTx)));
 }

@@ -1,0 +1,188 @@
+import { secp256k1 } from "@noble/curves/secp256k1";
+import { Transaction } from "@scure/btc-signer";
+import { TransactionInput } from "@scure/btc-signer/psbt";
+import { randomUUID } from "crypto";
+import { LeafRefundTxSigningJob, Transfer } from "../proto/spark";
+import {
+  getP2TRScriptFromPublicKey,
+  getTxFromRawTxBytes,
+} from "../utils/bitcoin";
+import {
+  getRandomSigningNonce,
+  getSigningCommitmentFromNonce,
+} from "../utils/signing";
+import { WalletConfigService } from "./config";
+import { ConnectionManager } from "./connection";
+import {
+  LeafKeyTweak,
+  LeafRefundSigningData,
+  TransferService,
+} from "./transfer";
+
+const TIME_LOCK_INTERVAL = 100;
+
+export type GetConnectorRefundSignaturesParams = {
+  leaves: LeafKeyTweak[];
+  exitTxId: Uint8Array;
+  connectorOutputs: TransactionInput[];
+  receiverPubKey: Uint8Array;
+};
+
+export class CoopExitService {
+  private readonly config: WalletConfigService;
+  private readonly connectionManager: ConnectionManager;
+  private readonly transferService: TransferService;
+
+  constructor(
+    config: WalletConfigService,
+    connectionManager: ConnectionManager,
+    // TODO: Restructure this so that the transfer service is not required??
+    transferService: TransferService
+  ) {
+    this.config = config;
+    this.connectionManager = connectionManager;
+    this.transferService = transferService;
+  }
+
+  async getConnectorRefundSignatures({
+    leaves,
+    exitTxId,
+    connectorOutputs,
+    receiverPubKey,
+  }: GetConnectorRefundSignaturesParams): Promise<{
+    transfer: Transfer;
+    signaturesMap: Map<string, Uint8Array>;
+  }> {
+    const { transfer, signaturesMap } = await this.signCoopExitRefunds(
+      leaves,
+      exitTxId,
+      connectorOutputs,
+      receiverPubKey
+    );
+    const transferTweak = await this.transferService.sendTransferTweakKey(
+      transfer,
+      leaves,
+      signaturesMap
+    );
+
+    return { transfer: transferTweak, signaturesMap };
+  }
+
+  private createConnectorRefundTransaction(
+    sequence: number,
+    nodeOutPoint: TransactionInput,
+    connectorOutput: TransactionInput,
+    amountSats: bigint,
+    receiverPubKey: Uint8Array
+  ): Transaction {
+    const refundTx = new Transaction();
+    if (!nodeOutPoint.txid || nodeOutPoint.index === undefined) {
+      throw new Error("Node outpoint txid or index is undefined");
+    }
+    refundTx.addInput({
+      txid: nodeOutPoint.txid,
+      index: nodeOutPoint.index,
+      sequence,
+    });
+
+    refundTx.addInput(connectorOutput);
+    const receiverScript = getP2TRScriptFromPublicKey(
+      receiverPubKey,
+      this.config.getConfig().network
+    );
+
+    refundTx.addOutput({
+      script: receiverScript,
+      amount: amountSats,
+    });
+
+    return refundTx;
+  }
+  private async signCoopExitRefunds(
+    leaves: LeafKeyTweak[],
+    exitTxId: Uint8Array,
+    connectorOutputs: TransactionInput[],
+    receiverPubKey: Uint8Array
+  ): Promise<{ transfer: Transfer; signaturesMap: Map<string, Uint8Array> }> {
+    if (leaves.length !== connectorOutputs.length) {
+      throw new Error("Number of leaves and connector outputs must match");
+    }
+
+    const signingJobs: LeafRefundTxSigningJob[] = [];
+    const leafDataMap: Map<string, LeafRefundSigningData> = new Map();
+
+    for (let i = 0; i < leaves.length; i++) {
+      const leaf = leaves[i];
+      const connectorOutput = connectorOutputs[i];
+      const currentRefundTx = getTxFromRawTxBytes(leaf.leaf.refundTx);
+
+      const sequence =
+        (1 << 30) |
+        ((currentRefundTx.getInput(0).sequence || 0) &
+          (0xffff - TIME_LOCK_INTERVAL));
+
+      const refundTx = this.createConnectorRefundTransaction(
+        sequence,
+        currentRefundTx.getInput(0),
+        connectorOutput,
+        BigInt(leaf.leaf.value),
+        receiverPubKey
+      );
+
+      const nonce = getRandomSigningNonce();
+      const signingPubKey = secp256k1.getPublicKey(leaf.signingPrivKey);
+      const signingJob: LeafRefundTxSigningJob = {
+        leafId: leaf.leaf.id,
+        refundTxSigningJob: {
+          signingPublicKey: signingPubKey,
+          rawTx: refundTx.toBytes(),
+          signingNonceCommitment: getSigningCommitmentFromNonce(nonce),
+        },
+      };
+
+      signingJobs.push(signingJob);
+      const tx = getTxFromRawTxBytes(leaf.leaf.nodeTx);
+      leafDataMap.set(leaf.leaf.id, {
+        signingPrivKey: leaf.signingPrivKey,
+        refundTx,
+        nonce,
+        tx,
+        vout: leaf.leaf.vout,
+        receivingPubkey: receiverPubKey,
+      });
+    }
+
+    const sparkClient = await this.connectionManager.createSparkClient(
+      this.config.getCoordinatorAddress(),
+      this.config
+    );
+
+    const response = await sparkClient.cooperative_exit({
+      transfer: {
+        transferId: randomUUID(),
+        leavesToSend: signingJobs,
+        ownerIdentityPublicKey: this.config.getIdentityPublicKey(),
+        receiverIdentityPublicKey: receiverPubKey,
+        expiryTime: new Date(Date.now() + 24 * 60 * 1000),
+      },
+      exitId: randomUUID(),
+      exitTxid: exitTxId,
+    });
+    sparkClient.close?.();
+    if (!response.transfer) {
+      throw new Error("Failed to initiate cooperative exit");
+    }
+
+    const signatures = await this.transferService.signRefunds(
+      leafDataMap,
+      response.signingResults
+    );
+
+    const signaturesMap: Map<string, Uint8Array> = new Map();
+    for (const signature of signatures) {
+      signaturesMap.set(signature.nodeId, signature.refundTxSignature);
+    }
+
+    return { transfer: response.transfer, signaturesMap };
+  }
+}

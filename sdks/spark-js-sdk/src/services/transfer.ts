@@ -1,4 +1,15 @@
 import {
+  bytesToHex,
+  bytesToNumberBE,
+  equalBytes,
+  numberToBytesBE,
+} from "@noble/curves/abstract/utils";
+import { secp256k1 } from "@noble/curves/secp256k1";
+import { Address, OutScript, Transaction } from "@scure/btc-signer";
+import { sha256 } from "@scure/btc-signer/utils";
+import { randomUUID } from "crypto";
+import * as ecies from "eciesjs";
+import {
   ClaimLeafKeyTweak,
   LeafRefundTxSigningJob,
   LeafRefundTxSigningResult,
@@ -8,38 +19,28 @@ import {
   Transfer,
   TreeNode,
 } from "proto/spark";
-import * as ecies from "eciesjs";
-import { WalletConfigService } from "./config";
-import {
-  bytesToHex,
-  bytesToNumberBE,
-  equalBytes,
-  numberToBytesBE,
-} from "@noble/curves/abstract/utils";
-import {
-  splitSecretWithProofs,
-  VerifiableSecretShare,
-} from "../utils/secret-sharing";
 import { SignatureIntent } from "../proto/common";
-import { KeyPackage, SigningNonce } from "../wasm/spark_bindings";
-import { Address, OutScript, Transaction } from "@scure/btc-signer";
-import { secp256k1 } from "@noble/curves/secp256k1";
 import {
   getP2TRAddressFromPublicKey,
   getSigHashFromTx,
   getTxFromRawTxBytes,
 } from "../utils/bitcoin";
+import { subtractPrivateKeys } from "../utils/keys";
+import { NetworkConfig } from "../utils/network";
 import {
-  getSigningCommitmentFromNonce,
+  splitSecretWithProofs,
+  VerifiableSecretShare,
+} from "../utils/secret-sharing";
+import {
   copySigningCommitment,
   getRandomSigningNonce,
+  getSigningCommitmentFromNonce,
 } from "../utils/signing";
-import { signFrost, aggregateFrost } from "../utils/wasm";
-import { NetworkConfig } from "../utils/network";
-import { subtractPrivateKeys } from "../utils/keys";
-import { sha256 } from "@scure/btc-signer/utils";
-import { randomUUID } from "crypto";
+import { aggregateFrost, signFrost } from "../utils/wasm";
+import { KeyPackage, SigningNonce } from "../wasm/spark_bindings";
+import { WalletConfigService } from "./config";
 import { ConnectionManager } from "./connection";
+
 const TIME_LOCK_INTERVAL = 100;
 
 export type LeafKeyTweak = {
@@ -156,7 +157,7 @@ export class TransferService {
     return leafPrivKeyMap;
   }
 
-  private async sendTransferTweakKey(
+  async sendTransferTweakKey(
     transfer: Transfer,
     leaves: LeafKeyTweak[],
     refundSignatureMap: Map<string, Uint8Array>
@@ -340,7 +341,6 @@ export class TransferService {
         throw new Error(`Share not found for operator ${operator.id}`);
       }
 
-      // TODO: check if this is correct
       const pubkeyTweak = secp256k1.getPublicKey(
         numberToBytesBE(share.share, 32),
         true
@@ -611,7 +611,7 @@ export class TransferService {
     return this.signRefunds(leafDataMap, resp.signingResults);
   }
 
-  private async signRefunds(
+  async signRefunds(
     leafDataMap: Map<string, ClaimLeafData>,
     operatorSigningResults: LeafRefundTxSigningResult[]
   ): Promise<NodeSignatures[]> {
