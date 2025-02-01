@@ -7,11 +7,11 @@ import {
   DummyTx,
   encrypt_ecies,
   KeyPackage,
+  SigningCommitment,
+  SigningNonce,
   TransactionResult,
   wasm_aggregate_frost,
   wasm_sign_frost,
-  SigningNonce,
-  SigningCommitment,
 } from "../wasm/spark_bindings";
 
 export type SignFrostParams = {
@@ -20,6 +20,7 @@ export type SignFrostParams = {
   nonce: SigningNonce;
   selfCommitment: SigningCommitment;
   statechainCommitments: any;
+  adaptorPubKey?: Uint8Array | undefined;
 };
 
 export type AggregateFrostParams = {
@@ -31,6 +32,7 @@ export type AggregateFrostParams = {
   statechainPublicKeys: any;
   selfPublicKey: Uint8Array;
   verifyingKey: Uint8Array;
+  adaptorPubKey?: Uint8Array | undefined;
 };
 
 export type ConstructNodeTxParams = {
@@ -46,13 +48,15 @@ export function signFrost({
   nonce,
   selfCommitment,
   statechainCommitments,
+  adaptorPubKey,
 }: SignFrostParams): Uint8Array {
   return wasm_sign_frost(
     msg,
     keyPackage,
     nonce,
     selfCommitment,
-    statechainCommitments
+    statechainCommitments,
+    adaptorPubKey
   );
 }
 
@@ -65,6 +69,7 @@ export function aggregateFrost({
   statechainPublicKeys,
   selfPublicKey,
   verifyingKey,
+  adaptorPubKey,
 }: AggregateFrostParams): Uint8Array {
   return wasm_aggregate_frost(
     msg,
@@ -74,7 +79,8 @@ export function aggregateFrost({
     selfSignature,
     statechainPublicKeys,
     selfPublicKey,
-    verifyingKey
+    verifyingKey,
+    adaptorPubKey
   );
 }
 

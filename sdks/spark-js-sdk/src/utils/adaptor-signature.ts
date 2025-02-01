@@ -52,17 +52,18 @@ export function applyAdaptorToSignature(
   const sBigInt = bytesToNumberBE(s);
   const adaptorPrivateKey = bytesToNumberBE(adaptorPrivateKeyBytes);
 
-  // Add adaptor to s
-  let newS = mod(sBigInt + adaptorPrivateKey, secp256k1.CURVE.n);
-
-  // Create and verify new signature
+  // Try adding adaptor to s first
+  const newS = mod(sBigInt + adaptorPrivateKey, secp256k1.CURVE.n);
   const newSig = new Uint8Array([...r, ...numberToBytesBE(newS, 32)]);
+
   if (schnorr.verify(newSig, hash, pubkey)) {
     return newSig;
   }
 
-  newS = mod(sBigInt - adaptorPrivateKey, secp256k1.CURVE.n);
-  const altSig = new Uint8Array([...r, ...numberToBytesBE(newS, 32)]);
+  // If adding didn't work, try subtracting
+  const altS = mod(sBigInt - adaptorPrivateKey, secp256k1.CURVE.n);
+  const altSig = new Uint8Array([...r, ...numberToBytesBE(altS, 32)]);
+
   if (schnorr.verify(altSig, hash, pubkey)) {
     return altSig;
   }

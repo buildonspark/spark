@@ -222,11 +222,87 @@ export class TransferService {
     return updatedTransfer;
   }
 
-  private async sendTransferSignRefund(
+  async sendSwapSignRefund(
+    leaves: LeafKeyTweak[],
+    receiverIdentityPubkey: Uint8Array,
+    expiryTime: Date,
+    adaptorPubKey?: Uint8Array
+  ): Promise<{
+    transfer: Transfer;
+    signatureMap: Map<string, Uint8Array>;
+    leafDataMap: Map<string, LeafRefundSigningData>;
+    signingResults: LeafRefundTxSigningResult[];
+  }> {
+    const transferId = randomUUID();
+
+    const leafDataMap = new Map<string, LeafRefundSigningData>();
+    for (const leaf of leaves) {
+      const nonce = getRandomSigningNonce();
+      const tx = getTxFromRawTxBytes(leaf.leaf.nodeTx);
+      const refundTx = getTxFromRawTxBytes(leaf.leaf.refundTx);
+      leafDataMap.set(leaf.leaf.id, {
+        signingPrivKey: leaf.signingPrivKey,
+        receivingPubkey: receiverIdentityPubkey,
+        nonce,
+        tx,
+        refundTx,
+        vout: leaf.leaf.vout,
+      });
+    }
+
+    const signingJobs = this.prepareRefundSoSigningJobs(leaves, leafDataMap);
+
+    const sparkConn = await this.connectionManager.createSparkClient(
+      this.config.getCoordinatorAddress(),
+      this.config
+    );
+
+    const response = await sparkConn.leaf_swap({
+      transfer: {
+        transferId,
+        leavesToSend: signingJobs,
+        ownerIdentityPublicKey: this.config.getIdentityPublicKey(),
+        receiverIdentityPublicKey: receiverIdentityPubkey,
+        expiryTime: expiryTime,
+      },
+      swapId: randomUUID(),
+      adaptorPublicKey: adaptorPubKey || new Uint8Array(),
+    });
+
+    sparkConn.close?.();
+
+    if (!response.transfer) {
+      throw new Error("No transfer response from coordinator");
+    }
+
+    const signatures = await this.signRefunds(
+      leafDataMap,
+      response.signingResults,
+      adaptorPubKey
+    );
+
+    const signatureMap = new Map<string, Uint8Array>();
+    for (const signature of signatures) {
+      signatureMap.set(signature.nodeId, signature.refundTxSignature);
+    }
+
+    return {
+      transfer: response.transfer,
+      signatureMap,
+      leafDataMap,
+      signingResults: response.signingResults,
+    };
+  }
+
+  async sendTransferSignRefund(
     leaves: LeafKeyTweak[],
     receiverIdentityPubkey: Uint8Array,
     expiryTime: Date
-  ): Promise<{ transfer: Transfer; signatureMap: Map<string, Uint8Array> }> {
+  ): Promise<{
+    transfer: Transfer;
+    signatureMap: Map<string, Uint8Array>;
+    leafDataMap: Map<string, LeafRefundSigningData>;
+  }> {
     const transferID = randomUUID();
 
     const leafDataMap = new Map<string, LeafRefundSigningData>();
@@ -278,6 +354,7 @@ export class TransferService {
     return {
       transfer: response.transfer,
       signatureMap,
+      leafDataMap,
     };
   }
 
@@ -613,7 +690,8 @@ export class TransferService {
 
   async signRefunds(
     leafDataMap: Map<string, ClaimLeafData>,
-    operatorSigningResults: LeafRefundTxSigningResult[]
+    operatorSigningResults: LeafRefundTxSigningResult[],
+    adaptorPubKey?: Uint8Array
   ): Promise<NodeSignatures[]> {
     const nodeSignatures: NodeSignatures[] = [];
     for (const operatorSigningResult of operatorSigningResults) {
@@ -651,6 +729,7 @@ export class TransferService {
         selfCommitment: copySigningCommitment(nonceCommitment),
         statechainCommitments:
           operatorSigningResult.refundTxSigningResult?.signingNonceCommitments,
+        adaptorPubKey: adaptorPubKey,
       });
 
       const refundAggregate = aggregateFrost({
@@ -665,6 +744,7 @@ export class TransferService {
         selfCommitment: copySigningCommitment(nonceCommitment),
         selfPublicKey: secp256k1.getPublicKey(leafData.signingPrivKey, true),
         selfSignature: userSignature,
+        adaptorPubKey: adaptorPubKey,
       });
 
       nodeSignatures.push({

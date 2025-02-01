@@ -536,6 +536,17 @@ export interface CooperativeExitResponse {
   signingResults: LeafRefundTxSigningResult[];
 }
 
+export interface LeafSwapRequest {
+  transfer: StartSendTransferRequest | undefined;
+  swapId: string;
+  adaptorPublicKey: Uint8Array;
+}
+
+export interface LeafSwapResponse {
+  transfer: Transfer | undefined;
+  signingResults: LeafRefundTxSigningResult[];
+}
+
 export interface AddressRequestNode {
   userPublicKey: Uint8Array;
   children: AddressRequestNode[];
@@ -6690,6 +6701,180 @@ export const CooperativeExitResponse: MessageFns<CooperativeExitResponse> = {
   },
 };
 
+function createBaseLeafSwapRequest(): LeafSwapRequest {
+  return { transfer: undefined, swapId: "", adaptorPublicKey: new Uint8Array(0) };
+}
+
+export const LeafSwapRequest: MessageFns<LeafSwapRequest> = {
+  encode(message: LeafSwapRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.transfer !== undefined) {
+      StartSendTransferRequest.encode(message.transfer, writer.uint32(10).fork()).join();
+    }
+    if (message.swapId !== "") {
+      writer.uint32(18).string(message.swapId);
+    }
+    if (message.adaptorPublicKey.length !== 0) {
+      writer.uint32(26).bytes(message.adaptorPublicKey);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): LeafSwapRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseLeafSwapRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.transfer = StartSendTransferRequest.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.swapId = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.adaptorPublicKey = reader.bytes();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): LeafSwapRequest {
+    return {
+      transfer: isSet(object.transfer) ? StartSendTransferRequest.fromJSON(object.transfer) : undefined,
+      swapId: isSet(object.swapId) ? globalThis.String(object.swapId) : "",
+      adaptorPublicKey: isSet(object.adaptorPublicKey) ? bytesFromBase64(object.adaptorPublicKey) : new Uint8Array(0),
+    };
+  },
+
+  toJSON(message: LeafSwapRequest): unknown {
+    const obj: any = {};
+    if (message.transfer !== undefined) {
+      obj.transfer = StartSendTransferRequest.toJSON(message.transfer);
+    }
+    if (message.swapId !== "") {
+      obj.swapId = message.swapId;
+    }
+    if (message.adaptorPublicKey.length !== 0) {
+      obj.adaptorPublicKey = base64FromBytes(message.adaptorPublicKey);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<LeafSwapRequest>): LeafSwapRequest {
+    return LeafSwapRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<LeafSwapRequest>): LeafSwapRequest {
+    const message = createBaseLeafSwapRequest();
+    message.transfer = (object.transfer !== undefined && object.transfer !== null)
+      ? StartSendTransferRequest.fromPartial(object.transfer)
+      : undefined;
+    message.swapId = object.swapId ?? "";
+    message.adaptorPublicKey = object.adaptorPublicKey ?? new Uint8Array(0);
+    return message;
+  },
+};
+
+function createBaseLeafSwapResponse(): LeafSwapResponse {
+  return { transfer: undefined, signingResults: [] };
+}
+
+export const LeafSwapResponse: MessageFns<LeafSwapResponse> = {
+  encode(message: LeafSwapResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.transfer !== undefined) {
+      Transfer.encode(message.transfer, writer.uint32(10).fork()).join();
+    }
+    for (const v of message.signingResults) {
+      LeafRefundTxSigningResult.encode(v!, writer.uint32(18).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): LeafSwapResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseLeafSwapResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.transfer = Transfer.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.signingResults.push(LeafRefundTxSigningResult.decode(reader, reader.uint32()));
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): LeafSwapResponse {
+    return {
+      transfer: isSet(object.transfer) ? Transfer.fromJSON(object.transfer) : undefined,
+      signingResults: globalThis.Array.isArray(object?.signingResults)
+        ? object.signingResults.map((e: any) => LeafRefundTxSigningResult.fromJSON(e))
+        : [],
+    };
+  },
+
+  toJSON(message: LeafSwapResponse): unknown {
+    const obj: any = {};
+    if (message.transfer !== undefined) {
+      obj.transfer = Transfer.toJSON(message.transfer);
+    }
+    if (message.signingResults?.length) {
+      obj.signingResults = message.signingResults.map((e) => LeafRefundTxSigningResult.toJSON(e));
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<LeafSwapResponse>): LeafSwapResponse {
+    return LeafSwapResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<LeafSwapResponse>): LeafSwapResponse {
+    const message = createBaseLeafSwapResponse();
+    message.transfer = (object.transfer !== undefined && object.transfer !== null)
+      ? Transfer.fromPartial(object.transfer)
+      : undefined;
+    message.signingResults = object.signingResults?.map((e) => LeafRefundTxSigningResult.fromPartial(e)) || [];
+    return message;
+  },
+};
+
 function createBaseAddressRequestNode(): AddressRequestNode {
   return { userPublicKey: new Uint8Array(0), children: [] };
 }
@@ -7816,6 +8001,14 @@ export const SparkServiceDefinition = {
       responseStream: false,
       options: {},
     },
+    leaf_swap: {
+      name: "leaf_swap",
+      requestType: LeafSwapRequest,
+      requestStream: false,
+      responseType: LeafSwapResponse,
+      responseStream: false,
+      options: {},
+    },
     prepare_tree_address: {
       name: "prepare_tree_address",
       requestType: PrepareTreeAddressRequest,
@@ -7920,6 +8113,7 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
     request: InitiatePreimageSwapRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<InitiatePreimageSwapResponse>>;
+  leaf_swap(request: LeafSwapRequest, context: CallContext & CallContextExt): Promise<DeepPartial<LeafSwapResponse>>;
   prepare_tree_address(
     request: PrepareTreeAddressRequest,
     context: CallContext & CallContextExt,
@@ -7999,6 +8193,7 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
     request: DeepPartial<InitiatePreimageSwapRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<InitiatePreimageSwapResponse>;
+  leaf_swap(request: DeepPartial<LeafSwapRequest>, options?: CallOptions & CallOptionsExt): Promise<LeafSwapResponse>;
   prepare_tree_address(
     request: DeepPartial<PrepareTreeAddressRequest>,
     options?: CallOptions & CallOptionsExt,

@@ -1,10 +1,34 @@
-import { bytesToHex, hexToBytes } from "@noble/curves/abstract/utils";
-import { secp256k1 } from "@noble/curves/secp256k1";
+import {
+  bytesToHex,
+  bytesToNumberBE,
+  hexToBytes,
+} from "@noble/curves/abstract/utils";
+import { schnorr, secp256k1 } from "@noble/curves/secp256k1";
 
 import * as btc from "@scure/btc-signer";
 import { TransactionOutput } from "@scure/btc-signer/psbt";
 import { sha256 } from "@scure/btc-signer/utils";
 import { Network, NetworkConfig } from "./network";
+
+// const t = tapTweak(pubKey, h); // t = int_from_bytes(tagged_hash("TapTweak", pubkey + h)
+// const P = u.lift_x(u.bytesToNumberBE(pubKey)); // P = lift_x(int_from_bytes(pubkey))
+// const Q = P.add(Point.fromPrivateKey(t)); // Q = point_add(P, point_mul(G, t))
+export function computeTaprootKeyNoScript(pubkey: Uint8Array): Uint8Array {
+  if (pubkey.length !== 32) {
+    throw new Error("Public key must be 32 bytes");
+  }
+
+  const taggedHash = schnorr.utils.taggedHash("TapTweak", pubkey);
+  const tweak = bytesToNumberBE(taggedHash);
+
+  // Get the original point
+  const P = schnorr.utils.lift_x(schnorr.utils.bytesToNumberBE(pubkey));
+
+  // Add the tweak times the generator point
+  const Q = P.add(secp256k1.ProjectivePoint.fromPrivateKey(tweak));
+
+  return Q.toRawBytes();
+}
 
 export function getP2TRScriptFromPublicKey(
   pubKey: Uint8Array,
