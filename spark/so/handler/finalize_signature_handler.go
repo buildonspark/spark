@@ -202,7 +202,11 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 		SetRawTx(nodeTxBytes).
 		SetRawRefundTx(refundTxBytes)
 	if tree.Status == schema.TreeStatusAvailable {
-		nodeMutator.SetStatus(schema.TreeNodeStatusAvailable)
+		if len(node.RawRefundTx) > 0 {
+			nodeMutator.SetStatus(schema.TreeNodeStatusAvailable)
+		} else {
+			nodeMutator.SetStatus(schema.TreeNodeStatusSplitted)
+		}
 	}
 	node, err = nodeMutator.Save(ctx)
 	if err != nil {
