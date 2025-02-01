@@ -186,7 +186,7 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 		if err != nil {
 			return nil, nil, fmt.Errorf("unable to deserialize leaf tx: %v", err)
 		}
-		err = common.VerifySignature(refundTx, 0, treeNodeTx.TxOut[node.Vout])
+		err = common.VerifySignature(refundTx, 0, treeNodeTx.TxOut[0])
 		if err != nil {
 			return nil, nil, fmt.Errorf("unable to verify refund tx signature: %v", err)
 		}
