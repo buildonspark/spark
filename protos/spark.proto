@@ -370,6 +370,7 @@ message UserSignedRefund {
     bytes refund_tx = 2;
     bytes user_signature = 3;
     SigningCommitments signing_commitments = 4;
+    common.SigningCommitment user_signature_commitment = 5;
 }
 
 message InvoiceAmountProof {

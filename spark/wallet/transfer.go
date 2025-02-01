@@ -690,7 +690,7 @@ func prepareRefundSoSigningJobs(
 	for _, leaf := range leaves {
 		refundSigningData := leafDataMap[leaf.Leaf.Id]
 		signingPubkey := refundSigningData.SigningPrivKey.PubKey().SerializeCompressed()
-		refundTx, err := createRefundTx(config, leaf.Leaf, refundSigningData.ReceivingPubkey)
+		refundTx, _, err := createRefundTx(config, leaf.Leaf, refundSigningData.ReceivingPubkey)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create refund tx: %v", err)
 		}
@@ -720,14 +720,14 @@ func createRefundTx(
 	config *Config,
 	leaf *pb.TreeNode,
 	receivingPubkey []byte,
-) (*wire.MsgTx, error) {
+) (*wire.MsgTx, []byte, error) {
 	tx, err := common.TxFromRawTxBytes(leaf.NodeTx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse leaf tx: %v", err)
+		return nil, nil, fmt.Errorf("failed to parse leaf tx: %v", err)
 	}
 	refundTx, err := common.TxFromRawTxBytes(leaf.RefundTx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse leaf tx: %v", err)
+		return nil, nil, fmt.Errorf("failed to parse leaf tx: %v", err)
 	}
 
 	newRefundTx := wire.NewMsgTx(2)
@@ -741,16 +741,21 @@ func createRefundTx(
 	})
 	refundP2trAddress, err := common.P2TRAddressFromPublicKey(receivingPubkey, config.Network)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create p2tr address from pubkey: %v", err)
+		return nil, nil, fmt.Errorf("failed to create p2tr address from pubkey: %v", err)
 	}
 	refundAddress, _ := btcutil.DecodeAddress(*refundP2trAddress, common.NetworkParams(config.Network))
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode p2tr address: %v", err)
+		return nil, nil, fmt.Errorf("failed to decode p2tr address: %v", err)
 	}
 	refundPkScript, _ := txscript.PayToAddrScript(refundAddress)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create pk script: %v", err)
+		return nil, nil, fmt.Errorf("failed to create pk script: %v", err)
 	}
 	newRefundTx.AddTxOut(wire.NewTxOut(tx.TxOut[0].Value, refundPkScript))
-	return newRefundTx, nil
+
+	sighash, err := common.SigHashFromTx(newRefundTx, 0, tx.TxOut[0])
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to calculate sighash: %v", err)
+	}
+	return newRefundTx, sighash, nil
 }

@@ -2,9 +2,11 @@ package grpctest
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/hex"
 	"testing"
 
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lightsparkdev/spark-go/common"
 	pbmock "github.com/lightsparkdev/spark-go/proto/mock"
 	testutil "github.com/lightsparkdev/spark-go/test_util"
@@ -22,6 +24,23 @@ func (f *FakeLightningInvoiceCreator) CreateInvoice(_ uint64, _ []byte, _ string
 	return &invoice, nil
 }
 
+func cleanUp(t *testing.T, config *wallet.Config, paymentHash []byte) {
+	for _, operator := range config.SigningOperators {
+		conn, err := common.NewGRPCConnection(operator.Address)
+		if err != nil {
+			t.Fatal(err)
+		}
+		mockClient := pbmock.NewMockServiceClient(conn)
+		_, err = mockClient.CleanUpPreimageShare(context.Background(), &pbmock.CleanUpPreimageShareRequest{
+			PaymentHash: paymentHash,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		conn.Close()
+	}
+}
+
 func TestCreateLightningInvoice(t *testing.T) {
 	config, err := testutil.TestWalletConfig()
 	if err != nil {
@@ -34,26 +53,76 @@ func TestCreateLightningInvoice(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	paymentHash := sha256.Sum256(preimage)
 
 	invoice, err := wallet.CreateLightningInvoiceWithPreimage(context.Background(), config, fakeInvoiceCreator, 100, "test", preimage)
 	if err != nil {
 		t.Fatal(err)
 	}
+	assert.NotNil(t, invoice)
 
-	for _, operator := range config.SigningOperators {
-		conn, err := common.NewGRPCConnection(operator.Address)
-		if err != nil {
-			t.Fatal(err)
-		}
-		mockClient := pbmock.NewMockServiceClient(conn)
-		_, err = mockClient.CleanUpPreimageShare(context.Background(), &pbmock.CleanUpPreimageShareRequest{
-			PaymentHash: preimage,
-		})
-		if err != nil {
-			t.Fatal(err)
-		}
-		conn.Close()
+	cleanUp(t, config, paymentHash[:])
+}
+
+func TestReceiveLightningPayment(t *testing.T) {
+	// Create user and ssp configs
+	userConfig, err := testutil.TestWalletConfig()
+	if err != nil {
+		t.Fatal(err)
 	}
 
+	sspConfig, err := testutil.TestWalletConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// User creates an invoice
+	preimage, err := hex.DecodeString("2d059c3ede82a107aa1452c0bea47759be3c5c6e5342be6a310f6c3a907d9f4c")
+	if err != nil {
+		t.Fatal(err)
+	}
+	paymentHash := sha256.Sum256(preimage)
+	fakeInvoiceCreator := &FakeLightningInvoiceCreator{}
+
+	defer cleanUp(t, userConfig, paymentHash[:])
+
+	invoice, err := wallet.CreateLightningInvoiceWithPreimage(context.Background(), userConfig, fakeInvoiceCreator, 100, "test", preimage)
+	if err != nil {
+		t.Fatal(err)
+	}
 	assert.NotNil(t, invoice)
+
+	// SSP creates a node of 12345 sats
+	sspLeafPrivKey, err := secp256k1.GeneratePrivateKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodeToSend, err := testutil.CreateNewTree(sspConfig, sspLeafPrivKey, 12345)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	newLeafPrivKey, err := secp256k1.GeneratePrivateKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	leaves := []wallet.LeafKeyTweak{}
+	leaves = append(leaves, wallet.LeafKeyTweak{
+		Leaf:              nodeToSend,
+		SigningPrivKey:    sspLeafPrivKey.Serialize(),
+		NewSigningPrivKey: newLeafPrivKey.Serialize(),
+	})
+
+	receivedPreimage, err := wallet.SwapNodesForPreimage(
+		context.Background(),
+		sspConfig,
+		leaves,
+		userConfig.IdentityPublicKey(),
+		paymentHash[:],
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, receivedPreimage, preimage)
 }

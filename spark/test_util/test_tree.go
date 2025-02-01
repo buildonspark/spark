@@ -15,7 +15,7 @@ import (
 )
 
 // CreateNewTree creates a new Tree
-func CreateNewTree(config *wallet.Config, privKey *secp256k1.PrivateKey) (*pb.TreeNode, error) {
+func CreateNewTree(config *wallet.Config, privKey *secp256k1.PrivateKey, amountSats int64) (*pb.TreeNode, error) {
 	// Setup Mock tx
 	conn, err := common.NewGRPCConnection(config.CoodinatorAddress())
 	if err != nil {
@@ -38,7 +38,7 @@ func CreateNewTree(config *wallet.Config, privKey *secp256k1.PrivateKey) (*pb.Tr
 		return nil, fmt.Errorf("failed to generate deposit address: %v", err)
 	}
 
-	depositTx, err := CreateTestP2TRTransaction(depositResp.DepositAddress.Address, 100_000)
+	depositTx, err := CreateTestP2TRTransaction(depositResp.DepositAddress.Address, amountSats)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create deposit tx: %v", err)
 	}

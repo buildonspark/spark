@@ -122,7 +122,7 @@ func CreateTreeRoot(
 		nil,
 		nil, // witness
 	))
-	rootTx.AddTxOut(wire.NewTxOut(100_000, depositTx.TxOut[0].PkScript))
+	rootTx.AddTxOut(wire.NewTxOut(depositTx.TxOut[0].Value, depositTx.TxOut[0].PkScript))
 	var rootBuf bytes.Buffer
 	err := rootTx.Serialize(&rootBuf)
 	if err != nil {

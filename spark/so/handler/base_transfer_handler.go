@@ -105,7 +105,7 @@ func (h *BaseTransferHandler) createTransfer(
 		return nil, nil, fmt.Errorf("unable to parse transfer_id as a uuid %s: %v", transferID, err)
 	}
 
-	if !expiryTime.IsZero() && expiryTime.Before(time.Now()) {
+	if expiryTime.Unix() != 0 && expiryTime.Before(time.Now()) {
 		return nil, nil, fmt.Errorf("invalid expiry_time %s: %v", expiryTime.String(), err)
 	}
 

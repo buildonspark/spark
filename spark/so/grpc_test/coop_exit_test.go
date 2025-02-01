@@ -25,7 +25,7 @@ func TestCoopExit(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create node signing private key: %v", err)
 	}
-	rootNode, err := testutil.CreateNewTree(config, leafPrivKey)
+	rootNode, err := testutil.CreateNewTree(config, leafPrivKey, 100_000)
 	if err != nil {
 		t.Fatalf("failed to create new tree: %v", err)
 	}

@@ -188,12 +188,21 @@ func (h *LightningHandler) validateGetPreimageRequest(ctx context.Context, trans
 	return nil
 }
 
-func (h *LightningHandler) storeUserSignedTransactions(ctx context.Context, paymentHash []byte, preimageShare *ent.PreimageShare, transactions []*pb.UserSignedRefund, userIdentityPubkey []byte, transfer *ent.Transfer) (*ent.PreimageRequest, error) {
+func (h *LightningHandler) storeUserSignedTransactions(
+	ctx context.Context,
+	paymentHash []byte,
+	preimageShare *ent.PreimageShare,
+	transactions []*pb.UserSignedRefund,
+	userIdentityPubkey []byte,
+	transfer *ent.Transfer,
+	status schema.PreimageRequestStatus,
+) (*ent.PreimageRequest, error) {
 	db := ent.GetDbFromContext(ctx)
 	preimageRequest, err := db.PreimageRequest.Create().
 		SetPaymentHash(paymentHash).
 		SetPreimageShares(preimageShare).
 		SetTransfers(transfer).
+		SetStatus(status).
 		Save(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create preimage request: %v", err)
@@ -204,20 +213,21 @@ func (h *LightningHandler) storeUserSignedTransactions(ctx context.Context, paym
 		if err != nil {
 			return nil, fmt.Errorf("unable to marshal signing commitments: %v", err)
 		}
+		nodeID, err := uuid.Parse(transaction.NodeId)
+		if err != nil {
+			return nil, fmt.Errorf("unable to parse node id: %v", err)
+		}
 		_, err = db.UserSignedTransaction.Create().
 			SetTransaction(transaction.RefundTx).
 			SetUserSignature(transaction.UserSignature).
 			SetSigningCommitments(commitmentsBytes).
 			SetPreimageRequest(preimageRequest).
+			SetTreeNodeID(nodeID).
 			Save(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("unable to store user signed transaction: %v", err)
 		}
 
-		nodeID, err := uuid.Parse(transaction.NodeId)
-		if err != nil {
-			return nil, fmt.Errorf("unable to parse node id: %v", err)
-		}
 		node, err := db.TreeNode.Get(ctx, nodeID)
 		if err != nil {
 			return nil, fmt.Errorf("unable to get node: %v", err)
@@ -257,7 +267,13 @@ func (h *LightningHandler) GetPreimageShare(ctx context.Context, req *pb.Initiat
 		return nil, fmt.Errorf("unable to create transfer: %v", err)
 	}
 
-	_, err = h.storeUserSignedTransactions(ctx, req.PaymentHash, preimageShare, req.UserSignedRefunds, preimageShare.OwnerIdentityPubkey, transfer)
+	var status schema.PreimageRequestStatus
+	if req.Reason == pb.InitiatePreimageSwapRequest_REASON_RECEIVE {
+		status = schema.PreimageRequestStatusPreimageShared
+	} else {
+		status = schema.PreimageRequestStatusWaitingForPreimage
+	}
+	_, err = h.storeUserSignedTransactions(ctx, req.PaymentHash, preimageShare, req.UserSignedRefunds, preimageShare.OwnerIdentityPubkey, transfer, status)
 	if err != nil {
 		return nil, fmt.Errorf("unable to store user signed transactions: %v", err)
 	}
@@ -280,9 +296,6 @@ func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pb.Ini
 			return nil, fmt.Errorf("unable to get preimage share: %v", err)
 		}
 	}
-	if err = authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, preimageShare.OwnerIdentityPubkey); err != nil {
-		return nil, err
-	}
 
 	leafRefundMap := make(map[string][]byte)
 	for _, transaction := range req.UserSignedRefunds {
@@ -295,7 +308,13 @@ func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pb.Ini
 		return nil, fmt.Errorf("unable to create transfer: %v", err)
 	}
 
-	preimageRequest, err := h.storeUserSignedTransactions(ctx, req.PaymentHash, preimageShare, req.UserSignedRefunds, preimageShare.OwnerIdentityPubkey, transfer)
+	var status schema.PreimageRequestStatus
+	if req.Reason == pb.InitiatePreimageSwapRequest_REASON_RECEIVE {
+		status = schema.PreimageRequestStatusPreimageShared
+	} else {
+		status = schema.PreimageRequestStatusWaitingForPreimage
+	}
+	preimageRequest, err := h.storeUserSignedTransactions(ctx, req.PaymentHash, preimageShare, req.UserSignedRefunds, preimageShare.OwnerIdentityPubkey, transfer, status)
 	if err != nil {
 		return nil, fmt.Errorf("unable to store user signed transactions: %v", err)
 	}
@@ -341,12 +360,12 @@ func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pb.Ini
 		})
 	}
 
-	secretShare, err := secretsharing.RecoverSecret(shares)
+	secret, err := secretsharing.RecoverSecret(shares)
 	if err != nil {
 		return nil, fmt.Errorf("unable to recover secret: %v", err)
 	}
 
-	hash := sha256.Sum256(secretShare.Bytes())
+	hash := sha256.Sum256(secret.Bytes())
 	if !bytes.Equal(hash[:], req.PaymentHash) {
 		// TODO: Notify the operator that the preimage is wrong
 		return nil, fmt.Errorf("invalid preimage")
@@ -357,7 +376,7 @@ func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pb.Ini
 		return nil, fmt.Errorf("unable to update preimage request status: %v", err)
 	}
 
-	return &pb.InitiatePreimageSwapResponse{Preimage: hash[:]}, nil
+	return &pb.InitiatePreimageSwapResponse{Preimage: secret.Bytes()}, nil
 }
 
 // UpdatePreimageRequest updates the preimage request.
