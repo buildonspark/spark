@@ -185,6 +185,11 @@ func (h *BaseTransferHandler) createTransfer(
 		return nil, nil, fmt.Errorf("unable to update transfer total value: %v", err)
 	}
 
+	leaves, err = lockLeaves(ctx, db, leaves)
+	if err != nil {
+		return nil, nil, fmt.Errorf("unable to lock leaves: %v", err)
+	}
+
 	leafMap := make(map[string]*ent.TreeNode)
 	for _, leaf := range leaves {
 		leafMap[leaf.ID.String()] = leaf
@@ -277,4 +282,16 @@ func setTotalTransferValue(ctx context.Context, db *ent.Tx, transfer *ent.Transf
 		return fmt.Errorf("unable to update transfer total value: %v", err)
 	}
 	return nil
+}
+
+func lockLeaves(ctx context.Context, db *ent.Tx, leaves []*ent.TreeNode) ([]*ent.TreeNode, error) {
+	lockedLeaves := make([]*ent.TreeNode, 0)
+	for _, leaf := range leaves {
+		lockedLeaf, err := db.TreeNode.UpdateOne(leaf).SetStatus(schema.TreeNodeStatusTransferLocked).Save(ctx)
+		lockedLeaves = append(lockedLeaves, lockedLeaf)
+		if err != nil {
+			return nil, fmt.Errorf("unable to update leaf status: %v", err)
+		}
+	}
+	return lockedLeaves, nil
 }

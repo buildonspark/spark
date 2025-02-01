@@ -73,7 +73,7 @@ func (h *TransferHandler) StartSendTransfer(ctx context.Context, req *pb.StartSe
 	return &pb.StartSendTransferResponse{Transfer: transferProto, SigningResults: signingResults}, nil
 }
 
-// StartSendTransfer initiates a transfer from sender.
+// InitiateLeafSwap initiates a leaf swap.
 func (h *TransferHandler) InitiateLeafSwap(ctx context.Context, req *pb.LeafSwapRequest) (*pb.LeafSwapResponse, error) {
 	reqTransfer := req.Transfer
 	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, reqTransfer.OwnerIdentityPublicKey); err != nil {
@@ -270,8 +270,7 @@ func (h *TransferHandler) completeSendLeaf(ctx context.Context, transfer *ent.Tr
 	if err != nil || leaf == nil {
 		return fmt.Errorf("unable to find leaf %s: %v", req.LeafId, err)
 	}
-	if (leaf.Status != schema.TreeNodeStatusAvailable &&
-		(leaf.Status != schema.TreeNodeStatusDestinationLock || !bytes.Equal(leaf.DestinationLockIdentityPubkey, transfer.ReceiverIdentityPubkey))) ||
+	if leaf.Status != schema.TreeNodeStatusTransferLocked ||
 		!bytes.Equal(leaf.OwnerIdentityPubkey, transfer.SenderIdentityPubkey) {
 		return fmt.Errorf("leaf %s is not available to transfer", req.LeafId)
 	}
@@ -339,7 +338,6 @@ func (h *TransferHandler) completeSendLeaf(ctx context.Context, transfer *ent.Tr
 	leaf, err = leaf.
 		Update().
 		SetOwnerSigningPubkey(signingPubkey).
-		SetStatus(schema.TreeNodeStatusTransferLocked).
 		SetRawRefundTx(refundTxBytes).
 		Save(ctx)
 	if err != nil || leaf == nil {
