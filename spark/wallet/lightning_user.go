@@ -18,24 +18,14 @@ type LightningInvoiceCreator interface {
 	CreateInvoice(amountSats uint64, paymentHash []byte, memo string) (*string, error)
 }
 
-// FakeLightningInvoiceCreator is a fake implementation of the LightningInvoiceCreator interface.
-type FakeLightningInvoiceCreator struct{}
-
-// CreateInvoice is a fake implementation of the LightningInvoiceCreator interface.
-// It returns a fake invoice string.
-func (f *FakeLightningInvoiceCreator) CreateInvoice(_ uint64, _ []byte, _ string) (*string, error) {
-	invoice := "fake-invoice"
-	return &invoice, nil
-}
-
-// CreateLightningInvoice creates a Lightning invoice and sends the preimage shares to the signing operators.
-func CreateLightningInvoice(ctx context.Context, config *Config, creator LightningInvoiceCreator, amountSats uint64, memo string) (*string, error) {
-	preimagePrivKey, err := secp256k1.GeneratePrivateKey()
-	if err != nil {
-		return nil, err
-	}
-
-	preimage := preimagePrivKey.Serialize()
+func CreateLightningInvoiceWithPreimage(
+	ctx context.Context,
+	config *Config,
+	creator LightningInvoiceCreator,
+	amountSats uint64,
+	memo string,
+	preimage []byte,
+) (*string, error) {
 	paymentHash := sha256.Sum256(preimage)
 	invoice, err := creator.CreateInvoice(amountSats, paymentHash[:], memo)
 	if err != nil {
@@ -90,4 +80,15 @@ func CreateLightningInvoice(ctx context.Context, config *Config, creator Lightni
 		}
 	}
 	return invoice, nil
+}
+
+// CreateLightningInvoice creates a Lightning invoice and sends the preimage shares to the signing operators.
+func CreateLightningInvoice(ctx context.Context, config *Config, creator LightningInvoiceCreator, amountSats uint64, memo string) (*string, error) {
+	preimagePrivKey, err := secp256k1.GeneratePrivateKey()
+	if err != nil {
+		return nil, err
+	}
+
+	preimage := preimagePrivKey.Serialize()
+	return CreateLightningInvoiceWithPreimage(ctx, config, creator, amountSats, memo, preimage)
 }

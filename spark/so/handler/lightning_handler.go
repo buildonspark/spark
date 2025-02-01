@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"math/big"
 	"strings"
@@ -24,6 +25,7 @@ import (
 	"github.com/lightsparkdev/spark-go/so/ent/treenode"
 	"github.com/lightsparkdev/spark-go/so/helper"
 	"github.com/lightsparkdev/spark-go/so/objects"
+	decodepay "github.com/nbd-wtf/ln-decodepay"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -56,6 +58,20 @@ func (h *LightningHandler) StorePreimageShare(ctx context.Context, req *pb.Store
 	)
 	if err != nil {
 		return fmt.Errorf("unable to validate share: %v", err)
+	}
+
+	bolt11, err := decodepay.Decodepay(req.InvoiceString)
+	if err != nil {
+		return fmt.Errorf("unable to decode invoice: %v", err)
+	}
+
+	paymentHash, err := hex.DecodeString(bolt11.PaymentHash)
+	if err != nil {
+		return fmt.Errorf("unable to decode payment hash: %v", err)
+	}
+
+	if !bytes.Equal(paymentHash, req.PaymentHash) {
+		return fmt.Errorf("payment hash mismatch")
 	}
 
 	db := ent.GetDbFromContext(ctx)

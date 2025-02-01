@@ -4,9 +4,11 @@ import (
 	"context"
 
 	"github.com/lightsparkdev/spark-go/so"
+	"github.com/lightsparkdev/spark-go/so/ent"
 	"github.com/lightsparkdev/spark-go/so/helper"
 
 	pbmock "github.com/lightsparkdev/spark-go/proto/mock"
+	"github.com/lightsparkdev/spark-go/so/ent/preimageshare"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
@@ -25,5 +27,12 @@ func NewMockServer(config *so.Config, onchainHelper *helper.MockOnChainHelper) *
 // SetMockOnchainTx sets a mock onchain tx for the given txid.
 func (o *MockServer) SetMockOnchainTx(ctx context.Context, req *pbmock.SetMockOnchainTxRequest) (*emptypb.Empty, error) {
 	o.onchainHelper.SetMockOnchainTx(req.Txid, req.Tx)
+	return &emptypb.Empty{}, nil
+}
+
+// CleanUpPreimageShare cleans up the preimage share for the given payment hash.
+func (o *MockServer) CleanUpPreimageShare(ctx context.Context, req *pbmock.CleanUpPreimageShareRequest) (*emptypb.Empty, error) {
+	db := ent.GetDbFromContext(ctx)
+	db.PreimageShare.Delete().Where(preimageshare.PaymentHashEQ(req.PaymentHash))
 	return &emptypb.Empty{}, nil
 }

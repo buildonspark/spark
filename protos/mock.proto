@@ -7,9 +7,14 @@ import "google/protobuf/empty.proto";
 
 service MockService {
     rpc set_mock_onchain_tx(SetMockOnchainTxRequest) returns (google.protobuf.Empty) {}
+    rpc clean_up_preimage_share(CleanUpPreimageShareRequest) returns (google.protobuf.Empty) {}
 }
 
 message SetMockOnchainTxRequest {
     string txid = 1;
     string tx = 2;
+}
+
+message CleanUpPreimageShareRequest {
+    bytes payment_hash = 1;
 }
