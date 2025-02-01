@@ -1,11 +1,7 @@
+import { bytesToHex, hexToBytes } from "@noble/curves/abstract/utils";
 import { secp256k1 } from "@noble/curves/secp256k1";
 import { SparkWallet } from "../spark-sdk";
-import {
-  createNewTree,
-  getTestWalletConfig,
-  getTestWalletConfigWithIdentityKey,
-} from "./test-util";
-import { bytesToHex } from "@noble/curves/abstract/utils";
+import { createNewTree } from "./test-util";
 
 describe("Transfer", () => {
   // Skip all tests if running in GitHub Actions
@@ -14,15 +10,20 @@ describe("Transfer", () => {
   testFn(
     "test transfer",
     async () => {
-      const senderConfig = getTestWalletConfig();
-      const senderWallet = new SparkWallet(senderConfig);
+      const senderWallet = new SparkWallet();
+      const senderMnemonic = senderWallet.generateMnemonic();
+      await senderWallet.createSparkWallet(senderMnemonic);
 
       const leafPrivKey = secp256k1.utils.randomPrivateKey();
       const rootNode = await createNewTree(senderWallet, leafPrivKey);
 
       const newLeafPrivKey = secp256k1.utils.randomPrivateKey();
 
-      const receiverPrivKey = secp256k1.utils.randomPrivateKey();
+      const receiverWallet = new SparkWallet();
+      const receiverMnemonic = receiverWallet.generateMnemonic();
+      const receiverPubkey = await receiverWallet.createSparkWallet(
+        receiverMnemonic
+      );
 
       const transferNode = {
         leaf: rootNode,
@@ -32,14 +33,9 @@ describe("Transfer", () => {
 
       const senderTransfer = await senderWallet.sendTransfer(
         [transferNode],
-        secp256k1.getPublicKey(receiverPrivKey, true),
+        hexToBytes(receiverPubkey),
         new Date(Date.now() + 10 * 60 * 1000)
       );
-
-      const receiverConfig =
-        getTestWalletConfigWithIdentityKey(receiverPrivKey);
-
-      const receiverWallet = new SparkWallet(receiverConfig);
 
       const pendingTransfer = await receiverWallet.queryPendingTransfers();
 

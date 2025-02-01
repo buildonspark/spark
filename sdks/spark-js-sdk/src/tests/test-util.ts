@@ -7,6 +7,15 @@ import { SparkWallet } from "../spark-sdk";
 import { getTxFromRawTxBytes, getTxId } from "../utils/bitcoin";
 import { createDummyTx } from "../utils/wasm";
 
+export const TEST_WALLET_CONFIG = {
+  network: "regtest",
+  coodinatorIdentifier:
+    "0000000000000000000000000000000000000000000000000000000000000001",
+  frostSignerAddress: "unix:///tmp/frost_0.sock",
+  threshold: 3,
+  signingOperators: getAllSigningOperators(),
+};
+
 export function getAllSigningOperators(): Record<string, SigningOperator> {
   const pubkeys = [
     "0322ca18fc489ae25418a0e768273c2c61cabb823edfb14feb891e9bec62016510",
@@ -65,16 +74,10 @@ export function getTestWalletConfig(): WalletConfig {
 export function getTestWalletConfigWithIdentityKey(
   identityPrivateKey: Uint8Array
 ): WalletConfig {
-  const signingOperators = getAllSigningOperators();
   return {
-    network: "regtest",
-    signingOperators,
-    coodinatorIdentifier:
-      "0000000000000000000000000000000000000000000000000000000000000001",
-    frostSignerAddress: "unix:///tmp/frost_0.sock",
+    ...TEST_WALLET_CONFIG,
     identityPrivateKey,
-    threshold: 3,
-  };
+  } as WalletConfig;
 }
 
 export async function createNewTree(
@@ -82,8 +85,9 @@ export async function createNewTree(
   wallet: SparkWallet,
   privKey: Uint8Array
 ): Promise<TreeNode> {
+  const config = wallet.getConfig();
   const mockClient = ConnectionManager.createMockClient(
-    wallet.config.getCoordinatorAddress()
+    config.signingOperators[config.coodinatorIdentifier].address
   );
 
   // Generate private/public key pair

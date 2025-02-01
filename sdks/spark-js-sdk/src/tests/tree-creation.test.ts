@@ -1,11 +1,9 @@
-import { SparkWallet } from "../spark-sdk";
-import { getTestWalletConfig } from "./test-util";
-import { secp256k1 } from "@noble/curves/secp256k1";
-import { createDummyTx } from "../utils/wasm";
-import { getTxFromRawTxBytes } from "../utils/bitcoin";
-import { getTxId } from "../utils/bitcoin";
 import { bytesToHex } from "@noble/curves/abstract/utils";
+import { secp256k1 } from "@noble/curves/secp256k1";
 import { ConnectionManager } from "../services/connection";
+import { SparkWallet } from "../spark-sdk";
+import { getTxFromRawTxBytes, getTxId } from "../utils/bitcoin";
+import { createDummyTx } from "../utils/wasm";
 
 describe("Tree Creation", () => {
   // Skip all tests if running in GitHub Actions
@@ -14,8 +12,10 @@ describe("Tree Creation", () => {
   testFn(
     "test tree creation address generation",
     async () => {
-      const config = getTestWalletConfig();
-      const wallet = new SparkWallet(config);
+      const wallet = new SparkWallet();
+      const mnemonic = wallet.generateMnemonic();
+      await wallet.createSparkWallet(mnemonic);
+      const config = wallet.getConfig();
 
       const mockClient = ConnectionManager.createMockClient(
         config.signingOperators[config.coodinatorIdentifier].address

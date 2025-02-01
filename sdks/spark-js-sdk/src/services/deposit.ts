@@ -1,12 +1,17 @@
+import { schnorr, secp256k1 } from "@noble/curves/secp256k1";
+import * as btc from "@scure/btc-signer";
 import { NETWORK, p2tr, Transaction } from "@scure/btc-signer";
-import { WalletConfigService } from "./config";
-import { secp256k1, schnorr } from "@noble/curves/secp256k1";
 import { equalBytes, sha256 } from "@scure/btc-signer/utils";
-import { GenerateDepositAddressResponse, Address } from "../proto/spark";
-import { subtractPublicKeys } from "../utils/keys";
-import { proofOfPossessionMessageHashForDepositAddress } from "../utils/proof";
-import { ConnectionManager } from "./connection";
 import { SignatureIntent } from "../proto/common";
+import { Address, GenerateDepositAddressResponse } from "../proto/spark";
+import {
+  getP2TRAddressFromPublicKey,
+  getSigHashFromTx,
+  getTxId,
+} from "../utils/bitcoin";
+import { subtractPublicKeys } from "../utils/keys";
+import { NetworkConfig } from "../utils/network";
+import { proofOfPossessionMessageHashForDepositAddress } from "../utils/proof";
 import {
   copySigningCommitment,
   copySigningNonce,
@@ -14,14 +19,9 @@ import {
   getSigningCommitmentFromNonce,
 } from "../utils/signing";
 import { aggregateFrost, signFrost } from "../utils/wasm";
-import {
-  getTxId,
-  getSigHashFromTx,
-  getP2TRAddressFromPublicKey,
-} from "../utils/bitcoin";
-import { NetworkConfig } from "../utils/network";
 import { KeyPackage } from "../wasm/spark_bindings";
-import * as btc from "@scure/btc-signer";
+import { WalletConfigService } from "./config";
+import { ConnectionManager } from "./connection";
 type ValidateDepositAddressParams = {
   address: Address;
   userPubkey: Uint8Array;
@@ -212,6 +212,7 @@ export class DepositService {
       this.config.getCoordinatorAddress(),
       this.config
     );
+
     const treeResp = await sparkClient.start_tree_creation({
       identityPublicKey: this.config.getIdentityPublicKey(),
       onChainUtxo: {

@@ -51,6 +51,7 @@
     "@noble/curves": "^1.8.0",
     "@noble/secp256k1": "^2.2.3",
     "@scure/base": "^1.2.1",
+    "@scure/bip32": "^1.6.2",
     "@scure/bip39": "^1.5.4",
     "@scure/btc-signer": "^1.5.0",
     "crypto-js": "^4.2.0",

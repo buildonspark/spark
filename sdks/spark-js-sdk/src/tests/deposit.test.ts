@@ -4,7 +4,6 @@ import { ConnectionManager } from "../services/connection";
 import { SparkWallet } from "../spark-sdk";
 import { getTxFromRawTxBytes, getTxId } from "../utils/bitcoin";
 import { createDummyTx } from "../utils/wasm";
-import { getTestWalletConfig } from "./test-util";
 
 describe("deposit", () => {
   // Skip all tests if running in GitHub Actions
@@ -13,8 +12,10 @@ describe("deposit", () => {
   testFn(
     "should generate a deposit address",
     async () => {
-      const config = getTestWalletConfig();
-      const sdk = new SparkWallet(config);
+      const sdk = new SparkWallet();
+      const mnemonic = sdk.generateMnemonic();
+      await sdk.createSparkWallet(mnemonic);
+
       const pubKey = hexToBytes(
         "0330d50fd2e26d274e15f3dcea34a8bb611a9d0f14d1a9b1211f3608b3b7cd56c7"
       );
@@ -28,8 +29,10 @@ describe("deposit", () => {
   testFn(
     "should create a tree root",
     async () => {
-      const config = getTestWalletConfig();
-      const sdk = new SparkWallet(config);
+      const sdk = new SparkWallet();
+      const mnemonic = sdk.generateMnemonic();
+      await sdk.createSparkWallet(mnemonic);
+      const config = sdk.getConfig();
 
       // Setup mock connection
       const mockClient = ConnectionManager.createMockClient(

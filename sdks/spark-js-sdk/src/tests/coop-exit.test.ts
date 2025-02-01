@@ -16,18 +16,18 @@ import {
 } from "../utils/bitcoin";
 import { NetworkConfig } from "../utils/network";
 import { createDummyTx } from "../utils/wasm";
-import {
-  createNewTree,
-  getTestWalletConfig,
-  getTestWalletConfigWithIdentityKey,
-} from "./test-util";
+import { createNewTree } from "./test-util";
 
 describe("coop exit", () => {
   // Skip all tests if running in GitHub Actions
   const testFn = process.env.GITHUB_ACTIONS ? it.skip : it;
 
   testFn("test coop exit", async () => {
-    const config = getTestWalletConfig();
+    const wallet = new SparkWallet();
+    const mnemonic = wallet.generateMnemonic();
+    await wallet.createSparkWallet(mnemonic);
+    const config = wallet.getConfig();
+
     const configService = new WalletConfigService(config);
     const connectionManager = new ConnectionManager();
     const transferService = new TransferService(
@@ -40,20 +40,17 @@ describe("coop exit", () => {
       transferService
     );
 
-    const wallet = new SparkWallet(config);
-
     const leafPrivKey = secp256k1.utils.randomPrivateKey();
     const rootNode = await createNewTree(wallet, leafPrivKey);
 
-    const sspPrivKey = secp256k1.utils.randomPrivateKey();
-    const sspPubkey = secp256k1.getPublicKey(sspPrivKey, true);
+    const sspWallet = new SparkWallet();
+    const sspMnemonic = sspWallet.generateMnemonic();
+    const sspPubkey = await sspWallet.createSparkWallet(sspMnemonic);
+
     const sspIntermediateAddressScript = getP2TRScriptFromPublicKey(
-      sspPubkey,
+      hexToBytes(sspPubkey),
       config.network
     );
-
-    const sspConfig = getTestWalletConfigWithIdentityKey(sspPrivKey);
-    const sspWallet = new SparkWallet(sspConfig);
     const amountSats = 100_000n;
 
     const withdrawPrivKey = secp256k1.utils.randomPrivateKey();
@@ -130,7 +127,7 @@ describe("coop exit", () => {
       ],
       exitTxId: hexToBytes(getTxId(exitTx)),
       connectorOutputs,
-      receiverPubKey: sspPubkey,
+      receiverPubKey: hexToBytes(sspPubkey),
     });
 
     const pendingTransfer = await sspWallet.queryPendingTransfers();
