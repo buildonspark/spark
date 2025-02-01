@@ -21,7 +21,7 @@ type InternalTransferHandler struct {
 
 // NewInternalTransferHandler creates a new InternalTransferHandler.
 func NewInternalTransferHandler(onchainHelper helper.OnChainHelper, config *so.Config) *InternalTransferHandler {
-	return &InternalTransferHandler{BaseTransferHandler: BaseTransferHandler{config}, onchainHelper: onchainHelper, config: config}
+	return &InternalTransferHandler{BaseTransferHandler: NewBaseTransferHandler(onchainHelper, config), onchainHelper: onchainHelper, config: config}
 }
 
 // FinalizeTransfer finalizes a transfer.

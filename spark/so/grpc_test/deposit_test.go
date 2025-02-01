@@ -6,12 +6,14 @@ import (
 	"encoding/hex"
 	"log"
 	"testing"
+	"time"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lightsparkdev/spark-go/common"
 	pbmock "github.com/lightsparkdev/spark-go/proto/mock"
 	testutil "github.com/lightsparkdev/spark-go/test_util"
 	"github.com/lightsparkdev/spark-go/wallet"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestGenerateDepositAddress(t *testing.T) {
@@ -108,6 +110,8 @@ func TestStartTreeCreation(t *testing.T) {
 	log.Printf("tree created: %v", resp)
 }
 
+// Test that we can get refund signatures for a tree before depositing funds on-chain,
+// and that after we confirm funds on-chain, our leaves are available for transfer.
 func TestStartTreeCreationOffchain(t *testing.T) {
 	config, err := testutil.TestWalletConfig()
 	if err != nil {
@@ -165,4 +169,53 @@ func TestStartTreeCreationOffchain(t *testing.T) {
 	}
 
 	log.Printf("tree created: %v", resp)
+
+	// User should not be able to transfer funds since
+	// L1 tx has not confirmed
+	rootNode := resp.Nodes[0]
+	newLeafPrivKey, err := secp256k1.GeneratePrivateKey()
+	if err != nil {
+		t.Fatalf("failed to create new node signing private key: %v", err)
+	}
+
+	receiverPrivKey, err := secp256k1.GeneratePrivateKey()
+	if err != nil {
+		t.Fatalf("failed to create receiver private key: %v", err)
+	}
+
+	transferNode := wallet.LeafKeyTweak{
+		Leaf:              rootNode,
+		SigningPrivKey:    privKey.Serialize(),
+		NewSigningPrivKey: newLeafPrivKey.Serialize(),
+	}
+	leavesToTransfer := [1]wallet.LeafKeyTweak{transferNode}
+	_, err = wallet.SendTransfer(
+		context.Background(),
+		config,
+		leavesToTransfer[:],
+		receiverPrivKey.PubKey().SerializeCompressed(),
+		time.Now().Add(10*time.Minute),
+	)
+	if err == nil {
+		t.Fatalf("expected error when sending transfer")
+	}
+
+	// After L1 tx confirms, user should be able to transfer funds
+	mockClient := pbmock.NewMockServiceClient(conn)
+	_, err = mockClient.SetMockOnchainTx(context.Background(), &pbmock.SetMockOnchainTxRequest{
+		Txid: depositTx.TxID(),
+		Tx:   depositTxHex,
+	})
+	assert.Nil(t, err, "failed to set mock onchain tx")
+
+	_, err = wallet.SendTransfer(
+		context.Background(),
+		config,
+		leavesToTransfer[:],
+		receiverPrivKey.PubKey().SerializeCompressed(),
+		time.Now().Add(10*time.Minute),
+	)
+	if err != nil {
+		t.Fatalf("failed to send transfer: %v", err)
+	}
 }

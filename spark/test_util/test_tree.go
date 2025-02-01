@@ -49,14 +49,6 @@ func CreateNewTree(config *wallet.Config, privKey *secp256k1.PrivateKey) (*pb.Tr
 		return nil, fmt.Errorf("failed to serialize deposit tx: %v", err)
 	}
 	depositTxHex := hex.EncodeToString(buf.Bytes())
-	decodedBytes, err := hex.DecodeString(depositTxHex)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode deposit tx hex: %v", err)
-	}
-	depositTx, err = common.TxFromRawTxBytes(decodedBytes)
-	if err != nil {
-		return nil, fmt.Errorf("failed to deserilize deposit tx: %v", err)
-	}
 
 	log.Printf("deposit tx: %s", depositTxHex)
 	mockClient.SetMockOnchainTx(context.Background(), &pbmock.SetMockOnchainTxRequest{

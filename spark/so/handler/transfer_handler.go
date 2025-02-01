@@ -37,7 +37,7 @@ type TransferHandler struct {
 
 // NewTransferHandler creates a new TransferHandler.
 func NewTransferHandler(onchainHelper helper.OnChainHelper, config *so.Config) *TransferHandler {
-	return &TransferHandler{BaseTransferHandler: BaseTransferHandler{config}, onchainHelper: onchainHelper, config: config}
+	return &TransferHandler{BaseTransferHandler: NewBaseTransferHandler(onchainHelper, config), onchainHelper: onchainHelper, config: config}
 }
 
 // StartSendTransfer initiates a transfer from sender.
