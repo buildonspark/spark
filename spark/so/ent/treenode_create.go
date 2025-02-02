@@ -100,12 +100,6 @@ func (tnc *TreeNodeCreate) SetRawRefundTx(b []byte) *TreeNodeCreate {
 	return tnc
 }
 
-// SetDestinationLockIdentityPubkey sets the "destination_lock_identity_pubkey" field.
-func (tnc *TreeNodeCreate) SetDestinationLockIdentityPubkey(b []byte) *TreeNodeCreate {
-	tnc.mutation.SetDestinationLockIdentityPubkey(b)
-	return tnc
-}
-
 // SetID sets the "id" field.
 func (tnc *TreeNodeCreate) SetID(u uuid.UUID) *TreeNodeCreate {
 	tnc.mutation.SetID(u)
@@ -359,10 +353,6 @@ func (tnc *TreeNodeCreate) createSpec() (*TreeNode, *sqlgraph.CreateSpec) {
 	if value, ok := tnc.mutation.RawRefundTx(); ok {
 		_spec.SetField(treenode.FieldRawRefundTx, field.TypeBytes, value)
 		_node.RawRefundTx = value
-	}
-	if value, ok := tnc.mutation.DestinationLockIdentityPubkey(); ok {
-		_spec.SetField(treenode.FieldDestinationLockIdentityPubkey, field.TypeBytes, value)
-		_node.DestinationLockIdentityPubkey = value
 	}
 	if nodes := tnc.mutation.TreeIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{

@@ -393,6 +393,7 @@ message InitiatePreimageSwapRequest {
     }
     Reason reason = 4;
     StartSendTransferRequest transfer = 5;
+    bytes receiver_identity_public_key = 6;
 }
 
 message InitiatePreimageSwapResponse {

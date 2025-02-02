@@ -102,11 +102,6 @@ func RawRefundTx(v []byte) predicate.TreeNode {
 	return predicate.TreeNode(sql.FieldEQ(FieldRawRefundTx, v))
 }
 
-// DestinationLockIdentityPubkey applies equality check predicate on the "destination_lock_identity_pubkey" field. It's identical to DestinationLockIdentityPubkeyEQ.
-func DestinationLockIdentityPubkey(v []byte) predicate.TreeNode {
-	return predicate.TreeNode(sql.FieldEQ(FieldDestinationLockIdentityPubkey, v))
-}
-
 // CreateTimeEQ applies the EQ predicate on the "create_time" field.
 func CreateTimeEQ(v time.Time) predicate.TreeNode {
 	return predicate.TreeNode(sql.FieldEQ(FieldCreateTime, v))
@@ -505,56 +500,6 @@ func RawRefundTxIsNil() predicate.TreeNode {
 // RawRefundTxNotNil applies the NotNil predicate on the "raw_refund_tx" field.
 func RawRefundTxNotNil() predicate.TreeNode {
 	return predicate.TreeNode(sql.FieldNotNull(FieldRawRefundTx))
-}
-
-// DestinationLockIdentityPubkeyEQ applies the EQ predicate on the "destination_lock_identity_pubkey" field.
-func DestinationLockIdentityPubkeyEQ(v []byte) predicate.TreeNode {
-	return predicate.TreeNode(sql.FieldEQ(FieldDestinationLockIdentityPubkey, v))
-}
-
-// DestinationLockIdentityPubkeyNEQ applies the NEQ predicate on the "destination_lock_identity_pubkey" field.
-func DestinationLockIdentityPubkeyNEQ(v []byte) predicate.TreeNode {
-	return predicate.TreeNode(sql.FieldNEQ(FieldDestinationLockIdentityPubkey, v))
-}
-
-// DestinationLockIdentityPubkeyIn applies the In predicate on the "destination_lock_identity_pubkey" field.
-func DestinationLockIdentityPubkeyIn(vs ...[]byte) predicate.TreeNode {
-	return predicate.TreeNode(sql.FieldIn(FieldDestinationLockIdentityPubkey, vs...))
-}
-
-// DestinationLockIdentityPubkeyNotIn applies the NotIn predicate on the "destination_lock_identity_pubkey" field.
-func DestinationLockIdentityPubkeyNotIn(vs ...[]byte) predicate.TreeNode {
-	return predicate.TreeNode(sql.FieldNotIn(FieldDestinationLockIdentityPubkey, vs...))
-}
-
-// DestinationLockIdentityPubkeyGT applies the GT predicate on the "destination_lock_identity_pubkey" field.
-func DestinationLockIdentityPubkeyGT(v []byte) predicate.TreeNode {
-	return predicate.TreeNode(sql.FieldGT(FieldDestinationLockIdentityPubkey, v))
-}
-
-// DestinationLockIdentityPubkeyGTE applies the GTE predicate on the "destination_lock_identity_pubkey" field.
-func DestinationLockIdentityPubkeyGTE(v []byte) predicate.TreeNode {
-	return predicate.TreeNode(sql.FieldGTE(FieldDestinationLockIdentityPubkey, v))
-}
-
-// DestinationLockIdentityPubkeyLT applies the LT predicate on the "destination_lock_identity_pubkey" field.
-func DestinationLockIdentityPubkeyLT(v []byte) predicate.TreeNode {
-	return predicate.TreeNode(sql.FieldLT(FieldDestinationLockIdentityPubkey, v))
-}
-
-// DestinationLockIdentityPubkeyLTE applies the LTE predicate on the "destination_lock_identity_pubkey" field.
-func DestinationLockIdentityPubkeyLTE(v []byte) predicate.TreeNode {
-	return predicate.TreeNode(sql.FieldLTE(FieldDestinationLockIdentityPubkey, v))
-}
-
-// DestinationLockIdentityPubkeyIsNil applies the IsNil predicate on the "destination_lock_identity_pubkey" field.
-func DestinationLockIdentityPubkeyIsNil() predicate.TreeNode {
-	return predicate.TreeNode(sql.FieldIsNull(FieldDestinationLockIdentityPubkey))
-}
-
-// DestinationLockIdentityPubkeyNotNil applies the NotNil predicate on the "destination_lock_identity_pubkey" field.
-func DestinationLockIdentityPubkeyNotNil() predicate.TreeNode {
-	return predicate.TreeNode(sql.FieldNotNull(FieldDestinationLockIdentityPubkey))
 }
 
 // HasTree applies the HasEdge predicate on the "tree" edge.

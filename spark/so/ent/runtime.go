@@ -309,6 +309,10 @@ func init() {
 	usersignedtransactionDescSigningCommitments := usersignedtransactionFields[2].Descriptor()
 	// usersignedtransaction.SigningCommitmentsValidator is a validator for the "signing_commitments" field. It is called by the builders before save.
 	usersignedtransaction.SigningCommitmentsValidator = usersignedtransactionDescSigningCommitments.Validators[0].(func([]byte) error)
+	// usersignedtransactionDescUserSignatureCommitment is the schema descriptor for user_signature_commitment field.
+	usersignedtransactionDescUserSignatureCommitment := usersignedtransactionFields[3].Descriptor()
+	// usersignedtransaction.UserSignatureCommitmentValidator is a validator for the "user_signature_commitment" field. It is called by the builders before save.
+	usersignedtransaction.UserSignatureCommitmentValidator = usersignedtransactionDescUserSignatureCommitment.Validators[0].(func([]byte) error)
 	// usersignedtransactionDescID is the schema descriptor for id field.
 	usersignedtransactionDescID := usersignedtransactionMixinFields0[0].Descriptor()
 	// usersignedtransaction.DefaultID holds the default value on creation for the id field.

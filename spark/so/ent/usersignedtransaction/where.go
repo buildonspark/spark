@@ -81,6 +81,11 @@ func SigningCommitments(v []byte) predicate.UserSignedTransaction {
 	return predicate.UserSignedTransaction(sql.FieldEQ(FieldSigningCommitments, v))
 }
 
+// UserSignatureCommitment applies equality check predicate on the "user_signature_commitment" field. It's identical to UserSignatureCommitmentEQ.
+func UserSignatureCommitment(v []byte) predicate.UserSignedTransaction {
+	return predicate.UserSignedTransaction(sql.FieldEQ(FieldUserSignatureCommitment, v))
+}
+
 // CreateTimeEQ applies the EQ predicate on the "create_time" field.
 func CreateTimeEQ(v time.Time) predicate.UserSignedTransaction {
 	return predicate.UserSignedTransaction(sql.FieldEQ(FieldCreateTime, v))
@@ -279,6 +284,46 @@ func SigningCommitmentsLT(v []byte) predicate.UserSignedTransaction {
 // SigningCommitmentsLTE applies the LTE predicate on the "signing_commitments" field.
 func SigningCommitmentsLTE(v []byte) predicate.UserSignedTransaction {
 	return predicate.UserSignedTransaction(sql.FieldLTE(FieldSigningCommitments, v))
+}
+
+// UserSignatureCommitmentEQ applies the EQ predicate on the "user_signature_commitment" field.
+func UserSignatureCommitmentEQ(v []byte) predicate.UserSignedTransaction {
+	return predicate.UserSignedTransaction(sql.FieldEQ(FieldUserSignatureCommitment, v))
+}
+
+// UserSignatureCommitmentNEQ applies the NEQ predicate on the "user_signature_commitment" field.
+func UserSignatureCommitmentNEQ(v []byte) predicate.UserSignedTransaction {
+	return predicate.UserSignedTransaction(sql.FieldNEQ(FieldUserSignatureCommitment, v))
+}
+
+// UserSignatureCommitmentIn applies the In predicate on the "user_signature_commitment" field.
+func UserSignatureCommitmentIn(vs ...[]byte) predicate.UserSignedTransaction {
+	return predicate.UserSignedTransaction(sql.FieldIn(FieldUserSignatureCommitment, vs...))
+}
+
+// UserSignatureCommitmentNotIn applies the NotIn predicate on the "user_signature_commitment" field.
+func UserSignatureCommitmentNotIn(vs ...[]byte) predicate.UserSignedTransaction {
+	return predicate.UserSignedTransaction(sql.FieldNotIn(FieldUserSignatureCommitment, vs...))
+}
+
+// UserSignatureCommitmentGT applies the GT predicate on the "user_signature_commitment" field.
+func UserSignatureCommitmentGT(v []byte) predicate.UserSignedTransaction {
+	return predicate.UserSignedTransaction(sql.FieldGT(FieldUserSignatureCommitment, v))
+}
+
+// UserSignatureCommitmentGTE applies the GTE predicate on the "user_signature_commitment" field.
+func UserSignatureCommitmentGTE(v []byte) predicate.UserSignedTransaction {
+	return predicate.UserSignedTransaction(sql.FieldGTE(FieldUserSignatureCommitment, v))
+}
+
+// UserSignatureCommitmentLT applies the LT predicate on the "user_signature_commitment" field.
+func UserSignatureCommitmentLT(v []byte) predicate.UserSignedTransaction {
+	return predicate.UserSignedTransaction(sql.FieldLT(FieldUserSignatureCommitment, v))
+}
+
+// UserSignatureCommitmentLTE applies the LTE predicate on the "user_signature_commitment" field.
+func UserSignatureCommitmentLTE(v []byte) predicate.UserSignedTransaction {
+	return predicate.UserSignedTransaction(sql.FieldLTE(FieldUserSignatureCommitment, v))
 }
 
 // HasTreeNode applies the HasEdge predicate on the "tree_node" edge.

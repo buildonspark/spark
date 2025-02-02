@@ -6336,35 +6336,34 @@ func (m *TreeMutation) ResetEdge(name string) error {
 // TreeNodeMutation represents an operation that mutates the TreeNode nodes in the graph.
 type TreeNodeMutation struct {
 	config
-	op                               Op
-	typ                              string
-	id                               *uuid.UUID
-	create_time                      *time.Time
-	update_time                      *time.Time
-	value                            *uint64
-	addvalue                         *int64
-	status                           *schema.TreeNodeStatus
-	verifying_pubkey                 *[]byte
-	owner_identity_pubkey            *[]byte
-	owner_signing_pubkey             *[]byte
-	raw_tx                           *[]byte
-	vout                             *uint16
-	addvout                          *int16
-	raw_refund_tx                    *[]byte
-	destination_lock_identity_pubkey *[]byte
-	clearedFields                    map[string]struct{}
-	tree                             *uuid.UUID
-	clearedtree                      bool
-	parent                           *uuid.UUID
-	clearedparent                    bool
-	signing_keyshare                 *uuid.UUID
-	clearedsigning_keyshare          bool
-	children                         map[uuid.UUID]struct{}
-	removedchildren                  map[uuid.UUID]struct{}
-	clearedchildren                  bool
-	done                             bool
-	oldValue                         func(context.Context) (*TreeNode, error)
-	predicates                       []predicate.TreeNode
+	op                      Op
+	typ                     string
+	id                      *uuid.UUID
+	create_time             *time.Time
+	update_time             *time.Time
+	value                   *uint64
+	addvalue                *int64
+	status                  *schema.TreeNodeStatus
+	verifying_pubkey        *[]byte
+	owner_identity_pubkey   *[]byte
+	owner_signing_pubkey    *[]byte
+	raw_tx                  *[]byte
+	vout                    *uint16
+	addvout                 *int16
+	raw_refund_tx           *[]byte
+	clearedFields           map[string]struct{}
+	tree                    *uuid.UUID
+	clearedtree             bool
+	parent                  *uuid.UUID
+	clearedparent           bool
+	signing_keyshare        *uuid.UUID
+	clearedsigning_keyshare bool
+	children                map[uuid.UUID]struct{}
+	removedchildren         map[uuid.UUID]struct{}
+	clearedchildren         bool
+	done                    bool
+	oldValue                func(context.Context) (*TreeNode, error)
+	predicates              []predicate.TreeNode
 }
 
 var _ ent.Mutation = (*TreeNodeMutation)(nil)
@@ -6884,55 +6883,6 @@ func (m *TreeNodeMutation) ResetRawRefundTx() {
 	delete(m.clearedFields, treenode.FieldRawRefundTx)
 }
 
-// SetDestinationLockIdentityPubkey sets the "destination_lock_identity_pubkey" field.
-func (m *TreeNodeMutation) SetDestinationLockIdentityPubkey(b []byte) {
-	m.destination_lock_identity_pubkey = &b
-}
-
-// DestinationLockIdentityPubkey returns the value of the "destination_lock_identity_pubkey" field in the mutation.
-func (m *TreeNodeMutation) DestinationLockIdentityPubkey() (r []byte, exists bool) {
-	v := m.destination_lock_identity_pubkey
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldDestinationLockIdentityPubkey returns the old "destination_lock_identity_pubkey" field's value of the TreeNode entity.
-// If the TreeNode object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *TreeNodeMutation) OldDestinationLockIdentityPubkey(ctx context.Context) (v []byte, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldDestinationLockIdentityPubkey is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldDestinationLockIdentityPubkey requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldDestinationLockIdentityPubkey: %w", err)
-	}
-	return oldValue.DestinationLockIdentityPubkey, nil
-}
-
-// ClearDestinationLockIdentityPubkey clears the value of the "destination_lock_identity_pubkey" field.
-func (m *TreeNodeMutation) ClearDestinationLockIdentityPubkey() {
-	m.destination_lock_identity_pubkey = nil
-	m.clearedFields[treenode.FieldDestinationLockIdentityPubkey] = struct{}{}
-}
-
-// DestinationLockIdentityPubkeyCleared returns if the "destination_lock_identity_pubkey" field was cleared in this mutation.
-func (m *TreeNodeMutation) DestinationLockIdentityPubkeyCleared() bool {
-	_, ok := m.clearedFields[treenode.FieldDestinationLockIdentityPubkey]
-	return ok
-}
-
-// ResetDestinationLockIdentityPubkey resets all changes to the "destination_lock_identity_pubkey" field.
-func (m *TreeNodeMutation) ResetDestinationLockIdentityPubkey() {
-	m.destination_lock_identity_pubkey = nil
-	delete(m.clearedFields, treenode.FieldDestinationLockIdentityPubkey)
-}
-
 // SetTreeID sets the "tree" edge to the Tree entity by id.
 func (m *TreeNodeMutation) SetTreeID(id uuid.UUID) {
 	m.tree = &id
@@ -7138,7 +7088,7 @@ func (m *TreeNodeMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *TreeNodeMutation) Fields() []string {
-	fields := make([]string, 0, 11)
+	fields := make([]string, 0, 10)
 	if m.create_time != nil {
 		fields = append(fields, treenode.FieldCreateTime)
 	}
@@ -7169,9 +7119,6 @@ func (m *TreeNodeMutation) Fields() []string {
 	if m.raw_refund_tx != nil {
 		fields = append(fields, treenode.FieldRawRefundTx)
 	}
-	if m.destination_lock_identity_pubkey != nil {
-		fields = append(fields, treenode.FieldDestinationLockIdentityPubkey)
-	}
 	return fields
 }
 
@@ -7200,8 +7147,6 @@ func (m *TreeNodeMutation) Field(name string) (ent.Value, bool) {
 		return m.Vout()
 	case treenode.FieldRawRefundTx:
 		return m.RawRefundTx()
-	case treenode.FieldDestinationLockIdentityPubkey:
-		return m.DestinationLockIdentityPubkey()
 	}
 	return nil, false
 }
@@ -7231,8 +7176,6 @@ func (m *TreeNodeMutation) OldField(ctx context.Context, name string) (ent.Value
 		return m.OldVout(ctx)
 	case treenode.FieldRawRefundTx:
 		return m.OldRawRefundTx(ctx)
-	case treenode.FieldDestinationLockIdentityPubkey:
-		return m.OldDestinationLockIdentityPubkey(ctx)
 	}
 	return nil, fmt.Errorf("unknown TreeNode field %s", name)
 }
@@ -7312,13 +7255,6 @@ func (m *TreeNodeMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetRawRefundTx(v)
 		return nil
-	case treenode.FieldDestinationLockIdentityPubkey:
-		v, ok := value.([]byte)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetDestinationLockIdentityPubkey(v)
-		return nil
 	}
 	return fmt.Errorf("unknown TreeNode field %s", name)
 }
@@ -7379,9 +7315,6 @@ func (m *TreeNodeMutation) ClearedFields() []string {
 	if m.FieldCleared(treenode.FieldRawRefundTx) {
 		fields = append(fields, treenode.FieldRawRefundTx)
 	}
-	if m.FieldCleared(treenode.FieldDestinationLockIdentityPubkey) {
-		fields = append(fields, treenode.FieldDestinationLockIdentityPubkey)
-	}
 	return fields
 }
 
@@ -7398,9 +7331,6 @@ func (m *TreeNodeMutation) ClearField(name string) error {
 	switch name {
 	case treenode.FieldRawRefundTx:
 		m.ClearRawRefundTx()
-		return nil
-	case treenode.FieldDestinationLockIdentityPubkey:
-		m.ClearDestinationLockIdentityPubkey()
 		return nil
 	}
 	return fmt.Errorf("unknown TreeNode nullable field %s", name)
@@ -7439,9 +7369,6 @@ func (m *TreeNodeMutation) ResetField(name string) error {
 		return nil
 	case treenode.FieldRawRefundTx:
 		m.ResetRawRefundTx()
-		return nil
-	case treenode.FieldDestinationLockIdentityPubkey:
-		m.ResetDestinationLockIdentityPubkey()
 		return nil
 	}
 	return fmt.Errorf("unknown TreeNode field %s", name)
@@ -7588,22 +7515,23 @@ func (m *TreeNodeMutation) ResetEdge(name string) error {
 // UserSignedTransactionMutation represents an operation that mutates the UserSignedTransaction nodes in the graph.
 type UserSignedTransactionMutation struct {
 	config
-	op                      Op
-	typ                     string
-	id                      *uuid.UUID
-	create_time             *time.Time
-	update_time             *time.Time
-	transaction             *[]byte
-	user_signature          *[]byte
-	signing_commitments     *[]byte
-	clearedFields           map[string]struct{}
-	tree_node               *uuid.UUID
-	clearedtree_node        bool
-	preimage_request        *uuid.UUID
-	clearedpreimage_request bool
-	done                    bool
-	oldValue                func(context.Context) (*UserSignedTransaction, error)
-	predicates              []predicate.UserSignedTransaction
+	op                        Op
+	typ                       string
+	id                        *uuid.UUID
+	create_time               *time.Time
+	update_time               *time.Time
+	transaction               *[]byte
+	user_signature            *[]byte
+	signing_commitments       *[]byte
+	user_signature_commitment *[]byte
+	clearedFields             map[string]struct{}
+	tree_node                 *uuid.UUID
+	clearedtree_node          bool
+	preimage_request          *uuid.UUID
+	clearedpreimage_request   bool
+	done                      bool
+	oldValue                  func(context.Context) (*UserSignedTransaction, error)
+	predicates                []predicate.UserSignedTransaction
 }
 
 var _ ent.Mutation = (*UserSignedTransactionMutation)(nil)
@@ -7890,6 +7818,42 @@ func (m *UserSignedTransactionMutation) ResetSigningCommitments() {
 	m.signing_commitments = nil
 }
 
+// SetUserSignatureCommitment sets the "user_signature_commitment" field.
+func (m *UserSignedTransactionMutation) SetUserSignatureCommitment(b []byte) {
+	m.user_signature_commitment = &b
+}
+
+// UserSignatureCommitment returns the value of the "user_signature_commitment" field in the mutation.
+func (m *UserSignedTransactionMutation) UserSignatureCommitment() (r []byte, exists bool) {
+	v := m.user_signature_commitment
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUserSignatureCommitment returns the old "user_signature_commitment" field's value of the UserSignedTransaction entity.
+// If the UserSignedTransaction object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UserSignedTransactionMutation) OldUserSignatureCommitment(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUserSignatureCommitment is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUserSignatureCommitment requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUserSignatureCommitment: %w", err)
+	}
+	return oldValue.UserSignatureCommitment, nil
+}
+
+// ResetUserSignatureCommitment resets all changes to the "user_signature_commitment" field.
+func (m *UserSignedTransactionMutation) ResetUserSignatureCommitment() {
+	m.user_signature_commitment = nil
+}
+
 // SetTreeNodeID sets the "tree_node" edge to the TreeNode entity by id.
 func (m *UserSignedTransactionMutation) SetTreeNodeID(id uuid.UUID) {
 	m.tree_node = &id
@@ -8002,7 +7966,7 @@ func (m *UserSignedTransactionMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *UserSignedTransactionMutation) Fields() []string {
-	fields := make([]string, 0, 5)
+	fields := make([]string, 0, 6)
 	if m.create_time != nil {
 		fields = append(fields, usersignedtransaction.FieldCreateTime)
 	}
@@ -8017,6 +7981,9 @@ func (m *UserSignedTransactionMutation) Fields() []string {
 	}
 	if m.signing_commitments != nil {
 		fields = append(fields, usersignedtransaction.FieldSigningCommitments)
+	}
+	if m.user_signature_commitment != nil {
+		fields = append(fields, usersignedtransaction.FieldUserSignatureCommitment)
 	}
 	return fields
 }
@@ -8036,6 +8003,8 @@ func (m *UserSignedTransactionMutation) Field(name string) (ent.Value, bool) {
 		return m.UserSignature()
 	case usersignedtransaction.FieldSigningCommitments:
 		return m.SigningCommitments()
+	case usersignedtransaction.FieldUserSignatureCommitment:
+		return m.UserSignatureCommitment()
 	}
 	return nil, false
 }
@@ -8055,6 +8024,8 @@ func (m *UserSignedTransactionMutation) OldField(ctx context.Context, name strin
 		return m.OldUserSignature(ctx)
 	case usersignedtransaction.FieldSigningCommitments:
 		return m.OldSigningCommitments(ctx)
+	case usersignedtransaction.FieldUserSignatureCommitment:
+		return m.OldUserSignatureCommitment(ctx)
 	}
 	return nil, fmt.Errorf("unknown UserSignedTransaction field %s", name)
 }
@@ -8098,6 +8069,13 @@ func (m *UserSignedTransactionMutation) SetField(name string, value ent.Value) e
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetSigningCommitments(v)
+		return nil
+	case usersignedtransaction.FieldUserSignatureCommitment:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUserSignatureCommitment(v)
 		return nil
 	}
 	return fmt.Errorf("unknown UserSignedTransaction field %s", name)
@@ -8162,6 +8140,9 @@ func (m *UserSignedTransactionMutation) ResetField(name string) error {
 		return nil
 	case usersignedtransaction.FieldSigningCommitments:
 		m.ResetSigningCommitments()
+		return nil
+	case usersignedtransaction.FieldUserSignatureCommitment:
+		m.ResetUserSignatureCommitment()
 		return nil
 	}
 	return fmt.Errorf("unknown UserSignedTransaction field %s", name)

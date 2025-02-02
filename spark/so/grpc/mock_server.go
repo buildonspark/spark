@@ -10,6 +10,7 @@ import (
 	pbmock "github.com/lightsparkdev/spark-go/proto/mock"
 	"github.com/lightsparkdev/spark-go/so/ent/preimagerequest"
 	"github.com/lightsparkdev/spark-go/so/ent/preimageshare"
+	"github.com/lightsparkdev/spark-go/so/ent/usersignedtransaction"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
@@ -37,6 +38,24 @@ func (o *MockServer) CleanUpPreimageShare(ctx context.Context, req *pbmock.Clean
 	_, err := db.PreimageShare.Delete().Where(preimageshare.PaymentHashEQ(req.PaymentHash)).Exec(ctx)
 	if err != nil {
 		return nil, err
+	}
+	preimageRequestQuery := db.PreimageRequest.Query().Where(preimagerequest.PaymentHashEQ(req.PaymentHash))
+	if preimageRequestQuery.CountX(ctx) == 0 {
+		return nil, nil
+	}
+	preimageRequest, err := preimageRequestQuery.First(ctx)
+	if err != nil {
+		return nil, err
+	}
+	txs, err := preimageRequest.QueryTransactions().All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, tx := range txs {
+		_, err = db.UserSignedTransaction.Delete().Where(usersignedtransaction.IDEQ(tx.ID)).Exec(ctx)
+		if err != nil {
+			return nil, err
+		}
 	}
 	_, err = db.PreimageRequest.Delete().Where(preimagerequest.PaymentHashEQ(req.PaymentHash)).Exec(ctx)
 	if err != nil {

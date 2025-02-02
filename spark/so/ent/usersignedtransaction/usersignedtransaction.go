@@ -25,6 +25,8 @@ const (
 	FieldUserSignature = "user_signature"
 	// FieldSigningCommitments holds the string denoting the signing_commitments field in the database.
 	FieldSigningCommitments = "signing_commitments"
+	// FieldUserSignatureCommitment holds the string denoting the user_signature_commitment field in the database.
+	FieldUserSignatureCommitment = "user_signature_commitment"
 	// EdgeTreeNode holds the string denoting the tree_node edge name in mutations.
 	EdgeTreeNode = "tree_node"
 	// EdgePreimageRequest holds the string denoting the preimage_request edge name in mutations.
@@ -55,6 +57,7 @@ var Columns = []string{
 	FieldTransaction,
 	FieldUserSignature,
 	FieldSigningCommitments,
+	FieldUserSignatureCommitment,
 }
 
 // ForeignKeys holds the SQL foreign-keys that are owned by the "user_signed_transactions"
@@ -92,6 +95,8 @@ var (
 	UserSignatureValidator func([]byte) error
 	// SigningCommitmentsValidator is a validator for the "signing_commitments" field. It is called by the builders before save.
 	SigningCommitmentsValidator func([]byte) error
+	// UserSignatureCommitmentValidator is a validator for the "user_signature_commitment" field. It is called by the builders before save.
+	UserSignatureCommitmentValidator func([]byte) error
 	// DefaultID holds the default value on creation for the "id" field.
 	DefaultID func() uuid.UUID
 )

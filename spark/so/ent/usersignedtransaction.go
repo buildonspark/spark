@@ -30,6 +30,8 @@ type UserSignedTransaction struct {
 	UserSignature []byte `json:"user_signature,omitempty"`
 	// SigningCommitments holds the value of the "signing_commitments" field.
 	SigningCommitments []byte `json:"signing_commitments,omitempty"`
+	// UserSignatureCommitment holds the value of the "user_signature_commitment" field.
+	UserSignatureCommitment []byte `json:"user_signature_commitment,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the UserSignedTransactionQuery when eager-loading is set.
 	Edges                                    UserSignedTransactionEdges `json:"edges"`
@@ -76,7 +78,7 @@ func (*UserSignedTransaction) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case usersignedtransaction.FieldTransaction, usersignedtransaction.FieldUserSignature, usersignedtransaction.FieldSigningCommitments:
+		case usersignedtransaction.FieldTransaction, usersignedtransaction.FieldUserSignature, usersignedtransaction.FieldSigningCommitments, usersignedtransaction.FieldUserSignatureCommitment:
 			values[i] = new([]byte)
 		case usersignedtransaction.FieldCreateTime, usersignedtransaction.FieldUpdateTime:
 			values[i] = new(sql.NullTime)
@@ -136,6 +138,12 @@ func (ust *UserSignedTransaction) assignValues(columns []string, values []any) e
 				return fmt.Errorf("unexpected type %T for field signing_commitments", values[i])
 			} else if value != nil {
 				ust.SigningCommitments = *value
+			}
+		case usersignedtransaction.FieldUserSignatureCommitment:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field user_signature_commitment", values[i])
+			} else if value != nil {
+				ust.UserSignatureCommitment = *value
 			}
 		case usersignedtransaction.ForeignKeys[0]:
 			if value, ok := values[i].(*sql.NullScanner); !ok {
@@ -211,6 +219,9 @@ func (ust *UserSignedTransaction) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("signing_commitments=")
 	builder.WriteString(fmt.Sprintf("%v", ust.SigningCommitments))
+	builder.WriteString(", ")
+	builder.WriteString("user_signature_commitment=")
+	builder.WriteString(fmt.Sprintf("%v", ust.UserSignatureCommitment))
 	builder.WriteByte(')')
 	return builder.String()
 }

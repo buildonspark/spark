@@ -20,6 +20,8 @@ func SwapNodesForPreimage(
 	leaves []LeafKeyTweak,
 	receiverIdentityPubkey []byte,
 	paymentHash []byte,
+	invoiceString *string,
+	isInboundPayment bool,
 ) ([]byte, error) {
 	// SSP asks for signing commitment
 	conn, err := common.NewGRPCConnection(config.CoodinatorAddress())
@@ -80,15 +82,29 @@ func SwapNodesForPreimage(
 
 	// SSP calls SO to get the preimage
 	transferID := uuid.New().String()
+	bolt11String := ""
+	if invoiceString != nil {
+		bolt11String = *invoiceString
+	}
+	reason := pb.InitiatePreimageSwapRequest_REASON_SEND
+	if isInboundPayment {
+		reason = pb.InitiatePreimageSwapRequest_REASON_RECEIVE
+	}
 	response, err := client.InitiatePreimageSwap(tmpCtx, &pb.InitiatePreimageSwapRequest{
 		PaymentHash:       paymentHash,
 		UserSignedRefunds: userSignedRefunds,
-		Reason:            pb.InitiatePreimageSwapRequest_REASON_RECEIVE,
+		Reason:            reason,
+		InvoiceAmount: &pb.InvoiceAmount{
+			InvoiceAmountProof: &pb.InvoiceAmountProof{
+				Bolt11Invoice: bolt11String,
+			},
+		},
 		Transfer: &pb.StartSendTransferRequest{
 			TransferId:                transferID,
 			OwnerIdentityPublicKey:    config.IdentityPublicKey(),
 			ReceiverIdentityPublicKey: receiverIdentityPubkey,
 		},
+		ReceiverIdentityPublicKey: receiverIdentityPubkey,
 	})
 	if err != nil {
 		return nil, err

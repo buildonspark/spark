@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/common"
 	secretsharing "github.com/lightsparkdev/spark-go/common/secret_sharing"
+	pbcommon "github.com/lightsparkdev/spark-go/proto/common"
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark-go/proto/spark_internal"
 	"github.com/lightsparkdev/spark-go/so"
@@ -193,17 +194,18 @@ func (h *LightningHandler) storeUserSignedTransactions(
 	paymentHash []byte,
 	preimageShare *ent.PreimageShare,
 	transactions []*pb.UserSignedRefund,
-	userIdentityPubkey []byte,
 	transfer *ent.Transfer,
 	status schema.PreimageRequestStatus,
 ) (*ent.PreimageRequest, error) {
 	db := ent.GetDbFromContext(ctx)
-	preimageRequest, err := db.PreimageRequest.Create().
+	preimageRequestMutator := db.PreimageRequest.Create().
 		SetPaymentHash(paymentHash).
-		SetPreimageShares(preimageShare).
 		SetTransfers(transfer).
-		SetStatus(status).
-		Save(ctx)
+		SetStatus(status)
+	if preimageShare != nil {
+		preimageRequestMutator.SetPreimageShares(preimageShare)
+	}
+	preimageRequest, err := preimageRequestMutator.Save(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create preimage request: %v", err)
 	}
@@ -217,9 +219,14 @@ func (h *LightningHandler) storeUserSignedTransactions(
 		if err != nil {
 			return nil, fmt.Errorf("unable to parse node id: %v", err)
 		}
+		userSignatureCommitmentBytes, err := proto.Marshal(transaction.UserSignatureCommitment)
+		if err != nil {
+			return nil, fmt.Errorf("unable to marshal user signature commitment: %v", err)
+		}
 		_, err = db.UserSignedTransaction.Create().
 			SetTransaction(transaction.RefundTx).
 			SetUserSignature(transaction.UserSignature).
+			SetUserSignatureCommitment(userSignatureCommitmentBytes).
 			SetSigningCommitments(commitmentsBytes).
 			SetPreimageRequest(preimageRequest).
 			SetTreeNodeID(nodeID).
@@ -233,8 +240,7 @@ func (h *LightningHandler) storeUserSignedTransactions(
 			return nil, fmt.Errorf("unable to get node: %v", err)
 		}
 		db.TreeNode.UpdateOne(node).
-			SetStatus(schema.TreeNodeStatusDestinationLock).
-			SetDestinationLockIdentityPubkey(userIdentityPubkey).
+			SetStatus(schema.TreeNodeStatusTransferLocked).
 			Exec(ctx)
 	}
 	return preimageRequest, nil
@@ -254,46 +260,8 @@ func (h *LightningHandler) GetPreimageShare(ctx context.Context, req *pb.Initiat
 		if err != nil {
 			return nil, fmt.Errorf("unable to get preimage share: %v", err)
 		}
-	}
-
-	leafRefundMap := make(map[string][]byte)
-	for _, transaction := range req.UserSignedRefunds {
-		leafRefundMap[transaction.NodeId] = transaction.RefundTx
-	}
-
-	transferHandler := NewTransferHandler(h.onchainHelper, h.config)
-	transfer, _, err := transferHandler.createTransfer(ctx, req.Transfer.TransferId, schema.TransferTypePreimageSwap, req.Transfer.ExpiryTime.AsTime(), req.Transfer.OwnerIdentityPublicKey, req.Transfer.ReceiverIdentityPublicKey, leafRefundMap)
-	if err != nil {
-		return nil, fmt.Errorf("unable to create transfer: %v", err)
-	}
-
-	var status schema.PreimageRequestStatus
-	if req.Reason == pb.InitiatePreimageSwapRequest_REASON_RECEIVE {
-		status = schema.PreimageRequestStatusPreimageShared
-	} else {
-		status = schema.PreimageRequestStatusWaitingForPreimage
-	}
-	_, err = h.storeUserSignedTransactions(ctx, req.PaymentHash, preimageShare, req.UserSignedRefunds, preimageShare.OwnerIdentityPubkey, transfer, status)
-	if err != nil {
-		return nil, fmt.Errorf("unable to store user signed transactions: %v", err)
-	}
-
-	return preimageShare.PreimageShare, nil
-}
-
-// InitiatePreimageSwap initiates a preimage swap for the given payment hash.
-func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pb.InitiatePreimageSwapRequest) (*pb.InitiatePreimageSwapResponse, error) {
-	err := h.validateGetPreimageRequest(ctx, req.UserSignedRefunds, req.InvoiceAmount)
-	if err != nil {
-		return nil, fmt.Errorf("unable to validate request: %v", err)
-	}
-
-	var preimageShare *ent.PreimageShare
-	if req.Reason == pb.InitiatePreimageSwapRequest_REASON_RECEIVE {
-		db := ent.GetDbFromContext(ctx)
-		preimageShare, err = db.PreimageShare.Query().Where(preimageshare.PaymentHash(req.PaymentHash)).First(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("unable to get preimage share: %v", err)
+		if !bytes.Equal(preimageShare.OwnerIdentityPubkey, req.ReceiverIdentityPublicKey) {
+			return nil, fmt.Errorf("preimage share owner identity public key mismatch")
 		}
 	}
 
@@ -314,7 +282,55 @@ func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pb.Ini
 	} else {
 		status = schema.PreimageRequestStatusWaitingForPreimage
 	}
-	preimageRequest, err := h.storeUserSignedTransactions(ctx, req.PaymentHash, preimageShare, req.UserSignedRefunds, preimageShare.OwnerIdentityPubkey, transfer, status)
+	_, err = h.storeUserSignedTransactions(ctx, req.PaymentHash, preimageShare, req.UserSignedRefunds, transfer, status)
+	if err != nil {
+		return nil, fmt.Errorf("unable to store user signed transactions: %v", err)
+	}
+
+	if preimageShare != nil {
+		return preimageShare.PreimageShare, nil
+	}
+
+	return nil, nil
+}
+
+// InitiatePreimageSwap initiates a preimage swap for the given payment hash.
+func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pb.InitiatePreimageSwapRequest) (*pb.InitiatePreimageSwapResponse, error) {
+	err := h.validateGetPreimageRequest(ctx, req.UserSignedRefunds, req.InvoiceAmount)
+	if err != nil {
+		return nil, fmt.Errorf("unable to validate request: %v", err)
+	}
+
+	var preimageShare *ent.PreimageShare
+	if req.Reason == pb.InitiatePreimageSwapRequest_REASON_RECEIVE {
+		db := ent.GetDbFromContext(ctx)
+		preimageShare, err = db.PreimageShare.Query().Where(preimageshare.PaymentHash(req.PaymentHash)).First(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("unable to get preimage share: %v", err)
+		}
+		if !bytes.Equal(preimageShare.OwnerIdentityPubkey, req.ReceiverIdentityPublicKey) {
+			return nil, fmt.Errorf("preimage share owner identity public key mismatch")
+		}
+	}
+
+	leafRefundMap := make(map[string][]byte)
+	for _, transaction := range req.UserSignedRefunds {
+		leafRefundMap[transaction.NodeId] = transaction.RefundTx
+	}
+
+	transferHandler := NewTransferHandler(h.onchainHelper, h.config)
+	transfer, _, err := transferHandler.createTransfer(ctx, req.Transfer.TransferId, schema.TransferTypePreimageSwap, req.Transfer.ExpiryTime.AsTime(), req.Transfer.OwnerIdentityPublicKey, req.Transfer.ReceiverIdentityPublicKey, leafRefundMap)
+	if err != nil {
+		return nil, fmt.Errorf("unable to create transfer: %v", err)
+	}
+
+	var status schema.PreimageRequestStatus
+	if req.Reason == pb.InitiatePreimageSwapRequest_REASON_RECEIVE {
+		status = schema.PreimageRequestStatusPreimageShared
+	} else {
+		status = schema.PreimageRequestStatusWaitingForPreimage
+	}
+	preimageRequest, err := h.storeUserSignedTransactions(ctx, req.PaymentHash, preimageShare, req.UserSignedRefunds, transfer, status)
 	if err != nil {
 		return nil, fmt.Errorf("unable to store user signed transactions: %v", err)
 	}
@@ -411,12 +427,27 @@ func (h *LightningHandler) QueryUserSignedRefunds(ctx context.Context, req *pb.Q
 
 	protos := make([]*pb.UserSignedRefund, len(userSignedRefunds))
 	for i, userSignedRefund := range userSignedRefunds {
-		message := &pb.UserSignedRefund{}
-		err := proto.Unmarshal(userSignedRefund.UserSignature, message)
+		userSigningCommitment := &pbcommon.SigningCommitment{}
+		err := proto.Unmarshal(userSignedRefund.SigningCommitments, userSigningCommitment)
 		if err != nil {
 			return nil, fmt.Errorf("unable to unmarshal user signed refund: %v", err)
 		}
-		protos[i] = message
+		signingCommitments := &pb.SigningCommitments{}
+		err = proto.Unmarshal(userSignedRefund.SigningCommitments, signingCommitments)
+		if err != nil {
+			return nil, fmt.Errorf("unable to unmarshal user signed refund: %v", err)
+		}
+		treeNode, err := userSignedRefund.QueryTreeNode().Only(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("unable to get tree node: %v", err)
+		}
+		protos[i] = &pb.UserSignedRefund{
+			NodeId:                  treeNode.ID.String(),
+			RefundTx:                userSignedRefund.Transaction,
+			UserSignature:           userSignedRefund.UserSignature,
+			SigningCommitments:      signingCommitments,
+			UserSignatureCommitment: userSigningCommitment,
+		}
 	}
 	return &pb.QueryUserSignedRefundsResponse{UserSignedRefunds: protos}, nil
 }

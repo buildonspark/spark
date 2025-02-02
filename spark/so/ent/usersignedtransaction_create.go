@@ -69,6 +69,12 @@ func (ustc *UserSignedTransactionCreate) SetSigningCommitments(b []byte) *UserSi
 	return ustc
 }
 
+// SetUserSignatureCommitment sets the "user_signature_commitment" field.
+func (ustc *UserSignedTransactionCreate) SetUserSignatureCommitment(b []byte) *UserSignedTransactionCreate {
+	ustc.mutation.SetUserSignatureCommitment(b)
+	return ustc
+}
+
 // SetID sets the "id" field.
 func (ustc *UserSignedTransactionCreate) SetID(u uuid.UUID) *UserSignedTransactionCreate {
 	ustc.mutation.SetID(u)
@@ -186,6 +192,14 @@ func (ustc *UserSignedTransactionCreate) check() error {
 			return &ValidationError{Name: "signing_commitments", err: fmt.Errorf(`ent: validator failed for field "UserSignedTransaction.signing_commitments": %w`, err)}
 		}
 	}
+	if _, ok := ustc.mutation.UserSignatureCommitment(); !ok {
+		return &ValidationError{Name: "user_signature_commitment", err: errors.New(`ent: missing required field "UserSignedTransaction.user_signature_commitment"`)}
+	}
+	if v, ok := ustc.mutation.UserSignatureCommitment(); ok {
+		if err := usersignedtransaction.UserSignatureCommitmentValidator(v); err != nil {
+			return &ValidationError{Name: "user_signature_commitment", err: fmt.Errorf(`ent: validator failed for field "UserSignedTransaction.user_signature_commitment": %w`, err)}
+		}
+	}
 	if len(ustc.mutation.TreeNodeIDs()) == 0 {
 		return &ValidationError{Name: "tree_node", err: errors.New(`ent: missing required edge "UserSignedTransaction.tree_node"`)}
 	}
@@ -246,6 +260,10 @@ func (ustc *UserSignedTransactionCreate) createSpec() (*UserSignedTransaction, *
 	if value, ok := ustc.mutation.SigningCommitments(); ok {
 		_spec.SetField(usersignedtransaction.FieldSigningCommitments, field.TypeBytes, value)
 		_node.SigningCommitments = value
+	}
+	if value, ok := ustc.mutation.UserSignatureCommitment(); ok {
+		_spec.SetField(usersignedtransaction.FieldUserSignatureCommitment, field.TypeBytes, value)
+		_node.UserSignatureCommitment = value
 	}
 	if nodes := ustc.mutation.TreeNodeIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{

@@ -37,8 +37,6 @@ const (
 	FieldVout = "vout"
 	// FieldRawRefundTx holds the string denoting the raw_refund_tx field in the database.
 	FieldRawRefundTx = "raw_refund_tx"
-	// FieldDestinationLockIdentityPubkey holds the string denoting the destination_lock_identity_pubkey field in the database.
-	FieldDestinationLockIdentityPubkey = "destination_lock_identity_pubkey"
 	// EdgeTree holds the string denoting the tree edge name in mutations.
 	EdgeTree = "tree"
 	// EdgeParent holds the string denoting the parent edge name in mutations.
@@ -86,7 +84,6 @@ var Columns = []string{
 	FieldRawTx,
 	FieldVout,
 	FieldRawRefundTx,
-	FieldDestinationLockIdentityPubkey,
 }
 
 // ForeignKeys holds the SQL foreign-keys that are owned by the "tree_nodes"

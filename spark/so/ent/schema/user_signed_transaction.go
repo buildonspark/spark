@@ -29,6 +29,7 @@ func (UserSignedTransaction) Fields() []ent.Field {
 		field.Bytes("transaction").NotEmpty().Immutable(),
 		field.Bytes("user_signature").NotEmpty().Immutable(),
 		field.Bytes("signing_commitments").NotEmpty().Immutable(),
+		field.Bytes("user_signature_commitment").NotEmpty().Immutable(),
 	}
 }
 

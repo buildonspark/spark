@@ -287,7 +287,6 @@ var (
 		{Name: "raw_tx", Type: field.TypeBytes},
 		{Name: "vout", Type: field.TypeUint16},
 		{Name: "raw_refund_tx", Type: field.TypeBytes, Nullable: true},
-		{Name: "destination_lock_identity_pubkey", Type: field.TypeBytes, Nullable: true},
 		{Name: "tree_node_tree", Type: field.TypeUUID},
 		{Name: "tree_node_parent", Type: field.TypeUUID, Nullable: true},
 		{Name: "tree_node_signing_keyshare", Type: field.TypeUUID},
@@ -300,19 +299,19 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "tree_nodes_trees_tree",
-				Columns:    []*schema.Column{TreeNodesColumns[12]},
+				Columns:    []*schema.Column{TreeNodesColumns[11]},
 				RefColumns: []*schema.Column{TreesColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "tree_nodes_tree_nodes_parent",
-				Columns:    []*schema.Column{TreeNodesColumns[13]},
+				Columns:    []*schema.Column{TreeNodesColumns[12]},
 				RefColumns: []*schema.Column{TreeNodesColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "tree_nodes_signing_keyshares_signing_keyshare",
-				Columns:    []*schema.Column{TreeNodesColumns[14]},
+				Columns:    []*schema.Column{TreeNodesColumns[13]},
 				RefColumns: []*schema.Column{SigningKeysharesColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -321,12 +320,12 @@ var (
 			{
 				Name:    "treenode_tree_node_parent",
 				Unique:  false,
-				Columns: []*schema.Column{TreeNodesColumns[13]},
+				Columns: []*schema.Column{TreeNodesColumns[12]},
 			},
 			{
 				Name:    "treenode_tree_node_tree",
 				Unique:  false,
-				Columns: []*schema.Column{TreeNodesColumns[12]},
+				Columns: []*schema.Column{TreeNodesColumns[11]},
 			},
 			{
 				Name:    "treenode_owner_identity_pubkey",
@@ -343,6 +342,7 @@ var (
 		{Name: "transaction", Type: field.TypeBytes},
 		{Name: "user_signature", Type: field.TypeBytes},
 		{Name: "signing_commitments", Type: field.TypeBytes},
+		{Name: "user_signature_commitment", Type: field.TypeBytes},
 		{Name: "user_signed_transaction_tree_node", Type: field.TypeUUID},
 		{Name: "user_signed_transaction_preimage_request", Type: field.TypeUUID},
 	}
@@ -354,13 +354,13 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "user_signed_transactions_tree_nodes_tree_node",
-				Columns:    []*schema.Column{UserSignedTransactionsColumns[6]},
+				Columns:    []*schema.Column{UserSignedTransactionsColumns[7]},
 				RefColumns: []*schema.Column{TreeNodesColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "user_signed_transactions_preimage_requests_preimage_request",
-				Columns:    []*schema.Column{UserSignedTransactionsColumns[7]},
+				Columns:    []*schema.Column{UserSignedTransactionsColumns[8]},
 				RefColumns: []*schema.Column{PreimageRequestsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},

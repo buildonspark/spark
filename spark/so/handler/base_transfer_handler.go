@@ -222,7 +222,7 @@ func validateCooperativeExitLeaves(transfer *ent.Transfer, leaves []*ent.TreeNod
 		if err != nil {
 			return fmt.Errorf("unable to validate refund tx for leaf %s: %v", leaf.ID, err)
 		}
-		err = leafAvailableToTransfer(leaf, transfer.SenderIdentityPubkey, transfer.ReceiverIdentityPubkey)
+		err = leafAvailableToTransfer(leaf, transfer)
 		if err != nil {
 			return fmt.Errorf("unable to validate leaf %s: %v", leaf.ID, err)
 		}
@@ -237,7 +237,7 @@ func validateTransferLeaves(transfer *ent.Transfer, leaves []*ent.TreeNode, leaf
 		if err != nil {
 			return fmt.Errorf("unable to validate refund tx for leaf %s: %v", leaf.ID, err)
 		}
-		err = leafAvailableToTransfer(leaf, transfer.SenderIdentityPubkey, transfer.ReceiverIdentityPubkey)
+		err = leafAvailableToTransfer(leaf, transfer)
 		if err != nil {
 			return fmt.Errorf("unable to validate leaf %s: %v", leaf.ID, err)
 		}
@@ -245,12 +245,11 @@ func validateTransferLeaves(transfer *ent.Transfer, leaves []*ent.TreeNode, leaf
 	return nil
 }
 
-func leafAvailableToTransfer(leaf *ent.TreeNode, senderIdentityPublicKey []byte, receiverIdentityPubkey []byte) error {
-	if leaf.Status != schema.TreeNodeStatusAvailable &&
-		(leaf.Status != schema.TreeNodeStatusDestinationLock || !bytes.Equal(leaf.DestinationLockIdentityPubkey, receiverIdentityPubkey)) {
+func leafAvailableToTransfer(leaf *ent.TreeNode, transfer *ent.Transfer) error {
+	if leaf.Status != schema.TreeNodeStatusTransferLocked {
 		return fmt.Errorf("leaf %s is not available to transfer, status: %s", leaf.ID.String(), leaf.Status)
 	}
-	if !bytes.Equal(leaf.OwnerIdentityPubkey, senderIdentityPublicKey) {
+	if !bytes.Equal(leaf.OwnerIdentityPubkey, transfer.SenderIdentityPubkey) {
 		return fmt.Errorf("leaf %s is not owned by sender", leaf.ID.String())
 	}
 	return nil
