@@ -395,3 +395,28 @@ func (h *LightningHandler) UpdatePreimageRequest(ctx context.Context, req *pbint
 	}
 	return nil
 }
+
+// QueryUserSignedRefunds queries the user signed refunds for the given payment hash.
+func (h *LightningHandler) QueryUserSignedRefunds(ctx context.Context, req *pb.QueryUserSignedRefundsRequest) (*pb.QueryUserSignedRefundsResponse, error) {
+	db := ent.GetDbFromContext(ctx)
+	preimageRequest, err := db.PreimageRequest.Query().Where(preimagerequest.PaymentHashEQ(req.PaymentHash)).First(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get preimage request: %v", err)
+	}
+
+	userSignedRefunds, err := preimageRequest.QueryTransactions().All(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get user signed transactions: %v", err)
+	}
+
+	protos := make([]*pb.UserSignedRefund, len(userSignedRefunds))
+	for i, userSignedRefund := range userSignedRefunds {
+		message := &pb.UserSignedRefund{}
+		err := proto.Unmarshal(userSignedRefund.UserSignature, message)
+		if err != nil {
+			return nil, fmt.Errorf("unable to unmarshal user signed refund: %v", err)
+		}
+		protos[i] = message
+	}
+	return &pb.QueryUserSignedRefundsResponse{UserSignedRefunds: protos}, nil
+}

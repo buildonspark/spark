@@ -40,6 +40,7 @@ const (
 	SparkService_GenerateRevocationPublicKey_FullMethodName = "/spark.SparkService/generate_revocation_public_key"
 	SparkService_StartTokenTransaction_FullMethodName       = "/spark.SparkService/start_token_transaction"
 	SparkService_FinalizeTokenTransaction_FullMethodName    = "/spark.SparkService/finalize_token_transaction"
+	SparkService_QueryUserSignedRefunds_FullMethodName      = "/spark.SparkService/query_user_signed_refunds"
 )
 
 // SparkServiceClient is the client API for SparkService service.
@@ -66,6 +67,7 @@ type SparkServiceClient interface {
 	GenerateRevocationPublicKey(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GenerateRevocationPublicKeyResponse, error)
 	StartTokenTransaction(ctx context.Context, in *StartTokenTransactionRequest, opts ...grpc.CallOption) (*StartTokenTransactionResponse, error)
 	FinalizeTokenTransaction(ctx context.Context, in *FinalizeTokenTransactionRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	QueryUserSignedRefunds(ctx context.Context, in *QueryUserSignedRefundsRequest, opts ...grpc.CallOption) (*QueryUserSignedRefundsResponse, error)
 }
 
 type sparkServiceClient struct {
@@ -276,6 +278,16 @@ func (c *sparkServiceClient) FinalizeTokenTransaction(ctx context.Context, in *F
 	return out, nil
 }
 
+func (c *sparkServiceClient) QueryUserSignedRefunds(ctx context.Context, in *QueryUserSignedRefundsRequest, opts ...grpc.CallOption) (*QueryUserSignedRefundsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(QueryUserSignedRefundsResponse)
+	err := c.cc.Invoke(ctx, SparkService_QueryUserSignedRefunds_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SparkServiceServer is the server API for SparkService service.
 // All implementations must embed UnimplementedSparkServiceServer
 // for forward compatibility.
@@ -300,6 +312,7 @@ type SparkServiceServer interface {
 	GenerateRevocationPublicKey(context.Context, *emptypb.Empty) (*GenerateRevocationPublicKeyResponse, error)
 	StartTokenTransaction(context.Context, *StartTokenTransactionRequest) (*StartTokenTransactionResponse, error)
 	FinalizeTokenTransaction(context.Context, *FinalizeTokenTransactionRequest) (*emptypb.Empty, error)
+	QueryUserSignedRefunds(context.Context, *QueryUserSignedRefundsRequest) (*QueryUserSignedRefundsResponse, error)
 	mustEmbedUnimplementedSparkServiceServer()
 }
 
@@ -369,6 +382,9 @@ func (UnimplementedSparkServiceServer) StartTokenTransaction(context.Context, *S
 }
 func (UnimplementedSparkServiceServer) FinalizeTokenTransaction(context.Context, *FinalizeTokenTransactionRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method FinalizeTokenTransaction not implemented")
+}
+func (UnimplementedSparkServiceServer) QueryUserSignedRefunds(context.Context, *QueryUserSignedRefundsRequest) (*QueryUserSignedRefundsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method QueryUserSignedRefunds not implemented")
 }
 func (UnimplementedSparkServiceServer) mustEmbedUnimplementedSparkServiceServer() {}
 func (UnimplementedSparkServiceServer) testEmbeddedByValue()                      {}
@@ -751,6 +767,24 @@ func _SparkService_FinalizeTokenTransaction_Handler(srv interface{}, ctx context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SparkService_QueryUserSignedRefunds_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QueryUserSignedRefundsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkServiceServer).QueryUserSignedRefunds(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkService_QueryUserSignedRefunds_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkServiceServer).QueryUserSignedRefunds(ctx, req.(*QueryUserSignedRefundsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // SparkService_ServiceDesc is the grpc.ServiceDesc for SparkService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -837,6 +871,10 @@ var SparkService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "finalize_token_transaction",
 			Handler:    _SparkService_FinalizeTokenTransaction_Handler,
+		},
+		{
+			MethodName: "query_user_signed_refunds",
+			Handler:    _SparkService_QueryUserSignedRefunds_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

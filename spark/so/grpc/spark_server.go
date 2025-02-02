@@ -135,3 +135,8 @@ func (s *SparkServer) CreateTree(ctx context.Context, req *pb.CreateTreeRequest)
 func (s *SparkServer) GetSigningOperatorList(ctx context.Context, req *emptypb.Empty) (*pb.GetSigningOperatorListResponse, error) {
 	return &pb.GetSigningOperatorListResponse{SigningOperators: s.config.GetSigningOperatorList()}, nil
 }
+
+func (s *SparkServer) QueryUserSignedRefunds(ctx context.Context, req *pb.QueryUserSignedRefundsRequest) (*pb.QueryUserSignedRefundsResponse, error) {
+	lightningHandler := handler.NewLightningHandler(s.config, s.onchainHelper)
+	return wrapWithGRPCError(lightningHandler.QueryUserSignedRefunds(ctx, req))
+}

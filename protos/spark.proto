@@ -30,6 +30,7 @@ service SparkService {
     rpc generate_revocation_public_key(google.protobuf.Empty) returns (GenerateRevocationPublicKeyResponse) {}
     rpc start_token_transaction(StartTokenTransactionRequest) returns (StartTokenTransactionResponse) {}
     rpc finalize_token_transaction(FinalizeTokenTransactionRequest) returns (google.protobuf.Empty) {}
+    rpc query_user_signed_refunds(QueryUserSignedRefundsRequest) returns (QueryUserSignedRefundsResponse) {}
 }
 
 message DepositAddressProof {
@@ -496,4 +497,12 @@ message SigningOperatorInfo {
 
 message GetSigningOperatorListResponse {
     map<string, SigningOperatorInfo> signing_operators = 1;
+}
+
+message QueryUserSignedRefundsRequest {
+    bytes payment_hash = 1;
+}
+
+message QueryUserSignedRefundsResponse {
+    repeated UserSignedRefund user_signed_refunds = 1;
 }

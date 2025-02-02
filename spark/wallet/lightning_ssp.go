@@ -1,30 +1,17 @@
 package wallet
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 
-	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/common"
-	pbcommon "github.com/lightsparkdev/spark-go/proto/common"
-	pbfrost "github.com/lightsparkdev/spark-go/proto/frost"
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
-	"github.com/lightsparkdev/spark-go/so/objects"
 )
 
-// SwapNodesForLightning swaps a node for a preimage of a Lightning invoice.
-func SwapNodesForPreimage(
-	ctx context.Context,
-	config *Config,
-	leaves []LeafKeyTweak,
-	receiverIdentityPubkey []byte,
-	paymentHash []byte,
-) ([]byte, error) {
-	// SSP asks for signing commitment
+func QueryUserSignedRefunds(ctx context.Context, config *Config, paymentHash []byte) ([]*pb.UserSignedRefund, error) {
 	conn, err := common.NewGRPCConnection(config.CoodinatorAddress())
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("unable to connect to coordinator: %v", err)
 	}
 	defer conn.Close()
 
@@ -33,141 +20,25 @@ func SwapNodesForPreimage(
 		return nil, fmt.Errorf("failed to authenticate with server: %v", err)
 	}
 	tmpCtx := ContextWithToken(ctx, token)
-
 	client := pb.NewSparkServiceClient(conn)
-	nodeIDs := make([]string, len(leaves))
-	for i, leaf := range leaves {
-		nodeIDs[i] = leaf.Leaf.Id
-	}
-	signingCommitments, err := client.GetSigningCommitments(tmpCtx, &pb.GetSigningCommitmentsRequest{
-		NodeIds: nodeIDs,
-	})
-	if err != nil {
-		return nil, err
+
+	request := &pb.QueryUserSignedRefundsRequest{
+		PaymentHash: paymentHash,
 	}
 
-	// SSP signs partial refund tx to receiver
-	signerConn, err := common.NewGRPCConnection(config.FrostSignerAddress)
+	response, err := client.QueryUserSignedRefunds(tmpCtx, request)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to query user signed refunds: %v", err)
 	}
-	defer signerConn.Close()
-
-	signingJobs, refundTxs, userCommitments, err := prepareFrostSigningJobs(config, leaves, signingCommitments.SigningCommitments, receiverIdentityPubkey)
-	if err != nil {
-		return nil, err
-	}
-
-	signerClient := pbfrost.NewFrostServiceClient(signerConn)
-	signingResults, err := signerClient.SignFrost(ctx, &pbfrost.SignFrostRequest{
-		SigningJobs: signingJobs,
-		Role:        pbfrost.SigningRole_USER,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	userSignedRefunds, err := prepareUserSignedRefunds(
-		leaves,
-		refundTxs,
-		signingResults.Results,
-		userCommitments,
-		signingCommitments.SigningCommitments,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	// SSP calls SO to get the preimage
-	transferID := uuid.New().String()
-	response, err := client.InitiatePreimageSwap(tmpCtx, &pb.InitiatePreimageSwapRequest{
-		PaymentHash:       paymentHash,
-		UserSignedRefunds: userSignedRefunds,
-		Reason:            pb.InitiatePreimageSwapRequest_REASON_RECEIVE,
-		Transfer: &pb.StartSendTransferRequest{
-			TransferId:                transferID,
-			OwnerIdentityPublicKey:    config.IdentityPublicKey(),
-			ReceiverIdentityPublicKey: receiverIdentityPubkey,
-		},
-	})
-	if err != nil {
-		return nil, err
-	}
-	return response.Preimage, nil
+	return response.UserSignedRefunds, nil
 }
 
-func prepareFrostSigningJobs(
-	config *Config,
-	leaves []LeafKeyTweak,
-	signingCommitments []*pb.RequestedSigningCommitments,
-	receiverIdentityPubkey []byte,
-) ([]*pbfrost.FrostSigningJob, [][]byte, []*objects.SigningCommitment, error) {
-	signingJobs := []*pbfrost.FrostSigningJob{}
-	refundTxs := make([][]byte, len(leaves))
-	userCommitments := make([]*objects.SigningCommitment, len(leaves))
-	for i, leaf := range leaves {
-		refundTx, sighash, err := createRefundTx(config, leaf.Leaf, receiverIdentityPubkey)
-		if err != nil {
-			return nil, nil, nil, err
-		}
-		var refundBuf bytes.Buffer
-		err = refundTx.Serialize(&refundBuf)
-		if err != nil {
-			return nil, nil, nil, err
-		}
-		refundTxs[i] = refundBuf.Bytes()
-
-		signingNonce, err := objects.RandomSigningNonce()
-		if err != nil {
-			return nil, nil, nil, err
-		}
-		signingNonceProto, err := signingNonce.MarshalProto()
-		if err != nil {
-			return nil, nil, nil, err
-		}
-		userCommitmentProto, err := signingNonce.SigningCommitment().MarshalProto()
-		if err != nil {
-			return nil, nil, nil, err
-		}
-		userCommitments[i] = signingNonce.SigningCommitment()
-
-		userKeyPackage := CreateUserKeyPackage(leaf.SigningPrivKey)
-
-		signingJobs = append(signingJobs, &pbfrost.FrostSigningJob{
-			JobId:           leaf.Leaf.Id,
-			Message:         sighash,
-			KeyPackage:      userKeyPackage,
-			VerifyingKey:    leaf.Leaf.VerifyingPublicKey,
-			Nonce:           signingNonceProto,
-			Commitments:     signingCommitments[i].SigningNonceCommitments,
-			UserCommitments: userCommitmentProto,
-		})
+func ValidateUserSignedRefund(userSignedRefund *pb.UserSignedRefund) (int64, error) {
+	// TODO: Validate the signed refund from user's public key
+	refundTx, err := common.TxFromRawTxBytes(userSignedRefund.RefundTx)
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse refund transaction: %v", err)
 	}
-	return signingJobs, refundTxs, userCommitments, nil
-}
 
-func prepareUserSignedRefunds(
-	leaves []LeafKeyTweak,
-	refundTxs [][]byte,
-	signingResults map[string]*pbcommon.SigningResult,
-	userCommitments []*objects.SigningCommitment,
-	signingCommitments []*pb.RequestedSigningCommitments,
-) ([]*pb.UserSignedRefund, error) {
-	userSignedRefunds := []*pb.UserSignedRefund{}
-	for i, leaf := range leaves {
-		userCommitmentProto, err := userCommitments[i].MarshalProto()
-		if err != nil {
-			return nil, err
-		}
-		userSignedRefunds = append(userSignedRefunds, &pb.UserSignedRefund{
-			NodeId:        leaf.Leaf.Id,
-			RefundTx:      refundTxs[i],
-			UserSignature: signingResults[leaf.Leaf.Id].SignatureShare,
-			SigningCommitments: &pb.SigningCommitments{
-				SigningCommitments: signingCommitments[i].SigningNonceCommitments,
-			},
-			UserSignatureCommitment: userCommitmentProto,
-		})
-	}
-	return userSignedRefunds, nil
+	return refundTx.TxOut[0].Value, nil
 }
