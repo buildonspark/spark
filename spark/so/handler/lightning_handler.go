@@ -354,9 +354,14 @@ func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pb.Ini
 		return nil, fmt.Errorf("unable to execute task with all operators: %v", err)
 	}
 
+	transferProto, err := transfer.MarshalProto(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to marshal transfer: %v", err)
+	}
+
 	// Recover secret if necessary
 	if req.Reason == pb.InitiatePreimageSwapRequest_REASON_SEND {
-		return &pb.InitiatePreimageSwapResponse{}, nil
+		return &pb.InitiatePreimageSwapResponse{Transfer: transferProto}, nil
 	}
 
 	shares := make([]*secretsharing.SecretShare, 0)
@@ -392,7 +397,7 @@ func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pb.Ini
 		return nil, fmt.Errorf("unable to update preimage request status: %v", err)
 	}
 
-	return &pb.InitiatePreimageSwapResponse{Preimage: secret.Bytes()}, nil
+	return &pb.InitiatePreimageSwapResponse{Preimage: secret.Bytes(), Transfer: transferProto}, nil
 }
 
 // UpdatePreimageRequest updates the preimage request.

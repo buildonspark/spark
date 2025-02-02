@@ -1,6 +1,7 @@
 package grpctest
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -9,6 +10,7 @@ import (
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lightsparkdev/spark-go/common"
 	pbmock "github.com/lightsparkdev/spark-go/proto/mock"
+	"github.com/lightsparkdev/spark-go/proto/spark"
 	testutil "github.com/lightsparkdev/spark-go/test_util"
 	"github.com/lightsparkdev/spark-go/wallet"
 	"github.com/stretchr/testify/assert"
@@ -114,7 +116,7 @@ func TestReceiveLightningPayment(t *testing.T) {
 		NewSigningPrivKey: newLeafPrivKey.Serialize(),
 	})
 
-	receivedPreimage, err := wallet.SwapNodesForPreimage(
+	response, err := wallet.SwapNodesForPreimage(
 		context.Background(),
 		sspConfig,
 		leaves,
@@ -126,7 +128,62 @@ func TestReceiveLightningPayment(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.Equal(t, receivedPreimage, preimage)
+	assert.Equal(t, response.Preimage, preimage)
+	senderTransfer := response.Transfer
+
+	transfer, err := wallet.SendTransferTweakKey(context.Background(), sspConfig, response.Transfer, leaves, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, transfer.Status, spark.TransferStatus_TRANSFER_STATUS_RECEIVER_KEY_TWEAKED)
+
+	receiverToken, err := wallet.AuthenticateWithServer(context.Background(), userConfig)
+	if err != nil {
+		t.Fatalf("failed to authenticate receiver: %v", err)
+	}
+	receiverCtx := wallet.ContextWithToken(context.Background(), receiverToken)
+	pendingTransfer, err := wallet.QueryPendingTransfers(receiverCtx, userConfig)
+	if err != nil {
+		t.Fatalf("failed to query pending transfers: %v", err)
+	}
+	if len(pendingTransfer.Transfers) != 1 {
+		t.Fatalf("expected 1 pending transfer, got %d", len(pendingTransfer.Transfers))
+	}
+	receiverTransfer := pendingTransfer.Transfers[0]
+	if receiverTransfer.Id != senderTransfer.Id {
+		t.Fatalf("expected transfer id %s, got %s", senderTransfer.Id, receiverTransfer.Id)
+	}
+
+	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(context.Background(), userConfig, receiverTransfer)
+	if err != nil {
+		t.Fatalf("unable to verify pending transfer: %v", err)
+	}
+	if len(*leafPrivKeyMap) != 1 {
+		t.Fatalf("Expected 1 leaf to transfer, got %d", len(*leafPrivKeyMap))
+	}
+	if !bytes.Equal((*leafPrivKeyMap)[nodeToSend.Id], newLeafPrivKey.Serialize()) {
+		t.Fatalf("wrong leaf signing private key")
+	}
+
+	finalLeafPrivKey, err := secp256k1.GeneratePrivateKey()
+	if err != nil {
+		t.Fatalf("failed to create new node signing private key: %v", err)
+	}
+	claimingNode := wallet.LeafKeyTweak{
+		Leaf:              receiverTransfer.Leaves[0].Leaf,
+		SigningPrivKey:    newLeafPrivKey.Serialize(),
+		NewSigningPrivKey: finalLeafPrivKey.Serialize(),
+	}
+	leavesToClaim := [1]wallet.LeafKeyTweak{claimingNode}
+	err = wallet.ClaimTransfer(
+		receiverCtx,
+		receiverTransfer,
+		userConfig,
+		leavesToClaim[:],
+	)
+	if err != nil {
+		t.Fatalf("failed to ClaimTransfer: %v", err)
+	}
 }
 
 func TestSendLightningPayment(t *testing.T) {

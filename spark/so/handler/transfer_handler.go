@@ -291,18 +291,20 @@ func (h *TransferHandler) completeSendLeaf(ctx context.Context, transfer *ent.Tr
 		return fmt.Errorf("unable to update refund tx with signature: %v", err)
 	}
 
-	// Verify signature
-	refundTx, err := common.TxFromRawTxBytes(refundTxBytes)
-	if err != nil {
-		return fmt.Errorf("unable to deserialize refund tx: %v", err)
-	}
-	leafNodeTx, err := common.TxFromRawTxBytes(leaf.RawTx)
-	if err != nil {
-		return fmt.Errorf("unable to deserialize leaf tx: %v", err)
-	}
-	err = common.VerifySignature(refundTx, 0, leafNodeTx.TxOut[leaf.Vout])
-	if err != nil {
-		return fmt.Errorf("unable to verify refund tx signature: %v", err)
+	if transfer.Type != schema.TransferTypePreimageSwap {
+		// Verify signature
+		refundTx, err := common.TxFromRawTxBytes(refundTxBytes)
+		if err != nil {
+			return fmt.Errorf("unable to deserialize refund tx: %v", err)
+		}
+		leafNodeTx, err := common.TxFromRawTxBytes(leaf.RawTx)
+		if err != nil {
+			return fmt.Errorf("unable to deserialize leaf tx: %v", err)
+		}
+		err = common.VerifySignature(refundTx, 0, leafNodeTx.TxOut[leaf.Vout])
+		if err != nil {
+			return fmt.Errorf("unable to verify refund tx signature: %v", err)
+		}
 	}
 
 	_, err = db.TransferLeaf.
@@ -359,7 +361,10 @@ func (h *TransferHandler) QueryPendingTransfers(ctx context.Context, req *pb.Que
 			enttransfer.And(
 				enttransfer.ReceiverIdentityPubkeyEQ(req.ReceiverIdentityPublicKey),
 				enttransfer.StatusEQ(schema.TransferStatusSenderKeyTweaked),
-				enttransfer.ExpiryTimeGT(time.Now()),
+				enttransfer.Or(
+					enttransfer.ExpiryTimeGT(time.Now()),
+					enttransfer.ExpiryTimeEQ(time.Unix(0, 0)),
+				),
 			),
 		).All(ctx)
 	if err != nil {
@@ -417,7 +422,7 @@ func (h *TransferHandler) ClaimTransferTweakKeys(ctx context.Context, req *pb.Cl
 		return fmt.Errorf("unable to find pending transfer %s: %v", req.TransferId, err)
 	}
 	// TODO (yun): Check with other SO if expires
-	if !bytes.Equal(transfer.ReceiverIdentityPubkey, req.OwnerIdentityPublicKey) || transfer.Status != schema.TransferStatusSenderKeyTweaked || (!transfer.ExpiryTime.IsZero() && transfer.ExpiryTime.Before(time.Now())) {
+	if !bytes.Equal(transfer.ReceiverIdentityPubkey, req.OwnerIdentityPublicKey) || transfer.Status != schema.TransferStatusSenderKeyTweaked || (transfer.ExpiryTime.Unix() != 0 && transfer.ExpiryTime.Before(time.Now())) {
 		return fmt.Errorf("transfer cannot be claimed %s", req.TransferId)
 	}
 

@@ -398,6 +398,7 @@ message InitiatePreimageSwapRequest {
 
 message InitiatePreimageSwapResponse {
     bytes preimage = 1;
+    Transfer transfer = 2;
 }
 
 message OutPoint {

@@ -22,7 +22,7 @@ func SwapNodesForPreimage(
 	paymentHash []byte,
 	invoiceString *string,
 	isInboundPayment bool,
-) ([]byte, error) {
+) (*pb.InitiatePreimageSwapResponse, error) {
 	// SSP asks for signing commitment
 	conn, err := common.NewGRPCConnection(config.CoodinatorAddress())
 	if err != nil {
@@ -109,7 +109,7 @@ func SwapNodesForPreimage(
 	if err != nil {
 		return nil, err
 	}
-	return response.Preimage, nil
+	return response, nil
 }
 
 func prepareFrostSigningJobs(
