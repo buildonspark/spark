@@ -33,6 +33,7 @@ const (
 	SparkService_GetSigningCommitments_FullMethodName       = "/spark.SparkService/get_signing_commitments"
 	SparkService_CooperativeExit_FullMethodName             = "/spark.SparkService/cooperative_exit"
 	SparkService_InitiatePreimageSwap_FullMethodName        = "/spark.SparkService/initiate_preimage_swap"
+	SparkService_ProvidePreimage_FullMethodName             = "/spark.SparkService/provide_preimage"
 	SparkService_LeafSwap_FullMethodName                    = "/spark.SparkService/leaf_swap"
 	SparkService_PrepareTreeAddress_FullMethodName          = "/spark.SparkService/prepare_tree_address"
 	SparkService_CreateTree_FullMethodName                  = "/spark.SparkService/create_tree"
@@ -60,6 +61,7 @@ type SparkServiceClient interface {
 	GetSigningCommitments(ctx context.Context, in *GetSigningCommitmentsRequest, opts ...grpc.CallOption) (*GetSigningCommitmentsResponse, error)
 	CooperativeExit(ctx context.Context, in *CooperativeExitRequest, opts ...grpc.CallOption) (*CooperativeExitResponse, error)
 	InitiatePreimageSwap(ctx context.Context, in *InitiatePreimageSwapRequest, opts ...grpc.CallOption) (*InitiatePreimageSwapResponse, error)
+	ProvidePreimage(ctx context.Context, in *ProvidePreimageRequest, opts ...grpc.CallOption) (*ProvidePreimageResponse, error)
 	LeafSwap(ctx context.Context, in *LeafSwapRequest, opts ...grpc.CallOption) (*LeafSwapResponse, error)
 	PrepareTreeAddress(ctx context.Context, in *PrepareTreeAddressRequest, opts ...grpc.CallOption) (*PrepareTreeAddressResponse, error)
 	CreateTree(ctx context.Context, in *CreateTreeRequest, opts ...grpc.CallOption) (*CreateTreeResponse, error)
@@ -208,6 +210,16 @@ func (c *sparkServiceClient) InitiatePreimageSwap(ctx context.Context, in *Initi
 	return out, nil
 }
 
+func (c *sparkServiceClient) ProvidePreimage(ctx context.Context, in *ProvidePreimageRequest, opts ...grpc.CallOption) (*ProvidePreimageResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ProvidePreimageResponse)
+	err := c.cc.Invoke(ctx, SparkService_ProvidePreimage_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *sparkServiceClient) LeafSwap(ctx context.Context, in *LeafSwapRequest, opts ...grpc.CallOption) (*LeafSwapResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(LeafSwapResponse)
@@ -305,6 +317,7 @@ type SparkServiceServer interface {
 	GetSigningCommitments(context.Context, *GetSigningCommitmentsRequest) (*GetSigningCommitmentsResponse, error)
 	CooperativeExit(context.Context, *CooperativeExitRequest) (*CooperativeExitResponse, error)
 	InitiatePreimageSwap(context.Context, *InitiatePreimageSwapRequest) (*InitiatePreimageSwapResponse, error)
+	ProvidePreimage(context.Context, *ProvidePreimageRequest) (*ProvidePreimageResponse, error)
 	LeafSwap(context.Context, *LeafSwapRequest) (*LeafSwapResponse, error)
 	PrepareTreeAddress(context.Context, *PrepareTreeAddressRequest) (*PrepareTreeAddressResponse, error)
 	CreateTree(context.Context, *CreateTreeRequest) (*CreateTreeResponse, error)
@@ -361,6 +374,9 @@ func (UnimplementedSparkServiceServer) CooperativeExit(context.Context, *Coopera
 }
 func (UnimplementedSparkServiceServer) InitiatePreimageSwap(context.Context, *InitiatePreimageSwapRequest) (*InitiatePreimageSwapResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method InitiatePreimageSwap not implemented")
+}
+func (UnimplementedSparkServiceServer) ProvidePreimage(context.Context, *ProvidePreimageRequest) (*ProvidePreimageResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ProvidePreimage not implemented")
 }
 func (UnimplementedSparkServiceServer) LeafSwap(context.Context, *LeafSwapRequest) (*LeafSwapResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method LeafSwap not implemented")
@@ -641,6 +657,24 @@ func _SparkService_InitiatePreimageSwap_Handler(srv interface{}, ctx context.Con
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SparkService_ProvidePreimage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ProvidePreimageRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkServiceServer).ProvidePreimage(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkService_ProvidePreimage_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkServiceServer).ProvidePreimage(ctx, req.(*ProvidePreimageRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _SparkService_LeafSwap_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(LeafSwapRequest)
 	if err := dec(in); err != nil {
@@ -843,6 +877,10 @@ var SparkService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "initiate_preimage_swap",
 			Handler:    _SparkService_InitiatePreimageSwap_Handler,
+		},
+		{
+			MethodName: "provide_preimage",
+			Handler:    _SparkService_ProvidePreimage_Handler,
 		},
 		{
 			MethodName: "leaf_swap",

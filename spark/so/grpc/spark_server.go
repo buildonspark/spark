@@ -140,3 +140,8 @@ func (s *SparkServer) QueryUserSignedRefunds(ctx context.Context, req *pb.QueryU
 	lightningHandler := handler.NewLightningHandler(s.config, s.onchainHelper)
 	return wrapWithGRPCError(lightningHandler.QueryUserSignedRefunds(ctx, req))
 }
+
+func (s *SparkServer) ProvidePreimage(ctx context.Context, req *pb.ProvidePreimageRequest) (*pb.ProvidePreimageResponse, error) {
+	lightningHandler := handler.NewLightningHandler(s.config, s.onchainHelper)
+	return wrapWithGRPCError(lightningHandler.ProvidePreimage(ctx, req))
+}

@@ -20,12 +20,14 @@ import (
 	"github.com/lightsparkdev/spark-go/so/authz"
 	"github.com/lightsparkdev/spark-go/so/ent"
 	"github.com/lightsparkdev/spark-go/so/ent/cooperativeexit"
+	"github.com/lightsparkdev/spark-go/so/ent/preimagerequest"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
 	enttransfer "github.com/lightsparkdev/spark-go/so/ent/transfer"
 	enttransferleaf "github.com/lightsparkdev/spark-go/so/ent/transferleaf"
 	enttreenode "github.com/lightsparkdev/spark-go/so/ent/treenode"
 	"github.com/lightsparkdev/spark-go/so/helper"
 	"github.com/lightsparkdev/spark-go/so/objects"
+	"google.golang.org/protobuf/proto"
 )
 
 // TransferHandler is a helper struct to handle leaves transfer request.
@@ -221,15 +223,29 @@ func (h *TransferHandler) CompleteSendTransfer(ctx context.Context, req *pb.Comp
 		return nil, fmt.Errorf("send transfer cannot be completed %s", req.TransferId)
 	}
 
+	shouldTweakKey := true
+	if transfer.Type == schema.TransferTypePreimageSwap {
+		preimageRequest, err := db.PreimageRequest.Query().Where(preimagerequest.HasTransfersWith(enttransfer.ID(transfer.ID))).Only(ctx)
+		if err != nil || preimageRequest == nil {
+			return nil, fmt.Errorf("unable to find preimage request for transfer %s: %v", transfer.ID.String(), err)
+		}
+		shouldTweakKey = preimageRequest.Status == schema.PreimageRequestStatusPreimageShared
+	}
+
 	for _, leaf := range req.LeavesToSend {
-		err = h.completeSendLeaf(ctx, transfer, leaf)
+		log.Printf("complete send leaf %s shouldTweakKey: %v", leaf.LeafId, shouldTweakKey)
+		err = h.completeSendLeaf(ctx, transfer, leaf, shouldTweakKey)
 		if err != nil {
 			return nil, fmt.Errorf("unable to complete send leaf transfer for leaf %s: %v", leaf.LeafId, err)
 		}
 	}
 
 	// Update transfer status
-	transfer, err = transfer.Update().SetStatus(schema.TransferStatusSenderKeyTweaked).Save(ctx)
+	statusToSet := schema.TransferStatusSenderKeyTweaked
+	if !shouldTweakKey {
+		statusToSet = schema.TransferStatusSenderKeyTweakPending
+	}
+	transfer, err = transfer.Update().SetStatus(statusToSet).Save(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to update transfer status %s: %v", transfer.ID.String(), err)
 	}
@@ -240,7 +256,7 @@ func (h *TransferHandler) CompleteSendTransfer(ctx context.Context, req *pb.Comp
 	return &pb.CompleteSendTransferResponse{Transfer: transferProto}, nil
 }
 
-func (h *TransferHandler) completeSendLeaf(ctx context.Context, transfer *ent.Transfer, req *pb.SendLeafKeyTweak) error {
+func (h *TransferHandler) completeSendLeaf(ctx context.Context, transfer *ent.Transfer, req *pb.SendLeafKeyTweak, shouldTweakKey bool) error {
 	// Use Feldman's verifiable secret sharing to verify the share.
 	err := secretsharing.ValidateShare(
 		&secretsharing.VerifiableSecretShare{
@@ -307,16 +323,34 @@ func (h *TransferHandler) completeSendLeaf(ctx context.Context, transfer *ent.Tr
 		}
 	}
 
-	_, err = db.TransferLeaf.
+	transferLeafMutator := db.TransferLeaf.
 		UpdateOne(transferLeaf).
 		SetIntermediateRefundTx(refundTxBytes).
 		SetSecretCipher(req.SecretCipher).
-		SetSignature(req.Signature).
-		Save(ctx)
+		SetSignature(req.Signature)
+	if !shouldTweakKey {
+		keyTweak, err := proto.Marshal(req)
+		if err != nil {
+			return fmt.Errorf("unable to marshal key tweak: %v", err)
+		}
+		transferLeafMutator.SetKeyTweak(keyTweak)
+	}
+	_, err = transferLeafMutator.Save(ctx)
 	if err != nil {
 		return fmt.Errorf("unable to update transfer leaf: %v", err)
 	}
 
+	if shouldTweakKey {
+		err = h.tweakLeafKey(ctx, leaf, req, refundTxBytes)
+		if err != nil {
+			return fmt.Errorf("unable to tweak leaf key: %v", err)
+		}
+	}
+
+	return nil
+}
+
+func (h *TransferHandler) tweakLeafKey(ctx context.Context, leaf *ent.TreeNode, req *pb.SendLeafKeyTweak, updatedRefundTx []byte) error {
 	// Tweak keyshare
 	keyshare, err := leaf.QuerySigningKeyshare().First(ctx)
 	if err != nil || keyshare == nil {
@@ -337,15 +371,16 @@ func (h *TransferHandler) completeSendLeaf(ctx context.Context, transfer *ent.Tr
 	if err != nil {
 		return fmt.Errorf("unable to calculate new signing pubkey for leaf %s: %v", req.LeafId, err)
 	}
-	leaf, err = leaf.
+	leafMutator := leaf.
 		Update().
-		SetOwnerSigningPubkey(signingPubkey).
-		SetRawRefundTx(refundTxBytes).
-		Save(ctx)
+		SetOwnerSigningPubkey(signingPubkey)
+	if updatedRefundTx != nil {
+		leafMutator.SetRawRefundTx(updatedRefundTx)
+	}
+	leaf, err = leafMutator.Save(ctx)
 	if err != nil || leaf == nil {
 		return fmt.Errorf("unable to update leaf %s: %v", req.LeafId, err)
 	}
-
 	return nil
 }
 

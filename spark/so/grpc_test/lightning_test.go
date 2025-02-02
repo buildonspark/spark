@@ -230,11 +230,11 @@ func TestSendLightningPayment(t *testing.T) {
 		NewSigningPrivKey: newLeafPrivKey.Serialize(),
 	})
 
-	_, err = wallet.SwapNodesForPreimage(
+	response, err := wallet.SwapNodesForPreimage(
 		context.Background(),
 		userConfig,
 		leaves,
-		userConfig.IdentityPublicKey(),
+		sspConfig.IdentityPublicKey(),
 		paymentHash[:],
 		&invoice,
 		false,
@@ -257,4 +257,56 @@ func TestSendLightningPayment(t *testing.T) {
 		totalValue += value
 	}
 	assert.Equal(t, totalValue, int64(12345))
+
+	transfer, err := wallet.SendTransferTweakKey(context.Background(), userConfig, response.Transfer, leaves, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, transfer.Status, spark.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING)
+
+	receiverTransfer, err := wallet.ProvidePreimage(context.Background(), sspConfig, preimage)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, receiverTransfer.Status, spark.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED)
+
+	receiverToken, err := wallet.AuthenticateWithServer(context.Background(), sspConfig)
+	if err != nil {
+		t.Fatalf("failed to authenticate receiver: %v", err)
+	}
+	receiverCtx := wallet.ContextWithToken(context.Background(), receiverToken)
+	if receiverTransfer.Id != transfer.Id {
+		t.Fatalf("expected transfer id %s, got %s", transfer.Id, receiverTransfer.Id)
+	}
+
+	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(context.Background(), sspConfig, receiverTransfer)
+	if err != nil {
+		t.Fatalf("unable to verify pending transfer: %v", err)
+	}
+	if len(*leafPrivKeyMap) != 1 {
+		t.Fatalf("Expected 1 leaf to transfer, got %d", len(*leafPrivKeyMap))
+	}
+	if !bytes.Equal((*leafPrivKeyMap)[nodeToSend.Id], newLeafPrivKey.Serialize()) {
+		t.Fatalf("wrong leaf signing private key")
+	}
+
+	finalLeafPrivKey, err := secp256k1.GeneratePrivateKey()
+	if err != nil {
+		t.Fatalf("failed to create new node signing private key: %v", err)
+	}
+	claimingNode := wallet.LeafKeyTweak{
+		Leaf:              receiverTransfer.Leaves[0].Leaf,
+		SigningPrivKey:    newLeafPrivKey.Serialize(),
+		NewSigningPrivKey: finalLeafPrivKey.Serialize(),
+	}
+	leavesToClaim := [1]wallet.LeafKeyTweak{claimingNode}
+	err = wallet.ClaimTransfer(
+		receiverCtx,
+		receiverTransfer,
+		sspConfig,
+		leavesToClaim[:],
+	)
+	if err != nil {
+		t.Fatalf("failed to ClaimTransfer: %v", err)
+	}
 }

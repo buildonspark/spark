@@ -456,3 +456,88 @@ func (h *LightningHandler) QueryUserSignedRefunds(ctx context.Context, req *pb.Q
 	}
 	return &pb.QueryUserSignedRefundsResponse{UserSignedRefunds: protos}, nil
 }
+
+func (h *LightningHandler) ProvidePreimageInternal(ctx context.Context, req *pb.ProvidePreimageRequest) (*ent.Transfer, error) {
+	db := ent.GetDbFromContext(ctx)
+	calculatedPaymentHash := sha256.Sum256(req.Preimage)
+	if !bytes.Equal(calculatedPaymentHash[:], req.PaymentHash) {
+		return nil, fmt.Errorf("invalid preimage")
+	}
+
+	preimageRequest, err := db.PreimageRequest.Query().Where(preimagerequest.PaymentHashEQ(req.PaymentHash)).First(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get preimage request: %v", err)
+	}
+
+	preimageRequest, err = preimageRequest.Update().SetStatus(schema.PreimageRequestStatusPreimageShared).Save(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to update preimage request status: %v", err)
+	}
+
+	transfer, err := preimageRequest.QueryTransfers().Only(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get transfer: %v", err)
+	}
+
+	// apply key tweaks for all transfer_leaves
+	transferHandler := NewTransferHandler(h.onchainHelper, h.config)
+	transferLeaves, err := transfer.QueryTransferLeaves().All(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get transfer leaves: %v", err)
+	}
+	for _, leaf := range transferLeaves {
+		keyTweak := &pb.SendLeafKeyTweak{}
+		err := proto.Unmarshal(leaf.KeyTweak, keyTweak)
+		if err != nil {
+			return nil, fmt.Errorf("unable to unmarshal key tweak: %v", err)
+		}
+		treeNode, err := leaf.QueryLeaf().Only(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("unable to get tree node: %v", err)
+		}
+		err = transferHandler.tweakLeafKey(ctx, treeNode, keyTweak, nil)
+		if err != nil {
+			return nil, fmt.Errorf("unable to tweak leaf key: %v", err)
+		}
+	}
+
+	transfer, err = transfer.Update().SetStatus(schema.TransferStatusSenderKeyTweaked).Save(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to update transfer status: %v", err)
+	}
+
+	return transfer, nil
+}
+
+func (h *LightningHandler) ProvidePreimage(ctx context.Context, req *pb.ProvidePreimageRequest) (*pb.ProvidePreimageResponse, error) {
+	transfer, err := h.ProvidePreimageInternal(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("unable to provide preimage: %v", err)
+	}
+
+	transferProto, err := transfer.MarshalProto(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to marshal transfer: %v", err)
+	}
+
+	operatorSelection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
+	_, err = helper.ExecuteTaskWithAllOperators(ctx, h.config, &operatorSelection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
+		conn, err := common.NewGRPCConnection(operator.Address)
+		if err != nil {
+			return nil, err
+		}
+		defer conn.Close()
+
+		client := pbinternal.NewSparkInternalServiceClient(conn)
+		_, err = client.ProvidePreimage(ctx, req)
+		if err != nil {
+			return nil, fmt.Errorf("unable to provide preimage: %v", err)
+		}
+		return nil, nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("unable to execute task with all operators: %v", err)
+	}
+
+	return &pb.ProvidePreimageResponse{Transfer: transferProto}, nil
+}

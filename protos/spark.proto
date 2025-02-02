@@ -21,6 +21,7 @@ service SparkService {
     rpc get_signing_commitments(GetSigningCommitmentsRequest) returns (GetSigningCommitmentsResponse) {}
     rpc cooperative_exit(CooperativeExitRequest) returns (CooperativeExitResponse) {}
     rpc initiate_preimage_swap(InitiatePreimageSwapRequest) returns (InitiatePreimageSwapResponse) {}
+    rpc provide_preimage(ProvidePreimageRequest) returns (ProvidePreimageResponse) {}
     rpc leaf_swap(LeafSwapRequest) returns (LeafSwapResponse) {}
 
     rpc prepare_tree_address(PrepareTreeAddressRequest) returns (PrepareTreeAddressResponse) {}
@@ -267,11 +268,12 @@ message CompleteSendTransferRequest {
 
 enum TransferStatus {
     TRANSFER_STATUS_SENDER_INITIATED = 0; 
-    TRANSFER_STATUS_SENDER_KEY_TWEAKED = 1;
-    TRANSFER_STATUS_RECEIVER_KEY_TWEAKED = 2;
-    TRANSFER_STATUSR_RECEIVER_REFUND_SIGNED = 3;
-    TRANSFER_STATUS_COMPLETED = 4;
-    TRANSFER_STATUS_EXPIRED = 5;
+    TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING = 1;
+    TRANSFER_STATUS_SENDER_KEY_TWEAKED = 2;
+    TRANSFER_STATUS_RECEIVER_KEY_TWEAKED = 3;
+    TRANSFER_STATUSR_RECEIVER_REFUND_SIGNED = 4;
+    TRANSFER_STATUS_COMPLETED = 5;
+    TRANSFER_STATUS_EXPIRED = 6;
 }
 
 message Transfer {
@@ -507,4 +509,13 @@ message QueryUserSignedRefundsRequest {
 
 message QueryUserSignedRefundsResponse {
     repeated UserSignedRefund user_signed_refunds = 1;
+}
+
+message ProvidePreimageRequest {
+    bytes payment_hash = 1;
+    bytes preimage = 2;
+}
+
+message ProvidePreimageResponse {
+    Transfer transfer = 1;
 }

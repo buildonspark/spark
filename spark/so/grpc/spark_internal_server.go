@@ -313,3 +313,13 @@ func (s *SparkInternalServer) InitiateCooperativeExit(ctx context.Context, req *
 	}
 	return &emptypb.Empty{}, nil
 }
+
+// ProvidePreimage provides the preimage for the given payment hash.
+func (s *SparkInternalServer) ProvidePreimage(ctx context.Context, req *pbspark.ProvidePreimageRequest) (*emptypb.Empty, error) {
+	lightningHandler := handler.NewLightningHandler(s.config, s.onchainHelper)
+	_, err := lightningHandler.ProvidePreimageInternal(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	return &emptypb.Empty{}, nil
+}

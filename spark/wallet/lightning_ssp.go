@@ -2,6 +2,7 @@ package wallet
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
 
 	"github.com/lightsparkdev/spark-go/common"
@@ -41,4 +42,33 @@ func ValidateUserSignedRefund(userSignedRefund *pb.UserSignedRefund) (int64, err
 	}
 
 	return refundTx.TxOut[0].Value, nil
+}
+
+func ProvidePreimage(ctx context.Context, config *Config, preimage []byte) (*pb.Transfer, error) {
+	conn, err := common.NewGRPCConnection(config.CoodinatorAddress())
+	if err != nil {
+		return nil, fmt.Errorf("unable to connect to coordinator: %v", err)
+	}
+	defer conn.Close()
+
+	token, err := AuthenticateWithConnection(ctx, config, conn)
+	if err != nil {
+		return nil, fmt.Errorf("failed to authenticate with server: %v", err)
+	}
+	tmpCtx := ContextWithToken(ctx, token)
+	client := pb.NewSparkServiceClient(conn)
+
+	paymentHash := sha256.Sum256(preimage)
+
+	request := &pb.ProvidePreimageRequest{
+		Preimage:    preimage,
+		PaymentHash: paymentHash[:],
+	}
+
+	response, err := client.ProvidePreimage(tmpCtx, request)
+	if err != nil {
+		return nil, fmt.Errorf("failed to provide preimage: %v", err)
+	}
+
+	return response.Transfer, nil
 }
