@@ -246,7 +246,7 @@ func validateTransferLeaves(transfer *ent.Transfer, leaves []*ent.TreeNode, leaf
 }
 
 func leafAvailableToTransfer(leaf *ent.TreeNode, transfer *ent.Transfer) error {
-	if leaf.Status != schema.TreeNodeStatusTransferLocked {
+	if leaf.Status != schema.TreeNodeStatusAvailable {
 		return fmt.Errorf("leaf %s is not available to transfer, status: %s", leaf.ID.String(), leaf.Status)
 	}
 	if !bytes.Equal(leaf.OwnerIdentityPubkey, transfer.SenderIdentityPubkey) {
