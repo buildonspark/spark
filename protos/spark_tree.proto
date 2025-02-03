@@ -21,7 +21,8 @@ message GetLeafDenominationCountsResponse {
 
 message FindLeavesToGiveUserRequest {
     bytes ssp_identity_public_key = 1;
-    uint64 amount_sats = 2;
+    bytes user_identity_public_key = 2;
+    uint64 amount_sats = 3;
 }
 
 message FindLeavesToGiveUserResponse {
@@ -43,10 +44,11 @@ message FindLeavesToTakeFromUserResponse {
 
 message ProposeTreeDenominationsRequest {
     bytes ssp_identity_public_key = 1;
-    uint64 amount_sats = 2;
-    uint32 num_user_leaves = 3;
+    uint64 max_amount_sats = 2;
 }
 
 message ProposeTreeDenominationsResponse {
-    repeated uint64 denominations = 1;
+    repeated uint64 denominations = 1; // For backwards compatibility.
+    repeated uint64 small_denominations = 2;
+    repeated uint64 large_denominations = 3;
 }

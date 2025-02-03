@@ -3,6 +3,7 @@ package tree
 import (
 	"context"
 	"fmt"
+	"math/bits"
 
 	"github.com/google/uuid"
 	pb "github.com/lightsparkdev/spark-go/proto/spark_tree"
@@ -16,6 +17,44 @@ const DenominationMaxPow = 30
 
 // DenominationMax is the maximum allowed denomination value for a leaf, calculated as 2^DenominationMaxPow.
 const DenominationMax = uint64(1) << DenominationMaxPow
+
+// SmallDenominationsMaxPow is the maximum power of 2 for small denominations.
+const SmallDenominationsMaxPow = 13
+
+// DefaultDenominationsCounts is the target number of leaves of each denomination to maintain.
+var DefaultDenominationsCounts = map[uint64]uint64{
+	1:             5_000,
+	2:             5_000,
+	4:             5_000,
+	8:             5_000,
+	16:            5_000,
+	32:            5_000,
+	64:            5_000,
+	128:           1_000,
+	256:           1_000,
+	512:           1_000,
+	1024:          1_000,
+	2048:          1_000,
+	4096:          1_000,
+	8192:          1_000,
+	16_384:        500,
+	32_768:        500,
+	65_536:        500,
+	131_072:       100,
+	262_144:       100,
+	524_288:       100,
+	1_048_576:     100,
+	2_097_152:     100,
+	4_194_304:     0,
+	8_388_608:     0,
+	16_777_216:    0,
+	33_554_432:    0,
+	67_108_864:    0,
+	134_217_728:   0,
+	268_435_456:   0,
+	536_870_912:   0,
+	1_073_741_824: 0,
+}
 
 // MakeChange returns a list of denominations that sum up to the given amount.
 func MakeChange(amount uint64) []uint64 {
@@ -180,6 +219,7 @@ func FindLeavesToTakeFromUser(ctx context.Context, req *pb.FindLeavesToTakeFromU
 // ProposeTreeDenominations is called with the amount of sats we have available, the number of users we expect to need to support, and
 // returns the list of denominations we should use for the tree. The SSP is responsible for taking this and mapping it to a structure.
 func ProposeTreeDenominations(ctx context.Context, req *pb.ProposeTreeDenominationsRequest) (*pb.ProposeTreeDenominationsResponse, error) {
+	// Figure out which denominations we are missing.
 	existing, err := GetLeafDenominationCounts(ctx, &pb.GetLeafDenominationCountsRequest{
 		OwnerIdentityPublicKey: req.SspIdentityPublicKey,
 	})
@@ -187,23 +227,53 @@ func ProposeTreeDenominations(ctx context.Context, req *pb.ProposeTreeDenominati
 		return nil, err
 	}
 
-	denominations := []uint64{}
-	remainingSats := req.AmountSats
+	// Get the list of denominations we need to propose.
+	remainingSats := req.MaxAmountSats
+	smallDenominations := []uint64{}
+	largeDenominations := []uint64{}
 	for i := 0; i < DenominationMaxPow; i++ {
-		if existing.Counts[uint64(1)<<i] >= uint64(req.NumUserLeaves) {
-			// We already have enough of this denomination, skip it!
+		currentDenomination := uint64(1) << i
+		if existing.Counts[currentDenomination] >= DefaultDenominationsCounts[currentDenomination] {
 			continue
 		}
-		for i := 0; i < int(req.NumUserLeaves); i++ {
-			if remainingSats >= uint64(1)<<i {
-				denominations = append(denominations, uint64(1)<<i)
-				remainingSats -= uint64(1) << i
+		missingCount := DefaultDenominationsCounts[currentDenomination] - existing.Counts[currentDenomination]
+		for j := uint64(0); j < missingCount; j++ {
+			if i <= SmallDenominationsMaxPow {
+				smallDenominations = append(smallDenominations, currentDenomination)
+			} else {
+				largeDenominations = append(largeDenominations, currentDenomination)
+			}
+			remainingSats -= currentDenomination
+			if remainingSats < currentDenomination {
+				break
 			}
 		}
 	}
 
-	if remainingSats != 0 {
-		denominations = append(denominations, MakeChange(remainingSats)...)
+	// Truncate the leaves to a power of 2 if applicable.
+	if len(smallDenominations) > 0 {
+		// Compute 2^floor(log2(len(smallDenominations))).
+		targetLength := uint64(1) << bits.TrailingZeros64(uint64(len(smallDenominations)))
+		if targetLength > 0 && targetLength < uint64(len(smallDenominations)) {
+			smallDenominations = smallDenominations[:targetLength]
+		}
 	}
-	return &pb.ProposeTreeDenominationsResponse{Denominations: denominations}, nil
+	if len(largeDenominations) > 0 {
+		// Compute 2^floor(log2(len(largeDenominations))).
+		targetLength := uint64(1) << bits.TrailingZeros64(uint64(len(largeDenominations)))
+		if targetLength > 0 && targetLength < uint64(len(largeDenominations)) {
+			largeDenominations = largeDenominations[:targetLength]
+		}
+	}
+
+	// For backwards compatibility. Will be removed in a future version.
+	denominations := []uint64{}
+	denominations = append(denominations, smallDenominations...)
+	denominations = append(denominations, largeDenominations...)
+
+	return &pb.ProposeTreeDenominationsResponse{
+		Denominations:      denominations,
+		SmallDenominations: smallDenominations,
+		LargeDenominations: largeDenominations,
+	}, nil
 }
