@@ -135,7 +135,7 @@ func TestReceiveLightningPayment(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.Equal(t, transfer.Status, spark.TransferStatus_TRANSFER_STATUS_RECEIVER_KEY_TWEAKED)
+	assert.Equal(t, transfer.Status, spark.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED)
 
 	receiverToken, err := wallet.AuthenticateWithServer(context.Background(), userConfig)
 	if err != nil {
