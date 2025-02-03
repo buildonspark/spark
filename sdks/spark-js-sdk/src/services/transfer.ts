@@ -5,7 +5,7 @@ import {
   numberToBytesBE,
 } from "@noble/curves/abstract/utils";
 import { secp256k1 } from "@noble/curves/secp256k1";
-import { Address, OutScript, Transaction } from "@scure/btc-signer";
+import { Transaction } from "@scure/btc-signer";
 import { sha256 } from "@scure/btc-signer/utils";
 import { randomUUID } from "crypto";
 import * as ecies from "eciesjs";
@@ -20,13 +20,8 @@ import {
   TreeNode,
 } from "proto/spark";
 import { SignatureIntent } from "../proto/common";
-import {
-  getP2TRAddressFromPublicKey,
-  getSigHashFromTx,
-  getTxFromRawTxBytes,
-} from "../utils/bitcoin";
+import { getSigHashFromTx, getTxFromRawTxBytes } from "../utils/bitcoin";
 import { subtractPrivateKeys } from "../utils/keys";
-import { NetworkConfig } from "../utils/network";
 import {
   splitSecretWithProofs,
   VerifiableSecretShare,
@@ -36,12 +31,11 @@ import {
   getRandomSigningNonce,
   getSigningCommitmentFromNonce,
 } from "../utils/signing";
+import { createRefundTx } from "../utils/transaction";
 import { aggregateFrost, signFrost } from "../utils/wasm";
 import { KeyPackage, SigningNonce } from "../wasm/spark_bindings";
 import { WalletConfigService } from "./config";
 import { ConnectionManager } from "./connection";
-
-const TIME_LOCK_INTERVAL = 100;
 
 export type LeafKeyTweak = {
   leaf: TreeNode;
@@ -371,9 +365,6 @@ export class TransferService {
 
     for (const leaf of leaves) {
       const refundSignature = refundSignatureMap.get(leaf.leaf.id);
-      if (!refundSignature) {
-        throw new Error(`Refund signature not found for leaf ${leaf.leaf.id}`);
-      }
       const leafTweaksMap = this.prepareSingleSendTransferKeyTweak(
         transfer.id,
         leaf,
@@ -395,7 +386,7 @@ export class TransferService {
     transferID: string,
     leaf: LeafKeyTweak,
     receiverEciesPubKey: ecies.PublicKey,
-    refundSignature: Uint8Array
+    refundSignature?: Uint8Array
   ): Map<string, SendLeafKeyTweak> {
     const privKeyTweak = subtractPrivateKeys(
       leaf.signingPrivKey,
@@ -460,7 +451,7 @@ export class TransferService {
         pubkeySharesTweak: Object.fromEntries(pubkeySharesTweak),
         secretCipher,
         signature,
-        refundSignature,
+        refundSignature: refundSignature ?? new Uint8Array(),
       });
     }
 
@@ -480,9 +471,10 @@ export class TransferService {
       const signingPubkey = secp256k1.getPublicKey(
         refundSigningData.signingPrivKey
       );
-      const refundTx = this.createRefundTx(
+      const { refundTx } = createRefundTx(
         leaf.leaf,
-        refundSigningData.receivingPubkey
+        refundSigningData.receivingPubkey,
+        this.config.getConfig().network
       );
 
       refundSigningData.refundTx = refundTx;
@@ -502,53 +494,6 @@ export class TransferService {
     }
 
     return signingJobs;
-  }
-
-  private createRefundTx(
-    leaf: TreeNode,
-    receivingPubkey: Uint8Array
-  ): Transaction {
-    const tx = getTxFromRawTxBytes(leaf.nodeTx);
-    const refundTx = getTxFromRawTxBytes(leaf.refundTx);
-
-    const newRefundTx = new Transaction();
-    const sequence =
-      (1 << 30) |
-      ((refundTx.getInput(0).sequence || 0) & (0xffff - TIME_LOCK_INTERVAL));
-    newRefundTx.addInput({
-      txid: tx.id,
-      index: 0,
-      sequence,
-    });
-
-    const finalScriptSig = refundTx.getInput(0).finalScriptSig;
-    if (!finalScriptSig) {
-      throw new Error(`Final script sig not found for refund tx`);
-    }
-
-    const refundP2trAddress = getP2TRAddressFromPublicKey(
-      receivingPubkey,
-      this.config.getConfig().network
-    );
-    const refundAddress = Address(
-      NetworkConfig[this.config.getConfig().network]
-    ).decode(refundP2trAddress);
-    const refundPkScript = OutScript.encode(refundAddress);
-
-    const amount = refundTx.getOutput(0).amount;
-    if (!amount) {
-      throw new Error(`Amount not found for refund tx`);
-    }
-    newRefundTx.addOutput({
-      script: refundPkScript,
-      amount,
-    });
-
-    newRefundTx.updateInput(0, {
-      finalScriptSig,
-    });
-
-    return newRefundTx;
   }
 
   private async claimTransferTweakKeys(

@@ -1,9 +1,13 @@
 import { bytesToHex, hexToBytes } from "@noble/curves/abstract/utils";
 import { secp256k1 } from "@noble/curves/secp256k1";
 import { TreeNode } from "../proto/spark";
-import { SigningOperator, WalletConfig } from "../services/config";
+import {
+  SigningOperator,
+  WalletConfig,
+  WalletConfigService,
+} from "../services/config";
 import { ConnectionManager } from "../services/connection";
-import { SparkWallet } from "../spark-sdk";
+import { DepositService } from "../services/deposit";
 import { getTxFromRawTxBytes, getTxId } from "../utils/bitcoin";
 import { createDummyTx } from "../utils/wasm";
 
@@ -81,11 +85,14 @@ export function getTestWalletConfigWithIdentityKey(
 }
 
 export async function createNewTree(
-  // TODO: Fix this so wallet doesn't have to be passed in
-  wallet: SparkWallet,
-  privKey: Uint8Array
+  config: WalletConfig,
+  privKey: Uint8Array,
+  amountSats: bigint = 100_000n
 ): Promise<TreeNode> {
-  const config = wallet.getConfig();
+  const depositService = new DepositService(
+    new WalletConfigService(config),
+    new ConnectionManager()
+  );
   const mockClient = ConnectionManager.createMockClient(
     config.signingOperators[config.coodinatorIdentifier].address
   );
@@ -94,19 +101,20 @@ export async function createNewTree(
   const pubKey = secp256k1.getPublicKey(privKey, true);
 
   // Generate deposit address
-  const depositResp = await wallet.generateDepositAddress(pubKey);
+  const depositResp = await depositService.generateDepositAddress({
+    signingPubkey: pubKey,
+  });
   if (!depositResp.depositAddress) {
     throw new Error("deposit address not found");
   }
 
   const dummyTx = createDummyTx({
     address: depositResp.depositAddress.address,
-    amountSats: 100_000n,
+    amountSats,
   });
 
   const depositTxHex = bytesToHex(dummyTx.tx);
   const depositTx = getTxFromRawTxBytes(dummyTx.tx);
-
   const vout = 0;
   const txid = getTxId(depositTx);
   if (!txid) {
@@ -120,14 +128,12 @@ export async function createNewTree(
   });
 
   // Create tree root
-  const treeResp = await wallet.createTreeRoot(
-    privKey,
-    depositResp.depositAddress.verifyingKey,
+  const treeResp = await depositService.createTreeRoot({
+    signingPrivkey: privKey,
+    verifyingKey: depositResp.depositAddress.verifyingKey,
     depositTx,
-    vout
-  );
-
-  console.log("tree created:", treeResp);
+    vout,
+  });
 
   mockClient.close();
 

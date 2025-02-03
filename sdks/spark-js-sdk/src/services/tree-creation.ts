@@ -1,7 +1,5 @@
-import { WalletConfigService } from "services/config";
-import { ConnectionManager } from "./connection";
 import { secp256k1 } from "@noble/curves/secp256k1";
-import { subtractPrivateKeys } from "../utils/keys";
+import { Address, OutScript, Transaction } from "@scure/btc-signer";
 import {
   AddressNode,
   AddressRequestNode,
@@ -13,20 +11,24 @@ import {
   PrepareTreeAddressRequest,
   SigningJob,
   TreeNode,
-} from "proto/spark";
-import { copySigningCommitment, getRandomSigningNonce } from "../utils/signing";
-import { KeyPackage, SigningNonce } from "../wasm/spark_bindings";
-import { Address, OutScript, Transaction } from "@scure/btc-signer";
-import { Network, NetworkConfig } from "../utils/network";
+} from "../proto/spark";
 import {
   getP2TRAddressFromPublicKey,
   getSigHashFromTx,
   getTxFromRawTxBytes,
   getTxId,
 } from "../utils/bitcoin";
-import { getSigningCommitmentFromNonce } from "../utils/signing";
-import { aggregateFrost } from "../utils/wasm";
-import { signFrost } from "../utils/wasm";
+import { subtractPrivateKeys } from "../utils/keys";
+import { getNetwork, Network } from "../utils/network";
+import {
+  copySigningCommitment,
+  getRandomSigningNonce,
+  getSigningCommitmentFromNonce,
+} from "../utils/signing";
+import { aggregateFrost, signFrost } from "../utils/wasm";
+import { KeyPackage, SigningNonce } from "../wasm/spark_bindings";
+import { WalletConfigService } from "./config";
+import { ConnectionManager } from "./connection";
 
 export type DepositAddressTree = {
   address?: string | undefined;
@@ -318,7 +320,7 @@ export class TreeCreationService {
     });
 
     const refundP2trAddress = getP2TRAddressFromPublicKey(pubkey, network);
-    const refundAddress = Address({ ...NetworkConfig[network] }).decode(
+    const refundAddress = Address(getNetwork(network)).decode(
       refundP2trAddress
     );
     const refundPkScript = OutScript.encode(refundAddress);
@@ -370,9 +372,7 @@ export class TreeCreationService {
       if (!child.address) {
         throw new Error("child address is undefined");
       }
-      const childAddress = Address({ ...NetworkConfig[network] }).decode(
-        child.address
-      );
+      const childAddress = Address(getNetwork(network)).decode(child.address);
       const childPkScript = OutScript.encode(childAddress);
       rootNodeTx.addOutput({
         script: childPkScript,

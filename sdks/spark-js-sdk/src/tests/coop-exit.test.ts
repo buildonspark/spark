@@ -14,7 +14,7 @@ import {
   getTxId,
   getTxIdNoReverse,
 } from "../utils/bitcoin";
-import { NetworkConfig } from "../utils/network";
+import { getNetwork } from "../utils/network";
 import { createDummyTx } from "../utils/wasm";
 import { createNewTree } from "./test-util";
 
@@ -41,7 +41,7 @@ describe("coop exit", () => {
     );
 
     const leafPrivKey = secp256k1.utils.randomPrivateKey();
-    const rootNode = await createNewTree(wallet, leafPrivKey);
+    const rootNode = await createNewTree(config, leafPrivKey);
 
     const sspWallet = new SparkWallet();
     const sspMnemonic = sspWallet.generateMnemonic();
@@ -99,7 +99,7 @@ describe("coop exit", () => {
     for (const addr of [...connectorP2trAddrs, feeBumpAddr]) {
       transaction.addOutput({
         script: OutScript.encode(
-          Address(NetworkConfig[config.network]).decode(addr)
+          Address(getNetwork(config.network)).decode(addr)
         ),
         amount: BigInt(
           intermediateAmountSats / (connectorP2trAddrs.length + 1)

@@ -15,7 +15,10 @@ describe("Transfer", () => {
       await senderWallet.createSparkWallet(senderMnemonic);
 
       const leafPrivKey = secp256k1.utils.randomPrivateKey();
-      const rootNode = await createNewTree(senderWallet, leafPrivKey);
+      const rootNode = await createNewTree(
+        senderWallet.getConfig(),
+        leafPrivKey
+      );
 
       const newLeafPrivKey = secp256k1.utils.randomPrivateKey();
 

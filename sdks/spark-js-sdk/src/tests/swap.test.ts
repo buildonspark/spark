@@ -39,13 +39,13 @@ describe("swap", () => {
 
       const senderLeafPrivKey = secp256k1.utils.randomPrivateKey();
       const senderRootNode = await createNewTree(
-        senderWallet,
+        senderWallet.getConfig(),
         senderLeafPrivKey
       );
 
       const receiverLeafPrivKey = secp256k1.utils.randomPrivateKey();
       const receiverRootNode = await createNewTree(
-        receiverWallet,
+        receiverWallet.getConfig(),
         receiverLeafPrivKey
       );
 

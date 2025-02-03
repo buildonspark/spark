@@ -10,7 +10,7 @@ import {
   getTxId,
 } from "../utils/bitcoin";
 import { subtractPublicKeys } from "../utils/keys";
-import { NetworkConfig } from "../utils/network";
+import { getNetwork } from "../utils/network";
 import { proofOfPossessionMessageHashForDepositAddress } from "../utils/proof";
 import {
   copySigningCommitment,
@@ -191,7 +191,7 @@ export class DepositService {
       this.config.getConfig().network
     );
     const refundAddress = btc
-      .Address(NetworkConfig[this.config.getConfig().network])
+      .Address(getNetwork(this.config.getConfig().network))
       .decode(refundP2trAddress);
     const refundPkScript = btc.OutScript.encode(refundAddress);
 

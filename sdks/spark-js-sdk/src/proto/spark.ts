@@ -15,11 +15,12 @@ export const protobufPackage = "spark";
 
 export enum TransferStatus {
   TRANSFER_STATUS_SENDER_INITIATED = 0,
-  TRANSFER_STATUS_SENDER_KEY_TWEAKED = 1,
-  TRANSFER_STATUS_RECEIVER_KEY_TWEAKED = 2,
-  TRANSFER_STATUSR_RECEIVER_REFUND_SIGNED = 3,
-  TRANSFER_STATUS_COMPLETED = 4,
-  TRANSFER_STATUS_EXPIRED = 5,
+  TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING = 1,
+  TRANSFER_STATUS_SENDER_KEY_TWEAKED = 2,
+  TRANSFER_STATUS_RECEIVER_KEY_TWEAKED = 3,
+  TRANSFER_STATUSR_RECEIVER_REFUND_SIGNED = 4,
+  TRANSFER_STATUS_COMPLETED = 5,
+  TRANSFER_STATUS_EXPIRED = 6,
   UNRECOGNIZED = -1,
 }
 
@@ -29,18 +30,21 @@ export function transferStatusFromJSON(object: any): TransferStatus {
     case "TRANSFER_STATUS_SENDER_INITIATED":
       return TransferStatus.TRANSFER_STATUS_SENDER_INITIATED;
     case 1:
+    case "TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING":
+      return TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING;
+    case 2:
     case "TRANSFER_STATUS_SENDER_KEY_TWEAKED":
       return TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAKED;
-    case 2:
+    case 3:
     case "TRANSFER_STATUS_RECEIVER_KEY_TWEAKED":
       return TransferStatus.TRANSFER_STATUS_RECEIVER_KEY_TWEAKED;
-    case 3:
+    case 4:
     case "TRANSFER_STATUSR_RECEIVER_REFUND_SIGNED":
       return TransferStatus.TRANSFER_STATUSR_RECEIVER_REFUND_SIGNED;
-    case 4:
+    case 5:
     case "TRANSFER_STATUS_COMPLETED":
       return TransferStatus.TRANSFER_STATUS_COMPLETED;
-    case 5:
+    case 6:
     case "TRANSFER_STATUS_EXPIRED":
       return TransferStatus.TRANSFER_STATUS_EXPIRED;
     case -1:
@@ -54,6 +58,8 @@ export function transferStatusToJSON(object: TransferStatus): string {
   switch (object) {
     case TransferStatus.TRANSFER_STATUS_SENDER_INITIATED:
       return "TRANSFER_STATUS_SENDER_INITIATED";
+    case TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING:
+      return "TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING";
     case TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAKED:
       return "TRANSFER_STATUS_SENDER_KEY_TWEAKED";
     case TransferStatus.TRANSFER_STATUS_RECEIVER_KEY_TWEAKED:
@@ -463,6 +469,7 @@ export interface UserSignedRefund {
   refundTx: Uint8Array;
   userSignature: Uint8Array;
   signingCommitments: SigningCommitments | undefined;
+  userSignatureCommitment: SigningCommitment | undefined;
 }
 
 export interface InvoiceAmountProof {
@@ -480,6 +487,7 @@ export interface InitiatePreimageSwapRequest {
   invoiceAmount: InvoiceAmount | undefined;
   reason: InitiatePreimageSwapRequest_Reason;
   transfer: StartSendTransferRequest | undefined;
+  receiverIdentityPublicKey: Uint8Array;
 }
 
 export enum InitiatePreimageSwapRequest_Reason {
@@ -517,6 +525,7 @@ export function initiatePreimageSwapRequest_ReasonToJSON(object: InitiatePreimag
 
 export interface InitiatePreimageSwapResponse {
   preimage: Uint8Array;
+  transfer: Transfer | undefined;
 }
 
 export interface OutPoint {
@@ -628,6 +637,23 @@ export interface GetSigningOperatorListResponse {
 export interface GetSigningOperatorListResponse_SigningOperatorsEntry {
   key: string;
   value: SigningOperatorInfo | undefined;
+}
+
+export interface QueryUserSignedRefundsRequest {
+  paymentHash: Uint8Array;
+}
+
+export interface QueryUserSignedRefundsResponse {
+  userSignedRefunds: UserSignedRefund[];
+}
+
+export interface ProvidePreimageRequest {
+  paymentHash: Uint8Array;
+  preimage: Uint8Array;
+}
+
+export interface ProvidePreimageResponse {
+  transfer: Transfer | undefined;
 }
 
 function createBaseDepositAddressProof(): DepositAddressProof {
@@ -6008,7 +6034,13 @@ export const SigningCommitments_SigningCommitmentsEntry: MessageFns<SigningCommi
 };
 
 function createBaseUserSignedRefund(): UserSignedRefund {
-  return { nodeId: "", refundTx: new Uint8Array(0), userSignature: new Uint8Array(0), signingCommitments: undefined };
+  return {
+    nodeId: "",
+    refundTx: new Uint8Array(0),
+    userSignature: new Uint8Array(0),
+    signingCommitments: undefined,
+    userSignatureCommitment: undefined,
+  };
 }
 
 export const UserSignedRefund: MessageFns<UserSignedRefund> = {
@@ -6024,6 +6056,9 @@ export const UserSignedRefund: MessageFns<UserSignedRefund> = {
     }
     if (message.signingCommitments !== undefined) {
       SigningCommitments.encode(message.signingCommitments, writer.uint32(34).fork()).join();
+    }
+    if (message.userSignatureCommitment !== undefined) {
+      SigningCommitment.encode(message.userSignatureCommitment, writer.uint32(42).fork()).join();
     }
     return writer;
   },
@@ -6067,6 +6102,14 @@ export const UserSignedRefund: MessageFns<UserSignedRefund> = {
           message.signingCommitments = SigningCommitments.decode(reader, reader.uint32());
           continue;
         }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.userSignatureCommitment = SigningCommitment.decode(reader, reader.uint32());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -6083,6 +6126,9 @@ export const UserSignedRefund: MessageFns<UserSignedRefund> = {
       userSignature: isSet(object.userSignature) ? bytesFromBase64(object.userSignature) : new Uint8Array(0),
       signingCommitments: isSet(object.signingCommitments)
         ? SigningCommitments.fromJSON(object.signingCommitments)
+        : undefined,
+      userSignatureCommitment: isSet(object.userSignatureCommitment)
+        ? SigningCommitment.fromJSON(object.userSignatureCommitment)
         : undefined,
     };
   },
@@ -6101,6 +6147,9 @@ export const UserSignedRefund: MessageFns<UserSignedRefund> = {
     if (message.signingCommitments !== undefined) {
       obj.signingCommitments = SigningCommitments.toJSON(message.signingCommitments);
     }
+    if (message.userSignatureCommitment !== undefined) {
+      obj.userSignatureCommitment = SigningCommitment.toJSON(message.userSignatureCommitment);
+    }
     return obj;
   },
 
@@ -6115,6 +6164,10 @@ export const UserSignedRefund: MessageFns<UserSignedRefund> = {
     message.signingCommitments = (object.signingCommitments !== undefined && object.signingCommitments !== null)
       ? SigningCommitments.fromPartial(object.signingCommitments)
       : undefined;
+    message.userSignatureCommitment =
+      (object.userSignatureCommitment !== undefined && object.userSignatureCommitment !== null)
+        ? SigningCommitment.fromPartial(object.userSignatureCommitment)
+        : undefined;
     return message;
   },
 };
@@ -6264,6 +6317,7 @@ function createBaseInitiatePreimageSwapRequest(): InitiatePreimageSwapRequest {
     invoiceAmount: undefined,
     reason: 0,
     transfer: undefined,
+    receiverIdentityPublicKey: new Uint8Array(0),
   };
 }
 
@@ -6283,6 +6337,9 @@ export const InitiatePreimageSwapRequest: MessageFns<InitiatePreimageSwapRequest
     }
     if (message.transfer !== undefined) {
       StartSendTransferRequest.encode(message.transfer, writer.uint32(42).fork()).join();
+    }
+    if (message.receiverIdentityPublicKey.length !== 0) {
+      writer.uint32(50).bytes(message.receiverIdentityPublicKey);
     }
     return writer;
   },
@@ -6334,6 +6391,14 @@ export const InitiatePreimageSwapRequest: MessageFns<InitiatePreimageSwapRequest
           message.transfer = StartSendTransferRequest.decode(reader, reader.uint32());
           continue;
         }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.receiverIdentityPublicKey = reader.bytes();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -6352,6 +6417,9 @@ export const InitiatePreimageSwapRequest: MessageFns<InitiatePreimageSwapRequest
       invoiceAmount: isSet(object.invoiceAmount) ? InvoiceAmount.fromJSON(object.invoiceAmount) : undefined,
       reason: isSet(object.reason) ? initiatePreimageSwapRequest_ReasonFromJSON(object.reason) : 0,
       transfer: isSet(object.transfer) ? StartSendTransferRequest.fromJSON(object.transfer) : undefined,
+      receiverIdentityPublicKey: isSet(object.receiverIdentityPublicKey)
+        ? bytesFromBase64(object.receiverIdentityPublicKey)
+        : new Uint8Array(0),
     };
   },
 
@@ -6372,6 +6440,9 @@ export const InitiatePreimageSwapRequest: MessageFns<InitiatePreimageSwapRequest
     if (message.transfer !== undefined) {
       obj.transfer = StartSendTransferRequest.toJSON(message.transfer);
     }
+    if (message.receiverIdentityPublicKey.length !== 0) {
+      obj.receiverIdentityPublicKey = base64FromBytes(message.receiverIdentityPublicKey);
+    }
     return obj;
   },
 
@@ -6389,18 +6460,22 @@ export const InitiatePreimageSwapRequest: MessageFns<InitiatePreimageSwapRequest
     message.transfer = (object.transfer !== undefined && object.transfer !== null)
       ? StartSendTransferRequest.fromPartial(object.transfer)
       : undefined;
+    message.receiverIdentityPublicKey = object.receiverIdentityPublicKey ?? new Uint8Array(0);
     return message;
   },
 };
 
 function createBaseInitiatePreimageSwapResponse(): InitiatePreimageSwapResponse {
-  return { preimage: new Uint8Array(0) };
+  return { preimage: new Uint8Array(0), transfer: undefined };
 }
 
 export const InitiatePreimageSwapResponse: MessageFns<InitiatePreimageSwapResponse> = {
   encode(message: InitiatePreimageSwapResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.preimage.length !== 0) {
       writer.uint32(10).bytes(message.preimage);
+    }
+    if (message.transfer !== undefined) {
+      Transfer.encode(message.transfer, writer.uint32(18).fork()).join();
     }
     return writer;
   },
@@ -6420,6 +6495,14 @@ export const InitiatePreimageSwapResponse: MessageFns<InitiatePreimageSwapRespon
           message.preimage = reader.bytes();
           continue;
         }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.transfer = Transfer.decode(reader, reader.uint32());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -6430,13 +6513,19 @@ export const InitiatePreimageSwapResponse: MessageFns<InitiatePreimageSwapRespon
   },
 
   fromJSON(object: any): InitiatePreimageSwapResponse {
-    return { preimage: isSet(object.preimage) ? bytesFromBase64(object.preimage) : new Uint8Array(0) };
+    return {
+      preimage: isSet(object.preimage) ? bytesFromBase64(object.preimage) : new Uint8Array(0),
+      transfer: isSet(object.transfer) ? Transfer.fromJSON(object.transfer) : undefined,
+    };
   },
 
   toJSON(message: InitiatePreimageSwapResponse): unknown {
     const obj: any = {};
     if (message.preimage.length !== 0) {
       obj.preimage = base64FromBytes(message.preimage);
+    }
+    if (message.transfer !== undefined) {
+      obj.transfer = Transfer.toJSON(message.transfer);
     }
     return obj;
   },
@@ -6447,6 +6536,9 @@ export const InitiatePreimageSwapResponse: MessageFns<InitiatePreimageSwapRespon
   fromPartial(object: DeepPartial<InitiatePreimageSwapResponse>): InitiatePreimageSwapResponse {
     const message = createBaseInitiatePreimageSwapResponse();
     message.preimage = object.preimage ?? new Uint8Array(0);
+    message.transfer = (object.transfer !== undefined && object.transfer !== null)
+      ? Transfer.fromPartial(object.transfer)
+      : undefined;
     return message;
   },
 };
@@ -7892,6 +7984,262 @@ export const GetSigningOperatorListResponse_SigningOperatorsEntry: MessageFns<
   },
 };
 
+function createBaseQueryUserSignedRefundsRequest(): QueryUserSignedRefundsRequest {
+  return { paymentHash: new Uint8Array(0) };
+}
+
+export const QueryUserSignedRefundsRequest: MessageFns<QueryUserSignedRefundsRequest> = {
+  encode(message: QueryUserSignedRefundsRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.paymentHash.length !== 0) {
+      writer.uint32(10).bytes(message.paymentHash);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): QueryUserSignedRefundsRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseQueryUserSignedRefundsRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.paymentHash = reader.bytes();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): QueryUserSignedRefundsRequest {
+    return { paymentHash: isSet(object.paymentHash) ? bytesFromBase64(object.paymentHash) : new Uint8Array(0) };
+  },
+
+  toJSON(message: QueryUserSignedRefundsRequest): unknown {
+    const obj: any = {};
+    if (message.paymentHash.length !== 0) {
+      obj.paymentHash = base64FromBytes(message.paymentHash);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<QueryUserSignedRefundsRequest>): QueryUserSignedRefundsRequest {
+    return QueryUserSignedRefundsRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<QueryUserSignedRefundsRequest>): QueryUserSignedRefundsRequest {
+    const message = createBaseQueryUserSignedRefundsRequest();
+    message.paymentHash = object.paymentHash ?? new Uint8Array(0);
+    return message;
+  },
+};
+
+function createBaseQueryUserSignedRefundsResponse(): QueryUserSignedRefundsResponse {
+  return { userSignedRefunds: [] };
+}
+
+export const QueryUserSignedRefundsResponse: MessageFns<QueryUserSignedRefundsResponse> = {
+  encode(message: QueryUserSignedRefundsResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.userSignedRefunds) {
+      UserSignedRefund.encode(v!, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): QueryUserSignedRefundsResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseQueryUserSignedRefundsResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.userSignedRefunds.push(UserSignedRefund.decode(reader, reader.uint32()));
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): QueryUserSignedRefundsResponse {
+    return {
+      userSignedRefunds: globalThis.Array.isArray(object?.userSignedRefunds)
+        ? object.userSignedRefunds.map((e: any) => UserSignedRefund.fromJSON(e))
+        : [],
+    };
+  },
+
+  toJSON(message: QueryUserSignedRefundsResponse): unknown {
+    const obj: any = {};
+    if (message.userSignedRefunds?.length) {
+      obj.userSignedRefunds = message.userSignedRefunds.map((e) => UserSignedRefund.toJSON(e));
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<QueryUserSignedRefundsResponse>): QueryUserSignedRefundsResponse {
+    return QueryUserSignedRefundsResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<QueryUserSignedRefundsResponse>): QueryUserSignedRefundsResponse {
+    const message = createBaseQueryUserSignedRefundsResponse();
+    message.userSignedRefunds = object.userSignedRefunds?.map((e) => UserSignedRefund.fromPartial(e)) || [];
+    return message;
+  },
+};
+
+function createBaseProvidePreimageRequest(): ProvidePreimageRequest {
+  return { paymentHash: new Uint8Array(0), preimage: new Uint8Array(0) };
+}
+
+export const ProvidePreimageRequest: MessageFns<ProvidePreimageRequest> = {
+  encode(message: ProvidePreimageRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.paymentHash.length !== 0) {
+      writer.uint32(10).bytes(message.paymentHash);
+    }
+    if (message.preimage.length !== 0) {
+      writer.uint32(18).bytes(message.preimage);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ProvidePreimageRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseProvidePreimageRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.paymentHash = reader.bytes();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.preimage = reader.bytes();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ProvidePreimageRequest {
+    return {
+      paymentHash: isSet(object.paymentHash) ? bytesFromBase64(object.paymentHash) : new Uint8Array(0),
+      preimage: isSet(object.preimage) ? bytesFromBase64(object.preimage) : new Uint8Array(0),
+    };
+  },
+
+  toJSON(message: ProvidePreimageRequest): unknown {
+    const obj: any = {};
+    if (message.paymentHash.length !== 0) {
+      obj.paymentHash = base64FromBytes(message.paymentHash);
+    }
+    if (message.preimage.length !== 0) {
+      obj.preimage = base64FromBytes(message.preimage);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ProvidePreimageRequest>): ProvidePreimageRequest {
+    return ProvidePreimageRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ProvidePreimageRequest>): ProvidePreimageRequest {
+    const message = createBaseProvidePreimageRequest();
+    message.paymentHash = object.paymentHash ?? new Uint8Array(0);
+    message.preimage = object.preimage ?? new Uint8Array(0);
+    return message;
+  },
+};
+
+function createBaseProvidePreimageResponse(): ProvidePreimageResponse {
+  return { transfer: undefined };
+}
+
+export const ProvidePreimageResponse: MessageFns<ProvidePreimageResponse> = {
+  encode(message: ProvidePreimageResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.transfer !== undefined) {
+      Transfer.encode(message.transfer, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ProvidePreimageResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseProvidePreimageResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.transfer = Transfer.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ProvidePreimageResponse {
+    return { transfer: isSet(object.transfer) ? Transfer.fromJSON(object.transfer) : undefined };
+  },
+
+  toJSON(message: ProvidePreimageResponse): unknown {
+    const obj: any = {};
+    if (message.transfer !== undefined) {
+      obj.transfer = Transfer.toJSON(message.transfer);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ProvidePreimageResponse>): ProvidePreimageResponse {
+    return ProvidePreimageResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ProvidePreimageResponse>): ProvidePreimageResponse {
+    const message = createBaseProvidePreimageResponse();
+    message.transfer = (object.transfer !== undefined && object.transfer !== null)
+      ? Transfer.fromPartial(object.transfer)
+      : undefined;
+    return message;
+  },
+};
+
 export type SparkServiceDefinition = typeof SparkServiceDefinition;
 export const SparkServiceDefinition = {
   name: "SparkService",
@@ -8001,6 +8349,14 @@ export const SparkServiceDefinition = {
       responseStream: false,
       options: {},
     },
+    provide_preimage: {
+      name: "provide_preimage",
+      requestType: ProvidePreimageRequest,
+      requestStream: false,
+      responseType: ProvidePreimageResponse,
+      responseStream: false,
+      options: {},
+    },
     leaf_swap: {
       name: "leaf_swap",
       requestType: LeafSwapRequest,
@@ -8054,6 +8410,14 @@ export const SparkServiceDefinition = {
       requestType: FinalizeTokenTransactionRequest,
       requestStream: false,
       responseType: Empty,
+      responseStream: false,
+      options: {},
+    },
+    query_user_signed_refunds: {
+      name: "query_user_signed_refunds",
+      requestType: QueryUserSignedRefundsRequest,
+      requestStream: false,
+      responseType: QueryUserSignedRefundsResponse,
       responseStream: false,
       options: {},
     },
@@ -8113,6 +8477,10 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
     request: InitiatePreimageSwapRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<InitiatePreimageSwapResponse>>;
+  provide_preimage(
+    request: ProvidePreimageRequest,
+    context: CallContext & CallContextExt,
+  ): Promise<DeepPartial<ProvidePreimageResponse>>;
   leaf_swap(request: LeafSwapRequest, context: CallContext & CallContextExt): Promise<DeepPartial<LeafSwapResponse>>;
   prepare_tree_address(
     request: PrepareTreeAddressRequest,
@@ -8138,6 +8506,10 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
     request: FinalizeTokenTransactionRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<Empty>>;
+  query_user_signed_refunds(
+    request: QueryUserSignedRefundsRequest,
+    context: CallContext & CallContextExt,
+  ): Promise<DeepPartial<QueryUserSignedRefundsResponse>>;
 }
 
 export interface SparkServiceClient<CallOptionsExt = {}> {
@@ -8193,6 +8565,10 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
     request: DeepPartial<InitiatePreimageSwapRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<InitiatePreimageSwapResponse>;
+  provide_preimage(
+    request: DeepPartial<ProvidePreimageRequest>,
+    options?: CallOptions & CallOptionsExt,
+  ): Promise<ProvidePreimageResponse>;
   leaf_swap(request: DeepPartial<LeafSwapRequest>, options?: CallOptions & CallOptionsExt): Promise<LeafSwapResponse>;
   prepare_tree_address(
     request: DeepPartial<PrepareTreeAddressRequest>,
@@ -8218,6 +8594,10 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
     request: DeepPartial<FinalizeTokenTransactionRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<Empty>;
+  query_user_signed_refunds(
+    request: DeepPartial<QueryUserSignedRefundsRequest>,
+    options?: CallOptions & CallOptionsExt,
+  ): Promise<QueryUserSignedRefundsResponse>;
 }
 
 function bytesFromBase64(b64: string): Uint8Array {
