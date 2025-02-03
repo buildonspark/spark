@@ -22,7 +22,7 @@ import (
 	"github.com/lightsparkdev/spark-go/so/objects"
 )
 
-func validateDepositAddress(ctx context.Context, config *Config, address *pb.Address, userPubkey []byte) error {
+func validateDepositAddress(config *Config, address *pb.Address, userPubkey []byte) error {
 	if address.DepositAddressProof.ProofOfPossessionSignature == nil {
 		return fmt.Errorf("proof of possession signature is nil")
 	}
@@ -98,7 +98,7 @@ func GenerateDepositAddress(
 	if err != nil {
 		return nil, err
 	}
-	if err := validateDepositAddress(ctx, config, depositResp.DepositAddress, signingPubkey); err != nil {
+	if err := validateDepositAddress(config, depositResp.DepositAddress, signingPubkey); err != nil {
 		return nil, err
 	}
 	return depositResp, nil

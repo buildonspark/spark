@@ -12,7 +12,6 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/lightsparkdev/spark-go/common"
-	"github.com/lightsparkdev/spark-go/proto/spark"
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
 	"github.com/lightsparkdev/spark-go/so/objects"
 )
@@ -26,7 +25,7 @@ type Leaf struct {
 	SigningPubKey  *secp256k1.PublicKey
 	RefundTimeLock uint32
 	AmountSats     int64
-	TreeNode       *spark.TreeNode
+	TreeNode       *pb.TreeNode
 }
 
 // GetConnectorRefundSignatures asks the coordinator to sign refund

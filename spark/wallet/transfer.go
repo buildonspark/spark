@@ -318,9 +318,6 @@ func prepareSingleSendTransferKeyTweak(config *Config, transferID string, leaf L
 	payload := append(append([]byte(leaf.Leaf.Id), []byte(transferID)...), secretCipher...)
 	payloadHash := sha256.Sum256(payload)
 	signature := ecdsa.Sign(&config.IdentityPrivateKey, payloadHash[:])
-	if err != nil {
-		return nil, fmt.Errorf("failed to sign payload: %v", err)
-	}
 
 	leafTweaksMap := make(map[string]*pb.SendLeafKeyTweak)
 	for identifier, operator := range config.SigningOperators {
@@ -743,11 +740,11 @@ func createRefundTx(
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create p2tr address from pubkey: %v", err)
 	}
-	refundAddress, _ := btcutil.DecodeAddress(*refundP2trAddress, common.NetworkParams(config.Network))
+	refundAddress, err := btcutil.DecodeAddress(*refundP2trAddress, common.NetworkParams(config.Network))
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to decode p2tr address: %v", err)
 	}
-	refundPkScript, _ := txscript.PayToAddrScript(refundAddress)
+	refundPkScript, err := txscript.PayToAddrScript(refundAddress)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create pk script: %v", err)
 	}
