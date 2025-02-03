@@ -10,21 +10,21 @@
     }
   },
   "scripts": {
-    "build": "bun build ./index.ts --outdir ./dist",
-    "dev": "bun build ./index.ts --outdir ./dist --watch",
+    "build": "tsc ./index.ts --outDir ./dist",
+    "dev": "tsc ./index.ts --outDir ./dist --watch",
     "format": "prettier src --check",
     "format:fix": "prettier src --write",
-    "test": "bun test",
-    "proto": "protoc --plugin=./node_modules/.bin/protoc-gen-ts_proto --ts_proto_out=./src/proto ./proto/*.proto"
+    "test": "pnpm test"
   },
   "dependencies": {
-    "spark-js-sdk": "file:../spark-js-sdk",
-    "lrc20": "file:../../../lrc20/js-sdk"
+    "@wcbd/yuv-js-sdk": "file:../../../lrc20/js-sdk",
+    "bitcoinjs-lib": "^6.1.7",
+    "spark-sdk": "file:../spark-js-sdk"
   },
   "devDependencies": {
-    "@types/bun": "latest",
     "prettier": "^3.0.0",
-    "typescript": "^5.7.3",
-    "ts-proto": "^1.166.2"
-  }
+    "ts-proto": "^1.166.2",
+    "typescript": "^5.7.3"
+  },
+  "packageManager": "pnpm@9.15.4+sha512.b2dc20e2fc72b3e18848459b37359a32064663e5627a51e4c74b2c29dd8e8e0491483c3abb40789cfd578bf362fb6ba8261b05f0387d76792ed6e23ea3b1b6a0"
 }
