@@ -11,11 +11,15 @@ import { randomUUID } from "crypto";
 import * as ecies from "eciesjs";
 import {
   ClaimLeafKeyTweak,
+  ClaimTransferSignRefundsResponse,
+  CompleteSendTransferResponse,
   LeafRefundTxSigningJob,
   LeafRefundTxSigningResult,
+  LeafSwapResponse,
   NodeSignatures,
   QueryPendingTransfersResponse,
   SendLeafKeyTweak,
+  StartSendTransferResponse,
   Transfer,
   TreeNode,
 } from "proto/spark";
@@ -105,10 +109,16 @@ export class TransferService {
       this.config.getCoordinatorAddress(),
       this.config
     );
-    const pendingTransfersResp = await sparkClient.query_pending_transfers({
-      receiverIdentityPublicKey: this.config.getIdentityPublicKey(),
-    });
-    sparkClient.close?.();
+    let pendingTransfersResp: QueryPendingTransfersResponse;
+    try {
+      pendingTransfersResp = await sparkClient.query_pending_transfers({
+        receiverIdentityPublicKey: this.config.getIdentityPublicKey(),
+      });
+    } catch (error) {
+      throw new Error(`Error querying pending transfers: ${error}`);
+    } finally {
+      sparkClient.close?.();
+    }
     return pendingTransfersResp;
   }
 
@@ -177,11 +187,19 @@ export class TransferService {
         errors.push(new Error(`No leaves to send for operator ${identifier}`));
         return;
       }
-      const transferResp = await sparkClient.complete_send_transfer({
-        transferId: transfer.id,
-        ownerIdentityPublicKey: this.config.getIdentityPublicKey(),
-        leavesToSend,
-      });
+      let transferResp: CompleteSendTransferResponse;
+      try {
+        transferResp = await sparkClient.complete_send_transfer({
+          transferId: transfer.id,
+          ownerIdentityPublicKey: this.config.getIdentityPublicKey(),
+          leavesToSend,
+        });
+      } catch (error) {
+        errors.push(new Error(`Error completing send transfer: ${error}`));
+        return;
+      } finally {
+        sparkClient.close?.();
+      }
 
       if (!updatedTransfer) {
         updatedTransfer = transferResp.transfer;
@@ -199,14 +217,12 @@ export class TransferService {
           );
         }
       }
-
-      sparkClient.close?.();
     });
 
     await Promise.all(promises);
 
     if (errors.length > 0) {
-      throw errors[0];
+      throw new Error(`Error completing send transfer: ${errors[0]}`);
     }
 
     if (!updatedTransfer) {
@@ -246,24 +262,29 @@ export class TransferService {
 
     const signingJobs = this.prepareRefundSoSigningJobs(leaves, leafDataMap);
 
-    const sparkConn = await this.connectionManager.createSparkClient(
+    const sparkClient = await this.connectionManager.createSparkClient(
       this.config.getCoordinatorAddress(),
       this.config
     );
 
-    const response = await sparkConn.leaf_swap({
-      transfer: {
-        transferId,
-        leavesToSend: signingJobs,
-        ownerIdentityPublicKey: this.config.getIdentityPublicKey(),
-        receiverIdentityPublicKey: receiverIdentityPubkey,
-        expiryTime: expiryTime,
-      },
-      swapId: randomUUID(),
-      adaptorPublicKey: adaptorPubKey || new Uint8Array(),
-    });
-
-    sparkConn.close?.();
+    let response: LeafSwapResponse;
+    try {
+      response = await sparkClient.leaf_swap({
+        transfer: {
+          transferId,
+          leavesToSend: signingJobs,
+          ownerIdentityPublicKey: this.config.getIdentityPublicKey(),
+          receiverIdentityPublicKey: receiverIdentityPubkey,
+          expiryTime: expiryTime,
+        },
+        swapId: randomUUID(),
+        adaptorPublicKey: adaptorPubKey || new Uint8Array(),
+      });
+    } catch (error) {
+      throw new Error(`Error initiating leaf swap: ${error}`);
+    } finally {
+      sparkClient.close?.();
+    }
 
     if (!response.transfer) {
       throw new Error("No transfer response from coordinator");
@@ -316,20 +337,25 @@ export class TransferService {
 
     const signingJobs = this.prepareRefundSoSigningJobs(leaves, leafDataMap);
 
-    const sparkConn = await this.connectionManager.createSparkClient(
+    const sparkClient = await this.connectionManager.createSparkClient(
       this.config.getCoordinatorAddress(),
       this.config
     );
 
-    const response = await sparkConn.start_send_transfer({
-      transferId: transferID,
-      leavesToSend: signingJobs,
-      ownerIdentityPublicKey: this.config.getIdentityPublicKey(),
-      receiverIdentityPublicKey: receiverIdentityPubkey,
-      expiryTime: expiryTime,
-    });
-
-    sparkConn.close?.();
+    let response: StartSendTransferResponse;
+    try {
+      response = await sparkClient.start_send_transfer({
+        transferId: transferID,
+        leavesToSend: signingJobs,
+        ownerIdentityPublicKey: this.config.getIdentityPublicKey(),
+        receiverIdentityPublicKey: receiverIdentityPubkey,
+        expiryTime: expiryTime,
+      });
+    } catch (error) {
+      throw new Error(`Error starting send transfer: ${error}`);
+    } finally {
+      sparkClient.close?.();
+    }
 
     const signatures = await this.signRefunds(
       leafDataMap,
@@ -520,18 +546,24 @@ export class TransferService {
         return;
       }
 
-      await sparkClient.claim_transfer_tweak_keys({
-        transferId: transfer.id,
-        ownerIdentityPublicKey: this.config.getIdentityPublicKey(),
-        leavesToReceive,
-      });
-      sparkClient.close?.();
+      try {
+        await sparkClient.claim_transfer_tweak_keys({
+          transferId: transfer.id,
+          ownerIdentityPublicKey: this.config.getIdentityPublicKey(),
+          leavesToReceive,
+        });
+      } catch (error) {
+        errors.push(new Error(`Error claiming transfer tweak keys: ${error}`));
+        return;
+      } finally {
+        sparkClient.close?.();
+      }
     });
 
     await Promise.all(promises);
 
     if (errors.length > 0) {
-      throw errors[0];
+      throw new Error(`Error claiming transfer tweak keys: ${errors[0]}`);
     }
   }
 
@@ -624,12 +656,18 @@ export class TransferService {
       this.config.getCoordinatorAddress(),
       this.config
     );
-    const resp = await sparkClient.claim_transfer_sign_refunds({
-      transferId: transfer.id,
-      ownerIdentityPublicKey: this.config.getIdentityPublicKey(),
-      signingJobs,
-    });
-    sparkClient.close?.();
+    let resp: ClaimTransferSignRefundsResponse;
+    try {
+      resp = await sparkClient.claim_transfer_sign_refunds({
+        transferId: transfer.id,
+        ownerIdentityPublicKey: this.config.getIdentityPublicKey(),
+        signingJobs,
+      });
+    } catch (error) {
+      throw new Error(`Error claiming transfer sign refunds: ${error}`);
+    } finally {
+      sparkClient.close?.();
+    }
     return this.signRefunds(leafDataMap, resp.signingResults);
   }
 
@@ -707,11 +745,16 @@ export class TransferService {
       this.config.getCoordinatorAddress(),
       this.config
     );
-    await sparkClient.finalize_node_signatures({
-      intent: SignatureIntent.TRANSFER,
-      nodeSignatures,
-    });
-    sparkClient.close?.();
+    try {
+      await sparkClient.finalize_node_signatures({
+        intent: SignatureIntent.TRANSFER,
+        nodeSignatures,
+      });
+    } catch (error) {
+      throw new Error(`Error finalizing node signatures in transfer: ${error}`);
+    } finally {
+      sparkClient.close?.();
+    }
   }
 
   private findShare(shares: VerifiableSecretShare[], operatorID: number) {

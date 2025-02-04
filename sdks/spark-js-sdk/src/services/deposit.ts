@@ -3,7 +3,12 @@ import * as btc from "@scure/btc-signer";
 import { NETWORK, p2tr, Transaction } from "@scure/btc-signer";
 import { equalBytes, sha256 } from "@scure/btc-signer/utils";
 import { SignatureIntent } from "../proto/common";
-import { Address, GenerateDepositAddressResponse } from "../proto/spark";
+import {
+  Address,
+  FinalizeNodeSignaturesResponse,
+  GenerateDepositAddressResponse,
+  StartTreeCreationResponse,
+} from "../proto/spark";
 import {
   getP2TRAddressFromPublicKey,
   getSigHashFromTx,
@@ -120,12 +125,17 @@ export class DepositService {
       this.config
     );
 
-    const depositResp = await sparkClient.generate_deposit_address({
-      signingPublicKey: signingPubkey,
-      identityPublicKey: this.config.getIdentityPublicKey(),
-    });
-
-    sparkClient.close?.();
+    let depositResp: GenerateDepositAddressResponse;
+    try {
+      depositResp = await sparkClient.generate_deposit_address({
+        signingPublicKey: signingPubkey,
+        identityPublicKey: this.config.getIdentityPublicKey(),
+      });
+    } catch (error) {
+      throw new Error(`Error generating deposit address: ${error}`);
+    } finally {
+      sparkClient.close?.();
+    }
 
     if (!depositResp.depositAddress) {
       throw new Error("No deposit address response from coordinator");
@@ -213,24 +223,30 @@ export class DepositService {
       this.config
     );
 
-    const treeResp = await sparkClient.start_tree_creation({
-      identityPublicKey: this.config.getIdentityPublicKey(),
-      onChainUtxo: {
-        txid: getTxId(depositTx),
-        vout: vout,
-        rawTx: depositTx.toBytes(),
-      },
-      rootTxSigningJob: {
-        rawTx: rootTx.toBytes(),
-        signingPublicKey: signingPubKey,
-        signingNonceCommitment: rootNonceCommitment,
-      },
-      refundTxSigningJob: {
-        rawTx: refundTx.toBytes(),
-        signingPublicKey: signingPubKey,
-        signingNonceCommitment: refundNonceCommitment,
-      },
-    });
+    let treeResp: StartTreeCreationResponse;
+    try {
+      treeResp = await sparkClient.start_tree_creation({
+        identityPublicKey: this.config.getIdentityPublicKey(),
+        onChainUtxo: {
+          txid: getTxId(depositTx),
+          vout: vout,
+          rawTx: depositTx.toBytes(),
+        },
+        rootTxSigningJob: {
+          rawTx: rootTx.toBytes(),
+          signingPublicKey: signingPubKey,
+          signingNonceCommitment: rootNonceCommitment,
+        },
+        refundTxSigningJob: {
+          rawTx: refundTx.toBytes(),
+          signingPublicKey: signingPubKey,
+          signingNonceCommitment: refundNonceCommitment,
+        },
+      });
+    } catch (error) {
+      sparkClient.close?.();
+      throw new Error(`Error starting tree creation: ${error}`);
+    }
 
     treeResp.rootNodeSignatureShares?.refundTxSigningResult;
 
@@ -320,18 +336,24 @@ export class DepositService {
       selfSignature: refundSignature,
     });
 
-    const finalizeResp = await sparkClient.finalize_node_signatures({
-      intent: SignatureIntent.CREATION,
-      nodeSignatures: [
-        {
-          nodeId: treeResp.rootNodeSignatureShares.nodeId,
-          nodeTxSignature: rootAggregate,
-          refundTxSignature: refundAggregate,
-        },
-      ],
-    });
-
-    sparkClient.close?.();
+    let finalizeResp: FinalizeNodeSignaturesResponse;
+    try {
+      finalizeResp = await sparkClient.finalize_node_signatures({
+        intent: SignatureIntent.CREATION,
+        nodeSignatures: [
+          {
+            nodeId: treeResp.rootNodeSignatureShares.nodeId,
+            nodeTxSignature: rootAggregate,
+            refundTxSignature: refundAggregate,
+          },
+        ],
+      });
+    } catch (error) {
+      sparkClient.close?.();
+      throw new Error(`Error finalizing node signatures in deposit: ${error}`);
+    } finally {
+      sparkClient.close?.();
+    }
 
     return finalizeResp;
   }

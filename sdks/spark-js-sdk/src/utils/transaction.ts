@@ -18,9 +18,7 @@ export function createRefundTx(
   const refundTx = getTxFromRawTxBytes(leaf.refundTx);
 
   const newRefundTx = new Transaction();
-  const sequence =
-    (1 << 30) |
-    ((refundTx.getInput(0).sequence || 0) & (0xffff - TIME_LOCK_INTERVAL));
+  const sequence = getNextTransactionSequence(refundTx.getInput(0).sequence);
   newRefundTx.addInput({
     txid: tx.id,
     index: 0,
@@ -55,4 +53,8 @@ export function createRefundTx(
   const sighash = getSigHashFromTx(newRefundTx, 0, refundTx.getOutput(0));
 
   return { refundTx: newRefundTx, sighash };
+}
+
+export function getNextTransactionSequence(currentSequence?: number) {
+  return (1 << 30) | ((currentSequence || 0) & (0xffff - TIME_LOCK_INTERVAL));
 }

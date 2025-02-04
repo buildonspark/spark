@@ -4,11 +4,13 @@ import {
   AddressNode,
   AddressRequestNode,
   CreateTreeRequest,
+  CreateTreeResponse,
   CreationNode,
   CreationResponseNode,
   FinalizeNodeSignaturesResponse,
   NodeSignatures,
   PrepareTreeAddressRequest,
+  PrepareTreeAddressResponse,
   SigningJob,
   TreeNode,
 } from "../proto/spark";
@@ -104,8 +106,14 @@ export class TreeCreationService {
       children: tree,
     };
 
-    const response = await sparkClient.prepare_tree_address(request);
-    sparkClient.close?.();
+    let response: PrepareTreeAddressResponse;
+    try {
+      response = await sparkClient.prepare_tree_address(request);
+    } catch (error) {
+      throw new Error(`Error preparing tree address: ${error}`);
+    } finally {
+      sparkClient.close?.();
+    }
 
     if (!response.node) {
       throw new Error("No node found in response");
@@ -164,7 +172,13 @@ export class TreeCreationService {
       this.config
     );
 
-    const response = await sparkClient.create_tree(request);
+    let response: CreateTreeResponse;
+    try {
+      response = await sparkClient.create_tree(request);
+    } catch (error) {
+      sparkClient.close?.();
+      throw new Error(`Error creating tree: ${error}`);
+    }
 
     if (!response.node) {
       throw new Error("No node found in response");
@@ -180,11 +194,18 @@ export class TreeCreationService {
       creationResultTreeRoot
     );
 
-    const finalizeResp = await sparkClient.finalize_node_signatures({
-      nodeSignatures: nodeSignatures,
-    });
-
-    sparkClient.close?.();
+    let finalizeResp: FinalizeNodeSignaturesResponse;
+    try {
+      finalizeResp = await sparkClient.finalize_node_signatures({
+        nodeSignatures: nodeSignatures,
+      });
+    } catch (error) {
+      throw new Error(
+        `Error finalizing node signatures in tree creation: ${error}`
+      );
+    } finally {
+      sparkClient.close?.();
+    }
 
     return finalizeResp;
   }

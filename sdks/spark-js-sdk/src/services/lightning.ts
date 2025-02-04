@@ -3,8 +3,11 @@ import { secp256k1 } from "@noble/curves/secp256k1";
 import { sha256 } from "@scure/btc-signer/utils";
 import { randomUUID } from "crypto";
 import {
+  GetSigningCommitmentsResponse,
   InitiatePreimageSwapRequest_Reason,
   InitiatePreimageSwapResponse,
+  ProvidePreimageResponse,
+  QueryUserSignedRefundsResponse,
   RequestedSigningCommitments,
   Transfer,
   UserSignedRefund,
@@ -120,7 +123,7 @@ export class LightningService {
     await Promise.all(promises);
 
     if (errors.length > 0) {
-      throw errors[0];
+      throw new Error(`Error creating lightning invoice: ${errors[0]}`);
     }
 
     return invoice;
@@ -138,9 +141,15 @@ export class LightningService {
       this.config
     );
 
-    const signingCommitments = await sparkClient.get_signing_commitments({
-      nodeIds: leaves.map((leaf) => leaf.leaf.id),
-    });
+    let signingCommitments: GetSigningCommitmentsResponse;
+    try {
+      signingCommitments = await sparkClient.get_signing_commitments({
+        nodeIds: leaves.map((leaf) => leaf.leaf.id),
+      });
+    } catch (error) {
+      sparkClient.close?.();
+      throw new Error(`Error getting signing commitments: ${error}`);
+    }
 
     const userSignedRefunds = this.signRefunds(
       leaves,
@@ -155,24 +164,29 @@ export class LightningService {
       ? InitiatePreimageSwapRequest_Reason.REASON_RECEIVE
       : InitiatePreimageSwapRequest_Reason.REASON_SEND;
 
-    const response = await sparkClient.initiate_preimage_swap({
-      paymentHash,
-      userSignedRefunds,
-      reason,
-      invoiceAmount: {
-        invoiceAmountProof: {
-          bolt11Invoice: bolt11String,
+    let response: InitiatePreimageSwapResponse;
+    try {
+      response = await sparkClient.initiate_preimage_swap({
+        paymentHash,
+        userSignedRefunds,
+        reason,
+        invoiceAmount: {
+          invoiceAmountProof: {
+            bolt11Invoice: bolt11String,
+          },
         },
-      },
-      transfer: {
-        transferId,
-        ownerIdentityPublicKey: this.config.getIdentityPublicKey(),
+        transfer: {
+          transferId,
+          ownerIdentityPublicKey: this.config.getIdentityPublicKey(),
+          receiverIdentityPublicKey: receiverIdentityPubkey,
+        },
         receiverIdentityPublicKey: receiverIdentityPubkey,
-      },
-      receiverIdentityPublicKey: receiverIdentityPubkey,
-    });
-
-    sparkClient.close?.();
+      });
+    } catch (error) {
+      throw new Error(`Error initiating preimage swap: ${error}`);
+    } finally {
+      sparkClient.close?.();
+    }
 
     return response;
   }
@@ -185,11 +199,16 @@ export class LightningService {
       this.config
     );
 
-    const response = await sparkClient.query_user_signed_refunds({
-      paymentHash,
-    });
-
-    sparkClient.close?.();
+    let response: QueryUserSignedRefundsResponse;
+    try {
+      response = await sparkClient.query_user_signed_refunds({
+        paymentHash,
+      });
+    } catch (error) {
+      throw new Error(`Error querying user signed refunds: ${error}`);
+    } finally {
+      sparkClient.close?.();
+    }
 
     return response.userSignedRefunds;
   }
@@ -207,12 +226,16 @@ export class LightningService {
     );
 
     const paymentHash = sha256(preimage);
-    const response = await sparkClient.provide_preimage({
-      preimage,
-      paymentHash,
-    });
-
-    sparkClient.close?.();
+    let response: ProvidePreimageResponse;
+    try {
+      response = await sparkClient.provide_preimage({
+        preimage,
+        paymentHash,
+      });
+    } catch (error) {
+      sparkClient.close?.();
+      throw new Error(`Error providing preimage: ${error}`);
+    }
 
     if (!response.transfer) {
       throw new Error("No transfer returned from coordinator");

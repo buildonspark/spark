@@ -2,7 +2,11 @@ import { secp256k1 } from "@noble/curves/secp256k1";
 import { Transaction } from "@scure/btc-signer";
 import { TransactionInput } from "@scure/btc-signer/psbt";
 import { randomUUID } from "crypto";
-import { LeafRefundTxSigningJob, Transfer } from "../proto/spark";
+import {
+  CooperativeExitResponse,
+  LeafRefundTxSigningJob,
+  Transfer,
+} from "../proto/spark";
 import {
   getP2TRScriptFromPublicKey,
   getTxFromRawTxBytes,
@@ -11,6 +15,7 @@ import {
   getRandomSigningNonce,
   getSigningCommitmentFromNonce,
 } from "../utils/signing";
+import { getNextTransactionSequence } from "../utils/transaction";
 import { WalletConfigService } from "./config";
 import { ConnectionManager } from "./connection";
 import {
@@ -116,10 +121,9 @@ export class CoopExitService {
       const connectorOutput = connectorOutputs[i];
       const currentRefundTx = getTxFromRawTxBytes(leaf.leaf.refundTx);
 
-      const sequence =
-        (1 << 30) |
-        ((currentRefundTx.getInput(0).sequence || 0) &
-          (0xffff - TIME_LOCK_INTERVAL));
+      const sequence = getNextTransactionSequence(
+        currentRefundTx.getInput(0).sequence
+      );
 
       const refundTx = this.createConnectorRefundTransaction(
         sequence,
@@ -157,18 +161,25 @@ export class CoopExitService {
       this.config
     );
 
-    const response = await sparkClient.cooperative_exit({
-      transfer: {
-        transferId: randomUUID(),
-        leavesToSend: signingJobs,
-        ownerIdentityPublicKey: this.config.getIdentityPublicKey(),
-        receiverIdentityPublicKey: receiverPubKey,
-        expiryTime: new Date(Date.now() + 24 * 60 * 1000),
-      },
-      exitId: randomUUID(),
-      exitTxid: exitTxId,
-    });
-    sparkClient.close?.();
+    let response: CooperativeExitResponse;
+    try {
+      response = await sparkClient.cooperative_exit({
+        transfer: {
+          transferId: randomUUID(),
+          leavesToSend: signingJobs,
+          ownerIdentityPublicKey: this.config.getIdentityPublicKey(),
+          receiverIdentityPublicKey: receiverPubKey,
+          expiryTime: new Date(Date.now() + 24 * 60 * 1000),
+        },
+        exitId: randomUUID(),
+        exitTxid: exitTxId,
+      });
+    } catch (error) {
+      throw new Error(`Error initiating cooperative exit: ${error}`);
+    } finally {
+      sparkClient.close?.();
+    }
+
     if (!response.transfer) {
       throw new Error("Failed to initiate cooperative exit");
     }
