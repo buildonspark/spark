@@ -48,7 +48,6 @@ message ProposeTreeDenominationsRequest {
 }
 
 message ProposeTreeDenominationsResponse {
-    repeated uint64 denominations = 1; // For backwards compatibility.
-    repeated uint64 small_denominations = 2;
-    repeated uint64 large_denominations = 3;
+    repeated uint64 small_denominations = 1;
+    repeated uint64 large_denominations = 2;
 }
