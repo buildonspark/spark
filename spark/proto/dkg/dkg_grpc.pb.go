@@ -11,6 +11,7 @@ import (
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 // This is a compile-time assertion to ensure that this generated file
@@ -19,6 +20,7 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
+	DKGService_StartDkg_FullMethodName        = "/dkg.DKGService/start_dkg"
 	DKGService_InitiateDkg_FullMethodName     = "/dkg.DKGService/initiate_dkg"
 	DKGService_Round1Packages_FullMethodName  = "/dkg.DKGService/round1_packages"
 	DKGService_Round1Signature_FullMethodName = "/dkg.DKGService/round1_signature"
@@ -34,6 +36,11 @@ const (
 // This service is used to coordinate the Distributed Key Generation protocol for each participant
 // signing operator in a batch.
 type DKGServiceClient interface {
+	// Start the Distributed Key Generation protocol for a participant.
+	//
+	// This call will be made by a signing operator to the DKG coordinator to start the DKG
+	// protocol.
+	StartDkg(ctx context.Context, in *StartDkgRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// Initiate the Distributed Key Generation protocol for a participant.
 	//
 	// This will be called by the coordinator to initiate the DKG protocol. The call will be made
@@ -74,6 +81,16 @@ type dKGServiceClient struct {
 
 func NewDKGServiceClient(cc grpc.ClientConnInterface) DKGServiceClient {
 	return &dKGServiceClient{cc}
+}
+
+func (c *dKGServiceClient) StartDkg(ctx context.Context, in *StartDkgRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, DKGService_StartDkg_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *dKGServiceClient) InitiateDkg(ctx context.Context, in *InitiateDkgRequest, opts ...grpc.CallOption) (*InitiateDkgResponse, error) {
@@ -125,6 +142,11 @@ func (c *dKGServiceClient) Round2Packages(ctx context.Context, in *Round2Package
 // This service is used to coordinate the Distributed Key Generation protocol for each participant
 // signing operator in a batch.
 type DKGServiceServer interface {
+	// Start the Distributed Key Generation protocol for a participant.
+	//
+	// This call will be made by a signing operator to the DKG coordinator to start the DKG
+	// protocol.
+	StartDkg(context.Context, *StartDkgRequest) (*emptypb.Empty, error)
 	// Initiate the Distributed Key Generation protocol for a participant.
 	//
 	// This will be called by the coordinator to initiate the DKG protocol. The call will be made
@@ -167,6 +189,9 @@ type DKGServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedDKGServiceServer struct{}
 
+func (UnimplementedDKGServiceServer) StartDkg(context.Context, *StartDkgRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method StartDkg not implemented")
+}
 func (UnimplementedDKGServiceServer) InitiateDkg(context.Context, *InitiateDkgRequest) (*InitiateDkgResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method InitiateDkg not implemented")
 }
@@ -198,6 +223,24 @@ func RegisterDKGServiceServer(s grpc.ServiceRegistrar, srv DKGServiceServer) {
 		t.testEmbeddedByValue()
 	}
 	s.RegisterService(&DKGService_ServiceDesc, srv)
+}
+
+func _DKGService_StartDkg_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StartDkgRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DKGServiceServer).StartDkg(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DKGService_StartDkg_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DKGServiceServer).StartDkg(ctx, req.(*StartDkgRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _DKGService_InitiateDkg_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -279,6 +322,10 @@ var DKGService_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "dkg.DKGService",
 	HandlerType: (*DKGServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "start_dkg",
+			Handler:    _DKGService_StartDkg_Handler,
+		},
 		{
 			MethodName: "initiate_dkg",
 			Handler:    _DKGService_InitiateDkg_Handler,

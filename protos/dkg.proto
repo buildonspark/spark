@@ -5,6 +5,7 @@ package dkg;
 option go_package = "github.com/lightsparkdev/spark-go/proto/dkg";
 
 import "common.proto";
+import "google/protobuf/empty.proto";
 
 /*
  * Distributed Key Generation Service
@@ -13,6 +14,14 @@ import "common.proto";
  * signing operator in a batch.
  */
 service DKGService {
+    /*
+     * Start the Distributed Key Generation protocol for a participant.
+     *
+     * This call will be made by a signing operator to the DKG coordinator to start the DKG
+     * protocol.
+     */
+    rpc start_dkg(StartDkgRequest) returns (google.protobuf.Empty) {}
+
     /*
      * Initiate the Distributed Key Generation protocol for a participant.
      *
@@ -140,3 +149,8 @@ message Round2PackagesRequest {
 
 // Acknowledge the round2 packages from the participant.
 message Round2PackagesResponse {}
+
+message StartDkgRequest {
+    // The number of participants in the signing group.
+    int32 count = 1;
+}

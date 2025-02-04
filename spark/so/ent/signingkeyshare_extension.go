@@ -8,7 +8,9 @@ import (
 
 	"github.com/decred/dcrd/dcrec/secp256k1"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark-go"
 	"github.com/lightsparkdev/spark-go/common"
+	pbdkg "github.com/lightsparkdev/spark-go/proto/dkg"
 	pbfrost "github.com/lightsparkdev/spark-go/proto/frost"
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
 	"github.com/lightsparkdev/spark-go/so"
@@ -97,6 +99,23 @@ func MarkSigningKeysharesAsUsed(ctx context.Context, config *so.Config, ids []uu
 
 	if count != len(ids) {
 		return fmt.Errorf("some keyshares are not available in %v", ids)
+	}
+
+	remainingKeyshares, err := db.SigningKeyshare.Query().Where(
+		signingkeyshare.StatusEQ(schema.KeyshareStatusAvailable),
+		signingkeyshare.CoordinatorIndexEQ(config.Index),
+	).Count(context.Background())
+	if err != nil {
+		return err
+	}
+	log.Printf("Remaining keyshares: %v", remainingKeyshares)
+	if uint64(remainingKeyshares) < spark.DKGKeyThreshold {
+		go func() {
+			err := RunDKG(context.Background(), config)
+			if err != nil {
+				log.Printf("Error running DKG: %v", err)
+			}
+		}()
 	}
 
 	return nil
@@ -289,4 +308,38 @@ func AggregateKeyshares(ctx context.Context, config *so.Config, keyshares []*Sig
 	}
 
 	return updateKeyshare, nil
+}
+
+// RunDKGIfNeeded checks if the keyshare count is below the threshold and runs DKG if needed.
+func RunDKGIfNeeded(db *Tx, config *so.Config) error {
+	count, err := db.SigningKeyshare.Query().Where(
+		signingkeyshare.StatusEQ(schema.KeyshareStatusAvailable),
+		signingkeyshare.CoordinatorIndexEQ(config.Index),
+	).Count(context.Background())
+	if err != nil {
+		return err
+	}
+	if uint64(count) >= spark.DKGKeyThreshold {
+		return nil
+	}
+
+	return RunDKG(context.Background(), config)
+}
+
+func RunDKG(ctx context.Context, config *so.Config) error {
+	connection, err := common.NewGRPCConnection(config.DKGCoordinatorAddress)
+	if err != nil {
+		return err
+	}
+	defer connection.Close()
+	client := pbdkg.NewDKGServiceClient(connection)
+
+	_, err = client.StartDkg(ctx, &pbdkg.StartDkgRequest{
+		Count: spark.DKGKeyCount,
+	})
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

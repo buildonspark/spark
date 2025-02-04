@@ -1,6 +1,7 @@
 package grpctest
 
 import (
+	"context"
 	"testing"
 
 	"github.com/lightsparkdev/spark-go/so/dkg"
@@ -13,7 +14,7 @@ func TestDKG(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = dkg.GenerateKeys(config, 100)
+	err = dkg.GenerateKeys(context.Background(), config, 100)
 	if err != nil {
 		t.Fatal(err)
 	}

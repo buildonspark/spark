@@ -6,35 +6,14 @@ import (
 	"sync"
 
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark-go"
 	"github.com/lightsparkdev/spark-go/common"
 	pbcommon "github.com/lightsparkdev/spark-go/proto/common"
 	pbdkg "github.com/lightsparkdev/spark-go/proto/dkg"
 	"github.com/lightsparkdev/spark-go/so"
-	"github.com/lightsparkdev/spark-go/so/ent"
-	"github.com/lightsparkdev/spark-go/so/ent/schema"
-	"github.com/lightsparkdev/spark-go/so/ent/signingkeyshare"
 )
 
-// RunDKGIfNeeded checks if the keyshare count is below the threshold and runs DKG if needed.
-func RunDKGIfNeeded(db *ent.Tx, config *so.Config) error {
-	count, err := db.SigningKeyshare.Query().Where(
-		signingkeyshare.StatusEQ(schema.KeyshareStatusAvailable),
-		signingkeyshare.CoordinatorIndexEQ(config.Index),
-	).Count(context.Background())
-	if err != nil {
-		return err
-	}
-	if uint64(count) >= spark.DKGKeyThreshold {
-		return nil
-	}
-
-	log.Printf("DKG started, only %d keyshares available", count)
-	return GenerateKeys(config, spark.DKGKeyCount)
-}
-
 // GenerateKeys runs the DKG protocol to generate the keys.
-func GenerateKeys(config *so.Config, keyCount uint64) error {
+func GenerateKeys(ctx context.Context, config *so.Config, keyCount uint64) error {
 	log.Printf("Generating %d keys", keyCount)
 	// Init clients
 	clientMap := make(map[string]pbdkg.DKGServiceClient)
@@ -66,7 +45,7 @@ func GenerateKeys(config *so.Config, keyCount uint64) error {
 
 	for identifier, client := range clientMap {
 		log.Printf("Initiating DKG with %s", identifier)
-		round1Response, err := client.InitiateDkg(context.Background(), initRequest)
+		round1Response, err := client.InitiateDkg(ctx, initRequest)
 		if err != nil {
 			return err
 		}
@@ -88,7 +67,7 @@ func GenerateKeys(config *so.Config, keyCount uint64) error {
 			RequestId:      requestIDString,
 			Round1Packages: round1Packages,
 		}
-		round1SignatureResponse, err := client.Round1Packages(context.Background(), round1SignatureRequest)
+		round1SignatureResponse, err := client.Round1Packages(ctx, round1SignatureRequest)
 		if err != nil {
 			return err
 		}
@@ -106,7 +85,7 @@ func GenerateKeys(config *so.Config, keyCount uint64) error {
 				RequestId:        requestIDString,
 				Round1Signatures: round1Signatures,
 			}
-			round1SignatureResponse, err := client.Round1Signature(context.Background(), round1SignatureRequest)
+			round1SignatureResponse, err := client.Round1Signature(ctx, round1SignatureRequest)
 			if err != nil {
 				return
 			}

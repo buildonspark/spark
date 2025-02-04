@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"strconv"
 	"time"
 
 	"github.com/go-co-op/gocron/v2"
@@ -33,17 +34,19 @@ import (
 )
 
 type args struct {
-	Index              uint64
-	IdentityPrivateKey string
-	OperatorsFilePath  string
-	Threshold          uint64
-	SignerAddress      string
-	Port               uint64
-	DatabasePath       string
-	MockOnchain        bool
-	ChallengeTimeout   time.Duration
-	SessionDuration    time.Duration
-	AuthzEnforced      bool
+	Index                 uint64
+	IdentityPrivateKey    string
+	OperatorsFilePath     string
+	Threshold             uint64
+	SignerAddress         string
+	Port                  uint64
+	DatabasePath          string
+	MockOnchain           bool
+	ChallengeTimeout      time.Duration
+	SessionDuration       time.Duration
+	AuthzEnforced         bool
+	DKGCoordinatorAddress string
+	DisableDKG            bool
 }
 
 func loadArgs() (*args, error) {
@@ -61,6 +64,8 @@ func loadArgs() (*args, error) {
 	flag.DurationVar(&args.ChallengeTimeout, "challenge-timeout", time.Duration(time.Minute), "Challenge timeout")
 	flag.DurationVar(&args.SessionDuration, "session-duration", time.Duration(time.Minute*15), "Session duration")
 	flag.BoolVar(&args.AuthzEnforced, "authz-enforced", true, "Enforce authorization checks")
+	flag.StringVar(&args.DKGCoordinatorAddress, "dkg-address", "", "DKG coordinator address")
+	flag.BoolVar(&args.DisableDKG, "disable-dkg", false, "Disable DKG")
 	// Parse flags
 	flag.Parse()
 
@@ -84,6 +89,10 @@ func loadArgs() (*args, error) {
 		return nil, errors.New("database path is required")
 	}
 
+	if args.DKGCoordinatorAddress == "" {
+		args.DKGCoordinatorAddress = "localhost:" + strconv.Itoa(int(args.Port))
+	}
+
 	return args, nil
 }
 
@@ -103,6 +112,7 @@ func main() {
 		args.SignerAddress,
 		args.DatabasePath,
 		args.AuthzEnforced,
+		args.DKGCoordinatorAddress,
 	)
 	if err != nil {
 		log.Fatalf("Failed to create config: %v", err)
@@ -154,10 +164,6 @@ func main() {
 
 	s.Start()
 
-	go runDKGOnStartup(dbClient, config)
-
-	dkgServer := dkg.NewServer(frostConnection, config)
-
 	sessionTokenCreatorVerifier, err := authninternal.NewSessionTokenCreatorVerifier(config.IdentityPrivateKey, nil)
 	if err != nil {
 		log.Fatalf("Failed to create token verifier: %v", err)
@@ -167,7 +173,11 @@ func main() {
 		ent.DbSessionMiddleware(dbClient),
 		authn.NewAuthnInterceptor(sessionTokenCreatorVerifier).AuthnInterceptor,
 	)))
-	pbdkg.RegisterDKGServiceServer(grpcServer, dkgServer)
+
+	if !args.DisableDKG {
+		dkgServer := dkg.NewServer(frostConnection, config)
+		pbdkg.RegisterDKGServiceServer(grpcServer, dkgServer)
+	}
 
 	var onchainHelper helper.OnChainHelper = &helper.DemoOnChainHelper{}
 	if args.MockOnchain {
@@ -195,6 +205,8 @@ func main() {
 	pbauthn.RegisterSparkAuthnServiceServer(grpcServer, authnServer)
 
 	log.Printf("Serving on port %d\n", args.Port)
+
+	go runDKGOnStartup(dbClient, config)
 	if err := grpcServer.Serve(lis); err != nil {
 		log.Fatalf("Failed to serve: %v", err)
 	}
@@ -219,7 +231,7 @@ func runDKGOnStartup(dbClient *ent.Client, config *so.Config) {
 		}
 	}()
 
-	err = dkg.RunDKGIfNeeded(tx, config)
+	err = ent.RunDKGIfNeeded(tx, config)
 	if err != nil {
 		log.Fatalf("Failed to run DKG: %v", err)
 	}

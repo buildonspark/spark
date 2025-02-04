@@ -11,6 +11,7 @@ import (
 	pbfrost "github.com/lightsparkdev/spark-go/proto/frost"
 	"github.com/lightsparkdev/spark-go/so"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 // Server is the grpc server for the DKG protocol.
@@ -29,6 +30,14 @@ func NewServer(frostConnection *grpc.ClientConn, config *so.Config) *Server {
 		frostConnection: frostConnection,
 		config:          config,
 	}
+}
+
+func (s *Server) StartDkg(ctx context.Context, req *pbdkg.StartDkgRequest) (*emptypb.Empty, error) {
+	log.Println("start dkg", req.Count)
+	if err := GenerateKeys(ctx, s.config, uint64(req.Count)); err != nil {
+		return nil, err
+	}
+	return &emptypb.Empty{}, nil
 }
 
 // InitiateDkg initiates the DKG protocol.
@@ -102,7 +111,7 @@ func (s *Server) Round1Signature(ctx context.Context, req *pbdkg.Round1Signature
 		return nil, err
 	}
 
-	if validationFailures != nil && len(validationFailures) > 0 {
+	if len(validationFailures) > 0 {
 		return &pbdkg.Round1SignatureResponse{
 			Identifier:         s.config.Identifier,
 			ValidationFailures: validationFailures,
@@ -139,12 +148,12 @@ func (s *Server) Round1Signature(ctx context.Context, req *pbdkg.Round1Signature
 			log.Println("distributing round 2 package for request id", req.RequestId, "to", identifier, addr)
 			defer wg.Done()
 			connection, err := common.NewGRPCConnection(addr)
-			defer connection.Close()
-
 			if err != nil {
 				log.Println("error creating connection", err)
 				return
 			}
+			defer connection.Close()
+
 			client := pbdkg.NewDKGServiceClient(connection)
 
 			round2Packages := make([][]byte, len(round2Response.Round2Packages))
