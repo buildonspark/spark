@@ -130,7 +130,7 @@ func GenerateDepositAddressesForTree(
 	if parentNode != nil {
 		request.Source = &pb.PrepareTreeAddressRequest_ParentNodeOutput{
 			ParentNodeOutput: &pb.NodeOutput{
-				NodeId: *parentNode.ParentNodeId,
+				NodeId: parentNode.Id,
 				Vout:   uint32(vout),
 			},
 		}
@@ -555,7 +555,7 @@ func CreateTree(
 		}
 		request.Source = &pb.CreateTreeRequest_ParentNodeOutput{
 			ParentNodeOutput: &pb.NodeOutput{
-				NodeId: *parentNode.ParentNodeId,
+				NodeId: parentNode.Id,
 				Vout:   uint32(vout),
 			},
 		}
