@@ -317,7 +317,7 @@ func (h *TransferHandler) completeSendLeaf(ctx context.Context, transfer *ent.Tr
 		if err != nil {
 			return fmt.Errorf("unable to deserialize leaf tx: %v", err)
 		}
-		err = common.VerifySignature(refundTx, 0, leafNodeTx.TxOut[leaf.Vout])
+		err = common.VerifySignature(refundTx, 0, leafNodeTx.TxOut[0])
 		if err != nil {
 			return fmt.Errorf("unable to verify refund tx signature: %v", err)
 		}
