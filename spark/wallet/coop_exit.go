@@ -120,8 +120,12 @@ func signCoopExitRefunds(
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to parse refund tx: %v", err)
 		}
+		sequence, err := nextSequence(currentRefundTx.TxIn[0].Sequence)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to get next sequence: %v", err)
+		}
 		refundTx, err := createConnectorRefundTransaction(
-			nextSequence(currentRefundTx.TxIn[0].Sequence), &currentRefundTx.TxIn[0].PreviousOutPoint, connectorOutput, int64(leaf.Leaf.Value), receiverPubKey,
+			sequence, &currentRefundTx.TxIn[0].PreviousOutPoint, connectorOutput, int64(leaf.Leaf.Value), receiverPubKey,
 		)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to create refund transaction: %v", err)

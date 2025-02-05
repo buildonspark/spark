@@ -56,7 +56,10 @@ func AggregateTreeNodes(
 	aggregatedSigningPublicKey := secp256k1.PrivKeyFromBytes(aggregatedSigningKey).PubKey()
 
 	newRefundTx := wire.NewMsgTx(2)
-	sequence := nextSequence(parentNode.RefundTimelock)
+	sequence, err := nextSequence(parentNode.RefundTimelock)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get next sequence: %v", err)
+	}
 	newRefundTx.AddTxIn(&wire.TxIn{
 		PreviousOutPoint: wire.OutPoint{Hash: parentTx.TxHash(), Index: uint32(parentNode.Vout)},
 		SignatureScript:  nil,
