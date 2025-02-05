@@ -19,6 +19,9 @@ import (
 	"github.com/lightsparkdev/spark-go/so/ent/preimageshare"
 	"github.com/lightsparkdev/spark-go/so/ent/signingkeyshare"
 	"github.com/lightsparkdev/spark-go/so/ent/signingnonce"
+	"github.com/lightsparkdev/spark-go/so/ent/tokenissuance"
+	"github.com/lightsparkdev/spark-go/so/ent/tokenleaf"
+	"github.com/lightsparkdev/spark-go/so/ent/tokentransactionreceipt"
 	"github.com/lightsparkdev/spark-go/so/ent/transfer"
 	"github.com/lightsparkdev/spark-go/so/ent/transferleaf"
 	"github.com/lightsparkdev/spark-go/so/ent/tree"
@@ -84,18 +87,21 @@ var (
 func checkColumn(table, column string) error {
 	initCheck.Do(func() {
 		columnCheck = sql.NewColumnCheck(map[string]func(string) bool{
-			blockheight.Table:           blockheight.ValidColumn,
-			cooperativeexit.Table:       cooperativeexit.ValidColumn,
-			depositaddress.Table:        depositaddress.ValidColumn,
-			preimagerequest.Table:       preimagerequest.ValidColumn,
-			preimageshare.Table:         preimageshare.ValidColumn,
-			signingkeyshare.Table:       signingkeyshare.ValidColumn,
-			signingnonce.Table:          signingnonce.ValidColumn,
-			transfer.Table:              transfer.ValidColumn,
-			transferleaf.Table:          transferleaf.ValidColumn,
-			tree.Table:                  tree.ValidColumn,
-			treenode.Table:              treenode.ValidColumn,
-			usersignedtransaction.Table: usersignedtransaction.ValidColumn,
+			blockheight.Table:             blockheight.ValidColumn,
+			cooperativeexit.Table:         cooperativeexit.ValidColumn,
+			depositaddress.Table:          depositaddress.ValidColumn,
+			preimagerequest.Table:         preimagerequest.ValidColumn,
+			preimageshare.Table:           preimageshare.ValidColumn,
+			signingkeyshare.Table:         signingkeyshare.ValidColumn,
+			signingnonce.Table:            signingnonce.ValidColumn,
+			tokenissuance.Table:           tokenissuance.ValidColumn,
+			tokenleaf.Table:               tokenleaf.ValidColumn,
+			tokentransactionreceipt.Table: tokentransactionreceipt.ValidColumn,
+			transfer.Table:                transfer.ValidColumn,
+			transferleaf.Table:            transferleaf.ValidColumn,
+			tree.Table:                    tree.ValidColumn,
+			treenode.Table:                treenode.ValidColumn,
+			usersignedtransaction.Table:   usersignedtransaction.ValidColumn,
 		})
 	})
 	return columnCheck(table, column)

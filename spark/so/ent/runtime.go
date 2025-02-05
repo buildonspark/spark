@@ -14,6 +14,9 @@ import (
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
 	"github.com/lightsparkdev/spark-go/so/ent/signingkeyshare"
 	"github.com/lightsparkdev/spark-go/so/ent/signingnonce"
+	"github.com/lightsparkdev/spark-go/so/ent/tokenissuance"
+	"github.com/lightsparkdev/spark-go/so/ent/tokenleaf"
+	"github.com/lightsparkdev/spark-go/so/ent/tokentransactionreceipt"
 	"github.com/lightsparkdev/spark-go/so/ent/transfer"
 	"github.com/lightsparkdev/spark-go/so/ent/transferleaf"
 	"github.com/lightsparkdev/spark-go/so/ent/tree"
@@ -190,6 +193,87 @@ func init() {
 	signingnonceDescID := signingnonceMixinFields0[0].Descriptor()
 	// signingnonce.DefaultID holds the default value on creation for the id field.
 	signingnonce.DefaultID = signingnonceDescID.Default.(func() uuid.UUID)
+	tokenissuanceMixin := schema.TokenIssuance{}.Mixin()
+	tokenissuanceMixinFields0 := tokenissuanceMixin[0].Fields()
+	_ = tokenissuanceMixinFields0
+	tokenissuanceFields := schema.TokenIssuance{}.Fields()
+	_ = tokenissuanceFields
+	// tokenissuanceDescCreateTime is the schema descriptor for create_time field.
+	tokenissuanceDescCreateTime := tokenissuanceMixinFields0[1].Descriptor()
+	// tokenissuance.DefaultCreateTime holds the default value on creation for the create_time field.
+	tokenissuance.DefaultCreateTime = tokenissuanceDescCreateTime.Default.(func() time.Time)
+	// tokenissuanceDescUpdateTime is the schema descriptor for update_time field.
+	tokenissuanceDescUpdateTime := tokenissuanceMixinFields0[2].Descriptor()
+	// tokenissuance.DefaultUpdateTime holds the default value on creation for the update_time field.
+	tokenissuance.DefaultUpdateTime = tokenissuanceDescUpdateTime.Default.(func() time.Time)
+	// tokenissuance.UpdateDefaultUpdateTime holds the default value on update for the update_time field.
+	tokenissuance.UpdateDefaultUpdateTime = tokenissuanceDescUpdateTime.UpdateDefault.(func() time.Time)
+	// tokenissuanceDescIssuerPublicKey is the schema descriptor for issuer_public_key field.
+	tokenissuanceDescIssuerPublicKey := tokenissuanceFields[0].Descriptor()
+	// tokenissuance.IssuerPublicKeyValidator is a validator for the "issuer_public_key" field. It is called by the builders before save.
+	tokenissuance.IssuerPublicKeyValidator = tokenissuanceDescIssuerPublicKey.Validators[0].(func([]byte) error)
+	// tokenissuanceDescIssuerSignature is the schema descriptor for issuer_signature field.
+	tokenissuanceDescIssuerSignature := tokenissuanceFields[1].Descriptor()
+	// tokenissuance.IssuerSignatureValidator is a validator for the "issuer_signature" field. It is called by the builders before save.
+	tokenissuance.IssuerSignatureValidator = tokenissuanceDescIssuerSignature.Validators[0].(func([]byte) error)
+	// tokenissuanceDescID is the schema descriptor for id field.
+	tokenissuanceDescID := tokenissuanceMixinFields0[0].Descriptor()
+	// tokenissuance.DefaultID holds the default value on creation for the id field.
+	tokenissuance.DefaultID = tokenissuanceDescID.Default.(func() uuid.UUID)
+	tokenleafMixin := schema.TokenLeaf{}.Mixin()
+	tokenleafMixinFields0 := tokenleafMixin[0].Fields()
+	_ = tokenleafMixinFields0
+	tokenleafFields := schema.TokenLeaf{}.Fields()
+	_ = tokenleafFields
+	// tokenleafDescCreateTime is the schema descriptor for create_time field.
+	tokenleafDescCreateTime := tokenleafMixinFields0[1].Descriptor()
+	// tokenleaf.DefaultCreateTime holds the default value on creation for the create_time field.
+	tokenleaf.DefaultCreateTime = tokenleafDescCreateTime.Default.(func() time.Time)
+	// tokenleafDescUpdateTime is the schema descriptor for update_time field.
+	tokenleafDescUpdateTime := tokenleafMixinFields0[2].Descriptor()
+	// tokenleaf.DefaultUpdateTime holds the default value on creation for the update_time field.
+	tokenleaf.DefaultUpdateTime = tokenleafDescUpdateTime.Default.(func() time.Time)
+	// tokenleaf.UpdateDefaultUpdateTime holds the default value on update for the update_time field.
+	tokenleaf.UpdateDefaultUpdateTime = tokenleafDescUpdateTime.UpdateDefault.(func() time.Time)
+	// tokenleafDescOwnerPublicKey is the schema descriptor for owner_public_key field.
+	tokenleafDescOwnerPublicKey := tokenleafFields[1].Descriptor()
+	// tokenleaf.OwnerPublicKeyValidator is a validator for the "owner_public_key" field. It is called by the builders before save.
+	tokenleaf.OwnerPublicKeyValidator = tokenleafDescOwnerPublicKey.Validators[0].(func([]byte) error)
+	// tokenleafDescTokenPublicKey is the schema descriptor for token_public_key field.
+	tokenleafDescTokenPublicKey := tokenleafFields[5].Descriptor()
+	// tokenleaf.TokenPublicKeyValidator is a validator for the "token_public_key" field. It is called by the builders before save.
+	tokenleaf.TokenPublicKeyValidator = tokenleafDescTokenPublicKey.Validators[0].(func([]byte) error)
+	// tokenleafDescTokenAmount is the schema descriptor for token_amount field.
+	tokenleafDescTokenAmount := tokenleafFields[6].Descriptor()
+	// tokenleaf.TokenAmountValidator is a validator for the "token_amount" field. It is called by the builders before save.
+	tokenleaf.TokenAmountValidator = tokenleafDescTokenAmount.Validators[0].(func([]byte) error)
+	// tokenleafDescID is the schema descriptor for id field.
+	tokenleafDescID := tokenleafMixinFields0[0].Descriptor()
+	// tokenleaf.DefaultID holds the default value on creation for the id field.
+	tokenleaf.DefaultID = tokenleafDescID.Default.(func() uuid.UUID)
+	tokentransactionreceiptMixin := schema.TokenTransactionReceipt{}.Mixin()
+	tokentransactionreceiptMixinFields0 := tokentransactionreceiptMixin[0].Fields()
+	_ = tokentransactionreceiptMixinFields0
+	tokentransactionreceiptFields := schema.TokenTransactionReceipt{}.Fields()
+	_ = tokentransactionreceiptFields
+	// tokentransactionreceiptDescCreateTime is the schema descriptor for create_time field.
+	tokentransactionreceiptDescCreateTime := tokentransactionreceiptMixinFields0[1].Descriptor()
+	// tokentransactionreceipt.DefaultCreateTime holds the default value on creation for the create_time field.
+	tokentransactionreceipt.DefaultCreateTime = tokentransactionreceiptDescCreateTime.Default.(func() time.Time)
+	// tokentransactionreceiptDescUpdateTime is the schema descriptor for update_time field.
+	tokentransactionreceiptDescUpdateTime := tokentransactionreceiptMixinFields0[2].Descriptor()
+	// tokentransactionreceipt.DefaultUpdateTime holds the default value on creation for the update_time field.
+	tokentransactionreceipt.DefaultUpdateTime = tokentransactionreceiptDescUpdateTime.Default.(func() time.Time)
+	// tokentransactionreceipt.UpdateDefaultUpdateTime holds the default value on update for the update_time field.
+	tokentransactionreceipt.UpdateDefaultUpdateTime = tokentransactionreceiptDescUpdateTime.UpdateDefault.(func() time.Time)
+	// tokentransactionreceiptDescPartialTokenTransactionHash is the schema descriptor for partial_token_transaction_hash field.
+	tokentransactionreceiptDescPartialTokenTransactionHash := tokentransactionreceiptFields[0].Descriptor()
+	// tokentransactionreceipt.PartialTokenTransactionHashValidator is a validator for the "partial_token_transaction_hash" field. It is called by the builders before save.
+	tokentransactionreceipt.PartialTokenTransactionHashValidator = tokentransactionreceiptDescPartialTokenTransactionHash.Validators[0].(func([]byte) error)
+	// tokentransactionreceiptDescID is the schema descriptor for id field.
+	tokentransactionreceiptDescID := tokentransactionreceiptMixinFields0[0].Descriptor()
+	// tokentransactionreceipt.DefaultID holds the default value on creation for the id field.
+	tokentransactionreceipt.DefaultID = tokentransactionreceiptDescID.Default.(func() uuid.UUID)
 	transferMixin := schema.Transfer{}.Mixin()
 	transferMixinFields0 := transferMixin[0].Fields()
 	_ = transferMixinFields0

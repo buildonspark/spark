@@ -185,6 +185,108 @@ var (
 			},
 		},
 	}
+	// TokenIssuancesColumns holds the columns for the "token_issuances" table.
+	TokenIssuancesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUUID},
+		{Name: "create_time", Type: field.TypeTime},
+		{Name: "update_time", Type: field.TypeTime},
+		{Name: "issuer_public_key", Type: field.TypeBytes, Unique: true},
+		{Name: "issuer_signature", Type: field.TypeBytes, Unique: true},
+	}
+	// TokenIssuancesTable holds the schema information for the "token_issuances" table.
+	TokenIssuancesTable = &schema.Table{
+		Name:       "token_issuances",
+		Columns:    TokenIssuancesColumns,
+		PrimaryKey: []*schema.Column{TokenIssuancesColumns[0]},
+	}
+	// TokenLeafsColumns holds the columns for the "token_leafs" table.
+	TokenLeafsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUUID},
+		{Name: "create_time", Type: field.TypeTime},
+		{Name: "update_time", Type: field.TypeTime},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"CREATED_UNSIGNED", "CREATED_SIGNED", "CREATED_FINALIZED", "SPENT_UNSIGNED", "SPENT_SIGNED", "SPENT_FINALIZED"}},
+		{Name: "owner_public_key", Type: field.TypeBytes},
+		{Name: "withdrawal_bond_sats", Type: field.TypeUint64},
+		{Name: "withdrawal_locktime", Type: field.TypeUint64},
+		{Name: "withdrawal_revocation_public_key", Type: field.TypeBytes},
+		{Name: "token_public_key", Type: field.TypeBytes},
+		{Name: "token_amount", Type: field.TypeBytes},
+		{Name: "leaf_created_transaction_ouput_vout", Type: field.TypeUint32},
+		{Name: "leaf_spent_ownership_signature", Type: field.TypeBytes, Nullable: true},
+		{Name: "leaf_spent_transaction_input_vout", Type: field.TypeUint32, Nullable: true},
+		{Name: "leaf_spent_revocation_private_key", Type: field.TypeBytes, Nullable: true},
+		{Name: "token_leaf_revocation_keyshare", Type: field.TypeUUID},
+		{Name: "token_leaf_leaf_created_token_transaction_receipt", Type: field.TypeUUID, Nullable: true},
+		{Name: "token_leaf_leaf_spent_token_transaction_receipt", Type: field.TypeUUID, Nullable: true},
+	}
+	// TokenLeafsTable holds the schema information for the "token_leafs" table.
+	TokenLeafsTable = &schema.Table{
+		Name:       "token_leafs",
+		Columns:    TokenLeafsColumns,
+		PrimaryKey: []*schema.Column{TokenLeafsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "token_leafs_signing_keyshares_revocation_keyshare",
+				Columns:    []*schema.Column{TokenLeafsColumns[14]},
+				RefColumns: []*schema.Column{SigningKeysharesColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "token_leafs_token_transaction_receipts_leaf_created_token_transaction_receipt",
+				Columns:    []*schema.Column{TokenLeafsColumns[15]},
+				RefColumns: []*schema.Column{TokenTransactionReceiptsColumns[0]},
+				OnDelete:   schema.SetNull,
+			},
+			{
+				Symbol:     "token_leafs_token_transaction_receipts_leaf_spent_token_transaction_receipt",
+				Columns:    []*schema.Column{TokenLeafsColumns[16]},
+				RefColumns: []*schema.Column{TokenTransactionReceiptsColumns[0]},
+				OnDelete:   schema.SetNull,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "tokenleaf_owner_public_key",
+				Unique:  false,
+				Columns: []*schema.Column{TokenLeafsColumns[4]},
+			},
+		},
+	}
+	// TokenTransactionReceiptsColumns holds the columns for the "token_transaction_receipts" table.
+	TokenTransactionReceiptsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUUID},
+		{Name: "create_time", Type: field.TypeTime},
+		{Name: "update_time", Type: field.TypeTime},
+		{Name: "partial_token_transaction_hash", Type: field.TypeBytes},
+		{Name: "finalized_token_transaction_hash", Type: field.TypeBytes, Nullable: true},
+		{Name: "token_issuance_token_transaction_receipt_issuance", Type: field.TypeUUID, Unique: true, Nullable: true},
+	}
+	// TokenTransactionReceiptsTable holds the schema information for the "token_transaction_receipts" table.
+	TokenTransactionReceiptsTable = &schema.Table{
+		Name:       "token_transaction_receipts",
+		Columns:    TokenTransactionReceiptsColumns,
+		PrimaryKey: []*schema.Column{TokenTransactionReceiptsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "token_transaction_receipts_token_issuances_token_transaction_receipt_issuance",
+				Columns:    []*schema.Column{TokenTransactionReceiptsColumns[5]},
+				RefColumns: []*schema.Column{TokenIssuancesColumns[0]},
+				OnDelete:   schema.SetNull,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "tokentransactionreceipt_partial_token_transaction_hash",
+				Unique:  false,
+				Columns: []*schema.Column{TokenTransactionReceiptsColumns[3]},
+			},
+			{
+				Name:    "tokentransactionreceipt_finalized_token_transaction_hash",
+				Unique:  false,
+				Columns: []*schema.Column{TokenTransactionReceiptsColumns[4]},
+			},
+		},
+	}
 	// TransfersColumns holds the columns for the "transfers" table.
 	TransfersColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeUUID},
@@ -390,6 +492,9 @@ var (
 		PreimageSharesTable,
 		SigningKeysharesTable,
 		SigningNoncesTable,
+		TokenIssuancesTable,
+		TokenLeafsTable,
+		TokenTransactionReceiptsTable,
 		TransfersTable,
 		TransferLeafsTable,
 		TreesTable,
@@ -403,6 +508,10 @@ func init() {
 	DepositAddressesTable.ForeignKeys[0].RefTable = SigningKeysharesTable
 	PreimageRequestsTable.ForeignKeys[0].RefTable = TransfersTable
 	PreimageSharesTable.ForeignKeys[0].RefTable = PreimageRequestsTable
+	TokenLeafsTable.ForeignKeys[0].RefTable = SigningKeysharesTable
+	TokenLeafsTable.ForeignKeys[1].RefTable = TokenTransactionReceiptsTable
+	TokenLeafsTable.ForeignKeys[2].RefTable = TokenTransactionReceiptsTable
+	TokenTransactionReceiptsTable.ForeignKeys[0].RefTable = TokenIssuancesTable
 	TransferLeafsTable.ForeignKeys[0].RefTable = TransfersTable
 	TransferLeafsTable.ForeignKeys[1].RefTable = TreeNodesTable
 	TreesTable.ForeignKeys[0].RefTable = TreeNodesTable

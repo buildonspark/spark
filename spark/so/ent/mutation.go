@@ -21,6 +21,9 @@ import (
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
 	"github.com/lightsparkdev/spark-go/so/ent/signingkeyshare"
 	"github.com/lightsparkdev/spark-go/so/ent/signingnonce"
+	"github.com/lightsparkdev/spark-go/so/ent/tokenissuance"
+	"github.com/lightsparkdev/spark-go/so/ent/tokenleaf"
+	"github.com/lightsparkdev/spark-go/so/ent/tokentransactionreceipt"
 	"github.com/lightsparkdev/spark-go/so/ent/transfer"
 	"github.com/lightsparkdev/spark-go/so/ent/transferleaf"
 	"github.com/lightsparkdev/spark-go/so/ent/tree"
@@ -37,18 +40,21 @@ const (
 	OpUpdateOne = ent.OpUpdateOne
 
 	// Node types.
-	TypeBlockHeight           = "BlockHeight"
-	TypeCooperativeExit       = "CooperativeExit"
-	TypeDepositAddress        = "DepositAddress"
-	TypePreimageRequest       = "PreimageRequest"
-	TypePreimageShare         = "PreimageShare"
-	TypeSigningKeyshare       = "SigningKeyshare"
-	TypeSigningNonce          = "SigningNonce"
-	TypeTransfer              = "Transfer"
-	TypeTransferLeaf          = "TransferLeaf"
-	TypeTree                  = "Tree"
-	TypeTreeNode              = "TreeNode"
-	TypeUserSignedTransaction = "UserSignedTransaction"
+	TypeBlockHeight             = "BlockHeight"
+	TypeCooperativeExit         = "CooperativeExit"
+	TypeDepositAddress          = "DepositAddress"
+	TypePreimageRequest         = "PreimageRequest"
+	TypePreimageShare           = "PreimageShare"
+	TypeSigningKeyshare         = "SigningKeyshare"
+	TypeSigningNonce            = "SigningNonce"
+	TypeTokenIssuance           = "TokenIssuance"
+	TypeTokenLeaf               = "TokenLeaf"
+	TypeTokenTransactionReceipt = "TokenTransactionReceipt"
+	TypeTransfer                = "Transfer"
+	TypeTransferLeaf            = "TransferLeaf"
+	TypeTree                    = "Tree"
+	TypeTreeNode                = "TreeNode"
+	TypeUserSignedTransaction   = "UserSignedTransaction"
 )
 
 // BlockHeightMutation represents an operation that mutates the BlockHeight nodes in the graph.
@@ -4551,6 +4557,2679 @@ func (m *SigningNonceMutation) ClearEdge(name string) error {
 // It returns an error if the edge is not defined in the schema.
 func (m *SigningNonceMutation) ResetEdge(name string) error {
 	return fmt.Errorf("unknown SigningNonce edge %s", name)
+}
+
+// TokenIssuanceMutation represents an operation that mutates the TokenIssuance nodes in the graph.
+type TokenIssuanceMutation struct {
+	config
+	op                                        Op
+	typ                                       string
+	id                                        *uuid.UUID
+	create_time                               *time.Time
+	update_time                               *time.Time
+	issuer_public_key                         *[]byte
+	issuer_signature                          *[]byte
+	clearedFields                             map[string]struct{}
+	token_transaction_receipt_issuance        *uuid.UUID
+	clearedtoken_transaction_receipt_issuance bool
+	done                                      bool
+	oldValue                                  func(context.Context) (*TokenIssuance, error)
+	predicates                                []predicate.TokenIssuance
+}
+
+var _ ent.Mutation = (*TokenIssuanceMutation)(nil)
+
+// tokenissuanceOption allows management of the mutation configuration using functional options.
+type tokenissuanceOption func(*TokenIssuanceMutation)
+
+// newTokenIssuanceMutation creates new mutation for the TokenIssuance entity.
+func newTokenIssuanceMutation(c config, op Op, opts ...tokenissuanceOption) *TokenIssuanceMutation {
+	m := &TokenIssuanceMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeTokenIssuance,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withTokenIssuanceID sets the ID field of the mutation.
+func withTokenIssuanceID(id uuid.UUID) tokenissuanceOption {
+	return func(m *TokenIssuanceMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *TokenIssuance
+		)
+		m.oldValue = func(ctx context.Context) (*TokenIssuance, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().TokenIssuance.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withTokenIssuance sets the old TokenIssuance of the mutation.
+func withTokenIssuance(node *TokenIssuance) tokenissuanceOption {
+	return func(m *TokenIssuanceMutation) {
+		m.oldValue = func(context.Context) (*TokenIssuance, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m TokenIssuanceMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m TokenIssuanceMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of TokenIssuance entities.
+func (m *TokenIssuanceMutation) SetID(id uuid.UUID) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *TokenIssuanceMutation) ID() (id uuid.UUID, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *TokenIssuanceMutation) IDs(ctx context.Context) ([]uuid.UUID, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []uuid.UUID{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().TokenIssuance.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetCreateTime sets the "create_time" field.
+func (m *TokenIssuanceMutation) SetCreateTime(t time.Time) {
+	m.create_time = &t
+}
+
+// CreateTime returns the value of the "create_time" field in the mutation.
+func (m *TokenIssuanceMutation) CreateTime() (r time.Time, exists bool) {
+	v := m.create_time
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreateTime returns the old "create_time" field's value of the TokenIssuance entity.
+// If the TokenIssuance object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenIssuanceMutation) OldCreateTime(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreateTime is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreateTime requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreateTime: %w", err)
+	}
+	return oldValue.CreateTime, nil
+}
+
+// ResetCreateTime resets all changes to the "create_time" field.
+func (m *TokenIssuanceMutation) ResetCreateTime() {
+	m.create_time = nil
+}
+
+// SetUpdateTime sets the "update_time" field.
+func (m *TokenIssuanceMutation) SetUpdateTime(t time.Time) {
+	m.update_time = &t
+}
+
+// UpdateTime returns the value of the "update_time" field in the mutation.
+func (m *TokenIssuanceMutation) UpdateTime() (r time.Time, exists bool) {
+	v := m.update_time
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdateTime returns the old "update_time" field's value of the TokenIssuance entity.
+// If the TokenIssuance object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenIssuanceMutation) OldUpdateTime(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdateTime is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdateTime requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdateTime: %w", err)
+	}
+	return oldValue.UpdateTime, nil
+}
+
+// ResetUpdateTime resets all changes to the "update_time" field.
+func (m *TokenIssuanceMutation) ResetUpdateTime() {
+	m.update_time = nil
+}
+
+// SetIssuerPublicKey sets the "issuer_public_key" field.
+func (m *TokenIssuanceMutation) SetIssuerPublicKey(b []byte) {
+	m.issuer_public_key = &b
+}
+
+// IssuerPublicKey returns the value of the "issuer_public_key" field in the mutation.
+func (m *TokenIssuanceMutation) IssuerPublicKey() (r []byte, exists bool) {
+	v := m.issuer_public_key
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldIssuerPublicKey returns the old "issuer_public_key" field's value of the TokenIssuance entity.
+// If the TokenIssuance object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenIssuanceMutation) OldIssuerPublicKey(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldIssuerPublicKey is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldIssuerPublicKey requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldIssuerPublicKey: %w", err)
+	}
+	return oldValue.IssuerPublicKey, nil
+}
+
+// ResetIssuerPublicKey resets all changes to the "issuer_public_key" field.
+func (m *TokenIssuanceMutation) ResetIssuerPublicKey() {
+	m.issuer_public_key = nil
+}
+
+// SetIssuerSignature sets the "issuer_signature" field.
+func (m *TokenIssuanceMutation) SetIssuerSignature(b []byte) {
+	m.issuer_signature = &b
+}
+
+// IssuerSignature returns the value of the "issuer_signature" field in the mutation.
+func (m *TokenIssuanceMutation) IssuerSignature() (r []byte, exists bool) {
+	v := m.issuer_signature
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldIssuerSignature returns the old "issuer_signature" field's value of the TokenIssuance entity.
+// If the TokenIssuance object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenIssuanceMutation) OldIssuerSignature(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldIssuerSignature is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldIssuerSignature requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldIssuerSignature: %w", err)
+	}
+	return oldValue.IssuerSignature, nil
+}
+
+// ResetIssuerSignature resets all changes to the "issuer_signature" field.
+func (m *TokenIssuanceMutation) ResetIssuerSignature() {
+	m.issuer_signature = nil
+}
+
+// SetTokenTransactionReceiptIssuanceID sets the "token_transaction_receipt_issuance" edge to the TokenTransactionReceipt entity by id.
+func (m *TokenIssuanceMutation) SetTokenTransactionReceiptIssuanceID(id uuid.UUID) {
+	m.token_transaction_receipt_issuance = &id
+}
+
+// ClearTokenTransactionReceiptIssuance clears the "token_transaction_receipt_issuance" edge to the TokenTransactionReceipt entity.
+func (m *TokenIssuanceMutation) ClearTokenTransactionReceiptIssuance() {
+	m.clearedtoken_transaction_receipt_issuance = true
+}
+
+// TokenTransactionReceiptIssuanceCleared reports if the "token_transaction_receipt_issuance" edge to the TokenTransactionReceipt entity was cleared.
+func (m *TokenIssuanceMutation) TokenTransactionReceiptIssuanceCleared() bool {
+	return m.clearedtoken_transaction_receipt_issuance
+}
+
+// TokenTransactionReceiptIssuanceID returns the "token_transaction_receipt_issuance" edge ID in the mutation.
+func (m *TokenIssuanceMutation) TokenTransactionReceiptIssuanceID() (id uuid.UUID, exists bool) {
+	if m.token_transaction_receipt_issuance != nil {
+		return *m.token_transaction_receipt_issuance, true
+	}
+	return
+}
+
+// TokenTransactionReceiptIssuanceIDs returns the "token_transaction_receipt_issuance" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// TokenTransactionReceiptIssuanceID instead. It exists only for internal usage by the builders.
+func (m *TokenIssuanceMutation) TokenTransactionReceiptIssuanceIDs() (ids []uuid.UUID) {
+	if id := m.token_transaction_receipt_issuance; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetTokenTransactionReceiptIssuance resets all changes to the "token_transaction_receipt_issuance" edge.
+func (m *TokenIssuanceMutation) ResetTokenTransactionReceiptIssuance() {
+	m.token_transaction_receipt_issuance = nil
+	m.clearedtoken_transaction_receipt_issuance = false
+}
+
+// Where appends a list predicates to the TokenIssuanceMutation builder.
+func (m *TokenIssuanceMutation) Where(ps ...predicate.TokenIssuance) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the TokenIssuanceMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *TokenIssuanceMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.TokenIssuance, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *TokenIssuanceMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *TokenIssuanceMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (TokenIssuance).
+func (m *TokenIssuanceMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *TokenIssuanceMutation) Fields() []string {
+	fields := make([]string, 0, 4)
+	if m.create_time != nil {
+		fields = append(fields, tokenissuance.FieldCreateTime)
+	}
+	if m.update_time != nil {
+		fields = append(fields, tokenissuance.FieldUpdateTime)
+	}
+	if m.issuer_public_key != nil {
+		fields = append(fields, tokenissuance.FieldIssuerPublicKey)
+	}
+	if m.issuer_signature != nil {
+		fields = append(fields, tokenissuance.FieldIssuerSignature)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *TokenIssuanceMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case tokenissuance.FieldCreateTime:
+		return m.CreateTime()
+	case tokenissuance.FieldUpdateTime:
+		return m.UpdateTime()
+	case tokenissuance.FieldIssuerPublicKey:
+		return m.IssuerPublicKey()
+	case tokenissuance.FieldIssuerSignature:
+		return m.IssuerSignature()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *TokenIssuanceMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case tokenissuance.FieldCreateTime:
+		return m.OldCreateTime(ctx)
+	case tokenissuance.FieldUpdateTime:
+		return m.OldUpdateTime(ctx)
+	case tokenissuance.FieldIssuerPublicKey:
+		return m.OldIssuerPublicKey(ctx)
+	case tokenissuance.FieldIssuerSignature:
+		return m.OldIssuerSignature(ctx)
+	}
+	return nil, fmt.Errorf("unknown TokenIssuance field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *TokenIssuanceMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case tokenissuance.FieldCreateTime:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreateTime(v)
+		return nil
+	case tokenissuance.FieldUpdateTime:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdateTime(v)
+		return nil
+	case tokenissuance.FieldIssuerPublicKey:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetIssuerPublicKey(v)
+		return nil
+	case tokenissuance.FieldIssuerSignature:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetIssuerSignature(v)
+		return nil
+	}
+	return fmt.Errorf("unknown TokenIssuance field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *TokenIssuanceMutation) AddedFields() []string {
+	return nil
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *TokenIssuanceMutation) AddedField(name string) (ent.Value, bool) {
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *TokenIssuanceMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	}
+	return fmt.Errorf("unknown TokenIssuance numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *TokenIssuanceMutation) ClearedFields() []string {
+	return nil
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *TokenIssuanceMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *TokenIssuanceMutation) ClearField(name string) error {
+	return fmt.Errorf("unknown TokenIssuance nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *TokenIssuanceMutation) ResetField(name string) error {
+	switch name {
+	case tokenissuance.FieldCreateTime:
+		m.ResetCreateTime()
+		return nil
+	case tokenissuance.FieldUpdateTime:
+		m.ResetUpdateTime()
+		return nil
+	case tokenissuance.FieldIssuerPublicKey:
+		m.ResetIssuerPublicKey()
+		return nil
+	case tokenissuance.FieldIssuerSignature:
+		m.ResetIssuerSignature()
+		return nil
+	}
+	return fmt.Errorf("unknown TokenIssuance field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *TokenIssuanceMutation) AddedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.token_transaction_receipt_issuance != nil {
+		edges = append(edges, tokenissuance.EdgeTokenTransactionReceiptIssuance)
+	}
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *TokenIssuanceMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case tokenissuance.EdgeTokenTransactionReceiptIssuance:
+		if id := m.token_transaction_receipt_issuance; id != nil {
+			return []ent.Value{*id}
+		}
+	}
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *TokenIssuanceMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 1)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *TokenIssuanceMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *TokenIssuanceMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.clearedtoken_transaction_receipt_issuance {
+		edges = append(edges, tokenissuance.EdgeTokenTransactionReceiptIssuance)
+	}
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *TokenIssuanceMutation) EdgeCleared(name string) bool {
+	switch name {
+	case tokenissuance.EdgeTokenTransactionReceiptIssuance:
+		return m.clearedtoken_transaction_receipt_issuance
+	}
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *TokenIssuanceMutation) ClearEdge(name string) error {
+	switch name {
+	case tokenissuance.EdgeTokenTransactionReceiptIssuance:
+		m.ClearTokenTransactionReceiptIssuance()
+		return nil
+	}
+	return fmt.Errorf("unknown TokenIssuance unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *TokenIssuanceMutation) ResetEdge(name string) error {
+	switch name {
+	case tokenissuance.EdgeTokenTransactionReceiptIssuance:
+		m.ResetTokenTransactionReceiptIssuance()
+		return nil
+	}
+	return fmt.Errorf("unknown TokenIssuance edge %s", name)
+}
+
+// TokenLeafMutation represents an operation that mutates the TokenLeaf nodes in the graph.
+type TokenLeafMutation struct {
+	config
+	op                                            Op
+	typ                                           string
+	id                                            *uuid.UUID
+	create_time                                   *time.Time
+	update_time                                   *time.Time
+	status                                        *schema.TokenLeafStatus
+	owner_public_key                              *[]byte
+	withdrawal_bond_sats                          *uint64
+	addwithdrawal_bond_sats                       *int64
+	withdrawal_locktime                           *uint64
+	addwithdrawal_locktime                        *int64
+	withdrawal_revocation_public_key              *[]byte
+	token_public_key                              *[]byte
+	token_amount                                  *[]byte
+	leaf_created_transaction_ouput_vout           *uint32
+	addleaf_created_transaction_ouput_vout        *int32
+	leaf_spent_ownership_signature                *[]byte
+	leaf_spent_transaction_input_vout             *uint32
+	addleaf_spent_transaction_input_vout          *int32
+	leaf_spent_revocation_private_key             *[]byte
+	clearedFields                                 map[string]struct{}
+	revocation_keyshare                           *uuid.UUID
+	clearedrevocation_keyshare                    bool
+	leaf_created_token_transaction_receipt        *uuid.UUID
+	clearedleaf_created_token_transaction_receipt bool
+	leaf_spent_token_transaction_receipt          *uuid.UUID
+	clearedleaf_spent_token_transaction_receipt   bool
+	done                                          bool
+	oldValue                                      func(context.Context) (*TokenLeaf, error)
+	predicates                                    []predicate.TokenLeaf
+}
+
+var _ ent.Mutation = (*TokenLeafMutation)(nil)
+
+// tokenleafOption allows management of the mutation configuration using functional options.
+type tokenleafOption func(*TokenLeafMutation)
+
+// newTokenLeafMutation creates new mutation for the TokenLeaf entity.
+func newTokenLeafMutation(c config, op Op, opts ...tokenleafOption) *TokenLeafMutation {
+	m := &TokenLeafMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeTokenLeaf,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withTokenLeafID sets the ID field of the mutation.
+func withTokenLeafID(id uuid.UUID) tokenleafOption {
+	return func(m *TokenLeafMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *TokenLeaf
+		)
+		m.oldValue = func(ctx context.Context) (*TokenLeaf, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().TokenLeaf.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withTokenLeaf sets the old TokenLeaf of the mutation.
+func withTokenLeaf(node *TokenLeaf) tokenleafOption {
+	return func(m *TokenLeafMutation) {
+		m.oldValue = func(context.Context) (*TokenLeaf, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m TokenLeafMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m TokenLeafMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of TokenLeaf entities.
+func (m *TokenLeafMutation) SetID(id uuid.UUID) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *TokenLeafMutation) ID() (id uuid.UUID, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *TokenLeafMutation) IDs(ctx context.Context) ([]uuid.UUID, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []uuid.UUID{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().TokenLeaf.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetCreateTime sets the "create_time" field.
+func (m *TokenLeafMutation) SetCreateTime(t time.Time) {
+	m.create_time = &t
+}
+
+// CreateTime returns the value of the "create_time" field in the mutation.
+func (m *TokenLeafMutation) CreateTime() (r time.Time, exists bool) {
+	v := m.create_time
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreateTime returns the old "create_time" field's value of the TokenLeaf entity.
+// If the TokenLeaf object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenLeafMutation) OldCreateTime(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreateTime is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreateTime requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreateTime: %w", err)
+	}
+	return oldValue.CreateTime, nil
+}
+
+// ResetCreateTime resets all changes to the "create_time" field.
+func (m *TokenLeafMutation) ResetCreateTime() {
+	m.create_time = nil
+}
+
+// SetUpdateTime sets the "update_time" field.
+func (m *TokenLeafMutation) SetUpdateTime(t time.Time) {
+	m.update_time = &t
+}
+
+// UpdateTime returns the value of the "update_time" field in the mutation.
+func (m *TokenLeafMutation) UpdateTime() (r time.Time, exists bool) {
+	v := m.update_time
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdateTime returns the old "update_time" field's value of the TokenLeaf entity.
+// If the TokenLeaf object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenLeafMutation) OldUpdateTime(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdateTime is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdateTime requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdateTime: %w", err)
+	}
+	return oldValue.UpdateTime, nil
+}
+
+// ResetUpdateTime resets all changes to the "update_time" field.
+func (m *TokenLeafMutation) ResetUpdateTime() {
+	m.update_time = nil
+}
+
+// SetStatus sets the "status" field.
+func (m *TokenLeafMutation) SetStatus(sls schema.TokenLeafStatus) {
+	m.status = &sls
+}
+
+// Status returns the value of the "status" field in the mutation.
+func (m *TokenLeafMutation) Status() (r schema.TokenLeafStatus, exists bool) {
+	v := m.status
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStatus returns the old "status" field's value of the TokenLeaf entity.
+// If the TokenLeaf object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenLeafMutation) OldStatus(ctx context.Context) (v schema.TokenLeafStatus, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStatus is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStatus requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStatus: %w", err)
+	}
+	return oldValue.Status, nil
+}
+
+// ResetStatus resets all changes to the "status" field.
+func (m *TokenLeafMutation) ResetStatus() {
+	m.status = nil
+}
+
+// SetOwnerPublicKey sets the "owner_public_key" field.
+func (m *TokenLeafMutation) SetOwnerPublicKey(b []byte) {
+	m.owner_public_key = &b
+}
+
+// OwnerPublicKey returns the value of the "owner_public_key" field in the mutation.
+func (m *TokenLeafMutation) OwnerPublicKey() (r []byte, exists bool) {
+	v := m.owner_public_key
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOwnerPublicKey returns the old "owner_public_key" field's value of the TokenLeaf entity.
+// If the TokenLeaf object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenLeafMutation) OldOwnerPublicKey(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOwnerPublicKey is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOwnerPublicKey requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOwnerPublicKey: %w", err)
+	}
+	return oldValue.OwnerPublicKey, nil
+}
+
+// ResetOwnerPublicKey resets all changes to the "owner_public_key" field.
+func (m *TokenLeafMutation) ResetOwnerPublicKey() {
+	m.owner_public_key = nil
+}
+
+// SetWithdrawalBondSats sets the "withdrawal_bond_sats" field.
+func (m *TokenLeafMutation) SetWithdrawalBondSats(u uint64) {
+	m.withdrawal_bond_sats = &u
+	m.addwithdrawal_bond_sats = nil
+}
+
+// WithdrawalBondSats returns the value of the "withdrawal_bond_sats" field in the mutation.
+func (m *TokenLeafMutation) WithdrawalBondSats() (r uint64, exists bool) {
+	v := m.withdrawal_bond_sats
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldWithdrawalBondSats returns the old "withdrawal_bond_sats" field's value of the TokenLeaf entity.
+// If the TokenLeaf object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenLeafMutation) OldWithdrawalBondSats(ctx context.Context) (v uint64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldWithdrawalBondSats is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldWithdrawalBondSats requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldWithdrawalBondSats: %w", err)
+	}
+	return oldValue.WithdrawalBondSats, nil
+}
+
+// AddWithdrawalBondSats adds u to the "withdrawal_bond_sats" field.
+func (m *TokenLeafMutation) AddWithdrawalBondSats(u int64) {
+	if m.addwithdrawal_bond_sats != nil {
+		*m.addwithdrawal_bond_sats += u
+	} else {
+		m.addwithdrawal_bond_sats = &u
+	}
+}
+
+// AddedWithdrawalBondSats returns the value that was added to the "withdrawal_bond_sats" field in this mutation.
+func (m *TokenLeafMutation) AddedWithdrawalBondSats() (r int64, exists bool) {
+	v := m.addwithdrawal_bond_sats
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetWithdrawalBondSats resets all changes to the "withdrawal_bond_sats" field.
+func (m *TokenLeafMutation) ResetWithdrawalBondSats() {
+	m.withdrawal_bond_sats = nil
+	m.addwithdrawal_bond_sats = nil
+}
+
+// SetWithdrawalLocktime sets the "withdrawal_locktime" field.
+func (m *TokenLeafMutation) SetWithdrawalLocktime(u uint64) {
+	m.withdrawal_locktime = &u
+	m.addwithdrawal_locktime = nil
+}
+
+// WithdrawalLocktime returns the value of the "withdrawal_locktime" field in the mutation.
+func (m *TokenLeafMutation) WithdrawalLocktime() (r uint64, exists bool) {
+	v := m.withdrawal_locktime
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldWithdrawalLocktime returns the old "withdrawal_locktime" field's value of the TokenLeaf entity.
+// If the TokenLeaf object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenLeafMutation) OldWithdrawalLocktime(ctx context.Context) (v uint64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldWithdrawalLocktime is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldWithdrawalLocktime requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldWithdrawalLocktime: %w", err)
+	}
+	return oldValue.WithdrawalLocktime, nil
+}
+
+// AddWithdrawalLocktime adds u to the "withdrawal_locktime" field.
+func (m *TokenLeafMutation) AddWithdrawalLocktime(u int64) {
+	if m.addwithdrawal_locktime != nil {
+		*m.addwithdrawal_locktime += u
+	} else {
+		m.addwithdrawal_locktime = &u
+	}
+}
+
+// AddedWithdrawalLocktime returns the value that was added to the "withdrawal_locktime" field in this mutation.
+func (m *TokenLeafMutation) AddedWithdrawalLocktime() (r int64, exists bool) {
+	v := m.addwithdrawal_locktime
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetWithdrawalLocktime resets all changes to the "withdrawal_locktime" field.
+func (m *TokenLeafMutation) ResetWithdrawalLocktime() {
+	m.withdrawal_locktime = nil
+	m.addwithdrawal_locktime = nil
+}
+
+// SetWithdrawalRevocationPublicKey sets the "withdrawal_revocation_public_key" field.
+func (m *TokenLeafMutation) SetWithdrawalRevocationPublicKey(b []byte) {
+	m.withdrawal_revocation_public_key = &b
+}
+
+// WithdrawalRevocationPublicKey returns the value of the "withdrawal_revocation_public_key" field in the mutation.
+func (m *TokenLeafMutation) WithdrawalRevocationPublicKey() (r []byte, exists bool) {
+	v := m.withdrawal_revocation_public_key
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldWithdrawalRevocationPublicKey returns the old "withdrawal_revocation_public_key" field's value of the TokenLeaf entity.
+// If the TokenLeaf object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenLeafMutation) OldWithdrawalRevocationPublicKey(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldWithdrawalRevocationPublicKey is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldWithdrawalRevocationPublicKey requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldWithdrawalRevocationPublicKey: %w", err)
+	}
+	return oldValue.WithdrawalRevocationPublicKey, nil
+}
+
+// ResetWithdrawalRevocationPublicKey resets all changes to the "withdrawal_revocation_public_key" field.
+func (m *TokenLeafMutation) ResetWithdrawalRevocationPublicKey() {
+	m.withdrawal_revocation_public_key = nil
+}
+
+// SetTokenPublicKey sets the "token_public_key" field.
+func (m *TokenLeafMutation) SetTokenPublicKey(b []byte) {
+	m.token_public_key = &b
+}
+
+// TokenPublicKey returns the value of the "token_public_key" field in the mutation.
+func (m *TokenLeafMutation) TokenPublicKey() (r []byte, exists bool) {
+	v := m.token_public_key
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTokenPublicKey returns the old "token_public_key" field's value of the TokenLeaf entity.
+// If the TokenLeaf object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenLeafMutation) OldTokenPublicKey(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTokenPublicKey is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTokenPublicKey requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTokenPublicKey: %w", err)
+	}
+	return oldValue.TokenPublicKey, nil
+}
+
+// ResetTokenPublicKey resets all changes to the "token_public_key" field.
+func (m *TokenLeafMutation) ResetTokenPublicKey() {
+	m.token_public_key = nil
+}
+
+// SetTokenAmount sets the "token_amount" field.
+func (m *TokenLeafMutation) SetTokenAmount(b []byte) {
+	m.token_amount = &b
+}
+
+// TokenAmount returns the value of the "token_amount" field in the mutation.
+func (m *TokenLeafMutation) TokenAmount() (r []byte, exists bool) {
+	v := m.token_amount
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTokenAmount returns the old "token_amount" field's value of the TokenLeaf entity.
+// If the TokenLeaf object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenLeafMutation) OldTokenAmount(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTokenAmount is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTokenAmount requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTokenAmount: %w", err)
+	}
+	return oldValue.TokenAmount, nil
+}
+
+// ResetTokenAmount resets all changes to the "token_amount" field.
+func (m *TokenLeafMutation) ResetTokenAmount() {
+	m.token_amount = nil
+}
+
+// SetLeafCreatedTransactionOuputVout sets the "leaf_created_transaction_ouput_vout" field.
+func (m *TokenLeafMutation) SetLeafCreatedTransactionOuputVout(u uint32) {
+	m.leaf_created_transaction_ouput_vout = &u
+	m.addleaf_created_transaction_ouput_vout = nil
+}
+
+// LeafCreatedTransactionOuputVout returns the value of the "leaf_created_transaction_ouput_vout" field in the mutation.
+func (m *TokenLeafMutation) LeafCreatedTransactionOuputVout() (r uint32, exists bool) {
+	v := m.leaf_created_transaction_ouput_vout
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldLeafCreatedTransactionOuputVout returns the old "leaf_created_transaction_ouput_vout" field's value of the TokenLeaf entity.
+// If the TokenLeaf object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenLeafMutation) OldLeafCreatedTransactionOuputVout(ctx context.Context) (v uint32, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldLeafCreatedTransactionOuputVout is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldLeafCreatedTransactionOuputVout requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldLeafCreatedTransactionOuputVout: %w", err)
+	}
+	return oldValue.LeafCreatedTransactionOuputVout, nil
+}
+
+// AddLeafCreatedTransactionOuputVout adds u to the "leaf_created_transaction_ouput_vout" field.
+func (m *TokenLeafMutation) AddLeafCreatedTransactionOuputVout(u int32) {
+	if m.addleaf_created_transaction_ouput_vout != nil {
+		*m.addleaf_created_transaction_ouput_vout += u
+	} else {
+		m.addleaf_created_transaction_ouput_vout = &u
+	}
+}
+
+// AddedLeafCreatedTransactionOuputVout returns the value that was added to the "leaf_created_transaction_ouput_vout" field in this mutation.
+func (m *TokenLeafMutation) AddedLeafCreatedTransactionOuputVout() (r int32, exists bool) {
+	v := m.addleaf_created_transaction_ouput_vout
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetLeafCreatedTransactionOuputVout resets all changes to the "leaf_created_transaction_ouput_vout" field.
+func (m *TokenLeafMutation) ResetLeafCreatedTransactionOuputVout() {
+	m.leaf_created_transaction_ouput_vout = nil
+	m.addleaf_created_transaction_ouput_vout = nil
+}
+
+// SetLeafSpentOwnershipSignature sets the "leaf_spent_ownership_signature" field.
+func (m *TokenLeafMutation) SetLeafSpentOwnershipSignature(b []byte) {
+	m.leaf_spent_ownership_signature = &b
+}
+
+// LeafSpentOwnershipSignature returns the value of the "leaf_spent_ownership_signature" field in the mutation.
+func (m *TokenLeafMutation) LeafSpentOwnershipSignature() (r []byte, exists bool) {
+	v := m.leaf_spent_ownership_signature
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldLeafSpentOwnershipSignature returns the old "leaf_spent_ownership_signature" field's value of the TokenLeaf entity.
+// If the TokenLeaf object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenLeafMutation) OldLeafSpentOwnershipSignature(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldLeafSpentOwnershipSignature is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldLeafSpentOwnershipSignature requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldLeafSpentOwnershipSignature: %w", err)
+	}
+	return oldValue.LeafSpentOwnershipSignature, nil
+}
+
+// ClearLeafSpentOwnershipSignature clears the value of the "leaf_spent_ownership_signature" field.
+func (m *TokenLeafMutation) ClearLeafSpentOwnershipSignature() {
+	m.leaf_spent_ownership_signature = nil
+	m.clearedFields[tokenleaf.FieldLeafSpentOwnershipSignature] = struct{}{}
+}
+
+// LeafSpentOwnershipSignatureCleared returns if the "leaf_spent_ownership_signature" field was cleared in this mutation.
+func (m *TokenLeafMutation) LeafSpentOwnershipSignatureCleared() bool {
+	_, ok := m.clearedFields[tokenleaf.FieldLeafSpentOwnershipSignature]
+	return ok
+}
+
+// ResetLeafSpentOwnershipSignature resets all changes to the "leaf_spent_ownership_signature" field.
+func (m *TokenLeafMutation) ResetLeafSpentOwnershipSignature() {
+	m.leaf_spent_ownership_signature = nil
+	delete(m.clearedFields, tokenleaf.FieldLeafSpentOwnershipSignature)
+}
+
+// SetLeafSpentTransactionInputVout sets the "leaf_spent_transaction_input_vout" field.
+func (m *TokenLeafMutation) SetLeafSpentTransactionInputVout(u uint32) {
+	m.leaf_spent_transaction_input_vout = &u
+	m.addleaf_spent_transaction_input_vout = nil
+}
+
+// LeafSpentTransactionInputVout returns the value of the "leaf_spent_transaction_input_vout" field in the mutation.
+func (m *TokenLeafMutation) LeafSpentTransactionInputVout() (r uint32, exists bool) {
+	v := m.leaf_spent_transaction_input_vout
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldLeafSpentTransactionInputVout returns the old "leaf_spent_transaction_input_vout" field's value of the TokenLeaf entity.
+// If the TokenLeaf object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenLeafMutation) OldLeafSpentTransactionInputVout(ctx context.Context) (v uint32, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldLeafSpentTransactionInputVout is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldLeafSpentTransactionInputVout requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldLeafSpentTransactionInputVout: %w", err)
+	}
+	return oldValue.LeafSpentTransactionInputVout, nil
+}
+
+// AddLeafSpentTransactionInputVout adds u to the "leaf_spent_transaction_input_vout" field.
+func (m *TokenLeafMutation) AddLeafSpentTransactionInputVout(u int32) {
+	if m.addleaf_spent_transaction_input_vout != nil {
+		*m.addleaf_spent_transaction_input_vout += u
+	} else {
+		m.addleaf_spent_transaction_input_vout = &u
+	}
+}
+
+// AddedLeafSpentTransactionInputVout returns the value that was added to the "leaf_spent_transaction_input_vout" field in this mutation.
+func (m *TokenLeafMutation) AddedLeafSpentTransactionInputVout() (r int32, exists bool) {
+	v := m.addleaf_spent_transaction_input_vout
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearLeafSpentTransactionInputVout clears the value of the "leaf_spent_transaction_input_vout" field.
+func (m *TokenLeafMutation) ClearLeafSpentTransactionInputVout() {
+	m.leaf_spent_transaction_input_vout = nil
+	m.addleaf_spent_transaction_input_vout = nil
+	m.clearedFields[tokenleaf.FieldLeafSpentTransactionInputVout] = struct{}{}
+}
+
+// LeafSpentTransactionInputVoutCleared returns if the "leaf_spent_transaction_input_vout" field was cleared in this mutation.
+func (m *TokenLeafMutation) LeafSpentTransactionInputVoutCleared() bool {
+	_, ok := m.clearedFields[tokenleaf.FieldLeafSpentTransactionInputVout]
+	return ok
+}
+
+// ResetLeafSpentTransactionInputVout resets all changes to the "leaf_spent_transaction_input_vout" field.
+func (m *TokenLeafMutation) ResetLeafSpentTransactionInputVout() {
+	m.leaf_spent_transaction_input_vout = nil
+	m.addleaf_spent_transaction_input_vout = nil
+	delete(m.clearedFields, tokenleaf.FieldLeafSpentTransactionInputVout)
+}
+
+// SetLeafSpentRevocationPrivateKey sets the "leaf_spent_revocation_private_key" field.
+func (m *TokenLeafMutation) SetLeafSpentRevocationPrivateKey(b []byte) {
+	m.leaf_spent_revocation_private_key = &b
+}
+
+// LeafSpentRevocationPrivateKey returns the value of the "leaf_spent_revocation_private_key" field in the mutation.
+func (m *TokenLeafMutation) LeafSpentRevocationPrivateKey() (r []byte, exists bool) {
+	v := m.leaf_spent_revocation_private_key
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldLeafSpentRevocationPrivateKey returns the old "leaf_spent_revocation_private_key" field's value of the TokenLeaf entity.
+// If the TokenLeaf object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenLeafMutation) OldLeafSpentRevocationPrivateKey(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldLeafSpentRevocationPrivateKey is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldLeafSpentRevocationPrivateKey requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldLeafSpentRevocationPrivateKey: %w", err)
+	}
+	return oldValue.LeafSpentRevocationPrivateKey, nil
+}
+
+// ClearLeafSpentRevocationPrivateKey clears the value of the "leaf_spent_revocation_private_key" field.
+func (m *TokenLeafMutation) ClearLeafSpentRevocationPrivateKey() {
+	m.leaf_spent_revocation_private_key = nil
+	m.clearedFields[tokenleaf.FieldLeafSpentRevocationPrivateKey] = struct{}{}
+}
+
+// LeafSpentRevocationPrivateKeyCleared returns if the "leaf_spent_revocation_private_key" field was cleared in this mutation.
+func (m *TokenLeafMutation) LeafSpentRevocationPrivateKeyCleared() bool {
+	_, ok := m.clearedFields[tokenleaf.FieldLeafSpentRevocationPrivateKey]
+	return ok
+}
+
+// ResetLeafSpentRevocationPrivateKey resets all changes to the "leaf_spent_revocation_private_key" field.
+func (m *TokenLeafMutation) ResetLeafSpentRevocationPrivateKey() {
+	m.leaf_spent_revocation_private_key = nil
+	delete(m.clearedFields, tokenleaf.FieldLeafSpentRevocationPrivateKey)
+}
+
+// SetRevocationKeyshareID sets the "revocation_keyshare" edge to the SigningKeyshare entity by id.
+func (m *TokenLeafMutation) SetRevocationKeyshareID(id uuid.UUID) {
+	m.revocation_keyshare = &id
+}
+
+// ClearRevocationKeyshare clears the "revocation_keyshare" edge to the SigningKeyshare entity.
+func (m *TokenLeafMutation) ClearRevocationKeyshare() {
+	m.clearedrevocation_keyshare = true
+}
+
+// RevocationKeyshareCleared reports if the "revocation_keyshare" edge to the SigningKeyshare entity was cleared.
+func (m *TokenLeafMutation) RevocationKeyshareCleared() bool {
+	return m.clearedrevocation_keyshare
+}
+
+// RevocationKeyshareID returns the "revocation_keyshare" edge ID in the mutation.
+func (m *TokenLeafMutation) RevocationKeyshareID() (id uuid.UUID, exists bool) {
+	if m.revocation_keyshare != nil {
+		return *m.revocation_keyshare, true
+	}
+	return
+}
+
+// RevocationKeyshareIDs returns the "revocation_keyshare" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// RevocationKeyshareID instead. It exists only for internal usage by the builders.
+func (m *TokenLeafMutation) RevocationKeyshareIDs() (ids []uuid.UUID) {
+	if id := m.revocation_keyshare; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetRevocationKeyshare resets all changes to the "revocation_keyshare" edge.
+func (m *TokenLeafMutation) ResetRevocationKeyshare() {
+	m.revocation_keyshare = nil
+	m.clearedrevocation_keyshare = false
+}
+
+// SetLeafCreatedTokenTransactionReceiptID sets the "leaf_created_token_transaction_receipt" edge to the TokenTransactionReceipt entity by id.
+func (m *TokenLeafMutation) SetLeafCreatedTokenTransactionReceiptID(id uuid.UUID) {
+	m.leaf_created_token_transaction_receipt = &id
+}
+
+// ClearLeafCreatedTokenTransactionReceipt clears the "leaf_created_token_transaction_receipt" edge to the TokenTransactionReceipt entity.
+func (m *TokenLeafMutation) ClearLeafCreatedTokenTransactionReceipt() {
+	m.clearedleaf_created_token_transaction_receipt = true
+}
+
+// LeafCreatedTokenTransactionReceiptCleared reports if the "leaf_created_token_transaction_receipt" edge to the TokenTransactionReceipt entity was cleared.
+func (m *TokenLeafMutation) LeafCreatedTokenTransactionReceiptCleared() bool {
+	return m.clearedleaf_created_token_transaction_receipt
+}
+
+// LeafCreatedTokenTransactionReceiptID returns the "leaf_created_token_transaction_receipt" edge ID in the mutation.
+func (m *TokenLeafMutation) LeafCreatedTokenTransactionReceiptID() (id uuid.UUID, exists bool) {
+	if m.leaf_created_token_transaction_receipt != nil {
+		return *m.leaf_created_token_transaction_receipt, true
+	}
+	return
+}
+
+// LeafCreatedTokenTransactionReceiptIDs returns the "leaf_created_token_transaction_receipt" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// LeafCreatedTokenTransactionReceiptID instead. It exists only for internal usage by the builders.
+func (m *TokenLeafMutation) LeafCreatedTokenTransactionReceiptIDs() (ids []uuid.UUID) {
+	if id := m.leaf_created_token_transaction_receipt; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetLeafCreatedTokenTransactionReceipt resets all changes to the "leaf_created_token_transaction_receipt" edge.
+func (m *TokenLeafMutation) ResetLeafCreatedTokenTransactionReceipt() {
+	m.leaf_created_token_transaction_receipt = nil
+	m.clearedleaf_created_token_transaction_receipt = false
+}
+
+// SetLeafSpentTokenTransactionReceiptID sets the "leaf_spent_token_transaction_receipt" edge to the TokenTransactionReceipt entity by id.
+func (m *TokenLeafMutation) SetLeafSpentTokenTransactionReceiptID(id uuid.UUID) {
+	m.leaf_spent_token_transaction_receipt = &id
+}
+
+// ClearLeafSpentTokenTransactionReceipt clears the "leaf_spent_token_transaction_receipt" edge to the TokenTransactionReceipt entity.
+func (m *TokenLeafMutation) ClearLeafSpentTokenTransactionReceipt() {
+	m.clearedleaf_spent_token_transaction_receipt = true
+}
+
+// LeafSpentTokenTransactionReceiptCleared reports if the "leaf_spent_token_transaction_receipt" edge to the TokenTransactionReceipt entity was cleared.
+func (m *TokenLeafMutation) LeafSpentTokenTransactionReceiptCleared() bool {
+	return m.clearedleaf_spent_token_transaction_receipt
+}
+
+// LeafSpentTokenTransactionReceiptID returns the "leaf_spent_token_transaction_receipt" edge ID in the mutation.
+func (m *TokenLeafMutation) LeafSpentTokenTransactionReceiptID() (id uuid.UUID, exists bool) {
+	if m.leaf_spent_token_transaction_receipt != nil {
+		return *m.leaf_spent_token_transaction_receipt, true
+	}
+	return
+}
+
+// LeafSpentTokenTransactionReceiptIDs returns the "leaf_spent_token_transaction_receipt" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// LeafSpentTokenTransactionReceiptID instead. It exists only for internal usage by the builders.
+func (m *TokenLeafMutation) LeafSpentTokenTransactionReceiptIDs() (ids []uuid.UUID) {
+	if id := m.leaf_spent_token_transaction_receipt; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetLeafSpentTokenTransactionReceipt resets all changes to the "leaf_spent_token_transaction_receipt" edge.
+func (m *TokenLeafMutation) ResetLeafSpentTokenTransactionReceipt() {
+	m.leaf_spent_token_transaction_receipt = nil
+	m.clearedleaf_spent_token_transaction_receipt = false
+}
+
+// Where appends a list predicates to the TokenLeafMutation builder.
+func (m *TokenLeafMutation) Where(ps ...predicate.TokenLeaf) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the TokenLeafMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *TokenLeafMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.TokenLeaf, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *TokenLeafMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *TokenLeafMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (TokenLeaf).
+func (m *TokenLeafMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *TokenLeafMutation) Fields() []string {
+	fields := make([]string, 0, 13)
+	if m.create_time != nil {
+		fields = append(fields, tokenleaf.FieldCreateTime)
+	}
+	if m.update_time != nil {
+		fields = append(fields, tokenleaf.FieldUpdateTime)
+	}
+	if m.status != nil {
+		fields = append(fields, tokenleaf.FieldStatus)
+	}
+	if m.owner_public_key != nil {
+		fields = append(fields, tokenleaf.FieldOwnerPublicKey)
+	}
+	if m.withdrawal_bond_sats != nil {
+		fields = append(fields, tokenleaf.FieldWithdrawalBondSats)
+	}
+	if m.withdrawal_locktime != nil {
+		fields = append(fields, tokenleaf.FieldWithdrawalLocktime)
+	}
+	if m.withdrawal_revocation_public_key != nil {
+		fields = append(fields, tokenleaf.FieldWithdrawalRevocationPublicKey)
+	}
+	if m.token_public_key != nil {
+		fields = append(fields, tokenleaf.FieldTokenPublicKey)
+	}
+	if m.token_amount != nil {
+		fields = append(fields, tokenleaf.FieldTokenAmount)
+	}
+	if m.leaf_created_transaction_ouput_vout != nil {
+		fields = append(fields, tokenleaf.FieldLeafCreatedTransactionOuputVout)
+	}
+	if m.leaf_spent_ownership_signature != nil {
+		fields = append(fields, tokenleaf.FieldLeafSpentOwnershipSignature)
+	}
+	if m.leaf_spent_transaction_input_vout != nil {
+		fields = append(fields, tokenleaf.FieldLeafSpentTransactionInputVout)
+	}
+	if m.leaf_spent_revocation_private_key != nil {
+		fields = append(fields, tokenleaf.FieldLeafSpentRevocationPrivateKey)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *TokenLeafMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case tokenleaf.FieldCreateTime:
+		return m.CreateTime()
+	case tokenleaf.FieldUpdateTime:
+		return m.UpdateTime()
+	case tokenleaf.FieldStatus:
+		return m.Status()
+	case tokenleaf.FieldOwnerPublicKey:
+		return m.OwnerPublicKey()
+	case tokenleaf.FieldWithdrawalBondSats:
+		return m.WithdrawalBondSats()
+	case tokenleaf.FieldWithdrawalLocktime:
+		return m.WithdrawalLocktime()
+	case tokenleaf.FieldWithdrawalRevocationPublicKey:
+		return m.WithdrawalRevocationPublicKey()
+	case tokenleaf.FieldTokenPublicKey:
+		return m.TokenPublicKey()
+	case tokenleaf.FieldTokenAmount:
+		return m.TokenAmount()
+	case tokenleaf.FieldLeafCreatedTransactionOuputVout:
+		return m.LeafCreatedTransactionOuputVout()
+	case tokenleaf.FieldLeafSpentOwnershipSignature:
+		return m.LeafSpentOwnershipSignature()
+	case tokenleaf.FieldLeafSpentTransactionInputVout:
+		return m.LeafSpentTransactionInputVout()
+	case tokenleaf.FieldLeafSpentRevocationPrivateKey:
+		return m.LeafSpentRevocationPrivateKey()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *TokenLeafMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case tokenleaf.FieldCreateTime:
+		return m.OldCreateTime(ctx)
+	case tokenleaf.FieldUpdateTime:
+		return m.OldUpdateTime(ctx)
+	case tokenleaf.FieldStatus:
+		return m.OldStatus(ctx)
+	case tokenleaf.FieldOwnerPublicKey:
+		return m.OldOwnerPublicKey(ctx)
+	case tokenleaf.FieldWithdrawalBondSats:
+		return m.OldWithdrawalBondSats(ctx)
+	case tokenleaf.FieldWithdrawalLocktime:
+		return m.OldWithdrawalLocktime(ctx)
+	case tokenleaf.FieldWithdrawalRevocationPublicKey:
+		return m.OldWithdrawalRevocationPublicKey(ctx)
+	case tokenleaf.FieldTokenPublicKey:
+		return m.OldTokenPublicKey(ctx)
+	case tokenleaf.FieldTokenAmount:
+		return m.OldTokenAmount(ctx)
+	case tokenleaf.FieldLeafCreatedTransactionOuputVout:
+		return m.OldLeafCreatedTransactionOuputVout(ctx)
+	case tokenleaf.FieldLeafSpentOwnershipSignature:
+		return m.OldLeafSpentOwnershipSignature(ctx)
+	case tokenleaf.FieldLeafSpentTransactionInputVout:
+		return m.OldLeafSpentTransactionInputVout(ctx)
+	case tokenleaf.FieldLeafSpentRevocationPrivateKey:
+		return m.OldLeafSpentRevocationPrivateKey(ctx)
+	}
+	return nil, fmt.Errorf("unknown TokenLeaf field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *TokenLeafMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case tokenleaf.FieldCreateTime:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreateTime(v)
+		return nil
+	case tokenleaf.FieldUpdateTime:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdateTime(v)
+		return nil
+	case tokenleaf.FieldStatus:
+		v, ok := value.(schema.TokenLeafStatus)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStatus(v)
+		return nil
+	case tokenleaf.FieldOwnerPublicKey:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOwnerPublicKey(v)
+		return nil
+	case tokenleaf.FieldWithdrawalBondSats:
+		v, ok := value.(uint64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetWithdrawalBondSats(v)
+		return nil
+	case tokenleaf.FieldWithdrawalLocktime:
+		v, ok := value.(uint64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetWithdrawalLocktime(v)
+		return nil
+	case tokenleaf.FieldWithdrawalRevocationPublicKey:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetWithdrawalRevocationPublicKey(v)
+		return nil
+	case tokenleaf.FieldTokenPublicKey:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTokenPublicKey(v)
+		return nil
+	case tokenleaf.FieldTokenAmount:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTokenAmount(v)
+		return nil
+	case tokenleaf.FieldLeafCreatedTransactionOuputVout:
+		v, ok := value.(uint32)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetLeafCreatedTransactionOuputVout(v)
+		return nil
+	case tokenleaf.FieldLeafSpentOwnershipSignature:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetLeafSpentOwnershipSignature(v)
+		return nil
+	case tokenleaf.FieldLeafSpentTransactionInputVout:
+		v, ok := value.(uint32)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetLeafSpentTransactionInputVout(v)
+		return nil
+	case tokenleaf.FieldLeafSpentRevocationPrivateKey:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetLeafSpentRevocationPrivateKey(v)
+		return nil
+	}
+	return fmt.Errorf("unknown TokenLeaf field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *TokenLeafMutation) AddedFields() []string {
+	var fields []string
+	if m.addwithdrawal_bond_sats != nil {
+		fields = append(fields, tokenleaf.FieldWithdrawalBondSats)
+	}
+	if m.addwithdrawal_locktime != nil {
+		fields = append(fields, tokenleaf.FieldWithdrawalLocktime)
+	}
+	if m.addleaf_created_transaction_ouput_vout != nil {
+		fields = append(fields, tokenleaf.FieldLeafCreatedTransactionOuputVout)
+	}
+	if m.addleaf_spent_transaction_input_vout != nil {
+		fields = append(fields, tokenleaf.FieldLeafSpentTransactionInputVout)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *TokenLeafMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case tokenleaf.FieldWithdrawalBondSats:
+		return m.AddedWithdrawalBondSats()
+	case tokenleaf.FieldWithdrawalLocktime:
+		return m.AddedWithdrawalLocktime()
+	case tokenleaf.FieldLeafCreatedTransactionOuputVout:
+		return m.AddedLeafCreatedTransactionOuputVout()
+	case tokenleaf.FieldLeafSpentTransactionInputVout:
+		return m.AddedLeafSpentTransactionInputVout()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *TokenLeafMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case tokenleaf.FieldWithdrawalBondSats:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddWithdrawalBondSats(v)
+		return nil
+	case tokenleaf.FieldWithdrawalLocktime:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddWithdrawalLocktime(v)
+		return nil
+	case tokenleaf.FieldLeafCreatedTransactionOuputVout:
+		v, ok := value.(int32)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddLeafCreatedTransactionOuputVout(v)
+		return nil
+	case tokenleaf.FieldLeafSpentTransactionInputVout:
+		v, ok := value.(int32)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddLeafSpentTransactionInputVout(v)
+		return nil
+	}
+	return fmt.Errorf("unknown TokenLeaf numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *TokenLeafMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(tokenleaf.FieldLeafSpentOwnershipSignature) {
+		fields = append(fields, tokenleaf.FieldLeafSpentOwnershipSignature)
+	}
+	if m.FieldCleared(tokenleaf.FieldLeafSpentTransactionInputVout) {
+		fields = append(fields, tokenleaf.FieldLeafSpentTransactionInputVout)
+	}
+	if m.FieldCleared(tokenleaf.FieldLeafSpentRevocationPrivateKey) {
+		fields = append(fields, tokenleaf.FieldLeafSpentRevocationPrivateKey)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *TokenLeafMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *TokenLeafMutation) ClearField(name string) error {
+	switch name {
+	case tokenleaf.FieldLeafSpentOwnershipSignature:
+		m.ClearLeafSpentOwnershipSignature()
+		return nil
+	case tokenleaf.FieldLeafSpentTransactionInputVout:
+		m.ClearLeafSpentTransactionInputVout()
+		return nil
+	case tokenleaf.FieldLeafSpentRevocationPrivateKey:
+		m.ClearLeafSpentRevocationPrivateKey()
+		return nil
+	}
+	return fmt.Errorf("unknown TokenLeaf nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *TokenLeafMutation) ResetField(name string) error {
+	switch name {
+	case tokenleaf.FieldCreateTime:
+		m.ResetCreateTime()
+		return nil
+	case tokenleaf.FieldUpdateTime:
+		m.ResetUpdateTime()
+		return nil
+	case tokenleaf.FieldStatus:
+		m.ResetStatus()
+		return nil
+	case tokenleaf.FieldOwnerPublicKey:
+		m.ResetOwnerPublicKey()
+		return nil
+	case tokenleaf.FieldWithdrawalBondSats:
+		m.ResetWithdrawalBondSats()
+		return nil
+	case tokenleaf.FieldWithdrawalLocktime:
+		m.ResetWithdrawalLocktime()
+		return nil
+	case tokenleaf.FieldWithdrawalRevocationPublicKey:
+		m.ResetWithdrawalRevocationPublicKey()
+		return nil
+	case tokenleaf.FieldTokenPublicKey:
+		m.ResetTokenPublicKey()
+		return nil
+	case tokenleaf.FieldTokenAmount:
+		m.ResetTokenAmount()
+		return nil
+	case tokenleaf.FieldLeafCreatedTransactionOuputVout:
+		m.ResetLeafCreatedTransactionOuputVout()
+		return nil
+	case tokenleaf.FieldLeafSpentOwnershipSignature:
+		m.ResetLeafSpentOwnershipSignature()
+		return nil
+	case tokenleaf.FieldLeafSpentTransactionInputVout:
+		m.ResetLeafSpentTransactionInputVout()
+		return nil
+	case tokenleaf.FieldLeafSpentRevocationPrivateKey:
+		m.ResetLeafSpentRevocationPrivateKey()
+		return nil
+	}
+	return fmt.Errorf("unknown TokenLeaf field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *TokenLeafMutation) AddedEdges() []string {
+	edges := make([]string, 0, 3)
+	if m.revocation_keyshare != nil {
+		edges = append(edges, tokenleaf.EdgeRevocationKeyshare)
+	}
+	if m.leaf_created_token_transaction_receipt != nil {
+		edges = append(edges, tokenleaf.EdgeLeafCreatedTokenTransactionReceipt)
+	}
+	if m.leaf_spent_token_transaction_receipt != nil {
+		edges = append(edges, tokenleaf.EdgeLeafSpentTokenTransactionReceipt)
+	}
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *TokenLeafMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case tokenleaf.EdgeRevocationKeyshare:
+		if id := m.revocation_keyshare; id != nil {
+			return []ent.Value{*id}
+		}
+	case tokenleaf.EdgeLeafCreatedTokenTransactionReceipt:
+		if id := m.leaf_created_token_transaction_receipt; id != nil {
+			return []ent.Value{*id}
+		}
+	case tokenleaf.EdgeLeafSpentTokenTransactionReceipt:
+		if id := m.leaf_spent_token_transaction_receipt; id != nil {
+			return []ent.Value{*id}
+		}
+	}
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *TokenLeafMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 3)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *TokenLeafMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *TokenLeafMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 3)
+	if m.clearedrevocation_keyshare {
+		edges = append(edges, tokenleaf.EdgeRevocationKeyshare)
+	}
+	if m.clearedleaf_created_token_transaction_receipt {
+		edges = append(edges, tokenleaf.EdgeLeafCreatedTokenTransactionReceipt)
+	}
+	if m.clearedleaf_spent_token_transaction_receipt {
+		edges = append(edges, tokenleaf.EdgeLeafSpentTokenTransactionReceipt)
+	}
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *TokenLeafMutation) EdgeCleared(name string) bool {
+	switch name {
+	case tokenleaf.EdgeRevocationKeyshare:
+		return m.clearedrevocation_keyshare
+	case tokenleaf.EdgeLeafCreatedTokenTransactionReceipt:
+		return m.clearedleaf_created_token_transaction_receipt
+	case tokenleaf.EdgeLeafSpentTokenTransactionReceipt:
+		return m.clearedleaf_spent_token_transaction_receipt
+	}
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *TokenLeafMutation) ClearEdge(name string) error {
+	switch name {
+	case tokenleaf.EdgeRevocationKeyshare:
+		m.ClearRevocationKeyshare()
+		return nil
+	case tokenleaf.EdgeLeafCreatedTokenTransactionReceipt:
+		m.ClearLeafCreatedTokenTransactionReceipt()
+		return nil
+	case tokenleaf.EdgeLeafSpentTokenTransactionReceipt:
+		m.ClearLeafSpentTokenTransactionReceipt()
+		return nil
+	}
+	return fmt.Errorf("unknown TokenLeaf unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *TokenLeafMutation) ResetEdge(name string) error {
+	switch name {
+	case tokenleaf.EdgeRevocationKeyshare:
+		m.ResetRevocationKeyshare()
+		return nil
+	case tokenleaf.EdgeLeafCreatedTokenTransactionReceipt:
+		m.ResetLeafCreatedTokenTransactionReceipt()
+		return nil
+	case tokenleaf.EdgeLeafSpentTokenTransactionReceipt:
+		m.ResetLeafSpentTokenTransactionReceipt()
+		return nil
+	}
+	return fmt.Errorf("unknown TokenLeaf edge %s", name)
+}
+
+// TokenTransactionReceiptMutation represents an operation that mutates the TokenTransactionReceipt nodes in the graph.
+type TokenTransactionReceiptMutation struct {
+	config
+	op                               Op
+	typ                              string
+	id                               *uuid.UUID
+	create_time                      *time.Time
+	update_time                      *time.Time
+	partial_token_transaction_hash   *[]byte
+	finalized_token_transaction_hash *[]byte
+	clearedFields                    map[string]struct{}
+	spent_leaf                       map[uuid.UUID]struct{}
+	removedspent_leaf                map[uuid.UUID]struct{}
+	clearedspent_leaf                bool
+	created_leaf                     map[uuid.UUID]struct{}
+	removedcreated_leaf              map[uuid.UUID]struct{}
+	clearedcreated_leaf              bool
+	issuance                         *uuid.UUID
+	clearedissuance                  bool
+	done                             bool
+	oldValue                         func(context.Context) (*TokenTransactionReceipt, error)
+	predicates                       []predicate.TokenTransactionReceipt
+}
+
+var _ ent.Mutation = (*TokenTransactionReceiptMutation)(nil)
+
+// tokentransactionreceiptOption allows management of the mutation configuration using functional options.
+type tokentransactionreceiptOption func(*TokenTransactionReceiptMutation)
+
+// newTokenTransactionReceiptMutation creates new mutation for the TokenTransactionReceipt entity.
+func newTokenTransactionReceiptMutation(c config, op Op, opts ...tokentransactionreceiptOption) *TokenTransactionReceiptMutation {
+	m := &TokenTransactionReceiptMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeTokenTransactionReceipt,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withTokenTransactionReceiptID sets the ID field of the mutation.
+func withTokenTransactionReceiptID(id uuid.UUID) tokentransactionreceiptOption {
+	return func(m *TokenTransactionReceiptMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *TokenTransactionReceipt
+		)
+		m.oldValue = func(ctx context.Context) (*TokenTransactionReceipt, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().TokenTransactionReceipt.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withTokenTransactionReceipt sets the old TokenTransactionReceipt of the mutation.
+func withTokenTransactionReceipt(node *TokenTransactionReceipt) tokentransactionreceiptOption {
+	return func(m *TokenTransactionReceiptMutation) {
+		m.oldValue = func(context.Context) (*TokenTransactionReceipt, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m TokenTransactionReceiptMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m TokenTransactionReceiptMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of TokenTransactionReceipt entities.
+func (m *TokenTransactionReceiptMutation) SetID(id uuid.UUID) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *TokenTransactionReceiptMutation) ID() (id uuid.UUID, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *TokenTransactionReceiptMutation) IDs(ctx context.Context) ([]uuid.UUID, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []uuid.UUID{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().TokenTransactionReceipt.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetCreateTime sets the "create_time" field.
+func (m *TokenTransactionReceiptMutation) SetCreateTime(t time.Time) {
+	m.create_time = &t
+}
+
+// CreateTime returns the value of the "create_time" field in the mutation.
+func (m *TokenTransactionReceiptMutation) CreateTime() (r time.Time, exists bool) {
+	v := m.create_time
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreateTime returns the old "create_time" field's value of the TokenTransactionReceipt entity.
+// If the TokenTransactionReceipt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenTransactionReceiptMutation) OldCreateTime(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreateTime is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreateTime requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreateTime: %w", err)
+	}
+	return oldValue.CreateTime, nil
+}
+
+// ResetCreateTime resets all changes to the "create_time" field.
+func (m *TokenTransactionReceiptMutation) ResetCreateTime() {
+	m.create_time = nil
+}
+
+// SetUpdateTime sets the "update_time" field.
+func (m *TokenTransactionReceiptMutation) SetUpdateTime(t time.Time) {
+	m.update_time = &t
+}
+
+// UpdateTime returns the value of the "update_time" field in the mutation.
+func (m *TokenTransactionReceiptMutation) UpdateTime() (r time.Time, exists bool) {
+	v := m.update_time
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdateTime returns the old "update_time" field's value of the TokenTransactionReceipt entity.
+// If the TokenTransactionReceipt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenTransactionReceiptMutation) OldUpdateTime(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdateTime is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdateTime requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdateTime: %w", err)
+	}
+	return oldValue.UpdateTime, nil
+}
+
+// ResetUpdateTime resets all changes to the "update_time" field.
+func (m *TokenTransactionReceiptMutation) ResetUpdateTime() {
+	m.update_time = nil
+}
+
+// SetPartialTokenTransactionHash sets the "partial_token_transaction_hash" field.
+func (m *TokenTransactionReceiptMutation) SetPartialTokenTransactionHash(b []byte) {
+	m.partial_token_transaction_hash = &b
+}
+
+// PartialTokenTransactionHash returns the value of the "partial_token_transaction_hash" field in the mutation.
+func (m *TokenTransactionReceiptMutation) PartialTokenTransactionHash() (r []byte, exists bool) {
+	v := m.partial_token_transaction_hash
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPartialTokenTransactionHash returns the old "partial_token_transaction_hash" field's value of the TokenTransactionReceipt entity.
+// If the TokenTransactionReceipt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenTransactionReceiptMutation) OldPartialTokenTransactionHash(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPartialTokenTransactionHash is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPartialTokenTransactionHash requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPartialTokenTransactionHash: %w", err)
+	}
+	return oldValue.PartialTokenTransactionHash, nil
+}
+
+// ResetPartialTokenTransactionHash resets all changes to the "partial_token_transaction_hash" field.
+func (m *TokenTransactionReceiptMutation) ResetPartialTokenTransactionHash() {
+	m.partial_token_transaction_hash = nil
+}
+
+// SetFinalizedTokenTransactionHash sets the "finalized_token_transaction_hash" field.
+func (m *TokenTransactionReceiptMutation) SetFinalizedTokenTransactionHash(b []byte) {
+	m.finalized_token_transaction_hash = &b
+}
+
+// FinalizedTokenTransactionHash returns the value of the "finalized_token_transaction_hash" field in the mutation.
+func (m *TokenTransactionReceiptMutation) FinalizedTokenTransactionHash() (r []byte, exists bool) {
+	v := m.finalized_token_transaction_hash
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFinalizedTokenTransactionHash returns the old "finalized_token_transaction_hash" field's value of the TokenTransactionReceipt entity.
+// If the TokenTransactionReceipt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenTransactionReceiptMutation) OldFinalizedTokenTransactionHash(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFinalizedTokenTransactionHash is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFinalizedTokenTransactionHash requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFinalizedTokenTransactionHash: %w", err)
+	}
+	return oldValue.FinalizedTokenTransactionHash, nil
+}
+
+// ClearFinalizedTokenTransactionHash clears the value of the "finalized_token_transaction_hash" field.
+func (m *TokenTransactionReceiptMutation) ClearFinalizedTokenTransactionHash() {
+	m.finalized_token_transaction_hash = nil
+	m.clearedFields[tokentransactionreceipt.FieldFinalizedTokenTransactionHash] = struct{}{}
+}
+
+// FinalizedTokenTransactionHashCleared returns if the "finalized_token_transaction_hash" field was cleared in this mutation.
+func (m *TokenTransactionReceiptMutation) FinalizedTokenTransactionHashCleared() bool {
+	_, ok := m.clearedFields[tokentransactionreceipt.FieldFinalizedTokenTransactionHash]
+	return ok
+}
+
+// ResetFinalizedTokenTransactionHash resets all changes to the "finalized_token_transaction_hash" field.
+func (m *TokenTransactionReceiptMutation) ResetFinalizedTokenTransactionHash() {
+	m.finalized_token_transaction_hash = nil
+	delete(m.clearedFields, tokentransactionreceipt.FieldFinalizedTokenTransactionHash)
+}
+
+// AddSpentLeafIDs adds the "spent_leaf" edge to the TokenLeaf entity by ids.
+func (m *TokenTransactionReceiptMutation) AddSpentLeafIDs(ids ...uuid.UUID) {
+	if m.spent_leaf == nil {
+		m.spent_leaf = make(map[uuid.UUID]struct{})
+	}
+	for i := range ids {
+		m.spent_leaf[ids[i]] = struct{}{}
+	}
+}
+
+// ClearSpentLeaf clears the "spent_leaf" edge to the TokenLeaf entity.
+func (m *TokenTransactionReceiptMutation) ClearSpentLeaf() {
+	m.clearedspent_leaf = true
+}
+
+// SpentLeafCleared reports if the "spent_leaf" edge to the TokenLeaf entity was cleared.
+func (m *TokenTransactionReceiptMutation) SpentLeafCleared() bool {
+	return m.clearedspent_leaf
+}
+
+// RemoveSpentLeafIDs removes the "spent_leaf" edge to the TokenLeaf entity by IDs.
+func (m *TokenTransactionReceiptMutation) RemoveSpentLeafIDs(ids ...uuid.UUID) {
+	if m.removedspent_leaf == nil {
+		m.removedspent_leaf = make(map[uuid.UUID]struct{})
+	}
+	for i := range ids {
+		delete(m.spent_leaf, ids[i])
+		m.removedspent_leaf[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedSpentLeaf returns the removed IDs of the "spent_leaf" edge to the TokenLeaf entity.
+func (m *TokenTransactionReceiptMutation) RemovedSpentLeafIDs() (ids []uuid.UUID) {
+	for id := range m.removedspent_leaf {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// SpentLeafIDs returns the "spent_leaf" edge IDs in the mutation.
+func (m *TokenTransactionReceiptMutation) SpentLeafIDs() (ids []uuid.UUID) {
+	for id := range m.spent_leaf {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetSpentLeaf resets all changes to the "spent_leaf" edge.
+func (m *TokenTransactionReceiptMutation) ResetSpentLeaf() {
+	m.spent_leaf = nil
+	m.clearedspent_leaf = false
+	m.removedspent_leaf = nil
+}
+
+// AddCreatedLeafIDs adds the "created_leaf" edge to the TokenLeaf entity by ids.
+func (m *TokenTransactionReceiptMutation) AddCreatedLeafIDs(ids ...uuid.UUID) {
+	if m.created_leaf == nil {
+		m.created_leaf = make(map[uuid.UUID]struct{})
+	}
+	for i := range ids {
+		m.created_leaf[ids[i]] = struct{}{}
+	}
+}
+
+// ClearCreatedLeaf clears the "created_leaf" edge to the TokenLeaf entity.
+func (m *TokenTransactionReceiptMutation) ClearCreatedLeaf() {
+	m.clearedcreated_leaf = true
+}
+
+// CreatedLeafCleared reports if the "created_leaf" edge to the TokenLeaf entity was cleared.
+func (m *TokenTransactionReceiptMutation) CreatedLeafCleared() bool {
+	return m.clearedcreated_leaf
+}
+
+// RemoveCreatedLeafIDs removes the "created_leaf" edge to the TokenLeaf entity by IDs.
+func (m *TokenTransactionReceiptMutation) RemoveCreatedLeafIDs(ids ...uuid.UUID) {
+	if m.removedcreated_leaf == nil {
+		m.removedcreated_leaf = make(map[uuid.UUID]struct{})
+	}
+	for i := range ids {
+		delete(m.created_leaf, ids[i])
+		m.removedcreated_leaf[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedCreatedLeaf returns the removed IDs of the "created_leaf" edge to the TokenLeaf entity.
+func (m *TokenTransactionReceiptMutation) RemovedCreatedLeafIDs() (ids []uuid.UUID) {
+	for id := range m.removedcreated_leaf {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// CreatedLeafIDs returns the "created_leaf" edge IDs in the mutation.
+func (m *TokenTransactionReceiptMutation) CreatedLeafIDs() (ids []uuid.UUID) {
+	for id := range m.created_leaf {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetCreatedLeaf resets all changes to the "created_leaf" edge.
+func (m *TokenTransactionReceiptMutation) ResetCreatedLeaf() {
+	m.created_leaf = nil
+	m.clearedcreated_leaf = false
+	m.removedcreated_leaf = nil
+}
+
+// SetIssuanceID sets the "issuance" edge to the TokenIssuance entity by id.
+func (m *TokenTransactionReceiptMutation) SetIssuanceID(id uuid.UUID) {
+	m.issuance = &id
+}
+
+// ClearIssuance clears the "issuance" edge to the TokenIssuance entity.
+func (m *TokenTransactionReceiptMutation) ClearIssuance() {
+	m.clearedissuance = true
+}
+
+// IssuanceCleared reports if the "issuance" edge to the TokenIssuance entity was cleared.
+func (m *TokenTransactionReceiptMutation) IssuanceCleared() bool {
+	return m.clearedissuance
+}
+
+// IssuanceID returns the "issuance" edge ID in the mutation.
+func (m *TokenTransactionReceiptMutation) IssuanceID() (id uuid.UUID, exists bool) {
+	if m.issuance != nil {
+		return *m.issuance, true
+	}
+	return
+}
+
+// IssuanceIDs returns the "issuance" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// IssuanceID instead. It exists only for internal usage by the builders.
+func (m *TokenTransactionReceiptMutation) IssuanceIDs() (ids []uuid.UUID) {
+	if id := m.issuance; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetIssuance resets all changes to the "issuance" edge.
+func (m *TokenTransactionReceiptMutation) ResetIssuance() {
+	m.issuance = nil
+	m.clearedissuance = false
+}
+
+// Where appends a list predicates to the TokenTransactionReceiptMutation builder.
+func (m *TokenTransactionReceiptMutation) Where(ps ...predicate.TokenTransactionReceipt) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the TokenTransactionReceiptMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *TokenTransactionReceiptMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.TokenTransactionReceipt, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *TokenTransactionReceiptMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *TokenTransactionReceiptMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (TokenTransactionReceipt).
+func (m *TokenTransactionReceiptMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *TokenTransactionReceiptMutation) Fields() []string {
+	fields := make([]string, 0, 4)
+	if m.create_time != nil {
+		fields = append(fields, tokentransactionreceipt.FieldCreateTime)
+	}
+	if m.update_time != nil {
+		fields = append(fields, tokentransactionreceipt.FieldUpdateTime)
+	}
+	if m.partial_token_transaction_hash != nil {
+		fields = append(fields, tokentransactionreceipt.FieldPartialTokenTransactionHash)
+	}
+	if m.finalized_token_transaction_hash != nil {
+		fields = append(fields, tokentransactionreceipt.FieldFinalizedTokenTransactionHash)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *TokenTransactionReceiptMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case tokentransactionreceipt.FieldCreateTime:
+		return m.CreateTime()
+	case tokentransactionreceipt.FieldUpdateTime:
+		return m.UpdateTime()
+	case tokentransactionreceipt.FieldPartialTokenTransactionHash:
+		return m.PartialTokenTransactionHash()
+	case tokentransactionreceipt.FieldFinalizedTokenTransactionHash:
+		return m.FinalizedTokenTransactionHash()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *TokenTransactionReceiptMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case tokentransactionreceipt.FieldCreateTime:
+		return m.OldCreateTime(ctx)
+	case tokentransactionreceipt.FieldUpdateTime:
+		return m.OldUpdateTime(ctx)
+	case tokentransactionreceipt.FieldPartialTokenTransactionHash:
+		return m.OldPartialTokenTransactionHash(ctx)
+	case tokentransactionreceipt.FieldFinalizedTokenTransactionHash:
+		return m.OldFinalizedTokenTransactionHash(ctx)
+	}
+	return nil, fmt.Errorf("unknown TokenTransactionReceipt field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *TokenTransactionReceiptMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case tokentransactionreceipt.FieldCreateTime:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreateTime(v)
+		return nil
+	case tokentransactionreceipt.FieldUpdateTime:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdateTime(v)
+		return nil
+	case tokentransactionreceipt.FieldPartialTokenTransactionHash:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPartialTokenTransactionHash(v)
+		return nil
+	case tokentransactionreceipt.FieldFinalizedTokenTransactionHash:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFinalizedTokenTransactionHash(v)
+		return nil
+	}
+	return fmt.Errorf("unknown TokenTransactionReceipt field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *TokenTransactionReceiptMutation) AddedFields() []string {
+	return nil
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *TokenTransactionReceiptMutation) AddedField(name string) (ent.Value, bool) {
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *TokenTransactionReceiptMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	}
+	return fmt.Errorf("unknown TokenTransactionReceipt numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *TokenTransactionReceiptMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(tokentransactionreceipt.FieldFinalizedTokenTransactionHash) {
+		fields = append(fields, tokentransactionreceipt.FieldFinalizedTokenTransactionHash)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *TokenTransactionReceiptMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *TokenTransactionReceiptMutation) ClearField(name string) error {
+	switch name {
+	case tokentransactionreceipt.FieldFinalizedTokenTransactionHash:
+		m.ClearFinalizedTokenTransactionHash()
+		return nil
+	}
+	return fmt.Errorf("unknown TokenTransactionReceipt nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *TokenTransactionReceiptMutation) ResetField(name string) error {
+	switch name {
+	case tokentransactionreceipt.FieldCreateTime:
+		m.ResetCreateTime()
+		return nil
+	case tokentransactionreceipt.FieldUpdateTime:
+		m.ResetUpdateTime()
+		return nil
+	case tokentransactionreceipt.FieldPartialTokenTransactionHash:
+		m.ResetPartialTokenTransactionHash()
+		return nil
+	case tokentransactionreceipt.FieldFinalizedTokenTransactionHash:
+		m.ResetFinalizedTokenTransactionHash()
+		return nil
+	}
+	return fmt.Errorf("unknown TokenTransactionReceipt field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *TokenTransactionReceiptMutation) AddedEdges() []string {
+	edges := make([]string, 0, 3)
+	if m.spent_leaf != nil {
+		edges = append(edges, tokentransactionreceipt.EdgeSpentLeaf)
+	}
+	if m.created_leaf != nil {
+		edges = append(edges, tokentransactionreceipt.EdgeCreatedLeaf)
+	}
+	if m.issuance != nil {
+		edges = append(edges, tokentransactionreceipt.EdgeIssuance)
+	}
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *TokenTransactionReceiptMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case tokentransactionreceipt.EdgeSpentLeaf:
+		ids := make([]ent.Value, 0, len(m.spent_leaf))
+		for id := range m.spent_leaf {
+			ids = append(ids, id)
+		}
+		return ids
+	case tokentransactionreceipt.EdgeCreatedLeaf:
+		ids := make([]ent.Value, 0, len(m.created_leaf))
+		for id := range m.created_leaf {
+			ids = append(ids, id)
+		}
+		return ids
+	case tokentransactionreceipt.EdgeIssuance:
+		if id := m.issuance; id != nil {
+			return []ent.Value{*id}
+		}
+	}
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *TokenTransactionReceiptMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 3)
+	if m.removedspent_leaf != nil {
+		edges = append(edges, tokentransactionreceipt.EdgeSpentLeaf)
+	}
+	if m.removedcreated_leaf != nil {
+		edges = append(edges, tokentransactionreceipt.EdgeCreatedLeaf)
+	}
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *TokenTransactionReceiptMutation) RemovedIDs(name string) []ent.Value {
+	switch name {
+	case tokentransactionreceipt.EdgeSpentLeaf:
+		ids := make([]ent.Value, 0, len(m.removedspent_leaf))
+		for id := range m.removedspent_leaf {
+			ids = append(ids, id)
+		}
+		return ids
+	case tokentransactionreceipt.EdgeCreatedLeaf:
+		ids := make([]ent.Value, 0, len(m.removedcreated_leaf))
+		for id := range m.removedcreated_leaf {
+			ids = append(ids, id)
+		}
+		return ids
+	}
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *TokenTransactionReceiptMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 3)
+	if m.clearedspent_leaf {
+		edges = append(edges, tokentransactionreceipt.EdgeSpentLeaf)
+	}
+	if m.clearedcreated_leaf {
+		edges = append(edges, tokentransactionreceipt.EdgeCreatedLeaf)
+	}
+	if m.clearedissuance {
+		edges = append(edges, tokentransactionreceipt.EdgeIssuance)
+	}
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *TokenTransactionReceiptMutation) EdgeCleared(name string) bool {
+	switch name {
+	case tokentransactionreceipt.EdgeSpentLeaf:
+		return m.clearedspent_leaf
+	case tokentransactionreceipt.EdgeCreatedLeaf:
+		return m.clearedcreated_leaf
+	case tokentransactionreceipt.EdgeIssuance:
+		return m.clearedissuance
+	}
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *TokenTransactionReceiptMutation) ClearEdge(name string) error {
+	switch name {
+	case tokentransactionreceipt.EdgeIssuance:
+		m.ClearIssuance()
+		return nil
+	}
+	return fmt.Errorf("unknown TokenTransactionReceipt unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *TokenTransactionReceiptMutation) ResetEdge(name string) error {
+	switch name {
+	case tokentransactionreceipt.EdgeSpentLeaf:
+		m.ResetSpentLeaf()
+		return nil
+	case tokentransactionreceipt.EdgeCreatedLeaf:
+		m.ResetCreatedLeaf()
+		return nil
+	case tokentransactionreceipt.EdgeIssuance:
+		m.ResetIssuance()
+		return nil
+	}
+	return fmt.Errorf("unknown TokenTransactionReceipt edge %s", name)
 }
 
 // TransferMutation represents an operation that mutates the Transfer nodes in the graph.
