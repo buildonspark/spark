@@ -16,6 +16,7 @@ import (
 	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
+	"github.com/lightsparkdev/spark-go/so/ent/blockheight"
 	"github.com/lightsparkdev/spark-go/so/ent/cooperativeexit"
 	"github.com/lightsparkdev/spark-go/so/ent/depositaddress"
 	"github.com/lightsparkdev/spark-go/so/ent/preimagerequest"
@@ -34,6 +35,8 @@ type Client struct {
 	config
 	// Schema is the client for creating, migrating and dropping schema.
 	Schema *migrate.Schema
+	// BlockHeight is the client for interacting with the BlockHeight builders.
+	BlockHeight *BlockHeightClient
 	// CooperativeExit is the client for interacting with the CooperativeExit builders.
 	CooperativeExit *CooperativeExitClient
 	// DepositAddress is the client for interacting with the DepositAddress builders.
@@ -67,6 +70,7 @@ func NewClient(opts ...Option) *Client {
 
 func (c *Client) init() {
 	c.Schema = migrate.NewSchema(c.driver)
+	c.BlockHeight = NewBlockHeightClient(c.config)
 	c.CooperativeExit = NewCooperativeExitClient(c.config)
 	c.DepositAddress = NewDepositAddressClient(c.config)
 	c.PreimageRequest = NewPreimageRequestClient(c.config)
@@ -170,6 +174,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 	return &Tx{
 		ctx:                   ctx,
 		config:                cfg,
+		BlockHeight:           NewBlockHeightClient(cfg),
 		CooperativeExit:       NewCooperativeExitClient(cfg),
 		DepositAddress:        NewDepositAddressClient(cfg),
 		PreimageRequest:       NewPreimageRequestClient(cfg),
@@ -200,6 +205,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 	return &Tx{
 		ctx:                   ctx,
 		config:                cfg,
+		BlockHeight:           NewBlockHeightClient(cfg),
 		CooperativeExit:       NewCooperativeExitClient(cfg),
 		DepositAddress:        NewDepositAddressClient(cfg),
 		PreimageRequest:       NewPreimageRequestClient(cfg),
@@ -217,7 +223,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 // Debug returns a new debug-client. It's used to get verbose logging on specific operations.
 //
 //	client.Debug().
-//		CooperativeExit.
+//		BlockHeight.
 //		Query().
 //		Count(ctx)
 func (c *Client) Debug() *Client {
@@ -240,9 +246,9 @@ func (c *Client) Close() error {
 // In order to add hooks to a specific client, call: `client.Node.Use(...)`.
 func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
-		c.CooperativeExit, c.DepositAddress, c.PreimageRequest, c.PreimageShare,
-		c.SigningKeyshare, c.SigningNonce, c.Transfer, c.TransferLeaf, c.Tree,
-		c.TreeNode, c.UserSignedTransaction,
+		c.BlockHeight, c.CooperativeExit, c.DepositAddress, c.PreimageRequest,
+		c.PreimageShare, c.SigningKeyshare, c.SigningNonce, c.Transfer, c.TransferLeaf,
+		c.Tree, c.TreeNode, c.UserSignedTransaction,
 	} {
 		n.Use(hooks...)
 	}
@@ -252,9 +258,9 @@ func (c *Client) Use(hooks ...Hook) {
 // In order to add interceptors to a specific client, call: `client.Node.Intercept(...)`.
 func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
-		c.CooperativeExit, c.DepositAddress, c.PreimageRequest, c.PreimageShare,
-		c.SigningKeyshare, c.SigningNonce, c.Transfer, c.TransferLeaf, c.Tree,
-		c.TreeNode, c.UserSignedTransaction,
+		c.BlockHeight, c.CooperativeExit, c.DepositAddress, c.PreimageRequest,
+		c.PreimageShare, c.SigningKeyshare, c.SigningNonce, c.Transfer, c.TransferLeaf,
+		c.Tree, c.TreeNode, c.UserSignedTransaction,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -263,6 +269,8 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 // Mutate implements the ent.Mutator interface.
 func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 	switch m := m.(type) {
+	case *BlockHeightMutation:
+		return c.BlockHeight.mutate(ctx, m)
 	case *CooperativeExitMutation:
 		return c.CooperativeExit.mutate(ctx, m)
 	case *DepositAddressMutation:
@@ -287,6 +295,139 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.UserSignedTransaction.mutate(ctx, m)
 	default:
 		return nil, fmt.Errorf("ent: unknown mutation type %T", m)
+	}
+}
+
+// BlockHeightClient is a client for the BlockHeight schema.
+type BlockHeightClient struct {
+	config
+}
+
+// NewBlockHeightClient returns a client for the BlockHeight from the given config.
+func NewBlockHeightClient(c config) *BlockHeightClient {
+	return &BlockHeightClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `blockheight.Hooks(f(g(h())))`.
+func (c *BlockHeightClient) Use(hooks ...Hook) {
+	c.hooks.BlockHeight = append(c.hooks.BlockHeight, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `blockheight.Intercept(f(g(h())))`.
+func (c *BlockHeightClient) Intercept(interceptors ...Interceptor) {
+	c.inters.BlockHeight = append(c.inters.BlockHeight, interceptors...)
+}
+
+// Create returns a builder for creating a BlockHeight entity.
+func (c *BlockHeightClient) Create() *BlockHeightCreate {
+	mutation := newBlockHeightMutation(c.config, OpCreate)
+	return &BlockHeightCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of BlockHeight entities.
+func (c *BlockHeightClient) CreateBulk(builders ...*BlockHeightCreate) *BlockHeightCreateBulk {
+	return &BlockHeightCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *BlockHeightClient) MapCreateBulk(slice any, setFunc func(*BlockHeightCreate, int)) *BlockHeightCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &BlockHeightCreateBulk{err: fmt.Errorf("calling to BlockHeightClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*BlockHeightCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &BlockHeightCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for BlockHeight.
+func (c *BlockHeightClient) Update() *BlockHeightUpdate {
+	mutation := newBlockHeightMutation(c.config, OpUpdate)
+	return &BlockHeightUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *BlockHeightClient) UpdateOne(bh *BlockHeight) *BlockHeightUpdateOne {
+	mutation := newBlockHeightMutation(c.config, OpUpdateOne, withBlockHeight(bh))
+	return &BlockHeightUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *BlockHeightClient) UpdateOneID(id uuid.UUID) *BlockHeightUpdateOne {
+	mutation := newBlockHeightMutation(c.config, OpUpdateOne, withBlockHeightID(id))
+	return &BlockHeightUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for BlockHeight.
+func (c *BlockHeightClient) Delete() *BlockHeightDelete {
+	mutation := newBlockHeightMutation(c.config, OpDelete)
+	return &BlockHeightDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *BlockHeightClient) DeleteOne(bh *BlockHeight) *BlockHeightDeleteOne {
+	return c.DeleteOneID(bh.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *BlockHeightClient) DeleteOneID(id uuid.UUID) *BlockHeightDeleteOne {
+	builder := c.Delete().Where(blockheight.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &BlockHeightDeleteOne{builder}
+}
+
+// Query returns a query builder for BlockHeight.
+func (c *BlockHeightClient) Query() *BlockHeightQuery {
+	return &BlockHeightQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeBlockHeight},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a BlockHeight entity by its id.
+func (c *BlockHeightClient) Get(ctx context.Context, id uuid.UUID) (*BlockHeight, error) {
+	return c.Query().Where(blockheight.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *BlockHeightClient) GetX(ctx context.Context, id uuid.UUID) *BlockHeight {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *BlockHeightClient) Hooks() []Hook {
+	return c.hooks.BlockHeight
+}
+
+// Interceptors returns the client interceptors.
+func (c *BlockHeightClient) Interceptors() []Interceptor {
+	return c.inters.BlockHeight
+}
+
+func (c *BlockHeightClient) mutate(ctx context.Context, m *BlockHeightMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&BlockHeightCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&BlockHeightUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&BlockHeightUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&BlockHeightDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown BlockHeight mutation op: %q", m.Op())
 	}
 }
 
@@ -2028,12 +2169,12 @@ func (c *UserSignedTransactionClient) mutate(ctx context.Context, m *UserSignedT
 // hooks and interceptors per client, for fast access.
 type (
 	hooks struct {
-		CooperativeExit, DepositAddress, PreimageRequest, PreimageShare,
+		BlockHeight, CooperativeExit, DepositAddress, PreimageRequest, PreimageShare,
 		SigningKeyshare, SigningNonce, Transfer, TransferLeaf, Tree, TreeNode,
 		UserSignedTransaction []ent.Hook
 	}
 	inters struct {
-		CooperativeExit, DepositAddress, PreimageRequest, PreimageShare,
+		BlockHeight, CooperativeExit, DepositAddress, PreimageRequest, PreimageShare,
 		SigningKeyshare, SigningNonce, Transfer, TransferLeaf, Tree, TreeNode,
 		UserSignedTransaction []ent.Interceptor
 	}

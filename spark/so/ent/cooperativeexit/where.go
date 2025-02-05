@@ -71,6 +71,11 @@ func ExitTxid(v []byte) predicate.CooperativeExit {
 	return predicate.CooperativeExit(sql.FieldEQ(FieldExitTxid, v))
 }
 
+// ConfirmationHeight applies equality check predicate on the "confirmation_height" field. It's identical to ConfirmationHeightEQ.
+func ConfirmationHeight(v int64) predicate.CooperativeExit {
+	return predicate.CooperativeExit(sql.FieldEQ(FieldConfirmationHeight, v))
+}
+
 // CreateTimeEQ applies the EQ predicate on the "create_time" field.
 func CreateTimeEQ(v time.Time) predicate.CooperativeExit {
 	return predicate.CooperativeExit(sql.FieldEQ(FieldCreateTime, v))
@@ -191,14 +196,54 @@ func ExitTxidLTE(v []byte) predicate.CooperativeExit {
 	return predicate.CooperativeExit(sql.FieldLTE(FieldExitTxid, v))
 }
 
-// ExitTxidIsNil applies the IsNil predicate on the "exit_txid" field.
-func ExitTxidIsNil() predicate.CooperativeExit {
-	return predicate.CooperativeExit(sql.FieldIsNull(FieldExitTxid))
+// ConfirmationHeightEQ applies the EQ predicate on the "confirmation_height" field.
+func ConfirmationHeightEQ(v int64) predicate.CooperativeExit {
+	return predicate.CooperativeExit(sql.FieldEQ(FieldConfirmationHeight, v))
 }
 
-// ExitTxidNotNil applies the NotNil predicate on the "exit_txid" field.
-func ExitTxidNotNil() predicate.CooperativeExit {
-	return predicate.CooperativeExit(sql.FieldNotNull(FieldExitTxid))
+// ConfirmationHeightNEQ applies the NEQ predicate on the "confirmation_height" field.
+func ConfirmationHeightNEQ(v int64) predicate.CooperativeExit {
+	return predicate.CooperativeExit(sql.FieldNEQ(FieldConfirmationHeight, v))
+}
+
+// ConfirmationHeightIn applies the In predicate on the "confirmation_height" field.
+func ConfirmationHeightIn(vs ...int64) predicate.CooperativeExit {
+	return predicate.CooperativeExit(sql.FieldIn(FieldConfirmationHeight, vs...))
+}
+
+// ConfirmationHeightNotIn applies the NotIn predicate on the "confirmation_height" field.
+func ConfirmationHeightNotIn(vs ...int64) predicate.CooperativeExit {
+	return predicate.CooperativeExit(sql.FieldNotIn(FieldConfirmationHeight, vs...))
+}
+
+// ConfirmationHeightGT applies the GT predicate on the "confirmation_height" field.
+func ConfirmationHeightGT(v int64) predicate.CooperativeExit {
+	return predicate.CooperativeExit(sql.FieldGT(FieldConfirmationHeight, v))
+}
+
+// ConfirmationHeightGTE applies the GTE predicate on the "confirmation_height" field.
+func ConfirmationHeightGTE(v int64) predicate.CooperativeExit {
+	return predicate.CooperativeExit(sql.FieldGTE(FieldConfirmationHeight, v))
+}
+
+// ConfirmationHeightLT applies the LT predicate on the "confirmation_height" field.
+func ConfirmationHeightLT(v int64) predicate.CooperativeExit {
+	return predicate.CooperativeExit(sql.FieldLT(FieldConfirmationHeight, v))
+}
+
+// ConfirmationHeightLTE applies the LTE predicate on the "confirmation_height" field.
+func ConfirmationHeightLTE(v int64) predicate.CooperativeExit {
+	return predicate.CooperativeExit(sql.FieldLTE(FieldConfirmationHeight, v))
+}
+
+// ConfirmationHeightIsNil applies the IsNil predicate on the "confirmation_height" field.
+func ConfirmationHeightIsNil() predicate.CooperativeExit {
+	return predicate.CooperativeExit(sql.FieldIsNull(FieldConfirmationHeight))
+}
+
+// ConfirmationHeightNotNil applies the NotNil predicate on the "confirmation_height" field.
+func ConfirmationHeightNotNil() predicate.CooperativeExit {
+	return predicate.CooperativeExit(sql.FieldNotNull(FieldConfirmationHeight))
 }
 
 // HasTransfer applies the HasEdge predicate on the "transfer" edge.

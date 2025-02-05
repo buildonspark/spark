@@ -56,6 +56,20 @@ func (cec *CooperativeExitCreate) SetExitTxid(b []byte) *CooperativeExitCreate {
 	return cec
 }
 
+// SetConfirmationHeight sets the "confirmation_height" field.
+func (cec *CooperativeExitCreate) SetConfirmationHeight(i int64) *CooperativeExitCreate {
+	cec.mutation.SetConfirmationHeight(i)
+	return cec
+}
+
+// SetNillableConfirmationHeight sets the "confirmation_height" field if the given value is not nil.
+func (cec *CooperativeExitCreate) SetNillableConfirmationHeight(i *int64) *CooperativeExitCreate {
+	if i != nil {
+		cec.SetConfirmationHeight(*i)
+	}
+	return cec
+}
+
 // SetID sets the "id" field.
 func (cec *CooperativeExitCreate) SetID(u uuid.UUID) *CooperativeExitCreate {
 	cec.mutation.SetID(u)
@@ -138,6 +152,9 @@ func (cec *CooperativeExitCreate) check() error {
 	if _, ok := cec.mutation.UpdateTime(); !ok {
 		return &ValidationError{Name: "update_time", err: errors.New(`ent: missing required field "CooperativeExit.update_time"`)}
 	}
+	if _, ok := cec.mutation.ExitTxid(); !ok {
+		return &ValidationError{Name: "exit_txid", err: errors.New(`ent: missing required field "CooperativeExit.exit_txid"`)}
+	}
 	if len(cec.mutation.TransferIDs()) == 0 {
 		return &ValidationError{Name: "transfer", err: errors.New(`ent: missing required edge "CooperativeExit.transfer"`)}
 	}
@@ -187,6 +204,10 @@ func (cec *CooperativeExitCreate) createSpec() (*CooperativeExit, *sqlgraph.Crea
 	if value, ok := cec.mutation.ExitTxid(); ok {
 		_spec.SetField(cooperativeexit.FieldExitTxid, field.TypeBytes, value)
 		_node.ExitTxid = value
+	}
+	if value, ok := cec.mutation.ConfirmationHeight(); ok {
+		_spec.SetField(cooperativeexit.FieldConfirmationHeight, field.TypeInt64, value)
+		_node.ConfirmationHeight = value
 	}
 	if nodes := cec.mutation.TransferIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{

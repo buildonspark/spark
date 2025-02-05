@@ -21,6 +21,8 @@ const (
 	FieldUpdateTime = "update_time"
 	// FieldExitTxid holds the string denoting the exit_txid field in the database.
 	FieldExitTxid = "exit_txid"
+	// FieldConfirmationHeight holds the string denoting the confirmation_height field in the database.
+	FieldConfirmationHeight = "confirmation_height"
 	// EdgeTransfer holds the string denoting the transfer edge name in mutations.
 	EdgeTransfer = "transfer"
 	// Table holds the table name of the cooperativeexit in the database.
@@ -40,6 +42,7 @@ var Columns = []string{
 	FieldCreateTime,
 	FieldUpdateTime,
 	FieldExitTxid,
+	FieldConfirmationHeight,
 }
 
 // ForeignKeys holds the SQL foreign-keys that are owned by the "cooperative_exits"
@@ -90,6 +93,11 @@ func ByCreateTime(opts ...sql.OrderTermOption) OrderOption {
 // ByUpdateTime orders the results by the update_time field.
 func ByUpdateTime(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldUpdateTime, opts...).ToFunc()
+}
+
+// ByConfirmationHeight orders the results by the confirmation_height field.
+func ByConfirmationHeight(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldConfirmationHeight, opts...).ToFunc()
 }
 
 // ByTransferField orders the results by transfer field.

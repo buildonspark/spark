@@ -42,9 +42,30 @@ func (ceu *CooperativeExitUpdate) SetExitTxid(b []byte) *CooperativeExitUpdate {
 	return ceu
 }
 
-// ClearExitTxid clears the value of the "exit_txid" field.
-func (ceu *CooperativeExitUpdate) ClearExitTxid() *CooperativeExitUpdate {
-	ceu.mutation.ClearExitTxid()
+// SetConfirmationHeight sets the "confirmation_height" field.
+func (ceu *CooperativeExitUpdate) SetConfirmationHeight(i int64) *CooperativeExitUpdate {
+	ceu.mutation.ResetConfirmationHeight()
+	ceu.mutation.SetConfirmationHeight(i)
+	return ceu
+}
+
+// SetNillableConfirmationHeight sets the "confirmation_height" field if the given value is not nil.
+func (ceu *CooperativeExitUpdate) SetNillableConfirmationHeight(i *int64) *CooperativeExitUpdate {
+	if i != nil {
+		ceu.SetConfirmationHeight(*i)
+	}
+	return ceu
+}
+
+// AddConfirmationHeight adds i to the "confirmation_height" field.
+func (ceu *CooperativeExitUpdate) AddConfirmationHeight(i int64) *CooperativeExitUpdate {
+	ceu.mutation.AddConfirmationHeight(i)
+	return ceu
+}
+
+// ClearConfirmationHeight clears the value of the "confirmation_height" field.
+func (ceu *CooperativeExitUpdate) ClearConfirmationHeight() *CooperativeExitUpdate {
+	ceu.mutation.ClearConfirmationHeight()
 	return ceu
 }
 
@@ -132,8 +153,14 @@ func (ceu *CooperativeExitUpdate) sqlSave(ctx context.Context) (n int, err error
 	if value, ok := ceu.mutation.ExitTxid(); ok {
 		_spec.SetField(cooperativeexit.FieldExitTxid, field.TypeBytes, value)
 	}
-	if ceu.mutation.ExitTxidCleared() {
-		_spec.ClearField(cooperativeexit.FieldExitTxid, field.TypeBytes)
+	if value, ok := ceu.mutation.ConfirmationHeight(); ok {
+		_spec.SetField(cooperativeexit.FieldConfirmationHeight, field.TypeInt64, value)
+	}
+	if value, ok := ceu.mutation.AddedConfirmationHeight(); ok {
+		_spec.AddField(cooperativeexit.FieldConfirmationHeight, field.TypeInt64, value)
+	}
+	if ceu.mutation.ConfirmationHeightCleared() {
+		_spec.ClearField(cooperativeexit.FieldConfirmationHeight, field.TypeInt64)
 	}
 	if ceu.mutation.TransferCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -196,9 +223,30 @@ func (ceuo *CooperativeExitUpdateOne) SetExitTxid(b []byte) *CooperativeExitUpda
 	return ceuo
 }
 
-// ClearExitTxid clears the value of the "exit_txid" field.
-func (ceuo *CooperativeExitUpdateOne) ClearExitTxid() *CooperativeExitUpdateOne {
-	ceuo.mutation.ClearExitTxid()
+// SetConfirmationHeight sets the "confirmation_height" field.
+func (ceuo *CooperativeExitUpdateOne) SetConfirmationHeight(i int64) *CooperativeExitUpdateOne {
+	ceuo.mutation.ResetConfirmationHeight()
+	ceuo.mutation.SetConfirmationHeight(i)
+	return ceuo
+}
+
+// SetNillableConfirmationHeight sets the "confirmation_height" field if the given value is not nil.
+func (ceuo *CooperativeExitUpdateOne) SetNillableConfirmationHeight(i *int64) *CooperativeExitUpdateOne {
+	if i != nil {
+		ceuo.SetConfirmationHeight(*i)
+	}
+	return ceuo
+}
+
+// AddConfirmationHeight adds i to the "confirmation_height" field.
+func (ceuo *CooperativeExitUpdateOne) AddConfirmationHeight(i int64) *CooperativeExitUpdateOne {
+	ceuo.mutation.AddConfirmationHeight(i)
+	return ceuo
+}
+
+// ClearConfirmationHeight clears the value of the "confirmation_height" field.
+func (ceuo *CooperativeExitUpdateOne) ClearConfirmationHeight() *CooperativeExitUpdateOne {
+	ceuo.mutation.ClearConfirmationHeight()
 	return ceuo
 }
 
@@ -316,8 +364,14 @@ func (ceuo *CooperativeExitUpdateOne) sqlSave(ctx context.Context) (_node *Coope
 	if value, ok := ceuo.mutation.ExitTxid(); ok {
 		_spec.SetField(cooperativeexit.FieldExitTxid, field.TypeBytes, value)
 	}
-	if ceuo.mutation.ExitTxidCleared() {
-		_spec.ClearField(cooperativeexit.FieldExitTxid, field.TypeBytes)
+	if value, ok := ceuo.mutation.ConfirmationHeight(); ok {
+		_spec.SetField(cooperativeexit.FieldConfirmationHeight, field.TypeInt64, value)
+	}
+	if value, ok := ceuo.mutation.AddedConfirmationHeight(); ok {
+		_spec.AddField(cooperativeexit.FieldConfirmationHeight, field.TypeInt64, value)
+	}
+	if ceuo.mutation.ConfirmationHeightCleared() {
+		_spec.ClearField(cooperativeexit.FieldConfirmationHeight, field.TypeInt64)
 	}
 	if ceuo.mutation.TransferCleared() {
 		edge := &sqlgraph.EdgeSpec{

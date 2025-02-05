@@ -12,6 +12,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
+	"github.com/lightsparkdev/spark-go/so/ent/blockheight"
 	"github.com/lightsparkdev/spark-go/so/ent/cooperativeexit"
 	"github.com/lightsparkdev/spark-go/so/ent/depositaddress"
 	"github.com/lightsparkdev/spark-go/so/ent/preimagerequest"
@@ -83,6 +84,7 @@ var (
 func checkColumn(table, column string) error {
 	initCheck.Do(func() {
 		columnCheck = sql.NewColumnCheck(map[string]func(string) bool{
+			blockheight.Table:           blockheight.ValidColumn,
 			cooperativeexit.Table:       cooperativeexit.ValidColumn,
 			depositaddress.Table:        depositaddress.ValidColumn,
 			preimagerequest.Table:       preimagerequest.ValidColumn,

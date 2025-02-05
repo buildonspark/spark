@@ -54,6 +54,10 @@ func (h *CooperativeExitHandler) CooperativeExit(ctx context.Context, req *pb.Co
 		return nil, fmt.Errorf("unable to parse exit_id %s: %v", req.ExitId, err)
 	}
 
+	if len(req.ExitTxid) != 32 {
+		return nil, fmt.Errorf("exit_txid is not 32 bytes: %v", req.ExitTxid)
+	}
+
 	db := ent.GetDbFromContext(ctx)
 	_, err = db.CooperativeExit.Create().
 		SetID(exitUUID).

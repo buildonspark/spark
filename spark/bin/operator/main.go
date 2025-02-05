@@ -156,7 +156,7 @@ func main() {
 	}
 
 	for _, task := range task.AllTasks() {
-		_, err := s.NewJob(gocron.DurationJob(task.Duration), gocron.NewTask(task.Task, config))
+		_, err := s.NewJob(gocron.DurationJob(task.Duration), gocron.NewTask(task.Task, config, dbClient))
 		if err != nil {
 			log.Fatalf("Failed to create job: %v", err)
 		}

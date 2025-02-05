@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark-go/so/ent/blockheight"
 	"github.com/lightsparkdev/spark-go/so/ent/cooperativeexit"
 	"github.com/lightsparkdev/spark-go/so/ent/depositaddress"
 	"github.com/lightsparkdev/spark-go/so/ent/preimagerequest"
@@ -24,6 +25,25 @@ import (
 // (default values, validators, hooks and policies) and stitches it
 // to their package variables.
 func init() {
+	blockheightMixin := schema.BlockHeight{}.Mixin()
+	blockheightMixinFields0 := blockheightMixin[0].Fields()
+	_ = blockheightMixinFields0
+	blockheightFields := schema.BlockHeight{}.Fields()
+	_ = blockheightFields
+	// blockheightDescCreateTime is the schema descriptor for create_time field.
+	blockheightDescCreateTime := blockheightMixinFields0[1].Descriptor()
+	// blockheight.DefaultCreateTime holds the default value on creation for the create_time field.
+	blockheight.DefaultCreateTime = blockheightDescCreateTime.Default.(func() time.Time)
+	// blockheightDescUpdateTime is the schema descriptor for update_time field.
+	blockheightDescUpdateTime := blockheightMixinFields0[2].Descriptor()
+	// blockheight.DefaultUpdateTime holds the default value on creation for the update_time field.
+	blockheight.DefaultUpdateTime = blockheightDescUpdateTime.Default.(func() time.Time)
+	// blockheight.UpdateDefaultUpdateTime holds the default value on update for the update_time field.
+	blockheight.UpdateDefaultUpdateTime = blockheightDescUpdateTime.UpdateDefault.(func() time.Time)
+	// blockheightDescID is the schema descriptor for id field.
+	blockheightDescID := blockheightMixinFields0[0].Descriptor()
+	// blockheight.DefaultID holds the default value on creation for the id field.
+	blockheight.DefaultID = blockheightDescID.Default.(func() uuid.UUID)
 	cooperativeexitMixin := schema.CooperativeExit{}.Mixin()
 	cooperativeexitMixinFields0 := cooperativeexitMixin[0].Fields()
 	_ = cooperativeexitMixinFields0

@@ -6,6 +6,9 @@ import (
 	"entgo.io/ent/dialect/sql"
 )
 
+// BlockHeight is the predicate function for blockheight builders.
+type BlockHeight func(*sql.Selector)
+
 // CooperativeExit is the predicate function for cooperativeexit builders.
 type CooperativeExit func(*sql.Selector)
 

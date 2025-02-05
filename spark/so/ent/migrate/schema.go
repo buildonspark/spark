@@ -8,12 +8,27 @@ import (
 )
 
 var (
+	// BlockHeightsColumns holds the columns for the "block_heights" table.
+	BlockHeightsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUUID},
+		{Name: "create_time", Type: field.TypeTime},
+		{Name: "update_time", Type: field.TypeTime},
+		{Name: "height", Type: field.TypeInt64},
+		{Name: "network", Type: field.TypeEnum, Enums: []string{"MAINNET", "REGTEST"}},
+	}
+	// BlockHeightsTable holds the schema information for the "block_heights" table.
+	BlockHeightsTable = &schema.Table{
+		Name:       "block_heights",
+		Columns:    BlockHeightsColumns,
+		PrimaryKey: []*schema.Column{BlockHeightsColumns[0]},
+	}
 	// CooperativeExitsColumns holds the columns for the "cooperative_exits" table.
 	CooperativeExitsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeUUID},
 		{Name: "create_time", Type: field.TypeTime},
 		{Name: "update_time", Type: field.TypeTime},
-		{Name: "exit_txid", Type: field.TypeBytes, Nullable: true},
+		{Name: "exit_txid", Type: field.TypeBytes},
+		{Name: "confirmation_height", Type: field.TypeInt64, Nullable: true},
 		{Name: "cooperative_exit_transfer", Type: field.TypeUUID},
 	}
 	// CooperativeExitsTable holds the schema information for the "cooperative_exits" table.
@@ -24,7 +39,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "cooperative_exits_transfers_transfer",
-				Columns:    []*schema.Column{CooperativeExitsColumns[4]},
+				Columns:    []*schema.Column{CooperativeExitsColumns[5]},
 				RefColumns: []*schema.Column{TransfersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -33,7 +48,7 @@ var (
 			{
 				Name:    "cooperativeexit_cooperative_exit_transfer",
 				Unique:  false,
-				Columns: []*schema.Column{CooperativeExitsColumns[4]},
+				Columns: []*schema.Column{CooperativeExitsColumns[5]},
 			},
 		},
 	}
@@ -368,6 +383,7 @@ var (
 	}
 	// Tables holds all the tables in the schema.
 	Tables = []*schema.Table{
+		BlockHeightsTable,
 		CooperativeExitsTable,
 		DepositAddressesTable,
 		PreimageRequestsTable,

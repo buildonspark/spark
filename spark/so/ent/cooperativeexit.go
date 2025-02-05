@@ -25,6 +25,8 @@ type CooperativeExit struct {
 	UpdateTime time.Time `json:"update_time,omitempty"`
 	// ExitTxid holds the value of the "exit_txid" field.
 	ExitTxid []byte `json:"exit_txid,omitempty"`
+	// ConfirmationHeight holds the value of the "confirmation_height" field.
+	ConfirmationHeight int64 `json:"confirmation_height,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the CooperativeExitQuery when eager-loading is set.
 	Edges                     CooperativeExitEdges `json:"edges"`
@@ -59,6 +61,8 @@ func (*CooperativeExit) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case cooperativeexit.FieldExitTxid:
 			values[i] = new([]byte)
+		case cooperativeexit.FieldConfirmationHeight:
+			values[i] = new(sql.NullInt64)
 		case cooperativeexit.FieldCreateTime, cooperativeexit.FieldUpdateTime:
 			values[i] = new(sql.NullTime)
 		case cooperativeexit.FieldID:
@@ -103,6 +107,12 @@ func (ce *CooperativeExit) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field exit_txid", values[i])
 			} else if value != nil {
 				ce.ExitTxid = *value
+			}
+		case cooperativeexit.FieldConfirmationHeight:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field confirmation_height", values[i])
+			} else if value.Valid {
+				ce.ConfirmationHeight = value.Int64
 			}
 		case cooperativeexit.ForeignKeys[0]:
 			if value, ok := values[i].(*sql.NullScanner); !ok {
@@ -160,6 +170,9 @@ func (ce *CooperativeExit) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("exit_txid=")
 	builder.WriteString(fmt.Sprintf("%v", ce.ExitTxid))
+	builder.WriteString(", ")
+	builder.WriteString("confirmation_height=")
+	builder.WriteString(fmt.Sprintf("%v", ce.ConfirmationHeight))
 	builder.WriteByte(')')
 	return builder.String()
 }

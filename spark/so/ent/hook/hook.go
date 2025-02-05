@@ -9,6 +9,18 @@ import (
 	"github.com/lightsparkdev/spark-go/so/ent"
 )
 
+// The BlockHeightFunc type is an adapter to allow the use of ordinary
+// function as BlockHeight mutator.
+type BlockHeightFunc func(context.Context, *ent.BlockHeightMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f BlockHeightFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.BlockHeightMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.BlockHeightMutation", m)
+}
+
 // The CooperativeExitFunc type is an adapter to allow the use of ordinary
 // function as CooperativeExit mutator.
 type CooperativeExitFunc func(context.Context, *ent.CooperativeExitMutation) (ent.Value, error)
