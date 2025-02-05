@@ -368,8 +368,12 @@ pub fn aggregate_frost(req: &AggregateFrostRequest) -> Result<AggregateFrostResp
 }
 
 pub fn validate_signature_share(req: &ValidateSignatureShareRequest) -> Result<(), String> {
-    let identifier = hex_string_to_identifier(&req.identifier)
-        .map_err(|e| format!("Failed to parse identifier: {:?}", e))?;
+    let identifier = match req.role {
+        0 => hex_string_to_identifier(&req.identifier)
+            .map_err(|e| format!("Failed to parse identifier: {:?}", e))?,
+        1 => Identifier::derive("user".as_bytes()).expect("Failed to derive user identifier"),
+        _ => return Err(format!("Invalid signing role")),
+    };
 
     let signature_share = SignatureShare::deserialize(req.signature_share.as_slice())
         .map_err(|e| format!("Failed to parse signature share: {:?}", e))?;

@@ -175,7 +175,6 @@ func TestFrostSign(t *testing.T) {
 
 	// User part
 	_, err = client.ValidateSignatureShare(ctx, &pbfrost.ValidateSignatureShareRequest{
-		Identifier:      userIdentifier,
 		Role:            pbfrost.SigningRole_USER,
 		Message:         msgHash[:],
 		SignatureShare:  userSignatures.Results[userJobID].SignatureShare,

@@ -14,6 +14,7 @@ import (
 	"github.com/lightsparkdev/spark-go/common"
 	secretsharing "github.com/lightsparkdev/spark-go/common/secret_sharing"
 	pbcommon "github.com/lightsparkdev/spark-go/proto/common"
+	pbfrost "github.com/lightsparkdev/spark-go/proto/frost"
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark-go/proto/spark_internal"
 	"github.com/lightsparkdev/spark-go/so"
@@ -184,8 +185,78 @@ func (h *LightningHandler) GetSigningCommitments(ctx context.Context, req *pb.Ge
 	return &pb.GetSigningCommitmentsResponse{SigningCommitments: requestedCommitments}, nil
 }
 
-func (h *LightningHandler) validateGetPreimageRequest(ctx context.Context, transactions []*pb.UserSignedRefund, amount *pb.InvoiceAmount) error {
-	// TODO: This validation requires validate partial signature.
+func (h *LightningHandler) validateGetPreimageRequest(ctx context.Context, transactions []*pb.UserSignedRefund, amount *pb.InvoiceAmount, destinationPubkey []byte) error {
+	// Step 1 validate all signatures are valid
+	conn, err := common.NewGRPCConnection(h.config.SignerAddress)
+	if err != nil {
+		return fmt.Errorf("unable to connect to signer: %v", err)
+	}
+	defer conn.Close()
+
+	client := pbfrost.NewFrostServiceClient(conn)
+	db := ent.GetDbFromContext(ctx)
+	for _, transaction := range transactions {
+		// First fetch the node tx in order to calculate the sighash
+		nodeID, err := uuid.Parse(transaction.NodeId)
+		if err != nil {
+			return fmt.Errorf("unable to parse node id: %v", err)
+		}
+		node, err := db.TreeNode.Get(ctx, nodeID)
+		if err != nil {
+			return fmt.Errorf("unable to get node: %v", err)
+		}
+		tx, err := common.TxFromRawTxBytes(node.RawTx)
+		if err != nil {
+			return fmt.Errorf("unable to get tx: %v", err)
+		}
+
+		refundTx, err := common.TxFromRawTxBytes(transaction.RefundTx)
+		if err != nil {
+			return fmt.Errorf("unable to get refund tx: %v", err)
+		}
+
+		sighash, err := common.SigHashFromTx(refundTx, 0, tx.TxOut[0])
+		if err != nil {
+			return fmt.Errorf("unable to get sighash: %v", err)
+		}
+
+		_, err = client.ValidateSignatureShare(ctx, &pbfrost.ValidateSignatureShareRequest{
+			Message:         sighash,
+			SignatureShare:  transaction.UserSignature,
+			Role:            pbfrost.SigningRole_USER,
+			VerifyingKey:    node.VerifyingPubkey,
+			PublicShare:     node.OwnerSigningPubkey,
+			Commitments:     transaction.SigningCommitments.SigningCommitments,
+			UserCommitments: transaction.UserSignatureCommitment,
+		})
+		if err != nil {
+			return fmt.Errorf("unable to validate signature share: %v", err)
+		}
+	}
+
+	// Step 2 validate the amount is correct and paid to the destination pubkey
+	destinationPubkeyBytes, err := secp256k1.ParsePubKey(destinationPubkey)
+	if err != nil {
+		return fmt.Errorf("unable to parse destination pubkey: %v", err)
+	}
+	var totalAmount uint64
+	for _, transaction := range transactions {
+		refundTx, err := common.TxFromRawTxBytes(transaction.RefundTx)
+		if err != nil {
+			return fmt.Errorf("unable to get refund tx: %v", err)
+		}
+		pubkeyScript, err := common.P2TRScriptFromPubKey(destinationPubkeyBytes)
+		if err != nil {
+			return fmt.Errorf("unable to extract pubkey from tx: %v", err)
+		}
+		if !bytes.Equal(pubkeyScript, refundTx.TxOut[0].PkScript) {
+			return fmt.Errorf("invalid destination pubkey")
+		}
+		totalAmount += uint64(refundTx.TxOut[0].Value)
+	}
+	if totalAmount != amount.ValueSats {
+		return fmt.Errorf("invalid amount, expected %d, got %d", amount.ValueSats, totalAmount)
+	}
 	return nil
 }
 
@@ -248,14 +319,10 @@ func (h *LightningHandler) storeUserSignedTransactions(
 
 // GetPreimageShare gets the preimage share for the given payment hash.
 func (h *LightningHandler) GetPreimageShare(ctx context.Context, req *pb.InitiatePreimageSwapRequest) ([]byte, error) {
-	err := h.validateGetPreimageRequest(ctx, req.UserSignedRefunds, req.InvoiceAmount)
-	if err != nil {
-		return nil, fmt.Errorf("unable to validate request: %v", err)
-	}
-
 	var preimageShare *ent.PreimageShare
 	if req.Reason == pb.InitiatePreimageSwapRequest_REASON_RECEIVE {
 		db := ent.GetDbFromContext(ctx)
+		var err error
 		preimageShare, err = db.PreimageShare.Query().Where(preimageshare.PaymentHash(req.PaymentHash)).First(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("unable to get preimage share: %v", err)
@@ -263,6 +330,25 @@ func (h *LightningHandler) GetPreimageShare(ctx context.Context, req *pb.Initiat
 		if !bytes.Equal(preimageShare.OwnerIdentityPubkey, req.ReceiverIdentityPublicKey) {
 			return nil, fmt.Errorf("preimage share owner identity public key mismatch")
 		}
+	}
+
+	invoiceAmount := req.InvoiceAmount
+	if preimageShare != nil {
+		bolt11, err := decodepay.Decodepay(preimageShare.InvoiceString)
+		if err != nil {
+			return nil, fmt.Errorf("unable to decode invoice: %v", err)
+		}
+		invoiceAmount = &pb.InvoiceAmount{
+			ValueSats: uint64(bolt11.MSatoshi / 1000),
+			InvoiceAmountProof: &pb.InvoiceAmountProof{
+				Bolt11Invoice: preimageShare.InvoiceString,
+			},
+		}
+	}
+
+	err := h.validateGetPreimageRequest(ctx, req.UserSignedRefunds, invoiceAmount, req.ReceiverIdentityPublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("unable to validate request: %v", err)
 	}
 
 	leafRefundMap := make(map[string][]byte)
@@ -296,14 +382,10 @@ func (h *LightningHandler) GetPreimageShare(ctx context.Context, req *pb.Initiat
 
 // InitiatePreimageSwap initiates a preimage swap for the given payment hash.
 func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pb.InitiatePreimageSwapRequest) (*pb.InitiatePreimageSwapResponse, error) {
-	err := h.validateGetPreimageRequest(ctx, req.UserSignedRefunds, req.InvoiceAmount)
-	if err != nil {
-		return nil, fmt.Errorf("unable to validate request: %v", err)
-	}
-
 	var preimageShare *ent.PreimageShare
 	if req.Reason == pb.InitiatePreimageSwapRequest_REASON_RECEIVE {
 		db := ent.GetDbFromContext(ctx)
+		var err error
 		preimageShare, err = db.PreimageShare.Query().Where(preimageshare.PaymentHash(req.PaymentHash)).First(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("unable to get preimage share: %v", err)
@@ -311,6 +393,25 @@ func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pb.Ini
 		if !bytes.Equal(preimageShare.OwnerIdentityPubkey, req.ReceiverIdentityPublicKey) {
 			return nil, fmt.Errorf("preimage share owner identity public key mismatch")
 		}
+	}
+
+	invoiceAmount := req.InvoiceAmount
+	if preimageShare != nil {
+		bolt11, err := decodepay.Decodepay(preimageShare.InvoiceString)
+		if err != nil {
+			return nil, fmt.Errorf("unable to decode invoice: %v", err)
+		}
+		invoiceAmount = &pb.InvoiceAmount{
+			ValueSats: uint64(bolt11.MSatoshi / 1000),
+			InvoiceAmountProof: &pb.InvoiceAmountProof{
+				Bolt11Invoice: preimageShare.InvoiceString,
+			},
+		}
+	}
+
+	err := h.validateGetPreimageRequest(ctx, req.UserSignedRefunds, invoiceAmount, req.ReceiverIdentityPublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("unable to validate request: %v", err)
 	}
 
 	leafRefundMap := make(map[string][]byte)

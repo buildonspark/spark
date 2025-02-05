@@ -11,6 +11,7 @@ import (
 	pbfrost "github.com/lightsparkdev/spark-go/proto/frost"
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
 	"github.com/lightsparkdev/spark-go/so/objects"
+	decodepay "github.com/nbd-wtf/ln-decodepay"
 )
 
 // SwapNodesForLightning swaps a node for a preimage of a Lightning invoice.
@@ -83,8 +84,14 @@ func SwapNodesForPreimage(
 	// SSP calls SO to get the preimage
 	transferID := uuid.New().String()
 	bolt11String := ""
+	var amountSats uint64
 	if invoiceString != nil {
 		bolt11String = *invoiceString
+		bolt11, err := decodepay.Decodepay(bolt11String)
+		if err != nil {
+			return nil, fmt.Errorf("unable to decode invoice: %v", err)
+		}
+		amountSats = uint64(bolt11.MSatoshi / 1000)
 	}
 	reason := pb.InitiatePreimageSwapRequest_REASON_SEND
 	if isInboundPayment {
@@ -98,6 +105,7 @@ func SwapNodesForPreimage(
 			InvoiceAmountProof: &pb.InvoiceAmountProof{
 				Bolt11Invoice: bolt11String,
 			},
+			ValueSats: amountSats,
 		},
 		Transfer: &pb.StartSendTransferRequest{
 			TransferId:                transferID,
