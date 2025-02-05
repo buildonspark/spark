@@ -390,12 +390,15 @@ message InitiatePreimageSwapRequest {
     repeated UserSignedRefund user_signed_refunds = 2;
     InvoiceAmount invoice_amount = 3;
     enum Reason {
+        // The associated lightning service is sending the payment.
         REASON_SEND = 0;
+        // The associated lightning service is receiving the payment.
         REASON_RECEIVE = 1;
     }
     Reason reason = 4;
     StartSendTransferRequest transfer = 5;
     bytes receiver_identity_public_key = 6;
+    uint64 fee_sats = 7;
 }
 
 message InitiatePreimageSwapResponse {

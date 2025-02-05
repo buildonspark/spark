@@ -99,7 +99,8 @@ func TestReceiveLightningPayment(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	nodeToSend, err := testutil.CreateNewTree(sspConfig, sspLeafPrivKey, 12345)
+	feeSats := uint64(2)
+	nodeToSend, err := testutil.CreateNewTree(sspConfig, sspLeafPrivKey, 12343)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -123,6 +124,7 @@ func TestReceiveLightningPayment(t *testing.T) {
 		userConfig.IdentityPublicKey(),
 		paymentHash[:],
 		nil,
+		feeSats,
 		true,
 	)
 	if err != nil {
@@ -213,7 +215,8 @@ func TestSendLightningPayment(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	nodeToSend, err := testutil.CreateNewTree(userConfig, userLeafPrivKey, 12345)
+	feeSats := uint64(2)
+	nodeToSend, err := testutil.CreateNewTree(userConfig, userLeafPrivKey, 12347)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -237,6 +240,7 @@ func TestSendLightningPayment(t *testing.T) {
 		sspConfig.IdentityPublicKey(),
 		paymentHash[:],
 		&invoice,
+		feeSats,
 		false,
 	)
 	if err != nil {
@@ -256,7 +260,7 @@ func TestSendLightningPayment(t *testing.T) {
 		}
 		totalValue += value
 	}
-	assert.Equal(t, totalValue, int64(12345))
+	assert.Equal(t, totalValue, int64(12345+feeSats))
 
 	transfer, err := wallet.SendTransferTweakKey(context.Background(), userConfig, response.Transfer, leaves, nil)
 	if err != nil {

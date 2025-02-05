@@ -185,7 +185,14 @@ func (h *LightningHandler) GetSigningCommitments(ctx context.Context, req *pb.Ge
 	return &pb.GetSigningCommitmentsResponse{SigningCommitments: requestedCommitments}, nil
 }
 
-func (h *LightningHandler) validateGetPreimageRequest(ctx context.Context, transactions []*pb.UserSignedRefund, amount *pb.InvoiceAmount, destinationPubkey []byte) error {
+func (h *LightningHandler) validateGetPreimageRequest(
+	ctx context.Context,
+	transactions []*pb.UserSignedRefund,
+	amount *pb.InvoiceAmount,
+	destinationPubkey []byte,
+	feeSats uint64,
+	reason pb.InitiatePreimageSwapRequest_Reason,
+) error {
 	// Step 1 validate all signatures are valid
 	conn, err := common.NewGRPCConnection(h.config.SignerAddress)
 	if err != nil {
@@ -253,6 +260,11 @@ func (h *LightningHandler) validateGetPreimageRequest(ctx context.Context, trans
 			return fmt.Errorf("invalid destination pubkey")
 		}
 		totalAmount += uint64(refundTx.TxOut[0].Value)
+	}
+	if reason == pb.InitiatePreimageSwapRequest_REASON_SEND {
+		totalAmount -= feeSats
+	} else if reason == pb.InitiatePreimageSwapRequest_REASON_RECEIVE {
+		totalAmount += feeSats
 	}
 	if totalAmount != amount.ValueSats {
 		return fmt.Errorf("invalid amount, expected %d, got %d", amount.ValueSats, totalAmount)
@@ -346,7 +358,14 @@ func (h *LightningHandler) GetPreimageShare(ctx context.Context, req *pb.Initiat
 		}
 	}
 
-	err := h.validateGetPreimageRequest(ctx, req.UserSignedRefunds, invoiceAmount, req.ReceiverIdentityPublicKey)
+	err := h.validateGetPreimageRequest(
+		ctx,
+		req.UserSignedRefunds,
+		invoiceAmount,
+		req.ReceiverIdentityPublicKey,
+		req.FeeSats,
+		req.Reason,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("unable to validate request: %v", err)
 	}
@@ -409,7 +428,14 @@ func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pb.Ini
 		}
 	}
 
-	err := h.validateGetPreimageRequest(ctx, req.UserSignedRefunds, invoiceAmount, req.ReceiverIdentityPublicKey)
+	err := h.validateGetPreimageRequest(
+		ctx,
+		req.UserSignedRefunds,
+		invoiceAmount,
+		req.ReceiverIdentityPublicKey,
+		req.FeeSats,
+		req.Reason,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("unable to validate request: %v", err)
 	}

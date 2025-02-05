@@ -22,6 +22,7 @@ func SwapNodesForPreimage(
 	receiverIdentityPubkey []byte,
 	paymentHash []byte,
 	invoiceString *string,
+	feeSats uint64,
 	isInboundPayment bool,
 ) (*pb.InitiatePreimageSwapResponse, error) {
 	// SSP asks for signing commitment
@@ -113,6 +114,7 @@ func SwapNodesForPreimage(
 			ReceiverIdentityPublicKey: receiverIdentityPubkey,
 		},
 		ReceiverIdentityPublicKey: receiverIdentityPubkey,
+		FeeSats:                   feeSats,
 	})
 	if err != nil {
 		return nil, err
