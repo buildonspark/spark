@@ -17,10 +17,5 @@ type Task struct {
 
 // AllTasks returns all the tasks that are scheduled to run.
 func AllTasks() []Task {
-	return []Task{
-		{
-			Duration: 30 * time.Second,
-			Task:     watchRegtest,
-		},
-	}
+	return []Task{}
 }

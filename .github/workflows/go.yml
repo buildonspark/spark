@@ -27,6 +27,9 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    - name: Install ZMQ dependencies
+      run: sudo apt-get update && sudo apt-get install -y libzmq3-dev
+
     - name: Set up Go
       uses: actions/setup-go@v4
       with:
@@ -60,6 +63,8 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: stable
+      - name: Install ZMQ dependencies
+        run: sudo apt-get update && sudo apt-get install -y libzmq3-dev
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v6
         with:

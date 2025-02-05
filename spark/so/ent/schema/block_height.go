@@ -11,6 +11,7 @@ type Network string
 const (
 	NetworkMainnet Network = "MAINNET"
 	NetworkRegtest Network = "REGTEST"
+	NetworkTestnet Network = "TESTNET"
 )
 
 // Values returns the values for the Network type.

@@ -24,6 +24,7 @@ import (
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/authn"
 	"github.com/lightsparkdev/spark-go/so/authninternal"
+	"github.com/lightsparkdev/spark-go/so/chain"
 	"github.com/lightsparkdev/spark-go/so/dkg"
 	"github.com/lightsparkdev/spark-go/so/ent"
 	sparkgrpc "github.com/lightsparkdev/spark-go/so/grpc"
@@ -154,6 +155,13 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to create scheduler: %v", err)
 	}
+
+	go func() {
+		err := chain.WatchChain(dbClient, config.Network)
+		if err != nil {
+			log.Fatalf("Failed to watch chain: %v", err)
+		}
+	}()
 
 	for _, task := range task.AllTasks() {
 		_, err := s.NewJob(gocron.DurationJob(task.Duration), gocron.NewTask(task.Task, config, dbClient))

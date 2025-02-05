@@ -19,6 +19,7 @@ require (
 	github.com/lib/pq v1.10.9
 	github.com/mattn/go-sqlite3 v1.14.24
 	github.com/nbd-wtf/ln-decodepay v1.13.0
+	github.com/pebbe/zmq4 v1.2.11
 	github.com/stretchr/testify v1.10.0
 )
 

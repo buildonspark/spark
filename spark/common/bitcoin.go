@@ -12,6 +12,7 @@ import (
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
+	"github.com/lightsparkdev/spark-go/so/ent/schema"
 )
 
 // Network is the type for Bitcoin networks used with the operator.
@@ -37,6 +38,19 @@ func NetworkParams(network Network) *chaincfg.Params {
 		return &chaincfg.TestNet3Params
 	default:
 		return &chaincfg.MainNetParams
+	}
+}
+
+func SchemaNetwork(network Network) schema.Network {
+	switch network {
+	case Mainnet:
+		return schema.NetworkMainnet
+	case Regtest:
+		return schema.NetworkRegtest
+	case Testnet:
+		return schema.NetworkTestnet
+	default:
+		return schema.NetworkMainnet
 	}
 }
 

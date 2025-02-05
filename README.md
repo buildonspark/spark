@@ -23,6 +23,18 @@ After modifying the proto files, you can generate the Go files with the followin
 make
 ```
 
+Our SO implementation uses ZMQ to listen for block updates from bitcoind. Install it with:
+```
+brew install zeromq
+```
+
+Note: whatever bitcoind you are running will also need to have been compiled with ZMQ.
+The default installation via brew has ZMQ, but binaries downloaded from the bitcoin core
+website do not.
+```
+brew install bitcoin
+```
+
 ## Developer tips
 
 If spark_frost.udl file has issue with VSCode, you can add the following to your settings.json file:
