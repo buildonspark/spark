@@ -1854,6 +1854,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@scure/base@npm:1.1.1":
+  version: 1.1.1
+  resolution: "@scure/base@npm:1.1.1"
+  checksum: 10c0/97d200da8915ca18a4eceb73c23dda7fc3a4b8509f620c9b7756ee451d7c9ebbc828c6662f9ffa047806fbe41f37bf236c6ef75692690688b7659196cb2dc804
+  languageName: node
+  linkType: hard
+
 "@scure/base@npm:^1.2.1, @scure/base@npm:~1.2.1":
   version: 1.2.1
   resolution: "@scure/base@npm:1.2.1"
@@ -4069,6 +4076,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"light-bolt11-decoder@npm:^3.2.0":
+  version: 3.2.0
+  resolution: "light-bolt11-decoder@npm:3.2.0"
+  dependencies:
+    "@scure/base": "npm:1.1.1"
+  checksum: 10c0/65c1514b40b3b7fd5f4f0b40412bab35b0135f20f6b4929f5616bc5693f759fa8636d2393ba71fa782b2d9204315015e044628736ee7aea72f71939b0eb486f1
+  languageName: node
+  linkType: hard
+
 "lines-and-columns@npm:^1.1.6":
   version: 1.2.4
   resolution: "lines-and-columns@npm:1.2.4"
@@ -5166,6 +5182,7 @@ __metadata:
     eciesjs: "npm:^0.4.13"
     grpc-tools: "npm:^1.12.4"
     jest: "npm:^29.7.0"
+    light-bolt11-decoder: "npm:^3.2.0"
     long: "npm:^5.2.4"
     nice-grpc: "npm:^2.1.10"
     nice-grpc-web: "npm:^3.3.5"

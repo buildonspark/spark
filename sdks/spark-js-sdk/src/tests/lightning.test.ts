@@ -101,7 +101,8 @@ describe("LightningService", () => {
     const sspLeafPrivKey = secp256k1.utils.randomPrivateKey();
     const nodeToSend = await createNewTree(
       sspConfig.getConfig(),
-      sspLeafPrivKey
+      sspLeafPrivKey,
+      12345n
     );
 
     const newLeafPrivKey = secp256k1.utils.randomPrivateKey();

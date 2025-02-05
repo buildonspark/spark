@@ -57,6 +57,7 @@
     "crypto-js": "^4.2.0",
     "eciesjs": "^0.4.13",
     "grpc-tools": "^1.12.4",
+    "light-bolt11-decoder": "^3.2.0",
     "long": "^5.2.4",
     "nice-grpc": "^2.1.10",
     "nice-grpc-web": "^3.3.5",

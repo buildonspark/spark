@@ -2,6 +2,7 @@ import { bytesToNumberBE, numberToBytesBE } from "@noble/curves/abstract/utils";
 import { secp256k1 } from "@noble/curves/secp256k1";
 import { sha256 } from "@scure/btc-signer/utils";
 import { randomUUID } from "crypto";
+import { decode } from "light-bolt11-decoder";
 import {
   GetSigningCommitmentsResponse,
   InitiatePreimageSwapRequest_Reason,
@@ -158,7 +159,23 @@ export class LightningService {
     );
 
     const transferId = randomUUID();
-    const bolt11String = invoiceString ?? "";
+    let bolt11String = "";
+    let amountSats: number = 0;
+    if (invoiceString) {
+      const decodedInvoice = decode(invoiceString);
+      let amountMsats = 0;
+      try {
+        amountMsats = Number(
+          decodedInvoice.sections.find((section) => section.name === "amount")
+            ?.value
+        );
+      } catch (error) {
+        console.error("Error decoding invoice", error);
+      }
+
+      amountSats = amountMsats / 1000;
+      bolt11String = invoiceString;
+    }
 
     const reason = isInboundPayment
       ? InitiatePreimageSwapRequest_Reason.REASON_RECEIVE
@@ -174,6 +191,7 @@ export class LightningService {
           invoiceAmountProof: {
             bolt11Invoice: bolt11String,
           },
+          valueSats: amountSats,
         },
         transfer: {
           transferId,

@@ -50,7 +50,7 @@ export function createRefundTx(
     finalScriptSig,
   });
 
-  const sighash = getSigHashFromTx(newRefundTx, 0, refundTx.getOutput(0));
+  const sighash = getSigHashFromTx(newRefundTx, 0, tx.getOutput(0));
 
   return { refundTx: newRefundTx, sighash };
 }
