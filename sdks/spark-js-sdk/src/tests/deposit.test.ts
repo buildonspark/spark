@@ -1,8 +1,8 @@
-import { bytesToHex, hexToBytes } from "@noble/curves/abstract/utils";
-import { secp256k1 } from "@noble/curves/secp256k1";
+import { bytesToHex } from "@noble/curves/abstract/utils";
 import { ConnectionManager } from "../services/connection";
 import { SparkWallet } from "../spark-sdk";
 import { getTxFromRawTxBytes, getTxId } from "../utils/bitcoin";
+import { Network } from "../utils/network";
 import { createDummyTx } from "../utils/wasm";
 
 describe("deposit", () => {
@@ -12,13 +12,12 @@ describe("deposit", () => {
   testFn(
     "should generate a deposit address",
     async () => {
-      const sdk = new SparkWallet("regtest");
+      const sdk = new SparkWallet(Network.REGTEST);
       const mnemonic = sdk.generateMnemonic();
       await sdk.createSparkWallet(mnemonic);
 
-      const pubKey = hexToBytes(
-        "0330d50fd2e26d274e15f3dcea34a8bb611a9d0f14d1a9b1211f3608b3b7cd56c7"
-      );
+      const pubKey = sdk.getSigner().generatePublicKey();
+
       const depositAddress = await sdk.generateDepositAddress(pubKey);
 
       expect(depositAddress.depositAddress).toBeDefined();
@@ -29,7 +28,7 @@ describe("deposit", () => {
   testFn(
     "should create a tree root",
     async () => {
-      const sdk = new SparkWallet("regtest");
+      const sdk = new SparkWallet(Network.REGTEST);
       const mnemonic = sdk.generateMnemonic();
       await sdk.createSparkWallet(mnemonic);
       const config = sdk.getConfig();
@@ -40,8 +39,7 @@ describe("deposit", () => {
       );
 
       // Generate private/public key pair
-      const privKey = secp256k1.utils.randomPrivateKey();
-      const pubKey = secp256k1.getPublicKey(privKey);
+      const pubKey = sdk.getSigner().generatePublicKey();
 
       // Generate deposit address
       const depositResp = await sdk.generateDepositAddress(pubKey);
@@ -73,7 +71,7 @@ describe("deposit", () => {
 
       // Create tree root
       const treeResp = await sdk.createTreeRoot(
-        privKey,
+        pubKey,
         depositResp.depositAddress.verifyingKey,
         depositTx,
         vout

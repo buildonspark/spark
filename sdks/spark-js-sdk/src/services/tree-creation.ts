@@ -1,5 +1,6 @@
-import { secp256k1 } from "@noble/curves/secp256k1";
 import { Address, OutScript, Transaction } from "@scure/btc-signer";
+import { sha256 } from "@scure/btc-signer/utils";
+import { SigningCommitment } from "signer/signer";
 import {
   AddressNode,
   AddressRequestNode,
@@ -20,28 +21,20 @@ import {
   getTxFromRawTxBytes,
   getTxId,
 } from "../utils/bitcoin";
-import { subtractPrivateKeys } from "../utils/keys";
 import { getNetwork, Network } from "../utils/network";
-import {
-  copySigningCommitment,
-  getRandomSigningNonce,
-  getSigningCommitmentFromNonce,
-} from "../utils/signing";
-import { aggregateFrost, signFrost } from "../utils/wasm";
-import { KeyPackage, SigningNonce } from "../wasm/spark_bindings";
 import { WalletConfigService } from "./config";
 import { ConnectionManager } from "./connection";
 
 export type DepositAddressTree = {
   address?: string | undefined;
-  signingPrivateKey: Uint8Array;
+  signingPublicKey: Uint8Array;
   verificationKey?: Uint8Array | undefined;
   children: DepositAddressTree[];
 };
 
 export type CreationNodeWithNonces = CreationNode & {
-  nodeTxSigningNonce?: SigningNonce | undefined;
-  refundTxSigningNonce?: SigningNonce | undefined;
+  nodeTxSigningCommitment?: SigningCommitment | undefined;
+  refundTxSigningCommitment?: SigningCommitment | undefined;
 };
 
 const INITIAL_TIME_LOCK = 200;
@@ -60,11 +53,18 @@ export class TreeCreationService {
 
   async generateDepositAddressForTree(
     vout: number,
-    parentSigningPrivKey: Uint8Array,
+    parentSigningPublicKey: Uint8Array,
     parentTx?: Transaction,
     parentNode?: TreeNode
   ): Promise<DepositAddressTree> {
-    const tree = this.createDepositAddressTree(parentSigningPrivKey);
+    if (!parentTx && !parentNode) {
+      throw new Error("No parent tx or parent node provided");
+    }
+
+    const id = parentNode?.id ?? getTxId(parentTx!);
+
+    const tree = this.createDepositAddressTree(parentSigningPublicKey, id);
+
     const addressRequestNodes =
       this.createAddressRequestNodeFromTreeNodes(tree);
     const sparkClient = await this.connectionManager.createSparkClient(
@@ -88,20 +88,20 @@ export class TreeCreationService {
         txid: getTxId(parentTx),
         vout: vout,
         rawTx: parentTx.toBytes(),
+        network: this.config.getNetwork(),
       };
     } else {
       throw new Error("No parent node or parent tx provided");
     }
 
-    const pubkey = secp256k1.getPublicKey(parentSigningPrivKey, true);
     request.node = {
-      userPublicKey: pubkey,
+      userPublicKey: parentSigningPublicKey,
       children: addressRequestNodes,
     };
 
     const root: DepositAddressTree = {
       address: undefined,
-      signingPrivateKey: parentSigningPrivKey,
+      signingPublicKey: parentSigningPublicKey,
       children: tree,
     };
 
@@ -142,6 +142,7 @@ export class TreeCreationService {
         txid: getTxId(parentTx),
         vout: vout,
         rawTx: parentTx.toBytes(),
+        network: this.config.getNetwork(),
       };
     } else if (parentNode) {
       tx = getTxFromRawTxBytes(parentNode.nodeTx);
@@ -159,7 +160,7 @@ export class TreeCreationService {
     const rootCreationNode = this.buildCreationNodesFromTree(
       vout,
       createLeaves,
-      this.config.getConfig().network,
+      this.config.getNetwork(),
       root,
       tx
     );
@@ -209,18 +210,22 @@ export class TreeCreationService {
   }
 
   private createDepositAddressTree(
-    targetSigningPrivateKey: Uint8Array
+    targetSigningPublicKey: Uint8Array,
+    nodeId: string
   ): DepositAddressTree[] {
-    const leftKey = secp256k1.utils.randomPrivateKey();
+    const leftKey = this.config.signer.generatePublicKey(sha256(nodeId));
     const leftNode: DepositAddressTree = {
-      signingPrivateKey: leftKey,
+      signingPublicKey: leftKey,
       children: [],
     };
 
-    const rightKey = subtractPrivateKeys(targetSigningPrivateKey, leftKey);
+    const rightKey = this.config.signer.subtractPrivateKeysGivenPublicKeys(
+      targetSigningPublicKey,
+      leftKey
+    );
 
     const rightNode: DepositAddressTree = {
-      signingPrivateKey: rightKey,
+      signingPublicKey: rightKey,
       children: [],
     };
     return [leftNode, rightNode];
@@ -231,9 +236,8 @@ export class TreeCreationService {
   ): AddressRequestNode[] {
     const results = [];
     for (const node of treeNodes) {
-      const pubkey = secp256k1.getPublicKey(node.signingPrivateKey, true);
       const result: AddressRequestNode = {
-        userPublicKey: pubkey,
+        userPublicKey: node.signingPublicKey,
         children: this.createAddressRequestNodeFromTreeNodes(node.children),
       };
       results.push(result);
@@ -285,16 +289,15 @@ export class TreeCreationService {
       finalScriptSig: parentTxOut.script,
     });
 
-    const pubkey = secp256k1.getPublicKey(node.signingPrivateKey, true);
-    const signingNonce = getRandomSigningNonce();
-    const signingNonceCommitment = getSigningCommitmentFromNonce(signingNonce);
+    const signingNonceCommitment =
+      this.config.signer.getRandomSigningCommitment();
     const signingJob: SigningJob = {
-      signingPublicKey: pubkey,
+      signingPublicKey: node.signingPublicKey,
       rawTx: tx.toBytes(),
       signingNonceCommitment: signingNonceCommitment,
     };
 
-    internalCreationNode.nodeTxSigningNonce = signingNonce;
+    internalCreationNode.nodeTxSigningCommitment = signingNonceCommitment;
     internalCreationNode.nodeTxSigningJob = signingJob;
 
     // leaf node
@@ -318,17 +321,15 @@ export class TreeCreationService {
       amount: parentTxOut.amount,
     });
 
-    const childPubkey = secp256k1.getPublicKey(node.signingPrivateKey, true);
-    const childSigningNonce = getRandomSigningNonce();
     const childSigningNonceCommitment =
-      getSigningCommitmentFromNonce(childSigningNonce);
+      this.config.signer.getRandomSigningCommitment();
     const childSigningJob: SigningJob = {
-      signingPublicKey: childPubkey,
+      signingPublicKey: node.signingPublicKey,
       rawTx: childTx.toBytes(),
       signingNonceCommitment: childSigningNonceCommitment,
     };
 
-    childCreationNode.nodeTxSigningNonce = childSigningNonce;
+    childCreationNode.nodeTxSigningCommitment = childSigningNonceCommitment;
     childCreationNode.nodeTxSigningJob = childSigningJob;
 
     const refundTx = new Transaction();
@@ -338,7 +339,10 @@ export class TreeCreationService {
       sequence,
     });
 
-    const refundP2trAddress = getP2TRAddressFromPublicKey(pubkey, network);
+    const refundP2trAddress = getP2TRAddressFromPublicKey(
+      node.signingPublicKey,
+      network
+    );
     const refundAddress = Address(getNetwork(network)).decode(
       refundP2trAddress
     );
@@ -352,16 +356,15 @@ export class TreeCreationService {
       finalScriptSig: parentTxOut.script,
     });
 
-    const refundSigningNonce = getRandomSigningNonce();
     const refundSigningNonceCommitment =
-      getSigningCommitmentFromNonce(refundSigningNonce);
+      this.config.signer.getRandomSigningCommitment();
 
     const refundSigningJob: SigningJob = {
-      signingPublicKey: pubkey,
+      signingPublicKey: node.signingPublicKey,
       rawTx: refundTx.toBytes(),
       signingNonceCommitment: refundSigningNonceCommitment,
     };
-    childCreationNode.refundTxSigningNonce = refundSigningNonce;
+    childCreationNode.refundTxSigningCommitment = refundSigningNonceCommitment;
     childCreationNode.refundTxSigningJob = refundSigningJob;
 
     internalCreationNode.children.push(childCreationNode);
@@ -403,19 +406,19 @@ export class TreeCreationService {
       finalScriptSig: parentTxOutput.script,
     });
 
-    const rootNodeSigningNonce = getRandomSigningNonce();
+    const rootNodeSigningCommitment =
+      this.config.signer.getRandomSigningCommitment();
     const rootNodeSigningJob: SigningJob = {
-      signingPublicKey: secp256k1.getPublicKey(root.signingPrivateKey, true),
+      signingPublicKey: root.signingPublicKey,
       rawTx: rootNodeTx.toBytes(),
-      signingNonceCommitment:
-        getSigningCommitmentFromNonce(rootNodeSigningNonce),
+      signingNonceCommitment: rootNodeSigningCommitment,
     };
     const rootCreationNode: CreationNodeWithNonces = {
       nodeTxSigningJob: rootNodeSigningJob,
       refundTxSigningJob: undefined,
       children: [],
     };
-    rootCreationNode.nodeTxSigningNonce = rootNodeSigningNonce;
+    rootCreationNode.nodeTxSigningCommitment = rootNodeSigningCommitment;
 
     const leftChildCreationNode = this.buildChildCreationNode(
       root.children[0],
@@ -450,12 +453,6 @@ export class TreeCreationService {
       throw new Error("signingPublicKey or verificationKey is undefined");
     }
 
-    const rootKeyPackage = new KeyPackage(
-      internalNode.signingPrivateKey,
-      creationNode.nodeTxSigningJob.signingPublicKey,
-      internalNode.verificationKey
-    );
-
     const parentTxOutput = parentTx.getOutput(vout);
     if (!parentTxOutput) {
       throw new Error("parentTxOutput is undefined");
@@ -465,22 +462,19 @@ export class TreeCreationService {
     const txSighash = getSigHashFromTx(tx, 0, parentTxOutput);
 
     let nodeTxSignature: Uint8Array = new Uint8Array();
-    if (creationNode.nodeTxSigningNonce) {
-      const signingNonceCommitment = getSigningCommitmentFromNonce(
-        creationNode.nodeTxSigningNonce
-      );
-
-      const userSignature = signFrost({
-        msg: txSighash,
-        keyPackage: rootKeyPackage,
-        nonce: creationNode.nodeTxSigningNonce,
-        selfCommitment: copySigningCommitment(signingNonceCommitment),
+    if (creationNode.nodeTxSigningCommitment) {
+      const userSignature = this.config.signer.signFrost({
+        message: txSighash,
+        publicKey: creationNode.nodeTxSigningJob.signingPublicKey,
+        privateAsPubKey: internalNode.signingPublicKey,
+        selfCommitment: creationNode.nodeTxSigningCommitment,
         statechainCommitments:
           creationResponseNode.nodeTxSigningResult?.signingNonceCommitments,
+        verifyingKey: internalNode.verificationKey,
       });
 
-      nodeTxSignature = aggregateFrost({
-        msg: txSighash,
+      nodeTxSignature = this.config.signer.aggregateFrost({
+        message: txSighash,
         statechainSignatures:
           creationResponseNode.nodeTxSigningResult?.signatureShares,
         statechainPublicKeys:
@@ -488,17 +482,14 @@ export class TreeCreationService {
         verifyingKey: internalNode.verificationKey,
         statechainCommitments:
           creationResponseNode.nodeTxSigningResult?.signingNonceCommitments,
-        selfCommitment: signingNonceCommitment,
+        selfCommitment: creationNode.nodeTxSigningCommitment,
         selfSignature: userSignature,
-        selfPublicKey: secp256k1.getPublicKey(
-          internalNode.signingPrivateKey,
-          true
-        ),
+        publicKey: internalNode.signingPublicKey,
       });
     }
 
     let refundTxSignature: Uint8Array = new Uint8Array();
-    if (creationNode.refundTxSigningNonce) {
+    if (creationNode.refundTxSigningCommitment) {
       const rawTx = creationNode.refundTxSigningJob?.rawTx;
       if (!rawTx) {
         throw new Error("rawTx is undefined");
@@ -509,27 +500,18 @@ export class TreeCreationService {
       const refundTx = getTxFromRawTxBytes(rawTx);
       const refundTxSighash = getSigHashFromTx(refundTx, 0, parentTxOutput);
 
-      const refundSigningNonceCommitment = getSigningCommitmentFromNonce(
-        creationNode.refundTxSigningNonce
-      );
-
-      const refundKeyPackage = new KeyPackage(
-        internalNode.signingPrivateKey,
-        creationNode.nodeTxSigningJob.signingPublicKey,
-        internalNode.verificationKey
-      );
-
-      const refundSigningResponse = signFrost({
-        msg: refundTxSighash,
-        keyPackage: refundKeyPackage,
-        nonce: creationNode.refundTxSigningNonce,
-        selfCommitment: copySigningCommitment(refundSigningNonceCommitment),
+      const refundSigningResponse = this.config.signer.signFrost({
+        message: refundTxSighash,
+        publicKey: creationNode.refundTxSigningJob.signingPublicKey,
+        privateAsPubKey: internalNode.signingPublicKey,
+        selfCommitment: creationNode.refundTxSigningCommitment,
         statechainCommitments:
           creationResponseNode.refundTxSigningResult?.signingNonceCommitments,
+        verifyingKey: internalNode.verificationKey,
       });
 
-      refundTxSignature = aggregateFrost({
-        msg: refundTxSighash,
+      refundTxSignature = this.config.signer.aggregateFrost({
+        message: refundTxSighash,
         statechainSignatures:
           creationResponseNode.refundTxSigningResult?.signatureShares,
         statechainPublicKeys:
@@ -537,12 +519,9 @@ export class TreeCreationService {
         verifyingKey: internalNode.verificationKey,
         statechainCommitments:
           creationResponseNode.refundTxSigningResult?.signingNonceCommitments,
-        selfCommitment: refundSigningNonceCommitment,
+        selfCommitment: creationNode.refundTxSigningCommitment,
         selfSignature: refundSigningResponse,
-        selfPublicKey: secp256k1.getPublicKey(
-          internalNode.signingPrivateKey,
-          true
-        ),
+        publicKey: internalNode.signingPublicKey,
       });
     }
 

@@ -1,6 +1,5 @@
 import { bytesToHex, hexToBytes } from "@noble/curves/abstract/utils";
 import { Transaction } from "@scure/btc-signer";
-import { Network } from "utils/network";
 import {
   getP2TRAddressFromPkScript,
   getP2TRAddressFromPublicKey,
@@ -8,6 +7,7 @@ import {
   getSigHashFromTx,
   getTxFromRawTxHex,
 } from "../utils/bitcoin";
+import { Network } from "../utils/network";
 
 describe("bitcoin", () => {
   it("test p2tr address from public key", () => {
@@ -21,14 +21,14 @@ describe("bitcoin", () => {
           "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
         p2trAddr:
           "bc1pmfr3p9j00pfxjh0zmgp99y8zftmd3s5pmedqhyptwy6lm87hf5sspknck9",
-        network: "mainnet",
+        network: Network.MAINNET,
       },
       {
         pubKey:
           "03797dd653040d344fd048c1ad05d4cbcb2178b30c6a0c4276994795f3e833da41",
         p2trAddr:
           "tb1p8dlmzllfah294ntwatr8j5uuvcj7yg0dete94ck2krrk0ka2c9qqex96hv",
-        network: "testnet",
+        network: Network.TESTNET,
       },
     ];
 
@@ -50,14 +50,14 @@ describe("bitcoin", () => {
           "51206d2a651074ff19686d4cd4e45aaaad3f85639e90bb24e21b875b174b0635eb30",
         p2trAddr:
           "bc1pd54x2yr5luvksm2v6nj9424d87zk885shvjwyxu8tvt5kp34avcq024v6k",
-        network: "mainnet",
+        network: Network.MAINNET,
       },
       {
         pkScript:
           "5120d0cd6fade9979fc9e0cc353d8e06a22f43d659cf09c8f909834e80468f4af966",
         p2trAddr:
           "bcrt1p6rxklt0fj70uncxvx57cup4z9apavkw0p8y0jzvrf6qydr62l9nqd94jkz",
-        network: "regtest",
+        network: Network.REGTEST,
       },
     ];
 
@@ -109,7 +109,10 @@ describe("bitcoin", () => {
   it("test script from pubkey", () => {
     const pubKey =
       "03ef261da8259f5ea86abe1b7d658ebd13fe2b2ce2418dabe854ccec67bdb9ba87";
-    const script = getP2TRScriptFromPublicKey(hexToBytes(pubKey), "mainnet");
+    const script = getP2TRScriptFromPublicKey(
+      hexToBytes(pubKey),
+      Network.MAINNET
+    );
     expect(bytesToHex(script)).toEqual(
       "51208af8e5e92783248418d5c68007dc8659a2100261b5bb561efc28dde94ec8cb93"
     );

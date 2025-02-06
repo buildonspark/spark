@@ -1,8 +1,7 @@
 import { bytesToHex, hexToBytes } from "@noble/curves/abstract/utils";
-import { secp256k1 } from "@noble/curves/secp256k1";
-import { WalletConfigService } from "../services/config";
-import { DefaultSparkSigner } from "../signer/signer";
+import { sha256 } from "@scure/btc-signer/utils";
 import { SparkWallet } from "../spark-sdk";
+import { Network } from "../utils/network";
 import { createNewTree } from "./test-util";
 
 describe("Transfer", () => {
@@ -12,20 +11,18 @@ describe("Transfer", () => {
   testFn(
     "test transfer",
     async () => {
-      const senderWallet = new SparkWallet("regtest");
+      const senderWallet = new SparkWallet(Network.REGTEST);
       const senderMnemonic = senderWallet.generateMnemonic();
       await senderWallet.createSparkWallet(senderMnemonic);
 
-      const senderSigner = new DefaultSparkSigner();
-      senderSigner.createSparkWalletFromMnemonic(senderMnemonic);
-      const senderConfig = new WalletConfigService("regtest", senderSigner);
+      const leafPubKey = senderWallet.getSigner().generatePublicKey();
+      const rootNode = await createNewTree(senderWallet, leafPubKey);
 
-      const leafPrivKey = secp256k1.utils.randomPrivateKey();
-      const rootNode = await createNewTree(senderConfig, leafPrivKey);
+      const newLeafPubKey = senderWallet
+        .getSigner()
+        .generatePublicKey(sha256("1"));
 
-      const newLeafPrivKey = secp256k1.utils.randomPrivateKey();
-
-      const receiverWallet = new SparkWallet("regtest");
+      const receiverWallet = new SparkWallet(Network.REGTEST);
       const receiverMnemonic = receiverWallet.generateMnemonic();
       const receiverPubkey = await receiverWallet.createSparkWallet(
         receiverMnemonic
@@ -33,8 +30,8 @@ describe("Transfer", () => {
 
       const transferNode = {
         leaf: rootNode,
-        signingPrivKey: leafPrivKey,
-        newSigningPrivKey: newLeafPrivKey,
+        signingPubKey: leafPubKey,
+        newSigningPubKey: newLeafPubKey,
       };
 
       const senderTransfer = await senderWallet.sendTransfer(
@@ -59,14 +56,16 @@ describe("Transfer", () => {
 
       const leafPrivKeyMapBytes = leafPrivKeyMap.get(rootNode.id);
       expect(leafPrivKeyMapBytes).toBeDefined();
-      expect(bytesToHex(leafPrivKeyMapBytes!)).toBe(bytesToHex(newLeafPrivKey));
+      expect(bytesToHex(leafPrivKeyMapBytes!)).toBe(bytesToHex(newLeafPubKey));
 
-      const finalLeafPrivKey = secp256k1.utils.randomPrivateKey();
+      const finalLeafPubKey = receiverWallet
+        .getSigner()
+        .generatePublicKey(sha256("2"));
 
       const claimingNode = {
         leaf: rootNode,
-        signingPrivKey: newLeafPrivKey,
-        newSigningPrivKey: finalLeafPrivKey,
+        signingPubKey: newLeafPubKey,
+        newSigningPubKey: finalLeafPubKey,
       };
 
       await receiverWallet.claimTransfer(receiverTransfer, [claimingNode]);

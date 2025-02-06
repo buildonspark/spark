@@ -1,22 +1,28 @@
 import { schnorr, secp256k1 } from "@noble/curves/secp256k1";
 import { sha256 } from "@scure/btc-signer/utils";
+import { SparkWallet } from "../spark-sdk";
 import {
   applyAdaptorToSignature,
   generateAdaptorFromSignature,
   validateOutboundAdaptorSignature,
 } from "../utils/adaptor-signature";
+import { Network } from "../utils/network";
 
 describe("adaptor signature", () => {
-  it("should validate outbound adaptor signature", () => {
+  it("should validate outbound adaptor signature", async () => {
     let failures = 0;
+
+    const wallet = new SparkWallet(Network.REGTEST);
+    const mnemonic = wallet.generateMnemonic();
+    await wallet.createSparkWallet(mnemonic);
 
     const msg = "test";
     const hash = sha256(msg);
     for (let i = 0; i < 1000; i++) {
-      const privKey = secp256k1.utils.randomPrivateKey();
-      const pubkey = schnorr.getPublicKey(privKey);
+      const pubKey = wallet.getSigner().generatePublicKey();
+      const pubkey = wallet.getSigner().getSchnorrPublicKey(pubKey);
 
-      const sig = schnorr.sign(hash, privKey);
+      const sig = wallet.getSigner().signSchnorr(hash, pubKey);
 
       expect(schnorr.verify(sig, hash, pubkey)).toBe(true);
 

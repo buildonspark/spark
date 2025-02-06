@@ -24,7 +24,7 @@ export class WalletConfigService {
   // TODO: update config based on network
   constructor(network: Network, signer?: SparkSigner) {
     this.config = {
-      network: "regtest",
+      network,
       coodinatorIdentifier:
         "0000000000000000000000000000000000000000000000000000000000000001",
       frostSignerAddress: "unix:///tmp/frost_0.sock",
@@ -41,5 +41,9 @@ export class WalletConfigService {
 
   getConfig() {
     return this.config;
+  }
+
+  getNetwork() {
+    return this.config.network;
   }
 }

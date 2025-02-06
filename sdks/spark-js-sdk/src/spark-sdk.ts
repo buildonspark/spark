@@ -66,7 +66,10 @@ export class SparkWallet {
       this.config,
       this.connectionManager
     );
-    this.initWasm();
+  }
+
+  getSigner(): SparkSigner {
+    return this.config.signer;
   }
 
   private async initWasm() {
@@ -83,6 +86,11 @@ export class SparkWallet {
     }
   }
 
+  // TODO: Probably remove this. Only used temporarily for tests
+  getConfigService(): WalletConfigService {
+    return this.config;
+  }
+
   getConfig(): WalletConfig {
     return this.config.getConfig();
   }
@@ -93,7 +101,7 @@ export class SparkWallet {
 
   getP2trAddress(): string {
     const pubKey = this.config.signer.getIdentityPublicKey();
-    const network = this.config.getConfig().network;
+    const network = this.config.getNetwork();
 
     return getP2TRAddressFromPublicKey(pubKey, network);
   }
@@ -114,10 +122,12 @@ export class SparkWallet {
 
   // TODO: Update to use config based on options
   async createSparkWallet(mnemonic: string): Promise<string> {
+    await this.initWasm();
     return this.config.signer.createSparkWalletFromMnemonic(mnemonic);
   }
 
   async createSparkWalletFromSeed(seed: Uint8Array | string): Promise<string> {
+    await this.initWasm();
     return this.config.signer.createSparkWalletFromSeed(seed);
   }
 
@@ -197,13 +207,13 @@ export class SparkWallet {
   }
 
   async createTreeRoot(
-    signingPrivkey: Uint8Array,
+    signingPubKey: Uint8Array,
     verifyingKey: Uint8Array,
     depositTx: Transaction,
     vout: number
   ) {
     return await this.depositService!.createTreeRoot({
-      signingPrivkey,
+      signingPubKey,
       verifyingKey,
       depositTx,
       vout,
@@ -212,13 +222,13 @@ export class SparkWallet {
 
   async generateDepositAddressForTree(
     vout: number,
-    parentSigningPrivKey: Uint8Array,
+    parentSigningPubKey: Uint8Array,
     parentTx?: Transaction,
     parentNode?: TreeNode
   ) {
     return await this.treeCreationService!.generateDepositAddressForTree(
       vout,
-      parentSigningPrivKey,
+      parentSigningPubKey,
       parentTx,
       parentNode
     );

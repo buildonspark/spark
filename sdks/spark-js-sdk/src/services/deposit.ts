@@ -1,6 +1,6 @@
 import { schnorr, secp256k1 } from "@noble/curves/secp256k1";
 import * as btc from "@scure/btc-signer";
-import { NETWORK, p2tr, Transaction } from "@scure/btc-signer";
+import { p2tr, Transaction } from "@scure/btc-signer";
 import { equalBytes, sha256 } from "@scure/btc-signer/utils";
 import { SignatureIntent } from "../proto/common";
 import {
@@ -17,14 +17,7 @@ import {
 import { subtractPublicKeys } from "../utils/keys";
 import { getNetwork } from "../utils/network";
 import { proofOfPossessionMessageHashForDepositAddress } from "../utils/proof";
-import {
-  copySigningCommitment,
-  copySigningNonce,
-  getRandomSigningNonce,
-  getSigningCommitmentFromNonce,
-} from "../utils/signing";
-import { aggregateFrost, signFrost } from "../utils/wasm";
-import { KeyPackage } from "../wasm/spark_bindings";
+import { createWasmSigningCommitment } from "../utils/signing";
 import { WalletConfigService } from "./config";
 import { ConnectionManager } from "./connection";
 type ValidateDepositAddressParams = {
@@ -37,7 +30,7 @@ export type GenerateDepositAddressParams = {
 };
 
 export type CreateTreeRootParams = {
-  signingPrivkey: Uint8Array;
+  signingPubKey: Uint8Array;
   verifyingKey: Uint8Array;
   depositTx: Transaction;
   vout: number;
@@ -81,7 +74,7 @@ export class DepositService {
     const taprootKey = p2tr(
       operatorPubkey.slice(1, 33),
       undefined,
-      NETWORK
+      getNetwork(this.config.getNetwork())
     ).tweakedPubkey;
 
     const isVerified = schnorr.verify(
@@ -149,13 +142,11 @@ export class DepositService {
   }
 
   async createTreeRoot({
-    signingPrivkey,
+    signingPubKey,
     verifyingKey,
     depositTx,
     vout,
   }: CreateTreeRootParams) {
-    const signingPubKey = secp256k1.getPublicKey(signingPrivkey);
-
     // Create a root tx
     const rootTx = new Transaction();
     const output = depositTx.getOutput(0);
@@ -182,8 +173,7 @@ export class DepositService {
       finalScriptSig: script,
     });
 
-    const rootNonce = getRandomSigningNonce();
-    const rootNonceCommitment = getSigningCommitmentFromNonce(rootNonce);
+    const rootNonceCommitment = this.config.signer.getRandomSigningCommitment();
     const rootTxSighash = getSigHashFromTx(rootTx, 0, output);
 
     // Create a refund tx
@@ -197,10 +187,10 @@ export class DepositService {
 
     const refundP2trAddress = getP2TRAddressFromPublicKey(
       signingPubKey,
-      this.config.getConfig().network
+      this.config.getNetwork()
     );
     const refundAddress = btc
-      .Address(getNetwork(this.config.getConfig().network))
+      .Address(getNetwork(this.config.getNetwork()))
       .decode(refundP2trAddress);
     const refundPkScript = btc.OutScript.encode(refundAddress);
 
@@ -213,8 +203,8 @@ export class DepositService {
       finalScriptSig: script,
     });
 
-    const refundNonce = getRandomSigningNonce();
-    const refundNonceCommitment = getSigningCommitmentFromNonce(refundNonce);
+    const refundNonceCommitment =
+      this.config.signer.getRandomSigningCommitment();
     const refundTxSighash = getSigHashFromTx(refundTx, 0, output);
 
     const sparkClient = await this.connectionManager.createSparkClient(
@@ -222,6 +212,7 @@ export class DepositService {
     );
 
     let treeResp: StartTreeCreationResponse;
+
     try {
       treeResp = await sparkClient.start_tree_creation({
         identityPublicKey: this.config.signer.getIdentityPublicKey(),
@@ -245,8 +236,6 @@ export class DepositService {
       sparkClient.close?.();
       throw new Error(`Error starting tree creation: ${error}`);
     }
-
-    treeResp.rootNodeSignatureShares?.refundTxSigningResult;
 
     if (!treeResp.rootNodeSignatureShares?.verifyingKey) {
       throw new Error("No verifying key found in tree response");
@@ -272,40 +261,32 @@ export class DepositService {
       throw new Error("Verifying key does not match");
     }
 
-    const userKeyPackage = new KeyPackage(
-      signingPrivkey,
-      signingPubKey,
-      verifyingKey
-    );
-
-    const refundKeyPackage = new KeyPackage(
-      signingPrivkey,
-      signingPubKey,
-      verifyingKey
-    );
-
-    const rootSignature = signFrost({
-      msg: rootTxSighash,
-      keyPackage: userKeyPackage,
-      nonce: copySigningNonce(rootNonce),
-      selfCommitment: copySigningCommitment(rootNonceCommitment),
+    const rootSignature = this.config.signer.signFrost({
+      message: rootTxSighash,
+      publicKey: signingPubKey,
+      privateAsPubKey: signingPubKey,
+      verifyingKey,
+      selfCommitment: rootNonceCommitment,
       statechainCommitments:
         treeResp.rootNodeSignatureShares.nodeTxSigningResult
           .signingNonceCommitments,
+      adaptorPubKey: new Uint8Array(),
     });
 
-    const refundSignature = signFrost({
-      msg: refundTxSighash,
-      keyPackage: refundKeyPackage,
-      nonce: copySigningNonce(refundNonce),
-      selfCommitment: copySigningCommitment(refundNonceCommitment),
+    const refundSignature = this.config.signer.signFrost({
+      message: refundTxSighash,
+      publicKey: signingPubKey,
+      privateAsPubKey: signingPubKey,
+      verifyingKey,
+      selfCommitment: refundNonceCommitment,
       statechainCommitments:
         treeResp.rootNodeSignatureShares.refundTxSigningResult
           .signingNonceCommitments,
+      adaptorPubKey: new Uint8Array(),
     });
 
-    const rootAggregate = aggregateFrost({
-      msg: rootTxSighash,
+    const rootAggregate = this.config.signer.aggregateFrost({
+      message: rootTxSighash,
       statechainSignatures:
         treeResp.rootNodeSignatureShares.nodeTxSigningResult.signatureShares,
       statechainPublicKeys:
@@ -314,13 +295,14 @@ export class DepositService {
       statechainCommitments:
         treeResp.rootNodeSignatureShares.nodeTxSigningResult
           .signingNonceCommitments,
-      selfCommitment: copySigningCommitment(rootNonceCommitment),
-      selfPublicKey: signingPubKey,
+      selfCommitment: createWasmSigningCommitment(rootNonceCommitment),
+      publicKey: signingPubKey,
       selfSignature: rootSignature!,
+      adaptorPubKey: new Uint8Array(),
     });
 
-    const refundAggregate = aggregateFrost({
-      msg: refundTxSighash,
+    const refundAggregate = this.config.signer.aggregateFrost({
+      message: refundTxSighash,
       statechainSignatures:
         treeResp.rootNodeSignatureShares.refundTxSigningResult.signatureShares,
       statechainPublicKeys:
@@ -329,9 +311,10 @@ export class DepositService {
       statechainCommitments:
         treeResp.rootNodeSignatureShares.refundTxSigningResult
           .signingNonceCommitments,
-      selfCommitment: copySigningCommitment(refundNonceCommitment),
-      selfPublicKey: signingPubKey,
+      selfCommitment: createWasmSigningCommitment(refundNonceCommitment),
+      publicKey: signingPubKey,
       selfSignature: refundSignature,
+      adaptorPubKey: new Uint8Array(),
     });
 
     let finalizeResp: FinalizeNodeSignaturesResponse;

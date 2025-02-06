@@ -1,12 +1,11 @@
 import { equalBytes, hexToBytes } from "@noble/curves/abstract/utils";
-import { secp256k1 } from "@noble/curves/secp256k1";
 import { Address, OutScript, Transaction } from "@scure/btc-signer";
 import { TransactionInput } from "@scure/btc-signer/psbt";
+import { sha256 } from "@scure/btc-signer/utils";
 import { WalletConfigService } from "../services/config";
 import { ConnectionManager } from "../services/connection";
 import { CoopExitService } from "../services/coop-exit";
 import { LeafKeyTweak, TransferService } from "../services/transfer";
-import { DefaultSparkSigner } from "../signer/signer";
 import { SparkWallet } from "../spark-sdk";
 import {
   getP2TRAddressFromPublicKey,
@@ -15,7 +14,7 @@ import {
   getTxId,
   getTxIdNoReverse,
 } from "../utils/bitcoin";
-import { getNetwork } from "../utils/network";
+import { getNetwork, Network } from "../utils/network";
 import { createDummyTx } from "../utils/wasm";
 import { createNewTree } from "./test-util";
 
@@ -24,16 +23,16 @@ describe("coop exit", () => {
   const testFn = process.env.GITHUB_ACTIONS ? it.skip : it;
 
   testFn("test coop exit", async () => {
-    const wallet = new SparkWallet("regtest");
+    const wallet = new SparkWallet(Network.REGTEST);
     const mnemonic = wallet.generateMnemonic();
     await wallet.createSparkWallet(mnemonic);
 
     const config = wallet.getConfig();
 
-    const signer = new DefaultSparkSigner();
-    signer.createSparkWalletFromMnemonic(mnemonic);
-
-    const configService = new WalletConfigService("regtest", signer);
+    const configService = new WalletConfigService(
+      Network.REGTEST,
+      wallet.getSigner()
+    );
     const connectionManager = new ConnectionManager(configService);
     const transferService = new TransferService(
       configService,
@@ -45,10 +44,10 @@ describe("coop exit", () => {
       transferService
     );
 
-    const leafPrivKey = secp256k1.utils.randomPrivateKey();
-    const rootNode = await createNewTree(configService, leafPrivKey);
+    const leafPubKey = wallet.getSigner().generatePublicKey(sha256("asdf"));
+    const rootNode = await createNewTree(wallet, leafPubKey);
 
-    const sspWallet = new SparkWallet("regtest");
+    const sspWallet = new SparkWallet(Network.REGTEST);
     const sspMnemonic = sspWallet.generateMnemonic();
     const sspPubkey = await sspWallet.createSparkWallet(sspMnemonic);
 
@@ -58,8 +57,7 @@ describe("coop exit", () => {
     );
     const amountSats = 100_000n;
 
-    const withdrawPrivKey = secp256k1.utils.randomPrivateKey();
-    const withdrawPubKey = secp256k1.getPublicKey(withdrawPrivKey, true);
+    const withdrawPubKey = wallet.getSigner().generatePublicKey();
     const withdrawAddress = getP2TRAddressFromPublicKey(
       withdrawPubKey,
       config.network
@@ -87,8 +85,7 @@ describe("coop exit", () => {
     };
     let connectorP2trAddrs: string[] = [];
     for (let i = 0; i < leafCount + 1; i++) {
-      const connectorPrivKey = secp256k1.utils.randomPrivateKey();
-      const connectorPubKey = secp256k1.getPublicKey(connectorPrivKey, true);
+      const connectorPubKey = wallet.getSigner().generatePublicKey();
       const connectorP2trAddr = getP2TRAddressFromPublicKey(
         connectorPubKey,
         config.network
@@ -120,14 +117,14 @@ describe("coop exit", () => {
       });
     }
 
-    const newLeafPrivKey = secp256k1.utils.randomPrivateKey();
+    const newLeafPubKey = wallet.getSigner().generatePublicKey();
 
     const senderTransfer = await coopExitService.getConnectorRefundSignatures({
       leaves: [
         {
           leaf: rootNode,
-          signingPrivKey: leafPrivKey,
-          newSigningPrivKey: newLeafPrivKey,
+          signingPubKey: leafPubKey,
+          newSigningPubKey: newLeafPubKey,
         },
       ],
       exitTxId: hexToBytes(getTxId(exitTx)),
@@ -142,23 +139,22 @@ describe("coop exit", () => {
     const receiverTransfer = pendingTransfer.transfers[0];
     expect(receiverTransfer.id).toBe(senderTransfer.transfer.id);
     expect(receiverTransfer.leaves[0].leaf).toBeDefined();
-    const leafPrivKeyMap = await sspWallet.verifyPendingTransfer(
+    const leafPubKeyMap = await sspWallet.verifyPendingTransfer(
       receiverTransfer
     );
 
-    expect(leafPrivKeyMap.size).toBe(1);
-    expect(leafPrivKeyMap.get(rootNode.id)).toBeDefined();
-    const isEqual = equalBytes(
-      leafPrivKeyMap.get(rootNode.id)!,
-      newLeafPrivKey
-    );
+    expect(leafPubKeyMap.size).toBe(1);
+    expect(leafPubKeyMap.get(rootNode.id)).toBeDefined();
+    const isEqual = equalBytes(leafPubKeyMap.get(rootNode.id)!, newLeafPubKey);
+
     expect(isEqual).toBe(true);
-    const finalLeafPrivKey = secp256k1.utils.randomPrivateKey();
+    const finalLeafPubKey = sspWallet.getSigner().generatePublicKey();
+
     const leavesToClaim: LeafKeyTweak[] = [
       {
         leaf: receiverTransfer.leaves[0].leaf!,
-        signingPrivKey: newLeafPrivKey,
-        newSigningPrivKey: finalLeafPrivKey,
+        signingPubKey: newLeafPubKey,
+        newSigningPubKey: finalLeafPubKey,
       },
     ];
 

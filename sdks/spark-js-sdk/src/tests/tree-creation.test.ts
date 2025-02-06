@@ -1,8 +1,8 @@
 import { bytesToHex } from "@noble/curves/abstract/utils";
-import { secp256k1 } from "@noble/curves/secp256k1";
 import { ConnectionManager } from "../services/connection";
 import { SparkWallet } from "../spark-sdk";
 import { getTxFromRawTxBytes, getTxId } from "../utils/bitcoin";
+import { Network } from "../utils/network";
 import { createDummyTx } from "../utils/wasm";
 
 describe("Tree Creation", () => {
@@ -12,7 +12,7 @@ describe("Tree Creation", () => {
   testFn(
     "test tree creation address generation",
     async () => {
-      const wallet = new SparkWallet("regtest");
+      const wallet = new SparkWallet(Network.REGTEST);
       const mnemonic = wallet.generateMnemonic();
       await wallet.createSparkWallet(mnemonic);
       const config = wallet.getConfig();
@@ -21,8 +21,7 @@ describe("Tree Creation", () => {
         config.signingOperators[config.coodinatorIdentifier].address
       );
 
-      const privKey = secp256k1.utils.randomPrivateKey();
-      const pubKey = secp256k1.getPublicKey(privKey);
+      const pubKey = wallet.getSigner().generatePublicKey();
 
       const depositResp = await wallet.generateDepositAddress(pubKey);
 
@@ -50,7 +49,7 @@ describe("Tree Creation", () => {
 
       const treeResp = await wallet.generateDepositAddressForTree(
         vout,
-        privKey,
+        pubKey,
         depositTx
       );
 

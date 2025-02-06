@@ -1,18 +1,16 @@
 import { bytesToHex, hexToBytes } from "@noble/curves/abstract/utils";
 import { secp256k1 } from "@noble/curves/secp256k1";
+import { SparkWallet } from "spark-sdk";
 import { TreeNode } from "../proto/spark";
-import {
-  SigningOperator,
-  WalletConfig,
-  WalletConfigService,
-} from "../services/config";
+import { SigningOperator, WalletConfig } from "../services/config";
 import { ConnectionManager } from "../services/connection";
 import { DepositService } from "../services/deposit";
 import { getTxFromRawTxBytes, getTxId } from "../utils/bitcoin";
+import { Network } from "../utils/network";
 import { createDummyTx } from "../utils/wasm";
 
 export const TEST_WALLET_CONFIG = {
-  network: "regtest",
+  network: Network.REGTEST,
   coodinatorIdentifier:
     "0000000000000000000000000000000000000000000000000000000000000001",
   frostSignerAddress: "unix:///tmp/frost_0.sock",
@@ -85,18 +83,18 @@ export function getTestWalletConfigWithIdentityKey(
 }
 
 export async function createNewTree(
-  config: WalletConfigService,
-  privKey: Uint8Array,
+  wallet: SparkWallet,
+  pubKey: Uint8Array,
   amountSats: bigint = 100_000n
 ): Promise<TreeNode> {
-  const connectionManager = new ConnectionManager(config);
-  const depositService = new DepositService(config, connectionManager);
-  const mockClient = ConnectionManager.createMockClient(
-    config.getCoordinatorAddress()
+  const connectionManager = new ConnectionManager(wallet.getConfigService());
+  const depositService = new DepositService(
+    wallet.getConfigService(),
+    connectionManager
   );
-
-  // Generate private/public key pair
-  const pubKey = secp256k1.getPublicKey(privKey, true);
+  const mockClient = ConnectionManager.createMockClient(
+    wallet.getConfigService().getCoordinatorAddress()
+  );
 
   // Generate deposit address
   const depositResp = await depositService.generateDepositAddress({
@@ -127,7 +125,7 @@ export async function createNewTree(
 
   // Create tree root
   const treeResp = await depositService.createTreeRoot({
-    signingPrivkey: privKey,
+    signingPubKey: pubKey,
     verifyingKey: depositResp.depositAddress.verifyingKey,
     depositTx,
     vout,

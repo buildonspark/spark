@@ -1,4 +1,3 @@
-import { secp256k1 } from "@noble/curves/secp256k1";
 import { Transaction } from "@scure/btc-signer";
 import { TransactionInput } from "@scure/btc-signer/psbt";
 import { randomUUID } from "crypto";
@@ -11,10 +10,6 @@ import {
   getP2TRScriptFromPublicKey,
   getTxFromRawTxBytes,
 } from "../utils/bitcoin";
-import {
-  getRandomSigningNonce,
-  getSigningCommitmentFromNonce,
-} from "../utils/signing";
 import { getNextTransactionSequence } from "../utils/transaction";
 import { WalletConfigService } from "./config";
 import { ConnectionManager } from "./connection";
@@ -93,7 +88,7 @@ export class CoopExitService {
     refundTx.addInput(connectorOutput);
     const receiverScript = getP2TRScriptFromPublicKey(
       receiverPubKey,
-      this.config.getConfig().network
+      this.config.getNetwork()
     );
 
     refundTx.addOutput({
@@ -133,23 +128,23 @@ export class CoopExitService {
         receiverPubKey
       );
 
-      const nonce = getRandomSigningNonce();
-      const signingPubKey = secp256k1.getPublicKey(leaf.signingPrivKey);
+      const signingNonceCommitment =
+        this.config.signer.getRandomSigningCommitment();
       const signingJob: LeafRefundTxSigningJob = {
         leafId: leaf.leaf.id,
         refundTxSigningJob: {
-          signingPublicKey: signingPubKey,
+          signingPublicKey: leaf.signingPubKey,
           rawTx: refundTx.toBytes(),
-          signingNonceCommitment: getSigningCommitmentFromNonce(nonce),
+          signingNonceCommitment: signingNonceCommitment,
         },
       };
 
       signingJobs.push(signingJob);
       const tx = getTxFromRawTxBytes(leaf.leaf.nodeTx);
       leafDataMap.set(leaf.leaf.id, {
-        signingPrivKey: leaf.signingPrivKey,
+        signingPubKey: leaf.signingPubKey,
         refundTx,
-        nonce,
+        signingNonceCommitment,
         tx,
         vout: leaf.leaf.vout,
         receivingPubkey: receiverPubKey,

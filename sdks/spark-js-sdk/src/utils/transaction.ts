@@ -1,5 +1,5 @@
 import { Address, OutScript, Transaction } from "@scure/btc-signer";
-import { TreeNode } from "proto/spark";
+import { TreeNode } from "../proto/spark";
 import {
   getP2TRAddressFromPublicKey,
   getSigHashFromTx,

@@ -1,6 +1,5 @@
 import {
   bytesToHex,
-  bytesToNumberBE,
   equalBytes,
   numberToBytesBE,
 } from "@noble/curves/abstract/utils";
@@ -23,50 +22,40 @@ import {
   Transfer,
   TreeNode,
 } from "proto/spark";
+import { SigningCommitment } from "signer/signer";
 import { SignatureIntent } from "../proto/common";
 import { getSigHashFromTx, getTxFromRawTxBytes } from "../utils/bitcoin";
-import { subtractPrivateKeys } from "../utils/keys";
-import {
-  splitSecretWithProofs,
-  VerifiableSecretShare,
-} from "../utils/secret-sharing";
-import {
-  copySigningCommitment,
-  getRandomSigningNonce,
-  getSigningCommitmentFromNonce,
-} from "../utils/signing";
+import { VerifiableSecretShare } from "../utils/secret-sharing";
 import { createRefundTx } from "../utils/transaction";
-import { aggregateFrost, signFrost } from "../utils/wasm";
-import { KeyPackage, SigningNonce } from "../wasm/spark_bindings";
 import { WalletConfigService } from "./config";
 import { ConnectionManager } from "./connection";
 
 export type LeafKeyTweak = {
   leaf: TreeNode;
-  signingPrivKey: Uint8Array;
-  newSigningPrivKey: Uint8Array;
+  signingPubKey: Uint8Array;
+  newSigningPubKey: Uint8Array;
 };
 
 export type ClaimLeafData = {
-  signingPrivKey: Uint8Array;
+  signingPubKey: Uint8Array;
   tx?: Transaction;
   refundTx?: Transaction;
-  nonce: SigningNonce;
+  signingNonceCommitment: SigningCommitment;
   vout?: number;
 };
 
 export type LeafRefundSigningData = {
-  signingPrivKey: Uint8Array;
+  signingPubKey: Uint8Array;
   receivingPubkey: Uint8Array;
   tx: Transaction;
   refundTx?: Transaction;
-  nonce: SigningNonce;
+  signingNonceCommitment: SigningCommitment;
   vout: number;
 };
 
 export class TransferService {
-  private readonly config: WalletConfigService;
-  private readonly connectionManager: ConnectionManager;
+  readonly config: WalletConfigService;
+  readonly connectionManager: ConnectionManager;
 
   constructor(
     config: WalletConfigService,
@@ -124,7 +113,7 @@ export class TransferService {
   async verifyPendingTransfer(
     transfer: Transfer
   ): Promise<Map<string, Uint8Array>> {
-    const leafPrivKeyMap = new Map<string, Uint8Array>();
+    const leafPubKeyMap = new Map<string, Uint8Array>();
     for (const leaf of transfer.leaves) {
       if (!leaf.leaf) {
         throw new Error("Leaf is undefined");
@@ -148,12 +137,11 @@ export class TransferService {
         throw new Error("Signature verification failed");
       }
 
-      // TODO: Probably need to move a lot of this logic to the signer
       const leafSecret = this.config.signer.decryptEcies(leaf.secretCipher);
 
-      leafPrivKeyMap.set(leaf.leaf.id, leafSecret);
+      leafPubKeyMap.set(leaf.leaf.id, leafSecret);
     }
-    return leafPrivKeyMap;
+    return leafPubKeyMap;
   }
 
   async sendTransferTweakKey(
@@ -241,13 +229,15 @@ export class TransferService {
 
     const leafDataMap = new Map<string, LeafRefundSigningData>();
     for (const leaf of leaves) {
-      const nonce = getRandomSigningNonce();
+      const signingNonceCommitment =
+        this.config.signer.getRandomSigningCommitment();
+
       const tx = getTxFromRawTxBytes(leaf.leaf.nodeTx);
       const refundTx = getTxFromRawTxBytes(leaf.leaf.refundTx);
       leafDataMap.set(leaf.leaf.id, {
-        signingPrivKey: leaf.signingPrivKey,
+        signingPubKey: leaf.signingPubKey,
         receivingPubkey: receiverIdentityPubkey,
-        nonce,
+        signingNonceCommitment,
         tx,
         refundTx,
         vout: leaf.leaf.vout,
@@ -315,13 +305,15 @@ export class TransferService {
 
     const leafDataMap = new Map<string, LeafRefundSigningData>();
     for (const leaf of leaves) {
-      const nonce = getRandomSigningNonce();
+      const signingNonceCommitment =
+        this.config.signer.getRandomSigningCommitment();
+
       const tx = getTxFromRawTxBytes(leaf.leaf.nodeTx);
       const refundTx = getTxFromRawTxBytes(leaf.leaf.refundTx);
       leafDataMap.set(leaf.leaf.id, {
-        signingPrivKey: leaf.signingPrivKey,
+        signingPubKey: leaf.signingPubKey,
         receivingPubkey: receiverIdentityPubkey,
-        nonce,
+        signingNonceCommitment,
         tx,
         refundTx,
         vout: leaf.leaf.vout,
@@ -406,17 +398,18 @@ export class TransferService {
     receiverEciesPubKey: ecies.PublicKey,
     refundSignature?: Uint8Array
   ): Map<string, SendLeafKeyTweak> {
-    const privKeyTweak = subtractPrivateKeys(
-      leaf.signingPrivKey,
-      leaf.newSigningPrivKey
+    const pubKeyTweak = this.config.signer.subtractPrivateKeysGivenPublicKeys(
+      leaf.signingPubKey,
+      leaf.newSigningPubKey
     );
 
-    const shares = splitSecretWithProofs(
-      bytesToNumberBE(privKeyTweak),
-      secp256k1.CURVE.n,
-      this.config.getConfig().threshold,
-      Object.keys(this.config.getConfig().signingOperators).length
-    );
+    const shares = this.config.signer.splitSecretWithProofs({
+      secret: pubKeyTweak,
+      isSecretPubkey: true,
+      curveOrder: secp256k1.CURVE.n,
+      threshold: this.config.getConfig().threshold,
+      numShares: Object.keys(this.config.getConfig().signingOperators).length,
+    });
 
     const pubkeySharesTweak = new Map<string, Uint8Array>();
     for (const [identifier, operator] of Object.entries(
@@ -434,9 +427,9 @@ export class TransferService {
       pubkeySharesTweak.set(identifier, pubkeyTweak);
     }
 
-    const secretCipher = ecies.encrypt(
+    const secretCipher = this.config.signer.encryptLeafPrivateKeyEcies(
       receiverEciesPubKey.toBytes(),
-      leaf.newSigningPrivKey
+      leaf.newSigningPubKey
     );
 
     const encoder = new TextEncoder();
@@ -485,25 +478,22 @@ export class TransferService {
       if (!refundSigningData) {
         throw new Error(`Leaf data not found for leaf ${leaf.leaf.id}`);
       }
-      const signingPubkey = secp256k1.getPublicKey(
-        refundSigningData.signingPrivKey
-      );
+
       const { refundTx } = createRefundTx(
         leaf.leaf,
         refundSigningData.receivingPubkey,
-        this.config.getConfig().network
+        this.config.getNetwork()
       );
 
       refundSigningData.refundTx = refundTx;
 
-      const refundNonceCommitmentProto = getSigningCommitmentFromNonce(
-        refundSigningData.nonce
-      );
+      const refundNonceCommitmentProto =
+        refundSigningData.signingNonceCommitment;
 
       signingJobs.push({
         leafId: leaf.leaf.id,
         refundTxSigningJob: {
-          signingPublicKey: signingPubkey,
+          signingPublicKey: refundSigningData.signingPubKey,
           rawTx: refundTx.toBytes(),
           signingNonceCommitment: refundNonceCommitmentProto,
         },
@@ -576,16 +566,19 @@ export class TransferService {
   private prepareClaimLeafKeyTweaks(
     leaf: LeafKeyTweak
   ): Map<string, ClaimLeafKeyTweak> {
-    const prvKeyTweak = subtractPrivateKeys(
-      leaf.signingPrivKey,
-      leaf.newSigningPrivKey
+    const pubKeyTweak = this.config.signer.subtractPrivateKeysGivenPublicKeys(
+      leaf.signingPubKey,
+      leaf.newSigningPubKey
     );
-    const shares = splitSecretWithProofs(
-      bytesToNumberBE(prvKeyTweak),
-      secp256k1.CURVE.n,
-      this.config.getConfig().threshold,
-      Object.keys(this.config.getConfig().signingOperators).length
-    );
+
+    const shares = this.config.signer.splitSecretWithProofs({
+      secret: pubKeyTweak,
+      isSecretPubkey: true,
+      curveOrder: secp256k1.CURVE.n,
+      threshold: this.config.getConfig().threshold,
+      numShares: Object.keys(this.config.getConfig().signingOperators).length,
+    });
+
     const pubkeySharesTweak = new Map<string, Uint8Array>();
 
     for (const [identifier, operator] of Object.entries(
@@ -629,12 +622,11 @@ export class TransferService {
   ): Promise<NodeSignatures[]> {
     const leafDataMap: Map<string, LeafRefundSigningData> = new Map();
     for (const leafKey of leafKeys) {
-      const nonce = getRandomSigningNonce();
       const tx = getTxFromRawTxBytes(leafKey.leaf.nodeTx);
       leafDataMap.set(leafKey.leaf.id, {
-        signingPrivKey: leafKey.newSigningPrivKey,
-        receivingPubkey: secp256k1.getPublicKey(leafKey.newSigningPrivKey),
-        nonce,
+        signingPubKey: leafKey.newSigningPubKey,
+        receivingPubkey: leafKey.newSigningPubKey,
+        signingNonceCommitment: this.config.signer.getRandomSigningCommitment(),
         tx,
         vout: leafKey.leaf.vout,
       });
@@ -687,25 +679,20 @@ export class TransferService {
       }
 
       const refundTxSighash = getSigHashFromTx(leafData.refundTx, 0, txOutput);
-      const nonceCommitment = getSigningCommitmentFromNonce(leafData.nonce);
-      const userKeyPackage = new KeyPackage(
-        leafData.signingPrivKey,
-        secp256k1.getPublicKey(leafData.signingPrivKey),
-        operatorSigningResult.verifyingKey
-      );
 
-      const userSignature = signFrost({
-        msg: refundTxSighash,
-        keyPackage: userKeyPackage,
-        nonce: leafData.nonce,
-        selfCommitment: copySigningCommitment(nonceCommitment),
+      const userSignature = this.config.signer.signFrost({
+        message: refundTxSighash,
+        publicKey: leafData.signingPubKey,
+        privateAsPubKey: leafData.signingPubKey,
+        selfCommitment: leafData.signingNonceCommitment,
         statechainCommitments:
           operatorSigningResult.refundTxSigningResult?.signingNonceCommitments,
         adaptorPubKey: adaptorPubKey,
+        verifyingKey: operatorSigningResult.verifyingKey,
       });
 
-      const refundAggregate = aggregateFrost({
-        msg: refundTxSighash,
+      const refundAggregate = this.config.signer.aggregateFrost({
+        message: refundTxSighash,
         statechainSignatures:
           operatorSigningResult.refundTxSigningResult?.signatureShares,
         statechainPublicKeys:
@@ -713,8 +700,8 @@ export class TransferService {
         verifyingKey: operatorSigningResult.verifyingKey,
         statechainCommitments:
           operatorSigningResult.refundTxSigningResult?.signingNonceCommitments,
-        selfCommitment: copySigningCommitment(nonceCommitment),
-        selfPublicKey: secp256k1.getPublicKey(leafData.signingPrivKey, true),
+        selfCommitment: leafData.signingNonceCommitment,
+        publicKey: leafData.signingPubKey,
         selfSignature: userSignature,
         adaptorPubKey: adaptorPubKey,
       });

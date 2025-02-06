@@ -1,15 +1,16 @@
 import { equalBytes, hexToBytes } from "@noble/curves/abstract/utils";
 import { secp256k1 } from "@noble/curves/secp256k1";
+import { sha256 } from "@scure/btc-signer/utils";
 import { WalletConfigService } from "../services/config";
 import { ConnectionManager } from "../services/connection";
 import { LeafKeyTweak, TransferService } from "../services/transfer";
-import { DefaultSparkSigner } from "../signer/signer";
 import { SparkWallet } from "../spark-sdk";
 import {
   applyAdaptorToSignature,
   generateAdaptorFromSignature,
 } from "../utils/adaptor-signature";
 import { computeTaprootKeyNoScript, getSigHashFromTx } from "../utils/bitcoin";
+import { Network } from "../utils/network";
 import { createNewTree } from "./test-util";
 
 describe("swap", () => {
@@ -19,13 +20,14 @@ describe("swap", () => {
     "test swap",
     async () => {
       // Initiate sender
-      const senderWallet = new SparkWallet("regtest");
+      const senderWallet = new SparkWallet(Network.REGTEST);
       const senderMnemonic = senderWallet.generateMnemonic();
       const senderPubkey = await senderWallet.createSparkWallet(senderMnemonic);
 
-      const senderSigner = new DefaultSparkSigner();
-      senderSigner.createSparkWalletFromMnemonic(senderMnemonic);
-      const senderConfig = new WalletConfigService("regtest", senderSigner);
+      const senderConfig = new WalletConfigService(
+        Network.REGTEST,
+        senderWallet.getSigner()
+      );
       const senderConnectionManager = new ConnectionManager(senderConfig);
       const senderTransferService = new TransferService(
         senderConfig,
@@ -33,39 +35,42 @@ describe("swap", () => {
       );
 
       // Initiate receiver
-      const receiverWallet = new SparkWallet("regtest");
+      const receiverWallet = new SparkWallet(Network.REGTEST);
       const receiverMnemonic = receiverWallet.generateMnemonic();
       const receiverPubkey = await receiverWallet.createSparkWallet(
         receiverMnemonic
       );
 
-      const receiverSigner = new DefaultSparkSigner();
-      receiverSigner.createSparkWalletFromMnemonic(receiverMnemonic);
-      const receiverConfig = new WalletConfigService("regtest", receiverSigner);
+      const receiverConfig = new WalletConfigService(
+        Network.REGTEST,
+        receiverWallet.getSigner()
+      );
       const receiverConnectionManager = new ConnectionManager(receiverConfig);
       const receiverTransferService = new TransferService(
         receiverConfig,
         receiverConnectionManager
       );
 
-      const senderLeafPrivKey = secp256k1.utils.randomPrivateKey();
+      const senderLeafPubKey = senderWallet.getSigner().generatePublicKey();
       const senderRootNode = await createNewTree(
-        senderConfig,
-        senderLeafPrivKey
+        senderWallet,
+        senderLeafPubKey
       );
 
-      const receiverLeafPrivKey = secp256k1.utils.randomPrivateKey();
+      const receiverLeafPubKey = receiverWallet.getSigner().generatePublicKey();
       const receiverRootNode = await createNewTree(
-        receiverConfig,
-        receiverLeafPrivKey
+        receiverWallet,
+        receiverLeafPubKey
       );
 
       // Sender initiates transfer
-      const senderNewLeafPrivKey = secp256k1.utils.randomPrivateKey();
+      const senderNewLeafPubKey = senderWallet
+        .getSigner()
+        .generatePublicKey(sha256("1"));
       const senderTransferNode: LeafKeyTweak = {
         leaf: senderRootNode,
-        signingPrivKey: senderLeafPrivKey,
-        newSigningPrivKey: senderNewLeafPrivKey,
+        signingPubKey: senderLeafPubKey,
+        newSigningPubKey: senderNewLeafPubKey,
       };
       const senderLeavesToTransfer = [senderTransferNode];
 
@@ -89,12 +94,14 @@ describe("swap", () => {
         generateAdaptorFromSignature(senderSignature!);
       const adaptorPubKey = secp256k1.getPublicKey(adaptorPrivateKey);
 
-      const receiverNewLeafPrivKey = secp256k1.utils.randomPrivateKey();
+      const receiverNewLeafPubKey = receiverWallet
+        .getSigner()
+        .generatePublicKey(sha256("1"));
 
       const receiverTransferNode: LeafKeyTweak = {
         leaf: receiverRootNode,
-        signingPrivKey: receiverLeafPrivKey,
-        newSigningPrivKey: receiverNewLeafPrivKey,
+        signingPubKey: receiverLeafPubKey,
+        newSigningPubKey: receiverNewLeafPubKey,
       };
       const receiverLeavesToTransfer = [receiverTransferNode];
 
@@ -161,15 +168,17 @@ describe("swap", () => {
       expect(leafPrivKeyMap.get(senderRootNode.id)).toBeDefined();
       const bytesEqual = equalBytes(
         leafPrivKeyMap.get(senderRootNode.id)!,
-        senderNewLeafPrivKey
+        senderNewLeafPubKey
       );
       expect(bytesEqual).toBe(true);
       expect(receiverPendingTransfer.leaves[0].leaf).toBeDefined();
-      const finalLeafPrivKey = secp256k1.utils.randomPrivateKey();
+      const finalLeafPubKey = receiverWallet
+        .getSigner()
+        .generatePublicKey(sha256("2"));
       const claimingNode: LeafKeyTweak = {
         leaf: receiverPendingTransfer.leaves[0].leaf!,
-        signingPrivKey: senderNewLeafPrivKey,
-        newSigningPrivKey: finalLeafPrivKey,
+        signingPubKey: senderNewLeafPubKey,
+        newSigningPubKey: finalLeafPubKey,
       };
       const leavesToClaim = [claimingNode];
       await receiverTransferService.claimTransfer(
@@ -196,16 +205,18 @@ describe("swap", () => {
       expect(senderLeafPrivKeyMap.get(receiverRootNode.id)).toBeDefined();
       const bytesEqual_1 = equalBytes(
         senderLeafPrivKeyMap.get(receiverRootNode.id)!,
-        receiverNewLeafPrivKey
+        receiverNewLeafPubKey
       );
       expect(bytesEqual_1).toBe(true);
       expect(senderPendingTransfer.leaves[0].leaf).toBeDefined();
 
-      const finalLeafPrivKey_1 = secp256k1.utils.randomPrivateKey();
+      const finalLeafPubKey_1 = senderWallet
+        .getSigner()
+        .generatePublicKey(sha256("3"));
       const claimingNode_1: LeafKeyTweak = {
         leaf: senderPendingTransfer.leaves[0].leaf!,
-        signingPrivKey: receiverNewLeafPrivKey,
-        newSigningPrivKey: finalLeafPrivKey_1,
+        signingPubKey: receiverNewLeafPubKey,
+        newSigningPubKey: finalLeafPubKey_1,
       };
       const leavesToClaim_1 = [claimingNode_1];
       await senderTransferService.claimTransfer(

@@ -1,4 +1,4 @@
-import { bytesToNumberBE, numberToBytesBE } from "@noble/curves/abstract/utils";
+import { numberToBytesBE } from "@noble/curves/abstract/utils";
 import { secp256k1 } from "@noble/curves/secp256k1";
 import { sha256 } from "@scure/btc-signer/utils";
 import { randomUUID } from "crypto";
@@ -14,15 +14,7 @@ import {
   UserSignedRefund,
 } from "../proto/spark";
 import { getTxFromRawTxBytes } from "../utils/bitcoin";
-import { splitSecretWithProofs } from "../utils/secret-sharing";
-import {
-  copySigningCommitment,
-  getRandomSigningNonce,
-  getSigningCommitmentFromNonce,
-} from "../utils/signing";
 import { createRefundTx } from "../utils/transaction";
-import { signFrost } from "../utils/wasm";
-import { KeyPackage } from "../wasm/spark_bindings";
 import { WalletConfigService } from "./config";
 import { ConnectionManager } from "./connection";
 import { LeafKeyTweak } from "./transfer";
@@ -66,12 +58,12 @@ export class LightningService {
     amountSats,
     memo,
   }: CreateLightningInvoiceParams): Promise<string> {
-    const preimagePrivKey = secp256k1.utils.randomPrivateKey();
+    const preimagePubKey = this.config.signer.generatePublicKey();
     return await this.createLightningInvoiceWithPreImage({
       invoiceCreator,
       amountSats,
       memo,
-      preimage: preimagePrivKey,
+      preimage: preimagePubKey,
     });
   }
 
@@ -84,13 +76,13 @@ export class LightningService {
     const paymentHash = sha256(preimage);
     const invoice = await invoiceCreator(amountSats, paymentHash, memo);
 
-    const preimageAsInt = bytesToNumberBE(preimage);
-    const shares = splitSecretWithProofs(
-      preimageAsInt,
-      secp256k1.CURVE.n,
-      this.config.getConfig().threshold,
-      Object.keys(this.config.getConfig().signingOperators).length
-    );
+    const shares = this.config.signer.splitSecretWithProofs({
+      secret: preimage,
+      isSecretPubkey: false,
+      curveOrder: secp256k1.CURVE.n,
+      threshold: this.config.getConfig().threshold,
+      numShares: Object.keys(this.config.getConfig().signingOperators).length,
+    });
 
     const errors: Error[] = [];
     const promises = Object.entries(
@@ -269,25 +261,19 @@ export class LightningService {
       const { refundTx, sighash } = createRefundTx(
         leaf.leaf,
         receiverIdentityPubkey,
-        this.config.getConfig().network
+        this.config.getNetwork()
       );
 
-      const signingNonce = getRandomSigningNonce();
-      const signingCommitment = getSigningCommitmentFromNonce(signingNonce);
+      const signingCommitment = this.config.signer.getRandomSigningCommitment();
 
-      const signingPubKey = secp256k1.getPublicKey(leaf.signingPrivKey);
-      const keyPackage = new KeyPackage(
-        leaf.signingPrivKey,
-        signingPubKey,
-        leaf.leaf.verifyingPublicKey
-      );
-
-      const signingResult = signFrost({
-        msg: sighash,
-        keyPackage,
-        nonce: signingNonce,
-        selfCommitment: copySigningCommitment(signingCommitment),
+      const signingResult = this.config.signer.signFrost({
+        message: sighash,
+        publicKey: leaf.signingPubKey,
+        privateAsPubKey: leaf.signingPubKey,
+        selfCommitment: signingCommitment,
         statechainCommitments: signingCommitments[i].signingNonceCommitments,
+        adaptorPubKey: new Uint8Array(),
+        verifyingKey: leaf.leaf.verifyingPublicKey,
       });
 
       userSignedRefunds.push({
