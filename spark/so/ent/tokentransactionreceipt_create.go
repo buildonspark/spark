@@ -276,8 +276,8 @@ func (ttrc *TokenTransactionReceiptCreate) createSpec() (*TokenTransactionReceip
 	}
 	if nodes := ttrc.mutation.IssuanceIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2O,
-			Inverse: true,
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
 			Table:   tokentransactionreceipt.IssuanceTable,
 			Columns: []string{tokentransactionreceipt.IssuanceColumn},
 			Bidi:    false,
@@ -288,7 +288,7 @@ func (ttrc *TokenTransactionReceiptCreate) createSpec() (*TokenTransactionReceip
 		for _, k := range nodes {
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
-		_node.token_issuance_token_transaction_receipt_issuance = &nodes[0]
+		_node.token_transaction_receipt_issuance = &nodes[0]
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	return _node, _spec

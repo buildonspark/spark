@@ -319,8 +319,8 @@ func (ttru *TokenTransactionReceiptUpdate) sqlSave(ctx context.Context) (n int, 
 	}
 	if ttru.mutation.IssuanceCleared() {
 		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2O,
-			Inverse: true,
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
 			Table:   tokentransactionreceipt.IssuanceTable,
 			Columns: []string{tokentransactionreceipt.IssuanceColumn},
 			Bidi:    false,
@@ -332,8 +332,8 @@ func (ttru *TokenTransactionReceiptUpdate) sqlSave(ctx context.Context) (n int, 
 	}
 	if nodes := ttru.mutation.IssuanceIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2O,
-			Inverse: true,
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
 			Table:   tokentransactionreceipt.IssuanceTable,
 			Columns: []string{tokentransactionreceipt.IssuanceColumn},
 			Bidi:    false,
@@ -684,8 +684,8 @@ func (ttruo *TokenTransactionReceiptUpdateOne) sqlSave(ctx context.Context) (_no
 	}
 	if ttruo.mutation.IssuanceCleared() {
 		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2O,
-			Inverse: true,
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
 			Table:   tokentransactionreceipt.IssuanceTable,
 			Columns: []string{tokentransactionreceipt.IssuanceColumn},
 			Bidi:    false,
@@ -697,8 +697,8 @@ func (ttruo *TokenTransactionReceiptUpdateOne) sqlSave(ctx context.Context) (_no
 	}
 	if nodes := ttruo.mutation.IssuanceIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2O,
-			Inverse: true,
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
 			Table:   tokentransactionreceipt.IssuanceTable,
 			Columns: []string{tokentransactionreceipt.IssuanceColumn},
 			Bidi:    false,

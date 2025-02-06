@@ -124,7 +124,7 @@ func (ttrq *TokenTransactionReceiptQuery) QueryIssuance() *TokenIssuanceQuery {
 		step := sqlgraph.NewStep(
 			sqlgraph.From(tokentransactionreceipt.Table, tokentransactionreceipt.FieldID, selector),
 			sqlgraph.To(tokenissuance.Table, tokenissuance.FieldID),
-			sqlgraph.Edge(sqlgraph.O2O, true, tokentransactionreceipt.IssuanceTable, tokentransactionreceipt.IssuanceColumn),
+			sqlgraph.Edge(sqlgraph.M2O, false, tokentransactionreceipt.IssuanceTable, tokentransactionreceipt.IssuanceColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(ttrq.driver.Dialect(), step)
 		return fromU, nil
@@ -564,10 +564,10 @@ func (ttrq *TokenTransactionReceiptQuery) loadIssuance(ctx context.Context, quer
 	ids := make([]uuid.UUID, 0, len(nodes))
 	nodeids := make(map[uuid.UUID][]*TokenTransactionReceipt)
 	for i := range nodes {
-		if nodes[i].token_issuance_token_transaction_receipt_issuance == nil {
+		if nodes[i].token_transaction_receipt_issuance == nil {
 			continue
 		}
-		fk := *nodes[i].token_issuance_token_transaction_receipt_issuance
+		fk := *nodes[i].token_transaction_receipt_issuance
 		if _, ok := nodeids[fk]; !ok {
 			ids = append(ids, fk)
 		}
@@ -584,7 +584,7 @@ func (ttrq *TokenTransactionReceiptQuery) loadIssuance(ctx context.Context, quer
 	for _, n := range neighbors {
 		nodes, ok := nodeids[n.ID]
 		if !ok {
-			return fmt.Errorf(`unexpected foreign-key "token_issuance_token_transaction_receipt_issuance" returned %v`, n.ID)
+			return fmt.Errorf(`unexpected foreign-key "token_transaction_receipt_issuance" returned %v`, n.ID)
 		}
 		for i := range nodes {
 			assign(nodes[i], n)

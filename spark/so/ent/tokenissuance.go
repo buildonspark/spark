@@ -11,7 +11,6 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/so/ent/tokenissuance"
-	"github.com/lightsparkdev/spark-go/so/ent/tokentransactionreceipt"
 )
 
 // TokenIssuance is the model entity for the TokenIssuance schema.
@@ -35,22 +34,20 @@ type TokenIssuance struct {
 
 // TokenIssuanceEdges holds the relations/edges for other nodes in the graph.
 type TokenIssuanceEdges struct {
-	// TokenTransactionReceiptIssuance holds the value of the token_transaction_receipt_issuance edge.
-	TokenTransactionReceiptIssuance *TokenTransactionReceipt `json:"token_transaction_receipt_issuance,omitempty"`
+	// TokenTransactionReceipt holds the value of the token_transaction_receipt edge.
+	TokenTransactionReceipt []*TokenTransactionReceipt `json:"token_transaction_receipt,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
 	loadedTypes [1]bool
 }
 
-// TokenTransactionReceiptIssuanceOrErr returns the TokenTransactionReceiptIssuance value or an error if the edge
-// was not loaded in eager-loading, or loaded but was not found.
-func (e TokenIssuanceEdges) TokenTransactionReceiptIssuanceOrErr() (*TokenTransactionReceipt, error) {
-	if e.TokenTransactionReceiptIssuance != nil {
-		return e.TokenTransactionReceiptIssuance, nil
-	} else if e.loadedTypes[0] {
-		return nil, &NotFoundError{label: tokentransactionreceipt.Label}
+// TokenTransactionReceiptOrErr returns the TokenTransactionReceipt value or an error if the edge
+// was not loaded in eager-loading.
+func (e TokenIssuanceEdges) TokenTransactionReceiptOrErr() ([]*TokenTransactionReceipt, error) {
+	if e.loadedTypes[0] {
+		return e.TokenTransactionReceipt, nil
 	}
-	return nil, &NotLoadedError{edge: "token_transaction_receipt_issuance"}
+	return nil, &NotLoadedError{edge: "token_transaction_receipt"}
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -122,9 +119,9 @@ func (ti *TokenIssuance) Value(name string) (ent.Value, error) {
 	return ti.selectValues.Get(name)
 }
 
-// QueryTokenTransactionReceiptIssuance queries the "token_transaction_receipt_issuance" edge of the TokenIssuance entity.
-func (ti *TokenIssuance) QueryTokenTransactionReceiptIssuance() *TokenTransactionReceiptQuery {
-	return NewTokenIssuanceClient(ti.config).QueryTokenTransactionReceiptIssuance(ti)
+// QueryTokenTransactionReceipt queries the "token_transaction_receipt" edge of the TokenIssuance entity.
+func (ti *TokenIssuance) QueryTokenTransactionReceipt() *TokenTransactionReceiptQuery {
+	return NewTokenIssuanceClient(ti.config).QueryTokenTransactionReceipt(ti)
 }
 
 // Update returns a builder for updating this TokenIssuance.

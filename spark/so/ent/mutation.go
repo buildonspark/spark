@@ -4562,19 +4562,20 @@ func (m *SigningNonceMutation) ResetEdge(name string) error {
 // TokenIssuanceMutation represents an operation that mutates the TokenIssuance nodes in the graph.
 type TokenIssuanceMutation struct {
 	config
-	op                                        Op
-	typ                                       string
-	id                                        *uuid.UUID
-	create_time                               *time.Time
-	update_time                               *time.Time
-	issuer_public_key                         *[]byte
-	issuer_signature                          *[]byte
-	clearedFields                             map[string]struct{}
-	token_transaction_receipt_issuance        *uuid.UUID
-	clearedtoken_transaction_receipt_issuance bool
-	done                                      bool
-	oldValue                                  func(context.Context) (*TokenIssuance, error)
-	predicates                                []predicate.TokenIssuance
+	op                               Op
+	typ                              string
+	id                               *uuid.UUID
+	create_time                      *time.Time
+	update_time                      *time.Time
+	issuer_public_key                *[]byte
+	issuer_signature                 *[]byte
+	clearedFields                    map[string]struct{}
+	token_transaction_receipt        map[uuid.UUID]struct{}
+	removedtoken_transaction_receipt map[uuid.UUID]struct{}
+	clearedtoken_transaction_receipt bool
+	done                             bool
+	oldValue                         func(context.Context) (*TokenIssuance, error)
+	predicates                       []predicate.TokenIssuance
 }
 
 var _ ent.Mutation = (*TokenIssuanceMutation)(nil)
@@ -4825,43 +4826,58 @@ func (m *TokenIssuanceMutation) ResetIssuerSignature() {
 	m.issuer_signature = nil
 }
 
-// SetTokenTransactionReceiptIssuanceID sets the "token_transaction_receipt_issuance" edge to the TokenTransactionReceipt entity by id.
-func (m *TokenIssuanceMutation) SetTokenTransactionReceiptIssuanceID(id uuid.UUID) {
-	m.token_transaction_receipt_issuance = &id
+// AddTokenTransactionReceiptIDs adds the "token_transaction_receipt" edge to the TokenTransactionReceipt entity by ids.
+func (m *TokenIssuanceMutation) AddTokenTransactionReceiptIDs(ids ...uuid.UUID) {
+	if m.token_transaction_receipt == nil {
+		m.token_transaction_receipt = make(map[uuid.UUID]struct{})
+	}
+	for i := range ids {
+		m.token_transaction_receipt[ids[i]] = struct{}{}
+	}
 }
 
-// ClearTokenTransactionReceiptIssuance clears the "token_transaction_receipt_issuance" edge to the TokenTransactionReceipt entity.
-func (m *TokenIssuanceMutation) ClearTokenTransactionReceiptIssuance() {
-	m.clearedtoken_transaction_receipt_issuance = true
+// ClearTokenTransactionReceipt clears the "token_transaction_receipt" edge to the TokenTransactionReceipt entity.
+func (m *TokenIssuanceMutation) ClearTokenTransactionReceipt() {
+	m.clearedtoken_transaction_receipt = true
 }
 
-// TokenTransactionReceiptIssuanceCleared reports if the "token_transaction_receipt_issuance" edge to the TokenTransactionReceipt entity was cleared.
-func (m *TokenIssuanceMutation) TokenTransactionReceiptIssuanceCleared() bool {
-	return m.clearedtoken_transaction_receipt_issuance
+// TokenTransactionReceiptCleared reports if the "token_transaction_receipt" edge to the TokenTransactionReceipt entity was cleared.
+func (m *TokenIssuanceMutation) TokenTransactionReceiptCleared() bool {
+	return m.clearedtoken_transaction_receipt
 }
 
-// TokenTransactionReceiptIssuanceID returns the "token_transaction_receipt_issuance" edge ID in the mutation.
-func (m *TokenIssuanceMutation) TokenTransactionReceiptIssuanceID() (id uuid.UUID, exists bool) {
-	if m.token_transaction_receipt_issuance != nil {
-		return *m.token_transaction_receipt_issuance, true
+// RemoveTokenTransactionReceiptIDs removes the "token_transaction_receipt" edge to the TokenTransactionReceipt entity by IDs.
+func (m *TokenIssuanceMutation) RemoveTokenTransactionReceiptIDs(ids ...uuid.UUID) {
+	if m.removedtoken_transaction_receipt == nil {
+		m.removedtoken_transaction_receipt = make(map[uuid.UUID]struct{})
+	}
+	for i := range ids {
+		delete(m.token_transaction_receipt, ids[i])
+		m.removedtoken_transaction_receipt[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedTokenTransactionReceipt returns the removed IDs of the "token_transaction_receipt" edge to the TokenTransactionReceipt entity.
+func (m *TokenIssuanceMutation) RemovedTokenTransactionReceiptIDs() (ids []uuid.UUID) {
+	for id := range m.removedtoken_transaction_receipt {
+		ids = append(ids, id)
 	}
 	return
 }
 
-// TokenTransactionReceiptIssuanceIDs returns the "token_transaction_receipt_issuance" edge IDs in the mutation.
-// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
-// TokenTransactionReceiptIssuanceID instead. It exists only for internal usage by the builders.
-func (m *TokenIssuanceMutation) TokenTransactionReceiptIssuanceIDs() (ids []uuid.UUID) {
-	if id := m.token_transaction_receipt_issuance; id != nil {
-		ids = append(ids, *id)
+// TokenTransactionReceiptIDs returns the "token_transaction_receipt" edge IDs in the mutation.
+func (m *TokenIssuanceMutation) TokenTransactionReceiptIDs() (ids []uuid.UUID) {
+	for id := range m.token_transaction_receipt {
+		ids = append(ids, id)
 	}
 	return
 }
 
-// ResetTokenTransactionReceiptIssuance resets all changes to the "token_transaction_receipt_issuance" edge.
-func (m *TokenIssuanceMutation) ResetTokenTransactionReceiptIssuance() {
-	m.token_transaction_receipt_issuance = nil
-	m.clearedtoken_transaction_receipt_issuance = false
+// ResetTokenTransactionReceipt resets all changes to the "token_transaction_receipt" edge.
+func (m *TokenIssuanceMutation) ResetTokenTransactionReceipt() {
+	m.token_transaction_receipt = nil
+	m.clearedtoken_transaction_receipt = false
+	m.removedtoken_transaction_receipt = nil
 }
 
 // Where appends a list predicates to the TokenIssuanceMutation builder.
@@ -5049,8 +5065,8 @@ func (m *TokenIssuanceMutation) ResetField(name string) error {
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *TokenIssuanceMutation) AddedEdges() []string {
 	edges := make([]string, 0, 1)
-	if m.token_transaction_receipt_issuance != nil {
-		edges = append(edges, tokenissuance.EdgeTokenTransactionReceiptIssuance)
+	if m.token_transaction_receipt != nil {
+		edges = append(edges, tokenissuance.EdgeTokenTransactionReceipt)
 	}
 	return edges
 }
@@ -5059,10 +5075,12 @@ func (m *TokenIssuanceMutation) AddedEdges() []string {
 // name in this mutation.
 func (m *TokenIssuanceMutation) AddedIDs(name string) []ent.Value {
 	switch name {
-	case tokenissuance.EdgeTokenTransactionReceiptIssuance:
-		if id := m.token_transaction_receipt_issuance; id != nil {
-			return []ent.Value{*id}
+	case tokenissuance.EdgeTokenTransactionReceipt:
+		ids := make([]ent.Value, 0, len(m.token_transaction_receipt))
+		for id := range m.token_transaction_receipt {
+			ids = append(ids, id)
 		}
+		return ids
 	}
 	return nil
 }
@@ -5070,20 +5088,31 @@ func (m *TokenIssuanceMutation) AddedIDs(name string) []ent.Value {
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *TokenIssuanceMutation) RemovedEdges() []string {
 	edges := make([]string, 0, 1)
+	if m.removedtoken_transaction_receipt != nil {
+		edges = append(edges, tokenissuance.EdgeTokenTransactionReceipt)
+	}
 	return edges
 }
 
 // RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
 // the given name in this mutation.
 func (m *TokenIssuanceMutation) RemovedIDs(name string) []ent.Value {
+	switch name {
+	case tokenissuance.EdgeTokenTransactionReceipt:
+		ids := make([]ent.Value, 0, len(m.removedtoken_transaction_receipt))
+		for id := range m.removedtoken_transaction_receipt {
+			ids = append(ids, id)
+		}
+		return ids
+	}
 	return nil
 }
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *TokenIssuanceMutation) ClearedEdges() []string {
 	edges := make([]string, 0, 1)
-	if m.clearedtoken_transaction_receipt_issuance {
-		edges = append(edges, tokenissuance.EdgeTokenTransactionReceiptIssuance)
+	if m.clearedtoken_transaction_receipt {
+		edges = append(edges, tokenissuance.EdgeTokenTransactionReceipt)
 	}
 	return edges
 }
@@ -5092,8 +5121,8 @@ func (m *TokenIssuanceMutation) ClearedEdges() []string {
 // was cleared in this mutation.
 func (m *TokenIssuanceMutation) EdgeCleared(name string) bool {
 	switch name {
-	case tokenissuance.EdgeTokenTransactionReceiptIssuance:
-		return m.clearedtoken_transaction_receipt_issuance
+	case tokenissuance.EdgeTokenTransactionReceipt:
+		return m.clearedtoken_transaction_receipt
 	}
 	return false
 }
@@ -5102,9 +5131,6 @@ func (m *TokenIssuanceMutation) EdgeCleared(name string) bool {
 // if that edge is not defined in the schema.
 func (m *TokenIssuanceMutation) ClearEdge(name string) error {
 	switch name {
-	case tokenissuance.EdgeTokenTransactionReceiptIssuance:
-		m.ClearTokenTransactionReceiptIssuance()
-		return nil
 	}
 	return fmt.Errorf("unknown TokenIssuance unique edge %s", name)
 }
@@ -5113,8 +5139,8 @@ func (m *TokenIssuanceMutation) ClearEdge(name string) error {
 // It returns an error if the edge is not defined in the schema.
 func (m *TokenIssuanceMutation) ResetEdge(name string) error {
 	switch name {
-	case tokenissuance.EdgeTokenTransactionReceiptIssuance:
-		m.ResetTokenTransactionReceiptIssuance()
+	case tokenissuance.EdgeTokenTransactionReceipt:
+		m.ResetTokenTransactionReceipt()
 		return nil
 	}
 	return fmt.Errorf("unknown TokenIssuance edge %s", name)

@@ -236,21 +236,21 @@ func IssuerSignatureLTE(v []byte) predicate.TokenIssuance {
 	return predicate.TokenIssuance(sql.FieldLTE(FieldIssuerSignature, v))
 }
 
-// HasTokenTransactionReceiptIssuance applies the HasEdge predicate on the "token_transaction_receipt_issuance" edge.
-func HasTokenTransactionReceiptIssuance() predicate.TokenIssuance {
+// HasTokenTransactionReceipt applies the HasEdge predicate on the "token_transaction_receipt" edge.
+func HasTokenTransactionReceipt() predicate.TokenIssuance {
 	return predicate.TokenIssuance(func(s *sql.Selector) {
 		step := sqlgraph.NewStep(
 			sqlgraph.From(Table, FieldID),
-			sqlgraph.Edge(sqlgraph.O2O, false, TokenTransactionReceiptIssuanceTable, TokenTransactionReceiptIssuanceColumn),
+			sqlgraph.Edge(sqlgraph.O2M, true, TokenTransactionReceiptTable, TokenTransactionReceiptColumn),
 		)
 		sqlgraph.HasNeighbors(s, step)
 	})
 }
 
-// HasTokenTransactionReceiptIssuanceWith applies the HasEdge predicate on the "token_transaction_receipt_issuance" edge with a given conditions (other predicates).
-func HasTokenTransactionReceiptIssuanceWith(preds ...predicate.TokenTransactionReceipt) predicate.TokenIssuance {
+// HasTokenTransactionReceiptWith applies the HasEdge predicate on the "token_transaction_receipt" edge with a given conditions (other predicates).
+func HasTokenTransactionReceiptWith(preds ...predicate.TokenTransactionReceipt) predicate.TokenIssuance {
 	return predicate.TokenIssuance(func(s *sql.Selector) {
-		step := newTokenTransactionReceiptIssuanceStep()
+		step := newTokenTransactionReceiptStep()
 		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
 			for _, p := range preds {
 				p(s)

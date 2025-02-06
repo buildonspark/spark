@@ -297,7 +297,7 @@ func HasIssuance() predicate.TokenTransactionReceipt {
 	return predicate.TokenTransactionReceipt(func(s *sql.Selector) {
 		step := sqlgraph.NewStep(
 			sqlgraph.From(Table, FieldID),
-			sqlgraph.Edge(sqlgraph.O2O, true, IssuanceTable, IssuanceColumn),
+			sqlgraph.Edge(sqlgraph.M2O, false, IssuanceTable, IssuanceColumn),
 		)
 		sqlgraph.HasNeighbors(s, step)
 	})

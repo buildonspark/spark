@@ -36,23 +36,19 @@ func (tiu *TokenIssuanceUpdate) SetUpdateTime(t time.Time) *TokenIssuanceUpdate 
 	return tiu
 }
 
-// SetTokenTransactionReceiptIssuanceID sets the "token_transaction_receipt_issuance" edge to the TokenTransactionReceipt entity by ID.
-func (tiu *TokenIssuanceUpdate) SetTokenTransactionReceiptIssuanceID(id uuid.UUID) *TokenIssuanceUpdate {
-	tiu.mutation.SetTokenTransactionReceiptIssuanceID(id)
+// AddTokenTransactionReceiptIDs adds the "token_transaction_receipt" edge to the TokenTransactionReceipt entity by IDs.
+func (tiu *TokenIssuanceUpdate) AddTokenTransactionReceiptIDs(ids ...uuid.UUID) *TokenIssuanceUpdate {
+	tiu.mutation.AddTokenTransactionReceiptIDs(ids...)
 	return tiu
 }
 
-// SetNillableTokenTransactionReceiptIssuanceID sets the "token_transaction_receipt_issuance" edge to the TokenTransactionReceipt entity by ID if the given value is not nil.
-func (tiu *TokenIssuanceUpdate) SetNillableTokenTransactionReceiptIssuanceID(id *uuid.UUID) *TokenIssuanceUpdate {
-	if id != nil {
-		tiu = tiu.SetTokenTransactionReceiptIssuanceID(*id)
+// AddTokenTransactionReceipt adds the "token_transaction_receipt" edges to the TokenTransactionReceipt entity.
+func (tiu *TokenIssuanceUpdate) AddTokenTransactionReceipt(t ...*TokenTransactionReceipt) *TokenIssuanceUpdate {
+	ids := make([]uuid.UUID, len(t))
+	for i := range t {
+		ids[i] = t[i].ID
 	}
-	return tiu
-}
-
-// SetTokenTransactionReceiptIssuance sets the "token_transaction_receipt_issuance" edge to the TokenTransactionReceipt entity.
-func (tiu *TokenIssuanceUpdate) SetTokenTransactionReceiptIssuance(t *TokenTransactionReceipt) *TokenIssuanceUpdate {
-	return tiu.SetTokenTransactionReceiptIssuanceID(t.ID)
+	return tiu.AddTokenTransactionReceiptIDs(ids...)
 }
 
 // Mutation returns the TokenIssuanceMutation object of the builder.
@@ -60,10 +56,25 @@ func (tiu *TokenIssuanceUpdate) Mutation() *TokenIssuanceMutation {
 	return tiu.mutation
 }
 
-// ClearTokenTransactionReceiptIssuance clears the "token_transaction_receipt_issuance" edge to the TokenTransactionReceipt entity.
-func (tiu *TokenIssuanceUpdate) ClearTokenTransactionReceiptIssuance() *TokenIssuanceUpdate {
-	tiu.mutation.ClearTokenTransactionReceiptIssuance()
+// ClearTokenTransactionReceipt clears all "token_transaction_receipt" edges to the TokenTransactionReceipt entity.
+func (tiu *TokenIssuanceUpdate) ClearTokenTransactionReceipt() *TokenIssuanceUpdate {
+	tiu.mutation.ClearTokenTransactionReceipt()
 	return tiu
+}
+
+// RemoveTokenTransactionReceiptIDs removes the "token_transaction_receipt" edge to TokenTransactionReceipt entities by IDs.
+func (tiu *TokenIssuanceUpdate) RemoveTokenTransactionReceiptIDs(ids ...uuid.UUID) *TokenIssuanceUpdate {
+	tiu.mutation.RemoveTokenTransactionReceiptIDs(ids...)
+	return tiu
+}
+
+// RemoveTokenTransactionReceipt removes "token_transaction_receipt" edges to TokenTransactionReceipt entities.
+func (tiu *TokenIssuanceUpdate) RemoveTokenTransactionReceipt(t ...*TokenTransactionReceipt) *TokenIssuanceUpdate {
+	ids := make([]uuid.UUID, len(t))
+	for i := range t {
+		ids[i] = t[i].ID
+	}
+	return tiu.RemoveTokenTransactionReceiptIDs(ids...)
 }
 
 // Save executes the query and returns the number of nodes affected by the update operation.
@@ -114,12 +125,12 @@ func (tiu *TokenIssuanceUpdate) sqlSave(ctx context.Context) (n int, err error) 
 	if value, ok := tiu.mutation.UpdateTime(); ok {
 		_spec.SetField(tokenissuance.FieldUpdateTime, field.TypeTime, value)
 	}
-	if tiu.mutation.TokenTransactionReceiptIssuanceCleared() {
+	if tiu.mutation.TokenTransactionReceiptCleared() {
 		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2O,
-			Inverse: false,
-			Table:   tokenissuance.TokenTransactionReceiptIssuanceTable,
-			Columns: []string{tokenissuance.TokenTransactionReceiptIssuanceColumn},
+			Rel:     sqlgraph.O2M,
+			Inverse: true,
+			Table:   tokenissuance.TokenTransactionReceiptTable,
+			Columns: []string{tokenissuance.TokenTransactionReceiptColumn},
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(tokentransactionreceipt.FieldID, field.TypeUUID),
@@ -127,12 +138,28 @@ func (tiu *TokenIssuanceUpdate) sqlSave(ctx context.Context) (n int, err error) 
 		}
 		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
 	}
-	if nodes := tiu.mutation.TokenTransactionReceiptIssuanceIDs(); len(nodes) > 0 {
+	if nodes := tiu.mutation.RemovedTokenTransactionReceiptIDs(); len(nodes) > 0 && !tiu.mutation.TokenTransactionReceiptCleared() {
 		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2O,
-			Inverse: false,
-			Table:   tokenissuance.TokenTransactionReceiptIssuanceTable,
-			Columns: []string{tokenissuance.TokenTransactionReceiptIssuanceColumn},
+			Rel:     sqlgraph.O2M,
+			Inverse: true,
+			Table:   tokenissuance.TokenTransactionReceiptTable,
+			Columns: []string{tokenissuance.TokenTransactionReceiptColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(tokentransactionreceipt.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := tiu.mutation.TokenTransactionReceiptIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: true,
+			Table:   tokenissuance.TokenTransactionReceiptTable,
+			Columns: []string{tokenissuance.TokenTransactionReceiptColumn},
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(tokentransactionreceipt.FieldID, field.TypeUUID),
@@ -169,23 +196,19 @@ func (tiuo *TokenIssuanceUpdateOne) SetUpdateTime(t time.Time) *TokenIssuanceUpd
 	return tiuo
 }
 
-// SetTokenTransactionReceiptIssuanceID sets the "token_transaction_receipt_issuance" edge to the TokenTransactionReceipt entity by ID.
-func (tiuo *TokenIssuanceUpdateOne) SetTokenTransactionReceiptIssuanceID(id uuid.UUID) *TokenIssuanceUpdateOne {
-	tiuo.mutation.SetTokenTransactionReceiptIssuanceID(id)
+// AddTokenTransactionReceiptIDs adds the "token_transaction_receipt" edge to the TokenTransactionReceipt entity by IDs.
+func (tiuo *TokenIssuanceUpdateOne) AddTokenTransactionReceiptIDs(ids ...uuid.UUID) *TokenIssuanceUpdateOne {
+	tiuo.mutation.AddTokenTransactionReceiptIDs(ids...)
 	return tiuo
 }
 
-// SetNillableTokenTransactionReceiptIssuanceID sets the "token_transaction_receipt_issuance" edge to the TokenTransactionReceipt entity by ID if the given value is not nil.
-func (tiuo *TokenIssuanceUpdateOne) SetNillableTokenTransactionReceiptIssuanceID(id *uuid.UUID) *TokenIssuanceUpdateOne {
-	if id != nil {
-		tiuo = tiuo.SetTokenTransactionReceiptIssuanceID(*id)
+// AddTokenTransactionReceipt adds the "token_transaction_receipt" edges to the TokenTransactionReceipt entity.
+func (tiuo *TokenIssuanceUpdateOne) AddTokenTransactionReceipt(t ...*TokenTransactionReceipt) *TokenIssuanceUpdateOne {
+	ids := make([]uuid.UUID, len(t))
+	for i := range t {
+		ids[i] = t[i].ID
 	}
-	return tiuo
-}
-
-// SetTokenTransactionReceiptIssuance sets the "token_transaction_receipt_issuance" edge to the TokenTransactionReceipt entity.
-func (tiuo *TokenIssuanceUpdateOne) SetTokenTransactionReceiptIssuance(t *TokenTransactionReceipt) *TokenIssuanceUpdateOne {
-	return tiuo.SetTokenTransactionReceiptIssuanceID(t.ID)
+	return tiuo.AddTokenTransactionReceiptIDs(ids...)
 }
 
 // Mutation returns the TokenIssuanceMutation object of the builder.
@@ -193,10 +216,25 @@ func (tiuo *TokenIssuanceUpdateOne) Mutation() *TokenIssuanceMutation {
 	return tiuo.mutation
 }
 
-// ClearTokenTransactionReceiptIssuance clears the "token_transaction_receipt_issuance" edge to the TokenTransactionReceipt entity.
-func (tiuo *TokenIssuanceUpdateOne) ClearTokenTransactionReceiptIssuance() *TokenIssuanceUpdateOne {
-	tiuo.mutation.ClearTokenTransactionReceiptIssuance()
+// ClearTokenTransactionReceipt clears all "token_transaction_receipt" edges to the TokenTransactionReceipt entity.
+func (tiuo *TokenIssuanceUpdateOne) ClearTokenTransactionReceipt() *TokenIssuanceUpdateOne {
+	tiuo.mutation.ClearTokenTransactionReceipt()
 	return tiuo
+}
+
+// RemoveTokenTransactionReceiptIDs removes the "token_transaction_receipt" edge to TokenTransactionReceipt entities by IDs.
+func (tiuo *TokenIssuanceUpdateOne) RemoveTokenTransactionReceiptIDs(ids ...uuid.UUID) *TokenIssuanceUpdateOne {
+	tiuo.mutation.RemoveTokenTransactionReceiptIDs(ids...)
+	return tiuo
+}
+
+// RemoveTokenTransactionReceipt removes "token_transaction_receipt" edges to TokenTransactionReceipt entities.
+func (tiuo *TokenIssuanceUpdateOne) RemoveTokenTransactionReceipt(t ...*TokenTransactionReceipt) *TokenIssuanceUpdateOne {
+	ids := make([]uuid.UUID, len(t))
+	for i := range t {
+		ids[i] = t[i].ID
+	}
+	return tiuo.RemoveTokenTransactionReceiptIDs(ids...)
 }
 
 // Where appends a list predicates to the TokenIssuanceUpdate builder.
@@ -277,12 +315,12 @@ func (tiuo *TokenIssuanceUpdateOne) sqlSave(ctx context.Context) (_node *TokenIs
 	if value, ok := tiuo.mutation.UpdateTime(); ok {
 		_spec.SetField(tokenissuance.FieldUpdateTime, field.TypeTime, value)
 	}
-	if tiuo.mutation.TokenTransactionReceiptIssuanceCleared() {
+	if tiuo.mutation.TokenTransactionReceiptCleared() {
 		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2O,
-			Inverse: false,
-			Table:   tokenissuance.TokenTransactionReceiptIssuanceTable,
-			Columns: []string{tokenissuance.TokenTransactionReceiptIssuanceColumn},
+			Rel:     sqlgraph.O2M,
+			Inverse: true,
+			Table:   tokenissuance.TokenTransactionReceiptTable,
+			Columns: []string{tokenissuance.TokenTransactionReceiptColumn},
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(tokentransactionreceipt.FieldID, field.TypeUUID),
@@ -290,12 +328,28 @@ func (tiuo *TokenIssuanceUpdateOne) sqlSave(ctx context.Context) (_node *TokenIs
 		}
 		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
 	}
-	if nodes := tiuo.mutation.TokenTransactionReceiptIssuanceIDs(); len(nodes) > 0 {
+	if nodes := tiuo.mutation.RemovedTokenTransactionReceiptIDs(); len(nodes) > 0 && !tiuo.mutation.TokenTransactionReceiptCleared() {
 		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2O,
-			Inverse: false,
-			Table:   tokenissuance.TokenTransactionReceiptIssuanceTable,
-			Columns: []string{tokenissuance.TokenTransactionReceiptIssuanceColumn},
+			Rel:     sqlgraph.O2M,
+			Inverse: true,
+			Table:   tokenissuance.TokenTransactionReceiptTable,
+			Columns: []string{tokenissuance.TokenTransactionReceiptColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(tokentransactionreceipt.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := tiuo.mutation.TokenTransactionReceiptIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: true,
+			Table:   tokenissuance.TokenTransactionReceiptTable,
+			Columns: []string{tokenissuance.TokenTransactionReceiptColumn},
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(tokentransactionreceipt.FieldID, field.TypeUUID),

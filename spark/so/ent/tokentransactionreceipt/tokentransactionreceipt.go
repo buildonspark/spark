@@ -51,7 +51,7 @@ const (
 	// It exists in this package in order to avoid circular dependency with the "tokenissuance" package.
 	IssuanceInverseTable = "token_issuances"
 	// IssuanceColumn is the table column denoting the issuance relation/edge.
-	IssuanceColumn = "token_issuance_token_transaction_receipt_issuance"
+	IssuanceColumn = "token_transaction_receipt_issuance"
 )
 
 // Columns holds all SQL columns for tokentransactionreceipt fields.
@@ -66,7 +66,7 @@ var Columns = []string{
 // ForeignKeys holds the SQL foreign-keys that are owned by the "token_transaction_receipts"
 // table and are not defined as standalone fields in the schema.
 var ForeignKeys = []string{
-	"token_issuance_token_transaction_receipt_issuance",
+	"token_transaction_receipt_issuance",
 }
 
 // ValidColumn reports if the column name is valid (part of the table columns).
@@ -167,6 +167,6 @@ func newIssuanceStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(IssuanceInverseTable, FieldID),
-		sqlgraph.Edge(sqlgraph.O2O, true, IssuanceTable, IssuanceColumn),
+		sqlgraph.Edge(sqlgraph.M2O, false, IssuanceTable, IssuanceColumn),
 	)
 }

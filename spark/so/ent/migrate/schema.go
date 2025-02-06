@@ -259,7 +259,7 @@ var (
 		{Name: "update_time", Type: field.TypeTime},
 		{Name: "partial_token_transaction_hash", Type: field.TypeBytes},
 		{Name: "finalized_token_transaction_hash", Type: field.TypeBytes, Nullable: true},
-		{Name: "token_issuance_token_transaction_receipt_issuance", Type: field.TypeUUID, Unique: true, Nullable: true},
+		{Name: "token_transaction_receipt_issuance", Type: field.TypeUUID, Nullable: true},
 	}
 	// TokenTransactionReceiptsTable holds the schema information for the "token_transaction_receipts" table.
 	TokenTransactionReceiptsTable = &schema.Table{
@@ -268,7 +268,7 @@ var (
 		PrimaryKey: []*schema.Column{TokenTransactionReceiptsColumns[0]},
 		ForeignKeys: []*schema.ForeignKey{
 			{
-				Symbol:     "token_transaction_receipts_token_issuances_token_transaction_receipt_issuance",
+				Symbol:     "token_transaction_receipts_token_issuances_issuance",
 				Columns:    []*schema.Column{TokenTransactionReceiptsColumns[5]},
 				RefColumns: []*schema.Column{TokenIssuancesColumns[0]},
 				OnDelete:   schema.SetNull,

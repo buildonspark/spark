@@ -1459,15 +1459,15 @@ func (c *TokenIssuanceClient) GetX(ctx context.Context, id uuid.UUID) *TokenIssu
 	return obj
 }
 
-// QueryTokenTransactionReceiptIssuance queries the token_transaction_receipt_issuance edge of a TokenIssuance.
-func (c *TokenIssuanceClient) QueryTokenTransactionReceiptIssuance(ti *TokenIssuance) *TokenTransactionReceiptQuery {
+// QueryTokenTransactionReceipt queries the token_transaction_receipt edge of a TokenIssuance.
+func (c *TokenIssuanceClient) QueryTokenTransactionReceipt(ti *TokenIssuance) *TokenTransactionReceiptQuery {
 	query := (&TokenTransactionReceiptClient{config: c.config}).Query()
 	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
 		id := ti.ID
 		step := sqlgraph.NewStep(
 			sqlgraph.From(tokenissuance.Table, tokenissuance.FieldID, id),
 			sqlgraph.To(tokentransactionreceipt.Table, tokentransactionreceipt.FieldID),
-			sqlgraph.Edge(sqlgraph.O2O, false, tokenissuance.TokenTransactionReceiptIssuanceTable, tokenissuance.TokenTransactionReceiptIssuanceColumn),
+			sqlgraph.Edge(sqlgraph.O2M, true, tokenissuance.TokenTransactionReceiptTable, tokenissuance.TokenTransactionReceiptColumn),
 		)
 		fromV = sqlgraph.Neighbors(ti.driver.Dialect(), step)
 		return fromV, nil
@@ -1829,7 +1829,7 @@ func (c *TokenTransactionReceiptClient) QueryIssuance(ttr *TokenTransactionRecei
 		step := sqlgraph.NewStep(
 			sqlgraph.From(tokentransactionreceipt.Table, tokentransactionreceipt.FieldID, id),
 			sqlgraph.To(tokenissuance.Table, tokenissuance.FieldID),
-			sqlgraph.Edge(sqlgraph.O2O, true, tokentransactionreceipt.IssuanceTable, tokentransactionreceipt.IssuanceColumn),
+			sqlgraph.Edge(sqlgraph.M2O, false, tokentransactionreceipt.IssuanceTable, tokentransactionreceipt.IssuanceColumn),
 		)
 		fromV = sqlgraph.Neighbors(ttr.driver.Dialect(), step)
 		return fromV, nil

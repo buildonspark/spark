@@ -76,23 +76,19 @@ func (tic *TokenIssuanceCreate) SetNillableID(u *uuid.UUID) *TokenIssuanceCreate
 	return tic
 }
 
-// SetTokenTransactionReceiptIssuanceID sets the "token_transaction_receipt_issuance" edge to the TokenTransactionReceipt entity by ID.
-func (tic *TokenIssuanceCreate) SetTokenTransactionReceiptIssuanceID(id uuid.UUID) *TokenIssuanceCreate {
-	tic.mutation.SetTokenTransactionReceiptIssuanceID(id)
+// AddTokenTransactionReceiptIDs adds the "token_transaction_receipt" edge to the TokenTransactionReceipt entity by IDs.
+func (tic *TokenIssuanceCreate) AddTokenTransactionReceiptIDs(ids ...uuid.UUID) *TokenIssuanceCreate {
+	tic.mutation.AddTokenTransactionReceiptIDs(ids...)
 	return tic
 }
 
-// SetNillableTokenTransactionReceiptIssuanceID sets the "token_transaction_receipt_issuance" edge to the TokenTransactionReceipt entity by ID if the given value is not nil.
-func (tic *TokenIssuanceCreate) SetNillableTokenTransactionReceiptIssuanceID(id *uuid.UUID) *TokenIssuanceCreate {
-	if id != nil {
-		tic = tic.SetTokenTransactionReceiptIssuanceID(*id)
+// AddTokenTransactionReceipt adds the "token_transaction_receipt" edges to the TokenTransactionReceipt entity.
+func (tic *TokenIssuanceCreate) AddTokenTransactionReceipt(t ...*TokenTransactionReceipt) *TokenIssuanceCreate {
+	ids := make([]uuid.UUID, len(t))
+	for i := range t {
+		ids[i] = t[i].ID
 	}
-	return tic
-}
-
-// SetTokenTransactionReceiptIssuance sets the "token_transaction_receipt_issuance" edge to the TokenTransactionReceipt entity.
-func (tic *TokenIssuanceCreate) SetTokenTransactionReceiptIssuance(t *TokenTransactionReceipt) *TokenIssuanceCreate {
-	return tic.SetTokenTransactionReceiptIssuanceID(t.ID)
+	return tic.AddTokenTransactionReceiptIDs(ids...)
 }
 
 // Mutation returns the TokenIssuanceMutation object of the builder.
@@ -219,12 +215,12 @@ func (tic *TokenIssuanceCreate) createSpec() (*TokenIssuance, *sqlgraph.CreateSp
 		_spec.SetField(tokenissuance.FieldIssuerSignature, field.TypeBytes, value)
 		_node.IssuerSignature = value
 	}
-	if nodes := tic.mutation.TokenTransactionReceiptIssuanceIDs(); len(nodes) > 0 {
+	if nodes := tic.mutation.TokenTransactionReceiptIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2O,
-			Inverse: false,
-			Table:   tokenissuance.TokenTransactionReceiptIssuanceTable,
-			Columns: []string{tokenissuance.TokenTransactionReceiptIssuanceColumn},
+			Rel:     sqlgraph.O2M,
+			Inverse: true,
+			Table:   tokenissuance.TokenTransactionReceiptTable,
+			Columns: []string{tokenissuance.TokenTransactionReceiptColumn},
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(tokentransactionreceipt.FieldID, field.TypeUUID),

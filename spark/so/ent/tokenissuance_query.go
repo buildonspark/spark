@@ -21,11 +21,11 @@ import (
 // TokenIssuanceQuery is the builder for querying TokenIssuance entities.
 type TokenIssuanceQuery struct {
 	config
-	ctx                                 *QueryContext
-	order                               []tokenissuance.OrderOption
-	inters                              []Interceptor
-	predicates                          []predicate.TokenIssuance
-	withTokenTransactionReceiptIssuance *TokenTransactionReceiptQuery
+	ctx                         *QueryContext
+	order                       []tokenissuance.OrderOption
+	inters                      []Interceptor
+	predicates                  []predicate.TokenIssuance
+	withTokenTransactionReceipt *TokenTransactionReceiptQuery
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -62,8 +62,8 @@ func (tiq *TokenIssuanceQuery) Order(o ...tokenissuance.OrderOption) *TokenIssua
 	return tiq
 }
 
-// QueryTokenTransactionReceiptIssuance chains the current query on the "token_transaction_receipt_issuance" edge.
-func (tiq *TokenIssuanceQuery) QueryTokenTransactionReceiptIssuance() *TokenTransactionReceiptQuery {
+// QueryTokenTransactionReceipt chains the current query on the "token_transaction_receipt" edge.
+func (tiq *TokenIssuanceQuery) QueryTokenTransactionReceipt() *TokenTransactionReceiptQuery {
 	query := (&TokenTransactionReceiptClient{config: tiq.config}).Query()
 	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
 		if err := tiq.prepareQuery(ctx); err != nil {
@@ -76,7 +76,7 @@ func (tiq *TokenIssuanceQuery) QueryTokenTransactionReceiptIssuance() *TokenTran
 		step := sqlgraph.NewStep(
 			sqlgraph.From(tokenissuance.Table, tokenissuance.FieldID, selector),
 			sqlgraph.To(tokentransactionreceipt.Table, tokentransactionreceipt.FieldID),
-			sqlgraph.Edge(sqlgraph.O2O, false, tokenissuance.TokenTransactionReceiptIssuanceTable, tokenissuance.TokenTransactionReceiptIssuanceColumn),
+			sqlgraph.Edge(sqlgraph.O2M, true, tokenissuance.TokenTransactionReceiptTable, tokenissuance.TokenTransactionReceiptColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(tiq.driver.Dialect(), step)
 		return fromU, nil
@@ -271,26 +271,26 @@ func (tiq *TokenIssuanceQuery) Clone() *TokenIssuanceQuery {
 		return nil
 	}
 	return &TokenIssuanceQuery{
-		config:                              tiq.config,
-		ctx:                                 tiq.ctx.Clone(),
-		order:                               append([]tokenissuance.OrderOption{}, tiq.order...),
-		inters:                              append([]Interceptor{}, tiq.inters...),
-		predicates:                          append([]predicate.TokenIssuance{}, tiq.predicates...),
-		withTokenTransactionReceiptIssuance: tiq.withTokenTransactionReceiptIssuance.Clone(),
+		config:                      tiq.config,
+		ctx:                         tiq.ctx.Clone(),
+		order:                       append([]tokenissuance.OrderOption{}, tiq.order...),
+		inters:                      append([]Interceptor{}, tiq.inters...),
+		predicates:                  append([]predicate.TokenIssuance{}, tiq.predicates...),
+		withTokenTransactionReceipt: tiq.withTokenTransactionReceipt.Clone(),
 		// clone intermediate query.
 		sql:  tiq.sql.Clone(),
 		path: tiq.path,
 	}
 }
 
-// WithTokenTransactionReceiptIssuance tells the query-builder to eager-load the nodes that are connected to
-// the "token_transaction_receipt_issuance" edge. The optional arguments are used to configure the query builder of the edge.
-func (tiq *TokenIssuanceQuery) WithTokenTransactionReceiptIssuance(opts ...func(*TokenTransactionReceiptQuery)) *TokenIssuanceQuery {
+// WithTokenTransactionReceipt tells the query-builder to eager-load the nodes that are connected to
+// the "token_transaction_receipt" edge. The optional arguments are used to configure the query builder of the edge.
+func (tiq *TokenIssuanceQuery) WithTokenTransactionReceipt(opts ...func(*TokenTransactionReceiptQuery)) *TokenIssuanceQuery {
 	query := (&TokenTransactionReceiptClient{config: tiq.config}).Query()
 	for _, opt := range opts {
 		opt(query)
 	}
-	tiq.withTokenTransactionReceiptIssuance = query
+	tiq.withTokenTransactionReceipt = query
 	return tiq
 }
 
@@ -373,7 +373,7 @@ func (tiq *TokenIssuanceQuery) sqlAll(ctx context.Context, hooks ...queryHook) (
 		nodes       = []*TokenIssuance{}
 		_spec       = tiq.querySpec()
 		loadedTypes = [1]bool{
-			tiq.withTokenTransactionReceiptIssuance != nil,
+			tiq.withTokenTransactionReceipt != nil,
 		}
 	)
 	_spec.ScanValues = func(columns []string) ([]any, error) {
@@ -394,38 +394,44 @@ func (tiq *TokenIssuanceQuery) sqlAll(ctx context.Context, hooks ...queryHook) (
 	if len(nodes) == 0 {
 		return nodes, nil
 	}
-	if query := tiq.withTokenTransactionReceiptIssuance; query != nil {
-		if err := tiq.loadTokenTransactionReceiptIssuance(ctx, query, nodes, nil,
-			func(n *TokenIssuance, e *TokenTransactionReceipt) { n.Edges.TokenTransactionReceiptIssuance = e }); err != nil {
+	if query := tiq.withTokenTransactionReceipt; query != nil {
+		if err := tiq.loadTokenTransactionReceipt(ctx, query, nodes,
+			func(n *TokenIssuance) { n.Edges.TokenTransactionReceipt = []*TokenTransactionReceipt{} },
+			func(n *TokenIssuance, e *TokenTransactionReceipt) {
+				n.Edges.TokenTransactionReceipt = append(n.Edges.TokenTransactionReceipt, e)
+			}); err != nil {
 			return nil, err
 		}
 	}
 	return nodes, nil
 }
 
-func (tiq *TokenIssuanceQuery) loadTokenTransactionReceiptIssuance(ctx context.Context, query *TokenTransactionReceiptQuery, nodes []*TokenIssuance, init func(*TokenIssuance), assign func(*TokenIssuance, *TokenTransactionReceipt)) error {
+func (tiq *TokenIssuanceQuery) loadTokenTransactionReceipt(ctx context.Context, query *TokenTransactionReceiptQuery, nodes []*TokenIssuance, init func(*TokenIssuance), assign func(*TokenIssuance, *TokenTransactionReceipt)) error {
 	fks := make([]driver.Value, 0, len(nodes))
 	nodeids := make(map[uuid.UUID]*TokenIssuance)
 	for i := range nodes {
 		fks = append(fks, nodes[i].ID)
 		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
 	}
 	query.withFKs = true
 	query.Where(predicate.TokenTransactionReceipt(func(s *sql.Selector) {
-		s.Where(sql.InValues(s.C(tokenissuance.TokenTransactionReceiptIssuanceColumn), fks...))
+		s.Where(sql.InValues(s.C(tokenissuance.TokenTransactionReceiptColumn), fks...))
 	}))
 	neighbors, err := query.All(ctx)
 	if err != nil {
 		return err
 	}
 	for _, n := range neighbors {
-		fk := n.token_issuance_token_transaction_receipt_issuance
+		fk := n.token_transaction_receipt_issuance
 		if fk == nil {
-			return fmt.Errorf(`foreign-key "token_issuance_token_transaction_receipt_issuance" is nil for node %v`, n.ID)
+			return fmt.Errorf(`foreign-key "token_transaction_receipt_issuance" is nil for node %v`, n.ID)
 		}
 		node, ok := nodeids[*fk]
 		if !ok {
-			return fmt.Errorf(`unexpected referenced foreign-key "token_issuance_token_transaction_receipt_issuance" returned %v for node %v`, *fk, n.ID)
+			return fmt.Errorf(`unexpected referenced foreign-key "token_transaction_receipt_issuance" returned %v for node %v`, *fk, n.ID)
 		}
 		assign(node, n)
 	}

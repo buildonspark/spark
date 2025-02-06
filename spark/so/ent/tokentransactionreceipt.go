@@ -29,9 +29,9 @@ type TokenTransactionReceipt struct {
 	FinalizedTokenTransactionHash []byte `json:"finalized_token_transaction_hash,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the TokenTransactionReceiptQuery when eager-loading is set.
-	Edges                                             TokenTransactionReceiptEdges `json:"edges"`
-	token_issuance_token_transaction_receipt_issuance *uuid.UUID
-	selectValues                                      sql.SelectValues
+	Edges                              TokenTransactionReceiptEdges `json:"edges"`
+	token_transaction_receipt_issuance *uuid.UUID
+	selectValues                       sql.SelectValues
 }
 
 // TokenTransactionReceiptEdges holds the relations/edges for other nodes in the graph.
@@ -87,7 +87,7 @@ func (*TokenTransactionReceipt) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullTime)
 		case tokentransactionreceipt.FieldID:
 			values[i] = new(uuid.UUID)
-		case tokentransactionreceipt.ForeignKeys[0]: // token_issuance_token_transaction_receipt_issuance
+		case tokentransactionreceipt.ForeignKeys[0]: // token_transaction_receipt_issuance
 			values[i] = &sql.NullScanner{S: new(uuid.UUID)}
 		default:
 			values[i] = new(sql.UnknownType)
@@ -136,10 +136,10 @@ func (ttr *TokenTransactionReceipt) assignValues(columns []string, values []any)
 			}
 		case tokentransactionreceipt.ForeignKeys[0]:
 			if value, ok := values[i].(*sql.NullScanner); !ok {
-				return fmt.Errorf("unexpected type %T for field token_issuance_token_transaction_receipt_issuance", values[i])
+				return fmt.Errorf("unexpected type %T for field token_transaction_receipt_issuance", values[i])
 			} else if value.Valid {
-				ttr.token_issuance_token_transaction_receipt_issuance = new(uuid.UUID)
-				*ttr.token_issuance_token_transaction_receipt_issuance = *value.S.(*uuid.UUID)
+				ttr.token_transaction_receipt_issuance = new(uuid.UUID)
+				*ttr.token_transaction_receipt_issuance = *value.S.(*uuid.UUID)
 			}
 		default:
 			ttr.selectValues.Set(columns[i], values[i])

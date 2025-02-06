@@ -23,17 +23,17 @@ const (
 	FieldIssuerPublicKey = "issuer_public_key"
 	// FieldIssuerSignature holds the string denoting the issuer_signature field in the database.
 	FieldIssuerSignature = "issuer_signature"
-	// EdgeTokenTransactionReceiptIssuance holds the string denoting the token_transaction_receipt_issuance edge name in mutations.
-	EdgeTokenTransactionReceiptIssuance = "token_transaction_receipt_issuance"
+	// EdgeTokenTransactionReceipt holds the string denoting the token_transaction_receipt edge name in mutations.
+	EdgeTokenTransactionReceipt = "token_transaction_receipt"
 	// Table holds the table name of the tokenissuance in the database.
 	Table = "token_issuances"
-	// TokenTransactionReceiptIssuanceTable is the table that holds the token_transaction_receipt_issuance relation/edge.
-	TokenTransactionReceiptIssuanceTable = "token_transaction_receipts"
-	// TokenTransactionReceiptIssuanceInverseTable is the table name for the TokenTransactionReceipt entity.
+	// TokenTransactionReceiptTable is the table that holds the token_transaction_receipt relation/edge.
+	TokenTransactionReceiptTable = "token_transaction_receipts"
+	// TokenTransactionReceiptInverseTable is the table name for the TokenTransactionReceipt entity.
 	// It exists in this package in order to avoid circular dependency with the "tokentransactionreceipt" package.
-	TokenTransactionReceiptIssuanceInverseTable = "token_transaction_receipts"
-	// TokenTransactionReceiptIssuanceColumn is the table column denoting the token_transaction_receipt_issuance relation/edge.
-	TokenTransactionReceiptIssuanceColumn = "token_issuance_token_transaction_receipt_issuance"
+	TokenTransactionReceiptInverseTable = "token_transaction_receipts"
+	// TokenTransactionReceiptColumn is the table column denoting the token_transaction_receipt relation/edge.
+	TokenTransactionReceiptColumn = "token_transaction_receipt_issuance"
 )
 
 // Columns holds all SQL columns for tokenissuance fields.
@@ -88,16 +88,23 @@ func ByUpdateTime(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldUpdateTime, opts...).ToFunc()
 }
 
-// ByTokenTransactionReceiptIssuanceField orders the results by token_transaction_receipt_issuance field.
-func ByTokenTransactionReceiptIssuanceField(field string, opts ...sql.OrderTermOption) OrderOption {
+// ByTokenTransactionReceiptCount orders the results by token_transaction_receipt count.
+func ByTokenTransactionReceiptCount(opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
-		sqlgraph.OrderByNeighborTerms(s, newTokenTransactionReceiptIssuanceStep(), sql.OrderByField(field, opts...))
+		sqlgraph.OrderByNeighborsCount(s, newTokenTransactionReceiptStep(), opts...)
 	}
 }
-func newTokenTransactionReceiptIssuanceStep() *sqlgraph.Step {
+
+// ByTokenTransactionReceipt orders the results by token_transaction_receipt terms.
+func ByTokenTransactionReceipt(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newTokenTransactionReceiptStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+func newTokenTransactionReceiptStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
-		sqlgraph.To(TokenTransactionReceiptIssuanceInverseTable, FieldID),
-		sqlgraph.Edge(sqlgraph.O2O, false, TokenTransactionReceiptIssuanceTable, TokenTransactionReceiptIssuanceColumn),
+		sqlgraph.To(TokenTransactionReceiptInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, true, TokenTransactionReceiptTable, TokenTransactionReceiptColumn),
 	)
 }

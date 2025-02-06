@@ -27,7 +27,11 @@ func (TokenIssuance) Fields() []ent.Field {
 func (TokenIssuance) Edges() []ent.Edge {
 	return []ent.Edge{
 		// Maps to the token transaction receipt representing the token issuance.
-		edge.To("token_transaction_receipt_issuance", TokenTransactionReceipt.Type).
-			Unique(),
+		edge.From("token_transaction_receipt", TokenTransactionReceipt.Type).
+			Ref("issuance"),
 	}
+}
+
+func (TokenIssuance) Indexes() []ent.Index {
+	return []ent.Index{}
 }
