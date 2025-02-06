@@ -6,6 +6,7 @@ import {
   getP2TRScriptFromPublicKey,
   getSigHashFromTx,
   getTxFromRawTxHex,
+  getTxId,
 } from "../utils/bitcoin";
 import { Network } from "../utils/network";
 
@@ -83,7 +84,7 @@ describe("bitcoin", () => {
     const tx = new Transaction();
 
     tx.addInput({
-      txid: prevTx.id,
+      txid: getTxId(prevTx),
       index: 0,
     });
 

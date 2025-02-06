@@ -169,10 +169,6 @@ export class DepositService {
       amount,
     });
 
-    rootTx.updateInput(0, {
-      finalScriptSig: script,
-    });
-
     const rootNonceCommitment = this.config.signer.getRandomSigningCommitment();
     const rootTxSighash = getSigHashFromTx(rootTx, 0, output);
 
@@ -197,10 +193,6 @@ export class DepositService {
     refundTx.addOutput({
       script: refundPkScript,
       amount: amount,
-    });
-
-    rootTx.updateInput(0, {
-      finalScriptSig: script,
     });
 
     const refundNonceCommitment =

@@ -285,10 +285,6 @@ export class TreeCreationService {
       amount: parentTxOut.amount,
     });
 
-    tx.updateInput(0, {
-      finalScriptSig: parentTxOut.script,
-    });
-
     const signingNonceCommitment =
       this.config.signer.getRandomSigningCommitment();
     const signingJob: SigningJob = {
@@ -311,7 +307,7 @@ export class TreeCreationService {
 
     const childTx = new Transaction();
     childTx.addInput({
-      txid: tx.id,
+      txid: getTxId(tx),
       index: 0,
       sequence,
     });
@@ -350,10 +346,6 @@ export class TreeCreationService {
     refundTx.addOutput({
       script: refundPkScript,
       amount: parentTxOut.amount,
-    });
-
-    refundTx.updateInput(0, {
-      finalScriptSig: parentTxOut.script,
     });
 
     const refundSigningNonceCommitment =
@@ -401,10 +393,6 @@ export class TreeCreationService {
         amount: parentTxOutput.amount / 2n,
       });
     }
-
-    rootNodeTx.updateInput(0, {
-      finalScriptSig: parentTxOutput.script,
-    });
 
     const rootNodeSigningCommitment =
       this.config.signer.getRandomSigningCommitment();

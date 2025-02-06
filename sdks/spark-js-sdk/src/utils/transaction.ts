@@ -4,6 +4,7 @@ import {
   getP2TRAddressFromPublicKey,
   getSigHashFromTx,
   getTxFromRawTxBytes,
+  getTxId,
 } from "./bitcoin";
 import { getNetwork, Network } from "./network";
 
@@ -20,15 +21,10 @@ export function createRefundTx(
   const newRefundTx = new Transaction();
   const sequence = getNextTransactionSequence(refundTx.getInput(0).sequence);
   newRefundTx.addInput({
-    txid: tx.id,
+    txid: getTxId(tx),
     index: 0,
     sequence,
   });
-
-  const finalScriptSig = refundTx.getInput(0).finalScriptSig;
-  if (!finalScriptSig) {
-    throw new Error(`Final script sig not found for refund tx`);
-  }
 
   const refundP2trAddress = getP2TRAddressFromPublicKey(
     receivingPubkey,
@@ -44,10 +40,6 @@ export function createRefundTx(
   newRefundTx.addOutput({
     script: refundPkScript,
     amount,
-  });
-
-  newRefundTx.updateInput(0, {
-    finalScriptSig,
   });
 
   const sighash = getSigHashFromTx(newRefundTx, 0, tx.getOutput(0));
