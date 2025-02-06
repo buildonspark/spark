@@ -34,6 +34,8 @@ service SparkService {
     rpc start_token_transaction(StartTokenTransactionRequest) returns (StartTokenTransactionResponse) {}
     rpc get_token_transaction_revocation_keyshares(GetTokenTransactionRevocationKeysharesRequest) returns (GetTokenTransactionRevocationKeysharesResponse) {}
     rpc finalize_token_transaction(FinalizeTokenTransactionRequest) returns (google.protobuf.Empty) {}
+
+    rpc return_lightning_payment(ReturnLightningPaymentRequest) returns (google.protobuf.Empty) {}
 }
 
 enum Network {
@@ -542,4 +544,9 @@ message ProvidePreimageRequest {
 
 message ProvidePreimageResponse {
     Transfer transfer = 1;
+}
+
+message ReturnLightningPaymentRequest {
+    bytes payment_hash = 1;
+    bytes user_identity_public_key = 2;
 }

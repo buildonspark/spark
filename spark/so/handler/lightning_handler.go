@@ -29,6 +29,7 @@ import (
 	"github.com/lightsparkdev/spark-go/so/objects"
 	decodepay "github.com/nbd-wtf/ln-decodepay"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 // LightningHandler is the handler for the lightning service.
@@ -667,4 +668,80 @@ func (h *LightningHandler) ProvidePreimage(ctx context.Context, req *pb.ProvideP
 	}
 
 	return &pb.ProvidePreimageResponse{Transfer: transferProto}, nil
+}
+
+func (h *LightningHandler) ReturnLightningPayment(ctx context.Context, req *pb.ReturnLightningPaymentRequest, internal bool) (*emptypb.Empty, error) {
+	if !internal {
+		if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, req.UserIdentityPublicKey); err != nil {
+			return nil, err
+		}
+	}
+
+	db := ent.GetDbFromContext(ctx)
+	preimageRequest, err := db.PreimageRequest.Query().Where(preimagerequest.PaymentHashEQ(req.PaymentHash)).First(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get preimage request: %v", err)
+	}
+
+	if preimageRequest.Status != schema.PreimageRequestStatusWaitingForPreimage {
+		return nil, fmt.Errorf("preimage request is not in the waiting for preimage status")
+	}
+
+	err = preimageRequest.Update().SetStatus(schema.PreimageRequestStatusReturned).Exec(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to update preimage request status: %v", err)
+	}
+
+	transfer, err := preimageRequest.QueryTransfers().Only(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get transfer: %v", err)
+	}
+
+	if !bytes.Equal(transfer.ReceiverIdentityPubkey, req.UserIdentityPublicKey) {
+		return nil, fmt.Errorf("transfer receiver identity public key mismatch")
+	}
+
+	transfer, err = transfer.Update().SetStatus(schema.TransferStatusReturned).Save(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to update transfer status: %v", err)
+	}
+
+	transferLeaves, err := transfer.QueryTransferLeaves().All(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get transfer leaves: %v", err)
+	}
+
+	for _, leaf := range transferLeaves {
+		treenode, err := leaf.QueryLeaf().Only(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("unable to get tree node: %v", err)
+		}
+		_, err = treenode.Update().SetStatus(schema.TreeNodeStatusAvailable).Save(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("unable to update tree node status: %v", err)
+		}
+	}
+
+	if !internal {
+		operatorSelection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
+		_, err = helper.ExecuteTaskWithAllOperators(ctx, h.config, &operatorSelection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
+			conn, err := common.NewGRPCConnection(operator.Address)
+			if err != nil {
+				return nil, err
+			}
+			defer conn.Close()
+
+			client := pbinternal.NewSparkInternalServiceClient(conn)
+			_, err = client.ReturnLightningPayment(ctx, req)
+			if err != nil {
+				return nil, fmt.Errorf("unable to return lightning payment: %v", err)
+			}
+			return nil, nil
+		})
+		if err != nil {
+			return nil, fmt.Errorf("unable to execute task with all operators: %v", err)
+		}
+	}
+
+	return &emptypb.Empty{}, nil
 }

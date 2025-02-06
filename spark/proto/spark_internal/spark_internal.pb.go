@@ -1697,7 +1697,7 @@ var file_spark_internal_proto_rawDesc = string([]byte{
 	0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x11, 0x70, 0x72, 0x65, 0x69, 0x6d, 0x61, 0x67, 0x65,
 	0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x49, 0x64, 0x12, 0x1a, 0x0a, 0x08, 0x70, 0x72, 0x65,
 	0x69, 0x6d, 0x61, 0x67, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x08, 0x70, 0x72, 0x65,
-	0x69, 0x6d, 0x61, 0x67, 0x65, 0x32, 0xfa, 0x0d, 0x0a, 0x14, 0x53, 0x70, 0x61, 0x72, 0x6b, 0x49,
+	0x69, 0x6d, 0x61, 0x67, 0x65, 0x32, 0xd6, 0x0e, 0x0a, 0x14, 0x53, 0x70, 0x61, 0x72, 0x6b, 0x49,
 	0x6e, 0x74, 0x65, 0x72, 0x6e, 0x61, 0x6c, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x12, 0x5e,
 	0x0a, 0x16, 0x6d, 0x61, 0x72, 0x6b, 0x5f, 0x6b, 0x65, 0x79, 0x73, 0x68, 0x61, 0x72, 0x65, 0x73,
 	0x5f, 0x61, 0x73, 0x5f, 0x75, 0x73, 0x65, 0x64, 0x12, 0x2a, 0x2e, 0x73, 0x70, 0x61, 0x72, 0x6b,
@@ -1809,11 +1809,16 @@ var file_spark_internal_proto_rawDesc = string([]byte{
 	0x69, 0x6e, 0x74, 0x65, 0x72, 0x6e, 0x61, 0x6c, 0x2e, 0x4d, 0x61, 0x72, 0x6b, 0x4b, 0x65, 0x79,
 	0x73, 0x68, 0x61, 0x72, 0x65, 0x46, 0x6f, 0x72, 0x54, 0x6f, 0x6b, 0x65, 0x6e, 0x54, 0x72, 0x61,
 	0x6e, 0x73, 0x61, 0x63, 0x74, 0x69, 0x6f, 0x6e, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65,
-	0x22, 0x00, 0x42, 0x38, 0x5a, 0x36, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d,
-	0x2f, 0x6c, 0x69, 0x67, 0x68, 0x74, 0x73, 0x70, 0x61, 0x72, 0x6b, 0x64, 0x65, 0x76, 0x2f, 0x73,
-	0x70, 0x61, 0x72, 0x6b, 0x2d, 0x67, 0x6f, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2f, 0x73, 0x70,
-	0x61, 0x72, 0x6b, 0x5f, 0x69, 0x6e, 0x74, 0x65, 0x72, 0x6e, 0x61, 0x6c, 0x62, 0x06, 0x70, 0x72,
-	0x6f, 0x74, 0x6f, 0x33,
+	0x22, 0x00, 0x12, 0x5a, 0x0a, 0x18, 0x72, 0x65, 0x74, 0x75, 0x72, 0x6e, 0x5f, 0x6c, 0x69, 0x67,
+	0x68, 0x74, 0x6e, 0x69, 0x6e, 0x67, 0x5f, 0x70, 0x61, 0x79, 0x6d, 0x65, 0x6e, 0x74, 0x12, 0x24,
+	0x2e, 0x73, 0x70, 0x61, 0x72, 0x6b, 0x2e, 0x52, 0x65, 0x74, 0x75, 0x72, 0x6e, 0x4c, 0x69, 0x67,
+	0x68, 0x74, 0x6e, 0x69, 0x6e, 0x67, 0x50, 0x61, 0x79, 0x6d, 0x65, 0x6e, 0x74, 0x52, 0x65, 0x71,
+	0x75, 0x65, 0x73, 0x74, 0x1a, 0x16, 0x2e, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2e, 0x70, 0x72,
+	0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x45, 0x6d, 0x70, 0x74, 0x79, 0x22, 0x00, 0x42, 0x38,
+	0x5a, 0x36, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x6c, 0x69, 0x67,
+	0x68, 0x74, 0x73, 0x70, 0x61, 0x72, 0x6b, 0x64, 0x65, 0x76, 0x2f, 0x73, 0x70, 0x61, 0x72, 0x6b,
+	0x2d, 0x67, 0x6f, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2f, 0x73, 0x70, 0x61, 0x72, 0x6b, 0x5f,
+	0x69, 0x6e, 0x74, 0x65, 0x72, 0x6e, 0x61, 0x6c, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 })
 
 var (
@@ -1864,7 +1869,8 @@ var file_spark_internal_proto_goTypes = []any{
 	(*spark.AggregateNodesRequest)(nil),               // 31: spark.AggregateNodesRequest
 	(*spark.InitiatePreimageSwapRequest)(nil),         // 32: spark.InitiatePreimageSwapRequest
 	(*spark.ProvidePreimageRequest)(nil),              // 33: spark.ProvidePreimageRequest
-	(*emptypb.Empty)(nil),                             // 34: google.protobuf.Empty
+	(*spark.ReturnLightningPaymentRequest)(nil),       // 34: spark.ReturnLightningPaymentRequest
+	(*emptypb.Empty)(nil),                             // 35: google.protobuf.Empty
 }
 var file_spark_internal_proto_depIdxs = []int32{
 	27, // 0: spark_internal.FrostRound1Response.signing_commitments:type_name -> common.SigningCommitment
@@ -1903,25 +1909,27 @@ var file_spark_internal_proto_depIdxs = []int32{
 	19, // 33: spark_internal.SparkInternalService.initiate_cooperative_exit:input_type -> spark_internal.InitiateCooperativeExitRequest
 	20, // 34: spark_internal.SparkInternalService.mark_keyshare_for_revocation_public_key:input_type -> spark_internal.MarkKeyshareForRevocationPublicKeyRequest
 	21, // 35: spark_internal.SparkInternalService.mark_keyshare_for_token_transaction:input_type -> spark_internal.MarkKeyshareForTokenTransactionRequest
-	34, // 36: spark_internal.SparkInternalService.mark_keyshares_as_used:output_type -> google.protobuf.Empty
-	2,  // 37: spark_internal.SparkInternalService.mark_keyshare_for_deposit_address:output_type -> spark_internal.MarkKeyshareForDepositAddressResponse
-	34, // 38: spark_internal.SparkInternalService.finalize_tree_creation:output_type -> google.protobuf.Empty
-	4,  // 39: spark_internal.SparkInternalService.frost_round1:output_type -> spark_internal.FrostRound1Response
-	7,  // 40: spark_internal.SparkInternalService.frost_round2:output_type -> spark_internal.FrostRound2Response
-	34, // 41: spark_internal.SparkInternalService.prepare_split_keyshares:output_type -> google.protobuf.Empty
-	34, // 42: spark_internal.SparkInternalService.aggregate_nodes:output_type -> google.protobuf.Empty
-	34, // 43: spark_internal.SparkInternalService.finalize_nodes_aggregation:output_type -> google.protobuf.Empty
-	34, // 44: spark_internal.SparkInternalService.finalize_transfer:output_type -> google.protobuf.Empty
-	13, // 45: spark_internal.SparkInternalService.initiate_preimage_swap:output_type -> spark_internal.InitiatePreimageSwapResponse
-	34, // 46: spark_internal.SparkInternalService.provide_preimage:output_type -> google.protobuf.Empty
-	34, // 47: spark_internal.SparkInternalService.update_preimage_request:output_type -> google.protobuf.Empty
-	16, // 48: spark_internal.SparkInternalService.prepare_tree_address:output_type -> spark_internal.PrepareTreeAddressResponse
-	34, // 49: spark_internal.SparkInternalService.initiate_transfer:output_type -> google.protobuf.Empty
-	34, // 50: spark_internal.SparkInternalService.initiate_cooperative_exit:output_type -> google.protobuf.Empty
-	34, // 51: spark_internal.SparkInternalService.mark_keyshare_for_revocation_public_key:output_type -> google.protobuf.Empty
-	22, // 52: spark_internal.SparkInternalService.mark_keyshare_for_token_transaction:output_type -> spark_internal.MarkKeyshareForTokenTransactionResponse
-	36, // [36:53] is the sub-list for method output_type
-	19, // [19:36] is the sub-list for method input_type
+	34, // 36: spark_internal.SparkInternalService.return_lightning_payment:input_type -> spark.ReturnLightningPaymentRequest
+	35, // 37: spark_internal.SparkInternalService.mark_keyshares_as_used:output_type -> google.protobuf.Empty
+	2,  // 38: spark_internal.SparkInternalService.mark_keyshare_for_deposit_address:output_type -> spark_internal.MarkKeyshareForDepositAddressResponse
+	35, // 39: spark_internal.SparkInternalService.finalize_tree_creation:output_type -> google.protobuf.Empty
+	4,  // 40: spark_internal.SparkInternalService.frost_round1:output_type -> spark_internal.FrostRound1Response
+	7,  // 41: spark_internal.SparkInternalService.frost_round2:output_type -> spark_internal.FrostRound2Response
+	35, // 42: spark_internal.SparkInternalService.prepare_split_keyshares:output_type -> google.protobuf.Empty
+	35, // 43: spark_internal.SparkInternalService.aggregate_nodes:output_type -> google.protobuf.Empty
+	35, // 44: spark_internal.SparkInternalService.finalize_nodes_aggregation:output_type -> google.protobuf.Empty
+	35, // 45: spark_internal.SparkInternalService.finalize_transfer:output_type -> google.protobuf.Empty
+	13, // 46: spark_internal.SparkInternalService.initiate_preimage_swap:output_type -> spark_internal.InitiatePreimageSwapResponse
+	35, // 47: spark_internal.SparkInternalService.provide_preimage:output_type -> google.protobuf.Empty
+	35, // 48: spark_internal.SparkInternalService.update_preimage_request:output_type -> google.protobuf.Empty
+	16, // 49: spark_internal.SparkInternalService.prepare_tree_address:output_type -> spark_internal.PrepareTreeAddressResponse
+	35, // 50: spark_internal.SparkInternalService.initiate_transfer:output_type -> google.protobuf.Empty
+	35, // 51: spark_internal.SparkInternalService.initiate_cooperative_exit:output_type -> google.protobuf.Empty
+	35, // 52: spark_internal.SparkInternalService.mark_keyshare_for_revocation_public_key:output_type -> google.protobuf.Empty
+	22, // 53: spark_internal.SparkInternalService.mark_keyshare_for_token_transaction:output_type -> spark_internal.MarkKeyshareForTokenTransactionResponse
+	35, // 54: spark_internal.SparkInternalService.return_lightning_payment:output_type -> google.protobuf.Empty
+	37, // [37:55] is the sub-list for method output_type
+	19, // [19:37] is the sub-list for method input_type
 	19, // [19:19] is the sub-list for extension type_name
 	19, // [19:19] is the sub-list for extension extendee
 	0,  // [0:19] is the sub-list for field type_name

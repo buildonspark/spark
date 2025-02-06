@@ -197,3 +197,31 @@ func prepareUserSignedRefunds(
 	}
 	return userSignedRefunds, nil
 }
+
+func ReturnLightningPayment(
+	ctx context.Context,
+	config *Config,
+	paymentHash []byte,
+) error {
+	conn, err := common.NewGRPCConnection(config.CoodinatorAddress())
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	token, err := AuthenticateWithConnection(ctx, config, conn)
+	if err != nil {
+		return err
+	}
+	tmpCtx := ContextWithToken(ctx, token)
+
+	client := pb.NewSparkServiceClient(conn)
+	_, err = client.ReturnLightningPayment(tmpCtx, &pb.ReturnLightningPaymentRequest{
+		PaymentHash:           paymentHash,
+		UserIdentityPublicKey: config.IdentityPublicKey(),
+	})
+	if err != nil {
+		return err
+	}
+	return nil
+}

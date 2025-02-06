@@ -102,7 +102,7 @@ var (
 // StatusValidator is a validator for the "status" field enum values. It is called by the builders before save.
 func StatusValidator(s schema.PreimageRequestStatus) error {
 	switch s {
-	case "WAITING_FOR_PREIMAGE", "PREIMAGE_SHARED":
+	case "WAITING_FOR_PREIMAGE", "PREIMAGE_SHARED", "RETURNED":
 		return nil
 	default:
 		return fmt.Errorf("preimagerequest: invalid enum value for status field: %q", s)

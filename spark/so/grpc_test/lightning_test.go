@@ -314,3 +314,89 @@ func TestSendLightningPayment(t *testing.T) {
 		t.Fatalf("failed to ClaimTransfer: %v", err)
 	}
 }
+
+func TestSendLightningPaymentWithRejection(t *testing.T) {
+	// Create user and ssp configs
+	userConfig, err := testutil.TestWalletConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	sspConfig, err := testutil.TestWalletConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// User creates an invoice
+	preimage, err := hex.DecodeString("2d059c3ede82a107aa1452c0bea47759be3c5c6e5342be6a310f6c3a907d9f4c")
+	if err != nil {
+		t.Fatal(err)
+	}
+	paymentHash := sha256.Sum256(preimage)
+	invoice := "lnbcrt123450n1pnj6uf4pp5l26hsdxssmr52vd4xmn5xran7puzx34hpr6uevaq7ta0ayzrp8esdqqcqzpgxqyz5vqrzjqtr2vd60g57hu63rdqk87u3clac6jlfhej4kldrrjvfcw3mphcw8sqqqqzp3jlj6zyqqqqqqqqqqqqqq9qsp5w22fd8aqn7sdum7hxdf59ptgk322fkv589ejxjltngvgehlcqcyq9qxpqysgqvykwsxdx64qrj0s5pgcgygmrpj8w25jsjgltwn09yp24l9nvghe3dl3y0ycy70ksrlqmcn42hxn24e0ucuy3g9fjltudvhv4lrhhamgq3stqgp"
+
+	defer cleanUp(t, userConfig, paymentHash[:])
+
+	// User creates a node of 12345 sats
+	userLeafPrivKey, err := secp256k1.GeneratePrivateKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	feeSats := uint64(2)
+	nodeToSend, err := testutil.CreateNewTree(userConfig, userLeafPrivKey, 12347)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	newLeafPrivKey, err := secp256k1.GeneratePrivateKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	leaves := []wallet.LeafKeyTweak{}
+	leaves = append(leaves, wallet.LeafKeyTweak{
+		Leaf:              nodeToSend,
+		SigningPrivKey:    userLeafPrivKey.Serialize(),
+		NewSigningPrivKey: newLeafPrivKey.Serialize(),
+	})
+
+	response, err := wallet.SwapNodesForPreimage(
+		context.Background(),
+		userConfig,
+		leaves,
+		sspConfig.IdentityPublicKey(),
+		paymentHash[:],
+		&invoice,
+		feeSats,
+		false,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	refunds, err := wallet.QueryUserSignedRefunds(context.Background(), sspConfig, paymentHash[:])
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var totalValue int64
+	for _, refund := range refunds {
+		value, err := wallet.ValidateUserSignedRefund(refund)
+		if err != nil {
+			t.Fatal(err)
+		}
+		totalValue += value
+	}
+	assert.Equal(t, totalValue, int64(12345+feeSats))
+
+	transfer, err := wallet.SendTransferTweakKey(context.Background(), userConfig, response.Transfer, leaves, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, transfer.Status, spark.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING)
+
+	err = wallet.ReturnLightningPayment(context.Background(), sspConfig, paymentHash[:])
+	if err != nil {
+		t.Fatal(err)
+	}
+}

@@ -323,3 +323,8 @@ func (s *SparkInternalServer) ProvidePreimage(ctx context.Context, req *pbspark.
 	}
 	return &emptypb.Empty{}, nil
 }
+
+func (s *SparkInternalServer) ReturnLightningPayment(ctx context.Context, req *pbspark.ReturnLightningPaymentRequest) (*emptypb.Empty, error) {
+	lightningHandler := handler.NewLightningHandler(s.config, s.onchainHelper)
+	return wrapWithGRPCError(lightningHandler.ReturnLightningPayment(ctx, req, true))
+}

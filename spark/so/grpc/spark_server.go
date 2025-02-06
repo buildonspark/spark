@@ -145,3 +145,8 @@ func (s *SparkServer) ProvidePreimage(ctx context.Context, req *pb.ProvidePreima
 	lightningHandler := handler.NewLightningHandler(s.config, s.onchainHelper)
 	return wrapWithGRPCError(lightningHandler.ProvidePreimage(ctx, req))
 }
+
+func (s *SparkServer) ReturnLightningPayment(ctx context.Context, req *pb.ReturnLightningPaymentRequest) (*emptypb.Empty, error) {
+	lightningHandler := handler.NewLightningHandler(s.config, s.onchainHelper)
+	return wrapWithGRPCError(lightningHandler.ReturnLightningPayment(ctx, req, false))
+}

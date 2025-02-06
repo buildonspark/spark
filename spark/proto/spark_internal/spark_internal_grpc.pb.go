@@ -38,6 +38,7 @@ const (
 	SparkInternalService_InitiateCooperativeExit_FullMethodName            = "/spark_internal.SparkInternalService/initiate_cooperative_exit"
 	SparkInternalService_MarkKeyshareForRevocationPublicKey_FullMethodName = "/spark_internal.SparkInternalService/mark_keyshare_for_revocation_public_key"
 	SparkInternalService_MarkKeyshareForTokenTransaction_FullMethodName    = "/spark_internal.SparkInternalService/mark_keyshare_for_token_transaction"
+	SparkInternalService_ReturnLightningPayment_FullMethodName             = "/spark_internal.SparkInternalService/return_lightning_payment"
 )
 
 // SparkInternalServiceClient is the client API for SparkInternalService service.
@@ -61,6 +62,7 @@ type SparkInternalServiceClient interface {
 	InitiateCooperativeExit(ctx context.Context, in *InitiateCooperativeExitRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	MarkKeyshareForRevocationPublicKey(ctx context.Context, in *MarkKeyshareForRevocationPublicKeyRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	MarkKeyshareForTokenTransaction(ctx context.Context, in *MarkKeyshareForTokenTransactionRequest, opts ...grpc.CallOption) (*MarkKeyshareForTokenTransactionResponse, error)
+	ReturnLightningPayment(ctx context.Context, in *spark.ReturnLightningPaymentRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type sparkInternalServiceClient struct {
@@ -241,6 +243,16 @@ func (c *sparkInternalServiceClient) MarkKeyshareForTokenTransaction(ctx context
 	return out, nil
 }
 
+func (c *sparkInternalServiceClient) ReturnLightningPayment(ctx context.Context, in *spark.ReturnLightningPaymentRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, SparkInternalService_ReturnLightningPayment_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SparkInternalServiceServer is the server API for SparkInternalService service.
 // All implementations must embed UnimplementedSparkInternalServiceServer
 // for forward compatibility.
@@ -262,6 +274,7 @@ type SparkInternalServiceServer interface {
 	InitiateCooperativeExit(context.Context, *InitiateCooperativeExitRequest) (*emptypb.Empty, error)
 	MarkKeyshareForRevocationPublicKey(context.Context, *MarkKeyshareForRevocationPublicKeyRequest) (*emptypb.Empty, error)
 	MarkKeyshareForTokenTransaction(context.Context, *MarkKeyshareForTokenTransactionRequest) (*MarkKeyshareForTokenTransactionResponse, error)
+	ReturnLightningPayment(context.Context, *spark.ReturnLightningPaymentRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedSparkInternalServiceServer()
 }
 
@@ -322,6 +335,9 @@ func (UnimplementedSparkInternalServiceServer) MarkKeyshareForRevocationPublicKe
 }
 func (UnimplementedSparkInternalServiceServer) MarkKeyshareForTokenTransaction(context.Context, *MarkKeyshareForTokenTransactionRequest) (*MarkKeyshareForTokenTransactionResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method MarkKeyshareForTokenTransaction not implemented")
+}
+func (UnimplementedSparkInternalServiceServer) ReturnLightningPayment(context.Context, *spark.ReturnLightningPaymentRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ReturnLightningPayment not implemented")
 }
 func (UnimplementedSparkInternalServiceServer) mustEmbedUnimplementedSparkInternalServiceServer() {}
 func (UnimplementedSparkInternalServiceServer) testEmbeddedByValue()                              {}
@@ -650,6 +666,24 @@ func _SparkInternalService_MarkKeyshareForTokenTransaction_Handler(srv interface
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SparkInternalService_ReturnLightningPayment_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(spark.ReturnLightningPaymentRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkInternalServiceServer).ReturnLightningPayment(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkInternalService_ReturnLightningPayment_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkInternalServiceServer).ReturnLightningPayment(ctx, req.(*spark.ReturnLightningPaymentRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // SparkInternalService_ServiceDesc is the grpc.ServiceDesc for SparkInternalService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -724,6 +758,10 @@ var SparkInternalService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "mark_keyshare_for_token_transaction",
 			Handler:    _SparkInternalService_MarkKeyshareForTokenTransaction_Handler,
+		},
+		{
+			MethodName: "return_lightning_payment",
+			Handler:    _SparkInternalService_ReturnLightningPayment_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

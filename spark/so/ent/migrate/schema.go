@@ -89,7 +89,7 @@ var (
 		{Name: "create_time", Type: field.TypeTime},
 		{Name: "update_time", Type: field.TypeTime},
 		{Name: "payment_hash", Type: field.TypeBytes, Unique: true},
-		{Name: "status", Type: field.TypeEnum, Enums: []string{"WAITING_FOR_PREIMAGE", "PREIMAGE_SHARED"}},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"WAITING_FOR_PREIMAGE", "PREIMAGE_SHARED", "RETURNED"}},
 		{Name: "preimage_request_transfers", Type: field.TypeUUID, Nullable: true},
 	}
 	// PreimageRequestsTable holds the schema information for the "preimage_requests" table.
@@ -295,7 +295,7 @@ var (
 		{Name: "sender_identity_pubkey", Type: field.TypeBytes},
 		{Name: "receiver_identity_pubkey", Type: field.TypeBytes},
 		{Name: "total_value", Type: field.TypeUint64},
-		{Name: "status", Type: field.TypeEnum, Enums: []string{"SENDER_INITIATED", "SENDER_KEY_TWEAK_PENDING", "SENDER_KEY_TWEAKED", "RECEIVER_KEY_TWEAKED", "RECEIVER_REFUND_SIGNED", "COMPLETED", "EXPIRED"}},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"SENDER_INITIATED", "SENDER_KEY_TWEAK_PENDING", "SENDER_KEY_TWEAKED", "RECEIVER_KEY_TWEAKED", "RECEIVER_REFUND_SIGNED", "COMPLETED", "EXPIRED", "RETURNED"}},
 		{Name: "type", Type: field.TypeEnum, Enums: []string{"PREIMAGE_SWAP", "COOPERATIVE_EXIT", "TRANSFER"}},
 		{Name: "expiry_time", Type: field.TypeTime},
 		{Name: "completion_time", Type: field.TypeTime, Nullable: true},

@@ -42,6 +42,7 @@ const (
 	SparkService_StartTokenTransaction_FullMethodName                  = "/spark.SparkService/start_token_transaction"
 	SparkService_GetTokenTransactionRevocationKeyshares_FullMethodName = "/spark.SparkService/get_token_transaction_revocation_keyshares"
 	SparkService_FinalizeTokenTransaction_FullMethodName               = "/spark.SparkService/finalize_token_transaction"
+	SparkService_ReturnLightningPayment_FullMethodName                 = "/spark.SparkService/return_lightning_payment"
 )
 
 // SparkServiceClient is the client API for SparkService service.
@@ -71,6 +72,7 @@ type SparkServiceClient interface {
 	StartTokenTransaction(ctx context.Context, in *StartTokenTransactionRequest, opts ...grpc.CallOption) (*StartTokenTransactionResponse, error)
 	GetTokenTransactionRevocationKeyshares(ctx context.Context, in *GetTokenTransactionRevocationKeysharesRequest, opts ...grpc.CallOption) (*GetTokenTransactionRevocationKeysharesResponse, error)
 	FinalizeTokenTransaction(ctx context.Context, in *FinalizeTokenTransactionRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	ReturnLightningPayment(ctx context.Context, in *ReturnLightningPaymentRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type sparkServiceClient struct {
@@ -301,6 +303,16 @@ func (c *sparkServiceClient) FinalizeTokenTransaction(ctx context.Context, in *F
 	return out, nil
 }
 
+func (c *sparkServiceClient) ReturnLightningPayment(ctx context.Context, in *ReturnLightningPaymentRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, SparkService_ReturnLightningPayment_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SparkServiceServer is the server API for SparkService service.
 // All implementations must embed UnimplementedSparkServiceServer
 // for forward compatibility.
@@ -328,6 +340,7 @@ type SparkServiceServer interface {
 	StartTokenTransaction(context.Context, *StartTokenTransactionRequest) (*StartTokenTransactionResponse, error)
 	GetTokenTransactionRevocationKeyshares(context.Context, *GetTokenTransactionRevocationKeysharesRequest) (*GetTokenTransactionRevocationKeysharesResponse, error)
 	FinalizeTokenTransaction(context.Context, *FinalizeTokenTransactionRequest) (*emptypb.Empty, error)
+	ReturnLightningPayment(context.Context, *ReturnLightningPaymentRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedSparkServiceServer()
 }
 
@@ -403,6 +416,9 @@ func (UnimplementedSparkServiceServer) GetTokenTransactionRevocationKeyshares(co
 }
 func (UnimplementedSparkServiceServer) FinalizeTokenTransaction(context.Context, *FinalizeTokenTransactionRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method FinalizeTokenTransaction not implemented")
+}
+func (UnimplementedSparkServiceServer) ReturnLightningPayment(context.Context, *ReturnLightningPaymentRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ReturnLightningPayment not implemented")
 }
 func (UnimplementedSparkServiceServer) mustEmbedUnimplementedSparkServiceServer() {}
 func (UnimplementedSparkServiceServer) testEmbeddedByValue()                      {}
@@ -821,6 +837,24 @@ func _SparkService_FinalizeTokenTransaction_Handler(srv interface{}, ctx context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SparkService_ReturnLightningPayment_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ReturnLightningPaymentRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkServiceServer).ReturnLightningPayment(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkService_ReturnLightningPayment_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkServiceServer).ReturnLightningPayment(ctx, req.(*ReturnLightningPaymentRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // SparkService_ServiceDesc is the grpc.ServiceDesc for SparkService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -915,6 +949,10 @@ var SparkService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "finalize_token_transaction",
 			Handler:    _SparkService_FinalizeTokenTransaction_Handler,
+		},
+		{
+			MethodName: "return_lightning_payment",
+			Handler:    _SparkService_ReturnLightningPayment_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

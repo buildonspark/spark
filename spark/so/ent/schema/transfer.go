@@ -25,6 +25,8 @@ const (
 	TransferStatusCompleted TransferStatus = "COMPLETED"
 	// TransferStatusExpired is the status of transfer that has expired and ownership has been returned to the transfer issuer.
 	TransferStatusExpired TransferStatus = "EXPIRED"
+	// TransferStatusReturned is the status of transfer that has been returned to the sender.
+	TransferStatusReturned TransferStatus = "RETURNED"
 )
 
 // Values returns the values of the transfer status.
@@ -37,6 +39,7 @@ func (TransferStatus) Values() []string {
 		string(TransferStatusReceiverRefundSigned),
 		string(TransferStatusCompleted),
 		string(TransferStatusExpired),
+		string(TransferStatusReturned),
 	}
 }
 
