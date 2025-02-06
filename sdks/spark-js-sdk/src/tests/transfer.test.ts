@@ -1,5 +1,7 @@
 import { bytesToHex, hexToBytes } from "@noble/curves/abstract/utils";
 import { secp256k1 } from "@noble/curves/secp256k1";
+import { WalletConfigService } from "../services/config";
+import { DefaultSparkSigner } from "../signer/signer";
 import { SparkWallet } from "../spark-sdk";
 import { createNewTree } from "./test-util";
 
@@ -10,19 +12,20 @@ describe("Transfer", () => {
   testFn(
     "test transfer",
     async () => {
-      const senderWallet = new SparkWallet();
+      const senderWallet = new SparkWallet("regtest");
       const senderMnemonic = senderWallet.generateMnemonic();
       await senderWallet.createSparkWallet(senderMnemonic);
 
+      const senderSigner = new DefaultSparkSigner();
+      senderSigner.createSparkWalletFromMnemonic(senderMnemonic);
+      const senderConfig = new WalletConfigService("regtest", senderSigner);
+
       const leafPrivKey = secp256k1.utils.randomPrivateKey();
-      const rootNode = await createNewTree(
-        senderWallet.getConfig(),
-        leafPrivKey
-      );
+      const rootNode = await createNewTree(senderConfig, leafPrivKey);
 
       const newLeafPrivKey = secp256k1.utils.randomPrivateKey();
 
-      const receiverWallet = new SparkWallet();
+      const receiverWallet = new SparkWallet("regtest");
       const receiverMnemonic = receiverWallet.generateMnemonic();
       const receiverPubkey = await receiverWallet.createSparkWallet(
         receiverMnemonic

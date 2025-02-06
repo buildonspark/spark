@@ -23,29 +23,32 @@ import {
   SignFrostParams,
 } from "./utils/wasm";
 
-import { bytesToHex, hexToBytes } from "@noble/curves/abstract/utils";
-import { secp256k1 } from "@noble/curves/secp256k1";
-import { HDKey } from "@scure/bip32";
-import * as bip39 from "@scure/bip39";
-import { wordlist } from "@scure/bip39/wordlists/english";
-import assert from "assert";
-import { TEST_WALLET_CONFIG } from "./tests/test-util";
+import { LightningService } from "./services/lightning";
+import { SparkSigner } from "./signer/signer";
+import { getP2TRAddressFromPublicKey } from "./utils/bitcoin";
 import { Network } from "./utils/network";
 
+type CreateLightningInvoiceParams = {
+  amountSats: number;
+  expirySeconds: number;
+  memo: string;
+  invoiceCreator?: () => Promise<string>;
+};
 export class SparkWallet {
-  private config: WalletConfigService | null = null;
-  private connectionManager: ConnectionManager | null = null;
+  private config: WalletConfigService;
+
+  private connectionManager: ConnectionManager;
+  private depositService: DepositService;
+  private transferService: TransferService;
+  private treeCreationService: TreeCreationService;
+  private lightningService: LightningService;
+
   private wasmModule: InitOutput | null = null;
 
-  private depositService: DepositService | null = null;
-  private transferService: TransferService | null = null;
-  private treeCreationService: TreeCreationService | null = null;
+  constructor(network: Network, signer?: SparkSigner) {
+    this.config = new WalletConfigService(network, signer);
 
-  constructor() {}
-
-  private async initWallet(config: WalletConfig) {
-    this.config = new WalletConfigService(config);
-    this.connectionManager = new ConnectionManager();
+    this.connectionManager = new ConnectionManager(this.config);
 
     this.depositService = new DepositService(
       this.config,
@@ -56,6 +59,10 @@ export class SparkWallet {
       this.connectionManager
     );
     this.treeCreationService = new TreeCreationService(
+      this.config,
+      this.connectionManager
+    );
+    this.lightningService = new LightningService(
       this.config,
       this.connectionManager
     );
@@ -77,17 +84,18 @@ export class SparkWallet {
   }
 
   getConfig(): WalletConfig {
-    if (!this.config) {
-      throw new Error("Wallet not initialized. Call createSparkWallet first.");
-    }
     return this.config.getConfig();
   }
 
   getMasterPubKey(): Uint8Array {
-    if (!this.config) {
-      throw new Error("Wallet not initialized. Call createSparkWallet first.");
-    }
-    return this.config.getIdentityPublicKey();
+    return this.config.signer.getIdentityPublicKey();
+  }
+
+  getP2trAddress(): string {
+    const pubKey = this.config.signer.getIdentityPublicKey();
+    const network = this.config.getConfig().network;
+
+    return getP2TRAddressFromPublicKey(pubKey, network);
   }
 
   async signFrost(params: SignFrostParams): Promise<Uint8Array> {
@@ -101,49 +109,59 @@ export class SparkWallet {
   }
 
   generateMnemonic(): string {
-    return bip39.generateMnemonic(wordlist);
+    return this.config.signer.generateMnemonic();
   }
 
   // TODO: Update to use config based on options
-  async createSparkWallet(
-    mnemonic: string,
-    options: { network: Network } = { network: "regtest" }
-  ): Promise<string> {
-    const seed = bip39.mnemonicToSeedSync(mnemonic);
-
-    return await this.createSparkWalletFromSeed(seed);
+  async createSparkWallet(mnemonic: string): Promise<string> {
+    return this.config.signer.createSparkWalletFromMnemonic(mnemonic);
   }
 
   async createSparkWalletFromSeed(seed: Uint8Array | string): Promise<string> {
-    if (typeof seed === "string") {
-      seed = hexToBytes(seed);
-    }
-
-    const hdkey = HDKey.fromMasterSeed(seed);
-
-    assert(hdkey.privateKey, "Private key is not set");
-
-    const config: WalletConfig = {
-      ...TEST_WALLET_CONFIG,
-      identityPrivateKey: hdkey.privateKey,
-    } as WalletConfig;
-
-    await this.initWallet(config);
-
-    return bytesToHex(secp256k1.getPublicKey(hdkey.privateKey, true));
+    return this.config.signer.createSparkWalletFromSeed(seed);
   }
 
-  private async ensureWalletInitialized() {
-    if (
-      !this.config ||
-      !this.connectionManager ||
-      !this.transferService ||
-      !this.depositService ||
-      !this.treeCreationService
-    ) {
-      throw new Error("Wallet not initialized. Call createSparkWallet first.");
-    }
-    await this.ensureInitialized();
+  // Lightning
+  async createLightningInvoice({
+    amountSats,
+    expirySeconds,
+    memo,
+    // TODO: This should default to lightspark ssp
+    invoiceCreator = () => Promise.resolve(""),
+  }: CreateLightningInvoiceParams) {
+    return this.lightningService!.createLightningInvoice({
+      amountSats,
+      memo,
+      invoiceCreator,
+    });
+  }
+
+  async payLightningInvoice() {
+    throw new Error("Not implemented");
+  }
+
+  async getLightningPaymentFees() {
+    throw new Error("Not implemented");
+  }
+
+  async initiateDeposit() {
+    throw new Error("Not implemented");
+  }
+
+  async completeDeposit() {
+    throw new Error("Not implemented");
+  }
+
+  async _sendTransfer() {
+    throw new Error("Not implemented");
+  }
+
+  async _claimTransfer() {
+    throw new Error("Not implemented");
+  }
+
+  async coopExit() {
+    throw new Error("Not implemented");
   }
 
   async sendTransfer(
@@ -151,7 +169,6 @@ export class SparkWallet {
     receiverIdentityPubkey: Uint8Array,
     expiryTime: Date
   ): Promise<Transfer> {
-    await this.ensureWalletInitialized();
     return await this.transferService!.sendTransfer(
       leaves,
       receiverIdentityPubkey,
@@ -160,26 +177,22 @@ export class SparkWallet {
   }
 
   async claimTransfer(transfer: Transfer, leaves: LeafKeyTweak[]) {
-    await this.ensureWalletInitialized();
     return await this.transferService!.claimTransfer(transfer, leaves);
   }
 
   async queryPendingTransfers(): Promise<QueryPendingTransfersResponse> {
-    await this.ensureWalletInitialized();
     return await this.transferService!.queryPendingTransfers();
   }
 
   async verifyPendingTransfer(
     transfer: Transfer
   ): Promise<Map<string, Uint8Array>> {
-    await this.ensureWalletInitialized();
     return await this.transferService!.verifyPendingTransfer(transfer);
   }
 
   async generateDepositAddress(
     signingPubkey: Uint8Array
   ): Promise<GenerateDepositAddressResponse> {
-    await this.ensureWalletInitialized();
     return await this.depositService!.generateDepositAddress({ signingPubkey });
   }
 
@@ -189,7 +202,6 @@ export class SparkWallet {
     depositTx: Transaction,
     vout: number
   ) {
-    await this.ensureWalletInitialized();
     return await this.depositService!.createTreeRoot({
       signingPrivkey,
       verifyingKey,
@@ -204,7 +216,6 @@ export class SparkWallet {
     parentTx?: Transaction,
     parentNode?: TreeNode
   ) {
-    await this.ensureWalletInitialized();
     return await this.treeCreationService!.generateDepositAddressForTree(
       vout,
       parentSigningPrivKey,
@@ -220,7 +231,6 @@ export class SparkWallet {
     parentTx?: Transaction,
     parentNode?: TreeNode
   ) {
-    await this.ensureWalletInitialized();
     return await this.treeCreationService!.createTree(
       vout,
       root,

@@ -1,7 +1,10 @@
 import { secp256k1 } from "@noble/curves/secp256k1";
-import { SigningCommitment, SigningNonce } from "../wasm/spark_bindings";
+import {
+  SigningCommitment as WasmSigningCommitment,
+  SigningNonce as WasmSigningNonce,
+} from "../wasm/spark_bindings";
 
-export function getRandomSigningNonce(): SigningNonce {
+export function getRandomSigningNonce(): WasmSigningNonce {
   const binding = secp256k1.utils.randomPrivateKey();
   const hiding = secp256k1.utils.randomPrivateKey();
   return createSigningNonce(binding, hiding);
@@ -10,45 +13,45 @@ export function getRandomSigningNonce(): SigningNonce {
 export function createSigningNonce(
   binding: Uint8Array,
   hiding: Uint8Array
-): SigningNonce {
+): WasmSigningNonce {
   if (binding.length !== 32 || hiding.length !== 32) {
     throw new Error("Invalid nonce length");
   }
 
-  return new SigningNonce(hiding, binding);
+  return new WasmSigningNonce(hiding, binding);
 }
 
 export function getSigningCommitmentFromNonce(
-  nonce: SigningNonce
-): SigningCommitment {
+  nonce: WasmSigningNonce
+): WasmSigningCommitment {
   const bindingPubKey = secp256k1.getPublicKey(nonce.binding, true);
   const hidingPubKey = secp256k1.getPublicKey(nonce.hiding, true);
-  return new SigningCommitment(hidingPubKey, bindingPubKey);
+  return new WasmSigningCommitment(hidingPubKey, bindingPubKey);
 }
 
-export function encodeSigningNonceToBytes(nonce: SigningNonce): Uint8Array {
+export function encodeSigningNonceToBytes(nonce: WasmSigningNonce): Uint8Array {
   return new Uint8Array([...nonce.binding, ...nonce.hiding]);
 }
 
-export function decodeBytesToSigningNonce(bytes: Uint8Array): SigningNonce {
+export function decodeBytesToSigningNonce(bytes: Uint8Array): WasmSigningNonce {
   if (bytes.length !== 64) {
     throw new Error("Invalid nonce length");
   }
-  return new SigningNonce(bytes.slice(32, 64), bytes.slice(0, 32));
+  return new WasmSigningNonce(bytes.slice(32, 64), bytes.slice(0, 32));
 }
 
 export function createSigningCommitment(
   binding: Uint8Array,
   hiding: Uint8Array
-): SigningCommitment {
+): WasmSigningCommitment {
   if (binding.length !== 33 || hiding.length !== 33) {
     throw new Error("Invalid nonce commitment length");
   }
-  return new SigningCommitment(hiding, binding);
+  return new WasmSigningCommitment(hiding, binding);
 }
 
 export function encodeSigningCommitmentToBytes(
-  commitment: SigningCommitment
+  commitment: WasmSigningCommitment
 ): Uint8Array {
   if (commitment.binding.length !== 33 || commitment.hiding.length !== 33) {
     throw new Error("Invalid nonce commitment length");
@@ -59,19 +62,19 @@ export function encodeSigningCommitmentToBytes(
 
 export function decodeBytesToSigningCommitment(
   bytes: Uint8Array
-): SigningCommitment {
+): WasmSigningCommitment {
   if (bytes.length !== 66) {
     throw new Error("Invalid nonce commitment length");
   }
-  return new SigningCommitment(bytes.slice(33, 66), bytes.slice(0, 33));
+  return new WasmSigningCommitment(bytes.slice(33, 66), bytes.slice(0, 33));
 }
 
-export function copySigningNonce(nonce: SigningNonce): SigningNonce {
-  return new SigningNonce(nonce.hiding, nonce.binding);
+export function copySigningNonce(nonce: WasmSigningNonce): WasmSigningNonce {
+  return new WasmSigningNonce(nonce.hiding, nonce.binding);
 }
 
 export function copySigningCommitment(
-  commitment: SigningCommitment
-): SigningCommitment {
-  return new SigningCommitment(commitment.hiding, commitment.binding);
+  commitment: WasmSigningCommitment
+): WasmSigningCommitment {
+  return new WasmSigningCommitment(commitment.hiding, commitment.binding);
 }

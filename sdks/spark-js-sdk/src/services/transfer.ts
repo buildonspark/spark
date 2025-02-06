@@ -106,13 +106,12 @@ export class TransferService {
 
   async queryPendingTransfers(): Promise<QueryPendingTransfersResponse> {
     const sparkClient = await this.connectionManager.createSparkClient(
-      this.config.getCoordinatorAddress(),
-      this.config
+      this.config.getCoordinatorAddress()
     );
     let pendingTransfersResp: QueryPendingTransfersResponse;
     try {
       pendingTransfersResp = await sparkClient.query_pending_transfers({
-        receiverIdentityPublicKey: this.config.getIdentityPublicKey(),
+        receiverIdentityPublicKey: this.config.signer.getIdentityPublicKey(),
       });
     } catch (error) {
       throw new Error(`Error querying pending transfers: ${error}`);
@@ -126,9 +125,6 @@ export class TransferService {
     transfer: Transfer
   ): Promise<Map<string, Uint8Array>> {
     const leafPrivKeyMap = new Map<string, Uint8Array>();
-    const receiverEciesPrivKey = ecies.PrivateKey.fromHex(
-      bytesToHex(this.config.getConfig().identityPrivateKey)
-    );
     for (const leaf of transfer.leaves) {
       if (!leaf.leaf) {
         throw new Error("Leaf is undefined");
@@ -152,10 +148,9 @@ export class TransferService {
         throw new Error("Signature verification failed");
       }
 
-      const leafSecret = ecies.decrypt(
-        receiverEciesPrivKey.toHex(),
-        leaf.secretCipher
-      );
+      // TODO: Probably need to move a lot of this logic to the signer
+      const leafSecret = this.config.signer.decryptEcies(leaf.secretCipher);
+
       leafPrivKeyMap.set(leaf.leaf.id, leafSecret);
     }
     return leafPrivKeyMap;
@@ -178,8 +173,7 @@ export class TransferService {
       this.config.getConfig().signingOperators
     ).map(async ([identifier, operator]) => {
       const sparkClient = await this.connectionManager.createSparkClient(
-        operator.address,
-        this.config
+        operator.address
       );
 
       const leavesToSend = keyTweakInputMap.get(identifier);
@@ -191,7 +185,7 @@ export class TransferService {
       try {
         transferResp = await sparkClient.complete_send_transfer({
           transferId: transfer.id,
-          ownerIdentityPublicKey: this.config.getIdentityPublicKey(),
+          ownerIdentityPublicKey: this.config.signer.getIdentityPublicKey(),
           leavesToSend,
         });
       } catch (error) {
@@ -263,8 +257,7 @@ export class TransferService {
     const signingJobs = this.prepareRefundSoSigningJobs(leaves, leafDataMap);
 
     const sparkClient = await this.connectionManager.createSparkClient(
-      this.config.getCoordinatorAddress(),
-      this.config
+      this.config.getCoordinatorAddress()
     );
 
     let response: LeafSwapResponse;
@@ -273,7 +266,7 @@ export class TransferService {
         transfer: {
           transferId,
           leavesToSend: signingJobs,
-          ownerIdentityPublicKey: this.config.getIdentityPublicKey(),
+          ownerIdentityPublicKey: this.config.signer.getIdentityPublicKey(),
           receiverIdentityPublicKey: receiverIdentityPubkey,
           expiryTime: expiryTime,
         },
@@ -338,8 +331,7 @@ export class TransferService {
     const signingJobs = this.prepareRefundSoSigningJobs(leaves, leafDataMap);
 
     const sparkClient = await this.connectionManager.createSparkClient(
-      this.config.getCoordinatorAddress(),
-      this.config
+      this.config.getCoordinatorAddress()
     );
 
     let response: StartSendTransferResponse;
@@ -347,7 +339,7 @@ export class TransferService {
       response = await sparkClient.start_send_transfer({
         transferId: transferID,
         leavesToSend: signingJobs,
-        ownerIdentityPublicKey: this.config.getIdentityPublicKey(),
+        ownerIdentityPublicKey: this.config.signer.getIdentityPublicKey(),
         receiverIdentityPublicKey: receiverIdentityPubkey,
         expiryTime: expiryTime,
       });
@@ -455,9 +447,8 @@ export class TransferService {
     ]);
 
     const payloadHash = sha256(payload);
-    const signature = secp256k1
-      .sign(payloadHash, this.config.getConfig().identityPrivateKey)
-      .toCompactRawBytes();
+    const signature =
+      this.config.signer.signEcdsaWithIdentityPrivateKey(payloadHash);
 
     const leafTweaksMap = new Map<string, SendLeafKeyTweak>();
     for (const [identifier, operator] of Object.entries(
@@ -534,8 +525,7 @@ export class TransferService {
       this.config.getConfig().signingOperators
     ).map(async ([identifier, operator]) => {
       const sparkClient = await this.connectionManager.createSparkClient(
-        operator.address,
-        this.config
+        operator.address
       );
 
       const leavesToReceive = leavesTweaksMap.get(identifier);
@@ -549,7 +539,7 @@ export class TransferService {
       try {
         await sparkClient.claim_transfer_tweak_keys({
           transferId: transfer.id,
-          ownerIdentityPublicKey: this.config.getIdentityPublicKey(),
+          ownerIdentityPublicKey: this.config.signer.getIdentityPublicKey(),
           leavesToReceive,
         });
       } catch (error) {
@@ -653,14 +643,13 @@ export class TransferService {
     const signingJobs = this.prepareRefundSoSigningJobs(leafKeys, leafDataMap);
 
     const sparkClient = await this.connectionManager.createSparkClient(
-      this.config.getCoordinatorAddress(),
-      this.config
+      this.config.getCoordinatorAddress()
     );
     let resp: ClaimTransferSignRefundsResponse;
     try {
       resp = await sparkClient.claim_transfer_sign_refunds({
         transferId: transfer.id,
-        ownerIdentityPublicKey: this.config.getIdentityPublicKey(),
+        ownerIdentityPublicKey: this.config.signer.getIdentityPublicKey(),
         signingJobs,
       });
     } catch (error) {
@@ -742,8 +731,7 @@ export class TransferService {
 
   private async finalizeTransfer(nodeSignatures: NodeSignatures[]) {
     const sparkClient = await this.connectionManager.createSparkClient(
-      this.config.getCoordinatorAddress(),
-      this.config
+      this.config.getCoordinatorAddress()
     );
     try {
       await sparkClient.finalize_node_signatures({

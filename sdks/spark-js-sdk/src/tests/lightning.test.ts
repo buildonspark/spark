@@ -6,6 +6,7 @@ import { WalletConfigService } from "../services/config";
 import { ConnectionManager } from "../services/connection";
 import { LightningService } from "../services/lightning";
 import { LeafKeyTweak, TransferService } from "../services/transfer";
+import { DefaultSparkSigner } from "../signer/signer";
 import { SparkWallet } from "../spark-sdk";
 import { createNewTree, getTestWalletConfig } from "./test-util";
 
@@ -45,24 +46,31 @@ describe("LightningService", () => {
   const testFn = process.env.GITHUB_ACTIONS ? it.skip : it;
 
   beforeAll(async () => {
-    const connectionManager = new ConnectionManager();
-
-    userWallet = new SparkWallet();
+    userWallet = new SparkWallet("regtest");
     const mnemonic = userWallet.generateMnemonic();
     await userWallet.createSparkWallet(mnemonic);
     const config = userWallet.getConfig();
 
-    userConfig = new WalletConfigService(config);
+    const signer = new DefaultSparkSigner();
+    signer.createSparkWalletFromMnemonic(mnemonic);
+
+    userConfig = new WalletConfigService("regtest", signer);
+    const connectionManager = new ConnectionManager(userConfig);
     lightningService = new LightningService(userConfig, connectionManager);
     transferService = new TransferService(userConfig, connectionManager);
 
-    sspWallet = new SparkWallet();
+    sspWallet = new SparkWallet("regtest");
     const sspMnemonic = sspWallet.generateMnemonic();
     await sspWallet.createSparkWallet(sspMnemonic);
     const _sspConfig = sspWallet.getConfig();
-    sspConfig = new WalletConfigService(_sspConfig);
-    sspLightningService = new LightningService(sspConfig, connectionManager);
-    sspTransferService = new TransferService(sspConfig, connectionManager);
+
+    const sspSigner = new DefaultSparkSigner();
+    sspSigner.createSparkWalletFromMnemonic(sspMnemonic);
+
+    sspConfig = new WalletConfigService("regtest", sspSigner);
+    const sspConnectionManager = new ConnectionManager(sspConfig);
+    sspLightningService = new LightningService(sspConfig, sspConnectionManager);
+    sspTransferService = new TransferService(sspConfig, sspConnectionManager);
   });
   afterEach(async () => {
     await cleanUp();
@@ -99,11 +107,7 @@ describe("LightningService", () => {
     expect(invoice).toBeDefined();
 
     const sspLeafPrivKey = secp256k1.utils.randomPrivateKey();
-    const nodeToSend = await createNewTree(
-      sspConfig.getConfig(),
-      sspLeafPrivKey,
-      12345n
-    );
+    const nodeToSend = await createNewTree(sspConfig, sspLeafPrivKey, 12345n);
 
     const newLeafPrivKey = secp256k1.utils.randomPrivateKey();
 
@@ -117,7 +121,7 @@ describe("LightningService", () => {
 
     const response = await sspLightningService.swapNodesForPreimage({
       leaves,
-      receiverIdentityPubkey: userConfig.getIdentityPublicKey(),
+      receiverIdentityPubkey: userConfig.signer.getIdentityPublicKey(),
       paymentHash,
       isInboundPayment: true,
     });
@@ -177,11 +181,7 @@ describe("LightningService", () => {
     const paymentHash = sha256(preimage);
 
     const userLeafPrivKey = secp256k1.utils.randomPrivateKey();
-    const nodeToSend = await createNewTree(
-      userConfig.getConfig(),
-      userLeafPrivKey,
-      12345n
-    );
+    const nodeToSend = await createNewTree(userConfig, userLeafPrivKey, 12345n);
 
     const newLeafPrivKey = secp256k1.utils.randomPrivateKey();
 
@@ -195,7 +195,7 @@ describe("LightningService", () => {
 
     const response = await lightningService.swapNodesForPreimage({
       leaves,
-      receiverIdentityPubkey: sspConfig.getIdentityPublicKey(),
+      receiverIdentityPubkey: sspConfig.signer.getIdentityPublicKey(),
       paymentHash,
       isInboundPayment: false,
       invoiceString: await fakeInvoiceCreator(),

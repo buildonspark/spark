@@ -157,8 +157,7 @@ export class CoopExitService {
     }
 
     const sparkClient = await this.connectionManager.createSparkClient(
-      this.config.getCoordinatorAddress(),
-      this.config
+      this.config.getCoordinatorAddress()
     );
 
     let response: CooperativeExitResponse;
@@ -167,7 +166,7 @@ export class CoopExitService {
         transfer: {
           transferId: randomUUID(),
           leavesToSend: signingJobs,
-          ownerIdentityPublicKey: this.config.getIdentityPublicKey(),
+          ownerIdentityPublicKey: this.config.signer.getIdentityPublicKey(),
           receiverIdentityPublicKey: receiverPubKey,
           expiryTime: new Date(Date.now() + 24 * 60 * 1000),
         },

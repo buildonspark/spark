@@ -1,4 +1,3 @@
-import { bytesToHex } from "@noble/curves/abstract/utils";
 import { secp256k1 } from "@noble/curves/secp256k1";
 import { sha256 } from "@scure/btc-signer/utils";
 import {
@@ -10,21 +9,24 @@ import {
   Metadata,
 } from "nice-grpc";
 import {
-  createClient as createWebClient,
   createChannel as createWebChannel,
+  createClient as createWebClient,
   createClientFactory as createWebClientFactory,
 } from "nice-grpc-web";
 import { MockServiceClient, MockServiceDefinition } from "../proto/mock";
-import { SparkServiceClient } from "../proto/spark";
-import { SparkServiceDefinition } from "../proto/spark";
+import { SparkServiceClient, SparkServiceDefinition } from "../proto/spark";
 import {
   Challenge,
   SparkAuthnServiceClient,
   SparkAuthnServiceDefinition,
 } from "../proto/spark_authn";
-import { WalletConfig, WalletConfigService } from "./config";
+import { WalletConfigService } from "./config";
 
 export class ConnectionManager {
+  private config: WalletConfigService;
+  constructor(config: WalletConfigService) {
+    this.config = config;
+  }
   static createMockClient(address: string): MockServiceClient & {
     close: () => void;
   } {
@@ -34,14 +36,9 @@ export class ConnectionManager {
   }
 
   async createSparkClient(
-    address: string,
-    config: WalletConfigService
+    address: string
   ): Promise<SparkServiceClient & { close?: () => void }> {
-    const authToken = await this.authenticate(
-      address,
-      config.getIdentityPublicKey(),
-      config.getConfig().identityPrivateKey
-    );
+    const authToken = await this.authenticate(address);
 
     const middleWare = (
       call: ClientMiddlewareCall<any, any>,
@@ -70,11 +67,9 @@ export class ConnectionManager {
         .create(SparkServiceDefinition, channel);
     }
   }
-  private async authenticate(
-    address: string,
-    identityPublicKey: Uint8Array,
-    identityPrivateKey: Uint8Array
-  ) {
+  private async authenticate(address: string) {
+    const identityPublicKey = this.config.signer.getIdentityPublicKey();
+
     const sparkAuthnClient = this.createSparkAuthnGrpcConnection(address);
     const challengeResp = await sparkAuthnClient.get_challenge({
       publicKey: identityPublicKey,
@@ -85,11 +80,15 @@ export class ConnectionManager {
     ).finish();
     const hash = sha256(challengeBytes);
 
-    const signature = secp256k1.sign(hash, identityPrivateKey);
+    const compactSignatureBytes =
+      this.config.signer.signEcdsaWithIdentityPrivateKey(hash);
+    const derSignatureBytes = secp256k1.Signature.fromCompact(
+      compactSignatureBytes
+    ).toDERRawBytes();
 
     const verifyResp = await sparkAuthnClient.verify_challenge({
       protectedChallenge: challengeResp.protectedChallenge,
-      signature: signature.toDERRawBytes(),
+      signature: derSignatureBytes,
       publicKey: identityPublicKey,
     });
     sparkAuthnClient.close?.();

@@ -68,12 +68,11 @@ export class TreeCreationService {
     const addressRequestNodes =
       this.createAddressRequestNodeFromTreeNodes(tree);
     const sparkClient = await this.connectionManager.createSparkClient(
-      this.config.getCoordinatorAddress(),
-      this.config
+      this.config.getCoordinatorAddress()
     );
 
     const request: PrepareTreeAddressRequest = {
-      userIdentityPublicKey: this.config.getIdentityPublicKey(),
+      userIdentityPublicKey: this.config.signer.getIdentityPublicKey(),
       node: undefined,
     };
     if (parentNode) {
@@ -132,7 +131,7 @@ export class TreeCreationService {
     parentNode?: TreeNode
   ): Promise<FinalizeNodeSignaturesResponse> {
     const request: CreateTreeRequest = {
-      userIdentityPublicKey: this.config.getIdentityPublicKey(),
+      userIdentityPublicKey: this.config.signer.getIdentityPublicKey(),
       node: undefined,
     };
 
@@ -168,8 +167,7 @@ export class TreeCreationService {
     request.node = rootCreationNode;
 
     const sparkClient = await this.connectionManager.createSparkClient(
-      this.config.getCoordinatorAddress(),
-      this.config
+      this.config.getCoordinatorAddress()
     );
 
     let response: CreateTreeResponse;
@@ -300,7 +298,7 @@ export class TreeCreationService {
     internalCreationNode.nodeTxSigningJob = signingJob;
 
     // leaf node
-    const sequence = 1 << 30 || INITIAL_TIME_LOCK;
+    const sequence = (1 << 30) | INITIAL_TIME_LOCK;
 
     const childCreationNode: CreationNodeWithNonces = {
       nodeTxSigningJob: undefined,
@@ -310,7 +308,7 @@ export class TreeCreationService {
 
     const childTx = new Transaction();
     childTx.addInput({
-      txid: getTxId(parentTx),
+      txid: tx.id,
       index: 0,
       sequence,
     });
@@ -335,7 +333,7 @@ export class TreeCreationService {
 
     const refundTx = new Transaction();
     refundTx.addInput({
-      txid: tx.id,
+      txid: getTxId(childTx),
       index: 0,
       sequence,
     });

@@ -12,7 +12,7 @@ describe("deposit", () => {
   testFn(
     "should generate a deposit address",
     async () => {
-      const sdk = new SparkWallet();
+      const sdk = new SparkWallet("regtest");
       const mnemonic = sdk.generateMnemonic();
       await sdk.createSparkWallet(mnemonic);
 
@@ -29,7 +29,7 @@ describe("deposit", () => {
   testFn(
     "should create a tree root",
     async () => {
-      const sdk = new SparkWallet();
+      const sdk = new SparkWallet("regtest");
       const mnemonic = sdk.generateMnemonic();
       await sdk.createSparkWallet(mnemonic);
       const config = sdk.getConfig();
@@ -48,6 +48,8 @@ describe("deposit", () => {
       if (!depositResp.depositAddress) {
         throw new Error("deposit address not found");
       }
+
+      console.log("depositResp", depositResp.depositAddress.address);
 
       const dummyTx = createDummyTx({
         address: depositResp.depositAddress.address,

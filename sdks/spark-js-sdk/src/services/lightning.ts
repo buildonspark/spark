@@ -99,8 +99,7 @@ export class LightningService {
       const share = shares[operator.id];
 
       const sparkClient = await this.connectionManager.createSparkClient(
-        operator.address,
-        this.config
+        operator.address
       );
 
       try {
@@ -112,7 +111,7 @@ export class LightningService {
           },
           threshold: this.config.getConfig().threshold,
           invoiceString: invoice,
-          userIdentityPublicKey: this.config.getIdentityPublicKey(),
+          userIdentityPublicKey: this.config.signer.getIdentityPublicKey(),
         });
       } catch (e: any) {
         errors.push(e);
@@ -138,8 +137,7 @@ export class LightningService {
     isInboundPayment,
   }: SwapNodesForPreimageParams): Promise<InitiatePreimageSwapResponse> {
     const sparkClient = await this.connectionManager.createSparkClient(
-      this.config.getCoordinatorAddress(),
-      this.config
+      this.config.getCoordinatorAddress()
     );
 
     let signingCommitments: GetSigningCommitmentsResponse;
@@ -195,7 +193,7 @@ export class LightningService {
         },
         transfer: {
           transferId,
-          ownerIdentityPublicKey: this.config.getIdentityPublicKey(),
+          ownerIdentityPublicKey: this.config.signer.getIdentityPublicKey(),
           receiverIdentityPublicKey: receiverIdentityPubkey,
         },
         receiverIdentityPublicKey: receiverIdentityPubkey,
@@ -213,8 +211,7 @@ export class LightningService {
     paymentHash: Uint8Array
   ): Promise<UserSignedRefund[]> {
     const sparkClient = await this.connectionManager.createSparkClient(
-      this.config.getCoordinatorAddress(),
-      this.config
+      this.config.getCoordinatorAddress()
     );
 
     let response: QueryUserSignedRefundsResponse;
@@ -239,8 +236,7 @@ export class LightningService {
 
   async providePreimage(preimage: Uint8Array): Promise<Transfer> {
     const sparkClient = await this.connectionManager.createSparkClient(
-      this.config.getCoordinatorAddress(),
-      this.config
+      this.config.getCoordinatorAddress()
     );
 
     const paymentHash = sha256(preimage);

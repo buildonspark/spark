@@ -3,6 +3,7 @@ import { secp256k1 } from "@noble/curves/secp256k1";
 import { WalletConfigService } from "../services/config";
 import { ConnectionManager } from "../services/connection";
 import { LeafKeyTweak, TransferService } from "../services/transfer";
+import { DefaultSparkSigner } from "../signer/signer";
 import { SparkWallet } from "../spark-sdk";
 import {
   applyAdaptorToSignature,
@@ -18,34 +19,44 @@ describe("swap", () => {
     "test swap",
     async () => {
       // Initiate sender
-      const senderWallet = new SparkWallet();
+      const senderWallet = new SparkWallet("regtest");
       const senderMnemonic = senderWallet.generateMnemonic();
       const senderPubkey = await senderWallet.createSparkWallet(senderMnemonic);
+
+      const senderSigner = new DefaultSparkSigner();
+      senderSigner.createSparkWalletFromMnemonic(senderMnemonic);
+      const senderConfig = new WalletConfigService("regtest", senderSigner);
+      const senderConnectionManager = new ConnectionManager(senderConfig);
       const senderTransferService = new TransferService(
-        new WalletConfigService(senderWallet.getConfig()),
-        new ConnectionManager()
+        senderConfig,
+        senderConnectionManager
       );
 
       // Initiate receiver
-      const receiverWallet = new SparkWallet();
+      const receiverWallet = new SparkWallet("regtest");
       const receiverMnemonic = receiverWallet.generateMnemonic();
       const receiverPubkey = await receiverWallet.createSparkWallet(
         receiverMnemonic
       );
+
+      const receiverSigner = new DefaultSparkSigner();
+      receiverSigner.createSparkWalletFromMnemonic(receiverMnemonic);
+      const receiverConfig = new WalletConfigService("regtest", receiverSigner);
+      const receiverConnectionManager = new ConnectionManager(receiverConfig);
       const receiverTransferService = new TransferService(
-        new WalletConfigService(receiverWallet.getConfig()),
-        new ConnectionManager()
+        receiverConfig,
+        receiverConnectionManager
       );
 
       const senderLeafPrivKey = secp256k1.utils.randomPrivateKey();
       const senderRootNode = await createNewTree(
-        senderWallet.getConfig(),
+        senderConfig,
         senderLeafPrivKey
       );
 
       const receiverLeafPrivKey = secp256k1.utils.randomPrivateKey();
       const receiverRootNode = await createNewTree(
-        receiverWallet.getConfig(),
+        receiverConfig,
         receiverLeafPrivKey
       );
 

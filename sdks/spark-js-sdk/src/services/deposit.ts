@@ -73,7 +73,7 @@ export class DepositService {
 
     const operatorPubkey = subtractPublicKeys(address.verifyingKey, userPubkey);
     const msg = proofOfPossessionMessageHashForDepositAddress(
-      this.config.getIdentityPublicKey(),
+      this.config.signer.getIdentityPublicKey(),
       operatorPubkey,
       address.address
     );
@@ -121,15 +121,14 @@ export class DepositService {
     signingPubkey,
   }: GenerateDepositAddressParams): Promise<GenerateDepositAddressResponse> {
     const sparkClient = await this.connectionManager.createSparkClient(
-      this.config.getCoordinatorAddress(),
-      this.config
+      this.config.getCoordinatorAddress()
     );
 
     let depositResp: GenerateDepositAddressResponse;
     try {
       depositResp = await sparkClient.generate_deposit_address({
         signingPublicKey: signingPubkey,
-        identityPublicKey: this.config.getIdentityPublicKey(),
+        identityPublicKey: this.config.signer.getIdentityPublicKey(),
       });
     } catch (error) {
       throw new Error(`Error generating deposit address: ${error}`);
@@ -219,14 +218,13 @@ export class DepositService {
     const refundTxSighash = getSigHashFromTx(refundTx, 0, output);
 
     const sparkClient = await this.connectionManager.createSparkClient(
-      this.config.getCoordinatorAddress(),
-      this.config
+      this.config.getCoordinatorAddress()
     );
 
     let treeResp: StartTreeCreationResponse;
     try {
       treeResp = await sparkClient.start_tree_creation({
-        identityPublicKey: this.config.getIdentityPublicKey(),
+        identityPublicKey: this.config.signer.getIdentityPublicKey(),
         onChainUtxo: {
           txid: getTxId(depositTx),
           vout: vout,

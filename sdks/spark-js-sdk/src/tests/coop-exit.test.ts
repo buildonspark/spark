@@ -6,6 +6,7 @@ import { WalletConfigService } from "../services/config";
 import { ConnectionManager } from "../services/connection";
 import { CoopExitService } from "../services/coop-exit";
 import { LeafKeyTweak, TransferService } from "../services/transfer";
+import { DefaultSparkSigner } from "../signer/signer";
 import { SparkWallet } from "../spark-sdk";
 import {
   getP2TRAddressFromPublicKey,
@@ -23,13 +24,17 @@ describe("coop exit", () => {
   const testFn = process.env.GITHUB_ACTIONS ? it.skip : it;
 
   testFn("test coop exit", async () => {
-    const wallet = new SparkWallet();
+    const wallet = new SparkWallet("regtest");
     const mnemonic = wallet.generateMnemonic();
     await wallet.createSparkWallet(mnemonic);
+
     const config = wallet.getConfig();
 
-    const configService = new WalletConfigService(config);
-    const connectionManager = new ConnectionManager();
+    const signer = new DefaultSparkSigner();
+    signer.createSparkWalletFromMnemonic(mnemonic);
+
+    const configService = new WalletConfigService("regtest", signer);
+    const connectionManager = new ConnectionManager(configService);
     const transferService = new TransferService(
       configService,
       connectionManager
@@ -41,9 +46,9 @@ describe("coop exit", () => {
     );
 
     const leafPrivKey = secp256k1.utils.randomPrivateKey();
-    const rootNode = await createNewTree(config, leafPrivKey);
+    const rootNode = await createNewTree(configService, leafPrivKey);
 
-    const sspWallet = new SparkWallet();
+    const sspWallet = new SparkWallet("regtest");
     const sspMnemonic = sspWallet.generateMnemonic();
     const sspPubkey = await sspWallet.createSparkWallet(sspMnemonic);
 

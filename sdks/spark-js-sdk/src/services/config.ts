@@ -1,4 +1,5 @@
-import { secp256k1 } from "@noble/curves/secp256k1";
+import { DefaultSparkSigner, SparkSigner } from "../signer/signer";
+import { getAllSigningOperators } from "../tests/test-util";
 import { Network } from "../utils/network";
 
 export type SigningOperator = {
@@ -13,24 +14,29 @@ export type WalletConfig = {
   signingOperators: Record<string, SigningOperator>;
   coodinatorIdentifier: string;
   frostSignerAddress: string;
-  identityPrivateKey: Uint8Array;
   threshold: number;
 };
 
 export class WalletConfigService {
   private config: WalletConfig;
+  public readonly signer: SparkSigner;
 
-  constructor(config: WalletConfig) {
-    this.config = config;
+  // TODO: update config based on network
+  constructor(network: Network, signer?: SparkSigner) {
+    this.config = {
+      network: "regtest",
+      coodinatorIdentifier:
+        "0000000000000000000000000000000000000000000000000000000000000001",
+      frostSignerAddress: "unix:///tmp/frost_0.sock",
+      threshold: 3,
+      signingOperators: getAllSigningOperators(),
+    };
+    this.signer = signer || new DefaultSparkSigner();
   }
 
   getCoordinatorAddress() {
     return this.config.signingOperators[this.config.coodinatorIdentifier]
       .address;
-  }
-
-  getIdentityPublicKey() {
-    return secp256k1.getPublicKey(this.config.identityPrivateKey);
   }
 
   getConfig() {

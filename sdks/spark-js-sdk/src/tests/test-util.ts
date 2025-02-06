@@ -85,16 +85,14 @@ export function getTestWalletConfigWithIdentityKey(
 }
 
 export async function createNewTree(
-  config: WalletConfig,
+  config: WalletConfigService,
   privKey: Uint8Array,
   amountSats: bigint = 100_000n
 ): Promise<TreeNode> {
-  const depositService = new DepositService(
-    new WalletConfigService(config),
-    new ConnectionManager()
-  );
+  const connectionManager = new ConnectionManager(config);
+  const depositService = new DepositService(config, connectionManager);
   const mockClient = ConnectionManager.createMockClient(
-    config.signingOperators[config.coodinatorIdentifier].address
+    config.getCoordinatorAddress()
   );
 
   // Generate private/public key pair
