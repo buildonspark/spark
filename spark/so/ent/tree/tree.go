@@ -25,6 +25,8 @@ const (
 	FieldOwnerIdentityPubkey = "owner_identity_pubkey"
 	// FieldStatus holds the string denoting the status field in the database.
 	FieldStatus = "status"
+	// FieldNetwork holds the string denoting the network field in the database.
+	FieldNetwork = "network"
 	// EdgeRoot holds the string denoting the root edge name in mutations.
 	EdgeRoot = "root"
 	// EdgeNodes holds the string denoting the nodes edge name in mutations.
@@ -54,6 +56,7 @@ var Columns = []string{
 	FieldUpdateTime,
 	FieldOwnerIdentityPubkey,
 	FieldStatus,
+	FieldNetwork,
 }
 
 // ForeignKeys holds the SQL foreign-keys that are owned by the "trees"
@@ -100,6 +103,16 @@ func StatusValidator(s schema.TreeStatus) error {
 	}
 }
 
+// NetworkValidator is a validator for the "network" field enum values. It is called by the builders before save.
+func NetworkValidator(n schema.Network) error {
+	switch n {
+	case "MAINNET", "REGTEST", "TESTNET", "SIGNET":
+		return nil
+	default:
+		return fmt.Errorf("tree: invalid enum value for network field: %q", n)
+	}
+}
+
 // OrderOption defines the ordering options for the Tree queries.
 type OrderOption func(*sql.Selector)
 
@@ -121,6 +134,11 @@ func ByUpdateTime(opts ...sql.OrderTermOption) OrderOption {
 // ByStatus orders the results by the status field.
 func ByStatus(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldStatus, opts...).ToFunc()
+}
+
+// ByNetwork orders the results by the network field.
+func ByNetwork(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldNetwork, opts...).ToFunc()
 }
 
 // ByRootField orders the results by root field.

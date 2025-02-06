@@ -63,6 +63,12 @@ func (tc *TreeCreate) SetStatus(ss schema.TreeStatus) *TreeCreate {
 	return tc
 }
 
+// SetNetwork sets the "network" field.
+func (tc *TreeCreate) SetNetwork(s schema.Network) *TreeCreate {
+	tc.mutation.SetNetwork(s)
+	return tc
+}
+
 // SetID sets the "id" field.
 func (tc *TreeCreate) SetID(u uuid.UUID) *TreeCreate {
 	tc.mutation.SetID(u)
@@ -184,6 +190,14 @@ func (tc *TreeCreate) check() error {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "Tree.status": %w`, err)}
 		}
 	}
+	if _, ok := tc.mutation.Network(); !ok {
+		return &ValidationError{Name: "network", err: errors.New(`ent: missing required field "Tree.network"`)}
+	}
+	if v, ok := tc.mutation.Network(); ok {
+		if err := tree.NetworkValidator(v); err != nil {
+			return &ValidationError{Name: "network", err: fmt.Errorf(`ent: validator failed for field "Tree.network": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -234,6 +248,10 @@ func (tc *TreeCreate) createSpec() (*Tree, *sqlgraph.CreateSpec) {
 	if value, ok := tc.mutation.Status(); ok {
 		_spec.SetField(tree.FieldStatus, field.TypeEnum, value)
 		_node.Status = value
+	}
+	if value, ok := tc.mutation.Network(); ok {
+		_spec.SetField(tree.FieldNetwork, field.TypeEnum, value)
+		_node.Network = value
 	}
 	if nodes := tc.mutation.RootIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{

@@ -12,6 +12,7 @@ import (
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
+	pb "github.com/lightsparkdev/spark-go/proto/spark"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
 )
 
@@ -25,7 +26,69 @@ const (
 	Regtest
 	// Testnet is the test network.
 	Testnet
+	// Signet is the signet network.
+	Signet
 )
+
+func NetworkFromProtoNetwork(protoNetwork pb.Network) (Network, error) {
+	switch protoNetwork {
+	case pb.Network_MAINNET:
+		return Mainnet, nil
+	case pb.Network_REGTEST:
+		return Regtest, nil
+	case pb.Network_TESTNET:
+		return Testnet, nil
+	case pb.Network_SIGNET:
+		return Signet, nil
+	default:
+		return Mainnet, fmt.Errorf("invalid network")
+	}
+}
+
+func NetworkFromSchemaNetwork(schemaNetwork schema.Network) (Network, error) {
+	switch schemaNetwork {
+	case schema.NetworkMainnet:
+		return Mainnet, nil
+	case schema.NetworkRegtest:
+		return Regtest, nil
+	case schema.NetworkTestnet:
+		return Testnet, nil
+	case schema.NetworkSignet:
+		return Signet, nil
+	default:
+		return Mainnet, fmt.Errorf("invalid network")
+	}
+}
+
+func SchemaNetworkFromNetwork(network Network) (schema.Network, error) {
+	switch network {
+	case Mainnet:
+		return schema.NetworkMainnet, nil
+	case Regtest:
+		return schema.NetworkRegtest, nil
+	case Testnet:
+		return schema.NetworkTestnet, nil
+	case Signet:
+		return schema.NetworkSignet, nil
+	default:
+		return schema.NetworkMainnet, fmt.Errorf("invalid network")
+	}
+}
+
+func ProtoNetworkFromNetwork(network Network) (pb.Network, error) {
+	switch network {
+	case Mainnet:
+		return pb.Network_MAINNET, nil
+	case Regtest:
+		return pb.Network_REGTEST, nil
+	case Testnet:
+		return pb.Network_TESTNET, nil
+	case Signet:
+		return pb.Network_SIGNET, nil
+	default:
+		return pb.Network_MAINNET, fmt.Errorf("invalid network")
+	}
+}
 
 // NetworkParams converts a Network to its corresponding chaincfg.Params
 func NetworkParams(network Network) *chaincfg.Params {

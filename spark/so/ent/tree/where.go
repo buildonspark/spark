@@ -222,6 +222,36 @@ func StatusNotIn(vs ...schema.TreeStatus) predicate.Tree {
 	return predicate.Tree(sql.FieldNotIn(FieldStatus, v...))
 }
 
+// NetworkEQ applies the EQ predicate on the "network" field.
+func NetworkEQ(v schema.Network) predicate.Tree {
+	vc := v
+	return predicate.Tree(sql.FieldEQ(FieldNetwork, vc))
+}
+
+// NetworkNEQ applies the NEQ predicate on the "network" field.
+func NetworkNEQ(v schema.Network) predicate.Tree {
+	vc := v
+	return predicate.Tree(sql.FieldNEQ(FieldNetwork, vc))
+}
+
+// NetworkIn applies the In predicate on the "network" field.
+func NetworkIn(vs ...schema.Network) predicate.Tree {
+	v := make([]any, len(vs))
+	for i := range v {
+		v[i] = vs[i]
+	}
+	return predicate.Tree(sql.FieldIn(FieldNetwork, v...))
+}
+
+// NetworkNotIn applies the NotIn predicate on the "network" field.
+func NetworkNotIn(vs ...schema.Network) predicate.Tree {
+	v := make([]any, len(vs))
+	for i := range v {
+		v[i] = vs[i]
+	}
+	return predicate.Tree(sql.FieldNotIn(FieldNetwork, v...))
+}
+
 // HasRoot applies the HasEdge predicate on the "root" edge.
 func HasRoot() predicate.Tree {
 	return predicate.Tree(func(s *sql.Selector) {

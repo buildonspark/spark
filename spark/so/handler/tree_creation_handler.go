@@ -76,8 +76,8 @@ func (h *TreeCreationHandler) findParentOutputFromCreateTreeRequest(ctx context.
 	}
 }
 
-func (h *TreeCreationHandler) getSigningKeyshareFromOutput(ctx context.Context, output *wire.TxOut) ([]byte, *ent.SigningKeyshare, error) {
-	addressString, err := common.P2TRAddressFromPkScript(output.PkScript, h.config.Network)
+func (h *TreeCreationHandler) getSigningKeyshareFromOutput(ctx context.Context, network common.Network, output *wire.TxOut) ([]byte, *ent.SigningKeyshare, error) {
+	addressString, err := common.P2TRAddressFromPkScript(output.PkScript, network)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -96,13 +96,12 @@ func (h *TreeCreationHandler) getSigningKeyshareFromOutput(ctx context.Context, 
 	return depositAddress.OwnerSigningPubkey, keyshare, nil
 }
 
-func (h *TreeCreationHandler) findParentPublicKeys(ctx context.Context, req *pb.PrepareTreeAddressRequest) ([]byte, *ent.SigningKeyshare, error) {
+func (h *TreeCreationHandler) findParentPublicKeys(ctx context.Context, network common.Network, req *pb.PrepareTreeAddressRequest) ([]byte, *ent.SigningKeyshare, error) {
 	parentOutput, err := h.findParentOutputFromPrepareTreeAddressRequest(ctx, req)
 	if err != nil {
 		return nil, nil, err
 	}
-
-	return h.getSigningKeyshareFromOutput(ctx, parentOutput)
+	return h.getSigningKeyshareFromOutput(ctx, network, parentOutput)
 }
 
 func (h *TreeCreationHandler) validateAndCountTreeAddressNodes(ctx context.Context, parentUserPublicKey []byte, nodes []*pb.AddressRequestNode) (int, error) {
@@ -205,13 +204,20 @@ func (h *TreeCreationHandler) applyKeysharesToTree(ctx context.Context, targetKe
 	return node, keysharesMap, nil
 }
 
-func (h *TreeCreationHandler) createAddressNodeFromPrepareTreeAddressNode(ctx context.Context, node *pbinternal.PrepareTreeAddressNode, keysharesMap map[string]*ent.SigningKeyshare, userIdentityPublicKey []byte, save bool) (addressNode *pb.AddressNode, err error) {
+func (h *TreeCreationHandler) createAddressNodeFromPrepareTreeAddressNode(
+	ctx context.Context,
+	network common.Network,
+	node *pbinternal.PrepareTreeAddressNode,
+	keysharesMap map[string]*ent.SigningKeyshare,
+	userIdentityPublicKey []byte,
+	save bool,
+) (addressNode *pb.AddressNode, err error) {
 	combinedPublicKey, err := common.AddPublicKeys(keysharesMap[node.SigningKeyshareId].PublicKey, node.UserPublicKey)
 	if err != nil {
 		return nil, err
 	}
 
-	depositAddress, err := common.P2TRAddressFromPublicKey(combinedPublicKey, h.config.Network)
+	depositAddress, err := common.P2TRAddressFromPublicKey(combinedPublicKey, network)
 	if err != nil {
 		return nil, err
 	}
@@ -237,7 +243,7 @@ func (h *TreeCreationHandler) createAddressNodeFromPrepareTreeAddressNode(ctx co
 	}
 	children := make([]*pb.AddressNode, len(node.Children))
 	for i, child := range node.Children {
-		children[i], err = h.createAddressNodeFromPrepareTreeAddressNode(ctx, child, keysharesMap, userIdentityPublicKey, len(node.Children) > 1)
+		children[i], err = h.createAddressNodeFromPrepareTreeAddressNode(ctx, network, child, keysharesMap, userIdentityPublicKey, len(node.Children) > 1)
 		if err != nil {
 			return nil, err
 		}
@@ -257,7 +263,35 @@ func (h *TreeCreationHandler) PrepareTreeAddress(ctx context.Context, req *pb.Pr
 		return nil, err
 	}
 
-	parentUserPublicKey, signingKeyshare, err := h.findParentPublicKeys(ctx, req)
+	var network common.Network
+	var err error
+	switch req.Source.(type) {
+	case *pb.PrepareTreeAddressRequest_ParentNodeOutput:
+		uuid, err := uuid.Parse(req.GetParentNodeOutput().NodeId)
+		if err != nil {
+			return nil, err
+		}
+		db := ent.GetDbFromContext(ctx)
+		treeNode, err := db.TreeNode.Get(ctx, uuid)
+		if err != nil {
+			return nil, err
+		}
+		tree, err := treeNode.QueryTree().Only(ctx)
+		if err != nil {
+			return nil, err
+		}
+		network, err = common.NetworkFromSchemaNetwork(tree.Network)
+		if err != nil {
+			return nil, err
+		}
+	case *pb.PrepareTreeAddressRequest_OnChainUtxo:
+		network, err = common.NetworkFromProtoNetwork(req.GetOnChainUtxo().Network)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	parentUserPublicKey, signingKeyshare, err := h.findParentPublicKeys(ctx, network, req)
 	if err != nil {
 		return nil, err
 	}
@@ -302,17 +336,22 @@ func (h *TreeCreationHandler) PrepareTreeAddress(ctx context.Context, req *pb.Pr
 		}
 		client := pbinternal.NewSparkInternalServiceClient(conn)
 
+		protoNetwork, err := common.ProtoNetworkFromNetwork(network)
+		if err != nil {
+			return nil, err
+		}
 		return client.PrepareTreeAddress(ctx, &pbinternal.PrepareTreeAddressRequest{
 			TargetKeyshareId:      signingKeyshare.ID.String(),
 			Node:                  addressNode,
 			UserIdentityPublicKey: req.UserIdentityPublicKey,
+			Network:               protoNetwork,
 		})
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	resultRootNode, err := h.createAddressNodeFromPrepareTreeAddressNode(ctx, addressNode, keysharesMap, req.UserIdentityPublicKey, false)
+	resultRootNode, err := h.createAddressNodeFromPrepareTreeAddressNode(ctx, network, addressNode, keysharesMap, req.UserIdentityPublicKey, false)
 	if err != nil {
 		return nil, err
 	}
@@ -335,6 +374,7 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 	db := ent.GetDbFromContext(ctx)
 	var parentNode *ent.TreeNode
 	var vout uint32
+	var network common.Network
 	switch req.Source.(type) {
 	case *pb.CreateTreeRequest_ParentNodeOutput:
 		uuid, err := uuid.Parse(req.GetParentNodeOutput().NodeId)
@@ -346,9 +386,21 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 			return nil, nil, err
 		}
 		vout = req.GetParentNodeOutput().Vout
+		tree, err := parentNode.QueryTree().Only(ctx)
+		if err != nil {
+			return nil, nil, err
+		}
+		network, err = common.NetworkFromSchemaNetwork(tree.Network)
+		if err != nil {
+			return nil, nil, err
+		}
 	case *pb.CreateTreeRequest_OnChainUtxo:
 		parentNode = nil
 		vout = req.GetOnChainUtxo().Vout
+		network, err = common.NetworkFromProtoNetwork(req.GetOnChainUtxo().Network)
+		if err != nil {
+			return nil, nil, err
+		}
 	default:
 		return nil, nil, errors.New("invalid source")
 	}
@@ -362,7 +414,7 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 		vout          uint32
 	}
 
-	userPublicKey, keyshare, err := h.getSigningKeyshareFromOutput(ctx, parentOutput)
+	userPublicKey, keyshare, err := h.getSigningKeyshareFromOutput(ctx, network, parentOutput)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -398,7 +450,11 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 		var tree *ent.Tree
 		var parentNodeID *uuid.UUID
 		if currentElement.parentNode == nil {
-			tree, err = db.Tree.Create().SetStatus(schema.TreeStatusAvailable).SetOwnerIdentityPubkey(req.UserIdentityPublicKey).Save(ctx)
+			schemaNetwork, err := common.SchemaNetworkFromNetwork(network)
+			if err != nil {
+				return nil, nil, err
+			}
+			tree, err = db.Tree.Create().SetStatus(schema.TreeStatusAvailable).SetOwnerIdentityPubkey(req.UserIdentityPublicKey).SetNetwork(schemaNetwork).Save(ctx)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -454,7 +510,7 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 			userPublicKeys := [][]byte{}
 			statechainPublicKeys := [][]byte{}
 			for i, child := range currentElement.node.Children {
-				userSigningKey, keyshare, err := h.getSigningKeyshareFromOutput(ctx, tx.TxOut[i])
+				userSigningKey, keyshare, err := h.getSigningKeyshareFromOutput(ctx, network, tx.TxOut[i])
 				if err != nil {
 					return nil, nil, err
 				}

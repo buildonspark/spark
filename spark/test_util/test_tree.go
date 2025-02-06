@@ -55,7 +55,6 @@ func CreateNewTree(config *wallet.Config, privKey *secp256k1.PrivateKey, amountS
 		Txid: depositTx.TxID(),
 		Tx:   depositTxHex,
 	})
-
 	resp, err := wallet.CreateTreeRoot(ctx, config, privKey.Serialize(), depositResp.DepositAddress.VerifyingKey, depositTx, vout)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create tree: %v", err)

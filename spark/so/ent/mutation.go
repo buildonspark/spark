@@ -8999,6 +8999,7 @@ type TreeMutation struct {
 	update_time           *time.Time
 	owner_identity_pubkey *[]byte
 	status                *schema.TreeStatus
+	network               *schema.Network
 	clearedFields         map[string]struct{}
 	root                  *uuid.UUID
 	clearedroot           bool
@@ -9258,6 +9259,42 @@ func (m *TreeMutation) ResetStatus() {
 	m.status = nil
 }
 
+// SetNetwork sets the "network" field.
+func (m *TreeMutation) SetNetwork(s schema.Network) {
+	m.network = &s
+}
+
+// Network returns the value of the "network" field in the mutation.
+func (m *TreeMutation) Network() (r schema.Network, exists bool) {
+	v := m.network
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldNetwork returns the old "network" field's value of the Tree entity.
+// If the Tree object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TreeMutation) OldNetwork(ctx context.Context) (v schema.Network, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldNetwork is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldNetwork requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldNetwork: %w", err)
+	}
+	return oldValue.Network, nil
+}
+
+// ResetNetwork resets all changes to the "network" field.
+func (m *TreeMutation) ResetNetwork() {
+	m.network = nil
+}
+
 // SetRootID sets the "root" edge to the TreeNode entity by id.
 func (m *TreeMutation) SetRootID(id uuid.UUID) {
 	m.root = &id
@@ -9385,7 +9422,7 @@ func (m *TreeMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *TreeMutation) Fields() []string {
-	fields := make([]string, 0, 4)
+	fields := make([]string, 0, 5)
 	if m.create_time != nil {
 		fields = append(fields, tree.FieldCreateTime)
 	}
@@ -9397,6 +9434,9 @@ func (m *TreeMutation) Fields() []string {
 	}
 	if m.status != nil {
 		fields = append(fields, tree.FieldStatus)
+	}
+	if m.network != nil {
+		fields = append(fields, tree.FieldNetwork)
 	}
 	return fields
 }
@@ -9414,6 +9454,8 @@ func (m *TreeMutation) Field(name string) (ent.Value, bool) {
 		return m.OwnerIdentityPubkey()
 	case tree.FieldStatus:
 		return m.Status()
+	case tree.FieldNetwork:
+		return m.Network()
 	}
 	return nil, false
 }
@@ -9431,6 +9473,8 @@ func (m *TreeMutation) OldField(ctx context.Context, name string) (ent.Value, er
 		return m.OldOwnerIdentityPubkey(ctx)
 	case tree.FieldStatus:
 		return m.OldStatus(ctx)
+	case tree.FieldNetwork:
+		return m.OldNetwork(ctx)
 	}
 	return nil, fmt.Errorf("unknown Tree field %s", name)
 }
@@ -9467,6 +9511,13 @@ func (m *TreeMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetStatus(v)
+		return nil
+	case tree.FieldNetwork:
+		v, ok := value.(schema.Network)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetNetwork(v)
 		return nil
 	}
 	return fmt.Errorf("unknown Tree field %s", name)
@@ -9528,6 +9579,9 @@ func (m *TreeMutation) ResetField(name string) error {
 		return nil
 	case tree.FieldStatus:
 		m.ResetStatus()
+		return nil
+	case tree.FieldNetwork:
+		m.ResetNetwork()
 		return nil
 	}
 	return fmt.Errorf("unknown Tree field %s", name)

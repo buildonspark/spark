@@ -28,12 +28,12 @@ type Config struct {
 	SignerAddress string
 	// DatabasePath is the path to the database.
 	DatabasePath string
-	// Network is the network of the signing operator.
-	Network common.Network
 	// authzEnforced determines if authorization checks are enforced
 	authzEnforced bool
 	// DKGCoordinatorAddress is the address of the DKG coordinator.
 	DKGCoordinatorAddress string
+	// SupportedNetworks is the list of networks supported by the signing operator.
+	SupportedNetworks []common.Network
 }
 
 // DatabaseDriver returns the database driver based on the database path.
@@ -54,6 +54,7 @@ func NewConfig(
 	databasePath string,
 	authzEnforced bool,
 	dkgCoordinatorAddress string,
+	supportedNetworks []common.Network,
 ) (*Config, error) {
 	identityPrivateKeyBytes, err := hex.DecodeString(identityPrivateKey)
 	if err != nil {
@@ -73,10 +74,19 @@ func NewConfig(
 		Threshold:             threshold,
 		SignerAddress:         signerAddress,
 		DatabasePath:          databasePath,
-		Network:               common.Regtest, // TODO: load this from args
 		authzEnforced:         authzEnforced,
 		DKGCoordinatorAddress: dkgCoordinatorAddress,
+		SupportedNetworks:     supportedNetworks,
 	}, nil
+}
+
+func (c *Config) IsNetworkSupported(network common.Network) bool {
+	for _, supportedNetwork := range c.SupportedNetworks {
+		if supportedNetwork == network {
+			return true
+		}
+	}
+	return false
 }
 
 // LoadOperators loads the operators from the given file path.

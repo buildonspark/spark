@@ -96,10 +96,24 @@ func (h *InternalDepositHandler) FinalizeTreeCreation(ctx context.Context, req *
 		txid := nodeTx.TxIn[0].PreviousOutPoint.Hash.String()
 		markNodAsAvailalbe = h.checkTransactionOnchain(ctx, txid)
 
+		network, err := common.NetworkFromSchemaNetwork(schema.NetworkRegtest)
+		if err != nil {
+			return err
+		}
+		if !h.config.IsNetworkSupported(network) {
+			return fmt.Errorf("network not supported")
+		}
+
+		schemaNetwork, err := common.SchemaNetworkFromNetwork(network)
+		if err != nil {
+			return err
+		}
+
 		treeMutator := db.Tree.
 			Create().
 			SetID(treeID).
-			SetOwnerIdentityPubkey(selectedNode.OwnerIdentityPubkey)
+			SetOwnerIdentityPubkey(selectedNode.OwnerIdentityPubkey).
+			SetNetwork(schemaNetwork)
 
 		if markNodAsAvailalbe {
 			treeMutator.SetStatus(schema.TreeStatusAvailable)

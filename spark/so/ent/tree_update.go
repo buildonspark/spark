@@ -57,6 +57,20 @@ func (tu *TreeUpdate) SetNillableStatus(ss *schema.TreeStatus) *TreeUpdate {
 	return tu
 }
 
+// SetNetwork sets the "network" field.
+func (tu *TreeUpdate) SetNetwork(s schema.Network) *TreeUpdate {
+	tu.mutation.SetNetwork(s)
+	return tu
+}
+
+// SetNillableNetwork sets the "network" field if the given value is not nil.
+func (tu *TreeUpdate) SetNillableNetwork(s *schema.Network) *TreeUpdate {
+	if s != nil {
+		tu.SetNetwork(*s)
+	}
+	return tu
+}
+
 // SetRootID sets the "root" edge to the TreeNode entity by ID.
 func (tu *TreeUpdate) SetRootID(id uuid.UUID) *TreeUpdate {
 	tu.mutation.SetRootID(id)
@@ -171,6 +185,11 @@ func (tu *TreeUpdate) check() error {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "Tree.status": %w`, err)}
 		}
 	}
+	if v, ok := tu.mutation.Network(); ok {
+		if err := tree.NetworkValidator(v); err != nil {
+			return &ValidationError{Name: "network", err: fmt.Errorf(`ent: validator failed for field "Tree.network": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -194,6 +213,9 @@ func (tu *TreeUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if value, ok := tu.mutation.Status(); ok {
 		_spec.SetField(tree.FieldStatus, field.TypeEnum, value)
+	}
+	if value, ok := tu.mutation.Network(); ok {
+		_spec.SetField(tree.FieldNetwork, field.TypeEnum, value)
 	}
 	if tu.mutation.RootCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -311,6 +333,20 @@ func (tuo *TreeUpdateOne) SetStatus(ss schema.TreeStatus) *TreeUpdateOne {
 func (tuo *TreeUpdateOne) SetNillableStatus(ss *schema.TreeStatus) *TreeUpdateOne {
 	if ss != nil {
 		tuo.SetStatus(*ss)
+	}
+	return tuo
+}
+
+// SetNetwork sets the "network" field.
+func (tuo *TreeUpdateOne) SetNetwork(s schema.Network) *TreeUpdateOne {
+	tuo.mutation.SetNetwork(s)
+	return tuo
+}
+
+// SetNillableNetwork sets the "network" field if the given value is not nil.
+func (tuo *TreeUpdateOne) SetNillableNetwork(s *schema.Network) *TreeUpdateOne {
+	if s != nil {
+		tuo.SetNetwork(*s)
 	}
 	return tuo
 }
@@ -442,6 +478,11 @@ func (tuo *TreeUpdateOne) check() error {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "Tree.status": %w`, err)}
 		}
 	}
+	if v, ok := tuo.mutation.Network(); ok {
+		if err := tree.NetworkValidator(v); err != nil {
+			return &ValidationError{Name: "network", err: fmt.Errorf(`ent: validator failed for field "Tree.network": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -482,6 +523,9 @@ func (tuo *TreeUpdateOne) sqlSave(ctx context.Context) (_node *Tree, err error) 
 	}
 	if value, ok := tuo.mutation.Status(); ok {
 		_spec.SetField(tree.FieldStatus, field.TypeEnum, value)
+	}
+	if value, ok := tuo.mutation.Network(); ok {
+		_spec.SetField(tree.FieldNetwork, field.TypeEnum, value)
 	}
 	if tuo.mutation.RootCleared() {
 		edge := &sqlgraph.EdgeSpec{

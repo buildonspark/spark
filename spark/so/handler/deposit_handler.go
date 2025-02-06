@@ -37,6 +37,13 @@ func NewDepositHandler(onchainHelper helper.OnChainHelper, config authz.Config) 
 
 // GenerateDepositAddress generates a deposit address for the given public key.
 func (o *DepositHandler) GenerateDepositAddress(ctx context.Context, config *so.Config, req *pb.GenerateDepositAddressRequest) (*pb.GenerateDepositAddressResponse, error) {
+	network, err := common.NetworkFromProtoNetwork(req.Network)
+	if err != nil {
+		return nil, err
+	}
+	if !config.IsNetworkSupported(network) {
+		return nil, fmt.Errorf("network not supported")
+	}
 	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, o.config, req.IdentityPublicKey); err != nil {
 		return nil, err
 	}
@@ -82,8 +89,7 @@ func (o *DepositHandler) GenerateDepositAddress(ctx context.Context, config *so.
 		log.Printf("Failed to add public keys: %v", err)
 		return nil, err
 	}
-
-	depositAddress, err := common.P2TRAddressFromPublicKey(combinedPublicKey, config.Network)
+	depositAddress, err := common.P2TRAddressFromPublicKey(combinedPublicKey, network)
 	if err != nil {
 		log.Printf("Failed to generate deposit address: %v", err)
 		return nil, err
@@ -171,7 +177,14 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 
 	// Verify that the on chain utxo is paid to the registered deposit address
 	onChainOutput := onChainTx.TxOut[req.OnChainUtxo.Vout]
-	utxoAddress, err := common.P2TRAddressFromPkScript(onChainOutput.PkScript, config.Network)
+	network, err := common.NetworkFromProtoNetwork(req.OnChainUtxo.Network)
+	if err != nil {
+		return nil, err
+	}
+	if !config.IsNetworkSupported(network) {
+		return nil, fmt.Errorf("network not supported")
+	}
+	utxoAddress, err := common.P2TRAddressFromPkScript(onChainOutput.PkScript, network)
 	if err != nil {
 		return nil, err
 	}
@@ -262,7 +275,11 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 	}
 	// Create the tree
 	db := ent.GetDbFromContext(ctx)
-	treeMutator := db.Tree.Create().SetOwnerIdentityPubkey(depositAddress.OwnerIdentityPubkey)
+	schemaNetwork, err := common.SchemaNetworkFromNetwork(network)
+	if err != nil {
+		return nil, err
+	}
+	treeMutator := db.Tree.Create().SetOwnerIdentityPubkey(depositAddress.OwnerIdentityPubkey).SetNetwork(schemaNetwork)
 	if txBroadcasted {
 		treeMutator.SetStatus(schema.TreeStatusAvailable)
 	} else {

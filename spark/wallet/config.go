@@ -3,6 +3,7 @@ package wallet
 import (
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lightsparkdev/spark-go/common"
+	pb "github.com/lightsparkdev/spark-go/proto/spark"
 	"github.com/lightsparkdev/spark-go/so"
 )
 
@@ -30,4 +31,12 @@ func (c *Config) CoodinatorAddress() string {
 // IdentityPublicKey returns the identity public key.
 func (c *Config) IdentityPublicKey() []byte {
 	return c.IdentityPrivateKey.PubKey().SerializeCompressed()
+}
+
+func (c *Config) ProtoNetwork() pb.Network {
+	network, err := common.ProtoNetworkFromNetwork(c.Network)
+	if err != nil {
+		panic(err)
+	}
+	return network
 }

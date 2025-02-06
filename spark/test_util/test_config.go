@@ -143,7 +143,7 @@ func TestWalletConfigWithIdentityKey(identityPrivKey secp256k1.PrivateKey) (*wal
 		return nil, err
 	}
 	return &wallet.Config{
-		Network:              common.Mainnet,
+		Network:              common.Regtest,
 		SigningOperators:     signingOperators,
 		CoodinatorIdentifier: "0000000000000000000000000000000000000000000000000000000000000001",
 		FrostSignerAddress:   "unix:///tmp/frost_0.sock",

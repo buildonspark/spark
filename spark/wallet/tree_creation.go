@@ -137,8 +137,9 @@ func GenerateDepositAddressesForTree(
 	} else if parentTx != nil {
 		request.Source = &pb.PrepareTreeAddressRequest_OnChainUtxo{
 			OnChainUtxo: &pb.UTXO{
-				Txid: parentTx.TxHash().String(),
-				Vout: uint32(vout),
+				Txid:    parentTx.TxHash().String(),
+				Vout:    uint32(vout),
+				Network: config.ProtoNetwork(),
 			},
 		}
 	} else {
@@ -543,8 +544,9 @@ func CreateTree(
 		tx = parentTx
 		request.Source = &pb.CreateTreeRequest_OnChainUtxo{
 			OnChainUtxo: &pb.UTXO{
-				Txid: parentTx.TxHash().String(),
-				Vout: uint32(vout),
+				Txid:    parentTx.TxHash().String(),
+				Vout:    uint32(vout),
+				Network: config.ProtoNetwork(),
 			},
 		}
 	} else if parentNode != nil {

@@ -33,6 +33,10 @@ func NewFinalizeSignatureHandler(config *so.Config) *FinalizeSignatureHandler {
 
 // FinalizeNodeSignatures verifies the node signatures and updates the node.
 func (o *FinalizeSignatureHandler) FinalizeNodeSignatures(ctx context.Context, req *pb.FinalizeNodeSignaturesRequest) (*pb.FinalizeNodeSignaturesResponse, error) {
+	if len(req.NodeSignatures) == 0 {
+		return &pb.FinalizeNodeSignaturesResponse{Nodes: []*pb.TreeNode{}}, nil
+	}
+
 	var transfer *ent.Transfer
 	switch req.Intent {
 	case pbcommon.SignatureIntent_TRANSFER:
@@ -54,9 +58,26 @@ func (o *FinalizeSignatureHandler) FinalizeNodeSignatures(ctx context.Context, r
 		internalNodes = append(internalNodes, internalNode)
 	}
 
+	db := ent.GetDbFromContext(ctx)
+	firstNodeID, err := uuid.Parse(req.NodeSignatures[0].NodeId)
+	if err != nil {
+		return nil, err
+	}
+	firstNode, err := db.TreeNode.Get(ctx, firstNodeID)
+	if err != nil {
+		return nil, err
+	}
+	tree, err := firstNode.QueryTree().Only(ctx)
+	if err != nil {
+		return nil, err
+	}
+	network, err := common.NetworkFromSchemaNetwork(tree.Network)
+	if err != nil {
+		return nil, err
+	}
 	// Sync with all other SOs
 	selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
-	_, err := helper.ExecuteTaskWithAllOperators(ctx, o.config, &selection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
+	_, err = helper.ExecuteTaskWithAllOperators(ctx, o.config, &selection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
 		conn, err := common.NewGRPCConnection(operator.Address)
 		if err != nil {
 			return nil, err
@@ -67,7 +88,11 @@ func (o *FinalizeSignatureHandler) FinalizeNodeSignatures(ctx context.Context, r
 
 		switch req.Intent {
 		case pbcommon.SignatureIntent_CREATION:
-			_, err = client.FinalizeTreeCreation(ctx, &pbinternal.FinalizeTreeCreationRequest{Nodes: internalNodes})
+			protoNetwork, err := common.ProtoNetworkFromNetwork(network)
+			if err != nil {
+				return nil, err
+			}
+			_, err = client.FinalizeTreeCreation(ctx, &pbinternal.FinalizeTreeCreationRequest{Nodes: internalNodes, Network: protoNetwork})
 			return nil, err
 		case pbcommon.SignatureIntent_AGGREGATE:
 			_, err = client.FinalizeNodesAggregation(ctx, &pbinternal.FinalizeNodesAggregationRequest{Nodes: internalNodes})

@@ -36,6 +36,13 @@ service SparkService {
     rpc finalize_token_transaction(FinalizeTokenTransactionRequest) returns (google.protobuf.Empty) {}
 }
 
+enum Network {
+    MAINNET = 0;
+    REGTEST = 1;
+    TESTNET = 2;
+    SIGNET = 3;
+}
+
 message DepositAddressProof {
     map<string, bytes> address_signatures = 1;
     bytes proof_of_possession_signature = 2;
@@ -44,6 +51,7 @@ message DepositAddressProof {
 message GenerateDepositAddressRequest {
     bytes signing_public_key = 1;
     bytes identity_public_key = 2;
+    Network network = 3;
 }
 
 message Address {
@@ -60,6 +68,7 @@ message UTXO {
     string txid = 1;
     uint32 vout = 2;
     bytes raw_tx = 3;
+    Network network = 4;
 }
 
 message NodeOutput {
@@ -364,7 +373,6 @@ message StorePreimageShareRequest {
     SecretShare preimage_share = 2;
     uint32 threshold = 3;
     string invoice_string = 4;
-    // TODO: This should be removed once we have a proper auth process.
     bytes user_identity_public_key = 5;
 }
 
@@ -460,12 +468,9 @@ message PrepareTreeAddressRequest {
         NodeOutput parent_node_output = 1;
         UTXO on_chain_utxo = 2;
     }
-
     // The tx on this node is to spend the source's utxo.
     // The user's public key should already be registered with the SE for the root node.
     AddressRequestNode node = 3;
-
-    // TODO: This should be removed once we have a proper auth process.
     bytes user_identity_public_key = 4;
 }
 

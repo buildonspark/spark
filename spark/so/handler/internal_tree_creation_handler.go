@@ -74,12 +74,12 @@ func (h *InternalTreeCreationHandler) markExistingSigningKeysharesAsUsed(ctx con
 	return result, nil
 }
 
-func (h *InternalTreeCreationHandler) generateAndStoreDepositAddress(ctx context.Context, seKeyshare *ent.SigningKeyshare, userPubkey, identityPubkey []byte, save bool) (string, []byte, error) {
+func (h *InternalTreeCreationHandler) generateAndStoreDepositAddress(ctx context.Context, network common.Network, seKeyshare *ent.SigningKeyshare, userPubkey, identityPubkey []byte, save bool) (string, []byte, error) {
 	combinedPublicKey, err := common.AddPublicKeys(seKeyshare.PublicKey, userPubkey)
 	if err != nil {
 		return "", nil, err
 	}
-	address, err := common.P2TRAddressFromPublicKey(combinedPublicKey, h.config.Network)
+	address, err := common.P2TRAddressFromPublicKey(combinedPublicKey, network)
 	if err != nil {
 		return "", nil, err
 	}
@@ -132,7 +132,14 @@ func (h *InternalTreeCreationHandler) prepareDepositAddress(ctx context.Context,
 			}
 			selectedSigningKeyshares = append(selectedSigningKeyshares, selectedSigningKeyshare)
 
-			address, signature, err := h.generateAndStoreDepositAddress(ctx, selectedSigningKeyshare, node.UserPublicKey, req.UserIdentityPublicKey, true)
+			network, err := common.NetworkFromProtoNetwork(req.Network)
+			if err != nil {
+				return nil, err
+			}
+			if !h.config.IsNetworkSupported(network) {
+				return nil, fmt.Errorf("network not supported")
+			}
+			address, signature, err := h.generateAndStoreDepositAddress(ctx, network, selectedSigningKeyshare, node.UserPublicKey, req.UserIdentityPublicKey, true)
 			if err != nil {
 				return nil, err
 			}
@@ -153,7 +160,14 @@ func (h *InternalTreeCreationHandler) prepareDepositAddress(ctx context.Context,
 			return nil, err
 		}
 
-		address, signature, err := h.generateAndStoreDepositAddress(ctx, lastKeyShare, lastNode.UserPublicKey, req.UserIdentityPublicKey, len(currentElement.nodes) > 1)
+		network, err := common.NetworkFromProtoNetwork(req.Network)
+		if err != nil {
+			return nil, err
+		}
+		if !h.config.IsNetworkSupported(network) {
+			return nil, fmt.Errorf("network not supported")
+		}
+		address, signature, err := h.generateAndStoreDepositAddress(ctx, network, lastKeyShare, lastNode.UserPublicKey, req.UserIdentityPublicKey, len(currentElement.nodes) > 1)
 		if err != nil {
 			return nil, err
 		}

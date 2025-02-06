@@ -94,6 +94,7 @@ func GenerateDepositAddress(
 	depositResp, err := sparkClient.GenerateDepositAddress(ctx, &pb.GenerateDepositAddressRequest{
 		SigningPublicKey:  signingPubkey,
 		IdentityPublicKey: config.IdentityPublicKey(),
+		Network:           config.ProtoNetwork(),
 	})
 	if err != nil {
 		return nil, err
@@ -195,9 +196,10 @@ func CreateTreeRoot(
 	treeResponse, err := sparkClient.StartTreeCreation(ctx, &pb.StartTreeCreationRequest{
 		IdentityPublicKey: config.IdentityPublicKey(),
 		OnChainUtxo: &pb.UTXO{
-			Txid:  depositTx.TxID(),
-			Vout:  uint32(vout),
-			RawTx: depositBuf.Bytes(),
+			Txid:    depositTx.TxID(),
+			Vout:    uint32(vout),
+			RawTx:   depositBuf.Bytes(),
+			Network: config.ProtoNetwork(),
 		},
 		RootTxSigningJob: &pb.SigningJob{
 			RawTx:                  rootBuf.Bytes(),

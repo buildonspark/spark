@@ -12,6 +12,7 @@ const (
 	NetworkMainnet Network = "MAINNET"
 	NetworkRegtest Network = "REGTEST"
 	NetworkTestnet Network = "TESTNET"
+	NetworkSignet  Network = "SIGNET"
 )
 
 // Values returns the values for the Network type.
@@ -19,6 +20,8 @@ func (Network) Values() []string {
 	return []string{
 		string(NetworkMainnet),
 		string(NetworkRegtest),
+		string(NetworkTestnet),
+		string(NetworkSignet),
 	}
 }
 

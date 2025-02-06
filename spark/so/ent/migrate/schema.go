@@ -14,7 +14,7 @@ var (
 		{Name: "create_time", Type: field.TypeTime},
 		{Name: "update_time", Type: field.TypeTime},
 		{Name: "height", Type: field.TypeInt64},
-		{Name: "network", Type: field.TypeEnum, Enums: []string{"MAINNET", "REGTEST"}},
+		{Name: "network", Type: field.TypeEnum, Enums: []string{"MAINNET", "REGTEST", "TESTNET", "SIGNET"}},
 	}
 	// BlockHeightsTable holds the schema information for the "block_heights" table.
 	BlockHeightsTable = &schema.Table{
@@ -375,6 +375,7 @@ var (
 		{Name: "update_time", Type: field.TypeTime},
 		{Name: "owner_identity_pubkey", Type: field.TypeBytes},
 		{Name: "status", Type: field.TypeEnum, Enums: []string{"PENDING", "AVAILABLE"}},
+		{Name: "network", Type: field.TypeEnum, Enums: []string{"MAINNET", "REGTEST", "TESTNET", "SIGNET"}},
 		{Name: "tree_root", Type: field.TypeUUID, Nullable: true},
 	}
 	// TreesTable holds the schema information for the "trees" table.
@@ -385,7 +386,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "trees_tree_nodes_root",
-				Columns:    []*schema.Column{TreesColumns[5]},
+				Columns:    []*schema.Column{TreesColumns[6]},
 				RefColumns: []*schema.Column{TreeNodesColumns[0]},
 				OnDelete:   schema.SetNull,
 			},

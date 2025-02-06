@@ -9,6 +9,7 @@ import (
 	"log"
 	"net"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-co-op/gocron/v2"
@@ -48,6 +49,24 @@ type args struct {
 	AuthzEnforced         bool
 	DKGCoordinatorAddress string
 	DisableDKG            bool
+	SupportedNetworks     string
+}
+
+func (a *args) SupportedNetworksList() []common.Network {
+	networks := make([]common.Network, 0)
+	if strings.Contains(a.SupportedNetworks, "mainnet") || a.SupportedNetworks == "" {
+		networks = append(networks, common.Mainnet)
+	}
+	if strings.Contains(a.SupportedNetworks, "testnet") || a.SupportedNetworks == "" {
+		networks = append(networks, common.Testnet)
+	}
+	if strings.Contains(a.SupportedNetworks, "regtest") || a.SupportedNetworks == "" {
+		networks = append(networks, common.Regtest)
+	}
+	if strings.Contains(a.SupportedNetworks, "signet") || a.SupportedNetworks == "" {
+		networks = append(networks, common.Signet)
+	}
+	return networks
 }
 
 func loadArgs() (*args, error) {
@@ -67,6 +86,7 @@ func loadArgs() (*args, error) {
 	flag.BoolVar(&args.AuthzEnforced, "authz-enforced", true, "Enforce authorization checks")
 	flag.StringVar(&args.DKGCoordinatorAddress, "dkg-address", "", "DKG coordinator address")
 	flag.BoolVar(&args.DisableDKG, "disable-dkg", false, "Disable DKG")
+	flag.StringVar(&args.SupportedNetworks, "supported-networks", "", "Supported networks")
 	// Parse flags
 	flag.Parse()
 
@@ -114,6 +134,7 @@ func main() {
 		args.DatabasePath,
 		args.AuthzEnforced,
 		args.DKGCoordinatorAddress,
+		args.SupportedNetworksList(),
 	)
 	if err != nil {
 		log.Fatalf("Failed to create config: %v", err)
@@ -157,7 +178,8 @@ func main() {
 	}
 
 	go func() {
-		err := chain.WatchChain(dbClient, config.Network)
+		// TODO (alec): Watch all the supported network from the config
+		err := chain.WatchChain(dbClient, common.Regtest)
 		if err != nil {
 			log.Fatalf("Failed to watch chain: %v", err)
 		}

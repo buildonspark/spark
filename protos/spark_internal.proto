@@ -100,6 +100,7 @@ message PrepareSplitKeysharesRequest {
 
 message FinalizeTreeCreationRequest {
     repeated TreeNode nodes = 1;
+    spark.Network network = 2;
 }
 
 message FinalizeNodesAggregationRequest {
@@ -143,6 +144,7 @@ message PrepareTreeAddressRequest {
 
     // TODO: This should be removed once we have a proper auth process.
     bytes user_identity_public_key = 3;
+    spark.Network network = 4;
 }
 
 message PrepareTreeAddressResponse {
