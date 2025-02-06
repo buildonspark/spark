@@ -227,5 +227,9 @@ func ProposeTreeDenominations(ctx context.Context, req *pb.ProposeTreeDenominati
 	if err != nil {
 		return nil, err
 	}
-	return solveLeafDenominations(leafDenominationCounts, DefaultDenominationsCounts, req.MaxAmountSats)
+	maxTreeDepth := req.MaxTreeDepth
+	if maxTreeDepth == 0 {
+		maxTreeDepth = 15
+	}
+	return solveLeafDenominations(leafDenominationCounts, DefaultDenominationsCounts, req.MaxAmountSats, maxTreeDepth)
 }

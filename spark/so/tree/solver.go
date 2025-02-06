@@ -6,7 +6,7 @@ import (
 	pb "github.com/lightsparkdev/spark-go/proto/spark_tree"
 )
 
-func solveLeafDenominations(counts *pb.GetLeafDenominationCountsResponse, targetCounts map[uint64]uint64, maxAmountSats uint64) (*pb.ProposeTreeDenominationsResponse, error) {
+func solveLeafDenominations(counts *pb.GetLeafDenominationCountsResponse, targetCounts map[uint64]uint64, maxAmountSats uint64, maxTreeDepth uint64) (*pb.ProposeTreeDenominationsResponse, error) {
 	// Figure out how many leaves of each denomination we are missing.
 	missingCount := make([]uint64, DenominationMaxPow)
 	for i := 0; i < DenominationMaxPow; i++ {
@@ -54,6 +54,9 @@ func solveLeafDenominations(counts *pb.GetLeafDenominationCountsResponse, target
 	if len(smallDenominations) > 0 {
 		// Compute 2^floor(log2(len(smallDenominations))).
 		targetLength := uint64(1) << (bits.Len64(uint64(len(smallDenominations))) - 1)
+		if targetLength > uint64(1)<<maxTreeDepth {
+			targetLength = uint64(1) << maxTreeDepth
+		}
 		if targetLength > 0 && targetLength < uint64(len(smallDenominations)) {
 			smallDenominations = smallDenominations[:targetLength]
 		}
@@ -61,6 +64,9 @@ func solveLeafDenominations(counts *pb.GetLeafDenominationCountsResponse, target
 	if len(largeDenominations) > 0 {
 		// Compute 2^floor(log2(len(smallDenominations))).
 		targetLength := uint64(1) << (bits.Len64(uint64(len(largeDenominations))) - 1)
+		if targetLength > uint64(1)<<maxTreeDepth {
+			targetLength = uint64(1) << maxTreeDepth
+		}
 		if targetLength > 0 && targetLength < uint64(len(largeDenominations)) {
 			largeDenominations = largeDenominations[:targetLength]
 		}

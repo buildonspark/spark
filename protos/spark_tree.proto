@@ -45,6 +45,7 @@ message FindLeavesToTakeFromUserResponse {
 message ProposeTreeDenominationsRequest {
     bytes ssp_identity_public_key = 1;
     uint64 max_amount_sats = 2;
+    uint64 max_tree_depth = 3;
 }
 
 message ProposeTreeDenominationsResponse {

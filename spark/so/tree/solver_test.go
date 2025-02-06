@@ -13,6 +13,7 @@ func TestSolveLeafDenominations(t *testing.T) {
 		currentCounts map[uint64]uint64
 		targetCounts  map[uint64]uint64
 		maxAmountSats uint64
+		maxTreeDepth  uint64
 		expectError   bool
 		expectedSmall []uint64
 		expectedLarge []uint64
@@ -27,6 +28,7 @@ func TestSolveLeafDenominations(t *testing.T) {
 				8: 2,
 			},
 			maxAmountSats: 100,
+			maxTreeDepth:  15,
 			expectError:   false,
 			expectedSmall: []uint64{1, 1, 2, 2, 4, 4, 8, 8},
 			expectedLarge: []uint64{},
@@ -46,6 +48,7 @@ func TestSolveLeafDenominations(t *testing.T) {
 				8: 2,
 			},
 			maxAmountSats: 15,
+			maxTreeDepth:  15,
 			expectError:   false,
 			expectedSmall: []uint64{1, 2, 4, 8},
 			expectedLarge: []uint64{},
@@ -58,6 +61,7 @@ func TestSolveLeafDenominations(t *testing.T) {
 				32768: 2,
 			},
 			maxAmountSats: 98304,
+			maxTreeDepth:  15,
 			expectError:   false,
 			expectedSmall: []uint64{},
 			expectedLarge: []uint64{16384, 16384, 32768, 32768},
@@ -77,6 +81,7 @@ func TestSolveLeafDenominations(t *testing.T) {
 				8: 1,
 			},
 			maxAmountSats: 15000,
+			maxTreeDepth:  15,
 			expectError:   false,
 			expectedSmall: []uint64{},
 			expectedLarge: []uint64{},
@@ -93,8 +98,24 @@ func TestSolveLeafDenominations(t *testing.T) {
 				8: 2,
 			},
 			maxAmountSats: 1,
+			maxTreeDepth:  15,
 			expectError:   false,
 			expectedSmall: []uint64{},
+			expectedLarge: []uint64{},
+		},
+		{
+			name:          "basic test with binding tree depth",
+			currentCounts: map[uint64]uint64{},
+			targetCounts: map[uint64]uint64{
+				1: 2,
+				2: 2,
+				4: 2,
+				8: 2,
+			},
+			maxAmountSats: 100,
+			maxTreeDepth:  2,
+			expectError:   false,
+			expectedSmall: []uint64{1, 1, 2, 2},
 			expectedLarge: []uint64{},
 		},
 	}
@@ -105,6 +126,7 @@ func TestSolveLeafDenominations(t *testing.T) {
 				&pb.GetLeafDenominationCountsResponse{Counts: tt.currentCounts},
 				tt.targetCounts,
 				tt.maxAmountSats,
+				tt.maxTreeDepth,
 			)
 
 			if tt.expectError {
