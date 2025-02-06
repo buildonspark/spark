@@ -28,10 +28,12 @@ service SparkService {
     rpc create_tree(CreateTreeRequest) returns (CreateTreeResponse) {}
     rpc get_signing_operator_list(google.protobuf.Empty) returns (GetSigningOperatorListResponse) {}
 
-    rpc generate_revocation_public_key(google.protobuf.Empty) returns (GenerateRevocationPublicKeyResponse) {}
-    rpc start_token_transaction(StartTokenTransactionRequest) returns (StartTokenTransactionResponse) {}
-    rpc finalize_token_transaction(FinalizeTokenTransactionRequest) returns (google.protobuf.Empty) {}
     rpc query_user_signed_refunds(QueryUserSignedRefundsRequest) returns (QueryUserSignedRefundsResponse) {}
+
+    // Token RPCs
+    rpc start_token_transaction(StartTokenTransactionRequest) returns (StartTokenTransactionResponse) {}
+    rpc get_token_transaction_revocation_keyshares(GetTokenTransactionRevocationKeysharesRequest) returns (GetTokenTransactionRevocationKeysharesResponse) {}
+    rpc finalize_token_transaction(FinalizeTokenTransactionRequest) returns (google.protobuf.Empty) {}
 }
 
 message DepositAddressProof {
@@ -109,94 +111,108 @@ message StartTreeCreationResponse {
     NodeSignatureShares root_node_signature_shares = 2;
 }
 
-// This proto is included by the wallet in a token transaction request 
-// to inform the SO set of the nonce and signing public key that the
-// wallet will use for this token transaction.
-message TokenTransactionSigningJob {
-    bytes leaf_id = 1;
-    common.SigningCommitment signing_nonce_commitment = 2;
-    // Signature of the partial token transaction hash to prove that the requesting
-    // wallet has the signing key necessary to spend the leaves before SO's resolve
-    // the revocation private key.
-    // Note that actual combined signing will happen later.
-    bytes ownership_signature = 3;
-}
-
-
-// This proto is returned to the wallet after the initial token transaction
-// request so that it can verify the SE combined signature, generate the final
-// aggregate signature, and finalize the transaction with the SE.
-message TokenTransactionSignatureShares {
-    bytes token_transaction_hash = 1;
-    SigningResult token_transaction_signing_result = 2;
-    bytes verifying_key = 3;
-}
-
-// This proto is constructed by the wallet (without a revocation private key initially)
-// to specify leaves it wants to spend as part of a token transaction. Upon starting
-// the private key field will be filled and returned by the Coordinator SO so that the
-// wallet can validate the full transaction hash before finalizng the transaction.
+// This proto is constructed by the wallet to specify leaves it wants to spend as
+// part of the token transaction.
 message TokenLeafToSpend {
-    bytes token_transaction_hash = 1;
-    uint32 token_leaf_index = 2;
-    bytes revocation_private_key = 3;   
+    bytes prev_token_transaction_hash = 1;
+    uint32 prev_token_transaction_leaf_vout = 2; 
+}
+
+message TransferInput {
+    repeated TokenLeafToSpend leaves_to_spend = 1;
+}
+
+message IssueInput {
+    bytes issuer_public_key = 1;
 }
 
 // This proto is constructed by the wallet to specify leaves it wants to create
 // as part of a token transaction.
-message TokenLeafToCreate {
+message TokenLeafOutput {
     string id = 1;
-    bytes verifying_key = 2;
-    bytes owner_identity_public_key = 3;
-    bytes revocation_public_key = 4;
-    uint64 withdrawal_bond_sats = 5;
-    uint64 withdrawal_locktime = 6;
-    bytes token_public_key = 7;
-    bytes token_amount = 8;  // Decoded uint128
+    bytes owner_public_key = 2;
+    bytes revocation_public_key = 3;
+    uint64 withdrawal_bond_sats = 4;
+    uint64 withdrawal_locktime = 5;
+    bytes token_public_key = 6;
+    bytes token_amount = 7;  // Decoded uint128
 }
 
 // This proto is constructed by the wallet and is the core transaction data structure.
 // This proto is deterministically hashed to generate the token_transaction_hash that 
 // is cooperatively signed by the SO group to confirm a token transaction.
 message TokenTransaction {    
-    // For issuance transactions there will be 0 input leaves and one or more output leaves.
+    // For issuance transactions issuer_public_key will be specified without any leaves_to_spend.
     // For transfer transactions the token amount in the input leaves must match the token amount in the output leaves.
-    repeated TokenLeafToSpend leaves_to_spend = 1;
-    repeated TokenLeafToCreate leaves_to_create = 2;
+    oneof token_input {
+        IssueInput issue_input = 1;
+        TransferInput transfer_input = 2;
+    }
+    repeated TokenLeafOutput output_leaves = 3;
+    repeated bytes spark_operator_identity_public_keys = 4;
 }
 
-message GenerateRevocationPublicKeyResponse {
-    bytes revocation_public_key = 1;
+message InputSignature {
+  // Filled by signing the token transaction hash with the owner/issuer private key.
+  bytes owner_signature = 1;
+}
+
+message TokenTransactionSignatures {
+  repeated InputSignature signatures = 1;
 }
 
 message StartTokenTransactionRequest {
     bytes identity_public_key = 1;
     TokenTransaction partial_token_transaction = 2;
-    // For issuance transactions this should have one signing job where the signing public key 
-    // is the same as the wallets identity public key (which is also the token public key).
-    // For transfer transactions this should have one signing job for each leaf in 
-    // leaves_to_spend within the token transaction.
-    repeated TokenTransactionSigningJob signing_jobs = 4;
+    // List of ecdsa signatures authorizing movement of tokens from the token input.
+    // For issuance this will be a single signature matching the issuer public key.
+    // For transfer this will be one or more ordered signatures matching to each input leaf
+    repeated bytes owner_signatures = 3;
 }
 
 message StartTokenTransactionResponse {
-    // This is the same token transaction sent by the wallet with the revocation
-    // private key for each spent leaf filled in by the SO.  This is the final transaction
-    // that will be signed and used for the token transaction hash.
-    // Note that for issuance (because no leaves are spent) this will match the 
-    // token transaction provided by the wallet.
-    TokenTransaction finalized_token_transaction = 1;
-    repeated TokenTransactionSignatureShares signature_shares = 2;
+    // This is the same token transaction sent by the wallet with leaf revocation public keys 
+    // filled. This is the final transaction that is published and gossiped among LRC20 nodes.
+    TokenTransaction final_token_transaction = 1;
+    // Map from operator identifier to their operator signature. This information could also 
+    // be eventually validated by a call to an LRC node but returned here for wallet validation and 
+    // to ensure immediate availability prior to requesting keyshares.
+    map<string, bytes> spark_operator_signatures = 2;
+    // Information for fetching and resolving the revocation keyshare on a transfer operation.
+    // Contains the number of keyshares needed and the SO owners of those keyshares.
+    repeated SigningKeyshare keyshare_info = 3;
+}
+
+message RevocationKeyshareSignablePayload {
+    bytes final_token_transaction_hash = 1;
+    bytes operator_identity_public_key = 2;
+}
+
+// This message allows the sender of a leaf being spent to provide final evidence
+// that it owns a leaf to an SO when requesting a revocation keyshare.  This proves
+// to the SO that the sender (the current owner) of the leaf is requesting release
+// of the keyshare.
+message GetLeafRevocationKeyshareSignature {
+    bytes owner_public_key = 1;
+    bytes owner_signature = 2;
+    RevocationKeyshareSignablePayload payload = 3;
+}
+
+message GetTokenTransactionRevocationKeysharesRequest {
+    bytes final_token_transaction_hash = 1;
+    // Ordered list of nonce signatures mapping 1:1 with each leaf to spend.
+    repeated GetLeafRevocationKeyshareSignature signatures = 2;
+}
+
+message GetTokenTransactionRevocationKeysharesResponse {
+    repeated bytes token_transaction_revocation_keyshares = 1;
 }
 
 message FinalizeTokenTransactionRequest {
-     // Deterministic hash of token transaction payload
-    bytes token_transaction_hash = 1;
-     // Combined signatures by the SO set and User.
-     // For issuance this will be one signature for the entire operation.
-     // For transfer this will be multiple signatures in the same order as the provided TokenLeafToSpend objects
-     // when constructing the TokenTransaction.
-    repeated bytes signatures = 2;
+    bytes final_token_transaction_hash = 1;
+    // List of ordered revocation keys that map 1:1 with leaves being spent in the
+    // token transaction.
+    repeated bytes leaf_to_spend_revocation_keys = 2;
 }
 
 message TreeNode {
