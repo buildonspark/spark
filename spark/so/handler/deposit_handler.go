@@ -176,6 +176,9 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 	}
 
 	// Verify that the on chain utxo is paid to the registered deposit address
+	if len(onChainTx.TxOut) <= int(req.OnChainUtxo.Vout) {
+		return nil, fmt.Errorf("utxo index out of bounds")
+	}
 	onChainOutput := onChainTx.TxOut[req.OnChainUtxo.Vout]
 	network, err := common.NetworkFromProtoNetwork(req.OnChainUtxo.Network)
 	if err != nil {
@@ -221,6 +224,9 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 	err = o.verifyRefundTransaction(rootTx, refundTx)
 	if err != nil {
 		return nil, err
+	}
+	if len(rootTx.TxOut) <= 0 {
+		return nil, fmt.Errorf("vout out of bounds")
 	}
 	refundTxSigHash, err := common.SigHashFromTx(refundTx, 0, rootTx.TxOut[0])
 	if err != nil {
@@ -322,9 +328,12 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 }
 
 func (o *DepositHandler) verifyRootTransaction(rootTx *wire.MsgTx, onChainTx *wire.MsgTx, onChainVout uint32) error {
-	// Root transaction must have 1 input and 1 output
-	if len(rootTx.TxIn) != 1 || len(rootTx.TxOut) != 1 {
-		return fmt.Errorf("root transaction must have 1 input and 1 output")
+	if len(rootTx.TxIn) <= 0 || len(rootTx.TxOut) <= 0 {
+		return fmt.Errorf("root transaction should have at least 1 input and 1 output")
+	}
+
+	if len(onChainTx.TxOut) <= int(onChainVout) {
+		return fmt.Errorf("vout out of bounds")
 	}
 
 	// Check root transaction input

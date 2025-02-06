@@ -159,6 +159,9 @@ func signRefunds(ctx context.Context, config *so.Config, requests []*pb.LeafRefu
 		if err != nil {
 			return nil, fmt.Errorf("unable to load leaf tx: %v", err)
 		}
+		if len(leafTx.TxOut) <= 0 {
+			return nil, fmt.Errorf("vout out of bounds")
+		}
 		refundTxSigHash, err := common.SigHashFromTx(refundTx, 0, leafTx.TxOut[0])
 		if err != nil {
 			return nil, fmt.Errorf("unable to calculate sighash from refund tx: %v", err)
@@ -316,6 +319,9 @@ func (h *TransferHandler) completeSendLeaf(ctx context.Context, transfer *ent.Tr
 		leafNodeTx, err := common.TxFromRawTxBytes(leaf.RawTx)
 		if err != nil {
 			return fmt.Errorf("unable to deserialize leaf tx: %v", err)
+		}
+		if len(leafNodeTx.TxOut) <= 0 {
+			return fmt.Errorf("vout out of bounds")
 		}
 		err = common.VerifySignature(refundTx, 0, leafNodeTx.TxOut[0])
 		if err != nil {
@@ -651,7 +657,10 @@ func (h *TransferHandler) getRefundTxSigningJob(ctx context.Context, leaf *ent.T
 	if err != nil {
 		return nil, fmt.Errorf("unable to load leaf tx for leaf %s: %v", leaf.ID.String(), err)
 	}
-	refundSigningJob, _, err := helper.NewSigningJob(keyshare, job, leafTx.TxOut[leaf.Vout], nil)
+	if len(leafTx.TxOut) <= 0 {
+		return nil, fmt.Errorf("vout out of bounds")
+	}
+	refundSigningJob, _, err := helper.NewSigningJob(keyshare, job, leafTx.TxOut[0], nil)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create signing job for leaf %s: %v", leaf.ID.String(), err)
 	}

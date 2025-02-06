@@ -223,6 +223,9 @@ func (h *LightningHandler) validateGetPreimageRequest(
 			return fmt.Errorf("unable to get refund tx: %v", err)
 		}
 
+		if len(tx.TxOut) <= 0 {
+			return fmt.Errorf("vout out of bounds")
+		}
 		sighash, err := common.SigHashFromTx(refundTx, 0, tx.TxOut[0])
 		if err != nil {
 			return fmt.Errorf("unable to get sighash: %v", err)
@@ -256,6 +259,9 @@ func (h *LightningHandler) validateGetPreimageRequest(
 		pubkeyScript, err := common.P2TRScriptFromPubKey(destinationPubkeyBytes)
 		if err != nil {
 			return fmt.Errorf("unable to extract pubkey from tx: %v", err)
+		}
+		if len(refundTx.TxOut) <= 0 {
+			return fmt.Errorf("vout out of bounds")
 		}
 		if !bytes.Equal(pubkeyScript, refundTx.TxOut[0].PkScript) {
 			return fmt.Errorf("invalid destination pubkey")

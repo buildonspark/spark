@@ -188,6 +188,9 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 			if err != nil {
 				return nil, nil, fmt.Errorf("unable to deserialize parent tx: %v", err)
 			}
+			if len(treeNodeParentTx.TxOut) <= int(node.Vout) {
+				return nil, nil, fmt.Errorf("vout out of bounds")
+			}
 			err = common.VerifySignature(treeNodeTx, 0, treeNodeParentTx.TxOut[node.Vout])
 			if err != nil {
 				return nil, nil, fmt.Errorf("unable to verify node tx signature: %v", err)
@@ -210,6 +213,9 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 		treeNodeTx, err := common.TxFromRawTxBytes(nodeTxBytes)
 		if err != nil {
 			return nil, nil, fmt.Errorf("unable to deserialize leaf tx: %v", err)
+		}
+		if len(treeNodeTx.TxOut) <= 0 {
+			return nil, nil, fmt.Errorf("vout out of bounds")
 		}
 		err = common.VerifySignature(refundTx, 0, treeNodeTx.TxOut[0])
 		if err != nil {

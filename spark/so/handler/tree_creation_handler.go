@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/btcsuite/btcd/wire"
 	"github.com/google/uuid"
@@ -34,6 +35,9 @@ func (h *TreeCreationHandler) findParentOutputFromUtxo(ctx context.Context, utxo
 	if err != nil {
 		return nil, err
 	}
+	if len(tx.TxOut) <= int(utxo.Vout) {
+		return nil, fmt.Errorf("vout out of bounds")
+	}
 	return tx.TxOut[utxo.Vout], nil
 }
 
@@ -50,6 +54,9 @@ func (h *TreeCreationHandler) findParentOutputFromNodeOutput(ctx context.Context
 	tx, err := common.TxFromRawTxBytes(node.RawTx)
 	if err != nil {
 		return nil, err
+	}
+	if len(tx.TxOut) <= int(nodeOutput.Vout) {
+		return nil, fmt.Errorf("vout out of bounds")
 	}
 	return tx.TxOut[nodeOutput.Vout], nil
 }
@@ -436,7 +443,6 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 	for len(queue) > 0 {
 		currentElement := queue[0]
 		queue = queue[1:]
-
 		if len(currentElement.node.Children) > 0 && currentElement.node.RefundTxSigningJob != nil {
 			return nil, nil, errors.New("refund tx should be on leaf node")
 		}
@@ -501,6 +507,9 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 		}
 		nodes = append(nodes, node)
 		if currentElement.node.RefundTxSigningJob != nil {
+			if len(tx.TxOut) <= 0 {
+				return nil, nil, fmt.Errorf("vout out of bounds")
+			}
 			refundSigningJob, _, err := helper.NewSigningJob(currentElement.keyshare, currentElement.node.RefundTxSigningJob, tx.TxOut[0], nil)
 			if err != nil {
 				return nil, nil, err
@@ -509,6 +518,9 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 		} else if len(currentElement.node.Children) > 0 {
 			userPublicKeys := [][]byte{}
 			statechainPublicKeys := [][]byte{}
+			if len(tx.TxOut) < len(currentElement.node.Children) {
+				return nil, nil, fmt.Errorf("vout out of bounds")
+			}
 			for i, child := range currentElement.node.Children {
 				userSigningKey, keyshare, err := h.getSigningKeyshareFromOutput(ctx, network, tx.TxOut[i])
 				if err != nil {
