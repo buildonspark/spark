@@ -163,22 +163,18 @@ message TokenTransaction {
     repeated bytes spark_operator_identity_public_keys = 4;
 }
 
-message InputSignature {
-  // Filled by signing the token transaction hash with the owner/issuer private key.
-  bytes owner_signature = 1;
-}
-
 message TokenTransactionSignatures {
-  repeated InputSignature signatures = 1;
+      // Filled by signing the partial token transaction hash with the owner/issuer private key.
+      // For issuance transactions this will be one signature for the input issuer_public_key
+      // For transfer transactions this will be one for each leaf for the leaf owner_public_key
+      repeated bytes owner_signatures = 1;
 }
 
 message StartTokenTransactionRequest {
     bytes identity_public_key = 1;
     TokenTransaction partial_token_transaction = 2;
     // List of ecdsa signatures authorizing movement of tokens from the token input.
-    // For issuance this will be a single signature matching the issuer public key.
-    // For transfer this will be one or more ordered signatures matching to each input leaf
-    repeated bytes owner_signatures = 3;
+    TokenTransactionSignatures token_transaction_signatures = 3;
 }
 
 message StartTokenTransactionResponse {
