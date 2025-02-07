@@ -5,7 +5,8 @@ import (
 	"crypto/sha256"
 	"fmt"
 
-	"github.com/ethereum/go-ethereum/crypto/secp256k1"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/common"
 	pbinternal "github.com/lightsparkdev/spark-go/proto/spark_internal"
@@ -96,11 +97,9 @@ func (h *InternalTreeCreationHandler) generateAndStoreDepositAddress(ctx context
 	}
 
 	addressHash := sha256.Sum256([]byte(*address))
-	signature, err := secp256k1.Sign(addressHash[:], h.config.IdentityPrivateKey)
-	if err != nil {
-		return "", nil, err
-	}
-	return *address, signature, nil
+	privKey := secp256k1.PrivKeyFromBytes(h.config.IdentityPrivateKey)
+	signature := ecdsa.Sign(privKey, addressHash[:])
+	return *address, signature.Serialize(), nil
 }
 
 func (h *InternalTreeCreationHandler) prepareDepositAddress(ctx context.Context, req *pbinternal.PrepareTreeAddressRequest, existingSigningKeyshares map[string]*ent.SigningKeyshare) (map[string][]byte, error) {

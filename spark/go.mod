@@ -13,7 +13,6 @@ require (
 	github.com/btcsuite/btcd/chaincfg/chainhash v1.1.0
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.3.0
 	github.com/ecies/go/v2 v2.0.10
-	github.com/ethereum/go-ethereum v1.14.12
 	github.com/google/uuid v1.6.0
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
 	github.com/lib/pq v1.10.9
@@ -45,6 +44,7 @@ require (
 	github.com/decred/dcrd/crypto/blake256 v1.1.0 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v2 v2.0.0 // indirect
 	github.com/decred/dcrd/lru v1.1.3 // indirect
+	github.com/ethereum/go-ethereum v1.14.12 // indirect
 	github.com/go-errors/errors v1.5.1 // indirect
 	github.com/go-openapi/inflect v0.19.0 // indirect
 	github.com/golang/snappy v0.0.5-0.20220116011046-fa5810519dcb // indirect
