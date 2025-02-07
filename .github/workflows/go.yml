@@ -1,24 +1,25 @@
 # This workflow will build a golang project
 # For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-go
 
-name: Go Build and Lint
+name: Go
 
 on:
   push:
     branches: [ main ]
     paths:
-      - 'spark/**'
+      - "spark/**"
+      - ".github/workflows/go.yml"
   pull_request:
-    branches: [ main ]
     paths:
-      - 'spark/**'
+      - "spark/**"
+      - ".github/workflows/go.yml"
 
 permissions:
-  contents: read  
+  contents: read
   checks: write
 
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -35,7 +36,7 @@ jobs:
       with:
         go-version: '1.21'
         cache: true
-        
+
     - name: Verify dependencies
       run: go mod verify
 
@@ -53,8 +54,7 @@ jobs:
           exit 1
         fi
 
-  golangci:
-    name: lint
+  lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -71,3 +71,86 @@ jobs:
           version: v1.60
           working-directory: ./spark
           args:  --timeout 5m
+
+  build:
+    needs: ["test", "lint"]
+    if: "github.event_name == 'push'"
+    runs-on: "ubuntu-22.04-2-arm"
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: "Configure AWS credentials"
+        uses: "aws-actions/configure-aws-credentials@v1"
+        with:
+          role-to-assume: "arn:aws:iam::674966927423:role/github-actions-spark"
+          aws-region: "us-west-2"
+      - name: "Log into ECR"
+        id: ecr-login
+        uses: "aws-actions/amazon-ecr-login@v1"
+      - name: "Setup QEMU"
+        uses: "docker/setup-qemu-action@v3"
+      - name: "Setup builder"
+        uses: "docker/setup-buildx-action@v2"
+      - name: "Checkout"
+        uses: "actions/checkout@v3"
+        with:
+          fetch-depth: 20
+      - name: "Determine metadata"
+        id: metadata
+        run: |
+          GIT_HASH="$(git log -1 --format='%H' spark signer)"
+          echo "hash_short=${GIT_HASH:0:8}" >> $GITHUB_OUTPUT
+          echo "date=$(date -u '+%Y%m%d')" >> $GITHUB_OUTPUT
+      - name: "Docker metadata"
+        id: docker-meta
+        uses: "docker/metadata-action@v4"
+        with:
+          images: ${{ steps.ecr-login.outputs.registry }}/spark-go
+          labels: |
+            org.opencontainers.image.vendor=Lightspark
+            org.opencontainers.image.title=spark
+      - name: "Build and push image"
+        uses: "docker/build-push-action@v3"
+        with:
+          context: .
+          file: Dockerfile
+          platforms: linux/arm64
+          build-args: BUILDKIT_INLINE_CACHE=1
+          cache-from: type=registry,ref=${{ steps.ecr-login.outputs.registry }}/spark-go:cache
+          cache-to: type=registry,ref=${{ steps.ecr-login.outputs.registry }}/spark-go:cache,mode=max,image-manifest=true,oci-mediatypes=true
+          labels: ${{ steps.docker-meta.outputs.labels }}
+          tags: |
+            ${{ steps.ecr-login.outputs.registry }}/spark-go:latest,
+            ${{ steps.ecr-login.outputs.registry }}/spark-go:git_${{ steps.metadata.outputs.hash_short }},
+            ${{ steps.ecr-login.outputs.registry }}/spark-go:git_${{ steps.metadata.outputs.date }}_${{ steps.metadata.outputs.hash_short }}
+          push: true
+          provenance: false # skopeo can't handle this
+
+  deploy:
+    needs: ["build"]
+    runs-on: "self-hosted"
+    permissions:
+      id-token: write
+      contents: read
+    env:
+      KUBECONFIG: "/tmp/${{ github.run_id }}.kubeconfig"
+    steps:
+      - name: "Configure AWS credentials"
+        uses: "aws-actions/configure-aws-credentials@v1"
+        with:
+          role-to-assume: "arn:aws:iam::674966927423:role/github-actions-spark"
+          aws-region: "us-west-2"
+      - name: "Configure Kubernetes cluster"
+        run: "aws --region us-west-2 eks update-kubeconfig --name dev"
+      - name: "Restart pods"
+        run: "kubectl -n spark-v1 rollout restart sts/spark"
+      - name: "Check pod status"
+        run: |
+          for i in `seq 12`; do
+            sleep 10s
+            date
+            kubectl -n spark-v1 get pods -l 'app.kubernetes.io/name=spark' -o jsonpath='{range .items[*]}{.metadata.name} {.status.phase} {.status.conditions[?(@.type=="Ready")].status}{ "\n"}{end}' | grep -v ' Running True$' | tee /tmp/status
+            if [ ! -s /tmp/status ]; then break; fi
+          done
+          if [ -s /tmp/status ]; then exit 1; fi

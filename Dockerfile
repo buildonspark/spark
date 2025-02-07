@@ -29,7 +29,7 @@ FROM debian:bookworm-slim AS final
 RUN addgroup --system --gid 1000 spark
 RUN adduser --system --uid 1000 --home /home/spark --ingroup spark spark
 
-RUN apt-get update && apt-get -y install libzmq5 && rm -rf /var/lib/apt/lists
+RUN apt-get update && apt-get -y install libzmq5 ca-certificates && rm -rf /var/lib/apt/lists
 
 EXPOSE 9735 10009
 ENTRYPOINT ["spark-operator"]
