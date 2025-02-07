@@ -77,9 +77,10 @@ func TestStartTreeCreation(t *testing.T) {
 	client, err := chain.NewRegtestClient()
 	assert.NoError(t, err)
 
-	userOnChainKey, fundingTxOut, fundingOutPoint := testutil.FundFaucet(t, client)
+	coin, err := faucet.Fund()
+	assert.NoError(t, err)
 
-	depositTx, err := testutil.CreateTestDepositTransaction(fundingOutPoint, depositResp.DepositAddress.Address, 100_000)
+	depositTx, err := testutil.CreateTestDepositTransaction(coin.OutPoint, depositResp.DepositAddress.Address, 100_000)
 	if err != nil {
 		t.Fatalf("failed to create deposit tx: %v", err)
 	}
@@ -100,7 +101,8 @@ func TestStartTreeCreation(t *testing.T) {
 	}
 
 	// Sign, broadcast, and mine deposit tx
-	signedDepositTx := testutil.SignOnChainTx(t, depositTx, fundingTxOut, userOnChainKey)
+	signedDepositTx, err := testutil.SignFaucetCoin(depositTx, coin.TxOut, coin.Key)
+	assert.NoError(t, err)
 	_, err = client.SendRawTransaction(signedDepositTx, true)
 	assert.NoError(t, err)
 
@@ -126,7 +128,8 @@ func TestStartTreeCreationOffchain(t *testing.T) {
 	client, err := chain.NewRegtestClient()
 	assert.NoError(t, err)
 
-	userOnChainKey, fundingTxOut, fundingOutPoint := testutil.FundFaucet(t, client)
+	coin, err := faucet.Fund()
+	assert.NoError(t, err)
 
 	config, err := testutil.TestWalletConfig()
 	if err != nil {
@@ -158,7 +161,7 @@ func TestStartTreeCreationOffchain(t *testing.T) {
 		t.Fatalf("failed to generate deposit address: %v", err)
 	}
 
-	depositTx, err := testutil.CreateTestDepositTransaction(fundingOutPoint, depositResp.DepositAddress.Address, 100_000)
+	depositTx, err := testutil.CreateTestDepositTransaction(coin.OutPoint, depositResp.DepositAddress.Address, 100_000)
 	if err != nil {
 		t.Fatalf("failed to create deposit tx: %v", err)
 	}
@@ -216,7 +219,8 @@ func TestStartTreeCreationOffchain(t *testing.T) {
 	}
 
 	// Sign, broadcast, and mine deposit tx
-	signedDepositTx := testutil.SignOnChainTx(t, depositTx, fundingTxOut, userOnChainKey)
+	signedDepositTx, err := testutil.SignFaucetCoin(depositTx, coin.TxOut, coin.Key)
+	assert.NoError(t, err)
 	_, err = client.SendRawTransaction(signedDepositTx, true)
 	assert.NoError(t, err)
 

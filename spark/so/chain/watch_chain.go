@@ -189,7 +189,7 @@ func handleNewBlocks(ctx context.Context, db *ent.Client, client *rpcclient.Clie
 		}
 		txs := []wire.MsgTx{}
 		for _, tx := range block.Tx {
-			rawTx, err := txFromRPCTx(tx)
+			rawTx, err := TxFromRPCTx(tx)
 			if err != nil {
 				return nil, err
 			}
@@ -217,7 +217,7 @@ func handleNewBlocks(ctx context.Context, db *ent.Client, client *rpcclient.Clie
 	return newEntBlockHeight, nil
 }
 
-func txFromRPCTx(txs btcjson.TxRawResult) (wire.MsgTx, error) {
+func TxFromRPCTx(txs btcjson.TxRawResult) (wire.MsgTx, error) {
 	rawTxBytes, err := hex.DecodeString(txs.Hex)
 	if err != nil {
 		return wire.MsgTx{}, err

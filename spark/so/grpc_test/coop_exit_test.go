@@ -19,7 +19,8 @@ func TestCoopExit(t *testing.T) {
 	client, err := chain.NewRegtestClient()
 	assert.NoError(t, err)
 
-	sspOnChainKey, fundingTxOut, fundingOutPoint := testutil.FundFaucet(t, client)
+	coin, err := faucet.Fund()
+	assert.NoError(t, err)
 
 	config, err := testutil.TestWalletConfig()
 	assert.NoError(t, err)
@@ -29,7 +30,7 @@ func TestCoopExit(t *testing.T) {
 	// Setup a user with some leaves
 	leafPrivKey, err := secp256k1.GeneratePrivateKey()
 	assert.NoError(t, err)
-	rootNode, err := testutil.CreateNewTree(t, config, leafPrivKey, amountSats)
+	rootNode, err := testutil.CreateNewTree(config, faucet, leafPrivKey, amountSats)
 	assert.NoError(t, err)
 
 	// Initiate SSP
@@ -52,7 +53,7 @@ func TestCoopExit(t *testing.T) {
 	dustAmountSats := 354                                             // TODO: this should match the proper dust
 	intermediateAmountSats := int64((leafCount + 1) * dustAmountSats) // +1 for an output SSP can fee bump
 
-	exitTx, err := testutil.CreateTestCoopExitTransaction(fundingOutPoint, *withdrawAddress, amountSats, *sspIntermediateAddress, intermediateAmountSats)
+	exitTx, err := testutil.CreateTestCoopExitTransaction(coin.OutPoint, *withdrawAddress, amountSats, *sspIntermediateAddress, intermediateAmountSats)
 	assert.NoError(t, err)
 
 	exitTxHash := exitTx.TxHash()
@@ -139,7 +140,8 @@ func TestCoopExit(t *testing.T) {
 	}
 
 	// Sign exit tx and broadcast
-	signedExitTx := testutil.SignOnChainTx(t, exitTx, fundingTxOut, sspOnChainKey)
+	signedExitTx, err := testutil.SignFaucetCoin(exitTx, coin.TxOut, coin.Key)
+	assert.NoError(t, err)
 
 	_, err = client.SendRawTransaction(signedExitTx, true)
 	assert.NoError(t, err)
