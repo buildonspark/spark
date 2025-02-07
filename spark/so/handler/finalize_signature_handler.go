@@ -244,5 +244,9 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 		return nil, nil, err
 	}
 
-	return node.MarshalSparkProto(ctx), node.MarshalInternalProto(ctx), nil
+	nodeSparkProto, err := node.MarshalSparkProto(ctx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("unable to marshal node %s on spark: %v", node.ID.String(), err)
+	}
+	return nodeSparkProto, node.MarshalInternalProto(ctx), nil
 }

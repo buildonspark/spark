@@ -157,3 +157,9 @@ func (s *SparkServer) StartTokenTransaction(ctx context.Context, req *pb.StartTo
 	tokenTransactionHandler := handler.NewTokenTransactionHandler(s.config)
 	return wrapWithGRPCError(tokenTransactionHandler.StartTokenTransaction(ctx, s.config, req))
 }
+
+// QueryNodes queries the details of nodes given the node ids.
+func (s *SparkServer) QueryNodes(ctx context.Context, req *pb.QueryNodesRequest) (*pb.QueryNodesResponse, error) {
+	nodeQueryHandler := handler.NewNodeQueryHandler(s.config)
+	return wrapWithGRPCError(nodeQueryHandler.QueryNodes(ctx, req))
+}

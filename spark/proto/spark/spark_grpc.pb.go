@@ -38,6 +38,7 @@ const (
 	SparkService_PrepareTreeAddress_FullMethodName                     = "/spark.SparkService/prepare_tree_address"
 	SparkService_CreateTree_FullMethodName                             = "/spark.SparkService/create_tree"
 	SparkService_GetSigningOperatorList_FullMethodName                 = "/spark.SparkService/get_signing_operator_list"
+	SparkService_QueryNodes_FullMethodName                             = "/spark.SparkService/query_nodes"
 	SparkService_QueryUserSignedRefunds_FullMethodName                 = "/spark.SparkService/query_user_signed_refunds"
 	SparkService_StartTokenTransaction_FullMethodName                  = "/spark.SparkService/start_token_transaction"
 	SparkService_GetTokenTransactionRevocationKeyshares_FullMethodName = "/spark.SparkService/get_token_transaction_revocation_keyshares"
@@ -67,6 +68,7 @@ type SparkServiceClient interface {
 	PrepareTreeAddress(ctx context.Context, in *PrepareTreeAddressRequest, opts ...grpc.CallOption) (*PrepareTreeAddressResponse, error)
 	CreateTree(ctx context.Context, in *CreateTreeRequest, opts ...grpc.CallOption) (*CreateTreeResponse, error)
 	GetSigningOperatorList(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetSigningOperatorListResponse, error)
+	QueryNodes(ctx context.Context, in *QueryNodesRequest, opts ...grpc.CallOption) (*QueryNodesResponse, error)
 	QueryUserSignedRefunds(ctx context.Context, in *QueryUserSignedRefundsRequest, opts ...grpc.CallOption) (*QueryUserSignedRefundsResponse, error)
 	// Token RPCs
 	StartTokenTransaction(ctx context.Context, in *StartTokenTransactionRequest, opts ...grpc.CallOption) (*StartTokenTransactionResponse, error)
@@ -263,6 +265,16 @@ func (c *sparkServiceClient) GetSigningOperatorList(ctx context.Context, in *emp
 	return out, nil
 }
 
+func (c *sparkServiceClient) QueryNodes(ctx context.Context, in *QueryNodesRequest, opts ...grpc.CallOption) (*QueryNodesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(QueryNodesResponse)
+	err := c.cc.Invoke(ctx, SparkService_QueryNodes_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *sparkServiceClient) QueryUserSignedRefunds(ctx context.Context, in *QueryUserSignedRefundsRequest, opts ...grpc.CallOption) (*QueryUserSignedRefundsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(QueryUserSignedRefundsResponse)
@@ -335,6 +347,7 @@ type SparkServiceServer interface {
 	PrepareTreeAddress(context.Context, *PrepareTreeAddressRequest) (*PrepareTreeAddressResponse, error)
 	CreateTree(context.Context, *CreateTreeRequest) (*CreateTreeResponse, error)
 	GetSigningOperatorList(context.Context, *emptypb.Empty) (*GetSigningOperatorListResponse, error)
+	QueryNodes(context.Context, *QueryNodesRequest) (*QueryNodesResponse, error)
 	QueryUserSignedRefunds(context.Context, *QueryUserSignedRefundsRequest) (*QueryUserSignedRefundsResponse, error)
 	// Token RPCs
 	StartTokenTransaction(context.Context, *StartTokenTransactionRequest) (*StartTokenTransactionResponse, error)
@@ -404,6 +417,9 @@ func (UnimplementedSparkServiceServer) CreateTree(context.Context, *CreateTreeRe
 }
 func (UnimplementedSparkServiceServer) GetSigningOperatorList(context.Context, *emptypb.Empty) (*GetSigningOperatorListResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetSigningOperatorList not implemented")
+}
+func (UnimplementedSparkServiceServer) QueryNodes(context.Context, *QueryNodesRequest) (*QueryNodesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method QueryNodes not implemented")
 }
 func (UnimplementedSparkServiceServer) QueryUserSignedRefunds(context.Context, *QueryUserSignedRefundsRequest) (*QueryUserSignedRefundsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method QueryUserSignedRefunds not implemented")
@@ -765,6 +781,24 @@ func _SparkService_GetSigningOperatorList_Handler(srv interface{}, ctx context.C
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SparkService_QueryNodes_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QueryNodesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkServiceServer).QueryNodes(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkService_QueryNodes_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkServiceServer).QueryNodes(ctx, req.(*QueryNodesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _SparkService_QueryUserSignedRefunds_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(QueryUserSignedRefundsRequest)
 	if err := dec(in); err != nil {
@@ -933,6 +967,10 @@ var SparkService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "get_signing_operator_list",
 			Handler:    _SparkService_GetSigningOperatorList_Handler,
+		},
+		{
+			MethodName: "query_nodes",
+			Handler:    _SparkService_QueryNodes_Handler,
 		},
 		{
 			MethodName: "query_user_signed_refunds",

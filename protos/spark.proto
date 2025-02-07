@@ -28,6 +28,8 @@ service SparkService {
     rpc create_tree(CreateTreeRequest) returns (CreateTreeResponse) {}
     rpc get_signing_operator_list(google.protobuf.Empty) returns (GetSigningOperatorListResponse) {}
 
+    rpc query_nodes(QueryNodesRequest) returns (QueryNodesResponse) {}
+
     rpc query_user_signed_refunds(QueryUserSignedRefundsRequest) returns (QueryUserSignedRefundsResponse) {}
 
     // Token RPCs
@@ -233,6 +235,7 @@ message TreeNode {
     bytes verifying_public_key = 8;
     bytes owner_identity_public_key = 9;
     uint32 refund_timelock = 10;
+    SigningKeyshare signing_keyshare = 11;
 }
 
 message FinalizeNodeSignaturesRequest {
@@ -314,7 +317,6 @@ message TransferLeaf {
     bytes secret_cipher = 2;
     bytes signature = 3;
     bytes intermediate_refund_tx = 4;
-    SigningKeyshare signing_keyshare = 5;
 }
 
 message CompleteSendTransferResponse {
@@ -545,4 +547,12 @@ message ProvidePreimageResponse {
 message ReturnLightningPaymentRequest {
     bytes payment_hash = 1;
     bytes user_identity_public_key = 2;
+}
+
+message QueryNodesRequest {
+    repeated string node_ids = 1;
+}
+
+message QueryNodesResponse {
+    map<string, TreeNode> nodes = 1;
 }

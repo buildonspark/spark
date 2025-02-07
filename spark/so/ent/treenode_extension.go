@@ -12,7 +12,11 @@ import (
 )
 
 // MarshalSparkProto converts a TreeNode to a spark protobuf TreeNode.
-func (tn *TreeNode) MarshalSparkProto(ctx context.Context) *pbspark.TreeNode {
+func (tn *TreeNode) MarshalSparkProto(ctx context.Context) (*pbspark.TreeNode, error) {
+	signingKeyshare, err := tn.QuerySigningKeyshare().Only(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to query signing keyshare for leaf %s: %v", tn.ID.String(), err)
+	}
 	return &pbspark.TreeNode{
 		Id:                     tn.ID.String(),
 		TreeId:                 tn.QueryTree().FirstIDX(ctx).String(),
@@ -23,7 +27,8 @@ func (tn *TreeNode) MarshalSparkProto(ctx context.Context) *pbspark.TreeNode {
 		Vout:                   uint32(tn.Vout),
 		VerifyingPublicKey:     tn.VerifyingPubkey,
 		OwnerIdentityPublicKey: tn.OwnerIdentityPubkey,
-	}
+		SigningKeyshare:        signingKeyshare.MarshalProto(),
+	}, nil
 }
 
 // MarshalInternalProto converts a TreeNode to a spark internal protobuf TreeNode.
