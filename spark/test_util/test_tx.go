@@ -25,9 +25,10 @@ func CreateTestP2TRTransaction(p2trAddress string, amountSats int64) (*wire.MsgT
 // The first output is for the user and the second output is for the intermediate tx spending
 // to connector outputs. See `CreateTestConnectorTransaction` for the intermediate tx.
 func CreateTestCoopExitTransaction(
+	outPoint *wire.OutPoint,
 	userP2trAddr string, userAmountSats int64, intermediateP2trAddr string, intermediateAmountSats int64,
 ) (*wire.MsgTx, error) {
-	inputs := []*wire.TxIn{dummyInput()}
+	inputs := []*wire.TxIn{wire.NewTxIn(outPoint, nil, [][]byte{})}
 	userOutput, err := createP2TROutput(userP2trAddr, userAmountSats)
 	if err != nil {
 		return nil, fmt.Errorf("error creating output: %v", err)

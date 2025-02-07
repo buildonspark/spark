@@ -63,6 +63,7 @@ func (h *CooperativeExitHandler) CooperativeExit(ctx context.Context, req *pb.Co
 		SetID(exitUUID).
 		SetTransfer(transfer).
 		SetExitTxid(req.ExitTxid).
+		// ConfirmationHeight is nil since the transaction is not confirmed yet.
 		Save(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cooperative exit: %v", err)

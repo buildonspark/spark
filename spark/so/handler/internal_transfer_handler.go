@@ -38,7 +38,7 @@ func (h *InternalTransferHandler) FinalizeTransfer(ctx context.Context, req *pbi
 	if transfer.Status != schema.TransferStatusReceiverKeyTweaked {
 		return fmt.Errorf("transfer is not in receiver key tweaked status")
 	}
-	if err := checkCoopExitTxBroadcasted(ctx, db, transferID, h.onchainHelper); err != nil {
+	if err := checkCoopExitTxBroadcasted(ctx, db, transferID, h.config.SupportedNetworks); err != nil {
 		return fmt.Errorf("failed to unlock transfer %s: %v", req.TransferId, err)
 	}
 

@@ -18,8 +18,8 @@ import (
 	"github.com/pebbe/zmq4"
 )
 
-func regtestConfig() rpcclient.ConnConfig {
-	return rpcclient.ConnConfig{
+func NewRegtestClient() (*rpcclient.Client, error) {
+	connConfig := rpcclient.ConnConfig{
 		Host:         "127.0.0.1:18443",
 		User:         "admin1",
 		Pass:         "123",
@@ -27,6 +27,10 @@ func regtestConfig() rpcclient.ConnConfig {
 		DisableTLS:   true, // TODO: PE help
 		HTTPPostMode: true,
 	}
+	return rpcclient.New(
+		&connConfig,
+		nil,
+	)
 }
 
 func initZmq(endpoint string) (*zmq4.Context, *zmq4.Socket, error) {
@@ -53,11 +57,7 @@ func initZmq(endpoint string) (*zmq4.Context, *zmq4.Socket, error) {
 }
 
 func WatchChain(dbClient *ent.Client, network common.Network) error {
-	connConfig := regtestConfig()
-	client, err := rpcclient.New(
-		&connConfig,
-		nil,
-	)
+	client, err := NewRegtestClient()
 	if err != nil {
 		return err
 	}
@@ -228,6 +228,7 @@ func handleBlock(ctx context.Context, tx *ent.Tx, block *btcjson.GetBlockVerbose
 			if err != nil {
 				return nil, err
 			}
+			log.Printf("Updated confirmation height for coop exit %s to %d\n", coopExit.ID, blockHeight)
 		}
 	}
 	return entBlockHeight, nil

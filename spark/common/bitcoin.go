@@ -123,8 +123,7 @@ func P2TRScriptFromPubKey(pubKey *secp256k1.PublicKey) ([]byte, error) {
 	return txscript.PayToTaprootScript(taprootKey)
 }
 
-// P2TRAddressFromPublicKey returns a P2TR address from a public key.
-func P2TRAddressFromPublicKey(pubKey []byte, network Network) (*string, error) {
+func P2TRRawAddressFromPublicKey(pubKey []byte, network Network) (btcutil.Address, error) {
 	if len(pubKey) != 33 {
 		return nil, fmt.Errorf("public key must be 33 bytes")
 	}
@@ -145,7 +144,16 @@ func P2TRAddressFromPublicKey(pubKey []byte, network Network) (*string, error) {
 		return nil, err
 	}
 
-	addr := taprootAddress.EncodeAddress()
+	return taprootAddress, nil
+}
+
+// P2TRAddressFromPublicKey returns a P2TR address from a public key.
+func P2TRAddressFromPublicKey(pubKey []byte, network Network) (*string, error) {
+	addrRaw, err := P2TRRawAddressFromPublicKey(pubKey, network)
+	if err != nil {
+		return nil, err
+	}
+	addr := addrRaw.EncodeAddress()
 	return &addr, nil
 }
 

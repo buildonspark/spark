@@ -3,13 +3,11 @@ package handler
 import (
 	"bytes"
 	"context"
-	"encoding/hex"
 	"fmt"
 	"log"
 	"math/big"
 	"time"
 
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/common"
@@ -19,6 +17,7 @@ import (
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/authz"
 	"github.com/lightsparkdev/spark-go/so/ent"
+	"github.com/lightsparkdev/spark-go/so/ent/blockheight"
 	"github.com/lightsparkdev/spark-go/so/ent/cooperativeexit"
 	"github.com/lightsparkdev/spark-go/so/ent/preimagerequest"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
@@ -423,26 +422,33 @@ func (h *TransferHandler) QueryPendingTransfers(ctx context.Context, req *pb.Que
 	return &pb.QueryPendingTransfersResponse{Transfers: transferProtos}, nil
 }
 
-func checkCoopExitTxBroadcasted(ctx context.Context, db *ent.Tx, transferID uuid.UUID, onchainHelper helper.OnChainHelper) error {
+const CoopExitConfirmationThreshold = 6
+
+func checkCoopExitTxBroadcasted(ctx context.Context, db *ent.Tx, transferID uuid.UUID, networks []common.Network) error {
 	coopExit, err := db.CooperativeExit.Query().Where(
 		cooperativeexit.HasTransferWith(enttransfer.ID(transferID)),
 	).Only(ctx)
-	if err != nil && !ent.IsNotFound(err) {
-		return fmt.Errorf("failed to find coop exit for transfer %s: %v", transferID.String(), err)
-	}
-	if coopExit == nil {
+	if ent.IsNotFound(err) {
 		return nil
 	}
-	txid, err := chainhash.NewHash(coopExit.ExitTxid)
 	if err != nil {
-		return fmt.Errorf("unable to parse exit txid %s: %v", hex.EncodeToString(coopExit.ExitTxid), err)
+		return fmt.Errorf("failed to find coop exit for transfer %s: %v", transferID.String(), err)
 	}
-	tx, err := onchainHelper.GetTxOnChain(context.Background(), txid.String())
+	schemaNetworks := []schema.Network{}
+	for _, network := range networks {
+		schemaNetworks = append(schemaNetworks, common.SchemaNetwork(network))
+	}
+	blockHeight, err := db.BlockHeight.Query().Where(
+		blockheight.NetworkIn(schemaNetworks...),
+	).Only(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to find block height: %v", err)
 	}
-	if tx == nil {
-		return fmt.Errorf("exit tx not found on chain")
+	if coopExit.ConfirmationHeight == 0 {
+		return fmt.Errorf("coop exit tx hasn't been broadcasted")
+	}
+	if coopExit.ConfirmationHeight+CoopExitConfirmationThreshold-1 > blockHeight.Height {
+		return fmt.Errorf("coop exit tx doesn't have enough confirmations: confirmation height: %d current block height: %d", coopExit.ConfirmationHeight, blockHeight.Height)
 	}
 	return nil
 }
@@ -467,7 +473,7 @@ func (h *TransferHandler) ClaimTransferTweakKeys(ctx context.Context, req *pb.Cl
 		return fmt.Errorf("transfer cannot be claimed %s", req.TransferId)
 	}
 
-	if err := checkCoopExitTxBroadcasted(ctx, db, transferID, h.onchainHelper); err != nil {
+	if err := checkCoopExitTxBroadcasted(ctx, db, transferID, h.config.SupportedNetworks); err != nil {
 		return fmt.Errorf("failed to unlock transfer %s: %v", req.TransferId, err)
 	}
 

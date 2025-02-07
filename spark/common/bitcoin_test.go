@@ -1,10 +1,18 @@
 package common
 
 import (
+	"bytes"
 	"encoding/hex"
+	"log"
 	"testing"
 
+	"github.com/btcsuite/btcd/btcec/v2/schnorr"
+	"github.com/btcsuite/btcd/btcutil"
+	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
+	"github.com/stretchr/testify/require"
 )
 
 func TestP2TRAddressFromPublicKey(t *testing.T) {
@@ -88,4 +96,50 @@ func TestSigHashFromTx(t *testing.T) {
 	if hex.EncodeToString(sighash) != "8da5e7aa2b03491d7c2f4359ea4968dd58f69adf9af1a2c6881be0295591c293" {
 		t.Fatalf("Sighash mismatch")
 	}
+}
+
+func TestVerifySignature(t *testing.T) {
+	privKey, err := secp256k1.GeneratePrivateKey()
+	require.NoError(t, err)
+	pubKey := privKey.PubKey()
+	addr, err := P2TRAddressFromPublicKey(pubKey.SerializeCompressed(), Regtest)
+	require.NoError(t, err)
+	address, err := btcutil.DecodeAddress(*addr, &chaincfg.RegressionNetParams)
+	require.NoError(t, err)
+	script, _ := txscript.PayToAddrScript(address)
+	require.NoError(t, err)
+
+	creditTx := wire.NewMsgTx(2)
+	txOut := wire.NewTxOut(100_000, script)
+	creditTx.AddTxOut(txOut)
+
+	debitTx := wire.NewMsgTx(2)
+	txIn := wire.NewTxIn(
+		&wire.OutPoint{Hash: creditTx.TxHash(), Index: 0},
+		nil,
+		nil,
+	)
+	debitTx.AddTxIn(txIn)
+	newTxOut := wire.NewTxOut(99_000, script)
+	debitTx.AddTxOut(newTxOut)
+
+	sighash, err := SigHashFromTx(debitTx, 0, creditTx.TxOut[0])
+	require.NoError(t, err)
+	// secp vs. schnorr.sign...?
+	taprootKey := txscript.TweakTaprootPrivKey(*privKey, []byte{})
+	sig, err := schnorr.Sign(taprootKey, sighash)
+	require.NoError(t, err)
+	require.True(t, sig.Verify(sighash, taprootKey.PubKey()))
+	var debitTxBuf bytes.Buffer
+	err = debitTx.Serialize(&debitTxBuf)
+	require.NoError(t, err)
+
+	log.Println("debitTx:", hex.EncodeToString(debitTxBuf.Bytes()))
+	signedDebitTxBytes, err := UpdateTxWithSignature(debitTxBuf.Bytes(), 0, sig.Serialize())
+	require.NoError(t, err)
+	signedDebitTx, err := TxFromRawTxBytes(signedDebitTxBytes)
+	require.NoError(t, err)
+
+	err = VerifySignature(signedDebitTx, 0, creditTx.TxOut[0])
+	require.NoError(t, err, "signature verification failed: %v", err)
 }
