@@ -44,6 +44,7 @@ const (
 	SparkService_GetTokenTransactionRevocationKeyshares_FullMethodName = "/spark.SparkService/get_token_transaction_revocation_keyshares"
 	SparkService_FinalizeTokenTransaction_FullMethodName               = "/spark.SparkService/finalize_token_transaction"
 	SparkService_ReturnLightningPayment_FullMethodName                 = "/spark.SparkService/return_lightning_payment"
+	SparkService_GetTreeNodesByPublicKey_FullMethodName                = "/spark.SparkService/get_tree_nodes_by_public_key"
 )
 
 // SparkServiceClient is the client API for SparkService service.
@@ -75,6 +76,7 @@ type SparkServiceClient interface {
 	GetTokenTransactionRevocationKeyshares(ctx context.Context, in *GetTokenTransactionRevocationKeysharesRequest, opts ...grpc.CallOption) (*GetTokenTransactionRevocationKeysharesResponse, error)
 	FinalizeTokenTransaction(ctx context.Context, in *FinalizeTokenTransactionRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	ReturnLightningPayment(ctx context.Context, in *ReturnLightningPaymentRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	GetTreeNodesByPublicKey(ctx context.Context, in *TreeNodesByPublicKeyRequest, opts ...grpc.CallOption) (*TreeNodesByPublicKeyResponse, error)
 }
 
 type sparkServiceClient struct {
@@ -325,6 +327,16 @@ func (c *sparkServiceClient) ReturnLightningPayment(ctx context.Context, in *Ret
 	return out, nil
 }
 
+func (c *sparkServiceClient) GetTreeNodesByPublicKey(ctx context.Context, in *TreeNodesByPublicKeyRequest, opts ...grpc.CallOption) (*TreeNodesByPublicKeyResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(TreeNodesByPublicKeyResponse)
+	err := c.cc.Invoke(ctx, SparkService_GetTreeNodesByPublicKey_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SparkServiceServer is the server API for SparkService service.
 // All implementations must embed UnimplementedSparkServiceServer
 // for forward compatibility.
@@ -354,6 +366,7 @@ type SparkServiceServer interface {
 	GetTokenTransactionRevocationKeyshares(context.Context, *GetTokenTransactionRevocationKeysharesRequest) (*GetTokenTransactionRevocationKeysharesResponse, error)
 	FinalizeTokenTransaction(context.Context, *FinalizeTokenTransactionRequest) (*emptypb.Empty, error)
 	ReturnLightningPayment(context.Context, *ReturnLightningPaymentRequest) (*emptypb.Empty, error)
+	GetTreeNodesByPublicKey(context.Context, *TreeNodesByPublicKeyRequest) (*TreeNodesByPublicKeyResponse, error)
 	mustEmbedUnimplementedSparkServiceServer()
 }
 
@@ -435,6 +448,9 @@ func (UnimplementedSparkServiceServer) FinalizeTokenTransaction(context.Context,
 }
 func (UnimplementedSparkServiceServer) ReturnLightningPayment(context.Context, *ReturnLightningPaymentRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ReturnLightningPayment not implemented")
+}
+func (UnimplementedSparkServiceServer) GetTreeNodesByPublicKey(context.Context, *TreeNodesByPublicKeyRequest) (*TreeNodesByPublicKeyResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetTreeNodesByPublicKey not implemented")
 }
 func (UnimplementedSparkServiceServer) mustEmbedUnimplementedSparkServiceServer() {}
 func (UnimplementedSparkServiceServer) testEmbeddedByValue()                      {}
@@ -889,6 +905,24 @@ func _SparkService_ReturnLightningPayment_Handler(srv interface{}, ctx context.C
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SparkService_GetTreeNodesByPublicKey_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(TreeNodesByPublicKeyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkServiceServer).GetTreeNodesByPublicKey(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkService_GetTreeNodesByPublicKey_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkServiceServer).GetTreeNodesByPublicKey(ctx, req.(*TreeNodesByPublicKeyRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // SparkService_ServiceDesc is the grpc.ServiceDesc for SparkService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -991,6 +1025,10 @@ var SparkService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "return_lightning_payment",
 			Handler:    _SparkService_ReturnLightningPayment_Handler,
+		},
+		{
+			MethodName: "get_tree_nodes_by_public_key",
+			Handler:    _SparkService_GetTreeNodesByPublicKey_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

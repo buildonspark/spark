@@ -131,6 +131,12 @@ func (s *SparkServer) CreateTree(ctx context.Context, req *pb.CreateTreeRequest)
 	return result, err
 }
 
+// GetTreeNodesByPublicKey returns all nodes owned by a public key and their paths to root
+func (s *SparkServer) GetTreeNodesByPublicKey(ctx context.Context, req *pb.TreeNodesByPublicKeyRequest) (*pb.TreeNodesByPublicKeyResponse, error) {
+	queryHandler := handler.NewTreeQueryHandler(s.config)
+	return queryHandler.GetTreeNodesByPublicKey(ctx, req)
+}
+
 // GetSigningOperatorList gets the list of signing operators.
 func (s *SparkServer) GetSigningOperatorList(ctx context.Context, req *emptypb.Empty) (*pb.GetSigningOperatorListResponse, error) {
 	return &pb.GetSigningOperatorListResponse{SigningOperators: s.config.GetSigningOperatorList()}, nil

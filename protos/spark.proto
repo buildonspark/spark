@@ -38,6 +38,7 @@ service SparkService {
     rpc finalize_token_transaction(FinalizeTokenTransactionRequest) returns (google.protobuf.Empty) {}
 
     rpc return_lightning_payment(ReturnLightningPaymentRequest) returns (google.protobuf.Empty) {}
+    rpc get_tree_nodes_by_public_key(TreeNodesByPublicKeyRequest) returns (TreeNodesByPublicKeyResponse) {}
 }
 
 enum Network {
@@ -548,6 +549,13 @@ message ReturnLightningPaymentRequest {
     bytes user_identity_public_key = 2;
 }
 
+message TreeNodesByPublicKeyRequest {
+    bytes owner_identity_pubkey = 1;
+}
+
+message TreeNodesByPublicKeyResponse {
+    repeated TreeNode nodes = 1;
+}
 message QueryNodesRequest {
     repeated string node_ids = 1;
 }

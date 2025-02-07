@@ -135,7 +135,8 @@ func (o TokenTransactionHandler) StartTokenTransaction(ctx context.Context, conf
 		response, err := client.SignTokenTransaction(ctx, &pbinternal.SignTokenTransactionRequest{
 			TokenTransaction:                finalTokenTransaction,
 			TokenTransactionSignatures:      req.TokenTransactionSignatures,
-			OutputLeafRevocationKeyshareIds: keyshareIDStrings})
+			OutputLeafRevocationKeyshareIds: keyshareIDStrings,
+		})
 		return response, err
 	})
 	if err != nil {
