@@ -248,12 +248,11 @@ func runDKGOnStartup(dbClient *ent.Client, config *so.Config) {
 	ctx := context.Background()
 	tx, err := dbClient.Tx(ctx)
 	if err != nil {
-		log.Fatalf("Failed to create db transaction: %v", err)
+		log.Printf("Failed to create db transaction: %v", err)
 	}
 	defer func() {
 		if p := recover(); p != nil {
 			tx.Rollback()
-			panic(p)
 		} else if err != nil {
 			tx.Rollback()
 		} else {
@@ -263,6 +262,6 @@ func runDKGOnStartup(dbClient *ent.Client, config *so.Config) {
 
 	err = ent.RunDKGIfNeeded(tx, config)
 	if err != nil {
-		log.Fatalf("Failed to run DKG: %v", err)
+		log.Printf("Failed to run DKG: %v", err)
 	}
 }
