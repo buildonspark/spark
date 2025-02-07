@@ -29,6 +29,8 @@ type DepositAddress struct {
 	OwnerIdentityPubkey []byte `json:"owner_identity_pubkey,omitempty"`
 	// OwnerSigningPubkey holds the value of the "owner_signing_pubkey" field.
 	OwnerSigningPubkey []byte `json:"owner_signing_pubkey,omitempty"`
+	// ConfirmationHeight holds the value of the "confirmation_height" field.
+	ConfirmationHeight int64 `json:"confirmation_height,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the DepositAddressQuery when eager-loading is set.
 	Edges                            DepositAddressEdges `json:"edges"`
@@ -63,6 +65,8 @@ func (*DepositAddress) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case depositaddress.FieldOwnerIdentityPubkey, depositaddress.FieldOwnerSigningPubkey:
 			values[i] = new([]byte)
+		case depositaddress.FieldConfirmationHeight:
+			values[i] = new(sql.NullInt64)
 		case depositaddress.FieldAddress:
 			values[i] = new(sql.NullString)
 		case depositaddress.FieldCreateTime, depositaddress.FieldUpdateTime:
@@ -121,6 +125,12 @@ func (da *DepositAddress) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field owner_signing_pubkey", values[i])
 			} else if value != nil {
 				da.OwnerSigningPubkey = *value
+			}
+		case depositaddress.FieldConfirmationHeight:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field confirmation_height", values[i])
+			} else if value.Valid {
+				da.ConfirmationHeight = value.Int64
 			}
 		case depositaddress.ForeignKeys[0]:
 			if value, ok := values[i].(*sql.NullScanner); !ok {
@@ -184,6 +194,9 @@ func (da *DepositAddress) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("owner_signing_pubkey=")
 	builder.WriteString(fmt.Sprintf("%v", da.OwnerSigningPubkey))
+	builder.WriteString(", ")
+	builder.WriteString("confirmation_height=")
+	builder.WriteString(fmt.Sprintf("%v", da.ConfirmationHeight))
 	builder.WriteByte(')')
 	return builder.String()
 }

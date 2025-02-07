@@ -27,7 +27,7 @@ var (
 		{Name: "id", Type: field.TypeUUID},
 		{Name: "create_time", Type: field.TypeTime},
 		{Name: "update_time", Type: field.TypeTime},
-		{Name: "exit_txid", Type: field.TypeBytes},
+		{Name: "exit_txid", Type: field.TypeBytes, Unique: true},
 		{Name: "confirmation_height", Type: field.TypeInt64, Nullable: true},
 		{Name: "cooperative_exit_transfer", Type: field.TypeUUID},
 	}
@@ -60,6 +60,7 @@ var (
 		{Name: "address", Type: field.TypeString, Unique: true},
 		{Name: "owner_identity_pubkey", Type: field.TypeBytes},
 		{Name: "owner_signing_pubkey", Type: field.TypeBytes},
+		{Name: "confirmation_height", Type: field.TypeInt64, Nullable: true},
 		{Name: "deposit_address_signing_keyshare", Type: field.TypeUUID},
 	}
 	// DepositAddressesTable holds the schema information for the "deposit_addresses" table.
@@ -70,7 +71,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "deposit_addresses_signing_keyshares_signing_keyshare",
-				Columns:    []*schema.Column{DepositAddressesColumns[6]},
+				Columns:    []*schema.Column{DepositAddressesColumns[7]},
 				RefColumns: []*schema.Column{SigningKeysharesColumns[0]},
 				OnDelete:   schema.NoAction,
 			},

@@ -36,12 +36,6 @@ func (ceu *CooperativeExitUpdate) SetUpdateTime(t time.Time) *CooperativeExitUpd
 	return ceu
 }
 
-// SetExitTxid sets the "exit_txid" field.
-func (ceu *CooperativeExitUpdate) SetExitTxid(b []byte) *CooperativeExitUpdate {
-	ceu.mutation.SetExitTxid(b)
-	return ceu
-}
-
 // SetConfirmationHeight sets the "confirmation_height" field.
 func (ceu *CooperativeExitUpdate) SetConfirmationHeight(i int64) *CooperativeExitUpdate {
 	ceu.mutation.ResetConfirmationHeight()
@@ -150,9 +144,6 @@ func (ceu *CooperativeExitUpdate) sqlSave(ctx context.Context) (n int, err error
 	if value, ok := ceu.mutation.UpdateTime(); ok {
 		_spec.SetField(cooperativeexit.FieldUpdateTime, field.TypeTime, value)
 	}
-	if value, ok := ceu.mutation.ExitTxid(); ok {
-		_spec.SetField(cooperativeexit.FieldExitTxid, field.TypeBytes, value)
-	}
 	if value, ok := ceu.mutation.ConfirmationHeight(); ok {
 		_spec.SetField(cooperativeexit.FieldConfirmationHeight, field.TypeInt64, value)
 	}
@@ -214,12 +205,6 @@ type CooperativeExitUpdateOne struct {
 // SetUpdateTime sets the "update_time" field.
 func (ceuo *CooperativeExitUpdateOne) SetUpdateTime(t time.Time) *CooperativeExitUpdateOne {
 	ceuo.mutation.SetUpdateTime(t)
-	return ceuo
-}
-
-// SetExitTxid sets the "exit_txid" field.
-func (ceuo *CooperativeExitUpdateOne) SetExitTxid(b []byte) *CooperativeExitUpdateOne {
-	ceuo.mutation.SetExitTxid(b)
 	return ceuo
 }
 
@@ -360,9 +345,6 @@ func (ceuo *CooperativeExitUpdateOne) sqlSave(ctx context.Context) (_node *Coope
 	}
 	if value, ok := ceuo.mutation.UpdateTime(); ok {
 		_spec.SetField(cooperativeexit.FieldUpdateTime, field.TypeTime, value)
-	}
-	if value, ok := ceuo.mutation.ExitTxid(); ok {
-		_spec.SetField(cooperativeexit.FieldExitTxid, field.TypeBytes, value)
 	}
 	if value, ok := ceuo.mutation.ConfirmationHeight(); ok {
 		_spec.SetField(cooperativeexit.FieldConfirmationHeight, field.TypeInt64, value)

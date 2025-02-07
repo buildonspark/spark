@@ -100,7 +100,7 @@ func TestReceiveLightningPayment(t *testing.T) {
 		t.Fatal(err)
 	}
 	feeSats := uint64(2)
-	nodeToSend, err := testutil.CreateNewTree(sspConfig, sspLeafPrivKey, 12343)
+	nodeToSend, err := testutil.CreateNewTree(t, sspConfig, sspLeafPrivKey, 12343)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -216,7 +216,7 @@ func TestSendLightningPayment(t *testing.T) {
 		t.Fatal(err)
 	}
 	feeSats := uint64(2)
-	nodeToSend, err := testutil.CreateNewTree(userConfig, userLeafPrivKey, 12347)
+	nodeToSend, err := testutil.CreateNewTree(t, userConfig, userLeafPrivKey, 12347)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -343,7 +343,7 @@ func TestSendLightningPaymentWithRejection(t *testing.T) {
 		t.Fatal(err)
 	}
 	feeSats := uint64(2)
-	nodeToSend, err := testutil.CreateNewTree(userConfig, userLeafPrivKey, 12347)
+	nodeToSend, err := testutil.CreateNewTree(t, userConfig, userLeafPrivKey, 12347)
 	if err != nil {
 		t.Fatal(err)
 	}

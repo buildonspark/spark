@@ -3,20 +3,26 @@ package testutil
 import (
 	"bytes"
 	"context"
-	"encoding/hex"
 	"fmt"
-	"log"
+	"testing"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lightsparkdev/spark-go/common"
-	pbmock "github.com/lightsparkdev/spark-go/proto/mock"
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
+	"github.com/lightsparkdev/spark-go/so/chain"
 	"github.com/lightsparkdev/spark-go/wallet"
+	"github.com/stretchr/testify/assert"
 )
 
 // CreateNewTree creates a new Tree
-func CreateNewTree(config *wallet.Config, privKey *secp256k1.PrivateKey, amountSats int64) (*pb.TreeNode, error) {
-	// Setup Mock tx
+func CreateNewTree(t *testing.T, config *wallet.Config, privKey *secp256k1.PrivateKey, amountSats int64) (*pb.TreeNode, error) {
+	client, err := chain.NewRegtestClient()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create regtest client: %v", err)
+	}
+
+	userOnChainKey, fundingTxOut, fundingOutPoint := FundFaucet(t, client)
+
 	conn, err := common.NewGRPCConnection(config.CoodinatorAddress())
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to operator: %v", err)
@@ -29,7 +35,6 @@ func CreateNewTree(config *wallet.Config, privKey *secp256k1.PrivateKey, amountS
 	}
 	ctx := wallet.ContextWithToken(context.Background(), token)
 
-	mockClient := pbmock.NewMockServiceClient(conn)
 	userPubKey := privKey.PubKey()
 	userPubKeyBytes := userPubKey.SerializeCompressed()
 
@@ -38,7 +43,7 @@ func CreateNewTree(config *wallet.Config, privKey *secp256k1.PrivateKey, amountS
 		return nil, fmt.Errorf("failed to generate deposit address: %v", err)
 	}
 
-	depositTx, err := CreateTestP2TRTransaction(depositResp.DepositAddress.Address, amountSats)
+	depositTx, err := CreateTestDepositTransaction(fundingOutPoint, depositResp.DepositAddress.Address, amountSats)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create deposit tx: %v", err)
 	}
@@ -48,16 +53,23 @@ func CreateNewTree(config *wallet.Config, privKey *secp256k1.PrivateKey, amountS
 	if err != nil {
 		return nil, fmt.Errorf("failed to serialize deposit tx: %v", err)
 	}
-	depositTxHex := hex.EncodeToString(buf.Bytes())
 
-	log.Printf("deposit tx: %s", depositTxHex)
-	mockClient.SetMockOnchainTx(context.Background(), &pbmock.SetMockOnchainTxRequest{
-		Txid: depositTx.TxID(),
-		Tx:   depositTxHex,
-	})
 	resp, err := wallet.CreateTreeRoot(ctx, config, privKey.Serialize(), depositResp.DepositAddress.VerifyingKey, depositTx, vout)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create tree: %v", err)
 	}
+
+	// Sign, broadcast, mine deposit tx
+	signedExitTx := SignOnChainTx(t, depositTx, fundingTxOut, userOnChainKey)
+	_, err = client.SendRawTransaction(signedExitTx, true)
+	assert.NoError(t, err)
+	randomKey, err := secp256k1.GeneratePrivateKey()
+	assert.NoError(t, err)
+	randomPubKey := randomKey.PubKey()
+	randomAddress, err := common.P2TRRawAddressFromPublicKey(randomPubKey.SerializeCompressed(), common.Regtest)
+	assert.NoError(t, err)
+	_, err = client.GenerateToAddress(1, randomAddress, nil)
+	assert.NoError(t, err)
+
 	return resp.Nodes[0], nil
 }

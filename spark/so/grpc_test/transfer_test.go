@@ -22,7 +22,7 @@ func TestTransfer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create node signing private key: %v", err)
 	}
-	rootNode, err := testutil.CreateNewTree(senderConfig, leafPrivKey, 100_000)
+	rootNode, err := testutil.CreateNewTree(t, senderConfig, leafPrivKey, 100_000)
 	if err != nil {
 		t.Fatalf("failed to create new tree: %v", err)
 	}

@@ -100,6 +100,7 @@ func (o *DepositHandler) GenerateDepositAddress(ctx context.Context, config *so.
 		SetOwnerIdentityPubkey(req.IdentityPublicKey).
 		SetOwnerSigningPubkey(req.SigningPublicKey).
 		SetAddress(*depositAddress).
+		// Confirmation height is not set since nothing has been confirmed yet.
 		Save(ctx)
 	if err != nil {
 		log.Printf("Failed to link keyshare to deposit address: %v", err)
@@ -161,15 +162,10 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 		return nil, err
 	}
 
-	txBroadcasted := true
 	// Get the on chain tx
-	onChainTx, err := o.onchainHelper.GetTxOnChain(ctx, req.OnChainUtxo.Txid)
-	if onChainTx == nil || err != nil {
-		onChainTx, err = common.TxFromRawTxBytes(req.OnChainUtxo.RawTx)
-		if err != nil {
-			return nil, fmt.Errorf("onchain tx not found and not provided in raw tx: %w", err)
-		}
-		txBroadcasted = false
+	onChainTx, err := common.TxFromRawTxBytes(req.OnChainUtxo.RawTx)
+	if err != nil {
+		return nil, err
 	}
 	if len(onChainTx.TxOut) <= int(req.OnChainUtxo.Vout) {
 		return nil, fmt.Errorf("utxo index out of bounds")
@@ -191,7 +187,8 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 	if err != nil {
 		return nil, err
 	}
-	depositAddress, err := ent.GetDbFromContext(ctx).DepositAddress.Query().Where(depositaddress.Address(*utxoAddress)).First(ctx)
+	db := ent.GetDbFromContext(ctx)
+	depositAddress, err := db.DepositAddress.Query().Where(depositaddress.Address(*utxoAddress)).First(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -201,6 +198,7 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 	if !bytes.Equal(depositAddress.OwnerSigningPubkey, req.RootTxSigningJob.SigningPublicKey) || !bytes.Equal(depositAddress.OwnerSigningPubkey, req.RefundTxSigningJob.SigningPublicKey) {
 		return nil, fmt.Errorf("unexpected signing public key")
 	}
+	txConfirmed := depositAddress.ConfirmationHeight != 0
 
 	// Verify the root transaction
 	rootTx, err := common.TxFromRawTxBytes(req.RootTxSigningJob.RawTx)
@@ -280,13 +278,12 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 		return nil, err
 	}
 	// Create the tree
-	db := ent.GetDbFromContext(ctx)
 	schemaNetwork, err := common.SchemaNetworkFromNetwork(network)
 	if err != nil {
 		return nil, err
 	}
 	treeMutator := db.Tree.Create().SetOwnerIdentityPubkey(depositAddress.OwnerIdentityPubkey).SetNetwork(schemaNetwork)
-	if txBroadcasted {
+	if txConfirmed {
 		treeMutator.SetStatus(schema.TreeStatusAvailable)
 	} else {
 		treeMutator.SetStatus(schema.TreeStatusPending)

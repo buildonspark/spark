@@ -21,6 +21,18 @@ func CreateTestP2TRTransaction(p2trAddress string, amountSats int64) (*wire.MsgT
 	return createTestTransaction(inputs, outputs), nil
 }
 
+// CreateTestDepositTransaction creates a test deposit transaction spending
+// the given outpoint to the given P2TR address with the given amount.
+func CreateTestDepositTransaction(outPoint *wire.OutPoint, p2trAddress string, amountSats int64) (*wire.MsgTx, error) {
+	inputs := []*wire.TxIn{wire.NewTxIn(outPoint, nil, [][]byte{})}
+	txOut, err := createP2TROutput(p2trAddress, amountSats)
+	if err != nil {
+		return nil, fmt.Errorf("error creating output: %v", err)
+	}
+	outputs := []*wire.TxOut{txOut}
+	return createTestTransaction(inputs, outputs), nil
+}
+
 // CreateTestCoopExitTransaction creates a test coop exit transaction with a dummy input and two outputs.
 // The first output is for the user and the second output is for the intermediate tx spending
 // to connector outputs. See `CreateTestConnectorTransaction` for the intermediate tx.

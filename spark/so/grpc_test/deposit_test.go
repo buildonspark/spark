@@ -10,7 +10,7 @@ import (
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lightsparkdev/spark-go/common"
-	pbmock "github.com/lightsparkdev/spark-go/proto/mock"
+	"github.com/lightsparkdev/spark-go/so/chain"
 	testutil "github.com/lightsparkdev/spark-go/test_util"
 	"github.com/lightsparkdev/spark-go/wallet"
 	"github.com/stretchr/testify/assert"
@@ -62,8 +62,6 @@ func TestStartTreeCreation(t *testing.T) {
 	}
 	ctx := wallet.ContextWithToken(context.Background(), token)
 
-	mockClient := pbmock.NewMockServiceClient(conn)
-
 	privKey, err := secp256k1.GeneratePrivateKey()
 	if err != nil {
 		t.Fatal(err)
@@ -76,7 +74,12 @@ func TestStartTreeCreation(t *testing.T) {
 		t.Fatalf("failed to generate deposit address: %v", err)
 	}
 
-	depositTx, err := testutil.CreateTestP2TRTransaction(depositResp.DepositAddress.Address, 100_000)
+	client, err := chain.NewRegtestClient()
+	assert.NoError(t, err)
+
+	userOnChainKey, fundingTxOut, fundingOutPoint := testutil.FundFaucet(t, client)
+
+	depositTx, err := testutil.CreateTestDepositTransaction(fundingOutPoint, depositResp.DepositAddress.Address, 100_000)
 	if err != nil {
 		t.Fatalf("failed to create deposit tx: %v", err)
 	}
@@ -96,11 +99,18 @@ func TestStartTreeCreation(t *testing.T) {
 		t.Fatalf("failed to deserilize deposit tx: %v", err)
 	}
 
-	log.Printf("deposit tx: %s", depositTxHex)
-	mockClient.SetMockOnchainTx(context.Background(), &pbmock.SetMockOnchainTxRequest{
-		Txid: depositTx.TxID(),
-		Tx:   depositTxHex,
-	})
+	// Sign, broadcast, and mine deposit tx
+	signedDepositTx := testutil.SignOnChainTx(t, depositTx, fundingTxOut, userOnChainKey)
+	_, err = client.SendRawTransaction(signedDepositTx, true)
+	assert.NoError(t, err)
+
+	randomKey, err := secp256k1.GeneratePrivateKey()
+	assert.NoError(t, err)
+	randomPubKey := randomKey.PubKey()
+	randomAddress, err := common.P2TRRawAddressFromPublicKey(randomPubKey.SerializeCompressed(), common.Regtest)
+	assert.NoError(t, err)
+	_, err = client.GenerateToAddress(1, randomAddress, nil)
+	assert.NoError(t, err)
 
 	resp, err := wallet.CreateTreeRoot(ctx, config, privKey.Serialize(), depositResp.DepositAddress.VerifyingKey, depositTx, vout)
 	if err != nil {
@@ -113,6 +123,11 @@ func TestStartTreeCreation(t *testing.T) {
 // Test that we can get refund signatures for a tree before depositing funds on-chain,
 // and that after we confirm funds on-chain, our leaves are available for transfer.
 func TestStartTreeCreationOffchain(t *testing.T) {
+	client, err := chain.NewRegtestClient()
+	assert.NoError(t, err)
+
+	userOnChainKey, fundingTxOut, fundingOutPoint := testutil.FundFaucet(t, client)
+
 	config, err := testutil.TestWalletConfig()
 	if err != nil {
 		t.Fatalf("failed to create wallet config: %v", err)
@@ -143,7 +158,7 @@ func TestStartTreeCreationOffchain(t *testing.T) {
 		t.Fatalf("failed to generate deposit address: %v", err)
 	}
 
-	depositTx, err := testutil.CreateTestP2TRTransaction(depositResp.DepositAddress.Address, 100_000)
+	depositTx, err := testutil.CreateTestDepositTransaction(fundingOutPoint, depositResp.DepositAddress.Address, 100_000)
 	if err != nil {
 		t.Fatalf("failed to create deposit tx: %v", err)
 	}
@@ -200,14 +215,20 @@ func TestStartTreeCreationOffchain(t *testing.T) {
 		t.Fatalf("expected error when sending transfer")
 	}
 
-	// After L1 tx confirms, user should be able to transfer funds
-	mockClient := pbmock.NewMockServiceClient(conn)
-	_, err = mockClient.SetMockOnchainTx(context.Background(), &pbmock.SetMockOnchainTxRequest{
-		Txid: depositTx.TxID(),
-		Tx:   depositTxHex,
-	})
-	assert.Nil(t, err, "failed to set mock onchain tx")
+	// Sign, broadcast, and mine deposit tx
+	signedDepositTx := testutil.SignOnChainTx(t, depositTx, fundingTxOut, userOnChainKey)
+	_, err = client.SendRawTransaction(signedDepositTx, true)
+	assert.NoError(t, err)
 
+	randomKey, err := secp256k1.GeneratePrivateKey()
+	assert.NoError(t, err)
+	randomPubKey := randomKey.PubKey()
+	randomAddress, err := common.P2TRRawAddressFromPublicKey(randomPubKey.SerializeCompressed(), common.Regtest)
+	assert.NoError(t, err)
+	_, err = client.GenerateToAddress(1, randomAddress, nil)
+	assert.NoError(t, err)
+
+	// After L1 tx confirms, user should be able to transfer funds
 	_, err = wallet.SendTransfer(
 		context.Background(),
 		config,

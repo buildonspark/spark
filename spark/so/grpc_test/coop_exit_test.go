@@ -3,12 +3,8 @@ package grpctest
 import (
 	"bytes"
 	"context"
-	"encoding/hex"
 	"testing"
 
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/rpcclient"
-	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lightsparkdev/spark-go/common"
@@ -17,67 +13,13 @@ import (
 	testutil "github.com/lightsparkdev/spark-go/test_util"
 	"github.com/lightsparkdev/spark-go/wallet"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
-
-func fundFaucet(t *testing.T, client *rpcclient.Client) (*secp256k1.PrivateKey, *wire.TxOut, *wire.OutPoint) {
-	// Mine a block sending some coins to an address
-	sspOnChainKey, err := secp256k1.GeneratePrivateKey()
-	assert.NoError(t, err)
-	sspOnChainPubKey := sspOnChainKey.PubKey()
-	sspOnChainAddress, err := common.P2TRRawAddressFromPublicKey(sspOnChainPubKey.SerializeCompressed(), common.Regtest)
-	assert.NoError(t, err)
-	blockHash, err := client.GenerateToAddress(1, sspOnChainAddress, nil)
-	assert.NoError(t, err)
-
-	// Get the tx, and check the output matches the expected script/pubkey
-	sspOnChainScript, err := txscript.PayToAddrScript(sspOnChainAddress)
-	assert.NoError(t, err)
-
-	block, err := client.GetBlockVerboseTx(blockHash[0])
-	assert.NoError(t, err)
-	fundingTx := block.Tx[0]
-	assert.Equal(t, 2, len(fundingTx.Vout))
-	observedScript, err := hex.DecodeString(fundingTx.Vout[0].ScriptPubKey.Hex)
-	assert.NoError(t, err)
-
-	assert.Equal(t, sspOnChainScript, observedScript)
-
-	// Extract the pubkey from the script and check it matches the one we expect
-	require.Equal(t, 34, len(observedScript))
-	observedPubkey, err := secp256k1.ParsePubKey(append([]byte{0x02}, observedScript[2:34]...))
-	if err != nil {
-		observedPubkey, err = secp256k1.ParsePubKey(append([]byte{0x03}, observedScript[2:34]...))
-	}
-	assert.NoError(t, err)
-
-	taprootKey := txscript.TweakTaprootPrivKey(*sspOnChainKey, []byte{})
-	assert.Equal(t, taprootKey.PubKey().SerializeCompressed()[1:], observedPubkey.SerializeCompressed()[1:])
-
-	// Generate 100 blocks to allow ssp funds to be spendable
-	randomKey, err := secp256k1.GeneratePrivateKey()
-	assert.NoError(t, err)
-	randomPubKey := randomKey.PubKey()
-	randomAddress, err := common.P2TRRawAddressFromPublicKey(randomPubKey.SerializeCompressed(), common.Regtest)
-	assert.NoError(t, err)
-	_, err = client.GenerateToAddress(100, randomAddress, nil)
-	assert.NoError(t, err)
-
-	// Craft the output and outpoint to spend this output
-	fundingTxOut := wire.NewTxOut(int64(fundingTx.Vout[0].Value*100_000_000), observedScript)
-
-	fundingTxid, err := chainhash.NewHashFromStr(fundingTx.Txid)
-	assert.NoError(t, err)
-	fundingOutPoint := wire.NewOutPoint(fundingTxid, 0)
-
-	return sspOnChainKey, fundingTxOut, fundingOutPoint
-}
 
 func TestCoopExit(t *testing.T) {
 	client, err := chain.NewRegtestClient()
 	assert.NoError(t, err)
 
-	sspOnChainKey, fundingTxOut, fundingOutPoint := fundFaucet(t, client)
+	sspOnChainKey, fundingTxOut, fundingOutPoint := testutil.FundFaucet(t, client)
 
 	config, err := testutil.TestWalletConfig()
 	assert.NoError(t, err)
@@ -87,7 +29,7 @@ func TestCoopExit(t *testing.T) {
 	// Setup a user with some leaves
 	leafPrivKey, err := secp256k1.GeneratePrivateKey()
 	assert.NoError(t, err)
-	rootNode, err := testutil.CreateNewTree(config, leafPrivKey, amountSats)
+	rootNode, err := testutil.CreateNewTree(t, config, leafPrivKey, amountSats)
 	assert.NoError(t, err)
 
 	// Initiate SSP
@@ -197,28 +139,7 @@ func TestCoopExit(t *testing.T) {
 	}
 
 	// Sign exit tx and broadcast
-	prevOutputFetcher := txscript.NewCannedPrevOutputFetcher(
-		fundingTxOut.PkScript, fundingTxOut.Value,
-	)
-	sighashes := txscript.NewTxSigHashes(exitTx, prevOutputFetcher)
-	fakeTapscriptRootHash := []byte{}
-	sig, err := txscript.RawTxInTaprootSignature(
-		exitTx, sighashes, 0, fundingTxOut.Value, fundingTxOut.PkScript,
-		fakeTapscriptRootHash, txscript.SigHashDefault, sspOnChainKey,
-	)
-	assert.NoError(t, err)
-
-	var exitTxBuf bytes.Buffer
-	err = exitTx.Serialize(&exitTxBuf)
-	assert.NoError(t, err)
-
-	signedExitTxBytes, err := common.UpdateTxWithSignature(exitTxBuf.Bytes(), 0, sig)
-	assert.NoError(t, err)
-	signedExitTx, err := common.TxFromRawTxBytes(signedExitTxBytes)
-	assert.NoError(t, err)
-
-	err = common.VerifySignature(signedExitTx, 0, fundingTxOut)
-	assert.NoError(t, err)
+	signedExitTx := testutil.SignOnChainTx(t, exitTx, fundingTxOut, sspOnChainKey)
 
 	_, err = client.SendRawTransaction(signedExitTx, true)
 	assert.NoError(t, err)

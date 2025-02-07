@@ -81,6 +81,11 @@ func OwnerSigningPubkey(v []byte) predicate.DepositAddress {
 	return predicate.DepositAddress(sql.FieldEQ(FieldOwnerSigningPubkey, v))
 }
 
+// ConfirmationHeight applies equality check predicate on the "confirmation_height" field. It's identical to ConfirmationHeightEQ.
+func ConfirmationHeight(v int64) predicate.DepositAddress {
+	return predicate.DepositAddress(sql.FieldEQ(FieldConfirmationHeight, v))
+}
+
 // CreateTimeEQ applies the EQ predicate on the "create_time" field.
 func CreateTimeEQ(v time.Time) predicate.DepositAddress {
 	return predicate.DepositAddress(sql.FieldEQ(FieldCreateTime, v))
@@ -304,6 +309,56 @@ func OwnerSigningPubkeyLT(v []byte) predicate.DepositAddress {
 // OwnerSigningPubkeyLTE applies the LTE predicate on the "owner_signing_pubkey" field.
 func OwnerSigningPubkeyLTE(v []byte) predicate.DepositAddress {
 	return predicate.DepositAddress(sql.FieldLTE(FieldOwnerSigningPubkey, v))
+}
+
+// ConfirmationHeightEQ applies the EQ predicate on the "confirmation_height" field.
+func ConfirmationHeightEQ(v int64) predicate.DepositAddress {
+	return predicate.DepositAddress(sql.FieldEQ(FieldConfirmationHeight, v))
+}
+
+// ConfirmationHeightNEQ applies the NEQ predicate on the "confirmation_height" field.
+func ConfirmationHeightNEQ(v int64) predicate.DepositAddress {
+	return predicate.DepositAddress(sql.FieldNEQ(FieldConfirmationHeight, v))
+}
+
+// ConfirmationHeightIn applies the In predicate on the "confirmation_height" field.
+func ConfirmationHeightIn(vs ...int64) predicate.DepositAddress {
+	return predicate.DepositAddress(sql.FieldIn(FieldConfirmationHeight, vs...))
+}
+
+// ConfirmationHeightNotIn applies the NotIn predicate on the "confirmation_height" field.
+func ConfirmationHeightNotIn(vs ...int64) predicate.DepositAddress {
+	return predicate.DepositAddress(sql.FieldNotIn(FieldConfirmationHeight, vs...))
+}
+
+// ConfirmationHeightGT applies the GT predicate on the "confirmation_height" field.
+func ConfirmationHeightGT(v int64) predicate.DepositAddress {
+	return predicate.DepositAddress(sql.FieldGT(FieldConfirmationHeight, v))
+}
+
+// ConfirmationHeightGTE applies the GTE predicate on the "confirmation_height" field.
+func ConfirmationHeightGTE(v int64) predicate.DepositAddress {
+	return predicate.DepositAddress(sql.FieldGTE(FieldConfirmationHeight, v))
+}
+
+// ConfirmationHeightLT applies the LT predicate on the "confirmation_height" field.
+func ConfirmationHeightLT(v int64) predicate.DepositAddress {
+	return predicate.DepositAddress(sql.FieldLT(FieldConfirmationHeight, v))
+}
+
+// ConfirmationHeightLTE applies the LTE predicate on the "confirmation_height" field.
+func ConfirmationHeightLTE(v int64) predicate.DepositAddress {
+	return predicate.DepositAddress(sql.FieldLTE(FieldConfirmationHeight, v))
+}
+
+// ConfirmationHeightIsNil applies the IsNil predicate on the "confirmation_height" field.
+func ConfirmationHeightIsNil() predicate.DepositAddress {
+	return predicate.DepositAddress(sql.FieldIsNull(FieldConfirmationHeight))
+}
+
+// ConfirmationHeightNotNil applies the NotNil predicate on the "confirmation_height" field.
+func ConfirmationHeightNotNil() predicate.DepositAddress {
+	return predicate.DepositAddress(sql.FieldNotNull(FieldConfirmationHeight))
 }
 
 // HasSigningKeyshare applies the HasEdge predicate on the "signing_keyshare" edge.

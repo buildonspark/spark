@@ -128,43 +128,6 @@ func (h *BaseTransferHandler) createTransfer(
 		return nil, nil, fmt.Errorf("unable to load leaves: %v", err)
 	}
 
-	// If the trees for the leaves are waiting on a confirmation on-chain,
-	// check that here and update them. In the future, this should be done
-	// by some chain watcher.
-	newLeaves := make([]*ent.TreeNode, 0)
-	for _, leaf := range leaves {
-		tree, err := leaf.QueryTree().Only(ctx)
-		if err != nil {
-			return nil, nil, fmt.Errorf("unable to load tree for leaf %s: %v", leaf.ID, err)
-		}
-		if tree.Status == schema.TreeStatusPending && leaf.Status == schema.TreeNodeStatusCreating {
-			root, err := tree.QueryRoot().Only(ctx)
-			if err != nil {
-				return nil, nil, fmt.Errorf("unable to load root for tree %s: %v", tree.ID, err)
-			}
-			rootTx, err := common.TxFromRawTxBytes(root.RawTx)
-			if err != nil {
-				return nil, nil, fmt.Errorf("unable to load root tx for tree %s: %v", tree.ID, err)
-			}
-			_, err = h.onchainHelper.GetTxOnChain(ctx, rootTx.TxIn[0].PreviousOutPoint.Hash.String())
-			if err != nil {
-				return nil, nil, fmt.Errorf("unable to get tx on chain for tree %s: %v", tree.ID, err)
-			}
-			_, err = db.Tree.UpdateOne(tree).SetStatus(schema.TreeStatusAvailable).Save(ctx)
-			if err != nil {
-				return nil, nil, fmt.Errorf("unable to update tree status: %v", err)
-			}
-			newLeaf, err := db.TreeNode.UpdateOne(leaf).SetStatus(schema.TreeNodeStatusAvailable).Save(ctx)
-			if err != nil {
-				return nil, nil, fmt.Errorf("unable to update leaf status: %v", err)
-			}
-			newLeaves = append(newLeaves, newLeaf)
-		} else {
-			newLeaves = append(newLeaves, leaf)
-		}
-	}
-	leaves = newLeaves
-
 	switch transferType {
 	case schema.TransferTypeCooperativeExit:
 		err = validateCooperativeExitLeaves(transfer, leaves, leafRefundMap, receiverIdentityPublicKey)

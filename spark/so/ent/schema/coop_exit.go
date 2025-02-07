@@ -21,7 +21,7 @@ func (CooperativeExit) Mixin() []ent.Mixin {
 // Fields are the fields for the CooperativeExit table.
 func (CooperativeExit) Fields() []ent.Field {
 	return []ent.Field{
-		field.Bytes("exit_txid"),
+		field.Bytes("exit_txid").Unique().Immutable(),
 		field.Int64("confirmation_height").Optional(),
 	}
 }

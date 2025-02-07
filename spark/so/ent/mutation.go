@@ -1218,6 +1218,8 @@ type DepositAddressMutation struct {
 	address                 *string
 	owner_identity_pubkey   *[]byte
 	owner_signing_pubkey    *[]byte
+	confirmation_height     *int64
+	addconfirmation_height  *int64
 	clearedFields           map[string]struct{}
 	signing_keyshare        *uuid.UUID
 	clearedsigning_keyshare bool
@@ -1510,6 +1512,76 @@ func (m *DepositAddressMutation) ResetOwnerSigningPubkey() {
 	m.owner_signing_pubkey = nil
 }
 
+// SetConfirmationHeight sets the "confirmation_height" field.
+func (m *DepositAddressMutation) SetConfirmationHeight(i int64) {
+	m.confirmation_height = &i
+	m.addconfirmation_height = nil
+}
+
+// ConfirmationHeight returns the value of the "confirmation_height" field in the mutation.
+func (m *DepositAddressMutation) ConfirmationHeight() (r int64, exists bool) {
+	v := m.confirmation_height
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldConfirmationHeight returns the old "confirmation_height" field's value of the DepositAddress entity.
+// If the DepositAddress object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DepositAddressMutation) OldConfirmationHeight(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldConfirmationHeight is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldConfirmationHeight requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldConfirmationHeight: %w", err)
+	}
+	return oldValue.ConfirmationHeight, nil
+}
+
+// AddConfirmationHeight adds i to the "confirmation_height" field.
+func (m *DepositAddressMutation) AddConfirmationHeight(i int64) {
+	if m.addconfirmation_height != nil {
+		*m.addconfirmation_height += i
+	} else {
+		m.addconfirmation_height = &i
+	}
+}
+
+// AddedConfirmationHeight returns the value that was added to the "confirmation_height" field in this mutation.
+func (m *DepositAddressMutation) AddedConfirmationHeight() (r int64, exists bool) {
+	v := m.addconfirmation_height
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearConfirmationHeight clears the value of the "confirmation_height" field.
+func (m *DepositAddressMutation) ClearConfirmationHeight() {
+	m.confirmation_height = nil
+	m.addconfirmation_height = nil
+	m.clearedFields[depositaddress.FieldConfirmationHeight] = struct{}{}
+}
+
+// ConfirmationHeightCleared returns if the "confirmation_height" field was cleared in this mutation.
+func (m *DepositAddressMutation) ConfirmationHeightCleared() bool {
+	_, ok := m.clearedFields[depositaddress.FieldConfirmationHeight]
+	return ok
+}
+
+// ResetConfirmationHeight resets all changes to the "confirmation_height" field.
+func (m *DepositAddressMutation) ResetConfirmationHeight() {
+	m.confirmation_height = nil
+	m.addconfirmation_height = nil
+	delete(m.clearedFields, depositaddress.FieldConfirmationHeight)
+}
+
 // SetSigningKeyshareID sets the "signing_keyshare" edge to the SigningKeyshare entity by id.
 func (m *DepositAddressMutation) SetSigningKeyshareID(id uuid.UUID) {
 	m.signing_keyshare = &id
@@ -1583,7 +1655,7 @@ func (m *DepositAddressMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *DepositAddressMutation) Fields() []string {
-	fields := make([]string, 0, 5)
+	fields := make([]string, 0, 6)
 	if m.create_time != nil {
 		fields = append(fields, depositaddress.FieldCreateTime)
 	}
@@ -1598,6 +1670,9 @@ func (m *DepositAddressMutation) Fields() []string {
 	}
 	if m.owner_signing_pubkey != nil {
 		fields = append(fields, depositaddress.FieldOwnerSigningPubkey)
+	}
+	if m.confirmation_height != nil {
+		fields = append(fields, depositaddress.FieldConfirmationHeight)
 	}
 	return fields
 }
@@ -1617,6 +1692,8 @@ func (m *DepositAddressMutation) Field(name string) (ent.Value, bool) {
 		return m.OwnerIdentityPubkey()
 	case depositaddress.FieldOwnerSigningPubkey:
 		return m.OwnerSigningPubkey()
+	case depositaddress.FieldConfirmationHeight:
+		return m.ConfirmationHeight()
 	}
 	return nil, false
 }
@@ -1636,6 +1713,8 @@ func (m *DepositAddressMutation) OldField(ctx context.Context, name string) (ent
 		return m.OldOwnerIdentityPubkey(ctx)
 	case depositaddress.FieldOwnerSigningPubkey:
 		return m.OldOwnerSigningPubkey(ctx)
+	case depositaddress.FieldConfirmationHeight:
+		return m.OldConfirmationHeight(ctx)
 	}
 	return nil, fmt.Errorf("unknown DepositAddress field %s", name)
 }
@@ -1680,6 +1759,13 @@ func (m *DepositAddressMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetOwnerSigningPubkey(v)
 		return nil
+	case depositaddress.FieldConfirmationHeight:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetConfirmationHeight(v)
+		return nil
 	}
 	return fmt.Errorf("unknown DepositAddress field %s", name)
 }
@@ -1687,13 +1773,21 @@ func (m *DepositAddressMutation) SetField(name string, value ent.Value) error {
 // AddedFields returns all numeric fields that were incremented/decremented during
 // this mutation.
 func (m *DepositAddressMutation) AddedFields() []string {
-	return nil
+	var fields []string
+	if m.addconfirmation_height != nil {
+		fields = append(fields, depositaddress.FieldConfirmationHeight)
+	}
+	return fields
 }
 
 // AddedField returns the numeric value that was incremented/decremented on a field
 // with the given name. The second boolean return value indicates that this field
 // was not set, or was not defined in the schema.
 func (m *DepositAddressMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case depositaddress.FieldConfirmationHeight:
+		return m.AddedConfirmationHeight()
+	}
 	return nil, false
 }
 
@@ -1702,6 +1796,13 @@ func (m *DepositAddressMutation) AddedField(name string) (ent.Value, bool) {
 // type.
 func (m *DepositAddressMutation) AddField(name string, value ent.Value) error {
 	switch name {
+	case depositaddress.FieldConfirmationHeight:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddConfirmationHeight(v)
+		return nil
 	}
 	return fmt.Errorf("unknown DepositAddress numeric field %s", name)
 }
@@ -1709,7 +1810,11 @@ func (m *DepositAddressMutation) AddField(name string, value ent.Value) error {
 // ClearedFields returns all nullable fields that were cleared during this
 // mutation.
 func (m *DepositAddressMutation) ClearedFields() []string {
-	return nil
+	var fields []string
+	if m.FieldCleared(depositaddress.FieldConfirmationHeight) {
+		fields = append(fields, depositaddress.FieldConfirmationHeight)
+	}
+	return fields
 }
 
 // FieldCleared returns a boolean indicating if a field with the given name was
@@ -1722,6 +1827,11 @@ func (m *DepositAddressMutation) FieldCleared(name string) bool {
 // ClearField clears the value of the field with the given name. It returns an
 // error if the field is not defined in the schema.
 func (m *DepositAddressMutation) ClearField(name string) error {
+	switch name {
+	case depositaddress.FieldConfirmationHeight:
+		m.ClearConfirmationHeight()
+		return nil
+	}
 	return fmt.Errorf("unknown DepositAddress nullable field %s", name)
 }
 
@@ -1743,6 +1853,9 @@ func (m *DepositAddressMutation) ResetField(name string) error {
 		return nil
 	case depositaddress.FieldOwnerSigningPubkey:
 		m.ResetOwnerSigningPubkey()
+		return nil
+	case depositaddress.FieldConfirmationHeight:
+		m.ResetConfirmationHeight()
 		return nil
 	}
 	return fmt.Errorf("unknown DepositAddress field %s", name)

@@ -26,7 +26,7 @@ func TestSwap(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create node signing private key: %v", err)
 	}
-	senderRootNode, err := testutil.CreateNewTree(senderConfig, senderLeafPrivKey, 100_000)
+	senderRootNode, err := testutil.CreateNewTree(t, senderConfig, senderLeafPrivKey, 100_000)
 	if err != nil {
 		t.Fatalf("failed to create new tree: %v", err)
 	}
@@ -41,7 +41,7 @@ func TestSwap(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create node signing private key: %v", err)
 	}
-	receiverRootNode, err := testutil.CreateNewTree(receiverConfig, receiverLeafPrivKey, 100_000)
+	receiverRootNode, err := testutil.CreateNewTree(t, receiverConfig, receiverLeafPrivKey, 100_000)
 	if err != nil {
 		t.Fatalf("failed to create new tree: %v", err)
 	}

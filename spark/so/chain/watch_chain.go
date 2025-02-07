@@ -3,18 +3,23 @@ package chain
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"fmt"
 	"log"
 
 	"github.com/btcsuite/btcd/btcjson"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/rpcclient"
+	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/lightsparkdev/spark-go/common"
 	"github.com/lightsparkdev/spark-go/so/ent"
 	"github.com/lightsparkdev/spark-go/so/ent/blockheight"
 	"github.com/lightsparkdev/spark-go/so/ent/cooperativeexit"
+	"github.com/lightsparkdev/spark-go/so/ent/depositaddress"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
+	"github.com/lightsparkdev/spark-go/so/ent/signingkeyshare"
+	"github.com/lightsparkdev/spark-go/so/ent/treenode"
 	"github.com/pebbe/zmq4"
 )
 
@@ -80,10 +85,10 @@ func WatchChain(dbClient *ent.Client, network common.Network) error {
 	}
 
 	// Scan missed blocks between restart
-
+	networkParams := common.NetworkParams(network)
 	if entBlockHeight.Height < latestBlockHeight {
 		log.Printf("Scanning missed blocks from %d and %d\n", entBlockHeight.Height+1, latestBlockHeight)
-		entBlockHeight, err = handleNewBlocks(ctx, dbClient, client, entBlockHeight, latestBlockHeight)
+		entBlockHeight, err = handleNewBlocks(ctx, dbClient, client, entBlockHeight, latestBlockHeight, *networkParams)
 		if err != nil {
 			return fmt.Errorf("failed to handle new blocks: %v", err)
 		}
@@ -143,12 +148,21 @@ func WatchChain(dbClient *ent.Client, network common.Network) error {
 			log.Printf("Block %s is already in the database\n", blockHash)
 			continue
 		} else if prevBlockHash.IsEqual(currBlockHash) {
-			entBlockHeight, err = handleNewBlocks(ctx, dbClient, client, entBlockHeight, entBlockHeight.Height+1)
+			newEntBlockHeight, err := handleNewBlocks(ctx, dbClient, client, entBlockHeight,
+				entBlockHeight.Height+1, *networkParams)
 			if err != nil {
 				log.Printf("Failed to handle new blocks: %v\n", err)
+				continue
 			}
+			if newEntBlockHeight == nil {
+				log.Printf("Failed to update block height\n")
+				continue
+			}
+			entBlockHeight = newEntBlockHeight
 		} else {
 			log.Printf("Block %s is not the next block\n", blockHash)
+			// TODO: handle missing a block, i.e. failed to process last block,
+			// and just needs to rescan from last scanned block height
 			handleReorg()
 		}
 	}
@@ -156,30 +170,14 @@ func WatchChain(dbClient *ent.Client, network common.Network) error {
 
 func handleReorg() {
 	// TOOD: implement reorg handling
+	// coop closes - just set confirmation height to 0 if new count is less than height
+	// deposits - lock the tree...?
 }
 
-func handleNewBlocks(ctx context.Context, db *ent.Client, client *rpcclient.Client, entBlockHeight *ent.BlockHeight, latestBlockHeight int64) (*ent.BlockHeight, error) {
-	// TODO: deposits
-
-	// Cooperative exits
-	// TODO: how to make sure no more get added while we're processing?
-	coopExits, err := db.CooperativeExit.Query().Where(
-		cooperativeexit.ConfirmationHeightIsNil(),
-	).All(ctx)
-	if err != nil {
-		return nil, err
-	}
-	coopExitTxs := make(map[[32]byte][]*ent.CooperativeExit)
-	for _, coopExit := range coopExits {
-		if len(coopExit.ExitTxid) != 32 {
-			return nil, fmt.Errorf("coop exit txid is not 32 bytes: %v", coopExit.ExitTxid)
-		}
-		exitTxid := [32]byte(coopExit.ExitTxid)
-		coopExitTxs[exitTxid] = append(coopExitTxs[exitTxid], coopExit)
-	}
-
+func handleNewBlocks(ctx context.Context, db *ent.Client, client *rpcclient.Client, entBlockHeight *ent.BlockHeight, latestBlockHeight int64, network chaincfg.Params) (*ent.BlockHeight, error) {
 	// Process blocks
 	initialLastScannedBlockHeight := entBlockHeight.Height
+	newEntBlockHeight := entBlockHeight
 	for blockHeight := initialLastScannedBlockHeight + 1; blockHeight < latestBlockHeight+1; blockHeight++ {
 		blockHash, err := client.GetBlockHash(blockHeight)
 		if err != nil {
@@ -189,47 +187,134 @@ func handleNewBlocks(ctx context.Context, db *ent.Client, client *rpcclient.Clie
 		if err != nil {
 			return nil, err
 		}
-
-		tx, err := db.Tx(ctx)
-		if err != nil {
-			return nil, err
-		}
-		entBlockHeight, err = handleBlock(ctx, tx, block, entBlockHeight, blockHeight, coopExitTxs)
-		if err != nil {
-			err = tx.Rollback()
+		txs := []wire.MsgTx{}
+		for _, tx := range block.Tx {
+			rawTx, err := txFromRPCTx(tx)
 			if err != nil {
 				return nil, err
 			}
+			txs = append(txs, rawTx)
 		}
-		err = tx.Commit()
+
+		dbTx, err := db.Tx(ctx)
+		if err != nil {
+			return nil, err
+		}
+		newEntBlockHeight, err = handleBlock(ctx, dbTx, txs, newEntBlockHeight, blockHeight, network)
+		if err != nil {
+			log.Printf("Failed to handle block: %v", err)
+			rollbackErr := dbTx.Rollback()
+			if err != nil {
+				return nil, rollbackErr
+			}
+			return nil, err
+		}
+		err = dbTx.Commit()
 		if err != nil {
 			return nil, err
 		}
 	}
-	return entBlockHeight, nil
+	return newEntBlockHeight, nil
 }
 
-func handleBlock(ctx context.Context, tx *ent.Tx, block *btcjson.GetBlockVerboseTxResult, entBlockHeight *ent.BlockHeight, blockHeight int64, coopExitTxs map[[32]byte][]*ent.CooperativeExit) (*ent.BlockHeight, error) {
-	entBlockHeight, err := tx.BlockHeight.UpdateOne(entBlockHeight).SetHeight(blockHeight).Save(ctx)
+func txFromRPCTx(txs btcjson.TxRawResult) (wire.MsgTx, error) {
+	rawTxBytes, err := hex.DecodeString(txs.Hex)
+	if err != nil {
+		return wire.MsgTx{}, err
+	}
+	r := bytes.NewReader(rawTxBytes)
+	var tx wire.MsgTx
+	err = tx.Deserialize(r)
+	if err != nil {
+		return wire.MsgTx{}, err
+	}
+	return tx, nil
+}
+
+func handleBlock(ctx context.Context, dbTx *ent.Tx, txs []wire.MsgTx, entBlockHeight *ent.BlockHeight, blockHeight int64, network chaincfg.Params) (*ent.BlockHeight, error) {
+	entBlockHeight, err := dbTx.BlockHeight.UpdateOne(entBlockHeight).SetHeight(blockHeight).Save(ctx)
 	if err != nil {
 		return nil, err
 	}
-	for _, tx := range block.Tx {
-		txid, err := chainhash.NewHashFromStr(tx.Txid)
-		if err != nil {
-			return nil, err
-		}
-		txidBytes := txid.CloneBytes()
-		if len(txidBytes) != 32 {
-			return nil, fmt.Errorf("txid returned by bitcoin RPC is not 32 bytes")
-		}
-		for _, coopExit := range coopExitTxs[[32]byte(txidBytes)] {
-			_, err = coopExit.Update().SetConfirmationHeight(blockHeight).Save(ctx)
+	confirmedTxids := make([][]byte, 0)
+	debitedAddresses := make([]string, 0)
+	for _, tx := range txs {
+		for _, txOut := range tx.TxOut {
+			_, addresses, _, err := txscript.ExtractPkScriptAddrs(txOut.PkScript, &network)
 			if err != nil {
 				return nil, err
 			}
-			log.Printf("Updated confirmation height for coop exit %s to %d\n", coopExit.ID, blockHeight)
+			for _, address := range addresses {
+				debitedAddresses = append(debitedAddresses, address.EncodeAddress())
+			}
+		}
+		txid := tx.TxHash()
+		confirmedTxids = append(confirmedTxids, txid[:])
+	}
+
+	_, err = dbTx.CooperativeExit.Update().
+		Where(cooperativeexit.ConfirmationHeightIsNil()).
+		Where(cooperativeexit.ExitTxidIn(confirmedTxids...)).
+		SetConfirmationHeight(blockHeight).
+		Save(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	confirmedDeposits, err := dbTx.DepositAddress.Query().
+		Where(depositaddress.ConfirmationHeightIsNil()).
+		Where(depositaddress.AddressIn(debitedAddresses...)).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, deposit := range confirmedDeposits {
+		_, err = dbTx.DepositAddress.UpdateOne(deposit).
+			SetConfirmationHeight(blockHeight).
+			Save(ctx)
+		if err != nil {
+			return nil, err
+		}
+		// TODO: only unlock if deposit reaches X confirmations
+		signingKeyShare, err := deposit.QuerySigningKeyshare().Only(ctx)
+		if err != nil {
+			return nil, err
+		}
+		treeNode, err := dbTx.TreeNode.Query().
+			Where(treenode.HasSigningKeyshareWith(signingkeyshare.ID(signingKeyShare.ID))).
+			Only(ctx)
+		if ent.IsNotFound(err) {
+			log.Printf("Deposit confirmed before tree creation: %s", deposit.Address)
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		if treeNode.Status != schema.TreeNodeStatusCreating {
+			log.Printf("Expected tree node status to be creating, got %s", treeNode.Status)
+			continue
+		}
+		treeNode, err = dbTx.TreeNode.UpdateOne(treeNode).
+			SetStatus(schema.TreeNodeStatusAvailable).
+			Save(ctx)
+		if err != nil {
+			return nil, err
+		}
+		tree, err := treeNode.QueryTree().Only(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if tree.Status != schema.TreeStatusPending {
+			log.Printf("Expected tree status to be pending, got %s", tree.Status)
+			continue
+		}
+		_, err = dbTx.Tree.UpdateOne(tree).
+			SetStatus(schema.TreeStatusAvailable).
+			Save(ctx)
+		if err != nil {
+			return nil, err
 		}
 	}
+
 	return entBlockHeight, nil
 }

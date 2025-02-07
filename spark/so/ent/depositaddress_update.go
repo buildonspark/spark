@@ -34,6 +34,33 @@ func (dau *DepositAddressUpdate) SetUpdateTime(t time.Time) *DepositAddressUpdat
 	return dau
 }
 
+// SetConfirmationHeight sets the "confirmation_height" field.
+func (dau *DepositAddressUpdate) SetConfirmationHeight(i int64) *DepositAddressUpdate {
+	dau.mutation.ResetConfirmationHeight()
+	dau.mutation.SetConfirmationHeight(i)
+	return dau
+}
+
+// SetNillableConfirmationHeight sets the "confirmation_height" field if the given value is not nil.
+func (dau *DepositAddressUpdate) SetNillableConfirmationHeight(i *int64) *DepositAddressUpdate {
+	if i != nil {
+		dau.SetConfirmationHeight(*i)
+	}
+	return dau
+}
+
+// AddConfirmationHeight adds i to the "confirmation_height" field.
+func (dau *DepositAddressUpdate) AddConfirmationHeight(i int64) *DepositAddressUpdate {
+	dau.mutation.AddConfirmationHeight(i)
+	return dau
+}
+
+// ClearConfirmationHeight clears the value of the "confirmation_height" field.
+func (dau *DepositAddressUpdate) ClearConfirmationHeight() *DepositAddressUpdate {
+	dau.mutation.ClearConfirmationHeight()
+	return dau
+}
+
 // Mutation returns the DepositAddressMutation object of the builder.
 func (dau *DepositAddressUpdate) Mutation() *DepositAddressMutation {
 	return dau.mutation
@@ -98,6 +125,15 @@ func (dau *DepositAddressUpdate) sqlSave(ctx context.Context) (n int, err error)
 	if value, ok := dau.mutation.UpdateTime(); ok {
 		_spec.SetField(depositaddress.FieldUpdateTime, field.TypeTime, value)
 	}
+	if value, ok := dau.mutation.ConfirmationHeight(); ok {
+		_spec.SetField(depositaddress.FieldConfirmationHeight, field.TypeInt64, value)
+	}
+	if value, ok := dau.mutation.AddedConfirmationHeight(); ok {
+		_spec.AddField(depositaddress.FieldConfirmationHeight, field.TypeInt64, value)
+	}
+	if dau.mutation.ConfirmationHeightCleared() {
+		_spec.ClearField(depositaddress.FieldConfirmationHeight, field.TypeInt64)
+	}
 	if n, err = sqlgraph.UpdateNodes(ctx, dau.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{depositaddress.Label}
@@ -121,6 +157,33 @@ type DepositAddressUpdateOne struct {
 // SetUpdateTime sets the "update_time" field.
 func (dauo *DepositAddressUpdateOne) SetUpdateTime(t time.Time) *DepositAddressUpdateOne {
 	dauo.mutation.SetUpdateTime(t)
+	return dauo
+}
+
+// SetConfirmationHeight sets the "confirmation_height" field.
+func (dauo *DepositAddressUpdateOne) SetConfirmationHeight(i int64) *DepositAddressUpdateOne {
+	dauo.mutation.ResetConfirmationHeight()
+	dauo.mutation.SetConfirmationHeight(i)
+	return dauo
+}
+
+// SetNillableConfirmationHeight sets the "confirmation_height" field if the given value is not nil.
+func (dauo *DepositAddressUpdateOne) SetNillableConfirmationHeight(i *int64) *DepositAddressUpdateOne {
+	if i != nil {
+		dauo.SetConfirmationHeight(*i)
+	}
+	return dauo
+}
+
+// AddConfirmationHeight adds i to the "confirmation_height" field.
+func (dauo *DepositAddressUpdateOne) AddConfirmationHeight(i int64) *DepositAddressUpdateOne {
+	dauo.mutation.AddConfirmationHeight(i)
+	return dauo
+}
+
+// ClearConfirmationHeight clears the value of the "confirmation_height" field.
+func (dauo *DepositAddressUpdateOne) ClearConfirmationHeight() *DepositAddressUpdateOne {
+	dauo.mutation.ClearConfirmationHeight()
 	return dauo
 }
 
@@ -217,6 +280,15 @@ func (dauo *DepositAddressUpdateOne) sqlSave(ctx context.Context) (_node *Deposi
 	}
 	if value, ok := dauo.mutation.UpdateTime(); ok {
 		_spec.SetField(depositaddress.FieldUpdateTime, field.TypeTime, value)
+	}
+	if value, ok := dauo.mutation.ConfirmationHeight(); ok {
+		_spec.SetField(depositaddress.FieldConfirmationHeight, field.TypeInt64, value)
+	}
+	if value, ok := dauo.mutation.AddedConfirmationHeight(); ok {
+		_spec.AddField(depositaddress.FieldConfirmationHeight, field.TypeInt64, value)
+	}
+	if dauo.mutation.ConfirmationHeightCleared() {
+		_spec.ClearField(depositaddress.FieldConfirmationHeight, field.TypeInt64)
 	}
 	_node = &DepositAddress{config: dauo.config}
 	_spec.Assign = _node.assignValues
