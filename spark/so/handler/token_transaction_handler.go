@@ -28,8 +28,9 @@ func NewTokenTransactionHandler(config authz.Config) *TokenTransactionHandler {
 	}
 }
 
-// Rreserves new keyshares for revocation keys on created leaves.
-func (o *TokenTransactionHandler) generateTokenLeafRevocationKeys(
+// generateTokenTransactionKeyshare reserves new keyshares for revocation keys on created leaves and
+// recovers the revocation keys from the distributed keyshares for spent leaves.
+func (o *TokenTransactionHandler) generateAndResolveRevocationKeys(
 	ctx context.Context,
 	config *so.Config,
 	tokenTransaction *pb.TokenTransaction,
@@ -115,14 +116,44 @@ func (o TokenTransactionHandler) StartTokenTransaction(ctx context.Context, conf
 
 	// TODO: Add a call to the LRC20 node to verify the validity of the transaction payload.
 
-	finalTokenTransaction, _, keyshareInfo, err := o.generateTokenLeafRevocationKeys(ctx, config, req.GetPartialTokenTransaction())
+	finalTokenTransaction, keyshareIDStrings, keyshareInfo, err := o.generateAndResolveRevocationKeys(ctx, config, req.GetPartialTokenTransaction())
 	if err != nil {
 		return nil, err
 	}
 
+	// Ask all the coordinators to sign the token transaction
+	signingOperatorSelection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionAll}
+	signatureResponses, err := helper.ExecuteTaskWithAllOperators(ctx, config, &signingOperatorSelection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
+		conn, err := common.NewGRPCConnection(operator.Address)
+		if err != nil {
+			log.Printf("Failed to connect to operator for marking token transaction keyshare: %v", err)
+			return nil, err
+		}
+		defer conn.Close()
+
+		client := pbinternal.NewSparkInternalServiceClient(conn)
+		response, err := client.SignTokenTransaction(ctx, &pbinternal.SignTokenTransactionRequest{
+			TokenTransaction:                finalTokenTransaction,
+			TokenTransactionSignatures:      req.TokenTransactionSignatures,
+			OutputLeafRevocationKeyshareIds: keyshareIDStrings})
+		return response, err
+	})
+	if err != nil {
+		log.Printf("Failed to execute mark token transaction keyshare task with all operators: %v", err)
+		return nil, err
+	}
+
+	// Convert the signing operator list to a map of identifier to identity public key
+	sparkOperatorSignatures := make(map[string][]byte)
+	for identifier, signatureResponse := range signatureResponses {
+		sparkOperatorSignatures[identifier] = signatureResponse.(*pbinternal.SignTokenTransactionResponse).OperatorSignature
+	}
+
+	// TODO: Add a call to the LRC20 node to finalize the transaction payload.
+
 	return &pb.StartTokenTransactionResponse{
 		FinalTokenTransaction:   finalTokenTransaction,
-		SparkOperatorSignatures: nil, // TODO: Implement signature generation.
+		SparkOperatorSignatures: sparkOperatorSignatures,
 		KeyshareInfo:            keyshareInfo,
 	}, nil
 }

@@ -328,3 +328,13 @@ func (s *SparkInternalServer) ReturnLightningPayment(ctx context.Context, req *p
 	lightningHandler := handler.NewLightningHandler(s.config, s.onchainHelper)
 	return wrapWithGRPCError(lightningHandler.ReturnLightningPayment(ctx, req, true))
 }
+
+// SignTokenTransaction signs a token transaction for the given request.
+func (s *SparkInternalServer) SignTokenTransaction(ctx context.Context, req *pb.SignTokenTransactionRequest) (*pb.SignTokenTransactionResponse, error) {
+	tokenTransactionHandler := handler.NewInternalTokenTransactionHandler(s.config)
+	result, err := tokenTransactionHandler.SignTokenTransaction(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
