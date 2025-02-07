@@ -53,9 +53,9 @@ export type LeafRefundSigningData = {
   vout: number;
 };
 
-export class TransferService {
-  readonly config: WalletConfigService;
-  readonly connectionManager: ConnectionManager;
+export class BaseTransferService {
+  protected readonly config: WalletConfigService;
+  protected readonly connectionManager: ConnectionManager;
 
   constructor(
     config: WalletConfigService,
@@ -63,6 +63,279 @@ export class TransferService {
   ) {
     this.config = config;
     this.connectionManager = connectionManager;
+  }
+
+  async sendTransferTweakKey(
+    transfer: Transfer,
+    leaves: LeafKeyTweak[],
+    refundSignatureMap: Map<string, Uint8Array>
+  ): Promise<Transfer> {
+    const keyTweakInputMap = this.prepareSendTransferKeyTweaks(
+      transfer,
+      leaves,
+      refundSignatureMap
+    );
+
+    let updatedTransfer: Transfer | undefined;
+    const errors: Error[] = [];
+    const promises = Object.entries(
+      this.config.getConfig().signingOperators
+    ).map(async ([identifier, operator]) => {
+      const sparkClient = await this.connectionManager.createSparkClient(
+        operator.address
+      );
+
+      const leavesToSend = keyTweakInputMap.get(identifier);
+      if (!leavesToSend) {
+        errors.push(new Error(`No leaves to send for operator ${identifier}`));
+        return;
+      }
+      let transferResp: CompleteSendTransferResponse;
+      try {
+        transferResp = await sparkClient.complete_send_transfer({
+          transferId: transfer.id,
+          ownerIdentityPublicKey: this.config.signer.getIdentityPublicKey(),
+          leavesToSend,
+        });
+      } catch (error) {
+        errors.push(new Error(`Error completing send transfer: ${error}`));
+        return;
+      } finally {
+        sparkClient.close?.();
+      }
+
+      if (!updatedTransfer) {
+        updatedTransfer = transferResp.transfer;
+      } else {
+        if (!transferResp.transfer) {
+          errors.push(
+            new Error(`No transfer response from operator ${identifier}`)
+          );
+          return;
+        }
+
+        if (!this.compareTransfers(updatedTransfer, transferResp.transfer)) {
+          errors.push(
+            new Error(`Inconsistent transfer response from operators`)
+          );
+        }
+      }
+    });
+
+    await Promise.all(promises);
+
+    if (errors.length > 0) {
+      throw new Error(`Error completing send transfer: ${errors[0]}`);
+    }
+
+    if (!updatedTransfer) {
+      throw new Error("No updated transfer found");
+    }
+
+    return updatedTransfer;
+  }
+
+  async signRefunds(
+    leafDataMap: Map<string, ClaimLeafData>,
+    operatorSigningResults: LeafRefundTxSigningResult[],
+    adaptorPubKey?: Uint8Array
+  ): Promise<NodeSignatures[]> {
+    const nodeSignatures: NodeSignatures[] = [];
+    for (const operatorSigningResult of operatorSigningResults) {
+      const leafData = leafDataMap.get(operatorSigningResult.leafId);
+      if (
+        !leafData ||
+        !leafData.tx ||
+        leafData.vout === undefined ||
+        !leafData.refundTx
+      ) {
+        throw new Error(
+          `Leaf data not found for leaf ${operatorSigningResult.leafId}`
+        );
+      }
+
+      const txOutput = leafData.tx?.getOutput(leafData.vout);
+      if (!txOutput) {
+        throw new Error(
+          `Output not found for leaf ${operatorSigningResult.leafId}`
+        );
+      }
+
+      const refundTxSighash = getSigHashFromTx(leafData.refundTx, 0, txOutput);
+
+      const userSignature = this.config.signer.signFrost({
+        message: refundTxSighash,
+        publicKey: leafData.signingPubKey,
+        privateAsPubKey: leafData.signingPubKey,
+        selfCommitment: leafData.signingNonceCommitment,
+        statechainCommitments:
+          operatorSigningResult.refundTxSigningResult?.signingNonceCommitments,
+        adaptorPubKey: adaptorPubKey,
+        verifyingKey: operatorSigningResult.verifyingKey,
+      });
+
+      const refundAggregate = this.config.signer.aggregateFrost({
+        message: refundTxSighash,
+        statechainSignatures:
+          operatorSigningResult.refundTxSigningResult?.signatureShares,
+        statechainPublicKeys:
+          operatorSigningResult.refundTxSigningResult?.publicKeys,
+        verifyingKey: operatorSigningResult.verifyingKey,
+        statechainCommitments:
+          operatorSigningResult.refundTxSigningResult?.signingNonceCommitments,
+        selfCommitment: leafData.signingNonceCommitment,
+        publicKey: leafData.signingPubKey,
+        selfSignature: userSignature,
+        adaptorPubKey: adaptorPubKey,
+      });
+
+      nodeSignatures.push({
+        nodeId: operatorSigningResult.leafId,
+        refundTxSignature: refundAggregate,
+        nodeTxSignature: new Uint8Array(),
+      });
+    }
+
+    return nodeSignatures;
+  }
+
+  private prepareSendTransferKeyTweaks(
+    transfer: Transfer,
+    leaves: LeafKeyTweak[],
+    refundSignatureMap: Map<string, Uint8Array>
+  ): Map<string, SendLeafKeyTweak[]> {
+    const receiverEciesPubKey = ecies.PublicKey.fromHex(
+      bytesToHex(transfer.receiverIdentityPublicKey)
+    );
+
+    const leavesTweaksMap = new Map<string, SendLeafKeyTweak[]>();
+
+    for (const leaf of leaves) {
+      const refundSignature = refundSignatureMap.get(leaf.leaf.id);
+      const leafTweaksMap = this.prepareSingleSendTransferKeyTweak(
+        transfer.id,
+        leaf,
+        receiverEciesPubKey,
+        refundSignature
+      );
+      for (const [identifier, leafTweak] of leafTweaksMap) {
+        leavesTweaksMap.set(identifier, [
+          ...(leavesTweaksMap.get(identifier) || []),
+          leafTweak,
+        ]);
+      }
+    }
+
+    return leavesTweaksMap;
+  }
+
+  private prepareSingleSendTransferKeyTweak(
+    transferID: string,
+    leaf: LeafKeyTweak,
+    receiverEciesPubKey: ecies.PublicKey,
+    refundSignature?: Uint8Array
+  ): Map<string, SendLeafKeyTweak> {
+    const pubKeyTweak = this.config.signer.subtractPrivateKeysGivenPublicKeys(
+      leaf.signingPubKey,
+      leaf.newSigningPubKey
+    );
+
+    const shares = this.config.signer.splitSecretWithProofs({
+      secret: pubKeyTweak,
+      isSecretPubkey: true,
+      curveOrder: secp256k1.CURVE.n,
+      threshold: this.config.getConfig().threshold,
+      numShares: Object.keys(this.config.getConfig().signingOperators).length,
+    });
+
+    const pubkeySharesTweak = new Map<string, Uint8Array>();
+    for (const [identifier, operator] of Object.entries(
+      this.config.getConfig().signingOperators
+    )) {
+      const share = this.findShare(shares, operator.id);
+      if (!share) {
+        throw new Error(`Share not found for operator ${operator.id}`);
+      }
+
+      const pubkeyTweak = secp256k1.getPublicKey(
+        numberToBytesBE(share.share, 32),
+        true
+      );
+      pubkeySharesTweak.set(identifier, pubkeyTweak);
+    }
+
+    const secretCipher = this.config.signer.encryptLeafPrivateKeyEcies(
+      receiverEciesPubKey.toBytes(),
+      leaf.newSigningPubKey
+    );
+
+    const encoder = new TextEncoder();
+    const payload = new Uint8Array([
+      ...encoder.encode(leaf.leaf.id),
+      ...encoder.encode(transferID),
+      ...secretCipher,
+    ]);
+
+    const payloadHash = sha256(payload);
+    const signature =
+      this.config.signer.signEcdsaWithIdentityPrivateKey(payloadHash);
+
+    const leafTweaksMap = new Map<string, SendLeafKeyTweak>();
+    for (const [identifier, operator] of Object.entries(
+      this.config.getConfig().signingOperators
+    )) {
+      const share = this.findShare(shares, operator.id);
+      if (!share) {
+        throw new Error(`Share not found for operator ${operator.id}`);
+      }
+
+      leafTweaksMap.set(identifier, {
+        leafId: leaf.leaf.id,
+        secretShareTweak: {
+          secretShare: numberToBytesBE(share.share, 32),
+          proofs: share.proofs,
+        },
+        pubkeySharesTweak: Object.fromEntries(pubkeySharesTweak),
+        secretCipher,
+        signature,
+        refundSignature: refundSignature ?? new Uint8Array(),
+      });
+    }
+
+    return leafTweaksMap;
+  }
+
+  protected findShare(shares: VerifiableSecretShare[], operatorID: number) {
+    const targetShareIndex = BigInt(operatorID + 1);
+    for (const s of shares) {
+      if (s.index === targetShareIndex) {
+        return s;
+      }
+    }
+    return undefined;
+  }
+
+  private compareTransfers(transfer1: Transfer, transfer2: Transfer) {
+    return (
+      transfer1.id === transfer2.id &&
+      equalBytes(
+        transfer1.senderIdentityPublicKey,
+        transfer2.senderIdentityPublicKey
+      ) &&
+      transfer1.status === transfer2.status &&
+      transfer1.totalValue === transfer2.totalValue &&
+      transfer1.expiryTime?.getTime() === transfer2.expiryTime?.getTime() &&
+      transfer1.leaves.length === transfer2.leaves.length
+    );
+  }
+}
+
+export class TransferService extends BaseTransferService {
+  constructor(
+    config: WalletConfigService,
+    connectionManager: ConnectionManager
+  ) {
+    super(config, connectionManager);
   }
 
   async sendTransfer(
@@ -142,76 +415,6 @@ export class TransferService {
       leafPubKeyMap.set(leaf.leaf.id, leafSecret);
     }
     return leafPubKeyMap;
-  }
-
-  async sendTransferTweakKey(
-    transfer: Transfer,
-    leaves: LeafKeyTweak[],
-    refundSignatureMap: Map<string, Uint8Array>
-  ): Promise<Transfer> {
-    const keyTweakInputMap = this.prepareSendTransferKeyTweaks(
-      transfer,
-      leaves,
-      refundSignatureMap
-    );
-
-    let updatedTransfer: Transfer | undefined;
-    const errors: Error[] = [];
-    const promises = Object.entries(
-      this.config.getConfig().signingOperators
-    ).map(async ([identifier, operator]) => {
-      const sparkClient = await this.connectionManager.createSparkClient(
-        operator.address
-      );
-
-      const leavesToSend = keyTweakInputMap.get(identifier);
-      if (!leavesToSend) {
-        errors.push(new Error(`No leaves to send for operator ${identifier}`));
-        return;
-      }
-      let transferResp: CompleteSendTransferResponse;
-      try {
-        transferResp = await sparkClient.complete_send_transfer({
-          transferId: transfer.id,
-          ownerIdentityPublicKey: this.config.signer.getIdentityPublicKey(),
-          leavesToSend,
-        });
-      } catch (error) {
-        errors.push(new Error(`Error completing send transfer: ${error}`));
-        return;
-      } finally {
-        sparkClient.close?.();
-      }
-
-      if (!updatedTransfer) {
-        updatedTransfer = transferResp.transfer;
-      } else {
-        if (!transferResp.transfer) {
-          errors.push(
-            new Error(`No transfer response from operator ${identifier}`)
-          );
-          return;
-        }
-
-        if (!this.compareTransfers(updatedTransfer, transferResp.transfer)) {
-          errors.push(
-            new Error(`Inconsistent transfer response from operators`)
-          );
-        }
-      }
-    });
-
-    await Promise.all(promises);
-
-    if (errors.length > 0) {
-      throw new Error(`Error completing send transfer: ${errors[0]}`);
-    }
-
-    if (!updatedTransfer) {
-      throw new Error("No updated transfer found");
-    }
-
-    return updatedTransfer;
   }
 
   async sendSwapSignRefund(
@@ -360,112 +563,6 @@ export class TransferService {
       signatureMap,
       leafDataMap,
     };
-  }
-
-  private prepareSendTransferKeyTweaks(
-    transfer: Transfer,
-    leaves: LeafKeyTweak[],
-    refundSignatureMap: Map<string, Uint8Array>
-  ): Map<string, SendLeafKeyTweak[]> {
-    const receiverEciesPubKey = ecies.PublicKey.fromHex(
-      bytesToHex(transfer.receiverIdentityPublicKey)
-    );
-
-    const leavesTweaksMap = new Map<string, SendLeafKeyTweak[]>();
-
-    for (const leaf of leaves) {
-      const refundSignature = refundSignatureMap.get(leaf.leaf.id);
-      const leafTweaksMap = this.prepareSingleSendTransferKeyTweak(
-        transfer.id,
-        leaf,
-        receiverEciesPubKey,
-        refundSignature
-      );
-      for (const [identifier, leafTweak] of leafTweaksMap) {
-        leavesTweaksMap.set(identifier, [
-          ...(leavesTweaksMap.get(identifier) || []),
-          leafTweak,
-        ]);
-      }
-    }
-
-    return leavesTweaksMap;
-  }
-
-  private prepareSingleSendTransferKeyTweak(
-    transferID: string,
-    leaf: LeafKeyTweak,
-    receiverEciesPubKey: ecies.PublicKey,
-    refundSignature?: Uint8Array
-  ): Map<string, SendLeafKeyTweak> {
-    const pubKeyTweak = this.config.signer.subtractPrivateKeysGivenPublicKeys(
-      leaf.signingPubKey,
-      leaf.newSigningPubKey
-    );
-
-    const shares = this.config.signer.splitSecretWithProofs({
-      secret: pubKeyTweak,
-      isSecretPubkey: true,
-      curveOrder: secp256k1.CURVE.n,
-      threshold: this.config.getConfig().threshold,
-      numShares: Object.keys(this.config.getConfig().signingOperators).length,
-    });
-
-    const pubkeySharesTweak = new Map<string, Uint8Array>();
-    for (const [identifier, operator] of Object.entries(
-      this.config.getConfig().signingOperators
-    )) {
-      const share = this.findShare(shares, operator.id);
-      if (!share) {
-        throw new Error(`Share not found for operator ${operator.id}`);
-      }
-
-      const pubkeyTweak = secp256k1.getPublicKey(
-        numberToBytesBE(share.share, 32),
-        true
-      );
-      pubkeySharesTweak.set(identifier, pubkeyTweak);
-    }
-
-    const secretCipher = this.config.signer.encryptLeafPrivateKeyEcies(
-      receiverEciesPubKey.toBytes(),
-      leaf.newSigningPubKey
-    );
-
-    const encoder = new TextEncoder();
-    const payload = new Uint8Array([
-      ...encoder.encode(leaf.leaf.id),
-      ...encoder.encode(transferID),
-      ...secretCipher,
-    ]);
-
-    const payloadHash = sha256(payload);
-    const signature =
-      this.config.signer.signEcdsaWithIdentityPrivateKey(payloadHash);
-
-    const leafTweaksMap = new Map<string, SendLeafKeyTweak>();
-    for (const [identifier, operator] of Object.entries(
-      this.config.getConfig().signingOperators
-    )) {
-      const share = this.findShare(shares, operator.id);
-      if (!share) {
-        throw new Error(`Share not found for operator ${operator.id}`);
-      }
-
-      leafTweaksMap.set(identifier, {
-        leafId: leaf.leaf.id,
-        secretShareTweak: {
-          secretShare: numberToBytesBE(share.share, 32),
-          proofs: share.proofs,
-        },
-        pubkeySharesTweak: Object.fromEntries(pubkeySharesTweak),
-        secretCipher,
-        signature,
-        refundSignature: refundSignature ?? new Uint8Array(),
-      });
-    }
-
-    return leafTweaksMap;
   }
 
   private prepareRefundSoSigningJobs(
@@ -652,70 +749,6 @@ export class TransferService {
     return this.signRefunds(leafDataMap, resp.signingResults);
   }
 
-  async signRefunds(
-    leafDataMap: Map<string, ClaimLeafData>,
-    operatorSigningResults: LeafRefundTxSigningResult[],
-    adaptorPubKey?: Uint8Array
-  ): Promise<NodeSignatures[]> {
-    const nodeSignatures: NodeSignatures[] = [];
-    for (const operatorSigningResult of operatorSigningResults) {
-      const leafData = leafDataMap.get(operatorSigningResult.leafId);
-      if (
-        !leafData ||
-        !leafData.tx ||
-        leafData.vout === undefined ||
-        !leafData.refundTx
-      ) {
-        throw new Error(
-          `Leaf data not found for leaf ${operatorSigningResult.leafId}`
-        );
-      }
-
-      const txOutput = leafData.tx?.getOutput(leafData.vout);
-      if (!txOutput) {
-        throw new Error(
-          `Output not found for leaf ${operatorSigningResult.leafId}`
-        );
-      }
-
-      const refundTxSighash = getSigHashFromTx(leafData.refundTx, 0, txOutput);
-
-      const userSignature = this.config.signer.signFrost({
-        message: refundTxSighash,
-        publicKey: leafData.signingPubKey,
-        privateAsPubKey: leafData.signingPubKey,
-        selfCommitment: leafData.signingNonceCommitment,
-        statechainCommitments:
-          operatorSigningResult.refundTxSigningResult?.signingNonceCommitments,
-        adaptorPubKey: adaptorPubKey,
-        verifyingKey: operatorSigningResult.verifyingKey,
-      });
-
-      const refundAggregate = this.config.signer.aggregateFrost({
-        message: refundTxSighash,
-        statechainSignatures:
-          operatorSigningResult.refundTxSigningResult?.signatureShares,
-        statechainPublicKeys:
-          operatorSigningResult.refundTxSigningResult?.publicKeys,
-        verifyingKey: operatorSigningResult.verifyingKey,
-        statechainCommitments:
-          operatorSigningResult.refundTxSigningResult?.signingNonceCommitments,
-        selfCommitment: leafData.signingNonceCommitment,
-        publicKey: leafData.signingPubKey,
-        selfSignature: userSignature,
-        adaptorPubKey: adaptorPubKey,
-      });
-
-      nodeSignatures.push({
-        nodeId: operatorSigningResult.leafId,
-        refundTxSignature: refundAggregate,
-        nodeTxSignature: new Uint8Array(),
-      });
-    }
-
-    return nodeSignatures;
-  }
-
   private async finalizeTransfer(nodeSignatures: NodeSignatures[]) {
     const sparkClient = await this.connectionManager.createSparkClient(
       this.config.getCoordinatorAddress()
@@ -730,29 +763,5 @@ export class TransferService {
     } finally {
       sparkClient.close?.();
     }
-  }
-
-  private findShare(shares: VerifiableSecretShare[], operatorID: number) {
-    const targetShareIndex = BigInt(operatorID + 1);
-    for (const s of shares) {
-      if (s.index === targetShareIndex) {
-        return s;
-      }
-    }
-    return undefined;
-  }
-
-  private compareTransfers(transfer1: Transfer, transfer2: Transfer) {
-    return (
-      transfer1.id === transfer2.id &&
-      equalBytes(
-        transfer1.senderIdentityPublicKey,
-        transfer2.senderIdentityPublicKey
-      ) &&
-      transfer1.status === transfer2.status &&
-      transfer1.totalValue === transfer2.totalValue &&
-      transfer1.expiryTime?.getTime() === transfer2.expiryTime?.getTime() &&
-      transfer1.leaves.length === transfer2.leaves.length
-    );
   }
 }

@@ -23,6 +23,7 @@ import {
   SignFrostParams,
 } from "./utils/wasm";
 
+import { CoopExitService } from "./services/coop-exit";
 import { LightningService } from "./services/lightning";
 import { SparkSigner } from "./signer/signer";
 import { getP2TRAddressFromPublicKey } from "./utils/bitcoin";
@@ -42,7 +43,7 @@ export class SparkWallet {
   private transferService: TransferService;
   private treeCreationService: TreeCreationService;
   private lightningService: LightningService;
-
+  private coopExitService: CoopExitService;
   private wasmModule: InitOutput | null = null;
 
   constructor(network: Network, signer?: SparkSigner) {
@@ -63,6 +64,10 @@ export class SparkWallet {
       this.connectionManager
     );
     this.lightningService = new LightningService(
+      this.config,
+      this.connectionManager
+    );
+    this.coopExitService = new CoopExitService(
       this.config,
       this.connectionManager
     );

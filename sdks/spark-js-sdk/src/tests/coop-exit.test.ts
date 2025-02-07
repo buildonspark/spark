@@ -5,7 +5,7 @@ import { sha256 } from "@scure/btc-signer/utils";
 import { WalletConfigService } from "../services/config";
 import { ConnectionManager } from "../services/connection";
 import { CoopExitService } from "../services/coop-exit";
-import { LeafKeyTweak, TransferService } from "../services/transfer";
+import { LeafKeyTweak } from "../services/transfer";
 import { SparkWallet } from "../spark-sdk";
 import {
   getP2TRAddressFromPublicKey,
@@ -34,14 +34,9 @@ describe("coop exit", () => {
       wallet.getSigner()
     );
     const connectionManager = new ConnectionManager(configService);
-    const transferService = new TransferService(
-      configService,
-      connectionManager
-    );
     const coopExitService = new CoopExitService(
       configService,
-      connectionManager,
-      transferService
+      connectionManager
     );
 
     const leafPubKey = wallet.getSigner().generatePublicKey(sha256("asdf"));

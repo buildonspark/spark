@@ -14,9 +14,9 @@ import { getNextTransactionSequence } from "../utils/transaction";
 import { WalletConfigService } from "./config";
 import { ConnectionManager } from "./connection";
 import {
+  BaseTransferService,
   LeafKeyTweak,
   LeafRefundSigningData,
-  TransferService,
 } from "./transfer";
 
 const TIME_LOCK_INTERVAL = 100;
@@ -28,20 +28,12 @@ export type GetConnectorRefundSignaturesParams = {
   receiverPubKey: Uint8Array;
 };
 
-export class CoopExitService {
-  private readonly config: WalletConfigService;
-  private readonly connectionManager: ConnectionManager;
-  private readonly transferService: TransferService;
-
+export class CoopExitService extends BaseTransferService {
   constructor(
     config: WalletConfigService,
-    connectionManager: ConnectionManager,
-    // TODO: Restructure this so that the transfer service is not required??
-    transferService: TransferService
+    connectionManager: ConnectionManager
   ) {
-    this.config = config;
-    this.connectionManager = connectionManager;
-    this.transferService = transferService;
+    super(config, connectionManager);
   }
 
   async getConnectorRefundSignatures({
@@ -59,7 +51,7 @@ export class CoopExitService {
       connectorOutputs,
       receiverPubKey
     );
-    const transferTweak = await this.transferService.sendTransferTweakKey(
+    const transferTweak = await this.sendTransferTweakKey(
       transfer,
       leaves,
       signaturesMap
@@ -178,7 +170,7 @@ export class CoopExitService {
       throw new Error("Failed to initiate cooperative exit");
     }
 
-    const signatures = await this.transferService.signRefunds(
+    const signatures = await this.signRefunds(
       leafDataMap,
       response.signingResults
     );

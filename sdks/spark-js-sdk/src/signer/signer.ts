@@ -57,6 +57,7 @@ export type SplitSecretWithProofsParams = {
   numShares: number;
 };
 
+// TODO: Properly clean up keys when they are no longer needed
 interface SparkSigner {
   getIdentityPublicKey(): Uint8Array;
 
@@ -136,12 +137,6 @@ class DefaultSparkSigner implements SparkSigner {
 
     return this.createSparkWalletFromSeed(seed);
   }
-
-  /////
-  ////
-  //
-  //
-  //
 
   generatePublicKey(hash?: Uint8Array): Uint8Array {
     if (!this.identityPrivateKey) {
@@ -248,8 +243,6 @@ class DefaultSparkSigner implements SparkSigner {
     if (!nonce) {
       throw new Error("Nonce is not set");
     }
-
-    this.commitmentToNonceMap.delete(selfCommitment);
 
     const keyPackage = new KeyPackage(
       hexToBytes(signingPrivateKey),
