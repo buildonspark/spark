@@ -20,6 +20,7 @@ require (
 	github.com/nbd-wtf/ln-decodepay v1.13.0
 	github.com/pebbe/zmq4 v1.2.11
 	github.com/stretchr/testify v1.10.0
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
@@ -84,7 +85,6 @@ require (
 	golang.org/x/sync v0.10.0 // indirect
 	golang.org/x/term v0.28.0 // indirect
 	golang.org/x/tools v0.29.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
 require (

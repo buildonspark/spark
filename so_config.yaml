@@ -1,0 +1,7 @@
+bitcoind:
+  regtest:
+    network: regtest
+    host: 127.0.0.1:18443
+    rpcuser: admin1
+    rpcpassword: 123
+    zmqpubrawblock: tcp://127.0.0.1:28332

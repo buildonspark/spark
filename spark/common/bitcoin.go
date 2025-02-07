@@ -30,6 +30,21 @@ const (
 	Signet
 )
 
+func NetworkFromString(network string) (Network, error) {
+	switch network {
+	case "mainnet":
+		return Mainnet, nil
+	case "regtest":
+		return Regtest, nil
+	case "testnet":
+		return Testnet, nil
+	case "signet":
+		return Signet, nil
+	default:
+		return Mainnet, fmt.Errorf("invalid network: %s", network)
+	}
+}
+
 func NetworkFromProtoNetwork(protoNetwork pb.Network) (Network, error) {
 	switch protoNetwork {
 	case pb.Network_MAINNET:

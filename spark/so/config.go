@@ -9,6 +9,7 @@ import (
 	"github.com/lightsparkdev/spark-go/common"
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
 	"github.com/lightsparkdev/spark-go/so/utils"
+	"gopkg.in/yaml.v3"
 )
 
 // Config is the configuration for the signing operator.
@@ -34,6 +35,8 @@ type Config struct {
 	DKGCoordinatorAddress string
 	// SupportedNetworks is the list of networks supported by the signing operator.
 	SupportedNetworks []common.Network
+	// BitcoindConfigs is the configurations for different bitcoin nodes.
+	BitcoindConfigs map[string]BitcoindConfig
 }
 
 // DatabaseDriver returns the database driver based on the database path.
@@ -44,8 +47,23 @@ func (c *Config) DatabaseDriver() string {
 	return "sqlite3"
 }
 
+// BitcoindConfigs a map of bitcoind configurations per network.
+type BitcoindConfigs struct {
+	Bitcoind map[string]BitcoindConfig `yaml:"bitcoind"`
+}
+
+// BitcoindConfig is the configuration for a bitcoind node.
+type BitcoindConfig struct {
+	Network        string `yaml:"network"`
+	Host           string `yaml:"host"`
+	User           string `yaml:"rpcuser"`
+	Password       string `yaml:"rpcpassword"`
+	ZmqPubRawBlock string `yaml:"zmqpubrawblock"`
+}
+
 // NewConfig creates a new config for the signing operator.
 func NewConfig(
+	configFilePath string,
 	index uint64,
 	identityPrivateKey string,
 	operatorsFilePath string,
@@ -66,6 +84,16 @@ func NewConfig(
 		return nil, err
 	}
 
+	data, err := os.ReadFile(configFilePath)
+	if err != nil {
+		return nil, err
+	}
+
+	var bitcoindConfigs BitcoindConfigs
+	if err := yaml.Unmarshal(data, &bitcoindConfigs); err != nil {
+		return nil, err
+	}
+
 	return &Config{
 		Index:                 index,
 		Identifier:            utils.IndexToIdentifier(index),
@@ -77,6 +105,7 @@ func NewConfig(
 		authzEnforced:         authzEnforced,
 		DKGCoordinatorAddress: dkgCoordinatorAddress,
 		SupportedNetworks:     supportedNetworks,
+		BitcoindConfigs:       bitcoindConfigs.Bitcoind,
 	}, nil
 }
 

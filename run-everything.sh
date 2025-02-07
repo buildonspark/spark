@@ -319,11 +319,12 @@ EOF
 
 # Function to run operators in tmux
 run_operators_tmux() {
+   local config_file="so_config.yaml"
    local run_dir=$1
    local min_signers=$2
    local priv_keys=("${@:3}")  # Get private keys array from remaining args
    local session_name="operators"
-   local config_file="${run_dir}/config.json"
+   local operator_config_file="${run_dir}/config.json"
    
    # Kill existing session if it exists
    if tmux has-session -t "$session_name" 2>/dev/null; then
@@ -354,9 +355,10 @@ run_operators_tmux() {
        
        # Construct the command with all parameters
        local cmd="${run_dir}/bin/operator \
+           -config '${config_file}' \
            -index ${i} \
            -key '${priv_keys[$i]}' \
-           -operators '${config_file}' \
+           -operators '${operator_config_file}' \
            -threshold ${min_signers} \
            -signer '${signer_socket}' \
            -port ${port} \

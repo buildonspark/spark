@@ -36,6 +36,7 @@ import (
 )
 
 type args struct {
+	ConfigFilePath        string
 	Index                 uint64
 	IdentityPrivateKey    string
 	OperatorsFilePath     string
@@ -73,6 +74,7 @@ func loadArgs() (*args, error) {
 	args := &args{}
 
 	// Define flags
+	flag.StringVar(&args.ConfigFilePath, "config", "so_config.yaml", "Path to config file")
 	flag.Uint64Var(&args.Index, "index", 0, "Index value")
 	flag.StringVar(&args.IdentityPrivateKey, "key", "", "Identity private key")
 	flag.StringVar(&args.OperatorsFilePath, "operators", "", "Path to operators file")
@@ -126,9 +128,10 @@ func main() {
 	}
 
 	config, err := so.NewConfig(
+		args.ConfigFilePath,
 		args.Index,
 		args.IdentityPrivateKey,
-		args.OperatorsFilePath,
+		args.OperatorsFilePath, // TODO: Refactor this into the yaml config
 		args.Threshold,
 		args.SignerAddress,
 		args.DatabasePath,
@@ -177,13 +180,15 @@ func main() {
 		log.Fatalf("Failed to create scheduler: %v", err)
 	}
 
-	go func() {
-		// TODO (alec): Watch all the supported network from the config
-		err := chain.WatchChain(dbClient, common.Regtest)
-		if err != nil {
-			log.Fatalf("Failed to watch chain: %v", err)
-		}
-	}()
+	for network, bitcoindConfig := range config.BitcoindConfigs {
+		go func() {
+			log.Printf("Watching %s chain\n", network)
+			err := chain.WatchChain(dbClient, bitcoindConfig)
+			if err != nil {
+				log.Fatalf("Failed to watch %s chain: %v", network, err)
+			}
+		}()
+	}
 
 	for _, task := range task.AllTasks() {
 		_, err := s.NewJob(gocron.DurationJob(task.Duration), gocron.NewTask(task.Task, config, dbClient))

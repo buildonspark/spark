@@ -13,6 +13,7 @@ import (
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/lightsparkdev/spark-go/common"
+	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/ent"
 	"github.com/lightsparkdev/spark-go/so/ent/blockheight"
 	"github.com/lightsparkdev/spark-go/so/ent/cooperativeexit"
@@ -61,8 +62,27 @@ func initZmq(endpoint string) (*zmq4.Context, *zmq4.Socket, error) {
 	return zmqCtx, subscriber, nil
 }
 
-func WatchChain(dbClient *ent.Client, network common.Network) error {
-	client, err := NewRegtestClient()
+func RPCClientConfig(cfg so.BitcoindConfig) rpcclient.ConnConfig {
+	return rpcclient.ConnConfig{
+		Host:         cfg.Host,
+		User:         cfg.User,
+		Pass:         cfg.Password,
+		Params:       cfg.Network,
+		DisableTLS:   true, // TODO: PE help
+		HTTPPostMode: true,
+	}
+}
+
+func WatchChain(dbClient *ent.Client, cfg so.BitcoindConfig) error {
+	network, err := common.NetworkFromString(cfg.Network)
+	if err != nil {
+		return err
+	}
+	connConfig := RPCClientConfig(cfg)
+	client, err := rpcclient.New(
+		&connConfig,
+		nil,
+	)
 	if err != nil {
 		return err
 	}
@@ -96,7 +116,7 @@ func WatchChain(dbClient *ent.Client, network common.Network) error {
 		handleReorg()
 	}
 
-	zmqCtx, subscriber, err := initZmq("tcp://127.0.0.1:28332") // This should match our bitcoin config
+	zmqCtx, subscriber, err := initZmq(cfg.ZmqPubRawBlock) // This should match our bitcoin config
 	if err != nil {
 		log.Fatalf("Failed to initialize ZMQ: %v", err)
 	}
