@@ -186,8 +186,8 @@ message StartTokenTransactionResponse {
     // to ensure immediate availability prior to requesting keyshares.
     map<string, bytes> spark_operator_signatures = 2;
     // Information for fetching and resolving the revocation keyshare on a transfer operation.
-    // Contains the number of keyshares needed and the SO owners of those keyshares.
-    repeated SigningKeyshare keyshare_info = 3;
+    // Contains the threshold of keyshares needed and the SO owners of those keyshares.
+    SigningKeyshare keyshare_info = 3;
 }
 
 message RevocationKeyshareSignablePayload {

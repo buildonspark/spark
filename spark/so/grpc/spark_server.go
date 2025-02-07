@@ -150,3 +150,10 @@ func (s *SparkServer) ReturnLightningPayment(ctx context.Context, req *pb.Return
 	lightningHandler := handler.NewLightningHandler(s.config, s.onchainHelper)
 	return wrapWithGRPCError(lightningHandler.ReturnLightningPayment(ctx, req, false))
 }
+
+// StartTokenTransaction reserves revocation keyshares, fills the revocation public key to create the final token, and collects token transaction
+// signatures from each of the signing operators.
+func (s *SparkServer) StartTokenTransaction(ctx context.Context, req *pb.StartTokenTransactionRequest) (*pb.StartTokenTransactionResponse, error) {
+	tokenTransactionHandler := handler.NewTokenTransactionHandler(s.config)
+	return wrapWithGRPCError(tokenTransactionHandler.StartTokenTransaction(ctx, s.config, req))
+}
