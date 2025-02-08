@@ -8,7 +8,7 @@ import (
 	"log"
 
 	"github.com/btcsuite/btcd/btcjson"
-	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
@@ -24,44 +24,6 @@ import (
 	"github.com/pebbe/zmq4"
 )
 
-func NewRegtestClient() (*rpcclient.Client, error) {
-	connConfig := rpcclient.ConnConfig{
-		Host:         "127.0.0.1:18443",
-		User:         "admin1",
-		Pass:         "123",
-		Params:       "regtest",
-		DisableTLS:   true, // TODO: PE help
-		HTTPPostMode: true,
-	}
-	return rpcclient.New(
-		&connConfig,
-		nil,
-	)
-}
-
-func initZmq(endpoint string) (*zmq4.Context, *zmq4.Socket, error) {
-	zmqCtx, err := zmq4.NewContext()
-	if err != nil {
-		log.Fatalf("Failed to create ZMQ context: %v", err)
-	}
-
-	subscriber, err := zmqCtx.NewSocket(zmq4.SUB)
-	if err != nil {
-		log.Fatalf("Failed to create ZMQ socket: %v", err)
-	}
-
-	err = subscriber.Connect(endpoint)
-	if err != nil {
-		log.Fatalf("Failed to connect to ZMQ endpoint: %v", err)
-	}
-
-	err = subscriber.SetSubscribe("rawblock")
-	if err != nil {
-		log.Fatalf("Failed to subscribe to topic: %v", err)
-	}
-	return zmqCtx, subscriber, nil
-}
-
 func RPCClientConfig(cfg so.BitcoindConfig) rpcclient.ConnConfig {
 	return rpcclient.ConnConfig{
 		Host:         cfg.Host,
@@ -73,16 +35,136 @@ func RPCClientConfig(cfg so.BitcoindConfig) rpcclient.ConnConfig {
 	}
 }
 
-func WatchChain(dbClient *ent.Client, cfg so.BitcoindConfig) error {
+func ListenForBlockEvents(zmqEndpoint string, blockEventSender chan<- wire.MsgBlock) error {
+	zmqCtx, err := zmq4.NewContext()
+	if err != nil {
+		return fmt.Errorf("failed to create ZMQ context: %v", err)
+	}
+
+	subscriber, err := zmqCtx.NewSocket(zmq4.SUB)
+	if err != nil {
+		return fmt.Errorf("failed to create ZMQ socket: %v", err)
+	}
+
+	err = subscriber.Connect(zmqEndpoint)
+	if err != nil {
+		return fmt.Errorf("failed to connect to ZMQ endpoint: %v", err)
+	}
+
+	err = subscriber.SetSubscribe("rawblock")
+	if err != nil {
+		return fmt.Errorf("failed to set ZMQ subscription: %v", err)
+	}
+	defer func() {
+		err := zmqCtx.Term()
+		if err != nil {
+			log.Fatalf("Failed to terminate ZMQ context: %v", err)
+		}
+		err = subscriber.Close()
+		if err != nil {
+			log.Fatalf("Failed to close ZMQ subscriber: %v", err)
+		}
+	}()
+
+	log.Println("Listening for block notifications via ZMQ endpoint", zmqEndpoint)
+
+	for {
+		msg, err := subscriber.RecvMessage(0)
+		if err != nil {
+			log.Fatalf("Failed to receive message: %v", err)
+		}
+
+		_ = msg[0] // topic
+		rawBlock := msg[1]
+		_ = msg[2] // sequence number
+
+		block := wire.MsgBlock{}
+		err = block.Deserialize(bytes.NewReader([]byte(rawBlock)))
+		if err != nil {
+			log.Printf("Failed to deserialize block: %v\n", err)
+			log.Printf("Failed deserialization raw block: %s\n", hex.EncodeToString([]byte(rawBlock)))
+			continue
+		}
+
+		blockEventSender <- block
+	}
+}
+
+// Tip represents the tip of a blockchain.
+type Tip struct {
+	Height int64
+	Hash   chainhash.Hash
+}
+
+// NewTip creates a new ChainTip.
+func NewTip(height int64, hash chainhash.Hash) Tip {
+	return Tip{Height: height, Hash: hash}
+}
+
+// Difference represents the difference between two chain tips
+// that needs to be rescanned.
+type Difference struct {
+	CommonAncestor Tip
+	Disconnected   []Tip
+	Connected      []Tip
+}
+
+func findPreviousChainTip(chainTip Tip, client *rpcclient.Client) (Tip, error) {
+	blockResp, err := client.GetBlockVerbose(&chainTip.Hash)
+	if err != nil {
+		return Tip{}, err
+	}
+	var prevHash chainhash.Hash
+	err = chainhash.Decode(&prevHash, blockResp.PreviousHash)
+	if err != nil {
+		return Tip{}, err
+	}
+	return Tip{Height: blockResp.Height - 1, Hash: prevHash}, nil
+}
+
+func findDifference(currChainTip, newChainTip Tip, client *rpcclient.Client) (Difference, error) {
+	disconnected := []Tip{}
+	connected := []Tip{}
+
+	for {
+		if currChainTip.Hash.IsEqual(&newChainTip.Hash) {
+			break
+		}
+
+		// Walk back the chain, finding blocks needed to connect and disconnect. Only walk back
+		// the header with the greater height, or both if equal heights (i.e. same height, different hashes!).
+		if newChainTip.Height <= currChainTip.Height {
+			disconnected = append(disconnected, currChainTip)
+			prevChainTip, err := findPreviousChainTip(currChainTip, client)
+			if err != nil {
+				return Difference{}, err
+			}
+			currChainTip = prevChainTip
+		}
+		if newChainTip.Height >= currChainTip.Height {
+			connected = append(connected, newChainTip)
+			prevChainTip, err := findPreviousChainTip(newChainTip, client)
+			if err != nil {
+				return Difference{}, err
+			}
+			newChainTip = prevChainTip
+		}
+	}
+
+	return Difference{
+		CommonAncestor: newChainTip,
+		Disconnected:   disconnected,
+		Connected:      connected,
+	}, nil
+}
+
+func HandleBlockEvents(dbClient *ent.Client, cfg so.BitcoindConfig, blockEventReceiver <-chan wire.MsgBlock) error {
 	network, err := common.NetworkFromString(cfg.Network)
 	if err != nil {
 		return err
 	}
 	connConfig := RPCClientConfig(cfg)
-	client, err := rpcclient.New(
-		&connConfig,
-		nil,
-	)
+	client, err := rpcclient.New(&connConfig, nil)
 	if err != nil {
 		return err
 	}
@@ -91,6 +173,11 @@ func WatchChain(dbClient *ent.Client, cfg so.BitcoindConfig) error {
 	if err != nil {
 		return err
 	}
+	latestBlockHash, err := client.GetBlockHash(latestBlockHeight)
+	if err != nil {
+		return err
+	}
+	latestChainTip := NewTip(latestBlockHeight, *latestBlockHash)
 
 	// Load the latest scanned block height
 	ctx := context.Background()
@@ -103,138 +190,113 @@ func WatchChain(dbClient *ent.Client, cfg so.BitcoindConfig) error {
 	if err != nil {
 		return err
 	}
-
-	// Scan missed blocks between restart
-	networkParams := common.NetworkParams(network)
-	if entBlockHeight.Height < latestBlockHeight {
-		log.Printf("Scanning missed blocks from %d and %d\n", entBlockHeight.Height+1, latestBlockHeight)
-		entBlockHeight, err = handleNewBlocks(ctx, dbClient, client, entBlockHeight, latestBlockHeight, *networkParams)
-		if err != nil {
-			return fmt.Errorf("failed to handle new blocks: %v", err)
-		}
-	} else {
-		handleReorg()
-	}
-
-	zmqCtx, subscriber, err := initZmq(cfg.ZmqPubRawBlock) // This should match our bitcoin config
+	blockHash, err := client.GetBlockHash(entBlockHeight.Height)
 	if err != nil {
-		log.Fatalf("Failed to initialize ZMQ: %v", err)
+		return err
 	}
-	defer func() {
-		err := subscriber.Close()
+
+	chainTip := NewTip(entBlockHeight.Height, *blockHash)
+	difference, err := findDifference(chainTip, latestChainTip, client)
+	if err != nil {
+		return fmt.Errorf("failed to find difference: %v", err)
+	}
+
+	err = disconnectBlocks(ctx, dbClient, difference.Disconnected, network)
+	if err != nil {
+		return fmt.Errorf("failed to disconnect blocks: %v", err)
+	}
+
+	err = connectBlocks(ctx, dbClient, client, difference.Connected, network)
+	if err != nil {
+		return fmt.Errorf("failed to connect blocks: %v", err)
+	}
+
+	chainTip = latestChainTip
+
+	// TODO: we should consider alerting on errors within this loop
+	for range blockEventReceiver {
+		// We don't actually do anything with the block receive since
+		// we need to query bitcoind for the height anyway. We just
+		// treat it as a notification that a new block appeared.
+		latestBlockHeight, err = client.GetBlockCount()
 		if err != nil {
-			log.Fatalf("Failed to close ZMQ socket: %v", err)
-		}
-		err = zmqCtx.Term()
-		if err != nil {
-			log.Fatalf("Failed to terminate ZMQ context: %v", err)
-		}
-	}()
-
-	fmt.Println("Listening for ZMQ messages...")
-
-	// TODO: we should alert on errors within this loop
-	for {
-		// Receive the message
-		msg, err := subscriber.RecvMessage(0)
-		if err != nil {
-			log.Fatalf("Failed to receive message: %v", err)
-		}
-
-		topic := msg[0]
-		rawBlock := msg[1]
-		sequence := msg[2]
-
-		fmt.Printf("Received ZMQ message: topic=%s sequence=%s\n", topic, sequence)
-
-		block := &wire.MsgBlock{}
-		err = block.Deserialize(bytes.NewReader([]byte(rawBlock)))
-		if err != nil {
-			log.Printf("Failed to deserialize block: %v", err)
+			log.Printf("Failed to get block count: %v", err)
 			continue
 		}
-
-		// Extract the block hash and previous block hash
-		blockHash := block.BlockHash()
-		prevBlockHash := block.Header.PrevBlock
-
-		currBlockHash, err := client.GetBlockHash(entBlockHeight.Height)
+		latestBlockHash, err = client.GetBlockHash(latestBlockHeight)
 		if err != nil {
 			log.Printf("Failed to get block hash: %v", err)
 			continue
 		}
 
-		if blockHash.IsEqual(currBlockHash) {
-			log.Printf("Block %s is already in the database\n", blockHash)
-			continue
-		} else if prevBlockHash.IsEqual(currBlockHash) {
-			newEntBlockHeight, err := handleNewBlocks(ctx, dbClient, client, entBlockHeight,
-				entBlockHeight.Height+1, *networkParams)
-			if err != nil {
-				log.Printf("Failed to handle new blocks: %v\n", err)
-				continue
-			}
-			if newEntBlockHeight == nil {
-				log.Printf("Failed to update block height\n")
-				continue
-			}
-			entBlockHeight = newEntBlockHeight
-		} else {
-			log.Printf("Block %s is not the next block\n", blockHash)
-			// TODO: handle missing a block, i.e. failed to process last block,
-			// and just needs to rescan from last scanned block height
-			handleReorg()
-		}
-	}
-}
-
-func handleReorg() {
-	// TOOD: implement reorg handling
-	// coop closes - just set confirmation height to 0 if new count is less than height
-	// deposits - lock the tree...?
-}
-
-func handleNewBlocks(ctx context.Context, db *ent.Client, client *rpcclient.Client, entBlockHeight *ent.BlockHeight, latestBlockHeight int64, network chaincfg.Params) (*ent.BlockHeight, error) {
-	// Process blocks
-	initialLastScannedBlockHeight := entBlockHeight.Height
-	newEntBlockHeight := entBlockHeight
-	for blockHeight := initialLastScannedBlockHeight + 1; blockHeight < latestBlockHeight+1; blockHeight++ {
-		blockHash, err := client.GetBlockHash(blockHeight)
+		newChainTip := NewTip(latestBlockHeight, *latestBlockHash)
+		difference, err := findDifference(chainTip, newChainTip, client)
 		if err != nil {
-			return nil, err
+			log.Printf("Failed to find difference: %v", err)
+			continue
+		}
+
+		err = disconnectBlocks(ctx, dbClient, difference.Disconnected, network)
+		if err != nil {
+			log.Printf("Failed to disconnect blocks: %v", err)
+			continue
+		}
+
+		err = connectBlocks(ctx, dbClient, client, difference.Connected, network)
+		if err != nil {
+			log.Printf("Failed to connect blocks: %v", err)
+			continue
+		}
+
+		chainTip = newChainTip
+	}
+
+	return nil
+}
+
+func disconnectBlocks(_ context.Context, _ *ent.Client, _ []Tip, _ common.Network) error {
+	return nil
+}
+
+func connectBlocks(ctx context.Context, dbClient *ent.Client, client *rpcclient.Client, chainTips []Tip, network common.Network) error {
+	for _, chainTip := range chainTips {
+		blockHash, err := client.GetBlockHash(chainTip.Height)
+		if err != nil {
+			return err
 		}
 		block, err := client.GetBlockVerboseTx(blockHash)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		txs := []wire.MsgTx{}
 		for _, tx := range block.Tx {
 			rawTx, err := TxFromRPCTx(tx)
 			if err != nil {
-				return nil, err
+				return err
 			}
 			txs = append(txs, rawTx)
 		}
 
-		dbTx, err := db.Tx(ctx)
+		dbTx, err := dbClient.Tx(ctx)
 		if err != nil {
-			return nil, err
+			return err
 		}
-		newEntBlockHeight, err = handleBlock(ctx, dbTx, txs, newEntBlockHeight, blockHeight, network)
+		err = handleBlock(ctx, dbTx, txs, chainTip.Height, network)
 		if err != nil {
 			log.Printf("Failed to handle block: %v", err)
 			rollbackErr := dbTx.Rollback()
 			if err != nil {
-				return nil, rollbackErr
+				return rollbackErr
 			}
-			return nil, err
+			return err
 		}
 		err = dbTx.Commit()
 		if err != nil {
-			return nil, err
+			return err
 		}
+		log.Printf("Successfully processed %s block %d", network, chainTip.Height)
 	}
-	return newEntBlockHeight, nil
+	return nil
 }
 
 func TxFromRPCTx(txs btcjson.TxRawResult) (wire.MsgTx, error) {
@@ -251,18 +313,22 @@ func TxFromRPCTx(txs btcjson.TxRawResult) (wire.MsgTx, error) {
 	return tx, nil
 }
 
-func handleBlock(ctx context.Context, dbTx *ent.Tx, txs []wire.MsgTx, entBlockHeight *ent.BlockHeight, blockHeight int64, network chaincfg.Params) (*ent.BlockHeight, error) {
-	entBlockHeight, err := dbTx.BlockHeight.UpdateOne(entBlockHeight).SetHeight(blockHeight).Save(ctx)
+func handleBlock(ctx context.Context, dbTx *ent.Tx, txs []wire.MsgTx, blockHeight int64, network common.Network) error {
+	networkParams := common.NetworkParams(network)
+	_, err := dbTx.BlockHeight.Update().
+		SetHeight(blockHeight).
+		Where(blockheight.NetworkEQ(common.SchemaNetwork(network))).
+		Save(ctx)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	confirmedTxids := make([][]byte, 0)
 	debitedAddresses := make([]string, 0)
 	for _, tx := range txs {
 		for _, txOut := range tx.TxOut {
-			_, addresses, _, err := txscript.ExtractPkScriptAddrs(txOut.PkScript, &network)
+			_, addresses, _, err := txscript.ExtractPkScriptAddrs(txOut.PkScript, networkParams)
 			if err != nil {
-				return nil, err
+				return err
 			}
 			for _, address := range addresses {
 				debitedAddresses = append(debitedAddresses, address.EncodeAddress())
@@ -278,7 +344,7 @@ func handleBlock(ctx context.Context, dbTx *ent.Tx, txs []wire.MsgTx, entBlockHe
 		SetConfirmationHeight(blockHeight).
 		Save(ctx)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	confirmedDeposits, err := dbTx.DepositAddress.Query().
@@ -286,19 +352,19 @@ func handleBlock(ctx context.Context, dbTx *ent.Tx, txs []wire.MsgTx, entBlockHe
 		Where(depositaddress.AddressIn(debitedAddresses...)).
 		All(ctx)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	for _, deposit := range confirmedDeposits {
 		_, err = dbTx.DepositAddress.UpdateOne(deposit).
 			SetConfirmationHeight(blockHeight).
 			Save(ctx)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		// TODO: only unlock if deposit reaches X confirmations
 		signingKeyShare, err := deposit.QuerySigningKeyshare().Only(ctx)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		treeNode, err := dbTx.TreeNode.Query().
 			Where(treenode.HasSigningKeyshareWith(signingkeyshare.ID(signingKeyShare.ID))).
@@ -308,7 +374,7 @@ func handleBlock(ctx context.Context, dbTx *ent.Tx, txs []wire.MsgTx, entBlockHe
 			continue
 		}
 		if err != nil {
-			return nil, err
+			return err
 		}
 		if treeNode.Status != schema.TreeNodeStatusCreating {
 			log.Printf("Expected tree node status to be creating, got %s", treeNode.Status)
@@ -318,11 +384,11 @@ func handleBlock(ctx context.Context, dbTx *ent.Tx, txs []wire.MsgTx, entBlockHe
 			SetStatus(schema.TreeNodeStatusAvailable).
 			Save(ctx)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		tree, err := treeNode.QueryTree().Only(ctx)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		if tree.Status != schema.TreeStatusPending {
 			log.Printf("Expected tree status to be pending, got %s", tree.Status)
@@ -332,9 +398,9 @@ func handleBlock(ctx context.Context, dbTx *ent.Tx, txs []wire.MsgTx, entBlockHe
 			SetStatus(schema.TreeStatusAvailable).
 			Save(ctx)
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
 
-	return entBlockHeight, nil
+	return nil
 }

@@ -8,7 +8,6 @@ import (
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lightsparkdev/spark-go/common"
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
-	"github.com/lightsparkdev/spark-go/so/chain"
 	"github.com/lightsparkdev/spark-go/wallet"
 )
 
@@ -61,7 +60,7 @@ func CreateNewTree(config *wallet.Config, faucet *Faucet, privKey *secp256k1.Pri
 		return nil, fmt.Errorf("failed to sign deposit tx: %v", err)
 	}
 
-	client, err := chain.NewRegtestClient()
+	client, err := NewRegtestClient()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create regtest client: %v", err)
 	}

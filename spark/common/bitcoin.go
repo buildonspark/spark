@@ -30,6 +30,21 @@ const (
 	Signet
 )
 
+func (n Network) String() string {
+	switch n {
+	case Mainnet:
+		return "mainnet"
+	case Regtest:
+		return "regtest"
+	case Testnet:
+		return "testnet"
+	case Signet:
+		return "signet"
+	default:
+		return "mainnet"
+	}
+}
+
 func NetworkFromString(network string) (Network, error) {
 	switch network {
 	case "mainnet":

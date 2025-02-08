@@ -8,7 +8,6 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lightsparkdev/spark-go/common"
-	"github.com/lightsparkdev/spark-go/so/chain"
 	"github.com/lightsparkdev/spark-go/so/handler"
 	testutil "github.com/lightsparkdev/spark-go/test_util"
 	"github.com/lightsparkdev/spark-go/wallet"
@@ -16,7 +15,7 @@ import (
 )
 
 func TestCoopExit(t *testing.T) {
-	client, err := chain.NewRegtestClient()
+	client, err := testutil.NewRegtestClient()
 	assert.NoError(t, err)
 
 	coin, err := faucet.Fund()
@@ -152,7 +151,9 @@ func TestCoopExit(t *testing.T) {
 	randomPubKey := randomKey.PubKey()
 	randomAddress, err := common.P2TRRawAddressFromPublicKey(randomPubKey.SerializeCompressed(), common.Regtest)
 	assert.NoError(t, err)
-	_, err = client.GenerateToAddress(handler.CoopExitConfirmationThreshold, randomAddress, nil)
+	// Confirm extra buffer to scan more blocks than needed
+	// So that we don't race the chain watcher in this test
+	_, err = client.GenerateToAddress(handler.CoopExitConfirmationThreshold+6, randomAddress, nil)
 	assert.NoError(t, err)
 
 	// Claim leaf

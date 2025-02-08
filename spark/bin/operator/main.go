@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/btcsuite/btcd/wire"
 	"github.com/go-co-op/gocron/v2"
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
 	_ "github.com/lib/pq"
@@ -181,13 +182,20 @@ func main() {
 	}
 
 	for network, bitcoindConfig := range config.BitcoindConfigs {
+		blockEvents := make(chan wire.MsgBlock)
 		go func() {
-			log.Printf("Watching %s chain\n", network)
-			err := chain.WatchChain(dbClient, bitcoindConfig)
+			err := chain.ListenForBlockEvents(bitcoindConfig.ZmqPubRawBlock, blockEvents)
+			if err != nil {
+				log.Fatalf("Failed to listen for %s block events: %v", network, err)
+			}
+		}()
+		go func() {
+			err := chain.HandleBlockEvents(dbClient, bitcoindConfig, blockEvents)
 			if err != nil {
 				log.Fatalf("Failed to watch %s chain: %v", network, err)
 			}
 		}()
+		log.Printf("Watching %s chain\n", network)
 	}
 
 	for _, task := range task.AllTasks() {

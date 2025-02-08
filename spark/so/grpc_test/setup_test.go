@@ -5,7 +5,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/lightsparkdev/spark-go/so/chain"
 	testutil "github.com/lightsparkdev/spark-go/test_util"
 )
 
@@ -13,7 +12,7 @@ var faucet *testutil.Faucet
 
 func TestMain(m *testing.M) {
 	// Setup
-	client, err := chain.NewRegtestClient()
+	client, err := testutil.NewRegtestClient()
 	if err != nil {
 		log.Printf("Error creating regtest client: %v", err)
 		os.Exit(1)

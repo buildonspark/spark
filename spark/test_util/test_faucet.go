@@ -13,6 +13,23 @@ import (
 	"github.com/lightsparkdev/spark-go/so/chain"
 )
 
+// NewRegtestClient returns a new rpcclient.Client with a hard-coded
+// config for our integration tests.
+func NewRegtestClient() (*rpcclient.Client, error) {
+	connConfig := rpcclient.ConnConfig{
+		Host:         "127.0.0.1:18443",
+		User:         "admin1",
+		Pass:         "123",
+		Params:       "regtest",
+		DisableTLS:   true,
+		HTTPPostMode: true,
+	}
+	return rpcclient.New(
+		&connConfig,
+		nil,
+	)
+}
+
 type FaucetCoin struct {
 	Key      *secp256k1.PrivateKey
 	OutPoint *wire.OutPoint

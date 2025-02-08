@@ -10,7 +10,6 @@ import (
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lightsparkdev/spark-go/common"
-	"github.com/lightsparkdev/spark-go/so/chain"
 	testutil "github.com/lightsparkdev/spark-go/test_util"
 	"github.com/lightsparkdev/spark-go/wallet"
 	"github.com/stretchr/testify/assert"
@@ -74,7 +73,7 @@ func TestStartTreeCreation(t *testing.T) {
 		t.Fatalf("failed to generate deposit address: %v", err)
 	}
 
-	client, err := chain.NewRegtestClient()
+	client, err := testutil.NewRegtestClient()
 	assert.NoError(t, err)
 
 	coin, err := faucet.Fund()
@@ -125,7 +124,7 @@ func TestStartTreeCreation(t *testing.T) {
 // Test that we can get refund signatures for a tree before depositing funds on-chain,
 // and that after we confirm funds on-chain, our leaves are available for transfer.
 func TestStartTreeCreationOffchain(t *testing.T) {
-	client, err := chain.NewRegtestClient()
+	client, err := testutil.NewRegtestClient()
 	assert.NoError(t, err)
 
 	coin, err := faucet.Fund()
