@@ -35,59 +35,28 @@ func RPCClientConfig(cfg so.BitcoindConfig) rpcclient.ConnConfig {
 	}
 }
 
-func ListenForBlockEvents(zmqEndpoint string, blockEventSender chan<- wire.MsgBlock) error {
+func initZmq(endpoint string) (*zmq4.Context, *zmq4.Socket, error) {
 	zmqCtx, err := zmq4.NewContext()
 	if err != nil {
-		return fmt.Errorf("failed to create ZMQ context: %v", err)
+		return nil, nil, fmt.Errorf("failed to create ZMQ context: %v", err)
 	}
 
 	subscriber, err := zmqCtx.NewSocket(zmq4.SUB)
 	if err != nil {
-		return fmt.Errorf("failed to create ZMQ socket: %v", err)
+		return nil, nil, fmt.Errorf("failed to create ZMQ socket: %v", err)
 	}
 
-	err = subscriber.Connect(zmqEndpoint)
+	err = subscriber.Connect(endpoint)
 	if err != nil {
-		return fmt.Errorf("failed to connect to ZMQ endpoint: %v", err)
+		return nil, nil, fmt.Errorf("failed to connect to ZMQ endpoint: %v", err)
 	}
 
 	err = subscriber.SetSubscribe("rawblock")
 	if err != nil {
-		return fmt.Errorf("failed to set ZMQ subscription: %v", err)
+		return nil, nil, fmt.Errorf("failed to set ZMQ subscription: %v", err)
 	}
-	defer func() {
-		err := zmqCtx.Term()
-		if err != nil {
-			log.Fatalf("Failed to terminate ZMQ context: %v", err)
-		}
-		err = subscriber.Close()
-		if err != nil {
-			log.Fatalf("Failed to close ZMQ subscriber: %v", err)
-		}
-	}()
 
-	log.Println("Listening for block notifications via ZMQ endpoint", zmqEndpoint)
-
-	for {
-		msg, err := subscriber.RecvMessage(0)
-		if err != nil {
-			log.Fatalf("Failed to receive message: %v", err)
-		}
-
-		_ = msg[0] // topic
-		rawBlock := msg[1]
-		_ = msg[2] // sequence number
-
-		block := wire.MsgBlock{}
-		err = block.Deserialize(bytes.NewReader([]byte(rawBlock)))
-		if err != nil {
-			log.Printf("Failed to deserialize block: %v\n", err)
-			log.Printf("Failed deserialization raw block: %s\n", hex.EncodeToString([]byte(rawBlock)))
-			continue
-		}
-
-		blockEventSender <- block
-	}
+	return zmqCtx, subscriber, nil
 }
 
 // Tip represents the tip of a blockchain.
@@ -158,7 +127,7 @@ func findDifference(currChainTip, newChainTip Tip, client *rpcclient.Client) (Di
 	}, nil
 }
 
-func HandleBlockEvents(dbClient *ent.Client, cfg so.BitcoindConfig, blockEventReceiver <-chan wire.MsgBlock) error {
+func WatchChain(dbClient *ent.Client, cfg so.BitcoindConfig) error {
 	network, err := common.NetworkFromString(cfg.Network)
 	if err != nil {
 		return err
@@ -213,8 +182,42 @@ func HandleBlockEvents(dbClient *ent.Client, cfg so.BitcoindConfig, blockEventRe
 
 	chainTip = latestChainTip
 
+	zmqCtx, subscriber, err := initZmq(cfg.ZmqPubRawBlock)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		err := zmqCtx.Term()
+		if err != nil {
+			log.Fatalf("Failed to terminate ZMQ context: %v", err)
+		}
+		err = subscriber.Close()
+		if err != nil {
+			log.Fatalf("Failed to close ZMQ subscriber: %v", err)
+		}
+	}()
+
+	log.Println("Listening for block notifications via ZMQ endpoint", cfg.ZmqPubRawBlock)
+
 	// TODO: we should consider alerting on errors within this loop
-	for range blockEventReceiver {
+	for {
+		msg, err := subscriber.RecvMessage(0)
+		if err != nil {
+			log.Fatalf("Failed to receive message: %v", err)
+		}
+
+		_ = msg[0] // topic
+		rawBlock := msg[1]
+		_ = msg[2] // sequence number
+
+		block := wire.MsgBlock{}
+		err = block.Deserialize(bytes.NewReader([]byte(rawBlock)))
+		if err != nil {
+			log.Printf("Failed to deserialize block: %v\n", err)
+			log.Printf("Failed deserialization raw block: %s\n", hex.EncodeToString([]byte(rawBlock)))
+			continue
+		}
+
 		// We don't actually do anything with the block receive since
 		// we need to query bitcoind for the height anyway. We just
 		// treat it as a notification that a new block appeared.
@@ -250,8 +253,6 @@ func HandleBlockEvents(dbClient *ent.Client, cfg so.BitcoindConfig, blockEventRe
 
 		chainTip = newChainTip
 	}
-
-	return nil
 }
 
 func disconnectBlocks(_ context.Context, _ *ent.Client, _ []Tip, _ common.Network) error {
