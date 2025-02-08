@@ -49,12 +49,6 @@ func (ttru *TokenTransactionReceiptUpdate) SetFinalizedTokenTransactionHash(b []
 	return ttru
 }
 
-// ClearFinalizedTokenTransactionHash clears the value of the "finalized_token_transaction_hash" field.
-func (ttru *TokenTransactionReceiptUpdate) ClearFinalizedTokenTransactionHash() *TokenTransactionReceiptUpdate {
-	ttru.mutation.ClearFinalizedTokenTransactionHash()
-	return ttru
-}
-
 // AddSpentLeafIDs adds the "spent_leaf" edge to the TokenLeaf entity by IDs.
 func (ttru *TokenTransactionReceiptUpdate) AddSpentLeafIDs(ids ...uuid.UUID) *TokenTransactionReceiptUpdate {
 	ttru.mutation.AddSpentLeafIDs(ids...)
@@ -200,6 +194,11 @@ func (ttru *TokenTransactionReceiptUpdate) check() error {
 			return &ValidationError{Name: "partial_token_transaction_hash", err: fmt.Errorf(`ent: validator failed for field "TokenTransactionReceipt.partial_token_transaction_hash": %w`, err)}
 		}
 	}
+	if v, ok := ttru.mutation.FinalizedTokenTransactionHash(); ok {
+		if err := tokentransactionreceipt.FinalizedTokenTransactionHashValidator(v); err != nil {
+			return &ValidationError{Name: "finalized_token_transaction_hash", err: fmt.Errorf(`ent: validator failed for field "TokenTransactionReceipt.finalized_token_transaction_hash": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -223,9 +222,6 @@ func (ttru *TokenTransactionReceiptUpdate) sqlSave(ctx context.Context) (n int, 
 	}
 	if value, ok := ttru.mutation.FinalizedTokenTransactionHash(); ok {
 		_spec.SetField(tokentransactionreceipt.FieldFinalizedTokenTransactionHash, field.TypeBytes, value)
-	}
-	if ttru.mutation.FinalizedTokenTransactionHashCleared() {
-		_spec.ClearField(tokentransactionreceipt.FieldFinalizedTokenTransactionHash, field.TypeBytes)
 	}
 	if ttru.mutation.SpentLeafCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -381,12 +377,6 @@ func (ttruo *TokenTransactionReceiptUpdateOne) SetPartialTokenTransactionHash(b 
 // SetFinalizedTokenTransactionHash sets the "finalized_token_transaction_hash" field.
 func (ttruo *TokenTransactionReceiptUpdateOne) SetFinalizedTokenTransactionHash(b []byte) *TokenTransactionReceiptUpdateOne {
 	ttruo.mutation.SetFinalizedTokenTransactionHash(b)
-	return ttruo
-}
-
-// ClearFinalizedTokenTransactionHash clears the value of the "finalized_token_transaction_hash" field.
-func (ttruo *TokenTransactionReceiptUpdateOne) ClearFinalizedTokenTransactionHash() *TokenTransactionReceiptUpdateOne {
-	ttruo.mutation.ClearFinalizedTokenTransactionHash()
 	return ttruo
 }
 
@@ -548,6 +538,11 @@ func (ttruo *TokenTransactionReceiptUpdateOne) check() error {
 			return &ValidationError{Name: "partial_token_transaction_hash", err: fmt.Errorf(`ent: validator failed for field "TokenTransactionReceipt.partial_token_transaction_hash": %w`, err)}
 		}
 	}
+	if v, ok := ttruo.mutation.FinalizedTokenTransactionHash(); ok {
+		if err := tokentransactionreceipt.FinalizedTokenTransactionHashValidator(v); err != nil {
+			return &ValidationError{Name: "finalized_token_transaction_hash", err: fmt.Errorf(`ent: validator failed for field "TokenTransactionReceipt.finalized_token_transaction_hash": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -588,9 +583,6 @@ func (ttruo *TokenTransactionReceiptUpdateOne) sqlSave(ctx context.Context) (_no
 	}
 	if value, ok := ttruo.mutation.FinalizedTokenTransactionHash(); ok {
 		_spec.SetField(tokentransactionreceipt.FieldFinalizedTokenTransactionHash, field.TypeBytes, value)
-	}
-	if ttruo.mutation.FinalizedTokenTransactionHashCleared() {
-		_spec.ClearField(tokentransactionreceipt.FieldFinalizedTokenTransactionHash, field.TypeBytes)
 	}
 	if ttruo.mutation.SpentLeafCleared() {
 		edge := &sqlgraph.EdgeSpec{

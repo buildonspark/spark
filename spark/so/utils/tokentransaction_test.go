@@ -11,7 +11,7 @@ import (
 
 // TestHashTokenTransactionNil ensures an error is returned when HashTokenTransaction is called with a nil transaction.
 func TestHashTokenTransactionNil(t *testing.T) {
-	_, err := HashTokenTransaction(nil)
+	_, err := HashTokenTransaction(nil, false)
 	if err == nil {
 		t.Errorf("expected an error for nil token transaction, but got nil")
 	}
@@ -20,7 +20,7 @@ func TestHashTokenTransactionNil(t *testing.T) {
 // TestHashTokenTransactionEmpty checks that hashing an empty transaction does not produce an error.
 func TestHashTokenTransactionEmpty(t *testing.T) {
 	tx := &pb.TokenTransaction{}
-	hash, err := HashTokenTransaction(tx)
+	hash, err := HashTokenTransaction(tx, false)
 	if err != nil {
 		t.Errorf("expected no error for empty transaction, got: %v", err)
 	}
@@ -79,22 +79,22 @@ func TestHashTokenTransactionUniqueHash(t *testing.T) {
 	finalTransferTokenTransaction.OutputLeaves[0].RevocationPublicKey = bytes.Repeat([]byte{0x03}, 32)
 
 	// Hash all transactions
-	partialIssuanceHash, err := HashTokenTransaction(partialIssuanceTokenTransaction)
+	partialIssuanceHash, err := HashTokenTransaction(partialIssuanceTokenTransaction, true)
 	if err != nil {
 		t.Fatalf("failed to hash partial issuance transaction: %v", err)
 	}
 
-	partialTransferHash, err := HashTokenTransaction(partialTransferTokenTransaction)
+	partialTransferHash, err := HashTokenTransaction(partialTransferTokenTransaction, true)
 	if err != nil {
 		t.Fatalf("failed to hash partial transfer transaction: %v", err)
 	}
 
-	finalIssuanceHash, err := HashTokenTransaction(finalIssuanceTokenTransaction)
+	finalIssuanceHash, err := HashTokenTransaction(finalIssuanceTokenTransaction, false)
 	if err != nil {
 		t.Fatalf("failed to hash final issuance transaction: %v", err)
 	}
 
-	finalTransferHash, err := HashTokenTransaction(finalTransferTokenTransaction)
+	finalTransferHash, err := HashTokenTransaction(finalTransferTokenTransaction, false)
 	if err != nil {
 		t.Fatalf("failed to hash final transfer transaction: %v", err)
 	}

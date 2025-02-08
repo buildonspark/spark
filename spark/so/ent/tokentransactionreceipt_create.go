@@ -191,6 +191,14 @@ func (ttrc *TokenTransactionReceiptCreate) check() error {
 			return &ValidationError{Name: "partial_token_transaction_hash", err: fmt.Errorf(`ent: validator failed for field "TokenTransactionReceipt.partial_token_transaction_hash": %w`, err)}
 		}
 	}
+	if _, ok := ttrc.mutation.FinalizedTokenTransactionHash(); !ok {
+		return &ValidationError{Name: "finalized_token_transaction_hash", err: errors.New(`ent: missing required field "TokenTransactionReceipt.finalized_token_transaction_hash"`)}
+	}
+	if v, ok := ttrc.mutation.FinalizedTokenTransactionHash(); ok {
+		if err := tokentransactionreceipt.FinalizedTokenTransactionHashValidator(v); err != nil {
+			return &ValidationError{Name: "finalized_token_transaction_hash", err: fmt.Errorf(`ent: validator failed for field "TokenTransactionReceipt.finalized_token_transaction_hash": %w`, err)}
+		}
+	}
 	return nil
 }
 

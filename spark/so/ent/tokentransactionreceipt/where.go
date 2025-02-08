@@ -236,16 +236,6 @@ func FinalizedTokenTransactionHashLTE(v []byte) predicate.TokenTransactionReceip
 	return predicate.TokenTransactionReceipt(sql.FieldLTE(FieldFinalizedTokenTransactionHash, v))
 }
 
-// FinalizedTokenTransactionHashIsNil applies the IsNil predicate on the "finalized_token_transaction_hash" field.
-func FinalizedTokenTransactionHashIsNil() predicate.TokenTransactionReceipt {
-	return predicate.TokenTransactionReceipt(sql.FieldIsNull(FieldFinalizedTokenTransactionHash))
-}
-
-// FinalizedTokenTransactionHashNotNil applies the NotNil predicate on the "finalized_token_transaction_hash" field.
-func FinalizedTokenTransactionHashNotNil() predicate.TokenTransactionReceipt {
-	return predicate.TokenTransactionReceipt(sql.FieldNotNull(FieldFinalizedTokenTransactionHash))
-}
-
 // HasSpentLeaf applies the HasEdge predicate on the "spent_leaf" edge.
 func HasSpentLeaf() predicate.TokenTransactionReceipt {
 	return predicate.TokenTransactionReceipt(func(s *sql.Selector) {

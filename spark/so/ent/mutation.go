@@ -6887,22 +6887,9 @@ func (m *TokenTransactionReceiptMutation) OldFinalizedTokenTransactionHash(ctx c
 	return oldValue.FinalizedTokenTransactionHash, nil
 }
 
-// ClearFinalizedTokenTransactionHash clears the value of the "finalized_token_transaction_hash" field.
-func (m *TokenTransactionReceiptMutation) ClearFinalizedTokenTransactionHash() {
-	m.finalized_token_transaction_hash = nil
-	m.clearedFields[tokentransactionreceipt.FieldFinalizedTokenTransactionHash] = struct{}{}
-}
-
-// FinalizedTokenTransactionHashCleared returns if the "finalized_token_transaction_hash" field was cleared in this mutation.
-func (m *TokenTransactionReceiptMutation) FinalizedTokenTransactionHashCleared() bool {
-	_, ok := m.clearedFields[tokentransactionreceipt.FieldFinalizedTokenTransactionHash]
-	return ok
-}
-
 // ResetFinalizedTokenTransactionHash resets all changes to the "finalized_token_transaction_hash" field.
 func (m *TokenTransactionReceiptMutation) ResetFinalizedTokenTransactionHash() {
 	m.finalized_token_transaction_hash = nil
-	delete(m.clearedFields, tokentransactionreceipt.FieldFinalizedTokenTransactionHash)
 }
 
 // AddSpentLeafIDs adds the "spent_leaf" edge to the TokenLeaf entity by ids.
@@ -7198,11 +7185,7 @@ func (m *TokenTransactionReceiptMutation) AddField(name string, value ent.Value)
 // ClearedFields returns all nullable fields that were cleared during this
 // mutation.
 func (m *TokenTransactionReceiptMutation) ClearedFields() []string {
-	var fields []string
-	if m.FieldCleared(tokentransactionreceipt.FieldFinalizedTokenTransactionHash) {
-		fields = append(fields, tokentransactionreceipt.FieldFinalizedTokenTransactionHash)
-	}
-	return fields
+	return nil
 }
 
 // FieldCleared returns a boolean indicating if a field with the given name was
@@ -7215,11 +7198,6 @@ func (m *TokenTransactionReceiptMutation) FieldCleared(name string) bool {
 // ClearField clears the value of the field with the given name. It returns an
 // error if the field is not defined in the schema.
 func (m *TokenTransactionReceiptMutation) ClearField(name string) error {
-	switch name {
-	case tokentransactionreceipt.FieldFinalizedTokenTransactionHash:
-		m.ClearFinalizedTokenTransactionHash()
-		return nil
-	}
 	return fmt.Errorf("unknown TokenTransactionReceipt nullable field %s", name)
 }
 

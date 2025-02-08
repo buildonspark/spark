@@ -258,8 +258,8 @@ var (
 		{Name: "id", Type: field.TypeUUID},
 		{Name: "create_time", Type: field.TypeTime},
 		{Name: "update_time", Type: field.TypeTime},
-		{Name: "partial_token_transaction_hash", Type: field.TypeBytes},
-		{Name: "finalized_token_transaction_hash", Type: field.TypeBytes, Nullable: true},
+		{Name: "partial_token_transaction_hash", Type: field.TypeBytes, Unique: true},
+		{Name: "finalized_token_transaction_hash", Type: field.TypeBytes, Unique: true},
 		{Name: "token_transaction_receipt_issuance", Type: field.TypeUUID, Nullable: true},
 	}
 	// TokenTransactionReceiptsTable holds the schema information for the "token_transaction_receipts" table.

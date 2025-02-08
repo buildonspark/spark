@@ -13,7 +13,8 @@ import (
 // 1. Taking SHA256 of each field individually
 // 2. Concatenating all field hashes in order
 // 3. Taking SHA256 of the concatenated hashes
-func HashTokenTransaction(tokenTransaction *pb.TokenTransaction) ([]byte, error) {
+// If partialHash is true generate a partial hash even if the provided transaction is final.
+func HashTokenTransaction(tokenTransaction *pb.TokenTransaction, partialHash bool) ([]byte, error) {
 	if tokenTransaction == nil {
 		return nil, fmt.Errorf("token transaction cannot be nil")
 	}
@@ -53,7 +54,7 @@ func HashTokenTransaction(tokenTransaction *pb.TokenTransaction) ([]byte, error)
 		if leaf.GetOwnerPublicKey() != nil {
 			h.Write(leaf.GetOwnerPublicKey())
 		}
-		if leaf.GetRevocationPublicKey() != nil {
+		if leaf.GetRevocationPublicKey() != nil && !partialHash {
 			h.Write(leaf.GetRevocationPublicKey())
 		}
 		binary.BigEndian.PutUint64(make([]byte, 8), leaf.GetWithdrawalBondSats())

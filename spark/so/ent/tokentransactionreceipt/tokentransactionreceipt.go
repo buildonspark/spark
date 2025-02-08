@@ -93,6 +93,8 @@ var (
 	UpdateDefaultUpdateTime func() time.Time
 	// PartialTokenTransactionHashValidator is a validator for the "partial_token_transaction_hash" field. It is called by the builders before save.
 	PartialTokenTransactionHashValidator func([]byte) error
+	// FinalizedTokenTransactionHashValidator is a validator for the "finalized_token_transaction_hash" field. It is called by the builders before save.
+	FinalizedTokenTransactionHashValidator func([]byte) error
 	// DefaultID holds the default value on creation for the "id" field.
 	DefaultID func() uuid.UUID
 )

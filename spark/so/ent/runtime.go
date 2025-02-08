@@ -270,6 +270,10 @@ func init() {
 	tokentransactionreceiptDescPartialTokenTransactionHash := tokentransactionreceiptFields[0].Descriptor()
 	// tokentransactionreceipt.PartialTokenTransactionHashValidator is a validator for the "partial_token_transaction_hash" field. It is called by the builders before save.
 	tokentransactionreceipt.PartialTokenTransactionHashValidator = tokentransactionreceiptDescPartialTokenTransactionHash.Validators[0].(func([]byte) error)
+	// tokentransactionreceiptDescFinalizedTokenTransactionHash is the schema descriptor for finalized_token_transaction_hash field.
+	tokentransactionreceiptDescFinalizedTokenTransactionHash := tokentransactionreceiptFields[1].Descriptor()
+	// tokentransactionreceipt.FinalizedTokenTransactionHashValidator is a validator for the "finalized_token_transaction_hash" field. It is called by the builders before save.
+	tokentransactionreceipt.FinalizedTokenTransactionHashValidator = tokentransactionreceiptDescFinalizedTokenTransactionHash.Validators[0].(func([]byte) error)
 	// tokentransactionreceiptDescID is the schema descriptor for id field.
 	tokentransactionreceiptDescID := tokentransactionreceiptMixinFields0[0].Descriptor()
 	// tokentransactionreceipt.DefaultID holds the default value on creation for the id field.
