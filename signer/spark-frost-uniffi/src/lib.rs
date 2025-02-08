@@ -16,8 +16,8 @@ use bitcoin::{
 use ecies::{decrypt, encrypt};
 use frost_secp256k1_tr::Identifier;
 use serde::{Deserialize, Serialize};
-use wasm_bindgen::prelude::*;
 use serde_wasm_bindgen;
+use wasm_bindgen::prelude::*;
 
 /// A uniffi library for the Spark Frost signing protocol on client side.
 /// This only signs as the required participant in the signing protocol.
@@ -36,7 +36,7 @@ impl From<String> for Error {
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Error::Spark(s) => write!(f, "Spark error: {}", s)
+            Error::Spark(s) => write!(f, "Spark error: {}", s),
         }
     }
 }
@@ -239,8 +239,8 @@ pub fn wasm_sign_frost(
     statechain_commitments: JsValue,
     adaptor_public_key: Option<Vec<u8>>,
 ) -> Result<Vec<u8>, Error> {
-    let statechain_commitments: HashMap<String, SigningCommitment> = serde_wasm_bindgen::from_value(statechain_commitments)
-        .map_err(|e| {
+    let statechain_commitments: HashMap<String, SigningCommitment> =
+        serde_wasm_bindgen::from_value(statechain_commitments).map_err(|e| {
             log_to_file(&format!("Deserialization error: {:?}", e));
             Error::Spark(format!("Failed to deserialize commitments: {}", e))
         })?;
@@ -286,9 +286,36 @@ pub fn aggregate_frost(
         user_signature_share: self_signature.clone(),
         adaptor_public_key: adaptor_public_key.unwrap_or(vec![]),
     };
-    let response = spark_frost::signing::aggregate_frost(&request)
-        .map_err(|e| Error::Spark(e.to_string()))?;  // Convert the error to String first
+    let response =
+        spark_frost::signing::aggregate_frost(&request).map_err(|e| Error::Spark(e.to_string()))?; // Convert the error to String first
     Ok(response.signature)
+}
+
+pub fn validate_signature_share(
+    msg: Vec<u8>,
+    statechain_commitments: HashMap<String, SigningCommitment>,
+    self_commitment: SigningCommitment,
+    signature_share: Vec<u8>,
+    public_share: Vec<u8>,
+    verifying_key: Vec<u8>,
+) -> bool {
+    let identifier =
+        Identifier::derive("user".as_bytes()).expect("Failed to derive user identifier");
+    let identifier_string = hex::encode(identifier.to_scalar().to_bytes());
+    let request = spark_frost::proto::frost::ValidateSignatureShareRequest {
+        message: msg,
+        identifier: identifier_string,
+        role: spark_frost::proto::frost::SigningRole::User.into(),
+        signature_share: signature_share,
+        public_share: public_share,
+        verifying_key: verifying_key,
+        user_commitments: Some(self_commitment.into()),
+        commitments: statechain_commitments
+            .into_iter()
+            .map(|(k, v)| (k, v.into()))
+            .collect(),
+    };
+    spark_frost::signing::validate_signature_share(&request).is_ok()
 }
 
 #[wasm_bindgen]

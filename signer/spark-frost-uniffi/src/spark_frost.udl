@@ -9,6 +9,8 @@ namespace spark_frost {
     bytes aggregate_frost(bytes msg, record<string, SigningCommitment> statechain_commitments, SigningCommitment self_commitment, record<string, bytes> statechain_signatures, bytes self_signature, record<string, bytes> statechain_public_keys, bytes self_public_key, bytes verifying_key, bytes? adaptor_public_key);
 
     [Throws=Error]
+    bool validate_signature_share(bytes msg, record<string, SigningCommitment> statechain_commitments, SigningCommitment self_commitment, bytes signature_share, bytes public_share, bytes verifying_key);
+    [Throws=Error]
     TransactionResult construct_node_tx(bytes tx, u32 vout, string address, u16 locktime);
 
     [Throws=Error]
