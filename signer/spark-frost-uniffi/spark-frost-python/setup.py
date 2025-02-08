@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name="spark_frost_python",
-    version="0.0.2",
+    version="0.0.3",
     description="The Python language bindings for spark frost signer",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",

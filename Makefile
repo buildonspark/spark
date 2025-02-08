@@ -19,7 +19,7 @@ spark/proto/%/%.pb.go: $(PROTO_DIR)/%.proto
 		$<
 
 # Default target
-all: $(GO_OUT)
+all: $(GO_OUT) copy-protos
 
 # Clean target
 clean:
@@ -27,3 +27,7 @@ clean:
 
 ent:
 	cd spark && go generate ./so/ent
+
+copy-protos:
+	cp protos/common.proto signer/spark-frost/protos/
+	cp protos/frost.proto signer/spark-frost/protos/
