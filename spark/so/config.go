@@ -65,7 +65,7 @@ type BitcoindConfig struct {
 func NewConfig(
 	configFilePath string,
 	index uint64,
-	identityPrivateKey string,
+	identityPrivateKeyFilePath string,
 	operatorsFilePath string,
 	threshold uint64,
 	signerAddress string,
@@ -74,7 +74,11 @@ func NewConfig(
 	dkgCoordinatorAddress string,
 	supportedNetworks []common.Network,
 ) (*Config, error) {
-	identityPrivateKeyBytes, err := hex.DecodeString(identityPrivateKey)
+	identityPrivateKeyHexStringBytes, err := os.ReadFile(identityPrivateKeyFilePath)
+	if err != nil {
+		return nil, err
+	}
+	identityPrivateKeyBytes, err := hex.DecodeString(strings.TrimSpace(string(identityPrivateKeyHexStringBytes)))
 	if err != nil {
 		return nil, err
 	}

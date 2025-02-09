@@ -36,21 +36,21 @@ import (
 )
 
 type args struct {
-	ConfigFilePath        string
-	Index                 uint64
-	IdentityPrivateKey    string
-	OperatorsFilePath     string
-	Threshold             uint64
-	SignerAddress         string
-	Port                  uint64
-	DatabasePath          string
-	MockOnchain           bool
-	ChallengeTimeout      time.Duration
-	SessionDuration       time.Duration
-	AuthzEnforced         bool
-	DKGCoordinatorAddress string
-	DisableDKG            bool
-	SupportedNetworks     string
+	ConfigFilePath             string
+	Index                      uint64
+	IdentityPrivateKeyFilePath string
+	OperatorsFilePath          string
+	Threshold                  uint64
+	SignerAddress              string
+	Port                       uint64
+	DatabasePath               string
+	MockOnchain                bool
+	ChallengeTimeout           time.Duration
+	SessionDuration            time.Duration
+	AuthzEnforced              bool
+	DKGCoordinatorAddress      string
+	DisableDKG                 bool
+	SupportedNetworks          string
 }
 
 func (a *args) SupportedNetworksList() []common.Network {
@@ -76,7 +76,7 @@ func loadArgs() (*args, error) {
 	// Define flags
 	flag.StringVar(&args.ConfigFilePath, "config", "so_config.yaml", "Path to config file")
 	flag.Uint64Var(&args.Index, "index", 0, "Index value")
-	flag.StringVar(&args.IdentityPrivateKey, "key", "", "Identity private key")
+	flag.StringVar(&args.IdentityPrivateKeyFilePath, "key", "", "Identity private key")
 	flag.StringVar(&args.OperatorsFilePath, "operators", "", "Path to operators file")
 	flag.Uint64Var(&args.Threshold, "threshold", 0, "Threshold value")
 	flag.StringVar(&args.SignerAddress, "signer", "", "Signer address")
@@ -92,8 +92,8 @@ func loadArgs() (*args, error) {
 	// Parse flags
 	flag.Parse()
 
-	if args.IdentityPrivateKey == "" || len(args.IdentityPrivateKey) != 64 {
-		return nil, errors.New("identity private key is required and must be 32 bytes hex string")
+	if args.IdentityPrivateKeyFilePath == "" {
+		return nil, errors.New("identity private key file path is required")
 	}
 
 	if args.OperatorsFilePath == "" {
@@ -130,7 +130,7 @@ func main() {
 	config, err := so.NewConfig(
 		args.ConfigFilePath,
 		args.Index,
-		args.IdentityPrivateKey,
+		args.IdentityPrivateKeyFilePath,
 		args.OperatorsFilePath, // TODO: Refactor this into the yaml config
 		args.Threshold,
 		args.SignerAddress,

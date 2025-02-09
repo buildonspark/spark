@@ -322,7 +322,6 @@ run_operators_tmux() {
    local config_file="so_config.yaml"
    local run_dir=$1
    local min_signers=$2
-   local priv_keys=("${@:3}")  # Get private keys array from remaining args
    local session_name="operators"
    local operator_config_file="${run_dir}/config.json"
    
@@ -352,12 +351,14 @@ run_operators_tmux() {
        local db_file="postgresql://:@127.0.0.1:5432/operator_${i}?sslmode=disable"
     #    local db_file="${run_dir}/db/operator_${i}.sqlite?_fk=1"
        local signer_socket="unix:///tmp/frost_${i}.sock"
+
+       local priv_key_file="${run_dir}/operator_${i}.key"
        
        # Construct the command with all parameters
        local cmd="${run_dir}/bin/operator \
            -config '${config_file}' \
            -index ${i} \
-           -key '${priv_keys[$i]}' \
+           -key '${priv_key_file}' \
            -operators '${operator_config_file}' \
            -threshold ${min_signers} \
            -signer '${signer_socket}' \
@@ -507,6 +508,17 @@ reset_databases() {
     echo "Database operation complete!"
 }
 
+create_private_key_files() {
+    local run_dir=$1
+    local priv_keys=("${@:2}")
+
+    for i in {0..4}; do
+        local priv_key="${priv_keys[$i]}"
+        local file="${run_dir}/operator_${i}.key"
+        echo "$priv_key" > "$file"
+    done
+}
+
 # Initialize wipe flag
 WIPE=false
 
@@ -546,6 +558,7 @@ build_go_operator "$run_dir" || {
 
 # Create operator config
 create_operator_config "$run_dir" "${PUB_KEYS[@]}"
+create_private_key_files "$run_dir" "${PRIV_KEYS[@]}"
 
 if ! check_signers_ready "$run_dir"; then
     echo "Failed to start all signers"
@@ -555,7 +568,7 @@ fi
 echo "All signers are ready"
 
 # Run operators
-run_operators_tmux "$run_dir" "$MIN_SIGNERS" "${PRIV_KEYS[@]}"
+run_operators_tmux "$run_dir" "$MIN_SIGNERS"
 
 if ! check_operators_ready "$run_dir"; then
     echo "Failed to start all operators"
