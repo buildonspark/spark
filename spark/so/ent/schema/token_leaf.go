@@ -25,6 +25,9 @@ const (
 	// TokenLeafStatusSpent is the status of a leaf after the tx has been signed by the
 	// operator to spend it but before it is finalized.
 	TokenLeafStatusSpentSigned TokenLeafStatus = "SPENT_SIGNED"
+	// TokenLeafStatusSpentKeyshareReleased is the status of a leaf after the keyshare
+	// hash been released but before the private key has been provided by the wallet.
+	TokenLeafStatusSpentKeyshareReleased TokenLeafStatus = "SPENT_KEYSHARE_RELEASED"
 	// TokenLeafStatusSpentFinalized is the status of a leaf after the tx has been signed
 	// by the operator to spend it but before it is finalized.
 	TokenLeafStatusSpentFinalized TokenLeafStatus = "SPENT_FINALIZED"
@@ -38,6 +41,7 @@ func (TokenLeafStatus) Values() []string {
 		string(TokenLeafStatusCreatedFinalized),
 		string(TokenLeafStatusSpentUnsigned),
 		string(TokenLeafStatusSpentSigned),
+		string(TokenLeafStatusSpentKeyshareReleased),
 		string(TokenLeafStatusSpentFinalized),
 	}
 }

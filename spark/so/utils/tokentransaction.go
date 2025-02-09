@@ -85,6 +85,34 @@ func HashTokenTransaction(tokenTransaction *pb.TokenTransaction, partialHash boo
 	return h.Sum(nil), nil
 }
 
+func HashRequestRevocationKeysharesPayload(payload *pb.RevocationKeyshareSignablePayload) ([]byte, error) {
+	if payload == nil {
+		return nil, fmt.Errorf("revocation keyshare signable payload cannot be nil")
+	}
+
+	h := sha256.New()
+	var allHashes []byte
+
+	// Hash final_token_transaction_hash
+	h.Reset()
+	if payload.GetFinalTokenTransactionHash() != nil {
+		h.Write(payload.GetFinalTokenTransactionHash())
+	}
+	allHashes = append(allHashes, h.Sum(nil)...)
+
+	// Hash operator_identity_public_key
+	h.Reset()
+	if payload.GetOperatorIdentityPublicKey() != nil {
+		h.Write(payload.GetOperatorIdentityPublicKey())
+	}
+	allHashes = append(allHashes, h.Sum(nil)...)
+
+	// Final hash of all concatenated hashes
+	h.Reset()
+	h.Write(allHashes)
+	return h.Sum(nil), nil
+}
+
 // TODO: Extend to validate the full token transaction after filling revocation keys.
 // ValidatePartialTokenTransactionStartRequest validates a partial token transaction start request without revocation keys.
 func ValidatePartialTokenTransaction(

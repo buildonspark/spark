@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"log"
@@ -12,6 +13,9 @@ import (
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/authz"
 	"github.com/lightsparkdev/spark-go/so/ent"
+	"github.com/lightsparkdev/spark-go/so/ent/schema"
+	"github.com/lightsparkdev/spark-go/so/ent/tokenleaf"
+	"github.com/lightsparkdev/spark-go/so/ent/tokentransactionreceipt"
 	"github.com/lightsparkdev/spark-go/so/helper"
 	"github.com/lightsparkdev/spark-go/so/utils"
 )
@@ -156,5 +160,93 @@ func (o TokenTransactionHandler) StartTokenTransaction(ctx context.Context, conf
 		FinalTokenTransaction:   finalTokenTransaction,
 		SparkOperatorSignatures: sparkOperatorSignatures,
 		KeyshareInfo:            keyshareInfo,
+	}, nil
+}
+
+// StartTokenTransaction verifies the token leaves, generates the keyshares for the token transaction, and returns the signature shares for the token transaction payload.
+func (o TokenTransactionHandler) GetTokenTransactionRevocationKeyshares(
+	ctx context.Context,
+	config *so.Config,
+	req *pb.GetTokenTransactionRevocationKeysharesRequest,
+) (*pb.GetTokenTransactionRevocationKeysharesResponse, error) {
+	// TODO: Add authz
+
+	// Validate each leaf signature in the request. Each signed payload consists of
+	//   payload.final_token_transaction_hash
+	//   payload.operator_identity_public_key
+	// To verify that this request for this transaction came from the leaf owner
+	// (who is about to transfer the leaf once receiving all shares).
+	for _, leafSig := range req.Signatures {
+		payloadHash, err := utils.HashRequestRevocationKeysharesPayload(leafSig.Payload)
+		if err != nil {
+			return nil, fmt.Errorf("failed to hash revocation keyshares payload: %w", err)
+		}
+
+		if err := utils.ValidateOwnershipSignature(
+			leafSig.OwnerSignature,
+			payloadHash,
+			leafSig.OwnerPublicKey,
+		); err != nil {
+			return nil, fmt.Errorf("invalid owner signature for leaf: %w", err)
+		}
+	}
+
+	db := ent.GetDbFromContext(ctx)
+	finalTokenTransactionHash := req.FinalTokenTransactionHash
+
+	// Query the token_transaction_receipt by the final transaction hash.
+	receipt, err := db.TokenTransactionReceipt.Query().
+		Where(tokentransactionreceipt.FinalizedTokenTransactionHash(finalTokenTransactionHash)).
+		WithSpentLeaf().
+		Only(ctx)
+	if err != nil {
+		log.Printf("Failed to fetch matching transaction receipt: %v", err)
+		return nil, fmt.Errorf("failed to fetch transaction receipt: %w", err)
+	}
+
+	spentLeaves := receipt.Edges.SpentLeaf
+	if len(spentLeaves) == 0 {
+		return nil, fmt.Errorf("no spent leaves found for transaction hash %x", finalTokenTransactionHash)
+	}
+
+	var keyshares []*ent.SigningKeyshare
+	for _, leaf := range spentLeaves {
+		keyshare, err := leaf.QueryRevocationKeyshare().Only(ctx)
+		if err != nil {
+			log.Printf("Failed to get keyshare for leaf: %v", err)
+			return nil, err
+		}
+		keyshares = append(keyshares, keyshare)
+
+		// Validate that the keyshare's public key matches the leaf's revocation public key
+		if !bytes.Equal(keyshare.PublicKey, leaf.WithdrawalRevocationPublicKey) {
+			return nil, fmt.Errorf(
+				"keyshare public key %x does not match leaf revocation public key %x",
+				keyshare.PublicKey,
+				leaf.WithdrawalRevocationPublicKey,
+			)
+		}
+	}
+
+	revocationKeyshares := make([][]byte, len(keyshares))
+	for i, keyshare := range keyshares {
+		revocationKeyshares[i] = keyshare.SecretShare
+	}
+
+	// Update all spent leaves to Spent status in a single batch
+	leafIDs := make([]uuid.UUID, len(spentLeaves))
+	for i, leaf := range spentLeaves {
+		leafIDs[i] = leaf.ID
+	}
+	if _, err := db.TokenLeaf.Update().
+		Where(tokenleaf.IDIn(leafIDs...)).
+		SetStatus(schema.TokenLeafStatusSpentKeyshareReleased).
+		Save(ctx); err != nil {
+		log.Printf("Failed to batch update leaf statuses to Spent: %v", err)
+		return nil, fmt.Errorf("failed to update leaf statuses: %w", err)
+	}
+
+	return &pb.GetTokenTransactionRevocationKeysharesResponse{
+		TokenTransactionRevocationKeyshares: revocationKeyshares,
 	}, nil
 }

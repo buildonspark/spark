@@ -205,7 +205,7 @@ var (
 		{Name: "id", Type: field.TypeUUID},
 		{Name: "create_time", Type: field.TypeTime},
 		{Name: "update_time", Type: field.TypeTime},
-		{Name: "status", Type: field.TypeEnum, Enums: []string{"CREATED_UNSIGNED", "CREATED_SIGNED", "CREATED_FINALIZED", "SPENT_UNSIGNED", "SPENT_SIGNED", "SPENT_FINALIZED"}},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"CREATED_UNSIGNED", "CREATED_SIGNED", "CREATED_FINALIZED", "SPENT_UNSIGNED", "SPENT_SIGNED", "SPENT_KEYSHARE_RELEASED", "SPENT_FINALIZED"}},
 		{Name: "owner_public_key", Type: field.TypeBytes},
 		{Name: "withdrawal_bond_sats", Type: field.TypeUint64},
 		{Name: "withdrawal_locktime", Type: field.TypeUint64},

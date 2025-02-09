@@ -135,7 +135,7 @@ var (
 // StatusValidator is a validator for the "status" field enum values. It is called by the builders before save.
 func StatusValidator(s schema.TokenLeafStatus) error {
 	switch s {
-	case "CREATED_UNSIGNED", "CREATED_SIGNED", "CREATED_FINALIZED", "SPENT_UNSIGNED", "SPENT_SIGNED", "SPENT_FINALIZED":
+	case "CREATED_UNSIGNED", "CREATED_SIGNED", "CREATED_FINALIZED", "SPENT_UNSIGNED", "SPENT_SIGNED", "SPENT_KEYSHARE_RELEASED", "SPENT_FINALIZED":
 		return nil
 	default:
 		return fmt.Errorf("tokenleaf: invalid enum value for status field: %q", s)

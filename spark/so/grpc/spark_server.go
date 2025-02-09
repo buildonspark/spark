@@ -169,3 +169,10 @@ func (s *SparkServer) QueryNodes(ctx context.Context, req *pb.QueryNodesRequest)
 	nodeQueryHandler := handler.NewNodeQueryHandler(s.config)
 	return wrapWithGRPCError(nodeQueryHandler.QueryNodes(ctx, req))
 }
+
+// GetTokenTransactionRevocationKeyshares allows the wallet to retrieve the revocation private key shares from each individual SO to
+// allow the wallet to combine these shares into the fully resolved revocation private key necessary for transaction finalization.
+func (s *SparkServer) GetTokenTransactionRevocationKeyshares(ctx context.Context, req *pb.GetTokenTransactionRevocationKeysharesRequest) (*pb.GetTokenTransactionRevocationKeysharesResponse, error) {
+	tokenTransactionHandler := handler.NewTokenTransactionHandler(s.config)
+	return wrapWithGRPCError(tokenTransactionHandler.GetTokenTransactionRevocationKeyshares(ctx, s.config, req))
+}
