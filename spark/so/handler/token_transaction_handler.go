@@ -18,6 +18,7 @@ import (
 	"github.com/lightsparkdev/spark-go/so/ent/tokentransactionreceipt"
 	"github.com/lightsparkdev/spark-go/so/helper"
 	"github.com/lightsparkdev/spark-go/so/utils"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 // The TokenTransactionHandler is responsible for handling token transaction requests to spend and create leaves.
@@ -249,4 +250,56 @@ func (o TokenTransactionHandler) GetTokenTransactionRevocationKeyshares(
 	return &pb.GetTokenTransactionRevocationKeysharesResponse{
 		TokenTransactionRevocationKeyshares: revocationKeyshares,
 	}, nil
+}
+
+// FinalizeTokenTransaction takes the revocation private keys for spent leaves and updates their status to finalized.
+func (o TokenTransactionHandler) FinalizeTokenTransaction(
+	ctx context.Context,
+	config *so.Config,
+	req *pb.FinalizeTokenTransactionRequest,
+) (*emptypb.Empty, error) {
+	db := ent.GetDbFromContext(ctx)
+	finalTokenTransactionHash := req.FinalTokenTransactionHash
+
+	// Query the token_transaction_receipt by the final transaction hash.
+	receipt, err := db.TokenTransactionReceipt.Query().
+		Where(tokentransactionreceipt.FinalizedTokenTransactionHash(finalTokenTransactionHash)).
+		WithSpentLeaf().
+		Only(ctx)
+	if err != nil {
+		log.Printf("Failed to fetch matching transaction receipt: %v", err)
+		return nil, fmt.Errorf("failed to fetch transaction receipt: %w", err)
+	}
+
+	spentLeaves := receipt.Edges.SpentLeaf
+	if len(spentLeaves) == 0 {
+		return nil, fmt.Errorf("no spent leaves found for transaction hash %x", finalTokenTransactionHash)
+	}
+
+	// Validate that we have the right number of revocation keys
+	if len(req.LeafToSpendRevocationKeys) != len(spentLeaves) {
+		return nil, fmt.Errorf(
+			"number of revocation keys (%d) does not match number of spent leaves (%d)",
+			len(req.LeafToSpendRevocationKeys),
+			len(spentLeaves),
+		)
+	}
+
+	// TODO: Validate that the revocation private key is correct.
+
+	// Update all spent leaves with their revocation private keys and set status to finalized
+	leafIDs := make([]uuid.UUID, len(spentLeaves))
+	for i, leaf := range spentLeaves {
+		leafIDs[i] = leaf.ID
+		// Update each leaf individually to set the revocation private key
+		if _, err := db.TokenLeaf.UpdateOne(leaf).
+			SetLeafSpentRevocationPrivateKey(req.LeafToSpendRevocationKeys[i]).
+			SetStatus(schema.TokenLeafStatusSpentFinalized).
+			Save(ctx); err != nil {
+			log.Printf("Failed to update leaf %s with revocation private key: %v", leaf.ID, err)
+			return nil, fmt.Errorf("failed to update leaf with revocation key: %w", err)
+		}
+	}
+
+	return &emptypb.Empty{}, nil
 }
