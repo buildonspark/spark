@@ -19,6 +19,7 @@ import (
 	"github.com/lightsparkdev/spark-go/so/ent"
 	"github.com/lightsparkdev/spark-go/so/ent/blockheight"
 	"github.com/lightsparkdev/spark-go/so/ent/cooperativeexit"
+	"github.com/lightsparkdev/spark-go/so/ent/predicate"
 	"github.com/lightsparkdev/spark-go/so/ent/preimagerequest"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
 	enttransfer "github.com/lightsparkdev/spark-go/so/ent/transfer"
@@ -395,18 +396,28 @@ func (h *TransferHandler) QueryPendingTransfers(ctx context.Context, req *pb.Que
 		return nil, err
 	}
 
+	transferPredicate := []predicate.Transfer{
+		enttransfer.ReceiverIdentityPubkeyEQ(req.ReceiverIdentityPublicKey),
+		enttransfer.StatusEQ(schema.TransferStatusSenderKeyTweaked),
+		enttransfer.Or(
+			enttransfer.ExpiryTimeGT(time.Now()),
+			enttransfer.ExpiryTimeEQ(time.Unix(0, 0)),
+		),
+	}
+	if req.TransferIds != nil {
+		transferUUIDs := make([]uuid.UUID, len(req.TransferIds))
+		for _, transferID := range req.TransferIds {
+			transferUUID, err := uuid.Parse(transferID)
+			if err != nil {
+				return nil, fmt.Errorf("unable to parse transfer id as a uuid %s: %v", transferID, err)
+			}
+			transferUUIDs = append(transferUUIDs, transferUUID)
+		}
+		transferPredicate = append([]predicate.Transfer{enttransfer.IDIn(transferUUIDs...)}, transferPredicate...)
+	}
+
 	db := ent.GetDbFromContext(ctx)
-	transfers, err := db.Transfer.Query().
-		Where(
-			enttransfer.And(
-				enttransfer.ReceiverIdentityPubkeyEQ(req.ReceiverIdentityPublicKey),
-				enttransfer.StatusEQ(schema.TransferStatusSenderKeyTweaked),
-				enttransfer.Or(
-					enttransfer.ExpiryTimeGT(time.Now()),
-					enttransfer.ExpiryTimeEQ(time.Unix(0, 0)),
-				),
-			),
-		).All(ctx)
+	transfers, err := db.Transfer.Query().Where(enttransfer.And(transferPredicate...)).All(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to query pending transfers: %v", err)
 	}

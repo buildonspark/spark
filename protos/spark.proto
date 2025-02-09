@@ -325,6 +325,7 @@ message CompleteSendTransferResponse {
 
 message QueryPendingTransfersRequest {
     bytes receiver_identity_public_key = 1;
+    repeated string transfer_ids = 2;
 }
 
 message QueryPendingTransfersResponse {
