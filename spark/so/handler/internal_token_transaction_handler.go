@@ -1,12 +1,16 @@
 package handler
 
 import (
+	"bytes"
 	"context"
+	"fmt"
 	"log"
+	"math/big"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 	"github.com/google/uuid"
+	pb "github.com/lightsparkdev/spark-go/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark-go/proto/spark_internal"
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/ent"
@@ -99,6 +103,14 @@ func (h *InternalTokenTransactionHandler) SignTokenTransaction(ctx context.Conte
 		return nil, err
 	}
 
+	if req.TokenTransaction.GetIssueInput() != nil {
+		err = ValidateIssue(req.TokenTransaction, req.TokenTransactionSignatures)
+		if err != nil {
+			log.Printf("Failed to validate issuance signature for this transasction: %v", err)
+			return nil, err
+		}
+	}
+
 	if req.TokenTransaction.GetTransferInput() != nil {
 		tokenLeafEntsToSpend, err := ent.FetchTokenLeavesFromLeavesToSpend(ctx, req.TokenTransaction.GetTransferInput().LeavesToSpend)
 		if err != nil {
@@ -106,7 +118,12 @@ func (h *InternalTokenTransactionHandler) SignTokenTransaction(ctx context.Conte
 			return nil, err
 		}
 
-		// TODO: Validate that the leaves for transfer valid, signed, and are the right amount.
+		// Validate the transfer input with context from prior transactions.
+		err = ValidateTransferUsingPreviousTransactionData(req.TokenTransaction, req.TokenTransactionSignatures, tokenLeafEntsToSpend)
+		if err != nil {
+			log.Printf("Failed to validate leaves for transfer: %v", err)
+			return nil, err
+		}
 
 		inputLeavesUpdate := make([]*ent.TokenLeafUpdateOne, 0, len(req.TokenTransaction.GetTransferInput().LeavesToSpend))
 		for leafIndex, leafToSpendEnt := range tokenLeafEntsToSpend {
@@ -145,4 +162,86 @@ func (h *InternalTokenTransactionHandler) SignTokenTransaction(ctx context.Conte
 	return &pbinternal.SignTokenTransactionResponse{
 		OperatorSignature: operatorSignature.Serialize(),
 	}, nil
+}
+
+func ValidateIssue(
+	tokenTransaction *pb.TokenTransaction,
+	tokenTransactionSignatures *pb.TokenTransactionSignatures,
+) error {
+	partialTokenTransactionHash, err := utils.HashTokenTransaction(tokenTransaction, true)
+	if err != nil {
+		return fmt.Errorf("failed to hash token transaction: %w", err)
+	}
+
+	err = utils.ValidateOwnershipSignature(tokenTransactionSignatures.GetOwnerSignatures()[0], partialTokenTransactionHash, tokenTransaction.GetIssueInput().GetIssuerPublicKey())
+	if err != nil {
+		return fmt.Errorf("invalid issuer signature: %w", err)
+	}
+
+	return nil
+}
+
+func ValidateTransferUsingPreviousTransactionData(
+	tokenTransaction *pb.TokenTransaction,
+	tokenTransactionSignatures *pb.TokenTransactionSignatures,
+	leafToSpendEnts []*ent.TokenLeaf,
+) error {
+	// Validate that the correct number of signatures were provided
+	if len(tokenTransactionSignatures.GetOwnerSignatures()) != len(leafToSpendEnts) {
+		return fmt.Errorf("number of signatures must match number of ownership public keys")
+	}
+
+	// Validate that all token public keys in leaves to spend match the output leaves.
+	// Ok to just check against the first output because output token public key uniformity
+	// is checked in the main ValidateTokenTransaction() call.
+	expectedTokenPubKey := tokenTransaction.OutputLeaves[0].GetTokenPublicKey()
+	if expectedTokenPubKey == nil {
+		return fmt.Errorf("token public key cannot be nil in output leaves")
+	}
+	for i, leafEnt := range leafToSpendEnts {
+		if !bytes.Equal(leafEnt.TokenPublicKey, expectedTokenPubKey) {
+			return fmt.Errorf("token public key mismatch for leaf %d - input leaves must be for the same token public key as the output", i)
+		}
+	}
+
+	// Validate token conservation in inputs + outputs.
+	totalInputAmount := new(big.Int)
+	for _, leafEnt := range leafToSpendEnts {
+		inputAmount := new(big.Int).SetBytes(leafEnt.TokenAmount)
+		totalInputAmount.Add(totalInputAmount, inputAmount)
+	}
+	totalOutputAmount := new(big.Int)
+	for _, outputLeaf := range tokenTransaction.OutputLeaves {
+		outputAmount := new(big.Int).SetBytes(outputLeaf.GetTokenAmount())
+		totalOutputAmount.Add(totalOutputAmount, outputAmount)
+	}
+	if totalInputAmount.Cmp(totalOutputAmount) != 0 {
+		return fmt.Errorf("total input amount %s does not match total output amount %s", totalInputAmount.String(), totalOutputAmount.String())
+	}
+
+	// Validate that the ownership signatures match the ownership public keys in the leaves to spend.
+	partialTokenTransactionHash, err := utils.HashTokenTransaction(tokenTransaction, true)
+	if err != nil {
+		return fmt.Errorf("failed to hash token transaction: %w", err)
+	}
+
+	for i, ownershipSignature := range tokenTransactionSignatures.GetOwnerSignatures() {
+		if ownershipSignature == nil {
+			return fmt.Errorf("ownership signature cannot be nil")
+		}
+
+		err = utils.ValidateOwnershipSignature(ownershipSignature, partialTokenTransactionHash, leafToSpendEnts[i].OwnerPublicKey)
+		if err != nil {
+			return fmt.Errorf("invalid ownership signature for leaf %d: %w", i, err)
+		}
+	}
+
+	// TODO: Change to handle all leaf statuses appropriately
+	for i, leafEnt := range leafToSpendEnts {
+		if leafEnt.Status == schema.TokenLeafStatusSpentSigned {
+			return fmt.Errorf("leaf %d has already been spent", i)
+		}
+	}
+
+	return nil
 }

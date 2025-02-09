@@ -6,6 +6,8 @@ import (
 	"encoding/binary"
 	"fmt"
 
+	"github.com/btcsuite/btcd/btcec/v2/ecdsa"
+	secp256k1 "github.com/decred/dcrd/dcrec/secp256k1/v4"
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
 )
 
@@ -140,13 +142,6 @@ func ValidatePartialTokenTransaction(
 		if len(tokenTransactionSignatures.GetOwnerSignatures()) != len(transferSource.GetLeavesToSpend()) {
 			return fmt.Errorf("number of signatures must match number of leaves to spend")
 		}
-
-		for i := range transferSource.GetLeavesToSpend() {
-			signature := tokenTransactionSignatures.GetOwnerSignatures()[i]
-			if signature == nil {
-				return fmt.Errorf("transfer signature cannot be nil")
-			}
-		}
 	}
 
 	// Check that each operator's public key is present
@@ -193,6 +188,28 @@ func ValidateFinalTokenTransaction(
 			return fmt.Errorf("revocation public key does not match expected for leaf %d", i)
 		}
 		seenRevocationKeys[revKeyStr] = true
+	}
+	return nil
+}
+
+// ValidateOwnershipSignature validates the ownership signature of a token transaction and that it matches
+// a predefined public key attached to the leaf being spent or the token being created and the submitted transaction.
+func ValidateOwnershipSignature(ownershipSignature []byte, partialTokenTransactionHash []byte, ownerPublicKey []byte) error {
+	if ownershipSignature == nil {
+		return fmt.Errorf("ownership signature cannot be nil")
+	}
+	if partialTokenTransactionHash == nil {
+		return fmt.Errorf("partial token transaction hash cannot be nil")
+	}
+
+	sig, _ := ecdsa.ParseDERSignature(ownershipSignature)
+	pubKey, err := secp256k1.ParsePubKey(ownerPublicKey)
+	if err != nil {
+		return fmt.Errorf("failed to parse public key: %w", err)
+	}
+
+	if !sig.Verify(partialTokenTransactionHash, pubKey) {
+		return fmt.Errorf("invalid ownership signature")
 	}
 	return nil
 }
