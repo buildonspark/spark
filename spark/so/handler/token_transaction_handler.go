@@ -167,7 +167,6 @@ func (o TokenTransactionHandler) StartTokenTransaction(ctx context.Context, conf
 // StartTokenTransaction verifies the token leaves, generates the keyshares for the token transaction, and returns the signature shares for the token transaction payload.
 func (o TokenTransactionHandler) GetTokenTransactionRevocationKeyshares(
 	ctx context.Context,
-	config *so.Config,
 	req *pb.GetTokenTransactionRevocationKeysharesRequest,
 ) (*pb.GetTokenTransactionRevocationKeysharesResponse, error) {
 	// TODO: Add authz
@@ -255,7 +254,6 @@ func (o TokenTransactionHandler) GetTokenTransactionRevocationKeyshares(
 // FinalizeTokenTransaction takes the revocation private keys for spent leaves and updates their status to finalized.
 func (o TokenTransactionHandler) FinalizeTokenTransaction(
 	ctx context.Context,
-	config *so.Config,
 	req *pb.FinalizeTokenTransactionRequest,
 ) (*emptypb.Empty, error) {
 	db := ent.GetDbFromContext(ctx)
