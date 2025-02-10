@@ -98,11 +98,14 @@ func GetLeafDenominationCounts(ctx context.Context, req *pb.GetLeafDenominationC
 // FindLeavesToGiveUser is called to figure out which leaves to give to a user when they deposit funds or receive a lightning payment.
 func FindLeavesToGiveUser(ctx context.Context, req *pb.FindLeavesToGiveUserRequest) (*pb.FindLeavesToGiveUserResponse, error) {
 	db := ent.GetDbFromContext(ctx)
-	// TODO: Sort on the polarity score as well.
+
 	leaves, err := db.TreeNode.Query().
 		Where(treenode.OwnerIdentityPubkey(req.SspIdentityPublicKey)).
 		Where(treenode.StatusEQ(schema.TreeNodeStatusAvailable)).
-		Order(ent.Desc(treenode.FieldValue)).
+		Order(
+			ent.Desc(treenode.FieldValue),
+			ent.Asc(treenode.FieldCreateTime),
+		).
 		All(ctx)
 	if err != nil {
 		return nil, err

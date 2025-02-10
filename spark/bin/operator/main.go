@@ -238,7 +238,7 @@ func main() {
 	sparkServer := sparkgrpc.NewSparkServer(config, onchainHelper)
 	pbspark.RegisterSparkServiceServer(grpcServer, sparkServer)
 
-	treeServer := sparkgrpc.NewSparkTreeServer(config)
+	treeServer := sparkgrpc.NewSparkTreeServer(config, dbClient)
 	pbtree.RegisterSparkTreeServiceServer(grpcServer, treeServer)
 
 	authnServer, err := sparkgrpc.NewAuthnServer(sparkgrpc.AuthnServerConfig{

@@ -23,6 +23,7 @@ const (
 	SparkTreeService_FindLeavesToGiveUser_FullMethodName      = "/spark.SparkTreeService/find_leaves_to_give_user"
 	SparkTreeService_FindLeavesToTakeFromUser_FullMethodName  = "/spark.SparkTreeService/find_leaves_to_take_from_user"
 	SparkTreeService_ProposeTreeDenominations_FullMethodName  = "/spark.SparkTreeService/propose_tree_denominations"
+	SparkTreeService_FetchPolarityScores_FullMethodName       = "/spark.SparkTreeService/fetch_polarity_scores"
 )
 
 // SparkTreeServiceClient is the client API for SparkTreeService service.
@@ -33,6 +34,7 @@ type SparkTreeServiceClient interface {
 	FindLeavesToGiveUser(ctx context.Context, in *FindLeavesToGiveUserRequest, opts ...grpc.CallOption) (*FindLeavesToGiveUserResponse, error)
 	FindLeavesToTakeFromUser(ctx context.Context, in *FindLeavesToTakeFromUserRequest, opts ...grpc.CallOption) (*FindLeavesToTakeFromUserResponse, error)
 	ProposeTreeDenominations(ctx context.Context, in *ProposeTreeDenominationsRequest, opts ...grpc.CallOption) (*ProposeTreeDenominationsResponse, error)
+	FetchPolarityScores(ctx context.Context, in *FetchPolarityScore, opts ...grpc.CallOption) (*FetchPolarityScoreResponse, error)
 }
 
 type sparkTreeServiceClient struct {
@@ -83,6 +85,16 @@ func (c *sparkTreeServiceClient) ProposeTreeDenominations(ctx context.Context, i
 	return out, nil
 }
 
+func (c *sparkTreeServiceClient) FetchPolarityScores(ctx context.Context, in *FetchPolarityScore, opts ...grpc.CallOption) (*FetchPolarityScoreResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(FetchPolarityScoreResponse)
+	err := c.cc.Invoke(ctx, SparkTreeService_FetchPolarityScores_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SparkTreeServiceServer is the server API for SparkTreeService service.
 // All implementations must embed UnimplementedSparkTreeServiceServer
 // for forward compatibility.
@@ -91,6 +103,7 @@ type SparkTreeServiceServer interface {
 	FindLeavesToGiveUser(context.Context, *FindLeavesToGiveUserRequest) (*FindLeavesToGiveUserResponse, error)
 	FindLeavesToTakeFromUser(context.Context, *FindLeavesToTakeFromUserRequest) (*FindLeavesToTakeFromUserResponse, error)
 	ProposeTreeDenominations(context.Context, *ProposeTreeDenominationsRequest) (*ProposeTreeDenominationsResponse, error)
+	FetchPolarityScores(context.Context, *FetchPolarityScore) (*FetchPolarityScoreResponse, error)
 	mustEmbedUnimplementedSparkTreeServiceServer()
 }
 
@@ -112,6 +125,9 @@ func (UnimplementedSparkTreeServiceServer) FindLeavesToTakeFromUser(context.Cont
 }
 func (UnimplementedSparkTreeServiceServer) ProposeTreeDenominations(context.Context, *ProposeTreeDenominationsRequest) (*ProposeTreeDenominationsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ProposeTreeDenominations not implemented")
+}
+func (UnimplementedSparkTreeServiceServer) FetchPolarityScores(context.Context, *FetchPolarityScore) (*FetchPolarityScoreResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method FetchPolarityScores not implemented")
 }
 func (UnimplementedSparkTreeServiceServer) mustEmbedUnimplementedSparkTreeServiceServer() {}
 func (UnimplementedSparkTreeServiceServer) testEmbeddedByValue()                          {}
@@ -206,6 +222,24 @@ func _SparkTreeService_ProposeTreeDenominations_Handler(srv interface{}, ctx con
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SparkTreeService_FetchPolarityScores_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(FetchPolarityScore)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkTreeServiceServer).FetchPolarityScores(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkTreeService_FetchPolarityScores_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkTreeServiceServer).FetchPolarityScores(ctx, req.(*FetchPolarityScore))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // SparkTreeService_ServiceDesc is the grpc.ServiceDesc for SparkTreeService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -228,6 +262,10 @@ var SparkTreeService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "propose_tree_denominations",
 			Handler:    _SparkTreeService_ProposeTreeDenominations_Handler,
+		},
+		{
+			MethodName: "fetch_polarity_scores",
+			Handler:    _SparkTreeService_FetchPolarityScores_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
