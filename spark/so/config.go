@@ -1,11 +1,21 @@
 package so
 
 import (
+	"context"
+	"database/sql/driver"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
+	"net/url"
 	"os"
 	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
+	"github.com/aws/aws-sdk-go-v2/feature/rds/auth"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
+	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/lightsparkdev/spark-go/common"
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
 	"github.com/lightsparkdev/spark-go/so/utils"
@@ -37,6 +47,8 @@ type Config struct {
 	SupportedNetworks []common.Network
 	// BitcoindConfigs is the configurations for different bitcoin nodes.
 	BitcoindConfigs map[string]BitcoindConfig
+	// AWS determines if the database is in AWS RDS.
+	AWS bool
 }
 
 // DatabaseDriver returns the database driver based on the database path.
@@ -73,6 +85,7 @@ func NewConfig(
 	authzEnforced bool,
 	dkgCoordinatorAddress string,
 	supportedNetworks []common.Network,
+	aws bool,
 ) (*Config, error) {
 	identityPrivateKeyHexStringBytes, err := os.ReadFile(identityPrivateKeyFilePath)
 	if err != nil {
@@ -110,6 +123,7 @@ func NewConfig(
 		DKGCoordinatorAddress: dkgCoordinatorAddress,
 		SupportedNetworks:     supportedNetworks,
 		BitcoindConfigs:       bitcoindConfigs.Bitcoind,
+		AWS:                   aws,
 	}, nil
 }
 
@@ -120,6 +134,87 @@ func (c *Config) IsNetworkSupported(network common.Network) bool {
 		}
 	}
 	return false
+}
+
+func NewRDSAuthToken(ctx context.Context, uri *url.URL) (string, error) {
+	awsRegion := os.Getenv("AWS_REGION")
+	if awsRegion == "" {
+		return "", fmt.Errorf("AWS_REGION is not set")
+	}
+	awsRoleArn := os.Getenv("AWS_ROLE_ARN")
+	if awsRoleArn == "" {
+		return "", fmt.Errorf("AWS_ROLE_ARN is not set")
+	}
+	awsWebIdentityTokenFile := os.Getenv("AWS_WEB_IDENTITY_TOKEN_FILE")
+	if awsWebIdentityTokenFile == "" {
+		return "", fmt.Errorf("AWS_WEB_IDENTITY_TOKEN_FILE is not set")
+	}
+	podName := os.Getenv("POD_NAME")
+	if podName == "" {
+		return "", fmt.Errorf("POD_NAME is not set")
+	}
+
+	dbUser := uri.User.Username()
+	dbEndpoint := uri.Host
+
+	cfg, err := config.LoadDefaultConfig(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	client := sts.NewFromConfig(cfg)
+	awsCreds := aws.NewCredentialsCache(stscreds.NewWebIdentityRoleProvider(
+		client,
+		awsRoleArn,
+		stscreds.IdentityTokenFile(awsWebIdentityTokenFile),
+		func(o *stscreds.WebIdentityRoleOptions) {
+			o.RoleSessionName = podName
+		}))
+
+	token, err := auth.BuildAuthToken(ctx, dbEndpoint, awsRegion, dbUser, awsCreds)
+	if err != nil {
+		return "", err
+	}
+
+	return token, nil
+}
+
+// DBConnector is a database connector that can be configured
+// to generate a new AWS RDS auth token for each connection.
+type DBConnector struct {
+	baseURI *url.URL
+	AWS     bool
+	driver  driver.Driver
+}
+
+func NewDBConnector(urlStr string, aws bool) (*DBConnector, error) {
+	uri, err := url.Parse(urlStr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse database path: %w", err)
+	}
+	return &DBConnector{
+		baseURI: uri,
+		AWS:     aws,
+		driver:  stdlib.GetDefaultDriver(),
+	}, nil
+}
+
+func (c *DBConnector) Connect(ctx context.Context) (driver.Conn, error) {
+	if !c.AWS {
+		return c.driver.Open(c.baseURI.String())
+	}
+	uri := c.baseURI
+	token, err := NewRDSAuthToken(ctx, c.baseURI)
+	if err != nil {
+		return nil, err
+	}
+	uri.User = url.UserPassword(uri.User.Username(), token)
+	return c.driver.Open(uri.String())
+}
+
+// Driver returns the underlying driver.
+func (c *DBConnector) Driver() driver.Driver {
+	return c.driver
 }
 
 // LoadOperators loads the operators from the given file path.

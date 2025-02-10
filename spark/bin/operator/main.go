@@ -12,6 +12,8 @@ import (
 	"strings"
 	"time"
 
+	entsql "entgo.io/ent/dialect/sql"
+
 	"github.com/go-co-op/gocron/v2"
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
 	_ "github.com/lib/pq"
@@ -53,6 +55,7 @@ type args struct {
 	DKGCoordinatorAddress      string
 	DisableDKG                 bool
 	SupportedNetworks          string
+	AWS                        bool
 }
 
 func (a *args) SupportedNetworksList() []common.Network {
@@ -91,6 +94,7 @@ func loadArgs() (*args, error) {
 	flag.StringVar(&args.DKGCoordinatorAddress, "dkg-address", "", "DKG coordinator address")
 	flag.BoolVar(&args.DisableDKG, "disable-dkg", false, "Disable DKG")
 	flag.StringVar(&args.SupportedNetworks, "supported-networks", "", "Supported networks")
+	flag.BoolVar(&args.AWS, "aws", false, "Use AWS RDS")
 	// Parse flags
 	flag.Parse()
 
@@ -140,30 +144,36 @@ func main() {
 		args.AuthzEnforced,
 		args.DKGCoordinatorAddress,
 		args.SupportedNetworksList(),
+		args.AWS,
 	)
 	if err != nil {
 		log.Fatalf("Failed to create config: %v", err)
 	}
 
+	ctx := context.Background()
+
 	dbDriver := config.DatabaseDriver()
-	dbClient, err := ent.Open(dbDriver, config.DatabasePath)
+	connector, err := so.NewDBConnector(config.DatabasePath, config.AWS)
 	if err != nil {
-		log.Fatalf("Failed to create database client: %v", err)
+		log.Fatalf("Failed to create db connector: %v", err)
 	}
+	db := sql.OpenDB(connector)
+	dialectDriver := entsql.NewDriver(dbDriver, entsql.Conn{ExecQuerier: db})
+	dbClient := ent.NewClient(ent.Driver(dialectDriver))
 	defer dbClient.Close()
 
 	if dbDriver == "sqlite3" {
 		sqliteDb, _ := sql.Open("sqlite3", config.DatabasePath)
-		if _, err := sqliteDb.ExecContext(context.Background(), "PRAGMA journal_mode=WAL;"); err != nil {
+		if _, err := sqliteDb.ExecContext(ctx, "PRAGMA journal_mode=WAL;"); err != nil {
 			log.Fatalf("Failed to set journal_mode: %v", err)
 		}
-		if _, err := sqliteDb.ExecContext(context.Background(), "PRAGMA busy_timeout=5000;"); err != nil {
+		if _, err := sqliteDb.ExecContext(ctx, "PRAGMA busy_timeout=5000;"); err != nil {
 			log.Fatalf("Failed to set busy_timeout: %v", err)
 		}
 		sqliteDb.Close()
 	}
 
-	if err := dbClient.Schema.Create(context.Background()); err != nil {
+	if err := dbClient.Schema.Create(ctx); err != nil {
 		log.Fatalf("failed creating schema resources: %v", err)
 	}
 
