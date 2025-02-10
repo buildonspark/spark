@@ -33,6 +33,8 @@ import (
 	"github.com/lightsparkdev/spark-go/so/task"
 	_ "github.com/mattn/go-sqlite3"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/health"
+	"google.golang.org/grpc/health/grpc_health_v1"
 )
 
 type args struct {
@@ -238,6 +240,10 @@ func main() {
 		log.Fatalf("Failed to create authentication server: %v", err)
 	}
 	pbauthn.RegisterSparkAuthnServiceServer(grpcServer, authnServer)
+
+	healthService := health.NewServer()
+	grpc_health_v1.RegisterHealthServer(grpcServer, healthService)
+	healthService.SetServingStatus("spark-operator", grpc_health_v1.HealthCheckResponse_SERVING)
 
 	log.Printf("Serving on port %d\n", args.Port)
 
