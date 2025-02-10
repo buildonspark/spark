@@ -72,6 +72,12 @@ func GetUnusedSigningKeyshares(ctx context.Context, config *so.Config, keyshareC
 	}
 
 	if len(signingKeyshares) < keyshareCount {
+		go func() {
+			err := RunDKG(context.Background(), config)
+			if err != nil {
+				log.Printf("Error running DKG: %v", err)
+			}
+		}()
 		return nil, fmt.Errorf("not enough keyshares available")
 	}
 
