@@ -140,7 +140,7 @@ func (r *Requester) ExecuteGraphqlWithContext(ctx context.Context, query string,
 		return nil, err
 	}
 
-	request.Header.Add("Spark-Identity-Publick-Key", r.IdentityPublicKey)
+	request.Header.Add("Spark-Identity-Public-Key", r.IdentityPublicKey)
 	request.Header.Add("Content-Type", "application/json")
 	if compressed {
 		request.Header.Add("Content-Encoding", "zstd")
