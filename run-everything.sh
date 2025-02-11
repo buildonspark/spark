@@ -248,11 +248,33 @@ check_lrc_nodes_ready() {
    done
 }
 
+# Function to extract values from bitcoin_regtest.conf
+parse_bitcoin_config() {
+    local config_file="bitcoin_regtest.conf"
+    local rpcuser=""
+    local rpcpassword=""
+    
+    while IFS='=' read -r key value; do
+        # Remove leading/trailing whitespace
+        key=$(echo "$key" | tr -d '[:space:]')
+        value=$(echo "$value" | tr -d '[:space:]')
+        
+        case "$key" in
+            "rpcuser") rpcuser="$value" ;;
+            "rpcpassword") rpcpassword="$value" ;;
+        esac
+    done < "$config_file"
+    
+    echo "$rpcuser $rpcpassword"
+}
+
 run_bitcoind_tmux() {
     local run_dir=$1
     local session_name="bitcoind"
     local datadir="$run_dir/bitcoind"
     
+    # Read config values
+    read -r bitcoind_username bitcoind_password <<< "$(parse_bitcoin_config)"    
     # Ensure data directory exists
     mkdir -p "$datadir"
     cp bitcoin_regtest.conf "$datadir/bitcoin_regtest.conf"
@@ -261,6 +283,7 @@ run_bitcoind_tmux() {
     if tmux has-session -t "$session_name" 2>/dev/null; then
         echo "Killing existing bitcoind session..."
         tmux kill-session -t "$session_name"
+        bitcoin-cli -regtest -rpcuser="$bitcoind_username" -rpcpassword="$bitcoind_password" stop
     fi
     
     # Create new tmux session
