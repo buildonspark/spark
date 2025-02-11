@@ -59,8 +59,15 @@ func HashTokenTransaction(tokenTransaction *pb.TokenTransaction, partialHash boo
 		if leaf.GetRevocationPublicKey() != nil && !partialHash {
 			h.Write(leaf.GetRevocationPublicKey())
 		}
-		binary.BigEndian.PutUint64(make([]byte, 8), leaf.GetWithdrawalBondSats())
-		binary.BigEndian.PutUint64(make([]byte, 8), leaf.GetWithdrawalLocktime())
+
+		withdrawalBondBytes := make([]byte, 8)
+		binary.BigEndian.PutUint64(withdrawalBondBytes, leaf.GetWithdrawalBondSats())
+		h.Write(withdrawalBondBytes)
+
+		withdrawalLocktimeBytes := make([]byte, 8)
+		binary.BigEndian.PutUint64(withdrawalLocktimeBytes, leaf.GetWithdrawalLocktime())
+		h.Write(withdrawalLocktimeBytes)
+
 		if leaf.GetTokenPublicKey() != nil {
 			h.Write(leaf.GetTokenPublicKey())
 		}
