@@ -31,8 +31,8 @@ func NewBaseTransferHandler(onchainHelper helper.OnChainHelper, config *so.Confi
 }
 
 func validateLeafRefundTxOutput(refundTx *wire.MsgTx, receiverIdentityPublicKey []byte) error {
-	if len(refundTx.TxOut) != 1 {
-		return fmt.Errorf("refund tx must have exactly 1 output")
+	if len(refundTx.TxOut) == 0 {
+		return fmt.Errorf("refund tx must have at least 1 output")
 	}
 	receiverIdentityPubkey, err := secp256k1.ParsePubKey(receiverIdentityPublicKey)
 	if err != nil {

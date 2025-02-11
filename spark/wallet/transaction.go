@@ -5,11 +5,16 @@ package wallet
 import (
 	"fmt"
 
+	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lightsparkdev/spark-go"
 	"github.com/lightsparkdev/spark-go/common"
 )
+
+func ephemeralAnchorOutput() *wire.TxOut {
+	return wire.NewTxOut(0, []byte{txscript.OP_TRUE})
+}
 
 func createRootTx(
 	depositOutPoint *wire.OutPoint,
@@ -20,6 +25,7 @@ func createRootTx(
 	// We currently send the full value to the same address
 	// TODO: 0 fee will only be okay once we add ephemeral anchor outputs
 	rootTx.AddTxOut(depositTxOut)
+	rootTx.AddTxOut(ephemeralAnchorOutput())
 	return rootTx
 }
 
@@ -49,6 +55,7 @@ func createRefundTx(
 		return nil, fmt.Errorf("failed to create refund pkscript: %v", err)
 	}
 	newRefundTx.AddTxOut(wire.NewTxOut(amountSats, refundPkScript))
+	newRefundTx.AddTxOut(ephemeralAnchorOutput())
 
 	return newRefundTx, nil
 }
@@ -73,5 +80,6 @@ func createConnectorRefundTransaction(
 		return nil, fmt.Errorf("failed to create receiver script: %v", err)
 	}
 	refundTx.AddTxOut(wire.NewTxOut(amountSats, receiverScript))
+	refundTx.AddTxOut(ephemeralAnchorOutput())
 	return refundTx, nil
 }
