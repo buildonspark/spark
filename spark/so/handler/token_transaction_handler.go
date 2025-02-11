@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/common"
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
@@ -14,7 +16,6 @@ import (
 	"github.com/lightsparkdev/spark-go/so/authz"
 	"github.com/lightsparkdev/spark-go/so/ent"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
-	"github.com/lightsparkdev/spark-go/so/ent/tokenleaf"
 	"github.com/lightsparkdev/spark-go/so/ent/tokentransactionreceipt"
 	"github.com/lightsparkdev/spark-go/so/helper"
 	"github.com/lightsparkdev/spark-go/so/utils"
@@ -42,7 +43,6 @@ func (o *TokenTransactionHandler) generateAndResolveRevocationKeys(
 ) (*pb.TokenTransaction, []string, *pb.SigningKeyshare, error) {
 	// Each created leaf requires a keyshare for revocation key generation.
 	numRevocationKeysharesNeeded := len(tokenTransaction.GetOutputLeaves())
-
 	keyshares, err := ent.GetUnusedSigningKeyshares(ctx, config, numRevocationKeysharesNeeded)
 	if err != nil {
 		return nil, nil, nil, err
@@ -66,8 +66,8 @@ func (o *TokenTransactionHandler) generateAndResolveRevocationKeys(
 	}
 
 	// Mark keyshares as used in the non-coordinator SO's.
-	selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
-	_, err = helper.ExecuteTaskWithAllOperators(ctx, config, &selection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
+	exceptSelfSelection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
+	_, err = helper.ExecuteTaskWithAllOperators(ctx, config, &exceptSelfSelection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
 		conn, err := common.NewGRPCConnection(operator.Address)
 		if err != nil {
 			log.Printf("Failed to connect to operator for marking token transaction keyshare: %v", err)
@@ -89,14 +89,9 @@ func (o *TokenTransactionHandler) generateAndResolveRevocationKeys(
 		finalTokenTransaction.OutputLeaves[i].RevocationPublicKey = keyshares[i].PublicKey
 	}
 
-	operatorList, err := selection.OperatorList(config)
-	if err != nil {
-		log.Printf("Failed to get operator list: %v", err)
-		return nil, nil, nil, err
-	}
-	operatorIdentifiers := make([]string, len(config.GetSigningOperatorList()))
-	for i, operator := range operatorList {
-		operatorIdentifiers[i] = operator.Identifier
+	var operatorIdentifiers []string
+	for _, operator := range config.SigningOperatorMap {
+		operatorIdentifiers = append(operatorIdentifiers, operator.Identifier)
 	}
 
 	signingKeyshare := &pb.SigningKeyshare{
@@ -105,11 +100,10 @@ func (o *TokenTransactionHandler) generateAndResolveRevocationKeys(
 		Threshold: uint32(config.Threshold),
 	}
 
-	// Return final token transaction.
 	return finalTokenTransaction, keyshareIDStrings, signingKeyshare, nil
 }
 
-// StartTokenTransaction verifies the token leaves, generates the keyshares for the token transaction, and returns the signature shares for the token transaction payload.
+// StartTokenTransaction verifies the token leaves, generates the keyshares for the token transaction, and returns metadata about the operators that possess the keyshares.
 func (o TokenTransactionHandler) StartTokenTransaction(ctx context.Context, config *so.Config, req *pb.StartTokenTransactionRequest) (*pb.StartTokenTransactionResponse, error) {
 	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, o.config, req.IdentityPublicKey); err != nil {
 		return nil, err
@@ -126,9 +120,9 @@ func (o TokenTransactionHandler) StartTokenTransaction(ctx context.Context, conf
 		return nil, err
 	}
 
-	// Ask all the coordinators to sign the token transaction
-	signingOperatorSelection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionAll}
-	signatureResponses, err := helper.ExecuteTaskWithAllOperators(ctx, config, &signingOperatorSelection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
+	// Save the token transaction object to lock in the revocation public keys for each created leaf within this transaction.
+	allSelection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionAll}
+	_, err = helper.ExecuteTaskWithAllOperators(ctx, config, &allSelection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
 		conn, err := common.NewGRPCConnection(operator.Address)
 		if err != nil {
 			log.Printf("Failed to connect to operator for marking token transaction keyshare: %v", err)
@@ -137,38 +131,34 @@ func (o TokenTransactionHandler) StartTokenTransaction(ctx context.Context, conf
 		defer conn.Close()
 
 		client := pbinternal.NewSparkInternalServiceClient(conn)
-		response, err := client.SignTokenTransaction(ctx, &pbinternal.SignTokenTransactionRequest{
-			TokenTransaction:                finalTokenTransaction,
-			TokenTransactionSignatures:      req.TokenTransactionSignatures,
-			OutputLeafRevocationKeyshareIds: keyshareIDStrings,
+		_, err = client.StartTokenTransactionInternal(ctx, &pbinternal.StartTokenTransactionInternalRequest{
+			KeyshareIds:                keyshareIDStrings,
+			FinalTokenTransaction:      finalTokenTransaction,
+			TokenTransactionSignatures: req.TokenTransactionSignatures,
 		})
-		return response, err
+		return nil, err
 	})
 	if err != nil {
-		log.Printf("Failed to execute mark token transaction keyshare task with all operators: %v", err)
+		log.Printf("Failed to execute save final token transaction task with all operators: %v", err)
 		return nil, err
-	}
-
-	// Convert the signing operator list to a map of identifier to identity public key
-	sparkOperatorSignatures := make(map[string][]byte)
-	for identifier, signatureResponse := range signatureResponses {
-		sparkOperatorSignatures[identifier] = signatureResponse.(*pbinternal.SignTokenTransactionResponse).OperatorSignature
 	}
 
 	// TODO: Add a call to the LRC20 node to finalize the transaction payload.
 
 	return &pb.StartTokenTransactionResponse{
-		FinalTokenTransaction:   finalTokenTransaction,
-		SparkOperatorSignatures: sparkOperatorSignatures,
-		KeyshareInfo:            keyshareInfo,
+		FinalTokenTransaction: finalTokenTransaction,
+		KeyshareInfo:          keyshareInfo,
 	}, nil
 }
 
-// StartTokenTransaction verifies the token leaves, generates the keyshares for the token transaction, and returns the signature shares for the token transaction payload.
-func (o TokenTransactionHandler) GetTokenTransactionRevocationKeyshares(
+// SignTokenTransaction signs the token transaction with the operators private key.
+// If it is a transfer it also fetches this operators keyshare for each spent leaf and
+// returns it to the wallet so it can finalize the transaction.
+func (o TokenTransactionHandler) SignTokenTransaction(
 	ctx context.Context,
-	req *pb.GetTokenTransactionRevocationKeysharesRequest,
-) (*pb.GetTokenTransactionRevocationKeysharesResponse, error) {
+	config *so.Config,
+	req *pb.SignTokenTransactionRequest,
+) (*pb.SignTokenTransactionResponse, error) {
 	// TODO: Add authz
 
 	// Validate each leaf signature in the request. Each signed payload consists of
@@ -176,8 +166,8 @@ func (o TokenTransactionHandler) GetTokenTransactionRevocationKeyshares(
 	//   payload.operator_identity_public_key
 	// To verify that this request for this transaction came from the leaf owner
 	// (who is about to transfer the leaf once receiving all shares).
-	for _, leafSig := range req.Signatures {
-		payloadHash, err := utils.HashRequestRevocationKeysharesPayload(leafSig.Payload)
+	for _, leafSig := range req.OperatorSpecificSignatures {
+		payloadHash, err := utils.HashOperatorSpecificTokenTransactionSignablePayload(leafSig.Payload)
 		if err != nil {
 			return nil, fmt.Errorf("failed to hash revocation keyshares payload: %w", err)
 		}
@@ -190,27 +180,42 @@ func (o TokenTransactionHandler) GetTokenTransactionRevocationKeyshares(
 			return nil, fmt.Errorf("invalid owner signature for leaf: %w", err)
 		}
 	}
-
-	db := ent.GetDbFromContext(ctx)
-	finalTokenTransactionHash := req.FinalTokenTransactionHash
-
-	// Query the token_transaction_receipt by the final transaction hash.
-	receipt, err := db.TokenTransactionReceipt.Query().
-		Where(tokentransactionreceipt.FinalizedTokenTransactionHash(finalTokenTransactionHash)).
+	tokenTransactionReceipt, err := ent.GetDbFromContext(ctx).TokenTransactionReceipt.Query().
+		Where(tokentransactionreceipt.FinalizedTokenTransactionHash(req.FinalTokenTransactionHash)).
+		WithCreatedLeaf().
 		WithSpentLeaf().
 		Only(ctx)
 	if err != nil {
-		log.Printf("Failed to fetch matching transaction receipt: %v", err)
-		return nil, fmt.Errorf("failed to fetch transaction receipt: %w", err)
+		log.Printf("Sign request for token transaction did not map to a previously started transaction: %v", err)
+		return nil, err
 	}
 
-	spentLeaves := receipt.Edges.SpentLeaf
-	if len(spentLeaves) == 0 {
-		return nil, fmt.Errorf("no spent leaves found for transaction hash %x", finalTokenTransactionHash)
+	// Sign the token transaction hash with the operator identity private key.
+	identityPrivateKey := secp256k1.PrivKeyFromBytes(config.IdentityPrivateKey)
+	operatorSignature := ecdsa.Sign(identityPrivateKey, req.FinalTokenTransactionHash)
+	if err != nil {
+		log.Printf("Failed to sign token transaction with operator key: %v", err)
+		return nil, err
+	}
+
+	newCreatedLeafStatus := schema.TokenLeafStatusCreatedSigned
+	// If there are no spent leaves, it means the transaction is an issuance. These transctions don't require
+	// a finalize step so we can mark it as immediately final.
+	if len(tokenTransactionReceipt.Edges.SpentLeaf) == 0 {
+		newCreatedLeafStatus = schema.TokenLeafStatusCreatedFinalized
+	}
+	err = ent.UpdateLeafStatuses(ctx, tokenTransactionReceipt.Edges.CreatedLeaf, newCreatedLeafStatus)
+	if err != nil {
+		log.Printf("Failed to update created leaf statuses to CreatedSigned: %v", err)
+		return nil, err
+	}
+	err = ent.UpdateLeafStatuses(ctx, tokenTransactionReceipt.Edges.SpentLeaf, schema.TokenLeafStatusSpentSigned)
+	if err != nil {
+		log.Printf("Failed to update spent leaf statuses to SpentSigned: %v", err)
 	}
 
 	var keyshares []*ent.SigningKeyshare
-	for _, leaf := range spentLeaves {
+	for _, leaf := range tokenTransactionReceipt.Edges.SpentLeaf {
 		keyshare, err := leaf.QueryRevocationKeyshare().Only(ctx)
 		if err != nil {
 			log.Printf("Failed to get keyshare for leaf: %v", err)
@@ -233,20 +238,8 @@ func (o TokenTransactionHandler) GetTokenTransactionRevocationKeyshares(
 		revocationKeyshares[i] = keyshare.SecretShare
 	}
 
-	// Update all spent leaves to Spent status in a single batch
-	leafIDs := make([]uuid.UUID, len(spentLeaves))
-	for i, leaf := range spentLeaves {
-		leafIDs[i] = leaf.ID
-	}
-	if _, err := db.TokenLeaf.Update().
-		Where(tokenleaf.IDIn(leafIDs...)).
-		SetStatus(schema.TokenLeafStatusSpentKeyshareReleased).
-		Save(ctx); err != nil {
-		log.Printf("Failed to batch update leaf statuses to Spent: %v", err)
-		return nil, fmt.Errorf("failed to update leaf statuses: %w", err)
-	}
-
-	return &pb.GetTokenTransactionRevocationKeysharesResponse{
+	return &pb.SignTokenTransactionResponse{
+		SparkOperatorSignature:              operatorSignature.Serialize(),
 		TokenTransactionRevocationKeyshares: revocationKeyshares,
 	}, nil
 }

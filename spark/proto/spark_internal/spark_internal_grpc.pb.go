@@ -37,7 +37,7 @@ const (
 	SparkInternalService_InitiateTransfer_FullMethodName              = "/spark_internal.SparkInternalService/initiate_transfer"
 	SparkInternalService_InitiateCooperativeExit_FullMethodName       = "/spark_internal.SparkInternalService/initiate_cooperative_exit"
 	SparkInternalService_ReturnLightningPayment_FullMethodName        = "/spark_internal.SparkInternalService/return_lightning_payment"
-	SparkInternalService_SignTokenTransaction_FullMethodName          = "/spark_internal.SparkInternalService/sign_token_transaction"
+	SparkInternalService_StartTokenTransactionInternal_FullMethodName = "/spark_internal.SparkInternalService/start_token_transaction_internal"
 )
 
 // SparkInternalServiceClient is the client API for SparkInternalService service.
@@ -60,7 +60,7 @@ type SparkInternalServiceClient interface {
 	InitiateTransfer(ctx context.Context, in *InitiateTransferRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	InitiateCooperativeExit(ctx context.Context, in *InitiateCooperativeExitRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	ReturnLightningPayment(ctx context.Context, in *spark.ReturnLightningPaymentRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
-	SignTokenTransaction(ctx context.Context, in *SignTokenTransactionRequest, opts ...grpc.CallOption) (*SignTokenTransactionResponse, error)
+	StartTokenTransactionInternal(ctx context.Context, in *StartTokenTransactionInternalRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type sparkInternalServiceClient struct {
@@ -231,10 +231,10 @@ func (c *sparkInternalServiceClient) ReturnLightningPayment(ctx context.Context,
 	return out, nil
 }
 
-func (c *sparkInternalServiceClient) SignTokenTransaction(ctx context.Context, in *SignTokenTransactionRequest, opts ...grpc.CallOption) (*SignTokenTransactionResponse, error) {
+func (c *sparkInternalServiceClient) StartTokenTransactionInternal(ctx context.Context, in *StartTokenTransactionInternalRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(SignTokenTransactionResponse)
-	err := c.cc.Invoke(ctx, SparkInternalService_SignTokenTransaction_FullMethodName, in, out, cOpts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, SparkInternalService_StartTokenTransactionInternal_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -261,7 +261,7 @@ type SparkInternalServiceServer interface {
 	InitiateTransfer(context.Context, *InitiateTransferRequest) (*emptypb.Empty, error)
 	InitiateCooperativeExit(context.Context, *InitiateCooperativeExitRequest) (*emptypb.Empty, error)
 	ReturnLightningPayment(context.Context, *spark.ReturnLightningPaymentRequest) (*emptypb.Empty, error)
-	SignTokenTransaction(context.Context, *SignTokenTransactionRequest) (*SignTokenTransactionResponse, error)
+	StartTokenTransactionInternal(context.Context, *StartTokenTransactionInternalRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedSparkInternalServiceServer()
 }
 
@@ -320,8 +320,8 @@ func (UnimplementedSparkInternalServiceServer) InitiateCooperativeExit(context.C
 func (UnimplementedSparkInternalServiceServer) ReturnLightningPayment(context.Context, *spark.ReturnLightningPaymentRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ReturnLightningPayment not implemented")
 }
-func (UnimplementedSparkInternalServiceServer) SignTokenTransaction(context.Context, *SignTokenTransactionRequest) (*SignTokenTransactionResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method SignTokenTransaction not implemented")
+func (UnimplementedSparkInternalServiceServer) StartTokenTransactionInternal(context.Context, *StartTokenTransactionInternalRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method StartTokenTransactionInternal not implemented")
 }
 func (UnimplementedSparkInternalServiceServer) mustEmbedUnimplementedSparkInternalServiceServer() {}
 func (UnimplementedSparkInternalServiceServer) testEmbeddedByValue()                              {}
@@ -632,20 +632,20 @@ func _SparkInternalService_ReturnLightningPayment_Handler(srv interface{}, ctx c
 	return interceptor(ctx, in, info, handler)
 }
 
-func _SparkInternalService_SignTokenTransaction_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(SignTokenTransactionRequest)
+func _SparkInternalService_StartTokenTransactionInternal_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StartTokenTransactionInternalRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(SparkInternalServiceServer).SignTokenTransaction(ctx, in)
+		return srv.(SparkInternalServiceServer).StartTokenTransactionInternal(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: SparkInternalService_SignTokenTransaction_FullMethodName,
+		FullMethod: SparkInternalService_StartTokenTransactionInternal_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SparkInternalServiceServer).SignTokenTransaction(ctx, req.(*SignTokenTransactionRequest))
+		return srv.(SparkInternalServiceServer).StartTokenTransactionInternal(ctx, req.(*StartTokenTransactionInternalRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -722,8 +722,8 @@ var SparkInternalService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _SparkInternalService_ReturnLightningPayment_Handler,
 		},
 		{
-			MethodName: "sign_token_transaction",
-			Handler:    _SparkInternalService_SignTokenTransaction_Handler,
+			MethodName: "start_token_transaction_internal",
+			Handler:    _SparkInternalService_StartTokenTransactionInternal_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

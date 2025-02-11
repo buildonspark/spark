@@ -172,9 +172,9 @@ func (s *SparkServer) QueryNodes(ctx context.Context, req *pb.QueryNodesRequest)
 
 // GetTokenTransactionRevocationKeyshares allows the wallet to retrieve the revocation private key shares from each individual SO to
 // allow the wallet to combine these shares into the fully resolved revocation private key necessary for transaction finalization.
-func (s *SparkServer) GetTokenTransactionRevocationKeyshares(ctx context.Context, req *pb.GetTokenTransactionRevocationKeysharesRequest) (*pb.GetTokenTransactionRevocationKeysharesResponse, error) {
+func (s *SparkServer) SignTokenTransaction(ctx context.Context, req *pb.SignTokenTransactionRequest) (*pb.SignTokenTransactionResponse, error) {
 	tokenTransactionHandler := handler.NewTokenTransactionHandler(s.config)
-	return wrapWithGRPCError(tokenTransactionHandler.GetTokenTransactionRevocationKeyshares(ctx, req))
+	return wrapWithGRPCError(tokenTransactionHandler.SignTokenTransaction(ctx, s.config, req))
 }
 
 // FinalizeTokenTransaction verifies the revocation private keys constructed by the wallet and passes these keys to the LRC20 Node

@@ -35,7 +35,7 @@ service SparkInternalService {
 
     rpc return_lightning_payment(spark.ReturnLightningPaymentRequest) returns (google.protobuf.Empty) {}
 
-    rpc sign_token_transaction(SignTokenTransactionRequest) returns (SignTokenTransactionResponse) {}
+    rpc start_token_transaction_internal(StartTokenTransactionInternalRequest) returns (google.protobuf.Empty) {}
 }
 
 message MarkKeysharesAsUsedRequest {
@@ -172,17 +172,13 @@ message InitiateCooperativeExitRequest {
     bytes exit_txid = 3;
 }
 
-message SignTokenTransactionRequest {
-    spark.TokenTransaction token_transaction = 1;
-    spark.TokenTransactionSignatures token_transaction_signatures = 2;
-    repeated string output_leaf_revocation_keyshare_ids = 3;
-}
-
-message SignTokenTransactionResponse {
-    bytes operator_signature = 1;
-}
-
 message UpdatePreimageRequestRequest {
     string preimage_request_id = 1;
     bytes preimage = 2;
+}
+
+message StartTokenTransactionInternalRequest {
+    spark.TokenTransaction final_token_transaction = 1;
+    spark.TokenTransactionSignatures token_transaction_signatures = 2;
+    repeated string keyshare_ids = 3;
 }

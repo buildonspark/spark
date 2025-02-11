@@ -85,7 +85,7 @@ func HashTokenTransaction(tokenTransaction *pb.TokenTransaction, partialHash boo
 	return h.Sum(nil), nil
 }
 
-func HashRequestRevocationKeysharesPayload(payload *pb.RevocationKeyshareSignablePayload) ([]byte, error) {
+func HashOperatorSpecificTokenTransactionSignablePayload(payload *pb.OperatorSpecificTokenTransactionSignablePayload) ([]byte, error) {
 	if payload == nil {
 		return nil, fmt.Errorf("revocation keyshare signable payload cannot be nil")
 	}
@@ -144,6 +144,13 @@ func ValidatePartialTokenTransaction(
 		}
 	}
 
+	// Validate that the transaction is either an issuance or a transfer, but not both
+	hasIssueInput := tokenTransaction.GetIssueInput() != nil
+	hasTransferInput := tokenTransaction.GetTransferInput() != nil
+	if (!hasIssueInput && !hasTransferInput) || (hasIssueInput && hasTransferInput) {
+		return fmt.Errorf("token transaction must have exactly one of issue_input or transfer_input")
+	}
+
 	// Validation for issuance transactions
 	if issueInput := tokenTransaction.GetIssueInput(); issueInput != nil {
 		// Validate that the token public key on all created leaves
@@ -194,7 +201,6 @@ func ValidateFinalTokenTransaction(
 	tokenTransaction *pb.TokenTransaction,
 	tokenTransactionSignatures *pb.TokenTransactionSignatures,
 	sparkOperatorsFromConfig map[string]*pb.SigningOperatorInfo,
-	expectedOutputLeafRevocationPublicKeys [][]byte,
 ) error {
 	// Repeat same validations as for the partial token transaction.
 	err := ValidatePartialTokenTransaction(tokenTransaction, tokenTransactionSignatures, sparkOperatorsFromConfig)
@@ -211,9 +217,6 @@ func ValidateFinalTokenTransaction(
 		revKeyStr := string(leaf.GetRevocationPublicKey())
 		if seenRevocationKeys[revKeyStr] {
 			return fmt.Errorf("duplicate revocation public key found for leaf %d", i)
-		}
-		if !bytes.Equal(leaf.GetRevocationPublicKey(), expectedOutputLeafRevocationPublicKeys[i]) {
-			return fmt.Errorf("revocation public key does not match expected for leaf %d", i)
 		}
 		seenRevocationKeys[revKeyStr] = true
 	}

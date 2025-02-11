@@ -329,12 +329,12 @@ func (s *SparkInternalServer) ReturnLightningPayment(ctx context.Context, req *p
 	return wrapWithGRPCError(lightningHandler.ReturnLightningPayment(ctx, req, true))
 }
 
-// SignTokenTransaction signs a token transaction for the given request.
-func (s *SparkInternalServer) SignTokenTransaction(ctx context.Context, req *pb.SignTokenTransactionRequest) (*pb.SignTokenTransactionResponse, error) {
+// StartTokenTransactionInternal validates a token transaction and saves it to the database.
+func (s *SparkInternalServer) StartTokenTransactionInternal(ctx context.Context, req *pb.StartTokenTransactionInternalRequest) (*emptypb.Empty, error) {
 	tokenTransactionHandler := handler.NewInternalTokenTransactionHandler(s.config)
-	result, err := tokenTransactionHandler.SignTokenTransaction(ctx, req)
+	err := tokenTransactionHandler.StartTokenTransactionInternal(ctx, s.config, req)
 	if err != nil {
 		return nil, err
 	}
-	return result, nil
+	return &emptypb.Empty{}, nil
 }

@@ -20,31 +20,31 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	SparkService_GenerateDepositAddress_FullMethodName                 = "/spark.SparkService/generate_deposit_address"
-	SparkService_StartTreeCreation_FullMethodName                      = "/spark.SparkService/start_tree_creation"
-	SparkService_FinalizeNodeSignatures_FullMethodName                 = "/spark.SparkService/finalize_node_signatures"
-	SparkService_StartSendTransfer_FullMethodName                      = "/spark.SparkService/start_send_transfer"
-	SparkService_CompleteSendTransfer_FullMethodName                   = "/spark.SparkService/complete_send_transfer"
-	SparkService_QueryPendingTransfers_FullMethodName                  = "/spark.SparkService/query_pending_transfers"
-	SparkService_ClaimTransferTweakKeys_FullMethodName                 = "/spark.SparkService/claim_transfer_tweak_keys"
-	SparkService_ClaimTransferSignRefunds_FullMethodName               = "/spark.SparkService/claim_transfer_sign_refunds"
-	SparkService_AggregateNodes_FullMethodName                         = "/spark.SparkService/aggregate_nodes"
-	SparkService_StorePreimageShare_FullMethodName                     = "/spark.SparkService/store_preimage_share"
-	SparkService_GetSigningCommitments_FullMethodName                  = "/spark.SparkService/get_signing_commitments"
-	SparkService_CooperativeExit_FullMethodName                        = "/spark.SparkService/cooperative_exit"
-	SparkService_InitiatePreimageSwap_FullMethodName                   = "/spark.SparkService/initiate_preimage_swap"
-	SparkService_ProvidePreimage_FullMethodName                        = "/spark.SparkService/provide_preimage"
-	SparkService_LeafSwap_FullMethodName                               = "/spark.SparkService/leaf_swap"
-	SparkService_PrepareTreeAddress_FullMethodName                     = "/spark.SparkService/prepare_tree_address"
-	SparkService_CreateTree_FullMethodName                             = "/spark.SparkService/create_tree"
-	SparkService_GetSigningOperatorList_FullMethodName                 = "/spark.SparkService/get_signing_operator_list"
-	SparkService_QueryNodes_FullMethodName                             = "/spark.SparkService/query_nodes"
-	SparkService_QueryUserSignedRefunds_FullMethodName                 = "/spark.SparkService/query_user_signed_refunds"
-	SparkService_StartTokenTransaction_FullMethodName                  = "/spark.SparkService/start_token_transaction"
-	SparkService_GetTokenTransactionRevocationKeyshares_FullMethodName = "/spark.SparkService/get_token_transaction_revocation_keyshares"
-	SparkService_FinalizeTokenTransaction_FullMethodName               = "/spark.SparkService/finalize_token_transaction"
-	SparkService_ReturnLightningPayment_FullMethodName                 = "/spark.SparkService/return_lightning_payment"
-	SparkService_GetTreeNodesByPublicKey_FullMethodName                = "/spark.SparkService/get_tree_nodes_by_public_key"
+	SparkService_GenerateDepositAddress_FullMethodName   = "/spark.SparkService/generate_deposit_address"
+	SparkService_StartTreeCreation_FullMethodName        = "/spark.SparkService/start_tree_creation"
+	SparkService_FinalizeNodeSignatures_FullMethodName   = "/spark.SparkService/finalize_node_signatures"
+	SparkService_StartSendTransfer_FullMethodName        = "/spark.SparkService/start_send_transfer"
+	SparkService_CompleteSendTransfer_FullMethodName     = "/spark.SparkService/complete_send_transfer"
+	SparkService_QueryPendingTransfers_FullMethodName    = "/spark.SparkService/query_pending_transfers"
+	SparkService_ClaimTransferTweakKeys_FullMethodName   = "/spark.SparkService/claim_transfer_tweak_keys"
+	SparkService_ClaimTransferSignRefunds_FullMethodName = "/spark.SparkService/claim_transfer_sign_refunds"
+	SparkService_AggregateNodes_FullMethodName           = "/spark.SparkService/aggregate_nodes"
+	SparkService_StorePreimageShare_FullMethodName       = "/spark.SparkService/store_preimage_share"
+	SparkService_GetSigningCommitments_FullMethodName    = "/spark.SparkService/get_signing_commitments"
+	SparkService_CooperativeExit_FullMethodName          = "/spark.SparkService/cooperative_exit"
+	SparkService_InitiatePreimageSwap_FullMethodName     = "/spark.SparkService/initiate_preimage_swap"
+	SparkService_ProvidePreimage_FullMethodName          = "/spark.SparkService/provide_preimage"
+	SparkService_LeafSwap_FullMethodName                 = "/spark.SparkService/leaf_swap"
+	SparkService_PrepareTreeAddress_FullMethodName       = "/spark.SparkService/prepare_tree_address"
+	SparkService_CreateTree_FullMethodName               = "/spark.SparkService/create_tree"
+	SparkService_GetSigningOperatorList_FullMethodName   = "/spark.SparkService/get_signing_operator_list"
+	SparkService_QueryNodes_FullMethodName               = "/spark.SparkService/query_nodes"
+	SparkService_QueryUserSignedRefunds_FullMethodName   = "/spark.SparkService/query_user_signed_refunds"
+	SparkService_StartTokenTransaction_FullMethodName    = "/spark.SparkService/start_token_transaction"
+	SparkService_SignTokenTransaction_FullMethodName     = "/spark.SparkService/sign_token_transaction"
+	SparkService_FinalizeTokenTransaction_FullMethodName = "/spark.SparkService/finalize_token_transaction"
+	SparkService_ReturnLightningPayment_FullMethodName   = "/spark.SparkService/return_lightning_payment"
+	SparkService_GetTreeNodesByPublicKey_FullMethodName  = "/spark.SparkService/get_tree_nodes_by_public_key"
 )
 
 // SparkServiceClient is the client API for SparkService service.
@@ -73,7 +73,7 @@ type SparkServiceClient interface {
 	QueryUserSignedRefunds(ctx context.Context, in *QueryUserSignedRefundsRequest, opts ...grpc.CallOption) (*QueryUserSignedRefundsResponse, error)
 	// Token RPCs
 	StartTokenTransaction(ctx context.Context, in *StartTokenTransactionRequest, opts ...grpc.CallOption) (*StartTokenTransactionResponse, error)
-	GetTokenTransactionRevocationKeyshares(ctx context.Context, in *GetTokenTransactionRevocationKeysharesRequest, opts ...grpc.CallOption) (*GetTokenTransactionRevocationKeysharesResponse, error)
+	SignTokenTransaction(ctx context.Context, in *SignTokenTransactionRequest, opts ...grpc.CallOption) (*SignTokenTransactionResponse, error)
 	FinalizeTokenTransaction(ctx context.Context, in *FinalizeTokenTransactionRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	ReturnLightningPayment(ctx context.Context, in *ReturnLightningPaymentRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	GetTreeNodesByPublicKey(ctx context.Context, in *TreeNodesByPublicKeyRequest, opts ...grpc.CallOption) (*TreeNodesByPublicKeyResponse, error)
@@ -297,10 +297,10 @@ func (c *sparkServiceClient) StartTokenTransaction(ctx context.Context, in *Star
 	return out, nil
 }
 
-func (c *sparkServiceClient) GetTokenTransactionRevocationKeyshares(ctx context.Context, in *GetTokenTransactionRevocationKeysharesRequest, opts ...grpc.CallOption) (*GetTokenTransactionRevocationKeysharesResponse, error) {
+func (c *sparkServiceClient) SignTokenTransaction(ctx context.Context, in *SignTokenTransactionRequest, opts ...grpc.CallOption) (*SignTokenTransactionResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(GetTokenTransactionRevocationKeysharesResponse)
-	err := c.cc.Invoke(ctx, SparkService_GetTokenTransactionRevocationKeyshares_FullMethodName, in, out, cOpts...)
+	out := new(SignTokenTransactionResponse)
+	err := c.cc.Invoke(ctx, SparkService_SignTokenTransaction_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -363,7 +363,7 @@ type SparkServiceServer interface {
 	QueryUserSignedRefunds(context.Context, *QueryUserSignedRefundsRequest) (*QueryUserSignedRefundsResponse, error)
 	// Token RPCs
 	StartTokenTransaction(context.Context, *StartTokenTransactionRequest) (*StartTokenTransactionResponse, error)
-	GetTokenTransactionRevocationKeyshares(context.Context, *GetTokenTransactionRevocationKeysharesRequest) (*GetTokenTransactionRevocationKeysharesResponse, error)
+	SignTokenTransaction(context.Context, *SignTokenTransactionRequest) (*SignTokenTransactionResponse, error)
 	FinalizeTokenTransaction(context.Context, *FinalizeTokenTransactionRequest) (*emptypb.Empty, error)
 	ReturnLightningPayment(context.Context, *ReturnLightningPaymentRequest) (*emptypb.Empty, error)
 	GetTreeNodesByPublicKey(context.Context, *TreeNodesByPublicKeyRequest) (*TreeNodesByPublicKeyResponse, error)
@@ -440,8 +440,8 @@ func (UnimplementedSparkServiceServer) QueryUserSignedRefunds(context.Context, *
 func (UnimplementedSparkServiceServer) StartTokenTransaction(context.Context, *StartTokenTransactionRequest) (*StartTokenTransactionResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method StartTokenTransaction not implemented")
 }
-func (UnimplementedSparkServiceServer) GetTokenTransactionRevocationKeyshares(context.Context, *GetTokenTransactionRevocationKeysharesRequest) (*GetTokenTransactionRevocationKeysharesResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetTokenTransactionRevocationKeyshares not implemented")
+func (UnimplementedSparkServiceServer) SignTokenTransaction(context.Context, *SignTokenTransactionRequest) (*SignTokenTransactionResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SignTokenTransaction not implemented")
 }
 func (UnimplementedSparkServiceServer) FinalizeTokenTransaction(context.Context, *FinalizeTokenTransactionRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method FinalizeTokenTransaction not implemented")
@@ -851,20 +851,20 @@ func _SparkService_StartTokenTransaction_Handler(srv interface{}, ctx context.Co
 	return interceptor(ctx, in, info, handler)
 }
 
-func _SparkService_GetTokenTransactionRevocationKeyshares_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetTokenTransactionRevocationKeysharesRequest)
+func _SparkService_SignTokenTransaction_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SignTokenTransactionRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(SparkServiceServer).GetTokenTransactionRevocationKeyshares(ctx, in)
+		return srv.(SparkServiceServer).SignTokenTransaction(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: SparkService_GetTokenTransactionRevocationKeyshares_FullMethodName,
+		FullMethod: SparkService_SignTokenTransaction_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SparkServiceServer).GetTokenTransactionRevocationKeyshares(ctx, req.(*GetTokenTransactionRevocationKeysharesRequest))
+		return srv.(SparkServiceServer).SignTokenTransaction(ctx, req.(*SignTokenTransactionRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1015,8 +1015,8 @@ var SparkService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _SparkService_StartTokenTransaction_Handler,
 		},
 		{
-			MethodName: "get_token_transaction_revocation_keyshares",
-			Handler:    _SparkService_GetTokenTransactionRevocationKeyshares_Handler,
+			MethodName: "sign_token_transaction",
+			Handler:    _SparkService_SignTokenTransaction_Handler,
 		},
 		{
 			MethodName: "finalize_token_transaction",
