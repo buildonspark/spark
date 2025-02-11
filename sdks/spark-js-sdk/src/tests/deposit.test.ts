@@ -47,8 +47,6 @@ describe("deposit", () => {
         throw new Error("deposit address not found");
       }
 
-      console.log("depositResp", depositResp.depositAddress.address);
-
       const dummyTx = createDummyTx({
         address: depositResp.depositAddress.address,
         amountSats: 100_000n,

@@ -3,6 +3,7 @@ import { sha256 } from "@scure/btc-signer/utils";
 import { SparkWallet } from "../spark-sdk";
 import { Network } from "../utils/network";
 import { createNewTree } from "./test-util";
+import { BitcoinFaucet } from "./utils/test-faucet";
 
 describe("Transfer", () => {
   // Skip all tests if running in GitHub Actions
@@ -11,12 +12,23 @@ describe("Transfer", () => {
   testFn(
     "test transfer",
     async () => {
+      const faucet = new BitcoinFaucet(
+        "http://127.0.0.1:18443",
+        "admin1",
+        "123"
+      );
+
       const senderWallet = new SparkWallet(Network.REGTEST);
       const senderMnemonic = senderWallet.generateMnemonic();
-      await senderWallet.createSparkWallet(senderMnemonic);
+      const senderPubkey = await senderWallet.createSparkWallet(senderMnemonic);
 
       const leafPubKey = senderWallet.getSigner().generatePublicKey();
-      const rootNode = await createNewTree(senderWallet, leafPubKey);
+      const rootNode = await createNewTree(
+        senderWallet,
+        leafPubKey,
+        faucet,
+        1000n
+      );
 
       const newLeafPubKey = senderWallet
         .getSigner()
@@ -60,7 +72,7 @@ describe("Transfer", () => {
 
       const finalLeafPubKey = receiverWallet
         .getSigner()
-        .generatePublicKey(sha256("2"));
+        .generatePublicKey(sha256(rootNode.id));
 
       const claimingNode = {
         leaf: rootNode,
@@ -72,4 +84,34 @@ describe("Transfer", () => {
     },
     30000
   );
+
+  xit("test transfer in wallet", async () => {
+    const faucet = new BitcoinFaucet("http://127.0.0.1:18443", "admin1", "123");
+
+    const senderWallet = new SparkWallet(Network.REGTEST);
+    const senderMnemonic = senderWallet.generateMnemonic();
+    await senderWallet.createSparkWallet(senderMnemonic);
+
+    const receiverWallet = new SparkWallet(Network.REGTEST);
+    const receiverMnemonic = receiverWallet.generateMnemonic();
+    const receiverPubkey = await receiverWallet.createSparkWallet(
+      receiverMnemonic
+    );
+
+    const leafPubKey = senderWallet.getSigner().generatePublicKey(sha256("1"));
+    const rootNode = await createNewTree(
+      senderWallet,
+      leafPubKey,
+      faucet,
+      1000n
+    );
+
+    await senderWallet.setLeaves([rootNode]);
+
+    await senderWallet._sendTransfer(1000, hexToBytes(receiverPubkey));
+
+    const pendingTransfer = await receiverWallet.queryPendingTransfers();
+
+    await receiverWallet._claimTransfer(pendingTransfer.transfers[0]);
+  });
 });

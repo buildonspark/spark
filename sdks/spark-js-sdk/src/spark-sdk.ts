@@ -23,10 +23,12 @@ import {
   SignFrostParams,
 } from "./utils/wasm";
 
+import { sha256 } from "@scure/btc-signer/utils";
 import { CoopExitService } from "./services/coop-exit";
 import { LightningService } from "./services/lightning";
 import { SparkSigner } from "./signer/signer";
 import { getP2TRAddressFromPublicKey } from "./utils/bitcoin";
+import { selectLeaves } from "./utils/leaf-selection";
 import { Network } from "./utils/network";
 
 type CreateLightningInvoiceParams = {
@@ -45,6 +47,8 @@ export class SparkWallet {
   private lightningService: LightningService;
   private coopExitService: CoopExitService;
   private wasmModule: InitOutput | null = null;
+
+  private leaves: TreeNode[] = [];
 
   constructor(network: Network, signer?: SparkSigner) {
     this.config = new WalletConfigService(network, signer);
@@ -139,8 +143,8 @@ export class SparkWallet {
   // Lightning
   async createLightningInvoice({
     amountSats,
-    expirySeconds,
     memo,
+    expirySeconds,
     // TODO: This should default to lightspark ssp
     invoiceCreator = () => Promise.resolve(""),
   }: CreateLightningInvoiceParams) {
@@ -159,23 +163,155 @@ export class SparkWallet {
     throw new Error("Not implemented");
   }
 
-  async initiateDeposit() {
-    throw new Error("Not implemented");
+  async setLeaves(leaves: TreeNode[]) {
+    this.leaves = leaves;
   }
 
-  async completeDeposit() {
-    throw new Error("Not implemented");
+  async _sendTransfer(
+    amount: number,
+    receiverPubKey: Uint8Array,
+    expiryTime: Date = new Date(Date.now() + 10 * 60 * 1000)
+  ) {
+    const leaves = selectLeaves(
+      this.leaves.map((leaf) => ({ ...leaf, isUsed: false })),
+      amount
+    );
+
+    const leavesToSend = leaves.map((leaf) => ({
+      leaf,
+      signingPubKey: this.config.signer.generatePublicKey(sha256(leaf.id)),
+      newSigningPubKey: this.config.signer.generatePublicKey(),
+    }));
+
+    await this.transferService.sendTransfer(
+      leavesToSend,
+      receiverPubKey,
+      expiryTime
+    );
   }
 
-  async _sendTransfer() {
-    throw new Error("Not implemented");
+  async queryPendingTransfers(): Promise<QueryPendingTransfersResponse> {
+    return await this.transferService.queryPendingTransfers();
   }
 
-  async _claimTransfer() {
-    throw new Error("Not implemented");
+  async _claimTransfer(transfer: Transfer) {
+    const leafPubKeyMap = await this.transferService.verifyPendingTransfer(
+      transfer
+    );
+
+    const leavesToClaim = transfer.leaves.flatMap((leaf) => {
+      if (leaf.leaf) {
+        const leafPubKey = leafPubKeyMap.get(leaf.leaf.id);
+        if (leafPubKey) {
+          return [
+            {
+              leaf: leaf.leaf,
+              signingPubKey: leafPubKey,
+              newSigningPubKey: this.config.signer.generatePublicKey(
+                sha256(leaf.leaf.id)
+              ),
+            },
+          ];
+        }
+      }
+      return [];
+    });
+
+    return await this.transferService.claimTransfer(transfer, leavesToClaim);
+  }
+
+  async claimTransfers() {
+    const transfers = await this.queryPendingTransfers();
+    for (const transfer of transfers.transfers) {
+      await this._claimTransfer(transfer);
+    }
   }
 
   async coopExit() {
+    // const leaves = this.config.signer.getLeafKeyTweaks(this.leaves);
+
+    // const withdrawPubKey = this.config.signer.generatePublicKey(
+    //   sha256(leaves[0].leaf.treeId)
+    // );
+    // const withdrawAddress = getP2TRAddressFromPublicKey(
+    //   withdrawPubKey,
+    //   this.config.getNetwork()
+    // );
+
+    // const amountSats = leaves.reduce(
+    //   (acc, leaf) => acc + BigInt(leaf.leaf.value),
+    //   0n
+    // );
+
+    // // get/create exit tx from where?
+    // const dummyTx = createDummyTx({
+    //   address: withdrawAddress,
+    //   amountSats,
+    // });
+    // const exitTx = getTxFromRawTxBytes(dummyTx.tx);
+
+    // const dustAmountSats = 354;
+    // const intermediateAmountSats = (leaves.length + 1) * dustAmountSats;
+
+    // const sspIntermediateAddressScript = getP2TRScriptFromPublicKey(
+    //   withdrawPubKey, // Should be ssp pubkey
+    //   this.config.getNetwork()
+    // );
+
+    // exitTx.addOutput({
+    //   script: sspIntermediateAddressScript,
+    //   amount: BigInt(intermediateAmountSats),
+    // });
+    // // end
+
+    // const intermediateInput: TransactionInput = {
+    //   txid: hexToBytes(getTxId(exitTx)),
+    //   index: 1,
+    // };
+
+    // let connectorP2trAddrs: string[] = [];
+    // for (let i = 0; i < leaves.length + 1; i++) {
+    //   const connectorPubKey = this.config.signer.generatePublicKey(
+    //     sha256(leaves[i].leaf.id)
+    //   );
+    //   const connectorP2trAddr = getP2TRAddressFromPublicKey(
+    //     connectorPubKey,
+    //     this.config.getNetwork()
+    //   );
+    //   connectorP2trAddrs.push(connectorP2trAddr);
+    // }
+
+    // const feeBumpAddr = connectorP2trAddrs[connectorP2trAddrs.length - 1];
+    // connectorP2trAddrs = connectorP2trAddrs.slice(0, -1);
+    // const transaction = new Transaction();
+    // transaction.addInput(intermediateInput);
+
+    // for (const addr of [...connectorP2trAddrs, feeBumpAddr]) {
+    //   transaction.addOutput({
+    //     script: OutScript.encode(
+    //       Address(getNetwork(this.config.getNetwork())).decode(addr)
+    //     ),
+    //     amount: BigInt(
+    //       intermediateAmountSats / (connectorP2trAddrs.length + 1)
+    //     ),
+    //   });
+    // }
+
+    // const connectorOutputs = [];
+    // for (let i = 0; i < transaction.outputsLength - 1; i++) {
+    //   connectorOutputs.push({
+    //     txid: hexToBytes(getTxId(transaction)),
+    //     index: i,
+    //   });
+    // }
+
+    // await this.coopExitService.getConnectorRefundSignatures({
+    //   leaves,
+    //   exitTxId: hexToBytes(getTxId(exitTx)),
+    //   connectorOutputs,
+    //   receiverPubKey: withdrawPubKey,
+    // });
+
     throw new Error("Not implemented");
   }
 
@@ -193,10 +329,6 @@ export class SparkWallet {
 
   async claimTransfer(transfer: Transfer, leaves: LeafKeyTweak[]) {
     return await this.transferService!.claimTransfer(transfer, leaves);
-  }
-
-  async queryPendingTransfers(): Promise<QueryPendingTransfersResponse> {
-    return await this.transferService!.queryPendingTransfers();
   }
 
   async verifyPendingTransfer(

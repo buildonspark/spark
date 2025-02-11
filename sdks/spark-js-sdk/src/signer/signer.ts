@@ -62,7 +62,7 @@ interface SparkSigner {
   getIdentityPublicKey(): Uint8Array;
 
   generateMnemonic(): string;
-  createSparkWalletFromMnemonic(mnemonic: string): string;
+  createSparkWalletFromMnemonic(mnemonic: string): Promise<string>;
   createSparkWalletFromSeed(seed: Uint8Array | string): string;
 
   // Generates a new private key, and returns the public key
@@ -132,9 +132,8 @@ class DefaultSparkSigner implements SparkSigner {
     return bip39.generateMnemonic(wordlist);
   }
 
-  createSparkWalletFromMnemonic(mnemonic: string): string {
-    const seed = bip39.mnemonicToSeedSync(mnemonic);
-
+  async createSparkWalletFromMnemonic(mnemonic: string): Promise<string> {
+    const seed = await bip39.mnemonicToSeed(mnemonic);
     return this.createSparkWalletFromSeed(seed);
   }
 
@@ -143,24 +142,28 @@ class DefaultSparkSigner implements SparkSigner {
       throw new Error("Private key is not set");
     }
 
+    let newPrivateKey: Uint8Array | null = null;
     let amount = 0n;
     if (hash) {
       for (let i = 0; i < 8; i++) {
         amount += bytesToNumberBE(hash.slice(i * 4, i * 4 + 4));
         amount = amount % (2n ** 32n - 1n);
       }
+      newPrivateKey = this.identityPrivateKey.deriveChild(
+        Number(amount)
+      ).privateKey;
+    } else {
+      newPrivateKey = secp256k1.utils.randomPrivateKey();
     }
 
-    const newPrivateKey = this.identityPrivateKey.deriveChild(Number(amount));
-
-    if (!newPrivateKey.privateKey) {
+    if (!newPrivateKey) {
       throw new Error("Failed to generate new private key");
     }
 
-    const publicKey = secp256k1.getPublicKey(newPrivateKey.privateKey);
+    const publicKey = secp256k1.getPublicKey(newPrivateKey);
 
     const pubKeyHex = bytesToHex(publicKey);
-    const privKeyHex = bytesToHex(newPrivateKey.privateKey);
+    const privKeyHex = bytesToHex(newPrivateKey);
     this.publicKeyToPrivateKeyMap.set(pubKeyHex, privKeyHex);
 
     return publicKey;

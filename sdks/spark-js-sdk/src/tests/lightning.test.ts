@@ -8,6 +8,7 @@ import { LeafKeyTweak, TransferService } from "../services/transfer";
 import { SparkWallet } from "../spark-sdk";
 import { Network } from "../utils/network";
 import { createNewTree, getTestWalletConfig } from "./test-util";
+import { BitcoinFaucet } from "./utils/test-faucet";
 
 async function cleanUp() {
   const config = getTestWalletConfig();
@@ -48,7 +49,6 @@ describe("LightningService", () => {
     userWallet = new SparkWallet(Network.REGTEST);
     const mnemonic = userWallet.generateMnemonic();
     await userWallet.createSparkWallet(mnemonic);
-
     userConfig = new WalletConfigService(
       Network.REGTEST,
       userWallet.getSigner()
@@ -85,173 +85,209 @@ describe("LightningService", () => {
     expect(invoice).toBeDefined();
   });
 
-  testFn("test receive lightning payment", async () => {
-    const preimage = hexToBytes(
-      "2d059c3ede82a107aa1452c0bea47759be3c5c6e5342be6a310f6c3a907d9f4c"
-    );
-    const paymentHash = sha256(preimage);
+  testFn(
+    "test receive lightning payment",
+    async () => {
+      const faucet = new BitcoinFaucet(
+        "http://127.0.0.1:18443",
+        "admin1",
+        "123"
+      );
 
-    const invoice = await lightningService.createLightningInvoiceWithPreImage({
-      invoiceCreator: fakeInvoiceCreator,
-      amountSats: 100,
-      memo: "test",
-      preimage,
-    });
+      const preimage = hexToBytes(
+        "2d059c3ede82a107aa1452c0bea47759be3c5c6e5342be6a310f6c3a907d9f4c"
+      );
+      const paymentHash = sha256(preimage);
 
-    expect(invoice).toBeDefined();
+      const invoice = await lightningService.createLightningInvoiceWithPreImage(
+        {
+          invoiceCreator: fakeInvoiceCreator,
+          amountSats: 100,
+          memo: "test",
+          preimage,
+        }
+      );
 
-    const sspLeafPubKey = sspWallet.getSigner().generatePublicKey();
-    const nodeToSend = await createNewTree(sspWallet, sspLeafPubKey, 12345n);
+      expect(invoice).toBeDefined();
 
-    const newLeafPubKey = sspWallet.getSigner().generatePublicKey(sha256("1"));
+      const sspLeafPubKey = sspWallet.getSigner().generatePublicKey();
+      const nodeToSend = await createNewTree(
+        sspWallet,
+        sspLeafPubKey,
+        faucet,
+        12345n
+      );
 
-    const leaves: LeafKeyTweak[] = [
-      {
-        leaf: nodeToSend,
-        signingPubKey: sspLeafPubKey,
-        newSigningPubKey: newLeafPubKey,
-      },
-    ];
+      const newLeafPubKey = sspWallet
+        .getSigner()
+        .generatePublicKey(sha256("1"));
 
-    const response = await sspLightningService.swapNodesForPreimage({
-      leaves,
-      receiverIdentityPubkey: userConfig.signer.getIdentityPublicKey(),
-      paymentHash,
-      isInboundPayment: true,
-    });
+      const leaves: LeafKeyTweak[] = [
+        {
+          leaf: nodeToSend,
+          signingPubKey: sspLeafPubKey,
+          newSigningPubKey: newLeafPubKey,
+        },
+      ];
 
-    expect(equalBytes(response.preimage, preimage)).toBe(true);
+      const response = await sspLightningService.swapNodesForPreimage({
+        leaves,
+        receiverIdentityPubkey: userConfig.signer.getIdentityPublicKey(),
+        paymentHash,
+        isInboundPayment: true,
+      });
 
-    const senderTransfer = response.transfer;
+      expect(equalBytes(response.preimage, preimage)).toBe(true);
 
-    expect(senderTransfer).toBeDefined();
+      const senderTransfer = response.transfer;
 
-    const transfer = await sspTransferService.sendTransferTweakKey(
-      senderTransfer!,
-      leaves,
-      new Map()
-    );
+      expect(senderTransfer).toBeDefined();
 
-    expect(transfer.status).toEqual(
-      TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAKED
-    );
+      const transfer = await sspTransferService.sendTransferTweakKey(
+        senderTransfer!,
+        leaves,
+        new Map()
+      );
 
-    const pendingTransfer = await transferService.queryPendingTransfers();
+      expect(transfer.status).toEqual(
+        TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAKED
+      );
 
-    expect(pendingTransfer.transfers.length).toBe(1);
+      const pendingTransfer = await transferService.queryPendingTransfers();
 
-    const receiverTransfer = pendingTransfer.transfers[0];
+      expect(pendingTransfer.transfers.length).toBe(1);
 
-    expect(receiverTransfer.id).toEqual(senderTransfer!.id);
+      const receiverTransfer = pendingTransfer.transfers[0];
 
-    const leafPrivKeyMap = await transferService.verifyPendingTransfer(
-      receiverTransfer
-    );
+      expect(receiverTransfer.id).toEqual(senderTransfer!.id);
 
-    expect(leafPrivKeyMap.size).toBe(1);
-    expect(leafPrivKeyMap.has(nodeToSend.id)).toBe(true);
-    expect(equalBytes(leafPrivKeyMap.get(nodeToSend.id)!, newLeafPubKey)).toBe(
-      true
-    );
+      const leafPrivKeyMap = await transferService.verifyPendingTransfer(
+        receiverTransfer
+      );
 
-    const finalLeafPubKey = userWallet.getSigner().generatePublicKey();
+      expect(leafPrivKeyMap.size).toBe(1);
+      expect(leafPrivKeyMap.has(nodeToSend.id)).toBe(true);
+      expect(
+        equalBytes(leafPrivKeyMap.get(nodeToSend.id)!, newLeafPubKey)
+      ).toBe(true);
 
-    const leaf = receiverTransfer.leaves[0].leaf;
-    expect(leaf).toBeDefined();
+      const finalLeafPubKey = userWallet.getSigner().generatePublicKey();
 
-    const claimingNode = {
-      leaf: leaf!,
-      signingPubKey: newLeafPubKey,
-      newSigningPubKey: finalLeafPubKey,
-    };
+      const leaf = receiverTransfer.leaves[0].leaf;
+      expect(leaf).toBeDefined();
 
-    await transferService.claimTransfer(receiverTransfer, [claimingNode]);
-  });
+      const claimingNode = {
+        leaf: leaf!,
+        signingPubKey: newLeafPubKey,
+        newSigningPubKey: finalLeafPubKey,
+      };
 
-  testFn("test send lightning payment", async () => {
-    const preimage = hexToBytes(
-      "2d059c3ede82a107aa1452c0bea47759be3c5c6e5342be6a310f6c3a907d9f4c"
-    );
-    const paymentHash = sha256(preimage);
+      await transferService.claimTransfer(receiverTransfer, [claimingNode]);
+    },
+    60000
+  );
 
-    const userLeafPubKey = userWallet
-      .getSigner()
-      .generatePublicKey(sha256("1"));
-    const nodeToSend = await createNewTree(userWallet, userLeafPubKey, 12345n);
+  testFn(
+    "test send lightning payment",
+    async () => {
+      const faucet = new BitcoinFaucet(
+        "http://127.0.0.1:18443",
+        "admin1",
+        "123"
+      );
 
-    const newLeafPubKey = userWallet.getSigner().generatePublicKey(sha256("2"));
+      const preimage = hexToBytes(
+        "2d059c3ede82a107aa1452c0bea47759be3c5c6e5342be6a310f6c3a907d9f4c"
+      );
+      const paymentHash = sha256(preimage);
 
-    const leaves: LeafKeyTweak[] = [
-      {
-        leaf: nodeToSend,
-        signingPubKey: userLeafPubKey,
-        newSigningPubKey: newLeafPubKey,
-      },
-    ];
+      const userLeafPubKey = userWallet
+        .getSigner()
+        .generatePublicKey(sha256("1"));
+      const nodeToSend = await createNewTree(
+        userWallet,
+        userLeafPubKey,
+        faucet,
+        12345n
+      );
 
-    const response = await lightningService.swapNodesForPreimage({
-      leaves,
-      receiverIdentityPubkey: sspConfig.signer.getIdentityPublicKey(),
-      paymentHash,
-      isInboundPayment: false,
-      invoiceString: await fakeInvoiceCreator(),
-    });
+      const newLeafPubKey = userWallet
+        .getSigner()
+        .generatePublicKey(sha256("2"));
 
-    expect(response.transfer).toBeDefined();
+      const leaves: LeafKeyTweak[] = [
+        {
+          leaf: nodeToSend,
+          signingPubKey: userLeafPubKey,
+          newSigningPubKey: newLeafPubKey,
+        },
+      ];
 
-    const refunds = await sspLightningService.queryUserSignedRefunds(
-      paymentHash
-    );
+      const response = await lightningService.swapNodesForPreimage({
+        leaves,
+        receiverIdentityPubkey: sspConfig.signer.getIdentityPublicKey(),
+        paymentHash,
+        isInboundPayment: false,
+        invoiceString: await fakeInvoiceCreator(),
+      });
 
-    let totalValue = 0n;
-    for (const refund of refunds) {
-      const value = sspLightningService.validateUserSignedRefund(refund);
-      totalValue += value;
-    }
+      expect(response.transfer).toBeDefined();
 
-    expect(totalValue).toBe(12345n);
+      const refunds = await sspLightningService.queryUserSignedRefunds(
+        paymentHash
+      );
 
-    const transfer = await transferService.sendTransferTweakKey(
-      response.transfer!,
-      leaves,
-      new Map()
-    );
+      let totalValue = 0n;
+      for (const refund of refunds) {
+        const value = sspLightningService.validateUserSignedRefund(refund);
+        totalValue += value;
+      }
 
-    expect(transfer.status).toEqual(
-      TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING
-    );
+      expect(totalValue).toBe(12345n);
 
-    const receiverTransfer = await sspLightningService.providePreimage(
-      preimage
-    );
+      const transfer = await transferService.sendTransferTweakKey(
+        response.transfer!,
+        leaves,
+        new Map()
+      );
 
-    expect(receiverTransfer.status).toEqual(
-      TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAKED
-    );
-    expect(receiverTransfer.id).toEqual(transfer.id);
+      expect(transfer.status).toEqual(
+        TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING
+      );
 
-    const leafPrivKeyMap = await sspTransferService.verifyPendingTransfer(
-      receiverTransfer
-    );
+      const receiverTransfer = await sspLightningService.providePreimage(
+        preimage
+      );
 
-    expect(leafPrivKeyMap.size).toBe(1);
-    expect(leafPrivKeyMap.has(nodeToSend.id)).toBe(true);
-    expect(equalBytes(leafPrivKeyMap.get(nodeToSend.id)!, newLeafPubKey)).toBe(
-      true
-    );
+      expect(receiverTransfer.status).toEqual(
+        TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAKED
+      );
+      expect(receiverTransfer.id).toEqual(transfer.id);
 
-    const finalLeafPubKey = sspWallet
-      .getSigner()
-      .generatePublicKey(sha256("2"));
+      const leafPrivKeyMap = await sspTransferService.verifyPendingTransfer(
+        receiverTransfer
+      );
 
-    expect(receiverTransfer.leaves[0].leaf).toBeDefined();
+      expect(leafPrivKeyMap.size).toBe(1);
+      expect(leafPrivKeyMap.has(nodeToSend.id)).toBe(true);
+      expect(
+        equalBytes(leafPrivKeyMap.get(nodeToSend.id)!, newLeafPubKey)
+      ).toBe(true);
 
-    const claimingNode = {
-      leaf: receiverTransfer.leaves[0].leaf!,
-      signingPubKey: newLeafPubKey,
-      newSigningPubKey: finalLeafPubKey,
-    };
+      const finalLeafPubKey = sspWallet
+        .getSigner()
+        .generatePublicKey(sha256("2"));
 
-    await sspTransferService.claimTransfer(receiverTransfer, [claimingNode]);
-  });
+      expect(receiverTransfer.leaves[0].leaf).toBeDefined();
+
+      const claimingNode = {
+        leaf: receiverTransfer.leaves[0].leaf!,
+        signingPubKey: newLeafPubKey,
+        newSigningPubKey: finalLeafPubKey,
+      };
+
+      await sspTransferService.claimTransfer(receiverTransfer, [claimingNode]);
+    },
+    60000
+  );
 });

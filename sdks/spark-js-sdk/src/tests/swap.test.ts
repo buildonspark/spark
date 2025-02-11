@@ -12,6 +12,7 @@ import {
 import { computeTaprootKeyNoScript, getSigHashFromTx } from "../utils/bitcoin";
 import { Network } from "../utils/network";
 import { createNewTree } from "./test-util";
+import { BitcoinFaucet } from "./utils/test-faucet";
 
 describe("swap", () => {
   const testFn = process.env.GITHUB_ACTIONS ? it.skip : it;
@@ -19,6 +20,11 @@ describe("swap", () => {
   testFn(
     "test swap",
     async () => {
+      const faucet = new BitcoinFaucet(
+        "http://127.0.0.1:18443",
+        "admin1",
+        "123"
+      );
       // Initiate sender
       const senderWallet = new SparkWallet(Network.REGTEST);
       const senderMnemonic = senderWallet.generateMnemonic();
@@ -54,13 +60,15 @@ describe("swap", () => {
       const senderLeafPubKey = senderWallet.getSigner().generatePublicKey();
       const senderRootNode = await createNewTree(
         senderWallet,
-        senderLeafPubKey
+        senderLeafPubKey,
+        faucet
       );
 
       const receiverLeafPubKey = receiverWallet.getSigner().generatePublicKey();
       const receiverRootNode = await createNewTree(
         receiverWallet,
-        receiverLeafPubKey
+        receiverLeafPubKey,
+        faucet
       );
 
       // Sender initiates transfer

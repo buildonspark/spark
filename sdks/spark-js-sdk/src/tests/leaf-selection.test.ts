@@ -10,8 +10,8 @@ function createLeafNode(value: number): LeafNode {
     vout: 0,
     verifyingPublicKey: new Uint8Array(),
     ownerIdentityPublicKey: new Uint8Array(),
-    refundTimelock: 0,
     isUsed: false,
+    signingKeyshare: undefined,
   };
 }
 

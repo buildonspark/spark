@@ -122,13 +122,13 @@ export class DepositService {
       depositResp = await sparkClient.generate_deposit_address({
         signingPublicKey: signingPubkey,
         identityPublicKey: this.config.signer.getIdentityPublicKey(),
+        network: this.config.getNetwork(),
       });
     } catch (error) {
       throw new Error(`Error generating deposit address: ${error}`);
     } finally {
       sparkClient.close?.();
     }
-
     if (!depositResp.depositAddress) {
       throw new Error("No deposit address response from coordinator");
     }
@@ -212,6 +212,7 @@ export class DepositService {
           txid: getTxId(depositTx),
           vout: vout,
           rawTx: depositTx.toBytes(),
+          network: this.config.getNetwork(),
         },
         rootTxSigningJob: {
           rawTx: rootTx.toBytes(),
