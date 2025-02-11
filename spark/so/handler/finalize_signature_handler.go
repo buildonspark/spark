@@ -78,7 +78,7 @@ func (o *FinalizeSignatureHandler) FinalizeNodeSignatures(ctx context.Context, r
 	// Sync with all other SOs
 	selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
 	_, err = helper.ExecuteTaskWithAllOperators(ctx, o.config, &selection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
-		conn, err := common.NewGRPCConnection(operator.Address)
+		conn, err := common.NewGRPCConnectionWithCert(operator.Address, operator.CertPath)
 		if err != nil {
 			return nil, err
 		}

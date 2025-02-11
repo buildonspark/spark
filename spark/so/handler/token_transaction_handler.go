@@ -66,9 +66,10 @@ func (o *TokenTransactionHandler) generateAndResolveRevocationKeys(
 	}
 
 	// Mark keyshares as used in the non-coordinator SO's.
+
 	exceptSelfSelection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
 	_, err = helper.ExecuteTaskWithAllOperators(ctx, config, &exceptSelfSelection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
-		conn, err := common.NewGRPCConnection(operator.Address)
+		conn, err := common.NewGRPCConnectionWithCert(operator.Address, operator.CertPath)
 		if err != nil {
 			log.Printf("Failed to connect to operator for marking token transaction keyshare: %v", err)
 			return nil, err
@@ -123,7 +124,7 @@ func (o TokenTransactionHandler) StartTokenTransaction(ctx context.Context, conf
 	// Save the token transaction object to lock in the revocation public keys for each created leaf within this transaction.
 	allSelection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionAll}
 	_, err = helper.ExecuteTaskWithAllOperators(ctx, config, &allSelection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
-		conn, err := common.NewGRPCConnection(operator.Address)
+		conn, err := common.NewGRPCConnectionWithCert(operator.Address, operator.CertPath)
 		if err != nil {
 			log.Printf("Failed to connect to operator for marking token transaction keyshare: %v", err)
 			return nil, err

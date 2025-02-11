@@ -40,7 +40,7 @@ func GenerateProofOfPossessionSignatures(ctx context.Context, config *so.Config,
 		operatorCommitmentsProto[id] = commitmentProto
 	}
 
-	conn, err := common.NewGRPCConnection(config.SignerAddress)
+	conn, err := common.NewGRPCConnectionWithoutTLS(config.SignerAddress)
 	if err != nil {
 		return nil, err
 	}

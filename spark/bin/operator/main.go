@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"database/sql"
 	"errors"
 	"flag"
@@ -35,6 +36,7 @@ import (
 	"github.com/lightsparkdev/spark-go/so/task"
 	_ "github.com/mattn/go-sqlite3"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/health"
 	"google.golang.org/grpc/health/grpc_health_v1"
 )
@@ -56,6 +58,8 @@ type args struct {
 	DisableDKG                 bool
 	SupportedNetworks          string
 	AWS                        bool
+	ServerCertPath             string
+	ServerKeyPath              string
 }
 
 func (a *args) SupportedNetworksList() []common.Network {
@@ -95,6 +99,8 @@ func loadArgs() (*args, error) {
 	flag.BoolVar(&args.DisableDKG, "disable-dkg", false, "Disable DKG")
 	flag.StringVar(&args.SupportedNetworks, "supported-networks", "", "Supported networks")
 	flag.BoolVar(&args.AWS, "aws", false, "Use AWS RDS")
+	flag.StringVar(&args.ServerCertPath, "server-cert", "", "Path to server certificate")
+	flag.StringVar(&args.ServerKeyPath, "server-key", "", "Path to server key")
 	// Parse flags
 	flag.Parse()
 
@@ -122,6 +128,10 @@ func loadArgs() (*args, error) {
 		args.DKGCoordinatorAddress = "localhost:" + strconv.Itoa(int(args.Port))
 	}
 
+	if args.ServerCertPath == "" || args.ServerKeyPath == "" {
+		return nil, errors.New("server certificate and key path are required")
+	}
+
 	return args, nil
 }
 
@@ -145,6 +155,8 @@ func main() {
 		args.DKGCoordinatorAddress,
 		args.SupportedNetworksList(),
 		args.AWS,
+		args.ServerCertPath,
+		args.ServerKeyPath,
 	)
 	if err != nil {
 		log.Fatalf("Failed to create config: %v", err)
@@ -182,7 +194,7 @@ func main() {
 		log.Fatalf("Failed to listen on port %d: %v", args.Port, err)
 	}
 
-	frostConnection, err := common.NewGRPCConnection(args.SignerAddress)
+	frostConnection, err := common.NewGRPCConnectionWithoutTLS(args.SignerAddress)
 	if err != nil {
 		log.Fatalf("Failed to create frost client: %v", err)
 	}
@@ -216,10 +228,24 @@ func main() {
 		log.Fatalf("Failed to create token verifier: %v", err)
 	}
 
-	grpcServer := grpc.NewServer(grpc.UnaryInterceptor(grpc_middleware.ChainUnaryServer(
-		ent.DbSessionMiddleware(dbClient),
-		authn.NewAuthnInterceptor(sessionTokenCreatorVerifier).AuthnInterceptor,
-	)))
+	cert, err := tls.LoadX509KeyPair(args.ServerCertPath, args.ServerKeyPath)
+	if err != nil {
+		log.Fatalf("Failed to load server certificate: %v", err)
+	}
+	creds := credentials.NewTLS(&tls.Config{
+		Certificates: []tls.Certificate{cert},
+		ClientAuth:   tls.NoClientCert,
+		MinVersion:   tls.VersionTLS12,
+	})
+	log.Printf("Server starting with TLS on: %v", args.ServerCertPath)
+
+	grpcServer := grpc.NewServer(
+		grpc.Creds(creds),
+		grpc.UnaryInterceptor(grpc_middleware.ChainUnaryServer(
+			ent.DbSessionMiddleware(dbClient),
+			authn.NewAuthnInterceptor(sessionTokenCreatorVerifier).AuthnInterceptor,
+		)),
+	)
 
 	if !args.DisableDKG {
 		dkgServer := dkg.NewServer(frostConnection, config)

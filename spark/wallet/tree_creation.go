@@ -115,7 +115,7 @@ func GenerateDepositAddressesForTree(
 	}
 	addressRequestNodes := createAddressRequestNodeFromTreeNodes(tree)
 
-	conn, err := common.NewGRPCConnection(config.CoodinatorAddress())
+	conn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
 	if err != nil {
 		return nil, err
 	}
@@ -371,7 +371,7 @@ func signTreeCreation(
 		creationResponseNode: creationResultTreeRoot,
 	})
 
-	conn, err := common.NewGRPCConnection(config.FrostSignerAddress)
+	conn, err := common.NewGRPCConnectionWithoutTLS(config.FrostSignerAddress)
 	if err != nil {
 		return nil, err
 	}
@@ -573,7 +573,7 @@ func CreateTree(
 
 	request.Node = rootNode
 
-	conn, err := common.NewGRPCConnection(config.CoodinatorAddress())
+	conn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
 	if err != nil {
 		return nil, err
 	}

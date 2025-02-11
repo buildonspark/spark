@@ -22,7 +22,7 @@ func TestTreeCreationAddressGeneration(t *testing.T) {
 	}
 
 	// Setup Mock tx
-	conn, err := common.NewGRPCConnection(config.CoodinatorAddress())
+	conn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
 	if err != nil {
 		t.Fatalf("failed to connect to operator: %v", err)
 	}
@@ -100,7 +100,7 @@ func TestTreeCreationWithMultiLevels(t *testing.T) {
 	}
 
 	// Setup Mock tx
-	conn, err := common.NewGRPCConnection(config.CoodinatorAddress())
+	conn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
 	if err != nil {
 		t.Fatalf("failed to connect to operator: %v", err)
 	}

@@ -68,7 +68,7 @@ func (o *DepositHandler) GenerateDepositAddress(ctx context.Context, config *so.
 
 	selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
 	_, err = helper.ExecuteTaskWithAllOperators(ctx, config, &selection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
-		conn, err := common.NewGRPCConnection(operator.Address)
+		conn, err := common.NewGRPCConnectionWithCert(operator.Address, operator.CertPath)
 		if err != nil {
 			log.Printf("Failed to connect to operator: %v", err)
 			return nil, err
@@ -108,7 +108,7 @@ func (o *DepositHandler) GenerateDepositAddress(ctx context.Context, config *so.
 	}
 
 	response, err := helper.ExecuteTaskWithAllOperators(ctx, config, &selection, func(ctx context.Context, operator *so.SigningOperator) ([]byte, error) {
-		conn, err := common.NewGRPCConnection(operator.Address)
+		conn, err := common.NewGRPCConnectionWithCert(operator.Address, operator.CertPath)
 		if err != nil {
 			log.Printf("Failed to connect to operator: %v", err)
 			return nil, err

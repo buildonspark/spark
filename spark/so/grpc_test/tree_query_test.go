@@ -22,7 +22,7 @@ func TestTreeQuery(t *testing.T) {
 	}
 
 	// Create gRPC connection using common helper
-	conn, err := common.NewGRPCConnection(config.CoodinatorAddress())
+	conn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
 	if err != nil {
 		t.Fatalf("failed to connect to operator: %v", err)
 	}

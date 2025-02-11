@@ -18,7 +18,7 @@ func CreateNewTree(config *wallet.Config, faucet *Faucet, privKey *secp256k1.Pri
 		return nil, fmt.Errorf("failed to fund faucet: %v", err)
 	}
 
-	conn, err := common.NewGRPCConnection(config.CoodinatorAddress())
+	conn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to operator: %v", err)
 	}

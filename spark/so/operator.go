@@ -20,6 +20,8 @@ type SigningOperator struct {
 	Address string
 	// IdentityPublicKey is the identity public key of the signing operator.
 	IdentityPublicKey []byte
+	// ServerCertPath is the path to the server certificate.
+	CertPath string
 }
 
 // jsonSigningOperator is used for JSON unmarshaling
@@ -27,6 +29,7 @@ type jsonSigningOperator struct {
 	ID                uint64 `json:"id"`
 	Address           string `json:"address"`
 	IdentityPublicKey string `json:"identity_public_key"`
+	CertPath          string `json:"cert_path"`
 }
 
 // UnmarshalJSON implements json.Unmarshaler interface
@@ -45,6 +48,7 @@ func (s *SigningOperator) UnmarshalJSON(data []byte) error {
 	s.Identifier = utils.IndexToIdentifier(js.ID)
 	s.Address = js.Address
 	s.IdentityPublicKey = pubKey
+	s.CertPath = js.CertPath
 	return nil
 }
 

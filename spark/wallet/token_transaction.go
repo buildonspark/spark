@@ -31,7 +31,7 @@ func BroadcastTokenTransaction(
 	leafToSpendPrivateKeys []*secp256k1.PrivateKey,
 	leafToSpendRevocationPublicKeys []*secp256k1.PublicKey,
 ) (*pb.TokenTransaction, error) {
-	sparkConn, err := common.NewGRPCConnection(config.CoodinatorAddress())
+	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
 	if err != nil {
 		log.Printf("Error while establishing gRPC connection to coordinator at %s: %v", config.CoodinatorAddress(), err)
 		return nil, err
@@ -148,7 +148,7 @@ func BroadcastTokenTransaction(
 	leafRevocationKeyshares := make([][]*KeyshareWithOperatorIndex, len(tokenTransaction.GetTransferInput().GetLeavesToSpend()))
 	// Collect keyshares from each operator
 	for _, operator := range signingOperatorResponse.SigningOperators {
-		operatorConn, err := common.NewGRPCConnection(operator.Address)
+		operatorConn, err := common.NewGRPCConnectionWithTestTLS(operator.Address)
 		if err != nil {
 			log.Printf("Error while establishing gRPC connection to operator at %s: %v", operator.Address, err)
 			return nil, err
@@ -232,7 +232,7 @@ func BroadcastTokenTransaction(
 
 		// Finalize the token transaction with each operator.
 		for _, operator := range signingOperatorResponse.SigningOperators {
-			operatorConn, err := common.NewGRPCConnection(operator.Address)
+			operatorConn, err := common.NewGRPCConnectionWithTestTLS(operator.Address)
 			if err != nil {
 				log.Printf("Error while establishing gRPC connection to operator at %s: %v", operator.Address, err)
 				return nil, err

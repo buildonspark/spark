@@ -328,7 +328,8 @@ create_operator_config() {
 {
     "id": $i,
     "address": "localhost:$port",
-    "identity_public_key": "${pub_keys[$i]}"
+    "identity_public_key": "${pub_keys[$i]}",
+    "cert_path": "${run_dir}/server_${i}.crt"
 }
 EOF
 )
@@ -376,6 +377,8 @@ run_operators_tmux() {
        local signer_socket="unix:///tmp/frost_${i}.sock"
 
        local priv_key_file="${run_dir}/operator_${i}.key"
+       local key_file="${run_dir}/server_${i}.key"
+       local cert_file="${run_dir}/server_${i}.crt"
        
        # Construct the command with all parameters
        local cmd="${run_dir}/bin/operator \
@@ -387,6 +390,8 @@ run_operators_tmux() {
            -signer '${signer_socket}' \
            -port ${port} \
            -database '${db_file}' \
+           -server-cert '${cert_file}' \
+           -server-key '${key_file}' \
            -mock-onchain true \
            2>&1 | tee '${log_file}'"
        
@@ -539,6 +544,12 @@ create_private_key_files() {
         local priv_key="${priv_keys[$i]}"
         local file="${run_dir}/operator_${i}.key"
         echo "$priv_key" > "$file"
+
+        local key_file="${run_dir}/server_${i}.key"
+        openssl genrsa -out "$key_file" 2048
+
+        local cert_file="${run_dir}/server_${i}.crt"
+        openssl req -new -x509 -key "$key_file" -out "$cert_file" -days 365 -subj "/CN=localhost" -addext "subjectAltName = DNS:localhost"
     done
 }
 

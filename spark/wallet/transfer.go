@@ -72,7 +72,7 @@ func SendTransferTweakKey(
 		wg.Add(1)
 		go func(identifier string, operator *so.SigningOperator) {
 			defer wg.Done()
-			sparkConn, err := common.NewGRPCConnection(operator.Address)
+			sparkConn, err := common.NewGRPCConnectionWithTestTLS(operator.Address)
 			if err != nil {
 				results <- err
 				return
@@ -146,7 +146,7 @@ func SendSwapSignRefund(
 		return nil, nil, nil, nil, fmt.Errorf("failed to prepare signing jobs for sending transfer: %v", err)
 	}
 
-	sparkConn, err := common.NewGRPCConnection(config.CoodinatorAddress())
+	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
@@ -216,7 +216,7 @@ func SendTransferSignRefund(
 		return nil, nil, nil, fmt.Errorf("failed to prepare signing jobs for sending transfer: %v", err)
 	}
 
-	sparkConn, err := common.NewGRPCConnection(config.CoodinatorAddress())
+	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -355,7 +355,7 @@ func QueryPendingTransfers(
 	ctx context.Context,
 	config *Config,
 ) (*pb.QueryPendingTransfersResponse, error) {
-	sparkConn, err := common.NewGRPCConnection(config.CoodinatorAddress())
+	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
 	if err != nil {
 		return nil, err
 	}
@@ -441,7 +441,7 @@ func claimTransferTweakKeys(
 		wg.Add(1)
 		go func(identifier string, operator *so.SigningOperator) {
 			defer wg.Done()
-			sparkConn, err := common.NewGRPCConnection(operator.Address)
+			sparkConn, err := common.NewGRPCConnectionWithTestTLS(operator.Address)
 			if err != nil {
 				results <- err
 				return
@@ -569,7 +569,7 @@ func claimTransferSignRefunds(
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare signing jobs for claiming transfer: %v", err)
 	}
-	sparkConn, err := common.NewGRPCConnection(config.CoodinatorAddress())
+	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
 	if err != nil {
 		return nil, err
 	}
@@ -592,7 +592,7 @@ func finalizeTransfer(
 	config *Config,
 	signatures []*pb.NodeSignatures,
 ) error {
-	sparkConn, err := common.NewGRPCConnection(config.CoodinatorAddress())
+	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
 	if err != nil {
 		return err
 	}
@@ -651,7 +651,7 @@ func signRefunds(
 		}
 	}
 
-	frostConn, _ := common.NewGRPCConnection(config.FrostSignerAddress)
+	frostConn, _ := common.NewGRPCConnectionWithoutTLS(config.FrostSignerAddress)
 	defer frostConn.Close()
 	frostClient := pbfrost.NewFrostServiceClient(frostConn)
 	userSignatures, err := frostClient.SignFrost(context.Background(), &pbfrost.SignFrostRequest{

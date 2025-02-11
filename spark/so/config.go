@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/url"
 	"os"
 	"strings"
@@ -49,6 +50,10 @@ type Config struct {
 	BitcoindConfigs map[string]BitcoindConfig
 	// AWS determines if the database is in AWS RDS.
 	AWS bool
+	// ServerCertPath is the path to the server certificate.
+	ServerCertPath string
+	// ServerKeyPath is the path to the server key.
+	ServerKeyPath string
 }
 
 // DatabaseDriver returns the database driver based on the database path.
@@ -86,6 +91,8 @@ func NewConfig(
 	dkgCoordinatorAddress string,
 	supportedNetworks []common.Network,
 	aws bool,
+	serverCertPath string,
+	serverKeyPath string,
 ) (*Config, error) {
 	identityPrivateKeyHexStringBytes, err := os.ReadFile(identityPrivateKeyFilePath)
 	if err != nil {
@@ -111,6 +118,9 @@ func NewConfig(
 		return nil, err
 	}
 
+	log.Printf("Server cert path: %s", serverCertPath)
+	log.Printf("Server key path: %s", serverKeyPath)
+
 	return &Config{
 		Index:                 index,
 		Identifier:            utils.IndexToIdentifier(index),
@@ -124,6 +134,8 @@ func NewConfig(
 		SupportedNetworks:     supportedNetworks,
 		BitcoindConfigs:       bitcoindConfigs.Bitcoind,
 		AWS:                   aws,
+		ServerCertPath:        serverCertPath,
+		ServerKeyPath:         serverKeyPath,
 	}, nil
 }
 

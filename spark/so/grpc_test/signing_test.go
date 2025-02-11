@@ -130,7 +130,7 @@ func TestFrostSign(t *testing.T) {
 	}
 
 	// Step 7: User signing
-	conn, err := common.NewGRPCConnection(config.SignerAddress)
+	conn, err := common.NewGRPCConnectionWithoutTLS(config.SignerAddress)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -269,7 +269,7 @@ func TestFrostWithoutUserSign(t *testing.T) {
 	}
 
 	// Step 5: Signature aggregation
-	conn, err := common.NewGRPCConnection(config.SignerAddress)
+	conn, err := common.NewGRPCConnectionWithoutTLS(config.SignerAddress)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -411,7 +411,7 @@ func TestFrostSignWithAdaptor(t *testing.T) {
 	}
 
 	// Step 7: User signing
-	conn, err := common.NewGRPCConnection(config.SignerAddress)
+	conn, err := common.NewGRPCConnectionWithoutTLS(config.SignerAddress)
 	if err != nil {
 		t.Fatal(err)
 	}

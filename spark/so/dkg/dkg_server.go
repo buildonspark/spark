@@ -147,7 +147,7 @@ func (s *Server) Round1Signature(ctx context.Context, req *pbdkg.Round1Signature
 		go func(identifier string, addr string) {
 			log.Println("distributing round 2 package for request id", req.RequestId, "to", identifier, addr)
 			defer wg.Done()
-			connection, err := common.NewGRPCConnection(addr)
+			connection, err := common.NewGRPCConnectionWithCert(addr, operator.CertPath)
 			if err != nil {
 				log.Println("error creating connection", err)
 				return

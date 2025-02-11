@@ -116,7 +116,7 @@ func (h *TransferHandler) syncCoopExitInit(ctx context.Context, req *pb.Cooperat
 		Option: helper.OperatorSelectionOptionExcludeSelf,
 	}
 	_, err := helper.ExecuteTaskWithAllOperators(ctx, h.config, &selection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
-		conn, err := common.NewGRPCConnection(operator.Address)
+		conn, err := common.NewGRPCConnectionWithCert(operator.Address, operator.CertPath)
 		if err != nil {
 			log.Printf("Failed to connect to operator: %v", err)
 			return nil, err

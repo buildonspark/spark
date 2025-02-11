@@ -83,7 +83,7 @@ func (s *SparkInternalServer) FrostRound1(ctx context.Context, req *pb.FrostRoun
 		keyPackagesArray = append(keyPackagesArray, keyPackages[uuid])
 	}
 
-	frostConn, err := common.NewGRPCConnection(s.config.SignerAddress)
+	frostConn, err := common.NewGRPCConnectionWithoutTLS(s.config.SignerAddress)
 	if err != nil {
 		log.Printf("Failed to connect to frost: %v", err)
 		return nil, err
@@ -199,7 +199,7 @@ func (s *SparkInternalServer) FrostRound2(ctx context.Context, req *pb.FrostRoun
 		signingJobProtos = append(signingJobProtos, signingJobProto)
 	}
 
-	frostConn, err := common.NewGRPCConnection(s.config.SignerAddress)
+	frostConn, err := common.NewGRPCConnectionWithoutTLS(s.config.SignerAddress)
 	if err != nil {
 		log.Printf("Failed to connect to frost: %v", err)
 		return nil, err

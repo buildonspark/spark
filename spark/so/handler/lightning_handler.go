@@ -195,7 +195,7 @@ func (h *LightningHandler) validateGetPreimageRequest(
 	reason pb.InitiatePreimageSwapRequest_Reason,
 ) error {
 	// Step 1 validate all signatures are valid
-	conn, err := common.NewGRPCConnection(h.config.SignerAddress)
+	conn, err := common.NewGRPCConnectionWithoutTLS(h.config.SignerAddress)
 	if err != nil {
 		return fmt.Errorf("unable to connect to signer: %v", err)
 	}
@@ -471,7 +471,7 @@ func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pb.Ini
 
 	selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
 	result, err := helper.ExecuteTaskWithAllOperators(ctx, h.config, &selection, func(ctx context.Context, operator *so.SigningOperator) ([]byte, error) {
-		conn, err := common.NewGRPCConnection(operator.Address)
+		conn, err := common.NewGRPCConnectionWithCert(operator.Address, operator.CertPath)
 		if err != nil {
 			return nil, err
 		}
@@ -656,7 +656,7 @@ func (h *LightningHandler) ProvidePreimage(ctx context.Context, req *pb.ProvideP
 
 	operatorSelection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
 	_, err = helper.ExecuteTaskWithAllOperators(ctx, h.config, &operatorSelection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
-		conn, err := common.NewGRPCConnection(operator.Address)
+		conn, err := common.NewGRPCConnectionWithCert(operator.Address, operator.CertPath)
 		if err != nil {
 			return nil, err
 		}
@@ -731,7 +731,7 @@ func (h *LightningHandler) ReturnLightningPayment(ctx context.Context, req *pb.R
 	if !internal {
 		operatorSelection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
 		_, err = helper.ExecuteTaskWithAllOperators(ctx, h.config, &operatorSelection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
-			conn, err := common.NewGRPCConnection(operator.Address)
+			conn, err := common.NewGRPCConnectionWithCert(operator.Address, operator.CertPath)
 			if err != nil {
 				return nil, err
 			}

@@ -85,7 +85,7 @@ func GenerateDepositAddress(
 	config *Config,
 	signingPubkey []byte,
 ) (*pb.GenerateDepositAddressResponse, error) {
-	sparkConn, err := common.NewGRPCConnection(config.CoodinatorAddress())
+	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
 	if err != nil {
 		return nil, err
 	}
@@ -186,7 +186,7 @@ func CreateTreeRoot(
 		return nil, err
 	}
 
-	sparkConn, err := common.NewGRPCConnection(config.CoodinatorAddress())
+	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
 	if err != nil {
 		return nil, err
 	}
@@ -244,7 +244,7 @@ func CreateTreeRoot(
 		UserCommitments: refundNonceCommitmentProto,
 	})
 
-	frostConn, err := common.NewGRPCConnection(config.FrostSignerAddress)
+	frostConn, err := common.NewGRPCConnectionWithoutTLS(config.FrostSignerAddress)
 	if err != nil {
 		return nil, err
 	}

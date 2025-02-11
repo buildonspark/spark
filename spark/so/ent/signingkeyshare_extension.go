@@ -333,7 +333,7 @@ func RunDKGIfNeeded(db *Tx, config *so.Config) error {
 }
 
 func RunDKG(ctx context.Context, config *so.Config) error {
-	connection, err := common.NewGRPCConnection(config.DKGCoordinatorAddress)
+	connection, err := common.NewGRPCConnectionWithCert(config.DKGCoordinatorAddress, config.SigningOperatorMap[config.Identifier].CertPath)
 	if err != nil {
 		return err
 	}
