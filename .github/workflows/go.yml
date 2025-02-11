@@ -144,13 +144,13 @@ jobs:
       - name: "Configure Kubernetes cluster"
         run: "aws --region us-west-2 eks update-kubeconfig --name dev"
       - name: "Restart pods"
-        run: "kubectl -n spark-v1 rollout restart sts/spark"
+        run: "kubectl -n spark rollout restart sts/spark"
       - name: "Check pod status"
         run: |
           for i in `seq 12`; do
             sleep 10s
             date
-            kubectl -n spark-v1 get pods -l 'app.kubernetes.io/name=spark' -o jsonpath='{range .items[*]}{.metadata.name} {.status.phase} {.status.conditions[?(@.type=="Ready")].status}{ "\n"}{end}' | grep -v ' Running True$' | tee /tmp/status
+            kubectl -n spark get pods -l 'app.kubernetes.io/name=spark' -o jsonpath='{range .items[*]}{.metadata.name} {.status.phase} {.status.conditions[?(@.type=="Ready")].status}{ "\n"}{end}' | grep -v ' Running True$' | tee /tmp/status
             if [ ! -s /tmp/status ]; then break; fi
           done
           if [ -s /tmp/status ]; then exit 1; fi
