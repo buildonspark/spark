@@ -106,6 +106,7 @@ require (
 )
 
 require (
+	github.com/DataDog/zstd v1.5.6
 	github.com/btcsuite/btcd v0.24.3-0.20240921052913-67b8efd3ba53
 	github.com/decred/dcrd/dcrec/secp256k1 v1.0.4
 	github.com/go-co-op/gocron/v2 v2.14.2
