@@ -1,8 +1,6 @@
 package tree
 
 import (
-	"log"
-
 	"github.com/google/uuid"
 )
 
@@ -88,7 +86,6 @@ func (h *HelperNode) Score() map[string]float32 {
 		multiplier *= PolarityScoreGamma
 		node = node.parent
 		depth++
-		log.Printf("depth: %d, multiplier: %f, scores: %v", depth, multiplier, scores)
 	}
 
 	return scores

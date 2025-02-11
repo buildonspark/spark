@@ -109,6 +109,9 @@ func (s *PolarityScorer) UpdateLeaves(node *ent.TreeNode) {
 	// Build the helper tree starting from the given node
 	helperTree := buildHelperTree(node)
 	for _, leaf := range helperTree.Leaves() {
+		if _, ok := s.probPubKeyCanClaim[leaf.leafID]; !ok {
+			s.probPubKeyCanClaim[leaf.leafID] = make(map[string]float32)
+		}
 		for owner, score := range leaf.Score() {
 			s.probPubKeyCanClaim[leaf.leafID][owner] = score
 		}
