@@ -44,7 +44,7 @@ func (s *SparkInternalServer) MarkKeysharesAsUsed(ctx context.Context, req *pb.M
 		}
 		ids[i] = uuid
 	}
-	err := ent.MarkSigningKeysharesAsUsed(ctx, s.config, ids)
+	_, err := ent.MarkSigningKeysharesAsUsed(ctx, s.config, ids)
 	if err != nil {
 		log.Printf("Failed to mark keyshares as used: %v", err)
 		return nil, err
@@ -330,11 +330,11 @@ func (s *SparkInternalServer) ReturnLightningPayment(ctx context.Context, req *p
 }
 
 // StartTokenTransactionInternal validates a token transaction and saves it to the database.
-func (s *SparkInternalServer) StartTokenTransactionInternal(ctx context.Context, req *pb.StartTokenTransactionInternalRequest) (*emptypb.Empty, error) {
+func (s *SparkInternalServer) StartTokenTransactionInternal(ctx context.Context, req *pb.StartTokenTransactionInternalRequest) (*pb.StartTokenTransactionInternalResponse, error) {
 	tokenTransactionHandler := handler.NewInternalTokenTransactionHandler(s.config)
-	err := tokenTransactionHandler.StartTokenTransactionInternal(ctx, s.config, req)
+	response, err := tokenTransactionHandler.StartTokenTransactionInternal(ctx, s.config, req)
 	if err != nil {
 		return nil, err
 	}
-	return &emptypb.Empty{}, nil
+	return response, nil
 }

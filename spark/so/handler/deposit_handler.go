@@ -60,7 +60,7 @@ func (o *DepositHandler) GenerateDepositAddress(ctx context.Context, config *so.
 
 	keyshare := keyshares[0]
 
-	err = ent.MarkSigningKeysharesAsUsed(ctx, config, []uuid.UUID{keyshare.ID})
+	_, err = ent.MarkSigningKeysharesAsUsed(ctx, config, []uuid.UUID{keyshare.ID})
 	if err != nil {
 		log.Printf("Failed to mark keyshare as used: %v", err)
 		return nil, err

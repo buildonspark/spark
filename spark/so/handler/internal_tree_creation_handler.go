@@ -57,7 +57,7 @@ func (h *InternalTreeCreationHandler) markExistingSigningKeysharesAsUsed(ctx con
 		nodeQueue = append(nodeQueue, node.Children[len(node.Children)-1])
 	}
 
-	err = ent.MarkSigningKeysharesAsUsed(ctx, h.config, keyshareIDs)
+	_, err = ent.MarkSigningKeysharesAsUsed(ctx, h.config, keyshareIDs)
 	if err != nil {
 		return nil, err
 	}

@@ -90,21 +90,30 @@ func GetUnusedSigningKeyshares(ctx context.Context, config *so.Config, keyshareC
 
 // MarkSigningKeysharesAsUsed marks the given keyshares as used. If any of the keyshares are not
 // found or not available, it returns an error.
-func MarkSigningKeysharesAsUsed(ctx context.Context, config *so.Config, ids []uuid.UUID) error {
+func MarkSigningKeysharesAsUsed(ctx context.Context, config *so.Config, ids []uuid.UUID) (map[uuid.UUID]*SigningKeyshare, error) {
 	db := GetDbFromContext(ctx)
 	log.Printf("Marking keyshares as used: %v", ids)
 
+	keysharesMap, err := GetSigningKeysharesMap(ctx, ids)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check for existing in use keyshares: %w", err)
+	}
+	if len(keysharesMap) != len(ids) {
+		return nil, fmt.Errorf("some shares are already in use: %d", len(ids)-len(keysharesMap))
+	}
+
+	// If these keyshares are not already in use, proceed with the update.
 	count, err := db.SigningKeyshare.
 		Update().
 		Where(signingkeyshare.IDIn(ids...)).
 		SetStatus(schema.KeyshareStatusInUse).
 		Save(ctx)
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("failed to update keyshares to in use: %w", err)
 	}
 
 	if count != len(ids) {
-		return fmt.Errorf("some keyshares are not available in %v", ids)
+		return nil, fmt.Errorf("some keyshares are not available in %v", ids)
 	}
 
 	remainingKeyshares, err := db.SigningKeyshare.Query().Where(
@@ -112,7 +121,7 @@ func MarkSigningKeysharesAsUsed(ctx context.Context, config *so.Config, ids []uu
 		signingkeyshare.CoordinatorIndexEQ(config.Index),
 	).Count(context.Background())
 	if err != nil {
-		return err
+		return nil, err
 	}
 	log.Printf("Remaining keyshares: %v", remainingKeyshares)
 	if uint64(remainingKeyshares) < spark.DKGKeyThreshold {
@@ -124,7 +133,8 @@ func MarkSigningKeysharesAsUsed(ctx context.Context, config *so.Config, ids []uu
 		}()
 	}
 
-	return nil
+	// Return the keyshares that were marked as used in case the caller wants to make use of them.
+	return keysharesMap, nil
 }
 
 // GetKeyPackage returns the key package for the given keyshare ID.

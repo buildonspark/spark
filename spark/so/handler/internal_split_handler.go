@@ -51,7 +51,7 @@ func (h *InternalSplitHandler) PrepareSplitKeyshares(ctx context.Context, req *p
 		selectedKeyshares[i+1] = u
 	}
 
-	err = ent.MarkSigningKeysharesAsUsed(ctx, h.config, selectedKeyshares)
+	_, err = ent.MarkSigningKeysharesAsUsed(ctx, h.config, selectedKeyshares)
 	if err != nil {
 		log.Printf("Failed to mark keyshares as used: %v", err)
 		return nil, err

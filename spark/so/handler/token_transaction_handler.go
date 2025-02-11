@@ -34,74 +34,34 @@ func NewTokenTransactionHandler(config authz.Config) *TokenTransactionHandler {
 	}
 }
 
-// generateTokenTransactionKeyshare reserves new keyshares for revocation keys on created leaves and
-// recovers the revocation keys from the distributed keyshares for spent leaves.
-func (o *TokenTransactionHandler) generateAndResolveRevocationKeys(
-	ctx context.Context,
-	config *so.Config,
-	tokenTransaction *pb.TokenTransaction,
-) (*pb.TokenTransaction, []string, *pb.SigningKeyshare, error) {
-	// Each created leaf requires a keyshare for revocation key generation.
-	numRevocationKeysharesNeeded := len(tokenTransaction.GetOutputLeaves())
-	keyshares, err := ent.GetUnusedSigningKeyshares(ctx, config, numRevocationKeysharesNeeded)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	if len(keyshares) < numRevocationKeysharesNeeded {
-		return nil, nil, nil, fmt.Errorf("Not enough keyshares available for token transaction")
-	}
+func validateStartTokenTransactionOperatorResponses(response map[string]interface{}) (*pb.TokenTransaction, error) {
+	var expectedHash []byte
+	var finalTx *pb.TokenTransaction
 
-	keyshareIDs := make([]uuid.UUID, len(keyshares))
-	keyshareIDStrings := make([]string, len(keyshares))
-	for i, keyshare := range keyshares {
-		keyshareIDs[i] = keyshare.ID
-		keyshareIDStrings[i] = keyshare.ID.String()
-	}
-	err = ent.MarkSigningKeysharesAsUsed(ctx, config, keyshareIDs)
-
-	finalTokenTransaction := tokenTransaction
-	if err != nil {
-		log.Printf("Failed to mark keyshare as used: %v", err)
-		return nil, nil, nil, err
-	}
-
-	// Mark keyshares as used in the non-coordinator SO's.
-
-	exceptSelfSelection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
-	_, err = helper.ExecuteTaskWithAllOperators(ctx, config, &exceptSelfSelection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
-		conn, err := common.NewGRPCConnectionWithCert(operator.Address, operator.CertPath)
-		if err != nil {
-			log.Printf("Failed to connect to operator for marking token transaction keyshare: %v", err)
-			return nil, err
+	for operatorID, resp := range response {
+		txResponse, ok := resp.(*pbinternal.StartTokenTransactionInternalResponse)
+		if !ok {
+			return nil, fmt.Errorf("unexpected transaction from operator %s", operatorID)
 		}
-		defer conn.Close()
-
-		client := pbinternal.NewSparkInternalServiceClient(conn)
-		_, err = client.MarkKeysharesAsUsed(ctx, &pbinternal.MarkKeysharesAsUsedRequest{KeyshareId: keyshareIDStrings})
-		return nil, err
-	})
-	if err != nil {
-		log.Printf("Failed to execute mark token transaction keyshare task with all operators: %v", err)
-		return nil, nil, nil, err
+		currentHash, err := utils.HashTokenTransaction(txResponse.FinalTokenTransaction, false)
+		if err != nil {
+			return nil, fmt.Errorf("failed to hash final token transaction: %w", err)
+		}
+		if expectedHash == nil {
+			finalTx = txResponse.FinalTokenTransaction
+			expectedHash = currentHash
+			continue
+		}
+		if !bytes.Equal(expectedHash, currentHash) {
+			return nil, fmt.Errorf(
+				"inconsistent token transaction hash from operators - expected %x but got %x from operator %s",
+				expectedHash,
+				currentHash,
+				operatorID,
+			)
+		}
 	}
-
-	// Fill the used keyshare public keys as revocation public keys in the token transaction.
-	for i := 0; i < numRevocationKeysharesNeeded; i++ {
-		finalTokenTransaction.OutputLeaves[i].RevocationPublicKey = keyshares[i].PublicKey
-	}
-
-	var operatorIdentifiers []string
-	for _, operator := range config.SigningOperatorMap {
-		operatorIdentifiers = append(operatorIdentifiers, operator.Identifier)
-	}
-
-	signingKeyshare := &pb.SigningKeyshare{
-		OwnerIdentifiers: operatorIdentifiers,
-		// TODO: Unify threshold type (uint32 vs uint64) at all callsites between protos and config.
-		Threshold: uint32(config.Threshold),
-	}
-
-	return finalTokenTransaction, keyshareIDStrings, signingKeyshare, nil
+	return finalTx, nil
 }
 
 // StartTokenTransaction verifies the token leaves, generates the keyshares for the token transaction, and returns metadata about the operators that possess the keyshares.
@@ -116,14 +76,25 @@ func (o TokenTransactionHandler) StartTokenTransaction(ctx context.Context, conf
 
 	// TODO: Add a call to the LRC20 node to verify the validity of the transaction payload.
 
-	finalTokenTransaction, keyshareIDStrings, keyshareInfo, err := o.generateAndResolveRevocationKeys(ctx, config, req.GetPartialTokenTransaction())
+	// Each created leaf requires a keyshare for revocation key generation.
+	numRevocationKeysharesNeeded := len(req.PartialTokenTransaction.OutputLeaves)
+	keyshares, err := ent.GetUnusedSigningKeyshares(ctx, config, numRevocationKeysharesNeeded)
 	if err != nil {
 		return nil, err
 	}
 
+	keyshareIDs := make([]uuid.UUID, len(keyshares))
+	keyshareIDStrings := make([]string, len(keyshares))
+	for i, keyshare := range keyshares {
+		keyshareIDs[i] = keyshare.ID
+		keyshareIDStrings[i] = keyshare.ID.String()
+	}
+
 	// Save the token transaction object to lock in the revocation public keys for each created leaf within this transaction.
+	// Note that atomicity here is very important to ensure that the unused keyshares queried above are not used by another operation.
+	// This property should be help because the coordinator blocks on the other SO responses.
 	allSelection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionAll}
-	_, err = helper.ExecuteTaskWithAllOperators(ctx, config, &allSelection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
+	response, err := helper.ExecuteTaskWithAllOperators(ctx, config, &allSelection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
 		conn, err := common.NewGRPCConnectionWithCert(operator.Address, operator.CertPath)
 		if err != nil {
 			log.Printf("Failed to connect to operator for marking token transaction keyshare: %v", err)
@@ -132,23 +103,45 @@ func (o TokenTransactionHandler) StartTokenTransaction(ctx context.Context, conf
 		defer conn.Close()
 
 		client := pbinternal.NewSparkInternalServiceClient(conn)
-		_, err = client.StartTokenTransactionInternal(ctx, &pbinternal.StartTokenTransactionInternalRequest{
+		internalResp, err := client.StartTokenTransactionInternal(ctx, &pbinternal.StartTokenTransactionInternalRequest{
 			KeyshareIds:                keyshareIDStrings,
-			FinalTokenTransaction:      finalTokenTransaction,
+			PartialTokenTransaction:    req.PartialTokenTransaction,
 			TokenTransactionSignatures: req.TokenTransactionSignatures,
 		})
-		return nil, err
+		if err != nil {
+			log.Printf("Failed to execute start token transaction task with operator %s: %v", operator.Identifier, err)
+			return nil, err
+		}
+		return internalResp, err
 	})
 	if err != nil {
-		log.Printf("Failed to execute save final token transaction task with all operators: %v", err)
+		log.Printf("Failed to execute start token transaction task with all operators: %v", err)
 		return nil, err
 	}
 
-	// TODO: Add a call to the LRC20 node to finalize the transaction payload.
+	finalTokenTransaction, err := validateStartTokenTransactionOperatorResponses(response)
+	if err != nil {
+		return nil, err
+	}
+
+	operatorList, err := allSelection.OperatorList(config)
+	if err != nil {
+		log.Printf("Failed to get selection operator list: %v", err)
+		return nil, err
+	}
+	operatorIdentifiers := make([]string, len(operatorList))
+	for i, operator := range operatorList {
+		operatorIdentifiers[i] = operator.Identifier
+	}
+	signingKeyshareInfo := &pb.SigningKeyshare{
+		OwnerIdentifiers: operatorIdentifiers,
+		// TODO: Unify threshold type (uint32 vs uint64) at all callsites between protos and config.
+		Threshold: uint32(config.Threshold),
+	}
 
 	return &pb.StartTokenTransactionResponse{
 		FinalTokenTransaction: finalTokenTransaction,
-		KeyshareInfo:          keyshareInfo,
+		KeyshareInfo:          signingKeyshareInfo,
 	}, nil
 }
 
@@ -224,7 +217,7 @@ func (o TokenTransactionHandler) SignTokenTransaction(
 		}
 		keyshares = append(keyshares, keyshare)
 
-		// Validate that the keyshare's public key matches the leaf's revocation public key
+		// Validate that the keyshare's public key matches the leaf's revocation public key.
 		if !bytes.Equal(keyshare.PublicKey, leaf.WithdrawalRevocationPublicKey) {
 			return nil, fmt.Errorf(
 				"keyshare public key %x does not match leaf revocation public key %x",

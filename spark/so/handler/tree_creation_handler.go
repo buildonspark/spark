@@ -317,7 +317,7 @@ func (h *TreeCreationHandler) PrepareTreeAddress(ctx context.Context, req *pb.Pr
 	for _, keyshare := range keyshares {
 		keysharesToMark = append(keysharesToMark, keyshare.ID)
 	}
-	err = ent.MarkSigningKeysharesAsUsed(ctx, h.config, keysharesToMark)
+	_, err = ent.MarkSigningKeysharesAsUsed(ctx, h.config, keysharesToMark)
 	if err != nil {
 		return nil, err
 	}
