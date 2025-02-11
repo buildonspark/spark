@@ -29,11 +29,64 @@ func createRootTx(
 	return rootTx
 }
 
+func createSplitTx(
+	parentOutPoint *wire.OutPoint,
+	childTxOuts []*wire.TxOut,
+) *wire.MsgTx {
+	splitTx := wire.NewMsgTx(2)
+	splitTx.AddTxIn(wire.NewTxIn(parentOutPoint, nil, nil))
+	for _, txOut := range childTxOuts {
+		splitTx.AddTxOut(txOut)
+	}
+	splitTx.AddTxOut(ephemeralAnchorOutput())
+	return splitTx
+}
+
+func initialSequence() uint32 {
+	return uint32((1 << 30) | spark.InitialTimeLock)
+}
+
 func nextSequence(currSequence uint32) (uint32, error) {
 	if currSequence&0xFFFF-spark.TimeLockInterval <= 0 {
 		return 0, fmt.Errorf("timelock interval is less or equal to 0")
 	}
 	return uint32((1 << 30) | (currSequence&0xFFFF - spark.TimeLockInterval)), nil
+}
+
+// createNodeTx creates a node transaction.
+// This stands in between a split tx and a leaf node tx,
+// and has no timelock.
+func createNodeTx(
+	parentOutPoint *wire.OutPoint,
+	txOut *wire.TxOut,
+) *wire.MsgTx {
+	newNodeTx := wire.NewMsgTx(2)
+	newNodeTx.AddTxIn(wire.NewTxIn(parentOutPoint, nil, nil))
+	newNodeTx.AddTxOut(txOut)
+	newNodeTx.AddTxOut(ephemeralAnchorOutput())
+	return newNodeTx
+}
+
+// createLeafNodeTx creates a leaf node transaction.
+// This transaction provides an intermediate transaction
+// to allow the timelock of the final refund transaction
+// to be extended. E.g. when the refund tx timelock reaches
+// 0, the leaf node tx can be re-signed with a decremented
+// timelock, and the refund tx can be reset it's timelock.
+func createLeafNodeTx(
+	parentOutPoint *wire.OutPoint,
+	txOut *wire.TxOut,
+) *wire.MsgTx {
+	newLeafTx := wire.NewMsgTx(2)
+	newLeafTx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: *parentOutPoint,
+		SignatureScript:  nil,
+		Witness:          nil,
+		Sequence:         initialSequence(),
+	})
+	newLeafTx.AddTxOut(txOut)
+	newLeafTx.AddTxOut(ephemeralAnchorOutput())
+	return newLeafTx
 }
 
 func createRefundTx(

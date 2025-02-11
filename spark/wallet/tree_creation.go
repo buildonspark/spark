@@ -12,7 +12,6 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark-go"
 	"github.com/lightsparkdev/spark-go/common"
 	pbfrost "github.com/lightsparkdev/spark-go/proto/frost"
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
@@ -201,34 +200,36 @@ func buildCreationNodesFromTree(
 		if currentElement.node.Children != nil {
 			shouldAddToQueue := currentElement.node.Children[0].Children != nil || createLeaves
 
-			tx := wire.NewMsgTx(2)
-			tx.AddTxIn(wire.NewTxIn(
-				&wire.OutPoint{Hash: currentElement.parentTx.TxHash(), Index: currentElement.vout},
-				nil,
-				nil, // witness
-			))
-
-			childrenArray := make([]*pb.CreationNode, 0)
-
-			for i, child := range currentElement.node.Children {
+			// Form tx
+			childTxOuts := make([]*wire.TxOut, 0)
+			for _, child := range currentElement.node.Children {
 				childAddress, _ := btcutil.DecodeAddress(*child.Address, common.NetworkParams(network))
 				childPkScript, _ := txscript.PayToAddrScript(childAddress)
-				tx.AddTxOut(wire.NewTxOut(int64(currentElement.parentTx.TxOut[currentElement.vout].Value)/2, childPkScript))
-				if shouldAddToQueue {
-					childCreationNode := &pb.CreationNode{}
-					childrenArray = append(childrenArray, childCreationNode)
-					elements = append(elements, element{
-						parentTx:     tx,
-						vout:         uint32(i),
-						node:         child,
-						creationNode: childCreationNode,
-						leafNode:     false,
-					})
-				}
+				childTxOut := wire.NewTxOut(int64(currentElement.parentTx.TxOut[currentElement.vout].Value)/2, childPkScript)
+				childTxOuts = append(childTxOuts, childTxOut)
+			}
+			parentOutPoint := &wire.OutPoint{Hash: currentElement.parentTx.TxHash(), Index: currentElement.vout}
+			tx := createSplitTx(parentOutPoint, childTxOuts)
+
+			// Form children/elements
+			childrenArray := make([]*pb.CreationNode, 0)
+			newElements := make([]element, 0)
+			for i, child := range currentElement.node.Children {
+				childCreationNode := &pb.CreationNode{}
+				childrenArray = append(childrenArray, childCreationNode)
+				newElements = append(newElements, element{
+					parentTx:     tx,
+					vout:         uint32(i),
+					node:         child,
+					creationNode: childCreationNode,
+					leafNode:     false,
+				})
 			}
 			if shouldAddToQueue {
 				currentElement.creationNode.Children = childrenArray
+				elements = append(elements, newElements...)
 			}
+
 			var txBuf bytes.Buffer
 			tx.Serialize(&txBuf)
 			pubkey := secp256k1.PrivKeyFromBytes(currentElement.node.SigningPrivateKey).PubKey()
@@ -250,15 +251,12 @@ func buildCreationNodesFromTree(
 			currentElement.creationNode.NodeTxSigningJob = signingJob
 		} else {
 			if currentElement.leafNode {
-				tx := wire.NewMsgTx(2)
-				sequence := uint32((1 << 30) | spark.InitialTimeLock)
-				tx.AddTxIn(&wire.TxIn{
-					PreviousOutPoint: wire.OutPoint{Hash: currentElement.parentTx.TxHash(), Index: currentElement.vout},
-					SignatureScript:  nil,
-					Witness:          nil,
-					Sequence:         sequence,
-				})
-				tx.AddTxOut(wire.NewTxOut(currentElement.parentTx.TxOut[currentElement.vout].Value, currentElement.parentTx.TxOut[currentElement.vout].PkScript))
+				parentOutPoint := wire.OutPoint{Hash: currentElement.parentTx.TxHash(), Index: currentElement.vout}
+				parentTxOut := currentElement.parentTx.TxOut[currentElement.vout]
+				tx := createLeafNodeTx(
+					&parentOutPoint,
+					wire.NewTxOut(parentTxOut.Value, parentTxOut.PkScript),
+				)
 				var txBuf bytes.Buffer
 				tx.Serialize(&txBuf)
 
@@ -279,18 +277,12 @@ func buildCreationNodesFromTree(
 				}
 				currentElement.creationNode.NodeTxSigningJob = signingJob
 
-				refundTx := wire.NewMsgTx(2)
-				refundTx.AddTxIn(&wire.TxIn{
-					PreviousOutPoint: wire.OutPoint{Hash: tx.TxHash(), Index: 0},
-					SignatureScript:  nil,
-					Witness:          nil,
-					Sequence:         sequence,
-				})
-
-				refundP2trAddress, _ := common.P2TRAddressFromPublicKey(pubkey.SerializeCompressed(), network)
-				refundAddress, _ := btcutil.DecodeAddress(*refundP2trAddress, common.NetworkParams(network))
-				refundPkScript, _ := txscript.PayToAddrScript(refundAddress)
-				refundTx.AddTxOut(wire.NewTxOut(tx.TxOut[0].Value, refundPkScript))
+				refundTx, err := createRefundTx(initialSequence(),
+					&wire.OutPoint{Hash: tx.TxHash(), Index: 0},
+					tx.TxOut[0].Value, pubkey)
+				if err != nil {
+					return nil, nil, err
+				}
 				var refundTxBuf bytes.Buffer
 				refundTx.Serialize(&refundTxBuf)
 				refundSigningNonce, err := objects.RandomSigningNonce()
@@ -309,13 +301,9 @@ func buildCreationNodesFromTree(
 				}
 				currentElement.creationNode.RefundTxSigningJob = refundSigningJob
 			} else {
-				tx := wire.NewMsgTx(2)
-				tx.AddTxIn(wire.NewTxIn(
-					&wire.OutPoint{Hash: currentElement.parentTx.TxHash(), Index: currentElement.vout},
-					nil,
-					nil, // witness
-				))
-				tx.AddTxOut(wire.NewTxOut(currentElement.parentTx.TxOut[currentElement.vout].Value, currentElement.parentTx.TxOut[currentElement.vout].PkScript))
+				parentOutPoint := wire.OutPoint{Hash: currentElement.parentTx.TxHash(), Index: currentElement.vout}
+				parentTxOut := currentElement.parentTx.TxOut[currentElement.vout]
+				tx := createNodeTx(&parentOutPoint, wire.NewTxOut(parentTxOut.Value, parentTxOut.PkScript))
 				var txBuf bytes.Buffer
 				tx.Serialize(&txBuf)
 
