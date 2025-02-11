@@ -41,7 +41,10 @@ type PolarityScorer struct {
 }
 
 func NewPolarityScorer(dbClient *ent.Client) *PolarityScorer {
-	scorer := &PolarityScorer{dbClient: dbClient}
+	scorer := &PolarityScorer{
+		dbClient:           dbClient,
+		probPubKeyCanClaim: make(map[uuid.UUID]map[string]float32),
+	}
 	return scorer
 }
 
