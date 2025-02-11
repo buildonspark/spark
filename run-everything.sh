@@ -333,10 +333,6 @@ run_operators_tmux() {
    
    # Create new tmux session
    tmux new-session -d -s "$session_name"
-
-   # Create a user to login as when connecting locally
-   psql postgres -c "
-   CREATE USER alice WITH PASSWORD '321';" > /dev/null 2>&1
    
    # Split the window into 5 panes and run operators
    for i in {0..4}; do
@@ -352,7 +348,7 @@ run_operators_tmux() {
        
        # Construct paths
        local log_file="${run_dir}/logs/operator_${i}.log"
-       local db_file="postgresql://alice:321@127.0.0.1:5432/operator_${i}?sslmode=disable"
+       local db_file="postgresql://127.0.0.1:5432/operator_${i}?sslmode=disable"
     #    local db_file="${run_dir}/db/operator_${i}.sqlite?_fk=1"
        local signer_socket="unix:///tmp/frost_${i}.sock"
 
