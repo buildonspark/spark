@@ -55,51 +55,14 @@ func (h *InternalTokenTransactionHandler) SignTokenTransaction(ctx context.Conte
 		return nil, err
 	}
 
-	partialTokenTransactionHash, err := utils.HashTokenTransaction(req.TokenTransaction, true)
-	if err != nil {
-		log.Printf("Failed to hash partial token transaction: %v", err)
-		return nil, err
-	}
 	finalTokenTransactionHash, err := utils.HashTokenTransaction(req.TokenTransaction, false)
 	if err != nil {
 		log.Printf("Failed to hash final token transaction: %v", err)
 		return nil, err
 	}
-	tokenTransactionReceipt, err := db.TokenTransactionReceipt.Create().
-		SetPartialTokenTransactionHash(partialTokenTransactionHash).
-		SetFinalizedTokenTransactionHash(finalTokenTransactionHash).
-		Save(ctx)
+	tokenTransactionReceipt, err := ent.SaveTokenTransactionReceiptAndLeafEnts(ctx, req.TokenTransaction, req.OutputLeafRevocationKeyshareIds)
 	if err != nil {
 		log.Printf("Failed to create token transaction receipt: %v", err)
-		return nil, err
-	}
-
-	outputLeaves := make([]*ent.TokenLeafCreate, 0, len(req.TokenTransaction.OutputLeaves))
-	for leafIndex, outputLeaf := range req.TokenTransaction.OutputLeaves {
-		revocationUUID, err := uuid.Parse(req.OutputLeafRevocationKeyshareIds[leafIndex])
-		if err != nil {
-			return nil, err
-		}
-		outputLeaves = append(
-			outputLeaves,
-			db.TokenLeaf.
-				Create().
-				SetStatus(schema.TokenLeafStatusCreatedSigned).
-				SetOwnerPublicKey(outputLeaf.OwnerPublicKey).
-				SetWithdrawalBondSats(outputLeaf.WithdrawalBondSats).
-				SetWithdrawalLocktime(outputLeaf.WithdrawalLocktime).
-				SetWithdrawalRevocationPublicKey(outputLeaf.RevocationPublicKey).
-				SetTokenPublicKey(outputLeaf.TokenPublicKey).
-				SetTokenAmount(outputLeaf.TokenAmount).
-				SetLeafCreatedTransactionOuputVout(uint32(leafIndex)).
-				SetRevocationKeyshareID(revocationUUID).
-				SetLeafCreatedTokenTransactionReceiptID(tokenTransactionReceipt.ID).
-				SetRevocationKeyshareID(revocationUUID),
-		)
-	}
-	_, err = db.TokenLeaf.CreateBulk(outputLeaves...).Save(ctx)
-	if err != nil {
-		log.Printf("Failed to create token leaves: %v", err)
 		return nil, err
 	}
 
@@ -112,7 +75,7 @@ func (h *InternalTokenTransactionHandler) SignTokenTransaction(ctx context.Conte
 	}
 
 	if req.TokenTransaction.GetTransferInput() != nil {
-		tokenLeafEntsToSpend, err := ent.FetchTokenLeavesFromLeavesToSpend(ctx, req.TokenTransaction.GetTransferInput().LeavesToSpend)
+		tokenLeafEntsToSpend, err := ent.FetchInputLeaves(ctx, req.TokenTransaction.GetTransferInput().LeavesToSpend)
 		if err != nil {
 			log.Printf("Failed to fetch input leaves from previous transactions: %v", err)
 			return nil, err
@@ -125,29 +88,10 @@ func (h *InternalTokenTransactionHandler) SignTokenTransaction(ctx context.Conte
 			return nil, err
 		}
 
-		inputLeavesUpdate := make([]*ent.TokenLeafUpdateOne, 0, len(req.TokenTransaction.GetTransferInput().LeavesToSpend))
-		for leafIndex, leafToSpendEnt := range tokenLeafEntsToSpend {
-			if err != nil {
-				log.Printf("Ownership signature for leaf to spend was invalid: leaf_index=%d, owner_public_key=%x, partial_tx_hash=%x, err=%v",
-					leafIndex,
-					tokenLeafEntsToSpend[leafIndex].OwnerPublicKey,
-					partialTokenTransactionHash, err)
-				return nil, err
-			}
-			inputLeavesUpdate = append(
-				inputLeavesUpdate,
-				db.TokenLeaf.UpdateOne(leafToSpendEnt).
-					SetStatus(schema.TokenLeafStatusSpentSigned).
-					SetLeafSpentOwnershipSignature(req.TokenTransactionSignatures.GetOwnerSignatures()[leafIndex]).
-					SetLeafSpentTokenTransactionReceiptID(tokenTransactionReceipt.ID),
-			)
-		}
-		// Execute all the updates
-		for _, update := range inputLeavesUpdate {
-			if _, err := update.Save(ctx); err != nil {
-				log.Printf("Failed to update spent leaf: %v", err)
-				return nil, err
-			}
+		err = ent.MarkLeavesAsSpent(ctx, tokenLeafEntsToSpend, req.TokenTransactionSignatures.GetOwnerSignatures(), tokenTransactionReceipt)
+		if err != nil {
+			log.Printf("Failed to mark leaves as spent: %v", err)
+			return nil, err
 		}
 	}
 
