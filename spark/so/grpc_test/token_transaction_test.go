@@ -10,6 +10,7 @@ import (
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/google/uuid"
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
+	"github.com/lightsparkdev/spark-go/so/utils"
 	testutil "github.com/lightsparkdev/spark-go/test_util"
 	"github.com/lightsparkdev/spark-go/wallet"
 )
@@ -21,7 +22,7 @@ func int64ToUint128Bytes(high, low uint64) []byte {
 	)
 }
 
-func TestBroadcastTokenTransactionIssueTokens(t *testing.T) {
+func TestBroadcastTokenTransactionIssueAndTransferTokens(t *testing.T) {
 	config, err := testutil.TestWalletConfig()
 	if err != nil {
 		t.Fatalf("failed to create wallet config: %v", err)
@@ -77,9 +78,62 @@ func TestBroadcastTokenTransactionIssueTokens(t *testing.T) {
 	// Broadcast the token transaction
 	finalIssueTokenTransaction, err := wallet.BroadcastTokenTransaction(
 		context.Background(), config, issueTokenTransaction,
-	)
+		[]*secp256k1.PrivateKey{&tokenPrivKey},
+		[]*secp256k1.PublicKey{})
 	if err != nil {
 		t.Fatalf("failed to broadcast issuance token transaction: %v", err)
 	}
 	log.Printf("issuance broadcast finalized token transaction: %v", finalIssueTokenTransaction)
+
+	finalIssueTokenTransactionHash, err := utils.HashTokenTransaction(finalIssueTokenTransaction, false)
+	if err != nil {
+		t.Fatalf("failed to hash final issuance token transaction: %v", err)
+	}
+
+	transferTokenTransaction := &pb.TokenTransaction{
+		// Spend the leaves created with issuance before into a new single leaf.
+		TokenInput: &pb.TokenTransaction_TransferInput{
+			TransferInput: &pb.TransferInput{
+				LeavesToSpend: []*pb.TokenLeafToSpend{
+					{
+						PrevTokenTransactionHash:     finalIssueTokenTransactionHash,
+						PrevTokenTransactionLeafVout: 0,
+					},
+					{
+						PrevTokenTransactionHash:     finalIssueTokenTransactionHash,
+						PrevTokenTransactionLeafVout: 1,
+					},
+				},
+			},
+		},
+		// Send the funds back to the issuer.
+		OutputLeaves: []*pb.TokenLeafOutput{
+			{
+				Id:                 uuid.New().String(), // Generate a unique ID for the leaf
+				OwnerPublicKey:     tokenIdentityPubKeyBytes,
+				WithdrawalBondSats: 10000,                                         // Example bond amount
+				WithdrawalLocktime: uint64(time.Now().Add(24 * time.Hour).Unix()), // 24 hour locktime
+				TokenPublicKey:     tokenIdentityPubKeyBytes,                      // Using user pubkey as token ID for this example
+				TokenAmount:        int64ToUint128Bytes(0, 33333),                 // high bits = 0, low bits = 99999
+			},
+		},
+	}
+
+	revPubKey1, err := secp256k1.ParsePubKey(finalIssueTokenTransaction.OutputLeaves[0].RevocationPublicKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	revPubKey2, err := secp256k1.ParsePubKey(finalIssueTokenTransaction.OutputLeaves[1].RevocationPublicKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Broadcast the token transaction
+	finalTransferTokenTransaction, err := wallet.BroadcastTokenTransaction(
+		context.Background(), config, transferTokenTransaction,
+		[]*secp256k1.PrivateKey{userLeaf1PrivKey, userLeaf2PrivKey},
+		[]*secp256k1.PublicKey{revPubKey1, revPubKey2})
+	if err != nil {
+		t.Fatalf("failed to broadcast transfer token transaction: %v", err)
+	}
+	log.Printf("transfer broadcast finalized token transaction: %v", finalTransferTokenTransaction)
 }
