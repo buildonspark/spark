@@ -8,7 +8,6 @@ import (
 
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
-	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
@@ -55,7 +54,6 @@ func AggregateTreeNodes(
 
 	aggregatedSigningPublicKey := secp256k1.PrivKeyFromBytes(aggregatedSigningKey).PubKey()
 
-	newRefundTx := wire.NewMsgTx(2)
 	parentRefundTx, err := common.TxFromRawTxBytes(parentNode.RefundTx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse parent refund tx: %v", err)
@@ -64,16 +62,12 @@ func AggregateTreeNodes(
 	if err != nil {
 		return nil, fmt.Errorf("failed to get next sequence: %v", err)
 	}
-	newRefundTx.AddTxIn(&wire.TxIn{
-		PreviousOutPoint: wire.OutPoint{Hash: parentTx.TxHash(), Index: uint32(parentNode.Vout)},
-		SignatureScript:  nil,
-		Witness:          nil,
-		Sequence:         sequence,
-	})
-	refundP2trAddress, _ := common.P2TRAddressFromPublicKey(aggregatedSigningPublicKey.SerializeCompressed(), config.Network)
-	refundAddress, _ := btcutil.DecodeAddress(*refundP2trAddress, common.NetworkParams(config.Network))
-	refundPkScript, _ := txscript.PayToAddrScript(refundAddress)
-	newRefundTx.AddTxOut(wire.NewTxOut(parentTx.TxOut[parentNode.Vout].Value, refundPkScript))
+	parentOutPoint := wire.OutPoint{Hash: parentTx.TxHash(), Index: uint32(parentNode.Vout)}
+	newRefundTx, err := createRefundTx(sequence, &parentOutPoint,
+		parentTx.TxOut[parentNode.Vout].Value, aggregatedSigningPublicKey)
+	if err != nil {
+		return nil, err
+	}
 	var refundBuf bytes.Buffer
 	newRefundTx.Serialize(&refundBuf)
 

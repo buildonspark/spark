@@ -9,14 +9,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/btcsuite/btcd/btcutil"
-	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 	eciesgo "github.com/ecies/go/v2"
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark-go"
 	"github.com/lightsparkdev/spark-go/common"
 	secretsharing "github.com/lightsparkdev/spark-go/common/secret_sharing"
 	pbcommon "github.com/lightsparkdev/spark-go/proto/common"
@@ -686,8 +683,25 @@ func prepareRefundSoSigningJobs(
 	signingJobs := []*pb.LeafRefundTxSigningJob{}
 	for _, leaf := range leaves {
 		refundSigningData := leafDataMap[leaf.Leaf.Id]
-		signingPubkey := refundSigningData.SigningPrivKey.PubKey().SerializeCompressed()
-		refundTx, _, err := createRefundTx(config, leaf.Leaf, refundSigningData.ReceivingPubkey)
+		nodeTx, err := common.TxFromRawTxBytes(leaf.Leaf.NodeTx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse node tx: %v", err)
+		}
+		nodeOutPoint := wire.OutPoint{Hash: nodeTx.TxHash(), Index: 0}
+		currRefundTx, err := common.TxFromRawTxBytes(leaf.Leaf.RefundTx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse refund tx: %v", err)
+		}
+		amountSats := nodeTx.TxOut[0].Value
+		receivingPubkey, err := secp256k1.ParsePubKey(refundSigningData.ReceivingPubkey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse receiving pubkey: %v", err)
+		}
+		nextSequence, err := nextSequence(currRefundTx.TxIn[0].Sequence)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get next sequence: %v", err)
+		}
+		refundTx, err := createRefundTx(nextSequence, &nodeOutPoint, amountSats, receivingPubkey)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create refund tx: %v", err)
 		}
@@ -696,6 +710,7 @@ func prepareRefundSoSigningJobs(
 		refundTx.Serialize(&refundBuf)
 		refundNonceCommitmentProto, _ := refundSigningData.Nonce.SigningCommitment().MarshalProto()
 
+		signingPubkey := refundSigningData.SigningPrivKey.PubKey().SerializeCompressed()
 		signingJobs = append(signingJobs, &pb.LeafRefundTxSigningJob{
 			LeafId: leaf.Leaf.Id,
 			RefundTxSigningJob: &pb.SigningJob{
@@ -706,58 +721,4 @@ func prepareRefundSoSigningJobs(
 		})
 	}
 	return signingJobs, nil
-}
-
-func nextSequence(currSequence uint32) (uint32, error) {
-	if currSequence&0xFFFF-spark.TimeLockInterval <= 0 {
-		return 0, fmt.Errorf("timelock interval is less or equal to 0")
-	}
-	return uint32((1 << 30) | (currSequence&0xFFFF - spark.TimeLockInterval)), nil
-}
-
-func createRefundTx(
-	config *Config,
-	leaf *pb.TreeNode,
-	receivingPubkey []byte,
-) (*wire.MsgTx, []byte, error) {
-	tx, err := common.TxFromRawTxBytes(leaf.NodeTx)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to parse leaf tx: %v", err)
-	}
-	refundTx, err := common.TxFromRawTxBytes(leaf.RefundTx)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to parse leaf tx: %v", err)
-	}
-
-	newRefundTx := wire.NewMsgTx(2)
-
-	sequence, err := nextSequence(refundTx.TxIn[0].Sequence)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get next sequence: %v", err)
-	}
-	newRefundTx.AddTxIn(&wire.TxIn{
-		PreviousOutPoint: wire.OutPoint{Hash: tx.TxHash(), Index: 0},
-		SignatureScript:  nil,
-		Witness:          nil,
-		Sequence:         sequence,
-	})
-	refundP2trAddress, err := common.P2TRAddressFromPublicKey(receivingPubkey, config.Network)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create p2tr address from pubkey: %v", err)
-	}
-	refundAddress, err := btcutil.DecodeAddress(*refundP2trAddress, common.NetworkParams(config.Network))
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to decode p2tr address: %v", err)
-	}
-	refundPkScript, err := txscript.PayToAddrScript(refundAddress)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create pk script: %v", err)
-	}
-	newRefundTx.AddTxOut(wire.NewTxOut(tx.TxOut[0].Value, refundPkScript))
-
-	sighash, err := common.SigHashFromTx(newRefundTx, 0, tx.TxOut[0])
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to calculate sighash: %v", err)
-	}
-	return newRefundTx, sighash, nil
 }

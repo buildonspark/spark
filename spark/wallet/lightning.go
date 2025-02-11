@@ -5,6 +5,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/btcsuite/btcd/wire"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/common"
 	pbcommon "github.com/lightsparkdev/spark-go/proto/common"
@@ -19,7 +21,7 @@ func SwapNodesForPreimage(
 	ctx context.Context,
 	config *Config,
 	leaves []LeafKeyTweak,
-	receiverIdentityPubkey []byte,
+	receiverIdentityPubkeyBytes []byte,
 	paymentHash []byte,
 	invoiceString *string,
 	feeSats uint64,
@@ -57,7 +59,11 @@ func SwapNodesForPreimage(
 	}
 	defer signerConn.Close()
 
-	signingJobs, refundTxs, userCommitments, err := prepareFrostSigningJobs(config, leaves, signingCommitments.SigningCommitments, receiverIdentityPubkey)
+	receiverIdentityPubkey, err := secp256k1.ParsePubKey(receiverIdentityPubkeyBytes)
+	if err != nil {
+		return nil, err
+	}
+	signingJobs, refundTxs, userCommitments, err := prepareFrostSigningJobs(leaves, signingCommitments.SigningCommitments, receiverIdentityPubkey)
 	if err != nil {
 		return nil, err
 	}
@@ -111,9 +117,9 @@ func SwapNodesForPreimage(
 		Transfer: &pb.StartSendTransferRequest{
 			TransferId:                transferID,
 			OwnerIdentityPublicKey:    config.IdentityPublicKey(),
-			ReceiverIdentityPublicKey: receiverIdentityPubkey,
+			ReceiverIdentityPublicKey: receiverIdentityPubkeyBytes,
 		},
-		ReceiverIdentityPublicKey: receiverIdentityPubkey,
+		ReceiverIdentityPublicKey: receiverIdentityPubkeyBytes,
 		FeeSats:                   feeSats,
 	})
 	if err != nil {
@@ -123,16 +129,29 @@ func SwapNodesForPreimage(
 }
 
 func prepareFrostSigningJobs(
-	config *Config,
 	leaves []LeafKeyTweak,
 	signingCommitments []*pb.RequestedSigningCommitments,
-	receiverIdentityPubkey []byte,
+	receiverIdentityPubkey *secp256k1.PublicKey,
 ) ([]*pbfrost.FrostSigningJob, [][]byte, []*objects.SigningCommitment, error) {
 	signingJobs := []*pbfrost.FrostSigningJob{}
 	refundTxs := make([][]byte, len(leaves))
 	userCommitments := make([]*objects.SigningCommitment, len(leaves))
 	for i, leaf := range leaves {
-		refundTx, sighash, err := createRefundTx(config, leaf.Leaf, receiverIdentityPubkey)
+		nodeTx, err := common.TxFromRawTxBytes(leaf.Leaf.NodeTx)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("failed to parse node tx: %v", err)
+		}
+		nodeOutPoint := wire.OutPoint{Hash: nodeTx.TxHash(), Index: 0}
+		currRefundTx, err := common.TxFromRawTxBytes(leaf.Leaf.RefundTx)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("failed to parse refund tx: %v", err)
+		}
+		nextSequence, err := nextSequence(currRefundTx.TxIn[0].Sequence)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("failed to get next sequence: %v", err)
+		}
+		amountSats := nodeTx.TxOut[0].Value
+		refundTx, err := createRefundTx(nextSequence, &nodeOutPoint, amountSats, receiverIdentityPubkey)
 		if err != nil {
 			return nil, nil, nil, err
 		}
@@ -142,6 +161,11 @@ func prepareFrostSigningJobs(
 			return nil, nil, nil, err
 		}
 		refundTxs[i] = refundBuf.Bytes()
+
+		sighash, err := common.SigHashFromTx(refundTx, 0, nodeTx.TxOut[0])
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("failed to calculate sighash: %v", err)
+		}
 
 		signingNonce, err := objects.RandomSigningNonce()
 		if err != nil {

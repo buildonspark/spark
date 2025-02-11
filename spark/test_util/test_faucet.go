@@ -65,8 +65,10 @@ func (f *Faucet) Fund() (FaucetCoin, error) {
 	return coin, nil
 }
 
-// Refill mines a block and splits it into a bunch outputs,
-// which is freely gives away for various tests to use.
+// Refill mines a block to the faucet, mines 100 blocks to make
+// that output spendabled, then splits it into a bunch outputs
+// (coins) in a new transaction, which are then freely given away for
+// various tests to use.
 func (f *Faucet) Refill() error {
 	f.mu.Lock()
 	defer f.mu.Unlock()

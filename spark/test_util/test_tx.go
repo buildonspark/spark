@@ -75,7 +75,7 @@ func CreateTestConnectorTransaction(
 }
 
 func createTestTransaction(inputs []*wire.TxIn, outputs []*wire.TxOut) *wire.MsgTx {
-	tx := wire.NewMsgTx(wire.TxVersion)
+	tx := wire.NewMsgTx(2)
 	for _, in := range inputs {
 		tx.AddTxIn(in)
 	}

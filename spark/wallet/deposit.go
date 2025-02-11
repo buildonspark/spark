@@ -8,7 +8,6 @@ import (
 
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
-	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
@@ -117,13 +116,8 @@ func CreateTreeRoot(
 	signingPubkey := secp256k1.PrivKeyFromBytes(signingPrivKey).PubKey()
 	signingPubkeyBytes := signingPubkey.SerializeCompressed()
 	// Creat root tx
-	rootTx := wire.NewMsgTx(2)
-	rootTx.AddTxIn(wire.NewTxIn(
-		&wire.OutPoint{Hash: depositTx.TxHash(), Index: uint32(vout)},
-		nil,
-		nil, // witness
-	))
-	rootTx.AddTxOut(wire.NewTxOut(depositTx.TxOut[0].Value, depositTx.TxOut[0].PkScript))
+	depositOutPoint := &wire.OutPoint{Hash: depositTx.TxHash(), Index: uint32(vout)}
+	rootTx := createRootTx(depositOutPoint, depositTx.TxOut[0])
 	var rootBuf bytes.Buffer
 	err := rootTx.Serialize(&rootBuf)
 	if err != nil {
@@ -151,19 +145,16 @@ func CreateTreeRoot(
 		return nil, err
 	}
 
-	// Creat refund tx
-	refundTx := wire.NewMsgTx(2)
-	sequence := uint32((1 << 30) | spark.InitialTimeLock)
-	refundTx.AddTxIn(&wire.TxIn{
-		PreviousOutPoint: wire.OutPoint{Hash: rootTx.TxHash(), Index: 0},
-		SignatureScript:  nil,
-		Witness:          nil,
-		Sequence:         sequence,
-	})
-	refundP2trAddress, _ := common.P2TRAddressFromPublicKey(signingPubkeyBytes, config.Network)
-	refundAddress, _ := btcutil.DecodeAddress(*refundP2trAddress, common.NetworkParams(config.Network))
-	refundPkScript, _ := txscript.PayToAddrScript(refundAddress)
-	refundTx.AddTxOut(wire.NewTxOut(rootTx.TxOut[0].Value, refundPkScript))
+	// Create refund tx
+	refundTx, err := createRefundTx(
+		uint32((1<<30)|spark.InitialTimeLock),
+		&wire.OutPoint{Hash: rootTx.TxHash(), Index: 0},
+		rootTx.TxOut[0].Value,
+		signingPubkey,
+	)
+	if err != nil {
+		return nil, err
+	}
 	var refundBuf bytes.Buffer
 	err = refundTx.Serialize(&refundBuf)
 	if err != nil {

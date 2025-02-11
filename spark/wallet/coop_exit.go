@@ -53,29 +53,6 @@ func GetConnectorRefundSignatures(
 	return transfer, signaturesMap, nil
 }
 
-func createConnectorRefundTransaction(
-	sequence uint32,
-	nodeOutPoint *wire.OutPoint,
-	connectorOutput *wire.OutPoint,
-	amountSats int64,
-	receiverPubKey *secp256k1.PublicKey,
-) (*wire.MsgTx, error) {
-	refundTx := wire.NewMsgTx(2)
-	refundTx.AddTxIn(&wire.TxIn{
-		PreviousOutPoint: *nodeOutPoint,
-		SignatureScript:  nil,
-		Witness:          nil,
-		Sequence:         sequence,
-	})
-	refundTx.AddTxIn(wire.NewTxIn(connectorOutput, nil, nil))
-	receiverScript, err := common.P2TRScriptFromPubKey(receiverPubKey)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create receiver script: %v", err)
-	}
-	refundTx.AddTxOut(wire.NewTxOut(amountSats, receiverScript))
-	return refundTx, nil
-}
-
 func createConnectorRefundTransactionSigningJob(
 	leafID string,
 	signingPubkey []byte,
