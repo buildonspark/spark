@@ -91,7 +91,7 @@ func (h *InternalTokenTransactionHandler) StartTokenTransactionInternal(ctx cont
 	}
 
 	// Save the token transaction receipt, created leaf ents, and update the leaves to spend.
-	tokenTransactionReceipt, err := ent.SaveTokenTransactionReceiptAndLeafEnts(ctx, finalTokenTransaction, req.KeyshareIds)
+	tokenTransactionReceipt, err := ent.SaveTokenTransactionReceiptAndLeafEnts(ctx, finalTokenTransaction, req.TokenTransactionSignatures, req.KeyshareIds)
 	if err != nil {
 		return nil, fmt.Errorf("failed to save token transaction receipt and leaf ents: %w", err)
 	}

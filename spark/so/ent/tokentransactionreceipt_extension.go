@@ -22,7 +22,7 @@ func GetReceiptMapFromList(receipts []*TokenTransactionReceipt) (map[string]*Tok
 	return receiptMap, nil
 }
 
-func SaveTokenTransactionReceiptAndLeafEnts(ctx context.Context, tokenTransaction *pb.TokenTransaction, leafRevocationKeyshareIDs []string) (*TokenTransactionReceipt, error) {
+func SaveTokenTransactionReceiptAndLeafEnts(ctx context.Context, tokenTransaction *pb.TokenTransaction, tokenTransactionSignatures *pb.TokenTransactionSignatures, leafRevocationKeyshareIDs []string) (*TokenTransactionReceipt, error) {
 	partialTokenTransactionHash, err := utils.HashTokenTransaction(tokenTransaction, true)
 	if err != nil {
 		log.Printf("Failed to hash partial token transaction: %v", err)
@@ -43,9 +43,24 @@ func SaveTokenTransactionReceiptAndLeafEnts(ctx context.Context, tokenTransactio
 		return nil, err
 	}
 
+	if tokenTransaction.GetIssueInput() != nil {
+		_, err = db.TokenIssuance.Create().
+			SetIssuerPublicKey(tokenTransaction.GetIssueInput().GetIssuerPublicKey()).
+			SetIssuerSignature(tokenTransactionSignatures.GetOwnerSignatures()[0]).
+			Save(ctx)
+		if err != nil {
+			log.Printf("Failed to create token issuance ent: %v", err)
+			return nil, err
+		}
+	}
+
 	outputLeaves := make([]*TokenLeafCreate, 0, len(tokenTransaction.OutputLeaves))
 	for leafIndex, outputLeaf := range tokenTransaction.OutputLeaves {
 		revocationUUID, err := uuid.Parse(leafRevocationKeyshareIDs[leafIndex])
+		if err != nil {
+			return nil, err
+		}
+		leafUUID, err := uuid.Parse(outputLeaf.Id)
 		if err != nil {
 			return nil, err
 		}
@@ -53,6 +68,8 @@ func SaveTokenTransactionReceiptAndLeafEnts(ctx context.Context, tokenTransactio
 			outputLeaves,
 			db.TokenLeaf.
 				Create().
+				// TODO: Consider whether the coordinator instead of the wallet should define this ID.
+				SetID(leafUUID).
 				SetStatus(schema.TokenLeafStatusCreatedUnsigned).
 				SetOwnerPublicKey(outputLeaf.OwnerPublicKey).
 				SetWithdrawalBondSats(outputLeaf.WithdrawalBondSats).
