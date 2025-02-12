@@ -202,7 +202,7 @@ describe("coop exit", () => {
       );
       // Confirm extra buffer to scan more blocks than needed
       // So that we don't race the chain watcher in this test
-      await faucet.generateToAddress(20, randomAddress);
+      await faucet.generateToAddress(30, randomAddress);
 
       // Claim leaf
       await sspWallet.claimTransfer(receiverTransfer, leavesToClaim);

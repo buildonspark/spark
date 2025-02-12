@@ -1,7 +1,9 @@
 import { secp256k1 } from "@noble/curves/secp256k1";
 import { sha256 } from "@scure/btc-signer/utils";
+import * as fs from "fs";
 import {
   CallOptions,
+  ChannelCredentials,
   ClientMiddlewareCall,
   createChannel,
   createClient,
@@ -30,82 +32,132 @@ export class ConnectionManager {
   static createMockClient(address: string): MockServiceClient & {
     close: () => void;
   } {
-    const channel = createChannel(address);
+    const channel = this.createChannelWithTLS(address);
+
     const client = createClient(MockServiceDefinition, channel);
     return { ...client, close: () => channel.close() };
   }
 
-  async createSparkClient(
-    address: string
-  ): Promise<SparkServiceClient & { close?: () => void }> {
-    const authToken = await this.authenticate(address);
-
-    const middleWare = (
-      call: ClientMiddlewareCall<any, any>,
-      options: CallOptions
-    ) =>
-      call.next(call.request, {
-        ...options,
-        metadata: Metadata(options.metadata).set(
-          "Authorization",
-          `Bearer ${authToken}`
-        ),
-      });
-    if (typeof window === "undefined") {
-      // Node.js environment
-      const channel = createChannel(address);
-      const client = createClientFactory()
-        .use(middleWare)
-        .create(SparkServiceDefinition, channel);
-      return { ...client, close: () => channel.close() };
-    } else {
-      // Browser environment
-      // Channel connection is handled by the browser therefore we don't need to close it
-      const channel = createWebChannel(address);
-      return createWebClientFactory()
-        .use(middleWare)
-        .create(SparkServiceDefinition, channel);
+  // TODO: Web transport handles TLS differently, verify that we don't need to do anything
+  private static createChannelWithTLS(address: string, certPath?: string) {
+    try {
+      if (certPath) {
+        // TODO: Verify that this is the correct way to create a channel with TLS
+        const cert = fs.readFileSync(certPath);
+        return createChannel(address, ChannelCredentials.createSsl(cert));
+      } else {
+        // Fallback to insecure for development
+        return createChannel(
+          address,
+          ChannelCredentials.createSsl(null, null, null, {
+            rejectUnauthorized: false,
+          })
+        );
+      }
+    } catch (error) {
+      console.error("Channel creation error:", error);
+      throw new Error("Failed to create channel");
     }
   }
+
+  async createSparkClient(
+    address: string,
+    certPath?: string
+  ): Promise<SparkServiceClient & { close?: () => void }> {
+    try {
+      const authToken = await this.authenticate(address);
+
+      const middleWare = (
+        call: ClientMiddlewareCall<any, any>,
+        options: CallOptions
+      ) =>
+        call.next(call.request, {
+          ...options,
+          metadata: Metadata(options.metadata).set(
+            "Authorization",
+            `Bearer ${authToken}`
+          ),
+        });
+
+      if (typeof window === "undefined") {
+        const channel = ConnectionManager.createChannelWithTLS(
+          address,
+          certPath
+        );
+
+        const client = createClientFactory()
+          .use(middleWare)
+          .create(SparkServiceDefinition, channel);
+        return { ...client, close: () => channel.close() };
+      } else {
+        const channel = createWebChannel(address);
+        return createWebClientFactory()
+          .use(middleWare)
+          .create(SparkServiceDefinition, channel);
+      }
+    } catch (error) {
+      console.error("Spark client creation error:", error);
+      throw error;
+    }
+  }
+
   private async authenticate(address: string) {
-    const identityPublicKey = this.config.signer.getIdentityPublicKey();
+    try {
+      const identityPublicKey = this.config.signer.getIdentityPublicKey();
+      const sparkAuthnClient = this.createSparkAuthnGrpcConnection(address);
 
-    const sparkAuthnClient = this.createSparkAuthnGrpcConnection(address);
-    const challengeResp = await sparkAuthnClient.get_challenge({
-      publicKey: identityPublicKey,
-    });
+      const challengeResp = await sparkAuthnClient.get_challenge({
+        publicKey: identityPublicKey,
+      });
 
-    const challengeBytes = Challenge.encode(
-      challengeResp.protectedChallenge!.challenge!
-    ).finish();
-    const hash = sha256(challengeBytes);
+      if (!challengeResp.protectedChallenge?.challenge) {
+        throw new Error("Invalid challenge response");
+      }
 
-    const compactSignatureBytes =
-      this.config.signer.signEcdsaWithIdentityPrivateKey(hash);
-    const derSignatureBytes = secp256k1.Signature.fromCompact(
-      compactSignatureBytes
-    ).toDERRawBytes();
+      const challengeBytes = Challenge.encode(
+        challengeResp.protectedChallenge.challenge
+      ).finish();
+      const hash = sha256(challengeBytes);
 
-    const verifyResp = await sparkAuthnClient.verify_challenge({
-      protectedChallenge: challengeResp.protectedChallenge,
-      signature: derSignatureBytes,
-      publicKey: identityPublicKey,
-    });
-    sparkAuthnClient.close?.();
+      const compactSignatureBytes =
+        this.config.signer.signEcdsaWithIdentityPrivateKey(hash);
+      const derSignatureBytes = secp256k1.Signature.fromCompact(
+        compactSignatureBytes
+      ).toDERRawBytes();
 
-    return verifyResp.sessionToken;
+      const verifyResp = await sparkAuthnClient.verify_challenge({
+        protectedChallenge: challengeResp.protectedChallenge,
+        signature: derSignatureBytes,
+        publicKey: identityPublicKey,
+      });
+
+      sparkAuthnClient.close?.();
+      return verifyResp.sessionToken;
+    } catch (error: any) {
+      console.error("Authentication error:", error);
+      throw new Error(`Authentication failed: ${error.message}`);
+    }
   }
 
   private createSparkAuthnGrpcConnection(
-    address: string
+    address: string,
+    certPath?: string
   ): SparkAuthnServiceClient & { close?: () => void } {
-    if (typeof window === "undefined") {
-      const channel = createChannel(address);
-      const client = createClient(SparkAuthnServiceDefinition, channel);
-      return { ...client, close: () => channel.close() };
-    } else {
-      const channel = createWebChannel(address);
-      return createWebClient(SparkAuthnServiceDefinition, channel);
+    try {
+      if (typeof window === "undefined") {
+        const channel = ConnectionManager.createChannelWithTLS(
+          address,
+          certPath
+        );
+        const client = createClient(SparkAuthnServiceDefinition, channel);
+        return { ...client, close: () => channel.close() };
+      } else {
+        const channel = createWebChannel(address);
+        return createWebClient(SparkAuthnServiceDefinition, channel);
+      }
+    } catch (error) {
+      console.error("Authn client creation error:", error);
+      throw error;
     }
   }
 }
