@@ -37,7 +37,7 @@ export type CreationNodeWithNonces = CreationNode & {
   refundTxSigningCommitment?: SigningCommitment | undefined;
 };
 
-const INITIAL_TIME_LOCK = 200;
+const INITIAL_TIME_LOCK = 2000;
 
 export class TreeCreationService {
   private readonly config: WalletConfigService;

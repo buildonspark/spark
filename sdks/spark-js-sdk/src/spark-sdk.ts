@@ -340,6 +340,17 @@ export class SparkWallet {
     return await this.transferService!.claimTransfer(transfer, leaves);
   }
 
+  async getLeaves(): Promise<TreeNode[]> {
+    const sparkClient = await this.connectionManager.createSparkClient(
+      this.config.getCoordinatorAddress()
+    );
+    const leaves = await sparkClient.get_tree_nodes_by_public_key({
+      ownerIdentityPubkey: this.config.signer.getIdentityPublicKey(),
+    });
+    sparkClient.close?.();
+    return leaves.nodes;
+  }
+
   async verifyPendingTransfer(
     transfer: Transfer
   ): Promise<Map<string, Uint8Array>> {

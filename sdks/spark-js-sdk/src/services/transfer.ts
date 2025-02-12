@@ -754,7 +754,7 @@ export class TransferService extends BaseTransferService {
       this.config.getCoordinatorAddress()
     );
     try {
-      await sparkClient.finalize_node_signatures({
+      return await sparkClient.finalize_node_signatures({
         intent: SignatureIntent.TRANSFER,
         nodeSignatures,
       });

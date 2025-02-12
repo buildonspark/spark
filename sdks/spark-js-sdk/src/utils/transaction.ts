@@ -47,6 +47,10 @@ export function createRefundTx(
   return { refundTx: newRefundTx, sighash };
 }
 
-export function getNextTransactionSequence(currentSequence?: number) {
-  return (1 << 30) | ((currentSequence || 0) & (0xffff - TIME_LOCK_INTERVAL));
+export function getNextTransactionSequence(currSequence?: number): number {
+  const currentTimelock = (currSequence || 0) & 0xffff;
+  if (currentTimelock - TIME_LOCK_INTERVAL <= 0) {
+    throw new Error("timelock interval is less or equal to 0");
+  }
+  return (1 << 30) | (currentTimelock - TIME_LOCK_INTERVAL);
 }

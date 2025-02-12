@@ -1,9 +1,9 @@
-import { bytesToHex } from "@noble/curves/abstract/utils";
-import { ConnectionManager } from "../services/connection";
+import { secp256k1 } from "@noble/curves/secp256k1";
+import { Address, OutScript, Transaction } from "@scure/btc-signer";
 import { SparkWallet } from "../spark-sdk";
-import { getTxFromRawTxBytes, getTxId } from "../utils/bitcoin";
-import { Network } from "../utils/network";
-import { createDummyTx } from "../utils/wasm";
+import { getP2TRAddressFromPublicKey, getTxId } from "../utils/bitcoin";
+import { getNetwork, Network } from "../utils/network";
+import { BitcoinFaucet } from "./utils/test-faucet";
 
 describe("deposit", () => {
   // Skip all tests if running in GitHub Actions
@@ -28,15 +28,18 @@ describe("deposit", () => {
   testFn(
     "should create a tree root",
     async () => {
+      const faucet = new BitcoinFaucet(
+        "http://127.0.0.1:18443",
+        "admin1",
+        "123"
+      );
+
+      const coin = await faucet.fund();
+
       const sdk = new SparkWallet(Network.REGTEST);
       const mnemonic = sdk.generateMnemonic();
       await sdk.createSparkWallet(mnemonic);
       const config = sdk.getConfig();
-
-      // Setup mock connection
-      const mockClient = ConnectionManager.createMockClient(
-        config.signingOperators[config.coodinatorIdentifier].address
-      );
 
       // Generate private/public key pair
       const pubKey = sdk.getSigner().generatePublicKey();
@@ -47,13 +50,17 @@ describe("deposit", () => {
         throw new Error("deposit address not found");
       }
 
-      const dummyTx = createDummyTx({
-        address: depositResp.depositAddress.address,
-        amountSats: 100_000n,
-      });
+      const addr = Address(getNetwork(Network.REGTEST)).decode(
+        depositResp.depositAddress.address
+      );
+      const script = OutScript.encode(addr);
 
-      const depositTxHex = bytesToHex(dummyTx.tx);
-      const depositTx = getTxFromRawTxBytes(dummyTx.tx);
+      const depositTx = new Transaction();
+      depositTx.addInput(coin.outpoint);
+      depositTx.addOutput({
+        script,
+        amount: 100_000n,
+      });
 
       const vout = 0;
       const txid = getTxId(depositTx);
@@ -62,10 +69,22 @@ describe("deposit", () => {
       }
 
       // Set mock transaction
-      await mockClient.set_mock_onchain_tx({
-        txid,
-        tx: depositTxHex,
-      });
+      const signedTx = await faucet.signFaucetCoin(
+        depositTx,
+        coin.txout,
+        coin.key
+      );
+
+      await faucet.broadcastTx(signedTx.hex);
+
+      const randomPrivKey = secp256k1.utils.randomPrivateKey();
+      const randomPubKey = secp256k1.getPublicKey(randomPrivKey);
+      const randomAddr = getP2TRAddressFromPublicKey(
+        randomPubKey,
+        Network.REGTEST
+      );
+
+      await faucet.generateToAddress(1, randomAddr);
 
       // Create tree root
       const treeResp = await sdk.createTreeRoot(
@@ -76,8 +95,6 @@ describe("deposit", () => {
       );
 
       console.log("tree created:", treeResp);
-
-      mockClient.close();
     },
     30000
   );
