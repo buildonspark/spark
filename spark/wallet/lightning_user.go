@@ -15,7 +15,7 @@ import (
 
 // LightningInvoiceCreator is an interface that can be used to create a Lightning invoice.
 type LightningInvoiceCreator interface {
-	CreateInvoice(amountSats uint64, paymentHash []byte, memo string) (*string, error)
+	CreateInvoice(bitcoinNetwork common.Network, amountSats uint64, paymentHash []byte, memo string, expirySecs int) (*string, int64, error)
 }
 
 func CreateLightningInvoiceWithPreimage(
@@ -25,17 +25,17 @@ func CreateLightningInvoiceWithPreimage(
 	amountSats uint64,
 	memo string,
 	preimage []byte,
-) (*string, error) {
+) (*string, int64, error) {
 	paymentHash := sha256.Sum256(preimage)
-	invoice, err := creator.CreateInvoice(amountSats, paymentHash[:], memo)
+	invoice, fees, err := creator.CreateInvoice(config.Network, amountSats, paymentHash[:], memo, 60*60*24*30)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	preimageAsInt := new(big.Int).SetBytes(preimage)
 	shares, err := secretsharing.SplitSecretWithProofs(preimageAsInt, secp256k1.Params().N, config.Threshold, len(config.SigningOperators))
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	wg := sync.WaitGroup{}
@@ -76,17 +76,17 @@ func CreateLightningInvoiceWithPreimage(
 	close(results)
 	for err := range results {
 		if err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 	}
-	return invoice, nil
+	return invoice, fees, nil
 }
 
 // CreateLightningInvoice creates a Lightning invoice and sends the preimage shares to the signing operators.
-func CreateLightningInvoice(ctx context.Context, config *Config, creator LightningInvoiceCreator, amountSats uint64, memo string) (*string, error) {
+func CreateLightningInvoice(ctx context.Context, config *Config, creator LightningInvoiceCreator, amountSats uint64, memo string) (*string, int64, error) {
 	preimagePrivKey, err := secp256k1.GeneratePrivateKey()
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	preimage := preimagePrivKey.Serialize()

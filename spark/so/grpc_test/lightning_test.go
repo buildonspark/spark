@@ -21,9 +21,9 @@ type FakeLightningInvoiceCreator struct{}
 
 // CreateInvoice is a fake implementation of the LightningInvoiceCreator interface.
 // It returns a fake invoice string.
-func (f *FakeLightningInvoiceCreator) CreateInvoice(_ uint64, _ []byte, _ string) (*string, error) {
+func (f *FakeLightningInvoiceCreator) CreateInvoice(_ common.Network, _ uint64, _ []byte, _ string, _ int) (*string, int64, error) {
 	invoice := "lnbcrt123450n1pnj6uf4pp5l26hsdxssmr52vd4xmn5xran7puzx34hpr6uevaq7ta0ayzrp8esdqqcqzpgxqyz5vqrzjqtr2vd60g57hu63rdqk87u3clac6jlfhej4kldrrjvfcw3mphcw8sqqqqzp3jlj6zyqqqqqqqqqqqqqq9qsp5w22fd8aqn7sdum7hxdf59ptgk322fkv589ejxjltngvgehlcqcyq9qxpqysgqvykwsxdx64qrj0s5pgcgygmrpj8w25jsjgltwn09yp24l9nvghe3dl3y0ycy70ksrlqmcn42hxn24e0ucuy3g9fjltudvhv4lrhhamgq3stqgp"
-	return &invoice, nil
+	return &invoice, 100, nil
 }
 
 func cleanUp(t *testing.T, config *wallet.Config, paymentHash []byte) {
@@ -57,7 +57,7 @@ func TestCreateLightningInvoice(t *testing.T) {
 	}
 	paymentHash := sha256.Sum256(preimage)
 
-	invoice, err := wallet.CreateLightningInvoiceWithPreimage(context.Background(), config, fakeInvoiceCreator, 100, "test", preimage)
+	invoice, _, err := wallet.CreateLightningInvoiceWithPreimage(context.Background(), config, fakeInvoiceCreator, 100, "test", preimage)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -88,7 +88,7 @@ func TestReceiveLightningPayment(t *testing.T) {
 
 	defer cleanUp(t, userConfig, paymentHash[:])
 
-	invoice, err := wallet.CreateLightningInvoiceWithPreimage(context.Background(), userConfig, fakeInvoiceCreator, 100, "test", preimage)
+	invoice, _, err := wallet.CreateLightningInvoiceWithPreimage(context.Background(), userConfig, fakeInvoiceCreator, 100, "test", preimage)
 	if err != nil {
 		t.Fatal(err)
 	}

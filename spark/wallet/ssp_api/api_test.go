@@ -2,7 +2,6 @@ package sspapi
 
 import (
 	"crypto/sha256"
-	"encoding/hex"
 	"testing"
 
 	"github.com/decred/dcrd/dcrec/secp256k1"
@@ -10,7 +9,8 @@ import (
 )
 
 func TestCreateInvoice(t *testing.T) {
-	identityPublicKey, err := hex.DecodeString("03bead4a092468d96dee7723cc8f18c52b194a14a3a3cf722ef99d7b518c4cf236")
+	identityPublicKeyString := "03bead4a092468d96dee7723cc8f18c52b194a14a3a3cf722ef99d7b518c4cf236"
+	requester, err := NewRequesterWithBaseURL(identityPublicKeyString, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -21,7 +21,9 @@ func TestCreateInvoice(t *testing.T) {
 	}
 	paymentHash := sha256.Sum256(preimage.Serialize())
 
-	invoice, fees, err := CreateInvoice(identityPublicKey, common.Regtest, 1000, paymentHash[:], "test", 600)
+	api := NewSparkServiceAPI(requester)
+
+	invoice, fees, err := api.CreateInvoice(common.Regtest, 1000, paymentHash[:], "test", 600)
 	if err != nil {
 		t.Fatal(err)
 	}

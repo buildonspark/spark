@@ -7,20 +7,23 @@ import (
 	"github.com/lightsparkdev/spark-go/common"
 )
 
-func CreateInvoice(
-	identityPublicKey []byte,
+type SparkServiceAPI struct {
+	Requester *Requester
+}
+
+func NewSparkServiceAPI(requester *Requester) *SparkServiceAPI {
+	return &SparkServiceAPI{
+		Requester: requester,
+	}
+}
+
+func (s *SparkServiceAPI) CreateInvoice(
 	bitcoinNetwork common.Network,
-	amountSats int64,
+	amountSats uint64,
 	paymentHash []byte,
 	memo string,
 	expirySecs int,
 ) (*string, int64, error) {
-	identityPublicKeyString := hex.EncodeToString(identityPublicKey)
-	requester, err := NewRequesterWithBaseURL(identityPublicKeyString, nil)
-	if err != nil {
-		return nil, 0, err
-	}
-
 	variables := map[string]interface{}{
 		"network":      bitcoinNetwork.String(),
 		"amount_sats":  amountSats,
@@ -29,7 +32,7 @@ func CreateInvoice(
 		"expiry_secs":  expirySecs,
 	}
 
-	response, err := requester.ExecuteGraphqlWithContext(context.Background(), RequestLightningReceiveMutation, variables)
+	response, err := s.Requester.ExecuteGraphqlWithContext(context.Background(), RequestLightningReceiveMutation, variables)
 	if err != nil {
 		return nil, 0, err
 	}
