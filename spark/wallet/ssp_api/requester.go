@@ -93,7 +93,7 @@ func ValidateBaseURL(baseURL string) error {
 	return nil
 }
 
-const DefaultBaseURL = "https://api.lightspark.com/graphql/spark/rc"
+const DefaultBaseURL = "https://api.dev.dev.sparkinfra.net/graphql/spark/rc"
 
 func (r *Requester) ExecuteGraphqlWithContext(ctx context.Context, query string, variables map[string]interface{}) (map[string]interface{}, error) {
 	re := regexp.MustCompile(`(?i)\s*(?:query|mutation)\s+(?P<OperationName>\w+)`)
