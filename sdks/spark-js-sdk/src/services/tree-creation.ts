@@ -1,6 +1,5 @@
 import { Address, OutScript, Transaction } from "@scure/btc-signer";
 import { sha256 } from "@scure/btc-signer/utils";
-import { SigningCommitment } from "signer/signer";
 import {
   AddressNode,
   AddressRequestNode,
@@ -15,6 +14,7 @@ import {
   SigningJob,
   TreeNode,
 } from "../proto/spark";
+import { SigningCommitment } from "../signer/signer";
 import {
   getP2TRAddressFromPublicKey,
   getSigHashFromTx,
@@ -234,7 +234,7 @@ export class TreeCreationService {
   private createAddressRequestNodeFromTreeNodes(
     treeNodes: DepositAddressTree[]
   ): AddressRequestNode[] {
-    const results = [];
+    const results: AddressRequestNode[] = [];
     for (const node of treeNodes) {
       const result: AddressRequestNode = {
         userPublicKey: node.signingPublicKey,

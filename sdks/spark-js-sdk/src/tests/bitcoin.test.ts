@@ -1,3 +1,4 @@
+import { describe, expect, it } from "@jest/globals";
 import { bytesToHex, hexToBytes } from "@noble/curves/abstract/utils";
 import { Transaction } from "@scure/btc-signer";
 import {

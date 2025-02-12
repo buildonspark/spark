@@ -8,6 +8,7 @@ import { Transaction } from "@scure/btc-signer";
 import { sha256 } from "@scure/btc-signer/utils";
 import { randomUUID } from "crypto";
 import * as ecies from "eciesjs";
+import { SignatureIntent } from "../proto/common";
 import {
   ClaimLeafKeyTweak,
   ClaimTransferSignRefundsResponse,
@@ -21,9 +22,8 @@ import {
   StartSendTransferResponse,
   Transfer,
   TreeNode,
-} from "proto/spark";
-import { SigningCommitment } from "signer/signer";
-import { SignatureIntent } from "../proto/common";
+} from "../proto/spark";
+import { SigningCommitment } from "../signer/signer";
 import { getSigHashFromTx, getTxFromRawTxBytes } from "../utils/bitcoin";
 import { VerifiableSecretShare } from "../utils/secret-sharing";
 import { createRefundTx } from "../utils/transaction";

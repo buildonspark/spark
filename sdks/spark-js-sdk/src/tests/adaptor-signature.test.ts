@@ -1,3 +1,4 @@
+import { describe, expect, it } from "@jest/globals";
 import { schnorr, secp256k1 } from "@noble/curves/secp256k1";
 import { sha256 } from "@scure/btc-signer/utils";
 import { SparkWallet } from "../spark-sdk";

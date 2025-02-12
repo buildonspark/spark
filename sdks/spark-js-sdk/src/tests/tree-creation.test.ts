@@ -1,3 +1,4 @@
+import { describe, expect, it } from "@jest/globals";
 import { bytesToHex } from "@noble/curves/abstract/utils";
 import { ConnectionManager } from "../services/connection";
 import { SparkWallet } from "../spark-sdk";

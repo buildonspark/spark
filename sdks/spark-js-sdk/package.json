@@ -4,7 +4,7 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "build": "tsc && copyfiles -u 1 'src/wasm/**/*' dist/src/",
+    "build": "tsc && copyfiles -u 1 'src/wasm/**/*.wasm' dist/",
     "prepare": "npm run build",
     "build:watch": "yarn build --watch --clean=false",
     "clean": "rm -rf dist",

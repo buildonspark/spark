@@ -1,3 +1,4 @@
+import { describe, expect, it } from "@jest/globals";
 import { hexToBytes } from "@noble/curves/abstract/utils";
 import { secp256k1 } from "@noble/curves/secp256k1";
 import { Address, OutScript, Transaction } from "@scure/btc-signer";
@@ -178,7 +179,7 @@ describe("coop exit", () => {
 
       let hasError = false;
       try {
-        await sspWallet.claimTransfer(receiverTransfer, leavesToClaim);
+        await sspWallet._claimTransfer(receiverTransfer, leavesToClaim);
       } catch (e) {
         hasError = true;
       }
@@ -205,7 +206,7 @@ describe("coop exit", () => {
       await faucet.generateToAddress(30, randomAddress);
 
       // Claim leaf
-      await sspWallet.claimTransfer(receiverTransfer, leavesToClaim);
+      await sspWallet._claimTransfer(receiverTransfer, leavesToClaim);
     },
     30000
   );

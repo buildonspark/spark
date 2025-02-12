@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "noEmit": true,
+    "noEmit": false,
     "target": "ES2022",
     "module": "ES2022",
     "allowJs": true,
@@ -8,20 +8,21 @@
     "sourceMap": true,
     "outDir": "dist",
     "strict": true,
-    "noImplicitAny": true,
     "strictNullChecks": true,
     "noImplicitReturns": true,
-    "baseUrl": "./src",
-    "moduleResolution": "bundler",
+    "moduleResolution": "node",
     "types": ["node", "jest"],
     "resolveJsonModule": true,
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "exactOptionalPropertyTypes": true,
-    "allowImportingTsExtensions": true
+
+    "exactOptionalPropertyTypes": false,
+    /* Allow implicit any due to generated files. TODO look into resolving
+         implicit any for generated files or move them out of the type checks */
+    "noImplicitAny": false
   },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist"]
+  "include": ["src"],
+  "exclude": ["node_modules", "dist", "**/tests/*", "**/examples/*"]
 }

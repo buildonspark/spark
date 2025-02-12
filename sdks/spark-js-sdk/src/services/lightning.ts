@@ -24,7 +24,7 @@ export type CreateLightningInvoiceParams = {
     amountSats: number,
     paymentHash: Uint8Array,
     memo: string
-  ) => Promise<string>;
+  ) => Promise<string | undefined>;
   amountSats: number;
   memo: string;
 };
@@ -75,10 +75,13 @@ export class LightningService {
   }: CreateLightningInvoiceWithPreimageParams): Promise<string> {
     const paymentHash = sha256(preimage);
     const invoice = await invoiceCreator(amountSats, paymentHash, memo);
+    if (!invoice) {
+      throw new Error("Error creating lightning invoice");
+    }
 
     const shares = this.config.signer.splitSecretWithProofs({
       secret: preimage,
-      isSecretPubkey: false,
+      isSecretPubkey: true,
       curveOrder: secp256k1.CURVE.n,
       threshold: this.config.getConfig().threshold,
       numShares: Object.keys(this.config.getConfig().signingOperators).length,

@@ -23,14 +23,17 @@ import {
   SignFrostParams,
 } from "./utils/wasm";
 
-import { DefaultCrypto, NodeKeyCache, Requester } from "@lightsparkdev/core";
+import { bytesToHex } from "@noble/curves/abstract/utils";
 import { sha256 } from "@scure/btc-signer/utils";
+import SspClient from "./graphql/client";
+import { BitcoinNetwork } from "./graphql/objects";
 import { CoopExitService } from "./services/coop-exit";
 import { LightningService } from "./services/lightning";
 import { SparkSigner } from "./signer/signer";
 import { getP2TRAddressFromPublicKey } from "./utils/bitcoin";
 import { selectLeaves } from "./utils/leaf-selection";
 import { Network } from "./utils/network";
+
 type CreateLightningInvoiceParams = {
   amountSats: number;
   expirySeconds: number;
@@ -41,7 +44,6 @@ export class SparkWallet {
   private config: WalletConfigService;
 
   private connectionManager: ConnectionManager;
-  private requester: Requester;
 
   private depositService: DepositService;
   private transferService: TransferService;
@@ -49,18 +51,13 @@ export class SparkWallet {
   private lightningService: LightningService;
   private coopExitService: CoopExitService;
 
+  private sspClient: SspClient | null = null;
   private wasmModule: InitOutput | null = null;
 
   private leaves: TreeNode[] = [];
 
   constructor(network: Network, signer?: SparkSigner) {
     this.config = new WalletConfigService(network, signer);
-
-    this.requester = new Requester(
-      new NodeKeyCache(DefaultCrypto),
-      this.config.getCoordinatorAddress(),
-      ""
-    );
 
     this.connectionManager = new ConnectionManager(this.config);
 
@@ -141,12 +138,18 @@ export class SparkWallet {
   // TODO: Update to use config based on options
   async createSparkWallet(mnemonic: string): Promise<string> {
     await this.initWasm();
-    return this.config.signer.createSparkWalletFromMnemonic(mnemonic);
+    const identityPublicKey =
+      await this.config.signer.createSparkWalletFromMnemonic(mnemonic);
+    this.sspClient = new SspClient(identityPublicKey);
+    return identityPublicKey;
   }
 
   async createSparkWalletFromSeed(seed: Uint8Array | string): Promise<string> {
     await this.initWasm();
-    return this.config.signer.createSparkWalletFromSeed(seed);
+    const identityPublicKey =
+      this.config.signer.createSparkWalletFromSeed(seed);
+    this.sspClient = new SspClient(identityPublicKey);
+    return identityPublicKey;
   }
 
   // Lightning
@@ -157,10 +160,30 @@ export class SparkWallet {
     // TODO: This should default to lightspark ssp
     invoiceCreator = () => Promise.resolve(""),
   }: CreateLightningInvoiceParams) {
+    if (!this.sspClient) {
+      throw new Error("SSP client not initialized");
+    }
+
+    const requestLightningInvoice = async (
+      amountSats: number,
+      paymentHash: Uint8Array,
+      memo: string
+    ) =>
+      (
+        await this.sspClient!.requestLightningReceive({
+          amountSats,
+          // TODO: Map config network to ssp network
+          network: BitcoinNetwork.REGTEST,
+          paymentHash: bytesToHex(paymentHash),
+          expirySecs: expirySeconds,
+          memo,
+        })
+      )?.invoice.encodedEnvoice;
+
     return this.lightningService!.createLightningInvoice({
       amountSats,
       memo,
-      invoiceCreator,
+      invoiceCreator: requestLightningInvoice,
     });
   }
 
@@ -176,7 +199,7 @@ export class SparkWallet {
     this.leaves = leaves;
   }
 
-  async _sendTransfer(
+  async sendTransfer(
     amount: number,
     receiverPubKey: Uint8Array,
     expiryTime: Date = new Date(Date.now() + 10 * 60 * 1000)
@@ -203,7 +226,7 @@ export class SparkWallet {
     return await this.transferService.queryPendingTransfers();
   }
 
-  async _claimTransfer(transfer: Transfer) {
+  async claimTransfer(transfer: Transfer) {
     const leafPubKeyMap = await this.transferService.verifyPendingTransfer(
       transfer
     );
@@ -232,7 +255,7 @@ export class SparkWallet {
   async claimTransfers() {
     const transfers = await this.queryPendingTransfers();
     for (const transfer of transfers.transfers) {
-      await this._claimTransfer(transfer);
+      await this.claimTransfer(transfer);
     }
   }
 
@@ -324,7 +347,8 @@ export class SparkWallet {
     throw new Error("Not implemented");
   }
 
-  async sendTransfer(
+  // TODO: Remove this
+  async _sendTransfer(
     leaves: LeafKeyTweak[],
     receiverIdentityPubkey: Uint8Array,
     expiryTime: Date
@@ -336,7 +360,8 @@ export class SparkWallet {
     );
   }
 
-  async claimTransfer(transfer: Transfer, leaves: LeafKeyTweak[]) {
+  // TODO: Remove this
+  async _claimTransfer(transfer: Transfer, leaves: LeafKeyTweak[]) {
     return await this.transferService!.claimTransfer(transfer, leaves);
   }
 

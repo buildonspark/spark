@@ -1,7 +1,7 @@
 // Copyright ©, 2023-present, Lightspark Group, Inc. - All Rights Reserved
 
 import autoBind from "auto-bind";
-import LightsparkClient from "../client";
+import SspClient from "../client";
 import CurrencyAmount, {
   CurrencyAmountFromJson,
   CurrencyAmountToJson,
@@ -22,7 +22,7 @@ class Transfer {
   }
 
   public async getLeaves(
-    client: LightsparkClient,
+    client: SspClient,
     first: number | undefined = undefined,
     after: string | undefined = undefined
   ): Promise<SparkTransferToLeavesConnection> {

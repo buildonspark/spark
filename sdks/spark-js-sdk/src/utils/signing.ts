@@ -1,5 +1,5 @@
 import { secp256k1 } from "@noble/curves/secp256k1";
-import { SigningCommitment, SigningNonce } from "signer/signer";
+import { SigningCommitment, SigningNonce } from "../signer/signer";
 import {
   SigningCommitment as WasmSigningCommitment,
   SigningNonce as WasmSigningNonce,

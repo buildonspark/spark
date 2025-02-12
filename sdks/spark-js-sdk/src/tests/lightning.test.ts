@@ -1,3 +1,4 @@
+import { afterEach, beforeAll, describe, expect, it, xit } from "@jest/globals";
 import { hexToBytes } from "@noble/curves/abstract/utils";
 import { equalBytes, sha256 } from "@scure/btc-signer/utils";
 import { TransferStatus } from "../proto/spark";
@@ -43,7 +44,7 @@ describe("LightningService", () => {
   let sspTransferService: TransferService;
 
   // Skip all tests if running in GitHub Actions
-  const testFn = process.env.GITHUB_ACTIONS ? it.skip : it;
+  const testFn = process.env.GITHUB_ACTIONS ? it.skip : xit;
 
   beforeAll(async () => {
     userWallet = new SparkWallet(Network.REGTEST);

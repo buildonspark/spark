@@ -1,3 +1,4 @@
+import { describe, expect, it, xit } from "@jest/globals";
 import { bytesToHex, hexToBytes } from "@noble/curves/abstract/utils";
 import { sha256 } from "@scure/btc-signer/utils";
 import { SparkWallet } from "../spark-sdk";
@@ -44,7 +45,7 @@ describe("Transfer", () => {
         newSigningPubKey: newLeafPubKey,
       };
 
-      const senderTransfer = await senderWallet.sendTransfer(
+      const senderTransfer = await senderWallet._sendTransfer(
         [transferNode],
         hexToBytes(receiverPubkey),
         new Date(Date.now() + 10 * 60 * 1000)
@@ -78,7 +79,7 @@ describe("Transfer", () => {
         newSigningPubKey: finalLeafPubKey,
       };
 
-      await receiverWallet.claimTransfer(receiverTransfer, [claimingNode]);
+      await receiverWallet._claimTransfer(receiverTransfer, [claimingNode]);
 
       const nodes = await receiverWallet.getLeaves();
       await receiverWallet.setLeaves(nodes);
@@ -89,12 +90,12 @@ describe("Transfer", () => {
         newReceiverMnemonic
       );
 
-      await receiverWallet._sendTransfer(1000, hexToBytes(newReceiverPubkey));
+      await receiverWallet.sendTransfer(1000, hexToBytes(newReceiverPubkey));
 
       const newPendingTransfer =
         await newReceiverWallet.queryPendingTransfers();
 
-      await newReceiverWallet._claimTransfer(newPendingTransfer.transfers[0]);
+      await newReceiverWallet.claimTransfer(newPendingTransfer.transfers[0]);
     },
     30000
   );
@@ -122,10 +123,10 @@ describe("Transfer", () => {
 
     await senderWallet.setLeaves([rootNode]);
 
-    await senderWallet._sendTransfer(1000, hexToBytes(receiverPubkey));
+    await senderWallet.sendTransfer(1000, hexToBytes(receiverPubkey));
 
     const pendingTransfer = await receiverWallet.queryPendingTransfers();
 
-    await receiverWallet._claimTransfer(pendingTransfer.transfers[0]);
-  }, 30000);
+    await receiverWallet.claimTransfer(pendingTransfer.transfers[0]);
+  });
 });

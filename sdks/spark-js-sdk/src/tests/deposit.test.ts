@@ -1,3 +1,4 @@
+import { describe, expect, it } from "@jest/globals";
 import { secp256k1 } from "@noble/curves/secp256k1";
 import { Address, OutScript, Transaction } from "@scure/btc-signer";
 import { SparkWallet } from "../spark-sdk";
@@ -12,8 +13,9 @@ describe("deposit", () => {
   testFn(
     "should generate a deposit address",
     async () => {
+      const mnemonic =
+        "olive hawk cabbage obvious future great grass reunion plunge cereal rate canyon";
       const sdk = new SparkWallet(Network.REGTEST);
-      const mnemonic = sdk.generateMnemonic();
       await sdk.createSparkWallet(mnemonic);
 
       const pubKey = sdk.getSigner().generatePublicKey();
