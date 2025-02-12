@@ -23,6 +23,7 @@ import {
   SignFrostParams,
 } from "./utils/wasm";
 
+import { DefaultCrypto, NodeKeyCache, Requester } from "@lightsparkdev/core";
 import { sha256 } from "@scure/btc-signer/utils";
 import { CoopExitService } from "./services/coop-exit";
 import { LightningService } from "./services/lightning";
@@ -30,7 +31,6 @@ import { SparkSigner } from "./signer/signer";
 import { getP2TRAddressFromPublicKey } from "./utils/bitcoin";
 import { selectLeaves } from "./utils/leaf-selection";
 import { Network } from "./utils/network";
-
 type CreateLightningInvoiceParams = {
   amountSats: number;
   expirySeconds: number;
@@ -41,17 +41,26 @@ export class SparkWallet {
   private config: WalletConfigService;
 
   private connectionManager: ConnectionManager;
+  private requester: Requester;
+
   private depositService: DepositService;
   private transferService: TransferService;
   private treeCreationService: TreeCreationService;
   private lightningService: LightningService;
   private coopExitService: CoopExitService;
+
   private wasmModule: InitOutput | null = null;
 
   private leaves: TreeNode[] = [];
 
   constructor(network: Network, signer?: SparkSigner) {
     this.config = new WalletConfigService(network, signer);
+
+    this.requester = new Requester(
+      new NodeKeyCache(DefaultCrypto),
+      this.config.getCoordinatorAddress(),
+      ""
+    );
 
     this.connectionManager = new ConnectionManager(this.config);
 
