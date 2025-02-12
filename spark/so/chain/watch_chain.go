@@ -151,7 +151,9 @@ func WatchChain(dbClient *ent.Client, cfg so.BitcoindConfig) error {
 	// Load the latest scanned block height
 	ctx := context.Background()
 	entNetwork := common.SchemaNetwork(network)
-	entBlockHeight, err := dbClient.BlockHeight.Query().Where(blockheight.NetworkEQ(schema.NetworkRegtest)).Only(ctx)
+	entBlockHeight, err := dbClient.BlockHeight.Query().
+		Where(blockheight.NetworkEQ(entNetwork)).
+		Only(ctx)
 	if ent.IsNotFound(err) {
 		startHeight := max(0, latestBlockHeight-6)
 		entBlockHeight, err = dbClient.BlockHeight.Create().SetHeight(startHeight).SetNetwork(entNetwork).Save(ctx)
