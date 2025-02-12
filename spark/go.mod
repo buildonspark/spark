@@ -30,6 +30,8 @@ require (
 
 require (
 	ariga.io/atlas v0.19.1-0.20240203083654-5948b60a8e43 // indirect
+	github.com/FactomProject/basen v0.0.0-20150613233007-fe3947df716e // indirect
+	github.com/FactomProject/btcutilecc v0.0.0-20130527213604-d3a63a5752ec // indirect
 	github.com/aead/chacha20 v0.0.0-20180709150244-8b13a72661da // indirect
 	github.com/aead/siphash v1.0.1 // indirect
 	github.com/agext/levenshtein v1.2.1 // indirect
@@ -111,6 +113,7 @@ require (
 	github.com/decred/dcrd/dcrec/secp256k1 v1.0.4
 	github.com/go-co-op/gocron/v2 v2.14.2
 	github.com/go-playground/assert/v2 v2.2.0
+	github.com/tyler-smith/go-bip32 v1.0.0
 	golang.org/x/net v0.34.0 // indirect
 	golang.org/x/sys v0.29.0 // indirect
 	golang.org/x/text v0.21.0 // indirect

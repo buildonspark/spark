@@ -3,53 +3,12 @@ package testutil
 import (
 	"encoding/hex"
 	"fmt"
-	"os"
-	"strconv"
-	"strings"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lightsparkdev/spark-go/common"
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/wallet"
 )
-
-func findLatestRun(dirPath string) (int, error) {
-	entries, err := os.ReadDir(dirPath)
-	if err != nil {
-		return 0, fmt.Errorf("failed to read directory: %w", err)
-	}
-
-	maxNum := -1
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
-		}
-
-		name := entry.Name()
-		// Check if name matches pattern "run_x"
-		if !strings.HasPrefix(name, "run_") {
-			continue
-		}
-
-		// Extract number after "run_"
-		numStr := strings.TrimPrefix(name, "run_")
-		num, err := strconv.Atoi(numStr)
-		if err != nil {
-			// Skip if number parsing fails
-			continue
-		}
-
-		if num > maxNum {
-			maxNum = num
-		}
-	}
-
-	if maxNum == -1 {
-		return 0, fmt.Errorf("no run_x folders found")
-	}
-
-	return maxNum, nil
-}
 
 // GetAllSigningOperators returns all signing operator configurations.
 func GetAllSigningOperators() (map[string]*so.SigningOperator, error) {
@@ -104,6 +63,44 @@ func GetAllSigningOperators() (map[string]*so.SigningOperator, error) {
 	}, nil
 }
 
+func GetAllSigningOperatorsDeployed() (map[string]*so.SigningOperator, error) {
+	pubkeys := []string{
+		"03acd9a5a88db102730ff83dee69d69088cc4c9d93bbee893e90fd5051b7da9651",
+		"02d2d103cacb1d6355efeab27637c74484e2a7459e49110c3fe885210369782e23",
+		"0350f07ffc21bfd59d31e0a7a600e2995273938444447cb9bc4c75b8a895dbb853",
+	}
+
+	pubkeyBytesArray := make([][]byte, len(pubkeys))
+	for i, pubkey := range pubkeys {
+		pubkeyBytes, err := hex.DecodeString(pubkey)
+		if err != nil {
+			return nil, err
+		}
+		pubkeyBytesArray[i] = pubkeyBytes
+	}
+
+	return map[string]*so.SigningOperator{
+		"0000000000000000000000000000000000000000000000000000000000000001": {
+			ID:                0,
+			Identifier:        "0000000000000000000000000000000000000000000000000000000000000001",
+			Address:           "dns:///spark-0.dev.dev.sparkinfra.net",
+			IdentityPublicKey: pubkeyBytesArray[0],
+		},
+		"0000000000000000000000000000000000000000000000000000000000000002": {
+			ID:                1,
+			Identifier:        "0000000000000000000000000000000000000000000000000000000000000002",
+			Address:           "dns:///spark-1.dev.dev.sparkinfra.net",
+			IdentityPublicKey: pubkeyBytesArray[1],
+		},
+		"0000000000000000000000000000000000000000000000000000000000000003": {
+			ID:                2,
+			Identifier:        "0000000000000000000000000000000000000000000000000000000000000003",
+			Address:           "dns:///spark-2.dev.dev.sparkinfra.net",
+			IdentityPublicKey: pubkeyBytesArray[2],
+		},
+	}, nil
+}
+
 // TestConfig returns a test configuration that can be used for testing.
 func TestConfig() (*so.Config, error) {
 	identityPrivateKeyBytes, err := hex.DecodeString("5eaae81bcf1fd43fbb92432b82dbafc8273bb3287b42cb4cf3c851fcee2212a5")
@@ -149,5 +146,24 @@ func TestWalletConfigWithIdentityKey(identityPrivKey secp256k1.PrivateKey) (*wal
 		FrostSignerAddress:   "unix:///tmp/frost_0.sock",
 		IdentityPrivateKey:   identityPrivKey,
 		Threshold:            3,
+	}, nil
+}
+
+func TestWalletConfigDeployed(identityPrivKeyBytes []byte) (*wallet.Config, error) {
+	identityPrivKey := secp256k1.PrivKeyFromBytes(identityPrivKeyBytes)
+	if identityPrivKey == nil {
+		return nil, fmt.Errorf("failed to generate identity private key")
+	}
+	signingOperators, err := GetAllSigningOperatorsDeployed()
+	if err != nil {
+		return nil, err
+	}
+	return &wallet.Config{
+		Network:              common.Regtest,
+		SigningOperators:     signingOperators,
+		CoodinatorIdentifier: "0000000000000000000000000000000000000000000000000000000000000001",
+		FrostSignerAddress:   "unix:///tmp/frost_0.sock",
+		IdentityPrivateKey:   *identityPrivKey,
+		Threshold:            2,
 	}, nil
 }
