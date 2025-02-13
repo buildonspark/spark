@@ -247,7 +247,22 @@ func (o TokenTransactionHandler) FinalizeTokenTransaction(
 		return nil, fmt.Errorf("failed to fetch transaction receipt: %w", err)
 	}
 
-	// TODO: Validate that the revocation private key is correct.
+	// Extract revocation public keys from spent leaves
+	revocationPublicKeys := make([][]byte, len(tokenTransactionReceipt.Edges.SpentLeaf))
+	if (len(tokenTransactionReceipt.Edges.SpentLeaf)) != len(req.LeafToSpendRevocationKeys) {
+		return nil, fmt.Errorf(
+			"number of revocation keys (%d) does not match number of spent leaves (%d)",
+			len(req.LeafToSpendRevocationKeys),
+			len(tokenTransactionReceipt.Edges.SpentLeaf),
+		)
+	}
+	for _, leaf := range tokenTransactionReceipt.Edges.SpentLeaf {
+		revocationPublicKeys[leaf.LeafSpentTransactionInputVout] = leaf.WithdrawalRevocationPublicKey
+	}
+	err = utils.ValidateRevocationKeys(req.LeafToSpendRevocationKeys, revocationPublicKeys)
+	if err != nil {
+		return nil, err
+	}
 
 	err = ent.UpdateFinalizedTransactionLeaves(ctx, tokenTransactionReceipt, req.LeafToSpendRevocationKeys)
 	if err != nil {

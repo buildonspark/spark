@@ -29,7 +29,7 @@ func BroadcastTokenTransaction(
 	config *Config,
 	tokenTransaction *pb.TokenTransaction,
 	leafToSpendPrivateKeys []*secp256k1.PrivateKey,
-	leafToSpendRevocationPublicKeys []*secp256k1.PublicKey,
+	leafToSpendRevocationPublicKeys [][]byte,
 ) (*pb.TokenTransaction, error) {
 	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
 	if err != nil {
@@ -213,21 +213,10 @@ func BroadcastTokenTransaction(
 				return nil, fmt.Errorf("failed to recover keyshare for leaf %d: %w", i, err)
 			}
 			leafRecoveredSecrets[i] = recoveredKey.Bytes()
-
-			// Validate the recovered secret matches the leaf's public key
-			recoveredPrivKey := secp256k1.PrivKeyFromBytes(leafRecoveredSecrets[i])
-			recoveredPubKey := recoveredPrivKey.PubKey()
-			leafPubKey, err := secp256k1.ParsePubKey(leafToSpendRevocationPublicKeys[i].SerializeCompressed())
-			if err != nil {
-				// Try uncompressed format if compressed fails
-				leafPubKey, err = secp256k1.ParsePubKey(leafToSpendRevocationPublicKeys[i].SerializeUncompressed())
-				if err != nil {
-					return nil, fmt.Errorf("failed to parse leaf public key for leaf %d in both compressed and uncompressed formats: %w", i, err)
-				}
-			}
-			if !recoveredPubKey.IsEqual(leafPubKey) {
-				return nil, fmt.Errorf("recovered secret for leaf %d does not match leaf public key", i)
-			}
+		}
+		err = utils.ValidateRevocationKeys(leafRecoveredSecrets, leafToSpendRevocationPublicKeys)
+		if err != nil {
+			return nil, fmt.Errorf("invalid revocation keys: %w", err)
 		}
 
 		// Finalize the token transaction with each operator.

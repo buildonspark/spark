@@ -79,7 +79,7 @@ func TestBroadcastTokenTransactionIssueAndTransferTokens(t *testing.T) {
 	finalIssueTokenTransaction, err := wallet.BroadcastTokenTransaction(
 		context.Background(), config, issueTokenTransaction,
 		[]*secp256k1.PrivateKey{&tokenPrivKey},
-		[]*secp256k1.PublicKey{})
+		[][]byte{})
 	if err != nil {
 		t.Fatalf("failed to broadcast issuance token transaction: %v", err)
 	}
@@ -119,19 +119,15 @@ func TestBroadcastTokenTransactionIssueAndTransferTokens(t *testing.T) {
 		},
 	}
 
-	revPubKey1, err := secp256k1.ParsePubKey(finalIssueTokenTransaction.OutputLeaves[0].RevocationPublicKey)
-	if err != nil {
-		t.Fatal(err)
-	}
-	revPubKey2, err := secp256k1.ParsePubKey(finalIssueTokenTransaction.OutputLeaves[1].RevocationPublicKey)
-	if err != nil {
-		t.Fatal(err)
-	}
+	revPubKey1 := finalIssueTokenTransaction.OutputLeaves[0].RevocationPublicKey
+	revPubKey2 := finalIssueTokenTransaction.OutputLeaves[1].RevocationPublicKey
+
 	// Broadcast the token transaction
 	finalTransferTokenTransaction, err := wallet.BroadcastTokenTransaction(
 		context.Background(), config, transferTokenTransaction,
 		[]*secp256k1.PrivateKey{userLeaf1PrivKey, userLeaf2PrivKey},
-		[]*secp256k1.PublicKey{revPubKey1, revPubKey2})
+		[][]byte{revPubKey1, revPubKey2},
+	)
 	if err != nil {
 		t.Fatalf("failed to broadcast transfer token transaction: %v", err)
 	}

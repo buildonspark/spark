@@ -251,3 +251,22 @@ func ValidateOwnershipSignature(ownershipSignature []byte, partialTokenTransacti
 	}
 	return nil
 }
+
+func ValidateRevocationKeys(revocationPrivateKeys [][]byte, expectedRevocationPublicKeys [][]byte) error {
+	if len(expectedRevocationPublicKeys) != len(revocationPrivateKeys) {
+		return fmt.Errorf("number of revocation private keys does not match number of leaves to spend")
+	}
+
+	for i, revocationPrivateKeyBytes := range revocationPrivateKeys {
+		revocationKey := secp256k1.PrivKeyFromBytes(revocationPrivateKeyBytes)
+		revocationPubKey := revocationKey.PubKey()
+		expectedRevocationPubKey, err := secp256k1.ParsePubKey(expectedRevocationPublicKeys[i])
+		if err != nil {
+			return fmt.Errorf("failed to parse revocation private key: %w", err)
+		}
+		if !expectedRevocationPubKey.IsEqual(revocationPubKey) {
+			return fmt.Errorf("recovered secret for leaf %d does not match leaf public key", i)
+		}
+	}
+	return nil
+}
