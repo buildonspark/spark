@@ -36,6 +36,18 @@ func (tiu *TokenIssuanceUpdate) SetUpdateTime(t time.Time) *TokenIssuanceUpdate 
 	return tiu
 }
 
+// SetOperatorSpecificIssuerSignature sets the "operator_specific_issuer_signature" field.
+func (tiu *TokenIssuanceUpdate) SetOperatorSpecificIssuerSignature(b []byte) *TokenIssuanceUpdate {
+	tiu.mutation.SetOperatorSpecificIssuerSignature(b)
+	return tiu
+}
+
+// ClearOperatorSpecificIssuerSignature clears the value of the "operator_specific_issuer_signature" field.
+func (tiu *TokenIssuanceUpdate) ClearOperatorSpecificIssuerSignature() *TokenIssuanceUpdate {
+	tiu.mutation.ClearOperatorSpecificIssuerSignature()
+	return tiu
+}
+
 // AddTokenTransactionReceiptIDs adds the "token_transaction_receipt" edge to the TokenTransactionReceipt entity by IDs.
 func (tiu *TokenIssuanceUpdate) AddTokenTransactionReceiptIDs(ids ...uuid.UUID) *TokenIssuanceUpdate {
 	tiu.mutation.AddTokenTransactionReceiptIDs(ids...)
@@ -125,6 +137,12 @@ func (tiu *TokenIssuanceUpdate) sqlSave(ctx context.Context) (n int, err error) 
 	if value, ok := tiu.mutation.UpdateTime(); ok {
 		_spec.SetField(tokenissuance.FieldUpdateTime, field.TypeTime, value)
 	}
+	if value, ok := tiu.mutation.OperatorSpecificIssuerSignature(); ok {
+		_spec.SetField(tokenissuance.FieldOperatorSpecificIssuerSignature, field.TypeBytes, value)
+	}
+	if tiu.mutation.OperatorSpecificIssuerSignatureCleared() {
+		_spec.ClearField(tokenissuance.FieldOperatorSpecificIssuerSignature, field.TypeBytes)
+	}
 	if tiu.mutation.TokenTransactionReceiptCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.O2M,
@@ -193,6 +211,18 @@ type TokenIssuanceUpdateOne struct {
 // SetUpdateTime sets the "update_time" field.
 func (tiuo *TokenIssuanceUpdateOne) SetUpdateTime(t time.Time) *TokenIssuanceUpdateOne {
 	tiuo.mutation.SetUpdateTime(t)
+	return tiuo
+}
+
+// SetOperatorSpecificIssuerSignature sets the "operator_specific_issuer_signature" field.
+func (tiuo *TokenIssuanceUpdateOne) SetOperatorSpecificIssuerSignature(b []byte) *TokenIssuanceUpdateOne {
+	tiuo.mutation.SetOperatorSpecificIssuerSignature(b)
+	return tiuo
+}
+
+// ClearOperatorSpecificIssuerSignature clears the value of the "operator_specific_issuer_signature" field.
+func (tiuo *TokenIssuanceUpdateOne) ClearOperatorSpecificIssuerSignature() *TokenIssuanceUpdateOne {
+	tiuo.mutation.ClearOperatorSpecificIssuerSignature()
 	return tiuo
 }
 
@@ -314,6 +344,12 @@ func (tiuo *TokenIssuanceUpdateOne) sqlSave(ctx context.Context) (_node *TokenIs
 	}
 	if value, ok := tiuo.mutation.UpdateTime(); ok {
 		_spec.SetField(tokenissuance.FieldUpdateTime, field.TypeTime, value)
+	}
+	if value, ok := tiuo.mutation.OperatorSpecificIssuerSignature(); ok {
+		_spec.SetField(tokenissuance.FieldOperatorSpecificIssuerSignature, field.TypeBytes, value)
+	}
+	if tiuo.mutation.OperatorSpecificIssuerSignatureCleared() {
+		_spec.ClearField(tokenissuance.FieldOperatorSpecificIssuerSignature, field.TypeBytes)
 	}
 	if tiuo.mutation.TokenTransactionReceiptCleared() {
 		edge := &sqlgraph.EdgeSpec{

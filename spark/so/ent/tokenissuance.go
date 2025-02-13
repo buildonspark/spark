@@ -26,6 +26,8 @@ type TokenIssuance struct {
 	IssuerPublicKey []byte `json:"issuer_public_key,omitempty"`
 	// IssuerSignature holds the value of the "issuer_signature" field.
 	IssuerSignature []byte `json:"issuer_signature,omitempty"`
+	// OperatorSpecificIssuerSignature holds the value of the "operator_specific_issuer_signature" field.
+	OperatorSpecificIssuerSignature []byte `json:"operator_specific_issuer_signature,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the TokenIssuanceQuery when eager-loading is set.
 	Edges        TokenIssuanceEdges `json:"edges"`
@@ -55,7 +57,7 @@ func (*TokenIssuance) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case tokenissuance.FieldIssuerPublicKey, tokenissuance.FieldIssuerSignature:
+		case tokenissuance.FieldIssuerPublicKey, tokenissuance.FieldIssuerSignature, tokenissuance.FieldOperatorSpecificIssuerSignature:
 			values[i] = new([]byte)
 		case tokenissuance.FieldCreateTime, tokenissuance.FieldUpdateTime:
 			values[i] = new(sql.NullTime)
@@ -105,6 +107,12 @@ func (ti *TokenIssuance) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field issuer_signature", values[i])
 			} else if value != nil {
 				ti.IssuerSignature = *value
+			}
+		case tokenissuance.FieldOperatorSpecificIssuerSignature:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field operator_specific_issuer_signature", values[i])
+			} else if value != nil {
+				ti.OperatorSpecificIssuerSignature = *value
 			}
 		default:
 			ti.selectValues.Set(columns[i], values[i])
@@ -158,6 +166,9 @@ func (ti *TokenIssuance) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("issuer_signature=")
 	builder.WriteString(fmt.Sprintf("%v", ti.IssuerSignature))
+	builder.WriteString(", ")
+	builder.WriteString("operator_specific_issuer_signature=")
+	builder.WriteString(fmt.Sprintf("%v", ti.OperatorSpecificIssuerSignature))
 	builder.WriteByte(')')
 	return builder.String()
 }

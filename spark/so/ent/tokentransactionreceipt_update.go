@@ -49,6 +49,18 @@ func (ttru *TokenTransactionReceiptUpdate) SetFinalizedTokenTransactionHash(b []
 	return ttru
 }
 
+// SetOperatorSignature sets the "operator_signature" field.
+func (ttru *TokenTransactionReceiptUpdate) SetOperatorSignature(b []byte) *TokenTransactionReceiptUpdate {
+	ttru.mutation.SetOperatorSignature(b)
+	return ttru
+}
+
+// ClearOperatorSignature clears the value of the "operator_signature" field.
+func (ttru *TokenTransactionReceiptUpdate) ClearOperatorSignature() *TokenTransactionReceiptUpdate {
+	ttru.mutation.ClearOperatorSignature()
+	return ttru
+}
+
 // AddSpentLeafIDs adds the "spent_leaf" edge to the TokenLeaf entity by IDs.
 func (ttru *TokenTransactionReceiptUpdate) AddSpentLeafIDs(ids ...uuid.UUID) *TokenTransactionReceiptUpdate {
 	ttru.mutation.AddSpentLeafIDs(ids...)
@@ -223,6 +235,12 @@ func (ttru *TokenTransactionReceiptUpdate) sqlSave(ctx context.Context) (n int, 
 	if value, ok := ttru.mutation.FinalizedTokenTransactionHash(); ok {
 		_spec.SetField(tokentransactionreceipt.FieldFinalizedTokenTransactionHash, field.TypeBytes, value)
 	}
+	if value, ok := ttru.mutation.OperatorSignature(); ok {
+		_spec.SetField(tokentransactionreceipt.FieldOperatorSignature, field.TypeBytes, value)
+	}
+	if ttru.mutation.OperatorSignatureCleared() {
+		_spec.ClearField(tokentransactionreceipt.FieldOperatorSignature, field.TypeBytes)
+	}
 	if ttru.mutation.SpentLeafCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.O2M,
@@ -377,6 +395,18 @@ func (ttruo *TokenTransactionReceiptUpdateOne) SetPartialTokenTransactionHash(b 
 // SetFinalizedTokenTransactionHash sets the "finalized_token_transaction_hash" field.
 func (ttruo *TokenTransactionReceiptUpdateOne) SetFinalizedTokenTransactionHash(b []byte) *TokenTransactionReceiptUpdateOne {
 	ttruo.mutation.SetFinalizedTokenTransactionHash(b)
+	return ttruo
+}
+
+// SetOperatorSignature sets the "operator_signature" field.
+func (ttruo *TokenTransactionReceiptUpdateOne) SetOperatorSignature(b []byte) *TokenTransactionReceiptUpdateOne {
+	ttruo.mutation.SetOperatorSignature(b)
+	return ttruo
+}
+
+// ClearOperatorSignature clears the value of the "operator_signature" field.
+func (ttruo *TokenTransactionReceiptUpdateOne) ClearOperatorSignature() *TokenTransactionReceiptUpdateOne {
+	ttruo.mutation.ClearOperatorSignature()
 	return ttruo
 }
 
@@ -583,6 +613,12 @@ func (ttruo *TokenTransactionReceiptUpdateOne) sqlSave(ctx context.Context) (_no
 	}
 	if value, ok := ttruo.mutation.FinalizedTokenTransactionHash(); ok {
 		_spec.SetField(tokentransactionreceipt.FieldFinalizedTokenTransactionHash, field.TypeBytes, value)
+	}
+	if value, ok := ttruo.mutation.OperatorSignature(); ok {
+		_spec.SetField(tokentransactionreceipt.FieldOperatorSignature, field.TypeBytes, value)
+	}
+	if ttruo.mutation.OperatorSignatureCleared() {
+		_spec.ClearField(tokentransactionreceipt.FieldOperatorSignature, field.TypeBytes)
 	}
 	if ttruo.mutation.SpentLeafCleared() {
 		edge := &sqlgraph.EdgeSpec{

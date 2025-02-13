@@ -55,7 +55,7 @@ func FetchInputLeaves(ctx context.Context, leavesToSpend []*pb.TokenLeafToSpend)
 
 		var foundLeaf *TokenLeaf
 		for _, createdLeaf := range receipt.Edges.CreatedLeaf {
-			if createdLeaf.LeafCreatedTransactionOuputVout == leaf.PrevTokenTransactionLeafVout {
+			if createdLeaf.LeafCreatedTransactionOutputVout == leaf.PrevTokenTransactionLeafVout {
 				foundLeaf = createdLeaf
 				break
 			}
@@ -77,7 +77,7 @@ func FetchInputLeaves(ctx context.Context, leavesToSpend []*pb.TokenLeafToSpend)
 func MarkLeavesAsSpent(ctx context.Context, leafToSpendEnts []*TokenLeaf, leafSpentOwnershipSignatures [][]byte, leafSpentTokenTransactionReceipt *TokenTransactionReceipt) error {
 	for leafIndex, leafToSpendEnt := range leafToSpendEnts {
 		_, err := GetDbFromContext(ctx).TokenLeaf.UpdateOne(leafToSpendEnt).
-			SetStatus(schema.TokenLeafStatusSpentUnsigned).
+			SetStatus(schema.TokenLeafStatusSpentStarted).
 			SetLeafSpentOwnershipSignature(leafSpentOwnershipSignatures[leafIndex]).
 			SetLeafSpentTokenTransactionReceiptID(leafSpentTokenTransactionReceipt.ID).
 			Save(ctx)

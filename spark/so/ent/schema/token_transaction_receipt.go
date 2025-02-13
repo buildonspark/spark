@@ -23,6 +23,7 @@ func (TokenTransactionReceipt) Fields() []ent.Field {
 	return []ent.Field{
 		field.Bytes("partial_token_transaction_hash").NotEmpty().Unique(),
 		field.Bytes("finalized_token_transaction_hash").NotEmpty().Unique(),
+		field.Bytes("operator_signature").Optional().Unique(),
 	}
 }
 

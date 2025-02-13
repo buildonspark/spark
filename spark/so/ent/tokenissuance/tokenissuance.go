@@ -23,6 +23,8 @@ const (
 	FieldIssuerPublicKey = "issuer_public_key"
 	// FieldIssuerSignature holds the string denoting the issuer_signature field in the database.
 	FieldIssuerSignature = "issuer_signature"
+	// FieldOperatorSpecificIssuerSignature holds the string denoting the operator_specific_issuer_signature field in the database.
+	FieldOperatorSpecificIssuerSignature = "operator_specific_issuer_signature"
 	// EdgeTokenTransactionReceipt holds the string denoting the token_transaction_receipt edge name in mutations.
 	EdgeTokenTransactionReceipt = "token_transaction_receipt"
 	// Table holds the table name of the tokenissuance in the database.
@@ -43,6 +45,7 @@ var Columns = []string{
 	FieldUpdateTime,
 	FieldIssuerPublicKey,
 	FieldIssuerSignature,
+	FieldOperatorSpecificIssuerSignature,
 }
 
 // ValidColumn reports if the column name is valid (part of the table columns).

@@ -35,10 +35,12 @@ const (
 	FieldTokenPublicKey = "token_public_key"
 	// FieldTokenAmount holds the string denoting the token_amount field in the database.
 	FieldTokenAmount = "token_amount"
-	// FieldLeafCreatedTransactionOuputVout holds the string denoting the leaf_created_transaction_ouput_vout field in the database.
-	FieldLeafCreatedTransactionOuputVout = "leaf_created_transaction_ouput_vout"
+	// FieldLeafCreatedTransactionOutputVout holds the string denoting the leaf_created_transaction_output_vout field in the database.
+	FieldLeafCreatedTransactionOutputVout = "leaf_created_transaction_output_vout"
 	// FieldLeafSpentOwnershipSignature holds the string denoting the leaf_spent_ownership_signature field in the database.
 	FieldLeafSpentOwnershipSignature = "leaf_spent_ownership_signature"
+	// FieldLeafSpentOperatorSpecificOwnershipSignature holds the string denoting the leaf_spent_operator_specific_ownership_signature field in the database.
+	FieldLeafSpentOperatorSpecificOwnershipSignature = "leaf_spent_operator_specific_ownership_signature"
 	// FieldLeafSpentTransactionInputVout holds the string denoting the leaf_spent_transaction_input_vout field in the database.
 	FieldLeafSpentTransactionInputVout = "leaf_spent_transaction_input_vout"
 	// FieldLeafSpentRevocationPrivateKey holds the string denoting the leaf_spent_revocation_private_key field in the database.
@@ -86,8 +88,9 @@ var Columns = []string{
 	FieldWithdrawalRevocationPublicKey,
 	FieldTokenPublicKey,
 	FieldTokenAmount,
-	FieldLeafCreatedTransactionOuputVout,
+	FieldLeafCreatedTransactionOutputVout,
 	FieldLeafSpentOwnershipSignature,
+	FieldLeafSpentOperatorSpecificOwnershipSignature,
 	FieldLeafSpentTransactionInputVout,
 	FieldLeafSpentRevocationPrivateKey,
 }
@@ -135,7 +138,7 @@ var (
 // StatusValidator is a validator for the "status" field enum values. It is called by the builders before save.
 func StatusValidator(s schema.TokenLeafStatus) error {
 	switch s {
-	case "CREATED_UNSIGNED", "CREATED_SIGNED", "CREATED_FINALIZED", "SPENT_UNSIGNED", "SPENT_SIGNED", "SPENT_KEYSHARE_RELEASED", "SPENT_FINALIZED":
+	case "CREATED_STARTED", "CREATED_SIGNED", "CREATED_FINALIZED", "SPENT_STARTED", "SPENT_SIGNED", "SPENT_FINALIZED":
 		return nil
 	default:
 		return fmt.Errorf("tokenleaf: invalid enum value for status field: %q", s)
@@ -175,9 +178,9 @@ func ByWithdrawalLocktime(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldWithdrawalLocktime, opts...).ToFunc()
 }
 
-// ByLeafCreatedTransactionOuputVout orders the results by the leaf_created_transaction_ouput_vout field.
-func ByLeafCreatedTransactionOuputVout(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldLeafCreatedTransactionOuputVout, opts...).ToFunc()
+// ByLeafCreatedTransactionOutputVout orders the results by the leaf_created_transaction_output_vout field.
+func ByLeafCreatedTransactionOutputVout(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldLeafCreatedTransactionOutputVout, opts...).ToFunc()
 }
 
 // ByLeafSpentTransactionInputVout orders the results by the leaf_spent_transaction_input_vout field.

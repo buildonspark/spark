@@ -23,6 +23,8 @@ const (
 	FieldPartialTokenTransactionHash = "partial_token_transaction_hash"
 	// FieldFinalizedTokenTransactionHash holds the string denoting the finalized_token_transaction_hash field in the database.
 	FieldFinalizedTokenTransactionHash = "finalized_token_transaction_hash"
+	// FieldOperatorSignature holds the string denoting the operator_signature field in the database.
+	FieldOperatorSignature = "operator_signature"
 	// EdgeSpentLeaf holds the string denoting the spent_leaf edge name in mutations.
 	EdgeSpentLeaf = "spent_leaf"
 	// EdgeCreatedLeaf holds the string denoting the created_leaf edge name in mutations.
@@ -61,6 +63,7 @@ var Columns = []string{
 	FieldUpdateTime,
 	FieldPartialTokenTransactionHash,
 	FieldFinalizedTokenTransactionHash,
+	FieldOperatorSignature,
 }
 
 // ForeignKeys holds the SQL foreign-keys that are owned by the "token_transaction_receipts"

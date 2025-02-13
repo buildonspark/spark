@@ -191,8 +191,9 @@ var (
 		{Name: "id", Type: field.TypeUUID},
 		{Name: "create_time", Type: field.TypeTime},
 		{Name: "update_time", Type: field.TypeTime},
-		{Name: "issuer_public_key", Type: field.TypeBytes, Unique: true},
+		{Name: "issuer_public_key", Type: field.TypeBytes},
 		{Name: "issuer_signature", Type: field.TypeBytes, Unique: true},
+		{Name: "operator_specific_issuer_signature", Type: field.TypeBytes, Unique: true, Nullable: true},
 	}
 	// TokenIssuancesTable holds the schema information for the "token_issuances" table.
 	TokenIssuancesTable = &schema.Table{
@@ -205,15 +206,16 @@ var (
 		{Name: "id", Type: field.TypeUUID},
 		{Name: "create_time", Type: field.TypeTime},
 		{Name: "update_time", Type: field.TypeTime},
-		{Name: "status", Type: field.TypeEnum, Enums: []string{"CREATED_UNSIGNED", "CREATED_SIGNED", "CREATED_FINALIZED", "SPENT_UNSIGNED", "SPENT_SIGNED", "SPENT_KEYSHARE_RELEASED", "SPENT_FINALIZED"}},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"CREATED_STARTED", "CREATED_SIGNED", "CREATED_FINALIZED", "SPENT_STARTED", "SPENT_SIGNED", "SPENT_FINALIZED"}},
 		{Name: "owner_public_key", Type: field.TypeBytes},
 		{Name: "withdrawal_bond_sats", Type: field.TypeUint64},
 		{Name: "withdrawal_locktime", Type: field.TypeUint64},
 		{Name: "withdrawal_revocation_public_key", Type: field.TypeBytes},
 		{Name: "token_public_key", Type: field.TypeBytes},
 		{Name: "token_amount", Type: field.TypeBytes},
-		{Name: "leaf_created_transaction_ouput_vout", Type: field.TypeUint32},
+		{Name: "leaf_created_transaction_output_vout", Type: field.TypeUint32},
 		{Name: "leaf_spent_ownership_signature", Type: field.TypeBytes, Nullable: true},
+		{Name: "leaf_spent_operator_specific_ownership_signature", Type: field.TypeBytes, Nullable: true},
 		{Name: "leaf_spent_transaction_input_vout", Type: field.TypeUint32, Nullable: true},
 		{Name: "leaf_spent_revocation_private_key", Type: field.TypeBytes, Nullable: true},
 		{Name: "token_leaf_revocation_keyshare", Type: field.TypeUUID},
@@ -228,19 +230,19 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "token_leafs_signing_keyshares_revocation_keyshare",
-				Columns:    []*schema.Column{TokenLeafsColumns[14]},
+				Columns:    []*schema.Column{TokenLeafsColumns[15]},
 				RefColumns: []*schema.Column{SigningKeysharesColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "token_leafs_token_transaction_receipts_leaf_created_token_transaction_receipt",
-				Columns:    []*schema.Column{TokenLeafsColumns[15]},
+				Columns:    []*schema.Column{TokenLeafsColumns[16]},
 				RefColumns: []*schema.Column{TokenTransactionReceiptsColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "token_leafs_token_transaction_receipts_leaf_spent_token_transaction_receipt",
-				Columns:    []*schema.Column{TokenLeafsColumns[16]},
+				Columns:    []*schema.Column{TokenLeafsColumns[17]},
 				RefColumns: []*schema.Column{TokenTransactionReceiptsColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
@@ -260,6 +262,7 @@ var (
 		{Name: "update_time", Type: field.TypeTime},
 		{Name: "partial_token_transaction_hash", Type: field.TypeBytes, Unique: true},
 		{Name: "finalized_token_transaction_hash", Type: field.TypeBytes, Unique: true},
+		{Name: "operator_signature", Type: field.TypeBytes, Unique: true, Nullable: true},
 		{Name: "token_transaction_receipt_issuance", Type: field.TypeUUID, Nullable: true},
 	}
 	// TokenTransactionReceiptsTable holds the schema information for the "token_transaction_receipts" table.
@@ -270,7 +273,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "token_transaction_receipts_token_issuances_issuance",
-				Columns:    []*schema.Column{TokenTransactionReceiptsColumns[5]},
+				Columns:    []*schema.Column{TokenTransactionReceiptsColumns[6]},
 				RefColumns: []*schema.Column{TokenIssuancesColumns[0]},
 				OnDelete:   schema.SetNull,
 			},

@@ -76,6 +76,11 @@ func IssuerSignature(v []byte) predicate.TokenIssuance {
 	return predicate.TokenIssuance(sql.FieldEQ(FieldIssuerSignature, v))
 }
 
+// OperatorSpecificIssuerSignature applies equality check predicate on the "operator_specific_issuer_signature" field. It's identical to OperatorSpecificIssuerSignatureEQ.
+func OperatorSpecificIssuerSignature(v []byte) predicate.TokenIssuance {
+	return predicate.TokenIssuance(sql.FieldEQ(FieldOperatorSpecificIssuerSignature, v))
+}
+
 // CreateTimeEQ applies the EQ predicate on the "create_time" field.
 func CreateTimeEQ(v time.Time) predicate.TokenIssuance {
 	return predicate.TokenIssuance(sql.FieldEQ(FieldCreateTime, v))
@@ -234,6 +239,56 @@ func IssuerSignatureLT(v []byte) predicate.TokenIssuance {
 // IssuerSignatureLTE applies the LTE predicate on the "issuer_signature" field.
 func IssuerSignatureLTE(v []byte) predicate.TokenIssuance {
 	return predicate.TokenIssuance(sql.FieldLTE(FieldIssuerSignature, v))
+}
+
+// OperatorSpecificIssuerSignatureEQ applies the EQ predicate on the "operator_specific_issuer_signature" field.
+func OperatorSpecificIssuerSignatureEQ(v []byte) predicate.TokenIssuance {
+	return predicate.TokenIssuance(sql.FieldEQ(FieldOperatorSpecificIssuerSignature, v))
+}
+
+// OperatorSpecificIssuerSignatureNEQ applies the NEQ predicate on the "operator_specific_issuer_signature" field.
+func OperatorSpecificIssuerSignatureNEQ(v []byte) predicate.TokenIssuance {
+	return predicate.TokenIssuance(sql.FieldNEQ(FieldOperatorSpecificIssuerSignature, v))
+}
+
+// OperatorSpecificIssuerSignatureIn applies the In predicate on the "operator_specific_issuer_signature" field.
+func OperatorSpecificIssuerSignatureIn(vs ...[]byte) predicate.TokenIssuance {
+	return predicate.TokenIssuance(sql.FieldIn(FieldOperatorSpecificIssuerSignature, vs...))
+}
+
+// OperatorSpecificIssuerSignatureNotIn applies the NotIn predicate on the "operator_specific_issuer_signature" field.
+func OperatorSpecificIssuerSignatureNotIn(vs ...[]byte) predicate.TokenIssuance {
+	return predicate.TokenIssuance(sql.FieldNotIn(FieldOperatorSpecificIssuerSignature, vs...))
+}
+
+// OperatorSpecificIssuerSignatureGT applies the GT predicate on the "operator_specific_issuer_signature" field.
+func OperatorSpecificIssuerSignatureGT(v []byte) predicate.TokenIssuance {
+	return predicate.TokenIssuance(sql.FieldGT(FieldOperatorSpecificIssuerSignature, v))
+}
+
+// OperatorSpecificIssuerSignatureGTE applies the GTE predicate on the "operator_specific_issuer_signature" field.
+func OperatorSpecificIssuerSignatureGTE(v []byte) predicate.TokenIssuance {
+	return predicate.TokenIssuance(sql.FieldGTE(FieldOperatorSpecificIssuerSignature, v))
+}
+
+// OperatorSpecificIssuerSignatureLT applies the LT predicate on the "operator_specific_issuer_signature" field.
+func OperatorSpecificIssuerSignatureLT(v []byte) predicate.TokenIssuance {
+	return predicate.TokenIssuance(sql.FieldLT(FieldOperatorSpecificIssuerSignature, v))
+}
+
+// OperatorSpecificIssuerSignatureLTE applies the LTE predicate on the "operator_specific_issuer_signature" field.
+func OperatorSpecificIssuerSignatureLTE(v []byte) predicate.TokenIssuance {
+	return predicate.TokenIssuance(sql.FieldLTE(FieldOperatorSpecificIssuerSignature, v))
+}
+
+// OperatorSpecificIssuerSignatureIsNil applies the IsNil predicate on the "operator_specific_issuer_signature" field.
+func OperatorSpecificIssuerSignatureIsNil() predicate.TokenIssuance {
+	return predicate.TokenIssuance(sql.FieldIsNull(FieldOperatorSpecificIssuerSignature))
+}
+
+// OperatorSpecificIssuerSignatureNotNil applies the NotNil predicate on the "operator_specific_issuer_signature" field.
+func OperatorSpecificIssuerSignatureNotNil() predicate.TokenIssuance {
+	return predicate.TokenIssuance(sql.FieldNotNull(FieldOperatorSpecificIssuerSignature))
 }
 
 // HasTokenTransactionReceipt applies the HasEdge predicate on the "token_transaction_receipt" edge.

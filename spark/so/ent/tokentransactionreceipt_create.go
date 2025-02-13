@@ -63,6 +63,12 @@ func (ttrc *TokenTransactionReceiptCreate) SetFinalizedTokenTransactionHash(b []
 	return ttrc
 }
 
+// SetOperatorSignature sets the "operator_signature" field.
+func (ttrc *TokenTransactionReceiptCreate) SetOperatorSignature(b []byte) *TokenTransactionReceiptCreate {
+	ttrc.mutation.SetOperatorSignature(b)
+	return ttrc
+}
+
 // SetID sets the "id" field.
 func (ttrc *TokenTransactionReceiptCreate) SetID(u uuid.UUID) *TokenTransactionReceiptCreate {
 	ttrc.mutation.SetID(u)
@@ -249,6 +255,10 @@ func (ttrc *TokenTransactionReceiptCreate) createSpec() (*TokenTransactionReceip
 	if value, ok := ttrc.mutation.FinalizedTokenTransactionHash(); ok {
 		_spec.SetField(tokentransactionreceipt.FieldFinalizedTokenTransactionHash, field.TypeBytes, value)
 		_node.FinalizedTokenTransactionHash = value
+	}
+	if value, ok := ttrc.mutation.OperatorSignature(); ok {
+		_spec.SetField(tokentransactionreceipt.FieldOperatorSignature, field.TypeBytes, value)
+		_node.OperatorSignature = value
 	}
 	if nodes := ttrc.mutation.SpentLeafIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{

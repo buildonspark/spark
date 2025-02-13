@@ -4675,20 +4675,21 @@ func (m *SigningNonceMutation) ResetEdge(name string) error {
 // TokenIssuanceMutation represents an operation that mutates the TokenIssuance nodes in the graph.
 type TokenIssuanceMutation struct {
 	config
-	op                               Op
-	typ                              string
-	id                               *uuid.UUID
-	create_time                      *time.Time
-	update_time                      *time.Time
-	issuer_public_key                *[]byte
-	issuer_signature                 *[]byte
-	clearedFields                    map[string]struct{}
-	token_transaction_receipt        map[uuid.UUID]struct{}
-	removedtoken_transaction_receipt map[uuid.UUID]struct{}
-	clearedtoken_transaction_receipt bool
-	done                             bool
-	oldValue                         func(context.Context) (*TokenIssuance, error)
-	predicates                       []predicate.TokenIssuance
+	op                                 Op
+	typ                                string
+	id                                 *uuid.UUID
+	create_time                        *time.Time
+	update_time                        *time.Time
+	issuer_public_key                  *[]byte
+	issuer_signature                   *[]byte
+	operator_specific_issuer_signature *[]byte
+	clearedFields                      map[string]struct{}
+	token_transaction_receipt          map[uuid.UUID]struct{}
+	removedtoken_transaction_receipt   map[uuid.UUID]struct{}
+	clearedtoken_transaction_receipt   bool
+	done                               bool
+	oldValue                           func(context.Context) (*TokenIssuance, error)
+	predicates                         []predicate.TokenIssuance
 }
 
 var _ ent.Mutation = (*TokenIssuanceMutation)(nil)
@@ -4939,6 +4940,55 @@ func (m *TokenIssuanceMutation) ResetIssuerSignature() {
 	m.issuer_signature = nil
 }
 
+// SetOperatorSpecificIssuerSignature sets the "operator_specific_issuer_signature" field.
+func (m *TokenIssuanceMutation) SetOperatorSpecificIssuerSignature(b []byte) {
+	m.operator_specific_issuer_signature = &b
+}
+
+// OperatorSpecificIssuerSignature returns the value of the "operator_specific_issuer_signature" field in the mutation.
+func (m *TokenIssuanceMutation) OperatorSpecificIssuerSignature() (r []byte, exists bool) {
+	v := m.operator_specific_issuer_signature
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOperatorSpecificIssuerSignature returns the old "operator_specific_issuer_signature" field's value of the TokenIssuance entity.
+// If the TokenIssuance object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenIssuanceMutation) OldOperatorSpecificIssuerSignature(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOperatorSpecificIssuerSignature is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOperatorSpecificIssuerSignature requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOperatorSpecificIssuerSignature: %w", err)
+	}
+	return oldValue.OperatorSpecificIssuerSignature, nil
+}
+
+// ClearOperatorSpecificIssuerSignature clears the value of the "operator_specific_issuer_signature" field.
+func (m *TokenIssuanceMutation) ClearOperatorSpecificIssuerSignature() {
+	m.operator_specific_issuer_signature = nil
+	m.clearedFields[tokenissuance.FieldOperatorSpecificIssuerSignature] = struct{}{}
+}
+
+// OperatorSpecificIssuerSignatureCleared returns if the "operator_specific_issuer_signature" field was cleared in this mutation.
+func (m *TokenIssuanceMutation) OperatorSpecificIssuerSignatureCleared() bool {
+	_, ok := m.clearedFields[tokenissuance.FieldOperatorSpecificIssuerSignature]
+	return ok
+}
+
+// ResetOperatorSpecificIssuerSignature resets all changes to the "operator_specific_issuer_signature" field.
+func (m *TokenIssuanceMutation) ResetOperatorSpecificIssuerSignature() {
+	m.operator_specific_issuer_signature = nil
+	delete(m.clearedFields, tokenissuance.FieldOperatorSpecificIssuerSignature)
+}
+
 // AddTokenTransactionReceiptIDs adds the "token_transaction_receipt" edge to the TokenTransactionReceipt entity by ids.
 func (m *TokenIssuanceMutation) AddTokenTransactionReceiptIDs(ids ...uuid.UUID) {
 	if m.token_transaction_receipt == nil {
@@ -5027,7 +5077,7 @@ func (m *TokenIssuanceMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *TokenIssuanceMutation) Fields() []string {
-	fields := make([]string, 0, 4)
+	fields := make([]string, 0, 5)
 	if m.create_time != nil {
 		fields = append(fields, tokenissuance.FieldCreateTime)
 	}
@@ -5039,6 +5089,9 @@ func (m *TokenIssuanceMutation) Fields() []string {
 	}
 	if m.issuer_signature != nil {
 		fields = append(fields, tokenissuance.FieldIssuerSignature)
+	}
+	if m.operator_specific_issuer_signature != nil {
+		fields = append(fields, tokenissuance.FieldOperatorSpecificIssuerSignature)
 	}
 	return fields
 }
@@ -5056,6 +5109,8 @@ func (m *TokenIssuanceMutation) Field(name string) (ent.Value, bool) {
 		return m.IssuerPublicKey()
 	case tokenissuance.FieldIssuerSignature:
 		return m.IssuerSignature()
+	case tokenissuance.FieldOperatorSpecificIssuerSignature:
+		return m.OperatorSpecificIssuerSignature()
 	}
 	return nil, false
 }
@@ -5073,6 +5128,8 @@ func (m *TokenIssuanceMutation) OldField(ctx context.Context, name string) (ent.
 		return m.OldIssuerPublicKey(ctx)
 	case tokenissuance.FieldIssuerSignature:
 		return m.OldIssuerSignature(ctx)
+	case tokenissuance.FieldOperatorSpecificIssuerSignature:
+		return m.OldOperatorSpecificIssuerSignature(ctx)
 	}
 	return nil, fmt.Errorf("unknown TokenIssuance field %s", name)
 }
@@ -5110,6 +5167,13 @@ func (m *TokenIssuanceMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetIssuerSignature(v)
 		return nil
+	case tokenissuance.FieldOperatorSpecificIssuerSignature:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOperatorSpecificIssuerSignature(v)
+		return nil
 	}
 	return fmt.Errorf("unknown TokenIssuance field %s", name)
 }
@@ -5139,7 +5203,11 @@ func (m *TokenIssuanceMutation) AddField(name string, value ent.Value) error {
 // ClearedFields returns all nullable fields that were cleared during this
 // mutation.
 func (m *TokenIssuanceMutation) ClearedFields() []string {
-	return nil
+	var fields []string
+	if m.FieldCleared(tokenissuance.FieldOperatorSpecificIssuerSignature) {
+		fields = append(fields, tokenissuance.FieldOperatorSpecificIssuerSignature)
+	}
+	return fields
 }
 
 // FieldCleared returns a boolean indicating if a field with the given name was
@@ -5152,6 +5220,11 @@ func (m *TokenIssuanceMutation) FieldCleared(name string) bool {
 // ClearField clears the value of the field with the given name. It returns an
 // error if the field is not defined in the schema.
 func (m *TokenIssuanceMutation) ClearField(name string) error {
+	switch name {
+	case tokenissuance.FieldOperatorSpecificIssuerSignature:
+		m.ClearOperatorSpecificIssuerSignature()
+		return nil
+	}
 	return fmt.Errorf("unknown TokenIssuance nullable field %s", name)
 }
 
@@ -5170,6 +5243,9 @@ func (m *TokenIssuanceMutation) ResetField(name string) error {
 		return nil
 	case tokenissuance.FieldIssuerSignature:
 		m.ResetIssuerSignature()
+		return nil
+	case tokenissuance.FieldOperatorSpecificIssuerSignature:
+		m.ResetOperatorSpecificIssuerSignature()
 		return nil
 	}
 	return fmt.Errorf("unknown TokenIssuance field %s", name)
@@ -5262,36 +5338,37 @@ func (m *TokenIssuanceMutation) ResetEdge(name string) error {
 // TokenLeafMutation represents an operation that mutates the TokenLeaf nodes in the graph.
 type TokenLeafMutation struct {
 	config
-	op                                            Op
-	typ                                           string
-	id                                            *uuid.UUID
-	create_time                                   *time.Time
-	update_time                                   *time.Time
-	status                                        *schema.TokenLeafStatus
-	owner_public_key                              *[]byte
-	withdrawal_bond_sats                          *uint64
-	addwithdrawal_bond_sats                       *int64
-	withdrawal_locktime                           *uint64
-	addwithdrawal_locktime                        *int64
-	withdrawal_revocation_public_key              *[]byte
-	token_public_key                              *[]byte
-	token_amount                                  *[]byte
-	leaf_created_transaction_ouput_vout           *uint32
-	addleaf_created_transaction_ouput_vout        *int32
-	leaf_spent_ownership_signature                *[]byte
-	leaf_spent_transaction_input_vout             *uint32
-	addleaf_spent_transaction_input_vout          *int32
-	leaf_spent_revocation_private_key             *[]byte
-	clearedFields                                 map[string]struct{}
-	revocation_keyshare                           *uuid.UUID
-	clearedrevocation_keyshare                    bool
-	leaf_created_token_transaction_receipt        *uuid.UUID
-	clearedleaf_created_token_transaction_receipt bool
-	leaf_spent_token_transaction_receipt          *uuid.UUID
-	clearedleaf_spent_token_transaction_receipt   bool
-	done                                          bool
-	oldValue                                      func(context.Context) (*TokenLeaf, error)
-	predicates                                    []predicate.TokenLeaf
+	op                                               Op
+	typ                                              string
+	id                                               *uuid.UUID
+	create_time                                      *time.Time
+	update_time                                      *time.Time
+	status                                           *schema.TokenLeafStatus
+	owner_public_key                                 *[]byte
+	withdrawal_bond_sats                             *uint64
+	addwithdrawal_bond_sats                          *int64
+	withdrawal_locktime                              *uint64
+	addwithdrawal_locktime                           *int64
+	withdrawal_revocation_public_key                 *[]byte
+	token_public_key                                 *[]byte
+	token_amount                                     *[]byte
+	leaf_created_transaction_output_vout             *uint32
+	addleaf_created_transaction_output_vout          *int32
+	leaf_spent_ownership_signature                   *[]byte
+	leaf_spent_operator_specific_ownership_signature *[]byte
+	leaf_spent_transaction_input_vout                *uint32
+	addleaf_spent_transaction_input_vout             *int32
+	leaf_spent_revocation_private_key                *[]byte
+	clearedFields                                    map[string]struct{}
+	revocation_keyshare                              *uuid.UUID
+	clearedrevocation_keyshare                       bool
+	leaf_created_token_transaction_receipt           *uuid.UUID
+	clearedleaf_created_token_transaction_receipt    bool
+	leaf_spent_token_transaction_receipt             *uuid.UUID
+	clearedleaf_spent_token_transaction_receipt      bool
+	done                                             bool
+	oldValue                                         func(context.Context) (*TokenLeaf, error)
+	predicates                                       []predicate.TokenLeaf
 }
 
 var _ ent.Mutation = (*TokenLeafMutation)(nil)
@@ -5762,60 +5839,60 @@ func (m *TokenLeafMutation) ResetTokenAmount() {
 	m.token_amount = nil
 }
 
-// SetLeafCreatedTransactionOuputVout sets the "leaf_created_transaction_ouput_vout" field.
-func (m *TokenLeafMutation) SetLeafCreatedTransactionOuputVout(u uint32) {
-	m.leaf_created_transaction_ouput_vout = &u
-	m.addleaf_created_transaction_ouput_vout = nil
+// SetLeafCreatedTransactionOutputVout sets the "leaf_created_transaction_output_vout" field.
+func (m *TokenLeafMutation) SetLeafCreatedTransactionOutputVout(u uint32) {
+	m.leaf_created_transaction_output_vout = &u
+	m.addleaf_created_transaction_output_vout = nil
 }
 
-// LeafCreatedTransactionOuputVout returns the value of the "leaf_created_transaction_ouput_vout" field in the mutation.
-func (m *TokenLeafMutation) LeafCreatedTransactionOuputVout() (r uint32, exists bool) {
-	v := m.leaf_created_transaction_ouput_vout
+// LeafCreatedTransactionOutputVout returns the value of the "leaf_created_transaction_output_vout" field in the mutation.
+func (m *TokenLeafMutation) LeafCreatedTransactionOutputVout() (r uint32, exists bool) {
+	v := m.leaf_created_transaction_output_vout
 	if v == nil {
 		return
 	}
 	return *v, true
 }
 
-// OldLeafCreatedTransactionOuputVout returns the old "leaf_created_transaction_ouput_vout" field's value of the TokenLeaf entity.
+// OldLeafCreatedTransactionOutputVout returns the old "leaf_created_transaction_output_vout" field's value of the TokenLeaf entity.
 // If the TokenLeaf object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *TokenLeafMutation) OldLeafCreatedTransactionOuputVout(ctx context.Context) (v uint32, err error) {
+func (m *TokenLeafMutation) OldLeafCreatedTransactionOutputVout(ctx context.Context) (v uint32, err error) {
 	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldLeafCreatedTransactionOuputVout is only allowed on UpdateOne operations")
+		return v, errors.New("OldLeafCreatedTransactionOutputVout is only allowed on UpdateOne operations")
 	}
 	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldLeafCreatedTransactionOuputVout requires an ID field in the mutation")
+		return v, errors.New("OldLeafCreatedTransactionOutputVout requires an ID field in the mutation")
 	}
 	oldValue, err := m.oldValue(ctx)
 	if err != nil {
-		return v, fmt.Errorf("querying old value for OldLeafCreatedTransactionOuputVout: %w", err)
+		return v, fmt.Errorf("querying old value for OldLeafCreatedTransactionOutputVout: %w", err)
 	}
-	return oldValue.LeafCreatedTransactionOuputVout, nil
+	return oldValue.LeafCreatedTransactionOutputVout, nil
 }
 
-// AddLeafCreatedTransactionOuputVout adds u to the "leaf_created_transaction_ouput_vout" field.
-func (m *TokenLeafMutation) AddLeafCreatedTransactionOuputVout(u int32) {
-	if m.addleaf_created_transaction_ouput_vout != nil {
-		*m.addleaf_created_transaction_ouput_vout += u
+// AddLeafCreatedTransactionOutputVout adds u to the "leaf_created_transaction_output_vout" field.
+func (m *TokenLeafMutation) AddLeafCreatedTransactionOutputVout(u int32) {
+	if m.addleaf_created_transaction_output_vout != nil {
+		*m.addleaf_created_transaction_output_vout += u
 	} else {
-		m.addleaf_created_transaction_ouput_vout = &u
+		m.addleaf_created_transaction_output_vout = &u
 	}
 }
 
-// AddedLeafCreatedTransactionOuputVout returns the value that was added to the "leaf_created_transaction_ouput_vout" field in this mutation.
-func (m *TokenLeafMutation) AddedLeafCreatedTransactionOuputVout() (r int32, exists bool) {
-	v := m.addleaf_created_transaction_ouput_vout
+// AddedLeafCreatedTransactionOutputVout returns the value that was added to the "leaf_created_transaction_output_vout" field in this mutation.
+func (m *TokenLeafMutation) AddedLeafCreatedTransactionOutputVout() (r int32, exists bool) {
+	v := m.addleaf_created_transaction_output_vout
 	if v == nil {
 		return
 	}
 	return *v, true
 }
 
-// ResetLeafCreatedTransactionOuputVout resets all changes to the "leaf_created_transaction_ouput_vout" field.
-func (m *TokenLeafMutation) ResetLeafCreatedTransactionOuputVout() {
-	m.leaf_created_transaction_ouput_vout = nil
-	m.addleaf_created_transaction_ouput_vout = nil
+// ResetLeafCreatedTransactionOutputVout resets all changes to the "leaf_created_transaction_output_vout" field.
+func (m *TokenLeafMutation) ResetLeafCreatedTransactionOutputVout() {
+	m.leaf_created_transaction_output_vout = nil
+	m.addleaf_created_transaction_output_vout = nil
 }
 
 // SetLeafSpentOwnershipSignature sets the "leaf_spent_ownership_signature" field.
@@ -5865,6 +5942,55 @@ func (m *TokenLeafMutation) LeafSpentOwnershipSignatureCleared() bool {
 func (m *TokenLeafMutation) ResetLeafSpentOwnershipSignature() {
 	m.leaf_spent_ownership_signature = nil
 	delete(m.clearedFields, tokenleaf.FieldLeafSpentOwnershipSignature)
+}
+
+// SetLeafSpentOperatorSpecificOwnershipSignature sets the "leaf_spent_operator_specific_ownership_signature" field.
+func (m *TokenLeafMutation) SetLeafSpentOperatorSpecificOwnershipSignature(b []byte) {
+	m.leaf_spent_operator_specific_ownership_signature = &b
+}
+
+// LeafSpentOperatorSpecificOwnershipSignature returns the value of the "leaf_spent_operator_specific_ownership_signature" field in the mutation.
+func (m *TokenLeafMutation) LeafSpentOperatorSpecificOwnershipSignature() (r []byte, exists bool) {
+	v := m.leaf_spent_operator_specific_ownership_signature
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldLeafSpentOperatorSpecificOwnershipSignature returns the old "leaf_spent_operator_specific_ownership_signature" field's value of the TokenLeaf entity.
+// If the TokenLeaf object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenLeafMutation) OldLeafSpentOperatorSpecificOwnershipSignature(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldLeafSpentOperatorSpecificOwnershipSignature is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldLeafSpentOperatorSpecificOwnershipSignature requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldLeafSpentOperatorSpecificOwnershipSignature: %w", err)
+	}
+	return oldValue.LeafSpentOperatorSpecificOwnershipSignature, nil
+}
+
+// ClearLeafSpentOperatorSpecificOwnershipSignature clears the value of the "leaf_spent_operator_specific_ownership_signature" field.
+func (m *TokenLeafMutation) ClearLeafSpentOperatorSpecificOwnershipSignature() {
+	m.leaf_spent_operator_specific_ownership_signature = nil
+	m.clearedFields[tokenleaf.FieldLeafSpentOperatorSpecificOwnershipSignature] = struct{}{}
+}
+
+// LeafSpentOperatorSpecificOwnershipSignatureCleared returns if the "leaf_spent_operator_specific_ownership_signature" field was cleared in this mutation.
+func (m *TokenLeafMutation) LeafSpentOperatorSpecificOwnershipSignatureCleared() bool {
+	_, ok := m.clearedFields[tokenleaf.FieldLeafSpentOperatorSpecificOwnershipSignature]
+	return ok
+}
+
+// ResetLeafSpentOperatorSpecificOwnershipSignature resets all changes to the "leaf_spent_operator_specific_ownership_signature" field.
+func (m *TokenLeafMutation) ResetLeafSpentOperatorSpecificOwnershipSignature() {
+	m.leaf_spent_operator_specific_ownership_signature = nil
+	delete(m.clearedFields, tokenleaf.FieldLeafSpentOperatorSpecificOwnershipSignature)
 }
 
 // SetLeafSpentTransactionInputVout sets the "leaf_spent_transaction_input_vout" field.
@@ -6137,7 +6263,7 @@ func (m *TokenLeafMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *TokenLeafMutation) Fields() []string {
-	fields := make([]string, 0, 13)
+	fields := make([]string, 0, 14)
 	if m.create_time != nil {
 		fields = append(fields, tokenleaf.FieldCreateTime)
 	}
@@ -6165,11 +6291,14 @@ func (m *TokenLeafMutation) Fields() []string {
 	if m.token_amount != nil {
 		fields = append(fields, tokenleaf.FieldTokenAmount)
 	}
-	if m.leaf_created_transaction_ouput_vout != nil {
-		fields = append(fields, tokenleaf.FieldLeafCreatedTransactionOuputVout)
+	if m.leaf_created_transaction_output_vout != nil {
+		fields = append(fields, tokenleaf.FieldLeafCreatedTransactionOutputVout)
 	}
 	if m.leaf_spent_ownership_signature != nil {
 		fields = append(fields, tokenleaf.FieldLeafSpentOwnershipSignature)
+	}
+	if m.leaf_spent_operator_specific_ownership_signature != nil {
+		fields = append(fields, tokenleaf.FieldLeafSpentOperatorSpecificOwnershipSignature)
 	}
 	if m.leaf_spent_transaction_input_vout != nil {
 		fields = append(fields, tokenleaf.FieldLeafSpentTransactionInputVout)
@@ -6203,10 +6332,12 @@ func (m *TokenLeafMutation) Field(name string) (ent.Value, bool) {
 		return m.TokenPublicKey()
 	case tokenleaf.FieldTokenAmount:
 		return m.TokenAmount()
-	case tokenleaf.FieldLeafCreatedTransactionOuputVout:
-		return m.LeafCreatedTransactionOuputVout()
+	case tokenleaf.FieldLeafCreatedTransactionOutputVout:
+		return m.LeafCreatedTransactionOutputVout()
 	case tokenleaf.FieldLeafSpentOwnershipSignature:
 		return m.LeafSpentOwnershipSignature()
+	case tokenleaf.FieldLeafSpentOperatorSpecificOwnershipSignature:
+		return m.LeafSpentOperatorSpecificOwnershipSignature()
 	case tokenleaf.FieldLeafSpentTransactionInputVout:
 		return m.LeafSpentTransactionInputVout()
 	case tokenleaf.FieldLeafSpentRevocationPrivateKey:
@@ -6238,10 +6369,12 @@ func (m *TokenLeafMutation) OldField(ctx context.Context, name string) (ent.Valu
 		return m.OldTokenPublicKey(ctx)
 	case tokenleaf.FieldTokenAmount:
 		return m.OldTokenAmount(ctx)
-	case tokenleaf.FieldLeafCreatedTransactionOuputVout:
-		return m.OldLeafCreatedTransactionOuputVout(ctx)
+	case tokenleaf.FieldLeafCreatedTransactionOutputVout:
+		return m.OldLeafCreatedTransactionOutputVout(ctx)
 	case tokenleaf.FieldLeafSpentOwnershipSignature:
 		return m.OldLeafSpentOwnershipSignature(ctx)
+	case tokenleaf.FieldLeafSpentOperatorSpecificOwnershipSignature:
+		return m.OldLeafSpentOperatorSpecificOwnershipSignature(ctx)
 	case tokenleaf.FieldLeafSpentTransactionInputVout:
 		return m.OldLeafSpentTransactionInputVout(ctx)
 	case tokenleaf.FieldLeafSpentRevocationPrivateKey:
@@ -6318,12 +6451,12 @@ func (m *TokenLeafMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetTokenAmount(v)
 		return nil
-	case tokenleaf.FieldLeafCreatedTransactionOuputVout:
+	case tokenleaf.FieldLeafCreatedTransactionOutputVout:
 		v, ok := value.(uint32)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
-		m.SetLeafCreatedTransactionOuputVout(v)
+		m.SetLeafCreatedTransactionOutputVout(v)
 		return nil
 	case tokenleaf.FieldLeafSpentOwnershipSignature:
 		v, ok := value.([]byte)
@@ -6331,6 +6464,13 @@ func (m *TokenLeafMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetLeafSpentOwnershipSignature(v)
+		return nil
+	case tokenleaf.FieldLeafSpentOperatorSpecificOwnershipSignature:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetLeafSpentOperatorSpecificOwnershipSignature(v)
 		return nil
 	case tokenleaf.FieldLeafSpentTransactionInputVout:
 		v, ok := value.(uint32)
@@ -6360,8 +6500,8 @@ func (m *TokenLeafMutation) AddedFields() []string {
 	if m.addwithdrawal_locktime != nil {
 		fields = append(fields, tokenleaf.FieldWithdrawalLocktime)
 	}
-	if m.addleaf_created_transaction_ouput_vout != nil {
-		fields = append(fields, tokenleaf.FieldLeafCreatedTransactionOuputVout)
+	if m.addleaf_created_transaction_output_vout != nil {
+		fields = append(fields, tokenleaf.FieldLeafCreatedTransactionOutputVout)
 	}
 	if m.addleaf_spent_transaction_input_vout != nil {
 		fields = append(fields, tokenleaf.FieldLeafSpentTransactionInputVout)
@@ -6378,8 +6518,8 @@ func (m *TokenLeafMutation) AddedField(name string) (ent.Value, bool) {
 		return m.AddedWithdrawalBondSats()
 	case tokenleaf.FieldWithdrawalLocktime:
 		return m.AddedWithdrawalLocktime()
-	case tokenleaf.FieldLeafCreatedTransactionOuputVout:
-		return m.AddedLeafCreatedTransactionOuputVout()
+	case tokenleaf.FieldLeafCreatedTransactionOutputVout:
+		return m.AddedLeafCreatedTransactionOutputVout()
 	case tokenleaf.FieldLeafSpentTransactionInputVout:
 		return m.AddedLeafSpentTransactionInputVout()
 	}
@@ -6405,12 +6545,12 @@ func (m *TokenLeafMutation) AddField(name string, value ent.Value) error {
 		}
 		m.AddWithdrawalLocktime(v)
 		return nil
-	case tokenleaf.FieldLeafCreatedTransactionOuputVout:
+	case tokenleaf.FieldLeafCreatedTransactionOutputVout:
 		v, ok := value.(int32)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
-		m.AddLeafCreatedTransactionOuputVout(v)
+		m.AddLeafCreatedTransactionOutputVout(v)
 		return nil
 	case tokenleaf.FieldLeafSpentTransactionInputVout:
 		v, ok := value.(int32)
@@ -6429,6 +6569,9 @@ func (m *TokenLeafMutation) ClearedFields() []string {
 	var fields []string
 	if m.FieldCleared(tokenleaf.FieldLeafSpentOwnershipSignature) {
 		fields = append(fields, tokenleaf.FieldLeafSpentOwnershipSignature)
+	}
+	if m.FieldCleared(tokenleaf.FieldLeafSpentOperatorSpecificOwnershipSignature) {
+		fields = append(fields, tokenleaf.FieldLeafSpentOperatorSpecificOwnershipSignature)
 	}
 	if m.FieldCleared(tokenleaf.FieldLeafSpentTransactionInputVout) {
 		fields = append(fields, tokenleaf.FieldLeafSpentTransactionInputVout)
@@ -6452,6 +6595,9 @@ func (m *TokenLeafMutation) ClearField(name string) error {
 	switch name {
 	case tokenleaf.FieldLeafSpentOwnershipSignature:
 		m.ClearLeafSpentOwnershipSignature()
+		return nil
+	case tokenleaf.FieldLeafSpentOperatorSpecificOwnershipSignature:
+		m.ClearLeafSpentOperatorSpecificOwnershipSignature()
 		return nil
 	case tokenleaf.FieldLeafSpentTransactionInputVout:
 		m.ClearLeafSpentTransactionInputVout()
@@ -6494,11 +6640,14 @@ func (m *TokenLeafMutation) ResetField(name string) error {
 	case tokenleaf.FieldTokenAmount:
 		m.ResetTokenAmount()
 		return nil
-	case tokenleaf.FieldLeafCreatedTransactionOuputVout:
-		m.ResetLeafCreatedTransactionOuputVout()
+	case tokenleaf.FieldLeafCreatedTransactionOutputVout:
+		m.ResetLeafCreatedTransactionOutputVout()
 		return nil
 	case tokenleaf.FieldLeafSpentOwnershipSignature:
 		m.ResetLeafSpentOwnershipSignature()
+		return nil
+	case tokenleaf.FieldLeafSpentOperatorSpecificOwnershipSignature:
+		m.ResetLeafSpentOperatorSpecificOwnershipSignature()
 		return nil
 	case tokenleaf.FieldLeafSpentTransactionInputVout:
 		m.ResetLeafSpentTransactionInputVout()
@@ -6630,6 +6779,7 @@ type TokenTransactionReceiptMutation struct {
 	update_time                      *time.Time
 	partial_token_transaction_hash   *[]byte
 	finalized_token_transaction_hash *[]byte
+	operator_signature               *[]byte
 	clearedFields                    map[string]struct{}
 	spent_leaf                       map[uuid.UUID]struct{}
 	removedspent_leaf                map[uuid.UUID]struct{}
@@ -6892,6 +7042,55 @@ func (m *TokenTransactionReceiptMutation) ResetFinalizedTokenTransactionHash() {
 	m.finalized_token_transaction_hash = nil
 }
 
+// SetOperatorSignature sets the "operator_signature" field.
+func (m *TokenTransactionReceiptMutation) SetOperatorSignature(b []byte) {
+	m.operator_signature = &b
+}
+
+// OperatorSignature returns the value of the "operator_signature" field in the mutation.
+func (m *TokenTransactionReceiptMutation) OperatorSignature() (r []byte, exists bool) {
+	v := m.operator_signature
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOperatorSignature returns the old "operator_signature" field's value of the TokenTransactionReceipt entity.
+// If the TokenTransactionReceipt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenTransactionReceiptMutation) OldOperatorSignature(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOperatorSignature is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOperatorSignature requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOperatorSignature: %w", err)
+	}
+	return oldValue.OperatorSignature, nil
+}
+
+// ClearOperatorSignature clears the value of the "operator_signature" field.
+func (m *TokenTransactionReceiptMutation) ClearOperatorSignature() {
+	m.operator_signature = nil
+	m.clearedFields[tokentransactionreceipt.FieldOperatorSignature] = struct{}{}
+}
+
+// OperatorSignatureCleared returns if the "operator_signature" field was cleared in this mutation.
+func (m *TokenTransactionReceiptMutation) OperatorSignatureCleared() bool {
+	_, ok := m.clearedFields[tokentransactionreceipt.FieldOperatorSignature]
+	return ok
+}
+
+// ResetOperatorSignature resets all changes to the "operator_signature" field.
+func (m *TokenTransactionReceiptMutation) ResetOperatorSignature() {
+	m.operator_signature = nil
+	delete(m.clearedFields, tokentransactionreceipt.FieldOperatorSignature)
+}
+
 // AddSpentLeafIDs adds the "spent_leaf" edge to the TokenLeaf entity by ids.
 func (m *TokenTransactionReceiptMutation) AddSpentLeafIDs(ids ...uuid.UUID) {
 	if m.spent_leaf == nil {
@@ -7073,7 +7272,7 @@ func (m *TokenTransactionReceiptMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *TokenTransactionReceiptMutation) Fields() []string {
-	fields := make([]string, 0, 4)
+	fields := make([]string, 0, 5)
 	if m.create_time != nil {
 		fields = append(fields, tokentransactionreceipt.FieldCreateTime)
 	}
@@ -7085,6 +7284,9 @@ func (m *TokenTransactionReceiptMutation) Fields() []string {
 	}
 	if m.finalized_token_transaction_hash != nil {
 		fields = append(fields, tokentransactionreceipt.FieldFinalizedTokenTransactionHash)
+	}
+	if m.operator_signature != nil {
+		fields = append(fields, tokentransactionreceipt.FieldOperatorSignature)
 	}
 	return fields
 }
@@ -7102,6 +7304,8 @@ func (m *TokenTransactionReceiptMutation) Field(name string) (ent.Value, bool) {
 		return m.PartialTokenTransactionHash()
 	case tokentransactionreceipt.FieldFinalizedTokenTransactionHash:
 		return m.FinalizedTokenTransactionHash()
+	case tokentransactionreceipt.FieldOperatorSignature:
+		return m.OperatorSignature()
 	}
 	return nil, false
 }
@@ -7119,6 +7323,8 @@ func (m *TokenTransactionReceiptMutation) OldField(ctx context.Context, name str
 		return m.OldPartialTokenTransactionHash(ctx)
 	case tokentransactionreceipt.FieldFinalizedTokenTransactionHash:
 		return m.OldFinalizedTokenTransactionHash(ctx)
+	case tokentransactionreceipt.FieldOperatorSignature:
+		return m.OldOperatorSignature(ctx)
 	}
 	return nil, fmt.Errorf("unknown TokenTransactionReceipt field %s", name)
 }
@@ -7156,6 +7362,13 @@ func (m *TokenTransactionReceiptMutation) SetField(name string, value ent.Value)
 		}
 		m.SetFinalizedTokenTransactionHash(v)
 		return nil
+	case tokentransactionreceipt.FieldOperatorSignature:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOperatorSignature(v)
+		return nil
 	}
 	return fmt.Errorf("unknown TokenTransactionReceipt field %s", name)
 }
@@ -7185,7 +7398,11 @@ func (m *TokenTransactionReceiptMutation) AddField(name string, value ent.Value)
 // ClearedFields returns all nullable fields that were cleared during this
 // mutation.
 func (m *TokenTransactionReceiptMutation) ClearedFields() []string {
-	return nil
+	var fields []string
+	if m.FieldCleared(tokentransactionreceipt.FieldOperatorSignature) {
+		fields = append(fields, tokentransactionreceipt.FieldOperatorSignature)
+	}
+	return fields
 }
 
 // FieldCleared returns a boolean indicating if a field with the given name was
@@ -7198,6 +7415,11 @@ func (m *TokenTransactionReceiptMutation) FieldCleared(name string) bool {
 // ClearField clears the value of the field with the given name. It returns an
 // error if the field is not defined in the schema.
 func (m *TokenTransactionReceiptMutation) ClearField(name string) error {
+	switch name {
+	case tokentransactionreceipt.FieldOperatorSignature:
+		m.ClearOperatorSignature()
+		return nil
+	}
 	return fmt.Errorf("unknown TokenTransactionReceipt nullable field %s", name)
 }
 
@@ -7216,6 +7438,9 @@ func (m *TokenTransactionReceiptMutation) ResetField(name string) error {
 		return nil
 	case tokentransactionreceipt.FieldFinalizedTokenTransactionHash:
 		m.ResetFinalizedTokenTransactionHash()
+		return nil
+	case tokentransactionreceipt.FieldOperatorSignature:
+		m.ResetOperatorSignature()
 		return nil
 	}
 	return fmt.Errorf("unknown TokenTransactionReceipt field %s", name)

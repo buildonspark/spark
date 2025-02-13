@@ -70,14 +70,14 @@ func SaveTokenTransactionReceiptAndLeafEnts(ctx context.Context, tokenTransactio
 				Create().
 				// TODO: Consider whether the coordinator instead of the wallet should define this ID.
 				SetID(leafUUID).
-				SetStatus(schema.TokenLeafStatusCreatedUnsigned).
+				SetStatus(schema.TokenLeafStatusCreatedStarted).
 				SetOwnerPublicKey(outputLeaf.OwnerPublicKey).
 				SetWithdrawalBondSats(outputLeaf.WithdrawalBondSats).
 				SetWithdrawalLocktime(outputLeaf.WithdrawalLocktime).
 				SetWithdrawalRevocationPublicKey(outputLeaf.RevocationPublicKey).
 				SetTokenPublicKey(outputLeaf.TokenPublicKey).
 				SetTokenAmount(outputLeaf.TokenAmount).
-				SetLeafCreatedTransactionOuputVout(uint32(leafIndex)).
+				SetLeafCreatedTransactionOutputVout(uint32(leafIndex)).
 				SetRevocationKeyshareID(revocationUUID).
 				SetLeafCreatedTokenTransactionReceiptID(tokenTransactionReceipt.ID),
 		)

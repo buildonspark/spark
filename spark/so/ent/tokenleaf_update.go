@@ -63,6 +63,18 @@ func (tlu *TokenLeafUpdate) ClearLeafSpentOwnershipSignature() *TokenLeafUpdate 
 	return tlu
 }
 
+// SetLeafSpentOperatorSpecificOwnershipSignature sets the "leaf_spent_operator_specific_ownership_signature" field.
+func (tlu *TokenLeafUpdate) SetLeafSpentOperatorSpecificOwnershipSignature(b []byte) *TokenLeafUpdate {
+	tlu.mutation.SetLeafSpentOperatorSpecificOwnershipSignature(b)
+	return tlu
+}
+
+// ClearLeafSpentOperatorSpecificOwnershipSignature clears the value of the "leaf_spent_operator_specific_ownership_signature" field.
+func (tlu *TokenLeafUpdate) ClearLeafSpentOperatorSpecificOwnershipSignature() *TokenLeafUpdate {
+	tlu.mutation.ClearLeafSpentOperatorSpecificOwnershipSignature()
+	return tlu
+}
+
 // SetLeafSpentTransactionInputVout sets the "leaf_spent_transaction_input_vout" field.
 func (tlu *TokenLeafUpdate) SetLeafSpentTransactionInputVout(u uint32) *TokenLeafUpdate {
 	tlu.mutation.ResetLeafSpentTransactionInputVout()
@@ -230,6 +242,12 @@ func (tlu *TokenLeafUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if tlu.mutation.LeafSpentOwnershipSignatureCleared() {
 		_spec.ClearField(tokenleaf.FieldLeafSpentOwnershipSignature, field.TypeBytes)
 	}
+	if value, ok := tlu.mutation.LeafSpentOperatorSpecificOwnershipSignature(); ok {
+		_spec.SetField(tokenleaf.FieldLeafSpentOperatorSpecificOwnershipSignature, field.TypeBytes, value)
+	}
+	if tlu.mutation.LeafSpentOperatorSpecificOwnershipSignatureCleared() {
+		_spec.ClearField(tokenleaf.FieldLeafSpentOperatorSpecificOwnershipSignature, field.TypeBytes)
+	}
 	if value, ok := tlu.mutation.LeafSpentTransactionInputVout(); ok {
 		_spec.SetField(tokenleaf.FieldLeafSpentTransactionInputVout, field.TypeUint32, value)
 	}
@@ -352,6 +370,18 @@ func (tluo *TokenLeafUpdateOne) SetLeafSpentOwnershipSignature(b []byte) *TokenL
 // ClearLeafSpentOwnershipSignature clears the value of the "leaf_spent_ownership_signature" field.
 func (tluo *TokenLeafUpdateOne) ClearLeafSpentOwnershipSignature() *TokenLeafUpdateOne {
 	tluo.mutation.ClearLeafSpentOwnershipSignature()
+	return tluo
+}
+
+// SetLeafSpentOperatorSpecificOwnershipSignature sets the "leaf_spent_operator_specific_ownership_signature" field.
+func (tluo *TokenLeafUpdateOne) SetLeafSpentOperatorSpecificOwnershipSignature(b []byte) *TokenLeafUpdateOne {
+	tluo.mutation.SetLeafSpentOperatorSpecificOwnershipSignature(b)
+	return tluo
+}
+
+// ClearLeafSpentOperatorSpecificOwnershipSignature clears the value of the "leaf_spent_operator_specific_ownership_signature" field.
+func (tluo *TokenLeafUpdateOne) ClearLeafSpentOperatorSpecificOwnershipSignature() *TokenLeafUpdateOne {
+	tluo.mutation.ClearLeafSpentOperatorSpecificOwnershipSignature()
 	return tluo
 }
 
@@ -551,6 +581,12 @@ func (tluo *TokenLeafUpdateOne) sqlSave(ctx context.Context) (_node *TokenLeaf, 
 	}
 	if tluo.mutation.LeafSpentOwnershipSignatureCleared() {
 		_spec.ClearField(tokenleaf.FieldLeafSpentOwnershipSignature, field.TypeBytes)
+	}
+	if value, ok := tluo.mutation.LeafSpentOperatorSpecificOwnershipSignature(); ok {
+		_spec.SetField(tokenleaf.FieldLeafSpentOperatorSpecificOwnershipSignature, field.TypeBytes, value)
+	}
+	if tluo.mutation.LeafSpentOperatorSpecificOwnershipSignatureCleared() {
+		_spec.ClearField(tokenleaf.FieldLeafSpentOperatorSpecificOwnershipSignature, field.TypeBytes)
 	}
 	if value, ok := tluo.mutation.LeafSpentTransactionInputVout(); ok {
 		_spec.SetField(tokenleaf.FieldLeafSpentTransactionInputVout, field.TypeUint32, value)

@@ -11,23 +11,21 @@ import (
 type TokenLeafStatus string
 
 const (
-	// TokenLeafStatusCreating is the initial status of leaf that is being created.
-	TokenLeafStatusCreatedUnsigned TokenLeafStatus = "CREATED_UNSIGNED"
+	// TokenLeafStatusCreating is the status of a leaf after the creation has started
+	// but before the transaction creating it has been signed.
+	TokenLeafStatusCreatedStarted TokenLeafStatus = "CREATED_STARTED"
 	// TokenLeafStatusSigned is the status after a leaf has been signed by the operator
 	// but before the transaction has been finalized.
 	TokenLeafStatusCreatedSigned TokenLeafStatus = "CREATED_SIGNED"
 	// TokenLeafStatusFinalized is the status after a leaf has been finalized by the
 	// operator and is ready for spending.
 	TokenLeafStatusCreatedFinalized TokenLeafStatus = "CREATED_FINALIZED"
-	// TokenLeafStatusSpent is the status of a leaf after a tx has come in to spend it but
-	// before the transaction has been signed.
-	TokenLeafStatusSpentUnsigned TokenLeafStatus = "SPENT_UNSIGNED"
+	// TokenLeafStatusSpentStarted is the status of a leaf after a tx has come in to start
+	// spending but before the transaction has been signed.
+	TokenLeafStatusSpentStarted TokenLeafStatus = "SPENT_STARTED"
 	// TokenLeafStatusSpent is the status of a leaf after the tx has been signed by the
 	// operator to spend it but before it is finalized.
 	TokenLeafStatusSpentSigned TokenLeafStatus = "SPENT_SIGNED"
-	// TokenLeafStatusSpentKeyshareReleased is the status of a leaf after the keyshare
-	// hash been released but before the private key has been provided by the wallet.
-	TokenLeafStatusSpentKeyshareReleased TokenLeafStatus = "SPENT_KEYSHARE_RELEASED"
 	// TokenLeafStatusSpentFinalized is the status of a leaf after the tx has been signed
 	// by the operator to spend it but before it is finalized.
 	TokenLeafStatusSpentFinalized TokenLeafStatus = "SPENT_FINALIZED"
@@ -36,12 +34,11 @@ const (
 // Values returns the values of the token leaf status.
 func (TokenLeafStatus) Values() []string {
 	return []string{
-		string(TokenLeafStatusCreatedUnsigned),
+		string(TokenLeafStatusCreatedStarted),
 		string(TokenLeafStatusCreatedSigned),
 		string(TokenLeafStatusCreatedFinalized),
-		string(TokenLeafStatusSpentUnsigned),
+		string(TokenLeafStatusSpentStarted),
 		string(TokenLeafStatusSpentSigned),
-		string(TokenLeafStatusSpentKeyshareReleased),
 		string(TokenLeafStatusSpentFinalized),
 	}
 }
@@ -68,8 +65,9 @@ func (TokenLeaf) Fields() []ent.Field {
 		field.Bytes("withdrawal_revocation_public_key").Immutable(),
 		field.Bytes("token_public_key").NotEmpty().Immutable(),
 		field.Bytes("token_amount").NotEmpty().Immutable(),
-		field.Uint32("leaf_created_transaction_ouput_vout").Immutable(),
+		field.Uint32("leaf_created_transaction_output_vout").Immutable(),
 		field.Bytes("leaf_spent_ownership_signature").Optional(),
+		field.Bytes("leaf_spent_operator_specific_ownership_signature").Optional(),
 		field.Uint32("leaf_spent_transaction_input_vout").Optional(),
 		field.Bytes("leaf_spent_revocation_private_key").Optional(),
 	}

@@ -62,6 +62,12 @@ func (tic *TokenIssuanceCreate) SetIssuerSignature(b []byte) *TokenIssuanceCreat
 	return tic
 }
 
+// SetOperatorSpecificIssuerSignature sets the "operator_specific_issuer_signature" field.
+func (tic *TokenIssuanceCreate) SetOperatorSpecificIssuerSignature(b []byte) *TokenIssuanceCreate {
+	tic.mutation.SetOperatorSpecificIssuerSignature(b)
+	return tic
+}
+
 // SetID sets the "id" field.
 func (tic *TokenIssuanceCreate) SetID(u uuid.UUID) *TokenIssuanceCreate {
 	tic.mutation.SetID(u)
@@ -214,6 +220,10 @@ func (tic *TokenIssuanceCreate) createSpec() (*TokenIssuance, *sqlgraph.CreateSp
 	if value, ok := tic.mutation.IssuerSignature(); ok {
 		_spec.SetField(tokenissuance.FieldIssuerSignature, field.TypeBytes, value)
 		_node.IssuerSignature = value
+	}
+	if value, ok := tic.mutation.OperatorSpecificIssuerSignature(); ok {
+		_spec.SetField(tokenissuance.FieldOperatorSpecificIssuerSignature, field.TypeBytes, value)
+		_node.OperatorSpecificIssuerSignature = value
 	}
 	if nodes := tic.mutation.TokenTransactionReceiptIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{

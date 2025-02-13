@@ -94,15 +94,21 @@ func (tlc *TokenLeafCreate) SetTokenAmount(b []byte) *TokenLeafCreate {
 	return tlc
 }
 
-// SetLeafCreatedTransactionOuputVout sets the "leaf_created_transaction_ouput_vout" field.
-func (tlc *TokenLeafCreate) SetLeafCreatedTransactionOuputVout(u uint32) *TokenLeafCreate {
-	tlc.mutation.SetLeafCreatedTransactionOuputVout(u)
+// SetLeafCreatedTransactionOutputVout sets the "leaf_created_transaction_output_vout" field.
+func (tlc *TokenLeafCreate) SetLeafCreatedTransactionOutputVout(u uint32) *TokenLeafCreate {
+	tlc.mutation.SetLeafCreatedTransactionOutputVout(u)
 	return tlc
 }
 
 // SetLeafSpentOwnershipSignature sets the "leaf_spent_ownership_signature" field.
 func (tlc *TokenLeafCreate) SetLeafSpentOwnershipSignature(b []byte) *TokenLeafCreate {
 	tlc.mutation.SetLeafSpentOwnershipSignature(b)
+	return tlc
+}
+
+// SetLeafSpentOperatorSpecificOwnershipSignature sets the "leaf_spent_operator_specific_ownership_signature" field.
+func (tlc *TokenLeafCreate) SetLeafSpentOperatorSpecificOwnershipSignature(b []byte) *TokenLeafCreate {
+	tlc.mutation.SetLeafSpentOperatorSpecificOwnershipSignature(b)
 	return tlc
 }
 
@@ -287,8 +293,8 @@ func (tlc *TokenLeafCreate) check() error {
 			return &ValidationError{Name: "token_amount", err: fmt.Errorf(`ent: validator failed for field "TokenLeaf.token_amount": %w`, err)}
 		}
 	}
-	if _, ok := tlc.mutation.LeafCreatedTransactionOuputVout(); !ok {
-		return &ValidationError{Name: "leaf_created_transaction_ouput_vout", err: errors.New(`ent: missing required field "TokenLeaf.leaf_created_transaction_ouput_vout"`)}
+	if _, ok := tlc.mutation.LeafCreatedTransactionOutputVout(); !ok {
+		return &ValidationError{Name: "leaf_created_transaction_output_vout", err: errors.New(`ent: missing required field "TokenLeaf.leaf_created_transaction_output_vout"`)}
 	}
 	if len(tlc.mutation.RevocationKeyshareIDs()) == 0 {
 		return &ValidationError{Name: "revocation_keyshare", err: errors.New(`ent: missing required edge "TokenLeaf.revocation_keyshare"`)}
@@ -364,13 +370,17 @@ func (tlc *TokenLeafCreate) createSpec() (*TokenLeaf, *sqlgraph.CreateSpec) {
 		_spec.SetField(tokenleaf.FieldTokenAmount, field.TypeBytes, value)
 		_node.TokenAmount = value
 	}
-	if value, ok := tlc.mutation.LeafCreatedTransactionOuputVout(); ok {
-		_spec.SetField(tokenleaf.FieldLeafCreatedTransactionOuputVout, field.TypeUint32, value)
-		_node.LeafCreatedTransactionOuputVout = value
+	if value, ok := tlc.mutation.LeafCreatedTransactionOutputVout(); ok {
+		_spec.SetField(tokenleaf.FieldLeafCreatedTransactionOutputVout, field.TypeUint32, value)
+		_node.LeafCreatedTransactionOutputVout = value
 	}
 	if value, ok := tlc.mutation.LeafSpentOwnershipSignature(); ok {
 		_spec.SetField(tokenleaf.FieldLeafSpentOwnershipSignature, field.TypeBytes, value)
 		_node.LeafSpentOwnershipSignature = value
+	}
+	if value, ok := tlc.mutation.LeafSpentOperatorSpecificOwnershipSignature(); ok {
+		_spec.SetField(tokenleaf.FieldLeafSpentOperatorSpecificOwnershipSignature, field.TypeBytes, value)
+		_node.LeafSpentOperatorSpecificOwnershipSignature = value
 	}
 	if value, ok := tlc.mutation.LeafSpentTransactionInputVout(); ok {
 		_spec.SetField(tokenleaf.FieldLeafSpentTransactionInputVout, field.TypeUint32, value)

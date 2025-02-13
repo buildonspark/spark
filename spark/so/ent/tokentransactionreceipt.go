@@ -27,6 +27,8 @@ type TokenTransactionReceipt struct {
 	PartialTokenTransactionHash []byte `json:"partial_token_transaction_hash,omitempty"`
 	// FinalizedTokenTransactionHash holds the value of the "finalized_token_transaction_hash" field.
 	FinalizedTokenTransactionHash []byte `json:"finalized_token_transaction_hash,omitempty"`
+	// OperatorSignature holds the value of the "operator_signature" field.
+	OperatorSignature []byte `json:"operator_signature,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the TokenTransactionReceiptQuery when eager-loading is set.
 	Edges                              TokenTransactionReceiptEdges `json:"edges"`
@@ -81,7 +83,7 @@ func (*TokenTransactionReceipt) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case tokentransactionreceipt.FieldPartialTokenTransactionHash, tokentransactionreceipt.FieldFinalizedTokenTransactionHash:
+		case tokentransactionreceipt.FieldPartialTokenTransactionHash, tokentransactionreceipt.FieldFinalizedTokenTransactionHash, tokentransactionreceipt.FieldOperatorSignature:
 			values[i] = new([]byte)
 		case tokentransactionreceipt.FieldCreateTime, tokentransactionreceipt.FieldUpdateTime:
 			values[i] = new(sql.NullTime)
@@ -133,6 +135,12 @@ func (ttr *TokenTransactionReceipt) assignValues(columns []string, values []any)
 				return fmt.Errorf("unexpected type %T for field finalized_token_transaction_hash", values[i])
 			} else if value != nil {
 				ttr.FinalizedTokenTransactionHash = *value
+			}
+		case tokentransactionreceipt.FieldOperatorSignature:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field operator_signature", values[i])
+			} else if value != nil {
+				ttr.OperatorSignature = *value
 			}
 		case tokentransactionreceipt.ForeignKeys[0]:
 			if value, ok := values[i].(*sql.NullScanner); !ok {
@@ -203,6 +211,9 @@ func (ttr *TokenTransactionReceipt) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("finalized_token_transaction_hash=")
 	builder.WriteString(fmt.Sprintf("%v", ttr.FinalizedTokenTransactionHash))
+	builder.WriteString(", ")
+	builder.WriteString("operator_signature=")
+	builder.WriteString(fmt.Sprintf("%v", ttr.OperatorSignature))
 	builder.WriteByte(')')
 	return builder.String()
 }

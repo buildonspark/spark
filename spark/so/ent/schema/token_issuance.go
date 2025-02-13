@@ -19,8 +19,9 @@ func (TokenIssuance) Mixin() []ent.Mixin {
 
 func (TokenIssuance) Fields() []ent.Field {
 	return []ent.Field{
-		field.Bytes("issuer_public_key").NotEmpty().Immutable().Unique(),
+		field.Bytes("issuer_public_key").NotEmpty().Immutable(),
 		field.Bytes("issuer_signature").NotEmpty().Immutable().Unique(),
+		field.Bytes("operator_specific_issuer_signature").Optional().Unique(),
 	}
 }
 

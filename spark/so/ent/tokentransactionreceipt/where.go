@@ -76,6 +76,11 @@ func FinalizedTokenTransactionHash(v []byte) predicate.TokenTransactionReceipt {
 	return predicate.TokenTransactionReceipt(sql.FieldEQ(FieldFinalizedTokenTransactionHash, v))
 }
 
+// OperatorSignature applies equality check predicate on the "operator_signature" field. It's identical to OperatorSignatureEQ.
+func OperatorSignature(v []byte) predicate.TokenTransactionReceipt {
+	return predicate.TokenTransactionReceipt(sql.FieldEQ(FieldOperatorSignature, v))
+}
+
 // CreateTimeEQ applies the EQ predicate on the "create_time" field.
 func CreateTimeEQ(v time.Time) predicate.TokenTransactionReceipt {
 	return predicate.TokenTransactionReceipt(sql.FieldEQ(FieldCreateTime, v))
@@ -234,6 +239,56 @@ func FinalizedTokenTransactionHashLT(v []byte) predicate.TokenTransactionReceipt
 // FinalizedTokenTransactionHashLTE applies the LTE predicate on the "finalized_token_transaction_hash" field.
 func FinalizedTokenTransactionHashLTE(v []byte) predicate.TokenTransactionReceipt {
 	return predicate.TokenTransactionReceipt(sql.FieldLTE(FieldFinalizedTokenTransactionHash, v))
+}
+
+// OperatorSignatureEQ applies the EQ predicate on the "operator_signature" field.
+func OperatorSignatureEQ(v []byte) predicate.TokenTransactionReceipt {
+	return predicate.TokenTransactionReceipt(sql.FieldEQ(FieldOperatorSignature, v))
+}
+
+// OperatorSignatureNEQ applies the NEQ predicate on the "operator_signature" field.
+func OperatorSignatureNEQ(v []byte) predicate.TokenTransactionReceipt {
+	return predicate.TokenTransactionReceipt(sql.FieldNEQ(FieldOperatorSignature, v))
+}
+
+// OperatorSignatureIn applies the In predicate on the "operator_signature" field.
+func OperatorSignatureIn(vs ...[]byte) predicate.TokenTransactionReceipt {
+	return predicate.TokenTransactionReceipt(sql.FieldIn(FieldOperatorSignature, vs...))
+}
+
+// OperatorSignatureNotIn applies the NotIn predicate on the "operator_signature" field.
+func OperatorSignatureNotIn(vs ...[]byte) predicate.TokenTransactionReceipt {
+	return predicate.TokenTransactionReceipt(sql.FieldNotIn(FieldOperatorSignature, vs...))
+}
+
+// OperatorSignatureGT applies the GT predicate on the "operator_signature" field.
+func OperatorSignatureGT(v []byte) predicate.TokenTransactionReceipt {
+	return predicate.TokenTransactionReceipt(sql.FieldGT(FieldOperatorSignature, v))
+}
+
+// OperatorSignatureGTE applies the GTE predicate on the "operator_signature" field.
+func OperatorSignatureGTE(v []byte) predicate.TokenTransactionReceipt {
+	return predicate.TokenTransactionReceipt(sql.FieldGTE(FieldOperatorSignature, v))
+}
+
+// OperatorSignatureLT applies the LT predicate on the "operator_signature" field.
+func OperatorSignatureLT(v []byte) predicate.TokenTransactionReceipt {
+	return predicate.TokenTransactionReceipt(sql.FieldLT(FieldOperatorSignature, v))
+}
+
+// OperatorSignatureLTE applies the LTE predicate on the "operator_signature" field.
+func OperatorSignatureLTE(v []byte) predicate.TokenTransactionReceipt {
+	return predicate.TokenTransactionReceipt(sql.FieldLTE(FieldOperatorSignature, v))
+}
+
+// OperatorSignatureIsNil applies the IsNil predicate on the "operator_signature" field.
+func OperatorSignatureIsNil() predicate.TokenTransactionReceipt {
+	return predicate.TokenTransactionReceipt(sql.FieldIsNull(FieldOperatorSignature))
+}
+
+// OperatorSignatureNotNil applies the NotNil predicate on the "operator_signature" field.
+func OperatorSignatureNotNil() predicate.TokenTransactionReceipt {
+	return predicate.TokenTransactionReceipt(sql.FieldNotNull(FieldOperatorSignature))
 }
 
 // HasSpentLeaf applies the HasEdge predicate on the "spent_leaf" edge.
