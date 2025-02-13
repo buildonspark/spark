@@ -16,13 +16,13 @@ import {
   CompleteCoopExitOutput,
   CoopExitFeeEstimateInput,
   CoopExitFeeEstimateOutput,
+  LightningSendRequest,
   RequestCoopExitInput,
   RequestCoopExitOutput,
   RequestLeavesSwapInput,
   RequestLeavesSwapOutput,
   RequestLightningReceiveInput,
   RequestLightningSendInput,
-  RequestLightningSendOutput,
 } from "./objects";
 import { CompleteCoopExitOutputFromJson } from "./objects/CompleteCoopExitOutput";
 import { CoopExitFeeEstimateOutputFromJson } from "./objects/CoopExitFeeEstimateOutput";
@@ -35,9 +35,9 @@ import LightningReceiveRequest, {
 import LightningSendFeeEstimateOutput, {
   LightningSendFeeEstimateOutputFromJson,
 } from "./objects/LightningSendFeeEstimateOutput";
+import { LightningSendRequestFromJson } from "./objects/LightningSendRequest";
 import { RequestCoopExitOutputFromJson } from "./objects/RequestCoopExitOutput";
 import { RequestLeavesSwapOutputFromJson } from "./objects/RequestLeavesSwapOutput";
-import { RequestLightningSendOutputFromJson } from "./objects/RequestLightningSendOutput";
 import { CoopExitFeeEstimate } from "./queries/CoopExitFeeEstimate";
 import { LightningReceiveFeeEstimate } from "./queries/LightningReceiveFeeEstimate";
 import { LightningSendFeeEstimate } from "./queries/LightningSendFeeEstimate";
@@ -183,7 +183,7 @@ export default class SspClient {
   async requestLightningSend({
     encodedInvoice,
     idempotencyKey,
-  }: RequestLightningSendInput): Promise<RequestLightningSendOutput | null> {
+  }: RequestLightningSendInput): Promise<LightningSendRequest | null> {
     return await this.executeRawQuery({
       queryPayload: RequestLightningSend,
       variables: {
@@ -191,7 +191,7 @@ export default class SspClient {
         idempotency_key: idempotencyKey,
       },
       constructObject: (response: { request_lightning_send: any }) => {
-        return RequestLightningSendOutputFromJson(
+        return LightningSendRequestFromJson(
           response.request_lightning_send.request
         );
       },

@@ -48,6 +48,13 @@ type CreateLightningInvoiceParams = {
   memo: string;
   invoiceCreator?: () => Promise<string>;
 };
+
+type PayLightningInvoiceParams = {
+  invoice: string;
+  idempotencyKey: string;
+  amountSats: number;
+};
+
 export class SparkWallet {
   private config: WalletConfigService;
 
@@ -195,8 +202,55 @@ export class SparkWallet {
     });
   }
 
-  async payLightningInvoice() {
-    throw new Error("Not implemented");
+  async payLightningInvoice({
+    invoice,
+    idempotencyKey,
+    amountSats,
+  }: PayLightningInvoiceParams) {
+    if (!this.sspClient) {
+      throw new Error("SSP client not initialized");
+    }
+
+    const sspResponse = await this.sspClient.requestLightningSend({
+      encodedInvoice: invoice,
+      idempotencyKey,
+    });
+
+    if (!sspResponse) {
+      throw new Error("Failed to contact SSP");
+    }
+
+    // fetch leaves for amount
+    const leaves = selectLeaves(
+      this.leaves.map((leaf) => ({ ...leaf, isUsed: false })),
+      amountSats
+    );
+
+    const leavesToSend = leaves.map((leaf) => ({
+      leaf,
+      signingPubKey: this.config.signer.generatePublicKey(sha256(leaf.id)),
+      newSigningPubKey: this.config.signer.generatePublicKey(),
+    }));
+
+    const swapResponse = await this.lightningService.swapNodesForPreimage({
+      leaves: leavesToSend,
+      receiverIdentityPubkey: this.config.signer.getSspIdentityPublicKey(),
+      paymentHash: this.config.signer.hashRandomPrivateKey(),
+      isInboundPayment: false,
+      invoiceString: sspResponse.encodedInvoice,
+    });
+
+    if (!swapResponse.transfer) {
+      throw new Error("Failed to swap nodes for preimage");
+    }
+
+    const transfer = await this.transferService.sendTransferTweakKey(
+      swapResponse.transfer,
+      leavesToSend,
+      new Map()
+    );
+
+    return transfer;
   }
 
   async getLightningReceiveFeeEstimate({

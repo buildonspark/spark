@@ -7,6 +7,7 @@ import { schnorr, secp256k1 } from "@noble/curves/secp256k1";
 import { HDKey } from "@scure/bip32";
 import * as bip39 from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english";
+import { sha256 } from "@scure/btc-signer/utils";
 import assert from "assert";
 import * as ecies from "eciesjs";
 import { subtractPrivateKeys } from "../utils/keys";
@@ -93,6 +94,8 @@ interface SparkSigner {
 
   getRandomSigningCommitment(): SigningCommitment;
   getSspIdentityPublicKey(): Uint8Array;
+
+  hashRandomPrivateKey(): Uint8Array;
 }
 
 class DefaultSparkSigner implements SparkSigner {
@@ -355,6 +358,10 @@ class DefaultSparkSigner implements SparkSigner {
     return hexToBytes(
       "030868bb1892292e7e4cd6c14a02c16ca2326f07a185d45b2f1068d996532559d5"
     );
+  }
+
+  hashRandomPrivateKey(): Uint8Array {
+    return sha256(secp256k1.utils.randomPrivateKey());
   }
 }
 
