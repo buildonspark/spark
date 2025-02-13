@@ -36,7 +36,7 @@ if ! [[ "$CONTEXT" =~ ^(brett|dev|loadtest|mgorven|prod)$ ]]; then
     usage
 fi
 
-AUTHORITY="$(kubectl --context "$CONTEXT" -n spark-v1 get statefulset spark -o yaml -o jsonpath='{.spec.template.spec.containers[0].command[-1]}' | grep "database=" | cut -d/ -f3)"
+AUTHORITY="$(kubectl --context "$CONTEXT" -n spark get statefulset spark -o yaml -o jsonpath='{.spec.template.spec.containers[0].command[-1]}' | grep "database=" | cut -d/ -f3)"
 PORT="${AUTHORITY#*:}"
 HOSTPORT="${AUTHORITY#*@}"
 HOST="${HOSTPORT%:*}"
