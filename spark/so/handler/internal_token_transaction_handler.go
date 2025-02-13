@@ -3,15 +3,19 @@ package handler
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"math/big"
 
 	"github.com/google/uuid"
+	pblrc20 "github.com/lightsparkdev/spark-go/proto/lrc20"
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark-go/proto/spark_internal"
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/ent"
+	"github.com/lightsparkdev/spark-go/so/helper"
+
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
 	"github.com/lightsparkdev/spark-go/so/utils"
 )
@@ -83,11 +87,20 @@ func (h *InternalTokenTransactionHandler) StartTokenTransactionInternal(ctx cont
 		finalTokenTransaction.OutputLeaves[i].RevocationPublicKey = keyshare.PublicKey
 	}
 
-	// Validate final token transaction just to be safe (eg. to ensure all public keys are valid + unique) before saving, even
-	// though an invalid transaction at this point is unlikely because all generated keyshare ids should map to a unique public key.
-	err = utils.ValidateFinalTokenTransaction(finalTokenTransaction, req.TokenTransactionSignatures, config.GetSigningOperatorList())
+	conn, err := helper.ConnectToLrc20Node(config)
 	if err != nil {
-		return nil, fmt.Errorf("invalid final token transaction: %w", err)
+		return nil, fmt.Errorf("failed to connect to LRC20 node: %w", err)
+	}
+	defer conn.Close()
+	lrc20Client := pblrc20.NewSparkServiceClient(conn)
+	res, err := lrc20Client.VerifySparkTx(ctx, &pblrc20.VerifySparkTxRequest{FinalTokenTransaction: finalTokenTransaction})
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: Remove is_valid boolean in response and use error codes only instead.
+	if !res.IsValid {
+		return nil, errors.New("LRC20 node validation: invalid token transaction")
 	}
 
 	// Save the token transaction receipt, created leaf ents, and update the leaves to spend.

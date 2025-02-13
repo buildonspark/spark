@@ -10,12 +10,12 @@ import (
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/common"
+	pblrc20 "github.com/lightsparkdev/spark-go/proto/lrc20"
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark-go/proto/spark_internal"
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/authz"
 	"github.com/lightsparkdev/spark-go/so/ent"
-	"github.com/lightsparkdev/spark-go/so/ent/tokentransactionreceipt"
 	"github.com/lightsparkdev/spark-go/so/helper"
 	"github.com/lightsparkdev/spark-go/so/utils"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -173,7 +173,12 @@ func (o TokenTransactionHandler) SignTokenTransaction(
 			return nil, fmt.Errorf("invalid owner signature for leaf: %w", err)
 		}
 	}
-	tokenTransactionReceipt, err := ent.FetchTokenTransactionData(ctx, req.FinalTokenTransactionHash)
+	finalTokenTransactionHash, err := utils.HashTokenTransaction(req.FinalTokenTransaction, false)
+	if err != nil {
+		log.Printf("Failed to hash final token transaction: %v", err)
+		return nil, err
+	}
+	tokenTransactionReceipt, err := ent.FetchTokenTransactionData(ctx, finalTokenTransactionHash)
 	if err != nil {
 		log.Printf("Sign request for token transaction did not map to a previously started transaction: %v", err)
 		return nil, err
@@ -181,7 +186,7 @@ func (o TokenTransactionHandler) SignTokenTransaction(
 
 	// Sign the token transaction hash with the operator identity private key.
 	identityPrivateKey := secp256k1.PrivKeyFromBytes(config.IdentityPrivateKey)
-	operatorSignature := ecdsa.Sign(identityPrivateKey, req.FinalTokenTransactionHash)
+	operatorSignature := ecdsa.Sign(identityPrivateKey, finalTokenTransactionHash)
 
 	operatorSpecificSignature := make([][]byte, len(req.OperatorSpecificSignatures))
 	for i, sig := range req.OperatorSpecificSignatures {
@@ -192,10 +197,16 @@ func (o TokenTransactionHandler) SignTokenTransaction(
 		log.Printf("Failed to update leaves after signing: %v", err)
 		return nil, err
 	}
-	// Refetch the data to update the receipt object with the updated ents.
-	tokenTransactionReceipt, err = ent.FetchTokenTransactionData(ctx, req.FinalTokenTransactionHash)
+
+	err = o.SendTransactionToLRC20Node(
+		ctx,
+		config,
+		req.FinalTokenTransaction,
+		operatorSignature.Serialize(),
+		// Revocation keys not available until finalize step.
+		[][]byte{})
 	if err != nil {
-		log.Printf("Failed to refetch token transaction data: %v", err)
+		log.Printf("Failed to send transaction to LRC20 node: %v", err)
 		return nil, err
 	}
 
@@ -232,16 +243,16 @@ func (o TokenTransactionHandler) SignTokenTransaction(
 // FinalizeTokenTransaction takes the revocation private keys for spent leaves and updates their status to finalized.
 func (o TokenTransactionHandler) FinalizeTokenTransaction(
 	ctx context.Context,
+	config *so.Config,
 	req *pb.FinalizeTokenTransactionRequest,
 ) (*emptypb.Empty, error) {
-	db := ent.GetDbFromContext(ctx)
-	finalTokenTransactionHash := req.FinalTokenTransactionHash
+	finalTokenTransactionHash, err := utils.HashTokenTransaction(req.FinalTokenTransaction, false)
+	if err != nil {
+		log.Printf("Failed to hash final token transaction: %v", err)
+		return nil, err
+	}
 
-	tokenTransactionReceipt, err := db.TokenTransactionReceipt.Query().
-		Where(tokentransactionreceipt.FinalizedTokenTransactionHash(finalTokenTransactionHash)).
-		WithSpentLeaf().
-		WithCreatedLeaf().
-		Only(ctx)
+	tokenTransactionReceipt, err := ent.FetchTokenTransactionData(ctx, finalTokenTransactionHash)
 	if err != nil {
 		log.Printf("Failed to fetch matching transaction receipt: %v", err)
 		return nil, fmt.Errorf("failed to fetch transaction receipt: %w", err)
@@ -264,6 +275,18 @@ func (o TokenTransactionHandler) FinalizeTokenTransaction(
 		return nil, err
 	}
 
+	err = o.SendTransactionToLRC20Node(
+		ctx,
+		config,
+		req.FinalTokenTransaction,
+		// TODO: Consider removing this because it was already provided in the Sign() step.
+		tokenTransactionReceipt.OperatorSignature,
+		req.LeafToSpendRevocationKeys)
+	if err != nil {
+		log.Printf("Failed to send transaction to LRC20 node: %v", err)
+		return nil, err
+	}
+
 	err = ent.UpdateFinalizedTransactionLeaves(ctx, tokenTransactionReceipt, req.LeafToSpendRevocationKeys)
 	if err != nil {
 		log.Printf("Failed to update leaves after finalizing: %v", err)
@@ -271,4 +294,45 @@ func (o TokenTransactionHandler) FinalizeTokenTransaction(
 	}
 
 	return &emptypb.Empty{}, nil
+}
+
+func (o TokenTransactionHandler) SendTransactionToLRC20Node(
+	ctx context.Context,
+	config *so.Config,
+	finalTokenTransaction *pb.TokenTransaction,
+	operatorSignature []byte,
+	revocationKeys [][]byte,
+) error {
+	leavesToSpendData := make([]*pblrc20.SparkSignatureLeafData, len(revocationKeys))
+	for i, revocationKey := range revocationKeys {
+		leavesToSpendData[i] = &pblrc20.SparkSignatureLeafData{
+			SpentLeafIndex: uint32(i),
+			// Revocation will be nil if we are sending the transaction at the Sign() step.
+			// It will be filled when sending a transaction in the Finalize() step.
+			RevocationPrivateKey: revocationKey,
+		}
+	}
+
+	signatureData := &pblrc20.SparkSignatureData{
+		SparkOperatorSignature:         operatorSignature,
+		SparkOperatorIdentityPublicKey: config.IdentityPublicKey(),
+		FinalTokenTransaction:          finalTokenTransaction,
+		LeavesToSpendData:              leavesToSpendData,
+	}
+
+	conn, err := helper.ConnectToLrc20Node(config)
+	if err != nil {
+		return fmt.Errorf("failed to connect to LRC20 node: %w", err)
+	}
+	defer conn.Close()
+	lrc20Client := pblrc20.NewSparkServiceClient(conn)
+
+	_, err = lrc20Client.SendSparkSignature(ctx, &pblrc20.SendSparkSignatureRequest{
+		SignatureData: signatureData,
+	})
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

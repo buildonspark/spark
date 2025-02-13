@@ -181,5 +181,5 @@ func (s *SparkServer) SignTokenTransaction(ctx context.Context, req *pb.SignToke
 // to finalize the transaction. This operation irreversibly spends the input leaves associated with the transaction.
 func (s *SparkServer) FinalizeTokenTransaction(ctx context.Context, req *pb.FinalizeTokenTransactionRequest) (*emptypb.Empty, error) {
 	tokenTransactionHandler := handler.NewTokenTransactionHandler(s.config)
-	return wrapWithGRPCError(tokenTransactionHandler.FinalizeTokenTransaction(ctx, req))
+	return wrapWithGRPCError(tokenTransactionHandler.FinalizeTokenTransaction(ctx, s.config, req))
 }

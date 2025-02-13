@@ -158,7 +158,7 @@ func BroadcastTokenTransaction(
 		operatorClient := pb.NewSparkServiceClient(operatorConn)
 		signTokenTransactionResponse, err := operatorClient.SignTokenTransaction(ctx,
 			&pb.SignTokenTransactionRequest{
-				FinalTokenTransactionHash:  finalTokenTransactionHash,
+				FinalTokenTransaction:      startResponse.FinalTokenTransaction,
 				OperatorSpecificSignatures: operatorSpecificSignatures,
 			})
 		if err != nil {
@@ -230,7 +230,7 @@ func BroadcastTokenTransaction(
 
 			operatorClient := pb.NewSparkServiceClient(operatorConn)
 			_, err = operatorClient.FinalizeTokenTransaction(ctx, &pb.FinalizeTokenTransactionRequest{
-				FinalTokenTransactionHash: finalTokenTransactionHash,
+				FinalTokenTransaction:     startResponse.FinalTokenTransaction,
 				LeafToSpendRevocationKeys: leafRecoveredSecrets,
 			})
 			if err != nil {

@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
+	"sort"
 
 	"github.com/btcsuite/btcd/btcec/v2/ecdsa"
 	secp256k1 "github.com/decred/dcrd/dcrec/secp256k1/v4"
@@ -77,8 +78,13 @@ func HashTokenTransaction(tokenTransaction *pb.TokenTransaction, partialHash boo
 		allHashes = append(allHashes, h.Sum(nil)...)
 	}
 
+	operatorPublicKeys := tokenTransaction.GetSparkOperatorIdentityPublicKeys()
+	sort.Slice(operatorPublicKeys, func(i, j int) bool {
+		return bytes.Compare(operatorPublicKeys[i], operatorPublicKeys[j]) < 0
+	})
+
 	// Hash spark operator identity public keys
-	for _, pubKey := range tokenTransaction.GetSparkOperatorIdentityPublicKeys() {
+	for _, pubKey := range operatorPublicKeys {
 		h.Reset()
 		if pubKey != nil {
 			h.Write(pubKey)

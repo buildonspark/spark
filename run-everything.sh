@@ -153,6 +153,19 @@ clone_or_pull_lrcd() {
     fi
 }
 
+generate_lrcd_bootnodes() {
+    local skip_port=$1
+    local output=()
+
+    for port in {8000..8004}; do
+        if [ "$port" -ne "$skip_port" ]; then
+            output+=("\"127.0.0.1:$port\"")
+        fi
+    done
+
+    echo "$(IFS=,; echo "${output[*]}")"
+}
+
 run_lrcd_tmux() {
     local run_dir=$1
     local session_name="lrcd"
@@ -180,6 +193,8 @@ run_lrcd_tmux() {
         grpc_address="127.0.0.1:1853${i}"
         p2p_address="0.0.0.0:800${i}"
         storage_path="./.yuvd/node_$i"
+        db="postgresql://127.0.0.1:5432/lrc20_${i}?sslmode=disable"
+        bootnodes="$(generate_lrcd_bootnodes "800${i}")"
 
         # Create a temporary config file for this instance
         local temp_config_file="temp_config_$i.dev.toml"
@@ -187,10 +202,12 @@ run_lrcd_tmux() {
             -e "s|{GRPC_ADDRESS}|$grpc_address|g" \
             -e "s|{P2P_ADDRESS}|$p2p_address|g" \
             -e "s|{STORAGE_PATH}|$storage_path|g" \
+            -e "s|{POSTGRES}|$db|g" \
+            -e "s|{BOOTNODES}|$bootnodes|g" \
             lrcd.template.config.toml >"$temp_config_file"
         local log_file="${run_dir}/logs/lrcd_${i}.log"
 
-        local cmd="cd lrc20.dev && cargo run -p yuvd --release -- run --config ../$temp_config_file 2>&1 | tee '${log_file}'"
+        local cmd="cd lrc20.dev && DATABASE_URL=$db cargo sqlx migrate run --source ./crates/storage/src/migrations && cargo run -p yuvd --release -- run --config ../$temp_config_file 2>&1 | tee '${log_file}'"
 
         tmux send-keys -t "$session_name" "$cmd" C-m
     done
@@ -347,7 +364,6 @@ EOF
 
 # Function to run operators in tmux
 run_operators_tmux() {
-   local config_file="so_config.yaml"
    local run_dir=$1
    local min_signers=$2
    local session_name="operators"
@@ -373,7 +389,12 @@ run_operators_tmux() {
        
        # Calculate port
        local port=$((8535 + i))
-       
+       local lrc20_address="127.0.0.1:1853${i}"
+
+       local temp_config_file="temp_config_operator_$i.dev.yaml"
+       sed -e "s|{LRC20_ADDRESS}|$lrc20_address|g" \
+           so.template.config.yaml >"$temp_config_file"
+
        # Construct paths
        local log_file="${run_dir}/logs/operator_${i}.log"
        local db_file="postgresql://127.0.0.1:5432/operator_${i}?sslmode=disable"
@@ -386,7 +407,7 @@ run_operators_tmux() {
        
        # Construct the command with all parameters
        local cmd="${run_dir}/bin/operator \
-           -config '${config_file}' \
+           -config '${temp_config_file}' \
            -index ${i} \
            -key '${priv_key_file}' \
            -operators '${operator_config_file}' \
@@ -514,11 +535,23 @@ reset_databases() {
             FROM pg_stat_activity 
             WHERE datname = '$db' 
             AND pid <> pg_backend_pid();" > /dev/null 2>&1
+
+            db="lrc20_$i"
+            psql postgres -c "
+            SELECT pg_terminate_backend(pid)
+            FROM pg_stat_activity
+            WHERE datname = '$db'
+            AND pid <> pg_backend_pid();" > /dev/null 2>&1
         done
 
         # Drop and recreate
         for i in $(seq 0 $max_count); do
             db="operator_$i"
+            echo "Resetting $db..."
+            dropdb --if-exists "$db" > /dev/null 2>&1
+            createdb "$db" > /dev/null 2>&1
+
+            db="lrc20_$i"
             echo "Resetting $db..."
             dropdb --if-exists "$db" > /dev/null 2>&1
             createdb "$db" > /dev/null 2>&1
@@ -528,6 +561,14 @@ reset_databases() {
         
         for i in $(seq 0 $max_count); do
             db="operator_$i"
+            if ! psql -lqt | cut -d \| -f 1 | grep -qw "$db"; then
+                echo "Creating $db as it doesn't exist..."
+                createdb "$db" > /dev/null 2>&1
+            else
+                echo "Database $db already exists, skipping..."
+            fi
+
+            db="lrc20_$i"
             if ! psql -lqt | cut -d \| -f 1 | grep -qw "$db"; then
                 echo "Creating $db as it doesn't exist..."
                 createdb "$db" > /dev/null 2>&1

@@ -203,7 +203,7 @@ message OperatorSpecificTokenTransactionSignature {
 }
 
 message SignTokenTransactionRequest {
-    bytes final_token_transaction_hash = 1;
+    TokenTransaction final_token_transaction = 1;
     repeated OperatorSpecificTokenTransactionSignature operator_specific_signatures = 2;
 }
 
@@ -213,7 +213,7 @@ message SignTokenTransactionResponse {
 }
 
 message FinalizeTokenTransactionRequest {
-    bytes final_token_transaction_hash = 1;
+    TokenTransaction final_token_transaction = 1;
     // List of ordered revocation keys that map 1:1 with leaves being spent in the
     // token transaction.
     repeated bytes leaf_to_spend_revocation_keys = 2;

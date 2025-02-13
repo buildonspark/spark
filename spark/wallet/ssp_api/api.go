@@ -3,6 +3,7 @@ package sspapi
 import (
 	"context"
 	"encoding/hex"
+	"strings"
 
 	"github.com/lightsparkdev/spark-go/common"
 )
@@ -25,7 +26,7 @@ func (s *SparkServiceAPI) CreateInvoice(
 	expirySecs int,
 ) (*string, int64, error) {
 	variables := map[string]interface{}{
-		"network":      bitcoinNetwork.String(),
+		"network":      strings.ToUpper(bitcoinNetwork.String()),
 		"amount_sats":  amountSats,
 		"payment_hash": hex.EncodeToString(paymentHash),
 		"memo":         memo,

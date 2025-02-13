@@ -33,15 +33,15 @@ const (
 func (n Network) String() string {
 	switch n {
 	case Mainnet:
-		return "MAINNET"
+		return "mainnet"
 	case Regtest:
-		return "REGTEST"
+		return "regtest"
 	case Testnet:
-		return "TESTNET"
+		return "testnet"
 	case Signet:
-		return "SIGNET"
+		return "signet"
 	default:
-		return "MAINNET"
+		return "mainnet"
 	}
 }
 

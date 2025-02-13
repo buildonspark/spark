@@ -46,7 +46,7 @@ type Config struct {
 	DKGCoordinatorAddress string
 	// SupportedNetworks is the list of networks supported by the signing operator.
 	SupportedNetworks []common.Network
-	// BitcoindConfigs is the configurations for different bitcoin nodes.
+	// BitcoindConfigs are the configurations for different bitcoin nodes.
 	BitcoindConfigs map[string]BitcoindConfig
 	// AWS determines if the database is in AWS RDS.
 	AWS bool
@@ -54,6 +54,8 @@ type Config struct {
 	ServerCertPath string
 	// ServerKeyPath is the path to the server key.
 	ServerKeyPath string
+	// Lrc20Configs are the configurations for different LRC20 nodes
+	Lrc20Configs map[string]Lrc20Config
 }
 
 // DatabaseDriver returns the database driver based on the database path.
@@ -64,9 +66,12 @@ func (c *Config) DatabaseDriver() string {
 	return "sqlite3"
 }
 
-// BitcoindConfigs a map of bitcoind configurations per network.
-type BitcoindConfigs struct {
+// NodesConfig is a map of bitcoind and lrc20 configs per network.
+type NodesConfig struct {
+	// Bitcoind is a map of bitcoind configurations per network.
 	Bitcoind map[string]BitcoindConfig `yaml:"bitcoind"`
+	// Lrc20 is a map of addresses of lrc20 nodes per network
+	Lrc20 map[string]Lrc20Config `yaml:"lrc20"`
 }
 
 // BitcoindConfig is the configuration for a bitcoind node.
@@ -76,6 +81,11 @@ type BitcoindConfig struct {
 	User           string `yaml:"rpcuser"`
 	Password       string `yaml:"rpcpassword"`
 	ZmqPubRawBlock string `yaml:"zmqpubrawblock"`
+}
+
+type Lrc20Config struct {
+	Network string `yaml:"network"`
+	Host    string `yaml:"host"`
 }
 
 // NewConfig creates a new config for the signing operator.
@@ -113,8 +123,8 @@ func NewConfig(
 		return nil, err
 	}
 
-	var bitcoindConfigs BitcoindConfigs
-	if err := yaml.Unmarshal(data, &bitcoindConfigs); err != nil {
+	var nodes NodesConfig
+	if err := yaml.Unmarshal(data, &nodes); err != nil {
 		return nil, err
 	}
 
@@ -132,7 +142,8 @@ func NewConfig(
 		authzEnforced:         authzEnforced,
 		DKGCoordinatorAddress: dkgCoordinatorAddress,
 		SupportedNetworks:     supportedNetworks,
-		BitcoindConfigs:       bitcoindConfigs.Bitcoind,
+		BitcoindConfigs:       nodes.Bitcoind,
+		Lrc20Configs:          nodes.Lrc20,
 		AWS:                   aws,
 		ServerCertPath:        serverCertPath,
 		ServerKeyPath:         serverKeyPath,
@@ -260,4 +271,8 @@ func (c *Config) GetSigningOperatorList() map[string]*pb.SigningOperatorInfo {
 // AuthzEnforced returns whether authorization is enforced
 func (c *Config) AuthzEnforced() bool {
 	return c.authzEnforced
+}
+
+func (c *Config) IdentityPublicKey() []byte {
+	return c.SigningOperatorMap[c.Identifier].IdentityPublicKey
 }

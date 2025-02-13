@@ -4,7 +4,7 @@ network = "regtest"
 address = "{P2P_ADDRESS}"
 max_inbound_connections = 16
 max_outbound_connections = 8
-bootnodes = []
+bootnodes = [{BOOTNODES}]
 
 [rpc]
 address = "{RPC_ADDRESS}"
@@ -23,7 +23,7 @@ url = "http://127.0.0.1:18443"
 auth = { username = "admin1", password = "123" }
 
 [logger]
-level = "DEBUG"
+level = "TRACE"
 
 [indexer]
 polling_period = { secs = 0, nanos = 1000000 }
@@ -38,4 +38,4 @@ cleanup_period = { secs = 3600, nanos = 0 }
 tx_outdated_duration = { secs = 86400, nanos = 0 }
 
 [spark]
-database_url = "postgresql://postgres:postgres@postgres:5432/postgres" # mocked value for now
+database_url = "{POSTGRES}"
