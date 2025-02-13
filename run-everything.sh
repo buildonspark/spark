@@ -270,8 +270,10 @@ parse_bitcoin_config() {
 
 run_bitcoind_tmux() {
     local run_dir=$1
+    local wipe=$2
     local session_name="bitcoind"
     local datadir="$run_dir/bitcoind"
+
     
     # Read config values
     read -r bitcoind_username bitcoind_password <<< "$(parse_bitcoin_config)"    
@@ -283,7 +285,9 @@ run_bitcoind_tmux() {
     if tmux has-session -t "$session_name" 2>/dev/null; then
         echo "Killing existing bitcoind session..."
         tmux kill-session -t "$session_name"
-        bitcoin-cli -regtest -rpcuser="$bitcoind_username" -rpcpassword="$bitcoind_password" stop
+        if [ "$wipe" = true ]; then
+            bitcoin-cli -regtest -rpcuser="$bitcoind_username" -rpcpassword="$bitcoind_password" stop
+        fi
     fi
     
     # Create new tmux session
@@ -573,7 +577,7 @@ create_data_dir
 run_dir=$(create_run_dir)
 echo "Working with directory: $run_dir"
 
-run_bitcoind_tmux "$run_dir"
+run_bitcoind_tmux "$run_dir" $WIPE
 run_lrcd_tmux "$run_dir"
 
 if ! check_lrc_nodes_ready "$run_dir"; then

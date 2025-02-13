@@ -134,10 +134,16 @@ func GenerateDepositAddressesForTree(
 			},
 		}
 	} else if parentTx != nil {
+		var bytebuf bytes.Buffer
+		err := parentTx.Serialize(&bytebuf)
+		if err != nil {
+			return nil, err
+		}
 		request.Source = &pb.PrepareTreeAddressRequest_OnChainUtxo{
 			OnChainUtxo: &pb.UTXO{
 				Txid:    parentTx.TxHash().String(),
 				Vout:    uint32(vout),
+				RawTx:   bytebuf.Bytes(),
 				Network: config.ProtoNetwork(),
 			},
 		}
@@ -530,10 +536,16 @@ func CreateTree(
 	var tx *wire.MsgTx
 	if parentTx != nil {
 		tx = parentTx
+		var bytebuf bytes.Buffer
+		err := parentTx.Serialize(&bytebuf)
+		if err != nil {
+			return nil, err
+		}
 		request.Source = &pb.CreateTreeRequest_OnChainUtxo{
 			OnChainUtxo: &pb.UTXO{
 				Txid:    parentTx.TxHash().String(),
 				Vout:    uint32(vout),
+				RawTx:   bytebuf.Bytes(),
 				Network: config.ProtoNetwork(),
 			},
 		}

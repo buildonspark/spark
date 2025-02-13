@@ -33,7 +33,10 @@ func NewTreeCreationHandler(config *so.Config, onchainHelper helper.OnChainHelpe
 func (h *TreeCreationHandler) findParentOutputFromUtxo(ctx context.Context, utxo *pb.UTXO) (*wire.TxOut, error) {
 	tx, err := h.onchainHelper.GetTxOnChain(ctx, utxo.Txid)
 	if err != nil {
-		return nil, err
+		tx, err = common.TxFromRawTxBytes(utxo.RawTx)
+		if err != nil {
+			return nil, err
+		}
 	}
 	if len(tx.TxOut) <= int(utxo.Vout) {
 		return nil, fmt.Errorf("vout out of bounds")
@@ -382,6 +385,7 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 	var parentNode *ent.TreeNode
 	var vout uint32
 	var network common.Network
+	onchain := true
 	switch req.Source.(type) {
 	case *pb.CreateTreeRequest_ParentNodeOutput:
 		uuid, err := uuid.Parse(req.GetParentNodeOutput().NodeId)
@@ -407,6 +411,10 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 		network, err = common.NetworkFromProtoNetwork(req.GetOnChainUtxo().Network)
 		if err != nil {
 			return nil, nil, err
+		}
+		_, err = h.onchainHelper.GetTxOnChain(ctx, req.GetOnChainUtxo().Txid)
+		if err != nil {
+			onchain = false
 		}
 	default:
 		return nil, nil, errors.New("invalid source")
@@ -460,7 +468,13 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 			if err != nil {
 				return nil, nil, err
 			}
-			tree, err = db.Tree.Create().SetStatus(schema.TreeStatusAvailable).SetOwnerIdentityPubkey(req.UserIdentityPublicKey).SetNetwork(schemaNetwork).Save(ctx)
+			treeMutator := db.Tree.Create().SetOwnerIdentityPubkey(req.UserIdentityPublicKey).SetNetwork(schemaNetwork)
+			if onchain {
+				treeMutator.SetStatus(schema.TreeStatusAvailable)
+			} else {
+				treeMutator.SetStatus(schema.TreeStatusPending)
+			}
+			tree, err = treeMutator.Save(ctx)
 			if err != nil {
 				return nil, nil, err
 			}

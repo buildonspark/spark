@@ -112,8 +112,6 @@ func TestTreeCreationWithMultiLevels(t *testing.T) {
 	}
 	ctx := wallet.ContextWithToken(context.Background(), token)
 
-	mockClient := pbmock.NewMockServiceClient(conn)
-
 	privKey, err := secp256k1.GeneratePrivateKey()
 	if err != nil {
 		t.Fatal(err)
@@ -144,15 +142,6 @@ func TestTreeCreationWithMultiLevels(t *testing.T) {
 	depositTx, err = common.TxFromRawTxBytes(decodedBytes)
 	if err != nil {
 		t.Fatalf("failed to deserilize deposit tx: %v", err)
-	}
-
-	log.Printf("deposit tx: %s", depositTxHex)
-	_, err = mockClient.SetMockOnchainTx(context.Background(), &pbmock.SetMockOnchainTxRequest{
-		Txid: depositTx.TxID(),
-		Tx:   depositTxHex,
-	})
-	if err != nil {
-		t.Fatalf("failed to set mock onchain tx: %v", err)
 	}
 
 	log.Printf("deposit public key: %x", hex.EncodeToString(privKey.PubKey().SerializeCompressed()))
