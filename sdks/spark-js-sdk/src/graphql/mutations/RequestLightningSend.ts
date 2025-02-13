@@ -1,4 +1,4 @@
-import { FRAGMENT as RequestLightningSendOutputFragment } from "../objects/RequestLightningSendOutput";
+import { FRAGMENT as RequestLightningSendOutputFragment } from "../objects/LightningSendRequest";
 export const RequestLightningSend = `
   mutation RequestLightningSend(
     $encoded_invoice: String!
@@ -8,7 +8,9 @@ export const RequestLightningSend = `
       encoded_invoice: $encoded_invoice
       idempotency_key: $idempotency_key
     }) {
-      ...RequestLightningSendOutputFragment
+      request {
+        ...LightningSendRequestFragment
+      }
     }
   }
   ${RequestLightningSendOutputFragment}

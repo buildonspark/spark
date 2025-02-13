@@ -5,7 +5,11 @@ import {
   Query,
   Requester,
 } from "@lightsparkdev/core";
+import { CompleteCoopExit } from "./mutations/CompleteCoopExit";
+import { RequestCoopExit } from "./mutations/RequestCoopExit";
 import { RequestLightningReceive } from "./mutations/RequestLightningReceive";
+import { RequestLightningSend } from "./mutations/RequestLightningSend";
+import { RequestSwapLeaves } from "./mutations/RequestSwapLeaves";
 import {
   BitcoinNetwork,
   CompleteCoopExitInput,
@@ -20,13 +24,23 @@ import {
   RequestLightningSendInput,
   RequestLightningSendOutput,
 } from "./objects";
+import { CompleteCoopExitOutputFromJson } from "./objects/CompleteCoopExitOutput";
+import { CoopExitFeeEstimateOutputFromJson } from "./objects/CoopExitFeeEstimateOutput";
 import LightningReceiveFeeEstimateOutput, {
   LightningReceiveFeeEstimateOutputFromJson,
 } from "./objects/LightningReceiveFeeEstimateOutput";
 import LightningReceiveRequest, {
   LightningReceiveRequestFromJson,
 } from "./objects/LightningReceiveRequest";
+import LightningSendFeeEstimateOutput, {
+  LightningSendFeeEstimateOutputFromJson,
+} from "./objects/LightningSendFeeEstimateOutput";
+import { RequestCoopExitOutputFromJson } from "./objects/RequestCoopExitOutput";
+import { RequestLeavesSwapOutputFromJson } from "./objects/RequestLeavesSwapOutput";
+import { RequestLightningSendOutputFromJson } from "./objects/RequestLightningSendOutput";
+import { CoopExitFeeEstimate } from "./queries/CoopExitFeeEstimate";
 import { LightningReceiveFeeEstimate } from "./queries/LightningReceiveFeeEstimate";
+import { LightningSendFeeEstimate } from "./queries/LightningSendFeeEstimate";
 
 export default class SspClient {
   private readonly requester: Requester;
@@ -45,35 +59,14 @@ export default class SspClient {
   }
 
   async executeRawQuery<T>(query: Query<T>): Promise<T | null> {
-    try {
-      // Log the full query details before sending
-      // console.log("Sending GraphQL request:", {
-      //   query: query.queryPayload,
-      //   variables: query.variables,
-      //   signingNodeId: query.signingNodeId,
-      //   skipAuth: query.skipAuth,
-      // });
-
-      return await this.requester.executeQuery(query);
-    } catch (error: any) {
-      console.error("Query failed with error:", error);
-      if (error.response) {
-        console.error("Response details:", {
-          status: error.response.status,
-          statusText: error.response.statusText,
-          data: error.response.data,
-        });
-      }
-      console.error("Full error object:", JSON.stringify(error, null, 2));
-      throw error;
-    }
+    return await this.requester.executeQuery(query);
   }
 
   async getLightningReceiveFeeEstimate(
     amountSats: number,
     network: BitcoinNetwork
   ): Promise<LightningReceiveFeeEstimateOutput | null> {
-    const query = {
+    return await this.executeRawQuery({
       queryPayload: LightningReceiveFeeEstimate,
       variables: {
         amount_sats: amountSats,
@@ -84,15 +77,41 @@ export default class SspClient {
           response.lightning_receive_fee_estimate
         );
       },
-    };
-    // console.log("Sending query:", JSON.stringify(query, null, 2));
-    const response = await this.executeRawQuery(query);
-    // console.log("Received response:", response);
-    return response;
+    });
   }
 
-  async getLightningSendFeeEstimate() {
-    throw new Error("Not implemented");
+  async getLightningSendFeeEstimate(
+    encodedInvoice: string
+  ): Promise<LightningSendFeeEstimateOutput | null> {
+    return await this.executeRawQuery({
+      queryPayload: LightningSendFeeEstimate,
+      variables: {
+        encoded_invoice: encodedInvoice,
+      },
+      constructObject: (response: { lightning_send_fee_estimate: any }) => {
+        return LightningSendFeeEstimateOutputFromJson(
+          response.lightning_send_fee_estimate
+        );
+      },
+    });
+  }
+
+  async getCoopExitFeeEstimate({
+    leafExternalIds,
+    withdrawalAddress,
+  }: CoopExitFeeEstimateInput): Promise<CoopExitFeeEstimateOutput | null> {
+    return await this.executeRawQuery({
+      queryPayload: CoopExitFeeEstimate,
+      variables: {
+        leaf_external_ids: leafExternalIds,
+        withdrawal_address: withdrawalAddress,
+      },
+      constructObject: (response: { coop_exit_fee_estimate: any }) => {
+        return CoopExitFeeEstimateOutputFromJson(
+          response.coop_exit_fee_estimate
+        );
+      },
+    });
   }
 
   // TODO: Might not need
@@ -100,25 +119,40 @@ export default class SspClient {
     throw new Error("Not implemented");
   }
 
-  async getCoopExitFeeEstimate({
-    leafExternalIds,
-    withdrawalAddress,
-  }: CoopExitFeeEstimateInput): Promise<CoopExitFeeEstimateOutput> {
-    throw new Error("Not implemented");
-  }
-
   async completeCoopExit({
     userOutboundTransferExternalId,
     coopExitRequestId,
-  }: CompleteCoopExitInput): Promise<CompleteCoopExitOutput> {
-    throw new Error("Not implemented");
+  }: CompleteCoopExitInput): Promise<CompleteCoopExitOutput | null> {
+    return await this.executeRawQuery({
+      queryPayload: CompleteCoopExit,
+      variables: {
+        user_outbound_transfer_external_id: userOutboundTransferExternalId,
+        coop_exit_request_id: coopExitRequestId,
+      },
+      constructObject: (response: { complete_coop_exit: any }) => {
+        return CompleteCoopExitOutputFromJson(
+          response.complete_coop_exit.request
+        );
+      },
+    });
   }
 
   async requestCoopExit({
     leafExternalIds,
     withdrawalAddress,
-  }: RequestCoopExitInput): Promise<RequestCoopExitOutput> {
-    throw new Error("Not implemented");
+  }: RequestCoopExitInput): Promise<RequestCoopExitOutput | null> {
+    return await this.executeRawQuery({
+      queryPayload: RequestCoopExit,
+      variables: {
+        leaf_external_ids: leafExternalIds,
+        withdrawal_address: withdrawalAddress,
+      },
+      constructObject: (response: { request_coop_exit: any }) => {
+        return RequestCoopExitOutputFromJson(
+          response.request_coop_exit.request
+        );
+      },
+    });
   }
 
   // TODO: Lets name this better
@@ -149,8 +183,19 @@ export default class SspClient {
   async requestLightningSend({
     encodedInvoice,
     idempotencyKey,
-  }: RequestLightningSendInput): Promise<RequestLightningSendOutput> {
-    throw new Error("Not implemented");
+  }: RequestLightningSendInput): Promise<RequestLightningSendOutput | null> {
+    return await this.executeRawQuery({
+      queryPayload: RequestLightningSend,
+      variables: {
+        encoded_invoice: encodedInvoice,
+        idempotency_key: idempotencyKey,
+      },
+      constructObject: (response: { request_lightning_send: any }) => {
+        return RequestLightningSendOutputFromJson(
+          response.request_lightning_send.request
+        );
+      },
+    });
   }
 
   async requestLeaveSwap({
@@ -158,8 +203,21 @@ export default class SspClient {
     totalAmountSats,
     targetAmountSats,
     network,
-  }: RequestLeavesSwapInput): Promise<RequestLeavesSwapOutput> {
-    throw new Error("Not implemented");
+  }: RequestLeavesSwapInput): Promise<RequestLeavesSwapOutput | null> {
+    return await this.executeRawQuery({
+      queryPayload: RequestSwapLeaves,
+      variables: {
+        adaptor_pubkey: adaptorPubkey,
+        total_amount_sats: totalAmountSats,
+        target_amount_sats: targetAmountSats,
+        network: network,
+      },
+      constructObject: (response: { request_swap_leaves: any }) => {
+        return RequestLeavesSwapOutputFromJson(
+          response.request_swap_leaves.request
+        );
+      },
+    });
   }
 }
 

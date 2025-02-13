@@ -92,6 +92,7 @@ interface SparkSigner {
   decryptEcies(ciphertext: Uint8Array): Uint8Array;
 
   getRandomSigningCommitment(): SigningCommitment;
+  getSspIdentityPublicKey(): Uint8Array;
 }
 
 class DefaultSparkSigner implements SparkSigner {
@@ -347,6 +348,13 @@ class DefaultSparkSigner implements SparkSigner {
     const commitment = getSigningCommitmentFromNonce(nonce);
     this.commitmentToNonceMap.set(commitment, nonce);
     return commitment;
+  }
+
+  // Hardcode this for default ssp
+  getSspIdentityPublicKey(): Uint8Array {
+    return hexToBytes(
+      "030868bb1892292e7e4cd6c14a02c16ca2326f07a185d45b2f1068d996532559d5"
+    );
   }
 }
 

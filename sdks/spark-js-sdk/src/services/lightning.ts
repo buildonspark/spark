@@ -31,6 +31,7 @@ export type CreateLightningInvoiceParams = {
 
 export type CreateLightningInvoiceWithPreimageParams = {
   preimage: Uint8Array;
+  isSecretPubkey?: boolean;
 } & CreateLightningInvoiceParams;
 
 export type SwapNodesForPreimageParams = {
@@ -64,6 +65,7 @@ export class LightningService {
       amountSats,
       memo,
       preimage: preimagePubKey,
+      isSecretPubkey: true,
     });
   }
 
@@ -72,6 +74,7 @@ export class LightningService {
     amountSats,
     memo,
     preimage,
+    isSecretPubkey = false,
   }: CreateLightningInvoiceWithPreimageParams): Promise<string> {
     const paymentHash = sha256(preimage);
     const invoice = await invoiceCreator(amountSats, paymentHash, memo);

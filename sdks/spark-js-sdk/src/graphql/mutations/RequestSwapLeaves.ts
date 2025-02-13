@@ -13,7 +13,9 @@ export const RequestSwapLeaves = `
       target_amount_sats: $targetAmountSats
       network: $network
     }) {
-      ...RequestSwapLeavesOutputFragment
+      request {
+        ...SwapLeavesRequestFragment
+      }
     }
   }
   ${TransferFragment}

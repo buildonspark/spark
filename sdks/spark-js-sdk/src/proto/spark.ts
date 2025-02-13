@@ -288,47 +288,34 @@ export interface StartTokenTransactionResponse {
     | TokenTransaction
     | undefined;
   /**
-   * Map from operator identifier to their operator signature. This information could also
-   * be eventually validated by a call to an LRC node but returned here for wallet validation and
-   * to ensure immediate availability prior to requesting keyshares.
-   */
-  sparkOperatorSignatures: { [key: string]: Uint8Array };
-  /**
    * Information for fetching and resolving the revocation keyshare on a transfer operation.
    * Contains the threshold of keyshares needed and the SO owners of those keyshares.
    */
   keyshareInfo: SigningKeyshare | undefined;
 }
 
-export interface StartTokenTransactionResponse_SparkOperatorSignaturesEntry {
-  key: string;
-  value: Uint8Array;
-}
-
-export interface RevocationKeyshareSignablePayload {
+export interface OperatorSpecificTokenTransactionSignablePayload {
   finalTokenTransactionHash: Uint8Array;
   operatorIdentityPublicKey: Uint8Array;
 }
 
 /**
  * This message allows the sender of a leaf being spent to provide final evidence
- * that it owns a leaf to an SO when requesting a revocation keyshare.  This proves
- * to the SO that the sender (the current owner) of the leaf is requesting release
- * of the keyshare.
+ * that it owns a leaf to an SO when requesting signing and release of the  revocation keyshare.
  */
-export interface GetLeafRevocationKeyshareSignature {
+export interface OperatorSpecificTokenTransactionSignature {
   ownerPublicKey: Uint8Array;
   ownerSignature: Uint8Array;
-  payload: RevocationKeyshareSignablePayload | undefined;
+  payload: OperatorSpecificTokenTransactionSignablePayload | undefined;
 }
 
-export interface GetTokenTransactionRevocationKeysharesRequest {
+export interface SignTokenTransactionRequest {
   finalTokenTransactionHash: Uint8Array;
-  /** Ordered list of nonce signatures mapping 1:1 with each leaf to spend. */
-  signatures: GetLeafRevocationKeyshareSignature[];
+  operatorSpecificSignatures: OperatorSpecificTokenTransactionSignature[];
 }
 
-export interface GetTokenTransactionRevocationKeysharesResponse {
+export interface SignTokenTransactionResponse {
+  sparkOperatorSignature: Uint8Array;
   tokenTransactionRevocationKeyshares: Uint8Array[];
 }
 
@@ -3008,7 +2995,7 @@ export const StartTokenTransactionRequest: MessageFns<StartTokenTransactionReque
 };
 
 function createBaseStartTokenTransactionResponse(): StartTokenTransactionResponse {
-  return { finalTokenTransaction: undefined, sparkOperatorSignatures: {}, keyshareInfo: undefined };
+  return { finalTokenTransaction: undefined, keyshareInfo: undefined };
 }
 
 export const StartTokenTransactionResponse: MessageFns<StartTokenTransactionResponse> = {
@@ -3016,14 +3003,8 @@ export const StartTokenTransactionResponse: MessageFns<StartTokenTransactionResp
     if (message.finalTokenTransaction !== undefined) {
       TokenTransaction.encode(message.finalTokenTransaction, writer.uint32(10).fork()).join();
     }
-    Object.entries(message.sparkOperatorSignatures).forEach(([key, value]) => {
-      StartTokenTransactionResponse_SparkOperatorSignaturesEntry.encode(
-        { key: key as any, value },
-        writer.uint32(18).fork(),
-      ).join();
-    });
     if (message.keyshareInfo !== undefined) {
-      SigningKeyshare.encode(message.keyshareInfo, writer.uint32(26).fork()).join();
+      SigningKeyshare.encode(message.keyshareInfo, writer.uint32(18).fork()).join();
     }
     return writer;
   },
@@ -3048,17 +3029,6 @@ export const StartTokenTransactionResponse: MessageFns<StartTokenTransactionResp
             break;
           }
 
-          const entry2 = StartTokenTransactionResponse_SparkOperatorSignaturesEntry.decode(reader, reader.uint32());
-          if (entry2.value !== undefined) {
-            message.sparkOperatorSignatures[entry2.key] = entry2.value;
-          }
-          continue;
-        }
-        case 3: {
-          if (tag !== 26) {
-            break;
-          }
-
           message.keyshareInfo = SigningKeyshare.decode(reader, reader.uint32());
           continue;
         }
@@ -3076,12 +3046,6 @@ export const StartTokenTransactionResponse: MessageFns<StartTokenTransactionResp
       finalTokenTransaction: isSet(object.finalTokenTransaction)
         ? TokenTransaction.fromJSON(object.finalTokenTransaction)
         : undefined,
-      sparkOperatorSignatures: isObject(object.sparkOperatorSignatures)
-        ? Object.entries(object.sparkOperatorSignatures).reduce<{ [key: string]: Uint8Array }>((acc, [key, value]) => {
-          acc[key] = bytesFromBase64(value as string);
-          return acc;
-        }, {})
-        : {},
       keyshareInfo: isSet(object.keyshareInfo) ? SigningKeyshare.fromJSON(object.keyshareInfo) : undefined,
     };
   },
@@ -3090,15 +3054,6 @@ export const StartTokenTransactionResponse: MessageFns<StartTokenTransactionResp
     const obj: any = {};
     if (message.finalTokenTransaction !== undefined) {
       obj.finalTokenTransaction = TokenTransaction.toJSON(message.finalTokenTransaction);
-    }
-    if (message.sparkOperatorSignatures) {
-      const entries = Object.entries(message.sparkOperatorSignatures);
-      if (entries.length > 0) {
-        obj.sparkOperatorSignatures = {};
-        entries.forEach(([k, v]) => {
-          obj.sparkOperatorSignatures[k] = base64FromBytes(v);
-        });
-      }
     }
     if (message.keyshareInfo !== undefined) {
       obj.keyshareInfo = SigningKeyshare.toJSON(message.keyshareInfo);
@@ -3115,14 +3070,6 @@ export const StartTokenTransactionResponse: MessageFns<StartTokenTransactionResp
       (object.finalTokenTransaction !== undefined && object.finalTokenTransaction !== null)
         ? TokenTransaction.fromPartial(object.finalTokenTransaction)
         : undefined;
-    message.sparkOperatorSignatures = Object.entries(object.sparkOperatorSignatures ?? {}).reduce<
-      { [key: string]: Uint8Array }
-    >((acc, [key, value]) => {
-      if (value !== undefined) {
-        acc[key] = value;
-      }
-      return acc;
-    }, {});
     message.keyshareInfo = (object.keyshareInfo !== undefined && object.keyshareInfo !== null)
       ? SigningKeyshare.fromPartial(object.keyshareInfo)
       : undefined;
@@ -3130,100 +3077,17 @@ export const StartTokenTransactionResponse: MessageFns<StartTokenTransactionResp
   },
 };
 
-function createBaseStartTokenTransactionResponse_SparkOperatorSignaturesEntry(): StartTokenTransactionResponse_SparkOperatorSignaturesEntry {
-  return { key: "", value: new Uint8Array(0) };
-}
-
-export const StartTokenTransactionResponse_SparkOperatorSignaturesEntry: MessageFns<
-  StartTokenTransactionResponse_SparkOperatorSignaturesEntry
-> = {
-  encode(
-    message: StartTokenTransactionResponse_SparkOperatorSignaturesEntry,
-    writer: BinaryWriter = new BinaryWriter(),
-  ): BinaryWriter {
-    if (message.key !== "") {
-      writer.uint32(10).string(message.key);
-    }
-    if (message.value.length !== 0) {
-      writer.uint32(18).bytes(message.value);
-    }
-    return writer;
-  },
-
-  decode(
-    input: BinaryReader | Uint8Array,
-    length?: number,
-  ): StartTokenTransactionResponse_SparkOperatorSignaturesEntry {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseStartTokenTransactionResponse_SparkOperatorSignaturesEntry();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.key = reader.string();
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.value = reader.bytes();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): StartTokenTransactionResponse_SparkOperatorSignaturesEntry {
-    return {
-      key: isSet(object.key) ? globalThis.String(object.key) : "",
-      value: isSet(object.value) ? bytesFromBase64(object.value) : new Uint8Array(0),
-    };
-  },
-
-  toJSON(message: StartTokenTransactionResponse_SparkOperatorSignaturesEntry): unknown {
-    const obj: any = {};
-    if (message.key !== "") {
-      obj.key = message.key;
-    }
-    if (message.value.length !== 0) {
-      obj.value = base64FromBytes(message.value);
-    }
-    return obj;
-  },
-
-  create(
-    base?: DeepPartial<StartTokenTransactionResponse_SparkOperatorSignaturesEntry>,
-  ): StartTokenTransactionResponse_SparkOperatorSignaturesEntry {
-    return StartTokenTransactionResponse_SparkOperatorSignaturesEntry.fromPartial(base ?? {});
-  },
-  fromPartial(
-    object: DeepPartial<StartTokenTransactionResponse_SparkOperatorSignaturesEntry>,
-  ): StartTokenTransactionResponse_SparkOperatorSignaturesEntry {
-    const message = createBaseStartTokenTransactionResponse_SparkOperatorSignaturesEntry();
-    message.key = object.key ?? "";
-    message.value = object.value ?? new Uint8Array(0);
-    return message;
-  },
-};
-
-function createBaseRevocationKeyshareSignablePayload(): RevocationKeyshareSignablePayload {
+function createBaseOperatorSpecificTokenTransactionSignablePayload(): OperatorSpecificTokenTransactionSignablePayload {
   return { finalTokenTransactionHash: new Uint8Array(0), operatorIdentityPublicKey: new Uint8Array(0) };
 }
 
-export const RevocationKeyshareSignablePayload: MessageFns<RevocationKeyshareSignablePayload> = {
-  encode(message: RevocationKeyshareSignablePayload, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+export const OperatorSpecificTokenTransactionSignablePayload: MessageFns<
+  OperatorSpecificTokenTransactionSignablePayload
+> = {
+  encode(
+    message: OperatorSpecificTokenTransactionSignablePayload,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     if (message.finalTokenTransactionHash.length !== 0) {
       writer.uint32(10).bytes(message.finalTokenTransactionHash);
     }
@@ -3233,10 +3097,10 @@ export const RevocationKeyshareSignablePayload: MessageFns<RevocationKeyshareSig
     return writer;
   },
 
-  decode(input: BinaryReader | Uint8Array, length?: number): RevocationKeyshareSignablePayload {
+  decode(input: BinaryReader | Uint8Array, length?: number): OperatorSpecificTokenTransactionSignablePayload {
     const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseRevocationKeyshareSignablePayload();
+    const message = createBaseOperatorSpecificTokenTransactionSignablePayload();
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
@@ -3265,7 +3129,7 @@ export const RevocationKeyshareSignablePayload: MessageFns<RevocationKeyshareSig
     return message;
   },
 
-  fromJSON(object: any): RevocationKeyshareSignablePayload {
+  fromJSON(object: any): OperatorSpecificTokenTransactionSignablePayload {
     return {
       finalTokenTransactionHash: isSet(object.finalTokenTransactionHash)
         ? bytesFromBase64(object.finalTokenTransactionHash)
@@ -3276,7 +3140,7 @@ export const RevocationKeyshareSignablePayload: MessageFns<RevocationKeyshareSig
     };
   },
 
-  toJSON(message: RevocationKeyshareSignablePayload): unknown {
+  toJSON(message: OperatorSpecificTokenTransactionSignablePayload): unknown {
     const obj: any = {};
     if (message.finalTokenTransactionHash.length !== 0) {
       obj.finalTokenTransactionHash = base64FromBytes(message.finalTokenTransactionHash);
@@ -3287,23 +3151,27 @@ export const RevocationKeyshareSignablePayload: MessageFns<RevocationKeyshareSig
     return obj;
   },
 
-  create(base?: DeepPartial<RevocationKeyshareSignablePayload>): RevocationKeyshareSignablePayload {
-    return RevocationKeyshareSignablePayload.fromPartial(base ?? {});
+  create(
+    base?: DeepPartial<OperatorSpecificTokenTransactionSignablePayload>,
+  ): OperatorSpecificTokenTransactionSignablePayload {
+    return OperatorSpecificTokenTransactionSignablePayload.fromPartial(base ?? {});
   },
-  fromPartial(object: DeepPartial<RevocationKeyshareSignablePayload>): RevocationKeyshareSignablePayload {
-    const message = createBaseRevocationKeyshareSignablePayload();
+  fromPartial(
+    object: DeepPartial<OperatorSpecificTokenTransactionSignablePayload>,
+  ): OperatorSpecificTokenTransactionSignablePayload {
+    const message = createBaseOperatorSpecificTokenTransactionSignablePayload();
     message.finalTokenTransactionHash = object.finalTokenTransactionHash ?? new Uint8Array(0);
     message.operatorIdentityPublicKey = object.operatorIdentityPublicKey ?? new Uint8Array(0);
     return message;
   },
 };
 
-function createBaseGetLeafRevocationKeyshareSignature(): GetLeafRevocationKeyshareSignature {
+function createBaseOperatorSpecificTokenTransactionSignature(): OperatorSpecificTokenTransactionSignature {
   return { ownerPublicKey: new Uint8Array(0), ownerSignature: new Uint8Array(0), payload: undefined };
 }
 
-export const GetLeafRevocationKeyshareSignature: MessageFns<GetLeafRevocationKeyshareSignature> = {
-  encode(message: GetLeafRevocationKeyshareSignature, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+export const OperatorSpecificTokenTransactionSignature: MessageFns<OperatorSpecificTokenTransactionSignature> = {
+  encode(message: OperatorSpecificTokenTransactionSignature, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.ownerPublicKey.length !== 0) {
       writer.uint32(10).bytes(message.ownerPublicKey);
     }
@@ -3311,15 +3179,15 @@ export const GetLeafRevocationKeyshareSignature: MessageFns<GetLeafRevocationKey
       writer.uint32(18).bytes(message.ownerSignature);
     }
     if (message.payload !== undefined) {
-      RevocationKeyshareSignablePayload.encode(message.payload, writer.uint32(26).fork()).join();
+      OperatorSpecificTokenTransactionSignablePayload.encode(message.payload, writer.uint32(26).fork()).join();
     }
     return writer;
   },
 
-  decode(input: BinaryReader | Uint8Array, length?: number): GetLeafRevocationKeyshareSignature {
+  decode(input: BinaryReader | Uint8Array, length?: number): OperatorSpecificTokenTransactionSignature {
     const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseGetLeafRevocationKeyshareSignature();
+    const message = createBaseOperatorSpecificTokenTransactionSignature();
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
@@ -3344,7 +3212,7 @@ export const GetLeafRevocationKeyshareSignature: MessageFns<GetLeafRevocationKey
             break;
           }
 
-          message.payload = RevocationKeyshareSignablePayload.decode(reader, reader.uint32());
+          message.payload = OperatorSpecificTokenTransactionSignablePayload.decode(reader, reader.uint32());
           continue;
         }
       }
@@ -3356,15 +3224,17 @@ export const GetLeafRevocationKeyshareSignature: MessageFns<GetLeafRevocationKey
     return message;
   },
 
-  fromJSON(object: any): GetLeafRevocationKeyshareSignature {
+  fromJSON(object: any): OperatorSpecificTokenTransactionSignature {
     return {
       ownerPublicKey: isSet(object.ownerPublicKey) ? bytesFromBase64(object.ownerPublicKey) : new Uint8Array(0),
       ownerSignature: isSet(object.ownerSignature) ? bytesFromBase64(object.ownerSignature) : new Uint8Array(0),
-      payload: isSet(object.payload) ? RevocationKeyshareSignablePayload.fromJSON(object.payload) : undefined,
+      payload: isSet(object.payload)
+        ? OperatorSpecificTokenTransactionSignablePayload.fromJSON(object.payload)
+        : undefined,
     };
   },
 
-  toJSON(message: GetLeafRevocationKeyshareSignature): unknown {
+  toJSON(message: OperatorSpecificTokenTransactionSignature): unknown {
     const obj: any = {};
     if (message.ownerPublicKey.length !== 0) {
       obj.ownerPublicKey = base64FromBytes(message.ownerPublicKey);
@@ -3373,139 +3243,144 @@ export const GetLeafRevocationKeyshareSignature: MessageFns<GetLeafRevocationKey
       obj.ownerSignature = base64FromBytes(message.ownerSignature);
     }
     if (message.payload !== undefined) {
-      obj.payload = RevocationKeyshareSignablePayload.toJSON(message.payload);
+      obj.payload = OperatorSpecificTokenTransactionSignablePayload.toJSON(message.payload);
     }
     return obj;
   },
 
-  create(base?: DeepPartial<GetLeafRevocationKeyshareSignature>): GetLeafRevocationKeyshareSignature {
-    return GetLeafRevocationKeyshareSignature.fromPartial(base ?? {});
+  create(base?: DeepPartial<OperatorSpecificTokenTransactionSignature>): OperatorSpecificTokenTransactionSignature {
+    return OperatorSpecificTokenTransactionSignature.fromPartial(base ?? {});
   },
-  fromPartial(object: DeepPartial<GetLeafRevocationKeyshareSignature>): GetLeafRevocationKeyshareSignature {
-    const message = createBaseGetLeafRevocationKeyshareSignature();
+  fromPartial(
+    object: DeepPartial<OperatorSpecificTokenTransactionSignature>,
+  ): OperatorSpecificTokenTransactionSignature {
+    const message = createBaseOperatorSpecificTokenTransactionSignature();
     message.ownerPublicKey = object.ownerPublicKey ?? new Uint8Array(0);
     message.ownerSignature = object.ownerSignature ?? new Uint8Array(0);
     message.payload = (object.payload !== undefined && object.payload !== null)
-      ? RevocationKeyshareSignablePayload.fromPartial(object.payload)
+      ? OperatorSpecificTokenTransactionSignablePayload.fromPartial(object.payload)
       : undefined;
     return message;
   },
 };
 
-function createBaseGetTokenTransactionRevocationKeysharesRequest(): GetTokenTransactionRevocationKeysharesRequest {
-  return { finalTokenTransactionHash: new Uint8Array(0), signatures: [] };
+function createBaseSignTokenTransactionRequest(): SignTokenTransactionRequest {
+  return { finalTokenTransactionHash: new Uint8Array(0), operatorSpecificSignatures: [] };
 }
 
-export const GetTokenTransactionRevocationKeysharesRequest: MessageFns<GetTokenTransactionRevocationKeysharesRequest> =
-  {
-    encode(
-      message: GetTokenTransactionRevocationKeysharesRequest,
-      writer: BinaryWriter = new BinaryWriter(),
-    ): BinaryWriter {
-      if (message.finalTokenTransactionHash.length !== 0) {
-        writer.uint32(10).bytes(message.finalTokenTransactionHash);
-      }
-      for (const v of message.signatures) {
-        GetLeafRevocationKeyshareSignature.encode(v!, writer.uint32(18).fork()).join();
-      }
-      return writer;
-    },
-
-    decode(input: BinaryReader | Uint8Array, length?: number): GetTokenTransactionRevocationKeysharesRequest {
-      const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-      let end = length === undefined ? reader.len : reader.pos + length;
-      const message = createBaseGetTokenTransactionRevocationKeysharesRequest();
-      while (reader.pos < end) {
-        const tag = reader.uint32();
-        switch (tag >>> 3) {
-          case 1: {
-            if (tag !== 10) {
-              break;
-            }
-
-            message.finalTokenTransactionHash = reader.bytes();
-            continue;
-          }
-          case 2: {
-            if (tag !== 18) {
-              break;
-            }
-
-            message.signatures.push(GetLeafRevocationKeyshareSignature.decode(reader, reader.uint32()));
-            continue;
-          }
-        }
-        if ((tag & 7) === 4 || tag === 0) {
-          break;
-        }
-        reader.skip(tag & 7);
-      }
-      return message;
-    },
-
-    fromJSON(object: any): GetTokenTransactionRevocationKeysharesRequest {
-      return {
-        finalTokenTransactionHash: isSet(object.finalTokenTransactionHash)
-          ? bytesFromBase64(object.finalTokenTransactionHash)
-          : new Uint8Array(0),
-        signatures: globalThis.Array.isArray(object?.signatures)
-          ? object.signatures.map((e: any) => GetLeafRevocationKeyshareSignature.fromJSON(e))
-          : [],
-      };
-    },
-
-    toJSON(message: GetTokenTransactionRevocationKeysharesRequest): unknown {
-      const obj: any = {};
-      if (message.finalTokenTransactionHash.length !== 0) {
-        obj.finalTokenTransactionHash = base64FromBytes(message.finalTokenTransactionHash);
-      }
-      if (message.signatures?.length) {
-        obj.signatures = message.signatures.map((e) => GetLeafRevocationKeyshareSignature.toJSON(e));
-      }
-      return obj;
-    },
-
-    create(
-      base?: DeepPartial<GetTokenTransactionRevocationKeysharesRequest>,
-    ): GetTokenTransactionRevocationKeysharesRequest {
-      return GetTokenTransactionRevocationKeysharesRequest.fromPartial(base ?? {});
-    },
-    fromPartial(
-      object: DeepPartial<GetTokenTransactionRevocationKeysharesRequest>,
-    ): GetTokenTransactionRevocationKeysharesRequest {
-      const message = createBaseGetTokenTransactionRevocationKeysharesRequest();
-      message.finalTokenTransactionHash = object.finalTokenTransactionHash ?? new Uint8Array(0);
-      message.signatures = object.signatures?.map((e) => GetLeafRevocationKeyshareSignature.fromPartial(e)) || [];
-      return message;
-    },
-  };
-
-function createBaseGetTokenTransactionRevocationKeysharesResponse(): GetTokenTransactionRevocationKeysharesResponse {
-  return { tokenTransactionRevocationKeyshares: [] };
-}
-
-export const GetTokenTransactionRevocationKeysharesResponse: MessageFns<
-  GetTokenTransactionRevocationKeysharesResponse
-> = {
-  encode(
-    message: GetTokenTransactionRevocationKeysharesResponse,
-    writer: BinaryWriter = new BinaryWriter(),
-  ): BinaryWriter {
-    for (const v of message.tokenTransactionRevocationKeyshares) {
-      writer.uint32(10).bytes(v!);
+export const SignTokenTransactionRequest: MessageFns<SignTokenTransactionRequest> = {
+  encode(message: SignTokenTransactionRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.finalTokenTransactionHash.length !== 0) {
+      writer.uint32(10).bytes(message.finalTokenTransactionHash);
+    }
+    for (const v of message.operatorSpecificSignatures) {
+      OperatorSpecificTokenTransactionSignature.encode(v!, writer.uint32(18).fork()).join();
     }
     return writer;
   },
 
-  decode(input: BinaryReader | Uint8Array, length?: number): GetTokenTransactionRevocationKeysharesResponse {
+  decode(input: BinaryReader | Uint8Array, length?: number): SignTokenTransactionRequest {
     const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseGetTokenTransactionRevocationKeysharesResponse();
+    const message = createBaseSignTokenTransactionRequest();
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
         case 1: {
           if (tag !== 10) {
+            break;
+          }
+
+          message.finalTokenTransactionHash = reader.bytes();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.operatorSpecificSignatures.push(
+            OperatorSpecificTokenTransactionSignature.decode(reader, reader.uint32()),
+          );
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): SignTokenTransactionRequest {
+    return {
+      finalTokenTransactionHash: isSet(object.finalTokenTransactionHash)
+        ? bytesFromBase64(object.finalTokenTransactionHash)
+        : new Uint8Array(0),
+      operatorSpecificSignatures: globalThis.Array.isArray(object?.operatorSpecificSignatures)
+        ? object.operatorSpecificSignatures.map((e: any) => OperatorSpecificTokenTransactionSignature.fromJSON(e))
+        : [],
+    };
+  },
+
+  toJSON(message: SignTokenTransactionRequest): unknown {
+    const obj: any = {};
+    if (message.finalTokenTransactionHash.length !== 0) {
+      obj.finalTokenTransactionHash = base64FromBytes(message.finalTokenTransactionHash);
+    }
+    if (message.operatorSpecificSignatures?.length) {
+      obj.operatorSpecificSignatures = message.operatorSpecificSignatures.map((e) =>
+        OperatorSpecificTokenTransactionSignature.toJSON(e)
+      );
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<SignTokenTransactionRequest>): SignTokenTransactionRequest {
+    return SignTokenTransactionRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<SignTokenTransactionRequest>): SignTokenTransactionRequest {
+    const message = createBaseSignTokenTransactionRequest();
+    message.finalTokenTransactionHash = object.finalTokenTransactionHash ?? new Uint8Array(0);
+    message.operatorSpecificSignatures =
+      object.operatorSpecificSignatures?.map((e) => OperatorSpecificTokenTransactionSignature.fromPartial(e)) || [];
+    return message;
+  },
+};
+
+function createBaseSignTokenTransactionResponse(): SignTokenTransactionResponse {
+  return { sparkOperatorSignature: new Uint8Array(0), tokenTransactionRevocationKeyshares: [] };
+}
+
+export const SignTokenTransactionResponse: MessageFns<SignTokenTransactionResponse> = {
+  encode(message: SignTokenTransactionResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.sparkOperatorSignature.length !== 0) {
+      writer.uint32(10).bytes(message.sparkOperatorSignature);
+    }
+    for (const v of message.tokenTransactionRevocationKeyshares) {
+      writer.uint32(18).bytes(v!);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): SignTokenTransactionResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseSignTokenTransactionResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.sparkOperatorSignature = reader.bytes();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
             break;
           }
 
@@ -3521,16 +3396,22 @@ export const GetTokenTransactionRevocationKeysharesResponse: MessageFns<
     return message;
   },
 
-  fromJSON(object: any): GetTokenTransactionRevocationKeysharesResponse {
+  fromJSON(object: any): SignTokenTransactionResponse {
     return {
+      sparkOperatorSignature: isSet(object.sparkOperatorSignature)
+        ? bytesFromBase64(object.sparkOperatorSignature)
+        : new Uint8Array(0),
       tokenTransactionRevocationKeyshares: globalThis.Array.isArray(object?.tokenTransactionRevocationKeyshares)
         ? object.tokenTransactionRevocationKeyshares.map((e: any) => bytesFromBase64(e))
         : [],
     };
   },
 
-  toJSON(message: GetTokenTransactionRevocationKeysharesResponse): unknown {
+  toJSON(message: SignTokenTransactionResponse): unknown {
     const obj: any = {};
+    if (message.sparkOperatorSignature.length !== 0) {
+      obj.sparkOperatorSignature = base64FromBytes(message.sparkOperatorSignature);
+    }
     if (message.tokenTransactionRevocationKeyshares?.length) {
       obj.tokenTransactionRevocationKeyshares = message.tokenTransactionRevocationKeyshares.map((e) =>
         base64FromBytes(e)
@@ -3539,15 +3420,12 @@ export const GetTokenTransactionRevocationKeysharesResponse: MessageFns<
     return obj;
   },
 
-  create(
-    base?: DeepPartial<GetTokenTransactionRevocationKeysharesResponse>,
-  ): GetTokenTransactionRevocationKeysharesResponse {
-    return GetTokenTransactionRevocationKeysharesResponse.fromPartial(base ?? {});
+  create(base?: DeepPartial<SignTokenTransactionResponse>): SignTokenTransactionResponse {
+    return SignTokenTransactionResponse.fromPartial(base ?? {});
   },
-  fromPartial(
-    object: DeepPartial<GetTokenTransactionRevocationKeysharesResponse>,
-  ): GetTokenTransactionRevocationKeysharesResponse {
-    const message = createBaseGetTokenTransactionRevocationKeysharesResponse();
+  fromPartial(object: DeepPartial<SignTokenTransactionResponse>): SignTokenTransactionResponse {
+    const message = createBaseSignTokenTransactionResponse();
+    message.sparkOperatorSignature = object.sparkOperatorSignature ?? new Uint8Array(0);
     message.tokenTransactionRevocationKeyshares = object.tokenTransactionRevocationKeyshares?.map((e) => e) || [];
     return message;
   },
@@ -9352,11 +9230,11 @@ export const SparkServiceDefinition = {
       responseStream: false,
       options: {},
     },
-    get_token_transaction_revocation_keyshares: {
-      name: "get_token_transaction_revocation_keyshares",
-      requestType: GetTokenTransactionRevocationKeysharesRequest,
+    sign_token_transaction: {
+      name: "sign_token_transaction",
+      requestType: SignTokenTransactionRequest,
       requestStream: false,
-      responseType: GetTokenTransactionRevocationKeysharesResponse,
+      responseType: SignTokenTransactionResponse,
       responseStream: false,
       options: {},
     },
@@ -9470,10 +9348,10 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
     request: StartTokenTransactionRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<StartTokenTransactionResponse>>;
-  get_token_transaction_revocation_keyshares(
-    request: GetTokenTransactionRevocationKeysharesRequest,
+  sign_token_transaction(
+    request: SignTokenTransactionRequest,
     context: CallContext & CallContextExt,
-  ): Promise<DeepPartial<GetTokenTransactionRevocationKeysharesResponse>>;
+  ): Promise<DeepPartial<SignTokenTransactionResponse>>;
   finalize_token_transaction(
     request: FinalizeTokenTransactionRequest,
     context: CallContext & CallContextExt,
@@ -9571,10 +9449,10 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
     request: DeepPartial<StartTokenTransactionRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<StartTokenTransactionResponse>;
-  get_token_transaction_revocation_keyshares(
-    request: DeepPartial<GetTokenTransactionRevocationKeysharesRequest>,
+  sign_token_transaction(
+    request: DeepPartial<SignTokenTransactionRequest>,
     options?: CallOptions & CallOptionsExt,
-  ): Promise<GetTokenTransactionRevocationKeysharesResponse>;
+  ): Promise<SignTokenTransactionResponse>;
   finalize_token_transaction(
     request: DeepPartial<FinalizeTokenTransactionRequest>,
     options?: CallOptions & CallOptionsExt,

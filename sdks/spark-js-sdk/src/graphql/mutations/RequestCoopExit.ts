@@ -1,4 +1,4 @@
-import { FRAGMENT as RequestCoopExitOutputFragment } from "../objects/RequestCoopExitOutput";
+import { FRAGMENT as RequestCoopExitOutputFragment } from "../objects/CoopExitRequest";
 
 export const RequestCoopExit = `
   mutation RequestCoopExit(
@@ -11,7 +11,9 @@ export const RequestCoopExit = `
         withdrawal_address: $withdrawal_address
       }
     ) {
-      ...RequestCoopExitOutputFragment
+      request {
+        ...CoopExitRequestFragment
+      }
     }
   }
   ${RequestCoopExitOutputFragment}

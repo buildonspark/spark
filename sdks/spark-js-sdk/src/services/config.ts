@@ -1,5 +1,5 @@
 import { DefaultSparkSigner, SparkSigner } from "../signer/signer";
-import { getAllSigningOperators } from "../tests/test-util";
+import { REGTEST_WALLET_CONFIG } from "../tests/test-util";
 import { Network } from "../utils/network";
 
 export type SigningOperator = {
@@ -21,16 +21,10 @@ export class WalletConfigService {
   private config: WalletConfig;
   public readonly signer: SparkSigner;
 
-  // TODO: update config based on network
   constructor(network: Network, signer?: SparkSigner) {
-    this.config = {
-      network,
-      coodinatorIdentifier:
-        "0000000000000000000000000000000000000000000000000000000000000001",
-      frostSignerAddress: "unix:///tmp/frost_0.sock",
-      threshold: 3,
-      signingOperators: getAllSigningOperators(),
-    };
+    // TODO: differentiate between mainnet, regtest, and local
+    // local config is LOCAL_WALLET_CONFIG - uses local signing operators
+    this.config = REGTEST_WALLET_CONFIG;
     this.signer = signer || new DefaultSparkSigner();
   }
 

@@ -26,7 +26,15 @@ import {
 import { bytesToHex } from "@noble/curves/abstract/utils";
 import { sha256 } from "@scure/btc-signer/utils";
 import SspClient from "./graphql/client";
-import { BitcoinNetwork } from "./graphql/objects";
+import {
+  BitcoinNetwork,
+  CoopExitFeeEstimateInput,
+  CoopExitFeeEstimateOutput,
+  LightningReceiveFeeEstimateInput,
+  LightningReceiveFeeEstimateOutput,
+  LightningSendFeeEstimateInput,
+  LightningSendFeeEstimateOutput,
+} from "./graphql/objects";
 import { CoopExitService } from "./services/coop-exit";
 import { LightningService } from "./services/lightning";
 import { SparkSigner } from "./signer/signer";
@@ -191,8 +199,42 @@ export class SparkWallet {
     throw new Error("Not implemented");
   }
 
-  async getLightningPaymentFees() {
-    throw new Error("Not implemented");
+  async getLightningReceiveFeeEstimate({
+    amountSats,
+    network,
+  }: LightningReceiveFeeEstimateInput): Promise<LightningReceiveFeeEstimateOutput | null> {
+    if (!this.sspClient) {
+      throw new Error("SSP client not initialized");
+    }
+
+    return await this.sspClient.getLightningReceiveFeeEstimate(
+      amountSats,
+      network
+    );
+  }
+
+  async getLightningSendFeeEstimate({
+    encodedInvoice,
+  }: LightningSendFeeEstimateInput): Promise<LightningSendFeeEstimateOutput | null> {
+    if (!this.sspClient) {
+      throw new Error("SSP client not initialized");
+    }
+
+    return await this.sspClient.getLightningSendFeeEstimate(encodedInvoice);
+  }
+
+  async getCoopExitFeeEstimate({
+    leafExternalIds,
+    withdrawalAddress,
+  }: CoopExitFeeEstimateInput): Promise<CoopExitFeeEstimateOutput | null> {
+    if (!this.sspClient) {
+      throw new Error("SSP client not initialized");
+    }
+
+    return await this.sspClient.getCoopExitFeeEstimate({
+      leafExternalIds,
+      withdrawalAddress,
+    });
   }
 
   async setLeaves(leaves: TreeNode[]) {
@@ -376,12 +418,18 @@ export class SparkWallet {
     return leaves.nodes;
   }
 
+  async getBalance(): Promise<BigInt> {
+    const leaves = await this.getLeaves();
+    return leaves.reduce((acc, leaf) => acc + BigInt(leaf.value), 0n);
+  }
+
   async verifyPendingTransfer(
     transfer: Transfer
   ): Promise<Map<string, Uint8Array>> {
     return await this.transferService!.verifyPendingTransfer(transfer);
   }
 
+  // **** Deposit Flow ****
   async generateDepositAddress(
     signingPubkey: Uint8Array
   ): Promise<GenerateDepositAddressResponse> {
@@ -401,7 +449,9 @@ export class SparkWallet {
       vout,
     });
   }
+  // **********************
 
+  // **** Tree Creation Flow ****
   async generateDepositAddressForTree(
     vout: number,
     parentSigningPubKey: Uint8Array,
@@ -431,4 +481,5 @@ export class SparkWallet {
       parentNode
     );
   }
+  // **********************
 }

@@ -10,16 +10,61 @@ import { getP2TRAddressFromPublicKey } from "../utils/bitcoin";
 import { getNetwork, Network } from "../utils/network";
 import { BitcoinFaucet } from "./utils/test-faucet";
 
-export const TEST_WALLET_CONFIG = {
+export const LOCAL_WALLET_CONFIG = {
   network: Network.REGTEST,
   coodinatorIdentifier:
     "0000000000000000000000000000000000000000000000000000000000000001",
   frostSignerAddress: "unix:///tmp/frost_0.sock",
   threshold: 3,
-  signingOperators: getAllSigningOperators(),
+  signingOperators: getLocalSigningOperators(),
 };
 
-export function getAllSigningOperators(): Record<string, SigningOperator> {
+export const REGTEST_WALLET_CONFIG = {
+  network: Network.REGTEST,
+  coodinatorIdentifier:
+    "0000000000000000000000000000000000000000000000000000000000000001",
+  frostSignerAddress: "unix:///tmp/frost_0.sock",
+  threshold: 3,
+  signingOperators: getRegtestSigningOperators(),
+};
+
+export function getRegtestSigningOperators(): Record<string, SigningOperator> {
+  const pubkeys = [
+    "03acd9a5a88db102730ff83dee69d69088cc4c9d93bbee893e90fd5051b7da9651",
+    "02d2d103cacb1d6355efeab27637c74484e2a7459e49110c3fe885210369782e23",
+    "0350f07ffc21bfd59d31e0a7a600e2995273938444447cb9bc4c75b8a895dbb853",
+  ];
+
+  const pubkeyBytesArray = pubkeys.map((pubkey) => hexToBytes(pubkey));
+
+  return {
+    "0000000000000000000000000000000000000000000000000000000000000001": {
+      id: 0,
+      identifier:
+        "0000000000000000000000000000000000000000000000000000000000000001",
+      address: "dns:///spark-0.dev.dev.sparkinfra.net",
+
+      identityPublicKey: pubkeyBytesArray[0],
+    },
+    "0000000000000000000000000000000000000000000000000000000000000002": {
+      id: 1,
+      identifier:
+        "0000000000000000000000000000000000000000000000000000000000000002",
+      address: "dns:///spark-1.dev.dev.sparkinfra.net",
+
+      identityPublicKey: pubkeyBytesArray[1],
+    },
+    "0000000000000000000000000000000000000000000000000000000000000003": {
+      id: 2,
+      identifier:
+        "0000000000000000000000000000000000000000000000000000000000000003",
+      address: "dns:///spark-2.dev.dev.sparkinfra.net",
+      identityPublicKey: pubkeyBytesArray[2],
+    },
+  };
+}
+
+export function getLocalSigningOperators(): Record<string, SigningOperator> {
   const pubkeys = [
     "0322ca18fc489ae25418a0e768273c2c61cabb823edfb14feb891e9bec62016510",
     "0341727a6c41b168f07eb50865ab8c397a53c7eef628ac1020956b705e43b6cb27",
@@ -78,7 +123,7 @@ export function getTestWalletConfigWithIdentityKey(
   identityPrivateKey: Uint8Array
 ): WalletConfig {
   return {
-    ...TEST_WALLET_CONFIG,
+    ...LOCAL_WALLET_CONFIG,
     identityPrivateKey,
   } as WalletConfig;
 }

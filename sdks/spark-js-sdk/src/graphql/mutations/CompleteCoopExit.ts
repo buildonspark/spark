@@ -1,4 +1,4 @@
-import { FRAGMENT as CompleteCoopExitOutputFragment } from "../objects/CompleteCoopExitOutput";
+import { FRAGMENT as CompleteCoopExitOutputFragment } from "../objects/CoopExitRequest";
 
 export const CompleteCoopExit = `
   mutation CompleteCoopExit(
@@ -9,7 +9,9 @@ export const CompleteCoopExit = `
       user_outbound_transfer_external_id: $user_outbound_transfer_external_id
       coop_exit_request_id: $coop_exit_request_id
     }) {
-      ...CompleteCoopExitOutputFragment
+      request {
+        ...CoopExitRequestFragment
+      }
     }
   }
     
