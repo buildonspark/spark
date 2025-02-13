@@ -31,7 +31,7 @@ func (s *TestScorer) Score(_ uuid.UUID, _ []byte, _ []byte) float32 {
 	return 0
 }
 
-func (s *TestScorer) FetchPolarityScores(_ *pb.FetchPolarityScoreRequest, stream pb.SparkTreeService_FetchPolarityScoresServer) error {
+func (s *TestScorer) FetchPolarityScores(_ *pb.FetchPolarityScoreRequest, _ pb.SparkTreeService_FetchPolarityScoresServer) error {
 	return nil
 }
 
