@@ -22,7 +22,7 @@ const PolarityScoreGamma = 0.5
 
 type Scorer interface {
 	Score(leafID uuid.UUID, sspPublicKey []byte, userPublicKey []byte) float32
-	FetchPolarityScores() (*pb.FetchPolarityScoreResponse, error)
+	FetchPolarityScores(req *pb.FetchPolarityScoreRequest, stream pb.SparkTreeService_FetchPolarityScoresServer) error
 }
 
 type TestScorer struct{}
@@ -31,8 +31,8 @@ func (s *TestScorer) Score(_ uuid.UUID, _ []byte, _ []byte) float32 {
 	return 0
 }
 
-func (s *TestScorer) FetchPolarityScores() (*pb.FetchPolarityScoreResponse, error) {
-	return &pb.FetchPolarityScoreResponse{}, nil
+func (s *TestScorer) FetchPolarityScores(_ *pb.FetchPolarityScoreRequest, stream pb.SparkTreeService_FetchPolarityScoresServer) error {
+	return nil
 }
 
 type PolarityScorer struct {
@@ -136,17 +136,26 @@ func (s *PolarityScorer) Score(leafID uuid.UUID, sspPublicKey []byte, userPublic
 	return probSspCanClaim - probUserCanClaim
 }
 
-func (s *PolarityScorer) FetchPolarityScores() (*pb.FetchPolarityScoreResponse, error) {
-	scores := pb.FetchPolarityScoreResponse{}
+func (s *PolarityScorer) FetchPolarityScores(req *pb.FetchPolarityScoreRequest, stream pb.SparkTreeService_FetchPolarityScoresServer) error {
+	targetPubKeys := make(map[string]bool)
+	for _, pubKey := range req.PublicKeys {
+		targetPubKeys[string(pubKey)] = true
+	}
 
 	for leafID, leafScores := range s.probPubKeyCanClaim {
 		for pubKey, score := range leafScores {
-			scores.Scores = append(scores.Scores, &pb.PolarityScores{
-				LeafId:        leafID.String(),
-				PublicKey:     []byte(pubKey),
-				PolarityScore: score,
+			if len(targetPubKeys) > 0 && !targetPubKeys[pubKey] {
+				continue
+			}
+			err := stream.Send(&pb.PolarityScore{
+				LeafId:    leafID.String(),
+				PublicKey: []byte(pubKey),
+				Score:     score,
 			})
+			if err != nil {
+				return err
+			}
 		}
 	}
-	return &scores, nil
+	return nil
 }

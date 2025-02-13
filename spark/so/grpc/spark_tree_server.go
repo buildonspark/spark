@@ -45,6 +45,6 @@ func (*SparkTreeServer) ProposeTreeDenominations(ctx context.Context, req *pb.Pr
 }
 
 // FetchPolarityScores fetches the polarity scores for a given SSP.
-func (s *SparkTreeServer) FetchPolarityScores(_ context.Context, _ *pb.FetchPolarityScore) (*pb.FetchPolarityScoreResponse, error) {
-	return s.scorer.FetchPolarityScores()
+func (s *SparkTreeServer) FetchPolarityScores(req *pb.FetchPolarityScoreRequest, stream pb.SparkTreeService_FetchPolarityScoresServer) error {
+	return s.scorer.FetchPolarityScores(req, stream)
 }

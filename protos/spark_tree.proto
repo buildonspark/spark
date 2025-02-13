@@ -9,7 +9,7 @@ service SparkTreeService {
     rpc find_leaves_to_give_user(FindLeavesToGiveUserRequest) returns (FindLeavesToGiveUserResponse) {}
     rpc find_leaves_to_take_from_user(FindLeavesToTakeFromUserRequest) returns (FindLeavesToTakeFromUserResponse) {}
     rpc propose_tree_denominations(ProposeTreeDenominationsRequest) returns (ProposeTreeDenominationsResponse) {}
-    rpc fetch_polarity_scores(FetchPolarityScore) returns (FetchPolarityScoreResponse) {}
+    rpc fetch_polarity_scores(FetchPolarityScoreRequest) returns (stream PolarityScore) {}
 }
 
 message GetLeafDenominationCountsRequest {
@@ -54,14 +54,12 @@ message ProposeTreeDenominationsResponse {
     repeated uint64 large_denominations = 2;
 }
 
-message FetchPolarityScore {}
-
-message PolarityScores {
-    string leaf_id = 1;
-    bytes public_key = 2;
-    float polarity_score = 3;
+message FetchPolarityScoreRequest {
+    repeated bytes public_keys = 1;
 }
 
-message FetchPolarityScoreResponse {
-    repeated PolarityScores scores = 1;
+message PolarityScore {
+    string leaf_id = 1;
+    bytes public_key = 2;
+    float score = 3;
 }
