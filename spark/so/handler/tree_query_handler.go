@@ -6,6 +6,7 @@ import (
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/ent"
+	"github.com/lightsparkdev/spark-go/so/ent/schema"
 	"github.com/lightsparkdev/spark-go/so/ent/treenode"
 )
 
@@ -26,6 +27,7 @@ func (h *TreeQueryHandler) GetTreeNodesByPublicKey(ctx context.Context, req *pb.
 	// First, get all nodes owned by the given public key
 	ownedNodes, err := db.TreeNode.Query().
 		Where(treenode.OwnerIdentityPubkey(req.OwnerIdentityPubkey)).
+		Where(treenode.StatusNEQ(schema.TreeNodeStatusCreating)).
 		All(ctx)
 	if err != nil {
 		return nil, err

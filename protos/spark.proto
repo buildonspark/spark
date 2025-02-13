@@ -230,6 +230,7 @@ message TreeNode {
     bytes verifying_public_key = 8;
     bytes owner_identity_public_key = 9;
     SigningKeyshare signing_keyshare = 10;
+    string status = 11;
 }
 
 message FinalizeNodeSignaturesRequest {

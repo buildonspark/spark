@@ -28,6 +28,7 @@ func (tn *TreeNode) MarshalSparkProto(ctx context.Context) (*pbspark.TreeNode, e
 		VerifyingPublicKey:     tn.VerifyingPubkey,
 		OwnerIdentityPublicKey: tn.OwnerIdentityPubkey,
 		SigningKeyshare:        signingKeyshare.MarshalProto(),
+		Status:                 string(tn.Status),
 	}, nil
 }
 
