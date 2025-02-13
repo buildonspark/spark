@@ -74,6 +74,7 @@ export class BitcoinFaucet {
       txid: fundingTxId,
       index: 0,
     };
+
     const splitTx = new Transaction();
     splitTx.addInput(fundingOutpoint);
     let initialValue = fundingTx.getOutput(0)!.amount!;
@@ -157,27 +158,32 @@ export class BitcoinFaucet {
   }
 
   private async call(method: string, params: any[]) {
-    const response = await fetch(this.url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: "Basic " + btoa(`${this.username}:${this.password}`),
-      },
-      body: JSON.stringify({
-        jsonrpc: "1.0",
-        id: "spark-js",
-        method,
-        params,
-      }),
-    });
+    try {
+      const response = await fetch(this.url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Basic " + btoa(`${this.username}:${this.password}`),
+        },
+        body: JSON.stringify({
+          jsonrpc: "1.0",
+          id: "spark-js",
+          method,
+          params,
+        }),
+      });
 
-    const data = await response.json();
-    if (data.error) {
-      console.error(`RPC Error for method ${method}:`, data.error);
-      throw new Error(`Bitcoin RPC error: ${data.error.message}`);
+      const data = await response.json();
+      if (data.error) {
+        console.error(`RPC Error for method ${method}:`, data.error);
+        throw new Error(`Bitcoin RPC error: ${data.error.message}`);
+      }
+
+      return data.result;
+    } catch (error) {
+      console.error("Error calling Bitcoin RPC:", error);
+      throw error;
     }
-
-    return data.result;
   }
 
   async generateToAddress(numBlocks: number, address: string) {

@@ -150,6 +150,10 @@ export class SparkWallet {
     return this.config.signer.generateMnemonic();
   }
 
+  isInitialized(): boolean {
+    return this.sspClient !== null && this.wasmModule !== null;
+  }
+
   // TODO: Update to use config based on options
   async createSparkWallet(mnemonic: string): Promise<string> {
     await this.initWasm();
@@ -356,20 +360,28 @@ export class SparkWallet {
   }
 
   async coopExit() {
+    const leavesToSend = this.leaves.map((leaf) => ({
+      leaf,
+      signingPubKey: this.config.signer.generatePublicKey(sha256(leaf.id)),
+      newSigningPubKey: this.config.signer.generatePublicKey(),
+    }));
+
     // const leaves = this.config.signer.getLeafKeyTweaks(this.leaves);
 
-    // const withdrawPubKey = this.config.signer.generatePublicKey(
-    //   sha256(leaves[0].leaf.treeId)
-    // );
-    // const withdrawAddress = getP2TRAddressFromPublicKey(
-    //   withdrawPubKey,
-    //   this.config.getNetwork()
-    // );
+    // TODO: Might need a differnet ID for this
+    const withdrawPubKey = this.config.signer.generatePublicKey(
+      sha256(leavesToSend[0].leaf.treeId)
+    );
 
-    // const amountSats = leaves.reduce(
-    //   (acc, leaf) => acc + BigInt(leaf.leaf.value),
-    //   0n
-    // );
+    const withdrawAddress = getP2TRAddressFromPublicKey(
+      withdrawPubKey,
+      this.config.getNetwork()
+    );
+
+    const amountSats = leavesToSend.reduce(
+      (acc, leaf) => acc + BigInt(leaf.leaf.value),
+      0n
+    );
 
     // // get/create exit tx from where?
     // const dummyTx = createDummyTx({

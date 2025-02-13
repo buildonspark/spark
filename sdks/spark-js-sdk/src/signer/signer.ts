@@ -296,7 +296,7 @@ class DefaultSparkSigner implements SparkSigner {
       seed = hexToBytes(seed);
     }
 
-    const hdkey = HDKey.fromMasterSeed(seed);
+    const hdkey = HDKey.fromMasterSeed(seed).derive("m/0");
 
     assert(hdkey.privateKey, "Private key is not set");
 

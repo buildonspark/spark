@@ -34,7 +34,7 @@
     "@types/copyfiles": "^2",
     "@types/crypto-js": "^4",
     "@types/jest": "^29.5.14",
-    "@types/node": "^22.10.6",
+    "@types/node": "^22.13.2",
     "@types/secp256k1": "^4.0.6",
     "@types/ws": "^8",
     "babel-jest": "^29.7.0",
