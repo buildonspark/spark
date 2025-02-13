@@ -15,7 +15,6 @@ import (
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/authz"
 	"github.com/lightsparkdev/spark-go/so/ent"
-	"github.com/lightsparkdev/spark-go/so/ent/schema"
 	"github.com/lightsparkdev/spark-go/so/ent/tokentransactionreceipt"
 	"github.com/lightsparkdev/spark-go/so/helper"
 	"github.com/lightsparkdev/spark-go/so/utils"
@@ -174,11 +173,7 @@ func (o TokenTransactionHandler) SignTokenTransaction(
 			return nil, fmt.Errorf("invalid owner signature for leaf: %w", err)
 		}
 	}
-	tokenTransactionReceipt, err := ent.GetDbFromContext(ctx).TokenTransactionReceipt.Query().
-		Where(tokentransactionreceipt.FinalizedTokenTransactionHash(req.FinalTokenTransactionHash)).
-		WithCreatedLeaf().
-		WithSpentLeaf().
-		Only(ctx)
+	tokenTransactionReceipt, err := ent.FetchTokenTransactionData(ctx, req.FinalTokenTransactionHash)
 	if err != nil {
 		log.Printf("Sign request for token transaction did not map to a previously started transaction: %v", err)
 		return nil, err
@@ -187,25 +182,21 @@ func (o TokenTransactionHandler) SignTokenTransaction(
 	// Sign the token transaction hash with the operator identity private key.
 	identityPrivateKey := secp256k1.PrivKeyFromBytes(config.IdentityPrivateKey)
 	operatorSignature := ecdsa.Sign(identityPrivateKey, req.FinalTokenTransactionHash)
-	if err != nil {
-		log.Printf("Failed to sign token transaction with operator key: %v", err)
-		return nil, err
-	}
 
-	newCreatedLeafStatus := schema.TokenLeafStatusCreatedSigned
-	// If there are no spent leaves, it means the transaction is an issuance. These transctions don't require
-	// a finalize step so we can mark it as immediately final.
-	if len(tokenTransactionReceipt.Edges.SpentLeaf) == 0 {
-		newCreatedLeafStatus = schema.TokenLeafStatusCreatedFinalized
+	operatorSpecificSignature := make([][]byte, len(req.OperatorSpecificSignatures))
+	for i, sig := range req.OperatorSpecificSignatures {
+		operatorSpecificSignature[i] = sig.OwnerSignature
 	}
-	err = ent.UpdateLeafStatuses(ctx, tokenTransactionReceipt.Edges.CreatedLeaf, newCreatedLeafStatus)
+	err = ent.UpdateSignedTransactionLeaves(ctx, tokenTransactionReceipt, operatorSpecificSignature, operatorSignature.Serialize())
 	if err != nil {
-		log.Printf("Failed to update created leaf statuses to CreatedSigned: %v", err)
+		log.Printf("Failed to update leaves after signing: %v", err)
 		return nil, err
 	}
-	err = ent.UpdateLeafStatuses(ctx, tokenTransactionReceipt.Edges.SpentLeaf, schema.TokenLeafStatusSpentSigned)
+	// Refetch the data to update the receipt object with the updated ents.
+	tokenTransactionReceipt, err = ent.FetchTokenTransactionData(ctx, req.FinalTokenTransactionHash)
 	if err != nil {
-		log.Printf("Failed to update spent leaf statuses to SpentSigned: %v", err)
+		log.Printf("Failed to refetch token transaction data: %v", err)
+		return nil, err
 	}
 
 	var keyshares []*ent.SigningKeyshare
@@ -246,44 +237,22 @@ func (o TokenTransactionHandler) FinalizeTokenTransaction(
 	db := ent.GetDbFromContext(ctx)
 	finalTokenTransactionHash := req.FinalTokenTransactionHash
 
-	// Query the token_transaction_receipt by the final transaction hash.
-	receipt, err := db.TokenTransactionReceipt.Query().
+	tokenTransactionReceipt, err := db.TokenTransactionReceipt.Query().
 		Where(tokentransactionreceipt.FinalizedTokenTransactionHash(finalTokenTransactionHash)).
 		WithSpentLeaf().
+		WithCreatedLeaf().
 		Only(ctx)
 	if err != nil {
 		log.Printf("Failed to fetch matching transaction receipt: %v", err)
 		return nil, fmt.Errorf("failed to fetch transaction receipt: %w", err)
 	}
 
-	spentLeaves := receipt.Edges.SpentLeaf
-	if len(spentLeaves) == 0 {
-		return nil, fmt.Errorf("no spent leaves found for transaction hash %x", finalTokenTransactionHash)
-	}
-
-	// Validate that we have the right number of revocation keys
-	if len(req.LeafToSpendRevocationKeys) != len(spentLeaves) {
-		return nil, fmt.Errorf(
-			"number of revocation keys (%d) does not match number of spent leaves (%d)",
-			len(req.LeafToSpendRevocationKeys),
-			len(spentLeaves),
-		)
-	}
-
 	// TODO: Validate that the revocation private key is correct.
 
-	// Update all spent leaves with their revocation private keys and set status to finalized
-	leafIDs := make([]uuid.UUID, len(spentLeaves))
-	for i, leaf := range spentLeaves {
-		leafIDs[i] = leaf.ID
-		// Update each leaf individually to set the revocation private key
-		if _, err := db.TokenLeaf.UpdateOne(leaf).
-			SetLeafSpentRevocationPrivateKey(req.LeafToSpendRevocationKeys[i]).
-			SetStatus(schema.TokenLeafStatusSpentFinalized).
-			Save(ctx); err != nil {
-			log.Printf("Failed to update leaf %s with revocation private key: %v", leaf.ID, err)
-			return nil, fmt.Errorf("failed to update leaf with revocation key: %w", err)
-		}
+	err = ent.UpdateFinalizedTransactionLeaves(ctx, tokenTransactionReceipt, req.LeafToSpendRevocationKeys)
+	if err != nil {
+		log.Printf("Failed to update leaves after finalizing: %v", err)
+		return nil, err
 	}
 
 	return &emptypb.Empty{}, nil

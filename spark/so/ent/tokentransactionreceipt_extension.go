@@ -9,6 +9,8 @@ import (
 	"github.com/google/uuid"
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
+	"github.com/lightsparkdev/spark-go/so/ent/tokenleaf"
+	"github.com/lightsparkdev/spark-go/so/ent/tokentransactionreceipt"
 	"github.com/lightsparkdev/spark-go/so/utils"
 )
 
@@ -124,4 +126,143 @@ func CreateStartedTransactionEntities(
 		return nil, err
 	}
 	return tokenTransactionReceipt, nil
+}
+
+// UpdateSignedTransactionLeaves updates the status and ownership signatures of the input + output leaves
+// and the issuance signature (if applicable).
+func UpdateSignedTransactionLeaves(
+	ctx context.Context,
+	tokenTransactionReceipt *TokenTransactionReceipt,
+	operatorSpecificOwnershipSignatures [][]byte,
+	operatorSignature []byte,
+) error {
+	// Update the token transaction receipt with the operator signature
+	_, err := GetDbFromContext(ctx).TokenTransactionReceipt.UpdateOne(tokenTransactionReceipt).
+		SetOperatorSignature(operatorSignature).
+		Save(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to update token transaction receipt with operator signature: %w", err)
+	}
+
+	newInputLeafStatus := schema.TokenLeafStatusSpentSigned
+	newOutputLeafStatus := schema.TokenLeafStatusCreatedSigned
+	if tokenTransactionReceipt.Edges.Issuance != nil {
+		// If this is an issuance, update status straight to finalized because a follow up Finalize() call
+		// is not necessary for issuance.
+		newInputLeafStatus = schema.TokenLeafStatusSpentFinalized
+		newOutputLeafStatus = schema.TokenLeafStatusCreatedFinalized
+		if len(operatorSpecificOwnershipSignatures) != 1 {
+			return fmt.Errorf(
+				"expected 1 ownership signature for issuance, got %d",
+				len(operatorSpecificOwnershipSignatures),
+			)
+		}
+
+		_, err := GetDbFromContext(ctx).TokenIssuance.UpdateOne(tokenTransactionReceipt.Edges.Issuance).
+			SetOperatorSpecificIssuerSignature(operatorSpecificOwnershipSignatures[0]).
+			Save(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to update issuance with signature: %w", err)
+		}
+	}
+
+	// Update input leaves.
+	if tokenTransactionReceipt.Edges.SpentLeaf != nil {
+		for _, leafToSpendEnt := range tokenTransactionReceipt.Edges.SpentLeaf {
+			spentLeaves := tokenTransactionReceipt.Edges.SpentLeaf
+			if len(spentLeaves) == 0 {
+				return fmt.Errorf("no spent leaves found for transaction. cannot finalize")
+			}
+
+			// Validate that we have the right number of revocation keys
+			if len(operatorSpecificOwnershipSignatures) != len(spentLeaves) {
+				return fmt.Errorf(
+					"number of operator specific ownership signatures (%d) does not match number of spent leaves (%d)",
+					len(operatorSpecificOwnershipSignatures),
+					len(spentLeaves),
+				)
+			}
+
+			inputLeafIndex := leafToSpendEnt.LeafSpentTransactionInputVout
+			_, err := GetDbFromContext(ctx).TokenLeaf.UpdateOne(leafToSpendEnt).
+				SetStatus(newInputLeafStatus).
+				SetLeafSpentOperatorSpecificOwnershipSignature(operatorSpecificOwnershipSignatures[inputLeafIndex]).
+				Save(ctx)
+			if err != nil {
+				return fmt.Errorf("failed to update spent leaf to signed: %w", err)
+			}
+		}
+	}
+
+	// Update output leaves.
+	leafIDs := make([]uuid.UUID, len(tokenTransactionReceipt.Edges.CreatedLeaf))
+	for i, leaf := range tokenTransactionReceipt.Edges.CreatedLeaf {
+		leafIDs[i] = leaf.ID
+	}
+	_, err = GetDbFromContext(ctx).TokenLeaf.Update().
+		Where(tokenleaf.IDIn(leafIDs...)).
+		SetStatus(newOutputLeafStatus).
+		Save(ctx)
+	if err != nil {
+		log.Printf("Failed to bulk update leaf status to signed: %v", err)
+		return err
+	}
+
+	return nil
+}
+
+// UpdateFinalizedTransactionInputs updates the status and ownership signatures of the finalized input + output
+// leaves.
+func UpdateFinalizedTransactionLeaves(
+	ctx context.Context,
+	tokenTransactionReceipt *TokenTransactionReceipt,
+	revocationKeys [][]byte,
+) error {
+	spentLeaves := tokenTransactionReceipt.Edges.SpentLeaf
+	if len(spentLeaves) == 0 {
+		return fmt.Errorf("no spent leaves found for transaction. cannot finalize")
+	}
+	if len(revocationKeys) != len(spentLeaves) {
+		return fmt.Errorf(
+			"number of revocation keys (%d) does not match number of spent leaves (%d)",
+			len(revocationKeys),
+			len(spentLeaves),
+		)
+	}
+	// Update input leaves.
+	for _, leafToSpendEnt := range tokenTransactionReceipt.Edges.SpentLeaf {
+		inputLeafIndex := leafToSpendEnt.LeafSpentTransactionInputVout
+		_, err := GetDbFromContext(ctx).TokenLeaf.UpdateOne(leafToSpendEnt).
+			SetStatus(schema.TokenLeafStatusSpentFinalized).
+			SetLeafSpentRevocationPrivateKey(revocationKeys[inputLeafIndex]).
+			Save(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to update spent leaf to signed: %w", err)
+		}
+	}
+
+	// Update output leaves.
+	leafIDs := make([]uuid.UUID, len(tokenTransactionReceipt.Edges.CreatedLeaf))
+	for i, leaf := range tokenTransactionReceipt.Edges.CreatedLeaf {
+		leafIDs[i] = leaf.ID
+	}
+	_, err := GetDbFromContext(ctx).TokenLeaf.Update().
+		Where(tokenleaf.IDIn(leafIDs...)).
+		SetStatus(schema.TokenLeafStatusCreatedFinalized).
+		Save(ctx)
+	if err != nil {
+		log.Printf("Failed to bulk update leaf status to signed: %v", err)
+		return err
+	}
+	return nil
+}
+
+// FetchTokenTransactionReceipt refetches the receipt with all its relations.
+func FetchTokenTransactionData(ctx context.Context, finalTokenTransactionHash []byte) (*TokenTransactionReceipt, error) {
+	return GetDbFromContext(ctx).TokenTransactionReceipt.Query().
+		Where(tokentransactionreceipt.FinalizedTokenTransactionHash(finalTokenTransactionHash)).
+		WithCreatedLeaf().
+		WithSpentLeaf().
+		WithIssuance().
+		Only(ctx)
 }
