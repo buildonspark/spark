@@ -39,7 +39,7 @@ func (h *TreeCreationHandler) findParentOutputFromUtxo(ctx context.Context, utxo
 		}
 	}
 	if len(tx.TxOut) <= int(utxo.Vout) {
-		return nil, fmt.Errorf("vout out of bounds")
+		return nil, fmt.Errorf("vout out of bounds utxo, tx vout: %d, utxo vout: %d", len(tx.TxOut), utxo.Vout)
 	}
 	return tx.TxOut[utxo.Vout], nil
 }
@@ -59,7 +59,7 @@ func (h *TreeCreationHandler) findParentOutputFromNodeOutput(ctx context.Context
 		return nil, err
 	}
 	if len(tx.TxOut) <= int(nodeOutput.Vout) {
-		return nil, fmt.Errorf("vout out of bounds")
+		return nil, fmt.Errorf("vout out of bounds node output, tx vout: %d, node output vout: %d", len(tx.TxOut), nodeOutput.Vout)
 	}
 	return tx.TxOut[nodeOutput.Vout], nil
 }
@@ -522,7 +522,7 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 		nodes = append(nodes, node)
 		if currentElement.node.RefundTxSigningJob != nil {
 			if len(tx.TxOut) <= 0 {
-				return nil, nil, fmt.Errorf("vout out of bounds")
+				return nil, nil, fmt.Errorf("vout out of bounds for node tx, need at least one output")
 			}
 			refundSigningJob, _, err := helper.NewSigningJob(currentElement.keyshare, currentElement.node.RefundTxSigningJob, tx.TxOut[0], nil)
 			if err != nil {
@@ -533,7 +533,7 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 			userPublicKeys := [][]byte{}
 			statechainPublicKeys := [][]byte{}
 			if len(tx.TxOut) < len(currentElement.node.Children) {
-				return nil, nil, fmt.Errorf("vout out of bounds")
+				return nil, nil, fmt.Errorf("vout out of bounds for node split tx, had: %d, needed: %d", len(tx.TxOut), len(currentElement.node.Children))
 			}
 			for i, child := range currentElement.node.Children {
 				userSigningKey, keyshare, err := h.getSigningKeyshareFromOutput(ctx, network, tx.TxOut[i])
