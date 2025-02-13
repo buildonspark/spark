@@ -31,12 +31,9 @@ func NewTreeCreationHandler(config *so.Config, onchainHelper helper.OnChainHelpe
 }
 
 func (h *TreeCreationHandler) findParentOutputFromUtxo(ctx context.Context, utxo *pb.UTXO) (*wire.TxOut, error) {
-	tx, err := h.onchainHelper.GetTxOnChain(ctx, utxo.Txid)
+	tx, err := common.TxFromRawTxBytes(utxo.RawTx)
 	if err != nil {
-		tx, err = common.TxFromRawTxBytes(utxo.RawTx)
-		if err != nil {
-			return nil, err
-		}
+		return nil, err
 	}
 	if len(tx.TxOut) <= int(utxo.Vout) {
 		return nil, fmt.Errorf("vout out of bounds utxo, tx vout: %d, utxo vout: %d", len(tx.TxOut), utxo.Vout)
