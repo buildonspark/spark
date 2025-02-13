@@ -3,6 +3,7 @@ package ent
 import (
 	"context"
 	"encoding/hex"
+	"fmt"
 	"log"
 
 	"github.com/google/uuid"
@@ -22,7 +23,13 @@ func GetReceiptMapFromList(receipts []*TokenTransactionReceipt) (map[string]*Tok
 	return receiptMap, nil
 }
 
-func SaveTokenTransactionReceiptAndLeafEnts(ctx context.Context, tokenTransaction *pb.TokenTransaction, tokenTransactionSignatures *pb.TokenTransactionSignatures, leafRevocationKeyshareIDs []string) (*TokenTransactionReceipt, error) {
+func CreateStartedTransactionEntities(
+	ctx context.Context,
+	tokenTransaction *pb.TokenTransaction,
+	tokenTransactionSignatures *pb.TokenTransactionSignatures,
+	leafRevocationKeyshareIDs []string,
+	leafToSpendEnts []*TokenLeaf,
+) (*TokenTransactionReceipt, error) {
 	partialTokenTransactionHash, err := utils.HashTokenTransaction(tokenTransaction, true)
 	if err != nil {
 		log.Printf("Failed to hash partial token transaction: %v", err)
@@ -33,24 +40,53 @@ func SaveTokenTransactionReceiptAndLeafEnts(ctx context.Context, tokenTransactio
 		log.Printf("Failed to hash final token transaction: %v", err)
 		return nil, err
 	}
-	db := GetDbFromContext(ctx)
-	tokenTransactionReceipt, err := db.TokenTransactionReceipt.Create().
-		SetPartialTokenTransactionHash(partialTokenTransactionHash).
-		SetFinalizedTokenTransactionHash(finalTokenTransactionHash).
-		Save(ctx)
-	if err != nil {
-		log.Printf("Failed to create token transaction receipt: %v", err)
-		return nil, err
-	}
 
+	db := GetDbFromContext(ctx)
+	var tokenIssuanceEnt *TokenIssuance
 	if tokenTransaction.GetIssueInput() != nil {
-		_, err = db.TokenIssuance.Create().
+		tokenIssuanceEnt, err = db.TokenIssuance.Create().
 			SetIssuerPublicKey(tokenTransaction.GetIssueInput().GetIssuerPublicKey()).
 			SetIssuerSignature(tokenTransactionSignatures.GetOwnerSignatures()[0]).
 			Save(ctx)
 		if err != nil {
 			log.Printf("Failed to create token issuance ent: %v", err)
 			return nil, err
+		}
+	}
+
+	txReceiptUpdate := db.TokenTransactionReceipt.Create().
+		SetPartialTokenTransactionHash(partialTokenTransactionHash).
+		SetFinalizedTokenTransactionHash(finalTokenTransactionHash)
+	if tokenIssuanceEnt != nil {
+		txReceiptUpdate.SetIssuanceID(tokenIssuanceEnt.ID)
+	}
+	tokenTransactionReceipt, err := txReceiptUpdate.Save(ctx)
+	if err != nil {
+		log.Printf("Failed to create token transaction receipt: %v", err)
+		return nil, err
+	}
+
+	if tokenTransaction.GetTransferInput() != nil {
+		ownershipSignatures := tokenTransactionSignatures.GetOwnerSignatures()
+		if len(ownershipSignatures) != len(leafToSpendEnts) {
+			return nil, fmt.Errorf(
+				"number of signatures %d doesn't match number of leaves to spend %d",
+				len(ownershipSignatures),
+				len(leafToSpendEnts),
+			)
+		}
+
+		for leafIndex, leafToSpendEnt := range leafToSpendEnts {
+			_, err = db.TokenLeaf.UpdateOne(leafToSpendEnt).
+				SetStatus(schema.TokenLeafStatusSpentStarted).
+				SetLeafSpentTokenTransactionReceiptID(tokenTransactionReceipt.ID).
+				SetLeafSpentOwnershipSignature(ownershipSignatures[leafIndex]).
+				SetLeafSpentTransactionInputVout(uint32(leafIndex)).
+				Save(ctx)
+			if err != nil {
+				log.Printf("Failed to update leaf to spent: %v", err)
+				return nil, err
+			}
 		}
 	}
 
