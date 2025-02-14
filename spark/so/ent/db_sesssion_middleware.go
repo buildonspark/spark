@@ -25,23 +25,31 @@ func DbSessionMiddleware(dbClient *Client) grpc.UnaryServerInterceptor {
 		// Attach the transaction to the context
 		ctx = context.WithValue(ctx, TxKey, tx)
 
+		// Ensure rollback on panic
+		defer func() {
+			if r := recover(); r != nil {
+				_ = tx.Rollback()
+				panic(r)
+			}
+		}()
+
 		// Call the handler (the actual RPC method)
 		resp, err := handler(ctx, req)
 
-		// If there was an error, rollback the transaction, otherwise commit
+		// Handle transaction commit/rollback
 		if err != nil {
-			dberr := tx.Rollback()
-			if dberr != nil {
-				log.Printf("Failed to rollback in %s: %s.\n", info.FullMethod, dberr)
+			if dberr := tx.Rollback(); dberr != nil {
+				log.Printf("Failed to rollback transaction in %s: %s.\n", info.FullMethod, dberr)
 			}
-		} else {
-			dberr := tx.Commit()
-			if dberr != nil {
-				log.Printf("Failed to commit in %s: %s.\n", info.FullMethod, dberr)
-			}
+			return nil, err
 		}
 
-		return resp, err
+		if dberr := tx.Commit(); dberr != nil {
+			log.Printf("Failed to commit transaction in %s: %s.\n", info.FullMethod, dberr)
+			return nil, dberr
+		}
+
+		return resp, nil
 	}
 }
 
