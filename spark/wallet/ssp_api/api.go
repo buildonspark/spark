@@ -55,7 +55,7 @@ func (s *SparkServiceAPI) PayInvoice(
 	}
 	idempotencyKey := hex.EncodeToString(randomKey.Serialize())
 	variables := map[string]interface{}{
-		"invoice":         invoice,
+		"encoded_invoice": invoice,
 		"idempotency_key": idempotencyKey,
 	}
 
