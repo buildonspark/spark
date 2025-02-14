@@ -118,6 +118,24 @@ func TestSolveLeafDenominations(t *testing.T) {
 			expectedSmall: []uint64{1, 1, 2, 2},
 			expectedLarge: []uint64{},
 		},
+		{
+			name:          "test prioritizing small denominations",
+			currentCounts: map[uint64]uint64{},
+			targetCounts: map[uint64]uint64{
+				1:  2,
+				2:  2,
+				4:  2,
+				8:  2,
+				16: 2,
+				32: 2,
+				64: 2,
+			},
+			maxAmountSats: 10000,
+			maxTreeDepth:  2,
+			expectError:   false,
+			expectedSmall: []uint64{1, 1, 2, 2},
+			expectedLarge: []uint64{},
+		},
 	}
 
 	for _, tt := range tests {

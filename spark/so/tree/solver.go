@@ -1,6 +1,7 @@
 package tree
 
 import (
+	"log"
 	"math/bits"
 
 	pb "github.com/lightsparkdev/spark-go/proto/spark_tree"
@@ -13,6 +14,9 @@ func solveLeafDenominations(counts *pb.GetLeafDenominationCountsResponse, target
 		currentDenomination := uint64(1) << i
 		if counts.Counts[currentDenomination] <= targetCounts[currentDenomination] {
 			missingCount[i] = targetCounts[currentDenomination] - counts.Counts[currentDenomination]
+			if missingCount[i] > 0 {
+				log.Printf("missing count for %d: %d", currentDenomination, missingCount[i])
+			}
 		}
 	}
 
@@ -60,6 +64,7 @@ func solveLeafDenominations(counts *pb.GetLeafDenominationCountsResponse, target
 		if targetLength > 0 && targetLength < uint64(len(smallDenominations)) {
 			smallDenominations = smallDenominations[:targetLength]
 		}
+		log.Printf("small denominations: %v, min: %d, max: %d", len(smallDenominations), smallDenominations[0], smallDenominations[len(smallDenominations)-1])
 	}
 	if len(largeDenominations) > 0 {
 		// Compute 2^floor(log2(len(smallDenominations))).
@@ -70,6 +75,7 @@ func solveLeafDenominations(counts *pb.GetLeafDenominationCountsResponse, target
 		if targetLength > 0 && targetLength < uint64(len(largeDenominations)) {
 			largeDenominations = largeDenominations[:targetLength]
 		}
+		log.Printf("large denominations: %v, min: %d, max: %d", len(largeDenominations), largeDenominations[0], largeDenominations[len(largeDenominations)-1])
 	}
 
 	return &pb.ProposeTreeDenominationsResponse{

@@ -2,6 +2,7 @@ package tree
 
 import (
 	"context"
+	"log"
 	"time"
 
 	"github.com/google/uuid"
@@ -62,6 +63,7 @@ func (s *PolarityScorer) Start() {
 			).
 			Limit(limit).
 			All(context.Background())
+		log.Printf("found %d leaves to update", len(leaves))
 		for _, leaf := range leaves {
 			node := leaf
 			for i := 0; i < PolarityScoreDepth; i++ {
@@ -141,7 +143,13 @@ func (s *PolarityScorer) FetchPolarityScores(req *pb.FetchPolarityScoreRequest, 
 	for _, pubKey := range req.PublicKeys {
 		targetPubKeys[string(pubKey)] = true
 	}
+	if len(targetPubKeys) > 0 {
+		log.Printf("fetching polarity scores for %d target pubkeys", len(targetPubKeys))
+	} else {
+		log.Printf("fetching all polarity scores")
+	}
 
+	log.Printf("found %d leaves in map", len(s.probPubKeyCanClaim))
 	for leafID, leafScores := range s.probPubKeyCanClaim {
 		for pubKey, score := range leafScores {
 			if len(targetPubKeys) > 0 && !targetPubKeys[pubKey] {
