@@ -13,6 +13,7 @@ function createLeafNode(value: number): LeafNode {
     ownerIdentityPublicKey: new Uint8Array(),
     isUsed: false,
     signingKeyshare: undefined,
+    status: "unspent",
   };
 }
 

@@ -67,6 +67,7 @@ interface SparkSigner {
   createSparkWalletFromMnemonic(mnemonic: string): Promise<string>;
   createSparkWalletFromSeed(seed: Uint8Array | string): string;
 
+  restoreSigningKeysFromLeafs(leafs: TreeNode[]): void;
   // Generates a new private key, and returns the public key
   generatePublicKey(hash?: Uint8Array): Uint8Array;
   // Called when a public key is no longer needed

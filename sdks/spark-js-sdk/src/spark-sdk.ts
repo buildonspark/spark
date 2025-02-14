@@ -8,20 +8,16 @@ import {
 import { initWasm } from "./utils/wasm-wrapper";
 import { InitOutput } from "./wasm/spark_bindings";
 
+import { TokenTransaction } from "./proto/spark";
 import { WalletConfig, WalletConfigService } from "./services/config";
 import { ConnectionManager } from "./services/connection";
 import { DepositService } from "./services/deposit";
+import { TokenTransactionService } from "./services/tokens";
 import { LeafKeyTweak, TransferService } from "./services/transfer";
 import {
   DepositAddressTree,
   TreeCreationService,
 } from "./services/tree-creation";
-import { TokenTransactionService } from "./services/tokens";
-import {
-  TokenTransaction,
-  StartTokenTransactionResponse,
-  TokenLeafOutput,
-} from "./proto/spark";
 import {
   aggregateFrost,
   AggregateFrostParams,
@@ -96,7 +92,10 @@ export class SparkWallet {
       this.connectionManager
     );
 
-    this.tokenTransactionService = new TokenTransactionService(this.config, this.connectionManager);
+    this.tokenTransactionService = new TokenTransactionService(
+      this.config,
+      this.connectionManager
+    );
 
     this.lightningService = new LightningService(
       this.config,
@@ -166,19 +165,25 @@ export class SparkWallet {
 
   // TODO: Update to use config based on options
   async createSparkWallet(mnemonic: string): Promise<string> {
-    await this.initWasm();
     const identityPublicKey =
       await this.config.signer.createSparkWalletFromMnemonic(mnemonic);
-    this.sspClient = new SspClient(identityPublicKey);
+    await this.initializeWallet(identityPublicKey);
     return identityPublicKey;
   }
 
   async createSparkWalletFromSeed(seed: Uint8Array | string): Promise<string> {
-    await this.initWasm();
     const identityPublicKey =
       this.config.signer.createSparkWalletFromSeed(seed);
-    this.sspClient = new SspClient(identityPublicKey);
+    await this.initializeWallet(identityPublicKey);
     return identityPublicKey;
+  }
+
+  private async initializeWallet(identityPublicKey: string) {
+    this.sspClient = new SspClient(identityPublicKey);
+    await this.initWasm();
+    // TODO: Better leaf management?
+    this.leaves = await this.getLeaves();
+    this.config.signer.restoreSigningKeysFromLeafs(this.leaves);
   }
 
   // Lightning

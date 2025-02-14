@@ -79,16 +79,22 @@ export class TreeCreationService {
       if (!parentNode.parentNodeId) {
         throw new Error("Parent node ID is undefined");
       }
-      request.parentNodeOutput = {
-        nodeId: parentNode.parentNodeId,
-        vout: vout,
+      request.source = {
+        $case: "parentNodeOutput",
+        parentNodeOutput: {
+          nodeId: parentNode.parentNodeId,
+          vout: vout,
+        },
       };
     } else if (parentTx) {
-      request.onChainUtxo = {
-        txid: getTxId(parentTx),
-        vout: vout,
-        rawTx: parentTx.toBytes(),
-        network: this.config.getNetwork(),
+      request.source = {
+        $case: "onChainUtxo",
+        onChainUtxo: {
+          txid: getTxId(parentTx),
+          vout: vout,
+          rawTx: parentTx.toBytes(),
+          network: this.config.getNetwork(),
+        },
       };
     } else {
       throw new Error("No parent node or parent tx provided");
@@ -138,20 +144,26 @@ export class TreeCreationService {
     let tx: Transaction | undefined;
     if (parentTx) {
       tx = parentTx;
-      request.onChainUtxo = {
-        txid: getTxId(parentTx),
-        vout: vout,
-        rawTx: parentTx.toBytes(),
-        network: this.config.getNetwork(),
+      request.source = {
+        $case: "onChainUtxo",
+        onChainUtxo: {
+          txid: getTxId(parentTx),
+          vout: vout,
+          rawTx: parentTx.toBytes(),
+          network: this.config.getNetwork(),
+        },
       };
     } else if (parentNode) {
       tx = getTxFromRawTxBytes(parentNode.nodeTx);
       if (!parentNode.parentNodeId) {
         throw new Error("Parent node ID is undefined");
       }
-      request.parentNodeOutput = {
-        nodeId: parentNode.parentNodeId,
-        vout: vout,
+      request.source = {
+        $case: "parentNodeOutput",
+        parentNodeOutput: {
+          nodeId: parentNode.parentNodeId,
+          vout: vout,
+        },
       };
     } else {
       throw new Error("No parent node or parent tx provided");
