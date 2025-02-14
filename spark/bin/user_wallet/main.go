@@ -266,9 +266,10 @@ func main() {
 			}
 			balance := 0
 			for _, node := range cli.wallet.OwnedNodes {
+				fmt.Printf("Leaf %s: %d sats\n", node.Id, node.Value)
 				balance += int(node.Value)
 			}
-			fmt.Printf("Balance: %d sats\n", balance)
+			fmt.Printf("Total balance: %d sats\n", balance)
 			return nil
 		},
 	})
