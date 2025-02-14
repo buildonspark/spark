@@ -1,7 +1,14 @@
-export { IssuerSDK } from "./src/client";
+export {
+  createToken,
+  mintTokens,
+  transferToken,
+  freezeToken,
+  getToken,
+} from "./src/client";
+
 export type {
   CreateTokenInput,
   MintTokenInput,
   TransferTokenInput,
   FreezeTokenInput,
-} from "./src/types";
+} from "./src/client";

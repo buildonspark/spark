@@ -22,7 +22,7 @@
     "test:integration": "yarn test-cmd src/tests/integration/*.test.ts",
     "types:watch": "tsc-absolute --watch",
     "types": "tsc",
-    "generate:proto": "protoc --ts_proto_out=./src/proto --ts_proto_opt=outputServices=nice-grpc,outputServices=generic-definitions,useExactTypes=false --proto_path=../../protos spark.proto mock.proto spark_authn.proto"
+    "generate:proto": "PATH=\"$PATH:./node_modules/.bin\" protoc --ts_proto_out=./src/proto --ts_proto_opt=outputServices=nice-grpc,useExactTypes=false,outputServices=generic-definitions,oneof=unions --proto_path=../../protos spark.proto mock.proto spark_authn.proto"
   },
   "author": "",
   "license": "ISC",

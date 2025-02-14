@@ -1,7 +1,10 @@
 {
   "name": "@lightsparkdev/issuer-sdk",
   "version": "1.0.0",
-  "module": "index.ts",
+  "description": "Lightspark Issuer SDK for token issuance",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "type": "module",
   "exports": {
     ".": {
@@ -9,21 +12,32 @@
       "import": "./dist/index.js"
     }
   },
+  "files": [
+    "dist"
+  ],
   "scripts": {
-    "build": "tsc ./index.ts --outDir ./dist",
-    "dev": "tsc ./index.ts --outDir ./dist --watch",
+    "clean": "rm -rf dist",
+    "build": "npm run clean && tsc",
+    "dev": "tsc --watch",
     "format": "prettier src --check",
     "format:fix": "prettier src --write",
-    "test": "pnpm test"
+    "test": "jest --passWithNoTests",
+    "pack-test": "npm pack --dry-run"
   },
   "dependencies": {
+    "@noble/curves": "^1.8.0",
     "@wcbd/yuv-js-sdk": "file:../../../lrc20/js-sdk",
-    "bitcoinjs-lib": "^6.1.7",
-    "spark-sdk": "file:../spark-js-sdk"
+    "bitcoinjs-lib": "^6.1.5",
+    "crypto-js": "^4.2.0",
+    "spark-js-sdk": "file:../spark-js-sdk"
   },
   "devDependencies": {
-    "prettier": "^3.0.0",
-    "ts-proto": "^1.166.2",
+    "@types/jest": "^29.5.14",
+    "@types/node": "latest",
+    "jest": "^29.7.0",
+    "prettier": "^3.4.2",
+    "ts-jest": "^29.1.0",
+    "ts-node": "^10.9.2",
     "typescript": "^5.7.3"
   },
   "packageManager": "pnpm@9.15.4+sha512.b2dc20e2fc72b3e18848459b37359a32064663e5627a51e4c74b2c29dd8e8e0491483c3abb40789cfd578bf362fb6ba8261b05f0387d76792ed6e23ea3b1b6a0"

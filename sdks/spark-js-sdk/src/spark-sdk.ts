@@ -16,6 +16,12 @@ import {
   DepositAddressTree,
   TreeCreationService,
 } from "./services/tree-creation";
+import { TokenTransactionService } from "./services/tokens";
+import {
+  TokenTransaction,
+  StartTokenTransactionResponse,
+  TokenLeafOutput,
+} from "./proto/spark";
 import {
   aggregateFrost,
   AggregateFrostParams,
@@ -65,6 +71,7 @@ export class SparkWallet {
   private treeCreationService: TreeCreationService;
   private lightningService: LightningService;
   private coopExitService: CoopExitService;
+  private tokenTransactionService: TokenTransactionService;
 
   private sspClient: SspClient | null = null;
   private wasmModule: InitOutput | null = null;
@@ -88,6 +95,9 @@ export class SparkWallet {
       this.config,
       this.connectionManager
     );
+
+    this.tokenTransactionService = new TokenTransactionService(this.config, this.connectionManager);
+
     this.lightningService = new LightningService(
       this.config,
       this.connectionManager
@@ -500,6 +510,18 @@ export class SparkWallet {
     signingPubkey: Uint8Array
   ): Promise<GenerateDepositAddressResponse> {
     return await this.depositService!.generateDepositAddress({ signingPubkey });
+  }
+
+  async broadcastTokenTransaction(
+    tokenTransaction: TokenTransaction,
+    leafToSpendPrivateKeys?: Uint8Array[],
+    leafToSpendRevocationPublicKeys?: Uint8Array[]
+  ): Promise<TokenTransaction> {
+    return await this.tokenTransactionService!.broadcastTokenTransaction(
+      tokenTransaction,
+      leafToSpendPrivateKeys,
+      leafToSpendRevocationPublicKeys
+    );
   }
 
   async createTreeRoot(
