@@ -209,6 +209,15 @@ func main() {
 	})
 
 	cli.registry.RegisterCommand(Command{
+		Name:        "claim",
+		Description: "Claim transfers",
+		Usage:       "claim",
+		Handler: func(args []string) error {
+			return cli.wallet.ClaimAllTransfers(context.Background())
+		},
+	})
+
+	cli.registry.RegisterCommand(Command{
 		Name:        "help",
 		Description: "Show available commands",
 		Usage:       "help",

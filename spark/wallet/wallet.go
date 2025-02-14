@@ -3,6 +3,7 @@ package wallet
 import (
 	"context"
 	"encoding/hex"
+	"fmt"
 
 	sspapi "github.com/lightsparkdev/spark-go/wallet/ssp_api"
 )
@@ -33,4 +34,35 @@ func (w *SignleKeyWallet) CreateLightningInvoice(ctx context.Context, amount int
 		return nil, 0, err
 	}
 	return invoice, fees, nil
+}
+
+func (w *SignleKeyWallet) ClaimAllTransfers(ctx context.Context) error {
+	pendingTransfers, err := QueryPendingTransfers(ctx, w.Config)
+	if err != nil {
+		return err
+	}
+
+	for _, transfer := range pendingTransfers.Transfers {
+		leavesMap, err := VerifyPendingTransfer(ctx, w.Config, transfer)
+		if err != nil {
+			return err
+		}
+		leaves := make([]LeafKeyTweak, 0, len(transfer.Leaves))
+		for _, leaf := range transfer.Leaves {
+			leafPrivKey, ok := (*leavesMap)[leaf.Leaf.Id]
+			if !ok {
+				return fmt.Errorf("leaf %s not found", leaf.Leaf.Id)
+			}
+			leaves = append(leaves, LeafKeyTweak{
+				Leaf:              leaf.Leaf,
+				SigningPrivKey:    leafPrivKey,
+				NewSigningPrivKey: w.SigningPrivateKey,
+			})
+		}
+		err = ClaimTransfer(ctx, transfer, w.Config, leaves)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
