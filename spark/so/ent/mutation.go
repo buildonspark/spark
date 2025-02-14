@@ -4682,11 +4682,11 @@ type TokenLeafMutation struct {
 	update_time                                      *time.Time
 	status                                           *schema.TokenLeafStatus
 	owner_public_key                                 *[]byte
-	withdrawal_bond_sats                             *uint64
-	addwithdrawal_bond_sats                          *int64
-	withdrawal_locktime                              *uint64
-	addwithdrawal_locktime                           *int64
-	withdrawal_revocation_public_key                 *[]byte
+	withdraw_bond_sats                               *uint64
+	addwithdraw_bond_sats                            *int64
+	withdraw_relative_block_locktime                 *uint64
+	addwithdraw_relative_block_locktime              *int64
+	withdraw_revocation_public_key                   *[]byte
 	token_public_key                                 *[]byte
 	token_amount                                     *[]byte
 	leaf_created_transaction_output_vout             *uint32
@@ -4956,152 +4956,152 @@ func (m *TokenLeafMutation) ResetOwnerPublicKey() {
 	m.owner_public_key = nil
 }
 
-// SetWithdrawalBondSats sets the "withdrawal_bond_sats" field.
-func (m *TokenLeafMutation) SetWithdrawalBondSats(u uint64) {
-	m.withdrawal_bond_sats = &u
-	m.addwithdrawal_bond_sats = nil
+// SetWithdrawBondSats sets the "withdraw_bond_sats" field.
+func (m *TokenLeafMutation) SetWithdrawBondSats(u uint64) {
+	m.withdraw_bond_sats = &u
+	m.addwithdraw_bond_sats = nil
 }
 
-// WithdrawalBondSats returns the value of the "withdrawal_bond_sats" field in the mutation.
-func (m *TokenLeafMutation) WithdrawalBondSats() (r uint64, exists bool) {
-	v := m.withdrawal_bond_sats
+// WithdrawBondSats returns the value of the "withdraw_bond_sats" field in the mutation.
+func (m *TokenLeafMutation) WithdrawBondSats() (r uint64, exists bool) {
+	v := m.withdraw_bond_sats
 	if v == nil {
 		return
 	}
 	return *v, true
 }
 
-// OldWithdrawalBondSats returns the old "withdrawal_bond_sats" field's value of the TokenLeaf entity.
+// OldWithdrawBondSats returns the old "withdraw_bond_sats" field's value of the TokenLeaf entity.
 // If the TokenLeaf object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *TokenLeafMutation) OldWithdrawalBondSats(ctx context.Context) (v uint64, err error) {
+func (m *TokenLeafMutation) OldWithdrawBondSats(ctx context.Context) (v uint64, err error) {
 	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldWithdrawalBondSats is only allowed on UpdateOne operations")
+		return v, errors.New("OldWithdrawBondSats is only allowed on UpdateOne operations")
 	}
 	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldWithdrawalBondSats requires an ID field in the mutation")
+		return v, errors.New("OldWithdrawBondSats requires an ID field in the mutation")
 	}
 	oldValue, err := m.oldValue(ctx)
 	if err != nil {
-		return v, fmt.Errorf("querying old value for OldWithdrawalBondSats: %w", err)
+		return v, fmt.Errorf("querying old value for OldWithdrawBondSats: %w", err)
 	}
-	return oldValue.WithdrawalBondSats, nil
+	return oldValue.WithdrawBondSats, nil
 }
 
-// AddWithdrawalBondSats adds u to the "withdrawal_bond_sats" field.
-func (m *TokenLeafMutation) AddWithdrawalBondSats(u int64) {
-	if m.addwithdrawal_bond_sats != nil {
-		*m.addwithdrawal_bond_sats += u
+// AddWithdrawBondSats adds u to the "withdraw_bond_sats" field.
+func (m *TokenLeafMutation) AddWithdrawBondSats(u int64) {
+	if m.addwithdraw_bond_sats != nil {
+		*m.addwithdraw_bond_sats += u
 	} else {
-		m.addwithdrawal_bond_sats = &u
+		m.addwithdraw_bond_sats = &u
 	}
 }
 
-// AddedWithdrawalBondSats returns the value that was added to the "withdrawal_bond_sats" field in this mutation.
-func (m *TokenLeafMutation) AddedWithdrawalBondSats() (r int64, exists bool) {
-	v := m.addwithdrawal_bond_sats
+// AddedWithdrawBondSats returns the value that was added to the "withdraw_bond_sats" field in this mutation.
+func (m *TokenLeafMutation) AddedWithdrawBondSats() (r int64, exists bool) {
+	v := m.addwithdraw_bond_sats
 	if v == nil {
 		return
 	}
 	return *v, true
 }
 
-// ResetWithdrawalBondSats resets all changes to the "withdrawal_bond_sats" field.
-func (m *TokenLeafMutation) ResetWithdrawalBondSats() {
-	m.withdrawal_bond_sats = nil
-	m.addwithdrawal_bond_sats = nil
+// ResetWithdrawBondSats resets all changes to the "withdraw_bond_sats" field.
+func (m *TokenLeafMutation) ResetWithdrawBondSats() {
+	m.withdraw_bond_sats = nil
+	m.addwithdraw_bond_sats = nil
 }
 
-// SetWithdrawalLocktime sets the "withdrawal_locktime" field.
-func (m *TokenLeafMutation) SetWithdrawalLocktime(u uint64) {
-	m.withdrawal_locktime = &u
-	m.addwithdrawal_locktime = nil
+// SetWithdrawRelativeBlockLocktime sets the "withdraw_relative_block_locktime" field.
+func (m *TokenLeafMutation) SetWithdrawRelativeBlockLocktime(u uint64) {
+	m.withdraw_relative_block_locktime = &u
+	m.addwithdraw_relative_block_locktime = nil
 }
 
-// WithdrawalLocktime returns the value of the "withdrawal_locktime" field in the mutation.
-func (m *TokenLeafMutation) WithdrawalLocktime() (r uint64, exists bool) {
-	v := m.withdrawal_locktime
+// WithdrawRelativeBlockLocktime returns the value of the "withdraw_relative_block_locktime" field in the mutation.
+func (m *TokenLeafMutation) WithdrawRelativeBlockLocktime() (r uint64, exists bool) {
+	v := m.withdraw_relative_block_locktime
 	if v == nil {
 		return
 	}
 	return *v, true
 }
 
-// OldWithdrawalLocktime returns the old "withdrawal_locktime" field's value of the TokenLeaf entity.
+// OldWithdrawRelativeBlockLocktime returns the old "withdraw_relative_block_locktime" field's value of the TokenLeaf entity.
 // If the TokenLeaf object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *TokenLeafMutation) OldWithdrawalLocktime(ctx context.Context) (v uint64, err error) {
+func (m *TokenLeafMutation) OldWithdrawRelativeBlockLocktime(ctx context.Context) (v uint64, err error) {
 	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldWithdrawalLocktime is only allowed on UpdateOne operations")
+		return v, errors.New("OldWithdrawRelativeBlockLocktime is only allowed on UpdateOne operations")
 	}
 	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldWithdrawalLocktime requires an ID field in the mutation")
+		return v, errors.New("OldWithdrawRelativeBlockLocktime requires an ID field in the mutation")
 	}
 	oldValue, err := m.oldValue(ctx)
 	if err != nil {
-		return v, fmt.Errorf("querying old value for OldWithdrawalLocktime: %w", err)
+		return v, fmt.Errorf("querying old value for OldWithdrawRelativeBlockLocktime: %w", err)
 	}
-	return oldValue.WithdrawalLocktime, nil
+	return oldValue.WithdrawRelativeBlockLocktime, nil
 }
 
-// AddWithdrawalLocktime adds u to the "withdrawal_locktime" field.
-func (m *TokenLeafMutation) AddWithdrawalLocktime(u int64) {
-	if m.addwithdrawal_locktime != nil {
-		*m.addwithdrawal_locktime += u
+// AddWithdrawRelativeBlockLocktime adds u to the "withdraw_relative_block_locktime" field.
+func (m *TokenLeafMutation) AddWithdrawRelativeBlockLocktime(u int64) {
+	if m.addwithdraw_relative_block_locktime != nil {
+		*m.addwithdraw_relative_block_locktime += u
 	} else {
-		m.addwithdrawal_locktime = &u
+		m.addwithdraw_relative_block_locktime = &u
 	}
 }
 
-// AddedWithdrawalLocktime returns the value that was added to the "withdrawal_locktime" field in this mutation.
-func (m *TokenLeafMutation) AddedWithdrawalLocktime() (r int64, exists bool) {
-	v := m.addwithdrawal_locktime
+// AddedWithdrawRelativeBlockLocktime returns the value that was added to the "withdraw_relative_block_locktime" field in this mutation.
+func (m *TokenLeafMutation) AddedWithdrawRelativeBlockLocktime() (r int64, exists bool) {
+	v := m.addwithdraw_relative_block_locktime
 	if v == nil {
 		return
 	}
 	return *v, true
 }
 
-// ResetWithdrawalLocktime resets all changes to the "withdrawal_locktime" field.
-func (m *TokenLeafMutation) ResetWithdrawalLocktime() {
-	m.withdrawal_locktime = nil
-	m.addwithdrawal_locktime = nil
+// ResetWithdrawRelativeBlockLocktime resets all changes to the "withdraw_relative_block_locktime" field.
+func (m *TokenLeafMutation) ResetWithdrawRelativeBlockLocktime() {
+	m.withdraw_relative_block_locktime = nil
+	m.addwithdraw_relative_block_locktime = nil
 }
 
-// SetWithdrawalRevocationPublicKey sets the "withdrawal_revocation_public_key" field.
-func (m *TokenLeafMutation) SetWithdrawalRevocationPublicKey(b []byte) {
-	m.withdrawal_revocation_public_key = &b
+// SetWithdrawRevocationPublicKey sets the "withdraw_revocation_public_key" field.
+func (m *TokenLeafMutation) SetWithdrawRevocationPublicKey(b []byte) {
+	m.withdraw_revocation_public_key = &b
 }
 
-// WithdrawalRevocationPublicKey returns the value of the "withdrawal_revocation_public_key" field in the mutation.
-func (m *TokenLeafMutation) WithdrawalRevocationPublicKey() (r []byte, exists bool) {
-	v := m.withdrawal_revocation_public_key
+// WithdrawRevocationPublicKey returns the value of the "withdraw_revocation_public_key" field in the mutation.
+func (m *TokenLeafMutation) WithdrawRevocationPublicKey() (r []byte, exists bool) {
+	v := m.withdraw_revocation_public_key
 	if v == nil {
 		return
 	}
 	return *v, true
 }
 
-// OldWithdrawalRevocationPublicKey returns the old "withdrawal_revocation_public_key" field's value of the TokenLeaf entity.
+// OldWithdrawRevocationPublicKey returns the old "withdraw_revocation_public_key" field's value of the TokenLeaf entity.
 // If the TokenLeaf object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *TokenLeafMutation) OldWithdrawalRevocationPublicKey(ctx context.Context) (v []byte, err error) {
+func (m *TokenLeafMutation) OldWithdrawRevocationPublicKey(ctx context.Context) (v []byte, err error) {
 	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldWithdrawalRevocationPublicKey is only allowed on UpdateOne operations")
+		return v, errors.New("OldWithdrawRevocationPublicKey is only allowed on UpdateOne operations")
 	}
 	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldWithdrawalRevocationPublicKey requires an ID field in the mutation")
+		return v, errors.New("OldWithdrawRevocationPublicKey requires an ID field in the mutation")
 	}
 	oldValue, err := m.oldValue(ctx)
 	if err != nil {
-		return v, fmt.Errorf("querying old value for OldWithdrawalRevocationPublicKey: %w", err)
+		return v, fmt.Errorf("querying old value for OldWithdrawRevocationPublicKey: %w", err)
 	}
-	return oldValue.WithdrawalRevocationPublicKey, nil
+	return oldValue.WithdrawRevocationPublicKey, nil
 }
 
-// ResetWithdrawalRevocationPublicKey resets all changes to the "withdrawal_revocation_public_key" field.
-func (m *TokenLeafMutation) ResetWithdrawalRevocationPublicKey() {
-	m.withdrawal_revocation_public_key = nil
+// ResetWithdrawRevocationPublicKey resets all changes to the "withdraw_revocation_public_key" field.
+func (m *TokenLeafMutation) ResetWithdrawRevocationPublicKey() {
+	m.withdraw_revocation_public_key = nil
 }
 
 // SetTokenPublicKey sets the "token_public_key" field.
@@ -5613,14 +5613,14 @@ func (m *TokenLeafMutation) Fields() []string {
 	if m.owner_public_key != nil {
 		fields = append(fields, tokenleaf.FieldOwnerPublicKey)
 	}
-	if m.withdrawal_bond_sats != nil {
-		fields = append(fields, tokenleaf.FieldWithdrawalBondSats)
+	if m.withdraw_bond_sats != nil {
+		fields = append(fields, tokenleaf.FieldWithdrawBondSats)
 	}
-	if m.withdrawal_locktime != nil {
-		fields = append(fields, tokenleaf.FieldWithdrawalLocktime)
+	if m.withdraw_relative_block_locktime != nil {
+		fields = append(fields, tokenleaf.FieldWithdrawRelativeBlockLocktime)
 	}
-	if m.withdrawal_revocation_public_key != nil {
-		fields = append(fields, tokenleaf.FieldWithdrawalRevocationPublicKey)
+	if m.withdraw_revocation_public_key != nil {
+		fields = append(fields, tokenleaf.FieldWithdrawRevocationPublicKey)
 	}
 	if m.token_public_key != nil {
 		fields = append(fields, tokenleaf.FieldTokenPublicKey)
@@ -5659,12 +5659,12 @@ func (m *TokenLeafMutation) Field(name string) (ent.Value, bool) {
 		return m.Status()
 	case tokenleaf.FieldOwnerPublicKey:
 		return m.OwnerPublicKey()
-	case tokenleaf.FieldWithdrawalBondSats:
-		return m.WithdrawalBondSats()
-	case tokenleaf.FieldWithdrawalLocktime:
-		return m.WithdrawalLocktime()
-	case tokenleaf.FieldWithdrawalRevocationPublicKey:
-		return m.WithdrawalRevocationPublicKey()
+	case tokenleaf.FieldWithdrawBondSats:
+		return m.WithdrawBondSats()
+	case tokenleaf.FieldWithdrawRelativeBlockLocktime:
+		return m.WithdrawRelativeBlockLocktime()
+	case tokenleaf.FieldWithdrawRevocationPublicKey:
+		return m.WithdrawRevocationPublicKey()
 	case tokenleaf.FieldTokenPublicKey:
 		return m.TokenPublicKey()
 	case tokenleaf.FieldTokenAmount:
@@ -5696,12 +5696,12 @@ func (m *TokenLeafMutation) OldField(ctx context.Context, name string) (ent.Valu
 		return m.OldStatus(ctx)
 	case tokenleaf.FieldOwnerPublicKey:
 		return m.OldOwnerPublicKey(ctx)
-	case tokenleaf.FieldWithdrawalBondSats:
-		return m.OldWithdrawalBondSats(ctx)
-	case tokenleaf.FieldWithdrawalLocktime:
-		return m.OldWithdrawalLocktime(ctx)
-	case tokenleaf.FieldWithdrawalRevocationPublicKey:
-		return m.OldWithdrawalRevocationPublicKey(ctx)
+	case tokenleaf.FieldWithdrawBondSats:
+		return m.OldWithdrawBondSats(ctx)
+	case tokenleaf.FieldWithdrawRelativeBlockLocktime:
+		return m.OldWithdrawRelativeBlockLocktime(ctx)
+	case tokenleaf.FieldWithdrawRevocationPublicKey:
+		return m.OldWithdrawRevocationPublicKey(ctx)
 	case tokenleaf.FieldTokenPublicKey:
 		return m.OldTokenPublicKey(ctx)
 	case tokenleaf.FieldTokenAmount:
@@ -5753,26 +5753,26 @@ func (m *TokenLeafMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetOwnerPublicKey(v)
 		return nil
-	case tokenleaf.FieldWithdrawalBondSats:
+	case tokenleaf.FieldWithdrawBondSats:
 		v, ok := value.(uint64)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
-		m.SetWithdrawalBondSats(v)
+		m.SetWithdrawBondSats(v)
 		return nil
-	case tokenleaf.FieldWithdrawalLocktime:
+	case tokenleaf.FieldWithdrawRelativeBlockLocktime:
 		v, ok := value.(uint64)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
-		m.SetWithdrawalLocktime(v)
+		m.SetWithdrawRelativeBlockLocktime(v)
 		return nil
-	case tokenleaf.FieldWithdrawalRevocationPublicKey:
+	case tokenleaf.FieldWithdrawRevocationPublicKey:
 		v, ok := value.([]byte)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
-		m.SetWithdrawalRevocationPublicKey(v)
+		m.SetWithdrawRevocationPublicKey(v)
 		return nil
 	case tokenleaf.FieldTokenPublicKey:
 		v, ok := value.([]byte)
@@ -5831,11 +5831,11 @@ func (m *TokenLeafMutation) SetField(name string, value ent.Value) error {
 // this mutation.
 func (m *TokenLeafMutation) AddedFields() []string {
 	var fields []string
-	if m.addwithdrawal_bond_sats != nil {
-		fields = append(fields, tokenleaf.FieldWithdrawalBondSats)
+	if m.addwithdraw_bond_sats != nil {
+		fields = append(fields, tokenleaf.FieldWithdrawBondSats)
 	}
-	if m.addwithdrawal_locktime != nil {
-		fields = append(fields, tokenleaf.FieldWithdrawalLocktime)
+	if m.addwithdraw_relative_block_locktime != nil {
+		fields = append(fields, tokenleaf.FieldWithdrawRelativeBlockLocktime)
 	}
 	if m.addleaf_created_transaction_output_vout != nil {
 		fields = append(fields, tokenleaf.FieldLeafCreatedTransactionOutputVout)
@@ -5851,10 +5851,10 @@ func (m *TokenLeafMutation) AddedFields() []string {
 // was not set, or was not defined in the schema.
 func (m *TokenLeafMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
-	case tokenleaf.FieldWithdrawalBondSats:
-		return m.AddedWithdrawalBondSats()
-	case tokenleaf.FieldWithdrawalLocktime:
-		return m.AddedWithdrawalLocktime()
+	case tokenleaf.FieldWithdrawBondSats:
+		return m.AddedWithdrawBondSats()
+	case tokenleaf.FieldWithdrawRelativeBlockLocktime:
+		return m.AddedWithdrawRelativeBlockLocktime()
 	case tokenleaf.FieldLeafCreatedTransactionOutputVout:
 		return m.AddedLeafCreatedTransactionOutputVout()
 	case tokenleaf.FieldLeafSpentTransactionInputVout:
@@ -5868,19 +5868,19 @@ func (m *TokenLeafMutation) AddedField(name string) (ent.Value, bool) {
 // type.
 func (m *TokenLeafMutation) AddField(name string, value ent.Value) error {
 	switch name {
-	case tokenleaf.FieldWithdrawalBondSats:
+	case tokenleaf.FieldWithdrawBondSats:
 		v, ok := value.(int64)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
-		m.AddWithdrawalBondSats(v)
+		m.AddWithdrawBondSats(v)
 		return nil
-	case tokenleaf.FieldWithdrawalLocktime:
+	case tokenleaf.FieldWithdrawRelativeBlockLocktime:
 		v, ok := value.(int64)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
-		m.AddWithdrawalLocktime(v)
+		m.AddWithdrawRelativeBlockLocktime(v)
 		return nil
 	case tokenleaf.FieldLeafCreatedTransactionOutputVout:
 		v, ok := value.(int32)
@@ -5962,14 +5962,14 @@ func (m *TokenLeafMutation) ResetField(name string) error {
 	case tokenleaf.FieldOwnerPublicKey:
 		m.ResetOwnerPublicKey()
 		return nil
-	case tokenleaf.FieldWithdrawalBondSats:
-		m.ResetWithdrawalBondSats()
+	case tokenleaf.FieldWithdrawBondSats:
+		m.ResetWithdrawBondSats()
 		return nil
-	case tokenleaf.FieldWithdrawalLocktime:
-		m.ResetWithdrawalLocktime()
+	case tokenleaf.FieldWithdrawRelativeBlockLocktime:
+		m.ResetWithdrawRelativeBlockLocktime()
 		return nil
-	case tokenleaf.FieldWithdrawalRevocationPublicKey:
-		m.ResetWithdrawalRevocationPublicKey()
+	case tokenleaf.FieldWithdrawRevocationPublicKey:
+		m.ResetWithdrawRevocationPublicKey()
 		return nil
 	case tokenleaf.FieldTokenPublicKey:
 		m.ResetTokenPublicKey()

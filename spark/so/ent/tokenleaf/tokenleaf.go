@@ -25,12 +25,12 @@ const (
 	FieldStatus = "status"
 	// FieldOwnerPublicKey holds the string denoting the owner_public_key field in the database.
 	FieldOwnerPublicKey = "owner_public_key"
-	// FieldWithdrawalBondSats holds the string denoting the withdrawal_bond_sats field in the database.
-	FieldWithdrawalBondSats = "withdrawal_bond_sats"
-	// FieldWithdrawalLocktime holds the string denoting the withdrawal_locktime field in the database.
-	FieldWithdrawalLocktime = "withdrawal_locktime"
-	// FieldWithdrawalRevocationPublicKey holds the string denoting the withdrawal_revocation_public_key field in the database.
-	FieldWithdrawalRevocationPublicKey = "withdrawal_revocation_public_key"
+	// FieldWithdrawBondSats holds the string denoting the withdraw_bond_sats field in the database.
+	FieldWithdrawBondSats = "withdraw_bond_sats"
+	// FieldWithdrawRelativeBlockLocktime holds the string denoting the withdraw_relative_block_locktime field in the database.
+	FieldWithdrawRelativeBlockLocktime = "withdraw_relative_block_locktime"
+	// FieldWithdrawRevocationPublicKey holds the string denoting the withdraw_revocation_public_key field in the database.
+	FieldWithdrawRevocationPublicKey = "withdraw_revocation_public_key"
 	// FieldTokenPublicKey holds the string denoting the token_public_key field in the database.
 	FieldTokenPublicKey = "token_public_key"
 	// FieldTokenAmount holds the string denoting the token_amount field in the database.
@@ -83,9 +83,9 @@ var Columns = []string{
 	FieldUpdateTime,
 	FieldStatus,
 	FieldOwnerPublicKey,
-	FieldWithdrawalBondSats,
-	FieldWithdrawalLocktime,
-	FieldWithdrawalRevocationPublicKey,
+	FieldWithdrawBondSats,
+	FieldWithdrawRelativeBlockLocktime,
+	FieldWithdrawRevocationPublicKey,
 	FieldTokenPublicKey,
 	FieldTokenAmount,
 	FieldLeafCreatedTransactionOutputVout,
@@ -168,14 +168,14 @@ func ByStatus(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldStatus, opts...).ToFunc()
 }
 
-// ByWithdrawalBondSats orders the results by the withdrawal_bond_sats field.
-func ByWithdrawalBondSats(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldWithdrawalBondSats, opts...).ToFunc()
+// ByWithdrawBondSats orders the results by the withdraw_bond_sats field.
+func ByWithdrawBondSats(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldWithdrawBondSats, opts...).ToFunc()
 }
 
-// ByWithdrawalLocktime orders the results by the withdrawal_locktime field.
-func ByWithdrawalLocktime(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldWithdrawalLocktime, opts...).ToFunc()
+// ByWithdrawRelativeBlockLocktime orders the results by the withdraw_relative_block_locktime field.
+func ByWithdrawRelativeBlockLocktime(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldWithdrawRelativeBlockLocktime, opts...).ToFunc()
 }
 
 // ByLeafCreatedTransactionOutputVout orders the results by the leaf_created_transaction_output_vout field.

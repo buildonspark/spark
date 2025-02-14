@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"log"
 	"testing"
-	"time"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
@@ -56,18 +55,14 @@ func TestBroadcastTokenTransactionIssueAndTransferTokens(t *testing.T) {
 		},
 		OutputLeaves: []*pb.TokenLeafOutput{
 			{
-				OwnerPublicKey:     userLeaf1PubKeyBytes,
-				WithdrawalBondSats: 10000,                                         // Example bond amount
-				WithdrawalLocktime: uint64(time.Now().Add(24 * time.Hour).Unix()), // 24 hour locktime
-				TokenPublicKey:     tokenIdentityPubKeyBytes,                      // Using user pubkey as token ID for this example
-				TokenAmount:        int64ToUint128Bytes(0, 11111),                 // high bits = 0, low bits = 99999
+				OwnerPublicKey: userLeaf1PubKeyBytes,
+				TokenPublicKey: tokenIdentityPubKeyBytes,      // Using user pubkey as token ID for this example
+				TokenAmount:    int64ToUint128Bytes(0, 11111), // high bits = 0, low bits = 99999
 			},
 			{
-				OwnerPublicKey:     userLeaf2PubKeyBytes,
-				WithdrawalBondSats: 10000,                                         // Example bond amount
-				WithdrawalLocktime: uint64(time.Now().Add(24 * time.Hour).Unix()), // 24 hour locktime
-				TokenPublicKey:     tokenIdentityPubKeyBytes,                      // Using user pubkey as token ID for this example
-				TokenAmount:        int64ToUint128Bytes(0, 22222),                 // high bits = 0, low bits = 99999
+				OwnerPublicKey: userLeaf2PubKeyBytes,
+				TokenPublicKey: tokenIdentityPubKeyBytes,      // Using user pubkey as token ID for this example
+				TokenAmount:    int64ToUint128Bytes(0, 22222), // high bits = 0, low bits = 99999
 			},
 		},
 	}
@@ -81,6 +76,16 @@ func TestBroadcastTokenTransactionIssueAndTransferTokens(t *testing.T) {
 		t.Fatalf("failed to broadcast issuance token transaction: %v", err)
 	}
 	log.Printf("issuance broadcast finalized token transaction: %v", finalIssueTokenTransaction)
+
+	// Validate withdrawal params match config
+	for i, leaf := range finalIssueTokenTransaction.OutputLeaves {
+		if leaf.GetWithdrawBondSats() != 1000000 {
+			t.Errorf("leaf %d: expected withdrawal bond sats 1000000, got %d", i, leaf.GetWithdrawBondSats())
+		}
+		if leaf.GetWithdrawRelativeBlockLocktime() != 1000 {
+			t.Errorf("leaf %d: expected withdrawal relative block locktime 1000, got %d", i, leaf.GetWithdrawRelativeBlockLocktime())
+		}
+	}
 
 	finalIssueTokenTransactionHash, err := utils.HashTokenTransaction(finalIssueTokenTransaction, false)
 	if err != nil {
@@ -106,13 +111,21 @@ func TestBroadcastTokenTransactionIssueAndTransferTokens(t *testing.T) {
 		// Send the funds back to the issuer.
 		OutputLeaves: []*pb.TokenLeafOutput{
 			{
-				OwnerPublicKey:     tokenIdentityPubKeyBytes,
-				WithdrawalBondSats: 10000,                                         // Example bond amount
-				WithdrawalLocktime: uint64(time.Now().Add(24 * time.Hour).Unix()), // 24 hour locktime
-				TokenPublicKey:     tokenIdentityPubKeyBytes,                      // Using user pubkey as token ID for this example
-				TokenAmount:        int64ToUint128Bytes(0, 33333),                 // high bits = 0, low bits = 99999
+				OwnerPublicKey: tokenIdentityPubKeyBytes,
+				TokenPublicKey: tokenIdentityPubKeyBytes,      // Using user pubkey as token ID for this example
+				TokenAmount:    int64ToUint128Bytes(0, 33333), // high bits = 0, low bits = 99999
 			},
 		},
+	}
+
+	// Validate withdrawal params match config
+	for i, leaf := range finalIssueTokenTransaction.OutputLeaves {
+		if leaf.GetWithdrawBondSats() != 1000000 {
+			t.Errorf("leaf %d: expected withdrawal bond sats 1000000, got %d", i, leaf.GetWithdrawBondSats())
+		}
+		if leaf.GetWithdrawRelativeBlockLocktime() != 1000 {
+			t.Errorf("leaf %d: expected withdrawal relative block locktime 1000, got %d", i, leaf.GetWithdrawRelativeBlockLocktime())
+		}
 	}
 
 	revPubKey1 := finalIssueTokenTransaction.OutputLeaves[0].RevocationPublicKey

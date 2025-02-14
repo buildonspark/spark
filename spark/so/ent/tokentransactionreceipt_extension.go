@@ -110,9 +110,9 @@ func CreateStartedTransactionEntities(
 				SetID(leafUUID).
 				SetStatus(schema.TokenLeafStatusCreatedStarted).
 				SetOwnerPublicKey(outputLeaf.OwnerPublicKey).
-				SetWithdrawalBondSats(outputLeaf.WithdrawalBondSats).
-				SetWithdrawalLocktime(outputLeaf.WithdrawalLocktime).
-				SetWithdrawalRevocationPublicKey(outputLeaf.RevocationPublicKey).
+				SetWithdrawBondSats(*outputLeaf.WithdrawBondSats).
+				SetWithdrawRelativeBlockLocktime(*outputLeaf.WithdrawRelativeBlockLocktime).
+				SetWithdrawRevocationPublicKey(outputLeaf.RevocationPublicKey).
 				SetTokenPublicKey(outputLeaf.TokenPublicKey).
 				SetTokenAmount(outputLeaf.TokenAmount).
 				SetLeafCreatedTransactionOutputVout(uint32(leafIndex)).

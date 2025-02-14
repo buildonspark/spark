@@ -62,13 +62,15 @@ func HashTokenTransaction(tokenTransaction *pb.TokenTransaction, partialHash boo
 			h.Write(leaf.GetRevocationPublicKey())
 		}
 
-		withdrawalBondBytes := make([]byte, 8)
-		binary.BigEndian.PutUint64(withdrawalBondBytes, leaf.GetWithdrawalBondSats())
-		h.Write(withdrawalBondBytes)
+		if !partialHash {
+			withdrawalBondBytes := make([]byte, 8)
+			binary.BigEndian.PutUint64(withdrawalBondBytes, leaf.GetWithdrawBondSats())
+			h.Write(withdrawalBondBytes)
 
-		withdrawalLocktimeBytes := make([]byte, 8)
-		binary.BigEndian.PutUint64(withdrawalLocktimeBytes, leaf.GetWithdrawalLocktime())
-		h.Write(withdrawalLocktimeBytes)
+			withdrawalLocktimeBytes := make([]byte, 8)
+			binary.BigEndian.PutUint64(withdrawalLocktimeBytes, leaf.GetWithdrawRelativeBlockLocktime())
+			h.Write(withdrawalLocktimeBytes)
+		}
 
 		if leaf.GetTokenPublicKey() != nil {
 			h.Write(leaf.GetTokenPublicKey())
@@ -208,30 +210,6 @@ func ValidatePartialTokenTransaction(
 		}
 	}
 
-	return nil
-}
-
-func ValidateFinalTokenTransaction(
-	tokenTransaction *pb.TokenTransaction,
-	tokenTransactionSignatures *pb.TokenTransactionSignatures,
-	expectedRevocationPublicKeys [][]byte,
-	sparkOperatorsFromConfig map[string]*pb.SigningOperatorInfo,
-) error {
-	// Repeat same validations as for the partial token transaction.
-	err := ValidatePartialTokenTransaction(tokenTransaction, tokenTransactionSignatures, sparkOperatorsFromConfig)
-	if err != nil {
-		return fmt.Errorf("failed to validate final token transaction: %w", err)
-	}
-
-	// Additionally validate the revocation public keys which were added to make it final.
-	for i, leaf := range tokenTransaction.OutputLeaves {
-		if leaf.GetRevocationPublicKey() == nil {
-			return fmt.Errorf("revocation public key cannot be nil for leaf %d", i)
-		}
-		if !bytes.Equal(leaf.GetRevocationPublicKey(), expectedRevocationPublicKeys[i]) {
-			return fmt.Errorf("revocation public key mismatch for leaf %d", i)
-		}
-	}
 	return nil
 }
 

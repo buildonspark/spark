@@ -79,6 +79,19 @@ func (o TokenTransactionHandler) StartTokenTransaction(ctx context.Context, conf
 		}
 		defer conn.Close()
 
+		// Fill revocation public keys and withdrawal bond/locktime for each leaf.
+		finalTokenTransaction := req.PartialTokenTransaction
+		for i, leaf := range finalTokenTransaction.OutputLeaves {
+			leafID := uuid.New().String()
+			leaf.Id = &leafID
+			leaf.RevocationPublicKey = keyshares[i].PublicKey
+			// TODO: Support non-regtest configs by providing network as a field in the transaction.
+			withdrawalBondSats := config.Lrc20Configs[common.Regtest.String()].WithdrawBondSats
+			leaf.WithdrawBondSats = &withdrawalBondSats
+			withdrawRelativeBlockLocktime := config.Lrc20Configs[common.Regtest.String()].WithdrawRelativeBlockLocktime
+			leaf.WithdrawRelativeBlockLocktime = &withdrawRelativeBlockLocktime
+		}
+
 		client := pbinternal.NewSparkInternalServiceClient(conn)
 		internalResp, err := client.StartTokenTransactionInternal(ctx, &pbinternal.StartTokenTransactionInternalRequest{
 			KeyshareIds:                keyshareIDStrings,
@@ -193,11 +206,11 @@ func (o TokenTransactionHandler) SignTokenTransaction(
 		keyshares = append(keyshares, keyshare)
 
 		// Validate that the keyshare's public key matches the leaf's revocation public key.
-		if !bytes.Equal(keyshare.PublicKey, leaf.WithdrawalRevocationPublicKey) {
+		if !bytes.Equal(keyshare.PublicKey, leaf.WithdrawRevocationPublicKey) {
 			return nil, fmt.Errorf(
 				"keyshare public key %x does not match leaf revocation public key %x",
 				keyshare.PublicKey,
-				leaf.WithdrawalRevocationPublicKey,
+				leaf.WithdrawRevocationPublicKey,
 			)
 		}
 	}
@@ -241,7 +254,7 @@ func (o TokenTransactionHandler) FinalizeTokenTransaction(
 		)
 	}
 	for _, leaf := range tokenTransactionReceipt.Edges.SpentLeaf {
-		revocationPublicKeys[leaf.LeafSpentTransactionInputVout] = leaf.WithdrawalRevocationPublicKey
+		revocationPublicKeys[leaf.LeafSpentTransactionInputVout] = leaf.WithdrawRevocationPublicKey
 	}
 	err = utils.ValidateRevocationKeys(req.LeafToSpendRevocationKeys, revocationPublicKeys)
 	if err != nil {

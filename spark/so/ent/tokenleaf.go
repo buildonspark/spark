@@ -29,12 +29,12 @@ type TokenLeaf struct {
 	Status schema.TokenLeafStatus `json:"status,omitempty"`
 	// OwnerPublicKey holds the value of the "owner_public_key" field.
 	OwnerPublicKey []byte `json:"owner_public_key,omitempty"`
-	// WithdrawalBondSats holds the value of the "withdrawal_bond_sats" field.
-	WithdrawalBondSats uint64 `json:"withdrawal_bond_sats,omitempty"`
-	// WithdrawalLocktime holds the value of the "withdrawal_locktime" field.
-	WithdrawalLocktime uint64 `json:"withdrawal_locktime,omitempty"`
-	// WithdrawalRevocationPublicKey holds the value of the "withdrawal_revocation_public_key" field.
-	WithdrawalRevocationPublicKey []byte `json:"withdrawal_revocation_public_key,omitempty"`
+	// WithdrawBondSats holds the value of the "withdraw_bond_sats" field.
+	WithdrawBondSats uint64 `json:"withdraw_bond_sats,omitempty"`
+	// WithdrawRelativeBlockLocktime holds the value of the "withdraw_relative_block_locktime" field.
+	WithdrawRelativeBlockLocktime uint64 `json:"withdraw_relative_block_locktime,omitempty"`
+	// WithdrawRevocationPublicKey holds the value of the "withdraw_revocation_public_key" field.
+	WithdrawRevocationPublicKey []byte `json:"withdraw_revocation_public_key,omitempty"`
 	// TokenPublicKey holds the value of the "token_public_key" field.
 	TokenPublicKey []byte `json:"token_public_key,omitempty"`
 	// TokenAmount holds the value of the "token_amount" field.
@@ -109,9 +109,9 @@ func (*TokenLeaf) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case tokenleaf.FieldOwnerPublicKey, tokenleaf.FieldWithdrawalRevocationPublicKey, tokenleaf.FieldTokenPublicKey, tokenleaf.FieldTokenAmount, tokenleaf.FieldLeafSpentOwnershipSignature, tokenleaf.FieldLeafSpentOperatorSpecificOwnershipSignature, tokenleaf.FieldLeafSpentRevocationPrivateKey:
+		case tokenleaf.FieldOwnerPublicKey, tokenleaf.FieldWithdrawRevocationPublicKey, tokenleaf.FieldTokenPublicKey, tokenleaf.FieldTokenAmount, tokenleaf.FieldLeafSpentOwnershipSignature, tokenleaf.FieldLeafSpentOperatorSpecificOwnershipSignature, tokenleaf.FieldLeafSpentRevocationPrivateKey:
 			values[i] = new([]byte)
-		case tokenleaf.FieldWithdrawalBondSats, tokenleaf.FieldWithdrawalLocktime, tokenleaf.FieldLeafCreatedTransactionOutputVout, tokenleaf.FieldLeafSpentTransactionInputVout:
+		case tokenleaf.FieldWithdrawBondSats, tokenleaf.FieldWithdrawRelativeBlockLocktime, tokenleaf.FieldLeafCreatedTransactionOutputVout, tokenleaf.FieldLeafSpentTransactionInputVout:
 			values[i] = new(sql.NullInt64)
 		case tokenleaf.FieldStatus:
 			values[i] = new(sql.NullString)
@@ -170,23 +170,23 @@ func (tl *TokenLeaf) assignValues(columns []string, values []any) error {
 			} else if value != nil {
 				tl.OwnerPublicKey = *value
 			}
-		case tokenleaf.FieldWithdrawalBondSats:
+		case tokenleaf.FieldWithdrawBondSats:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
-				return fmt.Errorf("unexpected type %T for field withdrawal_bond_sats", values[i])
+				return fmt.Errorf("unexpected type %T for field withdraw_bond_sats", values[i])
 			} else if value.Valid {
-				tl.WithdrawalBondSats = uint64(value.Int64)
+				tl.WithdrawBondSats = uint64(value.Int64)
 			}
-		case tokenleaf.FieldWithdrawalLocktime:
+		case tokenleaf.FieldWithdrawRelativeBlockLocktime:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
-				return fmt.Errorf("unexpected type %T for field withdrawal_locktime", values[i])
+				return fmt.Errorf("unexpected type %T for field withdraw_relative_block_locktime", values[i])
 			} else if value.Valid {
-				tl.WithdrawalLocktime = uint64(value.Int64)
+				tl.WithdrawRelativeBlockLocktime = uint64(value.Int64)
 			}
-		case tokenleaf.FieldWithdrawalRevocationPublicKey:
+		case tokenleaf.FieldWithdrawRevocationPublicKey:
 			if value, ok := values[i].(*[]byte); !ok {
-				return fmt.Errorf("unexpected type %T for field withdrawal_revocation_public_key", values[i])
+				return fmt.Errorf("unexpected type %T for field withdraw_revocation_public_key", values[i])
 			} else if value != nil {
-				tl.WithdrawalRevocationPublicKey = *value
+				tl.WithdrawRevocationPublicKey = *value
 			}
 		case tokenleaf.FieldTokenPublicKey:
 			if value, ok := values[i].(*[]byte); !ok {
@@ -314,14 +314,14 @@ func (tl *TokenLeaf) String() string {
 	builder.WriteString("owner_public_key=")
 	builder.WriteString(fmt.Sprintf("%v", tl.OwnerPublicKey))
 	builder.WriteString(", ")
-	builder.WriteString("withdrawal_bond_sats=")
-	builder.WriteString(fmt.Sprintf("%v", tl.WithdrawalBondSats))
+	builder.WriteString("withdraw_bond_sats=")
+	builder.WriteString(fmt.Sprintf("%v", tl.WithdrawBondSats))
 	builder.WriteString(", ")
-	builder.WriteString("withdrawal_locktime=")
-	builder.WriteString(fmt.Sprintf("%v", tl.WithdrawalLocktime))
+	builder.WriteString("withdraw_relative_block_locktime=")
+	builder.WriteString(fmt.Sprintf("%v", tl.WithdrawRelativeBlockLocktime))
 	builder.WriteString(", ")
-	builder.WriteString("withdrawal_revocation_public_key=")
-	builder.WriteString(fmt.Sprintf("%v", tl.WithdrawalRevocationPublicKey))
+	builder.WriteString("withdraw_revocation_public_key=")
+	builder.WriteString(fmt.Sprintf("%v", tl.WithdrawRevocationPublicKey))
 	builder.WriteString(", ")
 	builder.WriteString("token_public_key=")
 	builder.WriteString(fmt.Sprintf("%v", tl.TokenPublicKey))

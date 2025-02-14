@@ -147,8 +147,8 @@ message TokenLeafOutput {
     optional string id = 1;
     bytes owner_public_key = 2;
     optional bytes revocation_public_key = 3;
-    uint64 withdrawal_bond_sats = 4;
-    uint64 withdrawal_locktime = 5;
+    optional uint64 withdraw_bond_sats = 4;
+    optional uint64 withdraw_relative_block_locktime = 5;
     bytes token_public_key = 6;
     bytes token_amount = 7;  // Decoded uint128
 }

@@ -54,7 +54,8 @@ type Config struct {
 	ServerCertPath string
 	// ServerKeyPath is the path to the server key.
 	ServerKeyPath string
-	// Lrc20Configs are the configurations for different LRC20 nodes
+	// Lrc20Configs are the configurations for different LRC20 nodes and
+	// token transaction withdrawal parameters.
 	Lrc20Configs map[string]Lrc20Config
 	// DKGLimitOverride is the override for the DKG limit.
 	DKGLimitOverride uint64
@@ -86,8 +87,10 @@ type BitcoindConfig struct {
 }
 
 type Lrc20Config struct {
-	Network string `yaml:"network"`
-	Host    string `yaml:"host"`
+	Network                       string `yaml:"network"`
+	Host                          string `yaml:"host"`
+	WithdrawBondSats              uint64 `yaml:"withdrawbondsats"`
+	WithdrawRelativeBlockLocktime uint64 `yaml:"withdrawrelativeblocklocktime"`
 }
 
 // NewConfig creates a new config for the signing operator.

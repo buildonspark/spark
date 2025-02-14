@@ -60,9 +60,9 @@ func (TokenLeaf) Fields() []ent.Field {
 	return []ent.Field{
 		field.Enum("status").GoType(TokenLeafStatus("")),
 		field.Bytes("owner_public_key").NotEmpty().Immutable(),
-		field.Uint64("withdrawal_bond_sats").Immutable(),
-		field.Uint64("withdrawal_locktime").Immutable(),
-		field.Bytes("withdrawal_revocation_public_key").Immutable(),
+		field.Uint64("withdraw_bond_sats").Immutable(),
+		field.Uint64("withdraw_relative_block_locktime").Immutable(),
+		field.Bytes("withdraw_revocation_public_key").Immutable(),
 		field.Bytes("token_public_key").NotEmpty().Immutable(),
 		field.Bytes("token_amount").NotEmpty().Immutable(),
 		field.Uint32("leaf_created_transaction_output_vout").Immutable(),

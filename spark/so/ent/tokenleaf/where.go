@@ -72,19 +72,19 @@ func OwnerPublicKey(v []byte) predicate.TokenLeaf {
 	return predicate.TokenLeaf(sql.FieldEQ(FieldOwnerPublicKey, v))
 }
 
-// WithdrawalBondSats applies equality check predicate on the "withdrawal_bond_sats" field. It's identical to WithdrawalBondSatsEQ.
-func WithdrawalBondSats(v uint64) predicate.TokenLeaf {
-	return predicate.TokenLeaf(sql.FieldEQ(FieldWithdrawalBondSats, v))
+// WithdrawBondSats applies equality check predicate on the "withdraw_bond_sats" field. It's identical to WithdrawBondSatsEQ.
+func WithdrawBondSats(v uint64) predicate.TokenLeaf {
+	return predicate.TokenLeaf(sql.FieldEQ(FieldWithdrawBondSats, v))
 }
 
-// WithdrawalLocktime applies equality check predicate on the "withdrawal_locktime" field. It's identical to WithdrawalLocktimeEQ.
-func WithdrawalLocktime(v uint64) predicate.TokenLeaf {
-	return predicate.TokenLeaf(sql.FieldEQ(FieldWithdrawalLocktime, v))
+// WithdrawRelativeBlockLocktime applies equality check predicate on the "withdraw_relative_block_locktime" field. It's identical to WithdrawRelativeBlockLocktimeEQ.
+func WithdrawRelativeBlockLocktime(v uint64) predicate.TokenLeaf {
+	return predicate.TokenLeaf(sql.FieldEQ(FieldWithdrawRelativeBlockLocktime, v))
 }
 
-// WithdrawalRevocationPublicKey applies equality check predicate on the "withdrawal_revocation_public_key" field. It's identical to WithdrawalRevocationPublicKeyEQ.
-func WithdrawalRevocationPublicKey(v []byte) predicate.TokenLeaf {
-	return predicate.TokenLeaf(sql.FieldEQ(FieldWithdrawalRevocationPublicKey, v))
+// WithdrawRevocationPublicKey applies equality check predicate on the "withdraw_revocation_public_key" field. It's identical to WithdrawRevocationPublicKeyEQ.
+func WithdrawRevocationPublicKey(v []byte) predicate.TokenLeaf {
+	return predicate.TokenLeaf(sql.FieldEQ(FieldWithdrawRevocationPublicKey, v))
 }
 
 // TokenPublicKey applies equality check predicate on the "token_public_key" field. It's identical to TokenPublicKeyEQ.
@@ -272,124 +272,124 @@ func OwnerPublicKeyLTE(v []byte) predicate.TokenLeaf {
 	return predicate.TokenLeaf(sql.FieldLTE(FieldOwnerPublicKey, v))
 }
 
-// WithdrawalBondSatsEQ applies the EQ predicate on the "withdrawal_bond_sats" field.
-func WithdrawalBondSatsEQ(v uint64) predicate.TokenLeaf {
-	return predicate.TokenLeaf(sql.FieldEQ(FieldWithdrawalBondSats, v))
+// WithdrawBondSatsEQ applies the EQ predicate on the "withdraw_bond_sats" field.
+func WithdrawBondSatsEQ(v uint64) predicate.TokenLeaf {
+	return predicate.TokenLeaf(sql.FieldEQ(FieldWithdrawBondSats, v))
 }
 
-// WithdrawalBondSatsNEQ applies the NEQ predicate on the "withdrawal_bond_sats" field.
-func WithdrawalBondSatsNEQ(v uint64) predicate.TokenLeaf {
-	return predicate.TokenLeaf(sql.FieldNEQ(FieldWithdrawalBondSats, v))
+// WithdrawBondSatsNEQ applies the NEQ predicate on the "withdraw_bond_sats" field.
+func WithdrawBondSatsNEQ(v uint64) predicate.TokenLeaf {
+	return predicate.TokenLeaf(sql.FieldNEQ(FieldWithdrawBondSats, v))
 }
 
-// WithdrawalBondSatsIn applies the In predicate on the "withdrawal_bond_sats" field.
-func WithdrawalBondSatsIn(vs ...uint64) predicate.TokenLeaf {
-	return predicate.TokenLeaf(sql.FieldIn(FieldWithdrawalBondSats, vs...))
+// WithdrawBondSatsIn applies the In predicate on the "withdraw_bond_sats" field.
+func WithdrawBondSatsIn(vs ...uint64) predicate.TokenLeaf {
+	return predicate.TokenLeaf(sql.FieldIn(FieldWithdrawBondSats, vs...))
 }
 
-// WithdrawalBondSatsNotIn applies the NotIn predicate on the "withdrawal_bond_sats" field.
-func WithdrawalBondSatsNotIn(vs ...uint64) predicate.TokenLeaf {
-	return predicate.TokenLeaf(sql.FieldNotIn(FieldWithdrawalBondSats, vs...))
+// WithdrawBondSatsNotIn applies the NotIn predicate on the "withdraw_bond_sats" field.
+func WithdrawBondSatsNotIn(vs ...uint64) predicate.TokenLeaf {
+	return predicate.TokenLeaf(sql.FieldNotIn(FieldWithdrawBondSats, vs...))
 }
 
-// WithdrawalBondSatsGT applies the GT predicate on the "withdrawal_bond_sats" field.
-func WithdrawalBondSatsGT(v uint64) predicate.TokenLeaf {
-	return predicate.TokenLeaf(sql.FieldGT(FieldWithdrawalBondSats, v))
+// WithdrawBondSatsGT applies the GT predicate on the "withdraw_bond_sats" field.
+func WithdrawBondSatsGT(v uint64) predicate.TokenLeaf {
+	return predicate.TokenLeaf(sql.FieldGT(FieldWithdrawBondSats, v))
 }
 
-// WithdrawalBondSatsGTE applies the GTE predicate on the "withdrawal_bond_sats" field.
-func WithdrawalBondSatsGTE(v uint64) predicate.TokenLeaf {
-	return predicate.TokenLeaf(sql.FieldGTE(FieldWithdrawalBondSats, v))
+// WithdrawBondSatsGTE applies the GTE predicate on the "withdraw_bond_sats" field.
+func WithdrawBondSatsGTE(v uint64) predicate.TokenLeaf {
+	return predicate.TokenLeaf(sql.FieldGTE(FieldWithdrawBondSats, v))
 }
 
-// WithdrawalBondSatsLT applies the LT predicate on the "withdrawal_bond_sats" field.
-func WithdrawalBondSatsLT(v uint64) predicate.TokenLeaf {
-	return predicate.TokenLeaf(sql.FieldLT(FieldWithdrawalBondSats, v))
+// WithdrawBondSatsLT applies the LT predicate on the "withdraw_bond_sats" field.
+func WithdrawBondSatsLT(v uint64) predicate.TokenLeaf {
+	return predicate.TokenLeaf(sql.FieldLT(FieldWithdrawBondSats, v))
 }
 
-// WithdrawalBondSatsLTE applies the LTE predicate on the "withdrawal_bond_sats" field.
-func WithdrawalBondSatsLTE(v uint64) predicate.TokenLeaf {
-	return predicate.TokenLeaf(sql.FieldLTE(FieldWithdrawalBondSats, v))
+// WithdrawBondSatsLTE applies the LTE predicate on the "withdraw_bond_sats" field.
+func WithdrawBondSatsLTE(v uint64) predicate.TokenLeaf {
+	return predicate.TokenLeaf(sql.FieldLTE(FieldWithdrawBondSats, v))
 }
 
-// WithdrawalLocktimeEQ applies the EQ predicate on the "withdrawal_locktime" field.
-func WithdrawalLocktimeEQ(v uint64) predicate.TokenLeaf {
-	return predicate.TokenLeaf(sql.FieldEQ(FieldWithdrawalLocktime, v))
+// WithdrawRelativeBlockLocktimeEQ applies the EQ predicate on the "withdraw_relative_block_locktime" field.
+func WithdrawRelativeBlockLocktimeEQ(v uint64) predicate.TokenLeaf {
+	return predicate.TokenLeaf(sql.FieldEQ(FieldWithdrawRelativeBlockLocktime, v))
 }
 
-// WithdrawalLocktimeNEQ applies the NEQ predicate on the "withdrawal_locktime" field.
-func WithdrawalLocktimeNEQ(v uint64) predicate.TokenLeaf {
-	return predicate.TokenLeaf(sql.FieldNEQ(FieldWithdrawalLocktime, v))
+// WithdrawRelativeBlockLocktimeNEQ applies the NEQ predicate on the "withdraw_relative_block_locktime" field.
+func WithdrawRelativeBlockLocktimeNEQ(v uint64) predicate.TokenLeaf {
+	return predicate.TokenLeaf(sql.FieldNEQ(FieldWithdrawRelativeBlockLocktime, v))
 }
 
-// WithdrawalLocktimeIn applies the In predicate on the "withdrawal_locktime" field.
-func WithdrawalLocktimeIn(vs ...uint64) predicate.TokenLeaf {
-	return predicate.TokenLeaf(sql.FieldIn(FieldWithdrawalLocktime, vs...))
+// WithdrawRelativeBlockLocktimeIn applies the In predicate on the "withdraw_relative_block_locktime" field.
+func WithdrawRelativeBlockLocktimeIn(vs ...uint64) predicate.TokenLeaf {
+	return predicate.TokenLeaf(sql.FieldIn(FieldWithdrawRelativeBlockLocktime, vs...))
 }
 
-// WithdrawalLocktimeNotIn applies the NotIn predicate on the "withdrawal_locktime" field.
-func WithdrawalLocktimeNotIn(vs ...uint64) predicate.TokenLeaf {
-	return predicate.TokenLeaf(sql.FieldNotIn(FieldWithdrawalLocktime, vs...))
+// WithdrawRelativeBlockLocktimeNotIn applies the NotIn predicate on the "withdraw_relative_block_locktime" field.
+func WithdrawRelativeBlockLocktimeNotIn(vs ...uint64) predicate.TokenLeaf {
+	return predicate.TokenLeaf(sql.FieldNotIn(FieldWithdrawRelativeBlockLocktime, vs...))
 }
 
-// WithdrawalLocktimeGT applies the GT predicate on the "withdrawal_locktime" field.
-func WithdrawalLocktimeGT(v uint64) predicate.TokenLeaf {
-	return predicate.TokenLeaf(sql.FieldGT(FieldWithdrawalLocktime, v))
+// WithdrawRelativeBlockLocktimeGT applies the GT predicate on the "withdraw_relative_block_locktime" field.
+func WithdrawRelativeBlockLocktimeGT(v uint64) predicate.TokenLeaf {
+	return predicate.TokenLeaf(sql.FieldGT(FieldWithdrawRelativeBlockLocktime, v))
 }
 
-// WithdrawalLocktimeGTE applies the GTE predicate on the "withdrawal_locktime" field.
-func WithdrawalLocktimeGTE(v uint64) predicate.TokenLeaf {
-	return predicate.TokenLeaf(sql.FieldGTE(FieldWithdrawalLocktime, v))
+// WithdrawRelativeBlockLocktimeGTE applies the GTE predicate on the "withdraw_relative_block_locktime" field.
+func WithdrawRelativeBlockLocktimeGTE(v uint64) predicate.TokenLeaf {
+	return predicate.TokenLeaf(sql.FieldGTE(FieldWithdrawRelativeBlockLocktime, v))
 }
 
-// WithdrawalLocktimeLT applies the LT predicate on the "withdrawal_locktime" field.
-func WithdrawalLocktimeLT(v uint64) predicate.TokenLeaf {
-	return predicate.TokenLeaf(sql.FieldLT(FieldWithdrawalLocktime, v))
+// WithdrawRelativeBlockLocktimeLT applies the LT predicate on the "withdraw_relative_block_locktime" field.
+func WithdrawRelativeBlockLocktimeLT(v uint64) predicate.TokenLeaf {
+	return predicate.TokenLeaf(sql.FieldLT(FieldWithdrawRelativeBlockLocktime, v))
 }
 
-// WithdrawalLocktimeLTE applies the LTE predicate on the "withdrawal_locktime" field.
-func WithdrawalLocktimeLTE(v uint64) predicate.TokenLeaf {
-	return predicate.TokenLeaf(sql.FieldLTE(FieldWithdrawalLocktime, v))
+// WithdrawRelativeBlockLocktimeLTE applies the LTE predicate on the "withdraw_relative_block_locktime" field.
+func WithdrawRelativeBlockLocktimeLTE(v uint64) predicate.TokenLeaf {
+	return predicate.TokenLeaf(sql.FieldLTE(FieldWithdrawRelativeBlockLocktime, v))
 }
 
-// WithdrawalRevocationPublicKeyEQ applies the EQ predicate on the "withdrawal_revocation_public_key" field.
-func WithdrawalRevocationPublicKeyEQ(v []byte) predicate.TokenLeaf {
-	return predicate.TokenLeaf(sql.FieldEQ(FieldWithdrawalRevocationPublicKey, v))
+// WithdrawRevocationPublicKeyEQ applies the EQ predicate on the "withdraw_revocation_public_key" field.
+func WithdrawRevocationPublicKeyEQ(v []byte) predicate.TokenLeaf {
+	return predicate.TokenLeaf(sql.FieldEQ(FieldWithdrawRevocationPublicKey, v))
 }
 
-// WithdrawalRevocationPublicKeyNEQ applies the NEQ predicate on the "withdrawal_revocation_public_key" field.
-func WithdrawalRevocationPublicKeyNEQ(v []byte) predicate.TokenLeaf {
-	return predicate.TokenLeaf(sql.FieldNEQ(FieldWithdrawalRevocationPublicKey, v))
+// WithdrawRevocationPublicKeyNEQ applies the NEQ predicate on the "withdraw_revocation_public_key" field.
+func WithdrawRevocationPublicKeyNEQ(v []byte) predicate.TokenLeaf {
+	return predicate.TokenLeaf(sql.FieldNEQ(FieldWithdrawRevocationPublicKey, v))
 }
 
-// WithdrawalRevocationPublicKeyIn applies the In predicate on the "withdrawal_revocation_public_key" field.
-func WithdrawalRevocationPublicKeyIn(vs ...[]byte) predicate.TokenLeaf {
-	return predicate.TokenLeaf(sql.FieldIn(FieldWithdrawalRevocationPublicKey, vs...))
+// WithdrawRevocationPublicKeyIn applies the In predicate on the "withdraw_revocation_public_key" field.
+func WithdrawRevocationPublicKeyIn(vs ...[]byte) predicate.TokenLeaf {
+	return predicate.TokenLeaf(sql.FieldIn(FieldWithdrawRevocationPublicKey, vs...))
 }
 
-// WithdrawalRevocationPublicKeyNotIn applies the NotIn predicate on the "withdrawal_revocation_public_key" field.
-func WithdrawalRevocationPublicKeyNotIn(vs ...[]byte) predicate.TokenLeaf {
-	return predicate.TokenLeaf(sql.FieldNotIn(FieldWithdrawalRevocationPublicKey, vs...))
+// WithdrawRevocationPublicKeyNotIn applies the NotIn predicate on the "withdraw_revocation_public_key" field.
+func WithdrawRevocationPublicKeyNotIn(vs ...[]byte) predicate.TokenLeaf {
+	return predicate.TokenLeaf(sql.FieldNotIn(FieldWithdrawRevocationPublicKey, vs...))
 }
 
-// WithdrawalRevocationPublicKeyGT applies the GT predicate on the "withdrawal_revocation_public_key" field.
-func WithdrawalRevocationPublicKeyGT(v []byte) predicate.TokenLeaf {
-	return predicate.TokenLeaf(sql.FieldGT(FieldWithdrawalRevocationPublicKey, v))
+// WithdrawRevocationPublicKeyGT applies the GT predicate on the "withdraw_revocation_public_key" field.
+func WithdrawRevocationPublicKeyGT(v []byte) predicate.TokenLeaf {
+	return predicate.TokenLeaf(sql.FieldGT(FieldWithdrawRevocationPublicKey, v))
 }
 
-// WithdrawalRevocationPublicKeyGTE applies the GTE predicate on the "withdrawal_revocation_public_key" field.
-func WithdrawalRevocationPublicKeyGTE(v []byte) predicate.TokenLeaf {
-	return predicate.TokenLeaf(sql.FieldGTE(FieldWithdrawalRevocationPublicKey, v))
+// WithdrawRevocationPublicKeyGTE applies the GTE predicate on the "withdraw_revocation_public_key" field.
+func WithdrawRevocationPublicKeyGTE(v []byte) predicate.TokenLeaf {
+	return predicate.TokenLeaf(sql.FieldGTE(FieldWithdrawRevocationPublicKey, v))
 }
 
-// WithdrawalRevocationPublicKeyLT applies the LT predicate on the "withdrawal_revocation_public_key" field.
-func WithdrawalRevocationPublicKeyLT(v []byte) predicate.TokenLeaf {
-	return predicate.TokenLeaf(sql.FieldLT(FieldWithdrawalRevocationPublicKey, v))
+// WithdrawRevocationPublicKeyLT applies the LT predicate on the "withdraw_revocation_public_key" field.
+func WithdrawRevocationPublicKeyLT(v []byte) predicate.TokenLeaf {
+	return predicate.TokenLeaf(sql.FieldLT(FieldWithdrawRevocationPublicKey, v))
 }
 
-// WithdrawalRevocationPublicKeyLTE applies the LTE predicate on the "withdrawal_revocation_public_key" field.
-func WithdrawalRevocationPublicKeyLTE(v []byte) predicate.TokenLeaf {
-	return predicate.TokenLeaf(sql.FieldLTE(FieldWithdrawalRevocationPublicKey, v))
+// WithdrawRevocationPublicKeyLTE applies the LTE predicate on the "withdraw_revocation_public_key" field.
+func WithdrawRevocationPublicKeyLTE(v []byte) predicate.TokenLeaf {
+	return predicate.TokenLeaf(sql.FieldLTE(FieldWithdrawRevocationPublicKey, v))
 }
 
 // TokenPublicKeyEQ applies the EQ predicate on the "token_public_key" field.

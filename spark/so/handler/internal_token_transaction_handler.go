@@ -9,6 +9,7 @@ import (
 	"math/big"
 
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark-go/common"
 	pblrc20 "github.com/lightsparkdev/spark-go/proto/lrc20"
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark-go/proto/spark_internal"
@@ -61,7 +62,7 @@ func (h *InternalTokenTransactionHandler) StartTokenTransactionInternal(ctx cont
 	}
 
 	// Validate the final token transaction.
-	err = utils.ValidateFinalTokenTransaction(req.FinalTokenTransaction, req.TokenTransactionSignatures, expectedRevocationPublicKeys, config.GetSigningOperatorList())
+	err = ValidateFinalTokenTransaction(config, req.FinalTokenTransaction, req.TokenTransactionSignatures, expectedRevocationPublicKeys)
 	if err != nil {
 		return nil, fmt.Errorf("invalid final token transaction: %w", err)
 	}
@@ -194,5 +195,41 @@ func ValidateTransferSignaturesUsingPreviousTransactionData(
 		}
 	}
 
+	return nil
+}
+
+func ValidateFinalTokenTransaction(
+	config *so.Config,
+	tokenTransaction *pb.TokenTransaction,
+	tokenTransactionSignatures *pb.TokenTransactionSignatures,
+	expectedRevocationPublicKeys [][]byte,
+) error {
+	expectedBondSats := config.Lrc20Configs[common.Regtest.String()].WithdrawBondSats
+	expectedRelativeBlockLocktime := config.Lrc20Configs[common.Regtest.String()].WithdrawRelativeBlockLocktime
+	sparkOperatorsFromConfig := config.GetSigningOperatorList()
+	// Repeat same validations as for the partial token transaction.
+	err := utils.ValidatePartialTokenTransaction(tokenTransaction, tokenTransactionSignatures, sparkOperatorsFromConfig)
+	if err != nil {
+		return fmt.Errorf("failed to validate final token transaction: %w", err)
+	}
+
+	// Additionally validate the revocation public keys and withdrawal params which were added to make it final.
+	for i, leaf := range tokenTransaction.OutputLeaves {
+		if leaf.GetRevocationPublicKey() == nil {
+			return fmt.Errorf("revocation public key cannot be nil for leaf %d", i)
+		}
+		if !bytes.Equal(leaf.GetRevocationPublicKey(), expectedRevocationPublicKeys[i]) {
+			return fmt.Errorf("revocation public key mismatch for leaf %d", i)
+		}
+		if leaf.WithdrawBondSats == nil || leaf.WithdrawRelativeBlockLocktime == nil {
+			return fmt.Errorf("withdrawal params not set for leaf %d", i)
+		}
+		if leaf.GetWithdrawBondSats() != expectedBondSats {
+			return fmt.Errorf("withdrawal bond sats mismatch for leaf %d", i)
+		}
+		if leaf.GetWithdrawRelativeBlockLocktime() != expectedRelativeBlockLocktime {
+			return fmt.Errorf("withdrawal locktime mismatch for leaf %d", i)
+		}
+	}
 	return nil
 }

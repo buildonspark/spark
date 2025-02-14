@@ -64,21 +64,21 @@ func (tlc *TokenLeafCreate) SetOwnerPublicKey(b []byte) *TokenLeafCreate {
 	return tlc
 }
 
-// SetWithdrawalBondSats sets the "withdrawal_bond_sats" field.
-func (tlc *TokenLeafCreate) SetWithdrawalBondSats(u uint64) *TokenLeafCreate {
-	tlc.mutation.SetWithdrawalBondSats(u)
+// SetWithdrawBondSats sets the "withdraw_bond_sats" field.
+func (tlc *TokenLeafCreate) SetWithdrawBondSats(u uint64) *TokenLeafCreate {
+	tlc.mutation.SetWithdrawBondSats(u)
 	return tlc
 }
 
-// SetWithdrawalLocktime sets the "withdrawal_locktime" field.
-func (tlc *TokenLeafCreate) SetWithdrawalLocktime(u uint64) *TokenLeafCreate {
-	tlc.mutation.SetWithdrawalLocktime(u)
+// SetWithdrawRelativeBlockLocktime sets the "withdraw_relative_block_locktime" field.
+func (tlc *TokenLeafCreate) SetWithdrawRelativeBlockLocktime(u uint64) *TokenLeafCreate {
+	tlc.mutation.SetWithdrawRelativeBlockLocktime(u)
 	return tlc
 }
 
-// SetWithdrawalRevocationPublicKey sets the "withdrawal_revocation_public_key" field.
-func (tlc *TokenLeafCreate) SetWithdrawalRevocationPublicKey(b []byte) *TokenLeafCreate {
-	tlc.mutation.SetWithdrawalRevocationPublicKey(b)
+// SetWithdrawRevocationPublicKey sets the "withdraw_revocation_public_key" field.
+func (tlc *TokenLeafCreate) SetWithdrawRevocationPublicKey(b []byte) *TokenLeafCreate {
+	tlc.mutation.SetWithdrawRevocationPublicKey(b)
 	return tlc
 }
 
@@ -268,14 +268,14 @@ func (tlc *TokenLeafCreate) check() error {
 			return &ValidationError{Name: "owner_public_key", err: fmt.Errorf(`ent: validator failed for field "TokenLeaf.owner_public_key": %w`, err)}
 		}
 	}
-	if _, ok := tlc.mutation.WithdrawalBondSats(); !ok {
-		return &ValidationError{Name: "withdrawal_bond_sats", err: errors.New(`ent: missing required field "TokenLeaf.withdrawal_bond_sats"`)}
+	if _, ok := tlc.mutation.WithdrawBondSats(); !ok {
+		return &ValidationError{Name: "withdraw_bond_sats", err: errors.New(`ent: missing required field "TokenLeaf.withdraw_bond_sats"`)}
 	}
-	if _, ok := tlc.mutation.WithdrawalLocktime(); !ok {
-		return &ValidationError{Name: "withdrawal_locktime", err: errors.New(`ent: missing required field "TokenLeaf.withdrawal_locktime"`)}
+	if _, ok := tlc.mutation.WithdrawRelativeBlockLocktime(); !ok {
+		return &ValidationError{Name: "withdraw_relative_block_locktime", err: errors.New(`ent: missing required field "TokenLeaf.withdraw_relative_block_locktime"`)}
 	}
-	if _, ok := tlc.mutation.WithdrawalRevocationPublicKey(); !ok {
-		return &ValidationError{Name: "withdrawal_revocation_public_key", err: errors.New(`ent: missing required field "TokenLeaf.withdrawal_revocation_public_key"`)}
+	if _, ok := tlc.mutation.WithdrawRevocationPublicKey(); !ok {
+		return &ValidationError{Name: "withdraw_revocation_public_key", err: errors.New(`ent: missing required field "TokenLeaf.withdraw_revocation_public_key"`)}
 	}
 	if _, ok := tlc.mutation.TokenPublicKey(); !ok {
 		return &ValidationError{Name: "token_public_key", err: errors.New(`ent: missing required field "TokenLeaf.token_public_key"`)}
@@ -350,17 +350,17 @@ func (tlc *TokenLeafCreate) createSpec() (*TokenLeaf, *sqlgraph.CreateSpec) {
 		_spec.SetField(tokenleaf.FieldOwnerPublicKey, field.TypeBytes, value)
 		_node.OwnerPublicKey = value
 	}
-	if value, ok := tlc.mutation.WithdrawalBondSats(); ok {
-		_spec.SetField(tokenleaf.FieldWithdrawalBondSats, field.TypeUint64, value)
-		_node.WithdrawalBondSats = value
+	if value, ok := tlc.mutation.WithdrawBondSats(); ok {
+		_spec.SetField(tokenleaf.FieldWithdrawBondSats, field.TypeUint64, value)
+		_node.WithdrawBondSats = value
 	}
-	if value, ok := tlc.mutation.WithdrawalLocktime(); ok {
-		_spec.SetField(tokenleaf.FieldWithdrawalLocktime, field.TypeUint64, value)
-		_node.WithdrawalLocktime = value
+	if value, ok := tlc.mutation.WithdrawRelativeBlockLocktime(); ok {
+		_spec.SetField(tokenleaf.FieldWithdrawRelativeBlockLocktime, field.TypeUint64, value)
+		_node.WithdrawRelativeBlockLocktime = value
 	}
-	if value, ok := tlc.mutation.WithdrawalRevocationPublicKey(); ok {
-		_spec.SetField(tokenleaf.FieldWithdrawalRevocationPublicKey, field.TypeBytes, value)
-		_node.WithdrawalRevocationPublicKey = value
+	if value, ok := tlc.mutation.WithdrawRevocationPublicKey(); ok {
+		_spec.SetField(tokenleaf.FieldWithdrawRevocationPublicKey, field.TypeBytes, value)
+		_node.WithdrawRevocationPublicKey = value
 	}
 	if value, ok := tlc.mutation.TokenPublicKey(); ok {
 		_spec.SetField(tokenleaf.FieldTokenPublicKey, field.TypeBytes, value)

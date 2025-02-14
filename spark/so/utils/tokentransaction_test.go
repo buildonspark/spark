@@ -39,11 +39,9 @@ func TestHashTokenTransactionUniqueHash(t *testing.T) {
 		},
 		OutputLeaves: []*pb.TokenLeafOutput{
 			{
-				OwnerPublicKey:     bytes.Repeat([]byte{0x01}, 32),
-				TokenPublicKey:     bytes.Repeat([]byte{0x02}, 32),
-				TokenAmount:        []byte{0x01},
-				WithdrawalBondSats: 500000,
-				WithdrawalLocktime: 1000,
+				OwnerPublicKey: bytes.Repeat([]byte{0x01}, 32),
+				TokenPublicKey: bytes.Repeat([]byte{0x02}, 32),
+				TokenAmount:    []byte{0x01},
 			},
 		},
 	}
@@ -61,23 +59,27 @@ func TestHashTokenTransactionUniqueHash(t *testing.T) {
 		},
 		OutputLeaves: []*pb.TokenLeafOutput{
 			{
-				OwnerPublicKey:     bytes.Repeat([]byte{0x01}, 32),
-				TokenPublicKey:     bytes.Repeat([]byte{0x02}, 32),
-				TokenAmount:        []byte{0x01},
-				WithdrawalBondSats: 500000,
-				WithdrawalLocktime: 1000,
+				OwnerPublicKey: bytes.Repeat([]byte{0x01}, 32),
+				TokenPublicKey: bytes.Repeat([]byte{0x02}, 32),
+				TokenAmount:    []byte{0x01},
 			},
 		},
 	}
 
 	leafID := "test-leaf-1"
+	bondSats := uint64(1000000)
+	blockLocktime := uint64(1000)
 	finalMintTokenTransaction := proto.Clone(partialMintTokenTransaction).(*pb.TokenTransaction)
 	finalMintTokenTransaction.OutputLeaves[0].Id = &leafID
 	finalMintTokenTransaction.OutputLeaves[0].RevocationPublicKey = bytes.Repeat([]byte{0x03}, 32)
+	finalMintTokenTransaction.OutputLeaves[0].WithdrawBondSats = &bondSats
+	finalMintTokenTransaction.OutputLeaves[0].WithdrawRelativeBlockLocktime = &blockLocktime
 
 	finalTransferTokenTransaction := proto.Clone(partialTransferTokenTransaction).(*pb.TokenTransaction)
 	finalTransferTokenTransaction.OutputLeaves[0].Id = &leafID
 	finalTransferTokenTransaction.OutputLeaves[0].RevocationPublicKey = bytes.Repeat([]byte{0x03}, 32)
+	finalTransferTokenTransaction.OutputLeaves[0].WithdrawBondSats = &bondSats
+	finalTransferTokenTransaction.OutputLeaves[0].WithdrawRelativeBlockLocktime = &blockLocktime
 
 	// Hash all transactions
 	partialMintHash, err := HashTokenTransaction(partialMintTokenTransaction, true)
