@@ -51,8 +51,9 @@ func NewPolarityScorer(dbClient *ent.Client) *PolarityScorer {
 
 func (s *PolarityScorer) Start() {
 	const limit = 1000
-	lastUpdated := time.Now()
+	lastUpdated := time.Now().Add(-24 * 30 * time.Hour)
 	for {
+		log.Printf("checking for leaves updated after: %v", lastUpdated)
 		leaves, _ := s.dbClient.TreeNode.Query().
 			Where(
 				treenode.StatusEQ(schema.TreeNodeStatusAvailable),
