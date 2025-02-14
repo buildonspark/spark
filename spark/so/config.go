@@ -131,9 +131,15 @@ func NewConfig(
 	log.Printf("Server cert path: %s", serverCertPath)
 	log.Printf("Server key path: %s", serverKeyPath)
 
+	identifier := utils.IndexToIdentifier(index)
+
+	if dkgCoordinatorAddress == "" {
+		dkgCoordinatorAddress = signingOperatorMap[identifier].Address
+	}
+
 	return &Config{
 		Index:                 index,
-		Identifier:            utils.IndexToIdentifier(index),
+		Identifier:            identifier,
 		IdentityPrivateKey:    identityPrivateKeyBytes,
 		SigningOperatorMap:    signingOperatorMap,
 		Threshold:             threshold,

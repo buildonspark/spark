@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"strconv"
 	"strings"
 	"time"
 
@@ -122,10 +121,6 @@ func loadArgs() (*args, error) {
 		return nil, errors.New("database path is required")
 	}
 
-	if args.DKGCoordinatorAddress == "" {
-		args.DKGCoordinatorAddress = "localhost:" + strconv.Itoa(int(args.Port))
-	}
-
 	if args.ServerCertPath == "" || args.ServerKeyPath == "" {
 		return nil, errors.New("server certificate and key path are required")
 	}
@@ -213,7 +208,6 @@ func main() {
 	}
 
 	for _, task := range task.AllTasks() {
-		log.Printf("Adding task: %v", task)
 		_, err := s.NewJob(gocron.DurationJob(task.Duration), gocron.NewTask(task.Task, config, dbClient))
 		if err != nil {
 			log.Fatalf("Failed to create job: %v", err)

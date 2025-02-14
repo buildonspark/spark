@@ -328,7 +328,6 @@ func AggregateKeyshares(ctx context.Context, config *so.Config, keyshares []*Sig
 
 // RunDKGIfNeeded checks if the keyshare count is below the threshold and runs DKG if needed.
 func RunDKGIfNeeded(db *Tx, config *so.Config) error {
-	log.Printf("Running DKG if needed")
 	count, err := db.SigningKeyshare.Query().Where(
 		signingkeyshare.StatusEQ(schema.KeyshareStatusAvailable),
 		signingkeyshare.CoordinatorIndexEQ(config.Index),
@@ -344,9 +343,7 @@ func RunDKGIfNeeded(db *Tx, config *so.Config) error {
 }
 
 func RunDKG(ctx context.Context, config *so.Config) error {
-	log.Printf("Running DKG")
-	dkgCoordinatorAddress := config.SigningOperatorMap[config.Identifier].Address
-	connection, err := common.NewGRPCConnectionWithCert(dkgCoordinatorAddress, config.SigningOperatorMap[config.Identifier].CertPath)
+	connection, err := common.NewGRPCConnectionWithCert(config.DKGCoordinatorAddress, config.SigningOperatorMap[config.Identifier].CertPath)
 	if err != nil {
 		log.Printf("Failed to create connection to DKG coordinator: %v, cert path: %v", err, config.SigningOperatorMap[config.Identifier].CertPath)
 		return err
