@@ -85,7 +85,7 @@ func (s *PolarityScorer) Start() {
 			time.Sleep(1 * time.Millisecond)
 		} else {
 			// Done for now, sleep for a while.
-			time.Sleep(10 * time.Second)
+			time.Sleep(60 * time.Second)
 		}
 	}
 }
@@ -95,7 +95,7 @@ func (s *PolarityScorer) UpdateLeaves(node *ent.TreeNode) {
 	// Helper function to recursively build the helper tree
 	var buildHelperTree func(*ent.TreeNode) *HelperNode
 	buildHelperTree = func(n *ent.TreeNode) *HelperNode {
-		helperNode := NewHelperNode(string(n.OwnerSigningPubkey), n.ID)
+		helperNode := NewHelperNode(string(n.OwnerIdentityPubkey), n.ID)
 
 		// Load and process all children
 		children, err := n.QueryChildren().Where().All(context.Background())
