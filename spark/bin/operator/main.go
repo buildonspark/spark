@@ -8,7 +8,9 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"log/slog"
 	"net"
+	"os"
 	"strings"
 	"time"
 
@@ -39,6 +41,8 @@ import (
 )
 
 type args struct {
+	LogLevel                   string
+	LogJSON                    bool
 	ConfigFilePath             string
 	Index                      uint64
 	IdentityPrivateKeyFilePath string
@@ -80,6 +84,8 @@ func loadArgs() (*args, error) {
 	args := &args{}
 
 	// Define flags
+	flag.StringVar(&args.LogLevel, "log-level", "debug", "Logging level: debug|info|warn|error")
+	flag.BoolVar(&args.LogJSON, "log-json", false, "Output logs in JSON format")
 	flag.StringVar(&args.ConfigFilePath, "config", "so_config.yaml", "Path to config file")
 	flag.Uint64Var(&args.Index, "index", 0, "Index value")
 	flag.StringVar(&args.IdentityPrivateKeyFilePath, "key", "", "Identity private key")
@@ -100,6 +106,29 @@ func loadArgs() (*args, error) {
 	flag.StringVar(&args.ServerKeyPath, "server-key", "", "Path to server key")
 	// Parse flags
 	flag.Parse()
+
+	var level slog.Level
+	switch strings.ToLower(args.LogLevel) {
+	case "debug":
+		level = slog.LevelDebug
+	case "info":
+		level = slog.LevelInfo
+	case "warn":
+		level = slog.LevelWarn
+	case "error":
+		level = slog.LevelError
+	default:
+		return nil, errors.New("Invalid log level")
+	}
+
+	options := slog.HandlerOptions{AddSource: true, Level: level}
+	var handler slog.Handler
+	if args.LogJSON {
+		handler = slog.NewJSONHandler(os.Stdout, &options)
+	} else {
+		handler = slog.NewTextHandler(os.Stdout, &options)
+	}
+	slog.SetDefault(slog.New(handler))
 
 	if args.IdentityPrivateKeyFilePath == "" {
 		return nil, errors.New("identity private key file path is required")
@@ -129,8 +158,6 @@ func loadArgs() (*args, error) {
 }
 
 func main() {
-	log.SetFlags(log.Lshortfile | log.Llongfile | log.Ldate | log.Ltime)
-
 	args, err := loadArgs()
 	if err != nil {
 		log.Fatalf("Failed to load args: %v", err)
