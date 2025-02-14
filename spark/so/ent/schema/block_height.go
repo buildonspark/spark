@@ -1,8 +1,11 @@
 package schema
 
 import (
+	"fmt"
+
 	"entgo.io/ent"
 	"entgo.io/ent/schema/field"
+	pb "github.com/lightsparkdev/spark-go/proto/spark"
 )
 
 // Network is the network type.
@@ -14,6 +17,21 @@ const (
 	NetworkTestnet Network = "TESTNET"
 	NetworkSignet  Network = "SIGNET"
 )
+
+// MarshalProto converts a Network to a spark protobuf Network.
+func (n Network) MarshalProto() (pb.Network, error) {
+	switch n {
+	case NetworkMainnet:
+		return pb.Network_MAINNET, nil
+	case NetworkRegtest:
+		return pb.Network_REGTEST, nil
+	case NetworkTestnet:
+		return pb.Network_TESTNET, nil
+	case NetworkSignet:
+		return pb.Network_SIGNET, nil
+	}
+	return pb.Network_MAINNET, fmt.Errorf("unknown network: %s", n)
+}
 
 // Values returns the values for the Network type.
 func (Network) Values() []string {

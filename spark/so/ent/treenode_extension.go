@@ -17,6 +17,14 @@ func (tn *TreeNode) MarshalSparkProto(ctx context.Context) (*pbspark.TreeNode, e
 	if err != nil {
 		return nil, fmt.Errorf("unable to query signing keyshare for leaf %s: %v", tn.ID.String(), err)
 	}
+	tree, err := tn.QueryTree().Only(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to query tree for leaf %s: %v", tn.ID.String(), err)
+	}
+	networkProto, err := tree.Network.MarshalProto()
+	if err != nil {
+		return nil, fmt.Errorf("unable to marshal network of tree %s: %v", tree.ID.String(), err)
+	}
 	return &pbspark.TreeNode{
 		Id:                     tn.ID.String(),
 		TreeId:                 tn.QueryTree().FirstIDX(ctx).String(),
@@ -29,6 +37,7 @@ func (tn *TreeNode) MarshalSparkProto(ctx context.Context) (*pbspark.TreeNode, e
 		OwnerIdentityPublicKey: tn.OwnerIdentityPubkey,
 		SigningKeyshare:        signingKeyshare.MarshalProto(),
 		Status:                 string(tn.Status),
+		Network:                networkProto,
 	}, nil
 }
 
