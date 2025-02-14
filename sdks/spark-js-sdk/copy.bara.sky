@@ -19,6 +19,7 @@ core.workflow(
             "sdks/spark-js-sdk/.github/**",
             "sdks/spark-js-sdk/yarn.lock",
             "sdks/spark-js-sdk/.changeset/*.md",
+            "sdks/spark-js-sdk/src/examples/spark-demo/**"
         ],
     ),
     # GH actions, yarn.lock, and changesets are managed separately in each repo.

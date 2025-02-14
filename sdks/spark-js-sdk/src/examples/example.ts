@@ -7,7 +7,7 @@ import { Network } from "../../dist/utils/network";
 
 // Initialize Spark Wallet
 const walletMnemonic =
-  "typical stereo dose party penalty decline neglect feel harvest abstract stage winter";
+  "second stereo dose party penalty decline neglect feel harvest abstract stage winter";
 
 async function runCLI() {
   let wallet = new SparkWallet(Network.REGTEST);
@@ -25,7 +25,8 @@ async function runCLI() {
   payinvoice <invoice> <amount>                   - Pay a lightning invoice
   balance                                         - Show current wallet balance
   getleaves                                       - Show current leaves
-  pending                                         - Show pending transfers
+  sendtransfer <amount> <receiverPubKey>          - Send a transfer
+  pendingtransfers                                - Show pending transfers
   claimtransfer <transferId>                      - Claim a pending transfer
   help                                            - Show this help message
   exit/quit                                       - Exit the program
@@ -111,7 +112,16 @@ async function runCLI() {
           `Fee: ${fee?.feeEstimate.originalValue} ${fee?.feeEstimate.originalUnit}`
         );
         break;
-      case "pending":
+      case "sendtransfer":
+        if (!wallet.isInitialized()) {
+          console.log("No wallet initialized");
+          break;
+        }
+        const receiverPubKey = hexToBytes(args[1]);
+        const amount = parseInt(args[0]);
+        await wallet.sendTransfer(amount, receiverPubKey);
+        break;
+      case "pendingtransfers":
         if (!wallet.isInitialized()) {
           console.log("No wallet initialized");
           break;
@@ -172,4 +182,4 @@ async function runCLI() {
   }
 }
 
-await runCLI();
+runCLI();
