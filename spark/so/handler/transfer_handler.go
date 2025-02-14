@@ -542,7 +542,7 @@ func (h *TransferHandler) claimLeafTweakKey(ctx context.Context, leaf *ent.TreeN
 	if err != nil {
 		return fmt.Errorf("unable to load keyshare for leaf %s: %v", leaf.ID.String(), err)
 	}
-	_, err = keyshare.TweakKeyShare(
+	keyshare, err = keyshare.TweakKeyShare(
 		ctx,
 		req.SecretShareTweak.SecretShare,
 		req.SecretShareTweak.Proofs[0],
