@@ -20,7 +20,7 @@ type Task struct {
 func AllTasks() []Task {
 	return []Task{
 		{
-			Duration: 1 * time.Minute,
+			Duration: 10 * time.Second,
 			Task: func(config *so.Config, db *ent.Client) error {
 				tx, err := db.Tx(context.Background())
 				if err != nil {
