@@ -10,11 +10,11 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark-go/so/ent/tokenissuance"
+	"github.com/lightsparkdev/spark-go/so/ent/tokenmint"
 )
 
-// TokenIssuance is the model entity for the TokenIssuance schema.
-type TokenIssuance struct {
+// TokenMint is the model entity for the TokenMint schema.
+type TokenMint struct {
 	config `json:"-"`
 	// ID of the ent.
 	ID uuid.UUID `json:"id,omitempty"`
@@ -29,13 +29,13 @@ type TokenIssuance struct {
 	// OperatorSpecificIssuerSignature holds the value of the "operator_specific_issuer_signature" field.
 	OperatorSpecificIssuerSignature []byte `json:"operator_specific_issuer_signature,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
-	// The values are being populated by the TokenIssuanceQuery when eager-loading is set.
-	Edges        TokenIssuanceEdges `json:"edges"`
+	// The values are being populated by the TokenMintQuery when eager-loading is set.
+	Edges        TokenMintEdges `json:"edges"`
 	selectValues sql.SelectValues
 }
 
-// TokenIssuanceEdges holds the relations/edges for other nodes in the graph.
-type TokenIssuanceEdges struct {
+// TokenMintEdges holds the relations/edges for other nodes in the graph.
+type TokenMintEdges struct {
 	// TokenTransactionReceipt holds the value of the token_transaction_receipt edge.
 	TokenTransactionReceipt []*TokenTransactionReceipt `json:"token_transaction_receipt,omitempty"`
 	// loadedTypes holds the information for reporting if a
@@ -45,7 +45,7 @@ type TokenIssuanceEdges struct {
 
 // TokenTransactionReceiptOrErr returns the TokenTransactionReceipt value or an error if the edge
 // was not loaded in eager-loading.
-func (e TokenIssuanceEdges) TokenTransactionReceiptOrErr() ([]*TokenTransactionReceipt, error) {
+func (e TokenMintEdges) TokenTransactionReceiptOrErr() ([]*TokenTransactionReceipt, error) {
 	if e.loadedTypes[0] {
 		return e.TokenTransactionReceipt, nil
 	}
@@ -53,15 +53,15 @@ func (e TokenIssuanceEdges) TokenTransactionReceiptOrErr() ([]*TokenTransactionR
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
-func (*TokenIssuance) scanValues(columns []string) ([]any, error) {
+func (*TokenMint) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case tokenissuance.FieldIssuerPublicKey, tokenissuance.FieldIssuerSignature, tokenissuance.FieldOperatorSpecificIssuerSignature:
+		case tokenmint.FieldIssuerPublicKey, tokenmint.FieldIssuerSignature, tokenmint.FieldOperatorSpecificIssuerSignature:
 			values[i] = new([]byte)
-		case tokenissuance.FieldCreateTime, tokenissuance.FieldUpdateTime:
+		case tokenmint.FieldCreateTime, tokenmint.FieldUpdateTime:
 			values[i] = new(sql.NullTime)
-		case tokenissuance.FieldID:
+		case tokenmint.FieldID:
 			values[i] = new(uuid.UUID)
 		default:
 			values[i] = new(sql.UnknownType)
@@ -71,107 +71,107 @@ func (*TokenIssuance) scanValues(columns []string) ([]any, error) {
 }
 
 // assignValues assigns the values that were returned from sql.Rows (after scanning)
-// to the TokenIssuance fields.
-func (ti *TokenIssuance) assignValues(columns []string, values []any) error {
+// to the TokenMint fields.
+func (tm *TokenMint) assignValues(columns []string, values []any) error {
 	if m, n := len(values), len(columns); m < n {
 		return fmt.Errorf("mismatch number of scan values: %d != %d", m, n)
 	}
 	for i := range columns {
 		switch columns[i] {
-		case tokenissuance.FieldID:
+		case tokenmint.FieldID:
 			if value, ok := values[i].(*uuid.UUID); !ok {
 				return fmt.Errorf("unexpected type %T for field id", values[i])
 			} else if value != nil {
-				ti.ID = *value
+				tm.ID = *value
 			}
-		case tokenissuance.FieldCreateTime:
+		case tokenmint.FieldCreateTime:
 			if value, ok := values[i].(*sql.NullTime); !ok {
 				return fmt.Errorf("unexpected type %T for field create_time", values[i])
 			} else if value.Valid {
-				ti.CreateTime = value.Time
+				tm.CreateTime = value.Time
 			}
-		case tokenissuance.FieldUpdateTime:
+		case tokenmint.FieldUpdateTime:
 			if value, ok := values[i].(*sql.NullTime); !ok {
 				return fmt.Errorf("unexpected type %T for field update_time", values[i])
 			} else if value.Valid {
-				ti.UpdateTime = value.Time
+				tm.UpdateTime = value.Time
 			}
-		case tokenissuance.FieldIssuerPublicKey:
+		case tokenmint.FieldIssuerPublicKey:
 			if value, ok := values[i].(*[]byte); !ok {
 				return fmt.Errorf("unexpected type %T for field issuer_public_key", values[i])
 			} else if value != nil {
-				ti.IssuerPublicKey = *value
+				tm.IssuerPublicKey = *value
 			}
-		case tokenissuance.FieldIssuerSignature:
+		case tokenmint.FieldIssuerSignature:
 			if value, ok := values[i].(*[]byte); !ok {
 				return fmt.Errorf("unexpected type %T for field issuer_signature", values[i])
 			} else if value != nil {
-				ti.IssuerSignature = *value
+				tm.IssuerSignature = *value
 			}
-		case tokenissuance.FieldOperatorSpecificIssuerSignature:
+		case tokenmint.FieldOperatorSpecificIssuerSignature:
 			if value, ok := values[i].(*[]byte); !ok {
 				return fmt.Errorf("unexpected type %T for field operator_specific_issuer_signature", values[i])
 			} else if value != nil {
-				ti.OperatorSpecificIssuerSignature = *value
+				tm.OperatorSpecificIssuerSignature = *value
 			}
 		default:
-			ti.selectValues.Set(columns[i], values[i])
+			tm.selectValues.Set(columns[i], values[i])
 		}
 	}
 	return nil
 }
 
-// Value returns the ent.Value that was dynamically selected and assigned to the TokenIssuance.
+// Value returns the ent.Value that was dynamically selected and assigned to the TokenMint.
 // This includes values selected through modifiers, order, etc.
-func (ti *TokenIssuance) Value(name string) (ent.Value, error) {
-	return ti.selectValues.Get(name)
+func (tm *TokenMint) Value(name string) (ent.Value, error) {
+	return tm.selectValues.Get(name)
 }
 
-// QueryTokenTransactionReceipt queries the "token_transaction_receipt" edge of the TokenIssuance entity.
-func (ti *TokenIssuance) QueryTokenTransactionReceipt() *TokenTransactionReceiptQuery {
-	return NewTokenIssuanceClient(ti.config).QueryTokenTransactionReceipt(ti)
+// QueryTokenTransactionReceipt queries the "token_transaction_receipt" edge of the TokenMint entity.
+func (tm *TokenMint) QueryTokenTransactionReceipt() *TokenTransactionReceiptQuery {
+	return NewTokenMintClient(tm.config).QueryTokenTransactionReceipt(tm)
 }
 
-// Update returns a builder for updating this TokenIssuance.
-// Note that you need to call TokenIssuance.Unwrap() before calling this method if this TokenIssuance
+// Update returns a builder for updating this TokenMint.
+// Note that you need to call TokenMint.Unwrap() before calling this method if this TokenMint
 // was returned from a transaction, and the transaction was committed or rolled back.
-func (ti *TokenIssuance) Update() *TokenIssuanceUpdateOne {
-	return NewTokenIssuanceClient(ti.config).UpdateOne(ti)
+func (tm *TokenMint) Update() *TokenMintUpdateOne {
+	return NewTokenMintClient(tm.config).UpdateOne(tm)
 }
 
-// Unwrap unwraps the TokenIssuance entity that was returned from a transaction after it was closed,
+// Unwrap unwraps the TokenMint entity that was returned from a transaction after it was closed,
 // so that all future queries will be executed through the driver which created the transaction.
-func (ti *TokenIssuance) Unwrap() *TokenIssuance {
-	_tx, ok := ti.config.driver.(*txDriver)
+func (tm *TokenMint) Unwrap() *TokenMint {
+	_tx, ok := tm.config.driver.(*txDriver)
 	if !ok {
-		panic("ent: TokenIssuance is not a transactional entity")
+		panic("ent: TokenMint is not a transactional entity")
 	}
-	ti.config.driver = _tx.drv
-	return ti
+	tm.config.driver = _tx.drv
+	return tm
 }
 
 // String implements the fmt.Stringer.
-func (ti *TokenIssuance) String() string {
+func (tm *TokenMint) String() string {
 	var builder strings.Builder
-	builder.WriteString("TokenIssuance(")
-	builder.WriteString(fmt.Sprintf("id=%v, ", ti.ID))
+	builder.WriteString("TokenMint(")
+	builder.WriteString(fmt.Sprintf("id=%v, ", tm.ID))
 	builder.WriteString("create_time=")
-	builder.WriteString(ti.CreateTime.Format(time.ANSIC))
+	builder.WriteString(tm.CreateTime.Format(time.ANSIC))
 	builder.WriteString(", ")
 	builder.WriteString("update_time=")
-	builder.WriteString(ti.UpdateTime.Format(time.ANSIC))
+	builder.WriteString(tm.UpdateTime.Format(time.ANSIC))
 	builder.WriteString(", ")
 	builder.WriteString("issuer_public_key=")
-	builder.WriteString(fmt.Sprintf("%v", ti.IssuerPublicKey))
+	builder.WriteString(fmt.Sprintf("%v", tm.IssuerPublicKey))
 	builder.WriteString(", ")
 	builder.WriteString("issuer_signature=")
-	builder.WriteString(fmt.Sprintf("%v", ti.IssuerSignature))
+	builder.WriteString(fmt.Sprintf("%v", tm.IssuerSignature))
 	builder.WriteString(", ")
 	builder.WriteString("operator_specific_issuer_signature=")
-	builder.WriteString(fmt.Sprintf("%v", ti.OperatorSpecificIssuerSignature))
+	builder.WriteString(fmt.Sprintf("%v", tm.OperatorSpecificIssuerSignature))
 	builder.WriteByte(')')
 	return builder.String()
 }
 
-// TokenIssuances is a parsable slice of TokenIssuance.
-type TokenIssuances []*TokenIssuance
+// TokenMints is a parsable slice of TokenMint.
+type TokenMints []*TokenMint

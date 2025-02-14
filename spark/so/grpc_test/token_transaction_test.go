@@ -50,8 +50,8 @@ func TestBroadcastTokenTransactionIssueAndTransferTokens(t *testing.T) {
 	// Create a token transaction
 	issueTokenTransaction := &pb.TokenTransaction{
 		// For an issuance transaction, we don't need any input leaves
-		TokenInput: &pb.TokenTransaction_IssueInput{
-			IssueInput: &pb.IssueInput{
+		TokenInput: &pb.TokenTransaction_MintInput{
+			MintInput: &pb.MintInput{
 				IssuerPublicKey: tokenIdentityPubKeyBytes,
 			},
 		},

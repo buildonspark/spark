@@ -37,7 +37,7 @@ func (TokenTransactionReceipt) Edges() []ent.Edge {
 			Ref("leaf_spent_token_transaction_receipt"),
 		edge.From("created_leaf", TokenLeaf.Type).
 			Ref("leaf_created_token_transaction_receipt"),
-		edge.To("issuance", TokenIssuance.Type).
+		edge.To("mint", TokenMint.Type).
 			Unique(),
 	}
 }

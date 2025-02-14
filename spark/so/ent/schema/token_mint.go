@@ -7,17 +7,17 @@ import (
 )
 
 // TokenTransactionAuthorization is the schema for tracking keys required to authorize issuance and transfers.
-type TokenIssuance struct {
+type TokenMint struct {
 	ent.Schema
 }
 
-func (TokenIssuance) Mixin() []ent.Mixin {
+func (TokenMint) Mixin() []ent.Mixin {
 	return []ent.Mixin{
 		BaseMixin{},
 	}
 }
 
-func (TokenIssuance) Fields() []ent.Field {
+func (TokenMint) Fields() []ent.Field {
 	return []ent.Field{
 		field.Bytes("issuer_public_key").NotEmpty().Immutable(),
 		field.Bytes("issuer_signature").NotEmpty().Immutable().Unique(),
@@ -25,14 +25,14 @@ func (TokenIssuance) Fields() []ent.Field {
 	}
 }
 
-func (TokenIssuance) Edges() []ent.Edge {
+func (TokenMint) Edges() []ent.Edge {
 	return []ent.Edge{
-		// Maps to the token transaction receipt representing the token issuance.
+		// Maps to the token transaction receipt representing the token mint.
 		edge.From("token_transaction_receipt", TokenTransactionReceipt.Type).
-			Ref("issuance"),
+			Ref("mint"),
 	}
 }
 
-func (TokenIssuance) Indexes() []ent.Index {
+func (TokenMint) Indexes() []ent.Index {
 	return []ent.Index{}
 }

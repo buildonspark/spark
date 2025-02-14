@@ -31,9 +31,9 @@ func TestHashTokenTransactionEmpty(t *testing.T) {
 
 // TestHashTokenTransactionValid checks that hashing a valid token transaction does not produce an error.
 func TestHashTokenTransactionUniqueHash(t *testing.T) {
-	partialIssuanceTokenTransaction := &pb.TokenTransaction{
-		TokenInput: &pb.TokenTransaction_IssueInput{
-			IssueInput: &pb.IssueInput{
+	partialMintTokenTransaction := &pb.TokenTransaction{
+		TokenInput: &pb.TokenTransaction_MintInput{
+			MintInput: &pb.MintInput{
 				IssuerPublicKey: bytes.Repeat([]byte{0x01}, 32),
 			},
 		},
@@ -72,14 +72,14 @@ func TestHashTokenTransactionUniqueHash(t *testing.T) {
 		},
 	}
 
-	finalIssuanceTokenTransaction := proto.Clone(partialIssuanceTokenTransaction).(*pb.TokenTransaction)
-	finalIssuanceTokenTransaction.OutputLeaves[0].RevocationPublicKey = bytes.Repeat([]byte{0x03}, 32)
+	finalMintTokenTransaction := proto.Clone(partialMintTokenTransaction).(*pb.TokenTransaction)
+	finalMintTokenTransaction.OutputLeaves[0].RevocationPublicKey = bytes.Repeat([]byte{0x03}, 32)
 
 	finalTransferTokenTransaction := proto.Clone(partialTransferTokenTransaction).(*pb.TokenTransaction)
 	finalTransferTokenTransaction.OutputLeaves[0].RevocationPublicKey = bytes.Repeat([]byte{0x03}, 32)
 
 	// Hash all transactions
-	partialIssuanceHash, err := HashTokenTransaction(partialIssuanceTokenTransaction, true)
+	partialMintHash, err := HashTokenTransaction(partialMintTokenTransaction, true)
 	if err != nil {
 		t.Fatalf("failed to hash partial issuance transaction: %v", err)
 	}
@@ -89,7 +89,7 @@ func TestHashTokenTransactionUniqueHash(t *testing.T) {
 		t.Fatalf("failed to hash partial transfer transaction: %v", err)
 	}
 
-	finalIssuanceHash, err := HashTokenTransaction(finalIssuanceTokenTransaction, false)
+	finalMintHash, err := HashTokenTransaction(finalMintTokenTransaction, false)
 	if err != nil {
 		t.Fatalf("failed to hash final issuance transaction: %v", err)
 	}
@@ -101,9 +101,9 @@ func TestHashTokenTransactionUniqueHash(t *testing.T) {
 
 	// Create map to check for duplicates
 	hashes := map[string]string{
-		"partialIssuance": hex.EncodeToString(partialIssuanceHash),
+		"partialMint":     hex.EncodeToString(partialMintHash),
 		"partialTransfer": hex.EncodeToString(partialTransferHash),
-		"finalIssuance":   hex.EncodeToString(finalIssuanceHash),
+		"finalMint":       hex.EncodeToString(finalMintHash),
 		"finalTransfer":   hex.EncodeToString(finalTransferHash),
 	}
 

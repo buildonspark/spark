@@ -29,8 +29,8 @@ const (
 	EdgeSpentLeaf = "spent_leaf"
 	// EdgeCreatedLeaf holds the string denoting the created_leaf edge name in mutations.
 	EdgeCreatedLeaf = "created_leaf"
-	// EdgeIssuance holds the string denoting the issuance edge name in mutations.
-	EdgeIssuance = "issuance"
+	// EdgeMint holds the string denoting the mint edge name in mutations.
+	EdgeMint = "mint"
 	// Table holds the table name of the tokentransactionreceipt in the database.
 	Table = "token_transaction_receipts"
 	// SpentLeafTable is the table that holds the spent_leaf relation/edge.
@@ -47,13 +47,13 @@ const (
 	CreatedLeafInverseTable = "token_leafs"
 	// CreatedLeafColumn is the table column denoting the created_leaf relation/edge.
 	CreatedLeafColumn = "token_leaf_leaf_created_token_transaction_receipt"
-	// IssuanceTable is the table that holds the issuance relation/edge.
-	IssuanceTable = "token_transaction_receipts"
-	// IssuanceInverseTable is the table name for the TokenIssuance entity.
-	// It exists in this package in order to avoid circular dependency with the "tokenissuance" package.
-	IssuanceInverseTable = "token_issuances"
-	// IssuanceColumn is the table column denoting the issuance relation/edge.
-	IssuanceColumn = "token_transaction_receipt_issuance"
+	// MintTable is the table that holds the mint relation/edge.
+	MintTable = "token_transaction_receipts"
+	// MintInverseTable is the table name for the TokenMint entity.
+	// It exists in this package in order to avoid circular dependency with the "tokenmint" package.
+	MintInverseTable = "token_mints"
+	// MintColumn is the table column denoting the mint relation/edge.
+	MintColumn = "token_transaction_receipt_mint"
 )
 
 // Columns holds all SQL columns for tokentransactionreceipt fields.
@@ -69,7 +69,7 @@ var Columns = []string{
 // ForeignKeys holds the SQL foreign-keys that are owned by the "token_transaction_receipts"
 // table and are not defined as standalone fields in the schema.
 var ForeignKeys = []string{
-	"token_transaction_receipt_issuance",
+	"token_transaction_receipt_mint",
 }
 
 // ValidColumn reports if the column name is valid (part of the table columns).
@@ -148,10 +148,10 @@ func ByCreatedLeaf(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 	}
 }
 
-// ByIssuanceField orders the results by issuance field.
-func ByIssuanceField(field string, opts ...sql.OrderTermOption) OrderOption {
+// ByMintField orders the results by mint field.
+func ByMintField(field string, opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
-		sqlgraph.OrderByNeighborTerms(s, newIssuanceStep(), sql.OrderByField(field, opts...))
+		sqlgraph.OrderByNeighborTerms(s, newMintStep(), sql.OrderByField(field, opts...))
 	}
 }
 func newSpentLeafStep() *sqlgraph.Step {
@@ -168,10 +168,10 @@ func newCreatedLeafStep() *sqlgraph.Step {
 		sqlgraph.Edge(sqlgraph.O2M, true, CreatedLeafTable, CreatedLeafColumn),
 	)
 }
-func newIssuanceStep() *sqlgraph.Step {
+func newMintStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
-		sqlgraph.To(IssuanceInverseTable, FieldID),
-		sqlgraph.Edge(sqlgraph.M2O, false, IssuanceTable, IssuanceColumn),
+		sqlgraph.To(MintInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.M2O, false, MintTable, MintColumn),
 	)
 }

@@ -44,14 +44,14 @@ func CreateStartedTransactionEntities(
 	}
 
 	db := GetDbFromContext(ctx)
-	var tokenIssuanceEnt *TokenIssuance
-	if tokenTransaction.GetIssueInput() != nil {
-		tokenIssuanceEnt, err = db.TokenIssuance.Create().
-			SetIssuerPublicKey(tokenTransaction.GetIssueInput().GetIssuerPublicKey()).
+	var tokenMintEnt *TokenMint
+	if tokenTransaction.GetMintInput() != nil {
+		tokenMintEnt, err = db.TokenMint.Create().
+			SetIssuerPublicKey(tokenTransaction.GetMintInput().GetIssuerPublicKey()).
 			SetIssuerSignature(tokenTransactionSignatures.GetOwnerSignatures()[0]).
 			Save(ctx)
 		if err != nil {
-			log.Printf("Failed to create token issuance ent: %v", err)
+			log.Printf("Failed to create token mint ent: %v", err)
 			return nil, err
 		}
 	}
@@ -59,8 +59,8 @@ func CreateStartedTransactionEntities(
 	txReceiptUpdate := db.TokenTransactionReceipt.Create().
 		SetPartialTokenTransactionHash(partialTokenTransactionHash).
 		SetFinalizedTokenTransactionHash(finalTokenTransactionHash)
-	if tokenIssuanceEnt != nil {
-		txReceiptUpdate.SetIssuanceID(tokenIssuanceEnt.ID)
+	if tokenMintEnt != nil {
+		txReceiptUpdate.SetMintID(tokenMintEnt.ID)
 	}
 	tokenTransactionReceipt, err := txReceiptUpdate.Save(ctx)
 	if err != nil {
@@ -129,7 +129,7 @@ func CreateStartedTransactionEntities(
 }
 
 // UpdateSignedTransactionLeaves updates the status and ownership signatures of the input + output leaves
-// and the issuance signature (if applicable).
+// and the issuer signature (if applicable).
 func UpdateSignedTransactionLeaves(
 	ctx context.Context,
 	tokenTransactionReceipt *TokenTransactionReceipt,
@@ -146,23 +146,23 @@ func UpdateSignedTransactionLeaves(
 
 	newInputLeafStatus := schema.TokenLeafStatusSpentSigned
 	newOutputLeafStatus := schema.TokenLeafStatusCreatedSigned
-	if tokenTransactionReceipt.Edges.Issuance != nil {
-		// If this is an issuance, update status straight to finalized because a follow up Finalize() call
-		// is not necessary for issuance.
+	if tokenTransactionReceipt.Edges.Mint != nil {
+		// If this is a mint, update status straight to finalized because a follow up Finalize() call
+		// is not necessary for mint.
 		newInputLeafStatus = schema.TokenLeafStatusSpentFinalized
 		newOutputLeafStatus = schema.TokenLeafStatusCreatedFinalized
 		if len(operatorSpecificOwnershipSignatures) != 1 {
 			return fmt.Errorf(
-				"expected 1 ownership signature for issuance, got %d",
+				"expected 1 ownership signature for mint, got %d",
 				len(operatorSpecificOwnershipSignatures),
 			)
 		}
 
-		_, err := GetDbFromContext(ctx).TokenIssuance.UpdateOne(tokenTransactionReceipt.Edges.Issuance).
+		_, err := GetDbFromContext(ctx).TokenMint.UpdateOne(tokenTransactionReceipt.Edges.Mint).
 			SetOperatorSpecificIssuerSignature(operatorSpecificOwnershipSignatures[0]).
 			Save(ctx)
 		if err != nil {
-			return fmt.Errorf("failed to update issuance with signature: %w", err)
+			return fmt.Errorf("failed to update mint with signature: %w", err)
 		}
 	}
 
@@ -263,6 +263,6 @@ func FetchTokenTransactionData(ctx context.Context, finalTokenTransactionHash []
 		Where(tokentransactionreceipt.FinalizedTokenTransactionHash(finalTokenTransactionHash)).
 		WithCreatedLeaf().
 		WithSpentLeaf().
-		WithIssuance().
+		WithMint().
 		Only(ctx)
 }

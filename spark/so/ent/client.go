@@ -23,8 +23,8 @@ import (
 	"github.com/lightsparkdev/spark-go/so/ent/preimageshare"
 	"github.com/lightsparkdev/spark-go/so/ent/signingkeyshare"
 	"github.com/lightsparkdev/spark-go/so/ent/signingnonce"
-	"github.com/lightsparkdev/spark-go/so/ent/tokenissuance"
 	"github.com/lightsparkdev/spark-go/so/ent/tokenleaf"
+	"github.com/lightsparkdev/spark-go/so/ent/tokenmint"
 	"github.com/lightsparkdev/spark-go/so/ent/tokentransactionreceipt"
 	"github.com/lightsparkdev/spark-go/so/ent/transfer"
 	"github.com/lightsparkdev/spark-go/so/ent/transferleaf"
@@ -52,10 +52,10 @@ type Client struct {
 	SigningKeyshare *SigningKeyshareClient
 	// SigningNonce is the client for interacting with the SigningNonce builders.
 	SigningNonce *SigningNonceClient
-	// TokenIssuance is the client for interacting with the TokenIssuance builders.
-	TokenIssuance *TokenIssuanceClient
 	// TokenLeaf is the client for interacting with the TokenLeaf builders.
 	TokenLeaf *TokenLeafClient
+	// TokenMint is the client for interacting with the TokenMint builders.
+	TokenMint *TokenMintClient
 	// TokenTransactionReceipt is the client for interacting with the TokenTransactionReceipt builders.
 	TokenTransactionReceipt *TokenTransactionReceiptClient
 	// Transfer is the client for interacting with the Transfer builders.
@@ -86,8 +86,8 @@ func (c *Client) init() {
 	c.PreimageShare = NewPreimageShareClient(c.config)
 	c.SigningKeyshare = NewSigningKeyshareClient(c.config)
 	c.SigningNonce = NewSigningNonceClient(c.config)
-	c.TokenIssuance = NewTokenIssuanceClient(c.config)
 	c.TokenLeaf = NewTokenLeafClient(c.config)
+	c.TokenMint = NewTokenMintClient(c.config)
 	c.TokenTransactionReceipt = NewTokenTransactionReceiptClient(c.config)
 	c.Transfer = NewTransferClient(c.config)
 	c.TransferLeaf = NewTransferLeafClient(c.config)
@@ -193,8 +193,8 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		PreimageShare:           NewPreimageShareClient(cfg),
 		SigningKeyshare:         NewSigningKeyshareClient(cfg),
 		SigningNonce:            NewSigningNonceClient(cfg),
-		TokenIssuance:           NewTokenIssuanceClient(cfg),
 		TokenLeaf:               NewTokenLeafClient(cfg),
+		TokenMint:               NewTokenMintClient(cfg),
 		TokenTransactionReceipt: NewTokenTransactionReceiptClient(cfg),
 		Transfer:                NewTransferClient(cfg),
 		TransferLeaf:            NewTransferLeafClient(cfg),
@@ -227,8 +227,8 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		PreimageShare:           NewPreimageShareClient(cfg),
 		SigningKeyshare:         NewSigningKeyshareClient(cfg),
 		SigningNonce:            NewSigningNonceClient(cfg),
-		TokenIssuance:           NewTokenIssuanceClient(cfg),
 		TokenLeaf:               NewTokenLeafClient(cfg),
+		TokenMint:               NewTokenMintClient(cfg),
 		TokenTransactionReceipt: NewTokenTransactionReceiptClient(cfg),
 		Transfer:                NewTransferClient(cfg),
 		TransferLeaf:            NewTransferLeafClient(cfg),
@@ -265,9 +265,9 @@ func (c *Client) Close() error {
 func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
 		c.BlockHeight, c.CooperativeExit, c.DepositAddress, c.PreimageRequest,
-		c.PreimageShare, c.SigningKeyshare, c.SigningNonce, c.TokenIssuance,
-		c.TokenLeaf, c.TokenTransactionReceipt, c.Transfer, c.TransferLeaf, c.Tree,
-		c.TreeNode, c.UserSignedTransaction,
+		c.PreimageShare, c.SigningKeyshare, c.SigningNonce, c.TokenLeaf, c.TokenMint,
+		c.TokenTransactionReceipt, c.Transfer, c.TransferLeaf, c.Tree, c.TreeNode,
+		c.UserSignedTransaction,
 	} {
 		n.Use(hooks...)
 	}
@@ -278,9 +278,9 @@ func (c *Client) Use(hooks ...Hook) {
 func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
 		c.BlockHeight, c.CooperativeExit, c.DepositAddress, c.PreimageRequest,
-		c.PreimageShare, c.SigningKeyshare, c.SigningNonce, c.TokenIssuance,
-		c.TokenLeaf, c.TokenTransactionReceipt, c.Transfer, c.TransferLeaf, c.Tree,
-		c.TreeNode, c.UserSignedTransaction,
+		c.PreimageShare, c.SigningKeyshare, c.SigningNonce, c.TokenLeaf, c.TokenMint,
+		c.TokenTransactionReceipt, c.Transfer, c.TransferLeaf, c.Tree, c.TreeNode,
+		c.UserSignedTransaction,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -303,10 +303,10 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.SigningKeyshare.mutate(ctx, m)
 	case *SigningNonceMutation:
 		return c.SigningNonce.mutate(ctx, m)
-	case *TokenIssuanceMutation:
-		return c.TokenIssuance.mutate(ctx, m)
 	case *TokenLeafMutation:
 		return c.TokenLeaf.mutate(ctx, m)
+	case *TokenMintMutation:
+		return c.TokenMint.mutate(ctx, m)
 	case *TokenTransactionReceiptMutation:
 		return c.TokenTransactionReceipt.mutate(ctx, m)
 	case *TransferMutation:
@@ -1351,155 +1351,6 @@ func (c *SigningNonceClient) mutate(ctx context.Context, m *SigningNonceMutation
 	}
 }
 
-// TokenIssuanceClient is a client for the TokenIssuance schema.
-type TokenIssuanceClient struct {
-	config
-}
-
-// NewTokenIssuanceClient returns a client for the TokenIssuance from the given config.
-func NewTokenIssuanceClient(c config) *TokenIssuanceClient {
-	return &TokenIssuanceClient{config: c}
-}
-
-// Use adds a list of mutation hooks to the hooks stack.
-// A call to `Use(f, g, h)` equals to `tokenissuance.Hooks(f(g(h())))`.
-func (c *TokenIssuanceClient) Use(hooks ...Hook) {
-	c.hooks.TokenIssuance = append(c.hooks.TokenIssuance, hooks...)
-}
-
-// Intercept adds a list of query interceptors to the interceptors stack.
-// A call to `Intercept(f, g, h)` equals to `tokenissuance.Intercept(f(g(h())))`.
-func (c *TokenIssuanceClient) Intercept(interceptors ...Interceptor) {
-	c.inters.TokenIssuance = append(c.inters.TokenIssuance, interceptors...)
-}
-
-// Create returns a builder for creating a TokenIssuance entity.
-func (c *TokenIssuanceClient) Create() *TokenIssuanceCreate {
-	mutation := newTokenIssuanceMutation(c.config, OpCreate)
-	return &TokenIssuanceCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// CreateBulk returns a builder for creating a bulk of TokenIssuance entities.
-func (c *TokenIssuanceClient) CreateBulk(builders ...*TokenIssuanceCreate) *TokenIssuanceCreateBulk {
-	return &TokenIssuanceCreateBulk{config: c.config, builders: builders}
-}
-
-// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
-// a builder and applies setFunc on it.
-func (c *TokenIssuanceClient) MapCreateBulk(slice any, setFunc func(*TokenIssuanceCreate, int)) *TokenIssuanceCreateBulk {
-	rv := reflect.ValueOf(slice)
-	if rv.Kind() != reflect.Slice {
-		return &TokenIssuanceCreateBulk{err: fmt.Errorf("calling to TokenIssuanceClient.MapCreateBulk with wrong type %T, need slice", slice)}
-	}
-	builders := make([]*TokenIssuanceCreate, rv.Len())
-	for i := 0; i < rv.Len(); i++ {
-		builders[i] = c.Create()
-		setFunc(builders[i], i)
-	}
-	return &TokenIssuanceCreateBulk{config: c.config, builders: builders}
-}
-
-// Update returns an update builder for TokenIssuance.
-func (c *TokenIssuanceClient) Update() *TokenIssuanceUpdate {
-	mutation := newTokenIssuanceMutation(c.config, OpUpdate)
-	return &TokenIssuanceUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// UpdateOne returns an update builder for the given entity.
-func (c *TokenIssuanceClient) UpdateOne(ti *TokenIssuance) *TokenIssuanceUpdateOne {
-	mutation := newTokenIssuanceMutation(c.config, OpUpdateOne, withTokenIssuance(ti))
-	return &TokenIssuanceUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// UpdateOneID returns an update builder for the given id.
-func (c *TokenIssuanceClient) UpdateOneID(id uuid.UUID) *TokenIssuanceUpdateOne {
-	mutation := newTokenIssuanceMutation(c.config, OpUpdateOne, withTokenIssuanceID(id))
-	return &TokenIssuanceUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// Delete returns a delete builder for TokenIssuance.
-func (c *TokenIssuanceClient) Delete() *TokenIssuanceDelete {
-	mutation := newTokenIssuanceMutation(c.config, OpDelete)
-	return &TokenIssuanceDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// DeleteOne returns a builder for deleting the given entity.
-func (c *TokenIssuanceClient) DeleteOne(ti *TokenIssuance) *TokenIssuanceDeleteOne {
-	return c.DeleteOneID(ti.ID)
-}
-
-// DeleteOneID returns a builder for deleting the given entity by its id.
-func (c *TokenIssuanceClient) DeleteOneID(id uuid.UUID) *TokenIssuanceDeleteOne {
-	builder := c.Delete().Where(tokenissuance.ID(id))
-	builder.mutation.id = &id
-	builder.mutation.op = OpDeleteOne
-	return &TokenIssuanceDeleteOne{builder}
-}
-
-// Query returns a query builder for TokenIssuance.
-func (c *TokenIssuanceClient) Query() *TokenIssuanceQuery {
-	return &TokenIssuanceQuery{
-		config: c.config,
-		ctx:    &QueryContext{Type: TypeTokenIssuance},
-		inters: c.Interceptors(),
-	}
-}
-
-// Get returns a TokenIssuance entity by its id.
-func (c *TokenIssuanceClient) Get(ctx context.Context, id uuid.UUID) (*TokenIssuance, error) {
-	return c.Query().Where(tokenissuance.ID(id)).Only(ctx)
-}
-
-// GetX is like Get, but panics if an error occurs.
-func (c *TokenIssuanceClient) GetX(ctx context.Context, id uuid.UUID) *TokenIssuance {
-	obj, err := c.Get(ctx, id)
-	if err != nil {
-		panic(err)
-	}
-	return obj
-}
-
-// QueryTokenTransactionReceipt queries the token_transaction_receipt edge of a TokenIssuance.
-func (c *TokenIssuanceClient) QueryTokenTransactionReceipt(ti *TokenIssuance) *TokenTransactionReceiptQuery {
-	query := (&TokenTransactionReceiptClient{config: c.config}).Query()
-	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
-		id := ti.ID
-		step := sqlgraph.NewStep(
-			sqlgraph.From(tokenissuance.Table, tokenissuance.FieldID, id),
-			sqlgraph.To(tokentransactionreceipt.Table, tokentransactionreceipt.FieldID),
-			sqlgraph.Edge(sqlgraph.O2M, true, tokenissuance.TokenTransactionReceiptTable, tokenissuance.TokenTransactionReceiptColumn),
-		)
-		fromV = sqlgraph.Neighbors(ti.driver.Dialect(), step)
-		return fromV, nil
-	}
-	return query
-}
-
-// Hooks returns the client hooks.
-func (c *TokenIssuanceClient) Hooks() []Hook {
-	return c.hooks.TokenIssuance
-}
-
-// Interceptors returns the client interceptors.
-func (c *TokenIssuanceClient) Interceptors() []Interceptor {
-	return c.inters.TokenIssuance
-}
-
-func (c *TokenIssuanceClient) mutate(ctx context.Context, m *TokenIssuanceMutation) (Value, error) {
-	switch m.Op() {
-	case OpCreate:
-		return (&TokenIssuanceCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
-	case OpUpdate:
-		return (&TokenIssuanceUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
-	case OpUpdateOne:
-		return (&TokenIssuanceUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
-	case OpDelete, OpDeleteOne:
-		return (&TokenIssuanceDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
-	default:
-		return nil, fmt.Errorf("ent: unknown TokenIssuance mutation op: %q", m.Op())
-	}
-}
-
 // TokenLeafClient is a client for the TokenLeaf schema.
 type TokenLeafClient struct {
 	config
@@ -1681,6 +1532,155 @@ func (c *TokenLeafClient) mutate(ctx context.Context, m *TokenLeafMutation) (Val
 	}
 }
 
+// TokenMintClient is a client for the TokenMint schema.
+type TokenMintClient struct {
+	config
+}
+
+// NewTokenMintClient returns a client for the TokenMint from the given config.
+func NewTokenMintClient(c config) *TokenMintClient {
+	return &TokenMintClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `tokenmint.Hooks(f(g(h())))`.
+func (c *TokenMintClient) Use(hooks ...Hook) {
+	c.hooks.TokenMint = append(c.hooks.TokenMint, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `tokenmint.Intercept(f(g(h())))`.
+func (c *TokenMintClient) Intercept(interceptors ...Interceptor) {
+	c.inters.TokenMint = append(c.inters.TokenMint, interceptors...)
+}
+
+// Create returns a builder for creating a TokenMint entity.
+func (c *TokenMintClient) Create() *TokenMintCreate {
+	mutation := newTokenMintMutation(c.config, OpCreate)
+	return &TokenMintCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of TokenMint entities.
+func (c *TokenMintClient) CreateBulk(builders ...*TokenMintCreate) *TokenMintCreateBulk {
+	return &TokenMintCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *TokenMintClient) MapCreateBulk(slice any, setFunc func(*TokenMintCreate, int)) *TokenMintCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &TokenMintCreateBulk{err: fmt.Errorf("calling to TokenMintClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*TokenMintCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &TokenMintCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for TokenMint.
+func (c *TokenMintClient) Update() *TokenMintUpdate {
+	mutation := newTokenMintMutation(c.config, OpUpdate)
+	return &TokenMintUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *TokenMintClient) UpdateOne(tm *TokenMint) *TokenMintUpdateOne {
+	mutation := newTokenMintMutation(c.config, OpUpdateOne, withTokenMint(tm))
+	return &TokenMintUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *TokenMintClient) UpdateOneID(id uuid.UUID) *TokenMintUpdateOne {
+	mutation := newTokenMintMutation(c.config, OpUpdateOne, withTokenMintID(id))
+	return &TokenMintUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for TokenMint.
+func (c *TokenMintClient) Delete() *TokenMintDelete {
+	mutation := newTokenMintMutation(c.config, OpDelete)
+	return &TokenMintDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *TokenMintClient) DeleteOne(tm *TokenMint) *TokenMintDeleteOne {
+	return c.DeleteOneID(tm.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *TokenMintClient) DeleteOneID(id uuid.UUID) *TokenMintDeleteOne {
+	builder := c.Delete().Where(tokenmint.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &TokenMintDeleteOne{builder}
+}
+
+// Query returns a query builder for TokenMint.
+func (c *TokenMintClient) Query() *TokenMintQuery {
+	return &TokenMintQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeTokenMint},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a TokenMint entity by its id.
+func (c *TokenMintClient) Get(ctx context.Context, id uuid.UUID) (*TokenMint, error) {
+	return c.Query().Where(tokenmint.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *TokenMintClient) GetX(ctx context.Context, id uuid.UUID) *TokenMint {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryTokenTransactionReceipt queries the token_transaction_receipt edge of a TokenMint.
+func (c *TokenMintClient) QueryTokenTransactionReceipt(tm *TokenMint) *TokenTransactionReceiptQuery {
+	query := (&TokenTransactionReceiptClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := tm.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(tokenmint.Table, tokenmint.FieldID, id),
+			sqlgraph.To(tokentransactionreceipt.Table, tokentransactionreceipt.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, true, tokenmint.TokenTransactionReceiptTable, tokenmint.TokenTransactionReceiptColumn),
+		)
+		fromV = sqlgraph.Neighbors(tm.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *TokenMintClient) Hooks() []Hook {
+	return c.hooks.TokenMint
+}
+
+// Interceptors returns the client interceptors.
+func (c *TokenMintClient) Interceptors() []Interceptor {
+	return c.inters.TokenMint
+}
+
+func (c *TokenMintClient) mutate(ctx context.Context, m *TokenMintMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&TokenMintCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&TokenMintUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&TokenMintUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&TokenMintDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown TokenMint mutation op: %q", m.Op())
+	}
+}
+
 // TokenTransactionReceiptClient is a client for the TokenTransactionReceipt schema.
 type TokenTransactionReceiptClient struct {
 	config
@@ -1821,15 +1821,15 @@ func (c *TokenTransactionReceiptClient) QueryCreatedLeaf(ttr *TokenTransactionRe
 	return query
 }
 
-// QueryIssuance queries the issuance edge of a TokenTransactionReceipt.
-func (c *TokenTransactionReceiptClient) QueryIssuance(ttr *TokenTransactionReceipt) *TokenIssuanceQuery {
-	query := (&TokenIssuanceClient{config: c.config}).Query()
+// QueryMint queries the mint edge of a TokenTransactionReceipt.
+func (c *TokenTransactionReceiptClient) QueryMint(ttr *TokenTransactionReceipt) *TokenMintQuery {
+	query := (&TokenMintClient{config: c.config}).Query()
 	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
 		id := ttr.ID
 		step := sqlgraph.NewStep(
 			sqlgraph.From(tokentransactionreceipt.Table, tokentransactionreceipt.FieldID, id),
-			sqlgraph.To(tokenissuance.Table, tokenissuance.FieldID),
-			sqlgraph.Edge(sqlgraph.M2O, false, tokentransactionreceipt.IssuanceTable, tokentransactionreceipt.IssuanceColumn),
+			sqlgraph.To(tokenmint.Table, tokenmint.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, tokentransactionreceipt.MintTable, tokentransactionreceipt.MintColumn),
 		)
 		fromV = sqlgraph.Neighbors(ttr.driver.Dialect(), step)
 		return fromV, nil
@@ -2707,14 +2707,12 @@ func (c *UserSignedTransactionClient) mutate(ctx context.Context, m *UserSignedT
 type (
 	hooks struct {
 		BlockHeight, CooperativeExit, DepositAddress, PreimageRequest, PreimageShare,
-		SigningKeyshare, SigningNonce, TokenIssuance, TokenLeaf,
-		TokenTransactionReceipt, Transfer, TransferLeaf, Tree, TreeNode,
-		UserSignedTransaction []ent.Hook
+		SigningKeyshare, SigningNonce, TokenLeaf, TokenMint, TokenTransactionReceipt,
+		Transfer, TransferLeaf, Tree, TreeNode, UserSignedTransaction []ent.Hook
 	}
 	inters struct {
 		BlockHeight, CooperativeExit, DepositAddress, PreimageRequest, PreimageShare,
-		SigningKeyshare, SigningNonce, TokenIssuance, TokenLeaf,
-		TokenTransactionReceipt, Transfer, TransferLeaf, Tree, TreeNode,
-		UserSignedTransaction []ent.Interceptor
+		SigningKeyshare, SigningNonce, TokenLeaf, TokenMint, TokenTransactionReceipt,
+		Transfer, TransferLeaf, Tree, TreeNode, UserSignedTransaction []ent.Interceptor
 	}
 )

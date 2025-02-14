@@ -11,8 +11,8 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark-go/so/ent/tokenissuance"
 	"github.com/lightsparkdev/spark-go/so/ent/tokenleaf"
+	"github.com/lightsparkdev/spark-go/so/ent/tokenmint"
 	"github.com/lightsparkdev/spark-go/so/ent/tokentransactionreceipt"
 )
 
@@ -113,23 +113,23 @@ func (ttrc *TokenTransactionReceiptCreate) AddCreatedLeaf(t ...*TokenLeaf) *Toke
 	return ttrc.AddCreatedLeafIDs(ids...)
 }
 
-// SetIssuanceID sets the "issuance" edge to the TokenIssuance entity by ID.
-func (ttrc *TokenTransactionReceiptCreate) SetIssuanceID(id uuid.UUID) *TokenTransactionReceiptCreate {
-	ttrc.mutation.SetIssuanceID(id)
+// SetMintID sets the "mint" edge to the TokenMint entity by ID.
+func (ttrc *TokenTransactionReceiptCreate) SetMintID(id uuid.UUID) *TokenTransactionReceiptCreate {
+	ttrc.mutation.SetMintID(id)
 	return ttrc
 }
 
-// SetNillableIssuanceID sets the "issuance" edge to the TokenIssuance entity by ID if the given value is not nil.
-func (ttrc *TokenTransactionReceiptCreate) SetNillableIssuanceID(id *uuid.UUID) *TokenTransactionReceiptCreate {
+// SetNillableMintID sets the "mint" edge to the TokenMint entity by ID if the given value is not nil.
+func (ttrc *TokenTransactionReceiptCreate) SetNillableMintID(id *uuid.UUID) *TokenTransactionReceiptCreate {
 	if id != nil {
-		ttrc = ttrc.SetIssuanceID(*id)
+		ttrc = ttrc.SetMintID(*id)
 	}
 	return ttrc
 }
 
-// SetIssuance sets the "issuance" edge to the TokenIssuance entity.
-func (ttrc *TokenTransactionReceiptCreate) SetIssuance(t *TokenIssuance) *TokenTransactionReceiptCreate {
-	return ttrc.SetIssuanceID(t.ID)
+// SetMint sets the "mint" edge to the TokenMint entity.
+func (ttrc *TokenTransactionReceiptCreate) SetMint(t *TokenMint) *TokenTransactionReceiptCreate {
+	return ttrc.SetMintID(t.ID)
 }
 
 // Mutation returns the TokenTransactionReceiptMutation object of the builder.
@@ -292,21 +292,21 @@ func (ttrc *TokenTransactionReceiptCreate) createSpec() (*TokenTransactionReceip
 		}
 		_spec.Edges = append(_spec.Edges, edge)
 	}
-	if nodes := ttrc.mutation.IssuanceIDs(); len(nodes) > 0 {
+	if nodes := ttrc.mutation.MintIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2O,
 			Inverse: false,
-			Table:   tokentransactionreceipt.IssuanceTable,
-			Columns: []string{tokentransactionreceipt.IssuanceColumn},
+			Table:   tokentransactionreceipt.MintTable,
+			Columns: []string{tokentransactionreceipt.MintColumn},
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(tokenissuance.FieldID, field.TypeUUID),
+				IDSpec: sqlgraph.NewFieldSpec(tokenmint.FieldID, field.TypeUUID),
 			},
 		}
 		for _, k := range nodes {
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
-		_node.token_transaction_receipt_issuance = &nodes[0]
+		_node.token_transaction_receipt_mint = &nodes[0]
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	return _node, _spec

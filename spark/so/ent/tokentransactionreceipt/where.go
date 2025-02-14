@@ -337,21 +337,21 @@ func HasCreatedLeafWith(preds ...predicate.TokenLeaf) predicate.TokenTransaction
 	})
 }
 
-// HasIssuance applies the HasEdge predicate on the "issuance" edge.
-func HasIssuance() predicate.TokenTransactionReceipt {
+// HasMint applies the HasEdge predicate on the "mint" edge.
+func HasMint() predicate.TokenTransactionReceipt {
 	return predicate.TokenTransactionReceipt(func(s *sql.Selector) {
 		step := sqlgraph.NewStep(
 			sqlgraph.From(Table, FieldID),
-			sqlgraph.Edge(sqlgraph.M2O, false, IssuanceTable, IssuanceColumn),
+			sqlgraph.Edge(sqlgraph.M2O, false, MintTable, MintColumn),
 		)
 		sqlgraph.HasNeighbors(s, step)
 	})
 }
 
-// HasIssuanceWith applies the HasEdge predicate on the "issuance" edge with a given conditions (other predicates).
-func HasIssuanceWith(preds ...predicate.TokenIssuance) predicate.TokenTransactionReceipt {
+// HasMintWith applies the HasEdge predicate on the "mint" edge with a given conditions (other predicates).
+func HasMintWith(preds ...predicate.TokenMint) predicate.TokenTransactionReceipt {
 	return predicate.TokenTransactionReceipt(func(s *sql.Selector) {
-		step := newIssuanceStep()
+		step := newMintStep()
 		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
 			for _, p := range preds {
 				p(s)

@@ -186,21 +186,6 @@ var (
 			},
 		},
 	}
-	// TokenIssuancesColumns holds the columns for the "token_issuances" table.
-	TokenIssuancesColumns = []*schema.Column{
-		{Name: "id", Type: field.TypeUUID},
-		{Name: "create_time", Type: field.TypeTime},
-		{Name: "update_time", Type: field.TypeTime},
-		{Name: "issuer_public_key", Type: field.TypeBytes},
-		{Name: "issuer_signature", Type: field.TypeBytes, Unique: true},
-		{Name: "operator_specific_issuer_signature", Type: field.TypeBytes, Unique: true, Nullable: true},
-	}
-	// TokenIssuancesTable holds the schema information for the "token_issuances" table.
-	TokenIssuancesTable = &schema.Table{
-		Name:       "token_issuances",
-		Columns:    TokenIssuancesColumns,
-		PrimaryKey: []*schema.Column{TokenIssuancesColumns[0]},
-	}
 	// TokenLeafsColumns holds the columns for the "token_leafs" table.
 	TokenLeafsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeUUID},
@@ -255,6 +240,21 @@ var (
 			},
 		},
 	}
+	// TokenMintsColumns holds the columns for the "token_mints" table.
+	TokenMintsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUUID},
+		{Name: "create_time", Type: field.TypeTime},
+		{Name: "update_time", Type: field.TypeTime},
+		{Name: "issuer_public_key", Type: field.TypeBytes},
+		{Name: "issuer_signature", Type: field.TypeBytes, Unique: true},
+		{Name: "operator_specific_issuer_signature", Type: field.TypeBytes, Unique: true, Nullable: true},
+	}
+	// TokenMintsTable holds the schema information for the "token_mints" table.
+	TokenMintsTable = &schema.Table{
+		Name:       "token_mints",
+		Columns:    TokenMintsColumns,
+		PrimaryKey: []*schema.Column{TokenMintsColumns[0]},
+	}
 	// TokenTransactionReceiptsColumns holds the columns for the "token_transaction_receipts" table.
 	TokenTransactionReceiptsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeUUID},
@@ -263,7 +263,7 @@ var (
 		{Name: "partial_token_transaction_hash", Type: field.TypeBytes, Unique: true},
 		{Name: "finalized_token_transaction_hash", Type: field.TypeBytes, Unique: true},
 		{Name: "operator_signature", Type: field.TypeBytes, Unique: true, Nullable: true},
-		{Name: "token_transaction_receipt_issuance", Type: field.TypeUUID, Nullable: true},
+		{Name: "token_transaction_receipt_mint", Type: field.TypeUUID, Nullable: true},
 	}
 	// TokenTransactionReceiptsTable holds the schema information for the "token_transaction_receipts" table.
 	TokenTransactionReceiptsTable = &schema.Table{
@@ -272,9 +272,9 @@ var (
 		PrimaryKey: []*schema.Column{TokenTransactionReceiptsColumns[0]},
 		ForeignKeys: []*schema.ForeignKey{
 			{
-				Symbol:     "token_transaction_receipts_token_issuances_issuance",
+				Symbol:     "token_transaction_receipts_token_mints_mint",
 				Columns:    []*schema.Column{TokenTransactionReceiptsColumns[6]},
-				RefColumns: []*schema.Column{TokenIssuancesColumns[0]},
+				RefColumns: []*schema.Column{TokenMintsColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 		},
@@ -497,8 +497,8 @@ var (
 		PreimageSharesTable,
 		SigningKeysharesTable,
 		SigningNoncesTable,
-		TokenIssuancesTable,
 		TokenLeafsTable,
+		TokenMintsTable,
 		TokenTransactionReceiptsTable,
 		TransfersTable,
 		TransferLeafsTable,
@@ -516,7 +516,7 @@ func init() {
 	TokenLeafsTable.ForeignKeys[0].RefTable = SigningKeysharesTable
 	TokenLeafsTable.ForeignKeys[1].RefTable = TokenTransactionReceiptsTable
 	TokenLeafsTable.ForeignKeys[2].RefTable = TokenTransactionReceiptsTable
-	TokenTransactionReceiptsTable.ForeignKeys[0].RefTable = TokenIssuancesTable
+	TokenTransactionReceiptsTable.ForeignKeys[0].RefTable = TokenMintsTable
 	TransferLeafsTable.ForeignKeys[0].RefTable = TransfersTable
 	TransferLeafsTable.ForeignKeys[1].RefTable = TreeNodesTable
 	TreesTable.ForeignKeys[0].RefTable = TreeNodesTable

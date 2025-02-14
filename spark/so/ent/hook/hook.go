@@ -93,18 +93,6 @@ func (f SigningNonceFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.SigningNonceMutation", m)
 }
 
-// The TokenIssuanceFunc type is an adapter to allow the use of ordinary
-// function as TokenIssuance mutator.
-type TokenIssuanceFunc func(context.Context, *ent.TokenIssuanceMutation) (ent.Value, error)
-
-// Mutate calls f(ctx, m).
-func (f TokenIssuanceFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
-	if mv, ok := m.(*ent.TokenIssuanceMutation); ok {
-		return f(ctx, mv)
-	}
-	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.TokenIssuanceMutation", m)
-}
-
 // The TokenLeafFunc type is an adapter to allow the use of ordinary
 // function as TokenLeaf mutator.
 type TokenLeafFunc func(context.Context, *ent.TokenLeafMutation) (ent.Value, error)
@@ -115,6 +103,18 @@ func (f TokenLeafFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, e
 		return f(ctx, mv)
 	}
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.TokenLeafMutation", m)
+}
+
+// The TokenMintFunc type is an adapter to allow the use of ordinary
+// function as TokenMint mutator.
+type TokenMintFunc func(context.Context, *ent.TokenMintMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f TokenMintFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.TokenMintMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.TokenMintMutation", m)
 }
 
 // The TokenTransactionReceiptFunc type is an adapter to allow the use of ordinary

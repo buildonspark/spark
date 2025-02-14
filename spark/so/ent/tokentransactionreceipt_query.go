@@ -14,8 +14,8 @@ import (
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/so/ent/predicate"
-	"github.com/lightsparkdev/spark-go/so/ent/tokenissuance"
 	"github.com/lightsparkdev/spark-go/so/ent/tokenleaf"
+	"github.com/lightsparkdev/spark-go/so/ent/tokenmint"
 	"github.com/lightsparkdev/spark-go/so/ent/tokentransactionreceipt"
 )
 
@@ -28,7 +28,7 @@ type TokenTransactionReceiptQuery struct {
 	predicates      []predicate.TokenTransactionReceipt
 	withSpentLeaf   *TokenLeafQuery
 	withCreatedLeaf *TokenLeafQuery
-	withIssuance    *TokenIssuanceQuery
+	withMint        *TokenMintQuery
 	withFKs         bool
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
@@ -110,9 +110,9 @@ func (ttrq *TokenTransactionReceiptQuery) QueryCreatedLeaf() *TokenLeafQuery {
 	return query
 }
 
-// QueryIssuance chains the current query on the "issuance" edge.
-func (ttrq *TokenTransactionReceiptQuery) QueryIssuance() *TokenIssuanceQuery {
-	query := (&TokenIssuanceClient{config: ttrq.config}).Query()
+// QueryMint chains the current query on the "mint" edge.
+func (ttrq *TokenTransactionReceiptQuery) QueryMint() *TokenMintQuery {
+	query := (&TokenMintClient{config: ttrq.config}).Query()
 	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
 		if err := ttrq.prepareQuery(ctx); err != nil {
 			return nil, err
@@ -123,8 +123,8 @@ func (ttrq *TokenTransactionReceiptQuery) QueryIssuance() *TokenIssuanceQuery {
 		}
 		step := sqlgraph.NewStep(
 			sqlgraph.From(tokentransactionreceipt.Table, tokentransactionreceipt.FieldID, selector),
-			sqlgraph.To(tokenissuance.Table, tokenissuance.FieldID),
-			sqlgraph.Edge(sqlgraph.M2O, false, tokentransactionreceipt.IssuanceTable, tokentransactionreceipt.IssuanceColumn),
+			sqlgraph.To(tokenmint.Table, tokenmint.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, tokentransactionreceipt.MintTable, tokentransactionreceipt.MintColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(ttrq.driver.Dialect(), step)
 		return fromU, nil
@@ -326,7 +326,7 @@ func (ttrq *TokenTransactionReceiptQuery) Clone() *TokenTransactionReceiptQuery 
 		predicates:      append([]predicate.TokenTransactionReceipt{}, ttrq.predicates...),
 		withSpentLeaf:   ttrq.withSpentLeaf.Clone(),
 		withCreatedLeaf: ttrq.withCreatedLeaf.Clone(),
-		withIssuance:    ttrq.withIssuance.Clone(),
+		withMint:        ttrq.withMint.Clone(),
 		// clone intermediate query.
 		sql:  ttrq.sql.Clone(),
 		path: ttrq.path,
@@ -355,14 +355,14 @@ func (ttrq *TokenTransactionReceiptQuery) WithCreatedLeaf(opts ...func(*TokenLea
 	return ttrq
 }
 
-// WithIssuance tells the query-builder to eager-load the nodes that are connected to
-// the "issuance" edge. The optional arguments are used to configure the query builder of the edge.
-func (ttrq *TokenTransactionReceiptQuery) WithIssuance(opts ...func(*TokenIssuanceQuery)) *TokenTransactionReceiptQuery {
-	query := (&TokenIssuanceClient{config: ttrq.config}).Query()
+// WithMint tells the query-builder to eager-load the nodes that are connected to
+// the "mint" edge. The optional arguments are used to configure the query builder of the edge.
+func (ttrq *TokenTransactionReceiptQuery) WithMint(opts ...func(*TokenMintQuery)) *TokenTransactionReceiptQuery {
+	query := (&TokenMintClient{config: ttrq.config}).Query()
 	for _, opt := range opts {
 		opt(query)
 	}
-	ttrq.withIssuance = query
+	ttrq.withMint = query
 	return ttrq
 }
 
@@ -448,10 +448,10 @@ func (ttrq *TokenTransactionReceiptQuery) sqlAll(ctx context.Context, hooks ...q
 		loadedTypes = [3]bool{
 			ttrq.withSpentLeaf != nil,
 			ttrq.withCreatedLeaf != nil,
-			ttrq.withIssuance != nil,
+			ttrq.withMint != nil,
 		}
 	)
-	if ttrq.withIssuance != nil {
+	if ttrq.withMint != nil {
 		withFKs = true
 	}
 	if withFKs {
@@ -489,9 +489,9 @@ func (ttrq *TokenTransactionReceiptQuery) sqlAll(ctx context.Context, hooks ...q
 			return nil, err
 		}
 	}
-	if query := ttrq.withIssuance; query != nil {
-		if err := ttrq.loadIssuance(ctx, query, nodes, nil,
-			func(n *TokenTransactionReceipt, e *TokenIssuance) { n.Edges.Issuance = e }); err != nil {
+	if query := ttrq.withMint; query != nil {
+		if err := ttrq.loadMint(ctx, query, nodes, nil,
+			func(n *TokenTransactionReceipt, e *TokenMint) { n.Edges.Mint = e }); err != nil {
 			return nil, err
 		}
 	}
@@ -560,14 +560,14 @@ func (ttrq *TokenTransactionReceiptQuery) loadCreatedLeaf(ctx context.Context, q
 	}
 	return nil
 }
-func (ttrq *TokenTransactionReceiptQuery) loadIssuance(ctx context.Context, query *TokenIssuanceQuery, nodes []*TokenTransactionReceipt, init func(*TokenTransactionReceipt), assign func(*TokenTransactionReceipt, *TokenIssuance)) error {
+func (ttrq *TokenTransactionReceiptQuery) loadMint(ctx context.Context, query *TokenMintQuery, nodes []*TokenTransactionReceipt, init func(*TokenTransactionReceipt), assign func(*TokenTransactionReceipt, *TokenMint)) error {
 	ids := make([]uuid.UUID, 0, len(nodes))
 	nodeids := make(map[uuid.UUID][]*TokenTransactionReceipt)
 	for i := range nodes {
-		if nodes[i].token_transaction_receipt_issuance == nil {
+		if nodes[i].token_transaction_receipt_mint == nil {
 			continue
 		}
-		fk := *nodes[i].token_transaction_receipt_issuance
+		fk := *nodes[i].token_transaction_receipt_mint
 		if _, ok := nodeids[fk]; !ok {
 			ids = append(ids, fk)
 		}
@@ -576,7 +576,7 @@ func (ttrq *TokenTransactionReceiptQuery) loadIssuance(ctx context.Context, quer
 	if len(ids) == 0 {
 		return nil
 	}
-	query.Where(tokenissuance.IDIn(ids...))
+	query.Where(tokenmint.IDIn(ids...))
 	neighbors, err := query.All(ctx)
 	if err != nil {
 		return err
@@ -584,7 +584,7 @@ func (ttrq *TokenTransactionReceiptQuery) loadIssuance(ctx context.Context, quer
 	for _, n := range neighbors {
 		nodes, ok := nodeids[n.ID]
 		if !ok {
-			return fmt.Errorf(`unexpected foreign-key "token_transaction_receipt_issuance" returned %v`, n.ID)
+			return fmt.Errorf(`unexpected foreign-key "token_transaction_receipt_mint" returned %v`, n.ID)
 		}
 		for i := range nodes {
 			assign(nodes[i], n)

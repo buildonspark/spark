@@ -37,8 +37,8 @@ func (h *InternalTokenTransactionHandler) StartTokenTransactionInternal(ctx cont
 	}
 
 	// Validate the token transaction.
-	if req.PartialTokenTransaction.GetIssueInput() != nil {
-		err = ValidateIssue(req.PartialTokenTransaction, req.TokenTransactionSignatures)
+	if req.PartialTokenTransaction.GetMintInput() != nil {
+		err = ValidateMint(req.PartialTokenTransaction, req.TokenTransactionSignatures)
 		if err != nil {
 			return nil, fmt.Errorf("invalid token transaction: %w", err)
 		}
@@ -114,7 +114,7 @@ func (h *InternalTokenTransactionHandler) StartTokenTransactionInternal(ctx cont
 	}, nil
 }
 
-func ValidateIssue(
+func ValidateMint(
 	tokenTransaction *pb.TokenTransaction,
 	tokenTransactionSignatures *pb.TokenTransactionSignatures,
 ) error {
@@ -123,7 +123,7 @@ func ValidateIssue(
 		return fmt.Errorf("failed to hash token transaction: %w", err)
 	}
 
-	err = utils.ValidateOwnershipSignature(tokenTransactionSignatures.GetOwnerSignatures()[0], partialTokenTransactionHash, tokenTransaction.GetIssueInput().GetIssuerPublicKey())
+	err = utils.ValidateOwnershipSignature(tokenTransactionSignatures.GetOwnerSignatures()[0], partialTokenTransactionHash, tokenTransaction.GetMintInput().GetIssuerPublicKey())
 	if err != nil {
 		return fmt.Errorf("invalid issuer signature: %w", err)
 	}

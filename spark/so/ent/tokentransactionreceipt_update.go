@@ -13,8 +13,8 @@ import (
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/so/ent/predicate"
-	"github.com/lightsparkdev/spark-go/so/ent/tokenissuance"
 	"github.com/lightsparkdev/spark-go/so/ent/tokenleaf"
+	"github.com/lightsparkdev/spark-go/so/ent/tokenmint"
 	"github.com/lightsparkdev/spark-go/so/ent/tokentransactionreceipt"
 )
 
@@ -91,23 +91,23 @@ func (ttru *TokenTransactionReceiptUpdate) AddCreatedLeaf(t ...*TokenLeaf) *Toke
 	return ttru.AddCreatedLeafIDs(ids...)
 }
 
-// SetIssuanceID sets the "issuance" edge to the TokenIssuance entity by ID.
-func (ttru *TokenTransactionReceiptUpdate) SetIssuanceID(id uuid.UUID) *TokenTransactionReceiptUpdate {
-	ttru.mutation.SetIssuanceID(id)
+// SetMintID sets the "mint" edge to the TokenMint entity by ID.
+func (ttru *TokenTransactionReceiptUpdate) SetMintID(id uuid.UUID) *TokenTransactionReceiptUpdate {
+	ttru.mutation.SetMintID(id)
 	return ttru
 }
 
-// SetNillableIssuanceID sets the "issuance" edge to the TokenIssuance entity by ID if the given value is not nil.
-func (ttru *TokenTransactionReceiptUpdate) SetNillableIssuanceID(id *uuid.UUID) *TokenTransactionReceiptUpdate {
+// SetNillableMintID sets the "mint" edge to the TokenMint entity by ID if the given value is not nil.
+func (ttru *TokenTransactionReceiptUpdate) SetNillableMintID(id *uuid.UUID) *TokenTransactionReceiptUpdate {
 	if id != nil {
-		ttru = ttru.SetIssuanceID(*id)
+		ttru = ttru.SetMintID(*id)
 	}
 	return ttru
 }
 
-// SetIssuance sets the "issuance" edge to the TokenIssuance entity.
-func (ttru *TokenTransactionReceiptUpdate) SetIssuance(t *TokenIssuance) *TokenTransactionReceiptUpdate {
-	return ttru.SetIssuanceID(t.ID)
+// SetMint sets the "mint" edge to the TokenMint entity.
+func (ttru *TokenTransactionReceiptUpdate) SetMint(t *TokenMint) *TokenTransactionReceiptUpdate {
+	return ttru.SetMintID(t.ID)
 }
 
 // Mutation returns the TokenTransactionReceiptMutation object of the builder.
@@ -157,9 +157,9 @@ func (ttru *TokenTransactionReceiptUpdate) RemoveCreatedLeaf(t ...*TokenLeaf) *T
 	return ttru.RemoveCreatedLeafIDs(ids...)
 }
 
-// ClearIssuance clears the "issuance" edge to the TokenIssuance entity.
-func (ttru *TokenTransactionReceiptUpdate) ClearIssuance() *TokenTransactionReceiptUpdate {
-	ttru.mutation.ClearIssuance()
+// ClearMint clears the "mint" edge to the TokenMint entity.
+func (ttru *TokenTransactionReceiptUpdate) ClearMint() *TokenTransactionReceiptUpdate {
+	ttru.mutation.ClearMint()
 	return ttru
 }
 
@@ -331,28 +331,28 @@ func (ttru *TokenTransactionReceiptUpdate) sqlSave(ctx context.Context) (n int, 
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
-	if ttru.mutation.IssuanceCleared() {
+	if ttru.mutation.MintCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2O,
 			Inverse: false,
-			Table:   tokentransactionreceipt.IssuanceTable,
-			Columns: []string{tokentransactionreceipt.IssuanceColumn},
+			Table:   tokentransactionreceipt.MintTable,
+			Columns: []string{tokentransactionreceipt.MintColumn},
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(tokenissuance.FieldID, field.TypeUUID),
+				IDSpec: sqlgraph.NewFieldSpec(tokenmint.FieldID, field.TypeUUID),
 			},
 		}
 		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
 	}
-	if nodes := ttru.mutation.IssuanceIDs(); len(nodes) > 0 {
+	if nodes := ttru.mutation.MintIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2O,
 			Inverse: false,
-			Table:   tokentransactionreceipt.IssuanceTable,
-			Columns: []string{tokentransactionreceipt.IssuanceColumn},
+			Table:   tokentransactionreceipt.MintTable,
+			Columns: []string{tokentransactionreceipt.MintColumn},
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(tokenissuance.FieldID, field.TypeUUID),
+				IDSpec: sqlgraph.NewFieldSpec(tokenmint.FieldID, field.TypeUUID),
 			},
 		}
 		for _, k := range nodes {
@@ -440,23 +440,23 @@ func (ttruo *TokenTransactionReceiptUpdateOne) AddCreatedLeaf(t ...*TokenLeaf) *
 	return ttruo.AddCreatedLeafIDs(ids...)
 }
 
-// SetIssuanceID sets the "issuance" edge to the TokenIssuance entity by ID.
-func (ttruo *TokenTransactionReceiptUpdateOne) SetIssuanceID(id uuid.UUID) *TokenTransactionReceiptUpdateOne {
-	ttruo.mutation.SetIssuanceID(id)
+// SetMintID sets the "mint" edge to the TokenMint entity by ID.
+func (ttruo *TokenTransactionReceiptUpdateOne) SetMintID(id uuid.UUID) *TokenTransactionReceiptUpdateOne {
+	ttruo.mutation.SetMintID(id)
 	return ttruo
 }
 
-// SetNillableIssuanceID sets the "issuance" edge to the TokenIssuance entity by ID if the given value is not nil.
-func (ttruo *TokenTransactionReceiptUpdateOne) SetNillableIssuanceID(id *uuid.UUID) *TokenTransactionReceiptUpdateOne {
+// SetNillableMintID sets the "mint" edge to the TokenMint entity by ID if the given value is not nil.
+func (ttruo *TokenTransactionReceiptUpdateOne) SetNillableMintID(id *uuid.UUID) *TokenTransactionReceiptUpdateOne {
 	if id != nil {
-		ttruo = ttruo.SetIssuanceID(*id)
+		ttruo = ttruo.SetMintID(*id)
 	}
 	return ttruo
 }
 
-// SetIssuance sets the "issuance" edge to the TokenIssuance entity.
-func (ttruo *TokenTransactionReceiptUpdateOne) SetIssuance(t *TokenIssuance) *TokenTransactionReceiptUpdateOne {
-	return ttruo.SetIssuanceID(t.ID)
+// SetMint sets the "mint" edge to the TokenMint entity.
+func (ttruo *TokenTransactionReceiptUpdateOne) SetMint(t *TokenMint) *TokenTransactionReceiptUpdateOne {
+	return ttruo.SetMintID(t.ID)
 }
 
 // Mutation returns the TokenTransactionReceiptMutation object of the builder.
@@ -506,9 +506,9 @@ func (ttruo *TokenTransactionReceiptUpdateOne) RemoveCreatedLeaf(t ...*TokenLeaf
 	return ttruo.RemoveCreatedLeafIDs(ids...)
 }
 
-// ClearIssuance clears the "issuance" edge to the TokenIssuance entity.
-func (ttruo *TokenTransactionReceiptUpdateOne) ClearIssuance() *TokenTransactionReceiptUpdateOne {
-	ttruo.mutation.ClearIssuance()
+// ClearMint clears the "mint" edge to the TokenMint entity.
+func (ttruo *TokenTransactionReceiptUpdateOne) ClearMint() *TokenTransactionReceiptUpdateOne {
+	ttruo.mutation.ClearMint()
 	return ttruo
 }
 
@@ -710,28 +710,28 @@ func (ttruo *TokenTransactionReceiptUpdateOne) sqlSave(ctx context.Context) (_no
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
-	if ttruo.mutation.IssuanceCleared() {
+	if ttruo.mutation.MintCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2O,
 			Inverse: false,
-			Table:   tokentransactionreceipt.IssuanceTable,
-			Columns: []string{tokentransactionreceipt.IssuanceColumn},
+			Table:   tokentransactionreceipt.MintTable,
+			Columns: []string{tokentransactionreceipt.MintColumn},
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(tokenissuance.FieldID, field.TypeUUID),
+				IDSpec: sqlgraph.NewFieldSpec(tokenmint.FieldID, field.TypeUUID),
 			},
 		}
 		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
 	}
-	if nodes := ttruo.mutation.IssuanceIDs(); len(nodes) > 0 {
+	if nodes := ttruo.mutation.MintIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2O,
 			Inverse: false,
-			Table:   tokentransactionreceipt.IssuanceTable,
-			Columns: []string{tokentransactionreceipt.IssuanceColumn},
+			Table:   tokentransactionreceipt.MintTable,
+			Columns: []string{tokentransactionreceipt.MintColumn},
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(tokenissuance.FieldID, field.TypeUUID),
+				IDSpec: sqlgraph.NewFieldSpec(tokenmint.FieldID, field.TypeUUID),
 			},
 		}
 		for _, k := range nodes {

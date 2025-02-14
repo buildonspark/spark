@@ -63,7 +63,7 @@ func BroadcastTokenTransaction(
 	}
 
 	var ownerSignatures [][]byte
-	if tokenTransaction.GetIssueInput() != nil {
+	if tokenTransaction.GetMintInput() != nil {
 		signingPrivKeySecp := secp256k1.PrivKeyFromBytes(config.IdentityPrivateKey.Serialize())
 		ownerSignatures = append(ownerSignatures,
 			ecdsa.Sign(signingPrivKeySecp, partialTokenTransactionHash).Serialize())
@@ -119,7 +119,7 @@ func BroadcastTokenTransaction(
 		return nil, err
 	}
 	// For issue transactions, create a single operator-specific signature using the issuer private key
-	if tokenTransaction.GetIssueInput() != nil {
+	if tokenTransaction.GetMintInput() != nil {
 		// Sign with the issuer's private key
 		sig := ecdsa.Sign(secp256k1.PrivKeyFromBytes(config.IdentityPrivateKey.Serialize()), payloadHash)
 		operatorSpecificSignatures = append(operatorSpecificSignatures, &pb.OperatorSpecificTokenTransactionSignature{

@@ -25,9 +25,8 @@ func HashTokenTransaction(tokenTransaction *pb.TokenTransaction, partialHash boo
 	h := sha256.New()
 	var allHashes []byte
 
-	// Hash input leaves if a transfer appropriate leaves based on the token source type
+	// Hash input leaves if a transfer.
 	if transferSource := tokenTransaction.GetTransferInput(); transferSource != nil {
-		// Hash leaves_to_spend
 		for _, leaf := range transferSource.GetLeavesToSpend() {
 			h.Reset()
 			if leaf.GetPrevTokenTransactionHash() != nil {
@@ -39,11 +38,11 @@ func HashTokenTransaction(tokenTransaction *pb.TokenTransaction, partialHash boo
 			allHashes = append(allHashes, h.Sum(nil)...)
 		}
 	}
-	// Hash input issuance if an issuance.
-	if issueInput := tokenTransaction.GetIssueInput(); issueInput != nil {
+	// Hash mint input if a mint
+	if mintInput := tokenTransaction.GetMintInput(); mintInput != nil {
 		h.Reset()
-		if issueInput.GetIssuerPublicKey() != nil {
-			h.Write(issueInput.GetIssuerPublicKey())
+		if mintInput.GetIssuerPublicKey() != nil {
+			h.Write(mintInput.GetIssuerPublicKey())
 		}
 		allHashes = append(allHashes, h.Sum(nil)...)
 	}
@@ -157,30 +156,30 @@ func ValidatePartialTokenTransaction(
 		}
 	}
 
-	// Validate that the transaction is either an issuance or a transfer, but not both
-	hasIssueInput := tokenTransaction.GetIssueInput() != nil
+	// Validate that the transaction is either a mint or a transfer, but not both.
+	hasMintInput := tokenTransaction.GetMintInput() != nil
 	hasTransferInput := tokenTransaction.GetTransferInput() != nil
-	if (!hasIssueInput && !hasTransferInput) || (hasIssueInput && hasTransferInput) {
+	if (!hasMintInput && !hasTransferInput) || (hasMintInput && hasTransferInput) {
 		return fmt.Errorf("token transaction must have exactly one of issue_input or transfer_input")
 	}
 
-	// Validation for issuance transactions
-	if issueInput := tokenTransaction.GetIssueInput(); issueInput != nil {
+	// Validation for mint transactions.
+	if mintInput := tokenTransaction.GetMintInput(); mintInput != nil {
 		// Validate that the token public key on all created leaves
 		// matches the issuer public key.
-		if !bytes.Equal(issueInput.GetIssuerPublicKey(), expectedTokenPubKey) {
-			return fmt.Errorf("token public key must match issuer public key for issuance transactions")
+		if !bytes.Equal(mintInput.GetIssuerPublicKey(), expectedTokenPubKey) {
+			return fmt.Errorf("token public key must match issuer public key for mint transactions")
 		}
 
 		// Validate that the transaction signatures match the issuer public key.
 		if len(tokenTransactionSignatures.GetOwnerSignatures()) != 1 {
-			return fmt.Errorf("issuance transactions must have exactly one signature")
+			return fmt.Errorf("mint transactions must have exactly one signature")
 		}
 
-		// Get the signature for the issuance input
+		// Get the signature for the mint input.
 		issueSignature := tokenTransactionSignatures.GetOwnerSignatures()[0]
 		if issueSignature == nil {
-			return fmt.Errorf("issuance signature cannot be nil")
+			return fmt.Errorf("mint signature cannot be nil")
 		}
 	}
 
@@ -192,7 +191,7 @@ func ValidatePartialTokenTransaction(
 		}
 	}
 
-	// Check that each operator's public key is present
+	// Check that each operator's public key is present.
 	for _, operatorInfoFromConfig := range sparkOperatorsFromConfig {
 		found := false
 		configPubKey := operatorInfoFromConfig.GetPublicKey()

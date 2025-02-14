@@ -14,8 +14,8 @@ import (
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
 	"github.com/lightsparkdev/spark-go/so/ent/signingkeyshare"
 	"github.com/lightsparkdev/spark-go/so/ent/signingnonce"
-	"github.com/lightsparkdev/spark-go/so/ent/tokenissuance"
 	"github.com/lightsparkdev/spark-go/so/ent/tokenleaf"
+	"github.com/lightsparkdev/spark-go/so/ent/tokenmint"
 	"github.com/lightsparkdev/spark-go/so/ent/tokentransactionreceipt"
 	"github.com/lightsparkdev/spark-go/so/ent/transfer"
 	"github.com/lightsparkdev/spark-go/so/ent/transferleaf"
@@ -193,33 +193,6 @@ func init() {
 	signingnonceDescID := signingnonceMixinFields0[0].Descriptor()
 	// signingnonce.DefaultID holds the default value on creation for the id field.
 	signingnonce.DefaultID = signingnonceDescID.Default.(func() uuid.UUID)
-	tokenissuanceMixin := schema.TokenIssuance{}.Mixin()
-	tokenissuanceMixinFields0 := tokenissuanceMixin[0].Fields()
-	_ = tokenissuanceMixinFields0
-	tokenissuanceFields := schema.TokenIssuance{}.Fields()
-	_ = tokenissuanceFields
-	// tokenissuanceDescCreateTime is the schema descriptor for create_time field.
-	tokenissuanceDescCreateTime := tokenissuanceMixinFields0[1].Descriptor()
-	// tokenissuance.DefaultCreateTime holds the default value on creation for the create_time field.
-	tokenissuance.DefaultCreateTime = tokenissuanceDescCreateTime.Default.(func() time.Time)
-	// tokenissuanceDescUpdateTime is the schema descriptor for update_time field.
-	tokenissuanceDescUpdateTime := tokenissuanceMixinFields0[2].Descriptor()
-	// tokenissuance.DefaultUpdateTime holds the default value on creation for the update_time field.
-	tokenissuance.DefaultUpdateTime = tokenissuanceDescUpdateTime.Default.(func() time.Time)
-	// tokenissuance.UpdateDefaultUpdateTime holds the default value on update for the update_time field.
-	tokenissuance.UpdateDefaultUpdateTime = tokenissuanceDescUpdateTime.UpdateDefault.(func() time.Time)
-	// tokenissuanceDescIssuerPublicKey is the schema descriptor for issuer_public_key field.
-	tokenissuanceDescIssuerPublicKey := tokenissuanceFields[0].Descriptor()
-	// tokenissuance.IssuerPublicKeyValidator is a validator for the "issuer_public_key" field. It is called by the builders before save.
-	tokenissuance.IssuerPublicKeyValidator = tokenissuanceDescIssuerPublicKey.Validators[0].(func([]byte) error)
-	// tokenissuanceDescIssuerSignature is the schema descriptor for issuer_signature field.
-	tokenissuanceDescIssuerSignature := tokenissuanceFields[1].Descriptor()
-	// tokenissuance.IssuerSignatureValidator is a validator for the "issuer_signature" field. It is called by the builders before save.
-	tokenissuance.IssuerSignatureValidator = tokenissuanceDescIssuerSignature.Validators[0].(func([]byte) error)
-	// tokenissuanceDescID is the schema descriptor for id field.
-	tokenissuanceDescID := tokenissuanceMixinFields0[0].Descriptor()
-	// tokenissuance.DefaultID holds the default value on creation for the id field.
-	tokenissuance.DefaultID = tokenissuanceDescID.Default.(func() uuid.UUID)
 	tokenleafMixin := schema.TokenLeaf{}.Mixin()
 	tokenleafMixinFields0 := tokenleafMixin[0].Fields()
 	_ = tokenleafMixinFields0
@@ -251,6 +224,33 @@ func init() {
 	tokenleafDescID := tokenleafMixinFields0[0].Descriptor()
 	// tokenleaf.DefaultID holds the default value on creation for the id field.
 	tokenleaf.DefaultID = tokenleafDescID.Default.(func() uuid.UUID)
+	tokenmintMixin := schema.TokenMint{}.Mixin()
+	tokenmintMixinFields0 := tokenmintMixin[0].Fields()
+	_ = tokenmintMixinFields0
+	tokenmintFields := schema.TokenMint{}.Fields()
+	_ = tokenmintFields
+	// tokenmintDescCreateTime is the schema descriptor for create_time field.
+	tokenmintDescCreateTime := tokenmintMixinFields0[1].Descriptor()
+	// tokenmint.DefaultCreateTime holds the default value on creation for the create_time field.
+	tokenmint.DefaultCreateTime = tokenmintDescCreateTime.Default.(func() time.Time)
+	// tokenmintDescUpdateTime is the schema descriptor for update_time field.
+	tokenmintDescUpdateTime := tokenmintMixinFields0[2].Descriptor()
+	// tokenmint.DefaultUpdateTime holds the default value on creation for the update_time field.
+	tokenmint.DefaultUpdateTime = tokenmintDescUpdateTime.Default.(func() time.Time)
+	// tokenmint.UpdateDefaultUpdateTime holds the default value on update for the update_time field.
+	tokenmint.UpdateDefaultUpdateTime = tokenmintDescUpdateTime.UpdateDefault.(func() time.Time)
+	// tokenmintDescIssuerPublicKey is the schema descriptor for issuer_public_key field.
+	tokenmintDescIssuerPublicKey := tokenmintFields[0].Descriptor()
+	// tokenmint.IssuerPublicKeyValidator is a validator for the "issuer_public_key" field. It is called by the builders before save.
+	tokenmint.IssuerPublicKeyValidator = tokenmintDescIssuerPublicKey.Validators[0].(func([]byte) error)
+	// tokenmintDescIssuerSignature is the schema descriptor for issuer_signature field.
+	tokenmintDescIssuerSignature := tokenmintFields[1].Descriptor()
+	// tokenmint.IssuerSignatureValidator is a validator for the "issuer_signature" field. It is called by the builders before save.
+	tokenmint.IssuerSignatureValidator = tokenmintDescIssuerSignature.Validators[0].(func([]byte) error)
+	// tokenmintDescID is the schema descriptor for id field.
+	tokenmintDescID := tokenmintMixinFields0[0].Descriptor()
+	// tokenmint.DefaultID holds the default value on creation for the id field.
+	tokenmint.DefaultID = tokenmintDescID.Default.(func() uuid.UUID)
 	tokentransactionreceiptMixin := schema.TokenTransactionReceipt{}.Mixin()
 	tokentransactionreceiptMixinFields0 := tokentransactionreceiptMixin[0].Fields()
 	_ = tokentransactionreceiptMixinFields0

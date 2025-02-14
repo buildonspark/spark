@@ -26,10 +26,10 @@ type Tx struct {
 	SigningKeyshare *SigningKeyshareClient
 	// SigningNonce is the client for interacting with the SigningNonce builders.
 	SigningNonce *SigningNonceClient
-	// TokenIssuance is the client for interacting with the TokenIssuance builders.
-	TokenIssuance *TokenIssuanceClient
 	// TokenLeaf is the client for interacting with the TokenLeaf builders.
 	TokenLeaf *TokenLeafClient
+	// TokenMint is the client for interacting with the TokenMint builders.
+	TokenMint *TokenMintClient
 	// TokenTransactionReceipt is the client for interacting with the TokenTransactionReceipt builders.
 	TokenTransactionReceipt *TokenTransactionReceiptClient
 	// Transfer is the client for interacting with the Transfer builders.
@@ -180,8 +180,8 @@ func (tx *Tx) init() {
 	tx.PreimageShare = NewPreimageShareClient(tx.config)
 	tx.SigningKeyshare = NewSigningKeyshareClient(tx.config)
 	tx.SigningNonce = NewSigningNonceClient(tx.config)
-	tx.TokenIssuance = NewTokenIssuanceClient(tx.config)
 	tx.TokenLeaf = NewTokenLeafClient(tx.config)
+	tx.TokenMint = NewTokenMintClient(tx.config)
 	tx.TokenTransactionReceipt = NewTokenTransactionReceiptClient(tx.config)
 	tx.Transfer = NewTransferClient(tx.config)
 	tx.TransferLeaf = NewTransferLeafClient(tx.config)

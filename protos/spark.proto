@@ -136,7 +136,7 @@ message TransferInput {
     repeated TokenLeafToSpend leaves_to_spend = 1;
 }
 
-message IssueInput {
+message MintInput {
     bytes issuer_public_key = 1;
 }
 
@@ -156,10 +156,10 @@ message TokenLeafOutput {
 // This proto is deterministically hashed to generate the token_transaction_hash that 
 // is cooperatively signed by the SO group to confirm a token transaction.
 message TokenTransaction {    
-    // For issuance transactions issuer_public_key will be specified without any leaves_to_spend.
+    // For mint transactions issuer_public_key will be specified without any leaves_to_spend.
     // For transfer transactions the token amount in the input leaves must match the token amount in the output leaves.
     oneof token_input {
-        IssueInput issue_input = 1;
+        MintInput mint_input = 1;
         TransferInput transfer_input = 2;
     }
     repeated TokenLeafOutput output_leaves = 3;
@@ -168,7 +168,7 @@ message TokenTransaction {
 
 message TokenTransactionSignatures {
       // Filled by signing the partial token transaction hash with the owner/issuer private key.
-      // For issuance transactions this will be one signature for the input issuer_public_key
+      // For mint transactions this will be one signature for the input issuer_public_key
       // For transfer transactions this will be one for each leaf for the leaf owner_public_key
       repeated bytes owner_signatures = 1;
 }

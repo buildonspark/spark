@@ -27,11 +27,11 @@ type SigningKeyshare func(*sql.Selector)
 // SigningNonce is the predicate function for signingnonce builders.
 type SigningNonce func(*sql.Selector)
 
-// TokenIssuance is the predicate function for tokenissuance builders.
-type TokenIssuance func(*sql.Selector)
-
 // TokenLeaf is the predicate function for tokenleaf builders.
 type TokenLeaf func(*sql.Selector)
+
+// TokenMint is the predicate function for tokenmint builders.
+type TokenMint func(*sql.Selector)
 
 // TokenTransactionReceipt is the predicate function for tokentransactionreceipt builders.
 type TokenTransactionReceipt func(*sql.Selector)

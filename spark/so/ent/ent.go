@@ -19,8 +19,8 @@ import (
 	"github.com/lightsparkdev/spark-go/so/ent/preimageshare"
 	"github.com/lightsparkdev/spark-go/so/ent/signingkeyshare"
 	"github.com/lightsparkdev/spark-go/so/ent/signingnonce"
-	"github.com/lightsparkdev/spark-go/so/ent/tokenissuance"
 	"github.com/lightsparkdev/spark-go/so/ent/tokenleaf"
+	"github.com/lightsparkdev/spark-go/so/ent/tokenmint"
 	"github.com/lightsparkdev/spark-go/so/ent/tokentransactionreceipt"
 	"github.com/lightsparkdev/spark-go/so/ent/transfer"
 	"github.com/lightsparkdev/spark-go/so/ent/transferleaf"
@@ -94,8 +94,8 @@ func checkColumn(table, column string) error {
 			preimageshare.Table:           preimageshare.ValidColumn,
 			signingkeyshare.Table:         signingkeyshare.ValidColumn,
 			signingnonce.Table:            signingnonce.ValidColumn,
-			tokenissuance.Table:           tokenissuance.ValidColumn,
 			tokenleaf.Table:               tokenleaf.ValidColumn,
+			tokenmint.Table:               tokenmint.ValidColumn,
 			tokentransactionreceipt.Table: tokentransactionreceipt.ValidColumn,
 			transfer.Table:                transfer.ValidColumn,
 			transferleaf.Table:            transferleaf.ValidColumn,

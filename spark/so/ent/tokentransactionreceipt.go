@@ -10,7 +10,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark-go/so/ent/tokenissuance"
+	"github.com/lightsparkdev/spark-go/so/ent/tokenmint"
 	"github.com/lightsparkdev/spark-go/so/ent/tokentransactionreceipt"
 )
 
@@ -31,9 +31,9 @@ type TokenTransactionReceipt struct {
 	OperatorSignature []byte `json:"operator_signature,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the TokenTransactionReceiptQuery when eager-loading is set.
-	Edges                              TokenTransactionReceiptEdges `json:"edges"`
-	token_transaction_receipt_issuance *uuid.UUID
-	selectValues                       sql.SelectValues
+	Edges                          TokenTransactionReceiptEdges `json:"edges"`
+	token_transaction_receipt_mint *uuid.UUID
+	selectValues                   sql.SelectValues
 }
 
 // TokenTransactionReceiptEdges holds the relations/edges for other nodes in the graph.
@@ -42,8 +42,8 @@ type TokenTransactionReceiptEdges struct {
 	SpentLeaf []*TokenLeaf `json:"spent_leaf,omitempty"`
 	// CreatedLeaf holds the value of the created_leaf edge.
 	CreatedLeaf []*TokenLeaf `json:"created_leaf,omitempty"`
-	// Issuance holds the value of the issuance edge.
-	Issuance *TokenIssuance `json:"issuance,omitempty"`
+	// Mint holds the value of the mint edge.
+	Mint *TokenMint `json:"mint,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
 	loadedTypes [3]bool
@@ -67,15 +67,15 @@ func (e TokenTransactionReceiptEdges) CreatedLeafOrErr() ([]*TokenLeaf, error) {
 	return nil, &NotLoadedError{edge: "created_leaf"}
 }
 
-// IssuanceOrErr returns the Issuance value or an error if the edge
+// MintOrErr returns the Mint value or an error if the edge
 // was not loaded in eager-loading, or loaded but was not found.
-func (e TokenTransactionReceiptEdges) IssuanceOrErr() (*TokenIssuance, error) {
-	if e.Issuance != nil {
-		return e.Issuance, nil
+func (e TokenTransactionReceiptEdges) MintOrErr() (*TokenMint, error) {
+	if e.Mint != nil {
+		return e.Mint, nil
 	} else if e.loadedTypes[2] {
-		return nil, &NotFoundError{label: tokenissuance.Label}
+		return nil, &NotFoundError{label: tokenmint.Label}
 	}
-	return nil, &NotLoadedError{edge: "issuance"}
+	return nil, &NotLoadedError{edge: "mint"}
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -89,7 +89,7 @@ func (*TokenTransactionReceipt) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullTime)
 		case tokentransactionreceipt.FieldID:
 			values[i] = new(uuid.UUID)
-		case tokentransactionreceipt.ForeignKeys[0]: // token_transaction_receipt_issuance
+		case tokentransactionreceipt.ForeignKeys[0]: // token_transaction_receipt_mint
 			values[i] = &sql.NullScanner{S: new(uuid.UUID)}
 		default:
 			values[i] = new(sql.UnknownType)
@@ -144,10 +144,10 @@ func (ttr *TokenTransactionReceipt) assignValues(columns []string, values []any)
 			}
 		case tokentransactionreceipt.ForeignKeys[0]:
 			if value, ok := values[i].(*sql.NullScanner); !ok {
-				return fmt.Errorf("unexpected type %T for field token_transaction_receipt_issuance", values[i])
+				return fmt.Errorf("unexpected type %T for field token_transaction_receipt_mint", values[i])
 			} else if value.Valid {
-				ttr.token_transaction_receipt_issuance = new(uuid.UUID)
-				*ttr.token_transaction_receipt_issuance = *value.S.(*uuid.UUID)
+				ttr.token_transaction_receipt_mint = new(uuid.UUID)
+				*ttr.token_transaction_receipt_mint = *value.S.(*uuid.UUID)
 			}
 		default:
 			ttr.selectValues.Set(columns[i], values[i])
@@ -172,9 +172,9 @@ func (ttr *TokenTransactionReceipt) QueryCreatedLeaf() *TokenLeafQuery {
 	return NewTokenTransactionReceiptClient(ttr.config).QueryCreatedLeaf(ttr)
 }
 
-// QueryIssuance queries the "issuance" edge of the TokenTransactionReceipt entity.
-func (ttr *TokenTransactionReceipt) QueryIssuance() *TokenIssuanceQuery {
-	return NewTokenTransactionReceiptClient(ttr.config).QueryIssuance(ttr)
+// QueryMint queries the "mint" edge of the TokenTransactionReceipt entity.
+func (ttr *TokenTransactionReceipt) QueryMint() *TokenMintQuery {
+	return NewTokenTransactionReceiptClient(ttr.config).QueryMint(ttr)
 }
 
 // Update returns a builder for updating this TokenTransactionReceipt.
