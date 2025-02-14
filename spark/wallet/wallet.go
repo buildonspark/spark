@@ -4,9 +4,13 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"math"
+	"sort"
 
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
 	sspapi "github.com/lightsparkdev/spark-go/wallet/ssp_api"
+	decodepay "github.com/nbd-wtf/ln-decodepay"
 )
 
 // SignleKeyWallet is a wallet that uses a single private key for all signing keys.
@@ -70,4 +74,81 @@ func (w *SignleKeyWallet) ClaimAllTransfers(ctx context.Context) ([]*pb.TreeNode
 	}
 	w.ownedNodes = append(w.ownedNodes, nodesResult...)
 	return nodesResult, nil
+}
+
+func (w *SignleKeyWallet) leafSelection(targetAmount int64) ([]*pb.TreeNode, error) {
+	sort.Slice(w.ownedNodes, func(i, j int) bool {
+		return w.ownedNodes[i].Value > w.ownedNodes[j].Value
+	})
+
+	amount := int64(0)
+	nodes := make([]*pb.TreeNode, 0)
+	for _, node := range w.ownedNodes {
+		if targetAmount-amount >= int64(node.Value) {
+			amount += int64(node.Value)
+			nodes = append(nodes, node)
+		}
+	}
+	if amount == targetAmount {
+		return nodes, nil
+	}
+	return nil, fmt.Errorf("there's no exact match for the target amount")
+}
+
+func (w *SignleKeyWallet) PayInvoice(ctx context.Context, invoice string) (string, error) {
+	// TODO: query fee
+
+	bolt11, err := decodepay.Decodepay(invoice)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse invoice: %w", err)
+	}
+
+	amount := math.Ceil(float64(bolt11.MSatoshi) / 1000.0)
+	nodes, err := w.leafSelection(int64(amount))
+	if err != nil {
+		return "", fmt.Errorf("failed to select nodes: %w", err)
+	}
+
+	nodeKeyTweaks := make([]LeafKeyTweak, 0, len(nodes))
+	nodesToRemove := make(map[string]bool)
+	for _, node := range nodes {
+		newLeafPrivKey, err := secp256k1.GeneratePrivateKey()
+		if err != nil {
+			return "", fmt.Errorf("failed to generate new leaf private key: %w", err)
+		}
+		nodeKeyTweaks = append(nodeKeyTweaks, LeafKeyTweak{
+			Leaf:              node,
+			SigningPrivKey:    w.SigningPrivateKey,
+			NewSigningPrivKey: newLeafPrivKey.Serialize(),
+		})
+		nodesToRemove[node.Id] = true
+	}
+
+	paymentHash, err := hex.DecodeString(bolt11.PaymentHash)
+	if err != nil {
+		return "", fmt.Errorf("failed to decode payment hash: %w", err)
+	}
+
+	_, err = SwapNodesForPreimage(ctx, w.Config, nodeKeyTweaks, w.Config.SparkServiceProviderIdentityPublicKey, paymentHash, &invoice, 0, false)
+	if err != nil {
+		return "", fmt.Errorf("failed to swap nodes for preimage: %w", err)
+	}
+
+	requester, err := sspapi.NewRequesterWithBaseURL(hex.EncodeToString(w.Config.IdentityPublicKey()), nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to create requester: %w", err)
+	}
+	api := sspapi.NewSparkServiceAPI(requester)
+
+	requestID, err := api.PayInvoice(invoice)
+	if err != nil {
+		return "", fmt.Errorf("failed to pay invoice: %w", err)
+	}
+
+	for i, node := range w.ownedNodes {
+		if nodesToRemove[node.Id] {
+			w.ownedNodes = append(w.ownedNodes[:i], w.ownedNodes[i+1:]...)
+		}
+	}
+	return requestID, nil
 }

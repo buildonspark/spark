@@ -21,6 +21,8 @@ type Config struct {
 	IdentityPrivateKey secp256k1.PrivateKey
 	// Threshold is the min signing operators.
 	Threshold int
+	// SparkServiceProviderIdentityPublicKey is the identity public key of the Spark service provider.
+	SparkServiceProviderIdentityPublicKey []byte
 }
 
 // CoodinatorAddress returns coodinator address.

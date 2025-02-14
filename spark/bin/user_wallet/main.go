@@ -228,6 +228,25 @@ func main() {
 	})
 
 	cli.registry.RegisterCommand(Command{
+		Name:        "pay",
+		Description: "Pay an invoice",
+		Usage:       "pay <invoice>",
+		Handler: func(args []string) error {
+			if len(args) < 1 {
+				return fmt.Errorf("please provide an invoice")
+			}
+			invoice := args[0]
+			fmt.Printf("Paying invoice: %s\n", invoice)
+			requestID, err := cli.wallet.PayInvoice(context.Background(), invoice)
+			if err != nil {
+				return fmt.Errorf("failed to pay invoice: %w", err)
+			}
+			fmt.Printf("Invoice paid: %s\n", requestID)
+			return nil
+		},
+	})
+
+	cli.registry.RegisterCommand(Command{
 		Name:        "help",
 		Description: "Show available commands",
 		Usage:       "help",

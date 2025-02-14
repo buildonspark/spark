@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"strings"
 
+	"github.com/decred/dcrd/dcrec/secp256k1"
 	"github.com/lightsparkdev/spark-go/common"
 )
 
@@ -43,4 +44,26 @@ func (s *SparkServiceAPI) CreateInvoice(
 	fees := response["request_lightning_receive"].(map[string]interface{})["request"].(map[string]interface{})["fee"].(map[string]interface{})["original_value"].(float64)
 
 	return &encodedInvoice, int64(fees), nil
+}
+
+func (s *SparkServiceAPI) PayInvoice(
+	invoice string,
+) (string, error) {
+	randomKey, err := secp256k1.GeneratePrivateKey()
+	if err != nil {
+		return "", err
+	}
+	idempotencyKey := hex.EncodeToString(randomKey.Serialize())
+	variables := map[string]interface{}{
+		"invoice":         invoice,
+		"idempotency_key": idempotencyKey,
+	}
+
+	response, err := s.Requester.ExecuteGraphqlWithContext(context.Background(), RequestLightningSendMutation, variables)
+	if err != nil {
+		return "", err
+	}
+
+	request := response["request_lightning_send"].(map[string]interface{})["request"].(map[string]interface{})
+	return request["id"].(string), nil
 }
