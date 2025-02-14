@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"log/slog"
 	"math/big"
 	"strings"
 
@@ -212,6 +213,10 @@ func (h *LightningHandler) validateGetPreimageRequest(
 		if err != nil {
 			return fmt.Errorf("unable to get node: %v", err)
 		}
+		keyshare, err := node.QuerySigningKeyshare().First(ctx)
+		if err != nil {
+			return fmt.Errorf("unable to get keyshare: %v", err)
+		}
 		tx, err := common.TxFromRawTxBytes(node.RawTx)
 		if err != nil {
 			return fmt.Errorf("unable to get tx: %v", err)
@@ -228,6 +233,19 @@ func (h *LightningHandler) validateGetPreimageRequest(
 		sighash, err := common.SigHashFromTx(refundTx, 0, tx.TxOut[0])
 		if err != nil {
 			return fmt.Errorf("unable to get sighash: %v", err)
+		}
+
+		realUserPublicKey, err := common.SubtractPublicKeys(node.VerifyingPubkey, keyshare.PublicKey)
+		if err != nil {
+			return fmt.Errorf("unable to get real user public key: %v", err)
+		}
+
+		if !bytes.Equal(realUserPublicKey, node.OwnerSigningPubkey) {
+			slog.Debug("real user public key mismatch", "expected", hex.EncodeToString(node.OwnerSigningPubkey), "got", hex.EncodeToString(realUserPublicKey))
+			node, err = node.Update().SetOwnerSigningPubkey(realUserPublicKey).Save(ctx)
+			if err != nil {
+				return fmt.Errorf("unable to update node: %v", err)
+			}
 		}
 
 		_, err = client.ValidateSignatureShare(ctx, &pbfrost.ValidateSignatureShareRequest{
