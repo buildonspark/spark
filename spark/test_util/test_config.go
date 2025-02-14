@@ -158,12 +158,17 @@ func TestWalletConfigDeployed(identityPrivKeyBytes []byte) (*wallet.Config, erro
 	if err != nil {
 		return nil, err
 	}
+	sspIdentityKey, err := hex.DecodeString("028c094a432d46a0ac95349d792c2e3730bd60c29188db716f56a99e39b95338b4")
+	if err != nil {
+		return nil, err
+	}
 	return &wallet.Config{
-		Network:              common.Regtest,
-		SigningOperators:     signingOperators,
-		CoodinatorIdentifier: "0000000000000000000000000000000000000000000000000000000000000001",
-		FrostSignerAddress:   "unix:///tmp/frost_0.sock",
-		IdentityPrivateKey:   *identityPrivKey,
-		Threshold:            2,
+		Network:                               common.Regtest,
+		SigningOperators:                      signingOperators,
+		CoodinatorIdentifier:                  "0000000000000000000000000000000000000000000000000000000000000001",
+		FrostSignerAddress:                    "unix:///tmp/frost_0.sock",
+		IdentityPrivateKey:                    *identityPrivKey,
+		Threshold:                             2,
+		SparkServiceProviderIdentityPublicKey: sspIdentityKey,
 	}, nil
 }
