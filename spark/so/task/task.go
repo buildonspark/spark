@@ -2,6 +2,7 @@ package task
 
 import (
 	"context"
+	"log"
 	"time"
 
 	"github.com/lightsparkdev/spark-go/so"
@@ -22,8 +23,10 @@ func AllTasks() []Task {
 		{
 			Duration: 10 * time.Second,
 			Task: func(config *so.Config, db *ent.Client) error {
+				log.Printf("Running DKG if needed")
 				tx, err := db.Tx(context.Background())
 				if err != nil {
+					log.Printf("Failed to create transaction: %v", err)
 					return err
 				}
 				return ent.RunDKGIfNeeded(tx, config)
