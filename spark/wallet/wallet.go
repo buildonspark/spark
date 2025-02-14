@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 
+	pb "github.com/lightsparkdev/spark-go/proto/spark"
 	sspapi "github.com/lightsparkdev/spark-go/wallet/ssp_api"
 )
 
@@ -13,6 +14,7 @@ import (
 type SignleKeyWallet struct {
 	Config            *Config
 	SigningPrivateKey []byte
+	ownedNodes        []*pb.TreeNode
 }
 
 // NewSignleKeyWallet creates a new single key wallet.
@@ -36,22 +38,23 @@ func (w *SignleKeyWallet) CreateLightningInvoice(ctx context.Context, amount int
 	return invoice, fees, nil
 }
 
-func (w *SignleKeyWallet) ClaimAllTransfers(ctx context.Context) error {
+func (w *SignleKeyWallet) ClaimAllTransfers(ctx context.Context) ([]*pb.TreeNode, error) {
 	pendingTransfers, err := QueryPendingTransfers(ctx, w.Config)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
+	nodesResult := make([]*pb.TreeNode, 0)
 	for _, transfer := range pendingTransfers.Transfers {
 		leavesMap, err := VerifyPendingTransfer(ctx, w.Config, transfer)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		leaves := make([]LeafKeyTweak, 0, len(transfer.Leaves))
 		for _, leaf := range transfer.Leaves {
 			leafPrivKey, ok := (*leavesMap)[leaf.Leaf.Id]
 			if !ok {
-				return fmt.Errorf("leaf %s not found", leaf.Leaf.Id)
+				return nil, fmt.Errorf("leaf %s not found", leaf.Leaf.Id)
 			}
 			leaves = append(leaves, LeafKeyTweak{
 				Leaf:              leaf.Leaf,
@@ -59,10 +62,12 @@ func (w *SignleKeyWallet) ClaimAllTransfers(ctx context.Context) error {
 				NewSigningPrivKey: w.SigningPrivateKey,
 			})
 		}
-		err = ClaimTransfer(ctx, transfer, w.Config, leaves)
+		nodes, err := ClaimTransfer(ctx, transfer, w.Config, leaves)
 		if err != nil {
-			return err
+			return nil, err
 		}
+		nodesResult = append(nodesResult, nodes...)
 	}
-	return nil
+	w.ownedNodes = append(w.ownedNodes, nodesResult...)
+	return nodesResult, nil
 }

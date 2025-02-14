@@ -128,7 +128,7 @@ func TestCoopExit(t *testing.T) {
 		NewSigningPrivKey: finalLeafPrivKey.Serialize(),
 	}
 	leavesToClaim := [1]wallet.LeafKeyTweak{claimingNode}
-	err = wallet.ClaimTransfer(
+	_, err = wallet.ClaimTransfer(
 		sspCtx,
 		receiverTransfer,
 		sspConfig,
@@ -157,7 +157,7 @@ func TestCoopExit(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Claim leaf
-	err = wallet.ClaimTransfer(
+	_, err = wallet.ClaimTransfer(
 		sspCtx,
 		receiverTransfer,
 		sspConfig,

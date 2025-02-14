@@ -213,7 +213,17 @@ func main() {
 		Description: "Claim transfers",
 		Usage:       "claim",
 		Handler: func(_ []string) error {
-			return cli.wallet.ClaimAllTransfers(context.Background())
+			nodes, err := cli.wallet.ClaimAllTransfers(context.Background())
+			if err != nil {
+				return fmt.Errorf("failed to claim transfers: %w", err)
+			}
+			amount := 0
+			for _, node := range nodes {
+				amount += int(node.Value)
+				fmt.Printf("Claimed node %s for %d sats\n", node.Id, node.Value)
+			}
+			fmt.Printf("Total amount claimed: %d sats\n", amount)
+			return nil
 		},
 	})
 

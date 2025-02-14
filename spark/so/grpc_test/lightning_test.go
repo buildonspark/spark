@@ -177,7 +177,7 @@ func TestReceiveLightningPayment(t *testing.T) {
 		NewSigningPrivKey: finalLeafPrivKey.Serialize(),
 	}
 	leavesToClaim := [1]wallet.LeafKeyTweak{claimingNode}
-	err = wallet.ClaimTransfer(
+	_, err = wallet.ClaimTransfer(
 		receiverCtx,
 		receiverTransfer,
 		userConfig,
@@ -304,7 +304,7 @@ func TestSendLightningPayment(t *testing.T) {
 		NewSigningPrivKey: finalLeafPrivKey.Serialize(),
 	}
 	leavesToClaim := [1]wallet.LeafKeyTweak{claimingNode}
-	err = wallet.ClaimTransfer(
+	_, err = wallet.ClaimTransfer(
 		receiverCtx,
 		receiverTransfer,
 		sspConfig,

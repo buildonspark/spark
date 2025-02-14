@@ -414,15 +414,15 @@ func ClaimTransfer(
 	transfer *pb.Transfer,
 	config *Config,
 	leaves []LeafKeyTweak,
-) error {
+) ([]*pb.TreeNode, error) {
 	err := claimTransferTweakKeys(ctx, transfer, config, leaves)
 	if err != nil {
-		return fmt.Errorf("failed to tweak keys when claiming leaves: %v", err)
+		return nil, fmt.Errorf("failed to tweak keys when claiming leaves: %v", err)
 	}
 
 	signatures, err := claimTransferSignRefunds(ctx, transfer, config, leaves)
 	if err != nil {
-		return fmt.Errorf("failed to sign refunds when claiming leaves: %v", err)
+		return nil, fmt.Errorf("failed to sign refunds when claiming leaves: %v", err)
 	}
 
 	return finalizeTransfer(ctx, config, signatures)
@@ -596,18 +596,21 @@ func finalizeTransfer(
 	ctx context.Context,
 	config *Config,
 	signatures []*pb.NodeSignatures,
-) error {
+) ([]*pb.TreeNode, error) {
 	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer sparkConn.Close()
 	sparkClient := pb.NewSparkServiceClient(sparkConn)
-	_, err = sparkClient.FinalizeNodeSignatures(ctx, &pb.FinalizeNodeSignaturesRequest{
+	response, err := sparkClient.FinalizeNodeSignatures(ctx, &pb.FinalizeNodeSignaturesRequest{
 		Intent:         pbcommon.SignatureIntent_TRANSFER,
 		NodeSignatures: signatures,
 	})
-	return err
+	if err != nil {
+		return nil, fmt.Errorf("failed to call FinalizeNodeSignatures: %v", err)
+	}
+	return response.Nodes, nil
 }
 
 func signRefunds(

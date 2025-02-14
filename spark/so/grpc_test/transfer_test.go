@@ -97,7 +97,7 @@ func TestTransfer(t *testing.T) {
 		NewSigningPrivKey: finalLeafPrivKey.Serialize(),
 	}
 	leavesToClaim := [1]wallet.LeafKeyTweak{claimingNode}
-	err = wallet.ClaimTransfer(
+	_, err = wallet.ClaimTransfer(
 		receiverCtx,
 		receiverTransfer,
 		receiverConfig,
