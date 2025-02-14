@@ -22,11 +22,16 @@ message ProposeTreeDenominationsRequest {
     bytes ssp_identity_public_key = 1;
     uint64 max_amount_sats = 2;
     uint64 max_tree_depth = 3;
+    uint64 min_tree_depth = 4;
+}
+
+message ProposeTree {
+    bool is_small = 1;
+    repeated uint64 leaves = 2;
 }
 
 message ProposeTreeDenominationsResponse {
-    repeated uint64 small_denominations = 1;
-    repeated uint64 large_denominations = 2;
+    repeated ProposeTree trees = 1;
 }
 
 message FetchPolarityScoreRequest {

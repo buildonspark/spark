@@ -7,7 +7,29 @@ import (
 	pb "github.com/lightsparkdev/spark-go/proto/spark_tree"
 )
 
-func solveLeafDenominations(counts *pb.GetLeafDenominationCountsResponse, targetCounts map[uint64]uint64, maxAmountSats uint64, maxTreeDepth uint64) (*pb.ProposeTreeDenominationsResponse, error) {
+// chunkIntoPowersOf2 splits a list of numbers into chunks of size at most maxChunkSize,
+// where each chunk's length is	a power of 2. both minChunkSize and maxChunkSize are
+// expected to be powers of 2.
+func chunkIntoPowersOf2(nums []uint64, minChunkSize int, maxChunkSize int) [][]uint64 {
+	chunks := [][]uint64{}
+	currentChunk := []uint64{}
+	for _, num := range nums {
+		if len(currentChunk) >= maxChunkSize {
+			chunks = append(chunks, currentChunk)
+			currentChunk = []uint64{}
+		}
+		currentChunk = append(currentChunk, num)
+	}
+	if len(currentChunk) >= minChunkSize && len(currentChunk) > 0 {
+		// For the last chunk, we need to truncate it to a power of 2.
+		targetLength := uint64(1) << (bits.Len64(uint64(len(currentChunk))) - 1)
+		currentChunk = currentChunk[:targetLength]
+		chunks = append(chunks, currentChunk)
+	}
+	return chunks
+}
+
+func solveLeafDenominations(counts *pb.GetLeafDenominationCountsResponse, targetCounts map[uint64]uint64, maxAmountSats uint64, minTreeDepth uint64, maxTreeDepth uint64) (*pb.ProposeTreeDenominationsResponse, error) {
 	// Figure out how many leaves of each denomination we are missing.
 	missingCount := make([]uint64, DenominationMaxPow)
 	for i := 0; i < DenominationMaxPow; i++ {
@@ -54,32 +76,35 @@ func solveLeafDenominations(counts *pb.GetLeafDenominationCountsResponse, target
 		}
 	}
 
+	// Split it up into a list of trees, each of which has depth up to maxTreeDepth.
+	trees := []*pb.ProposeTree{}
+	minNumLeaves := int(1) << minTreeDepth
+	maxNumLeaves := int(1) << maxTreeDepth
+
 	// Truncate the leaves to a power of 2 if applicable.
 	if len(smallDenominations) > 0 {
-		// Compute 2^floor(log2(len(smallDenominations))).
-		targetLength := uint64(1) << (bits.Len64(uint64(len(smallDenominations))) - 1)
-		if targetLength > uint64(1)<<maxTreeDepth {
-			targetLength = uint64(1) << maxTreeDepth
+		chunks := chunkIntoPowersOf2(smallDenominations, minNumLeaves, maxNumLeaves)
+		for _, chunk := range chunks {
+			trees = append(trees, &pb.ProposeTree{
+				IsSmall: true,
+				Leaves:  chunk,
+			})
+			log.Printf("proposed tree: leaves: %v, min: %d, max: %d", len(chunk), chunk[0], chunk[len(chunk)-1])
 		}
-		if targetLength > 0 && targetLength < uint64(len(smallDenominations)) {
-			smallDenominations = smallDenominations[:targetLength]
-		}
-		log.Printf("small denominations: %v, min: %d, max: %d", len(smallDenominations), smallDenominations[0], smallDenominations[len(smallDenominations)-1])
 	}
+
 	if len(largeDenominations) > 0 {
-		// Compute 2^floor(log2(len(smallDenominations))).
-		targetLength := uint64(1) << (bits.Len64(uint64(len(largeDenominations))) - 1)
-		if targetLength > uint64(1)<<maxTreeDepth {
-			targetLength = uint64(1) << maxTreeDepth
+		chunks := chunkIntoPowersOf2(largeDenominations, minNumLeaves, maxNumLeaves)
+		for _, chunk := range chunks {
+			trees = append(trees, &pb.ProposeTree{
+				IsSmall: false,
+				Leaves:  chunk,
+			})
+			log.Printf("proposed tree: leaves: %v, min: %d, max: %d", len(chunk), chunk[0], chunk[len(chunk)-1])
 		}
-		if targetLength > 0 && targetLength < uint64(len(largeDenominations)) {
-			largeDenominations = largeDenominations[:targetLength]
-		}
-		log.Printf("large denominations: %v, min: %d, max: %d", len(largeDenominations), largeDenominations[0], largeDenominations[len(largeDenominations)-1])
 	}
 
 	return &pb.ProposeTreeDenominationsResponse{
-		SmallDenominations: smallDenominations,
-		LargeDenominations: largeDenominations,
+		Trees: trees,
 	}, nil
 }
