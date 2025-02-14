@@ -379,14 +379,9 @@ func handleBlock(ctx context.Context, dbTx *ent.Tx, txs []wire.MsgTx, blockHeigh
 		if err != nil {
 			return err
 		}
+		log.Printf("Found tree node: %s, start processing", treeNode.ID)
 		if treeNode.Status != schema.TreeNodeStatusCreating {
 			log.Printf("Expected tree node status to be creating, got %s", treeNode.Status)
-		}
-		treeNode, err = dbTx.TreeNode.UpdateOne(treeNode).
-			SetStatus(schema.TreeNodeStatusAvailable).
-			Save(ctx)
-		if err != nil {
-			return err
 		}
 		tree, err := treeNode.QueryTree().Only(ctx)
 		if err != nil {
@@ -401,6 +396,28 @@ func handleBlock(ctx context.Context, dbTx *ent.Tx, txs []wire.MsgTx, blockHeigh
 			Save(ctx)
 		if err != nil {
 			return err
+		}
+
+		treeNodes, err := tree.QueryNodes().All(ctx)
+		if err != nil {
+			return err
+		}
+		for _, treeNode := range treeNodes {
+			if len(treeNode.RawRefundTx) > 0 {
+				_, err = dbTx.TreeNode.UpdateOne(treeNode).
+					SetStatus(schema.TreeNodeStatusAvailable).
+					Save(ctx)
+				if err != nil {
+					return err
+				}
+			} else {
+				_, err = dbTx.TreeNode.UpdateOne(treeNode).
+					SetStatus(schema.TreeNodeStatusSplitted).
+					Save(ctx)
+				if err != nil {
+					return err
+				}
+			}
 		}
 	}
 

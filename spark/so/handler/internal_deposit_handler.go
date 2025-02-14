@@ -76,7 +76,7 @@ func (h *InternalDepositHandler) FinalizeTreeCreation(ctx context.Context, req *
 	if selectedNode == nil {
 		return fmt.Errorf("no node in the request")
 	}
-	markNodAsAvailalbe := false
+	markNodeAsAvailalbe := false
 	if selectedNode.ParentNodeId == nil {
 		treeID, err := uuid.Parse(selectedNode.TreeId)
 		if err != nil {
@@ -89,8 +89,8 @@ func (h *InternalDepositHandler) FinalizeTreeCreation(ctx context.Context, req *
 		if !h.config.IsNetworkSupported(network) {
 			return fmt.Errorf("network not supported")
 		}
-		markNodAsAvailalbe = helper.CheckOnchainWithKeyshareID(ctx, selectedNode.SigningKeyshareId)
-		log.Printf("Marking node as available: %v", markNodAsAvailalbe)
+		markNodeAsAvailalbe = helper.CheckOnchainWithKeyshareID(ctx, selectedNode.SigningKeyshareId)
+		log.Printf("Marking node as available: %v", markNodeAsAvailalbe)
 
 		schemaNetwork, err := common.SchemaNetworkFromNetwork(network)
 		if err != nil {
@@ -103,7 +103,7 @@ func (h *InternalDepositHandler) FinalizeTreeCreation(ctx context.Context, req *
 			SetOwnerIdentityPubkey(selectedNode.OwnerIdentityPubkey).
 			SetNetwork(schemaNetwork)
 
-		if markNodAsAvailalbe {
+		if markNodeAsAvailalbe {
 			treeMutator.SetStatus(schema.TreeStatusAvailable)
 		} else {
 			treeMutator.SetStatus(schema.TreeStatusPending)
@@ -122,6 +122,7 @@ func (h *InternalDepositHandler) FinalizeTreeCreation(ctx context.Context, req *
 		if err != nil {
 			return err
 		}
+		markNodeAsAvailalbe = tree.Status == schema.TreeStatusAvailable
 	}
 
 	for _, node := range req.Nodes {
@@ -154,8 +155,12 @@ func (h *InternalDepositHandler) FinalizeTreeCreation(ctx context.Context, req *
 			nodeMutator.SetParentID(parentID)
 		}
 
-		if markNodAsAvailalbe {
-			nodeMutator.SetStatus(schema.TreeNodeStatusAvailable)
+		if markNodeAsAvailalbe {
+			if len(node.RawRefundTx) > 0 {
+				nodeMutator.SetStatus(schema.TreeNodeStatusAvailable)
+			} else {
+				nodeMutator.SetStatus(schema.TreeNodeStatusSplitted)
+			}
 		} else {
 			nodeMutator.SetStatus(schema.TreeNodeStatusCreating)
 		}

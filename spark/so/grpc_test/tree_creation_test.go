@@ -87,7 +87,6 @@ func TestTreeCreationWithMultiLevels(t *testing.T) {
 		t.Fatalf("failed to create wallet config: %v", err)
 	}
 
-	// Setup Mock tx
 	conn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
 	if err != nil {
 		t.Fatalf("failed to connect to operator: %v", err)
@@ -112,7 +111,12 @@ func TestTreeCreationWithMultiLevels(t *testing.T) {
 		t.Fatalf("failed to generate deposit address: %v", err)
 	}
 
-	depositTx, err := testutil.CreateTestP2TRTransaction(depositResp.DepositAddress.Address, 65536)
+	client, err := testutil.NewRegtestClient()
+	assert.NoError(t, err)
+
+	coin, err := faucet.Fund()
+	assert.NoError(t, err)
+	depositTx, err := testutil.CreateTestDepositTransaction(coin.OutPoint, depositResp.DepositAddress.Address, 65536)
 	if err != nil {
 		t.Fatalf("failed to create deposit tx: %v", err)
 	}
@@ -131,6 +135,20 @@ func TestTreeCreationWithMultiLevels(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to deserilize deposit tx: %v", err)
 	}
+
+	// Sign, broadcast, and mine deposit tx
+	signedDepositTx, err := testutil.SignFaucetCoin(depositTx, coin.TxOut, coin.Key)
+	assert.NoError(t, err)
+	_, err = client.SendRawTransaction(signedDepositTx, true)
+	assert.NoError(t, err)
+
+	randomKey, err := secp256k1.GeneratePrivateKey()
+	assert.NoError(t, err)
+	randomPubKey := randomKey.PubKey()
+	randomAddress, err := common.P2TRRawAddressFromPublicKey(randomPubKey.SerializeCompressed(), common.Regtest)
+	assert.NoError(t, err)
+	_, err = client.GenerateToAddress(1, randomAddress, nil)
+	assert.NoError(t, err)
 
 	log.Printf("deposit public key: %x", hex.EncodeToString(privKey.PubKey().SerializeCompressed()))
 	tree, err := wallet.GenerateDepositAddressesForTree(ctx, config, depositTx, nil, uint32(vout), privKey.Serialize(), 2)

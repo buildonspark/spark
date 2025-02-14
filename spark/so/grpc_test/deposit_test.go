@@ -48,7 +48,6 @@ func TestStartTreeCreation(t *testing.T) {
 		t.Fatalf("failed to create wallet config: %v", err)
 	}
 
-	// Setup Mock tx
 	conn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
 	if err != nil {
 		t.Fatalf("failed to connect to operator: %v", err)
