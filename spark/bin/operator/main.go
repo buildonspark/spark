@@ -21,6 +21,7 @@ import (
 	_ "github.com/lib/pq"
 	"github.com/lightsparkdev/spark-go/common"
 	pbdkg "github.com/lightsparkdev/spark-go/proto/dkg"
+	pbmock "github.com/lightsparkdev/spark-go/proto/mock"
 	pbspark "github.com/lightsparkdev/spark-go/proto/spark"
 	pbauthn "github.com/lightsparkdev/spark-go/proto/spark_authn"
 	pbinternal "github.com/lightsparkdev/spark-go/proto/spark_internal"
@@ -61,6 +62,7 @@ type args struct {
 	AWS                        bool
 	ServerCertPath             string
 	ServerKeyPath              string
+	DKGLimitOverride           uint64
 }
 
 func (a *args) SupportedNetworksList() []common.Network {
@@ -104,6 +106,7 @@ func loadArgs() (*args, error) {
 	flag.BoolVar(&args.AWS, "aws", false, "Use AWS RDS")
 	flag.StringVar(&args.ServerCertPath, "server-cert", "", "Path to server certificate")
 	flag.StringVar(&args.ServerKeyPath, "server-key", "", "Path to server key")
+	flag.Uint64Var(&args.DKGLimitOverride, "dkg-limit-override", 0, "Override the DKG limit")
 	// Parse flags
 	flag.Parse()
 
@@ -177,6 +180,7 @@ func main() {
 		args.AWS,
 		args.ServerCertPath,
 		args.ServerKeyPath,
+		args.DKGLimitOverride,
 	)
 	if err != nil {
 		log.Fatalf("Failed to create config: %v", err)
@@ -280,6 +284,11 @@ func main() {
 
 	treeServer := sparkgrpc.NewSparkTreeServer(config, dbClient)
 	pbtree.RegisterSparkTreeServiceServer(grpcServer, treeServer)
+
+	if args.MockOnchain {
+		mockServer := sparkgrpc.NewMockServer(config)
+		pbmock.RegisterMockServiceServer(grpcServer, mockServer)
+	}
 
 	authnServer, err := sparkgrpc.NewAuthnServer(sparkgrpc.AuthnServerConfig{
 		IdentityPrivateKey: config.IdentityPrivateKey,

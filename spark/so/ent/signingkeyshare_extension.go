@@ -335,6 +335,9 @@ func RunDKGIfNeeded(db *Tx, config *so.Config) error {
 	if err != nil {
 		return err
 	}
+	if config.DKGLimitOverride > 0 && uint64(count) >= config.DKGLimitOverride {
+		return nil
+	}
 	if uint64(count) >= spark.DKGKeyThreshold {
 		return nil
 	}

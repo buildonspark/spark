@@ -417,6 +417,7 @@ run_operators_tmux() {
            -database '${db_file}' \
            -server-cert '${cert_file}' \
            -server-key '${key_file}' \
+            -dkg-limit-override 100 \
            -mock-onchain true \
            2>&1 | tee '${log_file}'"
        

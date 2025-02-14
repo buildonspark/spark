@@ -56,6 +56,8 @@ type Config struct {
 	ServerKeyPath string
 	// Lrc20Configs are the configurations for different LRC20 nodes
 	Lrc20Configs map[string]Lrc20Config
+	// DKGLimitOverride is the override for the DKG limit.
+	DKGLimitOverride uint64
 }
 
 // DatabaseDriver returns the database driver based on the database path.
@@ -103,6 +105,7 @@ func NewConfig(
 	aws bool,
 	serverCertPath string,
 	serverKeyPath string,
+	dkgLimitOverride uint64,
 ) (*Config, error) {
 	identityPrivateKeyHexStringBytes, err := os.ReadFile(identityPrivateKeyFilePath)
 	if err != nil {
@@ -153,6 +156,7 @@ func NewConfig(
 		AWS:                   aws,
 		ServerCertPath:        serverCertPath,
 		ServerKeyPath:         serverKeyPath,
+		DKGLimitOverride:      dkgLimitOverride,
 	}, nil
 }
 
