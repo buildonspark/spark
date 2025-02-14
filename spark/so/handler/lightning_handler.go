@@ -240,7 +240,7 @@ func (h *LightningHandler) validateGetPreimageRequest(
 			UserCommitments: transaction.UserSignatureCommitment,
 		})
 		if err != nil {
-			return fmt.Errorf("unable to validate signature share: %v", err)
+			return fmt.Errorf("unable to validate signature share: %v, for sighash: %v, user pubkey: %v", err, hex.EncodeToString(sighash), hex.EncodeToString(node.OwnerSigningPubkey))
 		}
 	}
 
