@@ -6,8 +6,6 @@ option go_package = "github.com/lightsparkdev/spark-go/proto/spark_tree";
 
 service SparkTreeService {
     rpc get_leaf_denomination_counts(GetLeafDenominationCountsRequest) returns (GetLeafDenominationCountsResponse) {}
-    rpc find_leaves_to_give_user(FindLeavesToGiveUserRequest) returns (FindLeavesToGiveUserResponse) {}
-    rpc find_leaves_to_take_from_user(FindLeavesToTakeFromUserRequest) returns (FindLeavesToTakeFromUserResponse) {}
     rpc propose_tree_denominations(ProposeTreeDenominationsRequest) returns (ProposeTreeDenominationsResponse) {}
     rpc fetch_polarity_scores(FetchPolarityScoreRequest) returns (stream PolarityScore) {}
 }
@@ -18,29 +16,6 @@ message GetLeafDenominationCountsRequest {
 
 message GetLeafDenominationCountsResponse {
     map<uint64, uint64> counts = 1;
-}
-
-message FindLeavesToGiveUserRequest {
-    bytes ssp_identity_public_key = 1;
-    bytes user_identity_public_key = 2;
-    uint64 amount_sats = 3;
-}
-
-message FindLeavesToGiveUserResponse {
-    repeated bytes leaves = 1;
-}
-
-message FindLeavesToTakeFromUserRequest {
-    bytes ssp_identity_public_key = 1;
-    bytes user_identity_public_key = 2;
-    uint64 amount_sats = 3;
-}
-
-message FindLeavesToTakeFromUserResponse {
-    // The leaves that the user will give to the SSP.
-    repeated bytes leaves_to_take = 1;
-    // The leaves that the SSP will give to the user.
-    repeated bytes leaves_to_swap = 2;
 }
 
 message ProposeTreeDenominationsRequest {

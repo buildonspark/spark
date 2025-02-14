@@ -20,8 +20,6 @@ const _ = grpc.SupportPackageIsVersion9
 
 const (
 	SparkTreeService_GetLeafDenominationCounts_FullMethodName = "/spark.SparkTreeService/get_leaf_denomination_counts"
-	SparkTreeService_FindLeavesToGiveUser_FullMethodName      = "/spark.SparkTreeService/find_leaves_to_give_user"
-	SparkTreeService_FindLeavesToTakeFromUser_FullMethodName  = "/spark.SparkTreeService/find_leaves_to_take_from_user"
 	SparkTreeService_ProposeTreeDenominations_FullMethodName  = "/spark.SparkTreeService/propose_tree_denominations"
 	SparkTreeService_FetchPolarityScores_FullMethodName       = "/spark.SparkTreeService/fetch_polarity_scores"
 )
@@ -31,8 +29,6 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type SparkTreeServiceClient interface {
 	GetLeafDenominationCounts(ctx context.Context, in *GetLeafDenominationCountsRequest, opts ...grpc.CallOption) (*GetLeafDenominationCountsResponse, error)
-	FindLeavesToGiveUser(ctx context.Context, in *FindLeavesToGiveUserRequest, opts ...grpc.CallOption) (*FindLeavesToGiveUserResponse, error)
-	FindLeavesToTakeFromUser(ctx context.Context, in *FindLeavesToTakeFromUserRequest, opts ...grpc.CallOption) (*FindLeavesToTakeFromUserResponse, error)
 	ProposeTreeDenominations(ctx context.Context, in *ProposeTreeDenominationsRequest, opts ...grpc.CallOption) (*ProposeTreeDenominationsResponse, error)
 	FetchPolarityScores(ctx context.Context, in *FetchPolarityScoreRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[PolarityScore], error)
 }
@@ -49,26 +45,6 @@ func (c *sparkTreeServiceClient) GetLeafDenominationCounts(ctx context.Context, 
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetLeafDenominationCountsResponse)
 	err := c.cc.Invoke(ctx, SparkTreeService_GetLeafDenominationCounts_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *sparkTreeServiceClient) FindLeavesToGiveUser(ctx context.Context, in *FindLeavesToGiveUserRequest, opts ...grpc.CallOption) (*FindLeavesToGiveUserResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(FindLeavesToGiveUserResponse)
-	err := c.cc.Invoke(ctx, SparkTreeService_FindLeavesToGiveUser_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *sparkTreeServiceClient) FindLeavesToTakeFromUser(ctx context.Context, in *FindLeavesToTakeFromUserRequest, opts ...grpc.CallOption) (*FindLeavesToTakeFromUserResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(FindLeavesToTakeFromUserResponse)
-	err := c.cc.Invoke(ctx, SparkTreeService_FindLeavesToTakeFromUser_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -109,8 +85,6 @@ type SparkTreeService_FetchPolarityScoresClient = grpc.ServerStreamingClient[Pol
 // for forward compatibility.
 type SparkTreeServiceServer interface {
 	GetLeafDenominationCounts(context.Context, *GetLeafDenominationCountsRequest) (*GetLeafDenominationCountsResponse, error)
-	FindLeavesToGiveUser(context.Context, *FindLeavesToGiveUserRequest) (*FindLeavesToGiveUserResponse, error)
-	FindLeavesToTakeFromUser(context.Context, *FindLeavesToTakeFromUserRequest) (*FindLeavesToTakeFromUserResponse, error)
 	ProposeTreeDenominations(context.Context, *ProposeTreeDenominationsRequest) (*ProposeTreeDenominationsResponse, error)
 	FetchPolarityScores(*FetchPolarityScoreRequest, grpc.ServerStreamingServer[PolarityScore]) error
 	mustEmbedUnimplementedSparkTreeServiceServer()
@@ -125,12 +99,6 @@ type UnimplementedSparkTreeServiceServer struct{}
 
 func (UnimplementedSparkTreeServiceServer) GetLeafDenominationCounts(context.Context, *GetLeafDenominationCountsRequest) (*GetLeafDenominationCountsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetLeafDenominationCounts not implemented")
-}
-func (UnimplementedSparkTreeServiceServer) FindLeavesToGiveUser(context.Context, *FindLeavesToGiveUserRequest) (*FindLeavesToGiveUserResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method FindLeavesToGiveUser not implemented")
-}
-func (UnimplementedSparkTreeServiceServer) FindLeavesToTakeFromUser(context.Context, *FindLeavesToTakeFromUserRequest) (*FindLeavesToTakeFromUserResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method FindLeavesToTakeFromUser not implemented")
 }
 func (UnimplementedSparkTreeServiceServer) ProposeTreeDenominations(context.Context, *ProposeTreeDenominationsRequest) (*ProposeTreeDenominationsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ProposeTreeDenominations not implemented")
@@ -177,42 +145,6 @@ func _SparkTreeService_GetLeafDenominationCounts_Handler(srv interface{}, ctx co
 	return interceptor(ctx, in, info, handler)
 }
 
-func _SparkTreeService_FindLeavesToGiveUser_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(FindLeavesToGiveUserRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(SparkTreeServiceServer).FindLeavesToGiveUser(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: SparkTreeService_FindLeavesToGiveUser_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SparkTreeServiceServer).FindLeavesToGiveUser(ctx, req.(*FindLeavesToGiveUserRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _SparkTreeService_FindLeavesToTakeFromUser_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(FindLeavesToTakeFromUserRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(SparkTreeServiceServer).FindLeavesToTakeFromUser(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: SparkTreeService_FindLeavesToTakeFromUser_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SparkTreeServiceServer).FindLeavesToTakeFromUser(ctx, req.(*FindLeavesToTakeFromUserRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _SparkTreeService_ProposeTreeDenominations_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ProposeTreeDenominationsRequest)
 	if err := dec(in); err != nil {
@@ -252,14 +184,6 @@ var SparkTreeService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "get_leaf_denomination_counts",
 			Handler:    _SparkTreeService_GetLeafDenominationCounts_Handler,
-		},
-		{
-			MethodName: "find_leaves_to_give_user",
-			Handler:    _SparkTreeService_FindLeavesToGiveUser_Handler,
-		},
-		{
-			MethodName: "find_leaves_to_take_from_user",
-			Handler:    _SparkTreeService_FindLeavesToTakeFromUser_Handler,
 		},
 		{
 			MethodName: "propose_tree_denominations",

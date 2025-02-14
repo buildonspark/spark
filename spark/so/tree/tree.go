@@ -2,10 +2,8 @@ package tree
 
 import (
 	"context"
-	"fmt"
 	"log"
 
-	"github.com/google/uuid"
 	pb "github.com/lightsparkdev/spark-go/proto/spark_tree"
 	"github.com/lightsparkdev/spark-go/so/ent"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
@@ -93,131 +91,6 @@ func GetLeafDenominationCounts(ctx context.Context, req *pb.GetLeafDenominationC
 		counts[leaf.Value]++
 	}
 	return &pb.GetLeafDenominationCountsResponse{Counts: counts}, nil
-}
-
-// FindLeavesToGiveUser is called to figure out which leaves to give to a user when they deposit funds or receive a lightning payment.
-func FindLeavesToGiveUser(ctx context.Context, req *pb.FindLeavesToGiveUserRequest) (*pb.FindLeavesToGiveUserResponse, error) {
-	db := ent.GetDbFromContext(ctx)
-
-	leaves, err := db.TreeNode.Query().
-		Where(treenode.OwnerIdentityPubkey(req.SspIdentityPublicKey)).
-		Where(treenode.StatusEQ(schema.TreeNodeStatusAvailable)).
-		Order(
-			ent.Desc(treenode.FieldValue),
-			ent.Asc(treenode.FieldCreateTime),
-		).
-		All(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	remainingSats := req.AmountSats
-	leavesToGive := []uuid.UUID{}
-	for _, leaf := range leaves {
-		if remainingSats >= leaf.Value {
-			leavesToGive = append(leavesToGive, leaf.ID)
-			remainingSats -= leaf.Value
-		}
-	}
-	if remainingSats != 0 {
-		// Due to the construction of the denominations, this should only happen if we're missing some
-		// denominations or if we don't have enough balance.
-		return nil, fmt.Errorf("unable to find leaves")
-	}
-
-	// Convert []uuid.UUID to [][]byte
-	leavesBytes := make([][]byte, len(leavesToGive))
-	for i, leaf := range leavesToGive {
-		leavesBytes[i] = leaf[:]
-	}
-	return &pb.FindLeavesToGiveUserResponse{Leaves: leavesBytes}, nil
-}
-
-// FindLeavesToTakeFromUser is called to obtain a plan for how to enable the user to send the specified amount of sats to the SSP (i.e. for a lightning payment).
-func FindLeavesToTakeFromUser(ctx context.Context, req *pb.FindLeavesToTakeFromUserRequest) (*pb.FindLeavesToTakeFromUserResponse, error) {
-	db := ent.GetDbFromContext(ctx)
-
-	// TODO: Sort on the polarity score as well.
-	leaves, err := db.TreeNode.Query().Where(treenode.OwnerIdentityPubkey(req.UserIdentityPublicKey)).
-		Where(treenode.StatusEQ(schema.TreeNodeStatusAvailable)).
-		Order(ent.Desc(treenode.FieldValue)).
-		All(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	// Split into leaves based on whether they should be taken or possibly swapped.
-	remainingSats := req.AmountSats
-	leavesToTake := []uuid.UUID{}
-	leavesToSwap := []*ent.TreeNode{}
-	for _, leaf := range leaves {
-		if remainingSats >= leaf.Value {
-			leavesToTake = append(leavesToTake, leaf.ID)
-			remainingSats -= leaf.Value
-		} else if remainingSats > 0 {
-			leavesToSwap = append(leavesToSwap, leaf)
-		}
-	}
-
-	// We have exact change, so we can just take the leaves.
-	if remainingSats == 0 {
-		// Convert []uuid.UUID to [][]byte
-		leavesBytes := make([][]byte, len(leavesToTake))
-		for i, leaf := range leavesToTake {
-			leavesBytes[i] = leaf[:]
-		}
-		return &pb.FindLeavesToTakeFromUserResponse{LeavesToTake: leavesBytes}, nil
-	}
-	// Truncate the list of leaves to swap to the amount we actually need.
-	amountTotal := uint64(0)
-	for i := 0; i < len(leavesToSwap); i++ {
-		amountTotal += leavesToSwap[i].Value
-		if amountTotal >= remainingSats {
-			leavesToSwap = leavesToSwap[:i+1]
-			break
-		}
-	}
-	if amountTotal < remainingSats {
-		return nil, fmt.Errorf("insufficient balance")
-	}
-
-	// Find leaves that can achieve the specific `remainingSats` amount.
-	sspLeaves1, err := FindLeavesToGiveUser(ctx, &pb.FindLeavesToGiveUserRequest{
-		SspIdentityPublicKey: req.SspIdentityPublicKey,
-		AmountSats:           remainingSats,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	// Find leaves that can achieve the total amount minus the specific `remainingSats` amount.
-	sspLeaves2, err := FindLeavesToGiveUser(ctx, &pb.FindLeavesToGiveUserRequest{
-		SspIdentityPublicKey: req.SspIdentityPublicKey,
-		AmountSats:           amountTotal - remainingSats,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	// The user will give the SSP these leaves.
-	userLeaves := [][]byte{}
-	for _, leaf := range leavesToTake {
-		userLeaves = append(userLeaves, leaf[:])
-	}
-	for _, leaf := range leavesToSwap {
-		userLeaves = append(userLeaves, leaf.ID[:])
-	}
-
-	// The SSP will give the user these leaves (swap).
-	sspLeaves := [][]byte{}
-	sspLeaves = append(sspLeaves, sspLeaves1.Leaves...)
-	sspLeaves = append(sspLeaves, sspLeaves2.Leaves...)
-
-	// The difference between take and give should be the amount that the user is sending.
-	return &pb.FindLeavesToTakeFromUserResponse{
-		LeavesToTake: userLeaves,
-		LeavesToSwap: sspLeaves,
-	}, nil
 }
 
 // ProposeTreeDenominations is called with the amount of sats we have available, the number of users we expect to need to support, and
