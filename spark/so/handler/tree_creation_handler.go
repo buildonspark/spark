@@ -21,13 +21,12 @@ import (
 
 // TreeCreationHandler is a handler for tree creation requests.
 type TreeCreationHandler struct {
-	config        *so.Config
-	onchainHelper helper.OnChainHelper
+	config *so.Config
 }
 
 // NewTreeCreationHandler creates a new TreeCreationHandler.
-func NewTreeCreationHandler(config *so.Config, onchainHelper helper.OnChainHelper) *TreeCreationHandler {
-	return &TreeCreationHandler{config: config, onchainHelper: onchainHelper}
+func NewTreeCreationHandler(config *so.Config) *TreeCreationHandler {
+	return &TreeCreationHandler{config: config}
 }
 
 func (h *TreeCreationHandler) findParentOutputFromUtxo(ctx context.Context, utxo *pb.UTXO) (*wire.TxOut, error) {
@@ -409,8 +408,7 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 		if err != nil {
 			return nil, nil, err
 		}
-		_, err = h.onchainHelper.GetTxOnChain(ctx, req.GetOnChainUtxo().Txid)
-		if err != nil {
+		if !helper.CheckUTXOOnchain(ctx, h.config, req.GetOnChainUtxo()) {
 			onchain = false
 		}
 	default:

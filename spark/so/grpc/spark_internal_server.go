@@ -13,7 +13,6 @@ import (
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/ent"
 	"github.com/lightsparkdev/spark-go/so/handler"
-	"github.com/lightsparkdev/spark-go/so/helper"
 	"github.com/lightsparkdev/spark-go/so/objects"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
@@ -22,13 +21,12 @@ import (
 // This server is only used by the operator.
 type SparkInternalServer struct {
 	pb.UnimplementedSparkInternalServiceServer
-	config        *so.Config
-	onchainHelper helper.OnChainHelper
+	config *so.Config
 }
 
 // NewSparkInternalServer creates a new SparkInternalServer.
-func NewSparkInternalServer(config *so.Config, onchainHelper helper.OnChainHelper) *SparkInternalServer {
-	return &SparkInternalServer{config: config, onchainHelper: onchainHelper}
+func NewSparkInternalServer(config *so.Config) *SparkInternalServer {
+	return &SparkInternalServer{config: config}
 }
 
 // MarkKeysharesAsUsed marks the keyshares as used.
@@ -57,7 +55,7 @@ func (s *SparkInternalServer) MarkKeysharesAsUsed(ctx context.Context, req *pb.M
 
 // MarkKeyshareForDepositAddress links the keyshare to a deposit address.
 func (s *SparkInternalServer) MarkKeyshareForDepositAddress(ctx context.Context, req *pb.MarkKeyshareForDepositAddressRequest) (*pb.MarkKeyshareForDepositAddressResponse, error) {
-	depositHandler := handler.NewInternalDepositHandler(s.config, s.onchainHelper)
+	depositHandler := handler.NewInternalDepositHandler(s.config)
 	return depositHandler.MarkKeyshareForDepositAddress(ctx, req)
 }
 
@@ -230,7 +228,7 @@ func (s *SparkInternalServer) PrepareSplitKeyshares(ctx context.Context, req *pb
 
 // FinalizeTreeCreation syncs final tree creation.
 func (s *SparkInternalServer) FinalizeTreeCreation(ctx context.Context, req *pb.FinalizeTreeCreationRequest) (*emptypb.Empty, error) {
-	depositHandler := handler.NewInternalDepositHandler(s.config, s.onchainHelper)
+	depositHandler := handler.NewInternalDepositHandler(s.config)
 	err := depositHandler.FinalizeTreeCreation(ctx, req)
 	if err != nil {
 		return nil, err
@@ -256,7 +254,7 @@ func (s *SparkInternalServer) FinalizeNodesAggregation(ctx context.Context, req 
 
 // FinalizeTransfer finalizes a transfer
 func (s *SparkInternalServer) FinalizeTransfer(ctx context.Context, req *pb.FinalizeTransferRequest) (*emptypb.Empty, error) {
-	transferHandler := handler.NewInternalTransferHandler(s.onchainHelper, s.config)
+	transferHandler := handler.NewInternalTransferHandler(s.config)
 	err := transferHandler.FinalizeTransfer(ctx, req)
 	if err != nil {
 		return nil, err
@@ -266,7 +264,7 @@ func (s *SparkInternalServer) FinalizeTransfer(ctx context.Context, req *pb.Fina
 
 // InitiatePreimageSwap initiates a preimage swap for the given payment hash.
 func (s *SparkInternalServer) InitiatePreimageSwap(ctx context.Context, req *pbspark.InitiatePreimageSwapRequest) (*pb.InitiatePreimageSwapResponse, error) {
-	lightningHandler := handler.NewLightningHandler(s.config, s.onchainHelper)
+	lightningHandler := handler.NewLightningHandler(s.config)
 	preimageShare, err := lightningHandler.GetPreimageShare(ctx, req)
 	if err != nil {
 		return nil, err
@@ -276,7 +274,7 @@ func (s *SparkInternalServer) InitiatePreimageSwap(ctx context.Context, req *pbs
 
 // UpdatePreimageRequest updates the preimage request.
 func (s *SparkInternalServer) UpdatePreimageRequest(ctx context.Context, req *pb.UpdatePreimageRequestRequest) (*emptypb.Empty, error) {
-	lightningHandler := handler.NewLightningHandler(s.config, s.onchainHelper)
+	lightningHandler := handler.NewLightningHandler(s.config)
 	err := lightningHandler.UpdatePreimageRequest(ctx, req)
 	if err != nil {
 		return nil, err
@@ -296,7 +294,7 @@ func (s *SparkInternalServer) PrepareTreeAddress(ctx context.Context, req *pb.Pr
 
 // InitiateTransfer initiates a transfer by creating transfer and transfer_leaf
 func (s *SparkInternalServer) InitiateTransfer(ctx context.Context, req *pb.InitiateTransferRequest) (*emptypb.Empty, error) {
-	transferHandler := handler.NewInternalTransferHandler(s.onchainHelper, s.config)
+	transferHandler := handler.NewInternalTransferHandler(s.config)
 	err := transferHandler.InitiateTransfer(ctx, req)
 	if err != nil {
 		log.Printf("failed to initiate transfer: %v", err)
@@ -306,7 +304,7 @@ func (s *SparkInternalServer) InitiateTransfer(ctx context.Context, req *pb.Init
 
 // InitiateCooperativeExit initiates a cooperative exit.
 func (s *SparkInternalServer) InitiateCooperativeExit(ctx context.Context, req *pb.InitiateCooperativeExitRequest) (*emptypb.Empty, error) {
-	transferHandler := handler.NewInternalTransferHandler(s.onchainHelper, s.config)
+	transferHandler := handler.NewInternalTransferHandler(s.config)
 	err := transferHandler.InitiateCooperativeExit(ctx, req)
 	if err != nil {
 		log.Printf("failed to initiate cooperative exit: %v", err)
@@ -316,7 +314,7 @@ func (s *SparkInternalServer) InitiateCooperativeExit(ctx context.Context, req *
 
 // ProvidePreimage provides the preimage for the given payment hash.
 func (s *SparkInternalServer) ProvidePreimage(ctx context.Context, req *pbspark.ProvidePreimageRequest) (*emptypb.Empty, error) {
-	lightningHandler := handler.NewLightningHandler(s.config, s.onchainHelper)
+	lightningHandler := handler.NewLightningHandler(s.config)
 	_, err := lightningHandler.ProvidePreimageInternal(ctx, req)
 	if err != nil {
 		return nil, err
@@ -325,7 +323,7 @@ func (s *SparkInternalServer) ProvidePreimage(ctx context.Context, req *pbspark.
 }
 
 func (s *SparkInternalServer) ReturnLightningPayment(ctx context.Context, req *pbspark.ReturnLightningPaymentRequest) (*emptypb.Empty, error) {
-	lightningHandler := handler.NewLightningHandler(s.config, s.onchainHelper)
+	lightningHandler := handler.NewLightningHandler(s.config)
 	return wrapWithGRPCError(lightningHandler.ReturnLightningPayment(ctx, req, true))
 }
 

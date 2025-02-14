@@ -20,7 +20,6 @@ import (
 	_ "github.com/lib/pq"
 	"github.com/lightsparkdev/spark-go/common"
 	pbdkg "github.com/lightsparkdev/spark-go/proto/dkg"
-	pbmock "github.com/lightsparkdev/spark-go/proto/mock"
 	pbspark "github.com/lightsparkdev/spark-go/proto/spark"
 	pbauthn "github.com/lightsparkdev/spark-go/proto/spark_authn"
 	pbinternal "github.com/lightsparkdev/spark-go/proto/spark_internal"
@@ -32,7 +31,6 @@ import (
 	"github.com/lightsparkdev/spark-go/so/dkg"
 	"github.com/lightsparkdev/spark-go/so/ent"
 	sparkgrpc "github.com/lightsparkdev/spark-go/so/grpc"
-	"github.com/lightsparkdev/spark-go/so/helper"
 	"github.com/lightsparkdev/spark-go/so/task"
 	_ "github.com/mattn/go-sqlite3"
 	"google.golang.org/grpc"
@@ -252,16 +250,10 @@ func main() {
 		pbdkg.RegisterDKGServiceServer(grpcServer, dkgServer)
 	}
 
-	var onchainHelper helper.OnChainHelper = &helper.DemoOnChainHelper{}
-	if args.MockOnchain {
-		onchainHelper = helper.NewMockOnChainHelper()
-		mockServer := sparkgrpc.NewMockServer(config, onchainHelper.(*helper.MockOnChainHelper))
-		pbmock.RegisterMockServiceServer(grpcServer, mockServer)
-	}
-	sparkInternalServer := sparkgrpc.NewSparkInternalServer(config, onchainHelper)
+	sparkInternalServer := sparkgrpc.NewSparkInternalServer(config)
 	pbinternal.RegisterSparkInternalServiceServer(grpcServer, sparkInternalServer)
 
-	sparkServer := sparkgrpc.NewSparkServer(config, onchainHelper)
+	sparkServer := sparkgrpc.NewSparkServer(config)
 	pbspark.RegisterSparkServiceServer(grpcServer, sparkServer)
 
 	treeServer := sparkgrpc.NewSparkTreeServer(config, dbClient)

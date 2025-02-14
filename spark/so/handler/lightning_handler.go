@@ -34,13 +34,12 @@ import (
 
 // LightningHandler is the handler for the lightning service.
 type LightningHandler struct {
-	config        *so.Config
-	onchainHelper helper.OnChainHelper
+	config *so.Config
 }
 
 // NewLightningHandler returns a new LightningHandler.
-func NewLightningHandler(config *so.Config, onchainHelper helper.OnChainHelper) *LightningHandler {
-	return &LightningHandler{config: config, onchainHelper: onchainHelper}
+func NewLightningHandler(config *so.Config) *LightningHandler {
+	return &LightningHandler{config: config}
 }
 
 // StorePreimageShare stores the preimage share for the given payment hash.
@@ -382,7 +381,7 @@ func (h *LightningHandler) GetPreimageShare(ctx context.Context, req *pb.Initiat
 		leafRefundMap[transaction.NodeId] = transaction.RefundTx
 	}
 
-	transferHandler := NewTransferHandler(h.onchainHelper, h.config)
+	transferHandler := NewTransferHandler(h.config)
 	transfer, _, err := transferHandler.createTransfer(ctx, req.Transfer.TransferId, schema.TransferTypePreimageSwap, req.Transfer.ExpiryTime.AsTime(), req.Transfer.OwnerIdentityPublicKey, req.Transfer.ReceiverIdentityPublicKey, leafRefundMap)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create transfer: %v", err)
@@ -452,7 +451,7 @@ func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pb.Ini
 		leafRefundMap[transaction.NodeId] = transaction.RefundTx
 	}
 
-	transferHandler := NewTransferHandler(h.onchainHelper, h.config)
+	transferHandler := NewTransferHandler(h.config)
 	transfer, _, err := transferHandler.createTransfer(ctx, req.Transfer.TransferId, schema.TransferTypePreimageSwap, req.Transfer.ExpiryTime.AsTime(), req.Transfer.OwnerIdentityPublicKey, req.Transfer.ReceiverIdentityPublicKey, leafRefundMap)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create transfer: %v", err)
@@ -614,7 +613,7 @@ func (h *LightningHandler) ProvidePreimageInternal(ctx context.Context, req *pb.
 	}
 
 	// apply key tweaks for all transfer_leaves
-	transferHandler := NewTransferHandler(h.onchainHelper, h.config)
+	transferHandler := NewTransferHandler(h.config)
 	transferLeaves, err := transfer.QueryTransferLeaves().All(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get transfer leaves: %v", err)

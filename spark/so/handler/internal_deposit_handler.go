@@ -19,13 +19,12 @@ import (
 
 // InternalDepositHandler is the deposit handler for so internal
 type InternalDepositHandler struct {
-	config        *so.Config
-	onchainHelper helper.OnChainHelper
+	config *so.Config
 }
 
 // NewInternalDepositHandler creates a new InternalDepositHandler.
-func NewInternalDepositHandler(config *so.Config, onchainHelper helper.OnChainHelper) *InternalDepositHandler {
-	return &InternalDepositHandler{config: config, onchainHelper: onchainHelper}
+func NewInternalDepositHandler(config *so.Config) *InternalDepositHandler {
+	return &InternalDepositHandler{config: config}
 }
 
 // MarkKeyshareForDepositAddress links the keyshare to a deposit address.
@@ -59,21 +58,15 @@ func (h *InternalDepositHandler) MarkKeyshareForDepositAddress(ctx context.Conte
 	}, nil
 }
 
-func (h *InternalDepositHandler) checkTransactionOnchain(ctx context.Context, txid string) bool {
-	utxo, err := h.onchainHelper.GetTxOnChain(ctx, txid)
-	if err != nil {
-		return false
-	}
-	return utxo != nil
-}
-
 // FinalizeTreeCreation finalizes a tree creation during deposit
 func (h *InternalDepositHandler) FinalizeTreeCreation(ctx context.Context, req *pbinternal.FinalizeTreeCreationRequest) error {
+	log.Printf("Finalizing tree creation: %v", req.Nodes)
 	db := ent.GetDbFromContext(ctx)
 	var tree *ent.Tree = nil
 	var selectedNode *pbinternal.TreeNode
 	for _, node := range req.Nodes {
 		if node.ParentNodeId == nil {
+			log.Printf("Selected node: %v", node)
 			selectedNode = node
 			break
 		}
@@ -89,13 +82,6 @@ func (h *InternalDepositHandler) FinalizeTreeCreation(ctx context.Context, req *
 		if err != nil {
 			return err
 		}
-		nodeTx, err := common.TxFromRawTxBytes(selectedNode.RawTx)
-		if err != nil {
-			return err
-		}
-		txid := nodeTx.TxIn[0].PreviousOutPoint.Hash.String()
-		markNodAsAvailalbe = h.checkTransactionOnchain(ctx, txid)
-
 		network, err := common.NetworkFromSchemaNetwork(schema.NetworkRegtest)
 		if err != nil {
 			return err
@@ -103,6 +89,8 @@ func (h *InternalDepositHandler) FinalizeTreeCreation(ctx context.Context, req *
 		if !h.config.IsNetworkSupported(network) {
 			return fmt.Errorf("network not supported")
 		}
+		markNodAsAvailalbe = helper.CheckOnchainWithKeyshareID(ctx, selectedNode.SigningKeyshareId)
+		log.Printf("Marking node as available: %v", markNodAsAvailalbe)
 
 		schemaNetwork, err := common.SchemaNetworkFromNetwork(network)
 		if err != nil {
@@ -172,16 +160,9 @@ func (h *InternalDepositHandler) FinalizeTreeCreation(ctx context.Context, req *
 			nodeMutator.SetStatus(schema.TreeNodeStatusCreating)
 		}
 
-		entNode, err := nodeMutator.Save(ctx)
+		_, err = nodeMutator.Save(ctx)
 		if err != nil {
 			return err
-		}
-
-		if node.ParentNodeId == nil {
-			_, err = entNode.Update().SetStatus(schema.TreeNodeStatusAvailable).Save(ctx)
-			if err != nil {
-				return err
-			}
 		}
 	}
 	return nil

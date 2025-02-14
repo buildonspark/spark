@@ -13,20 +13,17 @@ import (
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/ent"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
-	"github.com/lightsparkdev/spark-go/so/helper"
 )
 
 // BaseTransferHandler is the base transfer handler that is shared for internal and external transfer handlers.
 type BaseTransferHandler struct {
-	onchainHelper helper.OnChainHelper
-	config        *so.Config
+	config *so.Config
 }
 
 // NewBaseTransferHandler creates a new BaseTransferHandler.
-func NewBaseTransferHandler(onchainHelper helper.OnChainHelper, config *so.Config) BaseTransferHandler {
+func NewBaseTransferHandler(config *so.Config) BaseTransferHandler {
 	return BaseTransferHandler{
-		onchainHelper: onchainHelper,
-		config:        config,
+		config: config,
 	}
 }
 

@@ -1,14 +1,11 @@
 package grpctest
 
 import (
-	"bytes"
 	"context"
-	"encoding/hex"
 	"testing"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lightsparkdev/spark-go/common"
-	pbmock "github.com/lightsparkdev/spark-go/proto/mock"
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
 	testutil "github.com/lightsparkdev/spark-go/test_util"
 	"github.com/lightsparkdev/spark-go/wallet"
@@ -37,9 +34,6 @@ func TestTreeQuery(t *testing.T) {
 	ctx := wallet.ContextWithToken(context.Background(), token)
 	client := pb.NewSparkServiceClient(conn)
 
-	// Setup mock client for transaction verification
-	mockClient := pbmock.NewMockServiceClient(conn)
-
 	// Create test nodes with parent chain
 	rootPrivKey, err := secp256k1.GeneratePrivateKey()
 	require.NoError(t, err)
@@ -54,19 +48,7 @@ func TestTreeQuery(t *testing.T) {
 	depositTx, err := testutil.CreateTestP2TRTransaction(depositResp.DepositAddress.Address, txValue)
 	require.NoError(t, err)
 
-	// Mock the transaction in the test environment
-	var buf bytes.Buffer
-	err = depositTx.Serialize(&buf)
-	require.NoError(t, err)
-	depositTxHex := hex.EncodeToString(buf.Bytes())
-
-	_, err = mockClient.SetMockOnchainTx(context.Background(), &pbmock.SetMockOnchainTxRequest{
-		Txid: depositTx.TxHash().String(),
-		Tx:   depositTxHex,
-	})
-	require.NoError(t, err)
-
-	// Generate tree structure for root with 2 levels first
+	// Generate tree structure for root with 2 levels
 	rootTree, err := wallet.GenerateDepositAddressesForTree(ctx, config, depositTx, nil, uint32(0), rootPrivKey.Serialize(), 2)
 	require.NoError(t, err)
 

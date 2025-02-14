@@ -19,15 +19,13 @@ import (
 // CooperativeExitHandler tracks transfers
 // and on-chain txs events for cooperative exits.
 type CooperativeExitHandler struct {
-	onchainHelper helper.OnChainHelper
-	config        *so.Config
+	config *so.Config
 }
 
 // NewCooperativeExitHandler creates a new CooperativeExitHandler.
-func NewCooperativeExitHandler(onchainHelper helper.OnChainHelper, config *so.Config) *CooperativeExitHandler {
+func NewCooperativeExitHandler(config *so.Config) *CooperativeExitHandler {
 	return &CooperativeExitHandler{
-		onchainHelper: onchainHelper,
-		config:        config,
+		config: config,
 	}
 }
 
@@ -38,7 +36,7 @@ func (h *CooperativeExitHandler) CooperativeExit(ctx context.Context, req *pb.Co
 		return nil, err
 	}
 
-	transferHandler := NewTransferHandler(h.onchainHelper, h.config)
+	transferHandler := NewTransferHandler(h.config)
 	leafRefundMap := make(map[string][]byte)
 	for _, job := range req.Transfer.LeavesToSend {
 		leafRefundMap[job.LeafId] = job.RefundTxSigningJob.RawTx

@@ -23,15 +23,13 @@ import (
 
 // The DepositHandler is responsible for handling deposit related requests.
 type DepositHandler struct {
-	onchainHelper helper.OnChainHelper
-	config        authz.Config
+	config *so.Config
 }
 
 // NewDepositHandler creates a new DepositHandler.
-func NewDepositHandler(onchainHelper helper.OnChainHelper, config authz.Config) *DepositHandler {
+func NewDepositHandler(config *so.Config) *DepositHandler {
 	return &DepositHandler{
-		onchainHelper: onchainHelper,
-		config:        config,
+		config: config,
 	}
 }
 

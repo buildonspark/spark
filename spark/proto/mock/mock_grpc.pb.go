@@ -20,7 +20,6 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	MockService_SetMockOnchainTx_FullMethodName     = "/mock.MockService/set_mock_onchain_tx"
 	MockService_CleanUpPreimageShare_FullMethodName = "/mock.MockService/clean_up_preimage_share"
 )
 
@@ -28,7 +27,6 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type MockServiceClient interface {
-	SetMockOnchainTx(ctx context.Context, in *SetMockOnchainTxRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	CleanUpPreimageShare(ctx context.Context, in *CleanUpPreimageShareRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
@@ -38,16 +36,6 @@ type mockServiceClient struct {
 
 func NewMockServiceClient(cc grpc.ClientConnInterface) MockServiceClient {
 	return &mockServiceClient{cc}
-}
-
-func (c *mockServiceClient) SetMockOnchainTx(ctx context.Context, in *SetMockOnchainTxRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(emptypb.Empty)
-	err := c.cc.Invoke(ctx, MockService_SetMockOnchainTx_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
 }
 
 func (c *mockServiceClient) CleanUpPreimageShare(ctx context.Context, in *CleanUpPreimageShareRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
@@ -64,7 +52,6 @@ func (c *mockServiceClient) CleanUpPreimageShare(ctx context.Context, in *CleanU
 // All implementations must embed UnimplementedMockServiceServer
 // for forward compatibility.
 type MockServiceServer interface {
-	SetMockOnchainTx(context.Context, *SetMockOnchainTxRequest) (*emptypb.Empty, error)
 	CleanUpPreimageShare(context.Context, *CleanUpPreimageShareRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedMockServiceServer()
 }
@@ -76,9 +63,6 @@ type MockServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedMockServiceServer struct{}
 
-func (UnimplementedMockServiceServer) SetMockOnchainTx(context.Context, *SetMockOnchainTxRequest) (*emptypb.Empty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method SetMockOnchainTx not implemented")
-}
 func (UnimplementedMockServiceServer) CleanUpPreimageShare(context.Context, *CleanUpPreimageShareRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CleanUpPreimageShare not implemented")
 }
@@ -101,24 +85,6 @@ func RegisterMockServiceServer(s grpc.ServiceRegistrar, srv MockServiceServer) {
 		t.testEmbeddedByValue()
 	}
 	s.RegisterService(&MockService_ServiceDesc, srv)
-}
-
-func _MockService_SetMockOnchainTx_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(SetMockOnchainTxRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(MockServiceServer).SetMockOnchainTx(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: MockService_SetMockOnchainTx_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(MockServiceServer).SetMockOnchainTx(ctx, req.(*SetMockOnchainTxRequest))
-	}
-	return interceptor(ctx, in, info, handler)
 }
 
 func _MockService_CleanUpPreimageShare_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -146,10 +112,6 @@ var MockService_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "mock.MockService",
 	HandlerType: (*MockServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
-		{
-			MethodName: "set_mock_onchain_tx",
-			Handler:    _MockService_SetMockOnchainTx_Handler,
-		},
 		{
 			MethodName: "clean_up_preimage_share",
 			Handler:    _MockService_CleanUpPreimageShare_Handler,

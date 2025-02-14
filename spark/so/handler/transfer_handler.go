@@ -33,13 +33,12 @@ import (
 // TransferHandler is a helper struct to handle leaves transfer request.
 type TransferHandler struct {
 	BaseTransferHandler
-	onchainHelper helper.OnChainHelper
-	config        *so.Config
+	config *so.Config
 }
 
 // NewTransferHandler creates a new TransferHandler.
-func NewTransferHandler(onchainHelper helper.OnChainHelper, config *so.Config) *TransferHandler {
-	return &TransferHandler{BaseTransferHandler: NewBaseTransferHandler(onchainHelper, config), onchainHelper: onchainHelper, config: config}
+func NewTransferHandler(config *so.Config) *TransferHandler {
+	return &TransferHandler{BaseTransferHandler: NewBaseTransferHandler(config), config: config}
 }
 
 // StartSendTransfer initiates a transfer from sender.

@@ -381,7 +381,6 @@ func handleBlock(ctx context.Context, dbTx *ent.Tx, txs []wire.MsgTx, blockHeigh
 		}
 		if treeNode.Status != schema.TreeNodeStatusCreating {
 			log.Printf("Expected tree node status to be creating, got %s", treeNode.Status)
-			continue
 		}
 		treeNode, err = dbTx.TreeNode.UpdateOne(treeNode).
 			SetStatus(schema.TreeNodeStatusAvailable).

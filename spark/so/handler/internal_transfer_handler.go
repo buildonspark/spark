@@ -9,19 +9,17 @@ import (
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/ent"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
-	"github.com/lightsparkdev/spark-go/so/helper"
 )
 
 // InternalTransferHandler is the transfer handler for so internal
 type InternalTransferHandler struct {
 	BaseTransferHandler
-	onchainHelper helper.OnChainHelper
-	config        *so.Config
+	config *so.Config
 }
 
 // NewInternalTransferHandler creates a new InternalTransferHandler.
-func NewInternalTransferHandler(onchainHelper helper.OnChainHelper, config *so.Config) *InternalTransferHandler {
-	return &InternalTransferHandler{BaseTransferHandler: NewBaseTransferHandler(onchainHelper, config), onchainHelper: onchainHelper, config: config}
+func NewInternalTransferHandler(config *so.Config) *InternalTransferHandler {
+	return &InternalTransferHandler{BaseTransferHandler: NewBaseTransferHandler(config), config: config}
 }
 
 // FinalizeTransfer finalizes a transfer.

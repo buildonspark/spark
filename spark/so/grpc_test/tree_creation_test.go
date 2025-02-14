@@ -9,7 +9,6 @@ import (
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lightsparkdev/spark-go/common"
-	pbmock "github.com/lightsparkdev/spark-go/proto/mock"
 	testutil "github.com/lightsparkdev/spark-go/test_util"
 	"github.com/lightsparkdev/spark-go/wallet"
 	"github.com/stretchr/testify/assert"
@@ -33,8 +32,6 @@ func TestTreeCreationAddressGeneration(t *testing.T) {
 		t.Fatalf("failed to authenticate: %v", err)
 	}
 	ctx := wallet.ContextWithToken(context.Background(), token)
-
-	mockClient := pbmock.NewMockServiceClient(conn)
 
 	privKey, err := secp256k1.GeneratePrivateKey()
 	if err != nil {
@@ -66,15 +63,6 @@ func TestTreeCreationAddressGeneration(t *testing.T) {
 	depositTx, err = common.TxFromRawTxBytes(decodedBytes)
 	if err != nil {
 		t.Fatalf("failed to deserilize deposit tx: %v", err)
-	}
-
-	log.Printf("deposit tx: %s", depositTxHex)
-	_, err = mockClient.SetMockOnchainTx(context.Background(), &pbmock.SetMockOnchainTxRequest{
-		Txid: depositTx.TxID(),
-		Tx:   depositTxHex,
-	})
-	if err != nil {
-		t.Fatalf("failed to set mock onchain tx: %v", err)
 	}
 
 	log.Printf("deposit public key: %x", hex.EncodeToString(privKey.PubKey().SerializeCompressed()))
