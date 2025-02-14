@@ -247,6 +247,32 @@ func main() {
 	})
 
 	cli.registry.RegisterCommand(Command{
+		Name:        "sync",
+		Description: "Sync wallet",
+		Usage:       "sync",
+		Handler: func(_ []string) error {
+			return cli.wallet.SyncWallet(context.Background())
+		},
+	})
+
+	cli.registry.RegisterCommand(Command{
+		Name:        "balance",
+		Description: "Show balance",
+		Usage:       "balance",
+		Handler: func(_ []string) error {
+			err := cli.wallet.SyncWallet(context.Background())
+			if err != nil {
+				return fmt.Errorf("failed to sync wallet: %w", err)
+			}
+			balance := 0
+			for _, node := range cli.wallet.OwnedNodes {
+				balance += int(node.Value)
+			}
+			fmt.Printf("Balance: %d sats\n", balance)
+			return nil
+		},
+	})
+	cli.registry.RegisterCommand(Command{
 		Name:        "help",
 		Description: "Show available commands",
 		Usage:       "help",

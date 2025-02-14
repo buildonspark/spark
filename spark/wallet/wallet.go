@@ -8,7 +8,9 @@ import (
 	"sort"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
+	"github.com/lightsparkdev/spark-go/common"
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
+	"github.com/lightsparkdev/spark-go/so/ent/schema"
 	sspapi "github.com/lightsparkdev/spark-go/wallet/ssp_api"
 	decodepay "github.com/nbd-wtf/ln-decodepay"
 )
@@ -18,7 +20,7 @@ import (
 type SignleKeyWallet struct {
 	Config            *Config
 	SigningPrivateKey []byte
-	ownedNodes        []*pb.TreeNode
+	OwnedNodes        []*pb.TreeNode
 }
 
 // NewSignleKeyWallet creates a new single key wallet.
@@ -72,18 +74,18 @@ func (w *SignleKeyWallet) ClaimAllTransfers(ctx context.Context) ([]*pb.TreeNode
 		}
 		nodesResult = append(nodesResult, nodes...)
 	}
-	w.ownedNodes = append(w.ownedNodes, nodesResult...)
+	w.OwnedNodes = append(w.OwnedNodes, nodesResult...)
 	return nodesResult, nil
 }
 
 func (w *SignleKeyWallet) leafSelection(targetAmount int64) ([]*pb.TreeNode, error) {
-	sort.Slice(w.ownedNodes, func(i, j int) bool {
-		return w.ownedNodes[i].Value > w.ownedNodes[j].Value
+	sort.Slice(w.OwnedNodes, func(i, j int) bool {
+		return w.OwnedNodes[i].Value > w.OwnedNodes[j].Value
 	})
 
 	amount := int64(0)
 	nodes := make([]*pb.TreeNode, 0)
-	for _, node := range w.ownedNodes {
+	for _, node := range w.OwnedNodes {
 		if targetAmount-amount >= int64(node.Value) {
 			amount += int64(node.Value)
 			nodes = append(nodes, node)
@@ -145,10 +147,38 @@ func (w *SignleKeyWallet) PayInvoice(ctx context.Context, invoice string) (strin
 		return "", fmt.Errorf("failed to pay invoice: %w", err)
 	}
 
-	for i, node := range w.ownedNodes {
+	for i, node := range w.OwnedNodes {
 		if nodesToRemove[node.Id] {
-			w.ownedNodes = append(w.ownedNodes[:i], w.ownedNodes[i+1:]...)
+			w.OwnedNodes = append(w.OwnedNodes[:i], w.OwnedNodes[i+1:]...)
 		}
 	}
 	return requestID, nil
+}
+
+func (w *SignleKeyWallet) SyncWallet(ctx context.Context) error {
+	conn, err := common.NewGRPCConnectionWithTestTLS(w.Config.CoodinatorAddress())
+	if err != nil {
+		return fmt.Errorf("failed to connect to operator: %w", err)
+	}
+	defer conn.Close()
+
+	token, err := AuthenticateWithConnection(ctx, w.Config, conn)
+	if err != nil {
+		return fmt.Errorf("failed to authenticate: %w", err)
+	}
+	ctx = ContextWithToken(ctx, token)
+
+	client := pb.NewSparkServiceClient(conn)
+	response, err := client.GetTreeNodesByPublicKey(ctx, &pb.TreeNodesByPublicKeyRequest{
+		OwnerIdentityPubkey: w.Config.IdentityPublicKey(),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to get owned nodes: %w", err)
+	}
+	for _, node := range response.Nodes {
+		if node.Status == string(schema.TreeNodeStatusAvailable) {
+			w.OwnedNodes = append(w.OwnedNodes, node)
+		}
+	}
+	return nil
 }
