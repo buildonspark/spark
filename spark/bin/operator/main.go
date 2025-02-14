@@ -163,6 +163,7 @@ func main() {
 		log.Fatalf("Failed to create db connector: %v", err)
 	}
 	db := sql.OpenDB(connector)
+	db.SetMaxOpenConns(8)
 	dialectDriver := entsql.NewDriver(dbDriver, entsql.Conn{ExecQuerier: db})
 	dbClient := ent.NewClient(ent.Driver(dialectDriver))
 	defer dbClient.Close()
