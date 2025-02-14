@@ -2,10 +2,10 @@ package spark
 
 const (
 	// DKGKeyThreshold is the number of keyshares required to start the DKG.
-	DKGKeyThreshold = 400
+	DKGKeyThreshold = 1000
 
 	// DKGKeyCount is the number of keyshares to generate during the DKG.
-	DKGKeyCount = 500
+	DKGKeyCount = 2000
 
 	// InitialTimeLock is the initial time lock for the deposit.
 	InitialTimeLock = 2000

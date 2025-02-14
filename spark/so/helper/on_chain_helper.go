@@ -47,7 +47,6 @@ func CheckUTXOOnchain(ctx context.Context, config *so.Config, utxo *pb.UTXO) boo
 		return false
 	}
 	return depositAddress.ConfirmationHeight != 0
-
 }
 
 func CheckOnchainWithKeyshareID(ctx context.Context, keyshareID string) bool {

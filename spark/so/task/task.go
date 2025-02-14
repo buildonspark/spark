@@ -1,6 +1,7 @@
 package task
 
 import (
+	"context"
 	"time"
 
 	"github.com/lightsparkdev/spark-go/so"
@@ -17,5 +18,16 @@ type Task struct {
 
 // AllTasks returns all the tasks that are scheduled to run.
 func AllTasks() []Task {
-	return []Task{}
+	return []Task{
+		{
+			Duration: 1 * time.Minute,
+			Task: func(config *so.Config, db *ent.Client) error {
+				tx, err := db.Tx(context.Background())
+				if err != nil {
+					return err
+				}
+				return ent.RunDKGIfNeeded(tx, config)
+			},
+		},
+	}
 }
