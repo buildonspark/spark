@@ -381,7 +381,15 @@ func VerifyPendingTransfer(
 		// Verify signature
 		signature, err := ecdsa.ParseDERSignature(leaf.Signature)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse signature: %v", err)
+			if len(leaf.Signature) == 65 {
+				r := secp256k1.ModNScalar{}
+				r.SetByteSlice(leaf.Signature[1:33])
+				s := secp256k1.ModNScalar{}
+				s.SetByteSlice(leaf.Signature[33:65])
+				signature = ecdsa.NewSignature(&r, &s)
+			} else {
+				return nil, fmt.Errorf("failed to parse signature: %v", err)
+			}
 		}
 		payload := append(append([]byte(leaf.Leaf.Id), []byte(transfer.Id)...), leaf.SecretCipher...)
 		payloadHash := sha256.Sum256(payload)
