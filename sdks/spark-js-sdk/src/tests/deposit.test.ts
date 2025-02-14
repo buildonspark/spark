@@ -1,4 +1,4 @@
-import { describe, expect, it, xit } from "@jest/globals";
+import { describe, expect, it } from "@jest/globals";
 import { secp256k1 } from "@noble/curves/secp256k1";
 import { Address, OutScript, Transaction } from "@scure/btc-signer";
 import { SparkWallet } from "../spark-sdk";
@@ -8,7 +8,7 @@ import { BitcoinFaucet } from "./utils/test-faucet";
 
 describe("deposit", () => {
   // Skip all tests if running in GitHub Actions
-  const testFn = process.env.GITHUB_ACTIONS ? it.skip : xit;
+  const testFn = process.env.GITHUB_ACTIONS ? it.skip : it;
 
   testFn(
     "should generate a deposit address",

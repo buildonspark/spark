@@ -10,6 +10,7 @@ import { wordlist } from "@scure/bip39/wordlists/english";
 import { sha256 } from "@scure/btc-signer/utils";
 import assert from "assert";
 import * as ecies from "eciesjs";
+import { TreeNode } from "../proto/spark";
 import { subtractPrivateKeys } from "../utils/keys";
 import {
   splitSecretWithProofs,
@@ -106,6 +107,44 @@ class DefaultSparkSigner implements SparkSigner {
   private commitmentToNonceMap: Map<SigningCommitment, SigningNonce> =
     new Map();
 
+  private deriveSigningKey(hash: Uint8Array): Uint8Array {
+    if (!this.identityPrivateKey) {
+      throw new Error("Private key is not set");
+    }
+
+    let amount = 0n;
+    for (let i = 0; i < 8; i++) {
+      amount += bytesToNumberBE(hash.slice(i * 4, i * 4 + 4));
+      amount = amount % (2n ** 32n - 1n);
+    }
+    const newPrivateKey = this.identityPrivateKey.deriveChild(
+      Number(amount) + 0x80000000
+    ).privateKey;
+
+    if (!newPrivateKey) {
+      throw new Error("Failed to recover signing key");
+    }
+
+    return newPrivateKey;
+  }
+
+  restoreSigningKeysFromLeafs(leafs: TreeNode[]) {
+    if (!this.identityPrivateKey) {
+      throw new Error("Private key is not set");
+    }
+
+    for (const leaf of leafs) {
+      const hash = sha256(leaf.id);
+      const privateKey = this.deriveSigningKey(hash);
+
+      const publicKey = secp256k1.getPublicKey(privateKey);
+      this.publicKeyToPrivateKeyMap.set(
+        bytesToHex(publicKey),
+        bytesToHex(privateKey)
+      );
+    }
+  }
+
   getSchnorrPublicKey(publicKey: Uint8Array): Uint8Array {
     const privateKey = this.publicKeyToPrivateKeyMap.get(bytesToHex(publicKey));
     if (!privateKey) {
@@ -147,15 +186,8 @@ class DefaultSparkSigner implements SparkSigner {
     }
 
     let newPrivateKey: Uint8Array | null = null;
-    let amount = 0n;
     if (hash) {
-      for (let i = 0; i < 8; i++) {
-        amount += bytesToNumberBE(hash.slice(i * 4, i * 4 + 4));
-        amount = amount % (2n ** 32n - 1n);
-      }
-      newPrivateKey = this.identityPrivateKey.deriveChild(
-        Number(amount)
-      ).privateKey;
+      newPrivateKey = this.deriveSigningKey(hash);
     } else {
       newPrivateKey = secp256k1.utils.randomPrivateKey();
     }
