@@ -38,8 +38,7 @@ async function runCLI() {
       rl.question("> ", resolve);
     });
 
-    const [firstWord, ...rest] = command.split(" ");
-    const args = rest.join(" ");
+    const [firstWord, ...args] = command.split(" ");
     const lowerCommand = firstWord.toLowerCase();
 
     if (lowerCommand === "exit" || lowerCommand === "quit") {
@@ -57,7 +56,9 @@ async function runCLI() {
         break;
       case "initwallet":
         console.log(`:${args}:`);
-        const pubKey = await wallet.createSparkWallet(args || walletMnemonic);
+        const pubKey = await wallet.createSparkWallet(
+          args.join(" ") || walletMnemonic
+        );
         console.log("pubkey", pubKey);
         break;
       case "gendepositaddr":
@@ -98,13 +99,13 @@ async function runCLI() {
         }
 
         const invoice = await wallet.createLightningInvoice({
-          amountSats: parseInt(args),
+          amountSats: parseInt(args[0]),
           memo: args[1],
           expirySeconds: 60 * 60 * 24,
         });
 
         const fee = await wallet.getLightningReceiveFeeEstimate({
-          amountSats: parseInt(args),
+          amountSats: parseInt(args[0]),
           network: BitcoinNetwork.REGTEST,
         });
         console.log("Invoice created:", invoice);
@@ -141,7 +142,9 @@ async function runCLI() {
           break;
         }
         const pendingTransfers = await wallet.queryPendingTransfers();
-        const transfer = pendingTransfers.transfers.find((t) => t.id === args);
+        const transfer = pendingTransfers.transfers.find(
+          (t) => t.id === args[0]
+        );
         if (!transfer) {
           console.log("Transfer not found");
           break;

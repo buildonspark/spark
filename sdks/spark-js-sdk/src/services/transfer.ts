@@ -8,6 +8,7 @@ import { Transaction } from "@scure/btc-signer";
 import { sha256 } from "@scure/btc-signer/utils";
 import { randomUUID } from "crypto";
 import * as ecies from "eciesjs";
+import { SignatureIntent } from "../proto/common";
 import {
   ClaimLeafKeyTweak,
   ClaimTransferSignRefundsResponse,
@@ -22,7 +23,6 @@ import {
   Transfer,
   TreeNode,
 } from "../proto/spark";
-import { SignatureIntent } from "../proto/common";
 import { SigningCommitment } from "../signer/signer";
 import { getSigHashFromTx, getTxFromRawTxBytes } from "../utils/bitcoin";
 import { VerifiableSecretShare } from "../utils/secret-sharing";
@@ -242,10 +242,10 @@ export class BaseTransferService {
 
     const shares = this.config.signer.splitSecretWithProofs({
       secret: pubKeyTweak,
-      isSecretPubkey: true,
       curveOrder: secp256k1.CURVE.n,
       threshold: this.config.getConfig().threshold,
       numShares: Object.keys(this.config.getConfig().signingOperators).length,
+      isSecretPubkey: true,
     });
 
     const pubkeySharesTweak = new Map<string, Uint8Array>();
@@ -670,10 +670,10 @@ export class TransferService extends BaseTransferService {
 
     const shares = this.config.signer.splitSecretWithProofs({
       secret: pubKeyTweak,
-      isSecretPubkey: true,
       curveOrder: secp256k1.CURVE.n,
       threshold: this.config.getConfig().threshold,
       numShares: Object.keys(this.config.getConfig().signingOperators).length,
+      isSecretPubkey: true,
     });
 
     const pubkeySharesTweak = new Map<string, Uint8Array>();

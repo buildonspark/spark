@@ -1,4 +1,4 @@
-import { numberToBytesBE } from "@noble/curves/abstract/utils";
+import { bytesToNumberBE, numberToBytesBE } from "@noble/curves/abstract/utils";
 import { secp256k1 } from "@noble/curves/secp256k1";
 import { sha256 } from "@scure/btc-signer/utils";
 import { randomUUID } from "crypto";
@@ -31,7 +31,6 @@ export type CreateLightningInvoiceParams = {
 
 export type CreateLightningInvoiceWithPreimageParams = {
   preimage: Uint8Array;
-  isSecretPubkey?: boolean;
 } & CreateLightningInvoiceParams;
 
 export type SwapNodesForPreimageParams = {
@@ -59,13 +58,16 @@ export class LightningService {
     amountSats,
     memo,
   }: CreateLightningInvoiceParams): Promise<string> {
-    const preimagePubKey = this.config.signer.generatePublicKey();
+    const randomBytes = crypto.getRandomValues(new Uint8Array(32));
+    const preimage = numberToBytesBE(
+      bytesToNumberBE(randomBytes) % secp256k1.CURVE.n,
+      32
+    );
     return await this.createLightningInvoiceWithPreImage({
       invoiceCreator,
       amountSats,
       memo,
-      preimage: preimagePubKey,
-      isSecretPubkey: true,
+      preimage,
     });
   }
 
@@ -74,7 +76,6 @@ export class LightningService {
     amountSats,
     memo,
     preimage,
-    isSecretPubkey = false,
   }: CreateLightningInvoiceWithPreimageParams): Promise<string> {
     const paymentHash = sha256(preimage);
     const invoice = await invoiceCreator(amountSats, paymentHash, memo);
@@ -84,7 +85,6 @@ export class LightningService {
 
     const shares = this.config.signer.splitSecretWithProofs({
       secret: preimage,
-      isSecretPubkey: true,
       curveOrder: secp256k1.CURVE.n,
       threshold: this.config.getConfig().threshold,
       numShares: Object.keys(this.config.getConfig().signingOperators).length,

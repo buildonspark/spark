@@ -53,10 +53,10 @@ export type AggregateFrostParams = Omit<SignFrostParams, "privateAsPubKey"> & {
 
 export type SplitSecretWithProofsParams = {
   secret: Uint8Array;
-  isSecretPubkey: boolean;
   curveOrder: bigint;
   threshold: number;
   numShares: number;
+  isSecretPubkey?: boolean;
 };
 
 // TODO: Properly clean up keys when they are no longer needed
@@ -113,10 +113,11 @@ class DefaultSparkSigner implements SparkSigner {
       throw new Error("Private key is not set");
     }
 
-    let amount = 0n;
+    let amount = 0;
     for (let i = 0; i < 8; i++) {
-      amount += bytesToNumberBE(hash.slice(i * 4, i * 4 + 4));
-      amount = amount % (2n ** 32n - 1n);
+      const view = new DataView(hash.buffer, i * 4, 4);
+      amount += view.getUint32(0, false);
+      amount = amount % 0x80000000;
     }
     const newPrivateKey = this.identityPrivateKey.deriveChild(
       Number(amount) + 0x80000000
@@ -243,21 +244,19 @@ class DefaultSparkSigner implements SparkSigner {
 
   splitSecretWithProofs({
     secret,
-    isSecretPubkey,
     curveOrder,
     threshold,
     numShares,
+    isSecretPubkey = false,
   }: SplitSecretWithProofsParams): VerifiableSecretShare[] {
     if (isSecretPubkey) {
-      const secretPrivKey = this.publicKeyToPrivateKeyMap.get(
-        bytesToHex(secret)
-      );
-      if (!secretPrivKey) {
+      const pubKeyHex = bytesToHex(secret);
+      const privateKey = this.publicKeyToPrivateKeyMap.get(pubKeyHex);
+      if (!privateKey) {
         throw new Error("Private key is not set");
       }
-      secret = hexToBytes(secretPrivKey);
+      secret = hexToBytes(privateKey);
     }
-
     const secretAsInt = bytesToNumberBE(secret);
     return splitSecretWithProofs(secretAsInt, curveOrder, threshold, numShares);
   }

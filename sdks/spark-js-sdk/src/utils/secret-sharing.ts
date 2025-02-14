@@ -172,7 +172,7 @@ export function splitSecretWithProofs(
   const polynomial = generatePolynomialForSecretSharing(
     fieldModulus,
     secret,
-    threshold
+    threshold - 1
   );
 
   const shares: VerifiableSecretShare[] = [];
