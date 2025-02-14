@@ -212,7 +212,7 @@ func main() {
 		Name:        "claim",
 		Description: "Claim transfers",
 		Usage:       "claim",
-		Handler: func(args []string) error {
+		Handler: func(_ []string) error {
 			return cli.wallet.ClaimAllTransfers(context.Background())
 		},
 	})
