@@ -39,7 +39,6 @@ func TestHashTokenTransactionUniqueHash(t *testing.T) {
 		},
 		OutputLeaves: []*pb.TokenLeafOutput{
 			{
-				Id:                 "test-leaf-1",
 				OwnerPublicKey:     bytes.Repeat([]byte{0x01}, 32),
 				TokenPublicKey:     bytes.Repeat([]byte{0x02}, 32),
 				TokenAmount:        []byte{0x01},
@@ -62,7 +61,6 @@ func TestHashTokenTransactionUniqueHash(t *testing.T) {
 		},
 		OutputLeaves: []*pb.TokenLeafOutput{
 			{
-				Id:                 "test-leaf-1",
 				OwnerPublicKey:     bytes.Repeat([]byte{0x01}, 32),
 				TokenPublicKey:     bytes.Repeat([]byte{0x02}, 32),
 				TokenAmount:        []byte{0x01},
@@ -72,10 +70,13 @@ func TestHashTokenTransactionUniqueHash(t *testing.T) {
 		},
 	}
 
+	leafID := "test-leaf-1"
 	finalMintTokenTransaction := proto.Clone(partialMintTokenTransaction).(*pb.TokenTransaction)
+	finalMintTokenTransaction.OutputLeaves[0].Id = &leafID
 	finalMintTokenTransaction.OutputLeaves[0].RevocationPublicKey = bytes.Repeat([]byte{0x03}, 32)
 
 	finalTransferTokenTransaction := proto.Clone(partialTransferTokenTransaction).(*pb.TokenTransaction)
+	finalTransferTokenTransaction.OutputLeaves[0].Id = &leafID
 	finalTransferTokenTransaction.OutputLeaves[0].RevocationPublicKey = bytes.Repeat([]byte{0x03}, 32)
 
 	// Hash all transactions

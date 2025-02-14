@@ -141,11 +141,12 @@ message MintInput {
 }
 
 // This proto is constructed by the wallet to specify leaves it wants to create
-// as part of a token transaction.
+// as part of a token transaction.  id and revocation public key should remain unfilled
+// so that the SE can fill them as part of the StartTokenTransaction() call.
 message TokenLeafOutput {
-    string id = 1;
+    optional string id = 1;
     bytes owner_public_key = 2;
-    bytes revocation_public_key = 3;
+    optional bytes revocation_public_key = 3;
     uint64 withdrawal_bond_sats = 4;
     uint64 withdrawal_locktime = 5;
     bytes token_public_key = 6;

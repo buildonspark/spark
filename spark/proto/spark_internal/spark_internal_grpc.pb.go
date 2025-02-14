@@ -60,7 +60,7 @@ type SparkInternalServiceClient interface {
 	InitiateTransfer(ctx context.Context, in *InitiateTransferRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	InitiateCooperativeExit(ctx context.Context, in *InitiateCooperativeExitRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	ReturnLightningPayment(ctx context.Context, in *spark.ReturnLightningPaymentRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
-	StartTokenTransactionInternal(ctx context.Context, in *StartTokenTransactionInternalRequest, opts ...grpc.CallOption) (*StartTokenTransactionInternalResponse, error)
+	StartTokenTransactionInternal(ctx context.Context, in *StartTokenTransactionInternalRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type sparkInternalServiceClient struct {
@@ -231,9 +231,9 @@ func (c *sparkInternalServiceClient) ReturnLightningPayment(ctx context.Context,
 	return out, nil
 }
 
-func (c *sparkInternalServiceClient) StartTokenTransactionInternal(ctx context.Context, in *StartTokenTransactionInternalRequest, opts ...grpc.CallOption) (*StartTokenTransactionInternalResponse, error) {
+func (c *sparkInternalServiceClient) StartTokenTransactionInternal(ctx context.Context, in *StartTokenTransactionInternalRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(StartTokenTransactionInternalResponse)
+	out := new(emptypb.Empty)
 	err := c.cc.Invoke(ctx, SparkInternalService_StartTokenTransactionInternal_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -261,7 +261,7 @@ type SparkInternalServiceServer interface {
 	InitiateTransfer(context.Context, *InitiateTransferRequest) (*emptypb.Empty, error)
 	InitiateCooperativeExit(context.Context, *InitiateCooperativeExitRequest) (*emptypb.Empty, error)
 	ReturnLightningPayment(context.Context, *spark.ReturnLightningPaymentRequest) (*emptypb.Empty, error)
-	StartTokenTransactionInternal(context.Context, *StartTokenTransactionInternalRequest) (*StartTokenTransactionInternalResponse, error)
+	StartTokenTransactionInternal(context.Context, *StartTokenTransactionInternalRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedSparkInternalServiceServer()
 }
 
@@ -320,7 +320,7 @@ func (UnimplementedSparkInternalServiceServer) InitiateCooperativeExit(context.C
 func (UnimplementedSparkInternalServiceServer) ReturnLightningPayment(context.Context, *spark.ReturnLightningPaymentRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ReturnLightningPayment not implemented")
 }
-func (UnimplementedSparkInternalServiceServer) StartTokenTransactionInternal(context.Context, *StartTokenTransactionInternalRequest) (*StartTokenTransactionInternalResponse, error) {
+func (UnimplementedSparkInternalServiceServer) StartTokenTransactionInternal(context.Context, *StartTokenTransactionInternalRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method StartTokenTransactionInternal not implemented")
 }
 func (UnimplementedSparkInternalServiceServer) mustEmbedUnimplementedSparkInternalServiceServer() {}

@@ -50,12 +50,14 @@ func HashTokenTransaction(tokenTransaction *pb.TokenTransaction, partialHash boo
 	// Hash output leaves
 	for _, leaf := range tokenTransaction.OutputLeaves {
 		h.Reset()
-		if leaf.GetId() != "" {
+		// Leaf ID is not set in the partial token transaction.
+		if leaf.GetId() != "" && !partialHash {
 			h.Write([]byte(leaf.GetId()))
 		}
 		if leaf.GetOwnerPublicKey() != nil {
 			h.Write(leaf.GetOwnerPublicKey())
 		}
+		// Revocation public key is not set in the partial token transaction.
 		if leaf.GetRevocationPublicKey() != nil && !partialHash {
 			h.Write(leaf.GetRevocationPublicKey())
 		}
@@ -212,6 +214,7 @@ func ValidatePartialTokenTransaction(
 func ValidateFinalTokenTransaction(
 	tokenTransaction *pb.TokenTransaction,
 	tokenTransactionSignatures *pb.TokenTransactionSignatures,
+	expectedRevocationPublicKeys [][]byte,
 	sparkOperatorsFromConfig map[string]*pb.SigningOperatorInfo,
 ) error {
 	// Repeat same validations as for the partial token transaction.
@@ -221,16 +224,13 @@ func ValidateFinalTokenTransaction(
 	}
 
 	// Additionally validate the revocation public keys which were added to make it final.
-	seenRevocationKeys := make(map[string]bool)
 	for i, leaf := range tokenTransaction.OutputLeaves {
 		if leaf.GetRevocationPublicKey() == nil {
 			return fmt.Errorf("revocation public key cannot be nil for leaf %d", i)
 		}
-		revKeyStr := string(leaf.GetRevocationPublicKey())
-		if seenRevocationKeys[revKeyStr] {
-			return fmt.Errorf("duplicate revocation public key found for leaf %d", i)
+		if !bytes.Equal(leaf.GetRevocationPublicKey(), expectedRevocationPublicKeys[i]) {
+			return fmt.Errorf("revocation public key mismatch for leaf %d", i)
 		}
-		seenRevocationKeys[revKeyStr] = true
 	}
 	return nil
 }

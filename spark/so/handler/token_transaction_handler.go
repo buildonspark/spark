@@ -33,36 +33,6 @@ func NewTokenTransactionHandler(config authz.Config) *TokenTransactionHandler {
 	}
 }
 
-func validateStartTokenTransactionOperatorResponses(response map[string]interface{}) (*pb.TokenTransaction, error) {
-	var expectedHash []byte
-	var finalTx *pb.TokenTransaction
-
-	for operatorID, resp := range response {
-		txResponse, ok := resp.(*pbinternal.StartTokenTransactionInternalResponse)
-		if !ok {
-			return nil, fmt.Errorf("unexpected transaction from operator %s", operatorID)
-		}
-		currentHash, err := utils.HashTokenTransaction(txResponse.FinalTokenTransaction, false)
-		if err != nil {
-			return nil, fmt.Errorf("failed to hash final token transaction: %w", err)
-		}
-		if expectedHash == nil {
-			finalTx = txResponse.FinalTokenTransaction
-			expectedHash = currentHash
-			continue
-		}
-		if !bytes.Equal(expectedHash, currentHash) {
-			return nil, fmt.Errorf(
-				"inconsistent token transaction hash from operators - expected %x but got %x from operator %s",
-				expectedHash,
-				currentHash,
-				operatorID,
-			)
-		}
-	}
-	return finalTx, nil
-}
-
 // StartTokenTransaction verifies the token leaves, generates the keyshares for the token transaction, and returns metadata about the operators that possess the keyshares.
 func (o TokenTransactionHandler) StartTokenTransaction(ctx context.Context, config *so.Config, req *pb.StartTokenTransactionRequest) (*pb.StartTokenTransactionResponse, error) {
 	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, o.config, req.IdentityPublicKey); err != nil {
@@ -89,11 +59,19 @@ func (o TokenTransactionHandler) StartTokenTransaction(ctx context.Context, conf
 		keyshareIDStrings[i] = keyshare.ID.String()
 	}
 
+	// Fill revocation public keys and withdrawal bond/locktime for each leaf.
+	finalTokenTransaction := req.PartialTokenTransaction
+	for i, leaf := range finalTokenTransaction.OutputLeaves {
+		id := uuid.New().String()
+		leaf.Id = &id
+		leaf.RevocationPublicKey = keyshares[i].PublicKey
+	}
+
 	// Save the token transaction object to lock in the revocation public keys for each created leaf within this transaction.
 	// Note that atomicity here is very important to ensure that the unused keyshares queried above are not used by another operation.
 	// This property should be help because the coordinator blocks on the other SO responses.
 	allSelection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionAll}
-	response, err := helper.ExecuteTaskWithAllOperators(ctx, config, &allSelection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
+	_, err = helper.ExecuteTaskWithAllOperators(ctx, config, &allSelection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
 		conn, err := common.NewGRPCConnectionWithCert(operator.Address, operator.CertPath)
 		if err != nil {
 			log.Printf("Failed to connect to operator for marking token transaction keyshare: %v", err)
@@ -104,7 +82,7 @@ func (o TokenTransactionHandler) StartTokenTransaction(ctx context.Context, conf
 		client := pbinternal.NewSparkInternalServiceClient(conn)
 		internalResp, err := client.StartTokenTransactionInternal(ctx, &pbinternal.StartTokenTransactionInternalRequest{
 			KeyshareIds:                keyshareIDStrings,
-			PartialTokenTransaction:    req.PartialTokenTransaction,
+			FinalTokenTransaction:      finalTokenTransaction,
 			TokenTransactionSignatures: req.TokenTransactionSignatures,
 		})
 		if err != nil {
@@ -114,12 +92,7 @@ func (o TokenTransactionHandler) StartTokenTransaction(ctx context.Context, conf
 		return internalResp, err
 	})
 	if err != nil {
-		log.Printf("Failed to execute start token transaction task with all operators: %v", err)
-		return nil, err
-	}
-
-	finalTokenTransaction, err := validateStartTokenTransactionOperatorResponses(response)
-	if err != nil {
+		log.Printf("Failed to successfully execute start token transaction task with all operators: %v", err)
 		return nil, err
 	}
 
@@ -157,8 +130,8 @@ func (o TokenTransactionHandler) SignTokenTransaction(
 	// Validate each leaf signature in the request. Each signed payload consists of
 	//   payload.final_token_transaction_hash
 	//   payload.operator_identity_public_key
-	// To verify that this request for this transaction came from the leaf owner
-	// (who is about to transfer the leaf once receiving all shares).
+	// This verifies that this request for this transaction (and release of the revocation
+	// keyshare) came from the leaf owner and was intended for this specific SO.
 	for _, leafSig := range req.OperatorSpecificSignatures {
 		payloadHash, err := utils.HashOperatorSpecificTokenTransactionSignablePayload(leafSig.Payload)
 		if err != nil {

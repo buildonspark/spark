@@ -328,11 +328,11 @@ func (s *SparkInternalServer) ReturnLightningPayment(ctx context.Context, req *p
 }
 
 // StartTokenTransactionInternal validates a token transaction and saves it to the database.
-func (s *SparkInternalServer) StartTokenTransactionInternal(ctx context.Context, req *pb.StartTokenTransactionInternalRequest) (*pb.StartTokenTransactionInternalResponse, error) {
+func (s *SparkInternalServer) StartTokenTransactionInternal(ctx context.Context, req *pb.StartTokenTransactionInternalRequest) (*emptypb.Empty, error) {
 	tokenTransactionHandler := handler.NewInternalTokenTransactionHandler(s.config)
-	response, err := tokenTransactionHandler.StartTokenTransactionInternal(ctx, s.config, req)
+	_, err := tokenTransactionHandler.StartTokenTransactionInternal(ctx, s.config, req)
 	if err != nil {
 		return nil, err
 	}
-	return response, nil
+	return &emptypb.Empty{}, nil
 }

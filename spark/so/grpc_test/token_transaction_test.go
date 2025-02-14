@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
-	"github.com/google/uuid"
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
 	"github.com/lightsparkdev/spark-go/so/utils"
 	testutil "github.com/lightsparkdev/spark-go/test_util"
@@ -57,7 +56,6 @@ func TestBroadcastTokenTransactionIssueAndTransferTokens(t *testing.T) {
 		},
 		OutputLeaves: []*pb.TokenLeafOutput{
 			{
-				Id:                 uuid.New().String(), // Generate a unique ID for the leaf
 				OwnerPublicKey:     userLeaf1PubKeyBytes,
 				WithdrawalBondSats: 10000,                                         // Example bond amount
 				WithdrawalLocktime: uint64(time.Now().Add(24 * time.Hour).Unix()), // 24 hour locktime
@@ -65,7 +63,6 @@ func TestBroadcastTokenTransactionIssueAndTransferTokens(t *testing.T) {
 				TokenAmount:        int64ToUint128Bytes(0, 11111),                 // high bits = 0, low bits = 99999
 			},
 			{
-				Id:                 uuid.New().String(), // Generate a unique ID for the leaf
 				OwnerPublicKey:     userLeaf2PubKeyBytes,
 				WithdrawalBondSats: 10000,                                         // Example bond amount
 				WithdrawalLocktime: uint64(time.Now().Add(24 * time.Hour).Unix()), // 24 hour locktime
@@ -109,7 +106,6 @@ func TestBroadcastTokenTransactionIssueAndTransferTokens(t *testing.T) {
 		// Send the funds back to the issuer.
 		OutputLeaves: []*pb.TokenLeafOutput{
 			{
-				Id:                 uuid.New().String(), // Generate a unique ID for the leaf
 				OwnerPublicKey:     tokenIdentityPubKeyBytes,
 				WithdrawalBondSats: 10000,                                         // Example bond amount
 				WithdrawalLocktime: uint64(time.Now().Add(24 * time.Hour).Unix()), // 24 hour locktime

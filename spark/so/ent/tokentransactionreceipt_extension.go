@@ -98,7 +98,7 @@ func CreateStartedTransactionEntities(
 		if err != nil {
 			return nil, err
 		}
-		leafUUID, err := uuid.Parse(outputLeaf.Id)
+		leafUUID, err := uuid.Parse(*outputLeaf.Id)
 		if err != nil {
 			return nil, err
 		}

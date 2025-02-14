@@ -14,10 +14,10 @@ import (
 	pbinternal "github.com/lightsparkdev/spark-go/proto/spark_internal"
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/ent"
-	"github.com/lightsparkdev/spark-go/so/helper"
-
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
+	"github.com/lightsparkdev/spark-go/so/helper"
 	"github.com/lightsparkdev/spark-go/so/utils"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 // InternalTokenTransactionHandler is the deposit handler for so internal
@@ -30,37 +30,9 @@ func NewInternalTokenTransactionHandler(config *so.Config) *InternalTokenTransac
 	return &InternalTokenTransactionHandler{config: config}
 }
 
-func (h *InternalTokenTransactionHandler) StartTokenTransactionInternal(ctx context.Context, config *so.Config, req *pbinternal.StartTokenTransactionInternalRequest) (*pbinternal.StartTokenTransactionInternalResponse, error) {
-	err := utils.ValidatePartialTokenTransaction(req.PartialTokenTransaction, req.TokenTransactionSignatures, config.GetSigningOperatorList())
-	if err != nil {
-		return nil, fmt.Errorf("invalid final token transaction: %w", err)
-	}
-
-	// Validate the token transaction.
-	if req.PartialTokenTransaction.GetMintInput() != nil {
-		err = ValidateMint(req.PartialTokenTransaction, req.TokenTransactionSignatures)
-		if err != nil {
-			return nil, fmt.Errorf("invalid token transaction: %w", err)
-		}
-	}
-	var leafToSpendEnts []*ent.TokenLeaf
-	if req.PartialTokenTransaction.GetTransferInput() != nil {
-		// Get the leaves to spend from the database.
-		leafToSpendEnts, err = ent.FetchInputLeaves(ctx, req.PartialTokenTransaction.GetTransferInput().GetLeavesToSpend())
-		if err != nil {
-			return nil, fmt.Errorf("failed to fetch leaves to spend: %w", err)
-		}
-		if len(leafToSpendEnts) != len(req.PartialTokenTransaction.GetTransferInput().GetLeavesToSpend()) {
-			return nil, fmt.Errorf("failed to fetch all leaves to spend: got %d leaves, expected %d", len(leafToSpendEnts), len(req.PartialTokenTransaction.GetTransferInput().GetLeavesToSpend()))
-		}
-
-		err = ValidateTransferUsingPreviousTransactionData(req.PartialTokenTransaction, req.TokenTransactionSignatures, leafToSpendEnts)
-		if err != nil {
-			return nil, fmt.Errorf("error validating transfer using previous leaf data: %w", err)
-		}
-	}
-
+func (h *InternalTokenTransactionHandler) StartTokenTransactionInternal(ctx context.Context, config *so.Config, req *pbinternal.StartTokenTransactionInternalRequest) (*emptypb.Empty, error) {
 	keyshareUUIDs := make([]uuid.UUID, len(req.KeyshareIds))
+	// Ensure that the coordinator SO did not pass duplicate keyshare UUIDs for different leaves.
 	seenUUIDs := make(map[uuid.UUID]bool)
 	for i, id := range req.KeyshareIds {
 		uuid, err := uuid.Parse(id)
@@ -79,21 +51,51 @@ func (h *InternalTokenTransactionHandler) StartTokenTransactionInternal(ctx cont
 		log.Printf("Failed to mark keyshares as used: %v", err)
 		return nil, err
 	}
-
-	// Fill the used keyshare public keys as revocation public keys in the token transaction.
-	finalTokenTransaction := req.PartialTokenTransaction
-	for i, uuid := range keyshareUUIDs {
-		keyshare := keysharesMap[uuid]
-		finalTokenTransaction.OutputLeaves[i].RevocationPublicKey = keyshare.PublicKey
+	expectedRevocationPublicKeys := make([][]byte, len(req.KeyshareIds))
+	for i, id := range keyshareUUIDs {
+		keyshare, ok := keysharesMap[id]
+		if !ok {
+			return nil, fmt.Errorf("keyshare ID not found: %s", id)
+		}
+		expectedRevocationPublicKeys[i] = keyshare.PublicKey
 	}
 
+	// Validate the final token transaction.
+	err = utils.ValidateFinalTokenTransaction(req.FinalTokenTransaction, req.TokenTransactionSignatures, expectedRevocationPublicKeys, config.GetSigningOperatorList())
+	if err != nil {
+		return nil, fmt.Errorf("invalid final token transaction: %w", err)
+	}
+	if req.FinalTokenTransaction.GetMintInput() != nil {
+		err = ValidateMintSignature(req.FinalTokenTransaction, req.TokenTransactionSignatures)
+		if err != nil {
+			return nil, fmt.Errorf("invalid token transaction: %w", err)
+		}
+	}
+	var leafToSpendEnts []*ent.TokenLeaf
+	if req.FinalTokenTransaction.GetTransferInput() != nil {
+		// Get the leaves to spend from the database.
+		leafToSpendEnts, err = ent.FetchInputLeaves(ctx, req.FinalTokenTransaction.GetTransferInput().GetLeavesToSpend())
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch leaves to spend: %w", err)
+		}
+		if len(leafToSpendEnts) != len(req.FinalTokenTransaction.GetTransferInput().GetLeavesToSpend()) {
+			return nil, fmt.Errorf("failed to fetch all leaves to spend: got %d leaves, expected %d", len(leafToSpendEnts), len(req.FinalTokenTransaction.GetTransferInput().GetLeavesToSpend()))
+		}
+
+		err = ValidateTransferSignaturesUsingPreviousTransactionData(req.FinalTokenTransaction, req.TokenTransactionSignatures, leafToSpendEnts)
+		if err != nil {
+			return nil, fmt.Errorf("error validating transfer using previous leaf data: %w", err)
+		}
+	}
+
+	// Additionally validate the transaction with an LRC20 node.
 	conn, err := helper.ConnectToLrc20Node(config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to LRC20 node: %w", err)
 	}
 	defer conn.Close()
 	lrc20Client := pblrc20.NewSparkServiceClient(conn)
-	res, err := lrc20Client.VerifySparkTx(ctx, &pblrc20.VerifySparkTxRequest{FinalTokenTransaction: finalTokenTransaction})
+	res, err := lrc20Client.VerifySparkTx(ctx, &pblrc20.VerifySparkTxRequest{FinalTokenTransaction: req.FinalTokenTransaction})
 	if err != nil {
 		return nil, err
 	}
@@ -104,20 +106,19 @@ func (h *InternalTokenTransactionHandler) StartTokenTransactionInternal(ctx cont
 	}
 
 	// Save the token transaction receipt, created leaf ents, and update the leaves to spend.
-	_, err = ent.CreateStartedTransactionEntities(ctx, finalTokenTransaction, req.TokenTransactionSignatures, req.KeyshareIds, leafToSpendEnts)
+	_, err = ent.CreateStartedTransactionEntities(ctx, req.FinalTokenTransaction, req.TokenTransactionSignatures, req.KeyshareIds, leafToSpendEnts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to save token transaction receipt and leaf ents: %w", err)
 	}
 
-	return &pbinternal.StartTokenTransactionInternalResponse{
-		FinalTokenTransaction: finalTokenTransaction,
-	}, nil
+	return &emptypb.Empty{}, nil
 }
 
-func ValidateMint(
+func ValidateMintSignature(
 	tokenTransaction *pb.TokenTransaction,
 	tokenTransactionSignatures *pb.TokenTransactionSignatures,
 ) error {
+	// Although this token transaction is final we pass in 'true' to generate the partial hash.
 	partialTokenTransactionHash, err := utils.HashTokenTransaction(tokenTransaction, true)
 	if err != nil {
 		return fmt.Errorf("failed to hash token transaction: %w", err)
@@ -131,7 +132,7 @@ func ValidateMint(
 	return nil
 }
 
-func ValidateTransferUsingPreviousTransactionData(
+func ValidateTransferSignaturesUsingPreviousTransactionData(
 	tokenTransaction *pb.TokenTransaction,
 	tokenTransactionSignatures *pb.TokenTransactionSignatures,
 	leafToSpendEnts []*ent.TokenLeaf,
@@ -170,6 +171,7 @@ func ValidateTransferUsingPreviousTransactionData(
 	}
 
 	// Validate that the ownership signatures match the ownership public keys in the leaves to spend.
+	// Although this token transaction is final we pass in 'true' to generate the partial hash.
 	partialTokenTransactionHash, err := utils.HashTokenTransaction(tokenTransaction, true)
 	if err != nil {
 		return fmt.Errorf("failed to hash token transaction: %w", err)
