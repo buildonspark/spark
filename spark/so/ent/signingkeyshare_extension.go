@@ -345,8 +345,10 @@ func RunDKGIfNeeded(db *Tx, config *so.Config) error {
 
 func RunDKG(ctx context.Context, config *so.Config) error {
 	log.Printf("Running DKG")
-	connection, err := common.NewGRPCConnectionWithCert(config.DKGCoordinatorAddress, config.SigningOperatorMap[config.Identifier].CertPath)
+	dkgCoordinatorAddress := config.SigningOperatorMap[config.Identifier].Address
+	connection, err := common.NewGRPCConnectionWithCert(dkgCoordinatorAddress, config.SigningOperatorMap[config.Identifier].CertPath)
 	if err != nil {
+		log.Printf("Failed to create connection to DKG coordinator: %v, cert path: %v", err, config.SigningOperatorMap[config.Identifier].CertPath)
 		return err
 	}
 	defer connection.Close()
@@ -356,6 +358,7 @@ func RunDKG(ctx context.Context, config *so.Config) error {
 		Count: spark.DKGKeyCount,
 	})
 	if err != nil {
+		log.Printf("Failed to start DKG: %v", err)
 		return err
 	}
 
