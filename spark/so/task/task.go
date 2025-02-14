@@ -21,9 +21,8 @@ type Task struct {
 func AllTasks() []Task {
 	return []Task{
 		{
-			Duration: 10 * time.Second,
+			Duration: 1 * time.Minute,
 			Task: func(config *so.Config, db *ent.Client) error {
-				log.Printf("Running DKG if needed")
 				tx, err := db.Tx(context.Background())
 				if err != nil {
 					log.Printf("Failed to create transaction: %v", err)
