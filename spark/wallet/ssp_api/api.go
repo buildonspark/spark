@@ -80,7 +80,7 @@ func (s *SparkServiceAPI) RequestLeavesSwap(
 		"total_amount_sats":  totalAmountSats,
 		"target_amount_sats": targetAmountSats,
 		"fee_sats":           feeSats,
-		"network":            network.String(),
+		"network":            strings.ToUpper(network.String()),
 	}
 
 	response, err := s.Requester.ExecuteGraphqlWithContext(context.Background(), RequestLeavesSwapMutation, variables)
