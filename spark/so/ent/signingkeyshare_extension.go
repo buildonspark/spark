@@ -327,7 +327,7 @@ func AggregateKeyshares(ctx context.Context, config *so.Config, keyshares []*Sig
 }
 
 // RunDKGIfNeeded checks if the keyshare count is below the threshold and runs DKG if needed.
-func RunDKGIfNeeded(db *Tx, config *so.Config) error {
+func RunDKGIfNeeded(db *Client, config *so.Config) error {
 	count, err := db.SigningKeyshare.Query().Where(
 		signingkeyshare.StatusEQ(schema.KeyshareStatusAvailable),
 		signingkeyshare.CoordinatorIndexEQ(config.Index),

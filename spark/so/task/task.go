@@ -1,8 +1,6 @@
 package task
 
 import (
-	"context"
-	"log"
 	"time"
 
 	"github.com/lightsparkdev/spark-go/so"
@@ -23,12 +21,7 @@ func AllTasks() []Task {
 		{
 			Duration: 1 * time.Minute,
 			Task: func(config *so.Config, db *ent.Client) error {
-				tx, err := db.Tx(context.Background())
-				if err != nil {
-					log.Printf("Failed to create transaction: %v", err)
-					return err
-				}
-				return ent.RunDKGIfNeeded(tx, config)
+				return ent.RunDKGIfNeeded(db, config)
 			},
 		},
 	}

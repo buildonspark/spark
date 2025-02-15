@@ -314,23 +314,7 @@ func main() {
 
 func runDKGOnStartup(dbClient *ent.Client, config *so.Config) {
 	time.Sleep(5 * time.Second)
-
-	ctx := context.Background()
-	tx, err := dbClient.Tx(ctx)
-	if err != nil {
-		log.Printf("Failed to create db transaction: %v", err)
-	}
-	defer func() {
-		if p := recover(); p != nil {
-			tx.Rollback()
-		} else if err != nil {
-			tx.Rollback()
-		} else {
-			err = tx.Commit()
-		}
-	}()
-
-	err = ent.RunDKGIfNeeded(tx, config)
+	err := ent.RunDKGIfNeeded(dbClient, config)
 	if err != nil {
 		log.Printf("Failed to run DKG: %v", err)
 	}
