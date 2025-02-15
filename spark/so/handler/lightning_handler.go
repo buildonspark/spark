@@ -614,21 +614,25 @@ func (h *LightningHandler) ProvidePreimageInternal(ctx context.Context, req *pb.
 	if !bytes.Equal(calculatedPaymentHash[:], req.PaymentHash) {
 		return nil, fmt.Errorf("invalid preimage")
 	}
+	slog.Debug("ProvidePreimage: hash calculated")
 
 	preimageRequest, err := db.PreimageRequest.Query().Where(preimagerequest.PaymentHashEQ(req.PaymentHash)).First(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get preimage request: %v", err)
 	}
+	slog.Debug("ProvidePreimage: preimage request found")
 
 	preimageRequest, err = preimageRequest.Update().SetStatus(schema.PreimageRequestStatusPreimageShared).Save(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to update preimage request status: %v", err)
 	}
+	slog.Debug("ProvidePreimage: preimage request status updated")
 
 	transfer, err := preimageRequest.QueryTransfers().Only(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get transfer: %v", err)
 	}
+	slog.Debug("ProvidePreimage: transfer loaded")
 
 	// apply key tweaks for all transfer_leaves
 	transferHandler := NewTransferHandler(h.config)
@@ -651,25 +655,30 @@ func (h *LightningHandler) ProvidePreimageInternal(ctx context.Context, req *pb.
 			return nil, fmt.Errorf("unable to tweak leaf key: %v", err)
 		}
 	}
+	slog.Debug("ProvidePreimage: key tweaked")
 
 	transfer, err = transfer.Update().SetStatus(schema.TransferStatusSenderKeyTweaked).Save(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to update transfer status: %v", err)
 	}
+	slog.Debug("ProvidePreimage: transfer updated")
 
 	return transfer, nil
 }
 
 func (h *LightningHandler) ProvidePreimage(ctx context.Context, req *pb.ProvidePreimageRequest) (*pb.ProvidePreimageResponse, error) {
+	slog.Debug("ProvidePreimage: request received")
 	transfer, err := h.ProvidePreimageInternal(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("unable to provide preimage: %v", err)
 	}
+	slog.Debug("ProvidePreimage: provided preimage internal completed")
 
 	transferProto, err := transfer.MarshalProto(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to marshal transfer: %v", err)
 	}
+	slog.Debug("ProvidePreimage: transfer marshalled")
 
 	operatorSelection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
 	_, err = helper.ExecuteTaskWithAllOperators(ctx, h.config, &operatorSelection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
@@ -689,6 +698,7 @@ func (h *LightningHandler) ProvidePreimage(ctx context.Context, req *pb.ProvideP
 	if err != nil {
 		return nil, fmt.Errorf("unable to execute task with all operators: %v", err)
 	}
+	slog.Debug("ProvidePreimage: SO synced")
 
 	return &pb.ProvidePreimageResponse{Transfer: transferProto}, nil
 }
