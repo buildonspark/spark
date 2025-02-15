@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"sync"
 
 	"github.com/decred/dcrd/dcrec/secp256k1"
 	"github.com/google/uuid"
@@ -62,8 +63,16 @@ func (keyshare *SigningKeyshare) MarshalProto() *pb.SigningKeyshare {
 }
 
 // GetUnusedSigningKeyshares returns the available keyshares for the given coordinator index.
-func GetUnusedSigningKeyshares(ctx context.Context, config *so.Config, keyshareCount int) ([]*SigningKeyshare, error) {
-	signingKeyshares, err := GetDbFromContext(ctx).SigningKeyshare.Query().Where(
+func GetUnusedSigningKeyshares(ctx context.Context, lock *sync.Mutex, dbClient *Client, config *so.Config, keyshareCount int) ([]*SigningKeyshare, error) {
+	lock.Lock()
+	defer lock.Unlock()
+
+	tx, err := dbClient.Tx(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	signingKeyshares, err := tx.SigningKeyshare.Query().Where(
 		signingkeyshare.StatusEQ(schema.KeyshareStatusAvailable),
 		signingkeyshare.CoordinatorIndexEQ(config.Index),
 	).Limit(keyshareCount).All(ctx)
@@ -82,7 +91,17 @@ func GetUnusedSigningKeyshares(ctx context.Context, config *so.Config, keyshareC
 	}
 
 	for _, keyshare := range signingKeyshares {
-		log.Printf("Keyshare: %v, status: %v", keyshare.ID, keyshare.Status)
+		_, err := keyshare.Update().
+			SetStatus(schema.KeyshareStatusInUse).
+			Save(ctx)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return nil, err
 	}
 
 	return signingKeyshares, nil

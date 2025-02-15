@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"sync"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
@@ -24,12 +25,16 @@ import (
 // The TokenTransactionHandler is responsible for handling token transaction requests to spend and create leaves.
 type TokenTransactionHandler struct {
 	config authz.Config
+	lock   *sync.Mutex
+	db     *ent.Client
 }
 
 // NewTokenTransactionHandler creates a new TokenTransactionHandler.
-func NewTokenTransactionHandler(config authz.Config) *TokenTransactionHandler {
+func NewTokenTransactionHandler(config authz.Config, lock *sync.Mutex, db *ent.Client) *TokenTransactionHandler {
 	return &TokenTransactionHandler{
 		config: config,
+		lock:   lock,
+		db:     db,
 	}
 }
 
@@ -47,7 +52,7 @@ func (o TokenTransactionHandler) StartTokenTransaction(ctx context.Context, conf
 
 	// Each created leaf requires a keyshare for revocation key generation.
 	numRevocationKeysharesNeeded := len(req.PartialTokenTransaction.OutputLeaves)
-	keyshares, err := ent.GetUnusedSigningKeyshares(ctx, config, numRevocationKeysharesNeeded)
+	keyshares, err := ent.GetUnusedSigningKeyshares(ctx, o.lock, o.db, config, numRevocationKeysharesNeeded)
 	if err != nil {
 		return nil, err
 	}

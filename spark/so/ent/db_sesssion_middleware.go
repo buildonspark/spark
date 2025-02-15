@@ -24,7 +24,6 @@ func DbSessionMiddleware(dbClient *Client) grpc.UnaryServerInterceptor {
 
 		// Attach the transaction to the context
 		ctx = context.WithValue(ctx, TxKey, tx)
-
 		// Ensure rollback on panic
 		defer func() {
 			if r := recover(); r != nil {

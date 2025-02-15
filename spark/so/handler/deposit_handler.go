@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log"
+	"sync"
 
 	"github.com/btcsuite/btcd/wire"
 	"github.com/google/uuid"
@@ -24,12 +25,16 @@ import (
 // The DepositHandler is responsible for handling deposit related requests.
 type DepositHandler struct {
 	config *so.Config
+	lock   *sync.Mutex
+	db     *ent.Client
 }
 
 // NewDepositHandler creates a new DepositHandler.
-func NewDepositHandler(config *so.Config) *DepositHandler {
+func NewDepositHandler(config *so.Config, lock *sync.Mutex, db *ent.Client) *DepositHandler {
 	return &DepositHandler{
 		config: config,
+		lock:   lock,
+		db:     db,
 	}
 }
 
@@ -46,7 +51,7 @@ func (o *DepositHandler) GenerateDepositAddress(ctx context.Context, config *so.
 		return nil, err
 	}
 	log.Printf("Generating deposit address for public key: %s", hex.EncodeToString(req.SigningPublicKey))
-	keyshares, err := ent.GetUnusedSigningKeyshares(ctx, config, 1)
+	keyshares, err := ent.GetUnusedSigningKeyshares(ctx, o.lock, o.db, config, 1)
 	if err != nil {
 		return nil, err
 	}
@@ -57,12 +62,6 @@ func (o *DepositHandler) GenerateDepositAddress(ctx context.Context, config *so.
 	}
 
 	keyshare := keyshares[0]
-
-	_, err = ent.MarkSigningKeysharesAsUsed(ctx, config, []uuid.UUID{keyshare.ID})
-	if err != nil {
-		log.Printf("Failed to mark keyshare as used: %v", err)
-		return nil, err
-	}
 
 	selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
 	_, err = helper.ExecuteTaskWithAllOperators(ctx, config, &selection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {

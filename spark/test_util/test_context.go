@@ -9,19 +9,19 @@ import (
 )
 
 // TestContext returns a context with a database client that can be used for testing.
-func TestContext(config *so.Config) (context.Context, error) {
+func TestContext(config *so.Config) (context.Context, *ent.Client, error) {
 	dbDriver := config.DatabaseDriver()
 	dbClient, err := ent.Open(dbDriver, config.DatabasePath)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	ctx := context.Background()
 
 	tx, err := dbClient.Tx(ctx)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return context.WithValue(ctx, ent.TxKey, tx), nil
+	return context.WithValue(ctx, ent.TxKey, tx), dbClient, nil
 }

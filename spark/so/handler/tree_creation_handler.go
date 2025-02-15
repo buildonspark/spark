@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/btcsuite/btcd/wire"
 	"github.com/google/uuid"
@@ -22,11 +23,13 @@ import (
 // TreeCreationHandler is a handler for tree creation requests.
 type TreeCreationHandler struct {
 	config *so.Config
+	lock   *sync.Mutex
+	db     *ent.Client
 }
 
 // NewTreeCreationHandler creates a new TreeCreationHandler.
-func NewTreeCreationHandler(config *so.Config) *TreeCreationHandler {
-	return &TreeCreationHandler{config: config}
+func NewTreeCreationHandler(config *so.Config, lock *sync.Mutex, db *ent.Client) *TreeCreationHandler {
+	return &TreeCreationHandler{config: config, lock: lock, db: db}
 }
 
 func (h *TreeCreationHandler) findParentOutputFromUtxo(ctx context.Context, utxo *pb.UTXO) (*wire.TxOut, error) {
@@ -307,16 +310,7 @@ func (h *TreeCreationHandler) PrepareTreeAddress(ctx context.Context, req *pb.Pr
 		return nil, err
 	}
 
-	keyshares, err := ent.GetUnusedSigningKeyshares(ctx, h.config, keyCount)
-	if err != nil {
-		return nil, err
-	}
-
-	keysharesToMark := make([]uuid.UUID, 0)
-	for _, keyshare := range keyshares {
-		keysharesToMark = append(keysharesToMark, keyshare.ID)
-	}
-	_, err = ent.MarkSigningKeysharesAsUsed(ctx, h.config, keysharesToMark)
+	keyshares, err := ent.GetUnusedSigningKeyshares(ctx, h.lock, h.db, h.config, keyCount)
 	if err != nil {
 		return nil, err
 	}

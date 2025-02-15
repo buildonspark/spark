@@ -279,7 +279,7 @@ func main() {
 	sparkInternalServer := sparkgrpc.NewSparkInternalServer(config)
 	pbinternal.RegisterSparkInternalServiceServer(grpcServer, sparkInternalServer)
 
-	sparkServer := sparkgrpc.NewSparkServer(config)
+	sparkServer := sparkgrpc.NewSparkServer(config, dbClient)
 	pbspark.RegisterSparkServiceServer(grpcServer, sparkServer)
 
 	treeServer := sparkgrpc.NewSparkTreeServer(config, dbClient)
