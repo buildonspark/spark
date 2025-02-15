@@ -640,20 +640,25 @@ func (h *LightningHandler) ProvidePreimageInternal(ctx context.Context, req *pb.
 	if err != nil {
 		return nil, fmt.Errorf("unable to get transfer leaves: %v", err)
 	}
+	slog.Debug("ProvidePreimage: transfer leaves loaded")
 	for _, leaf := range transferLeaves {
+		slog.Debug("ProvidePreimage: tweaking leaf key started", "leafID", leaf.ID.String())
 		keyTweak := &pb.SendLeafKeyTweak{}
 		err := proto.Unmarshal(leaf.KeyTweak, keyTweak)
 		if err != nil {
 			return nil, fmt.Errorf("unable to unmarshal key tweak: %v", err)
 		}
+		slog.Debug("ProvidePreimage: key tweak unmarshalled")
 		treeNode, err := leaf.QueryLeaf().Only(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("unable to get tree node: %v", err)
 		}
+		slog.Debug("ProvidePreimage: treeNode loaded")
 		err = transferHandler.tweakLeafKey(ctx, treeNode, keyTweak, nil)
 		if err != nil {
 			return nil, fmt.Errorf("unable to tweak leaf key: %v", err)
 		}
+		slog.Debug("ProvidePreimage: tweaking leaf key ended")
 	}
 	slog.Debug("ProvidePreimage: key tweaked")
 

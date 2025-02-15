@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"log/slog"
 	"math/big"
 	"time"
 
@@ -361,6 +362,7 @@ func (h *TransferHandler) tweakLeafKey(ctx context.Context, leaf *ent.TreeNode, 
 	if err != nil || keyshare == nil {
 		return fmt.Errorf("unable to load keyshare for leaf %s: %v", req.LeafId, err)
 	}
+	slog.Debug("Transfer tweak key: keyshare loaded")
 	keyshare, err = keyshare.TweakKeyShare(
 		ctx,
 		req.SecretShareTweak.SecretShare,
@@ -370,12 +372,14 @@ func (h *TransferHandler) tweakLeafKey(ctx context.Context, leaf *ent.TreeNode, 
 	if err != nil || keyshare == nil {
 		return fmt.Errorf("unable to tweak keyshare %s for leaf %s: %v", keyshare.ID.String(), req.LeafId, err)
 	}
+	slog.Debug("Transfer tweak key: keyshare tweaked")
 
 	// Update leaf
 	signingPubkey, err := common.SubtractPublicKeys(leaf.VerifyingPubkey, keyshare.PublicKey)
 	if err != nil {
 		return fmt.Errorf("unable to calculate new signing pubkey for leaf %s: %v", req.LeafId, err)
 	}
+	slog.Debug("Transfer tweak key: signingPubkey calculated")
 	leafMutator := leaf.
 		Update().
 		SetOwnerSigningPubkey(signingPubkey)
@@ -386,6 +390,7 @@ func (h *TransferHandler) tweakLeafKey(ctx context.Context, leaf *ent.TreeNode, 
 	if err != nil || leaf == nil {
 		return fmt.Errorf("unable to update leaf %s: %v", req.LeafId, err)
 	}
+	slog.Debug("Transfer tweak key: leaf updated")
 	return nil
 }
 
