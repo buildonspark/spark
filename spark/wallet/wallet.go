@@ -303,3 +303,38 @@ func (w *SignleKeyWallet) RequestLeavesSwap(ctx context.Context, targetAmount in
 
 	return claimedNodes, nil
 }
+
+func (w *SignleKeyWallet) SendTransfer(ctx context.Context, receiverIdentityPubkey []byte, targetAmount int64) (*pb.Transfer, error) {
+	nodes, err := w.leafSelection(targetAmount)
+	if err != nil {
+		return nil, fmt.Errorf("failed to select nodes: %w", err)
+	}
+
+	leafKeyTweaks := make([]LeafKeyTweak, 0, len(nodes))
+	nodesToRemove := make(map[string]bool)
+	for _, node := range nodes {
+		newLeafPrivKey, err := secp256k1.GeneratePrivateKey()
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate new leaf private key: %w", err)
+		}
+		leafKeyTweaks = append(leafKeyTweaks, LeafKeyTweak{
+			Leaf:              node,
+			SigningPrivKey:    w.SigningPrivateKey,
+			NewSigningPrivKey: newLeafPrivKey.Serialize(),
+		})
+		nodesToRemove[node.Id] = true
+	}
+
+	transfer, err := SendTransfer(ctx, w.Config, leafKeyTweaks, receiverIdentityPubkey, time.Time{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to send transfer: %w", err)
+	}
+
+	for i, node := range w.OwnedNodes {
+		if nodesToRemove[node.Id] {
+			w.OwnedNodes = append(w.OwnedNodes[:i], w.OwnedNodes[i+1:]...)
+		}
+	}
+
+	return transfer, nil
+}

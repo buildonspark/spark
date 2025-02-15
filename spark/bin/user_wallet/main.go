@@ -273,6 +273,32 @@ func main() {
 			return nil
 		},
 	})
+
+	cli.registry.RegisterCommand(Command{
+		Name:        "send",
+		Description: "Send transfer",
+		Usage:       "send <receiver_identity_pubkey> <amount>",
+		Handler: func(args []string) error {
+			if len(args) < 2 {
+				return fmt.Errorf("please provide a receiver identity pubkey in hex string format and amount")
+			}
+			receiverIdentityPubkey, err := hex.DecodeString(args[0])
+			if err != nil {
+				return fmt.Errorf("invalid receiver identity pubkey: %w", err)
+			}
+			amount, err := strconv.ParseUint(args[1], 10, 64)
+			if err != nil {
+				return fmt.Errorf("invalid amount: %w", err)
+			}
+			transfer, err := cli.wallet.SendTransfer(context.Background(), receiverIdentityPubkey, int64(amount))
+			if err != nil {
+				return fmt.Errorf("failed to send transfer: %w", err)
+			}
+			fmt.Printf("Transfer sent: %s\n", transfer.Id)
+			return nil
+		},
+	})
+
 	cli.registry.RegisterCommand(Command{
 		Name:        "help",
 		Description: "Show available commands",
