@@ -154,9 +154,14 @@ func (w *SignleKeyWallet) PayInvoice(ctx context.Context, invoice string) (strin
 		return "", fmt.Errorf("failed to decode payment hash: %w", err)
 	}
 
-	_, err = SwapNodesForPreimage(ctx, w.Config, nodeKeyTweaks, w.Config.SparkServiceProviderIdentityPublicKey, paymentHash, &invoice, 0, false)
+	resp, err := SwapNodesForPreimage(ctx, w.Config, nodeKeyTweaks, w.Config.SparkServiceProviderIdentityPublicKey, paymentHash, &invoice, 0, false)
 	if err != nil {
 		return "", fmt.Errorf("failed to swap nodes for preimage: %w", err)
+	}
+
+	_, err = SendTransferTweakKey(ctx, w.Config, resp.Transfer, nodeKeyTweaks, nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to send transfer: %w", err)
 	}
 
 	requester, err := sspapi.NewRequesterWithBaseURL(hex.EncodeToString(w.Config.IdentityPublicKey()), nil)
