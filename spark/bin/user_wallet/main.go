@@ -286,6 +286,32 @@ func main() {
 		},
 	})
 
+	cli.registry.RegisterCommand(Command{
+		Name:        "swap",
+		Description: "Swap leaves",
+		Usage:       "swap <amount>",
+		Handler: func(args []string) error {
+			if len(args) < 1 {
+				return fmt.Errorf("please provide an amount")
+			}
+			amount, err := strconv.ParseUint(args[0], 10, 64)
+			if err != nil {
+				return fmt.Errorf("invalid amount: %w", err)
+			}
+			nodes, err := cli.wallet.RequestLeavesSwap(context.Background(), int64(amount))
+			if err != nil {
+				return fmt.Errorf("failed to request leaves swap: %w", err)
+			}
+			amountClaimed := 0
+			for _, node := range nodes {
+				amountClaimed += int(node.Value)
+				fmt.Printf("Swapped node %s for %d sats\n", node.Id, node.Value)
+			}
+			fmt.Printf("Total amount claimed: %d sats\n", amountClaimed)
+			return nil
+		},
+	})
+
 	// Start the CLI
 	if err := cli.Run(); err != nil {
 		fmt.Printf("Error running CLI: %v\n", err)

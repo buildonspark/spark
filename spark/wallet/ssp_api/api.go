@@ -67,3 +67,47 @@ func (s *SparkServiceAPI) PayInvoice(
 	request := response["request_lightning_send"].(map[string]interface{})["request"].(map[string]interface{})
 	return request["id"].(string), nil
 }
+
+func (s *SparkServiceAPI) RequestLeavesSwap(
+	adaptorPubkey string,
+	totalAmountSats uint64,
+	targetAmountSats uint64,
+	feeSats uint64,
+	network common.Network,
+) (string, error) {
+	variables := map[string]interface{}{
+		"adaptor_pubkey":     adaptorPubkey,
+		"total_amount_sats":  totalAmountSats,
+		"target_amount_sats": targetAmountSats,
+		"fee_sats":           feeSats,
+		"network":            network.String(),
+	}
+
+	response, err := s.Requester.ExecuteGraphqlWithContext(context.Background(), RequestLeavesSwapMutation, variables)
+	if err != nil {
+		return "", err
+	}
+
+	request := response["request_leaves_swap"].(map[string]interface{})["request"].(map[string]interface{})["id"].(string)
+	return request, nil
+}
+
+func (s *SparkServiceAPI) CompleteLeavesSwap(
+	adaptorSecretKey string,
+	userOutboundTransferExternalID string,
+	leavesSwapRequestID string,
+) (string, error) {
+	variables := map[string]interface{}{
+		"adaptor_secret_key":                 adaptorSecretKey,
+		"user_outbound_transfer_external_id": userOutboundTransferExternalID,
+		"leaves_swap_request_id":             leavesSwapRequestID,
+	}
+
+	response, err := s.Requester.ExecuteGraphqlWithContext(context.Background(), CompleteLeavesSwapMutation, variables)
+	if err != nil {
+		return "", err
+	}
+
+	request := response["complete_leaves_swap"].(map[string]interface{})["request"].(map[string]interface{})["id"].(string)
+	return request, nil
+}

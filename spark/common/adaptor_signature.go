@@ -31,6 +31,24 @@ func GenerateAdaptorFromSignature(signature []byte) ([]byte, []byte, error) {
 	return newSig.serialize(), adaptorPrivateKey.Serialize(), nil
 }
 
+func GenerateSignatureFromExistingAdaptor(signature []byte, adaptorPrivateKeyBytes []byte) ([]byte, error) {
+	adaptorPrivateKey, _ := btcec.PrivKeyFromBytes(adaptorPrivateKeyBytes)
+
+	sig, err := parseSignature(signature)
+	if err != nil {
+		return nil, err
+	}
+
+	t := adaptorPrivateKey.Key
+	t.Negate()
+	newS := sig.s
+	newS.Add(&t)
+
+	newSig := newSignature(&sig.r, &newS)
+
+	return newSig.serialize(), nil
+}
+
 // ValidateOutboundAdaptorSignature validates a adaptor signature from creator of the adaptor.
 func ValidateOutboundAdaptorSignature(pubkey *btcec.PublicKey, hash []byte, signature []byte, adaptorPubkey []byte) error {
 	sig, err := parseSignature(signature)

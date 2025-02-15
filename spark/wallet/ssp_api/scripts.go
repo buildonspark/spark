@@ -127,3 +127,59 @@ mutation RequestLightningReceive(
   }
 }
 `
+
+const CompleteCoopExitMutation = `
+mutation CompleteCoopExit(
+  $user_outbound_transfer_external_id: UUID!
+  $coop_exit_request_id: ID!
+) {
+  complete_coop_exit(input: {
+    user_outbound_transfer_external_id: $user_outbound_transfer_external_id
+    coop_exit_request_id: $coop_exit_request_id
+  }) {
+    request {
+      id
+    }
+  }
+}
+`
+
+const RequestLeavesSwapMutation = `
+mutation RequestLeavesSwap(
+  $adaptor_pubkey: String!
+  $total_amount_sats: Int!
+  $target_amount_sats: Int!
+  $fee_sats: Int!
+  $network: BitcoinNetwork!
+) {
+  request_leaves_swap(input: {
+    adaptor_pubkey: $adaptor_pubkey
+    total_amount_sats: $total_amount_sats
+    target_amount_sats: $target_amount_sats
+    fee_sats: $fee_sats
+    network: $network
+  }) {
+    request {
+      id
+    }
+  }
+}
+`
+
+const CompleteLeavesSwapMutation = `
+mutation CompleteLeavesSwap(
+  $adaptor_secret_key: String!
+  $user_outbound_transfer_external_id: UUID!
+  $leaves_swap_request_id: ID!
+) {
+  complete_leaves_swap(input: {
+    adaptor_secret_key: $adaptor_secret_key
+    user_outbound_transfer_external_id: $user_outbound_transfer_external_id
+    leaves_swap_request_id: $leaves_swap_request_id
+  }) {
+    request {
+      id
+    }
+  }
+}
+`

@@ -35,7 +35,6 @@ func DbSessionMiddleware(dbClient *Client) grpc.UnaryServerInterceptor {
 
 		// Call the handler (the actual RPC method)
 		resp, err := handler(ctx, req)
-
 		// Handle transaction commit/rollback
 		if err != nil {
 			if dberr := tx.Rollback(); dberr != nil {

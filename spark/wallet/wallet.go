@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"time"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lightsparkdev/spark-go/common"
@@ -97,6 +98,28 @@ func (w *SignleKeyWallet) leafSelection(targetAmount int64) ([]*pb.TreeNode, err
 	return nil, fmt.Errorf("there's no exact match for the target amount")
 }
 
+func (w *SignleKeyWallet) leafSelectionForSwap(targetAmount int64) ([]*pb.TreeNode, int64, error) {
+	sort.Slice(w.OwnedNodes, func(i, j int) bool {
+		return w.OwnedNodes[i].Value < w.OwnedNodes[j].Value
+	})
+
+	amount := int64(0)
+	nodes := make([]*pb.TreeNode, 0)
+	for _, node := range w.OwnedNodes {
+		if amount < targetAmount {
+			amount += int64(node.Value)
+			nodes = append(nodes, node)
+		}
+	}
+	if amount > targetAmount {
+		return nodes, amount, nil
+	}
+	if amount == targetAmount {
+		return nil, amount, fmt.Errorf("you're trying to swap for the exact amount you have, no need to swap")
+	}
+	return nil, amount, fmt.Errorf("you don't have enough nodes to swap for the target amount")
+}
+
 func (w *SignleKeyWallet) PayInvoice(ctx context.Context, invoice string) (string, error) {
 	// TODO: query fee
 
@@ -181,4 +204,102 @@ func (w *SignleKeyWallet) SyncWallet(ctx context.Context) error {
 		}
 	}
 	return nil
+}
+
+func (w *SignleKeyWallet) RequestLeavesSwap(ctx context.Context, targetAmount int64) ([]*pb.TreeNode, error) {
+	// Claim all transfers to get the latest leaves
+	_, err := w.ClaimAllTransfers(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to claim all transfers: %w", err)
+	}
+
+	nodes, totalAmount, err := w.leafSelectionForSwap(targetAmount)
+	if err != nil {
+		return nil, fmt.Errorf("failed to select nodes: %w", err)
+	}
+
+	leafKeyTweaks := make([]LeafKeyTweak, 0, len(nodes))
+	nodesToRemove := make(map[string]bool)
+	for _, node := range nodes {
+		newLeafPrivKey, err := secp256k1.GeneratePrivateKey()
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate new leaf private key: %w", err)
+		}
+		leafKeyTweaks = append(leafKeyTweaks, LeafKeyTweak{
+			Leaf:              node,
+			SigningPrivKey:    w.SigningPrivateKey,
+			NewSigningPrivKey: newLeafPrivKey.Serialize(),
+		})
+		nodesToRemove[node.Id] = true
+	}
+
+	// Get signature for refunds (normal flow)
+	transfer, refundSignatureMap, _, err := SendTransferSignRefund(
+		ctx,
+		w.Config,
+		leafKeyTweaks[:],
+		w.Config.SparkServiceProviderIdentityPublicKey,
+		time.Now().Add(10*time.Minute),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send transfer sign refund: %w", err)
+	}
+
+	// This signature needs to be sent to the SSP.
+	_, adaptorPrivKeyBytes, err := common.GenerateAdaptorFromSignature(refundSignatureMap[nodes[0].Id])
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate adaptor: %w", err)
+	}
+
+	adaptorPrivateKey := secp256k1.PrivKeyFromBytes(adaptorPrivKeyBytes)
+	adaptorPubKey := adaptorPrivateKey.PubKey()
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse adaptor private key: %w", err)
+	}
+
+	requester, err := sspapi.NewRequesterWithBaseURL(hex.EncodeToString(w.Config.IdentityPublicKey()), nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create requester: %w", err)
+	}
+	api := sspapi.NewSparkServiceAPI(requester)
+
+	requestID, err := api.RequestLeavesSwap(hex.EncodeToString(adaptorPubKey.SerializeCompressed()), uint64(totalAmount), uint64(targetAmount), 0, w.Config.Network)
+	if err != nil {
+		return nil, fmt.Errorf("failed to request leaves swap: %w", err)
+	}
+
+	_, err = api.CompleteLeavesSwap(hex.EncodeToString(adaptorPrivKeyBytes), transfer.Id, requestID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to complete leaves swap: %w", err)
+	}
+
+	claimedNodes, err := w.ClaimAllTransfers(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to claim all transfers: %w", err)
+	}
+
+	amountClaimed := int64(0)
+	for _, node := range claimedNodes {
+		amountClaimed += int64(node.Value)
+	}
+
+	// TODO: accomodate for fees
+	if amountClaimed != totalAmount {
+		return nil, fmt.Errorf("amount claimed is not equal to the total amount")
+	}
+
+	// send the transfer
+	_, err = SendTransferTweakKey(ctx, w.Config, transfer, leafKeyTweaks, refundSignatureMap)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send transfer: %w", err)
+	}
+
+	for i, node := range w.OwnedNodes {
+		if nodesToRemove[node.Id] {
+			w.OwnedNodes = append(w.OwnedNodes[:i], w.OwnedNodes[i+1:]...)
+		}
+	}
+
+	return claimedNodes, nil
 }
