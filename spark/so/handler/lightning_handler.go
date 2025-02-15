@@ -576,6 +576,15 @@ func (h *LightningHandler) QueryUserSignedRefunds(ctx context.Context, req *pb.Q
 		return nil, fmt.Errorf("unable to get preimage request: %v", err)
 	}
 
+	transfer, err := preimageRequest.QueryTransfers().Only(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get transfer: %v", err)
+	}
+
+	if transfer.Status != schema.TransferStatusSenderKeyTweakPending {
+		return nil, fmt.Errorf("transfer is not in the sender key tweak pending status, status: %s", transfer.Status)
+	}
+
 	userSignedRefunds, err := preimageRequest.QueryTransactions().All(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get user signed transactions: %v", err)
