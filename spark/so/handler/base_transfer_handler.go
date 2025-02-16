@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/btcsuite/btcd/wire"
@@ -48,6 +49,7 @@ func validateLeafRefundTxOutput(refundTx *wire.MsgTx, receiverIdentityPublicKey 
 func validateLeafRefundTxInput(refundTx *wire.MsgTx, oldSequence uint32, leafOutPoint *wire.OutPoint, expectedInputCount uint32) error {
 	newTimeLock := refundTx.TxIn[0].Sequence & 0xFFFF
 	oldTimeLock := oldSequence & 0xFFFF
+	slog.Debug("oldSequence: %v, newSequence: %v", oldTimeLock, refundTx.TxIn[0].Sequence)
 	if newTimeLock >= oldTimeLock {
 		return fmt.Errorf("time lock on the new refund tx, %d, must be less than the old one, %d", newTimeLock, oldTimeLock)
 	}
