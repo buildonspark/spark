@@ -64,7 +64,7 @@ func (r *CommandRegistry) ListCommands() []Command {
 type CLI struct {
 	registry *CommandRegistry
 	reader   *bufio.Reader
-	wallet   *wallet.SignleKeyWallet
+	wallet   *wallet.SingleKeyWallet
 }
 
 // NewCLI creates a new CLI instance
@@ -140,7 +140,7 @@ func (cli *CLI) Run() error {
 		return fmt.Errorf("failed to create test wallet config: %w", err)
 	}
 
-	cli.wallet = wallet.NewSignleKeyWallet(config, signingKey.Key)
+	cli.wallet = wallet.NewSingleKeyWallet(config, signingKey.Key)
 
 	fmt.Println("\nWallet initialized. Ready for commands.")
 
@@ -335,6 +335,92 @@ func main() {
 				fmt.Printf("Swapped node %s for %d sats\n", node.Id, node.Value)
 			}
 			fmt.Printf("Total amount claimed: %d sats\n", amountClaimed)
+			return nil
+		},
+	})
+
+	cli.registry.RegisterCommand(Command{
+		Name:        "mint_tokens",
+		Description: "Mint tokens",
+		Usage:       "mint_tokens <amount>",
+		Handler: func(args []string) error {
+			if len(args) < 1 {
+				return fmt.Errorf("please provide an amount")
+			}
+			amount, err := strconv.ParseUint(args[0], 10, 64)
+			if err != nil {
+				return fmt.Errorf("invalid amount: %w", err)
+			}
+
+			fmt.Printf("Minting %d tokens with token public key %s\n", amount, hex.EncodeToString(cli.wallet.Config.IdentityPublicKey()))
+			err = cli.wallet.MintTokens(context.Background(), amount)
+			if err != nil {
+				return fmt.Errorf("failed to mint tokens: %w", err)
+			}
+			fmt.Printf("%d tokens minted\n", amount)
+			return nil
+		},
+	})
+
+	cli.registry.RegisterCommand(Command{
+		Name:        "transfer_tokens",
+		Description: "Transfer tokens",
+		Usage:       "transfer_tokens <amount> <receiver_public_key>",
+		Handler: func(args []string) error {
+			if len(args) < 2 {
+				return fmt.Errorf("please provide an amount and receiver public key")
+			}
+			amount, err := strconv.ParseUint(args[0], 10, 64)
+			if err != nil {
+				return fmt.Errorf("invalid amount: %w", err)
+			}
+			receiverPublicKey, err := hex.DecodeString(args[1])
+			if err != nil {
+				return fmt.Errorf("invalid receiver public key: failed to decode hex string: %w", err)
+			}
+			if len(receiverPublicKey) != 33 {
+				return fmt.Errorf("invalid receiver public key: decoded bytes must be 33 bytes (66 hex characters), got %d bytes from %d hex characters: %s",
+					len(receiverPublicKey),
+					len(args[1]),
+					args[1])
+			}
+			fmt.Printf("Transferring %d tokens to public key %s\n", amount, args[1])
+			err = cli.wallet.TransferTokens(context.Background(), amount, receiverPublicKey)
+			if err != nil {
+				return fmt.Errorf("failed to transfer tokens: %w", err)
+			}
+			fmt.Printf("%d tokens transferred with Token Public Key: %s\n", amount, hex.EncodeToString(cli.wallet.Config.IdentityPublicKey()))
+			return nil
+		},
+	})
+
+	cli.registry.RegisterCommand(Command{
+		Name:        "token_balance",
+		Description: "Get token balance for a specific token public key",
+		Usage:       "token_balance",
+		Handler: func(args []string) error {
+			if len(args) < 1 {
+				return fmt.Errorf("please provide a token public key in hex string format")
+			}
+			tokenPublicKey, err := hex.DecodeString(args[0])
+			if err != nil {
+				return fmt.Errorf("invalid token public key: failed to decode hex string: %w", err)
+			}
+			if len(tokenPublicKey) != 33 {
+				return fmt.Errorf("invalid token public key: decoded bytes must be 33 bytes (66 hex characters), got %d bytes from %d hex characters: %s",
+					len(tokenPublicKey),
+					len(args[0]),
+					args[0])
+			}
+
+			numLeaves, totalAmount, err := cli.wallet.GetTokenBalance(context.Background(), tokenPublicKey)
+			if err != nil {
+				return fmt.Errorf("failed to get token balance: %w", err)
+			}
+
+			fmt.Printf("Token Public Key: %s\n", args[0])
+			fmt.Printf("Number of leaves: %d\n", numLeaves)
+			fmt.Printf("Total amount: %d tokens\n", totalAmount)
 			return nil
 		},
 	})

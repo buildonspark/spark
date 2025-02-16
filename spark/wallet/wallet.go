@@ -1,7 +1,9 @@
 package wallet
 
 import (
+	"bytes"
 	"context"
+	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"math"
@@ -12,27 +14,29 @@ import (
 	"github.com/lightsparkdev/spark-go/common"
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
+	"github.com/lightsparkdev/spark-go/so/utils"
 	sspapi "github.com/lightsparkdev/spark-go/wallet/ssp_api"
 	decodepay "github.com/nbd-wtf/ln-decodepay"
 )
 
-// SignleKeyWallet is a wallet that uses a single private key for all signing keys.
+// SingleKeyWallet is a wallet that uses a single private key for all signing keys.
 // This is the most simple type of wallet and for testing purposes only.
-type SignleKeyWallet struct {
+type SingleKeyWallet struct {
 	Config            *Config
 	SigningPrivateKey []byte
 	OwnedNodes        []*pb.TreeNode
+	OwnedTokenLeaves  []*pb.LeafWithPreviousTransactionData
 }
 
-// NewSignleKeyWallet creates a new single key wallet.
-func NewSignleKeyWallet(config *Config, signingPrivateKey []byte) *SignleKeyWallet {
-	return &SignleKeyWallet{
+// NewSingleKeyWallet creates a new single key wallet.
+func NewSingleKeyWallet(config *Config, signingPrivateKey []byte) *SingleKeyWallet {
+	return &SingleKeyWallet{
 		Config:            config,
 		SigningPrivateKey: signingPrivateKey,
 	}
 }
 
-func (w *SignleKeyWallet) CreateLightningInvoice(ctx context.Context, amount int64, memo string) (*string, int64, error) {
+func (w *SingleKeyWallet) CreateLightningInvoice(ctx context.Context, amount int64, memo string) (*string, int64, error) {
 	requester, err := sspapi.NewRequesterWithBaseURL(hex.EncodeToString(w.Config.IdentityPublicKey()), nil)
 	if err != nil {
 		return nil, 0, err
@@ -45,7 +49,7 @@ func (w *SignleKeyWallet) CreateLightningInvoice(ctx context.Context, amount int
 	return invoice, fees, nil
 }
 
-func (w *SignleKeyWallet) ClaimAllTransfers(ctx context.Context) ([]*pb.TreeNode, error) {
+func (w *SingleKeyWallet) ClaimAllTransfers(ctx context.Context) ([]*pb.TreeNode, error) {
 	pendingTransfers, err := QueryPendingTransfers(ctx, w.Config)
 	if err != nil {
 		return nil, err
@@ -79,7 +83,7 @@ func (w *SignleKeyWallet) ClaimAllTransfers(ctx context.Context) ([]*pb.TreeNode
 	return nodesResult, nil
 }
 
-func (w *SignleKeyWallet) leafSelection(targetAmount int64) ([]*pb.TreeNode, error) {
+func (w *SingleKeyWallet) leafSelection(targetAmount int64) ([]*pb.TreeNode, error) {
 	sort.Slice(w.OwnedNodes, func(i, j int) bool {
 		return w.OwnedNodes[i].Value > w.OwnedNodes[j].Value
 	})
@@ -98,7 +102,7 @@ func (w *SignleKeyWallet) leafSelection(targetAmount int64) ([]*pb.TreeNode, err
 	return nil, fmt.Errorf("there's no exact match for the target amount")
 }
 
-func (w *SignleKeyWallet) leafSelectionForSwap(targetAmount int64) ([]*pb.TreeNode, int64, error) {
+func (w *SingleKeyWallet) leafSelectionForSwap(targetAmount int64) ([]*pb.TreeNode, int64, error) {
 	sort.Slice(w.OwnedNodes, func(i, j int) bool {
 		return w.OwnedNodes[i].Value < w.OwnedNodes[j].Value
 	})
@@ -120,7 +124,7 @@ func (w *SignleKeyWallet) leafSelectionForSwap(targetAmount int64) ([]*pb.TreeNo
 	return nil, amount, fmt.Errorf("you don't have enough nodes to swap for the target amount")
 }
 
-func (w *SignleKeyWallet) PayInvoice(ctx context.Context, invoice string) (string, error) {
+func (w *SingleKeyWallet) PayInvoice(ctx context.Context, invoice string) (string, error) {
 	// TODO: query fee
 
 	bolt11, err := decodepay.Decodepay(invoice)
@@ -183,7 +187,7 @@ func (w *SignleKeyWallet) PayInvoice(ctx context.Context, invoice string) (strin
 	return requestID, nil
 }
 
-func (w *SignleKeyWallet) SyncWallet(ctx context.Context) error {
+func (w *SingleKeyWallet) SyncWallet(ctx context.Context) error {
 	conn, err := common.NewGRPCConnectionWithTestTLS(w.Config.CoodinatorAddress())
 	if err != nil {
 		return fmt.Errorf("failed to connect to operator: %w", err)
@@ -211,7 +215,7 @@ func (w *SignleKeyWallet) SyncWallet(ctx context.Context) error {
 	return nil
 }
 
-func (w *SignleKeyWallet) RequestLeavesSwap(ctx context.Context, targetAmount int64) ([]*pb.TreeNode, error) {
+func (w *SingleKeyWallet) RequestLeavesSwap(ctx context.Context, targetAmount int64) ([]*pb.TreeNode, error) {
 	// Claim all transfers to get the latest leaves
 	_, err := w.ClaimAllTransfers(ctx)
 	if err != nil {
@@ -309,7 +313,7 @@ func (w *SignleKeyWallet) RequestLeavesSwap(ctx context.Context, targetAmount in
 	return claimedNodes, nil
 }
 
-func (w *SignleKeyWallet) SendTransfer(ctx context.Context, receiverIdentityPubkey []byte, targetAmount int64) (*pb.Transfer, error) {
+func (w *SingleKeyWallet) SendTransfer(ctx context.Context, receiverIdentityPubkey []byte, targetAmount int64) (*pb.Transfer, error) {
 	nodes, err := w.leafSelection(targetAmount)
 	if err != nil {
 		return nil, fmt.Errorf("failed to select nodes: %w", err)
@@ -342,4 +346,249 @@ func (w *SignleKeyWallet) SendTransfer(ctx context.Context, receiverIdentityPubk
 	}
 
 	return transfer, nil
+}
+
+// For simplicity always mint directly to the issuer wallet (eg. owner == token public key)
+func (w *SingleKeyWallet) MintTokens(ctx context.Context, amount uint64) error {
+	conn, err := common.NewGRPCConnectionWithTestTLS(w.Config.CoodinatorAddress())
+	if err != nil {
+		return fmt.Errorf("failed to connect to operator: %w", err)
+	}
+	defer conn.Close()
+
+	token, err := AuthenticateWithConnection(ctx, w.Config, conn)
+	if err != nil {
+		return fmt.Errorf("failed to authenticate: %w", err)
+	}
+	ctx = ContextWithToken(ctx, token)
+
+	tokenIdentityPubKeyBytes := w.Config.IdentityPublicKey()
+	mintTransaction := &pb.TokenTransaction{
+		TokenInput: &pb.TokenTransaction_MintInput{
+			MintInput: &pb.MintInput{
+				IssuerPublicKey: tokenIdentityPubKeyBytes,
+			},
+		},
+		OutputLeaves: []*pb.TokenLeafOutput{
+			{
+				OwnerPublicKey: tokenIdentityPubKeyBytes,
+				TokenPublicKey: tokenIdentityPubKeyBytes,       // Using user pubkey as token ID for this example
+				TokenAmount:    int64ToUint128Bytes(0, amount), // high bits = 0, low bits = 99999
+			},
+		},
+	}
+	finalTokenTransaction, err := BroadcastTokenTransaction(ctx, w.Config, mintTransaction,
+		[]*secp256k1.PrivateKey{&w.Config.IdentityPrivateKey},
+		nil,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to broadcast mint transaction: %w", err)
+	}
+	newOwnedLeaves, err := getOwnedLeavesFromTokenTransaction(finalTokenTransaction, w.Config.IdentityPublicKey())
+	if err != nil {
+		return fmt.Errorf("failed to add owned leaves: %w", err)
+	}
+	w.OwnedTokenLeaves = append(w.OwnedTokenLeaves, newOwnedLeaves...)
+	return nil
+}
+
+// For simplicity always use the wallet's identity public key as the token public key.
+func (w *SingleKeyWallet) TransferTokens(ctx context.Context, amount uint64, receiverPubKey []byte) error {
+	conn, err := common.NewGRPCConnectionWithTestTLS(w.Config.CoodinatorAddress())
+	if err != nil {
+		return fmt.Errorf("failed to connect to operator: %w", err)
+	}
+	defer conn.Close()
+
+	token, err := AuthenticateWithConnection(ctx, w.Config, conn)
+	if err != nil {
+		return fmt.Errorf("failed to authenticate: %w", err)
+	}
+	ctx = ContextWithToken(ctx, token)
+	selectedLeavesWithPrevTxData, selectedLeavesAmount, err := selectTokenLeaves(amount, w.OwnedTokenLeaves)
+	if err != nil {
+		return fmt.Errorf("failed to select token leaves: %w", err)
+	}
+
+	leavesToSpend := make([]*pb.TokenLeafToSpend, len(selectedLeavesWithPrevTxData))
+	revocationPublicKeys := make([][]byte, len(selectedLeavesWithPrevTxData))
+	leavesToSpendPrivateKeys := make([]*secp256k1.PrivateKey, len(selectedLeavesWithPrevTxData))
+	for i, leaf := range selectedLeavesWithPrevTxData {
+		leavesToSpend[i] = &pb.TokenLeafToSpend{
+			PrevTokenTransactionHash:     leaf.GetPreviousTransactionHash(),
+			PrevTokenTransactionLeafVout: leaf.GetPreviousTransactionVout(),
+		}
+		revocationPublicKeys[i] = leaf.Leaf.RevocationPublicKey
+		// Assume all leaves to spend are owned by the wallet.
+		leavesToSpendPrivateKeys[i] = &w.Config.IdentityPrivateKey
+	}
+
+	transferTransaction := &pb.TokenTransaction{
+		TokenInput: &pb.TokenTransaction_TransferInput{
+			TransferInput: &pb.TransferInput{
+				LeavesToSpend: leavesToSpend,
+			},
+		},
+		OutputLeaves: []*pb.TokenLeafOutput{
+			{
+				OwnerPublicKey: receiverPubKey,
+				TokenPublicKey: w.Config.IdentityPublicKey(),
+				TokenAmount:    int64ToUint128Bytes(0, uint64(amount)),
+			},
+		},
+	}
+
+	// Send the remainder back to our wallet with an additional output if necessary.
+	if selectedLeavesAmount > amount {
+		remainder := selectedLeavesAmount - amount
+		changeOutput := &pb.TokenLeafOutput{
+			OwnerPublicKey: w.Config.IdentityPublicKey(),
+			TokenPublicKey: w.Config.IdentityPublicKey(),
+			TokenAmount:    int64ToUint128Bytes(0, remainder),
+		}
+		transferTransaction.OutputLeaves = append(transferTransaction.OutputLeaves, changeOutput)
+	}
+
+	finalTokenTransaction, err := BroadcastTokenTransaction(ctx, w.Config, transferTransaction, leavesToSpendPrivateKeys,
+		revocationPublicKeys,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to broadcast transfer transaction: %w", err)
+	}
+	// Remove the spent leaves from the owned leaves list.
+	spentLeafMap := make(map[string]bool)
+	j := 0
+	for _, leaf := range selectedLeavesWithPrevTxData {
+		spentLeafMap[getLeafWithPrevTxKey(leaf)] = true
+	}
+	for i := range w.OwnedTokenLeaves {
+		if !spentLeafMap[getLeafWithPrevTxKey(w.OwnedTokenLeaves[i])] {
+			w.OwnedTokenLeaves[j] = w.OwnedTokenLeaves[i]
+			j++
+		}
+	}
+	w.OwnedTokenLeaves = w.OwnedTokenLeaves[:j]
+
+	// Add the created leaves to the owned leaves list.
+	newOwnedLeaves, err := getOwnedLeavesFromTokenTransaction(finalTokenTransaction, w.Config.IdentityPublicKey())
+	if err != nil {
+		return fmt.Errorf("failed to add owned leaves: %w", err)
+	}
+	w.OwnedTokenLeaves = append(w.OwnedTokenLeaves, newOwnedLeaves...)
+
+	return nil
+}
+
+// For simplicity always use the wallet's identity public key as the token public key.
+func (w *SingleKeyWallet) GetTokenBalance(ctx context.Context, tokenPublicKey []byte) (int, uint64, error) {
+	// Claim all transfers first to ensure we have the latest state
+	_, err := w.ClaimAllTransfers(ctx)
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to claim all transfers: %w", err)
+	}
+
+	// Call the GetOwnedTokenLeaves function with the wallet's identity public key
+	response, err := GetOwnedTokenLeaves(
+		ctx,
+		w.Config,
+		w.Config.IdentityPublicKey(),
+		tokenPublicKey,
+	)
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to get owned token leaves: %w", err)
+	}
+
+	// Calculate total amount across all leaves
+	totalAmount := uint64(0)
+	for _, leaf := range response.LeavesWithPreviousTransactionData {
+		_, amount, err := uint128BytesToInt64(leaf.Leaf.TokenAmount)
+		if err != nil {
+			return 0, 0, fmt.Errorf("invalid token amount in leaf: %w", err)
+		}
+		totalAmount += amount
+	}
+
+	return len(response.LeavesWithPreviousTransactionData), totalAmount, nil
+}
+
+func selectTokenLeaves(targetAmount uint64, leavesWithPrevTxData []*pb.LeafWithPreviousTransactionData) ([]*pb.LeafWithPreviousTransactionData, uint64, error) {
+	getTokenAmount := func(leaf *pb.LeafWithPreviousTransactionData) (uint64, error) {
+		_, amount, err := uint128BytesToInt64(leaf.Leaf.TokenAmount)
+		return amount, err
+	}
+
+	// Pre-check all leaves for valid token amounts
+	for _, leaf := range leavesWithPrevTxData {
+		if _, err := getTokenAmount(leaf); err != nil {
+			return nil, 0, fmt.Errorf("invalid token amount in leaf: %w", err)
+		}
+	}
+
+	// Sort to spend smallest leaves first to proactively reduce withdrawal cost.
+	sort.Slice(leavesWithPrevTxData, func(i, j int) bool {
+		iAmount, _ := getTokenAmount(leavesWithPrevTxData[i])
+		jAmount, _ := getTokenAmount(leavesWithPrevTxData[j])
+		return iAmount < jAmount
+	})
+
+	selectedLeavesAmount := uint64(0)
+	selectedLeaves := make([]*pb.LeafWithPreviousTransactionData, 0)
+	for _, leaf := range leavesWithPrevTxData {
+		// Checked above so no err is expected.
+		leafTokenAmount, _ := getTokenAmount(leaf)
+		selectedLeavesAmount += uint64(leafTokenAmount)
+		selectedLeaves = append(selectedLeaves, leaf)
+		if selectedLeavesAmount >= targetAmount {
+			break
+		}
+	}
+
+	if selectedLeavesAmount < targetAmount {
+		return nil, 0, fmt.Errorf("insufficient tokens: have %d, need %d", selectedLeavesAmount, targetAmount)
+	}
+	return selectedLeaves, selectedLeavesAmount, nil
+}
+
+func uint128BytesToInt64(bytes []byte) (high uint64, low uint64, err error) {
+	if len(bytes) != 16 {
+		return 0, 0, fmt.Errorf("invalid uint128 bytes length: expected 16, got %d", len(bytes))
+	}
+	high = binary.BigEndian.Uint64(bytes[:8])
+	low = binary.BigEndian.Uint64(bytes[8:])
+	return high, low, nil
+}
+
+func int64ToUint128Bytes(high, low uint64) []byte {
+	return append(
+		binary.BigEndian.AppendUint64(make([]byte, 0), high),
+		binary.BigEndian.AppendUint64(make([]byte, 0), low)...,
+	)
+}
+
+func getOwnedLeavesFromTokenTransaction(leaf *pb.TokenTransaction, walletPublicKey []byte) ([]*pb.LeafWithPreviousTransactionData, error) {
+	finalTokenTransactionHash, err := utils.HashTokenTransaction(leaf, false)
+	if err != nil {
+		return nil, err
+	}
+	newLeavesToSpend := make([]*pb.LeafWithPreviousTransactionData, 0)
+	for i, leaf := range leaf.OutputLeaves {
+		if bytes.Equal(leaf.OwnerPublicKey, walletPublicKey) {
+			leafWithPrevTxData := &pb.LeafWithPreviousTransactionData{
+				Leaf: &pb.TokenLeafOutput{
+					OwnerPublicKey: leaf.OwnerPublicKey,
+					TokenPublicKey: leaf.TokenPublicKey,
+					TokenAmount:    leaf.TokenAmount,
+				},
+				PreviousTransactionHash: finalTokenTransactionHash,
+				PreviousTransactionVout: uint32(i),
+			}
+			newLeavesToSpend = append(newLeavesToSpend, leafWithPrevTxData)
+		}
+	}
+	return newLeavesToSpend, nil
+}
+
+func getLeafWithPrevTxKey(leaf *pb.LeafWithPreviousTransactionData) string {
+	txHashStr := hex.EncodeToString(leaf.GetPreviousTransactionHash())
+	return txHashStr + ":" + fmt.Sprintf("%d", leaf.GetPreviousTransactionVout())
 }

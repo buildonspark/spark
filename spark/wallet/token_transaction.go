@@ -12,7 +12,6 @@ import (
 	"github.com/lightsparkdev/spark-go/common"
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
 	"github.com/lightsparkdev/spark-go/so/utils"
-	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 	secretsharing "github.com/lightsparkdev/spark-go/common/secret_sharing"
@@ -45,14 +44,9 @@ func BroadcastTokenTransaction(
 	tmpCtx := ContextWithToken(ctx, token)
 	sparkClient := pb.NewSparkServiceClient(sparkConn)
 
-	signingOperatorResponse, err := sparkClient.GetSigningOperatorList(tmpCtx, &emptypb.Empty{})
-	if err != nil {
-		log.Printf("Error while calling GetSigningOperatorList: %v", err)
-		return nil, err
-	}
 	var operatorKeys [][]byte
-	for _, operator := range signingOperatorResponse.SigningOperators {
-		operatorKeys = append(operatorKeys, operator.PublicKey)
+	for _, operator := range config.SigningOperators {
+		operatorKeys = append(operatorKeys, operator.IdentityPublicKey)
 	}
 
 	tokenTransaction.SparkOperatorIdentityPublicKeys = operatorKeys
@@ -90,12 +84,12 @@ func BroadcastTokenTransaction(
 
 	// Validate that the keyshare config returned by the coordinator SO matches the full signing operator list.
 	// TODO: When we support threshold signing allow the keyshare identifiers to be a subset of the signing operators.
-	if len(startResponse.KeyshareInfo.OwnerIdentifiers) != len(signingOperatorResponse.SigningOperators) {
+	if len(startResponse.KeyshareInfo.OwnerIdentifiers) != len(config.SigningOperators) {
 		return nil, fmt.Errorf("keyshare operator count (%d) does not match signing operator count (%d)",
-			len(startResponse.KeyshareInfo.OwnerIdentifiers), len(signingOperatorResponse.SigningOperators))
+			len(startResponse.KeyshareInfo.OwnerIdentifiers), len(config.SigningOperators))
 	}
 	for _, operator := range startResponse.KeyshareInfo.OwnerIdentifiers {
-		if _, exists := signingOperatorResponse.SigningOperators[operator]; !exists {
+		if _, exists := config.SigningOperators[operator]; !exists {
 			return nil, fmt.Errorf("keyshare operator %s not found in signing operator list", operator)
 		}
 	}
@@ -148,7 +142,7 @@ func BroadcastTokenTransaction(
 	// This will be unfilled if its an issuance transaction.
 	leafRevocationKeyshares := make([][]*KeyshareWithOperatorIndex, len(tokenTransaction.GetTransferInput().GetLeavesToSpend()))
 	// Collect keyshares from each operator
-	for _, operator := range signingOperatorResponse.SigningOperators {
+	for _, operator := range config.SigningOperators {
 		operatorConn, err := common.NewGRPCConnectionWithTestTLS(operator.Address)
 		if err != nil {
 			log.Printf("Error while establishing gRPC connection to operator at %s: %v", operator.Address, err)
@@ -168,8 +162,8 @@ func BroadcastTokenTransaction(
 		}
 
 		operatorSig := signTokenTransactionResponse.SparkOperatorSignature
-		if err := utils.ValidateOwnershipSignature(operatorSig, finalTokenTransactionHash, operator.PublicKey); err != nil {
-			return nil, fmt.Errorf("invalid signature from operator with public key %x: %v", operator.PublicKey, err)
+		if err := utils.ValidateOwnershipSignature(operatorSig, finalTokenTransactionHash, operator.IdentityPublicKey); err != nil {
+			return nil, fmt.Errorf("invalid signature from operator with public key %x: %v", operator.IdentityPublicKey, err)
 		}
 		// Store each leaf's keyshare and operator index
 		for leafIndex, keyshare := range signTokenTransactionResponse.TokenTransactionRevocationKeyshares {
@@ -221,7 +215,7 @@ func BroadcastTokenTransaction(
 		}
 
 		// Finalize the token transaction with each operator.
-		for _, operator := range signingOperatorResponse.SigningOperators {
+		for _, operator := range config.SigningOperators {
 			operatorConn, err := common.NewGRPCConnectionWithTestTLS(operator.Address)
 			if err != nil {
 				log.Printf("Error while establishing gRPC connection to operator at %s: %v", operator.Address, err)
