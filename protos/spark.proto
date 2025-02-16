@@ -37,6 +37,7 @@ service SparkService {
     rpc sign_token_transaction(SignTokenTransactionRequest) returns (SignTokenTransactionResponse) {}
     rpc finalize_token_transaction(FinalizeTokenTransactionRequest) returns (google.protobuf.Empty) {}
     rpc freeze_tokens(FreezeTokensRequest) returns (FreezeTokensResponse) {}
+    rpc get_owned_token_leaves(GetOwnedTokenLeavesRequest) returns (GetOwnedTokenLeavesResponse) {}
 
     rpc return_lightning_payment(ReturnLightningPaymentRequest) returns (google.protobuf.Empty) {}
     rpc get_tree_nodes_by_public_key(TreeNodesByPublicKeyRequest) returns (TreeNodesByPublicKeyResponse) {}
@@ -238,6 +239,23 @@ message FreezeTokensRequest {
 message FreezeTokensResponse {
     repeated string impacted_leaf_ids = 1;
     repeated bytes impacted_token_amount = 2;  // Decoded uint128
+}
+
+message GetOwnedTokenLeavesRequest {
+    // TODO: In the future consider if this should be a permissioned operation.
+    bytes owner_public_key = 1;
+    // Optionally provide a token public key. If not set return leaves for all tokens.
+    optional bytes token_public_key = 2;
+}
+
+message LeafWithPreviousTransactionData {
+    TokenLeafOutput leaf = 1;
+	bytes previous_transaction_hash = 2;
+	uint32 previous_transaction_vout = 3;
+}
+
+message GetOwnedTokenLeavesResponse {
+    repeated LeafWithPreviousTransactionData leaves_with_previous_transaction_data = 1;
 }
 
 message TreeNode {

@@ -190,3 +190,9 @@ func (s *SparkServer) FreezeTokens(ctx context.Context, req *pb.FreezeTokensRequ
 	tokenTransactionHandler := handler.NewTokenTransactionHandler(s.config, s.db)
 	return wrapWithGRPCError(tokenTransactionHandler.FreezeTokens(ctx, req))
 }
+
+// GetOwnedTokenLeaves returns the leaves currently owned by the provided owner public key.
+func (s *SparkServer) GetOwnedTokenLeaves(ctx context.Context, req *pb.GetOwnedTokenLeavesRequest) (*pb.GetOwnedTokenLeavesResponse, error) {
+	tokenTransactionHandler := handler.NewTokenTransactionHandler(s.config, s.db)
+	return wrapWithGRPCError(tokenTransactionHandler.GetOwnedTokenLeaves(ctx, req))
+}

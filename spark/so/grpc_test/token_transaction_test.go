@@ -1,6 +1,7 @@
 package grpctest
 
 import (
+	"bytes"
 	"context"
 	"encoding/binary"
 	"log"
@@ -166,7 +167,7 @@ func TestBroadcastTokenTransactionIssueAndTransferTokens(t *testing.T) {
 	frozenAmount := new(big.Int).SetBytes(freezeResponse.ImpactedTokenAmount[0])
 
 	// Calculate total amount from transaction output leaves
-	expectedAmount := new(big.Int).SetBytes(finalTransferTokenTransaction.OutputLeaves[0].TokenAmount)
+	expectedAmount := new(big.Int).SetBytes(int64ToUint128Bytes(0, 33333))
 	expectedLeafID := finalTransferTokenTransaction.OutputLeaves[0].Id
 
 	if frozenAmount.Cmp(expectedAmount) != 0 {
@@ -295,4 +296,49 @@ func TestBroadcastTokenTransactionIssueAndTransferTokens(t *testing.T) {
 		t.Fatal("expected non-nil response when transferring thawed tokens")
 	}
 	log.Printf("thawed token transfer broadcast finalized token transaction: %v", transferThawedTokenTransactionResponse)
+
+	// Test GetOwnedTokenLeaves
+	ownedLeavesResponse, err := wallet.GetOwnedTokenLeaves(
+		context.Background(),
+		config,
+		userLeaf1PubKeyBytes,
+		tokenIdentityPubKeyBytes,
+	)
+	if err != nil {
+		t.Fatalf("failed to get owned token leaves: %v", err)
+	}
+
+	// Validate the response
+	if len(ownedLeavesResponse.LeavesWithPreviousTransactionData) != 1 {
+		t.Fatalf("expected 1 owned leaf, got %d", len(ownedLeavesResponse.LeavesWithPreviousTransactionData))
+	}
+
+	leaf := ownedLeavesResponse.LeavesWithPreviousTransactionData[0]
+
+	// Validate leaf details
+	if !bytes.Equal(leaf.Leaf.OwnerPublicKey, userLeaf1PubKeyBytes) {
+		t.Fatalf("leaf owner public key does not match expected")
+	}
+	if !bytes.Equal(leaf.Leaf.TokenPublicKey, tokenIdentityPubKeyBytes) {
+		t.Fatalf("leaf token public key does not match expected")
+	}
+
+	// Validate amount
+	expectedAmount = new(big.Int).SetBytes(int64ToUint128Bytes(0, 33333))
+	actualAmount := new(big.Int).SetBytes(leaf.Leaf.TokenAmount)
+	if actualAmount.Cmp(expectedAmount) != 0 {
+		t.Fatalf("leaf token amount %d does not match expected %d", actualAmount, expectedAmount)
+	}
+
+	// Validate previous transaction data
+	transferThawedTokenTransactionResponseHash, err := utils.HashTokenTransaction(transferThawedTokenTransactionResponse, false)
+	if err != nil {
+		t.Fatalf("failed to hash final transfer token transaction: %v", err)
+	}
+	if !bytes.Equal(leaf.PreviousTransactionHash, transferThawedTokenTransactionResponseHash) {
+		t.Fatalf("previous transaction hash does not match expected")
+	}
+	if leaf.PreviousTransactionVout != 0 {
+		t.Fatalf("previous transaction vout expected 0, got %d", leaf.PreviousTransactionVout)
+	}
 }

@@ -410,3 +410,36 @@ func (o TokenTransactionHandler) FreezeTokens(
 		ImpactedTokenAmount: [][]byte{totalAmount.Bytes()},
 	}, nil
 }
+
+func (o TokenTransactionHandler) GetOwnedTokenLeaves(
+	ctx context.Context,
+	req *pb.GetOwnedTokenLeavesRequest,
+) (*pb.GetOwnedTokenLeavesResponse, error) {
+	leaves, err := ent.GetOwnedLeaves(ctx, req.OwnerPublicKey, req.TokenPublicKey)
+	if err != nil {
+		log.Printf("Failed to get owned leaf stats: %v", err)
+		return nil, err
+	}
+
+	leavesWithPrevTxData := make([]*pb.LeafWithPreviousTransactionData, len(leaves))
+	for i, leaf := range leaves {
+		idStr := leaf.ID.String()
+		leavesWithPrevTxData[i] = &pb.LeafWithPreviousTransactionData{
+			Leaf: &pb.TokenLeafOutput{
+				Id:                            &idStr,
+				OwnerPublicKey:                leaf.OwnerPublicKey,
+				RevocationPublicKey:           leaf.WithdrawRevocationPublicKey,
+				WithdrawBondSats:              &leaf.WithdrawBondSats,
+				WithdrawRelativeBlockLocktime: &leaf.WithdrawRelativeBlockLocktime,
+				TokenPublicKey:                leaf.TokenPublicKey,
+				TokenAmount:                   leaf.TokenAmount,
+			},
+			PreviousTransactionHash: leaf.Edges.LeafCreatedTokenTransactionReceipt.FinalizedTokenTransactionHash,
+			PreviousTransactionVout: leaf.LeafCreatedTransactionOutputVout,
+		}
+	}
+
+	return &pb.GetOwnedTokenLeavesResponse{
+		LeavesWithPreviousTransactionData: leavesWithPrevTxData,
+	}, nil
+}

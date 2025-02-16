@@ -312,6 +312,38 @@ func FreezeTokens(
 	return lastResponse, nil
 }
 
+func GetOwnedTokenLeaves(
+	ctx context.Context,
+	config *Config,
+	ownerPublicKey []byte,
+	tokenPublicKey []byte,
+) (*pb.GetOwnedTokenLeavesResponse, error) {
+	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
+	if err != nil {
+		log.Printf("Error while establishing gRPC connection to coordinator at %s: %v", config.CoodinatorAddress(), err)
+		return nil, err
+	}
+	defer sparkConn.Close()
+
+	token, err := AuthenticateWithConnection(ctx, config, sparkConn)
+	if err != nil {
+		return nil, fmt.Errorf("failed to authenticate with server: %v", err)
+	}
+	tmpCtx := ContextWithToken(ctx, token)
+	sparkClient := pb.NewSparkServiceClient(sparkConn)
+
+	request := &pb.GetOwnedTokenLeavesRequest{
+		OwnerPublicKey: ownerPublicKey,
+		TokenPublicKey: tokenPublicKey,
+	}
+
+	response, err := sparkClient.GetOwnedTokenLeaves(tmpCtx, request)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get owned token leaves: %v", err)
+	}
+	return response, nil
+}
+
 func parseHexIdentifierToUint64(binaryIdentifier string) uint64 {
 	value, _ := strconv.ParseUint(binaryIdentifier, 16, 64)
 	return value
