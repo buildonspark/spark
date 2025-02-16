@@ -7,6 +7,7 @@ import (
 	pb "github.com/lightsparkdev/spark-go/proto/spark_tree"
 	"github.com/lightsparkdev/spark-go/so/ent"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
+	"github.com/lightsparkdev/spark-go/so/ent/tree"
 	"github.com/lightsparkdev/spark-go/so/ent/treenode"
 )
 
@@ -77,6 +78,11 @@ func GetLeafDenominationCounts(ctx context.Context, req *pb.GetLeafDenominationC
 	leaves, err := db.TreeNode.Query().
 		Where(treenode.OwnerIdentityPubkey(req.OwnerIdentityPublicKey)).
 		Where(treenode.StatusEQ(schema.TreeNodeStatusAvailable)).
+		Where(
+			treenode.HasTreeWith(
+				tree.NetworkEQ(schema.Network(req.Network)),
+			),
+		).
 		All(ctx)
 	if err != nil {
 		return nil, err
@@ -99,6 +105,7 @@ func ProposeTreeDenominations(ctx context.Context, req *pb.ProposeTreeDenominati
 	// Figure out how many leaves of each denomination we are missing.
 	leafDenominationCounts, err := GetLeafDenominationCounts(ctx, &pb.GetLeafDenominationCountsRequest{
 		OwnerIdentityPublicKey: req.SspIdentityPublicKey,
+		Network:                req.Network,
 	})
 	if err != nil {
 		return nil, err

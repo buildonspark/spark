@@ -1,6 +1,7 @@
 package tree
 
 import (
+	"log"
 	"testing"
 
 	pb "github.com/lightsparkdev/spark-go/proto/spark_tree"
@@ -282,4 +283,26 @@ func TestSolveLeafDenominations(t *testing.T) {
 			assert.Equal(t, tt.expectedTrees, result.Trees)
 		})
 	}
+}
+
+func TestSolveLeafDenominationsReal(t *testing.T) {
+	result, err := solveLeafDenominations(
+		&pb.GetLeafDenominationCountsResponse{Counts: map[uint64]uint64{}},
+		DefaultDenominationsCounts,
+		10_000_000,
+		6,
+		10,
+	)
+
+	assert.NoError(t, err)
+	assert.Equal(t, 12, len(result.Trees))
+
+	denomToCount := make(map[uint64]uint64)
+	for _, tree := range result.Trees {
+		for _, denom := range tree.Leaves {
+			denomToCount[denom]++
+		}
+	}
+	log.Printf("denomToCount: %v", denomToCount)
+	log.Printf("numTrees: %d", len(result.Trees))
 }

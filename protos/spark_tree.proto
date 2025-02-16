@@ -3,6 +3,7 @@ syntax = "proto3";
 package spark;
 
 option go_package = "github.com/lightsparkdev/spark-go/proto/spark_tree";
+import "spark.proto";
 
 service SparkTreeService {
     rpc get_leaf_denomination_counts(GetLeafDenominationCountsRequest) returns (GetLeafDenominationCountsResponse) {}
@@ -12,6 +13,7 @@ service SparkTreeService {
 
 message GetLeafDenominationCountsRequest {
     bytes owner_identity_public_key = 1;
+    spark.Network network = 2;
 }
 
 message GetLeafDenominationCountsResponse {
@@ -23,6 +25,7 @@ message ProposeTreeDenominationsRequest {
     uint64 max_amount_sats = 2;
     uint64 max_tree_depth = 3;
     uint64 min_tree_depth = 4;
+    spark.Network network = 5;
 }
 
 message ProposeTree {
