@@ -49,7 +49,7 @@ func validateLeafRefundTxInput(refundTx *wire.MsgTx, oldSequence uint32, leafOut
 	newTimeLock := refundTx.TxIn[0].Sequence & 0xFFFF
 	oldTimeLock := oldSequence & 0xFFFF
 	if newTimeLock >= oldTimeLock {
-		return fmt.Errorf("time lock on the new refund tx must be less than the old one")
+		return fmt.Errorf("time lock on the new refund tx, %d, must be less than the old one, %d", newTimeLock, oldTimeLock)
 	}
 	if len(refundTx.TxIn) != int(expectedInputCount) {
 		return fmt.Errorf("refund tx should have %d inputs, but has %d", expectedInputCount, len(refundTx.TxIn))
