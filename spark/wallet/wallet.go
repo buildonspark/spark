@@ -207,11 +207,13 @@ func (w *SingleKeyWallet) SyncWallet(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to get owned nodes: %w", err)
 	}
+	ownedNodes := make([]*pb.TreeNode, 0)
 	for _, node := range response.Nodes {
 		if node.Status == string(schema.TreeNodeStatusAvailable) {
-			w.OwnedNodes = append(w.OwnedNodes, node)
+			ownedNodes = append(ownedNodes, node)
 		}
 	}
+	w.OwnedNodes = ownedNodes
 	return nil
 }
 
