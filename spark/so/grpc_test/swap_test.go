@@ -74,10 +74,20 @@ func TestSwap(t *testing.T) {
 	leafData := leafDataMap[senderRootNode.Id]
 	assert.NotNil(t, leafData, "expected leaf data for root node")
 
+	sighash, err := common.SigHashFromTx(leafData.RefundTx, 0, leafData.Tx.TxOut[leafData.Vout])
+	assert.NoError(t, err)
+
 	// Create adaptor from that signature
-	_, adaptorPrivKey, err := common.GenerateAdaptorFromSignature(signature)
+	adaptorAddedSignature, adaptorPrivKey, err := common.GenerateAdaptorFromSignature(signature)
 	assert.NoError(t, err)
 	_, adaptorPub := btcec.PrivKeyFromBytes(adaptorPrivKey)
+
+	// Alice sends adaptor and signature to Bob, Bob validates the adaptor
+	nodeVerifyingPubkey, err := secp256k1.ParsePubKey(senderRootNode.VerifyingPublicKey)
+	assert.NoError(t, err)
+	taprootKey := txscript.ComputeTaprootKeyNoScript(nodeVerifyingPubkey)
+	err = common.ValidateOutboundAdaptorSignature(taprootKey, sighash, adaptorAddedSignature, adaptorPub.SerializeCompressed())
+	assert.NoError(t, err)
 
 	// Bob signs refunds with adaptor
 	receiverNewLeafPrivKey, err := secp256k1.GeneratePrivateKey()
@@ -99,7 +109,16 @@ func TestSwap(t *testing.T) {
 	)
 	assert.NoError(t, err)
 
-	// Alice should verify the signatures (but we skip this for now)
+	// Alice verifies Bob's signatures
+	receiverSighash, err := common.SigHashFromTx(leafDataMap[receiverLeavesToTransfer[0].Leaf.Id].RefundTx, 0, leafDataMap[receiverLeavesToTransfer[0].Leaf.Id].Tx.TxOut[leafDataMap[receiverLeavesToTransfer[0].Leaf.Id].Vout])
+	assert.NoError(t, err)
+
+	receiverKey, err := secp256k1.ParsePubKey(receiverLeavesToTransfer[0].Leaf.VerifyingPublicKey)
+	assert.NoError(t, err)
+	receiverTaprootKey := txscript.ComputeTaprootKeyNoScript(receiverKey)
+
+	_, err = common.ApplyAdaptorToSignature(receiverTaprootKey, receiverSighash, receiverRefundSignatureMap[receiverLeavesToTransfer[0].Leaf.Id], adaptorPrivKey)
+	assert.NoError(t, err)
 
 	// Alice reveals adaptor secret to Bob, Bob combines with existing adaptor signatures to get valid signatures
 	newReceiverRefundSignatureMap := make(map[string][]byte)

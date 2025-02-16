@@ -418,7 +418,7 @@ run_operators_tmux() {
            -server-cert '${cert_file}' \
            -server-key '${key_file}' \
             -dkg-limit-override 100 \
-           -mock-onchain true \
+           -local true \
            2>&1 | tee '${log_file}'"
        
        # Send the command to tmux

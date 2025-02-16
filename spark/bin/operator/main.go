@@ -52,7 +52,7 @@ type args struct {
 	SignerAddress              string
 	Port                       uint64
 	DatabasePath               string
-	MockOnchain                bool
+	RunningLocally             bool
 	ChallengeTimeout           time.Duration
 	SessionDuration            time.Duration
 	AuthzEnforced              bool
@@ -96,7 +96,7 @@ func loadArgs() (*args, error) {
 	flag.StringVar(&args.SignerAddress, "signer", "", "Signer address")
 	flag.Uint64Var(&args.Port, "port", 0, "Port value")
 	flag.StringVar(&args.DatabasePath, "database", "", "Path to database file")
-	flag.BoolVar(&args.MockOnchain, "mock-onchain", false, "Mock onchain tx")
+	flag.BoolVar(&args.RunningLocally, "local", false, "Running locally")
 	flag.DurationVar(&args.ChallengeTimeout, "challenge-timeout", time.Duration(time.Minute), "Challenge timeout")
 	flag.DurationVar(&args.SessionDuration, "session-duration", time.Duration(time.Minute*15), "Session duration")
 	flag.BoolVar(&args.AuthzEnforced, "authz-enforced", false, "Enforce authorization checks")
@@ -223,11 +223,6 @@ func main() {
 		log.Fatalf("Failed to create frost client: %v", err)
 	}
 
-	s, err := gocron.NewScheduler()
-	if err != nil {
-		log.Fatalf("Failed to create scheduler: %v", err)
-	}
-
 	for network, bitcoindConfig := range config.BitcoindConfigs {
 		go func() {
 			err := chain.WatchChain(dbClient, bitcoindConfig)
@@ -238,14 +233,19 @@ func main() {
 		log.Printf("Watching %s chain\n", network)
 	}
 
-	for _, task := range task.AllTasks() {
-		_, err := s.NewJob(gocron.DurationJob(task.Duration), gocron.NewTask(task.Task, config, dbClient))
+	if !args.RunningLocally {
+		s, err := gocron.NewScheduler()
 		if err != nil {
-			log.Fatalf("Failed to create job: %v", err)
+			log.Fatalf("Failed to create scheduler: %v", err)
 		}
+		for _, task := range task.AllTasks() {
+			_, err := s.NewJob(gocron.DurationJob(task.Duration), gocron.NewTask(task.Task, config, dbClient))
+			if err != nil {
+				log.Fatalf("Failed to create job: %v", err)
+			}
+		}
+		s.Start()
 	}
-
-	s.Start()
 
 	sessionTokenCreatorVerifier, err := authninternal.NewSessionTokenCreatorVerifier(config.IdentityPrivateKey, nil)
 	if err != nil {
@@ -285,7 +285,7 @@ func main() {
 	treeServer := sparkgrpc.NewSparkTreeServer(config, dbClient)
 	pbtree.RegisterSparkTreeServiceServer(grpcServer, treeServer)
 
-	if args.MockOnchain {
+	if args.RunningLocally {
 		mockServer := sparkgrpc.NewMockServer(config)
 		pbmock.RegisterMockServiceServer(grpcServer, mockServer)
 	}

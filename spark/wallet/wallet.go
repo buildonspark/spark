@@ -265,10 +265,6 @@ func (w *SingleKeyWallet) RequestLeavesSwap(ctx context.Context, targetAmount in
 	adaptorPrivateKey := secp256k1.PrivKeyFromBytes(adaptorPrivKeyBytes)
 	adaptorPubKey := adaptorPrivateKey.PubKey()
 
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse adaptor private key: %w", err)
-	}
-
 	requester, err := sspapi.NewRequesterWithBaseURL(hex.EncodeToString(w.Config.IdentityPublicKey()), nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create requester: %w", err)
