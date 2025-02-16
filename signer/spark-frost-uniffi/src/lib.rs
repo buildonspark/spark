@@ -406,7 +406,7 @@ pub fn construct_node_tx(
     // Construct the transaction with version 2 for Taproot support
     let new_tx = Transaction {
         version: Version::TWO,
-        lock_time: LockTime::from_height(locktime as u32).unwrap(),
+        lock_time: LockTime::ZERO,
         input: vec![input],
         output: vec![output],
     };
@@ -552,7 +552,7 @@ pub fn construct_split_tx(
     // Construct the transaction with version 2 for Taproot support
     let new_tx = Transaction {
         version: Version::TWO,
-        lock_time: LockTime::from_height(locktime as u32).unwrap(),
+        lock_time: LockTime::ZERO,
         input: vec![input],
         output: outputs,
     };
@@ -607,7 +607,7 @@ pub fn create_dummy_tx(address: String, amount_sats: u64) -> Result<DummyTx, Err
     // Construct the transaction with version 2 for Taproot support
     let new_tx = Transaction {
         version: Version::TWO,
-        lock_time: LockTime::from_height(0).unwrap(),
+        lock_time: LockTime::ZERO,
         input: vec![input],
         output: vec![output],
     };
