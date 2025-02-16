@@ -62,7 +62,7 @@ func (h *InternalTokenTransactionHandler) StartTokenTransactionInternal(ctx cont
 	}
 
 	// Validate the final token transaction.
-	err = ValidateFinalTokenTransaction(config, req.FinalTokenTransaction, req.TokenTransactionSignatures, expectedRevocationPublicKeys)
+	err = validateFinalTokenTransaction(config, req.FinalTokenTransaction, req.TokenTransactionSignatures, expectedRevocationPublicKeys)
 	if err != nil {
 		return nil, fmt.Errorf("invalid final token transaction: %w", err)
 	}
@@ -190,15 +190,21 @@ func ValidateTransferSignaturesUsingPreviousTransactionData(
 	}
 
 	for i, leafEnt := range leafToSpendEnts {
-		if leafEnt.Status != schema.TokenLeafStatusCreatedFinalized {
-			return fmt.Errorf("leaf %d either has already been spent or it is too early to be spent. It has status: %s", i, leafEnt.Status)
+		if !isLeafSpendable(leafEnt.Status) {
+			return fmt.Errorf("leaf %d is not in a spendable state - current status: %s", i, leafEnt.Status)
 		}
 	}
 
 	return nil
 }
 
-func ValidateFinalTokenTransaction(
+// isLeafSpendable checks if a leaf's status allows it to be spent.
+func isLeafSpendable(status schema.TokenLeafStatus) bool {
+	return status == schema.TokenLeafStatusCreatedFinalized ||
+		status == schema.TokenLeafStatusSpentStarted
+}
+
+func validateFinalTokenTransaction(
 	config *so.Config,
 	tokenTransaction *pb.TokenTransaction,
 	tokenTransactionSignatures *pb.TokenTransactionSignatures,

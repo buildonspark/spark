@@ -166,10 +166,38 @@ func (o TokenTransactionHandler) SignTokenTransaction(
 		log.Printf("Failed to hash final token transaction: %v", err)
 		return nil, err
 	}
-	tokenTransactionReceipt, err := ent.FetchTokenTransactionData(ctx, finalTokenTransactionHash)
+	tokenTransactionReceipt, err := ent.FetchTokenTransactionData(ctx, req.FinalTokenTransaction)
 	if err != nil {
 		log.Printf("Sign request for token transaction did not map to a previously started transaction: %v", err)
 		return nil, err
+	}
+
+	// Check for frozen input leaves.
+	if len(tokenTransactionReceipt.Edges.SpentLeaf) > 0 {
+		ownerPublicKeys := make([][]byte, len(tokenTransactionReceipt.Edges.SpentLeaf))
+		// Assumes that all token public keys are the same as the first leaf. This is asserted when validating
+		// in the StartTokenTransaction() step.
+		tokenPublicKey := tokenTransactionReceipt.Edges.SpentLeaf[0].TokenPublicKey
+		for i, leaf := range tokenTransactionReceipt.Edges.SpentLeaf {
+			ownerPublicKeys[i] = leaf.OwnerPublicKey
+		}
+
+		// Bulk query all input leaf ids to ensure none of them are frozen.
+		activeFreezes, err := ent.GetActiveFreezes(ctx, ownerPublicKeys, tokenPublicKey)
+		if err != nil {
+			log.Printf("Failed to query token freeze status: %v", err)
+			return nil, err
+		}
+
+		if len(activeFreezes) > 0 {
+			for _, freeze := range activeFreezes {
+				log.Printf("Found active freeze - owner: %x, token: %x, freeze timestamp: %d",
+					freeze.OwnerPublicKey,
+					freeze.TokenPublicKey,
+					freeze.WalletProvidedFreezeTimestamp)
+			}
+			return nil, fmt.Errorf("at least one input leaf is frozen. Cannot proceed with transaction")
+		}
 	}
 
 	// Sign the token transaction hash with the operator identity private key.
@@ -234,13 +262,7 @@ func (o TokenTransactionHandler) FinalizeTokenTransaction(
 	config *so.Config,
 	req *pb.FinalizeTokenTransactionRequest,
 ) (*emptypb.Empty, error) {
-	finalTokenTransactionHash, err := utils.HashTokenTransaction(req.FinalTokenTransaction, false)
-	if err != nil {
-		log.Printf("Failed to hash final token transaction: %v", err)
-		return nil, err
-	}
-
-	tokenTransactionReceipt, err := ent.FetchTokenTransactionData(ctx, finalTokenTransactionHash)
+	tokenTransactionReceipt, err := ent.FetchTokenTransactionData(ctx, req.FinalTokenTransaction)
 	if err != nil {
 		log.Printf("Failed to fetch matching transaction receipt: %v", err)
 		return nil, fmt.Errorf("failed to fetch transaction receipt: %w", err)
@@ -323,4 +345,68 @@ func (o TokenTransactionHandler) SendTransactionToLRC20Node(
 	}
 
 	return nil
+}
+
+func (o TokenTransactionHandler) FreezeTokens(
+	ctx context.Context,
+	req *pb.FreezeTokensRequest,
+) (*pb.FreezeTokensResponse, error) {
+	freezePayloadHash, err := utils.HashFreezeTokensPayload(req.FreezeTokensPayload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to hash freeze tokens payload: %w", err)
+	}
+
+	if err := utils.ValidateOwnershipSignature(
+		req.IssuerSignature,
+		freezePayloadHash,
+		req.FreezeTokensPayload.TokenPublicKey,
+	); err != nil {
+		return nil, fmt.Errorf("invalid issuer signature to freeze token public key %x: %w", req.FreezeTokensPayload.TokenPublicKey, err)
+	}
+
+	// Check for existing freeze.
+	activeFreezes, err := ent.GetActiveFreezes(ctx, [][]byte{req.FreezeTokensPayload.OwnerPublicKey}, req.FreezeTokensPayload.TokenPublicKey)
+	if err != nil {
+		log.Printf("Failed to check for existing token freeze: %v", err)
+		return nil, err
+	}
+	if req.FreezeTokensPayload.ShouldUnfreeze {
+		if len(activeFreezes) == 0 {
+			return nil, fmt.Errorf("no active freezes found to thaw")
+		}
+		if len(activeFreezes) > 1 {
+			return nil, fmt.Errorf("multiple active freezes found for this owner and token which should not happen")
+		}
+		err = ent.ThawActiveFreeze(ctx, activeFreezes[0].ID, req.FreezeTokensPayload.Timestamp)
+		if err != nil {
+			log.Printf("Failed to update token freeze status to thawed: %v", err)
+			return nil, err
+		}
+	} else { // Freeze
+		if len(activeFreezes) > 0 {
+			return nil, fmt.Errorf("tokens are already frozen for this owner and token")
+		}
+		err = ent.ActivateFreeze(ctx,
+			req.FreezeTokensPayload.OwnerPublicKey,
+			req.FreezeTokensPayload.TokenPublicKey,
+			req.IssuerSignature,
+			req.FreezeTokensPayload.Timestamp,
+		)
+		if err != nil {
+			log.Printf("Failed to create token freeze entity: %v", err)
+			return nil, err
+		}
+	}
+
+	// Collect information about the frozen leaves.
+	leafIDs, totalAmount, err := ent.GetOwnedLeafStats(ctx, req.FreezeTokensPayload.OwnerPublicKey, req.FreezeTokensPayload.TokenPublicKey)
+	if err != nil {
+		log.Printf("Failed to get impacted leaf stats: %v", err)
+		return nil, err
+	}
+
+	return &pb.FreezeTokensResponse{
+		ImpactedLeafIds:     leafIDs,
+		ImpactedTokenAmount: [][]byte{totalAmount.Bytes()},
+	}, nil
 }

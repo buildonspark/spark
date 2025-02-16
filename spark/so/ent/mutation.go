@@ -21,6 +21,7 @@ import (
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
 	"github.com/lightsparkdev/spark-go/so/ent/signingkeyshare"
 	"github.com/lightsparkdev/spark-go/so/ent/signingnonce"
+	"github.com/lightsparkdev/spark-go/so/ent/tokenfreeze"
 	"github.com/lightsparkdev/spark-go/so/ent/tokenleaf"
 	"github.com/lightsparkdev/spark-go/so/ent/tokenmint"
 	"github.com/lightsparkdev/spark-go/so/ent/tokentransactionreceipt"
@@ -47,6 +48,7 @@ const (
 	TypePreimageShare           = "PreimageShare"
 	TypeSigningKeyshare         = "SigningKeyshare"
 	TypeSigningNonce            = "SigningNonce"
+	TypeTokenFreeze             = "TokenFreeze"
 	TypeTokenLeaf               = "TokenLeaf"
 	TypeTokenMint               = "TokenMint"
 	TypeTokenTransactionReceipt = "TokenTransactionReceipt"
@@ -4670,6 +4672,808 @@ func (m *SigningNonceMutation) ClearEdge(name string) error {
 // It returns an error if the edge is not defined in the schema.
 func (m *SigningNonceMutation) ResetEdge(name string) error {
 	return fmt.Errorf("unknown SigningNonce edge %s", name)
+}
+
+// TokenFreezeMutation represents an operation that mutates the TokenFreeze nodes in the graph.
+type TokenFreezeMutation struct {
+	config
+	op                                  Op
+	typ                                 string
+	id                                  *uuid.UUID
+	create_time                         *time.Time
+	update_time                         *time.Time
+	status                              *schema.TokenFreezeStatus
+	owner_public_key                    *[]byte
+	token_public_key                    *[]byte
+	issuer_signature                    *[]byte
+	wallet_provided_freeze_timestamp    *uint64
+	addwallet_provided_freeze_timestamp *int64
+	wallet_provided_thaw_timestamp      *uint64
+	addwallet_provided_thaw_timestamp   *int64
+	clearedFields                       map[string]struct{}
+	done                                bool
+	oldValue                            func(context.Context) (*TokenFreeze, error)
+	predicates                          []predicate.TokenFreeze
+}
+
+var _ ent.Mutation = (*TokenFreezeMutation)(nil)
+
+// tokenfreezeOption allows management of the mutation configuration using functional options.
+type tokenfreezeOption func(*TokenFreezeMutation)
+
+// newTokenFreezeMutation creates new mutation for the TokenFreeze entity.
+func newTokenFreezeMutation(c config, op Op, opts ...tokenfreezeOption) *TokenFreezeMutation {
+	m := &TokenFreezeMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeTokenFreeze,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withTokenFreezeID sets the ID field of the mutation.
+func withTokenFreezeID(id uuid.UUID) tokenfreezeOption {
+	return func(m *TokenFreezeMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *TokenFreeze
+		)
+		m.oldValue = func(ctx context.Context) (*TokenFreeze, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().TokenFreeze.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withTokenFreeze sets the old TokenFreeze of the mutation.
+func withTokenFreeze(node *TokenFreeze) tokenfreezeOption {
+	return func(m *TokenFreezeMutation) {
+		m.oldValue = func(context.Context) (*TokenFreeze, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m TokenFreezeMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m TokenFreezeMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of TokenFreeze entities.
+func (m *TokenFreezeMutation) SetID(id uuid.UUID) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *TokenFreezeMutation) ID() (id uuid.UUID, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *TokenFreezeMutation) IDs(ctx context.Context) ([]uuid.UUID, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []uuid.UUID{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().TokenFreeze.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetCreateTime sets the "create_time" field.
+func (m *TokenFreezeMutation) SetCreateTime(t time.Time) {
+	m.create_time = &t
+}
+
+// CreateTime returns the value of the "create_time" field in the mutation.
+func (m *TokenFreezeMutation) CreateTime() (r time.Time, exists bool) {
+	v := m.create_time
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreateTime returns the old "create_time" field's value of the TokenFreeze entity.
+// If the TokenFreeze object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenFreezeMutation) OldCreateTime(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreateTime is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreateTime requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreateTime: %w", err)
+	}
+	return oldValue.CreateTime, nil
+}
+
+// ResetCreateTime resets all changes to the "create_time" field.
+func (m *TokenFreezeMutation) ResetCreateTime() {
+	m.create_time = nil
+}
+
+// SetUpdateTime sets the "update_time" field.
+func (m *TokenFreezeMutation) SetUpdateTime(t time.Time) {
+	m.update_time = &t
+}
+
+// UpdateTime returns the value of the "update_time" field in the mutation.
+func (m *TokenFreezeMutation) UpdateTime() (r time.Time, exists bool) {
+	v := m.update_time
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdateTime returns the old "update_time" field's value of the TokenFreeze entity.
+// If the TokenFreeze object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenFreezeMutation) OldUpdateTime(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdateTime is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdateTime requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdateTime: %w", err)
+	}
+	return oldValue.UpdateTime, nil
+}
+
+// ResetUpdateTime resets all changes to the "update_time" field.
+func (m *TokenFreezeMutation) ResetUpdateTime() {
+	m.update_time = nil
+}
+
+// SetStatus sets the "status" field.
+func (m *TokenFreezeMutation) SetStatus(sfs schema.TokenFreezeStatus) {
+	m.status = &sfs
+}
+
+// Status returns the value of the "status" field in the mutation.
+func (m *TokenFreezeMutation) Status() (r schema.TokenFreezeStatus, exists bool) {
+	v := m.status
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStatus returns the old "status" field's value of the TokenFreeze entity.
+// If the TokenFreeze object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenFreezeMutation) OldStatus(ctx context.Context) (v schema.TokenFreezeStatus, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStatus is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStatus requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStatus: %w", err)
+	}
+	return oldValue.Status, nil
+}
+
+// ResetStatus resets all changes to the "status" field.
+func (m *TokenFreezeMutation) ResetStatus() {
+	m.status = nil
+}
+
+// SetOwnerPublicKey sets the "owner_public_key" field.
+func (m *TokenFreezeMutation) SetOwnerPublicKey(b []byte) {
+	m.owner_public_key = &b
+}
+
+// OwnerPublicKey returns the value of the "owner_public_key" field in the mutation.
+func (m *TokenFreezeMutation) OwnerPublicKey() (r []byte, exists bool) {
+	v := m.owner_public_key
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOwnerPublicKey returns the old "owner_public_key" field's value of the TokenFreeze entity.
+// If the TokenFreeze object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenFreezeMutation) OldOwnerPublicKey(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOwnerPublicKey is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOwnerPublicKey requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOwnerPublicKey: %w", err)
+	}
+	return oldValue.OwnerPublicKey, nil
+}
+
+// ResetOwnerPublicKey resets all changes to the "owner_public_key" field.
+func (m *TokenFreezeMutation) ResetOwnerPublicKey() {
+	m.owner_public_key = nil
+}
+
+// SetTokenPublicKey sets the "token_public_key" field.
+func (m *TokenFreezeMutation) SetTokenPublicKey(b []byte) {
+	m.token_public_key = &b
+}
+
+// TokenPublicKey returns the value of the "token_public_key" field in the mutation.
+func (m *TokenFreezeMutation) TokenPublicKey() (r []byte, exists bool) {
+	v := m.token_public_key
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTokenPublicKey returns the old "token_public_key" field's value of the TokenFreeze entity.
+// If the TokenFreeze object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenFreezeMutation) OldTokenPublicKey(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTokenPublicKey is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTokenPublicKey requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTokenPublicKey: %w", err)
+	}
+	return oldValue.TokenPublicKey, nil
+}
+
+// ResetTokenPublicKey resets all changes to the "token_public_key" field.
+func (m *TokenFreezeMutation) ResetTokenPublicKey() {
+	m.token_public_key = nil
+}
+
+// SetIssuerSignature sets the "issuer_signature" field.
+func (m *TokenFreezeMutation) SetIssuerSignature(b []byte) {
+	m.issuer_signature = &b
+}
+
+// IssuerSignature returns the value of the "issuer_signature" field in the mutation.
+func (m *TokenFreezeMutation) IssuerSignature() (r []byte, exists bool) {
+	v := m.issuer_signature
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldIssuerSignature returns the old "issuer_signature" field's value of the TokenFreeze entity.
+// If the TokenFreeze object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenFreezeMutation) OldIssuerSignature(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldIssuerSignature is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldIssuerSignature requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldIssuerSignature: %w", err)
+	}
+	return oldValue.IssuerSignature, nil
+}
+
+// ResetIssuerSignature resets all changes to the "issuer_signature" field.
+func (m *TokenFreezeMutation) ResetIssuerSignature() {
+	m.issuer_signature = nil
+}
+
+// SetWalletProvidedFreezeTimestamp sets the "wallet_provided_freeze_timestamp" field.
+func (m *TokenFreezeMutation) SetWalletProvidedFreezeTimestamp(u uint64) {
+	m.wallet_provided_freeze_timestamp = &u
+	m.addwallet_provided_freeze_timestamp = nil
+}
+
+// WalletProvidedFreezeTimestamp returns the value of the "wallet_provided_freeze_timestamp" field in the mutation.
+func (m *TokenFreezeMutation) WalletProvidedFreezeTimestamp() (r uint64, exists bool) {
+	v := m.wallet_provided_freeze_timestamp
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldWalletProvidedFreezeTimestamp returns the old "wallet_provided_freeze_timestamp" field's value of the TokenFreeze entity.
+// If the TokenFreeze object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenFreezeMutation) OldWalletProvidedFreezeTimestamp(ctx context.Context) (v uint64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldWalletProvidedFreezeTimestamp is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldWalletProvidedFreezeTimestamp requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldWalletProvidedFreezeTimestamp: %w", err)
+	}
+	return oldValue.WalletProvidedFreezeTimestamp, nil
+}
+
+// AddWalletProvidedFreezeTimestamp adds u to the "wallet_provided_freeze_timestamp" field.
+func (m *TokenFreezeMutation) AddWalletProvidedFreezeTimestamp(u int64) {
+	if m.addwallet_provided_freeze_timestamp != nil {
+		*m.addwallet_provided_freeze_timestamp += u
+	} else {
+		m.addwallet_provided_freeze_timestamp = &u
+	}
+}
+
+// AddedWalletProvidedFreezeTimestamp returns the value that was added to the "wallet_provided_freeze_timestamp" field in this mutation.
+func (m *TokenFreezeMutation) AddedWalletProvidedFreezeTimestamp() (r int64, exists bool) {
+	v := m.addwallet_provided_freeze_timestamp
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetWalletProvidedFreezeTimestamp resets all changes to the "wallet_provided_freeze_timestamp" field.
+func (m *TokenFreezeMutation) ResetWalletProvidedFreezeTimestamp() {
+	m.wallet_provided_freeze_timestamp = nil
+	m.addwallet_provided_freeze_timestamp = nil
+}
+
+// SetWalletProvidedThawTimestamp sets the "wallet_provided_thaw_timestamp" field.
+func (m *TokenFreezeMutation) SetWalletProvidedThawTimestamp(u uint64) {
+	m.wallet_provided_thaw_timestamp = &u
+	m.addwallet_provided_thaw_timestamp = nil
+}
+
+// WalletProvidedThawTimestamp returns the value of the "wallet_provided_thaw_timestamp" field in the mutation.
+func (m *TokenFreezeMutation) WalletProvidedThawTimestamp() (r uint64, exists bool) {
+	v := m.wallet_provided_thaw_timestamp
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldWalletProvidedThawTimestamp returns the old "wallet_provided_thaw_timestamp" field's value of the TokenFreeze entity.
+// If the TokenFreeze object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenFreezeMutation) OldWalletProvidedThawTimestamp(ctx context.Context) (v uint64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldWalletProvidedThawTimestamp is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldWalletProvidedThawTimestamp requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldWalletProvidedThawTimestamp: %w", err)
+	}
+	return oldValue.WalletProvidedThawTimestamp, nil
+}
+
+// AddWalletProvidedThawTimestamp adds u to the "wallet_provided_thaw_timestamp" field.
+func (m *TokenFreezeMutation) AddWalletProvidedThawTimestamp(u int64) {
+	if m.addwallet_provided_thaw_timestamp != nil {
+		*m.addwallet_provided_thaw_timestamp += u
+	} else {
+		m.addwallet_provided_thaw_timestamp = &u
+	}
+}
+
+// AddedWalletProvidedThawTimestamp returns the value that was added to the "wallet_provided_thaw_timestamp" field in this mutation.
+func (m *TokenFreezeMutation) AddedWalletProvidedThawTimestamp() (r int64, exists bool) {
+	v := m.addwallet_provided_thaw_timestamp
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearWalletProvidedThawTimestamp clears the value of the "wallet_provided_thaw_timestamp" field.
+func (m *TokenFreezeMutation) ClearWalletProvidedThawTimestamp() {
+	m.wallet_provided_thaw_timestamp = nil
+	m.addwallet_provided_thaw_timestamp = nil
+	m.clearedFields[tokenfreeze.FieldWalletProvidedThawTimestamp] = struct{}{}
+}
+
+// WalletProvidedThawTimestampCleared returns if the "wallet_provided_thaw_timestamp" field was cleared in this mutation.
+func (m *TokenFreezeMutation) WalletProvidedThawTimestampCleared() bool {
+	_, ok := m.clearedFields[tokenfreeze.FieldWalletProvidedThawTimestamp]
+	return ok
+}
+
+// ResetWalletProvidedThawTimestamp resets all changes to the "wallet_provided_thaw_timestamp" field.
+func (m *TokenFreezeMutation) ResetWalletProvidedThawTimestamp() {
+	m.wallet_provided_thaw_timestamp = nil
+	m.addwallet_provided_thaw_timestamp = nil
+	delete(m.clearedFields, tokenfreeze.FieldWalletProvidedThawTimestamp)
+}
+
+// Where appends a list predicates to the TokenFreezeMutation builder.
+func (m *TokenFreezeMutation) Where(ps ...predicate.TokenFreeze) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the TokenFreezeMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *TokenFreezeMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.TokenFreeze, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *TokenFreezeMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *TokenFreezeMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (TokenFreeze).
+func (m *TokenFreezeMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *TokenFreezeMutation) Fields() []string {
+	fields := make([]string, 0, 8)
+	if m.create_time != nil {
+		fields = append(fields, tokenfreeze.FieldCreateTime)
+	}
+	if m.update_time != nil {
+		fields = append(fields, tokenfreeze.FieldUpdateTime)
+	}
+	if m.status != nil {
+		fields = append(fields, tokenfreeze.FieldStatus)
+	}
+	if m.owner_public_key != nil {
+		fields = append(fields, tokenfreeze.FieldOwnerPublicKey)
+	}
+	if m.token_public_key != nil {
+		fields = append(fields, tokenfreeze.FieldTokenPublicKey)
+	}
+	if m.issuer_signature != nil {
+		fields = append(fields, tokenfreeze.FieldIssuerSignature)
+	}
+	if m.wallet_provided_freeze_timestamp != nil {
+		fields = append(fields, tokenfreeze.FieldWalletProvidedFreezeTimestamp)
+	}
+	if m.wallet_provided_thaw_timestamp != nil {
+		fields = append(fields, tokenfreeze.FieldWalletProvidedThawTimestamp)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *TokenFreezeMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case tokenfreeze.FieldCreateTime:
+		return m.CreateTime()
+	case tokenfreeze.FieldUpdateTime:
+		return m.UpdateTime()
+	case tokenfreeze.FieldStatus:
+		return m.Status()
+	case tokenfreeze.FieldOwnerPublicKey:
+		return m.OwnerPublicKey()
+	case tokenfreeze.FieldTokenPublicKey:
+		return m.TokenPublicKey()
+	case tokenfreeze.FieldIssuerSignature:
+		return m.IssuerSignature()
+	case tokenfreeze.FieldWalletProvidedFreezeTimestamp:
+		return m.WalletProvidedFreezeTimestamp()
+	case tokenfreeze.FieldWalletProvidedThawTimestamp:
+		return m.WalletProvidedThawTimestamp()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *TokenFreezeMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case tokenfreeze.FieldCreateTime:
+		return m.OldCreateTime(ctx)
+	case tokenfreeze.FieldUpdateTime:
+		return m.OldUpdateTime(ctx)
+	case tokenfreeze.FieldStatus:
+		return m.OldStatus(ctx)
+	case tokenfreeze.FieldOwnerPublicKey:
+		return m.OldOwnerPublicKey(ctx)
+	case tokenfreeze.FieldTokenPublicKey:
+		return m.OldTokenPublicKey(ctx)
+	case tokenfreeze.FieldIssuerSignature:
+		return m.OldIssuerSignature(ctx)
+	case tokenfreeze.FieldWalletProvidedFreezeTimestamp:
+		return m.OldWalletProvidedFreezeTimestamp(ctx)
+	case tokenfreeze.FieldWalletProvidedThawTimestamp:
+		return m.OldWalletProvidedThawTimestamp(ctx)
+	}
+	return nil, fmt.Errorf("unknown TokenFreeze field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *TokenFreezeMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case tokenfreeze.FieldCreateTime:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreateTime(v)
+		return nil
+	case tokenfreeze.FieldUpdateTime:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdateTime(v)
+		return nil
+	case tokenfreeze.FieldStatus:
+		v, ok := value.(schema.TokenFreezeStatus)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStatus(v)
+		return nil
+	case tokenfreeze.FieldOwnerPublicKey:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOwnerPublicKey(v)
+		return nil
+	case tokenfreeze.FieldTokenPublicKey:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTokenPublicKey(v)
+		return nil
+	case tokenfreeze.FieldIssuerSignature:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetIssuerSignature(v)
+		return nil
+	case tokenfreeze.FieldWalletProvidedFreezeTimestamp:
+		v, ok := value.(uint64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetWalletProvidedFreezeTimestamp(v)
+		return nil
+	case tokenfreeze.FieldWalletProvidedThawTimestamp:
+		v, ok := value.(uint64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetWalletProvidedThawTimestamp(v)
+		return nil
+	}
+	return fmt.Errorf("unknown TokenFreeze field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *TokenFreezeMutation) AddedFields() []string {
+	var fields []string
+	if m.addwallet_provided_freeze_timestamp != nil {
+		fields = append(fields, tokenfreeze.FieldWalletProvidedFreezeTimestamp)
+	}
+	if m.addwallet_provided_thaw_timestamp != nil {
+		fields = append(fields, tokenfreeze.FieldWalletProvidedThawTimestamp)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *TokenFreezeMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case tokenfreeze.FieldWalletProvidedFreezeTimestamp:
+		return m.AddedWalletProvidedFreezeTimestamp()
+	case tokenfreeze.FieldWalletProvidedThawTimestamp:
+		return m.AddedWalletProvidedThawTimestamp()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *TokenFreezeMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case tokenfreeze.FieldWalletProvidedFreezeTimestamp:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddWalletProvidedFreezeTimestamp(v)
+		return nil
+	case tokenfreeze.FieldWalletProvidedThawTimestamp:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddWalletProvidedThawTimestamp(v)
+		return nil
+	}
+	return fmt.Errorf("unknown TokenFreeze numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *TokenFreezeMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(tokenfreeze.FieldWalletProvidedThawTimestamp) {
+		fields = append(fields, tokenfreeze.FieldWalletProvidedThawTimestamp)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *TokenFreezeMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *TokenFreezeMutation) ClearField(name string) error {
+	switch name {
+	case tokenfreeze.FieldWalletProvidedThawTimestamp:
+		m.ClearWalletProvidedThawTimestamp()
+		return nil
+	}
+	return fmt.Errorf("unknown TokenFreeze nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *TokenFreezeMutation) ResetField(name string) error {
+	switch name {
+	case tokenfreeze.FieldCreateTime:
+		m.ResetCreateTime()
+		return nil
+	case tokenfreeze.FieldUpdateTime:
+		m.ResetUpdateTime()
+		return nil
+	case tokenfreeze.FieldStatus:
+		m.ResetStatus()
+		return nil
+	case tokenfreeze.FieldOwnerPublicKey:
+		m.ResetOwnerPublicKey()
+		return nil
+	case tokenfreeze.FieldTokenPublicKey:
+		m.ResetTokenPublicKey()
+		return nil
+	case tokenfreeze.FieldIssuerSignature:
+		m.ResetIssuerSignature()
+		return nil
+	case tokenfreeze.FieldWalletProvidedFreezeTimestamp:
+		m.ResetWalletProvidedFreezeTimestamp()
+		return nil
+	case tokenfreeze.FieldWalletProvidedThawTimestamp:
+		m.ResetWalletProvidedThawTimestamp()
+		return nil
+	}
+	return fmt.Errorf("unknown TokenFreeze field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *TokenFreezeMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *TokenFreezeMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *TokenFreezeMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *TokenFreezeMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *TokenFreezeMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *TokenFreezeMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *TokenFreezeMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown TokenFreeze unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *TokenFreezeMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown TokenFreeze edge %s", name)
 }
 
 // TokenLeafMutation represents an operation that mutates the TokenLeaf nodes in the graph.

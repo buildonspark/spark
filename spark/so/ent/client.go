@@ -23,6 +23,7 @@ import (
 	"github.com/lightsparkdev/spark-go/so/ent/preimageshare"
 	"github.com/lightsparkdev/spark-go/so/ent/signingkeyshare"
 	"github.com/lightsparkdev/spark-go/so/ent/signingnonce"
+	"github.com/lightsparkdev/spark-go/so/ent/tokenfreeze"
 	"github.com/lightsparkdev/spark-go/so/ent/tokenleaf"
 	"github.com/lightsparkdev/spark-go/so/ent/tokenmint"
 	"github.com/lightsparkdev/spark-go/so/ent/tokentransactionreceipt"
@@ -52,6 +53,8 @@ type Client struct {
 	SigningKeyshare *SigningKeyshareClient
 	// SigningNonce is the client for interacting with the SigningNonce builders.
 	SigningNonce *SigningNonceClient
+	// TokenFreeze is the client for interacting with the TokenFreeze builders.
+	TokenFreeze *TokenFreezeClient
 	// TokenLeaf is the client for interacting with the TokenLeaf builders.
 	TokenLeaf *TokenLeafClient
 	// TokenMint is the client for interacting with the TokenMint builders.
@@ -86,6 +89,7 @@ func (c *Client) init() {
 	c.PreimageShare = NewPreimageShareClient(c.config)
 	c.SigningKeyshare = NewSigningKeyshareClient(c.config)
 	c.SigningNonce = NewSigningNonceClient(c.config)
+	c.TokenFreeze = NewTokenFreezeClient(c.config)
 	c.TokenLeaf = NewTokenLeafClient(c.config)
 	c.TokenMint = NewTokenMintClient(c.config)
 	c.TokenTransactionReceipt = NewTokenTransactionReceiptClient(c.config)
@@ -193,6 +197,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		PreimageShare:           NewPreimageShareClient(cfg),
 		SigningKeyshare:         NewSigningKeyshareClient(cfg),
 		SigningNonce:            NewSigningNonceClient(cfg),
+		TokenFreeze:             NewTokenFreezeClient(cfg),
 		TokenLeaf:               NewTokenLeafClient(cfg),
 		TokenMint:               NewTokenMintClient(cfg),
 		TokenTransactionReceipt: NewTokenTransactionReceiptClient(cfg),
@@ -227,6 +232,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		PreimageShare:           NewPreimageShareClient(cfg),
 		SigningKeyshare:         NewSigningKeyshareClient(cfg),
 		SigningNonce:            NewSigningNonceClient(cfg),
+		TokenFreeze:             NewTokenFreezeClient(cfg),
 		TokenLeaf:               NewTokenLeafClient(cfg),
 		TokenMint:               NewTokenMintClient(cfg),
 		TokenTransactionReceipt: NewTokenTransactionReceiptClient(cfg),
@@ -265,9 +271,9 @@ func (c *Client) Close() error {
 func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
 		c.BlockHeight, c.CooperativeExit, c.DepositAddress, c.PreimageRequest,
-		c.PreimageShare, c.SigningKeyshare, c.SigningNonce, c.TokenLeaf, c.TokenMint,
-		c.TokenTransactionReceipt, c.Transfer, c.TransferLeaf, c.Tree, c.TreeNode,
-		c.UserSignedTransaction,
+		c.PreimageShare, c.SigningKeyshare, c.SigningNonce, c.TokenFreeze, c.TokenLeaf,
+		c.TokenMint, c.TokenTransactionReceipt, c.Transfer, c.TransferLeaf, c.Tree,
+		c.TreeNode, c.UserSignedTransaction,
 	} {
 		n.Use(hooks...)
 	}
@@ -278,9 +284,9 @@ func (c *Client) Use(hooks ...Hook) {
 func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
 		c.BlockHeight, c.CooperativeExit, c.DepositAddress, c.PreimageRequest,
-		c.PreimageShare, c.SigningKeyshare, c.SigningNonce, c.TokenLeaf, c.TokenMint,
-		c.TokenTransactionReceipt, c.Transfer, c.TransferLeaf, c.Tree, c.TreeNode,
-		c.UserSignedTransaction,
+		c.PreimageShare, c.SigningKeyshare, c.SigningNonce, c.TokenFreeze, c.TokenLeaf,
+		c.TokenMint, c.TokenTransactionReceipt, c.Transfer, c.TransferLeaf, c.Tree,
+		c.TreeNode, c.UserSignedTransaction,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -303,6 +309,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.SigningKeyshare.mutate(ctx, m)
 	case *SigningNonceMutation:
 		return c.SigningNonce.mutate(ctx, m)
+	case *TokenFreezeMutation:
+		return c.TokenFreeze.mutate(ctx, m)
 	case *TokenLeafMutation:
 		return c.TokenLeaf.mutate(ctx, m)
 	case *TokenMintMutation:
@@ -1348,6 +1356,139 @@ func (c *SigningNonceClient) mutate(ctx context.Context, m *SigningNonceMutation
 		return (&SigningNonceDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown SigningNonce mutation op: %q", m.Op())
+	}
+}
+
+// TokenFreezeClient is a client for the TokenFreeze schema.
+type TokenFreezeClient struct {
+	config
+}
+
+// NewTokenFreezeClient returns a client for the TokenFreeze from the given config.
+func NewTokenFreezeClient(c config) *TokenFreezeClient {
+	return &TokenFreezeClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `tokenfreeze.Hooks(f(g(h())))`.
+func (c *TokenFreezeClient) Use(hooks ...Hook) {
+	c.hooks.TokenFreeze = append(c.hooks.TokenFreeze, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `tokenfreeze.Intercept(f(g(h())))`.
+func (c *TokenFreezeClient) Intercept(interceptors ...Interceptor) {
+	c.inters.TokenFreeze = append(c.inters.TokenFreeze, interceptors...)
+}
+
+// Create returns a builder for creating a TokenFreeze entity.
+func (c *TokenFreezeClient) Create() *TokenFreezeCreate {
+	mutation := newTokenFreezeMutation(c.config, OpCreate)
+	return &TokenFreezeCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of TokenFreeze entities.
+func (c *TokenFreezeClient) CreateBulk(builders ...*TokenFreezeCreate) *TokenFreezeCreateBulk {
+	return &TokenFreezeCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *TokenFreezeClient) MapCreateBulk(slice any, setFunc func(*TokenFreezeCreate, int)) *TokenFreezeCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &TokenFreezeCreateBulk{err: fmt.Errorf("calling to TokenFreezeClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*TokenFreezeCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &TokenFreezeCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for TokenFreeze.
+func (c *TokenFreezeClient) Update() *TokenFreezeUpdate {
+	mutation := newTokenFreezeMutation(c.config, OpUpdate)
+	return &TokenFreezeUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *TokenFreezeClient) UpdateOne(tf *TokenFreeze) *TokenFreezeUpdateOne {
+	mutation := newTokenFreezeMutation(c.config, OpUpdateOne, withTokenFreeze(tf))
+	return &TokenFreezeUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *TokenFreezeClient) UpdateOneID(id uuid.UUID) *TokenFreezeUpdateOne {
+	mutation := newTokenFreezeMutation(c.config, OpUpdateOne, withTokenFreezeID(id))
+	return &TokenFreezeUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for TokenFreeze.
+func (c *TokenFreezeClient) Delete() *TokenFreezeDelete {
+	mutation := newTokenFreezeMutation(c.config, OpDelete)
+	return &TokenFreezeDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *TokenFreezeClient) DeleteOne(tf *TokenFreeze) *TokenFreezeDeleteOne {
+	return c.DeleteOneID(tf.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *TokenFreezeClient) DeleteOneID(id uuid.UUID) *TokenFreezeDeleteOne {
+	builder := c.Delete().Where(tokenfreeze.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &TokenFreezeDeleteOne{builder}
+}
+
+// Query returns a query builder for TokenFreeze.
+func (c *TokenFreezeClient) Query() *TokenFreezeQuery {
+	return &TokenFreezeQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeTokenFreeze},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a TokenFreeze entity by its id.
+func (c *TokenFreezeClient) Get(ctx context.Context, id uuid.UUID) (*TokenFreeze, error) {
+	return c.Query().Where(tokenfreeze.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *TokenFreezeClient) GetX(ctx context.Context, id uuid.UUID) *TokenFreeze {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *TokenFreezeClient) Hooks() []Hook {
+	return c.hooks.TokenFreeze
+}
+
+// Interceptors returns the client interceptors.
+func (c *TokenFreezeClient) Interceptors() []Interceptor {
+	return c.inters.TokenFreeze
+}
+
+func (c *TokenFreezeClient) mutate(ctx context.Context, m *TokenFreezeMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&TokenFreezeCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&TokenFreezeUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&TokenFreezeUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&TokenFreezeDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown TokenFreeze mutation op: %q", m.Op())
 	}
 }
 
@@ -2707,12 +2848,14 @@ func (c *UserSignedTransactionClient) mutate(ctx context.Context, m *UserSignedT
 type (
 	hooks struct {
 		BlockHeight, CooperativeExit, DepositAddress, PreimageRequest, PreimageShare,
-		SigningKeyshare, SigningNonce, TokenLeaf, TokenMint, TokenTransactionReceipt,
-		Transfer, TransferLeaf, Tree, TreeNode, UserSignedTransaction []ent.Hook
+		SigningKeyshare, SigningNonce, TokenFreeze, TokenLeaf, TokenMint,
+		TokenTransactionReceipt, Transfer, TransferLeaf, Tree, TreeNode,
+		UserSignedTransaction []ent.Hook
 	}
 	inters struct {
 		BlockHeight, CooperativeExit, DepositAddress, PreimageRequest, PreimageShare,
-		SigningKeyshare, SigningNonce, TokenLeaf, TokenMint, TokenTransactionReceipt,
-		Transfer, TransferLeaf, Tree, TreeNode, UserSignedTransaction []ent.Interceptor
+		SigningKeyshare, SigningNonce, TokenFreeze, TokenLeaf, TokenMint,
+		TokenTransactionReceipt, Transfer, TransferLeaf, Tree, TreeNode,
+		UserSignedTransaction []ent.Interceptor
 	}
 )

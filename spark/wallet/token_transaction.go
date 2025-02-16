@@ -6,6 +6,7 @@ import (
 	"log"
 	"math/big"
 	"strconv"
+	"time"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lightsparkdev/spark-go/common"
@@ -241,6 +242,74 @@ func BroadcastTokenTransaction(
 	}
 
 	return startResponse.FinalTokenTransaction, nil
+}
+
+// FreezeTokens sends a request to freeze all tokens owned by a specific owner public key.
+// This prevents transfer of all leaves owned now and in the future by the provided owner public key.
+func FreezeTokens(
+	ctx context.Context,
+	config *Config,
+	ownerPublicKey []byte,
+	tokenPublicKey []byte,
+	shouldUnfreeze bool,
+) (*pb.FreezeTokensResponse, error) {
+	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
+	if err != nil {
+		log.Printf("Error while establishing gRPC connection to coordinator at %s: %v", config.CoodinatorAddress(), err)
+		return nil, err
+	}
+	defer sparkConn.Close()
+
+	var lastResponse *pb.FreezeTokensResponse
+	timestamp := uint64(time.Now().UnixNano())
+	for _, operator := range config.SigningOperators {
+		// Establish connection to coordinator
+		sparkConn, err := common.NewGRPCConnectionWithTestTLS(operator.Address)
+		if err != nil {
+			log.Printf("Error while establishing gRPC connection to coordinator at %s: %v", operator.Address, err)
+			return nil, err
+		}
+		defer sparkConn.Close()
+
+		// Authenticate
+		token, err := AuthenticateWithConnection(ctx, config, sparkConn)
+		if err != nil {
+			return nil, fmt.Errorf("failed to authenticate with server: %v", err)
+		}
+		tmpCtx := ContextWithToken(ctx, token)
+		sparkClient := pb.NewSparkServiceClient(sparkConn)
+
+		// Create the freeze tokens payload
+		payload := &pb.FreezeTokensPayload{
+			OwnerPublicKey:            ownerPublicKey,
+			TokenPublicKey:            tokenPublicKey,
+			OperatorIdentityPublicKey: operator.IdentityPublicKey,
+			Timestamp:                 timestamp,
+			ShouldUnfreeze:            shouldUnfreeze,
+		}
+
+		// Hash and sign the payload with the issuer's private key
+		payloadHash, err := utils.HashFreezeTokensPayload(payload)
+		if err != nil {
+			return nil, fmt.Errorf("failed to hash freeze tokens payload: %v", err)
+		}
+
+		// Sign with the issuer's private key
+		signingPrivKeySecp := secp256k1.PrivKeyFromBytes(config.IdentityPrivateKey.Serialize())
+		issuerSignature := ecdsa.Sign(signingPrivKeySecp, payloadHash).Serialize()
+
+		// Create and send the freeze request
+		request := &pb.FreezeTokensRequest{
+			FreezeTokensPayload: payload,
+			IssuerSignature:     issuerSignature,
+		}
+
+		lastResponse, err = sparkClient.FreezeTokens(tmpCtx, request)
+		if err != nil {
+			return nil, fmt.Errorf("failed to freeze tokens: %v", err)
+		}
+	}
+	return lastResponse, nil
 }
 
 func parseHexIdentifierToUint64(binaryIdentifier string) uint64 {

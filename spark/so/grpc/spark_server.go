@@ -183,3 +183,10 @@ func (s *SparkServer) FinalizeTokenTransaction(ctx context.Context, req *pb.Fina
 	tokenTransactionHandler := handler.NewTokenTransactionHandler(s.config, s.db)
 	return wrapWithGRPCError(tokenTransactionHandler.FinalizeTokenTransaction(ctx, s.config, req))
 }
+
+// FreezeTokens prevents transfer of all leaves owned now and in the future by the provided owner public key.
+// Unfreeze undos this operation and re-enables transfers.
+func (s *SparkServer) FreezeTokens(ctx context.Context, req *pb.FreezeTokensRequest) (*pb.FreezeTokensResponse, error) {
+	tokenTransactionHandler := handler.NewTokenTransactionHandler(s.config, s.db)
+	return wrapWithGRPCError(tokenTransactionHandler.FreezeTokens(ctx, req))
+}

@@ -14,6 +14,7 @@ import (
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
 	"github.com/lightsparkdev/spark-go/so/ent/signingkeyshare"
 	"github.com/lightsparkdev/spark-go/so/ent/signingnonce"
+	"github.com/lightsparkdev/spark-go/so/ent/tokenfreeze"
 	"github.com/lightsparkdev/spark-go/so/ent/tokenleaf"
 	"github.com/lightsparkdev/spark-go/so/ent/tokenmint"
 	"github.com/lightsparkdev/spark-go/so/ent/tokentransactionreceipt"
@@ -193,6 +194,37 @@ func init() {
 	signingnonceDescID := signingnonceMixinFields0[0].Descriptor()
 	// signingnonce.DefaultID holds the default value on creation for the id field.
 	signingnonce.DefaultID = signingnonceDescID.Default.(func() uuid.UUID)
+	tokenfreezeMixin := schema.TokenFreeze{}.Mixin()
+	tokenfreezeMixinFields0 := tokenfreezeMixin[0].Fields()
+	_ = tokenfreezeMixinFields0
+	tokenfreezeFields := schema.TokenFreeze{}.Fields()
+	_ = tokenfreezeFields
+	// tokenfreezeDescCreateTime is the schema descriptor for create_time field.
+	tokenfreezeDescCreateTime := tokenfreezeMixinFields0[1].Descriptor()
+	// tokenfreeze.DefaultCreateTime holds the default value on creation for the create_time field.
+	tokenfreeze.DefaultCreateTime = tokenfreezeDescCreateTime.Default.(func() time.Time)
+	// tokenfreezeDescUpdateTime is the schema descriptor for update_time field.
+	tokenfreezeDescUpdateTime := tokenfreezeMixinFields0[2].Descriptor()
+	// tokenfreeze.DefaultUpdateTime holds the default value on creation for the update_time field.
+	tokenfreeze.DefaultUpdateTime = tokenfreezeDescUpdateTime.Default.(func() time.Time)
+	// tokenfreeze.UpdateDefaultUpdateTime holds the default value on update for the update_time field.
+	tokenfreeze.UpdateDefaultUpdateTime = tokenfreezeDescUpdateTime.UpdateDefault.(func() time.Time)
+	// tokenfreezeDescOwnerPublicKey is the schema descriptor for owner_public_key field.
+	tokenfreezeDescOwnerPublicKey := tokenfreezeFields[1].Descriptor()
+	// tokenfreeze.OwnerPublicKeyValidator is a validator for the "owner_public_key" field. It is called by the builders before save.
+	tokenfreeze.OwnerPublicKeyValidator = tokenfreezeDescOwnerPublicKey.Validators[0].(func([]byte) error)
+	// tokenfreezeDescTokenPublicKey is the schema descriptor for token_public_key field.
+	tokenfreezeDescTokenPublicKey := tokenfreezeFields[2].Descriptor()
+	// tokenfreeze.TokenPublicKeyValidator is a validator for the "token_public_key" field. It is called by the builders before save.
+	tokenfreeze.TokenPublicKeyValidator = tokenfreezeDescTokenPublicKey.Validators[0].(func([]byte) error)
+	// tokenfreezeDescIssuerSignature is the schema descriptor for issuer_signature field.
+	tokenfreezeDescIssuerSignature := tokenfreezeFields[3].Descriptor()
+	// tokenfreeze.IssuerSignatureValidator is a validator for the "issuer_signature" field. It is called by the builders before save.
+	tokenfreeze.IssuerSignatureValidator = tokenfreezeDescIssuerSignature.Validators[0].(func([]byte) error)
+	// tokenfreezeDescID is the schema descriptor for id field.
+	tokenfreezeDescID := tokenfreezeMixinFields0[0].Descriptor()
+	// tokenfreeze.DefaultID holds the default value on creation for the id field.
+	tokenfreeze.DefaultID = tokenfreezeDescID.Default.(func() uuid.UUID)
 	tokenleafMixin := schema.TokenLeaf{}.Mixin()
 	tokenleafMixinFields0 := tokenleafMixin[0].Fields()
 	_ = tokenleafMixinFields0

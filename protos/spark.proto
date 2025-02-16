@@ -36,6 +36,7 @@ service SparkService {
     rpc start_token_transaction(StartTokenTransactionRequest) returns (StartTokenTransactionResponse) {}
     rpc sign_token_transaction(SignTokenTransactionRequest) returns (SignTokenTransactionResponse) {}
     rpc finalize_token_transaction(FinalizeTokenTransactionRequest) returns (google.protobuf.Empty) {}
+    rpc freeze_tokens(FreezeTokensRequest) returns (FreezeTokensResponse) {}
 
     rpc return_lightning_payment(ReturnLightningPaymentRequest) returns (google.protobuf.Empty) {}
     rpc get_tree_nodes_by_public_key(TreeNodesByPublicKeyRequest) returns (TreeNodesByPublicKeyResponse) {}
@@ -218,6 +219,25 @@ message FinalizeTokenTransactionRequest {
     // List of ordered revocation keys that map 1:1 with leaves being spent in the
     // token transaction.
     repeated bytes leaf_to_spend_revocation_keys = 2;
+}
+
+message FreezeTokensPayload {
+    bytes owner_public_key = 1;
+    bytes token_public_key = 2;
+    uint64 timestamp = 3;
+    bytes operator_identity_public_key = 4;
+    // Set to false when requesting a freeze.
+    bool should_unfreeze = 5;  
+}
+
+message FreezeTokensRequest {
+    FreezeTokensPayload freeze_tokens_payload = 1;
+    bytes issuer_signature = 2;
+}
+
+message FreezeTokensResponse {
+    repeated string impacted_leaf_ids = 1;
+    repeated bytes impacted_token_amount = 2;  // Decoded uint128
 }
 
 message TreeNode {

@@ -43,6 +43,7 @@ const (
 	SparkService_StartTokenTransaction_FullMethodName    = "/spark.SparkService/start_token_transaction"
 	SparkService_SignTokenTransaction_FullMethodName     = "/spark.SparkService/sign_token_transaction"
 	SparkService_FinalizeTokenTransaction_FullMethodName = "/spark.SparkService/finalize_token_transaction"
+	SparkService_FreezeTokens_FullMethodName             = "/spark.SparkService/freeze_tokens"
 	SparkService_ReturnLightningPayment_FullMethodName   = "/spark.SparkService/return_lightning_payment"
 	SparkService_GetTreeNodesByPublicKey_FullMethodName  = "/spark.SparkService/get_tree_nodes_by_public_key"
 )
@@ -75,6 +76,7 @@ type SparkServiceClient interface {
 	StartTokenTransaction(ctx context.Context, in *StartTokenTransactionRequest, opts ...grpc.CallOption) (*StartTokenTransactionResponse, error)
 	SignTokenTransaction(ctx context.Context, in *SignTokenTransactionRequest, opts ...grpc.CallOption) (*SignTokenTransactionResponse, error)
 	FinalizeTokenTransaction(ctx context.Context, in *FinalizeTokenTransactionRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	FreezeTokens(ctx context.Context, in *FreezeTokensRequest, opts ...grpc.CallOption) (*FreezeTokensResponse, error)
 	ReturnLightningPayment(ctx context.Context, in *ReturnLightningPaymentRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	GetTreeNodesByPublicKey(ctx context.Context, in *TreeNodesByPublicKeyRequest, opts ...grpc.CallOption) (*TreeNodesByPublicKeyResponse, error)
 }
@@ -317,6 +319,16 @@ func (c *sparkServiceClient) FinalizeTokenTransaction(ctx context.Context, in *F
 	return out, nil
 }
 
+func (c *sparkServiceClient) FreezeTokens(ctx context.Context, in *FreezeTokensRequest, opts ...grpc.CallOption) (*FreezeTokensResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(FreezeTokensResponse)
+	err := c.cc.Invoke(ctx, SparkService_FreezeTokens_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *sparkServiceClient) ReturnLightningPayment(ctx context.Context, in *ReturnLightningPaymentRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(emptypb.Empty)
@@ -365,6 +377,7 @@ type SparkServiceServer interface {
 	StartTokenTransaction(context.Context, *StartTokenTransactionRequest) (*StartTokenTransactionResponse, error)
 	SignTokenTransaction(context.Context, *SignTokenTransactionRequest) (*SignTokenTransactionResponse, error)
 	FinalizeTokenTransaction(context.Context, *FinalizeTokenTransactionRequest) (*emptypb.Empty, error)
+	FreezeTokens(context.Context, *FreezeTokensRequest) (*FreezeTokensResponse, error)
 	ReturnLightningPayment(context.Context, *ReturnLightningPaymentRequest) (*emptypb.Empty, error)
 	GetTreeNodesByPublicKey(context.Context, *TreeNodesByPublicKeyRequest) (*TreeNodesByPublicKeyResponse, error)
 	mustEmbedUnimplementedSparkServiceServer()
@@ -445,6 +458,9 @@ func (UnimplementedSparkServiceServer) SignTokenTransaction(context.Context, *Si
 }
 func (UnimplementedSparkServiceServer) FinalizeTokenTransaction(context.Context, *FinalizeTokenTransactionRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method FinalizeTokenTransaction not implemented")
+}
+func (UnimplementedSparkServiceServer) FreezeTokens(context.Context, *FreezeTokensRequest) (*FreezeTokensResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method FreezeTokens not implemented")
 }
 func (UnimplementedSparkServiceServer) ReturnLightningPayment(context.Context, *ReturnLightningPaymentRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ReturnLightningPayment not implemented")
@@ -887,6 +903,24 @@ func _SparkService_FinalizeTokenTransaction_Handler(srv interface{}, ctx context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SparkService_FreezeTokens_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(FreezeTokensRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkServiceServer).FreezeTokens(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkService_FreezeTokens_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkServiceServer).FreezeTokens(ctx, req.(*FreezeTokensRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _SparkService_ReturnLightningPayment_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ReturnLightningPaymentRequest)
 	if err := dec(in); err != nil {
@@ -1021,6 +1055,10 @@ var SparkService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "finalize_token_transaction",
 			Handler:    _SparkService_FinalizeTokenTransaction_Handler,
+		},
+		{
+			MethodName: "freeze_tokens",
+			Handler:    _SparkService_FreezeTokens_Handler,
 		},
 		{
 			MethodName: "return_lightning_payment",

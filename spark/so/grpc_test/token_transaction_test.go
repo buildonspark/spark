@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/binary"
 	"log"
+	"math/big"
 	"testing"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
@@ -92,6 +93,13 @@ func TestBroadcastTokenTransactionIssueAndTransferTokens(t *testing.T) {
 		t.Fatalf("failed to hash final issuance token transaction: %v", err)
 	}
 
+	userLeaf3PrivKey, err := secp256k1.GeneratePrivateKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	userLeaf3PubKey := userLeaf3PrivKey.PubKey()
+	userLeaf3PubKeyBytes := userLeaf3PubKey.SerializeCompressed()
+
 	transferTokenTransaction := &pb.TokenTransaction{
 		// Spend the leaves created with issuance before into a new single leaf.
 		TokenInput: &pb.TokenTransaction_TransferInput{
@@ -111,7 +119,7 @@ func TestBroadcastTokenTransactionIssueAndTransferTokens(t *testing.T) {
 		// Send the funds back to the issuer.
 		OutputLeaves: []*pb.TokenLeafOutput{
 			{
-				OwnerPublicKey: tokenIdentityPubKeyBytes,
+				OwnerPublicKey: userLeaf3PubKeyBytes,
 				TokenPublicKey: tokenIdentityPubKeyBytes,      // Using user pubkey as token ID for this example
 				TokenAmount:    int64ToUint128Bytes(0, 33333), // high bits = 0, low bits = 99999
 			},
@@ -141,4 +149,150 @@ func TestBroadcastTokenTransactionIssueAndTransferTokens(t *testing.T) {
 		t.Fatalf("failed to broadcast transfer token transaction: %v", err)
 	}
 	log.Printf("transfer broadcast finalized token transaction: %v", finalTransferTokenTransaction)
+
+	// Call FreezeTokens to freeze the output leaf
+	freezeResponse, err := wallet.FreezeTokens(
+		context.Background(),
+		config,
+		finalTransferTokenTransaction.OutputLeaves[0].OwnerPublicKey, // owner public key of the leaf to freeze
+		tokenIdentityPubKeyBytes,                                     // token public key
+		false,                                                        // unfreeze
+	)
+	if err != nil {
+		t.Fatalf("failed to freeze tokens: %v", err)
+	}
+
+	// Convert frozen amount bytes to big.Int for comparison
+	frozenAmount := new(big.Int).SetBytes(freezeResponse.ImpactedTokenAmount[0])
+
+	// Calculate total amount from transaction output leaves
+	expectedAmount := new(big.Int).SetBytes(finalTransferTokenTransaction.OutputLeaves[0].TokenAmount)
+	expectedLeafID := finalTransferTokenTransaction.OutputLeaves[0].Id
+
+	if frozenAmount.Cmp(expectedAmount) != 0 {
+		t.Errorf("frozen amount %s does not match expected amount %s",
+			frozenAmount.String(), expectedAmount.String())
+	}
+	if len(freezeResponse.ImpactedLeafIds) != 1 {
+		t.Errorf("expected 1 impacted leaf ID, got %d", len(freezeResponse.ImpactedLeafIds))
+	}
+	if freezeResponse.ImpactedLeafIds[0] != *expectedLeafID {
+		t.Errorf("frozen leaf ID %s does not match expected leaf ID %s",
+			freezeResponse.ImpactedLeafIds[0], *expectedLeafID)
+	}
+
+	if err != nil {
+		t.Fatalf("failed to freeze tokens: %v", err)
+	}
+
+	finalTransferTokenTransactionHash, err := utils.HashTokenTransaction(finalTransferTokenTransaction, false)
+	if err != nil {
+		t.Fatalf("failed to hash final transfer token transaction: %v", err)
+	}
+	revPubKey3 := finalTransferTokenTransaction.OutputLeaves[0].RevocationPublicKey
+
+	transferFrozenTokenTransaction := &pb.TokenTransaction{
+		// Spend the leaves created with issuance before into a new single leaf.
+		TokenInput: &pb.TokenTransaction_TransferInput{
+			TransferInput: &pb.TransferInput{
+				LeavesToSpend: []*pb.TokenLeafToSpend{
+					{
+						PrevTokenTransactionHash:     finalTransferTokenTransactionHash,
+						PrevTokenTransactionLeafVout: 0,
+					},
+				},
+			},
+		},
+		// Send the funds back to the issuer.
+		OutputLeaves: []*pb.TokenLeafOutput{
+			{
+				OwnerPublicKey: tokenIdentityPubKeyBytes,
+				TokenPublicKey: tokenIdentityPubKeyBytes,      // Using user pubkey as token ID for this example
+				TokenAmount:    int64ToUint128Bytes(0, 33333), // high bits = 0, low bits = 99999
+			},
+		},
+	}
+
+	// Broadcast the token transaction
+	transferFrozenTokenTransactionResponse, err := wallet.BroadcastTokenTransaction(
+		context.Background(), config, transferFrozenTokenTransaction,
+		[]*secp256k1.PrivateKey{userLeaf3PrivKey},
+		[][]byte{revPubKey3},
+	)
+	if err == nil {
+		t.Fatal("expected error when transferring frozen tokens, got nil")
+	}
+	if transferFrozenTokenTransactionResponse != nil {
+		t.Errorf("expected nil response when transferring frozen tokens, got %+v", transferFrozenTokenTransactionResponse)
+	}
+
+	log.Printf("Froze tokens with response: %+v", freezeResponse)
+
+	// Call FreezeTokens to thaw the output leaf
+	unfreezeResponse, err := wallet.FreezeTokens(
+		context.Background(),
+		config,
+		finalTransferTokenTransaction.OutputLeaves[0].OwnerPublicKey, // owner public key of the leaf to freeze
+		tokenIdentityPubKeyBytes,
+		true, // unfreeze
+	)
+
+	// Convert frozen amount bytes to big.Int for comparison
+	thawedAmount := new(big.Int).SetBytes(unfreezeResponse.ImpactedTokenAmount[0])
+
+	if thawedAmount.Cmp(expectedAmount) != 0 {
+		t.Errorf("thawed amount %s does not match expected amount %s",
+			thawedAmount.String(), expectedAmount.String())
+	}
+	if len(unfreezeResponse.ImpactedLeafIds) != 1 {
+		t.Errorf("expected 1 impacted leaf ID, got %d", len(unfreezeResponse.ImpactedLeafIds))
+	}
+	if unfreezeResponse.ImpactedLeafIds[0] != *expectedLeafID {
+		t.Errorf("thawed leaf ID %s does not match expected leaf ID %s",
+			unfreezeResponse.ImpactedLeafIds[0], *expectedLeafID)
+	}
+
+	if err != nil {
+		t.Fatalf("failed to freeze tokens: %v", err)
+	}
+
+	if err != nil {
+		t.Fatalf("failed to hash final transfer token transaction: %v", err)
+	}
+
+	transferThawedTokenTransaction := &pb.TokenTransaction{
+		// Spend the leaves created with issuance before into a new single leaf.
+		TokenInput: &pb.TokenTransaction_TransferInput{
+			TransferInput: &pb.TransferInput{
+				LeavesToSpend: []*pb.TokenLeafToSpend{
+					{
+						PrevTokenTransactionHash:     finalTransferTokenTransactionHash,
+						PrevTokenTransactionLeafVout: 0,
+					},
+				},
+			},
+		},
+		// Send the funds back to the issuer.
+		OutputLeaves: []*pb.TokenLeafOutput{
+			{
+				OwnerPublicKey: userLeaf1PubKeyBytes,
+				TokenPublicKey: tokenIdentityPubKeyBytes,      // Using user pubkey as token ID for this example
+				TokenAmount:    int64ToUint128Bytes(0, 33333), // high bits = 0, low bits = 99999
+			},
+		},
+	}
+
+	// Broadcast the token transaction
+	transferThawedTokenTransactionResponse, err := wallet.BroadcastTokenTransaction(
+		context.Background(), config, transferThawedTokenTransaction,
+		[]*secp256k1.PrivateKey{userLeaf3PrivKey},
+		[][]byte{revPubKey3},
+	)
+	if err != nil {
+		t.Fatalf("failed to broadcast thawed token transaction: %v", err)
+	}
+	if transferThawedTokenTransactionResponse == nil {
+		t.Fatal("expected non-nil response when transferring thawed tokens")
+	}
+	log.Printf("thawed token transfer broadcast finalized token transaction: %v", transferThawedTokenTransactionResponse)
 }

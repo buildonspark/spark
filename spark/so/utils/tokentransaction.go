@@ -129,6 +129,52 @@ func HashOperatorSpecificTokenTransactionSignablePayload(payload *pb.OperatorSpe
 	return h.Sum(nil), nil
 }
 
+func HashFreezeTokensPayload(payload *pb.FreezeTokensPayload) ([]byte, error) {
+	if payload == nil {
+		return nil, fmt.Errorf("revocation keyshare signable payload cannot be nil")
+	}
+
+	h := sha256.New()
+	var allHashes []byte
+
+	h.Reset()
+	if payload.GetOwnerPublicKey() != nil {
+		h.Write(payload.GetOwnerPublicKey())
+	}
+	allHashes = append(allHashes, h.Sum(nil)...)
+
+	h.Reset()
+	if payload.GetTokenPublicKey() != nil {
+		h.Write(payload.GetTokenPublicKey())
+	}
+	allHashes = append(allHashes, h.Sum(nil)...)
+
+	h.Reset()
+	if payload.GetShouldUnfreeze() {
+		h.Write([]byte{1})
+	} else {
+		h.Write([]byte{0})
+	}
+
+	h.Reset()
+	if payload.GetTimestamp() != 0 {
+		nonceBytes := make([]byte, 8)
+		binary.LittleEndian.PutUint64(nonceBytes, payload.Timestamp)
+		h.Write(nonceBytes)
+	}
+	allHashes = append(allHashes, h.Sum(nil)...)
+
+	h.Reset()
+	if payload.GetOperatorIdentityPublicKey() != nil {
+		h.Write(payload.GetOperatorIdentityPublicKey())
+	}
+	allHashes = append(allHashes, h.Sum(nil)...)
+	// Final hash of all concatenated hashes
+	h.Reset()
+	h.Write(allHashes)
+	return h.Sum(nil), nil
+}
+
 // TODO: Extend to validate the full token transaction after filling revocation keys.
 // ValidatePartialTokenTransactionStartRequest validates a partial token transaction start request without revocation keys.
 func ValidatePartialTokenTransaction(

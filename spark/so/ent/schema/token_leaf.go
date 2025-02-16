@@ -91,6 +91,8 @@ func (TokenLeaf) Edges() []ent.Edge {
 // Indexes are the indexes for the token leafs table.
 func (TokenLeaf) Indexes() []ent.Index {
 	return []ent.Index{
-		index.Fields("owner_public_key"),
+		// Enable fast fetching of all leaves owned by a token owner, or optionally all token leaves
+		// owned by a token owner for a specific token type.
+		index.Fields("owner_public_key", "token_public_key"),
 	}
 }

@@ -93,6 +93,18 @@ func (f SigningNonceFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.SigningNonceMutation", m)
 }
 
+// The TokenFreezeFunc type is an adapter to allow the use of ordinary
+// function as TokenFreeze mutator.
+type TokenFreezeFunc func(context.Context, *ent.TokenFreezeMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f TokenFreezeFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.TokenFreezeMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.TokenFreezeMutation", m)
+}
+
 // The TokenLeafFunc type is an adapter to allow the use of ordinary
 // function as TokenLeaf mutator.
 type TokenLeafFunc func(context.Context, *ent.TokenLeafMutation) (ent.Value, error)

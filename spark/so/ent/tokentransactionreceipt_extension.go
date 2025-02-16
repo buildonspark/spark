@@ -258,11 +258,42 @@ func UpdateFinalizedTransactionLeaves(
 }
 
 // FetchTokenTransactionReceipt refetches the receipt with all its relations.
-func FetchTokenTransactionData(ctx context.Context, finalTokenTransactionHash []byte) (*TokenTransactionReceipt, error) {
-	return GetDbFromContext(ctx).TokenTransactionReceipt.Query().
+func FetchTokenTransactionData(ctx context.Context, finalTokenTransaction *pb.TokenTransaction) (*TokenTransactionReceipt, error) {
+	finalTokenTransactionHash, err := utils.HashTokenTransaction(finalTokenTransaction, false)
+	if err != nil {
+		return nil, err
+	}
+
+	tokenTransctionReceipt, err := GetDbFromContext(ctx).TokenTransactionReceipt.Query().
 		Where(tokentransactionreceipt.FinalizedTokenTransactionHash(finalTokenTransactionHash)).
 		WithCreatedLeaf().
 		WithSpentLeaf().
 		WithMint().
 		Only(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Sanity check that inputs and outputs matching the expected length were found.
+	if finalTokenTransaction.GetMintInput() != nil {
+		if tokenTransctionReceipt.Edges.Mint == nil {
+			return nil, fmt.Errorf("mint transaction must have a mint record, but none was found")
+		}
+	} else { // Transfer
+		if len(finalTokenTransaction.GetTransferInput().LeavesToSpend) != len(tokenTransctionReceipt.Edges.SpentLeaf) {
+			return nil, fmt.Errorf(
+				"number of input leaves in transaction (%d) does not match number of spent leaves in receipt (%d)",
+				len(finalTokenTransaction.GetTransferInput().LeavesToSpend),
+				len(tokenTransctionReceipt.Edges.SpentLeaf),
+			)
+		}
+	}
+	if len(finalTokenTransaction.OutputLeaves) != len(tokenTransctionReceipt.Edges.CreatedLeaf) {
+		return nil, fmt.Errorf(
+			"number of output leaves in transaction (%d) does not match number of created leaves in receipt (%d)",
+			len(finalTokenTransaction.OutputLeaves),
+			len(tokenTransctionReceipt.Edges.CreatedLeaf),
+		)
+	}
+	return tokenTransctionReceipt, nil
 }

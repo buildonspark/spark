@@ -186,6 +186,36 @@ var (
 			},
 		},
 	}
+	// TokenFreezesColumns holds the columns for the "token_freezes" table.
+	TokenFreezesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUUID},
+		{Name: "create_time", Type: field.TypeTime},
+		{Name: "update_time", Type: field.TypeTime},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"FROZEN", "THAWED"}},
+		{Name: "owner_public_key", Type: field.TypeBytes},
+		{Name: "token_public_key", Type: field.TypeBytes},
+		{Name: "issuer_signature", Type: field.TypeBytes, Unique: true},
+		{Name: "wallet_provided_freeze_timestamp", Type: field.TypeUint64},
+		{Name: "wallet_provided_thaw_timestamp", Type: field.TypeUint64, Nullable: true},
+	}
+	// TokenFreezesTable holds the schema information for the "token_freezes" table.
+	TokenFreezesTable = &schema.Table{
+		Name:       "token_freezes",
+		Columns:    TokenFreezesColumns,
+		PrimaryKey: []*schema.Column{TokenFreezesColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "tokenfreeze_owner_public_key_token_public_key_wallet_provided_freeze_timestamp",
+				Unique:  true,
+				Columns: []*schema.Column{TokenFreezesColumns[4], TokenFreezesColumns[5], TokenFreezesColumns[7]},
+			},
+			{
+				Name:    "tokenfreeze_owner_public_key_token_public_key_wallet_provided_thaw_timestamp",
+				Unique:  true,
+				Columns: []*schema.Column{TokenFreezesColumns[4], TokenFreezesColumns[5], TokenFreezesColumns[8]},
+			},
+		},
+	}
 	// TokenLeafsColumns holds the columns for the "token_leafs" table.
 	TokenLeafsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeUUID},
@@ -234,9 +264,9 @@ var (
 		},
 		Indexes: []*schema.Index{
 			{
-				Name:    "tokenleaf_owner_public_key",
+				Name:    "tokenleaf_owner_public_key_token_public_key",
 				Unique:  false,
-				Columns: []*schema.Column{TokenLeafsColumns[4]},
+				Columns: []*schema.Column{TokenLeafsColumns[4], TokenLeafsColumns[8]},
 			},
 		},
 	}
@@ -497,6 +527,7 @@ var (
 		PreimageSharesTable,
 		SigningKeysharesTable,
 		SigningNoncesTable,
+		TokenFreezesTable,
 		TokenLeafsTable,
 		TokenMintsTable,
 		TokenTransactionReceiptsTable,
