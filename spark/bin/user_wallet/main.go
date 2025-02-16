@@ -129,11 +129,12 @@ func (cli *CLI) Run() error {
 	if err != nil {
 		return fmt.Errorf("failed to create identity key: %w", err)
 	}
+	fmt.Printf("Identity key pubkey: %s\n", hex.EncodeToString(identityKey.PublicKey().Key))
 	signingKey, err := masterKey.NewChildKey(1 + 0x80000000)
 	if err != nil {
 		return fmt.Errorf("failed to create signing key: %w", err)
 	}
-
+	fmt.Printf("Signing key pubkey: %s\n", hex.EncodeToString(signingKey.PublicKey().Key))
 	config, err := testutil.TestWalletConfigDeployed(identityKey.Key)
 	if err != nil {
 		return fmt.Errorf("failed to create test wallet config: %w", err)

@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"sync"
 
 	"github.com/decred/dcrd/dcrec/secp256k1"
 	"github.com/google/uuid"
@@ -63,10 +62,7 @@ func (keyshare *SigningKeyshare) MarshalProto() *pb.SigningKeyshare {
 }
 
 // GetUnusedSigningKeyshares returns the available keyshares for the given coordinator index.
-func GetUnusedSigningKeyshares(ctx context.Context, lock *sync.Mutex, dbClient *Client, config *so.Config, keyshareCount int) ([]*SigningKeyshare, error) {
-	lock.Lock()
-	defer lock.Unlock()
-
+func GetUnusedSigningKeyshares(ctx context.Context, dbClient *Client, config *so.Config, keyshareCount int) ([]*SigningKeyshare, error) {
 	tx, err := dbClient.Tx(ctx)
 	if err != nil {
 		return nil, err
@@ -75,9 +71,12 @@ func GetUnusedSigningKeyshares(ctx context.Context, lock *sync.Mutex, dbClient *
 	signingKeyshares, err := tx.SigningKeyshare.Query().Where(
 		signingkeyshare.StatusEQ(schema.KeyshareStatusAvailable),
 		signingkeyshare.CoordinatorIndexEQ(config.Index),
-	).Limit(keyshareCount).All(ctx)
+	).
+		Limit(keyshareCount).
+		ForUpdate().
+		All(ctx)
 	if err != nil {
-		return nil, err
+		return nil, tx.Rollback()
 	}
 
 	if len(signingKeyshares) < keyshareCount {
@@ -87,7 +86,7 @@ func GetUnusedSigningKeyshares(ctx context.Context, lock *sync.Mutex, dbClient *
 				log.Printf("Error running DKG: %v", err)
 			}
 		}()
-		return nil, fmt.Errorf("not enough keyshares available")
+		return nil, tx.Rollback()
 	}
 
 	for _, keyshare := range signingKeyshares {
@@ -95,7 +94,7 @@ func GetUnusedSigningKeyshares(ctx context.Context, lock *sync.Mutex, dbClient *
 			SetStatus(schema.KeyshareStatusInUse).
 			Save(ctx)
 		if err != nil {
-			return nil, err
+			return nil, tx.Rollback()
 		}
 	}
 

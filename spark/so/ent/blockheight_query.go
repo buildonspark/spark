@@ -8,6 +8,7 @@ import (
 	"math"
 
 	"entgo.io/ent"
+	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
@@ -23,6 +24,7 @@ type BlockHeightQuery struct {
 	order      []blockheight.OrderOption
 	inters     []Interceptor
 	predicates []predicate.BlockHeight
+	modifiers  []func(*sql.Selector)
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -344,6 +346,9 @@ func (bhq *BlockHeightQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]
 		nodes = append(nodes, node)
 		return node.assignValues(columns, values)
 	}
+	if len(bhq.modifiers) > 0 {
+		_spec.Modifiers = bhq.modifiers
+	}
 	for i := range hooks {
 		hooks[i](ctx, _spec)
 	}
@@ -358,6 +363,9 @@ func (bhq *BlockHeightQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]
 
 func (bhq *BlockHeightQuery) sqlCount(ctx context.Context) (int, error) {
 	_spec := bhq.querySpec()
+	if len(bhq.modifiers) > 0 {
+		_spec.Modifiers = bhq.modifiers
+	}
 	_spec.Node.Columns = bhq.ctx.Fields
 	if len(bhq.ctx.Fields) > 0 {
 		_spec.Unique = bhq.ctx.Unique != nil && *bhq.ctx.Unique
@@ -420,6 +428,9 @@ func (bhq *BlockHeightQuery) sqlQuery(ctx context.Context) *sql.Selector {
 	if bhq.ctx.Unique != nil && *bhq.ctx.Unique {
 		selector.Distinct()
 	}
+	for _, m := range bhq.modifiers {
+		m(selector)
+	}
 	for _, p := range bhq.predicates {
 		p(selector)
 	}
@@ -435,6 +446,32 @@ func (bhq *BlockHeightQuery) sqlQuery(ctx context.Context) *sql.Selector {
 		selector.Limit(*limit)
 	}
 	return selector
+}
+
+// ForUpdate locks the selected rows against concurrent updates, and prevent them from being
+// updated, deleted or "selected ... for update" by other sessions, until the transaction is
+// either committed or rolled-back.
+func (bhq *BlockHeightQuery) ForUpdate(opts ...sql.LockOption) *BlockHeightQuery {
+	if bhq.driver.Dialect() == dialect.Postgres {
+		bhq.Unique(false)
+	}
+	bhq.modifiers = append(bhq.modifiers, func(s *sql.Selector) {
+		s.ForUpdate(opts...)
+	})
+	return bhq
+}
+
+// ForShare behaves similarly to ForUpdate, except that it acquires a shared mode lock
+// on any rows that are read. Other sessions can read the rows, but cannot modify them
+// until your transaction commits.
+func (bhq *BlockHeightQuery) ForShare(opts ...sql.LockOption) *BlockHeightQuery {
+	if bhq.driver.Dialect() == dialect.Postgres {
+		bhq.Unique(false)
+	}
+	bhq.modifiers = append(bhq.modifiers, func(s *sql.Selector) {
+		s.ForShare(opts...)
+	})
+	return bhq
 }
 
 // BlockHeightGroupBy is the group-by builder for BlockHeight entities.

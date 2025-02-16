@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log"
-	"sync"
 
 	"github.com/btcsuite/btcd/wire"
 	"github.com/google/uuid"
@@ -25,15 +24,13 @@ import (
 // The DepositHandler is responsible for handling deposit related requests.
 type DepositHandler struct {
 	config *so.Config
-	lock   *sync.Mutex
 	db     *ent.Client
 }
 
 // NewDepositHandler creates a new DepositHandler.
-func NewDepositHandler(config *so.Config, lock *sync.Mutex, db *ent.Client) *DepositHandler {
+func NewDepositHandler(config *so.Config, db *ent.Client) *DepositHandler {
 	return &DepositHandler{
 		config: config,
-		lock:   lock,
 		db:     db,
 	}
 }
@@ -51,7 +48,7 @@ func (o *DepositHandler) GenerateDepositAddress(ctx context.Context, config *so.
 		return nil, err
 	}
 	log.Printf("Generating deposit address for public key: %s", hex.EncodeToString(req.SigningPublicKey))
-	keyshares, err := ent.GetUnusedSigningKeyshares(ctx, o.lock, o.db, config, 1)
+	keyshares, err := ent.GetUnusedSigningKeyshares(ctx, o.db, config, 1)
 	if err != nil {
 		return nil, err
 	}

@@ -3,7 +3,6 @@ package grpc
 import (
 	"context"
 	"log"
-	"sync"
 
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
 	"github.com/lightsparkdev/spark-go/so"
@@ -17,7 +16,6 @@ import (
 type SparkServer struct {
 	pb.UnimplementedSparkServiceServer
 	config *so.Config
-	lock   *sync.Mutex
 	db     *ent.Client
 }
 
@@ -25,19 +23,18 @@ var emptyResponse = &emptypb.Empty{}
 
 // NewSparkServer creates a new SparkServer.
 func NewSparkServer(config *so.Config, db *ent.Client) *SparkServer {
-	lock := &sync.Mutex{}
-	return &SparkServer{config: config, lock: lock, db: db}
+	return &SparkServer{config: config, db: db}
 }
 
 // GenerateDepositAddress generates a deposit address for the given public key.
 func (s *SparkServer) GenerateDepositAddress(ctx context.Context, req *pb.GenerateDepositAddressRequest) (*pb.GenerateDepositAddressResponse, error) {
-	depositHandler := handler.NewDepositHandler(s.config, s.lock, s.db)
+	depositHandler := handler.NewDepositHandler(s.config, s.db)
 	return wrapWithGRPCError(depositHandler.GenerateDepositAddress(ctx, s.config, req))
 }
 
 // StartTreeCreation verifies the on chain utxo, and then verifies and signs the offchain root and refund transactions.
 func (s *SparkServer) StartTreeCreation(ctx context.Context, req *pb.StartTreeCreationRequest) (*pb.StartTreeCreationResponse, error) {
-	depositHandler := handler.NewDepositHandler(s.config, s.lock, s.db)
+	depositHandler := handler.NewDepositHandler(s.config, s.db)
 	return wrapWithGRPCError(depositHandler.StartTreeCreation(ctx, s.config, req))
 }
 
@@ -116,7 +113,7 @@ func (s *SparkServer) LeafSwap(ctx context.Context, req *pb.LeafSwapRequest) (*p
 
 // PrepareTreeAddress prepares the tree address for the given public key.
 func (s *SparkServer) PrepareTreeAddress(ctx context.Context, req *pb.PrepareTreeAddressRequest) (*pb.PrepareTreeAddressResponse, error) {
-	treeHandler := handler.NewTreeCreationHandler(s.config, s.lock, s.db)
+	treeHandler := handler.NewTreeCreationHandler(s.config, s.db)
 	result, err := wrapWithGRPCError(treeHandler.PrepareTreeAddress(ctx, req))
 	if err != nil {
 		log.Printf("failed to prepare tree address: %v", err)
@@ -126,7 +123,7 @@ func (s *SparkServer) PrepareTreeAddress(ctx context.Context, req *pb.PrepareTre
 
 // CreateTree creates a tree from user input and signs the transactions in the tree.
 func (s *SparkServer) CreateTree(ctx context.Context, req *pb.CreateTreeRequest) (*pb.CreateTreeResponse, error) {
-	treeHandler := handler.NewTreeCreationHandler(s.config, s.lock, s.db)
+	treeHandler := handler.NewTreeCreationHandler(s.config, s.db)
 	result, err := wrapWithGRPCError(treeHandler.CreateTree(ctx, req))
 	if err != nil {
 		log.Printf("failed to create tree: %v", err)
@@ -163,7 +160,7 @@ func (s *SparkServer) ReturnLightningPayment(ctx context.Context, req *pb.Return
 // StartTokenTransaction reserves revocation keyshares, fills the revocation public key to create the final token, and collects token transaction
 // signatures from each of the signing operators.
 func (s *SparkServer) StartTokenTransaction(ctx context.Context, req *pb.StartTokenTransactionRequest) (*pb.StartTokenTransactionResponse, error) {
-	tokenTransactionHandler := handler.NewTokenTransactionHandler(s.config, s.lock, s.db)
+	tokenTransactionHandler := handler.NewTokenTransactionHandler(s.config, s.db)
 	return wrapWithGRPCError(tokenTransactionHandler.StartTokenTransaction(ctx, s.config, req))
 }
 
@@ -176,13 +173,13 @@ func (s *SparkServer) QueryNodes(ctx context.Context, req *pb.QueryNodesRequest)
 // GetTokenTransactionRevocationKeyshares allows the wallet to retrieve the revocation private key shares from each individual SO to
 // allow the wallet to combine these shares into the fully resolved revocation private key necessary for transaction finalization.
 func (s *SparkServer) SignTokenTransaction(ctx context.Context, req *pb.SignTokenTransactionRequest) (*pb.SignTokenTransactionResponse, error) {
-	tokenTransactionHandler := handler.NewTokenTransactionHandler(s.config, s.lock, s.db)
+	tokenTransactionHandler := handler.NewTokenTransactionHandler(s.config, s.db)
 	return wrapWithGRPCError(tokenTransactionHandler.SignTokenTransaction(ctx, s.config, req))
 }
 
 // FinalizeTokenTransaction verifies the revocation private keys constructed by the wallet and passes these keys to the LRC20 Node
 // to finalize the transaction. This operation irreversibly spends the input leaves associated with the transaction.
 func (s *SparkServer) FinalizeTokenTransaction(ctx context.Context, req *pb.FinalizeTokenTransactionRequest) (*emptypb.Empty, error) {
-	tokenTransactionHandler := handler.NewTokenTransactionHandler(s.config, s.lock, s.db)
+	tokenTransactionHandler := handler.NewTokenTransactionHandler(s.config, s.db)
 	return wrapWithGRPCError(tokenTransactionHandler.FinalizeTokenTransaction(ctx, s.config, req))
 }

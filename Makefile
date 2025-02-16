@@ -26,7 +26,7 @@ clean:
 	rm -rf spark/proto/*/*.pb.go
 
 ent:
-	cd spark && go generate ./so/ent
+	cd spark && go run -mod=mod entgo.io/ent/cmd/ent generate --feature sql/lock ./so/ent/schema
 
 copy-protos:
 	cp protos/common.proto signer/spark-frost/protos/

@@ -9,6 +9,7 @@ import (
 	"math"
 
 	"entgo.io/ent"
+	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
@@ -31,6 +32,7 @@ type TreeNodeQuery struct {
 	withSigningKeyshare *SigningKeyshareQuery
 	withChildren        *TreeNodeQuery
 	withFKs             bool
+	modifiers           []func(*sql.Selector)
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -502,6 +504,9 @@ func (tnq *TreeNodeQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Tr
 		node.Edges.loadedTypes = loadedTypes
 		return node.assignValues(columns, values)
 	}
+	if len(tnq.modifiers) > 0 {
+		_spec.Modifiers = tnq.modifiers
+	}
 	for i := range hooks {
 		hooks[i](ctx, _spec)
 	}
@@ -669,6 +674,9 @@ func (tnq *TreeNodeQuery) loadChildren(ctx context.Context, query *TreeNodeQuery
 
 func (tnq *TreeNodeQuery) sqlCount(ctx context.Context) (int, error) {
 	_spec := tnq.querySpec()
+	if len(tnq.modifiers) > 0 {
+		_spec.Modifiers = tnq.modifiers
+	}
 	_spec.Node.Columns = tnq.ctx.Fields
 	if len(tnq.ctx.Fields) > 0 {
 		_spec.Unique = tnq.ctx.Unique != nil && *tnq.ctx.Unique
@@ -731,6 +739,9 @@ func (tnq *TreeNodeQuery) sqlQuery(ctx context.Context) *sql.Selector {
 	if tnq.ctx.Unique != nil && *tnq.ctx.Unique {
 		selector.Distinct()
 	}
+	for _, m := range tnq.modifiers {
+		m(selector)
+	}
 	for _, p := range tnq.predicates {
 		p(selector)
 	}
@@ -746,6 +757,32 @@ func (tnq *TreeNodeQuery) sqlQuery(ctx context.Context) *sql.Selector {
 		selector.Limit(*limit)
 	}
 	return selector
+}
+
+// ForUpdate locks the selected rows against concurrent updates, and prevent them from being
+// updated, deleted or "selected ... for update" by other sessions, until the transaction is
+// either committed or rolled-back.
+func (tnq *TreeNodeQuery) ForUpdate(opts ...sql.LockOption) *TreeNodeQuery {
+	if tnq.driver.Dialect() == dialect.Postgres {
+		tnq.Unique(false)
+	}
+	tnq.modifiers = append(tnq.modifiers, func(s *sql.Selector) {
+		s.ForUpdate(opts...)
+	})
+	return tnq
+}
+
+// ForShare behaves similarly to ForUpdate, except that it acquires a shared mode lock
+// on any rows that are read. Other sessions can read the rows, but cannot modify them
+// until your transaction commits.
+func (tnq *TreeNodeQuery) ForShare(opts ...sql.LockOption) *TreeNodeQuery {
+	if tnq.driver.Dialect() == dialect.Postgres {
+		tnq.Unique(false)
+	}
+	tnq.modifiers = append(tnq.modifiers, func(s *sql.Selector) {
+		s.ForShare(opts...)
+	})
+	return tnq
 }
 
 // TreeNodeGroupBy is the group-by builder for TreeNode entities.

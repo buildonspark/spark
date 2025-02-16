@@ -8,6 +8,7 @@ import (
 	"math"
 
 	"entgo.io/ent"
+	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
@@ -28,6 +29,7 @@ type UserSignedTransactionQuery struct {
 	withTreeNode        *TreeNodeQuery
 	withPreimageRequest *PreimageRequestQuery
 	withFKs             bool
+	modifiers           []func(*sql.Selector)
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -429,6 +431,9 @@ func (ustq *UserSignedTransactionQuery) sqlAll(ctx context.Context, hooks ...que
 		node.Edges.loadedTypes = loadedTypes
 		return node.assignValues(columns, values)
 	}
+	if len(ustq.modifiers) > 0 {
+		_spec.Modifiers = ustq.modifiers
+	}
 	for i := range hooks {
 		hooks[i](ctx, _spec)
 	}
@@ -520,6 +525,9 @@ func (ustq *UserSignedTransactionQuery) loadPreimageRequest(ctx context.Context,
 
 func (ustq *UserSignedTransactionQuery) sqlCount(ctx context.Context) (int, error) {
 	_spec := ustq.querySpec()
+	if len(ustq.modifiers) > 0 {
+		_spec.Modifiers = ustq.modifiers
+	}
 	_spec.Node.Columns = ustq.ctx.Fields
 	if len(ustq.ctx.Fields) > 0 {
 		_spec.Unique = ustq.ctx.Unique != nil && *ustq.ctx.Unique
@@ -582,6 +590,9 @@ func (ustq *UserSignedTransactionQuery) sqlQuery(ctx context.Context) *sql.Selec
 	if ustq.ctx.Unique != nil && *ustq.ctx.Unique {
 		selector.Distinct()
 	}
+	for _, m := range ustq.modifiers {
+		m(selector)
+	}
 	for _, p := range ustq.predicates {
 		p(selector)
 	}
@@ -597,6 +608,32 @@ func (ustq *UserSignedTransactionQuery) sqlQuery(ctx context.Context) *sql.Selec
 		selector.Limit(*limit)
 	}
 	return selector
+}
+
+// ForUpdate locks the selected rows against concurrent updates, and prevent them from being
+// updated, deleted or "selected ... for update" by other sessions, until the transaction is
+// either committed or rolled-back.
+func (ustq *UserSignedTransactionQuery) ForUpdate(opts ...sql.LockOption) *UserSignedTransactionQuery {
+	if ustq.driver.Dialect() == dialect.Postgres {
+		ustq.Unique(false)
+	}
+	ustq.modifiers = append(ustq.modifiers, func(s *sql.Selector) {
+		s.ForUpdate(opts...)
+	})
+	return ustq
+}
+
+// ForShare behaves similarly to ForUpdate, except that it acquires a shared mode lock
+// on any rows that are read. Other sessions can read the rows, but cannot modify them
+// until your transaction commits.
+func (ustq *UserSignedTransactionQuery) ForShare(opts ...sql.LockOption) *UserSignedTransactionQuery {
+	if ustq.driver.Dialect() == dialect.Postgres {
+		ustq.Unique(false)
+	}
+	ustq.modifiers = append(ustq.modifiers, func(s *sql.Selector) {
+		s.ForShare(opts...)
+	})
+	return ustq
 }
 
 // UserSignedTransactionGroupBy is the group-by builder for UserSignedTransaction entities.

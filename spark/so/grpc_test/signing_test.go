@@ -2,7 +2,6 @@ package grpctest
 
 import (
 	"crypto/sha256"
-	"sync"
 	"testing"
 
 	"github.com/btcsuite/btcd/btcec/v2"
@@ -38,10 +37,8 @@ func TestFrostSign(t *testing.T) {
 	msg := []byte("hello")
 	msgHash := sha256.Sum256(msg)
 
-	lock := &sync.Mutex{}
-
 	// Step 2: Get operator key share
-	operatorKeyShares, err := ent.GetUnusedSigningKeyshares(ctx, lock, dbClient, config, 1)
+	operatorKeyShares, err := ent.GetUnusedSigningKeyshares(ctx, dbClient, config, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -240,10 +237,8 @@ func TestFrostWithoutUserSign(t *testing.T) {
 	msg := []byte("hello")
 	msgHash := sha256.Sum256(msg)
 
-	lock := &sync.Mutex{}
-
 	// Step 2: Get operator key share
-	operatorKeyShares, err := ent.GetUnusedSigningKeyshares(ctx, lock, dbClient, config, 1)
+	operatorKeyShares, err := ent.GetUnusedSigningKeyshares(ctx, dbClient, config, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -329,10 +324,8 @@ func TestFrostSignWithAdaptor(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	lock := &sync.Mutex{}
-
 	// Step 2: Get operator key share
-	operatorKeyShares, err := ent.GetUnusedSigningKeyshares(ctx, lock, dbClient, config, 1)
+	operatorKeyShares, err := ent.GetUnusedSigningKeyshares(ctx, dbClient, config, 1)
 	if err != nil {
 		t.Fatal(err)
 	}

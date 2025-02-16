@@ -9,6 +9,7 @@ import (
 	"math"
 
 	"entgo.io/ent"
+	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
@@ -30,6 +31,7 @@ type TokenTransactionReceiptQuery struct {
 	withCreatedLeaf *TokenLeafQuery
 	withMint        *TokenMintQuery
 	withFKs         bool
+	modifiers       []func(*sql.Selector)
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -466,6 +468,9 @@ func (ttrq *TokenTransactionReceiptQuery) sqlAll(ctx context.Context, hooks ...q
 		node.Edges.loadedTypes = loadedTypes
 		return node.assignValues(columns, values)
 	}
+	if len(ttrq.modifiers) > 0 {
+		_spec.Modifiers = ttrq.modifiers
+	}
 	for i := range hooks {
 		hooks[i](ctx, _spec)
 	}
@@ -595,6 +600,9 @@ func (ttrq *TokenTransactionReceiptQuery) loadMint(ctx context.Context, query *T
 
 func (ttrq *TokenTransactionReceiptQuery) sqlCount(ctx context.Context) (int, error) {
 	_spec := ttrq.querySpec()
+	if len(ttrq.modifiers) > 0 {
+		_spec.Modifiers = ttrq.modifiers
+	}
 	_spec.Node.Columns = ttrq.ctx.Fields
 	if len(ttrq.ctx.Fields) > 0 {
 		_spec.Unique = ttrq.ctx.Unique != nil && *ttrq.ctx.Unique
@@ -657,6 +665,9 @@ func (ttrq *TokenTransactionReceiptQuery) sqlQuery(ctx context.Context) *sql.Sel
 	if ttrq.ctx.Unique != nil && *ttrq.ctx.Unique {
 		selector.Distinct()
 	}
+	for _, m := range ttrq.modifiers {
+		m(selector)
+	}
 	for _, p := range ttrq.predicates {
 		p(selector)
 	}
@@ -672,6 +683,32 @@ func (ttrq *TokenTransactionReceiptQuery) sqlQuery(ctx context.Context) *sql.Sel
 		selector.Limit(*limit)
 	}
 	return selector
+}
+
+// ForUpdate locks the selected rows against concurrent updates, and prevent them from being
+// updated, deleted or "selected ... for update" by other sessions, until the transaction is
+// either committed or rolled-back.
+func (ttrq *TokenTransactionReceiptQuery) ForUpdate(opts ...sql.LockOption) *TokenTransactionReceiptQuery {
+	if ttrq.driver.Dialect() == dialect.Postgres {
+		ttrq.Unique(false)
+	}
+	ttrq.modifiers = append(ttrq.modifiers, func(s *sql.Selector) {
+		s.ForUpdate(opts...)
+	})
+	return ttrq
+}
+
+// ForShare behaves similarly to ForUpdate, except that it acquires a shared mode lock
+// on any rows that are read. Other sessions can read the rows, but cannot modify them
+// until your transaction commits.
+func (ttrq *TokenTransactionReceiptQuery) ForShare(opts ...sql.LockOption) *TokenTransactionReceiptQuery {
+	if ttrq.driver.Dialect() == dialect.Postgres {
+		ttrq.Unique(false)
+	}
+	ttrq.modifiers = append(ttrq.modifiers, func(s *sql.Selector) {
+		s.ForShare(opts...)
+	})
+	return ttrq
 }
 
 // TokenTransactionReceiptGroupBy is the group-by builder for TokenTransactionReceipt entities.

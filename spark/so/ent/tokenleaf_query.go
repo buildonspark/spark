@@ -8,6 +8,7 @@ import (
 	"math"
 
 	"entgo.io/ent"
+	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
@@ -29,6 +30,7 @@ type TokenLeafQuery struct {
 	withLeafCreatedTokenTransactionReceipt *TokenTransactionReceiptQuery
 	withLeafSpentTokenTransactionReceipt   *TokenTransactionReceiptQuery
 	withFKs                                bool
+	modifiers                              []func(*sql.Selector)
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -465,6 +467,9 @@ func (tlq *TokenLeafQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*T
 		node.Edges.loadedTypes = loadedTypes
 		return node.assignValues(columns, values)
 	}
+	if len(tlq.modifiers) > 0 {
+		_spec.Modifiers = tlq.modifiers
+	}
 	for i := range hooks {
 		hooks[i](ctx, _spec)
 	}
@@ -594,6 +599,9 @@ func (tlq *TokenLeafQuery) loadLeafSpentTokenTransactionReceipt(ctx context.Cont
 
 func (tlq *TokenLeafQuery) sqlCount(ctx context.Context) (int, error) {
 	_spec := tlq.querySpec()
+	if len(tlq.modifiers) > 0 {
+		_spec.Modifiers = tlq.modifiers
+	}
 	_spec.Node.Columns = tlq.ctx.Fields
 	if len(tlq.ctx.Fields) > 0 {
 		_spec.Unique = tlq.ctx.Unique != nil && *tlq.ctx.Unique
@@ -656,6 +664,9 @@ func (tlq *TokenLeafQuery) sqlQuery(ctx context.Context) *sql.Selector {
 	if tlq.ctx.Unique != nil && *tlq.ctx.Unique {
 		selector.Distinct()
 	}
+	for _, m := range tlq.modifiers {
+		m(selector)
+	}
 	for _, p := range tlq.predicates {
 		p(selector)
 	}
@@ -671,6 +682,32 @@ func (tlq *TokenLeafQuery) sqlQuery(ctx context.Context) *sql.Selector {
 		selector.Limit(*limit)
 	}
 	return selector
+}
+
+// ForUpdate locks the selected rows against concurrent updates, and prevent them from being
+// updated, deleted or "selected ... for update" by other sessions, until the transaction is
+// either committed or rolled-back.
+func (tlq *TokenLeafQuery) ForUpdate(opts ...sql.LockOption) *TokenLeafQuery {
+	if tlq.driver.Dialect() == dialect.Postgres {
+		tlq.Unique(false)
+	}
+	tlq.modifiers = append(tlq.modifiers, func(s *sql.Selector) {
+		s.ForUpdate(opts...)
+	})
+	return tlq
+}
+
+// ForShare behaves similarly to ForUpdate, except that it acquires a shared mode lock
+// on any rows that are read. Other sessions can read the rows, but cannot modify them
+// until your transaction commits.
+func (tlq *TokenLeafQuery) ForShare(opts ...sql.LockOption) *TokenLeafQuery {
+	if tlq.driver.Dialect() == dialect.Postgres {
+		tlq.Unique(false)
+	}
+	tlq.modifiers = append(tlq.modifiers, func(s *sql.Selector) {
+		s.ForShare(opts...)
+	})
+	return tlq
 }
 
 // TokenLeafGroupBy is the group-by builder for TokenLeaf entities.

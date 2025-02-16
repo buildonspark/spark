@@ -8,6 +8,7 @@ import (
 	"math"
 
 	"entgo.io/ent"
+	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
@@ -26,6 +27,7 @@ type PreimageShareQuery struct {
 	predicates          []predicate.PreimageShare
 	withPreimageRequest *PreimageRequestQuery
 	withFKs             bool
+	modifiers           []func(*sql.Selector)
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -392,6 +394,9 @@ func (psq *PreimageShareQuery) sqlAll(ctx context.Context, hooks ...queryHook) (
 		node.Edges.loadedTypes = loadedTypes
 		return node.assignValues(columns, values)
 	}
+	if len(psq.modifiers) > 0 {
+		_spec.Modifiers = psq.modifiers
+	}
 	for i := range hooks {
 		hooks[i](ctx, _spec)
 	}
@@ -445,6 +450,9 @@ func (psq *PreimageShareQuery) loadPreimageRequest(ctx context.Context, query *P
 
 func (psq *PreimageShareQuery) sqlCount(ctx context.Context) (int, error) {
 	_spec := psq.querySpec()
+	if len(psq.modifiers) > 0 {
+		_spec.Modifiers = psq.modifiers
+	}
 	_spec.Node.Columns = psq.ctx.Fields
 	if len(psq.ctx.Fields) > 0 {
 		_spec.Unique = psq.ctx.Unique != nil && *psq.ctx.Unique
@@ -507,6 +515,9 @@ func (psq *PreimageShareQuery) sqlQuery(ctx context.Context) *sql.Selector {
 	if psq.ctx.Unique != nil && *psq.ctx.Unique {
 		selector.Distinct()
 	}
+	for _, m := range psq.modifiers {
+		m(selector)
+	}
 	for _, p := range psq.predicates {
 		p(selector)
 	}
@@ -522,6 +533,32 @@ func (psq *PreimageShareQuery) sqlQuery(ctx context.Context) *sql.Selector {
 		selector.Limit(*limit)
 	}
 	return selector
+}
+
+// ForUpdate locks the selected rows against concurrent updates, and prevent them from being
+// updated, deleted or "selected ... for update" by other sessions, until the transaction is
+// either committed or rolled-back.
+func (psq *PreimageShareQuery) ForUpdate(opts ...sql.LockOption) *PreimageShareQuery {
+	if psq.driver.Dialect() == dialect.Postgres {
+		psq.Unique(false)
+	}
+	psq.modifiers = append(psq.modifiers, func(s *sql.Selector) {
+		s.ForUpdate(opts...)
+	})
+	return psq
+}
+
+// ForShare behaves similarly to ForUpdate, except that it acquires a shared mode lock
+// on any rows that are read. Other sessions can read the rows, but cannot modify them
+// until your transaction commits.
+func (psq *PreimageShareQuery) ForShare(opts ...sql.LockOption) *PreimageShareQuery {
+	if psq.driver.Dialect() == dialect.Postgres {
+		psq.Unique(false)
+	}
+	psq.modifiers = append(psq.modifiers, func(s *sql.Selector) {
+		s.ForShare(opts...)
+	})
+	return psq
 }
 
 // PreimageShareGroupBy is the group-by builder for PreimageShare entities.

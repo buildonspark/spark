@@ -8,6 +8,7 @@ import (
 	"math"
 
 	"entgo.io/ent"
+	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
@@ -23,6 +24,7 @@ type SigningNonceQuery struct {
 	order      []signingnonce.OrderOption
 	inters     []Interceptor
 	predicates []predicate.SigningNonce
+	modifiers  []func(*sql.Selector)
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -344,6 +346,9 @@ func (snq *SigningNonceQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([
 		nodes = append(nodes, node)
 		return node.assignValues(columns, values)
 	}
+	if len(snq.modifiers) > 0 {
+		_spec.Modifiers = snq.modifiers
+	}
 	for i := range hooks {
 		hooks[i](ctx, _spec)
 	}
@@ -358,6 +363,9 @@ func (snq *SigningNonceQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([
 
 func (snq *SigningNonceQuery) sqlCount(ctx context.Context) (int, error) {
 	_spec := snq.querySpec()
+	if len(snq.modifiers) > 0 {
+		_spec.Modifiers = snq.modifiers
+	}
 	_spec.Node.Columns = snq.ctx.Fields
 	if len(snq.ctx.Fields) > 0 {
 		_spec.Unique = snq.ctx.Unique != nil && *snq.ctx.Unique
@@ -420,6 +428,9 @@ func (snq *SigningNonceQuery) sqlQuery(ctx context.Context) *sql.Selector {
 	if snq.ctx.Unique != nil && *snq.ctx.Unique {
 		selector.Distinct()
 	}
+	for _, m := range snq.modifiers {
+		m(selector)
+	}
 	for _, p := range snq.predicates {
 		p(selector)
 	}
@@ -435,6 +446,32 @@ func (snq *SigningNonceQuery) sqlQuery(ctx context.Context) *sql.Selector {
 		selector.Limit(*limit)
 	}
 	return selector
+}
+
+// ForUpdate locks the selected rows against concurrent updates, and prevent them from being
+// updated, deleted or "selected ... for update" by other sessions, until the transaction is
+// either committed or rolled-back.
+func (snq *SigningNonceQuery) ForUpdate(opts ...sql.LockOption) *SigningNonceQuery {
+	if snq.driver.Dialect() == dialect.Postgres {
+		snq.Unique(false)
+	}
+	snq.modifiers = append(snq.modifiers, func(s *sql.Selector) {
+		s.ForUpdate(opts...)
+	})
+	return snq
+}
+
+// ForShare behaves similarly to ForUpdate, except that it acquires a shared mode lock
+// on any rows that are read. Other sessions can read the rows, but cannot modify them
+// until your transaction commits.
+func (snq *SigningNonceQuery) ForShare(opts ...sql.LockOption) *SigningNonceQuery {
+	if snq.driver.Dialect() == dialect.Postgres {
+		snq.Unique(false)
+	}
+	snq.modifiers = append(snq.modifiers, func(s *sql.Selector) {
+		s.ForShare(opts...)
+	})
+	return snq
 }
 
 // SigningNonceGroupBy is the group-by builder for SigningNonce entities.
