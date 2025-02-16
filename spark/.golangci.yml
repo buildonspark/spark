@@ -5,4 +5,4 @@ linters:
 
 issues:
   new: true
-  new-from-rev: 4463971
+  new-from-rev: "HEAD~1"
