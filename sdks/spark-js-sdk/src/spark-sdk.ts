@@ -496,7 +496,7 @@ export class SparkWallet {
       ownerIdentityPubkey: this.config.signer.getIdentityPublicKey(),
     });
     sparkClient.close?.();
-    return leaves.nodes;
+    return leaves.nodes.filter((node) => node.status === "AVAILABLE");
   }
 
   async getBalance(): Promise<BigInt> {

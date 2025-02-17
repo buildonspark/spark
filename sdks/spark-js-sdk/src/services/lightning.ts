@@ -1,7 +1,7 @@
 import { bytesToNumberBE, numberToBytesBE } from "@noble/curves/abstract/utils";
 import { secp256k1 } from "@noble/curves/secp256k1";
 import { sha256 } from "@scure/btc-signer/utils";
-import { randomUUID } from "crypto";
+import { getRandomValues, randomUUID } from "crypto";
 import { decode } from "light-bolt11-decoder";
 import {
   GetSigningCommitmentsResponse,
@@ -58,7 +58,7 @@ export class LightningService {
     amountSats,
     memo,
   }: CreateLightningInvoiceParams): Promise<string> {
-    const randomBytes = crypto.getRandomValues(new Uint8Array(32));
+    const randomBytes = getRandomValues(new Uint8Array(32));
     const preimage = numberToBytesBE(
       bytesToNumberBE(randomBytes) % secp256k1.CURVE.n,
       32

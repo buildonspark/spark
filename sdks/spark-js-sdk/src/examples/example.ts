@@ -7,7 +7,7 @@ import { Network } from "../../dist/utils/network";
 
 // Initialize Spark Wallet
 const walletMnemonic =
-  "second stereo dose party penalty decline neglect feel harvest abstract stage winter";
+  "typical stereo dose party penalty decline neglect feel harvest abstract stage winter";
 
 async function runCLI() {
   let wallet = new SparkWallet(Network.REGTEST);
