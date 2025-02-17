@@ -8,6 +8,7 @@ import (
 	"math"
 
 	"entgo.io/ent"
+	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
@@ -23,6 +24,7 @@ type TokenFreezeQuery struct {
 	order      []tokenfreeze.OrderOption
 	inters     []Interceptor
 	predicates []predicate.TokenFreeze
+	modifiers  []func(*sql.Selector)
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -344,6 +346,9 @@ func (tfq *TokenFreezeQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]
 		nodes = append(nodes, node)
 		return node.assignValues(columns, values)
 	}
+	if len(tfq.modifiers) > 0 {
+		_spec.Modifiers = tfq.modifiers
+	}
 	for i := range hooks {
 		hooks[i](ctx, _spec)
 	}
@@ -358,6 +363,9 @@ func (tfq *TokenFreezeQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]
 
 func (tfq *TokenFreezeQuery) sqlCount(ctx context.Context) (int, error) {
 	_spec := tfq.querySpec()
+	if len(tfq.modifiers) > 0 {
+		_spec.Modifiers = tfq.modifiers
+	}
 	_spec.Node.Columns = tfq.ctx.Fields
 	if len(tfq.ctx.Fields) > 0 {
 		_spec.Unique = tfq.ctx.Unique != nil && *tfq.ctx.Unique
@@ -420,6 +428,9 @@ func (tfq *TokenFreezeQuery) sqlQuery(ctx context.Context) *sql.Selector {
 	if tfq.ctx.Unique != nil && *tfq.ctx.Unique {
 		selector.Distinct()
 	}
+	for _, m := range tfq.modifiers {
+		m(selector)
+	}
 	for _, p := range tfq.predicates {
 		p(selector)
 	}
@@ -435,6 +446,32 @@ func (tfq *TokenFreezeQuery) sqlQuery(ctx context.Context) *sql.Selector {
 		selector.Limit(*limit)
 	}
 	return selector
+}
+
+// ForUpdate locks the selected rows against concurrent updates, and prevent them from being
+// updated, deleted or "selected ... for update" by other sessions, until the transaction is
+// either committed or rolled-back.
+func (tfq *TokenFreezeQuery) ForUpdate(opts ...sql.LockOption) *TokenFreezeQuery {
+	if tfq.driver.Dialect() == dialect.Postgres {
+		tfq.Unique(false)
+	}
+	tfq.modifiers = append(tfq.modifiers, func(s *sql.Selector) {
+		s.ForUpdate(opts...)
+	})
+	return tfq
+}
+
+// ForShare behaves similarly to ForUpdate, except that it acquires a shared mode lock
+// on any rows that are read. Other sessions can read the rows, but cannot modify them
+// until your transaction commits.
+func (tfq *TokenFreezeQuery) ForShare(opts ...sql.LockOption) *TokenFreezeQuery {
+	if tfq.driver.Dialect() == dialect.Postgres {
+		tfq.Unique(false)
+	}
+	tfq.modifiers = append(tfq.modifiers, func(s *sql.Selector) {
+		s.ForShare(opts...)
+	})
+	return tfq
 }
 
 // TokenFreezeGroupBy is the group-by builder for TokenFreeze entities.

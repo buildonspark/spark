@@ -290,7 +290,7 @@ var (
 		{Name: "id", Type: field.TypeUUID},
 		{Name: "create_time", Type: field.TypeTime},
 		{Name: "update_time", Type: field.TypeTime},
-		{Name: "partial_token_transaction_hash", Type: field.TypeBytes, Unique: true},
+		{Name: "partial_token_transaction_hash", Type: field.TypeBytes},
 		{Name: "finalized_token_transaction_hash", Type: field.TypeBytes, Unique: true},
 		{Name: "operator_signature", Type: field.TypeBytes, Unique: true, Nullable: true},
 		{Name: "token_transaction_receipt_mint", Type: field.TypeUUID, Nullable: true},
@@ -309,11 +309,6 @@ var (
 			},
 		},
 		Indexes: []*schema.Index{
-			{
-				Name:    "tokentransactionreceipt_partial_token_transaction_hash",
-				Unique:  false,
-				Columns: []*schema.Column{TokenTransactionReceiptsColumns[3]},
-			},
 			{
 				Name:    "tokentransactionreceipt_finalized_token_transaction_hash",
 				Unique:  false,

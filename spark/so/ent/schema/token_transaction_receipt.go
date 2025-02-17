@@ -21,7 +21,7 @@ func (TokenTransactionReceipt) Mixin() []ent.Mixin {
 
 func (TokenTransactionReceipt) Fields() []ent.Field {
 	return []ent.Field{
-		field.Bytes("partial_token_transaction_hash").NotEmpty().Unique(),
+		field.Bytes("partial_token_transaction_hash").NotEmpty(),
 		field.Bytes("finalized_token_transaction_hash").NotEmpty().Unique(),
 		field.Bytes("operator_signature").Optional().Unique(),
 	}
@@ -45,7 +45,6 @@ func (TokenTransactionReceipt) Edges() []ent.Edge {
 // Indexes are the indexes for the tree nodes table.
 func (TokenTransactionReceipt) Indexes() []ent.Index {
 	return []ent.Index{
-		index.Fields("partial_token_transaction_hash"),
 		index.Fields("finalized_token_transaction_hash"),
 	}
 }
