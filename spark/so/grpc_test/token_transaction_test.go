@@ -7,6 +7,7 @@ import (
 	"log"
 	"math/big"
 	"testing"
+	"time"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
@@ -40,7 +41,8 @@ func createTestTokenIssuanceTransaction(tokenIdentityPubKeyBytes []byte) (*pb.To
 	issueTokenTransaction := &pb.TokenTransaction{
 		TokenInput: &pb.TokenTransaction_MintInput{
 			MintInput: &pb.MintInput{
-				IssuerPublicKey: tokenIdentityPubKeyBytes,
+				IssuerPublicKey:         tokenIdentityPubKeyBytes,
+				IssuerProvidedTimestamp: uint64(time.Now().UnixNano()),
 			},
 		},
 		OutputLeaves: []*pb.TokenLeafOutput{
@@ -358,4 +360,134 @@ func TestFreezeAndUnfreezeTokens(t *testing.T) {
 		t.Fatal("expected non-nil response when transferring thawed tokens")
 	}
 	log.Printf("thawed token transfer broadcast finalized token transaction: %v", transferTokenTransactionResponse)
+}
+
+func TestBroadcastTokenTransactionIssueAndTransferTokensDoubleStart(t *testing.T) {
+	config, err := testutil.TestWalletConfig()
+	if err != nil {
+		t.Fatalf("failed to create wallet config: %v", err)
+	}
+
+	tokenPrivKey := config.IdentityPrivateKey
+	tokenIdentityPubKeyBytes := tokenPrivKey.PubKey().SerializeCompressed()
+	issueTokenTransaction, _, _, err := createTestTokenIssuanceTransaction(tokenIdentityPubKeyBytes)
+	if err != nil {
+		t.Fatalf("failed to create test token issuance transaction: %v", err)
+	}
+
+	// Make a start token transaction that we will not continue.
+	_, _, _, _ = wallet.StartTokenTransaction(context.Background(), config, issueTokenTransaction, []*secp256k1.PrivateKey{&tokenPrivKey},
+		[][]byte{})
+
+	// Create a new transaction which will change the issuer timestamp to avoid a DB unique key error.
+	issueTokenTransaction, userLeaf1PrivKey, userLeaf2PrivKey, err := createTestTokenIssuanceTransaction(tokenIdentityPubKeyBytes)
+	if err != nil {
+		t.Fatalf("failed to create test token issuance transaction: %v", err)
+	}
+
+	// Go through the full flow (including start token transaction)
+	finalIssueTokenTransaction, err := wallet.BroadcastTokenTransaction(
+		context.Background(), config, issueTokenTransaction,
+		[]*secp256k1.PrivateKey{&tokenPrivKey},
+		[][]byte{})
+	if err != nil {
+		t.Fatalf("failed to broadcast issuance token transaction: %v", err)
+	}
+	log.Printf("issuance broadcast finalized token transaction: %v", finalIssueTokenTransaction)
+
+	// Validate withdrawal params match config
+	for i, leaf := range finalIssueTokenTransaction.OutputLeaves {
+		if leaf.GetWithdrawBondSats() != 1000000 {
+			t.Errorf("leaf %d: expected withdrawal bond sats 1000000, got %d", i, leaf.GetWithdrawBondSats())
+		}
+		if leaf.GetWithdrawRelativeBlockLocktime() != 1000 {
+			t.Errorf("leaf %d: expected withdrawal relative block locktime 1000, got %d", i, leaf.GetWithdrawRelativeBlockLocktime())
+		}
+	}
+
+	finalIssueTokenTransactionHash, err := utils.HashTokenTransaction(finalIssueTokenTransaction, false)
+	if err != nil {
+		t.Fatalf("failed to hash final issuance token transaction: %v", err)
+	}
+	transferTokenTransaction, userLeaf3PrivKey, err := createTestTokenTransferTransaction(
+		finalIssueTokenTransactionHash,
+		tokenIdentityPubKeyBytes,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	userLeaf3PubKeyBytes := userLeaf3PrivKey.PubKey().SerializeCompressed()
+
+	// Validate withdrawal params match config
+	for i, leaf := range finalIssueTokenTransaction.OutputLeaves {
+		if leaf.GetWithdrawBondSats() != 1000000 {
+			t.Errorf("leaf %d: expected withdrawal bond sats 1000000, got %d", i, leaf.GetWithdrawBondSats())
+		}
+		if leaf.GetWithdrawRelativeBlockLocktime() != 1000 {
+			t.Errorf("leaf %d: expected withdrawal relative block locktime 1000, got %d", i, leaf.GetWithdrawRelativeBlockLocktime())
+		}
+	}
+
+	revPubKey1 := finalIssueTokenTransaction.OutputLeaves[0].RevocationPublicKey
+	revPubKey2 := finalIssueTokenTransaction.OutputLeaves[1].RevocationPublicKey
+
+	// Make a start token transaction with identical params but dont continue.
+	_, _, _, _ = wallet.StartTokenTransaction(context.Background(), config, transferTokenTransaction, []*secp256k1.PrivateKey{userLeaf1PrivKey, userLeaf2PrivKey},
+		[][]byte{revPubKey1, revPubKey2})
+
+	// Broadcast the transfer token transaction
+	transferTokenTransactionResponse, err := wallet.BroadcastTokenTransaction(
+		context.Background(), config, transferTokenTransaction,
+		[]*secp256k1.PrivateKey{userLeaf1PrivKey, userLeaf2PrivKey},
+		[][]byte{revPubKey1, revPubKey2},
+	)
+	if err != nil {
+		t.Fatalf("failed to broadcast transfer token transaction: %v", err)
+	}
+	log.Printf("transfer broadcast finalized token transaction: %v", transferTokenTransactionResponse)
+
+	// Test GetOwnedTokenLeaves
+	ownedLeavesResponse, err := wallet.GetOwnedTokenLeaves(
+		context.Background(),
+		config,
+		[][]byte{userLeaf3PubKeyBytes},
+		[][]byte{tokenIdentityPubKeyBytes},
+	)
+	if err != nil {
+		t.Fatalf("failed to get owned token leaves: %v", err)
+	}
+
+	// Validate the response
+	if len(ownedLeavesResponse.LeavesWithPreviousTransactionData) != 1 {
+		t.Fatalf("expected 1 owned leaf, got %d", len(ownedLeavesResponse.LeavesWithPreviousTransactionData))
+	}
+
+	leaf := ownedLeavesResponse.LeavesWithPreviousTransactionData[0]
+
+	// Validate leaf details
+	if !bytes.Equal(leaf.Leaf.OwnerPublicKey, userLeaf3PubKeyBytes) {
+		t.Fatalf("leaf owner public key does not match expected")
+	}
+	if !bytes.Equal(leaf.Leaf.TokenPublicKey, tokenIdentityPubKeyBytes) {
+		t.Fatalf("leaf token public key does not match expected")
+	}
+
+	// Validate amount
+	expectedAmount := new(big.Int).SetBytes(int64ToUint128Bytes(0, 33333))
+	actualAmount := new(big.Int).SetBytes(leaf.Leaf.TokenAmount)
+	if actualAmount.Cmp(expectedAmount) != 0 {
+		t.Fatalf("leaf token amount %d does not match expected %d", actualAmount, expectedAmount)
+	}
+
+	// Validate previous transaction data
+	transferTokenTransactionResponseHash, err := utils.HashTokenTransaction(transferTokenTransactionResponse, false)
+	if err != nil {
+		t.Fatalf("failed to hash final transfer token transaction: %v", err)
+	}
+	if !bytes.Equal(leaf.PreviousTransactionHash, transferTokenTransactionResponseHash) {
+		t.Fatalf("previous transaction hash does not match expected")
+	}
+	if leaf.PreviousTransactionVout != 0 {
+		t.Fatalf("previous transaction vout expected 0, got %d", leaf.PreviousTransactionVout)
+	}
 }

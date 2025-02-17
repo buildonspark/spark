@@ -24,6 +24,8 @@ type TokenMint struct {
 	UpdateTime time.Time `json:"update_time,omitempty"`
 	// IssuerPublicKey holds the value of the "issuer_public_key" field.
 	IssuerPublicKey []byte `json:"issuer_public_key,omitempty"`
+	// WalletProvidedTimestamp holds the value of the "wallet_provided_timestamp" field.
+	WalletProvidedTimestamp uint64 `json:"wallet_provided_timestamp,omitempty"`
 	// IssuerSignature holds the value of the "issuer_signature" field.
 	IssuerSignature []byte `json:"issuer_signature,omitempty"`
 	// OperatorSpecificIssuerSignature holds the value of the "operator_specific_issuer_signature" field.
@@ -59,6 +61,8 @@ func (*TokenMint) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case tokenmint.FieldIssuerPublicKey, tokenmint.FieldIssuerSignature, tokenmint.FieldOperatorSpecificIssuerSignature:
 			values[i] = new([]byte)
+		case tokenmint.FieldWalletProvidedTimestamp:
+			values[i] = new(sql.NullInt64)
 		case tokenmint.FieldCreateTime, tokenmint.FieldUpdateTime:
 			values[i] = new(sql.NullTime)
 		case tokenmint.FieldID:
@@ -101,6 +105,12 @@ func (tm *TokenMint) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field issuer_public_key", values[i])
 			} else if value != nil {
 				tm.IssuerPublicKey = *value
+			}
+		case tokenmint.FieldWalletProvidedTimestamp:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field wallet_provided_timestamp", values[i])
+			} else if value.Valid {
+				tm.WalletProvidedTimestamp = uint64(value.Int64)
 			}
 		case tokenmint.FieldIssuerSignature:
 			if value, ok := values[i].(*[]byte); !ok {
@@ -163,6 +173,9 @@ func (tm *TokenMint) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("issuer_public_key=")
 	builder.WriteString(fmt.Sprintf("%v", tm.IssuerPublicKey))
+	builder.WriteString(", ")
+	builder.WriteString("wallet_provided_timestamp=")
+	builder.WriteString(fmt.Sprintf("%v", tm.WalletProvidedTimestamp))
 	builder.WriteString(", ")
 	builder.WriteString("issuer_signature=")
 	builder.WriteString(fmt.Sprintf("%v", tm.IssuerSignature))

@@ -276,7 +276,7 @@ func init() {
 	// tokenmint.IssuerPublicKeyValidator is a validator for the "issuer_public_key" field. It is called by the builders before save.
 	tokenmint.IssuerPublicKeyValidator = tokenmintDescIssuerPublicKey.Validators[0].(func([]byte) error)
 	// tokenmintDescIssuerSignature is the schema descriptor for issuer_signature field.
-	tokenmintDescIssuerSignature := tokenmintFields[1].Descriptor()
+	tokenmintDescIssuerSignature := tokenmintFields[2].Descriptor()
 	// tokenmint.IssuerSignatureValidator is a validator for the "issuer_signature" field. It is called by the builders before save.
 	tokenmint.IssuerSignatureValidator = tokenmintDescIssuerSignature.Validators[0].(func([]byte) error)
 	// tokenmintDescID is the schema descriptor for id field.

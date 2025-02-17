@@ -71,6 +71,11 @@ func IssuerPublicKey(v []byte) predicate.TokenMint {
 	return predicate.TokenMint(sql.FieldEQ(FieldIssuerPublicKey, v))
 }
 
+// WalletProvidedTimestamp applies equality check predicate on the "wallet_provided_timestamp" field. It's identical to WalletProvidedTimestampEQ.
+func WalletProvidedTimestamp(v uint64) predicate.TokenMint {
+	return predicate.TokenMint(sql.FieldEQ(FieldWalletProvidedTimestamp, v))
+}
+
 // IssuerSignature applies equality check predicate on the "issuer_signature" field. It's identical to IssuerSignatureEQ.
 func IssuerSignature(v []byte) predicate.TokenMint {
 	return predicate.TokenMint(sql.FieldEQ(FieldIssuerSignature, v))
@@ -199,6 +204,46 @@ func IssuerPublicKeyLT(v []byte) predicate.TokenMint {
 // IssuerPublicKeyLTE applies the LTE predicate on the "issuer_public_key" field.
 func IssuerPublicKeyLTE(v []byte) predicate.TokenMint {
 	return predicate.TokenMint(sql.FieldLTE(FieldIssuerPublicKey, v))
+}
+
+// WalletProvidedTimestampEQ applies the EQ predicate on the "wallet_provided_timestamp" field.
+func WalletProvidedTimestampEQ(v uint64) predicate.TokenMint {
+	return predicate.TokenMint(sql.FieldEQ(FieldWalletProvidedTimestamp, v))
+}
+
+// WalletProvidedTimestampNEQ applies the NEQ predicate on the "wallet_provided_timestamp" field.
+func WalletProvidedTimestampNEQ(v uint64) predicate.TokenMint {
+	return predicate.TokenMint(sql.FieldNEQ(FieldWalletProvidedTimestamp, v))
+}
+
+// WalletProvidedTimestampIn applies the In predicate on the "wallet_provided_timestamp" field.
+func WalletProvidedTimestampIn(vs ...uint64) predicate.TokenMint {
+	return predicate.TokenMint(sql.FieldIn(FieldWalletProvidedTimestamp, vs...))
+}
+
+// WalletProvidedTimestampNotIn applies the NotIn predicate on the "wallet_provided_timestamp" field.
+func WalletProvidedTimestampNotIn(vs ...uint64) predicate.TokenMint {
+	return predicate.TokenMint(sql.FieldNotIn(FieldWalletProvidedTimestamp, vs...))
+}
+
+// WalletProvidedTimestampGT applies the GT predicate on the "wallet_provided_timestamp" field.
+func WalletProvidedTimestampGT(v uint64) predicate.TokenMint {
+	return predicate.TokenMint(sql.FieldGT(FieldWalletProvidedTimestamp, v))
+}
+
+// WalletProvidedTimestampGTE applies the GTE predicate on the "wallet_provided_timestamp" field.
+func WalletProvidedTimestampGTE(v uint64) predicate.TokenMint {
+	return predicate.TokenMint(sql.FieldGTE(FieldWalletProvidedTimestamp, v))
+}
+
+// WalletProvidedTimestampLT applies the LT predicate on the "wallet_provided_timestamp" field.
+func WalletProvidedTimestampLT(v uint64) predicate.TokenMint {
+	return predicate.TokenMint(sql.FieldLT(FieldWalletProvidedTimestamp, v))
+}
+
+// WalletProvidedTimestampLTE applies the LTE predicate on the "wallet_provided_timestamp" field.
+func WalletProvidedTimestampLTE(v uint64) predicate.TokenMint {
+	return predicate.TokenMint(sql.FieldLTE(FieldWalletProvidedTimestamp, v))
 }
 
 // IssuerSignatureEQ applies the EQ predicate on the "issuer_signature" field.

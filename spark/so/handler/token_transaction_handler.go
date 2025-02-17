@@ -377,7 +377,7 @@ func (o TokenTransactionHandler) FreezeTokens(
 		if len(activeFreezes) > 1 {
 			return nil, fmt.Errorf("multiple active freezes found for this owner and token which should not happen")
 		}
-		err = ent.ThawActiveFreeze(ctx, activeFreezes[0].ID, req.FreezeTokensPayload.Timestamp)
+		err = ent.ThawActiveFreeze(ctx, activeFreezes[0].ID, req.FreezeTokensPayload.IssuerProvidedTimestamp)
 		if err != nil {
 			log.Printf("Failed to update token freeze status to thawed: %v", err)
 			return nil, err
@@ -390,7 +390,7 @@ func (o TokenTransactionHandler) FreezeTokens(
 			req.FreezeTokensPayload.OwnerPublicKey,
 			req.FreezeTokensPayload.TokenPublicKey,
 			req.IssuerSignature,
-			req.FreezeTokensPayload.Timestamp,
+			req.FreezeTokensPayload.IssuerProvidedTimestamp,
 		)
 		if err != nil {
 			log.Printf("Failed to create token freeze entity: %v", err)

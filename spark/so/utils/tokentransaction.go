@@ -44,6 +44,12 @@ func HashTokenTransaction(tokenTransaction *pb.TokenTransaction, partialHash boo
 		if mintInput.GetIssuerPublicKey() != nil {
 			h.Write(mintInput.GetIssuerPublicKey())
 		}
+		if mintInput.GetIssuerProvidedTimestamp() != 0 {
+			nonceBytes := make([]byte, 8)
+			binary.LittleEndian.PutUint64(nonceBytes, mintInput.GetIssuerProvidedTimestamp())
+			h.Write(nonceBytes)
+		}
+
 		allHashes = append(allHashes, h.Sum(nil)...)
 	}
 
@@ -157,9 +163,9 @@ func HashFreezeTokensPayload(payload *pb.FreezeTokensPayload) ([]byte, error) {
 	}
 
 	h.Reset()
-	if payload.GetTimestamp() != 0 {
+	if payload.GetIssuerProvidedTimestamp() != 0 {
 		nonceBytes := make([]byte, 8)
-		binary.LittleEndian.PutUint64(nonceBytes, payload.Timestamp)
+		binary.LittleEndian.PutUint64(nonceBytes, payload.IssuerProvidedTimestamp)
 		h.Write(nonceBytes)
 	}
 	allHashes = append(allHashes, h.Sum(nil)...)

@@ -56,6 +56,12 @@ func (tmc *TokenMintCreate) SetIssuerPublicKey(b []byte) *TokenMintCreate {
 	return tmc
 }
 
+// SetWalletProvidedTimestamp sets the "wallet_provided_timestamp" field.
+func (tmc *TokenMintCreate) SetWalletProvidedTimestamp(u uint64) *TokenMintCreate {
+	tmc.mutation.SetWalletProvidedTimestamp(u)
+	return tmc
+}
+
 // SetIssuerSignature sets the "issuer_signature" field.
 func (tmc *TokenMintCreate) SetIssuerSignature(b []byte) *TokenMintCreate {
 	tmc.mutation.SetIssuerSignature(b)
@@ -162,6 +168,9 @@ func (tmc *TokenMintCreate) check() error {
 			return &ValidationError{Name: "issuer_public_key", err: fmt.Errorf(`ent: validator failed for field "TokenMint.issuer_public_key": %w`, err)}
 		}
 	}
+	if _, ok := tmc.mutation.WalletProvidedTimestamp(); !ok {
+		return &ValidationError{Name: "wallet_provided_timestamp", err: errors.New(`ent: missing required field "TokenMint.wallet_provided_timestamp"`)}
+	}
 	if _, ok := tmc.mutation.IssuerSignature(); !ok {
 		return &ValidationError{Name: "issuer_signature", err: errors.New(`ent: missing required field "TokenMint.issuer_signature"`)}
 	}
@@ -216,6 +225,10 @@ func (tmc *TokenMintCreate) createSpec() (*TokenMint, *sqlgraph.CreateSpec) {
 	if value, ok := tmc.mutation.IssuerPublicKey(); ok {
 		_spec.SetField(tokenmint.FieldIssuerPublicKey, field.TypeBytes, value)
 		_node.IssuerPublicKey = value
+	}
+	if value, ok := tmc.mutation.WalletProvidedTimestamp(); ok {
+		_spec.SetField(tokenmint.FieldWalletProvidedTimestamp, field.TypeUint64, value)
+		_node.WalletProvidedTimestamp = value
 	}
 	if value, ok := tmc.mutation.IssuerSignature(); ok {
 		_spec.SetField(tokenmint.FieldIssuerSignature, field.TypeBytes, value)

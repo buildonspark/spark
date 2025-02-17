@@ -6919,6 +6919,8 @@ type TokenMintMutation struct {
 	create_time                        *time.Time
 	update_time                        *time.Time
 	issuer_public_key                  *[]byte
+	wallet_provided_timestamp          *uint64
+	addwallet_provided_timestamp       *int64
 	issuer_signature                   *[]byte
 	operator_specific_issuer_signature *[]byte
 	clearedFields                      map[string]struct{}
@@ -7142,6 +7144,62 @@ func (m *TokenMintMutation) ResetIssuerPublicKey() {
 	m.issuer_public_key = nil
 }
 
+// SetWalletProvidedTimestamp sets the "wallet_provided_timestamp" field.
+func (m *TokenMintMutation) SetWalletProvidedTimestamp(u uint64) {
+	m.wallet_provided_timestamp = &u
+	m.addwallet_provided_timestamp = nil
+}
+
+// WalletProvidedTimestamp returns the value of the "wallet_provided_timestamp" field in the mutation.
+func (m *TokenMintMutation) WalletProvidedTimestamp() (r uint64, exists bool) {
+	v := m.wallet_provided_timestamp
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldWalletProvidedTimestamp returns the old "wallet_provided_timestamp" field's value of the TokenMint entity.
+// If the TokenMint object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenMintMutation) OldWalletProvidedTimestamp(ctx context.Context) (v uint64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldWalletProvidedTimestamp is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldWalletProvidedTimestamp requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldWalletProvidedTimestamp: %w", err)
+	}
+	return oldValue.WalletProvidedTimestamp, nil
+}
+
+// AddWalletProvidedTimestamp adds u to the "wallet_provided_timestamp" field.
+func (m *TokenMintMutation) AddWalletProvidedTimestamp(u int64) {
+	if m.addwallet_provided_timestamp != nil {
+		*m.addwallet_provided_timestamp += u
+	} else {
+		m.addwallet_provided_timestamp = &u
+	}
+}
+
+// AddedWalletProvidedTimestamp returns the value that was added to the "wallet_provided_timestamp" field in this mutation.
+func (m *TokenMintMutation) AddedWalletProvidedTimestamp() (r int64, exists bool) {
+	v := m.addwallet_provided_timestamp
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetWalletProvidedTimestamp resets all changes to the "wallet_provided_timestamp" field.
+func (m *TokenMintMutation) ResetWalletProvidedTimestamp() {
+	m.wallet_provided_timestamp = nil
+	m.addwallet_provided_timestamp = nil
+}
+
 // SetIssuerSignature sets the "issuer_signature" field.
 func (m *TokenMintMutation) SetIssuerSignature(b []byte) {
 	m.issuer_signature = &b
@@ -7315,7 +7373,7 @@ func (m *TokenMintMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *TokenMintMutation) Fields() []string {
-	fields := make([]string, 0, 5)
+	fields := make([]string, 0, 6)
 	if m.create_time != nil {
 		fields = append(fields, tokenmint.FieldCreateTime)
 	}
@@ -7324,6 +7382,9 @@ func (m *TokenMintMutation) Fields() []string {
 	}
 	if m.issuer_public_key != nil {
 		fields = append(fields, tokenmint.FieldIssuerPublicKey)
+	}
+	if m.wallet_provided_timestamp != nil {
+		fields = append(fields, tokenmint.FieldWalletProvidedTimestamp)
 	}
 	if m.issuer_signature != nil {
 		fields = append(fields, tokenmint.FieldIssuerSignature)
@@ -7345,6 +7406,8 @@ func (m *TokenMintMutation) Field(name string) (ent.Value, bool) {
 		return m.UpdateTime()
 	case tokenmint.FieldIssuerPublicKey:
 		return m.IssuerPublicKey()
+	case tokenmint.FieldWalletProvidedTimestamp:
+		return m.WalletProvidedTimestamp()
 	case tokenmint.FieldIssuerSignature:
 		return m.IssuerSignature()
 	case tokenmint.FieldOperatorSpecificIssuerSignature:
@@ -7364,6 +7427,8 @@ func (m *TokenMintMutation) OldField(ctx context.Context, name string) (ent.Valu
 		return m.OldUpdateTime(ctx)
 	case tokenmint.FieldIssuerPublicKey:
 		return m.OldIssuerPublicKey(ctx)
+	case tokenmint.FieldWalletProvidedTimestamp:
+		return m.OldWalletProvidedTimestamp(ctx)
 	case tokenmint.FieldIssuerSignature:
 		return m.OldIssuerSignature(ctx)
 	case tokenmint.FieldOperatorSpecificIssuerSignature:
@@ -7398,6 +7463,13 @@ func (m *TokenMintMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetIssuerPublicKey(v)
 		return nil
+	case tokenmint.FieldWalletProvidedTimestamp:
+		v, ok := value.(uint64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetWalletProvidedTimestamp(v)
+		return nil
 	case tokenmint.FieldIssuerSignature:
 		v, ok := value.([]byte)
 		if !ok {
@@ -7419,13 +7491,21 @@ func (m *TokenMintMutation) SetField(name string, value ent.Value) error {
 // AddedFields returns all numeric fields that were incremented/decremented during
 // this mutation.
 func (m *TokenMintMutation) AddedFields() []string {
-	return nil
+	var fields []string
+	if m.addwallet_provided_timestamp != nil {
+		fields = append(fields, tokenmint.FieldWalletProvidedTimestamp)
+	}
+	return fields
 }
 
 // AddedField returns the numeric value that was incremented/decremented on a field
 // with the given name. The second boolean return value indicates that this field
 // was not set, or was not defined in the schema.
 func (m *TokenMintMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case tokenmint.FieldWalletProvidedTimestamp:
+		return m.AddedWalletProvidedTimestamp()
+	}
 	return nil, false
 }
 
@@ -7434,6 +7514,13 @@ func (m *TokenMintMutation) AddedField(name string) (ent.Value, bool) {
 // type.
 func (m *TokenMintMutation) AddField(name string, value ent.Value) error {
 	switch name {
+	case tokenmint.FieldWalletProvidedTimestamp:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddWalletProvidedTimestamp(v)
+		return nil
 	}
 	return fmt.Errorf("unknown TokenMint numeric field %s", name)
 }
@@ -7478,6 +7565,9 @@ func (m *TokenMintMutation) ResetField(name string) error {
 		return nil
 	case tokenmint.FieldIssuerPublicKey:
 		m.ResetIssuerPublicKey()
+		return nil
+	case tokenmint.FieldWalletProvidedTimestamp:
+		m.ResetWalletProvidedTimestamp()
 		return nil
 	case tokenmint.FieldIssuerSignature:
 		m.ResetIssuerSignature()

@@ -21,6 +21,8 @@ const (
 	FieldUpdateTime = "update_time"
 	// FieldIssuerPublicKey holds the string denoting the issuer_public_key field in the database.
 	FieldIssuerPublicKey = "issuer_public_key"
+	// FieldWalletProvidedTimestamp holds the string denoting the wallet_provided_timestamp field in the database.
+	FieldWalletProvidedTimestamp = "wallet_provided_timestamp"
 	// FieldIssuerSignature holds the string denoting the issuer_signature field in the database.
 	FieldIssuerSignature = "issuer_signature"
 	// FieldOperatorSpecificIssuerSignature holds the string denoting the operator_specific_issuer_signature field in the database.
@@ -44,6 +46,7 @@ var Columns = []string{
 	FieldCreateTime,
 	FieldUpdateTime,
 	FieldIssuerPublicKey,
+	FieldWalletProvidedTimestamp,
 	FieldIssuerSignature,
 	FieldOperatorSpecificIssuerSignature,
 }
@@ -89,6 +92,11 @@ func ByCreateTime(opts ...sql.OrderTermOption) OrderOption {
 // ByUpdateTime orders the results by the update_time field.
 func ByUpdateTime(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldUpdateTime, opts...).ToFunc()
+}
+
+// ByWalletProvidedTimestamp orders the results by the wallet_provided_timestamp field.
+func ByWalletProvidedTimestamp(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldWalletProvidedTimestamp, opts...).ToFunc()
 }
 
 // ByTokenTransactionReceiptCount orders the results by token_transaction_receipt count.

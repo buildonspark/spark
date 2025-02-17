@@ -49,6 +49,7 @@ func CreateStartedTransactionEntities(
 		tokenMintEnt, err = db.TokenMint.Create().
 			SetIssuerPublicKey(tokenTransaction.GetMintInput().GetIssuerPublicKey()).
 			SetIssuerSignature(tokenTransactionSignatures.GetOwnerSignatures()[0]).
+			SetWalletProvidedTimestamp(tokenTransaction.GetMintInput().GetIssuerProvidedTimestamp()).
 			Save(ctx)
 		if err != nil {
 			log.Printf("Failed to create token mint ent: %v", err)

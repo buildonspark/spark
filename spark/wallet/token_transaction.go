@@ -360,7 +360,7 @@ func FreezeTokens(
 			OwnerPublicKey:            ownerPublicKey,
 			TokenPublicKey:            tokenPublicKey,
 			OperatorIdentityPublicKey: operator.IdentityPublicKey,
-			Timestamp:                 timestamp,
+			IssuerProvidedTimestamp:   timestamp,
 			ShouldUnfreeze:            shouldUnfreeze,
 		}
 

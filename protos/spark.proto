@@ -140,6 +140,14 @@ message TransferInput {
 
 message MintInput {
     bytes issuer_public_key = 1;
+    // Issuer provided timestamp of when the transaction was signed/constructed. 
+    // Helps provide idempotency and ensures that each mint input signature is unique 
+    // as long as multiple mint signatures are not happening at the same time. Also gives a 
+    // potentially useful data point for when the issuer authorized from their 
+    // perspective.  Note that we have no way of proving this is accurate.
+    // TODO: Consider whether implementing generic idempotency controls and/or a 
+    // random nonce would be favorable to populating this field.
+    uint64 issuer_provided_timestamp = 2;
 }
 
 // This proto is constructed by the wallet to specify leaves it wants to create
@@ -225,7 +233,7 @@ message FinalizeTokenTransactionRequest {
 message FreezeTokensPayload {
     bytes owner_public_key = 1;
     bytes token_public_key = 2;
-    uint64 timestamp = 3;
+    uint64 issuer_provided_timestamp = 3;
     bytes operator_identity_public_key = 4;
     // Set to false when requesting a freeze.
     bool should_unfreeze = 5;  
