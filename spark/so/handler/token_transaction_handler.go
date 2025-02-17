@@ -399,7 +399,7 @@ func (o TokenTransactionHandler) FreezeTokens(
 	}
 
 	// Collect information about the frozen leaves.
-	leafIDs, totalAmount, err := ent.GetOwnedLeafStats(ctx, req.FreezeTokensPayload.OwnerPublicKey, req.FreezeTokensPayload.TokenPublicKey)
+	leafIDs, totalAmount, err := ent.GetOwnedLeafTokenStats(ctx, [][]byte{req.FreezeTokensPayload.OwnerPublicKey}, req.FreezeTokensPayload.TokenPublicKey)
 	if err != nil {
 		log.Printf("Failed to get impacted leaf stats: %v", err)
 		return nil, err
@@ -415,7 +415,7 @@ func (o TokenTransactionHandler) GetOwnedTokenLeaves(
 	ctx context.Context,
 	req *pb.GetOwnedTokenLeavesRequest,
 ) (*pb.GetOwnedTokenLeavesResponse, error) {
-	leaves, err := ent.GetOwnedLeaves(ctx, req.OwnerPublicKey, req.TokenPublicKey)
+	leaves, err := ent.GetOwnedLeaves(ctx, req.OwnerPublicKeys, req.TokenPublicKeys)
 	if err != nil {
 		log.Printf("Failed to get owned leaf stats: %v", err)
 		return nil, err

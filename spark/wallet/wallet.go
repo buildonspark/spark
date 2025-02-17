@@ -489,8 +489,8 @@ func (w *SingleKeyWallet) GetTokenBalance(ctx context.Context, tokenPublicKey []
 	response, err := GetOwnedTokenLeaves(
 		ctx,
 		w.Config,
-		w.Config.IdentityPublicKey(),
-		tokenPublicKey,
+		[][]byte{w.Config.IdentityPublicKey()},
+		[][]byte{tokenPublicKey},
 	)
 	if err != nil {
 		return 0, 0, fmt.Errorf("failed to get owned token leaves: %w", err)

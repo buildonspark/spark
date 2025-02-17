@@ -242,10 +242,9 @@ message FreezeTokensResponse {
 }
 
 message GetOwnedTokenLeavesRequest {
-    // TODO: In the future consider if this should be a permissioned operation.
-    bytes owner_public_key = 1;
-    // Optionally provide a token public key. If not set return leaves for all tokens.
-    optional bytes token_public_key = 2;
+    repeated bytes owner_public_keys = 1;
+    // Optionally provide token public keys. If not set return leaves for all tokens.
+    repeated bytes token_public_keys = 2;
 }
 
 message LeafWithPreviousTransactionData {

@@ -309,8 +309,8 @@ func FreezeTokens(
 func GetOwnedTokenLeaves(
 	ctx context.Context,
 	config *Config,
-	ownerPublicKey []byte,
-	tokenPublicKey []byte,
+	ownerPublicKeys [][]byte,
+	tokenPublicKeys [][]byte,
 ) (*pb.GetOwnedTokenLeavesResponse, error) {
 	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
 	if err != nil {
@@ -327,8 +327,8 @@ func GetOwnedTokenLeaves(
 	sparkClient := pb.NewSparkServiceClient(sparkConn)
 
 	request := &pb.GetOwnedTokenLeavesRequest{
-		OwnerPublicKey: ownerPublicKey,
-		TokenPublicKey: tokenPublicKey,
+		OwnerPublicKeys: ownerPublicKeys,
+		TokenPublicKeys: tokenPublicKeys,
 	}
 
 	response, err := sparkClient.GetOwnedTokenLeaves(tmpCtx, request)

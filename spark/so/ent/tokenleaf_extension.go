@@ -106,12 +106,12 @@ func UpdateLeafStatuses(ctx context.Context, leafEnts []*TokenLeaf, status schem
 	return nil
 }
 
-func GetOwnedLeaves(ctx context.Context, ownerPublicKey []byte, tokenPublicKey []byte) ([]*TokenLeaf, error) {
+func GetOwnedLeaves(ctx context.Context, ownerPublicKeys [][]byte, tokenPublicKeys [][]byte) ([]*TokenLeaf, error) {
 	query := GetDbFromContext(ctx).TokenLeaf.
 		Query().
 		Where(
 			// Order matters here to leverage the index.
-			tokenleaf.OwnerPublicKeyEQ(ownerPublicKey),
+			tokenleaf.OwnerPublicKeyIn(ownerPublicKeys...),
 			// A leaf is 'owned' as long as it has been fully created and a spending transaction
 			// has not yet been signed by this SO (if a transaction with it has been started
 			// and not yet signed it is still considered owned).
@@ -121,8 +121,8 @@ func GetOwnedLeaves(ctx context.Context, ownerPublicKey []byte, tokenPublicKey [
 			),
 		)
 	// Only filter by tokenPublicKey if it's provided.
-	if tokenPublicKey != nil {
-		query = query.Where(tokenleaf.TokenPublicKeyEQ(tokenPublicKey))
+	if len(tokenPublicKeys) > 0 {
+		query = query.Where(tokenleaf.TokenPublicKeyIn(tokenPublicKeys...))
 	}
 	query = query.
 		WithLeafCreatedTokenTransactionReceipt()
@@ -135,8 +135,8 @@ func GetOwnedLeaves(ctx context.Context, ownerPublicKey []byte, tokenPublicKey [
 	return leaves, nil
 }
 
-func GetOwnedLeafStats(ctx context.Context, ownerPublicKey []byte, tokenPublicKey []byte) ([]string, *big.Int, error) {
-	leaves, err := GetOwnedLeaves(ctx, ownerPublicKey, tokenPublicKey)
+func GetOwnedLeafTokenStats(ctx context.Context, ownerPublicKeys [][]byte, tokenPublicKey []byte) ([]string, *big.Int, error) {
+	leaves, err := GetOwnedLeaves(ctx, ownerPublicKeys, [][]byte{tokenPublicKey})
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to query owned leaf stats: %w", err)
 	}

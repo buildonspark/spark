@@ -301,8 +301,8 @@ func TestBroadcastTokenTransactionIssueAndTransferTokens(t *testing.T) {
 	ownedLeavesResponse, err := wallet.GetOwnedTokenLeaves(
 		context.Background(),
 		config,
-		userLeaf1PubKeyBytes,
-		tokenIdentityPubKeyBytes,
+		[][]byte{userLeaf1PubKeyBytes},
+		[][]byte{tokenIdentityPubKeyBytes},
 	)
 	if err != nil {
 		t.Fatalf("failed to get owned token leaves: %v", err)
