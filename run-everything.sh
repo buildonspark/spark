@@ -599,15 +599,20 @@ create_private_key_files() {
     done
 }
 
-# Initialize wipe flag
+# Initialize flags
 WIPE=false
+DISABLE_TOKENS=false
 
 # Parse command line arguments
 for arg in "$@"; do
     case $arg in
         --wipe)
             WIPE=true
-            shift # Remove --wipe from processing
+            shift
+            ;;
+        --disable-tokens)
+            DISABLE_TOKENS=true
+            shift
             ;;
     esac
 done
@@ -620,11 +625,16 @@ run_dir=$(create_run_dir)
 echo "Working with directory: $run_dir"
 
 run_bitcoind_tmux "$run_dir" $WIPE
-run_lrcd_tmux "$run_dir"
 
-if ! check_lrc_nodes_ready "$run_dir"; then
-    echo "Failed to start all LRC-20 nodes"
-    exit 1
+if [ "$DISABLE_TOKENS" = false ]; then
+    run_lrcd_tmux "$run_dir"
+
+    if ! check_lrc_nodes_ready "$run_dir"; then
+        echo "Failed to start all LRC-20 nodes"
+        exit 1
+    fi
+else
+    echo "Skipping LRC-20 node setup (--disable-tokens flag is set)"
 fi
 
 # For all 5 instances
