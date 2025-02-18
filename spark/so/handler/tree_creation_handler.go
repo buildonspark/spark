@@ -458,8 +458,12 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 			if req.GetOnChainUtxo() == nil {
 				return nil, nil, errors.New("onchain utxo is required for new tree")
 			}
-			txid := req.GetOnChainUtxo().Txid
-			treeMutator := db.Tree.Create().SetOwnerIdentityPubkey(req.UserIdentityPublicKey).SetNetwork(schemaNetwork).SetBaseTxid(txid)
+			tx, err := common.TxFromRawTxBytes(req.GetOnChainUtxo().RawTx)
+			if err != nil {
+				return nil, nil, err
+			}
+			txid := tx.TxHash()
+			treeMutator := db.Tree.Create().SetOwnerIdentityPubkey(req.UserIdentityPublicKey).SetNetwork(schemaNetwork).SetBaseTxid(txid[:])
 			if onchain {
 				treeMutator.SetStatus(schema.TreeStatusAvailable)
 			} else {

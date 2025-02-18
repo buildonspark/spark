@@ -14,7 +14,12 @@ func CheckUTXOOnchain(config *so.Config, utxo *pb.UTXO) bool {
 	if err != nil {
 		return false
 	}
-	return CheckTxIDOnchain(config, utxo.Txid, network)
+	tx, err := common.TxFromRawTxBytes(utxo.RawTx)
+	if err != nil {
+		return false
+	}
+	txid := tx.TxHash()
+	return CheckTxIDOnchain(config, txid[:], network)
 }
 
 func CheckTxIDOnchain(config *so.Config, txid []byte, network common.Network) bool {
