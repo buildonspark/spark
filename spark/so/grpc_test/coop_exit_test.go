@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"testing"
+	"time"
 
 	"github.com/btcsuite/btcd/wire"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
@@ -31,6 +32,8 @@ func TestCoopExit(t *testing.T) {
 	assert.NoError(t, err)
 	rootNode, err := testutil.CreateNewTree(config, faucet, leafPrivKey, amountSats)
 	assert.NoError(t, err)
+
+	time.Sleep(100 * time.Millisecond)
 
 	// Initiate SSP
 	sspPrivKey, err := secp256k1.GeneratePrivateKey()
@@ -155,6 +158,8 @@ func TestCoopExit(t *testing.T) {
 	// So that we don't race the chain watcher in this test
 	_, err = client.GenerateToAddress(handler.CoopExitConfirmationThreshold+6, randomAddress, nil)
 	assert.NoError(t, err)
+
+	time.Sleep(100 * time.Millisecond)
 
 	// Claim leaf
 	_, err = wallet.ClaimTransfer(
