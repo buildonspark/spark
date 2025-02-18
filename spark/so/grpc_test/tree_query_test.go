@@ -57,30 +57,46 @@ func TestTreeQuery(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, treeNodes.Nodes, 3) // Root + 2 children
 
-	// Store the root node
-	rootNode := treeNodes.Nodes[0]
+	leafNode := treeNodes.Nodes[1]
 
-	t.Run("query root node", func(t *testing.T) {
-		req := &pb.TreeNodesByPublicKeyRequest{
-			OwnerIdentityPubkey: rootNode.GetOwnerIdentityPublicKey(),
+	t.Run("query by owner identity key", func(t *testing.T) {
+		req := &pb.QueryNodesRequest{
+			Source:         &pb.QueryNodesRequest_OwnerIdentityPubkey{OwnerIdentityPubkey: leafNode.OwnerIdentityPublicKey},
+			IncludeParents: true,
 		}
 
-		resp, err := client.GetTreeNodesByPublicKey(ctx, req)
+		resp, err := client.QueryNodes(ctx, req)
 		require.NoError(t, err)
-
 		require.Len(t, resp.Nodes, 3)
-		require.Equal(t, rootNode.GetId(), resp.Nodes[0].Id)
 	})
 
-	t.Run("query leaf node", func(t *testing.T) {
-		req := &pb.TreeNodesByPublicKeyRequest{
-			OwnerIdentityPubkey: treeNodes.Nodes[1].GetOwnerIdentityPublicKey(),
+	t.Run("query by node id without parents", func(t *testing.T) {
+		req := &pb.QueryNodesRequest{
+			Source:         &pb.QueryNodesRequest_NodeIds{NodeIds: &pb.TreeNodeIds{NodeIds: []string{leafNode.Id}}},
+			IncludeParents: false,
 		}
 
-		resp, err := client.GetTreeNodesByPublicKey(ctx, req)
+		resp, err := client.QueryNodes(ctx, req)
 		require.NoError(t, err)
 
-		require.Len(t, resp.Nodes, 3)
-		require.Equal(t, rootNode.GetId(), resp.Nodes[0].Id)
+		require.Len(t, resp.Nodes, 1)
+		_, exists := resp.Nodes[leafNode.Id]
+		require.True(t, exists)
+	})
+
+	t.Run("query by node id with parents", func(t *testing.T) {
+		req := &pb.QueryNodesRequest{
+			Source:         &pb.QueryNodesRequest_NodeIds{NodeIds: &pb.TreeNodeIds{NodeIds: []string{leafNode.Id}}},
+			IncludeParents: true,
+		}
+
+		resp, err := client.QueryNodes(ctx, req)
+		require.NoError(t, err)
+
+		require.Len(t, resp.Nodes, 2)
+		_, exists := resp.Nodes[leafNode.Id]
+		require.True(t, exists)
+		_, exists = resp.Nodes[treeNodes.Nodes[0].Id]
+		require.True(t, exists)
 	})
 }

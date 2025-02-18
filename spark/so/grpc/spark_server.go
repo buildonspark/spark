@@ -131,12 +131,6 @@ func (s *SparkServer) CreateTree(ctx context.Context, req *pb.CreateTreeRequest)
 	return result, err
 }
 
-// GetTreeNodesByPublicKey returns all nodes owned by a public key and their paths to root
-func (s *SparkServer) GetTreeNodesByPublicKey(ctx context.Context, req *pb.TreeNodesByPublicKeyRequest) (*pb.TreeNodesByPublicKeyResponse, error) {
-	queryHandler := handler.NewTreeQueryHandler(s.config)
-	return queryHandler.GetTreeNodesByPublicKey(ctx, req)
-}
-
 // GetSigningOperatorList gets the list of signing operators.
 func (s *SparkServer) GetSigningOperatorList(ctx context.Context, req *emptypb.Empty) (*pb.GetSigningOperatorListResponse, error) {
 	return &pb.GetSigningOperatorListResponse{SigningOperators: s.config.GetSigningOperatorList()}, nil
@@ -164,10 +158,10 @@ func (s *SparkServer) StartTokenTransaction(ctx context.Context, req *pb.StartTo
 	return wrapWithGRPCError(tokenTransactionHandler.StartTokenTransaction(ctx, s.config, req))
 }
 
-// QueryNodes queries the details of nodes given the node ids.
+// QueryNodes queries the details of nodes given either the owner identity public key or a list of node ids.
 func (s *SparkServer) QueryNodes(ctx context.Context, req *pb.QueryNodesRequest) (*pb.QueryNodesResponse, error) {
-	nodeQueryHandler := handler.NewNodeQueryHandler(s.config)
-	return wrapWithGRPCError(nodeQueryHandler.QueryNodes(ctx, req))
+	treeQueryHandler := handler.NewTreeQueryHandler(s.config)
+	return wrapWithGRPCError(treeQueryHandler.QueryNodes(ctx, req))
 }
 
 // GetTokenTransactionRevocationKeyshares allows the wallet to retrieve the revocation private key shares from each individual SO to

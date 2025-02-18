@@ -201,8 +201,9 @@ func (w *SingleKeyWallet) SyncWallet(ctx context.Context) error {
 	ctx = ContextWithToken(ctx, token)
 
 	client := pb.NewSparkServiceClient(conn)
-	response, err := client.GetTreeNodesByPublicKey(ctx, &pb.TreeNodesByPublicKeyRequest{
-		OwnerIdentityPubkey: w.Config.IdentityPublicKey(),
+	response, err := client.QueryNodes(ctx, &pb.QueryNodesRequest{
+		Source:         &pb.QueryNodesRequest_OwnerIdentityPubkey{OwnerIdentityPubkey: w.Config.IdentityPublicKey()},
+		IncludeParents: true,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to get owned nodes: %w", err)

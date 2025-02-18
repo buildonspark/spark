@@ -2,7 +2,9 @@ package handler
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/google/uuid"
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/ent"
@@ -20,64 +22,66 @@ func NewTreeQueryHandler(config *so.Config) *TreeQueryHandler {
 	return &TreeQueryHandler{config: config}
 }
 
-// GetTreeNodesByPublicKey returns all nodes owned by a public key and their related nodes in a flat structure
-func (h *TreeQueryHandler) GetTreeNodesByPublicKey(ctx context.Context, req *pb.TreeNodesByPublicKeyRequest) (*pb.TreeNodesByPublicKeyResponse, error) {
+// QueryNodes queries the details of nodes given either the owner identity public key or a list of node ids.
+func (h *TreeQueryHandler) QueryNodes(ctx context.Context, req *pb.QueryNodesRequest) (*pb.QueryNodesResponse, error) {
 	db := ent.GetDbFromContext(ctx)
 
-	// First, get all nodes owned by the given public key
-	ownedNodes, err := db.TreeNode.Query().
-		Where(treenode.OwnerIdentityPubkey(req.OwnerIdentityPubkey)).
-		Where(treenode.StatusNEQ(schema.TreeNodeStatusCreating)).
-		All(ctx)
+	query := db.TreeNode.Query()
+	switch req.Source.(type) {
+	case *pb.QueryNodesRequest_OwnerIdentityPubkey:
+		query = query.
+			Where(treenode.StatusNotIn(schema.TreeNodeStatusCreating, schema.TreeNodeStatusSplitted)).
+			Where(treenode.OwnerIdentityPubkey(req.GetOwnerIdentityPubkey()))
+	case *pb.QueryNodesRequest_NodeIds:
+		nodeIDs := make([]uuid.UUID, len(req.GetNodeIds().NodeIds))
+		for _, nodeID := range req.GetNodeIds().NodeIds {
+			nodeUUID, err := uuid.Parse(nodeID)
+			if err != nil {
+				return nil, fmt.Errorf("unable to parse node id as a uuid %s: %v", nodeID, err)
+			}
+			nodeIDs = append(nodeIDs, nodeUUID)
+		}
+		query = query.Where(treenode.IDIn(nodeIDs...))
+	}
+
+	nodes, err := query.All(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	// Create a map to track unique nodes we've seen
 	protoNodeMap := make(map[string]*pb.TreeNode)
-	var orderedNodes []*pb.TreeNode
-
-	// Process each owned node and its ancestors in pre-order
-	for _, node := range ownedNodes {
-		err := getAncestorChainPreOrder(ctx, db, node, protoNodeMap, &orderedNodes)
+	for _, node := range nodes {
+		protoNodeMap[node.ID.String()], err = node.MarshalSparkProto(ctx)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("unable to marshal node %s: %v", node.ID.String(), err)
+		}
+		if req.IncludeParents {
+			err := getAncestorChain(ctx, db, node, protoNodeMap)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 
-	return &pb.TreeNodesByPublicKeyResponse{
-		Nodes: orderedNodes,
+	return &pb.QueryNodesResponse{
+		Nodes: protoNodeMap,
 	}, nil
 }
 
-// Helper function to process node and ancestors in pre-order
-func getAncestorChainPreOrder(ctx context.Context, db *ent.Tx, node *ent.TreeNode, nodeMap map[string]*pb.TreeNode, orderedNodes *[]*pb.TreeNode) error {
-	// Skip if already processed
-	if _, exists := nodeMap[node.ID.String()]; exists {
-		return nil
-	}
-
-	// Use MarshalSparkProto instead of manual construction
-	protoNode, err := node.MarshalSparkProto(ctx)
-	if err != nil {
-		return err
-	}
-
-	// Get parent node and continue chain if parent exists
+func getAncestorChain(ctx context.Context, db *ent.Tx, node *ent.TreeNode, nodeMap map[string]*pb.TreeNode) error {
 	parent, err := node.QueryParent().Only(ctx)
 	if err != nil {
 		if !ent.IsNotFound(err) {
 			return err
 		}
-		// No parent (root node), just add current node
-		nodeMap[node.ID.String()] = protoNode
-		*orderedNodes = append(*orderedNodes, protoNode)
 		return nil
 	}
 
-	// Parent exists, continue chain
-	nodeMap[node.ID.String()] = protoNode
-	*orderedNodes = append(*orderedNodes, protoNode)
+	// Parent exists, continue search
+	nodeMap[parent.ID.String()], err = parent.MarshalSparkProto(ctx)
+	if err != nil {
+		return fmt.Errorf("unable to marshal node %s: %v", parent.ID.String(), err)
+	}
 
-	return getAncestorChainPreOrder(ctx, db, parent, nodeMap, orderedNodes)
+	return getAncestorChain(ctx, db, parent, nodeMap)
 }
