@@ -277,6 +277,12 @@ func (w *SingleKeyWallet) RequestLeavesSwap(ctx context.Context, targetAmount in
 		return nil, fmt.Errorf("failed to request leaves swap: %w", err)
 	}
 
+	// send the transfer
+	_, err = SendTransferTweakKey(ctx, w.Config, transfer, leafKeyTweaks, refundSignatureMap)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send transfer: %w", err)
+	}
+
 	_, err = api.CompleteLeavesSwap(hex.EncodeToString(adaptorPrivKeyBytes), transfer.Id, requestID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to complete leaves swap: %w", err)
@@ -295,12 +301,6 @@ func (w *SingleKeyWallet) RequestLeavesSwap(ctx context.Context, targetAmount in
 	// TODO: accomodate for fees
 	if amountClaimed != totalAmount {
 		return nil, fmt.Errorf("amount claimed is not equal to the total amount")
-	}
-
-	// send the transfer
-	_, err = SendTransferTweakKey(ctx, w.Config, transfer, leafKeyTweaks, refundSignatureMap)
-	if err != nil {
-		return nil, fmt.Errorf("failed to send transfer: %w", err)
 	}
 
 	for i, node := range w.OwnedNodes {
