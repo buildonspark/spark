@@ -71,10 +71,9 @@ message GenerateDepositAddressResponse {
 }
 
 message UTXO {
-    bytes txid = 1;
+    bytes raw_tx = 1;
     uint32 vout = 2;
-    bytes raw_tx = 3;
-    Network network = 4;
+    Network network = 3;
 }
 
 message NodeOutput {
