@@ -6,9 +6,12 @@ import (
 	"encoding/hex"
 	"log"
 	"testing"
+	"time"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lightsparkdev/spark-go/common"
+	pb "github.com/lightsparkdev/spark-go/proto/spark"
+	"github.com/lightsparkdev/spark-go/so/ent/schema"
 	testutil "github.com/lightsparkdev/spark-go/test_util"
 	"github.com/lightsparkdev/spark-go/wallet"
 	"github.com/stretchr/testify/assert"
@@ -136,20 +139,6 @@ func TestTreeCreationWithMultiLevels(t *testing.T) {
 		t.Fatalf("failed to deserilize deposit tx: %v", err)
 	}
 
-	// Sign, broadcast, and mine deposit tx
-	signedDepositTx, err := testutil.SignFaucetCoin(depositTx, coin.TxOut, coin.Key)
-	assert.NoError(t, err)
-	_, err = client.SendRawTransaction(signedDepositTx, true)
-	assert.NoError(t, err)
-
-	randomKey, err := secp256k1.GeneratePrivateKey()
-	assert.NoError(t, err)
-	randomPubKey := randomKey.PubKey()
-	randomAddress, err := common.P2TRRawAddressFromPublicKey(randomPubKey.SerializeCompressed(), common.Regtest)
-	assert.NoError(t, err)
-	_, err = client.GenerateToAddress(1, randomAddress, nil)
-	assert.NoError(t, err)
-
 	log.Printf("deposit public key: %x", hex.EncodeToString(privKey.PubKey().SerializeCompressed()))
 	tree, err := wallet.GenerateDepositAddressesForTree(ctx, config, depositTx, nil, uint32(vout), privKey.Serialize(), 2)
 	if err != nil {
@@ -191,5 +180,31 @@ func TestTreeCreationWithMultiLevels(t *testing.T) {
 
 	}
 
-	log.Printf("tree nodes created: %v", treeNodes)
+	for _, node := range treeNodes.Nodes {
+		assert.Equal(t, node.Status, string(schema.TreeNodeStatusCreating))
+	}
+
+	// Sign, broadcast, and mine deposit tx
+	signedDepositTx, err := testutil.SignFaucetCoin(depositTx, coin.TxOut, coin.Key)
+	log.Printf("signed deposit tx: %s", signedDepositTx.TxHash().String())
+	assert.NoError(t, err)
+	_, err = client.SendRawTransaction(signedDepositTx, true)
+	assert.NoError(t, err)
+
+	randomKey, err := secp256k1.GeneratePrivateKey()
+	assert.NoError(t, err)
+	randomPubKey := randomKey.PubKey()
+	randomAddress, err := common.P2TRRawAddressFromPublicKey(randomPubKey.SerializeCompressed(), common.Regtest)
+	assert.NoError(t, err)
+	_, err = client.GenerateToAddress(1, randomAddress, nil)
+	assert.NoError(t, err)
+
+	time.Sleep(2 * time.Second)
+
+	sparkClient := pb.NewSparkServiceClient(conn)
+	response, err := sparkClient.GetTreeNodesByPublicKey(ctx, &pb.TreeNodesByPublicKeyRequest{
+		OwnerIdentityPubkey: config.IdentityPublicKey(),
+	})
+	assert.NoError(t, err)
+	assert.Greater(t, len(response.Nodes), 0)
 }

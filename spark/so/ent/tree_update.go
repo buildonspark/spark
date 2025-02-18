@@ -71,6 +71,18 @@ func (tu *TreeUpdate) SetNillableNetwork(s *schema.Network) *TreeUpdate {
 	return tu
 }
 
+// SetBaseTxid sets the "base_txid" field.
+func (tu *TreeUpdate) SetBaseTxid(b []byte) *TreeUpdate {
+	tu.mutation.SetBaseTxid(b)
+	return tu
+}
+
+// ClearBaseTxid clears the value of the "base_txid" field.
+func (tu *TreeUpdate) ClearBaseTxid() *TreeUpdate {
+	tu.mutation.ClearBaseTxid()
+	return tu
+}
+
 // SetRootID sets the "root" edge to the TreeNode entity by ID.
 func (tu *TreeUpdate) SetRootID(id uuid.UUID) *TreeUpdate {
 	tu.mutation.SetRootID(id)
@@ -217,6 +229,12 @@ func (tu *TreeUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if value, ok := tu.mutation.Network(); ok {
 		_spec.SetField(tree.FieldNetwork, field.TypeEnum, value)
 	}
+	if value, ok := tu.mutation.BaseTxid(); ok {
+		_spec.SetField(tree.FieldBaseTxid, field.TypeBytes, value)
+	}
+	if tu.mutation.BaseTxidCleared() {
+		_spec.ClearField(tree.FieldBaseTxid, field.TypeBytes)
+	}
 	if tu.mutation.RootCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2O,
@@ -348,6 +366,18 @@ func (tuo *TreeUpdateOne) SetNillableNetwork(s *schema.Network) *TreeUpdateOne {
 	if s != nil {
 		tuo.SetNetwork(*s)
 	}
+	return tuo
+}
+
+// SetBaseTxid sets the "base_txid" field.
+func (tuo *TreeUpdateOne) SetBaseTxid(b []byte) *TreeUpdateOne {
+	tuo.mutation.SetBaseTxid(b)
+	return tuo
+}
+
+// ClearBaseTxid clears the value of the "base_txid" field.
+func (tuo *TreeUpdateOne) ClearBaseTxid() *TreeUpdateOne {
+	tuo.mutation.ClearBaseTxid()
 	return tuo
 }
 
@@ -526,6 +556,12 @@ func (tuo *TreeUpdateOne) sqlSave(ctx context.Context) (_node *Tree, err error) 
 	}
 	if value, ok := tuo.mutation.Network(); ok {
 		_spec.SetField(tree.FieldNetwork, field.TypeEnum, value)
+	}
+	if value, ok := tuo.mutation.BaseTxid(); ok {
+		_spec.SetField(tree.FieldBaseTxid, field.TypeBytes, value)
+	}
+	if tuo.mutation.BaseTxidCleared() {
+		_spec.ClearField(tree.FieldBaseTxid, field.TypeBytes)
 	}
 	if tuo.mutation.RootCleared() {
 		edge := &sqlgraph.EdgeSpec{

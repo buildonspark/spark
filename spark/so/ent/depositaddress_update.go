@@ -61,6 +61,26 @@ func (dau *DepositAddressUpdate) ClearConfirmationHeight() *DepositAddressUpdate
 	return dau
 }
 
+// SetConfirmationTxid sets the "confirmation_txid" field.
+func (dau *DepositAddressUpdate) SetConfirmationTxid(s string) *DepositAddressUpdate {
+	dau.mutation.SetConfirmationTxid(s)
+	return dau
+}
+
+// SetNillableConfirmationTxid sets the "confirmation_txid" field if the given value is not nil.
+func (dau *DepositAddressUpdate) SetNillableConfirmationTxid(s *string) *DepositAddressUpdate {
+	if s != nil {
+		dau.SetConfirmationTxid(*s)
+	}
+	return dau
+}
+
+// ClearConfirmationTxid clears the value of the "confirmation_txid" field.
+func (dau *DepositAddressUpdate) ClearConfirmationTxid() *DepositAddressUpdate {
+	dau.mutation.ClearConfirmationTxid()
+	return dau
+}
+
 // Mutation returns the DepositAddressMutation object of the builder.
 func (dau *DepositAddressUpdate) Mutation() *DepositAddressMutation {
 	return dau.mutation
@@ -134,6 +154,12 @@ func (dau *DepositAddressUpdate) sqlSave(ctx context.Context) (n int, err error)
 	if dau.mutation.ConfirmationHeightCleared() {
 		_spec.ClearField(depositaddress.FieldConfirmationHeight, field.TypeInt64)
 	}
+	if value, ok := dau.mutation.ConfirmationTxid(); ok {
+		_spec.SetField(depositaddress.FieldConfirmationTxid, field.TypeString, value)
+	}
+	if dau.mutation.ConfirmationTxidCleared() {
+		_spec.ClearField(depositaddress.FieldConfirmationTxid, field.TypeString)
+	}
 	if n, err = sqlgraph.UpdateNodes(ctx, dau.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{depositaddress.Label}
@@ -184,6 +210,26 @@ func (dauo *DepositAddressUpdateOne) AddConfirmationHeight(i int64) *DepositAddr
 // ClearConfirmationHeight clears the value of the "confirmation_height" field.
 func (dauo *DepositAddressUpdateOne) ClearConfirmationHeight() *DepositAddressUpdateOne {
 	dauo.mutation.ClearConfirmationHeight()
+	return dauo
+}
+
+// SetConfirmationTxid sets the "confirmation_txid" field.
+func (dauo *DepositAddressUpdateOne) SetConfirmationTxid(s string) *DepositAddressUpdateOne {
+	dauo.mutation.SetConfirmationTxid(s)
+	return dauo
+}
+
+// SetNillableConfirmationTxid sets the "confirmation_txid" field if the given value is not nil.
+func (dauo *DepositAddressUpdateOne) SetNillableConfirmationTxid(s *string) *DepositAddressUpdateOne {
+	if s != nil {
+		dauo.SetConfirmationTxid(*s)
+	}
+	return dauo
+}
+
+// ClearConfirmationTxid clears the value of the "confirmation_txid" field.
+func (dauo *DepositAddressUpdateOne) ClearConfirmationTxid() *DepositAddressUpdateOne {
+	dauo.mutation.ClearConfirmationTxid()
 	return dauo
 }
 
@@ -289,6 +335,12 @@ func (dauo *DepositAddressUpdateOne) sqlSave(ctx context.Context) (_node *Deposi
 	}
 	if dauo.mutation.ConfirmationHeightCleared() {
 		_spec.ClearField(depositaddress.FieldConfirmationHeight, field.TypeInt64)
+	}
+	if value, ok := dauo.mutation.ConfirmationTxid(); ok {
+		_spec.SetField(depositaddress.FieldConfirmationTxid, field.TypeString, value)
+	}
+	if dauo.mutation.ConfirmationTxidCleared() {
+		_spec.ClearField(depositaddress.FieldConfirmationTxid, field.TypeString)
 	}
 	_node = &DepositAddress{config: dauo.config}
 	_spec.Assign = _node.assignValues

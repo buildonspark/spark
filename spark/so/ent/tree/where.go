@@ -72,6 +72,11 @@ func OwnerIdentityPubkey(v []byte) predicate.Tree {
 	return predicate.Tree(sql.FieldEQ(FieldOwnerIdentityPubkey, v))
 }
 
+// BaseTxid applies equality check predicate on the "base_txid" field. It's identical to BaseTxidEQ.
+func BaseTxid(v []byte) predicate.Tree {
+	return predicate.Tree(sql.FieldEQ(FieldBaseTxid, v))
+}
+
 // CreateTimeEQ applies the EQ predicate on the "create_time" field.
 func CreateTimeEQ(v time.Time) predicate.Tree {
 	return predicate.Tree(sql.FieldEQ(FieldCreateTime, v))
@@ -250,6 +255,56 @@ func NetworkNotIn(vs ...schema.Network) predicate.Tree {
 		v[i] = vs[i]
 	}
 	return predicate.Tree(sql.FieldNotIn(FieldNetwork, v...))
+}
+
+// BaseTxidEQ applies the EQ predicate on the "base_txid" field.
+func BaseTxidEQ(v []byte) predicate.Tree {
+	return predicate.Tree(sql.FieldEQ(FieldBaseTxid, v))
+}
+
+// BaseTxidNEQ applies the NEQ predicate on the "base_txid" field.
+func BaseTxidNEQ(v []byte) predicate.Tree {
+	return predicate.Tree(sql.FieldNEQ(FieldBaseTxid, v))
+}
+
+// BaseTxidIn applies the In predicate on the "base_txid" field.
+func BaseTxidIn(vs ...[]byte) predicate.Tree {
+	return predicate.Tree(sql.FieldIn(FieldBaseTxid, vs...))
+}
+
+// BaseTxidNotIn applies the NotIn predicate on the "base_txid" field.
+func BaseTxidNotIn(vs ...[]byte) predicate.Tree {
+	return predicate.Tree(sql.FieldNotIn(FieldBaseTxid, vs...))
+}
+
+// BaseTxidGT applies the GT predicate on the "base_txid" field.
+func BaseTxidGT(v []byte) predicate.Tree {
+	return predicate.Tree(sql.FieldGT(FieldBaseTxid, v))
+}
+
+// BaseTxidGTE applies the GTE predicate on the "base_txid" field.
+func BaseTxidGTE(v []byte) predicate.Tree {
+	return predicate.Tree(sql.FieldGTE(FieldBaseTxid, v))
+}
+
+// BaseTxidLT applies the LT predicate on the "base_txid" field.
+func BaseTxidLT(v []byte) predicate.Tree {
+	return predicate.Tree(sql.FieldLT(FieldBaseTxid, v))
+}
+
+// BaseTxidLTE applies the LTE predicate on the "base_txid" field.
+func BaseTxidLTE(v []byte) predicate.Tree {
+	return predicate.Tree(sql.FieldLTE(FieldBaseTxid, v))
+}
+
+// BaseTxidIsNil applies the IsNil predicate on the "base_txid" field.
+func BaseTxidIsNil() predicate.Tree {
+	return predicate.Tree(sql.FieldIsNull(FieldBaseTxid))
+}
+
+// BaseTxidNotNil applies the NotNil predicate on the "base_txid" field.
+func BaseTxidNotNil() predicate.Tree {
+	return predicate.Tree(sql.FieldNotNull(FieldBaseTxid))
 }
 
 // HasRoot applies the HasEdge predicate on the "root" edge.

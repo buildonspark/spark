@@ -31,6 +31,8 @@ type DepositAddress struct {
 	OwnerSigningPubkey []byte `json:"owner_signing_pubkey,omitempty"`
 	// ConfirmationHeight holds the value of the "confirmation_height" field.
 	ConfirmationHeight int64 `json:"confirmation_height,omitempty"`
+	// ConfirmationTxid holds the value of the "confirmation_txid" field.
+	ConfirmationTxid string `json:"confirmation_txid,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the DepositAddressQuery when eager-loading is set.
 	Edges                            DepositAddressEdges `json:"edges"`
@@ -67,7 +69,7 @@ func (*DepositAddress) scanValues(columns []string) ([]any, error) {
 			values[i] = new([]byte)
 		case depositaddress.FieldConfirmationHeight:
 			values[i] = new(sql.NullInt64)
-		case depositaddress.FieldAddress:
+		case depositaddress.FieldAddress, depositaddress.FieldConfirmationTxid:
 			values[i] = new(sql.NullString)
 		case depositaddress.FieldCreateTime, depositaddress.FieldUpdateTime:
 			values[i] = new(sql.NullTime)
@@ -131,6 +133,12 @@ func (da *DepositAddress) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field confirmation_height", values[i])
 			} else if value.Valid {
 				da.ConfirmationHeight = value.Int64
+			}
+		case depositaddress.FieldConfirmationTxid:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field confirmation_txid", values[i])
+			} else if value.Valid {
+				da.ConfirmationTxid = value.String
 			}
 		case depositaddress.ForeignKeys[0]:
 			if value, ok := values[i].(*sql.NullScanner); !ok {
@@ -197,6 +205,9 @@ func (da *DepositAddress) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("confirmation_height=")
 	builder.WriteString(fmt.Sprintf("%v", da.ConfirmationHeight))
+	builder.WriteString(", ")
+	builder.WriteString("confirmation_txid=")
+	builder.WriteString(da.ConfirmationTxid)
 	builder.WriteByte(')')
 	return builder.String()
 }

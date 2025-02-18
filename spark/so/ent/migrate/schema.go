@@ -61,6 +61,7 @@ var (
 		{Name: "owner_identity_pubkey", Type: field.TypeBytes},
 		{Name: "owner_signing_pubkey", Type: field.TypeBytes},
 		{Name: "confirmation_height", Type: field.TypeInt64, Nullable: true},
+		{Name: "confirmation_txid", Type: field.TypeString, Nullable: true},
 		{Name: "deposit_address_signing_keyshare", Type: field.TypeUUID},
 	}
 	// DepositAddressesTable holds the schema information for the "deposit_addresses" table.
@@ -71,7 +72,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "deposit_addresses_signing_keyshares_signing_keyshare",
-				Columns:    []*schema.Column{DepositAddressesColumns[7]},
+				Columns:    []*schema.Column{DepositAddressesColumns[8]},
 				RefColumns: []*schema.Column{SigningKeysharesColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -406,6 +407,7 @@ var (
 		{Name: "owner_identity_pubkey", Type: field.TypeBytes},
 		{Name: "status", Type: field.TypeEnum, Enums: []string{"PENDING", "AVAILABLE"}},
 		{Name: "network", Type: field.TypeEnum, Enums: []string{"MAINNET", "REGTEST", "TESTNET", "SIGNET"}},
+		{Name: "base_txid", Type: field.TypeBytes, Nullable: true},
 		{Name: "tree_root", Type: field.TypeUUID, Nullable: true},
 	}
 	// TreesTable holds the schema information for the "trees" table.
@@ -416,7 +418,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "trees_tree_nodes_root",
-				Columns:    []*schema.Column{TreesColumns[6]},
+				Columns:    []*schema.Column{TreesColumns[7]},
 				RefColumns: []*schema.Column{TreeNodesColumns[0]},
 				OnDelete:   schema.SetNull,
 			},

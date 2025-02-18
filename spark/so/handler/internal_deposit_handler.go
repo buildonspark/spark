@@ -89,7 +89,12 @@ func (h *InternalDepositHandler) FinalizeTreeCreation(ctx context.Context, req *
 		if !h.config.IsNetworkSupported(network) {
 			return fmt.Errorf("network not supported")
 		}
-		markNodeAsAvailalbe = helper.CheckOnchainWithKeyshareID(ctx, selectedNode.SigningKeyshareId)
+		nodeTx, err := common.TxFromRawTxBytes(selectedNode.RawTx)
+		if err != nil {
+			return err
+		}
+		txid := nodeTx.TxIn[0].PreviousOutPoint.Hash
+		markNodeAsAvailalbe = helper.CheckTxIDOnchain(h.config, txid[:], network)
 		log.Printf("Marking node as available: %v", markNodeAsAvailalbe)
 
 		schemaNetwork, err := common.SchemaNetworkFromNetwork(network)
@@ -101,6 +106,7 @@ func (h *InternalDepositHandler) FinalizeTreeCreation(ctx context.Context, req *
 			Create().
 			SetID(treeID).
 			SetOwnerIdentityPubkey(selectedNode.OwnerIdentityPubkey).
+			SetBaseTxid(txid[:]).
 			SetNetwork(schemaNetwork)
 
 		if markNodeAsAvailalbe {

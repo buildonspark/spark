@@ -400,7 +400,7 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 		if err != nil {
 			return nil, nil, err
 		}
-		if !helper.CheckUTXOOnchain(ctx, h.config, req.GetOnChainUtxo()) {
+		if !helper.CheckUTXOOnchain(h.config, req.GetOnChainUtxo()) {
 			onchain = false
 		}
 	default:
@@ -455,7 +455,11 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 			if err != nil {
 				return nil, nil, err
 			}
-			treeMutator := db.Tree.Create().SetOwnerIdentityPubkey(req.UserIdentityPublicKey).SetNetwork(schemaNetwork)
+			if req.GetOnChainUtxo() == nil {
+				return nil, nil, errors.New("onchain utxo is required for new tree")
+			}
+			txid := req.GetOnChainUtxo().Txid
+			treeMutator := db.Tree.Create().SetOwnerIdentityPubkey(req.UserIdentityPublicKey).SetNetwork(schemaNetwork).SetBaseTxid(txid)
 			if onchain {
 				treeMutator.SetStatus(schema.TreeStatusAvailable)
 			} else {

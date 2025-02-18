@@ -27,6 +27,8 @@ const (
 	FieldStatus = "status"
 	// FieldNetwork holds the string denoting the network field in the database.
 	FieldNetwork = "network"
+	// FieldBaseTxid holds the string denoting the base_txid field in the database.
+	FieldBaseTxid = "base_txid"
 	// EdgeRoot holds the string denoting the root edge name in mutations.
 	EdgeRoot = "root"
 	// EdgeNodes holds the string denoting the nodes edge name in mutations.
@@ -57,6 +59,7 @@ var Columns = []string{
 	FieldOwnerIdentityPubkey,
 	FieldStatus,
 	FieldNetwork,
+	FieldBaseTxid,
 }
 
 // ForeignKeys holds the SQL foreign-keys that are owned by the "trees"

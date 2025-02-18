@@ -1,68 +1,32 @@
 package helper
 
 import (
-	"context"
-
-	"github.com/google/uuid"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/lightsparkdev/spark-go/common"
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
 	"github.com/lightsparkdev/spark-go/so"
-	"github.com/lightsparkdev/spark-go/so/ent"
-	"github.com/lightsparkdev/spark-go/so/ent/depositaddress"
-	"github.com/lightsparkdev/spark-go/so/ent/signingkeyshare"
+	"github.com/lightsparkdev/spark-go/so/chain"
 )
 
-func CheckUTXOOnchain(ctx context.Context, config *so.Config, utxo *pb.UTXO) bool {
-	// Get the on chain tx
-	onChainTx, err := common.TxFromRawTxBytes(utxo.RawTx)
+func CheckUTXOOnchain(config *so.Config, utxo *pb.UTXO) bool {
+	network, err := common.NetworkFromString(utxo.Network.String())
 	if err != nil {
 		return false
 	}
-	if len(onChainTx.TxOut) <= int(utxo.Vout) {
-		return false
-	}
-
-	// Verify that the on chain utxo is paid to the registered deposit address
-	if len(onChainTx.TxOut) <= int(utxo.Vout) {
-		return false
-	}
-	onChainOutput := onChainTx.TxOut[utxo.Vout]
-	network, err := common.NetworkFromProtoNetwork(utxo.Network)
-	if err != nil {
-		return false
-	}
-	if !config.IsNetworkSupported(network) {
-		return false
-	}
-	utxoAddress, err := common.P2TRAddressFromPkScript(onChainOutput.PkScript, network)
-	if err != nil {
-		return false
-	}
-	db := ent.GetDbFromContext(ctx)
-	depositAddress, err := db.DepositAddress.Query().Where(depositaddress.Address(*utxoAddress)).First(ctx)
-	if err != nil {
-		return false
-	}
-	if depositAddress == nil {
-		return false
-	}
-	return depositAddress.ConfirmationHeight != 0
+	return CheckTxIDOnchain(config, utxo.Txid, network)
 }
 
-func CheckOnchainWithKeyshareID(ctx context.Context, keyshareID string) bool {
-	db := ent.GetDbFromContext(ctx)
-	keyshareUUID, err := uuid.Parse(keyshareID)
+func CheckTxIDOnchain(config *so.Config, txid []byte, network common.Network) bool {
+	connConfig := chain.RPCClientConfig(config.BitcoindConfigs[network.String()])
+	client, err := rpcclient.New(&connConfig, nil)
 	if err != nil {
 		return false
 	}
-	depositAddress, err := db.DepositAddress.Query().Where(
-		depositaddress.HasSigningKeyshareWith(
-			signingkeyshare.ID(keyshareUUID))).First(ctx)
+	txidHash := chainhash.Hash(txid)
+	tx, err := client.GetRawTransaction(&txidHash)
 	if err != nil {
 		return false
 	}
-	if depositAddress == nil {
-		return false
-	}
-	return depositAddress.ConfirmationHeight != 0
+	return tx != nil
 }

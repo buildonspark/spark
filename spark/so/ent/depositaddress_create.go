@@ -82,6 +82,20 @@ func (dac *DepositAddressCreate) SetNillableConfirmationHeight(i *int64) *Deposi
 	return dac
 }
 
+// SetConfirmationTxid sets the "confirmation_txid" field.
+func (dac *DepositAddressCreate) SetConfirmationTxid(s string) *DepositAddressCreate {
+	dac.mutation.SetConfirmationTxid(s)
+	return dac
+}
+
+// SetNillableConfirmationTxid sets the "confirmation_txid" field if the given value is not nil.
+func (dac *DepositAddressCreate) SetNillableConfirmationTxid(s *string) *DepositAddressCreate {
+	if s != nil {
+		dac.SetConfirmationTxid(*s)
+	}
+	return dac
+}
+
 // SetID sets the "id" field.
 func (dac *DepositAddressCreate) SetID(u uuid.UUID) *DepositAddressCreate {
 	dac.mutation.SetID(u)
@@ -249,6 +263,10 @@ func (dac *DepositAddressCreate) createSpec() (*DepositAddress, *sqlgraph.Create
 	if value, ok := dac.mutation.ConfirmationHeight(); ok {
 		_spec.SetField(depositaddress.FieldConfirmationHeight, field.TypeInt64, value)
 		_node.ConfirmationHeight = value
+	}
+	if value, ok := dac.mutation.ConfirmationTxid(); ok {
+		_spec.SetField(depositaddress.FieldConfirmationTxid, field.TypeString, value)
+		_node.ConfirmationTxid = value
 	}
 	if nodes := dac.mutation.SigningKeyshareIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{

@@ -27,6 +27,8 @@ const (
 	FieldOwnerSigningPubkey = "owner_signing_pubkey"
 	// FieldConfirmationHeight holds the string denoting the confirmation_height field in the database.
 	FieldConfirmationHeight = "confirmation_height"
+	// FieldConfirmationTxid holds the string denoting the confirmation_txid field in the database.
+	FieldConfirmationTxid = "confirmation_txid"
 	// EdgeSigningKeyshare holds the string denoting the signing_keyshare edge name in mutations.
 	EdgeSigningKeyshare = "signing_keyshare"
 	// Table holds the table name of the depositaddress in the database.
@@ -49,6 +51,7 @@ var Columns = []string{
 	FieldOwnerIdentityPubkey,
 	FieldOwnerSigningPubkey,
 	FieldConfirmationHeight,
+	FieldConfirmationTxid,
 }
 
 // ForeignKeys holds the SQL foreign-keys that are owned by the "deposit_addresses"
@@ -115,6 +118,11 @@ func ByAddress(opts ...sql.OrderTermOption) OrderOption {
 // ByConfirmationHeight orders the results by the confirmation_height field.
 func ByConfirmationHeight(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldConfirmationHeight, opts...).ToFunc()
+}
+
+// ByConfirmationTxid orders the results by the confirmation_txid field.
+func ByConfirmationTxid(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldConfirmationTxid, opts...).ToFunc()
 }
 
 // BySigningKeyshareField orders the results by signing_keyshare field.

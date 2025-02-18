@@ -157,6 +157,8 @@ func loadArgs() (*args, error) {
 		return nil, errors.New("server certificate and key path are required")
 	}
 
+	log.Printf("args: %v", args)
+
 	return args, nil
 }
 
@@ -234,6 +236,7 @@ func main() {
 	}
 
 	if !args.RunningLocally {
+		log.Printf("Starting scheduler")
 		s, err := gocron.NewScheduler()
 		if err != nil {
 			log.Fatalf("Failed to create scheduler: %v", err)

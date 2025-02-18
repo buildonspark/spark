@@ -72,7 +72,7 @@ message GenerateDepositAddressResponse {
 }
 
 message UTXO {
-    string txid = 1;
+    bytes txid = 1;
     uint32 vout = 2;
     bytes raw_tx = 3;
     Network network = 4;

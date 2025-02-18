@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log"
+	"log/slog"
 
 	"github.com/btcsuite/btcd/btcjson"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
@@ -358,12 +359,6 @@ func handleBlock(ctx context.Context, dbTx *ent.Tx, txs []wire.MsgTx, blockHeigh
 		return err
 	}
 	for _, deposit := range confirmedDeposits {
-		_, err = dbTx.DepositAddress.UpdateOne(deposit).
-			SetConfirmationHeight(blockHeight).
-			Save(ctx)
-		if err != nil {
-			return err
-		}
 		// TODO: only unlock if deposit reaches X confirmations
 		signingKeyShare, err := deposit.QuerySigningKeyshare().Only(ctx)
 		if err != nil {
@@ -391,6 +386,18 @@ func handleBlock(ctx context.Context, dbTx *ent.Tx, txs []wire.MsgTx, blockHeigh
 			log.Printf("Expected tree status to be pending, got %s", tree.Status)
 			continue
 		}
+		foundTx := false
+		for _, tx := range confirmedTxids {
+			if bytes.Equal(tx, tree.BaseTxid) {
+				foundTx = true
+				break
+			}
+		}
+		if !foundTx {
+			slog.Info("Base txid not found in confirmed txids", "base_txid", hex.EncodeToString(tree.BaseTxid))
+			continue
+		}
+
 		_, err = dbTx.Tree.UpdateOne(tree).
 			SetStatus(schema.TreeStatusAvailable).
 			Save(ctx)
@@ -418,6 +425,12 @@ func handleBlock(ctx context.Context, dbTx *ent.Tx, txs []wire.MsgTx, blockHeigh
 					return err
 				}
 			}
+		}
+		_, err = dbTx.DepositAddress.UpdateOne(deposit).
+			SetConfirmationHeight(blockHeight).
+			Save(ctx)
+		if err != nil {
+			return err
 		}
 	}
 

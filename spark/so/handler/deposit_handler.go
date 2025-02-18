@@ -192,7 +192,7 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 	if !bytes.Equal(depositAddress.OwnerSigningPubkey, req.RootTxSigningJob.SigningPublicKey) || !bytes.Equal(depositAddress.OwnerSigningPubkey, req.RefundTxSigningJob.SigningPublicKey) {
 		return nil, fmt.Errorf("unexpected signing public key")
 	}
-	txConfirmed := depositAddress.ConfirmationHeight != 0
+	txConfirmed := helper.CheckUTXOOnchain(config, req.OnChainUtxo)
 
 	// Verify the root transaction
 	rootTx, err := common.TxFromRawTxBytes(req.RootTxSigningJob.RawTx)
@@ -276,7 +276,8 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 	if err != nil {
 		return nil, err
 	}
-	treeMutator := db.Tree.Create().SetOwnerIdentityPubkey(depositAddress.OwnerIdentityPubkey).SetNetwork(schemaNetwork)
+	txid := onChainTx.TxHash()
+	treeMutator := db.Tree.Create().SetOwnerIdentityPubkey(depositAddress.OwnerIdentityPubkey).SetNetwork(schemaNetwork).SetBaseTxid(txid[:])
 	if txConfirmed {
 		treeMutator.SetStatus(schema.TreeStatusAvailable)
 	} else {

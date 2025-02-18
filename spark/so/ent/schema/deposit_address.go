@@ -33,6 +33,7 @@ func (DepositAddress) Fields() []ent.Field {
 		field.Bytes("owner_identity_pubkey").NotEmpty().Immutable(),
 		field.Bytes("owner_signing_pubkey").NotEmpty().Immutable(),
 		field.Int64("confirmation_height").Optional(),
+		field.String("confirmation_txid").Optional(),
 	}
 }
 

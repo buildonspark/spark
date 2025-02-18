@@ -86,6 +86,11 @@ func ConfirmationHeight(v int64) predicate.DepositAddress {
 	return predicate.DepositAddress(sql.FieldEQ(FieldConfirmationHeight, v))
 }
 
+// ConfirmationTxid applies equality check predicate on the "confirmation_txid" field. It's identical to ConfirmationTxidEQ.
+func ConfirmationTxid(v string) predicate.DepositAddress {
+	return predicate.DepositAddress(sql.FieldEQ(FieldConfirmationTxid, v))
+}
+
 // CreateTimeEQ applies the EQ predicate on the "create_time" field.
 func CreateTimeEQ(v time.Time) predicate.DepositAddress {
 	return predicate.DepositAddress(sql.FieldEQ(FieldCreateTime, v))
@@ -359,6 +364,81 @@ func ConfirmationHeightIsNil() predicate.DepositAddress {
 // ConfirmationHeightNotNil applies the NotNil predicate on the "confirmation_height" field.
 func ConfirmationHeightNotNil() predicate.DepositAddress {
 	return predicate.DepositAddress(sql.FieldNotNull(FieldConfirmationHeight))
+}
+
+// ConfirmationTxidEQ applies the EQ predicate on the "confirmation_txid" field.
+func ConfirmationTxidEQ(v string) predicate.DepositAddress {
+	return predicate.DepositAddress(sql.FieldEQ(FieldConfirmationTxid, v))
+}
+
+// ConfirmationTxidNEQ applies the NEQ predicate on the "confirmation_txid" field.
+func ConfirmationTxidNEQ(v string) predicate.DepositAddress {
+	return predicate.DepositAddress(sql.FieldNEQ(FieldConfirmationTxid, v))
+}
+
+// ConfirmationTxidIn applies the In predicate on the "confirmation_txid" field.
+func ConfirmationTxidIn(vs ...string) predicate.DepositAddress {
+	return predicate.DepositAddress(sql.FieldIn(FieldConfirmationTxid, vs...))
+}
+
+// ConfirmationTxidNotIn applies the NotIn predicate on the "confirmation_txid" field.
+func ConfirmationTxidNotIn(vs ...string) predicate.DepositAddress {
+	return predicate.DepositAddress(sql.FieldNotIn(FieldConfirmationTxid, vs...))
+}
+
+// ConfirmationTxidGT applies the GT predicate on the "confirmation_txid" field.
+func ConfirmationTxidGT(v string) predicate.DepositAddress {
+	return predicate.DepositAddress(sql.FieldGT(FieldConfirmationTxid, v))
+}
+
+// ConfirmationTxidGTE applies the GTE predicate on the "confirmation_txid" field.
+func ConfirmationTxidGTE(v string) predicate.DepositAddress {
+	return predicate.DepositAddress(sql.FieldGTE(FieldConfirmationTxid, v))
+}
+
+// ConfirmationTxidLT applies the LT predicate on the "confirmation_txid" field.
+func ConfirmationTxidLT(v string) predicate.DepositAddress {
+	return predicate.DepositAddress(sql.FieldLT(FieldConfirmationTxid, v))
+}
+
+// ConfirmationTxidLTE applies the LTE predicate on the "confirmation_txid" field.
+func ConfirmationTxidLTE(v string) predicate.DepositAddress {
+	return predicate.DepositAddress(sql.FieldLTE(FieldConfirmationTxid, v))
+}
+
+// ConfirmationTxidContains applies the Contains predicate on the "confirmation_txid" field.
+func ConfirmationTxidContains(v string) predicate.DepositAddress {
+	return predicate.DepositAddress(sql.FieldContains(FieldConfirmationTxid, v))
+}
+
+// ConfirmationTxidHasPrefix applies the HasPrefix predicate on the "confirmation_txid" field.
+func ConfirmationTxidHasPrefix(v string) predicate.DepositAddress {
+	return predicate.DepositAddress(sql.FieldHasPrefix(FieldConfirmationTxid, v))
+}
+
+// ConfirmationTxidHasSuffix applies the HasSuffix predicate on the "confirmation_txid" field.
+func ConfirmationTxidHasSuffix(v string) predicate.DepositAddress {
+	return predicate.DepositAddress(sql.FieldHasSuffix(FieldConfirmationTxid, v))
+}
+
+// ConfirmationTxidIsNil applies the IsNil predicate on the "confirmation_txid" field.
+func ConfirmationTxidIsNil() predicate.DepositAddress {
+	return predicate.DepositAddress(sql.FieldIsNull(FieldConfirmationTxid))
+}
+
+// ConfirmationTxidNotNil applies the NotNil predicate on the "confirmation_txid" field.
+func ConfirmationTxidNotNil() predicate.DepositAddress {
+	return predicate.DepositAddress(sql.FieldNotNull(FieldConfirmationTxid))
+}
+
+// ConfirmationTxidEqualFold applies the EqualFold predicate on the "confirmation_txid" field.
+func ConfirmationTxidEqualFold(v string) predicate.DepositAddress {
+	return predicate.DepositAddress(sql.FieldEqualFold(FieldConfirmationTxid, v))
+}
+
+// ConfirmationTxidContainsFold applies the ContainsFold predicate on the "confirmation_txid" field.
+func ConfirmationTxidContainsFold(v string) predicate.DepositAddress {
+	return predicate.DepositAddress(sql.FieldContainsFold(FieldConfirmationTxid, v))
 }
 
 // HasSigningKeyshare applies the HasEdge predicate on the "signing_keyshare" edge.

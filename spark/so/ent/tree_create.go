@@ -69,6 +69,12 @@ func (tc *TreeCreate) SetNetwork(s schema.Network) *TreeCreate {
 	return tc
 }
 
+// SetBaseTxid sets the "base_txid" field.
+func (tc *TreeCreate) SetBaseTxid(b []byte) *TreeCreate {
+	tc.mutation.SetBaseTxid(b)
+	return tc
+}
+
 // SetID sets the "id" field.
 func (tc *TreeCreate) SetID(u uuid.UUID) *TreeCreate {
 	tc.mutation.SetID(u)
@@ -252,6 +258,10 @@ func (tc *TreeCreate) createSpec() (*Tree, *sqlgraph.CreateSpec) {
 	if value, ok := tc.mutation.Network(); ok {
 		_spec.SetField(tree.FieldNetwork, field.TypeEnum, value)
 		_node.Network = value
+	}
+	if value, ok := tc.mutation.BaseTxid(); ok {
+		_spec.SetField(tree.FieldBaseTxid, field.TypeBytes, value)
+		_node.BaseTxid = value
 	}
 	if nodes := tc.mutation.RootIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{

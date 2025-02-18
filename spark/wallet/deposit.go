@@ -183,10 +183,11 @@ func CreateTreeRoot(
 	defer sparkConn.Close()
 	sparkClient := pb.NewSparkServiceClient(sparkConn)
 
+	txid := depositTx.TxHash()
 	treeResponse, err := sparkClient.StartTreeCreation(ctx, &pb.StartTreeCreationRequest{
 		IdentityPublicKey: config.IdentityPublicKey(),
 		OnChainUtxo: &pb.UTXO{
-			Txid:    depositTx.TxID(),
+			Txid:    txid[:],
 			Vout:    uint32(vout),
 			RawTx:   depositBuf.Bytes(),
 			Network: config.ProtoNetwork(),

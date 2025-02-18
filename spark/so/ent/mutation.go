@@ -1222,6 +1222,7 @@ type DepositAddressMutation struct {
 	owner_signing_pubkey    *[]byte
 	confirmation_height     *int64
 	addconfirmation_height  *int64
+	confirmation_txid       *string
 	clearedFields           map[string]struct{}
 	signing_keyshare        *uuid.UUID
 	clearedsigning_keyshare bool
@@ -1584,6 +1585,55 @@ func (m *DepositAddressMutation) ResetConfirmationHeight() {
 	delete(m.clearedFields, depositaddress.FieldConfirmationHeight)
 }
 
+// SetConfirmationTxid sets the "confirmation_txid" field.
+func (m *DepositAddressMutation) SetConfirmationTxid(s string) {
+	m.confirmation_txid = &s
+}
+
+// ConfirmationTxid returns the value of the "confirmation_txid" field in the mutation.
+func (m *DepositAddressMutation) ConfirmationTxid() (r string, exists bool) {
+	v := m.confirmation_txid
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldConfirmationTxid returns the old "confirmation_txid" field's value of the DepositAddress entity.
+// If the DepositAddress object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DepositAddressMutation) OldConfirmationTxid(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldConfirmationTxid is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldConfirmationTxid requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldConfirmationTxid: %w", err)
+	}
+	return oldValue.ConfirmationTxid, nil
+}
+
+// ClearConfirmationTxid clears the value of the "confirmation_txid" field.
+func (m *DepositAddressMutation) ClearConfirmationTxid() {
+	m.confirmation_txid = nil
+	m.clearedFields[depositaddress.FieldConfirmationTxid] = struct{}{}
+}
+
+// ConfirmationTxidCleared returns if the "confirmation_txid" field was cleared in this mutation.
+func (m *DepositAddressMutation) ConfirmationTxidCleared() bool {
+	_, ok := m.clearedFields[depositaddress.FieldConfirmationTxid]
+	return ok
+}
+
+// ResetConfirmationTxid resets all changes to the "confirmation_txid" field.
+func (m *DepositAddressMutation) ResetConfirmationTxid() {
+	m.confirmation_txid = nil
+	delete(m.clearedFields, depositaddress.FieldConfirmationTxid)
+}
+
 // SetSigningKeyshareID sets the "signing_keyshare" edge to the SigningKeyshare entity by id.
 func (m *DepositAddressMutation) SetSigningKeyshareID(id uuid.UUID) {
 	m.signing_keyshare = &id
@@ -1657,7 +1707,7 @@ func (m *DepositAddressMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *DepositAddressMutation) Fields() []string {
-	fields := make([]string, 0, 6)
+	fields := make([]string, 0, 7)
 	if m.create_time != nil {
 		fields = append(fields, depositaddress.FieldCreateTime)
 	}
@@ -1675,6 +1725,9 @@ func (m *DepositAddressMutation) Fields() []string {
 	}
 	if m.confirmation_height != nil {
 		fields = append(fields, depositaddress.FieldConfirmationHeight)
+	}
+	if m.confirmation_txid != nil {
+		fields = append(fields, depositaddress.FieldConfirmationTxid)
 	}
 	return fields
 }
@@ -1696,6 +1749,8 @@ func (m *DepositAddressMutation) Field(name string) (ent.Value, bool) {
 		return m.OwnerSigningPubkey()
 	case depositaddress.FieldConfirmationHeight:
 		return m.ConfirmationHeight()
+	case depositaddress.FieldConfirmationTxid:
+		return m.ConfirmationTxid()
 	}
 	return nil, false
 }
@@ -1717,6 +1772,8 @@ func (m *DepositAddressMutation) OldField(ctx context.Context, name string) (ent
 		return m.OldOwnerSigningPubkey(ctx)
 	case depositaddress.FieldConfirmationHeight:
 		return m.OldConfirmationHeight(ctx)
+	case depositaddress.FieldConfirmationTxid:
+		return m.OldConfirmationTxid(ctx)
 	}
 	return nil, fmt.Errorf("unknown DepositAddress field %s", name)
 }
@@ -1768,6 +1825,13 @@ func (m *DepositAddressMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetConfirmationHeight(v)
 		return nil
+	case depositaddress.FieldConfirmationTxid:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetConfirmationTxid(v)
+		return nil
 	}
 	return fmt.Errorf("unknown DepositAddress field %s", name)
 }
@@ -1816,6 +1880,9 @@ func (m *DepositAddressMutation) ClearedFields() []string {
 	if m.FieldCleared(depositaddress.FieldConfirmationHeight) {
 		fields = append(fields, depositaddress.FieldConfirmationHeight)
 	}
+	if m.FieldCleared(depositaddress.FieldConfirmationTxid) {
+		fields = append(fields, depositaddress.FieldConfirmationTxid)
+	}
 	return fields
 }
 
@@ -1832,6 +1899,9 @@ func (m *DepositAddressMutation) ClearField(name string) error {
 	switch name {
 	case depositaddress.FieldConfirmationHeight:
 		m.ClearConfirmationHeight()
+		return nil
+	case depositaddress.FieldConfirmationTxid:
+		m.ClearConfirmationTxid()
 		return nil
 	}
 	return fmt.Errorf("unknown DepositAddress nullable field %s", name)
@@ -1858,6 +1928,9 @@ func (m *DepositAddressMutation) ResetField(name string) error {
 		return nil
 	case depositaddress.FieldConfirmationHeight:
 		m.ResetConfirmationHeight()
+		return nil
+	case depositaddress.FieldConfirmationTxid:
+		m.ResetConfirmationTxid()
 		return nil
 	}
 	return fmt.Errorf("unknown DepositAddress field %s", name)
@@ -10236,6 +10309,7 @@ type TreeMutation struct {
 	owner_identity_pubkey *[]byte
 	status                *schema.TreeStatus
 	network               *schema.Network
+	base_txid             *[]byte
 	clearedFields         map[string]struct{}
 	root                  *uuid.UUID
 	clearedroot           bool
@@ -10531,6 +10605,55 @@ func (m *TreeMutation) ResetNetwork() {
 	m.network = nil
 }
 
+// SetBaseTxid sets the "base_txid" field.
+func (m *TreeMutation) SetBaseTxid(b []byte) {
+	m.base_txid = &b
+}
+
+// BaseTxid returns the value of the "base_txid" field in the mutation.
+func (m *TreeMutation) BaseTxid() (r []byte, exists bool) {
+	v := m.base_txid
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldBaseTxid returns the old "base_txid" field's value of the Tree entity.
+// If the Tree object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TreeMutation) OldBaseTxid(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldBaseTxid is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldBaseTxid requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldBaseTxid: %w", err)
+	}
+	return oldValue.BaseTxid, nil
+}
+
+// ClearBaseTxid clears the value of the "base_txid" field.
+func (m *TreeMutation) ClearBaseTxid() {
+	m.base_txid = nil
+	m.clearedFields[tree.FieldBaseTxid] = struct{}{}
+}
+
+// BaseTxidCleared returns if the "base_txid" field was cleared in this mutation.
+func (m *TreeMutation) BaseTxidCleared() bool {
+	_, ok := m.clearedFields[tree.FieldBaseTxid]
+	return ok
+}
+
+// ResetBaseTxid resets all changes to the "base_txid" field.
+func (m *TreeMutation) ResetBaseTxid() {
+	m.base_txid = nil
+	delete(m.clearedFields, tree.FieldBaseTxid)
+}
+
 // SetRootID sets the "root" edge to the TreeNode entity by id.
 func (m *TreeMutation) SetRootID(id uuid.UUID) {
 	m.root = &id
@@ -10658,7 +10781,7 @@ func (m *TreeMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *TreeMutation) Fields() []string {
-	fields := make([]string, 0, 5)
+	fields := make([]string, 0, 6)
 	if m.create_time != nil {
 		fields = append(fields, tree.FieldCreateTime)
 	}
@@ -10673,6 +10796,9 @@ func (m *TreeMutation) Fields() []string {
 	}
 	if m.network != nil {
 		fields = append(fields, tree.FieldNetwork)
+	}
+	if m.base_txid != nil {
+		fields = append(fields, tree.FieldBaseTxid)
 	}
 	return fields
 }
@@ -10692,6 +10818,8 @@ func (m *TreeMutation) Field(name string) (ent.Value, bool) {
 		return m.Status()
 	case tree.FieldNetwork:
 		return m.Network()
+	case tree.FieldBaseTxid:
+		return m.BaseTxid()
 	}
 	return nil, false
 }
@@ -10711,6 +10839,8 @@ func (m *TreeMutation) OldField(ctx context.Context, name string) (ent.Value, er
 		return m.OldStatus(ctx)
 	case tree.FieldNetwork:
 		return m.OldNetwork(ctx)
+	case tree.FieldBaseTxid:
+		return m.OldBaseTxid(ctx)
 	}
 	return nil, fmt.Errorf("unknown Tree field %s", name)
 }
@@ -10755,6 +10885,13 @@ func (m *TreeMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetNetwork(v)
 		return nil
+	case tree.FieldBaseTxid:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetBaseTxid(v)
+		return nil
 	}
 	return fmt.Errorf("unknown Tree field %s", name)
 }
@@ -10784,7 +10921,11 @@ func (m *TreeMutation) AddField(name string, value ent.Value) error {
 // ClearedFields returns all nullable fields that were cleared during this
 // mutation.
 func (m *TreeMutation) ClearedFields() []string {
-	return nil
+	var fields []string
+	if m.FieldCleared(tree.FieldBaseTxid) {
+		fields = append(fields, tree.FieldBaseTxid)
+	}
+	return fields
 }
 
 // FieldCleared returns a boolean indicating if a field with the given name was
@@ -10797,6 +10938,11 @@ func (m *TreeMutation) FieldCleared(name string) bool {
 // ClearField clears the value of the field with the given name. It returns an
 // error if the field is not defined in the schema.
 func (m *TreeMutation) ClearField(name string) error {
+	switch name {
+	case tree.FieldBaseTxid:
+		m.ClearBaseTxid()
+		return nil
+	}
 	return fmt.Errorf("unknown Tree nullable field %s", name)
 }
 
@@ -10818,6 +10964,9 @@ func (m *TreeMutation) ResetField(name string) error {
 		return nil
 	case tree.FieldNetwork:
 		m.ResetNetwork()
+		return nil
+	case tree.FieldBaseTxid:
+		m.ResetBaseTxid()
 		return nil
 	}
 	return fmt.Errorf("unknown Tree field %s", name)

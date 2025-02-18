@@ -142,7 +142,7 @@ func MarkSigningKeysharesAsUsed(ctx context.Context, config *so.Config, ids []uu
 		return nil, err
 	}
 	log.Printf("Remaining keyshares: %v", remainingKeyshares)
-	if uint64(remainingKeyshares) < spark.DKGKeyThreshold {
+	if uint64(remainingKeyshares) < spark.DKGKeyThreshold && (config.DKGLimitOverride == 0 || uint64(remainingKeyshares) < config.DKGLimitOverride) {
 		go func() {
 			err := RunDKG(context.Background(), config)
 			if err != nil {
