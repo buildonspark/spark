@@ -395,6 +395,9 @@ func handleBlock(ctx context.Context, dbTx *ent.Tx, txs []wire.MsgTx, blockHeigh
 		}
 		if !foundTx {
 			slog.Info("Base txid not found in confirmed txids", "base_txid", hex.EncodeToString(tree.BaseTxid))
+			for _, txid := range confirmedTxids {
+				slog.Info("confirmed txid", "txid", hex.EncodeToString(txid))
+			}
 			continue
 		}
 
