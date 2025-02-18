@@ -413,6 +413,10 @@ func handleBlock(ctx context.Context, dbTx *ent.Tx, txs []wire.MsgTx, blockHeigh
 			return err
 		}
 		for _, treeNode := range treeNodes {
+			if treeNode.Status != schema.TreeNodeStatusCreating {
+				slog.Debug("Tree node is not in creating status", "node", treeNode.ID)
+				continue
+			}
 			if len(treeNode.RawRefundTx) > 0 {
 				_, err = dbTx.TreeNode.UpdateOne(treeNode).
 					SetStatus(schema.TreeNodeStatusAvailable).
