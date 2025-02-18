@@ -374,6 +374,12 @@ func TestSendLightningPaymentWithRejection(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	transfer, err := wallet.SendTransferTweakKey(context.Background(), userConfig, response.Transfer, leaves, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, transfer.Status, spark.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING)
+
 	refunds, err := wallet.QueryUserSignedRefunds(context.Background(), sspConfig, paymentHash[:])
 	if err != nil {
 		t.Fatal(err)
@@ -388,12 +394,6 @@ func TestSendLightningPaymentWithRejection(t *testing.T) {
 		totalValue += value
 	}
 	assert.Equal(t, totalValue, int64(12345+feeSats))
-
-	transfer, err := wallet.SendTransferTweakKey(context.Background(), userConfig, response.Transfer, leaves, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	assert.Equal(t, transfer.Status, spark.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING)
 
 	err = wallet.ReturnLightningPayment(context.Background(), sspConfig, paymentHash[:])
 	if err != nil {
