@@ -43,10 +43,10 @@ describe("Tree Creation", () => {
       }
 
       // Set mock transaction
-      await mockClient.set_mock_onchain_tx({
-        txid,
-        tx: depositTxHex,
-      });
+      // await mockClient.set_mock_onchain_tx({
+      //   txid,
+      //   tx: depositTxHex,
+      // });
 
       const treeResp = await wallet.generateDepositAddressForTree(
         vout,

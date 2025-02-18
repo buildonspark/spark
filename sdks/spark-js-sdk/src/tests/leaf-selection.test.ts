@@ -1,4 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
+import { Network } from "../proto/spark";
 import { LeafNode, selectLeaves } from "../utils/leaf-selection";
 
 function createLeafNode(value: number): LeafNode {
@@ -14,6 +15,7 @@ function createLeafNode(value: number): LeafNode {
     isUsed: false,
     signingKeyshare: undefined,
     status: "unspent",
+    network: Network.REGTEST,
   };
 }
 

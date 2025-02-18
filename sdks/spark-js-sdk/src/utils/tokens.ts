@@ -1,14 +1,14 @@
-import {
-  TokenTransaction,
-  TokenLeafOutput,
-  TransferInput,
-  OperatorSpecificTokenTransactionSignablePayload,
-} from "../proto/spark";
-import { TokenTransferData } from "../services/tokens";
-import { randomUUID } from "crypto";
-import { sha256 } from "@scure/btc-signer/utils";
 import { secp256k1 } from "@noble/curves/secp256k1";
-import { recoverSecret, bigIntToPrivateKey, VerifiableSecretShare } from "./secret-sharing";
+import { sha256 } from "@scure/btc-signer/utils";
+import {
+  OperatorSpecificTokenTransactionSignablePayload,
+  TokenTransaction,
+} from "../proto/spark";
+import {
+  bigIntToPrivateKey,
+  recoverSecret,
+  VerifiableSecretShare,
+} from "./secret-sharing";
 
 export function hashTokenTransaction(
   tokenTransaction: TokenTransaction,
@@ -69,7 +69,7 @@ export function hashTokenTransaction(
     const bondBytes = new Uint8Array(8);
     new DataView(bondBytes.buffer).setBigUint64(
       0,
-      BigInt(leaf.withdrawalBondSats),
+      BigInt(leaf.withdrawBondSats || 0),
       false
     );
     hashObj.update(bondBytes);
@@ -77,7 +77,7 @@ export function hashTokenTransaction(
     const locktimeBytes = new Uint8Array(8);
     new DataView(locktimeBytes.buffer).setBigUint64(
       0,
-      BigInt(leaf.withdrawalLocktime),
+      BigInt(leaf.withdrawRelativeBlockLocktime || 0),
       false
     );
     hashObj.update(locktimeBytes);
@@ -146,12 +146,12 @@ export function recoverPrivateKeyFromKeyshares(
   threshold: number
 ): Uint8Array {
   // Convert keyshares to secret shares format
-  const shares: VerifiableSecretShare[] = keyshares.map(keyshare => ({
+  const shares: VerifiableSecretShare[] = keyshares.map((keyshare) => ({
     fieldModulus: BigInt("0x" + secp256k1.CURVE.n.toString(16)), // secp256k1 curve order
     threshold,
     index: BigInt(keyshare.index),
-    share: BigInt("0x" + Buffer.from(keyshare.keyshare).toString('hex')),
-    proofs: []
+    share: BigInt("0x" + Buffer.from(keyshare.keyshare).toString("hex")),
+    proofs: [],
   }));
 
   // Recover the secret

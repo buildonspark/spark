@@ -90,7 +90,6 @@ export class TreeCreationService {
       request.source = {
         $case: "onChainUtxo",
         onChainUtxo: {
-          txid: getTxId(parentTx),
           vout: vout,
           rawTx: parentTx.toBytes(),
           network: this.config.getNetwork(),
@@ -147,7 +146,6 @@ export class TreeCreationService {
       request.source = {
         $case: "onChainUtxo",
         onChainUtxo: {
-          txid: getTxId(parentTx),
           vout: vout,
           rawTx: parentTx.toBytes(),
           network: this.config.getNetwork(),

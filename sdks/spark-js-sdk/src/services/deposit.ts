@@ -209,7 +209,6 @@ export class DepositService {
       treeResp = await sparkClient.start_tree_creation({
         identityPublicKey: this.config.signer.getIdentityPublicKey(),
         onChainUtxo: {
-          txid: getTxId(depositTx),
           vout: vout,
           rawTx: depositTx.toBytes(),
           network: this.config.getNetwork(),

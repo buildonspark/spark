@@ -27,6 +27,7 @@ import {
 
 import { bytesToHex } from "@noble/curves/abstract/utils";
 import { sha256 } from "@scure/btc-signer/utils";
+import { decode } from "light-bolt11-decoder";
 import SspClient from "./graphql/client";
 import {
   BitcoinNetwork,
@@ -53,8 +54,7 @@ type CreateLightningInvoiceParams = {
 
 type PayLightningInvoiceParams = {
   invoice: string;
-  idempotencyKey: string;
-  amountSats: number;
+  amountSats?: number;
 };
 
 export class SparkWallet {
@@ -202,17 +202,18 @@ export class SparkWallet {
       amountSats: number,
       paymentHash: Uint8Array,
       memo: string
-    ) =>
-      (
-        await this.sspClient!.requestLightningReceive({
-          amountSats,
-          // TODO: Map config network to ssp network
-          network: BitcoinNetwork.REGTEST,
-          paymentHash: bytesToHex(paymentHash),
-          expirySecs: expirySeconds,
-          memo,
-        })
-      )?.invoice.encodedEnvoice;
+    ) => {
+      const invoice = await this.sspClient!.requestLightningReceive({
+        amountSats,
+        // TODO: Map config network to ssp network
+        network: BitcoinNetwork.REGTEST,
+        paymentHash: bytesToHex(paymentHash),
+        expirySecs: expirySeconds,
+        memo,
+      });
+
+      return invoice?.invoice.encodedEnvoice;
+    };
 
     return this.lightningService!.createLightningInvoice({
       amountSats,
@@ -223,20 +224,23 @@ export class SparkWallet {
 
   async payLightningInvoice({
     invoice,
-    idempotencyKey,
     amountSats,
   }: PayLightningInvoiceParams) {
     if (!this.sspClient) {
       throw new Error("SSP client not initialized");
     }
 
-    const sspResponse = await this.sspClient.requestLightningSend({
-      encodedInvoice: invoice,
-      idempotencyKey,
-    });
+    // TODO: Get fee
 
-    if (!sspResponse) {
-      throw new Error("Failed to contact SSP");
+    const decodedInvoice = decode(invoice);
+    amountSats =
+      Number(
+        decodedInvoice.sections.find((section) => section.name === "amount")
+          ?.value
+      ) / 1000;
+
+    if (isNaN(amountSats) || amountSats <= 0) {
+      throw new Error("Invalid amount");
     }
 
     // fetch leaves for amount
@@ -256,7 +260,7 @@ export class SparkWallet {
       receiverIdentityPubkey: this.config.signer.getSspIdentityPublicKey(),
       paymentHash: this.config.signer.hashRandomPrivateKey(),
       isInboundPayment: false,
-      invoiceString: sspResponse.encodedInvoice,
+      invoiceString: invoice,
     });
 
     if (!swapResponse.transfer) {
@@ -268,6 +272,15 @@ export class SparkWallet {
       leavesToSend,
       new Map()
     );
+
+    const sspResponse = await this.sspClient.requestLightningSend({
+      encodedInvoice: invoice,
+      idempotencyKey: bytesToHex(this.config.signer.hashRandomPrivateKey()),
+    });
+
+    if (!sspResponse) {
+      throw new Error("Failed to contact SSP");
+    }
 
     return transfer;
   }
@@ -492,11 +505,17 @@ export class SparkWallet {
     const sparkClient = await this.connectionManager.createSparkClient(
       this.config.getCoordinatorAddress()
     );
-    const leaves = await sparkClient.get_tree_nodes_by_public_key({
-      ownerIdentityPubkey: this.config.signer.getIdentityPublicKey(),
+    const leaves = await sparkClient.query_nodes({
+      source: {
+        $case: "ownerIdentityPubkey",
+        ownerIdentityPubkey: this.config.signer.getIdentityPublicKey(),
+      },
+      includeParents: true,
     });
     sparkClient.close?.();
-    return leaves.nodes.filter((node) => node.status === "AVAILABLE");
+    return Object.entries(leaves.nodes)
+      .filter(([_, node]) => node.status === "AVAILABLE")
+      .map(([_, node]) => node);
   }
 
   async getBalance(): Promise<BigInt> {
