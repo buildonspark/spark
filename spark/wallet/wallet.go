@@ -38,6 +38,16 @@ func NewSingleKeyWallet(config *Config, signingPrivateKey []byte) *SingleKeyWall
 	}
 }
 
+func (w *SingleKeyWallet) RemoveOwnedNodes(nodeIDs map[string]bool) {
+	newOwnedNodes := make([]*pb.TreeNode, 0)
+	for i, node := range w.OwnedNodes {
+		if !nodeIDs[node.Id] {
+			newOwnedNodes = append(newOwnedNodes, w.OwnedNodes[i])
+		}
+	}
+	w.OwnedNodes = newOwnedNodes
+}
+
 func (w *SingleKeyWallet) CreateLightningInvoice(ctx context.Context, amount int64, memo string) (*string, int64, error) {
 	requester, err := sspapi.NewRequesterWithBaseURL(hex.EncodeToString(w.Config.IdentityPublicKey()), nil)
 	if err != nil {
@@ -185,11 +195,7 @@ func (w *SingleKeyWallet) PayInvoice(ctx context.Context, invoice string) (strin
 		return "", fmt.Errorf("failed to pay invoice: %w", err)
 	}
 
-	for i, node := range w.OwnedNodes {
-		if nodesToRemove[node.Id] {
-			w.OwnedNodes = append(w.OwnedNodes[:i], w.OwnedNodes[i+1:]...)
-		}
-	}
+	w.RemoveOwnedNodes(nodesToRemove)
 	return requestID, nil
 }
 
@@ -331,12 +337,7 @@ func (w *SingleKeyWallet) RequestLeavesSwap(ctx context.Context, targetAmount in
 		return nil, fmt.Errorf("amount claimed is not equal to the total amount")
 	}
 
-	for i, node := range w.OwnedNodes {
-		if nodesToRemove[node.Id] {
-			w.OwnedNodes = append(w.OwnedNodes[:i], w.OwnedNodes[i+1:]...)
-		}
-	}
-
+	w.RemoveOwnedNodes(nodesToRemove)
 	return claimedNodes, nil
 }
 
@@ -366,12 +367,7 @@ func (w *SingleKeyWallet) SendTransfer(ctx context.Context, receiverIdentityPubk
 		return nil, fmt.Errorf("failed to send transfer: %w", err)
 	}
 
-	for i, node := range w.OwnedNodes {
-		if nodesToRemove[node.Id] {
-			w.OwnedNodes = append(w.OwnedNodes[:i], w.OwnedNodes[i+1:]...)
-		}
-	}
-
+	w.RemoveOwnedNodes(nodesToRemove)
 	return transfer, nil
 }
 
@@ -432,13 +428,7 @@ func (w *SingleKeyWallet) CoopExit(ctx context.Context, targetAmountSats int64, 
 	}
 	fmt.Printf("Coop exit completed with id %s\n", completeID)
 
-	// Remove spent leaves (assuming everything goes through)
-	for i, node := range w.OwnedNodes {
-		if nodesToRemove[node.Id] {
-			w.OwnedNodes = append(w.OwnedNodes[:i], w.OwnedNodes[i+1:]...)
-		}
-	}
-
+	w.RemoveOwnedNodes(nodesToRemove)
 	return transfer, nil
 }
 
