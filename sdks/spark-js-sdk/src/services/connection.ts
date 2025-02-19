@@ -1,4 +1,3 @@
-import { secp256k1 } from "@noble/curves/secp256k1";
 import { sha256 } from "@scure/btc-signer/utils";
 import * as fs from "fs";
 import {
@@ -119,11 +118,8 @@ export class ConnectionManager {
       ).finish();
       const hash = sha256(challengeBytes);
 
-      const compactSignatureBytes =
-        await this.config.signer.signEcdsaWithIdentityPrivateKey(hash);
-      const derSignatureBytes = secp256k1.Signature.fromCompact(
-        compactSignatureBytes
-      ).toDERRawBytes();
+      const derSignatureBytes =
+        await this.config.signer.signMessageWithIdentityKey(hash);
 
       const verifyResp = await sparkAuthnClient.verify_challenge({
         protectedChallenge: challengeResp.protectedChallenge,

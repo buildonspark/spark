@@ -279,8 +279,9 @@ export class BaseTransferService {
     ]);
 
     const payloadHash = sha256(payload);
-    const signature = await this.config.signer.signEcdsaWithIdentityPrivateKey(
-      payloadHash
+    const signature = await this.config.signer.signMessageWithIdentityKey(
+      payloadHash,
+      true
     );
 
     const leafTweaksMap = new Map<string, SendLeafKeyTweak>();

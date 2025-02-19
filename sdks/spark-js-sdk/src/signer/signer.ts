@@ -88,7 +88,12 @@ interface SparkSigner {
   signFrost(params: SignFrostParams): Promise<Uint8Array>;
   aggregateFrost(params: AggregateFrostParams): Promise<Uint8Array>;
 
-  signEcdsaWithIdentityPrivateKey(message: Uint8Array): Promise<Uint8Array>;
+  // If compact is true, the signature should be in ecdsa compact format else it should be in DER format
+  signMessageWithIdentityKey(
+    message: Uint8Array,
+    compact?: boolean
+  ): Promise<Uint8Array>;
+
   encryptLeafPrivateKeyEcies(
     receiverPublicKey: Uint8Array,
     publicKey: Uint8Array
@@ -345,16 +350,24 @@ class DefaultSparkSigner implements SparkSigner {
     return bytesToHex(secp256k1.getPublicKey(hdkey.privateKey, true));
   }
 
-  async signEcdsaWithIdentityPrivateKey(
-    message: Uint8Array
+  async signMessageWithIdentityKey(
+    message: Uint8Array,
+    compact?: boolean
   ): Promise<Uint8Array> {
     if (!this.identityPrivateKey?.privateKey) {
       throw new Error("Private key is not set");
     }
 
-    return secp256k1
-      .sign(message, this.identityPrivateKey.privateKey)
-      .toCompactRawBytes();
+    const signature = secp256k1.sign(
+      message,
+      this.identityPrivateKey.privateKey
+    );
+
+    if (compact) {
+      return signature.toCompactRawBytes();
+    }
+
+    return signature.toDERRawBytes();
   }
 
   async encryptLeafPrivateKeyEcies(

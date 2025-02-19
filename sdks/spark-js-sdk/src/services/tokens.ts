@@ -72,13 +72,11 @@ export class TokenTransactionService {
     const ownerSignatures: Uint8Array[] = [];
     if (tokenTransaction.tokenInput!.$case === "mintInput") {
       // For issuance transaction, sign with identity private key
-      const compactSignature =
-        await this.config.signer.signEcdsaWithIdentityPrivateKey(
+      const derSignatureBytes =
+        await this.config.signer.signMessageWithIdentityKey(
           partialTokenTransactionHash
         );
 
-      const derSignatureBytes =
-        secp256k1.Signature.fromCompact(compactSignature).toDERRawBytes();
       ownerSignatures.push(derSignatureBytes);
     } else if (tokenTransaction.tokenInput!.$case === "transferInput") {
       const transferInput = tokenTransaction.tokenInput!.transferInput;
@@ -142,11 +140,8 @@ export class TokenTransactionService {
     const operatorSpecificSignatures: OperatorSpecificTokenTransactionSignature[] =
       [];
     if (tokenTransaction.tokenInput!.$case === "mintInput") {
-      const compactSignature =
-        await this.config.signer.signEcdsaWithIdentityPrivateKey(payloadHash);
-
       const derSignatureBytes =
-        secp256k1.Signature.fromCompact(compactSignature).toDERRawBytes();
+        await this.config.signer.signMessageWithIdentityKey(payloadHash);
 
       operatorSpecificSignatures.push({
         ownerPublicKey: await this.config.signer.getIdentityPublicKey(),
@@ -158,11 +153,8 @@ export class TokenTransactionService {
     if (tokenTransaction.tokenInput!.$case === "transferInput") {
       const transferInput = tokenTransaction.tokenInput!.transferInput;
       for (const leaf of transferInput.leavesToSpend) {
-        const compactSignature =
-          await this.config.signer.signEcdsaWithIdentityPrivateKey(payloadHash);
-
         const derSignatureBytes =
-          secp256k1.Signature.fromCompact(compactSignature).toDERRawBytes();
+          await this.config.signer.signMessageWithIdentityKey(payloadHash);
 
         operatorSpecificSignatures.push({
           ownerPublicKey: await this.config.signer.getIdentityPublicKey(),
