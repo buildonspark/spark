@@ -119,8 +119,8 @@ func (s *SparkServiceAPI) InitiateCoopExit(
 	address string,
 ) ([]byte, *wire.MsgTx, error) {
 	variables := map[string]interface{}{
-		"leaf_external_ids": leafExternalIDs,
-		"address":           address,
+		"leaf_external_ids":  leafExternalIDs,
+		"withdrawal_address": address,
 	}
 
 	response, err := s.Requester.ExecuteGraphqlWithContext(context.Background(), RequestCoopExitMutation, variables)
