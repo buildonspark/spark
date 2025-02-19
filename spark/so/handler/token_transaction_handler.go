@@ -226,16 +226,17 @@ func (o TokenTransactionHandler) SignTokenTransaction(
 		return nil, err
 	}
 
-	var keyshares []*ent.SigningKeyshare
+	keyshares := make([]*ent.SigningKeyshare, len(tokenTransactionReceipt.Edges.SpentLeaf))
 	for _, leaf := range tokenTransactionReceipt.Edges.SpentLeaf {
 		keyshare, err := leaf.QueryRevocationKeyshare().Only(ctx)
 		if err != nil {
 			log.Printf("Failed to get keyshare for leaf: %v", err)
 			return nil, err
 		}
-		keyshares = append(keyshares, keyshare)
+		// Use the vout index to order the keyshares
+		keyshares[leaf.LeafSpentTransactionInputVout] = keyshare
 
-		// Validate that the keyshare's public key matches the leaf's revocation public key.
+		// Validate that the keyshare's public key is as expected.
 		if !bytes.Equal(keyshare.PublicKey, leaf.WithdrawRevocationPublicKey) {
 			return nil, fmt.Errorf(
 				"keyshare public key %x does not match leaf revocation public key %x",
