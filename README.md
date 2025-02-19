@@ -1,6 +1,6 @@
 # spark-go
 
-## Setup
+## Generate proto files
 
 Protobuf needs to be installed in order to build the project.
 
@@ -15,13 +15,13 @@ go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
 go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
 ```
 
-## Generate proto files
-
 After modifying the proto files, you can generate the Go files with the following command:
 
 ```
 make
 ```
+
+## Bitcoind
 
 Our SO implementation uses ZMQ to listen for block updates from bitcoind. Install it with:
 
@@ -37,7 +37,30 @@ website do not.
 brew install bitcoin
 ```
 
-## Developer tips
+## DB Migrations
+
+We use atlas to manage our database migrations. Install it [here](https://atlasgo.io/getting-started/#installation).
+
+To make a migration, follow these steps:
+
+- Make your change to the schema, run `make ent`
+- Generate migration files by running (from spark directory):
+```
+createdb operator_temp
+atlas migrate diff <diff_name> \
+--dir "file://so/ent/migrate/migrations" \
+--to "ent://so/ent/schema" \
+--dev-url "postgresql://127.0.0.1:5432/operator_temp?sslmode=disable&search_path=public"
+dropdb operator_temp
+```
+- When running `run-everything.sh`, the migration will be automatically
+applied to each operator's database. But if you want to apply a migration manually, you can run:
+```
+atlas migrate apply --dir "file://so/ent/migrate/migrations" --url "postgresql://127.0.0.1:5432/operator_0?sslmode=disable" --baseline 20250219194108
+```
+- Commit the migration files, and submit a PR.
+
+## VSCode
 
 If spark_frost.udl file has issue with VSCode, you can add the following to your settings.json file:
 
@@ -46,6 +69,8 @@ If spark_frost.udl file has issue with VSCode, you can add the following to your
     "spark_frost.udl": "plaintext"
 }
 ```
+
+## Linting
 
 Linting uses `golang-ci`, install it [according to your platform](https://golangci-lint.run/welcome/install/). Note that it is discouraged to install from sources via `go install`.
 
@@ -81,7 +106,7 @@ go test $(go list ./... | grep -v -E "so/grpc_test|so/tree")
 
 ##### bitcoind
 
-`brew install bitcoin`
+See bitcoin section above.
 
 ##### sqlx-cli (required for LRC20 Node)
 
