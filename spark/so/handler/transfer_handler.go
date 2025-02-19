@@ -410,7 +410,12 @@ func (h *TransferHandler) QueryPendingTransfers(ctx context.Context, req *pb.Que
 		transferPredicate = append(transferPredicate, enttransfer.SenderIdentityPubkeyEQ(req.GetSenderIdentityPublicKey()))
 	}
 	transferPredicate = append(transferPredicate,
-		enttransfer.StatusIn(schema.TransferStatusSenderKeyTweaked, schema.TransferStatusSenderInitiated),
+		enttransfer.StatusIn(
+			schema.TransferStatusSenderKeyTweaked,
+			schema.TransferStatusSenderInitiated,
+			schema.TransferStatusReceiverKeyTweaked,
+			schema.TransferStatusReceiverRefundSigned,
+		),
 		enttransfer.Or(
 			enttransfer.ExpiryTimeGT(time.Now()),
 			enttransfer.ExpiryTimeEQ(time.Unix(0, 0)),
@@ -611,8 +616,8 @@ func (h *TransferHandler) ClaimTransferSignRefunds(ctx context.Context, req *pb.
 	if err != nil {
 		return nil, fmt.Errorf("unable to find pending transfer %s: %v", req.TransferId, err)
 	}
-	if !bytes.Equal(transfer.ReceiverIdentityPubkey, req.OwnerIdentityPublicKey) || transfer.Status != schema.TransferStatusReceiverKeyTweaked {
-		return nil, fmt.Errorf("transfer %s is expected to be at status TransferStatusKeyTweaked but %s found", req.TransferId, transfer.Status)
+	if !bytes.Equal(transfer.ReceiverIdentityPubkey, req.OwnerIdentityPublicKey) || (transfer.Status != schema.TransferStatusReceiverKeyTweaked && transfer.Status != schema.TransferStatusReceiverRefundSigned) {
+		return nil, fmt.Errorf("transfer %s is expected to be at status TransferStatusKeyTweaked or TransferStatusReceiverRefundSigned but %s found", req.TransferId, transfer.Status)
 	}
 
 	// Validate leaves count

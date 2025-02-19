@@ -70,7 +70,9 @@ func (w *SingleKeyWallet) ClaimAllTransfers(ctx context.Context) ([]*pb.TreeNode
 	nodesResult := make([]*pb.TreeNode, 0)
 	for _, transfer := range pendingTransfers.Transfers {
 		log.Println("Claiming transfer", transfer.Id, transfer.Status)
-		if transfer.Status != pb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED {
+		if transfer.Status != pb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED &&
+			transfer.Status != pb.TransferStatus_TRANSFER_STATUS_RECEIVER_KEY_TWEAKED &&
+			transfer.Status != pb.TransferStatus_TRANSFER_STATUSR_RECEIVER_REFUND_SIGNED {
 			continue
 		}
 		leavesMap, err := VerifyPendingTransfer(ctx, w.Config, transfer)

@@ -417,12 +417,14 @@ func ClaimTransfer(
 	config *Config,
 	leaves []LeafKeyTweak,
 ) ([]*pb.TreeNode, error) {
-	err := claimTransferTweakKeys(ctx, transfer, config, leaves)
-	if err != nil {
-		return nil, fmt.Errorf("failed to tweak keys when claiming leaves: %v", err)
+	if transfer.Status == pb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED {
+		err := ClaimTransferTweakKeys(ctx, transfer, config, leaves)
+		if err != nil {
+			return nil, fmt.Errorf("failed to tweak keys when claiming leaves: %v", err)
+		}
 	}
 
-	signatures, err := claimTransferSignRefunds(ctx, transfer, config, leaves)
+	signatures, err := ClaimTransferSignRefunds(ctx, transfer, config, leaves)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign refunds when claiming leaves: %v", err)
 	}
@@ -430,7 +432,7 @@ func ClaimTransfer(
 	return finalizeTransfer(ctx, config, signatures)
 }
 
-func claimTransferTweakKeys(
+func ClaimTransferTweakKeys(
 	ctx context.Context,
 	transfer *pb.Transfer,
 	config *Config,
@@ -552,7 +554,7 @@ type LeafRefundSigningData struct {
 	Vout            int
 }
 
-func claimTransferSignRefunds(
+func ClaimTransferSignRefunds(
 	ctx context.Context,
 	transfer *pb.Transfer,
 	config *Config,

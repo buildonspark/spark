@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lightsparkdev/spark-go/common"
@@ -81,6 +82,8 @@ func CreateNewTree(config *wallet.Config, faucet *Faucet, privKey *secp256k1.Pri
 	if err != nil {
 		return nil, fmt.Errorf("failed to mine deposit tx: %v", err)
 	}
+
+	time.Sleep(100 * time.Millisecond)
 
 	return resp.Nodes[0], nil
 }
