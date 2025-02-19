@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"log"
 	"math"
 	"sort"
 	"time"
@@ -58,12 +59,13 @@ func (w *SingleKeyWallet) ClaimAllTransfers(ctx context.Context) ([]*pb.TreeNode
 
 	nodesResult := make([]*pb.TreeNode, 0)
 	for _, transfer := range pendingTransfers.Transfers {
+		log.Println("Claiming transfer", transfer.Id, transfer.Status)
 		if transfer.Status != pb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED {
 			continue
 		}
 		leavesMap, err := VerifyPendingTransfer(ctx, w.Config, transfer)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to verify pending transfer: %w", err)
 		}
 		leaves := make([]LeafKeyTweak, 0, len(transfer.Leaves))
 		for _, leaf := range transfer.Leaves {
@@ -79,7 +81,7 @@ func (w *SingleKeyWallet) ClaimAllTransfers(ctx context.Context) ([]*pb.TreeNode
 		}
 		nodes, err := ClaimTransfer(ctx, transfer, w.Config, leaves)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to claim transfer: %w", err)
 		}
 		nodesResult = append(nodesResult, nodes...)
 	}
@@ -381,7 +383,7 @@ func (w *SingleKeyWallet) CoopExit(ctx context.Context, targetAmountSats int64, 
 		return nil, fmt.Errorf("failed to create requester: %w", err)
 	}
 	api := sspapi.NewSparkServiceAPI(requester)
-	coopExitTxid, connectorTx, err := api.InitiateCoopExit(leafIDs, onchainAddress)
+	coopExitID, coopExitTxid, connectorTx, err := api.InitiateCoopExit(leafIDs, onchainAddress)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initiate coop exit: %w", err)
 	}
@@ -401,6 +403,12 @@ func (w *SingleKeyWallet) CoopExit(ctx context.Context, targetAmountSats int64, 
 	if err != nil {
 		return nil, fmt.Errorf("failed to get connector refund signatures: %w", err)
 	}
+
+	completeID, err := api.CompleteCoopExit(transfer.Id, coopExitID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to complete coop exit: %w", err)
+	}
+	fmt.Printf("Coop exit completed with id %s\n", completeID)
 
 	// Remove spent leaves (assuming everything goes through)
 	for i, node := range w.OwnedNodes {

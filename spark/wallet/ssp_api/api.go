@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
+	"log"
 	"strings"
 
 	"github.com/btcsuite/btcd/wire"
@@ -117,7 +118,7 @@ func (s *SparkServiceAPI) CompleteLeavesSwap(
 func (s *SparkServiceAPI) InitiateCoopExit(
 	leafExternalIDs []string,
 	address string,
-) ([]byte, *wire.MsgTx, error) {
+) (string, []byte, *wire.MsgTx, error) {
 	variables := map[string]interface{}{
 		"leaf_external_ids":  leafExternalIDs,
 		"withdrawal_address": address,
@@ -125,16 +126,41 @@ func (s *SparkServiceAPI) InitiateCoopExit(
 
 	response, err := s.Requester.ExecuteGraphqlWithContext(context.Background(), RequestCoopExitMutation, variables)
 	if err != nil {
-		return nil, nil, err
+		return "", nil, nil, err
 	}
 
-	connectorTxBytes := response["request_coop_exit"].(map[string]interface{})["request"].(map[string]interface{})["raw_connector_transaction"].([]byte)
+	coopExitID := response["request_coop_exit"].(map[string]interface{})["request"].(map[string]interface{})["id"].(string)
+
+	connectorTxString := response["request_coop_exit"].(map[string]interface{})["request"].(map[string]interface{})["raw_connector_transaction"].(string)
+	log.Printf("connectorTxString: %s", connectorTxString)
+	connectorTxBytes, err := hex.DecodeString(connectorTxString)
+	if err != nil {
+		return "", nil, nil, err
+	}
 	var connectorTx wire.MsgTx
 	err = connectorTx.Deserialize(bytes.NewReader(connectorTxBytes))
 	if err != nil {
-		return nil, nil, err
+		return "", nil, nil, err
 	}
 	coopExitTxid := connectorTx.TxIn[0].PreviousOutPoint.Hash[:]
 
-	return coopExitTxid, &connectorTx, nil
+	return coopExitID, coopExitTxid, &connectorTx, nil
+}
+
+func (s *SparkServiceAPI) CompleteCoopExit(
+	userOutboundTransferExternalID string,
+	coopExitRequestID string,
+) (string, error) {
+	variables := map[string]interface{}{
+		"user_outbound_transfer_external_id": userOutboundTransferExternalID,
+		"coop_exit_request_id":               coopExitRequestID,
+	}
+
+	response, err := s.Requester.ExecuteGraphqlWithContext(context.Background(), CompleteCoopExitMutation, variables)
+	if err != nil {
+		return "", err
+	}
+
+	requestID := response["complete_coop_exit"].(map[string]interface{})["request"].(map[string]interface{})["id"].(string)
+	return requestID, nil
 }
