@@ -364,8 +364,11 @@ message CompleteSendTransferResponse {
 }
 
 message QueryPendingTransfersRequest {
-    bytes receiver_identity_public_key = 1;
-    repeated string transfer_ids = 2;
+    oneof participant {
+        bytes receiver_identity_public_key = 1;
+        bytes sender_identity_public_key = 2;
+    }
+    repeated string transfer_ids = 3;
 }
 
 message QueryPendingTransfersResponse {

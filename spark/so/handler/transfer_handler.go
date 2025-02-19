@@ -396,18 +396,26 @@ func (h *TransferHandler) tweakLeafKey(ctx context.Context, leaf *ent.TreeNode, 
 
 // QueryPendingTransfers queries the pending transfers to claim.
 func (h *TransferHandler) QueryPendingTransfers(ctx context.Context, req *pb.QueryPendingTransfersRequest) (*pb.QueryPendingTransfersResponse, error) {
-	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, req.ReceiverIdentityPublicKey); err != nil {
-		return nil, err
+	var transferPredicate []predicate.Transfer
+	switch req.Participant.(type) {
+	case *pb.QueryPendingTransfersRequest_ReceiverIdentityPublicKey:
+		if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, req.GetReceiverIdentityPublicKey()); err != nil {
+			return nil, err
+		}
+		transferPredicate = append(transferPredicate, enttransfer.ReceiverIdentityPubkeyEQ(req.GetReceiverIdentityPublicKey()))
+	case *pb.QueryPendingTransfersRequest_SenderIdentityPublicKey:
+		if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, req.GetSenderIdentityPublicKey()); err != nil {
+			return nil, err
+		}
+		transferPredicate = append(transferPredicate, enttransfer.SenderIdentityPubkeyEQ(req.GetSenderIdentityPublicKey()))
 	}
-
-	transferPredicate := []predicate.Transfer{
-		enttransfer.ReceiverIdentityPubkeyEQ(req.ReceiverIdentityPublicKey),
-		enttransfer.StatusEQ(schema.TransferStatusSenderKeyTweaked),
+	transferPredicate = append(transferPredicate,
+		enttransfer.StatusIn(schema.TransferStatusSenderKeyTweaked, schema.TransferStatusSenderInitiated),
 		enttransfer.Or(
 			enttransfer.ExpiryTimeGT(time.Now()),
 			enttransfer.ExpiryTimeEQ(time.Unix(0, 0)),
 		),
-	}
+	)
 	if req.TransferIds != nil {
 		transferUUIDs := make([]uuid.UUID, len(req.TransferIds))
 		for _, transferID := range req.TransferIds {

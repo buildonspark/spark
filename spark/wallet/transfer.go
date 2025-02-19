@@ -360,7 +360,9 @@ func QueryPendingTransfers(
 
 	sparkClient := pb.NewSparkServiceClient(sparkConn)
 	return sparkClient.QueryPendingTransfers(ctx, &pb.QueryPendingTransfersRequest{
-		ReceiverIdentityPublicKey: config.IdentityPublicKey(),
+		Participant: &pb.QueryPendingTransfersRequest_ReceiverIdentityPublicKey{
+			ReceiverIdentityPublicKey: config.IdentityPublicKey(),
+		},
 	})
 }
 
