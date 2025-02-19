@@ -1,10 +1,12 @@
 package sspapi
 
 import (
+	"bytes"
 	"context"
 	"encoding/hex"
 	"strings"
 
+	"github.com/btcsuite/btcd/wire"
 	"github.com/decred/dcrd/dcrec/secp256k1"
 	"github.com/lightsparkdev/spark-go/common"
 )
@@ -110,4 +112,29 @@ func (s *SparkServiceAPI) CompleteLeavesSwap(
 
 	request := response["complete_leaves_swap"].(map[string]interface{})["request"].(map[string]interface{})["id"].(string)
 	return request, nil
+}
+
+func (s *SparkServiceAPI) InitiateCoopExit(
+	leafExternalIDs []string,
+	address string,
+) ([]byte, *wire.MsgTx, error) {
+	variables := map[string]interface{}{
+		"leaf_external_ids": leafExternalIDs,
+		"address":           address,
+	}
+
+	response, err := s.Requester.ExecuteGraphqlWithContext(context.Background(), RequestCoopExitMutation, variables)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	connectorTxBytes := response["request_coop_exit"].(map[string]interface{})["request"].(map[string]interface{})["raw_connector_transaction"].([]byte)
+	var connectorTx wire.MsgTx
+	err = connectorTx.Deserialize(bytes.NewReader(connectorTxBytes))
+	if err != nil {
+		return nil, nil, err
+	}
+	coopExitTxid := connectorTx.TxIn[0].PreviousOutPoint.Hash[:]
+
+	return coopExitTxid, &connectorTx, nil
 }

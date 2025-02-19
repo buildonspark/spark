@@ -67,6 +67,7 @@ mutation RequestCoopExit(
         original_unit
       }
       status
+      raw_connector_transaction
       expires_at
     }
   }

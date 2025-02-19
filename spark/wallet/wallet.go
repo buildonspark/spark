@@ -10,6 +10,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/btcsuite/btcd/wire"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lightsparkdev/spark-go/common"
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
@@ -338,6 +339,67 @@ func (w *SingleKeyWallet) SendTransfer(ctx context.Context, receiverIdentityPubk
 		return nil, fmt.Errorf("failed to send transfer: %w", err)
 	}
 
+	for i, node := range w.OwnedNodes {
+		if nodesToRemove[node.Id] {
+			w.OwnedNodes = append(w.OwnedNodes[:i], w.OwnedNodes[i+1:]...)
+		}
+	}
+
+	return transfer, nil
+}
+
+func (w *SingleKeyWallet) CoopExit(ctx context.Context, targetAmountSats int64, onchainAddress string) (*pb.Transfer, error) {
+	// Prepare leaves to send
+	nodes, err := w.leafSelection(targetAmountSats)
+	if err != nil {
+		return nil, fmt.Errorf("failed to select nodes: %w", err)
+	}
+
+	leafIDs := make([]string, 0, len(nodes))
+	leafKeyTweaks := make([]LeafKeyTweak, 0, len(nodes))
+	nodesToRemove := make(map[string]bool)
+	for _, node := range nodes {
+		newLeafPrivKey, err := secp256k1.GeneratePrivateKey()
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate new leaf private key: %w", err)
+		}
+		leafKeyTweaks = append(leafKeyTweaks, LeafKeyTweak{
+			Leaf:              node,
+			SigningPrivKey:    w.SigningPrivateKey,
+			NewSigningPrivKey: newLeafPrivKey.Serialize(),
+		})
+		nodesToRemove[node.Id] = true
+		leafIDs = append(leafIDs, node.Id)
+	}
+
+	// Get tx from SSP
+	requester, err := sspapi.NewRequesterWithBaseURL(hex.EncodeToString(w.Config.IdentityPublicKey()), nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create requester: %w", err)
+	}
+	api := sspapi.NewSparkServiceAPI(requester)
+	coopExitTxid, connectorTx, err := api.InitiateCoopExit(leafIDs, onchainAddress)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initiate coop exit: %w", err)
+	}
+	connectorOutputs := make([]*wire.OutPoint, 0)
+	connectorTxid := connectorTx.TxHash()
+	for i := range connectorTx.TxOut[:len(connectorTx.TxOut)-1] {
+		connectorOutputs = append(connectorOutputs, wire.NewOutPoint(&connectorTxid, uint32(i)))
+	}
+
+	// Get refund signatures and send tweak
+	sspPubIdentityKey, err := secp256k1.ParsePubKey(w.Config.SparkServiceProviderIdentityPublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse ssp pubkey: %w", err)
+	}
+
+	transfer, _, err := GetConnectorRefundSignatures(ctx, w.Config, leafKeyTweaks, coopExitTxid, connectorOutputs, sspPubIdentityKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get connector refund signatures: %w", err)
+	}
+
+	// Remove spent leaves (assuming everything goes through)
 	for i, node := range w.OwnedNodes {
 		if nodesToRemove[node.Id] {
 			w.OwnedNodes = append(w.OwnedNodes[:i], w.OwnedNodes[i+1:]...)

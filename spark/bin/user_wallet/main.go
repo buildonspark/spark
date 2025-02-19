@@ -314,6 +314,29 @@ func main() {
 	})
 
 	cli.registry.RegisterCommand(Command{
+		Name:        "coop_exit",
+		Description: "Swap leaves for on-chain funds",
+		Usage:       "coop_exit <amount_sats> <onchain_address>",
+		Handler: func(args []string) error {
+			if len(args) < 2 {
+				return fmt.Errorf("please provide an amount and address")
+			}
+			amountSats, err := strconv.ParseUint(args[0], 10, 64)
+			if err != nil {
+				return fmt.Errorf("invalid amount: %w", err)
+			}
+			address := args[1]
+			fmt.Printf("Cooperative exit for %d sats to address %s\n", amountSats, address)
+			transfer, err := cli.wallet.CoopExit(context.Background(), int64(amountSats), address)
+			if err != nil {
+				return fmt.Errorf("failed to perform cooperative exit: %w", err)
+			}
+			fmt.Printf("Cooperative exit completed: %s\n", transfer.Id)
+			return nil
+		},
+	})
+
+	cli.registry.RegisterCommand(Command{
 		Name:        "swap",
 		Description: "Swap leaves",
 		Usage:       "swap <amount>",
