@@ -71,12 +71,19 @@ func (s *SparkServiceAPI) PayInvoice(
 	return request["id"].(string), nil
 }
 
+type SwapLeaf struct {
+	LeafID                       string `json:"leaf_id"`
+	RawUnsignedRefundTransaction string `json:"raw_unsigned_refund_transaction"`
+	AdaptorAddedSignature        string `json:"adaptor_added_signature"`
+}
+
 func (s *SparkServiceAPI) RequestLeavesSwap(
 	adaptorPubkey string,
 	totalAmountSats uint64,
 	targetAmountSats uint64,
 	feeSats uint64,
 	network common.Network,
+	userLeaves []SwapLeaf,
 ) (string, error) {
 	variables := map[string]interface{}{
 		"adaptor_pubkey":     adaptorPubkey,
@@ -84,6 +91,7 @@ func (s *SparkServiceAPI) RequestLeavesSwap(
 		"target_amount_sats": targetAmountSats,
 		"fee_sats":           feeSats,
 		"network":            strings.ToUpper(network.String()),
+		"user_leaves":        userLeaves,
 	}
 
 	response, err := s.Requester.ExecuteGraphqlWithContext(context.Background(), RequestLeavesSwapMutation, variables)
@@ -91,8 +99,8 @@ func (s *SparkServiceAPI) RequestLeavesSwap(
 		return "", err
 	}
 
-	request := response["request_leaves_swap"].(map[string]interface{})["request"].(map[string]interface{})["id"].(string)
-	return request, nil
+	requestID := response["request_leaves_swap"].(map[string]interface{})["request"].(map[string]interface{})["id"].(string)
+	return requestID, nil
 }
 
 func (s *SparkServiceAPI) CompleteLeavesSwap(

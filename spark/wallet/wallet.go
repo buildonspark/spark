@@ -264,9 +264,31 @@ func (w *SingleKeyWallet) RequestLeavesSwap(ctx context.Context, targetAmount in
 	}
 
 	// This signature needs to be sent to the SSP.
-	_, adaptorPrivKeyBytes, err := common.GenerateAdaptorFromSignature(refundSignatureMap[nodes[0].Id])
+	adaptorSignature, adaptorPrivKeyBytes, err := common.GenerateAdaptorFromSignature(refundSignatureMap[nodes[0].Id])
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate adaptor: %w", err)
+	}
+
+	userLeaves := make([]sspapi.SwapLeaf, 0, len(nodes))
+	userLeaves = append(userLeaves, sspapi.SwapLeaf{
+		LeafID:                       nodes[0].Id,
+		RawUnsignedRefundTransaction: hex.EncodeToString(transfer.Leaves[0].IntermediateRefundTx),
+		AdaptorAddedSignature:        hex.EncodeToString(adaptorSignature),
+	})
+
+	for i, leaf := range transfer.Leaves {
+		if i == 0 {
+			continue
+		}
+		signature, err := common.GenerateSignatureFromExistingAdaptor(refundSignatureMap[leaf.Leaf.Id], adaptorPrivKeyBytes)
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate signature: %w", err)
+		}
+		userLeaves = append(userLeaves, sspapi.SwapLeaf{
+			LeafID:                       leaf.Leaf.Id,
+			RawUnsignedRefundTransaction: hex.EncodeToString(leaf.IntermediateRefundTx),
+			AdaptorAddedSignature:        hex.EncodeToString(signature),
+		})
 	}
 
 	adaptorPrivateKey := secp256k1.PrivKeyFromBytes(adaptorPrivKeyBytes)
@@ -278,7 +300,7 @@ func (w *SingleKeyWallet) RequestLeavesSwap(ctx context.Context, targetAmount in
 	}
 	api := sspapi.NewSparkServiceAPI(requester)
 
-	requestID, err := api.RequestLeavesSwap(hex.EncodeToString(adaptorPubKey.SerializeCompressed()), uint64(totalAmount), uint64(targetAmount), 0, w.Config.Network)
+	requestID, err := api.RequestLeavesSwap(hex.EncodeToString(adaptorPubKey.SerializeCompressed()), uint64(totalAmount), uint64(targetAmount), 0, w.Config.Network, userLeaves)
 	if err != nil {
 		return nil, fmt.Errorf("failed to request leaves swap: %w", err)
 	}
