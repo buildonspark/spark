@@ -30,10 +30,10 @@ const StyledButton = styled.button<{
   align-items: center;
   justify-content: center;
 
-  padding: 14px 32px;
+  padding: 5px 0px;
   gap: 12px;
 
-  border-radius: 999px;
+  border-radius: 8px;
   font-family: "Decimal";
 
   font-size: 15px;
