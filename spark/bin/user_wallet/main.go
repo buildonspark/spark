@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -57,6 +58,9 @@ func (r *CommandRegistry) ListCommands() []Command {
 	for _, cmd := range r.commands {
 		cmdList = append(cmdList, cmd)
 	}
+	sort.Slice(cmdList, func(i, j int) bool {
+		return cmdList[i].Name < cmdList[j].Name
+	})
 	return cmdList
 }
 
