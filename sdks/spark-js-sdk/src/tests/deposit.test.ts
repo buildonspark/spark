@@ -18,7 +18,7 @@ describe("deposit", () => {
       const sdk = new SparkWallet(Network.REGTEST);
       await sdk.createSparkWallet(mnemonic);
 
-      const pubKey = sdk.getSigner().generatePublicKey();
+      const pubKey = await sdk.getSigner().generatePublicKey();
 
       const depositAddress = await sdk.generateDepositAddress(pubKey);
 
@@ -39,12 +39,12 @@ describe("deposit", () => {
       const coin = await faucet.fund();
 
       const sdk = new SparkWallet(Network.REGTEST);
-      const mnemonic = sdk.generateMnemonic();
+      const mnemonic = await sdk.generateMnemonic();
       await sdk.createSparkWallet(mnemonic);
       const config = sdk.getConfig();
 
       // Generate private/public key pair
-      const pubKey = sdk.getSigner().generatePublicKey();
+      const pubKey = await sdk.getSigner().generatePublicKey();
 
       // Generate deposit address
       const depositResp = await sdk.generateDepositAddress(pubKey);

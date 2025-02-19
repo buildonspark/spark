@@ -22,12 +22,14 @@ async function runCLI() {
   gendepositaddr                                  - Generate a new deposit address
   completedeposit <pubkey> <verifyingKey> <rawtx> - Complete a deposit
   createinvoice <amount> <memo>                   - Create a new lightning invoice
-  payinvoice <invoice> <amount>                   - Pay a lightning invoice
+  payinvoice <invoice> <amount>
+  swap <targetAmount>                             - Swap leaves for a target amount
   balance                                         - Show current wallet balance
   getleaves                                       - Show current leaves
   sendtransfer <amount> <receiverPubKey>          - Send a transfer
   pendingtransfers                                - Show pending transfers
   claimtransfer <transferId>                      - Claim a pending transfer
+  claim                                           - Claim all pending transfers
   help                                            - Show this help message
   exit/quit                                       - Exit the program
 `;
@@ -66,7 +68,7 @@ async function runCLI() {
           console.log("No wallet initialized");
           break;
         }
-        const leafPubKey = wallet.getSigner().generatePublicKey();
+        const leafPubKey = await wallet.getSigner().generatePublicKey();
         const depositAddress = await wallet.generateDepositAddress(leafPubKey);
         console.log("Deposit address:", depositAddress.depositAddress?.address);
         console.log(
@@ -120,7 +122,10 @@ async function runCLI() {
         }
         const receiverPubKey = hexToBytes(args[1]);
         const amount = parseInt(args[0]);
-        await wallet.sendTransfer(amount, receiverPubKey);
+        await wallet.sendTransfer({
+          amount,
+          receiverPubKey,
+        });
         break;
       case "pendingtransfers":
         if (!wallet.isInitialized()) {
@@ -152,6 +157,13 @@ async function runCLI() {
         const result = await wallet.claimTransfer(transfer);
         console.log(result.nodes);
         break;
+      case "claimall":
+        if (!wallet.isInitialized()) {
+          console.log("No wallet initialized");
+          break;
+        }
+        console.log(await wallet.claimTransfers());
+        break;
       case "payinvoice":
         if (!wallet.isInitialized()) {
           console.log("No wallet initialized");
@@ -159,10 +171,17 @@ async function runCLI() {
         }
         const payResult = await wallet.payLightningInvoice({
           invoice: args[0],
-          idempotencyKey: args[0],
           amountSats: parseInt(args[1]),
         });
         console.log(payResult);
+        break;
+      case "swap":
+        if (!wallet.isInitialized()) {
+          console.log("No wallet initialized");
+          break;
+        }
+        const targetAmount = parseInt(args[0]);
+        await wallet.requestLeavesSwap(targetAmount);
         break;
       case "balance":
         if (!wallet.isInitialized()) {

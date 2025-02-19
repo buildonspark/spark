@@ -38,7 +38,7 @@ describe("coop exit", () => {
 
       // Setup user with leaves
       const userWallet = new SparkWallet(Network.REGTEST);
-      const userMnemonic = userWallet.generateMnemonic();
+      const userMnemonic = await userWallet.generateMnemonic();
       await userWallet.createSparkWallet(userMnemonic);
 
       const configService = new WalletConfigService(
@@ -51,7 +51,7 @@ describe("coop exit", () => {
         connectionManager
       );
 
-      const leafPubKey = userWallet
+      const leafPubKey = await userWallet
         .getSigner()
         .generatePublicKey(sha256("leafPubKey"));
       const rootNode = await createNewTree(
@@ -63,7 +63,7 @@ describe("coop exit", () => {
 
       // Setup ssp
       const sspWallet = new SparkWallet(Network.REGTEST);
-      const sspMnemonic = sspWallet.generateMnemonic();
+      const sspMnemonic = await sspWallet.generateMnemonic();
       const sspPubkey = await sspWallet.createSparkWallet(sspMnemonic);
 
       const sspIntermediateAddressScript = getP2TRScriptFromPublicKey(
@@ -72,7 +72,7 @@ describe("coop exit", () => {
       );
 
       // Setup withdraw
-      const withdrawPubKey = userWallet.getSigner().generatePublicKey();
+      const withdrawPubKey = await userWallet.getSigner().generatePublicKey();
       const withdrawAddressScript = getP2TRScriptFromPublicKey(
         withdrawPubKey,
         Network.REGTEST
@@ -101,7 +101,9 @@ describe("coop exit", () => {
 
       let connectorP2trAddrs: string[] = [];
       for (let i = 0; i < leafCount + 1; i++) {
-        const connectorPubKey = userWallet.getSigner().generatePublicKey();
+        const connectorPubKey = await userWallet
+          .getSigner()
+          .generatePublicKey();
         const connectorP2trAddr = getP2TRAddressFromPublicKey(
           connectorPubKey,
           Network.REGTEST
@@ -130,7 +132,7 @@ describe("coop exit", () => {
         });
       }
 
-      const newLeafPubKey = userWallet.getSigner().generatePublicKey();
+      const newLeafPubKey = await userWallet.getSigner().generatePublicKey();
 
       const transferNode = {
         leaf: rootNode,
@@ -165,7 +167,7 @@ describe("coop exit", () => {
       );
 
       // Try to claim leaf before exit tx confirms -> should fail
-      const finalLeafPubKey = sspWallet
+      const finalLeafPubKey = await sspWallet
         .getSigner()
         .generatePublicKey(sha256("finalLeafPubKey"));
 

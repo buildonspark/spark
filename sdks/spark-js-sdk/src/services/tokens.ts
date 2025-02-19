@@ -1,18 +1,17 @@
 import { secp256k1 } from "@noble/curves/secp256k1";
 import {
-  TokenTransaction,
   OperatorSpecificTokenTransactionSignablePayload,
-  SignTokenTransactionResponse,
   OperatorSpecificTokenTransactionSignature,
+  SignTokenTransactionResponse,
+  TokenTransaction,
 } from "../proto/spark";
-import { ConnectionManager } from "./connection";
 import { WalletConfigService } from "../services/config";
 import {
-  hashTokenTransaction,
   hashOperatorSpecificTokenTransactionSignablePayload,
-  KeyshareWithOperatorIndex,
+  hashTokenTransaction,
   recoverPrivateKeyFromKeyshares,
 } from "../utils/tokens";
+import { ConnectionManager } from "./connection";
 
 export type TokenLeafCreationData = {
   tokenPublicKey: Uint8Array;
@@ -74,28 +73,28 @@ export class TokenTransactionService {
     if (tokenTransaction.tokenInput!.$case === "mintInput") {
       // For issuance transaction, sign with identity private key
       const compactSignature =
-        this.config.signer.signEcdsaWithIdentityPrivateKey(
+        await this.config.signer.signEcdsaWithIdentityPrivateKey(
           partialTokenTransactionHash
         );
 
       const derSignatureBytes =
         secp256k1.Signature.fromCompact(compactSignature).toDERRawBytes();
       ownerSignatures.push(derSignatureBytes);
-
     } else if (tokenTransaction.tokenInput!.$case === "transferInput") {
       const transferInput = tokenTransaction.tokenInput!.transferInput;
 
       transferInput.leavesToSpend.forEach((leaf, index) => {
-        const derSignatureBytes = secp256k1.sign(partialTokenTransactionHash, leafToSpendPrivateKeys![index]).toDERRawBytes();
+        const derSignatureBytes = secp256k1
+          .sign(partialTokenTransactionHash, leafToSpendPrivateKeys![index])
+          .toDERRawBytes();
 
         ownerSignatures.push(derSignatureBytes);
       });
-
     }
 
     // Start the token transaction
     const startResponse = await sparkClient.start_token_transaction({
-      identityPublicKey: this.config.signer.getIdentityPublicKey(),
+      identityPublicKey: await this.config.signer.getIdentityPublicKey(),
       partialTokenTransaction: tokenTransaction,
       tokenTransactionSignatures: {
         ownerSignatures: ownerSignatures,
@@ -133,7 +132,8 @@ export class TokenTransactionService {
 
     const payload: OperatorSpecificTokenTransactionSignablePayload = {
       finalTokenTransactionHash: finalTokenTransactionHash,
-      operatorIdentityPublicKey: this.config.signer.getIdentityPublicKey(),
+      operatorIdentityPublicKey:
+        await this.config.signer.getIdentityPublicKey(),
     };
 
     const payloadHash =
@@ -143,13 +143,13 @@ export class TokenTransactionService {
       [];
     if (tokenTransaction.tokenInput!.$case === "mintInput") {
       const compactSignature =
-        this.config.signer.signEcdsaWithIdentityPrivateKey(payloadHash);
+        await this.config.signer.signEcdsaWithIdentityPrivateKey(payloadHash);
 
       const derSignatureBytes =
         secp256k1.Signature.fromCompact(compactSignature).toDERRawBytes();
 
       operatorSpecificSignatures.push({
-        ownerPublicKey: this.config.signer.getIdentityPublicKey(),
+        ownerPublicKey: await this.config.signer.getIdentityPublicKey(),
         ownerSignature: derSignatureBytes,
         payload: payload,
       });
@@ -157,19 +157,19 @@ export class TokenTransactionService {
 
     if (tokenTransaction.tokenInput!.$case === "transferInput") {
       const transferInput = tokenTransaction.tokenInput!.transferInput;
-      transferInput.leavesToSpend.forEach((leaf, index) => {
+      for (const leaf of transferInput.leavesToSpend) {
         const compactSignature =
-          this.config.signer.signEcdsaWithIdentityPrivateKey(payloadHash);
+          await this.config.signer.signEcdsaWithIdentityPrivateKey(payloadHash);
 
         const derSignatureBytes =
           secp256k1.Signature.fromCompact(compactSignature).toDERRawBytes();
 
         operatorSpecificSignatures.push({
-          ownerPublicKey: this.config.signer.getIdentityPublicKey(),
+          ownerPublicKey: await this.config.signer.getIdentityPublicKey(),
           ownerSignature: derSignatureBytes,
           payload: payload,
         });
-      });
+      }
     }
 
     // Submit sign_token_transaction to all SOs in parallel and track their indices
@@ -229,10 +229,12 @@ export class TokenTransactionService {
 
       leavesToSpend.forEach((leaf, leafIndex) => {
         // For each leaf, collect keyshares from all SOs that responded successfully
-        const leafKeyshares = successfulSignatures.map(({ identifier, response }) => ({
-          index: parseInt(identifier, 16),
-          keyshare: response.tokenTransactionRevocationKeyshares[leafIndex]
-        }));
+        const leafKeyshares = successfulSignatures.map(
+          ({ identifier, response }) => ({
+            index: parseInt(identifier, 16),
+            keyshare: response.tokenTransactionRevocationKeyshares[leafIndex],
+          })
+        );
 
         if (leafKeyshares.length < threshold) {
           throw new Error(
@@ -244,7 +246,9 @@ export class TokenTransactionService {
         const seenIndices = new Set<number>();
         for (const { index } of leafKeyshares) {
           if (seenIndices.has(index)) {
-            throw new Error(`Duplicate operator index ${index} for leaf ${leafIndex}`);
+            throw new Error(
+              `Duplicate operator index ${index} for leaf ${leafIndex}`
+            );
           }
           seenIndices.add(index);
         }
@@ -253,19 +257,32 @@ export class TokenTransactionService {
           leafKeyshares,
           threshold
         );
-        const recoveredPublicKey = secp256k1.getPublicKey(recoveredPrivateKey, true);
+        const recoveredPublicKey = secp256k1.getPublicKey(
+          recoveredPrivateKey,
+          true
+        );
 
-        if (!leafToSpendRevocationPublicKeys ||
+        if (
+          !leafToSpendRevocationPublicKeys ||
           !leafToSpendRevocationPublicKeys[leafIndex] ||
-          !recoveredPublicKey.every((byte, i) => byte === leafToSpendRevocationPublicKeys[leafIndex][i])) {
-          throw new Error(`Recovered public key does not match expected revocation public key for leaf ${leafIndex}`);
+          !recoveredPublicKey.every(
+            (byte, i) => byte === leafToSpendRevocationPublicKeys[leafIndex][i]
+          )
+        ) {
+          throw new Error(
+            `Recovered public key does not match expected revocation public key for leaf ${leafIndex}`
+          );
         }
 
         revocationKeys.push(recoveredPrivateKey);
       });
 
       // Finalize the token transaction with the keyshares
-      this.finalizeTokenTransaction(finalTokenTransaction, revocationKeys, threshold);
+      this.finalizeTokenTransaction(
+        finalTokenTransaction,
+        revocationKeys,
+        threshold
+      );
     }
 
     return startResponse.finalTokenTransaction!;
@@ -290,10 +307,12 @@ export class TokenTransactionService {
         async ([identifier, operator]) => {
           const internalSparkClient =
             await this.connectionManager.createSparkClient(operator.address);
-          const response = await internalSparkClient.finalize_token_transaction({
-            finalTokenTransaction,
-            leafToSpendRevocationKeys,
-          });
+          const response = await internalSparkClient.finalize_token_transaction(
+            {
+              finalTokenTransaction,
+              leafToSpendRevocationKeys,
+            }
+          );
 
           return {
             identifier,
@@ -306,7 +325,9 @@ export class TokenTransactionService {
     // Count successful responses
     const successfulResponses = soResponses
       .filter(
-        (result): result is PromiseFulfilledResult<{
+        (
+          result
+        ): result is PromiseFulfilledResult<{
           identifier: string;
           response: TokenTransaction;
         }> => result.status === "fulfilled"

@@ -103,7 +103,7 @@ export class ConnectionManager {
 
   private async authenticate(address: string) {
     try {
-      const identityPublicKey = this.config.signer.getIdentityPublicKey();
+      const identityPublicKey = await this.config.signer.getIdentityPublicKey();
       const sparkAuthnClient = this.createSparkAuthnGrpcConnection(address);
 
       const challengeResp = await sparkAuthnClient.get_challenge({
@@ -120,7 +120,7 @@ export class ConnectionManager {
       const hash = sha256(challengeBytes);
 
       const compactSignatureBytes =
-        this.config.signer.signEcdsaWithIdentityPrivateKey(hash);
+        await this.config.signer.signEcdsaWithIdentityPrivateKey(hash);
       const derSignatureBytes = secp256k1.Signature.fromCompact(
         compactSignatureBytes
       ).toDERRawBytes();

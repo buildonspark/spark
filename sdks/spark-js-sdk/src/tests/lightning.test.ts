@@ -48,7 +48,7 @@ describe("LightningService", () => {
 
   beforeAll(async () => {
     userWallet = new SparkWallet(Network.REGTEST);
-    const mnemonic = userWallet.generateMnemonic();
+    const mnemonic = await userWallet.generateMnemonic();
     await userWallet.createSparkWallet(mnemonic);
     userConfig = new WalletConfigService(
       Network.REGTEST,
@@ -59,7 +59,7 @@ describe("LightningService", () => {
     transferService = new TransferService(userConfig, connectionManager);
 
     sspWallet = new SparkWallet(Network.REGTEST);
-    const sspMnemonic = sspWallet.generateMnemonic();
+    const sspMnemonic = await sspWallet.generateMnemonic();
     await sspWallet.createSparkWallet(sspMnemonic);
 
     sspConfig = new WalletConfigService(Network.REGTEST, sspWallet.getSigner());
@@ -111,7 +111,7 @@ describe("LightningService", () => {
 
       expect(invoice).toBeDefined();
 
-      const sspLeafPubKey = sspWallet.getSigner().generatePublicKey();
+      const sspLeafPubKey = await sspWallet.getSigner().generatePublicKey();
       const nodeToSend = await createNewTree(
         sspWallet,
         sspLeafPubKey,
@@ -119,7 +119,7 @@ describe("LightningService", () => {
         12345n
       );
 
-      const newLeafPubKey = sspWallet
+      const newLeafPubKey = await sspWallet
         .getSigner()
         .generatePublicKey(sha256("1"));
 
@@ -133,7 +133,7 @@ describe("LightningService", () => {
 
       const response = await sspLightningService.swapNodesForPreimage({
         leaves,
-        receiverIdentityPubkey: userConfig.signer.getIdentityPublicKey(),
+        receiverIdentityPubkey: await userConfig.signer.getIdentityPublicKey(),
         paymentHash,
         isInboundPayment: true,
       });
@@ -172,7 +172,7 @@ describe("LightningService", () => {
         equalBytes(leafPrivKeyMap.get(nodeToSend.id)!, newLeafPubKey)
       ).toBe(true);
 
-      const finalLeafPubKey = userWallet.getSigner().generatePublicKey();
+      const finalLeafPubKey = await userWallet.getSigner().generatePublicKey();
 
       const leaf = receiverTransfer.leaves[0].leaf;
       expect(leaf).toBeDefined();
@@ -202,7 +202,7 @@ describe("LightningService", () => {
       );
       const paymentHash = sha256(preimage);
 
-      const userLeafPubKey = userWallet
+      const userLeafPubKey = await userWallet
         .getSigner()
         .generatePublicKey(sha256("1"));
       const nodeToSend = await createNewTree(
@@ -212,7 +212,7 @@ describe("LightningService", () => {
         12345n
       );
 
-      const newLeafPubKey = userWallet
+      const newLeafPubKey = await userWallet
         .getSigner()
         .generatePublicKey(sha256("2"));
 
@@ -226,7 +226,7 @@ describe("LightningService", () => {
 
       const response = await lightningService.swapNodesForPreimage({
         leaves,
-        receiverIdentityPubkey: sspConfig.signer.getIdentityPublicKey(),
+        receiverIdentityPubkey: await sspConfig.signer.getIdentityPublicKey(),
         paymentHash,
         isInboundPayment: false,
         invoiceString: await fakeInvoiceCreator(),
@@ -275,7 +275,7 @@ describe("LightningService", () => {
         equalBytes(leafPrivKeyMap.get(nodeToSend.id)!, newLeafPubKey)
       ).toBe(true);
 
-      const finalLeafPubKey = sspWallet
+      const finalLeafPubKey = await sspWallet
         .getSigner()
         .generatePublicKey(sha256("2"));
 

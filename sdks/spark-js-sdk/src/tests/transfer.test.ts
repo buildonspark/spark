@@ -20,10 +20,10 @@ describe("Transfer", () => {
       );
 
       const senderWallet = new SparkWallet(Network.REGTEST);
-      const senderMnemonic = senderWallet.generateMnemonic();
+      const senderMnemonic = await senderWallet.generateMnemonic();
       await senderWallet.createSparkWallet(senderMnemonic);
 
-      const leafPubKey = senderWallet.getSigner().generatePublicKey();
+      const leafPubKey = await senderWallet.getSigner().generatePublicKey();
       const rootNode = await createNewTree(
         senderWallet,
         leafPubKey,
@@ -31,10 +31,10 @@ describe("Transfer", () => {
         1000n
       );
 
-      const newLeafPubKey = senderWallet.getSigner().generatePublicKey();
+      const newLeafPubKey = await senderWallet.getSigner().generatePublicKey();
 
       const receiverWallet = new SparkWallet(Network.REGTEST);
-      const receiverMnemonic = receiverWallet.generateMnemonic();
+      const receiverMnemonic = await receiverWallet.generateMnemonic();
       const receiverPubkey = await receiverWallet.createSparkWallet(
         receiverMnemonic
       );
@@ -69,7 +69,7 @@ describe("Transfer", () => {
       expect(leafPrivKeyMapBytes).toBeDefined();
       expect(bytesToHex(leafPrivKeyMapBytes!)).toBe(bytesToHex(newLeafPubKey));
 
-      const finalLeafPubKey = receiverWallet
+      const finalLeafPubKey = await receiverWallet
         .getSigner()
         .generatePublicKey(sha256(rootNode.id));
 
@@ -85,12 +85,15 @@ describe("Transfer", () => {
       await receiverWallet.setLeaves(nodes);
 
       const newReceiverWallet = new SparkWallet(Network.REGTEST);
-      const newReceiverMnemonic = newReceiverWallet.generateMnemonic();
+      const newReceiverMnemonic = await newReceiverWallet.generateMnemonic();
       const newReceiverPubkey = await newReceiverWallet.createSparkWallet(
         newReceiverMnemonic
       );
 
-      await receiverWallet.sendTransfer(1000, hexToBytes(newReceiverPubkey));
+      await receiverWallet.sendTransfer({
+        amount: 1000,
+        receiverPubKey: hexToBytes(newReceiverPubkey),
+      });
 
       const newPendingTransfer =
         await newReceiverWallet.queryPendingTransfers();
@@ -104,16 +107,18 @@ describe("Transfer", () => {
     const faucet = new BitcoinFaucet("http://127.0.0.1:18443", "admin1", "123");
 
     const senderWallet = new SparkWallet(Network.REGTEST);
-    const senderMnemonic = senderWallet.generateMnemonic();
+    const senderMnemonic = await senderWallet.generateMnemonic();
     await senderWallet.createSparkWallet(senderMnemonic);
 
     const receiverWallet = new SparkWallet(Network.REGTEST);
-    const receiverMnemonic = receiverWallet.generateMnemonic();
+    const receiverMnemonic = await receiverWallet.generateMnemonic();
     const receiverPubkey = await receiverWallet.createSparkWallet(
       receiverMnemonic
     );
 
-    const leafPubKey = senderWallet.getSigner().generatePublicKey(sha256("1"));
+    const leafPubKey = await senderWallet
+      .getSigner()
+      .generatePublicKey(sha256("1"));
     const rootNode = await createNewTree(
       senderWallet,
       leafPubKey,
@@ -123,7 +128,10 @@ describe("Transfer", () => {
 
     await senderWallet.setLeaves([rootNode]);
 
-    await senderWallet.sendTransfer(1000, hexToBytes(receiverPubkey));
+    await senderWallet.sendTransfer({
+      amount: 1000,
+      receiverPubKey: hexToBytes(receiverPubkey),
+    });
 
     const pendingTransfer = await receiverWallet.queryPendingTransfers();
 

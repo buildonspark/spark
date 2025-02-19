@@ -109,7 +109,8 @@ export class LightningService {
           },
           threshold: this.config.getConfig().threshold,
           invoiceString: invoice,
-          userIdentityPublicKey: this.config.signer.getIdentityPublicKey(),
+          userIdentityPublicKey:
+            await this.config.signer.getIdentityPublicKey(),
         });
       } catch (e: any) {
         errors.push(e);
@@ -148,7 +149,7 @@ export class LightningService {
       throw new Error(`Error getting signing commitments: ${error}`);
     }
 
-    const userSignedRefunds = this.signRefunds(
+    const userSignedRefunds = await this.signRefunds(
       leaves,
       signingCommitments.signingCommitments,
       receiverIdentityPubkey
@@ -191,10 +192,12 @@ export class LightningService {
         },
         transfer: {
           transferId,
-          ownerIdentityPublicKey: this.config.signer.getIdentityPublicKey(),
+          ownerIdentityPublicKey:
+            await this.config.signer.getIdentityPublicKey(),
           receiverIdentityPublicKey: receiverIdentityPubkey,
         },
         receiverIdentityPublicKey: receiverIdentityPubkey,
+        feeSats: 0,
       });
     } catch (error) {
       throw new Error(`Error initiating preimage swap: ${error}`);
@@ -256,11 +259,11 @@ export class LightningService {
     return response.transfer;
   }
 
-  private signRefunds(
+  private async signRefunds(
     leaves: LeafKeyTweak[],
     signingCommitments: RequestedSigningCommitments[],
     receiverIdentityPubkey: Uint8Array
-  ): UserSignedRefund[] {
+  ): Promise<UserSignedRefund[]> {
     const userSignedRefunds: UserSignedRefund[] = [];
     for (let i = 0; i < leaves.length; i++) {
       const leaf = leaves[i];
@@ -270,9 +273,10 @@ export class LightningService {
         this.config.getNetwork()
       );
 
-      const signingCommitment = this.config.signer.getRandomSigningCommitment();
+      const signingCommitment =
+        await this.config.signer.getRandomSigningCommitment();
 
-      const signingResult = this.config.signer.signFrost({
+      const signingResult = await this.config.signer.signFrost({
         message: sighash,
         publicKey: leaf.signingPubKey,
         privateAsPubKey: leaf.signingPubKey,

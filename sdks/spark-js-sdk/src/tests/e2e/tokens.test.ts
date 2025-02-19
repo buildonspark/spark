@@ -14,10 +14,10 @@ describe("token integration test", () => {
     const tokenAmount: bigint = 1000n;
 
     const sdk = new SparkWallet(Network.REGTEST);
-    const mnemonic = sdk.generateMnemonic();
+    const mnemonic = await sdk.generateMnemonic();
     await sdk.createSparkWallet(mnemonic);
 
-    const pubKey = sdk.getSigner().getIdentityPublicKey();
+    const pubKey = await sdk.getSigner().getIdentityPublicKey();
 
     const tokenLeafData: TokenLeafCreationData[] = [
       {
@@ -56,10 +56,10 @@ describe("token integration test", () => {
     const tokenAmount2: bigint = 2000n;
 
     const sdk = new SparkWallet(Network.REGTEST);
-    const mnemonic = sdk.generateMnemonic();
+    const mnemonic = await sdk.generateMnemonic();
     await sdk.createSparkWallet(mnemonic);
 
-    const pubKey = sdk.getSigner().getIdentityPublicKey();
+    const pubKey = await sdk.getSigner().getIdentityPublicKey();
 
     const tokenLeafData: TokenLeafCreationData[] = [
       {
@@ -103,11 +103,11 @@ describe("token integration test", () => {
     const tokenAmount: bigint = 1000n;
 
     const sdk = new SparkWallet(Network.REGTEST);
-    const mnemonic = sdk.generateMnemonic();
+    const mnemonic = await sdk.generateMnemonic();
     await sdk.createSparkWallet(mnemonic);
 
-    const targetWalletPubKey = sdk.getSigner().generatePublicKey();
-    const pubKey = sdk.getSigner().getIdentityPublicKey();
+    const targetWalletPubKey = await sdk.getSigner().generatePublicKey();
+    const pubKey = await sdk.getSigner().getIdentityPublicKey();
 
     const leafOwnerPrivateKey = secp256k1.utils.randomPrivateKey();
     const leafOwnerPublicKey = secp256k1.getPublicKey(leafOwnerPrivateKey);

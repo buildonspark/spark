@@ -25,7 +25,8 @@ import {
   SignFrostParams,
 } from "./utils/wasm";
 
-import { bytesToHex } from "@noble/curves/abstract/utils";
+import { bytesToHex, hexToBytes } from "@noble/curves/abstract/utils";
+import { secp256k1 } from "@noble/curves/secp256k1";
 import { sha256 } from "@scure/btc-signer/utils";
 import { decode } from "light-bolt11-decoder";
 import SspClient from "./graphql/client";
@@ -41,8 +42,9 @@ import {
 import { CoopExitService } from "./services/coop-exit";
 import { LightningService } from "./services/lightning";
 import { SparkSigner } from "./signer/signer";
+import { generateAdaptorFromSignature } from "./utils/adaptor-signature";
 import { getP2TRAddressFromPublicKey } from "./utils/bitcoin";
-import { selectLeaves } from "./utils/leaf-selection";
+import { LeafNode, selectLeaves } from "./utils/leaf-selection";
 import { Network } from "./utils/network";
 
 type CreateLightningInvoiceParams = {
@@ -55,6 +57,13 @@ type CreateLightningInvoiceParams = {
 type PayLightningInvoiceParams = {
   invoice: string;
   amountSats?: number;
+};
+
+type SendTransferParams = {
+  amount?: number;
+  leaves?: TreeNode[];
+  receiverPubKey: Uint8Array;
+  expiryTime?: Date;
 };
 
 export class SparkWallet {
@@ -134,12 +143,12 @@ export class SparkWallet {
     return this.config.getConfig();
   }
 
-  getMasterPubKey(): Uint8Array {
-    return this.config.signer.getIdentityPublicKey();
+  async getMasterPubKey(): Promise<Uint8Array> {
+    return await this.config.signer.getIdentityPublicKey();
   }
 
-  getP2trAddress(): string {
-    const pubKey = this.config.signer.getIdentityPublicKey();
+  async getP2trAddress(): Promise<string> {
+    const pubKey = await this.config.signer.getIdentityPublicKey();
     const network = this.config.getNetwork();
 
     return getP2TRAddressFromPublicKey(pubKey, network);
@@ -155,8 +164,8 @@ export class SparkWallet {
     return aggregateFrost(params);
   }
 
-  generateMnemonic(): string {
-    return this.config.signer.generateMnemonic();
+  async generateMnemonic(): Promise<string> {
+    return await this.config.signer.generateMnemonic();
   }
 
   isInitialized(): boolean {
@@ -173,7 +182,7 @@ export class SparkWallet {
 
   async createSparkWalletFromSeed(seed: Uint8Array | string): Promise<string> {
     const identityPublicKey =
-      this.config.signer.createSparkWalletFromSeed(seed);
+      await this.config.signer.createSparkWalletFromSeed(seed);
     await this.initializeWallet(identityPublicKey);
     return identityPublicKey;
   }
@@ -184,6 +193,70 @@ export class SparkWallet {
     // TODO: Better leaf management?
     this.leaves = await this.getLeaves();
     this.config.signer.restoreSigningKeysFromLeafs(this.leaves);
+  }
+
+  async requestLeavesSwap(targetAmount: number) {
+    await this.claimTransfers();
+    const leaves = await this.getLeaves();
+
+    const leavesToSwap = selectLeaves(
+      leaves.map((leaf) => ({ ...leaf, isUsed: false })),
+      targetAmount
+    );
+
+    const leafKeyTweaks = await Promise.all(
+      leavesToSwap.map(async (leaf) => ({
+        leaf,
+        signingPubKey: await this.config.signer.generatePublicKey(
+          sha256(leaf.id)
+        ),
+        newSigningPubKey: await this.config.signer.generatePublicKey(),
+      }))
+    );
+
+    const { transfer, signatureMap } =
+      await this.transferService.sendTransferSignRefund(
+        leafKeyTweaks,
+        await this.config.signer.getSspIdentityPublicKey(),
+        new Date(Date.now() + 10 * 60 * 1000)
+      );
+
+    const refundSignature = signatureMap.get(leavesToSwap[0].id);
+    if (!refundSignature) {
+      throw new Error("Failed to get refund signature");
+    }
+
+    const { adaptorPrivateKey, adaptorSignature } =
+      generateAdaptorFromSignature(refundSignature);
+
+    const request = await this.sspClient?.requestLeaveSwap({
+      adaptorPubkey: bytesToHex(secp256k1.getPublicKey(adaptorPrivateKey)),
+      targetAmountSats: targetAmount,
+      totalAmountSats: leavesToSwap.reduce((acc, leaf) => acc + leaf.value, 0),
+      // TODO: Request fee from SSP
+      feeSats: 0,
+      // TODO: Map config network to proto network
+      network: BitcoinNetwork.REGTEST,
+    });
+
+    if (!request) {
+      throw new Error("Failed to request leaves swap");
+    }
+
+    console.log({
+      transferID: transfer.id,
+    });
+    const completeResponse = await this.sspClient?.completeLeaveSwap({
+      adaptorSecretKey: bytesToHex(adaptorPrivateKey),
+      userOutboundTransferExternalId: transfer.id,
+      leavesSwapRequestId: request.id,
+    });
+
+    if (!completeResponse) {
+      throw new Error("Failed to complete leaves swap");
+    }
+
+    await this.claimTransfers();
   }
 
   // Lightning
@@ -233,6 +306,7 @@ export class SparkWallet {
     // TODO: Get fee
 
     const decodedInvoice = decode(invoice);
+    console.log({ decodedInvoiceSections: decodedInvoice.sections });
     amountSats =
       Number(
         decodedInvoice.sections.find((section) => section.name === "amount")
@@ -243,22 +317,35 @@ export class SparkWallet {
       throw new Error("Invalid amount");
     }
 
+    const paymentHash = decodedInvoice.sections.find(
+      (section) => section.name === "payment_hash"
+    )?.value;
+
+    if (!paymentHash) {
+      throw new Error("No payment hash found in invoice");
+    }
+
     // fetch leaves for amount
     const leaves = selectLeaves(
       this.leaves.map((leaf) => ({ ...leaf, isUsed: false })),
       amountSats
     );
 
-    const leavesToSend = leaves.map((leaf) => ({
-      leaf,
-      signingPubKey: this.config.signer.generatePublicKey(sha256(leaf.id)),
-      newSigningPubKey: this.config.signer.generatePublicKey(),
-    }));
+    const leavesToSend = await Promise.all(
+      leaves.map(async (leaf) => ({
+        leaf,
+        signingPubKey: await this.config.signer.generatePublicKey(
+          sha256(leaf.id)
+        ),
+        newSigningPubKey: await this.config.signer.generatePublicKey(),
+      }))
+    );
 
     const swapResponse = await this.lightningService.swapNodesForPreimage({
       leaves: leavesToSend,
-      receiverIdentityPubkey: this.config.signer.getSspIdentityPublicKey(),
-      paymentHash: this.config.signer.hashRandomPrivateKey(),
+      receiverIdentityPubkey:
+        await this.config.signer.getSspIdentityPublicKey(),
+      paymentHash: hexToBytes(paymentHash),
       isInboundPayment: false,
       invoiceString: invoice,
     });
@@ -275,14 +362,14 @@ export class SparkWallet {
 
     const sspResponse = await this.sspClient.requestLightningSend({
       encodedInvoice: invoice,
-      idempotencyKey: bytesToHex(this.config.signer.hashRandomPrivateKey()),
+      idempotencyKey: paymentHash,
     });
 
     if (!sspResponse) {
       throw new Error("Failed to contact SSP");
     }
 
-    return transfer;
+    return sspResponse;
   }
 
   async getLightningReceiveFeeEstimate({
@@ -327,24 +414,39 @@ export class SparkWallet {
     this.leaves = leaves;
   }
 
-  async sendTransfer(
-    amount: number,
-    receiverPubKey: Uint8Array,
-    expiryTime: Date = new Date(Date.now() + 10 * 60 * 1000)
-  ) {
-    const leaves = selectLeaves(
-      this.leaves.map((leaf) => ({ ...leaf, isUsed: false })),
-      amount
+  async sendTransfer({
+    amount,
+    receiverPubKey,
+    leaves,
+    expiryTime = new Date(Date.now() + 10 * 60 * 1000),
+  }: SendTransferParams) {
+    let leavesToSend: LeafNode[] = [];
+    if (leaves) {
+      leavesToSend = leaves.map((leaf) => ({
+        ...leaf,
+        isUsed: true,
+      }));
+    } else if (amount) {
+      leavesToSend = selectLeaves(
+        this.leaves.map((leaf) => ({ ...leaf, isUsed: false })),
+        amount
+      );
+    } else {
+      throw new Error("Must provide amount or leaves");
+    }
+
+    const leafKeyTweaks = await Promise.all(
+      leavesToSend.map(async (leaf) => ({
+        leaf,
+        signingPubKey: await this.config.signer.generatePublicKey(
+          sha256(leaf.id)
+        ),
+        newSigningPubKey: await this.config.signer.generatePublicKey(),
+      }))
     );
 
-    const leavesToSend = leaves.map((leaf) => ({
-      leaf,
-      signingPubKey: this.config.signer.generatePublicKey(sha256(leaf.id)),
-      newSigningPubKey: this.config.signer.generatePublicKey(),
-    }));
-
-    await this.transferService.sendTransfer(
-      leavesToSend,
+    return await this.transferService.sendTransfer(
+      leafKeyTweaks,
       receiverPubKey,
       expiryTime
     );
@@ -359,23 +461,22 @@ export class SparkWallet {
       transfer
     );
 
-    const leavesToClaim = transfer.leaves.flatMap((leaf) => {
+    let leavesToClaim: LeafKeyTweak[] = [];
+
+    for (const leaf of transfer.leaves) {
       if (leaf.leaf) {
         const leafPubKey = leafPubKeyMap.get(leaf.leaf.id);
         if (leafPubKey) {
-          return [
-            {
-              leaf: leaf.leaf,
-              signingPubKey: leafPubKey,
-              newSigningPubKey: this.config.signer.generatePublicKey(
-                sha256(leaf.leaf.id)
-              ),
-            },
-          ];
+          leavesToClaim.push({
+            leaf: leaf.leaf,
+            signingPubKey: leafPubKey,
+            newSigningPubKey: await this.config.signer.generatePublicKey(
+              sha256(leaf.leaf.id)
+            ),
+          });
         }
       }
-      return [];
-    });
+    }
 
     return await this.transferService.claimTransfer(transfer, leavesToClaim);
   }
@@ -397,7 +498,7 @@ export class SparkWallet {
     // const leaves = this.config.signer.getLeafKeyTweaks(this.leaves);
 
     // TODO: Might need a differnet ID for this
-    const withdrawPubKey = this.config.signer.generatePublicKey(
+    const withdrawPubKey = await this.config.signer.generatePublicKey(
       sha256(leavesToSend[0].leaf.treeId)
     );
 
@@ -410,6 +511,16 @@ export class SparkWallet {
       (acc, leaf) => acc + BigInt(leaf.leaf.value),
       0n
     );
+
+    // everything async
+    // return identifiers
+    //
+    //
+    //
+    //
+    //
+    //
+    //
 
     // // get/create exit tx from where?
     // const dummyTx = createDummyTx({
@@ -508,7 +619,7 @@ export class SparkWallet {
     const leaves = await sparkClient.query_nodes({
       source: {
         $case: "ownerIdentityPubkey",
-        ownerIdentityPubkey: this.config.signer.getIdentityPublicKey(),
+        ownerIdentityPubkey: await this.config.signer.getIdentityPublicKey(),
       },
       includeParents: true,
     });

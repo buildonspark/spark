@@ -70,7 +70,7 @@ export class BaseTransferService {
     leaves: LeafKeyTweak[],
     refundSignatureMap: Map<string, Uint8Array>
   ): Promise<Transfer> {
-    const keyTweakInputMap = this.prepareSendTransferKeyTweaks(
+    const keyTweakInputMap = await this.prepareSendTransferKeyTweaks(
       transfer,
       leaves,
       refundSignatureMap
@@ -94,7 +94,8 @@ export class BaseTransferService {
       try {
         transferResp = await sparkClient.complete_send_transfer({
           transferId: transfer.id,
-          ownerIdentityPublicKey: this.config.signer.getIdentityPublicKey(),
+          ownerIdentityPublicKey:
+            await this.config.signer.getIdentityPublicKey(),
           leavesToSend,
         });
       } catch (error) {
@@ -163,7 +164,7 @@ export class BaseTransferService {
 
       const refundTxSighash = getSigHashFromTx(leafData.refundTx, 0, txOutput);
 
-      const userSignature = this.config.signer.signFrost({
+      const userSignature = await this.config.signer.signFrost({
         message: refundTxSighash,
         publicKey: leafData.signingPubKey,
         privateAsPubKey: leafData.signingPubKey,
@@ -174,7 +175,7 @@ export class BaseTransferService {
         verifyingKey: operatorSigningResult.verifyingKey,
       });
 
-      const refundAggregate = this.config.signer.aggregateFrost({
+      const refundAggregate = await this.config.signer.aggregateFrost({
         message: refundTxSighash,
         statechainSignatures:
           operatorSigningResult.refundTxSigningResult?.signatureShares,
@@ -199,11 +200,11 @@ export class BaseTransferService {
     return nodeSignatures;
   }
 
-  private prepareSendTransferKeyTweaks(
+  private async prepareSendTransferKeyTweaks(
     transfer: Transfer,
     leaves: LeafKeyTweak[],
     refundSignatureMap: Map<string, Uint8Array>
-  ): Map<string, SendLeafKeyTweak[]> {
+  ): Promise<Map<string, SendLeafKeyTweak[]>> {
     const receiverEciesPubKey = ecies.PublicKey.fromHex(
       bytesToHex(transfer.receiverIdentityPublicKey)
     );
@@ -212,7 +213,7 @@ export class BaseTransferService {
 
     for (const leaf of leaves) {
       const refundSignature = refundSignatureMap.get(leaf.leaf.id);
-      const leafTweaksMap = this.prepareSingleSendTransferKeyTweak(
+      const leafTweaksMap = await this.prepareSingleSendTransferKeyTweak(
         transfer.id,
         leaf,
         receiverEciesPubKey,
@@ -229,18 +230,19 @@ export class BaseTransferService {
     return leavesTweaksMap;
   }
 
-  private prepareSingleSendTransferKeyTweak(
+  private async prepareSingleSendTransferKeyTweak(
     transferID: string,
     leaf: LeafKeyTweak,
     receiverEciesPubKey: ecies.PublicKey,
     refundSignature?: Uint8Array
-  ): Map<string, SendLeafKeyTweak> {
-    const pubKeyTweak = this.config.signer.subtractPrivateKeysGivenPublicKeys(
-      leaf.signingPubKey,
-      leaf.newSigningPubKey
-    );
+  ): Promise<Map<string, SendLeafKeyTweak>> {
+    const pubKeyTweak =
+      await this.config.signer.subtractPrivateKeysGivenPublicKeys(
+        leaf.signingPubKey,
+        leaf.newSigningPubKey
+      );
 
-    const shares = this.config.signer.splitSecretWithProofs({
+    const shares = await this.config.signer.splitSecretWithProofs({
       secret: pubKeyTweak,
       curveOrder: secp256k1.CURVE.n,
       threshold: this.config.getConfig().threshold,
@@ -264,7 +266,7 @@ export class BaseTransferService {
       pubkeySharesTweak.set(identifier, pubkeyTweak);
     }
 
-    const secretCipher = this.config.signer.encryptLeafPrivateKeyEcies(
+    const secretCipher = await this.config.signer.encryptLeafPrivateKeyEcies(
       receiverEciesPubKey.toBytes(),
       leaf.newSigningPubKey
     );
@@ -277,8 +279,9 @@ export class BaseTransferService {
     ]);
 
     const payloadHash = sha256(payload);
-    const signature =
-      this.config.signer.signEcdsaWithIdentityPrivateKey(payloadHash);
+    const signature = await this.config.signer.signEcdsaWithIdentityPrivateKey(
+      payloadHash
+    );
 
     const leafTweaksMap = new Map<string, SendLeafKeyTweak>();
     for (const [identifier, operator] of Object.entries(
@@ -373,7 +376,8 @@ export class TransferService extends BaseTransferService {
     let pendingTransfersResp: QueryPendingTransfersResponse;
     try {
       pendingTransfersResp = await sparkClient.query_pending_transfers({
-        receiverIdentityPublicKey: this.config.signer.getIdentityPublicKey(),
+        receiverIdentityPublicKey:
+          await this.config.signer.getIdentityPublicKey(),
       });
     } catch (error) {
       throw new Error(`Error querying pending transfers: ${error}`);
@@ -410,7 +414,9 @@ export class TransferService extends BaseTransferService {
         throw new Error("Signature verification failed");
       }
 
-      const leafSecret = this.config.signer.decryptEcies(leaf.secretCipher);
+      const leafSecret = await this.config.signer.decryptEcies(
+        leaf.secretCipher
+      );
 
       leafPubKeyMap.set(leaf.leaf.id, leafSecret);
     }
@@ -433,7 +439,7 @@ export class TransferService extends BaseTransferService {
     const leafDataMap = new Map<string, LeafRefundSigningData>();
     for (const leaf of leaves) {
       const signingNonceCommitment =
-        this.config.signer.getRandomSigningCommitment();
+        await this.config.signer.getRandomSigningCommitment();
 
       const tx = getTxFromRawTxBytes(leaf.leaf.nodeTx);
       const refundTx = getTxFromRawTxBytes(leaf.leaf.refundTx);
@@ -459,7 +465,8 @@ export class TransferService extends BaseTransferService {
         transfer: {
           transferId,
           leavesToSend: signingJobs,
-          ownerIdentityPublicKey: this.config.signer.getIdentityPublicKey(),
+          ownerIdentityPublicKey:
+            await this.config.signer.getIdentityPublicKey(),
           receiverIdentityPublicKey: receiverIdentityPubkey,
           expiryTime: expiryTime,
         },
@@ -509,7 +516,7 @@ export class TransferService extends BaseTransferService {
     const leafDataMap = new Map<string, LeafRefundSigningData>();
     for (const leaf of leaves) {
       const signingNonceCommitment =
-        this.config.signer.getRandomSigningCommitment();
+        await this.config.signer.getRandomSigningCommitment();
 
       const tx = getTxFromRawTxBytes(leaf.leaf.nodeTx);
       const refundTx = getTxFromRawTxBytes(leaf.leaf.refundTx);
@@ -534,7 +541,7 @@ export class TransferService extends BaseTransferService {
       response = await sparkClient.start_send_transfer({
         transferId: transferID,
         leavesToSend: signingJobs,
-        ownerIdentityPublicKey: this.config.signer.getIdentityPublicKey(),
+        ownerIdentityPublicKey: await this.config.signer.getIdentityPublicKey(),
         receiverIdentityPublicKey: receiverIdentityPubkey,
         expiryTime: expiryTime,
       });
@@ -604,7 +611,7 @@ export class TransferService extends BaseTransferService {
     transfer: Transfer,
     leaves: LeafKeyTweak[]
   ) {
-    const leavesTweaksMap = this.prepareClaimLeavesKeyTweaks(leaves);
+    const leavesTweaksMap = await this.prepareClaimLeavesKeyTweaks(leaves);
 
     const errors: Error[] = [];
 
@@ -626,7 +633,8 @@ export class TransferService extends BaseTransferService {
       try {
         await sparkClient.claim_transfer_tweak_keys({
           transferId: transfer.id,
-          ownerIdentityPublicKey: this.config.signer.getIdentityPublicKey(),
+          ownerIdentityPublicKey:
+            await this.config.signer.getIdentityPublicKey(),
           leavesToReceive,
         });
       } catch (error) {
@@ -644,12 +652,12 @@ export class TransferService extends BaseTransferService {
     }
   }
 
-  private prepareClaimLeavesKeyTweaks(
+  private async prepareClaimLeavesKeyTweaks(
     leaves: LeafKeyTweak[]
-  ): Map<string, ClaimLeafKeyTweak[]> {
+  ): Promise<Map<string, ClaimLeafKeyTweak[]>> {
     const leafDataMap = new Map<string, ClaimLeafKeyTweak[]>();
     for (const leaf of leaves) {
-      const leafData = this.prepareClaimLeafKeyTweaks(leaf);
+      const leafData = await this.prepareClaimLeafKeyTweaks(leaf);
       for (const [identifier, leafTweak] of leafData) {
         leafDataMap.set(identifier, [
           ...(leafDataMap.get(identifier) || []),
@@ -660,15 +668,16 @@ export class TransferService extends BaseTransferService {
     return leafDataMap;
   }
 
-  private prepareClaimLeafKeyTweaks(
+  private async prepareClaimLeafKeyTweaks(
     leaf: LeafKeyTweak
-  ): Map<string, ClaimLeafKeyTweak> {
-    const pubKeyTweak = this.config.signer.subtractPrivateKeysGivenPublicKeys(
-      leaf.signingPubKey,
-      leaf.newSigningPubKey
-    );
+  ): Promise<Map<string, ClaimLeafKeyTweak>> {
+    const pubKeyTweak =
+      await this.config.signer.subtractPrivateKeysGivenPublicKeys(
+        leaf.signingPubKey,
+        leaf.newSigningPubKey
+      );
 
-    const shares = this.config.signer.splitSecretWithProofs({
+    const shares = await this.config.signer.splitSecretWithProofs({
       secret: pubKeyTweak,
       curveOrder: secp256k1.CURVE.n,
       threshold: this.config.getConfig().threshold,
@@ -723,7 +732,8 @@ export class TransferService extends BaseTransferService {
       leafDataMap.set(leafKey.leaf.id, {
         signingPubKey: leafKey.newSigningPubKey,
         receivingPubkey: leafKey.newSigningPubKey,
-        signingNonceCommitment: this.config.signer.getRandomSigningCommitment(),
+        signingNonceCommitment:
+          await this.config.signer.getRandomSigningCommitment(),
         tx,
         vout: leafKey.leaf.vout,
       });
@@ -738,7 +748,7 @@ export class TransferService extends BaseTransferService {
     try {
       resp = await sparkClient.claim_transfer_sign_refunds({
         transferId: transfer.id,
-        ownerIdentityPublicKey: this.config.signer.getIdentityPublicKey(),
+        ownerIdentityPublicKey: await this.config.signer.getIdentityPublicKey(),
         signingJobs,
       });
     } catch (error) {

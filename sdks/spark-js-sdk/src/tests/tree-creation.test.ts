@@ -14,7 +14,7 @@ describe("Tree Creation", () => {
     "test tree creation address generation",
     async () => {
       const wallet = new SparkWallet(Network.REGTEST);
-      const mnemonic = wallet.generateMnemonic();
+      const mnemonic = await wallet.generateMnemonic();
       await wallet.createSparkWallet(mnemonic);
       const config = wallet.getConfig();
 
@@ -22,7 +22,7 @@ describe("Tree Creation", () => {
         config.signingOperators[config.coodinatorIdentifier].address
       );
 
-      const pubKey = wallet.getSigner().generatePublicKey();
+      const pubKey = await wallet.getSigner().generatePublicKey();
 
       const depositResp = await wallet.generateDepositAddress(pubKey);
 

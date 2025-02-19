@@ -1,24 +1,38 @@
+
 // Copyright ©, 2023-present, Lightspark Group, Inc. - All Rights Reserved
+
+
+import { Query, isObject } from '@lightsparkdev/core';
 
 /** This interface is used by all the entities in the Lightspark system. It defines a few core fields that are available everywhere. Any object that implements this interface can be queried using the `entity` query and its ID. **/
 interface Entity {
-  /**
-   * The unique identifier of this entity across all Lightspark systems. Should be treated as an opaque
-   * string.
-   **/
-  id: string;
 
-  /** The date and time when the entity was first created. **/
-  createdAt: string;
 
-  /** The date and time when the entity was last updated. **/
-  updatedAt: string;
+    /**
+ * The unique identifier of this entity across all Lightspark systems. Should be treated as an opaque
+ * string.
+**/
+id: string;
 
-  /** The typename of the object **/
-  typename: string;
+    /** The date and time when the entity was first created. **/
+createdAt: string;
+
+    /** The date and time when the entity was last updated. **/
+updatedAt: string;
+
+    /** The typename of the object **/
+typename: string;
+
+
+
+
 }
 
-export const FRAGMENT = `
+
+
+
+
+    export const FRAGMENT = `
 fragment EntityFragment on Entity {
     __typename
     ... on CoopExitRequest {
@@ -67,6 +81,7 @@ fragment EntityFragment on Entity {
             }
             transfer_spark_id: spark_id
         }
+        leaves_swap_request_expires_at: expires_at
     }
     ... on LightningReceiveRequest {
         __typename
@@ -149,5 +164,8 @@ fragment EntityFragment on Entity {
         wallet_user_identity_public_key: identity_public_key
     }
 }`;
+
+
+
 
 export default Entity;

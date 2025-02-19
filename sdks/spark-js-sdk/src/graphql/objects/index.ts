@@ -1,6 +1,8 @@
 export { default as BitcoinNetwork } from "./BitcoinNetwork.js";
 export { default as CompleteCoopExitInput } from "./CompleteCoopExitInput.js";
 export { default as CompleteCoopExitOutput } from "./CompleteCoopExitOutput.js";
+export { default as CompleteLeavesSwapInput } from "./CompleteLeavesSwapInput.js";
+export { default as CompleteLeavesSwapOutput } from "./CompleteLeavesSwapOutput.js";
 export { default as Connection } from "./Connection.js";
 export { default as CoopExitFeeEstimateInput } from "./CoopExitFeeEstimateInput.js";
 export { default as CoopExitFeeEstimateOutput } from "./CoopExitFeeEstimateOutput.js";
@@ -13,6 +15,8 @@ export { default as CurrencyUnit } from "./CurrencyUnit.js";
 export { default as Entity } from "./Entity.js";
 export { default as Invoice } from "./Invoice.js";
 export { default as Leaf } from "./Leaf.js";
+export { default as LeavesSwapFeeEstimateInput } from "./LeavesSwapFeeEstimateInput.js";
+export { default as LeavesSwapFeeEstimateOutput } from "./LeavesSwapFeeEstimateOutput.js";
 export {
   default as LeavesSwapRequest,
   getLeavesSwapRequestQuery,

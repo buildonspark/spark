@@ -7,7 +7,7 @@ import CurrencyAmount from './CurrencyAmount.js';
 import {CurrencyAmountFromJson} from './CurrencyAmount.js';
 
 
-interface CoopExitFeeEstimateOutput {
+interface LeavesSwapFeeEstimateOutput {
 
 
     feeEstimate: CurrencyAmount;
@@ -17,16 +17,16 @@ interface CoopExitFeeEstimateOutput {
 
 }
 
-export const CoopExitFeeEstimateOutputFromJson = (obj: any): CoopExitFeeEstimateOutput => {
+export const LeavesSwapFeeEstimateOutputFromJson = (obj: any): LeavesSwapFeeEstimateOutput => {
     return {
-        feeEstimate: CurrencyAmountFromJson(obj["coop_exit_fee_estimate_output_fee_estimate"]),
+        feeEstimate: CurrencyAmountFromJson(obj["leaves_swap_fee_estimate_output_fee_estimate"]),
 
-        } as CoopExitFeeEstimateOutput;
+        } as LeavesSwapFeeEstimateOutput;
 
 }
-export const CoopExitFeeEstimateOutputToJson = (obj: CoopExitFeeEstimateOutput): any => {
+export const LeavesSwapFeeEstimateOutputToJson = (obj: LeavesSwapFeeEstimateOutput): any => {
 return {
-coop_exit_fee_estimate_output_fee_estimate: CurrencyAmountToJson(obj.feeEstimate),
+leaves_swap_fee_estimate_output_fee_estimate: CurrencyAmountToJson(obj.feeEstimate),
 
         }
 
@@ -34,9 +34,9 @@ coop_exit_fee_estimate_output_fee_estimate: CurrencyAmountToJson(obj.feeEstimate
 
 
     export const FRAGMENT = `
-fragment CoopExitFeeEstimateOutputFragment on CoopExitFeeEstimateOutput {
+fragment LeavesSwapFeeEstimateOutputFragment on LeavesSwapFeeEstimateOutput {
     __typename
-    coop_exit_fee_estimate_output_fee_estimate: fee_estimate {
+    leaves_swap_fee_estimate_output_fee_estimate: fee_estimate {
         __typename
         currency_amount_original_value: original_value
         currency_amount_original_unit: original_unit
@@ -49,4 +49,4 @@ fragment CoopExitFeeEstimateOutputFragment on CoopExitFeeEstimateOutput {
 
 
 
-export default CoopExitFeeEstimateOutput;
+export default LeavesSwapFeeEstimateOutput;

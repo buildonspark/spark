@@ -1,22 +1,24 @@
-import { FRAGMENT as TransferFragment } from "../objects/Transfer";
+import { FRAGMENT as LeavesSwapRequestFragment } from "../objects/LeavesSwapRequest";
 
 export const RequestSwapLeaves = `
   mutation RequestSwapLeaves(
-    $adaptorPubkey: String!
-    $totalAmountSats: Int!
-    $targetAmountSats: Int!
+    $adaptor_pubkey: String!
+    $total_amount_sats: Int!
+    $target_amount_sats: Int!
+    $fee_sats: Int!
     $network: BitcoinNetwork!
   ) {
     request_leaves_swap(input: {
-      adaptor_pubkey: $adaptorPubkey
-      total_amount_sats: $totalAmountSats
-      target_amount_sats: $targetAmountSats
+      adaptor_pubkey: $adaptor_pubkey
+      total_amount_sats: $total_amount_sats
+      target_amount_sats: $target_amount_sats
+      fee_sats: $fee_sats
       network: $network
     }) {
       request {
-        ...SwapLeavesRequestFragment
+        ...LeavesSwapRequestFragment
       }
     }
   }
-  ${TransferFragment}
+  ${LeavesSwapRequestFragment}
 `;

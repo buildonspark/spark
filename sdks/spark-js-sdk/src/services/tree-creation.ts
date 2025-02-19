@@ -63,7 +63,10 @@ export class TreeCreationService {
 
     const id = parentNode?.id ?? getTxId(parentTx!);
 
-    const tree = this.createDepositAddressTree(parentSigningPublicKey, id);
+    const tree = await this.createDepositAddressTree(
+      parentSigningPublicKey,
+      id
+    );
 
     const addressRequestNodes =
       this.createAddressRequestNodeFromTreeNodes(tree);
@@ -72,7 +75,7 @@ export class TreeCreationService {
     );
 
     const request: PrepareTreeAddressRequest = {
-      userIdentityPublicKey: this.config.signer.getIdentityPublicKey(),
+      userIdentityPublicKey: await this.config.signer.getIdentityPublicKey(),
       node: undefined,
     };
     if (parentNode) {
@@ -136,7 +139,7 @@ export class TreeCreationService {
     parentNode?: TreeNode
   ): Promise<FinalizeNodeSignaturesResponse> {
     const request: CreateTreeRequest = {
-      userIdentityPublicKey: this.config.signer.getIdentityPublicKey(),
+      userIdentityPublicKey: await this.config.signer.getIdentityPublicKey(),
       node: undefined,
     };
 
@@ -167,7 +170,7 @@ export class TreeCreationService {
       throw new Error("No parent node or parent tx provided");
     }
 
-    const rootCreationNode = this.buildCreationNodesFromTree(
+    const rootCreationNode = await this.buildCreationNodesFromTree(
       vout,
       createLeaves,
       this.config.getNetwork(),
@@ -219,20 +222,21 @@ export class TreeCreationService {
     return finalizeResp;
   }
 
-  private createDepositAddressTree(
+  private async createDepositAddressTree(
     targetSigningPublicKey: Uint8Array,
     nodeId: string
-  ): DepositAddressTree[] {
-    const leftKey = this.config.signer.generatePublicKey(sha256(nodeId));
+  ): Promise<DepositAddressTree[]> {
+    const leftKey = await this.config.signer.generatePublicKey(sha256(nodeId));
     const leftNode: DepositAddressTree = {
       signingPublicKey: leftKey,
       children: [],
     };
 
-    const rightKey = this.config.signer.subtractPrivateKeysGivenPublicKeys(
-      targetSigningPublicKey,
-      leftKey
-    );
+    const rightKey =
+      await this.config.signer.subtractPrivateKeysGivenPublicKeys(
+        targetSigningPublicKey,
+        leftKey
+      );
 
     const rightNode: DepositAddressTree = {
       signingPublicKey: rightKey,
@@ -266,12 +270,12 @@ export class TreeCreationService {
     }
   }
 
-  private buildChildCreationNode(
+  private async buildChildCreationNode(
     node: DepositAddressTree,
     parentTx: Transaction,
     vout: number,
     network: Network
-  ): CreationNodeWithNonces {
+  ): Promise<CreationNodeWithNonces> {
     // internal node
     const internalCreationNode: CreationNodeWithNonces = {
       nodeTxSigningJob: undefined,
@@ -296,7 +300,7 @@ export class TreeCreationService {
     });
 
     const signingNonceCommitment =
-      this.config.signer.getRandomSigningCommitment();
+      await this.config.signer.getRandomSigningCommitment();
     const signingJob: SigningJob = {
       signingPublicKey: node.signingPublicKey,
       rawTx: tx.toBytes(),
@@ -328,7 +332,7 @@ export class TreeCreationService {
     });
 
     const childSigningNonceCommitment =
-      this.config.signer.getRandomSigningCommitment();
+      await this.config.signer.getRandomSigningCommitment();
     const childSigningJob: SigningJob = {
       signingPublicKey: node.signingPublicKey,
       rawTx: childTx.toBytes(),
@@ -359,7 +363,7 @@ export class TreeCreationService {
     });
 
     const refundSigningNonceCommitment =
-      this.config.signer.getRandomSigningCommitment();
+      await this.config.signer.getRandomSigningCommitment();
 
     const refundSigningJob: SigningJob = {
       signingPublicKey: node.signingPublicKey,
@@ -374,13 +378,13 @@ export class TreeCreationService {
     return internalCreationNode;
   }
 
-  private buildCreationNodesFromTree(
+  private async buildCreationNodesFromTree(
     vout: number,
     createLeaves: boolean,
     network: Network,
     root: DepositAddressTree,
     parentTx: Transaction
-  ): CreationNodeWithNonces {
+  ): Promise<CreationNodeWithNonces> {
     const parentTxOutput = parentTx.getOutput(vout);
     if (!parentTxOutput?.script || !parentTxOutput?.amount) {
       throw new Error("parentTxOutput is undefined");
@@ -405,7 +409,7 @@ export class TreeCreationService {
     }
 
     const rootNodeSigningCommitment =
-      this.config.signer.getRandomSigningCommitment();
+      await this.config.signer.getRandomSigningCommitment();
     const rootNodeSigningJob: SigningJob = {
       signingPublicKey: root.signingPublicKey,
       rawTx: rootNodeTx.toBytes(),
@@ -418,13 +422,13 @@ export class TreeCreationService {
     };
     rootCreationNode.nodeTxSigningCommitment = rootNodeSigningCommitment;
 
-    const leftChildCreationNode = this.buildChildCreationNode(
+    const leftChildCreationNode = await this.buildChildCreationNode(
       root.children[0],
       rootNodeTx,
       0,
       network
     );
-    const rightChildCreationNode = this.buildChildCreationNode(
+    const rightChildCreationNode = await this.buildChildCreationNode(
       root.children[1],
       rootNodeTx,
       1,
@@ -437,13 +441,13 @@ export class TreeCreationService {
     return rootCreationNode;
   }
 
-  private signNodeCreation(
+  private async signNodeCreation(
     parentTx: Transaction,
     vout: number,
     internalNode: DepositAddressTree,
     creationNode: CreationNodeWithNonces,
     creationResponseNode: CreationResponseNode
-  ): { tx: Transaction; signature: NodeSignatures } {
+  ): Promise<{ tx: Transaction; signature: NodeSignatures }> {
     if (
       !creationNode.nodeTxSigningJob?.signingPublicKey ||
       !internalNode.verificationKey
@@ -461,7 +465,7 @@ export class TreeCreationService {
 
     let nodeTxSignature: Uint8Array = new Uint8Array();
     if (creationNode.nodeTxSigningCommitment) {
-      const userSignature = this.config.signer.signFrost({
+      const userSignature = await this.config.signer.signFrost({
         message: txSighash,
         publicKey: creationNode.nodeTxSigningJob.signingPublicKey,
         privateAsPubKey: internalNode.signingPublicKey,
@@ -471,7 +475,7 @@ export class TreeCreationService {
         verifyingKey: internalNode.verificationKey,
       });
 
-      nodeTxSignature = this.config.signer.aggregateFrost({
+      nodeTxSignature = await this.config.signer.aggregateFrost({
         message: txSighash,
         statechainSignatures:
           creationResponseNode.nodeTxSigningResult?.signatureShares,
@@ -498,7 +502,7 @@ export class TreeCreationService {
       const refundTx = getTxFromRawTxBytes(rawTx);
       const refundTxSighash = getSigHashFromTx(refundTx, 0, parentTxOutput);
 
-      const refundSigningResponse = this.config.signer.signFrost({
+      const refundSigningResponse = await this.config.signer.signFrost({
         message: refundTxSighash,
         publicKey: creationNode.refundTxSigningJob.signingPublicKey,
         privateAsPubKey: internalNode.signingPublicKey,
@@ -508,7 +512,7 @@ export class TreeCreationService {
         verifyingKey: internalNode.verificationKey,
       });
 
-      refundTxSignature = this.config.signer.aggregateFrost({
+      refundTxSignature = await this.config.signer.aggregateFrost({
         message: refundTxSighash,
         statechainSignatures:
           creationResponseNode.refundTxSigningResult?.signatureShares,
@@ -540,7 +544,7 @@ export class TreeCreationService {
     rootCreationNode: CreationNodeWithNonces,
     creationResultTreeRoot: CreationResponseNode
   ): Promise<NodeSignatures[]> {
-    const rootSignature = this.signNodeCreation(
+    const rootSignature = await this.signNodeCreation(
       tx,
       vout,
       root,
@@ -548,7 +552,7 @@ export class TreeCreationService {
       creationResultTreeRoot
     );
 
-    const leftChildSignature = this.signNodeCreation(
+    const leftChildSignature = await this.signNodeCreation(
       rootSignature.tx,
       0,
       root.children[0],
@@ -556,7 +560,7 @@ export class TreeCreationService {
       creationResultTreeRoot.children[0]
     );
 
-    const rightChildSignature = this.signNodeCreation(
+    const rightChildSignature = await this.signNodeCreation(
       rootSignature.tx,
       1,
       root.children[1],

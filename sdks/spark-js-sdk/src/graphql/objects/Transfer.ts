@@ -1,7 +1,7 @@
 // Copyright ©, 2023-present, Lightspark Group, Inc. - All Rights Reserved
 
 import autoBind from "auto-bind";
-import SspClient from "../client";
+import LightsparkClient from "../client.js";
 import CurrencyAmount, {
   CurrencyAmountFromJson,
   CurrencyAmountToJson,
@@ -22,7 +22,7 @@ class Transfer {
   }
 
   public async getLeaves(
-    client: SspClient,
+    client: LightsparkClient,
     first: number | undefined = undefined,
     after: string | undefined = undefined
   ): Promise<SparkTransferToLeavesConnection> {
@@ -59,7 +59,7 @@ query FetchSparkTransferToLeavesConnection($entity_id: ID!, $first: Int, $after:
 }
 `,
       variables: { entity_id: this.sparkId, first: first, after: after },
-      constructObject: (json: any) => {
+      constructObject: (json) => {
         const connection = json["entity"]["leaves"];
         return SparkTransferToLeavesConnectionFromJson(connection);
       },

@@ -1,12 +1,12 @@
-import { Address, OutScript, Transaction } from "@scure/btc-signer";
+import { Transaction } from "@scure/btc-signer";
 import { TreeNode } from "../proto/spark";
 import {
-  getP2TRAddressFromPublicKey,
+  getP2TRScriptFromPublicKey,
   getSigHashFromTx,
   getTxFromRawTxBytes,
   getTxId,
 } from "./bitcoin";
-import { getNetwork, Network } from "./network";
+import { Network } from "./network";
 
 const TIME_LOCK_INTERVAL = 100;
 
@@ -26,12 +26,7 @@ export function createRefundTx(
     sequence,
   });
 
-  const refundP2trAddress = getP2TRAddressFromPublicKey(
-    receivingPubkey,
-    network
-  );
-  const refundAddress = Address(getNetwork(network)).decode(refundP2trAddress);
-  const refundPkScript = OutScript.encode(refundAddress);
+  const refundPkScript = getP2TRScriptFromPublicKey(receivingPubkey, network);
 
   const amount = refundTx.getOutput(0).amount;
   if (!amount) {

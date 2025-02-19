@@ -14,16 +14,16 @@ describe("adaptor signature", () => {
     let failures = 0;
 
     const wallet = new SparkWallet(Network.REGTEST);
-    const mnemonic = wallet.generateMnemonic();
+    const mnemonic = await wallet.generateMnemonic();
     await wallet.createSparkWallet(mnemonic);
 
     const msg = "test";
     const hash = sha256(msg);
     for (let i = 0; i < 1000; i++) {
-      const pubKey = wallet.getSigner().generatePublicKey();
-      const pubkey = wallet.getSigner().getSchnorrPublicKey(pubKey);
+      const pubKey = await wallet.getSigner().generatePublicKey();
+      const pubkey = await wallet.getSigner().getSchnorrPublicKey(pubKey);
 
-      const sig = wallet.getSigner().signSchnorr(hash, pubKey);
+      const sig = await wallet.getSigner().signSchnorr(hash, pubKey);
 
       expect(schnorr.verify(sig, hash, pubkey)).toBe(true);
 

@@ -121,7 +121,7 @@ export class CoopExitService extends BaseTransferService {
       );
 
       const signingNonceCommitment =
-        this.config.signer.getRandomSigningCommitment();
+        await this.config.signer.getRandomSigningCommitment();
       const signingJob: LeafRefundTxSigningJob = {
         leafId: leaf.leaf.id,
         refundTxSigningJob: {
@@ -153,7 +153,8 @@ export class CoopExitService extends BaseTransferService {
         transfer: {
           transferId: randomUUID(),
           leavesToSend: signingJobs,
-          ownerIdentityPublicKey: this.config.signer.getIdentityPublicKey(),
+          ownerIdentityPublicKey:
+            await this.config.signer.getIdentityPublicKey(),
           receiverIdentityPublicKey: receiverPubKey,
           expiryTime: new Date(Date.now() + 24 * 60 * 1000),
         },

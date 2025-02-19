@@ -50,7 +50,7 @@ export class DepositService {
     this.connectionManager = connectionManager;
   }
 
-  private validateDepositAddress({
+  private async validateDepositAddress({
     address,
     userPubkey,
   }: ValidateDepositAddressParams) {
@@ -66,7 +66,7 @@ export class DepositService {
 
     const operatorPubkey = subtractPublicKeys(address.verifyingKey, userPubkey);
     const msg = proofOfPossessionMessageHashForDepositAddress(
-      this.config.signer.getIdentityPublicKey(),
+      await this.config.signer.getIdentityPublicKey(),
       operatorPubkey,
       address.address
     );
@@ -121,7 +121,7 @@ export class DepositService {
     try {
       depositResp = await sparkClient.generate_deposit_address({
         signingPublicKey: signingPubkey,
-        identityPublicKey: this.config.signer.getIdentityPublicKey(),
+        identityPublicKey: await this.config.signer.getIdentityPublicKey(),
         network: this.config.getNetwork(),
       });
     } catch (error) {
@@ -169,7 +169,8 @@ export class DepositService {
       amount,
     });
 
-    const rootNonceCommitment = this.config.signer.getRandomSigningCommitment();
+    const rootNonceCommitment =
+      await this.config.signer.getRandomSigningCommitment();
     const rootTxSighash = getSigHashFromTx(rootTx, 0, output);
 
     // Create a refund tx
@@ -196,7 +197,7 @@ export class DepositService {
     });
 
     const refundNonceCommitment =
-      this.config.signer.getRandomSigningCommitment();
+      await this.config.signer.getRandomSigningCommitment();
     const refundTxSighash = getSigHashFromTx(refundTx, 0, output);
 
     const sparkClient = await this.connectionManager.createSparkClient(
@@ -207,7 +208,7 @@ export class DepositService {
 
     try {
       treeResp = await sparkClient.start_tree_creation({
-        identityPublicKey: this.config.signer.getIdentityPublicKey(),
+        identityPublicKey: await this.config.signer.getIdentityPublicKey(),
         onChainUtxo: {
           vout: vout,
           rawTx: depositTx.toBytes(),
@@ -253,7 +254,7 @@ export class DepositService {
       throw new Error("Verifying key does not match");
     }
 
-    const rootSignature = this.config.signer.signFrost({
+    const rootSignature = await this.config.signer.signFrost({
       message: rootTxSighash,
       publicKey: signingPubKey,
       privateAsPubKey: signingPubKey,
@@ -265,7 +266,7 @@ export class DepositService {
       adaptorPubKey: new Uint8Array(),
     });
 
-    const refundSignature = this.config.signer.signFrost({
+    const refundSignature = await this.config.signer.signFrost({
       message: refundTxSighash,
       publicKey: signingPubKey,
       privateAsPubKey: signingPubKey,
@@ -277,7 +278,7 @@ export class DepositService {
       adaptorPubKey: new Uint8Array(),
     });
 
-    const rootAggregate = this.config.signer.aggregateFrost({
+    const rootAggregate = await this.config.signer.aggregateFrost({
       message: rootTxSighash,
       statechainSignatures:
         treeResp.rootNodeSignatureShares.nodeTxSigningResult.signatureShares,
@@ -293,7 +294,7 @@ export class DepositService {
       adaptorPubKey: new Uint8Array(),
     });
 
-    const refundAggregate = this.config.signer.aggregateFrost({
+    const refundAggregate = await this.config.signer.aggregateFrost({
       message: refundTxSighash,
       statechainSignatures:
         treeResp.rootNodeSignatureShares.refundTxSigningResult.signatureShares,

@@ -1,64 +1,62 @@
+
 // Copyright ©, 2023-present, Lightspark Group, Inc. - All Rights Reserved
 
-import { LightsparkException } from "@lightsparkdev/core";
-import { LeafFromJson, LeafToJson } from "./Leaf.js";
-import PageInfo, { PageInfoFromJson, PageInfoToJson } from "./PageInfo.js";
-import SparkTransferToLeavesConnection from "./SparkTransferToLeavesConnection.js";
+
+import { LightsparkException } from '@lightsparkdev/core';
+import {PageInfoFromJson} from './PageInfo.js';
+import SparkTransferToLeavesConnection from './SparkTransferToLeavesConnection.js';
+import {PageInfoToJson} from './PageInfo.js';
+import {LeafToJson} from './Leaf.js';
+import {LeafFromJson} from './Leaf.js';
+import PageInfo from './PageInfo.js';
+
 
 interface Connection {
-  /**
-   * The total count of objects in this connection, using the current filters. It is different from the
-   * number of objects returned in the current page (in the `entities` field).
-   **/
-  count: number;
 
-  /** An object that holds pagination information about the objects in this connection. **/
-  pageInfo: PageInfo;
 
-  /** The typename of the object **/
-  typename: string;
+    /**
+ * The total count of objects in this connection, using the current filters. It is different from the
+ * number of objects returned in the current page (in the `entities` field).
+**/
+count: number;
+
+    /** An object that holds pagination information about the objects in this connection. **/
+pageInfo: PageInfo;
+
+    /** The typename of the object **/
+typename: string;
+
+
+
+
 }
 
 export const ConnectionFromJson = (obj: any): Connection => {
-  if (obj["__typename"] == "SparkTransferToLeavesConnection") {
-    return {
-      count: obj["spark_transfer_to_leaves_connection_count"],
-      pageInfo: PageInfoFromJson(
-        obj["spark_transfer_to_leaves_connection_page_info"]
-      ),
-      entities: obj["spark_transfer_to_leaves_connection_entities"].map(
-        (e: any) => LeafFromJson(e)
-      ),
-      typename: "SparkTransferToLeavesConnection",
-    } as SparkTransferToLeavesConnection;
-  }
-  throw new LightsparkException(
-    "DeserializationError",
-    `Couldn't find a concrete type for interface Connection corresponding to the typename=${obj["__typename"]}`
-  );
-};
-export const ConnectionToJson = (obj: Connection): any => {
-  if (obj.typename == "SparkTransferToLeavesConnection") {
-    const sparkTransferToLeavesConnection =
-      obj as SparkTransferToLeavesConnection;
-    return {
-      __typename: "SparkTransferToLeavesConnection",
-      spark_transfer_to_leaves_connection_count:
-        sparkTransferToLeavesConnection.count,
-      spark_transfer_to_leaves_connection_page_info: PageInfoToJson(
-        sparkTransferToLeavesConnection.pageInfo
-      ),
-      spark_transfer_to_leaves_connection_entities:
-        sparkTransferToLeavesConnection.entities.map((e) => LeafToJson(e)),
-    };
-  }
-  throw new LightsparkException(
-    "DeserializationError",
-    `Couldn't find a concrete type for interface Connection corresponding to the typename=${obj.typename}`
-  );
-};
+    if (obj["__typename"] == "SparkTransferToLeavesConnection") {
+        return {
+            count: obj["spark_transfer_to_leaves_connection_count"],
+            pageInfo: PageInfoFromJson(obj["spark_transfer_to_leaves_connection_page_info"]),
+            entities: obj["spark_transfer_to_leaves_connection_entities"].map((e) => LeafFromJson(e)),
+typename: "SparkTransferToLeavesConnection",
+        } as SparkTransferToLeavesConnection;
 
-export const FRAGMENT = `
+}    throw new LightsparkException("DeserializationError", `Couldn't find a concrete type for interface Connection corresponding to the typename=${obj["__typename"]}`)
+}
+export const ConnectionToJson = (obj: Connection): any => {
+    if (obj.typename == "SparkTransferToLeavesConnection") {
+       const sparkTransferToLeavesConnection = obj as SparkTransferToLeavesConnection;
+return {
+__typename: "SparkTransferToLeavesConnection",spark_transfer_to_leaves_connection_count: sparkTransferToLeavesConnection.count,
+spark_transfer_to_leaves_connection_page_info: PageInfoToJson(sparkTransferToLeavesConnection.pageInfo),
+spark_transfer_to_leaves_connection_entities: sparkTransferToLeavesConnection.entities.map((e) => LeafToJson(e)),
+
+        }
+
+}    throw new LightsparkException("DeserializationError", `Couldn't find a concrete type for interface Connection corresponding to the typename=${obj.typename}`)
+}
+
+
+    export const FRAGMENT = `
 fragment ConnectionFragment on Connection {
     __typename
     ... on SparkTransferToLeavesConnection {
@@ -85,5 +83,8 @@ fragment ConnectionFragment on Connection {
         }
     }
 }`;
+
+
+
 
 export default Connection;

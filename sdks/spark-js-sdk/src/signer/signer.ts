@@ -11,6 +11,7 @@ import { sha256 } from "@scure/btc-signer/utils";
 import assert from "assert";
 import * as ecies from "eciesjs";
 import { TreeNode } from "../proto/spark";
+import { generateAdaptorFromSignature } from "../utils/adaptor-signature";
 import { subtractPrivateKeys } from "../utils/keys";
 import {
   splitSecretWithProofs,
@@ -61,43 +62,47 @@ export type SplitSecretWithProofsParams = {
 
 // TODO: Properly clean up keys when they are no longer needed
 interface SparkSigner {
-  getIdentityPublicKey(): Uint8Array;
+  getIdentityPublicKey(): Promise<Uint8Array>;
 
-  generateMnemonic(): string;
+  generateMnemonic(): Promise<string>;
   createSparkWalletFromMnemonic(mnemonic: string): Promise<string>;
-  createSparkWalletFromSeed(seed: Uint8Array | string): string;
+  createSparkWalletFromSeed(seed: Uint8Array | string): Promise<string>;
 
-  restoreSigningKeysFromLeafs(leafs: TreeNode[]): void;
+  restoreSigningKeysFromLeafs(leafs: TreeNode[]): Promise<void>;
   // Generates a new private key, and returns the public key
-  generatePublicKey(hash?: Uint8Array): Uint8Array;
+  generatePublicKey(hash?: Uint8Array): Promise<Uint8Array>;
   // Called when a public key is no longer needed
-  removePublicKey(publicKey: Uint8Array): void;
-  getSchnorrPublicKey(publicKey: Uint8Array): Uint8Array;
+  removePublicKey(publicKey: Uint8Array): Promise<void>;
+  getSchnorrPublicKey(publicKey: Uint8Array): Promise<Uint8Array>;
 
-  signSchnorr(message: Uint8Array, publicKey: Uint8Array): Uint8Array;
+  signSchnorr(message: Uint8Array, publicKey: Uint8Array): Promise<Uint8Array>;
 
   subtractPrivateKeysGivenPublicKeys(
     first: Uint8Array,
     second: Uint8Array
-  ): Uint8Array;
+  ): Promise<Uint8Array>;
   splitSecretWithProofs(
     params: SplitSecretWithProofsParams
-  ): VerifiableSecretShare[];
+  ): Promise<VerifiableSecretShare[]>;
 
-  signFrost(params: SignFrostParams): Uint8Array;
-  aggregateFrost(params: AggregateFrostParams): Uint8Array;
+  signFrost(params: SignFrostParams): Promise<Uint8Array>;
+  aggregateFrost(params: AggregateFrostParams): Promise<Uint8Array>;
 
-  signEcdsaWithIdentityPrivateKey(message: Uint8Array): Uint8Array;
+  signEcdsaWithIdentityPrivateKey(message: Uint8Array): Promise<Uint8Array>;
   encryptLeafPrivateKeyEcies(
     receiverPublicKey: Uint8Array,
     publicKey: Uint8Array
-  ): Uint8Array;
-  decryptEcies(ciphertext: Uint8Array): Uint8Array;
+  ): Promise<Uint8Array>;
+  decryptEcies(ciphertext: Uint8Array): Promise<Uint8Array>;
 
-  getRandomSigningCommitment(): SigningCommitment;
-  getSspIdentityPublicKey(): Uint8Array;
+  getRandomSigningCommitment(): Promise<SigningCommitment>;
+  getSspIdentityPublicKey(): Promise<Uint8Array>;
 
-  hashRandomPrivateKey(): Uint8Array;
+  hashRandomPrivateKey(): Promise<Uint8Array>;
+  generateAdaptorFromSignature(signature: Uint8Array): Promise<{
+    adaptorSignature: Uint8Array;
+    adaptorPublicKey: Uint8Array;
+  }>;
 }
 
 class DefaultSparkSigner implements SparkSigner {
@@ -130,7 +135,7 @@ class DefaultSparkSigner implements SparkSigner {
     return newPrivateKey;
   }
 
-  restoreSigningKeysFromLeafs(leafs: TreeNode[]) {
+  async restoreSigningKeysFromLeafs(leafs: TreeNode[]) {
     if (!this.identityPrivateKey) {
       throw new Error("Private key is not set");
     }
@@ -147,7 +152,7 @@ class DefaultSparkSigner implements SparkSigner {
     }
   }
 
-  getSchnorrPublicKey(publicKey: Uint8Array): Uint8Array {
+  async getSchnorrPublicKey(publicKey: Uint8Array): Promise<Uint8Array> {
     const privateKey = this.publicKeyToPrivateKeyMap.get(bytesToHex(publicKey));
     if (!privateKey) {
       throw new Error("Private key is not set");
@@ -156,7 +161,10 @@ class DefaultSparkSigner implements SparkSigner {
     return schnorr.getPublicKey(hexToBytes(privateKey));
   }
 
-  signSchnorr(message: Uint8Array, publicKey: Uint8Array): Uint8Array {
+  async signSchnorr(
+    message: Uint8Array,
+    publicKey: Uint8Array
+  ): Promise<Uint8Array> {
     const privateKey = this.publicKeyToPrivateKeyMap.get(bytesToHex(publicKey));
     if (!privateKey) {
       throw new Error("Private key is not set");
@@ -165,7 +173,7 @@ class DefaultSparkSigner implements SparkSigner {
     return schnorr.sign(message, hexToBytes(privateKey));
   }
 
-  getIdentityPublicKey(): Uint8Array {
+  async getIdentityPublicKey(): Promise<Uint8Array> {
     if (!this.identityPrivateKey?.privateKey) {
       throw new Error("Private key is not set");
     }
@@ -173,7 +181,7 @@ class DefaultSparkSigner implements SparkSigner {
     return secp256k1.getPublicKey(this.identityPrivateKey.privateKey);
   }
 
-  generateMnemonic(): string {
+  async generateMnemonic(): Promise<string> {
     return bip39.generateMnemonic(wordlist);
   }
 
@@ -182,7 +190,7 @@ class DefaultSparkSigner implements SparkSigner {
     return this.createSparkWalletFromSeed(seed);
   }
 
-  generatePublicKey(hash?: Uint8Array): Uint8Array {
+  async generatePublicKey(hash?: Uint8Array): Promise<Uint8Array> {
     if (!this.identityPrivateKey) {
       throw new Error("Private key is not set");
     }
@@ -207,14 +215,14 @@ class DefaultSparkSigner implements SparkSigner {
     return publicKey;
   }
 
-  removePublicKey(publicKey: Uint8Array): void {
+  async removePublicKey(publicKey: Uint8Array): Promise<void> {
     this.publicKeyToPrivateKeyMap.delete(bytesToHex(publicKey));
   }
 
-  subtractPrivateKeysGivenPublicKeys(
+  async subtractPrivateKeysGivenPublicKeys(
     first: Uint8Array,
     second: Uint8Array
-  ): Uint8Array {
+  ): Promise<Uint8Array> {
     const firstPubKeyHex = bytesToHex(first);
     const secondPubKeyHex = bytesToHex(second);
 
@@ -242,13 +250,13 @@ class DefaultSparkSigner implements SparkSigner {
     return resultPubKey;
   }
 
-  splitSecretWithProofs({
+  async splitSecretWithProofs({
     secret,
     curveOrder,
     threshold,
     numShares,
     isSecretPubkey = false,
-  }: SplitSecretWithProofsParams): VerifiableSecretShare[] {
+  }: SplitSecretWithProofsParams): Promise<VerifiableSecretShare[]> {
     if (isSecretPubkey) {
       const pubKeyHex = bytesToHex(secret);
       const privateKey = this.publicKeyToPrivateKeyMap.get(pubKeyHex);
@@ -261,7 +269,7 @@ class DefaultSparkSigner implements SparkSigner {
     return splitSecretWithProofs(secretAsInt, curveOrder, threshold, numShares);
   }
 
-  signFrost({
+  async signFrost({
     message,
     privateAsPubKey,
     publicKey,
@@ -269,7 +277,7 @@ class DefaultSparkSigner implements SparkSigner {
     selfCommitment,
     statechainCommitments,
     adaptorPubKey,
-  }: SignFrostParams): Uint8Array {
+  }: SignFrostParams): Promise<Uint8Array> {
     const privateAsPubKeyHex = bytesToHex(privateAsPubKey);
     const signingPrivateKey =
       this.publicKeyToPrivateKeyMap.get(privateAsPubKeyHex);
@@ -299,7 +307,7 @@ class DefaultSparkSigner implements SparkSigner {
     });
   }
 
-  aggregateFrost({
+  async aggregateFrost({
     message,
     publicKey,
     verifyingKey,
@@ -309,7 +317,7 @@ class DefaultSparkSigner implements SparkSigner {
     selfSignature,
     statechainSignatures,
     statechainPublicKeys,
-  }: AggregateFrostParams): Uint8Array {
+  }: AggregateFrostParams): Promise<Uint8Array> {
     return aggregateFrost({
       msg: message,
       statechainSignatures,
@@ -323,7 +331,7 @@ class DefaultSparkSigner implements SparkSigner {
     });
   }
 
-  createSparkWalletFromSeed(seed: Uint8Array): string {
+  async createSparkWalletFromSeed(seed: Uint8Array): Promise<string> {
     if (typeof seed === "string") {
       seed = hexToBytes(seed);
     }
@@ -337,7 +345,9 @@ class DefaultSparkSigner implements SparkSigner {
     return bytesToHex(secp256k1.getPublicKey(hdkey.privateKey, true));
   }
 
-  signEcdsaWithIdentityPrivateKey(message: Uint8Array): Uint8Array {
+  async signEcdsaWithIdentityPrivateKey(
+    message: Uint8Array
+  ): Promise<Uint8Array> {
     if (!this.identityPrivateKey?.privateKey) {
       throw new Error("Private key is not set");
     }
@@ -347,10 +357,10 @@ class DefaultSparkSigner implements SparkSigner {
       .toCompactRawBytes();
   }
 
-  encryptLeafPrivateKeyEcies(
+  async encryptLeafPrivateKeyEcies(
     receiverPublicKey: Uint8Array,
     publicKey: Uint8Array
-  ): Uint8Array {
+  ): Promise<Uint8Array> {
     const publicKeyHex = bytesToHex(publicKey);
     const privateKey = this.publicKeyToPrivateKeyMap.get(publicKeyHex);
     if (!privateKey) {
@@ -360,7 +370,7 @@ class DefaultSparkSigner implements SparkSigner {
     return ecies.encrypt(receiverPublicKey, hexToBytes(privateKey));
   }
 
-  decryptEcies(ciphertext: Uint8Array): Uint8Array {
+  async decryptEcies(ciphertext: Uint8Array): Promise<Uint8Array> {
     if (!this.identityPrivateKey?.privateKey) {
       throw new Error("Private key is not set");
     }
@@ -378,7 +388,7 @@ class DefaultSparkSigner implements SparkSigner {
     return publicKey;
   }
 
-  getRandomSigningCommitment(): SigningCommitment {
+  async getRandomSigningCommitment(): Promise<SigningCommitment> {
     const nonce = getRandomSigningNonce();
     const commitment = getSigningCommitmentFromNonce(nonce);
     this.commitmentToNonceMap.set(commitment, nonce);
@@ -386,14 +396,33 @@ class DefaultSparkSigner implements SparkSigner {
   }
 
   // Hardcode this for default ssp
-  getSspIdentityPublicKey(): Uint8Array {
+  async getSspIdentityPublicKey(): Promise<Uint8Array> {
     return hexToBytes(
-      "030868bb1892292e7e4cd6c14a02c16ca2326f07a185d45b2f1068d996532559d5"
+      "028c094a432d46a0ac95349d792c2e3730bd60c29188db716f56a99e39b95338b4"
     );
   }
 
-  hashRandomPrivateKey(): Uint8Array {
+  async hashRandomPrivateKey(): Promise<Uint8Array> {
     return sha256(secp256k1.utils.randomPrivateKey());
+  }
+
+  async generateAdaptorFromSignature(signature: Uint8Array): Promise<{
+    adaptorSignature: Uint8Array;
+    adaptorPublicKey: Uint8Array;
+  }> {
+    const adaptor = generateAdaptorFromSignature(signature);
+
+    const adaptorPublicKey = secp256k1.getPublicKey(adaptor.adaptorPrivateKey);
+
+    this.publicKeyToPrivateKeyMap.set(
+      bytesToHex(adaptorPublicKey),
+      bytesToHex(adaptor.adaptorPrivateKey)
+    );
+
+    return {
+      adaptorSignature: signature,
+      adaptorPublicKey: adaptorPublicKey,
+    };
   }
 }
 

@@ -28,7 +28,7 @@ describe("swap", () => {
       );
       // Initiate sender
       const senderWallet = new SparkWallet(Network.REGTEST);
-      const senderMnemonic = senderWallet.generateMnemonic();
+      const senderMnemonic = await senderWallet.generateMnemonic();
       const senderPubkey = await senderWallet.createSparkWallet(senderMnemonic);
 
       const senderConfig = new WalletConfigService(
@@ -43,7 +43,7 @@ describe("swap", () => {
 
       // Initiate receiver
       const receiverWallet = new SparkWallet(Network.REGTEST);
-      const receiverMnemonic = receiverWallet.generateMnemonic();
+      const receiverMnemonic = await receiverWallet.generateMnemonic();
       const receiverPubkey = await receiverWallet.createSparkWallet(
         receiverMnemonic
       );
@@ -58,14 +58,18 @@ describe("swap", () => {
         receiverConnectionManager
       );
 
-      const senderLeafPubKey = senderWallet.getSigner().generatePublicKey();
+      const senderLeafPubKey = await senderWallet
+        .getSigner()
+        .generatePublicKey();
       const senderRootNode = await createNewTree(
         senderWallet,
         senderLeafPubKey,
         faucet
       );
 
-      const receiverLeafPubKey = receiverWallet.getSigner().generatePublicKey();
+      const receiverLeafPubKey = await receiverWallet
+        .getSigner()
+        .generatePublicKey();
       const receiverRootNode = await createNewTree(
         receiverWallet,
         receiverLeafPubKey,
@@ -73,7 +77,7 @@ describe("swap", () => {
       );
 
       // Sender initiates transfer
-      const senderNewLeafPubKey = senderWallet
+      const senderNewLeafPubKey = await senderWallet
         .getSigner()
         .generatePublicKey(sha256("1"));
       const senderTransferNode: LeafKeyTweak = {
@@ -103,7 +107,7 @@ describe("swap", () => {
         generateAdaptorFromSignature(senderSignature!);
       const adaptorPubKey = secp256k1.getPublicKey(adaptorPrivateKey);
 
-      const receiverNewLeafPubKey = receiverWallet
+      const receiverNewLeafPubKey = await receiverWallet
         .getSigner()
         .generatePublicKey(sha256("1"));
 
@@ -181,7 +185,7 @@ describe("swap", () => {
       );
       expect(bytesEqual).toBe(true);
       expect(receiverPendingTransfer.leaves[0].leaf).toBeDefined();
-      const finalLeafPubKey = receiverWallet
+      const finalLeafPubKey = await receiverWallet
         .getSigner()
         .generatePublicKey(sha256("2"));
       const claimingNode: LeafKeyTweak = {
@@ -219,7 +223,7 @@ describe("swap", () => {
       expect(bytesEqual_1).toBe(true);
       expect(senderPendingTransfer.leaves[0].leaf).toBeDefined();
 
-      const finalLeafPubKey_1 = senderWallet
+      const finalLeafPubKey_1 = await senderWallet
         .getSigner()
         .generatePublicKey(sha256("3"));
       const claimingNode_1: LeafKeyTweak = {
