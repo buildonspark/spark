@@ -152,7 +152,7 @@ mutation RequestLeavesSwap(
   $target_amount_sats: Int!
   $fee_sats: Int!
   $network: BitcoinNetwork!
-  $user_leaves: [UserLeaf!]!
+  $user_leaves: [UserLeafInput!]!
 ) {
   request_leaves_swap(input: {
     adaptor_pubkey: $adaptor_pubkey
@@ -164,7 +164,7 @@ mutation RequestLeavesSwap(
   }) {
     request {
       id
-      spark_leaves {
+      swap_leaves {
         leaf_id
         raw_unsigned_refund_transaction
         adaptor_signed_signature

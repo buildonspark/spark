@@ -264,14 +264,14 @@ func (w *SingleKeyWallet) RequestLeavesSwap(ctx context.Context, targetAmount in
 	}
 
 	// This signature needs to be sent to the SSP.
-	adaptorSignature, adaptorPrivKeyBytes, err := common.GenerateAdaptorFromSignature(refundSignatureMap[nodes[0].Id])
+	adaptorSignature, adaptorPrivKeyBytes, err := common.GenerateAdaptorFromSignature(refundSignatureMap[transfer.Leaves[0].Leaf.Id])
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate adaptor: %w", err)
 	}
 
 	userLeaves := make([]sspapi.SwapLeaf, 0, len(nodes))
 	userLeaves = append(userLeaves, sspapi.SwapLeaf{
-		LeafID:                       nodes[0].Id,
+		LeafID:                       transfer.Leaves[0].Leaf.Id,
 		RawUnsignedRefundTransaction: hex.EncodeToString(transfer.Leaves[0].IntermediateRefundTx),
 		AdaptorAddedSignature:        hex.EncodeToString(adaptorSignature),
 	})
