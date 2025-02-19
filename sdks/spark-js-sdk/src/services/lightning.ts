@@ -83,7 +83,7 @@ export class LightningService {
       throw new Error("Error creating lightning invoice");
     }
 
-    const shares = this.config.signer.splitSecretWithProofs({
+    const shares = await this.config.signer.splitSecretWithProofs({
       secret: preimage,
       curveOrder: secp256k1.CURVE.n,
       threshold: this.config.getConfig().threshold,

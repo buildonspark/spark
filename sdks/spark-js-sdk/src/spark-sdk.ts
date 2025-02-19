@@ -192,7 +192,7 @@ export class SparkWallet {
     await this.initWasm();
     // TODO: Better leaf management?
     this.leaves = await this.getLeaves();
-    this.config.signer.restoreSigningKeysFromLeafs(this.leaves);
+    await this.config.signer.restoreSigningKeysFromLeafs(this.leaves);
   }
 
   async requestLeavesSwap(targetAmount: number) {
@@ -489,11 +489,15 @@ export class SparkWallet {
   }
 
   async coopExit() {
-    const leavesToSend = this.leaves.map((leaf) => ({
-      leaf,
-      signingPubKey: this.config.signer.generatePublicKey(sha256(leaf.id)),
-      newSigningPubKey: this.config.signer.generatePublicKey(),
-    }));
+    const leavesToSend = await Promise.all(
+      this.leaves.map(async (leaf) => ({
+        leaf,
+        signingPubKey: await this.config.signer.generatePublicKey(
+          sha256(leaf.id)
+        ),
+        newSigningPubKey: await this.config.signer.generatePublicKey(),
+      }))
+    );
 
     // const leaves = this.config.signer.getLeafKeyTweaks(this.leaves);
 
