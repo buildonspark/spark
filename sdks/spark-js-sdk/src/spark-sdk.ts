@@ -50,7 +50,6 @@ import {
   getTxFromRawTxHex,
   getTxId,
 } from "./utils/bitcoin";
-import { LeafNode, selectLeaves } from "./utils/leaf-selection";
 import { Network } from "./utils/network";
 import {
   calculateAvailableTokenAmount,
@@ -227,14 +226,110 @@ export class SparkWallet {
     await this.syncTokenLeaves();
   }
 
-  async requestLeavesSwap(targetAmount: number) {
-    await this.claimTransfers();
-    const leaves = await this.getLeaves();
+  private async selectLeaves(targetAmount: number): Promise<TreeNode[]> {
+    if (targetAmount <= 0) {
+      throw new Error("Target amount must be positive");
+    }
 
-    const leavesToSwap = selectLeaves(
-      leaves.map((leaf) => ({ ...leaf, isUsed: false })),
-      targetAmount
-    );
+    const leaves = await this.getLeaves();
+    if (leaves.length === 0) {
+      return [];
+    }
+
+    leaves.sort((a, b) => b.value - a.value);
+
+    let amount = 0;
+    let nodes: TreeNode[] = [];
+    for (const leaf of leaves) {
+      if (targetAmount - amount >= leaf.value) {
+        amount += leaf.value;
+        nodes.push(leaf);
+      }
+    }
+
+    if (amount !== targetAmount) {
+      await this.requestLeavesSwap({ targetAmount });
+
+      amount = 0;
+      nodes = [];
+      const newLeaves = await this.getLeaves();
+      newLeaves.sort((a, b) => b.value - a.value);
+      for (const leaf of newLeaves) {
+        if (targetAmount - amount >= leaf.value) {
+          amount += leaf.value;
+          nodes.push(leaf);
+        }
+      }
+    }
+
+    return nodes;
+  }
+
+  private async selectLeavesForSwap(targetAmount: number) {
+    const leaves = await this.getLeaves();
+    leaves.sort((a, b) => a.value - b.value);
+
+    let amount = 0;
+    const nodes: TreeNode[] = [];
+    for (const leaf of leaves) {
+      if (amount < targetAmount) {
+        amount += leaf.value;
+        nodes.push(leaf);
+      }
+    }
+
+    if (amount === targetAmount) {
+      throw new Error(
+        "You're trying to swap for the exact amount you have, no need to swap"
+      );
+    }
+
+    if (amount < targetAmount) {
+      throw new Error(
+        "You don't have enough nodes to swap for the target amount"
+      );
+    }
+
+    return nodes;
+  }
+
+  async syncWallet() {
+    await this.claimTransfers();
+    await this.syncTokenLeaves();
+    this.leaves = await this.getLeaves();
+    await this.optimizeLeaves();
+  }
+
+  async optimizeLeaves() {
+    await this.requestLeavesSwap({ leaves: this.leaves });
+  }
+
+  async requestLeavesSwap({
+    targetAmount,
+    leaves,
+  }: {
+    targetAmount?: number;
+    leaves?: TreeNode[];
+  }) {
+    if (targetAmount && targetAmount <= 0) {
+      throw new Error("targetAmount must be positive");
+    }
+
+    await this.claimTransfers();
+
+    let leavesToSwap: TreeNode[];
+    if (targetAmount && leaves && leaves.length > 0) {
+      if (targetAmount < leaves.reduce((acc, leaf) => acc + leaf.value, 0)) {
+        throw new Error("targetAmount is less than the sum of leaves");
+      }
+      leavesToSwap = leaves;
+    } else if (targetAmount) {
+      leavesToSwap = await this.selectLeavesForSwap(targetAmount);
+    } else if (leaves && leaves.length > 0) {
+      leavesToSwap = leaves;
+    } else {
+      throw new Error("targetAmount or leaves must be provided");
+    }
 
     const leafKeyTweaks = await Promise.all(
       leavesToSwap.map(async (leaf) => ({
@@ -302,7 +397,8 @@ export class SparkWallet {
     const request = await this.sspClient?.requestLeaveSwap({
       userLeaves,
       adaptorPubkey,
-      targetAmountSats: leavesToSwap.reduce((acc, leaf) => acc + leaf.value, 0),
+      targetAmountSats:
+        targetAmount || leavesToSwap.reduce((acc, leaf) => acc + leaf.value, 0),
       totalAmountSats: leavesToSwap.reduce((acc, leaf) => acc + leaf.value, 0),
       // TODO: Request fee from SSP
       feeSats: 0,
@@ -437,10 +533,8 @@ export class SparkWallet {
     }
 
     // fetch leaves for amount
-    const leaves = selectLeaves(
-      this.leaves.map((leaf) => ({ ...leaf, isUsed: false })),
-      amountSats
-    );
+
+    const leaves = await this.selectLeaves(amountSats);
 
     const leavesToSend = await Promise.all(
       leaves.map(async (leaf) => ({
@@ -525,7 +619,7 @@ export class SparkWallet {
     this.leaves = leaves;
   }
 
-  async transferDepositToSelf(leaves: LeafNode[], signingPubKey: Uint8Array) {
+  async transferDepositToSelf(leaves: TreeNode[], signingPubKey: Uint8Array) {
     const leafKeyTweaks = await Promise.all(
       leaves.map(async (leaf) => ({
         leaf,
@@ -552,17 +646,13 @@ export class SparkWallet {
     leaves,
     expiryTime = new Date(Date.now() + 10 * 60 * 1000),
   }: SendTransferParams) {
-    let leavesToSend: LeafNode[] = [];
+    let leavesToSend: TreeNode[] = [];
     if (leaves) {
       leavesToSend = leaves.map((leaf) => ({
         ...leaf,
-        isUsed: true,
       }));
     } else if (amount) {
-      leavesToSend = selectLeaves(
-        this.leaves.map((leaf) => ({ ...leaf, isUsed: false })),
-        amount
-      );
+      leavesToSend = await this.selectLeaves(amount);
     } else {
       throw new Error("Must provide amount or leaves");
     }
@@ -626,16 +716,12 @@ export class SparkWallet {
   }
 
   async coopExit(onchainAddress: string, targetAmountSats?: number) {
-    let leavesToSend: LeafNode[] = [];
+    let leavesToSend: TreeNode[] = [];
     if (targetAmountSats) {
-      leavesToSend = selectLeaves(
-        this.leaves.map((leaf) => ({ ...leaf, isUsed: false })),
-        targetAmountSats
-      );
+      leavesToSend = await this.selectLeaves(targetAmountSats);
     } else {
       leavesToSend = this.leaves.map((leaf) => ({
         ...leaf,
-        isUsed: true,
       }));
     }
 

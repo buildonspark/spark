@@ -98,7 +98,6 @@ async function runCLI() {
             await wallet.transferDepositToSelf(
               nodes.nodes.map((node) => ({
                 ...node,
-                isUsed: false,
               })),
               leafPubKey
             );
