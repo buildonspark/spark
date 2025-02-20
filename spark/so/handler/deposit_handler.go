@@ -102,6 +102,8 @@ func (o *DepositHandler) GenerateDepositAddress(ctx context.Context, config *so.
 	}
 
 	response, err := helper.ExecuteTaskWithAllOperators(ctx, config, &selection, func(ctx context.Context, operator *so.SigningOperator) ([]byte, error) {
+		log.Println("operator.Address", operator.Address)
+		log.Println("operator.CertPath", operator.CertPath)
 		conn, err := common.NewGRPCConnectionWithCert(operator.Address, operator.CertPath)
 		if err != nil {
 			log.Printf("Failed to connect to operator: %v", err)

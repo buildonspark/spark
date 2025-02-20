@@ -215,7 +215,7 @@ func (w *SingleKeyWallet) PayInvoice(ctx context.Context, invoice string) (strin
 }
 
 func (w *SingleKeyWallet) grpcClient(ctx context.Context) (context.Context, *pb.SparkServiceClient, *grpc.ClientConn, error) {
-	conn, err := common.NewGRPCConnectionWithTestTLS(w.Config.CoodinatorAddress())
+	conn, err := common.NewGRPCConnectionWithoutTLS(w.Config.CoodinatorAddress())
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to connect to operator: %w", err)
 	}
@@ -528,7 +528,7 @@ func (w *SingleKeyWallet) RefreshTimelocks(_ context.Context) error {
 
 // For simplicity always mint directly to the issuer wallet (eg. owner == token public key)
 func (w *SingleKeyWallet) MintTokens(ctx context.Context, amount uint64) error {
-	conn, err := common.NewGRPCConnectionWithTestTLS(w.Config.CoodinatorAddress())
+	conn, err := common.NewGRPCConnectionWithoutTLS(w.Config.CoodinatorAddress())
 	if err != nil {
 		return fmt.Errorf("failed to connect to operator: %w", err)
 	}
@@ -573,7 +573,7 @@ func (w *SingleKeyWallet) MintTokens(ctx context.Context, amount uint64) error {
 
 // For simplicity always use the wallet's identity public key as the token public key.
 func (w *SingleKeyWallet) TransferTokens(ctx context.Context, amount uint64, receiverPubKey []byte) error {
-	conn, err := common.NewGRPCConnectionWithTestTLS(w.Config.CoodinatorAddress())
+	conn, err := common.NewGRPCConnectionWithoutTLS(w.Config.CoodinatorAddress())
 	if err != nil {
 		return fmt.Errorf("failed to connect to operator: %w", err)
 	}

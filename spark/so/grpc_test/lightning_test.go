@@ -28,7 +28,7 @@ func (f *FakeLightningInvoiceCreator) CreateInvoice(_ common.Network, _ uint64, 
 
 func cleanUp(t *testing.T, config *wallet.Config, paymentHash []byte) {
 	for _, operator := range config.SigningOperators {
-		conn, err := common.NewGRPCConnectionWithTestTLS(operator.Address)
+		conn, err := common.NewGRPCConnectionWithoutTLS(operator.Address)
 		if err != nil {
 			t.Fatal(err)
 		}

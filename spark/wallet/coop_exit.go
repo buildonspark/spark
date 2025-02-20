@@ -130,7 +130,7 @@ func signCoopExitRefunds(
 		}
 	}
 
-	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
+	sparkConn, err := common.NewGRPCConnectionWithoutTLS(config.CoodinatorAddress())
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create grpc connection: %v", err)
 	}

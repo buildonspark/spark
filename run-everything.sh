@@ -329,7 +329,9 @@ run_bitcoind_tmux() {
 # Function to create operator config JSON
 create_operator_config() {
     local run_dir=$1
+    local tls=$2
     shift  # Remove first argument
+    shift  # Remove second argument
     local pub_keys=("$@")  # Get remaining arguments as pub_keys array
     local config_file="${run_dir}/config.json"
     
@@ -343,6 +345,12 @@ create_operator_config() {
         
         # Calculate port
         local port=$((8535 + i))
+
+        local cert_config=""
+        if [ "$tls" = true ]; then
+            cert_config=",
+cert_path": "${run_dir}/server_${i}.crt"
+        fi
         
         # Add operator entry
         json+=$(cat <<EOF
@@ -350,8 +358,7 @@ create_operator_config() {
     "id": $i,
     "address": "localhost:$port",
     "external_address": "localhost:$port",
-    "identity_public_key": "${pub_keys[$i]}",
-    "cert_path": "${run_dir}/server_${i}.crt"
+    "identity_public_key": "${pub_keys[$i]}"${cert_config}
 }
 EOF
 )
@@ -604,7 +611,7 @@ create_private_key_files() {
 # Initialize flags
 WIPE=false
 DISABLE_TOKENS=false
-TLS=true
+TLS=false
 
 # Parse command line arguments
 for arg in "$@"; do
@@ -617,8 +624,8 @@ for arg in "$@"; do
             DISABLE_TOKENS=true
             shift
             ;;
-        --disable-tls)
-            TLS=false
+        --tls)
+            TLS=true
             shift
             ;;
     esac
@@ -654,7 +661,7 @@ build_go_operator "$run_dir" || {
 }
 
 # Create operator config
-create_operator_config "$run_dir" "${PUB_KEYS[@]}"
+create_operator_config "$run_dir" "$TLS" "${PUB_KEYS[@]}"
 create_private_key_files "$run_dir" "${PRIV_KEYS[@]}"
 
 if ! check_signers_ready "$run_dir"; then

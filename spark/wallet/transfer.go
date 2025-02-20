@@ -70,7 +70,7 @@ func SendTransferTweakKey(
 		wg.Add(1)
 		go func(identifier string, operator *so.SigningOperator) {
 			defer wg.Done()
-			sparkConn, err := common.NewGRPCConnectionWithTestTLS(operator.Address)
+			sparkConn, err := common.NewGRPCConnectionWithoutTLS(operator.Address)
 			if err != nil {
 				results <- err
 				return
@@ -144,7 +144,7 @@ func SendSwapSignRefund(
 		return nil, nil, nil, nil, fmt.Errorf("failed to prepare signing jobs for sending transfer: %v", err)
 	}
 
-	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
+	sparkConn, err := common.NewGRPCConnectionWithoutTLS(config.CoodinatorAddress())
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
@@ -218,7 +218,7 @@ func SendTransferSignRefund(
 		return nil, nil, nil, fmt.Errorf("failed to prepare signing jobs for sending transfer: %v", err)
 	}
 
-	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
+	sparkConn, err := common.NewGRPCConnectionWithoutTLS(config.CoodinatorAddress())
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -357,7 +357,7 @@ func QueryPendingTransfers(
 	ctx context.Context,
 	config *Config,
 ) (*pb.QueryPendingTransfersResponse, error) {
-	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
+	sparkConn, err := common.NewGRPCConnectionWithoutTLS(config.CoodinatorAddress())
 	if err != nil {
 		return nil, err
 	}
@@ -455,7 +455,7 @@ func ClaimTransferTweakKeys(
 		wg.Add(1)
 		go func(identifier string, operator *so.SigningOperator) {
 			defer wg.Done()
-			sparkConn, err := common.NewGRPCConnectionWithTestTLS(operator.Address)
+			sparkConn, err := common.NewGRPCConnectionWithoutTLS(operator.Address)
 			if err != nil {
 				results <- err
 				return
@@ -583,7 +583,7 @@ func ClaimTransferSignRefunds(
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare signing jobs for claiming transfer: %v", err)
 	}
-	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
+	sparkConn, err := common.NewGRPCConnectionWithoutTLS(config.CoodinatorAddress())
 	if err != nil {
 		return nil, err
 	}
@@ -606,7 +606,7 @@ func finalizeTransfer(
 	config *Config,
 	signatures []*pb.NodeSignatures,
 ) ([]*pb.TreeNode, error) {
-	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
+	sparkConn, err := common.NewGRPCConnectionWithoutTLS(config.CoodinatorAddress())
 	if err != nil {
 		return nil, err
 	}
@@ -743,7 +743,7 @@ func prepareRefundSoSigningJobs(
 }
 
 func CancelSendTransfer(ctx context.Context, config *Config, transfer *pb.Transfer) (*pb.Transfer, error) {
-	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
+	sparkConn, err := common.NewGRPCConnectionWithoutTLS(config.CoodinatorAddress())
 	if err != nil {
 		return nil, err
 	}

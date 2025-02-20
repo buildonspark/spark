@@ -74,7 +74,7 @@ func RefreshTimelockRefundTx(
 	})
 
 	// Connect and call GRPC
-	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
+	sparkConn, err := common.NewGRPCConnectionWithoutTLS(config.CoodinatorAddress())
 	if err != nil {
 		return fmt.Errorf("failed to create grpc connection: %v", err)
 	}
@@ -273,7 +273,7 @@ func RefreshTimelockNodes(
 	nonces[len(nonces)-1] = nonce
 
 	// Connect and call GRPC
-	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
+	sparkConn, err := common.NewGRPCConnectionWithoutTLS(config.CoodinatorAddress())
 	if err != nil {
 		return fmt.Errorf("failed to create grpc connection: %v", err)
 	}

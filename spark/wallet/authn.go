@@ -15,7 +15,7 @@ import (
 
 // AuthenticateWithServer authenticates with the coordinator and returns a session token.
 func AuthenticateWithServer(ctx context.Context, config *Config) (string, error) {
-	conn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
+	conn, err := common.NewGRPCConnectionWithoutTLS(config.CoodinatorAddress())
 	if err != nil {
 		return "", fmt.Errorf("failed to connect to coordinator: %v", err)
 	}
