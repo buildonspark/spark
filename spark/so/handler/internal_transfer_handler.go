@@ -25,18 +25,15 @@ func NewInternalTransferHandler(config *so.Config) *InternalTransferHandler {
 // FinalizeTransfer finalizes a transfer.
 func (h *InternalTransferHandler) FinalizeTransfer(ctx context.Context, req *pbinternal.FinalizeTransferRequest) error {
 	db := ent.GetDbFromContext(ctx)
-	transferID, err := uuid.Parse(req.TransferId)
+	transfer, err := h.loadTransfer(ctx, req.TransferId)
 	if err != nil {
-		return err
+		return fmt.Errorf("unable to load transfer %s: %v", req.TransferId, err)
 	}
-	transfer, err := db.Transfer.Get(ctx, transferID)
-	if err != nil {
-		return err
-	}
+
 	if transfer.Status != schema.TransferStatusReceiverKeyTweaked {
 		return fmt.Errorf("transfer is not in receiver key tweaked status")
 	}
-	if err := checkCoopExitTxBroadcasted(ctx, db, transferID, h.config.SupportedNetworks); err != nil {
+	if err := checkCoopExitTxBroadcasted(ctx, db, transfer.ID, h.config.SupportedNetworks); err != nil {
 		return fmt.Errorf("failed to unlock transfer %s: %v", req.TransferId, err)
 	}
 

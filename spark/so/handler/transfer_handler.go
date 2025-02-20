@@ -212,20 +212,15 @@ func (h *TransferHandler) CompleteSendTransfer(ctx context.Context, req *pb.Comp
 		return nil, err
 	}
 
-	transferID, err := uuid.Parse(req.TransferId)
+	transfer, err := h.loadTransfer(ctx, req.TransferId)
 	if err != nil {
-		return nil, fmt.Errorf("unable to parse transfer_id as a uuid %s: %v", req.TransferId, err)
-	}
-
-	db := ent.GetDbFromContext(ctx)
-	transfer, err := db.Transfer.Get(ctx, transferID)
-	if err != nil || transfer == nil {
-		return nil, fmt.Errorf("unable to find transfer %s: %v", transferID, err)
+		return nil, fmt.Errorf("unable to load transfer %s: %v", req.TransferId, err)
 	}
 	if !bytes.Equal(transfer.SenderIdentityPubkey, req.OwnerIdentityPublicKey) || transfer.Status != schema.TransferStatusSenderInitiated {
 		return nil, fmt.Errorf("send transfer cannot be completed %s", req.TransferId)
 	}
 
+	db := ent.GetDbFromContext(ctx)
 	shouldTweakKey := true
 	if transfer.Type == schema.TransferTypePreimageSwap {
 		preimageRequest, err := db.PreimageRequest.Query().Where(preimagerequest.HasTransfersWith(enttransfer.ID(transfer.ID))).Only(ctx)
@@ -487,21 +482,17 @@ func (h *TransferHandler) ClaimTransferTweakKeys(ctx context.Context, req *pb.Cl
 		return err
 	}
 
-	transferID, err := uuid.Parse(req.TransferId)
+	transfer, err := h.loadTransfer(ctx, req.TransferId)
 	if err != nil {
-		return fmt.Errorf("unable to parse transfer_id as a uuid %s: %v", req.TransferId, err)
-	}
-	db := ent.GetDbFromContext(ctx)
-	transfer, err := db.Transfer.Get(ctx, transferID)
-	if err != nil {
-		return fmt.Errorf("unable to find pending transfer %s: %v", req.TransferId, err)
+		return fmt.Errorf("unable to load transfer %s: %v", req.TransferId, err)
 	}
 	// TODO (yun): Check with other SO if expires
 	if !bytes.Equal(transfer.ReceiverIdentityPubkey, req.OwnerIdentityPublicKey) || transfer.Status != schema.TransferStatusSenderKeyTweaked || (transfer.ExpiryTime.Unix() != 0 && transfer.ExpiryTime.Before(time.Now())) {
 		return fmt.Errorf("transfer cannot be claimed %s", req.TransferId)
 	}
 
-	if err := checkCoopExitTxBroadcasted(ctx, db, transferID, h.config.SupportedNetworks); err != nil {
+	db := ent.GetDbFromContext(ctx)
+	if err := checkCoopExitTxBroadcasted(ctx, db, transfer.ID, h.config.SupportedNetworks); err != nil {
 		return fmt.Errorf("failed to unlock transfer %s: %v", req.TransferId, err)
 	}
 
@@ -607,14 +598,9 @@ func (h *TransferHandler) ClaimTransferSignRefunds(ctx context.Context, req *pb.
 		return nil, err
 	}
 
-	transferID, err := uuid.Parse(req.TransferId)
+	transfer, err := h.loadTransfer(ctx, req.TransferId)
 	if err != nil {
-		return nil, fmt.Errorf("unable to parse transfer_id as a uuid %s: %v", req.TransferId, err)
-	}
-	db := ent.GetDbFromContext(ctx)
-	transfer, err := db.Transfer.Get(ctx, transferID)
-	if err != nil {
-		return nil, fmt.Errorf("unable to find pending transfer %s: %v", req.TransferId, err)
+		return nil, fmt.Errorf("unable to load transfer %s: %v", req.TransferId, err)
 	}
 	if !bytes.Equal(transfer.ReceiverIdentityPubkey, req.OwnerIdentityPublicKey) || (transfer.Status != schema.TransferStatusReceiverKeyTweaked && transfer.Status != schema.TransferStatusReceiverRefundSigned) {
 		return nil, fmt.Errorf("transfer %s is expected to be at status TransferStatusKeyTweaked or TransferStatusReceiverRefundSigned but %s found", req.TransferId, transfer.Status)

@@ -40,6 +40,8 @@ service SparkService {
     rpc get_owned_token_leaves(GetOwnedTokenLeavesRequest) returns (GetOwnedTokenLeavesResponse) {}
 
     rpc return_lightning_payment(ReturnLightningPaymentRequest) returns (google.protobuf.Empty) {}
+
+    rpc cancel_send_transfer(CancelSendTransferRequest) returns (CancelSendTransferResponse) {}
 }
 
 enum Network {
@@ -608,4 +610,13 @@ message QueryNodesRequest {
 
 message QueryNodesResponse {
     map<string, TreeNode> nodes = 1;
+}
+
+message CancelSendTransferRequest {
+    string transfer_id = 1;
+    bytes sender_identity_public_key = 2;
+}
+
+message CancelSendTransferResponse {
+    Transfer transfer = 1;
 }

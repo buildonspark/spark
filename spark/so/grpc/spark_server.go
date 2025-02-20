@@ -56,6 +56,12 @@ func (s *SparkServer) CompleteSendTransfer(ctx context.Context, req *pb.Complete
 	return wrapWithGRPCError(transferHander.CompleteSendTransfer(ctx, req))
 }
 
+// CancelSendTransfer cancels a transfer from sender before key is tweaked.
+func (s *SparkServer) CancelSendTransfer(ctx context.Context, req *pb.CancelSendTransferRequest) (*pb.CancelSendTransferResponse, error) {
+	transferHander := handler.NewTransferHandler(s.config)
+	return transferHander.CancelSendTransfer(ctx, req, false)
+}
+
 // QueryPendingTransfers queries the pending transfers to claim.
 func (s *SparkServer) QueryPendingTransfers(ctx context.Context, req *pb.QueryPendingTransfersRequest) (*pb.QueryPendingTransfersResponse, error) {
 	transferHander := handler.NewTransferHandler(s.config)

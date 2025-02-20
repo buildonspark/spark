@@ -11,9 +11,15 @@ import (
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/common"
+	pbspark "github.com/lightsparkdev/spark-go/proto/spark"
+	pbinternal "github.com/lightsparkdev/spark-go/proto/spark_internal"
 	"github.com/lightsparkdev/spark-go/so"
+	"github.com/lightsparkdev/spark-go/so/authz"
 	"github.com/lightsparkdev/spark-go/so/ent"
+	"github.com/lightsparkdev/spark-go/so/ent/preimagerequest"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
+	enttransfer "github.com/lightsparkdev/spark-go/so/ent/transfer"
+	"github.com/lightsparkdev/spark-go/so/helper"
 )
 
 // BaseTransferHandler is the base transfer handler that is shared for internal and external transfer handlers.
@@ -255,4 +261,112 @@ func lockLeaves(ctx context.Context, db *ent.Tx, leaves []*ent.TreeNode) ([]*ent
 		}
 	}
 	return lockedLeaves, nil
+}
+
+func (h *BaseTransferHandler) CancelSendTransfer(ctx context.Context, req *pbspark.CancelSendTransferRequest, internal bool) (*pbspark.CancelSendTransferResponse, error) {
+	if !internal {
+		if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, req.SenderIdentityPublicKey); err != nil {
+			return nil, err
+		}
+	}
+
+	transfer, err := h.loadTransfer(ctx, req.TransferId)
+	if err != nil {
+		return nil, fmt.Errorf("unable to load transfer %s: %v", req.TransferId, err)
+	}
+	if !bytes.Equal(transfer.SenderIdentityPubkey, req.SenderIdentityPublicKey) {
+		return nil, fmt.Errorf("only sender is eligible to cancel the transfer %s", req.TransferId)
+	}
+	if transfer.Status != schema.TransferStatusSenderInitiated {
+		return nil, fmt.Errorf("transfer %s is expected to be at status TransferStatusSenderInitiated but %s found", req.TransferId, transfer.Status)
+	}
+
+	transfer, err = transfer.Update().SetStatus(schema.TransferStatusReturned).Save(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to update transfer status: %v", err)
+	}
+
+	err = h.cancelTransferUnlockLeaves(ctx, transfer)
+	if err != nil {
+		return nil, fmt.Errorf("unable to unlock leaves in the transfer: %v", err)
+	}
+
+	err = h.cancelTransferCancelRequest(ctx, transfer)
+	if err != nil {
+		return nil, fmt.Errorf("unable to cancel associated request: %v", err)
+	}
+
+	if !internal {
+		operatorSelection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
+		_, err = helper.ExecuteTaskWithAllOperators(ctx, h.config, &operatorSelection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
+			conn, err := common.NewGRPCConnectionWithCert(operator.Address, operator.CertPath)
+			if err != nil {
+				return nil, err
+			}
+			defer conn.Close()
+
+			client := pbinternal.NewSparkInternalServiceClient(conn)
+			_, err = client.CancelSendTransfer(ctx, req)
+			if err != nil {
+				return nil, fmt.Errorf("unable to cancel transfer: %v", err)
+			}
+			return nil, nil
+		})
+		if err != nil {
+			return nil, fmt.Errorf("unable to execute task with all operators: %v", err)
+		}
+	}
+
+	return &pbspark.CancelSendTransferResponse{}, nil
+}
+
+func (h *BaseTransferHandler) cancelTransferUnlockLeaves(ctx context.Context, transfer *ent.Transfer) error {
+	transferLeaves, err := transfer.QueryTransferLeaves().All(ctx)
+	if err != nil {
+		return fmt.Errorf("unable to get transfer leaves: %v", err)
+	}
+
+	for _, leaf := range transferLeaves {
+		treenode, err := leaf.QueryLeaf().Only(ctx)
+		if err != nil {
+			return fmt.Errorf("unable to get tree node: %v", err)
+		}
+		_, err = treenode.Update().SetStatus(schema.TreeNodeStatusAvailable).Save(ctx)
+		if err != nil {
+			return fmt.Errorf("unable to update tree node status: %v", err)
+		}
+	}
+	return nil
+}
+
+func (h *BaseTransferHandler) cancelTransferCancelRequest(ctx context.Context, transfer *ent.Transfer) error {
+	if transfer.Type == schema.TransferTypePreimageSwap {
+		db := ent.GetDbFromContext(ctx)
+		preimageRequest, err := db.PreimageRequest.Query().Where(preimagerequest.HasTransfersWith(enttransfer.ID(transfer.ID))).Only(ctx)
+		if err != nil || preimageRequest == nil {
+			return fmt.Errorf("cannot find preimage request for transfer %s", transfer.ID.String())
+		}
+		if preimageRequest.Status != schema.PreimageRequestStatusWaitingForPreimage {
+			return fmt.Errorf("preimage request is not in the waiting for preimage status")
+		}
+		err = preimageRequest.Update().SetStatus(schema.PreimageRequestStatusReturned).Exec(ctx)
+		if err != nil {
+			return fmt.Errorf("unable to update preimage request status: %v", err)
+		}
+	}
+	return nil
+}
+
+func (h *BaseTransferHandler) loadTransfer(ctx context.Context, transferID string) (*ent.Transfer, error) {
+	transferUUID, err := uuid.Parse(transferID)
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse transfer_id as a uuid %s: %v", transferID, err)
+	}
+
+	db := ent.GetDbFromContext(ctx)
+	transfer, err := db.Transfer.Get(ctx, transferUUID)
+	if err != nil || transfer == nil {
+		return nil, fmt.Errorf("unable to find transfer %s: %v", transferID, err)
+	}
+	return transfer, nil
 }

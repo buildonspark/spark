@@ -46,6 +46,7 @@ const (
 	SparkService_FreezeTokens_FullMethodName             = "/spark.SparkService/freeze_tokens"
 	SparkService_GetOwnedTokenLeaves_FullMethodName      = "/spark.SparkService/get_owned_token_leaves"
 	SparkService_ReturnLightningPayment_FullMethodName   = "/spark.SparkService/return_lightning_payment"
+	SparkService_CancelSendTransfer_FullMethodName       = "/spark.SparkService/cancel_send_transfer"
 )
 
 // SparkServiceClient is the client API for SparkService service.
@@ -79,6 +80,7 @@ type SparkServiceClient interface {
 	FreezeTokens(ctx context.Context, in *FreezeTokensRequest, opts ...grpc.CallOption) (*FreezeTokensResponse, error)
 	GetOwnedTokenLeaves(ctx context.Context, in *GetOwnedTokenLeavesRequest, opts ...grpc.CallOption) (*GetOwnedTokenLeavesResponse, error)
 	ReturnLightningPayment(ctx context.Context, in *ReturnLightningPaymentRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	CancelSendTransfer(ctx context.Context, in *CancelSendTransferRequest, opts ...grpc.CallOption) (*CancelSendTransferResponse, error)
 }
 
 type sparkServiceClient struct {
@@ -349,6 +351,16 @@ func (c *sparkServiceClient) ReturnLightningPayment(ctx context.Context, in *Ret
 	return out, nil
 }
 
+func (c *sparkServiceClient) CancelSendTransfer(ctx context.Context, in *CancelSendTransferRequest, opts ...grpc.CallOption) (*CancelSendTransferResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CancelSendTransferResponse)
+	err := c.cc.Invoke(ctx, SparkService_CancelSendTransfer_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SparkServiceServer is the server API for SparkService service.
 // All implementations must embed UnimplementedSparkServiceServer
 // for forward compatibility.
@@ -380,6 +392,7 @@ type SparkServiceServer interface {
 	FreezeTokens(context.Context, *FreezeTokensRequest) (*FreezeTokensResponse, error)
 	GetOwnedTokenLeaves(context.Context, *GetOwnedTokenLeavesRequest) (*GetOwnedTokenLeavesResponse, error)
 	ReturnLightningPayment(context.Context, *ReturnLightningPaymentRequest) (*emptypb.Empty, error)
+	CancelSendTransfer(context.Context, *CancelSendTransferRequest) (*CancelSendTransferResponse, error)
 	mustEmbedUnimplementedSparkServiceServer()
 }
 
@@ -467,6 +480,9 @@ func (UnimplementedSparkServiceServer) GetOwnedTokenLeaves(context.Context, *Get
 }
 func (UnimplementedSparkServiceServer) ReturnLightningPayment(context.Context, *ReturnLightningPaymentRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ReturnLightningPayment not implemented")
+}
+func (UnimplementedSparkServiceServer) CancelSendTransfer(context.Context, *CancelSendTransferRequest) (*CancelSendTransferResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CancelSendTransfer not implemented")
 }
 func (UnimplementedSparkServiceServer) mustEmbedUnimplementedSparkServiceServer() {}
 func (UnimplementedSparkServiceServer) testEmbeddedByValue()                      {}
@@ -957,6 +973,24 @@ func _SparkService_ReturnLightningPayment_Handler(srv interface{}, ctx context.C
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SparkService_CancelSendTransfer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CancelSendTransferRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkServiceServer).CancelSendTransfer(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkService_CancelSendTransfer_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkServiceServer).CancelSendTransfer(ctx, req.(*CancelSendTransferRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // SparkService_ServiceDesc is the grpc.ServiceDesc for SparkService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -1067,6 +1101,10 @@ var SparkService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "return_lightning_payment",
 			Handler:    _SparkService_ReturnLightningPayment_Handler,
+		},
+		{
+			MethodName: "cancel_send_transfer",
+			Handler:    _SparkService_CancelSendTransfer_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

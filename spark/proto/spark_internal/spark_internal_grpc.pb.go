@@ -38,6 +38,7 @@ const (
 	SparkInternalService_InitiateCooperativeExit_FullMethodName       = "/spark_internal.SparkInternalService/initiate_cooperative_exit"
 	SparkInternalService_ReturnLightningPayment_FullMethodName        = "/spark_internal.SparkInternalService/return_lightning_payment"
 	SparkInternalService_StartTokenTransactionInternal_FullMethodName = "/spark_internal.SparkInternalService/start_token_transaction_internal"
+	SparkInternalService_CancelSendTransfer_FullMethodName            = "/spark_internal.SparkInternalService/cancel_send_transfer"
 )
 
 // SparkInternalServiceClient is the client API for SparkInternalService service.
@@ -61,6 +62,7 @@ type SparkInternalServiceClient interface {
 	InitiateCooperativeExit(ctx context.Context, in *InitiateCooperativeExitRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	ReturnLightningPayment(ctx context.Context, in *spark.ReturnLightningPaymentRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	StartTokenTransactionInternal(ctx context.Context, in *StartTokenTransactionInternalRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	CancelSendTransfer(ctx context.Context, in *spark.CancelSendTransferRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type sparkInternalServiceClient struct {
@@ -241,6 +243,16 @@ func (c *sparkInternalServiceClient) StartTokenTransactionInternal(ctx context.C
 	return out, nil
 }
 
+func (c *sparkInternalServiceClient) CancelSendTransfer(ctx context.Context, in *spark.CancelSendTransferRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, SparkInternalService_CancelSendTransfer_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SparkInternalServiceServer is the server API for SparkInternalService service.
 // All implementations must embed UnimplementedSparkInternalServiceServer
 // for forward compatibility.
@@ -262,6 +274,7 @@ type SparkInternalServiceServer interface {
 	InitiateCooperativeExit(context.Context, *InitiateCooperativeExitRequest) (*emptypb.Empty, error)
 	ReturnLightningPayment(context.Context, *spark.ReturnLightningPaymentRequest) (*emptypb.Empty, error)
 	StartTokenTransactionInternal(context.Context, *StartTokenTransactionInternalRequest) (*emptypb.Empty, error)
+	CancelSendTransfer(context.Context, *spark.CancelSendTransferRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedSparkInternalServiceServer()
 }
 
@@ -322,6 +335,9 @@ func (UnimplementedSparkInternalServiceServer) ReturnLightningPayment(context.Co
 }
 func (UnimplementedSparkInternalServiceServer) StartTokenTransactionInternal(context.Context, *StartTokenTransactionInternalRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method StartTokenTransactionInternal not implemented")
+}
+func (UnimplementedSparkInternalServiceServer) CancelSendTransfer(context.Context, *spark.CancelSendTransferRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CancelSendTransfer not implemented")
 }
 func (UnimplementedSparkInternalServiceServer) mustEmbedUnimplementedSparkInternalServiceServer() {}
 func (UnimplementedSparkInternalServiceServer) testEmbeddedByValue()                              {}
@@ -650,6 +666,24 @@ func _SparkInternalService_StartTokenTransactionInternal_Handler(srv interface{}
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SparkInternalService_CancelSendTransfer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(spark.CancelSendTransferRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkInternalServiceServer).CancelSendTransfer(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkInternalService_CancelSendTransfer_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkInternalServiceServer).CancelSendTransfer(ctx, req.(*spark.CancelSendTransferRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // SparkInternalService_ServiceDesc is the grpc.ServiceDesc for SparkInternalService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -724,6 +758,10 @@ var SparkInternalService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "start_token_transaction_internal",
 			Handler:    _SparkInternalService_StartTokenTransactionInternal_Handler,
+		},
+		{
+			MethodName: "cancel_send_transfer",
+			Handler:    _SparkInternalService_CancelSendTransfer_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
