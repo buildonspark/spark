@@ -6,6 +6,7 @@ import ClockIcon from "../icons/ClockIcon";
 import CopyIcon from "../icons/CopyIcon";
 import PencilIcon from "../icons/PencilIcon";
 import Button from "./Button";
+import DetailsRow from "./DetailsRow";
 type ActiveButton = "bitcoin" | "lightning" | "uma";
 
 const ACTIVE_BUTTON_STYLES =
@@ -83,49 +84,6 @@ export default function ReceiveDetails() {
     </div>
   );
 }
-type DetailsRowProps = {
-  borderTop?: boolean;
-  title?: string;
-  subtitle?: string;
-  logoRight?: React.ReactNode;
-  logoLeft?: React.ReactNode;
-};
-const DetailsRow = ({
-  title,
-  subtitle,
-  logoRight,
-  logoLeft,
-  borderTop = false,
-}: DetailsRowProps) => {
-  return (
-    <div
-      className={`h-[72px] flex flex-row items-center justify-between ${
-        borderTop ? "border-t border-[#2d3845]" : ""
-      }`}
-    >
-      <div className="flex flex-row items-center">
-        {logoLeft && <div className="flex items-center pl-4">{logoLeft}</div>}
-        <div
-          className={`flex flex-col justify-between ${
-            !logoLeft ? "pl-4" : "pl-2"
-          }`}
-        >
-          {title && <div className="text-[12px] text-[#f9f9f9]">{title}</div>}
-          {subtitle && (
-            <div className="text-[12px] text-[#f9f9f9] opacity-50">
-              {subtitle}
-            </div>
-          )}
-        </div>
-      </div>
-      {logoRight && (
-        <div className="flex flex-col items-center justify-between pr-4">
-          {logoRight}
-        </div>
-      )}
-    </div>
-  );
-};
 
 const ReceiveDetailsContainer = styled.div`
   margin-top: 8px;
