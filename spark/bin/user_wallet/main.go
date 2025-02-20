@@ -256,7 +256,17 @@ func main() {
 		Description: "Sync wallet",
 		Usage:       "sync",
 		Handler: func(_ []string) error {
-			return cli.wallet.SyncWallet(context.Background())
+			err := cli.wallet.SyncWallet(context.Background())
+			if err != nil {
+				return fmt.Errorf("failed to sync wallet: %w", err)
+			}
+			fmt.Println("Successfully synced wallet")
+			err = cli.wallet.OptimizeLeaves(context.Background())
+			if err != nil {
+				return fmt.Errorf("failed to optimize leaves: %w", err)
+			}
+			fmt.Println("Successfully optimized leaves")
+			return nil
 		},
 	})
 

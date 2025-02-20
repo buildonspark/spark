@@ -254,6 +254,15 @@ func (w *SingleKeyWallet) SyncWallet(ctx context.Context) error {
 	return nil
 }
 
+func (w *SingleKeyWallet) OptimizeLeaves(ctx context.Context) error {
+	balance := uint64(0)
+	for _, node := range w.OwnedNodes {
+		balance += node.Value
+	}
+	_, err := w.RequestLeavesSwap(ctx, int64(balance))
+	return err
+}
+
 func (w *SingleKeyWallet) RequestLeavesSwap(ctx context.Context, targetAmount int64) ([]*pb.TreeNode, error) {
 	// Claim all transfers to get the latest leaves
 	_, err := w.ClaimAllTransfers(ctx)
