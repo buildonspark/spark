@@ -452,6 +452,64 @@ func main() {
 		},
 	})
 
+	cli.registry.RegisterCommand(Command{
+		Name:        "freeze_tokens",
+		Description: "Freeze tokens for a specific owner public key",
+		Usage:       "freeze_tokens <owner_public_key>",
+		Handler: func(args []string) error {
+			if len(args) < 1 {
+				return fmt.Errorf("please provide an owner public key in hex string format")
+			}
+			ownerPublicKey, err := hex.DecodeString(args[0])
+			if err != nil {
+				return fmt.Errorf("invalid owner public key: failed to decode hex string: %w", err)
+			}
+			if len(ownerPublicKey) != 33 {
+				return fmt.Errorf("invalid owner public key: decoded bytes must be 33 bytes (66 hex characters), got %d bytes from %d hex characters: %s",
+					len(ownerPublicKey),
+					len(args[0]),
+					args[0])
+			}
+
+			fmt.Printf("Freezing tokens for owner public key: %s\n", args[0])
+			numLeaves, totalAmount, err := cli.wallet.FreezeTokens(context.Background(), ownerPublicKey)
+			if err != nil {
+				return fmt.Errorf("failed to freeze tokens: %w", err)
+			}
+			fmt.Printf("Successfully froze %d leaves with total amount of %d tokens\n", numLeaves, totalAmount)
+			return nil
+		},
+	})
+
+	cli.registry.RegisterCommand(Command{
+		Name:        "unfreeze_tokens",
+		Description: "Unfreeze tokens for a specific owner public key",
+		Usage:       "unfreeze_tokens <owner_public_key>",
+		Handler: func(args []string) error {
+			if len(args) < 1 {
+				return fmt.Errorf("please provide an owner public key in hex string format")
+			}
+			ownerPublicKey, err := hex.DecodeString(args[0])
+			if err != nil {
+				return fmt.Errorf("invalid owner public key: failed to decode hex string: %w", err)
+			}
+			if len(ownerPublicKey) != 33 {
+				return fmt.Errorf("invalid owner public key: decoded bytes must be 33 bytes (66 hex characters), got %d bytes from %d hex characters: %s",
+					len(ownerPublicKey),
+					len(args[0]),
+					args[0])
+			}
+
+			fmt.Printf("Unfreezing tokens for owner public key: %s\n", args[0])
+			numLeaves, totalAmount, err := cli.wallet.UnfreezeTokens(context.Background(), ownerPublicKey)
+			if err != nil {
+				return fmt.Errorf("failed to unfreeze tokens: %w", err)
+			}
+			fmt.Printf("Successfully unfroze %d leaves with total amount of %d tokens\n", numLeaves, totalAmount)
+			return nil
+		},
+	})
+
 	// Start the CLI
 	if err := cli.Run(); err != nil {
 		fmt.Printf("Error running CLI: %v\n", err)

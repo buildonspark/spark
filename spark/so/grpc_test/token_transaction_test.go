@@ -42,7 +42,7 @@ func createTestTokenIssuanceTransaction(tokenIdentityPubKeyBytes []byte) (*pb.To
 		TokenInput: &pb.TokenTransaction_MintInput{
 			MintInput: &pb.MintInput{
 				IssuerPublicKey:         tokenIdentityPubKeyBytes,
-				IssuerProvidedTimestamp: uint64(time.Now().UnixNano()),
+				IssuerProvidedTimestamp: uint64(time.Now().UnixMilli()),
 			},
 		},
 		OutputLeaves: []*pb.TokenLeafOutput{

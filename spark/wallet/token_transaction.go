@@ -340,7 +340,7 @@ func FreezeTokens(
 	defer sparkConn.Close()
 
 	var lastResponse *pb.FreezeTokensResponse
-	timestamp := uint64(time.Now().UnixNano())
+	timestamp := uint64(time.Now().UnixMilli())
 	for _, operator := range config.SigningOperators {
 		operatorConn, err := common.NewGRPCConnectionWithTestTLS(operator.Address)
 		if err != nil {

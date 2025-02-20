@@ -518,7 +518,8 @@ func (w *SingleKeyWallet) MintTokens(ctx context.Context, amount uint64) error {
 	mintTransaction := &pb.TokenTransaction{
 		TokenInput: &pb.TokenTransaction_MintInput{
 			MintInput: &pb.MintInput{
-				IssuerPublicKey: tokenIdentityPubKeyBytes,
+				IssuerPublicKey:         tokenIdentityPubKeyBytes,
+				IssuerProvidedTimestamp: uint64(time.Now().UnixMilli()),
 			},
 		},
 		OutputLeaves: []*pb.TokenLeafOutput{
@@ -727,9 +728,10 @@ func getOwnedLeavesFromTokenTransaction(leaf *pb.TokenTransaction, walletPublicK
 		if bytes.Equal(leaf.OwnerPublicKey, walletPublicKey) {
 			leafWithPrevTxData := &pb.LeafWithPreviousTransactionData{
 				Leaf: &pb.TokenLeafOutput{
-					OwnerPublicKey: leaf.OwnerPublicKey,
-					TokenPublicKey: leaf.TokenPublicKey,
-					TokenAmount:    leaf.TokenAmount,
+					OwnerPublicKey:      leaf.OwnerPublicKey,
+					RevocationPublicKey: leaf.RevocationPublicKey,
+					TokenPublicKey:      leaf.TokenPublicKey,
+					TokenAmount:         leaf.TokenAmount,
 				},
 				PreviousTransactionHash: finalTokenTransactionHash,
 				PreviousTransactionVout: uint32(i),
@@ -743,4 +745,44 @@ func getOwnedLeavesFromTokenTransaction(leaf *pb.TokenTransaction, walletPublicK
 func getLeafWithPrevTxKey(leaf *pb.LeafWithPreviousTransactionData) string {
 	txHashStr := hex.EncodeToString(leaf.GetPreviousTransactionHash())
 	return txHashStr + ":" + fmt.Sprintf("%d", leaf.GetPreviousTransactionVout())
+}
+
+// FreezeTokens freezes all tokens owned by a specific owner public key.
+func (w *SingleKeyWallet) FreezeTokens(ctx context.Context, ownerPublicKey []byte) (int, int64, error) {
+	// For simplicity, we're using the wallet's identity public key as the token public key
+	tokenPublicKey := w.Config.IdentityPublicKey()
+	response, err := FreezeTokens(ctx, w.Config, ownerPublicKey, tokenPublicKey, false)
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to freeze tokens: %w", err)
+	}
+
+	var totalAmount int64
+	for _, amountBytes := range response.ImpactedTokenAmount {
+		_, amount, err := uint128BytesToInt64(amountBytes)
+		if err != nil {
+			return 0, 0, fmt.Errorf("failed to parse token amount: %w", err)
+		}
+		totalAmount += int64(amount)
+	}
+	return len(response.ImpactedLeafIds), totalAmount, nil
+}
+
+// UnfreezeTokens unfreezes all tokens owned by a specific owner public key.
+func (w *SingleKeyWallet) UnfreezeTokens(ctx context.Context, ownerPublicKey []byte) (int, int64, error) {
+	// For simplicity, we're using the wallet's identity public key as the token public key
+	tokenPublicKey := w.Config.IdentityPublicKey()
+	response, err := FreezeTokens(ctx, w.Config, ownerPublicKey, tokenPublicKey, true)
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to unfreeze tokens: %w", err)
+	}
+
+	var totalAmount int64
+	for _, amountBytes := range response.ImpactedTokenAmount {
+		_, amount, err := uint128BytesToInt64(amountBytes)
+		if err != nil {
+			return 0, 0, fmt.Errorf("failed to parse token amount: %w", err)
+		}
+		totalAmount += int64(amount)
+	}
+	return len(response.ImpactedLeafIds), totalAmount, nil
 }
