@@ -1,7 +1,11 @@
 {
   "name": "spark-js-sdk",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "dist/spark-sdk.js",
+  "types": "dist/spark-sdk.d.ts",
+  "files": [
+    "dist"
+  ],
   "type": "module",
   "scripts": {
     "build": "tsc && copyfiles -u 1 'src/wasm/**/*.wasm' dist/",
