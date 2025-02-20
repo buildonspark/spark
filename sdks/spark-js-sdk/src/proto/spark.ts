@@ -478,7 +478,10 @@ export interface CompleteSendTransferResponse {
 }
 
 export interface QueryPendingTransfersRequest {
-  receiverIdentityPublicKey: Uint8Array;
+  participant?: { $case: "receiverIdentityPublicKey"; receiverIdentityPublicKey: Uint8Array } | {
+    $case: "senderIdentityPublicKey";
+    senderIdentityPublicKey: Uint8Array;
+  } | undefined;
   transferIds: string[];
 }
 
@@ -5674,16 +5677,21 @@ export const CompleteSendTransferResponse: MessageFns<CompleteSendTransferRespon
 };
 
 function createBaseQueryPendingTransfersRequest(): QueryPendingTransfersRequest {
-  return { receiverIdentityPublicKey: new Uint8Array(0), transferIds: [] };
+  return { participant: undefined, transferIds: [] };
 }
 
 export const QueryPendingTransfersRequest: MessageFns<QueryPendingTransfersRequest> = {
   encode(message: QueryPendingTransfersRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.receiverIdentityPublicKey.length !== 0) {
-      writer.uint32(10).bytes(message.receiverIdentityPublicKey);
+    switch (message.participant?.$case) {
+      case "receiverIdentityPublicKey":
+        writer.uint32(10).bytes(message.participant.receiverIdentityPublicKey);
+        break;
+      case "senderIdentityPublicKey":
+        writer.uint32(18).bytes(message.participant.senderIdentityPublicKey);
+        break;
     }
     for (const v of message.transferIds) {
-      writer.uint32(18).string(v!);
+      writer.uint32(26).string(v!);
     }
     return writer;
   },
@@ -5700,11 +5708,19 @@ export const QueryPendingTransfersRequest: MessageFns<QueryPendingTransfersReque
             break;
           }
 
-          message.receiverIdentityPublicKey = reader.bytes();
+          message.participant = { $case: "receiverIdentityPublicKey", receiverIdentityPublicKey: reader.bytes() };
           continue;
         }
         case 2: {
           if (tag !== 18) {
+            break;
+          }
+
+          message.participant = { $case: "senderIdentityPublicKey", senderIdentityPublicKey: reader.bytes() };
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
             break;
           }
 
@@ -5722,9 +5738,14 @@ export const QueryPendingTransfersRequest: MessageFns<QueryPendingTransfersReque
 
   fromJSON(object: any): QueryPendingTransfersRequest {
     return {
-      receiverIdentityPublicKey: isSet(object.receiverIdentityPublicKey)
-        ? bytesFromBase64(object.receiverIdentityPublicKey)
-        : new Uint8Array(0),
+      participant: isSet(object.receiverIdentityPublicKey)
+        ? {
+          $case: "receiverIdentityPublicKey",
+          receiverIdentityPublicKey: bytesFromBase64(object.receiverIdentityPublicKey),
+        }
+        : isSet(object.senderIdentityPublicKey)
+        ? { $case: "senderIdentityPublicKey", senderIdentityPublicKey: bytesFromBase64(object.senderIdentityPublicKey) }
+        : undefined,
       transferIds: globalThis.Array.isArray(object?.transferIds)
         ? object.transferIds.map((e: any) => globalThis.String(e))
         : [],
@@ -5733,8 +5754,10 @@ export const QueryPendingTransfersRequest: MessageFns<QueryPendingTransfersReque
 
   toJSON(message: QueryPendingTransfersRequest): unknown {
     const obj: any = {};
-    if (message.receiverIdentityPublicKey.length !== 0) {
-      obj.receiverIdentityPublicKey = base64FromBytes(message.receiverIdentityPublicKey);
+    if (message.participant?.$case === "receiverIdentityPublicKey") {
+      obj.receiverIdentityPublicKey = base64FromBytes(message.participant.receiverIdentityPublicKey);
+    } else if (message.participant?.$case === "senderIdentityPublicKey") {
+      obj.senderIdentityPublicKey = base64FromBytes(message.participant.senderIdentityPublicKey);
     }
     if (message.transferIds?.length) {
       obj.transferIds = message.transferIds;
@@ -5747,7 +5770,32 @@ export const QueryPendingTransfersRequest: MessageFns<QueryPendingTransfersReque
   },
   fromPartial(object: DeepPartial<QueryPendingTransfersRequest>): QueryPendingTransfersRequest {
     const message = createBaseQueryPendingTransfersRequest();
-    message.receiverIdentityPublicKey = object.receiverIdentityPublicKey ?? new Uint8Array(0);
+    switch (object.participant?.$case) {
+      case "receiverIdentityPublicKey": {
+        if (
+          object.participant?.receiverIdentityPublicKey !== undefined &&
+          object.participant?.receiverIdentityPublicKey !== null
+        ) {
+          message.participant = {
+            $case: "receiverIdentityPublicKey",
+            receiverIdentityPublicKey: object.participant.receiverIdentityPublicKey,
+          };
+        }
+        break;
+      }
+      case "senderIdentityPublicKey": {
+        if (
+          object.participant?.senderIdentityPublicKey !== undefined &&
+          object.participant?.senderIdentityPublicKey !== null
+        ) {
+          message.participant = {
+            $case: "senderIdentityPublicKey",
+            senderIdentityPublicKey: object.participant.senderIdentityPublicKey,
+          };
+        }
+        break;
+      }
+    }
     message.transferIds = object.transferIds?.map((e) => e) || [];
     return message;
   },

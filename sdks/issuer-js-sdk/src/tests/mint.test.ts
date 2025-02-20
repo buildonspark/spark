@@ -12,9 +12,7 @@ describe("construct issuence transaction", () => {
       const tokenLeafData: TokenLeafCreationData[] = [
         {
           tokenPublicKey: tokenPublicKey,
-          tokenAmount: numberToBytesBE(tokenAmount, 16),
-          withdrawalBondSats: 10000,
-          withdrawalLocktime: 100,
+          tokenAmount: numberToBytesBE(tokenAmount, 16)
         },
       ];
   
@@ -28,12 +26,6 @@ describe("construct issuence transaction", () => {
       expect(transaction.outputLeaves[0].ownerPublicKey).toEqual(tokenPublicKey);
       expect(bytesToNumberBE(transaction.outputLeaves[0].tokenAmount)).toEqual(
         tokenAmount
-      );
-      expect(transaction.outputLeaves[0].withdrawalBondSats).toEqual(
-        tokenLeafData[0].withdrawalBondSats
-      );
-      expect(transaction.outputLeaves[0].withdrawalLocktime).toEqual(
-        tokenLeafData[0].withdrawalLocktime
       );
     });
   });

@@ -69,6 +69,7 @@ interface SparkSigner {
   createSparkWalletFromSeed(seed: Uint8Array | string): Promise<string>;
 
   restoreSigningKeysFromLeafs(leafs: TreeNode[]): Promise<void>;
+  getTrackedPublicKeys(): Promise<Uint8Array[]>;
   // Generates a new private key, and returns the public key
   generatePublicKey(hash?: Uint8Array): Promise<Uint8Array>;
   // Called when a public key is no longer needed
@@ -88,6 +89,11 @@ interface SparkSigner {
   signFrost(params: SignFrostParams): Promise<Uint8Array>;
   aggregateFrost(params: AggregateFrostParams): Promise<Uint8Array>;
 
+  signMessageWithPublicKey(
+    message: Uint8Array,
+    publicKey: Uint8Array,
+    compact?: boolean
+  ): Promise<Uint8Array>;
   // If compact is true, the signature should be in ecdsa compact format else it should be in DER format
   signMessageWithIdentityKey(
     message: Uint8Array,
@@ -193,6 +199,10 @@ class DefaultSparkSigner implements SparkSigner {
   async createSparkWalletFromMnemonic(mnemonic: string): Promise<string> {
     const seed = await bip39.mnemonicToSeed(mnemonic);
     return this.createSparkWalletFromSeed(seed);
+  }
+
+  async getTrackedPublicKeys(): Promise<Uint8Array[]> {
+    return Array.from(this.publicKeyToPrivateKeyMap.keys()).map(hexToBytes);
   }
 
   async generatePublicKey(hash?: Uint8Array): Promise<Uint8Array> {
@@ -348,6 +358,30 @@ class DefaultSparkSigner implements SparkSigner {
     this.identityPrivateKey = hdkey;
 
     return bytesToHex(secp256k1.getPublicKey(hdkey.privateKey, true));
+  }
+
+  async signMessageWithPublicKey(
+    message: Uint8Array,
+    publicKey: Uint8Array,
+    compact?: boolean
+  ): Promise<Uint8Array> {
+    const privateKey = this.publicKeyToPrivateKeyMap.get(bytesToHex(publicKey));
+    if (!privateKey) {
+      throw new Error(
+        `No private key found for public key: ${bytesToHex(publicKey)}`
+      );
+    }
+
+    const signature = secp256k1.sign(
+      message,
+      hexToBytes(privateKey)
+    );
+
+    if (compact) {
+      return signature.toCompactRawBytes();
+    }
+
+    return signature.toDERRawBytes();
   }
 
   async signMessageWithIdentityKey(

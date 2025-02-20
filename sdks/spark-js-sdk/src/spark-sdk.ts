@@ -4,6 +4,8 @@ import {
   QueryPendingTransfersResponse,
   Transfer,
   TreeNode,
+  LeafWithPreviousTransactionData,
+  FreezeTokensResponse,
 } from "./proto/spark";
 import { initWasm } from "./utils/wasm-wrapper";
 import { InitOutput } from "./wasm/spark_bindings";
@@ -12,7 +14,7 @@ import { TokenTransaction } from "./proto/spark";
 import { WalletConfig, WalletConfigService } from "./services/config";
 import { ConnectionManager } from "./services/connection";
 import { DepositService } from "./services/deposit";
-import { TokenTransactionService } from "./services/tokens";
+import { TokenTransactionService } from "./services/tokens-transaction";
 import { LeafKeyTweak, TransferService } from "./services/transfer";
 import {
   DepositAddressTree,
@@ -46,6 +48,11 @@ import { generateAdaptorFromSignature } from "./utils/adaptor-signature";
 import { getP2TRAddressFromPublicKey } from "./utils/bitcoin";
 import { LeafNode, selectLeaves } from "./utils/leaf-selection";
 import { Network } from "./utils/network";
+import {
+  calculateAvailableTokenAmount,
+  checkIfSelectedLeavesAreAvailable,
+} from "./utils/token-transactions";
+import { TokenFreezeService } from "./services/tokens-freeze";
 
 type CreateLightningInvoiceParams = {
   amountSats: number;
@@ -77,11 +84,14 @@ export class SparkWallet {
   private lightningService: LightningService;
   private coopExitService: CoopExitService;
   private tokenTransactionService: TokenTransactionService;
+  private tokenFreezeService: TokenFreezeService;
 
   private sspClient: SspClient | null = null;
   private wasmModule: InitOutput | null = null;
 
   private leaves: TreeNode[] = [];
+  private tokenLeaves: Map<string, LeafWithPreviousTransactionData[]> =
+    new Map();
 
   constructor(network: Network, signer?: SparkSigner) {
     this.config = new WalletConfigService(network, signer);
@@ -100,12 +110,14 @@ export class SparkWallet {
       this.config,
       this.connectionManager
     );
-
     this.tokenTransactionService = new TokenTransactionService(
       this.config,
       this.connectionManager
     );
-
+    this.tokenFreezeService = new TokenFreezeService(
+      this.config,
+      this.connectionManager
+    );
     this.lightningService = new LightningService(
       this.config,
       this.connectionManager
@@ -192,7 +204,9 @@ export class SparkWallet {
     await this.initWasm();
     // TODO: Better leaf management?
     this.leaves = await this.getLeaves();
-    await this.config.signer.restoreSigningKeysFromLeafs(this.leaves);
+    this.config.signer.restoreSigningKeysFromLeafs(this.leaves);
+
+    await this.syncTokenLeaves();
   }
 
   async requestLeavesSwap(targetAmount: number) {
@@ -651,15 +665,204 @@ export class SparkWallet {
     return await this.depositService!.generateDepositAddress({ signingPubkey });
   }
 
-  async broadcastTokenTransaction(
-    tokenTransaction: TokenTransaction,
-    leafToSpendPrivateKeys?: Uint8Array[],
-    leafToSpendRevocationPublicKeys?: Uint8Array[]
-  ): Promise<TokenTransaction> {
-    return await this.tokenTransactionService!.broadcastTokenTransaction(
-      tokenTransaction,
-      leafToSpendPrivateKeys,
-      leafToSpendRevocationPublicKeys
+  async syncTokenLeaves() {
+    await this.tokenTransactionService.syncTokenLeaves(this.tokenLeaves);
+  }
+
+  getTokenBalance(tokenPublicKey: Uint8Array) {
+    return calculateAvailableTokenAmount(
+      this.tokenLeaves.get(bytesToHex(tokenPublicKey))!
+    );
+  }
+
+  async mintTokens(tokenPublicKey: Uint8Array, tokenAmount: bigint) {
+    const tokenTransaction =
+      this.tokenTransactionService.createMintTokenTransaction(
+        tokenPublicKey,
+        tokenAmount
+      );
+
+    const finalizedTokenTransaction =
+      await this.tokenTransactionService.broadcastTokenTransaction(
+        tokenTransaction
+      );
+
+    const tokenPubKeyHex = bytesToHex(tokenPublicKey);
+    if (!this.tokenLeaves.has(tokenPubKeyHex)) {
+      this.tokenLeaves.set(tokenPubKeyHex, []);
+    }
+    this.tokenTransactionService.updateTokenLeavesFromFinalizedTransaction(
+      this.tokenLeaves.get(tokenPubKeyHex)!,
+      finalizedTokenTransaction
+    );
+  }
+
+  async transferTokens(
+    tokenPublicKey: Uint8Array,
+    tokenAmount: bigint,
+    recipientPublicKey: Uint8Array,
+    selectedLeaves?: LeafWithPreviousTransactionData[]
+  ) {
+    if (!this.tokenLeaves.has(bytesToHex(tokenPublicKey))) {
+      throw new Error("No token leaves with the given tokenPublicKey");
+    }
+
+    if (selectedLeaves) {
+      if (
+        !checkIfSelectedLeavesAreAvailable(
+          selectedLeaves,
+          this.tokenLeaves,
+          tokenPublicKey
+        )
+      ) {
+        throw new Error("One or more selected leaves are not available");
+      }
+    } else {
+      selectedLeaves = this.selectTokenLeaves(tokenPublicKey, tokenAmount);
+    }
+
+    const tokenTransaction =
+      this.tokenTransactionService.createTransferTokenTransaction(
+        selectedLeaves,
+        recipientPublicKey,
+        tokenPublicKey,
+        tokenAmount
+      );
+
+    const finalizedTokenTransaction =
+      await this.tokenTransactionService.broadcastTokenTransaction(
+        tokenTransaction,
+        selectedLeaves.map((leaf) => leaf.leaf!.ownerPublicKey),
+        selectedLeaves.map((leaf) => leaf.leaf!.revocationPublicKey!)
+      );
+
+    const tokenPubKeyHex = bytesToHex(tokenPublicKey);
+    if (!this.tokenLeaves.has(tokenPubKeyHex)) {
+      this.tokenLeaves.set(tokenPubKeyHex, []);
+    }
+    this.tokenTransactionService.updateTokenLeavesFromFinalizedTransaction(
+      this.tokenLeaves.get(tokenPubKeyHex)!,
+      finalizedTokenTransaction
+    );
+  }
+
+  async burnTokens(
+    tokenPublicKey: Uint8Array,
+    tokenAmount: bigint,
+    selectedLeaves?: LeafWithPreviousTransactionData[]
+  ) {
+    if (!this.tokenLeaves.has(bytesToHex(tokenPublicKey))) {
+      throw new Error("No token leaves with the given tokenPublicKey");
+    }
+
+    if (selectedLeaves) {
+      if (
+        !checkIfSelectedLeavesAreAvailable(
+          selectedLeaves,
+          this.tokenLeaves,
+          tokenPublicKey
+        )
+      ) {
+        throw new Error("One or more selected leaves are not available");
+      }
+    } else {
+      selectedLeaves = this.selectTokenLeaves(tokenPublicKey, tokenAmount);
+    }
+
+    const partialTokenTransaction =
+      await this.tokenTransactionService.constructBurnTokenTransaction(
+        tokenPublicKey,
+        tokenAmount,
+        selectedLeaves
+      );
+
+    const finalizedTokenTransaction =
+      await this.tokenTransactionService.broadcastTokenTransaction(
+        partialTokenTransaction,
+        selectedLeaves.map((leaf) => leaf.leaf!.ownerPublicKey),
+        selectedLeaves.map((leaf) => leaf.leaf!.revocationPublicKey!)
+      );
+
+    const tokenPubKeyHex = bytesToHex(tokenPublicKey);
+    if (!this.tokenLeaves.has(tokenPubKeyHex)) {
+      this.tokenLeaves.set(tokenPubKeyHex, []);
+    }
+    this.tokenTransactionService.updateTokenLeavesFromFinalizedTransaction(
+      this.tokenLeaves.get(tokenPubKeyHex)!,
+      finalizedTokenTransaction
+    );
+  }
+
+  async freezeTokens(ownerPublicKey: Uint8Array, tokenPublicKey: Uint8Array) {
+    await this.tokenFreezeService!.freezeTokens(ownerPublicKey, tokenPublicKey);
+  }
+
+  async unfreezeTokens(ownerPublicKey: Uint8Array, tokenPublicKey: Uint8Array) {
+    await this.tokenFreezeService!.unfreezeTokens(
+      ownerPublicKey,
+      tokenPublicKey
+    );
+  }
+
+  selectTokenLeaves(
+    tokenPublicKey: Uint8Array,
+    tokenAmount: bigint
+  ): LeafWithPreviousTransactionData[] {
+    return this.tokenTransactionService.selectTokenLeaves(
+      this.tokenLeaves.get(bytesToHex(tokenPublicKey))!,
+      tokenPublicKey,
+      tokenAmount
+    );
+  }
+
+  // If no leaves are passed in, it will take all the leaves available for the given tokenPublicKey
+  async consolidateTokenLeaves(
+    tokenPublicKey: Uint8Array,
+    selectedLeaves?: LeafWithPreviousTransactionData[]
+  ) {
+    if (!this.tokenLeaves.has(bytesToHex(tokenPublicKey))) {
+      throw new Error("No token leaves with the given tokenPublicKey");
+    }
+
+    if (selectedLeaves) {
+      if (
+        !checkIfSelectedLeavesAreAvailable(
+          selectedLeaves,
+          this.tokenLeaves,
+          tokenPublicKey
+        )
+      ) {
+        throw new Error("One or more selected leaves are not available");
+      }
+    } else {
+      // Get all available leaves
+      selectedLeaves = this.tokenLeaves.get(bytesToHex(tokenPublicKey))!;
+    }
+
+    if (selectedLeaves!.length === 1) {
+      return;
+    }
+
+    const partialTokenTransaction =
+      await this.tokenTransactionService.constructConsolidateTokenTransaction(
+        tokenPublicKey,
+        selectedLeaves
+      );
+
+    const finalizedTokenTransaction =
+      await this.tokenTransactionService.broadcastTokenTransaction(
+        partialTokenTransaction,
+        selectedLeaves.map((leaf) => leaf.leaf!.ownerPublicKey),
+        selectedLeaves.map((leaf) => leaf.leaf!.revocationPublicKey!)
+      );
+
+    const tokenPubKeyHex = bytesToHex(tokenPublicKey);
+    if (!this.tokenLeaves.has(tokenPubKeyHex)) {
+      this.tokenLeaves.set(tokenPubKeyHex, []);
+    }
+    this.tokenTransactionService.updateTokenLeavesFromFinalizedTransaction(
+      this.tokenLeaves.get(tokenPubKeyHex)!,
+      finalizedTokenTransaction
     );
   }
 

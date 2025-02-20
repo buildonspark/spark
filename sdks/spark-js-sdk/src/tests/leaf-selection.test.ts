@@ -55,11 +55,11 @@ describe("leaf selection", () => {
       createLeafNode(1500),
     ];
 
-    const selectedLeaves = selectLeaves(leaves, 3000);
+    const selectedLeaves = selectLeaves(leaves, 300);
 
     expect(selectedLeaves.length).toBe(2);
     expect(selectedLeaves.reduce((acc, leaf) => acc + leaf.value, 0)).toBe(
-      3000
+      3000n
     );
   });
 
@@ -97,7 +97,7 @@ describe("leaf selection", () => {
 
     expect(selectedLeaves.length).toBe(6);
     expect(selectedLeaves.reduce((acc, leaf) => acc + leaf.value, 0)).toBe(
-      20500
+      20500n
     );
     expect(selectedLeaves[0].value).toBe(10000);
     expect(selectedLeaves[1].value).toBe(5000);

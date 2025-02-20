@@ -377,8 +377,10 @@ export class TransferService extends BaseTransferService {
     let pendingTransfersResp: QueryPendingTransfersResponse;
     try {
       pendingTransfersResp = await sparkClient.query_pending_transfers({
-        receiverIdentityPublicKey:
-          await this.config.signer.getIdentityPublicKey(),
+        participant: {
+          $case: "receiverIdentityPublicKey",
+          receiverIdentityPublicKey: await this.config.signer.getIdentityPublicKey(),
+        },
       });
     } catch (error) {
       throw new Error(`Error querying pending transfers: ${error}`);

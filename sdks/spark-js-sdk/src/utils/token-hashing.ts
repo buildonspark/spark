@@ -1,14 +1,9 @@
-import { secp256k1 } from "@noble/curves/secp256k1";
-import { sha256 } from "@scure/btc-signer/utils";
 import {
-  OperatorSpecificTokenTransactionSignablePayload,
   TokenTransaction,
+  OperatorSpecificTokenTransactionSignablePayload,
+  FreezeTokensPayload,
 } from "../proto/spark";
-import {
-  bigIntToPrivateKey,
-  recoverSecret,
-  VerifiableSecretShare,
-} from "./secret-sharing";
+import { sha256 } from "@scure/btc-signer/utils";
 
 export function hashTokenTransaction(
   tokenTransaction: TokenTransaction,
@@ -49,6 +44,15 @@ export function hashTokenTransaction(
     if (tokenTransaction.tokenInput.mintInput!.issuerPublicKey) {
       hashObj.update(tokenTransaction.tokenInput.mintInput!.issuerPublicKey);
     }
+    if (tokenTransaction.tokenInput.mintInput!.issuerProvidedTimestamp) {
+      const timestampBytes = new Uint8Array(8);
+      new DataView(timestampBytes.buffer).setBigUint64(
+        0,
+        BigInt(tokenTransaction.tokenInput.mintInput!.issuerProvidedTimestamp),
+        true // true for little-endian to match Go implementation
+      );
+      hashObj.update(timestampBytes);
+    }
     allHashes.push(hashObj.digest());
   }
 
@@ -56,7 +60,8 @@ export function hashTokenTransaction(
   for (const leaf of tokenTransaction.outputLeaves || []) {
     const hashObj = sha256.create();
 
-    if (leaf.id) {
+    // Only hash ID if it's not empty and not in partial hash mode
+    if (leaf.id && !partialHash) {
       hashObj.update(new TextEncoder().encode(leaf.id));
     }
     if (leaf.ownerPublicKey) {
@@ -66,21 +71,25 @@ export function hashTokenTransaction(
       hashObj.update(leaf.revocationPublicKey);
     }
 
-    const bondBytes = new Uint8Array(8);
-    new DataView(bondBytes.buffer).setBigUint64(
-      0,
-      BigInt(leaf.withdrawBondSats || 0),
-      false
-    );
-    hashObj.update(bondBytes);
+    if (leaf.withdrawBondSats && !partialHash) {
+      const bondBytes = new Uint8Array(8);
+      new DataView(bondBytes.buffer).setBigUint64(
+        0,
+        BigInt(leaf.withdrawBondSats!),
+        false
+      );
+      hashObj.update(bondBytes);
+    }
 
-    const locktimeBytes = new Uint8Array(8);
-    new DataView(locktimeBytes.buffer).setBigUint64(
-      0,
-      BigInt(leaf.withdrawRelativeBlockLocktime || 0),
-      false
-    );
-    hashObj.update(locktimeBytes);
+    if (leaf.withdrawRelativeBlockLocktime && !partialHash) {
+      const locktimeBytes = new Uint8Array(8);
+      new DataView(locktimeBytes.buffer).setBigUint64(
+        0,
+        BigInt(leaf.withdrawRelativeBlockLocktime!),
+        false
+      );
+      hashObj.update(locktimeBytes);
+    }
 
     if (leaf.tokenPublicKey) {
       hashObj.update(leaf.tokenPublicKey);
@@ -92,8 +101,18 @@ export function hashTokenTransaction(
     allHashes.push(hashObj.digest());
   }
 
+  // Sort operator public keys before hashing
+  const sortedPubKeys = [...(tokenTransaction.sparkOperatorIdentityPublicKeys || [])].sort(
+    (a, b) => {
+      for (let i = 0; i < a.length && i < b.length; i++) {
+        if (a[i] !== b[i]) return a[i] - b[i];
+      }
+      return a.length - b.length;
+    }
+  );
+
   // Hash spark operator identity public keys
-  for (const pubKey of tokenTransaction.sparkOperatorIdentityPublicKeys || []) {
+  for (const pubKey of sortedPubKeys) {
     const hashObj = sha256.create();
     if (pubKey) {
       hashObj.update(pubKey);
@@ -136,32 +155,62 @@ export function hashOperatorSpecificTokenTransactionSignablePayload(
   return sha256(allHashes);
 }
 
-export interface KeyshareWithOperatorIndex {
-  index: number;
-  keyshare: Uint8Array;
-}
-
-export function recoverPrivateKeyFromKeyshares(
-  keyshares: KeyshareWithOperatorIndex[],
-  threshold: number
+export function hashFreezeTokensPayload(
+  payload: FreezeTokensPayload
 ): Uint8Array {
-  // Convert keyshares to secret shares format
-  const shares: VerifiableSecretShare[] = keyshares.map((keyshare) => ({
-    fieldModulus: BigInt("0x" + secp256k1.CURVE.n.toString(16)), // secp256k1 curve order
-    threshold,
-    index: BigInt(keyshare.index),
-    share: BigInt("0x" + Buffer.from(keyshare.keyshare).toString("hex")),
-    proofs: [],
-  }));
+  if (!payload) {
+    throw new Error("freeze tokens payload cannot be nil");
+  }
 
-  // Recover the secret
-  const recoveredKey = recoverSecret(shares);
+  let allHashes: Uint8Array[] = [];
 
-  // Convert to bytes
-  return bigIntToPrivateKey(recoveredKey);
+  // Hash owner public key
+  const ownerPubKeyHash = sha256.create();
+  if (payload.ownerPublicKey) {
+    ownerPubKeyHash.update(payload.ownerPublicKey);
+  }
+  allHashes.push(ownerPubKeyHash.digest());
+
+  // Hash token public key
+  const tokenPubKeyHash = sha256.create();
+  if (payload.tokenPublicKey) {
+    tokenPubKeyHash.update(payload.tokenPublicKey);
+  }
+  allHashes.push(tokenPubKeyHash.digest());
+
+  // Hash shouldUnfreeze
+  const shouldUnfreezeHash = sha256.create();
+  shouldUnfreezeHash.update(new Uint8Array([payload.shouldUnfreeze ? 1 : 0]));
+  allHashes.push(shouldUnfreezeHash.digest());
+
+  // Hash timestamp
+  const timestampHash = sha256.create();
+  if (payload.issuerProvidedTimestamp) {
+    const timestampBytes = new Uint8Array(8);
+    new DataView(timestampBytes.buffer).setBigUint64(
+      0,
+      BigInt(payload.issuerProvidedTimestamp),
+      true // true for little-endian
+    );
+    timestampHash.update(timestampBytes);
+  }
+  allHashes.push(timestampHash.digest());
+
+  // Hash operator identity public key
+  const operatorPubKeyHash = sha256.create();
+  if (payload.operatorIdentityPublicKey) {
+    operatorPubKeyHash.update(payload.operatorIdentityPublicKey);
+  }
+  allHashes.push(operatorPubKeyHash.digest());
+
+  // Final hash of all concatenated hashes
+  const finalHash = sha256.create();
+  for (const hash of allHashes) {
+    finalHash.update(hash);
+  }
+  return finalHash.digest();
 }
 
-// Helper function to concatenate Uint8Arrays
 function concatenateUint8Arrays(array1: Uint8Array, array2: Uint8Array) {
   const result = new Uint8Array(array1.length + array2.length);
   result.set(array1, 0);
