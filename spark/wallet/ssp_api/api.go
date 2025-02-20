@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
-	"fmt"
 	"log"
 	"strings"
 
@@ -99,8 +98,6 @@ func (s *SparkServiceAPI) RequestLeavesSwap(
 	if err != nil {
 		return "", nil, err
 	}
-
-	fmt.Printf("leaves swap request response: %v\n", response)
 
 	request := response["request_leaves_swap"].(map[string]interface{})["request"].(map[string]interface{})["id"].(string)
 	leavesJSON := response["request_leaves_swap"].(map[string]interface{})["request"].(map[string]interface{})["swap_leaves"].([]interface{})
