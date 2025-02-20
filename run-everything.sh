@@ -565,9 +565,6 @@ reset_databases() {
             if ! psql -lqt | cut -d \| -f 1 | grep -qw "$db"; then
                 echo "Creating $db as it doesn't exist..."
                 createdb "$db" > /dev/null 2>&1
-            else
-                echo "Database $db already exists, applying migrations..."
-                cd spark && atlas migrate apply --dir "file://so/ent/migrate/migrations" --url "postgresql://127.0.0.1:5432/$db?sslmode=disable" --baseline 20250219194108 && cd ..
             fi
 
             db="lrc20_$i"
