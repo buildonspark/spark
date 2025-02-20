@@ -235,7 +235,7 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 		nodeTxBytes = node.RawTx
 	}
 	var refundTxBytes []byte
-	if nodeSignatures.RefundTxSignature != nil {
+	if len(nodeSignatures.RefundTxSignature) > 0 {
 		refundTxBytes, err = common.UpdateTxWithSignature(node.RawRefundTx, 0, nodeSignatures.RefundTxSignature)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to update refund tx with signature: %v", err)
