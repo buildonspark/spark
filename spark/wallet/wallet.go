@@ -155,7 +155,18 @@ func (w *SingleKeyWallet) PayInvoice(ctx context.Context, invoice string) (strin
 	amount := math.Ceil(float64(bolt11.MSatoshi) / 1000.0)
 	nodes, err := w.leafSelection(int64(amount))
 	if err != nil {
-		return "", fmt.Errorf("failed to select nodes: %w", err)
+		_, err = w.RequestLeavesSwap(ctx, int64(amount))
+		if err != nil {
+			return "", fmt.Errorf("failed to select nodes: %w", err)
+		}
+		err = w.SyncWallet(ctx)
+		if err != nil {
+			return "", fmt.Errorf("failed to sync wallet: %w", err)
+		}
+		nodes, err = w.leafSelection(int64(amount))
+		if err != nil {
+			return "", fmt.Errorf("failed to select nodes: %w", err)
+		}
 	}
 
 	nodeKeyTweaks := make([]LeafKeyTweak, 0, len(nodes))
@@ -406,6 +417,7 @@ func (w *SingleKeyWallet) RequestLeavesSwap(ctx context.Context, targetAmount in
 	}
 
 	w.RemoveOwnedNodes(nodesToRemove)
+	w.OwnedNodes = append(w.OwnedNodes, claimedNodes...)
 	return claimedNodes, nil
 }
 
