@@ -299,6 +299,9 @@ export class TreeCreationService {
       amount: parentTxOut.amount,
     });
 
+    // Add ephemeral anchor
+    tx.addOutput(this.ephemeralAnchorOutput());
+
     const signingNonceCommitment =
       await this.config.signer.getRandomSigningCommitment();
     const signingJob: SigningJob = {
@@ -330,6 +333,9 @@ export class TreeCreationService {
       script: parentTxOut.script,
       amount: parentTxOut.amount,
     });
+
+    // Add ephemeral anchor
+    childTx.addOutput(this.ephemeralAnchorOutput());
 
     const childSigningNonceCommitment =
       await this.config.signer.getRandomSigningCommitment();
@@ -378,6 +384,13 @@ export class TreeCreationService {
     return internalCreationNode;
   }
 
+  private ephemeralAnchorOutput(): { script: Uint8Array, amount: bigint } {
+    return {
+      script: new Uint8Array([0x51]), // OP_TRUE
+      amount: 0n
+    };
+  }
+
   private async buildCreationNodesFromTree(
     vout: number,
     createLeaves: boolean,
@@ -407,6 +420,10 @@ export class TreeCreationService {
         amount: parentTxOutput.amount / 2n,
       });
     }
+
+    // Add ephemeral anchor output
+    const anchor = this.ephemeralAnchorOutput();
+    rootNodeTx.addOutput(anchor);
 
     const rootNodeSigningCommitment =
       await this.config.signer.getRandomSigningCommitment();
