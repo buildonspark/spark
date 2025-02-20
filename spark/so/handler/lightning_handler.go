@@ -566,7 +566,8 @@ func (h *LightningHandler) UpdatePreimageRequest(ctx context.Context, req *pbint
 		),
 	).First(ctx)
 	if err != nil {
-		return fmt.Errorf("unable to get preimage request: %v", err)
+		slog.Error("UpdatePreimageRequest: unable to get preimage request", "error", err, "paymentHash", hex.EncodeToString(paymentHash[:]), "identityPublicKey", hex.EncodeToString(req.IdentityPublicKey))
+		return fmt.Errorf("UpdatePreimageRequest:unable to get preimage request: %v", err)
 	}
 
 	err = preimageRequest.Update().SetStatus(schema.PreimageRequestStatusPreimageShared).Exec(ctx)
@@ -587,7 +588,8 @@ func (h *LightningHandler) QueryUserSignedRefunds(ctx context.Context, req *pb.Q
 		),
 	).First(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("unable to get preimage request: %v", err)
+		slog.Error("QueryUserSignedRefunds: unable to get preimage request", "error", err, "paymentHash", hex.EncodeToString(req.PaymentHash), "identityPublicKey", hex.EncodeToString(req.IdentityPublicKey))
+		return nil, fmt.Errorf("QueryUserSignedRefunds: unable to get preimage request: %v", err)
 	}
 
 	transfer, err := preimageRequest.QueryTransfers().Only(ctx)
@@ -647,7 +649,8 @@ func (h *LightningHandler) ProvidePreimageInternal(ctx context.Context, req *pb.
 		),
 	).First(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("unable to get preimage request: %v", err)
+		slog.Error("ProvidePreimage: unable to get preimage request", "error", err, "paymentHash", hex.EncodeToString(req.PaymentHash), "identityPublicKey", hex.EncodeToString(req.IdentityPublicKey))
+		return nil, fmt.Errorf("ProvidePreimage: unable to get preimage request: %v", err)
 	}
 	slog.Debug("ProvidePreimage: preimage request found")
 
@@ -753,7 +756,8 @@ func (h *LightningHandler) ReturnLightningPayment(ctx context.Context, req *pb.R
 		),
 	).First(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("unable to get preimage request: %v", err)
+		slog.Error("ReturnLightningPayment: unable to get preimage request", "error", err, "paymentHash", hex.EncodeToString(req.PaymentHash), "identityPublicKey", hex.EncodeToString(req.UserIdentityPublicKey))
+		return nil, fmt.Errorf("ReturnLightningPayment: unable to get preimage request: %v", err)
 	}
 
 	if preimageRequest.Status != schema.PreimageRequestStatusWaitingForPreimage {
