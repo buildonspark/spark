@@ -35,6 +35,7 @@ const (
 	SparkService_InitiatePreimageSwap_FullMethodName     = "/spark.SparkService/initiate_preimage_swap"
 	SparkService_ProvidePreimage_FullMethodName          = "/spark.SparkService/provide_preimage"
 	SparkService_LeafSwap_FullMethodName                 = "/spark.SparkService/leaf_swap"
+	SparkService_RefreshTimelock_FullMethodName          = "/spark.SparkService/refresh_timelock"
 	SparkService_PrepareTreeAddress_FullMethodName       = "/spark.SparkService/prepare_tree_address"
 	SparkService_CreateTree_FullMethodName               = "/spark.SparkService/create_tree"
 	SparkService_GetSigningOperatorList_FullMethodName   = "/spark.SparkService/get_signing_operator_list"
@@ -68,6 +69,7 @@ type SparkServiceClient interface {
 	InitiatePreimageSwap(ctx context.Context, in *InitiatePreimageSwapRequest, opts ...grpc.CallOption) (*InitiatePreimageSwapResponse, error)
 	ProvidePreimage(ctx context.Context, in *ProvidePreimageRequest, opts ...grpc.CallOption) (*ProvidePreimageResponse, error)
 	LeafSwap(ctx context.Context, in *LeafSwapRequest, opts ...grpc.CallOption) (*LeafSwapResponse, error)
+	RefreshTimelock(ctx context.Context, in *RefreshTimelockRequest, opts ...grpc.CallOption) (*RefreshTimelockResponse, error)
 	PrepareTreeAddress(ctx context.Context, in *PrepareTreeAddressRequest, opts ...grpc.CallOption) (*PrepareTreeAddressResponse, error)
 	CreateTree(ctx context.Context, in *CreateTreeRequest, opts ...grpc.CallOption) (*CreateTreeResponse, error)
 	GetSigningOperatorList(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetSigningOperatorListResponse, error)
@@ -241,6 +243,16 @@ func (c *sparkServiceClient) LeafSwap(ctx context.Context, in *LeafSwapRequest, 
 	return out, nil
 }
 
+func (c *sparkServiceClient) RefreshTimelock(ctx context.Context, in *RefreshTimelockRequest, opts ...grpc.CallOption) (*RefreshTimelockResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RefreshTimelockResponse)
+	err := c.cc.Invoke(ctx, SparkService_RefreshTimelock_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *sparkServiceClient) PrepareTreeAddress(ctx context.Context, in *PrepareTreeAddressRequest, opts ...grpc.CallOption) (*PrepareTreeAddressResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(PrepareTreeAddressResponse)
@@ -380,6 +392,7 @@ type SparkServiceServer interface {
 	InitiatePreimageSwap(context.Context, *InitiatePreimageSwapRequest) (*InitiatePreimageSwapResponse, error)
 	ProvidePreimage(context.Context, *ProvidePreimageRequest) (*ProvidePreimageResponse, error)
 	LeafSwap(context.Context, *LeafSwapRequest) (*LeafSwapResponse, error)
+	RefreshTimelock(context.Context, *RefreshTimelockRequest) (*RefreshTimelockResponse, error)
 	PrepareTreeAddress(context.Context, *PrepareTreeAddressRequest) (*PrepareTreeAddressResponse, error)
 	CreateTree(context.Context, *CreateTreeRequest) (*CreateTreeResponse, error)
 	GetSigningOperatorList(context.Context, *emptypb.Empty) (*GetSigningOperatorListResponse, error)
@@ -447,6 +460,9 @@ func (UnimplementedSparkServiceServer) ProvidePreimage(context.Context, *Provide
 }
 func (UnimplementedSparkServiceServer) LeafSwap(context.Context, *LeafSwapRequest) (*LeafSwapResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method LeafSwap not implemented")
+}
+func (UnimplementedSparkServiceServer) RefreshTimelock(context.Context, *RefreshTimelockRequest) (*RefreshTimelockResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RefreshTimelock not implemented")
 }
 func (UnimplementedSparkServiceServer) PrepareTreeAddress(context.Context, *PrepareTreeAddressRequest) (*PrepareTreeAddressResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method PrepareTreeAddress not implemented")
@@ -775,6 +791,24 @@ func _SparkService_LeafSwap_Handler(srv interface{}, ctx context.Context, dec fu
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SparkService_RefreshTimelock_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RefreshTimelockRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkServiceServer).RefreshTimelock(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkService_RefreshTimelock_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkServiceServer).RefreshTimelock(ctx, req.(*RefreshTimelockRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _SparkService_PrepareTreeAddress_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(PrepareTreeAddressRequest)
 	if err := dec(in); err != nil {
@@ -1057,6 +1091,10 @@ var SparkService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "leaf_swap",
 			Handler:    _SparkService_LeafSwap_Handler,
+		},
+		{
+			MethodName: "refresh_timelock",
+			Handler:    _SparkService_RefreshTimelock_Handler,
 		},
 		{
 			MethodName: "prepare_tree_address",

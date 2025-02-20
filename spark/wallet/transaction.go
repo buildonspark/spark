@@ -42,17 +42,6 @@ func createSplitTx(
 	return splitTx
 }
 
-func initialSequence() uint32 {
-	return uint32((1 << 30) | spark.InitialTimeLock)
-}
-
-func nextSequence(currSequence uint32) (uint32, error) {
-	if currSequence&0xFFFF-spark.TimeLockInterval <= 0 {
-		return 0, fmt.Errorf("timelock interval is less or equal to 0")
-	}
-	return uint32((1 << 30) | (currSequence&0xFFFF - spark.TimeLockInterval)), nil
-}
-
 // createNodeTx creates a node transaction.
 // This stands in between a split tx and a leaf node tx,
 // and has no timelock.
@@ -82,7 +71,7 @@ func createLeafNodeTx(
 		PreviousOutPoint: *parentOutPoint,
 		SignatureScript:  nil,
 		Witness:          nil,
-		Sequence:         initialSequence(),
+		Sequence:         spark.InitialSequence(),
 	})
 	newLeafTx.AddTxOut(txOut)
 	newLeafTx.AddTxOut(ephemeralAnchorOutput())

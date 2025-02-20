@@ -110,10 +110,16 @@ func (s *SparkServer) CooperativeExit(ctx context.Context, req *pb.CooperativeEx
 	return wrapWithGRPCError(coopExitHandler.CooperativeExit(ctx, req))
 }
 
-// StartSendTransfer initiates a transfer from sender.
+// LeafSwap initiates a swap of leaves between two users.
 func (s *SparkServer) LeafSwap(ctx context.Context, req *pb.LeafSwapRequest) (*pb.LeafSwapResponse, error) {
 	transferHander := handler.NewTransferHandler(s.config)
-	return transferHander.InitiateLeafSwap(ctx, req)
+	return wrapWithGRPCError(transferHander.InitiateLeafSwap(ctx, req))
+}
+
+// RefreshTimelock refreshes the timelocks of a leaf and its ancestors.
+func (s *SparkServer) RefreshTimelock(ctx context.Context, req *pb.RefreshTimelockRequest) (*pb.RefreshTimelockResponse, error) {
+	handler := handler.NewRefreshTimelockHandler(s.config)
+	return wrapWithGRPCError(handler.RefreshTimelock(ctx, req))
 }
 
 // PrepareTreeAddress prepares the tree address for the given public key.

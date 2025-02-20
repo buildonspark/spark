@@ -509,6 +509,14 @@ func (w *SingleKeyWallet) CoopExit(ctx context.Context, targetAmountSats int64, 
 	return transfer, nil
 }
 
+func (w *SingleKeyWallet) RefreshTimelocks(_ context.Context) error {
+	fmt.Println("TODO: not implemented")
+	// Loop through all of our leaves and check if they need
+	// to be refreshed. Print out how many leaves need to be refreshed.
+	// Loop through any and refresh each, logging success or failure.
+	return nil
+}
+
 // For simplicity always mint directly to the issuer wallet (eg. owner == token public key)
 func (w *SingleKeyWallet) MintTokens(ctx context.Context, amount uint64) error {
 	conn, err := common.NewGRPCConnectionWithTestTLS(w.Config.CoodinatorAddress())

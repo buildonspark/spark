@@ -367,6 +367,15 @@ func main() {
 	})
 
 	cli.registry.RegisterCommand(Command{
+		Name:        "refresh",
+		Description: "Refresh all leaves if needed (unimplemented)",
+		Usage:       "refresh",
+		Handler: func(_ []string) error {
+			return cli.wallet.RefreshTimelocks(context.Background())
+		},
+	})
+
+	cli.registry.RegisterCommand(Command{
 		Name:        "mint_tokens",
 		Description: "Mint tokens",
 		Usage:       "mint_tokens <amount>",

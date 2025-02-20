@@ -23,6 +23,7 @@ service SparkService {
     rpc initiate_preimage_swap(InitiatePreimageSwapRequest) returns (InitiatePreimageSwapResponse) {}
     rpc provide_preimage(ProvidePreimageRequest) returns (ProvidePreimageResponse) {}
     rpc leaf_swap(LeafSwapRequest) returns (LeafSwapResponse) {}
+    rpc refresh_timelock(RefreshTimelockRequest) returns (RefreshTimelockResponse) {}
 
     rpc prepare_tree_address(PrepareTreeAddressRequest) returns (PrepareTreeAddressResponse) {}
     rpc create_tree(CreateTreeRequest) returns (CreateTreeResponse) {}
@@ -485,7 +486,6 @@ message CooperativeExitRequest {
     StartSendTransferRequest transfer = 1;
     string exit_id = 2;
     bytes exit_txid = 3;
-    // TODO: provide signatures for the leaves so SE can be watchtower
 }
 
 message CooperativeExitResponse {
@@ -502,6 +502,21 @@ message LeafSwapRequest {
 message LeafSwapResponse {
     Transfer transfer = 1;
     repeated LeafRefundTxSigningResult signing_results = 2;
+}
+
+message RefreshTimelockRequest {
+    string leaf_id = 1;
+    bytes owner_identity_public_key = 2;
+    repeated SigningJob signing_jobs = 3;
+}
+
+message RefreshTimelockSigningResult {
+    SigningResult signing_result = 1;
+    bytes verifying_key = 2; // Should maybe just be a part of SigningResult?
+}
+
+message RefreshTimelockResponse {
+    repeated RefreshTimelockSigningResult signing_results = 1;
 }
 
 message AddressRequestNode {

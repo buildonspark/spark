@@ -14,6 +14,7 @@ import (
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 	eciesgo "github.com/ecies/go/v2"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark-go"
 	"github.com/lightsparkdev/spark-go/common"
 	secretsharing "github.com/lightsparkdev/spark-go/common/secret_sharing"
 	pbcommon "github.com/lightsparkdev/spark-go/proto/common"
@@ -715,7 +716,7 @@ func prepareRefundSoSigningJobs(
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse receiving pubkey: %v", err)
 		}
-		nextSequence, err := nextSequence(currRefundTx.TxIn[0].Sequence)
+		nextSequence, err := spark.NextSequence(currRefundTx.TxIn[0].Sequence)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get next sequence: %v", err)
 		}

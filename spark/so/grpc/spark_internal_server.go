@@ -250,6 +250,16 @@ func (s *SparkInternalServer) FinalizeTransfer(ctx context.Context, req *pb.Fina
 	return wrapWithGRPCError(&emptypb.Empty{}, transferHandler.FinalizeTransfer(ctx, req))
 }
 
+// FinalizeRefreshTimelock finalizes the refresh timelock.
+func (s *SparkInternalServer) FinalizeRefreshTimelock(ctx context.Context, req *pb.FinalizeRefreshTimelockRequest) (*emptypb.Empty, error) {
+	refreshTimelockHandler := handler.NewInternalRefreshTimelockHandler(s.config)
+	err := refreshTimelockHandler.FinalizeRefreshTimelock(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	return &emptypb.Empty{}, nil
+}
+
 // InitiatePreimageSwap initiates a preimage swap for the given payment hash.
 func (s *SparkInternalServer) InitiatePreimageSwap(ctx context.Context, req *pbspark.InitiatePreimageSwapRequest) (*pb.InitiatePreimageSwapResponse, error) {
 	lightningHandler := handler.NewLightningHandler(s.config)

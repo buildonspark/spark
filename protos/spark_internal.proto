@@ -23,6 +23,8 @@ service SparkInternalService {
 
     rpc finalize_transfer(FinalizeTransferRequest) returns (google.protobuf.Empty) {}
 
+    rpc finalize_refresh_timelock(FinalizeRefreshTimelockRequest) returns (google.protobuf.Empty) {}
+
     rpc initiate_preimage_swap(spark.InitiatePreimageSwapRequest) returns (InitiatePreimageSwapResponse) {}
     rpc provide_preimage(spark.ProvidePreimageRequest) returns (google.protobuf.Empty) {}
     rpc update_preimage_request(UpdatePreimageRequestRequest) returns (google.protobuf.Empty) {}
@@ -114,6 +116,10 @@ message FinalizeTransferRequest {
     string transfer_id = 1;
     repeated TreeNode nodes = 2;
     google.protobuf.Timestamp timestamp = 3;
+}
+
+message FinalizeRefreshTimelockRequest {
+    repeated TreeNode nodes = 1;
 }
 
 message TreeNode {

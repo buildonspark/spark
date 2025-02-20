@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/lightsparkdev/spark-go"
 	"github.com/lightsparkdev/spark-go/common"
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
 	"github.com/lightsparkdev/spark-go/so/objects"
@@ -97,7 +98,7 @@ func signCoopExitRefunds(
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to parse refund tx: %v", err)
 		}
-		sequence, err := nextSequence(currentRefundTx.TxIn[0].Sequence)
+		sequence, err := spark.NextSequence(currentRefundTx.TxIn[0].Sequence)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to get next sequence: %v", err)
 		}

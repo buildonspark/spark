@@ -12,6 +12,7 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark-go"
 	"github.com/lightsparkdev/spark-go/common"
 	pbfrost "github.com/lightsparkdev/spark-go/proto/frost"
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
@@ -282,7 +283,7 @@ func buildCreationNodesFromTree(
 				}
 				currentElement.creationNode.NodeTxSigningJob = signingJob
 
-				refundTx, err := createRefundTx(initialSequence(),
+				refundTx, err := createRefundTx(spark.InitialSequence(),
 					&wire.OutPoint{Hash: tx.TxHash(), Index: 0},
 					tx.TxOut[0].Value, pubkey)
 				if err != nil {

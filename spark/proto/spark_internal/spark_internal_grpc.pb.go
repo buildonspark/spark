@@ -30,6 +30,7 @@ const (
 	SparkInternalService_AggregateNodes_FullMethodName                = "/spark_internal.SparkInternalService/aggregate_nodes"
 	SparkInternalService_FinalizeNodesAggregation_FullMethodName      = "/spark_internal.SparkInternalService/finalize_nodes_aggregation"
 	SparkInternalService_FinalizeTransfer_FullMethodName              = "/spark_internal.SparkInternalService/finalize_transfer"
+	SparkInternalService_FinalizeRefreshTimelock_FullMethodName       = "/spark_internal.SparkInternalService/finalize_refresh_timelock"
 	SparkInternalService_InitiatePreimageSwap_FullMethodName          = "/spark_internal.SparkInternalService/initiate_preimage_swap"
 	SparkInternalService_ProvidePreimage_FullMethodName               = "/spark_internal.SparkInternalService/provide_preimage"
 	SparkInternalService_UpdatePreimageRequest_FullMethodName         = "/spark_internal.SparkInternalService/update_preimage_request"
@@ -54,6 +55,7 @@ type SparkInternalServiceClient interface {
 	AggregateNodes(ctx context.Context, in *spark.AggregateNodesRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	FinalizeNodesAggregation(ctx context.Context, in *FinalizeNodesAggregationRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	FinalizeTransfer(ctx context.Context, in *FinalizeTransferRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	FinalizeRefreshTimelock(ctx context.Context, in *FinalizeRefreshTimelockRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	InitiatePreimageSwap(ctx context.Context, in *spark.InitiatePreimageSwapRequest, opts ...grpc.CallOption) (*InitiatePreimageSwapResponse, error)
 	ProvidePreimage(ctx context.Context, in *spark.ProvidePreimageRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	UpdatePreimageRequest(ctx context.Context, in *UpdatePreimageRequestRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
@@ -163,6 +165,16 @@ func (c *sparkInternalServiceClient) FinalizeTransfer(ctx context.Context, in *F
 	return out, nil
 }
 
+func (c *sparkInternalServiceClient) FinalizeRefreshTimelock(ctx context.Context, in *FinalizeRefreshTimelockRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, SparkInternalService_FinalizeRefreshTimelock_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *sparkInternalServiceClient) InitiatePreimageSwap(ctx context.Context, in *spark.InitiatePreimageSwapRequest, opts ...grpc.CallOption) (*InitiatePreimageSwapResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(InitiatePreimageSwapResponse)
@@ -266,6 +278,7 @@ type SparkInternalServiceServer interface {
 	AggregateNodes(context.Context, *spark.AggregateNodesRequest) (*emptypb.Empty, error)
 	FinalizeNodesAggregation(context.Context, *FinalizeNodesAggregationRequest) (*emptypb.Empty, error)
 	FinalizeTransfer(context.Context, *FinalizeTransferRequest) (*emptypb.Empty, error)
+	FinalizeRefreshTimelock(context.Context, *FinalizeRefreshTimelockRequest) (*emptypb.Empty, error)
 	InitiatePreimageSwap(context.Context, *spark.InitiatePreimageSwapRequest) (*InitiatePreimageSwapResponse, error)
 	ProvidePreimage(context.Context, *spark.ProvidePreimageRequest) (*emptypb.Empty, error)
 	UpdatePreimageRequest(context.Context, *UpdatePreimageRequestRequest) (*emptypb.Empty, error)
@@ -311,6 +324,9 @@ func (UnimplementedSparkInternalServiceServer) FinalizeNodesAggregation(context.
 }
 func (UnimplementedSparkInternalServiceServer) FinalizeTransfer(context.Context, *FinalizeTransferRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method FinalizeTransfer not implemented")
+}
+func (UnimplementedSparkInternalServiceServer) FinalizeRefreshTimelock(context.Context, *FinalizeRefreshTimelockRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method FinalizeRefreshTimelock not implemented")
 }
 func (UnimplementedSparkInternalServiceServer) InitiatePreimageSwap(context.Context, *spark.InitiatePreimageSwapRequest) (*InitiatePreimageSwapResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method InitiatePreimageSwap not implemented")
@@ -522,6 +538,24 @@ func _SparkInternalService_FinalizeTransfer_Handler(srv interface{}, ctx context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SparkInternalService_FinalizeRefreshTimelock_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(FinalizeRefreshTimelockRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkInternalServiceServer).FinalizeRefreshTimelock(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkInternalService_FinalizeRefreshTimelock_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkInternalServiceServer).FinalizeRefreshTimelock(ctx, req.(*FinalizeRefreshTimelockRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _SparkInternalService_InitiatePreimageSwap_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(spark.InitiatePreimageSwapRequest)
 	if err := dec(in); err != nil {
@@ -726,6 +760,10 @@ var SparkInternalService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "finalize_transfer",
 			Handler:    _SparkInternalService_FinalizeTransfer_Handler,
+		},
+		{
+			MethodName: "finalize_refresh_timelock",
+			Handler:    _SparkInternalService_FinalizeRefreshTimelock_Handler,
 		},
 		{
 			MethodName: "initiate_preimage_swap",

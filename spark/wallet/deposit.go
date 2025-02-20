@@ -13,6 +13,7 @@ import (
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark-go"
 	"github.com/lightsparkdev/spark-go/common"
 	pbcommon "github.com/lightsparkdev/spark-go/proto/common"
 	pbfrost "github.com/lightsparkdev/spark-go/proto/frost"
@@ -146,7 +147,7 @@ func CreateTreeRoot(
 
 	// Create refund tx
 	refundTx, err := createRefundTx(
-		initialSequence(),
+		spark.InitialSequence(),
 		&wire.OutPoint{Hash: rootTx.TxHash(), Index: 0},
 		rootTx.TxOut[0].Value,
 		signingPubkey,

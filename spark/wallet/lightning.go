@@ -8,6 +8,7 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark-go"
 	"github.com/lightsparkdev/spark-go/common"
 	pbcommon "github.com/lightsparkdev/spark-go/proto/common"
 	pbfrost "github.com/lightsparkdev/spark-go/proto/frost"
@@ -149,7 +150,7 @@ func prepareFrostSigningJobs(
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("failed to parse refund tx: %v", err)
 		}
-		nextSequence, err := nextSequence(currRefundTx.TxIn[0].Sequence)
+		nextSequence, err := spark.NextSequence(currRefundTx.TxIn[0].Sequence)
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("failed to get next sequence: %v", err)
 		}

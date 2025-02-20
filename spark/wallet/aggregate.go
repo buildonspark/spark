@@ -12,6 +12,7 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark-go"
 	"github.com/lightsparkdev/spark-go/common"
 	pbcommon "github.com/lightsparkdev/spark-go/proto/common"
 	pbfrost "github.com/lightsparkdev/spark-go/proto/frost"
@@ -58,7 +59,7 @@ func AggregateTreeNodes(
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse parent refund tx: %v", err)
 	}
-	sequence, err := nextSequence(uint32(parentRefundTx.TxIn[0].Sequence))
+	sequence, err := spark.NextSequence(uint32(parentRefundTx.TxIn[0].Sequence))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get next sequence: %v", err)
 	}
