@@ -2,7 +2,7 @@ package tree
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/google/uuid"
@@ -10,6 +10,7 @@ import (
 	"github.com/lightsparkdev/spark-go/so/ent"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
 	"github.com/lightsparkdev/spark-go/so/ent/treenode"
+	"github.com/lightsparkdev/spark-go/so/helper"
 )
 
 // PolarityScoreDepth is the depth of the tree to consider for the polarity score.
@@ -37,12 +38,14 @@ func (s *TestScorer) FetchPolarityScores(_ *pb.FetchPolarityScoreRequest, _ pb.S
 }
 
 type PolarityScorer struct {
+	logger             *slog.Logger
 	dbClient           *ent.Client
 	probPubKeyCanClaim map[uuid.UUID]map[string]float32
 }
 
 func NewPolarityScorer(dbClient *ent.Client) *PolarityScorer {
 	scorer := &PolarityScorer{
+		logger:             slog.Default(),
 		dbClient:           dbClient,
 		probPubKeyCanClaim: make(map[uuid.UUID]map[string]float32),
 	}
@@ -53,7 +56,7 @@ func (s *PolarityScorer) Start() {
 	const limit = 1000
 	lastUpdated := time.Now().Add(-24 * 30 * time.Hour)
 	for {
-		log.Printf("checking for leaves updated after: %v", lastUpdated)
+		s.logger.Info("checking for leaves updated after", slog.Time("last_updated", lastUpdated))
 		leaves, _ := s.dbClient.TreeNode.Query().
 			Where(
 				treenode.StatusEQ(schema.TreeNodeStatusAvailable),
@@ -64,7 +67,7 @@ func (s *PolarityScorer) Start() {
 			).
 			Limit(limit).
 			All(context.Background())
-		log.Printf("found %d leaves to update", len(leaves))
+		s.logger.Info("found leaves to update", slog.Int("num_leaves", len(leaves)))
 		for _, leaf := range leaves {
 			node := leaf
 			for i := 0; i < PolarityScoreDepth; i++ {
@@ -114,13 +117,16 @@ func (s *PolarityScorer) UpdateLeaves(node *ent.TreeNode) {
 
 	// Build the helper tree starting from the given node
 	helperTree := buildHelperTree(node)
+	s.logger.Info("helper tree", slog.Any("root", node.ID), slog.Int("leaves", len(helperTree.Leaves())))
 	for _, leaf := range helperTree.Leaves() {
 		if _, ok := s.probPubKeyCanClaim[leaf.leafID]; !ok {
 			s.probPubKeyCanClaim[leaf.leafID] = make(map[string]float32)
 		}
-		for owner, score := range leaf.Score() {
+		scores := leaf.Score()
+		for owner, score := range scores {
 			s.probPubKeyCanClaim[leaf.leafID][owner] = score
 		}
+		s.logger.Info("updated leaf", slog.Any("leaf_id", leaf.leafID), slog.Any("score-root", helperTree.leafID), slog.Any("scores", scores))
 	}
 }
 
@@ -140,17 +146,19 @@ func (s *PolarityScorer) Score(leafID uuid.UUID, sspPublicKey []byte, userPublic
 }
 
 func (s *PolarityScorer) FetchPolarityScores(req *pb.FetchPolarityScoreRequest, stream pb.SparkTreeService_FetchPolarityScoresServer) error {
+	logger := helper.GetLoggerFromContext(stream.Context())
+
 	targetPubKeys := make(map[string]bool)
 	for _, pubKey := range req.PublicKeys {
 		targetPubKeys[string(pubKey)] = true
 	}
 	if len(targetPubKeys) > 0 {
-		log.Printf("fetching polarity scores for %d target pubkeys", len(targetPubKeys))
+		logger.Info("fetching polarity scores", slog.Int("num_pubkeys", len(targetPubKeys)))
 	} else {
-		log.Printf("fetching all polarity scores")
+		logger.Info("fetching all polarity scores")
 	}
 
-	log.Printf("found %d leaves in map", len(s.probPubKeyCanClaim))
+	logger.Info("loading cache", slog.Int("num_leaves", len(s.probPubKeyCanClaim)))
 	for leafID, leafScores := range s.probPubKeyCanClaim {
 		for pubKey, score := range leafScores {
 			if len(targetPubKeys) > 0 && !targetPubKeys[pubKey] {
