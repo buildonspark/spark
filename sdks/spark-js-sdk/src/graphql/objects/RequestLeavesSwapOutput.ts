@@ -7,7 +7,6 @@ interface RequestLeavesSwapOutput {
 export const RequestLeavesSwapOutputFromJson = (
   obj: any
 ): RequestLeavesSwapOutput => {
-  console.log(obj);
   return {
     requestId: obj["request_leaves_swap_output_request"].leaves_swap_request_id,
   } as RequestLeavesSwapOutput;

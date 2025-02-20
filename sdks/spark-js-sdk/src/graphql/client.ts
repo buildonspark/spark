@@ -16,19 +16,19 @@ import {
   CompleteCoopExitInput,
   CompleteCoopExitOutput,
   CompleteLeavesSwapInput,
-  CompleteLeavesSwapOutput,
   CoopExitFeeEstimateInput,
   CoopExitFeeEstimateOutput,
   LightningSendRequest,
   RequestCoopExitInput,
-  RequestCoopExitOutput,
   RequestLeavesSwapInput,
   RequestLightningReceiveInput,
   RequestLightningSendInput,
 } from "./objects";
 import { CompleteCoopExitOutputFromJson } from "./objects/CompleteCoopExitOutput";
-import { CompleteLeavesSwapOutputFromJson } from "./objects/CompleteLeavesSwapOutput";
 import { CoopExitFeeEstimateOutputFromJson } from "./objects/CoopExitFeeEstimateOutput";
+import CoopExitRequest, {
+  CoopExitRequestFromJson,
+} from "./objects/CoopExitRequest";
 import LeavesSwapRequest, {
   LeavesSwapRequestFromJson,
 } from "./objects/LeavesSwapRequest";
@@ -42,7 +42,6 @@ import LightningSendFeeEstimateOutput, {
   LightningSendFeeEstimateOutputFromJson,
 } from "./objects/LightningSendFeeEstimateOutput";
 import { LightningSendRequestFromJson } from "./objects/LightningSendRequest";
-import { RequestCoopExitOutputFromJson } from "./objects/RequestCoopExitOutput";
 import { CoopExitFeeEstimate } from "./queries/CoopExitFeeEstimate";
 import { LightningReceiveFeeEstimate } from "./queries/LightningReceiveFeeEstimate";
 import { LightningSendFeeEstimate } from "./queries/LightningSendFeeEstimate";
@@ -145,7 +144,7 @@ export default class SspClient {
   async requestCoopExit({
     leafExternalIds,
     withdrawalAddress,
-  }: RequestCoopExitInput): Promise<RequestCoopExitOutput | null> {
+  }: RequestCoopExitInput): Promise<CoopExitRequest | null> {
     return await this.executeRawQuery({
       queryPayload: RequestCoopExit,
       variables: {
@@ -153,9 +152,7 @@ export default class SspClient {
         withdrawal_address: withdrawalAddress,
       },
       constructObject: (response: { request_coop_exit: any }) => {
-        return RequestCoopExitOutputFromJson(
-          response.request_coop_exit.request
-        );
+        return CoopExitRequestFromJson(response.request_coop_exit.request);
       },
     });
   }
@@ -210,14 +207,6 @@ export default class SspClient {
     feeSats,
     network,
   }: RequestLeavesSwapInput): Promise<LeavesSwapRequest | null> {
-    console.log("Request Variables:", {
-      adaptor_pubkey: adaptorPubkey,
-      total_amount_sats: totalAmountSats,
-      target_amount_sats: targetAmountSats,
-      fee_sats: feeSats,
-      network: network,
-    });
-    console.log("GraphQL Query:", RequestSwapLeaves);
     const query = {
       queryPayload: RequestSwapLeaves,
       variables: {
@@ -228,15 +217,10 @@ export default class SspClient {
         network: network,
       },
       constructObject: (response: { request_leaves_swap: any }) => {
-        console.log("Raw Response:", JSON.stringify(response, null, 2));
         if (!response.request_leaves_swap) {
-          console.log("Error: request_leaves_swap is null or undefined");
           return null;
         }
-        console.log(
-          "Request Leaves Swap Response:",
-          JSON.stringify(response.request_leaves_swap, null, 2)
-        );
+
         return LeavesSwapRequestFromJson(response.request_leaves_swap.request);
       },
     };
@@ -247,7 +231,7 @@ export default class SspClient {
     adaptorSecretKey,
     userOutboundTransferExternalId,
     leavesSwapRequestId,
-  }: CompleteLeavesSwapInput): Promise<CompleteLeavesSwapOutput | null> {
+  }: CompleteLeavesSwapInput): Promise<LeavesSwapRequest | null> {
     return await this.executeRawQuery({
       queryPayload: CompleteLeavesSwap,
       variables: {
@@ -256,9 +240,7 @@ export default class SspClient {
         leaves_swap_request_id: leavesSwapRequestId,
       },
       constructObject: (response: { complete_leaves_swap: any }) => {
-        return CompleteLeavesSwapOutputFromJson(
-          response.complete_leaves_swap.request
-        );
+        return LeavesSwapRequestFromJson(response.complete_leaves_swap.request);
       },
     });
   }

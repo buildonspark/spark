@@ -29,6 +29,7 @@ import {
 
 import { bytesToHex, hexToBytes } from "@noble/curves/abstract/utils";
 import { secp256k1 } from "@noble/curves/secp256k1";
+import { TransactionInput } from "@scure/btc-signer/psbt";
 import { sha256 } from "@scure/btc-signer/utils";
 import { decode } from "light-bolt11-decoder";
 import SspClient from "./graphql/client";
@@ -45,7 +46,10 @@ import { CoopExitService } from "./services/coop-exit";
 import { LightningService } from "./services/lightning";
 import { SparkSigner } from "./signer/signer";
 import { generateAdaptorFromSignature } from "./utils/adaptor-signature";
-import { getP2TRAddressFromPublicKey } from "./utils/bitcoin";
+import {
+  getP2TRAddressFromPublicKey,
+  getTxFromRawTxHex,
+} from "./utils/bitcoin";
 import { LeafNode, selectLeaves } from "./utils/leaf-selection";
 import { Network } from "./utils/network";
 import {
@@ -257,9 +261,12 @@ export class SparkWallet {
       throw new Error("Failed to request leaves swap");
     }
 
-    console.log({
-      transferID: transfer.id,
-    });
+    await this.transferService.sendTransferTweakKey(
+      transfer,
+      leafKeyTweaks,
+      signatureMap
+    );
+
     const completeResponse = await this.sspClient?.completeLeaveSwap({
       adaptorSecretKey: bytesToHex(adaptorPrivateKey),
       userOutboundTransferExternalId: transfer.id,
@@ -271,6 +278,8 @@ export class SparkWallet {
     }
 
     await this.claimTransfers();
+
+    return completeResponse;
   }
 
   // Lightning
@@ -320,7 +329,6 @@ export class SparkWallet {
     // TODO: Get fee
 
     const decodedInvoice = decode(invoice);
-    console.log({ decodedInvoiceSections: decodedInvoice.sections });
     amountSats =
       Number(
         decodedInvoice.sections.find((section) => section.name === "amount")
@@ -502,9 +510,22 @@ export class SparkWallet {
     }
   }
 
-  async coopExit() {
-    const leavesToSend = await Promise.all(
-      this.leaves.map(async (leaf) => ({
+  async coopExit(onchainAddress: string, targetAmountSats?: number) {
+    let leavesToSend: LeafNode[] = [];
+    if (targetAmountSats) {
+      leavesToSend = selectLeaves(
+        this.leaves.map((leaf) => ({ ...leaf, isUsed: false })),
+        targetAmountSats
+      );
+    } else {
+      leavesToSend = this.leaves.map((leaf) => ({
+        ...leaf,
+        isUsed: true,
+      }));
+    }
+
+    const leafKeyTweaks = await Promise.all(
+      leavesToSend.map(async (leaf) => ({
         leaf,
         signingPubKey: await this.config.signer.generatePublicKey(
           sha256(leaf.id)
@@ -513,103 +534,44 @@ export class SparkWallet {
       }))
     );
 
-    // const leaves = this.config.signer.getLeafKeyTweaks(this.leaves);
+    const coopExitRequest = await this.sspClient?.requestCoopExit({
+      leafExternalIds: leavesToSend.map((leaf) => leaf.id),
+      withdrawalAddress: onchainAddress,
+    });
 
-    // TODO: Might need a differnet ID for this
-    const withdrawPubKey = await this.config.signer.generatePublicKey(
-      sha256(leavesToSend[0].leaf.treeId)
+    if (!coopExitRequest?.rawConnectorTransaction) {
+      throw new Error("Failed to request coop exit");
+    }
+
+    const connectorTx = getTxFromRawTxHex(
+      coopExitRequest.rawConnectorTransaction
     );
+    const coopExitTxId = connectorTx.id;
 
-    const withdrawAddress = getP2TRAddressFromPublicKey(
-      withdrawPubKey,
-      this.config.getNetwork()
-    );
+    const connectorOutputs: TransactionInput[] = [];
+    for (let i = 0; i < connectorTx.outputsLength - 1; i++) {
+      connectorOutputs.push({
+        txid: hexToBytes(coopExitTxId),
+        index: i,
+      });
+    }
 
-    const amountSats = leavesToSend.reduce(
-      (acc, leaf) => acc + BigInt(leaf.leaf.value),
-      0n
-    );
+    const sspPubIdentityKey =
+      await this.config.signer.getSspIdentityPublicKey();
 
-    // everything async
-    // return identifiers
-    //
-    //
-    //
-    //
-    //
-    //
-    //
+    const transfer = await this.coopExitService.getConnectorRefundSignatures({
+      leaves: leafKeyTweaks,
+      exitTxId: hexToBytes(coopExitTxId),
+      connectorOutputs,
+      receiverPubKey: sspPubIdentityKey,
+    });
 
-    // // get/create exit tx from where?
-    // const dummyTx = createDummyTx({
-    //   address: withdrawAddress,
-    //   amountSats,
-    // });
-    // const exitTx = getTxFromRawTxBytes(dummyTx.tx);
+    const completeResponse = await this.sspClient?.completeCoopExit({
+      userOutboundTransferExternalId: transfer.transfer.id,
+      coopExitRequestId: coopExitRequest.id,
+    });
 
-    // const dustAmountSats = 354;
-    // const intermediateAmountSats = (leaves.length + 1) * dustAmountSats;
-
-    // const sspIntermediateAddressScript = getP2TRScriptFromPublicKey(
-    //   withdrawPubKey, // Should be ssp pubkey
-    //   this.config.getNetwork()
-    // );
-
-    // exitTx.addOutput({
-    //   script: sspIntermediateAddressScript,
-    //   amount: BigInt(intermediateAmountSats),
-    // });
-    // // end
-
-    // const intermediateInput: TransactionInput = {
-    //   txid: hexToBytes(getTxId(exitTx)),
-    //   index: 1,
-    // };
-
-    // let connectorP2trAddrs: string[] = [];
-    // for (let i = 0; i < leaves.length + 1; i++) {
-    //   const connectorPubKey = this.config.signer.generatePublicKey(
-    //     sha256(leaves[i].leaf.id)
-    //   );
-    //   const connectorP2trAddr = getP2TRAddressFromPublicKey(
-    //     connectorPubKey,
-    //     this.config.getNetwork()
-    //   );
-    //   connectorP2trAddrs.push(connectorP2trAddr);
-    // }
-
-    // const feeBumpAddr = connectorP2trAddrs[connectorP2trAddrs.length - 1];
-    // connectorP2trAddrs = connectorP2trAddrs.slice(0, -1);
-    // const transaction = new Transaction();
-    // transaction.addInput(intermediateInput);
-
-    // for (const addr of [...connectorP2trAddrs, feeBumpAddr]) {
-    //   transaction.addOutput({
-    //     script: OutScript.encode(
-    //       Address(getNetwork(this.config.getNetwork())).decode(addr)
-    //     ),
-    //     amount: BigInt(
-    //       intermediateAmountSats / (connectorP2trAddrs.length + 1)
-    //     ),
-    //   });
-    // }
-
-    // const connectorOutputs = [];
-    // for (let i = 0; i < transaction.outputsLength - 1; i++) {
-    //   connectorOutputs.push({
-    //     txid: hexToBytes(getTxId(transaction)),
-    //     index: i,
-    //   });
-    // }
-
-    // await this.coopExitService.getConnectorRefundSignatures({
-    //   leaves,
-    //   exitTxId: hexToBytes(getTxId(exitTx)),
-    //   connectorOutputs,
-    //   receiverPubKey: withdrawPubKey,
-    // });
-
-    throw new Error("Not implemented");
+    return completeResponse;
   }
 
   // TODO: Remove this
