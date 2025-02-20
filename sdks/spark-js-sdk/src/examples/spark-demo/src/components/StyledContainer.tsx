@@ -3,15 +3,18 @@ import styled from "styled-components";
 export default function StyledContainer({
   children,
   isPressable = false,
-
+  onClick,
   className,
 }: {
   children: React.ReactNode;
   isPressable?: boolean;
   className?: string;
+  onClick?: () => void;
 }) {
   return isPressable ? (
-    <ButtonContainer className={className}>{children}</ButtonContainer>
+    <ButtonContainer className={className} onClick={onClick}>
+      {children}
+    </ButtonContainer>
   ) : (
     <DivContainer className={className}>{children}</DivContainer>
   );

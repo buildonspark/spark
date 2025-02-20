@@ -3,9 +3,13 @@ import styled from "styled-components";
 import DeleteIcon from "../icons/DeleteIcon";
 import Button from "./Button";
 import { useNavigate } from "react-router-dom";
-export default function AmountInput() {
-  const navigate = useNavigate();
-  const [amount, setAmount] = useState("0");
+export default function AmountInput({
+  amount,
+  setAmount,
+}: {
+  amount: string;
+  setAmount: React.Dispatch<React.SetStateAction<string>>;
+}) {
   const [btcPrice, setBtcPrice] = useState<number | null>(null);
 
   const handleKey = (key: string) => {
@@ -131,12 +135,6 @@ export default function AmountInput() {
           </AmountInputButton>
         </div>
       </div>
-      <Button
-        text="Confirm"
-        onClick={() => {
-          navigate("/receive-details");
-        }}
-      />
     </div>
   );
 }

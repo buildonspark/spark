@@ -77,10 +77,6 @@ export default function ReceiveDetails() {
           //   logo={<WalletIcon />}
         />
       </ReceiveDetailsContainer>
-      <Button text="Share" />
-      <div className="text-[12px] text-[#f9f9f9] opacity-50 mt-20">
-        Powered by Spark
-      </div>
     </div>
   );
 }

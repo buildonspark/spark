@@ -18,7 +18,6 @@ export default function Root() {
           <Route path="/receive" element={<Receive />} />
           <Route path="/send" element={<Send />} />
           <Route path="/receive-details" element={<ReceiveDetails />} />
-          <Route path="/amount-input" element={<AmountInput />} />
         </Routes>
       </div>
     </Router>
