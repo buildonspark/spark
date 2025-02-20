@@ -1,4 +1,3 @@
-import { FormEventHandler } from "react";
 import Button from "./Button";
 
 export default function CardForm({

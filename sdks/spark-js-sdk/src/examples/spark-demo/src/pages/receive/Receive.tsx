@@ -1,10 +1,9 @@
-import { FormEventHandler, useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import CardForm from "../../components/CardForm";
 import Networks, { Network } from "../../components/Networks";
 import ArrowLeft from "../../icons/ArrowLeft";
 import AmountInput from "../../components/AmountInput";
 import { useNavigate } from "react-router-dom";
-import CloseIcon from "../../icons/CloseIcon";
 import ReceiveDetails from "../../components/ReceiveDetails";
 
 enum ReceiveStep {

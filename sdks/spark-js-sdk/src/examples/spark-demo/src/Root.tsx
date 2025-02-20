@@ -17,7 +17,6 @@ export default function Root() {
           <Route path="/wallet" element={<Wallet />} />
           <Route path="/receive" element={<Receive />} />
           <Route path="/send" element={<Send />} />
-          <Route path="/receive-details" element={<ReceiveDetails />} />
         </Routes>
       </div>
     </Router>

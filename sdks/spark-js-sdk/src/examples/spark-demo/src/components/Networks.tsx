@@ -1,6 +1,5 @@
 import ChevronRightIcon from "../icons/ChevronRightIcon";
 import LightningIcon from "../icons/LightningIcon";
-import AmountInput from "./AmountInput";
 import StyledContainer from "./StyledContainer";
 
 export enum Network {

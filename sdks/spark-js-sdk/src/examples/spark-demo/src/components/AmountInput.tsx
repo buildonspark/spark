@@ -1,8 +1,6 @@
 import { useEffect, useState } from "react";
 import styled from "styled-components";
 import DeleteIcon from "../icons/DeleteIcon";
-import Button from "./Button";
-import { useNavigate } from "react-router-dom";
 export default function AmountInput({
   amount,
   setAmount,

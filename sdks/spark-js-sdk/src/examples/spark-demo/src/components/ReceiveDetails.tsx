@@ -1,11 +1,9 @@
 import { useState } from "react";
-import StyledContainer from "./StyledContainer";
 import WalletIcon from "../icons/WalletIcon";
 import styled from "styled-components";
 import ClockIcon from "../icons/ClockIcon";
 import CopyIcon from "../icons/CopyIcon";
 import PencilIcon from "../icons/PencilIcon";
-import Button from "./Button";
 import DetailsRow from "./DetailsRow";
 type ActiveButton = "bitcoin" | "lightning" | "uma";
 

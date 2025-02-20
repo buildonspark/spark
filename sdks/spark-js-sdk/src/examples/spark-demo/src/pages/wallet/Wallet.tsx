@@ -1,11 +1,8 @@
 import { useNavigate } from "react-router-dom";
 import Button from "../../components/Button";
-import CurrencyBalanceDetails from "../../components/CurrencyBalanceDetails";
 import StyledContainer from "../../components/StyledContainer";
-import BitcoinIcon from "../../icons/BitcoinIcon";
 import ReceiveIcon from "../../icons/ReceiveIcon";
 import SendIcon from "../../icons/SendIcon";
-import StableCoinLogo from "../../icons/StableCoinLogo";
 import WalletIcon from "../../icons/WalletIcon";
 
 export default function Wallet() {

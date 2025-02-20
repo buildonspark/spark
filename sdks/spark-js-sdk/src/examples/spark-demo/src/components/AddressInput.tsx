@@ -1,10 +1,8 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { Network } from "./Networks";
 import DetailsRow from "./DetailsRow";
 import BitcoinIcon from "../icons/BitcoinIcon";
 import ChevronRightIcon from "../icons/ChevronRightIcon";
-import { SendStep } from "../pages/send/Send";
 
 function debounce<T extends (...args: any[]) => void>(func: T, wait: number) {
   let timeout: ReturnType<typeof setTimeout> | null = null;
