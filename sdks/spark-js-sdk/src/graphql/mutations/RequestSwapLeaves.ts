@@ -7,6 +7,7 @@ export const RequestSwapLeaves = `
     $target_amount_sats: Int!
     $fee_sats: Int!
     $network: BitcoinNetwork!
+    $user_leaves: [UserLeafInput!]!
   ) {
     request_leaves_swap(input: {
       adaptor_pubkey: $adaptor_pubkey
@@ -14,6 +15,7 @@ export const RequestSwapLeaves = `
       target_amount_sats: $target_amount_sats
       fee_sats: $fee_sats
       network: $network
+      user_leaves: $user_leaves
     }) {
       request {
         ...LeavesSwapRequestFragment

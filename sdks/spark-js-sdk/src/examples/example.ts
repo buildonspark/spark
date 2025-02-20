@@ -7,7 +7,7 @@ import { Network } from "../../dist/utils/network";
 
 // Initialize Spark Wallet
 const walletMnemonic =
-  "bbbbtypical stereo dose party penalty decline neglect feel harvest abstract stage winter";
+  "cctypical stereo dose party penalty decline neglect feel harvest abstract stage winter";
 
 async function runCLI() {
   let wallet = new SparkWallet(Network.REGTEST);
@@ -106,11 +106,7 @@ async function runCLI() {
           console.log("No wallet initialized");
           break;
         }
-        const txs = await wallet.queryDepositTx(
-          args[0],
-          hexToBytes(args[1]),
-          hexToBytes(args[2])
-        );
+        const txs = await wallet.queryPendingDepositTx(args[0]);
         console.log(txs);
         break;
       case "completedeposit":

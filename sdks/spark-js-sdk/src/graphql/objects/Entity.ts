@@ -50,6 +50,7 @@ fragment EntityFragment on Entity {
         }
         coop_exit_request_status: status
         coop_exit_request_expires_at: expires_at
+        coop_exit_request_raw_connector_transaction: raw_connector_transaction
     }
     ... on LeavesSwapRequest {
         __typename
@@ -82,6 +83,12 @@ fragment EntityFragment on Entity {
             transfer_spark_id: spark_id
         }
         leaves_swap_request_expires_at: expires_at
+        leaves_swap_request_swap_leaves: swap_leaves {
+            __typename
+            swap_leaf_leaf_id: leaf_id
+            swap_leaf_raw_unsigned_refund_transaction: raw_unsigned_refund_transaction
+            swap_leaf_adaptor_signed_signature: adaptor_signed_signature
+        }
     }
     ... on LightningReceiveRequest {
         __typename

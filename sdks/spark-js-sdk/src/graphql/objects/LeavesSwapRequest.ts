@@ -2,10 +2,13 @@
 // Copyright ©, 2023-present, Lightspark Group, Inc. - All Rights Reserved
 
 import Entity from './Entity.js';
+import SparkLeavesSwapRequestStatus from './SparkLeavesSwapRequestStatus.js';
+import Transfer from './Transfer.js';
+import SwapLeaf from './SwapLeaf.js';
 import { Query, isObject } from '@lightsparkdev/core';
 import {TransferFromJson} from './Transfer.js';
-import Transfer from './Transfer.js';
-import SparkLeavesSwapRequestStatus from './SparkLeavesSwapRequestStatus.js';
+import {SwapLeafToJson} from './SwapLeaf.js';
+import {SwapLeafFromJson} from './SwapLeaf.js';
 
 
 interface LeavesSwapRequest {
@@ -32,6 +35,9 @@ inboundTransfer: Transfer;
     /** The time when the leaves swap request expires. **/
 expiresAt: string;
 
+    /** The swap leaves returned to the user **/
+swapLeaves: SwapLeaf[];
+
     /** The typename of the object **/
 typename: string;
 
@@ -51,6 +57,7 @@ export const LeavesSwapRequestFromJson = (obj: any): LeavesSwapRequest => {
         status: SparkLeavesSwapRequestStatus[obj["leaves_swap_request_status"]] ?? SparkLeavesSwapRequestStatus.FUTURE_VALUE,
         inboundTransfer: TransferFromJson(obj["leaves_swap_request_inbound_transfer"]),
         expiresAt: obj["leaves_swap_request_expires_at"],
+        swapLeaves: obj["leaves_swap_request_swap_leaves"].map((e) => SwapLeafFromJson(e)),
 typename: "LeavesSwapRequest",        outboundTransfer: (!!obj["leaves_swap_request_outbound_transfer"] ? TransferFromJson(obj["leaves_swap_request_outbound_transfer"]) : undefined),
 
         } as LeavesSwapRequest;
@@ -65,6 +72,7 @@ leaves_swap_request_status: obj.status,
 leaves_swap_request_inbound_transfer: obj.inboundTransfer.toJson(),
 leaves_swap_request_outbound_transfer: (obj.outboundTransfer ? obj.outboundTransfer.toJson() : undefined),
 leaves_swap_request_expires_at: obj.expiresAt,
+leaves_swap_request_swap_leaves: obj.swapLeaves.map((e) => SwapLeafToJson(e)),
 
         }
 
@@ -103,6 +111,12 @@ fragment LeavesSwapRequestFragment on LeavesSwapRequest {
         transfer_spark_id: spark_id
     }
     leaves_swap_request_expires_at: expires_at
+    leaves_swap_request_swap_leaves: swap_leaves {
+        __typename
+        swap_leaf_leaf_id: leaf_id
+        swap_leaf_raw_unsigned_refund_transaction: raw_unsigned_refund_transaction
+        swap_leaf_adaptor_signed_signature: adaptor_signed_signature
+    }
 }`;
 
 

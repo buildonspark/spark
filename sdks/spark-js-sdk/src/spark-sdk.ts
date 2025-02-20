@@ -14,6 +14,7 @@ import {
   LightningReceiveFeeEstimateOutput,
   LightningSendFeeEstimateInput,
   LightningSendFeeEstimateOutput,
+  UserLeafInput,
 } from "./graphql/objects";
 import {
   GenerateDepositAddressResponse,
@@ -36,9 +37,16 @@ import {
   TreeCreationService,
 } from "./services/tree-creation";
 import { SparkSigner } from "./signer/signer";
-import { generateAdaptorFromSignature } from "./utils/adaptor-signature";
 import {
+  applyAdaptorToSignature,
+  generateAdaptorFromSignature,
+  generateSignatureFromExistingAdaptor,
+} from "./utils/adaptor-signature";
+import {
+  computeTaprootKeyNoScript,
   getP2TRAddressFromPublicKey,
+  getSigHashFromTx,
+  getTxFromRawTxBytes,
   getTxFromRawTxHex,
   getTxId,
 } from "./utils/bitcoin";
@@ -219,16 +227,14 @@ export class SparkWallet {
     await this.syncTokenLeaves();
   }
 
-  async requestLeavesSwap(leaves: TreeNode[]) {
-    // await this.claimTransfers();
-    // const leaves = await this.getLeaves();
+  async requestLeavesSwap(targetAmount: number) {
+    await this.claimTransfers();
+    const leaves = await this.getLeaves();
 
-    // const leavesToSwap = selectLeaves(
-    //   leaves.map((leaf) => ({ ...leaf, isUsed: false })),
-    //   targetAmount
-    // );
-
-    const leavesToSwap = leaves;
+    const leavesToSwap = selectLeaves(
+      leaves.map((leaf) => ({ ...leaf, isUsed: false })),
+      targetAmount
+    );
 
     const leafKeyTweaks = await Promise.all(
       leavesToSwap.map(async (leaf) => ({
@@ -255,8 +261,47 @@ export class SparkWallet {
     const { adaptorPrivateKey, adaptorSignature } =
       generateAdaptorFromSignature(refundSignature);
 
+    if (!transfer.leaves[0].leaf) {
+      throw new Error("Failed to get leaf");
+    }
+
+    const userLeaves: UserLeafInput[] = [];
+    userLeaves.push({
+      leaf_id: transfer.leaves[0].leaf.id,
+      raw_unsigned_refund_transaction: bytesToHex(
+        transfer.leaves[0].intermediateRefundTx
+      ),
+      adaptor_added_signature: bytesToHex(adaptorSignature),
+    });
+
+    for (let i = 1; i < transfer.leaves.length; i++) {
+      const leaf = transfer.leaves[i];
+      if (!leaf.leaf) {
+        throw new Error("Failed to get leaf");
+      }
+
+      const refundSignature = signatureMap.get(leaf.leaf.id);
+      if (!refundSignature) {
+        throw new Error("Failed to get refund signature");
+      }
+
+      const signature = generateSignatureFromExistingAdaptor(
+        refundSignature,
+        adaptorPrivateKey
+      );
+
+      userLeaves.push({
+        leaf_id: leaf.leaf.id,
+        raw_unsigned_refund_transaction: bytesToHex(leaf.intermediateRefundTx),
+        adaptor_added_signature: bytesToHex(signature),
+      });
+    }
+
+    const adaptorPubkey = bytesToHex(secp256k1.getPublicKey(adaptorPrivateKey));
+
     const request = await this.sspClient?.requestLeaveSwap({
-      adaptorPubkey: bytesToHex(secp256k1.getPublicKey(adaptorPrivateKey)),
+      userLeaves,
+      adaptorPubkey,
       targetAmountSats: leavesToSwap.reduce((acc, leaf) => acc + leaf.value, 0),
       totalAmountSats: leavesToSwap.reduce((acc, leaf) => acc + leaf.value, 0),
       // TODO: Request fee from SSP
@@ -268,6 +313,42 @@ export class SparkWallet {
     if (!request) {
       throw new Error("Failed to request leaves swap");
     }
+
+    const sparkClient = await this.connectionManager.createSparkClient(
+      this.config.getCoordinatorAddress()
+    );
+    for (const leaf of request.swapLeaves) {
+      const response = await sparkClient.query_nodes({
+        source: {
+          $case: "nodeIds",
+          nodeIds: {
+            nodeIds: [leaf.leafId],
+          },
+        },
+      });
+
+      const nodesLength = Object.values(response.nodes).length;
+      if (nodesLength !== 1) {
+        throw new Error(`Expected 1 node, got ${nodesLength}`);
+      }
+
+      const nodeTx = getTxFromRawTxBytes(response.nodes[leaf.leafId].nodeTx);
+      const refundTxBytes = hexToBytes(leaf.rawUnsignedRefundTransaction);
+      const refundTx = getTxFromRawTxBytes(refundTxBytes);
+      const sighash = getSigHashFromTx(refundTx, 0, nodeTx.getOutput(0));
+      const nodePublicKey = response.nodes[leaf.leafId].verifyingPublicKey;
+
+      const taprootKey = computeTaprootKeyNoScript(nodePublicKey.slice(1));
+      const adaptorSignatureBytes = hexToBytes(leaf.adaptorSignedSignature);
+      applyAdaptorToSignature(
+        taprootKey.slice(1),
+        sighash,
+        adaptorSignatureBytes,
+        adaptorPrivateKey
+      );
+    }
+
+    sparkClient.close?.();
 
     await this.transferService.sendTransferTweakKey(
       transfer,
@@ -551,8 +632,6 @@ export class SparkWallet {
       leafExternalIds: leavesToSend.map((leaf) => leaf.id),
       withdrawalAddress: onchainAddress,
     });
-
-    console.log("coopExitRequest", coopExitRequest);
 
     if (!coopExitRequest?.rawConnectorTransaction) {
       throw new Error("Failed to request coop exit");

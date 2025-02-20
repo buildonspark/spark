@@ -372,10 +372,7 @@ class DefaultSparkSigner implements SparkSigner {
       );
     }
 
-    const signature = secp256k1.sign(
-      message,
-      hexToBytes(privateKey)
-    );
+    const signature = secp256k1.sign(message, hexToBytes(privateKey));
 
     if (compact) {
       return signature.toCompactRawBytes();

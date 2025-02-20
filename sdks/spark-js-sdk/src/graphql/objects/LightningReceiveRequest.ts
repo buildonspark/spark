@@ -2,16 +2,16 @@
 // Copyright ©, 2023-present, Lightspark Group, Inc. - All Rights Reserved
 
 import Entity from './Entity.js';
-import { Query, isObject } from '@lightsparkdev/core';
-import {TransferFromJson} from './Transfer.js';
 import {CurrencyAmountFromJson} from './CurrencyAmount.js';
+import Transfer from './Transfer.js';
 import CurrencyAmount from './CurrencyAmount.js';
-import {InvoiceToJson} from './Invoice.js';
+import { Query, isObject } from '@lightsparkdev/core';
+import {InvoiceFromJson} from './Invoice.js';
+import Invoice from './Invoice.js';
+import {TransferFromJson} from './Transfer.js';
 import LightningReceiveRequestStatus from './LightningReceiveRequestStatus.js';
 import {CurrencyAmountToJson} from './CurrencyAmount.js';
-import Invoice from './Invoice.js';
-import Transfer from './Transfer.js';
-import {InvoiceFromJson} from './Invoice.js';
+import {InvoiceToJson} from './Invoice.js';
 
 
 interface LightningReceiveRequest {

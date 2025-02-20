@@ -47,5 +47,7 @@ export { default as RequestLightningSendOutput } from "./RequestLightningSendOut
 export { default as SparkCoopExitRequestStatus } from "./SparkCoopExitRequestStatus.js";
 export { default as SparkLeavesSwapRequestStatus } from "./SparkLeavesSwapRequestStatus.js";
 export { default as SparkTransferToLeavesConnection } from "./SparkTransferToLeavesConnection.js";
+export { default as SwapLeaf } from "./SwapLeaf.js";
 export { default as Transfer } from "./Transfer.js";
+export { default as UserLeafInput } from "./UserLeafInput.js";
 export { default as WalletUser, getWalletUserQuery } from "./WalletUser.js";

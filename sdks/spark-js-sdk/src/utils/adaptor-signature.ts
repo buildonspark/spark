@@ -2,6 +2,22 @@ import { mod } from "@noble/curves/abstract/modular";
 import { bytesToNumberBE, numberToBytesBE } from "@noble/curves/abstract/utils";
 import { schnorr, secp256k1 } from "@noble/curves/secp256k1";
 
+export function generateSignatureFromExistingAdaptor(
+  signature: Uint8Array,
+  adaptorPrivateKeyBytes: Uint8Array
+): Uint8Array {
+  const { r, s } = parseSignature(signature);
+
+  const sBigInt = bytesToNumberBE(s);
+  const tBigInt = bytesToNumberBE(adaptorPrivateKeyBytes);
+
+  const newS = mod(sBigInt - tBigInt, secp256k1.CURVE.n);
+
+  const newSignature = new Uint8Array([...r, ...numberToBytesBE(newS, 32)]);
+
+  return newSignature;
+}
+
 export function generateAdaptorFromSignature(signature: Uint8Array): {
   adaptorSignature: Uint8Array;
   adaptorPrivateKey: Uint8Array;

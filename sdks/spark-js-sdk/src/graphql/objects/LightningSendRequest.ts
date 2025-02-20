@@ -2,12 +2,12 @@
 // Copyright ©, 2023-present, Lightspark Group, Inc. - All Rights Reserved
 
 import Entity from './Entity.js';
+import {CurrencyAmountFromJson} from './CurrencyAmount.js';
+import Transfer from './Transfer.js';
+import CurrencyAmount from './CurrencyAmount.js';
 import { Query, isObject } from '@lightsparkdev/core';
 import {TransferFromJson} from './Transfer.js';
-import {CurrencyAmountFromJson} from './CurrencyAmount.js';
-import CurrencyAmount from './CurrencyAmount.js';
 import {CurrencyAmountToJson} from './CurrencyAmount.js';
-import Transfer from './Transfer.js';
 import LightningSendRequestStatus from './LightningSendRequestStatus.js';
 
 
