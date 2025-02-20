@@ -138,7 +138,7 @@ func SendSwapSignRefund(
 		}
 	}
 
-	signingJobs, err := prepareRefundSoSigningJobs(leaves, config, leafDataMap)
+	signingJobs, err := prepareRefundSoSigningJobs(leaves, leafDataMap)
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("failed to prepare signing jobs for sending transfer: %v", err)
 	}
@@ -212,7 +212,7 @@ func SendTransferSignRefund(
 		}
 	}
 
-	signingJobs, err := prepareRefundSoSigningJobs(leaves, config, leafDataMap)
+	signingJobs, err := prepareRefundSoSigningJobs(leaves, leafDataMap)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to prepare signing jobs for sending transfer: %v", err)
 	}
@@ -578,7 +578,7 @@ func ClaimTransferSignRefunds(
 		}
 	}
 
-	signingJobs, err := prepareRefundSoSigningJobs(leafKeys, config, leafDataMap)
+	signingJobs, err := prepareRefundSoSigningJobs(leafKeys, leafDataMap)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare signing jobs for claiming transfer: %v", err)
 	}
@@ -696,7 +696,6 @@ func signRefunds(
 
 func prepareRefundSoSigningJobs(
 	leaves []LeafKeyTweak,
-	config *Config,
 	leafDataMap map[string]*LeafRefundSigningData,
 ) ([]*pb.LeafRefundTxSigningJob, error) {
 	signingJobs := []*pb.LeafRefundTxSigningJob{}
@@ -740,4 +739,22 @@ func prepareRefundSoSigningJobs(
 		})
 	}
 	return signingJobs, nil
+}
+
+func CancelSendTransfer(ctx context.Context, config *Config, transfer *pb.Transfer) (*pb.Transfer, error) {
+	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
+	if err != nil {
+		return nil, err
+	}
+	defer sparkConn.Close()
+
+	sparkClient := pb.NewSparkServiceClient(sparkConn)
+	response, err := sparkClient.CancelSendTransfer(ctx, &pb.CancelSendTransferRequest{
+		TransferId:              transfer.Id,
+		SenderIdentityPublicKey: config.IdentityPublicKey(),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to call CancelSendTransfer: %v", err)
+	}
+	return response.Transfer, nil
 }

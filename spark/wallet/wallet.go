@@ -386,9 +386,6 @@ func (w *SingleKeyWallet) RequestLeavesSwap(ctx context.Context, targetAmount in
 			return nil, fmt.Errorf("failed to apply adaptor to signature: %w", err)
 		}
 	}
-	if err != nil {
-		return nil, fmt.Errorf("failed to complete leaves swap: %w", err)
-	}
 
 	// send the transfer
 	_, err = SendTransferTweakKey(ctx, w.Config, transfer, leafKeyTweaks, refundSignatureMap)
