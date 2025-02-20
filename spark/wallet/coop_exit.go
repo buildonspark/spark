@@ -140,15 +140,23 @@ func signCoopExitRefunds(
 		return nil, nil, fmt.Errorf("failed to authenticate with coordinator: %v", err)
 	}
 	tmpCtx := ContextWithToken(ctx, token)
+	transferID, err := uuid.NewV7()
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to generate transfer id: %v", err)
+	}
+	exitID, err := uuid.NewV7()
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to generate exit id: %v", err)
+	}
 	response, err := sparkClient.CooperativeExit(tmpCtx, &pb.CooperativeExitRequest{
 		Transfer: &pb.StartSendTransferRequest{
-			TransferId:                uuid.New().String(),
+			TransferId:                transferID.String(),
 			LeavesToSend:              signingJobs,
 			OwnerIdentityPublicKey:    config.IdentityPublicKey(),
 			ReceiverIdentityPublicKey: receiverPubKey.SerializeCompressed(),
 			ExpiryTime:                timestamppb.New(time.Now().Add(24 * time.Hour)),
 		},
-		ExitId:   uuid.New().String(),
+		ExitId:   exitID.String(),
 		ExitTxid: exitTxid,
 	})
 	if err != nil {

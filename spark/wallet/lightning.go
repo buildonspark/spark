@@ -89,7 +89,10 @@ func SwapNodesForPreimage(
 	}
 
 	// SSP calls SO to get the preimage
-	transferID := uuid.New().String()
+	transferID, err := uuid.NewV7()
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate transfer id: %v", err)
+	}
 	bolt11String := ""
 	var amountSats uint64
 	if invoiceString != nil {
@@ -115,7 +118,7 @@ func SwapNodesForPreimage(
 			ValueSats: amountSats,
 		},
 		Transfer: &pb.StartSendTransferRequest{
-			TransferId:                transferID,
+			TransferId:                transferID.String(),
 			OwnerIdentityPublicKey:    config.IdentityPublicKey(),
 			ReceiverIdentityPublicKey: receiverIdentityPubkeyBytes,
 		},

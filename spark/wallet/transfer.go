@@ -156,6 +156,10 @@ func SendSwapSignRefund(
 	tmpCtx := ContextWithToken(ctx, token)
 
 	sparkClient := pb.NewSparkServiceClient(sparkConn)
+	swapID, err := uuid.NewV7()
+	if err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("failed to generate swap id: %v", err)
+	}
 	response, err := sparkClient.LeafSwap(tmpCtx, &pb.LeafSwapRequest{
 		Transfer: &pb.StartSendTransferRequest{
 			TransferId:                transferID.String(),
@@ -164,7 +168,7 @@ func SendSwapSignRefund(
 			ReceiverIdentityPublicKey: receiverIdentityPubkey,
 			ExpiryTime:                timestamppb.New(expiryTime),
 		},
-		SwapId:           uuid.New().String(),
+		SwapId:           swapID.String(),
 		AdaptorPublicKey: adaptorPublicKey.SerializeCompressed(),
 	})
 	if err != nil {

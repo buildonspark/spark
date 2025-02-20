@@ -64,8 +64,12 @@ func (o TokenTransactionHandler) StartTokenTransaction(ctx context.Context, conf
 	// Fill revocation public keys and withdrawal bond/locktime for each leaf.
 	finalTokenTransaction := req.PartialTokenTransaction
 	for i, leaf := range finalTokenTransaction.OutputLeaves {
-		id := uuid.New().String()
-		leaf.Id = &id
+		id, err := uuid.NewV7()
+		if err != nil {
+			return nil, err
+		}
+		idStr := id.String()
+		leaf.Id = &idStr
 		leaf.RevocationPublicKey = keyshares[i].PublicKey
 	}
 

@@ -196,7 +196,11 @@ func (h *TreeCreationHandler) applyKeysharesToTree(ctx context.Context, targetKe
 			selectedKeyshares = append(selectedKeyshares, electedKeyShare)
 		}
 
-		lastKeyshare, err := ent.CalculateAndStoreLastKey(ctx, h.config, currentElement.keyshare, selectedKeyshares, uuid.New())
+		id, err := uuid.NewV7()
+		if err != nil {
+			return nil, nil, err
+		}
+		lastKeyshare, err := ent.CalculateAndStoreLastKey(ctx, h.config, currentElement.keyshare, selectedKeyshares, id)
 		if err != nil {
 			return nil, nil, err
 		}
