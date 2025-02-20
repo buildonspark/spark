@@ -8,6 +8,7 @@ package lrc20
 
 import (
 	context "context"
+	spark "github.com/lightsparkdev/spark-go/proto/spark"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
@@ -25,6 +26,7 @@ const (
 	SparkService_ListSparkTxs_FullMethodName       = "/rpc.v1.SparkService/ListSparkTxs"
 	SparkService_GetSparkTx_FullMethodName         = "/rpc.v1.SparkService/GetSparkTx"
 	SparkService_VerifySparkTx_FullMethodName      = "/rpc.v1.SparkService/VerifySparkTx"
+	SparkService_FreezeTokens_FullMethodName       = "/rpc.v1.SparkService/FreezeTokens"
 )
 
 // SparkServiceClient is the client API for SparkService service.
@@ -36,6 +38,7 @@ type SparkServiceClient interface {
 	ListSparkTxs(ctx context.Context, in *ListSparkTxsRequest, opts ...grpc.CallOption) (*ListSparkTxsResponse, error)
 	GetSparkTx(ctx context.Context, in *GetSparkTxRequest, opts ...grpc.CallOption) (*GetSparkTxResponse, error)
 	VerifySparkTx(ctx context.Context, in *VerifySparkTxRequest, opts ...grpc.CallOption) (*VerifySparkTxResponse, error)
+	FreezeTokens(ctx context.Context, in *spark.FreezeTokensRequest, opts ...grpc.CallOption) (*spark.FreezeTokensResponse, error)
 }
 
 type sparkServiceClient struct {
@@ -96,6 +99,16 @@ func (c *sparkServiceClient) VerifySparkTx(ctx context.Context, in *VerifySparkT
 	return out, nil
 }
 
+func (c *sparkServiceClient) FreezeTokens(ctx context.Context, in *spark.FreezeTokensRequest, opts ...grpc.CallOption) (*spark.FreezeTokensResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(spark.FreezeTokensResponse)
+	err := c.cc.Invoke(ctx, SparkService_FreezeTokens_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SparkServiceServer is the server API for SparkService service.
 // All implementations must embed UnimplementedSparkServiceServer
 // for forward compatibility.
@@ -105,6 +118,7 @@ type SparkServiceServer interface {
 	ListSparkTxs(context.Context, *ListSparkTxsRequest) (*ListSparkTxsResponse, error)
 	GetSparkTx(context.Context, *GetSparkTxRequest) (*GetSparkTxResponse, error)
 	VerifySparkTx(context.Context, *VerifySparkTxRequest) (*VerifySparkTxResponse, error)
+	FreezeTokens(context.Context, *spark.FreezeTokensRequest) (*spark.FreezeTokensResponse, error)
 	mustEmbedUnimplementedSparkServiceServer()
 }
 
@@ -129,6 +143,9 @@ func (UnimplementedSparkServiceServer) GetSparkTx(context.Context, *GetSparkTxRe
 }
 func (UnimplementedSparkServiceServer) VerifySparkTx(context.Context, *VerifySparkTxRequest) (*VerifySparkTxResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method VerifySparkTx not implemented")
+}
+func (UnimplementedSparkServiceServer) FreezeTokens(context.Context, *spark.FreezeTokensRequest) (*spark.FreezeTokensResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method FreezeTokens not implemented")
 }
 func (UnimplementedSparkServiceServer) mustEmbedUnimplementedSparkServiceServer() {}
 func (UnimplementedSparkServiceServer) testEmbeddedByValue()                      {}
@@ -241,6 +258,24 @@ func _SparkService_VerifySparkTx_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SparkService_FreezeTokens_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(spark.FreezeTokensRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkServiceServer).FreezeTokens(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkService_FreezeTokens_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkServiceServer).FreezeTokens(ctx, req.(*spark.FreezeTokensRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // SparkService_ServiceDesc is the grpc.ServiceDesc for SparkService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -267,6 +302,10 @@ var SparkService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "VerifySparkTx",
 			Handler:    _SparkService_VerifySparkTx_Handler,
+		},
+		{
+			MethodName: "FreezeTokens",
+			Handler:    _SparkService_FreezeTokens_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

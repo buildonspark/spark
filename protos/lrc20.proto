@@ -12,6 +12,7 @@ service SparkService {
   rpc ListSparkTxs(ListSparkTxsRequest) returns (ListSparkTxsResponse);
   rpc GetSparkTx(GetSparkTxRequest) returns (GetSparkTxResponse);
   rpc VerifySparkTx(VerifySparkTxRequest) returns (VerifySparkTxResponse);
+  rpc FreezeTokens(spark.FreezeTokensRequest) returns (spark.FreezeTokensResponse);
 }
 
 message SendSparkTxRequest {

@@ -354,6 +354,7 @@ func (o TokenTransactionHandler) SendTransactionToLRC20Node(
 
 func (o TokenTransactionHandler) FreezeTokens(
 	ctx context.Context,
+	config *so.Config,
 	req *pb.FreezeTokensRequest,
 ) (*pb.FreezeTokensResponse, error) {
 	freezePayloadHash, err := utils.HashFreezeTokensPayload(req.FreezeTokensPayload)
@@ -410,10 +411,36 @@ func (o TokenTransactionHandler) FreezeTokens(
 		return nil, err
 	}
 
+	err = o.FreezeTokensOnLRC20Node(ctx, config, req)
+	if err != nil {
+		log.Printf("Failed to freeze tokens on LRC20 node: %v", err)
+		return nil, err
+	}
+
 	return &pb.FreezeTokensResponse{
 		ImpactedLeafIds:     leafIDs,
 		ImpactedTokenAmount: [][]byte{totalAmount.Bytes()},
 	}, nil
+}
+
+func (o TokenTransactionHandler) FreezeTokensOnLRC20Node(
+	ctx context.Context,
+	config *so.Config,
+	req *pb.FreezeTokensRequest,
+) error {
+	conn, err := helper.ConnectToLrc20Node(config)
+	if err != nil {
+		return fmt.Errorf("failed to connect to LRC20 node: %w", err)
+	}
+	defer conn.Close()
+	lrc20Client := pblrc20.NewSparkServiceClient(conn)
+
+	_, err = lrc20Client.FreezeTokens(ctx, req)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (o TokenTransactionHandler) GetOwnedTokenLeaves(
