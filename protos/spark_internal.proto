@@ -177,6 +177,7 @@ message InitiateCooperativeExitRequest {
 message UpdatePreimageRequestRequest {
     string preimage_request_id = 1;
     bytes preimage = 2;
+    bytes identity_public_key = 3;
 }
 
 message StartTokenTransactionInternalRequest {

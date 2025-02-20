@@ -24,7 +24,8 @@ func QueryUserSignedRefunds(ctx context.Context, config *Config, paymentHash []b
 	client := pb.NewSparkServiceClient(conn)
 
 	request := &pb.QueryUserSignedRefundsRequest{
-		PaymentHash: paymentHash,
+		PaymentHash:       paymentHash,
+		IdentityPublicKey: config.IdentityPublicKey(),
 	}
 
 	response, err := client.QueryUserSignedRefunds(tmpCtx, request)
@@ -61,8 +62,9 @@ func ProvidePreimage(ctx context.Context, config *Config, preimage []byte) (*pb.
 	paymentHash := sha256.Sum256(preimage)
 
 	request := &pb.ProvidePreimageRequest{
-		Preimage:    preimage,
-		PaymentHash: paymentHash[:],
+		Preimage:          preimage,
+		PaymentHash:       paymentHash[:],
+		IdentityPublicKey: config.IdentityPublicKey(),
 	}
 
 	response, err := client.ProvidePreimage(tmpCtx, request)

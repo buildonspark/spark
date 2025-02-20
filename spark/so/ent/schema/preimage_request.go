@@ -4,6 +4,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
+	"entgo.io/ent/schema/index"
 )
 
 // PreimageRequestStatus is the status of the preimage request
@@ -41,17 +42,20 @@ func (PreimageRequest) Mixin() []ent.Mixin {
 
 // Indexes returns the indexes for the preimage request table.
 func (PreimageRequest) Indexes() []ent.Index {
-	return []ent.Index{}
+	return []ent.Index{
+		index.Fields("payment_hash", "receiver_identity_pubkey"),
+	}
 }
 
 // Fields returns the fields for the preimage request table.
 func (PreimageRequest) Fields() []ent.Field {
 	return []ent.Field{
 		field.Bytes("payment_hash").
-			NotEmpty().
-			Unique(),
+			NotEmpty(),
 		field.Enum("status").
 			GoType(PreimageRequestStatus("")),
+		field.Bytes("receiver_identity_pubkey").
+			Optional(),
 	}
 }
 

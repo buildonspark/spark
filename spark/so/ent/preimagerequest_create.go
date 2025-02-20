@@ -65,6 +65,12 @@ func (prc *PreimageRequestCreate) SetStatus(srs schema.PreimageRequestStatus) *P
 	return prc
 }
 
+// SetReceiverIdentityPubkey sets the "receiver_identity_pubkey" field.
+func (prc *PreimageRequestCreate) SetReceiverIdentityPubkey(b []byte) *PreimageRequestCreate {
+	prc.mutation.SetReceiverIdentityPubkey(b)
+	return prc
+}
+
 // SetID sets the "id" field.
 func (prc *PreimageRequestCreate) SetID(u uuid.UUID) *PreimageRequestCreate {
 	prc.mutation.SetID(u)
@@ -255,6 +261,10 @@ func (prc *PreimageRequestCreate) createSpec() (*PreimageRequest, *sqlgraph.Crea
 	if value, ok := prc.mutation.Status(); ok {
 		_spec.SetField(preimagerequest.FieldStatus, field.TypeEnum, value)
 		_node.Status = value
+	}
+	if value, ok := prc.mutation.ReceiverIdentityPubkey(); ok {
+		_spec.SetField(preimagerequest.FieldReceiverIdentityPubkey, field.TypeBytes, value)
+		_node.ReceiverIdentityPubkey = value
 	}
 	if nodes := prc.mutation.TransactionsIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{

@@ -29,6 +29,8 @@ type PreimageRequest struct {
 	PaymentHash []byte `json:"payment_hash,omitempty"`
 	// Status holds the value of the "status" field.
 	Status schema.PreimageRequestStatus `json:"status,omitempty"`
+	// ReceiverIdentityPubkey holds the value of the "receiver_identity_pubkey" field.
+	ReceiverIdentityPubkey []byte `json:"receiver_identity_pubkey,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the PreimageRequestQuery when eager-loading is set.
 	Edges                      PreimageRequestEdges `json:"edges"`
@@ -85,7 +87,7 @@ func (*PreimageRequest) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case preimagerequest.FieldPaymentHash:
+		case preimagerequest.FieldPaymentHash, preimagerequest.FieldReceiverIdentityPubkey:
 			values[i] = new([]byte)
 		case preimagerequest.FieldStatus:
 			values[i] = new(sql.NullString)
@@ -139,6 +141,12 @@ func (pr *PreimageRequest) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field status", values[i])
 			} else if value.Valid {
 				pr.Status = schema.PreimageRequestStatus(value.String)
+			}
+		case preimagerequest.FieldReceiverIdentityPubkey:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field receiver_identity_pubkey", values[i])
+			} else if value != nil {
+				pr.ReceiverIdentityPubkey = *value
 			}
 		case preimagerequest.ForeignKeys[0]:
 			if value, ok := values[i].(*sql.NullScanner); !ok {
@@ -209,6 +217,9 @@ func (pr *PreimageRequest) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("status=")
 	builder.WriteString(fmt.Sprintf("%v", pr.Status))
+	builder.WriteString(", ")
+	builder.WriteString("receiver_identity_pubkey=")
+	builder.WriteString(fmt.Sprintf("%v", pr.ReceiverIdentityPubkey))
 	builder.WriteByte(')')
 	return builder.String()
 }

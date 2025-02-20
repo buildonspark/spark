@@ -72,6 +72,11 @@ func PaymentHash(v []byte) predicate.PreimageRequest {
 	return predicate.PreimageRequest(sql.FieldEQ(FieldPaymentHash, v))
 }
 
+// ReceiverIdentityPubkey applies equality check predicate on the "receiver_identity_pubkey" field. It's identical to ReceiverIdentityPubkeyEQ.
+func ReceiverIdentityPubkey(v []byte) predicate.PreimageRequest {
+	return predicate.PreimageRequest(sql.FieldEQ(FieldReceiverIdentityPubkey, v))
+}
+
 // CreateTimeEQ applies the EQ predicate on the "create_time" field.
 func CreateTimeEQ(v time.Time) predicate.PreimageRequest {
 	return predicate.PreimageRequest(sql.FieldEQ(FieldCreateTime, v))
@@ -220,6 +225,56 @@ func StatusNotIn(vs ...schema.PreimageRequestStatus) predicate.PreimageRequest {
 		v[i] = vs[i]
 	}
 	return predicate.PreimageRequest(sql.FieldNotIn(FieldStatus, v...))
+}
+
+// ReceiverIdentityPubkeyEQ applies the EQ predicate on the "receiver_identity_pubkey" field.
+func ReceiverIdentityPubkeyEQ(v []byte) predicate.PreimageRequest {
+	return predicate.PreimageRequest(sql.FieldEQ(FieldReceiverIdentityPubkey, v))
+}
+
+// ReceiverIdentityPubkeyNEQ applies the NEQ predicate on the "receiver_identity_pubkey" field.
+func ReceiverIdentityPubkeyNEQ(v []byte) predicate.PreimageRequest {
+	return predicate.PreimageRequest(sql.FieldNEQ(FieldReceiverIdentityPubkey, v))
+}
+
+// ReceiverIdentityPubkeyIn applies the In predicate on the "receiver_identity_pubkey" field.
+func ReceiverIdentityPubkeyIn(vs ...[]byte) predicate.PreimageRequest {
+	return predicate.PreimageRequest(sql.FieldIn(FieldReceiverIdentityPubkey, vs...))
+}
+
+// ReceiverIdentityPubkeyNotIn applies the NotIn predicate on the "receiver_identity_pubkey" field.
+func ReceiverIdentityPubkeyNotIn(vs ...[]byte) predicate.PreimageRequest {
+	return predicate.PreimageRequest(sql.FieldNotIn(FieldReceiverIdentityPubkey, vs...))
+}
+
+// ReceiverIdentityPubkeyGT applies the GT predicate on the "receiver_identity_pubkey" field.
+func ReceiverIdentityPubkeyGT(v []byte) predicate.PreimageRequest {
+	return predicate.PreimageRequest(sql.FieldGT(FieldReceiverIdentityPubkey, v))
+}
+
+// ReceiverIdentityPubkeyGTE applies the GTE predicate on the "receiver_identity_pubkey" field.
+func ReceiverIdentityPubkeyGTE(v []byte) predicate.PreimageRequest {
+	return predicate.PreimageRequest(sql.FieldGTE(FieldReceiverIdentityPubkey, v))
+}
+
+// ReceiverIdentityPubkeyLT applies the LT predicate on the "receiver_identity_pubkey" field.
+func ReceiverIdentityPubkeyLT(v []byte) predicate.PreimageRequest {
+	return predicate.PreimageRequest(sql.FieldLT(FieldReceiverIdentityPubkey, v))
+}
+
+// ReceiverIdentityPubkeyLTE applies the LTE predicate on the "receiver_identity_pubkey" field.
+func ReceiverIdentityPubkeyLTE(v []byte) predicate.PreimageRequest {
+	return predicate.PreimageRequest(sql.FieldLTE(FieldReceiverIdentityPubkey, v))
+}
+
+// ReceiverIdentityPubkeyIsNil applies the IsNil predicate on the "receiver_identity_pubkey" field.
+func ReceiverIdentityPubkeyIsNil() predicate.PreimageRequest {
+	return predicate.PreimageRequest(sql.FieldIsNull(FieldReceiverIdentityPubkey))
+}
+
+// ReceiverIdentityPubkeyNotNil applies the NotNil predicate on the "receiver_identity_pubkey" field.
+func ReceiverIdentityPubkeyNotNil() predicate.PreimageRequest {
+	return predicate.PreimageRequest(sql.FieldNotNull(FieldReceiverIdentityPubkey))
 }
 
 // HasTransactions applies the HasEdge predicate on the "transactions" edge.

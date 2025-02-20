@@ -90,8 +90,9 @@ var (
 		{Name: "id", Type: field.TypeUUID},
 		{Name: "create_time", Type: field.TypeTime},
 		{Name: "update_time", Type: field.TypeTime},
-		{Name: "payment_hash", Type: field.TypeBytes, Unique: true},
+		{Name: "payment_hash", Type: field.TypeBytes},
 		{Name: "status", Type: field.TypeEnum, Enums: []string{"WAITING_FOR_PREIMAGE", "PREIMAGE_SHARED", "RETURNED"}},
+		{Name: "receiver_identity_pubkey", Type: field.TypeBytes, Nullable: true},
 		{Name: "preimage_request_transfers", Type: field.TypeUUID, Nullable: true},
 	}
 	// PreimageRequestsTable holds the schema information for the "preimage_requests" table.
@@ -102,9 +103,16 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "preimage_requests_transfers_transfers",
-				Columns:    []*schema.Column{PreimageRequestsColumns[5]},
+				Columns:    []*schema.Column{PreimageRequestsColumns[6]},
 				RefColumns: []*schema.Column{TransfersColumns[0]},
 				OnDelete:   schema.SetNull,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "preimagerequest_payment_hash_receiver_identity_pubkey",
+				Unique:  false,
+				Columns: []*schema.Column{PreimageRequestsColumns[3], PreimageRequestsColumns[5]},
 			},
 		},
 	}

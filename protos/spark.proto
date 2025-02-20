@@ -575,6 +575,7 @@ message GetSigningOperatorListResponse {
 
 message QueryUserSignedRefundsRequest {
     bytes payment_hash = 1;
+    bytes identity_public_key = 2;
 }
 
 message QueryUserSignedRefundsResponse {
@@ -584,6 +585,7 @@ message QueryUserSignedRefundsResponse {
 message ProvidePreimageRequest {
     bytes payment_hash = 1;
     bytes preimage = 2;
+    bytes identity_public_key = 3;
 }
 
 message ProvidePreimageResponse {

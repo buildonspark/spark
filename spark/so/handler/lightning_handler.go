@@ -303,10 +303,12 @@ func (h *LightningHandler) storeUserSignedTransactions(
 	transactions []*pb.UserSignedRefund,
 	transfer *ent.Transfer,
 	status schema.PreimageRequestStatus,
+	receiverIdentityPubkey []byte,
 ) (*ent.PreimageRequest, error) {
 	db := ent.GetDbFromContext(ctx)
 	preimageRequestMutator := db.PreimageRequest.Create().
 		SetPaymentHash(paymentHash).
+		SetReceiverIdentityPubkey(receiverIdentityPubkey).
 		SetTransfers(transfer).
 		SetStatus(status)
 	if preimageShare != nil {
@@ -411,7 +413,7 @@ func (h *LightningHandler) GetPreimageShare(ctx context.Context, req *pb.Initiat
 	} else {
 		status = schema.PreimageRequestStatusWaitingForPreimage
 	}
-	_, err = h.storeUserSignedTransactions(ctx, req.PaymentHash, preimageShare, req.UserSignedRefunds, transfer, status)
+	_, err = h.storeUserSignedTransactions(ctx, req.PaymentHash, preimageShare, req.UserSignedRefunds, transfer, status, req.ReceiverIdentityPublicKey)
 	if err != nil {
 		return nil, fmt.Errorf("unable to store user signed transactions: %v", err)
 	}
@@ -481,7 +483,7 @@ func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pb.Ini
 	} else {
 		status = schema.PreimageRequestStatusWaitingForPreimage
 	}
-	preimageRequest, err := h.storeUserSignedTransactions(ctx, req.PaymentHash, preimageShare, req.UserSignedRefunds, transfer, status)
+	preimageRequest, err := h.storeUserSignedTransactions(ctx, req.PaymentHash, preimageShare, req.UserSignedRefunds, transfer, status, req.ReceiverIdentityPublicKey)
 	if err != nil {
 		return nil, fmt.Errorf("unable to store user signed transactions: %v", err)
 	}
@@ -556,7 +558,13 @@ func (h *LightningHandler) UpdatePreimageRequest(ctx context.Context, req *pbint
 	db := ent.GetDbFromContext(ctx)
 
 	paymentHash := sha256.Sum256(req.Preimage)
-	preimageRequest, err := db.PreimageRequest.Query().Where(preimagerequest.PaymentHashEQ(paymentHash[:])).First(ctx)
+	preimageRequest, err := db.PreimageRequest.Query().Where(
+		preimagerequest.And(
+			preimagerequest.PaymentHashEQ(paymentHash[:]),
+			preimagerequest.ReceiverIdentityPubkeyEQ(req.IdentityPublicKey),
+			preimagerequest.StatusEQ(schema.PreimageRequestStatusWaitingForPreimage),
+		),
+	).First(ctx)
 	if err != nil {
 		return fmt.Errorf("unable to get preimage request: %v", err)
 	}
@@ -571,7 +579,13 @@ func (h *LightningHandler) UpdatePreimageRequest(ctx context.Context, req *pbint
 // QueryUserSignedRefunds queries the user signed refunds for the given payment hash.
 func (h *LightningHandler) QueryUserSignedRefunds(ctx context.Context, req *pb.QueryUserSignedRefundsRequest) (*pb.QueryUserSignedRefundsResponse, error) {
 	db := ent.GetDbFromContext(ctx)
-	preimageRequest, err := db.PreimageRequest.Query().Where(preimagerequest.PaymentHashEQ(req.PaymentHash)).First(ctx)
+	preimageRequest, err := db.PreimageRequest.Query().Where(
+		preimagerequest.And(
+			preimagerequest.PaymentHashEQ(req.PaymentHash),
+			preimagerequest.ReceiverIdentityPubkeyEQ(req.IdentityPublicKey),
+			preimagerequest.StatusEQ(schema.PreimageRequestStatusWaitingForPreimage),
+		),
+	).First(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get preimage request: %v", err)
 	}
@@ -625,7 +639,13 @@ func (h *LightningHandler) ProvidePreimageInternal(ctx context.Context, req *pb.
 	}
 	slog.Debug("ProvidePreimage: hash calculated")
 
-	preimageRequest, err := db.PreimageRequest.Query().Where(preimagerequest.PaymentHashEQ(req.PaymentHash)).First(ctx)
+	preimageRequest, err := db.PreimageRequest.Query().Where(
+		preimagerequest.And(
+			preimagerequest.PaymentHashEQ(req.PaymentHash),
+			preimagerequest.ReceiverIdentityPubkeyEQ(req.IdentityPublicKey),
+			preimagerequest.StatusEQ(schema.PreimageRequestStatusWaitingForPreimage),
+		),
+	).First(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get preimage request: %v", err)
 	}
@@ -725,7 +745,13 @@ func (h *LightningHandler) ReturnLightningPayment(ctx context.Context, req *pb.R
 	}
 
 	db := ent.GetDbFromContext(ctx)
-	preimageRequest, err := db.PreimageRequest.Query().Where(preimagerequest.PaymentHashEQ(req.PaymentHash)).First(ctx)
+	preimageRequest, err := db.PreimageRequest.Query().Where(
+		preimagerequest.And(
+			preimagerequest.PaymentHashEQ(req.PaymentHash),
+			preimagerequest.ReceiverIdentityPubkeyEQ(req.UserIdentityPublicKey),
+			preimagerequest.StatusEQ(schema.PreimageRequestStatusWaitingForPreimage),
+		),
+	).First(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get preimage request: %v", err)
 	}
