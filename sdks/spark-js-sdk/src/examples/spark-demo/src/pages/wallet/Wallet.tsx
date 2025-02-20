@@ -1,7 +1,10 @@
 import Button from "../../components/Button";
+import CurrencyBalanceDetails from "../../components/CurrencyBalanceDetails";
 import StyledContainer from "../../components/StyledContainer";
+import BitcoinIcon from "../../icons/BitcoinIcon";
 import ReceiveIcon from "../../icons/ReceiveIcon";
 import SendIcon from "../../icons/SendIcon";
+import StableCoinLogo from "../../icons/StableCoinLogo";
 import WalletIcon from "../../icons/WalletIcon";
 
 export default function Wallet() {
@@ -37,6 +40,18 @@ export default function Wallet() {
           direction="vertical"
         />
       </div>
+      {/* <div className="w-full border-y border-[#f9f9f9] border-opacity-10 mt-6">
+        <CurrencyBalanceDetails
+          logo={<BitcoinIcon strokeWidth="1.50" />}
+          currency="Bitcoin"
+          fiatBalance="$0.00"
+        />
+        <CurrencyBalanceDetails
+          logo={<StableCoinLogo strokeWidth="1.50" />}
+          currency="Stablecoins"
+          fiatBalance="$0.00"
+        />
+      </div> */}
     </div>
   );
 }
