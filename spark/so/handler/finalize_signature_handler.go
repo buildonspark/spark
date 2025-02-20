@@ -47,17 +47,6 @@ func (o *FinalizeSignatureHandler) FinalizeNodeSignatures(ctx context.Context, r
 		}
 	}
 
-	nodes := make([]*pb.TreeNode, 0)
-	internalNodes := make([]*pbinternal.TreeNode, 0)
-	for _, nodeSignatures := range req.NodeSignatures {
-		node, internalNode, err := o.updateNode(ctx, nodeSignatures, req.Intent)
-		if err != nil {
-			return nil, err
-		}
-		nodes = append(nodes, node)
-		internalNodes = append(internalNodes, internalNode)
-	}
-
 	db := ent.GetDbFromContext(ctx)
 	firstNodeID, err := uuid.Parse(req.NodeSignatures[0].NodeId)
 	if err != nil {
@@ -74,6 +63,46 @@ func (o *FinalizeSignatureHandler) FinalizeNodeSignatures(ctx context.Context, r
 	network, err := common.NetworkFromSchemaNetwork(tree.Network)
 	if err != nil {
 		return nil, err
+	}
+
+	if tree.Status != schema.TreeStatusAvailable {
+		for _, nodeSignatures := range req.NodeSignatures {
+			nodeID, err := uuid.Parse(nodeSignatures.NodeId)
+			if err != nil {
+				return nil, err
+			}
+			node, err := db.TreeNode.Get(ctx, nodeID)
+			if err != nil {
+				return nil, err
+			}
+			nodeParent, err := node.QueryParent().Only(ctx)
+			if err == nil && nodeParent != nil {
+				continue
+			}
+			nodeTx, err := common.TxFromRawTxBytes(node.RawTx)
+			if err != nil {
+				return nil, err
+			}
+			txid := nodeTx.TxIn[0].PreviousOutPoint.Hash
+			if helper.CheckTxIDOnchain(o.config, txid[:], network) {
+				_, err = tree.Update().SetStatus(schema.TreeStatusAvailable).Save(ctx)
+				if err != nil {
+					return nil, err
+				}
+				break
+			}
+		}
+	}
+
+	nodes := make([]*pb.TreeNode, 0)
+	internalNodes := make([]*pbinternal.TreeNode, 0)
+	for _, nodeSignatures := range req.NodeSignatures {
+		node, internalNode, err := o.updateNode(ctx, nodeSignatures, req.Intent)
+		if err != nil {
+			return nil, err
+		}
+		nodes = append(nodes, node)
+		internalNodes = append(internalNodes, internalNode)
 	}
 	// Sync with all other SOs
 	selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}

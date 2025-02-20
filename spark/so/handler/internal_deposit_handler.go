@@ -82,7 +82,7 @@ func (h *InternalDepositHandler) FinalizeTreeCreation(ctx context.Context, req *
 		if err != nil {
 			return err
 		}
-		network, err := common.NetworkFromSchemaNetwork(schema.NetworkRegtest)
+		network, err := common.NetworkFromProtoNetwork(req.Network)
 		if err != nil {
 			return err
 		}

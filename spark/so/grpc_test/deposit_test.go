@@ -10,6 +10,7 @@ import (
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lightsparkdev/spark-go/common"
+	"github.com/lightsparkdev/spark-go/so/ent/schema"
 	testutil "github.com/lightsparkdev/spark-go/test_util"
 	"github.com/lightsparkdev/spark-go/wallet"
 	"github.com/stretchr/testify/assert"
@@ -112,12 +113,20 @@ func TestStartTreeCreation(t *testing.T) {
 	_, err = client.GenerateToAddress(1, randomAddress, nil)
 	assert.NoError(t, err)
 
+	time.Sleep(100 * time.Millisecond)
+
 	resp, err := wallet.CreateTreeRoot(ctx, config, privKey.Serialize(), depositResp.DepositAddress.VerifyingKey, depositTx, vout)
 	if err != nil {
 		t.Fatalf("failed to create tree: %v", err)
 	}
 
 	log.Printf("tree created: %v", resp)
+
+	for _, node := range resp.Nodes {
+		if node.Status == string(schema.TreeNodeStatusCreating) {
+			t.Fatalf("tree node is in status TreeNodeStatusCreating %s", node.Id)
+		}
+	}
 }
 
 // Test that we can get refund signatures for a tree before depositing funds on-chain,
