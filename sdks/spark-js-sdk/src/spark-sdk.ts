@@ -525,6 +525,27 @@ export class SparkWallet {
     this.leaves = leaves;
   }
 
+  async transferDepositToSelf(leaves: LeafNode[], signingPubKey: Uint8Array) {
+    const leafKeyTweaks = await Promise.all(
+      leaves.map(async (leaf) => ({
+        leaf,
+        signingPubKey,
+        newSigningPubKey: await this.config.signer.generatePublicKey(),
+      }))
+    );
+
+    await this.transferService.sendTransfer(
+      leafKeyTweaks,
+      await this.config.signer.getIdentityPublicKey(),
+      new Date(Date.now() + 10 * 60 * 1000)
+    );
+
+    const pendingTransfers = await this.queryPendingTransfers();
+    if (pendingTransfers.transfers.length > 0) {
+      await this.claimTransfer(pendingTransfers.transfers[0]);
+    }
+  }
+
   async sendTransfer({
     amount,
     receiverPubKey,

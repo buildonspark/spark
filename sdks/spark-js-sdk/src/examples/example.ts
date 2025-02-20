@@ -95,11 +95,20 @@ async function runCLI() {
               depositTx.vout
             );
             console.log("Created new leaf node", nodes.nodes);
+            await wallet.transferDepositToSelf(
+              nodes.nodes.map((node) => ({
+                ...node,
+                isUsed: false,
+              })),
+              leafPubKey
+            );
+
             break;
           }
           console.log("Waiting for deposit tx");
           await new Promise((resolve) => setTimeout(resolve, 5000));
         }
+
         break;
       case "tx":
         if (!wallet.isInitialized()) {
