@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
+	"fmt"
 	"log"
 	"strings"
 
@@ -84,7 +85,7 @@ func (s *SparkServiceAPI) RequestLeavesSwap(
 	feeSats uint64,
 	network common.Network,
 	userLeaves []SwapLeaf,
-) (string, error) {
+) (string, []SwapLeaf, error) {
 	variables := map[string]interface{}{
 		"adaptor_pubkey":     adaptorPubkey,
 		"total_amount_sats":  totalAmountSats,
@@ -96,11 +97,23 @@ func (s *SparkServiceAPI) RequestLeavesSwap(
 
 	response, err := s.Requester.ExecuteGraphqlWithContext(context.Background(), RequestLeavesSwapMutation, variables)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 
-	requestID := response["request_leaves_swap"].(map[string]interface{})["request"].(map[string]interface{})["id"].(string)
-	return requestID, nil
+	fmt.Printf("leaves swap request response: %v\n", response)
+
+	request := response["request_leaves_swap"].(map[string]interface{})["request"].(map[string]interface{})["id"].(string)
+	leavesJSON := response["request_leaves_swap"].(map[string]interface{})["request"].(map[string]interface{})["swap_leaves"].([]interface{})
+	var leaves []SwapLeaf
+	for _, leaf := range leavesJSON {
+		leafMap := leaf.(map[string]interface{})
+		leaves = append(leaves, SwapLeaf{
+			LeafID:                       leafMap["leaf_id"].(string),
+			RawUnsignedRefundTransaction: leafMap["raw_unsigned_refund_transaction"].(string),
+			AdaptorAddedSignature:        leafMap["adaptor_signed_signature"].(string),
+		})
+	}
+	return request, leaves, nil
 }
 
 func (s *SparkServiceAPI) CompleteLeavesSwap(

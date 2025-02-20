@@ -11,6 +11,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lightsparkdev/spark-go/common"
@@ -19,6 +20,7 @@ import (
 	"github.com/lightsparkdev/spark-go/so/utils"
 	sspapi "github.com/lightsparkdev/spark-go/wallet/ssp_api"
 	decodepay "github.com/nbd-wtf/ln-decodepay"
+	"google.golang.org/grpc"
 )
 
 // SingleKeyWallet is a wallet that uses a single private key for all signing keys.
@@ -201,21 +203,30 @@ func (w *SingleKeyWallet) PayInvoice(ctx context.Context, invoice string) (strin
 	return requestID, nil
 }
 
-func (w *SingleKeyWallet) SyncWallet(ctx context.Context) error {
+func (w *SingleKeyWallet) grpcClient(ctx context.Context) (context.Context, *pb.SparkServiceClient, *grpc.ClientConn, error) {
 	conn, err := common.NewGRPCConnectionWithTestTLS(w.Config.CoodinatorAddress())
 	if err != nil {
-		return fmt.Errorf("failed to connect to operator: %w", err)
+		return nil, nil, nil, fmt.Errorf("failed to connect to operator: %w", err)
 	}
-	defer conn.Close()
 
 	token, err := AuthenticateWithConnection(ctx, w.Config, conn)
 	if err != nil {
-		return fmt.Errorf("failed to authenticate: %w", err)
+		return nil, nil, conn, fmt.Errorf("failed to authenticate: %w", err)
 	}
 	ctx = ContextWithToken(ctx, token)
 
 	client := pb.NewSparkServiceClient(conn)
-	response, err := client.QueryNodes(ctx, &pb.QueryNodesRequest{
+	return ctx, &client, conn, nil
+}
+
+func (w *SingleKeyWallet) SyncWallet(ctx context.Context) error {
+	ctx, client, conn, err := w.grpcClient(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to create grpc client: %w", err)
+	}
+	defer conn.Close()
+
+	response, err := (*client).QueryNodes(ctx, &pb.QueryNodesRequest{
 		Source:         &pb.QueryNodesRequest_OwnerIdentityPubkey{OwnerIdentityPubkey: w.Config.IdentityPublicKey()},
 		IncludeParents: true,
 	})
@@ -308,9 +319,64 @@ func (w *SingleKeyWallet) RequestLeavesSwap(ctx context.Context, targetAmount in
 	}
 	api := sspapi.NewSparkServiceAPI(requester)
 
-	requestID, err := api.RequestLeavesSwap(hex.EncodeToString(adaptorPubKey.SerializeCompressed()), uint64(totalAmount), uint64(targetAmount), 0, w.Config.Network, userLeaves)
+	requestID, leaves, err := api.RequestLeavesSwap(hex.EncodeToString(adaptorPubKey.SerializeCompressed()), uint64(totalAmount), uint64(targetAmount), 0, w.Config.Network, userLeaves)
 	if err != nil {
 		return nil, fmt.Errorf("failed to request leaves swap: %w", err)
+	}
+
+	ctx, grpcClient, conn, err := w.grpcClient(ctx)
+	defer conn.Close()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create grpc client: %w", err)
+	}
+
+	for _, leaf := range leaves {
+		response, err := (*grpcClient).QueryNodes(ctx, &pb.QueryNodesRequest{
+			Source: &pb.QueryNodesRequest_NodeIds{
+				NodeIds: &pb.TreeNodeIds{
+					NodeIds: []string{leaf.LeafID},
+				},
+			},
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to query nodes: %w", err)
+		}
+		if len(response.Nodes) != 1 {
+			return nil, fmt.Errorf("expected 1 node, got %d", len(response.Nodes))
+		}
+		nodeTx, err := common.TxFromRawTxBytes(response.Nodes[leaf.LeafID].NodeTx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get node tx: %w", err)
+		}
+		refundTxBytes, err := hex.DecodeString(leaf.RawUnsignedRefundTransaction)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode refund tx: %w", err)
+		}
+		refundTx, err := common.TxFromRawTxBytes(refundTxBytes)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get refund tx: %w", err)
+		}
+		sighash, err := common.SigHashFromTx(refundTx, 0, nodeTx.TxOut[0])
+		if err != nil {
+			return nil, fmt.Errorf("failed to get sighash: %w", err)
+		}
+
+		nodePublicKey, err := secp256k1.ParsePubKey(response.Nodes[leaf.LeafID].VerifyingPublicKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse node public key: %w", err)
+		}
+		taprootKey := txscript.ComputeTaprootKeyNoScript(nodePublicKey)
+		adaptorSignatureBytes, err := hex.DecodeString(leaf.AdaptorAddedSignature)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode adaptor signature: %w", err)
+		}
+		_, err = common.ApplyAdaptorToSignature(taprootKey, sighash, adaptorSignatureBytes, adaptorPrivKeyBytes)
+		if err != nil {
+			return nil, fmt.Errorf("failed to apply adaptor to signature: %w", err)
+		}
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to complete leaves swap: %w", err)
 	}
 
 	// send the transfer
