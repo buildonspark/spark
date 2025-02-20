@@ -369,7 +369,7 @@ run_operators_tmux() {
    local min_signers=$2
    local session_name="operators"
    local operator_config_file="${run_dir}/config.json"
-   
+   local tls=$3
    # Kill existing session if it exists
    if tmux has-session -t "$session_name" 2>/dev/null; then
        echo "Killing existing session..."
@@ -405,6 +405,10 @@ run_operators_tmux() {
        local priv_key_file="${run_dir}/operator_${i}.key"
        local key_file="${run_dir}/server_${i}.key"
        local cert_file="${run_dir}/server_${i}.crt"
+       local cert_config=""
+       if [ "$tls" = true ]; then
+           cert_config="-server-cert '${cert_file}' -server-key '${key_file}'"
+       fi
        
        # Construct the command with all parameters
        local cmd="${run_dir}/bin/operator \
@@ -416,8 +420,7 @@ run_operators_tmux() {
            -signer '${signer_socket}' \
            -port ${port} \
            -database '${db_file}' \
-           -server-cert '${cert_file}' \
-           -server-key '${key_file}' \
+           ${cert_config} \
            -dkg-limit-override 100 \
            -local true \
            2>&1 | tee '${log_file}'"
@@ -601,6 +604,7 @@ create_private_key_files() {
 # Initialize flags
 WIPE=false
 DISABLE_TOKENS=false
+TLS=true
 
 # Parse command line arguments
 for arg in "$@"; do
@@ -611,6 +615,10 @@ for arg in "$@"; do
             ;;
         --disable-tokens)
             DISABLE_TOKENS=true
+            shift
+            ;;
+        --disable-tls)
+            TLS=false
             shift
             ;;
     esac
@@ -657,7 +665,7 @@ fi
 echo "All signers are ready"
 
 # Run operators
-run_operators_tmux "$run_dir" "$MIN_SIGNERS"
+run_operators_tmux "$run_dir" "$MIN_SIGNERS" "$TLS"
 
 if ! check_operators_ready "$run_dir"; then
     echo "Failed to start all operators"

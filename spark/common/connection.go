@@ -17,10 +17,7 @@ import (
 func NewGRPCConnectionWithCert(address string, certPath string) (*grpc.ClientConn, error) {
 	var creds credentials.TransportCredentials
 	if len(certPath) == 0 {
-		tlsConfig := &tls.Config{
-			InsecureSkipVerify: true,
-		}
-		creds = credentials.NewTLS(tlsConfig)
+		return NewGRPCConnectionWithoutTLS(address)
 	} else {
 		certPool := x509.NewCertPool()
 		serverCert, err := os.ReadFile(certPath)

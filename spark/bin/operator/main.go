@@ -154,10 +154,6 @@ func loadArgs() (*args, error) {
 		return nil, errors.New("database path is required")
 	}
 
-	if args.ServerCertPath == "" || args.ServerKeyPath == "" {
-		return nil, errors.New("server certificate and key path are required")
-	}
-
 	log.Printf("args: %v", args)
 
 	return args, nil
@@ -256,25 +252,33 @@ func main() {
 		log.Fatalf("Failed to create token verifier: %v", err)
 	}
 
-	cert, err := tls.LoadX509KeyPair(args.ServerCertPath, args.ServerKeyPath)
-	if err != nil {
-		log.Fatalf("Failed to load server certificate: %v", err)
-	}
-	creds := credentials.NewTLS(&tls.Config{
-		Certificates: []tls.Certificate{cert},
-		ClientAuth:   tls.NoClientCert,
-		MinVersion:   tls.VersionTLS12,
-	})
-	log.Printf("Server starting with TLS on: %v", args.ServerCertPath)
+	serverOpts := grpc.UnaryInterceptor(grpc_middleware.ChainUnaryServer(
+		helper.LogInterceptor,
+		ent.DbSessionMiddleware(dbClient),
+		authn.NewAuthnInterceptor(sessionTokenCreatorVerifier).AuthnInterceptor,
+	))
 
-	grpcServer := grpc.NewServer(
-		grpc.Creds(creds),
-		grpc.UnaryInterceptor(grpc_middleware.ChainUnaryServer(
-			helper.LogInterceptor,
-			ent.DbSessionMiddleware(dbClient),
-			authn.NewAuthnInterceptor(sessionTokenCreatorVerifier).AuthnInterceptor,
-		)),
-	)
+	var grpcServer *grpc.Server
+	if args.ServerCertPath != "" && args.ServerKeyPath != "" {
+		cert, err := tls.LoadX509KeyPair(args.ServerCertPath, args.ServerKeyPath)
+		if err != nil {
+			log.Fatalf("Failed to load server certificate: %v", err)
+		}
+		creds := credentials.NewTLS(&tls.Config{
+			Certificates: []tls.Certificate{cert},
+			ClientAuth:   tls.NoClientCert,
+			MinVersion:   tls.VersionTLS12,
+		})
+		grpcServer = grpc.NewServer(
+			grpc.Creds(creds),
+			serverOpts,
+		)
+		log.Printf("Server starting with TLS on: %v", args.ServerCertPath)
+	} else {
+		grpcServer = grpc.NewServer(
+			serverOpts,
+		)
+	}
 
 	if !args.DisableDKG {
 		dkgServer := dkg.NewServer(frostConnection, config)
