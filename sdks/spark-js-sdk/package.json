@@ -53,6 +53,7 @@
   "dependencies": {
     "@grpc/grpc-js": "^1.12.5",
     "@lightsparkdev/core": "^1.2.7",
+    "@mempool/mempool.js": "^3.0.0",
     "@noble/curves": "^1.8.0",
     "@noble/secp256k1": "^2.2.3",
     "@scure/base": "^1.2.1",

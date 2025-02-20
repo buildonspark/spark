@@ -14,7 +14,6 @@ import { RequestSwapLeaves } from "./mutations/RequestSwapLeaves";
 import {
   BitcoinNetwork,
   CompleteCoopExitInput,
-  CompleteCoopExitOutput,
   CompleteLeavesSwapInput,
   CoopExitFeeEstimateInput,
   CoopExitFeeEstimateOutput,
@@ -24,7 +23,6 @@ import {
   RequestLightningReceiveInput,
   RequestLightningSendInput,
 } from "./objects";
-import { CompleteCoopExitOutputFromJson } from "./objects/CompleteCoopExitOutput";
 import { CoopExitFeeEstimateOutputFromJson } from "./objects/CoopExitFeeEstimateOutput";
 import CoopExitRequest, {
   CoopExitRequestFromJson,
@@ -126,7 +124,7 @@ export default class SspClient {
   async completeCoopExit({
     userOutboundTransferExternalId,
     coopExitRequestId,
-  }: CompleteCoopExitInput): Promise<CompleteCoopExitOutput | null> {
+  }: CompleteCoopExitInput): Promise<CoopExitRequest | null> {
     return await this.executeRawQuery({
       queryPayload: CompleteCoopExit,
       variables: {
@@ -134,9 +132,7 @@ export default class SspClient {
         coop_exit_request_id: coopExitRequestId,
       },
       constructObject: (response: { complete_coop_exit: any }) => {
-        return CompleteCoopExitOutputFromJson(
-          response.complete_coop_exit.request
-        );
+        return CoopExitRequestFromJson(response.complete_coop_exit.request);
       },
     });
   }

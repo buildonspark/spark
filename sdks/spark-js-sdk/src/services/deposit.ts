@@ -149,7 +149,7 @@ export class DepositService {
   }: CreateTreeRootParams) {
     // Create a root tx
     const rootTx = new Transaction();
-    const output = depositTx.getOutput(0);
+    const output = depositTx.getOutput(vout);
     if (!output) {
       throw new Error("No output found in deposit tx");
     }
@@ -171,7 +171,7 @@ export class DepositService {
 
     const rootNonceCommitment =
       await this.config.signer.getRandomSigningCommitment();
-    const rootTxSighash = getSigHashFromTx(rootTx, 0, output);
+    const rootTxSighash = getSigHashFromTx(rootTx, vout, output);
 
     // Create a refund tx
     const refundTx = new Transaction();

@@ -7,7 +7,7 @@ import { Network } from "../../dist/utils/network";
 
 // Initialize Spark Wallet
 const walletMnemonic =
-  "aaatypical stereo dose party penalty decline neglect feel harvest abstract stage winter";
+  "bbbbtypical stereo dose party penalty decline neglect feel harvest abstract stage winter";
 
 async function runCLI() {
   let wallet = new SparkWallet(Network.REGTEST);
@@ -29,6 +29,7 @@ async function runCLI() {
   sendtransfer <amount> <receiverPubKey>          - Send a transfer
   pendingtransfers                                - Show pending transfers
   claimtransfer <transferId>                      - Claim a pending transfer
+  coopexit <onchainAddress> <targetAmount>        - Coop exit
   claim                                           - Claim all pending transfers
   help                                            - Show this help message
   exit/quit                                       - Exit the program
@@ -78,6 +79,39 @@ async function runCLI() {
           )
         );
         console.log("Pubkey:", bytesToHex(leafPubKey));
+        if (!depositAddress.depositAddress) {
+          console.log("No deposit address");
+          break;
+        }
+        while (true) {
+          const depositTx = await wallet.queryPendingDepositTx(
+            depositAddress.depositAddress?.address
+          );
+          if (depositTx) {
+            const nodes = await wallet.createTreeRoot(
+              leafPubKey,
+              depositAddress.depositAddress?.verifyingKey,
+              depositTx.depositTx,
+              depositTx.vout
+            );
+            console.log("Created new leaf node", nodes.nodes);
+            break;
+          }
+          console.log("Waiting for deposit tx");
+          await new Promise((resolve) => setTimeout(resolve, 5000));
+        }
+        break;
+      case "tx":
+        if (!wallet.isInitialized()) {
+          console.log("No wallet initialized");
+          break;
+        }
+        const txs = await wallet.queryDepositTx(
+          args[0],
+          hexToBytes(args[1]),
+          hexToBytes(args[2])
+        );
+        console.log(txs);
         break;
       case "completedeposit":
         if (!wallet.isInitialized()) {
@@ -156,6 +190,17 @@ async function runCLI() {
         }
         const result = await wallet.claimTransfer(transfer);
         console.log(result.nodes);
+        break;
+      case "coopexit":
+        if (!wallet.isInitialized()) {
+          console.log("No wallet initialized");
+          break;
+        }
+        const coopExitResult = await wallet.coopExit(
+          args[0],
+          parseInt(args[1])
+        );
+        console.log(coopExitResult);
         break;
       case "claimall":
         if (!wallet.isInitialized()) {

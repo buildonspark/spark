@@ -1,34 +1,7 @@
-import { Transaction } from "@scure/btc-signer";
-import {
-  GenerateDepositAddressResponse,
-  QueryPendingTransfersResponse,
-  Transfer,
-  TreeNode,
-  LeafWithPreviousTransactionData,
-  FreezeTokensResponse,
-} from "./proto/spark";
-import { initWasm } from "./utils/wasm-wrapper";
-import { InitOutput } from "./wasm/spark_bindings";
-
-import { TokenTransaction } from "./proto/spark";
-import { WalletConfig, WalletConfigService } from "./services/config";
-import { ConnectionManager } from "./services/connection";
-import { DepositService } from "./services/deposit";
-import { TokenTransactionService } from "./services/tokens-transaction";
-import { LeafKeyTweak, TransferService } from "./services/transfer";
-import {
-  DepositAddressTree,
-  TreeCreationService,
-} from "./services/tree-creation";
-import {
-  aggregateFrost,
-  AggregateFrostParams,
-  signFrost,
-  SignFrostParams,
-} from "./utils/wasm";
-
+import mempoolJS from "@mempool/mempool.js";
 import { bytesToHex, hexToBytes } from "@noble/curves/abstract/utils";
 import { secp256k1 } from "@noble/curves/secp256k1";
+import { Transaction } from "@scure/btc-signer";
 import { TransactionInput } from "@scure/btc-signer/psbt";
 import { sha256 } from "@scure/btc-signer/utils";
 import { decode } from "light-bolt11-decoder";
@@ -42,13 +15,32 @@ import {
   LightningSendFeeEstimateInput,
   LightningSendFeeEstimateOutput,
 } from "./graphql/objects";
+import {
+  GenerateDepositAddressResponse,
+  LeafWithPreviousTransactionData,
+  QueryPendingTransfersResponse,
+  Transfer,
+  TransferStatus,
+  TreeNode,
+} from "./proto/spark";
+import { WalletConfig, WalletConfigService } from "./services/config";
+import { ConnectionManager } from "./services/connection";
 import { CoopExitService } from "./services/coop-exit";
+import { DepositService } from "./services/deposit";
 import { LightningService } from "./services/lightning";
+import { TokenFreezeService } from "./services/tokens-freeze";
+import { TokenTransactionService } from "./services/tokens-transaction";
+import { LeafKeyTweak, TransferService } from "./services/transfer";
+import {
+  DepositAddressTree,
+  TreeCreationService,
+} from "./services/tree-creation";
 import { SparkSigner } from "./signer/signer";
 import { generateAdaptorFromSignature } from "./utils/adaptor-signature";
 import {
   getP2TRAddressFromPublicKey,
   getTxFromRawTxHex,
+  getTxId,
 } from "./utils/bitcoin";
 import { LeafNode, selectLeaves } from "./utils/leaf-selection";
 import { Network } from "./utils/network";
@@ -56,7 +48,14 @@ import {
   calculateAvailableTokenAmount,
   checkIfSelectedLeavesAreAvailable,
 } from "./utils/token-transactions";
-import { TokenFreezeService } from "./services/tokens-freeze";
+import {
+  aggregateFrost,
+  AggregateFrostParams,
+  signFrost,
+  SignFrostParams,
+} from "./utils/wasm";
+import { initWasm } from "./utils/wasm-wrapper";
+import { InitOutput } from "./wasm/spark_bindings";
 
 type CreateLightningInvoiceParams = {
   amountSats: number;
@@ -75,6 +74,13 @@ type SendTransferParams = {
   leaves?: TreeNode[];
   receiverPubKey: Uint8Array;
   expiryTime?: Date;
+};
+
+type DepositParams = {
+  signingPubKey: Uint8Array;
+  verifyingKey: Uint8Array;
+  depositTx: Transaction;
+  vout: number;
 };
 
 export class SparkWallet {
@@ -213,14 +219,16 @@ export class SparkWallet {
     await this.syncTokenLeaves();
   }
 
-  async requestLeavesSwap(targetAmount: number) {
-    await this.claimTransfers();
-    const leaves = await this.getLeaves();
+  async requestLeavesSwap(leaves: TreeNode[]) {
+    // await this.claimTransfers();
+    // const leaves = await this.getLeaves();
 
-    const leavesToSwap = selectLeaves(
-      leaves.map((leaf) => ({ ...leaf, isUsed: false })),
-      targetAmount
-    );
+    // const leavesToSwap = selectLeaves(
+    //   leaves.map((leaf) => ({ ...leaf, isUsed: false })),
+    //   targetAmount
+    // );
+
+    const leavesToSwap = leaves;
 
     const leafKeyTweaks = await Promise.all(
       leavesToSwap.map(async (leaf) => ({
@@ -249,7 +257,7 @@ export class SparkWallet {
 
     const request = await this.sspClient?.requestLeaveSwap({
       adaptorPubkey: bytesToHex(secp256k1.getPublicKey(adaptorPrivateKey)),
-      targetAmountSats: targetAmount,
+      targetAmountSats: leavesToSwap.reduce((acc, leaf) => acc + leaf.value, 0),
       totalAmountSats: leavesToSwap.reduce((acc, leaf) => acc + leaf.value, 0),
       // TODO: Request fee from SSP
       feeSats: 0,
@@ -506,6 +514,11 @@ export class SparkWallet {
   async claimTransfers() {
     const transfers = await this.queryPendingTransfers();
     for (const transfer of transfers.transfers) {
+      if (
+        transfer.status !== TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAKED
+      ) {
+        continue;
+      }
       await this.claimTransfer(transfer);
     }
   }
@@ -539,6 +552,8 @@ export class SparkWallet {
       withdrawalAddress: onchainAddress,
     });
 
+    console.log("coopExitRequest", coopExitRequest);
+
     if (!coopExitRequest?.rawConnectorTransaction) {
       throw new Error("Failed to request coop exit");
     }
@@ -546,7 +561,7 @@ export class SparkWallet {
     const connectorTx = getTxFromRawTxHex(
       coopExitRequest.rawConnectorTransaction
     );
-    const coopExitTxId = connectorTx.id;
+    const coopExitTxId = getTxId(connectorTx);
 
     const connectorOutputs: TransactionInput[] = [];
     for (let i = 0; i < connectorTx.outputsLength - 1; i++) {
@@ -826,6 +841,52 @@ export class SparkWallet {
       this.tokenLeaves.get(tokenPubKeyHex)!,
       finalizedTokenTransaction
     );
+  }
+
+  async queryPendingDepositTx(depositAddress: string) {
+    const {
+      bitcoin: { addresses, transactions },
+    } = mempoolJS({
+      hostname: "regtest-mempool.dev.dev.sparkinfra.net",
+      protocol: "https",
+      config: {
+        auth: {
+          username: "lightspark",
+          password: "TFNR6ZeLdxF9HejW",
+        },
+        headers: {
+          "Content-Type": "application/json",
+        },
+      },
+      network: "regtest",
+    });
+
+    try {
+      const addressTxs = await addresses.getAddressTxs({
+        address: depositAddress,
+      });
+
+      if (addressTxs && addressTxs.length > 0) {
+        const latestTx = addressTxs[0];
+
+        // // Find our output
+        const outputIndex = latestTx.vout.findIndex(
+          (output: any) => output.scriptpubkey_address === depositAddress
+        );
+
+        if (outputIndex === -1) {
+          return null;
+        }
+
+        const txHex = await transactions.getTxHex({ txid: latestTx.txid });
+        const depositTx = getTxFromRawTxHex(txHex);
+
+        return { depositTx, vout: outputIndex };
+      }
+      return null;
+    } catch (error) {
+      throw error;
+    }
   }
 
   async createTreeRoot(

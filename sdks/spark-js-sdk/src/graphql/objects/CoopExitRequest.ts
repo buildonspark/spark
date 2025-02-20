@@ -39,6 +39,7 @@ interface CoopExitRequest {
 }
 
 export const CoopExitRequestFromJson = (obj: any): CoopExitRequest => {
+  console.log(obj);
   return {
     id: obj["coop_exit_request_id"],
     createdAt: obj["coop_exit_request_created_at"],
@@ -49,7 +50,7 @@ export const CoopExitRequestFromJson = (obj: any): CoopExitRequest => {
       SparkCoopExitRequestStatus.FUTURE_VALUE,
     expiresAt: obj["coop_exit_request_expires_at"],
     typename: "CoopExitRequest",
-    rawConnectorTransaction: obj["raw_connector_transaction"],
+    rawConnectorTransaction: obj["coop_exit_request_raw_connector_transaction"],
   } as CoopExitRequest;
 };
 export const CoopExitRequestToJson = (obj: CoopExitRequest): any => {
@@ -80,6 +81,7 @@ fragment CoopExitRequestFragment on CoopExitRequest {
     }
     coop_exit_request_status: status
     coop_exit_request_expires_at: expires_at
+    coop_exit_request_raw_connector_transaction: raw_connector_transaction
 }`;
 
 export const getCoopExitRequestQuery = (id: string): Query<CoopExitRequest> => {
