@@ -21,7 +21,7 @@ export default function CardForm({
   submitDisabled?: boolean;
 }) {
   return (
-    <div className="flex w-full flex-col justify-between items-center">
+    <div className=" flex w-full flex-col justify-between items-center">
       <div className="flex w-full flex-row text-center font-decimal text-[15px]">
         <div className="w-6 h-6 ml-6" onClick={logoLeftClick}>
           {logoLeft}
@@ -31,7 +31,7 @@ export default function CardForm({
       </div>
       <div className="flex w-full flex-col p-6">{children}</div>
       {!submitDisabled && (
-        <div className="fixed bottom-10 w-full p-6">
+        <div className="fixed bottom-10 w-full max-w-[400px] p-6">
           <Button
             text={submitButtonText || "Submit"}
             onClick={() => onSubmit()}
