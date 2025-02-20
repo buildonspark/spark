@@ -349,6 +349,7 @@ create_operator_config() {
 {
     "id": $i,
     "address": "localhost:$port",
+    "external_address": "localhost:$port",
     "identity_public_key": "${pub_keys[$i]}",
     "cert_path": "${run_dir}/server_${i}.crt"
 }
