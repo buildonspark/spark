@@ -33,6 +33,7 @@ import (
 	"github.com/lightsparkdev/spark-go/so/dkg"
 	"github.com/lightsparkdev/spark-go/so/ent"
 	sparkgrpc "github.com/lightsparkdev/spark-go/so/grpc"
+	"github.com/lightsparkdev/spark-go/so/helper"
 	"github.com/lightsparkdev/spark-go/so/task"
 	_ "github.com/mattn/go-sqlite3"
 	"google.golang.org/grpc"
@@ -269,6 +270,7 @@ func main() {
 	grpcServer := grpc.NewServer(
 		grpc.Creds(creds),
 		grpc.UnaryInterceptor(grpc_middleware.ChainUnaryServer(
+			helper.LogInterceptor,
 			ent.DbSessionMiddleware(dbClient),
 			authn.NewAuthnInterceptor(sessionTokenCreatorVerifier).AuthnInterceptor,
 		)),
