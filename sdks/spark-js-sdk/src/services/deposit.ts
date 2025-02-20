@@ -171,7 +171,7 @@ export class DepositService {
 
     const rootNonceCommitment =
       await this.config.signer.getRandomSigningCommitment();
-    const rootTxSighash = getSigHashFromTx(rootTx, vout, output);
+    const rootTxSighash = getSigHashFromTx(rootTx, 0, output);
 
     // Create a refund tx
     const refundTx = new Transaction();

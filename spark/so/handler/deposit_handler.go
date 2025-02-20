@@ -203,7 +203,7 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 	if err != nil {
 		return nil, err
 	}
-	rootTxSigHash, err := common.SigHashFromTx(rootTx, int(req.OnChainUtxo.Vout), onChainOutput)
+	rootTxSigHash, err := common.SigHashFromTx(rootTx, 0, onChainOutput)
 	if err != nil {
 		return nil, err
 	}
