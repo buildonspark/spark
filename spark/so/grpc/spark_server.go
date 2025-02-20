@@ -2,7 +2,6 @@ package grpc
 
 import (
 	"context"
-	"log"
 
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
 	"github.com/lightsparkdev/spark-go/so"
@@ -41,13 +40,13 @@ func (s *SparkServer) StartTreeCreation(ctx context.Context, req *pb.StartTreeCr
 // FinalizeNodeSignatures verifies the node signatures and updates the node.
 func (s *SparkServer) FinalizeNodeSignatures(ctx context.Context, req *pb.FinalizeNodeSignaturesRequest) (*pb.FinalizeNodeSignaturesResponse, error) {
 	finalizeSignatureHandler := handler.NewFinalizeSignatureHandler(s.config)
-	return finalizeSignatureHandler.FinalizeNodeSignatures(ctx, req)
+	return wrapWithGRPCError(finalizeSignatureHandler.FinalizeNodeSignatures(ctx, req))
 }
 
 // StartSendTransfer initiates a transfer from sender.
 func (s *SparkServer) StartSendTransfer(ctx context.Context, req *pb.StartSendTransferRequest) (*pb.StartSendTransferResponse, error) {
 	transferHander := handler.NewTransferHandler(s.config)
-	return transferHander.StartSendTransfer(ctx, req)
+	return wrapWithGRPCError(transferHander.StartSendTransfer(ctx, req))
 }
 
 // CompleteSendTransfer completes a transfer from sender.
@@ -59,7 +58,7 @@ func (s *SparkServer) CompleteSendTransfer(ctx context.Context, req *pb.Complete
 // CancelSendTransfer cancels a transfer from sender before key is tweaked.
 func (s *SparkServer) CancelSendTransfer(ctx context.Context, req *pb.CancelSendTransferRequest) (*pb.CancelSendTransferResponse, error) {
 	transferHander := handler.NewTransferHandler(s.config)
-	return transferHander.CancelSendTransfer(ctx, req, false)
+	return wrapWithGRPCError(transferHander.CancelSendTransfer(ctx, req, false))
 }
 
 // QueryPendingTransfers queries the pending transfers to claim.
@@ -120,21 +119,13 @@ func (s *SparkServer) LeafSwap(ctx context.Context, req *pb.LeafSwapRequest) (*p
 // PrepareTreeAddress prepares the tree address for the given public key.
 func (s *SparkServer) PrepareTreeAddress(ctx context.Context, req *pb.PrepareTreeAddressRequest) (*pb.PrepareTreeAddressResponse, error) {
 	treeHandler := handler.NewTreeCreationHandler(s.config, s.db)
-	result, err := wrapWithGRPCError(treeHandler.PrepareTreeAddress(ctx, req))
-	if err != nil {
-		log.Printf("failed to prepare tree address: %v", err)
-	}
-	return result, err
+	return wrapWithGRPCError(treeHandler.PrepareTreeAddress(ctx, req))
 }
 
 // CreateTree creates a tree from user input and signs the transactions in the tree.
 func (s *SparkServer) CreateTree(ctx context.Context, req *pb.CreateTreeRequest) (*pb.CreateTreeResponse, error) {
 	treeHandler := handler.NewTreeCreationHandler(s.config, s.db)
-	result, err := wrapWithGRPCError(treeHandler.CreateTree(ctx, req))
-	if err != nil {
-		log.Printf("failed to create tree: %v", err)
-	}
-	return result, err
+	return wrapWithGRPCError(treeHandler.CreateTree(ctx, req))
 }
 
 // GetSigningOperatorList gets the list of signing operators.
