@@ -16,8 +16,8 @@ export default function WalletIcon(props: React.SVGProps<SVGSVGElement>) {
         fill="#F9F9F9"
       />
       <path
-        fill-rule="evenodd"
-        clip-rule="evenodd"
+        fillRule="evenodd"
+        clipRule="evenodd"
         d="M26.9494 8.11914H0.908203V21.6048H26.9494V17.4195H19.5117V13.6993H26.9494V8.11914Z"
         fill="#F9F9F9"
       />

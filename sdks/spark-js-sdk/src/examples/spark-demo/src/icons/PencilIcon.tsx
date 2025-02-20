@@ -10,9 +10,9 @@ export default function PencilIcon() {
       <path
         d="M13.25 6.25L17 2.5L21.5 7L17.75 10.75M13.25 6.25L2.75 16.75V21.25H7.25L17.75 10.75M13.25 6.25L17.75 10.75"
         stroke="#F9F9F9"
-        stroke-width="1.5"
-        stroke-linecap="round"
-        stroke-linejoin="round"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
       />
     </svg>
   );

@@ -11,9 +11,9 @@ export default function SendIcon() {
         <path
           d="M23.5833 9.16667L8.91663 23.8333M11.9101 8.16667H23.25C23.9863 8.16667 24.5833 8.76362 24.5833 9.5V22.1611"
           stroke="#F9F9F9"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
         />
       </g>
       <defs>
@@ -24,9 +24,9 @@ export default function SendIcon() {
           width="40"
           height="40"
           filterUnits="userSpaceOnUse"
-          color-interpolation-filters="sRGB"
+          colorInterpolationFilters="sRGB"
         >
-          <feFlood flood-opacity="0" result="BackgroundImageFix" />
+          <feFlood floodOpacity="0" result="BackgroundImageFix" />
           <feColorMatrix
             in="SourceAlpha"
             type="matrix"
