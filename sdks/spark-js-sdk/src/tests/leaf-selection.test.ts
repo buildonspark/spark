@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import { Network } from "../proto/spark";
-import { LeafNode, selectLeaves } from "../utils/leaf-selection";
+import { LeafNode, MINIMUM_VALUE, selectLeaves } from "../utils/leaf-selection";
 
 function createLeafNode(value: number): LeafNode {
   return {
@@ -55,11 +55,11 @@ describe("leaf selection", () => {
       createLeafNode(1500),
     ];
 
-    const selectedLeaves = selectLeaves(leaves, 300);
+    const selectedLeaves = selectLeaves(leaves, 3000);
 
     expect(selectedLeaves.length).toBe(2);
     expect(selectedLeaves.reduce((acc, leaf) => acc + leaf.value, 0)).toBe(
-      3000n
+      3000
     );
   });
 
@@ -97,7 +97,7 @@ describe("leaf selection", () => {
 
     expect(selectedLeaves.length).toBe(6);
     expect(selectedLeaves.reduce((acc, leaf) => acc + leaf.value, 0)).toBe(
-      20500n
+      20500
     );
     expect(selectedLeaves[0].value).toBe(10000);
     expect(selectedLeaves[1].value).toBe(5000);
@@ -140,7 +140,7 @@ describe("leaf selection", () => {
       selectLeaves(leaves, 0);
     } catch (e: any) {
       expect(e.message).toBe(
-        "Target amount is too small to be processed: requested 0 but minimum is 540"
+        `Target amount is too small to be processed: requested 0 but minimum is ${MINIMUM_VALUE}`
       );
     }
   });

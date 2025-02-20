@@ -1,6 +1,6 @@
 import { TreeNode } from "../proto/spark";
 
-const MINIMUM_VALUE = 16;
+export const MINIMUM_VALUE = 16;
 
 // TODO: Do we even need this?
 export type LeafNode = TreeNode & {
