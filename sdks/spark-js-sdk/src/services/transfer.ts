@@ -155,7 +155,7 @@ export class BaseTransferService {
         );
       }
 
-      const txOutput = leafData.tx?.getOutput(leafData.vout);
+      const txOutput = leafData.tx?.getOutput(0);
       if (!txOutput) {
         throw new Error(
           `Output not found for leaf ${operatorSigningResult.leafId}`
@@ -379,7 +379,8 @@ export class TransferService extends BaseTransferService {
       pendingTransfersResp = await sparkClient.query_pending_transfers({
         participant: {
           $case: "receiverIdentityPublicKey",
-          receiverIdentityPublicKey: await this.config.signer.getIdentityPublicKey(),
+          receiverIdentityPublicKey:
+            await this.config.signer.getIdentityPublicKey(),
         },
       });
     } catch (error) {
