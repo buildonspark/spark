@@ -7,6 +7,50 @@
     "dist"
   ],
   "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/spark-sdk.d.ts",
+      "import": {
+        "types": "./dist/spark-sdk.d.ts",
+        "default": "./dist/spark-sdk.js"
+      }
+    },
+    "./signer": {
+      "types": "./dist/signer/signer.d.ts",
+      "import": {
+        "types": "./dist/signer/signer.d.ts",
+        "default": "./dist/signer/signer.js"
+      }
+    },
+    "./utils": {
+      "types": "./dist/utils/index.d.ts",
+      "import": {
+        "types": "./dist/utils/index.d.ts",
+        "default": "./dist/utils/index.js"
+      }
+    },
+    "./token-transaction-service": {
+      "types": "./dist/services/token-transaction-service.d.ts",
+      "import": {
+        "types": "./dist/services/token-transaction-service.d.ts",
+        "default": "./dist/services/token-transaction-service.js"
+      }
+    },
+    "./wasm": {
+      "types": "./dist/wasm/wasm.d.ts",
+      "import": {
+        "types": "./dist/wasm/wasm.d.ts",
+        "default": "./dist/wasm/wasm.js"
+      }
+    },
+    "./types": {
+      "types": "./dist/types/index.d.ts",
+      "import": {
+        "types": "./dist/types/index.d.ts",
+        "default": "./dist/types/index.js"
+      }
+    }
+  },
   "scripts": {
     "build": "tsc && copyfiles -u 1 'src/wasm/**/*.wasm' dist/",
     "prepare": "npm run build",
