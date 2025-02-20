@@ -2,7 +2,7 @@ import ChevronRightIcon from "../icons/ChevronRightIcon";
 import LightningIcon from "../icons/LightningIcon";
 import AmountInput from "./AmountInput";
 import StyledContainer from "./StyledContainer";
-import ReceiveDetailsPage from "./ReceiveDetailsPage";
+
 export enum Network {
   LIGHTNING = "lightning",
 }
@@ -35,7 +35,6 @@ export default function Networks({ onSelectNetwork }: NetworksProps) {
         Powered by Spark
       </div>
       <AmountInput />
-      <ReceiveDetailsPage />
     </div>
   );
 }

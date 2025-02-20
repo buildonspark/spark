@@ -5,6 +5,7 @@ interface ButtonsProps {
   kind?: "primary" | "secondary";
   icon?: React.ReactNode;
   text?: string;
+  onClick?: () => void;
 }
 
 export default function Button({
@@ -12,9 +13,10 @@ export default function Button({
   kind = "primary",
   icon,
   text,
+  onClick,
 }: ButtonsProps) {
   return (
-    <StyledButton direction={direction} kind={kind}>
+    <StyledButton direction={direction} kind={kind} onClick={onClick}>
       {icon}
       {text}
     </StyledButton>
@@ -78,5 +80,10 @@ const StyledButton = styled.button<{
     `}
   &:hover {
     background: linear-gradient(180deg, #0e3154 0%, rgba(14, 49, 84, 0.5) 100%);
+  }
+
+  &:active {
+    background: linear-gradient(180deg, #0a253b 0%, rgba(10, 37, 59, 0.5) 100%);
+    transform: scale(0.98);
   }
 `;

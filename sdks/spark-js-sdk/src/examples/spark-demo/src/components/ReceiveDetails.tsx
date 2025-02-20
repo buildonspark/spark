@@ -14,11 +14,11 @@ const ACTIVE_BUTTON_STYLES =
 const INACTIVE_BUTTON_STYLES =
   "rounded-[6px] border border-transparent bg-transparent shadow-none";
 
-export default function ReceiveDetailsPage() {
+export default function ReceiveDetails() {
   const [active, setActive] = useState<ActiveButton>("lightning");
   return (
     <div className="flex flex-col items-center mt-4 w-full">
-      <div className="flex py-4 px-6 w-full">
+      <div className="flex py-4 w-full">
         <div
           className={`flex-1 text-[12px] min-h-5 p-3 text-center rounded-md ${
             active === "bitcoin" ? ACTIVE_BUTTON_STYLES : INACTIVE_BUTTON_STYLES
@@ -129,14 +129,14 @@ const DetailsRow = ({
 
 const ReceiveDetailsContainer = styled.div`
   margin-top: 8px;
-  width: 345px;
+  width: 100%;
   display: flex;
   flex-direction: column;
   border-radius: 16px;
   border: 0.33px solid #2d3845;
 `;
 const ReceiveQRCard = styled.div`
-  width: 345px;
+  width: 100%;
   height: 184px;
   display: flex;
   border-radius: 24px;

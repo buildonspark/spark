@@ -2,8 +2,9 @@ import { useEffect, useState } from "react";
 import styled from "styled-components";
 import DeleteIcon from "../icons/DeleteIcon";
 import Button from "./Button";
-
+import { useNavigate } from "react-router-dom";
 export default function AmountInput() {
+  const navigate = useNavigate();
   const [amount, setAmount] = useState("0");
   const [btcPrice, setBtcPrice] = useState<number | null>(null);
 
@@ -130,7 +131,12 @@ export default function AmountInput() {
           </AmountInputButton>
         </div>
       </div>
-      <Button text="Confirm" />
+      <Button
+        text="Confirm"
+        onClick={() => {
+          navigate("/receive-details");
+        }}
+      />
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import { useNavigate } from "react-router-dom";
 import Button from "../../components/Button";
 import CurrencyBalanceDetails from "../../components/CurrencyBalanceDetails";
 import StyledContainer from "../../components/StyledContainer";
@@ -8,6 +9,8 @@ import StableCoinLogo from "../../icons/StableCoinLogo";
 import WalletIcon from "../../icons/WalletIcon";
 
 export default function Wallet() {
+  const navigate = useNavigate();
+
   return (
     <div className="mx-6">
       <div className="flex items-center justify-center gap-2">
@@ -32,12 +35,18 @@ export default function Wallet() {
           icon={<SendIcon />}
           kind="primary"
           direction="vertical"
+          onClick={() => {
+            navigate("/send");
+          }}
         />
         <Button
           text="Receive"
           icon={<ReceiveIcon />}
           kind="primary"
           direction="vertical"
+          onClick={() => {
+            navigate("/receive");
+          }}
         />
       </div>
       {/* <div className="w-full border-y border-[#f9f9f9] border-opacity-10 mt-6">
