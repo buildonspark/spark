@@ -139,6 +139,20 @@ func TestReceiveLightningPayment(t *testing.T) {
 	}
 	assert.Equal(t, transfer.Status, spark.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED)
 
+	_, err = wallet.SwapNodesForPreimage(
+		context.Background(),
+		sspConfig,
+		leaves,
+		userConfig.IdentityPublicKey(),
+		paymentHash[:],
+		nil,
+		feeSats,
+		true,
+	)
+	if err == nil {
+		t.Fatalf("expected error")
+	}
+
 	receiverToken, err := wallet.AuthenticateWithServer(context.Background(), userConfig)
 	if err != nil {
 		t.Fatalf("failed to authenticate receiver: %v", err)
