@@ -17,7 +17,6 @@ export default function DetailsRow({
   borderTop = false,
   onClick,
 }: DetailsRowProps) {
-  console.log(logoLeftCircleBackground);
   return (
     <div
       className={`h-[72px] flex flex-row items-center justify-between ${

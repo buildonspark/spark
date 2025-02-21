@@ -5,6 +5,7 @@ import ArrowLeft from "../../icons/ArrowLeft";
 import AmountInput from "../../components/AmountInput";
 import { useNavigate } from "react-router-dom";
 import ReceiveDetails from "../../components/ReceiveDetails";
+import CloseIcon from "../../icons/CloseIcon";
 
 enum ReceiveStep {
   NetworkSelect = "NetworkSelect",
@@ -17,6 +18,7 @@ enum ReceiveStep {
 export default function Receive() {
   const [amount, setAmount] = useState("0");
   const [paymentNetwork, setPaymentNetwork] = useState<Network>(Network.NONE);
+  const [qrCodeModalVisible, setQrCodeModalVisible] = useState<boolean>(false);
   const [currentStep, setCurrentStep] = useState<ReceiveStep>(
     ReceiveStep.NetworkSelect
   );
@@ -31,21 +33,19 @@ export default function Receive() {
         setCurrentStep(ReceiveStep.ShareQuote);
         break;
       case ReceiveStep.ShareQuote:
-        alert("Share quote");
+        setQrCodeModalVisible(true);
         break;
     }
   }, [currentStep, navigate, setCurrentStep]);
 
   const onLogoLeftClick = useCallback(() => {
     switch (currentStep) {
-      case ReceiveStep.ShareQuote:
-        setCurrentStep(ReceiveStep.InputAmount);
-        break;
       case ReceiveStep.InputAmount:
         setAmount("0");
         setCurrentStep(ReceiveStep.NetworkSelect);
         break;
       case ReceiveStep.NetworkSelect:
+      case ReceiveStep.ShareQuote:
         navigate("/wallet");
         break;
     }
@@ -64,11 +64,20 @@ export default function Receive() {
     }
   }, [currentStep]);
 
+  const logoLeft = useMemo(() => {
+    switch (currentStep) {
+      case ReceiveStep.ShareQuote:
+        return <CloseIcon strokeWidth="1.5" />;
+      default:
+        return <ArrowLeft strokeWidth="1.5" />;
+    }
+  }, [currentStep]);
+
   return (
     <div>
       <CardForm
         topTitle={topTitle}
-        logoLeft={<ArrowLeft strokeWidth="1.5" />}
+        logoLeft={logoLeft}
         onSubmit={onSubmit}
         submitButtonText={
           currentStep === ReceiveStep.InputAmount
@@ -91,7 +100,16 @@ export default function Receive() {
         {currentStep === ReceiveStep.InputAmount && (
           <AmountInput amount={amount} setAmount={setAmount} />
         )}
-        {currentStep === ReceiveStep.ShareQuote && <ReceiveDetails />}
+        {currentStep === ReceiveStep.ShareQuote && (
+          <ReceiveDetails
+            receiveAmount={amount}
+            onEditAmount={() => {
+              setCurrentStep(ReceiveStep.InputAmount);
+            }}
+            qrCodeModalVisible={qrCodeModalVisible}
+            setQrCodeModalVisible={setQrCodeModalVisible}
+          />
+        )}
       </CardForm>
     </div>
   );
