@@ -5,13 +5,13 @@ import CopyIcon from "../../icons/CopyIcon";
 
 import { useNavigate } from "react-router-dom";
 import WalletIcon from "../../icons/WalletIcon";
-import { useSparkWallet } from "../../context/SparkWalletContext";
+import useWalletStore from "../../store/wallet";
 
 export default function WalletSuccess() {
   const [mnemonic, setMnemonic] = useState<string | null>(null);
 
   const navigate = useNavigate();
-  const wallet = useSparkWallet();
+  const { wallet } = useWalletStore();
 
   useEffect(() => {
     wallet.generateMnemonic().then((mnemonic) => {

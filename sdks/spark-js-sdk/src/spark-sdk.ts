@@ -704,8 +704,9 @@ export class SparkWallet {
     return await this.transferService.claimTransfer(transfer, leavesToClaim);
   }
 
-  async claimTransfers() {
+  async claimTransfers(): Promise<boolean> {
     const transfers = await this.queryPendingTransfers();
+    let claimed = false;
     for (const transfer of transfers.transfers) {
       if (
         transfer.status !== TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAKED &&
@@ -717,7 +718,9 @@ export class SparkWallet {
         continue;
       }
       await this.claimTransfer(transfer);
+      claimed = true;
     }
+    return claimed;
   }
 
   async coopExit(onchainAddress: string, targetAmountSats?: number) {

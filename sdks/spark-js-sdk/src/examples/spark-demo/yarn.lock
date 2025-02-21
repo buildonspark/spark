@@ -2565,6 +2565,24 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@tanstack/query-core@npm:5.66.4":
+  version: 5.66.4
+  resolution: "@tanstack/query-core@npm:5.66.4"
+  checksum: 10c0/ef0ebf572e0109791e53e9a7c2790a93cbfe1c6f3fb462793c621c0f2d44c0b38f78f22a32526e124790f69a017ae3254877281f418ffef06d83f4edb82df51a
+  languageName: node
+  linkType: hard
+
+"@tanstack/react-query@npm:^5.66.8":
+  version: 5.66.8
+  resolution: "@tanstack/react-query@npm:5.66.8"
+  dependencies:
+    "@tanstack/query-core": "npm:5.66.4"
+  peerDependencies:
+    react: ^18 || ^19
+  checksum: 10c0/b5b0f954ee32cff4dbe76731dd7560d03e56f879d8b854049530f4a011a7806a99d8f83b5b69af03156bc5d0b399c66f0f427c43d513d87a2dccd54b256b1fc7
+  languageName: node
+  linkType: hard
+
 "@testing-library/dom@npm:^8.5.0":
   version: 8.20.1
   resolution: "@testing-library/dom@npm:8.20.1"
@@ -12235,6 +12253,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "spark-demo@workspace:."
   dependencies:
+    "@tanstack/react-query": "npm:^5.66.8"
     "@testing-library/jest-dom": "npm:^5.14.1"
     "@testing-library/react": "npm:^13.0.0"
     "@testing-library/user-event": "npm:^13.2.1"
@@ -12254,6 +12273,7 @@ __metadata:
     tailwindcss: "npm:3"
     typescript: "npm:^4.4.2"
     web-vitals: "npm:^2.1.0"
+    zustand: "npm:^5.0.3"
   languageName: unknown
   linkType: soft
 
@@ -14131,5 +14151,26 @@ __metadata:
   version: 0.1.0
   resolution: "yocto-queue@npm:0.1.0"
   checksum: 10c0/dceb44c28578b31641e13695d200d34ec4ab3966a5729814d5445b194933c096b7ced71494ce53a0e8820685d1d010df8b2422e5bf2cdea7e469d97ffbea306f
+  languageName: node
+  linkType: hard
+
+"zustand@npm:^5.0.3":
+  version: 5.0.3
+  resolution: "zustand@npm:5.0.3"
+  peerDependencies:
+    "@types/react": ">=18.0.0"
+    immer: ">=9.0.6"
+    react: ">=18.0.0"
+    use-sync-external-store: ">=1.2.0"
+  peerDependenciesMeta:
+    "@types/react":
+      optional: true
+    immer:
+      optional: true
+    react:
+      optional: true
+    use-sync-external-store:
+      optional: true
+  checksum: 10c0/dad96c6c123fda088c583d5df6692e9245cd207583078dc15f93d255a67b0f346bad4535545c98852ecde93d254812a0c799579dfde2ab595016b99fbe20e4d5
   languageName: node
   linkType: hard
