@@ -434,10 +434,6 @@ func (w *SingleKeyWallet) SendTransfer(ctx context.Context, receiverIdentityPubk
 		if err != nil {
 			return nil, fmt.Errorf("failed to select nodes: %w", err)
 		}
-		err = w.SyncWallet(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to sync wallet: %w", err)
-		}
 		nodes, err = w.leafSelection(int64(targetAmount))
 		if err != nil {
 			return nil, fmt.Errorf("failed to select nodes: %w", err)
