@@ -13,6 +13,18 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
+var retryPolicy = `{
+		"methodConfig": [{
+		  "name": [{}],
+		  "retryPolicy": {
+			  "MaxAttempts": 3,
+			  "InitialBackoff": "1s",
+			  "MaxBackoff": "10s",
+			  "BackoffMultiplier": 2.0,
+			  "RetryableStatusCodes": [ "UNAVAILABLE" ]
+		  }
+		}]}`
+
 // NewGRPCConnection creates a new gRPC connection to the given address.
 func NewGRPCConnectionWithCert(address string, certPath string) (*grpc.ClientConn, error) {
 	var creds credentials.TransportCredentials
@@ -44,7 +56,7 @@ func NewGRPCConnectionWithCert(address string, certPath string) (*grpc.ClientCon
 		})
 	}
 
-	conn, err := grpc.NewClient(address, grpc.WithTransportCredentials(creds))
+	conn, err := grpc.NewClient(address, grpc.WithTransportCredentials(creds), grpc.WithDefaultServiceConfig(retryPolicy))
 	if err != nil {
 		return nil, err
 	}
@@ -52,7 +64,7 @@ func NewGRPCConnectionWithCert(address string, certPath string) (*grpc.ClientCon
 }
 
 func NewGRPCConnectionWithoutTLS(address string) (*grpc.ClientConn, error) {
-	conn, err := grpc.NewClient(address, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.NewClient(address, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithDefaultServiceConfig(retryPolicy))
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +75,7 @@ func NewGRPCConnectionWithTestTLS(address string) (*grpc.ClientConn, error) {
 	tlsConfig := &tls.Config{
 		InsecureSkipVerify: true,
 	}
-	conn, err := grpc.NewClient(address, grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig)))
+	conn, err := grpc.NewClient(address, grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig)), grpc.WithDefaultServiceConfig(retryPolicy))
 	if err != nil {
 		return nil, err
 	}
