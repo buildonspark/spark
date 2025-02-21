@@ -256,6 +256,7 @@ func main() {
 		helper.LogInterceptor,
 		ent.DbSessionMiddleware(dbClient),
 		authn.NewAuthnInterceptor(sessionTokenCreatorVerifier).AuthnInterceptor,
+		sparkgrpc.ValidationInterceptor(),
 	))
 
 	var grpcServer *grpc.Server

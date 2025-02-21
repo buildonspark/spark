@@ -5,6 +5,7 @@ package spark;
 option go_package = "github.com/lightsparkdev/spark-go/proto/spark";
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/empty.proto";
+import "validate/validate.proto";
 import "common.proto";
 
 service SparkService {
@@ -132,7 +133,7 @@ message StartTreeCreationResponse {
 // This proto is constructed by the wallet to specify leaves it wants to spend as
 // part of the token transaction.
 message TokenLeafToSpend {
-    bytes prev_token_transaction_hash = 1;
+    bytes prev_token_transaction_hash = 1 [(validate.rules).bytes.len = 32];
     uint32 prev_token_transaction_leaf_vout = 2; 
 }
 
@@ -141,7 +142,7 @@ message TransferInput {
 }
 
 message MintInput {
-    bytes issuer_public_key = 1;
+    bytes issuer_public_key = 1 [(validate.rules).bytes.len = 33];
     // Issuer provided timestamp of when the transaction was signed/constructed. 
     // Helps provide idempotency and ensures that each mint input signature is unique 
     // as long as multiple mint signatures are not happening at the same time. Also gives a 
@@ -156,13 +157,13 @@ message MintInput {
 // as part of a token transaction.  id and revocation public key should remain unfilled
 // so that the SE can fill them as part of the StartTokenTransaction() call.
 message TokenLeafOutput {
-    optional string id = 1;
-    bytes owner_public_key = 2;
-    optional bytes revocation_public_key = 3;
+    optional string id = 1 [(validate.rules).string.uuid = true];
+    bytes owner_public_key = 2 [(validate.rules).bytes.len = 33];
+    optional bytes revocation_public_key = 3 [(validate.rules).bytes.len = 33];
     optional uint64 withdraw_bond_sats = 4;
     optional uint64 withdraw_relative_block_locktime = 5;
-    bytes token_public_key = 6;
-    bytes token_amount = 7;  // Decoded uint128
+    bytes token_public_key = 6 [(validate.rules).bytes.len = 33];
+    bytes token_amount = 7 [(validate.rules).bytes.len = 16];  // Decoded uint128
 }
 
 // This proto is constructed by the wallet and is the core transaction data structure.
@@ -176,18 +177,19 @@ message TokenTransaction {
         TransferInput transfer_input = 2;
     }
     repeated TokenLeafOutput output_leaves = 3;
-    repeated bytes spark_operator_identity_public_keys = 4;
+    repeated bytes spark_operator_identity_public_keys = 4 [(validate.rules).repeated.items.bytes.len = 33];
 }
 
 message TokenTransactionSignatures {
       // Filled by signing the partial token transaction hash with the owner/issuer private key.
       // For mint transactions this will be one signature for the input issuer_public_key
       // For transfer transactions this will be one for each leaf for the leaf owner_public_key
-      repeated bytes owner_signatures = 1;
+      // This is a DER signature which can be between 68 and 73 bytes.
+      repeated bytes owner_signatures = 1 [(validate.rules).repeated.items.bytes.min_len = 68, (validate.rules).repeated.items.bytes.max_len = 73];
 }
 
 message StartTokenTransactionRequest {
-    bytes identity_public_key = 1;
+    bytes identity_public_key = 1 [(validate.rules).bytes.len = 33];
     TokenTransaction partial_token_transaction = 2;
     // List of ecdsa signatures authorizing movement of tokens from the token input.
     TokenTransactionSignatures token_transaction_signatures = 3;
@@ -203,15 +205,16 @@ message StartTokenTransactionResponse {
 }
 
 message OperatorSpecificTokenTransactionSignablePayload {
-    bytes final_token_transaction_hash = 1;
-    bytes operator_identity_public_key = 2;
+    bytes final_token_transaction_hash = 1 [(validate.rules).bytes.len = 32];
+    bytes operator_identity_public_key = 2 [(validate.rules).bytes.len = 33];
 }
 
 // This message allows the sender of a leaf being spent to provide final evidence
 // that it owns a leaf to an SO when requesting signing and release of the  revocation keyshare.  
 message OperatorSpecificTokenTransactionSignature {
-    bytes owner_public_key = 1;
-    bytes owner_signature = 2;
+    bytes owner_public_key = 1 [(validate.rules).bytes.len = 33];
+    // This is a DER signature which can be between 68 and 73 bytes.
+    bytes owner_signature = 2 [(validate.rules).bytes.min_len = 68, (validate.rules).bytes.max_len = 73];
     OperatorSpecificTokenTransactionSignablePayload payload = 3;
 }
 
@@ -221,45 +224,46 @@ message SignTokenTransactionRequest {
 }
 
 message SignTokenTransactionResponse {
-    bytes spark_operator_signature = 1;
-    repeated bytes token_transaction_revocation_keyshares = 2;
+    bytes spark_operator_signature = 1 [(validate.rules).bytes.min_len = 68, (validate.rules).bytes.max_len = 73];
+    repeated bytes token_transaction_revocation_keyshares = 2 [(validate.rules).repeated.items.bytes.len = 32];
 }
 
 message FinalizeTokenTransactionRequest {
     TokenTransaction final_token_transaction = 1;
     // List of ordered revocation keys that map 1:1 with leaves being spent in the
     // token transaction.
-    repeated bytes leaf_to_spend_revocation_keys = 2;
+    repeated bytes leaf_to_spend_revocation_keys = 2 [(validate.rules).repeated.items.bytes.len = 32];
 }
 
 message FreezeTokensPayload {
-    bytes owner_public_key = 1;
-    bytes token_public_key = 2;
+    bytes owner_public_key = 1 [(validate.rules).bytes.len = 33];
+    bytes token_public_key = 2 [(validate.rules).bytes.len = 33];
     uint64 issuer_provided_timestamp = 3;
-    bytes operator_identity_public_key = 4;
+    bytes operator_identity_public_key = 4 [(validate.rules).bytes.len = 33];
     // Set to false when requesting a freeze.
     bool should_unfreeze = 5;  
 }
 
 message FreezeTokensRequest {
     FreezeTokensPayload freeze_tokens_payload = 1;
-    bytes issuer_signature = 2;
+    // This is a DER signature which can be between 68 and 73 bytes.
+    bytes issuer_signature = 2 [(validate.rules).bytes.min_len = 68, (validate.rules).bytes.max_len = 73];
 }
 
 message FreezeTokensResponse {
-    repeated string impacted_leaf_ids = 1;
+    repeated string impacted_leaf_ids = 1 [(validate.rules).repeated.items.string.uuid = true];
     repeated bytes impacted_token_amount = 2;  // Decoded uint128
 }
 
 message GetOwnedTokenLeavesRequest {
-    repeated bytes owner_public_keys = 1;
+    repeated bytes owner_public_keys = 1 [(validate.rules).repeated.items.bytes.len = 33];
     // Optionally provide token public keys. If not set return leaves for all tokens.
-    repeated bytes token_public_keys = 2;
+    repeated bytes token_public_keys = 2 [(validate.rules).repeated.items.bytes.len = 33];
 }
 
 message LeafWithPreviousTransactionData {
     TokenLeafOutput leaf = 1;
-	bytes previous_transaction_hash = 2;
+	bytes previous_transaction_hash = 2 [(validate.rules).bytes.len = 32];
 	uint32 previous_transaction_vout = 3;
 }
 

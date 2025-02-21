@@ -16,14 +16,15 @@ spark/proto/%/%.pb.go: $(PROTO_DIR)/%.proto
 		--proto_path=$(PROTO_DIR) \
 		--go-grpc_out=$(dir $@) \
 		--go-grpc_opt=paths=source_relative \
+		--validate_out="lang=go,paths=source_relative:$(dir $@)" \
 		$<
-
 # Default target
 all: $(GO_OUT) copy-protos
 
 # Clean target
 clean:
 	rm -rf spark/proto/*/*.pb.go
+	rm -rf spark/proto/*/*.pb.validate.go
 
 ent:
 	cd spark && go run -mod=mod entgo.io/ent/cmd/ent generate --feature sql/lock ./so/ent/schema

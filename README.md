@@ -13,6 +13,7 @@ Go protobuf tools need to be installed as well:
 ```
 go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
 go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+go install github.com/envoyproxy/protoc-gen-validate@latest
 ```
 
 After modifying the proto files, you can generate the Go files with the following command:
@@ -45,6 +46,7 @@ To make a migration, follow these steps:
 
 - Make your change to the schema, run `make ent`
 - Generate migration files by running (from spark directory):
+
 ```
 createdb operator_temp
 atlas migrate diff <diff_name> \
@@ -53,11 +55,14 @@ atlas migrate diff <diff_name> \
 --dev-url "postgresql://127.0.0.1:5432/operator_temp?sslmode=disable&search_path=public"
 dropdb operator_temp
 ```
+
 - When running `run-everything.sh`, the migration will be automatically
-applied to each operator's database. But if you want to apply a migration manually, you can run:
+  applied to each operator's database. But if you want to apply a migration manually, you can run:
+
 ```
 atlas migrate apply --dir "file://so/ent/migrate/migrations" --url "postgresql://127.0.0.1:5432/operator_0?sslmode=disable" --baseline 20250219194108
 ```
+
 - Commit the migration files, and submit a PR.
 
 ## VSCode
