@@ -57,7 +57,7 @@ func (s *PolarityScorer) Start() {
 	lastUpdated := time.Now().Add(-24 * 30 * time.Hour)
 	for {
 		s.logger.Info("checking for leaves updated after", slog.Time("last_updated", lastUpdated))
-		leaves, _ := s.dbClient.TreeNode.Query().
+		leaves, err := s.dbClient.TreeNode.Query().
 			Where(
 				treenode.StatusEQ(schema.TreeNodeStatusAvailable),
 				treenode.UpdateTimeGTE(lastUpdated),
@@ -65,8 +65,13 @@ func (s *PolarityScorer) Start() {
 			Order(
 				ent.Desc(treenode.FieldUpdateTime),
 			).
+			WithParent().
 			Limit(limit).
 			All(context.Background())
+		if err != nil {
+			s.logger.Error("error loading leaves", slog.Any("error", err))
+		}
+
 		s.logger.Info("found leaves to update", slog.Int("num_leaves", len(leaves)))
 		for _, leaf := range leaves {
 			node := leaf
@@ -74,7 +79,15 @@ func (s *PolarityScorer) Start() {
 				if node.Edges.Parent == nil {
 					break
 				}
-				node = node.Edges.Parent
+
+				node, err = s.dbClient.TreeNode.Query().
+					Where(treenode.ID(node.Edges.Parent.ID)).
+					WithParent().
+					Only(context.Background())
+				if err != nil {
+					s.logger.Error("error loading parent", slog.Any("error", err))
+					break
+				}
 			}
 			s.UpdateLeaves(node)
 		}
