@@ -32,4 +32,5 @@ enum SignatureIntent {
     TRANSFER = 1;
     AGGREGATE = 2;
     REFRESH = 3;
+    EXTEND = 4;
 }

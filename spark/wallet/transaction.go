@@ -8,7 +8,6 @@ import (
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
-	"github.com/lightsparkdev/spark-go"
 	"github.com/lightsparkdev/spark-go/common"
 )
 
@@ -63,6 +62,7 @@ func createNodeTx(
 // 0, the leaf node tx can be re-signed with a decremented
 // timelock, and the refund tx can be reset it's timelock.
 func createLeafNodeTx(
+	sequence uint32,
 	parentOutPoint *wire.OutPoint,
 	txOut *wire.TxOut,
 ) *wire.MsgTx {
@@ -71,7 +71,7 @@ func createLeafNodeTx(
 		PreviousOutPoint: *parentOutPoint,
 		SignatureScript:  nil,
 		Witness:          nil,
-		Sequence:         spark.InitialSequence(),
+		Sequence:         sequence,
 	})
 	newLeafTx.AddTxOut(txOut)
 	newLeafTx.AddTxOut(ephemeralAnchorOutput())

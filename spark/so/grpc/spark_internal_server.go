@@ -228,11 +228,12 @@ func (s *SparkInternalServer) FinalizeTransfer(ctx context.Context, req *pb.Fina
 // FinalizeRefreshTimelock finalizes the refresh timelock.
 func (s *SparkInternalServer) FinalizeRefreshTimelock(ctx context.Context, req *pb.FinalizeRefreshTimelockRequest) (*emptypb.Empty, error) {
 	refreshTimelockHandler := handler.NewInternalRefreshTimelockHandler(s.config)
-	err := refreshTimelockHandler.FinalizeRefreshTimelock(ctx, req)
-	if err != nil {
-		return nil, err
-	}
-	return &emptypb.Empty{}, nil
+	return wrapWithGRPCError(&emptypb.Empty{}, refreshTimelockHandler.FinalizeRefreshTimelock(ctx, req))
+}
+
+func (s *SparkInternalServer) FinalizeExtendLeaf(ctx context.Context, req *pb.FinalizeExtendLeafRequest) (*emptypb.Empty, error) {
+	extendLeafHandler := handler.NewInternalExtendLeafHandler(s.config)
+	return wrapWithGRPCError(&emptypb.Empty{}, extendLeafHandler.FinalizeExtendLeaf(ctx, req))
 }
 
 // InitiatePreimageSwap initiates a preimage swap for the given payment hash.

@@ -24,6 +24,7 @@ service SparkService {
     rpc provide_preimage(ProvidePreimageRequest) returns (ProvidePreimageResponse) {}
     rpc leaf_swap(LeafSwapRequest) returns (LeafSwapResponse) {}
     rpc refresh_timelock(RefreshTimelockRequest) returns (RefreshTimelockResponse) {}
+    rpc extend_leaf(ExtendLeafRequest) returns (ExtendLeafResponse) {}
 
     rpc prepare_tree_address(PrepareTreeAddressRequest) returns (PrepareTreeAddressResponse) {}
     rpc create_tree(CreateTreeRequest) returns (CreateTreeResponse) {}
@@ -517,6 +518,24 @@ message RefreshTimelockSigningResult {
 
 message RefreshTimelockResponse {
     repeated RefreshTimelockSigningResult signing_results = 1;
+}
+
+message ExtendLeafRequest {
+    string leaf_id = 1;
+    bytes owner_identity_public_key = 2;
+    SigningJob node_tx_signing_job = 3;
+    SigningJob refund_tx_signing_job = 4;
+}
+
+message ExtendLeafSigningResult {
+    SigningResult signing_result = 1;
+    bytes verifying_key = 2;
+}
+
+message ExtendLeafResponse {
+    string leaf_id = 1;
+    ExtendLeafSigningResult node_tx_signing_result = 2;
+    ExtendLeafSigningResult refund_tx_signing_result = 3;
 }
 
 message AddressRequestNode {

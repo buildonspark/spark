@@ -418,3 +418,167 @@ func RefreshTimelockNodes(
 
 	return nil
 }
+
+func ExtendTimelock(
+	ctx context.Context,
+	config *Config,
+	node *pb.TreeNode,
+	signingPrivKey *secp256k1.PrivateKey,
+) error {
+	// Insert a new node in between the current refund and the node tx
+	nodeTx, err := common.TxFromRawTxBytes(node.NodeTx)
+	if err != nil {
+		return fmt.Errorf("failed to parse node tx: %v", err)
+	}
+
+	refundTx, err := common.TxFromRawTxBytes(node.RefundTx)
+	if err != nil {
+		return fmt.Errorf("failed to parse refund tx: %v", err)
+	}
+
+	// Create new node tx to spend the node tx and send to a new refund tx
+	refundSequence := refundTx.TxIn[0].Sequence
+	newNodeSequence, err := spark.NextSequence(refundSequence)
+	if err != nil {
+		return fmt.Errorf("failed to increment sequence: %v", err)
+	}
+	newNodeOutPoint := wire.OutPoint{Hash: nodeTx.TxHash(), Index: 0}
+	newNodeTx := createLeafNodeTx(newNodeSequence, &newNodeOutPoint, nodeTx.TxOut[0])
+
+	// Create new refund tx to spend the new node tx
+	// (signing pubkey is used here as the destination for convenience,
+	// though normally it should just be the same output as the refund tx)
+	newRefundOutPoint := wire.OutPoint{Hash: newNodeTx.TxHash(), Index: 0}
+	newRefundTx, err := createRefundTx(spark.InitialSequence(), &newRefundOutPoint, refundTx.TxOut[0].Value, signingPrivKey.PubKey())
+	if err != nil {
+		return fmt.Errorf("failed to create refund tx: %v", err)
+	}
+
+	// Create signing jobs
+	newNodeSigningJob, newNodeNonce, err := signingJobFromTx(newNodeTx, signingPrivKey)
+	if err != nil {
+		return fmt.Errorf("failed to create signing job: %v", err)
+	}
+	newRefundSigningJob, newRefundNonce, err := signingJobFromTx(newRefundTx, signingPrivKey)
+	if err != nil {
+		return fmt.Errorf("failed to create signing job: %v", err)
+	}
+
+	// Send to SO to sign
+	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
+	if err != nil {
+		return fmt.Errorf("failed to create grpc connection: %v", err)
+	}
+	defer sparkConn.Close()
+
+	token, err := AuthenticateWithConnection(ctx, config, sparkConn)
+	if err != nil {
+		return fmt.Errorf("failed to authenticate with server: %v", err)
+	}
+	authCtx := ContextWithToken(ctx, token)
+
+	sparkClient := pb.NewSparkServiceClient(sparkConn)
+	response, err := sparkClient.ExtendLeaf(authCtx, &pb.ExtendLeafRequest{
+		LeafId:                 node.Id,
+		OwnerIdentityPublicKey: config.IdentityPublicKey(),
+		NodeTxSigningJob:       newNodeSigningJob,
+		RefundTxSigningJob:     newRefundSigningJob,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to extend leaf: %v", err)
+	}
+
+	// Sign and aggregate
+	newNodeSignFrostJob, newNodeAggFrostJob, err := createFrostJobsFromTx(newNodeTx, nodeTx.TxOut[0], newNodeNonce, signingPrivKey, response.NodeTxSigningResult)
+	if err != nil {
+		return fmt.Errorf("failed to create node frost signing job: %v", err)
+	}
+	newRefundSignFrostJob, newRefundAggFrostJob, err := createFrostJobsFromTx(newRefundTx, newNodeTx.TxOut[0], newRefundNonce, signingPrivKey, response.RefundTxSigningResult)
+	if err != nil {
+		return fmt.Errorf("failed to create refund frost signing job: %v", err)
+	}
+
+	frostConn, _ := common.NewGRPCConnectionWithoutTLS(config.FrostSignerAddress)
+	defer frostConn.Close()
+	frostClient := pbfrost.NewFrostServiceClient(frostConn)
+	userSignatures, err := frostClient.SignFrost(context.Background(), &pbfrost.SignFrostRequest{
+		SigningJobs: []*pbfrost.FrostSigningJob{newNodeSignFrostJob, newRefundSignFrostJob},
+		Role:        pbfrost.SigningRole_USER,
+	})
+	if err != nil {
+		return err
+	}
+	if len(userSignatures.Results) != 2 {
+		return fmt.Errorf("expected 2 signing results, got %d", len(userSignatures.Results))
+	}
+	newNodeAggFrostJob.UserSignatureShare = userSignatures.Results[newNodeSignFrostJob.JobId].SignatureShare
+	newRefundAggFrostJob.UserSignatureShare = userSignatures.Results[newRefundSignFrostJob.JobId].SignatureShare
+
+	// Aggregate
+	newNodeResp, err := frostClient.AggregateFrost(context.Background(), newNodeAggFrostJob)
+	if err != nil {
+		return fmt.Errorf("failed to aggregate node tx: %v", err)
+	}
+	newRefundResp, err := frostClient.AggregateFrost(context.Background(), newRefundAggFrostJob)
+	if err != nil {
+		return fmt.Errorf("failed to aggregate refund tx: %v", err)
+	}
+
+	// Finalize signatures
+	_, err = sparkClient.FinalizeNodeSignatures(authCtx, &pb.FinalizeNodeSignaturesRequest{
+		Intent: pbcommon.SignatureIntent_EXTEND,
+		NodeSignatures: []*pb.NodeSignatures{{
+			NodeId:            response.LeafId,
+			NodeTxSignature:   newNodeResp.Signature,
+			RefundTxSignature: newRefundResp.Signature,
+		}},
+	})
+	if err != nil {
+		return fmt.Errorf("failed to finalize node signatures: %v", err)
+	}
+
+	// Call it a day
+	return nil
+}
+
+func createFrostJobsFromTx(
+	tx *wire.MsgTx,
+	parentTxOut *wire.TxOut,
+	nonce *objects.SigningNonce,
+	signingPrivKey *secp256k1.PrivateKey,
+	signingResult *pb.ExtendLeafSigningResult,
+) (*pbfrost.FrostSigningJob, *pbfrost.AggregateFrostRequest, error) {
+	sigHash, err := common.SigHashFromTx(tx, 0, parentTxOut)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to calculate sighash: %v", err)
+	}
+	signingNonce, err := nonce.MarshalProto()
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to marshal nonce: %v", err)
+	}
+	signingNonceCommitment, err := nonce.SigningCommitment().MarshalProto()
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to marshal nonce commitment: %v", err)
+	}
+	frostKeyPackage := CreateUserKeyPackage(signingPrivKey.Serialize())
+	userSigningJobID := uuid.New().String()
+	signingJob := &pbfrost.FrostSigningJob{
+		JobId:           userSigningJobID,
+		Message:         sigHash,
+		KeyPackage:      frostKeyPackage,
+		VerifyingKey:    signingResult.VerifyingKey,
+		Nonce:           signingNonce,
+		Commitments:     signingResult.SigningResult.SigningNonceCommitments,
+		UserCommitments: signingNonceCommitment,
+	}
+	aggregateJob := &pbfrost.AggregateFrostRequest{
+		Message:         sigHash,
+		SignatureShares: signingResult.SigningResult.SignatureShares,
+		PublicShares:    signingResult.SigningResult.PublicKeys,
+		VerifyingKey:    signingResult.VerifyingKey,
+		Commitments:     signingResult.SigningResult.SigningNonceCommitments,
+		UserCommitments: signingNonceCommitment,
+		UserPublicKey:   signingPrivKey.PubKey().SerializeCompressed(),
+	}
+	return signingJob, aggregateJob, nil
+}

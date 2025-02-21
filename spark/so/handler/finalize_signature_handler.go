@@ -134,6 +134,15 @@ func (o *FinalizeSignatureHandler) FinalizeNodeSignatures(ctx context.Context, r
 				return nil, fmt.Errorf("finalize refresh failed: %v", err)
 			}
 			return nil, nil
+		case pbcommon.SignatureIntent_EXTEND:
+			if len(internalNodes) == 0 {
+				return nil, fmt.Errorf("no nodes to extend")
+			}
+			_, err = client.FinalizeExtendLeaf(ctx, &pbinternal.FinalizeExtendLeafRequest{Node: internalNodes[0]})
+			if err != nil {
+				return nil, fmt.Errorf("finalize extend failed: %v", err)
+			}
+			return nil, nil
 		}
 		return nil, err
 	})

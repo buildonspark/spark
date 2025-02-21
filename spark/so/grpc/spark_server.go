@@ -122,6 +122,11 @@ func (s *SparkServer) RefreshTimelock(ctx context.Context, req *pb.RefreshTimelo
 	return wrapWithGRPCError(handler.RefreshTimelock(ctx, req))
 }
 
+func (s *SparkServer) ExtendLeaf(ctx context.Context, req *pb.ExtendLeafRequest) (*pb.ExtendLeafResponse, error) {
+	handler := handler.NewExtendLeafHandler(s.config)
+	return wrapWithGRPCError(handler.ExtendLeaf(ctx, req))
+}
+
 // PrepareTreeAddress prepares the tree address for the given public key.
 func (s *SparkServer) PrepareTreeAddress(ctx context.Context, req *pb.PrepareTreeAddressRequest) (*pb.PrepareTreeAddressResponse, error) {
 	treeHandler := handler.NewTreeCreationHandler(s.config, s.db)

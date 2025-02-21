@@ -260,6 +260,7 @@ func buildCreationNodesFromTree(
 				parentOutPoint := wire.OutPoint{Hash: currentElement.parentTx.TxHash(), Index: currentElement.vout}
 				parentTxOut := currentElement.parentTx.TxOut[currentElement.vout]
 				tx := createLeafNodeTx(
+					spark.InitialSequence(),
 					&parentOutPoint,
 					wire.NewTxOut(parentTxOut.Value, parentTxOut.PkScript),
 				)
