@@ -5,6 +5,7 @@ import StyledContainer from "../../components/StyledContainer";
 import ReceiveIcon from "../../icons/ReceiveIcon";
 import SendIcon from "../../icons/SendIcon";
 import WalletIcon from "../../icons/WalletIcon";
+import { Routes } from "../../routes";
 import { useWallet } from "../../store/wallet";
 import { roundDown } from "../../utils/utils";
 
@@ -67,7 +68,7 @@ export default function Wallet() {
           kind="primary"
           direction="vertical"
           onClick={() => {
-            navigate("/send");
+            navigate(Routes.Send);
           }}
         />
         <Button
@@ -76,7 +77,7 @@ export default function Wallet() {
           kind="primary"
           direction="vertical"
           onClick={() => {
-            navigate("/receive");
+            navigate(Routes.Receive);
           }}
         />
       </div>

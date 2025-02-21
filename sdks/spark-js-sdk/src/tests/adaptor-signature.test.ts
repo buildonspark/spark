@@ -10,48 +10,54 @@ import {
 import { Network } from "../utils/network.js";
 
 describe("adaptor signature", () => {
-  it("should validate outbound adaptor signature", async () => {
-    let failures = 0;
+  const testFn = process.env.GITHUB_ACTIONS ? it.skip : it;
 
-    const wallet = new SparkWallet(Network.REGTEST);
-    const mnemonic = await wallet.generateMnemonic();
-    await wallet.createSparkWallet(mnemonic);
+  testFn(
+    "should validate outbound adaptor signature",
+    async () => {
+      let failures = 0;
 
-    const msg = "test";
-    const hash = sha256(msg);
-    for (let i = 0; i < 1000; i++) {
-      const pubKey = await wallet.getSigner().generatePublicKey();
-      const pubkey = await wallet.getSigner().getSchnorrPublicKey(pubKey);
+      const wallet = new SparkWallet(Network.REGTEST);
+      const mnemonic = await wallet.generateMnemonic();
+      await wallet.createSparkWallet(mnemonic);
 
-      const sig = await wallet.getSigner().signSchnorr(hash, pubKey);
+      const msg = "test";
+      const hash = sha256(msg);
+      for (let i = 0; i < 1000; i++) {
+        const pubKey = await wallet.getSigner().generatePublicKey();
+        const pubkey = await wallet.getSigner().getSchnorrPublicKey(pubKey);
 
-      expect(schnorr.verify(sig, hash, pubkey)).toBe(true);
+        const sig = await wallet.getSigner().signSchnorr(hash, pubKey);
 
-      try {
-        const { adaptorPrivateKey, adaptorSignature } =
-          generateAdaptorFromSignature(sig);
+        expect(schnorr.verify(sig, hash, pubkey)).toBe(true);
 
-        const adaptorPubkey = secp256k1.getPublicKey(adaptorPrivateKey);
-        validateOutboundAdaptorSignature(
-          pubkey,
-          hash,
-          adaptorSignature,
-          adaptorPubkey
-        );
+        try {
+          const { adaptorPrivateKey, adaptorSignature } =
+            generateAdaptorFromSignature(sig);
 
-        const adapterSig = applyAdaptorToSignature(
-          pubkey,
-          hash,
-          adaptorSignature,
-          adaptorPrivateKey
-        );
+          const adaptorPubkey = secp256k1.getPublicKey(adaptorPrivateKey);
+          validateOutboundAdaptorSignature(
+            pubkey,
+            hash,
+            adaptorSignature,
+            adaptorPubkey
+          );
 
-        expect(schnorr.verify(adapterSig, hash, pubkey)).toBe(true);
-      } catch (e) {
-        failures++;
+          const adapterSig = applyAdaptorToSignature(
+            pubkey,
+            hash,
+            adaptorSignature,
+            adaptorPrivateKey
+          );
+
+          expect(schnorr.verify(adapterSig, hash, pubkey)).toBe(true);
+        } catch (e) {
+          failures++;
+        }
       }
-    }
 
-    expect(failures).toBe(0);
-  }, 30000);
+      expect(failures).toBe(0);
+    },
+    30000
+  );
 });

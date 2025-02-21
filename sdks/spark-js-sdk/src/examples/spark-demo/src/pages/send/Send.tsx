@@ -1,13 +1,14 @@
 import { useCallback, useMemo, useState } from "react";
-import AddressInput from "../../components/AddressInput";
-import CardForm from "../../components/CardForm";
-import { Network } from "../../components/Networks";
-import CloseIcon from "../../icons/CloseIcon";
-import ArrowLeft from "../../icons/ArrowLeft";
-import AmountInput from "../../components/AmountInput";
 import { useNavigate } from "react-router-dom";
+import AddressInput from "../../components/AddressInput";
+import AmountInput from "../../components/AmountInput";
+import CardForm from "../../components/CardForm";
 import ConfirmQuote from "../../components/ConfirmQuote";
+import { Network } from "../../components/Networks";
 import SendDetails from "../../components/SendDetails";
+import ArrowLeft from "../../icons/ArrowLeft";
+import CloseIcon from "../../icons/CloseIcon";
+import { Routes } from "../../routes";
 
 export enum SendStep {
   AddressInput = "AddressInput",
@@ -47,7 +48,7 @@ export default function Send() {
         setCurrentStep(SendStep.AmountInput);
         break;
       default:
-        navigate("/wallet");
+        navigate(Routes.Wallet);
         break;
     }
   }, [currentStep, navigate, setCurrentStep]);
@@ -90,7 +91,7 @@ export default function Send() {
         setCurrentStep(SendStep.Success);
         break;
       case SendStep.Success:
-        navigate("/wallet");
+        navigate(Routes.Wallet);
         break;
     }
   };

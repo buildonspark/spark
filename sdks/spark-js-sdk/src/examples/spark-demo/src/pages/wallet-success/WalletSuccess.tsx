@@ -5,6 +5,7 @@ import CopyIcon from "../../icons/CopyIcon";
 
 import { useNavigate } from "react-router-dom";
 import WalletIcon from "../../icons/WalletIcon";
+import { Routes } from "../../routes";
 import { useWallet } from "../../store/wallet";
 
 export default function WalletSuccess() {
@@ -22,7 +23,7 @@ export default function WalletSuccess() {
   const onContinue = async () => {
     if (!mnemonic) return;
     await initWallet(mnemonic);
-    navigate("/wallet");
+    navigate(Routes.Wallet);
   };
 
   if (!mnemonic) return null;

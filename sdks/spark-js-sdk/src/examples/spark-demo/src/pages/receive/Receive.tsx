@@ -6,6 +6,7 @@ import Networks, { Network } from "../../components/Networks";
 import ReceiveDetails from "../../components/ReceiveDetails";
 import ArrowLeft from "../../icons/ArrowLeft";
 import CloseIcon from "../../icons/CloseIcon";
+import { Routes } from "../../routes";
 import { useWallet } from "../../store/wallet";
 
 enum ReceiveStep {
@@ -36,6 +37,7 @@ export default function Receive() {
         break;
       case ReceiveStep.InputAmount:
         const satsToSend = Math.floor(Number(fiatAmount) / btcPrice.value);
+        console.log("satsToSend", satsToSend);
         const invoice = await createLightningInvoice(satsToSend, "test memo");
         setInvoice(invoice);
         setCurrentStep(ReceiveStep.ShareQuote);
@@ -54,7 +56,7 @@ export default function Receive() {
         break;
       case ReceiveStep.NetworkSelect:
       case ReceiveStep.ShareQuote:
-        navigate("/wallet");
+        navigate(Routes.Wallet);
         break;
     }
   }, [currentStep, navigate, setFiatAmount, setCurrentStep]);

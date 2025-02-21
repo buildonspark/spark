@@ -1,21 +1,27 @@
-import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
+import {
+  Route,
+  BrowserRouter as Router,
+  Routes as RoutesProvider,
+} from "react-router-dom";
 import Login from "./pages/login/Login";
 import Receive from "./pages/receive/Receive";
-import Wallet from "./pages/wallet/Wallet";
-import WalletSuccess from "./pages/wallet-success/WalletSuccess";
+import RecoverWallet from "./pages/recover-wallet/RecoverWallet";
 import Send from "./pages/send/Send";
-
+import WalletSuccess from "./pages/wallet-success/WalletSuccess";
+import Wallet from "./pages/wallet/Wallet";
+import { Routes } from "./routes";
 export default function Root() {
   return (
     <Router>
       <div className="mt-[40px]">
-        <Routes>
-          <Route path="/" element={<Login />} />
-          <Route path="/wallet-success" element={<WalletSuccess />} />
-          <Route path="/wallet" element={<Wallet />} />
-          <Route path="/receive" element={<Receive />} />
-          <Route path="/send" element={<Send />} />
-        </Routes>
+        <RoutesProvider>
+          <Route path={Routes.Base} element={<Login />} />
+          <Route path={Routes.WalletSuccess} element={<WalletSuccess />} />
+          <Route path={Routes.Wallet} element={<Wallet />} />
+          <Route path={Routes.Receive} element={<Receive />} />
+          <Route path={Routes.Send} element={<Send />} />
+          <Route path={Routes.RecoverWallet} element={<RecoverWallet />} />
+        </RoutesProvider>
       </div>
     </Router>
   );

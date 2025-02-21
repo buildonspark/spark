@@ -3,6 +3,7 @@ import Button from "../../components/Button";
 import KeyIcon from "../../icons/KeyIcon";
 import SparkleIcon from "../../icons/SparkleIcon";
 import WalletIcon from "../../icons/WalletIcon";
+import { Routes } from "../../routes";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -27,7 +28,7 @@ export default function Login() {
             icon={<SparkleIcon />}
             kind="primary"
             onClick={() => {
-              navigate("/wallet-success");
+              navigate(Routes.WalletSuccess);
             }}
           />
           <Button
@@ -35,7 +36,7 @@ export default function Login() {
             icon={<KeyIcon />}
             kind="secondary"
             onClick={() => {
-              navigate("/wallet");
+              navigate(Routes.RecoverWallet);
             }}
           />
         </div>
