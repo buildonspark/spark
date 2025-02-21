@@ -4,10 +4,21 @@ import StyledContainer from "../../components/StyledContainer";
 import ReceiveIcon from "../../icons/ReceiveIcon";
 import SendIcon from "../../icons/SendIcon";
 import WalletIcon from "../../icons/WalletIcon";
+import { useMemo, useState } from "react";
+import { useBtcPrice } from "../../context/BtcPriceContext";
+import { roundDown } from "../../utils/utils";
 
 export default function Wallet() {
   const navigate = useNavigate();
+  const [satsBalance, setSatsBalance] = useState(2323222323);
+  const { satsUsdPrice, lastSuccessfulFetch } = useBtcPrice();
 
+  let usdBalance = useMemo(() => {
+    return satsUsdPrice
+      ? roundDown(satsUsdPrice * satsBalance, 2).toFixed(2)
+      : null;
+  }, [satsUsdPrice, satsBalance]);
+  const fontSize = Math.max(60 - (satsBalance.toString().length - 1) * 5, 30);
   return (
     <div className="mx-6">
       <div className="flex items-center justify-center gap-2">
@@ -16,14 +27,36 @@ export default function Wallet() {
       </div>
       <StyledContainer className="mt-9 flex items-center justify-center w-full h-[180px]">
         <div>
-          <div className="flex  font-decimal justify-center">
-            <div className="text-[24px] self-center">$</div>
-            <div className="text-[60px] leading-[60px]">0</div>
-            <div className="text-[24px] self-end">.00</div>
+          <div className="flex flex-col justify-center max-w-[300px]">
+            {usdBalance !== null ? (
+              <div className="flex font-decimal">
+                <div
+                  className="text-center break-words whitespace-normal max-w-[300px]"
+                  style={{ fontSize: `${fontSize}px` }}
+                >
+                  {"$" +
+                    Number(usdBalance.split(".")[0]).toLocaleString() +
+                    "." +
+                    usdBalance.split(".")[1]}
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col justify-center items-center text-center">
+                <div
+                  className="leading-[60px] break-words whitespace-normal"
+                  style={{ fontSize: `${fontSize}px` }}
+                >
+                  {satsBalance.toLocaleString()}
+                </div>
+                <div className="text-[13px] opacity-40">SATs</div>
+              </div>
+            )}
           </div>
-          <div className=" font-decimal text-[13px] opacity-40">
-            0.00000000 BTC
-          </div>
+          {usdBalance && (
+            <div className="flex justify-center items-center font-decimal text-[13px] opacity-40">
+              {satsBalance} SATs
+            </div>
+          )}
         </div>
       </StyledContainer>
       <div className="flex items-center justify-center gap-4 mt-6">

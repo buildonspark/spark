@@ -20,12 +20,12 @@ export default function ReceiveDetails({
   qrCodeModalVisible,
   setQrCodeModalVisible,
   onEditAmount,
-  receiveAmount,
+  receiveFiatAmount,
 }: {
   qrCodeModalVisible: boolean;
   setQrCodeModalVisible: React.Dispatch<React.SetStateAction<boolean>>;
   onEditAmount: () => void;
-  receiveAmount: string;
+  receiveFiatAmount: string;
 }) {
   const [active, setActive] = useState<ActiveButton>("lightning");
   const [url, setUrl] = useState(
@@ -109,7 +109,7 @@ export default function ReceiveDetails({
       <ReceiveDetailsContainer>
         <DetailsRow
           title="Amount"
-          subtitle={receiveAmount}
+          subtitle={receiveFiatAmount}
           logoRight={<PencilIcon />}
           onClick={onEditAmount}
         />

@@ -5,7 +5,7 @@ import CopyIcon from "../../icons/CopyIcon";
 
 import { useNavigate } from "react-router-dom";
 import WalletIcon from "../../icons/WalletIcon";
-import { useSparkWallet } from "../../sparkwallet";
+import { useSparkWallet } from "../../context/SparkWalletContext";
 
 export default function WalletSuccess() {
   const [mnemonic, setMnemonic] = useState<string | null>(null);

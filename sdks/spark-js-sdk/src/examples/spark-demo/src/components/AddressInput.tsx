@@ -65,7 +65,7 @@ export default function AddressInput({ onAddressSelect }: AddressInputProps) {
         onChange={handleInputChange}
       />
       {inputAddressNetwork === Network.NONE && (
-        <span className="text-[12px] text-[#999999]">
+        <span className="ml-2 text-[12px] text-[#999999]">
           Works with spark and bitcoin wallet addresses.
         </span>
       )}
@@ -88,6 +88,10 @@ export default function AddressInput({ onAddressSelect }: AddressInputProps) {
           title={inputAddress}
           subtitle={`${capitalizeFirstLetter(inputAddressNetwork)} address`}
           logoRight={<ChevronRightIcon />}
+          logoLeftCircleBackground={true}
+          onClick={() => {
+            onAddressSelect(inputAddress, inputAddressNetwork);
+          }}
         />
       )}
       {inputAddressNetwork === Network.SPARK && (
@@ -96,6 +100,10 @@ export default function AddressInput({ onAddressSelect }: AddressInputProps) {
           title={inputAddress}
           subtitle={`${capitalizeFirstLetter(inputAddressNetwork)} address`}
           logoRight={<ChevronRightIcon />}
+          logoLeftCircleBackground={true}
+          onClick={() => {
+            onAddressSelect(inputAddress, inputAddressNetwork);
+          }}
         />
       )}
     </div>

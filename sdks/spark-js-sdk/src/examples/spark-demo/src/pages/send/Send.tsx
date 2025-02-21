@@ -26,7 +26,7 @@ export default function Send() {
   const [sendAddressNetwork, setSendAddressNetwork] = useState<Network>(
     Network.NONE
   );
-  const [sendAmount, setSendAmount] = useState<string>("0");
+  const [sendFiatAmount, setSendFiatAmount] = useState<string>("0");
 
   const logoLeft = useMemo(() => {
     switch (currentStep) {
@@ -40,7 +40,7 @@ export default function Send() {
   const onLogoLeftClick = useCallback(() => {
     switch (currentStep) {
       case SendStep.AmountInput:
-        setSendAmount("0");
+        setSendFiatAmount("0");
         setCurrentStep(SendStep.AddressInput);
         break;
       case SendStep.ConfirmQuote:
@@ -113,17 +113,23 @@ export default function Send() {
         />
       )}
       {currentStep === SendStep.AmountInput && (
-        <AmountInput amount={sendAmount} setAmount={setSendAmount} />
+        <AmountInput
+          fiatAmount={sendFiatAmount}
+          setFiatAmount={setSendFiatAmount}
+        />
       )}
       {currentStep === SendStep.ConfirmQuote && (
         <ConfirmQuote
-          sendAmount={sendAmount}
+          sendFiatAmount={sendFiatAmount}
           sendAddress={sendAddress}
           sendAddressNetwork={sendAddressNetwork}
         />
       )}
       {currentStep === SendStep.Success && (
-        <SendDetails sendAmount={sendAmount} sendAddress={sendAddress} />
+        <SendDetails
+          sendFiatAmount={sendFiatAmount}
+          sendAddress={sendAddress}
+        />
       )}
     </CardForm>
   );

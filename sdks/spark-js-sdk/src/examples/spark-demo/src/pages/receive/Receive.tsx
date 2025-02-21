@@ -16,7 +16,7 @@ enum ReceiveStep {
 }
 
 export default function Receive() {
-  const [amount, setAmount] = useState("0");
+  const [fiatAmount, setFiatAmount] = useState("0");
   const [paymentNetwork, setPaymentNetwork] = useState<Network>(Network.NONE);
   const [qrCodeModalVisible, setQrCodeModalVisible] = useState<boolean>(false);
   const [currentStep, setCurrentStep] = useState<ReceiveStep>(
@@ -41,7 +41,7 @@ export default function Receive() {
   const onLogoLeftClick = useCallback(() => {
     switch (currentStep) {
       case ReceiveStep.InputAmount:
-        setAmount("0");
+        setFiatAmount("0");
         setCurrentStep(ReceiveStep.NetworkSelect);
         break;
       case ReceiveStep.NetworkSelect:
@@ -49,7 +49,7 @@ export default function Receive() {
         navigate("/wallet");
         break;
     }
-  }, [currentStep, navigate, setAmount, setCurrentStep]);
+  }, [currentStep, navigate, setFiatAmount, setCurrentStep]);
 
   const topTitle = useMemo(() => {
     switch (currentStep) {
@@ -98,11 +98,11 @@ export default function Receive() {
           />
         )}
         {currentStep === ReceiveStep.InputAmount && (
-          <AmountInput amount={amount} setAmount={setAmount} />
+          <AmountInput fiatAmount={fiatAmount} setFiatAmount={setFiatAmount} />
         )}
         {currentStep === ReceiveStep.ShareQuote && (
           <ReceiveDetails
-            receiveAmount={amount}
+            receiveFiatAmount={fiatAmount}
             onEditAmount={() => {
               setCurrentStep(ReceiveStep.InputAmount);
             }}

@@ -1,17 +1,21 @@
 import { useEffect, useState } from "react";
 import styled from "styled-components";
 import DeleteIcon from "../icons/DeleteIcon";
+import { useBtcPrice } from "../context/BtcPriceContext";
+import ToggleIcon from "../icons/ToggleIcon";
 export default function AmountInput({
-  amount,
-  setAmount,
+  fiatAmount,
+  setFiatAmount,
+  togglePrimaryCurrency,
 }: {
-  amount: string;
-  setAmount: React.Dispatch<React.SetStateAction<string>>;
+  fiatAmount: string;
+  setFiatAmount: React.Dispatch<React.SetStateAction<string>>;
+  togglePrimaryCurrency: () => void;
 }) {
-  const [btcPrice, setBtcPrice] = useState<number | null>(null);
+  const { satsUsdPrice } = useBtcPrice();
 
   const handleKey = (key: string) => {
-    setAmount((prev) => {
+    setFiatAmount((prev) => {
       if (key === "Backspace") {
         if (prev.length === 1) {
           return "0";
@@ -44,31 +48,11 @@ export default function AmountInput({
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [amount]);
+  }, [fiatAmount]);
 
-  useEffect(() => {
-    const fetchBtcPrice = async () => {
-      try {
-        const response = await fetch(
-          "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd"
-        );
-        const data = await response.json();
-        setBtcPrice(data.bitcoin.usd);
-      } catch (error) {
-        console.error("Error fetching BTC price:", error);
-      }
-    };
-
-    fetchBtcPrice();
-    // Refresh price every minute
-    const interval = setInterval(fetchBtcPrice, 60000);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  const intAmount = amount.split(".")[0];
-  const decAmount = amount.split(".")[1];
-  const hasDecimal = amount.includes(".");
+  const intAmount = fiatAmount.split(".")[0];
+  const decAmount = fiatAmount.split(".")[1];
+  const hasDecimal = fiatAmount.includes(".");
   return (
     <div className="flex flex-col gap-2 items-center w-full">
       <div className="my-10">
@@ -81,10 +65,14 @@ export default function AmountInput({
             <div className="text-[24px] self-end">.{decAmount}</div>
           )}
         </div>
-        <div className="font-decimal text-[13px] opacity-40 text-center">
-          {btcPrice
-            ? `${(Number(amount) / btcPrice).toFixed(8)} BTC`
-            : "0.00000000 BTC"}
+        <div
+          className="font-decimal text-[13px] opacity-40 text-center flex items-center gap-2 rounded-full bg-[#F9F9F9] bg-opacity-20 px-2 py-1"
+          onClick={togglePrimaryCurrency}
+        >
+          {satsUsdPrice
+            ? `${Math.floor(Number(fiatAmount) / satsUsdPrice).toFixed(0)} SATs`
+            : "0 SATs"}
+          <ToggleIcon />
         </div>
       </div>
       <div className="flex flex-col gap-2 font-decimal text-[22px]">

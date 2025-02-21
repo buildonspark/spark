@@ -3,9 +3,7 @@ import Login from "./pages/login/Login";
 import Receive from "./pages/receive/Receive";
 import Wallet from "./pages/wallet/Wallet";
 import WalletSuccess from "./pages/wallet-success/WalletSuccess";
-import ReceiveDetails from "./components/ReceiveDetails";
 import Send from "./pages/send/Send";
-import AmountInput from "./components/AmountInput";
 
 export default function Root() {
   return (
