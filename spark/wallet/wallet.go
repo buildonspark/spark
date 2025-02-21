@@ -430,7 +430,18 @@ func (w *SingleKeyWallet) RequestLeavesSwap(ctx context.Context, targetAmount in
 func (w *SingleKeyWallet) SendTransfer(ctx context.Context, receiverIdentityPubkey []byte, targetAmount int64) (*pb.Transfer, error) {
 	nodes, err := w.leafSelection(targetAmount)
 	if err != nil {
-		return nil, fmt.Errorf("failed to select nodes: %w", err)
+		_, err = w.RequestLeavesSwap(ctx, int64(targetAmount))
+		if err != nil {
+			return nil, fmt.Errorf("failed to select nodes: %w", err)
+		}
+		err = w.SyncWallet(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to sync wallet: %w", err)
+		}
+		nodes, err = w.leafSelection(int64(targetAmount))
+		if err != nil {
+			return nil, fmt.Errorf("failed to select nodes: %w", err)
+		}
 	}
 
 	leafKeyTweaks := make([]LeafKeyTweak, 0, len(nodes))
@@ -448,7 +459,7 @@ func (w *SingleKeyWallet) SendTransfer(ctx context.Context, receiverIdentityPubk
 		nodesToRemove[node.Id] = true
 	}
 
-	transfer, err := SendTransfer(ctx, w.Config, leafKeyTweaks, receiverIdentityPubkey, time.Time{})
+	transfer, err := SendTransfer(ctx, w.Config, leafKeyTweaks, receiverIdentityPubkey, time.Now().Add(10*time.Minute))
 	if err != nil {
 		return nil, fmt.Errorf("failed to send transfer: %w", err)
 	}
