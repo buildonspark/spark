@@ -19,6 +19,8 @@ func LogInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServer
 	response, err := handler(ctx, req)
 	if err != nil {
 		logger.Error("error in grpc", "error", err)
+	} else {
+		logger.Debug("grpc call successful", "response", response)
 	}
 	return response, err
 }
