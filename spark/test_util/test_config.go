@@ -83,19 +83,19 @@ func GetAllSigningOperatorsDeployed() (map[string]*so.SigningOperator, error) {
 		"0000000000000000000000000000000000000000000000000000000000000001": {
 			ID:                0,
 			Identifier:        "0000000000000000000000000000000000000000000000000000000000000001",
-			Address:           "dns:///spark-0.dev.dev.sparkinfra.net",
+			Address:           "dns:///0.spark.dev.dev.sparkinfra.net",
 			IdentityPublicKey: pubkeyBytesArray[0],
 		},
 		"0000000000000000000000000000000000000000000000000000000000000002": {
 			ID:                1,
 			Identifier:        "0000000000000000000000000000000000000000000000000000000000000002",
-			Address:           "dns:///spark-1.dev.dev.sparkinfra.net",
+			Address:           "dns:///1.spark.dev.dev.sparkinfra.net",
 			IdentityPublicKey: pubkeyBytesArray[1],
 		},
 		"0000000000000000000000000000000000000000000000000000000000000003": {
 			ID:                2,
 			Identifier:        "0000000000000000000000000000000000000000000000000000000000000003",
-			Address:           "dns:///spark-2.dev.dev.sparkinfra.net",
+			Address:           "dns:///2.spark.dev.dev.sparkinfra.net",
 			IdentityPublicKey: pubkeyBytesArray[2],
 		},
 	}, nil
