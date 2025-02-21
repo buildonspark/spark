@@ -213,6 +213,9 @@ func (h *LightningHandler) validateGetPreimageRequest(
 		if err != nil {
 			return fmt.Errorf("unable to get node: %v", err)
 		}
+		if node.Status != schema.TreeNodeStatusAvailable {
+			return fmt.Errorf("node %v is not available: %v", node.ID, node.Status)
+		}
 		keyshare, err := node.QuerySigningKeyshare().First(ctx)
 		if err != nil {
 			return fmt.Errorf("unable to get keyshare: %v", err)
