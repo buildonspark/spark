@@ -1,4 +1,4 @@
-import { FRAGMENT as RequestLightningReceiveOutputFragment } from "../objects/LightningReceiveRequest";
+import { FRAGMENT as RequestLightningReceiveOutputFragment } from "../objects/LightningReceiveRequest.js";
 
 export const RequestLightningReceive = `
   mutation RequestLightningReceive(

@@ -1,4 +1,4 @@
-import { FRAGMENT as RequestLightningSendOutputFragment } from "../objects/LightningSendRequest";
+import { FRAGMENT as RequestLightningSendOutputFragment } from "../objects/LightningSendRequest.js";
 export const RequestLightningSend = `
   mutation RequestLightningSend(
     $encoded_invoice: String!

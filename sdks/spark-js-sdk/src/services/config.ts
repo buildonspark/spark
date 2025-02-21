@@ -1,6 +1,6 @@
-import { DefaultSparkSigner, SparkSigner } from "../signer/signer";
-import { REGTEST_WALLET_CONFIG } from "../tests/test-util";
-import { Network } from "../utils/network";
+import { DefaultSparkSigner, SparkSigner } from "../signer/signer.js";
+import { REGTEST_WALLET_CONFIG } from "../tests/test-util.js";
+import { Network } from "../utils/network.js";
 
 export type SigningOperator = {
   id: number;

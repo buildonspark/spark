@@ -7,9 +7,9 @@
 /* eslint-disable */
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import { type CallContext, type CallOptions } from "nice-grpc-common";
-import { SignatureIntent, signatureIntentFromJSON, signatureIntentToJSON, SigningCommitment } from "./common";
-import { Empty } from "./google/protobuf/empty";
-import { Timestamp } from "./google/protobuf/timestamp";
+import { SignatureIntent, signatureIntentFromJSON, signatureIntentToJSON, SigningCommitment } from "./common.js";
+import { Empty } from "./google/protobuf/empty.js";
+import { Timestamp } from "./google/protobuf/timestamp.js";
 
 export const protobufPackage = "spark";
 
@@ -641,7 +641,6 @@ export interface OutPoint {
 export interface CooperativeExitRequest {
   transfer: StartSendTransferRequest | undefined;
   exitId: string;
-  /** TODO: provide signatures for the leaves so SE can be watchtower */
   exitTxid: Uint8Array;
 }
 
@@ -659,6 +658,24 @@ export interface LeafSwapRequest {
 export interface LeafSwapResponse {
   transfer: Transfer | undefined;
   signingResults: LeafRefundTxSigningResult[];
+}
+
+export interface RefreshTimelockRequest {
+  leafId: string;
+  ownerIdentityPublicKey: Uint8Array;
+  signingJobs: SigningJob[];
+}
+
+export interface RefreshTimelockSigningResult {
+  signingResult:
+    | SigningResult
+    | undefined;
+  /** Should maybe just be a part of SigningResult? */
+  verifyingKey: Uint8Array;
+}
+
+export interface RefreshTimelockResponse {
+  signingResults: RefreshTimelockSigningResult[];
 }
 
 export interface AddressRequestNode {
@@ -743,6 +760,7 @@ export interface GetSigningOperatorListResponse_SigningOperatorsEntry {
 
 export interface QueryUserSignedRefundsRequest {
   paymentHash: Uint8Array;
+  identityPublicKey: Uint8Array;
 }
 
 export interface QueryUserSignedRefundsResponse {
@@ -752,6 +770,7 @@ export interface QueryUserSignedRefundsResponse {
 export interface ProvidePreimageRequest {
   paymentHash: Uint8Array;
   preimage: Uint8Array;
+  identityPublicKey: Uint8Array;
 }
 
 export interface ProvidePreimageResponse {
@@ -782,6 +801,15 @@ export interface QueryNodesResponse {
 export interface QueryNodesResponse_NodesEntry {
   key: string;
   value: TreeNode | undefined;
+}
+
+export interface CancelSendTransferRequest {
+  transferId: string;
+  senderIdentityPublicKey: Uint8Array;
+}
+
+export interface CancelSendTransferResponse {
+  transfer: Transfer | undefined;
 }
 
 function createBaseDepositAddressProof(): DepositAddressProof {
@@ -8068,6 +8096,242 @@ export const LeafSwapResponse: MessageFns<LeafSwapResponse> = {
   },
 };
 
+function createBaseRefreshTimelockRequest(): RefreshTimelockRequest {
+  return { leafId: "", ownerIdentityPublicKey: new Uint8Array(0), signingJobs: [] };
+}
+
+export const RefreshTimelockRequest: MessageFns<RefreshTimelockRequest> = {
+  encode(message: RefreshTimelockRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.leafId !== "") {
+      writer.uint32(10).string(message.leafId);
+    }
+    if (message.ownerIdentityPublicKey.length !== 0) {
+      writer.uint32(18).bytes(message.ownerIdentityPublicKey);
+    }
+    for (const v of message.signingJobs) {
+      SigningJob.encode(v!, writer.uint32(26).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): RefreshTimelockRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseRefreshTimelockRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.leafId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.ownerIdentityPublicKey = reader.bytes();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.signingJobs.push(SigningJob.decode(reader, reader.uint32()));
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): RefreshTimelockRequest {
+    return {
+      leafId: isSet(object.leafId) ? globalThis.String(object.leafId) : "",
+      ownerIdentityPublicKey: isSet(object.ownerIdentityPublicKey)
+        ? bytesFromBase64(object.ownerIdentityPublicKey)
+        : new Uint8Array(0),
+      signingJobs: globalThis.Array.isArray(object?.signingJobs)
+        ? object.signingJobs.map((e: any) => SigningJob.fromJSON(e))
+        : [],
+    };
+  },
+
+  toJSON(message: RefreshTimelockRequest): unknown {
+    const obj: any = {};
+    if (message.leafId !== "") {
+      obj.leafId = message.leafId;
+    }
+    if (message.ownerIdentityPublicKey.length !== 0) {
+      obj.ownerIdentityPublicKey = base64FromBytes(message.ownerIdentityPublicKey);
+    }
+    if (message.signingJobs?.length) {
+      obj.signingJobs = message.signingJobs.map((e) => SigningJob.toJSON(e));
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<RefreshTimelockRequest>): RefreshTimelockRequest {
+    return RefreshTimelockRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<RefreshTimelockRequest>): RefreshTimelockRequest {
+    const message = createBaseRefreshTimelockRequest();
+    message.leafId = object.leafId ?? "";
+    message.ownerIdentityPublicKey = object.ownerIdentityPublicKey ?? new Uint8Array(0);
+    message.signingJobs = object.signingJobs?.map((e) => SigningJob.fromPartial(e)) || [];
+    return message;
+  },
+};
+
+function createBaseRefreshTimelockSigningResult(): RefreshTimelockSigningResult {
+  return { signingResult: undefined, verifyingKey: new Uint8Array(0) };
+}
+
+export const RefreshTimelockSigningResult: MessageFns<RefreshTimelockSigningResult> = {
+  encode(message: RefreshTimelockSigningResult, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.signingResult !== undefined) {
+      SigningResult.encode(message.signingResult, writer.uint32(10).fork()).join();
+    }
+    if (message.verifyingKey.length !== 0) {
+      writer.uint32(18).bytes(message.verifyingKey);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): RefreshTimelockSigningResult {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseRefreshTimelockSigningResult();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.signingResult = SigningResult.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.verifyingKey = reader.bytes();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): RefreshTimelockSigningResult {
+    return {
+      signingResult: isSet(object.signingResult) ? SigningResult.fromJSON(object.signingResult) : undefined,
+      verifyingKey: isSet(object.verifyingKey) ? bytesFromBase64(object.verifyingKey) : new Uint8Array(0),
+    };
+  },
+
+  toJSON(message: RefreshTimelockSigningResult): unknown {
+    const obj: any = {};
+    if (message.signingResult !== undefined) {
+      obj.signingResult = SigningResult.toJSON(message.signingResult);
+    }
+    if (message.verifyingKey.length !== 0) {
+      obj.verifyingKey = base64FromBytes(message.verifyingKey);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<RefreshTimelockSigningResult>): RefreshTimelockSigningResult {
+    return RefreshTimelockSigningResult.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<RefreshTimelockSigningResult>): RefreshTimelockSigningResult {
+    const message = createBaseRefreshTimelockSigningResult();
+    message.signingResult = (object.signingResult !== undefined && object.signingResult !== null)
+      ? SigningResult.fromPartial(object.signingResult)
+      : undefined;
+    message.verifyingKey = object.verifyingKey ?? new Uint8Array(0);
+    return message;
+  },
+};
+
+function createBaseRefreshTimelockResponse(): RefreshTimelockResponse {
+  return { signingResults: [] };
+}
+
+export const RefreshTimelockResponse: MessageFns<RefreshTimelockResponse> = {
+  encode(message: RefreshTimelockResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.signingResults) {
+      RefreshTimelockSigningResult.encode(v!, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): RefreshTimelockResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseRefreshTimelockResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.signingResults.push(RefreshTimelockSigningResult.decode(reader, reader.uint32()));
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): RefreshTimelockResponse {
+    return {
+      signingResults: globalThis.Array.isArray(object?.signingResults)
+        ? object.signingResults.map((e: any) => RefreshTimelockSigningResult.fromJSON(e))
+        : [],
+    };
+  },
+
+  toJSON(message: RefreshTimelockResponse): unknown {
+    const obj: any = {};
+    if (message.signingResults?.length) {
+      obj.signingResults = message.signingResults.map((e) => RefreshTimelockSigningResult.toJSON(e));
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<RefreshTimelockResponse>): RefreshTimelockResponse {
+    return RefreshTimelockResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<RefreshTimelockResponse>): RefreshTimelockResponse {
+    const message = createBaseRefreshTimelockResponse();
+    message.signingResults = object.signingResults?.map((e) => RefreshTimelockSigningResult.fromPartial(e)) || [];
+    return message;
+  },
+};
+
 function createBaseAddressRequestNode(): AddressRequestNode {
   return { userPublicKey: new Uint8Array(0), children: [] };
 }
@@ -9106,13 +9370,16 @@ export const GetSigningOperatorListResponse_SigningOperatorsEntry: MessageFns<
 };
 
 function createBaseQueryUserSignedRefundsRequest(): QueryUserSignedRefundsRequest {
-  return { paymentHash: new Uint8Array(0) };
+  return { paymentHash: new Uint8Array(0), identityPublicKey: new Uint8Array(0) };
 }
 
 export const QueryUserSignedRefundsRequest: MessageFns<QueryUserSignedRefundsRequest> = {
   encode(message: QueryUserSignedRefundsRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.paymentHash.length !== 0) {
       writer.uint32(10).bytes(message.paymentHash);
+    }
+    if (message.identityPublicKey.length !== 0) {
+      writer.uint32(18).bytes(message.identityPublicKey);
     }
     return writer;
   },
@@ -9132,6 +9399,14 @@ export const QueryUserSignedRefundsRequest: MessageFns<QueryUserSignedRefundsReq
           message.paymentHash = reader.bytes();
           continue;
         }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.identityPublicKey = reader.bytes();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -9142,13 +9417,21 @@ export const QueryUserSignedRefundsRequest: MessageFns<QueryUserSignedRefundsReq
   },
 
   fromJSON(object: any): QueryUserSignedRefundsRequest {
-    return { paymentHash: isSet(object.paymentHash) ? bytesFromBase64(object.paymentHash) : new Uint8Array(0) };
+    return {
+      paymentHash: isSet(object.paymentHash) ? bytesFromBase64(object.paymentHash) : new Uint8Array(0),
+      identityPublicKey: isSet(object.identityPublicKey)
+        ? bytesFromBase64(object.identityPublicKey)
+        : new Uint8Array(0),
+    };
   },
 
   toJSON(message: QueryUserSignedRefundsRequest): unknown {
     const obj: any = {};
     if (message.paymentHash.length !== 0) {
       obj.paymentHash = base64FromBytes(message.paymentHash);
+    }
+    if (message.identityPublicKey.length !== 0) {
+      obj.identityPublicKey = base64FromBytes(message.identityPublicKey);
     }
     return obj;
   },
@@ -9159,6 +9442,7 @@ export const QueryUserSignedRefundsRequest: MessageFns<QueryUserSignedRefundsReq
   fromPartial(object: DeepPartial<QueryUserSignedRefundsRequest>): QueryUserSignedRefundsRequest {
     const message = createBaseQueryUserSignedRefundsRequest();
     message.paymentHash = object.paymentHash ?? new Uint8Array(0);
+    message.identityPublicKey = object.identityPublicKey ?? new Uint8Array(0);
     return message;
   },
 };
@@ -9226,7 +9510,7 @@ export const QueryUserSignedRefundsResponse: MessageFns<QueryUserSignedRefundsRe
 };
 
 function createBaseProvidePreimageRequest(): ProvidePreimageRequest {
-  return { paymentHash: new Uint8Array(0), preimage: new Uint8Array(0) };
+  return { paymentHash: new Uint8Array(0), preimage: new Uint8Array(0), identityPublicKey: new Uint8Array(0) };
 }
 
 export const ProvidePreimageRequest: MessageFns<ProvidePreimageRequest> = {
@@ -9236,6 +9520,9 @@ export const ProvidePreimageRequest: MessageFns<ProvidePreimageRequest> = {
     }
     if (message.preimage.length !== 0) {
       writer.uint32(18).bytes(message.preimage);
+    }
+    if (message.identityPublicKey.length !== 0) {
+      writer.uint32(26).bytes(message.identityPublicKey);
     }
     return writer;
   },
@@ -9263,6 +9550,14 @@ export const ProvidePreimageRequest: MessageFns<ProvidePreimageRequest> = {
           message.preimage = reader.bytes();
           continue;
         }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.identityPublicKey = reader.bytes();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -9276,6 +9571,9 @@ export const ProvidePreimageRequest: MessageFns<ProvidePreimageRequest> = {
     return {
       paymentHash: isSet(object.paymentHash) ? bytesFromBase64(object.paymentHash) : new Uint8Array(0),
       preimage: isSet(object.preimage) ? bytesFromBase64(object.preimage) : new Uint8Array(0),
+      identityPublicKey: isSet(object.identityPublicKey)
+        ? bytesFromBase64(object.identityPublicKey)
+        : new Uint8Array(0),
     };
   },
 
@@ -9287,6 +9585,9 @@ export const ProvidePreimageRequest: MessageFns<ProvidePreimageRequest> = {
     if (message.preimage.length !== 0) {
       obj.preimage = base64FromBytes(message.preimage);
     }
+    if (message.identityPublicKey.length !== 0) {
+      obj.identityPublicKey = base64FromBytes(message.identityPublicKey);
+    }
     return obj;
   },
 
@@ -9297,6 +9598,7 @@ export const ProvidePreimageRequest: MessageFns<ProvidePreimageRequest> = {
     const message = createBaseProvidePreimageRequest();
     message.paymentHash = object.paymentHash ?? new Uint8Array(0);
     message.preimage = object.preimage ?? new Uint8Array(0);
+    message.identityPublicKey = object.identityPublicKey ?? new Uint8Array(0);
     return message;
   },
 };
@@ -9764,6 +10066,144 @@ export const QueryNodesResponse_NodesEntry: MessageFns<QueryNodesResponse_NodesE
   },
 };
 
+function createBaseCancelSendTransferRequest(): CancelSendTransferRequest {
+  return { transferId: "", senderIdentityPublicKey: new Uint8Array(0) };
+}
+
+export const CancelSendTransferRequest: MessageFns<CancelSendTransferRequest> = {
+  encode(message: CancelSendTransferRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.transferId !== "") {
+      writer.uint32(10).string(message.transferId);
+    }
+    if (message.senderIdentityPublicKey.length !== 0) {
+      writer.uint32(18).bytes(message.senderIdentityPublicKey);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): CancelSendTransferRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseCancelSendTransferRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.transferId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.senderIdentityPublicKey = reader.bytes();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): CancelSendTransferRequest {
+    return {
+      transferId: isSet(object.transferId) ? globalThis.String(object.transferId) : "",
+      senderIdentityPublicKey: isSet(object.senderIdentityPublicKey)
+        ? bytesFromBase64(object.senderIdentityPublicKey)
+        : new Uint8Array(0),
+    };
+  },
+
+  toJSON(message: CancelSendTransferRequest): unknown {
+    const obj: any = {};
+    if (message.transferId !== "") {
+      obj.transferId = message.transferId;
+    }
+    if (message.senderIdentityPublicKey.length !== 0) {
+      obj.senderIdentityPublicKey = base64FromBytes(message.senderIdentityPublicKey);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<CancelSendTransferRequest>): CancelSendTransferRequest {
+    return CancelSendTransferRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<CancelSendTransferRequest>): CancelSendTransferRequest {
+    const message = createBaseCancelSendTransferRequest();
+    message.transferId = object.transferId ?? "";
+    message.senderIdentityPublicKey = object.senderIdentityPublicKey ?? new Uint8Array(0);
+    return message;
+  },
+};
+
+function createBaseCancelSendTransferResponse(): CancelSendTransferResponse {
+  return { transfer: undefined };
+}
+
+export const CancelSendTransferResponse: MessageFns<CancelSendTransferResponse> = {
+  encode(message: CancelSendTransferResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.transfer !== undefined) {
+      Transfer.encode(message.transfer, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): CancelSendTransferResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseCancelSendTransferResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.transfer = Transfer.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): CancelSendTransferResponse {
+    return { transfer: isSet(object.transfer) ? Transfer.fromJSON(object.transfer) : undefined };
+  },
+
+  toJSON(message: CancelSendTransferResponse): unknown {
+    const obj: any = {};
+    if (message.transfer !== undefined) {
+      obj.transfer = Transfer.toJSON(message.transfer);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<CancelSendTransferResponse>): CancelSendTransferResponse {
+    return CancelSendTransferResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<CancelSendTransferResponse>): CancelSendTransferResponse {
+    const message = createBaseCancelSendTransferResponse();
+    message.transfer = (object.transfer !== undefined && object.transfer !== null)
+      ? Transfer.fromPartial(object.transfer)
+      : undefined;
+    return message;
+  },
+};
+
 export type SparkServiceDefinition = typeof SparkServiceDefinition;
 export const SparkServiceDefinition = {
   name: "SparkService",
@@ -9889,6 +10329,14 @@ export const SparkServiceDefinition = {
       responseStream: false,
       options: {},
     },
+    refresh_timelock: {
+      name: "refresh_timelock",
+      requestType: RefreshTimelockRequest,
+      requestStream: false,
+      responseType: RefreshTimelockResponse,
+      responseStream: false,
+      options: {},
+    },
     prepare_tree_address: {
       name: "prepare_tree_address",
       requestType: PrepareTreeAddressRequest,
@@ -9978,6 +10426,14 @@ export const SparkServiceDefinition = {
       responseStream: false,
       options: {},
     },
+    cancel_send_transfer: {
+      name: "cancel_send_transfer",
+      requestType: CancelSendTransferRequest,
+      requestStream: false,
+      responseType: CancelSendTransferResponse,
+      responseStream: false,
+      options: {},
+    },
   },
 } as const;
 
@@ -10039,6 +10495,10 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<ProvidePreimageResponse>>;
   leaf_swap(request: LeafSwapRequest, context: CallContext & CallContextExt): Promise<DeepPartial<LeafSwapResponse>>;
+  refresh_timelock(
+    request: RefreshTimelockRequest,
+    context: CallContext & CallContextExt,
+  ): Promise<DeepPartial<RefreshTimelockResponse>>;
   prepare_tree_address(
     request: PrepareTreeAddressRequest,
     context: CallContext & CallContextExt,
@@ -10084,6 +10544,10 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
     request: ReturnLightningPaymentRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<Empty>>;
+  cancel_send_transfer(
+    request: CancelSendTransferRequest,
+    context: CallContext & CallContextExt,
+  ): Promise<DeepPartial<CancelSendTransferResponse>>;
 }
 
 export interface SparkServiceClient<CallOptionsExt = {}> {
@@ -10144,6 +10608,10 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
     options?: CallOptions & CallOptionsExt,
   ): Promise<ProvidePreimageResponse>;
   leaf_swap(request: DeepPartial<LeafSwapRequest>, options?: CallOptions & CallOptionsExt): Promise<LeafSwapResponse>;
+  refresh_timelock(
+    request: DeepPartial<RefreshTimelockRequest>,
+    options?: CallOptions & CallOptionsExt,
+  ): Promise<RefreshTimelockResponse>;
   prepare_tree_address(
     request: DeepPartial<PrepareTreeAddressRequest>,
     options?: CallOptions & CallOptionsExt,
@@ -10189,6 +10657,10 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
     request: DeepPartial<ReturnLightningPaymentRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<Empty>;
+  cancel_send_transfer(
+    request: DeepPartial<CancelSendTransferRequest>,
+    options?: CallOptions & CallOptionsExt,
+  ): Promise<CancelSendTransferResponse>;
 }
 
 function bytesFromBase64(b64: string): Uint8Array {

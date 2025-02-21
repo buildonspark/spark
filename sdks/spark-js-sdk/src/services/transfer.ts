@@ -6,9 +6,8 @@ import {
 import { secp256k1 } from "@noble/curves/secp256k1";
 import { Transaction } from "@scure/btc-signer";
 import { sha256 } from "@scure/btc-signer/utils";
-import { randomUUID } from "crypto";
 import * as ecies from "eciesjs";
-import { SignatureIntent } from "../proto/common";
+import { SignatureIntent } from "../proto/common.js";
 import {
   ClaimLeafKeyTweak,
   ClaimTransferSignRefundsResponse,
@@ -22,13 +21,16 @@ import {
   StartSendTransferResponse,
   Transfer,
   TreeNode,
-} from "../proto/spark";
-import { SigningCommitment } from "../signer/signer";
-import { getSigHashFromTx, getTxFromRawTxBytes } from "../utils/bitcoin";
-import { VerifiableSecretShare } from "../utils/secret-sharing";
-import { createRefundTx } from "../utils/transaction";
-import { WalletConfigService } from "./config";
-import { ConnectionManager } from "./connection";
+} from "../proto/spark.js";
+import { SigningCommitment } from "../signer/signer.js";
+import { getSigHashFromTx, getTxFromRawTxBytes } from "../utils/bitcoin.js";
+import { getCrypto } from "../utils/crypto.js";
+import { VerifiableSecretShare } from "../utils/secret-sharing.js";
+import { createRefundTx } from "../utils/transaction.js";
+import { WalletConfigService } from "./config.js";
+import { ConnectionManager } from "./connection.js";
+
+const crypto = getCrypto();
 
 export type LeafKeyTweak = {
   leaf: TreeNode;
@@ -438,7 +440,7 @@ export class TransferService extends BaseTransferService {
     leafDataMap: Map<string, LeafRefundSigningData>;
     signingResults: LeafRefundTxSigningResult[];
   }> {
-    const transferId = randomUUID();
+    const transferId = crypto.randomUUID();
 
     const leafDataMap = new Map<string, LeafRefundSigningData>();
     for (const leaf of leaves) {
@@ -474,7 +476,7 @@ export class TransferService extends BaseTransferService {
           receiverIdentityPublicKey: receiverIdentityPubkey,
           expiryTime: expiryTime,
         },
-        swapId: randomUUID(),
+        swapId: crypto.randomUUID(),
         adaptorPublicKey: adaptorPubKey || new Uint8Array(),
       });
     } catch (error) {
@@ -515,7 +517,7 @@ export class TransferService extends BaseTransferService {
     signatureMap: Map<string, Uint8Array>;
     leafDataMap: Map<string, LeafRefundSigningData>;
   }> {
-    const transferID = randomUUID();
+    const transferID = crypto.randomUUID();
 
     const leafDataMap = new Map<string, LeafRefundSigningData>();
     for (const leaf of leaves) {

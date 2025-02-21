@@ -12,7 +12,7 @@ import {
   TransactionResult,
   wasm_aggregate_frost,
   wasm_sign_frost,
-} from "../wasm/spark_bindings";
+} from "../wasm/spark_bindings.js";
 
 export type SignFrostParams = {
   msg: Uint8Array;

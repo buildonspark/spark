@@ -4,20 +4,20 @@ import { secp256k1 } from "@noble/curves/secp256k1";
 import { Address, OutScript, Transaction } from "@scure/btc-signer";
 import { TransactionInput } from "@scure/btc-signer/psbt";
 import { equalBytes, sha256 } from "@scure/btc-signer/utils";
-import { WalletConfigService } from "../services/config";
-import { ConnectionManager } from "../services/connection";
-import { CoopExitService } from "../services/coop-exit";
-import { LeafKeyTweak } from "../services/transfer";
-import { SparkWallet } from "../spark-sdk";
+import { WalletConfigService } from "../services/config.js";
+import { ConnectionManager } from "../services/connection.js";
+import { CoopExitService } from "../services/coop-exit.js";
+import { LeafKeyTweak } from "../services/transfer.js";
+import { SparkWallet } from "../spark-sdk.js";
 import {
   getP2TRAddressFromPublicKey,
   getP2TRScriptFromPublicKey,
   getTxId,
   getTxIdNoReverse,
-} from "../utils/bitcoin";
-import { getNetwork, Network } from "../utils/network";
-import { createNewTree } from "./test-util";
-import { BitcoinFaucet } from "./utils/test-faucet";
+} from "../utils/bitcoin.js";
+import { getNetwork, Network } from "../utils/network.js";
+import { createNewTree } from "./test-util.js";
+import { BitcoinFaucet } from "./utils/test-faucet.js";
 
 describe("coop exit", () => {
   // Skip all tests if running in GitHub Actions

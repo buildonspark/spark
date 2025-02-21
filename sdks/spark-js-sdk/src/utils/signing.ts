@@ -1,9 +1,9 @@
 import { secp256k1 } from "@noble/curves/secp256k1";
-import { SigningCommitment, SigningNonce } from "../signer/signer";
+import { SigningCommitment, SigningNonce } from "../signer/signer.js";
 import {
   SigningCommitment as WasmSigningCommitment,
   SigningNonce as WasmSigningNonce,
-} from "../wasm/spark_bindings";
+} from "../wasm/spark_bindings.js";
 
 export function getRandomSigningNonce(): SigningNonce {
   const binding = secp256k1.utils.randomPrivateKey();

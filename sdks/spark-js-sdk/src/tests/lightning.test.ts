@@ -1,15 +1,15 @@
 import { afterEach, beforeAll, describe, expect, it, xit } from "@jest/globals";
 import { hexToBytes } from "@noble/curves/abstract/utils";
 import { equalBytes, sha256 } from "@scure/btc-signer/utils";
-import { TransferStatus } from "../proto/spark";
-import { WalletConfigService } from "../services/config";
-import { ConnectionManager } from "../services/connection";
-import { LightningService } from "../services/lightning";
-import { LeafKeyTweak, TransferService } from "../services/transfer";
-import { SparkWallet } from "../spark-sdk";
-import { Network } from "../utils/network";
-import { createNewTree, getTestWalletConfig } from "./test-util";
-import { BitcoinFaucet } from "./utils/test-faucet";
+import { TransferStatus } from "../proto/spark.js";
+import { WalletConfigService } from "../services/config.js";
+import { ConnectionManager } from "../services/connection.js";
+import { LightningService } from "../services/lightning.js";
+import { LeafKeyTweak, TransferService } from "../services/transfer.js";
+import { SparkWallet } from "../spark-sdk.js";
+import { Network } from "../utils/network.js";
+import { createNewTree, getTestWalletConfig } from "./test-util.js";
+import { BitcoinFaucet } from "./utils/test-faucet.js";
 
 async function cleanUp() {
   const config = getTestWalletConfig();

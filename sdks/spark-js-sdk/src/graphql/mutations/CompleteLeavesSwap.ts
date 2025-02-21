@@ -1,4 +1,4 @@
-import { FRAGMENT as LeavesSwapRequestFragment } from "../objects/LeavesSwapRequest";
+import { FRAGMENT as LeavesSwapRequestFragment } from "../objects/LeavesSwapRequest.js";
 
 export const CompleteLeavesSwap = `
   mutation CompleteLeavesSwap(

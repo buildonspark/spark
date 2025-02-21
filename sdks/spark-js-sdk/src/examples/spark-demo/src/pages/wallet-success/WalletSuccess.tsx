@@ -1,16 +1,31 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Button from "../../components/Button";
 import StyledContainer from "../../components/StyledContainer";
 import CopyIcon from "../../icons/CopyIcon";
 
-import WalletIcon from "../../icons/WalletIcon";
 import { useNavigate } from "react-router-dom";
+import WalletIcon from "../../icons/WalletIcon";
+import { useSparkWallet } from "../../sparkwallet";
 
 export default function WalletSuccess() {
-  const [mnemonic, setMnemonic] = useState(
-    "CAFEBABE CAFEBABE CAFEBABE CAFEBABE CAFEBABE CAFEBABE CAFEBABE CAFEBABE CAFEBABE CAFEBABE CAFEBABE CAFEBABE"
-  );
+  const [mnemonic, setMnemonic] = useState<string | null>(null);
+
   const navigate = useNavigate();
+  const wallet = useSparkWallet();
+
+  useEffect(() => {
+    wallet.generateMnemonic().then((mnemonic) => {
+      setMnemonic(mnemonic);
+    });
+  }, [wallet]);
+
+  const onContinue = async () => {
+    if (!mnemonic) return;
+    await wallet.createSparkWallet(mnemonic);
+    navigate("/wallet");
+  };
+
+  if (!mnemonic) return null;
 
   return (
     <div className="mx-6">
@@ -20,7 +35,7 @@ export default function WalletSuccess() {
       </div>
       <StyledContainer className="mt-9 flex items-center justify-center w-full min-h-[180px]">
         <div className="w-full h-full flex flex-wrap">
-          {mnemonic.split(" ").map((word) => (
+          {mnemonic?.split(" ").map((word) => (
             <div className="w-1/3 p-2 text-center">{word}</div>
           ))}
         </div>
@@ -35,14 +50,14 @@ export default function WalletSuccess() {
           }
           kind="secondary"
           onClick={() => {
-            navigator.clipboard.writeText(mnemonic);
+            navigator.clipboard.writeText(mnemonic ?? "");
             alert("Copied to clipboard");
           }}
         />
         <Button
           icon={<div className="flex items-center h-10 gap-2">Continue</div>}
           kind="primary"
-          onClick={() => navigate("/wallet")}
+          onClick={onContinue}
         />
       </div>
     </div>

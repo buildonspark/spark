@@ -1,4 +1,4 @@
-import { FRAGMENT as RequestCoopExitOutputFragment } from "../objects/CoopExitRequest";
+import { FRAGMENT as RequestCoopExitOutputFragment } from "../objects/CoopExitRequest.js";
 
 export const RequestCoopExit = `
   mutation RequestCoopExit(

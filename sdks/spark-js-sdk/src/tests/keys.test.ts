@@ -8,7 +8,7 @@ import {
   subtractPrivateKeys,
   subtractPublicKeys,
   sumOfPrivateKeys,
-} from "../utils/keys";
+} from "../utils/keys.js";
 
 describe("keys", () => {
   it("test key addition", () => {

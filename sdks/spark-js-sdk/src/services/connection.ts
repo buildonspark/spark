@@ -1,3 +1,4 @@
+import { ChannelImplementation } from "@grpc/grpc-js/build/src/channel.js";
 import { sha256 } from "@scure/btc-signer/utils";
 import * as fs from "fs";
 import {
@@ -9,19 +10,14 @@ import {
   createClientFactory,
   Metadata,
 } from "nice-grpc";
-import {
-  createChannel as createWebChannel,
-  createClient as createWebClient,
-  createClientFactory as createWebClientFactory,
-} from "nice-grpc-web";
-import { MockServiceClient, MockServiceDefinition } from "../proto/mock";
-import { SparkServiceClient, SparkServiceDefinition } from "../proto/spark";
+import { MockServiceClient, MockServiceDefinition } from "../proto/mock.js";
+import { SparkServiceClient, SparkServiceDefinition } from "../proto/spark.js";
 import {
   Challenge,
   SparkAuthnServiceClient,
   SparkAuthnServiceDefinition,
-} from "../proto/spark_authn";
-import { WalletConfigService } from "./config";
+} from "../proto/spark_authn.js";
+import { WalletConfigService } from "./config.js";
 
 export class ConnectionManager {
   private config: WalletConfigService;
@@ -40,7 +36,7 @@ export class ConnectionManager {
   // TODO: Web transport handles TLS differently, verify that we don't need to do anything
   private static createChannelWithTLS(address: string, certPath?: string) {
     try {
-      if (certPath) {
+      if (certPath && typeof window === "undefined") {
         // TODO: Verify that this is the correct way to create a channel with TLS
         const cert = fs.readFileSync(certPath);
         return createChannel(address, ChannelCredentials.createSsl(cert));
@@ -48,9 +44,11 @@ export class ConnectionManager {
         // Fallback to insecure for development
         return createChannel(
           address,
-          ChannelCredentials.createSsl(null, null, null, {
-            rejectUnauthorized: false,
-          })
+          typeof window === "undefined"
+            ? ChannelCredentials.createSsl(null, null, null, {
+                rejectUnauthorized: false,
+              })
+            : undefined
         );
       }
     } catch (error) {
@@ -63,41 +61,15 @@ export class ConnectionManager {
     address: string,
     certPath?: string
   ): Promise<SparkServiceClient & { close?: () => void }> {
-    try {
-      const authToken = await this.authenticate(address);
+    const authToken = await this.authenticate(address);
 
-      const middleWare = (
-        call: ClientMiddlewareCall<any, any>,
-        options: CallOptions
-      ) =>
-        call.next(call.request, {
-          ...options,
-          metadata: Metadata(options.metadata).set(
-            "Authorization",
-            `Bearer ${authToken}`
-          ),
-        });
+    const channel = ConnectionManager.createChannelWithTLS(address, certPath);
 
-      if (typeof window === "undefined") {
-        const channel = ConnectionManager.createChannelWithTLS(
-          address,
-          certPath
-        );
-
-        const client = createClientFactory()
-          .use(middleWare)
-          .create(SparkServiceDefinition, channel);
-        return { ...client, close: () => channel.close() };
-      } else {
-        const channel = createWebChannel(address);
-        return createWebClientFactory()
-          .use(middleWare)
-          .create(SparkServiceDefinition, channel);
-      }
-    } catch (error) {
-      console.error("Spark client creation error:", error);
-      throw error;
-    }
+    return this.createGrpcClient<SparkServiceClient>(
+      SparkServiceDefinition,
+      channel,
+      this.createMiddleWare(authToken)
+    );
   }
 
   private async authenticate(address: string) {
@@ -139,21 +111,60 @@ export class ConnectionManager {
     address: string,
     certPath?: string
   ): SparkAuthnServiceClient & { close?: () => void } {
-    try {
-      if (typeof window === "undefined") {
-        const channel = ConnectionManager.createChannelWithTLS(
-          address,
-          certPath
-        );
-        const client = createClient(SparkAuthnServiceDefinition, channel);
-        return { ...client, close: () => channel.close() };
-      } else {
-        const channel = createWebChannel(address);
-        return createWebClient(SparkAuthnServiceDefinition, channel);
-      }
-    } catch (error) {
-      console.error("Authn client creation error:", error);
-      throw error;
+    const channel = ConnectionManager.createChannelWithTLS(address, certPath);
+    return this.createGrpcClient<SparkAuthnServiceClient>(
+      SparkAuthnServiceDefinition,
+      channel
+    );
+  }
+
+  private createMiddleWare(authToken: string) {
+    if (typeof window === "undefined") {
+      return this.createNodeMiddleWare(authToken);
+    } else {
+      return this.createBrowserMiddleWare(authToken);
     }
+  }
+
+  private createNodeMiddleWare(authToken: string) {
+    return (call: ClientMiddlewareCall<any, any>, options: CallOptions) => {
+      return call.next(call.request, {
+        ...options,
+        metadata: Metadata(options.metadata).set(
+          "Authorization",
+          `Bearer ${authToken}`
+        ),
+      });
+    };
+  }
+
+  private createBrowserMiddleWare(authToken: string) {
+    return (call: ClientMiddlewareCall<any, any>, options: CallOptions) => {
+      return call.next(call.request, {
+        ...options,
+        metadata: Metadata(options.metadata)
+          .set("Authorization", `Bearer ${authToken}`)
+          .set("X-Requested-With", "XMLHttpRequest")
+          .set("X-Grpc-Web", "1") // Explicitly set gRPC-web header
+          .set("Content-Type", "application/grpc-web+proto"), // Explicitly set content type
+      });
+    };
+  }
+
+  private createGrpcClient<T>(
+    defintion: SparkAuthnServiceDefinition | SparkServiceDefinition,
+    channel: ChannelImplementation,
+    middleware?: any
+  ): T & { close?: () => void } {
+    const clientFactory = createClientFactory();
+    if (middleware) {
+      clientFactory.use(middleware);
+    }
+
+    const client = clientFactory.create(defintion, channel) as T;
+    return {
+      ...client,
+      close: channel.close?.bind(channel),
+    };
   }
 }

@@ -1,4 +1,4 @@
-import { FRAGMENT as LightningReceiveFeeEstimateOutputFragment } from "../objects/LightningReceiveFeeEstimateOutput";
+import { FRAGMENT as LightningReceiveFeeEstimateOutputFragment } from "../objects/LightningReceiveFeeEstimateOutput.js";
 
 export const LightningReceiveFeeEstimate = `
   query LightningReceiveFeeEstimate(

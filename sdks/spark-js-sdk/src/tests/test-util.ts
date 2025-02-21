@@ -1,14 +1,14 @@
 import { hexToBytes } from "@noble/curves/abstract/utils";
 import { secp256k1 } from "@noble/curves/secp256k1";
 import { Address, OutScript, Transaction } from "@scure/btc-signer";
-import { TreeNode } from "../proto/spark";
-import { SigningOperator, WalletConfig } from "../services/config";
-import { ConnectionManager } from "../services/connection";
-import { DepositService } from "../services/deposit";
-import { SparkWallet } from "../spark-sdk";
-import { getP2TRAddressFromPublicKey } from "../utils/bitcoin";
-import { getNetwork, Network } from "../utils/network";
-import { BitcoinFaucet } from "./utils/test-faucet";
+import { TreeNode } from "../proto/spark.js";
+import { SigningOperator, WalletConfig } from "../services/config.js";
+import { ConnectionManager } from "../services/connection.js";
+import { DepositService } from "../services/deposit.js";
+import { SparkWallet } from "../spark-sdk.js";
+import { getP2TRAddressFromPublicKey } from "../utils/bitcoin.js";
+import { getNetwork, Network } from "../utils/network.js";
+import { BitcoinFaucet } from "./utils/test-faucet.js";
 
 export const LOCAL_WALLET_CONFIG = {
   network: Network.REGTEST,
@@ -42,7 +42,7 @@ export function getRegtestSigningOperators(): Record<string, SigningOperator> {
       id: 0,
       identifier:
         "0000000000000000000000000000000000000000000000000000000000000001",
-      address: "dns:///spark-0.dev.dev.sparkinfra.net",
+      address: "https://0.spark.dev.dev.sparkinfra.net",
 
       identityPublicKey: pubkeyBytesArray[0],
     },
@@ -50,7 +50,7 @@ export function getRegtestSigningOperators(): Record<string, SigningOperator> {
       id: 1,
       identifier:
         "0000000000000000000000000000000000000000000000000000000000000002",
-      address: "dns:///spark-1.dev.dev.sparkinfra.net",
+      address: "https://1.spark.dev.dev.sparkinfra.net",
 
       identityPublicKey: pubkeyBytesArray[1],
     },
@@ -58,7 +58,7 @@ export function getRegtestSigningOperators(): Record<string, SigningOperator> {
       id: 2,
       identifier:
         "0000000000000000000000000000000000000000000000000000000000000003",
-      address: "dns:///spark-2.dev.dev.sparkinfra.net",
+      address: "https://2.spark.dev.dev.sparkinfra.net",
       identityPublicKey: pubkeyBytesArray[2],
     },
   };

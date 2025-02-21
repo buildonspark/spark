@@ -5,7 +5,7 @@ import { Transaction } from "@scure/btc-signer";
 import { TransactionInput } from "@scure/btc-signer/psbt";
 import { sha256 } from "@scure/btc-signer/utils";
 import { decode } from "light-bolt11-decoder";
-import SspClient from "./graphql/client";
+import SspClient from "./graphql/client.js";
 import {
   BitcoinNetwork,
   CoopExitFeeEstimateInput,
@@ -15,7 +15,7 @@ import {
   LightningSendFeeEstimateInput,
   LightningSendFeeEstimateOutput,
   UserLeafInput,
-} from "./graphql/objects";
+} from "./graphql/objects/index.js";
 import {
   GenerateDepositAddressResponse,
   LeafWithPreviousTransactionData,
@@ -23,25 +23,25 @@ import {
   Transfer,
   TransferStatus,
   TreeNode,
-} from "./proto/spark";
-import { WalletConfig, WalletConfigService } from "./services/config";
-import { ConnectionManager } from "./services/connection";
-import { CoopExitService } from "./services/coop-exit";
-import { DepositService } from "./services/deposit";
-import { LightningService } from "./services/lightning";
-import { TokenFreezeService } from "./services/tokens-freeze";
-import { TokenTransactionService } from "./services/tokens-transaction";
-import { LeafKeyTweak, TransferService } from "./services/transfer";
+} from "./proto/spark.js";
+import { WalletConfig, WalletConfigService } from "./services/config.js";
+import { ConnectionManager } from "./services/connection.js";
+import { CoopExitService } from "./services/coop-exit.js";
+import { DepositService } from "./services/deposit.js";
+import { LightningService } from "./services/lightning.js";
+import { TokenFreezeService } from "./services/tokens-freeze.js";
+import { TokenTransactionService } from "./services/tokens-transaction.js";
+import { LeafKeyTweak, TransferService } from "./services/transfer.js";
 import {
   DepositAddressTree,
   TreeCreationService,
-} from "./services/tree-creation";
-import { SparkSigner } from "./signer/signer";
+} from "./services/tree-creation.js";
+import { SparkSigner } from "./signer/signer.js";
 import {
   applyAdaptorToSignature,
   generateAdaptorFromSignature,
   generateSignatureFromExistingAdaptor,
-} from "./utils/adaptor-signature";
+} from "./utils/adaptor-signature.js";
 import {
   computeTaprootKeyNoScript,
   getP2TRAddressFromPublicKey,
@@ -49,20 +49,20 @@ import {
   getTxFromRawTxBytes,
   getTxFromRawTxHex,
   getTxId,
-} from "./utils/bitcoin";
-import { Network } from "./utils/network";
+} from "./utils/bitcoin.js";
+import { Network } from "./utils/network.js";
 import {
   calculateAvailableTokenAmount,
   checkIfSelectedLeavesAreAvailable,
-} from "./utils/token-transactions";
+} from "./utils/token-transactions.js";
+import { initWasm } from "./utils/wasm-wrapper.js";
 import {
   aggregateFrost,
   AggregateFrostParams,
   signFrost,
   SignFrostParams,
-} from "./utils/wasm";
-import { initWasm } from "./utils/wasm-wrapper";
-import { InitOutput } from "./wasm/spark_bindings";
+} from "./utils/wasm.js";
+import { InitOutput } from "./wasm/spark_bindings.js";
 
 type CreateLightningInvoiceParams = {
   amountSats: number;

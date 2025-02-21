@@ -2,7 +2,7 @@
   "compilerOptions": {
     "noEmit": false,
     "target": "ES2022",
-    "module": "ES2022",
+    "module": "node16",
     "allowJs": true,
     "declaration": true,
     "sourceMap": true,
@@ -10,7 +10,7 @@
     "strict": true,
     "strictNullChecks": true,
     "noImplicitReturns": true,
-    "moduleResolution": "node",
+    "moduleResolution": "node16",
     "types": ["node", "jest"],
     "resolveJsonModule": true,
     "allowSyntheticDefaultImports": true,

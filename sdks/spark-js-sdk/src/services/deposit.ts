@@ -2,24 +2,25 @@ import { schnorr, secp256k1 } from "@noble/curves/secp256k1";
 import * as btc from "@scure/btc-signer";
 import { p2tr, Transaction } from "@scure/btc-signer";
 import { equalBytes, sha256 } from "@scure/btc-signer/utils";
-import { SignatureIntent } from "../proto/common";
+import { SignatureIntent } from "../proto/common.js";
 import {
   Address,
   FinalizeNodeSignaturesResponse,
   GenerateDepositAddressResponse,
+  Network,
   StartTreeCreationResponse,
-} from "../proto/spark";
+} from "../proto/spark.js";
 import {
   getP2TRAddressFromPublicKey,
   getSigHashFromTx,
   getTxId,
-} from "../utils/bitcoin";
-import { subtractPublicKeys } from "../utils/keys";
-import { getNetwork } from "../utils/network";
-import { proofOfPossessionMessageHashForDepositAddress } from "../utils/proof";
-import { createWasmSigningCommitment } from "../utils/signing";
-import { WalletConfigService } from "./config";
-import { ConnectionManager } from "./connection";
+} from "../utils/bitcoin.js";
+import { subtractPublicKeys } from "../utils/keys.js";
+import { getNetwork } from "../utils/network.js";
+import { proofOfPossessionMessageHashForDepositAddress } from "../utils/proof.js";
+import { createWasmSigningCommitment } from "../utils/signing.js";
+import { WalletConfigService } from "./config.js";
+import { ConnectionManager } from "./connection.js";
 type ValidateDepositAddressParams = {
   address: Address;
   userPubkey: Uint8Array;
@@ -122,7 +123,7 @@ export class DepositService {
       depositResp = await sparkClient.generate_deposit_address({
         signingPublicKey: signingPubkey,
         identityPublicKey: await this.config.signer.getIdentityPublicKey(),
-        network: this.config.getNetwork(),
+        network: this.config.getNetwork() as Network,
       });
     } catch (error) {
       throw new Error(`Error generating deposit address: ${error}`);
@@ -212,7 +213,7 @@ export class DepositService {
         onChainUtxo: {
           vout: vout,
           rawTx: depositTx.toBytes(),
-          network: this.config.getNetwork(),
+          network: this.config.getNetwork() as Network,
         },
         rootTxSigningJob: {
           rawTx: rootTx.toBytes(),

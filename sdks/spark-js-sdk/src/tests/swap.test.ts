@@ -2,18 +2,21 @@ import { describe, expect, it } from "@jest/globals";
 import { equalBytes, hexToBytes } from "@noble/curves/abstract/utils";
 import { secp256k1 } from "@noble/curves/secp256k1";
 import { sha256 } from "@scure/btc-signer/utils";
-import { WalletConfigService } from "../services/config";
-import { ConnectionManager } from "../services/connection";
-import { LeafKeyTweak, TransferService } from "../services/transfer";
-import { SparkWallet } from "../spark-sdk";
+import { WalletConfigService } from "../services/config.js";
+import { ConnectionManager } from "../services/connection.js";
+import { LeafKeyTweak, TransferService } from "../services/transfer.js";
+import { SparkWallet } from "../spark-sdk.js";
 import {
   applyAdaptorToSignature,
   generateAdaptorFromSignature,
-} from "../utils/adaptor-signature";
-import { computeTaprootKeyNoScript, getSigHashFromTx } from "../utils/bitcoin";
-import { Network } from "../utils/network";
-import { createNewTree } from "./test-util";
-import { BitcoinFaucet } from "./utils/test-faucet";
+} from "../utils/adaptor-signature.js";
+import {
+  computeTaprootKeyNoScript,
+  getSigHashFromTx,
+} from "../utils/bitcoin.js";
+import { Network } from "../utils/network.js";
+import { createNewTree } from "./test-util.js";
+import { BitcoinFaucet } from "./utils/test-faucet.js";
 
 describe("swap", () => {
   const testFn = process.env.GITHUB_ACTIONS ? it.skip : it;

@@ -1,7 +1,6 @@
 import { bytesToNumberBE, numberToBytesBE } from "@noble/curves/abstract/utils";
 import { secp256k1 } from "@noble/curves/secp256k1";
 import { sha256 } from "@scure/btc-signer/utils";
-import { getRandomValues, randomUUID } from "crypto";
 import { decode } from "light-bolt11-decoder";
 import {
   GetSigningCommitmentsResponse,
@@ -12,12 +11,15 @@ import {
   RequestedSigningCommitments,
   Transfer,
   UserSignedRefund,
-} from "../proto/spark";
-import { getTxFromRawTxBytes } from "../utils/bitcoin";
-import { createRefundTx } from "../utils/transaction";
-import { WalletConfigService } from "./config";
-import { ConnectionManager } from "./connection";
-import { LeafKeyTweak } from "./transfer";
+} from "../proto/spark.js";
+import { getTxFromRawTxBytes } from "../utils/bitcoin.js";
+import { getCrypto } from "../utils/crypto.js";
+import { createRefundTx } from "../utils/transaction.js";
+import { WalletConfigService } from "./config.js";
+import { ConnectionManager } from "./connection.js";
+import { LeafKeyTweak } from "./transfer.js";
+
+const crypto = getCrypto();
 
 export type CreateLightningInvoiceParams = {
   invoiceCreator: (
@@ -58,9 +60,9 @@ export class LightningService {
     amountSats,
     memo,
   }: CreateLightningInvoiceParams): Promise<string> {
-    const randomBytes = getRandomValues(new Uint8Array(32));
+    const randBytes = crypto.getRandomValues(new Uint8Array(32));
     const preimage = numberToBytesBE(
-      bytesToNumberBE(randomBytes) % secp256k1.CURVE.n,
+      bytesToNumberBE(randBytes) % secp256k1.CURVE.n,
       32
     );
     return await this.createLightningInvoiceWithPreImage({
@@ -155,7 +157,7 @@ export class LightningService {
       receiverIdentityPubkey
     );
 
-    const transferId = randomUUID();
+    const transferId = crypto.randomUUID();
     let bolt11String = "";
     let amountSats: number = 0;
     if (invoiceString) {

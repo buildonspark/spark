@@ -8,7 +8,7 @@ import { schnorr, secp256k1 } from "@noble/curves/secp256k1";
 import * as btc from "@scure/btc-signer";
 import { TransactionOutput } from "@scure/btc-signer/psbt";
 import { sha256 } from "@scure/btc-signer/utils";
-import { getNetwork, Network } from "./network";
+import { getNetwork, Network } from "./network.js";
 
 // const t = tapTweak(pubKey, h); // t = int_from_bytes(tagged_hash("TapTweak", pubkey + h)
 // const P = u.lift_x(u.bytesToNumberBE(pubKey)); // P = lift_x(int_from_bytes(pubkey))

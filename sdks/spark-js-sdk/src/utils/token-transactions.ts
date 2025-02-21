@@ -1,12 +1,10 @@
+import { bytesToHex, bytesToNumberBE } from "@noble/curves/abstract/utils";
 import {
-  TokenTransaction,
   LeafWithPreviousTransactionData,
-  TokenLeafOutput,
-} from "../proto/spark";
-import { numberToBytesBE, bytesToNumberBE } from "@noble/curves/abstract/utils";
-import { SparkSigner } from "../signer/signer";
-import { hashTokenTransaction } from "./token-hashing";
-import { bytesToHex } from "@noble/curves/abstract/utils";
+  TokenTransaction,
+} from "../proto/spark.js";
+import { SparkSigner } from "../signer/signer.js";
+import { hashTokenTransaction } from "./token-hashing.js";
 
 export async function collectOwnedTokenLeafPublicKeys(signer: SparkSigner) {
   let owner_public_keys = await signer.getTrackedPublicKeys();
@@ -60,18 +58,23 @@ export function checkIfSelectedLeavesAreAvailable(
   if (!tokenLeavesAvailable) {
     return false;
   }
-  if (selectedLeaves.length === 0 || tokenLeavesAvailable.length < selectedLeaves.length) {
+  if (
+    selectedLeaves.length === 0 ||
+    tokenLeavesAvailable.length < selectedLeaves.length
+  ) {
     return false;
   }
 
   // Create a Set of available leaf IDs for O(n + m) lookup
-  const availableLeafIds = new Set(tokenLeavesAvailable.map(leaf => leaf.leaf!.id));
+  const availableLeafIds = new Set(
+    tokenLeavesAvailable.map((leaf) => leaf.leaf!.id)
+  );
 
   for (const selectedLeaf of selectedLeaves) {
     if (!selectedLeaf.leaf?.id || !availableLeafIds.has(selectedLeaf.leaf.id)) {
       return false;
     }
   }
-  
+
   return true;
 }

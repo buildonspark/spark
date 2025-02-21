@@ -1,10 +1,10 @@
 import { describe, expect, it } from "@jest/globals";
 import { bytesToHex } from "@noble/curves/abstract/utils";
-import { ConnectionManager } from "../services/connection";
-import { SparkWallet } from "../spark-sdk";
-import { getTxFromRawTxBytes, getTxId } from "../utils/bitcoin";
-import { Network } from "../utils/network";
-import { createDummyTx } from "../utils/wasm";
+import { ConnectionManager } from "../services/connection.js";
+import { SparkWallet } from "../spark-sdk.js";
+import { getTxFromRawTxBytes, getTxId } from "../utils/bitcoin.js";
+import { Network } from "../utils/network.js";
+import { createDummyTx } from "../utils/wasm.js";
 
 describe("Tree Creation", () => {
   // Skip all tests if running in GitHub Actions

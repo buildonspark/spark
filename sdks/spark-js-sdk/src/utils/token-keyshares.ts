@@ -1,9 +1,9 @@
 import { secp256k1 } from "@noble/curves/secp256k1";
 import {
-  recoverSecret,
   bigIntToPrivateKey,
+  recoverSecret,
   VerifiableSecretShare,
-} from "./secret-sharing";
+} from "./secret-sharing.js";
 
 export interface KeyshareWithOperatorIndex {
   index: number;

@@ -5,7 +5,7 @@ import {
   recoverSecret,
   splitSecretWithProofs,
   validateShare,
-} from "../utils/secret-sharing";
+} from "../utils/secret-sharing.js";
 
 describe("Secret Sharing", () => {
   describe("modInverse", () => {

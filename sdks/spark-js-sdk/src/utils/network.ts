@@ -1,5 +1,5 @@
 import * as btc from "@scure/btc-signer";
-import { Network as NetworkProto } from "../proto/spark";
+import { Network as NetworkProto } from "../proto/spark.js";
 
 export enum Network {
   MAINNET = NetworkProto.MAINNET,

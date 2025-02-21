@@ -7,7 +7,7 @@
 /* eslint-disable */
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import { type CallContext, type CallOptions } from "nice-grpc-common";
-import { Empty } from "./google/protobuf/empty";
+import { Empty } from "./google/protobuf/empty.js";
 
 export const protobufPackage = "mock";
 

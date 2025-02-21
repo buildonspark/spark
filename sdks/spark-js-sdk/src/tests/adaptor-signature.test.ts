@@ -1,13 +1,13 @@
 import { describe, expect, it } from "@jest/globals";
 import { schnorr, secp256k1 } from "@noble/curves/secp256k1";
 import { sha256 } from "@scure/btc-signer/utils";
-import { SparkWallet } from "../spark-sdk";
+import { SparkWallet } from "../spark-sdk.js";
 import {
   applyAdaptorToSignature,
   generateAdaptorFromSignature,
   validateOutboundAdaptorSignature,
-} from "../utils/adaptor-signature";
-import { Network } from "../utils/network";
+} from "../utils/adaptor-signature.js";
+import { Network } from "../utils/network.js";
 
 describe("adaptor signature", () => {
   it("should validate outbound adaptor signature", async () => {

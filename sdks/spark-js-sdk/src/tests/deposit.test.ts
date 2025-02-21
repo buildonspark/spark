@@ -1,10 +1,10 @@
 import { describe, expect, it } from "@jest/globals";
 import { secp256k1 } from "@noble/curves/secp256k1";
 import { Address, OutScript, Transaction } from "@scure/btc-signer";
-import { SparkWallet } from "../spark-sdk";
-import { getP2TRAddressFromPublicKey, getTxId } from "../utils/bitcoin";
-import { getNetwork, Network } from "../utils/network";
-import { BitcoinFaucet } from "./utils/test-faucet";
+import { SparkWallet } from "../spark-sdk.js";
+import { getP2TRAddressFromPublicKey, getTxId } from "../utils/bitcoin.js";
+import { getNetwork, Network } from "../utils/network.js";
+import { BitcoinFaucet } from "./utils/test-faucet.js";
 
 describe("deposit", () => {
   // Skip all tests if running in GitHub Actions

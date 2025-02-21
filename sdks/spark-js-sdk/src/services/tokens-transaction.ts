@@ -1,28 +1,28 @@
-import { secp256k1 } from "@noble/curves/secp256k1";
 import {
-  TokenTransaction,
-  OperatorSpecificTokenTransactionSignablePayload,
-  OperatorSpecificTokenTransactionSignature,
-  LeafWithPreviousTransactionData,
-} from "../proto/spark";
-import { ConnectionManager } from "./connection";
-import { WalletConfigService } from "./config";
-import {
-  hashTokenTransaction,
-  hashOperatorSpecificTokenTransactionSignablePayload,
-} from "../utils/token-hashing";
-import {
-  getTokenLeavesSum,
-  collectOwnedTokenLeafPublicKeys,
-  calculateAvailableTokenAmount,
-} from "../utils/token-transactions";
-import { recoverPrivateKeyFromKeyshares } from "../utils/token-keyshares";
-import { validateResponses } from "../utils/response-validation";
-import {
-  numberToBytesBE,
   bytesToHex,
   bytesToNumberBE,
+  numberToBytesBE,
 } from "@noble/curves/abstract/utils";
+import { secp256k1 } from "@noble/curves/secp256k1";
+import {
+  LeafWithPreviousTransactionData,
+  OperatorSpecificTokenTransactionSignablePayload,
+  OperatorSpecificTokenTransactionSignature,
+  TokenTransaction,
+} from "../proto/spark.js";
+import { validateResponses } from "../utils/response-validation.js";
+import {
+  hashOperatorSpecificTokenTransactionSignablePayload,
+  hashTokenTransaction,
+} from "../utils/token-hashing.js";
+import { recoverPrivateKeyFromKeyshares } from "../utils/token-keyshares.js";
+import {
+  calculateAvailableTokenAmount,
+  collectOwnedTokenLeafPublicKeys,
+  getTokenLeavesSum,
+} from "../utils/token-transactions.js";
+import { WalletConfigService } from "./config.js";
+import { ConnectionManager } from "./connection.js";
 
 const BURN_ADDRESS = new Uint8Array(32).fill(0x02);
 
@@ -60,7 +60,7 @@ export class TokenTransactionService {
       sparkOperatorIdentityPublicKeys: this.collectOperatorIdentityPublicKeys(),
     };
   }
-  
+
   createTransferTokenTransaction(
     leavesToSpend: LeafWithPreviousTransactionData[],
     recipientPublicKey: Uint8Array,
@@ -87,13 +87,15 @@ export class TokenTransactionService {
       sparkOperatorIdentityPublicKeys: this.collectOperatorIdentityPublicKeys(),
     };
   }
-  
+
   collectOperatorIdentityPublicKeys(): Uint8Array[] {
     const operatorKeys: Uint8Array[] = [];
-    for (const [_, operator] of Object.entries(this.config.getConfig().signingOperators)) {
+    for (const [_, operator] of Object.entries(
+      this.config.getConfig().signingOperators
+    )) {
       operatorKeys.push(operator.identityPublicKey);
     }
-  
+
     return operatorKeys;
   }
 
@@ -139,10 +141,11 @@ export class TokenTransactionService {
 
       for (let i = 0; i < transferInput.leavesToSpend.length; i++) {
         const leaf = transferInput.leavesToSpend[i];
-        const ownerSignature = await this.config.signer.signMessageWithPublicKey(
-          partialTokenTransactionHash,
-          leafToSpendSigningPublicKeys![i]
-        );
+        const ownerSignature =
+          await this.config.signer.signMessageWithPublicKey(
+            partialTokenTransactionHash,
+            leafToSpendSigningPublicKeys![i]
+          );
 
         ownerSignatures.push(ownerSignature);
       }
@@ -333,23 +336,19 @@ export class TokenTransactionService {
 
     // Submit finalize_token_transaction to all SOs in parallel
     const soResponses = await Promise.allSettled(
-      Object.entries(signingOperators).map(
-        async ([identifier, operator]) => {
-          const internalSparkClient =
-            await this.connectionManager.createSparkClient(operator.address);
-          const response = await internalSparkClient.finalize_token_transaction(
-            {
-              finalTokenTransaction,
-              leafToSpendRevocationKeys,
-            }
-          );
+      Object.entries(signingOperators).map(async ([identifier, operator]) => {
+        const internalSparkClient =
+          await this.connectionManager.createSparkClient(operator.address);
+        const response = await internalSparkClient.finalize_token_transaction({
+          finalTokenTransaction,
+          leafToSpendRevocationKeys,
+        });
 
-          return {
-            identifier,
-            response,
-          };
-        }
-      )
+        return {
+          identifier,
+          response,
+        };
+      })
     );
 
     validateResponses(soResponses);
@@ -415,7 +414,8 @@ export class TokenTransactionService {
             tokenAmount: numberToBytesBE(tokenAmountSum, 16),
           },
         ],
-        sparkOperatorIdentityPublicKeys: this.collectOperatorIdentityPublicKeys(),
+        sparkOperatorIdentityPublicKeys:
+          this.collectOperatorIdentityPublicKeys(),
       };
     } else {
       const tokenDifferenceToSendBack = tokenAmountSum - tokenAmount;
@@ -442,7 +442,8 @@ export class TokenTransactionService {
             tokenAmount: numberToBytesBE(tokenDifferenceToSendBack, 16),
           },
         ],
-        sparkOperatorIdentityPublicKeys: this.collectOperatorIdentityPublicKeys(),
+        sparkOperatorIdentityPublicKeys:
+          this.collectOperatorIdentityPublicKeys(),
       };
     }
 
@@ -526,7 +527,9 @@ export class TokenTransactionService {
     }
 
     if (remainingAmount > 0n) {
-      throw new Error("You do not have enough funds to complete the specified operation");
+      throw new Error(
+        "You do not have enough funds to complete the specified operation"
+      );
     }
 
     return selectedLeaves;

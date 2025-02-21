@@ -1,6 +1,6 @@
-import { SparkWallet } from "../../spark-sdk";
-import { Network } from "../../utils/network";
 import { secp256k1 } from "@noble/curves/secp256k1";
+import { SparkWallet } from "../../spark-sdk.js";
+import { Network } from "../../utils/network.js";
 
 describe("token integration test", () => {
   // Skip all tests if running in GitHub Actions
@@ -13,12 +13,9 @@ describe("token integration test", () => {
     const mnemonic = await wallet.generateMnemonic();
     await wallet.createSparkWallet(mnemonic);
 
-    const tokenPublicKey = await wallet.getSigner().generatePublicKey()
+    const tokenPublicKey = await wallet.getSigner().generatePublicKey();
 
-    await wallet.mintTokens(
-      tokenPublicKey,
-      tokenAmount
-    );
+    await wallet.mintTokens(tokenPublicKey, tokenAmount);
   });
 
   it("should issue a single token and transfer it", async () => {
@@ -66,18 +63,18 @@ describe("token integration test", () => {
     const userMnemonic = await issuerWallet.generateMnemonic();
     await userWallet.createSparkWallet(userMnemonic);
 
-    const userWalletPublicKey = await userWallet.getSigner().getIdentityPublicKey();
-    issuerWallet.transferTokens(tokenPublicKey, tokenAmount, userWalletPublicKey);
-
-    await issuerWallet.freezeTokens(
-      userWalletPublicKey,
-      tokenPublicKey
+    const userWalletPublicKey = await userWallet
+      .getSigner()
+      .getIdentityPublicKey();
+    issuerWallet.transferTokens(
+      tokenPublicKey,
+      tokenAmount,
+      userWalletPublicKey
     );
 
-    await issuerWallet.unfreezeTokens(
-      userWalletPublicKey,
-      tokenPublicKey
-    );
+    await issuerWallet.freezeTokens(userWalletPublicKey, tokenPublicKey);
+
+    await issuerWallet.unfreezeTokens(userWalletPublicKey, tokenPublicKey);
   });
 
   it("should burn tokens", async () => {

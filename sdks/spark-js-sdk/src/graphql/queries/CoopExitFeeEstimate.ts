@@ -1,4 +1,4 @@
-import { FRAGMENT as CoopExitFeeEstimateOutputFragment } from "../objects/CoopExitFeeEstimateOutput";
+import { FRAGMENT as CoopExitFeeEstimateOutputFragment } from "../objects/CoopExitFeeEstimateOutput.js";
 
 export const CoopExitFeeEstimate = `
   query CoopExitFeeEstimate(

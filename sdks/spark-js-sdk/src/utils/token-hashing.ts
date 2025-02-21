@@ -1,9 +1,9 @@
-import {
-  TokenTransaction,
-  OperatorSpecificTokenTransactionSignablePayload,
-  FreezeTokensPayload,
-} from "../proto/spark";
 import { sha256 } from "@scure/btc-signer/utils";
+import {
+  FreezeTokensPayload,
+  OperatorSpecificTokenTransactionSignablePayload,
+  TokenTransaction,
+} from "../proto/spark.js";
 
 export function hashTokenTransaction(
   tokenTransaction: TokenTransaction,
@@ -102,14 +102,14 @@ export function hashTokenTransaction(
   }
 
   // Sort operator public keys before hashing
-  const sortedPubKeys = [...(tokenTransaction.sparkOperatorIdentityPublicKeys || [])].sort(
-    (a, b) => {
-      for (let i = 0; i < a.length && i < b.length; i++) {
-        if (a[i] !== b[i]) return a[i] - b[i];
-      }
-      return a.length - b.length;
+  const sortedPubKeys = [
+    ...(tokenTransaction.sparkOperatorIdentityPublicKeys || []),
+  ].sort((a, b) => {
+    for (let i = 0; i < a.length && i < b.length; i++) {
+      if (a[i] !== b[i]) return a[i] - b[i];
     }
-  );
+    return a.length - b.length;
+  });
 
   // Hash spark operator identity public keys
   for (const pubKey of sortedPubKeys) {

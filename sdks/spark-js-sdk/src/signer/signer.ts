@@ -8,23 +8,22 @@ import { HDKey } from "@scure/bip32";
 import * as bip39 from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english";
 import { sha256 } from "@scure/btc-signer/utils";
-import assert from "assert";
 import * as ecies from "eciesjs";
-import { TreeNode } from "../proto/spark";
-import { generateAdaptorFromSignature } from "../utils/adaptor-signature";
-import { subtractPrivateKeys } from "../utils/keys";
+import { TreeNode } from "../proto/spark.js";
+import { generateAdaptorFromSignature } from "../utils/adaptor-signature.js";
+import { subtractPrivateKeys } from "../utils/keys.js";
 import {
   splitSecretWithProofs,
   VerifiableSecretShare,
-} from "../utils/secret-sharing";
+} from "../utils/secret-sharing.js";
 import {
   createWasmSigningCommitment,
   createWasmSigningNonce,
   getRandomSigningNonce,
   getSigningCommitmentFromNonce,
-} from "../utils/signing";
-import { aggregateFrost, signFrost } from "../utils/wasm";
-import { KeyPackage } from "../wasm/spark_bindings";
+} from "../utils/signing.js";
+import { aggregateFrost, signFrost } from "../utils/wasm.js";
+import { KeyPackage } from "../wasm/spark_bindings.js";
 
 export type SigningNonce = {
   binding: Uint8Array;
@@ -353,7 +352,9 @@ class DefaultSparkSigner implements SparkSigner {
 
     const hdkey = HDKey.fromMasterSeed(seed).derive("m/0");
 
-    assert(hdkey.privateKey, "Private key is not set");
+    if (!hdkey.privateKey) {
+      throw new Error("Could not derive private key from seed");
+    }
 
     this.identityPrivateKey = hdkey;
 

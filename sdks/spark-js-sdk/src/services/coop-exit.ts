@@ -1,23 +1,25 @@
 import { Transaction } from "@scure/btc-signer";
 import { TransactionInput } from "@scure/btc-signer/psbt";
-import { randomUUID } from "crypto";
 import {
   CooperativeExitResponse,
   LeafRefundTxSigningJob,
   Transfer,
-} from "../proto/spark";
+} from "../proto/spark.js";
 import {
   getP2TRScriptFromPublicKey,
   getTxFromRawTxBytes,
-} from "../utils/bitcoin";
-import { getNextTransactionSequence } from "../utils/transaction";
-import { WalletConfigService } from "./config";
-import { ConnectionManager } from "./connection";
+} from "../utils/bitcoin.js";
+import { getCrypto } from "../utils/crypto.js";
+import { getNextTransactionSequence } from "../utils/transaction.js";
+import { WalletConfigService } from "./config.js";
+import { ConnectionManager } from "./connection.js";
 import {
   BaseTransferService,
   LeafKeyTweak,
   LeafRefundSigningData,
-} from "./transfer";
+} from "./transfer.js";
+
+const crypto = getCrypto();
 
 const TIME_LOCK_INTERVAL = 100;
 
@@ -151,14 +153,14 @@ export class CoopExitService extends BaseTransferService {
     try {
       response = await sparkClient.cooperative_exit({
         transfer: {
-          transferId: randomUUID(),
+          transferId: crypto.randomUUID(),
           leavesToSend: signingJobs,
           ownerIdentityPublicKey:
             await this.config.signer.getIdentityPublicKey(),
           receiverIdentityPublicKey: receiverPubKey,
           expiryTime: new Date(Date.now() + 24 * 60 * 1000),
         },
-        exitId: randomUUID(),
+        exitId: crypto.randomUUID(),
         exitTxid: exitTxId,
       });
     } catch (error) {

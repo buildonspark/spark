@@ -1,10 +1,10 @@
 import { describe, expect, it, xit } from "@jest/globals";
 import { bytesToHex, hexToBytes } from "@noble/curves/abstract/utils";
 import { sha256 } from "@scure/btc-signer/utils";
-import { SparkWallet } from "../spark-sdk";
-import { Network } from "../utils/network";
-import { createNewTree } from "./test-util";
-import { BitcoinFaucet } from "./utils/test-faucet";
+import { SparkWallet } from "../spark-sdk.js";
+import { Network } from "../utils/network.js";
+import { createNewTree } from "./test-util.js";
+import { BitcoinFaucet } from "./utils/test-faucet.js";
 
 describe("Transfer", () => {
   // Skip all tests if running in GitHub Actions

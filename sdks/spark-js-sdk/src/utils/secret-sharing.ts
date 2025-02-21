@@ -1,6 +1,8 @@
 import { equalBytes } from "@noble/curves/abstract/utils";
 import { secp256k1 } from "@noble/curves/secp256k1";
-import crypto from "crypto";
+import { getCrypto } from "./crypto.js";
+
+const crypto = getCrypto();
 
 type Polynomial = {
   fieldModulus: bigint;
@@ -25,10 +27,8 @@ export function getRandomBigInt(max: bigint): bigint {
   const maxBigInt = max;
 
   const mask = (1n << BigInt(max.toString(2).length)) - 1n;
-
   while (true) {
-    const randBytes = new Uint8Array(byteLength + 1);
-    crypto.getRandomValues(randBytes);
+    const randBytes = crypto.getRandomValues(new Uint8Array(byteLength + 1));
 
     let randValue =
       BigInt("0x" + Buffer.from(randBytes).toString("hex")) & mask;

@@ -10,45 +10,33 @@
   "exports": {
     ".": {
       "types": "./dist/spark-sdk.d.ts",
-      "import": {
-        "types": "./dist/spark-sdk.d.ts",
-        "default": "./dist/spark-sdk.js"
-      }
+      "require": "./dist/spark-sdk.js",
+      "import": "./dist/spark-sdk.js"
     },
     "./signer": {
       "types": "./dist/signer/signer.d.ts",
-      "import": {
-        "types": "./dist/signer/signer.d.ts",
-        "default": "./dist/signer/signer.js"
-      }
+      "require": "./dist/signer/signer.js",
+      "import": "./dist/signer/signer.js"
     },
     "./utils": {
       "types": "./dist/utils/index.d.ts",
-      "import": {
-        "types": "./dist/utils/index.d.ts",
-        "default": "./dist/utils/index.js"
-      }
+      "require": "./dist/utils/index.js",
+      "import": "./dist/utils/index.js"
     },
     "./token-transaction-service": {
       "types": "./dist/services/token-transaction-service.d.ts",
-      "import": {
-        "types": "./dist/services/token-transaction-service.d.ts",
-        "default": "./dist/services/token-transaction-service.js"
-      }
+      "require": "./dist/services/token-transaction-service.js",
+      "import": "./dist/services/token-transaction-service.js"
     },
     "./wasm": {
       "types": "./dist/wasm/wasm.d.ts",
-      "import": {
-        "types": "./dist/wasm/wasm.d.ts",
-        "default": "./dist/wasm/wasm.js"
-      }
+      "require": "./dist/wasm/wasm.js",
+      "import": "./dist/wasm/wasm.js"
     },
     "./types": {
       "types": "./dist/types/index.d.ts",
-      "import": {
-        "types": "./dist/types/index.d.ts",
-        "default": "./dist/types/index.js"
-      }
+      "require": "./dist/types/index.js",
+      "import": "./dist/types/index.js"
     }
   },
   "scripts": {
@@ -70,7 +58,7 @@
     "test:integration": "yarn test-cmd src/tests/integration/*.test.ts",
     "types:watch": "tsc-absolute --watch",
     "types": "tsc",
-    "generate:proto": "PATH=\"$PATH:./node_modules/.bin\" protoc --ts_proto_out=./src/proto --ts_proto_opt=outputServices=nice-grpc,useExactTypes=false,outputServices=generic-definitions,oneof=unions --proto_path=../../protos spark.proto mock.proto spark_authn.proto"
+    "generate:proto": "PATH=\"$PATH:./node_modules/.bin\" protoc --ts_proto_out=./src/proto --ts_proto_opt=outputServices=nice-grpc,useExactTypes=false,outputServices=generic-definitions,oneof=unions,importSuffix=.js --proto_path=../../protos spark.proto mock.proto spark_authn.proto"
   },
   "author": "",
   "license": "ISC",
@@ -80,10 +68,10 @@
     "@babel/preset-env": "^7.26.0",
     "@types/babel__preset-env": "^7",
     "@types/copyfiles": "^2",
-    "@types/crypto-js": "^4",
     "@types/jest": "^29.5.14",
     "@types/node": "^22.13.2",
     "@types/secp256k1": "^4.0.6",
+    "@types/uuid": "^10.0.0",
     "@types/ws": "^8",
     "babel-jest": "^29.7.0",
     "copyfiles": "^2.4.1",
@@ -105,7 +93,6 @@
     "@scure/bip39": "^1.5.4",
     "@scure/btc-signer": "^1.5.0",
     "auto-bind": "^5.0.1",
-    "crypto-js": "^4.2.0",
     "eciesjs": "^0.4.13",
     "grpc-tools": "^1.12.4",
     "light-bolt11-decoder": "^3.2.0",
@@ -115,9 +102,16 @@
     "protobufjs": "^7.4.0",
     "secp256k1": "^5.0.1",
     "ts-proto": "^2.6.1",
+    "uuid": "^11.1.0",
     "ws": "^8.18.0"
   },
   "browser": {
-    "nice-grpc": false
+    "assert": false,
+    "crypto": false,
+    "fs": false,
+    "fs/promises": false,
+    "nice-grpc": "nice-grpc-web",
+    "path": false,
+    "url": false
   }
 }

@@ -1,12 +1,12 @@
 import { Transaction } from "@scure/btc-signer";
-import { TreeNode } from "../proto/spark";
+import { TreeNode } from "../proto/spark.js";
 import {
   getP2TRScriptFromPublicKey,
   getSigHashFromTx,
   getTxFromRawTxBytes,
   getTxId,
-} from "./bitcoin";
-import { Network } from "./network";
+} from "./bitcoin.js";
+import { Network } from "./network.js";
 
 const TIME_LOCK_INTERVAL = 100;
 

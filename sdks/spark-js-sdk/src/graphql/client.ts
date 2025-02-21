@@ -5,12 +5,16 @@ import {
   Query,
   Requester,
 } from "@lightsparkdev/core";
-import { CompleteCoopExit } from "./mutations/CompleteCoopExit";
-import { CompleteLeavesSwap } from "./mutations/CompleteLeavesSwap";
-import { RequestCoopExit } from "./mutations/RequestCoopExit";
-import { RequestLightningReceive } from "./mutations/RequestLightningReceive";
-import { RequestLightningSend } from "./mutations/RequestLightningSend";
-import { RequestSwapLeaves } from "./mutations/RequestSwapLeaves";
+import { CompleteCoopExit } from "./mutations/CompleteCoopExit.js";
+import { CompleteLeavesSwap } from "./mutations/CompleteLeavesSwap.js";
+import { RequestCoopExit } from "./mutations/RequestCoopExit.js";
+import { RequestLightningReceive } from "./mutations/RequestLightningReceive.js";
+import { RequestLightningSend } from "./mutations/RequestLightningSend.js";
+import { RequestSwapLeaves } from "./mutations/RequestSwapLeaves.js";
+import { CoopExitFeeEstimateOutputFromJson } from "./objects/CoopExitFeeEstimateOutput.js";
+import CoopExitRequest, {
+  CoopExitRequestFromJson,
+} from "./objects/CoopExitRequest.js";
 import {
   BitcoinNetwork,
   CompleteCoopExitInput,
@@ -22,27 +26,23 @@ import {
   RequestLeavesSwapInput,
   RequestLightningReceiveInput,
   RequestLightningSendInput,
-} from "./objects";
-import { CoopExitFeeEstimateOutputFromJson } from "./objects/CoopExitFeeEstimateOutput";
-import CoopExitRequest, {
-  CoopExitRequestFromJson,
-} from "./objects/CoopExitRequest";
+} from "./objects/index.js";
 import LeavesSwapRequest, {
   LeavesSwapRequestFromJson,
-} from "./objects/LeavesSwapRequest";
+} from "./objects/LeavesSwapRequest.js";
 import LightningReceiveFeeEstimateOutput, {
   LightningReceiveFeeEstimateOutputFromJson,
-} from "./objects/LightningReceiveFeeEstimateOutput";
+} from "./objects/LightningReceiveFeeEstimateOutput.js";
 import LightningReceiveRequest, {
   LightningReceiveRequestFromJson,
-} from "./objects/LightningReceiveRequest";
+} from "./objects/LightningReceiveRequest.js";
 import LightningSendFeeEstimateOutput, {
   LightningSendFeeEstimateOutputFromJson,
-} from "./objects/LightningSendFeeEstimateOutput";
-import { LightningSendRequestFromJson } from "./objects/LightningSendRequest";
-import { CoopExitFeeEstimate } from "./queries/CoopExitFeeEstimate";
-import { LightningReceiveFeeEstimate } from "./queries/LightningReceiveFeeEstimate";
-import { LightningSendFeeEstimate } from "./queries/LightningSendFeeEstimate";
+} from "./objects/LightningSendFeeEstimateOutput.js";
+import { LightningSendRequestFromJson } from "./objects/LightningSendRequest.js";
+import { CoopExitFeeEstimate } from "./queries/CoopExitFeeEstimate.js";
+import { LightningReceiveFeeEstimate } from "./queries/LightningReceiveFeeEstimate.js";
+import { LightningSendFeeEstimate } from "./queries/LightningSendFeeEstimate.js";
 
 export default class SspClient {
   private readonly requester: Requester;

@@ -1,8 +1,5 @@
 import { numberToBytesBE } from "@noble/curves/abstract/utils";
-import {
-  hashTokenTransaction,
-  hashOperatorSpecificTokenTransactionSignablePayload,
-} from "../utils/token-hashing";
+import { hashTokenTransaction } from "../utils/token-hashing.js";
 
 describe("hash token transaction", () => {
   it("should produce the exact same hash", () => {

@@ -13,17 +13,17 @@ import {
   PrepareTreeAddressResponse,
   SigningJob,
   TreeNode,
-} from "../proto/spark";
-import { SigningCommitment } from "../signer/signer";
+} from "../proto/spark.js";
+import { SigningCommitment } from "../signer/signer.js";
 import {
   getP2TRAddressFromPublicKey,
   getSigHashFromTx,
   getTxFromRawTxBytes,
   getTxId,
-} from "../utils/bitcoin";
-import { getNetwork, Network } from "../utils/network";
-import { WalletConfigService } from "./config";
-import { ConnectionManager } from "./connection";
+} from "../utils/bitcoin.js";
+import { getNetwork, Network } from "../utils/network.js";
+import { WalletConfigService } from "./config.js";
+import { ConnectionManager } from "./connection.js";
 
 export type DepositAddressTree = {
   address?: string | undefined;
@@ -384,10 +384,10 @@ export class TreeCreationService {
     return internalCreationNode;
   }
 
-  private ephemeralAnchorOutput(): { script: Uint8Array, amount: bigint } {
+  private ephemeralAnchorOutput(): { script: Uint8Array; amount: bigint } {
     return {
       script: new Uint8Array([0x51]), // OP_TRUE
-      amount: 0n
+      amount: 0n,
     };
   }
 

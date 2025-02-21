@@ -6,8 +6,8 @@ import { taprootTweakPrivKey } from "@scure/btc-signer/utils";
 import {
   getP2TRAddressFromPublicKey,
   getP2TRScriptFromPublicKey,
-} from "../../utils/bitcoin";
-import { Network } from "../../utils/network";
+} from "../../utils/bitcoin.js";
+import { Network } from "../../utils/network.js";
 
 export type FaucetCoin = {
   key: Uint8Array;

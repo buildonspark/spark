@@ -1,4 +1,4 @@
-import { FRAGMENT as WalletUserFragment } from "../objects/WalletUser";
+import { FRAGMENT as WalletUserFragment } from "../objects/WalletUser.js";
 
 export const CurrentUser = `
   query CurrentUser {

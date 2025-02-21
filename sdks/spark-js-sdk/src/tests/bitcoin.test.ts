@@ -8,8 +8,8 @@ import {
   getSigHashFromTx,
   getTxFromRawTxHex,
   getTxId,
-} from "../utils/bitcoin";
-import { Network } from "../utils/network";
+} from "../utils/bitcoin.js";
+import { Network } from "../utils/network.js";
 
 describe("bitcoin", () => {
   it("test p2tr address from public key", () => {

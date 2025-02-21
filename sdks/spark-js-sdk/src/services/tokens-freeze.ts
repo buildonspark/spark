@@ -1,16 +1,9 @@
-import { secp256k1 } from "@noble/curves/secp256k1";
-import {
-  FreezeTokensPayload,
-  GetSigningOperatorListResponse,
-  FreezeTokensResponse,
-} from "../proto/spark";
-import { ConnectionManager } from "./connection";
-import { WalletConfigService } from "./config";
-import {
-    hashFreezeTokensPayload,
-  } from "../utils/token-hashing";
+import { FreezeTokensPayload, FreezeTokensResponse } from "../proto/spark.js";
+import { hashFreezeTokensPayload } from "../utils/token-hashing.js";
+import { WalletConfigService } from "./config.js";
+import { ConnectionManager } from "./connection.js";
 
-import { validateResponses } from "../utils/response-validation";
+import { validateResponses } from "../utils/response-validation.js";
 
 export class TokenFreezeService {
   private readonly config: WalletConfigService;
@@ -24,11 +17,17 @@ export class TokenFreezeService {
     this.connectionManager = connectionManager;
   }
 
-  async freezeTokens(ownerPublicKey: Uint8Array, tokenPublicKey: Uint8Array): Promise<FreezeTokensResponse> {
+  async freezeTokens(
+    ownerPublicKey: Uint8Array,
+    tokenPublicKey: Uint8Array
+  ): Promise<FreezeTokensResponse> {
     return this.freezeOperation(ownerPublicKey, tokenPublicKey, false);
   }
 
-  async unfreezeTokens(ownerPublicKey: Uint8Array, tokenPublicKey: Uint8Array): Promise<FreezeTokensResponse> {
+  async unfreezeTokens(
+    ownerPublicKey: Uint8Array,
+    tokenPublicKey: Uint8Array
+  ): Promise<FreezeTokensResponse> {
     return this.freezeOperation(ownerPublicKey, tokenPublicKey, true);
   }
 
@@ -42,40 +41,39 @@ export class TokenFreezeService {
 
     // Submit freeze_tokens to all SOs in parallel
     const freezeResponses = await Promise.allSettled(
-      Object.entries(signingOperators).map(
-        async ([identifier, operator]) => {
-          const internalSparkClient =
-            await this.connectionManager.createSparkClient(operator.address);
+      Object.entries(signingOperators).map(async ([identifier, operator]) => {
+        const internalSparkClient =
+          await this.connectionManager.createSparkClient(operator.address);
 
-          const freezeTokensPayload: FreezeTokensPayload = {
-            ownerPublicKey,
-            tokenPublicKey,
-            shouldUnfreeze,
-            issuerProvidedTimestamp,
-            operatorIdentityPublicKey: operator.identityPublicKey,
-          };
+        const freezeTokensPayload: FreezeTokensPayload = {
+          ownerPublicKey,
+          tokenPublicKey,
+          shouldUnfreeze,
+          issuerProvidedTimestamp,
+          operatorIdentityPublicKey: operator.identityPublicKey,
+        };
 
-          const hashedPayload: Uint8Array =
-            hashFreezeTokensPayload(freezeTokensPayload);
+        const hashedPayload: Uint8Array =
+          hashFreezeTokensPayload(freezeTokensPayload);
 
-          const issuerSignature =
-            await this.config.signer.signMessageWithPublicKey(hashedPayload, tokenPublicKey);
+        const issuerSignature =
+          await this.config.signer.signMessageWithPublicKey(
+            hashedPayload,
+            tokenPublicKey
+          );
 
-          const response = await internalSparkClient.freeze_tokens({
-            freezeTokensPayload,
-            issuerSignature,
-          });
-          return {
-            identifier,
-            response,
-          };
-        }
-      )
+        const response = await internalSparkClient.freeze_tokens({
+          freezeTokensPayload,
+          issuerSignature,
+        });
+        return {
+          identifier,
+          response,
+        };
+      })
     );
 
-    const successfulResponses = validateResponses(
-      freezeResponses
-    );
+    const successfulResponses = validateResponses(freezeResponses);
 
     return successfulResponses[0].response;
   }
