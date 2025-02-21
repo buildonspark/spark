@@ -80,7 +80,7 @@ func (s *PolarityScorer) Start() {
 					break
 				}
 
-				node, err = s.dbClient.TreeNode.Query().
+				parentNode, err := s.dbClient.TreeNode.Query().
 					Where(treenode.ID(node.Edges.Parent.ID)).
 					WithParent().
 					Only(context.Background())
@@ -88,8 +88,13 @@ func (s *PolarityScorer) Start() {
 					s.logger.Error("error loading parent", slog.Any("error", err))
 					break
 				}
+				node = parentNode
 			}
-			s.UpdateLeaves(node)
+			if node != nil {
+				s.UpdateLeaves(node)
+			} else {
+				s.logger.Error("node is nil")
+			}
 		}
 
 		if len(leaves) > 0 {
