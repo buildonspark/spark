@@ -185,5 +185,6 @@ export async function createNewTree(
 
   await faucet.generateToAddress(1, randomAddress);
 
+  await new Promise((resolve) => setTimeout(resolve, 100));
   return treeResp.nodes[0];
 }

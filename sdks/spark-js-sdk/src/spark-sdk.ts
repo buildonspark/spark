@@ -413,6 +413,7 @@ export class SparkWallet {
     const sparkClient = await this.connectionManager.createSparkClient(
       this.config.getCoordinatorAddress()
     );
+    sparkClient.refresh_timelock({});
     for (const leaf of request.swapLeaves) {
       const response = await sparkClient.query_nodes({
         source: {
@@ -707,7 +708,11 @@ export class SparkWallet {
     const transfers = await this.queryPendingTransfers();
     for (const transfer of transfers.transfers) {
       if (
-        transfer.status !== TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAKED
+        transfer.status !== TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAKED &&
+        transfer.status !==
+          TransferStatus.TRANSFER_STATUS_RECEIVER_KEY_TWEAKED &&
+        transfer.status !==
+          TransferStatus.TRANSFER_STATUSR_RECEIVER_REFUND_SIGNED
       ) {
         continue;
       }

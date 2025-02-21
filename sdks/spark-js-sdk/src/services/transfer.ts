@@ -20,6 +20,7 @@ import {
   SendLeafKeyTweak,
   StartSendTransferResponse,
   Transfer,
+  TransferStatus,
   TreeNode,
 } from "../proto/spark.js";
 import { SigningCommitment } from "../signer/signer.js";
@@ -365,8 +366,9 @@ export class TransferService extends BaseTransferService {
   }
 
   async claimTransfer(transfer: Transfer, leaves: LeafKeyTweak[]) {
-    await this.claimTransferTweakKeys(transfer, leaves);
-
+    if (transfer.status === TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAKED) {
+      await this.claimTransferTweakKeys(transfer, leaves);
+    }
     const signatures = await this.claimTransferSignRefunds(transfer, leaves);
 
     return await this.finalizeTransfer(signatures);
@@ -613,10 +615,7 @@ export class TransferService extends BaseTransferService {
     return signingJobs;
   }
 
-  private async claimTransferTweakKeys(
-    transfer: Transfer,
-    leaves: LeafKeyTweak[]
-  ) {
+  async claimTransferTweakKeys(transfer: Transfer, leaves: LeafKeyTweak[]) {
     const leavesTweaksMap = await this.prepareClaimLeavesKeyTweaks(leaves);
 
     const errors: Error[] = [];
@@ -728,7 +727,7 @@ export class TransferService extends BaseTransferService {
     return leafTweaksMap;
   }
 
-  private async claimTransferSignRefunds(
+  async claimTransferSignRefunds(
     transfer: Transfer,
     leafKeys: LeafKeyTweak[]
   ): Promise<NodeSignatures[]> {
@@ -778,6 +777,23 @@ export class TransferService extends BaseTransferService {
       throw new Error(`Error finalizing node signatures in transfer: ${error}`);
     } finally {
       sparkClient.close?.();
+    }
+  }
+
+  async cancelSendTransfer(transfer: Transfer): Promise<Transfer | undefined> {
+    const sparkClient = await this.connectionManager.createSparkClient(
+      this.config.getCoordinatorAddress()
+    );
+    try {
+      const response = await sparkClient.cancel_send_transfer({
+        transferId: transfer.id,
+        senderIdentityPublicKey:
+          await this.config.signer.getIdentityPublicKey(),
+      });
+
+      return response.transfer;
+    } catch (error) {
+      throw new Error(`Error canceling send transfer: ${error}`);
     }
   }
 }
