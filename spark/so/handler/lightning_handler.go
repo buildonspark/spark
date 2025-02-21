@@ -427,6 +427,7 @@ func (h *LightningHandler) GetPreimageShare(ctx context.Context, req *pb.Initiat
 
 // InitiatePreimageSwap initiates a preimage swap for the given payment hash.
 func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pb.InitiatePreimageSwapRequest) (*pb.InitiatePreimageSwapResponse, error) {
+	logger := helper.GetLoggerFromContext(ctx)
 	var preimageShare *ent.PreimageShare
 	if req.Reason == pb.InitiatePreimageSwapRequest_REASON_RECEIVE {
 		db := ent.GetDbFromContext(ctx)
@@ -463,6 +464,7 @@ func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pb.Ini
 		req.Reason,
 	)
 	if err != nil {
+		logger.Error("unable to validate request", "error", err)
 		return nil, fmt.Errorf("unable to validate request: %v", err)
 	}
 
@@ -474,6 +476,7 @@ func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pb.Ini
 	transferHandler := NewTransferHandler(h.config)
 	transfer, _, err := transferHandler.createTransfer(ctx, req.Transfer.TransferId, schema.TransferTypePreimageSwap, req.Transfer.ExpiryTime.AsTime(), req.Transfer.OwnerIdentityPublicKey, req.Transfer.ReceiverIdentityPublicKey, leafRefundMap)
 	if err != nil {
+		logger.Error("unable to create transfer", "error", err)
 		return nil, fmt.Errorf("unable to create transfer: %v", err)
 	}
 
@@ -485,6 +488,7 @@ func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pb.Ini
 	}
 	preimageRequest, err := h.storeUserSignedTransactions(ctx, req.PaymentHash, preimageShare, req.UserSignedRefunds, transfer, status, req.ReceiverIdentityPublicKey)
 	if err != nil {
+		logger.Error("unable to store user signed transactions", "error", err)
 		return nil, fmt.Errorf("unable to store user signed transactions: %v", err)
 	}
 
@@ -524,6 +528,7 @@ func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pb.Ini
 		}
 		index, ok := new(big.Int).SetString(identifier, 16)
 		if !ok {
+			logger.Error("unable to parse index", "identifier", identifier)
 			return nil, fmt.Errorf("unable to parse index: %v", identifier)
 		}
 		shares = append(shares, &secretsharing.SecretShare{
@@ -542,11 +547,13 @@ func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pb.Ini
 	hash := sha256.Sum256(secret.Bytes())
 	if !bytes.Equal(hash[:], req.PaymentHash) {
 		// TODO: Notify the operator that the preimage is wrong
+		logger.Error("invalid preimage", "expected", hex.EncodeToString(req.PaymentHash), "got", hex.EncodeToString(hash[:]))
 		return nil, fmt.Errorf("invalid preimage")
 	}
 
 	err = preimageRequest.Update().SetStatus(schema.PreimageRequestStatusPreimageShared).Exec(ctx)
 	if err != nil {
+		logger.Error("unable to update preimage request status", "error", err)
 		return nil, fmt.Errorf("unable to update preimage request status: %v", err)
 	}
 
