@@ -53,7 +53,6 @@ func (s *SigningResult) MarshalProto() (*pbspark.SigningResult, error) {
 
 // frostRound1 performs the first round of the Frost signing. It gathers the signing commitments from all operators.
 func frostRound1(ctx context.Context, config *so.Config, signingKeyshareIDs []uuid.UUID, operatorSelection *OperatorSelection) (map[string][]objects.SigningCommitment, error) {
-	logger := GetLoggerFromContext(ctx)
 	return ExecuteTaskWithAllOperators(ctx, config, operatorSelection, func(ctx context.Context, operator *so.SigningOperator) ([]objects.SigningCommitment, error) {
 		conn, err := common.NewGRPCConnectionWithCert(operator.Address, operator.CertPath)
 		if err != nil {
@@ -78,7 +77,6 @@ func frostRound1(ctx context.Context, config *so.Config, signingKeyshareIDs []uu
 		for i, commitment := range response.SigningCommitments {
 			err = commitments[i].UnmarshalProto(commitment)
 			if err != nil {
-				logger.Error("FrostRound1 UnmarshalProto failed", "error", err)
 				return nil, err
 			}
 		}
@@ -115,7 +113,6 @@ func frostRound2(
 			for operatorID, commitment := range commitmentsArray[i] {
 				commitmentProto, err := commitment.MarshalProto()
 				if err != nil {
-					logger.Error("Round2 MarshalProto failed", "error", err)
 					return nil, err
 				}
 				commitments[operatorID] = commitmentProto
@@ -124,7 +121,6 @@ func frostRound2(
 			if job.UserCommitment != nil {
 				userCommitmentProto, err = job.UserCommitment.MarshalProto()
 				if err != nil {
-					logger.Error("Round2 MarshalProto failed", "error", err)
 					return nil, err
 				}
 			}
@@ -144,7 +140,6 @@ func frostRound2(
 			SigningJobs: signingJobs,
 		})
 		if err != nil {
-			logger.Error("FrostRound2 failed", "error", err)
 			return nil, err
 		}
 
@@ -244,20 +239,16 @@ func SignFrost(
 	selection := OperatorSelection{Option: OperatorSelectionOptionThreshold, Threshold: int(config.Threshold)}
 	signingKeyshareIDs := SigningKeyshareIDsFromSigningJobs(jobs)
 	signingKeyshares, err := ent.GetKeyPackages(ctx, config, signingKeyshareIDs)
-	logger := GetLoggerFromContext(ctx)
 	if err != nil {
-		logger.Error("GetKeyPackages failed", "error", err)
 		return nil, err
 	}
 	round1, err := frostRound1(ctx, config, signingKeyshareIDs, &selection)
 	if err != nil {
-		logger.Error("FrostRound1 failed", "error", err)
 		return nil, err
 	}
 
 	round2, err := frostRound2(ctx, config, jobs, round1, &selection)
 	if err != nil {
-		logger.Error("FrostRound2 failed", "error", err)
 		return nil, err
 	}
 
@@ -266,7 +257,6 @@ func SignFrost(
 	results := make([]*SigningResult, len(jobs))
 	signingParticipants, err := selection.OperatorList(config)
 	if err != nil {
-		logger.Error("OperatorList failed", "error", err)
 		return nil, err
 	}
 	for i, job := range jobs {

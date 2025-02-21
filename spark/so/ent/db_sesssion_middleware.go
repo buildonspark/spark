@@ -2,7 +2,7 @@ package ent
 
 import (
 	"context"
-	"log"
+	"log/slog"
 
 	"google.golang.org/grpc"
 )
@@ -32,18 +32,20 @@ func DbSessionMiddleware(dbClient *Client) grpc.UnaryServerInterceptor {
 			}
 		}()
 
+		logger := slog.Default().With("method", info.FullMethod)
+
 		// Call the handler (the actual RPC method)
 		resp, err := handler(ctx, req)
 		// Handle transaction commit/rollback
 		if err != nil {
 			if dberr := tx.Rollback(); dberr != nil {
-				log.Printf("Failed to rollback transaction in %s: %s.\n", info.FullMethod, dberr)
+				logger.Error("Failed to rollback transaction in %s: %s.\n", info.FullMethod, dberr)
 			}
 			return nil, err
 		}
 
 		if dberr := tx.Commit(); dberr != nil {
-			log.Printf("Failed to commit transaction in %s: %s.\n", info.FullMethod, dberr)
+			logger.Error("Failed to commit transaction in %s: %s.\n", info.FullMethod, dberr)
 			return nil, dberr
 		}
 

@@ -2,7 +2,6 @@ package dkg
 
 import (
 	"context"
-	"log"
 	"sync"
 
 	"github.com/google/uuid"
@@ -14,7 +13,6 @@ import (
 
 // GenerateKeys runs the DKG protocol to generate the keys.
 func GenerateKeys(ctx context.Context, config *so.Config, keyCount uint64) error {
-	log.Printf("Generating %d keys", keyCount)
 	// Init clients
 	clientMap := make(map[string]pbdkg.DKGServiceClient)
 	for identifier, operator := range config.SigningOperatorMap {
@@ -43,8 +41,7 @@ func GenerateKeys(ctx context.Context, config *so.Config, keyCount uint64) error
 
 	round1Packages := make([]*pbcommon.PackageMap, int(keyCount))
 
-	for identifier, client := range clientMap {
-		log.Printf("Initiating DKG with %s", identifier)
+	for _, client := range clientMap {
 		round1Response, err := client.InitiateDkg(ctx, initRequest)
 		if err != nil {
 			return err

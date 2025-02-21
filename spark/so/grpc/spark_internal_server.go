@@ -2,7 +2,6 @@ package grpc
 
 import (
 	"context"
-	"log"
 
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/common"
@@ -32,24 +31,18 @@ func NewSparkInternalServer(config *so.Config) *SparkInternalServer {
 // MarkKeysharesAsUsed marks the keyshares as used.
 // It will return an error if the key is not found or the key is already used.
 func (s *SparkInternalServer) MarkKeysharesAsUsed(ctx context.Context, req *pb.MarkKeysharesAsUsedRequest) (*emptypb.Empty, error) {
-	log.Printf("Marking keyshares as used: %v", req.KeyshareId)
 	ids := make([]uuid.UUID, len(req.KeyshareId))
 	for i, id := range req.KeyshareId {
 		uuid, err := uuid.Parse(id)
 		if err != nil {
-			log.Printf("Failed to parse keyshare ID: %v", err)
 			return nil, err
 		}
 		ids[i] = uuid
 	}
 	_, err := ent.MarkSigningKeysharesAsUsed(ctx, s.config, ids)
 	if err != nil {
-		log.Printf("Failed to mark keyshares as used: %v", err)
 		return nil, err
 	}
-
-	log.Printf("Marked keyshares as used")
-
 	return &emptypb.Empty{}, nil
 }
 
@@ -65,7 +58,6 @@ func (s *SparkInternalServer) FrostRound1(ctx context.Context, req *pb.FrostRoun
 	for i, id := range req.KeyshareIds {
 		uuid, err := uuid.Parse(id)
 		if err != nil {
-			log.Printf("Failed to parse keyshare ID: %v", err)
 			return nil, err
 		}
 		uuids[i] = uuid
@@ -73,7 +65,6 @@ func (s *SparkInternalServer) FrostRound1(ctx context.Context, req *pb.FrostRoun
 
 	keyPackages, err := ent.GetKeyPackages(ctx, s.config, uuids)
 	if err != nil {
-		log.Printf("Failed to get key packages: %v", err)
 		return nil, err
 	}
 	keyPackagesArray := make([]*pbfrost.KeyPackage, 0)
@@ -83,7 +74,6 @@ func (s *SparkInternalServer) FrostRound1(ctx context.Context, req *pb.FrostRoun
 
 	frostConn, err := common.NewGRPCConnectionWithoutTLS(s.config.SignerAddress)
 	if err != nil {
-		log.Printf("Failed to connect to frost: %v", err)
 		return nil, err
 	}
 	defer frostConn.Close()
@@ -93,7 +83,6 @@ func (s *SparkInternalServer) FrostRound1(ctx context.Context, req *pb.FrostRoun
 		KeyPackages: keyPackagesArray,
 	})
 	if err != nil {
-		log.Printf("Failed to send frost round 1: %v", err)
 		return nil, err
 	}
 
@@ -101,19 +90,16 @@ func (s *SparkInternalServer) FrostRound1(ctx context.Context, req *pb.FrostRoun
 		nonce := objects.SigningNonce{}
 		err = nonce.UnmarshalProto(result.Nonces)
 		if err != nil {
-			log.Printf("Failed to unmarshal nonce: %v", err)
 			return nil, err
 		}
 		commitment := objects.SigningCommitment{}
 		err = commitment.UnmarshalProto(result.Commitments)
 		if err != nil {
-			log.Printf("Failed to unmarshal commitment: %v", err)
 			return nil, err
 		}
 
 		err = ent.StoreSigningNonce(ctx, s.config, nonce, commitment)
 		if err != nil {
-			log.Printf("Failed to store signing nonce: %v", err)
 			return nil, err
 		}
 	}
@@ -130,14 +116,11 @@ func (s *SparkInternalServer) FrostRound1(ctx context.Context, req *pb.FrostRoun
 
 // FrostRound2 handles FROST signing.
 func (s *SparkInternalServer) FrostRound2(ctx context.Context, req *pb.FrostRound2Request) (*pb.FrostRound2Response, error) {
-	log.Printf("Round2 request received for operator: %s", req)
-
 	// Fetch key packages in one call.
 	uuids := make([]uuid.UUID, len(req.SigningJobs))
 	for i, job := range req.SigningJobs {
 		uuid, err := uuid.Parse(job.KeyshareId)
 		if err != nil {
-			log.Printf("Failed to parse keyshare ID: %v", err)
 			return nil, err
 		}
 		uuids[i] = uuid
@@ -145,7 +128,6 @@ func (s *SparkInternalServer) FrostRound2(ctx context.Context, req *pb.FrostRoun
 
 	keyPackages, err := ent.GetKeyPackages(ctx, s.config, uuids)
 	if err != nil {
-		log.Printf("Failed to get key packages: %v", err)
 		return nil, err
 	}
 
@@ -155,13 +137,11 @@ func (s *SparkInternalServer) FrostRound2(ctx context.Context, req *pb.FrostRoun
 		commitments[i] = objects.SigningCommitment{}
 		err = commitments[i].UnmarshalProto(job.Commitments[s.config.Identifier])
 		if err != nil {
-			log.Printf("Failed to unmarshal commitment: %v", err)
 			return nil, err
 		}
 	}
 	nonces, err := ent.GetSigningNonces(ctx, s.config, commitments)
 	if err != nil {
-		log.Printf("Failed to get signing nonces: %v", err)
 		return nil, err
 	}
 
@@ -170,18 +150,15 @@ func (s *SparkInternalServer) FrostRound2(ctx context.Context, req *pb.FrostRoun
 	for _, job := range req.SigningJobs {
 		keyshareID, err := uuid.Parse(job.KeyshareId)
 		if err != nil {
-			log.Printf("Failed to parse keyshare ID: %v", err)
 			return nil, err
 		}
 		commitment := objects.SigningCommitment{}
 		err = commitment.UnmarshalProto(job.Commitments[s.config.Identifier])
 		if err != nil {
-			log.Printf("Failed to unmarshal commitment: %v", err)
 			return nil, err
 		}
 		nonceProto, err := nonces[commitment.Key()].MarshalProto()
 		if err != nil {
-			log.Printf("Failed to marshal nonce: %v", err)
 			return nil, err
 		}
 		signingJobProto := &pbfrost.FrostSigningJob{
@@ -199,7 +176,6 @@ func (s *SparkInternalServer) FrostRound2(ctx context.Context, req *pb.FrostRoun
 
 	frostConn, err := common.NewGRPCConnectionWithoutTLS(s.config.SignerAddress)
 	if err != nil {
-		log.Printf("Failed to connect to frost: %v", err)
 		return nil, err
 	}
 	defer frostConn.Close()
@@ -211,7 +187,6 @@ func (s *SparkInternalServer) FrostRound2(ctx context.Context, req *pb.FrostRoun
 	}
 	round2Response, err := frostClient.SignFrost(ctx, round2Request)
 	if err != nil {
-		log.Printf("Failed to send frost round 2: %v", err)
 		return nil, err
 	}
 

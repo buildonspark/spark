@@ -3,7 +3,6 @@ package authn
 import (
 	"context"
 	"fmt"
-	"log"
 	"strings"
 
 	"google.golang.org/grpc"
@@ -11,6 +10,7 @@ import (
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lightsparkdev/spark-go/so/authninternal"
+	"github.com/lightsparkdev/spark-go/so/helper"
 )
 
 // contextKey is a custom type for context keys to avoid collisions
@@ -65,9 +65,10 @@ func NewAuthnInterceptor(sessionTokenCreatorVerifier *authninternal.SessionToken
 // If there is no session or it does not validate, it will log rather than error.
 func (i *AuthnInterceptor) AuthnInterceptor(ctx context.Context, req interface{}, _ *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 	md, ok := metadata.FromIncomingContext(ctx)
+	logger := helper.GetLoggerFromContext(ctx)
 	if !ok {
 		err := fmt.Errorf("no metadata provided")
-		log.Printf("Authentication error: %v", err)
+		logger.Info("Authentication error", "error", err)
 		ctx = context.WithValue(ctx, authnContextKey, &AuthnContext{
 			Error: err,
 		})
@@ -78,7 +79,6 @@ func (i *AuthnInterceptor) AuthnInterceptor(ctx context.Context, req interface{}
 	tokens := md.Get(authorizationHeader)
 	if len(tokens) == 0 {
 		err := fmt.Errorf("no authorization token provided")
-		log.Printf("Authentication error: %v", err)
 		ctx = context.WithValue(ctx, authnContextKey, &AuthnContext{
 			Error: err,
 		})
@@ -91,7 +91,7 @@ func (i *AuthnInterceptor) AuthnInterceptor(ctx context.Context, req interface{}
 	sessionInfo, err := i.sessionTokenCreatorVerifier.VerifyToken(token)
 	if err != nil {
 		wrappedErr := fmt.Errorf("failed to verify token: %w", err)
-		log.Printf("Authentication error: %v", wrappedErr)
+		logger.Info("Authentication error", "error", wrappedErr)
 		ctx = context.WithValue(ctx, authnContextKey, &AuthnContext{
 			Error: wrappedErr,
 		})
@@ -101,7 +101,7 @@ func (i *AuthnInterceptor) AuthnInterceptor(ctx context.Context, req interface{}
 	key, err := secp256k1.ParsePubKey(sessionInfo.PublicKey)
 	if err != nil {
 		wrappedErr := fmt.Errorf("failed to parse public key: %w", err)
-		log.Printf("Authentication error: %v", wrappedErr)
+		logger.Info("Authentication error", "error", wrappedErr)
 		ctx = context.WithValue(ctx, authnContextKey, &AuthnContext{
 			Error: wrappedErr,
 		})

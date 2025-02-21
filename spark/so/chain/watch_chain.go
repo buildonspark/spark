@@ -129,6 +129,7 @@ func findDifference(currChainTip, newChainTip Tip, client *rpcclient.Client) (Di
 }
 
 func WatchChain(dbClient *ent.Client, cfg so.BitcoindConfig) error {
+	logger := slog.Default().With("method", "watch_chain.WatchChain")
 	network, err := common.NetworkFromString(cfg.Network)
 	if err != nil {
 		return err
@@ -200,7 +201,7 @@ func WatchChain(dbClient *ent.Client, cfg so.BitcoindConfig) error {
 		}
 	}()
 
-	log.Println("Listening for block notifications via ZMQ endpoint", cfg.ZmqPubRawBlock)
+	logger.Info("Listening for block notifications via ZMQ endpoint", "endpoint", cfg.ZmqPubRawBlock)
 
 	// TODO: we should consider alerting on errors within this loop
 	for {
@@ -216,8 +217,7 @@ func WatchChain(dbClient *ent.Client, cfg so.BitcoindConfig) error {
 		block := wire.MsgBlock{}
 		err = block.Deserialize(bytes.NewReader([]byte(rawBlock)))
 		if err != nil {
-			log.Printf("Failed to deserialize block: %v\n", err)
-			log.Printf("Failed deserialization raw block: %s\n", hex.EncodeToString([]byte(rawBlock)))
+			logger.Error("Failed deserialization raw block", "raw_block", hex.EncodeToString([]byte(rawBlock)))
 			continue
 		}
 
@@ -226,31 +226,31 @@ func WatchChain(dbClient *ent.Client, cfg so.BitcoindConfig) error {
 		// treat it as a notification that a new block appeared.
 		latestBlockHeight, err = client.GetBlockCount()
 		if err != nil {
-			log.Printf("Failed to get block count: %v", err)
+			logger.Error("Failed to get block count", "error", err)
 			continue
 		}
 		latestBlockHash, err = client.GetBlockHash(latestBlockHeight)
 		if err != nil {
-			log.Printf("Failed to get block hash: %v", err)
+			logger.Error("Failed to get block hash", "error", err)
 			continue
 		}
 
 		newChainTip := NewTip(latestBlockHeight, *latestBlockHash)
 		difference, err := findDifference(chainTip, newChainTip, client)
 		if err != nil {
-			log.Printf("Failed to find difference: %v", err)
+			logger.Error("Failed to find difference", "error", err)
 			continue
 		}
 
 		err = disconnectBlocks(ctx, dbClient, difference.Disconnected, network)
 		if err != nil {
-			log.Printf("Failed to disconnect blocks: %v", err)
+			logger.Error("Failed to disconnect blocks", "error", err)
 			continue
 		}
 
 		err = connectBlocks(ctx, dbClient, client, difference.Connected, network)
 		if err != nil {
-			log.Printf("Failed to connect blocks: %v", err)
+			logger.Error("Failed to connect blocks", "error", err)
 			continue
 		}
 
@@ -263,6 +263,7 @@ func disconnectBlocks(_ context.Context, _ *ent.Client, _ []Tip, _ common.Networ
 }
 
 func connectBlocks(ctx context.Context, dbClient *ent.Client, client *rpcclient.Client, chainTips []Tip, network common.Network) error {
+	logger := slog.Default().With("method", "watch_chain.connectBlocks")
 	for _, chainTip := range chainTips {
 		blockHash, err := client.GetBlockHash(chainTip.Height)
 		if err != nil {
@@ -287,7 +288,7 @@ func connectBlocks(ctx context.Context, dbClient *ent.Client, client *rpcclient.
 		}
 		err = handleBlock(ctx, dbTx, txs, chainTip.Height, network)
 		if err != nil {
-			log.Printf("Failed to handle block: %v", err)
+			logger.Error("Failed to handle block", "error", err)
 			rollbackErr := dbTx.Rollback()
 			if err != nil {
 				return rollbackErr
@@ -298,7 +299,6 @@ func connectBlocks(ctx context.Context, dbClient *ent.Client, client *rpcclient.
 		if err != nil {
 			return err
 		}
-		log.Printf("Successfully processed %s block %d", network, chainTip.Height)
 	}
 	return nil
 }
@@ -318,6 +318,7 @@ func TxFromRPCTx(txs btcjson.TxRawResult) (wire.MsgTx, error) {
 }
 
 func handleBlock(ctx context.Context, dbTx *ent.Tx, txs []wire.MsgTx, blockHeight int64, network common.Network) error {
+	logger := slog.Default().With("method", "watch_chain.handleBlock")
 	networkParams := common.NetworkParams(network)
 	_, err := dbTx.BlockHeight.Update().
 		SetHeight(blockHeight).
@@ -368,22 +369,22 @@ func handleBlock(ctx context.Context, dbTx *ent.Tx, txs []wire.MsgTx, blockHeigh
 			Where(treenode.HasSigningKeyshareWith(signingkeyshare.ID(signingKeyShare.ID))).
 			Only(ctx)
 		if ent.IsNotFound(err) {
-			log.Printf("Deposit confirmed before tree creation: %s", deposit.Address)
+			logger.Info("Deposit confirmed before tree creation", "address", deposit.Address)
 			continue
 		}
 		if err != nil {
 			return err
 		}
-		log.Printf("Found tree node: %s, start processing", treeNode.ID)
+		logger.Info("Found tree node", "node", treeNode.ID)
 		if treeNode.Status != schema.TreeNodeStatusCreating {
-			log.Printf("Expected tree node status to be creating, got %s", treeNode.Status)
+			logger.Info("Expected tree node status to be creating", "status", treeNode.Status)
 		}
 		tree, err := treeNode.QueryTree().Only(ctx)
 		if err != nil {
 			return err
 		}
 		if tree.Status != schema.TreeStatusPending {
-			log.Printf("Expected tree status to be pending, got %s", tree.Status)
+			logger.Info("Expected tree status to be pending", "status", tree.Status)
 			continue
 		}
 		foundTx := false
@@ -394,9 +395,9 @@ func handleBlock(ctx context.Context, dbTx *ent.Tx, txs []wire.MsgTx, blockHeigh
 			}
 		}
 		if !foundTx {
-			slog.Debug("Base txid not found in confirmed txids", "base_txid", hex.EncodeToString(tree.BaseTxid))
+			logger.Debug("Base txid not found in confirmed txids", "base_txid", hex.EncodeToString(tree.BaseTxid))
 			for _, txid := range confirmedTxids {
-				slog.Debug("confirmed txid", "txid", hex.EncodeToString(txid))
+				logger.Debug("confirmed txid", "txid", hex.EncodeToString(txid))
 			}
 			continue
 		}
@@ -414,7 +415,7 @@ func handleBlock(ctx context.Context, dbTx *ent.Tx, txs []wire.MsgTx, blockHeigh
 		}
 		for _, treeNode := range treeNodes {
 			if treeNode.Status != schema.TreeNodeStatusCreating {
-				slog.Debug("Tree node is not in creating status", "node", treeNode.ID)
+				logger.Debug("Tree node is not in creating status", "node", treeNode.ID)
 				continue
 			}
 			if len(treeNode.RawRefundTx) > 0 {

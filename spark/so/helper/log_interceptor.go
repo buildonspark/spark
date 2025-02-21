@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/proto"
 )
 
 type contextKey string
@@ -16,11 +17,18 @@ func LogInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServer
 	requestID := uuid.New().String()
 	logger := slog.Default().With("request_id", requestID, "method", info.FullMethod)
 	ctx = context.WithValue(ctx, LoggerKey, logger)
+	reqProto, ok := req.(proto.Message)
+	if ok {
+		logger.Info("grpc call started", "request", proto.MessageName(reqProto))
+	}
 	response, err := handler(ctx, req)
 	if err != nil {
 		logger.Error("error in grpc", "error", err)
 	} else {
-		logger.Debug("grpc call successful", "response", response)
+		responseProto, ok := response.(proto.Message)
+		if ok {
+			logger.Info("grpc call successful", "response", proto.MessageName(responseProto))
+		}
 	}
 	return response, err
 }

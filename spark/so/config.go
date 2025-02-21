@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/url"
 	"os"
 	"strings"
@@ -133,9 +132,6 @@ func NewConfig(
 	if err := yaml.Unmarshal(data, &nodes); err != nil {
 		return nil, err
 	}
-
-	log.Printf("Server cert path: %s", serverCertPath)
-	log.Printf("Server key path: %s", serverKeyPath)
 
 	identifier := utils.IndexToIdentifier(index)
 

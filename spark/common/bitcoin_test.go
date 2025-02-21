@@ -3,7 +3,6 @@ package common
 import (
 	"bytes"
 	"encoding/hex"
-	"log"
 	"testing"
 
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
@@ -134,7 +133,6 @@ func TestVerifySignature(t *testing.T) {
 	err = debitTx.Serialize(&debitTxBuf)
 	require.NoError(t, err)
 
-	log.Println("debitTx:", hex.EncodeToString(debitTxBuf.Bytes()))
 	signedDebitTxBytes, err := UpdateTxWithSignature(debitTxBuf.Bytes(), 0, sig.Serialize())
 	require.NoError(t, err)
 	signedDebitTx, err := TxFromRawTxBytes(signedDebitTxBytes)

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"log"
 	"sync"
 	"time"
 
@@ -180,7 +179,6 @@ func (s *States) ReceivedRound1Signature(requestID string, selfIdentifier string
 	valid, validationFailures := validateRound1Signature(state.ReceivedRound1Packages, round1Signatures, operatorMap)
 	if !valid {
 		// Abort the DKG process
-		log.Printf("State deleted for request id: %s by validation failures", requestID)
 		delete(s.states, requestID)
 
 		return validationFailures, nil
@@ -208,7 +206,6 @@ func (s *States) ReceivedRound2Packages(requestID string, identifier string, rou
 	}
 
 	if len(state.ReceivedRound2Packages) == 0 {
-		log.Printf("Making new received round 2 packages")
 		state.ReceivedRound2Packages = make([]map[string][]byte, len(round2Packages))
 		for i := range state.ReceivedRound2Packages {
 			state.ReceivedRound2Packages[i] = make(map[string][]byte)
@@ -219,7 +216,6 @@ func (s *States) ReceivedRound2Packages(requestID string, identifier string, rou
 		state.ReceivedRound2Packages[i][identifier] = p
 	}
 
-	log.Printf("Received round 2 packages: %v, for request id: %s", len(state.ReceivedRound2Packages[0]), requestID)
 	s.states[requestID] = state
 	return nil
 }
@@ -228,7 +224,6 @@ func (s *States) ReceivedRound2Packages(requestID string, identifier string, rou
 // We can proceed to round 3 if we have received the round 2 packages from all operators as well as we got our own round 2 package.
 // If we can, it will perform the round 3.
 func (s *States) ProceedToRound3(ctx context.Context, requestID string, frostConnection *grpc.ClientConn, config *so.Config) error {
-	log.Printf("Checking if we can proceed to round 3 for request id: %s", requestID)
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -242,7 +237,6 @@ func (s *States) ProceedToRound3(ctx context.Context, requestID string, frostCon
 		return nil
 	}
 	if int64(len(state.ReceivedRound2Packages[0])) == int64(state.MaxSigners-1) && state.Type == Round2 {
-		log.Printf("State deleted for request id: %s", requestID)
 		delete(s.states, requestID)
 
 		err := state.Round3(ctx, requestID, frostConnection, config)
@@ -256,7 +250,6 @@ func (s *States) ProceedToRound3(ctx context.Context, requestID string, frostCon
 // Round3 performs the round 3 of the DKG protocol.
 // This will generate the keyshares and store them in the database.
 func (s *State) Round3(ctx context.Context, requestID string, frostConnection *grpc.ClientConn, config *so.Config) error {
-	log.Printf("Round 3")
 	round1PackagesMaps := make([]*pbcommon.PackageMap, len(s.ReceivedRound1Packages))
 	for i, p := range s.ReceivedRound1Packages {
 		round1PackagesMaps[i] = &pbcommon.PackageMap{
@@ -278,7 +271,6 @@ func (s *State) Round3(ctx context.Context, requestID string, frostConnection *g
 		Round2PackagesMaps: round2PackagesMaps,
 	})
 	if err != nil {
-		log.Printf("Error in round 3: %v", err)
 		return err
 	}
 
@@ -308,8 +300,5 @@ func (s *States) RemoveState(requestID string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if _, exists := s.states[requestID]; exists {
-		log.Printf("State deleted for request id: %s by RemoveState", requestID)
-		delete(s.states, requestID)
-	}
+	delete(s.states, requestID)
 }

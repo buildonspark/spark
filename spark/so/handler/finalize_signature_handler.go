@@ -3,7 +3,6 @@ package handler
 import (
 	"context"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/google/uuid"
@@ -139,7 +138,6 @@ func (o *FinalizeSignatureHandler) FinalizeNodeSignatures(ctx context.Context, r
 		return nil, err
 	})
 	if err != nil {
-		log.Printf("failed to sync with other SOs: %v", err)
 		return nil, err
 	}
 
@@ -189,7 +187,6 @@ func (o *FinalizeSignatureHandler) verifyAndUpdateTransfer(ctx context.Context, 
 }
 
 func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignatures *pb.NodeSignatures, intent pbcommon.SignatureIntent) (*pb.TreeNode, *pbinternal.TreeNode, error) {
-	log.Printf("finalizing node signatures for node %s", nodeSignatures.NodeId)
 	db := ent.GetDbFromContext(ctx)
 
 	nodeID, err := uuid.Parse(nodeSignatures.NodeId)
