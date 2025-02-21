@@ -139,7 +139,6 @@ func (s *PolarityScorer) UpdateLeaves(node *ent.TreeNode) {
 		for owner, score := range scores {
 			s.probPubKeyCanClaim[leaf.leafID][owner] = score
 		}
-		s.logger.Info("updated leaf", slog.Any("leaf_id", leaf.leafID), slog.Any("score-root", helperTree.leafID), slog.Any("scores", scores))
 	}
 }
 
