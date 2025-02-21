@@ -32,7 +32,7 @@ func StartTokenTransaction(
 	leafToSpendPrivateKeys []*secp256k1.PrivateKey,
 	leafToSpendRevocationPublicKeys [][]byte,
 ) (*pb.StartTokenTransactionResponse, []byte, []byte, error) {
-	sparkConn, err := common.NewGRPCConnectionWithoutTLS(config.CoodinatorAddress())
+	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
 	if err != nil {
 		log.Printf("Error while establishing gRPC connection to coordinator at %s: %v", config.CoodinatorAddress(), err)
 		return nil, nil, nil, err
@@ -164,7 +164,7 @@ func SignTokenTransaction(
 	// ---------------------------------------------------------------------
 	leafRevocationKeyshares := make([][]*KeyshareWithOperatorIndex, len(finalTx.GetTransferInput().GetLeavesToSpend()))
 	for _, operator := range config.SigningOperators {
-		operatorConn, err := common.NewGRPCConnectionWithoutTLS(operator.Address)
+		operatorConn, err := common.NewGRPCConnectionWithTestTLS(operator.Address)
 		if err != nil {
 			log.Printf("Error while establishing gRPC connection to operator at %s: %v", operator.Address, err)
 			return nil, err
@@ -252,7 +252,7 @@ func FinalizeTokenTransaction(
 
 	// For each operator, finalize the transaction
 	for _, operator := range config.SigningOperators {
-		operatorConn, err := common.NewGRPCConnectionWithoutTLS(operator.Address)
+		operatorConn, err := common.NewGRPCConnectionWithTestTLS(operator.Address)
 		if err != nil {
 			log.Printf("Error while establishing gRPC connection to operator at %s: %v", operator.Address, err)
 			return err
@@ -332,7 +332,7 @@ func FreezeTokens(
 	tokenPublicKey []byte,
 	shouldUnfreeze bool,
 ) (*pb.FreezeTokensResponse, error) {
-	sparkConn, err := common.NewGRPCConnectionWithoutTLS(config.CoodinatorAddress())
+	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
 	if err != nil {
 		log.Printf("Error while establishing gRPC connection to coordinator at %s: %v", config.CoodinatorAddress(), err)
 		return nil, err
@@ -342,7 +342,7 @@ func FreezeTokens(
 	var lastResponse *pb.FreezeTokensResponse
 	timestamp := uint64(time.Now().UnixMilli())
 	for _, operator := range config.SigningOperators {
-		operatorConn, err := common.NewGRPCConnectionWithoutTLS(operator.Address)
+		operatorConn, err := common.NewGRPCConnectionWithTestTLS(operator.Address)
 		if err != nil {
 			log.Printf("Error while establishing gRPC connection to coordinator at %s: %v", operator.Address, err)
 			return nil, err
@@ -392,7 +392,7 @@ func GetOwnedTokenLeaves(
 	ownerPublicKeys [][]byte,
 	tokenPublicKeys [][]byte,
 ) (*pb.GetOwnedTokenLeavesResponse, error) {
-	sparkConn, err := common.NewGRPCConnectionWithoutTLS(config.CoodinatorAddress())
+	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
 	if err != nil {
 		log.Printf("Error while establishing gRPC connection to coordinator at %s: %v", config.CoodinatorAddress(), err)
 		return nil, err

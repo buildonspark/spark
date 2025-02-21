@@ -28,7 +28,7 @@ func AggregateTreeNodes(
 	parentNode *pb.TreeNode,
 	aggregatedSigningKey []byte,
 ) (*pb.FinalizeNodeSignaturesResponse, error) {
-	sparkConn, err := common.NewGRPCConnectionWithoutTLS(config.CoodinatorAddress())
+	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
 	if err != nil {
 		return nil, err
 	}

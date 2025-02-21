@@ -4,7 +4,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"log"
 
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
 	"github.com/lightsparkdev/spark-go/so/utils"
@@ -44,7 +43,6 @@ func (s *SigningOperator) UnmarshalJSON(data []byte) error {
 	}
 
 	// Decode hex string to bytes
-	log.Println("pubKey", js.IdentityPublicKey)
 	pubKey, err := hex.DecodeString(js.IdentityPublicKey)
 	if err != nil {
 		return fmt.Errorf("failed to decode public key hex: %w", err)

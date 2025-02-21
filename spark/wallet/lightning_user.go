@@ -47,7 +47,7 @@ func CreateLightningInvoiceWithPreimage(
 		wg.Add(1)
 		go func(operator *so.SigningOperator) {
 			defer wg.Done()
-			sparkConn, err := common.NewGRPCConnectionWithoutTLS(operator.Address)
+			sparkConn, err := common.NewGRPCConnectionWithTestTLS(operator.Address)
 			if err != nil {
 				results <- err
 				return

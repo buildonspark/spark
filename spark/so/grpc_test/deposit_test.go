@@ -49,7 +49,7 @@ func TestStartTreeCreation(t *testing.T) {
 		t.Fatalf("failed to create wallet config: %v", err)
 	}
 
-	conn, err := common.NewGRPCConnectionWithoutTLS(config.CoodinatorAddress())
+	conn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
 	if err != nil {
 		t.Fatalf("failed to connect to operator: %v", err)
 	}
@@ -144,7 +144,7 @@ func TestStartTreeCreationOffchain(t *testing.T) {
 	}
 
 	// Setup Mock tx
-	conn, err := common.NewGRPCConnectionWithoutTLS(config.CoodinatorAddress())
+	conn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
 	if err != nil {
 		t.Fatalf("failed to connect to operator: %v", err)
 	}
