@@ -1,12 +1,12 @@
+import { QRCodeSVG } from "qrcode.react";
 import { useEffect, useRef, useState } from "react";
-import WalletIcon from "../icons/WalletIcon";
 import styled from "styled-components";
 import ClockIcon from "../icons/ClockIcon";
+import CloseIcon from "../icons/CloseIcon";
 import CopyIcon from "../icons/CopyIcon";
 import PencilIcon from "../icons/PencilIcon";
+import WalletIcon from "../icons/WalletIcon";
 import DetailsRow from "./DetailsRow";
-import { QRCodeSVG } from "qrcode.react";
-import CloseIcon from "../icons/CloseIcon";
 
 type ActiveButton = "bitcoin" | "lightning" | "uma";
 
@@ -21,16 +21,16 @@ export default function ReceiveDetails({
   setQrCodeModalVisible,
   onEditAmount,
   receiveFiatAmount,
+  invoice,
 }: {
   qrCodeModalVisible: boolean;
   setQrCodeModalVisible: React.Dispatch<React.SetStateAction<boolean>>;
   onEditAmount: () => void;
   receiveFiatAmount: string;
+  invoice: string | null;
 }) {
   const [active, setActive] = useState<ActiveButton>("lightning");
-  const [url, setUrl] = useState(
-    "lnbcrt1990n1pnm02c4pp5uynyjcwx0a0p35wwrpffslxy5whgf8c4ld2xryv765xk6ernaqysdqqcqzpgxqyz5vqrzjqfd7grknq8s8hyl2c466ypdt48u0kd2gngragyjuppnyha0pj8jnuqqqqzav4wzeggqqqqqqqqqqqqqq9qsp5vyhdvum9yuud6ddqssrtfvelxfq8vw8hsut2fay6ju87rppycg5s9qxpqysgq7265qzsf2k5s9s3ptw85hr2xg3vx9v6lwj7y3cv3amnevl9e8cd4me55crj9rqmyt39p7nqyljnq9zkdsks9fsta029x6kzcg396kkgp4lg658"
-  );
+  const url = invoice;
 
   const ref = useRef<HTMLDivElement>(null);
 

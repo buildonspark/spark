@@ -1,4 +1,4 @@
-import { equalBytes } from "@noble/curves/abstract/utils";
+import { bytesToHex, equalBytes } from "@noble/curves/abstract/utils";
 import { secp256k1 } from "@noble/curves/secp256k1";
 import { getCrypto } from "./crypto.js";
 
@@ -30,8 +30,7 @@ export function getRandomBigInt(max: bigint): bigint {
   while (true) {
     const randBytes = crypto.getRandomValues(new Uint8Array(byteLength + 1));
 
-    let randValue =
-      BigInt("0x" + Buffer.from(randBytes).toString("hex")) & mask;
+    const randValue = BigInt("0x" + bytesToHex(randBytes)) & mask;
 
     if (randValue < maxBigInt) {
       return randValue;

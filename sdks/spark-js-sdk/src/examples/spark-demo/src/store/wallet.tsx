@@ -7,6 +7,7 @@ import { create } from "zustand";
 interface WalletState {
   wallet: SparkWallet;
   isInitialized: boolean;
+  mnemonic: string | null;
 }
 
 interface WalletActions {
@@ -15,23 +16,36 @@ interface WalletActions {
   createLightningInvoice: (amount: number, memo: string) => Promise<string>;
   sendTransfer: (amount: number, recipient: string) => Promise<void>;
   payLightningInvoice: (invoice: string) => Promise<void>;
+  loadStoredWallet: () => Promise<void>;
 }
 
 type WalletStore = WalletState & WalletActions;
 
+const MNEMONIC_STORAGE_KEY = "spark_wallet_mnemonic";
+
 const useWalletStore = create<WalletStore>((set, get) => ({
   wallet: new SparkWallet(Network.REGTEST),
   isInitialized: false,
+  mnemonic: null,
 
   generateMnemonic: async () => {
     const { wallet } = get();
     const mnemonic = await wallet.generateMnemonic();
+    localStorage.setItem(MNEMONIC_STORAGE_KEY, mnemonic);
+    set({ mnemonic });
     return mnemonic;
   },
   initWallet: async (mnemonic: string) => {
     const { wallet } = get();
     await wallet.createSparkWallet(mnemonic);
-    set({ isInitialized: true });
+    localStorage.setItem(MNEMONIC_STORAGE_KEY, mnemonic);
+    set({ isInitialized: true, mnemonic });
+  },
+  loadStoredWallet: async () => {
+    const storedMnemonic = localStorage.getItem(MNEMONIC_STORAGE_KEY);
+    if (storedMnemonic) {
+      await get().initWallet(storedMnemonic);
+    }
   },
   sendTransfer: async (amount: number, recipient: string) => {
     const { wallet } = get();
@@ -61,6 +75,14 @@ export function useWallet() {
   const { wallet, isInitialized } = useWalletStore();
   const queryClient = useQueryClient();
 
+  useQuery({
+    queryKey: ["wallet", "init"],
+    queryFn: () => useWalletStore.getState().loadStoredWallet(),
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  });
+
   const balanceQuery = useQuery({
     queryKey: ["wallet", "balance"],
     queryFn: () => wallet.getBalance(),
@@ -80,7 +102,7 @@ export function useWallet() {
       }
       const data = await response.json();
       if (!data?.bitcoin?.usd) throw new Error("Invalid response format");
-      return data.bitcoin.usd;
+      return data.bitcoin.usd / 1e8;
     },
     refetchInterval: 60000,
   });
@@ -88,6 +110,7 @@ export function useWallet() {
   useQuery({
     queryKey: ["wallet", "claimTransfers"],
     queryFn: async () => {
+      console.log("testing");
       const claimed = await wallet.claimTransfers();
       if (claimed) {
         queryClient.invalidateQueries({ queryKey: ["wallet", "balance"] });
@@ -102,7 +125,7 @@ export function useWallet() {
 
   return {
     balance: {
-      value: balanceQuery.data ?? 0,
+      value: Number(balanceQuery.data ?? 0),
       isLoading: balanceQuery.isLoading,
       error: balanceQuery.error,
     },
@@ -111,9 +134,14 @@ export function useWallet() {
       isLoading: btcPriceQuery.isLoading,
       error: btcPriceQuery.error,
     },
+    generatorMnemonic: state.generateMnemonic,
+    initWallet: async (mnemonic: string) => {
+      await state.initWallet(mnemonic);
+    },
     sendTransfer: state.sendTransfer,
     createLightningInvoice: state.createLightningInvoice,
     payLightningInvoice: state.payLightningInvoice,
+    loadStoredWallet: state.loadStoredWallet,
   };
 }
 

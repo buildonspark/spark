@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import styled from "styled-components";
 import DeleteIcon from "../icons/DeleteIcon";
-import { useBtcPrice } from "../context/BtcPriceContext";
 import ToggleIcon from "../icons/ToggleIcon";
+import { useWallet } from "../store/wallet";
 export default function AmountInput({
   fiatAmount,
   setFiatAmount,
@@ -12,7 +12,7 @@ export default function AmountInput({
   setFiatAmount: React.Dispatch<React.SetStateAction<string>>;
   togglePrimaryCurrency: () => void;
 }) {
-  const { satsUsdPrice } = useBtcPrice();
+  const { btcPrice } = useWallet();
 
   const handleKey = (key: string) => {
     setFiatAmount((prev) => {
@@ -69,8 +69,10 @@ export default function AmountInput({
           className="font-decimal text-[13px] opacity-40 text-center flex items-center gap-2 rounded-full bg-[#F9F9F9] bg-opacity-20 px-2 py-1"
           onClick={togglePrimaryCurrency}
         >
-          {satsUsdPrice
-            ? `${Math.floor(Number(fiatAmount) / satsUsdPrice).toFixed(0)} SATs`
+          {btcPrice
+            ? `${Math.floor(Number(fiatAmount) / btcPrice.value).toFixed(
+                0
+              )} SATs`
             : "0 SATs"}
           <ToggleIcon />
         </div>

@@ -1,23 +1,24 @@
+import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import Button from "../../components/Button";
 import StyledContainer from "../../components/StyledContainer";
 import ReceiveIcon from "../../icons/ReceiveIcon";
 import SendIcon from "../../icons/SendIcon";
 import WalletIcon from "../../icons/WalletIcon";
-import { useMemo, useState } from "react";
-import { useBtcPrice } from "../../context/BtcPriceContext";
+import { useWallet } from "../../store/wallet";
 import { roundDown } from "../../utils/utils";
 
 export default function Wallet() {
   const navigate = useNavigate();
-  const [satsBalance, setSatsBalance] = useState(2323222323);
-  const { satsUsdPrice, lastSuccessfulFetch } = useBtcPrice();
 
+  const { balance: satsBalance, btcPrice } = useWallet();
+
+  console.log(satsBalance);
   let usdBalance = useMemo(() => {
-    return satsUsdPrice
-      ? roundDown(satsUsdPrice * satsBalance, 2).toFixed(2)
+    return btcPrice
+      ? roundDown(btcPrice.value * satsBalance.value, 2).toFixed(2)
       : null;
-  }, [satsUsdPrice, satsBalance]);
+  }, [btcPrice, satsBalance]);
   const fontSize = Math.max(60 - (satsBalance.toString().length - 1) * 5, 30);
   return (
     <div className="mx-6">
@@ -54,7 +55,7 @@ export default function Wallet() {
           </div>
           {usdBalance && (
             <div className="flex justify-center items-center font-decimal text-[13px] opacity-40">
-              {satsBalance} SATs
+              {satsBalance.value} SATs
             </div>
           )}
         </div>

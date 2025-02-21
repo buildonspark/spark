@@ -80,35 +80,35 @@ export function getLocalSigningOperators(): Record<string, SigningOperator> {
       id: 0,
       identifier:
         "0000000000000000000000000000000000000000000000000000000000000001",
-      address: "localhost:8535",
+      address: "http://localhost:8535",
       identityPublicKey: pubkeyBytesArray[0],
     },
     "0000000000000000000000000000000000000000000000000000000000000002": {
       id: 1,
       identifier:
         "0000000000000000000000000000000000000000000000000000000000000002",
-      address: "localhost:8536",
+      address: "http://localhost:8536",
       identityPublicKey: pubkeyBytesArray[1],
     },
     "0000000000000000000000000000000000000000000000000000000000000003": {
       id: 2,
       identifier:
         "0000000000000000000000000000000000000000000000000000000000000003",
-      address: "localhost:8537",
+      address: "http://localhost:8537",
       identityPublicKey: pubkeyBytesArray[2],
     },
     "0000000000000000000000000000000000000000000000000000000000000004": {
       id: 3,
       identifier:
         "0000000000000000000000000000000000000000000000000000000000000004",
-      address: "localhost:8538",
+      address: "http://localhost:8538",
       identityPublicKey: pubkeyBytesArray[3],
     },
     "0000000000000000000000000000000000000000000000000000000000000005": {
       id: 4,
       identifier:
         "0000000000000000000000000000000000000000000000000000000000000005",
-      address: "localhost:8539",
+      address: "http://localhost:8539",
       identityPublicKey: pubkeyBytesArray[4],
     },
   };

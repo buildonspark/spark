@@ -1,5 +1,5 @@
 import { DefaultSparkSigner, SparkSigner } from "../signer/signer.js";
-import { REGTEST_WALLET_CONFIG } from "../tests/test-util.js";
+import { LOCAL_WALLET_CONFIG } from "../tests/test-util.js";
 import { Network } from "../utils/network.js";
 
 export type SigningOperator = {
@@ -24,7 +24,7 @@ export class WalletConfigService {
   constructor(network: Network, signer?: SparkSigner) {
     // TODO: differentiate between mainnet, regtest, and local
     // local config is LOCAL_WALLET_CONFIG - uses local signing operators
-    this.config = REGTEST_WALLET_CONFIG;
+    this.config = LOCAL_WALLET_CONFIG;
     this.signer = signer || new DefaultSparkSigner();
   }
 

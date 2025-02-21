@@ -50,6 +50,13 @@ export default class SspClient {
 
   constructor(identityPublicKey: string) {
     this.identityPublicKey = identityPublicKey;
+
+    // Make CompressionStream undefined to prevent compression
+    if (typeof window !== "undefined") {
+      // @ts-ignore
+      delete window.CompressionStream;
+    }
+
     this.requester = new Requester(
       new NodeKeyCache(DefaultCrypto),
       "graphql/spark/rc",
@@ -254,9 +261,10 @@ class SparkAuthProvider implements AuthProvider {
   async addAuthHeaders(
     headers: Record<string, string>
   ): Promise<Record<string, string>> {
+    console.log(headers);
     const _headers = {
-      ...headers,
       "Spark-Identity-Public-Key": this.publicKey,
+      "Content-Type": "application/json",
     };
     return Promise.resolve(_headers);
   }

@@ -1,11 +1,12 @@
 import { useCallback, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import AmountInput from "../../components/AmountInput";
 import CardForm from "../../components/CardForm";
 import Networks, { Network } from "../../components/Networks";
-import ArrowLeft from "../../icons/ArrowLeft";
-import AmountInput from "../../components/AmountInput";
-import { useNavigate } from "react-router-dom";
 import ReceiveDetails from "../../components/ReceiveDetails";
+import ArrowLeft from "../../icons/ArrowLeft";
 import CloseIcon from "../../icons/CloseIcon";
+import { useWallet } from "../../store/wallet";
 
 enum ReceiveStep {
   NetworkSelect = "NetworkSelect",
@@ -22,21 +23,28 @@ export default function Receive() {
   const [currentStep, setCurrentStep] = useState<ReceiveStep>(
     ReceiveStep.NetworkSelect
   );
+  const [invoice, setInvoice] = useState<string | null>(null);
   const navigate = useNavigate();
 
-  const onSubmit = useCallback(() => {
+  const { btcPrice } = useWallet();
+
+  const { createLightningInvoice } = useWallet();
+  const onSubmit = useCallback(async () => {
     switch (currentStep) {
       case ReceiveStep.NetworkSelect:
         setCurrentStep(ReceiveStep.InputAmount);
         break;
       case ReceiveStep.InputAmount:
+        const satsToSend = Math.floor(Number(fiatAmount) / btcPrice.value);
+        const invoice = await createLightningInvoice(satsToSend, "test memo");
+        setInvoice(invoice);
         setCurrentStep(ReceiveStep.ShareQuote);
         break;
       case ReceiveStep.ShareQuote:
         setQrCodeModalVisible(true);
         break;
     }
-  }, [currentStep, navigate, setCurrentStep]);
+  }, [currentStep, setCurrentStep]);
 
   const onLogoLeftClick = useCallback(() => {
     switch (currentStep) {
@@ -108,6 +116,7 @@ export default function Receive() {
             }}
             qrCodeModalVisible={qrCodeModalVisible}
             setQrCodeModalVisible={setQrCodeModalVisible}
+            invoice={invoice}
           />
         )}
       </CardForm>

@@ -5,23 +5,23 @@ import CopyIcon from "../../icons/CopyIcon";
 
 import { useNavigate } from "react-router-dom";
 import WalletIcon from "../../icons/WalletIcon";
-import useWalletStore from "../../store/wallet";
+import { useWallet } from "../../store/wallet";
 
 export default function WalletSuccess() {
   const [mnemonic, setMnemonic] = useState<string | null>(null);
 
   const navigate = useNavigate();
-  const { wallet } = useWalletStore();
+  const { generatorMnemonic, initWallet } = useWallet();
 
   useEffect(() => {
-    wallet.generateMnemonic().then((mnemonic) => {
+    generatorMnemonic().then((mnemonic) => {
       setMnemonic(mnemonic);
     });
-  }, [wallet]);
+  }, [generatorMnemonic]);
 
   const onContinue = async () => {
     if (!mnemonic) return;
-    await wallet.createSparkWallet(mnemonic);
+    await initWallet(mnemonic);
     navigate("/wallet");
   };
 
