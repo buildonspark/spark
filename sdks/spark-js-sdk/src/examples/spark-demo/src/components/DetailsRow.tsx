@@ -48,11 +48,17 @@ export default function DetailsRow({
           </div>
         )}
         <div
-          className={`flex flex-col justify-between ${!logoLeft ? "pl-4" : ""}`}
+          className={`flex flex-col justify-between max-w-[290px] ${
+            !logoLeft ? "ml-4" : ""
+          }`}
         >
-          {title && <div className="text-[12px] text-[#f9f9f9]">{title}</div>}
+          {title && (
+            <div className="text-[12px] text-[#f9f9f9] overflow-hidden text-ellipsis whitespace-nowrap ">
+              {title}
+            </div>
+          )}
           {subtitle && (
-            <div className="text-[12px] text-[#f9f9f9] opacity-50">
+            <div className="text-[12px] text-[#f9f9f9] opacity-50 overflow-hidden text-ellipsis whitespace-nowrap ">
               {subtitle}
             </div>
           )}

@@ -5,6 +5,8 @@ import StyledContainer from "./StyledContainer";
 export enum Network {
   NONE = "none",
   LIGHTNING = "lightning",
+  BITCOIN = "bitcoin",
+  SPARK = "spark",
 }
 
 interface NetworksProps {
