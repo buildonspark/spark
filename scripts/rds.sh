@@ -43,7 +43,7 @@ HOST="${HOSTPORT%:*}"
 
 PGPASSWORD="$(aws rds generate-db-auth-token --hostname "$HOST" --port "$PORT" --username "$PGUSER")"
 POD="postgres-$USER-$(date +%s)"
-OVERRIDES='{"spec": {"nodeSelector": {"lightspark.com/nodegroup": "public"}}}'
+OVERRIDES='{"spec": {"nodeSelector": {"lightspark.com/nodegroup": "private"}}}'
 
 echo "Starting pod $POD"
 kubectl --context "$CONTEXT" run -it "$POD" --restart=Never --image=postgres:17 --env "PGPASSWORD=$PGPASSWORD" --overrides "$OVERRIDES" -- psql -U $PGUSER -h $HOST -p $PORT $PGDATABASE
