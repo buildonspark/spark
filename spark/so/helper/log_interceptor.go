@@ -16,7 +16,11 @@ func LogInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServer
 	requestID := uuid.New().String()
 	logger := slog.Default().With("request_id", requestID, "method", info.FullMethod)
 	ctx = context.WithValue(ctx, LoggerKey, logger)
-	return handler(ctx, req)
+	response, err := handler(ctx, req)
+	if err != nil {
+		logger.Error("error in grpc", "error", err)
+	}
+	return response, err
 }
 
 func GetLoggerFromContext(ctx context.Context) *slog.Logger {
