@@ -7,7 +7,7 @@ const (
 	DKGKeyThreshold = 10000
 
 	// DKGKeyCount is the number of keyshares to generate during the DKG.
-	DKGKeyCount = 500
+	DKGKeyCount = 1000
 
 	// InitialTimeLock is the initial time lock for the deposit.
 	InitialTimeLock = 2000
