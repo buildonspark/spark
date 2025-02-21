@@ -296,7 +296,9 @@ export class SparkWallet {
   }
 
   async optimizeLeaves() {
-    await this.requestLeavesSwap({ leaves: this.leaves });
+    if (this.leaves.length > 0) {
+      await this.requestLeavesSwap({ leaves: this.leaves });
+    }
   }
 
   async requestLeavesSwap({
