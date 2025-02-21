@@ -20,5 +20,9 @@ func LogInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServer
 }
 
 func GetLoggerFromContext(ctx context.Context) *slog.Logger {
-	return ctx.Value(LoggerKey).(*slog.Logger)
+	logger, ok := ctx.Value(LoggerKey).(*slog.Logger)
+	if !ok {
+		return slog.Default()
+	}
+	return logger
 }
