@@ -13,6 +13,7 @@
     "@types/react": "^18.0.0",
     "@types/react-dom": "^18.0.0",
     "autoprefixer": "^10.4.20",
+    "clsx": "^2.1.1",
     "postcss": "^8.5.2",
     "qrcode.react": "^4.2.0",
     "react": "^19.0.0",

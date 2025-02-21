@@ -5,6 +5,8 @@ interface ButtonsProps {
   kind?: "primary" | "secondary";
   icon?: React.ReactNode;
   text?: string;
+  disabled?: boolean;
+  opaque?: boolean;
   onClick?: () => void;
 }
 
@@ -14,9 +16,17 @@ export default function Button({
   icon,
   text,
   onClick,
+  disabled,
+  opaque,
 }: ButtonsProps) {
   return (
-    <StyledButton direction={direction} kind={kind} onClick={onClick}>
+    <StyledButton
+      direction={direction}
+      kind={kind}
+      onClick={onClick}
+      disabled={disabled}
+      opaque={opaque}
+    >
       {icon}
       {text}
     </StyledButton>
@@ -26,6 +36,8 @@ export default function Button({
 const StyledButton = styled.button<{
   direction: "horizontal" | "vertical";
   kind: "primary" | "secondary";
+  disabled?: boolean;
+  opaque?: boolean;
 }>`
   width: 100%;
   display: flex;
@@ -57,12 +69,12 @@ const StyledButton = styled.button<{
     0px 4px 20px 0px rgba(0, 0, 0, 0.5), 0px 1px 4px 0px rgba(0, 0, 0, 0.25),
     0px 8px 16px 0px rgba(255, 255, 255, 0.1) inset;
 
-  ${({ kind }) =>
+  ${({ kind, opaque }) =>
     kind === "primary"
       ? css`
           background: linear-gradient(
             180deg,
-            #0e3154 0%,
+            #0e3154 ${opaque ? "100%" : "0%"},
             rgba(14, 49, 84, 0.5) 100%
           );
         `
@@ -78,12 +90,30 @@ const StyledButton = styled.button<{
       gap: 0px;
       line-height: 24px;
     `}
-  &:hover {
-    background: linear-gradient(180deg, #0e3154 0%, rgba(14, 49, 84, 0.5) 100%);
-  }
 
-  &:active {
-    background: linear-gradient(180deg, #0a253b 0%, rgba(10, 37, 59, 0.5) 100%);
-    transform: scale(0.98);
-  }
+  ${({ opaque }) =>
+    opaque &&
+    css`
+      &:hover {
+        background: linear-gradient(
+          180deg,
+          #0e3154 ${opaque ? "100%" : "0%"},
+          rgba(14, 49, 84, 0.5) 100%
+        );
+      }
+    `}
+  
+
+  ${({ disabled, opaque }) =>
+    !disabled &&
+    css`
+      &:active {
+        background: linear-gradient(
+          180deg,
+          #0a253b ${opaque ? "100%" : "0%"},
+          rgba(10, 37, 59, 0.5) 100%
+        );
+        transform: scale(0.98);
+      }
+    `}
 `;
