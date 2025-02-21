@@ -1,6 +1,6 @@
+import { IssuerSparkWallet } from "../../services/spark/wallet.js";
+import { Network } from "@buildonspark/spark-js-sdk/utils";
 import { secp256k1 } from "@noble/curves/secp256k1";
-import { SparkWallet } from "../../spark-sdk.js";
-import { Network } from "../../utils/network.js";
 
 describe("token integration test", () => {
   // Skip all tests if running in GitHub Actions
@@ -9,19 +9,22 @@ describe("token integration test", () => {
   it("should issue a single token", async () => {
     const tokenAmount: bigint = 1000n;
 
-    const wallet = new SparkWallet(Network.REGTEST);
+    const wallet = new IssuerSparkWallet(Network.REGTEST);
     const mnemonic = await wallet.generateMnemonic();
     await wallet.createSparkWallet(mnemonic);
 
-    const tokenPublicKey = await wallet.getSigner().generatePublicKey();
+    const tokenPublicKey = await wallet.getSigner().generatePublicKey()
 
-    await wallet.mintTokens(tokenPublicKey, tokenAmount);
-  });
+    await wallet.mintTokens(
+      tokenPublicKey,
+      tokenAmount
+    );
+  }, 100000);
 
   it("should issue a single token and transfer it", async () => {
     const tokenAmount: bigint = 1000n;
 
-    const wallet = new SparkWallet(Network.REGTEST);
+    const wallet = new IssuerSparkWallet(Network.REGTEST);
     const mnemonic = await wallet.generateMnemonic();
     await wallet.createSparkWallet(mnemonic);
 
@@ -40,7 +43,7 @@ describe("token integration test", () => {
 
   it("should consolidate token leaves", async () => {
     const tokenAmount: bigint = 1000n;
-    const wallet = new SparkWallet(Network.REGTEST);
+    const wallet = new IssuerSparkWallet(Network.REGTEST);
     const mnemonic = await wallet.generateMnemonic();
     await wallet.createSparkWallet(mnemonic);
 
@@ -52,34 +55,34 @@ describe("token integration test", () => {
 
   it("should freeze tokens", async () => {
     const tokenAmount: bigint = 1000n;
-    const issuerWallet = new SparkWallet(Network.REGTEST);
+    const issuerWallet = new IssuerSparkWallet(Network.REGTEST);
     const issuerMnemonic = await issuerWallet.generateMnemonic();
     await issuerWallet.createSparkWallet(issuerMnemonic);
 
     const tokenPublicKey = await issuerWallet.getSigner().generatePublicKey();
     await issuerWallet.mintTokens(tokenPublicKey, tokenAmount);
 
-    const userWallet = new SparkWallet(Network.REGTEST);
+    const userWallet = new IssuerSparkWallet(Network.REGTEST);
     const userMnemonic = await issuerWallet.generateMnemonic();
     await userWallet.createSparkWallet(userMnemonic);
 
-    const userWalletPublicKey = await userWallet
-      .getSigner()
-      .getIdentityPublicKey();
-    issuerWallet.transferTokens(
-      tokenPublicKey,
-      tokenAmount,
-      userWalletPublicKey
+    const userWalletPublicKey = await userWallet.getSigner().getIdentityPublicKey();
+    issuerWallet.transferTokens(tokenPublicKey, tokenAmount, userWalletPublicKey);
+
+    await issuerWallet.freezeTokens(
+      userWalletPublicKey,
+      tokenPublicKey
     );
 
-    await issuerWallet.freezeTokens(userWalletPublicKey, tokenPublicKey);
-
-    await issuerWallet.unfreezeTokens(userWalletPublicKey, tokenPublicKey);
+    await issuerWallet.unfreezeTokens(
+      userWalletPublicKey,
+      tokenPublicKey
+    );
   });
 
   it("should burn tokens", async () => {
     const tokenAmount: bigint = 1000n;
-    const issuerWallet = new SparkWallet(Network.REGTEST);
+    const issuerWallet = new IssuerSparkWallet(Network.REGTEST);
     const issuerMnemonic = await issuerWallet.generateMnemonic();
     await issuerWallet.createSparkWallet(issuerMnemonic);
 

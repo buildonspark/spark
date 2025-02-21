@@ -3,16 +3,7 @@ import {
   LeafWithPreviousTransactionData,
   TokenTransaction,
 } from "../proto/spark.js";
-import { SparkSigner } from "../signer/signer.js";
 import { hashTokenTransaction } from "./token-hashing.js";
-
-export async function collectOwnedTokenLeafPublicKeys(signer: SparkSigner) {
-  let owner_public_keys = await signer.getTrackedPublicKeys();
-  let identity_public_key = await signer.getIdentityPublicKey();
-
-  owner_public_keys.push(identity_public_key);
-  return owner_public_keys;
-}
 
 export function getTokenLeavesSum(
   leaves: LeafWithPreviousTransactionData[]

@@ -1,12 +1,12 @@
-import { SparkWallet } from "spark-js-sdk/src/spark-sdk";
-import { LRCWallet } from "@wcbd/yuv-js-sdk/src/index";
+import { LRCWallet } from "lrc20-js-sdk";
+import { IssuerSparkWallet } from "./services/spark/wallet.js";
 
 export interface IssuerWallet {
   bitcoinWallet: LRCWallet | undefined,
-  sparkWallet: SparkWallet | undefined,
+  sparkWallet: IssuerSparkWallet | undefined,
 }
 
-export const isSparkEnabled = (wallet: IssuerWallet): wallet is IssuerWallet & { sparkWallet: SparkWallet } => {
+export const isSparkEnabled = (wallet: IssuerWallet): wallet is IssuerWallet & { sparkWallet: IssuerSparkWallet } => {
   return wallet.sparkWallet !== undefined;
 };
 

@@ -23,6 +23,6 @@
          implicit any for generated files or move them out of the type checks */
     "noImplicitAny": false
   },
-  "include": ["src"],
+  "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "**/examples/*"]
 }

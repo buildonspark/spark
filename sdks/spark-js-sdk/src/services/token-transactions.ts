@@ -18,17 +18,14 @@ import {
 import { recoverPrivateKeyFromKeyshares } from "../utils/token-keyshares.js";
 import {
   calculateAvailableTokenAmount,
-  collectOwnedTokenLeafPublicKeys,
   getTokenLeavesSum,
 } from "../utils/token-transactions.js";
 import { WalletConfigService } from "./config.js";
 import { ConnectionManager } from "./connection.js";
 
-const BURN_ADDRESS = new Uint8Array(32).fill(0x02);
-
 export class TokenTransactionService {
-  private readonly config: WalletConfigService;
-  private readonly connectionManager: ConnectionManager;
+  protected readonly config: WalletConfigService;
+  protected readonly connectionManager: ConnectionManager;
 
   constructor(
     config: WalletConfigService,
@@ -38,30 +35,7 @@ export class TokenTransactionService {
     this.connectionManager = connectionManager;
   }
 
-  createMintTokenTransaction(
-    tokenPublicKey: Uint8Array,
-    tokenAmount: bigint
-  ): TokenTransaction {
-    return {
-      tokenInput: {
-        $case: "mintInput",
-        mintInput: {
-          issuerPublicKey: tokenPublicKey,
-          issuerProvidedTimestamp: Date.now(),
-        },
-      },
-      outputLeaves: [
-        {
-          ownerPublicKey: tokenPublicKey,
-          tokenPublicKey: tokenPublicKey,
-          tokenAmount: numberToBytesBE(tokenAmount, 16),
-        },
-      ],
-      sparkOperatorIdentityPublicKeys: this.collectOperatorIdentityPublicKeys(),
-    };
-  }
-
-  createTransferTokenTransaction(
+  public constructTransferTokenTransaction(
     leavesToSpend: LeafWithPreviousTransactionData[],
     recipientPublicKey: Uint8Array,
     tokenPublicKey: Uint8Array,
@@ -88,7 +62,7 @@ export class TokenTransactionService {
     };
   }
 
-  collectOperatorIdentityPublicKeys(): Uint8Array[] {
+  public collectOperatorIdentityPublicKeys(): Uint8Array[] {
     const operatorKeys: Uint8Array[] = [];
     for (const [_, operator] of Object.entries(
       this.config.getConfig().signingOperators
@@ -99,9 +73,8 @@ export class TokenTransactionService {
     return operatorKeys;
   }
 
-  async broadcastTokenTransaction(
+  public async broadcastTokenTransaction(
     tokenTransaction: TokenTransaction,
-    // Not necessary if it's a mint transaction
     leafToSpendSigningPublicKeys?: Uint8Array[],
     leafToSpendRevocationPublicKeys?: Uint8Array[]
   ): Promise<TokenTransaction> {
@@ -323,7 +296,7 @@ export class TokenTransactionService {
     return startResponse.finalTokenTransaction!;
   }
 
-  async finalizeTokenTransaction(
+  public async finalizeTokenTransaction(
     finalTokenTransaction: TokenTransaction,
     leafToSpendRevocationKeys: Uint8Array[],
     threshold: number
@@ -356,7 +329,7 @@ export class TokenTransactionService {
     return finalTokenTransaction;
   }
 
-  async constructConsolidateTokenTransaction(
+  public async constructConsolidateTokenTransaction(
     tokenPublicKey: Uint8Array,
     selectedLeaves: LeafWithPreviousTransactionData[]
   ): Promise<TokenTransaction> {
@@ -385,72 +358,7 @@ export class TokenTransactionService {
     return transferTokenTransaction;
   }
 
-  async constructBurnTokenTransaction(
-    tokenPublicKey: Uint8Array,
-    tokenAmount: bigint,
-    selectedLeaves: LeafWithPreviousTransactionData[]
-  ) {
-    const tokenAmountSum = getTokenLeavesSum(selectedLeaves);
-
-    let transferTokenTransaction: TokenTransaction;
-
-    if (tokenAmount > tokenAmountSum) {
-      throw new Error("Not enough tokens to burn");
-    } else if (tokenAmount === tokenAmountSum) {
-      transferTokenTransaction = {
-        tokenInput: {
-          $case: "transferInput",
-          transferInput: {
-            leavesToSpend: selectedLeaves.map((leaf) => ({
-              prevTokenTransactionHash: leaf.previousTransactionHash,
-              prevTokenTransactionLeafVout: leaf.previousTransactionVout,
-            })),
-          },
-        },
-        outputLeaves: [
-          {
-            ownerPublicKey: await this.config.signer.generatePublicKey(),
-            tokenPublicKey: tokenPublicKey,
-            tokenAmount: numberToBytesBE(tokenAmountSum, 16),
-          },
-        ],
-        sparkOperatorIdentityPublicKeys:
-          this.collectOperatorIdentityPublicKeys(),
-      };
-    } else {
-      const tokenDifferenceToSendBack = tokenAmountSum - tokenAmount;
-
-      transferTokenTransaction = {
-        tokenInput: {
-          $case: "transferInput",
-          transferInput: {
-            leavesToSpend: selectedLeaves.map((leaf) => ({
-              prevTokenTransactionHash: leaf.previousTransactionHash,
-              prevTokenTransactionLeafVout: leaf.previousTransactionVout,
-            })),
-          },
-        },
-        outputLeaves: [
-          {
-            ownerPublicKey: BURN_ADDRESS,
-            tokenPublicKey: tokenPublicKey,
-            tokenAmount: numberToBytesBE(tokenAmount, 16),
-          },
-          {
-            ownerPublicKey: await this.config.signer.generatePublicKey(),
-            tokenPublicKey: tokenPublicKey,
-            tokenAmount: numberToBytesBE(tokenDifferenceToSendBack, 16),
-          },
-        ],
-        sparkOperatorIdentityPublicKeys:
-          this.collectOperatorIdentityPublicKeys(),
-      };
-    }
-
-    return transferTokenTransaction;
-  }
-
-  async fetchOwnedTokenLeaves(
+  public async fetchOwnedTokenLeaves(
     ownerPublicKeys: Uint8Array[],
     tokenPublicKeys: Uint8Array[]
   ): Promise<LeafWithPreviousTransactionData[]> {
@@ -466,25 +374,23 @@ export class TokenTransactionService {
     return result.leavesWithPreviousTransactionData;
   }
 
-  async syncTokenLeaves(
+  public async syncTokenLeaves(
     tokenLeaves: Map<string, LeafWithPreviousTransactionData[]>
   ) {
     const unsortedTokenLeaves = await this.fetchOwnedTokenLeaves(
-      await collectOwnedTokenLeafPublicKeys(this.config.signer),
+      await this.config.signer.getTrackedPublicKeys(),
       []
     );
 
     unsortedTokenLeaves.forEach((leaf) => {
       const tokenKey = bytesToHex(leaf.leaf!.tokenPublicKey!);
-      const prevTxHashHex = bytesToHex(leaf.previousTransactionHash!);
       const index = leaf.previousTransactionVout!;
 
-      const existingLeaves = tokenLeaves.get(tokenKey) || [];
       tokenLeaves.set(tokenKey, [{ ...leaf, previousTransactionVout: index }]);
     });
   }
 
-  selectTokenLeaves(
+  public selectTokenLeaves(
     tokenLeaves: LeafWithPreviousTransactionData[],
     tokenPublicKey: Uint8Array,
     tokenAmount: bigint
@@ -541,7 +447,7 @@ export class TokenTransactionService {
    * @param tokenLeaves Current token leaves in memory for this tokenPublicKey
    * @param finalizedTokenTransaction Finalized transaction from either mint or transfer
    */
-  updateTokenLeavesFromFinalizedTransaction(
+  public updateTokenLeavesFromFinalizedTransaction(
     tokenLeaves: LeafWithPreviousTransactionData[],
     finalizedTokenTransaction: TokenTransaction
   ) {

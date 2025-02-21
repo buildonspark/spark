@@ -1,7 +1,7 @@
 {
-  "name": "@lightsparkdev/issuer-sdk",
+  "name": "@buildonspark/issuer-js-sdk",
   "version": "1.0.0",
-  "description": "Lightspark Issuer SDK for token issuance",
+  "description": "Spark Issuer SDK for token issuance",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -22,23 +22,45 @@
     "format": "prettier src --check",
     "format:fix": "prettier src --write",
     "test": "jest --passWithNoTests",
-    "pack-test": "npm pack --dry-run"
+    "pack-test": "npm pack --dry-run",
+    "test-cmd": "NODE_OPTIONS=--experimental-vm-modules jest --no-cache --runInBand --bail",
+    "test:e2e": "pnpm test-cmd src/tests/e2e/*.test.ts",
+    "generate:proto": "PATH=\"$PATH:./node_modules/.bin\" protoc --ts_proto_out=./src/proto --ts_proto_opt=outputServices=nice-grpc,useExactTypes=false,outputServices=generic-definitions,oneof=unions,importSuffix=.js --proto_path=../../protos spark.proto mock.proto spark_authn.proto"
   },
   "dependencies": {
+    "@bufbuild/protobuf": "^2.2.3",
+    "@buildonspark/spark-js-sdk": "file:../spark-js-sdk",
+    "@grpc/grpc-js": "^1.12.5",
+    "@scure/btc-signer": "^1.5.0",
     "@noble/curves": "^1.8.0",
-    "@wcbd/yuv-js-sdk": "file:../../../lrc20/js-sdk",
+    "@noble/secp256k1": "^2.2.3",
+    "lrc20-js-sdk": "file:../../../lrc20/js-sdk",
     "bitcoinjs-lib": "^6.1.5",
     "crypto-js": "^4.2.0",
-    "spark-js-sdk": "file:../spark-js-sdk"
+    "grpc-tools": "^1.12.4",
+    "nice-grpc": "^2.1.10",
+    "nice-grpc-common": "^2.0.2",
+    "nice-grpc-web": "^3.3.5",
+    "protobufjs": "^7.4.0",
+    "ts-proto": "^2.6.1"
   },
   "devDependencies": {
+    "@types/node": "^22.13.2",
     "@types/jest": "^29.5.14",
-    "@types/node": "latest",
     "jest": "^29.7.0",
     "prettier": "^3.4.2",
     "ts-jest": "^29.1.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.7.3"
+  },
+  "browser": {
+    "assert": false,
+    "crypto": false,
+    "fs": false,
+    "fs/promises": false,
+    "nice-grpc": "nice-grpc-web",
+    "path": false,
+    "url": false
   },
   "packageManager": "pnpm@9.15.4+sha512.b2dc20e2fc72b3e18848459b37359a32064663e5627a51e4c74b2c29dd8e8e0491483c3abb40789cfd578bf362fb6ba8261b05f0387d76792ed6e23ea3b1b6a0"
 }

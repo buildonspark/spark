@@ -1,44 +1,11 @@
-import { SparkWallet } from "spark-js-sdk/src/spark-sdk";
-import { LRCWallet } from "@wcbd/yuv-js-sdk/src/index";
-import { IssuerWallet, isSparkEnabled } from "./wallet";
-import { mintTokensOnSpark } from "./services/spark/mint";
+import { hexToBytes } from "@noble/curves/abstract/utils";
+import { LRCWallet } from "lrc20-js-sdk";
+import { IssuerWallet, isSparkEnabled } from "./wallet.js";
 import { networks } from "bitcoinjs-lib";
-import { NetworkType } from "@wcbd/yuv-js-sdk/src/network";
-import { Network } from "spark-js-sdk/src/utils/network";
-import { announceToken } from "./services/spark/create";
-
-export interface CreateTokenInput {
-  wallet: LRCWallet,
-  tokenName: string;
-  tokenTicker: string;
-  maxSupply: bigint;
-  decimals: number;
-  feeRate: number;
-  isFreezeable: boolean;
-  tokenLogo?: string;
-  network: string;
-}
-
-export interface MintTokenInput {
-  wallet: IssuerWallet,
-  tokenPublicKey: string;
-  amountToMint: bigint;
-  destinationAddress: string;
-  network: string;
-}
-
-export interface TransferTokenInput {
-  tokenPublicKey: string;
-  amountToTransfer: bigint;
-  transferDestinationAddress: string;
-  network: string;
-}
-
-export interface FreezeTokenInput {
-  tokenPublicKey: string;
-  freezeAddress: string;
-  network: string;
-}
+import { NetworkType } from "lrc20-js-sdk";
+import { Network } from "@buildonspark/spark-js-sdk/utils";
+import { IssuerSparkWallet } from "./services/spark/wallet.js";
+import { announceToken } from "./services/create.js";
 
 export function createLRCWallet(privateKeyHex: string): LRCWallet {
   let lrcWallet = new LRCWallet(
@@ -50,17 +17,17 @@ export function createLRCWallet(privateKeyHex: string): LRCWallet {
   return lrcWallet;
 }
 
-export function createSparkWallet(): SparkWallet {
-  let sparkWallet = new SparkWallet(Network.REGTEST);
-  const mnemonic = sparkWallet.generateMnemonic();
-  sparkWallet.createSparkWallet(mnemonic);
+export async function createSparkWallet(): Promise<IssuerSparkWallet> {
+  let sparkWallet = new IssuerSparkWallet(Network.REGTEST);
+  const mnemonic = await sparkWallet.generateMnemonic();
+  await sparkWallet.createSparkWallet(mnemonic);
 
   return sparkWallet;
 }
 
-export function createIssuerWallet(privateKeyHex: string): IssuerWallet {
+export async function createIssuerWallet(privateKeyHex: string): Promise<IssuerWallet> {
   let lrcWallet = createLRCWallet(privateKeyHex);
-  let sparkWallet = createSparkWallet();
+  let sparkWallet = await createSparkWallet();
 
   return {
     bitcoinWallet: lrcWallet,
@@ -72,33 +39,39 @@ export function createIssuerWallet(privateKeyHex: string): IssuerWallet {
  * Creates a new token with the specified parameters
  * returns the transaction ID of the announcement transaction
  */
-export async function createToken({
-  wallet,
-  tokenName,
-  tokenTicker,
-  maxSupply,
-  decimals,
-  feeRate,
-  isFreezeable
-}: CreateTokenInput): Promise<string> {
+export async function createTokens(
+  wallet: LRCWallet,
+  tokenName: string,
+  tokenTicker: string,
+  maxSupply: bigint,
+  decimals: number,
+  isFreezeable: boolean
+) {
   return await announceToken(wallet, tokenName, tokenTicker, maxSupply, decimals, isFreezeable)
 }
 
 /**
  * Mints new tokens to the specified address
  */
-export async function mintTokens({
-  wallet,
-  tokenPublicKey,
-  amountToMint,
-  destinationAddress,
-}: MintTokenInput) {
+export async function mintTokens(
+  wallet: IssuerWallet,
+  tokenPublicKey: string,
+  amountToMint: bigint,
+  destinationAddress: string,
+) {
   if (isSparkEnabled(wallet)) {
-    await mintTokensOnSpark(
-      wallet.sparkWallet,
-      tokenPublicKey,
+    const tokenPublicKeyBytes = hexToBytes(tokenPublicKey);
+
+    await wallet.sparkWallet.mintTokens(
+      tokenPublicKeyBytes,
       amountToMint,
     );
+
+    await wallet.sparkWallet.transferTokens(
+      tokenPublicKeyBytes,
+      amountToMint,
+      hexToBytes(destinationAddress)
+    )
   }
   // do a transaction to the destination address
 }
@@ -106,27 +79,44 @@ export async function mintTokens({
 /**
  * Transfers tokens to the specified address
  */
-export async function transferToken({
-  tokenPublicKey,
-  amountToTransfer,
-  transferDestinationAddress,
-}: TransferTokenInput): Promise<any> {
-  throw new Error("Not implemented");
+export async function transferTokens(
+  wallet: IssuerWallet,
+  tokenPublicKey: string,
+  amountToTransfer: bigint,
+  transferDestinationAddress: string,
+) {
+  if (isSparkEnabled(wallet)) {
+    const tokenPublicKeyBytes = hexToBytes(tokenPublicKey);
+
+    await wallet.sparkWallet.transferTokens(
+      tokenPublicKeyBytes,
+      amountToTransfer,
+      hexToBytes(transferDestinationAddress)
+    )
+  }
 }
 
 /**
  * Freezes tokens at the specified address
  */
-export async function freezeToken({
-  tokenPublicKey,
-  freezeAddress,
-}: FreezeTokenInput): Promise<any> {
-  throw new Error("Not implemented");
+export async function freezeTokens(
+  wallet: IssuerWallet,
+  tokenPublicKey: string,
+  freezeAddress: string,
+) {
+  if (isSparkEnabled(wallet)) {
+    const tokenPublicKeyBytes = hexToBytes(tokenPublicKey);
+
+    await wallet.sparkWallet.freezeTokens(
+      tokenPublicKeyBytes,
+      hexToBytes(freezeAddress)
+    )
+  }
 }
 
 /**
  * Gets token information by ID
  */
-export async function getToken(tokenId: string): Promise<any> {
+export async function getTokenInformation(tokenId: string): Promise<any> {
   throw new Error("Not implemented");
 }

@@ -1,8 +1,8 @@
 {
-  "name": "spark-js-sdk",
+  "name": "@buildonspark/spark-js-sdk",
   "version": "1.0.0",
-  "main": "dist/spark-sdk.js",
-  "types": "dist/spark-sdk.d.ts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "files": [
     "dist"
   ],
@@ -23,10 +23,10 @@
       "require": "./dist/utils/index.js",
       "import": "./dist/utils/index.js"
     },
-    "./token-transaction-service": {
-      "types": "./dist/services/token-transaction-service.d.ts",
-      "require": "./dist/services/token-transaction-service.js",
-      "import": "./dist/services/token-transaction-service.js"
+    "./token-transactions": {
+      "types": "./dist/services/token-transactions.d.ts",
+      "require": "./dist/services/token-transactions.js",
+      "import": "./dist/services/token-transactions.js"
     },
     "./wasm": {
       "types": "./dist/wasm/wasm.d.ts",
@@ -37,6 +37,16 @@
       "types": "./dist/types/index.d.ts",
       "require": "./dist/types/index.js",
       "import": "./dist/types/index.js"
+    },
+    "./config": {
+      "types": "./dist/services/config.d.ts",
+      "require": "./dist/services/config.js",
+      "import": "./dist/services/config.js"
+    },
+    "./connection": {
+      "types": "./dist/services/connection.d.ts",
+      "require": "./dist/services/connection.js",
+      "import": "./dist/services/connection.js"
     }
   },
   "scripts": {
@@ -64,6 +74,7 @@
   "license": "ISC",
   "description": "",
   "devDependencies": {
+    "@babel/core": "^7.24.0",
     "@babel/plugin-syntax-import-meta": "^7.10.4",
     "@babel/preset-env": "^7.26.0",
     "@types/babel__preset-env": "^7",

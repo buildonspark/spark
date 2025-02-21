@@ -1,4 +1,4 @@
-import { ChromaAnnouncement, Chroma, YuvTransaction, YuvTransactionDto, LRCWallet } from "@wcbd/yuv-js-sdk/src/index";
+import { TokenPubkeyAnnouncement, TokenPubkey, Lrc20Transaction, Lrc20TransactionDto, LRCWallet } from "lrc20-js-sdk";
 import { randomBytes } from "crypto";
 
 export async function announceToken(
@@ -12,8 +12,8 @@ export async function announceToken(
   ): Promise<string> {
     const tokenId = randomBytes(32);
   
-    const announcement = new ChromaAnnouncement(
-      new Chroma(tokenId),
+    const announcement = new TokenPubkeyAnnouncement(
+      new TokenPubkey(tokenId),
       tokenName,
       tokenTicker,
       decimals,
@@ -21,7 +21,7 @@ export async function announceToken(
       isFreezeable,
     );
   
-    const tx: YuvTransaction = await lrcWallet.prepareAnnouncement(announcement, feeRateSatsPerVb);
-    const txDto = YuvTransactionDto.fromYuvTransaction(tx);
+    const tx: Lrc20Transaction = await lrcWallet.prepareAnnouncement(announcement, feeRateSatsPerVb);
+    const txDto = Lrc20TransactionDto.fromLrc20Transaction(tx);
     return await lrcWallet.broadcast(txDto);
   }

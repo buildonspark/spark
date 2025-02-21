@@ -29,9 +29,9 @@ import { ConnectionManager } from "./services/connection.js";
 import { CoopExitService } from "./services/coop-exit.js";
 import { DepositService } from "./services/deposit.js";
 import { LightningService } from "./services/lightning.js";
-import { TokenFreezeService } from "./services/tokens-freeze.js";
-import { TokenTransactionService } from "./services/tokens-transaction.js";
 import { LeafKeyTweak, TransferService } from "./services/transfer.js";
+import { TokenTransactionService } from "./services/token-transactions.js";
+
 import {
   DepositAddressTree,
   TreeCreationService,
@@ -91,9 +91,9 @@ type DepositParams = {
 };
 
 export class SparkWallet {
-  private config: WalletConfigService;
+  protected config: WalletConfigService;
 
-  private connectionManager: ConnectionManager;
+  protected connectionManager: ConnectionManager;
 
   private depositService: DepositService;
   private transferService: TransferService;
@@ -101,13 +101,12 @@ export class SparkWallet {
   private lightningService: LightningService;
   private coopExitService: CoopExitService;
   private tokenTransactionService: TokenTransactionService;
-  private tokenFreezeService: TokenFreezeService;
 
   private sspClient: SspClient | null = null;
   private wasmModule: InitOutput | null = null;
 
-  private leaves: TreeNode[] = [];
-  private tokenLeaves: Map<string, LeafWithPreviousTransactionData[]> =
+  protected leaves: TreeNode[] = [];
+  protected tokenLeaves: Map<string, LeafWithPreviousTransactionData[]> =
     new Map();
 
   constructor(network: Network, signer?: SparkSigner) {
@@ -128,10 +127,6 @@ export class SparkWallet {
       this.connectionManager
     );
     this.tokenTransactionService = new TokenTransactionService(
-      this.config,
-      this.connectionManager
-    );
-    this.tokenFreezeService = new TokenFreezeService(
       this.config,
       this.connectionManager
     );
@@ -202,14 +197,14 @@ export class SparkWallet {
   }
 
   // TODO: Update to use config based on options
-  async createSparkWallet(mnemonic: string): Promise<string> {
+  public async createSparkWallet(mnemonic: string): Promise<string> {
     const identityPublicKey =
       await this.config.signer.createSparkWalletFromMnemonic(mnemonic);
     await this.initializeWallet(identityPublicKey);
     return identityPublicKey;
   }
 
-  async createSparkWalletFromSeed(seed: Uint8Array | string): Promise<string> {
+  public async createSparkWalletFromSeed(seed: Uint8Array | string): Promise<string> {
     const identityPublicKey =
       await this.config.signer.createSparkWalletFromSeed(seed);
     await this.initializeWallet(identityPublicKey);
@@ -846,28 +841,6 @@ export class SparkWallet {
     );
   }
 
-  async mintTokens(tokenPublicKey: Uint8Array, tokenAmount: bigint) {
-    const tokenTransaction =
-      this.tokenTransactionService.createMintTokenTransaction(
-        tokenPublicKey,
-        tokenAmount
-      );
-
-    const finalizedTokenTransaction =
-      await this.tokenTransactionService.broadcastTokenTransaction(
-        tokenTransaction
-      );
-
-    const tokenPubKeyHex = bytesToHex(tokenPublicKey);
-    if (!this.tokenLeaves.has(tokenPubKeyHex)) {
-      this.tokenLeaves.set(tokenPubKeyHex, []);
-    }
-    this.tokenTransactionService.updateTokenLeavesFromFinalizedTransaction(
-      this.tokenLeaves.get(tokenPubKeyHex)!,
-      finalizedTokenTransaction
-    );
-  }
-
   async transferTokens(
     tokenPublicKey: Uint8Array,
     tokenAmount: bigint,
@@ -893,7 +866,7 @@ export class SparkWallet {
     }
 
     const tokenTransaction =
-      this.tokenTransactionService.createTransferTokenTransaction(
+      this.tokenTransactionService.constructTransferTokenTransaction(
         selectedLeaves,
         recipientPublicKey,
         tokenPublicKey,
@@ -914,64 +887,6 @@ export class SparkWallet {
     this.tokenTransactionService.updateTokenLeavesFromFinalizedTransaction(
       this.tokenLeaves.get(tokenPubKeyHex)!,
       finalizedTokenTransaction
-    );
-  }
-
-  async burnTokens(
-    tokenPublicKey: Uint8Array,
-    tokenAmount: bigint,
-    selectedLeaves?: LeafWithPreviousTransactionData[]
-  ) {
-    if (!this.tokenLeaves.has(bytesToHex(tokenPublicKey))) {
-      throw new Error("No token leaves with the given tokenPublicKey");
-    }
-
-    if (selectedLeaves) {
-      if (
-        !checkIfSelectedLeavesAreAvailable(
-          selectedLeaves,
-          this.tokenLeaves,
-          tokenPublicKey
-        )
-      ) {
-        throw new Error("One or more selected leaves are not available");
-      }
-    } else {
-      selectedLeaves = this.selectTokenLeaves(tokenPublicKey, tokenAmount);
-    }
-
-    const partialTokenTransaction =
-      await this.tokenTransactionService.constructBurnTokenTransaction(
-        tokenPublicKey,
-        tokenAmount,
-        selectedLeaves
-      );
-
-    const finalizedTokenTransaction =
-      await this.tokenTransactionService.broadcastTokenTransaction(
-        partialTokenTransaction,
-        selectedLeaves.map((leaf) => leaf.leaf!.ownerPublicKey),
-        selectedLeaves.map((leaf) => leaf.leaf!.revocationPublicKey!)
-      );
-
-    const tokenPubKeyHex = bytesToHex(tokenPublicKey);
-    if (!this.tokenLeaves.has(tokenPubKeyHex)) {
-      this.tokenLeaves.set(tokenPubKeyHex, []);
-    }
-    this.tokenTransactionService.updateTokenLeavesFromFinalizedTransaction(
-      this.tokenLeaves.get(tokenPubKeyHex)!,
-      finalizedTokenTransaction
-    );
-  }
-
-  async freezeTokens(ownerPublicKey: Uint8Array, tokenPublicKey: Uint8Array) {
-    await this.tokenFreezeService!.freezeTokens(ownerPublicKey, tokenPublicKey);
-  }
-
-  async unfreezeTokens(ownerPublicKey: Uint8Array, tokenPublicKey: Uint8Array) {
-    await this.tokenFreezeService!.unfreezeTokens(
-      ownerPublicKey,
-      tokenPublicKey
     );
   }
 

@@ -1,9 +1,8 @@
+import { WalletConfigService } from "@buildonspark/spark-js-sdk/config";
+import { ConnectionManager } from "@buildonspark/spark-js-sdk/connection";
 import { FreezeTokensPayload, FreezeTokensResponse } from "../proto/spark.js";
+import { validateResponses } from "@buildonspark/spark-js-sdk/utils";
 import { hashFreezeTokensPayload } from "../utils/token-hashing.js";
-import { WalletConfigService } from "./config.js";
-import { ConnectionManager } from "./connection.js";
-
-import { validateResponses } from "../utils/response-validation.js";
 
 export class TokenFreezeService {
   private readonly config: WalletConfigService;
@@ -11,7 +10,7 @@ export class TokenFreezeService {
 
   constructor(
     config: WalletConfigService,
-    connectionManager: ConnectionManager
+    connectionManager: ConnectionManager,
   ) {
     this.config = config;
     this.connectionManager = connectionManager;
@@ -19,14 +18,14 @@ export class TokenFreezeService {
 
   async freezeTokens(
     ownerPublicKey: Uint8Array,
-    tokenPublicKey: Uint8Array
+    tokenPublicKey: Uint8Array,
   ): Promise<FreezeTokensResponse> {
     return this.freezeOperation(ownerPublicKey, tokenPublicKey, false);
   }
 
   async unfreezeTokens(
     ownerPublicKey: Uint8Array,
-    tokenPublicKey: Uint8Array
+    tokenPublicKey: Uint8Array,
   ): Promise<FreezeTokensResponse> {
     return this.freezeOperation(ownerPublicKey, tokenPublicKey, true);
   }
@@ -34,7 +33,7 @@ export class TokenFreezeService {
   private async freezeOperation(
     ownerPublicKey: Uint8Array,
     tokenPublicKey: Uint8Array,
-    shouldUnfreeze: boolean
+    shouldUnfreeze: boolean,
   ): Promise<FreezeTokensResponse> {
     const signingOperators = this.config.getConfig().signingOperators;
     const issuerProvidedTimestamp = Date.now();
@@ -59,7 +58,7 @@ export class TokenFreezeService {
         const issuerSignature =
           await this.config.signer.signMessageWithPublicKey(
             hashedPayload,
-            tokenPublicKey
+            tokenPublicKey,
           );
 
         const response = await internalSparkClient.freeze_tokens({
@@ -70,7 +69,7 @@ export class TokenFreezeService {
           identifier,
           response,
         };
-      })
+      }),
     );
 
     const successfulResponses = validateResponses(freezeResponses);
