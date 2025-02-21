@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
-	"log"
 
 	"github.com/btcsuite/btcd/wire"
 	"github.com/google/uuid"
@@ -38,6 +37,7 @@ func NewDepositHandler(config *so.Config, db *ent.Client) *DepositHandler {
 // GenerateDepositAddress generates a deposit address for the given public key.
 func (o *DepositHandler) GenerateDepositAddress(ctx context.Context, config *so.Config, req *pb.GenerateDepositAddressRequest) (*pb.GenerateDepositAddressResponse, error) {
 	network, err := common.NetworkFromProtoNetwork(req.Network)
+	logger := helper.GetLoggerFromContext(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -47,14 +47,14 @@ func (o *DepositHandler) GenerateDepositAddress(ctx context.Context, config *so.
 	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, o.config, req.IdentityPublicKey); err != nil {
 		return nil, err
 	}
-	log.Printf("Generating deposit address for public key: %s", hex.EncodeToString(req.SigningPublicKey))
+	logger.Info("Generating deposit address for public key", "public_key", hex.EncodeToString(req.SigningPublicKey))
 	keyshares, err := ent.GetUnusedSigningKeyshares(ctx, o.db, config, 1)
 	if err != nil {
 		return nil, err
 	}
 
 	if len(keyshares) == 0 {
-		log.Printf("No keyshares available")
+		logger.Error("No keyshares available")
 		return nil, fmt.Errorf("no keyshares available")
 	}
 
@@ -64,7 +64,7 @@ func (o *DepositHandler) GenerateDepositAddress(ctx context.Context, config *so.
 	_, err = helper.ExecuteTaskWithAllOperators(ctx, config, &selection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
 		conn, err := common.NewGRPCConnectionWithCert(operator.Address, operator.CertPath)
 		if err != nil {
-			log.Printf("Failed to connect to operator: %v", err)
+			logger.Error("Failed to connect to operator", "error", err)
 			return nil, err
 		}
 		defer conn.Close()
@@ -74,18 +74,18 @@ func (o *DepositHandler) GenerateDepositAddress(ctx context.Context, config *so.
 		return nil, err
 	})
 	if err != nil {
-		log.Printf("Failed to execute task with all operators: %v", err)
+		logger.Error("Failed to execute task with all operators", "error", err)
 		return nil, err
 	}
 
 	combinedPublicKey, err := common.AddPublicKeys(keyshare.PublicKey, req.SigningPublicKey)
 	if err != nil {
-		log.Printf("Failed to add public keys: %v", err)
+		logger.Error("Failed to add public keys", "error", err)
 		return nil, err
 	}
 	depositAddress, err := common.P2TRAddressFromPublicKey(combinedPublicKey, network)
 	if err != nil {
-		log.Printf("Failed to generate deposit address: %v", err)
+		logger.Error("Failed to generate deposit address", "error", err)
 		return nil, err
 	}
 
@@ -97,16 +97,13 @@ func (o *DepositHandler) GenerateDepositAddress(ctx context.Context, config *so.
 		// Confirmation height is not set since nothing has been confirmed yet.
 		Save(ctx)
 	if err != nil {
-		log.Printf("Failed to link keyshare to deposit address: %v", err)
+		logger.Error("Failed to link keyshare to deposit address", "error", err)
 		return nil, err
 	}
 
 	response, err := helper.ExecuteTaskWithAllOperators(ctx, config, &selection, func(ctx context.Context, operator *so.SigningOperator) ([]byte, error) {
-		log.Println("operator.Address", operator.Address)
-		log.Println("operator.CertPath", operator.CertPath)
 		conn, err := common.NewGRPCConnectionWithCert(operator.Address, operator.CertPath)
 		if err != nil {
-			log.Printf("Failed to connect to operator: %v", err)
 			return nil, err
 		}
 		defer conn.Close()
@@ -119,25 +116,25 @@ func (o *DepositHandler) GenerateDepositAddress(ctx context.Context, config *so.
 			OwnerSigningPublicKey:  req.SigningPublicKey,
 		})
 		if err != nil {
-			log.Printf("Failed to mark keyshare for deposit address: %v", err)
 			return nil, err
 		}
 		return response.AddressSignature, nil
 	})
 	if err != nil {
-		log.Printf("Failed to execute task with all operators: %v", err)
+		logger.Error("Failed to execute task with all operators", "error", err)
 		return nil, err
 	}
 
-	log.Printf("Generated deposit address: %s", *depositAddress)
 	verifyingKeyBytes, err := common.AddPublicKeys(keyshare.PublicKey, req.SigningPublicKey)
 	if err != nil {
+		logger.Error("Failed to add public keys", "error", err)
 		return nil, err
 	}
 
 	msg := common.ProofOfPossessionMessageHashForDepositAddress(req.IdentityPublicKey, keyshare.PublicKey, []byte(*depositAddress))
 	proofOfPossessionSignature, err := helper.GenerateProofOfPossessionSignatures(ctx, config, [][]byte{msg}, []*ent.SigningKeyshare{keyshare})
 	if err != nil {
+		logger.Error("Failed to generate proof of possession signature", "error", err)
 		return nil, err
 	}
 	return &pb.GenerateDepositAddressResponse{
@@ -157,18 +154,21 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, o.config, req.IdentityPublicKey); err != nil {
 		return nil, err
 	}
-
+	logger := helper.GetLoggerFromContext(ctx)
 	// Get the on chain tx
 	onChainTx, err := common.TxFromRawTxBytes(req.OnChainUtxo.RawTx)
 	if err != nil {
+		logger.Error("Failed to get on chain tx", "error", err)
 		return nil, err
 	}
 	if len(onChainTx.TxOut) <= int(req.OnChainUtxo.Vout) {
+		logger.Error("Utxo index out of bounds", "vout", req.OnChainUtxo.Vout, "tx_out_len", len(onChainTx.TxOut))
 		return nil, fmt.Errorf("utxo index out of bounds")
 	}
 
 	// Verify that the on chain utxo is paid to the registered deposit address
 	if len(onChainTx.TxOut) <= int(req.OnChainUtxo.Vout) {
+		logger.Error("Utxo index out of bounds", "vout", req.OnChainUtxo.Vout, "tx_out_len", len(onChainTx.TxOut))
 		return nil, fmt.Errorf("utxo index out of bounds")
 	}
 	onChainOutput := onChainTx.TxOut[req.OnChainUtxo.Vout]
@@ -220,7 +220,7 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 		return nil, err
 	}
 	if len(rootTx.TxOut) <= 0 {
-		return nil, fmt.Errorf("vout out of bounds")
+		return nil, fmt.Errorf("vout out of bounds, root tx has no outputs")
 	}
 	refundTxSigHash, err := common.SigHashFromTx(refundTx, 0, rootTx.TxOut[0])
 	if err != nil {
