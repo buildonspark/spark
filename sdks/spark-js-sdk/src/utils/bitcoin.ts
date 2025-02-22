@@ -85,7 +85,9 @@ export function getP2TRAddressFromPkScript(
 
 export function getTxFromRawTxHex(rawTxHex: string): btc.Transaction {
   const txBytes = hexToBytes(rawTxHex);
-  const tx = btc.Transaction.fromRaw(txBytes);
+  const tx = btc.Transaction.fromRaw(txBytes, {
+    allowUnknownOutputs: true,
+  });
 
   if (!tx) {
     throw new Error("Failed to parse transaction");
@@ -94,7 +96,9 @@ export function getTxFromRawTxHex(rawTxHex: string): btc.Transaction {
 }
 
 export function getTxFromRawTxBytes(rawTxBytes: Uint8Array): btc.Transaction {
-  const tx = btc.Transaction.fromRaw(rawTxBytes);
+  const tx = btc.Transaction.fromRaw(rawTxBytes, {
+    allowUnknownOutputs: true,
+  });
   if (!tx) {
     throw new Error("Failed to parse transaction");
   }
