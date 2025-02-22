@@ -12,6 +12,9 @@ import (
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
 )
 
+// MaxOutputLeaves defines the maximum number of input or output leaves allowed in a token transaction.
+const MaxInputOrOutputTokenTransactionLeaves = 100
+
 // hashTokenTransaction generates a SHA256 hash of the TokenTransaction by:
 // 1. Taking SHA256 of each field individually
 // 2. Concatenating all field hashes in order
@@ -197,6 +200,9 @@ func ValidatePartialTokenTransaction(
 	if len(tokenTransaction.OutputLeaves) == 0 {
 		return fmt.Errorf("leaves to create cannot be empty")
 	}
+	if len(tokenTransaction.OutputLeaves) > MaxInputOrOutputTokenTransactionLeaves {
+		return fmt.Errorf("too many output leaves, maximum is %d", MaxInputOrOutputTokenTransactionLeaves)
+	}
 
 	// Validate all output leaves have the same token public key
 	expectedTokenPubKey := tokenTransaction.OutputLeaves[0].GetTokenPublicKey()
@@ -221,6 +227,10 @@ func ValidatePartialTokenTransaction(
 
 	// Validation for mint transactions.
 	if mintInput := tokenTransaction.GetMintInput(); mintInput != nil {
+		if mintInput.GetIssuerProvidedTimestamp() == 0 {
+			return fmt.Errorf("issuer provided timestamp cannot be 0")
+		}
+
 		// Validate that the token public key on all created leaves
 		// matches the issuer public key.
 		if !bytes.Equal(mintInput.GetIssuerPublicKey(), expectedTokenPubKey) {
@@ -241,6 +251,13 @@ func ValidatePartialTokenTransaction(
 
 	// Validation for transfer transactions
 	if transferSource := tokenTransaction.GetTransferInput(); transferSource != nil {
+		if len(transferSource.GetLeavesToSpend()) == 0 {
+			return fmt.Errorf("leaves to spend cannot be empty")
+		}
+		if len(tokenTransaction.GetTransferInput().LeavesToSpend) > MaxInputOrOutputTokenTransactionLeaves {
+			return fmt.Errorf("too many leaves to spend, maximum is %d", MaxInputOrOutputTokenTransactionLeaves)
+		}
+
 		// Validate there is the correct number of signatures for leaves to spend.
 		if len(tokenTransactionSignatures.GetOwnerSignatures()) != len(transferSource.GetLeavesToSpend()) {
 			return fmt.Errorf("number of signatures must match number of leaves to spend")

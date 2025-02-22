@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
@@ -16,6 +17,7 @@ import (
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/authz"
 	"github.com/lightsparkdev/spark-go/so/ent"
+	"github.com/lightsparkdev/spark-go/so/ent/schema"
 	"github.com/lightsparkdev/spark-go/so/helper"
 	"github.com/lightsparkdev/spark-go/so/utils"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -176,16 +178,32 @@ func (o TokenTransactionHandler) SignTokenTransaction(
 		return nil, err
 	}
 
-	// Check for frozen input leaves.
+	var invalidLeaves []string
+	for i, leaf := range tokenTransactionReceipt.Edges.CreatedLeaf {
+		if leaf.Status != schema.TokenLeafStatusCreatedStarted {
+			invalidLeaves = append(invalidLeaves, fmt.Sprintf("output leaf %d has invalid status %s, expected CREATED_STARTED", i, leaf.Status))
+		}
+	}
+	if len(invalidLeaves) > 0 {
+		return nil, fmt.Errorf("found invalid output leaves: %s", strings.Join(invalidLeaves, "; "))
+	}
 	if len(tokenTransactionReceipt.Edges.SpentLeaf) > 0 {
 		ownerPublicKeys := make([][]byte, len(tokenTransactionReceipt.Edges.SpentLeaf))
 		// Assumes that all token public keys are the same as the first leaf. This is asserted when validating
 		// in the StartTokenTransaction() step.
 		tokenPublicKey := tokenTransactionReceipt.Edges.SpentLeaf[0].TokenPublicKey
+		var invalidLeaves []string
 		for i, leaf := range tokenTransactionReceipt.Edges.SpentLeaf {
 			ownerPublicKeys[i] = leaf.OwnerPublicKey
-		}
 
+			if leaf.Status != schema.TokenLeafStatusSpentStarted {
+				invalidLeaves = append(invalidLeaves, fmt.Sprintf("input leaf %x has invalid status %s, expected SPENT_STARTED",
+					leaf.ID, leaf.Status))
+			}
+		}
+		if len(invalidLeaves) > 0 {
+			return nil, fmt.Errorf("found invalid input leaves: %s", strings.Join(invalidLeaves, "; "))
+		}
 		// Bulk query all input leaf ids to ensure none of them are frozen.
 		activeFreezes, err := ent.GetActiveFreezes(ctx, ownerPublicKeys, tokenPublicKey)
 		if err != nil {

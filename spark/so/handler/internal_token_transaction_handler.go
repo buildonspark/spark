@@ -67,6 +67,9 @@ func (h *InternalTokenTransactionHandler) StartTokenTransactionInternal(ctx cont
 		return nil, fmt.Errorf("invalid final token transaction: %w", err)
 	}
 	if req.FinalTokenTransaction.GetMintInput() != nil {
+		if req.FinalTokenTransaction.GetMintInput().GetIssuerProvidedTimestamp() == 0 {
+			return nil, errors.New("issuer provided timestamp must be set for mint transaction")
+		}
 		err = ValidateMintSignature(req.FinalTokenTransaction, req.TokenTransactionSignatures)
 		if err != nil {
 			return nil, fmt.Errorf("invalid token transaction: %w", err)
