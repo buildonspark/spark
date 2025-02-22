@@ -2,17 +2,21 @@ import { useEffect } from "react";
 import styled from "styled-components";
 import DeleteIcon from "../icons/DeleteIcon";
 import ToggleIcon from "../icons/ToggleIcon";
+import { PrimaryCurrency } from "../pages/wallet/Wallet";
+
 import { useWallet } from "../store/wallet";
 export default function AmountInput({
   fiatAmount,
   setFiatAmount,
+  primaryCurrency,
   togglePrimaryCurrency,
 }: {
   fiatAmount: string;
   setFiatAmount: React.Dispatch<React.SetStateAction<string>>;
+  primaryCurrency: PrimaryCurrency;
   togglePrimaryCurrency: () => void;
 }) {
-  const { btcPrice } = useWallet();
+  const { satsUsdPrice } = useWallet();
 
   const handleKey = (key: string) => {
     setFiatAmount((prev) => {
@@ -55,26 +59,32 @@ export default function AmountInput({
   const hasDecimal = fiatAmount.includes(".");
   return (
     <div className="flex flex-col gap-2 items-center w-full">
-      <div className="my-10">
-        <div className="flex  font-decimal justify-center">
-          <div className="text-[24px] self-center">$</div>
-          <div className="text-[60px] leading-[60px]">
-            {Number(intAmount).toLocaleString()}
+      <div className="my-10 ">
+        {primaryCurrency === PrimaryCurrency.USD ? (
+          <div className="flex  font-decimal justify-center">
+            <div className="text-[24px] self-center">$</div>
+            <div className="text-[60px] leading-[60px]">
+              {Number(intAmount).toLocaleString()}
+            </div>
+            {(decAmount || hasDecimal) && (
+              <div className="text-[24px] self-end">.{decAmount}</div>
+            )}
           </div>
-          {(decAmount || hasDecimal) && (
-            <div className="text-[24px] self-end">.{decAmount}</div>
-          )}
-        </div>
-        <div
-          className="font-decimal text-[13px] opacity-40 text-center flex items-center gap-2 rounded-full bg-[#F9F9F9] bg-opacity-20 px-2 py-1"
-          onClick={togglePrimaryCurrency}
-        >
-          {btcPrice
-            ? `${Math.floor(Number(fiatAmount) / btcPrice.value).toFixed(
-                0
-              )} SATs`
-            : "0 SATs"}
-          <ToggleIcon />
+        ) : (
+          <div></div>
+        )}
+        <div className="flex items-center gap-2 justify-center">
+          <div
+            className="font-decimal text-[13px] opacity-40 text-center flex inline-flex items-center gap-2 rounded-full bg-[#F9F9F9] active:bg-opacity-40 bg-opacity-20 px-2 py-1"
+            onClick={togglePrimaryCurrency}
+          >
+            {satsUsdPrice
+              ? `${Math.floor(Number(fiatAmount) / satsUsdPrice.value).toFixed(
+                  0
+                )} SATs`
+              : "0 SATs"}
+            <ToggleIcon />
+          </div>
         </div>
       </div>
       <div className="flex flex-col gap-2 font-decimal text-[22px]">

@@ -1,5 +1,5 @@
 import { QRCodeSVG } from "qrcode.react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import styled from "styled-components";
 import ClockIcon from "../icons/ClockIcon";
 import CloseIcon from "../icons/CloseIcon";
@@ -8,75 +8,35 @@ import PencilIcon from "../icons/PencilIcon";
 import WalletIcon from "../icons/WalletIcon";
 import DetailsRow from "./DetailsRow";
 
-type ActiveButton = "bitcoin" | "lightning" | "uma";
-
-const ACTIVE_BUTTON_STYLES =
-  "rounded-[6px] border border-[rgba(249,249,249,0.12)] bg-[#0E3154] shadow-[0px_4px_6px_0px_rgba(0,0,0,0.14),0px_0px_0px_1px_#0C0D0F,0px_9px_14px_-5px_rgba(255,255,255,0.10)_inset]";
-
-const INACTIVE_BUTTON_STYLES =
-  "rounded-[6px] border border-transparent bg-transparent shadow-none";
-
 export default function ReceiveDetails({
   qrCodeModalVisible,
   setQrCodeModalVisible,
   onEditAmount,
   receiveFiatAmount,
-  invoice,
+  lightningInvoice,
 }: {
   qrCodeModalVisible: boolean;
   setQrCodeModalVisible: React.Dispatch<React.SetStateAction<boolean>>;
   onEditAmount: () => void;
   receiveFiatAmount: string;
-  invoice: string | null;
+  lightningInvoice?: string | null;
 }) {
-  const [active, setActive] = useState<ActiveButton>("lightning");
-  const url = invoice;
-
   const ref = useRef<HTMLDivElement>(null);
 
-  const handleClickOutside = (event: MouseEvent) => {
-    if (ref.current && !ref.current.contains(event.target as Node)) {
-      setQrCodeModalVisible(false);
-    }
-  };
-
   useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (ref.current && !ref.current.contains(event.target as Node)) {
+        setQrCodeModalVisible(false);
+      }
+    };
     document.addEventListener("mousedown", handleClickOutside);
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, []);
+  }, [setQrCodeModalVisible]);
 
   return (
     <div className="flex flex-col items-center mt-4 w-full">
-      {/* <div className="flex py-4 w-full">
-        <div
-          className={`flex-1 text-[12px] min-h-5 p-3 text-center rounded-md ${
-            active === "bitcoin" ? ACTIVE_BUTTON_STYLES : INACTIVE_BUTTON_STYLES
-          }`}
-          onClick={() => setActive("bitcoin")}
-        >
-          Bitcoin
-        </div>
-        <div
-          className={`flex-1 text-[12px] min-h-5 p-3 text-center rounded-md ${
-            active === "lightning"
-              ? ACTIVE_BUTTON_STYLES
-              : INACTIVE_BUTTON_STYLES
-          }`}
-          onClick={() => setActive("lightning")}
-        >
-          Lightning
-        </div>
-        <div
-          className={`flex-1 text-[12px] min-h-5 p-3 text-center rounded-md ${
-            active === "uma" ? ACTIVE_BUTTON_STYLES : INACTIVE_BUTTON_STYLES
-          }`}
-          onClick={() => setActive("uma")}
-        >
-          Uma
-        </div>
-      </div> */}
       <ReceiveQRCard>
         <div className="w-full h-full rounded-2xl flex flex-col items-right justify-between">
           <WalletIcon className="m-6 w-4" />
@@ -93,7 +53,7 @@ export default function ReceiveDetails({
             }}
           >
             <QRCodeSVG
-              value={url}
+              value={lightningInvoice || ""}
               size={130}
               // fix the logo
               // imageSettings={{
@@ -116,10 +76,10 @@ export default function ReceiveDetails({
         <DetailsRow
           borderTop={true}
           title="Lightning Invoice"
-          subtitle={url}
+          subtitle={lightningInvoice}
           logoRight={<CopyIcon />}
           onClick={() => {
-            navigator.clipboard.writeText(url);
+            navigator.clipboard.writeText(lightningInvoice || "");
             alert("Copied to clipboard");
           }}
         />
@@ -142,18 +102,18 @@ export default function ReceiveDetails({
               <CloseIcon strokeWidth="2" />
             </div>
             <div className="relative bg-white p-4 rounded-lg">
-              <QRCodeSVG value={url} size={300} />
+              <QRCodeSVG value={lightningInvoice || ""} size={300} />
             </div>
             <div
               className="flex flex-row items-center h-[40px] mt-4 bg-[#10151C] rounded-lg justify-center max-w-[340px]"
               onClick={(e) => {
                 e.stopPropagation();
-                navigator.clipboard.writeText(url);
+                navigator.clipboard.writeText(lightningInvoice || "");
                 alert("Copied to clipboard");
               }}
             >
               <div className="text-[12px] text-[#f9f9f9] opacity-50 m-6 overflow-hidden text-ellipsis whitespace-nowrap">
-                {url}
+                {lightningInvoice}
               </div>
               <div className="mr-5">
                 <CopyIcon stroke="#7C7C7C" strokeWidth="1.5" />

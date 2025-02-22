@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useWallet } from "../store/wallet";
 
 export default function ConfirmQuote({
   sendFiatAmount,
@@ -9,26 +9,8 @@ export default function ConfirmQuote({
   sendAddress: string;
   sendAddressNetwork: string;
 }) {
-  const [btcPrice, setBtcPrice] = useState<number | null>(null);
-  useEffect(() => {
-    const fetchBtcPrice = async () => {
-      try {
-        const response = await fetch(
-          "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd"
-        );
-        const data = await response.json();
-        setBtcPrice(data.bitcoin.usd);
-      } catch (error) {
-        console.error("Error fetching BTC price:", error);
-      }
-    };
-
-    fetchBtcPrice();
-    // Refresh price every minute
-    const interval = setInterval(fetchBtcPrice, 60000);
-
-    return () => clearInterval(interval);
-  }, []);
+  console.log("sendFiatAmount", sendFiatAmount);
+  const { satsUsdPrice } = useWallet();
   const intAmount = sendFiatAmount.split(".")[0];
   const decAmount = sendFiatAmount.split(".")[1];
   const hasDecimal = sendFiatAmount.includes(".");
@@ -45,9 +27,9 @@ export default function ConfirmQuote({
           )}
         </div>
         <div className="font-decimal text-[13px] opacity-40 text-center">
-          {btcPrice
-            ? `${(Number(sendFiatAmount) / btcPrice).toFixed(8)} BTC`
-            : "0.00000000 BTC"}
+          {satsUsdPrice
+            ? `${(Number(sendFiatAmount) / satsUsdPrice.value).toFixed(0)} SATs`
+            : "000000000 SATs"}
         </div>
       </div>
 
@@ -66,19 +48,19 @@ export default function ConfirmQuote({
       <div className="flex flex-row justify-between text-sm/6 mb-5">
         <div className="flex-[0_0_30%]">Your fees</div>
         <div className="flex-[0_0_50%] text-right overflow-hidden text-ellipsis whitespace-nowrap">
-          $0.00 BTC
+          $0.00
         </div>
       </div>
       <div className="flex flex-row font-bold justify-between text-sm/6 mb-5">
         <div className="flex-[0_0_30%]">They'll get</div>
         <div className="flex-[0_0_50%] text-right overflow-hidden text-ellipsis whitespace-nowrap">
-          {sendFiatAmount}
+          {"$" + Number(sendFiatAmount).toLocaleString()}
         </div>
       </div>
       <div className="flex flex-row font-bold justify-between text-sm/6 mb-5">
         <div className="flex-[0_0_30%]">You'll pay</div>
         <div className="flex-[0_0_50%] text-right overflow-hidden text-ellipsis whitespace-nowrap">
-          {sendFiatAmount}
+          {"$" + Number(sendFiatAmount).toLocaleString()}
         </div>
       </div>
     </div>

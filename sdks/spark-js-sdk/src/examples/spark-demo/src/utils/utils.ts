@@ -33,3 +33,6 @@ export const roundDown = (num: number, decimals: number): number => {
   const factor = 10 ** decimals;
   return Math.floor(num * factor) / factor;
 };
+
+export const getFontSizeForCard = (input: string) =>
+  Math.max(60 - (input.length - 1) * 5, 30);

@@ -1,7 +1,7 @@
 type DetailsRowProps = {
   borderTop?: boolean;
   title?: string;
-  subtitle?: string;
+  subtitle?: string | null;
   logoRight?: React.ReactNode;
   logoLeft?: React.ReactNode;
   logoLeftCircleBackground?: boolean;

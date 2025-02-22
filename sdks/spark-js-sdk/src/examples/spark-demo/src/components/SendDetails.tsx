@@ -1,12 +1,13 @@
 import ArrowUpRight from "../icons/ArrowUpRight";
-
+import { useWallet } from "../store/wallet";
 export default function SendDetails({
-  sendAmount,
+  sendFiatAmount,
   sendAddress,
 }: {
-  sendAmount: string;
+  sendFiatAmount: string;
   sendAddress: string;
 }) {
+  const { satsUsdPrice } = useWallet();
   return (
     <div className="flex flex-col items-center justify-center">
       <div className="flex h-32 w-32 mt-24 mb-4 bg-[#0E3154] items-center rounded-full justify-center">
@@ -16,7 +17,8 @@ export default function SendDetails({
       </div>
       <div className="text-[18px] font-normal">Payment sent</div>
       <div className="text-white/50 text-[13px] mt-2">
-        ${sendAmount} ({sendAmount} BTC) sent to
+        ${sendFiatAmount} ({" "}
+        {satsUsdPrice && Number(sendFiatAmount) / satsUsdPrice} SATs sent to)
       </div>
       <div className="text-white/50 text-[13px]">
         {sendAddress.length > 14

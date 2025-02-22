@@ -7,20 +7,25 @@ import SendIcon from "../../icons/SendIcon";
 import WalletIcon from "../../icons/WalletIcon";
 import { Routes } from "../../routes";
 import { useWallet } from "../../store/wallet";
-import { roundDown } from "../../utils/utils";
+import { roundDown, getFontSizeForCard } from "../../utils/utils";
+
+export enum PrimaryCurrency {
+  USD = "USD",
+  SATS = "SATs",
+}
 
 export default function Wallet() {
   const navigate = useNavigate();
 
-  const { balance: satsBalance, btcPrice } = useWallet();
-
+  const { balance: satsBalance, satsUsdPrice } = useWallet();
+  satsBalance.value = 202020;
   console.log(satsBalance);
   let usdBalance = useMemo(() => {
-    return btcPrice
-      ? roundDown(btcPrice.value * satsBalance.value, 2).toFixed(2)
+    return satsUsdPrice
+      ? roundDown(satsUsdPrice.value * satsBalance.value, 2).toFixed(2)
       : null;
-  }, [btcPrice, satsBalance]);
-  const fontSize = Math.max(60 - (satsBalance.toString().length - 1) * 5, 30);
+  }, [satsUsdPrice, satsBalance]);
+
   return (
     <div className="mx-6">
       <div className="flex items-center justify-center gap-2">
@@ -34,7 +39,7 @@ export default function Wallet() {
               <div className="flex font-decimal">
                 <div
                   className="text-center break-words whitespace-normal max-w-[300px]"
-                  style={{ fontSize: `${fontSize}px` }}
+                  style={{ fontSize: `${getFontSizeForCard(usdBalance)}px` }}
                 >
                   {"$" +
                     Number(usdBalance.split(".")[0]).toLocaleString() +
@@ -46,7 +51,9 @@ export default function Wallet() {
               <div className="flex flex-col justify-center items-center text-center">
                 <div
                   className="leading-[60px] break-words whitespace-normal"
-                  style={{ fontSize: `${fontSize}px` }}
+                  style={{
+                    fontSize: `${getFontSizeForCard(satsBalance.toString())}px`,
+                  }}
                 >
                   {satsBalance.toLocaleString()}
                 </div>

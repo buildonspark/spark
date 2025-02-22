@@ -9,6 +9,9 @@ import SendDetails from "../../components/SendDetails";
 import ArrowLeft from "../../icons/ArrowLeft";
 import CloseIcon from "../../icons/CloseIcon";
 import { Routes } from "../../routes";
+import { PrimaryCurrency } from "../wallet/Wallet";
+import { useWallet } from "../../store/wallet";
+import { Transfer } from "../../../../../../dist/proto/spark";
 
 export enum SendStep {
   AddressInput = "AddressInput",
@@ -28,6 +31,13 @@ export default function Send() {
     Network.NONE
   );
   const [sendFiatAmount, setSendFiatAmount] = useState<string>("0");
+  const [primaryCurrency, setPrimaryCurrency] = useState<PrimaryCurrency>(
+    PrimaryCurrency.USD
+  );
+  const [sendResponse, setSendResponse] = useState<Transfer | string | null>(
+    null
+  );
+  const { satsUsdPrice, sendTransfer, payLightningInvoice } = useWallet();
 
   const logoLeft = useMemo(() => {
     switch (currentStep) {
@@ -79,7 +89,7 @@ export default function Send() {
     }
   }, [currentStep]);
 
-  const onSubmit = () => {
+  const onSubmit = useCallback(async () => {
     switch (currentStep) {
       case SendStep.AddressInput:
         setCurrentStep(SendStep.AmountInput);
@@ -88,13 +98,34 @@ export default function Send() {
         setCurrentStep(SendStep.ConfirmQuote);
         break;
       case SendStep.ConfirmQuote:
+        const satsToSend = Math.floor(
+          Number(sendFiatAmount) / satsUsdPrice.value
+        );
+        console.log("satsToSend", satsToSend);
+        if (sendAddressNetwork === Network.LIGHTNING) {
+          await payLightningInvoice(sendAddress);
+        } else if (sendAddressNetwork === Network.SPARK) {
+          await sendTransfer(satsToSend, sendAddress);
+        } else if (sendAddressNetwork === Network.BITCOIN) {
+          // TODO
+        }
         setCurrentStep(SendStep.Success);
         break;
       case SendStep.Success:
         navigate(Routes.Wallet);
         break;
     }
-  };
+  }, [
+    currentStep,
+    navigate,
+    sendAddressNetwork,
+    sendAddress,
+    sendFiatAmount,
+    satsUsdPrice,
+    sendTransfer,
+    payLightningInvoice,
+  ]);
+
   return (
     <CardForm
       topTitle={topTitle}
@@ -117,6 +148,8 @@ export default function Send() {
         <AmountInput
           fiatAmount={sendFiatAmount}
           setFiatAmount={setSendFiatAmount}
+          primaryCurrency={primaryCurrency}
+          togglePrimaryCurrency={() => {}}
         />
       )}
       {currentStep === SendStep.ConfirmQuote && (

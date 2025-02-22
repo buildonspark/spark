@@ -8,6 +8,7 @@ import ArrowLeft from "../../icons/ArrowLeft";
 import CloseIcon from "../../icons/CloseIcon";
 import { Routes } from "../../routes";
 import { useWallet } from "../../store/wallet";
+import { PrimaryCurrency } from "../wallet/Wallet";
 
 enum ReceiveStep {
   NetworkSelect = "NetworkSelect",
@@ -19,34 +20,48 @@ enum ReceiveStep {
 
 export default function Receive() {
   const [fiatAmount, setFiatAmount] = useState("0");
+  const [satsAmount, setSatsAmount] = useState("0");
+  const [primaryCurrency, setPrimaryCurrency] = useState<PrimaryCurrency>(
+    PrimaryCurrency.USD
+  );
+  const [lightningInvoice, setLightningInvoice] = useState<string | null>(null);
   const [paymentNetwork, setPaymentNetwork] = useState<Network>(Network.NONE);
   const [qrCodeModalVisible, setQrCodeModalVisible] = useState<boolean>(false);
   const [currentStep, setCurrentStep] = useState<ReceiveStep>(
     ReceiveStep.NetworkSelect
   );
-  const [invoice, setInvoice] = useState<string | null>(null);
+  const { satsUsdPrice } = useWallet();
+  const { createLightningInvoice } = useWallet();
   const navigate = useNavigate();
 
-  const { btcPrice } = useWallet();
-
-  const { createLightningInvoice } = useWallet();
   const onSubmit = useCallback(async () => {
     switch (currentStep) {
       case ReceiveStep.NetworkSelect:
         setCurrentStep(ReceiveStep.InputAmount);
         break;
       case ReceiveStep.InputAmount:
-        const satsToSend = Math.floor(Number(fiatAmount) / btcPrice.value);
-        console.log("satsToSend", satsToSend);
-        const invoice = await createLightningInvoice(satsToSend, "test memo");
-        setInvoice(invoice);
+        const satsToReceive = Math.floor(
+          Number(fiatAmount) / satsUsdPrice.value
+        );
+        console.log("satsToReceive", satsToReceive);
+        const invoice = await createLightningInvoice(
+          satsToReceive,
+          "test memo"
+        );
+        setLightningInvoice(invoice);
         setCurrentStep(ReceiveStep.ShareQuote);
         break;
       case ReceiveStep.ShareQuote:
         setQrCodeModalVisible(true);
         break;
     }
-  }, [currentStep, setCurrentStep]);
+  }, [
+    setCurrentStep,
+    createLightningInvoice,
+    fiatAmount,
+    satsUsdPrice,
+    currentStep,
+  ]);
 
   const onLogoLeftClick = useCallback(() => {
     switch (currentStep) {
@@ -60,6 +75,17 @@ export default function Receive() {
         break;
     }
   }, [currentStep, navigate, setFiatAmount, setCurrentStep]);
+
+  const togglePrimaryCurrency = useCallback(() => {
+    switch (primaryCurrency) {
+      case PrimaryCurrency.USD:
+        setPrimaryCurrency(PrimaryCurrency.SATS);
+        break;
+      case PrimaryCurrency.SATS:
+        setPrimaryCurrency(PrimaryCurrency.USD);
+        break;
+    }
+  }, [primaryCurrency, setPrimaryCurrency]);
 
   const topTitle = useMemo(() => {
     switch (currentStep) {
@@ -108,17 +134,22 @@ export default function Receive() {
           />
         )}
         {currentStep === ReceiveStep.InputAmount && (
-          <AmountInput fiatAmount={fiatAmount} setFiatAmount={setFiatAmount} />
+          <AmountInput
+            fiatAmount={fiatAmount}
+            setFiatAmount={setFiatAmount}
+            primaryCurrency={primaryCurrency}
+            togglePrimaryCurrency={togglePrimaryCurrency}
+          />
         )}
         {currentStep === ReceiveStep.ShareQuote && (
           <ReceiveDetails
             receiveFiatAmount={fiatAmount}
+            lightningInvoice={lightningInvoice}
             onEditAmount={() => {
               setCurrentStep(ReceiveStep.InputAmount);
             }}
             qrCodeModalVisible={qrCodeModalVisible}
             setQrCodeModalVisible={setQrCodeModalVisible}
-            invoice={invoice}
           />
         )}
       </CardForm>

@@ -89,8 +89,8 @@ export function useWallet() {
     enabled: isInitialized,
   });
 
-  const btcPriceQuery = useQuery({
-    queryKey: ["btcPrice"],
+  const satsUsdPriceQuery = useQuery({
+    queryKey: ["satsUsdPrice"],
     queryFn: async () => {
       const response = await fetch(
         "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd"
@@ -102,7 +102,7 @@ export function useWallet() {
       }
       const data = await response.json();
       if (!data?.bitcoin?.usd) throw new Error("Invalid response format");
-      return data.bitcoin.usd / 1e8;
+      return data.bitcoin.usd / 100_000_000;
     },
     refetchInterval: 60000,
   });
@@ -129,10 +129,10 @@ export function useWallet() {
       isLoading: balanceQuery.isLoading,
       error: balanceQuery.error,
     },
-    btcPrice: {
-      value: btcPriceQuery.data ?? 0,
-      isLoading: btcPriceQuery.isLoading,
-      error: btcPriceQuery.error,
+    satsUsdPrice: {
+      value: satsUsdPriceQuery.data ?? 0,
+      isLoading: satsUsdPriceQuery.isLoading,
+      error: satsUsdPriceQuery.error,
     },
     generatorMnemonic: state.generateMnemonic,
     initWallet: async (mnemonic: string) => {
