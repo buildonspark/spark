@@ -819,3 +819,21 @@ func (w *SingleKeyWallet) UnfreezeTokens(ctx context.Context, ownerPublicKey []b
 	}
 	return len(response.ImpactedLeafIds), totalAmount, nil
 }
+
+func (w *SingleKeyWallet) SendToPhone(ctx context.Context, amount int64, phoneNumber string) (*pb.Transfer, error) {
+	requester, err := sspapi.NewRequesterWithBaseURL(hex.EncodeToString(w.Config.IdentityPublicKey()), nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create requester: %w", err)
+	}
+	api := sspapi.NewSparkServiceAPI(requester)
+	publicKey, err := api.FetchPublicKeyByPhoneNumber(phoneNumber)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch public key: %w", err)
+	}
+	publicKeyBytes, err := hex.DecodeString(publicKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode public key: %w", err)
+	}
+
+	return w.SendTransfer(ctx, publicKeyBytes, amount)
+}

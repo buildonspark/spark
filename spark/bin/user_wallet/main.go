@@ -315,6 +315,28 @@ func main() {
 	})
 
 	cli.registry.RegisterCommand(Command{
+		Name:        "send_to_phone",
+		Description: "Send transfer to phone number",
+		Usage:       "send_to_phone <phone_number> <amount>",
+		Handler: func(args []string) error {
+			if len(args) < 2 {
+				return fmt.Errorf("please provide a phone number and amount")
+			}
+			phoneNumber := args[0]
+			amount, err := strconv.ParseUint(args[1], 10, 64)
+			if err != nil {
+				return fmt.Errorf("invalid amount: %w", err)
+			}
+			transfer, err := cli.wallet.SendToPhone(context.Background(), int64(amount), phoneNumber)
+			if err != nil {
+				return fmt.Errorf("failed to send transfer: %w", err)
+			}
+			fmt.Printf("Transfer sent: %s\n", transfer.Id)
+			return nil
+		},
+	})
+
+	cli.registry.RegisterCommand(Command{
 		Name:        "help",
 		Description: "Show available commands",
 		Usage:       "help",

@@ -191,3 +191,13 @@ mutation CompleteLeavesSwap(
   }
 }
 `
+
+const WalletUserIdentityPublicKeyMutation = `
+mutation WalletUserIdentityPublicKey($phone_number: String!) {
+  wallet_user_identity_public_key(input: {
+    phone_number: $phone_number
+  }) {
+    public_key
+  }
+}
+`
