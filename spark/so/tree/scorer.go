@@ -163,7 +163,7 @@ func (s *PolarityScorer) Score(leafID uuid.UUID, sspPublicKey []byte, userPublic
 }
 
 func (s *PolarityScorer) FetchPolarityScores(req *pb.FetchPolarityScoreRequest, stream pb.SparkTreeService_FetchPolarityScoresServer) error {
-	logger := helper.GetLoggerFromContext(stream.Context())
+	logger := helper.GetLoggerFromContext(stream.Context()).With("method", "tree.FetchPolarityScores")
 
 	targetPubKeys := make(map[string]bool)
 	for _, pubKey := range req.PublicKeys {

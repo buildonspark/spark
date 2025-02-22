@@ -1,10 +1,12 @@
 package tree
 
 import (
-	"log"
+	"context"
+	"log/slog"
 	"math/bits"
 
 	pb "github.com/lightsparkdev/spark-go/proto/spark_tree"
+	"github.com/lightsparkdev/spark-go/so/helper"
 )
 
 // chunkIntoPowersOf2 splits a list of numbers into chunks of size at most maxChunkSize,
@@ -29,7 +31,9 @@ func chunkIntoPowersOf2(nums []uint64, minChunkSize int, maxChunkSize int) [][]u
 	return chunks
 }
 
-func solveLeafDenominations(counts *pb.GetLeafDenominationCountsResponse, targetCounts map[uint64]uint64, maxAmountSats uint64, minTreeDepth uint64, maxTreeDepth uint64) (*pb.ProposeTreeDenominationsResponse, error) {
+func solveLeafDenominations(ctx context.Context, counts *pb.GetLeafDenominationCountsResponse, targetCounts map[uint64]uint64, maxAmountSats uint64, minTreeDepth uint64, maxTreeDepth uint64) (*pb.ProposeTreeDenominationsResponse, error) {
+	logger := helper.GetLoggerFromContext(ctx).With("method", "tree.solveLeafDenominations")
+
 	// Figure out how many leaves of each denomination we are missing.
 	missingCount := make([]uint64, DenominationMaxPow)
 	for i := 0; i < DenominationMaxPow; i++ {
@@ -37,7 +41,7 @@ func solveLeafDenominations(counts *pb.GetLeafDenominationCountsResponse, target
 		if counts.Counts[currentDenomination] <= targetCounts[currentDenomination] {
 			missingCount[i] = targetCounts[currentDenomination] - counts.Counts[currentDenomination]
 			if missingCount[i] > 0 {
-				log.Printf("missing count for %d: %d", currentDenomination, missingCount[i])
+				logger.Info("missing denomination", slog.Uint64("denomination", currentDenomination), slog.Uint64("missing", missingCount[i]))
 			}
 		}
 	}
@@ -89,7 +93,7 @@ func solveLeafDenominations(counts *pb.GetLeafDenominationCountsResponse, target
 				IsSmall: true,
 				Leaves:  chunk,
 			})
-			log.Printf("proposed tree: leaves: %v, min: %d, max: %d", len(chunk), chunk[0], chunk[len(chunk)-1])
+			logger.Info("proposed tree", slog.Int("leaves", len(chunk)), slog.Uint64("min", chunk[0]), slog.Uint64("max", chunk[len(chunk)-1]))
 		}
 	}
 
@@ -100,7 +104,7 @@ func solveLeafDenominations(counts *pb.GetLeafDenominationCountsResponse, target
 				IsSmall: false,
 				Leaves:  chunk,
 			})
-			log.Printf("proposed tree: leaves: %v, min: %d, max: %d", len(chunk), chunk[0], chunk[len(chunk)-1])
+			logger.Info("proposed tree", slog.Int("leaves", len(chunk)), slog.Uint64("min", chunk[0]), slog.Uint64("max", chunk[len(chunk)-1]))
 		}
 	}
 

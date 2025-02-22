@@ -1,6 +1,7 @@
 package tree
 
 import (
+	"context"
 	"log"
 	"testing"
 
@@ -267,6 +268,7 @@ func TestSolveLeafDenominations(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result, err := solveLeafDenominations(
+				context.Background(),
 				&pb.GetLeafDenominationCountsResponse{Counts: tt.currentCounts},
 				tt.targetCounts,
 				tt.maxAmountSats,
@@ -287,15 +289,16 @@ func TestSolveLeafDenominations(t *testing.T) {
 
 func TestSolveLeafDenominationsReal(t *testing.T) {
 	result, err := solveLeafDenominations(
+		context.Background(),
 		&pb.GetLeafDenominationCountsResponse{Counts: map[uint64]uint64{}},
 		DefaultDenominationsCounts,
-		10_000_000,
+		1_000_000,
 		6,
-		10,
+		12,
 	)
 
 	assert.NoError(t, err)
-	assert.Equal(t, 12, len(result.Trees))
+	assert.Equal(t, 8, len(result.Trees))
 
 	denomToCount := make(map[uint64]uint64)
 	for _, tree := range result.Trees {

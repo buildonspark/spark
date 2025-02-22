@@ -2,13 +2,15 @@ package tree
 
 import (
 	"context"
-	"log"
+	"encoding/hex"
+	"log/slog"
 
 	pb "github.com/lightsparkdev/spark-go/proto/spark_tree"
 	"github.com/lightsparkdev/spark-go/so/ent"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
 	"github.com/lightsparkdev/spark-go/so/ent/tree"
 	"github.com/lightsparkdev/spark-go/so/ent/treenode"
+	"github.com/lightsparkdev/spark-go/so/helper"
 )
 
 // DenominationMaxPow is the maximum power of 2 for leaf denominations.
@@ -55,25 +57,10 @@ var DefaultDenominationsCounts = map[uint64]uint64{
 	1_073_741_824: 0,
 }
 
-// MakeChange returns a list of denominations that sum up to the given amount.
-func MakeChange(amount uint64) []uint64 {
-	change := []uint64{}
-	remaining := amount
-	for i := DenominationMaxPow; i >= 0; i-- {
-		denom := uint64(1) << i
-		for denom <= remaining {
-			change = append(change, denom)
-			remaining -= denom
-		}
-	}
-	if remaining != 0 {
-		panic("WTF!")
-	}
-	return change
-}
-
 // GetLeafDenominationCounts returns the counts of each leaf denomination for a given owner.
 func GetLeafDenominationCounts(ctx context.Context, req *pb.GetLeafDenominationCountsRequest) (*pb.GetLeafDenominationCountsResponse, error) {
+	logger := helper.GetLoggerFromContext(ctx)
+
 	db := ent.GetDbFromContext(ctx)
 	leaves, err := db.TreeNode.Query().
 		Where(treenode.OwnerIdentityPubkey(req.OwnerIdentityPublicKey)).
@@ -91,17 +78,20 @@ func GetLeafDenominationCounts(ctx context.Context, req *pb.GetLeafDenominationC
 	for _, leaf := range leaves {
 		// Leaves must be a power of 2 and less than or equal to the maximum denomination.
 		if leaf.Value&(leaf.Value-1) != 0 && leaf.Value <= DenominationMax {
-			log.Printf("invalid leaf denomination: %d", leaf.Value)
+			logger.Info("invalid leaf denomination", slog.Uint64("denomination", leaf.Value))
 			continue
 		}
 		counts[leaf.Value]++
 	}
+	logger.Info("leaf count", slog.Int("num_leaves", len(leaves)), slog.String("public_key", hex.EncodeToString(req.OwnerIdentityPublicKey)))
 	return &pb.GetLeafDenominationCountsResponse{Counts: counts}, nil
 }
 
 // ProposeTreeDenominations is called with the amount of sats we have available, the number of users we expect to need to support, and
 // returns the list of denominations we should use for the tree. The SSP is responsible for taking this and mapping it to a structure.
 func ProposeTreeDenominations(ctx context.Context, req *pb.ProposeTreeDenominationsRequest) (*pb.ProposeTreeDenominationsResponse, error) {
+	logger := helper.GetLoggerFromContext(ctx)
+
 	// Figure out how many leaves of each denomination we are missing.
 	leafDenominationCounts, err := GetLeafDenominationCounts(ctx, &pb.GetLeafDenominationCountsRequest{
 		OwnerIdentityPublicKey: req.SspIdentityPublicKey,
@@ -110,6 +100,7 @@ func ProposeTreeDenominations(ctx context.Context, req *pb.ProposeTreeDenominati
 	if err != nil {
 		return nil, err
 	}
+	logger.Info("leaf denomination counts", slog.Any("counts", leafDenominationCounts.Counts), slog.String("public_key", hex.EncodeToString(req.SspIdentityPublicKey)))
 
 	minTreeDepth := req.MinTreeDepth
 	if minTreeDepth == 0 {
@@ -121,5 +112,5 @@ func ProposeTreeDenominations(ctx context.Context, req *pb.ProposeTreeDenominati
 		maxTreeDepth = 12
 	}
 
-	return solveLeafDenominations(leafDenominationCounts, DefaultDenominationsCounts, req.MaxAmountSats, minTreeDepth, maxTreeDepth)
+	return solveLeafDenominations(ctx, leafDenominationCounts, DefaultDenominationsCounts, req.MaxAmountSats, minTreeDepth, maxTreeDepth)
 }
