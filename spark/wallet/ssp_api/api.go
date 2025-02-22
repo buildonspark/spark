@@ -199,3 +199,55 @@ func (s *SparkServiceAPI) FetchPublicKeyByPhoneNumber(_ string) (string, error) 
 	// TODO: Remove this, this is seed 0000 in golang wallet.
 	return "034720fdda0c8000f31215ff701de45f796f74941faf8776550698d45c4d7e12a8", nil
 }
+
+func (s *SparkServiceAPI) StartReleaseSeed(_ string) error {
+	// func (s *SparkServiceAPI) StartReleaseSeed(phoneNumber string) error {
+	// variables := map[string]interface{}{
+	// 	"phone_number": phoneNumber,
+	// }
+
+	// _, err := s.Requester.ExecuteGraphqlWithContext(context.Background(), StartReleaseSeedMutation, variables)
+	// if err != nil {
+	// 	return err
+	// }
+
+	return nil
+}
+
+func (s *SparkServiceAPI) CompleteReleaseSeed(_ string, _ string) ([]byte, error) {
+	// func (s *SparkServiceAPI) CompleteReleaseSeed(phoneNumber string, code string) ([]byte, error) {
+	// variables := map[string]interface{}{
+	// 	"phone_number": phoneNumber,
+	// 	"code":         code,
+	// }
+
+	// response, err := s.Requester.ExecuteGraphqlWithContext(context.Background(), CompleteReleaseSeedMutation, variables)
+	// if err != nil {
+	// 	return nil, err
+	// }
+
+	// seed := response["complete_release_seed"].(map[string]interface{})["seed"].(string)
+	// seedBytes, err := hex.DecodeString(seed)
+	// if err != nil {
+	// 	return nil, err
+	// }
+
+	// return seedBytes, nil
+
+	return []byte{0x00, 0x00, 0x00, 0x00}, nil
+}
+
+func (s *SparkServiceAPI) NotifyReceiverTransfer(_ string, _ uint64) error {
+	// func (s *SparkServiceAPI) NotifyReceiverTransfer(phoneNumber string, amountSats uint64) error {
+	// variables := map[string]interface{}{
+	// 	"phone_number": phoneNumber,
+	// 	"amount_sats":  amountSats,
+	// }
+
+	// _, err := s.Requester.ExecuteGraphqlWithContext(context.Background(), NotifyReceiverTransferMutation, variables)
+	// if err != nil {
+	// 	return err
+	// }
+
+	return nil
+}

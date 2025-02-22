@@ -51,7 +51,8 @@ func (w *SingleKeyWallet) RemoveOwnedNodes(nodeIDs map[string]bool) {
 }
 
 func (w *SingleKeyWallet) CreateLightningInvoice(ctx context.Context, amount int64, memo string) (*string, int64, error) {
-	requester, err := sspapi.NewRequesterWithBaseURL(hex.EncodeToString(w.Config.IdentityPublicKey()), nil)
+	identityPublicKey := hex.EncodeToString(w.Config.IdentityPublicKey())
+	requester, err := sspapi.NewRequesterWithBaseURL(&identityPublicKey, nil)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -199,7 +200,8 @@ func (w *SingleKeyWallet) PayInvoice(ctx context.Context, invoice string) (strin
 		return "", fmt.Errorf("failed to send transfer: %w", err)
 	}
 
-	requester, err := sspapi.NewRequesterWithBaseURL(hex.EncodeToString(w.Config.IdentityPublicKey()), nil)
+	identityPublicKey := hex.EncodeToString(w.Config.IdentityPublicKey())
+	requester, err := sspapi.NewRequesterWithBaseURL(&identityPublicKey, nil)
 	if err != nil {
 		return "", fmt.Errorf("failed to create requester: %w", err)
 	}
@@ -333,7 +335,8 @@ func (w *SingleKeyWallet) RequestLeavesSwap(ctx context.Context, targetAmount in
 	adaptorPrivateKey := secp256k1.PrivKeyFromBytes(adaptorPrivKeyBytes)
 	adaptorPubKey := adaptorPrivateKey.PubKey()
 
-	requester, err := sspapi.NewRequesterWithBaseURL(hex.EncodeToString(w.Config.IdentityPublicKey()), nil)
+	identityPublicKey := hex.EncodeToString(w.Config.IdentityPublicKey())
+	requester, err := sspapi.NewRequesterWithBaseURL(&identityPublicKey, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create requester: %w", err)
 	}
@@ -489,7 +492,8 @@ func (w *SingleKeyWallet) CoopExit(ctx context.Context, targetAmountSats int64, 
 	}
 
 	// Get tx from SSP
-	requester, err := sspapi.NewRequesterWithBaseURL(hex.EncodeToString(w.Config.IdentityPublicKey()), nil)
+	identityPublicKey := hex.EncodeToString(w.Config.IdentityPublicKey())
+	requester, err := sspapi.NewRequesterWithBaseURL(&identityPublicKey, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create requester: %w", err)
 	}
@@ -821,7 +825,8 @@ func (w *SingleKeyWallet) UnfreezeTokens(ctx context.Context, ownerPublicKey []b
 }
 
 func (w *SingleKeyWallet) SendToPhone(ctx context.Context, amount int64, phoneNumber string) (*pb.Transfer, error) {
-	requester, err := sspapi.NewRequesterWithBaseURL(hex.EncodeToString(w.Config.IdentityPublicKey()), nil)
+	identityPublicKey := hex.EncodeToString(w.Config.IdentityPublicKey())
+	requester, err := sspapi.NewRequesterWithBaseURL(&identityPublicKey, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create requester: %w", err)
 	}
@@ -835,5 +840,39 @@ func (w *SingleKeyWallet) SendToPhone(ctx context.Context, amount int64, phoneNu
 		return nil, fmt.Errorf("failed to decode public key: %w", err)
 	}
 
-	return w.SendTransfer(ctx, publicKeyBytes, amount)
+	transfer, err := w.SendTransfer(ctx, publicKeyBytes, amount)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send transfer: %w", err)
+	}
+	err = api.NotifyReceiverTransfer(phoneNumber, uint64(amount))
+	if err != nil {
+		return transfer, fmt.Errorf("failed to notify receiver transfer: %w", err)
+	}
+	return transfer, nil
+}
+
+func (w *SingleKeyWallet) StartReleaseSeed(phoneNumber string) error {
+	requester, err := sspapi.NewRequesterWithBaseURL(nil, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create requester: %w", err)
+	}
+	api := sspapi.NewSparkServiceAPI(requester)
+	err = api.StartReleaseSeed(phoneNumber)
+	if err != nil {
+		return fmt.Errorf("failed to start release seed: %w", err)
+	}
+	return nil
+}
+
+func (w *SingleKeyWallet) CompleteReleaseSeed(phoneNumber string, code string) ([]byte, error) {
+	requester, err := sspapi.NewRequesterWithBaseURL(nil, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create requester: %w", err)
+	}
+	api := sspapi.NewSparkServiceAPI(requester)
+	seed, err := api.CompleteReleaseSeed(phoneNumber, code)
+	if err != nil {
+		return nil, fmt.Errorf("failed to complete release seed: %w", err)
+	}
+	return seed, nil
 }

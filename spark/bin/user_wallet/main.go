@@ -98,13 +98,33 @@ func parseInput(input string) (string, []string) {
 // InitializeWallet handles the wallet setup process
 func (cli *CLI) InitializeWallet() ([]byte, error) {
 	fmt.Println("Welcome to the Spark Wallet CLI!")
-	fmt.Println("Please enter your secret seed:")
+	fmt.Println("Please enter your secret seed, or phone number this format phone:5555555555:")
 
 	for {
 		fmt.Print("Enter your secret seed: ")
 		input, err := cli.reader.ReadString('\n')
 		if err != nil {
 			return nil, fmt.Errorf("error reading input: %w", err)
+		}
+
+		if strings.HasPrefix(strings.TrimSpace(input), "phone:") {
+			phoneNumber := strings.TrimPrefix(strings.TrimSpace(input), "phone:")
+			fmt.Printf("Starting seed release for phone number: %s\n", phoneNumber)
+			err := cli.wallet.StartReleaseSeed(phoneNumber)
+			if err != nil {
+				return nil, fmt.Errorf("failed to start seed release: %w", err)
+			}
+			fmt.Println("Seed release started. Please check your phone for the code.")
+			fmt.Print("Enter the code: ")
+			code, err := cli.reader.ReadString('\n')
+			if err != nil {
+				return nil, fmt.Errorf("error reading input: %w", err)
+			}
+			seed, err := cli.wallet.CompleteReleaseSeed(phoneNumber, strings.TrimSpace(code))
+			if err != nil {
+				return nil, fmt.Errorf("failed to complete seed release: %w", err)
+			}
+			return seed, nil
 		}
 
 		seed, err := hex.DecodeString(strings.TrimSpace(input))
@@ -129,7 +149,7 @@ func (cli *CLI) Run() error {
 		return fmt.Errorf("failed to create master key: %w", err)
 	}
 
-	identityKey, err := masterKey.NewChildKey(0 + 0x80000000)
+	identityKey, err := masterKey.NewChildKey(0)
 	if err != nil {
 		return fmt.Errorf("failed to create identity key: %w", err)
 	}

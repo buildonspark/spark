@@ -201,3 +201,32 @@ mutation WalletUserIdentityPublicKey($phone_number: String!) {
   }
 }
 `
+
+const StartReleaseSeedMutation = `
+mutation StartReleaseSeed($phone_number: String!) {
+  start_release_seed(input: {
+    phone_number: $phone_number
+  }) {}
+}
+`
+
+const CompleteReleaseSeedMutation = `
+mutation CompleteReleaseSeed($phone_number: String!, $code: String!) {
+  complete_release_seed(input: {
+    phone_number: $phone_number
+    code: $code
+  }) {
+    seed
+  }
+}
+`
+
+const NotifyReceiverTransferMutation = `
+mutation NotifyReceiverTransfer($phone_number: String!, $amount_sats: Long!) {
+  notify_receiver_transfer(input: {
+    phone_number: $phone_number
+    amount_sats: $amount_sats
+  }) {
+  }
+}
+`

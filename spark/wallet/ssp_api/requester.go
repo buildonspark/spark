@@ -52,18 +52,18 @@ func (e GraphQLError) Error() string {
 
 type Requester struct {
 	BaseURL           *string
-	IdentityPublicKey string
+	IdentityPublicKey *string
 
 	HTTPClient *http.Client
 }
 
-func NewRequester(identityPublicKey string) (*Requester, error) {
+func NewRequester(identityPublicKey *string) (*Requester, error) {
 	return &Requester{
 		IdentityPublicKey: identityPublicKey,
 	}, nil
 }
 
-func NewRequesterWithBaseURL(identityPublicKey string, baseURL *string) (*Requester, error) {
+func NewRequesterWithBaseURL(identityPublicKey *string, baseURL *string) (*Requester, error) {
 	if baseURL == nil {
 		return NewRequester(identityPublicKey)
 	}
@@ -140,7 +140,9 @@ func (r *Requester) ExecuteGraphqlWithContext(ctx context.Context, query string,
 		return nil, err
 	}
 
-	request.Header.Add("Spark-Identity-Public-Key", r.IdentityPublicKey)
+	if r.IdentityPublicKey != nil {
+		request.Header.Add("Spark-Identity-Public-Key", *r.IdentityPublicKey)
+	}
 	request.Header.Add("Content-Type", "application/json")
 	if compressed {
 		request.Header.Add("Content-Encoding", "zstd")
