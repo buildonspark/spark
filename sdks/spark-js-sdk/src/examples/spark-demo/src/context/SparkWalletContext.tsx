@@ -7,7 +7,7 @@ interface SparkWalletContextType {
 }
 
 export const SparkWalletContext = createContext<SparkWalletContextType | null>(
-  null
+  null,
 );
 
 export const useSparkWallet = () => {
@@ -24,7 +24,7 @@ export const SparkWalletProvider = ({
   children: React.ReactNode;
 }) => {
   const [wallet] = useState<SparkWallet>(
-    () => new SparkWallet(Network.REGTEST)
+    () => new SparkWallet(Network.REGTEST),
   );
   return (
     <SparkWalletContext.Provider value={{ wallet }}>

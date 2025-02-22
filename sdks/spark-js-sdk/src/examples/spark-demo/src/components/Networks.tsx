@@ -15,21 +15,21 @@ interface NetworksProps {
 
 export default function Networks({ onSelectNetwork }: NetworksProps) {
   return (
-    <div className="flex w-full flex-col items-center mt-4">
+    <div className="mt-4 flex w-full flex-col items-center">
       <StyledContainer
-        className="py-6 px-4"
+        className="px-4 py-6"
         isPressable
         onClick={() => onSelectNetwork(Network.LIGHTNING)}
       >
         <div className="flex items-center gap-3">
           <LightningIcon />
-          <div className="flex flex-col flex-grow font-decimal gap-[4px]">
-            <div className="text-[13px] text-left">Lightning invoice</div>
+          <div className="flex flex-grow flex-col gap-[4px] font-decimal">
+            <div className="text-left text-[13px]">Lightning invoice</div>
             <div className="flex items-center gap-[1px] text-[12px] opacity-80">
-              <div className="bg-[#232E3D] rounded-l-[5px] px-[6px]">
+              <div className="rounded-l-[5px] bg-[#232E3D] px-[6px]">
                 Instant
               </div>
-              <div className="bg-[#232E3D] rounded-r-[5px] px-[6px]">
+              <div className="rounded-r-[5px] bg-[#232E3D] px-[6px]">
                 Low fees
               </div>
             </div>
@@ -37,7 +37,7 @@ export default function Networks({ onSelectNetwork }: NetworksProps) {
           <ChevronRightIcon />
         </div>
       </StyledContainer>
-      <div className="fixed bottom-10 w-full text-center text-[12px] text-[#f9f9f9] opacity-50 mt-20">
+      <div className="fixed bottom-10 mt-20 w-full text-center text-[12px] text-[#f9f9f9] opacity-50">
         Powered by Spark
       </div>
     </div>

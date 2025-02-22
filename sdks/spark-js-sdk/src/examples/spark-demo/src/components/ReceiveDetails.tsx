@@ -36,17 +36,17 @@ export default function ReceiveDetails({
   }, [setQrCodeModalVisible]);
 
   return (
-    <div className="flex flex-col items-center mt-4 w-full">
+    <div className="mt-4 flex w-full flex-col items-center">
       <ReceiveQRCard>
-        <div className="w-full h-full rounded-2xl flex flex-col items-right justify-between">
+        <div className="items-right flex h-full w-full flex-col justify-between rounded-2xl">
           <WalletIcon className="m-6 w-4" />
-          <div className="text-[12px] text-[#f9f9f9] opacity-50 m-6">
+          <div className="m-6 text-[12px] text-[#f9f9f9] opacity-50">
             Powered by Spark
           </div>
         </div>
-        <div className="flex items-center w-full h-full rounded-2xl">
+        <div className="flex h-full w-full items-center rounded-2xl">
           <div
-            className="m-3 w-[160px] h-[160px] rounded-xl flex items-center justify-center"
+            className="m-3 flex h-[160px] w-[160px] items-center justify-center rounded-xl"
             style={{ backgroundColor: "rgba(33, 43, 55, 0.6)" }}
             onClick={() => {
               setQrCodeModalVisible(true);
@@ -90,29 +90,29 @@ export default function ReceiveDetails({
         />
       </ReceiveDetailsContainer>
       {qrCodeModalVisible && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
           <div
             className="relative flex flex-col items-center justify-center"
             ref={ref}
           >
             <div
-              className="absolute top-[-26px] left-2 cursor-pointer"
+              className="absolute left-2 top-[-26px] cursor-pointer"
               onClick={() => setQrCodeModalVisible(false)}
             >
               <CloseIcon strokeWidth="2" />
             </div>
-            <div className="relative bg-white p-4 rounded-lg">
+            <div className="relative rounded-lg bg-white p-4">
               <QRCodeSVG value={lightningInvoice || ""} size={300} />
             </div>
             <div
-              className="flex flex-row items-center h-[40px] mt-4 bg-[#10151C] rounded-lg justify-center max-w-[340px]"
+              className="mt-4 flex h-[40px] max-w-[340px] flex-row items-center justify-center rounded-lg bg-[#10151C]"
               onClick={(e) => {
                 e.stopPropagation();
                 navigator.clipboard.writeText(lightningInvoice || "");
                 alert("Copied to clipboard");
               }}
             >
-              <div className="text-[12px] text-[#f9f9f9] opacity-50 m-6 overflow-hidden text-ellipsis whitespace-nowrap">
+              <div className="m-6 overflow-hidden text-ellipsis whitespace-nowrap text-[12px] text-[#f9f9f9] opacity-50">
                 {lightningInvoice}
               </div>
               <div className="mr-5">
@@ -162,8 +162,10 @@ const ReceiveQRCard = styled.div`
     #10151c 100%
   );
 
-  box-shadow: 0px 216px 60px 0px rgba(0, 0, 0, 0),
+  box-shadow:
+    0px 216px 60px 0px rgba(0, 0, 0, 0),
     0px 138px 55px 0px rgba(0, 0, 0, 0.01),
-    0px 78px 47px 0px rgba(0, 0, 0, 0.05), 0px 35px 35px 0px rgba(0, 0, 0, 0.09),
+    0px 78px 47px 0px rgba(0, 0, 0, 0.05),
+    0px 35px 35px 0px rgba(0, 0, 0, 0.09),
     0px 9px 19px 0px rgba(0, 0, 0, 0.1);
 `;

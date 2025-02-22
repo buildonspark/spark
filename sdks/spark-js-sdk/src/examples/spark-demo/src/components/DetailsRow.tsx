@@ -19,7 +19,7 @@ export default function DetailsRow({
 }: DetailsRowProps) {
   return (
     <div
-      className={`h-[72px] flex flex-row items-center justify-between ${
+      className={`flex h-[72px] flex-row items-center justify-between ${
         borderTop ? "border-t border-[#2d3845]" : ""
       }`}
       onClick={onClick}
@@ -27,9 +27,9 @@ export default function DetailsRow({
       <div className="flex flex-row items-center">
         {logoLeft && (
           <div
-            className={`flex items-center justify-center w-10 h-10 ${
+            className={`flex h-10 w-10 items-center justify-center ${
               logoLeftCircleBackground
-                ? "border border-[#10151C] rounded-full mr-2"
+                ? "mr-2 rounded-full border border-[#10151C]"
                 : ""
             }`}
             style={
@@ -47,17 +47,17 @@ export default function DetailsRow({
           </div>
         )}
         <div
-          className={`flex flex-col justify-between max-w-[290px] ${
+          className={`flex max-w-[290px] flex-col justify-between ${
             !logoLeft ? "ml-4" : ""
           }`}
         >
           {title && (
-            <div className="text-[12px] text-[#f9f9f9] overflow-hidden text-ellipsis whitespace-nowrap ">
+            <div className="overflow-hidden text-ellipsis whitespace-nowrap text-[12px] text-[#f9f9f9]">
               {title}
             </div>
           )}
           {subtitle && (
-            <div className="text-[12px] text-[#f9f9f9] opacity-50 overflow-hidden text-ellipsis whitespace-nowrap ">
+            <div className="overflow-hidden text-ellipsis whitespace-nowrap text-[12px] text-[#f9f9f9] opacity-50">
               {subtitle}
             </div>
           )}

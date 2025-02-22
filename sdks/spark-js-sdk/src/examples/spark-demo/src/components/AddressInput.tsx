@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { Network } from "./Networks";
-import DetailsRow from "./DetailsRow";
 import BitcoinIcon from "../icons/BitcoinIcon";
 import ChevronRightIcon from "../icons/ChevronRightIcon";
 import LightningIcon from "../icons/LightningIcon";
 import SparkIcon from "../icons/SparkIcon";
+import DetailsRow from "./DetailsRow";
+import { Network } from "./Networks";
 
 function debounce<T extends (...args: any[]) => void>(func: T, wait: number) {
   let timeout: ReturnType<typeof setTimeout> | null = null;
@@ -46,7 +46,7 @@ interface AddressInputProps {
 export default function AddressInput({ onAddressSelect }: AddressInputProps) {
   const [inputAddress, setInputAddress] = useState<string>("");
   const [inputAddressNetwork, setInputAddressNetwork] = useState<Network>(
-    Network.NONE
+    Network.NONE,
   );
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -58,7 +58,7 @@ export default function AddressInput({ onAddressSelect }: AddressInputProps) {
   return (
     <div>
       <input
-        className="w-full h-14 px-6 rounded-lg bg-[#121E2D] border border-solid border-[rgba(249,249,249,0.12)]"
+        className="h-14 w-full rounded-lg border border-solid border-[rgba(249,249,249,0.12)] bg-[#121E2D] px-6"
         placeholder="Wallet address, Lightning invoice"
         type="text"
         value={inputAddress}

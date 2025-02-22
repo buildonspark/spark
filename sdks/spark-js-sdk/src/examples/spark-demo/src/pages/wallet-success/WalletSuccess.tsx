@@ -32,19 +32,19 @@ export default function WalletSuccess() {
     <div className="mx-6">
       <div className="flex items-center justify-center gap-2">
         <WalletIcon className="h-[18px] w-[16px]" />
-        <div className="font-decimal font-black text-[24px]">Wallet</div>
+        <div className="font-decimal text-[24px] font-black">Wallet</div>
       </div>
-      <StyledContainer className="mt-9 flex items-center justify-center w-full min-h-[180px]">
-        <div className="w-full h-full flex flex-wrap">
-          {mnemonic?.split(" ").map((word) => (
-            <div className="w-1/3 p-2 text-center">{word}</div>
-          ))}
+      <StyledContainer className="mt-9 flex min-h-[180px] w-full items-center justify-center">
+        <div className="flex h-full w-full flex-wrap">
+          {mnemonic
+            ?.split(" ")
+            .map((word) => <div className="w-1/3 p-2 text-center">{word}</div>)}
         </div>
       </StyledContainer>
-      <div className="flex flex-col items-center justify-center gap-4 mt-6">
+      <div className="mt-6 flex flex-col items-center justify-center gap-4">
         <Button
           icon={
-            <div className="flex items-center h-10 gap-2">
+            <div className="flex h-10 items-center gap-2">
               Copy seed phrase
               <CopyIcon />
             </div>
@@ -56,7 +56,7 @@ export default function WalletSuccess() {
           }}
         />
         <Button
-          icon={<div className="flex items-center h-10 gap-2">Continue</div>}
+          icon={<div className="flex h-10 items-center gap-2">Continue</div>}
           kind="primary"
           onClick={onContinue}
         />

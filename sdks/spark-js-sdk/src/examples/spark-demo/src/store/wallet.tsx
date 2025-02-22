@@ -93,11 +93,11 @@ export function useWallet() {
     queryKey: ["satsUsdPrice"],
     queryFn: async () => {
       const response = await fetch(
-        "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd"
+        "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd",
       );
       if (!response.ok) {
         throw new Error(
-          `Failed to fetch BTC price. status: ${response.status}`
+          `Failed to fetch BTC price. status: ${response.status}`,
         );
       }
       const data = await response.json();

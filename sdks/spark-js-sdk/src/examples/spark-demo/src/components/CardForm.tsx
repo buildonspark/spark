@@ -20,13 +20,13 @@ export default function CardForm({
   submitDisabled?: boolean;
 }) {
   return (
-    <div className=" flex w-full flex-col justify-between items-center">
+    <div className="flex w-full flex-col items-center justify-between">
       <div className="flex w-full flex-row text-center font-decimal text-[15px]">
-        <div className="w-6 h-6 ml-6" onClick={logoLeftClick}>
+        <div className="ml-6 h-6 w-6" onClick={logoLeftClick}>
           {logoLeft}
         </div>
         <div className="flex-grow">{topTitle}</div>
-        <div className="w-6 h-6 mr-6">{logoRight}</div>
+        <div className="mr-6 h-6 w-6">{logoRight}</div>
       </div>
       <div className="flex w-full flex-col p-6">{children}</div>
       {!submitDisabled && (

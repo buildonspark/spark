@@ -65,8 +65,10 @@ const StyledButton = styled.button<{
     rgba(249, 249, 249, 0.04) 117.5%
   );
 
-  box-shadow: 0px 0px 0px 1px rgba(12, 13, 15, 0.7),
-    0px 4px 20px 0px rgba(0, 0, 0, 0.5), 0px 1px 4px 0px rgba(0, 0, 0, 0.25),
+  box-shadow:
+    0px 0px 0px 1px rgba(12, 13, 15, 0.7),
+    0px 4px 20px 0px rgba(0, 0, 0, 0.5),
+    0px 1px 4px 0px rgba(0, 0, 0, 0.25),
     0px 8px 16px 0px rgba(255, 255, 255, 0.1) inset;
 
   ${({ kind, opaque }) =>

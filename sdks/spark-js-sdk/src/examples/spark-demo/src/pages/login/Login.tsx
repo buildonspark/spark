@@ -13,16 +13,16 @@ export default function Login() {
       <div className="flex flex-col items-center justify-center">
         <div className="flex items-center justify-center gap-3">
           <WalletIcon />
-          <div className=" font-decimal font-black text-[32px]">Wallet</div>
+          <div className="font-decimal text-[32px] font-black">Wallet</div>
         </div>
 
-        <div className="font-decimal text-[#ffffff] text-[13px] text-center mt-4 opacity-40">
+        <div className="mt-4 text-center font-decimal text-[13px] text-[#ffffff] opacity-40">
           A Spark-enabled, self-custody
           <br />
           Bitcoin wallet
         </div>
 
-        <div className="flex flex-col gap-3 mt-16 w-full">
+        <div className="mt-16 flex w-full flex-col gap-3">
           <Button
             text="Create a new wallet"
             icon={<SparkleIcon />}

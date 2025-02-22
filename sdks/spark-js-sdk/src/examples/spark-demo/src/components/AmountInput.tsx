@@ -58,29 +58,29 @@ export default function AmountInput({
   const decAmount = fiatAmount.split(".")[1];
   const hasDecimal = fiatAmount.includes(".");
   return (
-    <div className="flex flex-col gap-2 items-center w-full">
-      <div className="my-10 ">
+    <div className="flex w-full flex-col items-center gap-2">
+      <div className="my-10">
         {primaryCurrency === PrimaryCurrency.USD ? (
-          <div className="flex  font-decimal justify-center">
-            <div className="text-[24px] self-center">$</div>
+          <div className="flex justify-center font-decimal">
+            <div className="self-center text-[24px]">$</div>
             <div className="text-[60px] leading-[60px]">
               {Number(intAmount).toLocaleString()}
             </div>
             {(decAmount || hasDecimal) && (
-              <div className="text-[24px] self-end">.{decAmount}</div>
+              <div className="self-end text-[24px]">.{decAmount}</div>
             )}
           </div>
         ) : (
           <div></div>
         )}
-        <div className="flex items-center gap-2 justify-center">
+        <div className="flex items-center justify-center gap-2">
           <div
-            className="font-decimal text-[13px] opacity-40 text-center flex inline-flex items-center gap-2 rounded-full bg-[#F9F9F9] active:bg-opacity-40 bg-opacity-20 px-2 py-1"
+            className="flex inline-flex items-center gap-2 rounded-full bg-[#F9F9F9] bg-opacity-20 px-2 py-1 text-center font-decimal text-[13px] opacity-40 active:bg-opacity-40"
             onClick={togglePrimaryCurrency}
           >
             {satsUsdPrice
               ? `${Math.floor(Number(fiatAmount) / satsUsdPrice.value).toFixed(
-                  0
+                  0,
                 )} SATs`
               : "0 SATs"}
             <ToggleIcon />

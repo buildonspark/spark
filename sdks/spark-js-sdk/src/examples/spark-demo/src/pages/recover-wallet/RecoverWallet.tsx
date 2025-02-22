@@ -45,24 +45,24 @@ export default function RecoverWallet() {
   return (
     <div
       className={
-        "flex flex-col items-center p-8 pb-16 border-[0.5px] border-opacity-25 border-[#f9f9f9] rounded-3xl"
+        "flex flex-col items-center rounded-3xl border-[0.5px] border-[#f9f9f9] border-opacity-25 p-8 pb-16"
       }
     >
-      <div className="text-[18px] font-decimal">Recover your wallet</div>
+      <div className="font-decimal text-[18px]">Recover your wallet</div>
       <div className="text-[13px] opacity-50">Past your Seed Phrase</div>
-      <StyledContainer className="mt-9 mb-6 flex items-center justify-center w-full min-h-[180px] py-9 px-12">
-        <div className="flex flex-col flex-1">
+      <StyledContainer className="mb-6 mt-9 flex min-h-[180px] w-full items-center justify-center px-12 py-9">
+        <div className="flex flex-1 flex-col">
           {Array.from({ length: MNEMONIC_WORDS / 2 }).map((_, index) => (
-            <div key={index} className="flex items-center  p-2 text-center">
-              <div className="mr-[6px] text-right w-[24px]">{index + 1}.</div>
+            <div key={index} className="flex items-center p-2 text-center">
+              <div className="mr-[6px] w-[24px] text-right">{index + 1}.</div>
               {mnemonic[index] ? <div>{mnemonic[index]}</div> : <EmptyWord />}
             </div>
           ))}
         </div>
-        <div className="flex flex-col flex-1">
+        <div className="flex flex-1 flex-col">
           {Array.from({ length: MNEMONIC_WORDS / 2 }).map((_, index) => (
             <div key={index} className="flex items-center p-2 text-center">
-              <div className="mr-[6px] text-right w-[24px]">{index + 7}.</div>
+              <div className="mr-[6px] w-[24px] text-right">{index + 7}.</div>
               {mnemonic[index + 6] ? (
                 <div className="text-center">{mnemonic[index + 6]}</div>
               ) : (
@@ -72,7 +72,7 @@ export default function RecoverWallet() {
           ))}
         </div>
         {mnemonic.length === 0 && (
-          <div className="absolute right-12 left-12">
+          <div className="absolute left-12 right-12">
             <Button
               text="Paste from clipboard"
               kind="primary"

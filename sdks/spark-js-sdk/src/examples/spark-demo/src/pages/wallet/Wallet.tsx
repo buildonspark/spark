@@ -7,7 +7,7 @@ import SendIcon from "../../icons/SendIcon";
 import WalletIcon from "../../icons/WalletIcon";
 import { Routes } from "../../routes";
 import { useWallet } from "../../store/wallet";
-import { roundDown, getFontSizeForCard } from "../../utils/utils";
+import { getFontSizeForCard, roundDown } from "../../utils/utils";
 
 export enum PrimaryCurrency {
   USD = "USD",
@@ -30,15 +30,15 @@ export default function Wallet() {
     <div className="mx-6">
       <div className="flex items-center justify-center gap-2">
         <WalletIcon className="h-[18px] w-[16px]" />
-        <div className="font-decimal font-black text-[24px]">Wallet</div>
+        <div className="font-decimal text-[24px] font-black">Wallet</div>
       </div>
-      <StyledContainer className="mt-9 flex items-center justify-center w-full h-[180px]">
+      <StyledContainer className="mt-9 flex h-[180px] w-full items-center justify-center">
         <div>
-          <div className="flex flex-col justify-center max-w-[300px]">
+          <div className="flex max-w-[300px] flex-col justify-center">
             {usdBalance !== null ? (
               <div className="flex font-decimal">
                 <div
-                  className="text-center break-words whitespace-normal max-w-[300px]"
+                  className="max-w-[300px] whitespace-normal break-words text-center"
                   style={{ fontSize: `${getFontSizeForCard(usdBalance)}px` }}
                 >
                   {"$" +
@@ -48,9 +48,9 @@ export default function Wallet() {
                 </div>
               </div>
             ) : (
-              <div className="flex flex-col justify-center items-center text-center">
+              <div className="flex flex-col items-center justify-center text-center">
                 <div
-                  className="leading-[60px] break-words whitespace-normal"
+                  className="whitespace-normal break-words leading-[60px]"
                   style={{
                     fontSize: `${getFontSizeForCard(satsBalance.toString())}px`,
                   }}
@@ -62,13 +62,13 @@ export default function Wallet() {
             )}
           </div>
           {usdBalance && (
-            <div className="flex justify-center items-center font-decimal text-[13px] opacity-40">
+            <div className="flex items-center justify-center font-decimal text-[13px] opacity-40">
               {satsBalance.value} SATs
             </div>
           )}
         </div>
       </StyledContainer>
-      <div className="flex items-center justify-center gap-4 mt-6">
+      <div className="mt-6 flex items-center justify-center gap-4">
         <Button
           text="Send"
           icon={<SendIcon />}

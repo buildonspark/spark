@@ -22,13 +22,13 @@ export default function Receive() {
   const [fiatAmount, setFiatAmount] = useState("0");
   const [satsAmount, setSatsAmount] = useState("0");
   const [primaryCurrency, setPrimaryCurrency] = useState<PrimaryCurrency>(
-    PrimaryCurrency.USD
+    PrimaryCurrency.USD,
   );
   const [lightningInvoice, setLightningInvoice] = useState<string | null>(null);
   const [paymentNetwork, setPaymentNetwork] = useState<Network>(Network.NONE);
   const [qrCodeModalVisible, setQrCodeModalVisible] = useState<boolean>(false);
   const [currentStep, setCurrentStep] = useState<ReceiveStep>(
-    ReceiveStep.NetworkSelect
+    ReceiveStep.NetworkSelect,
   );
   const { satsUsdPrice } = useWallet();
   const { createLightningInvoice } = useWallet();
@@ -41,12 +41,12 @@ export default function Receive() {
         break;
       case ReceiveStep.InputAmount:
         const satsToReceive = Math.floor(
-          Number(fiatAmount) / satsUsdPrice.value
+          Number(fiatAmount) / satsUsdPrice.value,
         );
         console.log("satsToReceive", satsToReceive);
         const invoice = await createLightningInvoice(
           satsToReceive,
-          "test memo"
+          "test memo",
         );
         setLightningInvoice(invoice);
         setCurrentStep(ReceiveStep.ShareQuote);
@@ -119,8 +119,8 @@ export default function Receive() {
           currentStep === ReceiveStep.InputAmount
             ? "Confirm"
             : currentStep === ReceiveStep.ShareQuote
-            ? "Share"
-            : ""
+              ? "Share"
+              : ""
         }
         logoLeftClick={onLogoLeftClick}
         submitDisabled={currentStep === ReceiveStep.NetworkSelect}

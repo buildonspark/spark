@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { Transfer } from "../../../../../../dist/proto/spark";
 import AddressInput from "../../components/AddressInput";
 import AmountInput from "../../components/AmountInput";
 import CardForm from "../../components/CardForm";
@@ -9,9 +10,8 @@ import SendDetails from "../../components/SendDetails";
 import ArrowLeft from "../../icons/ArrowLeft";
 import CloseIcon from "../../icons/CloseIcon";
 import { Routes } from "../../routes";
-import { PrimaryCurrency } from "../wallet/Wallet";
 import { useWallet } from "../../store/wallet";
-import { Transfer } from "../../../../../../dist/proto/spark";
+import { PrimaryCurrency } from "../wallet/Wallet";
 
 export enum SendStep {
   AddressInput = "AddressInput",
@@ -24,18 +24,18 @@ export enum SendStep {
 export default function Send() {
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState<SendStep>(
-    SendStep.AddressInput
+    SendStep.AddressInput,
   );
   const [sendAddress, setSendAddress] = useState<string>("");
   const [sendAddressNetwork, setSendAddressNetwork] = useState<Network>(
-    Network.NONE
+    Network.NONE,
   );
   const [sendFiatAmount, setSendFiatAmount] = useState<string>("0");
   const [primaryCurrency, setPrimaryCurrency] = useState<PrimaryCurrency>(
-    PrimaryCurrency.USD
+    PrimaryCurrency.USD,
   );
   const [sendResponse, setSendResponse] = useState<Transfer | string | null>(
-    null
+    null,
   );
   const { satsUsdPrice, sendTransfer, payLightningInvoice } = useWallet();
 
@@ -99,7 +99,7 @@ export default function Send() {
         break;
       case SendStep.ConfirmQuote:
         const satsToSend = Math.floor(
-          Number(sendFiatAmount) / satsUsdPrice.value
+          Number(sendFiatAmount) / satsUsdPrice.value,
         );
         console.log("satsToSend", satsToSend);
         if (sendAddressNetwork === Network.LIGHTNING) {
