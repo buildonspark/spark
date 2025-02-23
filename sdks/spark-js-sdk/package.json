@@ -104,6 +104,7 @@
     "@scure/bip39": "^1.5.4",
     "@scure/btc-signer": "^1.5.0",
     "auto-bind": "^5.0.1",
+    "buffer": "^6.0.3",
     "eciesjs": "^0.4.13",
     "grpc-tools": "^1.12.4",
     "light-bolt11-decoder": "^3.2.0",
@@ -118,6 +119,7 @@
   },
   "browser": {
     "assert": false,
+    "buffer": "buffer",
     "crypto": false,
     "fs": false,
     "fs/promises": false,

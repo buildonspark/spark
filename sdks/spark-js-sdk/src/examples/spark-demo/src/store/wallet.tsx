@@ -1,4 +1,5 @@
 import { hexToBytes } from "@lightsparkdev/core";
+import { bytesToHex } from "@noble/curves/abstract/utils";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { SparkWallet } from "spark-sdk";
 import { Network } from "spark-sdk/utils";
@@ -15,12 +16,13 @@ interface WalletState {
 interface WalletActions {
   generateMnemonic: () => Promise<string>;
   initWallet: (mnemonic: string) => Promise<void>;
+  getMasterPublicKey: () => Promise<string>;
   createLightningInvoice: (amount: number, memo: string) => Promise<string>;
   sendTransfer: (amount: number, recipient: string) => Promise<void>;
   payLightningInvoice: (invoice: string) => Promise<void>;
-  loadStoredWallet: () => Promise<void>;
   // fetchOwnedTokens: () => Promise<LeafWithPreviousTransactionData[]>;
   setActiveCurrency: (currency: Currency) => void;
+  loadStoredWallet: () => Promise<boolean>;
 }
 
 type WalletStore = WalletState & WalletActions;
@@ -47,21 +49,26 @@ const useWalletStore = create<WalletStore>((set, get) => ({
   generateMnemonic: async () => {
     const { wallet } = get();
     const mnemonic = await wallet.generateMnemonic();
-    localStorage.setItem(MNEMONIC_STORAGE_KEY, mnemonic);
+    sessionStorage.setItem(MNEMONIC_STORAGE_KEY, mnemonic);
     set({ mnemonic });
     return mnemonic;
   },
   initWallet: async (mnemonic: string) => {
     const { wallet } = get();
     await wallet.createSparkWallet(mnemonic);
-    localStorage.setItem(MNEMONIC_STORAGE_KEY, mnemonic);
+    sessionStorage.setItem(MNEMONIC_STORAGE_KEY, mnemonic);
     set({ isInitialized: true, mnemonic });
   },
+  getMasterPublicKey: async () => {
+    const { wallet } = get();
+    return bytesToHex(await wallet.getMasterPubKey());
+  },
   loadStoredWallet: async () => {
-    const storedMnemonic = localStorage.getItem(MNEMONIC_STORAGE_KEY);
+    const storedMnemonic = sessionStorage.getItem(MNEMONIC_STORAGE_KEY);
     if (storedMnemonic) {
       await get().initWallet(storedMnemonic);
     }
+    return true;
   },
   sendTransfer: async (amount: number, recipient: string) => {
     const { wallet } = get();
@@ -121,6 +128,9 @@ export function useWallet() {
       return data.bitcoin.usd / 100_000_000;
     },
     refetchInterval: 60000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    staleTime: 60000,
   });
 
   useQuery({
@@ -129,7 +139,10 @@ export function useWallet() {
       console.log("testing");
       const claimed = await wallet.claimTransfers();
       if (claimed) {
-        queryClient.invalidateQueries({ queryKey: ["wallet", "balance"] });
+        queryClient.invalidateQueries({
+          queryKey: ["wallet", "balance"],
+          exact: true,
+        });
       }
       return claimed;
     },
@@ -156,6 +169,7 @@ export function useWallet() {
     initWallet: async (mnemonic: string) => {
       await state.initWallet(mnemonic);
     },
+    getMasterPublicKey: state.getMasterPublicKey,
     sendTransfer: state.sendTransfer,
     createLightningInvoice: state.createLightningInvoice,
     payLightningInvoice: state.payLightningInvoice,

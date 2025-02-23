@@ -4,6 +4,7 @@ import {
   NodeKeyCache,
   Query,
   Requester,
+  SigningKey,
 } from "@lightsparkdev/core";
 import { CompleteCoopExit } from "./mutations/CompleteCoopExit.js";
 import { CompleteLeavesSwap } from "./mutations/CompleteLeavesSwap.js";
@@ -47,23 +48,23 @@ import { LightningSendFeeEstimate } from "./queries/LightningSendFeeEstimate.js"
 export default class SspClient {
   private readonly requester: Requester;
   private identityPublicKey: string;
+  private readonly signingKey?: SigningKey;
 
   constructor(identityPublicKey: string) {
     this.identityPublicKey = identityPublicKey;
 
-    // Make CompressionStream undefined to prevent compression
-    if (typeof window !== "undefined") {
-      // @ts-ignore
-      delete window.CompressionStream;
-    }
+    const fetchFunction =
+      typeof window !== "undefined" ? window.fetch.bind(window) : fetch;
 
     this.requester = new Requester(
       new NodeKeyCache(DefaultCrypto),
       "graphql/spark/rc",
-      "spark-js-sdk/v1.0.0",
+      "spark-js-sdk/v1.0.0  ",
       new SparkAuthProvider(identityPublicKey),
       "https://api.dev.dev.sparkinfra.net",
-      DefaultCrypto
+      DefaultCrypto,
+      this.signingKey,
+      fetchFunction
     );
   }
 

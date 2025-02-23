@@ -18,8 +18,6 @@ export default function Wallet() {
   const navigate = useNavigate();
 
   const { balance: satsBalance, satsUsdPrice } = useWallet();
-  // satsBalance.value = 202020;
-  console.log(satsBalance);
   let usdBalance = useMemo(() => {
     return satsUsdPrice
       ? roundDown(satsUsdPrice.value * satsBalance.value, 2).toFixed(2)

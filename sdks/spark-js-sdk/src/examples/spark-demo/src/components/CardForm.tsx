@@ -22,9 +22,9 @@ export default function CardForm({
   return (
     <div className="flex w-full flex-col items-center justify-between">
       <div className="flex w-full flex-row text-center font-decimal text-[15px]">
-        <div className="ml-6 h-6 w-6" onClick={logoLeftClick}>
+        <button className="ml-6 h-6 w-6 outline-none" onClick={logoLeftClick}>
           {logoLeft}
-        </div>
+        </button>
         <div className="flex-grow">{topTitle}</div>
         <div className="mr-6 h-6 w-6">{logoRight}</div>
       </div>

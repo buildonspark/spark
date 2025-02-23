@@ -9,6 +9,7 @@ import CloseIcon from "../../icons/CloseIcon";
 import { Routes } from "../../routes";
 import { useWallet } from "../../store/wallet";
 import { Currency } from "../../utils/currency";
+import SparkDepositAddress from "./SparkDepositAddress";
 
 enum ReceiveStep {
   NetworkSelect = "NetworkSelect",
@@ -16,6 +17,7 @@ enum ReceiveStep {
   ShareQuote = "ShareQuote",
   Success = "Success",
   Failed = "Failed",
+  SparkDepositAddress = "SparkDepositAddress",
 }
 
 export default function Receive() {
@@ -40,13 +42,12 @@ export default function Receive() {
           activeCurrency === Currency.USD
             ? Math.floor(Number(rawInputAmount) / satsUsdPrice.value)
             : Number(rawInputAmount);
-        console.log("satsToReceive", satsToReceive);
-        // const invoice = await createLightningInvoice(
-        //   satsToReceive,
-        //   "test memo",
-        // );
-        const TEST_INVOICE = "test_invoice";
-        setLightningInvoice(TEST_INVOICE);
+
+        const invoice = await createLightningInvoice(
+          satsToReceive,
+          "test memo",
+        );
+        setLightningInvoice(invoice);
         setCurrentStep(ReceiveStep.ShareQuote);
         break;
       case ReceiveStep.ShareQuote:
@@ -72,6 +73,9 @@ export default function Receive() {
       case ReceiveStep.ShareQuote:
         navigate(Routes.Wallet);
         break;
+      case ReceiveStep.SparkDepositAddress:
+        setCurrentStep(ReceiveStep.NetworkSelect);
+        break;
     }
   }, [currentStep, navigate, setRawInputAmount, setCurrentStep]);
 
@@ -83,6 +87,8 @@ export default function Receive() {
         return "Amount to receive";
       case ReceiveStep.ShareQuote:
         return "Receive";
+      case ReceiveStep.SparkDepositAddress:
+        return "Spark deposit address";
       default:
         return "Receive money via";
     }
@@ -96,6 +102,15 @@ export default function Receive() {
         return <ArrowLeft strokeWidth="1.5" />;
     }
   }, [currentStep]);
+
+  const onSelectNetwork = useCallback((network: Network) => {
+    setPaymentNetwork(network);
+    if (network === Network.SPARK) {
+      setCurrentStep(ReceiveStep.SparkDepositAddress);
+    } else {
+      setCurrentStep(ReceiveStep.InputAmount);
+    }
+  }, []);
 
   return (
     <div>
@@ -111,15 +126,16 @@ export default function Receive() {
               : ""
         }
         logoLeftClick={onLogoLeftClick}
-        submitDisabled={currentStep === ReceiveStep.NetworkSelect}
+        submitDisabled={
+          currentStep === ReceiveStep.NetworkSelect ||
+          currentStep === ReceiveStep.SparkDepositAddress
+        }
       >
         {currentStep === ReceiveStep.NetworkSelect && (
-          <Networks
-            onSelectNetwork={(network) => {
-              setPaymentNetwork(network);
-              setCurrentStep(ReceiveStep.InputAmount);
-            }}
-          />
+          <Networks onSelectNetwork={onSelectNetwork} />
+        )}
+        {currentStep === ReceiveStep.SparkDepositAddress && (
+          <SparkDepositAddress />
         )}
         {currentStep === ReceiveStep.InputAmount && (
           <AmountInput

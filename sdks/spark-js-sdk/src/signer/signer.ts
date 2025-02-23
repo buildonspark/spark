@@ -8,6 +8,7 @@ import { HDKey } from "@scure/bip32";
 import * as bip39 from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english";
 import { sha256 } from "@scure/btc-signer/utils";
+import { Buffer } from "buffer";
 import * as ecies from "eciesjs";
 import { TreeNode } from "../proto/spark.js";
 import { generateAdaptorFromSignature } from "../utils/adaptor-signature.js";
@@ -25,6 +26,7 @@ import {
 import { aggregateFrost, signFrost } from "../utils/wasm.js";
 import { KeyPackage } from "../wasm/spark_bindings.js";
 
+globalThis.Buffer = Buffer;
 export type SigningNonce = {
   binding: Uint8Array;
   hiding: Uint8Array;
@@ -419,14 +421,11 @@ class DefaultSparkSigner implements SparkSigner {
     if (!this.identityPrivateKey?.privateKey) {
       throw new Error("Private key is not set");
     }
-
     const receiverEciesPrivKey = ecies.PrivateKey.fromHex(
       bytesToHex(this.identityPrivateKey.privateKey)
     );
-
     const privateKey = ecies.decrypt(receiverEciesPrivKey.toHex(), ciphertext);
     const publicKey = secp256k1.getPublicKey(privateKey);
-
     const publicKeyHex = bytesToHex(publicKey);
     const privateKeyHex = bytesToHex(privateKey);
     this.publicKeyToPrivateKeyMap.set(publicKeyHex, privateKeyHex);
