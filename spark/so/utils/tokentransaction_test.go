@@ -19,7 +19,10 @@ func TestHashTokenTransactionNil(t *testing.T) {
 
 // TestHashTokenTransactionEmpty checks that hashing an empty transaction does not produce an error.
 func TestHashTokenTransactionEmpty(t *testing.T) {
-	tx := &pb.TokenTransaction{}
+	tx := &pb.TokenTransaction{
+		OutputLeaves:                    []*pb.TokenLeafOutput{},
+		SparkOperatorIdentityPublicKeys: [][]byte{},
+	}
 	hash, err := HashTokenTransaction(tx, false)
 	if err != nil {
 		t.Errorf("expected no error for empty transaction, got: %v", err)
@@ -31,6 +34,12 @@ func TestHashTokenTransactionEmpty(t *testing.T) {
 
 // TestHashTokenTransactionValid checks that hashing a valid token transaction does not produce an error.
 func TestHashTokenTransactionUniqueHash(t *testing.T) {
+	operatorKeys := [][]byte{
+		bytes.Repeat([]byte{0x04}, 32),
+		bytes.Repeat([]byte{0x05}, 32),
+		bytes.Repeat([]byte{0x06}, 32),
+	}
+
 	partialMintTokenTransaction := &pb.TokenTransaction{
 		TokenInput: &pb.TokenTransaction_MintInput{
 			MintInput: &pb.MintInput{
@@ -44,6 +53,7 @@ func TestHashTokenTransactionUniqueHash(t *testing.T) {
 				TokenAmount:    []byte{0x01},
 			},
 		},
+		SparkOperatorIdentityPublicKeys: operatorKeys,
 	}
 
 	partialTransferTokenTransaction := &pb.TokenTransaction{
@@ -64,6 +74,7 @@ func TestHashTokenTransactionUniqueHash(t *testing.T) {
 				TokenAmount:    []byte{0x01},
 			},
 		},
+		SparkOperatorIdentityPublicKeys: operatorKeys,
 	}
 
 	leafID := "test-leaf-1"

@@ -30,11 +30,23 @@ func HashTokenTransaction(tokenTransaction *pb.TokenTransaction, partialHash boo
 
 	// Hash input leaves if a transfer.
 	if transferSource := tokenTransaction.GetTransferInput(); transferSource != nil {
-		for _, leaf := range transferSource.GetLeavesToSpend() {
-			h.Reset()
-			if leaf.GetPrevTokenTransactionHash() != nil {
-				h.Write(leaf.GetPrevTokenTransactionHash())
+		if transferSource.LeavesToSpend == nil {
+			return nil, fmt.Errorf("transfer input leaves cannot be nil")
+		}
+		for i, leaf := range transferSource.GetLeavesToSpend() {
+			if leaf == nil {
+				return nil, fmt.Errorf("transfer input leaf at index %d cannot be nil", i)
 			}
+			h.Reset()
+
+			txHash := leaf.GetPrevTokenTransactionHash()
+			if txHash != nil {
+				if len(txHash) != 32 {
+					return nil, fmt.Errorf("invalid previous transaction hash length at index %d: expected 32 bytes, got %d", i, len(txHash))
+				}
+				h.Write(txHash)
+			}
+
 			buf := make([]byte, 4)
 			binary.BigEndian.PutUint32(buf, leaf.GetPrevTokenTransactionLeafVout())
 			h.Write(buf)
@@ -44,9 +56,14 @@ func HashTokenTransaction(tokenTransaction *pb.TokenTransaction, partialHash boo
 	// Hash mint input if a mint
 	if mintInput := tokenTransaction.GetMintInput(); mintInput != nil {
 		h.Reset()
-		if mintInput.GetIssuerPublicKey() != nil {
-			h.Write(mintInput.GetIssuerPublicKey())
+		pubKey := mintInput.GetIssuerPublicKey()
+		if pubKey != nil {
+			if len(pubKey) == 0 {
+				return nil, fmt.Errorf("issuer public key cannot be empty")
+			}
+			h.Write(pubKey)
 		}
+
 		if mintInput.GetIssuerProvidedTimestamp() != 0 {
 			nonceBytes := make([]byte, 8)
 			binary.LittleEndian.PutUint64(nonceBytes, mintInput.GetIssuerProvidedTimestamp())
@@ -57,21 +74,42 @@ func HashTokenTransaction(tokenTransaction *pb.TokenTransaction, partialHash boo
 	}
 
 	// Hash output leaves
-	for _, leaf := range tokenTransaction.OutputLeaves {
+	if tokenTransaction.OutputLeaves == nil {
+		return nil, fmt.Errorf("output leaves cannot be nil")
+	}
+	for i, leaf := range tokenTransaction.OutputLeaves {
+		if leaf == nil {
+			return nil, fmt.Errorf("output leaf at index %d cannot be nil", i)
+		}
 		h.Reset()
+
 		// Leaf ID is not set in the partial token transaction.
-		if leaf.GetId() != "" && !partialHash {
-			h.Write([]byte(leaf.GetId()))
-		}
-		if leaf.GetOwnerPublicKey() != nil {
-			h.Write(leaf.GetOwnerPublicKey())
-		}
-		// Revocation public key is not set in the partial token transaction.
-		if leaf.GetRevocationPublicKey() != nil && !partialHash {
-			h.Write(leaf.GetRevocationPublicKey())
+		if !partialHash && leaf.GetId() != "" {
+			id := []byte(leaf.GetId())
+			if len(id) == 0 {
+				return nil, fmt.Errorf("leaf ID at index %d cannot be empty", i)
+			}
+			h.Write(id)
 		}
 
+		ownerPubKey := leaf.GetOwnerPublicKey()
+		if ownerPubKey != nil {
+			if len(ownerPubKey) == 0 {
+				return nil, fmt.Errorf("owner public key at index %d cannot be empty", i)
+			}
+			h.Write(ownerPubKey)
+		}
+
+		// Revocation public key is not set in the partial token transaction.
 		if !partialHash {
+			revPubKey := leaf.GetRevocationPublicKey()
+			if revPubKey != nil {
+				if len(revPubKey) == 0 {
+					return nil, fmt.Errorf("revocation public key at index %d cannot be empty", i)
+				}
+				h.Write(revPubKey)
+			}
+
 			withdrawalBondBytes := make([]byte, 8)
 			binary.BigEndian.PutUint64(withdrawalBondBytes, leaf.GetWithdrawBondSats())
 			h.Write(withdrawalBondBytes)
@@ -81,26 +119,48 @@ func HashTokenTransaction(tokenTransaction *pb.TokenTransaction, partialHash boo
 			h.Write(withdrawalLocktimeBytes)
 		}
 
-		if leaf.GetTokenPublicKey() != nil {
-			h.Write(leaf.GetTokenPublicKey())
+		tokenPubKey := leaf.GetTokenPublicKey()
+		if tokenPubKey != nil {
+			if len(tokenPubKey) == 0 {
+				return nil, fmt.Errorf("token public key at index %d cannot be empty", i)
+			}
+			h.Write(tokenPubKey)
 		}
-		if leaf.GetTokenAmount() != nil {
-			h.Write(leaf.GetTokenAmount())
+
+		tokenAmount := leaf.GetTokenAmount()
+		if tokenAmount != nil {
+			if len(tokenAmount) == 0 {
+				return nil, fmt.Errorf("token amount at index %d cannot be empty", i)
+			}
+			if len(tokenAmount) > 16 {
+				return nil, fmt.Errorf("token amount at index %d exceeds maximum length: got %d bytes, max 16", i, len(tokenAmount))
+			}
+			h.Write(tokenAmount)
 		}
+
 		allHashes = append(allHashes, h.Sum(nil)...)
 	}
 
 	operatorPublicKeys := tokenTransaction.GetSparkOperatorIdentityPublicKeys()
+	if operatorPublicKeys == nil {
+		return nil, fmt.Errorf("operator public keys cannot be nil")
+	}
+
+	// Sort operator keys for consistent hashing
 	sort.Slice(operatorPublicKeys, func(i, j int) bool {
 		return bytes.Compare(operatorPublicKeys[i], operatorPublicKeys[j]) < 0
 	})
 
 	// Hash spark operator identity public keys
-	for _, pubKey := range operatorPublicKeys {
-		h.Reset()
-		if pubKey != nil {
-			h.Write(pubKey)
+	for i, pubKey := range operatorPublicKeys {
+		if pubKey == nil {
+			return nil, fmt.Errorf("operator public key at index %d cannot be nil", i)
 		}
+		if len(pubKey) == 0 {
+			return nil, fmt.Errorf("operator public key at index %d cannot be empty", i)
+		}
+		h.Reset()
+		h.Write(pubKey)
 		allHashes = append(allHashes, h.Sum(nil)...)
 	}
 
