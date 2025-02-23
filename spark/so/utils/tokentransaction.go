@@ -170,9 +170,11 @@ func HashTokenTransaction(tokenTransaction *pb.TokenTransaction, partialHash boo
 	return h.Sum(nil), nil
 }
 
+// HashOperatorSpecificTokenTransactionSignablePayload generates a hash of the operator-specific payload
+// by concatenating hashes of the transaction hash and operator public key.
 func HashOperatorSpecificTokenTransactionSignablePayload(payload *pb.OperatorSpecificTokenTransactionSignablePayload) ([]byte, error) {
 	if payload == nil {
-		return nil, fmt.Errorf("revocation keyshare signable payload cannot be nil")
+		return nil, fmt.Errorf("operator specific token transaction signable payload cannot be nil")
 	}
 
 	h := sha256.New()
@@ -180,16 +182,25 @@ func HashOperatorSpecificTokenTransactionSignablePayload(payload *pb.OperatorSpe
 
 	// Hash final_token_transaction_hash
 	h.Reset()
-	if payload.GetFinalTokenTransactionHash() != nil {
-		h.Write(payload.GetFinalTokenTransactionHash())
+	txHash := payload.GetFinalTokenTransactionHash()
+	if txHash != nil {
+		if len(txHash) != 32 {
+			return nil, fmt.Errorf("invalid final transaction hash length: expected 32 bytes, got %d", len(txHash))
+		}
+		h.Write(txHash)
 	}
 	allHashes = append(allHashes, h.Sum(nil)...)
 
 	// Hash operator_identity_public_key
 	h.Reset()
-	if payload.GetOperatorIdentityPublicKey() != nil {
-		h.Write(payload.GetOperatorIdentityPublicKey())
+	pubKey := payload.GetOperatorIdentityPublicKey()
+	if pubKey == nil {
+		return nil, fmt.Errorf("operator identity public key cannot be nil")
 	}
+	if len(pubKey) == 0 {
+		return nil, fmt.Errorf("operator identity public key cannot be empty")
+	}
+	h.Write(pubKey)
 	allHashes = append(allHashes, h.Sum(nil)...)
 
 	// Final hash of all concatenated hashes
@@ -198,26 +209,41 @@ func HashOperatorSpecificTokenTransactionSignablePayload(payload *pb.OperatorSpe
 	return h.Sum(nil), nil
 }
 
+// HashFreezeTokensPayload generates a hash of the freeze tokens payload by concatenating
+// hashes of the owner public key, token public key, freeze status, timestamp and operator key.
 func HashFreezeTokensPayload(payload *pb.FreezeTokensPayload) ([]byte, error) {
 	if payload == nil {
-		return nil, fmt.Errorf("revocation keyshare signable payload cannot be nil")
+		return nil, fmt.Errorf("freeze tokens payload cannot be nil")
 	}
 
 	h := sha256.New()
 	var allHashes []byte
 
+	// Hash owner_public_key
 	h.Reset()
-	if payload.GetOwnerPublicKey() != nil {
-		h.Write(payload.GetOwnerPublicKey())
+	ownerPubKey := payload.GetOwnerPublicKey()
+	if ownerPubKey == nil {
+		return nil, fmt.Errorf("owner public key cannot be nil")
 	}
+	if len(ownerPubKey) == 0 {
+		return nil, fmt.Errorf("owner public key cannot be empty")
+	}
+	h.Write(ownerPubKey)
 	allHashes = append(allHashes, h.Sum(nil)...)
 
+	// Hash token_public_key
 	h.Reset()
-	if payload.GetTokenPublicKey() != nil {
-		h.Write(payload.GetTokenPublicKey())
+	tokenPubKey := payload.GetTokenPublicKey()
+	if tokenPubKey == nil {
+		return nil, fmt.Errorf("token public key cannot be nil")
 	}
+	if len(tokenPubKey) == 0 {
+		return nil, fmt.Errorf("token public key cannot be empty")
+	}
+	h.Write(tokenPubKey)
 	allHashes = append(allHashes, h.Sum(nil)...)
 
+	// Hash should_unfreeze
 	h.Reset()
 	if payload.GetShouldUnfreeze() {
 		h.Write([]byte{1})
@@ -226,19 +252,28 @@ func HashFreezeTokensPayload(payload *pb.FreezeTokensPayload) ([]byte, error) {
 	}
 	allHashes = append(allHashes, h.Sum(nil)...)
 
+	// Hash issuer_provided_timestamp
 	h.Reset()
-	if payload.GetIssuerProvidedTimestamp() != 0 {
-		nonceBytes := make([]byte, 8)
-		binary.LittleEndian.PutUint64(nonceBytes, payload.IssuerProvidedTimestamp)
-		h.Write(nonceBytes)
+	if payload.GetIssuerProvidedTimestamp() == 0 {
+		return nil, fmt.Errorf("issuer provided timestamp cannot be 0")
 	}
+	nonceBytes := make([]byte, 8)
+	binary.LittleEndian.PutUint64(nonceBytes, payload.GetIssuerProvidedTimestamp())
+	h.Write(nonceBytes)
 	allHashes = append(allHashes, h.Sum(nil)...)
 
+	// Hash operator_identity_public_key
 	h.Reset()
-	if payload.GetOperatorIdentityPublicKey() != nil {
-		h.Write(payload.GetOperatorIdentityPublicKey())
+	operatorPubKey := payload.GetOperatorIdentityPublicKey()
+	if operatorPubKey == nil {
+		return nil, fmt.Errorf("operator identity public key cannot be nil")
 	}
+	if len(operatorPubKey) == 0 {
+		return nil, fmt.Errorf("operator identity public key cannot be empty")
+	}
+	h.Write(operatorPubKey)
 	allHashes = append(allHashes, h.Sum(nil)...)
+
 	// Final hash of all concatenated hashes
 	h.Reset()
 	h.Write(allHashes)
