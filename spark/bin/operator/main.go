@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"log"
 	"log/slog"
-	"net"
+	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -18,6 +18,7 @@ import (
 
 	"github.com/go-co-op/gocron/v2"
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
+	"github.com/improbable-eng/grpc-web/go/grpcweb"
 	_ "github.com/lib/pq"
 	"github.com/lightsparkdev/spark-go/common"
 	pbdkg "github.com/lightsparkdev/spark-go/proto/dkg"
@@ -122,7 +123,7 @@ func loadArgs() (*args, error) {
 	case "error":
 		level = slog.LevelError
 	default:
-		return nil, errors.New("Invalid log level")
+		return nil, errors.New("invalid log level")
 	}
 
 	options := slog.HandlerOptions{AddSource: true, Level: level}
@@ -212,11 +213,6 @@ func main() {
 		log.Fatalf("failed creating schema resources: %v", err)
 	}
 
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", args.Port))
-	if err != nil {
-		log.Fatalf("Failed to listen on port %d: %v", args.Port, err)
-	}
-
 	frostConnection, err := common.NewGRPCConnectionWithoutTLS(args.SignerAddress)
 	if err != nil {
 		log.Fatalf("Failed to create frost client: %v", err)
@@ -260,6 +256,7 @@ func main() {
 	))
 
 	var grpcServer *grpc.Server
+	var tlsConfig *tls.Config
 	if args.ServerCertPath != "" && args.ServerKeyPath != "" {
 		cert, err := tls.LoadX509KeyPair(args.ServerCertPath, args.ServerKeyPath)
 		if err != nil {
@@ -275,10 +272,15 @@ func main() {
 			serverOpts,
 		)
 		log.Printf("Server starting with TLS on: %v", args.ServerCertPath)
+		tlsConfig = &tls.Config{
+			Certificates: []tls.Certificate{cert},
+			MinVersion:   tls.VersionTLS12,
+		}
 	} else {
 		grpcServer = grpc.NewServer(
 			serverOpts,
 		)
+		tlsConfig = nil
 	}
 
 	if !args.DisableDKG {
@@ -317,7 +319,59 @@ func main() {
 	log.Printf("Serving on port %d\n", args.Port)
 
 	go runDKGOnStartup(dbClient, config)
-	if err := grpcServer.Serve(lis); err != nil {
+
+	wrappedGrpc := grpcweb.WrapServer(grpcServer,
+		grpcweb.WithOriginFunc(func(_ string) bool {
+			return true // Configure as needed for production
+		}),
+		grpcweb.WithAllowedRequestHeaders([]string{
+			"Accept",
+			"Content-Type",
+			"Content-Length",
+			"Accept-Encoding",
+			"X-CSRF-Token",
+			"Authorization",
+			"X-User-Agent",
+			"X-Grpc-Web",
+		}),
+	)
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Check if it's a gRPC request
+		if r.Method == "OPTIONS" {
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+			w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "*")
+			w.WriteHeader(http.StatusOK)
+			_, err := w.Write([]byte("OK"))
+			if err != nil {
+				log.Printf("Failed to write response: %v", err)
+			}
+			return
+		}
+		if strings.Contains(r.Header.Get("Content-Type"), "application/grpc-web") || wrappedGrpc.IsGrpcWebRequest(r) {
+			log.Printf("serving grpc-web request")
+			r.Header.Set("Access-Control-Allow-Origin", "*")
+			r.Header.Set("Access-Control-Allow-Headers", "*")
+			wrappedGrpc.ServeHTTP(w, r)
+			return
+		}
+		if r.ProtoMajor == 2 && strings.Contains(r.Header.Get("Content-Type"), "application/grpc") {
+			log.Printf("serving grpc request")
+			grpcServer.ServeHTTP(w, r)
+			return
+		}
+
+		http.NotFound(w, r)
+	})
+
+	server := &http.Server{
+		Addr:      fmt.Sprintf(":%d", args.Port),
+		Handler:   handler,
+		TLSConfig: tlsConfig,
+	}
+
+	if err := server.ListenAndServeTLS(args.ServerCertPath, args.ServerKeyPath); err != nil {
 		log.Fatalf("Failed to serve: %v", err)
 	}
 }
