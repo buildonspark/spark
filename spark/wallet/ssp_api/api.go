@@ -183,21 +183,17 @@ func (s *SparkServiceAPI) CompleteCoopExit(
 	return requestID, nil
 }
 
-func (s *SparkServiceAPI) FetchPublicKeyByPhoneNumber(_ string) (string, error) {
-	// func (s *SparkServiceAPI) FetchPublicKeyByPhoneNumber(phoneNumber string) (string, error) {
-	// variables := map[string]interface{}{
-	// 	"phone_number": phoneNumber,
-	// }
+func (s *SparkServiceAPI) FetchPublicKeyByPhoneNumber(phoneNumber string) (string, error) {
+	variables := map[string]interface{}{
+		"phone_number": phoneNumber,
+	}
 
-	// response, err := s.Requester.ExecuteGraphqlWithContext(context.Background(), WalletUserIdentityPublicKeyMutation, variables)
-	// if err != nil {
-	// 	return "", err
-	// }
+	response, err := s.Requester.ExecuteGraphqlWithContext(context.Background(), WalletUserIdentityPublicKeyMutation, variables)
+	if err != nil {
+		return "", err
+	}
 
-	// return response["wallet_user_identity_public_key"].(map[string]interface{})["public_key"].(string), nil
-
-	// TODO: Remove this, this is seed 0000 in golang wallet.
-	return "034720fdda0c8000f31215ff701de45f796f74941faf8776550698d45c4d7e12a8", nil
+	return response["wallet_user_identity_public_key"].(map[string]interface{})["identity_public_key"].(string), nil
 }
 
 func (s *SparkServiceAPI) StartReleaseSeed(_ string) error {
