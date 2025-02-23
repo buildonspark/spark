@@ -11,7 +11,7 @@ import ArrowLeft from "../../icons/ArrowLeft";
 import CloseIcon from "../../icons/CloseIcon";
 import { Routes } from "../../routes";
 import { useWallet } from "../../store/wallet";
-import { PrimaryCurrency } from "../wallet/Wallet";
+import { Currency } from "../../utils/currency";
 
 export enum SendStep {
   AddressInput = "AddressInput",
@@ -30,14 +30,12 @@ export default function Send() {
   const [sendAddressNetwork, setSendAddressNetwork] = useState<Network>(
     Network.NONE,
   );
-  const [sendFiatAmount, setSendFiatAmount] = useState<string>("0");
-  const [primaryCurrency, setPrimaryCurrency] = useState<PrimaryCurrency>(
-    PrimaryCurrency.USD,
-  );
+  const [rawInputAmount, setRawInputAmount] = useState<string>("0");
   const [sendResponse, setSendResponse] = useState<Transfer | string | null>(
     null,
   );
-  const { satsUsdPrice, sendTransfer, payLightningInvoice } = useWallet();
+  const { satsUsdPrice, activeCurrency, sendTransfer, payLightningInvoice } =
+    useWallet();
 
   const logoLeft = useMemo(() => {
     switch (currentStep) {
@@ -51,7 +49,7 @@ export default function Send() {
   const onLogoLeftClick = useCallback(() => {
     switch (currentStep) {
       case SendStep.AmountInput:
-        setSendFiatAmount("0");
+        setRawInputAmount("0");
         setCurrentStep(SendStep.AddressInput);
         break;
       case SendStep.ConfirmQuote:
@@ -98,14 +96,15 @@ export default function Send() {
         setCurrentStep(SendStep.ConfirmQuote);
         break;
       case SendStep.ConfirmQuote:
-        const satsToSend = Math.floor(
-          Number(sendFiatAmount) / satsUsdPrice.value,
-        );
+        const satsToSend =
+          activeCurrency === Currency.USD
+            ? Math.floor(Number(rawInputAmount) / satsUsdPrice.value)
+            : Number(rawInputAmount);
         console.log("satsToSend", satsToSend);
         if (sendAddressNetwork === Network.LIGHTNING) {
-          await payLightningInvoice(sendAddress);
+          // await payLightningInvoice(sendAddress);
         } else if (sendAddressNetwork === Network.SPARK) {
-          await sendTransfer(satsToSend, sendAddress);
+          // await sendTransfer(satsToSend, sendAddress);
         } else if (sendAddressNetwork === Network.BITCOIN) {
           // TODO
         }
@@ -119,11 +118,9 @@ export default function Send() {
     currentStep,
     navigate,
     sendAddressNetwork,
-    sendAddress,
-    sendFiatAmount,
+    rawInputAmount,
+    activeCurrency,
     satsUsdPrice,
-    sendTransfer,
-    payLightningInvoice,
   ]);
 
   return (
@@ -146,22 +143,28 @@ export default function Send() {
       )}
       {currentStep === SendStep.AmountInput && (
         <AmountInput
-          fiatAmount={sendFiatAmount}
-          setFiatAmount={setSendFiatAmount}
-          primaryCurrency={primaryCurrency}
-          togglePrimaryCurrency={() => {}}
+          rawInputAmount={rawInputAmount}
+          setRawInputAmount={setRawInputAmount}
         />
       )}
       {currentStep === SendStep.ConfirmQuote && (
         <ConfirmQuote
-          sendFiatAmount={sendFiatAmount}
+          sendFiatAmount={
+            activeCurrency === Currency.USD
+              ? rawInputAmount
+              : `${Number(rawInputAmount) * satsUsdPrice.value}`
+          }
           sendAddress={sendAddress}
           sendAddressNetwork={sendAddressNetwork}
         />
       )}
       {currentStep === SendStep.Success && (
         <SendDetails
-          sendFiatAmount={sendFiatAmount}
+          sendFiatAmount={
+            activeCurrency === Currency.USD
+              ? rawInputAmount
+              : `${(Number(rawInputAmount) * satsUsdPrice.value).toFixed(2)}`
+          }
           sendAddress={sendAddress}
         />
       )}

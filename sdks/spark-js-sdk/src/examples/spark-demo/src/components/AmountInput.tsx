@@ -1,46 +1,84 @@
-import { useEffect } from "react";
+import { useCallback, useEffect } from "react";
 import styled from "styled-components";
 import DeleteIcon from "../icons/DeleteIcon";
 import ToggleIcon from "../icons/ToggleIcon";
-import { PrimaryCurrency } from "../pages/wallet/Wallet";
 
 import { useWallet } from "../store/wallet";
-export default function AmountInput({
-  fiatAmount,
-  setFiatAmount,
-  primaryCurrency,
-  togglePrimaryCurrency,
+import { Currency } from "../utils/currency";
+
+const FiatAmountPrimaryDisplay = ({
+  parsedString,
 }: {
-  fiatAmount: string;
-  setFiatAmount: React.Dispatch<React.SetStateAction<string>>;
-  primaryCurrency: PrimaryCurrency;
-  togglePrimaryCurrency: () => void;
+  parsedString: string;
+}) => {
+  const intAmount = parsedString.split(".")[0];
+  const decAmount = parsedString.split(".")[1];
+  return (
+    <div className="relative flex items-end justify-center text-white">
+      <div className="flex items-center gap-2">
+        <div className="text-xl">$</div>
+        <div className="text-6xl">{intAmount}</div>
+      </div>
+      <div className="self-end text-xl">
+        {decAmount && decAmount !== "00" ? `.${decAmount}` : ""}
+      </div>
+    </div>
+  );
+};
+
+const SatAmountPrimaryDisplay = ({
+  parsedString,
+}: {
+  parsedString: string;
+}) => {
+  return (
+    <div className="text-6xl">
+      {Number(parsedString).toLocaleString()}
+      <span className="text-sm">SATs</span>
+    </div>
+  );
+};
+
+export default function AmountInput({
+  rawInputAmount,
+  setRawInputAmount,
+}: {
+  rawInputAmount: string;
+  setRawInputAmount: React.Dispatch<React.SetStateAction<string>>;
 }) {
-  const { satsUsdPrice } = useWallet();
+  const { satsUsdPrice, activeCurrency, setActiveCurrency } = useWallet();
 
-  const handleKey = (key: string) => {
-    setFiatAmount((prev) => {
-      if (key === "Backspace") {
-        if (prev.length === 1) {
-          return "0";
+  const handleKey = useCallback(
+    (key: string) => {
+      setRawInputAmount((prev) => {
+        if (key === "Backspace") {
+          if (prev.length === 1) {
+            return "0";
+          }
+          return prev.slice(0, -1);
         }
 
-        return prev.slice(0, -1);
-      }
-
-      if (!isNaN(Number(prev + key))) {
-        if (prev === "0" && key !== ".") {
-          return key;
+        // Check if the key is a decimal point and the active currency is BTC
+        if (key === "." && activeCurrency === Currency.BTC) {
+          return prev; // Ignore the decimal point in sats mode
         }
 
-        if (prev.length >= 4 && prev[prev.length - 3] === ".") {
-          return prev;
+        if (!isNaN(Number(prev + key))) {
+          if (prev === "0" && key !== ".") {
+            return key;
+          }
+          const decimalIndex = prev.indexOf(".");
+          if (decimalIndex !== -1 && prev.length - decimalIndex > 2) {
+            // If there are already two decimal places, prevent further input
+            return prev;
+          }
+          return prev + key;
         }
-        return prev + key;
-      }
-      return prev;
-    });
-  };
+        return prev;
+      });
+    },
+    [activeCurrency, setRawInputAmount],
+  );
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -52,37 +90,79 @@ export default function AmountInput({
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [fiatAmount]);
+  }, [handleKey]);
 
-  const intAmount = fiatAmount.split(".")[0];
-  const decAmount = fiatAmount.split(".")[1];
-  const hasDecimal = fiatAmount.includes(".");
+  const resolveCurrencyDisplay = useCallback(() => {
+    const intAmount = rawInputAmount.split(".")[0];
+    const decAmount = rawInputAmount.split(".")[1];
+
+    const fiatAmountString =
+      activeCurrency === Currency.USD
+        ? `${Number(intAmount).toLocaleString()}${
+            decAmount ? `.${decAmount}` : ""
+          }`
+        : (Number(rawInputAmount) * satsUsdPrice.value).toFixed(2);
+    const satsAmountString =
+      activeCurrency === Currency.BTC
+        ? `${rawInputAmount}`
+        : Number(
+            (Number(rawInputAmount) / satsUsdPrice.value).toFixed(0),
+          ).toLocaleString();
+    return {
+      fiatAmountString,
+      satsAmountString,
+    };
+  }, [satsUsdPrice, rawInputAmount, activeCurrency]);
+
+  useEffect(() => {
+    resolveCurrencyDisplay();
+  }, [rawInputAmount, satsUsdPrice, resolveCurrencyDisplay, activeCurrency]);
+
   return (
     <div className="flex w-full flex-col items-center gap-2">
       <div className="my-10">
-        {primaryCurrency === PrimaryCurrency.USD ? (
-          <div className="flex justify-center font-decimal">
-            <div className="self-center text-[24px]">$</div>
-            <div className="text-[60px] leading-[60px]">
-              {Number(intAmount).toLocaleString()}
-            </div>
-            {(decAmount || hasDecimal) && (
-              <div className="self-end text-[24px]">.{decAmount}</div>
-            )}
-          </div>
-        ) : (
-          <div></div>
-        )}
+        <div className="flex justify-center font-decimal text-[60px] leading-[60px]">
+          {activeCurrency === Currency.USD ? (
+            rawInputAmount ? (
+              <FiatAmountPrimaryDisplay
+                parsedString={resolveCurrencyDisplay().fiatAmountString}
+              />
+            ) : (
+              <FiatAmountPrimaryDisplay parsedString={"0"} />
+            )
+          ) : rawInputAmount ? (
+            <SatAmountPrimaryDisplay
+              parsedString={resolveCurrencyDisplay().satsAmountString}
+            />
+          ) : (
+            <SatAmountPrimaryDisplay parsedString={"0"} />
+          )}
+        </div>
         <div className="flex items-center justify-center gap-2">
           <div
             className="flex inline-flex items-center gap-2 rounded-full bg-[#F9F9F9] bg-opacity-20 px-2 py-1 text-center font-decimal text-[13px] opacity-40 active:bg-opacity-40"
-            onClick={togglePrimaryCurrency}
+            onClick={() => {
+              const { fiatAmountString, satsAmountString } =
+                resolveCurrencyDisplay();
+              if (activeCurrency === Currency.BTC) {
+                const removeCommas = fiatAmountString.replace(/,/g, ""); // remove commas
+                const cleanedInput = removeCommas.replace(/\.00$/, ""); // remove trailing .00
+                setRawInputAmount(cleanedInput);
+                setActiveCurrency(Currency.USD);
+              } else {
+                const parsedInput = satsAmountString.replace(/,/g, ""); // remove commas
+                setRawInputAmount(parsedInput.length > 0 ? parsedInput : "0");
+                setActiveCurrency(Currency.BTC);
+              }
+            }}
           >
-            {satsUsdPrice
-              ? `${Math.floor(Number(fiatAmount) / satsUsdPrice.value).toFixed(
-                  0,
-                )} SATs`
-              : "0 SATs"}
+            {activeCurrency === Currency.USD
+              ? rawInputAmount
+                ? `${resolveCurrencyDisplay().satsAmountString} SATs`
+                : "0 SATs"
+              : rawInputAmount
+                ? `$${resolveCurrencyDisplay().fiatAmountString}`
+                : "$0"}
             <ToggleIcon />
           </div>
         </div>

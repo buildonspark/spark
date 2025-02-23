@@ -3,11 +3,13 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { SparkWallet } from "spark-sdk";
 import { Network } from "spark-sdk/utils";
 import { create } from "zustand";
+import { Currency } from "../utils/currency";
 
 interface WalletState {
   wallet: SparkWallet;
   isInitialized: boolean;
   mnemonic: string | null;
+  activeCurrency: Currency;
 }
 
 interface WalletActions {
@@ -17,6 +19,8 @@ interface WalletActions {
   sendTransfer: (amount: number, recipient: string) => Promise<void>;
   payLightningInvoice: (invoice: string) => Promise<void>;
   loadStoredWallet: () => Promise<void>;
+  // fetchOwnedTokens: () => Promise<LeafWithPreviousTransactionData[]>;
+  setActiveCurrency: (currency: Currency) => void;
 }
 
 type WalletStore = WalletState & WalletActions;
@@ -27,6 +31,18 @@ const useWalletStore = create<WalletStore>((set, get) => ({
   wallet: new SparkWallet(Network.REGTEST),
   isInitialized: false,
   mnemonic: null,
+  activeCurrency: Currency.USD,
+  setActiveCurrency: (currency: Currency) => {
+    set({ activeCurrency: currency });
+  },
+  // fetchOwnedTokens: async () => {
+  //   const { wallet } = get();
+  //   const leaves = await wallet.fetchOwnedTokenLeaves([
+  //     await wallet.getMasterPubKey(),
+  //   ]);
+  //   // TODO: process the leaves into tokens.
+  //   return leaves;
+  // },
 
   generateMnemonic: async () => {
     const { wallet } = get();
@@ -124,6 +140,8 @@ export function useWallet() {
   const state = useWalletStore.getState();
 
   return {
+    activeCurrency: state.activeCurrency,
+    setActiveCurrency: state.setActiveCurrency,
     balance: {
       value: Number(balanceQuery.data ?? 0),
       isLoading: balanceQuery.isLoading,

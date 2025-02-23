@@ -11,14 +11,14 @@ import { getFontSizeForCard, roundDown } from "../../utils/utils";
 
 export enum PrimaryCurrency {
   USD = "USD",
-  SATS = "SATs",
+  BTC = "BTC",
 }
 
 export default function Wallet() {
   const navigate = useNavigate();
 
   const { balance: satsBalance, satsUsdPrice } = useWallet();
-  satsBalance.value = 202020;
+  // satsBalance.value = 202020;
   console.log(satsBalance);
   let usdBalance = useMemo(() => {
     return satsUsdPrice

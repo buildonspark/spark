@@ -8,7 +8,7 @@ import ArrowLeft from "../../icons/ArrowLeft";
 import CloseIcon from "../../icons/CloseIcon";
 import { Routes } from "../../routes";
 import { useWallet } from "../../store/wallet";
-import { PrimaryCurrency } from "../wallet/Wallet";
+import { Currency } from "../../utils/currency";
 
 enum ReceiveStep {
   NetworkSelect = "NetworkSelect",
@@ -19,18 +19,14 @@ enum ReceiveStep {
 }
 
 export default function Receive() {
-  const [fiatAmount, setFiatAmount] = useState("0");
-  const [satsAmount, setSatsAmount] = useState("0");
-  const [primaryCurrency, setPrimaryCurrency] = useState<PrimaryCurrency>(
-    PrimaryCurrency.USD,
-  );
+  const [rawInputAmount, setRawInputAmount] = useState("0");
   const [lightningInvoice, setLightningInvoice] = useState<string | null>(null);
   const [paymentNetwork, setPaymentNetwork] = useState<Network>(Network.NONE);
   const [qrCodeModalVisible, setQrCodeModalVisible] = useState<boolean>(false);
   const [currentStep, setCurrentStep] = useState<ReceiveStep>(
     ReceiveStep.NetworkSelect,
   );
-  const { satsUsdPrice } = useWallet();
+  const { satsUsdPrice, activeCurrency } = useWallet();
   const { createLightningInvoice } = useWallet();
   const navigate = useNavigate();
 
@@ -40,15 +36,17 @@ export default function Receive() {
         setCurrentStep(ReceiveStep.InputAmount);
         break;
       case ReceiveStep.InputAmount:
-        const satsToReceive = Math.floor(
-          Number(fiatAmount) / satsUsdPrice.value,
-        );
+        const satsToReceive =
+          activeCurrency === Currency.USD
+            ? Math.floor(Number(rawInputAmount) / satsUsdPrice.value)
+            : Number(rawInputAmount);
         console.log("satsToReceive", satsToReceive);
-        const invoice = await createLightningInvoice(
-          satsToReceive,
-          "test memo",
-        );
-        setLightningInvoice(invoice);
+        // const invoice = await createLightningInvoice(
+        //   satsToReceive,
+        //   "test memo",
+        // );
+        const TEST_INVOICE = "test_invoice";
+        setLightningInvoice(TEST_INVOICE);
         setCurrentStep(ReceiveStep.ShareQuote);
         break;
       case ReceiveStep.ShareQuote:
@@ -58,7 +56,8 @@ export default function Receive() {
   }, [
     setCurrentStep,
     createLightningInvoice,
-    fiatAmount,
+    activeCurrency,
+    rawInputAmount,
     satsUsdPrice,
     currentStep,
   ]);
@@ -66,7 +65,7 @@ export default function Receive() {
   const onLogoLeftClick = useCallback(() => {
     switch (currentStep) {
       case ReceiveStep.InputAmount:
-        setFiatAmount("0");
+        setRawInputAmount("0");
         setCurrentStep(ReceiveStep.NetworkSelect);
         break;
       case ReceiveStep.NetworkSelect:
@@ -74,18 +73,7 @@ export default function Receive() {
         navigate(Routes.Wallet);
         break;
     }
-  }, [currentStep, navigate, setFiatAmount, setCurrentStep]);
-
-  const togglePrimaryCurrency = useCallback(() => {
-    switch (primaryCurrency) {
-      case PrimaryCurrency.USD:
-        setPrimaryCurrency(PrimaryCurrency.SATS);
-        break;
-      case PrimaryCurrency.SATS:
-        setPrimaryCurrency(PrimaryCurrency.USD);
-        break;
-    }
-  }, [primaryCurrency, setPrimaryCurrency]);
+  }, [currentStep, navigate, setRawInputAmount, setCurrentStep]);
 
   const topTitle = useMemo(() => {
     switch (currentStep) {
@@ -135,15 +123,17 @@ export default function Receive() {
         )}
         {currentStep === ReceiveStep.InputAmount && (
           <AmountInput
-            fiatAmount={fiatAmount}
-            setFiatAmount={setFiatAmount}
-            primaryCurrency={primaryCurrency}
-            togglePrimaryCurrency={togglePrimaryCurrency}
+            rawInputAmount={rawInputAmount}
+            setRawInputAmount={setRawInputAmount}
           />
         )}
         {currentStep === ReceiveStep.ShareQuote && (
           <ReceiveDetails
-            receiveFiatAmount={fiatAmount}
+            receiveFiatAmount={
+              activeCurrency === Currency.USD
+                ? rawInputAmount
+                : `${Number(rawInputAmount) * satsUsdPrice.value}`
+            }
             lightningInvoice={lightningInvoice}
             onEditAmount={() => {
               setCurrentStep(ReceiveStep.InputAmount);

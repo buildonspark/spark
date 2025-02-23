@@ -20,7 +20,7 @@ export default function ConfirmQuote({
         <div className="flex justify-center font-decimal">
           <div className="self-center text-[24px]">$</div>
           <div className="text-[60px] leading-[60px]">
-            {Number(sendFiatAmount).toLocaleString()}
+            {Number(intAmount).toLocaleString()}
           </div>
           {(decAmount || hasDecimal) && (
             <div className="self-end text-[24px]">.{decAmount}</div>

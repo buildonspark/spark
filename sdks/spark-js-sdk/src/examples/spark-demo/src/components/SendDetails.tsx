@@ -18,7 +18,9 @@ export default function SendDetails({
       <div className="text-[18px] font-normal">Payment sent</div>
       <div className="mt-2 text-[13px] text-white/50">
         ${sendFiatAmount} ({" "}
-        {satsUsdPrice && Number(sendFiatAmount) / satsUsdPrice} SATs sent to)
+        {satsUsdPrice &&
+          (Number(sendFiatAmount) / satsUsdPrice.value).toFixed(0)}{" "}
+        SATs sent to)
       </div>
       <div className="text-[13px] text-white/50">
         {sendAddress.length > 14
