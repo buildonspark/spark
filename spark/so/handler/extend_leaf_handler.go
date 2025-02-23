@@ -104,19 +104,27 @@ func (h *ExtendLeafHandler) ExtendLeaf(ctx context.Context, req *pb.ExtendLeafRe
 		return nil, fmt.Errorf("failed to create refund signing job: %w", err)
 	}
 
+	treeID, err := leaf.QueryTree().Only(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get tree id: %w", err)
+	}
+	signingKeyshare, err := leaf.QuerySigningKeyshare().Only(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get signing keyshare id: %w", err)
+	}
 	// Update the nodes in the DB
 	// TODO: how to get the tree and keyshare id without a query?
 	// TODO: we probably need to sync this state between the SOs
 	newNode, err := db.
 		TreeNode.
 		Create().
-		SetTreeID(leaf.QueryTree().OnlyIDX(ctx)).
+		SetTreeID(treeID.ID).
 		SetStatus(schema.TreeNodeStatusAvailable).
 		SetOwnerIdentityPubkey(req.OwnerIdentityPublicKey).
 		SetOwnerSigningPubkey(leaf.OwnerSigningPubkey).
 		SetValue(leaf.Value).
 		SetVerifyingPubkey(leaf.VerifyingPubkey).
-		SetSigningKeyshareID(leaf.QuerySigningKeyshare().OnlyIDX(ctx)).
+		SetSigningKeyshareID(signingKeyshare.ID).
 		SetRawTx(req.NodeTxSigningJob.RawTx).
 		SetRawRefundTx(req.RefundTxSigningJob.RawTx).
 		SetVout(uint16(0)).
@@ -187,9 +195,13 @@ func createSigningJob(
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new node user nonce commitment: %w", err)
 	}
+	signingKeyshare, err := leaf.QuerySigningKeyshare().Only(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get signing keyshare id: %w", err)
+	}
 	return &helper.SigningJob{
 		JobID:             uuid.New().String(),
-		SigningKeyshareID: leaf.QuerySigningKeyshare().FirstIDX(ctx),
+		SigningKeyshareID: signingKeyshare.ID,
 		Message:           sigHash,
 		VerifyingKey:      leaf.VerifyingPubkey,
 		UserCommitment:    newNodeUserNonceCommitment,

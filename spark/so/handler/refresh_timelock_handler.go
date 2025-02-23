@@ -145,9 +145,15 @@ func (h *RefreshTimelockHandler) RefreshTimelock(ctx context.Context, req *pb.Re
 		if err != nil {
 			return nil, fmt.Errorf("unable to create user nonce commitment: %v", err)
 		}
+
+		signingKeyshare, err := nodes[i].QuerySigningKeyshare().Only(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get signing keyshare id: %w", err)
+		}
+
 		signingJobs = append(signingJobs, &helper.SigningJob{
 			JobID:             uuid.New().String(),
-			SigningKeyshareID: nodes[i].QuerySigningKeyshare().FirstIDX(ctx),
+			SigningKeyshareID: signingKeyshare.ID,
 			Message:           sigHash,
 			VerifyingKey:      nodes[i].VerifyingPubkey,
 			UserCommitment:    userNonceCommitment,

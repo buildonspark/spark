@@ -25,9 +25,13 @@ func (tn *TreeNode) MarshalSparkProto(ctx context.Context) (*pbspark.TreeNode, e
 	if err != nil {
 		return nil, fmt.Errorf("unable to marshal network of tree %s: %v", tree.ID.String(), err)
 	}
+	treeID, err := tn.QueryTree().Only(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to query tree for leaf %s: %v", tn.ID.String(), err)
+	}
 	return &pbspark.TreeNode{
 		Id:                     tn.ID.String(),
-		TreeId:                 tn.QueryTree().FirstIDX(ctx).String(),
+		TreeId:                 treeID.ID.String(),
 		Value:                  tn.Value,
 		ParentNodeId:           tn.getParentNodeID(ctx),
 		NodeTx:                 tn.RawTx,
@@ -42,7 +46,15 @@ func (tn *TreeNode) MarshalSparkProto(ctx context.Context) (*pbspark.TreeNode, e
 }
 
 // MarshalInternalProto converts a TreeNode to a spark internal protobuf TreeNode.
-func (tn *TreeNode) MarshalInternalProto(ctx context.Context) *pbinternal.TreeNode {
+func (tn *TreeNode) MarshalInternalProto(ctx context.Context) (*pbinternal.TreeNode, error) {
+	tree, err := tn.QueryTree().Only(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to query tree for leaf %s: %v", tn.ID.String(), err)
+	}
+	signingKeyshare, err := tn.QuerySigningKeyshare().Only(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to query signing keyshare for leaf %s: %v", tn.ID.String(), err)
+	}
 	return &pbinternal.TreeNode{
 		Id:                  tn.ID.String(),
 		Value:               tn.Value,
@@ -51,11 +63,11 @@ func (tn *TreeNode) MarshalInternalProto(ctx context.Context) *pbinternal.TreeNo
 		OwnerSigningPubkey:  tn.OwnerSigningPubkey,
 		RawTx:               tn.RawTx,
 		RawRefundTx:         tn.RawRefundTx,
-		TreeId:              tn.QueryTree().FirstIDX(ctx).String(),
+		TreeId:              tree.ID.String(),
 		ParentNodeId:        tn.getParentNodeID(ctx),
-		SigningKeyshareId:   tn.QuerySigningKeyshare().FirstIDX(ctx).String(),
+		SigningKeyshareId:   signingKeyshare.ID.String(),
 		Vout:                uint32(tn.Vout),
-	}
+	}, nil
 }
 
 // GetRefundTxTimeLock get the time lock of the refund tx.

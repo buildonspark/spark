@@ -172,11 +172,15 @@ func signRefunds(ctx context.Context, config *so.Config, requests []*pb.LeafRefu
 			return nil, err
 		}
 		jobID := uuid.New().String()
+		signingKeyshare, err := leaf.QuerySigningKeyshare().Only(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get signing keyshare id: %w", err)
+		}
 		signingJobs = append(
 			signingJobs,
 			&helper.SigningJob{
 				JobID:             jobID,
-				SigningKeyshareID: leaf.QuerySigningKeyshare().FirstIDX(ctx),
+				SigningKeyshareID: signingKeyshare.ID,
 				Message:           refundTxSigHash,
 				VerifyingKey:      leaf.VerifyingPubkey,
 				UserCommitment:    userNonceCommitment,

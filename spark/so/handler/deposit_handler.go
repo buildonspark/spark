@@ -215,7 +215,10 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 	}
 
 	// Sign the root and refund transactions
-	signingKeyShare := depositAddress.QuerySigningKeyshare().OnlyX(ctx)
+	signingKeyShare, err := depositAddress.QuerySigningKeyshare().Only(ctx)
+	if err != nil {
+		return nil, err
+	}
 	verifyingKeyBytes, err := common.AddPublicKeys(signingKeyShare.PublicKey, depositAddress.OwnerSigningPubkey)
 	if err != nil {
 		return nil, err
