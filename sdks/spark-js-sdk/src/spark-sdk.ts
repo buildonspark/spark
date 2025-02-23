@@ -10,6 +10,7 @@ import {
   BitcoinNetwork,
   CoopExitFeeEstimateInput,
   CoopExitFeeEstimateOutput,
+  LeavesSwapRequest,
   LightningReceiveFeeEstimateInput,
   LightningReceiveFeeEstimateOutput,
   LightningSendFeeEstimateInput,
@@ -347,7 +348,11 @@ export class SparkWallet {
         new Date(Date.now() + 10 * 60 * 1000)
       );
 
-    const refundSignature = signatureMap.get(leavesToSwap[0].id);
+    if (!transfer.leaves[0].leaf) {
+      throw new Error("Failed to get leaf");
+    }
+
+    const refundSignature = signatureMap.get(transfer.leaves[0].leaf.id);
     if (!refundSignature) {
       throw new Error("Failed to get refund signature");
     }
@@ -393,20 +398,30 @@ export class SparkWallet {
 
     const adaptorPubkey = bytesToHex(secp256k1.getPublicKey(adaptorPrivateKey));
 
-    const request = await this.sspClient?.requestLeaveSwap({
-      userLeaves,
-      adaptorPubkey,
-      targetAmountSats:
-        targetAmount || leavesToSwap.reduce((acc, leaf) => acc + leaf.value, 0),
-      totalAmountSats: leavesToSwap.reduce((acc, leaf) => acc + leaf.value, 0),
-      // TODO: Request fee from SSP
-      feeSats: 0,
-      // TODO: Map config network to proto network
-      network: BitcoinNetwork.REGTEST,
-    });
+    let request: LeavesSwapRequest | null | undefined = null;
+    try {
+      request = await this.sspClient?.requestLeaveSwap({
+        userLeaves,
+        adaptorPubkey,
+        targetAmountSats:
+          targetAmount ||
+          leavesToSwap.reduce((acc, leaf) => acc + leaf.value, 0),
+        totalAmountSats: leavesToSwap.reduce(
+          (acc, leaf) => acc + leaf.value,
+          0
+        ),
+        // TODO: Request fee from SSP
+        feeSats: 0,
+        // TODO: Map config network to proto network
+        network: BitcoinNetwork.REGTEST,
+      });
+    } catch (e) {
+      console.error("Failed to request leaves swap", e);
+      throw e;
+    }
 
     if (!request) {
-      throw new Error("Failed to request leaves swap");
+      throw new Error("Failed to request leaves swap. No response returned.");
     }
 
     const sparkClient = await this.connectionManager.createSparkClient(
