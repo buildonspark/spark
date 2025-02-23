@@ -226,7 +226,6 @@ mutation NotifyReceiverTransfer($phone_number: String!, $amount_sats: Long!) {
   notify_receiver_transfer(input: {
     phone_number: $phone_number
     amount_sats: $amount_sats
-  }) {
-  }
+  })
 }
 `

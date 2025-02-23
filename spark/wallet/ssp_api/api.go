@@ -229,17 +229,16 @@ func (s *SparkServiceAPI) CompleteReleaseSeed(phoneNumber string, code string) (
 	return seedBytes, nil
 }
 
-func (s *SparkServiceAPI) NotifyReceiverTransfer(_ string, _ uint64) error {
-	// func (s *SparkServiceAPI) NotifyReceiverTransfer(phoneNumber string, amountSats uint64) error {
-	// variables := map[string]interface{}{
-	// 	"phone_number": phoneNumber,
-	// 	"amount_sats":  amountSats,
-	// }
+func (s *SparkServiceAPI) NotifyReceiverTransfer(phoneNumber string, amountSats uint64) error {
+	variables := map[string]interface{}{
+		"phone_number": phoneNumber,
+		"amount_sats":  amountSats,
+	}
 
-	// _, err := s.Requester.ExecuteGraphqlWithContext(context.Background(), NotifyReceiverTransferMutation, variables)
-	// if err != nil {
-	// 	return err
-	// }
+	_, err := s.Requester.ExecuteGraphqlWithContext(context.Background(), NotifyReceiverTransferMutation, variables)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
