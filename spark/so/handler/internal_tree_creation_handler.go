@@ -177,7 +177,7 @@ func (h *InternalTreeCreationHandler) prepareDepositAddress(ctx context.Context,
 		})
 	}
 
-	return nil, nil
+	return depositAddressSignatures, nil
 }
 
 // PrepareTreeAddress prepares the tree address.
