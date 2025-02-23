@@ -1,3 +1,4 @@
+import BitcoinIcon from "../icons/BitcoinIcon";
 import ChevronRightIcon from "../icons/ChevronRightIcon";
 import LightningIcon from "../icons/LightningIcon";
 import SparkIcon from "../icons/SparkIcon";
@@ -53,6 +54,27 @@ export default function Networks({ onSelectNetwork }: NetworksProps) {
               </div>
               <div className="rounded-r-[5px] bg-[#232E3D] px-[6px]">
                 No fees
+              </div>
+            </div>
+          </div>
+          <ChevronRightIcon />
+        </div>
+      </StyledContainer>
+      <StyledContainer
+        className="px-4 py-6 mt-3"
+        isPressable
+        onClick={() => onSelectNetwork(Network.BITCOIN)}
+      >
+        <div className="flex items-center gap-3">
+          <BitcoinIcon />
+          <div className="flex flex-grow flex-col gap-[4px] font-decimal">
+            <div className="text-left text-[13px]">Bitcoin</div>
+            <div className="flex items-center gap-[1px] text-[12px] opacity-80">
+              <div className="rounded-l-[5px] bg-[#232E3D] px-[6px]">
+                ~30 min
+              </div>
+              <div className="rounded-r-[5px] bg-[#232E3D] px-[6px]">
+                High fees
               </div>
             </div>
           </div>

@@ -11,12 +11,20 @@ interface WalletState {
   isInitialized: boolean;
   mnemonic: string | null;
   activeCurrency: Currency;
+  btcAddressInfo: Record<
+    string,
+    {
+      pubkey: string;
+      verifyingKey: string;
+    }
+  >;
 }
 
 interface WalletActions {
   generateMnemonic: () => Promise<string>;
   initWallet: (mnemonic: string) => Promise<void>;
   getMasterPublicKey: () => Promise<string>;
+  generateDepositAddress: () => Promise<string>;
   createLightningInvoice: (amount: number, memo: string) => Promise<string>;
   sendTransfer: (amount: number, recipient: string) => Promise<void>;
   payLightningInvoice: (invoice: string) => Promise<void>;
@@ -45,6 +53,7 @@ const useWalletStore = create<WalletStore>((set, get) => ({
   //   // TODO: process the leaves into tokens.
   //   return leaves;
   // },
+  btcAddressInfo: {},
 
   generateMnemonic: async () => {
     const { wallet } = get();
@@ -62,6 +71,26 @@ const useWalletStore = create<WalletStore>((set, get) => ({
   getMasterPublicKey: async () => {
     const { wallet } = get();
     return bytesToHex(await wallet.getMasterPubKey());
+  },
+  generateDepositAddress: async () => {
+    const { wallet } = get();
+    const leafPubKey = await wallet.getSigner().generatePublicKey();
+    const address = await wallet.generateDepositAddress(leafPubKey);
+
+    if (!address.depositAddress) {
+      throw new Error("Failed to generate deposit address");
+    }
+
+    set({
+      btcAddressInfo: {
+        [address.depositAddress.address]: {
+          pubkey: bytesToHex(leafPubKey),
+          verifyingKey: bytesToHex(address.depositAddress.verifyingKey),
+        },
+      },
+    });
+
+    return address.depositAddress.address;
   },
   loadStoredWallet: async () => {
     const storedMnemonic = sessionStorage.getItem(MNEMONIC_STORAGE_KEY);
@@ -95,7 +124,7 @@ const useWalletStore = create<WalletStore>((set, get) => ({
 }));
 
 export function useWallet() {
-  const { wallet, isInitialized } = useWalletStore();
+  const { wallet, isInitialized, btcAddressInfo } = useWalletStore();
   const queryClient = useQueryClient();
 
   useQuery({
@@ -108,13 +137,52 @@ export function useWallet() {
 
   const balanceQuery = useQuery({
     queryKey: ["wallet", "balance"],
-    queryFn: () => wallet.getBalance(),
+    queryFn: () => {
+      return wallet.getBalance();
+    },
     enabled: isInitialized,
+  });
+
+  useQuery({
+    queryKey: ["wallet", "btcAddressInfo"],
+    queryFn: async () => {
+      for (const address of Object.keys(btcAddressInfo)) {
+        const pendingDepositTx = await wallet.queryPendingDepositTx(address);
+        if (pendingDepositTx) {
+          try {
+            const nodes = await wallet.createTreeRoot(
+              hexToBytes(btcAddressInfo[address].pubkey),
+              hexToBytes(btcAddressInfo[address].verifyingKey),
+              pendingDepositTx.depositTx,
+              pendingDepositTx.vout,
+            );
+            await wallet.transferDepositToSelf(
+              nodes.nodes,
+              hexToBytes(btcAddressInfo[address].pubkey),
+            );
+
+            const updatedAddressInfo = { ...btcAddressInfo };
+            delete updatedAddressInfo[address];
+            useWalletStore.setState({ btcAddressInfo: updatedAddressInfo });
+          } catch (error) {
+            console.error("error transferring deposit to self", error);
+          }
+        }
+      }
+
+      return true;
+    },
+    enabled: isInitialized,
+    refetchInterval: 5000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    staleTime: 5000,
   });
 
   const satsUsdPriceQuery = useQuery({
     queryKey: ["satsUsdPrice"],
     queryFn: async () => {
+      console.log("fetching sats usd price");
       const response = await fetch(
         "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd",
       );
@@ -136,7 +204,6 @@ export function useWallet() {
   useQuery({
     queryKey: ["wallet", "claimTransfers"],
     queryFn: async () => {
-      console.log("testing");
       const claimed = await wallet.claimTransfers();
       if (claimed) {
         queryClient.invalidateQueries({
@@ -170,6 +237,7 @@ export function useWallet() {
       await state.initWallet(mnemonic);
     },
     getMasterPublicKey: state.getMasterPublicKey,
+    generateDepositAddress: state.generateDepositAddress,
     sendTransfer: state.sendTransfer,
     createLightningInvoice: state.createLightningInvoice,
     payLightningInvoice: state.payLightningInvoice,

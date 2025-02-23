@@ -1,4 +1,3 @@
-import mempoolJS from "@mempool/mempool.js";
 import { bytesToHex, hexToBytes } from "@noble/curves/abstract/utils";
 import { secp256k1 } from "@noble/curves/secp256k1";
 import { Transaction } from "@scure/btc-signer";
@@ -265,9 +264,7 @@ export class SparkWallet {
 
   private async selectLeavesForSwap(targetAmount: number) {
     if (targetAmount == 0) {
-        throw new Error(
-            "Target amount needs to > 0"
-        )
+      throw new Error("Target amount needs to > 0");
     }
     const leaves = await this.getLeaves();
     leaves.sort((a, b) => a.value - b.value);
@@ -972,27 +969,18 @@ export class SparkWallet {
   }
 
   async queryPendingDepositTx(depositAddress: string) {
-    const {
-      bitcoin: { addresses, transactions },
-    } = mempoolJS({
-      hostname: "regtest-mempool.dev.dev.sparkinfra.net",
-      protocol: "https",
-      config: {
-        auth: {
-          username: "lightspark",
-          password: "TFNR6ZeLdxF9HejW",
-        },
+    try {
+      const baseUrl = "https://regtest-mempool.dev.dev.sparkinfra.net/api";
+      const auth = btoa("lightspark:TFNR6ZeLdxF9HejW");
+
+      const response = await fetch(`${baseUrl}/address/${depositAddress}/txs`, {
         headers: {
+          Authorization: `Basic ${auth}`,
           "Content-Type": "application/json",
         },
-      },
-      network: "regtest",
-    });
-
-    try {
-      const addressTxs = await addresses.getAddressTxs({
-        address: depositAddress,
       });
+
+      const addressTxs = await response.json();
 
       if (addressTxs && addressTxs.length > 0) {
         const latestTx = addressTxs[0];
@@ -1006,7 +994,13 @@ export class SparkWallet {
           return null;
         }
 
-        const txHex = await transactions.getTxHex({ txid: latestTx.txid });
+        const txResponse = await fetch(`${baseUrl}/tx/${latestTx.txid}/hex`, {
+          headers: {
+            Authorization: `Basic ${auth}`,
+            "Content-Type": "application/json",
+          },
+        });
+        const txHex = await txResponse.text();
         const depositTx = getTxFromRawTxHex(txHex);
 
         return { depositTx, vout: outputIndex };

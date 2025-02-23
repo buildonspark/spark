@@ -9,6 +9,7 @@ import CloseIcon from "../../icons/CloseIcon";
 import { Routes } from "../../routes";
 import { useWallet } from "../../store/wallet";
 import { Currency } from "../../utils/currency";
+import BitcoinDepositAddress from "./BitcoinDepositAddress";
 import SparkDepositAddress from "./SparkDepositAddress";
 
 enum ReceiveStep {
@@ -18,6 +19,7 @@ enum ReceiveStep {
   Success = "Success",
   Failed = "Failed",
   SparkDepositAddress = "SparkDepositAddress",
+  BitcoinDepositAddress = "BitcoinDepositAddress",
 }
 
 export default function Receive() {
@@ -73,6 +75,7 @@ export default function Receive() {
       case ReceiveStep.ShareQuote:
         navigate(Routes.Wallet);
         break;
+      case ReceiveStep.BitcoinDepositAddress:
       case ReceiveStep.SparkDepositAddress:
         setCurrentStep(ReceiveStep.NetworkSelect);
         break;
@@ -89,6 +92,8 @@ export default function Receive() {
         return "Receive";
       case ReceiveStep.SparkDepositAddress:
         return "Spark deposit address";
+      case ReceiveStep.BitcoinDepositAddress:
+        return "Bitcoin deposit address";
       default:
         return "Receive money via";
     }
@@ -107,6 +112,8 @@ export default function Receive() {
     setPaymentNetwork(network);
     if (network === Network.SPARK) {
       setCurrentStep(ReceiveStep.SparkDepositAddress);
+    } else if (network === Network.BITCOIN) {
+      setCurrentStep(ReceiveStep.BitcoinDepositAddress);
     } else {
       setCurrentStep(ReceiveStep.InputAmount);
     }
@@ -128,7 +135,8 @@ export default function Receive() {
         logoLeftClick={onLogoLeftClick}
         submitDisabled={
           currentStep === ReceiveStep.NetworkSelect ||
-          currentStep === ReceiveStep.SparkDepositAddress
+          currentStep === ReceiveStep.SparkDepositAddress ||
+          currentStep === ReceiveStep.BitcoinDepositAddress
         }
       >
         {currentStep === ReceiveStep.NetworkSelect && (
@@ -136,6 +144,9 @@ export default function Receive() {
         )}
         {currentStep === ReceiveStep.SparkDepositAddress && (
           <SparkDepositAddress />
+        )}
+        {currentStep === ReceiveStep.BitcoinDepositAddress && (
+          <BitcoinDepositAddress />
         )}
         {currentStep === ReceiveStep.InputAmount && (
           <AmountInput

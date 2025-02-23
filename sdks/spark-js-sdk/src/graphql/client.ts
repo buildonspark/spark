@@ -262,7 +262,6 @@ class SparkAuthProvider implements AuthProvider {
   async addAuthHeaders(
     headers: Record<string, string>
   ): Promise<Record<string, string>> {
-    console.log(headers);
     const _headers = {
       "Spark-Identity-Public-Key": this.publicKey,
       "Content-Type": "application/json",
