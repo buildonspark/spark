@@ -305,20 +305,59 @@ func ValidateOwnershipSignature(ownershipSignature []byte, partialTokenTransacti
 	return nil
 }
 
+// ValidateRevocationKeys validates that the provided revocation private keys correspond to the expected public keys.
+// It ensures the private keys can correctly derive the expected public keys, preventing key mismatches.
 func ValidateRevocationKeys(revocationPrivateKeys [][]byte, expectedRevocationPublicKeys [][]byte) error {
+	if revocationPrivateKeys == nil {
+		return fmt.Errorf("revocation private keys cannot be nil")
+	}
+	if expectedRevocationPublicKeys == nil {
+		return fmt.Errorf("expected revocation public keys cannot be nil")
+	}
 	if len(expectedRevocationPublicKeys) != len(revocationPrivateKeys) {
-		return fmt.Errorf("number of revocation private keys does not match number of leaves to spend")
+		return fmt.Errorf("number of revocation private keys (%d) does not match number of expected public keys (%d)",
+			len(revocationPrivateKeys), len(expectedRevocationPublicKeys))
 	}
 
 	for i, revocationPrivateKeyBytes := range revocationPrivateKeys {
-		revocationKey := secp256k1.PrivKeyFromBytes(revocationPrivateKeyBytes)
+		if revocationPrivateKeyBytes == nil {
+			return fmt.Errorf("revocation private key at index %d cannot be nil", i)
+		}
+		if expectedRevocationPublicKeys[i] == nil {
+			return fmt.Errorf("expected revocation public key at index %d cannot be nil", i)
+		}
+
+		// secp256k1 private keys must be 32 bytes
+		if len(revocationPrivateKeyBytes) != 32 {
+			return fmt.Errorf("invalid revocation private key length at index %d: expected 32 bytes, got %d",
+				i, len(revocationPrivateKeyBytes))
+		}
+
+		// Safely parse the private key
+		var revocationKey *secp256k1.PrivateKey
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					revocationKey = nil
+				}
+			}()
+			revocationKey = secp256k1.PrivKeyFromBytes(revocationPrivateKeyBytes)
+		}()
+		if revocationKey == nil {
+			return fmt.Errorf("failed to parse revocation private key at index %d", i)
+		}
+
 		revocationPubKey := revocationKey.PubKey()
 		expectedRevocationPubKey, err := secp256k1.ParsePubKey(expectedRevocationPublicKeys[i])
 		if err != nil {
-			return fmt.Errorf("failed to parse revocation private key: %w", err)
+			return fmt.Errorf("failed to parse expected revocation public key at index %d: %w", i, err)
 		}
+		if expectedRevocationPubKey == nil {
+			return fmt.Errorf("parsed expected revocation public key is nil at index %d", i)
+		}
+
 		if !expectedRevocationPubKey.IsEqual(revocationPubKey) {
-			return fmt.Errorf("recovered secret for leaf %d does not match leaf public key", i)
+			return fmt.Errorf("revocation key mismatch at index %d: derived public key does not match expected", i)
 		}
 	}
 	return nil
