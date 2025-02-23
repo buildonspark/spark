@@ -461,7 +461,7 @@ func (w *SingleKeyWallet) SendTransfer(ctx context.Context, receiverIdentityPubk
 		nodesToRemove[node.Id] = true
 	}
 
-	transfer, err := SendTransfer(ctx, w.Config, leafKeyTweaks, receiverIdentityPubkey, time.Now().Add(10*time.Minute))
+	transfer, err := SendTransfer(ctx, w.Config, leafKeyTweaks, receiverIdentityPubkey, time.Unix(0, 0))
 	if err != nil {
 		return nil, fmt.Errorf("failed to send transfer: %w", err)
 	}
