@@ -273,12 +273,6 @@ export class SparkWallet {
       }
     }
 
-    if (amount === targetAmount) {
-      throw new Error(
-        "You're trying to swap for the exact amount you have, no need to swap"
-      );
-    }
-
     if (amount < targetAmount) {
       throw new Error(
         "You don't have enough nodes to swap for the target amount"

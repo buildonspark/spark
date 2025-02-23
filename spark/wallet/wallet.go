@@ -136,11 +136,8 @@ func (w *SingleKeyWallet) leafSelectionForSwap(targetAmount int64) ([]*pb.TreeNo
 			nodes = append(nodes, node)
 		}
 	}
-	if amount > targetAmount {
+	if amount >= targetAmount {
 		return nodes, amount, nil
-	}
-	if amount == targetAmount {
-		return nil, amount, fmt.Errorf("you're trying to swap for the exact amount you have, no need to swap")
 	}
 	return nil, amount, fmt.Errorf("you don't have enough nodes to swap for the target amount")
 }
