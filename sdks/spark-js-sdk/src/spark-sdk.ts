@@ -29,8 +29,8 @@ import { ConnectionManager } from "./services/connection.js";
 import { CoopExitService } from "./services/coop-exit.js";
 import { DepositService } from "./services/deposit.js";
 import { LightningService } from "./services/lightning.js";
-import { LeafKeyTweak, TransferService } from "./services/transfer.js";
 import { TokenTransactionService } from "./services/token-transactions.js";
+import { LeafKeyTweak, TransferService } from "./services/transfer.js";
 
 import {
   DepositAddressTree,
@@ -204,7 +204,9 @@ export class SparkWallet {
     return identityPublicKey;
   }
 
-  public async createSparkWalletFromSeed(seed: Uint8Array | string): Promise<string> {
+  public async createSparkWalletFromSeed(
+    seed: Uint8Array | string
+  ): Promise<string> {
     const identityPublicKey =
       await this.config.signer.createSparkWalletFromSeed(seed);
     await this.initializeWallet(identityPublicKey);
@@ -218,7 +220,7 @@ export class SparkWallet {
     this.leaves = await this.getLeaves();
     this.config.signer.restoreSigningKeysFromLeafs(this.leaves);
 
-    await this.syncTokenLeaves();
+    // await this.syncTokenLeaves();
   }
 
   private async selectLeaves(targetAmount: number): Promise<TreeNode[]> {
@@ -289,7 +291,8 @@ export class SparkWallet {
 
   async syncWallet() {
     await this.claimTransfers();
-    await this.syncTokenLeaves();
+    // TODO: This is broken. Uncomment when fixed
+    // await this.syncTokenLeaves();
     this.leaves = await this.getLeaves();
     await this.optimizeLeaves();
   }
@@ -409,7 +412,7 @@ export class SparkWallet {
     const sparkClient = await this.connectionManager.createSparkClient(
       this.config.getCoordinatorAddress()
     );
-    sparkClient.refresh_timelock({});
+
     for (const leaf of request.swapLeaves) {
       const response = await sparkClient.query_nodes({
         source: {
