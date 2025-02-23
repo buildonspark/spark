@@ -2,9 +2,7 @@ import { TokenTransactionService } from "@buildonspark/spark-js-sdk/token-transa
 import { TokenTransaction } from "../../proto/spark.js";
 import { ConnectionManager } from "@buildonspark/spark-js-sdk/connection";
 import { WalletConfigService } from "@buildonspark/spark-js-sdk/config";
-import {
-  getTokenLeavesSum
-} from "@buildonspark/spark-js-sdk/utils";
+import { getTokenLeavesSum } from "@buildonspark/spark-js-sdk/utils";
 import { numberToBytesBE } from "@noble/curves/abstract/utils";
 
 const BURN_ADDRESS = new Uint8Array(32).fill(0x02);
@@ -36,7 +34,8 @@ export class IssuerTokenTransactionService extends TokenTransactionService {
           tokenAmount: numberToBytesBE(tokenAmount, 16),
         },
       ],
-      sparkOperatorIdentityPublicKeys: super.collectOperatorIdentityPublicKeys(),
+      sparkOperatorIdentityPublicKeys:
+        super.collectOperatorIdentityPublicKeys(),
     };
   }
 

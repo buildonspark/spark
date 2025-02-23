@@ -1,11 +1,9 @@
 import { bytesToHex } from "@noble/curves/abstract/utils";
 import { SparkWallet } from "@buildonspark/spark-js-sdk";
 import { SparkSigner } from "@buildonspark/spark-js-sdk/signer";
-import { LeafWithPreviousTransactionData } from "../../proto/spark.js"
+import { LeafWithPreviousTransactionData } from "../../proto/spark.js";
 import { Network } from "@buildonspark/spark-js-sdk/utils";
-import {
-  checkIfSelectedLeavesAreAvailable,
-} from "@buildonspark/spark-js-sdk/utils";
+import { checkIfSelectedLeavesAreAvailable } from "@buildonspark/spark-js-sdk/utils";
 import { IssuerTokenTransactionService } from "./token-transactions.js";
 import { TokenFreezeService } from "../freeze.js";
 
@@ -18,24 +16,24 @@ export class IssuerSparkWallet extends SparkWallet {
 
     this.issuerTokenTransactionService = new IssuerTokenTransactionService(
       this.config,
-      this.connectionManager
-    )
+      this.connectionManager,
+    );
     this.tokenFreezeService = new TokenFreezeService(
-        this.config,
-        this.connectionManager
-    )
+      this.config,
+      this.connectionManager,
+    );
   }
 
   async mintTokens(tokenPublicKey: Uint8Array, tokenAmount: bigint) {
     const tokenTransaction =
       await this.issuerTokenTransactionService.constructMintTokenTransaction(
         tokenPublicKey,
-        tokenAmount
+        tokenAmount,
       );
 
     const finalizedTokenTransaction =
       await this.issuerTokenTransactionService.broadcastTokenTransaction(
-        tokenTransaction
+        tokenTransaction,
       );
 
     const tokenPubKeyHex = bytesToHex(tokenPublicKey);
@@ -44,14 +42,14 @@ export class IssuerSparkWallet extends SparkWallet {
     }
     this.issuerTokenTransactionService.updateTokenLeavesFromFinalizedTransaction(
       this.tokenLeaves.get(tokenPubKeyHex)!,
-      finalizedTokenTransaction
+      finalizedTokenTransaction,
     );
   }
 
   async burnTokens(
     tokenPublicKey: Uint8Array,
     tokenAmount: bigint,
-    selectedLeaves?: LeafWithPreviousTransactionData[]
+    selectedLeaves?: LeafWithPreviousTransactionData[],
   ) {
     if (!this.tokenLeaves.has(bytesToHex(tokenPublicKey))) {
       throw new Error("No token leaves with the given tokenPublicKey");
@@ -62,7 +60,7 @@ export class IssuerSparkWallet extends SparkWallet {
         !checkIfSelectedLeavesAreAvailable(
           selectedLeaves,
           this.tokenLeaves,
-          tokenPublicKey
+          tokenPublicKey,
         )
       ) {
         throw new Error("One or more selected leaves are not available");
@@ -75,14 +73,14 @@ export class IssuerSparkWallet extends SparkWallet {
       await this.issuerTokenTransactionService.constructBurnTokenTransaction(
         tokenPublicKey,
         tokenAmount,
-        selectedLeaves
+        selectedLeaves,
       );
 
     const finalizedTokenTransaction =
       await this.issuerTokenTransactionService.broadcastTokenTransaction(
         partialTokenTransaction,
         selectedLeaves.map((leaf) => leaf.leaf!.ownerPublicKey),
-        selectedLeaves.map((leaf) => leaf.leaf!.revocationPublicKey!)
+        selectedLeaves.map((leaf) => leaf.leaf!.revocationPublicKey!),
       );
 
     const tokenPubKeyHex = bytesToHex(tokenPublicKey);
@@ -91,7 +89,7 @@ export class IssuerSparkWallet extends SparkWallet {
     }
     this.issuerTokenTransactionService.updateTokenLeavesFromFinalizedTransaction(
       this.tokenLeaves.get(tokenPubKeyHex)!,
-      finalizedTokenTransaction
+      finalizedTokenTransaction,
     );
   }
 
@@ -102,7 +100,7 @@ export class IssuerSparkWallet extends SparkWallet {
   async unfreezeTokens(ownerPublicKey: Uint8Array, tokenPublicKey: Uint8Array) {
     await this.tokenFreezeService!.unfreezeTokens(
       ownerPublicKey,
-      tokenPublicKey
+      tokenPublicKey,
     );
   }
 }

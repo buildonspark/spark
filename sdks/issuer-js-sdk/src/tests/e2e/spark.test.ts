@@ -13,12 +13,9 @@ describe("token integration test", () => {
     const mnemonic = await wallet.generateMnemonic();
     await wallet.createSparkWallet(mnemonic);
 
-    const tokenPublicKey = await wallet.getSigner().generatePublicKey()
+    const tokenPublicKey = await wallet.getSigner().generatePublicKey();
 
-    await wallet.mintTokens(
-      tokenPublicKey,
-      tokenAmount
-    );
+    await wallet.mintTokens(tokenPublicKey, tokenAmount);
   }, 100000);
 
   it("should issue a single token and transfer it", async () => {
@@ -66,18 +63,18 @@ describe("token integration test", () => {
     const userMnemonic = await issuerWallet.generateMnemonic();
     await userWallet.createSparkWallet(userMnemonic);
 
-    const userWalletPublicKey = await userWallet.getSigner().getIdentityPublicKey();
-    issuerWallet.transferTokens(tokenPublicKey, tokenAmount, userWalletPublicKey);
-
-    await issuerWallet.freezeTokens(
-      userWalletPublicKey,
-      tokenPublicKey
+    const userWalletPublicKey = await userWallet
+      .getSigner()
+      .getIdentityPublicKey();
+    issuerWallet.transferTokens(
+      tokenPublicKey,
+      tokenAmount,
+      userWalletPublicKey
     );
 
-    await issuerWallet.unfreezeTokens(
-      userWalletPublicKey,
-      tokenPublicKey
-    );
+    await issuerWallet.freezeTokens(userWalletPublicKey, tokenPublicKey);
+
+    await issuerWallet.unfreezeTokens(userWalletPublicKey, tokenPublicKey);
   });
 
   it("should burn tokens", async () => {

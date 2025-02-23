@@ -164,6 +164,7 @@ func HashFreezeTokensPayload(payload *pb.FreezeTokensPayload) ([]byte, error) {
 	} else {
 		h.Write([]byte{0})
 	}
+	allHashes = append(allHashes, h.Sum(nil)...)
 
 	h.Reset()
 	if payload.GetIssuerProvidedTimestamp() != 0 {

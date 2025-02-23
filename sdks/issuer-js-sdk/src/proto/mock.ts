@@ -19,59 +19,75 @@ function createBaseCleanUpPreimageShareRequest(): CleanUpPreimageShareRequest {
   return { paymentHash: new Uint8Array(0) };
 }
 
-export const CleanUpPreimageShareRequest: MessageFns<CleanUpPreimageShareRequest> = {
-  encode(message: CleanUpPreimageShareRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.paymentHash.length !== 0) {
-      writer.uint32(10).bytes(message.paymentHash);
-    }
-    return writer;
-  },
+export const CleanUpPreimageShareRequest: MessageFns<CleanUpPreimageShareRequest> =
+  {
+    encode(
+      message: CleanUpPreimageShareRequest,
+      writer: BinaryWriter = new BinaryWriter(),
+    ): BinaryWriter {
+      if (message.paymentHash.length !== 0) {
+        writer.uint32(10).bytes(message.paymentHash);
+      }
+      return writer;
+    },
 
-  decode(input: BinaryReader | Uint8Array, length?: number): CleanUpPreimageShareRequest {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseCleanUpPreimageShareRequest();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
+    decode(
+      input: BinaryReader | Uint8Array,
+      length?: number,
+    ): CleanUpPreimageShareRequest {
+      const reader =
+        input instanceof BinaryReader ? input : new BinaryReader(input);
+      let end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseCleanUpPreimageShareRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.paymentHash = reader.bytes();
+            continue;
           }
-
-          message.paymentHash = reader.bytes();
-          continue;
         }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
       }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
+      return message;
+    },
+
+    fromJSON(object: any): CleanUpPreimageShareRequest {
+      return {
+        paymentHash: isSet(object.paymentHash)
+          ? bytesFromBase64(object.paymentHash)
+          : new Uint8Array(0),
+      };
+    },
+
+    toJSON(message: CleanUpPreimageShareRequest): unknown {
+      const obj: any = {};
+      if (message.paymentHash.length !== 0) {
+        obj.paymentHash = base64FromBytes(message.paymentHash);
       }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
+      return obj;
+    },
 
-  fromJSON(object: any): CleanUpPreimageShareRequest {
-    return { paymentHash: isSet(object.paymentHash) ? bytesFromBase64(object.paymentHash) : new Uint8Array(0) };
-  },
-
-  toJSON(message: CleanUpPreimageShareRequest): unknown {
-    const obj: any = {};
-    if (message.paymentHash.length !== 0) {
-      obj.paymentHash = base64FromBytes(message.paymentHash);
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<CleanUpPreimageShareRequest>): CleanUpPreimageShareRequest {
-    return CleanUpPreimageShareRequest.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<CleanUpPreimageShareRequest>): CleanUpPreimageShareRequest {
-    const message = createBaseCleanUpPreimageShareRequest();
-    message.paymentHash = object.paymentHash ?? new Uint8Array(0);
-    return message;
-  },
-};
+    create(
+      base?: DeepPartial<CleanUpPreimageShareRequest>,
+    ): CleanUpPreimageShareRequest {
+      return CleanUpPreimageShareRequest.fromPartial(base ?? {});
+    },
+    fromPartial(
+      object: DeepPartial<CleanUpPreimageShareRequest>,
+    ): CleanUpPreimageShareRequest {
+      const message = createBaseCleanUpPreimageShareRequest();
+      message.paymentHash = object.paymentHash ?? new Uint8Array(0);
+      return message;
+    },
+  };
 
 export type MockServiceDefinition = typeof MockServiceDefinition;
 export const MockServiceDefinition = {
@@ -128,14 +144,28 @@ function base64FromBytes(arr: Uint8Array): string {
   }
 }
 
-type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
+type Builtin =
+  | Date
+  | Function
+  | Uint8Array
+  | string
+  | number
+  | boolean
+  | undefined;
 
-export type DeepPartial<T> = T extends Builtin ? T
-  : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>>
-  : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>>
-  : T extends { $case: string } ? { [K in keyof Omit<T, "$case">]?: DeepPartial<T[K]> } & { $case: T["$case"] }
-  : T extends {} ? { [K in keyof T]?: DeepPartial<T[K]> }
-  : Partial<T>;
+export type DeepPartial<T> = T extends Builtin
+  ? T
+  : T extends globalThis.Array<infer U>
+    ? globalThis.Array<DeepPartial<U>>
+    : T extends ReadonlyArray<infer U>
+      ? ReadonlyArray<DeepPartial<U>>
+      : T extends { $case: string }
+        ? { [K in keyof Omit<T, "$case">]?: DeepPartial<T[K]> } & {
+            $case: T["$case"];
+          }
+        : T extends {}
+          ? { [K in keyof T]?: DeepPartial<T[K]> }
+          : Partial<T>;
 
 function isSet(value: any): boolean {
   return value !== null && value !== undefined;
