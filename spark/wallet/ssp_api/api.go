@@ -196,41 +196,37 @@ func (s *SparkServiceAPI) FetchPublicKeyByPhoneNumber(phoneNumber string) (strin
 	return response["wallet_user_identity_public_key"].(map[string]interface{})["identity_public_key"].(string), nil
 }
 
-func (s *SparkServiceAPI) StartReleaseSeed(_ string) error {
-	// func (s *SparkServiceAPI) StartReleaseSeed(phoneNumber string) error {
-	// variables := map[string]interface{}{
-	// 	"phone_number": phoneNumber,
-	// }
+func (s *SparkServiceAPI) StartReleaseSeed(phoneNumber string) error {
+	variables := map[string]interface{}{
+		"phone_number": phoneNumber,
+	}
 
-	// _, err := s.Requester.ExecuteGraphqlWithContext(context.Background(), StartReleaseSeedMutation, variables)
-	// if err != nil {
-	// 	return err
-	// }
+	_, err := s.Requester.ExecuteGraphqlWithContext(context.Background(), StartReleaseSeedMutation, variables)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
 
-func (s *SparkServiceAPI) CompleteReleaseSeed(_ string, _ string) ([]byte, error) {
-	// func (s *SparkServiceAPI) CompleteReleaseSeed(phoneNumber string, code string) ([]byte, error) {
-	// variables := map[string]interface{}{
-	// 	"phone_number": phoneNumber,
-	// 	"code":         code,
-	// }
+func (s *SparkServiceAPI) CompleteReleaseSeed(phoneNumber string, code string) ([]byte, error) {
+	variables := map[string]interface{}{
+		"phone_number": phoneNumber,
+		"code":         code,
+	}
 
-	// response, err := s.Requester.ExecuteGraphqlWithContext(context.Background(), CompleteReleaseSeedMutation, variables)
-	// if err != nil {
-	// 	return nil, err
-	// }
+	response, err := s.Requester.ExecuteGraphqlWithContext(context.Background(), CompleteReleaseSeedMutation, variables)
+	if err != nil {
+		return nil, err
+	}
 
-	// seed := response["complete_release_seed"].(map[string]interface{})["seed"].(string)
-	// seedBytes, err := hex.DecodeString(seed)
-	// if err != nil {
-	// 	return nil, err
-	// }
+	seed := response["complete_seed_release"].(map[string]interface{})["seed"].(string)
+	seedBytes, err := hex.DecodeString(seed)
+	if err != nil {
+		return nil, err
+	}
 
-	// return seedBytes, nil
-
-	return []byte{0x00, 0x00, 0x00, 0x00}, nil
+	return seedBytes, nil
 }
 
 func (s *SparkServiceAPI) NotifyReceiverTransfer(_ string, _ uint64) error {

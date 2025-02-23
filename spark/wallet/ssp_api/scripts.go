@@ -204,15 +204,15 @@ mutation WalletUserIdentityPublicKey($phone_number: String!) {
 
 const StartReleaseSeedMutation = `
 mutation StartReleaseSeed($phone_number: String!) {
-  start_release_seed(input: {
+  start_seed_release(input: {
     phone_number: $phone_number
-  }) {}
+  })
 }
 `
 
 const CompleteReleaseSeedMutation = `
 mutation CompleteReleaseSeed($phone_number: String!, $code: String!) {
-  complete_release_seed(input: {
+  complete_seed_release(input: {
     phone_number: $phone_number
     code: $code
   }) {
