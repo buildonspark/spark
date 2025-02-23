@@ -336,6 +336,12 @@ func (o TokenTransactionHandler) SendTransactionToLRC20Node(
 	operatorSignature []byte,
 	revocationKeys [][]byte,
 ) error {
+	network := common.Regtest.String() // TODO: Get network from transaction
+	if lrc20Config, ok := config.Lrc20Configs[network]; ok && lrc20Config.DisableRpcs {
+		log.Printf("Skipping LRC20 node call due to DisableRpcs flag")
+		return nil
+	}
+
 	leavesToSpendData := make([]*pblrc20.SparkSignatureLeafData, len(revocationKeys))
 	for i, revocationKey := range revocationKeys {
 		leavesToSpendData[i] = &pblrc20.SparkSignatureLeafData{
@@ -446,6 +452,12 @@ func (o TokenTransactionHandler) FreezeTokensOnLRC20Node(
 	config *so.Config,
 	req *pb.FreezeTokensRequest,
 ) error {
+	network := common.Regtest.String() // TODO: Get network from transaction
+	if lrc20Config, ok := config.Lrc20Configs[network]; ok && lrc20Config.DisableRpcs {
+		log.Printf("Skipping LRC20 node call due to DisableRpcs flag")
+		return nil
+	}
+
 	conn, err := helper.ConnectToLrc20Node(config)
 	if err != nil {
 		return fmt.Errorf("failed to connect to LRC20 node: %w", err)

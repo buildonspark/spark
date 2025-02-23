@@ -92,21 +92,9 @@ func (h *InternalTokenTransactionHandler) StartTokenTransactionInternal(ctx cont
 		}
 	}
 
-	// Additionally validate the transaction with an LRC20 node.
-	conn, err := helper.ConnectToLrc20Node(config)
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect to LRC20 node: %w", err)
-	}
-	defer conn.Close()
-	lrc20Client := pblrc20.NewSparkServiceClient(conn)
-	res, err := lrc20Client.VerifySparkTx(ctx, &pblrc20.VerifySparkTxRequest{FinalTokenTransaction: req.FinalTokenTransaction})
+	err = h.VerifyTokenTransactionWithLrc20Node(ctx, config, req.FinalTokenTransaction)
 	if err != nil {
 		return nil, err
-	}
-
-	// TODO: Remove is_valid boolean in response and use error codes only instead.
-	if !res.IsValid {
-		return nil, errors.New("LRC20 node validation: invalid token transaction")
 	}
 
 	// Save the token transaction receipt, created leaf ents, and update the leaves to spend.
@@ -116,6 +104,31 @@ func (h *InternalTokenTransactionHandler) StartTokenTransactionInternal(ctx cont
 	}
 
 	return &emptypb.Empty{}, nil
+}
+
+func (h *InternalTokenTransactionHandler) VerifyTokenTransactionWithLrc20Node(ctx context.Context, config *so.Config, tokenTransaction *pb.TokenTransaction) error {
+	network := common.Regtest.String() // TODO: Get network from transaction
+	if lrc20Config, ok := config.Lrc20Configs[network]; ok && lrc20Config.DisableRpcs {
+		log.Printf("Skipping LRC20 node call due to DisableRpcs flag")
+		return nil
+	}
+
+	conn, err := helper.ConnectToLrc20Node(config)
+	if err != nil {
+		return fmt.Errorf("failed to connect to LRC20 node: %w", err)
+	}
+	defer conn.Close()
+	lrc20Client := pblrc20.NewSparkServiceClient(conn)
+	res, err := lrc20Client.VerifySparkTx(ctx, &pblrc20.VerifySparkTxRequest{FinalTokenTransaction: tokenTransaction})
+	if err != nil {
+		return err
+	}
+
+	// TODO: Remove is_valid boolean in response and use error codes only instead.
+	if !res.IsValid {
+		return fmt.Errorf("LRC20 node validation: invalid token transaction")
+	}
+	return nil
 }
 
 func ValidateMintSignature(

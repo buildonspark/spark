@@ -86,6 +86,12 @@ type BitcoindConfig struct {
 }
 
 type Lrc20Config struct {
+	// DisableRpcs turns off external LRC20 RPC calls for token transactions.
+	// Useful to unblock token transactions in the case LRC20 nodes behave unexpectedly.
+	// Although this is primarily intended for testing, even in a production environment
+	// transfers can still be validated and processed without LRC20 communication,
+	// although exits for resulting outputs will be blocked until the data is backfilled.
+	DisableRpcs                   bool   `yaml:"disablerpcs"`
 	Network                       string `yaml:"network"`
 	Host                          string `yaml:"host"`
 	WithdrawBondSats              uint64 `yaml:"withdrawbondsats"`
