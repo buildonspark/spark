@@ -124,6 +124,9 @@ func (w *SingleKeyWallet) leafSelection(targetAmount int64) ([]*pb.TreeNode, err
 }
 
 func (w *SingleKeyWallet) leafSelectionForSwap(targetAmount int64) ([]*pb.TreeNode, int64, error) {
+	if targetAmount == 0 {
+		return nil, 0, fmt.Errorf("target amount is 0")
+	}
 	sort.Slice(w.OwnedNodes, func(i, j int) bool {
 		return w.OwnedNodes[i].Value < w.OwnedNodes[j].Value
 	})
@@ -258,8 +261,11 @@ func (w *SingleKeyWallet) OptimizeLeaves(ctx context.Context) error {
 	for _, node := range w.OwnedNodes {
 		balance += node.Value
 	}
-	_, err := w.RequestLeavesSwap(ctx, int64(balance))
-	return err
+	if balance > 0 {
+		_, err := w.RequestLeavesSwap(ctx, int64(balance))
+		return err
+	}
+	return nil
 }
 
 func (w *SingleKeyWallet) RequestLeavesSwap(ctx context.Context, targetAmount int64) ([]*pb.TreeNode, error) {

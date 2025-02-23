@@ -261,6 +261,11 @@ export class SparkWallet {
   }
 
   private async selectLeavesForSwap(targetAmount: number) {
+    if (targetAmount == 0) {
+        throw new Error(
+            "Target amount needs to > 0"
+        )
+    }
     const leaves = await this.getLeaves();
     leaves.sort((a, b) => a.value - b.value);
 
