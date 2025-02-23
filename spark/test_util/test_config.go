@@ -166,7 +166,7 @@ func TestWalletConfigDeployed(identityPrivKeyBytes []byte) (*wallet.Config, erro
 		Network:                               common.Regtest,
 		SigningOperators:                      signingOperators,
 		CoodinatorIdentifier:                  "0000000000000000000000000000000000000000000000000000000000000001",
-		FrostSignerAddress:                    "unix:///tmp/frost_0.sock",
+		FrostSignerAddress:                    "unix:///tmp/frost_wallet.sock",
 		IdentityPrivateKey:                    *identityPrivKey,
 		Threshold:                             2,
 		SparkServiceProviderIdentityPublicKey: sspIdentityKey,
