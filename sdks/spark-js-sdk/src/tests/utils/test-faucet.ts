@@ -49,7 +49,7 @@ export class BitcoinFaucet {
     // Generate key for initial block reward
     const key = secp256k1.utils.randomPrivateKey();
     const pubKey = secp256k1.getPublicKey(key);
-    const address = getP2TRAddressFromPublicKey(pubKey, Network.REGTEST);
+    const address = getP2TRAddressFromPublicKey(pubKey, Network.LOCAL);
 
     // Mine a block to this address
     const blockHash = await this.generateToAddress(1, address);
@@ -65,7 +65,7 @@ export class BitcoinFaucet {
     const randomPubKey = secp256k1.getPublicKey(randomKey);
     const randomAddress = getP2TRAddressFromPublicKey(
       randomPubKey,
-      Network.REGTEST
+      Network.LOCAL
     );
     await this.generateToAddress(100, randomAddress);
 
@@ -86,7 +86,7 @@ export class BitcoinFaucet {
       const coinPubKey = secp256k1.getPublicKey(coinKey);
       coinKeys.push(coinKey);
 
-      const script = getP2TRScriptFromPublicKey(coinPubKey, Network.REGTEST);
+      const script = getP2TRScriptFromPublicKey(coinPubKey, Network.LOCAL);
       splitTx.addOutput({
         script,
         amount: coinAmount,
@@ -124,7 +124,7 @@ export class BitcoinFaucet {
     const pubKey = secp256k1.getPublicKey(key);
     const internalKey = pubKey.slice(1); // Remove the 0x02/0x03 prefix
 
-    const script = getP2TRScriptFromPublicKey(pubKey, Network.REGTEST);
+    const script = getP2TRScriptFromPublicKey(pubKey, Network.LOCAL);
 
     unsignedTx.updateInput(0, {
       tapInternalKey: internalKey,

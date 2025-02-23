@@ -15,7 +15,7 @@ describe("deposit", () => {
     async () => {
       const mnemonic =
         "raise benefit echo client clutch short pyramid grass fall core slogan boil device plastic drastic discover decide penalty middle appear medal elbow original income";
-      const sdk = new SparkWallet(Network.REGTEST);
+      const sdk = new SparkWallet(Network.LOCAL);
       await sdk.createSparkWallet(mnemonic);
 
       const pubKey = await sdk.getSigner().generatePublicKey();
@@ -38,7 +38,7 @@ describe("deposit", () => {
 
       const coin = await faucet.fund();
 
-      const sdk = new SparkWallet(Network.REGTEST);
+      const sdk = new SparkWallet(Network.LOCAL);
       const mnemonic = await sdk.generateMnemonic();
       await sdk.createSparkWallet(mnemonic);
       const config = sdk.getConfig();
@@ -52,7 +52,7 @@ describe("deposit", () => {
         throw new Error("deposit address not found");
       }
 
-      const addr = Address(getNetwork(Network.REGTEST)).decode(
+      const addr = Address(getNetwork(Network.LOCAL)).decode(
         depositResp.depositAddress.address
       );
       const script = OutScript.encode(addr);
@@ -83,7 +83,7 @@ describe("deposit", () => {
       const randomPubKey = secp256k1.getPublicKey(randomPrivKey);
       const randomAddr = getP2TRAddressFromPublicKey(
         randomPubKey,
-        Network.REGTEST
+        Network.LOCAL
       );
 
       await faucet.generateToAddress(1, randomAddr);

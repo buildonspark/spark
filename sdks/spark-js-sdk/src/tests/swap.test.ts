@@ -30,12 +30,12 @@ describe("swap", () => {
         "123"
       );
       // Initiate sender
-      const senderWallet = new SparkWallet(Network.REGTEST);
+      const senderWallet = new SparkWallet(Network.LOCAL);
       const senderMnemonic = await senderWallet.generateMnemonic();
       const senderPubkey = await senderWallet.createSparkWallet(senderMnemonic);
 
       const senderConfig = new WalletConfigService(
-        Network.REGTEST,
+        Network.LOCAL,
         senderWallet.getSigner()
       );
       const senderConnectionManager = new ConnectionManager(senderConfig);
@@ -45,14 +45,14 @@ describe("swap", () => {
       );
 
       // Initiate receiver
-      const receiverWallet = new SparkWallet(Network.REGTEST);
+      const receiverWallet = new SparkWallet(Network.LOCAL);
       const receiverMnemonic = await receiverWallet.generateMnemonic();
       const receiverPubkey = await receiverWallet.createSparkWallet(
         receiverMnemonic
       );
 
       const receiverConfig = new WalletConfigService(
-        Network.REGTEST,
+        Network.LOCAL,
         receiverWallet.getSigner()
       );
       const receiverConnectionManager = new ConnectionManager(receiverConfig);

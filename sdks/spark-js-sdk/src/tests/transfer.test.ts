@@ -25,7 +25,7 @@ describe("Transfer", () => {
         "123"
       );
 
-      const senderWallet = new SparkWallet(Network.REGTEST);
+      const senderWallet = new SparkWallet(Network.LOCAL);
       const senderMnemonic = await senderWallet.generateMnemonic();
       await senderWallet.createSparkWallet(senderMnemonic);
 
@@ -39,7 +39,7 @@ describe("Transfer", () => {
 
       const newLeafPubKey = await senderWallet.getSigner().generatePublicKey();
 
-      const receiverWallet = new SparkWallet(Network.REGTEST);
+      const receiverWallet = new SparkWallet(Network.LOCAL);
       const receiverMnemonic = await receiverWallet.generateMnemonic();
       const receiverPubkey = await receiverWallet.createSparkWallet(
         receiverMnemonic
@@ -90,7 +90,7 @@ describe("Transfer", () => {
       const nodes = await receiverWallet.getLeaves();
       await receiverWallet.setLeaves(nodes);
 
-      const newReceiverWallet = new SparkWallet(Network.REGTEST);
+      const newReceiverWallet = new SparkWallet(Network.LOCAL);
       const newReceiverMnemonic = await newReceiverWallet.generateMnemonic();
       const newReceiverPubkey = await newReceiverWallet.createSparkWallet(
         newReceiverMnemonic
@@ -112,11 +112,11 @@ describe("Transfer", () => {
   testFn("test transfer with separate", async () => {
     const faucet = new BitcoinFaucet("http://127.0.0.1:18443", "admin1", "123");
 
-    const senderWallet = new SparkWallet(Network.REGTEST);
+    const senderWallet = new SparkWallet(Network.LOCAL);
     const senderMnemonic = await senderWallet.generateMnemonic();
     await senderWallet.createSparkWallet(senderMnemonic);
 
-    const receiverWallet = new SparkWallet(Network.REGTEST);
+    const receiverWallet = new SparkWallet(Network.LOCAL);
     const receiverMnemonic = await receiverWallet.generateMnemonic();
     const receiverPubkey = await receiverWallet.createSparkWallet(
       receiverMnemonic
@@ -217,11 +217,11 @@ describe("Transfer", () => {
   testFn("cancel transfer", async () => {
     const faucet = new BitcoinFaucet("http://127.0.0.1:18443", "admin1", "123");
 
-    const senderWallet = new SparkWallet(Network.REGTEST);
+    const senderWallet = new SparkWallet(Network.LOCAL);
     const senderMnemonic = await senderWallet.generateMnemonic();
     await senderWallet.createSparkWallet(senderMnemonic);
 
-    const receiverWallet = new SparkWallet(Network.REGTEST);
+    const receiverWallet = new SparkWallet(Network.LOCAL);
     const receiverMnemonic = await receiverWallet.generateMnemonic();
     const receiverPubkey = await receiverWallet.createSparkWallet(
       receiverMnemonic
@@ -294,11 +294,11 @@ describe("Transfer", () => {
   xit("test transfer in wallet", async () => {
     const faucet = new BitcoinFaucet("http://127.0.0.1:18443", "admin1", "123");
 
-    const senderWallet = new SparkWallet(Network.REGTEST);
+    const senderWallet = new SparkWallet(Network.LOCAL);
     const senderMnemonic = await senderWallet.generateMnemonic();
     await senderWallet.createSparkWallet(senderMnemonic);
 
-    const receiverWallet = new SparkWallet(Network.REGTEST);
+    const receiverWallet = new SparkWallet(Network.LOCAL);
     const receiverMnemonic = await receiverWallet.generateMnemonic();
     const receiverPubkey = await receiverWallet.createSparkWallet(
       receiverMnemonic

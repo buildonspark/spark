@@ -95,7 +95,7 @@ export class TreeCreationService {
         onChainUtxo: {
           vout: vout,
           rawTx: parentTx.toBytes(),
-          network: this.config.getNetwork(),
+          network: this.config.getNetworkProto(),
         },
       };
     } else {
@@ -151,7 +151,7 @@ export class TreeCreationService {
         onChainUtxo: {
           vout: vout,
           rawTx: parentTx.toBytes(),
-          network: this.config.getNetwork(),
+          network: this.config.getNetworkProto(),
         },
       };
     } else if (parentNode) {

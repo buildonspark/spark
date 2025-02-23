@@ -13,7 +13,7 @@ describe("Tree Creation", () => {
   testFn(
     "test tree creation address generation",
     async () => {
-      const wallet = new SparkWallet(Network.REGTEST);
+      const wallet = new SparkWallet(Network.LOCAL);
       const mnemonic = await wallet.generateMnemonic();
       await wallet.createSparkWallet(mnemonic);
       const config = wallet.getConfig();

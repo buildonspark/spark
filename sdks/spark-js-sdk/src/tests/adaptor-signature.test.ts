@@ -17,7 +17,7 @@ describe("adaptor signature", () => {
     async () => {
       let failures = 0;
 
-      const wallet = new SparkWallet(Network.REGTEST);
+      const wallet = new SparkWallet(Network.LOCAL);
       const mnemonic = await wallet.generateMnemonic();
       await wallet.createSparkWallet(mnemonic);
 

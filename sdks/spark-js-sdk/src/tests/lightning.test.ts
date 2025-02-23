@@ -47,22 +47,19 @@ describe("LightningService", () => {
   const testFn = process.env.GITHUB_ACTIONS ? it.skip : xit;
 
   beforeAll(async () => {
-    userWallet = new SparkWallet(Network.REGTEST);
+    userWallet = new SparkWallet(Network.LOCAL);
     const mnemonic = await userWallet.generateMnemonic();
     await userWallet.createSparkWallet(mnemonic);
-    userConfig = new WalletConfigService(
-      Network.REGTEST,
-      userWallet.getSigner()
-    );
+    userConfig = new WalletConfigService(Network.LOCAL, userWallet.getSigner());
     const connectionManager = new ConnectionManager(userConfig);
     lightningService = new LightningService(userConfig, connectionManager);
     transferService = new TransferService(userConfig, connectionManager);
 
-    sspWallet = new SparkWallet(Network.REGTEST);
+    sspWallet = new SparkWallet(Network.LOCAL);
     const sspMnemonic = await sspWallet.generateMnemonic();
     await sspWallet.createSparkWallet(sspMnemonic);
 
-    sspConfig = new WalletConfigService(Network.REGTEST, sspWallet.getSigner());
+    sspConfig = new WalletConfigService(Network.LOCAL, sspWallet.getSigner());
     const sspConnectionManager = new ConnectionManager(sspConfig);
     sspLightningService = new LightningService(sspConfig, sspConnectionManager);
     sspTransferService = new TransferService(sspConfig, sspConnectionManager);

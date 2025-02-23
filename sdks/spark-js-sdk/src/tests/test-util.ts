@@ -154,7 +154,7 @@ export async function createNewTree(
   depositTx.addInput(faucetCoin.outpoint);
 
   // Add the main output
-  const addr = Address(getNetwork(Network.REGTEST)).decode(
+  const addr = Address(getNetwork(Network.LOCAL)).decode(
     depositResp.depositAddress.address
   );
   const script = OutScript.encode(addr);
@@ -180,7 +180,7 @@ export async function createNewTree(
   const randomPubKey = secp256k1.getPublicKey(randomKey);
   const randomAddress = getP2TRAddressFromPublicKey(
     randomPubKey,
-    Network.REGTEST
+    Network.LOCAL
   );
 
   await faucet.generateToAddress(1, randomAddress);

@@ -37,12 +37,12 @@ describe("coop exit", () => {
       const amountSats = 100_000n;
 
       // Setup user with leaves
-      const userWallet = new SparkWallet(Network.REGTEST);
+      const userWallet = new SparkWallet(Network.LOCAL);
       const userMnemonic = await userWallet.generateMnemonic();
       await userWallet.createSparkWallet(userMnemonic);
 
       const configService = new WalletConfigService(
-        Network.REGTEST,
+        Network.LOCAL,
         userWallet.getSigner()
       );
       const connectionManager = new ConnectionManager(configService);
@@ -62,20 +62,20 @@ describe("coop exit", () => {
       );
 
       // Setup ssp
-      const sspWallet = new SparkWallet(Network.REGTEST);
+      const sspWallet = new SparkWallet(Network.LOCAL);
       const sspMnemonic = await sspWallet.generateMnemonic();
       const sspPubkey = await sspWallet.createSparkWallet(sspMnemonic);
 
       const sspIntermediateAddressScript = getP2TRScriptFromPublicKey(
         hexToBytes(sspPubkey),
-        Network.REGTEST
+        Network.LOCAL
       );
 
       // Setup withdraw
       const withdrawPubKey = await userWallet.getSigner().generatePublicKey();
       const withdrawAddressScript = getP2TRScriptFromPublicKey(
         withdrawPubKey,
-        Network.REGTEST
+        Network.LOCAL
       );
 
       const leafCount = 1;
@@ -106,7 +106,7 @@ describe("coop exit", () => {
           .generatePublicKey();
         const connectorP2trAddr = getP2TRAddressFromPublicKey(
           connectorPubKey,
-          Network.REGTEST
+          Network.LOCAL
         );
         connectorP2trAddrs.push(connectorP2trAddr);
       }
@@ -118,7 +118,7 @@ describe("coop exit", () => {
       for (const addr of [...connectorP2trAddrs, feeBumpAddr]) {
         connectorTx.addOutput({
           script: OutScript.encode(
-            Address(getNetwork(Network.REGTEST)).decode(addr)
+            Address(getNetwork(Network.LOCAL)).decode(addr)
           ),
           amount: BigInt(intermediateAmountSats / connectorP2trAddrs.length),
         });
@@ -201,7 +201,7 @@ describe("coop exit", () => {
       const randomPubKey = secp256k1.getPublicKey(randomKey);
       const randomAddress = getP2TRAddressFromPublicKey(
         randomPubKey,
-        Network.REGTEST
+        Network.LOCAL
       );
       // Confirm extra buffer to scan more blocks than needed
       // So that we don't race the chain watcher in this test

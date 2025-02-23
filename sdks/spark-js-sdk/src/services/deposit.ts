@@ -7,7 +7,6 @@ import {
   Address,
   FinalizeNodeSignaturesResponse,
   GenerateDepositAddressResponse,
-  Network,
   StartTreeCreationResponse,
 } from "../proto/spark.js";
 import {
@@ -123,7 +122,7 @@ export class DepositService {
       depositResp = await sparkClient.generate_deposit_address({
         signingPublicKey: signingPubkey,
         identityPublicKey: await this.config.signer.getIdentityPublicKey(),
-        network: this.config.getNetwork() as Network,
+        network: this.config.getNetworkProto(),
       });
     } catch (error) {
       throw new Error(`Error generating deposit address: ${error}`);
@@ -213,7 +212,7 @@ export class DepositService {
         onChainUtxo: {
           vout: vout,
           rawTx: depositTx.toBytes(),
-          network: this.config.getNetwork() as Network,
+          network: this.config.getNetworkProto(),
         },
         rootTxSigningJob: {
           rawTx: rootTx.toBytes(),
