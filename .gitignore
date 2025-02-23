@@ -36,3 +36,6 @@ _data/
 # Dev files
 *.dev.*
 *.dev
+
+# Cursor files
+/.cursor*
