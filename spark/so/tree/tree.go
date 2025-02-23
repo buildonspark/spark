@@ -61,13 +61,19 @@ var DefaultDenominationsCounts = map[uint64]uint64{
 func GetLeafDenominationCounts(ctx context.Context, req *pb.GetLeafDenominationCountsRequest) (*pb.GetLeafDenominationCountsResponse, error) {
 	logger := helper.GetLoggerFromContext(ctx)
 
+	network := schema.Network(req.Network)
+	err := network.UnmarshalProto(req.Network)
+	if err != nil {
+		return nil, err
+	}
+
 	db := ent.GetDbFromContext(ctx)
 	leaves, err := db.TreeNode.Query().
 		Where(treenode.OwnerIdentityPubkey(req.OwnerIdentityPublicKey)).
 		Where(treenode.StatusEQ(schema.TreeNodeStatusAvailable)).
 		Where(
 			treenode.HasTreeWith(
-				tree.NetworkEQ(schema.Network(req.Network)),
+				tree.NetworkEQ(network),
 			),
 		).
 		All(ctx)

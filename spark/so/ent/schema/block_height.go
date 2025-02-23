@@ -33,6 +33,21 @@ func (n Network) MarshalProto() (pb.Network, error) {
 	return pb.Network_MAINNET, fmt.Errorf("unknown network: %s", n)
 }
 
+// UnmarshalProto converts a spark protobuf Network to a Network.
+func (n *Network) UnmarshalProto(proto pb.Network) error {
+	switch proto {
+	case pb.Network_MAINNET:
+		*n = NetworkMainnet
+	case pb.Network_REGTEST:
+		*n = NetworkRegtest
+	case pb.Network_TESTNET:
+		*n = NetworkTestnet
+	case pb.Network_SIGNET:
+		*n = NetworkSignet
+	}
+	return fmt.Errorf("unknown network: %d", proto)
+}
+
 // Values returns the values for the Network type.
 func (Network) Values() []string {
 	return []string{
