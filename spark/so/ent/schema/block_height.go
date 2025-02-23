@@ -44,8 +44,10 @@ func (n *Network) UnmarshalProto(proto pb.Network) error {
 		*n = NetworkTestnet
 	case pb.Network_SIGNET:
 		*n = NetworkSignet
+	default:
+		return fmt.Errorf("unknown network: %d", proto)
 	}
-	return fmt.Errorf("unknown network: %d", proto)
+	return nil
 }
 
 // Values returns the values for the Network type.
