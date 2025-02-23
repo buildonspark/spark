@@ -585,8 +585,8 @@ func (w *SingleKeyWallet) MintTokens(ctx context.Context, amount uint64) error {
 	return nil
 }
 
-// For simplicity always use the wallet's identity public key as the token public key.
-func (w *SingleKeyWallet) TransferTokens(ctx context.Context, amount uint64, receiverPubKey []byte) error {
+// TransferTokens transfers tokens to a receiver. If tokenPublicKey is nil, the wallet's identity public key is used.
+func (w *SingleKeyWallet) TransferTokens(ctx context.Context, amount uint64, receiverPubKey []byte, tokenPublicKey []byte) error {
 	conn, err := common.NewGRPCConnectionWithTestTLS(w.Config.CoodinatorAddress())
 	if err != nil {
 		return fmt.Errorf("failed to connect to operator: %w", err)
@@ -598,7 +598,13 @@ func (w *SingleKeyWallet) TransferTokens(ctx context.Context, amount uint64, rec
 		return fmt.Errorf("failed to authenticate: %w", err)
 	}
 	ctx = ContextWithToken(ctx, token)
-	selectedLeavesWithPrevTxData, selectedLeavesAmount, err := selectTokenLeaves(amount, w.OwnedTokenLeaves)
+
+	// If no token public key specified, use wallet's identity public key
+	if tokenPublicKey == nil {
+		tokenPublicKey = w.Config.IdentityPublicKey()
+	}
+
+	selectedLeavesWithPrevTxData, selectedLeavesAmount, err := selectTokenLeaves(ctx, w.Config, amount, tokenPublicKey, w.Config.IdentityPublicKey())
 	if err != nil {
 		return fmt.Errorf("failed to select token leaves: %w", err)
 	}
@@ -625,7 +631,7 @@ func (w *SingleKeyWallet) TransferTokens(ctx context.Context, amount uint64, rec
 		OutputLeaves: []*pb.TokenLeafOutput{
 			{
 				OwnerPublicKey: receiverPubKey,
-				TokenPublicKey: w.Config.IdentityPublicKey(),
+				TokenPublicKey: tokenPublicKey,
 				TokenAmount:    int64ToUint128Bytes(0, uint64(amount)),
 			},
 		},
@@ -636,7 +642,7 @@ func (w *SingleKeyWallet) TransferTokens(ctx context.Context, amount uint64, rec
 		remainder := selectedLeavesAmount - amount
 		changeOutput := &pb.TokenLeafOutput{
 			OwnerPublicKey: w.Config.IdentityPublicKey(),
-			TokenPublicKey: w.Config.IdentityPublicKey(),
+			TokenPublicKey: tokenPublicKey,
 			TokenAmount:    int64ToUint128Bytes(0, remainder),
 		}
 		transferTransaction.OutputLeaves = append(transferTransaction.OutputLeaves, changeOutput)
@@ -672,7 +678,43 @@ func (w *SingleKeyWallet) TransferTokens(ctx context.Context, amount uint64, rec
 	return nil
 }
 
-// For simplicity always use the wallet's identity public key as the token public key.
+// TokenBalance represents the balance for a specific token
+type TokenBalance struct {
+	NumLeaves   int
+	TotalAmount uint64
+}
+
+func (w *SingleKeyWallet) GetAllTokenBalances(ctx context.Context) (map[string]TokenBalance, error) {
+	// Get all token leaves owned by the wallet
+	response, err := GetOwnedTokenLeaves(
+		ctx,
+		w.Config,
+		[][]byte{w.Config.IdentityPublicKey()},
+		nil, // nil to get all tokens
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get owned token leaves: %w", err)
+	}
+
+	// Group leaves by token public key and calculate totals
+	balances := make(map[string]TokenBalance)
+	for _, leaf := range response.LeavesWithPreviousTransactionData {
+		tokenPubKey := leaf.Leaf.TokenPublicKey
+		balance := balances[hex.EncodeToString(tokenPubKey)]
+
+		_, amount, err := uint128BytesToInt64(leaf.Leaf.TokenAmount)
+		if err != nil {
+			return nil, fmt.Errorf("invalid token amount in leaf: %w", err)
+		}
+
+		balance.NumLeaves++
+		balance.TotalAmount += amount
+		balances[hex.EncodeToString(tokenPubKey)] = balance
+	}
+
+	return balances, nil
+}
+
 func (w *SingleKeyWallet) GetTokenBalance(ctx context.Context, tokenPublicKey []byte) (int, uint64, error) {
 	// Claim all transfers first to ensure we have the latest state
 	_, err := w.ClaimAllTransfers(ctx)
@@ -704,17 +746,17 @@ func (w *SingleKeyWallet) GetTokenBalance(ctx context.Context, tokenPublicKey []
 	return len(response.LeavesWithPreviousTransactionData), totalAmount, nil
 }
 
-func selectTokenLeaves(targetAmount uint64, leavesWithPrevTxData []*pb.LeafWithPreviousTransactionData) ([]*pb.LeafWithPreviousTransactionData, uint64, error) {
+func selectTokenLeaves(ctx context.Context, config *Config, targetAmount uint64, tokenPublicKey []byte, ownerPublicKey []byte) ([]*pb.LeafWithPreviousTransactionData, uint64, error) {
+	// Fetch owned token leaves
+	ownedLeavesResponse, err := GetOwnedTokenLeaves(ctx, config, [][]byte{ownerPublicKey}, [][]byte{tokenPublicKey})
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to get owned token leaves: %w", err)
+	}
+	leavesWithPrevTxData := ownedLeavesResponse.LeavesWithPreviousTransactionData
+
 	getTokenAmount := func(leaf *pb.LeafWithPreviousTransactionData) (uint64, error) {
 		_, amount, err := uint128BytesToInt64(leaf.Leaf.TokenAmount)
 		return amount, err
-	}
-
-	// Pre-check all leaves for valid token amounts
-	for _, leaf := range leavesWithPrevTxData {
-		if _, err := getTokenAmount(leaf); err != nil {
-			return nil, 0, fmt.Errorf("invalid token amount in leaf: %w", err)
-		}
 	}
 
 	// Sort to spend smallest leaves first to proactively reduce withdrawal cost.
@@ -727,8 +769,10 @@ func selectTokenLeaves(targetAmount uint64, leavesWithPrevTxData []*pb.LeafWithP
 	selectedLeavesAmount := uint64(0)
 	selectedLeaves := make([]*pb.LeafWithPreviousTransactionData, 0)
 	for _, leaf := range leavesWithPrevTxData {
-		// Checked above so no err is expected.
-		leafTokenAmount, _ := getTokenAmount(leaf)
+		leafTokenAmount, err := getTokenAmount(leaf)
+		if err != nil {
+			return nil, 0, fmt.Errorf("invalid token amount in leaf: %w", err)
+		}
 		selectedLeavesAmount += uint64(leafTokenAmount)
 		selectedLeaves = append(selectedLeaves, leaf)
 		if selectedLeavesAmount >= targetAmount {

@@ -453,7 +453,7 @@ func main() {
 	cli.registry.RegisterCommand(Command{
 		Name:        "transfer_tokens",
 		Description: "Transfer tokens",
-		Usage:       "transfer_tokens <amount> <receiver_public_key>",
+		Usage:       "transfer_tokens <amount> <receiver_public_key> [token_public_key]",
 		Handler: func(args []string) error {
 			if len(args) < 2 {
 				return fmt.Errorf("please provide an amount and receiver public key")
@@ -472,43 +472,70 @@ func main() {
 					len(args[1]),
 					args[1])
 			}
+
+			var tokenPublicKey []byte
+			if len(args) > 2 {
+				tokenPublicKey, err = hex.DecodeString(args[2])
+				if err != nil {
+					return fmt.Errorf("invalid token public key: failed to decode hex string: %w", err)
+				}
+				if len(tokenPublicKey) != 33 {
+					return fmt.Errorf("invalid token public key: decoded bytes must be 33 bytes (66 hex characters)")
+				}
+			}
+
 			fmt.Printf("Transferring %d tokens to public key %s\n", amount, args[1])
-			err = cli.wallet.TransferTokens(context.Background(), amount, receiverPublicKey)
+			err = cli.wallet.TransferTokens(context.Background(), amount, receiverPublicKey, tokenPublicKey)
 			if err != nil {
 				return fmt.Errorf("failed to transfer tokens: %w", err)
 			}
-			fmt.Printf("%d tokens transferred with Token Public Key: %s\n", amount, hex.EncodeToString(cli.wallet.Config.IdentityPublicKey()))
+			fmt.Printf("%d tokens transferred\n", amount)
 			return nil
 		},
 	})
 
 	cli.registry.RegisterCommand(Command{
 		Name:        "token_balance",
-		Description: "Get token balance for a specific token public key",
-		Usage:       "token_balance",
+		Description: "Get token balances for all token types",
+		Usage:       "token_balance [token_public_key]",
 		Handler: func(args []string) error {
-			if len(args) < 1 {
-				return fmt.Errorf("please provide a token public key in hex string format")
-			}
-			tokenPublicKey, err := hex.DecodeString(args[0])
-			if err != nil {
-				return fmt.Errorf("invalid token public key: failed to decode hex string: %w", err)
-			}
-			if len(tokenPublicKey) != 33 {
-				return fmt.Errorf("invalid token public key: decoded bytes must be 33 bytes (66 hex characters), got %d bytes from %d hex characters: %s",
-					len(tokenPublicKey),
-					len(args[0]),
-					args[0])
+			if len(args) > 0 {
+				// If specific token public key provided, show only that balance
+				tokenPublicKey, err := hex.DecodeString(args[0])
+				if err != nil {
+					return fmt.Errorf("invalid token public key: failed to decode hex string: %w", err)
+				}
+				if len(tokenPublicKey) != 33 {
+					return fmt.Errorf("invalid token public key: decoded bytes must be 33 bytes (66 hex characters)")
+				}
+
+				numLeaves, totalAmount, err := cli.wallet.GetTokenBalance(context.Background(), tokenPublicKey)
+				if err != nil {
+					return fmt.Errorf("failed to get token balance: %w", err)
+				}
+
+				fmt.Printf("Token Public Key: %s\n", args[0])
+				fmt.Printf("Number of leaves: %d\n", numLeaves)
+				fmt.Printf("Total amount: %d tokens\n", totalAmount)
+				return nil
 			}
 
-			numLeaves, totalAmount, err := cli.wallet.GetTokenBalance(context.Background(), tokenPublicKey)
+			// Show all token balances
+			balances, err := cli.wallet.GetAllTokenBalances(context.Background())
 			if err != nil {
-				return fmt.Errorf("failed to get token balance: %w", err)
+				return fmt.Errorf("failed to get token balances: %w", err)
 			}
 
-			fmt.Printf("Token Public Key: %s\n", args[0])
-			fmt.Printf("Number of leaves: %d\n", numLeaves)
-			fmt.Printf("Total amount: %d tokens\n", totalAmount)
+			if len(balances) == 0 {
+				fmt.Println("No token holdings found")
+				return nil
+			}
+
+			for tokenPubKey, balance := range balances {
+				fmt.Printf("\nToken Public Key: %s\n", tokenPubKey)
+				fmt.Printf("Number of leaves: %d\n", balance.NumLeaves)
+				fmt.Printf("Total amount: %d tokens\n", balance.TotalAmount)
+			}
 			return nil
 		},
 	})
