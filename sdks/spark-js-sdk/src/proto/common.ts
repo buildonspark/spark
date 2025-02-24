@@ -14,6 +14,7 @@ export enum SignatureIntent {
   TRANSFER = 1,
   AGGREGATE = 2,
   REFRESH = 3,
+  EXTEND = 4,
   UNRECOGNIZED = -1,
 }
 
@@ -31,6 +32,9 @@ export function signatureIntentFromJSON(object: any): SignatureIntent {
     case 3:
     case "REFRESH":
       return SignatureIntent.REFRESH;
+    case 4:
+    case "EXTEND":
+      return SignatureIntent.EXTEND;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -48,6 +52,8 @@ export function signatureIntentToJSON(object: SignatureIntent): string {
       return "AGGREGATE";
     case SignatureIntent.REFRESH:
       return "REFRESH";
+    case SignatureIntent.EXTEND:
+      return "EXTEND";
     case SignatureIntent.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";

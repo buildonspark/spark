@@ -175,6 +175,7 @@ func SignTokenTransaction(
 		signTokenTransactionResponse, err := operatorClient.SignTokenTransaction(ctx, &pb.SignTokenTransactionRequest{
 			FinalTokenTransaction:      finalTx,
 			OperatorSpecificSignatures: operatorSpecificSignatures,
+			IdentityPublicKey:          config.IdentityPublicKey(),
 		})
 		if err != nil {
 			log.Printf("Error while calling SignTokenTransaction with operator %s: %v", operator.Identifier, err)
@@ -263,6 +264,7 @@ func FinalizeTokenTransaction(
 		_, err = operatorClient.FinalizeTokenTransaction(ctx, &pb.FinalizeTokenTransactionRequest{
 			FinalTokenTransaction:     startResponse.FinalTokenTransaction,
 			LeafToSpendRevocationKeys: leafRecoveredSecrets,
+			IdentityPublicKey:         config.IdentityPublicKey(),
 		})
 		if err != nil {
 			log.Printf("Error while finalizing token transaction with operator %s: %v", operator.Identifier, err)

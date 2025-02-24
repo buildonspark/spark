@@ -222,6 +222,7 @@ message OperatorSpecificTokenTransactionSignature {
 message SignTokenTransactionRequest {
     TokenTransaction final_token_transaction = 1;
     repeated OperatorSpecificTokenTransactionSignature operator_specific_signatures = 2;
+    bytes identity_public_key = 3 [(validate.rules).bytes.len = 33];
 }
 
 message SignTokenTransactionResponse {
@@ -234,6 +235,7 @@ message FinalizeTokenTransactionRequest {
     // List of ordered revocation keys that map 1:1 with leaves being spent in the
     // token transaction.
     repeated bytes leaf_to_spend_revocation_keys = 2 [(validate.rules).repeated.items.bytes.len = 32];
+    bytes identity_public_key = 3 [(validate.rules).bytes.len = 33];
 }
 
 message FreezeTokensPayload {

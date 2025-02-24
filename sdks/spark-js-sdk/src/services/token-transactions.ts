@@ -248,9 +248,13 @@ export class TokenTransactionService {
         async ([identifier, operator], index) => {
           const internalSparkClient =
             await this.connectionManager.createSparkClient(operator.address);
+          const identityPublicKey =
+            await this.config.signer.getIdentityPublicKey();
+
           const response = await internalSparkClient.sign_token_transaction({
             finalTokenTransaction,
             operatorSpecificSignatures,
+            identityPublicKey,
           });
 
           return {
@@ -353,9 +357,13 @@ export class TokenTransactionService {
       Object.entries(signingOperators).map(async ([identifier, operator]) => {
         const internalSparkClient =
           await this.connectionManager.createSparkClient(operator.address);
+        const identityPublicKey =
+          await this.config.signer.getIdentityPublicKey();
+
         const response = await internalSparkClient.finalize_token_transaction({
           finalTokenTransaction,
           leafToSpendRevocationKeys,
+          identityPublicKey,
         });
 
         return {

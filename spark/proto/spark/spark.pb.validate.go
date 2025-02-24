@@ -3336,6 +3336,17 @@ func (m *SignTokenTransactionRequest) validate(all bool) error {
 
 	}
 
+	if len(m.GetIdentityPublicKey()) != 33 {
+		err := SignTokenTransactionRequestValidationError{
+			field:  "IdentityPublicKey",
+			reason: "value length must be 33 bytes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
 	if len(errors) > 0 {
 		return SignTokenTransactionRequestMultiError(errors)
 	}
@@ -3612,6 +3623,17 @@ func (m *FinalizeTokenTransactionRequest) validate(all bool) error {
 			errors = append(errors, err)
 		}
 
+	}
+
+	if len(m.GetIdentityPublicKey()) != 33 {
+		err := FinalizeTokenTransactionRequestValidationError{
+			field:  "IdentityPublicKey",
+			reason: "value length must be 33 bytes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
 	}
 
 	if len(errors) > 0 {

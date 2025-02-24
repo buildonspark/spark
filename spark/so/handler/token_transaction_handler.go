@@ -146,7 +146,9 @@ func (o TokenTransactionHandler) SignTokenTransaction(
 	config *so.Config,
 	req *pb.SignTokenTransactionRequest,
 ) (*pb.SignTokenTransactionResponse, error) {
-	// TODO: Add authz
+	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, o.config, req.IdentityPublicKey); err != nil {
+		return nil, err
+	}
 
 	// Validate each leaf signature in the request. Each signed payload consists of
 	//   payload.final_token_transaction_hash
@@ -285,6 +287,10 @@ func (o TokenTransactionHandler) FinalizeTokenTransaction(
 	config *so.Config,
 	req *pb.FinalizeTokenTransactionRequest,
 ) (*emptypb.Empty, error) {
+	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, o.config, req.IdentityPublicKey); err != nil {
+		return nil, err
+	}
+
 	tokenTransactionReceipt, err := ent.FetchTokenTransactionData(ctx, req.FinalTokenTransaction)
 	if err != nil {
 		log.Printf("Failed to fetch matching transaction receipt: %v", err)
