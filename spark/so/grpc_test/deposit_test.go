@@ -41,6 +41,19 @@ func TestGenerateDepositAddress(t *testing.T) {
 	if resp.DepositAddress.Address == "" {
 		t.Fatalf("deposit address is empty")
 	}
+
+	unusedDepositAddresses, err := wallet.QueryUnusedDepositAddresses(ctx, config)
+	if err != nil {
+		t.Fatalf("failed to query unused deposit addresses: %v", err)
+	}
+
+	if len(unusedDepositAddresses.DepositAddresses) != 1 {
+		t.Fatalf("expected 1 unused deposit address, got %d", len(unusedDepositAddresses.DepositAddresses))
+	}
+
+	if unusedDepositAddresses.DepositAddresses[0] != resp.DepositAddress.Address {
+		t.Fatalf("expected unused deposit address to be %s, got %s", resp.DepositAddress.Address, unusedDepositAddresses.DepositAddresses[0])
+	}
 }
 
 func TestStartTreeCreation(t *testing.T) {
@@ -126,6 +139,15 @@ func TestStartTreeCreation(t *testing.T) {
 		if node.Status == string(schema.TreeNodeStatusCreating) {
 			t.Fatalf("tree node is in status TreeNodeStatusCreating %s", node.Id)
 		}
+	}
+
+	unusedDepositAddresses, err := wallet.QueryUnusedDepositAddresses(ctx, config)
+	if err != nil {
+		t.Fatalf("failed to query unused deposit addresses: %v", err)
+	}
+
+	if len(unusedDepositAddresses.DepositAddresses) != 0 {
+		t.Fatalf("expected 0 unused deposit addresses, got %d", len(unusedDepositAddresses.DepositAddresses))
 	}
 }
 

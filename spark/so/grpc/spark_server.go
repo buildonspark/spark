@@ -203,3 +203,8 @@ func (s *SparkServer) QueryAllTransfers(ctx context.Context, req *pb.QueryAllTra
 	transferHander := handler.NewTransferHandler(s.config)
 	return wrapWithGRPCError(transferHander.QueryAllTransfers(ctx, req))
 }
+
+func (s *SparkServer) QueryUnusedDepositAddresses(ctx context.Context, req *pb.QueryUnusedDepositAddressesRequest) (*pb.QueryUnusedDepositAddressesResponse, error) {
+	treeQueryHandler := handler.NewTreeQueryHandler(s.config)
+	return wrapWithGRPCError(treeQueryHandler.QueryUnusedDepositAddresses(ctx, req))
+}

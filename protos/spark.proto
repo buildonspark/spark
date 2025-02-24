@@ -46,6 +46,8 @@ service SparkService {
     rpc return_lightning_payment(ReturnLightningPaymentRequest) returns (google.protobuf.Empty) {}
 
     rpc cancel_send_transfer(CancelSendTransferRequest) returns (CancelSendTransferResponse) {}
+
+    rpc query_unused_deposit_addresses(QueryUnusedDepositAddressesRequest) returns (QueryUnusedDepositAddressesResponse) {}
 }
 
 enum Network {
@@ -673,4 +675,12 @@ message QueryAllTransfersRequest {
 message QueryAllTransfersResponse {
     repeated Transfer transfers = 1;
     int64 offset = 2;
+}
+
+message QueryUnusedDepositAddressesRequest {
+    bytes identity_public_key = 1;
+}
+
+message QueryUnusedDepositAddressesResponse {
+    repeated string deposit_addresses = 1;
 }

@@ -8,7 +8,9 @@ import (
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/ent"
+	"github.com/lightsparkdev/spark-go/so/ent/depositaddress"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
+	"github.com/lightsparkdev/spark-go/so/ent/signingkeyshare"
 	"github.com/lightsparkdev/spark-go/so/ent/treenode"
 )
 
@@ -84,4 +86,32 @@ func getAncestorChain(ctx context.Context, db *ent.Tx, node *ent.TreeNode, nodeM
 	}
 
 	return getAncestorChain(ctx, db, parent, nodeMap)
+}
+
+func (h *TreeQueryHandler) QueryUnusedDepositAddresses(ctx context.Context, req *pb.QueryUnusedDepositAddressesRequest) (*pb.QueryUnusedDepositAddressesResponse, error) {
+	db := ent.GetDbFromContext(ctx)
+
+	query := db.DepositAddress.Query()
+	query = query.Where(depositaddress.OwnerIdentityPubkey(req.GetIdentityPublicKey())).WithSigningKeyshare()
+
+	depositAddresses, err := query.All(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	unusedDepositAddresses := make([]string, 0)
+	for _, depositAddress := range depositAddresses {
+		_, err := db.TreeNode.Query().Where(treenode.HasSigningKeyshareWith(signingkeyshare.ID(depositAddress.Edges.SigningKeyshare.ID))).Only(ctx)
+		if err != nil {
+			if ent.IsNotFound(err) {
+				unusedDepositAddresses = append(unusedDepositAddresses, depositAddress.Address)
+			} else {
+				return nil, err
+			}
+		}
+	}
+
+	return &pb.QueryUnusedDepositAddressesResponse{
+		DepositAddresses: unusedDepositAddresses,
+	}, nil
 }

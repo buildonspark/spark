@@ -13596,3 +13596,215 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = QueryAllTransfersResponseValidationError{}
+
+// Validate checks the field values on QueryUnusedDepositAddressesRequest with
+// the rules defined in the proto definition for this message. If any rules
+// are violated, the first error encountered is returned, or nil if there are
+// no violations.
+func (m *QueryUnusedDepositAddressesRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on QueryUnusedDepositAddressesRequest
+// with the rules defined in the proto definition for this message. If any
+// rules are violated, the result is a list of violation errors wrapped in
+// QueryUnusedDepositAddressesRequestMultiError, or nil if none found.
+func (m *QueryUnusedDepositAddressesRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *QueryUnusedDepositAddressesRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for IdentityPublicKey
+
+	if len(errors) > 0 {
+		return QueryUnusedDepositAddressesRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// QueryUnusedDepositAddressesRequestMultiError is an error wrapping multiple
+// validation errors returned by
+// QueryUnusedDepositAddressesRequest.ValidateAll() if the designated
+// constraints aren't met.
+type QueryUnusedDepositAddressesRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m QueryUnusedDepositAddressesRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m QueryUnusedDepositAddressesRequestMultiError) AllErrors() []error { return m }
+
+// QueryUnusedDepositAddressesRequestValidationError is the validation error
+// returned by QueryUnusedDepositAddressesRequest.Validate if the designated
+// constraints aren't met.
+type QueryUnusedDepositAddressesRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e QueryUnusedDepositAddressesRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e QueryUnusedDepositAddressesRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e QueryUnusedDepositAddressesRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e QueryUnusedDepositAddressesRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e QueryUnusedDepositAddressesRequestValidationError) ErrorName() string {
+	return "QueryUnusedDepositAddressesRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e QueryUnusedDepositAddressesRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sQueryUnusedDepositAddressesRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = QueryUnusedDepositAddressesRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = QueryUnusedDepositAddressesRequestValidationError{}
+
+// Validate checks the field values on QueryUnusedDepositAddressesResponse with
+// the rules defined in the proto definition for this message. If any rules
+// are violated, the first error encountered is returned, or nil if there are
+// no violations.
+func (m *QueryUnusedDepositAddressesResponse) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on QueryUnusedDepositAddressesResponse
+// with the rules defined in the proto definition for this message. If any
+// rules are violated, the result is a list of violation errors wrapped in
+// QueryUnusedDepositAddressesResponseMultiError, or nil if none found.
+func (m *QueryUnusedDepositAddressesResponse) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *QueryUnusedDepositAddressesResponse) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if len(errors) > 0 {
+		return QueryUnusedDepositAddressesResponseMultiError(errors)
+	}
+
+	return nil
+}
+
+// QueryUnusedDepositAddressesResponseMultiError is an error wrapping multiple
+// validation errors returned by
+// QueryUnusedDepositAddressesResponse.ValidateAll() if the designated
+// constraints aren't met.
+type QueryUnusedDepositAddressesResponseMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m QueryUnusedDepositAddressesResponseMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m QueryUnusedDepositAddressesResponseMultiError) AllErrors() []error { return m }
+
+// QueryUnusedDepositAddressesResponseValidationError is the validation error
+// returned by QueryUnusedDepositAddressesResponse.Validate if the designated
+// constraints aren't met.
+type QueryUnusedDepositAddressesResponseValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e QueryUnusedDepositAddressesResponseValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e QueryUnusedDepositAddressesResponseValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e QueryUnusedDepositAddressesResponseValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e QueryUnusedDepositAddressesResponseValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e QueryUnusedDepositAddressesResponseValidationError) ErrorName() string {
+	return "QueryUnusedDepositAddressesResponseValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e QueryUnusedDepositAddressesResponseValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sQueryUnusedDepositAddressesResponse.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = QueryUnusedDepositAddressesResponseValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = QueryUnusedDepositAddressesResponseValidationError{}

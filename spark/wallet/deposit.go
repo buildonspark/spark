@@ -104,6 +104,21 @@ func GenerateDepositAddress(
 	return depositResp, nil
 }
 
+func QueryUnusedDepositAddresses(
+	ctx context.Context,
+	config *Config,
+) (*pb.QueryUnusedDepositAddressesResponse, error) {
+	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
+	if err != nil {
+		return nil, err
+	}
+	defer sparkConn.Close()
+	sparkClient := pb.NewSparkServiceClient(sparkConn)
+	return sparkClient.QueryUnusedDepositAddresses(ctx, &pb.QueryUnusedDepositAddressesRequest{
+		IdentityPublicKey: config.IdentityPublicKey(),
+	})
+}
+
 // CreateTreeRoot creates a tree root for a given deposit transaction.
 func CreateTreeRoot(
 	ctx context.Context,
