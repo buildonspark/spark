@@ -371,6 +371,24 @@ func QueryPendingTransfers(
 	})
 }
 
+func QueryPendingTransfersBySender(
+	ctx context.Context,
+	config *Config,
+) (*pb.QueryPendingTransfersResponse, error) {
+	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
+	if err != nil {
+		return nil, err
+	}
+	defer sparkConn.Close()
+
+	sparkClient := pb.NewSparkServiceClient(sparkConn)
+	return sparkClient.QueryPendingTransfers(ctx, &pb.QueryPendingTransfersRequest{
+		Participant: &pb.QueryPendingTransfersRequest_SenderIdentityPublicKey{
+			SenderIdentityPublicKey: config.IdentityPublicKey(),
+		},
+	})
+}
+
 // VerifyPendingTransfer verifies signature and decrypt secret cipher for all leaves in the transfer.
 func VerifyPendingTransfer(
 	ctx context.Context,

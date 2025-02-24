@@ -370,6 +370,15 @@ func main() {
 	})
 
 	cli.registry.RegisterCommand(Command{
+		Name:        "cancel",
+		Description: "Cancel all sender initiated transfers",
+		Usage:       "cancel",
+		Handler: func(_ []string) error {
+			return cli.wallet.CancelAllSenderInitiatedTransfers(context.Background())
+		},
+	})
+
+	cli.registry.RegisterCommand(Command{
 		Name:        "coop_exit",
 		Description: "Swap leaves for on-chain funds",
 		Usage:       "coop_exit <amount_sats> <onchain_address>",

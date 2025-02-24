@@ -347,6 +347,11 @@ func (w *SingleKeyWallet) RequestLeavesSwap(ctx context.Context, targetAmount in
 
 	requestID, leaves, err := api.RequestLeavesSwap(hex.EncodeToString(adaptorPubKey.SerializeCompressed()), uint64(totalAmount), uint64(targetAmount), 0, w.Config.Network, userLeaves)
 	if err != nil {
+		_, err = CancelSendTransfer(ctx, w.Config, transfer)
+		if err != nil {
+			return nil, fmt.Errorf("failed to cancel send transfer: %w", err)
+		}
+		fmt.Printf("cancelled send transfer %s\n", transfer.Id)
 		return nil, fmt.Errorf("failed to request leaves swap: %w", err)
 	}
 
@@ -922,4 +927,20 @@ func (w *SingleKeyWallet) CompleteReleaseSeed(phoneNumber string, code string) (
 		return nil, fmt.Errorf("failed to complete release seed: %w", err)
 	}
 	return seed, nil
+}
+
+func (w *SingleKeyWallet) CancelAllSenderInitiatedTransfers(ctx context.Context) error {
+	transfers, err := QueryPendingTransfersBySender(ctx, w.Config)
+	if err != nil {
+		return fmt.Errorf("failed to query pending transfers: %w", err)
+	}
+	for _, transfer := range transfers.Transfers {
+		if transfer.Status == pb.TransferStatus_TRANSFER_STATUS_SENDER_INITIATED {
+			_, err = CancelSendTransfer(ctx, w.Config, transfer)
+			if err != nil {
+				return fmt.Errorf("failed to cancel send transfer: %w", err)
+			}
+		}
+	}
+	return nil
 }
