@@ -21,7 +21,7 @@ export default function DetailsRow({
     <div
       className={`flex h-[72px] flex-row items-center justify-between ${
         borderTop ? "border-t border-[#2d3845]" : ""
-      }`}
+      } ${onClick ? "cursor-pointer" : ""}`}
       onClick={onClick}
     >
       <div className="flex flex-row items-center">
@@ -31,7 +31,7 @@ export default function DetailsRow({
               logoLeftCircleBackground
                 ? "mr-2 rounded-full border border-[#10151C]"
                 : ""
-            }`}
+            } `}
             style={
               logoLeftCircleBackground
                 ? {
@@ -47,9 +47,7 @@ export default function DetailsRow({
           </div>
         )}
         <div
-          className={`flex max-w-[290px] flex-col justify-between ${
-            !logoLeft ? "ml-4" : ""
-          }`}
+          className={`flex max-w-[190px] flex-col justify-between ${!logoLeft ? "ml-4" : ""}`}
         >
           {title && (
             <div className="overflow-hidden text-ellipsis whitespace-nowrap text-[12px] text-[#f9f9f9]">
@@ -64,7 +62,7 @@ export default function DetailsRow({
         </div>
       </div>
       {logoRight && (
-        <div className="flex flex-col items-center justify-between pr-4">
+        <div className={`flex flex-col items-center justify-between pr-4`}>
           {logoRight}
         </div>
       )}

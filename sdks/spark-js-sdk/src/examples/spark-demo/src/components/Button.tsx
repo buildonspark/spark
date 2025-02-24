@@ -5,6 +5,7 @@ interface ButtonsProps {
   kind?: "primary" | "secondary";
   icon?: React.ReactNode;
   text?: string;
+  height?: number;
   disabled?: boolean;
   opaque?: boolean;
   onClick?: () => void;
@@ -15,6 +16,7 @@ export default function Button({
   kind = "primary",
   icon,
   text,
+  height = 64,
   onClick,
   disabled,
   opaque,
@@ -26,6 +28,7 @@ export default function Button({
       onClick={onClick}
       disabled={disabled}
       opaque={opaque}
+      height={height}
     >
       {icon}
       {text}
@@ -38,8 +41,10 @@ const StyledButton = styled.button<{
   kind: "primary" | "secondary";
   disabled?: boolean;
   opaque?: boolean;
+  height?: number;
 }>`
   width: 100%;
+  height: ${({ height }) => height}px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -55,7 +60,6 @@ const StyledButton = styled.button<{
 
   text-align: center;
   margin-top: 10px;
-  position: relative;
 
   border: 1px solid;
 

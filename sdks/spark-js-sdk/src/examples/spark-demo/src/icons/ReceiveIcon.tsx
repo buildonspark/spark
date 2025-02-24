@@ -1,4 +1,8 @@
-export default function ReceiveIcon() {
+export default function ReceiveIcon({
+  strokeWidth = "2",
+}: {
+  strokeWidth?: string;
+}) {
   return (
     <svg
       width="33"
@@ -11,7 +15,7 @@ export default function ReceiveIcon() {
         <path
           d="M9.41671 23.8333L24.0834 9.16667M21.0899 24.8333H9.75004C9.01366 24.8333 8.41671 24.2364 8.41671 23.5V10.8389"
           stroke="#F9F9F9"
-          strokeWidth="2"
+          strokeWidth={strokeWidth}
           strokeLinecap="round"
           strokeLinejoin="round"
         />

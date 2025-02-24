@@ -35,7 +35,9 @@ const AssetAmountPrimaryDisplay = ({
   return (
     <div className="text-6xl">
       {Number(parsedString).toLocaleString()}
-      <span className="text-sm">{activeAsset.code}</span>
+      <span className="text-sm">
+        {activeAsset.code === "BTC" ? "SATs" : activeAsset.code}
+      </span>
     </div>
   );
 };
@@ -169,8 +171,8 @@ export default function AmountInput({
           >
             {activeInputCurrency.type === CurrencyType.FIAT
               ? rawInputAmount
-                ? `${resolveCurrencyDisplay().assetAmountString} ${activeAsset.code}`
-                : `0 ${activeAsset.code}`
+                ? `${resolveCurrencyDisplay().assetAmountString} ${activeAsset.code === "BTC" ? "SATs" : activeAsset.code}`
+                : `0 ${activeAsset.code === "BTC" ? "SATs" : activeAsset.code}`
               : rawInputAmount
                 ? `$${resolveCurrencyDisplay().fiatAmountString}`
                 : "$0"}

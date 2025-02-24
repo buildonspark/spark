@@ -8,9 +8,8 @@ import ConfirmQuote from "../../components/ConfirmQuote";
 import { Network } from "../../components/Networks";
 import SendDetails from "../../components/SendDetails";
 import ArrowLeft from "../../icons/ArrowLeft";
-import CloseIcon from "../../icons/CloseIcon";
 import { Routes } from "../../routes";
-import { useWallet } from "../../store/wallet";
+import { PERMANENT_CURRENCIES, useWallet } from "../../store/wallet";
 import { CurrencyType } from "../../utils/currency";
 
 export enum SendStep {
@@ -39,12 +38,13 @@ export default function Send() {
     activeInputCurrency,
     sendTransfer,
     payLightningInvoice,
+    setActiveAsset,
   } = useWallet();
 
   const logoLeft = useMemo(() => {
     switch (currentStep) {
       case SendStep.Success:
-        return <CloseIcon />;
+        return null;
       default:
         return <ArrowLeft />;
     }
@@ -60,17 +60,18 @@ export default function Send() {
         setCurrentStep(SendStep.AmountInput);
         break;
       default:
+        setActiveAsset(PERMANENT_CURRENCIES.BTC);
         navigate(Routes.Wallet);
         break;
     }
-  }, [currentStep, navigate, setCurrentStep]);
+  }, [currentStep, navigate, setCurrentStep, setActiveAsset]);
 
   const topTitle = useMemo(() => {
     switch (currentStep) {
       case SendStep.AddressInput:
         return "Send";
       case SendStep.AmountInput:
-        return "Amount to send";
+        return "Enter amount";
       case SendStep.ConfirmQuote:
         return "Send";
       default:
@@ -78,10 +79,10 @@ export default function Send() {
     }
   }, [currentStep]);
 
-  const submitButtonText = useMemo(() => {
+  const primaryButtonText = useMemo(() => {
     switch (currentStep) {
       case SendStep.AmountInput:
-        return "Preview";
+        return "Continue";
       case SendStep.ConfirmQuote:
         return "Send";
       case SendStep.Success:
@@ -91,7 +92,7 @@ export default function Send() {
     }
   }, [currentStep]);
 
-  const onSubmit = useCallback(async () => {
+  const onPrimaryButtonClick = useCallback(async () => {
     switch (currentStep) {
       case SendStep.AddressInput:
         setCurrentStep(SendStep.AmountInput);
@@ -115,6 +116,8 @@ export default function Send() {
         setCurrentStep(SendStep.Success);
         break;
       case SendStep.Success:
+      default:
+        setActiveAsset(PERMANENT_CURRENCIES.BTC);
         navigate(Routes.Wallet);
         break;
     }
@@ -125,16 +128,18 @@ export default function Send() {
     rawInputAmount,
     activeInputCurrency,
     satsUsdPrice,
+    setActiveAsset,
   ]);
 
   return (
     <CardForm
       topTitle={topTitle}
-      submitDisabled={currentStep === SendStep.AddressInput}
-      onSubmit={onSubmit}
-      submitButtonText={submitButtonText}
+      primaryButtonDisabled={currentStep === SendStep.AddressInput}
+      primaryButtonClick={onPrimaryButtonClick}
+      primaryButtonText={primaryButtonText}
       logoLeft={logoLeft}
       logoLeftClick={onLogoLeftClick}
+      headerDisabled={currentStep === SendStep.Success}
     >
       {currentStep === SendStep.AddressInput && (
         <AddressInput

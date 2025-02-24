@@ -70,7 +70,7 @@ export default function Tokens() {
     }
   }, [currentStep, setActiveAsset, setCurrentStep, navigate]);
 
-  const submitButtonHandler = useCallback(() => {
+  const onPrimaryButtonClick = useCallback(() => {
     switch (currentStep) {
       case TokensStep.SendTokenInput:
         setCurrentStep(TokensStep.SendTokenConfirmQuote);
@@ -79,12 +79,13 @@ export default function Tokens() {
         setCurrentStep(TokensStep.SendTokenSuccess);
         break;
       default:
+        setActiveAsset(PERMANENT_CURRENCIES.BTC);
         navigate(Routes.Wallet);
         break;
     }
-  }, [currentStep, navigate, setCurrentStep]);
+  }, [currentStep, navigate, setCurrentStep, setActiveAsset]);
 
-  const submitButtonText = useMemo(() => {
+  const primaryButtonText = useMemo(() => {
     switch (currentStep) {
       case TokensStep.SendTokenInput:
         return "Preview";
@@ -108,7 +109,7 @@ export default function Tokens() {
       case TokensStep.SendTokenInput:
         return "Send amount";
       case TokensStep.SendTokenConfirmQuote:
-        return "Confirm transaction";
+        return `Send ${activeAsset.code}`;
       case TokensStep.SendTokenSuccess:
         return "Success";
       default:
@@ -131,8 +132,8 @@ export default function Tokens() {
   return (
     <CardForm
       topTitle={topTitle}
-      onSubmit={submitButtonHandler}
-      submitButtonText={submitButtonText}
+      primaryButtonClick={onPrimaryButtonClick}
+      primaryButtonText={primaryButtonText}
       logoLeft={
         currentStep === TokensStep.SendTokenSuccess ? (
           <CloseIcon />
@@ -142,29 +143,34 @@ export default function Tokens() {
       }
       logoLeftClick={logoLeftClickHandler}
       logoRight={logoRight}
-      submitDisabled={
+      primaryButtonDisabled={
         currentStep === TokensStep.TokenDetails ||
         currentStep === TokensStep.SelectToken ||
         currentStep === TokensStep.SendTokenAddressInput
       }
+      headerDisabled={currentStep === TokensStep.SendTokenSuccess}
     >
-      {currentStep === TokensStep.SelectToken &&
-        Object.values(assets)
-          .filter((asset) => asset.type === CurrencyType.TOKEN)
-          .map((token) => {
-            return (
-              <CurrencyBalanceDetails
-                key={token.name}
-                logo={token.logo}
-                currency={token.name}
-                fiatBalance={token.balance?.toString() ?? "0"}
-                onClick={() => {
-                  setActiveAsset(token);
-                  setCurrentStep(TokensStep.TokenDetails);
-                }}
-              />
-            );
-          })}
+      {currentStep === TokensStep.SelectToken && (
+        <div className="flex max-h-[600px] flex-col overflow-y-auto p-2">
+          {Object.values(assets)
+            .filter((asset) => asset.type === CurrencyType.TOKEN)
+            .map((token) => {
+              return (
+                <CurrencyBalanceDetails
+                  key={token.name}
+                  logo={token.logo}
+                  currency={token.name}
+                  fiatBalance={token.balance?.toString() ?? "0"}
+                  onClick={() => {
+                    setActiveAsset(token);
+                    setCurrentStep(TokensStep.TokenDetails);
+                  }}
+                  logoBorderEnabled={false}
+                />
+              );
+            })}
+        </div>
+      )}
       {currentStep === TokensStep.TokenDetails && (
         <TokenDetails
           onSendButtonClick={() => {

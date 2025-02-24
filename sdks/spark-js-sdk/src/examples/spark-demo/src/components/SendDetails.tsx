@@ -18,16 +18,18 @@ export default function SendDetails({
       ? (Number(inputAmount) / satsUsdPrice.value).toFixed(0)
       : inputAmount;
   return (
-    <div className="flex flex-col items-center justify-center">
-      <div className="mb-4 mt-24 flex h-32 w-32 items-center justify-center rounded-full bg-[#0E3154]">
+    <div className="mb-10 mt-4 flex flex-col items-center justify-center">
+      <div className="mb-4 mt-4 flex h-32 w-32 items-center justify-center rounded-full bg-[#0E3154]">
         <div className="flex items-center justify-center">
           <ArrowUpRight />
         </div>
       </div>
       <div className="text-[18px] font-normal">Payment sent</div>
       <div className="mt-2 text-[13px] text-white/50">
-        ${sendFiatAmount} ( {sendAssetAmount}{" "}
-        {activeAsset.code === "BTC" ? "SATs" : activeAsset.code} sent to)
+        ${Number(sendFiatAmount.split(".")[0]).toLocaleString()}
+        {sendFiatAmount.split(".")[1] && `.${sendFiatAmount.split(".")[1]}`} (
+        {Number(sendAssetAmount).toLocaleString()}{" "}
+        {activeAsset.code === "BTC" ? "SATs" : activeAsset.code || ""}) sent to
       </div>
       <div className="text-[13px] text-white/50">
         {sendAddress.length > 14

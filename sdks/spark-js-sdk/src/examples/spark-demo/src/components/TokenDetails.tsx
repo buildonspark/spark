@@ -20,7 +20,7 @@ export default function TokenDetails({
 
   return (
     <div className="mx-6">
-      <StyledContainer className="mt-9 flex h-[180px] w-full flex-col items-center justify-center">
+      <StyledContainer className="flex h-[180px] w-full flex-col items-center justify-center">
         <WalletBalance
           asset={activeAsset}
           assetBalance={Number(activeAsset.balance?.toString() ?? "0")}

@@ -5,10 +5,11 @@ import CardForm from "../../components/CardForm";
 import Networks, { Network } from "../../components/Networks";
 import ReceiveDetails from "../../components/ReceiveDetails";
 import ArrowLeft from "../../icons/ArrowLeft";
-import CloseIcon from "../../icons/CloseIcon";
 import { Routes } from "../../routes";
-import { useWallet } from "../../store/wallet";
+import { PERMANENT_CURRENCIES, useWallet } from "../../store/wallet";
 import { CurrencyType } from "../../utils/currency";
+import BitcoinDepositAddress from "./BitcoinDepositAddress";
+import SparkDepositAddress from "./SparkDepositAddress";
 
 enum ReceiveStep {
   NetworkSelect = "NetworkSelect",
@@ -28,11 +29,15 @@ export default function Receive() {
   const [currentStep, setCurrentStep] = useState<ReceiveStep>(
     ReceiveStep.NetworkSelect,
   );
-  const { satsUsdPrice, activeInputCurrency, createLightningInvoice } =
-    useWallet();
+  const {
+    satsUsdPrice,
+    activeInputCurrency,
+    createLightningInvoice,
+    setActiveAsset,
+  } = useWallet();
   const navigate = useNavigate();
 
-  const onSubmit = useCallback(async () => {
+  const onPrimaryButtonClick = useCallback(async () => {
     switch (currentStep) {
       case ReceiveStep.NetworkSelect:
         setCurrentStep(ReceiveStep.InputAmount);
@@ -51,16 +56,31 @@ export default function Receive() {
         setCurrentStep(ReceiveStep.ShareQuote);
         break;
       case ReceiveStep.ShareQuote:
-        setQrCodeModalVisible(true);
+      default:
+        setActiveAsset(PERMANENT_CURRENCIES.BTC);
+        navigate(Routes.Wallet);
         break;
     }
   }, [
-    setCurrentStep,
     activeInputCurrency,
     rawInputAmount,
     satsUsdPrice,
     currentStep,
+    setCurrentStep,
+    createLightningInvoice,
+    setActiveAsset,
+    navigate,
   ]);
+
+  const onSecondaryButtonClick = useCallback(() => {
+    switch (currentStep) {
+      case ReceiveStep.ShareQuote:
+        setQrCodeModalVisible(true);
+        break;
+      default:
+        return null;
+    }
+  }, [currentStep, setQrCodeModalVisible]);
 
   const onLogoLeftClick = useCallback(() => {
     switch (currentStep) {
@@ -85,21 +105,19 @@ export default function Receive() {
         return "Receive money via";
       case ReceiveStep.InputAmount:
         return "Amount to receive";
-      case ReceiveStep.ShareQuote:
-        return "Receive";
       case ReceiveStep.SparkDepositAddress:
         return "Spark deposit address";
       case ReceiveStep.BitcoinDepositAddress:
         return "Bitcoin deposit address";
       default:
-        return "Receive money via";
+        return "Receive";
     }
   }, [currentStep]);
 
   const logoLeft = useMemo(() => {
     switch (currentStep) {
       case ReceiveStep.ShareQuote:
-        return <CloseIcon strokeWidth="1.5" />;
+        return null;
       default:
         return <ArrowLeft strokeWidth="1.5" />;
     }
@@ -121,20 +139,26 @@ export default function Receive() {
       <CardForm
         topTitle={topTitle}
         logoLeft={logoLeft}
-        onSubmit={onSubmit}
-        submitButtonText={
+        primaryButtonClick={onPrimaryButtonClick}
+        primaryButtonText={
           currentStep === ReceiveStep.InputAmount
             ? "Confirm"
             : currentStep === ReceiveStep.ShareQuote
-              ? "Share"
+              ? "Done"
               : ""
         }
+        secondaryButtonText={
+          currentStep === ReceiveStep.ShareQuote ? "Share" : ""
+        }
+        secondaryButtonDisabled={currentStep !== ReceiveStep.ShareQuote}
+        secondaryButtonClick={onSecondaryButtonClick}
         logoLeftClick={onLogoLeftClick}
-        submitDisabled={
+        primaryButtonDisabled={
           currentStep === ReceiveStep.NetworkSelect ||
           currentStep === ReceiveStep.SparkDepositAddress ||
           currentStep === ReceiveStep.BitcoinDepositAddress
         }
+        headerDisabled={currentStep === ReceiveStep.ShareQuote}
       >
         {currentStep === ReceiveStep.NetworkSelect && (
           <Networks onSelectNetwork={onSelectNetwork} />
@@ -153,11 +177,7 @@ export default function Receive() {
         )}
         {currentStep === ReceiveStep.ShareQuote && (
           <ReceiveDetails
-            receiveFiatAmount={
-              activeInputCurrency.type === CurrencyType.FIAT
-                ? rawInputAmount
-                : `${Number(rawInputAmount) * satsUsdPrice.value}`
-            }
+            inputAmount={rawInputAmount}
             lightningInvoice={lightningInvoice}
             onEditAmount={() => {
               setCurrentStep(ReceiveStep.InputAmount);

@@ -1,5 +1,5 @@
 import BitcoinIcon from "../icons/BitcoinIcon";
-import ChevronRightIcon from "../icons/ChevronIcon";
+import ChevronIcon from "../icons/ChevronIcon";
 import LightningIcon from "../icons/LightningIcon";
 import SparkIcon from "../icons/SparkIcon";
 import StyledContainer from "./StyledContainer";
@@ -36,7 +36,7 @@ export default function Networks({ onSelectNetwork }: NetworksProps) {
               </div>
             </div>
           </div>
-          <ChevronRightIcon />
+          <ChevronIcon direction="right" />
         </div>
       </StyledContainer>
       <StyledContainer
@@ -57,7 +57,7 @@ export default function Networks({ onSelectNetwork }: NetworksProps) {
               </div>
             </div>
           </div>
-          <ChevronRightIcon />
+          <ChevronIcon direction="right" />
         </div>
       </StyledContainer>
       <StyledContainer
@@ -78,7 +78,7 @@ export default function Networks({ onSelectNetwork }: NetworksProps) {
               </div>
             </div>
           </div>
-          <ChevronRightIcon />
+          <ChevronIcon direction="right" />
         </div>
       </StyledContainer>
       <div className="fixed bottom-10 mt-20 w-full text-center text-[12px] text-[#f9f9f9] opacity-50">

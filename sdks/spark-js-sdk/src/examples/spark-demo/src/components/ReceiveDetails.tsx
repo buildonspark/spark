@@ -6,21 +6,24 @@ import CloseIcon from "../icons/CloseIcon";
 import CopyIcon from "../icons/CopyIcon";
 import PencilIcon from "../icons/PencilIcon";
 import WalletIcon from "../icons/WalletIcon";
+import { useWallet } from "../store/wallet";
+import { CurrencyType } from "../utils/currency";
 import DetailsRow from "./DetailsRow";
 
 export default function ReceiveDetails({
   qrCodeModalVisible,
   setQrCodeModalVisible,
   onEditAmount,
-  receiveFiatAmount,
+  inputAmount,
   lightningInvoice,
 }: {
   qrCodeModalVisible: boolean;
   setQrCodeModalVisible: React.Dispatch<React.SetStateAction<boolean>>;
   onEditAmount: () => void;
-  receiveFiatAmount: string;
+  inputAmount: string;
   lightningInvoice?: string | null;
 }) {
+  const { activeInputCurrency, satsUsdPrice, activeAsset } = useWallet();
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -34,9 +37,18 @@ export default function ReceiveDetails({
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [setQrCodeModalVisible]);
+  console.log(activeInputCurrency.type);
+  const receiveFiatAmount =
+    activeInputCurrency.type === CurrencyType.FIAT
+      ? inputAmount
+      : (Number(inputAmount) * satsUsdPrice.value).toFixed(2);
+  const receiveAssetAmount =
+    activeInputCurrency.type === CurrencyType.FIAT
+      ? (Number(inputAmount) / satsUsdPrice.value).toFixed(0)
+      : Number(inputAmount).toFixed(0);
 
   return (
-    <div className="mt-4 flex w-full flex-col items-center">
+    <div className="mb-8 flex w-full flex-col items-center">
       <ReceiveQRCard>
         <div className="items-right flex h-full w-full flex-col justify-between rounded-2xl">
           <WalletIcon className="m-6 w-4" />
@@ -69,7 +81,7 @@ export default function ReceiveDetails({
       <ReceiveDetailsContainer>
         <DetailsRow
           title="Amount"
-          subtitle={receiveFiatAmount}
+          subtitle={`$${Number(receiveFiatAmount.split(".")[0]).toLocaleString()}${receiveFiatAmount.split(".")[1] ? `.${receiveFiatAmount.split(".")[1]}` : ".00"} (${Number(receiveAssetAmount).toLocaleString()} ${activeAsset.code === "BTC" ? "SATs" : activeAsset.code || ""})`}
           logoRight={<PencilIcon />}
           onClick={onEditAmount}
         />
@@ -90,34 +102,50 @@ export default function ReceiveDetails({
         />
       </ReceiveDetailsContainer>
       {qrCodeModalVisible && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
+        <div className="fixed inset-0 flex h-full items-center justify-center bg-black bg-opacity-50">
           <div
-            className="relative flex flex-col items-center justify-center"
+            className="flex h-[510px] w-[360px] flex-col rounded-3xl bg-[#0E3154]"
             ref={ref}
           >
             <div
-              className="absolute left-2 top-[-26px] cursor-pointer"
+              className="flex h-[64px] w-full items-start justify-end pb-4 pt-5"
               onClick={() => setQrCodeModalVisible(false)}
             >
-              <CloseIcon strokeWidth="2" />
-            </div>
-            <div className="relative rounded-lg bg-white p-4">
-              <QRCodeSVG value={lightningInvoice || ""} size={300} />
-            </div>
-            <div
-              className="mt-4 flex h-[40px] max-w-[340px] flex-row items-center justify-center rounded-lg bg-[#10151C]"
-              onClick={(e) => {
-                e.stopPropagation();
-                navigator.clipboard.writeText(lightningInvoice || "");
-                alert("Copied to clipboard");
-              }}
-            >
-              <div className="m-6 overflow-hidden text-ellipsis whitespace-nowrap text-[12px] text-[#f9f9f9] opacity-50">
-                {lightningInvoice}
+              <div className="mr-4 cursor-pointer rounded-full bg-[rgba(255,255,255,0.04)] p-2">
+                <CloseIcon width="12" height="12" />
               </div>
-              <div className="mr-5">
-                <CopyIcon stroke="#7C7C7C" strokeWidth="1.5" />
+            </div>
+            <div className="h-[351px] w-full px-12 pb-10 pt-2">
+              <div className="flex h-[250px] w-full items-center justify-center rounded-lg bg-[rgba(255,255,255,0.04)] p-6">
+                <QRCodeSVG value={lightningInvoice || ""} size={250} />
               </div>
+              <div
+                className="mt-4 flex h-[40px] cursor-pointer flex-row items-center justify-between rounded-lg bg-[rgba(255,255,255,0.04)]"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigator.clipboard.writeText(lightningInvoice || "");
+                  alert("Copied to clipboard");
+                }}
+              >
+                <div className="m-6 overflow-hidden text-ellipsis whitespace-nowrap text-[12px] text-[#FFFFFF]">
+                  {lightningInvoice}
+                </div>
+                <div className="mr-5">
+                  <CopyIcon stroke="#FFFFFF" strokeWidth="1.5" />
+                </div>
+              </div>
+            </div>
+            <div className="flex h-[100px] w-full flex-col items-center justify-center bg-[rgba(255,255,255,0.04)] py-6">
+              <span className="text-[20px] font-bold text-[#FFFFFF]">
+                ${Number(receiveFiatAmount.split(".")[0]).toLocaleString()}
+                {receiveFiatAmount.split(".")[1]
+                  ? `.${receiveFiatAmount.split(".")[1]}`
+                  : ".00"}{" "}
+              </span>
+              <span className="text-[12px] text-[#FFFFFF]">
+                {Number(Number(receiveAssetAmount).toFixed(0)).toLocaleString()}{" "}
+                {activeAsset.code === "BTC" ? "SATs" : activeAsset.code}
+              </span>
             </div>
           </div>
         </div>
@@ -139,7 +167,7 @@ const ReceiveQRCard = styled.div`
   height: 184px;
   display: flex;
   border-radius: 24px;
-  border: 0.5px solid rgba(249, 249, 249, 0.25);
+  border: 0.5px solid rgba(249, 249, 249, 0.15);
   margin-bottom: 8px;
 
   background: linear-gradient(

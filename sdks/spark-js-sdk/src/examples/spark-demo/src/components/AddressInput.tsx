@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import BitcoinIcon from "../icons/BitcoinIcon";
-import ChevronRightIcon from "../icons/ChevronIcon";
+import ChevronIcon from "../icons/ChevronIcon";
 import LightningIcon from "../icons/LightningIcon";
 import SparkIcon from "../icons/SparkIcon";
 import DetailsRow from "./DetailsRow";
@@ -55,51 +55,32 @@ export default function AddressInput({ onAddressSelect }: AddressInputProps) {
     setInputAddressNetwork(validateAddress(inputValue));
   };
 
+  const logoLeft = useMemo(() => {
+    if (inputAddressNetwork === Network.LIGHTNING) return <LightningIcon />;
+    if (inputAddressNetwork === Network.BITCOIN) return <BitcoinIcon />;
+    if (inputAddressNetwork === Network.SPARK) return <SparkIcon />;
+    return null;
+  }, [inputAddressNetwork]);
+
   return (
-    <div>
+    <div className="flex w-full flex-col gap-2">
       <input
-        className="h-14 w-full rounded-lg border border-solid border-[rgba(249,249,249,0.12)] bg-[#121E2D] px-6"
+        className="h-12 w-full rounded-lg border border-solid border-[rgba(249,249,249,0.12)] bg-[#121E2D] px-4 text-[12px]"
         placeholder="Wallet address, Lightning invoice"
         type="text"
         value={inputAddress}
         onChange={handleInputChange}
       />
-      {inputAddressNetwork === Network.NONE && (
+      {inputAddressNetwork === Network.NONE ? (
         <span className="ml-2 text-[12px] text-[#999999]">
           Works with spark and bitcoin wallet addresses.
         </span>
-      )}
-      {inputAddressNetwork === Network.LIGHTNING && (
-        // If there are multiple potential addresses, we should be able to set the correct one in the parent with onAddressSelect(inputAddress)
+      ) : (
         <DetailsRow
-          logoLeft={<LightningIcon />}
+          logoLeft={logoLeft}
           title={inputAddress}
           subtitle={`${capitalizeFirstLetter(inputAddressNetwork)} address`}
-          logoRight={<ChevronRightIcon />}
-          logoLeftCircleBackground={true}
-          onClick={() => {
-            onAddressSelect(inputAddress, inputAddressNetwork);
-          }}
-        />
-      )}
-      {inputAddressNetwork === Network.BITCOIN && (
-        <DetailsRow
-          logoLeft={<BitcoinIcon strokeWidth="1.5" />}
-          title={inputAddress}
-          subtitle={`${capitalizeFirstLetter(inputAddressNetwork)} address`}
-          logoRight={<ChevronRightIcon />}
-          logoLeftCircleBackground={true}
-          onClick={() => {
-            onAddressSelect(inputAddress, inputAddressNetwork);
-          }}
-        />
-      )}
-      {inputAddressNetwork === Network.SPARK && (
-        <DetailsRow
-          logoLeft={<SparkIcon />}
-          title={inputAddress}
-          subtitle={`${capitalizeFirstLetter(inputAddressNetwork)} address`}
-          logoRight={<ChevronRightIcon />}
+          logoRight={<ChevronIcon direction="right" />}
           logoLeftCircleBackground={true}
           onClick={() => {
             onAddressSelect(inputAddress, inputAddressNetwork);

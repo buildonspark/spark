@@ -5,40 +5,60 @@ export default function CardForm({
   topTitle,
   logoRight,
   logoLeft,
-  onSubmit,
+  primaryButtonClick,
+  secondaryButtonClick,
   logoLeftClick,
-  submitButtonText,
-  submitDisabled,
+  primaryButtonText,
+  secondaryButtonText,
+  headerDisabled = false,
+  primaryButtonDisabled = false,
+  secondaryButtonDisabled = true,
 }: {
   children: React.ReactNode;
   topTitle: string;
   logoRight?: React.ReactNode;
   logoLeft?: React.ReactNode;
-  submitButtonText?: string;
-  onSubmit: () => void;
+  primaryButtonDisabled?: boolean;
+  secondaryButtonDisabled?: boolean;
+  primaryButtonText?: string;
+  secondaryButtonText?: string;
+  headerDisabled?: boolean;
+  primaryButtonClick?: () => void;
+  secondaryButtonClick?: () => void;
   logoLeftClick?: () => void;
-  submitDisabled?: boolean;
 }) {
   return (
-    <div className="flex w-full flex-col items-center justify-between">
-      <div className="flex w-full flex-row text-center font-decimal text-[15px]">
-        <button className="ml-6 h-6 w-6 outline-none" onClick={logoLeftClick}>
-          {logoLeft}
-        </button>
-        <div className="flex-grow">{topTitle}</div>
-        <div className="mr-6 flex h-8 w-8 items-center justify-center">
-          {logoRight}
-        </div>
-      </div>
-      <div className="flex w-full flex-col p-6">{children}</div>
-      {!submitDisabled && (
-        <div className="fixed bottom-10 w-full max-w-[400px] p-6">
-          <Button
-            text={submitButtonText || "Submit"}
-            onClick={() => onSubmit()}
-          />
+    <div className="mt-2 flex w-full flex-col items-center justify-between">
+      {!headerDisabled && (
+        <div className="mb-8 flex w-full flex-row items-center text-center font-decimal text-[15px]">
+          <div
+            className="ml-6 h-6 w-6 cursor-pointer outline-none"
+            onClick={logoLeftClick}
+          >
+            {logoLeft}
+          </div>
+          <div className="flex-grow">{topTitle}</div>
+          <div className="mr-6 flex h-8 w-8 items-center justify-center">
+            {logoRight}
+          </div>
         </div>
       )}
+      <div className="flex w-full flex-col">{children}</div>
+      <div className="mb-4 w-full">
+        {!secondaryButtonDisabled && (
+          <Button
+            text={secondaryButtonText || "Cancel"}
+            onClick={secondaryButtonClick}
+            kind="secondary"
+          />
+        )}
+        {!primaryButtonDisabled && (
+          <Button
+            text={primaryButtonText || "Submit"}
+            onClick={primaryButtonClick}
+          />
+        )}
+      </div>
     </div>
   );
 }

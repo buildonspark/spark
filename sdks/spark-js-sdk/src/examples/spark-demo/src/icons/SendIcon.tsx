@@ -1,4 +1,8 @@
-export default function SendIcon() {
+export default function SendIcon({
+  strokeWidth = "2",
+}: {
+  strokeWidth?: string;
+}) {
   return (
     <svg
       width="33"
@@ -11,7 +15,7 @@ export default function SendIcon() {
         <path
           d="M23.5833 9.16667L8.91663 23.8333M11.9101 8.16667H23.25C23.9863 8.16667 24.5833 8.76362 24.5833 9.5V22.1611"
           stroke="#F9F9F9"
-          strokeWidth="2"
+          strokeWidth={strokeWidth}
           strokeLinecap="round"
           strokeLinejoin="round"
         />

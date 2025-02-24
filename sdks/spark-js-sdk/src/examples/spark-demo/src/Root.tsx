@@ -3,6 +3,7 @@ import {
   Route,
   Routes as RoutesProvider,
 } from "react-router-dom";
+import SparkWithTextLogo from "./icons/SparkWithTextLogo";
 import Login from "./pages/login/Login";
 import Receive from "./pages/receive/Receive";
 import RecoverWallet from "./pages/recover-wallet/RecoverWallet";
@@ -14,7 +15,10 @@ import { Routes } from "./routes";
 export default function Root() {
   return (
     <Router>
-      <div className="mt-[40px]">
+      <div className="flex justify-center p-8">
+        <SparkWithTextLogo />
+      </div>
+      <div className="mt-[40px] min-h-[480px] rounded-3xl rounded-[32px] border border-[0.5px] border-[rgba(249,249,249,0.15)] p-8">
         <RoutesProvider>
           <Route path={Routes.Base} element={<Login />} />
           <Route path={Routes.WalletSuccess} element={<WalletSuccess />} />

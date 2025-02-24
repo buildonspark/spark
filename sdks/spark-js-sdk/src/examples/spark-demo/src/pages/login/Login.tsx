@@ -4,7 +4,6 @@ import { useNavigate } from "react-router-dom";
 import Button from "../../components/Button";
 import PhoneInput from "../../components/PhoneInput";
 import VerificationCode from "../../components/VerificationCode";
-import WalletIcon from "../../icons/WalletIcon";
 import { Routes } from "../../routes";
 import { useWallet } from "../../store/wallet";
 
@@ -69,11 +68,6 @@ export default function Login() {
   return (
     <div className="mx-8">
       <div className="flex flex-col items-center justify-center">
-        <div className="flex items-center justify-center gap-3">
-          <WalletIcon />
-          <div className="font-decimal text-[32px] font-black">Wallet</div>
-        </div>
-
         <div className="mt-4 text-center font-decimal text-[13px] text-[#ffffff] opacity-40">
           A Spark-enabled, self-custody
           <br />
