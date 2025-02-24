@@ -328,6 +328,7 @@ func main() {
 			"Accept",
 			"Content-Type",
 			"Content-Length",
+			"Content-Encoding",
 			"Accept-Encoding",
 			"X-CSRF-Token",
 			"Authorization",
