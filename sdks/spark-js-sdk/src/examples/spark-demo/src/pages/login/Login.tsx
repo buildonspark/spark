@@ -33,12 +33,30 @@ export default function Login() {
     setVerificationCode(numbersOnly);
   };
 
-  const wallet = useWallet();
+  const { initWalletFromSeed } = useWallet();
 
   const navigate = useNavigate();
 
   const handleSubmit = async () => {
     if (loginState === LoginState.PhoneInput) {
+      await fetch("https://api.dev.dev.sparkinfra.net/graphql/spark/rc", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          query: `
+            mutation StartSeedRelease($phone: String!) {
+              start_seed_release(input: {phone_number: $phone})
+            }
+          `,
+          variables: {
+            phone: phoneNumber,
+          },
+        }),
+      });
+      setLoginState(LoginState.VerificationCode);
+    } else {
       const response = await fetch(
         "https://api.dev.dev.sparkinfra.net/graphql/spark/rc",
         {
@@ -48,55 +66,60 @@ export default function Login() {
           },
           body: JSON.stringify({
             query: `
-            mutation StartSeedRelease($phone: String!) {
-              start_seed_release(input: {phone_number: $phone})
-            }
-          `,
+              mutation CompleteSeedRelease($phone: String!, $code: String!) { 
+                complete_seed_release(input: {phone_number: $phone, code: $code}) {
+                  seed
+                }
+              }
+            `,
             variables: {
-              phone: "+18163921294",
+              phone: phoneNumber,
+              code: verificationCode,
             },
           }),
         },
       );
-      setLoginState(LoginState.VerificationCode);
-    } else {
-      // TODO: Currently not receiving the OTP, confirm here once we have it
+
+      const data = await response.json();
+      const seed = data.data.complete_seed_release.seed;
+      console.log("Received seed:", seed);
+
+      await initWalletFromSeed(seed);
+
       navigate(Routes.Wallet);
     }
   };
 
   return (
-    <div className="mx-8">
-      <div className="flex flex-col items-center justify-center">
-        <div className="mt-4 text-center font-decimal text-[13px] text-[#ffffff] opacity-40">
-          A Spark-enabled, self-custody
-          <br />
-          Bitcoin wallet
-        </div>
-        <div className="mt-16">
-          {loginState === LoginState.PhoneInput && (
-            <PhoneInput value={phoneNumber} onChange={setPhoneNumber} />
-          )}
-          {loginState === LoginState.VerificationCode && (
-            <VerificationCode
-              value={verificationCode}
-              onChange={handleChangeVerificationCode}
-              onSubmit={handleSubmit}
-            />
-          )}
-        </div>
-        <div className="mt-32 w-full">
-          <Button
-            text="Submit"
-            kind="primary"
-            onClick={handleSubmit}
-            disabled={
-              (loginState === LoginState.PhoneInput && !isValidPhone) ||
-              (loginState === LoginState.VerificationCode &&
-                !isValidVerificationCode)
-            }
+    <div className="flex flex-col items-center justify-center">
+      <div className="mt-4 text-center font-decimal text-[13px] text-[#ffffff] opacity-40">
+        A Spark-enabled, self-custody
+        <br />
+        Bitcoin wallet
+      </div>
+      <div className="mt-16">
+        {loginState === LoginState.PhoneInput && (
+          <PhoneInput value={phoneNumber} onChange={setPhoneNumber} />
+        )}
+        {loginState === LoginState.VerificationCode && (
+          <VerificationCode
+            value={verificationCode}
+            onChange={handleChangeVerificationCode}
+            onSubmit={handleSubmit}
           />
-        </div>
+        )}
+      </div>
+      <div className="mt-32 w-full">
+        <Button
+          text="Submit"
+          kind="primary"
+          onClick={handleSubmit}
+          disabled={
+            (loginState === LoginState.PhoneInput && !isValidPhone) ||
+            (loginState === LoginState.VerificationCode &&
+              !isValidVerificationCode)
+          }
+        />
       </div>
     </div>
   );

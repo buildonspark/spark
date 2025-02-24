@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import BitcoinIcon from "../icons/BitcoinIcon";
 import ChevronIcon from "../icons/ChevronIcon";
 import LightningIcon from "../icons/LightningIcon";
+import PhoneIcon from "../icons/PhoneIcon";
 import SparkIcon from "../icons/SparkIcon";
 import DetailsRow from "./DetailsRow";
 import { Network } from "./Networks";
@@ -36,6 +37,7 @@ const validateAddress = (address: string): Network => {
     return Network.LIGHTNING;
   if (isValidBitcoinAddress(address)) return Network.BITCOIN;
   if (/^(02|03)[a-fA-F0-9]{64}$/.test(address)) return Network.SPARK;
+  if (/^[0-9]{10}$/.test(address)) return Network.PHONE;
   return Network.NONE;
 };
 
@@ -84,6 +86,21 @@ export default function AddressInput({ onAddressSelect }: AddressInputProps) {
           logoLeftCircleBackground={true}
           onClick={() => {
             onAddressSelect(inputAddress, inputAddressNetwork);
+          }}
+        />
+      )}
+      {inputAddressNetwork === Network.PHONE && (
+        <DetailsRow
+          logoLeft={<PhoneIcon />}
+          title={`+1 (${inputAddress.slice(0, 3)}) ${inputAddress.slice(
+            3,
+            6,
+          )}-${inputAddress.slice(6, 10)}`}
+          subtitle={`Send money via text`}
+          logoRight={<ChevronIcon />}
+          logoLeftCircleBackground={true}
+          onClick={() => {
+            onAddressSelect(`+1${inputAddress}`, inputAddressNetwork);
           }}
         />
       )}

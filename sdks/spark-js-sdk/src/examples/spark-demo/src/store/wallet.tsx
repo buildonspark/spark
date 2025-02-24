@@ -65,6 +65,7 @@ interface WalletState {
 interface WalletActions {
   generateMnemonic: () => Promise<string>;
   initWallet: (mnemonic: string) => Promise<void>;
+  initWalletFromSeed: (seed: string) => Promise<void>;
   getMasterPublicKey: () => Promise<string>;
   generateDepositAddress: () => Promise<string>;
   createLightningInvoice: (amount: number, memo: string) => Promise<string>;
@@ -116,6 +117,11 @@ const useWalletStore = create<WalletStore>((set, get) => ({
     await wallet.createSparkWallet(mnemonic);
     sessionStorage.setItem(MNEMONIC_STORAGE_KEY, mnemonic);
     set({ isInitialized: true, mnemonic });
+  },
+  initWalletFromSeed: async (seed: string) => {
+    const { wallet } = get();
+    await wallet.createSparkWalletFromSeed(seed);
+    set({ isInitialized: true });
   },
   getMasterPublicKey: async () => {
     const { wallet } = get();
@@ -285,9 +291,8 @@ export function useWallet() {
       error: satsUsdPriceQuery.error,
     },
     generatorMnemonic: state.generateMnemonic,
-    initWallet: async (mnemonic: string) => {
-      await state.initWallet(mnemonic);
-    },
+    initWallet: state.initWallet,
+    initWalletFromSeed: state.initWalletFromSeed,
     getMasterPublicKey: state.getMasterPublicKey,
     generateDepositAddress: state.generateDepositAddress,
     sendTransfer: state.sendTransfer,

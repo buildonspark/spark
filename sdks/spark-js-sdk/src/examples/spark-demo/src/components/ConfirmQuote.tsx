@@ -1,5 +1,6 @@
 import { useWallet } from "../store/wallet";
 import { CurrencyType } from "../utils/currency";
+import { Network } from "./Networks";
 
 export default function ConfirmQuote({
   inputAmount,
@@ -52,7 +53,12 @@ export default function ConfirmQuote({
       <div className="mb-5 flex flex-row justify-between text-sm/6">
         <div className="flex-[0_0_30%]">Send to</div>
         <div className="flex-[0_0_50%] overflow-hidden text-ellipsis whitespace-nowrap text-right">
-          {sendAddress}
+          {sendAddressNetwork === Network.PHONE
+            ? `${sendAddress.slice(0, 2)} (${sendAddress.slice(
+                2,
+                5,
+              )}) ${sendAddress.slice(5, 8)}-${sendAddress.slice(8, 12)}`
+            : sendAddress}
         </div>
       </div>
       <div className="mb-5 flex flex-row justify-between text-sm/6">

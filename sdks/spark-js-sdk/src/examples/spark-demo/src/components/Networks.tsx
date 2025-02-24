@@ -9,6 +9,7 @@ export enum Network {
   LIGHTNING = "lightning",
   BITCOIN = "bitcoin",
   SPARK = "spark",
+  PHONE = "phone",
 }
 
 interface NetworksProps {

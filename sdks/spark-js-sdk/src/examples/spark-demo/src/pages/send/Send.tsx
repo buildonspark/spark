@@ -39,6 +39,7 @@ export default function Send() {
     sendTransfer,
     payLightningInvoice,
     setActiveAsset,
+    getMasterPublicKey,
   } = useWallet();
 
   const logoLeft = useMemo(() => {
@@ -112,6 +113,56 @@ export default function Send() {
           // await sendTransfer(satsToSend, sendAddress);
         } else if (sendAddressNetwork === Network.BITCOIN) {
           // TODO
+        } else if (sendAddressNetwork === Network.PHONE) {
+          const response = await fetch(
+            `https://api.dev.dev.sparkinfra.net/graphql/spark/rc`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Spark-Identity-Public-Key": await getMasterPublicKey(),
+              },
+              body: JSON.stringify({
+                query: `
+                mutation GetPublicKey($phone: String!) {
+                  wallet_user_identity_public_key(input: { phone_number: $phone }) {
+                    identity_public_key
+                  }
+                }
+              `,
+                variables: {
+                  phone: sendAddress,
+                },
+              }),
+            },
+          );
+          const data = await response.json();
+          const publicKey =
+            data.data.wallet_user_identity_public_key.identity_public_key;
+
+          await sendTransfer(satsToSend, publicKey);
+
+          await fetch(`https://api.dev.dev.sparkinfra.net/graphql/spark/rc`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Spark-Identity-Public-Key": await getMasterPublicKey(),
+            },
+            body: JSON.stringify({
+              query: `
+              mutation NotifyReceiver($phone: String!, $amount: Long!) {
+                notify_receiver_transfer(input: { 
+                  phone_number: $phone,
+                  amount_sats: $amount
+                })
+              }
+            `,
+              variables: {
+                phone: sendAddress,
+                amount: satsToSend,
+              },
+            }),
+          });
         }
         setCurrentStep(SendStep.Success);
         break;
@@ -129,6 +180,9 @@ export default function Send() {
     activeInputCurrency,
     satsUsdPrice,
     setActiveAsset,
+    getMasterPublicKey,
+    sendAddress,
+    sendTransfer,
   ]);
 
   return (
