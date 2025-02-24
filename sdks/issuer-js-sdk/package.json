@@ -39,6 +39,7 @@
   },
   "dependencies": {
     "@bufbuild/protobuf": "^2.2.3",
+    "@buildonspark/lrc20-js-sdk": "file:../lrc20-js-sdk",
     "@buildonspark/spark-js-sdk": "file:../spark-js-sdk",
     "@grpc/grpc-js": "^1.12.5",
     "@noble/curves": "^1.8.0",

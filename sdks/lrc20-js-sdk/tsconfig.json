@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    /* Basic Options */
+    "target": "ES2020", // Specify ECMAScript target version
+    "module": "NodeNext", // Specify module code generation
+    "outDir": "./dist", // Output directory for compiled code
+    "rootDir": "./src", // Source code root directory
+    "strict": false, // Enable all strict type-checking options
+    "esModuleInterop": true, // Improved interoperability with CommonJS modules
+    /* Module Resolution */
+    "moduleResolution": "NodeNext",
+    /* Emit */
+    "declaration": true, // Generate .d.ts files for types
+    "sourceMap": true, // Generate source maps for debugging
+    /*  Experimental Options */
+    "experimentalDecorators": true, // Enable experimental support for decorators
+    "emitDecoratorMetadata": true, // Emit design-type metadata for decorators
+    "typeRoots":  ["node_modules/@type"]
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "tests", "examples"] // Files/folders to exclude
+
+}
