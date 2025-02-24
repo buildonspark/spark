@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Button from "../../components/Button";
 import StyledContainer from "../../components/StyledContainer";
 import CopyIcon from "../../icons/CopyIcon";
@@ -12,13 +12,13 @@ export default function WalletSuccess() {
   const [mnemonic, setMnemonic] = useState<string | null>(null);
 
   const navigate = useNavigate();
-  const { generatorMnemonic, initWallet } = useWallet();
+  const { initWallet } = useWallet();
 
-  useEffect(() => {
-    generatorMnemonic().then((mnemonic) => {
-      setMnemonic(mnemonic);
-    });
-  }, [generatorMnemonic]);
+  // useEffect(() => {
+  //   generatorMnemonic().then((mnemonic) => {
+  //     setMnemonic(mnemonic);
+  //   });
+  // }, [generatorMnemonic]);
 
   const onContinue = async () => {
     if (!mnemonic) return;

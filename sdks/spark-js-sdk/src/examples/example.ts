@@ -71,6 +71,7 @@ async function runCLI() {
           console.log("No wallet initialized");
           break;
         }
+
         const leafPubKey = hexToBytes(await wallet.generatePublicKey());
         const depositAddress = await wallet.generateDepositAddress(leafPubKey);
         console.log("Deposit address:", depositAddress.depositAddress?.address);

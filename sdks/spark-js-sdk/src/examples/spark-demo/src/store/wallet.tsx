@@ -1,8 +1,9 @@
 import { hexToBytes } from "@lightsparkdev/core";
 import { bytesToHex } from "@noble/curves/abstract/utils";
+import { Transaction } from "@scure/btc-signer";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { SparkWallet } from "spark-sdk";
-import { Network } from "spark-sdk/utils";
+import { getTxFromRawTxHex, Network } from "spark-sdk/utils";
 import { create } from "zustand";
 import MxnLogo from "../icons/test_logo/MxnLogo";
 import UsdcLogo from "../icons/test_logo/UsdcLogo";
@@ -63,7 +64,6 @@ interface WalletState {
 }
 
 interface WalletActions {
-  generateMnemonic: () => Promise<string>;
   initWallet: (mnemonic: string) => Promise<void>;
   initWalletFromSeed: (seed: string) => Promise<void>;
   getMasterPublicKey: () => Promise<string>;
@@ -107,33 +107,26 @@ const useWalletStore = create<WalletStore>((set, get) => ({
   // },
   btcAddressInfo: {},
 
-  generateMnemonic: async () => {
-    const { wallet } = get();
-    const mnemonic = await wallet.generateMnemonic();
-    sessionStorage.setItem(MNEMONIC_STORAGE_KEY, mnemonic);
-    set({ mnemonic });
-    return mnemonic;
-  },
   initWallet: async (mnemonic: string) => {
     const { wallet } = get();
-    await wallet.createSparkWallet(mnemonic);
+    await wallet.initWalletFromMnemonic(mnemonic);
     sessionStorage.setItem(MNEMONIC_STORAGE_KEY, mnemonic);
     set({ isInitialized: true, mnemonic });
   },
   initWalletFromSeed: async (seed: string) => {
     const { wallet } = get();
-    await wallet.createSparkWalletFromSeed(seed);
+    await wallet.initWallet(seed);
     sessionStorage.setItem(SEED_STORAGE_KEY, seed);
     set({ isInitialized: true });
   },
   getMasterPublicKey: async () => {
     const { wallet } = get();
-    return bytesToHex(await wallet.getMasterPubKey());
+    return await wallet.getIdentityPublicKey();
   },
   generateDepositAddress: async () => {
     const { wallet } = get();
-    const leafPubKey = await wallet.getSigner().generatePublicKey();
-    const address = await wallet.generateDepositAddress(leafPubKey);
+    const leafPubKey = await wallet.generatePublicKey();
+    const address = await wallet.generateDepositAddress(hexToBytes(leafPubKey));
 
     if (!address.depositAddress) {
       throw new Error("Failed to generate deposit address");
@@ -142,7 +135,7 @@ const useWalletStore = create<WalletStore>((set, get) => ({
     set({
       btcAddressInfo: {
         [address.depositAddress.address]: {
-          pubkey: bytesToHex(leafPubKey),
+          pubkey: bytesToHex(hexToBytes(leafPubKey)),
           verifyingKey: bytesToHex(address.depositAddress.verifyingKey),
         },
       },
@@ -214,41 +207,74 @@ export function useWallet() {
   useQuery({
     queryKey: ["wallet", "btcAddressInfo"],
     queryFn: async () => {
-      let updateBalance = await wallet.claimTransfers();
-
       for (const address of Object.keys(btcAddressInfo)) {
-        const pendingDepositTx = await wallet.queryPendingDepositTx(address);
-        if (pendingDepositTx) {
+        let depositTx: Transaction | null = null;
+        let vout = 0;
+        try {
+          const baseUrl = "https://regtest-mempool.dev.dev.sparkinfra.net/api";
+          const auth = btoa("lightspark:TFNR6ZeLdxF9HejW");
+
+          const response = await fetch(`${baseUrl}/address/${address}/txs`, {
+            headers: {
+              Authorization: `Basic ${auth}`,
+              "Content-Type": "application/json",
+            },
+          });
+
+          const addressTxs = await response.json();
+
+          if (addressTxs && addressTxs.length > 0) {
+            const latestTx = addressTxs[0];
+
+            // // Find our output
+            const outputIndex = latestTx.vout.findIndex(
+              (output: any) => output.scriptpubkey_address === address,
+            );
+
+            if (outputIndex === -1) {
+              return null;
+            }
+
+            const txResponse = await fetch(
+              `${baseUrl}/tx/${latestTx.txid}/hex`,
+              {
+                headers: {
+                  Authorization: `Basic ${auth}`,
+                  "Content-Type": "application/json",
+                },
+              },
+            );
+            const txHex = await txResponse.text();
+            depositTx = getTxFromRawTxHex(txHex);
+            vout = outputIndex;
+            break;
+          }
+        } catch (error) {
+          throw error;
+        }
+
+        if (depositTx) {
           try {
-            const nodes = await wallet.createTreeRoot(
+            await wallet.createTreeRoot(
               hexToBytes(btcAddressInfo[address].pubkey),
               hexToBytes(btcAddressInfo[address].verifyingKey),
-              pendingDepositTx.depositTx,
-              pendingDepositTx.vout,
-            );
-            await wallet.transferDepositToSelf(
-              nodes.nodes,
-              hexToBytes(btcAddressInfo[address].pubkey),
+              depositTx,
+              vout,
             );
 
             const updatedAddressInfo = { ...btcAddressInfo };
             delete updatedAddressInfo[address];
             useWalletStore.setState({ btcAddressInfo: updatedAddressInfo });
-            if (!updateBalance) {
-              updateBalance = true;
-            }
           } catch (error) {
             console.error("error transferring deposit to self", error);
           }
         }
       }
 
-      if (updateBalance) {
-        queryClient.invalidateQueries({
-          queryKey: ["wallet", "balance"],
-          exact: true,
-        });
-      }
+      queryClient.invalidateQueries({
+        queryKey: ["wallet", "balance"],
+        exact: true,
+      });
 
       return true;
     },
@@ -299,7 +325,6 @@ export function useWallet() {
       isLoading: satsUsdPriceQuery.isLoading,
       error: satsUsdPriceQuery.error,
     },
-    generatorMnemonic: state.generateMnemonic,
     initWallet: state.initWallet,
     initWalletFromSeed: state.initWalletFromSeed,
     getMasterPublicKey: state.getMasterPublicKey,
