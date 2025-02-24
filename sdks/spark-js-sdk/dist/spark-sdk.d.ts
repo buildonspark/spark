@@ -70,9 +70,9 @@ export declare class SparkWallet {
     generateDepositAddress(signingPubkey: Uint8Array): Promise<GenerateDepositAddressResponse>;
     syncTokenLeaves(): Promise<void>;
     getTokenBalance(tokenPublicKey: Uint8Array): bigint;
-    transferTokens(tokenPublicKey: Uint8Array, tokenAmount: bigint, recipientPublicKey: Uint8Array, selectedLeaves?: LeafWithPreviousTransactionData[]): Promise<void>;
-    selectTokenLeaves(tokenPublicKey: Uint8Array, tokenAmount: bigint): LeafWithPreviousTransactionData[];
-    consolidateTokenLeaves(tokenPublicKey: Uint8Array, selectedLeaves?: LeafWithPreviousTransactionData[], transferBackToIdentityPublicKey?: boolean): Promise<void>;
+    transferTokens(tokenPublicKey: string, tokenAmount: bigint, recipientPublicKey: string, selectedLeaves?: LeafWithPreviousTransactionData[]): Promise<void>;
+    selectTokenLeaves(tokenPublicKey: string, tokenAmount: bigint): LeafWithPreviousTransactionData[];
+    consolidateTokenLeaves(tokenPublicKey: string, selectedLeaves?: LeafWithPreviousTransactionData[], transferBackToIdentityPublicKey?: boolean): Promise<void>;
     queryPendingDepositTx(depositAddress: string): Promise<{
         depositTx: Transaction;
         vout: any;

@@ -1,4 +1,4 @@
-import { bytesToHex, hexToBytes } from "@noble/curves/abstract/utils";
+import { bytesToHex } from "@noble/curves/abstract/utils";
 import { SparkWallet } from "@buildonspark/spark-js-sdk";
 import { SparkSigner } from "@buildonspark/spark-js-sdk/signer";
 import { LeafWithPreviousTransactionData } from "../../proto/spark.js";
@@ -51,15 +51,15 @@ export class IssuerSparkWallet extends SparkWallet {
   async transferIssuerTokens(tokenAmount: bigint, recipientPublicKey: string) {
     var tokenPublicKey = await super.getSigner().getIdentityPublicKey();
     await super.transferTokens(
-      tokenPublicKey,
+      bytesToHex(tokenPublicKey),
       tokenAmount,
-      hexToBytes(recipientPublicKey)
+      recipientPublicKey
     );
   }
 
   async consolidateIssuerTokenLeaves() {
     var tokenPublicKey = await super.getSigner().getIdentityPublicKey();
-    await super.consolidateTokenLeaves(tokenPublicKey);
+    await super.consolidateTokenLeaves(bytesToHex(tokenPublicKey));
   }
 
   // TODO: Simplify so less logic is in the Issuer JS SDK in favor of the Spark
@@ -85,7 +85,7 @@ export class IssuerSparkWallet extends SparkWallet {
         throw new Error("One or more selected leaves are not available");
       }
     } else {
-      selectedLeaves = this.selectTokenLeaves(tokenPublicKey, tokenAmount);
+      selectedLeaves = this.selectTokenLeaves(bytesToHex(tokenPublicKey), tokenAmount);
     }
 
     const partialTokenTransaction =

@@ -435,7 +435,7 @@ __metadata:
 
 "@buildonspark/lrc20-js-sdk@file:../lrc20-js-sdk::locator=%40buildonspark%2Fissuer-js-sdk%40workspace%3A.":
   version: 1.0.9
-  resolution: "@buildonspark/lrc20-js-sdk@file:../lrc20-js-sdk#../lrc20-js-sdk::hash=e375b5&locator=%40buildonspark%2Fissuer-js-sdk%40workspace%3A."
+  resolution: "@buildonspark/lrc20-js-sdk@file:../lrc20-js-sdk#../lrc20-js-sdk::hash=65d82e&locator=%40buildonspark%2Fissuer-js-sdk%40workspace%3A."
   dependencies:
     "@bitcoinerlab/secp256k1": "npm:^1.1.1"
     "@sapphire/utilities": "npm:^3.17.0"
@@ -445,13 +445,13 @@ __metadata:
     class-transformer: "npm:^0.5.1"
     ecpair: "npm:^2.1.0"
     tiny-secp256k1: "npm:^2.2.3"
-  checksum: 10c0/146ca256247ee6d3e2bf759bb99a2ef1ca44e31ccb6fa7c6624613412f4ddc58e9ccc2b64ba4023810675a44b192ffa8c1f130d635e238ad4d4f3b7f41c2847b
+  checksum: 10c0/da0c12d75ec2680cb552f98394c6a4fbc18bfac75fd16e6a9cab16b66ef7dacc0a960d1025ea484ce9ad5b5e61a83b770a135ba38523afa6ada0165fb4655969
   languageName: node
   linkType: hard
 
 "@buildonspark/spark-js-sdk@file:../spark-js-sdk::locator=%40buildonspark%2Fissuer-js-sdk%40workspace%3A.":
   version: 1.0.0
-  resolution: "@buildonspark/spark-js-sdk@file:../spark-js-sdk#../spark-js-sdk::hash=1bfde7&locator=%40buildonspark%2Fissuer-js-sdk%40workspace%3A."
+  resolution: "@buildonspark/spark-js-sdk@file:../spark-js-sdk#../spark-js-sdk::hash=8110b5&locator=%40buildonspark%2Fissuer-js-sdk%40workspace%3A."
   dependencies:
     "@grpc/grpc-js": "npm:^1.12.5"
     "@lightsparkdev/core": "npm:^1.2.7"
@@ -475,7 +475,7 @@ __metadata:
     ts-proto: "npm:^2.6.1"
     uuid: "npm:^11.1.0"
     ws: "npm:^8.18.0"
-  checksum: 10c0/80acde7848de538891dd18be028f7435735c2b579280a4cb0bf6a617cd012a0f2a69695c2d1b55cafae0c5871870e1ade930d4f0b273439ddf172f5fd294f2e5
+  checksum: 10c0/0cb8d7fc026f54cf2aaf8160be9134a600302ffbf0cffa613b939d23a6d9882547a9476758244c75aa64ddf69af0b01de979bc2243bf7f61bc2503ea30afd621
   languageName: node
   linkType: hard
 
@@ -2370,9 +2370,9 @@ __metadata:
   linkType: hard
 
 "electron-to-chromium@npm:^1.5.73":
-  version: 1.5.103
-  resolution: "electron-to-chromium@npm:1.5.103"
-  checksum: 10c0/3b297311b9266ec3ad00eaa8566901603afedc2e19310a16ab9e7217e62f54dda83120ca5f2f75fe64a214d1ba6f6cbb52d7a1692e28de03fcba8bebf7bfc4d5
+  version: 1.5.104
+  resolution: "electron-to-chromium@npm:1.5.104"
+  checksum: 10c0/f58d9836607fba37b393aa86bd1bbc01721c32328b3c80e86bc39e3e636cc30ee70f97e652f611a38ab3de219cf16aca85ebda4774094bf43723e671290c344d
   languageName: node
   linkType: hard
 

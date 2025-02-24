@@ -510,11 +510,13 @@ export class SparkWallet {
         return calculateAvailableTokenAmount(this.tokenLeaves.get(bytesToHex(tokenPublicKey)));
     }
     async transferTokens(tokenPublicKey, tokenAmount, recipientPublicKey, selectedLeaves) {
-        if (!this.tokenLeaves.has(bytesToHex(tokenPublicKey))) {
+        if (!this.tokenLeaves.has(tokenPublicKey)) {
             throw new Error("No token leaves with the given tokenPublicKey");
         }
+        const tokenPublicKeyBytes = hexToBytes(tokenPublicKey);
+        const recipientPublicKeyBytes = hexToBytes(recipientPublicKey);
         if (selectedLeaves) {
-            if (!checkIfSelectedLeavesAreAvailable(selectedLeaves, this.tokenLeaves, tokenPublicKey)) {
+            if (!checkIfSelectedLeavesAreAvailable(selectedLeaves, this.tokenLeaves, tokenPublicKeyBytes)) {
                 throw new Error("One or more selected leaves are not available");
             }
         }
@@ -522,41 +524,40 @@ export class SparkWallet {
             await this.syncTokenLeaves();
             selectedLeaves = this.selectTokenLeaves(tokenPublicKey, tokenAmount);
         }
-        const tokenTransaction = await this.tokenTransactionService.constructTransferTokenTransaction(selectedLeaves, recipientPublicKey, tokenPublicKey, tokenAmount);
+        const tokenTransaction = await this.tokenTransactionService.constructTransferTokenTransaction(selectedLeaves, recipientPublicKeyBytes, tokenPublicKeyBytes, tokenAmount);
         const finalizedTokenTransaction = await this.tokenTransactionService.broadcastTokenTransaction(tokenTransaction, selectedLeaves.map((leaf) => leaf.leaf.ownerPublicKey), selectedLeaves.map((leaf) => leaf.leaf.revocationPublicKey));
-        const tokenPubKeyHex = bytesToHex(tokenPublicKey);
-        if (!this.tokenLeaves.has(tokenPubKeyHex)) {
-            this.tokenLeaves.set(tokenPubKeyHex, []);
+        if (!this.tokenLeaves.has(tokenPublicKey)) {
+            this.tokenLeaves.set(tokenPublicKey, []);
         }
-        this.tokenTransactionService.updateTokenLeavesFromFinalizedTransaction(this.tokenLeaves.get(tokenPubKeyHex), finalizedTokenTransaction);
+        this.tokenTransactionService.updateTokenLeavesFromFinalizedTransaction(this.tokenLeaves.get(tokenPublicKey), finalizedTokenTransaction);
     }
     selectTokenLeaves(tokenPublicKey, tokenAmount) {
-        return this.tokenTransactionService.selectTokenLeaves(this.tokenLeaves.get(bytesToHex(tokenPublicKey)), tokenPublicKey, tokenAmount);
+        return this.tokenTransactionService.selectTokenLeaves(this.tokenLeaves.get(tokenPublicKey), hexToBytes(tokenPublicKey), tokenAmount);
     }
     // If no leaves are passed in, it will take all the leaves available for the given tokenPublicKey
     async consolidateTokenLeaves(tokenPublicKey, selectedLeaves, transferBackToIdentityPublicKey = false) {
-        if (!this.tokenLeaves.has(bytesToHex(tokenPublicKey))) {
+        if (!this.tokenLeaves.has(tokenPublicKey)) {
             throw new Error("No token leaves with the given tokenPublicKey");
         }
+        const tokenPublicKeyBytes = hexToBytes(tokenPublicKey);
         if (selectedLeaves) {
-            if (!checkIfSelectedLeavesAreAvailable(selectedLeaves, this.tokenLeaves, tokenPublicKey)) {
+            if (!checkIfSelectedLeavesAreAvailable(selectedLeaves, this.tokenLeaves, tokenPublicKeyBytes)) {
                 throw new Error("One or more selected leaves are not available");
             }
         }
         else {
             // Get all available leaves
-            selectedLeaves = this.tokenLeaves.get(bytesToHex(tokenPublicKey));
+            selectedLeaves = this.tokenLeaves.get(tokenPublicKey);
         }
         if (selectedLeaves.length === 1) {
             return;
         }
-        const partialTokenTransaction = await this.tokenTransactionService.constructConsolidateTokenTransaction(selectedLeaves, tokenPublicKey, transferBackToIdentityPublicKey);
+        const partialTokenTransaction = await this.tokenTransactionService.constructConsolidateTokenTransaction(selectedLeaves, tokenPublicKeyBytes, transferBackToIdentityPublicKey);
         const finalizedTokenTransaction = await this.tokenTransactionService.broadcastTokenTransaction(partialTokenTransaction, selectedLeaves.map((leaf) => leaf.leaf.ownerPublicKey), selectedLeaves.map((leaf) => leaf.leaf.revocationPublicKey));
-        const tokenPubKeyHex = bytesToHex(tokenPublicKey);
-        if (!this.tokenLeaves.has(tokenPubKeyHex)) {
-            this.tokenLeaves.set(tokenPubKeyHex, []);
+        if (!this.tokenLeaves.has(tokenPublicKey)) {
+            this.tokenLeaves.set(tokenPublicKey, []);
         }
-        this.tokenTransactionService.updateTokenLeavesFromFinalizedTransaction(this.tokenLeaves.get(tokenPubKeyHex), finalizedTokenTransaction);
+        this.tokenTransactionService.updateTokenLeavesFromFinalizedTransaction(this.tokenLeaves.get(tokenPublicKey), finalizedTokenTransaction);
     }
     async queryPendingDepositTx(depositAddress) {
         try {

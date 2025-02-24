@@ -828,21 +828,24 @@ export class SparkWallet {
   }
 
   async transferTokens(
-    tokenPublicKey: Uint8Array,
+    tokenPublicKey: string,
     tokenAmount: bigint,
-    recipientPublicKey: Uint8Array,
+    recipientPublicKey: string,
     selectedLeaves?: LeafWithPreviousTransactionData[]
   ) {
-    if (!this.tokenLeaves.has(bytesToHex(tokenPublicKey))) {
+    if (!this.tokenLeaves.has(tokenPublicKey)) {
       throw new Error("No token leaves with the given tokenPublicKey");
     }
+
+    const tokenPublicKeyBytes = hexToBytes(tokenPublicKey);
+    const recipientPublicKeyBytes = hexToBytes(recipientPublicKey);
 
     if (selectedLeaves) {
       if (
         !checkIfSelectedLeavesAreAvailable(
           selectedLeaves,
           this.tokenLeaves,
-          tokenPublicKey
+          tokenPublicKeyBytes
         )
       ) {
         throw new Error("One or more selected leaves are not available");
@@ -855,8 +858,8 @@ export class SparkWallet {
     const tokenTransaction =
       await this.tokenTransactionService.constructTransferTokenTransaction(
         selectedLeaves,
-        recipientPublicKey,
-        tokenPublicKey,
+        recipientPublicKeyBytes,
+        tokenPublicKeyBytes,
         tokenAmount
       );
 
@@ -867,50 +870,51 @@ export class SparkWallet {
         selectedLeaves.map((leaf) => leaf.leaf!.revocationPublicKey!)
       );
 
-    const tokenPubKeyHex = bytesToHex(tokenPublicKey);
-    if (!this.tokenLeaves.has(tokenPubKeyHex)) {
-      this.tokenLeaves.set(tokenPubKeyHex, []);
+    if (!this.tokenLeaves.has(tokenPublicKey)) {
+      this.tokenLeaves.set(tokenPublicKey, []);
     }
     this.tokenTransactionService.updateTokenLeavesFromFinalizedTransaction(
-      this.tokenLeaves.get(tokenPubKeyHex)!,
+      this.tokenLeaves.get(tokenPublicKey)!,
       finalizedTokenTransaction
     );
   }
 
   selectTokenLeaves(
-    tokenPublicKey: Uint8Array,
+    tokenPublicKey: string,
     tokenAmount: bigint
   ): LeafWithPreviousTransactionData[] {
     return this.tokenTransactionService.selectTokenLeaves(
-      this.tokenLeaves.get(bytesToHex(tokenPublicKey))!,
-      tokenPublicKey,
+      this.tokenLeaves.get(tokenPublicKey)!,
+      hexToBytes(tokenPublicKey),
       tokenAmount
     );
   }
 
   // If no leaves are passed in, it will take all the leaves available for the given tokenPublicKey
   async consolidateTokenLeaves(
-    tokenPublicKey: Uint8Array,
+    tokenPublicKey: string,
     selectedLeaves?: LeafWithPreviousTransactionData[],
     transferBackToIdentityPublicKey: boolean = false
   ) {
-    if (!this.tokenLeaves.has(bytesToHex(tokenPublicKey))) {
+    if (!this.tokenLeaves.has(tokenPublicKey)) {
       throw new Error("No token leaves with the given tokenPublicKey");
     }
+
+    const tokenPublicKeyBytes = hexToBytes(tokenPublicKey);
 
     if (selectedLeaves) {
       if (
         !checkIfSelectedLeavesAreAvailable(
           selectedLeaves,
           this.tokenLeaves,
-          tokenPublicKey
+          tokenPublicKeyBytes
         )
       ) {
         throw new Error("One or more selected leaves are not available");
       }
     } else {
       // Get all available leaves
-      selectedLeaves = this.tokenLeaves.get(bytesToHex(tokenPublicKey))!;
+      selectedLeaves = this.tokenLeaves.get(tokenPublicKey)!;
     }
 
     if (selectedLeaves!.length === 1) {
@@ -920,7 +924,7 @@ export class SparkWallet {
     const partialTokenTransaction =
       await this.tokenTransactionService.constructConsolidateTokenTransaction(
         selectedLeaves,
-        tokenPublicKey,
+        tokenPublicKeyBytes,
         transferBackToIdentityPublicKey
       );
 
@@ -931,12 +935,11 @@ export class SparkWallet {
         selectedLeaves.map((leaf) => leaf.leaf!.revocationPublicKey!)
       );
 
-    const tokenPubKeyHex = bytesToHex(tokenPublicKey);
-    if (!this.tokenLeaves.has(tokenPubKeyHex)) {
-      this.tokenLeaves.set(tokenPubKeyHex, []);
+    if (!this.tokenLeaves.has(tokenPublicKey)) {
+      this.tokenLeaves.set(tokenPublicKey, []);
     }
     this.tokenTransactionService.updateTokenLeavesFromFinalizedTransaction(
-      this.tokenLeaves.get(tokenPubKeyHex)!,
+      this.tokenLeaves.get(tokenPublicKey)!,
       finalizedTokenTransaction
     );
   }
