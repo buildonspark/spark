@@ -63,7 +63,7 @@ export class IssuerTokenTransactionService extends TokenTransactionService {
         },
         outputLeaves: [
           {
-            ownerPublicKey: await this.config.signer.generatePublicKey(),
+            ownerPublicKey: BURN_ADDRESS,
             tokenPublicKey: tokenPublicKey,
             tokenAmount: numberToBytesBE(tokenAmountSum, 16),
           },
