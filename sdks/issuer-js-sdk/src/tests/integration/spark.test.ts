@@ -1,6 +1,8 @@
 import { IssuerSparkWallet } from "../../services/spark/wallet.js";
 import { Network } from "@buildonspark/spark-js-sdk/utils";
 import { secp256k1 } from "@noble/curves/secp256k1";
+import { hexToBytes, bytesToHex } from "@noble/curves/abstract/utils";
+import { SparkWallet } from "@buildonspark/spark-js-sdk";
 
 describe("token integration test", () => {
   // Skip all tests if running in GitHub Actions
@@ -13,9 +15,7 @@ describe("token integration test", () => {
     const mnemonic = await wallet.generateMnemonic();
     await wallet.createSparkWallet(mnemonic);
 
-    const tokenPublicKey = await wallet.getSigner().generatePublicKey();
-
-    await wallet.mintTokens(tokenPublicKey, tokenAmount);
+    await wallet.mintIssuerTokens(tokenAmount);
   });
 
   it("should issue a single token and transfer it", async () => {
@@ -25,16 +25,14 @@ describe("token integration test", () => {
     const mnemonic = await wallet.generateMnemonic();
     await wallet.createSparkWallet(mnemonic);
 
-    const targetWalletPrivateKey = secp256k1.utils.randomPrivateKey();
-    const targetWalletPubKey = secp256k1.getPublicKey(targetWalletPrivateKey);
+    const destinationWallet = new SparkWallet(Network.LOCAL);
+    const destinationMnemonic = await destinationWallet.generateMnemonic();
+    await destinationWallet.createSparkWallet(destinationMnemonic);
 
-    const tokenPublicKey = await wallet.getSigner().generatePublicKey();
-
-    await wallet.mintTokens(tokenPublicKey, tokenAmount);
-    await wallet.transferTokens(
-      tokenPublicKey,
+    await wallet.mintIssuerTokens(tokenAmount);
+    await wallet.transferIssuerTokens(
       tokenAmount,
-      targetWalletPubKey
+      bytesToHex(await destinationWallet.getSigner().getIdentityPublicKey())
     );
   });
 
@@ -44,10 +42,8 @@ describe("token integration test", () => {
     const mnemonic = await wallet.generateMnemonic();
     await wallet.createSparkWallet(mnemonic);
 
-    const tokenPublicKey = await wallet.getSigner().generatePublicKey();
-    await wallet.mintTokens(tokenPublicKey, tokenAmount);
-
-    await wallet.consolidateTokenLeaves(tokenPublicKey);
+    await wallet.mintIssuerTokens(tokenAmount);
+    await wallet.consolidateIssuerTokenLeaves();
   });
 
   it("should freeze tokens", async () => {
@@ -56,25 +52,23 @@ describe("token integration test", () => {
     const issuerMnemonic = await issuerWallet.generateMnemonic();
     await issuerWallet.createSparkWallet(issuerMnemonic);
 
-    const tokenPublicKey = await issuerWallet.getSigner().generatePublicKey();
-    await issuerWallet.mintTokens(tokenPublicKey, tokenAmount);
+    await issuerWallet.mintIssuerTokens(tokenAmount);
 
     const userWallet = new IssuerSparkWallet(Network.LOCAL);
-    const userMnemonic = await issuerWallet.generateMnemonic();
+    const userMnemonic = await userWallet.generateMnemonic();
     await userWallet.createSparkWallet(userMnemonic);
-
     const userWalletPublicKey = await userWallet
       .getSigner()
       .getIdentityPublicKey();
-    issuerWallet.transferTokens(
-      tokenPublicKey,
+
+    issuerWallet.transferIssuerTokens(
       tokenAmount,
-      userWalletPublicKey
+      bytesToHex(userWalletPublicKey)
     );
 
-    await issuerWallet.freezeTokens(userWalletPublicKey, tokenPublicKey);
+    await issuerWallet.freezeIssuerTokens(userWalletPublicKey);
 
-    await issuerWallet.unfreezeTokens(userWalletPublicKey, tokenPublicKey);
+    await issuerWallet.unfreezeIssuerTokens(userWalletPublicKey);
   });
 
   it("should burn tokens", async () => {
@@ -82,10 +76,8 @@ describe("token integration test", () => {
     const issuerWallet = new IssuerSparkWallet(Network.LOCAL);
     const issuerMnemonic = await issuerWallet.generateMnemonic();
     await issuerWallet.createSparkWallet(issuerMnemonic);
+    await issuerWallet.mintIssuerTokens(tokenAmount);
 
-    const tokenPublicKey = await issuerWallet.getSigner().generatePublicKey();
-    await issuerWallet.mintTokens(tokenPublicKey, tokenAmount);
-
-    await issuerWallet.burnTokens(tokenPublicKey, tokenAmount);
+    await issuerWallet.burnIssuerTokens(tokenAmount);
   });
 });

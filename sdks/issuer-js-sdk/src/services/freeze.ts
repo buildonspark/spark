@@ -2,6 +2,7 @@ import { WalletConfigService } from "@buildonspark/spark-js-sdk/config";
 import { ConnectionManager } from "@buildonspark/spark-js-sdk/connection";
 import { FreezeTokensPayload, FreezeTokensResponse } from "../proto/spark.js";
 import { validateResponses } from "@buildonspark/spark-js-sdk/utils";
+import { bytesToHex } from "@noble/curves/abstract/utils";
 import { hashFreezeTokensPayload } from "../utils/token-hashing.js";
 
 export class TokenFreezeService {
@@ -56,9 +57,8 @@ export class TokenFreezeService {
           hashFreezeTokensPayload(freezeTokensPayload);
 
         const issuerSignature =
-          await this.config.signer.signMessageWithPublicKey(
+          await this.config.signer.signMessageWithIdentityKey(
             hashedPayload,
-            tokenPublicKey,
           );
 
         const response = await internalSparkClient.freeze_tokens({

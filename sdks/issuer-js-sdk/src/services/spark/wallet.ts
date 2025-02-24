@@ -1,4 +1,4 @@
-import { bytesToHex } from "@noble/curves/abstract/utils";
+import { bytesToHex, hexToBytes } from "@noble/curves/abstract/utils";
 import { SparkWallet } from "@buildonspark/spark-js-sdk";
 import { SparkSigner } from "@buildonspark/spark-js-sdk/signer";
 import { LeafWithPreviousTransactionData } from "../../proto/spark.js";
@@ -16,24 +16,26 @@ export class IssuerSparkWallet extends SparkWallet {
 
     this.issuerTokenTransactionService = new IssuerTokenTransactionService(
       this.config,
-      this.connectionManager,
+      this.connectionManager
     );
     this.tokenFreezeService = new TokenFreezeService(
       this.config,
-      this.connectionManager,
+      this.connectionManager
     );
   }
 
-  async mintTokens(tokenPublicKey: Uint8Array, tokenAmount: bigint) {
+  async mintIssuerTokens(tokenAmount: bigint) {
+    var tokenPublicKey = await super.getSigner().getIdentityPublicKey();
+
     const tokenTransaction =
       await this.issuerTokenTransactionService.constructMintTokenTransaction(
         tokenPublicKey,
-        tokenAmount,
+        tokenAmount
       );
 
     const finalizedTokenTransaction =
       await this.issuerTokenTransactionService.broadcastTokenTransaction(
-        tokenTransaction,
+        tokenTransaction
       );
 
     const tokenPubKeyHex = bytesToHex(tokenPublicKey);
@@ -42,17 +44,34 @@ export class IssuerSparkWallet extends SparkWallet {
     }
     this.issuerTokenTransactionService.updateTokenLeavesFromFinalizedTransaction(
       this.tokenLeaves.get(tokenPubKeyHex)!,
-      finalizedTokenTransaction,
+      finalizedTokenTransaction
     );
   }
 
-  async burnTokens(
-    tokenPublicKey: Uint8Array,
+  async transferIssuerTokens(tokenAmount: bigint, recipientPublicKey: string) {
+    var tokenPublicKey = await super.getSigner().getIdentityPublicKey();
+    await super.transferTokens(
+      tokenPublicKey,
+      tokenAmount,
+      hexToBytes(recipientPublicKey)
+    );
+  }
+
+  async consolidateIssuerTokenLeaves() {
+    var tokenPublicKey = await super.getSigner().getIdentityPublicKey();
+    await super.consolidateTokenLeaves(tokenPublicKey);
+  }
+
+  // TODO: Simplify so less logic is in the Issuer JS SDK in favor of the Spark
+  // SDK logic.
+  async burnIssuerTokens(
     tokenAmount: bigint,
-    selectedLeaves?: LeafWithPreviousTransactionData[],
+    selectedLeaves?: LeafWithPreviousTransactionData[]
   ) {
+    var tokenPublicKey = await super.getSigner().getIdentityPublicKey();
+
     if (!this.tokenLeaves.has(bytesToHex(tokenPublicKey))) {
-      throw new Error("No token leaves with the given tokenPublicKey");
+      throw new Error("No token leaves available to burn");
     }
 
     if (selectedLeaves) {
@@ -60,7 +79,7 @@ export class IssuerSparkWallet extends SparkWallet {
         !checkIfSelectedLeavesAreAvailable(
           selectedLeaves,
           this.tokenLeaves,
-          tokenPublicKey,
+          tokenPublicKey
         )
       ) {
         throw new Error("One or more selected leaves are not available");
@@ -73,14 +92,14 @@ export class IssuerSparkWallet extends SparkWallet {
       await this.issuerTokenTransactionService.constructBurnTokenTransaction(
         selectedLeaves,
         tokenPublicKey,
-        tokenAmount,
+        tokenAmount
       );
 
     const finalizedTokenTransaction =
       await this.issuerTokenTransactionService.broadcastTokenTransaction(
         partialTokenTransaction,
         selectedLeaves.map((leaf) => leaf.leaf!.ownerPublicKey),
-        selectedLeaves.map((leaf) => leaf.leaf!.revocationPublicKey!),
+        selectedLeaves.map((leaf) => leaf.leaf!.revocationPublicKey!)
       );
 
     const tokenPubKeyHex = bytesToHex(tokenPublicKey);
@@ -89,18 +108,22 @@ export class IssuerSparkWallet extends SparkWallet {
     }
     this.issuerTokenTransactionService.updateTokenLeavesFromFinalizedTransaction(
       this.tokenLeaves.get(tokenPubKeyHex)!,
-      finalizedTokenTransaction,
+      finalizedTokenTransaction
     );
   }
 
-  async freezeTokens(ownerPublicKey: Uint8Array, tokenPublicKey: Uint8Array) {
+  async freezeIssuerTokens(ownerPublicKey: Uint8Array) {
+    var tokenPublicKey = await super.getSigner().getIdentityPublicKey();
+
     await this.tokenFreezeService!.freezeTokens(ownerPublicKey, tokenPublicKey);
   }
 
-  async unfreezeTokens(ownerPublicKey: Uint8Array, tokenPublicKey: Uint8Array) {
+  async unfreezeIssuerTokens(ownerPublicKey: Uint8Array) {
+    var tokenPublicKey = await super.getSigner().getIdentityPublicKey();
+
     await this.tokenFreezeService!.unfreezeTokens(
       ownerPublicKey,
-      tokenPublicKey,
+      tokenPublicKey
     );
   }
 }

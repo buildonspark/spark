@@ -40,6 +40,7 @@ export class TokenTransactionService {
     recipientPublicKey: Uint8Array,
     tokenPublicKey: Uint8Array,
     tokenAmount: bigint,
+    transferBackToIdentityPublicKey: boolean = false
   ): Promise<TokenTransaction> {
     let availableTokenAmount = calculateAvailableTokenAmount(selectedLeaves);
 
@@ -84,7 +85,9 @@ export class TokenTransactionService {
             tokenAmount: numberToBytesBE(tokenAmount, 16),
           },
           {
-            ownerPublicKey: selectedLeaves[0].leaf?.ownerPublicKey!,
+            ownerPublicKey: transferBackToIdentityPublicKey
+              ? await this.config.signer.getIdentityPublicKey()
+              : await this.config.signer.generatePublicKey(),
             tokenPublicKey: tokenPublicKey,
             tokenAmount: numberToBytesBE(tokenAmountDifference, 16),
           },
@@ -130,12 +133,12 @@ export class TokenTransactionService {
         throw new Error("issuer public key cannot be nil");
       }
 
-      const owner_signature = await this.config.signer.signMessageWithPublicKey(
+      const ownerSignature = await this.signMessageWithKey(
         partialTokenTransactionHash,
         issuerPublicKey
       );
 
-      ownerSignatures.push(owner_signature);
+      ownerSignatures.push(ownerSignature);
     } else if (tokenTransaction.tokenInput!.$case === "transferInput") {
       const transferInput = tokenTransaction.tokenInput!.transferInput;
 
@@ -147,11 +150,10 @@ export class TokenTransactionService {
 
       for (let i = 0; i < transferInput.leavesToSpend.length; i++) {
         const leaf = transferInput.leavesToSpend[i];
-        const ownerSignature =
-          await this.config.signer.signMessageWithPublicKey(
-            partialTokenTransactionHash,
-            leafToSpendSigningPublicKeys![i]
-          );
+        const ownerSignature = await this.signMessageWithKey(
+          partialTokenTransactionHash,
+          leafToSpendSigningPublicKeys![i]
+        );
 
         ownerSignatures.push(ownerSignature);
       }
@@ -213,7 +215,7 @@ export class TokenTransactionService {
         throw new Error("issuer public key cannot be nil");
       }
 
-      const ownerSignature = await this.config.signer.signMessageWithPublicKey(
+      const ownerSignature = await this.signMessageWithKey(
         payloadHash,
         issuerPublicKey
       );
@@ -228,12 +230,13 @@ export class TokenTransactionService {
     if (tokenTransaction.tokenInput!.$case === "transferInput") {
       const transferInput = tokenTransaction.tokenInput!.transferInput;
       for (let i = 0; i < transferInput.leavesToSpend.length; i++) {
-        const owner_signature =
-          await this.config.signer.signMessageWithIdentityKey(payloadHash);
+        const ownerSignature = await this.config.signer.signMessageWithIdentityKey(
+          payloadHash
+        );
 
         operatorSpecificSignatures.push({
           ownerPublicKey: await this.config.signer.getIdentityPublicKey(),
-          ownerSignature: owner_signature,
+          ownerSignature: ownerSignature,
           payload: payload,
         });
       }
@@ -522,5 +525,23 @@ export class TokenTransactionService {
         previousTransactionVout: index,
       });
     });
+  }
+
+  // Helper function for deciding if the signer public key is the identity public key
+  private async signMessageWithKey(
+    message: Uint8Array,
+    publicKey: Uint8Array
+  ): Promise<Uint8Array> {
+    if (
+      bytesToHex(publicKey) ===
+      bytesToHex(await this.config.signer.getIdentityPublicKey())
+    ) {
+      return await this.config.signer.signMessageWithIdentityKey(message);
+    } else {
+      return await this.config.signer.signMessageWithPublicKey(
+        message,
+        publicKey
+      );
+    }
   }
 }
