@@ -74,6 +74,7 @@ interface WalletActions {
   // fetchOwnedTokens: () => Promise<LeafWithPreviousTransactionData[]>;
   setActiveAsset: (asset: Currency) => void;
   setActiveInputCurrency: (currency: Currency) => void;
+  withdrawToBtc: (address: string, amount: number) => Promise<void>;
   loadStoredWallet: () => Promise<boolean>;
 }
 
@@ -169,6 +170,10 @@ const useWalletStore = create<WalletStore>((set, get) => ({
       expirySeconds: 60 * 60 * 24,
     });
     return invoice;
+  },
+  withdrawToBtc: async (address: string, amount: number) => {
+    const { wallet } = get();
+    await wallet.coopExit(address, amount);
   },
   payLightningInvoice: async (invoice: string) => {
     const { wallet } = get();
@@ -299,6 +304,7 @@ export function useWallet() {
     createLightningInvoice: state.createLightningInvoice,
     payLightningInvoice: state.payLightningInvoice,
     loadStoredWallet: state.loadStoredWallet,
+    withdrawToBtc: state.withdrawToBtc,
   };
 }
 

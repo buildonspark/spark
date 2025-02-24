@@ -38,6 +38,7 @@ export default function Send() {
     activeInputCurrency,
     sendTransfer,
     payLightningInvoice,
+    withdrawToBtc,
     setActiveAsset,
     getMasterPublicKey,
   } = useWallet();
@@ -112,7 +113,7 @@ export default function Send() {
         } else if (sendAddressNetwork === Network.SPARK) {
           // await sendTransfer(satsToSend, sendAddress);
         } else if (sendAddressNetwork === Network.BITCOIN) {
-          // TODO
+          // await withdrawToBtc(sendAddress, satsToSend);
         } else if (sendAddressNetwork === Network.PHONE) {
           const response = await fetch(
             `https://api.dev.dev.sparkinfra.net/graphql/spark/rc`,

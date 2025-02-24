@@ -26,7 +26,7 @@ function isValidBitcoinAddress(address: string): boolean {
   // Regex for P2PKH and P2SH addresses
   const legacyRegex = /^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$/;
   // Regex for Bech32 addresses (SegWit)
-  const bech32Regex = /^(bc1)[a-z0-9]{25,39}$/;
+  const bech32Regex = /^(bc1|bcrt1)[a-z0-9]{25,89}$/;
   // Check against both regex patterns
   return legacyRegex.test(address) || bech32Regex.test(address);
 }
