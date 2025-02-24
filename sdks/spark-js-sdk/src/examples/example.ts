@@ -228,7 +228,7 @@ async function runCLI() {
           break;
         }
         const targetAmount = parseInt(args[0]);
-        const response = await wallet.requestLeavesSwap(targetAmount);
+        const response = await wallet.requestLeavesSwap({targetAmount});
         console.log(response);
         break;
       case "balance":
