@@ -257,7 +257,7 @@ message FreezeTokensRequest {
 
 message FreezeTokensResponse {
     repeated string impacted_leaf_ids = 1 [(validate.rules).repeated.items.string.uuid = true];
-    repeated bytes impacted_token_amount = 2;  // Decoded uint128
+    bytes impacted_token_amount = 2;  // Decoded uint128
 }
 
 message GetOwnedTokenLeavesRequest {

@@ -370,7 +370,7 @@ export interface FreezeTokensRequest {
 export interface FreezeTokensResponse {
   impactedLeafIds: string[];
   /** Decoded uint128 */
-  impactedTokenAmount: Uint8Array[];
+  impactedTokenAmount: Uint8Array;
 }
 
 export interface GetOwnedTokenLeavesRequest {
@@ -835,6 +835,17 @@ export interface CancelSendTransferRequest {
 
 export interface CancelSendTransferResponse {
   transfer: Transfer | undefined;
+}
+
+export interface QueryAllTransfersRequest {
+  identityPublicKey: Uint8Array;
+  limit: number;
+  offset: number;
+}
+
+export interface QueryAllTransfersResponse {
+  transfers: Transfer[];
+  offset: number;
 }
 
 function createBaseDepositAddressProof(): DepositAddressProof {
@@ -3897,7 +3908,7 @@ export const FreezeTokensRequest: MessageFns<FreezeTokensRequest> = {
 };
 
 function createBaseFreezeTokensResponse(): FreezeTokensResponse {
-  return { impactedLeafIds: [], impactedTokenAmount: [] };
+  return { impactedLeafIds: [], impactedTokenAmount: new Uint8Array(0) };
 }
 
 export const FreezeTokensResponse: MessageFns<FreezeTokensResponse> = {
@@ -3905,8 +3916,8 @@ export const FreezeTokensResponse: MessageFns<FreezeTokensResponse> = {
     for (const v of message.impactedLeafIds) {
       writer.uint32(10).string(v!);
     }
-    for (const v of message.impactedTokenAmount) {
-      writer.uint32(18).bytes(v!);
+    if (message.impactedTokenAmount.length !== 0) {
+      writer.uint32(18).bytes(message.impactedTokenAmount);
     }
     return writer;
   },
@@ -3931,7 +3942,7 @@ export const FreezeTokensResponse: MessageFns<FreezeTokensResponse> = {
             break;
           }
 
-          message.impactedTokenAmount.push(reader.bytes());
+          message.impactedTokenAmount = reader.bytes();
           continue;
         }
       }
@@ -3948,9 +3959,9 @@ export const FreezeTokensResponse: MessageFns<FreezeTokensResponse> = {
       impactedLeafIds: globalThis.Array.isArray(object?.impactedLeafIds)
         ? object.impactedLeafIds.map((e: any) => globalThis.String(e))
         : [],
-      impactedTokenAmount: globalThis.Array.isArray(object?.impactedTokenAmount)
-        ? object.impactedTokenAmount.map((e: any) => bytesFromBase64(e))
-        : [],
+      impactedTokenAmount: isSet(object.impactedTokenAmount)
+        ? bytesFromBase64(object.impactedTokenAmount)
+        : new Uint8Array(0),
     };
   },
 
@@ -3959,8 +3970,8 @@ export const FreezeTokensResponse: MessageFns<FreezeTokensResponse> = {
     if (message.impactedLeafIds?.length) {
       obj.impactedLeafIds = message.impactedLeafIds;
     }
-    if (message.impactedTokenAmount?.length) {
-      obj.impactedTokenAmount = message.impactedTokenAmount.map((e) => base64FromBytes(e));
+    if (message.impactedTokenAmount.length !== 0) {
+      obj.impactedTokenAmount = base64FromBytes(message.impactedTokenAmount);
     }
     return obj;
   },
@@ -3971,7 +3982,7 @@ export const FreezeTokensResponse: MessageFns<FreezeTokensResponse> = {
   fromPartial(object: DeepPartial<FreezeTokensResponse>): FreezeTokensResponse {
     const message = createBaseFreezeTokensResponse();
     message.impactedLeafIds = object.impactedLeafIds?.map((e) => e) || [];
-    message.impactedTokenAmount = object.impactedTokenAmount?.map((e) => e) || [];
+    message.impactedTokenAmount = object.impactedTokenAmount ?? new Uint8Array(0);
     return message;
   },
 };
@@ -10563,6 +10574,178 @@ export const CancelSendTransferResponse: MessageFns<CancelSendTransferResponse> 
   },
 };
 
+function createBaseQueryAllTransfersRequest(): QueryAllTransfersRequest {
+  return { identityPublicKey: new Uint8Array(0), limit: 0, offset: 0 };
+}
+
+export const QueryAllTransfersRequest: MessageFns<QueryAllTransfersRequest> = {
+  encode(message: QueryAllTransfersRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.identityPublicKey.length !== 0) {
+      writer.uint32(10).bytes(message.identityPublicKey);
+    }
+    if (message.limit !== 0) {
+      writer.uint32(16).int64(message.limit);
+    }
+    if (message.offset !== 0) {
+      writer.uint32(24).int64(message.offset);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): QueryAllTransfersRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseQueryAllTransfersRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.identityPublicKey = reader.bytes();
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.limit = longToNumber(reader.int64());
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.offset = longToNumber(reader.int64());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): QueryAllTransfersRequest {
+    return {
+      identityPublicKey: isSet(object.identityPublicKey)
+        ? bytesFromBase64(object.identityPublicKey)
+        : new Uint8Array(0),
+      limit: isSet(object.limit) ? globalThis.Number(object.limit) : 0,
+      offset: isSet(object.offset) ? globalThis.Number(object.offset) : 0,
+    };
+  },
+
+  toJSON(message: QueryAllTransfersRequest): unknown {
+    const obj: any = {};
+    if (message.identityPublicKey.length !== 0) {
+      obj.identityPublicKey = base64FromBytes(message.identityPublicKey);
+    }
+    if (message.limit !== 0) {
+      obj.limit = Math.round(message.limit);
+    }
+    if (message.offset !== 0) {
+      obj.offset = Math.round(message.offset);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<QueryAllTransfersRequest>): QueryAllTransfersRequest {
+    return QueryAllTransfersRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<QueryAllTransfersRequest>): QueryAllTransfersRequest {
+    const message = createBaseQueryAllTransfersRequest();
+    message.identityPublicKey = object.identityPublicKey ?? new Uint8Array(0);
+    message.limit = object.limit ?? 0;
+    message.offset = object.offset ?? 0;
+    return message;
+  },
+};
+
+function createBaseQueryAllTransfersResponse(): QueryAllTransfersResponse {
+  return { transfers: [], offset: 0 };
+}
+
+export const QueryAllTransfersResponse: MessageFns<QueryAllTransfersResponse> = {
+  encode(message: QueryAllTransfersResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.transfers) {
+      Transfer.encode(v!, writer.uint32(10).fork()).join();
+    }
+    if (message.offset !== 0) {
+      writer.uint32(16).int64(message.offset);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): QueryAllTransfersResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseQueryAllTransfersResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.transfers.push(Transfer.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.offset = longToNumber(reader.int64());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): QueryAllTransfersResponse {
+    return {
+      transfers: globalThis.Array.isArray(object?.transfers)
+        ? object.transfers.map((e: any) => Transfer.fromJSON(e))
+        : [],
+      offset: isSet(object.offset) ? globalThis.Number(object.offset) : 0,
+    };
+  },
+
+  toJSON(message: QueryAllTransfersResponse): unknown {
+    const obj: any = {};
+    if (message.transfers?.length) {
+      obj.transfers = message.transfers.map((e) => Transfer.toJSON(e));
+    }
+    if (message.offset !== 0) {
+      obj.offset = Math.round(message.offset);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<QueryAllTransfersResponse>): QueryAllTransfersResponse {
+    return QueryAllTransfersResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<QueryAllTransfersResponse>): QueryAllTransfersResponse {
+    const message = createBaseQueryAllTransfersResponse();
+    message.transfers = object.transfers?.map((e) => Transfer.fromPartial(e)) || [];
+    message.offset = object.offset ?? 0;
+    return message;
+  },
+};
+
 export type SparkServiceDefinition = typeof SparkServiceDefinition;
 export const SparkServiceDefinition = {
   name: "SparkService",
@@ -10613,6 +10796,14 @@ export const SparkServiceDefinition = {
       requestType: QueryPendingTransfersRequest,
       requestStream: false,
       responseType: QueryPendingTransfersResponse,
+      responseStream: false,
+      options: {},
+    },
+    query_all_transfers: {
+      name: "query_all_transfers",
+      requestType: QueryAllTransfersRequest,
+      requestStream: false,
+      responseType: QueryAllTransfersResponse,
       responseStream: false,
       options: {},
     },
@@ -10829,6 +11020,10 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
     request: QueryPendingTransfersRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<QueryPendingTransfersResponse>>;
+  query_all_transfers(
+    request: QueryAllTransfersRequest,
+    context: CallContext & CallContextExt,
+  ): Promise<DeepPartial<QueryAllTransfersResponse>>;
   claim_transfer_tweak_keys(
     request: ClaimTransferTweakKeysRequest,
     context: CallContext & CallContextExt,
@@ -10946,6 +11141,10 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
     request: DeepPartial<QueryPendingTransfersRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<QueryPendingTransfersResponse>;
+  query_all_transfers(
+    request: DeepPartial<QueryAllTransfersRequest>,
+    options?: CallOptions & CallOptionsExt,
+  ): Promise<QueryAllTransfersResponse>;
   claim_transfer_tweak_keys(
     request: DeepPartial<ClaimTransferTweakKeysRequest>,
     options?: CallOptions & CallOptionsExt,

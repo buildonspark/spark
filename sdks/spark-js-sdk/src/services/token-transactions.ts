@@ -230,9 +230,8 @@ export class TokenTransactionService {
     if (tokenTransaction.tokenInput!.$case === "transferInput") {
       const transferInput = tokenTransaction.tokenInput!.transferInput;
       for (let i = 0; i < transferInput.leavesToSpend.length; i++) {
-        const ownerSignature = await this.config.signer.signMessageWithIdentityKey(
-          payloadHash
-        );
+        const ownerSignature =
+          await this.config.signer.signMessageWithIdentityKey(payloadHash);
 
         operatorSpecificSignatures.push({
           ownerPublicKey: await this.config.signer.getIdentityPublicKey(),
@@ -326,7 +325,7 @@ export class TokenTransactionService {
       }
 
       // Finalize the token transaction with the keyshares
-      this.finalizeTokenTransaction(
+      await this.finalizeTokenTransaction(
         finalTokenTransaction,
         revocationKeys,
         threshold

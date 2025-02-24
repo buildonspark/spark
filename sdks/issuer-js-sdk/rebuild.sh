@@ -11,6 +11,7 @@ echo "Building spark-js-sdk..."
 yarn clean
 yarn install
 yarn build
+yarn generate:proto
 
 # 3. Return to original directory
 cd "$CURRENT_DIR"
@@ -21,5 +22,6 @@ yarn clean:all
 rm -f yarn.lock
 yarn install
 yarn build
+yarn generate:proto
 
 echo "Build process completed!"

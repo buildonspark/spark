@@ -244,7 +244,7 @@ export interface FreezeTokensRequest {
 export interface FreezeTokensResponse {
     impactedLeafIds: string[];
     /** Decoded uint128 */
-    impactedTokenAmount: Uint8Array[];
+    impactedTokenAmount: Uint8Array;
 }
 export interface GetOwnedTokenLeavesRequest {
     ownerPublicKeys: Uint8Array[];
@@ -627,6 +627,15 @@ export interface CancelSendTransferRequest {
 export interface CancelSendTransferResponse {
     transfer: Transfer | undefined;
 }
+export interface QueryAllTransfersRequest {
+    identityPublicKey: Uint8Array;
+    limit: number;
+    offset: number;
+}
+export interface QueryAllTransfersResponse {
+    transfers: Transfer[];
+    offset: number;
+}
 export declare const DepositAddressProof: MessageFns<DepositAddressProof>;
 export declare const DepositAddressProof_AddressSignaturesEntry: MessageFns<DepositAddressProof_AddressSignaturesEntry>;
 export declare const GenerateDepositAddressRequest: MessageFns<GenerateDepositAddressRequest>;
@@ -731,6 +740,8 @@ export declare const QueryNodesResponse: MessageFns<QueryNodesResponse>;
 export declare const QueryNodesResponse_NodesEntry: MessageFns<QueryNodesResponse_NodesEntry>;
 export declare const CancelSendTransferRequest: MessageFns<CancelSendTransferRequest>;
 export declare const CancelSendTransferResponse: MessageFns<CancelSendTransferResponse>;
+export declare const QueryAllTransfersRequest: MessageFns<QueryAllTransfersRequest>;
+export declare const QueryAllTransfersResponse: MessageFns<QueryAllTransfersResponse>;
 export type SparkServiceDefinition = typeof SparkServiceDefinition;
 export declare const SparkServiceDefinition: {
     readonly name: "SparkService";
@@ -781,6 +792,14 @@ export declare const SparkServiceDefinition: {
             readonly requestType: MessageFns<QueryPendingTransfersRequest>;
             readonly requestStream: false;
             readonly responseType: MessageFns<QueryPendingTransfersResponse>;
+            readonly responseStream: false;
+            readonly options: {};
+        };
+        readonly query_all_transfers: {
+            readonly name: "query_all_transfers";
+            readonly requestType: MessageFns<QueryAllTransfersRequest>;
+            readonly requestStream: false;
+            readonly responseType: MessageFns<QueryAllTransfersResponse>;
             readonly responseStream: false;
             readonly options: {};
         };
@@ -978,6 +997,7 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
     start_send_transfer(request: StartSendTransferRequest, context: CallContext & CallContextExt): Promise<DeepPartial<StartSendTransferResponse>>;
     complete_send_transfer(request: CompleteSendTransferRequest, context: CallContext & CallContextExt): Promise<DeepPartial<CompleteSendTransferResponse>>;
     query_pending_transfers(request: QueryPendingTransfersRequest, context: CallContext & CallContextExt): Promise<DeepPartial<QueryPendingTransfersResponse>>;
+    query_all_transfers(request: QueryAllTransfersRequest, context: CallContext & CallContextExt): Promise<DeepPartial<QueryAllTransfersResponse>>;
     claim_transfer_tweak_keys(request: ClaimTransferTweakKeysRequest, context: CallContext & CallContextExt): Promise<DeepPartial<Empty>>;
     claim_transfer_sign_refunds(request: ClaimTransferSignRefundsRequest, context: CallContext & CallContextExt): Promise<DeepPartial<ClaimTransferSignRefundsResponse>>;
     aggregate_nodes(request: AggregateNodesRequest, context: CallContext & CallContextExt): Promise<DeepPartial<AggregateNodesResponse>>;
@@ -1010,6 +1030,7 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
     start_send_transfer(request: DeepPartial<StartSendTransferRequest>, options?: CallOptions & CallOptionsExt): Promise<StartSendTransferResponse>;
     complete_send_transfer(request: DeepPartial<CompleteSendTransferRequest>, options?: CallOptions & CallOptionsExt): Promise<CompleteSendTransferResponse>;
     query_pending_transfers(request: DeepPartial<QueryPendingTransfersRequest>, options?: CallOptions & CallOptionsExt): Promise<QueryPendingTransfersResponse>;
+    query_all_transfers(request: DeepPartial<QueryAllTransfersRequest>, options?: CallOptions & CallOptionsExt): Promise<QueryAllTransfersResponse>;
     claim_transfer_tweak_keys(request: DeepPartial<ClaimTransferTweakKeysRequest>, options?: CallOptions & CallOptionsExt): Promise<Empty>;
     claim_transfer_sign_refunds(request: DeepPartial<ClaimTransferSignRefundsRequest>, options?: CallOptions & CallOptionsExt): Promise<ClaimTransferSignRefundsResponse>;
     aggregate_nodes(request: DeepPartial<AggregateNodesRequest>, options?: CallOptions & CallOptionsExt): Promise<AggregateNodesResponse>;

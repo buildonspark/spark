@@ -451,7 +451,7 @@ __metadata:
 
 "@buildonspark/spark-js-sdk@file:../spark-js-sdk::locator=%40buildonspark%2Fissuer-js-sdk%40workspace%3A.":
   version: 1.0.0
-  resolution: "@buildonspark/spark-js-sdk@file:../spark-js-sdk#../spark-js-sdk::hash=8110b5&locator=%40buildonspark%2Fissuer-js-sdk%40workspace%3A."
+  resolution: "@buildonspark/spark-js-sdk@file:../spark-js-sdk#../spark-js-sdk::hash=917169&locator=%40buildonspark%2Fissuer-js-sdk%40workspace%3A."
   dependencies:
     "@grpc/grpc-js": "npm:^1.12.5"
     "@lightsparkdev/core": "npm:^1.2.7"
@@ -475,7 +475,7 @@ __metadata:
     ts-proto: "npm:^2.6.1"
     uuid: "npm:^11.1.0"
     ws: "npm:^8.18.0"
-  checksum: 10c0/0cb8d7fc026f54cf2aaf8160be9134a600302ffbf0cffa613b939d23a6d9882547a9476758244c75aa64ddf69af0b01de979bc2243bf7f61bc2503ea30afd621
+  checksum: 10c0/5467b3ec73682c6fc3860b3140a7fc9127785dad008cba4e70fa3cfc9f1ce276843eab0be081570636fc20f164d234563f1604b05ab194f776048d0c18326f5a
   languageName: node
   linkType: hard
 

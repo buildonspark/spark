@@ -1,4 +1,8 @@
-import { bytesToHex } from "@noble/curves/abstract/utils";
+import {
+  bytesToNumberBE,
+  bytesToHex,
+  hexToBytes,
+} from "@noble/curves/abstract/utils";
 import { SparkWallet } from "@buildonspark/spark-js-sdk";
 import { SparkSigner } from "@buildonspark/spark-js-sdk/signer";
 import { LeafWithPreviousTransactionData } from "../../proto/spark.js";
@@ -85,7 +89,10 @@ export class IssuerSparkWallet extends SparkWallet {
         throw new Error("One or more selected leaves are not available");
       }
     } else {
-      selectedLeaves = this.selectTokenLeaves(bytesToHex(tokenPublicKey), tokenAmount);
+      selectedLeaves = this.selectTokenLeaves(
+        bytesToHex(tokenPublicKey),
+        tokenAmount
+      );
     }
 
     const partialTokenTransaction =
@@ -115,15 +122,32 @@ export class IssuerSparkWallet extends SparkWallet {
   async freezeIssuerTokens(ownerPublicKey: Uint8Array) {
     var tokenPublicKey = await super.getSigner().getIdentityPublicKey();
 
-    await this.tokenFreezeService!.freezeTokens(ownerPublicKey, tokenPublicKey);
+    const response = await this.tokenFreezeService!.freezeTokens(
+      ownerPublicKey,
+      tokenPublicKey
+    );
+
+    // Convert the Uint8Array to a bigint
+    const tokenAmount = bytesToNumberBE(response.impactedTokenAmount);
+
+    return {
+      impactedLeafIds: response.impactedLeafIds,
+      impactedTokenAmount: tokenAmount,
+    };
   }
 
   async unfreezeIssuerTokens(ownerPublicKey: Uint8Array) {
     var tokenPublicKey = await super.getSigner().getIdentityPublicKey();
 
-    await this.tokenFreezeService!.unfreezeTokens(
+    const response = await this.tokenFreezeService!.unfreezeTokens(
       ownerPublicKey,
       tokenPublicKey
     );
+    const tokenAmount = bytesToNumberBE(response.impactedTokenAmount);
+
+    return {
+      impactedLeafIds: response.impactedLeafIds,
+      impactedTokenAmount: tokenAmount,
+    };
   }
 }

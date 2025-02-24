@@ -14,6 +14,7 @@ export enum SignatureIntent {
   TRANSFER = 1,
   AGGREGATE = 2,
   REFRESH = 3,
+  EXTEND = 4,
   UNRECOGNIZED = -1,
 }
 
@@ -31,6 +32,9 @@ export function signatureIntentFromJSON(object: any): SignatureIntent {
     case 3:
     case "REFRESH":
       return SignatureIntent.REFRESH;
+    case 4:
+    case "EXTEND":
+      return SignatureIntent.EXTEND;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -48,6 +52,8 @@ export function signatureIntentToJSON(object: SignatureIntent): string {
       return "AGGREGATE";
     case SignatureIntent.REFRESH:
       return "REFRESH";
+    case SignatureIntent.EXTEND:
+      return "EXTEND";
     case SignatureIntent.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
@@ -84,22 +90,15 @@ function createBasePackageMap(): PackageMap {
 }
 
 export const PackageMap: MessageFns<PackageMap> = {
-  encode(
-    message: PackageMap,
-    writer: BinaryWriter = new BinaryWriter(),
-  ): BinaryWriter {
+  encode(message: PackageMap, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     Object.entries(message.packages).forEach(([key, value]) => {
-      PackageMap_PackagesEntry.encode(
-        { key: key as any, value },
-        writer.uint32(10).fork(),
-      ).join();
+      PackageMap_PackagesEntry.encode({ key: key as any, value }, writer.uint32(10).fork()).join();
     });
     return writer;
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): PackageMap {
-    const reader =
-      input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
     const message = createBasePackageMap();
     while (reader.pos < end) {
@@ -110,10 +109,7 @@ export const PackageMap: MessageFns<PackageMap> = {
             break;
           }
 
-          const entry1 = PackageMap_PackagesEntry.decode(
-            reader,
-            reader.uint32(),
-          );
+          const entry1 = PackageMap_PackagesEntry.decode(reader, reader.uint32());
           if (entry1.value !== undefined) {
             message.packages[entry1.key] = entry1.value;
           }
@@ -131,13 +127,10 @@ export const PackageMap: MessageFns<PackageMap> = {
   fromJSON(object: any): PackageMap {
     return {
       packages: isObject(object.packages)
-        ? Object.entries(object.packages).reduce<{ [key: string]: Uint8Array }>(
-            (acc, [key, value]) => {
-              acc[key] = bytesFromBase64(value as string);
-              return acc;
-            },
-            {},
-          )
+        ? Object.entries(object.packages).reduce<{ [key: string]: Uint8Array }>((acc, [key, value]) => {
+          acc[key] = bytesFromBase64(value as string);
+          return acc;
+        }, {})
         : {},
     };
   },
@@ -161,14 +154,15 @@ export const PackageMap: MessageFns<PackageMap> = {
   },
   fromPartial(object: DeepPartial<PackageMap>): PackageMap {
     const message = createBasePackageMap();
-    message.packages = Object.entries(object.packages ?? {}).reduce<{
-      [key: string]: Uint8Array;
-    }>((acc, [key, value]) => {
-      if (value !== undefined) {
-        acc[key] = value;
-      }
-      return acc;
-    }, {});
+    message.packages = Object.entries(object.packages ?? {}).reduce<{ [key: string]: Uint8Array }>(
+      (acc, [key, value]) => {
+        if (value !== undefined) {
+          acc[key] = value;
+        }
+        return acc;
+      },
+      {},
+    );
     return message;
   },
 };
@@ -178,10 +172,7 @@ function createBasePackageMap_PackagesEntry(): PackageMap_PackagesEntry {
 }
 
 export const PackageMap_PackagesEntry: MessageFns<PackageMap_PackagesEntry> = {
-  encode(
-    message: PackageMap_PackagesEntry,
-    writer: BinaryWriter = new BinaryWriter(),
-  ): BinaryWriter {
+  encode(message: PackageMap_PackagesEntry, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.key !== "") {
       writer.uint32(10).string(message.key);
     }
@@ -191,12 +182,8 @@ export const PackageMap_PackagesEntry: MessageFns<PackageMap_PackagesEntry> = {
     return writer;
   },
 
-  decode(
-    input: BinaryReader | Uint8Array,
-    length?: number,
-  ): PackageMap_PackagesEntry {
-    const reader =
-      input instanceof BinaryReader ? input : new BinaryReader(input);
+  decode(input: BinaryReader | Uint8Array, length?: number): PackageMap_PackagesEntry {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
     const message = createBasePackageMap_PackagesEntry();
     while (reader.pos < end) {
@@ -230,9 +217,7 @@ export const PackageMap_PackagesEntry: MessageFns<PackageMap_PackagesEntry> = {
   fromJSON(object: any): PackageMap_PackagesEntry {
     return {
       key: isSet(object.key) ? globalThis.String(object.key) : "",
-      value: isSet(object.value)
-        ? bytesFromBase64(object.value)
-        : new Uint8Array(0),
+      value: isSet(object.value) ? bytesFromBase64(object.value) : new Uint8Array(0),
     };
   },
 
@@ -247,14 +232,10 @@ export const PackageMap_PackagesEntry: MessageFns<PackageMap_PackagesEntry> = {
     return obj;
   },
 
-  create(
-    base?: DeepPartial<PackageMap_PackagesEntry>,
-  ): PackageMap_PackagesEntry {
+  create(base?: DeepPartial<PackageMap_PackagesEntry>): PackageMap_PackagesEntry {
     return PackageMap_PackagesEntry.fromPartial(base ?? {});
   },
-  fromPartial(
-    object: DeepPartial<PackageMap_PackagesEntry>,
-  ): PackageMap_PackagesEntry {
+  fromPartial(object: DeepPartial<PackageMap_PackagesEntry>): PackageMap_PackagesEntry {
     const message = createBasePackageMap_PackagesEntry();
     message.key = object.key ?? "";
     message.value = object.value ?? new Uint8Array(0);
@@ -267,10 +248,7 @@ function createBaseSigningCommitment(): SigningCommitment {
 }
 
 export const SigningCommitment: MessageFns<SigningCommitment> = {
-  encode(
-    message: SigningCommitment,
-    writer: BinaryWriter = new BinaryWriter(),
-  ): BinaryWriter {
+  encode(message: SigningCommitment, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.hiding.length !== 0) {
       writer.uint32(10).bytes(message.hiding);
     }
@@ -281,8 +259,7 @@ export const SigningCommitment: MessageFns<SigningCommitment> = {
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): SigningCommitment {
-    const reader =
-      input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseSigningCommitment();
     while (reader.pos < end) {
@@ -315,12 +292,8 @@ export const SigningCommitment: MessageFns<SigningCommitment> = {
 
   fromJSON(object: any): SigningCommitment {
     return {
-      hiding: isSet(object.hiding)
-        ? bytesFromBase64(object.hiding)
-        : new Uint8Array(0),
-      binding: isSet(object.binding)
-        ? bytesFromBase64(object.binding)
-        : new Uint8Array(0),
+      hiding: isSet(object.hiding) ? bytesFromBase64(object.hiding) : new Uint8Array(0),
+      binding: isSet(object.binding) ? bytesFromBase64(object.binding) : new Uint8Array(0),
     };
   },
 
@@ -351,10 +324,7 @@ function createBaseSigningResult(): SigningResult {
 }
 
 export const SigningResult: MessageFns<SigningResult> = {
-  encode(
-    message: SigningResult,
-    writer: BinaryWriter = new BinaryWriter(),
-  ): BinaryWriter {
+  encode(message: SigningResult, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.signatureShare.length !== 0) {
       writer.uint32(10).bytes(message.signatureShare);
     }
@@ -362,8 +332,7 @@ export const SigningResult: MessageFns<SigningResult> = {
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): SigningResult {
-    const reader =
-      input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseSigningResult();
     while (reader.pos < end) {
@@ -388,9 +357,7 @@ export const SigningResult: MessageFns<SigningResult> = {
 
   fromJSON(object: any): SigningResult {
     return {
-      signatureShare: isSet(object.signatureShare)
-        ? bytesFromBase64(object.signatureShare)
-        : new Uint8Array(0),
+      signatureShare: isSet(object.signatureShare) ? bytesFromBase64(object.signatureShare) : new Uint8Array(0),
     };
   },
 
@@ -437,28 +404,14 @@ function base64FromBytes(arr: Uint8Array): string {
   }
 }
 
-type Builtin =
-  | Date
-  | Function
-  | Uint8Array
-  | string
-  | number
-  | boolean
-  | undefined;
+type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 
-export type DeepPartial<T> = T extends Builtin
-  ? T
-  : T extends globalThis.Array<infer U>
-    ? globalThis.Array<DeepPartial<U>>
-    : T extends ReadonlyArray<infer U>
-      ? ReadonlyArray<DeepPartial<U>>
-      : T extends { $case: string }
-        ? { [K in keyof Omit<T, "$case">]?: DeepPartial<T[K]> } & {
-            $case: T["$case"];
-          }
-        : T extends {}
-          ? { [K in keyof T]?: DeepPartial<T[K]> }
-          : Partial<T>;
+export type DeepPartial<T> = T extends Builtin ? T
+  : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>>
+  : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>>
+  : T extends { $case: string } ? { [K in keyof Omit<T, "$case">]?: DeepPartial<T[K]> } & { $case: T["$case"] }
+  : T extends {} ? { [K in keyof T]?: DeepPartial<T[K]> }
+  : Partial<T>;
 
 function isObject(value: any): boolean {
   return typeof value === "object" && value !== null;

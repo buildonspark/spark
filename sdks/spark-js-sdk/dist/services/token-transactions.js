@@ -192,7 +192,7 @@ export class TokenTransactionService {
                 revocationKeys.push(recoveredPrivateKey);
             }
             // Finalize the token transaction with the keyshares
-            this.finalizeTokenTransaction(finalTokenTransaction, revocationKeys, threshold);
+            await this.finalizeTokenTransaction(finalTokenTransaction, revocationKeys, threshold);
             leafToSpendSigningPublicKeys?.forEach(async (ownerPublicKey) => await this.config.signer.removePublicKey(ownerPublicKey));
         }
         return startResponse.finalTokenTransaction;

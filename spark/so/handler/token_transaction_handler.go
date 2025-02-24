@@ -449,7 +449,7 @@ func (o TokenTransactionHandler) FreezeTokens(
 
 	return &pb.FreezeTokensResponse{
 		ImpactedLeafIds:     leafIDs,
-		ImpactedTokenAmount: [][]byte{totalAmount.Bytes()},
+		ImpactedTokenAmount: totalAmount.Bytes(),
 	}, nil
 }
 

@@ -2894,15 +2894,15 @@ export const FreezeTokensRequest = {
     },
 };
 function createBaseFreezeTokensResponse() {
-    return { impactedLeafIds: [], impactedTokenAmount: [] };
+    return { impactedLeafIds: [], impactedTokenAmount: new Uint8Array(0) };
 }
 export const FreezeTokensResponse = {
     encode(message, writer = new BinaryWriter()) {
         for (const v of message.impactedLeafIds) {
             writer.uint32(10).string(v);
         }
-        for (const v of message.impactedTokenAmount) {
-            writer.uint32(18).bytes(v);
+        if (message.impactedTokenAmount.length !== 0) {
+            writer.uint32(18).bytes(message.impactedTokenAmount);
         }
         return writer;
     },
@@ -2924,7 +2924,7 @@ export const FreezeTokensResponse = {
                     if (tag !== 18) {
                         break;
                     }
-                    message.impactedTokenAmount.push(reader.bytes());
+                    message.impactedTokenAmount = reader.bytes();
                     continue;
                 }
             }
@@ -2940,9 +2940,9 @@ export const FreezeTokensResponse = {
             impactedLeafIds: globalThis.Array.isArray(object?.impactedLeafIds)
                 ? object.impactedLeafIds.map((e) => globalThis.String(e))
                 : [],
-            impactedTokenAmount: globalThis.Array.isArray(object?.impactedTokenAmount)
-                ? object.impactedTokenAmount.map((e) => bytesFromBase64(e))
-                : [],
+            impactedTokenAmount: isSet(object.impactedTokenAmount)
+                ? bytesFromBase64(object.impactedTokenAmount)
+                : new Uint8Array(0),
         };
     },
     toJSON(message) {
@@ -2950,8 +2950,8 @@ export const FreezeTokensResponse = {
         if (message.impactedLeafIds?.length) {
             obj.impactedLeafIds = message.impactedLeafIds;
         }
-        if (message.impactedTokenAmount?.length) {
-            obj.impactedTokenAmount = message.impactedTokenAmount.map((e) => base64FromBytes(e));
+        if (message.impactedTokenAmount.length !== 0) {
+            obj.impactedTokenAmount = base64FromBytes(message.impactedTokenAmount);
         }
         return obj;
     },
@@ -2961,7 +2961,7 @@ export const FreezeTokensResponse = {
     fromPartial(object) {
         const message = createBaseFreezeTokensResponse();
         message.impactedLeafIds = object.impactedLeafIds?.map((e) => e) || [];
-        message.impactedTokenAmount = object.impactedTokenAmount?.map((e) => e) || [];
+        message.impactedTokenAmount = object.impactedTokenAmount ?? new Uint8Array(0);
         return message;
     },
 };
@@ -8893,6 +8893,161 @@ export const CancelSendTransferResponse = {
         return message;
     },
 };
+function createBaseQueryAllTransfersRequest() {
+    return { identityPublicKey: new Uint8Array(0), limit: 0, offset: 0 };
+}
+export const QueryAllTransfersRequest = {
+    encode(message, writer = new BinaryWriter()) {
+        if (message.identityPublicKey.length !== 0) {
+            writer.uint32(10).bytes(message.identityPublicKey);
+        }
+        if (message.limit !== 0) {
+            writer.uint32(16).int64(message.limit);
+        }
+        if (message.offset !== 0) {
+            writer.uint32(24).int64(message.offset);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseQueryAllTransfersRequest();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1: {
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.identityPublicKey = reader.bytes();
+                    continue;
+                }
+                case 2: {
+                    if (tag !== 16) {
+                        break;
+                    }
+                    message.limit = longToNumber(reader.int64());
+                    continue;
+                }
+                case 3: {
+                    if (tag !== 24) {
+                        break;
+                    }
+                    message.offset = longToNumber(reader.int64());
+                    continue;
+                }
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skip(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            identityPublicKey: isSet(object.identityPublicKey)
+                ? bytesFromBase64(object.identityPublicKey)
+                : new Uint8Array(0),
+            limit: isSet(object.limit) ? globalThis.Number(object.limit) : 0,
+            offset: isSet(object.offset) ? globalThis.Number(object.offset) : 0,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.identityPublicKey.length !== 0) {
+            obj.identityPublicKey = base64FromBytes(message.identityPublicKey);
+        }
+        if (message.limit !== 0) {
+            obj.limit = Math.round(message.limit);
+        }
+        if (message.offset !== 0) {
+            obj.offset = Math.round(message.offset);
+        }
+        return obj;
+    },
+    create(base) {
+        return QueryAllTransfersRequest.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseQueryAllTransfersRequest();
+        message.identityPublicKey = object.identityPublicKey ?? new Uint8Array(0);
+        message.limit = object.limit ?? 0;
+        message.offset = object.offset ?? 0;
+        return message;
+    },
+};
+function createBaseQueryAllTransfersResponse() {
+    return { transfers: [], offset: 0 };
+}
+export const QueryAllTransfersResponse = {
+    encode(message, writer = new BinaryWriter()) {
+        for (const v of message.transfers) {
+            Transfer.encode(v, writer.uint32(10).fork()).join();
+        }
+        if (message.offset !== 0) {
+            writer.uint32(16).int64(message.offset);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseQueryAllTransfersResponse();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1: {
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.transfers.push(Transfer.decode(reader, reader.uint32()));
+                    continue;
+                }
+                case 2: {
+                    if (tag !== 16) {
+                        break;
+                    }
+                    message.offset = longToNumber(reader.int64());
+                    continue;
+                }
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skip(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            transfers: globalThis.Array.isArray(object?.transfers)
+                ? object.transfers.map((e) => Transfer.fromJSON(e))
+                : [],
+            offset: isSet(object.offset) ? globalThis.Number(object.offset) : 0,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.transfers?.length) {
+            obj.transfers = message.transfers.map((e) => Transfer.toJSON(e));
+        }
+        if (message.offset !== 0) {
+            obj.offset = Math.round(message.offset);
+        }
+        return obj;
+    },
+    create(base) {
+        return QueryAllTransfersResponse.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseQueryAllTransfersResponse();
+        message.transfers = object.transfers?.map((e) => Transfer.fromPartial(e)) || [];
+        message.offset = object.offset ?? 0;
+        return message;
+    },
+};
 export const SparkServiceDefinition = {
     name: "SparkService",
     fullName: "spark.SparkService",
@@ -8942,6 +9097,14 @@ export const SparkServiceDefinition = {
             requestType: QueryPendingTransfersRequest,
             requestStream: false,
             responseType: QueryPendingTransfersResponse,
+            responseStream: false,
+            options: {},
+        },
+        query_all_transfers: {
+            name: "query_all_transfers",
+            requestType: QueryAllTransfersRequest,
+            requestStream: false,
+            responseType: QueryAllTransfersResponse,
             responseStream: false,
             options: {},
         },

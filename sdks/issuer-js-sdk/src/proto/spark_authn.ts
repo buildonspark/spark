@@ -27,7 +27,9 @@ export interface ProtectedChallenge {
   /** Protocol version for backward compatibility */
   version: number;
   /** The core challenge data */
-  challenge: Challenge | undefined;
+  challenge:
+    | Challenge
+    | undefined;
   /** Server's HMAC of the Challenge */
   serverHmac: Uint8Array;
 }
@@ -47,7 +49,9 @@ export interface GetChallengeResponse {
 /** Request to verify a signed challenge */
 export interface VerifyChallengeRequest {
   /** The protected challenge from the server */
-  protectedChallenge: ProtectedChallenge | undefined;
+  protectedChallenge:
+    | ProtectedChallenge
+    | undefined;
   /** Client's secp256k1 signature of the Challenge */
   signature: Uint8Array;
   /** Client's public key (uncompressed secp256k1 public key) */
@@ -63,19 +67,11 @@ export interface VerifyChallengeResponse {
 }
 
 function createBaseChallenge(): Challenge {
-  return {
-    version: 0,
-    timestamp: 0,
-    nonce: new Uint8Array(0),
-    publicKey: new Uint8Array(0),
-  };
+  return { version: 0, timestamp: 0, nonce: new Uint8Array(0), publicKey: new Uint8Array(0) };
 }
 
 export const Challenge: MessageFns<Challenge> = {
-  encode(
-    message: Challenge,
-    writer: BinaryWriter = new BinaryWriter(),
-  ): BinaryWriter {
+  encode(message: Challenge, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.version !== 0) {
       writer.uint32(8).int32(message.version);
     }
@@ -92,8 +88,7 @@ export const Challenge: MessageFns<Challenge> = {
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): Challenge {
-    const reader =
-      input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseChallenge();
     while (reader.pos < end) {
@@ -143,15 +138,9 @@ export const Challenge: MessageFns<Challenge> = {
   fromJSON(object: any): Challenge {
     return {
       version: isSet(object.version) ? globalThis.Number(object.version) : 0,
-      timestamp: isSet(object.timestamp)
-        ? globalThis.Number(object.timestamp)
-        : 0,
-      nonce: isSet(object.nonce)
-        ? bytesFromBase64(object.nonce)
-        : new Uint8Array(0),
-      publicKey: isSet(object.publicKey)
-        ? bytesFromBase64(object.publicKey)
-        : new Uint8Array(0),
+      timestamp: isSet(object.timestamp) ? globalThis.Number(object.timestamp) : 0,
+      nonce: isSet(object.nonce) ? bytesFromBase64(object.nonce) : new Uint8Array(0),
+      publicKey: isSet(object.publicKey) ? bytesFromBase64(object.publicKey) : new Uint8Array(0),
     };
   },
 
@@ -190,10 +179,7 @@ function createBaseProtectedChallenge(): ProtectedChallenge {
 }
 
 export const ProtectedChallenge: MessageFns<ProtectedChallenge> = {
-  encode(
-    message: ProtectedChallenge,
-    writer: BinaryWriter = new BinaryWriter(),
-  ): BinaryWriter {
+  encode(message: ProtectedChallenge, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.version !== 0) {
       writer.uint32(8).int32(message.version);
     }
@@ -206,12 +192,8 @@ export const ProtectedChallenge: MessageFns<ProtectedChallenge> = {
     return writer;
   },
 
-  decode(
-    input: BinaryReader | Uint8Array,
-    length?: number,
-  ): ProtectedChallenge {
-    const reader =
-      input instanceof BinaryReader ? input : new BinaryReader(input);
+  decode(input: BinaryReader | Uint8Array, length?: number): ProtectedChallenge {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseProtectedChallenge();
     while (reader.pos < end) {
@@ -253,12 +235,8 @@ export const ProtectedChallenge: MessageFns<ProtectedChallenge> = {
   fromJSON(object: any): ProtectedChallenge {
     return {
       version: isSet(object.version) ? globalThis.Number(object.version) : 0,
-      challenge: isSet(object.challenge)
-        ? Challenge.fromJSON(object.challenge)
-        : undefined,
-      serverHmac: isSet(object.serverHmac)
-        ? bytesFromBase64(object.serverHmac)
-        : new Uint8Array(0),
+      challenge: isSet(object.challenge) ? Challenge.fromJSON(object.challenge) : undefined,
+      serverHmac: isSet(object.serverHmac) ? bytesFromBase64(object.serverHmac) : new Uint8Array(0),
     };
   },
 
@@ -282,10 +260,9 @@ export const ProtectedChallenge: MessageFns<ProtectedChallenge> = {
   fromPartial(object: DeepPartial<ProtectedChallenge>): ProtectedChallenge {
     const message = createBaseProtectedChallenge();
     message.version = object.version ?? 0;
-    message.challenge =
-      object.challenge !== undefined && object.challenge !== null
-        ? Challenge.fromPartial(object.challenge)
-        : undefined;
+    message.challenge = (object.challenge !== undefined && object.challenge !== null)
+      ? Challenge.fromPartial(object.challenge)
+      : undefined;
     message.serverHmac = object.serverHmac ?? new Uint8Array(0);
     return message;
   },
@@ -296,22 +273,15 @@ function createBaseGetChallengeRequest(): GetChallengeRequest {
 }
 
 export const GetChallengeRequest: MessageFns<GetChallengeRequest> = {
-  encode(
-    message: GetChallengeRequest,
-    writer: BinaryWriter = new BinaryWriter(),
-  ): BinaryWriter {
+  encode(message: GetChallengeRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.publicKey.length !== 0) {
       writer.uint32(10).bytes(message.publicKey);
     }
     return writer;
   },
 
-  decode(
-    input: BinaryReader | Uint8Array,
-    length?: number,
-  ): GetChallengeRequest {
-    const reader =
-      input instanceof BinaryReader ? input : new BinaryReader(input);
+  decode(input: BinaryReader | Uint8Array, length?: number): GetChallengeRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseGetChallengeRequest();
     while (reader.pos < end) {
@@ -335,11 +305,7 @@ export const GetChallengeRequest: MessageFns<GetChallengeRequest> = {
   },
 
   fromJSON(object: any): GetChallengeRequest {
-    return {
-      publicKey: isSet(object.publicKey)
-        ? bytesFromBase64(object.publicKey)
-        : new Uint8Array(0),
-    };
+    return { publicKey: isSet(object.publicKey) ? bytesFromBase64(object.publicKey) : new Uint8Array(0) };
   },
 
   toJSON(message: GetChallengeRequest): unknown {
@@ -365,25 +331,15 @@ function createBaseGetChallengeResponse(): GetChallengeResponse {
 }
 
 export const GetChallengeResponse: MessageFns<GetChallengeResponse> = {
-  encode(
-    message: GetChallengeResponse,
-    writer: BinaryWriter = new BinaryWriter(),
-  ): BinaryWriter {
+  encode(message: GetChallengeResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.protectedChallenge !== undefined) {
-      ProtectedChallenge.encode(
-        message.protectedChallenge,
-        writer.uint32(10).fork(),
-      ).join();
+      ProtectedChallenge.encode(message.protectedChallenge, writer.uint32(10).fork()).join();
     }
     return writer;
   },
 
-  decode(
-    input: BinaryReader | Uint8Array,
-    length?: number,
-  ): GetChallengeResponse {
-    const reader =
-      input instanceof BinaryReader ? input : new BinaryReader(input);
+  decode(input: BinaryReader | Uint8Array, length?: number): GetChallengeResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseGetChallengeResponse();
     while (reader.pos < end) {
@@ -394,10 +350,7 @@ export const GetChallengeResponse: MessageFns<GetChallengeResponse> = {
             break;
           }
 
-          message.protectedChallenge = ProtectedChallenge.decode(
-            reader,
-            reader.uint32(),
-          );
+          message.protectedChallenge = ProtectedChallenge.decode(reader, reader.uint32());
           continue;
         }
       }
@@ -420,9 +373,7 @@ export const GetChallengeResponse: MessageFns<GetChallengeResponse> = {
   toJSON(message: GetChallengeResponse): unknown {
     const obj: any = {};
     if (message.protectedChallenge !== undefined) {
-      obj.protectedChallenge = ProtectedChallenge.toJSON(
-        message.protectedChallenge,
-      );
+      obj.protectedChallenge = ProtectedChallenge.toJSON(message.protectedChallenge);
     }
     return obj;
   },
@@ -432,33 +383,21 @@ export const GetChallengeResponse: MessageFns<GetChallengeResponse> = {
   },
   fromPartial(object: DeepPartial<GetChallengeResponse>): GetChallengeResponse {
     const message = createBaseGetChallengeResponse();
-    message.protectedChallenge =
-      object.protectedChallenge !== undefined &&
-      object.protectedChallenge !== null
-        ? ProtectedChallenge.fromPartial(object.protectedChallenge)
-        : undefined;
+    message.protectedChallenge = (object.protectedChallenge !== undefined && object.protectedChallenge !== null)
+      ? ProtectedChallenge.fromPartial(object.protectedChallenge)
+      : undefined;
     return message;
   },
 };
 
 function createBaseVerifyChallengeRequest(): VerifyChallengeRequest {
-  return {
-    protectedChallenge: undefined,
-    signature: new Uint8Array(0),
-    publicKey: new Uint8Array(0),
-  };
+  return { protectedChallenge: undefined, signature: new Uint8Array(0), publicKey: new Uint8Array(0) };
 }
 
 export const VerifyChallengeRequest: MessageFns<VerifyChallengeRequest> = {
-  encode(
-    message: VerifyChallengeRequest,
-    writer: BinaryWriter = new BinaryWriter(),
-  ): BinaryWriter {
+  encode(message: VerifyChallengeRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.protectedChallenge !== undefined) {
-      ProtectedChallenge.encode(
-        message.protectedChallenge,
-        writer.uint32(10).fork(),
-      ).join();
+      ProtectedChallenge.encode(message.protectedChallenge, writer.uint32(10).fork()).join();
     }
     if (message.signature.length !== 0) {
       writer.uint32(18).bytes(message.signature);
@@ -469,12 +408,8 @@ export const VerifyChallengeRequest: MessageFns<VerifyChallengeRequest> = {
     return writer;
   },
 
-  decode(
-    input: BinaryReader | Uint8Array,
-    length?: number,
-  ): VerifyChallengeRequest {
-    const reader =
-      input instanceof BinaryReader ? input : new BinaryReader(input);
+  decode(input: BinaryReader | Uint8Array, length?: number): VerifyChallengeRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseVerifyChallengeRequest();
     while (reader.pos < end) {
@@ -485,10 +420,7 @@ export const VerifyChallengeRequest: MessageFns<VerifyChallengeRequest> = {
             break;
           }
 
-          message.protectedChallenge = ProtectedChallenge.decode(
-            reader,
-            reader.uint32(),
-          );
+          message.protectedChallenge = ProtectedChallenge.decode(reader, reader.uint32());
           continue;
         }
         case 2: {
@@ -521,21 +453,15 @@ export const VerifyChallengeRequest: MessageFns<VerifyChallengeRequest> = {
       protectedChallenge: isSet(object.protectedChallenge)
         ? ProtectedChallenge.fromJSON(object.protectedChallenge)
         : undefined,
-      signature: isSet(object.signature)
-        ? bytesFromBase64(object.signature)
-        : new Uint8Array(0),
-      publicKey: isSet(object.publicKey)
-        ? bytesFromBase64(object.publicKey)
-        : new Uint8Array(0),
+      signature: isSet(object.signature) ? bytesFromBase64(object.signature) : new Uint8Array(0),
+      publicKey: isSet(object.publicKey) ? bytesFromBase64(object.publicKey) : new Uint8Array(0),
     };
   },
 
   toJSON(message: VerifyChallengeRequest): unknown {
     const obj: any = {};
     if (message.protectedChallenge !== undefined) {
-      obj.protectedChallenge = ProtectedChallenge.toJSON(
-        message.protectedChallenge,
-      );
+      obj.protectedChallenge = ProtectedChallenge.toJSON(message.protectedChallenge);
     }
     if (message.signature.length !== 0) {
       obj.signature = base64FromBytes(message.signature);
@@ -549,15 +475,11 @@ export const VerifyChallengeRequest: MessageFns<VerifyChallengeRequest> = {
   create(base?: DeepPartial<VerifyChallengeRequest>): VerifyChallengeRequest {
     return VerifyChallengeRequest.fromPartial(base ?? {});
   },
-  fromPartial(
-    object: DeepPartial<VerifyChallengeRequest>,
-  ): VerifyChallengeRequest {
+  fromPartial(object: DeepPartial<VerifyChallengeRequest>): VerifyChallengeRequest {
     const message = createBaseVerifyChallengeRequest();
-    message.protectedChallenge =
-      object.protectedChallenge !== undefined &&
-      object.protectedChallenge !== null
-        ? ProtectedChallenge.fromPartial(object.protectedChallenge)
-        : undefined;
+    message.protectedChallenge = (object.protectedChallenge !== undefined && object.protectedChallenge !== null)
+      ? ProtectedChallenge.fromPartial(object.protectedChallenge)
+      : undefined;
     message.signature = object.signature ?? new Uint8Array(0);
     message.publicKey = object.publicKey ?? new Uint8Array(0);
     return message;
@@ -569,10 +491,7 @@ function createBaseVerifyChallengeResponse(): VerifyChallengeResponse {
 }
 
 export const VerifyChallengeResponse: MessageFns<VerifyChallengeResponse> = {
-  encode(
-    message: VerifyChallengeResponse,
-    writer: BinaryWriter = new BinaryWriter(),
-  ): BinaryWriter {
+  encode(message: VerifyChallengeResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.sessionToken !== "") {
       writer.uint32(10).string(message.sessionToken);
     }
@@ -582,12 +501,8 @@ export const VerifyChallengeResponse: MessageFns<VerifyChallengeResponse> = {
     return writer;
   },
 
-  decode(
-    input: BinaryReader | Uint8Array,
-    length?: number,
-  ): VerifyChallengeResponse {
-    const reader =
-      input instanceof BinaryReader ? input : new BinaryReader(input);
+  decode(input: BinaryReader | Uint8Array, length?: number): VerifyChallengeResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseVerifyChallengeResponse();
     while (reader.pos < end) {
@@ -620,12 +535,8 @@ export const VerifyChallengeResponse: MessageFns<VerifyChallengeResponse> = {
 
   fromJSON(object: any): VerifyChallengeResponse {
     return {
-      sessionToken: isSet(object.sessionToken)
-        ? globalThis.String(object.sessionToken)
-        : "",
-      expirationTimestamp: isSet(object.expirationTimestamp)
-        ? globalThis.Number(object.expirationTimestamp)
-        : 0,
+      sessionToken: isSet(object.sessionToken) ? globalThis.String(object.sessionToken) : "",
+      expirationTimestamp: isSet(object.expirationTimestamp) ? globalThis.Number(object.expirationTimestamp) : 0,
     };
   },
 
@@ -643,9 +554,7 @@ export const VerifyChallengeResponse: MessageFns<VerifyChallengeResponse> = {
   create(base?: DeepPartial<VerifyChallengeResponse>): VerifyChallengeResponse {
     return VerifyChallengeResponse.fromPartial(base ?? {});
   },
-  fromPartial(
-    object: DeepPartial<VerifyChallengeResponse>,
-  ): VerifyChallengeResponse {
+  fromPartial(object: DeepPartial<VerifyChallengeResponse>): VerifyChallengeResponse {
     const message = createBaseVerifyChallengeResponse();
     message.sessionToken = object.sessionToken ?? "";
     message.expirationTimestamp = object.expirationTimestamp ?? 0;
@@ -730,28 +639,14 @@ function base64FromBytes(arr: Uint8Array): string {
   }
 }
 
-type Builtin =
-  | Date
-  | Function
-  | Uint8Array
-  | string
-  | number
-  | boolean
-  | undefined;
+type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 
-export type DeepPartial<T> = T extends Builtin
-  ? T
-  : T extends globalThis.Array<infer U>
-    ? globalThis.Array<DeepPartial<U>>
-    : T extends ReadonlyArray<infer U>
-      ? ReadonlyArray<DeepPartial<U>>
-      : T extends { $case: string }
-        ? { [K in keyof Omit<T, "$case">]?: DeepPartial<T[K]> } & {
-            $case: T["$case"];
-          }
-        : T extends {}
-          ? { [K in keyof T]?: DeepPartial<T[K]> }
-          : Partial<T>;
+export type DeepPartial<T> = T extends Builtin ? T
+  : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>>
+  : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>>
+  : T extends { $case: string } ? { [K in keyof Omit<T, "$case">]?: DeepPartial<T[K]> } & { $case: T["$case"] }
+  : T extends {} ? { [K in keyof T]?: DeepPartial<T[K]> }
+  : Partial<T>;
 
 function longToNumber(int64: { toString(): string }): number {
   const num = globalThis.Number(int64.toString());

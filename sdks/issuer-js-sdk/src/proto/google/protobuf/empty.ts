@@ -18,7 +18,8 @@ export const protobufPackage = "google.protobuf";
  *       rpc Bar(google.protobuf.Empty) returns (google.protobuf.Empty);
  *     }
  */
-export interface Empty {}
+export interface Empty {
+}
 
 function createBaseEmpty(): Empty {
   return {};
@@ -30,8 +31,7 @@ export const Empty: MessageFns<Empty> = {
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): Empty {
-    const reader =
-      input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseEmpty();
     while (reader.pos < end) {
@@ -64,28 +64,14 @@ export const Empty: MessageFns<Empty> = {
   },
 };
 
-type Builtin =
-  | Date
-  | Function
-  | Uint8Array
-  | string
-  | number
-  | boolean
-  | undefined;
+type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 
-export type DeepPartial<T> = T extends Builtin
-  ? T
-  : T extends globalThis.Array<infer U>
-    ? globalThis.Array<DeepPartial<U>>
-    : T extends ReadonlyArray<infer U>
-      ? ReadonlyArray<DeepPartial<U>>
-      : T extends { $case: string }
-        ? { [K in keyof Omit<T, "$case">]?: DeepPartial<T[K]> } & {
-            $case: T["$case"];
-          }
-        : T extends {}
-          ? { [K in keyof T]?: DeepPartial<T[K]> }
-          : Partial<T>;
+export type DeepPartial<T> = T extends Builtin ? T
+  : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>>
+  : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>>
+  : T extends { $case: string } ? { [K in keyof Omit<T, "$case">]?: DeepPartial<T[K]> } & { $case: T["$case"] }
+  : T extends {} ? { [K in keyof T]?: DeepPartial<T[K]> }
+  : Partial<T>;
 
 export interface MessageFns<T> {
   encode(message: T, writer?: BinaryWriter): BinaryWriter;

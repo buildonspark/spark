@@ -61,14 +61,24 @@ describe("token integration test", () => {
       .getSigner()
       .getIdentityPublicKey();
 
-    issuerWallet.transferIssuerTokens(
+    await issuerWallet.transferIssuerTokens(
       tokenAmount,
       bytesToHex(userWalletPublicKey)
     );
 
-    await issuerWallet.freezeIssuerTokens(userWalletPublicKey);
+    // Freeze tokens and validate the return value
+    const freezeResult = await issuerWallet.freezeIssuerTokens(
+      userWalletPublicKey
+    );
+    expect(freezeResult.impactedLeafIds.length).toBe(1);
+    expect(freezeResult.impactedTokenAmount).toBe(1000n);
 
-    await issuerWallet.unfreezeIssuerTokens(userWalletPublicKey);
+    // Unfreeze tokens and validate the return value
+    const unfreezeResult = await issuerWallet.unfreezeIssuerTokens(
+      userWalletPublicKey
+    );
+    expect(unfreezeResult.impactedLeafIds.length).toBe(1);
+    expect(unfreezeResult.impactedTokenAmount).toBe(1000n);
   });
 
   it("should burn tokens", async () => {

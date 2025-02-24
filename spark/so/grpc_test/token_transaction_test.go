@@ -478,7 +478,7 @@ func TestFreezeAndUnfreezeTokens(t *testing.T) {
 	}
 
 	// Convert frozen amount bytes to big.Int for comparison
-	frozenAmount := new(big.Int).SetBytes(freezeResponse.ImpactedTokenAmount[0])
+	frozenAmount := new(big.Int).SetBytes(freezeResponse.ImpactedTokenAmount)
 
 	// Calculate total amount from transaction output leaves
 	expectedAmount := new(big.Int).SetBytes(int64ToUint128Bytes(0, TestIssueLeaf1Amount))
@@ -541,7 +541,7 @@ func TestFreezeAndUnfreezeTokens(t *testing.T) {
 	)
 
 	// Convert frozen amount bytes to big.Int for comparison
-	thawedAmount := new(big.Int).SetBytes(unfreezeResponse.ImpactedTokenAmount[0])
+	thawedAmount := new(big.Int).SetBytes(unfreezeResponse.ImpactedTokenAmount)
 
 	if thawedAmount.Cmp(expectedAmount) != 0 {
 		t.Errorf("thawed amount %s does not match expected amount %s",

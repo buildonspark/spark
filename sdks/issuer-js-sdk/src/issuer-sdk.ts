@@ -72,55 +72,73 @@ export class IssuerWallet {
    * TODO: Add support for minting to recipient address.
    */
   async mintTokens(amountToMint: bigint) {
-    if (this.isSparkInitialized()) {
-      await this.sparkWallet.mintIssuerTokens(amountToMint);
+    if (!this.isSparkInitialized()) {
+      throw new Error("Spark wallet not initialized");
     }
+
+    await this.sparkWallet.mintIssuerTokens(amountToMint);
   }
 
   /**
    * Transfers tokens to the specified receipient.
    */
   async transferTokens(amountToTransfer: bigint, recipientPublicKey: string) {
-    if (this.isSparkInitialized()) {
-      await this.sparkWallet.transferIssuerTokens(
-        amountToTransfer,
-        recipientPublicKey
-      );
+    if (!this.isSparkInitialized()) {
+      throw new Error("Spark wallet not initialized");
     }
+
+    await this.sparkWallet.transferIssuerTokens(
+      amountToTransfer,
+      recipientPublicKey
+    );
   }
 
   async consolidateTokens() {
-    if (this.isSparkInitialized()) {
-      await this.sparkWallet.consolidateIssuerTokenLeaves();
+    if (!this.isSparkInitialized()) {
+      throw new Error("Spark wallet not initialized");
     }
+
+    await this.sparkWallet.consolidateIssuerTokenLeaves();
   }
 
   /**
    * Burns issuer tokens at the specified receipient.
    */
   async burnTokens(amountToBurn: bigint) {
-    if (this.isSparkInitialized()) {
-      await this.sparkWallet.burnIssuerTokens(amountToBurn);
+    if (!this.isSparkInitialized()) {
+      throw new Error("Spark wallet not initialized");
     }
+
+    await this.sparkWallet.burnIssuerTokens(amountToBurn);
   }
 
   /**
    * Freezes tokens at the specified public key.
    */
-  async freezeTokens(freezePublicKey: string) {
-    if (this.isSparkInitialized()) {
-      await this.sparkWallet.freezeIssuerTokens(hexToBytes(freezePublicKey));
+  async freezeTokens(freezePublicKey: string): Promise<{
+    impactedLeafIds: string[];
+    impactedTokenAmount: bigint;
+  }> {
+    if (!this.isSparkInitialized()) {
+      throw new Error("Spark wallet not initialized");
     }
+    return await this.sparkWallet.freezeIssuerTokens(
+      hexToBytes(freezePublicKey)
+    );
   }
 
   /**
    * Unfreezes tokens at the specified public key.
    */
-  async unfreezeTokens(unfreezePublicKey: string) {
-    if (this.isSparkInitialized()) {
-      await this.sparkWallet.unfreezeIssuerTokens(
-        hexToBytes(unfreezePublicKey)
-      );
+  async unfreezeTokens(unfreezePublicKey: string): Promise<{
+    impactedLeafIds: string[];
+    impactedTokenAmount: bigint;
+  }> {
+    if (!this.isSparkInitialized()) {
+      throw new Error("Spark wallet not initialized");
     }
+    return await this.sparkWallet.unfreezeIssuerTokens(
+      hexToBytes(unfreezePublicKey)
+    );
   }
 }

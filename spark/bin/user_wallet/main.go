@@ -583,11 +583,11 @@ func main() {
 			}
 
 			fmt.Printf("Freezing tokens for owner public key: %s\n", args[0])
-			numLeaves, totalAmount, err := cli.wallet.FreezeTokens(context.Background(), ownerPublicKey)
+			leafIDs, totalAmount, err := cli.wallet.FreezeTokens(context.Background(), ownerPublicKey)
 			if err != nil {
 				return fmt.Errorf("failed to freeze tokens: %w", err)
 			}
-			fmt.Printf("Successfully froze %d leaves with total amount of %d tokens\n", numLeaves, totalAmount)
+			fmt.Printf("Successfully froze %d leaves with total amount of %d tokens\n", len(leafIDs), totalAmount)
 			return nil
 		},
 	})
@@ -612,11 +612,11 @@ func main() {
 			}
 
 			fmt.Printf("Unfreezing tokens for owner public key: %s\n", args[0])
-			numLeaves, totalAmount, err := cli.wallet.UnfreezeTokens(context.Background(), ownerPublicKey)
+			leafIDs, totalAmount, err := cli.wallet.UnfreezeTokens(context.Background(), ownerPublicKey)
 			if err != nil {
 				return fmt.Errorf("failed to unfreeze tokens: %w", err)
 			}
-			fmt.Printf("Successfully unfroze %d leaves with total amount of %d tokens\n", numLeaves, totalAmount)
+			fmt.Printf("Successfully unfroze %d leaves with total amount of %d tokens\n", len(leafIDs), totalAmount)
 			return nil
 		},
 	})

@@ -4037,6 +4037,8 @@ func (m *FreezeTokensResponse) validate(all bool) error {
 
 	}
 
+	// no validation rules for ImpactedTokenAmount
+
 	if len(errors) > 0 {
 		return FreezeTokensResponseMultiError(errors)
 	}
