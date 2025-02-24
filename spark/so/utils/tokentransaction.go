@@ -405,11 +405,24 @@ func ValidateOwnershipSignature(ownershipSignature []byte, partialTokenTransacti
 	if partialTokenTransactionHash == nil {
 		return fmt.Errorf("partial token transaction hash cannot be nil")
 	}
+	if ownerPublicKey == nil {
+		return fmt.Errorf("owner public key cannot be nil")
+	}
 
-	sig, _ := ecdsa.ParseDERSignature(ownershipSignature)
+	sig, err := ecdsa.ParseDERSignature(ownershipSignature)
+	if err != nil {
+		return fmt.Errorf("failed to parse DER signature: %w", err)
+	}
+	if sig == nil {
+		return fmt.Errorf("parsed signature is nil")
+	}
+
 	pubKey, err := secp256k1.ParsePubKey(ownerPublicKey)
 	if err != nil {
 		return fmt.Errorf("failed to parse public key: %w", err)
+	}
+	if pubKey == nil {
+		return fmt.Errorf("parsed public key is nil")
 	}
 
 	if !sig.Verify(partialTokenTransactionHash, pubKey) {
