@@ -244,6 +244,10 @@ export class SparkWallet {
       }
     }
 
+    if (amount < targetAmount) {
+      throw new Error("Not enough leaves to cover target amount");
+    }
+
     if (amount !== targetAmount) {
       await this.requestLeavesSwap({ targetAmount });
 
