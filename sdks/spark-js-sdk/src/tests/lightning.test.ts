@@ -1,4 +1,4 @@
-import { afterEach, beforeAll, describe, expect, it, xit } from "@jest/globals";
+import { afterEach, beforeAll, describe, expect, it } from "@jest/globals";
 import { hexToBytes } from "@noble/curves/abstract/utils";
 import { equalBytes, sha256 } from "@scure/btc-signer/utils";
 import { TransferStatus } from "../proto/spark.js";
@@ -6,9 +6,9 @@ import { WalletConfigService } from "../services/config.js";
 import { ConnectionManager } from "../services/connection.js";
 import { LightningService } from "../services/lightning.js";
 import { LeafKeyTweak, TransferService } from "../services/transfer.js";
-import { SparkWallet } from "../spark-sdk.js";
 import { Network } from "../utils/network.js";
 import { createNewTree, getTestWalletConfig } from "./test-util.js";
+import { SparkWalletTesting } from "./utils/spark-testing-wallet.js";
 import { BitcoinFaucet } from "./utils/test-faucet.js";
 
 async function cleanUp() {
@@ -33,31 +33,29 @@ const fakeInvoiceCreator = async () => {
 };
 
 describe("LightningService", () => {
-  let userWallet: SparkWallet;
+  let userWallet: SparkWalletTesting;
   let userConfig: WalletConfigService;
   let lightningService: LightningService;
   let transferService: TransferService;
 
-  let sspWallet: SparkWallet;
+  let sspWallet: SparkWalletTesting;
   let sspConfig: WalletConfigService;
   let sspLightningService: LightningService;
   let sspTransferService: TransferService;
 
   // Skip all tests if running in GitHub Actions
-  const testFn = process.env.GITHUB_ACTIONS ? it.skip : xit;
+  const testFn = process.env.GITHUB_ACTIONS ? it.skip : it;
 
   beforeAll(async () => {
-    userWallet = new SparkWallet(Network.LOCAL);
-    const mnemonic = await userWallet.generateMnemonic();
-    await userWallet.createSparkWallet(mnemonic);
+    userWallet = new SparkWalletTesting(Network.LOCAL);
+    await userWallet.initWalletFromMnemonic();
     userConfig = new WalletConfigService(Network.LOCAL, userWallet.getSigner());
     const connectionManager = new ConnectionManager(userConfig);
     lightningService = new LightningService(userConfig, connectionManager);
     transferService = new TransferService(userConfig, connectionManager);
 
-    sspWallet = new SparkWallet(Network.LOCAL);
-    const sspMnemonic = await sspWallet.generateMnemonic();
-    await sspWallet.createSparkWallet(sspMnemonic);
+    sspWallet = new SparkWalletTesting(Network.LOCAL);
+    await sspWallet.initWalletFromMnemonic();
 
     sspConfig = new WalletConfigService(Network.LOCAL, sspWallet.getSigner());
     const sspConnectionManager = new ConnectionManager(sspConfig);

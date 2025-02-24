@@ -7,10 +7,10 @@ import { WalletConfigService } from "../services/config.js";
 import { ConnectionManager } from "../services/connection.js";
 import { CoopExitService } from "../services/coop-exit.js";
 import { TransferService } from "../services/transfer.js";
-import { SparkWallet } from "../spark-sdk.js";
 import { getP2TRAddressFromPublicKey, getP2TRScriptFromPublicKey, getTxId, getTxIdNoReverse, } from "../utils/bitcoin.js";
 import { getNetwork, Network } from "../utils/network.js";
 import { createNewTree } from "./test-util.js";
+import { SparkWalletTesting } from "./utils/spark-testing-wallet.js";
 import { BitcoinFaucet } from "./utils/test-faucet.js";
 describe("coop exit", () => {
     // Skip all tests if running in GitHub Actions
@@ -20,9 +20,8 @@ describe("coop exit", () => {
         const faucetCoin = await faucet.fund();
         const amountSats = 100000n;
         // Setup user with leaves
-        const userWallet = new SparkWallet(Network.LOCAL);
-        const userMnemonic = await userWallet.generateMnemonic();
-        await userWallet.createSparkWallet(userMnemonic);
+        const userWallet = new SparkWalletTesting(Network.LOCAL);
+        await userWallet.initWalletFromMnemonic();
         const configService = new WalletConfigService(Network.LOCAL, userWallet.getSigner());
         const connectionManager = new ConnectionManager(configService);
         const coopExitService = new CoopExitService(configService, connectionManager);
@@ -31,9 +30,9 @@ describe("coop exit", () => {
             .generatePublicKey(sha256("leafPubKey"));
         const rootNode = await createNewTree(userWallet, leafPubKey, faucet, amountSats);
         // Setup ssp
-        const sspWallet = new SparkWallet(Network.LOCAL);
-        const sspMnemonic = await sspWallet.generateMnemonic();
-        const sspPubkey = await sspWallet.createSparkWallet(sspMnemonic);
+        const sspWallet = new SparkWalletTesting(Network.LOCAL);
+        await sspWallet.initWalletFromMnemonic();
+        const sspPubkey = await sspWallet.getIdentityPublicKey();
         const sspConfigService = new WalletConfigService(Network.LOCAL, sspWallet.getSigner());
         const sspConnectionManager = new ConnectionManager(sspConfigService);
         const sspTransferService = new TransferService(sspConfigService, sspConnectionManager);

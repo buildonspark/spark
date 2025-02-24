@@ -8,7 +8,6 @@ import { WalletConfigService } from "../services/config.js";
 import { ConnectionManager } from "../services/connection.js";
 import { CoopExitService } from "../services/coop-exit.js";
 import { LeafKeyTweak, TransferService } from "../services/transfer.js";
-import { SparkWallet } from "../spark-sdk.js";
 import {
   getP2TRAddressFromPublicKey,
   getP2TRScriptFromPublicKey,
@@ -17,8 +16,8 @@ import {
 } from "../utils/bitcoin.js";
 import { getNetwork, Network } from "../utils/network.js";
 import { createNewTree } from "./test-util.js";
+import { SparkWalletTesting } from "./utils/spark-testing-wallet.js";
 import { BitcoinFaucet } from "./utils/test-faucet.js";
-
 describe("coop exit", () => {
   // Skip all tests if running in GitHub Actions
   const testFn = process.env.GITHUB_ACTIONS ? it.skip : it;
@@ -37,9 +36,8 @@ describe("coop exit", () => {
       const amountSats = 100_000n;
 
       // Setup user with leaves
-      const userWallet = new SparkWallet(Network.LOCAL);
-      const userMnemonic = await userWallet.generateMnemonic();
-      await userWallet.createSparkWallet(userMnemonic);
+      const userWallet = new SparkWalletTesting(Network.LOCAL);
+      await userWallet.initWalletFromMnemonic();
 
       const configService = new WalletConfigService(
         Network.LOCAL,
@@ -62,9 +60,9 @@ describe("coop exit", () => {
       );
 
       // Setup ssp
-      const sspWallet = new SparkWallet(Network.LOCAL);
-      const sspMnemonic = await sspWallet.generateMnemonic();
-      const sspPubkey = await sspWallet.createSparkWallet(sspMnemonic);
+      const sspWallet = new SparkWalletTesting(Network.LOCAL);
+      await sspWallet.initWalletFromMnemonic();
+      const sspPubkey = await sspWallet.getIdentityPublicKey();
 
       const sspConfigService = new WalletConfigService(
         Network.LOCAL,

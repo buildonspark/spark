@@ -1,9 +1,9 @@
 import { describe, expect, it } from "@jest/globals";
 import { bytesToHex } from "@noble/curves/abstract/utils";
-import { SparkWallet } from "../spark-sdk.js";
 import { getTxFromRawTxBytes, getTxId } from "../utils/bitcoin.js";
 import { Network } from "../utils/network.js";
 import { createDummyTx } from "../utils/wasm.js";
+import { SparkWalletTesting } from "./utils/spark-testing-wallet.js";
 
 describe("Tree Creation", () => {
   // Skip all tests if running in GitHub Actions
@@ -12,9 +12,8 @@ describe("Tree Creation", () => {
   testFn(
     "test tree creation address generation",
     async () => {
-      const wallet = new SparkWallet(Network.LOCAL);
-      const mnemonic = await wallet.generateMnemonic();
-      await wallet.createSparkWallet(mnemonic);
+      const wallet = new SparkWalletTesting(Network.LOCAL);
+      await wallet.initWalletFromMnemonic();
 
       const pubKey = await wallet.getSigner().generatePublicKey();
 
@@ -35,12 +34,6 @@ describe("Tree Creation", () => {
       if (!txid) {
         throw new Error("txid not found");
       }
-
-      // Set mock transaction
-      // await mockClient.set_mock_onchain_tx({
-      //   txid,
-      //   tx: depositTxHex,
-      // });
 
       const treeResp = await wallet.generateDepositAddressForTree(
         vout,

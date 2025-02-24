@@ -25,9 +25,6 @@ export class WalletConfigService {
   public readonly signer: SparkSigner;
 
   constructor(network: Network, signer?: SparkSigner) {
-    // TODO: differentiate between mainnet, regtest, and local
-    // local config is LOCAL_WALLET_CONFIG - uses local signing operators
-    console.log("network", network === Network.LOCAL);
     this.config =
       network === Network.LOCAL ? LOCAL_WALLET_CONFIG : REGTEST_WALLET_CONFIG;
     this.signer = signer || new DefaultSparkSigner();

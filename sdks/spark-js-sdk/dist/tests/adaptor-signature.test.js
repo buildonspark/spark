@@ -1,16 +1,15 @@
 import { describe, expect, it } from "@jest/globals";
 import { schnorr, secp256k1 } from "@noble/curves/secp256k1";
 import { sha256 } from "@scure/btc-signer/utils";
-import { SparkWallet } from "../spark-sdk.js";
 import { applyAdaptorToSignature, generateAdaptorFromSignature, validateOutboundAdaptorSignature, } from "../utils/adaptor-signature.js";
 import { Network } from "../utils/network.js";
+import { SparkWalletTesting } from "./utils/spark-testing-wallet.js";
 describe("adaptor signature", () => {
     const testFn = process.env.GITHUB_ACTIONS ? it.skip : it;
     testFn("should validate outbound adaptor signature", async () => {
         let failures = 0;
-        const wallet = new SparkWallet(Network.LOCAL);
-        const mnemonic = await wallet.generateMnemonic();
-        await wallet.createSparkWallet(mnemonic);
+        const wallet = new SparkWalletTesting(Network.LOCAL);
+        await wallet.initWalletFromMnemonic();
         const msg = "test";
         const hash = sha256(msg);
         for (let i = 0; i < 1000; i++) {

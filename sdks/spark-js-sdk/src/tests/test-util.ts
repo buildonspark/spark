@@ -9,9 +9,9 @@ import {
 } from "../services/config.js";
 import { ConnectionManager } from "../services/connection.js";
 import { DepositService } from "../services/deposit.js";
-import { SparkWallet } from "../spark-sdk.js";
 import { getP2TRAddressFromPublicKey } from "../utils/bitcoin.js";
 import { getNetwork, Network } from "../utils/network.js";
+import { SparkWalletTesting } from "./utils/spark-testing-wallet.js";
 import { BitcoinFaucet } from "./utils/test-faucet.js";
 
 export const LOCAL_WALLET_CONFIG = {
@@ -133,7 +133,7 @@ export function getTestWalletConfigWithIdentityKey(
 }
 
 export async function createNewTree(
-  wallet: SparkWallet,
+  wallet: SparkWalletTesting,
   pubKey: Uint8Array,
   faucet: BitcoinFaucet,
   amountSats: bigint = 100_000n

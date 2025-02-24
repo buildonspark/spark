@@ -1,9 +1,9 @@
 import { describe, expect, it } from "@jest/globals";
 import { secp256k1 } from "@noble/curves/secp256k1";
 import { Address, OutScript, Transaction } from "@scure/btc-signer";
-import { SparkWallet } from "../spark-sdk.js";
 import { getP2TRAddressFromPublicKey, getTxId } from "../utils/bitcoin.js";
 import { getNetwork, Network } from "../utils/network.js";
+import { SparkWalletTesting } from "./utils/spark-testing-wallet.js";
 import { BitcoinFaucet } from "./utils/test-faucet.js";
 
 describe("deposit", () => {
@@ -15,8 +15,8 @@ describe("deposit", () => {
     async () => {
       const mnemonic =
         "raise benefit echo client clutch short pyramid grass fall core slogan boil device plastic drastic discover decide penalty middle appear medal elbow original income";
-      const sdk = new SparkWallet(Network.LOCAL);
-      await sdk.createSparkWallet(mnemonic);
+      const sdk = new SparkWalletTesting(Network.LOCAL);
+      await sdk.initWalletFromMnemonic(mnemonic);
 
       const pubKey = await sdk.getSigner().generatePublicKey();
 
@@ -38,9 +38,8 @@ describe("deposit", () => {
 
       const coin = await faucet.fund();
 
-      const sdk = new SparkWallet(Network.LOCAL);
-      const mnemonic = await sdk.generateMnemonic();
-      await sdk.createSparkWallet(mnemonic);
+      const sdk = new SparkWalletTesting(Network.LOCAL);
+      await sdk.initWalletFromMnemonic();
 
       // Generate private/public key pair
       const pubKey = await sdk.getSigner().generatePublicKey();

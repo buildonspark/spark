@@ -8,9 +8,9 @@ import { sha256 } from "@scure/btc-signer/utils";
 import { WalletConfigService } from "../services/config.js";
 import { ConnectionManager } from "../services/connection.js";
 import { LeafKeyTweak, TransferService } from "../services/transfer.js";
-import { SparkWallet } from "../spark-sdk.js";
 import { Network } from "../utils/network.js";
 import { createNewTree } from "./test-util.js";
+import { SparkWalletTesting } from "./utils/spark-testing-wallet.js";
 import { BitcoinFaucet } from "./utils/test-faucet.js";
 
 describe("Transfer", () => {
@@ -26,9 +26,8 @@ describe("Transfer", () => {
         "123"
       );
 
-      const senderWallet = new SparkWallet(Network.LOCAL);
-      const senderMnemonic = await senderWallet.generateMnemonic();
-      await senderWallet.createSparkWallet(senderMnemonic);
+      const senderWallet = new SparkWalletTesting(Network.LOCAL);
+      await senderWallet.initWalletFromMnemonic();
 
       const senderConfigService = new WalletConfigService(
         Network.LOCAL,
@@ -52,11 +51,9 @@ describe("Transfer", () => {
 
       const newLeafPubKey = await senderWallet.getSigner().generatePublicKey();
 
-      const receiverWallet = new SparkWallet(Network.LOCAL);
-      const receiverMnemonic = await receiverWallet.generateMnemonic();
-      const receiverPubkey = await receiverWallet.createSparkWallet(
-        receiverMnemonic
-      );
+      const receiverWallet = new SparkWalletTesting(Network.LOCAL);
+      await receiverWallet.initWalletFromMnemonic();
+      const receiverPubkey = await receiverWallet.getIdentityPublicKey();
 
       const receiverConfigService = new WalletConfigService(
         Network.LOCAL,
@@ -115,11 +112,9 @@ describe("Transfer", () => {
         claimingNode,
       ]);
 
-      const newReceiverWallet = new SparkWallet(Network.LOCAL);
-      const newReceiverMnemonic = await newReceiverWallet.generateMnemonic();
-      const newReceiverPubkey = await newReceiverWallet.createSparkWallet(
-        newReceiverMnemonic
-      );
+      const newReceiverWallet = new SparkWalletTesting(Network.LOCAL);
+      await newReceiverWallet.initWalletFromMnemonic();
+      const newReceiverPubkey = await newReceiverWallet.getIdentityPublicKey();
 
       await receiverWallet.sendTransfer({
         amount: 1000,
@@ -129,7 +124,8 @@ describe("Transfer", () => {
       const newPendingTransfer =
         await newReceiverWallet.queryPendingTransfers();
 
-      await newReceiverWallet.claimTransfer(newPendingTransfer.transfers[0]);
+      expect(newPendingTransfer.transfers.length).toBe(1);
+      await newReceiverWallet.getBalance();
     },
     30000
   );
@@ -137,9 +133,8 @@ describe("Transfer", () => {
   testFn("test transfer with separate", async () => {
     const faucet = new BitcoinFaucet("http://127.0.0.1:18443", "admin1", "123");
 
-    const senderWallet = new SparkWallet(Network.LOCAL);
-    const senderMnemonic = await senderWallet.generateMnemonic();
-    await senderWallet.createSparkWallet(senderMnemonic);
+    const senderWallet = new SparkWalletTesting(Network.LOCAL);
+    await senderWallet.initWalletFromMnemonic();
 
     const senderConfigService = new WalletConfigService(
       Network.LOCAL,
@@ -151,11 +146,9 @@ describe("Transfer", () => {
       senderConnectionManager
     );
 
-    const receiverWallet = new SparkWallet(Network.LOCAL);
-    const receiverMnemonic = await receiverWallet.generateMnemonic();
-    const receiverPubkey = await receiverWallet.createSparkWallet(
-      receiverMnemonic
-    );
+    const receiverWallet = new SparkWalletTesting(Network.LOCAL);
+    await receiverWallet.initWalletFromMnemonic();
+    const receiverPubkey = await receiverWallet.getIdentityPublicKey();
 
     const receiverConfigService = new WalletConfigService(
       Network.LOCAL,
@@ -265,15 +258,12 @@ describe("Transfer", () => {
   testFn("cancel transfer", async () => {
     const faucet = new BitcoinFaucet("http://127.0.0.1:18443", "admin1", "123");
 
-    const senderWallet = new SparkWallet(Network.LOCAL);
-    const senderMnemonic = await senderWallet.generateMnemonic();
-    await senderWallet.createSparkWallet(senderMnemonic);
+    const senderWallet = new SparkWalletTesting(Network.LOCAL);
+    await senderWallet.initWalletFromMnemonic();
 
-    const receiverWallet = new SparkWallet(Network.LOCAL);
-    const receiverMnemonic = await receiverWallet.generateMnemonic();
-    const receiverPubkey = await receiverWallet.createSparkWallet(
-      receiverMnemonic
-    );
+    const receiverWallet = new SparkWalletTesting(Network.LOCAL);
+    await receiverWallet.initWalletFromMnemonic();
+    const receiverPubkey = await receiverWallet.getIdentityPublicKey();
 
     const receiverConfigService = new WalletConfigService(
       Network.LOCAL,

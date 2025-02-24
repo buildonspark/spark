@@ -5,7 +5,6 @@ import { sha256 } from "@scure/btc-signer/utils";
 import { WalletConfigService } from "../services/config.js";
 import { ConnectionManager } from "../services/connection.js";
 import { LeafKeyTweak, TransferService } from "../services/transfer.js";
-import { SparkWallet } from "../spark-sdk.js";
 import {
   applyAdaptorToSignature,
   generateAdaptorFromSignature,
@@ -16,6 +15,7 @@ import {
 } from "../utils/bitcoin.js";
 import { Network } from "../utils/network.js";
 import { createNewTree } from "./test-util.js";
+import { SparkWalletTesting } from "./utils/spark-testing-wallet.js";
 import { BitcoinFaucet } from "./utils/test-faucet.js";
 
 describe("swap", () => {
@@ -30,9 +30,9 @@ describe("swap", () => {
         "123"
       );
       // Initiate sender
-      const senderWallet = new SparkWallet(Network.LOCAL);
-      const senderMnemonic = await senderWallet.generateMnemonic();
-      const senderPubkey = await senderWallet.createSparkWallet(senderMnemonic);
+      const senderWallet = new SparkWalletTesting(Network.LOCAL);
+      await senderWallet.initWalletFromMnemonic();
+      const senderPubkey = await senderWallet.getIdentityPublicKey();
 
       const senderConfig = new WalletConfigService(
         Network.LOCAL,
@@ -45,11 +45,9 @@ describe("swap", () => {
       );
 
       // Initiate receiver
-      const receiverWallet = new SparkWallet(Network.LOCAL);
-      const receiverMnemonic = await receiverWallet.generateMnemonic();
-      const receiverPubkey = await receiverWallet.createSparkWallet(
-        receiverMnemonic
-      );
+      const receiverWallet = new SparkWalletTesting(Network.LOCAL);
+      await receiverWallet.initWalletFromMnemonic();
+      const receiverPubkey = await receiverWallet.getIdentityPublicKey();
 
       const receiverConfig = new WalletConfigService(
         Network.LOCAL,

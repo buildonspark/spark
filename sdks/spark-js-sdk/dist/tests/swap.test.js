@@ -5,27 +5,27 @@ import { sha256 } from "@scure/btc-signer/utils";
 import { WalletConfigService } from "../services/config.js";
 import { ConnectionManager } from "../services/connection.js";
 import { TransferService } from "../services/transfer.js";
-import { SparkWallet } from "../spark-sdk.js";
 import { applyAdaptorToSignature, generateAdaptorFromSignature, } from "../utils/adaptor-signature.js";
 import { computeTaprootKeyNoScript, getSigHashFromTx, } from "../utils/bitcoin.js";
 import { Network } from "../utils/network.js";
 import { createNewTree } from "./test-util.js";
+import { SparkWalletTesting } from "./utils/spark-testing-wallet.js";
 import { BitcoinFaucet } from "./utils/test-faucet.js";
 describe("swap", () => {
     const testFn = process.env.GITHUB_ACTIONS ? it.skip : it;
     testFn("test swap", async () => {
         const faucet = new BitcoinFaucet("http://127.0.0.1:18443", "admin1", "123");
         // Initiate sender
-        const senderWallet = new SparkWallet(Network.LOCAL);
-        const senderMnemonic = await senderWallet.generateMnemonic();
-        const senderPubkey = await senderWallet.createSparkWallet(senderMnemonic);
+        const senderWallet = new SparkWalletTesting(Network.LOCAL);
+        await senderWallet.initWalletFromMnemonic();
+        const senderPubkey = await senderWallet.getIdentityPublicKey();
         const senderConfig = new WalletConfigService(Network.LOCAL, senderWallet.getSigner());
         const senderConnectionManager = new ConnectionManager(senderConfig);
         const senderTransferService = new TransferService(senderConfig, senderConnectionManager);
         // Initiate receiver
-        const receiverWallet = new SparkWallet(Network.LOCAL);
-        const receiverMnemonic = await receiverWallet.generateMnemonic();
-        const receiverPubkey = await receiverWallet.createSparkWallet(receiverMnemonic);
+        const receiverWallet = new SparkWalletTesting(Network.LOCAL);
+        await receiverWallet.initWalletFromMnemonic();
+        const receiverPubkey = await receiverWallet.getIdentityPublicKey();
         const receiverConfig = new WalletConfigService(Network.LOCAL, receiverWallet.getSigner());
         const receiverConnectionManager = new ConnectionManager(receiverConfig);
         const receiverTransferService = new TransferService(receiverConfig, receiverConnectionManager);

@@ -4,27 +4,26 @@ import { sha256 } from "@scure/btc-signer/utils";
 import { WalletConfigService } from "../services/config.js";
 import { ConnectionManager } from "../services/connection.js";
 import { TransferService } from "../services/transfer.js";
-import { SparkWallet } from "../spark-sdk.js";
 import { Network } from "../utils/network.js";
 import { createNewTree } from "./test-util.js";
+import { SparkWalletTesting } from "./utils/spark-testing-wallet.js";
 import { BitcoinFaucet } from "./utils/test-faucet.js";
 describe("Transfer", () => {
     // Skip all tests if running in GitHub Actions
     const testFn = process.env.GITHUB_ACTIONS ? it.skip : it;
     testFn("test transfer", async () => {
         const faucet = new BitcoinFaucet("http://127.0.0.1:18443", "admin1", "123");
-        const senderWallet = new SparkWallet(Network.LOCAL);
-        const senderMnemonic = await senderWallet.generateMnemonic();
-        await senderWallet.createSparkWallet(senderMnemonic);
+        const senderWallet = new SparkWalletTesting(Network.LOCAL);
+        await senderWallet.initWalletFromMnemonic();
         const senderConfigService = new WalletConfigService(Network.LOCAL, senderWallet.getSigner());
         const senderConnectionManager = new ConnectionManager(senderConfigService);
         const senderTransferService = new TransferService(senderConfigService, senderConnectionManager);
         const leafPubKey = await senderWallet.getSigner().generatePublicKey();
         const rootNode = await createNewTree(senderWallet, leafPubKey, faucet, 1000n);
         const newLeafPubKey = await senderWallet.getSigner().generatePublicKey();
-        const receiverWallet = new SparkWallet(Network.LOCAL);
-        const receiverMnemonic = await receiverWallet.generateMnemonic();
-        const receiverPubkey = await receiverWallet.createSparkWallet(receiverMnemonic);
+        const receiverWallet = new SparkWalletTesting(Network.LOCAL);
+        await receiverWallet.initWalletFromMnemonic();
+        const receiverPubkey = await receiverWallet.getIdentityPublicKey();
         const receiverConfigService = new WalletConfigService(Network.LOCAL, receiverWallet.getSigner());
         const receiverConnectionManager = new ConnectionManager(receiverConfigService);
         const receiverTransferService = new TransferService(receiverConfigService, receiverConnectionManager);
@@ -54,27 +53,27 @@ describe("Transfer", () => {
         await receiverTransferService.claimTransfer(receiverTransfer, [
             claimingNode,
         ]);
-        const newReceiverWallet = new SparkWallet(Network.LOCAL);
-        const newReceiverMnemonic = await newReceiverWallet.generateMnemonic();
-        const newReceiverPubkey = await newReceiverWallet.createSparkWallet(newReceiverMnemonic);
+        const newReceiverWallet = new SparkWalletTesting(Network.LOCAL);
+        await newReceiverWallet.initWalletFromMnemonic();
+        const newReceiverPubkey = await newReceiverWallet.getIdentityPublicKey();
         await receiverWallet.sendTransfer({
             amount: 1000,
             receiverPubKey: hexToBytes(newReceiverPubkey),
         });
         const newPendingTransfer = await newReceiverWallet.queryPendingTransfers();
-        await newReceiverWallet.claimTransfer(newPendingTransfer.transfers[0]);
+        expect(newPendingTransfer.transfers.length).toBe(1);
+        await newReceiverWallet.getBalance();
     }, 30000);
     testFn("test transfer with separate", async () => {
         const faucet = new BitcoinFaucet("http://127.0.0.1:18443", "admin1", "123");
-        const senderWallet = new SparkWallet(Network.LOCAL);
-        const senderMnemonic = await senderWallet.generateMnemonic();
-        await senderWallet.createSparkWallet(senderMnemonic);
+        const senderWallet = new SparkWalletTesting(Network.LOCAL);
+        await senderWallet.initWalletFromMnemonic();
         const senderConfigService = new WalletConfigService(Network.LOCAL, senderWallet.getSigner());
         const senderConnectionManager = new ConnectionManager(senderConfigService);
         const senderTransferService = new TransferService(senderConfigService, senderConnectionManager);
-        const receiverWallet = new SparkWallet(Network.LOCAL);
-        const receiverMnemonic = await receiverWallet.generateMnemonic();
-        const receiverPubkey = await receiverWallet.createSparkWallet(receiverMnemonic);
+        const receiverWallet = new SparkWalletTesting(Network.LOCAL);
+        await receiverWallet.initWalletFromMnemonic();
+        const receiverPubkey = await receiverWallet.getIdentityPublicKey();
         const receiverConfigService = new WalletConfigService(Network.LOCAL, receiverWallet.getSigner());
         const receiverConnectionManager = new ConnectionManager(receiverConfigService);
         const receiverTransferService = new TransferService(receiverConfigService, receiverConnectionManager);
@@ -128,12 +127,11 @@ describe("Transfer", () => {
     });
     testFn("cancel transfer", async () => {
         const faucet = new BitcoinFaucet("http://127.0.0.1:18443", "admin1", "123");
-        const senderWallet = new SparkWallet(Network.LOCAL);
-        const senderMnemonic = await senderWallet.generateMnemonic();
-        await senderWallet.createSparkWallet(senderMnemonic);
-        const receiverWallet = new SparkWallet(Network.LOCAL);
-        const receiverMnemonic = await receiverWallet.generateMnemonic();
-        const receiverPubkey = await receiverWallet.createSparkWallet(receiverMnemonic);
+        const senderWallet = new SparkWalletTesting(Network.LOCAL);
+        await senderWallet.initWalletFromMnemonic();
+        const receiverWallet = new SparkWalletTesting(Network.LOCAL);
+        await receiverWallet.initWalletFromMnemonic();
+        const receiverPubkey = await receiverWallet.getIdentityPublicKey();
         const receiverConfigService = new WalletConfigService(Network.LOCAL, receiverWallet.getSigner());
         const receiverConnectionManager = new ConnectionManager(receiverConfigService);
         const receiverTransferService = new TransferService(receiverConfigService, receiverConnectionManager);

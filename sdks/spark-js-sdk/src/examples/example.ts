@@ -1,7 +1,9 @@
 import { bytesToHex, hexToBytes } from "@noble/curves/abstract/utils";
+import { generateMnemonic } from "@scure/bip39";
+import { wordlist } from "@scure/bip39/wordlists/english";
+import { Transaction } from "@scure/btc-signer";
 import { Buffer } from "buffer";
 import readline from "readline";
-import { BitcoinNetwork } from "../../dist/graphql/objects";
 import { SparkWallet } from "../../dist/spark-sdk";
 import { getTxFromRawTxHex } from "../../dist/utils/bitcoin";
 import { Network } from "../../dist/utils/network";
@@ -55,22 +57,21 @@ async function runCLI() {
         console.log(helpMessage);
         break;
       case "genmnemonic":
-        const mnemonic = await wallet.generateMnemonic();
+        const mnemonic = generateMnemonic(wordlist);
         console.log(mnemonic);
         break;
       case "initwallet":
-        console.log(`:${args}:`);
-        const pubKey = await wallet.createSparkWallet(
-          args.join(" ") || walletMnemonic
+        const walletMnemonic = await wallet.initWalletFromMnemonic(
+          args.length > 0 ? args.join(" ") : undefined
         );
-        console.log("pubkey", pubKey);
+        console.log("mnemonic", walletMnemonic);
         break;
       case "gendepositaddr":
         if (!wallet.isInitialized()) {
           console.log("No wallet initialized");
           break;
         }
-        const leafPubKey = await wallet.getSigner().generatePublicKey();
+        const leafPubKey = hexToBytes(await wallet.generatePublicKey());
         const depositAddress = await wallet.generateDepositAddress(leafPubKey);
         console.log("Deposit address:", depositAddress.depositAddress?.address);
         console.log(
@@ -86,16 +87,63 @@ async function runCLI() {
           console.log("No deposit address");
           break;
         }
+
         while (true) {
-          const depositTx = await wallet.queryPendingDepositTx(
-            depositAddress.depositAddress?.address
-          );
+          let depositTx: Transaction | null = null;
+          let vout = 0;
+          try {
+            const baseUrl =
+              "https://regtest-mempool.dev.dev.sparkinfra.net/api";
+            const auth = btoa("lightspark:TFNR6ZeLdxF9HejW");
+
+            const response = await fetch(
+              `${baseUrl}/address/${depositAddress}/txs`,
+              {
+                headers: {
+                  Authorization: `Basic ${auth}`,
+                  "Content-Type": "application/json",
+                },
+              }
+            );
+
+            const addressTxs = await response.json();
+
+            if (addressTxs && addressTxs.length > 0) {
+              const latestTx = addressTxs[0];
+
+              // // Find our output
+              const outputIndex = latestTx.vout.findIndex(
+                (output: any) => output.scriptpubkey_address === depositAddress
+              );
+
+              if (outputIndex === -1) {
+                return null;
+              }
+
+              const txResponse = await fetch(
+                `${baseUrl}/tx/${latestTx.txid}/hex`,
+                {
+                  headers: {
+                    Authorization: `Basic ${auth}`,
+                    "Content-Type": "application/json",
+                  },
+                }
+              );
+              const txHex = await txResponse.text();
+              depositTx = getTxFromRawTxHex(txHex);
+              vout = outputIndex;
+              break;
+            }
+          } catch (error) {
+            throw error;
+          }
+
           if (depositTx) {
             const nodes = await wallet.createTreeRoot(
               leafPubKey,
               depositAddress.depositAddress?.verifyingKey,
-              depositTx.depositTx,
-              depositTx.vout
+              depositTx,
+              vout
             );
             console.log("Created new leaf node", nodes);
             break;
@@ -104,14 +152,6 @@ async function runCLI() {
           await new Promise((resolve) => setTimeout(resolve, 5000));
         }
 
-        break;
-      case "tx":
-        if (!wallet.isInitialized()) {
-          console.log("No wallet initialized");
-          break;
-        }
-        const txs = await wallet.queryPendingDepositTx(args[0]);
-        console.log(txs);
         break;
       case "completedeposit":
         if (!wallet.isInitialized()) {
@@ -140,14 +180,7 @@ async function runCLI() {
           expirySeconds: 60 * 60 * 24,
         });
 
-        const fee = await wallet.getLightningReceiveFeeEstimate({
-          amountSats: parseInt(args[0]),
-          network: BitcoinNetwork.REGTEST,
-        });
         console.log("Invoice created:", invoice);
-        console.log(
-          `Fee: ${fee?.feeEstimate.originalValue} ${fee?.feeEstimate.originalUnit}`
-        );
         break;
       case "sendtransfer":
         if (!wallet.isInitialized()) {
@@ -160,36 +193,6 @@ async function runCLI() {
           amount,
           receiverPubKey,
         });
-        break;
-      case "pendingtransfers":
-        if (!wallet.isInitialized()) {
-          console.log("No wallet initialized");
-          break;
-        }
-
-        const pending = await wallet.queryPendingTransfers();
-        console.log(pending);
-        break;
-      case "claimtransfer":
-        if (!wallet.isInitialized()) {
-          console.log("No wallet initialized");
-          break;
-        }
-
-        if (!args) {
-          console.log("Please provide a transfer id");
-          break;
-        }
-        const pendingTransfers = await wallet.queryPendingTransfers();
-        const transfer = pendingTransfers.transfers.find(
-          (t) => t.id === args[0]
-        );
-        if (!transfer) {
-          console.log("Transfer not found");
-          break;
-        }
-        const result = await wallet.claimTransfer(transfer);
-        console.log(result.nodes);
         break;
       case "coopexit":
         if (!wallet.isInitialized()) {
@@ -207,7 +210,7 @@ async function runCLI() {
           console.log("No wallet initialized");
           break;
         }
-        console.log(await wallet.claimTransfers());
+        console.log(await wallet.getBalance());
         break;
       case "payinvoice":
         if (!wallet.isInitialized()) {
@@ -227,33 +230,6 @@ async function runCLI() {
         }
         const balance = await wallet.getBalance();
         console.log(balance);
-        break;
-      case "getleaves":
-        if (!wallet.isInitialized()) {
-          console.log("No wallet initialized");
-          break;
-        }
-        const leaves = await wallet.getLeaves();
-        const formattedLeaves = leaves.map((leaf) => ({
-          ...leaf,
-          nodeTx:
-            typeof leaf.nodeTx === "object"
-              ? Buffer.from(leaf.nodeTx).toString("hex")
-              : leaf.nodeTx,
-          refundTx:
-            typeof leaf.refundTx === "object"
-              ? Buffer.from(leaf.refundTx).toString("hex")
-              : leaf.refundTx,
-          verifyingPublicKey:
-            typeof leaf.verifyingPublicKey === "object"
-              ? Buffer.from(leaf.verifyingPublicKey).toString("hex")
-              : leaf.verifyingPublicKey,
-          ownerIdentityPublicKey:
-            typeof leaf.ownerIdentityPublicKey === "object"
-              ? Buffer.from(leaf.ownerIdentityPublicKey).toString("hex")
-              : leaf.ownerIdentityPublicKey,
-        }));
-        console.log(JSON.stringify(formattedLeaves, null, 2));
         break;
     }
   }
