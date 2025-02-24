@@ -4,6 +4,7 @@ import { BitcoinNetwork } from "../../dist/graphql/objects";
 import { SparkWallet } from "../../dist/spark-sdk";
 import { getTxFromRawTxHex } from "../../dist/utils/bitcoin";
 import { Network } from "../../dist/utils/network";
+import { Buffer } from 'buffer';
 
 // Initialize Spark Wallet
 const walletMnemonic =
@@ -72,12 +73,9 @@ async function runCLI() {
         const leafPubKey = await wallet.getSigner().generatePublicKey();
         const depositAddress = await wallet.generateDepositAddress(leafPubKey);
         console.log("Deposit address:", depositAddress.depositAddress?.address);
-        console.log(
-          "Verifying key:",
-          bytesToHex(
-            depositAddress.depositAddress?.verifyingKey || new Uint8Array()
-          )
-        );
+        console.log("Verifying key:", typeof depositAddress.depositAddress?.verifyingKey === 'object' ?
+          Buffer.from(depositAddress.depositAddress.verifyingKey).toString('hex') :
+          depositAddress.depositAddress?.verifyingKey);
         console.log("Pubkey:", bytesToHex(leafPubKey));
         if (!depositAddress.depositAddress) {
           console.log("No deposit address");
@@ -246,9 +244,17 @@ async function runCLI() {
           console.log("No wallet initialized");
           break;
         }
-
         const leaves = await wallet.getLeaves();
-        console.log(leaves);
+        const formattedLeaves = leaves.map(leaf => ({
+          ...leaf,
+          nodeTx: typeof leaf.nodeTx === 'object' ? Buffer.from(leaf.nodeTx).toString('hex') : leaf.nodeTx,
+          refundTx: typeof leaf.refundTx === 'object' ? Buffer.from(leaf.refundTx).toString('hex') : leaf.refundTx,
+          verifyingPublicKey: typeof leaf.verifyingPublicKey === 'object' ?
+            Buffer.from(leaf.verifyingPublicKey).toString('hex') : leaf.verifyingPublicKey,
+          ownerIdentityPublicKey: typeof leaf.ownerIdentityPublicKey === 'object' ?
+            Buffer.from(leaf.ownerIdentityPublicKey).toString('hex') : leaf.ownerIdentityPublicKey,
+        }));
+        console.log(JSON.stringify(formattedLeaves, null, 2));
         break;
     }
   }
