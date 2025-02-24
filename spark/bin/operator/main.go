@@ -325,48 +325,17 @@ func main() {
 
 	wrappedGrpc := grpcweb.WrapServer(grpcServer,
 		grpcweb.WithOriginFunc(func(_ string) bool {
-			return true // Configure as needed for production
+			return true
 		}),
-		grpcweb.WithAllowedRequestHeaders([]string{
-			"Accept",
-			"Content-Type",
-			"Content-Length",
-			"Content-Encoding",
-			"Accept-Encoding",
-			"X-CSRF-Token",
-			"Authorization",
-			"X-User-Agent",
-			"X-Grpc-Web",
-		}),
+		grpcweb.WithCorsForRegisteredEndpointsOnly(false),
 	)
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Check if it's a gRPC request
-		if r.Method == "OPTIONS" {
-			w.Header().Set("Access-Control-Allow-Origin", "*")
-			w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
-			w.Header().Set("Access-Control-Allow-Headers", "*")
-			w.WriteHeader(http.StatusOK)
-			_, err := w.Write([]byte("OK"))
-			if err != nil {
-				log.Printf("Failed to write response: %v", err)
-			}
-			return
-		}
-		if strings.Contains(r.Header.Get("Content-Type"), "application/grpc-web") || wrappedGrpc.IsGrpcWebRequest(r) {
-			log.Printf("serving grpc-web request")
-			r.Header.Set("Access-Control-Allow-Origin", "*")
-			r.Header.Set("Access-Control-Allow-Headers", "*")
-			wrappedGrpc.ServeHTTP(w, r)
-			return
-		}
-		if r.ProtoMajor == 2 && strings.Contains(r.Header.Get("Content-Type"), "application/grpc") {
-			log.Printf("serving grpc request")
+		if strings.ToLower(r.Header.Get("Content-Type")) == "application/grpc" {
 			grpcServer.ServeHTTP(w, r)
 			return
 		}
-
-		http.NotFound(w, r)
+		wrappedGrpc.ServeHTTP(w, r)
 	})
 
 	server := &http.Server{
