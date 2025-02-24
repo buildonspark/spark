@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
+	"math/big"
 	"sort"
 
 	"github.com/btcsuite/btcd/btcec/v2/ecdsa"
@@ -14,6 +15,9 @@ import (
 
 // MaxOutputLeaves defines the maximum number of input or output leaves allowed in a token transaction.
 const MaxInputOrOutputTokenTransactionLeaves = 100
+
+// Zero represents a big.Int with value 0, used for amount comparisons.
+var Zero = new(big.Int)
 
 // hashTokenTransaction generates a SHA256 hash of the TokenTransaction by:
 // 1. Taking SHA256 of each field individually
@@ -280,8 +284,9 @@ func HashFreezeTokensPayload(payload *pb.FreezeTokensPayload) ([]byte, error) {
 	return h.Sum(nil), nil
 }
 
-// TODO: Extend to validate the full token transaction after filling revocation keys.
-// ValidatePartialTokenTransactionStartRequest validates a partial token transaction start request without revocation keys.
+// TODO(token): Extend validation to handle the full token transaction after filling revocation keys.
+// ValidatePartialTokenTransaction validates a token transaction request before revocation keys are assigned.
+// It checks the transaction structure, signatures, and token amounts for both mint and transfer operations.
 func ValidatePartialTokenTransaction(
 	tokenTransaction *pb.TokenTransaction,
 	tokenTransactionSignatures *pb.TokenTransactionSignatures,
@@ -342,6 +347,19 @@ func ValidatePartialTokenTransaction(
 		issueSignature := tokenTransactionSignatures.GetOwnerSignatures()[0]
 		if issueSignature == nil {
 			return fmt.Errorf("mint signature cannot be nil")
+		}
+
+		// Validate mint amounts
+		totalMintAmount := new(big.Int)
+		for i, leaf := range tokenTransaction.OutputLeaves {
+			amount := new(big.Int).SetBytes(leaf.GetTokenAmount())
+
+			if amount.Cmp(Zero) == 0 {
+				return fmt.Errorf("mint amount for leaf %d cannot be 0", i)
+			}
+
+			// Add to total
+			totalMintAmount.Add(totalMintAmount, amount)
 		}
 	}
 
