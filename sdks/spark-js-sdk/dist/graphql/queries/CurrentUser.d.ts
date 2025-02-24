@@ -1,0 +1,1 @@
+export declare const CurrentUser = "\n  query CurrentUser {\n    current_user {\n      ...WalletUserFragment\n    }\n  }\n  \nfragment WalletUserFragment on WalletUser {\n    __typename\n    wallet_user_id: id\n    wallet_user_created_at: created_at\n    wallet_user_updated_at: updated_at\n    wallet_user_identity_public_key: identity_public_key\n}\n";

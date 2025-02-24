@@ -1,0 +1,23 @@
+import { LeafWithPreviousTransactionData, TokenTransaction } from "../proto/spark.js";
+import { WalletConfigService } from "./config.js";
+import { ConnectionManager } from "./connection.js";
+export declare class TokenTransactionService {
+    protected readonly config: WalletConfigService;
+    protected readonly connectionManager: ConnectionManager;
+    constructor(config: WalletConfigService, connectionManager: ConnectionManager);
+    constructTransferTokenTransaction(selectedLeaves: LeafWithPreviousTransactionData[], recipientPublicKey: Uint8Array, tokenPublicKey: Uint8Array, tokenAmount: bigint): Promise<TokenTransaction>;
+    collectOperatorIdentityPublicKeys(): Uint8Array[];
+    broadcastTokenTransaction(tokenTransaction: TokenTransaction, leafToSpendSigningPublicKeys?: Uint8Array[], leafToSpendRevocationPublicKeys?: Uint8Array[]): Promise<TokenTransaction>;
+    finalizeTokenTransaction(finalTokenTransaction: TokenTransaction, leafToSpendRevocationKeys: Uint8Array[], threshold: number): Promise<TokenTransaction>;
+    constructConsolidateTokenTransaction(selectedLeaves: LeafWithPreviousTransactionData[], tokenPublicKey: Uint8Array, transferBackToIdentityPublicKey?: boolean): Promise<TokenTransaction>;
+    fetchOwnedTokenLeaves(ownerPublicKeys: Uint8Array[], tokenPublicKeys: Uint8Array[]): Promise<LeafWithPreviousTransactionData[]>;
+    syncTokenLeaves(tokenLeaves: Map<string, LeafWithPreviousTransactionData[]>): Promise<void>;
+    selectTokenLeaves(tokenLeaves: LeafWithPreviousTransactionData[], tokenPublicKey: Uint8Array, tokenAmount: bigint): LeafWithPreviousTransactionData[];
+    /**
+     * Called after successful completion of a transaction to spend token leaves.
+     * Allows wallet state to be updated without making an additional network call to sync token leaves.
+     * @param tokenLeaves Current token leaves in memory for this tokenPublicKey
+     * @param finalizedTokenTransaction Finalized transaction from either mint or transfer
+     */
+    updateTokenLeavesFromFinalizedTransaction(tokenLeaves: LeafWithPreviousTransactionData[], finalizedTokenTransaction: TokenTransaction): void;
+}

@@ -1,0 +1,12 @@
+import { SigningCommitment, SigningNonce } from "../signer/signer.js";
+import { SigningCommitment as WasmSigningCommitment, SigningNonce as WasmSigningNonce } from "../wasm/spark_bindings.js";
+export declare function getRandomSigningNonce(): SigningNonce;
+export declare function createSigningNonce(binding: Uint8Array, hiding: Uint8Array): SigningNonce;
+export declare function getSigningCommitmentFromNonce(nonce: SigningNonce): SigningCommitment;
+export declare function encodeSigningNonceToBytes(nonce: SigningNonce): Uint8Array;
+export declare function decodeBytesToSigningNonce(bytes: Uint8Array): SigningNonce;
+export declare function createSigningCommitment(binding: Uint8Array, hiding: Uint8Array): SigningCommitment;
+export declare function encodeSigningCommitmentToBytes(commitment: SigningCommitment): Uint8Array;
+export declare function decodeBytesToSigningCommitment(bytes: Uint8Array): SigningCommitment;
+export declare function createWasmSigningNonce(nonce: SigningNonce): WasmSigningNonce;
+export declare function createWasmSigningCommitment(commitment: SigningCommitment): WasmSigningCommitment;
