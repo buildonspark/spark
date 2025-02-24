@@ -1,6 +1,6 @@
 import { useState } from "react";
 import BitcoinIcon from "../icons/BitcoinIcon";
-import ChevronRightIcon from "../icons/ChevronRightIcon";
+import ChevronRightIcon from "../icons/ChevronIcon";
 import LightningIcon from "../icons/LightningIcon";
 import SparkIcon from "../icons/SparkIcon";
 import DetailsRow from "./DetailsRow";

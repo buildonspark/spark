@@ -1,5 +1,5 @@
 import BitcoinIcon from "../icons/BitcoinIcon";
-import ChevronRightIcon from "../icons/ChevronRightIcon";
+import ChevronRightIcon from "../icons/ChevronIcon";
 import LightningIcon from "../icons/LightningIcon";
 import SparkIcon from "../icons/SparkIcon";
 import StyledContainer from "./StyledContainer";
@@ -40,7 +40,7 @@ export default function Networks({ onSelectNetwork }: NetworksProps) {
         </div>
       </StyledContainer>
       <StyledContainer
-        className="px-4 py-6 mt-3"
+        className="mt-3 px-4 py-6"
         isPressable
         onClick={() => onSelectNetwork(Network.SPARK)}
       >
@@ -61,7 +61,7 @@ export default function Networks({ onSelectNetwork }: NetworksProps) {
         </div>
       </StyledContainer>
       <StyledContainer
-        className="px-4 py-6 mt-3"
+        className="mt-3 px-4 py-6"
         isPressable
         onClick={() => onSelectNetwork(Network.BITCOIN)}
       >

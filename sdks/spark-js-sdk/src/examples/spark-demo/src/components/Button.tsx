@@ -71,6 +71,12 @@ const StyledButton = styled.button<{
     0px 1px 4px 0px rgba(0, 0, 0, 0.25),
     0px 8px 16px 0px rgba(255, 255, 255, 0.1) inset;
 
+  ${({ disabled }) =>
+    disabled &&
+    css`
+      opacity: 0.5;
+    `}
+
   ${({ kind, opaque }) =>
     kind === "primary"
       ? css`
