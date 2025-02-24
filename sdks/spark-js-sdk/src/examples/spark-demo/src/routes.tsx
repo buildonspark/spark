@@ -9,6 +9,7 @@ export const Routes = {
   Receive: "/receive",
   Send: "/send",
   RecoverWallet: "/recover-wallet",
+  Tokens: "/tokens",
 };
 
 export type RoutesMapType = typeof Routes;

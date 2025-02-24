@@ -4,13 +4,53 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { SparkWallet } from "spark-sdk";
 import { Network } from "spark-sdk/utils";
 import { create } from "zustand";
-import { Currency } from "../utils/currency";
+import MxnLogo from "../icons/test_logo/MxnLogo";
+import UsdcLogo from "../icons/test_logo/UsdcLogo";
+import { Currency, CurrencyType } from "../utils/currency";
+
+export const PERMANENT_CURRENCIES: Record<string, Currency> = {
+  BTC: {
+    name: "Bitcoin",
+    code: "BTC",
+    decimals: 8,
+    type: CurrencyType.BLOCKCHAIN,
+    balance: 1231,
+    symbol: "₿",
+  },
+  USD: {
+    name: "US Dollar",
+    code: "USD",
+    decimals: 2,
+    type: CurrencyType.FIAT,
+    symbol: "$",
+  },
+  INOC: {
+    name: "MXP Coin",
+    code: "MXPC",
+    decimals: 2,
+    type: CurrencyType.TOKEN,
+    balance: 90909,
+    symbol: "MXN",
+    logo: <MxnLogo />,
+    pubkey: "0x1234567890",
+  },
+  USDC: {
+    name: "USD Coin",
+    code: "USDC",
+    decimals: 2,
+    type: CurrencyType.TOKEN,
+    balance: 35353,
+    symbol: "USDC",
+    logo: <UsdcLogo />,
+    pubkey: "0x1234567890",
+  },
+};
 
 interface WalletState {
   wallet: SparkWallet;
   isInitialized: boolean;
   mnemonic: string | null;
-  activeCurrency: Currency;
+  activeInputCurrency: Currency;
   btcAddressInfo: Record<
     string,
     {
@@ -18,6 +58,8 @@ interface WalletState {
       verifyingKey: string;
     }
   >;
+  activeAsset: Currency;
+  assets: Record<string, Currency>;
 }
 
 interface WalletActions {
@@ -29,7 +71,8 @@ interface WalletActions {
   sendTransfer: (amount: number, recipient: string) => Promise<void>;
   payLightningInvoice: (invoice: string) => Promise<void>;
   // fetchOwnedTokens: () => Promise<LeafWithPreviousTransactionData[]>;
-  setActiveCurrency: (currency: Currency) => void;
+  setActiveAsset: (asset: Currency) => void;
+  setActiveInputCurrency: (currency: Currency) => void;
   loadStoredWallet: () => Promise<boolean>;
 }
 
@@ -41,9 +84,15 @@ const useWalletStore = create<WalletStore>((set, get) => ({
   wallet: new SparkWallet(Network.REGTEST),
   isInitialized: false,
   mnemonic: null,
-  activeCurrency: Currency.USD,
-  setActiveCurrency: (currency: Currency) => {
-    set({ activeCurrency: currency });
+  activeInputCurrency: PERMANENT_CURRENCIES.USD,
+  setActiveInputCurrency: (currency: Currency) => {
+    set({ activeInputCurrency: currency });
+  },
+  assets: PERMANENT_CURRENCIES,
+  activeAsset: PERMANENT_CURRENCIES.BTC,
+  setActiveAsset: (asset: Currency) => {
+    console.log("setActiveAsset", asset.name);
+    set({ activeAsset: asset });
   },
   // fetchOwnedTokens: async () => {
   //   const { wallet } = get();
@@ -220,8 +269,11 @@ export function useWallet() {
   const state = useWalletStore.getState();
 
   return {
-    activeCurrency: state.activeCurrency,
-    setActiveCurrency: state.setActiveCurrency,
+    activeInputCurrency: state.activeInputCurrency,
+    setActiveInputCurrency: state.setActiveInputCurrency,
+    assets: state.assets,
+    activeAsset: state.activeAsset,
+    setActiveAsset: state.setActiveAsset,
     balance: {
       value: Number(balanceQuery.data ?? 0),
       isLoading: balanceQuery.isLoading,

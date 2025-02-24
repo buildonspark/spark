@@ -26,7 +26,9 @@ export default function CardForm({
           {logoLeft}
         </button>
         <div className="flex-grow">{topTitle}</div>
-        <div className="mr-6 h-6 w-6">{logoRight}</div>
+        <div className="mr-6 flex h-8 w-8 items-center justify-center">
+          {logoRight}
+        </div>
       </div>
       <div className="flex w-full flex-col p-6">{children}</div>
       {!submitDisabled && (

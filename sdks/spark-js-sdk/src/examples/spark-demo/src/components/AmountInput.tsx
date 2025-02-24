@@ -3,8 +3,8 @@ import styled from "styled-components";
 import DeleteIcon from "../icons/DeleteIcon";
 import ToggleIcon from "../icons/ToggleIcon";
 
-import { useWallet } from "../store/wallet";
-import { Currency } from "../utils/currency";
+import { PERMANENT_CURRENCIES, useWallet } from "../store/wallet";
+import { CurrencyType } from "../utils/currency";
 
 const FiatAmountPrimaryDisplay = ({
   parsedString,
@@ -26,15 +26,16 @@ const FiatAmountPrimaryDisplay = ({
   );
 };
 
-const SatAmountPrimaryDisplay = ({
+const AssetAmountPrimaryDisplay = ({
   parsedString,
 }: {
   parsedString: string;
 }) => {
+  const { activeAsset } = useWallet();
   return (
     <div className="text-6xl">
       {Number(parsedString).toLocaleString()}
-      <span className="text-sm">SATs</span>
+      <span className="text-sm">{activeAsset.code}</span>
     </div>
   );
 };
@@ -46,7 +47,12 @@ export default function AmountInput({
   rawInputAmount: string;
   setRawInputAmount: React.Dispatch<React.SetStateAction<string>>;
 }) {
-  const { satsUsdPrice, activeCurrency, setActiveCurrency } = useWallet();
+  const {
+    satsUsdPrice,
+    activeInputCurrency,
+    setActiveInputCurrency,
+    activeAsset,
+  } = useWallet();
 
   const handleKey = useCallback(
     (key: string) => {
@@ -59,7 +65,7 @@ export default function AmountInput({
         }
 
         // Check if the key is a decimal point and the active currency is BTC
-        if (key === "." && activeCurrency === Currency.BTC) {
+        if (key === "." && activeInputCurrency.type !== CurrencyType.FIAT) {
           return prev; // Ignore the decimal point in sats mode
         }
 
@@ -77,7 +83,7 @@ export default function AmountInput({
         return prev;
       });
     },
-    [activeCurrency, setRawInputAmount],
+    [activeInputCurrency, setRawInputAmount],
   );
 
   useEffect(() => {
@@ -97,32 +103,37 @@ export default function AmountInput({
     const decAmount = rawInputAmount.split(".")[1];
 
     const fiatAmountString =
-      activeCurrency === Currency.USD
+      activeInputCurrency.type === CurrencyType.FIAT
         ? `${Number(intAmount).toLocaleString()}${
             decAmount ? `.${decAmount}` : ""
           }`
         : (Number(rawInputAmount) * satsUsdPrice.value).toFixed(2);
-    const satsAmountString =
-      activeCurrency === Currency.BTC
+    const assetAmountString =
+      activeInputCurrency.type !== CurrencyType.FIAT
         ? `${rawInputAmount}`
         : Number(
             (Number(rawInputAmount) / satsUsdPrice.value).toFixed(0),
           ).toLocaleString();
     return {
       fiatAmountString,
-      satsAmountString,
+      assetAmountString,
     };
-  }, [satsUsdPrice, rawInputAmount, activeCurrency]);
+  }, [satsUsdPrice, rawInputAmount, activeInputCurrency]);
 
   useEffect(() => {
     resolveCurrencyDisplay();
-  }, [rawInputAmount, satsUsdPrice, resolveCurrencyDisplay, activeCurrency]);
+  }, [
+    rawInputAmount,
+    satsUsdPrice,
+    resolveCurrencyDisplay,
+    activeInputCurrency,
+  ]);
 
   return (
     <div className="flex w-full flex-col items-center gap-2">
       <div className="my-10">
         <div className="flex justify-center font-decimal text-[60px] leading-[60px]">
-          {activeCurrency === Currency.USD ? (
+          {activeInputCurrency.type === CurrencyType.FIAT ? (
             rawInputAmount ? (
               <FiatAmountPrimaryDisplay
                 parsedString={resolveCurrencyDisplay().fiatAmountString}
@@ -131,35 +142,35 @@ export default function AmountInput({
               <FiatAmountPrimaryDisplay parsedString={"0"} />
             )
           ) : rawInputAmount ? (
-            <SatAmountPrimaryDisplay
-              parsedString={resolveCurrencyDisplay().satsAmountString}
+            <AssetAmountPrimaryDisplay
+              parsedString={resolveCurrencyDisplay().assetAmountString}
             />
           ) : (
-            <SatAmountPrimaryDisplay parsedString={"0"} />
+            <AssetAmountPrimaryDisplay parsedString={"0"} />
           )}
         </div>
         <div className="flex items-center justify-center gap-2">
           <div
-            className="flex inline-flex items-center gap-2 rounded-full bg-[#F9F9F9] bg-opacity-20 px-2 py-1 text-center font-decimal text-[13px] opacity-40 active:bg-opacity-40"
+            className="mt-2 flex inline-flex items-center gap-2 rounded-full bg-[#F9F9F9] bg-opacity-20 px-2 py-1 text-center font-decimal text-[13px] opacity-40 active:bg-opacity-40"
             onClick={() => {
-              const { fiatAmountString, satsAmountString } =
+              const { fiatAmountString, assetAmountString } =
                 resolveCurrencyDisplay();
-              if (activeCurrency === Currency.BTC) {
+              if (activeInputCurrency.type !== CurrencyType.FIAT) {
                 const removeCommas = fiatAmountString.replace(/,/g, ""); // remove commas
                 const cleanedInput = removeCommas.replace(/\.00$/, ""); // remove trailing .00
                 setRawInputAmount(cleanedInput);
-                setActiveCurrency(Currency.USD);
+                setActiveInputCurrency(PERMANENT_CURRENCIES.USD);
               } else {
-                const parsedInput = satsAmountString.replace(/,/g, ""); // remove commas
+                const parsedInput = assetAmountString.replace(/,/g, ""); // remove commas
                 setRawInputAmount(parsedInput.length > 0 ? parsedInput : "0");
-                setActiveCurrency(Currency.BTC);
+                setActiveInputCurrency(activeAsset);
               }
             }}
           >
-            {activeCurrency === Currency.USD
+            {activeInputCurrency.type === CurrencyType.FIAT
               ? rawInputAmount
-                ? `${resolveCurrencyDisplay().satsAmountString} SATs`
-                : "0 SATs"
+                ? `${resolveCurrencyDisplay().assetAmountString} ${activeAsset.code}`
+                : `0 ${activeAsset.code}`
               : rawInputAmount
                 ? `$${resolveCurrencyDisplay().fiatAmountString}`
                 : "$0"}

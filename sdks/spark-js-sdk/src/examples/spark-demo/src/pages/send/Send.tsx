@@ -11,7 +11,7 @@ import ArrowLeft from "../../icons/ArrowLeft";
 import CloseIcon from "../../icons/CloseIcon";
 import { Routes } from "../../routes";
 import { useWallet } from "../../store/wallet";
-import { Currency } from "../../utils/currency";
+import { CurrencyType } from "../../utils/currency";
 
 export enum SendStep {
   AddressInput = "AddressInput",
@@ -34,8 +34,12 @@ export default function Send() {
   const [sendResponse, setSendResponse] = useState<Transfer | string | null>(
     null,
   );
-  const { satsUsdPrice, activeCurrency, sendTransfer, payLightningInvoice } =
-    useWallet();
+  const {
+    satsUsdPrice,
+    activeInputCurrency,
+    sendTransfer,
+    payLightningInvoice,
+  } = useWallet();
 
   const logoLeft = useMemo(() => {
     switch (currentStep) {
@@ -97,7 +101,7 @@ export default function Send() {
         break;
       case SendStep.ConfirmQuote:
         const satsToSend =
-          activeCurrency === Currency.USD
+          activeInputCurrency.type === CurrencyType.FIAT
             ? Math.floor(Number(rawInputAmount) / satsUsdPrice.value)
             : Number(rawInputAmount);
         console.log("satsToSend", satsToSend);
@@ -119,7 +123,7 @@ export default function Send() {
     navigate,
     sendAddressNetwork,
     rawInputAmount,
-    activeCurrency,
+    activeInputCurrency,
     satsUsdPrice,
   ]);
 
@@ -149,24 +153,13 @@ export default function Send() {
       )}
       {currentStep === SendStep.ConfirmQuote && (
         <ConfirmQuote
-          sendFiatAmount={
-            activeCurrency === Currency.USD
-              ? rawInputAmount
-              : `${Number(rawInputAmount) * satsUsdPrice.value}`
-          }
+          inputAmount={rawInputAmount}
           sendAddress={sendAddress}
           sendAddressNetwork={sendAddressNetwork}
         />
       )}
       {currentStep === SendStep.Success && (
-        <SendDetails
-          sendFiatAmount={
-            activeCurrency === Currency.USD
-              ? rawInputAmount
-              : `${(Number(rawInputAmount) * satsUsdPrice.value).toFixed(2)}`
-          }
-          sendAddress={sendAddress}
-        />
+        <SendDetails inputAmount={rawInputAmount} sendAddress={sendAddress} />
       )}
     </CardForm>
   );

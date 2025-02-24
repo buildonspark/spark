@@ -8,9 +8,7 @@ import ArrowLeft from "../../icons/ArrowLeft";
 import CloseIcon from "../../icons/CloseIcon";
 import { Routes } from "../../routes";
 import { useWallet } from "../../store/wallet";
-import { Currency } from "../../utils/currency";
-import BitcoinDepositAddress from "./BitcoinDepositAddress";
-import SparkDepositAddress from "./SparkDepositAddress";
+import { CurrencyType } from "../../utils/currency";
 
 enum ReceiveStep {
   NetworkSelect = "NetworkSelect",
@@ -30,8 +28,8 @@ export default function Receive() {
   const [currentStep, setCurrentStep] = useState<ReceiveStep>(
     ReceiveStep.NetworkSelect,
   );
-  const { satsUsdPrice, activeCurrency } = useWallet();
-  const { createLightningInvoice } = useWallet();
+  const { satsUsdPrice, activeInputCurrency, createLightningInvoice } =
+    useWallet();
   const navigate = useNavigate();
 
   const onSubmit = useCallback(async () => {
@@ -41,7 +39,7 @@ export default function Receive() {
         break;
       case ReceiveStep.InputAmount:
         const satsToReceive =
-          activeCurrency === Currency.USD
+          activeInputCurrency.type === CurrencyType.FIAT
             ? Math.floor(Number(rawInputAmount) / satsUsdPrice.value)
             : Number(rawInputAmount);
 
@@ -58,8 +56,7 @@ export default function Receive() {
     }
   }, [
     setCurrentStep,
-    createLightningInvoice,
-    activeCurrency,
+    activeInputCurrency,
     rawInputAmount,
     satsUsdPrice,
     currentStep,
@@ -157,7 +154,7 @@ export default function Receive() {
         {currentStep === ReceiveStep.ShareQuote && (
           <ReceiveDetails
             receiveFiatAmount={
-              activeCurrency === Currency.USD
+              activeInputCurrency.type === CurrencyType.FIAT
                 ? rawInputAmount
                 : `${Number(rawInputAmount) * satsUsdPrice.value}`
             }

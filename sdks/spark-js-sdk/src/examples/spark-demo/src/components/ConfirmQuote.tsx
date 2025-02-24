@@ -1,35 +1,42 @@
 import { useWallet } from "../store/wallet";
+import { CurrencyType } from "../utils/currency";
 
 export default function ConfirmQuote({
-  sendFiatAmount,
+  inputAmount,
   sendAddress,
   sendAddressNetwork,
 }: {
-  sendFiatAmount: string;
+  inputAmount: string;
   sendAddress: string;
   sendAddressNetwork: string;
 }) {
-  console.log("sendFiatAmount", sendFiatAmount);
-  const { satsUsdPrice } = useWallet();
-  const intAmount = sendFiatAmount.split(".")[0];
-  const decAmount = sendFiatAmount.split(".")[1];
-  const hasDecimal = sendFiatAmount.includes(".");
+  const { activeAsset, satsUsdPrice, activeInputCurrency } = useWallet();
+  const sendFiatAmount =
+    activeInputCurrency.type === CurrencyType.FIAT
+      ? inputAmount
+      : `${(Number(inputAmount) * satsUsdPrice.value).toFixed(2)}`;
+  const sendAssetAmount =
+    activeInputCurrency.type === CurrencyType.FIAT
+      ? (Number(inputAmount) / satsUsdPrice.value).toFixed(0)
+      : inputAmount;
   return (
     <div>
       <div className="my-10 flex h-[200px] flex-col items-center justify-center rounded-lg border border-solid border-[rgba(249,249,249,0.12)] bg-[#121E2D]">
         <div className="flex justify-center font-decimal">
           <div className="self-center text-[24px]">$</div>
           <div className="text-[60px] leading-[60px]">
-            {Number(intAmount).toLocaleString()}
+            {Number(sendFiatAmount.split(".")[0]).toLocaleString()}
           </div>
-          {(decAmount || hasDecimal) && (
-            <div className="self-end text-[24px]">.{decAmount}</div>
-          )}
+          {sendFiatAmount.split(".")[1] &&
+            sendFiatAmount.split(".")[1] !== "00" && (
+              <div className="self-end text-[24px]">
+                .{sendFiatAmount.split(".")[1]}
+              </div>
+            )}
         </div>
         <div className="text-center font-decimal text-[13px] opacity-40">
-          {satsUsdPrice
-            ? `${(Number(sendFiatAmount) / satsUsdPrice.value).toFixed(0)} SATs`
-            : "000000000 SATs"}
+          {sendAssetAmount}{" "}
+          {activeAsset.code === "BTC" ? "SATs" : activeAsset.code}
         </div>
       </div>
 
