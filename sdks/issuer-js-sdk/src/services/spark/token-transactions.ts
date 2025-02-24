@@ -1,5 +1,8 @@
 import { TokenTransactionService } from "@buildonspark/spark-js-sdk/token-transactions";
-import { TokenTransaction } from "../../proto/spark.js";
+import {
+  TokenTransaction,
+  LeafWithPreviousTransactionData,
+} from "../../proto/spark.js";
 import { ConnectionManager } from "@buildonspark/spark-js-sdk/connection";
 import { WalletConfigService } from "@buildonspark/spark-js-sdk/config";
 import { getTokenLeavesSum } from "@buildonspark/spark-js-sdk/utils";
@@ -10,14 +13,14 @@ const BURN_ADDRESS = new Uint8Array(32).fill(0x02);
 export class IssuerTokenTransactionService extends TokenTransactionService {
   constructor(
     config: WalletConfigService,
-    connectionManager: ConnectionManager,
+    connectionManager: ConnectionManager
   ) {
     super(config, connectionManager);
   }
 
   async constructMintTokenTransaction(
     tokenPublicKey: Uint8Array,
-    tokenAmount: bigint,
+    tokenAmount: bigint
   ): Promise<TokenTransaction> {
     return {
       tokenInput: {
@@ -40,9 +43,10 @@ export class IssuerTokenTransactionService extends TokenTransactionService {
   }
 
   async constructBurnTokenTransaction(
+    selectedLeaves: LeafWithPreviousTransactionData[],
     tokenPublicKey: Uint8Array,
     tokenAmount: bigint,
-    selectedLeaves: any[],
+    transferBackToIdentityPublicKey: boolean = false
   ) {
     const tokenAmountSum = getTokenLeavesSum(selectedLeaves);
 
@@ -91,7 +95,9 @@ export class IssuerTokenTransactionService extends TokenTransactionService {
             tokenAmount: numberToBytesBE(tokenAmount, 16),
           },
           {
-            ownerPublicKey: await this.config.signer.generatePublicKey(),
+            ownerPublicKey: transferBackToIdentityPublicKey
+              ? await this.config.signer.getIdentityPublicKey()
+              : await this.config.signer.generatePublicKey(),
             tokenPublicKey: tokenPublicKey,
             tokenAmount: numberToBytesBE(tokenDifferenceToSendBack, 16),
           },

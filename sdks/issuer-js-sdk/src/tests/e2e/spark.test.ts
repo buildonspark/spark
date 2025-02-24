@@ -9,19 +9,19 @@ describe("token integration test", () => {
   it("should issue a single token", async () => {
     const tokenAmount: bigint = 1000n;
 
-    const wallet = new IssuerSparkWallet(Network.REGTEST);
+    const wallet = new IssuerSparkWallet(Network.LOCAL);
     const mnemonic = await wallet.generateMnemonic();
     await wallet.createSparkWallet(mnemonic);
 
     const tokenPublicKey = await wallet.getSigner().generatePublicKey();
 
     await wallet.mintTokens(tokenPublicKey, tokenAmount);
-  }, 100000);
+  });
 
   it("should issue a single token and transfer it", async () => {
     const tokenAmount: bigint = 1000n;
 
-    const wallet = new IssuerSparkWallet(Network.REGTEST);
+    const wallet = new IssuerSparkWallet(Network.LOCAL);
     const mnemonic = await wallet.generateMnemonic();
     await wallet.createSparkWallet(mnemonic);
 
@@ -40,7 +40,7 @@ describe("token integration test", () => {
 
   it("should consolidate token leaves", async () => {
     const tokenAmount: bigint = 1000n;
-    const wallet = new IssuerSparkWallet(Network.REGTEST);
+    const wallet = new IssuerSparkWallet(Network.LOCAL);
     const mnemonic = await wallet.generateMnemonic();
     await wallet.createSparkWallet(mnemonic);
 
@@ -52,14 +52,14 @@ describe("token integration test", () => {
 
   it("should freeze tokens", async () => {
     const tokenAmount: bigint = 1000n;
-    const issuerWallet = new IssuerSparkWallet(Network.REGTEST);
+    const issuerWallet = new IssuerSparkWallet(Network.LOCAL);
     const issuerMnemonic = await issuerWallet.generateMnemonic();
     await issuerWallet.createSparkWallet(issuerMnemonic);
 
     const tokenPublicKey = await issuerWallet.getSigner().generatePublicKey();
     await issuerWallet.mintTokens(tokenPublicKey, tokenAmount);
 
-    const userWallet = new IssuerSparkWallet(Network.REGTEST);
+    const userWallet = new IssuerSparkWallet(Network.LOCAL);
     const userMnemonic = await issuerWallet.generateMnemonic();
     await userWallet.createSparkWallet(userMnemonic);
 
@@ -79,7 +79,7 @@ describe("token integration test", () => {
 
   it("should burn tokens", async () => {
     const tokenAmount: bigint = 1000n;
-    const issuerWallet = new IssuerSparkWallet(Network.REGTEST);
+    const issuerWallet = new IssuerSparkWallet(Network.LOCAL);
     const issuerMnemonic = await issuerWallet.generateMnemonic();
     await issuerWallet.createSparkWallet(issuerMnemonic);
 

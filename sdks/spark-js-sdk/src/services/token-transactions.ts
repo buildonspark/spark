@@ -35,31 +35,64 @@ export class TokenTransactionService {
     this.connectionManager = connectionManager;
   }
 
-  public constructTransferTokenTransaction(
-    leavesToSpend: LeafWithPreviousTransactionData[],
+  public async constructTransferTokenTransaction(
+    selectedLeaves: LeafWithPreviousTransactionData[],
     recipientPublicKey: Uint8Array,
     tokenPublicKey: Uint8Array,
-    tokenAmount: bigint
-  ): TokenTransaction {
-    return {
-      tokenInput: {
-        $case: "transferInput",
-        transferInput: {
-          leavesToSpend: leavesToSpend.map((leaf) => ({
-            prevTokenTransactionHash: leaf.previousTransactionHash,
-            prevTokenTransactionLeafVout: leaf.previousTransactionVout,
-          })),
+    tokenAmount: bigint,
+  ): Promise<TokenTransaction> {
+    let availableTokenAmount = calculateAvailableTokenAmount(selectedLeaves);
+
+    if (availableTokenAmount === tokenAmount) {
+      return {
+        tokenInput: {
+          $case: "transferInput",
+          transferInput: {
+            leavesToSpend: selectedLeaves.map((leaf) => ({
+              prevTokenTransactionHash: leaf.previousTransactionHash,
+              prevTokenTransactionLeafVout: leaf.previousTransactionVout,
+            })),
+          },
         },
-      },
-      outputLeaves: [
-        {
-          ownerPublicKey: recipientPublicKey,
-          tokenPublicKey: tokenPublicKey,
-          tokenAmount: numberToBytesBE(tokenAmount, 16),
+        outputLeaves: [
+          {
+            ownerPublicKey: recipientPublicKey,
+            tokenPublicKey: tokenPublicKey,
+            tokenAmount: numberToBytesBE(tokenAmount, 16),
+          },
+        ],
+        sparkOperatorIdentityPublicKeys:
+          this.collectOperatorIdentityPublicKeys(),
+      };
+    } else {
+      const tokenAmountDifference = availableTokenAmount - tokenAmount;
+
+      return {
+        tokenInput: {
+          $case: "transferInput",
+          transferInput: {
+            leavesToSpend: selectedLeaves.map((leaf) => ({
+              prevTokenTransactionHash: leaf.previousTransactionHash,
+              prevTokenTransactionLeafVout: leaf.previousTransactionVout,
+            })),
+          },
         },
-      ],
-      sparkOperatorIdentityPublicKeys: this.collectOperatorIdentityPublicKeys(),
-    };
+        outputLeaves: [
+          {
+            ownerPublicKey: recipientPublicKey,
+            tokenPublicKey: tokenPublicKey,
+            tokenAmount: numberToBytesBE(tokenAmount, 16),
+          },
+          {
+            ownerPublicKey: selectedLeaves[0].leaf?.ownerPublicKey!,
+            tokenPublicKey: tokenPublicKey,
+            tokenAmount: numberToBytesBE(tokenAmountDifference, 16),
+          },
+        ],
+        sparkOperatorIdentityPublicKeys:
+          this.collectOperatorIdentityPublicKeys(),
+      };
+    }
   }
 
   public collectOperatorIdentityPublicKeys(): Uint8Array[] {
@@ -291,6 +324,11 @@ export class TokenTransactionService {
         revocationKeys,
         threshold
       );
+
+      leafToSpendSigningPublicKeys?.forEach(
+        async (ownerPublicKey) =>
+          await this.config.signer.removePublicKey(ownerPublicKey)
+      );
     }
 
     return startResponse.finalTokenTransaction!;
@@ -330,8 +368,9 @@ export class TokenTransactionService {
   }
 
   public async constructConsolidateTokenTransaction(
+    selectedLeaves: LeafWithPreviousTransactionData[],
     tokenPublicKey: Uint8Array,
-    selectedLeaves: LeafWithPreviousTransactionData[]
+    transferBackToIdentityPublicKey: boolean = false
   ): Promise<TokenTransaction> {
     const tokenAmountSum = getTokenLeavesSum(selectedLeaves);
 
@@ -347,7 +386,9 @@ export class TokenTransactionService {
       },
       outputLeaves: [
         {
-          ownerPublicKey: await this.config.signer.generatePublicKey(),
+          ownerPublicKey: transferBackToIdentityPublicKey
+            ? await this.config.signer.getIdentityPublicKey()
+            : await this.config.signer.generatePublicKey(),
           tokenPublicKey: tokenPublicKey,
           tokenAmount: numberToBytesBE(tokenAmountSum, 16),
         },

@@ -71,9 +71,9 @@ export class IssuerSparkWallet extends SparkWallet {
 
     const partialTokenTransaction =
       await this.issuerTokenTransactionService.constructBurnTokenTransaction(
+        selectedLeaves,
         tokenPublicKey,
         tokenAmount,
-        selectedLeaves,
       );
 
     const finalizedTokenTransaction =
