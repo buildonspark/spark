@@ -6,6 +6,7 @@ import { equalBytes, sha256 } from "@scure/btc-signer/utils";
 import { WalletConfigService } from "../services/config.js";
 import { ConnectionManager } from "../services/connection.js";
 import { CoopExitService } from "../services/coop-exit.js";
+import { TransferService } from "../services/transfer.js";
 import { SparkWallet } from "../spark-sdk.js";
 import { getP2TRAddressFromPublicKey, getP2TRScriptFromPublicKey, getTxId, getTxIdNoReverse, } from "../utils/bitcoin.js";
 import { getNetwork, Network } from "../utils/network.js";
@@ -33,6 +34,9 @@ describe("coop exit", () => {
         const sspWallet = new SparkWallet(Network.LOCAL);
         const sspMnemonic = await sspWallet.generateMnemonic();
         const sspPubkey = await sspWallet.createSparkWallet(sspMnemonic);
+        const sspConfigService = new WalletConfigService(Network.LOCAL, sspWallet.getSigner());
+        const sspConnectionManager = new ConnectionManager(sspConfigService);
+        const sspTransferService = new TransferService(sspConfigService, sspConnectionManager);
         const sspIntermediateAddressScript = getP2TRScriptFromPublicKey(hexToBytes(sspPubkey), Network.LOCAL);
         // Setup withdraw
         const withdrawPubKey = await userWallet.getSigner().generatePublicKey();
@@ -113,7 +117,7 @@ describe("coop exit", () => {
         ];
         let hasError = false;
         try {
-            await sspWallet._claimTransfer(receiverTransfer, leavesToClaim);
+            await sspTransferService.claimTransfer(receiverTransfer, leavesToClaim);
         }
         catch (e) {
             hasError = true;
@@ -130,7 +134,7 @@ describe("coop exit", () => {
         // So that we don't race the chain watcher in this test
         await faucet.generateToAddress(30, randomAddress);
         // Claim leaf
-        await sspWallet._claimTransfer(receiverTransfer, leavesToClaim);
+        await sspTransferService.claimTransfer(receiverTransfer, leavesToClaim);
     }, 30000);
 });
 //# sourceMappingURL=coop-exit.test.js.map

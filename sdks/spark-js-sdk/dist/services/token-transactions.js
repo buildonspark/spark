@@ -11,7 +11,7 @@ export class TokenTransactionService {
         this.config = config;
         this.connectionManager = connectionManager;
     }
-    async constructTransferTokenTransaction(selectedLeaves, recipientPublicKey, tokenPublicKey, tokenAmount) {
+    async constructTransferTokenTransaction(selectedLeaves, recipientPublicKey, tokenPublicKey, tokenAmount, transferBackToIdentityPublicKey = false) {
         let availableTokenAmount = calculateAvailableTokenAmount(selectedLeaves);
         if (availableTokenAmount === tokenAmount) {
             return {
@@ -53,7 +53,9 @@ export class TokenTransactionService {
                         tokenAmount: numberToBytesBE(tokenAmount, 16),
                     },
                     {
-                        ownerPublicKey: selectedLeaves[0].leaf?.ownerPublicKey,
+                        ownerPublicKey: transferBackToIdentityPublicKey
+                            ? await this.config.signer.getIdentityPublicKey()
+                            : await this.config.signer.generatePublicKey(),
                         tokenPublicKey: tokenPublicKey,
                         tokenAmount: numberToBytesBE(tokenAmountDifference, 16),
                     },
@@ -79,8 +81,8 @@ export class TokenTransactionService {
             if (!issuerPublicKey) {
                 throw new Error("issuer public key cannot be nil");
             }
-            const owner_signature = await this.config.signer.signMessageWithPublicKey(partialTokenTransactionHash, issuerPublicKey);
-            ownerSignatures.push(owner_signature);
+            const ownerSignature = await this.signMessageWithKey(partialTokenTransactionHash, issuerPublicKey);
+            ownerSignatures.push(ownerSignature);
         }
         else if (tokenTransaction.tokenInput.$case === "transferInput") {
             const transferInput = tokenTransaction.tokenInput.transferInput;
@@ -89,7 +91,7 @@ export class TokenTransactionService {
             }
             for (let i = 0; i < transferInput.leavesToSpend.length; i++) {
                 const leaf = transferInput.leavesToSpend[i];
-                const ownerSignature = await this.config.signer.signMessageWithPublicKey(partialTokenTransactionHash, leafToSpendSigningPublicKeys[i]);
+                const ownerSignature = await this.signMessageWithKey(partialTokenTransactionHash, leafToSpendSigningPublicKeys[i]);
                 ownerSignatures.push(ownerSignature);
             }
         }
@@ -125,7 +127,7 @@ export class TokenTransactionService {
             if (!issuerPublicKey) {
                 throw new Error("issuer public key cannot be nil");
             }
-            const ownerSignature = await this.config.signer.signMessageWithPublicKey(payloadHash, issuerPublicKey);
+            const ownerSignature = await this.signMessageWithKey(payloadHash, issuerPublicKey);
             operatorSpecificSignatures.push({
                 ownerPublicKey: issuerPublicKey,
                 ownerSignature: ownerSignature,
@@ -135,10 +137,10 @@ export class TokenTransactionService {
         if (tokenTransaction.tokenInput.$case === "transferInput") {
             const transferInput = tokenTransaction.tokenInput.transferInput;
             for (let i = 0; i < transferInput.leavesToSpend.length; i++) {
-                const owner_signature = await this.config.signer.signMessageWithIdentityKey(payloadHash);
+                const ownerSignature = await this.config.signer.signMessageWithIdentityKey(payloadHash);
                 operatorSpecificSignatures.push({
                     ownerPublicKey: await this.config.signer.getIdentityPublicKey(),
-                    ownerSignature: owner_signature,
+                    ownerSignature: ownerSignature,
                     payload: payload,
                 });
             }
@@ -146,9 +148,11 @@ export class TokenTransactionService {
         // Submit sign_token_transaction to all SOs in parallel and track their indices
         const soSignatures = await Promise.allSettled(Object.entries(signingOperators).map(async ([identifier, operator], index) => {
             const internalSparkClient = await this.connectionManager.createSparkClient(operator.address);
+            const identityPublicKey = await this.config.signer.getIdentityPublicKey();
             const response = await internalSparkClient.sign_token_transaction({
                 finalTokenTransaction,
                 operatorSpecificSignatures,
+                identityPublicKey,
             });
             return {
                 index,
@@ -199,9 +203,11 @@ export class TokenTransactionService {
         // Submit finalize_token_transaction to all SOs in parallel
         const soResponses = await Promise.allSettled(Object.entries(signingOperators).map(async ([identifier, operator]) => {
             const internalSparkClient = await this.connectionManager.createSparkClient(operator.address);
+            const identityPublicKey = await this.config.signer.getIdentityPublicKey();
             const response = await internalSparkClient.finalize_token_transaction({
                 finalTokenTransaction,
                 leafToSpendRevocationKeys,
+                identityPublicKey,
             });
             return {
                 identifier,
@@ -308,6 +314,16 @@ export class TokenTransactionService {
                 previousTransactionVout: index,
             });
         });
+    }
+    // Helper function for deciding if the signer public key is the identity public key
+    async signMessageWithKey(message, publicKey) {
+        if (bytesToHex(publicKey) ===
+            bytesToHex(await this.config.signer.getIdentityPublicKey())) {
+            return await this.config.signer.signMessageWithIdentityKey(message);
+        }
+        else {
+            return await this.config.signer.signMessageWithPublicKey(message, publicKey);
+        }
     }
 }
 //# sourceMappingURL=token-transactions.js.map

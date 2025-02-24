@@ -1,9 +1,8 @@
 import { Transaction } from "@scure/btc-signer";
-import { CoopExitFeeEstimateInput, CoopExitFeeEstimateOutput, LeavesSwapRequest, LightningReceiveFeeEstimateInput, LightningReceiveFeeEstimateOutput, LightningSendFeeEstimateInput, LightningSendFeeEstimateOutput } from "./graphql/objects/index.js";
+import { CoopExitFeeEstimateInput, CoopExitFeeEstimateOutput, LightningReceiveFeeEstimateInput, LightningReceiveFeeEstimateOutput, LightningSendFeeEstimateInput, LightningSendFeeEstimateOutput } from "./graphql/objects/index.js";
 import { GenerateDepositAddressResponse, LeafWithPreviousTransactionData, QueryPendingTransfersResponse, Transfer, TreeNode } from "./proto/spark.js";
-import { WalletConfig, WalletConfigService } from "./services/config.js";
+import { WalletConfigService } from "./services/config.js";
 import { ConnectionManager } from "./services/connection.js";
-import { LeafKeyTweak } from "./services/transfer.js";
 import { DepositAddressTree } from "./services/tree-creation.js";
 import { SparkSigner } from "./signer/signer.js";
 import { Network } from "./utils/network.js";
@@ -41,10 +40,7 @@ export declare class SparkWallet {
     getSigner(): SparkSigner;
     private initWasm;
     private ensureInitialized;
-    getConfigService(): WalletConfigService;
-    getConfig(): WalletConfig;
     getMasterPubKey(): Promise<Uint8Array>;
-    getP2trAddress(): Promise<string>;
     signFrost(params: SignFrostParams): Promise<Uint8Array>;
     aggregateFrost(params: AggregateFrostParams): Promise<Uint8Array>;
     generateMnemonic(): Promise<string>;
@@ -55,24 +51,19 @@ export declare class SparkWallet {
     private selectLeaves;
     private selectLeavesForSwap;
     syncWallet(): Promise<void>;
-    optimizeLeaves(): Promise<void>;
-    requestLeavesSwap({ targetAmount, leaves, }: {
-        targetAmount?: number;
-        leaves?: TreeNode[];
-    }): Promise<LeavesSwapRequest>;
+    private optimizeLeaves;
+    private requestLeavesSwap;
     createLightningInvoice({ amountSats, memo, expirySeconds, invoiceCreator, }: CreateLightningInvoiceParams): Promise<string>;
     payLightningInvoice({ invoice, amountSats, }: PayLightningInvoiceParams): Promise<import("./graphql/objects/LightningSendRequest.js").default>;
     getLightningReceiveFeeEstimate({ amountSats, network, }: LightningReceiveFeeEstimateInput): Promise<LightningReceiveFeeEstimateOutput | null>;
     getLightningSendFeeEstimate({ encodedInvoice, }: LightningSendFeeEstimateInput): Promise<LightningSendFeeEstimateOutput | null>;
     getCoopExitFeeEstimate({ leafExternalIds, withdrawalAddress, }: CoopExitFeeEstimateInput): Promise<CoopExitFeeEstimateOutput | null>;
-    transferDepositToSelf(leaves: TreeNode[], signingPubKey: Uint8Array): Promise<void>;
+    private transferDepositToSelf;
     sendTransfer({ amount, receiverPubKey, leaves, expiryTime, }: SendTransferParams): Promise<Transfer>;
     queryPendingTransfers(): Promise<QueryPendingTransfersResponse>;
     claimTransfer(transfer: Transfer): Promise<import("./proto/spark.js").FinalizeNodeSignaturesResponse>;
     claimTransfers(): Promise<boolean>;
     coopExit(onchainAddress: string, targetAmountSats?: number): Promise<import("./graphql/objects/CoopExitRequest.js").default | null | undefined>;
-    _sendTransfer(leaves: LeafKeyTweak[], receiverIdentityPubkey: Uint8Array, expiryTime: Date): Promise<Transfer>;
-    _claimTransfer(transfer: Transfer, leaves: LeafKeyTweak[]): Promise<import("./proto/spark.js").FinalizeNodeSignaturesResponse>;
     getLeaves(): Promise<TreeNode[]>;
     getBalance(): Promise<BigInt>;
     verifyPendingTransfer(transfer: Transfer): Promise<Map<string, Uint8Array>>;
@@ -86,7 +77,7 @@ export declare class SparkWallet {
         depositTx: Transaction;
         vout: any;
     } | null>;
-    createTreeRoot(signingPubKey: Uint8Array, verifyingKey: Uint8Array, depositTx: Transaction, vout: number): Promise<import("./proto/spark.js").FinalizeNodeSignaturesResponse>;
+    createTreeRoot(signingPubKey: Uint8Array, verifyingKey: Uint8Array, depositTx: Transaction, vout: number): Promise<TreeNode[] | undefined>;
     generateDepositAddressForTree(vout: number, parentSigningPubKey: Uint8Array, parentTx?: Transaction, parentNode?: TreeNode): Promise<DepositAddressTree>;
     createTree(vout: number, root: DepositAddressTree, createLeaves: boolean, parentTx?: Transaction, parentNode?: TreeNode): Promise<import("./proto/spark.js").FinalizeNodeSignaturesResponse>;
 }

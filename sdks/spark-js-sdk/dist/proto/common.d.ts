@@ -5,6 +5,7 @@ export declare enum SignatureIntent {
     TRANSFER = 1,
     AGGREGATE = 2,
     REFRESH = 3,
+    EXTEND = 4,
     UNRECOGNIZED = -1
 }
 export declare function signatureIntentFromJSON(object: any): SignatureIntent;

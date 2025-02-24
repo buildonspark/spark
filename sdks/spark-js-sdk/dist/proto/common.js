@@ -12,6 +12,7 @@ export var SignatureIntent;
     SignatureIntent[SignatureIntent["TRANSFER"] = 1] = "TRANSFER";
     SignatureIntent[SignatureIntent["AGGREGATE"] = 2] = "AGGREGATE";
     SignatureIntent[SignatureIntent["REFRESH"] = 3] = "REFRESH";
+    SignatureIntent[SignatureIntent["EXTEND"] = 4] = "EXTEND";
     SignatureIntent[SignatureIntent["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
 })(SignatureIntent || (SignatureIntent = {}));
 export function signatureIntentFromJSON(object) {
@@ -28,6 +29,9 @@ export function signatureIntentFromJSON(object) {
         case 3:
         case "REFRESH":
             return SignatureIntent.REFRESH;
+        case 4:
+        case "EXTEND":
+            return SignatureIntent.EXTEND;
         case -1:
         case "UNRECOGNIZED":
         default:
@@ -44,6 +48,8 @@ export function signatureIntentToJSON(object) {
             return "AGGREGATE";
         case SignatureIntent.REFRESH:
             return "REFRESH";
+        case SignatureIntent.EXTEND:
+            return "EXTEND";
         case SignatureIntent.UNRECOGNIZED:
         default:
             return "UNRECOGNIZED";

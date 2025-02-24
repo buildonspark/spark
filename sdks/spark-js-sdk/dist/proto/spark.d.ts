@@ -174,6 +174,7 @@ export interface TokenTransactionSignatures {
      * Filled by signing the partial token transaction hash with the owner/issuer private key.
      * For mint transactions this will be one signature for the input issuer_public_key
      * For transfer transactions this will be one for each leaf for the leaf owner_public_key
+     * This is a DER signature which can be between 68 and 73 bytes.
      */
     ownerSignatures: Uint8Array[];
 }
@@ -205,12 +206,14 @@ export interface OperatorSpecificTokenTransactionSignablePayload {
  */
 export interface OperatorSpecificTokenTransactionSignature {
     ownerPublicKey: Uint8Array;
+    /** This is a DER signature which can be between 68 and 73 bytes. */
     ownerSignature: Uint8Array;
     payload: OperatorSpecificTokenTransactionSignablePayload | undefined;
 }
 export interface SignTokenTransactionRequest {
     finalTokenTransaction: TokenTransaction | undefined;
     operatorSpecificSignatures: OperatorSpecificTokenTransactionSignature[];
+    identityPublicKey: Uint8Array;
 }
 export interface SignTokenTransactionResponse {
     sparkOperatorSignature: Uint8Array;
@@ -223,6 +226,7 @@ export interface FinalizeTokenTransactionRequest {
      * token transaction.
      */
     leafToSpendRevocationKeys: Uint8Array[];
+    identityPublicKey: Uint8Array;
 }
 export interface FreezeTokensPayload {
     ownerPublicKey: Uint8Array;
@@ -234,6 +238,7 @@ export interface FreezeTokensPayload {
 }
 export interface FreezeTokensRequest {
     freezeTokensPayload: FreezeTokensPayload | undefined;
+    /** This is a DER signature which can be between 68 and 73 bytes. */
     issuerSignature: Uint8Array;
 }
 export interface FreezeTokensResponse {
@@ -488,6 +493,21 @@ export interface RefreshTimelockSigningResult {
 export interface RefreshTimelockResponse {
     signingResults: RefreshTimelockSigningResult[];
 }
+export interface ExtendLeafRequest {
+    leafId: string;
+    ownerIdentityPublicKey: Uint8Array;
+    nodeTxSigningJob: SigningJob | undefined;
+    refundTxSigningJob: SigningJob | undefined;
+}
+export interface ExtendLeafSigningResult {
+    signingResult: SigningResult | undefined;
+    verifyingKey: Uint8Array;
+}
+export interface ExtendLeafResponse {
+    leafId: string;
+    nodeTxSigningResult: ExtendLeafSigningResult | undefined;
+    refundTxSigningResult: ExtendLeafSigningResult | undefined;
+}
 export interface AddressRequestNode {
     userPublicKey: Uint8Array;
     children: AddressRequestNode[];
@@ -686,6 +706,9 @@ export declare const LeafSwapResponse: MessageFns<LeafSwapResponse>;
 export declare const RefreshTimelockRequest: MessageFns<RefreshTimelockRequest>;
 export declare const RefreshTimelockSigningResult: MessageFns<RefreshTimelockSigningResult>;
 export declare const RefreshTimelockResponse: MessageFns<RefreshTimelockResponse>;
+export declare const ExtendLeafRequest: MessageFns<ExtendLeafRequest>;
+export declare const ExtendLeafSigningResult: MessageFns<ExtendLeafSigningResult>;
+export declare const ExtendLeafResponse: MessageFns<ExtendLeafResponse>;
 export declare const AddressRequestNode: MessageFns<AddressRequestNode>;
 export declare const PrepareTreeAddressRequest: MessageFns<PrepareTreeAddressRequest>;
 export declare const AddressNode: MessageFns<AddressNode>;
@@ -841,6 +864,14 @@ export declare const SparkServiceDefinition: {
             readonly responseStream: false;
             readonly options: {};
         };
+        readonly extend_leaf: {
+            readonly name: "extend_leaf";
+            readonly requestType: MessageFns<ExtendLeafRequest>;
+            readonly requestStream: false;
+            readonly responseType: MessageFns<ExtendLeafResponse>;
+            readonly responseStream: false;
+            readonly options: {};
+        };
         readonly prepare_tree_address: {
             readonly name: "prepare_tree_address";
             readonly requestType: MessageFns<PrepareTreeAddressRequest>;
@@ -957,6 +988,7 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
     provide_preimage(request: ProvidePreimageRequest, context: CallContext & CallContextExt): Promise<DeepPartial<ProvidePreimageResponse>>;
     leaf_swap(request: LeafSwapRequest, context: CallContext & CallContextExt): Promise<DeepPartial<LeafSwapResponse>>;
     refresh_timelock(request: RefreshTimelockRequest, context: CallContext & CallContextExt): Promise<DeepPartial<RefreshTimelockResponse>>;
+    extend_leaf(request: ExtendLeafRequest, context: CallContext & CallContextExt): Promise<DeepPartial<ExtendLeafResponse>>;
     prepare_tree_address(request: PrepareTreeAddressRequest, context: CallContext & CallContextExt): Promise<DeepPartial<PrepareTreeAddressResponse>>;
     create_tree(request: CreateTreeRequest, context: CallContext & CallContextExt): Promise<DeepPartial<CreateTreeResponse>>;
     get_signing_operator_list(request: Empty, context: CallContext & CallContextExt): Promise<DeepPartial<GetSigningOperatorListResponse>>;
@@ -988,6 +1020,7 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
     provide_preimage(request: DeepPartial<ProvidePreimageRequest>, options?: CallOptions & CallOptionsExt): Promise<ProvidePreimageResponse>;
     leaf_swap(request: DeepPartial<LeafSwapRequest>, options?: CallOptions & CallOptionsExt): Promise<LeafSwapResponse>;
     refresh_timelock(request: DeepPartial<RefreshTimelockRequest>, options?: CallOptions & CallOptionsExt): Promise<RefreshTimelockResponse>;
+    extend_leaf(request: DeepPartial<ExtendLeafRequest>, options?: CallOptions & CallOptionsExt): Promise<ExtendLeafResponse>;
     prepare_tree_address(request: DeepPartial<PrepareTreeAddressRequest>, options?: CallOptions & CallOptionsExt): Promise<PrepareTreeAddressResponse>;
     create_tree(request: DeepPartial<CreateTreeRequest>, options?: CallOptions & CallOptionsExt): Promise<CreateTreeResponse>;
     get_signing_operator_list(request: DeepPartial<Empty>, options?: CallOptions & CallOptionsExt): Promise<GetSigningOperatorListResponse>;

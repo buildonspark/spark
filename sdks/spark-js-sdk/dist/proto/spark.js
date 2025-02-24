@@ -2442,7 +2442,7 @@ export const OperatorSpecificTokenTransactionSignature = {
     },
 };
 function createBaseSignTokenTransactionRequest() {
-    return { finalTokenTransaction: undefined, operatorSpecificSignatures: [] };
+    return { finalTokenTransaction: undefined, operatorSpecificSignatures: [], identityPublicKey: new Uint8Array(0) };
 }
 export const SignTokenTransactionRequest = {
     encode(message, writer = new BinaryWriter()) {
@@ -2451,6 +2451,9 @@ export const SignTokenTransactionRequest = {
         }
         for (const v of message.operatorSpecificSignatures) {
             OperatorSpecificTokenTransactionSignature.encode(v, writer.uint32(18).fork()).join();
+        }
+        if (message.identityPublicKey.length !== 0) {
+            writer.uint32(26).bytes(message.identityPublicKey);
         }
         return writer;
     },
@@ -2475,6 +2478,13 @@ export const SignTokenTransactionRequest = {
                     message.operatorSpecificSignatures.push(OperatorSpecificTokenTransactionSignature.decode(reader, reader.uint32()));
                     continue;
                 }
+                case 3: {
+                    if (tag !== 26) {
+                        break;
+                    }
+                    message.identityPublicKey = reader.bytes();
+                    continue;
+                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -2491,6 +2501,9 @@ export const SignTokenTransactionRequest = {
             operatorSpecificSignatures: globalThis.Array.isArray(object?.operatorSpecificSignatures)
                 ? object.operatorSpecificSignatures.map((e) => OperatorSpecificTokenTransactionSignature.fromJSON(e))
                 : [],
+            identityPublicKey: isSet(object.identityPublicKey)
+                ? bytesFromBase64(object.identityPublicKey)
+                : new Uint8Array(0),
         };
     },
     toJSON(message) {
@@ -2500,6 +2513,9 @@ export const SignTokenTransactionRequest = {
         }
         if (message.operatorSpecificSignatures?.length) {
             obj.operatorSpecificSignatures = message.operatorSpecificSignatures.map((e) => OperatorSpecificTokenTransactionSignature.toJSON(e));
+        }
+        if (message.identityPublicKey.length !== 0) {
+            obj.identityPublicKey = base64FromBytes(message.identityPublicKey);
         }
         return obj;
     },
@@ -2514,6 +2530,7 @@ export const SignTokenTransactionRequest = {
                 : undefined;
         message.operatorSpecificSignatures =
             object.operatorSpecificSignatures?.map((e) => OperatorSpecificTokenTransactionSignature.fromPartial(e)) || [];
+        message.identityPublicKey = object.identityPublicKey ?? new Uint8Array(0);
         return message;
     },
 };
@@ -2590,7 +2607,7 @@ export const SignTokenTransactionResponse = {
     },
 };
 function createBaseFinalizeTokenTransactionRequest() {
-    return { finalTokenTransaction: undefined, leafToSpendRevocationKeys: [] };
+    return { finalTokenTransaction: undefined, leafToSpendRevocationKeys: [], identityPublicKey: new Uint8Array(0) };
 }
 export const FinalizeTokenTransactionRequest = {
     encode(message, writer = new BinaryWriter()) {
@@ -2599,6 +2616,9 @@ export const FinalizeTokenTransactionRequest = {
         }
         for (const v of message.leafToSpendRevocationKeys) {
             writer.uint32(18).bytes(v);
+        }
+        if (message.identityPublicKey.length !== 0) {
+            writer.uint32(26).bytes(message.identityPublicKey);
         }
         return writer;
     },
@@ -2623,6 +2643,13 @@ export const FinalizeTokenTransactionRequest = {
                     message.leafToSpendRevocationKeys.push(reader.bytes());
                     continue;
                 }
+                case 3: {
+                    if (tag !== 26) {
+                        break;
+                    }
+                    message.identityPublicKey = reader.bytes();
+                    continue;
+                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -2639,6 +2666,9 @@ export const FinalizeTokenTransactionRequest = {
             leafToSpendRevocationKeys: globalThis.Array.isArray(object?.leafToSpendRevocationKeys)
                 ? object.leafToSpendRevocationKeys.map((e) => bytesFromBase64(e))
                 : [],
+            identityPublicKey: isSet(object.identityPublicKey)
+                ? bytesFromBase64(object.identityPublicKey)
+                : new Uint8Array(0),
         };
     },
     toJSON(message) {
@@ -2648,6 +2678,9 @@ export const FinalizeTokenTransactionRequest = {
         }
         if (message.leafToSpendRevocationKeys?.length) {
             obj.leafToSpendRevocationKeys = message.leafToSpendRevocationKeys.map((e) => base64FromBytes(e));
+        }
+        if (message.identityPublicKey.length !== 0) {
+            obj.identityPublicKey = base64FromBytes(message.identityPublicKey);
         }
         return obj;
     },
@@ -2661,6 +2694,7 @@ export const FinalizeTokenTransactionRequest = {
                 ? TokenTransaction.fromPartial(object.finalTokenTransaction)
                 : undefined;
         message.leafToSpendRevocationKeys = object.leafToSpendRevocationKeys?.map((e) => e) || [];
+        message.identityPublicKey = object.identityPublicKey ?? new Uint8Array(0);
         return message;
     },
 };
@@ -6906,6 +6940,277 @@ export const RefreshTimelockResponse = {
         return message;
     },
 };
+function createBaseExtendLeafRequest() {
+    return {
+        leafId: "",
+        ownerIdentityPublicKey: new Uint8Array(0),
+        nodeTxSigningJob: undefined,
+        refundTxSigningJob: undefined,
+    };
+}
+export const ExtendLeafRequest = {
+    encode(message, writer = new BinaryWriter()) {
+        if (message.leafId !== "") {
+            writer.uint32(10).string(message.leafId);
+        }
+        if (message.ownerIdentityPublicKey.length !== 0) {
+            writer.uint32(18).bytes(message.ownerIdentityPublicKey);
+        }
+        if (message.nodeTxSigningJob !== undefined) {
+            SigningJob.encode(message.nodeTxSigningJob, writer.uint32(26).fork()).join();
+        }
+        if (message.refundTxSigningJob !== undefined) {
+            SigningJob.encode(message.refundTxSigningJob, writer.uint32(34).fork()).join();
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseExtendLeafRequest();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1: {
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.leafId = reader.string();
+                    continue;
+                }
+                case 2: {
+                    if (tag !== 18) {
+                        break;
+                    }
+                    message.ownerIdentityPublicKey = reader.bytes();
+                    continue;
+                }
+                case 3: {
+                    if (tag !== 26) {
+                        break;
+                    }
+                    message.nodeTxSigningJob = SigningJob.decode(reader, reader.uint32());
+                    continue;
+                }
+                case 4: {
+                    if (tag !== 34) {
+                        break;
+                    }
+                    message.refundTxSigningJob = SigningJob.decode(reader, reader.uint32());
+                    continue;
+                }
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skip(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            leafId: isSet(object.leafId) ? globalThis.String(object.leafId) : "",
+            ownerIdentityPublicKey: isSet(object.ownerIdentityPublicKey)
+                ? bytesFromBase64(object.ownerIdentityPublicKey)
+                : new Uint8Array(0),
+            nodeTxSigningJob: isSet(object.nodeTxSigningJob) ? SigningJob.fromJSON(object.nodeTxSigningJob) : undefined,
+            refundTxSigningJob: isSet(object.refundTxSigningJob) ? SigningJob.fromJSON(object.refundTxSigningJob) : undefined,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.leafId !== "") {
+            obj.leafId = message.leafId;
+        }
+        if (message.ownerIdentityPublicKey.length !== 0) {
+            obj.ownerIdentityPublicKey = base64FromBytes(message.ownerIdentityPublicKey);
+        }
+        if (message.nodeTxSigningJob !== undefined) {
+            obj.nodeTxSigningJob = SigningJob.toJSON(message.nodeTxSigningJob);
+        }
+        if (message.refundTxSigningJob !== undefined) {
+            obj.refundTxSigningJob = SigningJob.toJSON(message.refundTxSigningJob);
+        }
+        return obj;
+    },
+    create(base) {
+        return ExtendLeafRequest.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseExtendLeafRequest();
+        message.leafId = object.leafId ?? "";
+        message.ownerIdentityPublicKey = object.ownerIdentityPublicKey ?? new Uint8Array(0);
+        message.nodeTxSigningJob = (object.nodeTxSigningJob !== undefined && object.nodeTxSigningJob !== null)
+            ? SigningJob.fromPartial(object.nodeTxSigningJob)
+            : undefined;
+        message.refundTxSigningJob = (object.refundTxSigningJob !== undefined && object.refundTxSigningJob !== null)
+            ? SigningJob.fromPartial(object.refundTxSigningJob)
+            : undefined;
+        return message;
+    },
+};
+function createBaseExtendLeafSigningResult() {
+    return { signingResult: undefined, verifyingKey: new Uint8Array(0) };
+}
+export const ExtendLeafSigningResult = {
+    encode(message, writer = new BinaryWriter()) {
+        if (message.signingResult !== undefined) {
+            SigningResult.encode(message.signingResult, writer.uint32(10).fork()).join();
+        }
+        if (message.verifyingKey.length !== 0) {
+            writer.uint32(18).bytes(message.verifyingKey);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseExtendLeafSigningResult();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1: {
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.signingResult = SigningResult.decode(reader, reader.uint32());
+                    continue;
+                }
+                case 2: {
+                    if (tag !== 18) {
+                        break;
+                    }
+                    message.verifyingKey = reader.bytes();
+                    continue;
+                }
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skip(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            signingResult: isSet(object.signingResult) ? SigningResult.fromJSON(object.signingResult) : undefined,
+            verifyingKey: isSet(object.verifyingKey) ? bytesFromBase64(object.verifyingKey) : new Uint8Array(0),
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.signingResult !== undefined) {
+            obj.signingResult = SigningResult.toJSON(message.signingResult);
+        }
+        if (message.verifyingKey.length !== 0) {
+            obj.verifyingKey = base64FromBytes(message.verifyingKey);
+        }
+        return obj;
+    },
+    create(base) {
+        return ExtendLeafSigningResult.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseExtendLeafSigningResult();
+        message.signingResult = (object.signingResult !== undefined && object.signingResult !== null)
+            ? SigningResult.fromPartial(object.signingResult)
+            : undefined;
+        message.verifyingKey = object.verifyingKey ?? new Uint8Array(0);
+        return message;
+    },
+};
+function createBaseExtendLeafResponse() {
+    return { leafId: "", nodeTxSigningResult: undefined, refundTxSigningResult: undefined };
+}
+export const ExtendLeafResponse = {
+    encode(message, writer = new BinaryWriter()) {
+        if (message.leafId !== "") {
+            writer.uint32(10).string(message.leafId);
+        }
+        if (message.nodeTxSigningResult !== undefined) {
+            ExtendLeafSigningResult.encode(message.nodeTxSigningResult, writer.uint32(18).fork()).join();
+        }
+        if (message.refundTxSigningResult !== undefined) {
+            ExtendLeafSigningResult.encode(message.refundTxSigningResult, writer.uint32(26).fork()).join();
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseExtendLeafResponse();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1: {
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.leafId = reader.string();
+                    continue;
+                }
+                case 2: {
+                    if (tag !== 18) {
+                        break;
+                    }
+                    message.nodeTxSigningResult = ExtendLeafSigningResult.decode(reader, reader.uint32());
+                    continue;
+                }
+                case 3: {
+                    if (tag !== 26) {
+                        break;
+                    }
+                    message.refundTxSigningResult = ExtendLeafSigningResult.decode(reader, reader.uint32());
+                    continue;
+                }
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skip(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            leafId: isSet(object.leafId) ? globalThis.String(object.leafId) : "",
+            nodeTxSigningResult: isSet(object.nodeTxSigningResult)
+                ? ExtendLeafSigningResult.fromJSON(object.nodeTxSigningResult)
+                : undefined,
+            refundTxSigningResult: isSet(object.refundTxSigningResult)
+                ? ExtendLeafSigningResult.fromJSON(object.refundTxSigningResult)
+                : undefined,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.leafId !== "") {
+            obj.leafId = message.leafId;
+        }
+        if (message.nodeTxSigningResult !== undefined) {
+            obj.nodeTxSigningResult = ExtendLeafSigningResult.toJSON(message.nodeTxSigningResult);
+        }
+        if (message.refundTxSigningResult !== undefined) {
+            obj.refundTxSigningResult = ExtendLeafSigningResult.toJSON(message.refundTxSigningResult);
+        }
+        return obj;
+    },
+    create(base) {
+        return ExtendLeafResponse.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseExtendLeafResponse();
+        message.leafId = object.leafId ?? "";
+        message.nodeTxSigningResult = (object.nodeTxSigningResult !== undefined && object.nodeTxSigningResult !== null)
+            ? ExtendLeafSigningResult.fromPartial(object.nodeTxSigningResult)
+            : undefined;
+        message.refundTxSigningResult =
+            (object.refundTxSigningResult !== undefined && object.refundTxSigningResult !== null)
+                ? ExtendLeafSigningResult.fromPartial(object.refundTxSigningResult)
+                : undefined;
+        return message;
+    },
+};
 function createBaseAddressRequestNode() {
     return { userPublicKey: new Uint8Array(0), children: [] };
 }
@@ -8717,6 +9022,14 @@ export const SparkServiceDefinition = {
             requestType: RefreshTimelockRequest,
             requestStream: false,
             responseType: RefreshTimelockResponse,
+            responseStream: false,
+            options: {},
+        },
+        extend_leaf: {
+            name: "extend_leaf",
+            requestType: ExtendLeafRequest,
+            requestStream: false,
+            responseType: ExtendLeafResponse,
             responseStream: false,
             options: {},
         },

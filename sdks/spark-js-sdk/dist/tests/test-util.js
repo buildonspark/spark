@@ -1,6 +1,7 @@
 import { hexToBytes } from "@noble/curves/abstract/utils";
 import { secp256k1 } from "@noble/curves/secp256k1";
 import { Address, OutScript, Transaction } from "@scure/btc-signer";
+import { WalletConfigService, } from "../services/config.js";
 import { ConnectionManager } from "../services/connection.js";
 import { DepositService } from "../services/deposit.js";
 import { getP2TRAddressFromPublicKey } from "../utils/bitcoin.js";
@@ -101,8 +102,9 @@ export function getTestWalletConfigWithIdentityKey(identityPrivateKey) {
 }
 export async function createNewTree(wallet, pubKey, faucet, amountSats = 100000n) {
     const faucetCoin = await faucet.fund();
-    const connectionManager = new ConnectionManager(wallet.getConfigService());
-    const depositService = new DepositService(wallet.getConfigService(), connectionManager);
+    const configService = new WalletConfigService(Network.LOCAL, wallet.getSigner());
+    const connectionManager = new ConnectionManager(configService);
+    const depositService = new DepositService(configService, connectionManager);
     const depositResp = await depositService.generateDepositAddress({
         signingPubkey: pubKey,
     });

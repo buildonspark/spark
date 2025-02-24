@@ -14,7 +14,7 @@ import { TokenTransactionService } from "./services/token-transactions.js";
 import { TransferService } from "./services/transfer.js";
 import { TreeCreationService, } from "./services/tree-creation.js";
 import { applyAdaptorToSignature, generateAdaptorFromSignature, generateSignatureFromExistingAdaptor, } from "./utils/adaptor-signature.js";
-import { computeTaprootKeyNoScript, getP2TRAddressFromPublicKey, getSigHashFromTx, getTxFromRawTxBytes, getTxFromRawTxHex, getTxId, } from "./utils/bitcoin.js";
+import { computeTaprootKeyNoScript, getSigHashFromTx, getTxFromRawTxBytes, getTxFromRawTxHex, getTxId, } from "./utils/bitcoin.js";
 import { calculateAvailableTokenAmount, checkIfSelectedLeavesAreAvailable, } from "./utils/token-transactions.js";
 import { initWasm } from "./utils/wasm-wrapper.js";
 import { aggregateFrost, signFrost, } from "./utils/wasm.js";
@@ -57,20 +57,8 @@ export class SparkWallet {
             await this.initWasm();
         }
     }
-    // TODO: Probably remove this. Only used temporarily for tests
-    getConfigService() {
-        return this.config;
-    }
-    getConfig() {
-        return this.config.getConfig();
-    }
     async getMasterPubKey() {
         return await this.config.signer.getIdentityPublicKey();
-    }
-    async getP2trAddress() {
-        const pubKey = await this.config.signer.getIdentityPublicKey();
-        const network = this.config.getNetwork();
-        return getP2TRAddressFromPublicKey(pubKey, network);
     }
     async signFrost(params) {
         await this.ensureInitialized();
@@ -386,8 +374,9 @@ export class SparkWallet {
         await this.transferService.sendTransfer(leafKeyTweaks, await this.config.signer.getIdentityPublicKey(), new Date(Date.now() + 10 * 60 * 1000));
         const pendingTransfers = await this.queryPendingTransfers();
         if (pendingTransfers.transfers.length > 0) {
-            await this.claimTransfer(pendingTransfers.transfers[0]);
+            return (await this.claimTransfer(pendingTransfers.transfers[0])).nodes;
         }
+        return;
     }
     async sendTransfer({ amount, receiverPubKey, leaves, expiryTime = new Date(Date.now() + 10 * 60 * 1000), }) {
         let leavesToSend = [];
@@ -488,14 +477,6 @@ export class SparkWallet {
             coopExitRequestId: coopExitRequest.id,
         });
         return completeResponse;
-    }
-    // TODO: Remove this
-    async _sendTransfer(leaves, receiverIdentityPubkey, expiryTime) {
-        return await this.transferService.sendTransfer(leaves, receiverIdentityPubkey, expiryTime);
-    }
-    // TODO: Remove this
-    async _claimTransfer(transfer, leaves) {
-        return await this.transferService.claimTransfer(transfer, leaves);
     }
     async getLeaves() {
         const sparkClient = await this.connectionManager.createSparkClient(this.config.getCoordinatorAddress());
@@ -612,12 +593,13 @@ export class SparkWallet {
         }
     }
     async createTreeRoot(signingPubKey, verifyingKey, depositTx, vout) {
-        return await this.depositService.createTreeRoot({
+        const response = await this.depositService.createTreeRoot({
             signingPubKey,
             verifyingKey,
             depositTx,
             vout,
         });
+        return await this.transferDepositToSelf(response.nodes, signingPubKey);
     }
     // **********************
     // **** Tree Creation Flow ****

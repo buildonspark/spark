@@ -22,7 +22,6 @@ describe("deposit", () => {
         const sdk = new SparkWallet(Network.LOCAL);
         const mnemonic = await sdk.generateMnemonic();
         await sdk.createSparkWallet(mnemonic);
-        const config = sdk.getConfig();
         // Generate private/public key pair
         const pubKey = await sdk.getSigner().generatePublicKey();
         // Generate deposit address

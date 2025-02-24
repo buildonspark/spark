@@ -1,6 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
 import { bytesToHex } from "@noble/curves/abstract/utils";
-import { ConnectionManager } from "../services/connection.js";
 import { SparkWallet } from "../spark-sdk.js";
 import { getTxFromRawTxBytes, getTxId } from "../utils/bitcoin.js";
 import { Network } from "../utils/network.js";
@@ -12,8 +11,6 @@ describe("Tree Creation", () => {
         const wallet = new SparkWallet(Network.LOCAL);
         const mnemonic = await wallet.generateMnemonic();
         await wallet.createSparkWallet(mnemonic);
-        const config = wallet.getConfig();
-        const mockClient = ConnectionManager.createMockClient(config.signingOperators[config.coodinatorIdentifier].address);
         const pubKey = await wallet.getSigner().generatePublicKey();
         const depositResp = await wallet.generateDepositAddress(pubKey);
         expect(depositResp.depositAddress).toBeDefined();

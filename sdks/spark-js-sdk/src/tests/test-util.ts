@@ -2,7 +2,11 @@ import { hexToBytes } from "@noble/curves/abstract/utils";
 import { secp256k1 } from "@noble/curves/secp256k1";
 import { Address, OutScript, Transaction } from "@scure/btc-signer";
 import { TreeNode } from "../proto/spark.js";
-import { SigningOperator, WalletConfig } from "../services/config.js";
+import {
+  SigningOperator,
+  WalletConfig,
+  WalletConfigService,
+} from "../services/config.js";
 import { ConnectionManager } from "../services/connection.js";
 import { DepositService } from "../services/deposit.js";
 import { SparkWallet } from "../spark-sdk.js";
@@ -136,11 +140,12 @@ export async function createNewTree(
 ): Promise<TreeNode> {
   const faucetCoin = await faucet.fund();
 
-  const connectionManager = new ConnectionManager(wallet.getConfigService());
-  const depositService = new DepositService(
-    wallet.getConfigService(),
-    connectionManager
+  const configService = new WalletConfigService(
+    Network.LOCAL,
+    wallet.getSigner()
   );
+  const connectionManager = new ConnectionManager(configService);
+  const depositService = new DepositService(configService, connectionManager);
 
   const depositResp = await depositService.generateDepositAddress({
     signingPubkey: pubKey,

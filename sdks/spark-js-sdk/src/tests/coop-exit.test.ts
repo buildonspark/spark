@@ -7,7 +7,7 @@ import { equalBytes, sha256 } from "@scure/btc-signer/utils";
 import { WalletConfigService } from "../services/config.js";
 import { ConnectionManager } from "../services/connection.js";
 import { CoopExitService } from "../services/coop-exit.js";
-import { LeafKeyTweak } from "../services/transfer.js";
+import { LeafKeyTweak, TransferService } from "../services/transfer.js";
 import { SparkWallet } from "../spark-sdk.js";
 import {
   getP2TRAddressFromPublicKey,
@@ -65,6 +65,16 @@ describe("coop exit", () => {
       const sspWallet = new SparkWallet(Network.LOCAL);
       const sspMnemonic = await sspWallet.generateMnemonic();
       const sspPubkey = await sspWallet.createSparkWallet(sspMnemonic);
+
+      const sspConfigService = new WalletConfigService(
+        Network.LOCAL,
+        sspWallet.getSigner()
+      );
+      const sspConnectionManager = new ConnectionManager(sspConfigService);
+      const sspTransferService = new TransferService(
+        sspConfigService,
+        sspConnectionManager
+      );
 
       const sspIntermediateAddressScript = getP2TRScriptFromPublicKey(
         hexToBytes(sspPubkey),
@@ -181,7 +191,7 @@ describe("coop exit", () => {
 
       let hasError = false;
       try {
-        await sspWallet._claimTransfer(receiverTransfer, leavesToClaim);
+        await sspTransferService.claimTransfer(receiverTransfer, leavesToClaim);
       } catch (e) {
         hasError = true;
       }
@@ -208,7 +218,7 @@ describe("coop exit", () => {
       await faucet.generateToAddress(30, randomAddress);
 
       // Claim leaf
-      await sspWallet._claimTransfer(receiverTransfer, leavesToClaim);
+      await sspTransferService.claimTransfer(receiverTransfer, leavesToClaim);
     },
     30000
   );

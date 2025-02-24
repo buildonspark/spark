@@ -24,7 +24,7 @@ import {
   TransferStatus,
   TreeNode,
 } from "./proto/spark.js";
-import { WalletConfig, WalletConfigService } from "./services/config.js";
+import { WalletConfigService } from "./services/config.js";
 import { ConnectionManager } from "./services/connection.js";
 import { CoopExitService } from "./services/coop-exit.js";
 import { DepositService } from "./services/deposit.js";
@@ -44,7 +44,6 @@ import {
 } from "./utils/adaptor-signature.js";
 import {
   computeTaprootKeyNoScript,
-  getP2TRAddressFromPublicKey,
   getSigHashFromTx,
   getTxFromRawTxBytes,
   getTxFromRawTxHex,
@@ -158,24 +157,8 @@ export class SparkWallet {
     }
   }
 
-  // TODO: Probably remove this. Only used temporarily for tests
-  getConfigService(): WalletConfigService {
-    return this.config;
-  }
-
-  getConfig(): WalletConfig {
-    return this.config.getConfig();
-  }
-
   async getMasterPubKey(): Promise<Uint8Array> {
     return await this.config.signer.getIdentityPublicKey();
-  }
-
-  async getP2trAddress(): Promise<string> {
-    const pubKey = await this.config.signer.getIdentityPublicKey();
-    const network = this.config.getNetwork();
-
-    return getP2TRAddressFromPublicKey(pubKey, network);
   }
 
   async signFrost(params: SignFrostParams): Promise<Uint8Array> {
@@ -299,13 +282,13 @@ export class SparkWallet {
     await this.optimizeLeaves();
   }
 
-  async optimizeLeaves() {
+  private async optimizeLeaves() {
     if (this.leaves.length > 0) {
       await this.requestLeavesSwap({ leaves: this.leaves });
     }
   }
 
-  async requestLeavesSwap({
+  private async requestLeavesSwap({
     targetAmount,
     leaves,
   }: {
@@ -631,7 +614,10 @@ export class SparkWallet {
     });
   }
 
-  async transferDepositToSelf(leaves: TreeNode[], signingPubKey: Uint8Array) {
+  private async transferDepositToSelf(
+    leaves: TreeNode[],
+    signingPubKey: Uint8Array
+  ): Promise<TreeNode[] | undefined> {
     const leafKeyTweaks = await Promise.all(
       leaves.map(async (leaf) => ({
         leaf,
@@ -648,8 +634,10 @@ export class SparkWallet {
 
     const pendingTransfers = await this.queryPendingTransfers();
     if (pendingTransfers.transfers.length > 0) {
-      await this.claimTransfer(pendingTransfers.transfers[0]);
+      return (await this.claimTransfer(pendingTransfers.transfers[0])).nodes;
     }
+
+    return;
   }
 
   async sendTransfer({
@@ -792,24 +780,6 @@ export class SparkWallet {
     });
 
     return completeResponse;
-  }
-
-  // TODO: Remove this
-  async _sendTransfer(
-    leaves: LeafKeyTweak[],
-    receiverIdentityPubkey: Uint8Array,
-    expiryTime: Date
-  ): Promise<Transfer> {
-    return await this.transferService!.sendTransfer(
-      leaves,
-      receiverIdentityPubkey,
-      expiryTime
-    );
-  }
-
-  // TODO: Remove this
-  async _claimTransfer(transfer: Transfer, leaves: LeafKeyTweak[]) {
-    return await this.transferService!.claimTransfer(transfer, leaves);
   }
 
   async getLeaves(): Promise<TreeNode[]> {
@@ -1020,12 +990,14 @@ export class SparkWallet {
     depositTx: Transaction,
     vout: number
   ) {
-    return await this.depositService!.createTreeRoot({
+    const response = await this.depositService!.createTreeRoot({
       signingPubKey,
       verifyingKey,
       depositTx,
       vout,
     });
+
+    return await this.transferDepositToSelf(response.nodes, signingPubKey);
   }
   // **********************
 

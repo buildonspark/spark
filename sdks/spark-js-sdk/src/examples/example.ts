@@ -1,10 +1,10 @@
 import { bytesToHex, hexToBytes } from "@noble/curves/abstract/utils";
+import { Buffer } from "buffer";
 import readline from "readline";
 import { BitcoinNetwork } from "../../dist/graphql/objects";
 import { SparkWallet } from "../../dist/spark-sdk";
 import { getTxFromRawTxHex } from "../../dist/utils/bitcoin";
 import { Network } from "../../dist/utils/network";
-import { Buffer } from 'buffer';
 
 // Initialize Spark Wallet
 const walletMnemonic =
@@ -73,9 +73,14 @@ async function runCLI() {
         const leafPubKey = await wallet.getSigner().generatePublicKey();
         const depositAddress = await wallet.generateDepositAddress(leafPubKey);
         console.log("Deposit address:", depositAddress.depositAddress?.address);
-        console.log("Verifying key:", typeof depositAddress.depositAddress?.verifyingKey === 'object' ?
-          Buffer.from(depositAddress.depositAddress.verifyingKey).toString('hex') :
-          depositAddress.depositAddress?.verifyingKey);
+        console.log(
+          "Verifying key:",
+          typeof depositAddress.depositAddress?.verifyingKey === "object"
+            ? Buffer.from(depositAddress.depositAddress.verifyingKey).toString(
+                "hex"
+              )
+            : depositAddress.depositAddress?.verifyingKey
+        );
         console.log("Pubkey:", bytesToHex(leafPubKey));
         if (!depositAddress.depositAddress) {
           console.log("No deposit address");
@@ -92,14 +97,7 @@ async function runCLI() {
               depositTx.depositTx,
               depositTx.vout
             );
-            console.log("Created new leaf node", nodes.nodes);
-            await wallet.transferDepositToSelf(
-              nodes.nodes.map((node) => ({
-                ...node,
-              })),
-              leafPubKey
-            );
-
+            console.log("Created new leaf node", nodes);
             break;
           }
           console.log("Waiting for deposit tx");
@@ -128,7 +126,7 @@ async function runCLI() {
           depositTx,
           0
         );
-        console.log("Tree root:", treeResp.nodes);
+        console.log("Tree root:", treeResp);
         break;
       case "createinvoice":
         if (!wallet.isInitialized()) {
@@ -222,15 +220,6 @@ async function runCLI() {
         });
         console.log(payResult);
         break;
-      case "swap":
-        if (!wallet.isInitialized()) {
-          console.log("No wallet initialized");
-          break;
-        }
-        const targetAmount = parseInt(args[0]);
-        const response = await wallet.requestLeavesSwap({targetAmount});
-        console.log(response);
-        break;
       case "balance":
         if (!wallet.isInitialized()) {
           console.log("No wallet initialized");
@@ -245,14 +234,24 @@ async function runCLI() {
           break;
         }
         const leaves = await wallet.getLeaves();
-        const formattedLeaves = leaves.map(leaf => ({
+        const formattedLeaves = leaves.map((leaf) => ({
           ...leaf,
-          nodeTx: typeof leaf.nodeTx === 'object' ? Buffer.from(leaf.nodeTx).toString('hex') : leaf.nodeTx,
-          refundTx: typeof leaf.refundTx === 'object' ? Buffer.from(leaf.refundTx).toString('hex') : leaf.refundTx,
-          verifyingPublicKey: typeof leaf.verifyingPublicKey === 'object' ?
-            Buffer.from(leaf.verifyingPublicKey).toString('hex') : leaf.verifyingPublicKey,
-          ownerIdentityPublicKey: typeof leaf.ownerIdentityPublicKey === 'object' ?
-            Buffer.from(leaf.ownerIdentityPublicKey).toString('hex') : leaf.ownerIdentityPublicKey,
+          nodeTx:
+            typeof leaf.nodeTx === "object"
+              ? Buffer.from(leaf.nodeTx).toString("hex")
+              : leaf.nodeTx,
+          refundTx:
+            typeof leaf.refundTx === "object"
+              ? Buffer.from(leaf.refundTx).toString("hex")
+              : leaf.refundTx,
+          verifyingPublicKey:
+            typeof leaf.verifyingPublicKey === "object"
+              ? Buffer.from(leaf.verifyingPublicKey).toString("hex")
+              : leaf.verifyingPublicKey,
+          ownerIdentityPublicKey:
+            typeof leaf.ownerIdentityPublicKey === "object"
+              ? Buffer.from(leaf.ownerIdentityPublicKey).toString("hex")
+              : leaf.ownerIdentityPublicKey,
         }));
         console.log(JSON.stringify(formattedLeaves, null, 2));
         break;
