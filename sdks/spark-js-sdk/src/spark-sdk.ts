@@ -631,10 +631,6 @@ export class SparkWallet {
     });
   }
 
-  async setLeaves(leaves: TreeNode[]) {
-    this.leaves = leaves;
-  }
-
   async transferDepositToSelf(leaves: TreeNode[], signingPubKey: Uint8Array) {
     const leafKeyTweaks = await Promise.all(
       leaves.map(async (leaf) => ({

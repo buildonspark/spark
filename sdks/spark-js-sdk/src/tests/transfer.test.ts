@@ -88,7 +88,6 @@ describe("Transfer", () => {
       await receiverWallet._claimTransfer(receiverTransfer, [claimingNode]);
 
       const nodes = await receiverWallet.getLeaves();
-      await receiverWallet.setLeaves(nodes);
 
       const newReceiverWallet = new SparkWallet(Network.LOCAL);
       const newReceiverMnemonic = await newReceiverWallet.generateMnemonic();
@@ -289,40 +288,5 @@ describe("Transfer", () => {
     };
 
     await receiverWallet._claimTransfer(receiverTransfer, [claimingNode]);
-  });
-
-  xit("test transfer in wallet", async () => {
-    const faucet = new BitcoinFaucet("http://127.0.0.1:18443", "admin1", "123");
-
-    const senderWallet = new SparkWallet(Network.LOCAL);
-    const senderMnemonic = await senderWallet.generateMnemonic();
-    await senderWallet.createSparkWallet(senderMnemonic);
-
-    const receiverWallet = new SparkWallet(Network.LOCAL);
-    const receiverMnemonic = await receiverWallet.generateMnemonic();
-    const receiverPubkey = await receiverWallet.createSparkWallet(
-      receiverMnemonic
-    );
-
-    const leafPubKey = await senderWallet
-      .getSigner()
-      .generatePublicKey(sha256("1"));
-    const rootNode = await createNewTree(
-      senderWallet,
-      leafPubKey,
-      faucet,
-      1000n
-    );
-
-    await senderWallet.setLeaves([rootNode]);
-
-    await senderWallet.sendTransfer({
-      amount: 1000,
-      receiverPubKey: hexToBytes(receiverPubkey),
-    });
-
-    const pendingTransfer = await receiverWallet.queryPendingTransfers();
-
-    await receiverWallet.claimTransfer(pendingTransfer.transfers[0]);
   });
 });
