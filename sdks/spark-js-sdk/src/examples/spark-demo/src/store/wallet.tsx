@@ -81,6 +81,7 @@ interface WalletActions {
 type WalletStore = WalletState & WalletActions;
 
 const MNEMONIC_STORAGE_KEY = "spark_wallet_mnemonic";
+const SEED_STORAGE_KEY = "spark_wallet_seed";
 
 const useWalletStore = create<WalletStore>((set, get) => ({
   wallet: new SparkWallet(Network.REGTEST),
@@ -122,6 +123,7 @@ const useWalletStore = create<WalletStore>((set, get) => ({
   initWalletFromSeed: async (seed: string) => {
     const { wallet } = get();
     await wallet.createSparkWalletFromSeed(seed);
+    sessionStorage.setItem(SEED_STORAGE_KEY, seed);
     set({ isInitialized: true });
   },
   getMasterPublicKey: async () => {
@@ -150,7 +152,11 @@ const useWalletStore = create<WalletStore>((set, get) => ({
   },
   loadStoredWallet: async () => {
     const storedMnemonic = sessionStorage.getItem(MNEMONIC_STORAGE_KEY);
-    if (storedMnemonic) {
+    const storedSeed = sessionStorage.getItem(SEED_STORAGE_KEY);
+
+    if (storedSeed) {
+      await get().initWalletFromSeed(storedSeed);
+    } else if (storedMnemonic) {
       await get().initWallet(storedMnemonic);
     }
     return true;
@@ -197,15 +203,19 @@ export function useWallet() {
 
   const balanceQuery = useQuery({
     queryKey: ["wallet", "balance"],
-    queryFn: () => {
-      return wallet.getBalance();
+    queryFn: async () => {
+      return await wallet.getBalance();
     },
+    refetchOnMount: true,
     enabled: isInitialized,
+    staleTime: 5000,
   });
 
   useQuery({
     queryKey: ["wallet", "btcAddressInfo"],
     queryFn: async () => {
+      let updateBalance = await wallet.claimTransfers();
+
       for (const address of Object.keys(btcAddressInfo)) {
         const pendingDepositTx = await wallet.queryPendingDepositTx(address);
         if (pendingDepositTx) {
@@ -224,10 +234,20 @@ export function useWallet() {
             const updatedAddressInfo = { ...btcAddressInfo };
             delete updatedAddressInfo[address];
             useWalletStore.setState({ btcAddressInfo: updatedAddressInfo });
+            if (!updateBalance) {
+              updateBalance = true;
+            }
           } catch (error) {
             console.error("error transferring deposit to self", error);
           }
         }
+      }
+
+      if (updateBalance) {
+        queryClient.invalidateQueries({
+          queryKey: ["wallet", "balance"],
+          exact: true,
+        });
       }
 
       return true;
@@ -259,22 +279,6 @@ export function useWallet() {
     refetchOnMount: false,
     refetchOnWindowFocus: false,
     staleTime: 60000,
-  });
-
-  useQuery({
-    queryKey: ["wallet", "claimTransfers"],
-    queryFn: async () => {
-      const claimed = await wallet.claimTransfers();
-      if (claimed) {
-        queryClient.invalidateQueries({
-          queryKey: ["wallet", "balance"],
-          exact: true,
-        });
-      }
-      return claimed;
-    },
-    enabled: isInitialized,
-    refetchInterval: 5000,
   });
 
   const state = useWalletStore.getState();
