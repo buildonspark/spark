@@ -379,6 +379,20 @@ func main() {
 	})
 
 	cli.registry.RegisterCommand(Command{
+		Name:        "history",
+		Description: "Query all transfers",
+		Usage:       "history",
+		Handler: func(_ []string) error {
+			transfers, err := cli.wallet.QueryAllTransfers(context.Background())
+			if err != nil {
+				return fmt.Errorf("failed to query all transfers: %w", err)
+			}
+			fmt.Printf("Transfers: %v\n", transfers)
+			return nil
+		},
+	})
+
+	cli.registry.RegisterCommand(Command{
 		Name:        "coop_exit",
 		Description: "Swap leaves for on-chain funds",
 		Usage:       "coop_exit <amount_sats> <onchain_address>",

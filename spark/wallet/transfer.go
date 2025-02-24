@@ -777,3 +777,22 @@ func CancelSendTransfer(ctx context.Context, config *Config, transfer *pb.Transf
 	}
 	return response.Transfer, nil
 }
+
+func QueryAllTransfers(ctx context.Context, config *Config, limit int64, offset int64) ([]*pb.Transfer, int64, error) {
+	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
+	if err != nil {
+		return nil, 0, err
+	}
+	defer sparkConn.Close()
+
+	sparkClient := pb.NewSparkServiceClient(sparkConn)
+	response, err := sparkClient.QueryAllTransfers(ctx, &pb.QueryAllTransfersRequest{
+		IdentityPublicKey: config.IdentityPublicKey(),
+		Limit:             limit,
+		Offset:            offset,
+	})
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to call QueryAllTransfers: %v", err)
+	}
+	return response.Transfers, response.Offset, nil
+}

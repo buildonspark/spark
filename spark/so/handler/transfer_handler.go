@@ -454,6 +454,57 @@ func (h *TransferHandler) QueryPendingTransfers(ctx context.Context, req *pb.Que
 	return &pb.QueryPendingTransfersResponse{Transfers: transferProtos}, nil
 }
 
+func (h *TransferHandler) QueryAllTransfers(ctx context.Context, req *pb.QueryAllTransfersRequest) (*pb.QueryAllTransfersResponse, error) {
+	db := ent.GetDbFromContext(ctx)
+	baseQuery := db.Transfer.Query().Where(
+		enttransfer.Or(
+			enttransfer.SenderIdentityPubkeyEQ(req.IdentityPublicKey),
+			enttransfer.ReceiverIdentityPubkeyEQ(req.IdentityPublicKey),
+		),
+	)
+
+	// Get total count first
+	total, err := baseQuery.Count(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get total count: %v", err)
+	}
+
+	query := baseQuery.Order(ent.Desc(enttransfer.FieldUpdateTime))
+
+	if req.Limit > 100 || req.Limit == 0 {
+		req.Limit = 100
+	}
+	query = query.Limit(int(req.Limit))
+
+	if req.Offset > 0 {
+		query = query.Offset(int(req.Offset))
+	}
+
+	transfers, err := query.All(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to query all transfers: %v", err)
+	}
+
+	transferProtos := []*pb.Transfer{}
+	for _, transfer := range transfers {
+		transferProto, err := transfer.MarshalProto(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("unable to marshal transfer: %v", err)
+		}
+		transferProtos = append(transferProtos, transferProto)
+	}
+
+	nextOffset := req.Offset + int64(len(transfers))
+	if nextOffset >= int64(total) {
+		nextOffset = -1
+	}
+
+	return &pb.QueryAllTransfersResponse{
+		Transfers: transferProtos,
+		Offset:    nextOffset,
+	}, nil
+}
+
 const CoopExitConfirmationThreshold = 6
 
 func checkCoopExitTxBroadcasted(ctx context.Context, db *ent.Tx, transferID uuid.UUID, networks []common.Network) error {

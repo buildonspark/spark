@@ -944,3 +944,11 @@ func (w *SingleKeyWallet) CancelAllSenderInitiatedTransfers(ctx context.Context)
 	}
 	return nil
 }
+
+func (w *SingleKeyWallet) QueryAllTransfers(ctx context.Context) ([]*pb.Transfer, error) {
+	transfers, _, err := QueryAllTransfers(ctx, w.Config, 100, 0)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query all transfers: %w", err)
+	}
+	return transfers, nil
+}

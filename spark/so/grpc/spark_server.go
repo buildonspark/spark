@@ -198,3 +198,8 @@ func (s *SparkServer) GetOwnedTokenLeaves(ctx context.Context, req *pb.GetOwnedT
 	tokenTransactionHandler := handler.NewTokenTransactionHandler(s.config, s.db)
 	return wrapWithGRPCError(tokenTransactionHandler.GetOwnedTokenLeaves(ctx, req))
 }
+
+func (s *SparkServer) QueryAllTransfers(ctx context.Context, req *pb.QueryAllTransfersRequest) (*pb.QueryAllTransfersResponse, error) {
+	transferHander := handler.NewTransferHandler(s.config)
+	return wrapWithGRPCError(transferHander.QueryAllTransfers(ctx, req))
+}

@@ -26,6 +26,7 @@ const (
 	SparkService_StartSendTransfer_FullMethodName        = "/spark.SparkService/start_send_transfer"
 	SparkService_CompleteSendTransfer_FullMethodName     = "/spark.SparkService/complete_send_transfer"
 	SparkService_QueryPendingTransfers_FullMethodName    = "/spark.SparkService/query_pending_transfers"
+	SparkService_QueryAllTransfers_FullMethodName        = "/spark.SparkService/query_all_transfers"
 	SparkService_ClaimTransferTweakKeys_FullMethodName   = "/spark.SparkService/claim_transfer_tweak_keys"
 	SparkService_ClaimTransferSignRefunds_FullMethodName = "/spark.SparkService/claim_transfer_sign_refunds"
 	SparkService_AggregateNodes_FullMethodName           = "/spark.SparkService/aggregate_nodes"
@@ -61,6 +62,7 @@ type SparkServiceClient interface {
 	StartSendTransfer(ctx context.Context, in *StartSendTransferRequest, opts ...grpc.CallOption) (*StartSendTransferResponse, error)
 	CompleteSendTransfer(ctx context.Context, in *CompleteSendTransferRequest, opts ...grpc.CallOption) (*CompleteSendTransferResponse, error)
 	QueryPendingTransfers(ctx context.Context, in *QueryPendingTransfersRequest, opts ...grpc.CallOption) (*QueryPendingTransfersResponse, error)
+	QueryAllTransfers(ctx context.Context, in *QueryAllTransfersRequest, opts ...grpc.CallOption) (*QueryAllTransfersResponse, error)
 	ClaimTransferTweakKeys(ctx context.Context, in *ClaimTransferTweakKeysRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	ClaimTransferSignRefunds(ctx context.Context, in *ClaimTransferSignRefundsRequest, opts ...grpc.CallOption) (*ClaimTransferSignRefundsResponse, error)
 	AggregateNodes(ctx context.Context, in *AggregateNodesRequest, opts ...grpc.CallOption) (*AggregateNodesResponse, error)
@@ -149,6 +151,16 @@ func (c *sparkServiceClient) QueryPendingTransfers(ctx context.Context, in *Quer
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(QueryPendingTransfersResponse)
 	err := c.cc.Invoke(ctx, SparkService_QueryPendingTransfers_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *sparkServiceClient) QueryAllTransfers(ctx context.Context, in *QueryAllTransfersRequest, opts ...grpc.CallOption) (*QueryAllTransfersResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(QueryAllTransfersResponse)
+	err := c.cc.Invoke(ctx, SparkService_QueryAllTransfers_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -395,6 +407,7 @@ type SparkServiceServer interface {
 	StartSendTransfer(context.Context, *StartSendTransferRequest) (*StartSendTransferResponse, error)
 	CompleteSendTransfer(context.Context, *CompleteSendTransferRequest) (*CompleteSendTransferResponse, error)
 	QueryPendingTransfers(context.Context, *QueryPendingTransfersRequest) (*QueryPendingTransfersResponse, error)
+	QueryAllTransfers(context.Context, *QueryAllTransfersRequest) (*QueryAllTransfersResponse, error)
 	ClaimTransferTweakKeys(context.Context, *ClaimTransferTweakKeysRequest) (*emptypb.Empty, error)
 	ClaimTransferSignRefunds(context.Context, *ClaimTransferSignRefundsRequest) (*ClaimTransferSignRefundsResponse, error)
 	AggregateNodes(context.Context, *AggregateNodesRequest) (*AggregateNodesResponse, error)
@@ -446,6 +459,9 @@ func (UnimplementedSparkServiceServer) CompleteSendTransfer(context.Context, *Co
 }
 func (UnimplementedSparkServiceServer) QueryPendingTransfers(context.Context, *QueryPendingTransfersRequest) (*QueryPendingTransfersResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method QueryPendingTransfers not implemented")
+}
+func (UnimplementedSparkServiceServer) QueryAllTransfers(context.Context, *QueryAllTransfersRequest) (*QueryAllTransfersResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method QueryAllTransfers not implemented")
 }
 func (UnimplementedSparkServiceServer) ClaimTransferTweakKeys(context.Context, *ClaimTransferTweakKeysRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ClaimTransferTweakKeys not implemented")
@@ -641,6 +657,24 @@ func _SparkService_QueryPendingTransfers_Handler(srv interface{}, ctx context.Co
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(SparkServiceServer).QueryPendingTransfers(ctx, req.(*QueryPendingTransfersRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SparkService_QueryAllTransfers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QueryAllTransfersRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkServiceServer).QueryAllTransfers(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkService_QueryAllTransfers_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkServiceServer).QueryAllTransfers(ctx, req.(*QueryAllTransfersRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1089,6 +1123,10 @@ var SparkService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "query_pending_transfers",
 			Handler:    _SparkService_QueryPendingTransfers_Handler,
+		},
+		{
+			MethodName: "query_all_transfers",
+			Handler:    _SparkService_QueryAllTransfers_Handler,
 		},
 		{
 			MethodName: "claim_transfer_tweak_keys",
