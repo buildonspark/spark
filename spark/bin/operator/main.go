@@ -65,6 +65,7 @@ type args struct {
 	ServerCertPath             string
 	ServerKeyPath              string
 	DKGLimitOverride           uint64
+	RunDirectory               string
 }
 
 func (a *args) SupportedNetworksList() []common.Network {
@@ -109,6 +110,7 @@ func loadArgs() (*args, error) {
 	flag.StringVar(&args.ServerCertPath, "server-cert", "", "Path to server certificate")
 	flag.StringVar(&args.ServerKeyPath, "server-key", "", "Path to server key")
 	flag.Uint64Var(&args.DKGLimitOverride, "dkg-limit-override", 0, "Override the DKG limit")
+	flag.StringVar(&args.RunDirectory, "run-dir", "", "Run directory for resolving relative paths")
 	// Parse flags
 	flag.Parse()
 
@@ -181,6 +183,7 @@ func main() {
 		args.ServerCertPath,
 		args.ServerKeyPath,
 		args.DKGLimitOverride,
+		args.RunDirectory,
 	)
 	if err != nil {
 		log.Fatalf("Failed to create config: %v", err)

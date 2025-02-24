@@ -58,6 +58,8 @@ type Config struct {
 	Lrc20Configs map[string]Lrc20Config
 	// DKGLimitOverride is the override for the DKG limit.
 	DKGLimitOverride uint64
+	// RunDirectory is the base directory for resolving relative paths
+	RunDirectory string
 }
 
 // DatabaseDriver returns the database driver based on the database path.
@@ -94,6 +96,7 @@ type Lrc20Config struct {
 	DisableRpcs                   bool   `yaml:"disablerpcs"`
 	Network                       string `yaml:"network"`
 	Host                          string `yaml:"host"`
+	RelativeCertPath              string `yaml:"relativecertpath"`
 	WithdrawBondSats              uint64 `yaml:"withdrawbondsats"`
 	WithdrawRelativeBlockLocktime uint64 `yaml:"withdrawrelativeblocklocktime"`
 }
@@ -114,6 +117,7 @@ func NewConfig(
 	serverCertPath string,
 	serverKeyPath string,
 	dkgLimitOverride uint64,
+	runDirectory string,
 ) (*Config, error) {
 	identityPrivateKeyHexStringBytes, err := os.ReadFile(identityPrivateKeyFilePath)
 	if err != nil {
@@ -162,6 +166,7 @@ func NewConfig(
 		ServerCertPath:        serverCertPath,
 		ServerKeyPath:         serverKeyPath,
 		DKGLimitOverride:      dkgLimitOverride,
+		RunDirectory:          runDirectory,
 	}, nil
 }
 
