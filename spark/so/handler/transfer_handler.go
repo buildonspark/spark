@@ -402,24 +402,29 @@ func (h *TransferHandler) QueryPendingTransfers(ctx context.Context, req *pb.Que
 			return nil, err
 		}
 		transferPredicate = append(transferPredicate, enttransfer.ReceiverIdentityPubkeyEQ(req.GetReceiverIdentityPublicKey()))
+		transferPredicate = append(transferPredicate,
+			enttransfer.StatusIn(
+				schema.TransferStatusSenderKeyTweaked,
+				schema.TransferStatusReceiverKeyTweaked,
+				schema.TransferStatusReceiverRefundSigned,
+			),
+			enttransfer.Or(
+				enttransfer.ExpiryTimeGT(time.Now()),
+				enttransfer.ExpiryTimeEQ(time.Unix(0, 0)),
+			),
+		)
 	case *pb.QueryPendingTransfersRequest_SenderIdentityPublicKey:
 		if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, req.GetSenderIdentityPublicKey()); err != nil {
 			return nil, err
 		}
 		transferPredicate = append(transferPredicate, enttransfer.SenderIdentityPubkeyEQ(req.GetSenderIdentityPublicKey()))
+		transferPredicate = append(transferPredicate,
+			enttransfer.StatusIn(
+				schema.TransferStatusSenderKeyTweaked,
+				schema.TransferStatusSenderInitiated,
+			),
+		)
 	}
-	transferPredicate = append(transferPredicate,
-		enttransfer.StatusIn(
-			schema.TransferStatusSenderKeyTweaked,
-			schema.TransferStatusSenderInitiated,
-			schema.TransferStatusReceiverKeyTweaked,
-			schema.TransferStatusReceiverRefundSigned,
-		),
-		enttransfer.Or(
-			enttransfer.ExpiryTimeGT(time.Now()),
-			enttransfer.ExpiryTimeEQ(time.Unix(0, 0)),
-		),
-	)
 	if req.TransferIds != nil {
 		transferUUIDs := make([]uuid.UUID, len(req.TransferIds))
 		for _, transferID := range req.TransferIds {
