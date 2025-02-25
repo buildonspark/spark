@@ -3,11 +3,14 @@
 
 import Entity from './Entity.js';
 import SparkLeavesSwapRequestStatus from './SparkLeavesSwapRequestStatus.js';
-import Transfer from './Transfer.js';
-import SwapLeaf from './SwapLeaf.js';
-import { Query, isObject } from '@lightsparkdev/core';
+import {CurrencyAmountToJson} from './CurrencyAmount.js';
+import {CurrencyAmountFromJson} from './CurrencyAmount.js';
 import {TransferFromJson} from './Transfer.js';
 import {SwapLeafToJson} from './SwapLeaf.js';
+import SwapLeaf from './SwapLeaf.js';
+import CurrencyAmount from './CurrencyAmount.js';
+import { Query, isObject } from '@lightsparkdev/core';
+import Transfer from './Transfer.js';
 import {SwapLeafFromJson} from './SwapLeaf.js';
 
 
@@ -28,6 +31,15 @@ updatedAt: string;
 
     /** The status of the request. **/
 status: SparkLeavesSwapRequestStatus;
+
+    /** The total amount of leaves user sent for swap. **/
+totalAmount: CurrencyAmount;
+
+    /** The target amount of leaves user wanted to get from the swap. **/
+targetAmount: CurrencyAmount;
+
+    /** The fee user needs to pay for swap. **/
+fee: CurrencyAmount;
 
     /** The leaves transfer to user. **/
 inboundTransfer: Transfer;
@@ -55,6 +67,9 @@ export const LeavesSwapRequestFromJson = (obj: any): LeavesSwapRequest => {
         createdAt: obj["leaves_swap_request_created_at"],
         updatedAt: obj["leaves_swap_request_updated_at"],
         status: SparkLeavesSwapRequestStatus[obj["leaves_swap_request_status"]] ?? SparkLeavesSwapRequestStatus.FUTURE_VALUE,
+        totalAmount: CurrencyAmountFromJson(obj["leaves_swap_request_total_amount"]),
+        targetAmount: CurrencyAmountFromJson(obj["leaves_swap_request_target_amount"]),
+        fee: CurrencyAmountFromJson(obj["leaves_swap_request_fee"]),
         inboundTransfer: TransferFromJson(obj["leaves_swap_request_inbound_transfer"]),
         expiresAt: obj["leaves_swap_request_expires_at"],
         swapLeaves: obj["leaves_swap_request_swap_leaves"].map((e) => SwapLeafFromJson(e)),
@@ -69,6 +84,9 @@ __typename: "LeavesSwapRequest",leaves_swap_request_id: obj.id,
 leaves_swap_request_created_at: obj.createdAt,
 leaves_swap_request_updated_at: obj.updatedAt,
 leaves_swap_request_status: obj.status,
+leaves_swap_request_total_amount: CurrencyAmountToJson(obj.totalAmount),
+leaves_swap_request_target_amount: CurrencyAmountToJson(obj.targetAmount),
+leaves_swap_request_fee: CurrencyAmountToJson(obj.fee),
 leaves_swap_request_inbound_transfer: obj.inboundTransfer.toJson(),
 leaves_swap_request_outbound_transfer: (obj.outboundTransfer ? obj.outboundTransfer.toJson() : undefined),
 leaves_swap_request_expires_at: obj.expiresAt,
@@ -86,6 +104,30 @@ fragment LeavesSwapRequestFragment on LeavesSwapRequest {
     leaves_swap_request_created_at: created_at
     leaves_swap_request_updated_at: updated_at
     leaves_swap_request_status: status
+    leaves_swap_request_total_amount: total_amount {
+        __typename
+        currency_amount_original_value: original_value
+        currency_amount_original_unit: original_unit
+        currency_amount_preferred_currency_unit: preferred_currency_unit
+        currency_amount_preferred_currency_value_rounded: preferred_currency_value_rounded
+        currency_amount_preferred_currency_value_approx: preferred_currency_value_approx
+    }
+    leaves_swap_request_target_amount: target_amount {
+        __typename
+        currency_amount_original_value: original_value
+        currency_amount_original_unit: original_unit
+        currency_amount_preferred_currency_unit: preferred_currency_unit
+        currency_amount_preferred_currency_value_rounded: preferred_currency_value_rounded
+        currency_amount_preferred_currency_value_approx: preferred_currency_value_approx
+    }
+    leaves_swap_request_fee: fee {
+        __typename
+        currency_amount_original_value: original_value
+        currency_amount_original_unit: original_unit
+        currency_amount_preferred_currency_unit: preferred_currency_unit
+        currency_amount_preferred_currency_value_rounded: preferred_currency_value_rounded
+        currency_amount_preferred_currency_value_approx: preferred_currency_value_approx
+    }
     leaves_swap_request_inbound_transfer: inbound_transfer {
         __typename
         transfer_total_amount: total_amount {

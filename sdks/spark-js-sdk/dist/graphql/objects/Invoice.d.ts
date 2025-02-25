@@ -1,5 +1,5 @@
-import BitcoinNetwork from './BitcoinNetwork.js';
 import CurrencyAmount from './CurrencyAmount.js';
+import BitcoinNetwork from './BitcoinNetwork.js';
 interface Invoice {
     encodedEnvoice: string;
     bitcoinNetwork: BitcoinNetwork;

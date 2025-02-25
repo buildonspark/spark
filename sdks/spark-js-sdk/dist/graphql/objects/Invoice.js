@@ -1,7 +1,7 @@
 // Copyright ©, 2023-present, Lightspark Group, Inc. - All Rights Reserved
-import BitcoinNetwork from './BitcoinNetwork.js';
 import { CurrencyAmountFromJson } from './CurrencyAmount.js';
 import { CurrencyAmountToJson } from './CurrencyAmount.js';
+import BitcoinNetwork from './BitcoinNetwork.js';
 export const InvoiceFromJson = (obj) => {
     return {
         encodedEnvoice: obj["invoice_encoded_envoice"],

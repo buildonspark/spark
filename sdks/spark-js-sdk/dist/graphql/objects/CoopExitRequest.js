@@ -1,8 +1,8 @@
 // Copyright ©, 2023-present, Lightspark Group, Inc. - All Rights Reserved
+import { CurrencyAmountToJson } from './CurrencyAmount.js';
 import { CurrencyAmountFromJson } from './CurrencyAmount.js';
 import SparkCoopExitRequestStatus from './SparkCoopExitRequestStatus.js';
 import { isObject } from '@lightsparkdev/core';
-import { CurrencyAmountToJson } from './CurrencyAmount.js';
 export const CoopExitRequestFromJson = (obj) => {
     return {
         id: obj["coop_exit_request_id"],

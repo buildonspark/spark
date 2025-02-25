@@ -1,6 +1,6 @@
 // Copyright ©, 2023-present, Lightspark Group, Inc. - All Rights Reserved
-import { CurrencyAmountFromJson } from './CurrencyAmount.js';
 import { CurrencyAmountToJson } from './CurrencyAmount.js';
+import { CurrencyAmountFromJson } from './CurrencyAmount.js';
 export const LeafFromJson = (obj) => {
     return {
         amount: CurrencyAmountFromJson(obj["leaf_amount"]),

@@ -1,8 +1,8 @@
-import Transfer from './Transfer.js';
-import CurrencyAmount from './CurrencyAmount.js';
-import { Query } from '@lightsparkdev/core';
 import Invoice from './Invoice.js';
 import LightningReceiveRequestStatus from './LightningReceiveRequestStatus.js';
+import CurrencyAmount from './CurrencyAmount.js';
+import { Query } from '@lightsparkdev/core';
+import Transfer from './Transfer.js';
 interface LightningReceiveRequest {
     /**
  * The unique identifier of this entity across all Lightspark systems. Should be treated as an opaque

@@ -1,10 +1,10 @@
-import { FRAGMENT as WalletUserFragment } from "../objects/WalletUser.js";
+import { FRAGMENT as SparkWalletUserFragment } from "../objects/SparkWalletUser.js";
 export const CurrentUser = `
   query CurrentUser {
     current_user {
-      ...WalletUserFragment
+      ...SparkWalletUserFragment
     }
   }
-  ${WalletUserFragment}
+  ${SparkWalletUserFragment}
 `;
 //# sourceMappingURL=CurrentUser.js.map

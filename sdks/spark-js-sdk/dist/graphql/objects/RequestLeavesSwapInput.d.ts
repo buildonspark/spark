@@ -1,11 +1,9 @@
-import BitcoinNetwork from './BitcoinNetwork.js';
 import UserLeafInput from './UserLeafInput.js';
 interface RequestLeavesSwapInput {
     adaptorPubkey: string;
     totalAmountSats: number;
     targetAmountSats: number;
     feeSats: number;
-    network: BitcoinNetwork;
     userLeaves: UserLeafInput[];
 }
 export declare const RequestLeavesSwapInputFromJson: (obj: any) => RequestLeavesSwapInput;

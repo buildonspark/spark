@@ -209,7 +209,6 @@ export default class SspClient {
     totalAmountSats,
     targetAmountSats,
     feeSats,
-    network,
     userLeaves,
   }: RequestLeavesSwapInput): Promise<LeavesSwapRequest | null> {
     const query = {
@@ -219,7 +218,6 @@ export default class SspClient {
         total_amount_sats: totalAmountSats,
         target_amount_sats: targetAmountSats,
         fee_sats: feeSats,
-        network: network,
         user_leaves: userLeaves,
       },
       constructObject: (response: { request_leaves_swap: any }) => {

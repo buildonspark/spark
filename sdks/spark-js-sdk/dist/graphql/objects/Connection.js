@@ -1,9 +1,9 @@
 // Copyright ©, 2023-present, Lightspark Group, Inc. - All Rights Reserved
-import { LeafFromJson } from './Leaf.js';
 import { PageInfoToJson } from './PageInfo.js';
-import { PageInfoFromJson } from './PageInfo.js';
 import { LeafToJson } from './Leaf.js';
+import { PageInfoFromJson } from './PageInfo.js';
 import { LightsparkException } from '@lightsparkdev/core';
+import { LeafFromJson } from './Leaf.js';
 export const ConnectionFromJson = (obj) => {
     if (obj["__typename"] == "SparkTransferToLeavesConnection") {
         return {

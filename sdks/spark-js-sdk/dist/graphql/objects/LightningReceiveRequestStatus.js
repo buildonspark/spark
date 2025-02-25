@@ -7,12 +7,14 @@ export var LightningReceiveRequestStatus;
      */
     LightningReceiveRequestStatus["FUTURE_VALUE"] = "FUTURE_VALUE";
     LightningReceiveRequestStatus["INVOICE_CREATED"] = "INVOICE_CREATED";
-    LightningReceiveRequestStatus["PAYMENT_PREIMAGE_REQUEST_RECEIVED"] = "PAYMENT_PREIMAGE_REQUEST_RECEIVED";
-    LightningReceiveRequestStatus["LEAVES_LOCKED"] = "LEAVES_LOCKED";
-    LightningReceiveRequestStatus["REFUND_SIGNING_COMMITMENTS_RECEIVED"] = "REFUND_SIGNING_COMMITMENTS_RECEIVED";
-    LightningReceiveRequestStatus["REFUND_SIGNED"] = "REFUND_SIGNED";
+    LightningReceiveRequestStatus["TRANSFER_CREATED"] = "TRANSFER_CREATED";
+    LightningReceiveRequestStatus["TRANSFER_CREATION_FAILED"] = "TRANSFER_CREATION_FAILED";
+    LightningReceiveRequestStatus["REFUND_SIGNING_COMMITMENTS_QUERYING_FAILED"] = "REFUND_SIGNING_COMMITMENTS_QUERYING_FAILED";
+    LightningReceiveRequestStatus["REFUND_SIGNING_FAILED"] = "REFUND_SIGNING_FAILED";
     LightningReceiveRequestStatus["PAYMENT_PREIMAGE_RECOVERED"] = "PAYMENT_PREIMAGE_RECOVERED";
+    LightningReceiveRequestStatus["PAYMENT_PREIMAGE_RECOVERING_FAILED"] = "PAYMENT_PREIMAGE_RECOVERING_FAILED";
     LightningReceiveRequestStatus["LIGHTNING_PAYMENT_RECEIVED"] = "LIGHTNING_PAYMENT_RECEIVED";
+    LightningReceiveRequestStatus["TRANSFER_FAILED"] = "TRANSFER_FAILED";
     LightningReceiveRequestStatus["TRANSFER_COMPLETED"] = "TRANSFER_COMPLETED";
 })(LightningReceiveRequestStatus || (LightningReceiveRequestStatus = {}));
 export default LightningReceiveRequestStatus;

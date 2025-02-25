@@ -3,9 +3,8 @@
 
 
 import {UserLeafInputFromJson} from './UserLeafInput.js';
-import BitcoinNetwork from './BitcoinNetwork.js';
-import {UserLeafInputToJson} from './UserLeafInput.js';
 import UserLeafInput from './UserLeafInput.js';
+import {UserLeafInputToJson} from './UserLeafInput.js';
 
 
 interface RequestLeavesSwapInput {
@@ -18,8 +17,6 @@ interface RequestLeavesSwapInput {
     targetAmountSats: number;
 
     feeSats: number;
-
-    network: BitcoinNetwork;
 
     userLeaves: UserLeafInput[];
 
@@ -34,7 +31,6 @@ export const RequestLeavesSwapInputFromJson = (obj: any): RequestLeavesSwapInput
         totalAmountSats: obj["request_leaves_swap_input_total_amount_sats"],
         targetAmountSats: obj["request_leaves_swap_input_target_amount_sats"],
         feeSats: obj["request_leaves_swap_input_fee_sats"],
-        network: BitcoinNetwork[obj["request_leaves_swap_input_network"]] ?? BitcoinNetwork.FUTURE_VALUE,
         userLeaves: obj["request_leaves_swap_input_user_leaves"].map((e) => UserLeafInputFromJson(e)),
 
         } as RequestLeavesSwapInput;
@@ -46,7 +42,6 @@ request_leaves_swap_input_adaptor_pubkey: obj.adaptorPubkey,
 request_leaves_swap_input_total_amount_sats: obj.totalAmountSats,
 request_leaves_swap_input_target_amount_sats: obj.targetAmountSats,
 request_leaves_swap_input_fee_sats: obj.feeSats,
-request_leaves_swap_input_network: obj.network,
 request_leaves_swap_input_user_leaves: obj.userLeaves.map((e) => UserLeafInputToJson(e)),
 
         }

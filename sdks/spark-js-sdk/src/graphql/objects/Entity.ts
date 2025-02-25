@@ -58,6 +58,30 @@ fragment EntityFragment on Entity {
         leaves_swap_request_created_at: created_at
         leaves_swap_request_updated_at: updated_at
         leaves_swap_request_status: status
+        leaves_swap_request_total_amount: total_amount {
+            __typename
+            currency_amount_original_value: original_value
+            currency_amount_original_unit: original_unit
+            currency_amount_preferred_currency_unit: preferred_currency_unit
+            currency_amount_preferred_currency_value_rounded: preferred_currency_value_rounded
+            currency_amount_preferred_currency_value_approx: preferred_currency_value_approx
+        }
+        leaves_swap_request_target_amount: target_amount {
+            __typename
+            currency_amount_original_value: original_value
+            currency_amount_original_unit: original_unit
+            currency_amount_preferred_currency_unit: preferred_currency_unit
+            currency_amount_preferred_currency_value_rounded: preferred_currency_value_rounded
+            currency_amount_preferred_currency_value_approx: preferred_currency_value_approx
+        }
+        leaves_swap_request_fee: fee {
+            __typename
+            currency_amount_original_value: original_value
+            currency_amount_original_unit: original_unit
+            currency_amount_preferred_currency_unit: preferred_currency_unit
+            currency_amount_preferred_currency_value_rounded: preferred_currency_value_rounded
+            currency_amount_preferred_currency_value_approx: preferred_currency_value_approx
+        }
         leaves_swap_request_inbound_transfer: inbound_transfer {
             __typename
             transfer_total_amount: total_amount {
@@ -163,12 +187,12 @@ fragment EntityFragment on Entity {
             transfer_spark_id: spark_id
         }
     }
-    ... on WalletUser {
+    ... on SparkWalletUser {
         __typename
-        wallet_user_id: id
-        wallet_user_created_at: created_at
-        wallet_user_updated_at: updated_at
-        wallet_user_identity_public_key: identity_public_key
+        spark_wallet_user_id: id
+        spark_wallet_user_created_at: created_at
+        spark_wallet_user_updated_at: updated_at
+        spark_wallet_user_identity_public_key: identity_public_key
     }
 }`;
 

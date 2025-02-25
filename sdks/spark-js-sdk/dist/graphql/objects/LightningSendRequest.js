@@ -1,9 +1,9 @@
 // Copyright ©, 2023-present, Lightspark Group, Inc. - All Rights Reserved
-import { CurrencyAmountFromJson } from './CurrencyAmount.js';
-import { isObject } from '@lightsparkdev/core';
-import { TransferFromJson } from './Transfer.js';
 import { CurrencyAmountToJson } from './CurrencyAmount.js';
+import { CurrencyAmountFromJson } from './CurrencyAmount.js';
 import LightningSendRequestStatus from './LightningSendRequestStatus.js';
+import { TransferFromJson } from './Transfer.js';
+import { isObject } from '@lightsparkdev/core';
 export const LightningSendRequestFromJson = (obj) => {
     return {
         id: obj["lightning_send_request_id"],

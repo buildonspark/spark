@@ -2,11 +2,11 @@
 // Copyright ©, 2023-present, Lightspark Group, Inc. - All Rights Reserved
 
 import Entity from './Entity.js';
+import {CurrencyAmountToJson} from './CurrencyAmount.js';
 import {CurrencyAmountFromJson} from './CurrencyAmount.js';
 import SparkCoopExitRequestStatus from './SparkCoopExitRequestStatus.js';
 import CurrencyAmount from './CurrencyAmount.js';
 import { Query, isObject } from '@lightsparkdev/core';
-import {CurrencyAmountToJson} from './CurrencyAmount.js';
 
 
 interface CoopExitRequest {

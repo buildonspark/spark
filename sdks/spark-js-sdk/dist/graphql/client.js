@@ -118,7 +118,7 @@ export default class SspClient {
             },
         });
     }
-    async requestLeaveSwap({ adaptorPubkey, totalAmountSats, targetAmountSats, feeSats, network, userLeaves, }) {
+    async requestLeaveSwap({ adaptorPubkey, totalAmountSats, targetAmountSats, feeSats, userLeaves, }) {
         const query = {
             queryPayload: RequestSwapLeaves,
             variables: {
@@ -126,7 +126,6 @@ export default class SspClient {
                 total_amount_sats: totalAmountSats,
                 target_amount_sats: targetAmountSats,
                 fee_sats: feeSats,
-                network: network,
                 user_leaves: userLeaves,
             },
             constructObject: (response) => {

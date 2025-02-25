@@ -179,42 +179,42 @@ export class SparkWallet {
             newSigningPubKey: await this.config.signer.generatePublicKey(),
         })));
         const { transfer, signatureMap } = await this.transferService.sendTransferSignRefund(leafKeyTweaks, await this.config.signer.getSspIdentityPublicKey(), new Date(Date.now() + 10 * 60 * 1000));
-        if (!transfer.leaves[0]?.leaf) {
-            throw new Error("Failed to get leaf");
-        }
-        const refundSignature = signatureMap.get(transfer.leaves[0].leaf.id);
-        if (!refundSignature) {
-            throw new Error("Failed to get refund signature");
-        }
-        const { adaptorPrivateKey, adaptorSignature } = generateAdaptorFromSignature(refundSignature);
-        if (!transfer.leaves[0].leaf) {
-            throw new Error("Failed to get leaf");
-        }
-        const userLeaves = [];
-        userLeaves.push({
-            leaf_id: transfer.leaves[0].leaf.id,
-            raw_unsigned_refund_transaction: bytesToHex(transfer.leaves[0].intermediateRefundTx),
-            adaptor_added_signature: bytesToHex(adaptorSignature),
-        });
-        for (let i = 1; i < transfer.leaves.length; i++) {
-            const leaf = transfer.leaves[i];
-            if (!leaf?.leaf) {
+        try {
+            if (!transfer.leaves[0]?.leaf) {
                 throw new Error("Failed to get leaf");
             }
-            const refundSignature = signatureMap.get(leaf.leaf.id);
+            const refundSignature = signatureMap.get(transfer.leaves[0].leaf.id);
             if (!refundSignature) {
                 throw new Error("Failed to get refund signature");
             }
-            const signature = generateSignatureFromExistingAdaptor(refundSignature, adaptorPrivateKey);
+            const { adaptorPrivateKey, adaptorSignature } = generateAdaptorFromSignature(refundSignature);
+            if (!transfer.leaves[0].leaf) {
+                throw new Error("Failed to get leaf");
+            }
+            const userLeaves = [];
             userLeaves.push({
-                leaf_id: leaf.leaf.id,
-                raw_unsigned_refund_transaction: bytesToHex(leaf.intermediateRefundTx),
-                adaptor_added_signature: bytesToHex(signature),
+                leafId: transfer.leaves[0].leaf.id,
+                rawUnsignedRefundTransaction: bytesToHex(transfer.leaves[0].intermediateRefundTx),
+                adaptorAddedSignature: bytesToHex(adaptorSignature),
             });
-        }
-        const adaptorPubkey = bytesToHex(secp256k1.getPublicKey(adaptorPrivateKey));
-        let request = null;
-        try {
+            for (let i = 1; i < transfer.leaves.length; i++) {
+                const leaf = transfer.leaves[i];
+                if (!leaf?.leaf) {
+                    throw new Error("Failed to get leaf");
+                }
+                const refundSignature = signatureMap.get(leaf.leaf.id);
+                if (!refundSignature) {
+                    throw new Error("Failed to get refund signature");
+                }
+                const signature = generateSignatureFromExistingAdaptor(refundSignature, adaptorPrivateKey);
+                userLeaves.push({
+                    leafId: leaf.leaf.id,
+                    rawUnsignedRefundTransaction: bytesToHex(leaf.intermediateRefundTx),
+                    adaptorAddedSignature: bytesToHex(signature),
+                });
+            }
+            const adaptorPubkey = bytesToHex(secp256k1.getPublicKey(adaptorPrivateKey));
+            let request = null;
             request = await this.sspClient?.requestLeaveSwap({
                 userLeaves,
                 adaptorPubkey,
@@ -223,63 +223,61 @@ export class SparkWallet {
                 totalAmountSats: leavesToSwap.reduce((acc, leaf) => acc + leaf.value, 0),
                 // TODO: Request fee from SSP
                 feeSats: 0,
-                // TODO: Map config network to proto network
-                network: BitcoinNetwork.REGTEST,
             });
             console.log("Request", request);
+            if (!request) {
+                throw new Error("Failed to request leaves swap. No response returned.");
+            }
+            const sparkClient = await this.connectionManager.createSparkClient(this.config.getCoordinatorAddress());
+            const nodes = await sparkClient.query_nodes({
+                source: {
+                    $case: "nodeIds",
+                    nodeIds: {
+                        nodeIds: request.swapLeaves.map((leaf) => leaf.leafId),
+                    },
+                },
+            });
+            if (Object.values(nodes.nodes).length !== request.swapLeaves.length) {
+                throw new Error("Expected same number of nodes as swapLeaves");
+            }
+            for (const [nodeId, node] of Object.entries(nodes.nodes)) {
+                if (!node.nodeTx) {
+                    throw new Error(`Node tx not found for leaf ${nodeId}`);
+                }
+                if (!node.verifyingPublicKey) {
+                    throw new Error(`Node public key not found for leaf ${nodeId}`);
+                }
+                const leaf = request.swapLeaves.find((leaf) => leaf.leafId === nodeId);
+                if (!leaf) {
+                    throw new Error(`Leaf not found for node ${nodeId}`);
+                }
+                // @ts-ignore - We do a null check above
+                const nodeTx = getTxFromRawTxBytes(node.nodeTx);
+                const refundTxBytes = hexToBytes(leaf.rawUnsignedRefundTransaction);
+                const refundTx = getTxFromRawTxBytes(refundTxBytes);
+                const sighash = getSigHashFromTx(refundTx, 0, nodeTx.getOutput(0));
+                const nodePublicKey = node.verifyingPublicKey;
+                const taprootKey = computeTaprootKeyNoScript(nodePublicKey.slice(1));
+                const adaptorSignatureBytes = hexToBytes(leaf.adaptorSignedSignature);
+                applyAdaptorToSignature(taprootKey.slice(1), sighash, adaptorSignatureBytes, adaptorPrivateKey);
+            }
+            await this.transferService.sendTransferTweakKey(transfer, leafKeyTweaks, signatureMap);
+            const completeResponse = await this.sspClient?.completeLeaveSwap({
+                adaptorSecretKey: bytesToHex(adaptorPrivateKey),
+                userOutboundTransferExternalId: transfer.id,
+                leavesSwapRequestId: request.id,
+            });
+            if (!completeResponse) {
+                throw new Error("Failed to complete leaves swap");
+            }
+            await this.claimTransfers();
+            return completeResponse;
         }
         catch (e) {
             await this.transferService.cancelSendTransfer(transfer);
             console.log("Cancelled send transfer", transfer.id);
             throw new Error(`Failed to request leaves swap: ${e}`);
         }
-        if (!request) {
-            throw new Error("Failed to request leaves swap. No response returned.");
-        }
-        const sparkClient = await this.connectionManager.createSparkClient(this.config.getCoordinatorAddress());
-        const nodes = await sparkClient.query_nodes({
-            source: {
-                $case: "nodeIds",
-                nodeIds: {
-                    nodeIds: request.swapLeaves.map((leaf) => leaf.leafId),
-                },
-            },
-        });
-        if (Object.values(nodes.nodes).length !== request.swapLeaves.length) {
-            throw new Error("Expected same number of nodes as swapLeaves");
-        }
-        for (const [nodeId, node] of Object.entries(nodes.nodes)) {
-            if (!node.nodeTx) {
-                throw new Error(`Node tx not found for leaf ${nodeId}`);
-            }
-            if (!node.verifyingPublicKey) {
-                throw new Error(`Node public key not found for leaf ${nodeId}`);
-            }
-            const leaf = request.swapLeaves.find((leaf) => leaf.leafId === nodeId);
-            if (!leaf) {
-                throw new Error(`Leaf not found for node ${nodeId}`);
-            }
-            // @ts-ignore - We do a null check above
-            const nodeTx = getTxFromRawTxBytes(node.nodeTx);
-            const refundTxBytes = hexToBytes(leaf.rawUnsignedRefundTransaction);
-            const refundTx = getTxFromRawTxBytes(refundTxBytes);
-            const sighash = getSigHashFromTx(refundTx, 0, nodeTx.getOutput(0));
-            const nodePublicKey = node.verifyingPublicKey;
-            const taprootKey = computeTaprootKeyNoScript(nodePublicKey.slice(1));
-            const adaptorSignatureBytes = hexToBytes(leaf.adaptorSignedSignature);
-            applyAdaptorToSignature(taprootKey.slice(1), sighash, adaptorSignatureBytes, adaptorPrivateKey);
-        }
-        await this.transferService.sendTransferTweakKey(transfer, leafKeyTweaks, signatureMap);
-        const completeResponse = await this.sspClient?.completeLeaveSwap({
-            adaptorSecretKey: bytesToHex(adaptorPrivateKey),
-            userOutboundTransferExternalId: transfer.id,
-            leavesSwapRequestId: request.id,
-        });
-        if (!completeResponse) {
-            throw new Error("Failed to complete leaves swap");
-        }
-        await this.claimTransfers();
-        return completeResponse;
     }
     async getBalance() {
         await this.claimTransfers();

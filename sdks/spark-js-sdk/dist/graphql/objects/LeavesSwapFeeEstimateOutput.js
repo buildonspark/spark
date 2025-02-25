@@ -1,6 +1,6 @@
 // Copyright ©, 2023-present, Lightspark Group, Inc. - All Rights Reserved
-import { CurrencyAmountFromJson } from './CurrencyAmount.js';
 import { CurrencyAmountToJson } from './CurrencyAmount.js';
+import { CurrencyAmountFromJson } from './CurrencyAmount.js';
 export const LeavesSwapFeeEstimateOutputFromJson = (obj) => {
     return {
         feeEstimate: CurrencyAmountFromJson(obj["leaves_swap_fee_estimate_output_fee_estimate"]),

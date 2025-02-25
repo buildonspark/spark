@@ -19,6 +19,6 @@ export default class SspClient {
     requestCoopExit({ leafExternalIds, withdrawalAddress, }: RequestCoopExitInput): Promise<CoopExitRequest | null>;
     requestLightningReceive({ amountSats, network, paymentHash, expirySecs, memo, }: RequestLightningReceiveInput): Promise<LightningReceiveRequest | null>;
     requestLightningSend({ encodedInvoice, idempotencyKey, }: RequestLightningSendInput): Promise<LightningSendRequest | null>;
-    requestLeaveSwap({ adaptorPubkey, totalAmountSats, targetAmountSats, feeSats, network, userLeaves, }: RequestLeavesSwapInput): Promise<LeavesSwapRequest | null>;
+    requestLeaveSwap({ adaptorPubkey, totalAmountSats, targetAmountSats, feeSats, userLeaves, }: RequestLeavesSwapInput): Promise<LeavesSwapRequest | null>;
     completeLeaveSwap({ adaptorSecretKey, userOutboundTransferExternalId, leavesSwapRequestId, }: CompleteLeavesSwapInput): Promise<LeavesSwapRequest | null>;
 }
