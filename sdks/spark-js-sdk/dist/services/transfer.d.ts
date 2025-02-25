@@ -59,4 +59,5 @@ export declare class TransferService extends BaseTransferService {
     claimTransferSignRefunds(transfer: Transfer, leafKeys: LeafKeyTweak[]): Promise<NodeSignatures[]>;
     private finalizeTransfer;
     cancelSendTransfer(transfer: Transfer): Promise<Transfer | undefined>;
+    queryPendingTransfersBySender(): Promise<QueryPendingTransfersResponse>;
 }

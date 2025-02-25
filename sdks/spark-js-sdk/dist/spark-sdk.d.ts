@@ -60,6 +60,7 @@ export declare class SparkWallet {
     sendTransfer({ amount, receiverPubKey, leaves, expiryTime, }: SendTransferParams): Promise<Transfer>;
     private claimTransfer;
     private claimTransfers;
+    cancelAllSenderInitiatedTransfers(): Promise<void>;
     createLightningInvoice({ amountSats, memo, expirySeconds, invoiceCreator, }: CreateLightningInvoiceParams): Promise<string>;
     payLightningInvoice({ invoice, amountSats, }: PayLightningInvoiceParams): Promise<import("./graphql/objects/LightningSendRequest.js").default>;
     private getLightningReceiveFeeEstimate;

@@ -118,8 +118,6 @@ export class TreeCreationService {
       response = await sparkClient.prepare_tree_address(request);
     } catch (error) {
       throw new Error(`Error preparing tree address: ${error}`);
-    } finally {
-      sparkClient.close?.();
     }
 
     if (!response.node) {
@@ -188,7 +186,6 @@ export class TreeCreationService {
     try {
       response = await sparkClient.create_tree(request);
     } catch (error) {
-      sparkClient.close?.();
       throw new Error(`Error creating tree: ${error}`);
     }
 
@@ -215,8 +212,6 @@ export class TreeCreationService {
       throw new Error(
         `Error finalizing node signatures in tree creation: ${error}`
       );
-    } finally {
-      sparkClient.close?.();
     }
 
     return finalizeResp;

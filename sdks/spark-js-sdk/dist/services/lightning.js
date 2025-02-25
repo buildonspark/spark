@@ -55,9 +55,6 @@ export class LightningService {
             catch (e) {
                 errors.push(e);
             }
-            finally {
-                sparkClient.close?.();
-            }
         });
         await Promise.all(promises);
         if (errors.length > 0) {
@@ -74,7 +71,6 @@ export class LightningService {
             });
         }
         catch (error) {
-            sparkClient.close?.();
             throw new Error(`Error getting signing commitments: ${error}`);
         }
         const userSignedRefunds = await this.signRefunds(leaves, signingCommitments.signingCommitments, receiverIdentityPubkey);
@@ -121,9 +117,6 @@ export class LightningService {
         catch (error) {
             throw new Error(`Error initiating preimage swap: ${error}`);
         }
-        finally {
-            sparkClient.close?.();
-        }
         return response;
     }
     async queryUserSignedRefunds(paymentHash) {
@@ -136,9 +129,6 @@ export class LightningService {
         }
         catch (error) {
             throw new Error(`Error querying user signed refunds: ${error}`);
-        }
-        finally {
-            sparkClient.close?.();
         }
         return response.userSignedRefunds;
     }
@@ -158,7 +148,6 @@ export class LightningService {
             });
         }
         catch (error) {
-            sparkClient.close?.();
             throw new Error(`Error providing preimage: ${error}`);
         }
         if (!response.transfer) {

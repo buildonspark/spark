@@ -63,9 +63,6 @@ export class TreeCreationService {
         catch (error) {
             throw new Error(`Error preparing tree address: ${error}`);
         }
-        finally {
-            sparkClient.close?.();
-        }
         if (!response.node) {
             throw new Error("No node found in response");
         }
@@ -113,7 +110,6 @@ export class TreeCreationService {
             response = await sparkClient.create_tree(request);
         }
         catch (error) {
-            sparkClient.close?.();
             throw new Error(`Error creating tree: ${error}`);
         }
         if (!response.node) {
@@ -129,9 +125,6 @@ export class TreeCreationService {
         }
         catch (error) {
             throw new Error(`Error finalizing node signatures in tree creation: ${error}`);
-        }
-        finally {
-            sparkClient.close?.();
         }
         return finalizeResp;
     }

@@ -126,9 +126,8 @@ export class DepositService {
       });
     } catch (error) {
       throw new Error(`Error generating deposit address: ${error}`);
-    } finally {
-      sparkClient.close?.();
     }
+
     if (!depositResp.depositAddress) {
       throw new Error("No deposit address response from coordinator");
     }
@@ -226,7 +225,6 @@ export class DepositService {
         },
       });
     } catch (error) {
-      sparkClient.close?.();
       throw new Error(`Error starting tree creation: ${error}`);
     }
 
@@ -323,10 +321,7 @@ export class DepositService {
         ],
       });
     } catch (error) {
-      sparkClient.close?.();
       throw new Error(`Error finalizing node signatures in deposit: ${error}`);
-    } finally {
-      sparkClient.close?.();
     }
 
     return finalizeResp;

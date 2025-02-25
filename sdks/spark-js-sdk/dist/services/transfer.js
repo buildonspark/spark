@@ -38,9 +38,6 @@ export class BaseTransferService {
                 errors.push(new Error(`Error completing send transfer: ${error}`));
                 return;
             }
-            finally {
-                sparkClient.close?.();
-            }
             if (!updatedTransfer) {
                 updatedTransfer = transferResp.transfer;
             }
@@ -216,9 +213,6 @@ export class TransferService extends BaseTransferService {
         catch (error) {
             throw new Error(`Error querying pending transfers: ${error}`);
         }
-        finally {
-            sparkClient.close?.();
-        }
         return pendingTransfersResp;
     }
     async verifyPendingTransfer(transfer) {
@@ -279,9 +273,6 @@ export class TransferService extends BaseTransferService {
         catch (error) {
             throw new Error(`Error initiating leaf swap: ${error}`);
         }
-        finally {
-            sparkClient.close?.();
-        }
         if (!response.transfer) {
             throw new Error("No transfer response from coordinator");
         }
@@ -327,9 +318,6 @@ export class TransferService extends BaseTransferService {
         }
         catch (error) {
             throw new Error(`Error starting send transfer: ${error}`);
-        }
-        finally {
-            sparkClient.close?.();
         }
         const signatures = await this.signRefunds(leafDataMap, response.signingResults);
         const signatureMap = new Map();
@@ -386,9 +374,6 @@ export class TransferService extends BaseTransferService {
             catch (error) {
                 errors.push(new Error(`Error claiming transfer tweak keys: ${error}`));
                 return;
-            }
-            finally {
-                sparkClient.close?.();
             }
         });
         await Promise.all(promises);
@@ -469,9 +454,6 @@ export class TransferService extends BaseTransferService {
         catch (error) {
             throw new Error(`Error claiming transfer sign refunds: ${error}`);
         }
-        finally {
-            sparkClient.close?.();
-        }
         return this.signRefunds(leafDataMap, resp.signingResults);
     }
     async finalizeTransfer(nodeSignatures) {
@@ -485,9 +467,6 @@ export class TransferService extends BaseTransferService {
         catch (error) {
             throw new Error(`Error finalizing node signatures in transfer: ${error}`);
         }
-        finally {
-            sparkClient.close?.();
-        }
     }
     async cancelSendTransfer(transfer) {
         const sparkClient = await this.connectionManager.createSparkClient(this.config.getCoordinatorAddress());
@@ -500,6 +479,20 @@ export class TransferService extends BaseTransferService {
         }
         catch (error) {
             throw new Error(`Error canceling send transfer: ${error}`);
+        }
+    }
+    async queryPendingTransfersBySender() {
+        const sparkClient = await this.connectionManager.createSparkClient(this.config.getCoordinatorAddress());
+        try {
+            return await sparkClient.query_pending_transfers({
+                participant: {
+                    $case: "senderIdentityPublicKey",
+                    senderIdentityPublicKey: await this.config.signer.getIdentityPublicKey(),
+                },
+            });
+        }
+        catch (error) {
+            throw new Error(`Error querying pending transfers by sender: ${error}`);
         }
     }
 }

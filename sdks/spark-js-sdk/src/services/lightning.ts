@@ -116,8 +116,6 @@ export class LightningService {
         });
       } catch (e: any) {
         errors.push(e);
-      } finally {
-        sparkClient.close?.();
       }
     });
 
@@ -147,7 +145,6 @@ export class LightningService {
         nodeIds: leaves.map((leaf) => leaf.leaf.id),
       });
     } catch (error) {
-      sparkClient.close?.();
       throw new Error(`Error getting signing commitments: ${error}`);
     }
 
@@ -203,8 +200,6 @@ export class LightningService {
       });
     } catch (error) {
       throw new Error(`Error initiating preimage swap: ${error}`);
-    } finally {
-      sparkClient.close?.();
     }
 
     return response;
@@ -224,8 +219,6 @@ export class LightningService {
       });
     } catch (error) {
       throw new Error(`Error querying user signed refunds: ${error}`);
-    } finally {
-      sparkClient.close?.();
     }
 
     return response.userSignedRefunds;
@@ -250,7 +243,6 @@ export class LightningService {
         paymentHash,
       });
     } catch (error) {
-      sparkClient.close?.();
       throw new Error(`Error providing preimage: ${error}`);
     }
 

@@ -119,7 +119,6 @@ export class SparkWallet {
             },
             includeParents: true,
         });
-        sparkClient.close?.();
         return Object.entries(leaves.nodes)
             .filter(([_, node]) => node.status === "AVAILABLE")
             .map(([_, node]) => node);
@@ -231,8 +230,9 @@ export class SparkWallet {
             });
         }
         catch (e) {
-            console.error("Failed to request leaves swap", e);
-            throw e;
+            await this.transferService.cancelSendTransfer(transfer);
+            console.log("Cancelled send transfer", transfer.id);
+            throw new Error(`Failed to request leaves swap: ${e}`);
         }
         if (!request) {
             throw new Error("Failed to request leaves swap. No response returned.");
@@ -260,7 +260,6 @@ export class SparkWallet {
             const adaptorSignatureBytes = hexToBytes(leaf.adaptorSignedSignature);
             applyAdaptorToSignature(taprootKey.slice(1), sighash, adaptorSignatureBytes, adaptorPrivateKey);
         }
-        sparkClient.close?.();
         await this.transferService.sendTransferTweakKey(transfer, leafKeyTweaks, signatureMap);
         const completeResponse = await this.sspClient?.completeLeaveSwap({
             adaptorSecretKey: bytesToHex(adaptorPrivateKey),
@@ -364,6 +363,14 @@ export class SparkWallet {
             claimed = true;
         }
         return claimed;
+    }
+    async cancelAllSenderInitiatedTransfers() {
+        const transfers = await this.transferService.queryPendingTransfersBySender();
+        for (const transfer of transfers.transfers) {
+            if (transfer.status === TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAKED) {
+                await this.transferService.cancelSendTransfer(transfer);
+            }
+        }
     }
     // ***** Lightning Flow *****
     async createLightningInvoice({ amountSats, memo, expirySeconds, 

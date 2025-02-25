@@ -98,7 +98,7 @@ async function runCLI() {
             const auth = btoa("lightspark:TFNR6ZeLdxF9HejW");
 
             const response = await fetch(
-              `${baseUrl}/address/${depositAddress}/txs`,
+              `${baseUrl}/address/${depositAddress.depositAddress.address}/txs`,
               {
                 headers: {
                   Authorization: `Basic ${auth}`,
@@ -114,7 +114,9 @@ async function runCLI() {
 
               // // Find our output
               const outputIndex = latestTx.vout.findIndex(
-                (output: any) => output.scriptpubkey_address === depositAddress
+                (output: any) =>
+                  output.scriptpubkey_address ===
+                  depositAddress.depositAddress?.address
               );
 
               if (outputIndex === -1) {
@@ -133,7 +135,6 @@ async function runCLI() {
               const txHex = await txResponse.text();
               depositTx = getTxFromRawTxHex(txHex);
               vout = outputIndex;
-              break;
             }
           } catch (error) {
             throw error;

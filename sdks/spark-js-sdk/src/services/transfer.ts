@@ -104,8 +104,6 @@ export class BaseTransferService {
       } catch (error) {
         errors.push(new Error(`Error completing send transfer: ${error}`));
         return;
-      } finally {
-        sparkClient.close?.();
       }
 
       if (!updatedTransfer) {
@@ -389,8 +387,6 @@ export class TransferService extends BaseTransferService {
       });
     } catch (error) {
       throw new Error(`Error querying pending transfers: ${error}`);
-    } finally {
-      sparkClient.close?.();
     }
     return pendingTransfersResp;
   }
@@ -483,8 +479,6 @@ export class TransferService extends BaseTransferService {
       });
     } catch (error) {
       throw new Error(`Error initiating leaf swap: ${error}`);
-    } finally {
-      sparkClient.close?.();
     }
 
     if (!response.transfer) {
@@ -555,8 +549,6 @@ export class TransferService extends BaseTransferService {
       });
     } catch (error) {
       throw new Error(`Error starting send transfer: ${error}`);
-    } finally {
-      sparkClient.close?.();
     }
 
     const signatures = await this.signRefunds(
@@ -645,8 +637,6 @@ export class TransferService extends BaseTransferService {
       } catch (error) {
         errors.push(new Error(`Error claiming transfer tweak keys: ${error}`));
         return;
-      } finally {
-        sparkClient.close?.();
       }
     });
 
@@ -758,8 +748,6 @@ export class TransferService extends BaseTransferService {
       });
     } catch (error) {
       throw new Error(`Error claiming transfer sign refunds: ${error}`);
-    } finally {
-      sparkClient.close?.();
     }
     return this.signRefunds(leafDataMap, resp.signingResults);
   }
@@ -775,8 +763,6 @@ export class TransferService extends BaseTransferService {
       });
     } catch (error) {
       throw new Error(`Error finalizing node signatures in transfer: ${error}`);
-    } finally {
-      sparkClient.close?.();
     }
   }
 
@@ -811,8 +797,6 @@ export class TransferService extends BaseTransferService {
       });
     } catch (error) {
       throw new Error(`Error querying pending transfers by sender: ${error}`);
-    } finally {
-      sparkClient.close?.();
     }
   }
 }

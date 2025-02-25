@@ -82,9 +82,6 @@ export class CoopExitService extends BaseTransferService {
         catch (error) {
             throw new Error(`Error initiating cooperative exit: ${error}`);
         }
-        finally {
-            sparkClient.close?.();
-        }
         if (!response.transfer) {
             throw new Error("Failed to initiate cooperative exit");
         }

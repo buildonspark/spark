@@ -229,7 +229,6 @@ export class SparkWallet {
       },
       includeParents: true,
     });
-    sparkClient.close?.();
     return Object.entries(leaves.nodes)
       .filter(([_, node]) => node.status === "AVAILABLE")
       .map(([_, node]) => node);
@@ -430,8 +429,6 @@ export class SparkWallet {
         adaptorPrivateKey
       );
     }
-
-    sparkClient.close?.();
 
     await this.transferService.sendTransferTweakKey(
       transfer,
