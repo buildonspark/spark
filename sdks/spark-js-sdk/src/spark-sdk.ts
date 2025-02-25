@@ -1,4 +1,8 @@
-import { bytesToHex, hexToBytes } from "@noble/curves/abstract/utils";
+import {
+  bytesToHex,
+  bytesToNumberBE,
+  hexToBytes,
+} from "@noble/curves/abstract/utils";
 import { secp256k1 } from "@noble/curves/secp256k1";
 import { Transaction } from "@scure/btc-signer";
 import { TransactionInput } from "@scure/btc-signer/psbt";
@@ -941,8 +945,9 @@ export class SparkWallet {
   // ***** Token Flow *****
 
   protected async syncTokenLeaves() {
-    const trackedPublicKeys = await this.config.signer.getTrackedPublicKeys();
+    this.tokenLeaves.clear();
 
+    const trackedPublicKeys = await this.config.signer.getTrackedPublicKeys();
     const unsortedTokenLeaves =
       await this.tokenTransactionService.fetchOwnedTokenLeaves(
         [...trackedPublicKeys, await this.config.signer.getIdentityPublicKey()],
@@ -990,7 +995,7 @@ export class SparkWallet {
     await this.syncTokenLeaves();
 
     if (!this.tokenLeaves.has(tokenPublicKey)) {
-      throw new Error("No token leaves with the given tokenPublicKey");
+      return 0n;
     }
     return calculateAvailableTokenAmount(this.tokenLeaves.get(tokenPublicKey)!);
   }

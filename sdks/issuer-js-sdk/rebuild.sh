@@ -10,8 +10,8 @@ cd ../spark-js-sdk
 echo "Building spark-js-sdk..."
 yarn clean
 yarn install
-yarn build
 yarn generate:proto
+yarn build
 
 # 3. Return to original directory
 cd "$CURRENT_DIR"

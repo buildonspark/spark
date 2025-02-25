@@ -149,7 +149,6 @@ export class TokenTransactionService {
       }
 
       for (let i = 0; i < transferInput.leavesToSpend.length; i++) {
-        const leaf = transferInput.leavesToSpend[i];
         const key = leafToSpendSigningPublicKeys![i];
         if (!key) {
           throw new Error("key not found");
@@ -344,12 +343,7 @@ export class TokenTransactionService {
     leafToSpendRevocationKeys: Uint8Array[],
     threshold: number
   ): Promise<TokenTransaction> {
-    const sparkClient = await this.connectionManager.createSparkClient(
-      this.config.getCoordinatorAddress()
-    );
-
     const signingOperators = this.config.getConfig().signingOperators;
-
     // Submit finalize_token_transaction to all SOs in parallel
     const soResponses = await Promise.allSettled(
       Object.entries(signingOperators).map(async ([identifier, operator]) => {

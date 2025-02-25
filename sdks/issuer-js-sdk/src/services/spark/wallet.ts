@@ -35,10 +35,9 @@ export class IssuerSparkWallet extends SparkWallet {
         tokenAmount
       );
 
-    const finalizedTokenTransaction =
-      await this.issuerTokenTransactionService.broadcastTokenTransaction(
-        tokenTransaction
-      );
+    await this.issuerTokenTransactionService.broadcastTokenTransaction(
+      tokenTransaction
+    );
 
     if (!this.tokenLeaves.has(tokenPublicKey)) {
       this.tokenLeaves.set(tokenPublicKey, []);
@@ -59,7 +58,12 @@ export class IssuerSparkWallet extends SparkWallet {
     tokenAmount: bigint,
     selectedLeaves?: LeafWithPreviousTransactionData[]
   ) {
-    await this.transferTokens(await this.getIdentityPublicKey(), tokenAmount, BURN_ADDRESS, selectedLeaves);
+    await this.transferTokens(
+      await this.getIdentityPublicKey(),
+      tokenAmount,
+      BURN_ADDRESS,
+      selectedLeaves
+    );
   }
 
   async freezeIssuerTokens(ownerPublicKey: string) {

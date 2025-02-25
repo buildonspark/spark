@@ -1,7 +1,5 @@
 import { TokenTransactionService } from "@buildonspark/spark-js-sdk/token-transactions";
-import {
-  TokenTransaction
-} from "../../proto/spark.js";
+import { TokenTransaction } from "../../proto/spark.js";
 import { ConnectionManager } from "@buildonspark/spark-js-sdk/connection";
 import { WalletConfigService } from "@buildonspark/spark-js-sdk/config";
 import { numberToBytesBE } from "@noble/curves/abstract/utils";
