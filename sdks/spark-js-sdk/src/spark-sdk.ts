@@ -984,7 +984,7 @@ export class SparkWallet {
     return this.tokenLeaves;
   }
 
-  async getAllTokenBalances(): Promise<Map<string, bigint>> {
+  public async getAllTokenBalances(): Promise<Map<string, bigint>> {
     await this.syncTokenLeaves();
 
     const balances = new Map<string, bigint>();
@@ -994,7 +994,7 @@ export class SparkWallet {
     return balances;
   }
 
-  async getTokenBalance(tokenPublicKey: string) {
+  public async getTokenBalance(tokenPublicKey: string) {
     await this.syncTokenLeaves();
 
     if (!this.tokenLeaves.has(tokenPublicKey)) {
@@ -1003,7 +1003,7 @@ export class SparkWallet {
     return calculateAvailableTokenAmount(this.tokenLeaves.get(tokenPublicKey)!);
   }
 
-  async transferTokens(
+  public async transferTokens(
     tokenPublicKey: string,
     tokenAmount: bigint,
     recipientPublicKey: string,
@@ -1050,7 +1050,7 @@ export class SparkWallet {
     );
   }
 
-  selectTokenLeaves(
+  private selectTokenLeaves(
     tokenPublicKey: string,
     tokenAmount: bigint
   ): LeafWithPreviousTransactionData[] {
@@ -1061,7 +1061,7 @@ export class SparkWallet {
   }
 
   // If no leaves are passed in, it will take all the leaves available for the given tokenPublicKey
-  async consolidateTokenLeaves(
+  public async consolidateTokenLeaves(
     tokenPublicKey: string,
     selectedLeaves?: LeafWithPreviousTransactionData[]
   ) {
