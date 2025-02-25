@@ -285,6 +285,10 @@ func (h *BaseTransferHandler) CancelSendTransfer(ctx context.Context, req *pbspa
 	if !bytes.Equal(transfer.SenderIdentityPubkey, req.SenderIdentityPublicKey) {
 		return nil, fmt.Errorf("only sender is eligible to cancel the transfer %s", req.TransferId)
 	}
+	// Don't error if the transfer is already returned.
+	if transfer.Status == schema.TransferStatusReturned {
+		return &pbspark.CancelSendTransferResponse{}, nil
+	}
 	if transfer.Status != schema.TransferStatusSenderInitiated {
 		return nil, fmt.Errorf("transfer %s is expected to be at status TransferStatusSenderInitiated but %s found", req.TransferId, transfer.Status)
 	}
