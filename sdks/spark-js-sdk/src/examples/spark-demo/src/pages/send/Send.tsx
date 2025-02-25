@@ -11,7 +11,6 @@ import ArrowLeft from "../../icons/ArrowLeft";
 import { Routes } from "../../routes";
 import { PERMANENT_CURRENCIES, useWallet } from "../../store/wallet";
 import { CurrencyType } from "../../utils/currency";
-import { delay } from "../../utils/utils";
 export enum SendStep {
   AddressInput = "AddressInput",
   AmountInput = "AmountInput",
@@ -114,10 +113,6 @@ export default function Send() {
             : Number(rawInputAmount);
 
         setPrimaryButtonLoading(true);
-        await delay(3000);
-        setPrimaryButtonLoading(false);
-
-        console.log("satsToSend", satsToSend);
         if (sendAddressNetwork === Network.LIGHTNING) {
           await payLightningInvoice(sendAddress);
         } else if (sendAddressNetwork === Network.SPARK) {
@@ -175,6 +170,8 @@ export default function Send() {
             }),
           });
         }
+        setPrimaryButtonLoading(false);
+
         // TODO: IF FAIL
         // setCurrentStep(SendStep.Failed);
         setCurrentStep(SendStep.Success);
@@ -190,15 +187,17 @@ export default function Send() {
     }
   }, [
     currentStep,
-    navigate,
-    sendAddressNetwork,
+    activeInputCurrency.type,
     rawInputAmount,
-    activeInputCurrency,
-    satsUsdPrice,
+    satsUsdPrice.value,
+    sendAddressNetwork,
     setActiveAsset,
-    getMasterPublicKey,
+    navigate,
+    payLightningInvoice,
     sendAddress,
     sendTransfer,
+    withdrawToBtc,
+    getMasterPublicKey,
   ]);
 
   const secondaryButtonText = useMemo(() => {

@@ -18,17 +18,22 @@ export default function Wallet() {
     balance: satsBalance,
     satsUsdPrice,
     getMasterPublicKey,
+    isInitialized,
   } = useWallet();
   const [pubkey, setPubkey] = useState("");
   const satsFiatBalance = (satsBalance.value * satsUsdPrice.value).toFixed(2);
 
   useEffect(() => {
-    const pubkey = async () => {
-      const walletPubkey = await getMasterPublicKey();
-      setPubkey(walletPubkey);
-    };
-    pubkey();
-  }, [getMasterPublicKey]);
+    console.log("isInitialized", isInitialized);
+    if (isInitialized) {
+      getMasterPublicKey().then((pubkey) => {
+        console.log("pubkey", pubkey);
+        if (pubkey) {
+          setPubkey(pubkey);
+        }
+      });
+    }
+  }, [getMasterPublicKey, isInitialized]);
 
   return (
     <div>

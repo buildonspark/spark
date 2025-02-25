@@ -78,17 +78,19 @@ export default function AddressInput({ onAddressSelect }: AddressInputProps) {
           Works with spark and bitcoin wallet addresses.
         </span>
       ) : (
-        <DetailsRow
-          logoLeft={logoLeft}
-          title={inputAddress}
-          subtitle={`${capitalizeFirstLetter(inputAddressNetwork)} address`}
-          logoRight={<ChevronIcon direction="right" />}
-          logoLeftCircleBackground={true}
-          onClick={() => {
-            onAddressSelect(inputAddress, inputAddressNetwork);
-          }}
-          logoRightMargin={0}
-        />
+        inputAddressNetwork !== Network.PHONE && (
+          <DetailsRow
+            logoLeft={logoLeft}
+            title={inputAddress}
+            subtitle={`${capitalizeFirstLetter(inputAddressNetwork)} address`}
+            logoRight={<ChevronIcon direction="right" />}
+            logoLeftCircleBackground={true}
+            onClick={() => {
+              onAddressSelect(inputAddress, inputAddressNetwork);
+            }}
+            logoRightMargin={0}
+          />
+        )
       )}
       {inputAddressNetwork === Network.PHONE && (
         <DetailsRow
