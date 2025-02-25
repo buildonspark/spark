@@ -102,7 +102,7 @@ func (h *TreeQueryHandler) QueryUnusedDepositAddresses(ctx context.Context, req 
 
 	unusedDepositAddresses := make([]*pb.DepositAddressQueryResult, 0)
 	for _, depositAddress := range depositAddresses {
-		_, err := db.TreeNode.Query().Where(treenode.HasSigningKeyshareWith(signingkeyshare.ID(depositAddress.Edges.SigningKeyshare.ID))).Only(ctx)
+		_, err := db.TreeNode.Query().Where(treenode.HasSigningKeyshareWith(signingkeyshare.ID(depositAddress.Edges.SigningKeyshare.ID))).All(ctx)
 		if err != nil {
 			if ent.IsNotFound(err) {
 				verifyingPublicKey, err := common.AddPublicKeys(depositAddress.OwnerSigningPubkey, depositAddress.Edges.SigningKeyshare.PublicKey)
