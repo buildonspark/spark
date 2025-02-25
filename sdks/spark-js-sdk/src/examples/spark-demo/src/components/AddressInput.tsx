@@ -82,7 +82,7 @@ export default function AddressInput({ onAddressSelect }: AddressInputProps) {
           <DetailsRow
             logoLeft={logoLeft}
             title={inputAddress}
-            subtitle={`${capitalizeFirstLetter(inputAddressNetwork)} address`}
+            subtitle={`${capitalizeFirstLetter(inputAddressNetwork)} ${inputAddressNetwork === Network.LIGHTNING ? "invoice" : "address"}`}
             logoRight={<ChevronIcon direction="right" />}
             logoLeftCircleBackground={true}
             onClick={() => {

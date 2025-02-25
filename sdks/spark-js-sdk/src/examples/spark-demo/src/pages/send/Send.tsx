@@ -61,14 +61,24 @@ export default function Send() {
         setCurrentStep(SendStep.AddressInput);
         break;
       case SendStep.ConfirmQuote:
-        setCurrentStep(SendStep.AmountInput);
+        if (sendAddressNetwork === Network.LIGHTNING) {
+          setCurrentStep(SendStep.AddressInput);
+        } else {
+          setCurrentStep(SendStep.AmountInput);
+        }
         break;
       default:
         setActiveAsset(PERMANENT_CURRENCIES.BTC);
         navigate(Routes.Wallet);
         break;
     }
-  }, [currentStep, navigate, setCurrentStep, setActiveAsset]);
+  }, [
+    currentStep,
+    sendAddressNetwork,
+    navigate,
+    setCurrentStep,
+    setActiveAsset,
+  ]);
 
   const topTitle = useMemo(() => {
     switch (currentStep) {
@@ -114,7 +124,13 @@ export default function Send() {
 
         setPrimaryButtonLoading(true);
         if (sendAddressNetwork === Network.LIGHTNING) {
-          await payLightningInvoice(sendAddress);
+          try {
+            await payLightningInvoice(sendAddress);
+            setCurrentStep(SendStep.Success);
+          } catch (e) {
+            console.error(e);
+            setCurrentStep(SendStep.Failed);
+          }
         } else if (sendAddressNetwork === Network.SPARK) {
           await sendTransfer(satsToSend, sendAddress);
         } else if (sendAddressNetwork === Network.BITCOIN) {
@@ -239,7 +255,7 @@ export default function Send() {
           onAddressSelect={(address, addressNetwork) => {
             setSendAddress(address);
             setSendAddressNetwork(addressNetwork);
-            setCurrentStep(SendStep.AmountInput);
+            setCurrentStep(SendStep.ConfirmQuote);
           }}
         />
       )}

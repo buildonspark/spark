@@ -1,6 +1,16 @@
+import { decode } from "light-bolt11-decoder";
 import { useWallet } from "../store/wallet";
 import { CurrencyType } from "../utils/currency";
 import { Network } from "./Networks";
+
+const decodeLnInvoiceSafely = (invoice: string) => {
+  try {
+    return decode(invoice);
+  } catch (error) {
+    console.error(error);
+    return null;
+  }
+};
 
 export default function ConfirmQuote({
   inputAmount,
@@ -12,19 +22,29 @@ export default function ConfirmQuote({
   sendAddressNetwork: string;
 }) {
   const { activeAsset, satsUsdPrice, activeInputCurrency } = useWallet();
+  const decodedLnInvoice = decodeLnInvoiceSafely(sendAddress) || null;
+  const decodedLnSatsAmount: number =
+    Number(
+      decodedLnInvoice?.sections.find((section) => section.name === "amount")
+        ?.value,
+    ) / 1000 || 0;
   const sendFiatAmount =
-    activeInputCurrency.type === CurrencyType.FIAT
-      ? inputAmount
-      : `${(Number(inputAmount) * (activeAsset.type === CurrencyType.TOKEN ? (activeAsset.usdPrice ?? 1) : satsUsdPrice.value)).toFixed(2)}`;
+    sendAddressNetwork === Network.LIGHTNING
+      ? `${(decodedLnSatsAmount * satsUsdPrice.value).toFixed(2)}`
+      : activeInputCurrency.type === CurrencyType.FIAT
+        ? inputAmount
+        : `${(Number(inputAmount) * (activeAsset.type === CurrencyType.TOKEN ? (activeAsset.usdPrice ?? 1) : satsUsdPrice.value)).toFixed(2)}`;
   const sendAssetAmount =
-    activeInputCurrency.type === CurrencyType.FIAT
-      ? (
-          Number(inputAmount) /
-          (activeAsset.type === CurrencyType.TOKEN
-            ? (activeAsset.usdPrice ?? 1)
-            : satsUsdPrice.value)
-        ).toFixed(0)
-      : inputAmount;
+    sendAddressNetwork === Network.LIGHTNING
+      ? decodedLnSatsAmount
+      : activeInputCurrency.type === CurrencyType.FIAT
+        ? (
+            Number(inputAmount) /
+            (activeAsset.type === CurrencyType.TOKEN
+              ? (activeAsset.usdPrice ?? 1)
+              : satsUsdPrice.value)
+          ).toFixed(0)
+        : inputAmount;
   return (
     <div>
       <div
