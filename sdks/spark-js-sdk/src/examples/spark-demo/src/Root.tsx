@@ -3,6 +3,7 @@ import {
   Route,
   Routes as RoutesProvider,
 } from "react-router-dom";
+import StyledToast from "./components/StyledToast";
 import SparkWithTextLogo from "./icons/SparkWithTextLogo";
 import Login from "./pages/login/Login";
 import Receive from "./pages/receive/Receive";
@@ -34,6 +35,7 @@ export default function Root() {
             <Route path={Routes.RecoverWallet} element={<RecoverWallet />} />
             <Route path={Routes.Tokens} element={<Tokens />} />
           </RoutesProvider>
+          <StyledToast />
         </div>
       </div>
     </Router>

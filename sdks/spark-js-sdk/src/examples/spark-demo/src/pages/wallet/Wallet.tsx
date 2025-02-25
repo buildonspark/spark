@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
 import Button from "../../components/Button";
 import CurrencyBalanceDetails from "../../components/CurrencyBalanceDetails";
 import StyledContainer from "../../components/StyledContainer";
@@ -12,6 +13,7 @@ import { useWallet } from "../../store/wallet";
 
 export default function Wallet() {
   const navigate = useNavigate();
+  const notify = () => toast("Copied!");
   const {
     balance: satsBalance,
     satsUsdPrice,
@@ -32,18 +34,21 @@ export default function Wallet() {
     <div>
       <StyledContainer className="flex h-[180px] w-full flex-col items-center justify-center p-6">
         <div className="flex h-[40px] w-full flex-row items-center justify-end">
-          <div className="flex max-w-[80px] flex-row items-center justify-center text-[13px] text-[#F9F9F999]">
-            <div className="mr-1 cursor-pointer overflow-hidden text-ellipsis whitespace-nowrap">
-              {pubkey ? pubkey : "Loading..."}
-            </div>
-          </div>
           <div
-            className="flex h-4 w-4 cursor-pointer items-center justify-center"
+            className="flex cursor-pointer flex-row items-center justify-center"
             onClick={() => {
               navigator.clipboard.writeText(pubkey);
+              notify();
             }}
           >
-            <CopyIcon stroke="#F9F9F999" />
+            <div className="flex max-w-[80px] flex-row items-center justify-center text-[13px] text-[#F9F9F999]">
+              <div className="mr-1 overflow-hidden text-ellipsis whitespace-nowrap">
+                {pubkey ? pubkey : "Loading..."}
+              </div>
+            </div>
+            <div className="flex h-4 w-4 items-center justify-center">
+              <CopyIcon stroke="#F9F9F999" />
+            </div>
           </div>
         </div>
         <div className="flex h-[140px] w-full flex-col items-start justify-end gap-2">

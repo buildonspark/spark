@@ -1,5 +1,6 @@
 import { QRCodeSVG } from "qrcode.react";
 import { useEffect, useRef } from "react";
+import { toast } from "react-toastify";
 import styled from "styled-components";
 import ClockIcon from "../icons/ClockIcon";
 import CloseIcon from "../icons/CloseIcon";
@@ -38,6 +39,7 @@ export default function ReceiveDetails({
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [setQrCodeModalVisible]);
+  const notify = () => toast("Copied!");
   const receiveFiatAmount =
     activeInputCurrency.type === CurrencyType.FIAT
       ? inputAmount
@@ -129,7 +131,7 @@ export default function ReceiveDetails({
           logoRight={<CopyIcon />}
           onClick={() => {
             navigator.clipboard.writeText(lightningInvoice || "");
-            alert("Copied to clipboard");
+            notify();
           }}
         />
         <DetailsRow
@@ -161,7 +163,7 @@ export default function ReceiveDetails({
                 onClick={(e) => {
                   e.stopPropagation();
                   navigator.clipboard.writeText(lightningInvoice || "");
-                  alert("Copied to clipboard");
+                  notify();
                 }}
               >
                 <div className="m-6 overflow-hidden text-ellipsis whitespace-nowrap text-[12px] text-[#FFFFFF]">
