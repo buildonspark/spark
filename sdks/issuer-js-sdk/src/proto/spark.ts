@@ -848,6 +848,14 @@ export interface QueryAllTransfersResponse {
   offset: number;
 }
 
+export interface QueryUnusedDepositAddressesRequest {
+  identityPublicKey: Uint8Array;
+}
+
+export interface QueryUnusedDepositAddressesResponse {
+  depositAddresses: string[];
+}
+
 function createBaseDepositAddressProof(): DepositAddressProof {
   return { addressSignatures: {}, proofOfPossessionSignature: new Uint8Array(0) };
 }
@@ -10746,6 +10754,130 @@ export const QueryAllTransfersResponse: MessageFns<QueryAllTransfersResponse> = 
   },
 };
 
+function createBaseQueryUnusedDepositAddressesRequest(): QueryUnusedDepositAddressesRequest {
+  return { identityPublicKey: new Uint8Array(0) };
+}
+
+export const QueryUnusedDepositAddressesRequest: MessageFns<QueryUnusedDepositAddressesRequest> = {
+  encode(message: QueryUnusedDepositAddressesRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.identityPublicKey.length !== 0) {
+      writer.uint32(10).bytes(message.identityPublicKey);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): QueryUnusedDepositAddressesRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseQueryUnusedDepositAddressesRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.identityPublicKey = reader.bytes();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): QueryUnusedDepositAddressesRequest {
+    return {
+      identityPublicKey: isSet(object.identityPublicKey)
+        ? bytesFromBase64(object.identityPublicKey)
+        : new Uint8Array(0),
+    };
+  },
+
+  toJSON(message: QueryUnusedDepositAddressesRequest): unknown {
+    const obj: any = {};
+    if (message.identityPublicKey.length !== 0) {
+      obj.identityPublicKey = base64FromBytes(message.identityPublicKey);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<QueryUnusedDepositAddressesRequest>): QueryUnusedDepositAddressesRequest {
+    return QueryUnusedDepositAddressesRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<QueryUnusedDepositAddressesRequest>): QueryUnusedDepositAddressesRequest {
+    const message = createBaseQueryUnusedDepositAddressesRequest();
+    message.identityPublicKey = object.identityPublicKey ?? new Uint8Array(0);
+    return message;
+  },
+};
+
+function createBaseQueryUnusedDepositAddressesResponse(): QueryUnusedDepositAddressesResponse {
+  return { depositAddresses: [] };
+}
+
+export const QueryUnusedDepositAddressesResponse: MessageFns<QueryUnusedDepositAddressesResponse> = {
+  encode(message: QueryUnusedDepositAddressesResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.depositAddresses) {
+      writer.uint32(10).string(v!);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): QueryUnusedDepositAddressesResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseQueryUnusedDepositAddressesResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.depositAddresses.push(reader.string());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): QueryUnusedDepositAddressesResponse {
+    return {
+      depositAddresses: globalThis.Array.isArray(object?.depositAddresses)
+        ? object.depositAddresses.map((e: any) => globalThis.String(e))
+        : [],
+    };
+  },
+
+  toJSON(message: QueryUnusedDepositAddressesResponse): unknown {
+    const obj: any = {};
+    if (message.depositAddresses?.length) {
+      obj.depositAddresses = message.depositAddresses;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<QueryUnusedDepositAddressesResponse>): QueryUnusedDepositAddressesResponse {
+    return QueryUnusedDepositAddressesResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<QueryUnusedDepositAddressesResponse>): QueryUnusedDepositAddressesResponse {
+    const message = createBaseQueryUnusedDepositAddressesResponse();
+    message.depositAddresses = object.depositAddresses?.map((e) => e) || [];
+    return message;
+  },
+};
+
 export type SparkServiceDefinition = typeof SparkServiceDefinition;
 export const SparkServiceDefinition = {
   name: "SparkService",
@@ -10992,6 +11124,14 @@ export const SparkServiceDefinition = {
       responseStream: false,
       options: {},
     },
+    query_unused_deposit_addresses: {
+      name: "query_unused_deposit_addresses",
+      requestType: QueryUnusedDepositAddressesRequest,
+      requestStream: false,
+      responseType: QueryUnusedDepositAddressesResponse,
+      responseStream: false,
+      options: {},
+    },
   },
 } as const;
 
@@ -11114,6 +11254,10 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
     request: CancelSendTransferRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<CancelSendTransferResponse>>;
+  query_unused_deposit_addresses(
+    request: QueryUnusedDepositAddressesRequest,
+    context: CallContext & CallContextExt,
+  ): Promise<DeepPartial<QueryUnusedDepositAddressesResponse>>;
 }
 
 export interface SparkServiceClient<CallOptionsExt = {}> {
@@ -11235,6 +11379,10 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
     request: DeepPartial<CancelSendTransferRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<CancelSendTransferResponse>;
+  query_unused_deposit_addresses(
+    request: DeepPartial<QueryUnusedDepositAddressesRequest>,
+    options?: CallOptions & CallOptionsExt,
+  ): Promise<QueryUnusedDepositAddressesResponse>;
 }
 
 function bytesFromBase64(b64: string): Uint8Array {

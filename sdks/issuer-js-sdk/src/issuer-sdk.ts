@@ -19,20 +19,12 @@ export class IssuerWallet {
     this.sparkWallet = new IssuerSparkWallet(network);
   }
 
-  async generateMnemonic(): Promise<string> {
-    if (!this.sparkWallet) {
-      throw new Error("Wallet not initialized");
-    }
-
-    return this.sparkWallet?.generateMnemonic();
-  }
-
-  async createWallet(
+  async initWalletFromMnemonic(
     mnemonic: string,
     // Set to true to enable L1 Token Announcements.
     enableL1Wallet: boolean = true
   ): Promise<void> {
-    await this.sparkWallet.createSparkWallet(mnemonic);
+    await this.sparkWallet.initWalletFromMnemonic(mnemonic);
 
     if (enableL1Wallet) {
       // const seed = await bip39.mnemonicToSeed(mnemonic);
@@ -123,7 +115,7 @@ export class IssuerWallet {
       throw new Error("Spark wallet not initialized");
     }
     return await this.sparkWallet.freezeIssuerTokens(
-      hexToBytes(freezePublicKey)
+      freezePublicKey
     );
   }
 
@@ -138,7 +130,7 @@ export class IssuerWallet {
       throw new Error("Spark wallet not initialized");
     }
     return await this.sparkWallet.unfreezeIssuerTokens(
-      hexToBytes(unfreezePublicKey)
+      unfreezePublicKey
     );
   }
 }

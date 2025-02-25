@@ -516,10 +516,20 @@ export class SparkWallet {
     }
     // ***** Token Flow *****
     async syncTokenLeaves() {
-        await this.tokenTransactionService.syncTokenLeaves(this.tokenLeaves);
+        const trackedPublicKeys = await this.config.signer.getTrackedPublicKeys();
+        const unsortedTokenLeaves = await this.tokenTransactionService.fetchOwnedTokenLeaves([...trackedPublicKeys, await this.config.signer.getIdentityPublicKey()], []);
+        unsortedTokenLeaves.forEach((leaf) => {
+            const tokenKey = bytesToHex(leaf.leaf.tokenPublicKey);
+            const index = leaf.previousTransactionVout;
+            this.tokenLeaves.set(tokenKey, [{ ...leaf, previousTransactionVout: index }]);
+        });
     }
-    getTokenBalance(tokenPublicKey) {
-        return calculateAvailableTokenAmount(this.tokenLeaves.get(bytesToHex(tokenPublicKey)));
+    async getTokenBalance(tokenPublicKey) {
+        await this.syncTokenLeaves();
+        if (!this.tokenLeaves.has(tokenPublicKey)) {
+            throw new Error("No token leaves with the given tokenPublicKey");
+        }
+        return calculateAvailableTokenAmount(this.tokenLeaves.get(tokenPublicKey));
     }
     async transferTokens(tokenPublicKey, tokenAmount, recipientPublicKey, selectedLeaves) {
         if (!this.tokenLeaves.has(tokenPublicKey)) {
@@ -544,7 +554,7 @@ export class SparkWallet {
         this.tokenTransactionService.updateTokenLeavesFromFinalizedTransaction(this.tokenLeaves.get(tokenPublicKey), finalizedTokenTransaction);
     }
     selectTokenLeaves(tokenPublicKey, tokenAmount) {
-        return this.tokenTransactionService.selectTokenLeaves(this.tokenLeaves.get(tokenPublicKey), hexToBytes(tokenPublicKey), tokenAmount);
+        return this.tokenTransactionService.selectTokenLeaves(this.tokenLeaves.get(tokenPublicKey), tokenAmount);
     }
     // If no leaves are passed in, it will take all the leaves available for the given tokenPublicKey
     async consolidateTokenLeaves(tokenPublicKey, selectedLeaves, transferBackToIdentityPublicKey = false) {

@@ -12,7 +12,7 @@ export declare class TokenTransactionService {
     constructConsolidateTokenTransaction(selectedLeaves: LeafWithPreviousTransactionData[], tokenPublicKey: Uint8Array, transferBackToIdentityPublicKey?: boolean): Promise<TokenTransaction>;
     fetchOwnedTokenLeaves(ownerPublicKeys: Uint8Array[], tokenPublicKeys: Uint8Array[]): Promise<LeafWithPreviousTransactionData[]>;
     syncTokenLeaves(tokenLeaves: Map<string, LeafWithPreviousTransactionData[]>): Promise<void>;
-    selectTokenLeaves(tokenLeaves: LeafWithPreviousTransactionData[], tokenPublicKey: Uint8Array, tokenAmount: bigint): LeafWithPreviousTransactionData[];
+    selectTokenLeaves(tokenLeaves: LeafWithPreviousTransactionData[], tokenAmount: bigint): LeafWithPreviousTransactionData[];
     /**
      * Called after successful completion of a transaction to spend token leaves.
      * Allows wallet state to be updated without making an additional network call to sync token leaves.

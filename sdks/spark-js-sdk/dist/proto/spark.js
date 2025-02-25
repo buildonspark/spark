@@ -9048,6 +9048,116 @@ export const QueryAllTransfersResponse = {
         return message;
     },
 };
+function createBaseQueryUnusedDepositAddressesRequest() {
+    return { identityPublicKey: new Uint8Array(0) };
+}
+export const QueryUnusedDepositAddressesRequest = {
+    encode(message, writer = new BinaryWriter()) {
+        if (message.identityPublicKey.length !== 0) {
+            writer.uint32(10).bytes(message.identityPublicKey);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseQueryUnusedDepositAddressesRequest();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1: {
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.identityPublicKey = reader.bytes();
+                    continue;
+                }
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skip(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            identityPublicKey: isSet(object.identityPublicKey)
+                ? bytesFromBase64(object.identityPublicKey)
+                : new Uint8Array(0),
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.identityPublicKey.length !== 0) {
+            obj.identityPublicKey = base64FromBytes(message.identityPublicKey);
+        }
+        return obj;
+    },
+    create(base) {
+        return QueryUnusedDepositAddressesRequest.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseQueryUnusedDepositAddressesRequest();
+        message.identityPublicKey = object.identityPublicKey ?? new Uint8Array(0);
+        return message;
+    },
+};
+function createBaseQueryUnusedDepositAddressesResponse() {
+    return { depositAddresses: [] };
+}
+export const QueryUnusedDepositAddressesResponse = {
+    encode(message, writer = new BinaryWriter()) {
+        for (const v of message.depositAddresses) {
+            writer.uint32(10).string(v);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseQueryUnusedDepositAddressesResponse();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1: {
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.depositAddresses.push(reader.string());
+                    continue;
+                }
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skip(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            depositAddresses: globalThis.Array.isArray(object?.depositAddresses)
+                ? object.depositAddresses.map((e) => globalThis.String(e))
+                : [],
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.depositAddresses?.length) {
+            obj.depositAddresses = message.depositAddresses;
+        }
+        return obj;
+    },
+    create(base) {
+        return QueryUnusedDepositAddressesResponse.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseQueryUnusedDepositAddressesResponse();
+        message.depositAddresses = object.depositAddresses?.map((e) => e) || [];
+        return message;
+    },
+};
 export const SparkServiceDefinition = {
     name: "SparkService",
     fullName: "spark.SparkService",
@@ -9290,6 +9400,14 @@ export const SparkServiceDefinition = {
             requestType: CancelSendTransferRequest,
             requestStream: false,
             responseType: CancelSendTransferResponse,
+            responseStream: false,
+            options: {},
+        },
+        query_unused_deposit_addresses: {
+            name: "query_unused_deposit_addresses",
+            requestType: QueryUnusedDepositAddressesRequest,
+            requestStream: false,
+            responseType: QueryUnusedDepositAddressesResponse,
             responseStream: false,
             options: {},
         },

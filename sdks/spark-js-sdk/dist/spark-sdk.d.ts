@@ -70,7 +70,7 @@ export declare class SparkWallet {
     coopExit(onchainAddress: string, targetAmountSats?: number): Promise<import("./graphql/objects/CoopExitRequest.js").default | null | undefined>;
     private getCoopExitFeeEstimate;
     syncTokenLeaves(): Promise<void>;
-    getTokenBalance(tokenPublicKey: Uint8Array): bigint;
+    getTokenBalance(tokenPublicKey: string): Promise<bigint>;
     transferTokens(tokenPublicKey: string, tokenAmount: bigint, recipientPublicKey: string, selectedLeaves?: LeafWithPreviousTransactionData[]): Promise<void>;
     selectTokenLeaves(tokenPublicKey: string, tokenAmount: bigint): LeafWithPreviousTransactionData[];
     consolidateTokenLeaves(tokenPublicKey: string, selectedLeaves?: LeafWithPreviousTransactionData[], transferBackToIdentityPublicKey?: boolean): Promise<void>;

@@ -1,5 +1,7 @@
 import { IssuerSparkWallet } from "../../services/spark/wallet.js";
 import { Network } from "@buildonspark/spark-js-sdk/utils";
+import { wordlist } from "@scure/bip39/wordlists/english";
+import { generateMnemonic } from "@scure/bip39";
 import { secp256k1 } from "@noble/curves/secp256k1";
 import { hexToBytes, bytesToHex } from "@noble/curves/abstract/utils";
 import { SparkWallet } from "@buildonspark/spark-js-sdk";
@@ -12,8 +14,8 @@ describe("token integration test", () => {
     const tokenAmount: bigint = 1000n;
 
     const wallet = new IssuerSparkWallet(Network.LOCAL);
-    const mnemonic = await wallet.generateMnemonic();
-    await wallet.createSparkWallet(mnemonic);
+    const mnemonic = generateMnemonic(wordlist);
+    await wallet.initWalletFromMnemonic(mnemonic);
 
     await wallet.mintIssuerTokens(tokenAmount);
   });
@@ -22,25 +24,25 @@ describe("token integration test", () => {
     const tokenAmount: bigint = 1000n;
 
     const wallet = new IssuerSparkWallet(Network.LOCAL);
-    const mnemonic = await wallet.generateMnemonic();
-    await wallet.createSparkWallet(mnemonic);
+    const mnemonic = generateMnemonic(wordlist);
+    await wallet.initWalletFromMnemonic(mnemonic);
 
     const destinationWallet = new SparkWallet(Network.LOCAL);
-    const destinationMnemonic = await destinationWallet.generateMnemonic();
-    await destinationWallet.createSparkWallet(destinationMnemonic);
+    const destinationMnemonic = generateMnemonic(wordlist);
+    await destinationWallet.initWalletFromMnemonic(destinationMnemonic);
 
     await wallet.mintIssuerTokens(tokenAmount);
     await wallet.transferIssuerTokens(
       tokenAmount,
-      bytesToHex(await destinationWallet.getSigner().getIdentityPublicKey())
+      await destinationWallet.getIdentityPublicKey()
     );
   });
 
   it("should consolidate token leaves", async () => {
     const tokenAmount: bigint = 1000n;
     const wallet = new IssuerSparkWallet(Network.LOCAL);
-    const mnemonic = await wallet.generateMnemonic();
-    await wallet.createSparkWallet(mnemonic);
+    const mnemonic = generateMnemonic(wordlist);
+    await wallet.initWalletFromMnemonic(mnemonic);
 
     await wallet.mintIssuerTokens(tokenAmount);
     await wallet.consolidateIssuerTokenLeaves();
@@ -49,21 +51,20 @@ describe("token integration test", () => {
   it("should freeze tokens", async () => {
     const tokenAmount: bigint = 1000n;
     const issuerWallet = new IssuerSparkWallet(Network.LOCAL);
-    const issuerMnemonic = await issuerWallet.generateMnemonic();
-    await issuerWallet.createSparkWallet(issuerMnemonic);
+    const issuerMnemonic = generateMnemonic(wordlist);
+    await issuerWallet.initWalletFromMnemonic(issuerMnemonic);
 
     await issuerWallet.mintIssuerTokens(tokenAmount);
 
     const userWallet = new IssuerSparkWallet(Network.LOCAL);
-    const userMnemonic = await userWallet.generateMnemonic();
-    await userWallet.createSparkWallet(userMnemonic);
+    const userMnemonic = generateMnemonic(wordlist);
+    await userWallet.initWalletFromMnemonic(userMnemonic);
     const userWalletPublicKey = await userWallet
-      .getSigner()
       .getIdentityPublicKey();
 
     await issuerWallet.transferIssuerTokens(
       tokenAmount,
-      bytesToHex(userWalletPublicKey)
+      userWalletPublicKey
     );
 
     // Freeze tokens and validate the return value
@@ -84,8 +85,8 @@ describe("token integration test", () => {
   it("should burn tokens", async () => {
     const tokenAmount: bigint = 1000n;
     const issuerWallet = new IssuerSparkWallet(Network.LOCAL);
-    const issuerMnemonic = await issuerWallet.generateMnemonic();
-    await issuerWallet.createSparkWallet(issuerMnemonic);
+    const issuerMnemonic = generateMnemonic(wordlist)
+    await issuerWallet.initWalletFromMnemonic(issuerMnemonic);
     await issuerWallet.mintIssuerTokens(tokenAmount);
 
     await issuerWallet.burnIssuerTokens(tokenAmount);

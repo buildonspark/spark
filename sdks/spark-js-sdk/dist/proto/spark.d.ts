@@ -636,6 +636,12 @@ export interface QueryAllTransfersResponse {
     transfers: Transfer[];
     offset: number;
 }
+export interface QueryUnusedDepositAddressesRequest {
+    identityPublicKey: Uint8Array;
+}
+export interface QueryUnusedDepositAddressesResponse {
+    depositAddresses: string[];
+}
 export declare const DepositAddressProof: MessageFns<DepositAddressProof>;
 export declare const DepositAddressProof_AddressSignaturesEntry: MessageFns<DepositAddressProof_AddressSignaturesEntry>;
 export declare const GenerateDepositAddressRequest: MessageFns<GenerateDepositAddressRequest>;
@@ -742,6 +748,8 @@ export declare const CancelSendTransferRequest: MessageFns<CancelSendTransferReq
 export declare const CancelSendTransferResponse: MessageFns<CancelSendTransferResponse>;
 export declare const QueryAllTransfersRequest: MessageFns<QueryAllTransfersRequest>;
 export declare const QueryAllTransfersResponse: MessageFns<QueryAllTransfersResponse>;
+export declare const QueryUnusedDepositAddressesRequest: MessageFns<QueryUnusedDepositAddressesRequest>;
+export declare const QueryUnusedDepositAddressesResponse: MessageFns<QueryUnusedDepositAddressesResponse>;
 export type SparkServiceDefinition = typeof SparkServiceDefinition;
 export declare const SparkServiceDefinition: {
     readonly name: "SparkService";
@@ -988,6 +996,14 @@ export declare const SparkServiceDefinition: {
             readonly responseStream: false;
             readonly options: {};
         };
+        readonly query_unused_deposit_addresses: {
+            readonly name: "query_unused_deposit_addresses";
+            readonly requestType: MessageFns<QueryUnusedDepositAddressesRequest>;
+            readonly requestStream: false;
+            readonly responseType: MessageFns<QueryUnusedDepositAddressesResponse>;
+            readonly responseStream: false;
+            readonly options: {};
+        };
     };
 };
 export interface SparkServiceImplementation<CallContextExt = {}> {
@@ -1022,6 +1038,7 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
     get_owned_token_leaves(request: GetOwnedTokenLeavesRequest, context: CallContext & CallContextExt): Promise<DeepPartial<GetOwnedTokenLeavesResponse>>;
     return_lightning_payment(request: ReturnLightningPaymentRequest, context: CallContext & CallContextExt): Promise<DeepPartial<Empty>>;
     cancel_send_transfer(request: CancelSendTransferRequest, context: CallContext & CallContextExt): Promise<DeepPartial<CancelSendTransferResponse>>;
+    query_unused_deposit_addresses(request: QueryUnusedDepositAddressesRequest, context: CallContext & CallContextExt): Promise<DeepPartial<QueryUnusedDepositAddressesResponse>>;
 }
 export interface SparkServiceClient<CallOptionsExt = {}> {
     generate_deposit_address(request: DeepPartial<GenerateDepositAddressRequest>, options?: CallOptions & CallOptionsExt): Promise<GenerateDepositAddressResponse>;
@@ -1055,6 +1072,7 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
     get_owned_token_leaves(request: DeepPartial<GetOwnedTokenLeavesRequest>, options?: CallOptions & CallOptionsExt): Promise<GetOwnedTokenLeavesResponse>;
     return_lightning_payment(request: DeepPartial<ReturnLightningPaymentRequest>, options?: CallOptions & CallOptionsExt): Promise<Empty>;
     cancel_send_transfer(request: DeepPartial<CancelSendTransferRequest>, options?: CallOptions & CallOptionsExt): Promise<CancelSendTransferResponse>;
+    query_unused_deposit_addresses(request: DeepPartial<QueryUnusedDepositAddressesRequest>, options?: CallOptions & CallOptionsExt): Promise<QueryUnusedDepositAddressesResponse>;
 }
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 export type DeepPartial<T> = T extends Builtin ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>> : T extends {

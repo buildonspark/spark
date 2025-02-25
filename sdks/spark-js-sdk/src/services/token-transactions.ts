@@ -443,11 +443,8 @@ export class TokenTransactionService {
 
   public selectTokenLeaves(
     tokenLeaves: LeafWithPreviousTransactionData[],
-    tokenPublicKey: Uint8Array,
     tokenAmount: bigint
   ): LeafWithPreviousTransactionData[] {
-    const tokenKey = bytesToHex(tokenPublicKey);
-
     if (calculateAvailableTokenAmount(tokenLeaves) < tokenAmount) {
       throw new Error("Insufficient available token amount");
     }

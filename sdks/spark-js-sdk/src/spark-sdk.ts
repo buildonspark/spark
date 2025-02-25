@@ -852,13 +852,30 @@ export class SparkWallet {
 
   // ***** Token Flow *****
 
-  async syncTokenLeaves() {
-    await this.tokenTransactionService.syncTokenLeaves(this.tokenLeaves);
+  public async syncTokenLeaves() {
+    const trackedPublicKeys = await this.config.signer.getTrackedPublicKeys();
+
+    const unsortedTokenLeaves = await this.tokenTransactionService.fetchOwnedTokenLeaves(
+      [...trackedPublicKeys, await this.config.signer.getIdentityPublicKey()],
+      []
+    );
+
+    unsortedTokenLeaves.forEach((leaf) => {
+      const tokenKey = bytesToHex(leaf.leaf!.tokenPublicKey!);
+      const index = leaf.previousTransactionVout!;
+
+      this.tokenLeaves.set(tokenKey, [{ ...leaf, previousTransactionVout: index }]);
+    });
   }
 
-  getTokenBalance(tokenPublicKey: Uint8Array) {
+  async getTokenBalance(tokenPublicKey: string) {
+    await this.syncTokenLeaves();
+
+    if (!this.tokenLeaves.has(tokenPublicKey)) {
+      throw new Error("No token leaves with the given tokenPublicKey");
+    }
     return calculateAvailableTokenAmount(
-      this.tokenLeaves.get(bytesToHex(tokenPublicKey))!
+      this.tokenLeaves.get(tokenPublicKey)!
     );
   }
 
@@ -920,7 +937,6 @@ export class SparkWallet {
   ): LeafWithPreviousTransactionData[] {
     return this.tokenTransactionService.selectTokenLeaves(
       this.tokenLeaves.get(tokenPublicKey)!,
-      hexToBytes(tokenPublicKey),
       tokenAmount
     );
   }

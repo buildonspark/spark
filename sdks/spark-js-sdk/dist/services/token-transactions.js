@@ -258,8 +258,7 @@ export class TokenTransactionService {
             tokenLeaves.set(tokenKey, [{ ...leaf, previousTransactionVout: index }]);
         });
     }
-    selectTokenLeaves(tokenLeaves, tokenPublicKey, tokenAmount) {
-        const tokenKey = bytesToHex(tokenPublicKey);
+    selectTokenLeaves(tokenLeaves, tokenAmount) {
         if (calculateAvailableTokenAmount(tokenLeaves) < tokenAmount) {
             throw new Error("Insufficient available token amount");
         }
