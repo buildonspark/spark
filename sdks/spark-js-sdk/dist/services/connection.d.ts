@@ -3,6 +3,7 @@ import { SparkServiceClient } from "../proto/spark.js";
 import { WalletConfigService } from "./config.js";
 export declare class ConnectionManager {
     private config;
+    private clients;
     constructor(config: WalletConfigService);
     static createMockClient(address: string): MockServiceClient & {
         close: () => void;
@@ -14,7 +15,7 @@ export declare class ConnectionManager {
     private authenticate;
     private createSparkAuthnGrpcConnection;
     private createMiddleWare;
-    private createNodeMiddleWare;
-    private createBrowserMiddleWare;
+    private createNodeMiddleware;
+    private createBrowserMiddleware;
     private createGrpcClient;
 }

@@ -19,8 +19,17 @@ import {
 } from "../proto/spark_authn.js";
 import { WalletConfigService } from "./config.js";
 
+// TODO: Some sort of client cleanup
 export class ConnectionManager {
   private config: WalletConfigService;
+  private clients: Record<
+    string,
+    {
+      client: SparkServiceClient & { close?: () => void };
+      authToken: string;
+    }
+  > = {};
+
   constructor(config: WalletConfigService) {
     this.config = config;
   }
@@ -61,15 +70,22 @@ export class ConnectionManager {
     address: string,
     certPath?: string
   ): Promise<SparkServiceClient & { close?: () => void }> {
-    const authToken = await this.authenticate(address);
+    if (this.clients[address]) {
+      return this.clients[address].client;
+    }
 
+    const authToken = await this.authenticate(address);
     const channel = ConnectionManager.createChannelWithTLS(address, certPath);
 
-    return this.createGrpcClient<SparkServiceClient>(
+    const middleware = this.createMiddleWare(address, authToken);
+    const client = this.createGrpcClient<SparkServiceClient>(
       SparkServiceDefinition,
       channel,
-      this.createMiddleWare(authToken)
+      middleware
     );
+
+    this.clients[address] = { client, authToken };
+    return client;
   }
 
   private async authenticate(address: string) {
@@ -118,37 +134,81 @@ export class ConnectionManager {
     );
   }
 
-  private createMiddleWare(authToken: string) {
+  private createMiddleWare(address: string, authToken: string) {
     if (typeof window === "undefined") {
-      return this.createNodeMiddleWare(authToken);
+      return this.createNodeMiddleware(address, authToken);
     } else {
-      return this.createBrowserMiddleWare(authToken);
+      return this.createBrowserMiddleware(address, authToken);
     }
   }
 
-  private createNodeMiddleWare(authToken: string) {
-    return (call: ClientMiddlewareCall<any, any>, options: CallOptions) => {
-      return call.next(call.request, {
-        ...options,
-        metadata: Metadata(options.metadata).set(
-          "Authorization",
-          `Bearer ${authToken}`
-        ),
-      });
-    };
+  private createNodeMiddleware(address: string, initialAuthToken: string) {
+    return async function* (
+      this: ConnectionManager,
+      call: ClientMiddlewareCall<any, any>,
+      options: CallOptions
+    ) {
+      try {
+        yield* call.next(call.request, {
+          ...options,
+          metadata: Metadata(options.metadata).set(
+            "Authorization",
+            `Bearer ${this.clients[address]?.authToken || initialAuthToken}`
+          ),
+        });
+      } catch (error: any) {
+        if (error.message?.includes("token has expired")) {
+          const newAuthToken = await this.authenticate(address);
+          this.clients[address].authToken = newAuthToken;
+
+          yield* call.next(call.request, {
+            ...options,
+            metadata: Metadata(options.metadata).set(
+              "Authorization",
+              `Bearer ${newAuthToken}`
+            ),
+          });
+        }
+        throw error;
+      }
+    }.bind(this);
   }
 
-  private createBrowserMiddleWare(authToken: string) {
-    return (call: ClientMiddlewareCall<any, any>, options: CallOptions) => {
-      return call.next(call.request, {
-        ...options,
-        metadata: Metadata(options.metadata)
-          .set("Authorization", `Bearer ${authToken}`)
-          .set("X-Requested-With", "XMLHttpRequest")
-          .set("X-Grpc-Web", "1") // Explicitly set gRPC-web header
-          .set("Content-Type", "application/grpc-web+proto"), // Explicitly set content type
-      });
-    };
+  private createBrowserMiddleware(address: string, initialAuthToken: string) {
+    return async function* (
+      this: ConnectionManager,
+      call: ClientMiddlewareCall<any, any>,
+      options: CallOptions
+    ) {
+      try {
+        yield* call.next(call.request, {
+          ...options,
+          metadata: Metadata(options.metadata)
+            .set(
+              "Authorization",
+              `Bearer ${this.clients[address]?.authToken || initialAuthToken}`
+            )
+            .set("X-Requested-With", "XMLHttpRequest")
+            .set("X-Grpc-Web", "1")
+            .set("Content-Type", "application/grpc-web+proto"),
+        });
+      } catch (error: any) {
+        if (error.message?.includes("token has expired")) {
+          const newAuthToken = await this.authenticate(address);
+          this.clients[address].authToken = newAuthToken;
+
+          yield* call.next(call.request, {
+            ...options,
+            metadata: Metadata(options.metadata)
+              .set("Authorization", `Bearer ${newAuthToken}`)
+              .set("X-Requested-With", "XMLHttpRequest")
+              .set("X-Grpc-Web", "1")
+              .set("Content-Type", "application/grpc-web+proto"),
+          });
+        }
+        throw error;
+      }
+    }.bind(this);
   }
 
   private createGrpcClient<T>(
