@@ -2,14 +2,18 @@
   "name": "@buildonspark/issuer-js-sdk",
   "version": "1.0.0",
   "description": "Spark Issuer SDK for token issuance",
-  "main": "./dist/index.js",
-  "module": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "module": "./dist/issuer-sdk.js",
+  "types": "./dist/issuer-sdk.d.ts",
   "type": "module",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "types": "./dist/issuer-sdk.d.ts",
+      "import": "./dist/issuer-sdk.js"
+    },
+    "./spark": {
+      "types": "./dist/services/spark/wallet.d.ts",
+      "require": "./dist/services/spark/wallet.d.ts",
+      "import": "./dist/services/spark/wallet.d.ts"
     }
   },
   "files": [
