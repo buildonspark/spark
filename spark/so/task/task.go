@@ -33,7 +33,7 @@ func AllTasks() []Task {
 			Duration: 10 * time.Minute,
 			Task: func(config *so.Config, db *ent.Client) error {
 				return DBTransactionTask(context.Background(), config, db, func(ctx context.Context, config *so.Config) error {
-					handler := handler.NewTransferHandler(config)
+					h := handler.NewTransferHandler(config)
 
 					time := time.Now()
 					query := db.Transfer.Query().Where(
@@ -49,10 +49,10 @@ func AllTasks() []Task {
 					}
 
 					for _, transfer := range transfers {
-						_, err := handler.CancelSendTransfer(ctx, &pbspark.CancelSendTransferRequest{
+						_, err := h.CancelSendTransfer(ctx, &pbspark.CancelSendTransferRequest{
 							SenderIdentityPublicKey: transfer.SenderIdentityPubkey,
 							TransferId:              transfer.ID.String(),
-						}, true)
+						}, handler.CancelSendTransferIntentTask)
 						if err != nil {
 							return err
 						}

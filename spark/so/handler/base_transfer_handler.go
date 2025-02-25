@@ -271,8 +271,20 @@ func lockLeaves(ctx context.Context, db *ent.Tx, leaves []*ent.TreeNode) ([]*ent
 	return lockedLeaves, nil
 }
 
-func (h *BaseTransferHandler) CancelSendTransfer(ctx context.Context, req *pbspark.CancelSendTransferRequest, internal bool) (*pbspark.CancelSendTransferResponse, error) {
-	if !internal {
+type CancelSendTransferIntent int
+
+const (
+	CancelSendTransferIntentInternal CancelSendTransferIntent = iota
+	CancelSendTransferIntentExternal
+	CancelSendTransferIntentTask
+)
+
+func (h *BaseTransferHandler) CancelSendTransfer(
+	ctx context.Context,
+	req *pbspark.CancelSendTransferRequest,
+	intent CancelSendTransferIntent,
+) (*pbspark.CancelSendTransferResponse, error) {
+	if intent == CancelSendTransferIntentExternal {
 		if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, req.SenderIdentityPublicKey); err != nil {
 			return nil, err
 		}
@@ -308,7 +320,7 @@ func (h *BaseTransferHandler) CancelSendTransfer(ctx context.Context, req *pbspa
 		return nil, fmt.Errorf("unable to cancel associated request: %v", err)
 	}
 
-	if !internal {
+	if intent != CancelSendTransferIntentInternal {
 		operatorSelection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
 		_, err = helper.ExecuteTaskWithAllOperators(ctx, h.config, &operatorSelection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
 			conn, err := common.NewGRPCConnectionWithCert(operator.Address, operator.CertPath)
