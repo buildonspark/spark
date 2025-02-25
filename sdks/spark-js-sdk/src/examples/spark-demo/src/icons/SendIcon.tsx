@@ -1,62 +1,25 @@
 export default function SendIcon({
+  stroke = "#F9F9F9",
   strokeWidth = "2",
 }: {
+  stroke?: string;
   strokeWidth?: string;
 }) {
   return (
     <svg
-      width="33"
-      height="33"
-      viewBox="0 0 33 33"
+      width="32"
+      height="32"
+      viewBox="0 0 32 32"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
     >
-      <g filter="url(#filter0_d_2901_5809)">
-        <path
-          d="M23.5833 9.16667L8.91663 23.8333M11.9101 8.16667H23.25C23.9863 8.16667 24.5833 8.76362 24.5833 9.5V22.1611"
-          stroke="#F9F9F9"
-          strokeWidth={strokeWidth}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </g>
-      <defs>
-        <filter
-          id="filter0_d_2901_5809"
-          x="-3.75"
-          y="-2.5"
-          width="40"
-          height="40"
-          filterUnits="userSpaceOnUse"
-          colorInterpolationFilters="sRGB"
-        >
-          <feFlood floodOpacity="0" result="BackgroundImageFix" />
-          <feColorMatrix
-            in="SourceAlpha"
-            type="matrix"
-            values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0"
-            result="hardAlpha"
-          />
-          <feOffset dy="1" />
-          <feGaussianBlur stdDeviation="2" />
-          <feComposite in2="hardAlpha" operator="out" />
-          <feColorMatrix
-            type="matrix"
-            values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.4 0"
-          />
-          <feBlend
-            mode="normal"
-            in2="BackgroundImageFix"
-            result="effect1_dropShadow_2901_5809"
-          />
-          <feBlend
-            mode="normal"
-            in="SourceGraphic"
-            in2="effect1_dropShadow_2901_5809"
-            result="shape"
-          />
-        </filter>
-      </defs>
+      <path
+        d="M23.3332 8.66669L8.6665 23.3334M11.66 7.66669H22.9998C23.7362 7.66669 24.3332 8.26364 24.3332 9.00002V21.6611"
+        stroke={stroke}
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }

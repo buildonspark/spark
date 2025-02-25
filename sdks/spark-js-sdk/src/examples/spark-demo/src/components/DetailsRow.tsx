@@ -5,6 +5,7 @@ type DetailsRowProps = {
   logoRight?: React.ReactNode;
   logoLeft?: React.ReactNode;
   logoLeftCircleBackground?: boolean;
+  logoRightMargin?: number;
   onClick?: () => void;
 };
 
@@ -14,6 +15,7 @@ export default function DetailsRow({
   logoRight,
   logoLeft,
   logoLeftCircleBackground = false,
+  logoRightMargin = 16,
   borderTop = false,
   onClick,
 }: DetailsRowProps) {
@@ -62,7 +64,9 @@ export default function DetailsRow({
         </div>
       </div>
       {logoRight && (
-        <div className={`flex flex-col items-center justify-between pr-4`}>
+        <div
+          className={`mr-${logoRightMargin / 4} flex flex-col items-center justify-between`}
+        >
           {logoRight}
         </div>
       )}

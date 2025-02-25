@@ -18,16 +18,23 @@ export default function Root() {
       <div className="flex justify-center p-8">
         <SparkWithTextLogo />
       </div>
-      <div className="mt-[40px] min-h-[480px] rounded-3xl rounded-[32px] border border-[0.5px] border-[rgba(249,249,249,0.15)] p-8">
-        <RoutesProvider>
-          <Route path={Routes.Base} element={<Login />} />
-          <Route path={Routes.WalletSuccess} element={<WalletSuccess />} />
-          <Route path={Routes.Wallet} element={<Wallet />} />
-          <Route path={Routes.Receive} element={<Receive />} />
-          <Route path={Routes.Send} element={<Send />} />
-          <Route path={Routes.RecoverWallet} element={<RecoverWallet />} />
-          <Route path={Routes.Tokens} element={<Tokens />} />
-        </RoutesProvider>
+      <div
+        className="card-background-gradient mt-[40px] min-h-[480px] rounded-xl"
+        style={{
+          padding: "0.5px",
+        }}
+      >
+        <div className="xs:p-8 h-full min-h-[480px] rounded-xl bg-[#0A0A0A]">
+          <RoutesProvider>
+            <Route path={Routes.Base} element={<Login />} />
+            <Route path={Routes.WalletSuccess} element={<WalletSuccess />} />
+            <Route path={Routes.Wallet} element={<Wallet />} />
+            <Route path={Routes.Receive} element={<Receive />} />
+            <Route path={Routes.Send} element={<Send />} />
+            <Route path={Routes.RecoverWallet} element={<RecoverWallet />} />
+            <Route path={Routes.Tokens} element={<Tokens />} />
+          </RoutesProvider>
+        </div>
       </div>
     </Router>
   );

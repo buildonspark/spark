@@ -94,7 +94,6 @@ const useWalletStore = create<WalletStore>((set, get) => ({
   assets: PERMANENT_CURRENCIES,
   activeAsset: PERMANENT_CURRENCIES.BTC,
   setActiveAsset: (asset: Currency) => {
-    console.log("setActiveAsset", asset.name);
     set({ activeAsset: asset });
   },
   // fetchOwnedTokens: async () => {
@@ -289,7 +288,6 @@ export function useWallet() {
   const satsUsdPriceQuery = useQuery({
     queryKey: ["satsUsdPrice"],
     queryFn: async () => {
-      console.log("fetching sats usd price");
       const response = await fetch(
         "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd",
       );

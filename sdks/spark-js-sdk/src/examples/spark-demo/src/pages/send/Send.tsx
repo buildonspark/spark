@@ -47,6 +47,7 @@ export default function Send() {
 
   const logoLeft = useMemo(() => {
     switch (currentStep) {
+      case SendStep.Failed:
       case SendStep.Success:
         return null;
       default:
@@ -77,7 +78,7 @@ export default function Send() {
       case SendStep.AmountInput:
         return "Enter amount";
       case SendStep.ConfirmQuote:
-        return "Send";
+        return "Send BTC";
       default:
         return "";
     }
@@ -91,6 +92,8 @@ export default function Send() {
         return "Send";
       case SendStep.Success:
         return "Done";
+      case SendStep.Failed:
+        return "Try again";
       default:
         return "Continue";
     }
@@ -172,7 +175,12 @@ export default function Send() {
             }),
           });
         }
+        // TODO: IF FAIL
+        // setCurrentStep(SendStep.Failed);
         setCurrentStep(SendStep.Success);
+        break;
+      case SendStep.Failed:
+        // TODO: TRY AGAIN functionality
         break;
       case SendStep.Success:
       default:
@@ -193,14 +201,37 @@ export default function Send() {
     sendTransfer,
   ]);
 
+  const secondaryButtonText = useMemo(() => {
+    switch (currentStep) {
+      case SendStep.Failed:
+      default:
+        return "Cancel";
+    }
+  }, [currentStep]);
+
+  const onSecondaryButtonClick = useCallback(() => {
+    switch (currentStep) {
+      case SendStep.Failed:
+      default:
+        setActiveAsset(PERMANENT_CURRENCIES.BTC);
+        navigate(Routes.Wallet);
+        break;
+    }
+  }, [currentStep, navigate, setActiveAsset]);
+
   return (
     <CardForm
-      headerDisabled={currentStep === SendStep.Success}
+      headerDisabled={
+        currentStep === SendStep.Success || currentStep === SendStep.Failed
+      }
       topTitle={topTitle}
       primaryButtonDisabled={currentStep === SendStep.AddressInput}
       primaryButtonClick={onPrimaryButtonClick}
       primaryButtonLoading={primaryButtonLoading}
       primaryButtonText={primaryButtonText}
+      secondaryButtonDisabled={currentStep !== SendStep.Failed}
+      secondaryButtonText={secondaryButtonText}
+      secondaryButtonClick={onSecondaryButtonClick}
       logoLeft={logoLeft}
       logoLeftClick={onLogoLeftClick}
     >
@@ -227,7 +258,18 @@ export default function Send() {
         />
       )}
       {currentStep === SendStep.Success && (
-        <SendDetails inputAmount={rawInputAmount} sendAddress={sendAddress} />
+        <SendDetails
+          inputAmount={rawInputAmount}
+          sendAddress={sendAddress}
+          success={true}
+        />
+      )}
+      {currentStep === SendStep.Failed && (
+        <SendDetails
+          inputAmount={rawInputAmount}
+          sendAddress={sendAddress}
+          success={false}
+        />
       )}
     </CardForm>
   );

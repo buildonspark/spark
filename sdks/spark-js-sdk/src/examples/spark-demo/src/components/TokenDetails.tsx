@@ -16,10 +16,10 @@ export default function TokenDetails({
     activeAsset,
   } = useWallet();
   //   satsBalance.value = 202020;
-  console.log(satsBalance);
+  //   console.log(satsBalance);
 
   return (
-    <div className="mx-6">
+    <div className="">
       <StyledContainer className="flex h-[180px] w-full flex-col items-center justify-center">
         <WalletBalance
           asset={activeAsset}

@@ -5,6 +5,7 @@ import ClockIcon from "../icons/ClockIcon";
 import CloseIcon from "../icons/CloseIcon";
 import CopyIcon from "../icons/CopyIcon";
 import PencilIcon from "../icons/PencilIcon";
+import SparkIcon from "../icons/SparkIcon";
 import WalletIcon from "../icons/WalletIcon";
 import { useWallet } from "../store/wallet";
 import { CurrencyType } from "../utils/currency";
@@ -37,7 +38,6 @@ export default function ReceiveDetails({
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [setQrCodeModalVisible]);
-  console.log(activeInputCurrency.type);
   const receiveFiatAmount =
     activeInputCurrency.type === CurrencyType.FIAT
       ? inputAmount
@@ -51,9 +51,46 @@ export default function ReceiveDetails({
     <div className="mb-8 flex w-full flex-col items-center">
       <ReceiveQRCard>
         <div className="items-right flex h-full w-full flex-col justify-between rounded-2xl">
-          <WalletIcon className="m-6 w-4" />
-          <div className="m-6 text-[12px] text-[#f9f9f9] opacity-50">
-            Powered by Spark
+          <div
+            className="relative inline-block"
+            style={{ width: "150px", height: "145px" }}
+          >
+            <div
+              className="absolute"
+              style={{ overflow: "hidden", width: "150px", height: "145px" }}
+            >
+              <SparkIcon
+                rotation={62.759}
+                height={210.579}
+                width={220.873}
+                fill="#4AA2FB"
+                opacity={0.02}
+                style={{
+                  position: "absolute",
+                  left: "-70px",
+                  top: "-80px",
+                }}
+              />
+              <WalletIcon
+                className="m-6 w-4"
+                style={{
+                  position: "absolute",
+                  left: "0",
+                  top: "0",
+                }}
+              />
+            </div>
+            <div
+              className="absolute text-[12px] text-[#f9f9f9] opacity-50"
+              style={{
+                top: "145px", // Position below the icons
+                left: "0",
+                width: "150px",
+                textAlign: "center", // Center the text
+              }}
+            >
+              Powered by Spark
+            </div>
           </div>
         </div>
         <div className="flex h-full w-full items-center rounded-2xl">
@@ -166,7 +203,7 @@ const ReceiveQRCard = styled.div`
   width: 100%;
   height: 184px;
   display: flex;
-  border-radius: 24px;
+  border-radius: 16px;
   border: 0.5px solid rgba(249, 249, 249, 0.15);
   margin-bottom: 8px;
 

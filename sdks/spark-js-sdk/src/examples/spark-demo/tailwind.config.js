@@ -8,6 +8,12 @@ const config = {
         "geist-sans": ["var(--font-geist-sans)", "sans-serif"],
         "geist-mono": ["var(--font-geist-mono)", "monospace"],
       },
+      opacity: {
+        4: "0.04",
+      },
+      screens: {
+        xs: "460px",
+      },
     },
   },
   plugins: [],

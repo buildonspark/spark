@@ -23,13 +23,9 @@ export default function ConfirmQuote({
   return (
     <div>
       <div
-        className="mb-10 flex h-[200px] flex-col items-center justify-center rounded-lg"
+        className="bg-opacity-4 mb-10 flex h-[200px] flex-col items-center justify-center rounded-lg bg-[white]"
         style={{
           border: "0.5px solid rgba(249, 249, 249, 0.1)",
-          background:
-            "linear-gradient(180deg, #141A22 0%, #141A22 11.79%, #131A22 21.38%, #131922 29.12%, #131922 35.34%, #131921 40.37%, #131921 44.56%, #121820 48.24%, #121820 51.76%, #12171F 55.44%, #11171F 59.63%, #11171E 64.66%, #11161E 70.88%, #11161D 78.62%, #10151C 88.21%, #10151C 100%)",
-          boxShadow:
-            "0px 216px 60px 0px rgba(0, 0, 0, 0.00), 0px 138px 55px 0px rgba(0, 0, 0, 0.01), 0px 78px 47px 0px rgba(0, 0, 0, 0.05), 0px 35px 35px 0px rgba(0, 0, 0, 0.09), 0px 9px 19px 0px rgba(0, 0, 0, 0.10)",
         }}
       >
         <div className="flex justify-center font-decimal">

@@ -43,8 +43,6 @@ export default function Tokens() {
   } = useWallet();
   const navigate = useNavigate();
 
-  console.log(currentStep, activeAsset.name);
-
   const logoLeftClickHandler = useCallback(() => {
     switch (currentStep) {
       case TokensStep.SelectToken:

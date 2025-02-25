@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Button from "../../components/Button";
 import CurrencyBalanceDetails from "../../components/CurrencyBalanceDetails";
@@ -11,22 +12,35 @@ import { useWallet } from "../../store/wallet";
 
 export default function Wallet() {
   const navigate = useNavigate();
-  const { balance: satsBalance, satsUsdPrice } = useWallet();
-
+  const {
+    balance: satsBalance,
+    satsUsdPrice,
+    getMasterPublicKey,
+  } = useWallet();
+  const [pubkey, setPubkey] = useState("");
   const satsFiatBalance = (satsBalance.value * satsUsdPrice.value).toFixed(2);
+
+  useEffect(() => {
+    const pubkey = async () => {
+      const walletPubkey = await getMasterPublicKey();
+      setPubkey(walletPubkey);
+    };
+    pubkey();
+  }, [getMasterPublicKey]);
+
   return (
     <div>
       <StyledContainer className="flex h-[180px] w-full flex-col items-center justify-center p-6">
         <div className="flex h-[40px] w-full flex-row items-center justify-end">
           <div className="flex max-w-[80px] flex-row items-center justify-center text-[13px] text-[#F9F9F999]">
             <div className="mr-1 cursor-pointer overflow-hidden text-ellipsis whitespace-nowrap">
-              asdfasdasdasdfasdfafdfasdf
+              {pubkey ? pubkey : "Loading..."}
             </div>
           </div>
           <div
             className="flex h-4 w-4 cursor-pointer items-center justify-center"
             onClick={() => {
-              navigator.clipboard.writeText("asdfasdasdasdfasdfafdfasdf");
+              navigator.clipboard.writeText(pubkey);
             }}
           >
             <CopyIcon stroke="#F9F9F999" />
@@ -41,22 +55,22 @@ export default function Wallet() {
       </StyledContainer>
       <div className="mt-6 flex items-center justify-center gap-4">
         <Button
-          text="Send"
-          icon={<SendIcon strokeWidth="1.5" />}
-          kind="primary"
+          text="Receive"
+          icon={<ReceiveIcon strokeWidth="1.5" />}
+          kind="secondary"
           direction="vertical"
           onClick={() => {
-            navigate(Routes.Send);
+            navigate(Routes.Receive);
           }}
           height={84}
         />
         <Button
-          text="Receive"
-          icon={<ReceiveIcon strokeWidth="1.5" />}
+          text="Send"
+          icon={<SendIcon strokeWidth="1.5" stroke="#0a0a0a" />}
           kind="primary"
           direction="vertical"
           onClick={() => {
-            navigate(Routes.Receive);
+            navigate(Routes.Send);
           }}
           height={84}
         />

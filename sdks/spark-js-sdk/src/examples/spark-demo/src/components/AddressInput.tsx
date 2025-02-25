@@ -87,6 +87,7 @@ export default function AddressInput({ onAddressSelect }: AddressInputProps) {
           onClick={() => {
             onAddressSelect(inputAddress, inputAddressNetwork);
           }}
+          logoRightMargin={0}
         />
       )}
       {inputAddressNetwork === Network.PHONE && (
@@ -102,6 +103,7 @@ export default function AddressInput({ onAddressSelect }: AddressInputProps) {
           onClick={() => {
             onAddressSelect(`+1${inputAddress}`, inputAddressNetwork);
           }}
+          logoRightMargin={0}
         />
       )}
     </div>
