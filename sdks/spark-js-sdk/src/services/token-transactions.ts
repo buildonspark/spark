@@ -496,48 +496,6 @@ export class TokenTransactionService {
     return selectedLeaves;
   }
 
-  /**
-   * Called after successful completion of a transaction to spend token leaves.
-   * Allows wallet state to be updated without making an additional network call to sync token leaves.
-   * @param tokenLeaves Current token leaves in memory for this tokenPublicKey
-   * @param finalizedTokenTransaction Finalized transaction from either mint or transfer
-   */
-  public updateTokenLeavesFromFinalizedTransaction(
-    tokenLeaves: LeafWithPreviousTransactionData[],
-    finalizedTokenTransaction: TokenTransaction
-  ) {
-    if (finalizedTokenTransaction.tokenInput!.$case === "transferInput") {
-      finalizedTokenTransaction!.tokenInput!.transferInput!.leavesToSpend.forEach(
-        (spentLeaf) => {
-          const index = tokenLeaves.findIndex(
-            (leaf) =>
-              leaf.previousTransactionHash ===
-                spentLeaf.prevTokenTransactionHash &&
-              leaf.previousTransactionVout ===
-                spentLeaf.prevTokenTransactionLeafVout
-          );
-          if (index !== -1) {
-            tokenLeaves.splice(index, 1);
-          }
-        }
-      );
-    }
-
-    const finalizedTokenTransactionHash = hashTokenTransaction(
-      finalizedTokenTransaction,
-      false
-    );
-
-    // Push the new leaves into the collection
-    finalizedTokenTransaction!.outputLeaves!.forEach((outputLeaf, index) => {
-      tokenLeaves.push({
-        leaf: outputLeaf,
-        previousTransactionHash: finalizedTokenTransactionHash,
-        previousTransactionVout: index,
-      });
-    });
-  }
-
   // Helper function for deciding if the signer public key is the identity public key
   private async signMessageWithKey(
     message: Uint8Array,

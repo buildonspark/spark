@@ -43,10 +43,6 @@ export class IssuerSparkWallet extends SparkWallet {
     if (!this.tokenLeaves.has(tokenPublicKey)) {
       this.tokenLeaves.set(tokenPublicKey, []);
     }
-    this.issuerTokenTransactionService.updateTokenLeavesFromFinalizedTransaction(
-      this.tokenLeaves.get(tokenPublicKey)!,
-      finalizedTokenTransaction
-    );
   }
 
   async transferIssuerTokens(tokenAmount: bigint, recipientPublicKey: string) {

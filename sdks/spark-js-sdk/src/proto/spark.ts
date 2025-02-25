@@ -852,8 +852,14 @@ export interface QueryUnusedDepositAddressesRequest {
   identityPublicKey: Uint8Array;
 }
 
+export interface DepositAddressQueryResult {
+  depositAddress: string;
+  userSigningPublicKey: Uint8Array;
+  verifyingPublicKey: Uint8Array;
+}
+
 export interface QueryUnusedDepositAddressesResponse {
-  depositAddresses: string[];
+  depositAddresses: DepositAddressQueryResult[];
 }
 
 function createBaseDepositAddressProof(): DepositAddressProof {
@@ -10816,6 +10822,102 @@ export const QueryUnusedDepositAddressesRequest: MessageFns<QueryUnusedDepositAd
   },
 };
 
+function createBaseDepositAddressQueryResult(): DepositAddressQueryResult {
+  return { depositAddress: "", userSigningPublicKey: new Uint8Array(0), verifyingPublicKey: new Uint8Array(0) };
+}
+
+export const DepositAddressQueryResult: MessageFns<DepositAddressQueryResult> = {
+  encode(message: DepositAddressQueryResult, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.depositAddress !== "") {
+      writer.uint32(10).string(message.depositAddress);
+    }
+    if (message.userSigningPublicKey.length !== 0) {
+      writer.uint32(18).bytes(message.userSigningPublicKey);
+    }
+    if (message.verifyingPublicKey.length !== 0) {
+      writer.uint32(26).bytes(message.verifyingPublicKey);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): DepositAddressQueryResult {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseDepositAddressQueryResult();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.depositAddress = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.userSigningPublicKey = reader.bytes();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.verifyingPublicKey = reader.bytes();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): DepositAddressQueryResult {
+    return {
+      depositAddress: isSet(object.depositAddress) ? globalThis.String(object.depositAddress) : "",
+      userSigningPublicKey: isSet(object.userSigningPublicKey)
+        ? bytesFromBase64(object.userSigningPublicKey)
+        : new Uint8Array(0),
+      verifyingPublicKey: isSet(object.verifyingPublicKey)
+        ? bytesFromBase64(object.verifyingPublicKey)
+        : new Uint8Array(0),
+    };
+  },
+
+  toJSON(message: DepositAddressQueryResult): unknown {
+    const obj: any = {};
+    if (message.depositAddress !== "") {
+      obj.depositAddress = message.depositAddress;
+    }
+    if (message.userSigningPublicKey.length !== 0) {
+      obj.userSigningPublicKey = base64FromBytes(message.userSigningPublicKey);
+    }
+    if (message.verifyingPublicKey.length !== 0) {
+      obj.verifyingPublicKey = base64FromBytes(message.verifyingPublicKey);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<DepositAddressQueryResult>): DepositAddressQueryResult {
+    return DepositAddressQueryResult.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<DepositAddressQueryResult>): DepositAddressQueryResult {
+    const message = createBaseDepositAddressQueryResult();
+    message.depositAddress = object.depositAddress ?? "";
+    message.userSigningPublicKey = object.userSigningPublicKey ?? new Uint8Array(0);
+    message.verifyingPublicKey = object.verifyingPublicKey ?? new Uint8Array(0);
+    return message;
+  },
+};
+
 function createBaseQueryUnusedDepositAddressesResponse(): QueryUnusedDepositAddressesResponse {
   return { depositAddresses: [] };
 }
@@ -10823,7 +10925,7 @@ function createBaseQueryUnusedDepositAddressesResponse(): QueryUnusedDepositAddr
 export const QueryUnusedDepositAddressesResponse: MessageFns<QueryUnusedDepositAddressesResponse> = {
   encode(message: QueryUnusedDepositAddressesResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     for (const v of message.depositAddresses) {
-      writer.uint32(10).string(v!);
+      DepositAddressQueryResult.encode(v!, writer.uint32(10).fork()).join();
     }
     return writer;
   },
@@ -10840,7 +10942,7 @@ export const QueryUnusedDepositAddressesResponse: MessageFns<QueryUnusedDepositA
             break;
           }
 
-          message.depositAddresses.push(reader.string());
+          message.depositAddresses.push(DepositAddressQueryResult.decode(reader, reader.uint32()));
           continue;
         }
       }
@@ -10855,7 +10957,7 @@ export const QueryUnusedDepositAddressesResponse: MessageFns<QueryUnusedDepositA
   fromJSON(object: any): QueryUnusedDepositAddressesResponse {
     return {
       depositAddresses: globalThis.Array.isArray(object?.depositAddresses)
-        ? object.depositAddresses.map((e: any) => globalThis.String(e))
+        ? object.depositAddresses.map((e: any) => DepositAddressQueryResult.fromJSON(e))
         : [],
     };
   },
@@ -10863,7 +10965,7 @@ export const QueryUnusedDepositAddressesResponse: MessageFns<QueryUnusedDepositA
   toJSON(message: QueryUnusedDepositAddressesResponse): unknown {
     const obj: any = {};
     if (message.depositAddresses?.length) {
-      obj.depositAddresses = message.depositAddresses;
+      obj.depositAddresses = message.depositAddresses.map((e) => DepositAddressQueryResult.toJSON(e));
     }
     return obj;
   },
@@ -10873,7 +10975,7 @@ export const QueryUnusedDepositAddressesResponse: MessageFns<QueryUnusedDepositA
   },
   fromPartial(object: DeepPartial<QueryUnusedDepositAddressesResponse>): QueryUnusedDepositAddressesResponse {
     const message = createBaseQueryUnusedDepositAddressesResponse();
-    message.depositAddresses = object.depositAddresses?.map((e) => e) || [];
+    message.depositAddresses = object.depositAddresses?.map((e) => DepositAddressQueryResult.fromPartial(e)) || [];
     return message;
   },
 };

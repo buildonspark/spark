@@ -944,10 +944,6 @@ export class SparkWallet {
     if (!this.tokenLeaves.has(tokenPublicKey)) {
       this.tokenLeaves.set(tokenPublicKey, []);
     }
-    this.tokenTransactionService.updateTokenLeavesFromFinalizedTransaction(
-      this.tokenLeaves.get(tokenPublicKey)!,
-      finalizedTokenTransaction
-    );
   }
 
   selectTokenLeaves(
@@ -1009,9 +1005,5 @@ export class SparkWallet {
     if (!this.tokenLeaves.has(tokenPublicKey)) {
       this.tokenLeaves.set(tokenPublicKey, []);
     }
-    this.tokenTransactionService.updateTokenLeavesFromFinalizedTransaction(
-      this.tokenLeaves.get(tokenPublicKey)!,
-      finalizedTokenTransaction
-    );
   }
 }

@@ -567,7 +567,6 @@ export class SparkWallet {
         if (!this.tokenLeaves.has(tokenPublicKey)) {
             this.tokenLeaves.set(tokenPublicKey, []);
         }
-        this.tokenTransactionService.updateTokenLeavesFromFinalizedTransaction(this.tokenLeaves.get(tokenPublicKey), finalizedTokenTransaction);
     }
     selectTokenLeaves(tokenPublicKey, tokenAmount) {
         return this.tokenTransactionService.selectTokenLeaves(this.tokenLeaves.get(tokenPublicKey), tokenAmount);
@@ -596,7 +595,6 @@ export class SparkWallet {
         if (!this.tokenLeaves.has(tokenPublicKey)) {
             this.tokenLeaves.set(tokenPublicKey, []);
         }
-        this.tokenTransactionService.updateTokenLeavesFromFinalizedTransaction(this.tokenLeaves.get(tokenPublicKey), finalizedTokenTransaction);
     }
 }
 //# sourceMappingURL=spark-sdk.js.map
