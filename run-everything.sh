@@ -207,7 +207,7 @@ run_lrcd_tmux() {
             lrcd.template.config.toml >"$temp_config_file"
         local log_file="${run_dir}/logs/lrcd_${i}.log"
 
-        local cmd="cd lrc20.dev && DATABASE_URL=$db cargo sqlx migrate run --source ./crates/storage/src/migrations && cargo run -p yuvd --release -- run --config ../$temp_config_file 2>&1 | tee '${log_file}'"
+        local cmd="cd lrc20.dev && DATABASE_URL=$db sqlx migrate run --source ./crates/storage/src/migrations && cargo run -p yuvd --release -- run --config ../$temp_config_file 2>&1 | tee '${log_file}'"
 
         tmux send-keys -t "$session_name" "$cmd" C-m
     done
