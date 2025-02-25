@@ -11,7 +11,7 @@ import ArrowLeft from "../../icons/ArrowLeft";
 import { Routes } from "../../routes";
 import { PERMANENT_CURRENCIES, useWallet } from "../../store/wallet";
 import { CurrencyType } from "../../utils/currency";
-
+import { delay } from "../../utils/utils";
 export enum SendStep {
   AddressInput = "AddressInput",
   AmountInput = "AmountInput",
@@ -30,6 +30,8 @@ export default function Send() {
     Network.NONE,
   );
   const [rawInputAmount, setRawInputAmount] = useState<string>("0");
+  const [primaryButtonLoading, setPrimaryButtonLoading] =
+    useState<boolean>(false);
   const [sendResponse, setSendResponse] = useState<Transfer | string | null>(
     null,
   );
@@ -107,6 +109,11 @@ export default function Send() {
           activeInputCurrency.type === CurrencyType.FIAT
             ? Math.floor(Number(rawInputAmount) / satsUsdPrice.value)
             : Number(rawInputAmount);
+
+        setPrimaryButtonLoading(true);
+        await delay(3000);
+        setPrimaryButtonLoading(false);
+
         console.log("satsToSend", satsToSend);
         if (sendAddressNetwork === Network.LIGHTNING) {
           // await payLightningInvoice(sendAddress);
@@ -188,13 +195,14 @@ export default function Send() {
 
   return (
     <CardForm
+      headerDisabled={currentStep === SendStep.Success}
       topTitle={topTitle}
       primaryButtonDisabled={currentStep === SendStep.AddressInput}
       primaryButtonClick={onPrimaryButtonClick}
+      primaryButtonLoading={primaryButtonLoading}
       primaryButtonText={primaryButtonText}
       logoLeft={logoLeft}
       logoLeftClick={onLogoLeftClick}
-      headerDisabled={currentStep === SendStep.Success}
     >
       {currentStep === SendStep.AddressInput && (
         <AddressInput

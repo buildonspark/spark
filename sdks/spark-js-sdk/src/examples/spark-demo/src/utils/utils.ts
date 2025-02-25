@@ -36,3 +36,6 @@ export const roundDown = (num: number, decimals: number): number => {
 
 export const getFontSizeForCard = (input: string) =>
   Math.max(60 - (input.length - 1) * 5, 30);
+
+export const delay = (ms: number) =>
+  new Promise((resolve) => setTimeout(resolve, ms));

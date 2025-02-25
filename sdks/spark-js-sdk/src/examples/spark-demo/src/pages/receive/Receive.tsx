@@ -8,6 +8,7 @@ import ArrowLeft from "../../icons/ArrowLeft";
 import { Routes } from "../../routes";
 import { PERMANENT_CURRENCIES, useWallet } from "../../store/wallet";
 import { CurrencyType } from "../../utils/currency";
+import { delay } from "../../utils/utils";
 import BitcoinDepositAddress from "./BitcoinDepositAddress";
 import SparkDepositAddress from "./SparkDepositAddress";
 
@@ -25,6 +26,8 @@ export default function Receive() {
   const [rawInputAmount, setRawInputAmount] = useState("0");
   const [lightningInvoice, setLightningInvoice] = useState<string | null>(null);
   const [paymentNetwork, setPaymentNetwork] = useState<Network>(Network.NONE);
+  const [primaryButtonLoading, setPrimaryButtonLoading] =
+    useState<boolean>(false);
   const [qrCodeModalVisible, setQrCodeModalVisible] = useState<boolean>(false);
   const [currentStep, setCurrentStep] = useState<ReceiveStep>(
     ReceiveStep.NetworkSelect,
@@ -52,6 +55,11 @@ export default function Receive() {
           satsToReceive,
           "test memo",
         );
+
+        setPrimaryButtonLoading(true);
+        await delay(3000);
+        setPrimaryButtonLoading(false);
+
         setLightningInvoice(invoice);
         setCurrentStep(ReceiveStep.ShareQuote);
         break;
@@ -137,8 +145,16 @@ export default function Receive() {
   return (
     <div>
       <CardForm
+        headerDisabled={currentStep === ReceiveStep.ShareQuote}
         topTitle={topTitle}
         logoLeft={logoLeft}
+        logoLeftClick={onLogoLeftClick}
+        primaryButtonDisabled={
+          currentStep === ReceiveStep.NetworkSelect ||
+          currentStep === ReceiveStep.SparkDepositAddress ||
+          currentStep === ReceiveStep.BitcoinDepositAddress
+        }
+        primaryButtonLoading={primaryButtonLoading}
         primaryButtonClick={onPrimaryButtonClick}
         primaryButtonText={
           currentStep === ReceiveStep.InputAmount
@@ -147,18 +163,11 @@ export default function Receive() {
               ? "Done"
               : ""
         }
+        secondaryButtonDisabled={currentStep !== ReceiveStep.ShareQuote}
+        secondaryButtonClick={onSecondaryButtonClick}
         secondaryButtonText={
           currentStep === ReceiveStep.ShareQuote ? "Share" : ""
         }
-        secondaryButtonDisabled={currentStep !== ReceiveStep.ShareQuote}
-        secondaryButtonClick={onSecondaryButtonClick}
-        logoLeftClick={onLogoLeftClick}
-        primaryButtonDisabled={
-          currentStep === ReceiveStep.NetworkSelect ||
-          currentStep === ReceiveStep.SparkDepositAddress ||
-          currentStep === ReceiveStep.BitcoinDepositAddress
-        }
-        headerDisabled={currentStep === ReceiveStep.ShareQuote}
       >
         {currentStep === ReceiveStep.NetworkSelect && (
           <Networks onSelectNetwork={onSelectNetwork} />

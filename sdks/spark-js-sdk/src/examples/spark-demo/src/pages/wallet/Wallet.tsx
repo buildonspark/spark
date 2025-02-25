@@ -11,9 +11,7 @@ import { useWallet } from "../../store/wallet";
 
 export default function Wallet() {
   const navigate = useNavigate();
-  const { balance: satsBalance, satsUsdPrice, assets } = useWallet();
-  // satsBalance.value = 202020;
-  console.log(satsBalance);
+  const { balance: satsBalance, satsUsdPrice } = useWallet();
 
   const satsFiatBalance = (satsBalance.value * satsUsdPrice.value).toFixed(2);
   return (

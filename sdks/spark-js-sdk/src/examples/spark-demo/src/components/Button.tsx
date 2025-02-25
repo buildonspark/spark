@@ -1,4 +1,5 @@
 import styled, { css } from "styled-components";
+import { LoadingSpinner } from "./LoadingSpinner";
 
 interface ButtonsProps {
   direction?: "horizontal" | "vertical";
@@ -8,6 +9,7 @@ interface ButtonsProps {
   height?: number;
   disabled?: boolean;
   opaque?: boolean;
+  loading?: boolean;
   onClick?: () => void;
 }
 
@@ -19,19 +21,26 @@ export default function Button({
   height = 64,
   onClick,
   disabled,
+  loading = false,
   opaque,
 }: ButtonsProps) {
   return (
     <StyledButton
       direction={direction}
       kind={kind}
-      onClick={onClick}
+      onClick={loading ? undefined : onClick} // disable click if loading
       disabled={disabled}
       opaque={opaque}
       height={height}
     >
-      {icon}
-      {text}
+      {loading ? (
+        <LoadingSpinner size={20} />
+      ) : (
+        <>
+          {icon}
+          {text}
+        </>
+      )}
     </StyledButton>
   );
 }

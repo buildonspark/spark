@@ -6,6 +6,7 @@ export default function CardForm({
   logoRight,
   logoLeft,
   primaryButtonClick,
+  primaryButtonLoading = false,
   secondaryButtonClick,
   logoLeftClick,
   primaryButtonText,
@@ -20,6 +21,7 @@ export default function CardForm({
   logoLeft?: React.ReactNode;
   primaryButtonDisabled?: boolean;
   secondaryButtonDisabled?: boolean;
+  primaryButtonLoading?: boolean;
   primaryButtonText?: string;
   secondaryButtonText?: string;
   headerDisabled?: boolean;
@@ -56,6 +58,7 @@ export default function CardForm({
           <Button
             text={primaryButtonText || "Submit"}
             onClick={primaryButtonClick}
+            loading={primaryButtonLoading}
           />
         )}
       </div>

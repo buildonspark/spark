@@ -12,6 +12,7 @@ import CloseIcon from "../../icons/CloseIcon";
 import { Routes } from "../../routes";
 import { PERMANENT_CURRENCIES, useWallet } from "../../store/wallet";
 import { CurrencyType } from "../../utils/currency";
+import { delay } from "../../utils/utils";
 
 export enum TokensStep {
   SelectToken = "SelectToken",
@@ -28,6 +29,7 @@ export default function Tokens() {
   const [currentStep, setCurrentStep] = useState<TokensStep>(
     TokensStep.SelectToken,
   );
+  const [primaryButtonLoading, setPrimaryButtonLoading] = useState(false);
   const [sendTokenAddress, setSendTokenAddress] = useState<string>("");
   const [sendTokenAddressNetwork, setSendTokenAddressNetwork] =
     useState<string>("");
@@ -70,12 +72,16 @@ export default function Tokens() {
     }
   }, [currentStep, setActiveAsset, setCurrentStep, navigate]);
 
-  const onPrimaryButtonClick = useCallback(() => {
+  const onPrimaryButtonClick = useCallback(async () => {
     switch (currentStep) {
       case TokensStep.SendTokenInput:
         setCurrentStep(TokensStep.SendTokenConfirmQuote);
         break;
       case TokensStep.SendTokenConfirmQuote:
+        setPrimaryButtonLoading(true);
+        await delay(3000);
+        setPrimaryButtonLoading(false);
+
         setCurrentStep(TokensStep.SendTokenSuccess);
         break;
       default:
@@ -131,7 +137,14 @@ export default function Tokens() {
   }, [currentStep, activeAsset]);
   return (
     <CardForm
+      headerDisabled={currentStep === TokensStep.SendTokenSuccess}
       topTitle={topTitle}
+      primaryButtonLoading={primaryButtonLoading}
+      primaryButtonDisabled={
+        currentStep === TokensStep.TokenDetails ||
+        currentStep === TokensStep.SelectToken ||
+        currentStep === TokensStep.SendTokenAddressInput
+      }
       primaryButtonClick={onPrimaryButtonClick}
       primaryButtonText={primaryButtonText}
       logoLeft={
@@ -143,12 +156,6 @@ export default function Tokens() {
       }
       logoLeftClick={logoLeftClickHandler}
       logoRight={logoRight}
-      primaryButtonDisabled={
-        currentStep === TokensStep.TokenDetails ||
-        currentStep === TokensStep.SelectToken ||
-        currentStep === TokensStep.SendTokenAddressInput
-      }
-      headerDisabled={currentStep === TokensStep.SendTokenSuccess}
     >
       {currentStep === TokensStep.SelectToken && (
         <div className="flex max-h-[600px] flex-col overflow-y-auto p-2">
