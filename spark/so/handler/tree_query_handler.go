@@ -102,21 +102,17 @@ func (h *TreeQueryHandler) QueryUnusedDepositAddresses(ctx context.Context, req 
 
 	unusedDepositAddresses := make([]*pb.DepositAddressQueryResult, 0)
 	for _, depositAddress := range depositAddresses {
-		_, err := db.TreeNode.Query().Where(treenode.HasSigningKeyshareWith(signingkeyshare.ID(depositAddress.Edges.SigningKeyshare.ID))).All(ctx)
-		if err != nil {
-			if ent.IsNotFound(err) {
-				verifyingPublicKey, err := common.AddPublicKeys(depositAddress.OwnerSigningPubkey, depositAddress.Edges.SigningKeyshare.PublicKey)
-				if err != nil {
-					return nil, err
-				}
-				unusedDepositAddresses = append(unusedDepositAddresses, &pb.DepositAddressQueryResult{
-					DepositAddress:       depositAddress.Address,
-					UserSigningPublicKey: depositAddress.OwnerSigningPubkey,
-					VerifyingPublicKey:   verifyingPublicKey,
-				})
-			} else {
+		treeNodes, err := db.TreeNode.Query().Where(treenode.HasSigningKeyshareWith(signingkeyshare.ID(depositAddress.Edges.SigningKeyshare.ID))).All(ctx)
+		if len(treeNodes) == 0 || ent.IsNotFound(err) {
+			verifyingPublicKey, err := common.AddPublicKeys(depositAddress.OwnerSigningPubkey, depositAddress.Edges.SigningKeyshare.PublicKey)
+			if err != nil {
 				return nil, err
 			}
+			unusedDepositAddresses = append(unusedDepositAddresses, &pb.DepositAddressQueryResult{
+				DepositAddress:       depositAddress.Address,
+				UserSigningPublicKey: depositAddress.OwnerSigningPubkey,
+				VerifyingPublicKey:   verifyingPublicKey,
+			})
 		}
 	}
 
