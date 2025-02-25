@@ -1,14 +1,13 @@
-import {
-  bytesToNumberBE,
-  hexToBytes,
-} from "@noble/curves/abstract/utils";
+import { bytesToNumberBE, hexToBytes } from "@noble/curves/abstract/utils";
 import { SparkWallet } from "@buildonspark/spark-js-sdk";
 import { SparkSigner } from "@buildonspark/spark-js-sdk/signer";
 import { LeafWithPreviousTransactionData } from "../../proto/spark.js";
 import { Network } from "@buildonspark/spark-js-sdk/utils";
-import { checkIfSelectedLeavesAreAvailable } from "@buildonspark/spark-js-sdk/utils";
 import { IssuerTokenTransactionService } from "./token-transactions.js";
 import { TokenFreezeService } from "../freeze.js";
+
+const BURN_ADDRESS =
+  "020202020202020202020202020202020202020202020202020202020202020202";
 
 export class IssuerSparkWallet extends SparkWallet {
   private issuerTokenTransactionService: IssuerTokenTransactionService;
@@ -52,11 +51,7 @@ export class IssuerSparkWallet extends SparkWallet {
 
   async transferIssuerTokens(tokenAmount: bigint, recipientPublicKey: string) {
     const tokenPublicKey = await super.getIdentityPublicKey();
-    await super.transferTokens(
-      tokenPublicKey,
-      tokenAmount,
-      recipientPublicKey
-    );
+    await super.transferTokens(tokenPublicKey, tokenAmount, recipientPublicKey);
   }
 
   async consolidateIssuerTokenLeaves() {
@@ -64,58 +59,11 @@ export class IssuerSparkWallet extends SparkWallet {
     await super.consolidateTokenLeaves(tokenPublicKey);
   }
 
-  // TODO: Simplify so less logic is in the Issuer JS SDK in favor of the Spark
-  // SDK logic.
   async burnIssuerTokens(
     tokenAmount: bigint,
     selectedLeaves?: LeafWithPreviousTransactionData[]
   ) {
-    await this.syncTokenLeaves();
-    const tokenPublicKey = await super.getIdentityPublicKey();
-
-    if (!this.tokenLeaves.has(tokenPublicKey)) {
-      throw new Error("No token leaves available to burn");
-    }
-
-    if (selectedLeaves) {
-      if (
-        !checkIfSelectedLeavesAreAvailable(
-          selectedLeaves,
-          this.tokenLeaves,
-          hexToBytes(tokenPublicKey)
-        )
-      ) {
-        throw new Error("One or more selected leaves are not available");
-      }
-    } else {
-      selectedLeaves = this.selectTokenLeaves(
-        tokenPublicKey,
-        tokenAmount
-      );
-    }
-
-    const partialTokenTransaction =
-      await this.issuerTokenTransactionService.constructBurnTokenTransaction(
-        selectedLeaves,
-        hexToBytes(tokenPublicKey),
-        tokenAmount
-      );
-
-    const finalizedTokenTransaction =
-      await this.issuerTokenTransactionService.broadcastTokenTransaction(
-        partialTokenTransaction,
-        selectedLeaves.map((leaf) => leaf.leaf!.ownerPublicKey),
-        selectedLeaves.map((leaf) => leaf.leaf!.revocationPublicKey!)
-      );
-
-    const tokenPubKeyHex = tokenPublicKey;
-    if (!this.tokenLeaves.has(tokenPubKeyHex)) {
-      this.tokenLeaves.set(tokenPubKeyHex, []);
-    }
-    this.issuerTokenTransactionService.updateTokenLeavesFromFinalizedTransaction(
-      this.tokenLeaves.get(tokenPubKeyHex)!,
-      finalizedTokenTransaction
-    );
+    await this.transferTokens(await this.getIdentityPublicKey(), tokenAmount, BURN_ADDRESS, selectedLeaves);
   }
 
   async freezeIssuerTokens(ownerPublicKey: string) {
