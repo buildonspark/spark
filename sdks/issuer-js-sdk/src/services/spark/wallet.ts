@@ -26,6 +26,23 @@ export class IssuerSparkWallet extends SparkWallet {
     );
   }
 
+  async getIssuerTokenBalance(): Promise<{
+    balance: bigint;
+    leafCount: number;
+  }> {
+    const publicKey = await this.getIdentityPublicKey();
+    const balance = await this.getTokenBalance(publicKey);
+    const allLeaves = await this.getAllTokenLeaves();
+
+    // Get the leaves for the issuer token public key from the map
+    const issuerTokenLeaves = allLeaves.get(publicKey) || [];
+
+    return {
+      balance,
+      leafCount: issuerTokenLeaves.length,
+    };
+  }
+
   async mintIssuerTokens(tokenAmount: bigint) {
     var tokenPublicKey = await super.getIdentityPublicKey();
 
@@ -38,10 +55,6 @@ export class IssuerSparkWallet extends SparkWallet {
     await this.issuerTokenTransactionService.broadcastTokenTransaction(
       tokenTransaction
     );
-
-    if (!this.tokenLeaves.has(tokenPublicKey)) {
-      this.tokenLeaves.set(tokenPublicKey, []);
-    }
   }
 
   async transferIssuerTokens(tokenAmount: bigint, recipientPublicKey: string) {

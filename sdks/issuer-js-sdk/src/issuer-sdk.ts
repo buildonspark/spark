@@ -13,9 +13,6 @@ export class IssuerWallet {
   private initialized: boolean = false;
 
   constructor(network: Network) {
-    if (network !== Network.REGTEST) {
-      throw new Error("Only REGTEST network is supported");
-    }
     this.sparkWallet = new IssuerSparkWallet(network);
   }
 
@@ -59,9 +56,28 @@ export class IssuerWallet {
     return this.initialized && this.bitcoinWallet !== undefined;
   }
 
+  async getTokenPublicKey(): Promise<string> {
+    if (!this.isSparkInitialized()) {
+      throw new Error("Spark wallet not initialized");
+    }
+    return await this.sparkWallet.getIdentityPublicKey();
+  }
+
+  /**
+   * Gets token balance and number of held leaves.
+   * @returns An object containing the token balance and the number of owned leaves
+   */
+  async getTokenBalance(): Promise<{ balance: bigint; leafCount: number }> {
+    if (!this.isSparkInitialized()) {
+      throw new Error("Spark wallet not initialized");
+    }
+
+    return await this.sparkWallet.getIssuerTokenBalance();
+  }
+
   /**
    * Mints new tokens to the specified address
-   * TODO: Add support for minting to recipient address.
+   * TODO: Add support for minting directly to recipient address.
    */
   async mintTokens(amountToMint: bigint) {
     if (!this.isSparkInitialized()) {
@@ -85,6 +101,9 @@ export class IssuerWallet {
     );
   }
 
+  /**
+   * Consolidate all leaves into a single leaf.
+   */
   async consolidateTokens() {
     if (!this.isSparkInitialized()) {
       throw new Error("Spark wallet not initialized");
@@ -114,9 +133,7 @@ export class IssuerWallet {
     if (!this.isSparkInitialized()) {
       throw new Error("Spark wallet not initialized");
     }
-    return await this.sparkWallet.freezeIssuerTokens(
-      freezePublicKey
-    );
+    return await this.sparkWallet.freezeIssuerTokens(freezePublicKey);
   }
 
   /**
@@ -129,8 +146,6 @@ export class IssuerWallet {
     if (!this.isSparkInitialized()) {
       throw new Error("Spark wallet not initialized");
     }
-    return await this.sparkWallet.unfreezeIssuerTokens(
-      unfreezePublicKey
-    );
+    return await this.sparkWallet.unfreezeIssuerTokens(unfreezePublicKey);
   }
 }
