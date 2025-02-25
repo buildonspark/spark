@@ -583,13 +583,20 @@ export class SparkWallet {
     async syncTokenLeaves() {
         const trackedPublicKeys = await this.config.signer.getTrackedPublicKeys();
         const unsortedTokenLeaves = await this.tokenTransactionService.fetchOwnedTokenLeaves([...trackedPublicKeys, await this.config.signer.getIdentityPublicKey()], []);
+        // Group leaves by token key
+        const groupedLeaves = new Map();
         unsortedTokenLeaves.forEach((leaf) => {
             const tokenKey = bytesToHex(leaf.leaf.tokenPublicKey);
             const index = leaf.previousTransactionVout;
-            this.tokenLeaves.set(tokenKey, [
-                { ...leaf, previousTransactionVout: index },
-            ]);
+            if (!groupedLeaves.has(tokenKey)) {
+                groupedLeaves.set(tokenKey, []);
+            }
+            groupedLeaves.get(tokenKey).push({
+                ...leaf,
+                previousTransactionVout: index,
+            });
         });
+        this.tokenLeaves = groupedLeaves;
     }
     async getAllTokenLeaves() {
         await this.syncTokenLeaves();
@@ -635,7 +642,7 @@ export class SparkWallet {
         return this.tokenTransactionService.selectTokenLeaves(this.tokenLeaves.get(tokenPublicKey), tokenAmount);
     }
     // If no leaves are passed in, it will take all the leaves available for the given tokenPublicKey
-    async consolidateTokenLeaves(tokenPublicKey, selectedLeaves, transferBackToIdentityPublicKey = false) {
+    async consolidateTokenLeaves(tokenPublicKey, selectedLeaves) {
         await this.syncTokenLeaves();
         const tokenPublicKeyBytes = hexToBytes(tokenPublicKey);
         if (!this.tokenLeaves.has(tokenPublicKey)) {
@@ -660,7 +667,7 @@ export class SparkWallet {
         if (selectedLeaves.length > MAX_TOKEN_LEAVES) {
             throw new Error("Too many leaves selected");
         }
-        const partialTokenTransaction = await this.tokenTransactionService.constructConsolidateTokenTransaction(selectedLeaves, tokenPublicKeyBytes, transferBackToIdentityPublicKey);
+        const partialTokenTransaction = await this.tokenTransactionService.constructConsolidateTokenTransaction(selectedLeaves, tokenPublicKeyBytes);
         await this.tokenTransactionService.broadcastTokenTransaction(partialTokenTransaction, selectedLeaves.map((leaf) => leaf.leaf.ownerPublicKey), selectedLeaves.map((leaf) => leaf.leaf.revocationPublicKey));
     }
 }

@@ -949,14 +949,24 @@ export class SparkWallet {
         []
       );
 
+    // Group leaves by token key
+    const groupedLeaves = new Map<string, LeafWithPreviousTransactionData[]>();
+
     unsortedTokenLeaves.forEach((leaf) => {
       const tokenKey = bytesToHex(leaf.leaf!.tokenPublicKey!);
       const index = leaf.previousTransactionVout!;
 
-      this.tokenLeaves.set(tokenKey, [
-        { ...leaf, previousTransactionVout: index },
-      ]);
+      if (!groupedLeaves.has(tokenKey)) {
+        groupedLeaves.set(tokenKey, []);
+      }
+
+      groupedLeaves.get(tokenKey)!.push({
+        ...leaf,
+        previousTransactionVout: index,
+      });
     });
+
+    this.tokenLeaves = groupedLeaves;
   }
 
   public async getAllTokenLeaves(): Promise<
@@ -1045,8 +1055,7 @@ export class SparkWallet {
   // If no leaves are passed in, it will take all the leaves available for the given tokenPublicKey
   async consolidateTokenLeaves(
     tokenPublicKey: string,
-    selectedLeaves?: LeafWithPreviousTransactionData[],
-    transferBackToIdentityPublicKey: boolean = false
+    selectedLeaves?: LeafWithPreviousTransactionData[]
   ) {
     await this.syncTokenLeaves();
     const tokenPublicKeyBytes = hexToBytes(tokenPublicKey);
@@ -1086,8 +1095,7 @@ export class SparkWallet {
     const partialTokenTransaction =
       await this.tokenTransactionService.constructConsolidateTokenTransaction(
         selectedLeaves,
-        tokenPublicKeyBytes,
-        transferBackToIdentityPublicKey
+        tokenPublicKeyBytes
       );
 
     await this.tokenTransactionService.broadcastTokenTransaction(

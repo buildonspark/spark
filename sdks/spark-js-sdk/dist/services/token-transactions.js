@@ -195,7 +195,6 @@ export class TokenTransactionService {
             }
             // Finalize the token transaction with the keyshares
             await this.finalizeTokenTransaction(finalTokenTransaction, revocationKeys, threshold);
-            leafToSpendSigningPublicKeys?.forEach(async (ownerPublicKey) => await this.config.signer.removePublicKey(ownerPublicKey));
         }
         return startResponse.finalTokenTransaction;
     }
@@ -219,7 +218,7 @@ export class TokenTransactionService {
         validateResponses(soResponses);
         return finalTokenTransaction;
     }
-    async constructConsolidateTokenTransaction(selectedLeaves, tokenPublicKey, transferBackToIdentityPublicKey = false) {
+    async constructConsolidateTokenTransaction(selectedLeaves, tokenPublicKey) {
         const tokenAmountSum = getTokenLeavesSum(selectedLeaves);
         const transferTokenTransaction = {
             tokenInput: {
@@ -233,9 +232,7 @@ export class TokenTransactionService {
             },
             outputLeaves: [
                 {
-                    ownerPublicKey: transferBackToIdentityPublicKey
-                        ? await this.config.signer.getIdentityPublicKey()
-                        : await this.config.signer.generatePublicKey(),
+                    ownerPublicKey: await this.config.signer.getIdentityPublicKey(),
                     tokenPublicKey: tokenPublicKey,
                     tokenAmount: numberToBytesBE(tokenAmountSum, 16),
                 },

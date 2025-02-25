@@ -9,7 +9,7 @@ export declare class TokenTransactionService {
     collectOperatorIdentityPublicKeys(): Uint8Array[];
     broadcastTokenTransaction(tokenTransaction: TokenTransaction, leafToSpendSigningPublicKeys?: Uint8Array[], leafToSpendRevocationPublicKeys?: Uint8Array[]): Promise<TokenTransaction>;
     finalizeTokenTransaction(finalTokenTransaction: TokenTransaction, leafToSpendRevocationKeys: Uint8Array[], threshold: number): Promise<TokenTransaction>;
-    constructConsolidateTokenTransaction(selectedLeaves: LeafWithPreviousTransactionData[], tokenPublicKey: Uint8Array, transferBackToIdentityPublicKey?: boolean): Promise<TokenTransaction>;
+    constructConsolidateTokenTransaction(selectedLeaves: LeafWithPreviousTransactionData[], tokenPublicKey: Uint8Array): Promise<TokenTransaction>;
     fetchOwnedTokenLeaves(ownerPublicKeys: Uint8Array[], tokenPublicKeys: Uint8Array[]): Promise<LeafWithPreviousTransactionData[]>;
     syncTokenLeaves(tokenLeaves: Map<string, LeafWithPreviousTransactionData[]>): Promise<void>;
     selectTokenLeaves(tokenLeaves: LeafWithPreviousTransactionData[], tokenAmount: bigint): LeafWithPreviousTransactionData[];

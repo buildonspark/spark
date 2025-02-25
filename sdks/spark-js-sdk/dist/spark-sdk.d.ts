@@ -83,5 +83,5 @@ export declare class SparkWallet {
     getTokenBalance(tokenPublicKey: string): Promise<bigint>;
     transferTokens(tokenPublicKey: string, tokenAmount: bigint, recipientPublicKey: string, selectedLeaves?: LeafWithPreviousTransactionData[]): Promise<void>;
     selectTokenLeaves(tokenPublicKey: string, tokenAmount: bigint): LeafWithPreviousTransactionData[];
-    consolidateTokenLeaves(tokenPublicKey: string, selectedLeaves?: LeafWithPreviousTransactionData[], transferBackToIdentityPublicKey?: boolean): Promise<void>;
+    consolidateTokenLeaves(tokenPublicKey: string, selectedLeaves?: LeafWithPreviousTransactionData[]): Promise<void>;
 }

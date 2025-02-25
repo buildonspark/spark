@@ -334,11 +334,6 @@ export class TokenTransactionService {
         revocationKeys,
         threshold
       );
-
-      leafToSpendSigningPublicKeys?.forEach(
-        async (ownerPublicKey) =>
-          await this.config.signer.removePublicKey(ownerPublicKey)
-      );
     }
 
     return startResponse.finalTokenTransaction!;
@@ -383,8 +378,7 @@ export class TokenTransactionService {
 
   public async constructConsolidateTokenTransaction(
     selectedLeaves: LeafWithPreviousTransactionData[],
-    tokenPublicKey: Uint8Array,
-    transferBackToIdentityPublicKey: boolean = false
+    tokenPublicKey: Uint8Array
   ): Promise<TokenTransaction> {
     const tokenAmountSum = getTokenLeavesSum(selectedLeaves);
 
@@ -400,9 +394,7 @@ export class TokenTransactionService {
       },
       outputLeaves: [
         {
-          ownerPublicKey: transferBackToIdentityPublicKey
-            ? await this.config.signer.getIdentityPublicKey()
-            : await this.config.signer.generatePublicKey(),
+          ownerPublicKey: await this.config.signer.getIdentityPublicKey(),
           tokenPublicKey: tokenPublicKey,
           tokenAmount: numberToBytesBE(tokenAmountSum, 16),
         },
