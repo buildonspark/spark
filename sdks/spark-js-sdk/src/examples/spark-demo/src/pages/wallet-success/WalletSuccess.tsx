@@ -4,13 +4,14 @@ import StyledContainer from "../../components/StyledContainer";
 import CopyIcon from "../../icons/CopyIcon";
 
 import { useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
 import WalletIcon from "../../icons/WalletIcon";
 import { Routes } from "../../routes";
 import { useWallet } from "../../store/wallet";
 
 export default function WalletSuccess() {
   const [mnemonic, setMnemonic] = useState<string | null>(null);
-
+  const notify = () => toast("Copied!");
   const navigate = useNavigate();
   const { initWallet } = useWallet();
 
@@ -52,7 +53,7 @@ export default function WalletSuccess() {
           kind="secondary"
           onClick={() => {
             navigator.clipboard.writeText(mnemonic ?? "");
-            alert("Copied to clipboard");
+            notify();
           }}
         />
         <Button
