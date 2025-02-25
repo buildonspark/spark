@@ -13706,6 +13706,114 @@ var _ interface {
 	ErrorName() string
 } = QueryUnusedDepositAddressesRequestValidationError{}
 
+// Validate checks the field values on DepositAddressQueryResult with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *DepositAddressQueryResult) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on DepositAddressQueryResult with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// DepositAddressQueryResultMultiError, or nil if none found.
+func (m *DepositAddressQueryResult) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *DepositAddressQueryResult) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for DepositAddress
+
+	// no validation rules for UserSigningPublicKey
+
+	// no validation rules for VerifyingPublicKey
+
+	if len(errors) > 0 {
+		return DepositAddressQueryResultMultiError(errors)
+	}
+
+	return nil
+}
+
+// DepositAddressQueryResultMultiError is an error wrapping multiple validation
+// errors returned by DepositAddressQueryResult.ValidateAll() if the
+// designated constraints aren't met.
+type DepositAddressQueryResultMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m DepositAddressQueryResultMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m DepositAddressQueryResultMultiError) AllErrors() []error { return m }
+
+// DepositAddressQueryResultValidationError is the validation error returned by
+// DepositAddressQueryResult.Validate if the designated constraints aren't met.
+type DepositAddressQueryResultValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e DepositAddressQueryResultValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e DepositAddressQueryResultValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e DepositAddressQueryResultValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e DepositAddressQueryResultValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e DepositAddressQueryResultValidationError) ErrorName() string {
+	return "DepositAddressQueryResultValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e DepositAddressQueryResultValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sDepositAddressQueryResult.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = DepositAddressQueryResultValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = DepositAddressQueryResultValidationError{}
+
 // Validate checks the field values on QueryUnusedDepositAddressesResponse with
 // the rules defined in the proto definition for this message. If any rules
 // are violated, the first error encountered is returned, or nil if there are
@@ -13728,6 +13836,40 @@ func (m *QueryUnusedDepositAddressesResponse) validate(all bool) error {
 	}
 
 	var errors []error
+
+	for idx, item := range m.GetDepositAddresses() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, QueryUnusedDepositAddressesResponseValidationError{
+						field:  fmt.Sprintf("DepositAddresses[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, QueryUnusedDepositAddressesResponseValidationError{
+						field:  fmt.Sprintf("DepositAddresses[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return QueryUnusedDepositAddressesResponseValidationError{
+					field:  fmt.Sprintf("DepositAddresses[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
 
 	if len(errors) > 0 {
 		return QueryUnusedDepositAddressesResponseMultiError(errors)

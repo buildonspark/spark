@@ -681,6 +681,12 @@ message QueryUnusedDepositAddressesRequest {
     bytes identity_public_key = 1;
 }
 
+message DepositAddressQueryResult {
+    string deposit_address = 1;
+    bytes user_signing_public_key = 2;
+    bytes verifying_public_key = 3;
+}
+
 message QueryUnusedDepositAddressesResponse {
-    repeated string deposit_addresses = 1;
+    repeated DepositAddressQueryResult deposit_addresses = 1;
 }

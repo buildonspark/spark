@@ -51,8 +51,16 @@ func TestGenerateDepositAddress(t *testing.T) {
 		t.Fatalf("expected 1 unused deposit address, got %d", len(unusedDepositAddresses.DepositAddresses))
 	}
 
-	if unusedDepositAddresses.DepositAddresses[0] != resp.DepositAddress.Address {
+	if unusedDepositAddresses.DepositAddresses[0].DepositAddress != resp.DepositAddress.Address {
 		t.Fatalf("expected unused deposit address to be %s, got %s", resp.DepositAddress.Address, unusedDepositAddresses.DepositAddresses[0])
+	}
+
+	if !bytes.Equal(unusedDepositAddresses.DepositAddresses[0].UserSigningPublicKey, pubkey) {
+		t.Fatalf("expected user signing public key to be %s, got %s", hex.EncodeToString(pubkey), hex.EncodeToString(unusedDepositAddresses.DepositAddresses[0].UserSigningPublicKey))
+	}
+
+	if !bytes.Equal(unusedDepositAddresses.DepositAddresses[0].VerifyingPublicKey, resp.DepositAddress.VerifyingKey) {
+		t.Fatalf("expected verifying public key to be %s, got %s", hex.EncodeToString(resp.DepositAddress.VerifyingKey), hex.EncodeToString(unusedDepositAddresses.DepositAddresses[0].VerifyingPublicKey))
 	}
 }
 

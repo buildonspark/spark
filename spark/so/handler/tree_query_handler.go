@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark-go/common"
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/ent"
@@ -99,12 +100,20 @@ func (h *TreeQueryHandler) QueryUnusedDepositAddresses(ctx context.Context, req 
 		return nil, err
 	}
 
-	unusedDepositAddresses := make([]string, 0)
+	unusedDepositAddresses := make([]*pb.DepositAddressQueryResult, 0)
 	for _, depositAddress := range depositAddresses {
 		_, err := db.TreeNode.Query().Where(treenode.HasSigningKeyshareWith(signingkeyshare.ID(depositAddress.Edges.SigningKeyshare.ID))).Only(ctx)
 		if err != nil {
 			if ent.IsNotFound(err) {
-				unusedDepositAddresses = append(unusedDepositAddresses, depositAddress.Address)
+				verifyingPublicKey, err := common.AddPublicKeys(depositAddress.OwnerSigningPubkey, depositAddress.Edges.SigningKeyshare.PublicKey)
+				if err != nil {
+					return nil, err
+				}
+				unusedDepositAddresses = append(unusedDepositAddresses, &pb.DepositAddressQueryResult{
+					DepositAddress:       depositAddress.Address,
+					UserSigningPublicKey: depositAddress.OwnerSigningPubkey,
+					VerifyingPublicKey:   verifyingPublicKey,
+				})
 			} else {
 				return nil, err
 			}
