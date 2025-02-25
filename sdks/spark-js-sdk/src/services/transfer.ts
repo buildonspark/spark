@@ -796,4 +796,23 @@ export class TransferService extends BaseTransferService {
       throw new Error(`Error canceling send transfer: ${error}`);
     }
   }
+
+  async queryPendingTransfersBySender(): Promise<QueryPendingTransfersResponse> {
+    const sparkClient = await this.connectionManager.createSparkClient(
+      this.config.getCoordinatorAddress()
+    );
+    try {
+      return await sparkClient.query_pending_transfers({
+        participant: {
+          $case: "senderIdentityPublicKey",
+          senderIdentityPublicKey:
+            await this.config.signer.getIdentityPublicKey(),
+        },
+      });
+    } catch (error) {
+      throw new Error(`Error querying pending transfers by sender: ${error}`);
+    } finally {
+      sparkClient.close?.();
+    }
+  }
 }

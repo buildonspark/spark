@@ -386,8 +386,10 @@ export class SparkWallet {
         network: BitcoinNetwork.REGTEST,
       });
     } catch (e) {
-      console.error("Failed to request leaves swap", e);
-      throw e;
+      await this.transferService.cancelSendTransfer(transfer);
+
+      console.log("Cancelled send transfer", transfer.id);
+      throw new Error(`Failed to request leaves swap: ${e}`);
     }
 
     if (!request) {
@@ -594,6 +596,18 @@ export class SparkWallet {
       claimed = true;
     }
     return claimed;
+  }
+
+  public async cancelAllSenderInitiatedTransfers() {
+    const transfers =
+      await this.transferService.queryPendingTransfersBySender();
+    for (const transfer of transfers.transfers) {
+      if (
+        transfer.status === TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAKED
+      ) {
+        await this.transferService.cancelSendTransfer(transfer);
+      }
+    }
   }
 
   // ***** Lightning Flow *****
