@@ -1,8 +1,4 @@
-import {
-  bytesToHex,
-  bytesToNumberBE,
-  hexToBytes,
-} from "@noble/curves/abstract/utils";
+import { bytesToHex, hexToBytes } from "@noble/curves/abstract/utils";
 import { secp256k1 } from "@noble/curves/secp256k1";
 import { Transaction } from "@scure/btc-signer";
 import { TransactionInput } from "@scure/btc-signer/psbt";
@@ -540,7 +536,7 @@ export class SparkWallet {
 
   private async queryMempoolTxs(address: string) {
     const baseUrl = "https://regtest-mempool.dev.dev.sparkinfra.net/api";
-    const auth = btoa("lightspark:TFNR6ZeLdxF9HejW");
+    const auth = btoa("spark-sdk:mCMk1JqlBNtetUNy");
 
     const response = await fetch(`${baseUrl}/address/${address}/txs`, {
       headers: {
