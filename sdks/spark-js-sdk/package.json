@@ -116,7 +116,6 @@
     "nice-grpc": "^2.1.10",
     "nice-grpc-web": "^3.3.5",
     "protobufjs": "^7.4.0",
-    "react-toastify": "^11.0.5",
     "secp256k1": "^5.0.1",
     "ts-proto": "^2.6.1",
     "uuid": "^11.1.0",

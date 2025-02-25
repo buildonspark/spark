@@ -56,6 +56,13 @@ async function runCLI() {
       case "help":
         console.log(helpMessage);
         break;
+      case "getpubkey":
+        if (!wallet.isInitialized()) {
+          console.log("No wallet initialized");
+          break;
+        }
+        console.log(await wallet.getIdentityPublicKey());
+        break;
       case "genmnemonic":
         const mnemonic = generateMnemonic(wordlist);
         console.log(mnemonic);
@@ -90,6 +97,9 @@ async function runCLI() {
           await new Promise((resolve) => setTimeout(resolve, 5000));
         }
 
+        break;
+      case "clear":
+        await wallet.cancelAllSenderInitiatedTransfers();
         break;
       case "completedeposit":
         if (!wallet.isInitialized()) {

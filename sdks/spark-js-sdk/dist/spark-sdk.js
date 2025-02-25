@@ -227,6 +227,7 @@ export class SparkWallet {
                 // TODO: Map config network to proto network
                 network: BitcoinNetwork.REGTEST,
             });
+            console.log("Request", request);
         }
         catch (e) {
             await this.transferService.cancelSendTransfer(transfer);
@@ -237,32 +238,34 @@ export class SparkWallet {
             throw new Error("Failed to request leaves swap. No response returned.");
         }
         const sparkClient = await this.connectionManager.createSparkClient(this.config.getCoordinatorAddress());
-        for (const leaf of request.swapLeaves) {
-            const response = await sparkClient.query_nodes({
-                source: {
-                    $case: "nodeIds",
-                    nodeIds: {
-                        nodeIds: [leaf.leafId],
-                    },
+        const nodes = await sparkClient.query_nodes({
+            source: {
+                $case: "nodeIds",
+                nodeIds: {
+                    nodeIds: request.swapLeaves.map((leaf) => leaf.leafId),
                 },
-            });
-            const nodesLength = Object.values(response.nodes).length;
-            if (nodesLength !== 1) {
-                throw new Error(`Expected 1 node, got ${nodesLength}`);
+            },
+        });
+        if (Object.values(nodes.nodes).length !== request.swapLeaves.length) {
+            throw new Error("Expected same number of nodes as swapLeaves");
+        }
+        for (const [nodeId, node] of Object.entries(nodes.nodes)) {
+            if (!node.nodeTx) {
+                throw new Error(`Node tx not found for leaf ${nodeId}`);
             }
-            if (!response.nodes[leaf.leafId]?.nodeTx) {
-                throw new Error(`Node tx not found for leaf ${leaf.leafId}`);
+            if (!node.verifyingPublicKey) {
+                throw new Error(`Node public key not found for leaf ${nodeId}`);
             }
-            if (!response.nodes[leaf.leafId]?.verifyingPublicKey) {
-                throw new Error(`Node public key not found for leaf ${leaf.leafId}`);
+            const leaf = request.swapLeaves.find((leaf) => leaf.leafId === nodeId);
+            if (!leaf) {
+                throw new Error(`Leaf not found for node ${nodeId}`);
             }
             // @ts-ignore - We do a null check above
-            const nodeTx = getTxFromRawTxBytes(response.nodes[leaf.leafId].nodeTx);
+            const nodeTx = getTxFromRawTxBytes(node.nodeTx);
             const refundTxBytes = hexToBytes(leaf.rawUnsignedRefundTransaction);
             const refundTx = getTxFromRawTxBytes(refundTxBytes);
             const sighash = getSigHashFromTx(refundTx, 0, nodeTx.getOutput(0));
-            // @ts-ignore - We do a null check above
-            const nodePublicKey = response.nodes[leaf.leafId].verifyingPublicKey;
+            const nodePublicKey = node.verifyingPublicKey;
             const taprootKey = computeTaprootKeyNoScript(nodePublicKey.slice(1));
             const adaptorSignatureBytes = hexToBytes(leaf.adaptorSignedSignature);
             applyAdaptorToSignature(taprootKey.slice(1), sighash, adaptorSignatureBytes, adaptorPrivateKey);
@@ -432,7 +435,8 @@ export class SparkWallet {
     async cancelAllSenderInitiatedTransfers() {
         const transfers = await this.transferService.queryPendingTransfersBySender();
         for (const transfer of transfers.transfers) {
-            if (transfer.status === TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAKED) {
+            if (transfer.status === TransferStatus.TRANSFER_STATUS_SENDER_INITIATED) {
+                console.log("Cancelling transfer", transfer.id);
                 await this.transferService.cancelSendTransfer(transfer);
             }
         }

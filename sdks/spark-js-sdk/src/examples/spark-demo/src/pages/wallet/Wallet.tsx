@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import Button from "../../components/Button";
 import CurrencyBalanceDetails from "../../components/CurrencyBalanceDetails";
+import { LoadingSpinner } from "../../components/LoadingSpinner";
 import StyledContainer from "../../components/StyledContainer";
 import CopyIcon from "../../icons/CopyIcon";
 import ReceiveIcon from "../../icons/ReceiveIcon";
@@ -22,7 +23,6 @@ export default function Wallet() {
   } = useWallet();
   const [pubkey, setPubkey] = useState("");
   const satsFiatBalance = (satsBalance.value * satsUsdPrice.value).toFixed(2);
-
   useEffect(() => {
     console.log("isInitialized", isInitialized);
     if (isInitialized) {
@@ -38,30 +38,36 @@ export default function Wallet() {
   return (
     <div>
       <StyledContainer className="flex h-[180px] w-full flex-col items-center justify-center p-6">
-        <div className="flex h-[40px] w-full flex-row items-center justify-end">
-          <div
-            className="flex cursor-pointer flex-row items-center justify-center"
-            onClick={() => {
-              navigator.clipboard.writeText(pubkey);
-              notify();
-            }}
-          >
-            <div className="flex max-w-[80px] flex-row items-center justify-center text-[13px] text-[#F9F9F999]">
-              <div className="mr-1 overflow-hidden text-ellipsis whitespace-nowrap">
-                {pubkey ? pubkey : "Loading..."}
+        {satsBalance.isLoading ? (
+          <LoadingSpinner size={40} />
+        ) : (
+          <>
+            <div className="flex h-[40px] w-full flex-row items-center justify-end">
+              <div
+                className="flex cursor-pointer flex-row items-center justify-center"
+                onClick={() => {
+                  navigator.clipboard.writeText(pubkey);
+                  notify();
+                }}
+              >
+                <div className="flex max-w-[80px] flex-row items-center justify-center text-[13px] text-[#F9F9F999]">
+                  <div className="mr-1 overflow-hidden text-ellipsis whitespace-nowrap">
+                    {pubkey ? pubkey : "Loading..."}
+                  </div>
+                </div>
+                <div className="flex h-4 w-4 items-center justify-center">
+                  <CopyIcon stroke="#F9F9F999" />
+                </div>
               </div>
             </div>
-            <div className="flex h-4 w-4 items-center justify-center">
-              <CopyIcon stroke="#F9F9F999" />
+            <div className="flex h-[140px] w-full flex-col items-start justify-end gap-2">
+              <div className="text-[24px] font-bold">${satsFiatBalance}</div>
+              <div className="text-[13px] text-[#F9F9F999]">
+                {satsBalance.value} SATs
+              </div>
             </div>
-          </div>
-        </div>
-        <div className="flex h-[140px] w-full flex-col items-start justify-end gap-2">
-          <div className="text-[24px] font-bold">${satsFiatBalance}</div>
-          <div className="text-[13px] text-[#F9F9F999]">
-            {satsBalance.value} SATs
-          </div>
-        </div>
+          </>
+        )}
       </StyledContainer>
       <div className="mt-6 flex items-center justify-center gap-4">
         <Button

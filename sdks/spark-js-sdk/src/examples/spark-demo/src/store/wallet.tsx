@@ -190,7 +190,12 @@ export function useWallet() {
 
   useQuery({
     queryKey: ["wallet", "init"],
-    queryFn: () => useWalletStore.getState().loadStoredWallet(),
+    queryFn: async () => {
+      const result = await useWalletStore.getState().loadStoredWallet();
+      if (result) {
+        queryClient.invalidateQueries({ queryKey: ["wallet", "balance"] });
+      }
+    },
     refetchOnMount: false,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
@@ -199,6 +204,7 @@ export function useWallet() {
   const balanceQuery = useQuery({
     queryKey: ["wallet", "balance"],
     queryFn: async () => {
+      console.log("fetching");
       return await wallet.getBalance();
     },
     refetchOnMount: true,
@@ -266,17 +272,21 @@ export function useWallet() {
   const satsUsdPriceQuery = useQuery({
     queryKey: ["satsUsdPrice"],
     queryFn: async () => {
-      const response = await fetch(
-        "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd",
-      );
-      if (!response.ok) {
-        throw new Error(
-          `Failed to fetch BTC price. status: ${response.status}`,
+      try {
+        const response = await fetch(
+          "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd",
         );
+        if (!response.ok) {
+          throw new Error(
+            `Failed to fetch BTC price. status: ${response.status}`,
+          );
+        }
+        const data = await response.json();
+        if (!data?.bitcoin?.usd) throw new Error("Invalid response format");
+        return data.bitcoin.usd / 100_000_000;
+      } catch {
+        return 0.00091491;
       }
-      const data = await response.json();
-      if (!data?.bitcoin?.usd) throw new Error("Invalid response format");
-      return data.bitcoin.usd / 100_000_000;
     },
     refetchInterval: 60000,
     refetchOnMount: false,
@@ -286,6 +296,16 @@ export function useWallet() {
 
   const state = useWalletStore.getState();
 
+  const initWallet = async (mnemonic: string) => {
+    await useWalletStore.getState().initWallet(mnemonic);
+    queryClient.invalidateQueries({ queryKey: ["wallet", "balance"] });
+  };
+
+  const initWalletFromSeed = async (seed: string) => {
+    await useWalletStore.getState().initWalletFromSeed(seed);
+    queryClient.invalidateQueries({ queryKey: ["wallet", "balance"] });
+  };
+
   return {
     activeInputCurrency: state.activeInputCurrency,
     setActiveInputCurrency: state.setActiveInputCurrency,
@@ -294,7 +314,7 @@ export function useWallet() {
     setActiveAsset: state.setActiveAsset,
     balance: {
       value: Number(balanceQuery.data ?? 0),
-      isLoading: balanceQuery.isLoading,
+      isLoading: balanceQuery.isLoading || !isInitialized,
       error: balanceQuery.error,
     },
     satsUsdPrice: {
@@ -313,10 +333,10 @@ export function useWallet() {
       isLoading: mxpBalanceQuery.isLoading,
       error: mxpBalanceQuery.error,
     },
-    initWallet: state.initWallet,
-    initWalletFromSeed: state.initWalletFromSeed,
     getTokenBalance: state.getTokenBalance,
     transferTokens: state.transferTokens,
+    initWallet,
+    initWalletFromSeed,
     getMasterPublicKey: state.getMasterPublicKey,
     generateDepositAddress: state.generateDepositAddress,
     sendTransfer: state.sendTransfer,

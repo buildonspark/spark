@@ -255,7 +255,11 @@ export default function Send() {
           onAddressSelect={(address, addressNetwork) => {
             setSendAddress(address);
             setSendAddressNetwork(addressNetwork);
-            setCurrentStep(SendStep.ConfirmQuote);
+            if (addressNetwork === Network.LIGHTNING) {
+              setCurrentStep(SendStep.ConfirmQuote);
+            } else {
+              setCurrentStep(SendStep.AmountInput);
+            }
           }}
         />
       )}
