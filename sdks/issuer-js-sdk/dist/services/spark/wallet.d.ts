@@ -10,9 +10,9 @@ export declare class IssuerSparkWallet extends SparkWallet {
         balance: bigint;
         leafCount: number;
     }>;
-    mintIssuerTokens(tokenAmount: bigint): Promise<void>;
-    transferIssuerTokens(tokenAmount: bigint, recipientPublicKey: string): Promise<void>;
-    consolidateIssuerTokenLeaves(): Promise<void>;
+    mintIssuerTokens(tokenAmount: bigint): Promise<string>;
+    transferIssuerTokens(tokenAmount: bigint, recipientPublicKey: string): Promise<string>;
+    consolidateIssuerTokenLeaves(): Promise<string>;
     burnIssuerTokens(tokenAmount: bigint, selectedLeaves?: LeafWithPreviousTransactionData[]): Promise<void>;
     freezeIssuerTokens(ownerPublicKey: string): Promise<{
         impactedLeafIds: string[];

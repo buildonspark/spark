@@ -113,7 +113,7 @@ export class TokenTransactionService {
     tokenTransaction: TokenTransaction,
     leafToSpendSigningPublicKeys?: Uint8Array[],
     leafToSpendRevocationPublicKeys?: Uint8Array[]
-  ): Promise<TokenTransaction> {
+  ): Promise<string> {
     const sparkClient = await this.connectionManager.createSparkClient(
       this.config.getCoordinatorAddress()
     );
@@ -335,7 +335,7 @@ export class TokenTransactionService {
       );
     }
 
-    return startResponse.finalTokenTransaction!;
+    return bytesToHex(hashTokenTransaction(startResponse.finalTokenTransaction!));
   }
 
   public async finalizeTokenTransaction(

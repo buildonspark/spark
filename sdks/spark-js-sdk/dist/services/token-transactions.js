@@ -195,7 +195,7 @@ export class TokenTransactionService {
             // Finalize the token transaction with the keyshares
             await this.finalizeTokenTransaction(finalTokenTransaction, revocationKeys, threshold);
         }
-        return startResponse.finalTokenTransaction;
+        return bytesToHex(hashTokenTransaction(startResponse.finalTokenTransaction));
     }
     async finalizeTokenTransaction(finalTokenTransaction, leafToSpendRevocationKeys, threshold) {
         const signingOperators = this.config.getConfig().signingOperators;

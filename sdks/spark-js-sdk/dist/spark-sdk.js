@@ -641,7 +641,7 @@ export class SparkWallet {
             throw new Error("Too many leaves selected");
         }
         const tokenTransaction = await this.tokenTransactionService.constructTransferTokenTransaction(selectedLeaves, recipientPublicKeyBytes, tokenPublicKeyBytes, tokenAmount);
-        await this.tokenTransactionService.broadcastTokenTransaction(tokenTransaction, selectedLeaves.map((leaf) => leaf.leaf.ownerPublicKey), selectedLeaves.map((leaf) => leaf.leaf.revocationPublicKey));
+        return await this.tokenTransactionService.broadcastTokenTransaction(tokenTransaction, selectedLeaves.map((leaf) => leaf.leaf.ownerPublicKey), selectedLeaves.map((leaf) => leaf.leaf.revocationPublicKey));
     }
     selectTokenLeaves(tokenPublicKey, tokenAmount) {
         return this.tokenTransactionService.selectTokenLeaves(this.tokenLeaves.get(tokenPublicKey), tokenAmount);
@@ -667,13 +667,13 @@ export class SparkWallet {
             }
         }
         if (selectedLeaves.length === 1) {
-            return;
+            return "";
         }
         if (selectedLeaves.length > MAX_TOKEN_LEAVES) {
             throw new Error("Too many leaves selected");
         }
         const partialTokenTransaction = await this.tokenTransactionService.constructConsolidateTokenTransaction(selectedLeaves, tokenPublicKeyBytes);
-        await this.tokenTransactionService.broadcastTokenTransaction(partialTokenTransaction, selectedLeaves.map((leaf) => leaf.leaf.ownerPublicKey), selectedLeaves.map((leaf) => leaf.leaf.revocationPublicKey));
+        return await this.tokenTransactionService.broadcastTokenTransaction(partialTokenTransaction, selectedLeaves.map((leaf) => leaf.leaf.ownerPublicKey), selectedLeaves.map((leaf) => leaf.leaf.revocationPublicKey));
     }
 }
 //# sourceMappingURL=spark-sdk.js.map

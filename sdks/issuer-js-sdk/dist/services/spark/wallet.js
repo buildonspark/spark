@@ -25,15 +25,15 @@ export class IssuerSparkWallet extends SparkWallet {
     async mintIssuerTokens(tokenAmount) {
         var tokenPublicKey = await super.getIdentityPublicKey();
         const tokenTransaction = await this.issuerTokenTransactionService.constructMintTokenTransaction(hexToBytes(tokenPublicKey), tokenAmount);
-        await this.issuerTokenTransactionService.broadcastTokenTransaction(tokenTransaction);
+        return await this.issuerTokenTransactionService.broadcastTokenTransaction(tokenTransaction);
     }
     async transferIssuerTokens(tokenAmount, recipientPublicKey) {
         const tokenPublicKey = await super.getIdentityPublicKey();
-        await super.transferTokens(tokenPublicKey, tokenAmount, recipientPublicKey);
+        return await super.transferTokens(tokenPublicKey, tokenAmount, recipientPublicKey);
     }
     async consolidateIssuerTokenLeaves() {
         const tokenPublicKey = await super.getIdentityPublicKey();
-        await super.consolidateTokenLeaves(tokenPublicKey);
+        return await super.consolidateTokenLeaves(tokenPublicKey);
     }
     async burnIssuerTokens(tokenAmount, selectedLeaves) {
         await this.transferTokens(await this.getIdentityPublicKey(), tokenAmount, BURN_ADDRESS, selectedLeaves);

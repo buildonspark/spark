@@ -1004,7 +1004,7 @@ export class SparkWallet {
     tokenAmount: bigint,
     recipientPublicKey: string,
     selectedLeaves?: LeafWithPreviousTransactionData[]
-  ) {
+  ): Promise<string> {
     await this.syncTokenLeaves();
     if (!this.tokenLeaves.has(tokenPublicKey)) {
       throw new Error("No token leaves with the given tokenPublicKey");
@@ -1039,7 +1039,7 @@ export class SparkWallet {
         tokenAmount
       );
 
-    await this.tokenTransactionService.broadcastTokenTransaction(
+    return await this.tokenTransactionService.broadcastTokenTransaction(
       tokenTransaction,
       selectedLeaves.map((leaf) => leaf.leaf!.ownerPublicKey),
       selectedLeaves.map((leaf) => leaf.leaf!.revocationPublicKey!)
@@ -1060,7 +1060,7 @@ export class SparkWallet {
   public async consolidateTokenLeaves(
     tokenPublicKey: string,
     selectedLeaves?: LeafWithPreviousTransactionData[]
-  ) {
+  ): Promise<string> {
     await this.syncTokenLeaves();
     const tokenPublicKeyBytes = hexToBytes(tokenPublicKey);
 
@@ -1089,7 +1089,7 @@ export class SparkWallet {
     }
 
     if (selectedLeaves!.length === 1) {
-      return;
+      return "";
     }
 
     if (selectedLeaves!.length > MAX_TOKEN_LEAVES) {
@@ -1102,7 +1102,7 @@ export class SparkWallet {
         tokenPublicKeyBytes
       );
 
-    await this.tokenTransactionService.broadcastTokenTransaction(
+    return await this.tokenTransactionService.broadcastTokenTransaction(
       partialTokenTransaction,
       selectedLeaves.map((leaf) => leaf.leaf!.ownerPublicKey),
       selectedLeaves.map((leaf) => leaf.leaf!.revocationPublicKey!)
