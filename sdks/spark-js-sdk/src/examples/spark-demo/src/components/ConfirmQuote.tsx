@@ -15,10 +15,15 @@ export default function ConfirmQuote({
   const sendFiatAmount =
     activeInputCurrency.type === CurrencyType.FIAT
       ? inputAmount
-      : `${(Number(inputAmount) * satsUsdPrice.value).toFixed(2)}`;
+      : `${(Number(inputAmount) * (activeAsset.type === CurrencyType.TOKEN ? (activeAsset.usdPrice ?? 1) : satsUsdPrice.value)).toFixed(2)}`;
   const sendAssetAmount =
     activeInputCurrency.type === CurrencyType.FIAT
-      ? (Number(inputAmount) / satsUsdPrice.value).toFixed(0)
+      ? (
+          Number(inputAmount) /
+          (activeAsset.type === CurrencyType.TOKEN
+            ? (activeAsset.usdPrice ?? 1)
+            : satsUsdPrice.value)
+        ).toFixed(0)
       : inputAmount;
   return (
     <div>

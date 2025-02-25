@@ -13,4 +13,5 @@ export interface Currency {
   balance?: number;
   logo?: React.ReactNode;
   pubkey?: string;
+  usdPrice?: number;
 }

@@ -12,7 +12,6 @@ import CloseIcon from "../../icons/CloseIcon";
 import { Routes } from "../../routes";
 import { PERMANENT_CURRENCIES, useWallet } from "../../store/wallet";
 import { CurrencyType } from "../../utils/currency";
-import { delay } from "../../utils/utils";
 
 export enum TokensStep {
   SelectToken = "SelectToken",
@@ -29,7 +28,7 @@ export default function Tokens() {
   const [currentStep, setCurrentStep] = useState<TokensStep>(
     TokensStep.SelectToken,
   );
-  const [primaryButtonLoading, setPrimaryButtonLoading] = useState(false);
+  const [sendTokenLoading, setSendTokenLoading] = useState(false);
   const [sendTokenAddress, setSendTokenAddress] = useState<string>("");
   const [sendTokenAddressNetwork, setSendTokenAddressNetwork] =
     useState<string>("");
@@ -37,13 +36,43 @@ export default function Tokens() {
     assets,
     activeAsset,
     activeInputCurrency,
-    satsUsdPrice,
+    transferTokens,
     setActiveAsset,
     setActiveInputCurrency,
   } = useWallet();
   const navigate = useNavigate();
 
-  const logoLeftClickHandler = useCallback(() => {
+  const handleTokenSend = useCallback(async () => {
+    try {
+      setSendTokenLoading(true);
+      const assetsToSendValue: bigint =
+        activeInputCurrency.type === CurrencyType.TOKEN
+          ? BigInt(rawInputAmount)
+          : BigInt(Number(rawInputAmount) * (activeAsset.usdPrice ?? 1));
+      if (!activeAsset.pubkey) {
+        throw new Error("Active asset pubkey is not set");
+      }
+      await transferTokens(
+        activeAsset.pubkey,
+        assetsToSendValue,
+        sendTokenAddress,
+      );
+      setSendTokenLoading(false);
+    } catch (e) {
+      setSendTokenLoading(false);
+      setCurrentStep(TokensStep.SendTokenFailed);
+    }
+    setCurrentStep(TokensStep.SendTokenSuccess);
+  }, [
+    setCurrentStep,
+    transferTokens,
+    activeAsset,
+    rawInputAmount,
+    sendTokenAddress,
+    activeInputCurrency,
+  ]);
+
+  const logoLeftClickHandler = useCallback(async () => {
     switch (currentStep) {
       case TokensStep.SelectToken:
         setActiveAsset(PERMANENT_CURRENCIES.BTC);
@@ -76,18 +105,24 @@ export default function Tokens() {
         setCurrentStep(TokensStep.SendTokenConfirmQuote);
         break;
       case TokensStep.SendTokenConfirmQuote:
-        setPrimaryButtonLoading(true);
-        await delay(3000);
-        setPrimaryButtonLoading(false);
-
-        setCurrentStep(TokensStep.SendTokenSuccess);
+        await handleTokenSend();
         break;
       default:
         setActiveAsset(PERMANENT_CURRENCIES.BTC);
         navigate(Routes.Wallet);
         break;
     }
-  }, [currentStep, navigate, setCurrentStep, setActiveAsset]);
+  }, [currentStep, navigate, setCurrentStep, setActiveAsset, handleTokenSend]);
+
+  const secondaryButtonClickHandler = useCallback(async () => {
+    switch (currentStep) {
+      case TokensStep.SendTokenFailed:
+        await handleTokenSend();
+        break;
+      default:
+        break;
+    }
+  }, [handleTokenSend, currentStep]);
 
   const primaryButtonText = useMemo(() => {
     switch (currentStep) {
@@ -116,10 +151,12 @@ export default function Tokens() {
         return `Send ${activeAsset.code}`;
       case TokensStep.SendTokenSuccess:
         return "Success";
+      case TokensStep.SendTokenFailed:
+        return "Failed";
       default:
         return "Send";
     }
-  }, [currentStep]);
+  }, [currentStep, activeAsset]);
 
   const logoRight = useMemo(() => {
     switch (currentStep) {
@@ -128,6 +165,7 @@ export default function Tokens() {
       case TokensStep.TokenDetails:
       case TokensStep.SendTokenConfirmQuote:
       case TokensStep.SendTokenSuccess:
+      case TokensStep.SendTokenFailed:
         return activeAsset.logo;
       default:
         return null;
@@ -135,9 +173,12 @@ export default function Tokens() {
   }, [currentStep, activeAsset]);
   return (
     <CardForm
-      headerDisabled={currentStep === TokensStep.SendTokenSuccess}
+      headerDisabled={
+        currentStep === TokensStep.SendTokenSuccess ||
+        currentStep === TokensStep.SendTokenFailed
+      }
       topTitle={topTitle}
-      primaryButtonLoading={primaryButtonLoading}
+      primaryButtonLoading={sendTokenLoading}
       primaryButtonDisabled={
         currentStep === TokensStep.TokenDetails ||
         currentStep === TokensStep.SelectToken ||
@@ -145,6 +186,14 @@ export default function Tokens() {
       }
       primaryButtonClick={onPrimaryButtonClick}
       primaryButtonText={primaryButtonText}
+      secondaryButtonText={
+        currentStep === TokensStep.SendTokenFailed ? "Retry" : undefined
+      }
+      secondaryButtonClick={secondaryButtonClickHandler}
+      secondaryButtonLoading={sendTokenLoading}
+      secondaryButtonDisabled={
+        currentStep === TokensStep.SendTokenFailed ? false : true
+      }
       logoLeft={
         currentStep === TokensStep.SendTokenSuccess ? (
           <CloseIcon />
@@ -210,6 +259,14 @@ export default function Tokens() {
         <SendDetails
           inputAmount={rawInputAmount}
           sendAddress={sendTokenAddress}
+          success={true}
+        />
+      )}
+      {currentStep === TokensStep.SendTokenFailed && (
+        <SendDetails
+          inputAmount={rawInputAmount}
+          sendAddress={sendTokenAddress}
+          success={false}
         />
       )}
     </CardForm>

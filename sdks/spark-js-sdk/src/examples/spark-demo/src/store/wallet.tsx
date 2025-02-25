@@ -23,25 +23,29 @@ export const PERMANENT_CURRENCIES: Record<string, Currency> = {
     type: CurrencyType.FIAT,
     symbol: "$",
   },
-  INOC: {
+  MXPC: {
     name: "MXP Coin",
     code: "MXPC",
     decimals: 2,
     type: CurrencyType.TOKEN,
-    balance: 90909,
+    balance: 0,
     symbol: "MXN",
     logo: <MxnLogo />,
-    pubkey: "0x1234567890",
+    pubkey:
+      "02773f9ebfaf81126d6dde46227374eac7c2de7f5a99f76a2ef93780e9960e355f",
+    usdPrice: 20.46,
   },
   USDC: {
     name: "USD Coin",
     code: "USDC",
     decimals: 2,
     type: CurrencyType.TOKEN,
-    balance: 35353,
+    balance: 0,
     symbol: "USDC",
     logo: <UsdcLogo />,
-    pubkey: "0x1234567890",
+    pubkey:
+      "03269c03f240fd2764e048284bceeb09f8b256b60a3bc2737cb119a61127358c1f",
+    usdPrice: 1.0,
   },
 };
 
@@ -63,7 +67,12 @@ interface WalletActions {
   createLightningInvoice: (amount: number, memo: string) => Promise<string>;
   sendTransfer: (amount: number, recipient: string) => Promise<void>;
   payLightningInvoice: (invoice: string) => Promise<void>;
-  // fetchOwnedTokens: () => Promise<LeafWithPreviousTransactionData[]>;
+  getTokenBalance: (tokenPublicKey: string) => Promise<bigint>;
+  transferTokens: (
+    tokenPublicKey: string,
+    tokenAmount: bigint,
+    recipientPublicKey: string,
+  ) => Promise<void>;
   setActiveAsset: (asset: Currency) => void;
   setActiveInputCurrency: (currency: Currency) => void;
   withdrawToBtc: (address: string, amount: number) => Promise<void>;
@@ -88,14 +97,24 @@ const useWalletStore = create<WalletStore>((set, get) => ({
   setActiveAsset: (asset: Currency) => {
     set({ activeAsset: asset });
   },
-  // fetchOwnedTokens: async () => {
-  //   const { wallet } = get();
-  //   const leaves = await wallet.fetchOwnedTokenLeaves([
-  //     await wallet.getMasterPubKey(),
-  //   ]);
-  //   // TODO: process the leaves into tokens.
-  //   return leaves;
-  // },
+  getTokenBalance: async (tokenPublicKey: string) => {
+    const { wallet } = get();
+    const balance = await wallet.getTokenBalance(tokenPublicKey);
+    return balance;
+  },
+  transferTokens: async (
+    tokenPublicKey: string,
+    tokenAmount: bigint,
+    recipientPublicKey: string,
+  ) => {
+    const { wallet } = get();
+    await wallet.transferTokens(
+      tokenPublicKey,
+      tokenAmount,
+      recipientPublicKey,
+    );
+  },
+  btcAddressInfo: {},
   initWallet: async (mnemonic: string) => {
     console.log("initWallet", mnemonic);
     const { wallet } = get();
@@ -188,6 +207,41 @@ export function useWallet() {
     refetchInterval: 5000,
   });
 
+  const usdcBalanceQuery = useQuery({
+    queryKey: ["wallet, usdcBalance"],
+    queryFn: async () => {
+      try {
+        console.log("wallet pubkey:", await wallet.getIdentityPublicKey());
+        return await wallet.getTokenBalance(
+          "03269c03f240fd2764e048284bceeb09f8b256b60a3bc2737cb119a61127358c1f",
+        );
+      } catch (e) {
+        console.log(e);
+        return BigInt(0);
+      }
+    },
+    refetchOnMount: true,
+    enabled: isInitialized,
+    staleTime: 5000,
+  });
+
+  const mxpBalanceQuery = useQuery({
+    queryKey: ["wallet, mxpBalance"],
+    queryFn: async () => {
+      try {
+        return await wallet.getTokenBalance(
+          "02773f9ebfaf81126d6dde46227374eac7c2de7f5a99f76a2ef93780e9960e355f",
+        );
+      } catch (e) {
+        console.log(e);
+        return BigInt(0);
+      }
+    },
+    refetchOnMount: true,
+    enabled: isInitialized,
+    staleTime: 5000,
+  });
+
   useQuery({
     queryKey: ["wallet", "claimDeposits"],
     queryFn: async () => {
@@ -249,8 +303,20 @@ export function useWallet() {
       error: satsUsdPriceQuery.error,
     },
     isInitialized,
+    usdcBalance: {
+      value: Number(usdcBalanceQuery.data ?? 0),
+      isLoading: usdcBalanceQuery.isLoading,
+      error: usdcBalanceQuery.error,
+    },
+    mxpBalance: {
+      value: Number(mxpBalanceQuery.data ?? 0),
+      isLoading: mxpBalanceQuery.isLoading,
+      error: mxpBalanceQuery.error,
+    },
     initWallet: state.initWallet,
     initWalletFromSeed: state.initWalletFromSeed,
+    getTokenBalance: state.getTokenBalance,
+    transferTokens: state.transferTokens,
     getMasterPublicKey: state.getMasterPublicKey,
     generateDepositAddress: state.generateDepositAddress,
     sendTransfer: state.sendTransfer,

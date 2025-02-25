@@ -12,6 +12,7 @@ export default function CardForm({
   logoLeftClick,
   primaryButtonText,
   secondaryButtonText,
+  secondaryButtonLoading = false,
   headerDisabled = false,
   primaryButtonDisabled = false,
   secondaryButtonDisabled = true,
@@ -23,6 +24,7 @@ export default function CardForm({
   primaryButtonDisabled?: boolean;
   secondaryButtonDisabled?: boolean;
   primaryButtonLoading?: boolean;
+  secondaryButtonLoading?: boolean;
   primaryButtonText?: string;
   secondaryButtonText?: string;
   headerDisabled?: boolean;
@@ -53,6 +55,7 @@ export default function CardForm({
             text={secondaryButtonText || "Cancel"}
             onClick={secondaryButtonClick}
             kind="secondary"
+            loading={secondaryButtonLoading}
           />
         )}
         {!primaryButtonDisabled && (
@@ -113,7 +116,6 @@ const StyledCardFormButton = styled.button<StyledCardFormButtonProps>`
   border-radius: 8px;
   font-weight: 600;
   font-size: 15px;
-  // padding-x: 20px;
   ${({ kind = "primary" }) =>
     kind === "primary"
       ? css`

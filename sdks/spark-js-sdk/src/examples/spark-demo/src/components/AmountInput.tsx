@@ -109,12 +109,22 @@ export default function AmountInput({
         ? `${Number(intAmount).toLocaleString()}${
             decAmount ? `.${decAmount}` : ""
           }`
-        : (Number(rawInputAmount) * satsUsdPrice.value).toFixed(2);
+        : (
+            Number(rawInputAmount) *
+            (activeAsset.type === CurrencyType.TOKEN
+              ? (activeAsset.usdPrice ?? 1)
+              : satsUsdPrice.value)
+          ).toFixed(2);
     const assetAmountString =
       activeInputCurrency.type !== CurrencyType.FIAT
         ? `${rawInputAmount}`
         : Number(
-            (Number(rawInputAmount) / satsUsdPrice.value).toFixed(0),
+            (
+              Number(rawInputAmount) /
+              (activeAsset.type === CurrencyType.TOKEN
+                ? (activeAsset.usdPrice ?? 1)
+                : satsUsdPrice.value)
+            ).toFixed(0),
           ).toLocaleString();
     return {
       fiatAmountString,
