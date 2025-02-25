@@ -42,7 +42,7 @@ func TestRefreshTimelock(t *testing.T) {
 		context.Background(),
 		senderConfig,
 		[]*pb.TreeNode{node},
-		[]*pb.TreeNode{parentNode},
+		parentNode,
 		signingKey,
 	)
 	assert.NoError(t, err)

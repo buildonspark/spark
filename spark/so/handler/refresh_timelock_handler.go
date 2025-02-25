@@ -116,8 +116,8 @@ func (h *RefreshTimelockHandler) RefreshTimelock(ctx context.Context, req *pb.Re
 	signingJobs := make([]*helper.SigningJob, 0, len(req.SigningJobs))
 	for i, signingJob := range req.SigningJobs {
 		var parentTx *wire.MsgTx
-		// Only signing refund tx
 		if i == 0 && len(nodes) == 1 {
+			// Only signing refund tx
 			parentTx, err = common.TxFromRawTxBytes(nodes[0].RawTx)
 			if err != nil {
 				return nil, fmt.Errorf("unable to deserialize refund signing tx: %w", err)
@@ -135,7 +135,13 @@ func (h *RefreshTimelockHandler) RefreshTimelock(ctx context.Context, req *pb.Re
 		} else {
 			parentTx = signingTxs[i-1]
 		}
-		parentTxOut := parentTx.TxOut[0]
+		parentTxOut := parentTx.TxOut[nodes[i].Vout]
+
+		// Validate the current tx spends the parent tx
+		parentTxHash := parentTx.TxHash()
+		if !signingTxs[i].TxIn[0].PreviousOutPoint.Hash.IsEqual(&parentTxHash) || signingTxs[i].TxIn[0].PreviousOutPoint.Index != uint32(nodes[i].Vout) {
+			return nil, fmt.Errorf("signing tx must spend parent tx vout, expected %s:%d, got %s:%d", parentTxHash, nodes[i].Vout, signingTxs[i].TxIn[0].PreviousOutPoint.Hash, signingTxs[i].TxIn[0].PreviousOutPoint.Index)
+		}
 
 		sigHash, err := common.SigHashFromTx(signingTxs[i], 0, parentTxOut)
 		if err != nil {

@@ -225,7 +225,7 @@ func RefreshTimelockNodes(
 	ctx context.Context,
 	config *Config,
 	nodes []*pb.TreeNode,
-	parentNodes []*pb.TreeNode,
+	parentNode *pb.TreeNode,
 	signingPrivKey *secp256k1.PrivateKey,
 ) error {
 	if len(nodes) == 0 {
@@ -235,6 +235,7 @@ func RefreshTimelockNodes(
 	signingJobs := make([]*pb.SigningJob, len(nodes)+1)
 	nonces := make([]*objects.SigningNonce, len(nodes)+1)
 
+	newNodeTxs := make([]*wire.MsgTx, len(nodes))
 	for i, node := range nodes {
 		newTx, err := common.TxFromRawTxBytes(node.NodeTx)
 		if err != nil {
@@ -246,8 +247,10 @@ func RefreshTimelockNodes(
 			if err != nil {
 				return fmt.Errorf("failed to increment sequence: %v", err)
 			}
+			// No need to change outpoint since parent did not change
 		} else {
 			newTx.TxIn[0].Sequence = spark.InitialSequence()
+			newTx.TxIn[0].PreviousOutPoint.Hash = newNodeTxs[i-1].TxHash()
 		}
 
 		signingJob, nonce, err := signingJobFromTx(newTx, signingPrivKey)
@@ -256,6 +259,7 @@ func RefreshTimelockNodes(
 		}
 		signingJobs[i] = signingJob
 		nonces[i] = nonce
+		newNodeTxs[i] = newTx
 	}
 
 	// Add one more job for the refund tx
@@ -265,6 +269,7 @@ func RefreshTimelockNodes(
 		return fmt.Errorf("failed to parse refund tx: %v", err)
 	}
 	newRefundTx.TxIn[0].Sequence = spark.InitialSequence()
+	newRefundTx.TxIn[0].PreviousOutPoint.Hash = newNodeTxs[len(newNodeTxs)-1].TxHash()
 	signingJob, nonce, err := signingJobFromTx(newRefundTx, signingPrivKey)
 	if err != nil {
 		return fmt.Errorf("failed to create signing job: %v", err)
@@ -314,22 +319,26 @@ func RefreshTimelockNodes(
 		}
 
 		// Get parent node for txout for sighash
-		var parentNode *pb.TreeNode
-		var node *pb.TreeNode
+		var parentTx *wire.MsgTx
+		var nodeID string
 		var vout int
 		if i == len(nodes) {
 			// Refund tx
-			node = nodes[i-1]
-			parentNode = nodes[i-1]
+			nodeID = nodes[i-1].Id
+			parentTx = newNodeTxs[i-1]
 			vout = 0
+		} else if i == 0 {
+			// First node
+			nodeID = nodes[i].Id
+			parentTx, err = common.TxFromRawTxBytes(parentNode.NodeTx)
+			if err != nil {
+				return fmt.Errorf("failed to parse parent tx: %v", err)
+			}
+			vout = int(nodes[i].Vout)
 		} else {
-			node = nodes[i]
-			parentNode = parentNodes[i]
-			vout = int(node.Vout)
-		}
-		parentTx, err := common.TxFromRawTxBytes(parentNode.NodeTx)
-		if err != nil {
-			return fmt.Errorf("failed to parse parent tx: %v", err)
+			nodeID = nodes[i].Id
+			parentTx = newNodeTxs[i-1]
+			vout = int(nodes[i].Vout)
 		}
 		txOut := parentTx.TxOut[vout]
 
@@ -375,7 +384,7 @@ func RefreshTimelockNodes(
 			UserPublicKey:   signingPrivKey.PubKey().SerializeCompressed(),
 		}
 
-		jobToNodeIDMap[userSigningJobID] = node.Id
+		jobToNodeIDMap[userSigningJobID] = nodeID
 	}
 
 	frostConn, _ := common.NewGRPCConnectionWithoutTLS(config.FrostSignerAddress)
