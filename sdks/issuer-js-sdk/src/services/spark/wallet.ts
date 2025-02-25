@@ -37,10 +37,7 @@ export class IssuerSparkWallet extends SparkWallet {
     // Get the leaves for the issuer token public key from the map
     const issuerTokenLeaves = allLeaves.get(publicKey) || [];
 
-    return {
-      balance,
-      leafCount: issuerTokenLeaves.length,
-    };
+    return await this.getTokenBalance(publicKey);
   }
 
   async mintIssuerTokens(tokenAmount: bigint): Promise<string> {

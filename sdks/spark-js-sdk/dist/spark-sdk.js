@@ -1,4 +1,4 @@
-import { bytesToHex, hexToBytes, } from "@noble/curves/abstract/utils";
+import { bytesToHex, hexToBytes } from "@noble/curves/abstract/utils";
 import { secp256k1 } from "@noble/curves/secp256k1";
 import { sha256 } from "@scure/btc-signer/utils";
 import { decode } from "light-bolt11-decoder";
@@ -56,7 +56,6 @@ export class SparkWallet {
         // TODO: Better leaf management?
         this.leaves = await this.getLeaves();
         this.config.signer.restoreSigningKeysFromLeafs(this.leaves);
-        // await this.syncTokenLeaves();
     }
     async selectLeaves(targetAmount) {
         if (targetAmount <= 0) {
@@ -331,7 +330,7 @@ export class SparkWallet {
     }
     async queryMempoolTxs(address) {
         const baseUrl = "https://regtest-mempool.dev.dev.sparkinfra.net/api";
-        const auth = btoa("lightspark:TFNR6ZeLdxF9HejW");
+        const auth = btoa("spark-sdk:mCMk1JqlBNtetUNy");
         const response = await fetch(`${baseUrl}/address/${address}/txs`, {
             headers: {
                 Authorization: `Basic ${auth}`,
@@ -607,20 +606,30 @@ export class SparkWallet {
         await this.syncTokenLeaves();
         return this.tokenLeaves;
     }
+    async getTokenBalance(tokenPublicKey) {
+        await this.syncTokenLeaves();
+        if (!this.tokenLeaves.has(tokenPublicKey)) {
+            return {
+                balance: 0n,
+                leafCount: 0,
+            };
+        }
+        const leaves = this.tokenLeaves.get(tokenPublicKey);
+        return {
+            balance: calculateAvailableTokenAmount(leaves),
+            leafCount: leaves.length,
+        };
+    }
     async getAllTokenBalances() {
         await this.syncTokenLeaves();
         const balances = new Map();
         for (const [tokenPublicKey, leaves] of this.tokenLeaves.entries()) {
-            balances.set(tokenPublicKey, calculateAvailableTokenAmount(leaves));
+            balances.set(tokenPublicKey, {
+                balance: calculateAvailableTokenAmount(leaves),
+                leafCount: leaves.length,
+            });
         }
         return balances;
-    }
-    async getTokenBalance(tokenPublicKey) {
-        await this.syncTokenLeaves();
-        if (!this.tokenLeaves.has(tokenPublicKey)) {
-            return 0n;
-        }
-        return calculateAvailableTokenAmount(this.tokenLeaves.get(tokenPublicKey));
     }
     async transferTokens(tokenPublicKey, tokenAmount, recipientPublicKey, selectedLeaves) {
         await this.syncTokenLeaves();

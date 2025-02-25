@@ -149,8 +149,6 @@ export class SparkWallet {
     // TODO: Better leaf management?
     this.leaves = await this.getLeaves();
     this.config.signer.restoreSigningKeysFromLeafs(this.leaves);
-
-    // await this.syncTokenLeaves();
   }
 
   private async selectLeaves(targetAmount: number): Promise<TreeNode[]> {
@@ -980,23 +978,45 @@ export class SparkWallet {
     return this.tokenLeaves;
   }
 
-  public async getAllTokenBalances(): Promise<Map<string, bigint>> {
-    await this.syncTokenLeaves();
-
-    const balances = new Map<string, bigint>();
-    for (const [tokenPublicKey, leaves] of this.tokenLeaves.entries()) {
-      balances.set(tokenPublicKey, calculateAvailableTokenAmount(leaves));
-    }
-    return balances;
-  }
-
-  public async getTokenBalance(tokenPublicKey: string) {
+  public async getTokenBalance(tokenPublicKey: string): Promise<{
+    balance: bigint;
+    leafCount: number;
+  }> {
     await this.syncTokenLeaves();
 
     if (!this.tokenLeaves.has(tokenPublicKey)) {
-      return 0n;
+      return {
+        balance: 0n,
+        leafCount: 0,
+      };
     }
-    return calculateAvailableTokenAmount(this.tokenLeaves.get(tokenPublicKey)!);
+
+    const leaves = this.tokenLeaves.get(tokenPublicKey)!;
+    return {
+      balance: calculateAvailableTokenAmount(leaves),
+      leafCount: leaves.length,
+    };
+  }
+
+  public async getAllTokenBalances(): Promise<
+    Map<
+      string,
+      {
+        balance: bigint;
+        leafCount: number;
+      }
+    >
+  > {
+    await this.syncTokenLeaves();
+
+    const balances = new Map<string, { balance: bigint; leafCount: number }>();
+    for (const [tokenPublicKey, leaves] of this.tokenLeaves.entries()) {
+      balances.set(tokenPublicKey, {
+        balance: calculateAvailableTokenAmount(leaves),
+        leafCount: leaves.length,
+      });
+    }
+    return balances;
   }
 
   public async transferTokens(

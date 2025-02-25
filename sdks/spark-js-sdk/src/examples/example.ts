@@ -22,18 +22,23 @@ async function runCLI() {
   Available commands:
   genmnemonic                                     - Generate a new mnemonic
   initwallet <mnemonic>                           - Create a new wallet from a mnemonic
+  getpubkey                                       - Get the wallet's identity public key
   gendepositaddr                                  - Generate a new deposit address, will poll to auto claim
   completedeposit <pubkey> <verifyingKey> <rawtx> - Complete a deposit
   createinvoice <amount> <memo>                   - Create a new lightning invoice
-  payinvoice <invoice> <amount>
+  payinvoice <invoice> <amount>                   - Pay a lightning invoice
   swap <targetAmount>                             - Swap leaves for a target amount
   balance                                         - Show current wallet balance
   getleaves                                       - Show current leaves
   sendtransfer <amount> <receiverPubKey>          - Send a transfer
   pendingtransfers                                - Show pending transfers
   claimtransfer <transferId>                      - Claim a pending transfer
+  claimall                                        - Claim all pending transfers
   coopexit <onchainAddress> <targetAmount>        - Coop exit
-  claim                                           - Claim all pending transfers
+  clear                                           - Cancel all sender initiated transfers
+  tokentransfer <tokenPubKey> <amount> <receiverPubKey> - Transfer tokens
+  tokenbalance [tokenPubKey]                      - Show token balance for specific token or all tokens
+  tokenconsolidate <tokenPubKey>                 - Consolidate token leaves for a specific token
   help                                            - Show this help message
   exit/quit                                       - Exit the program
 `;
@@ -178,6 +183,95 @@ async function runCLI() {
         }
         const balance = await wallet.getBalance();
         console.log(balance);
+        break;
+      case "tokentransfer":
+        if (!wallet.isInitialized()) {
+          console.log("No wallet initialized");
+          break;
+        }
+        if (args.length < 3) {
+          console.log(
+            "Usage: tokentransfer <tokenPubKey> <amount> <receiverPubKey>"
+          );
+          break;
+        }
+
+        const tokenPubKey = args[0];
+        const tokenAmount = BigInt(parseInt(args[1]));
+        const tokenReceiverPubKey = args[2];
+
+        try {
+          await wallet.transferTokens(
+            tokenPubKey,
+            tokenAmount,
+            tokenReceiverPubKey
+          );
+          console.log(
+            `Successfully transferred ${tokenAmount} tokens to ${tokenReceiverPubKey}`
+          );
+        } catch (error) {
+          console.error("Failed to transfer tokens:", error.message);
+        }
+        break;
+      case "tokenbalance":
+        if (!wallet.isInitialized()) {
+          console.log("No wallet initialized");
+          break;
+        }
+
+        try {
+          const allTokenBalances = await wallet.getAllTokenBalances();
+
+          if (args.length > 0) {
+            // If a specific token public key is provided, show only that token's balance
+            const tokenPubKey = args[0];
+            if (allTokenBalances.has(tokenPubKey)) {
+              console.log(
+                `Token balance for ${tokenPubKey}: ${allTokenBalances.get(
+                  tokenPubKey
+                )}`
+              );
+            } else {
+              console.log(`No balance found for token ${tokenPubKey}`);
+            }
+          } else {
+            // If no token public key is provided, show all token balances
+            if (allTokenBalances.size === 0) {
+              console.log("No token balances found");
+            } else {
+              console.log("All token balances:");
+              for (const [tokenPubKey, balance] of allTokenBalances.entries()) {
+                console.log(
+                  `  ${tokenPubKey}: ${balance.totalAmount} tokens (${balance.numLeaves} leaves)`
+                );
+              }
+            }
+          }
+        } catch (error) {
+          console.error("Failed to get token balances:", error.message);
+        }
+        break;
+      case "tokenconsolidate":
+        if (!wallet.isInitialized()) {
+          console.log("No wallet initialized");
+          break;
+        }
+
+        if (args.length < 1) {
+          console.log("Usage: tokenconsolidate <tokenPubKey>");
+          break;
+        }
+
+        const tokenPubKeyToConsolidate = args[0];
+
+        try {
+          await wallet.consolidateTokenLeaves(tokenPubKeyToConsolidate);
+          console.log(
+            `Successfully consolidated token leaves for ${tokenPubKeyToConsolidate}`
+          );
+        } catch (error) {
+          console.error("Failed to consolidate token leaves:", error.message);
+        }
         break;
     }
   }
