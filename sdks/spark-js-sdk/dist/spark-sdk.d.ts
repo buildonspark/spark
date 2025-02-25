@@ -55,7 +55,7 @@ export declare class SparkWallet {
     getBalance(): Promise<BigInt>;
     generatePublicKey(): Promise<string>;
     generateDepositAddress(signingPubkey: Uint8Array): Promise<GenerateDepositAddressResponse>;
-    createTreeRoot(signingPubKey: Uint8Array, verifyingKey: Uint8Array, depositTx: Transaction, vout: number): Promise<TreeNode[] | undefined>;
+    finalizeDeposit(signingPubKey: Uint8Array, verifyingKey: Uint8Array, depositTx: Transaction, vout: number): Promise<TreeNode[] | undefined>;
     private transferDepositToSelf;
     sendTransfer({ amount, receiverPubKey, leaves, expiryTime, }: SendTransferParams): Promise<Transfer>;
     private claimTransfer;

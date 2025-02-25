@@ -49,7 +49,7 @@ describe("deposit", () => {
         const randomAddr = getP2TRAddressFromPublicKey(randomPubKey, Network.LOCAL);
         await faucet.generateToAddress(1, randomAddr);
         // Create tree root
-        const treeResp = await sdk.createTreeRoot(pubKey, depositResp.depositAddress.verifyingKey, depositTx, vout);
+        const treeResp = await sdk.finalizeDeposit(pubKey, depositResp.depositAddress.verifyingKey, depositTx, vout);
         console.log("tree created:", treeResp);
     }, 30000);
 });

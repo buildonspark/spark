@@ -87,7 +87,7 @@ describe("deposit", () => {
       await faucet.generateToAddress(1, randomAddr);
 
       // Create tree root
-      const treeResp = await sdk.createTreeRoot(
+      const treeResp = await sdk.finalizeDeposit(
         pubKey,
         depositResp.depositAddress.verifyingKey,
         depositTx,

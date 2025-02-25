@@ -470,7 +470,7 @@ export class SparkWallet {
     return await this.depositService!.generateDepositAddress({ signingPubkey });
   }
 
-  public async createTreeRoot(
+  public async finalizeDeposit(
     signingPubKey: Uint8Array,
     verifyingKey: Uint8Array,
     depositTx: Transaction,

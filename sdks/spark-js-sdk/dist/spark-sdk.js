@@ -286,7 +286,7 @@ export class SparkWallet {
     async generateDepositAddress(signingPubkey) {
         return await this.depositService.generateDepositAddress({ signingPubkey });
     }
-    async createTreeRoot(signingPubKey, verifyingKey, depositTx, vout) {
+    async finalizeDeposit(signingPubKey, verifyingKey, depositTx, vout) {
         const response = await this.depositService.createTreeRoot({
             signingPubKey,
             verifyingKey,

@@ -140,7 +140,7 @@ async function runCLI() {
           }
 
           if (depositTx) {
-            const nodes = await wallet.createTreeRoot(
+            const nodes = await wallet.finalizeDeposit(
               leafPubKey,
               depositAddress.depositAddress?.verifyingKey,
               depositTx,
@@ -161,7 +161,7 @@ async function runCLI() {
         }
         const depositTx = getTxFromRawTxHex(args[2]);
 
-        const treeResp = await wallet.createTreeRoot(
+        const treeResp = await wallet.finalizeDeposit(
           hexToBytes(args[0]),
           hexToBytes(args[1]),
           depositTx,
