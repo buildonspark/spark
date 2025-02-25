@@ -10,3 +10,5 @@ export * from "./token-hashing.js";
 export * from "./token-keyshares.js";
 export * from "./token-transactions.js";
 export * from "./transaction.js";
+export * from "./wasm-wrapper.js";
+export * from "./wasm.js";

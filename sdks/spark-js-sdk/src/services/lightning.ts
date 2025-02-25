@@ -97,6 +97,9 @@ export class LightningService {
       this.config.getConfig().signingOperators
     ).map(async ([_, operator]) => {
       const share = shares[operator.id];
+      if (!share) {
+        throw new Error("Share not found");
+      }
 
       const sparkClient = await this.connectionManager.createSparkClient(
         operator.address
@@ -261,6 +264,9 @@ export class LightningService {
     const userSignedRefunds: UserSignedRefund[] = [];
     for (let i = 0; i < leaves.length; i++) {
       const leaf = leaves[i];
+      if (!leaf?.leaf) {
+        throw new Error("Leaf not found in signRefunds");
+      }
       const { refundTx, sighash } = createRefundTx(
         leaf.leaf,
         receiverIdentityPubkey,
@@ -270,12 +276,17 @@ export class LightningService {
       const signingCommitment =
         await this.config.signer.getRandomSigningCommitment();
 
+      const signingNonceCommitments =
+        signingCommitments[i]?.signingNonceCommitments;
+      if (!signingNonceCommitments) {
+        throw new Error("Signing nonce commitments not found in signRefunds");
+      }
       const signingResult = await this.config.signer.signFrost({
         message: sighash,
         publicKey: leaf.signingPubKey,
         privateAsPubKey: leaf.signingPubKey,
         selfCommitment: signingCommitment,
-        statechainCommitments: signingCommitments[i].signingNonceCommitments,
+        statechainCommitments: signingNonceCommitments,
         adaptorPubKey: new Uint8Array(),
         verifyingKey: leaf.leaf.verifyingPublicKey,
       });
@@ -286,7 +297,7 @@ export class LightningService {
         userSignature: signingResult,
         userSignatureCommitment: signingCommitment,
         signingCommitments: {
-          signingCommitments: signingCommitments[i].signingNonceCommitments,
+          signingCommitments: signingNonceCommitments,
         },
       });
     }

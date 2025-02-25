@@ -15,7 +15,10 @@ import {
   hashOperatorSpecificTokenTransactionSignablePayload,
   hashTokenTransaction,
 } from "../utils/token-hashing.js";
-import { recoverPrivateKeyFromKeyshares } from "../utils/token-keyshares.js";
+import {
+  KeyshareWithOperatorIndex,
+  recoverPrivateKeyFromKeyshares,
+} from "../utils/token-keyshares.js";
 import {
   calculateAvailableTokenAmount,
   getTokenLeavesSum,
@@ -150,9 +153,13 @@ export class TokenTransactionService {
 
       for (let i = 0; i < transferInput.leavesToSpend.length; i++) {
         const leaf = transferInput.leavesToSpend[i];
+        const key = leafToSpendSigningPublicKeys![i];
+        if (!key) {
+          throw new Error("key not found");
+        }
         const ownerSignature = await this.signMessageWithKey(
           partialTokenTransactionHash,
-          leafToSpendSigningPublicKeys![i]
+          key
         );
 
         ownerSignatures.push(ownerSignature);
@@ -301,7 +308,7 @@ export class TokenTransactionService {
         }
 
         const recoveredPrivateKey = recoverPrivateKeyFromKeyshares(
-          leafKeyshares,
+          leafKeyshares as KeyshareWithOperatorIndex[],
           threshold
         );
         const recoveredPublicKey = secp256k1.getPublicKey(
@@ -313,7 +320,7 @@ export class TokenTransactionService {
           !leafToSpendRevocationPublicKeys ||
           !leafToSpendRevocationPublicKeys[leafIndex] ||
           !recoveredPublicKey.every(
-            (byte, i) => byte === leafToSpendRevocationPublicKeys[leafIndex][i]
+            (byte, i) => byte === leafToSpendRevocationPublicKeys[leafIndex]![i]
           )
         ) {
           throw new Error(

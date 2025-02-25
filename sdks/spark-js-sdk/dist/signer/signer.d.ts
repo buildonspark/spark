@@ -93,4 +93,5 @@ declare class DefaultSparkSigner implements SparkSigner {
         adaptorPublicKey: Uint8Array;
     }>;
 }
-export { DefaultSparkSigner, SparkSigner };
+export { DefaultSparkSigner };
+export type { SparkSigner };

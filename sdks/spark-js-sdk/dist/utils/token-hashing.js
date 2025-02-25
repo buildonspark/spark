@@ -69,6 +69,7 @@ export function hashTokenTransaction(tokenTransaction, partialHash = false) {
         ...(tokenTransaction.sparkOperatorIdentityPublicKeys || []),
     ].sort((a, b) => {
         for (let i = 0; i < a.length && i < b.length; i++) {
+            // @ts-ignore - i < a and b length
             if (a[i] !== b[i])
                 return a[i] - b[i];
         }

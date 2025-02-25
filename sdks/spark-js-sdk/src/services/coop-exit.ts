@@ -108,6 +108,12 @@ export class CoopExitService extends BaseTransferService {
     for (let i = 0; i < leaves.length; i++) {
       const leaf = leaves[i];
       const connectorOutput = connectorOutputs[i];
+      if (!leaf?.leaf) {
+        throw new Error("Leaf not found");
+      }
+      if (!connectorOutput) {
+        throw new Error("Connector output not found");
+      }
       const currentRefundTx = getTxFromRawTxBytes(leaf.leaf.refundTx);
 
       const sequence = getNextTransactionSequence(

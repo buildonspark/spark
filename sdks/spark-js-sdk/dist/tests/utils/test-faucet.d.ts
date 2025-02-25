@@ -12,7 +12,7 @@ export declare class BitcoinFaucet {
     private coins;
     private static instance;
     constructor(url: string, username: string, password: string);
-    fund(): Promise<FaucetCoin>;
+    fund(): Promise<FaucetCoin | undefined>;
     refill(): Promise<void>;
     signFaucetCoin(unsignedTx: Transaction, fundingTxOut: TransactionOutput, key: Uint8Array): Promise<Transaction>;
     private call;

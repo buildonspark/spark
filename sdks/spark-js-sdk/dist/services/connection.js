@@ -98,6 +98,7 @@ export class ConnectionManager {
             catch (error) {
                 if (error.message?.includes("token has expired")) {
                     const newAuthToken = await this.authenticate(address);
+                    // @ts-ignore - We can only get here if the client exists
                     this.clients[address].authToken = newAuthToken;
                     yield* call.next(call.request, {
                         ...options,
@@ -123,6 +124,7 @@ export class ConnectionManager {
             catch (error) {
                 if (error.message?.includes("token has expired")) {
                     const newAuthToken = await this.authenticate(address);
+                    // @ts-ignore - We can only get here if the client exists
                     this.clients[address].authToken = newAuthToken;
                     yield* call.next(call.request, {
                         ...options,

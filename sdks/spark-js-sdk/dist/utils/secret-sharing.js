@@ -38,6 +38,9 @@ export function evaluatePolynomial(polynomial, x) {
     let result = 0n;
     for (let i = 0; i < polynomial.coefficients.length; i++) {
         const coeff = polynomial.coefficients[i];
+        if (!coeff) {
+            throw new Error("Coefficient is undefined");
+        }
         const xPow = x ** BigInt(i) % polynomial.fieldModulus;
         result = (result + xPow * coeff) % polynomial.fieldModulus;
     }
@@ -55,7 +58,10 @@ export function fieldDiv(numerator, denominator, fieldModulus) {
 export function computerLagrangeCoefficients(index, points) {
     let numerator = 1n;
     let denominator = 1n;
-    let fieldModulus = points[0].fieldModulus;
+    let fieldModulus = points[0]?.fieldModulus;
+    if (!fieldModulus) {
+        throw new Error("Field modulus is undefined");
+    }
     for (const point of points) {
         if (point.index === index) {
             continue;
@@ -73,8 +79,10 @@ export function generatePolynomialForSecretSharing(fieldModulus, secret, degree)
     coefficients[0] = secret;
     proofs[0] = secp256k1.ProjectivePoint.fromPrivateKey(secret).toRawBytes(true);
     for (let i = 1; i < degree; i++) {
-        coefficients[i] = getRandomBigInt(fieldModulus);
-        proofs[i] = secp256k1.ProjectivePoint.fromPrivateKey(coefficients[i]).toRawBytes(true);
+        const coefficient = getRandomBigInt(fieldModulus);
+        coefficients[i] = coefficient;
+        proofs[i] =
+            secp256k1.ProjectivePoint.fromPrivateKey(coefficient).toRawBytes(true);
     }
     return {
         fieldModulus,
@@ -115,14 +123,21 @@ export function splitSecretWithProofs(secret, fieldModulus, threshold, numberOfS
 }
 // Recovers a secret from a list of shares
 export function recoverSecret(shares) {
-    if (shares.length < shares[0].threshold) {
+    if (shares.length === 0)
+        return 0n;
+    const threshold = shares[0]?.threshold;
+    const fieldModulus = shares[0]?.fieldModulus;
+    if (!threshold || !fieldModulus) {
+        throw new Error("Shares are not valid");
+    }
+    if (shares.length < threshold) {
         throw new Error("Not enough shares to recover secret");
     }
     let result = 0n;
     for (const share of shares) {
         const coeff = computerLagrangeCoefficients(share.index, shares);
-        const item = (share.share * coeff) % shares[0].fieldModulus;
-        result = (result + item) % shares[0].fieldModulus;
+        const item = (share.share * coeff) % fieldModulus;
+        result = (result + item) % fieldModulus;
     }
     return result;
 }
@@ -130,8 +145,14 @@ export function recoverSecret(shares) {
 export function validateShare(share) {
     const targetPubkey = secp256k1.ProjectivePoint.fromPrivateKey(share.share).toRawBytes(true);
     let resultPubkey = share.proofs[0];
+    if (!resultPubkey) {
+        throw new Error("Result pubkey is not valid");
+    }
     for (let i = 1; i < share.proofs.length; i++) {
         const pubkey = share.proofs[i];
+        if (!pubkey) {
+            throw new Error("Pubkey is not valid");
+        }
         const value = share.index ** BigInt(i) % share.fieldModulus;
         const scaledPoint = secp256k1.ProjectivePoint.fromHex(pubkey).multiply(value);
         resultPubkey = secp256k1.ProjectivePoint.fromHex(resultPubkey)

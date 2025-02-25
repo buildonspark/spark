@@ -56,26 +56,26 @@ import {
 import { initWasm } from "./utils/wasm-wrapper.js";
 import { InitOutput } from "./wasm/spark_bindings.js";
 
-type CreateLightningInvoiceParams = {
+export type CreateLightningInvoiceParams = {
   amountSats: number;
   expirySeconds: number;
   memo: string;
   invoiceCreator?: () => Promise<string>;
 };
 
-type PayLightningInvoiceParams = {
+export type PayLightningInvoiceParams = {
   invoice: string;
   amountSats?: number;
 };
 
-type SendTransferParams = {
+export type SendTransferParams = {
   amount?: number;
   leaves?: TreeNode[];
   receiverPubKey: Uint8Array;
   expiryTime?: Date;
 };
 
-type DepositParams = {
+export type DepositParams = {
   signingPubKey: Uint8Array;
   verifyingKey: Uint8Array;
   depositTx: Transaction;
@@ -169,10 +169,6 @@ export class SparkWallet {
         amount += leaf.value;
         nodes.push(leaf);
       }
-    }
-
-    if (amount < targetAmount) {
-      throw new Error("Not enough leaves to cover target amount");
     }
 
     if (amount !== targetAmount) {
@@ -317,7 +313,7 @@ export class SparkWallet {
         new Date(Date.now() + 10 * 60 * 1000)
       );
 
-    if (!transfer.leaves[0].leaf) {
+    if (!transfer.leaves[0]?.leaf) {
       throw new Error("Failed to get leaf");
     }
 
@@ -344,7 +340,7 @@ export class SparkWallet {
 
     for (let i = 1; i < transfer.leaves.length; i++) {
       const leaf = transfer.leaves[i];
-      if (!leaf.leaf) {
+      if (!leaf?.leaf) {
         throw new Error("Failed to get leaf");
       }
 
@@ -414,11 +410,22 @@ export class SparkWallet {
         throw new Error(`Expected 1 node, got ${nodesLength}`);
       }
 
+      if (!response.nodes[leaf.leafId]?.nodeTx) {
+        throw new Error(`Node tx not found for leaf ${leaf.leafId}`);
+      }
+
+      if (!response.nodes[leaf.leafId]?.verifyingPublicKey) {
+        throw new Error(`Node public key not found for leaf ${leaf.leafId}`);
+      }
+
+      // @ts-ignore - We do a null check above
       const nodeTx = getTxFromRawTxBytes(response.nodes[leaf.leafId].nodeTx);
       const refundTxBytes = hexToBytes(leaf.rawUnsignedRefundTransaction);
       const refundTx = getTxFromRawTxBytes(refundTxBytes);
       const sighash = getSigHashFromTx(refundTx, 0, nodeTx.getOutput(0));
-      const nodePublicKey = response.nodes[leaf.leafId].verifyingPublicKey;
+
+      // @ts-ignore - We do a null check above
+      const nodePublicKey = response.nodes[leaf.leafId]!.verifyingPublicKey;
 
       const taprootKey = computeTaprootKeyNoScript(nodePublicKey.slice(1));
       const adaptorSignatureBytes = hexToBytes(leaf.adaptorSignedSignature);
@@ -469,12 +476,12 @@ export class SparkWallet {
     return await this.depositService!.generateDepositAddress({ signingPubkey });
   }
 
-  public async finalizeDeposit(
-    signingPubKey: Uint8Array,
-    verifyingKey: Uint8Array,
-    depositTx: Transaction,
-    vout: number
-  ) {
+  public async finalizeDeposit({
+    signingPubKey,
+    verifyingKey,
+    depositTx,
+    vout,
+  }: DepositParams) {
     const response = await this.depositService!.createTreeRoot({
       signingPubKey,
       verifyingKey,
@@ -505,6 +512,7 @@ export class SparkWallet {
 
     const pendingTransfers = await this.transferService.queryPendingTransfers();
     if (pendingTransfers.transfers.length > 0) {
+      // @ts-ignore - We check the length, so the first element is guaranteed to exist
       return (await this.claimTransfer(pendingTransfers.transfers[0])).nodes;
     }
 

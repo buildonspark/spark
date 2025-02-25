@@ -1,3 +1,5 @@
+// @ts-nocheck
+
 import { bytesToHex, hexToBytes } from "@noble/curves/abstract/utils";
 import { generateMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english";

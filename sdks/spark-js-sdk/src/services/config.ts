@@ -31,8 +31,14 @@ export class WalletConfigService {
   }
 
   getCoordinatorAddress() {
-    return this.config.signingOperators[this.config.coodinatorIdentifier]
-      .address;
+    const coordinator =
+      this.config.signingOperators[this.config.coodinatorIdentifier];
+    if (!coordinator) {
+      throw new Error(
+        `Coordinator ${this.config.coodinatorIdentifier} not found`
+      );
+    }
+    return coordinator.address;
   }
 
   getConfig() {

@@ -1,3 +1,4 @@
+//@ts-nocheck
 import { describe, expect, it } from "@jest/globals";
 import { secp256k1 } from "@noble/curves/secp256k1";
 import { addPrivateKeys, addPublicKeys, applyAdditiveTweakToPublicKey, lastKeyWithTarget, subtractPrivateKeys, subtractPublicKeys, sumOfPrivateKeys, } from "../utils/keys.js";

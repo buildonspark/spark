@@ -7,21 +7,27 @@ import { TransferService } from "./services/transfer.js";
 import { DepositAddressTree } from "./services/tree-creation.js";
 import { SparkSigner } from "./signer/signer.js";
 import { Network } from "./utils/network.js";
-type CreateLightningInvoiceParams = {
+export type CreateLightningInvoiceParams = {
     amountSats: number;
     expirySeconds: number;
     memo: string;
     invoiceCreator?: () => Promise<string>;
 };
-type PayLightningInvoiceParams = {
+export type PayLightningInvoiceParams = {
     invoice: string;
     amountSats?: number;
 };
-type SendTransferParams = {
+export type SendTransferParams = {
     amount?: number;
     leaves?: TreeNode[];
     receiverPubKey: Uint8Array;
     expiryTime?: Date;
+};
+export type DepositParams = {
+    signingPubKey: Uint8Array;
+    verifyingKey: Uint8Array;
+    depositTx: Transaction;
+    vout: number;
 };
 export declare class SparkWallet {
     protected config: WalletConfigService;
@@ -55,7 +61,7 @@ export declare class SparkWallet {
     getBalance(): Promise<BigInt>;
     generatePublicKey(): Promise<string>;
     generateDepositAddress(signingPubkey: Uint8Array): Promise<GenerateDepositAddressResponse>;
-    finalizeDeposit(signingPubKey: Uint8Array, verifyingKey: Uint8Array, depositTx: Transaction, vout: number): Promise<TreeNode[] | undefined>;
+    finalizeDeposit({ signingPubKey, verifyingKey, depositTx, vout, }: DepositParams): Promise<TreeNode[] | undefined>;
     private transferDepositToSelf;
     sendTransfer({ amount, receiverPubKey, leaves, expiryTime, }: SendTransferParams): Promise<Transfer>;
     private claimTransfer;
@@ -76,4 +82,3 @@ export declare class SparkWallet {
     selectTokenLeaves(tokenPublicKey: string, tokenAmount: bigint): LeafWithPreviousTransactionData[];
     consolidateTokenLeaves(tokenPublicKey: string, selectedLeaves?: LeafWithPreviousTransactionData[], transferBackToIdentityPublicKey?: boolean): Promise<void>;
 }
-export {};

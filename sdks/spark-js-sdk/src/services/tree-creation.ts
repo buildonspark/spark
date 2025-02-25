@@ -259,8 +259,17 @@ export class TreeCreationService {
     addressNodes: AddressNode[]
   ) {
     for (let i = 0; i < tree.length; i++) {
+      if (!tree[i]) {
+        throw new Error("Tree or address node is undefined");
+      }
+      if (!addressNodes[i]) {
+        throw new Error("Address node is undefined");
+      }
+      // @ts-ignore
       tree[i].address = addressNodes[i].address?.address;
+      // @ts-ignore
       tree[i].verificationKey = addressNodes[i].address?.verifyingKey;
+      // @ts-ignore
       this.applyAddressNodesToTree(tree[i].children, addressNodes[i].children);
     }
   }
@@ -405,7 +414,7 @@ export class TreeCreationService {
 
     for (let i = 0; i < root.children.length; i++) {
       const child = root.children[i];
-      if (!child.address) {
+      if (!child || !child.address) {
         throw new Error("child address is undefined");
       }
       const childAddress = Address(getNetwork(network)).decode(child.address);
@@ -434,14 +443,20 @@ export class TreeCreationService {
     };
     rootCreationNode.nodeTxSigningCommitment = rootNodeSigningCommitment;
 
+    const leftChild = root.children[0];
+    const rightChild = root.children[1];
+    if (!leftChild || !rightChild) {
+      throw new Error("Root children are undefined");
+    }
+
     const leftChildCreationNode = await this.buildChildCreationNode(
-      root.children[0],
+      leftChild,
       rootNodeTx,
       0,
       network
     );
     const rightChildCreationNode = await this.buildChildCreationNode(
-      root.children[1],
+      rightChild,
       rootNodeTx,
       1,
       network
@@ -564,20 +579,38 @@ export class TreeCreationService {
       creationResultTreeRoot
     );
 
+    const firstRootChild = root.children[0];
+    const secondRootChild = root.children[1];
+    const firstRootChildCreationNode = rootCreationNode.children[0];
+    const secondRootChildCreationNode = rootCreationNode.children[1];
+    const firstRootChildCreationResult = creationResultTreeRoot.children[0];
+    const secondRootChildCreationResult = creationResultTreeRoot.children[1];
+    if (!firstRootChild || !secondRootChild) {
+      throw new Error("Root children are undefined");
+    }
+
+    if (!firstRootChildCreationNode || !secondRootChildCreationNode) {
+      throw new Error("Root child creation nodes are undefined");
+    }
+
+    if (!firstRootChildCreationResult || !secondRootChildCreationResult) {
+      throw new Error("Root child creation results are undefined");
+    }
+
     const leftChildSignature = await this.signNodeCreation(
       rootSignature.tx,
       0,
-      root.children[0],
-      rootCreationNode.children[0],
-      creationResultTreeRoot.children[0]
+      firstRootChild,
+      firstRootChildCreationNode,
+      firstRootChildCreationResult
     );
 
     const rightChildSignature = await this.signNodeCreation(
       rootSignature.tx,
       1,
-      root.children[1],
-      rootCreationNode.children[1],
-      creationResultTreeRoot.children[1]
+      secondRootChild,
+      secondRootChildCreationNode,
+      secondRootChildCreationResult
     );
 
     const signatures = [

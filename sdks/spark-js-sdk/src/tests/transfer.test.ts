@@ -1,3 +1,5 @@
+//@ts-nocheck
+
 import { describe, expect, it } from "@jest/globals";
 import {
   bytesToHex,
@@ -12,7 +14,6 @@ import { Network } from "../utils/network.js";
 import { createNewTree } from "./test-util.js";
 import { SparkWalletTesting } from "./utils/spark-testing-wallet.js";
 import { BitcoinFaucet } from "./utils/test-faucet.js";
-
 describe("Transfer", () => {
   // Skip all tests if running in GitHub Actions
   const testFn = process.env.GITHUB_ACTIONS ? it.skip : it;

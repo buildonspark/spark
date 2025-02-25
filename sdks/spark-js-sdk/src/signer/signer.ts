@@ -469,5 +469,5 @@ class DefaultSparkSigner implements SparkSigner {
     };
   }
 }
-
-export { DefaultSparkSigner, SparkSigner };
+export { DefaultSparkSigner };
+export type { SparkSigner };

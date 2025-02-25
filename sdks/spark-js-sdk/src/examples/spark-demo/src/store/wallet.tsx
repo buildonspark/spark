@@ -171,6 +171,7 @@ const useWalletStore = create<WalletStore>((set, get) => ({
     return invoice;
   },
   withdrawToBtc: async (address: string, amount: number) => {
+    console.log("withdrawing to btc", address, amount);
     const { wallet } = get();
     await wallet.coopExit(address, amount);
   },
@@ -255,12 +256,12 @@ export function useWallet() {
 
         if (depositTx) {
           try {
-            await wallet.createTreeRoot(
-              hexToBytes(btcAddressInfo[address].pubkey),
-              hexToBytes(btcAddressInfo[address].verifyingKey),
+            await wallet.finalizeDeposit({
+              signingPubKey: hexToBytes(btcAddressInfo[address].pubkey),
+              verifyingKey: hexToBytes(btcAddressInfo[address].verifyingKey),
               depositTx,
               vout,
-            );
+            });
 
             const updatedAddressInfo = { ...btcAddressInfo };
             delete updatedAddressInfo[address];

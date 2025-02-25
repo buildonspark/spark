@@ -2,7 +2,7 @@ import { bytesToHex, bytesToNumberBE, numberToBytesBE, } from "@noble/curves/abs
 import { secp256k1 } from "@noble/curves/secp256k1";
 import { validateResponses } from "../utils/response-validation.js";
 import { hashOperatorSpecificTokenTransactionSignablePayload, hashTokenTransaction, } from "../utils/token-hashing.js";
-import { recoverPrivateKeyFromKeyshares } from "../utils/token-keyshares.js";
+import { recoverPrivateKeyFromKeyshares, } from "../utils/token-keyshares.js";
 import { calculateAvailableTokenAmount, getTokenLeavesSum, } from "../utils/token-transactions.js";
 export class TokenTransactionService {
     config;
@@ -91,7 +91,11 @@ export class TokenTransactionService {
             }
             for (let i = 0; i < transferInput.leavesToSpend.length; i++) {
                 const leaf = transferInput.leavesToSpend[i];
-                const ownerSignature = await this.signMessageWithKey(partialTokenTransactionHash, leafToSpendSigningPublicKeys[i]);
+                const key = leafToSpendSigningPublicKeys[i];
+                if (!key) {
+                    throw new Error("key not found");
+                }
+                const ownerSignature = await this.signMessageWithKey(partialTokenTransactionHash, key);
                 ownerSignatures.push(ownerSignature);
             }
         }

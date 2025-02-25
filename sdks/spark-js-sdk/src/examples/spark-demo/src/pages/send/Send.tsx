@@ -116,11 +116,11 @@ export default function Send() {
 
         console.log("satsToSend", satsToSend);
         if (sendAddressNetwork === Network.LIGHTNING) {
-          // await payLightningInvoice(sendAddress);
+          await payLightningInvoice(sendAddress);
         } else if (sendAddressNetwork === Network.SPARK) {
-          // await sendTransfer(satsToSend, sendAddress);
+          await sendTransfer(satsToSend, sendAddress);
         } else if (sendAddressNetwork === Network.BITCOIN) {
-          // await withdrawToBtc(sendAddress, satsToSend);
+          await withdrawToBtc(sendAddress, satsToSend);
         } else if (sendAddressNetwork === Network.PHONE) {
           const response = await fetch(
             `https://api.dev.dev.sparkinfra.net/graphql/spark/rc`,

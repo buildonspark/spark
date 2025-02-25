@@ -1,3 +1,5 @@
+//@ts-nocheck
+
 import { describe, expect, it } from "@jest/globals";
 import { hexToBytes } from "@noble/curves/abstract/utils";
 import { secp256k1 } from "@noble/curves/secp256k1";

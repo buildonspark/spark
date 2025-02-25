@@ -7,6 +7,9 @@
     "dist"
   ],
   "type": "module",
+  "engines": {
+    "node": ">=16.0.0"
+  },
   "exports": {
     ".": {
       "types": "./dist/spark-sdk.d.ts",
@@ -29,9 +32,9 @@
       "import": "./dist/services/token-transactions.js"
     },
     "./wasm": {
-      "types": "./dist/wasm/wasm.d.ts",
-      "require": "./dist/wasm/wasm.js",
-      "import": "./dist/wasm/wasm.js"
+      "types": "./dist/wasm/spark-bindings.d.ts",
+      "require": "./dist/wasm/spark-bindings.js",
+      "import": "./dist/wasm/spark-bindings.js"
     },
     "./types": {
       "types": "./dist/types/index.d.ts",

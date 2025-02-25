@@ -100,7 +100,9 @@ export class DepositService {
       const operatorPubkey = operator.identityPublicKey;
       const operatorSig =
         address.depositAddressProof.addressSignatures[operator.identifier];
-
+      if (!operatorSig) {
+        throw new Error("operator signature not found");
+      }
       const sig = secp256k1.Signature.fromDER(operatorSig);
 
       const isVerified = secp256k1.verify(sig, addrHash, operatorPubkey);

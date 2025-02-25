@@ -106,6 +106,7 @@ export class BitcoinFaucet {
     const splitTxId = signedSplitTx.id;
     for (let i = 0; i < signedSplitTx.outputsLength; i++) {
       this.coins.push({
+        // @ts-ignore - It's a test file
         key: coinKeys[i],
         outpoint: {
           txid: hexToBytes(splitTxId),

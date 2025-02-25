@@ -1,3 +1,4 @@
+//@ts-nocheck
 import { describe, expect, it } from "@jest/globals";
 import { bytesToHex, equalBytes, hexToBytes, } from "@noble/curves/abstract/utils";
 import { sha256 } from "@scure/btc-signer/utils";
