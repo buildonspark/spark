@@ -262,6 +262,8 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 		if err != nil {
 			return nil, nil, fmt.Errorf("unable to verify refund tx signature: %v", err)
 		}
+	} else {
+		refundTxBytes = node.RawRefundTx
 	}
 
 	tree, err := node.QueryTree().Only(ctx)

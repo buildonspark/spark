@@ -249,7 +249,7 @@ func SigHashFromTx(tx *wire.MsgTx, inputIndex int, prevOutput *wire.TxOut) ([]by
 func UpdateTxWithSignature(rawTxBytes []byte, vin int, signature []byte) ([]byte, error) {
 	tx, err := TxFromRawTxBytes(rawTxBytes)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to parse tx: %v", err)
 	}
 	tx.TxIn[vin].Witness = wire.TxWitness{signature}
 	var buf bytes.Buffer

@@ -303,7 +303,8 @@ func RefreshTimelockNodes(
 	userSigningJobs := []*pbfrost.FrostSigningJob{}
 	jobToAggregateRequestMap := map[string]*pbfrost.AggregateFrostRequest{}
 	jobToNodeIDMap := map[string]string{}
-	jobToRefundMap := map[string]bool{}
+	refundJobID := ""
+	leafNodeJobID := ""
 	for i, signingResult := range response.SigningResults {
 		nonce := nonces[i]
 		signingJob := signingJobs[i]
@@ -315,17 +316,14 @@ func RefreshTimelockNodes(
 		// Get parent node for txout for sighash
 		var parentNode *pb.TreeNode
 		var node *pb.TreeNode
-		var refund bool
 		var vout int
 		if i == len(nodes) {
 			// Refund tx
 			node = nodes[i-1]
-			refund = true
 			parentNode = nodes[i-1]
 			vout = 0
 		} else {
 			node = nodes[i]
-			refund = false
 			parentNode = parentNodes[i]
 			vout = int(node.Vout)
 		}
@@ -351,6 +349,11 @@ func RefreshTimelockNodes(
 		userKeyPackage := CreateUserKeyPackage(signingPrivKey.Serialize())
 
 		userSigningJobID := uuid.New().String()
+		if i == len(nodes) {
+			refundJobID = userSigningJobID
+		} else if i == len(nodes)-1 {
+			leafNodeJobID = userSigningJobID
+		}
 
 		userSigningJobs = append(userSigningJobs, &pbfrost.FrostSigningJob{
 			JobId:           userSigningJobID,
@@ -373,7 +376,6 @@ func RefreshTimelockNodes(
 		}
 
 		jobToNodeIDMap[userSigningJobID] = node.Id
-		jobToRefundMap[userSigningJobID] = refund
 	}
 
 	frostConn, _ := common.NewGRPCConnectionWithoutTLS(config.FrostSignerAddress)
@@ -389,24 +391,38 @@ func RefreshTimelockNodes(
 
 	nodeSignatures := []*pb.NodeSignatures{}
 	for jobID, userSignature := range userSignatures.Results {
+		if jobID == refundJobID || jobID == leafNodeJobID {
+			continue
+		}
 		request := jobToAggregateRequestMap[jobID]
 		request.UserSignatureShare = userSignature.SignatureShare
 		response, err := frostClient.AggregateFrost(context.Background(), request)
 		if err != nil {
 			return err
 		}
-		if jobToRefundMap[jobID] {
-			nodeSignatures = append(nodeSignatures, &pb.NodeSignatures{
-				NodeId:            jobToNodeIDMap[jobID],
-				RefundTxSignature: response.Signature,
-			})
-		} else {
-			nodeSignatures = append(nodeSignatures, &pb.NodeSignatures{
-				NodeId:          jobToNodeIDMap[jobID],
-				NodeTxSignature: response.Signature,
-			})
-		}
+		nodeSignatures = append(nodeSignatures, &pb.NodeSignatures{
+			NodeId:          jobToNodeIDMap[jobID],
+			NodeTxSignature: response.Signature,
+		})
 	}
+
+	leafRequest := jobToAggregateRequestMap[leafNodeJobID]
+	leafRequest.UserSignatureShare = userSignatures.Results[leafNodeJobID].SignatureShare
+	leafResponse, err := frostClient.AggregateFrost(context.Background(), leafRequest)
+	if err != nil {
+		return err
+	}
+	refundRequest := jobToAggregateRequestMap[refundJobID]
+	refundRequest.UserSignatureShare = userSignatures.Results[refundJobID].SignatureShare
+	refundResponse, err := frostClient.AggregateFrost(context.Background(), refundRequest)
+	if err != nil {
+		return err
+	}
+	nodeSignatures = append(nodeSignatures, &pb.NodeSignatures{
+		NodeId:            jobToNodeIDMap[leafNodeJobID],
+		NodeTxSignature:   leafResponse.Signature,
+		RefundTxSignature: refundResponse.Signature,
+	})
 
 	_, err = sparkClient.FinalizeNodeSignatures(authCtx, &pb.FinalizeNodeSignaturesRequest{
 		Intent:         pbcommon.SignatureIntent_REFRESH,
