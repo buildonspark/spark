@@ -166,6 +166,7 @@ func (h *BaseTransferHandler) createTransfer(
 
 func loadLeaves(ctx context.Context, db *ent.Tx, leafRefundMap map[string][]byte) ([]*ent.TreeNode, error) {
 	leaves := make([]*ent.TreeNode, 0)
+	var network *schema.Network
 	for leafID := range leafRefundMap {
 		leafUUID, err := uuid.Parse(leafID)
 		if err != nil {
@@ -175,6 +176,15 @@ func loadLeaves(ctx context.Context, db *ent.Tx, leafRefundMap map[string][]byte
 		leaf, err := db.TreeNode.Get(ctx, leafUUID)
 		if err != nil || leaf == nil {
 			return nil, fmt.Errorf("unable to find leaf %s: %v", leafID, err)
+		}
+		tree, err := leaf.QueryTree().Only(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("unable to find tree for leaf %s: %v", leafID, err)
+		}
+		if network == nil {
+			network = &tree.Network
+		} else if tree.Network != *network {
+			return nil, fmt.Errorf("leaves sent for transfer must be on the same network")
 		}
 		leaves = append(leaves, leaf)
 	}
