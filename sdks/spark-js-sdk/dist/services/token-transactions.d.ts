@@ -5,7 +5,7 @@ export declare class TokenTransactionService {
     protected readonly config: WalletConfigService;
     protected readonly connectionManager: ConnectionManager;
     constructor(config: WalletConfigService, connectionManager: ConnectionManager);
-    constructTransferTokenTransaction(selectedLeaves: LeafWithPreviousTransactionData[], recipientPublicKey: Uint8Array, tokenPublicKey: Uint8Array, tokenAmount: bigint, transferBackToIdentityPublicKey?: boolean): Promise<TokenTransaction>;
+    constructTransferTokenTransaction(selectedLeaves: LeafWithPreviousTransactionData[], recipientPublicKey: Uint8Array, tokenPublicKey: Uint8Array, tokenAmount: bigint): Promise<TokenTransaction>;
     collectOperatorIdentityPublicKeys(): Uint8Array[];
     broadcastTokenTransaction(tokenTransaction: TokenTransaction, leafToSpendSigningPublicKeys?: Uint8Array[], leafToSpendRevocationPublicKeys?: Uint8Array[]): Promise<TokenTransaction>;
     finalizeTokenTransaction(finalTokenTransaction: TokenTransaction, leafToSpendRevocationKeys: Uint8Array[], threshold: number): Promise<TokenTransaction>;

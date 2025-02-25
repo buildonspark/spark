@@ -11,7 +11,7 @@ export class TokenTransactionService {
         this.config = config;
         this.connectionManager = connectionManager;
     }
-    async constructTransferTokenTransaction(selectedLeaves, recipientPublicKey, tokenPublicKey, tokenAmount, transferBackToIdentityPublicKey = false) {
+    async constructTransferTokenTransaction(selectedLeaves, recipientPublicKey, tokenPublicKey, tokenAmount) {
         let availableTokenAmount = calculateAvailableTokenAmount(selectedLeaves);
         if (availableTokenAmount === tokenAmount) {
             return {
@@ -53,9 +53,7 @@ export class TokenTransactionService {
                         tokenAmount: numberToBytesBE(tokenAmount, 16),
                     },
                     {
-                        ownerPublicKey: transferBackToIdentityPublicKey
-                            ? await this.config.signer.getIdentityPublicKey()
-                            : await this.config.signer.generatePublicKey(),
+                        ownerPublicKey: await this.config.signer.getIdentityPublicKey(),
                         tokenPublicKey: tokenPublicKey,
                         tokenAmount: numberToBytesBE(tokenAmountDifference, 16),
                     },

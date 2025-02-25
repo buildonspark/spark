@@ -56,6 +56,9 @@ import {
 import { initWasm } from "./utils/wasm-wrapper.js";
 import { InitOutput } from "./wasm/spark_bindings.js";
 
+// Add this constant at the file level
+const MAX_TOKEN_LEAVES = 100;
+
 export type CreateLightningInvoiceParams = {
   amountSats: number;
   expirySeconds: number;
@@ -937,7 +940,7 @@ export class SparkWallet {
 
   // ***** Token Flow *****
 
-  public async syncTokenLeaves() {
+  protected async syncTokenLeaves() {
     const trackedPublicKeys = await this.config.signer.getTrackedPublicKeys();
 
     const unsortedTokenLeaves =
@@ -954,6 +957,13 @@ export class SparkWallet {
         { ...leaf, previousTransactionVout: index },
       ]);
     });
+  }
+
+  public async getAllTokenLeaves(): Promise<
+    Map<string, LeafWithPreviousTransactionData[]>
+  > {
+    await this.syncTokenLeaves();
+    return this.tokenLeaves;
   }
 
   async getAllTokenBalances(): Promise<Map<string, bigint>> {
@@ -1003,6 +1013,10 @@ export class SparkWallet {
       selectedLeaves = this.selectTokenLeaves(tokenPublicKey, tokenAmount);
     }
 
+    if (selectedLeaves!.length > MAX_TOKEN_LEAVES) {
+      throw new Error("Too many leaves selected");
+    }
+
     const tokenTransaction =
       await this.tokenTransactionService.constructTransferTokenTransaction(
         selectedLeaves,
@@ -1011,16 +1025,11 @@ export class SparkWallet {
         tokenAmount
       );
 
-    const finalizedTokenTransaction =
-      await this.tokenTransactionService.broadcastTokenTransaction(
-        tokenTransaction,
-        selectedLeaves.map((leaf) => leaf.leaf!.ownerPublicKey),
-        selectedLeaves.map((leaf) => leaf.leaf!.revocationPublicKey!)
-      );
-
-    if (!this.tokenLeaves.has(tokenPublicKey)) {
-      this.tokenLeaves.set(tokenPublicKey, []);
-    }
+    await this.tokenTransactionService.broadcastTokenTransaction(
+      tokenTransaction,
+      selectedLeaves.map((leaf) => leaf.leaf!.ownerPublicKey),
+      selectedLeaves.map((leaf) => leaf.leaf!.revocationPublicKey!)
+    );
   }
 
   selectTokenLeaves(
@@ -1059,10 +1068,19 @@ export class SparkWallet {
     } else {
       // Get all available leaves
       selectedLeaves = this.tokenLeaves.get(tokenPublicKey)!;
+
+      // Limit to MAX_TOKEN_LEAVES if there are too many
+      if (selectedLeaves.length > MAX_TOKEN_LEAVES) {
+        selectedLeaves = selectedLeaves.slice(0, MAX_TOKEN_LEAVES);
+      }
     }
 
     if (selectedLeaves!.length === 1) {
       return;
+    }
+
+    if (selectedLeaves!.length > MAX_TOKEN_LEAVES) {
+      throw new Error("Too many leaves selected");
     }
 
     const partialTokenTransaction =
@@ -1072,15 +1090,10 @@ export class SparkWallet {
         transferBackToIdentityPublicKey
       );
 
-    const finalizedTokenTransaction =
-      await this.tokenTransactionService.broadcastTokenTransaction(
-        partialTokenTransaction,
-        selectedLeaves.map((leaf) => leaf.leaf!.ownerPublicKey),
-        selectedLeaves.map((leaf) => leaf.leaf!.revocationPublicKey!)
-      );
-
-    if (!this.tokenLeaves.has(tokenPublicKey)) {
-      this.tokenLeaves.set(tokenPublicKey, []);
-    }
+    await this.tokenTransactionService.broadcastTokenTransaction(
+      partialTokenTransaction,
+      selectedLeaves.map((leaf) => leaf.leaf!.ownerPublicKey),
+      selectedLeaves.map((leaf) => leaf.leaf!.revocationPublicKey!)
+    );
   }
 }

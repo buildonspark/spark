@@ -77,7 +77,8 @@ export declare class SparkWallet {
     createTree(vout: number, root: DepositAddressTree, createLeaves: boolean, parentTx?: Transaction, parentNode?: TreeNode): Promise<import("./proto/spark.js").FinalizeNodeSignaturesResponse>;
     coopExit(onchainAddress: string, targetAmountSats?: number): Promise<import("./graphql/objects/CoopExitRequest.js").default | null | undefined>;
     private getCoopExitFeeEstimate;
-    syncTokenLeaves(): Promise<void>;
+    protected syncTokenLeaves(): Promise<void>;
+    getAllTokenLeaves(): Promise<Map<string, LeafWithPreviousTransactionData[]>>;
     getAllTokenBalances(): Promise<Map<string, bigint>>;
     getTokenBalance(tokenPublicKey: string): Promise<bigint>;
     transferTokens(tokenPublicKey: string, tokenAmount: bigint, recipientPublicKey: string, selectedLeaves?: LeafWithPreviousTransactionData[]): Promise<void>;

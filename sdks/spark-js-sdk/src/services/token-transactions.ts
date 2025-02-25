@@ -42,8 +42,7 @@ export class TokenTransactionService {
     selectedLeaves: LeafWithPreviousTransactionData[],
     recipientPublicKey: Uint8Array,
     tokenPublicKey: Uint8Array,
-    tokenAmount: bigint,
-    transferBackToIdentityPublicKey: boolean = false
+    tokenAmount: bigint
   ): Promise<TokenTransaction> {
     let availableTokenAmount = calculateAvailableTokenAmount(selectedLeaves);
 
@@ -88,9 +87,7 @@ export class TokenTransactionService {
             tokenAmount: numberToBytesBE(tokenAmount, 16),
           },
           {
-            ownerPublicKey: transferBackToIdentityPublicKey
-              ? await this.config.signer.getIdentityPublicKey()
-              : await this.config.signer.generatePublicKey(),
+            ownerPublicKey: await this.config.signer.getIdentityPublicKey(),
             tokenPublicKey: tokenPublicKey,
             tokenAmount: numberToBytesBE(tokenAmountDifference, 16),
           },

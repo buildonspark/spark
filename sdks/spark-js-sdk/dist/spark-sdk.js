@@ -17,6 +17,8 @@ import { applyAdaptorToSignature, generateAdaptorFromSignature, generateSignatur
 import { computeTaprootKeyNoScript, getSigHashFromTx, getTxFromRawTxBytes, getTxFromRawTxHex, getTxId, } from "./utils/bitcoin.js";
 import { calculateAvailableTokenAmount, checkIfSelectedLeavesAreAvailable, } from "./utils/token-transactions.js";
 import { initWasm } from "./utils/wasm-wrapper.js";
+// Add this constant at the file level
+const MAX_TOKEN_LEAVES = 100;
 export class SparkWallet {
     config;
     connectionManager;
@@ -589,6 +591,10 @@ export class SparkWallet {
             ]);
         });
     }
+    async getAllTokenLeaves() {
+        await this.syncTokenLeaves();
+        return this.tokenLeaves;
+    }
     async getAllTokenBalances() {
         await this.syncTokenLeaves();
         const balances = new Map();
@@ -619,11 +625,11 @@ export class SparkWallet {
         else {
             selectedLeaves = this.selectTokenLeaves(tokenPublicKey, tokenAmount);
         }
-        const tokenTransaction = await this.tokenTransactionService.constructTransferTokenTransaction(selectedLeaves, recipientPublicKeyBytes, tokenPublicKeyBytes, tokenAmount);
-        const finalizedTokenTransaction = await this.tokenTransactionService.broadcastTokenTransaction(tokenTransaction, selectedLeaves.map((leaf) => leaf.leaf.ownerPublicKey), selectedLeaves.map((leaf) => leaf.leaf.revocationPublicKey));
-        if (!this.tokenLeaves.has(tokenPublicKey)) {
-            this.tokenLeaves.set(tokenPublicKey, []);
+        if (selectedLeaves.length > MAX_TOKEN_LEAVES) {
+            throw new Error("Too many leaves selected");
         }
+        const tokenTransaction = await this.tokenTransactionService.constructTransferTokenTransaction(selectedLeaves, recipientPublicKeyBytes, tokenPublicKeyBytes, tokenAmount);
+        await this.tokenTransactionService.broadcastTokenTransaction(tokenTransaction, selectedLeaves.map((leaf) => leaf.leaf.ownerPublicKey), selectedLeaves.map((leaf) => leaf.leaf.revocationPublicKey));
     }
     selectTokenLeaves(tokenPublicKey, tokenAmount) {
         return this.tokenTransactionService.selectTokenLeaves(this.tokenLeaves.get(tokenPublicKey), tokenAmount);
@@ -643,15 +649,19 @@ export class SparkWallet {
         else {
             // Get all available leaves
             selectedLeaves = this.tokenLeaves.get(tokenPublicKey);
+            // Limit to MAX_TOKEN_LEAVES if there are too many
+            if (selectedLeaves.length > MAX_TOKEN_LEAVES) {
+                selectedLeaves = selectedLeaves.slice(0, MAX_TOKEN_LEAVES);
+            }
         }
         if (selectedLeaves.length === 1) {
             return;
         }
-        const partialTokenTransaction = await this.tokenTransactionService.constructConsolidateTokenTransaction(selectedLeaves, tokenPublicKeyBytes, transferBackToIdentityPublicKey);
-        const finalizedTokenTransaction = await this.tokenTransactionService.broadcastTokenTransaction(partialTokenTransaction, selectedLeaves.map((leaf) => leaf.leaf.ownerPublicKey), selectedLeaves.map((leaf) => leaf.leaf.revocationPublicKey));
-        if (!this.tokenLeaves.has(tokenPublicKey)) {
-            this.tokenLeaves.set(tokenPublicKey, []);
+        if (selectedLeaves.length > MAX_TOKEN_LEAVES) {
+            throw new Error("Too many leaves selected");
         }
+        const partialTokenTransaction = await this.tokenTransactionService.constructConsolidateTokenTransaction(selectedLeaves, tokenPublicKeyBytes, transferBackToIdentityPublicKey);
+        await this.tokenTransactionService.broadcastTokenTransaction(partialTokenTransaction, selectedLeaves.map((leaf) => leaf.leaf.ownerPublicKey), selectedLeaves.map((leaf) => leaf.leaf.revocationPublicKey));
     }
 }
 //# sourceMappingURL=spark-sdk.js.map
