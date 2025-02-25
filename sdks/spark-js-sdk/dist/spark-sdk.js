@@ -532,6 +532,7 @@ export class SparkWallet {
         return calculateAvailableTokenAmount(this.tokenLeaves.get(tokenPublicKey));
     }
     async transferTokens(tokenPublicKey, tokenAmount, recipientPublicKey, selectedLeaves) {
+        await this.syncTokenLeaves();
         if (!this.tokenLeaves.has(tokenPublicKey)) {
             throw new Error("No token leaves with the given tokenPublicKey");
         }
@@ -543,7 +544,6 @@ export class SparkWallet {
             }
         }
         else {
-            await this.syncTokenLeaves();
             selectedLeaves = this.selectTokenLeaves(tokenPublicKey, tokenAmount);
         }
         const tokenTransaction = await this.tokenTransactionService.constructTransferTokenTransaction(selectedLeaves, recipientPublicKeyBytes, tokenPublicKeyBytes, tokenAmount);
@@ -558,10 +558,11 @@ export class SparkWallet {
     }
     // If no leaves are passed in, it will take all the leaves available for the given tokenPublicKey
     async consolidateTokenLeaves(tokenPublicKey, selectedLeaves, transferBackToIdentityPublicKey = false) {
+        await this.syncTokenLeaves();
+        const tokenPublicKeyBytes = hexToBytes(tokenPublicKey);
         if (!this.tokenLeaves.has(tokenPublicKey)) {
             throw new Error("No token leaves with the given tokenPublicKey");
         }
-        const tokenPublicKeyBytes = hexToBytes(tokenPublicKey);
         if (selectedLeaves) {
             if (!checkIfSelectedLeavesAreAvailable(selectedLeaves, this.tokenLeaves, tokenPublicKeyBytes)) {
                 throw new Error("One or more selected leaves are not available");

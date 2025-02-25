@@ -885,6 +885,7 @@ export class SparkWallet {
     recipientPublicKey: string,
     selectedLeaves?: LeafWithPreviousTransactionData[]
   ) {
+    await this.syncTokenLeaves();
     if (!this.tokenLeaves.has(tokenPublicKey)) {
       throw new Error("No token leaves with the given tokenPublicKey");
     }
@@ -903,7 +904,6 @@ export class SparkWallet {
         throw new Error("One or more selected leaves are not available");
       }
     } else {
-      await this.syncTokenLeaves();
       selectedLeaves = this.selectTokenLeaves(tokenPublicKey, tokenAmount);
     }
 
@@ -947,11 +947,12 @@ export class SparkWallet {
     selectedLeaves?: LeafWithPreviousTransactionData[],
     transferBackToIdentityPublicKey: boolean = false
   ) {
+    await this.syncTokenLeaves();
+    const tokenPublicKeyBytes = hexToBytes(tokenPublicKey);
+
     if (!this.tokenLeaves.has(tokenPublicKey)) {
       throw new Error("No token leaves with the given tokenPublicKey");
     }
-
-    const tokenPublicKeyBytes = hexToBytes(tokenPublicKey);
 
     if (selectedLeaves) {
       if (

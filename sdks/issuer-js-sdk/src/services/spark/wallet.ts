@@ -70,6 +70,7 @@ export class IssuerSparkWallet extends SparkWallet {
     tokenAmount: bigint,
     selectedLeaves?: LeafWithPreviousTransactionData[]
   ) {
+    await this.syncTokenLeaves();
     const tokenPublicKey = await super.getIdentityPublicKey();
 
     if (!this.tokenLeaves.has(tokenPublicKey)) {
@@ -118,6 +119,7 @@ export class IssuerSparkWallet extends SparkWallet {
   }
 
   async freezeIssuerTokens(ownerPublicKey: string) {
+    await this.syncTokenLeaves();
     const tokenPublicKey = await super.getIdentityPublicKey();
 
     const response = await this.tokenFreezeService!.freezeTokens(
@@ -135,6 +137,7 @@ export class IssuerSparkWallet extends SparkWallet {
   }
 
   async unfreezeIssuerTokens(ownerPublicKey: string) {
+    await this.syncTokenLeaves();
     const tokenPublicKey = await super.getIdentityPublicKey();
 
     const response = await this.tokenFreezeService!.unfreezeTokens(
