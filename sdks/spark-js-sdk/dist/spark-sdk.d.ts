@@ -79,8 +79,14 @@ export declare class SparkWallet {
     private getCoopExitFeeEstimate;
     protected syncTokenLeaves(): Promise<void>;
     getAllTokenLeaves(): Promise<Map<string, LeafWithPreviousTransactionData[]>>;
-    getAllTokenBalances(): Promise<Map<string, bigint>>;
-    getTokenBalance(tokenPublicKey: string): Promise<bigint>;
+    getTokenBalance(tokenPublicKey: string): Promise<{
+        balance: bigint;
+        leafCount: number;
+    }>;
+    getAllTokenBalances(): Promise<Map<string, {
+        balance: bigint;
+        leafCount: number;
+    }>>;
     transferTokens(tokenPublicKey: string, tokenAmount: bigint, recipientPublicKey: string, selectedLeaves?: LeafWithPreviousTransactionData[]): Promise<string>;
     private selectTokenLeaves;
     consolidateTokenLeaves(tokenPublicKey: string, selectedLeaves?: LeafWithPreviousTransactionData[]): Promise<string>;

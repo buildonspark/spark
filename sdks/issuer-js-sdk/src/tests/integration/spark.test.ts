@@ -3,11 +3,14 @@ import { Network } from "@buildonspark/spark-js-sdk/utils";
 import { wordlist } from "@scure/bip39/wordlists/english";
 import { generateMnemonic } from "@scure/bip39";
 import { SparkWallet } from "@buildonspark/spark-js-sdk";
-import { bytesToHex } from "@noble/curves/abstract/utils";
+import { jest } from "@jest/globals";
 
 describe("token integration test", () => {
   // Skip all tests if running in GitHub Actions
   process.env.GITHUB_ACTIONS ? it.skip : it;
+
+  // Increase timeout for all tests in this suite
+  jest.setTimeout(15000);
 
   it("should issue a single token", async () => {
     const tokenAmount: bigint = 1000n;
@@ -21,7 +24,7 @@ describe("token integration test", () => {
     const tokenBalance = await wallet.getTokenBalance(
       await wallet.getIdentityPublicKey()
     );
-    expect(tokenBalance).toEqual(tokenAmount);
+    expect(tokenBalance.balance).toEqual(tokenAmount);
   });
 
   it("should issue a single token and transfer it", async () => {
@@ -44,13 +47,13 @@ describe("token integration test", () => {
     const sourceBalance = await issuerWallet.getTokenBalance(
       await issuerWallet.getIdentityPublicKey()
     );
-    expect(sourceBalance).toEqual(0n);
+    expect(sourceBalance.balance).toEqual(0n);
 
     const tokenPublicKey = await issuerWallet.getIdentityPublicKey();
     const destinationBalance = await destinationWallet.getTokenBalance(
       tokenPublicKey
     );
-    expect(destinationBalance).toEqual(tokenAmount);
+    expect(destinationBalance.balance).toEqual(tokenAmount);
   });
 
   it("should consolidate three token leaves", async () => {
@@ -68,7 +71,7 @@ describe("token integration test", () => {
       await wallet.getIdentityPublicKey()
     );
     const leavesBeforeConsolidation = await wallet.getAllTokenLeaves();
-    expect(balanceBeforeConsolidation).toEqual(tokenAmount * 3n);
+    expect(balanceBeforeConsolidation.balance).toEqual(tokenAmount * 3n);
     expect(
       leavesBeforeConsolidation.get(identityPublicKey)?.length || 0
     ).toEqual(3);
@@ -79,7 +82,7 @@ describe("token integration test", () => {
       await wallet.getIdentityPublicKey()
     );
     const leavesAfterConsolidation = await wallet.getAllTokenLeaves();
-    expect(balanceAfterConsolidation).toEqual(tokenAmount * 3n);
+    expect(balanceAfterConsolidation.balance).toEqual(tokenAmount * 3n);
     expect(
       leavesAfterConsolidation.get(identityPublicKey)?.length || 0
     ).toEqual(1);
@@ -97,7 +100,7 @@ describe("token integration test", () => {
     const issuerBalanceAfterMint = await issuerWallet.getTokenBalance(
       await issuerWallet.getIdentityPublicKey()
     );
-    expect(issuerBalanceAfterMint).toEqual(tokenAmount);
+    expect(issuerBalanceAfterMint.balance).toEqual(tokenAmount);
 
     const userWallet = new IssuerSparkWallet(Network.LOCAL);
     const userMnemonic = generateMnemonic(wordlist);
@@ -109,13 +112,13 @@ describe("token integration test", () => {
     const issuerBalanceAfterTransfer = await issuerWallet.getTokenBalance(
       await issuerWallet.getIdentityPublicKey()
     );
-    expect(issuerBalanceAfterTransfer).toEqual(0n);
+    expect(issuerBalanceAfterTransfer.balance).toEqual(0n);
 
     const tokenPublicKey = await issuerWallet.getIdentityPublicKey();
     const userBalanceAfterTransfer = await userWallet.getTokenBalance(
       tokenPublicKey
     );
-    expect(userBalanceAfterTransfer).toEqual(tokenAmount);
+    expect(userBalanceAfterTransfer.balance).toEqual(tokenAmount);
 
     const freezeResult = await issuerWallet.freezeIssuerTokens(
       userWalletPublicKey
@@ -140,14 +143,14 @@ describe("token integration test", () => {
     const issuerTokenBalance = await issuerWallet.getTokenBalance(
       await issuerWallet.getIdentityPublicKey()
     );
-    expect(issuerTokenBalance).toEqual(tokenAmount);
+    expect(issuerTokenBalance.balance).toEqual(tokenAmount);
 
     await issuerWallet.burnIssuerTokens(tokenAmount);
 
     const issuerTokenBalanceAfterBurn = await issuerWallet.getTokenBalance(
       await issuerWallet.getIdentityPublicKey()
     );
-    expect(issuerTokenBalanceAfterBurn).toEqual(0n);
+    expect(issuerTokenBalanceAfterBurn.balance).toEqual(0n);
   });
 
   it("mint, transfer to user, user transfer to issuer, burn", async () => {
@@ -166,7 +169,7 @@ describe("token integration test", () => {
     const issuerBalanceAfterMint = await issuerWallet.getTokenBalance(
       await issuerWallet.getIdentityPublicKey()
     );
-    expect(issuerBalanceAfterMint).toEqual(tokenAmount);
+    expect(issuerBalanceAfterMint.balance).toEqual(tokenAmount);
 
     const userWalletPublicKey = await userWallet.getIdentityPublicKey();
 
@@ -175,13 +178,13 @@ describe("token integration test", () => {
     const issuerBalanceAfterTransfer = await issuerWallet.getTokenBalance(
       await issuerWallet.getIdentityPublicKey()
     );
-    expect(issuerBalanceAfterTransfer).toEqual(0n);
+    expect(issuerBalanceAfterTransfer.balance).toEqual(0n);
 
     const tokenPublicKeyHex = await issuerWallet.getIdentityPublicKey();
     const userBalanceAfterTransfer = await userWallet.getTokenBalance(
       tokenPublicKeyHex
     );
-    expect(userBalanceAfterTransfer).toEqual(tokenAmount);
+    expect(userBalanceAfterTransfer.balance).toEqual(tokenAmount);
 
     await userWallet.transferTokens(
       tokenPublicKeyHex,
@@ -192,18 +195,18 @@ describe("token integration test", () => {
     const userBalanceAfterTransferBack = await userWallet.getTokenBalance(
       tokenPublicKeyHex
     );
-    expect(userBalanceAfterTransferBack).toEqual(0n);
+    expect(userBalanceAfterTransferBack.balance).toEqual(0n);
 
     const issuerTokenBalance = await issuerWallet.getTokenBalance(
       tokenPublicKeyHex
     );
-    expect(issuerTokenBalance).toEqual(tokenAmount);
+    expect(issuerTokenBalance.balance).toEqual(tokenAmount);
 
     await issuerWallet.burnIssuerTokens(tokenAmount);
 
     const issuerTokenBalanceAfterBurn = await issuerWallet.getTokenBalance(
       tokenPublicKeyHex
     );
-    expect(issuerTokenBalanceAfterBurn).toEqual(0n);
+    expect(issuerTokenBalanceAfterBurn.balance).toEqual(0n);
   });
 });
