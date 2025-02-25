@@ -620,16 +620,22 @@ func (h *LightningHandler) QueryUserSignedRefunds(ctx context.Context, req *pb.Q
 		if err != nil {
 			return nil, fmt.Errorf("unable to unmarshal user signed refund: %v", err)
 		}
-		treeNode, err := userSignedRefund.QueryTreeNode().Only(ctx)
+		treeNode, err := userSignedRefund.QueryTreeNode().WithTree().Only(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("unable to get tree node: %v", err)
 		}
+		networkProto, err := treeNode.Edges.Tree.Network.MarshalProto()
+		if err != nil {
+			return nil, fmt.Errorf("unable to marshal network: %v", err)
+		}
+
 		protos[i] = &pb.UserSignedRefund{
 			NodeId:                  treeNode.ID.String(),
 			RefundTx:                userSignedRefund.Transaction,
 			UserSignature:           userSignedRefund.UserSignature,
 			SigningCommitments:      signingCommitments,
 			UserSignatureCommitment: userSigningCommitment,
+			Network:                 networkProto,
 		}
 	}
 	return &pb.QueryUserSignedRefundsResponse{UserSignedRefunds: protos}, nil

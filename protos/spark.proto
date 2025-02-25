@@ -455,6 +455,7 @@ message UserSignedRefund {
     bytes user_signature = 3;
     SigningCommitments signing_commitments = 4;
     common.SigningCommitment user_signature_commitment = 5;
+    Network network = 6;
 }
 
 message InvoiceAmountProof {
