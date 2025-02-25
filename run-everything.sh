@@ -192,7 +192,7 @@ run_lrcd_tmux() {
         rpc_address="127.0.0.1:1833${i}"
         grpc_address="127.0.0.1:1853${i}"
         p2p_address="0.0.0.0:800${i}"
-        storage_path="./.yuvd/node_$i"
+        storage_path="./lrc20/node_$i"
         db="postgresql://127.0.0.1:5432/lrc20_${i}?sslmode=disable"
         bootnodes="$(generate_lrcd_bootnodes "800${i}")"
 
@@ -207,7 +207,7 @@ run_lrcd_tmux() {
             lrcd.template.config.toml >"$temp_config_file"
         local log_file="${run_dir}/logs/lrcd_${i}.log"
 
-        local cmd="cd lrc20.dev && DATABASE_URL=$db sqlx migrate run --source ./crates/storage/src/migrations && cargo run -p yuvd --release -- run --config ../$temp_config_file 2>&1 | tee '${log_file}'"
+        local cmd="cd lrc20.dev && DATABASE_URL=$db sqlx migrate run --source ./crates/storage/src/migrations && cargo run -p lrc20d --release -- run --config ../$temp_config_file 2>&1 | tee '${log_file}'"
 
         tmux send-keys -t "$session_name" "$cmd" C-m
     done
