@@ -521,8 +521,18 @@ export class SparkWallet {
         unsortedTokenLeaves.forEach((leaf) => {
             const tokenKey = bytesToHex(leaf.leaf.tokenPublicKey);
             const index = leaf.previousTransactionVout;
-            this.tokenLeaves.set(tokenKey, [{ ...leaf, previousTransactionVout: index }]);
+            this.tokenLeaves.set(tokenKey, [
+                { ...leaf, previousTransactionVout: index },
+            ]);
         });
+    }
+    async getAllTokenBalances() {
+        await this.syncTokenLeaves();
+        const balances = new Map();
+        for (const [tokenPublicKey, leaves] of this.tokenLeaves.entries()) {
+            balances.set(tokenPublicKey, calculateAvailableTokenAmount(leaves));
+        }
+        return balances;
     }
     async getTokenBalance(tokenPublicKey) {
         await this.syncTokenLeaves();

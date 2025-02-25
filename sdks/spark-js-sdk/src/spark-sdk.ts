@@ -855,17 +855,30 @@ export class SparkWallet {
   public async syncTokenLeaves() {
     const trackedPublicKeys = await this.config.signer.getTrackedPublicKeys();
 
-    const unsortedTokenLeaves = await this.tokenTransactionService.fetchOwnedTokenLeaves(
-      [...trackedPublicKeys, await this.config.signer.getIdentityPublicKey()],
-      []
-    );
+    const unsortedTokenLeaves =
+      await this.tokenTransactionService.fetchOwnedTokenLeaves(
+        [...trackedPublicKeys, await this.config.signer.getIdentityPublicKey()],
+        []
+      );
 
     unsortedTokenLeaves.forEach((leaf) => {
       const tokenKey = bytesToHex(leaf.leaf!.tokenPublicKey!);
       const index = leaf.previousTransactionVout!;
 
-      this.tokenLeaves.set(tokenKey, [{ ...leaf, previousTransactionVout: index }]);
+      this.tokenLeaves.set(tokenKey, [
+        { ...leaf, previousTransactionVout: index },
+      ]);
     });
+  }
+
+  async getAllTokenBalances(): Promise<Map<string, bigint>> {
+    await this.syncTokenLeaves();
+
+    const balances = new Map<string, bigint>();
+    for (const [tokenPublicKey, leaves] of this.tokenLeaves.entries()) {
+      balances.set(tokenPublicKey, calculateAvailableTokenAmount(leaves));
+    }
+    return balances;
   }
 
   async getTokenBalance(tokenPublicKey: string) {
@@ -874,9 +887,7 @@ export class SparkWallet {
     if (!this.tokenLeaves.has(tokenPublicKey)) {
       throw new Error("No token leaves with the given tokenPublicKey");
     }
-    return calculateAvailableTokenAmount(
-      this.tokenLeaves.get(tokenPublicKey)!
-    );
+    return calculateAvailableTokenAmount(this.tokenLeaves.get(tokenPublicKey)!);
   }
 
   async transferTokens(
