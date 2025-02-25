@@ -9103,13 +9103,100 @@ export const QueryUnusedDepositAddressesRequest = {
         return message;
     },
 };
+function createBaseDepositAddressQueryResult() {
+    return { depositAddress: "", userSigningPublicKey: new Uint8Array(0), verifyingPublicKey: new Uint8Array(0) };
+}
+export const DepositAddressQueryResult = {
+    encode(message, writer = new BinaryWriter()) {
+        if (message.depositAddress !== "") {
+            writer.uint32(10).string(message.depositAddress);
+        }
+        if (message.userSigningPublicKey.length !== 0) {
+            writer.uint32(18).bytes(message.userSigningPublicKey);
+        }
+        if (message.verifyingPublicKey.length !== 0) {
+            writer.uint32(26).bytes(message.verifyingPublicKey);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseDepositAddressQueryResult();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1: {
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.depositAddress = reader.string();
+                    continue;
+                }
+                case 2: {
+                    if (tag !== 18) {
+                        break;
+                    }
+                    message.userSigningPublicKey = reader.bytes();
+                    continue;
+                }
+                case 3: {
+                    if (tag !== 26) {
+                        break;
+                    }
+                    message.verifyingPublicKey = reader.bytes();
+                    continue;
+                }
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skip(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            depositAddress: isSet(object.depositAddress) ? globalThis.String(object.depositAddress) : "",
+            userSigningPublicKey: isSet(object.userSigningPublicKey)
+                ? bytesFromBase64(object.userSigningPublicKey)
+                : new Uint8Array(0),
+            verifyingPublicKey: isSet(object.verifyingPublicKey)
+                ? bytesFromBase64(object.verifyingPublicKey)
+                : new Uint8Array(0),
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.depositAddress !== "") {
+            obj.depositAddress = message.depositAddress;
+        }
+        if (message.userSigningPublicKey.length !== 0) {
+            obj.userSigningPublicKey = base64FromBytes(message.userSigningPublicKey);
+        }
+        if (message.verifyingPublicKey.length !== 0) {
+            obj.verifyingPublicKey = base64FromBytes(message.verifyingPublicKey);
+        }
+        return obj;
+    },
+    create(base) {
+        return DepositAddressQueryResult.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseDepositAddressQueryResult();
+        message.depositAddress = object.depositAddress ?? "";
+        message.userSigningPublicKey = object.userSigningPublicKey ?? new Uint8Array(0);
+        message.verifyingPublicKey = object.verifyingPublicKey ?? new Uint8Array(0);
+        return message;
+    },
+};
 function createBaseQueryUnusedDepositAddressesResponse() {
     return { depositAddresses: [] };
 }
 export const QueryUnusedDepositAddressesResponse = {
     encode(message, writer = new BinaryWriter()) {
         for (const v of message.depositAddresses) {
-            writer.uint32(10).string(v);
+            DepositAddressQueryResult.encode(v, writer.uint32(10).fork()).join();
         }
         return writer;
     },
@@ -9124,7 +9211,7 @@ export const QueryUnusedDepositAddressesResponse = {
                     if (tag !== 10) {
                         break;
                     }
-                    message.depositAddresses.push(reader.string());
+                    message.depositAddresses.push(DepositAddressQueryResult.decode(reader, reader.uint32()));
                     continue;
                 }
             }
@@ -9138,14 +9225,14 @@ export const QueryUnusedDepositAddressesResponse = {
     fromJSON(object) {
         return {
             depositAddresses: globalThis.Array.isArray(object?.depositAddresses)
-                ? object.depositAddresses.map((e) => globalThis.String(e))
+                ? object.depositAddresses.map((e) => DepositAddressQueryResult.fromJSON(e))
                 : [],
         };
     },
     toJSON(message) {
         const obj = {};
         if (message.depositAddresses?.length) {
-            obj.depositAddresses = message.depositAddresses;
+            obj.depositAddresses = message.depositAddresses.map((e) => DepositAddressQueryResult.toJSON(e));
         }
         return obj;
     },
@@ -9154,7 +9241,7 @@ export const QueryUnusedDepositAddressesResponse = {
     },
     fromPartial(object) {
         const message = createBaseQueryUnusedDepositAddressesResponse();
-        message.depositAddresses = object.depositAddresses?.map((e) => e) || [];
+        message.depositAddresses = object.depositAddresses?.map((e) => DepositAddressQueryResult.fromPartial(e)) || [];
         return message;
     },
 };

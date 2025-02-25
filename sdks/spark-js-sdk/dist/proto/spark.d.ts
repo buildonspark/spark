@@ -639,8 +639,13 @@ export interface QueryAllTransfersResponse {
 export interface QueryUnusedDepositAddressesRequest {
     identityPublicKey: Uint8Array;
 }
+export interface DepositAddressQueryResult {
+    depositAddress: string;
+    userSigningPublicKey: Uint8Array;
+    verifyingPublicKey: Uint8Array;
+}
 export interface QueryUnusedDepositAddressesResponse {
-    depositAddresses: string[];
+    depositAddresses: DepositAddressQueryResult[];
 }
 export declare const DepositAddressProof: MessageFns<DepositAddressProof>;
 export declare const DepositAddressProof_AddressSignaturesEntry: MessageFns<DepositAddressProof_AddressSignaturesEntry>;
@@ -749,6 +754,7 @@ export declare const CancelSendTransferResponse: MessageFns<CancelSendTransferRe
 export declare const QueryAllTransfersRequest: MessageFns<QueryAllTransfersRequest>;
 export declare const QueryAllTransfersResponse: MessageFns<QueryAllTransfersResponse>;
 export declare const QueryUnusedDepositAddressesRequest: MessageFns<QueryUnusedDepositAddressesRequest>;
+export declare const DepositAddressQueryResult: MessageFns<DepositAddressQueryResult>;
 export declare const QueryUnusedDepositAddressesResponse: MessageFns<QueryUnusedDepositAddressesResponse>;
 export type SparkServiceDefinition = typeof SparkServiceDefinition;
 export declare const SparkServiceDefinition: {

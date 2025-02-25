@@ -299,6 +299,63 @@ export class SparkWallet {
         });
         return await this.transferDepositToSelf(response.nodes, signingPubKey);
     }
+    async claimDeposits() {
+        const sparkClient = await this.connectionManager.createSparkClient(this.config.getCoordinatorAddress());
+        const identityPublicKey = await this.config.signer.getIdentityPublicKey();
+        const deposits = await sparkClient.query_unused_deposit_addresses({
+            identityPublicKey,
+        });
+        const depositNodes = [];
+        for (const deposit of deposits.depositAddresses) {
+            const tx = await this.queryMempoolTxs(deposit.depositAddress);
+            if (!tx) {
+                continue;
+            }
+            const { depositTx, vout } = tx;
+            const nodes = await this.finalizeDeposit({
+                signingPubKey: deposit.userSigningPublicKey,
+                verifyingKey: deposit.verifyingPublicKey,
+                depositTx,
+                vout,
+            });
+            if (nodes) {
+                depositNodes.push(...nodes);
+            }
+        }
+        return depositNodes;
+    }
+    async queryMempoolTxs(address) {
+        const baseUrl = "https://regtest-mempool.dev.dev.sparkinfra.net/api";
+        const auth = btoa("lightspark:TFNR6ZeLdxF9HejW");
+        const response = await fetch(`${baseUrl}/address/${address}/txs`, {
+            headers: {
+                Authorization: `Basic ${auth}`,
+                "Content-Type": "application/json",
+            },
+        });
+        const addressTxs = await response.json();
+        if (addressTxs && addressTxs.length > 0) {
+            console.log("Found transaction");
+            const latestTx = addressTxs[0];
+            const outputIndex = latestTx.vout.findIndex((output) => output.scriptpubkey_address === address);
+            if (outputIndex === -1) {
+                return null;
+            }
+            const txResponse = await fetch(`${baseUrl}/tx/${latestTx.txid}/hex`, {
+                headers: {
+                    Authorization: `Basic ${auth}`,
+                    "Content-Type": "application/json",
+                },
+            });
+            const txHex = await txResponse.text();
+            const depositTx = getTxFromRawTxHex(txHex);
+            return {
+                depositTx,
+                vout: outputIndex,
+            };
+        }
+        return null;
+    }
     async transferDepositToSelf(leaves, signingPubKey) {
         const leafKeyTweaks = await Promise.all(leaves.map(async (leaf) => ({
             leaf,

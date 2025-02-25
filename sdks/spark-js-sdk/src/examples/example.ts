@@ -1,10 +1,8 @@
 // @ts-nocheck
 
-import { bytesToHex, hexToBytes } from "@noble/curves/abstract/utils";
+import { hexToBytes } from "@noble/curves/abstract/utils";
 import { generateMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english";
-import { Transaction } from "@scure/btc-signer";
-import { Buffer } from "buffer";
 import readline from "readline";
 import { SparkWallet } from "../../dist/spark-sdk";
 import { getTxFromRawTxHex } from "../../dist/utils/bitcoin";
@@ -24,7 +22,7 @@ async function runCLI() {
   Available commands:
   genmnemonic                                     - Generate a new mnemonic
   initwallet <mnemonic>                           - Create a new wallet from a mnemonic
-  gendepositaddr                                  - Generate a new deposit address
+  gendepositaddr                                  - Generate a new deposit address, will poll to auto claim
   completedeposit <pubkey> <verifyingKey> <rawtx> - Complete a deposit
   createinvoice <amount> <memo>                   - Create a new lightning invoice
   payinvoice <invoice> <amount>
@@ -77,82 +75,18 @@ async function runCLI() {
         const leafPubKey = hexToBytes(await wallet.generatePublicKey());
         const depositAddress = await wallet.generateDepositAddress(leafPubKey);
         console.log("Deposit address:", depositAddress.depositAddress?.address);
-        console.log(
-          "Verifying key:",
-          typeof depositAddress.depositAddress?.verifyingKey === "object"
-            ? Buffer.from(depositAddress.depositAddress.verifyingKey).toString(
-                "hex"
-              )
-            : depositAddress.depositAddress?.verifyingKey
-        );
-        console.log("Pubkey:", bytesToHex(leafPubKey));
         if (!depositAddress.depositAddress) {
           console.log("No deposit address");
           break;
         }
 
         while (true) {
-          let depositTx: Transaction | null = null;
-          let vout = 0;
-          try {
-            const baseUrl =
-              "https://regtest-mempool.dev.dev.sparkinfra.net/api";
-            const auth = btoa("lightspark:TFNR6ZeLdxF9HejW");
-
-            const response = await fetch(
-              `${baseUrl}/address/${depositAddress.depositAddress.address}/txs`,
-              {
-                headers: {
-                  Authorization: `Basic ${auth}`,
-                  "Content-Type": "application/json",
-                },
-              }
-            );
-
-            const addressTxs = await response.json();
-
-            if (addressTxs && addressTxs.length > 0) {
-              const latestTx = addressTxs[0];
-
-              // // Find our output
-              const outputIndex = latestTx.vout.findIndex(
-                (output: any) =>
-                  output.scriptpubkey_address ===
-                  depositAddress.depositAddress?.address
-              );
-
-              if (outputIndex === -1) {
-                return null;
-              }
-
-              const txResponse = await fetch(
-                `${baseUrl}/tx/${latestTx.txid}/hex`,
-                {
-                  headers: {
-                    Authorization: `Basic ${auth}`,
-                    "Content-Type": "application/json",
-                  },
-                }
-              );
-              const txHex = await txResponse.text();
-              depositTx = getTxFromRawTxHex(txHex);
-              vout = outputIndex;
-            }
-          } catch (error) {
-            throw error;
-          }
-
-          if (depositTx) {
-            const nodes = await wallet.finalizeDeposit(
-              leafPubKey,
-              depositAddress.depositAddress?.verifyingKey,
-              depositTx,
-              vout
-            );
-            console.log("Created new leaf node", nodes);
+          const nodes = await wallet.claimDeposits();
+          if (nodes && nodes.length > 0) {
+            console.log("Claimed deposits", nodes);
             break;
           }
-          console.log("Waiting for deposit tx");
+          console.log("Waiting for deposits to be claimed");
           await new Promise((resolve) => setTimeout(resolve, 5000));
         }
 
