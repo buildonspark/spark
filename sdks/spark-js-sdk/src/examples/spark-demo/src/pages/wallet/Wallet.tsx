@@ -102,6 +102,19 @@ export default function Wallet() {
           <span>to your wallet to get started</span>
         </div>
       </div>
+      {/* <div className="mt-4">
+        <div className="flex flex-row items-center justify-between p-2">
+          <div className="text-[15px] font-medium text-[#F9F9F999]">
+            Recent activity
+          </div>
+          <div className="cursor-pointer text-[13px] font-medium">View all</div>
+        </div>
+        <TransactionDetailRow
+          transactionType="receive"
+          asset={PERMANENT_CURRENCIES.USDC}
+          assetAmount="100"
+        />
+      </div> */}
     </div>
   );
 }
