@@ -172,3 +172,27 @@ func TestWalletConfigDeployed(identityPrivKeyBytes []byte) (*wallet.Config, erro
 		SparkServiceProviderIdentityPublicKey: sspIdentityKey,
 	}, nil
 }
+
+func TestWalletConfigDeployedMainnet(identityPrivKeyBytes []byte) (*wallet.Config, error) {
+	identityPrivKey := secp256k1.PrivKeyFromBytes(identityPrivKeyBytes)
+	if identityPrivKey == nil {
+		return nil, fmt.Errorf("failed to generate identity private key")
+	}
+	signingOperators, err := GetAllSigningOperatorsDeployed()
+	if err != nil {
+		return nil, err
+	}
+	sspIdentityKey, err := hex.DecodeString("02e0b8d42c5d3b5fe4c5beb6ea796ab3bc8aaf28a3d3195407482c67e0b58228a5")
+	if err != nil {
+		return nil, err
+	}
+	return &wallet.Config{
+		Network:                               common.Mainnet,
+		SigningOperators:                      signingOperators,
+		CoodinatorIdentifier:                  "0000000000000000000000000000000000000000000000000000000000000001",
+		FrostSignerAddress:                    "unix:///tmp/frost_wallet.sock",
+		IdentityPrivateKey:                    *identityPrivKey,
+		Threshold:                             2,
+		SparkServiceProviderIdentityPublicKey: sspIdentityKey,
+	}, nil
+}

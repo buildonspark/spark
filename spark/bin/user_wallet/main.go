@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/lightsparkdev/spark-go/common"
 	testutil "github.com/lightsparkdev/spark-go/test_util"
 	"github.com/lightsparkdev/spark-go/wallet"
 	"github.com/tyler-smith/go-bip32"
@@ -69,13 +70,15 @@ type CLI struct {
 	registry *CommandRegistry
 	reader   *bufio.Reader
 	wallet   *wallet.SingleKeyWallet
+	network  common.Network
 }
 
 // NewCLI creates a new CLI instance
-func NewCLI() *CLI {
+func NewCLI(network common.Network) *CLI {
 	return &CLI{
 		registry: NewCommandRegistry(),
 		reader:   bufio.NewReader(os.Stdin),
+		network:  network,
 	}
 }
 
@@ -98,6 +101,7 @@ func parseInput(input string) (string, []string) {
 // InitializeWallet handles the wallet setup process
 func (cli *CLI) InitializeWallet() ([]byte, error) {
 	fmt.Println("Welcome to the Spark Wallet CLI!")
+	fmt.Printf("Network: %s\n", cli.network)
 	fmt.Println("Please enter your secret seed, or phone number this format phone:5555555555:")
 
 	for {
@@ -149,17 +153,27 @@ func (cli *CLI) Run() error {
 		return fmt.Errorf("failed to create master key: %w", err)
 	}
 
-	identityKey, err := masterKey.NewChildKey(0)
+	startIndex := 0
+	if cli.network == common.Mainnet {
+		startIndex = 2
+	}
+
+	identityKey, err := masterKey.NewChildKey(uint32(startIndex))
 	if err != nil {
 		return fmt.Errorf("failed to create identity key: %w", err)
 	}
 	fmt.Printf("Identity key pubkey: %s\n", hex.EncodeToString(identityKey.PublicKey().Key))
-	signingKey, err := masterKey.NewChildKey(1 + 0x80000000)
+	signingKey, err := masterKey.NewChildKey(uint32(startIndex + 1 + 0x80000000))
 	if err != nil {
 		return fmt.Errorf("failed to create signing key: %w", err)
 	}
 	fmt.Printf("Signing key pubkey: %s\n", hex.EncodeToString(signingKey.PublicKey().Key))
-	config, err := testutil.TestWalletConfigDeployed(identityKey.Key)
+	var config *wallet.Config
+	if cli.network == common.Mainnet {
+		config, err = testutil.TestWalletConfigDeployedMainnet(identityKey.Key)
+	} else {
+		config, err = testutil.TestWalletConfigDeployed(identityKey.Key)
+	}
 	if err != nil {
 		return fmt.Errorf("failed to create test wallet config: %w", err)
 	}
@@ -195,7 +209,14 @@ func (cli *CLI) Run() error {
 }
 
 func main() {
-	cli := NewCLI()
+	args := os.Args[1:]
+	network := common.Regtest
+	if len(args) > 0 {
+		if args[0] == "mainnet" {
+			network = common.Mainnet
+		}
+	}
+	cli := NewCLI(network)
 
 	// Register commands
 	cli.registry.RegisterCommand(Command{

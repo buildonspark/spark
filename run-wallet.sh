@@ -1,5 +1,10 @@
 #!/bin/bash
 
+network="regtest"
+if [ "$1" == "mainnet" ]; then
+    network="mainnet"
+fi
+
 cmd="cd signer && cargo run --bin spark-frost-signer --release -- -u /tmp/frost_wallet.sock"
 
 session_name="wallet-signers"
@@ -15,5 +20,4 @@ tmux new-session -d -s "$session_name"
 tmux split-window -t "$session_name" -v
 tmux send-keys -t "$session_name" "$cmd" C-m
 
-
-cd spark && go run bin/user_wallet/main.go
+cd spark && go run bin/user_wallet/main.go $network
