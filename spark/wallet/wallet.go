@@ -14,6 +14,8 @@ import (
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
+	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark-go"
 	"github.com/lightsparkdev/spark-go/common"
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
@@ -537,11 +539,85 @@ func (w *SingleKeyWallet) CoopExit(ctx context.Context, targetAmountSats int64, 
 	return transfer, nil
 }
 
-func (w *SingleKeyWallet) RefreshTimelocks(_ context.Context) error {
-	fmt.Println("TODO: not implemented")
-	// Loop through all of our leaves and check if they need
-	// to be refreshed. Print out how many leaves need to be refreshed.
-	// Loop through any and refresh each, logging success or failure.
+func (w *SingleKeyWallet) RefreshTimelocks(ctx context.Context, nodeUUID *uuid.UUID) error {
+	nodesToRefresh := make([]*pb.TreeNode, 0)
+	nodeIDs := make([]string, 0)
+
+	if nodeUUID != nil {
+		for _, node := range w.OwnedNodes {
+			if node.Id == nodeUUID.String() {
+				nodesToRefresh = append(nodesToRefresh, node)
+				nodeIDs = append(nodeIDs, node.Id)
+				break
+			}
+		}
+		if len(nodesToRefresh) == 0 {
+			return fmt.Errorf("node %s not found", nodeUUID.String())
+		}
+	} else {
+		for _, node := range w.OwnedNodes {
+			refundTx, err := common.TxFromRawTxBytes(node.RefundTx)
+			if err != nil {
+				return fmt.Errorf("failed to parse refund tx: %v", err)
+			}
+			_, err = spark.NextSequence(refundTx.TxIn[0].Sequence)
+			needRefresh := err != nil
+			if err != nil {
+				return fmt.Errorf("failed to check if node needs to be refreshed: %w", err)
+			}
+			if needRefresh {
+				nodesToRefresh = append(nodesToRefresh, node)
+				nodeIDs = append(nodeIDs, node.Id)
+			}
+		}
+	}
+	fmt.Printf("Refreshing %d nodes\n", len(nodesToRefresh))
+
+	authCtx, client, conn, err := w.grpcClient(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to create grpc client: %w", err)
+	}
+	defer conn.Close()
+
+	nodesResp, err := (*client).QueryNodes(authCtx, &pb.QueryNodesRequest{
+		Source: &pb.QueryNodesRequest_NodeIds{
+			NodeIds: &pb.TreeNodeIds{
+				NodeIds: nodeIDs,
+			},
+		},
+		IncludeParents: true,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to query nodes: %w", err)
+	}
+
+	nodesMap := make(map[string]*pb.TreeNode)
+	for _, node := range nodesResp.Nodes {
+		nodesMap[node.Id] = node
+	}
+
+	for _, node := range nodesToRefresh {
+		fmt.Printf("Refreshing node %s\n", node.Id)
+		// Get the parent node
+		parentNode, ok := nodesMap[*node.ParentNodeId]
+		if !ok {
+			return fmt.Errorf("parent node %s not found", *node.ParentNodeId)
+		}
+		signingPrivKey := secp256k1.PrivKeyFromBytes(w.SigningPrivateKey)
+		nodes, err := RefreshTimelockNodes(
+			ctx, w.Config, []*pb.TreeNode{node}, parentNode, signingPrivKey)
+		if err != nil {
+			return fmt.Errorf("failed to refresh timelock nodes: %w", err)
+		}
+		// We only expect to refresh leaf nodes, not chains of nodes right now
+		if len(nodes) != 1 {
+			return fmt.Errorf("expected 1 nodes, got %d", len(nodes))
+		}
+		newNode := nodes[0]
+		w.RemoveOwnedNodes(map[string]bool{node.Id: true})
+		w.OwnedNodes = append(w.OwnedNodes, newNode)
+	}
+
 	return nil
 }
 

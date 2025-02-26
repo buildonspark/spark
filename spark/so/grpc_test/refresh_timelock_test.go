@@ -38,7 +38,7 @@ func TestRefreshTimelock(t *testing.T) {
 	assert.Equal(t, parentNode.Id, *node.ParentNodeId)
 
 	// Reset timelock on refundTx, decrement timelock on leafNodeTx
-	err = wallet.RefreshTimelockNodes(
+	_, err = wallet.RefreshTimelockNodes(
 		context.Background(),
 		senderConfig,
 		[]*pb.TreeNode{node},

@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/common"
 	testutil "github.com/lightsparkdev/spark-go/test_util"
 	"github.com/lightsparkdev/spark-go/wallet"
@@ -463,11 +464,21 @@ func main() {
 	})
 
 	cli.registry.RegisterCommand(Command{
-		Name:        "refresh",
-		Description: "Refresh all leaves if needed (unimplemented)",
+		Name:        "refresh [<node_id>]",
+		Description: "Force refresh a node, or refresh all leaves if needed",
 		Usage:       "refresh",
-		Handler: func(_ []string) error {
-			return cli.wallet.RefreshTimelocks(context.Background())
+		Handler: func(args []string) error {
+			if len(args) < 1 {
+				fmt.Println("No node ID provided, checking all leaves...")
+				return cli.wallet.RefreshTimelocks(context.Background(), nil)
+			}
+			nodeID := args[0]
+			nodeUUID, err := uuid.Parse(nodeID)
+			if err != nil {
+				return fmt.Errorf("invalid node ID: %w", err)
+			}
+			fmt.Printf("Checking node %s...\n", nodeUUID)
+			return cli.wallet.RefreshTimelocks(context.Background(), &nodeUUID)
 		},
 	})
 
