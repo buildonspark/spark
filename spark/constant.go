@@ -4,7 +4,7 @@ import "fmt"
 
 const (
 	// DKGKeyThreshold is the number of keyshares required to start the DKG.
-	DKGKeyThreshold = 10000
+	DKGKeyThreshold = 1000000
 
 	// DKGKeyCount is the number of keyshares to generate during the DKG.
 	DKGKeyCount = 1000
