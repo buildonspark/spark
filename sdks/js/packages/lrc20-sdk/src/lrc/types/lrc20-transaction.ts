@@ -191,9 +191,14 @@ export class Lrc20TransactionTypeDto {
           outputProofs = outputProofs.set(key, receiptProof);
         }
 
+        let announcement = {
+          token_pubkey: txData.announcement.tokenPubkey,
+          amount: txData.announcement.amount,
+        } as IssueAnnouncementDto;
+
         data = {
           output_proofs: outputProofs,
-          announcement: txData.announcement,
+          announcement: announcement,
         };
         break;
       }
@@ -292,8 +297,12 @@ export class Lrc20TransactionTypeDto {
           }
         }
 
+        let announcement = txData.announcement as IssueAnnouncementDto;
         data = {
-          announcement: txData.announcement,
+          announcement: {
+            tokenPubkey: announcement.token_pubkey,
+            amount: announcement.amount
+          },
           output_proofs: outputProofs,
         } as IssueData;
         break;

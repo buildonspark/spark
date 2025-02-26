@@ -22,6 +22,7 @@ parse_bitcoin_config() {
 tmux kill-session -t frost-signers
 tmux kill-session -t operators
 tmux kill-session -t lrcd
+tmux kill-session -t electrs
 tmux kill-session -t bitcoind
 
 read -r bitcoind_username bitcoind_password <<< "$(parse_bitcoin_config)"
@@ -59,3 +60,5 @@ done
 rm -rf _data
 rm -rf temp_config_*
 rm -rf lrc20.dev/.yuvd
+rm -rf electrs.dev/electrs_data
+rm -rf electrs.dev/db

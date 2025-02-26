@@ -172,6 +172,7 @@ export class Lrc20JsonRPC {
       id,
     };
     let body = instanceToPlain(request);
+
     const response = await fetch(this.url, {
       method: "POST",
       headers: {

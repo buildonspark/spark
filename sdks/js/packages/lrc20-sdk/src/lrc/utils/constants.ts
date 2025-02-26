@@ -16,7 +16,7 @@ export const EMPTY_TOKEN_PUBKEY = Buffer.from(Array(33).fill(2));
 
 export const ESPLORA_URL = Object.freeze({
   [NetworkType.MAINNET]: "https://mempool.space/api",
-  [NetworkType.REGTEST]: "http://localhost:30000",
+  [NetworkType.REGTEST]: "http://127.0.0.1:30000",
   [NetworkType.TESTNET]: "https://electrs.mutiny.18.215.149.26.sslip.io",
   [NetworkType.DEVNET]: "https://electrs.stage.18.215.149.26.sslip.io",
   [NetworkType.LS_REGTEST]: "https://regtest-mempool.dev.dev.sparkinfra.net/api",
@@ -35,5 +35,5 @@ export const LRC_NODE_URL = Object.freeze({
   [NetworkType.MAINNET]: "http://54.219.77.43:18333",
   [NetworkType.TESTNET]: "https://rpc.lrc20d.mutiny.18.215.149.26.sslip.io",
   [NetworkType.DEVNET]: "https://rpc.lrc20.stage.18.215.149.26.sslip.io",
-  default: "http://localhost:18333",
+  default: "http://127.0.0.1:18333",
 });

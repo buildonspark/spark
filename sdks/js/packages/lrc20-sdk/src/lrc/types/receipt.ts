@@ -7,15 +7,15 @@ import { TokenPubkey } from "./token-pubkey";
 import { TokenAmount } from "./token-amount";
 
 export class ReceiptDto {
-  constructor(public tokenAmount: TokenAmountDto, public tokenPubkey: string) {}
+  constructor(public token_amount: TokenAmountDto, public token_pubkey: string) {}
 
   public static fromReceipt(receipt: Receipt): ReceiptDto {
     return new ReceiptDto(TokenAmountDto.fromTokenAmount(receipt.tokenAmount), receipt.tokenPubkey.pubkey.toString("hex"));
   }
 
   public toReceipt(): Receipt {
-    let tokenAmount = plainToInstance(TokenAmountDto, this.tokenAmount);
-    return new Receipt(tokenAmount.toTokenAmount(), new TokenPubkey(Buffer.from(this.tokenPubkey, "hex")));
+    let tokenAmount = plainToInstance(TokenAmountDto, this.token_amount);
+    return new Receipt(tokenAmount.toTokenAmount(), new TokenPubkey(Buffer.from(this.token_pubkey, "hex")));
   }
 }
 

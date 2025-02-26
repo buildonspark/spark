@@ -1,19 +1,24 @@
-import { hexToBytes /*, bytesToHex */ } from "@noble/curves/abstract/utils";
+import { hexToBytes, bytesToHex } from "@noble/curves/abstract/utils";
 import { Network } from "@buildonspark/spark-sdk/utils";
 import { IssuerSparkWallet } from "./services/spark/wallet.js";
-// import * as bip39 from "@scure/bip39";
-// import { HDKey } from "@scure/bip32";
-// import { LRCWallet } from "lrc20-js-sdk";
-// import { networks } from "bitcoinjs-lib";
-// import { NetworkType } from "lrc20-js-sdk";
+import * as bip39 from "@scure/bip39";
+import { HDKey } from "@scure/bip32";
+import lrc20sdk from "@buildonspark/lrc20-sdk";
+import {announceTokenL1} from "./services/lrc20/announce.js";
+import {
+  LRC_WALLET_NETWORK,
+  LRC_WALLET_NETWORK_TYPE
+} from "./utils/constants.js";
 
 export class IssuerWallet {
-  private bitcoinWallet: any | undefined;
+  private bitcoinWallet: lrc20sdk.LRCWallet | undefined;
   private sparkWallet: IssuerSparkWallet;
   private initialized: boolean = false;
+  private network: Network;
 
   constructor(network: Network) {
     this.sparkWallet = new IssuerSparkWallet(network);
+    this.network = network;
   }
 
   async initWallet(
@@ -21,15 +26,26 @@ export class IssuerWallet {
     // Set to true to enable L1 Token Announcements.
     enableL1Wallet: boolean = true,
   ): Promise<void> {
-    await this.sparkWallet.initWallet(mnemonicOrSeed);
+    let result = await this.sparkWallet.initWallet(mnemonicOrSeed);
 
     if (enableL1Wallet) {
-      // const seed = await bip39.mnemonicToSeed(mnemonic);
-      // const hdkey = HDKey.fromMasterSeed(seed).derive("m/0").privateKey;
-      // this.bitcoinWallet = createLRCWallet(
-      //    bytesToHex.privateKey,
-      //    networks.regtest,
-      //    NetworkType.REGTEST);
+      if(!mnemonicOrSeed) {
+        mnemonicOrSeed = result.mnemonic!;
+      }
+
+      let seed;
+      if (typeof mnemonicOrSeed === "string") {
+        seed = await bip39.mnemonicToSeed(mnemonicOrSeed);
+      } else {
+        seed = mnemonicOrSeed;
+      }
+
+      const hdkey = HDKey.fromMasterSeed(seed).derive("m/0").privateKey!;
+      this.bitcoinWallet = new lrc20sdk.LRCWallet(
+         bytesToHex(hdkey),
+         LRC_WALLET_NETWORK[this.network],
+         LRC_WALLET_NETWORK_TYPE[this.network]
+      );
     }
     this.initialized = true;
   }
@@ -41,11 +57,11 @@ export class IssuerWallet {
     return this.sparkWallet;
   }
 
-  getBitcoinWallet(): any {
+  getBitcoinWallet(): lrc20sdk.LRCWallet {
     if (!this.initialized || !this.bitcoinWallet) {
       throw new Error("Bitcoin wallet not initialized");
     }
-    return this.sparkWallet !== undefined;
+    return this.bitcoinWallet;
   }
 
   isSparkInitialized(): boolean {
@@ -136,5 +152,16 @@ export class IssuerWallet {
       throw new Error("Spark wallet not initialized");
     }
     return await this.sparkWallet.unfreezeIssuerTokens(unfreezePublicKey);
+  }
+
+  /**
+   * Announces LRC20 token on L1
+   */
+  async announceTokenL1(tokenName: string, tokenTicker: string, decimals: number, maxSupply: bigint, isFreezable: boolean): Promise<{txid: string}> {
+    if(!this.isL1Initialized()) {
+      throw new Error("L1 wallet not initialized");
+    }
+
+    return await announceTokenL1(this.bitcoinWallet!, tokenName, tokenTicker, decimals, maxSupply, isFreezable)
   }
 }

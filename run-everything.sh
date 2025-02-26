@@ -265,6 +265,86 @@ check_lrc_nodes_ready() {
    done
 }
 
+clone_electrs() {
+    if [ ! -d "electrs.dev" ]; then
+        echo "Cloning mempool/electrs git repo"
+        git clone git@github.com:mempool/electrs.git electrs.dev
+    fi
+}
+
+run_electrs_tmux() {
+    local run_dir=$1
+    local session_name="electrs"
+
+    clone_electrs
+
+    # Kill existing session if it exists
+    if tmux has-session -t "$session_name" 2>/dev/null; then
+        echo "Killing existing electrs session..."
+        tmux kill-session -t "$session_name"
+    fi
+
+    # Create new tmux session
+    tmux new-session -d -s "$session_name"
+    local log_file="${run_dir}/logs/electrs.log"
+
+    read -r bitcoind_username bitcoind_password <<< "$(parse_bitcoin_config)"
+
+    local cmd="cd electrs.dev && cargo run --release --bin electrs -- -vvvv --network regtest --daemon-dir ${run_dir}/electrs_data --daemon-rpc-addr 0.0.0.0:18443 --cookie ${bitcoind_username}:${bitcoind_password} --http-addr 0.0.0.0:30000 --electrum-rpc-addr 0.0.0.0:50000 --cors \"*\" --jsonrpc-import 2>&1 | tee '${log_file}'"
+
+    tmux send-keys -t "$session_name" "$cmd" C-m
+
+    echo ""
+    echo "================================================"
+    echo "Started electrs in tmux session: $session_name"
+    echo "To attach to the session: tmux attach -t $session_name"
+    echo "To detach from session: Press Ctrl-b then d"
+    echo "To kill the session: tmux kill-session -t $session_name"
+    echo "================================================"
+    echo ""
+}
+
+check_electrs_ready() {
+   local run_dir=$1
+   local timeout=30  # Maximum seconds to wait
+
+   echo "Checking electrs startup status..."
+
+   # Start timer
+   local start_time=$(date +%s)
+
+   while true; do
+       local is_ready=true
+       local current_time=$(date +%s)
+       local elapsed=$((current_time - start_time))
+
+       # Check if we've exceeded timeout
+       if [ $elapsed -gt $timeout ]; then
+           echo "Timeout after ${timeout} seconds waiting for electrs"
+           return 1
+       fi
+
+
+       local log_file="${run_dir}/logs/electrs.log"
+
+       if [ ! -f "$log_file" ]; then
+           is_ready=false
+           break
+       fi
+
+
+       # If all log files exist, break the loop
+       if $all_ready; then
+           echo "Electrs log files created!"
+           return 0
+       fi
+
+       # Wait a bit before next check
+       sleep 1
+       echo -n "."  # Show progress
+   done
+}
+
 # Function to extract values from bitcoin_regtest.conf
 parse_bitcoin_config() {
     local config_file="bitcoin_regtest.conf"
@@ -633,6 +713,12 @@ run_dir=$(create_run_dir)
 echo "Working with directory: $run_dir"
 
 run_bitcoind_tmux "$run_dir" $WIPE
+run_electrs_tmux "$run_dir"
+
+if ! check_electrs_ready "$run_dir"; then
+        echo "Failed to start electrs"
+        exit 1
+    fi
 
 if [ "$DISABLE_TOKENS" = false ]; then
     run_lrcd_tmux "$run_dir"

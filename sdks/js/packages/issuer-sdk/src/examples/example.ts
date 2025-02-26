@@ -30,6 +30,14 @@ async function runCLI() {
   balance                                    - Show current wallet balance
   help                                       - Show this help message
   exit/quit                                  - Exit the program
+
+  L1 commands:
+  announce <tokenName> <tokenTicker> <decimals> <maxSupply> <isFreezable> - Announce new token on L1
+           <tokenName>   - string, from 3 to 20 symbols
+           <tokenTicker> - string, from 3 to 6  symbols
+           <decimals>    - uint8
+           <maxSupply>   - uint128, set 0 if no restrictions are needed
+           <isFreezable> - boolean, true/false
 `;
   console.log(helpMessage);
 
@@ -69,6 +77,11 @@ async function runCLI() {
 
           const tokenPublicKey = await wallet.getTokenPublicKey();
           console.log("Token Public Key:", tokenPublicKey);
+          if (wallet.isL1Initialized()) {
+            let lrcWallet = wallet.getBitcoinWallet();
+            console.log("P2TR   (only for receiving LRC20 tokens):", lrcWallet.p2trAddress);
+            console.log("P2WPKH (only for receiving BTC):         ", lrcWallet.p2wpkhAddress);
+          }
           break;
         case "mint":
           if (!wallet.isSparkInitialized()) {
@@ -132,6 +145,42 @@ async function runCLI() {
           console.log("Balance:", balanceInfo.balance);
           console.log("Number of token leaves:", balanceInfo.leafCount);
           break;
+        case "announce": {
+          if (!wallet.isL1Initialized()) {
+            console.log("No L1 wallet initialized");
+            break;
+          }
+
+          const tokenName = args[0];
+          const tokenTicker = args[1];
+          const decimals = parseInt(args[2]);
+          const maxSupply = BigInt(parseInt(args[3]));
+          const isFreezable = args[4] === 'true';
+
+          if(tokenName.length < 3 || tokenName.length > 20) {
+            console.log("Invalid tokenName length");
+            break;
+          }
+
+          if(tokenTicker.length < 3 || tokenTicker.length > 6) {
+            console.log("Invalid tokenTicker length");
+            break;
+          }
+
+          if(decimals < 0) {
+            console.log("Invalid decimals. Should be >= 0");
+            break;
+          }
+
+          if(maxSupply < 0) {
+            console.log("Invalid maxSupply. Should be >= 0");
+            break;
+          }
+
+          let {txid} = await wallet.announceTokenL1(tokenName, tokenTicker, decimals, maxSupply, isFreezable);
+          console.log("Announcement tx:", txid);
+          break;
+        }
         default:
           console.log(`Unknown command: ${lowerCommand}`);
           console.log(helpMessage);
