@@ -32,9 +32,9 @@
       "import": "./dist/services/token-transactions.js"
     },
     "./wasm": {
-      "types": "./dist/wasm/spark-bindings.d.ts",
-      "require": "./dist/wasm/spark-bindings.js",
-      "import": "./dist/wasm/spark-bindings.js"
+      "types": "./dist/wasm/spark_bindings.d.ts",
+      "require": "./dist/wasm/spark_bindings.js",
+      "import": "./dist/wasm/spark_bindings.js"
     },
     "./types": {
       "types": "./dist/types/index.d.ts",

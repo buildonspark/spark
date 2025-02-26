@@ -332,11 +332,11 @@ export class SparkWallet {
 
       const userLeaves: UserLeafInput[] = [];
       userLeaves.push({
-        leafId: transfer.leaves[0].leaf.id,
-        rawUnsignedRefundTransaction: bytesToHex(
+        leaf_id: transfer.leaves[0].leaf.id,
+        raw_unsigned_refund_transaction: bytesToHex(
           transfer.leaves[0].intermediateRefundTx
         ),
-        adaptorAddedSignature: bytesToHex(adaptorSignature),
+        adaptor_added_signature: bytesToHex(adaptorSignature),
       });
 
       for (let i = 1; i < transfer.leaves.length; i++) {
@@ -356,16 +356,17 @@ export class SparkWallet {
         );
 
         userLeaves.push({
-          leafId: leaf.leaf.id,
-          rawUnsignedRefundTransaction: bytesToHex(leaf.intermediateRefundTx),
-          adaptorAddedSignature: bytesToHex(signature),
+          leaf_id: leaf.leaf.id,
+          raw_unsigned_refund_transaction: bytesToHex(
+            leaf.intermediateRefundTx
+          ),
+          adaptor_added_signature: bytesToHex(signature),
         });
       }
 
       const adaptorPubkey = bytesToHex(
         secp256k1.getPublicKey(adaptorPrivateKey)
       );
-
       let request: LeavesSwapRequest | null | undefined = null;
       request = await this.sspClient?.requestLeaveSwap({
         userLeaves,
@@ -380,7 +381,6 @@ export class SparkWallet {
         // TODO: Request fee from SSP
         feeSats: 0,
       });
-      console.log("Request", request);
 
       if (!request) {
         throw new Error("Failed to request leaves swap. No response returned.");
@@ -455,9 +455,7 @@ export class SparkWallet {
 
       return completeResponse;
     } catch (e) {
-      await this.transferService.cancelSendTransfer(transfer);
-
-      console.log("Cancelled send transfer", transfer.id);
+      await this.cancelAllSenderInitiatedTransfers();
       throw new Error(`Failed to request leaves swap: ${e}`);
     }
   }
