@@ -30,6 +30,8 @@ import { LightningService } from "./services/lightning.js";
 import { TokenTransactionService } from "./services/token-transactions.js";
 import { LeafKeyTweak, TransferService } from "./services/transfer.js";
 
+import { validateMnemonic } from "@scure/bip39";
+import { wordlist } from "@scure/bip39/wordlists/english";
 import { Mutex } from "async-mutex";
 import {
   DepositAddressTree,
@@ -61,14 +63,11 @@ const MAX_TOKEN_LEAVES = 100;
 
 export type CreateLightningInvoiceParams = {
   amountSats: number;
-  expirySeconds: number;
   memo: string;
-  invoiceCreator?: () => Promise<string>;
 };
 
 export type PayLightningInvoiceParams = {
   invoice: string;
-  amountSats?: number;
 };
 
 export type SendTransferParams = {
@@ -150,9 +149,9 @@ export class SparkWallet {
   private async initializeWallet(identityPublicKey: string) {
     this.sspClient = new SspClient(identityPublicKey);
     await this.initWasm();
-    // TODO: Better leaf management?
-    this.leaves = await this.getLeaves();
     this.config.signer.restoreSigningKeysFromLeafs(this.leaves);
+    // TODO: Better leaf management?
+    await this.syncWallet();
   }
 
   private async selectLeaves(targetAmount: number): Promise<TreeNode[]> {
@@ -239,46 +238,89 @@ export class SparkWallet {
     if (this.leaves.length > 0) {
       await this.requestLeavesSwap({ leaves: this.leaves });
     }
+    await new Promise((resolve) => setTimeout(resolve, 5000));
+    this.leaves = [];
+    this.leaves = await this.getLeaves();
   }
 
   private async syncWallet() {
     await this.claimTransfers();
+    await this.claimDeposits();
     // TODO: This is broken. Uncomment when fixed
-    // await this.syncTokenLeaves();
+    await this.syncTokenLeaves();
     this.leaves = await this.getLeaves();
     await this.optimizeLeaves();
   }
 
-  public isInitialized(): boolean {
+  private isInitialized(): boolean {
     return this.sspClient !== null && this.wasmModule !== null;
   }
 
-  public async getIdentityPublicKey(): Promise<string> {
+  private async getIdentityPublicKey(): Promise<string> {
     return bytesToHex(await this.config.signer.getIdentityPublicKey());
   }
 
-  public async initWalletFromMnemonic(mnemonic?: string) {
-    if (!mnemonic) {
-      mnemonic = await this.config.signer.generateMnemonic();
-    }
-    const identityPublicKey =
-      await this.config.signer.createSparkWalletFromMnemonic(mnemonic);
-    await this.initializeWallet(identityPublicKey);
-    // Hacky but do this to store the deposit signing key in the signer
-    await this.config.signer.getDepositSigningKey();
-    return mnemonic;
+  public async getSparkAddress(): Promise<string> {
+    return bytesToHex(await this.config.signer.getIdentityPublicKey());
   }
 
-  public async initWallet(seed: Uint8Array | string) {
+  public async initWallet(mnemonicOrSeed?: Uint8Array | string) {
+    const returnMnemonic = !mnemonicOrSeed;
+    if (!mnemonicOrSeed) {
+      mnemonicOrSeed = await this.config.signer.generateMnemonic();
+    }
+
+    if (typeof mnemonicOrSeed !== "string") {
+      mnemonicOrSeed = bytesToHex(mnemonicOrSeed);
+    }
+
+    let mnemonic: string | undefined;
+    if (validateMnemonic(mnemonicOrSeed, wordlist)) {
+      mnemonic = mnemonicOrSeed;
+      await this.initWalletFromMnemonic(mnemonicOrSeed);
+    } else {
+      await this.initWalletFromSeed(mnemonicOrSeed);
+    }
+
+    const balance = this.leaves.reduce(
+      (acc, leaf) => acc + BigInt(leaf.value),
+      0n,
+    );
+    const tokenBalance = await this.getAllTokenBalances();
+
+    if (returnMnemonic) {
+      return {
+        mnemonic,
+        balance,
+        tokenBalance,
+      };
+    }
+
+    return {
+      balance,
+      tokenBalance,
+    };
+  }
+
+  private async initWalletFromMnemonic(mnemonic: string) {
     const identityPublicKey =
-      await this.config.signer.createSparkWalletFromSeed(seed);
-    await this.initializeWallet(identityPublicKey);
+      await this.config.signer.createSparkWalletFromMnemonic(mnemonic);
     // Hacky but do this to store the deposit signing key in the signer
     await this.config.signer.getDepositSigningKey();
+    await this.initializeWallet(identityPublicKey);
     return identityPublicKey;
   }
 
-  public async requestLeavesSwap({
+  private async initWalletFromSeed(seed: Uint8Array | string) {
+    const identityPublicKey =
+      await this.config.signer.createSparkWalletFromSeed(seed);
+    // Hacky but do this to store the deposit signing key in the signer
+    await this.config.signer.getDepositSigningKey();
+    await this.initializeWallet(identityPublicKey);
+    return identityPublicKey;
+  }
+
+  private async requestLeavesSwap({
     targetAmount,
     leaves,
   }: {
@@ -468,15 +510,29 @@ export class SparkWallet {
     }
   }
 
-  public async getBalance(): Promise<BigInt> {
+  public async getBalance(): Promise<{
+    balance: bigint;
+    tokenBalance: Map<string, { balance: bigint; leafCount: number }>;
+  }> {
     await this.claimTransfers();
-    // await this.syncTokenLeaves();
+    await this.claimDeposits();
+    await this.syncTokenLeaves();
+
     const leaves = await this.getLeaves();
-    return leaves.reduce((acc, leaf) => acc + BigInt(leaf.value), 0n);
+    const balance = leaves.reduce((acc, leaf) => acc + BigInt(leaf.value), 0n);
+    const tokenBalance = await this.getAllTokenBalances();
+    return {
+      balance,
+      tokenBalance,
+    };
   }
 
   // ***** Deposit Flow *****
-  public async generateDepositAddress(): Promise<string> {
+  public async getDepositAddress(): Promise<string> {
+    return await this.generateDepositAddress();
+  }
+
+  private async generateDepositAddress(): Promise<string> {
     const signingPubkey = await this.config.signer.getDepositSigningKey();
     const address = await this.depositService!.generateDepositAddress({
       signingPubkey,
@@ -503,7 +559,7 @@ export class SparkWallet {
     return await this.transferDepositToSelf(response.nodes, signingPubKey);
   }
 
-  public async claimDeposits() {
+  private async claimDeposits() {
     const sparkClient = await this.connectionManager.createSparkClient(
       this.config.getCoordinatorAddress(),
     );
@@ -608,7 +664,20 @@ export class SparkWallet {
   }
   // ***** Transfer Flow *****
 
-  public async sendTransfer({
+  public async sendSparkTransfer({
+    receiverSparkAddress,
+    amount,
+  }: {
+    receiverSparkAddress: string;
+    amount: number;
+  }) {
+    return await this._sendTransfer({
+      receiverPubKey: receiverSparkAddress,
+      amount,
+    });
+  }
+
+  private async _sendTransfer({
     amount,
     receiverPubKey,
     leaves,
@@ -695,7 +764,7 @@ export class SparkWallet {
     return claimed;
   }
 
-  public async cancelAllSenderInitiatedTransfers() {
+  private async cancelAllSenderInitiatedTransfers() {
     const transfers =
       await this.transferService.queryPendingTransfersBySender();
     for (const transfer of transfers.transfers) {
@@ -710,10 +779,8 @@ export class SparkWallet {
   public async createLightningInvoice({
     amountSats,
     memo,
-    expirySeconds,
-    // TODO: This should default to lightspark ssp
-    invoiceCreator = () => Promise.resolve(""),
   }: CreateLightningInvoiceParams) {
+    const expirySeconds = 60 * 60 * 24 * 30;
     if (!this.sspClient) {
       throw new Error("SSP client not initialized");
     }
@@ -742,10 +809,7 @@ export class SparkWallet {
     });
   }
 
-  public async payLightningInvoice({
-    invoice,
-    amountSats,
-  }: PayLightningInvoiceParams) {
+  public async payLightningInvoice({ invoice }: PayLightningInvoiceParams) {
     if (!this.sspClient) {
       throw new Error("SSP client not initialized");
     }
@@ -753,7 +817,7 @@ export class SparkWallet {
     // TODO: Get fee
 
     const decodedInvoice = decode(invoice);
-    amountSats =
+    const amountSats =
       Number(
         decodedInvoice.sections.find((section) => section.name === "amount")
           ?.value,
@@ -844,7 +908,7 @@ export class SparkWallet {
   }
 
   // ***** Tree Creation Flow *****
-  async generateDepositAddressForTree(
+  private async generateDepositAddressForTree(
     vout: number,
     parentSigningPubKey: Uint8Array,
     parentTx?: Transaction,
@@ -858,7 +922,7 @@ export class SparkWallet {
     );
   }
 
-  async createTree(
+  private async createTree(
     vout: number,
     root: DepositAddressTree,
     createLeaves: boolean,
@@ -875,7 +939,17 @@ export class SparkWallet {
   }
   // ***** Cooperative Exit Flow *****
 
-  public async coopExit(onchainAddress: string, targetAmountSats?: number) {
+  public async withdraw({
+    onchainAddress,
+    targetAmountSats,
+  }: {
+    onchainAddress: string;
+    targetAmountSats?: number;
+  }) {
+    return this.coopExit(onchainAddress, targetAmountSats);
+  }
+
+  private async coopExit(onchainAddress: string, targetAmountSats?: number) {
     let leavesToSend: TreeNode[] = [];
     if (targetAmountSats) {
       leavesToSend = await this.selectLeaves(targetAmountSats);
@@ -884,6 +958,12 @@ export class SparkWallet {
         ...leaf,
       }));
     }
+
+    const pubkey = await this.config.signer.getIdentityPublicKey();
+
+    leavesToSend.map((map) => {
+      console.log(map.ownerIdentityPublicKey, pubkey);
+    });
 
     const leafKeyTweaks = await Promise.all(
       leavesToSend.map(async (leaf) => ({
@@ -895,6 +975,7 @@ export class SparkWallet {
       })),
     );
 
+    console.log(onchainAddress);
     const coopExitRequest = await this.sspClient?.requestCoopExit({
       leafExternalIds: leavesToSend.map((leaf) => leaf.id),
       withdrawalAddress: onchainAddress,

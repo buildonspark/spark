@@ -18,7 +18,7 @@ describe("adaptor signature", () => {
       let failures = 0;
 
       const wallet = new SparkWalletTesting(Network.LOCAL);
-      await wallet.initWalletFromMnemonic();
+      await wallet.initWallet();
 
       const msg = "test";
       const hash = sha256(msg);
@@ -39,14 +39,14 @@ describe("adaptor signature", () => {
             pubkey,
             hash,
             adaptorSignature,
-            adaptorPubkey
+            adaptorPubkey,
           );
 
           const adapterSig = applyAdaptorToSignature(
             pubkey,
             hash,
             adaptorSignature,
-            adaptorPrivateKey
+            adaptorPrivateKey,
           );
 
           expect(schnorr.verify(adapterSig, hash, pubkey)).toBe(true);
@@ -57,6 +57,6 @@ describe("adaptor signature", () => {
 
       expect(failures).toBe(0);
     },
-    30000
+    30000,
   );
 });
