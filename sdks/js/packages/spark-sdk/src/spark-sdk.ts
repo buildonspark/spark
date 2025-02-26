@@ -612,7 +612,6 @@ export class SparkWallet {
     const addressTxs = await response.json();
 
     if (addressTxs && addressTxs.length > 0) {
-      console.log("Found transaction");
       const latestTx = addressTxs[0];
 
       const outputIndex: number = latestTx.vout.findIndex(
@@ -761,7 +760,6 @@ export class SparkWallet {
       ) {
         continue;
       }
-      console.log("Claiming transfer", transfer);
       await this.claimTransfer(transfer);
       claimed = true;
     }
@@ -773,7 +771,6 @@ export class SparkWallet {
       await this.transferService.queryPendingTransfersBySender();
     for (const transfer of transfers.transfers) {
       if (transfer.status === TransferStatus.TRANSFER_STATUS_SENDER_INITIATED) {
-        console.log("Cancelling transfer", transfer.id);
         await this.transferService.cancelSendTransfer(transfer);
       }
     }
@@ -966,10 +963,6 @@ export class SparkWallet {
 
     const pubkey = await this.config.signer.getIdentityPublicKey();
 
-    leavesToSend.map((map) => {
-      console.log(map.ownerIdentityPublicKey, pubkey);
-    });
-
     const leafKeyTweaks = await Promise.all(
       leavesToSend.map(async (leaf) => ({
         leaf,
@@ -980,7 +973,6 @@ export class SparkWallet {
       })),
     );
 
-    console.log(onchainAddress);
     const coopExitRequest = await this.sspClient?.requestCoopExit({
       leafExternalIds: leavesToSend.map((leaf) => leaf.id),
       withdrawalAddress: onchainAddress,
