@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"log/slog"
+	"time"
 
 	"github.com/btcsuite/btcd/btcjson"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
@@ -203,22 +204,22 @@ func WatchChain(dbClient *ent.Client, cfg so.BitcoindConfig) error {
 
 	logger.Info("Listening for block notifications via ZMQ endpoint", "endpoint", cfg.ZmqPubRawBlock)
 
+	newBlockNotification := make(chan struct{})
+	go func() {
+		for {
+			_, err := subscriber.RecvMessage(0)
+			if err != nil {
+				log.Fatalf("Failed to receive message: %v", err)
+			}
+			newBlockNotification <- struct{}{}
+		}
+	}()
+
 	// TODO: we should consider alerting on errors within this loop
 	for {
-		msg, err := subscriber.RecvMessage(0)
-		if err != nil {
-			log.Fatalf("Failed to receive message: %v", err)
-		}
-
-		_ = msg[0] // topic
-		rawBlock := msg[1]
-		_ = msg[2] // sequence number
-
-		block := wire.MsgBlock{}
-		err = block.Deserialize(bytes.NewReader([]byte(rawBlock)))
-		if err != nil {
-			logger.Error("Failed deserialization raw block", "raw_block", hex.EncodeToString([]byte(rawBlock)))
-			continue
+		select {
+		case <-newBlockNotification:
+		case <-time.After(1 * time.Minute):
 		}
 
 		// We don't actually do anything with the block receive since
@@ -263,7 +264,7 @@ func disconnectBlocks(_ context.Context, _ *ent.Client, _ []Tip, _ common.Networ
 }
 
 func connectBlocks(ctx context.Context, dbClient *ent.Client, client *rpcclient.Client, chainTips []Tip, network common.Network) error {
-	logger := slog.Default().With("method", "watch_chain.connectBlocks")
+	logger := slog.Default().With("method", "watch_chain.connectBlocks").With("network", network.String())
 	for _, chainTip := range chainTips {
 		blockHash, err := client.GetBlockHash(chainTip.Height)
 		if err != nil {
