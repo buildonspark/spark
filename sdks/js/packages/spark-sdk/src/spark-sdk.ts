@@ -256,7 +256,7 @@ export class SparkWallet {
     return this.sspClient !== null && this.wasmModule !== null;
   }
 
-  private async getIdentityPublicKey(): Promise<string> {
+  async getIdentityPublicKey(): Promise<string> {
     return bytesToHex(await this.config.signer.getIdentityPublicKey());
   }
 
@@ -302,7 +302,7 @@ export class SparkWallet {
     };
   }
 
-  private async initWalletFromMnemonic(mnemonic: string) {
+  async initWalletFromMnemonic(mnemonic: string) {
     const identityPublicKey =
       await this.config.signer.createSparkWalletFromMnemonic(mnemonic);
     // Hacky but do this to store the deposit signing key in the signer
