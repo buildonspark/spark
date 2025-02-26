@@ -18,11 +18,11 @@ export class IssuerSparkWallet extends SparkWallet {
 
     this.issuerTokenTransactionService = new IssuerTokenTransactionService(
       this.config,
-      this.connectionManager
+      this.connectionManager,
     );
     this.tokenFreezeService = new TokenFreezeService(
       this.config,
-      this.connectionManager
+      this.connectionManager,
     );
   }
 
@@ -30,14 +30,18 @@ export class IssuerSparkWallet extends SparkWallet {
     balance: bigint;
     leafCount: number;
   }> {
-    const publicKey = await this.getIdentityPublicKey();
-    const balance = await this.getTokenBalance(publicKey);
-    const allLeaves = await this.getAllTokenLeaves();
-
-    // Get the leaves for the issuer token public key from the map
-    const issuerTokenLeaves = allLeaves.get(publicKey) || [];
-
-    return await this.getTokenBalance(publicKey);
+    const publicKey = await super.getIdentityPublicKey();
+    const balanceObj = await this.getBalance();
+    if (!balanceObj.tokenBalances || !balanceObj.tokenBalances.has(publicKey)) {
+      return {
+        balance: 0n,
+        leafCount: 0,
+      };
+    }
+    return {
+      balance: balanceObj.tokenBalances.get(publicKey)!.balance,
+      leafCount: balanceObj.tokenBalances.get(publicKey)!.leafCount,
+    };
   }
 
   async mintIssuerTokens(tokenAmount: bigint): Promise<string> {
@@ -46,43 +50,47 @@ export class IssuerSparkWallet extends SparkWallet {
     const tokenTransaction =
       await this.issuerTokenTransactionService.constructMintTokenTransaction(
         hexToBytes(tokenPublicKey),
-        tokenAmount
+        tokenAmount,
       );
 
     return await this.issuerTokenTransactionService.broadcastTokenTransaction(
-      tokenTransaction
+      tokenTransaction,
     );
   }
 
-  async transferIssuerTokens(tokenAmount: bigint, recipientPublicKey: string): Promise<string> {
+  async transferIssuerTokens(
+    tokenAmount: bigint,
+    recipientPublicKey: string,
+  ): Promise<string> {
     const tokenPublicKey = await super.getIdentityPublicKey();
-    return await super.transferTokens(tokenPublicKey, tokenAmount, recipientPublicKey);
-  }
-
-  async consolidateIssuerTokenLeaves(): Promise<string> {
-    const tokenPublicKey = await super.getIdentityPublicKey();
-    return await super.consolidateTokenLeaves(tokenPublicKey);
+    return await super.transferTokens(
+      tokenPublicKey,
+      tokenAmount,
+      recipientPublicKey,
+    );
   }
 
   async burnIssuerTokens(
     tokenAmount: bigint,
-    selectedLeaves?: LeafWithPreviousTransactionData[]
+    selectedLeaves?: LeafWithPreviousTransactionData[],
   ) {
     await this.transferTokens(
-      await this.getIdentityPublicKey(),
+      await super.getIdentityPublicKey(),
       tokenAmount,
       BURN_ADDRESS,
-      selectedLeaves
+      selectedLeaves,
     );
   }
 
-  async freezeIssuerTokens(ownerPublicKey: string): Promise<{ impactedLeafIds: string[], impactedTokenAmount: bigint }> {
+  async freezeIssuerTokens(
+    ownerPublicKey: string,
+  ): Promise<{ impactedLeafIds: string[]; impactedTokenAmount: bigint }> {
     await this.syncTokenLeaves();
     const tokenPublicKey = await super.getIdentityPublicKey();
 
     const response = await this.tokenFreezeService!.freezeTokens(
       hexToBytes(ownerPublicKey),
-      hexToBytes(tokenPublicKey)
+      hexToBytes(tokenPublicKey),
     );
 
     // Convert the Uint8Array to a bigint
@@ -94,13 +102,15 @@ export class IssuerSparkWallet extends SparkWallet {
     };
   }
 
-  async unfreezeIssuerTokens(ownerPublicKey: string): Promise<{ impactedLeafIds: string[], impactedTokenAmount: bigint }> {
+  async unfreezeIssuerTokens(
+    ownerPublicKey: string,
+  ): Promise<{ impactedLeafIds: string[]; impactedTokenAmount: bigint }> {
     await this.syncTokenLeaves();
     const tokenPublicKey = await super.getIdentityPublicKey();
 
     const response = await this.tokenFreezeService!.unfreezeTokens(
       hexToBytes(ownerPublicKey),
-      hexToBytes(tokenPublicKey)
+      hexToBytes(tokenPublicKey),
     );
     const tokenAmount = bytesToNumberBE(response.impactedTokenAmount);
 

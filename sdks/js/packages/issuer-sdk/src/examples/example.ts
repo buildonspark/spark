@@ -4,7 +4,7 @@ import { hexToBytes } from "@noble/curves/abstract/utils";
 import { generateMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english";
 import readline from "readline";
-import { IssuerWallet } from "../../dist/issuer-sdk";
+import { IssuerWallet } from "../issuer-sdk";
 import { Network } from "@buildonspark/spark-sdk/utils";
 
 // Initialize Issuer Wallet
@@ -27,7 +27,6 @@ async function runCLI() {
   burn <amount>                              - Burn tokens
   freeze <publicKey>                         - Freeze tokens at the specified public key
   unfreeze <publicKey>                       - Unfreeze tokens at the specified public key
-  consolidate                                - Consolidate token leaves
   balance                                    - Show current wallet balance
   help                                       - Show this help message
   exit/quit                                  - Exit the program
@@ -47,104 +46,100 @@ async function runCLI() {
       break;
     }
 
-    switch (lowerCommand) {
-      case "help":
-        console.log(helpMessage);
-        break;
-      case "genmnemonic":
-        const mnemonic = generateMnemonic(wordlist);
-        console.log(mnemonic);
-        break;
-      case "initwallet":
-        await wallet.initWalletFromMnemonic(
-          args.length > 0 ? args.join(" ") : walletMnemonic
-        );
-        console.log("Wallet initialized successfully");
-        break;
-      case "tokenpublickey":
-        if (!wallet.isSparkInitialized()) {
-          console.log("No wallet initialized");
+    try {
+      switch (lowerCommand) {
+        case "help":
+          console.log(helpMessage);
           break;
-        }
+        case "genmnemonic":
+          const mnemonic = generateMnemonic(wordlist);
+          console.log(mnemonic);
+          break;
+        case "initwallet":
+          await wallet.initWallet(
+            args.length > 0 ? args.join(" ") : walletMnemonic,
+          );
+          console.log("Wallet initialized successfully");
+          break;
+        case "tokenpublickey":
+          if (!wallet.isSparkInitialized()) {
+            console.log("No wallet initialized");
+            break;
+          }
 
-        const tokenPublicKey = await wallet.getTokenPublicKey();
-        console.log("Token Public Key:", tokenPublicKey);
-        break;
-      case "mint":
-        if (!wallet.isSparkInitialized()) {
-          console.log("No wallet initialized");
+          const tokenPublicKey = await wallet.getTokenPublicKey();
+          console.log("Token Public Key:", tokenPublicKey);
           break;
-        }
+        case "mint":
+          if (!wallet.isSparkInitialized()) {
+            console.log("No wallet initialized");
+            break;
+          }
 
-        const amountToMint = BigInt(parseInt(args[0]));
-        await wallet.mintTokens(amountToMint);
-        console.log(`Minted ${amountToMint} tokens`);
-        break;
-      case "transfer":
-        if (!wallet.isSparkInitialized()) {
-          console.log("No wallet initialized");
+          const amountToMint = BigInt(parseInt(args[0]));
+          await wallet.mintTokens(amountToMint);
+          console.log(`Minted ${amountToMint} tokens`);
           break;
-        }
+        case "transfer":
+          if (!wallet.isSparkInitialized()) {
+            console.log("No wallet initialized");
+            break;
+          }
 
-        const transferAmount = BigInt(parseInt(args[0]));
-        const receiverPubKey = args[1];
-        await wallet.transferTokens(transferAmount, receiverPubKey);
-        console.log(
-          `Transferred ${transferAmount} tokens to ${receiverPubKey}`
-        );
-        break;
-      case "burn":
-        if (!wallet.isSparkInitialized()) {
-          console.log("No wallet initialized");
+          const transferAmount = BigInt(parseInt(args[0]));
+          const receiverPubKey = args[1];
+          await wallet.transferTokens(transferAmount, receiverPubKey);
+          console.log(
+            `Transferred ${transferAmount} tokens to ${receiverPubKey}`,
+          );
           break;
-        }
+        case "burn":
+          if (!wallet.isSparkInitialized()) {
+            console.log("No wallet initialized");
+            break;
+          }
 
-        const amountToBurn = BigInt(parseInt(args[0]));
-        await wallet.burnTokens(amountToBurn);
-        console.log(`Burned ${amountToBurn} tokens`);
-        break;
-      case "freeze":
-        if (!wallet.isSparkInitialized()) {
-          console.log("No wallet initialized");
+          const amountToBurn = BigInt(parseInt(args[0]));
+          await wallet.burnTokens(amountToBurn);
+          console.log(`Burned ${amountToBurn} tokens`);
           break;
-        }
+        case "freeze":
+          if (!wallet.isSparkInitialized()) {
+            console.log("No wallet initialized");
+            break;
+          }
 
-        const freezePublicKey = args[0];
-        const freezeResult = await wallet.freezeTokens(freezePublicKey);
-        console.log("Freeze result:", freezeResult);
-        break;
-      case "unfreeze":
-        if (!wallet.isSparkInitialized()) {
-          console.log("No wallet initialized");
+          const freezePublicKey = args[0];
+          const freezeResult = await wallet.freezeTokens(freezePublicKey);
+          console.log("Freeze result:", freezeResult);
           break;
-        }
+        case "unfreeze":
+          if (!wallet.isSparkInitialized()) {
+            console.log("No wallet initialized");
+            break;
+          }
 
-        const unfreezePublicKey = args[0];
-        const unfreezeResult = await wallet.unfreezeTokens(unfreezePublicKey);
-        console.log("Unfreeze result:", unfreezeResult);
-        break;
-      case "consolidate":
-        if (!wallet.isSparkInitialized()) {
-          console.log("No wallet initialized");
+          const unfreezePublicKey = args[0];
+          const unfreezeResult = await wallet.unfreezeTokens(unfreezePublicKey);
+          console.log("Unfreeze result:", unfreezeResult);
           break;
-        }
-
-        await wallet.consolidateTokens();
-        console.log("Token leaves consolidated");
-        break;
-      case "balance":
-        if (!wallet.isSparkInitialized()) {
-          console.log("No wallet initialized");
+        case "balance":
+          if (!wallet.isSparkInitialized()) {
+            console.log("No wallet initialized");
+            break;
+          }
+          const balanceInfo = await wallet.getTokenBalance();
+          console.log("Balance:", balanceInfo.balance);
+          console.log("Number of token leaves:", balanceInfo.leafCount);
           break;
-        }
-        const balanceInfo = await wallet.getTokenBalance();
-        console.log("Balance:", balanceInfo.balance);
-        console.log("Number of token leaves:", balanceInfo.leafCount);
-        break;
-      default:
-        console.log(`Unknown command: ${lowerCommand}`);
-        console.log(helpMessage);
-        break;
+        default:
+          console.log(`Unknown command: ${lowerCommand}`);
+          console.log(helpMessage);
+          break;
+      }
+    } catch (error) {
+      console.error("Error executing command:", error.message);
+      console.log("Please try again or type 'help' for available commands");
     }
   }
 }

@@ -32,7 +32,7 @@ export class TokenTransactionService {
 
   constructor(
     config: WalletConfigService,
-    connectionManager: ConnectionManager
+    connectionManager: ConnectionManager,
   ) {
     this.config = config;
     this.connectionManager = connectionManager;
@@ -42,7 +42,7 @@ export class TokenTransactionService {
     selectedLeaves: LeafWithPreviousTransactionData[],
     recipientPublicKey: Uint8Array,
     tokenPublicKey: Uint8Array,
-    tokenAmount: bigint
+    tokenAmount: bigint,
   ): Promise<TokenTransaction> {
     let availableTokenAmount = calculateAvailableTokenAmount(selectedLeaves);
 
@@ -101,7 +101,7 @@ export class TokenTransactionService {
   public collectOperatorIdentityPublicKeys(): Uint8Array[] {
     const operatorKeys: Uint8Array[] = [];
     for (const [_, operator] of Object.entries(
-      this.config.getConfig().signingOperators
+      this.config.getConfig().signingOperators,
     )) {
       operatorKeys.push(operator.identityPublicKey);
     }
@@ -112,17 +112,17 @@ export class TokenTransactionService {
   public async broadcastTokenTransaction(
     tokenTransaction: TokenTransaction,
     leafToSpendSigningPublicKeys?: Uint8Array[],
-    leafToSpendRevocationPublicKeys?: Uint8Array[]
+    leafToSpendRevocationPublicKeys?: Uint8Array[],
   ): Promise<string> {
     const sparkClient = await this.connectionManager.createSparkClient(
-      this.config.getCoordinatorAddress()
+      this.config.getCoordinatorAddress(),
     );
 
     const signingOperators = this.config.getConfig().signingOperators;
 
     const partialTokenTransactionHash = hashTokenTransaction(
       tokenTransaction,
-      true
+      true,
     );
 
     const ownerSignatures: Uint8Array[] = [];
@@ -135,7 +135,7 @@ export class TokenTransactionService {
 
       const ownerSignature = await this.signMessageWithKey(
         partialTokenTransactionHash,
-        issuerPublicKey
+        issuerPublicKey,
       );
 
       ownerSignatures.push(ownerSignature);
@@ -144,7 +144,7 @@ export class TokenTransactionService {
 
       if (!leafToSpendSigningPublicKeys || !leafToSpendRevocationPublicKeys) {
         throw new Error(
-          "leafToSpendSigningPublicKeys and leafToSpendRevocationPublicKeys are required"
+          "leafToSpendSigningPublicKeys and leafToSpendRevocationPublicKeys are required",
         );
       }
 
@@ -155,7 +155,7 @@ export class TokenTransactionService {
         }
         const ownerSignature = await this.signMessageWithKey(
           partialTokenTransactionHash,
-          key
+          key,
         );
 
         ownerSignatures.push(ownerSignature);
@@ -181,7 +181,7 @@ export class TokenTransactionService {
           startResponse.keyshareInfo?.ownerIdentifiers.length
         }) does not match signing operator count (${
           Object.keys(signingOperators).length
-        })`
+        })`,
       );
     }
 
@@ -189,7 +189,7 @@ export class TokenTransactionService {
       []) {
       if (!signingOperators[identifier]) {
         throw new Error(
-          `Keyshare operator ${identifier} not found in signing operator list`
+          `Keyshare operator ${identifier} not found in signing operator list`,
         );
       }
     }
@@ -197,7 +197,7 @@ export class TokenTransactionService {
     const finalTokenTransaction = startResponse.finalTokenTransaction!;
     const finalTokenTransactionHash = hashTokenTransaction(
       finalTokenTransaction,
-      false
+      false,
     );
 
     const payload: OperatorSpecificTokenTransactionSignablePayload = {
@@ -220,7 +220,7 @@ export class TokenTransactionService {
 
       const ownerSignature = await this.signMessageWithKey(
         payloadHash,
-        issuerPublicKey
+        issuerPublicKey,
       );
 
       operatorSpecificSignatures.push({
@@ -264,8 +264,8 @@ export class TokenTransactionService {
             identifier,
             response,
           };
-        }
-      )
+        },
+      ),
     );
 
     const threshold = startResponse.keyshareInfo.threshold;
@@ -283,12 +283,12 @@ export class TokenTransactionService {
           ({ identifier, response }) => ({
             index: parseInt(identifier, 16),
             keyshare: response.tokenTransactionRevocationKeyshares[leafIndex],
-          })
+          }),
         );
 
         if (leafKeyshares.length < threshold) {
           throw new Error(
-            `Insufficient keyshares for leaf ${leafIndex}: got ${leafKeyshares.length}, need ${threshold}`
+            `Insufficient keyshares for leaf ${leafIndex}: got ${leafKeyshares.length}, need ${threshold}`,
           );
         }
 
@@ -297,7 +297,7 @@ export class TokenTransactionService {
         for (const { index } of leafKeyshares) {
           if (seenIndices.has(index)) {
             throw new Error(
-              `Duplicate operator index ${index} for leaf ${leafIndex}`
+              `Duplicate operator index ${index} for leaf ${leafIndex}`,
             );
           }
           seenIndices.add(index);
@@ -305,22 +305,23 @@ export class TokenTransactionService {
 
         const recoveredPrivateKey = recoverPrivateKeyFromKeyshares(
           leafKeyshares as KeyshareWithOperatorIndex[],
-          threshold
+          threshold,
         );
         const recoveredPublicKey = secp256k1.getPublicKey(
           recoveredPrivateKey,
-          true
+          true,
         );
 
         if (
           !leafToSpendRevocationPublicKeys ||
           !leafToSpendRevocationPublicKeys[leafIndex] ||
           !recoveredPublicKey.every(
-            (byte, i) => byte === leafToSpendRevocationPublicKeys[leafIndex]![i]
+            (byte, i) =>
+              byte === leafToSpendRevocationPublicKeys[leafIndex]![i],
           )
         ) {
           throw new Error(
-            `Recovered public key does not match expected revocation public key for leaf ${leafIndex}`
+            `Recovered public key does not match expected revocation public key for leaf ${leafIndex}`,
           );
         }
 
@@ -331,17 +332,19 @@ export class TokenTransactionService {
       await this.finalizeTokenTransaction(
         finalTokenTransaction,
         revocationKeys,
-        threshold
+        threshold,
       );
     }
 
-    return bytesToHex(hashTokenTransaction(startResponse.finalTokenTransaction!));
+    return bytesToHex(
+      hashTokenTransaction(startResponse.finalTokenTransaction!),
+    );
   }
 
   public async finalizeTokenTransaction(
     finalTokenTransaction: TokenTransaction,
     leafToSpendRevocationKeys: Uint8Array[],
-    threshold: number
+    threshold: number,
   ): Promise<TokenTransaction> {
     const signingOperators = this.config.getConfig().signingOperators;
     // Submit finalize_token_transaction to all SOs in parallel
@@ -362,7 +365,7 @@ export class TokenTransactionService {
           identifier,
           response,
         };
-      })
+      }),
     );
 
     validateResponses(soResponses);
@@ -370,41 +373,12 @@ export class TokenTransactionService {
     return finalTokenTransaction;
   }
 
-  public async constructConsolidateTokenTransaction(
-    selectedLeaves: LeafWithPreviousTransactionData[],
-    tokenPublicKey: Uint8Array
-  ): Promise<TokenTransaction> {
-    const tokenAmountSum = getTokenLeavesSum(selectedLeaves);
-
-    const transferTokenTransaction: TokenTransaction = {
-      tokenInput: {
-        $case: "transferInput",
-        transferInput: {
-          leavesToSpend: selectedLeaves.map((leaf) => ({
-            prevTokenTransactionHash: leaf.previousTransactionHash,
-            prevTokenTransactionLeafVout: leaf.previousTransactionVout,
-          })),
-        },
-      },
-      outputLeaves: [
-        {
-          ownerPublicKey: await this.config.signer.getIdentityPublicKey(),
-          tokenPublicKey: tokenPublicKey,
-          tokenAmount: numberToBytesBE(tokenAmountSum, 16),
-        },
-      ],
-      sparkOperatorIdentityPublicKeys: this.collectOperatorIdentityPublicKeys(),
-    };
-
-    return transferTokenTransaction;
-  }
-
   public async fetchOwnedTokenLeaves(
     ownerPublicKeys: Uint8Array[],
-    tokenPublicKeys: Uint8Array[]
+    tokenPublicKeys: Uint8Array[],
   ): Promise<LeafWithPreviousTransactionData[]> {
     const sparkClient = await this.connectionManager.createSparkClient(
-      this.config.getCoordinatorAddress()
+      this.config.getCoordinatorAddress(),
     );
 
     const result = await sparkClient.get_owned_token_leaves({
@@ -416,11 +390,11 @@ export class TokenTransactionService {
   }
 
   public async syncTokenLeaves(
-    tokenLeaves: Map<string, LeafWithPreviousTransactionData[]>
+    tokenLeaves: Map<string, LeafWithPreviousTransactionData[]>,
   ) {
     const unsortedTokenLeaves = await this.fetchOwnedTokenLeaves(
       await this.config.signer.getTrackedPublicKeys(),
-      []
+      [],
     );
 
     unsortedTokenLeaves.forEach((leaf) => {
@@ -433,7 +407,7 @@ export class TokenTransactionService {
 
   public selectTokenLeaves(
     tokenLeaves: LeafWithPreviousTransactionData[],
-    tokenAmount: bigint
+    tokenAmount: bigint,
   ): LeafWithPreviousTransactionData[] {
     if (calculateAvailableTokenAmount(tokenLeaves) < tokenAmount) {
       throw new Error("Insufficient available token amount");
@@ -442,7 +416,7 @@ export class TokenTransactionService {
     // First try to find an exact match
     const exactMatch: LeafWithPreviousTransactionData | undefined =
       tokenLeaves.find(
-        (item) => bytesToNumberBE(item.leaf!.tokenAmount!) === tokenAmount
+        (item) => bytesToNumberBE(item.leaf!.tokenAmount!) === tokenAmount,
       );
 
     if (exactMatch) {
@@ -455,8 +429,8 @@ export class TokenTransactionService {
     tokenLeaves.sort((a, b) =>
       Number(
         bytesToNumberBE(a.leaf!.tokenAmount!) -
-          bytesToNumberBE(b.leaf!.tokenAmount!)
-      )
+          bytesToNumberBE(b.leaf!.tokenAmount!),
+      ),
     );
 
     let remainingAmount = tokenAmount;
@@ -472,7 +446,7 @@ export class TokenTransactionService {
 
     if (remainingAmount > 0n) {
       throw new Error(
-        "You do not have enough funds to complete the specified operation"
+        "You do not have enough funds to complete the specified operation",
       );
     }
 
@@ -482,7 +456,7 @@ export class TokenTransactionService {
   // Helper function for deciding if the signer public key is the identity public key
   private async signMessageWithKey(
     message: Uint8Array,
-    publicKey: Uint8Array
+    publicKey: Uint8Array,
   ): Promise<Uint8Array> {
     if (
       bytesToHex(publicKey) ===
@@ -492,7 +466,7 @@ export class TokenTransactionService {
     } else {
       return await this.config.signer.signMessageWithPublicKey(
         message,
-        publicKey
+        publicKey,
       );
     }
   }

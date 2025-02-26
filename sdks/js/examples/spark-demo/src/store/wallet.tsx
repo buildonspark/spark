@@ -1,7 +1,7 @@
-import { hexToBytes } from "@lightsparkdev/core";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { SparkWallet } from "@buildonspark/spark-sdk";
 import { Network } from "@buildonspark/spark-sdk/utils";
+import { hexToBytes } from "@lightsparkdev/core";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { create } from "zustand";
 import MxnLogo from "../icons/test_logo/MxnLogo";
 import UsdcLogo from "../icons/test_logo/UsdcLogo";
@@ -102,8 +102,19 @@ const useWalletStore = create<WalletStore>((set, get) => ({
   },
   getTokenBalance: async (tokenPublicKey: string) => {
     const { wallet } = get();
-    const balance = await wallet.getTokenBalance(tokenPublicKey);
-    return balance;
+    const balanceObj = await wallet.getBalance();
+    if (!balanceObj.tokenBalances) {
+      return {
+        balance: BigInt(0),
+        leafCount: 0,
+      };
+    }
+    return (
+      balanceObj.tokenBalances.get(tokenPublicKey) || {
+        balance: BigInt(0),
+        leafCount: 0,
+      }
+    );
   },
   transferTokens: async (
     tokenPublicKey: string,
@@ -121,7 +132,7 @@ const useWalletStore = create<WalletStore>((set, get) => ({
   initWallet: async (mnemonic: string) => {
     console.log("initWallet", mnemonic);
     const { wallet } = get();
-    await wallet.initWalletFromMnemonic(mnemonic);
+    await wallet.initWallet(mnemonic);
     sessionStorage.setItem(MNEMONIC_STORAGE_KEY, mnemonic);
     set({ isInitialized: true, mnemonic });
   },

@@ -255,7 +255,7 @@ export class SparkWallet {
     return this.sspClient !== null && this.wasmModule !== null;
   }
 
-  async getIdentityPublicKey(): Promise<string> {
+  public async getIdentityPublicKey(): Promise<string> {
     return bytesToHex(await this.config.signer.getIdentityPublicKey());
   }
 
@@ -301,7 +301,7 @@ export class SparkWallet {
     };
   }
 
-  async initWalletFromMnemonic(mnemonic: string) {
+  private async initWalletFromMnemonic(mnemonic: string) {
     const identityPublicKey =
       await this.config.signer.createSparkWalletFromMnemonic(mnemonic);
     // Hacky but do this to store the deposit signing key in the signer
@@ -514,7 +514,7 @@ export class SparkWallet {
 
   public async getBalance(): Promise<{
     balance: bigint;
-    tokenBalance: Map<string, { balance: bigint; leafCount: number }>;
+    tokenBalances: Map<string, { balance: bigint; leafCount: number }>;
   }> {
     await Promise.all([
       this.claimTransfers(),
@@ -524,10 +524,10 @@ export class SparkWallet {
 
     const leaves = await this.getLeaves();
     const balance = leaves.reduce((acc, leaf) => acc + BigInt(leaf.value), 0n);
-    const tokenBalance = await this.getAllTokenBalances();
+    const tokenBalances = await this.getAllTokenBalances();
     return {
       balance,
-      tokenBalance,
+      tokenBalances,
     };
   }
 
@@ -1060,34 +1060,7 @@ export class SparkWallet {
     this.tokenLeaves = groupedLeaves;
   }
 
-  public async getAllTokenLeaves(): Promise<
-    Map<string, LeafWithPreviousTransactionData[]>
-  > {
-    await this.syncTokenLeaves();
-    return this.tokenLeaves;
-  }
-
-  public async getTokenBalance(tokenPublicKey: string): Promise<{
-    balance: bigint;
-    leafCount: number;
-  }> {
-    await this.syncTokenLeaves();
-
-    if (!this.tokenLeaves.has(tokenPublicKey)) {
-      return {
-        balance: 0n,
-        leafCount: 0,
-      };
-    }
-
-    const leaves = this.tokenLeaves.get(tokenPublicKey)!;
-    return {
-      balance: calculateAvailableTokenAmount(leaves),
-      leafCount: leaves.length,
-    };
-  }
-
-  public async getAllTokenBalances(): Promise<
+  private async getAllTokenBalances(): Promise<
     Map<
       string,
       {
@@ -1162,59 +1135,6 @@ export class SparkWallet {
     return this.tokenTransactionService.selectTokenLeaves(
       this.tokenLeaves.get(tokenPublicKey)!,
       tokenAmount,
-    );
-  }
-
-  // If no leaves are passed in, it will take all the leaves available for the given tokenPublicKey
-  public async consolidateTokenLeaves(
-    tokenPublicKey: string,
-    selectedLeaves?: LeafWithPreviousTransactionData[],
-  ): Promise<string> {
-    await this.syncTokenLeaves();
-    const tokenPublicKeyBytes = hexToBytes(tokenPublicKey);
-
-    if (!this.tokenLeaves.has(tokenPublicKey)) {
-      throw new Error("No token leaves with the given tokenPublicKey");
-    }
-
-    if (selectedLeaves) {
-      if (
-        !checkIfSelectedLeavesAreAvailable(
-          selectedLeaves,
-          this.tokenLeaves,
-          tokenPublicKeyBytes,
-        )
-      ) {
-        throw new Error("One or more selected leaves are not available");
-      }
-    } else {
-      // Get all available leaves
-      selectedLeaves = this.tokenLeaves.get(tokenPublicKey)!;
-
-      // Limit to MAX_TOKEN_LEAVES if there are too many
-      if (selectedLeaves.length > MAX_TOKEN_LEAVES) {
-        selectedLeaves = selectedLeaves.slice(0, MAX_TOKEN_LEAVES);
-      }
-    }
-
-    if (selectedLeaves!.length === 1) {
-      return "";
-    }
-
-    if (selectedLeaves!.length > MAX_TOKEN_LEAVES) {
-      throw new Error("Too many leaves selected");
-    }
-
-    const partialTokenTransaction =
-      await this.tokenTransactionService.constructConsolidateTokenTransaction(
-        selectedLeaves,
-        tokenPublicKeyBytes,
-      );
-
-    return await this.tokenTransactionService.broadcastTokenTransaction(
-      partialTokenTransaction,
-      selectedLeaves.map((leaf) => leaf.leaf!.ownerPublicKey),
-      selectedLeaves.map((leaf) => leaf.leaf!.revocationPublicKey!),
     );
   }
 }

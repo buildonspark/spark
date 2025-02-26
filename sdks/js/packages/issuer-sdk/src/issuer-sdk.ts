@@ -16,12 +16,12 @@ export class IssuerWallet {
     this.sparkWallet = new IssuerSparkWallet(network);
   }
 
-  async initWalletFromMnemonic(
-    mnemonic: string,
+  async initWallet(
+    mnemonicOrSeed?: Uint8Array | string,
     // Set to true to enable L1 Token Announcements.
-    enableL1Wallet: boolean = true
+    enableL1Wallet: boolean = true,
   ): Promise<void> {
-    await this.sparkWallet.initWalletFromMnemonic(mnemonic);
+    await this.sparkWallet.initWallet(mnemonicOrSeed);
 
     if (enableL1Wallet) {
       // const seed = await bip39.mnemonicToSeed(mnemonic);
@@ -97,19 +97,8 @@ export class IssuerWallet {
 
     await this.sparkWallet.transferIssuerTokens(
       amountToTransfer,
-      recipientPublicKey
+      recipientPublicKey,
     );
-  }
-
-  /**
-   * Consolidate all leaves into a single leaf.
-   */
-  async consolidateTokens() {
-    if (!this.isSparkInitialized()) {
-      throw new Error("Spark wallet not initialized");
-    }
-
-    await this.sparkWallet.consolidateIssuerTokenLeaves();
   }
 
   /**

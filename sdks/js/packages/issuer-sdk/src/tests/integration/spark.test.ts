@@ -17,13 +17,11 @@ describe("token integration test", () => {
 
     const wallet = new IssuerSparkWallet(Network.LOCAL);
     const mnemonic = generateMnemonic(wordlist);
-    await wallet.initWalletFromMnemonic(mnemonic);
+    await wallet.initWallet(mnemonic);
 
     await wallet.mintIssuerTokens(tokenAmount);
 
-    const tokenBalance = await wallet.getTokenBalance(
-      await wallet.getIdentityPublicKey()
-    );
+    const tokenBalance = await wallet.getIssuerTokenBalance();
     expect(tokenBalance.balance).toEqual(tokenAmount);
   });
 
@@ -32,103 +30,64 @@ describe("token integration test", () => {
 
     const issuerWallet = new IssuerSparkWallet(Network.LOCAL);
     const mnemonic = generateMnemonic(wordlist);
-    await issuerWallet.initWalletFromMnemonic(mnemonic);
+    await issuerWallet.initWallet(mnemonic);
 
     const destinationWallet = new SparkWallet(Network.LOCAL);
     const destinationMnemonic = generateMnemonic(wordlist);
-    await destinationWallet.initWalletFromMnemonic(destinationMnemonic);
+    await destinationWallet.initWallet(destinationMnemonic);
 
     await issuerWallet.mintIssuerTokens(tokenAmount);
     await issuerWallet.transferIssuerTokens(
       tokenAmount,
-      await destinationWallet.getIdentityPublicKey()
+      await destinationWallet.getIdentityPublicKey(),
     );
     await new Promise((resolve) => setTimeout(resolve, 3000));
-    const sourceBalance = await issuerWallet.getTokenBalance(
-      await issuerWallet.getIdentityPublicKey()
-    );
+    const sourceBalance = await issuerWallet.getIssuerTokenBalance();
     expect(sourceBalance.balance).toEqual(0n);
 
     const tokenPublicKey = await issuerWallet.getIdentityPublicKey();
-    const destinationBalance = await destinationWallet.getTokenBalance(
-      tokenPublicKey
+    const destinationBalance = await getSparkWalletTokenBalanceOrZero(
+      destinationWallet,
+      tokenPublicKey,
     );
     expect(destinationBalance.balance).toEqual(tokenAmount);
-  });
-
-  it("should consolidate three token leaves", async () => {
-    const tokenAmount: bigint = 1000n;
-    const wallet = new IssuerSparkWallet(Network.LOCAL);
-    const mnemonic = generateMnemonic(wordlist);
-    await wallet.initWalletFromMnemonic(mnemonic);
-
-    await wallet.mintIssuerTokens(tokenAmount);
-    await wallet.mintIssuerTokens(tokenAmount);
-    await wallet.mintIssuerTokens(tokenAmount);
-
-    const identityPublicKey = await wallet.getIdentityPublicKey();
-    const balanceBeforeConsolidation = await wallet.getTokenBalance(
-      await wallet.getIdentityPublicKey()
-    );
-    const leavesBeforeConsolidation = await wallet.getAllTokenLeaves();
-    expect(balanceBeforeConsolidation.balance).toEqual(tokenAmount * 3n);
-    expect(
-      leavesBeforeConsolidation.get(identityPublicKey)?.length || 0
-    ).toEqual(3);
-
-    await wallet.consolidateIssuerTokenLeaves();
-
-    const balanceAfterConsolidation = await wallet.getTokenBalance(
-      await wallet.getIdentityPublicKey()
-    );
-    const leavesAfterConsolidation = await wallet.getAllTokenLeaves();
-    expect(balanceAfterConsolidation.balance).toEqual(tokenAmount * 3n);
-    expect(
-      leavesAfterConsolidation.get(identityPublicKey)?.length || 0
-    ).toEqual(1);
   });
 
   it("should freeze tokens", async () => {
     const tokenAmount: bigint = 1000n;
     const issuerWallet = new IssuerSparkWallet(Network.LOCAL);
     const issuerMnemonic = generateMnemonic(wordlist);
-    await issuerWallet.initWalletFromMnemonic(issuerMnemonic);
+    await issuerWallet.initWallet(issuerMnemonic);
 
     await issuerWallet.mintIssuerTokens(tokenAmount);
 
     // Check issuer balance after minting
-    const issuerBalanceAfterMint = await issuerWallet.getTokenBalance(
-      await issuerWallet.getIdentityPublicKey()
-    );
+    const issuerBalanceAfterMint = await issuerWallet.getIssuerTokenBalance();
     expect(issuerBalanceAfterMint.balance).toEqual(tokenAmount);
 
-    const userWallet = new IssuerSparkWallet(Network.LOCAL);
+    const userWallet = new SparkWallet(Network.LOCAL);
     const userMnemonic = generateMnemonic(wordlist);
-    await userWallet.initWalletFromMnemonic(userMnemonic);
+    await userWallet.initWallet(userMnemonic);
     const userWalletPublicKey = await userWallet.getIdentityPublicKey();
 
     await issuerWallet.transferIssuerTokens(tokenAmount, userWalletPublicKey);
 
-    const issuerBalanceAfterTransfer = await issuerWallet.getTokenBalance(
-      await issuerWallet.getIdentityPublicKey()
-    );
+    const issuerBalanceAfterTransfer =
+      await issuerWallet.getIssuerTokenBalance();
     expect(issuerBalanceAfterTransfer.balance).toEqual(0n);
 
     const tokenPublicKey = await issuerWallet.getIdentityPublicKey();
-    const userBalanceAfterTransfer = await userWallet.getTokenBalance(
-      tokenPublicKey
-    );
+    const userBalanceAfterTransfer = (await userWallet.getBalance())
+      .tokenBalances[tokenPublicKey];
     expect(userBalanceAfterTransfer.balance).toEqual(tokenAmount);
 
-    const freezeResult = await issuerWallet.freezeIssuerTokens(
-      userWalletPublicKey
-    );
+    const freezeResult =
+      await issuerWallet.freezeIssuerTokens(userWalletPublicKey);
     expect(freezeResult.impactedLeafIds.length).toBe(1);
     expect(freezeResult.impactedTokenAmount).toBe(1000n);
 
-    const unfreezeResult = await issuerWallet.unfreezeIssuerTokens(
-      userWalletPublicKey
-    );
+    const unfreezeResult =
+      await issuerWallet.unfreezeIssuerTokens(userWalletPublicKey);
     expect(unfreezeResult.impactedLeafIds.length).toBe(1);
     expect(unfreezeResult.impactedTokenAmount).toBe(1000n);
   });
@@ -137,19 +96,16 @@ describe("token integration test", () => {
     const tokenAmount: bigint = 200n;
     const issuerWallet = new IssuerSparkWallet(Network.LOCAL);
     const issuerMnemonic = generateMnemonic(wordlist);
-    await issuerWallet.initWalletFromMnemonic(issuerMnemonic);
+    await issuerWallet.initWallet(issuerMnemonic);
     await issuerWallet.mintIssuerTokens(tokenAmount);
 
-    const issuerTokenBalance = await issuerWallet.getTokenBalance(
-      await issuerWallet.getIdentityPublicKey()
-    );
+    const issuerTokenBalance = await issuerWallet.getIssuerTokenBalance();
     expect(issuerTokenBalance.balance).toEqual(tokenAmount);
 
     await issuerWallet.burnIssuerTokens(tokenAmount);
 
-    const issuerTokenBalanceAfterBurn = await issuerWallet.getTokenBalance(
-      await issuerWallet.getIdentityPublicKey()
-    );
+    const issuerTokenBalanceAfterBurn =
+      await issuerWallet.getIssuerTokenBalance();
     expect(issuerTokenBalanceAfterBurn.balance).toEqual(0n);
   });
 
@@ -158,55 +114,65 @@ describe("token integration test", () => {
 
     const issuerWallet = new IssuerSparkWallet(Network.LOCAL);
     const issuerMnemonic = generateMnemonic(wordlist);
-    await issuerWallet.initWalletFromMnemonic(issuerMnemonic);
+    await issuerWallet.initWallet(issuerMnemonic);
 
     const userWallet = new SparkWallet(Network.LOCAL);
     const userMnemonic = generateMnemonic(wordlist);
-    await userWallet.initWalletFromMnemonic(userMnemonic);
+    await userWallet.initWallet(userMnemonic);
 
     await issuerWallet.mintIssuerTokens(tokenAmount);
 
-    const issuerBalanceAfterMint = await issuerWallet.getTokenBalance(
-      await issuerWallet.getIdentityPublicKey()
-    );
+    const issuerBalanceAfterMint = await issuerWallet.getIssuerTokenBalance();
     expect(issuerBalanceAfterMint.balance).toEqual(tokenAmount);
 
     const userWalletPublicKey = await userWallet.getIdentityPublicKey();
 
     await issuerWallet.transferIssuerTokens(tokenAmount, userWalletPublicKey);
 
-    const issuerBalanceAfterTransfer = await issuerWallet.getTokenBalance(
-      await issuerWallet.getIdentityPublicKey()
-    );
+    const issuerBalanceAfterTransfer =
+      await issuerWallet.getIssuerTokenBalance();
     expect(issuerBalanceAfterTransfer.balance).toEqual(0n);
 
     const tokenPublicKeyHex = await issuerWallet.getIdentityPublicKey();
-    const userBalanceAfterTransfer = await userWallet.getTokenBalance(
-      tokenPublicKeyHex
+    const userBalanceAfterTransfer = await getSparkWalletTokenBalanceOrZero(
+      userWallet,
+      tokenPublicKeyHex,
     );
     expect(userBalanceAfterTransfer.balance).toEqual(tokenAmount);
 
     await userWallet.transferTokens(
       tokenPublicKeyHex,
       tokenAmount,
-      tokenPublicKeyHex
+      tokenPublicKeyHex,
     );
 
-    const userBalanceAfterTransferBack = await userWallet.getTokenBalance(
-      tokenPublicKeyHex
+    const userBalanceAfterTransferBack = await getSparkWalletTokenBalanceOrZero(
+      userWallet,
+      tokenPublicKeyHex,
     );
     expect(userBalanceAfterTransferBack.balance).toEqual(0n);
 
-    const issuerTokenBalance = await issuerWallet.getTokenBalance(
-      tokenPublicKeyHex
-    );
+    const issuerTokenBalance = await issuerWallet.getIssuerTokenBalance();
     expect(issuerTokenBalance.balance).toEqual(tokenAmount);
 
     await issuerWallet.burnIssuerTokens(tokenAmount);
 
-    const issuerTokenBalanceAfterBurn = await issuerWallet.getTokenBalance(
-      tokenPublicKeyHex
-    );
+    const issuerTokenBalanceAfterBurn =
+      await issuerWallet.getIssuerTokenBalance();
     expect(issuerTokenBalanceAfterBurn.balance).toEqual(0n);
   });
 });
+
+async function getSparkWalletTokenBalanceOrZero(sparkWallet, publicKey) {
+  const balanceObj = await sparkWallet.getBalance();
+  if (!balanceObj.tokenBalances || !balanceObj.tokenBalances.has(publicKey)) {
+    return {
+      balance: 0n,
+      leafCount: 0,
+    };
+  }
+  return {
+    balance: balanceObj.tokenBalance,
+    leafCount: balanceObj.leafCount,
+  };
+}
