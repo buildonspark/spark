@@ -95,23 +95,23 @@ export class IssuerWallet {
    * Mints new tokens to the specified address
    * TODO: Add support for minting directly to recipient address.
    */
-  async mintTokens(amountToMint: bigint) {
+  async mintTokens(amountToMint: bigint): Promise<string> {
     if (!this.isSparkInitialized()) {
       throw new Error("Spark wallet not initialized");
     }
 
-    await this.sparkWallet.mintIssuerTokens(amountToMint);
+    return await this.sparkWallet.mintIssuerTokens(amountToMint);
   }
 
   /**
    * Transfers tokens to the specified receipient.
    */
-  async transferTokens(amountToTransfer: bigint, recipientPublicKey: string) {
+  async transferTokens(amountToTransfer: bigint, recipientPublicKey: string): Promise<string> {
     if (!this.isSparkInitialized()) {
       throw new Error("Spark wallet not initialized");
     }
 
-    await this.sparkWallet.transferIssuerTokens(
+    return await this.sparkWallet.transferIssuerTokens(
       amountToTransfer,
       recipientPublicKey,
     );
@@ -120,12 +120,12 @@ export class IssuerWallet {
   /**
    * Burns issuer tokens at the specified receipient.
    */
-  async burnTokens(amountToBurn: bigint) {
+  async burnTokens(amountToBurn: bigint): Promise<string> {
     if (!this.isSparkInitialized()) {
       throw new Error("Spark wallet not initialized");
     }
 
-    await this.sparkWallet.burnIssuerTokens(amountToBurn);
+    return await this.sparkWallet.burnIssuerTokens(amountToBurn);
   }
 
   /**

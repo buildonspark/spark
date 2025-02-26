@@ -73,8 +73,8 @@ export class IssuerSparkWallet extends SparkWallet {
   async burnIssuerTokens(
     tokenAmount: bigint,
     selectedLeaves?: LeafWithPreviousTransactionData[],
-  ) {
-    await this.transferTokens(
+  ): Promise<string> {
+    return await this.transferTokens(
       await super.getIdentityPublicKey(),
       tokenAmount,
       BURN_ADDRESS,
