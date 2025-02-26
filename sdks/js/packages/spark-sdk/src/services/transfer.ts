@@ -16,6 +16,7 @@ import {
   LeafRefundTxSigningResult,
   LeafSwapResponse,
   NodeSignatures,
+  QueryAllTransfersResponse,
   QueryPendingTransfersResponse,
   SendLeafKeyTweak,
   StartSendTransferResponse,
@@ -62,7 +63,7 @@ export class BaseTransferService {
 
   constructor(
     config: WalletConfigService,
-    connectionManager: ConnectionManager
+    connectionManager: ConnectionManager,
   ) {
     this.config = config;
     this.connectionManager = connectionManager;
@@ -71,21 +72,21 @@ export class BaseTransferService {
   async sendTransferTweakKey(
     transfer: Transfer,
     leaves: LeafKeyTweak[],
-    refundSignatureMap: Map<string, Uint8Array>
+    refundSignatureMap: Map<string, Uint8Array>,
   ): Promise<Transfer> {
     const keyTweakInputMap = await this.prepareSendTransferKeyTweaks(
       transfer,
       leaves,
-      refundSignatureMap
+      refundSignatureMap,
     );
 
     let updatedTransfer: Transfer | undefined;
     const errors: Error[] = [];
     const promises = Object.entries(
-      this.config.getConfig().signingOperators
+      this.config.getConfig().signingOperators,
     ).map(async ([identifier, operator]) => {
       const sparkClient = await this.connectionManager.createSparkClient(
-        operator.address
+        operator.address,
       );
 
       const leavesToSend = keyTweakInputMap.get(identifier);
@@ -111,14 +112,14 @@ export class BaseTransferService {
       } else {
         if (!transferResp.transfer) {
           errors.push(
-            new Error(`No transfer response from operator ${identifier}`)
+            new Error(`No transfer response from operator ${identifier}`),
           );
           return;
         }
 
         if (!this.compareTransfers(updatedTransfer, transferResp.transfer)) {
           errors.push(
-            new Error(`Inconsistent transfer response from operators`)
+            new Error(`Inconsistent transfer response from operators`),
           );
         }
       }
@@ -140,7 +141,7 @@ export class BaseTransferService {
   async signRefunds(
     leafDataMap: Map<string, ClaimLeafData>,
     operatorSigningResults: LeafRefundTxSigningResult[],
-    adaptorPubKey?: Uint8Array
+    adaptorPubKey?: Uint8Array,
   ): Promise<NodeSignatures[]> {
     const nodeSignatures: NodeSignatures[] = [];
     for (const operatorSigningResult of operatorSigningResults) {
@@ -152,14 +153,14 @@ export class BaseTransferService {
         !leafData.refundTx
       ) {
         throw new Error(
-          `Leaf data not found for leaf ${operatorSigningResult.leafId}`
+          `Leaf data not found for leaf ${operatorSigningResult.leafId}`,
         );
       }
 
       const txOutput = leafData.tx?.getOutput(0);
       if (!txOutput) {
         throw new Error(
-          `Output not found for leaf ${operatorSigningResult.leafId}`
+          `Output not found for leaf ${operatorSigningResult.leafId}`,
         );
       }
 
@@ -204,10 +205,10 @@ export class BaseTransferService {
   private async prepareSendTransferKeyTweaks(
     transfer: Transfer,
     leaves: LeafKeyTweak[],
-    refundSignatureMap: Map<string, Uint8Array>
+    refundSignatureMap: Map<string, Uint8Array>,
   ): Promise<Map<string, SendLeafKeyTweak[]>> {
     const receiverEciesPubKey = ecies.PublicKey.fromHex(
-      bytesToHex(transfer.receiverIdentityPublicKey)
+      bytesToHex(transfer.receiverIdentityPublicKey),
     );
 
     const leavesTweaksMap = new Map<string, SendLeafKeyTweak[]>();
@@ -218,7 +219,7 @@ export class BaseTransferService {
         transfer.id,
         leaf,
         receiverEciesPubKey,
-        refundSignature
+        refundSignature,
       );
       for (const [identifier, leafTweak] of leafTweaksMap) {
         leavesTweaksMap.set(identifier, [
@@ -235,12 +236,12 @@ export class BaseTransferService {
     transferID: string,
     leaf: LeafKeyTweak,
     receiverEciesPubKey: ecies.PublicKey,
-    refundSignature?: Uint8Array
+    refundSignature?: Uint8Array,
   ): Promise<Map<string, SendLeafKeyTweak>> {
     const pubKeyTweak =
       await this.config.signer.subtractPrivateKeysGivenPublicKeys(
         leaf.signingPubKey,
-        leaf.newSigningPubKey
+        leaf.newSigningPubKey,
       );
 
     const shares = await this.config.signer.splitSecretWithProofs({
@@ -253,7 +254,7 @@ export class BaseTransferService {
 
     const pubkeySharesTweak = new Map<string, Uint8Array>();
     for (const [identifier, operator] of Object.entries(
-      this.config.getConfig().signingOperators
+      this.config.getConfig().signingOperators,
     )) {
       const share = this.findShare(shares, operator.id);
       if (!share) {
@@ -262,14 +263,14 @@ export class BaseTransferService {
 
       const pubkeyTweak = secp256k1.getPublicKey(
         numberToBytesBE(share.share, 32),
-        true
+        true,
       );
       pubkeySharesTweak.set(identifier, pubkeyTweak);
     }
 
     const secretCipher = await this.config.signer.encryptLeafPrivateKeyEcies(
       receiverEciesPubKey.toBytes(),
-      leaf.newSigningPubKey
+      leaf.newSigningPubKey,
     );
 
     const encoder = new TextEncoder();
@@ -282,12 +283,12 @@ export class BaseTransferService {
     const payloadHash = sha256(payload);
     const signature = await this.config.signer.signMessageWithIdentityKey(
       payloadHash,
-      true
+      true,
     );
 
     const leafTweaksMap = new Map<string, SendLeafKeyTweak>();
     for (const [identifier, operator] of Object.entries(
-      this.config.getConfig().signingOperators
+      this.config.getConfig().signingOperators,
     )) {
       const share = this.findShare(shares, operator.id);
       if (!share) {
@@ -325,7 +326,7 @@ export class BaseTransferService {
       transfer1.id === transfer2.id &&
       equalBytes(
         transfer1.senderIdentityPublicKey,
-        transfer2.senderIdentityPublicKey
+        transfer2.senderIdentityPublicKey,
       ) &&
       transfer1.status === transfer2.status &&
       transfer1.totalValue === transfer2.totalValue &&
@@ -338,7 +339,7 @@ export class BaseTransferService {
 export class TransferService extends BaseTransferService {
   constructor(
     config: WalletConfigService,
-    connectionManager: ConnectionManager
+    connectionManager: ConnectionManager,
   ) {
     super(config, connectionManager);
   }
@@ -346,18 +347,18 @@ export class TransferService extends BaseTransferService {
   async sendTransfer(
     leaves: LeafKeyTweak[],
     receiverIdentityPubkey: Uint8Array,
-    expiryTime: Date
+    expiryTime: Date,
   ): Promise<Transfer> {
     const { transfer, signatureMap } = await this.sendTransferSignRefund(
       leaves,
       receiverIdentityPubkey,
-      expiryTime
+      expiryTime,
     );
 
     const transferWithTweakedKeys = await this.sendTransferTweakKey(
       transfer,
       leaves,
-      signatureMap
+      signatureMap,
     );
 
     return transferWithTweakedKeys;
@@ -374,7 +375,7 @@ export class TransferService extends BaseTransferService {
 
   async queryPendingTransfers(): Promise<QueryPendingTransfersResponse> {
     const sparkClient = await this.connectionManager.createSparkClient(
-      this.config.getCoordinatorAddress()
+      this.config.getCoordinatorAddress(),
     );
     let pendingTransfersResp: QueryPendingTransfersResponse;
     try {
@@ -391,8 +392,29 @@ export class TransferService extends BaseTransferService {
     return pendingTransfersResp;
   }
 
+  async queryAllTransfers(
+    limit: number,
+    offset: number,
+  ): Promise<QueryAllTransfersResponse> {
+    const sparkClient = await this.connectionManager.createSparkClient(
+      this.config.getCoordinatorAddress(),
+    );
+
+    let allTransfersResp: QueryAllTransfersResponse;
+    try {
+      allTransfersResp = await sparkClient.query_all_transfers({
+        identityPublicKey: await this.config.signer.getIdentityPublicKey(),
+        limit,
+        offset,
+      });
+    } catch (error) {
+      throw new Error(`Error querying all transfers: ${error}`);
+    }
+    return allTransfersResp;
+  }
+
   async verifyPendingTransfer(
-    transfer: Transfer
+    transfer: Transfer,
   ): Promise<Map<string, Uint8Array>> {
     const leafPubKeyMap = new Map<string, Uint8Array>();
     for (const leaf of transfer.leaves) {
@@ -412,14 +434,14 @@ export class TransferService extends BaseTransferService {
         !secp256k1.verify(
           leaf.signature,
           payloadHash,
-          transfer.senderIdentityPublicKey
+          transfer.senderIdentityPublicKey,
         )
       ) {
         throw new Error("Signature verification failed");
       }
 
       const leafSecret = await this.config.signer.decryptEcies(
-        leaf.secretCipher
+        leaf.secretCipher,
       );
 
       leafPubKeyMap.set(leaf.leaf.id, leafSecret);
@@ -431,7 +453,7 @@ export class TransferService extends BaseTransferService {
     leaves: LeafKeyTweak[],
     receiverIdentityPubkey: Uint8Array,
     expiryTime: Date,
-    adaptorPubKey?: Uint8Array
+    adaptorPubKey?: Uint8Array,
   ): Promise<{
     transfer: Transfer;
     signatureMap: Map<string, Uint8Array>;
@@ -460,7 +482,7 @@ export class TransferService extends BaseTransferService {
     const signingJobs = this.prepareRefundSoSigningJobs(leaves, leafDataMap);
 
     const sparkClient = await this.connectionManager.createSparkClient(
-      this.config.getCoordinatorAddress()
+      this.config.getCoordinatorAddress(),
     );
 
     let response: LeafSwapResponse;
@@ -488,7 +510,7 @@ export class TransferService extends BaseTransferService {
     const signatures = await this.signRefunds(
       leafDataMap,
       response.signingResults,
-      adaptorPubKey
+      adaptorPubKey,
     );
 
     const signatureMap = new Map<string, Uint8Array>();
@@ -507,7 +529,7 @@ export class TransferService extends BaseTransferService {
   async sendTransferSignRefund(
     leaves: LeafKeyTweak[],
     receiverIdentityPubkey: Uint8Array,
-    expiryTime: Date
+    expiryTime: Date,
   ): Promise<{
     transfer: Transfer;
     signatureMap: Map<string, Uint8Array>;
@@ -535,7 +557,7 @@ export class TransferService extends BaseTransferService {
     const signingJobs = this.prepareRefundSoSigningJobs(leaves, leafDataMap);
 
     const sparkClient = await this.connectionManager.createSparkClient(
-      this.config.getCoordinatorAddress()
+      this.config.getCoordinatorAddress(),
     );
 
     let response: StartSendTransferResponse;
@@ -553,7 +575,7 @@ export class TransferService extends BaseTransferService {
 
     const signatures = await this.signRefunds(
       leafDataMap,
-      response.signingResults
+      response.signingResults,
     );
 
     const signatureMap = new Map<string, Uint8Array>();
@@ -574,7 +596,7 @@ export class TransferService extends BaseTransferService {
 
   private prepareRefundSoSigningJobs(
     leaves: LeafKeyTweak[],
-    leafDataMap: Map<string, LeafRefundSigningData>
+    leafDataMap: Map<string, LeafRefundSigningData>,
   ): LeafRefundTxSigningJob[] {
     const signingJobs: LeafRefundTxSigningJob[] = [];
     for (const leaf of leaves) {
@@ -586,7 +608,7 @@ export class TransferService extends BaseTransferService {
       const { refundTx } = createRefundTx(
         leaf.leaf,
         refundSigningData.receivingPubkey,
-        this.config.getNetwork()
+        this.config.getNetwork(),
       );
 
       refundSigningData.refundTx = refundTx;
@@ -613,16 +635,16 @@ export class TransferService extends BaseTransferService {
     const errors: Error[] = [];
 
     const promises = Object.entries(
-      this.config.getConfig().signingOperators
+      this.config.getConfig().signingOperators,
     ).map(async ([identifier, operator]) => {
       const sparkClient = await this.connectionManager.createSparkClient(
-        operator.address
+        operator.address,
       );
 
       const leavesToReceive = leavesTweaksMap.get(identifier);
       if (!leavesToReceive) {
         errors.push(
-          new Error(`No leaves to receive for operator ${identifier}`)
+          new Error(`No leaves to receive for operator ${identifier}`),
         );
         return;
       }
@@ -648,7 +670,7 @@ export class TransferService extends BaseTransferService {
   }
 
   private async prepareClaimLeavesKeyTweaks(
-    leaves: LeafKeyTweak[]
+    leaves: LeafKeyTweak[],
   ): Promise<Map<string, ClaimLeafKeyTweak[]>> {
     const leafDataMap = new Map<string, ClaimLeafKeyTweak[]>();
     for (const leaf of leaves) {
@@ -664,12 +686,12 @@ export class TransferService extends BaseTransferService {
   }
 
   private async prepareClaimLeafKeyTweaks(
-    leaf: LeafKeyTweak
+    leaf: LeafKeyTweak,
   ): Promise<Map<string, ClaimLeafKeyTweak>> {
     const pubKeyTweak =
       await this.config.signer.subtractPrivateKeysGivenPublicKeys(
         leaf.signingPubKey,
-        leaf.newSigningPubKey
+        leaf.newSigningPubKey,
       );
 
     const shares = await this.config.signer.splitSecretWithProofs({
@@ -683,21 +705,21 @@ export class TransferService extends BaseTransferService {
     const pubkeySharesTweak = new Map<string, Uint8Array>();
 
     for (const [identifier, operator] of Object.entries(
-      this.config.getConfig().signingOperators
+      this.config.getConfig().signingOperators,
     )) {
       const share = this.findShare(shares, operator.id);
       if (!share) {
         throw new Error(`Share not found for operator ${operator.id}`);
       }
       const pubkeyTweak = secp256k1.getPublicKey(
-        numberToBytesBE(share.share, 32)
+        numberToBytesBE(share.share, 32),
       );
       pubkeySharesTweak.set(identifier, pubkeyTweak);
     }
 
     const leafTweaksMap = new Map<string, ClaimLeafKeyTweak>();
     for (const [identifier, operator] of Object.entries(
-      this.config.getConfig().signingOperators
+      this.config.getConfig().signingOperators,
     )) {
       const share = this.findShare(shares, operator.id);
       if (!share) {
@@ -719,7 +741,7 @@ export class TransferService extends BaseTransferService {
 
   async claimTransferSignRefunds(
     transfer: Transfer,
-    leafKeys: LeafKeyTweak[]
+    leafKeys: LeafKeyTweak[],
   ): Promise<NodeSignatures[]> {
     const leafDataMap: Map<string, LeafRefundSigningData> = new Map();
     for (const leafKey of leafKeys) {
@@ -737,7 +759,7 @@ export class TransferService extends BaseTransferService {
     const signingJobs = this.prepareRefundSoSigningJobs(leafKeys, leafDataMap);
 
     const sparkClient = await this.connectionManager.createSparkClient(
-      this.config.getCoordinatorAddress()
+      this.config.getCoordinatorAddress(),
     );
     let resp: ClaimTransferSignRefundsResponse;
     try {
@@ -754,7 +776,7 @@ export class TransferService extends BaseTransferService {
 
   private async finalizeTransfer(nodeSignatures: NodeSignatures[]) {
     const sparkClient = await this.connectionManager.createSparkClient(
-      this.config.getCoordinatorAddress()
+      this.config.getCoordinatorAddress(),
     );
     try {
       return await sparkClient.finalize_node_signatures({
@@ -768,7 +790,7 @@ export class TransferService extends BaseTransferService {
 
   async cancelSendTransfer(transfer: Transfer): Promise<Transfer | undefined> {
     const sparkClient = await this.connectionManager.createSparkClient(
-      this.config.getCoordinatorAddress()
+      this.config.getCoordinatorAddress(),
     );
     try {
       const response = await sparkClient.cancel_send_transfer({
@@ -785,7 +807,7 @@ export class TransferService extends BaseTransferService {
 
   async queryPendingTransfersBySender(): Promise<QueryPendingTransfersResponse> {
     const sparkClient = await this.connectionManager.createSparkClient(
-      this.config.getCoordinatorAddress()
+      this.config.getCoordinatorAddress(),
     );
     try {
       return await sparkClient.query_pending_transfers({
