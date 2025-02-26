@@ -1,0 +1,35 @@
+core.workflow(
+    name="default",
+    origin=git.github_origin(
+        url="https://github.com/lightsparkdev/spark.git",
+        ref="main",
+    ),
+    destination=git.github_pr_destination(
+        url="https://github.com/buildonspark/spark-sdk.git",
+        destination_ref="develop",
+        pr_branch="sync",
+        title="Sync from spark",
+    ),
+    # Switch to ITERATIVE mode to import each commit separately.
+    mode="ITERATIVE",
+    origin_files=glob(
+        ["sdks/spark-sdk/**"],  # Only files from spark-sdk directory
+        exclude=[
+            "sdks/spark-sdk/copy.bara.sky",  # Exclude the copybara config file
+            "sdks/spark-sdk/.github/**",
+            "sdks/spark-sdk/yarn.lock",
+            "sdks/spark-sdk/.changeset/*.md",
+            "sdks/spark-sdk/src/examples/spark-demo/**"
+        ],
+    ),
+    # GH actions, yarn.lock, and changesets are managed separately in each repo.
+    destination_files=glob(
+        ["**"], exclude=[".github/**", "yarn.lock", ".changeset/*.md"]
+    ),
+    authoring=authoring.pass_thru("Lightspark Eng <engineering@lightspark.com>"),
+    transformations=[
+        metadata.restore_author("ORIGINAL_AUTHOR", search_all_changes=True),
+        metadata.expose_label("COPYBARA_INTEGRATE_REVIEW"),
+        core.move("sdks/spark-sdk", ""),
+    ],
+)

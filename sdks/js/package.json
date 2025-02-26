@@ -1,0 +1,42 @@
+{
+  "name": "js",
+  "description": "Spark JS Projects",
+  "version": "0.0.0",
+  "private": true,
+  "main": "index.js",
+  "license": "Apache-2.0",
+  "scripts": {
+    "build-no-cache": "yarn build --force",
+    "build": "turbo run build",
+    "checks": "yarn deps:check && turbo lint format test circular-deps",
+    "circular-deps": "turbo run circular-deps",
+    "clean": "turbo run clean",
+    "clean-all": "./clean-all.sh",
+    "clean-resolve": "echo \"Use only as a last resort when clean-all fails to resolve an issue. In general yarn.lock should only be modified when dependencies explicitly change.\" && yarn clean-all && rm yarn.lock && yarn",
+    "deps:check": "manypkg check",
+    "deps:fix": "manypkg fix",
+    "format": "turbo run format",
+    "format:fix": "turbo run format:fix",
+    "lint": "turbo run lint",
+    "lint:fix": "turbo run lint:fix",
+    "release": "turbo build && changeset publish",
+    "test": "turbo run test",
+    "types": "turbo run types"
+  },
+  "workspaces": [
+    "packages/*",
+    "examples/*"
+  ],
+  "dependencies": {
+    "@changesets/cli": "^2.27.1",
+    "@manypkg/cli": "^0.21.0",
+    "@octokit/auth-action": "^4.0.1",
+    "octokit": "^4.0.2",
+    "ts-prune": "^0.10.3",
+    "turbo": "^1.13.3"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "packageManager": "yarn@4.5.0"
+}
