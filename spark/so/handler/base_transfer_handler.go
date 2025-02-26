@@ -18,6 +18,8 @@ import (
 	"github.com/lightsparkdev/spark-go/so/ent/preimagerequest"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
 	enttransfer "github.com/lightsparkdev/spark-go/so/ent/transfer"
+	enttransferleaf "github.com/lightsparkdev/spark-go/so/ent/transferleaf"
+	"github.com/lightsparkdev/spark-go/so/ent/treenode"
 	"github.com/lightsparkdev/spark-go/so/helper"
 )
 
@@ -133,9 +135,9 @@ func (h *BaseTransferHandler) createTransfer(
 
 	switch transferType {
 	case schema.TransferTypeCooperativeExit:
-		err = validateCooperativeExitLeaves(transfer, leaves, leafRefundMap, receiverIdentityPublicKey)
+		err = h.validateCooperativeExitLeaves(ctx, transfer, leaves, leafRefundMap, receiverIdentityPublicKey)
 	case schema.TransferTypeTransfer:
-		err = validateTransferLeaves(transfer, leaves, leafRefundMap, receiverIdentityPublicKey)
+		err = h.validateTransferLeaves(ctx, transfer, leaves, leafRefundMap, receiverIdentityPublicKey)
 	}
 	if err != nil {
 		return nil, nil, fmt.Errorf("unable to validate transfer leaves: %v", err)
@@ -191,14 +193,14 @@ func loadLeaves(ctx context.Context, db *ent.Tx, leafRefundMap map[string][]byte
 	return leaves, nil
 }
 
-func validateCooperativeExitLeaves(transfer *ent.Transfer, leaves []*ent.TreeNode, leafRefundMap map[string][]byte, receiverIdentityPublicKey []byte) error {
+func (h *BaseTransferHandler) validateCooperativeExitLeaves(ctx context.Context, transfer *ent.Transfer, leaves []*ent.TreeNode, leafRefundMap map[string][]byte, receiverIdentityPublicKey []byte) error {
 	for _, leaf := range leaves {
 		rawRefundTx := leafRefundMap[leaf.ID.String()]
 		err := validateSendLeafRefundTx(leaf, rawRefundTx, receiverIdentityPublicKey, 2)
 		if err != nil {
 			return fmt.Errorf("unable to validate refund tx for leaf %s: %v", leaf.ID, err)
 		}
-		err = leafAvailableToTransfer(leaf, transfer)
+		err = h.leafAvailableToTransfer(ctx, leaf, transfer)
 		if err != nil {
 			return fmt.Errorf("unable to validate leaf %s: %v", leaf.ID, err)
 		}
@@ -206,14 +208,14 @@ func validateCooperativeExitLeaves(transfer *ent.Transfer, leaves []*ent.TreeNod
 	return nil
 }
 
-func validateTransferLeaves(transfer *ent.Transfer, leaves []*ent.TreeNode, leafRefundMap map[string][]byte, receiverIdentityPublicKey []byte) error {
+func (h *BaseTransferHandler) validateTransferLeaves(ctx context.Context, transfer *ent.Transfer, leaves []*ent.TreeNode, leafRefundMap map[string][]byte, receiverIdentityPublicKey []byte) error {
 	for _, leaf := range leaves {
 		rawRefundTx := leafRefundMap[leaf.ID.String()]
 		err := validateSendLeafRefundTx(leaf, rawRefundTx, receiverIdentityPublicKey, 1)
 		if err != nil {
 			return fmt.Errorf("unable to validate refund tx for leaf %s: %v", leaf.ID, err)
 		}
-		err = leafAvailableToTransfer(leaf, transfer)
+		err = h.leafAvailableToTransfer(ctx, leaf, transfer)
 		if err != nil {
 			return fmt.Errorf("unable to validate leaf %s: %v", leaf.ID, err)
 		}
@@ -221,8 +223,28 @@ func validateTransferLeaves(transfer *ent.Transfer, leaves []*ent.TreeNode, leaf
 	return nil
 }
 
-func leafAvailableToTransfer(leaf *ent.TreeNode, transfer *ent.Transfer) error {
+func (h *BaseTransferHandler) leafAvailableToTransfer(ctx context.Context, leaf *ent.TreeNode, transfer *ent.Transfer) error {
 	if leaf.Status != schema.TreeNodeStatusAvailable {
+		if leaf.Status == schema.TreeNodeStatusTransferLocked {
+			transferLeaves, err := transfer.QueryTransferLeaves().Where(
+				enttransferleaf.HasLeafWith(treenode.IDEQ(leaf.ID)),
+			).WithTransfer().All(ctx)
+			if err != nil {
+				return fmt.Errorf("unable to find transfer leaf for leaf %s: %v", leaf.ID.String(), err)
+			}
+			now := time.Now()
+			for _, transferLeaf := range transferLeaves {
+				if transferLeaf.Edges.Transfer.Status == schema.TransferStatusSenderInitiated && transferLeaf.Edges.Transfer.ExpiryTime.Before(now) {
+					_, err := h.CancelSendTransfer(ctx, &pbspark.CancelSendTransferRequest{
+						TransferId:              transfer.ID.String(),
+						SenderIdentityPublicKey: transfer.SenderIdentityPubkey,
+					}, CancelSendTransferIntentTask)
+					if err != nil {
+						return fmt.Errorf("unable to cancel transfer: %v", err)
+					}
+				}
+			}
+		}
 		return fmt.Errorf("leaf %s is not available to transfer, status: %s", leaf.ID.String(), leaf.Status)
 	}
 	if !bytes.Equal(leaf.OwnerIdentityPubkey, transfer.SenderIdentityPubkey) {
