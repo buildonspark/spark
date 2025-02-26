@@ -100,7 +100,7 @@ const useWalletStore = create<WalletStore>((set, get) => ({
   getTokenBalance: async (tokenPublicKey: string) => {
     const { wallet } = get();
     const balance = await wallet.getTokenBalance(tokenPublicKey);
-    return balance;
+    return balance?.balance ?? BigInt(0);
   },
   transferTokens: async (
     tokenPublicKey: string,
@@ -217,10 +217,10 @@ export function useWallet() {
     queryKey: ["wallet, usdcBalance"],
     queryFn: async () => {
       try {
-        console.log("wallet pubkey:", await wallet.getIdentityPublicKey());
-        return await wallet.getTokenBalance(
+        const balance = await wallet.getTokenBalance(
           "03269c03f240fd2764e048284bceeb09f8b256b60a3bc2737cb119a61127358c1f",
         );
+        return balance?.balance ?? BigInt(0);
       } catch (e) {
         console.log(e);
         return BigInt(0);
@@ -235,9 +235,14 @@ export function useWallet() {
     queryKey: ["wallet, mxpBalance"],
     queryFn: async () => {
       try {
-        return await wallet.getTokenBalance(
+        console.log(
+          "getting mxp balance: ",
+          await wallet.getAllTokenBalances(),
+        );
+        const balance = await wallet.getTokenBalance(
           "02773f9ebfaf81126d6dde46227374eac7c2de7f5a99f76a2ef93780e9960e355f",
         );
+        return balance?.balance ?? BigInt(0);
       } catch (e) {
         console.log(e);
         return BigInt(0);
