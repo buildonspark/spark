@@ -147,9 +147,13 @@ export class SparkWallet {
 
   private async initializeWallet(identityPublicKey: string) {
     this.sspClient = new SspClient(identityPublicKey);
-    await this.initWasm();
-    this.config.signer.restoreSigningKeysFromLeafs(this.leaves);
-    // TODO: Better leaf management?
+    await Promise.all([
+      this.initWasm(),
+      this.config.signer.restoreSigningKeysFromLeafs(this.leaves),
+      // Hacky but do this to store the deposit signing key in the signer
+      this.config.signer.getDepositSigningKey(),
+    ]);
+
     await this.syncWallet();
   }
 
@@ -245,7 +249,6 @@ export class SparkWallet {
   private async syncWallet() {
     await this.claimTransfers();
     await this.claimDeposits();
-    // TODO: This is broken. Uncomment when fixed
     await this.syncTokenLeaves();
     this.leaves = await this.getLeaves();
     await this.optimizeLeaves();
@@ -304,8 +307,6 @@ export class SparkWallet {
   private async initWalletFromMnemonic(mnemonic: string) {
     const identityPublicKey =
       await this.config.signer.createSparkWalletFromMnemonic(mnemonic);
-    // Hacky but do this to store the deposit signing key in the signer
-    await this.config.signer.getDepositSigningKey();
     await this.initializeWallet(identityPublicKey);
     return identityPublicKey;
   }
@@ -313,8 +314,6 @@ export class SparkWallet {
   private async initWalletFromSeed(seed: Uint8Array | string) {
     const identityPublicKey =
       await this.config.signer.createSparkWalletFromSeed(seed);
-    // Hacky but do this to store the deposit signing key in the signer
-    await this.config.signer.getDepositSigningKey();
     await this.initializeWallet(identityPublicKey);
     return identityPublicKey;
   }
@@ -512,19 +511,37 @@ export class SparkWallet {
     }
   }
 
-  public async getBalance(): Promise<{
+  public async getBalance(forceRefetch = false): Promise<{
     balance: bigint;
     tokenBalances: Map<string, { balance: bigint; leafCount: number }>;
   }> {
-    await Promise.all([
-      this.claimTransfers(),
-      this.claimDeposits(),
-      this.syncTokenLeaves(),
-    ]);
+    if (forceRefetch) {
+      await Promise.all([
+        this.claimTransfers(),
+        this.claimDeposits(),
+        this.syncTokenLeaves(),
+      ]);
+      await this.syncTokenLeaves();
+      this.leaves = await this.getLeaves();
+    }
 
-    const leaves = await this.getLeaves();
-    const balance = leaves.reduce((acc, leaf) => acc + BigInt(leaf.value), 0n);
-    const tokenBalances = await this.getAllTokenBalances();
+    const tokenBalances = new Map<
+      string,
+      { balance: bigint; leafCount: number }
+    >();
+
+    for (const [tokenPublicKey, leaves] of this.tokenLeaves.entries()) {
+      tokenBalances.set(tokenPublicKey, {
+        balance: calculateAvailableTokenAmount(leaves),
+        leafCount: leaves.length,
+      });
+    }
+
+    const balance = this.leaves.reduce(
+      (acc, leaf) => acc + BigInt(leaf.value),
+      0n,
+    );
+
     return {
       balance,
       tokenBalances,
