@@ -18,6 +18,7 @@ import {
 } from "./graphql/objects/index.js";
 import {
   LeafWithPreviousTransactionData,
+  QueryAllTransfersResponse,
   Transfer,
   TransferStatus,
   TreeNode,
@@ -509,6 +510,13 @@ export class SparkWallet {
       await this.cancelAllSenderInitiatedTransfers();
       throw new Error(`Failed to request leaves swap: ${e}`);
     }
+  }
+
+  public async getAllTransfers(
+    limit: number = 20,
+    offset: number = 0,
+  ): Promise<QueryAllTransfersResponse> {
+    return await this.transferService.queryAllTransfers(limit, offset);
   }
 
   public async getBalance(forceRefetch = false): Promise<{
