@@ -13954,3 +13954,213 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = QueryUnusedDepositAddressesResponseValidationError{}
+
+// Validate checks the field values on QueryBalanceRequest with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *QueryBalanceRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on QueryBalanceRequest with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// QueryBalanceRequestMultiError, or nil if none found.
+func (m *QueryBalanceRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *QueryBalanceRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for IdentityPublicKey
+
+	if len(errors) > 0 {
+		return QueryBalanceRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// QueryBalanceRequestMultiError is an error wrapping multiple validation
+// errors returned by QueryBalanceRequest.ValidateAll() if the designated
+// constraints aren't met.
+type QueryBalanceRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m QueryBalanceRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m QueryBalanceRequestMultiError) AllErrors() []error { return m }
+
+// QueryBalanceRequestValidationError is the validation error returned by
+// QueryBalanceRequest.Validate if the designated constraints aren't met.
+type QueryBalanceRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e QueryBalanceRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e QueryBalanceRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e QueryBalanceRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e QueryBalanceRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e QueryBalanceRequestValidationError) ErrorName() string {
+	return "QueryBalanceRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e QueryBalanceRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sQueryBalanceRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = QueryBalanceRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = QueryBalanceRequestValidationError{}
+
+// Validate checks the field values on QueryBalanceResponse with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *QueryBalanceResponse) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on QueryBalanceResponse with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// QueryBalanceResponseMultiError, or nil if none found.
+func (m *QueryBalanceResponse) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *QueryBalanceResponse) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for Balance
+
+	// no validation rules for NodeBalances
+
+	if len(errors) > 0 {
+		return QueryBalanceResponseMultiError(errors)
+	}
+
+	return nil
+}
+
+// QueryBalanceResponseMultiError is an error wrapping multiple validation
+// errors returned by QueryBalanceResponse.ValidateAll() if the designated
+// constraints aren't met.
+type QueryBalanceResponseMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m QueryBalanceResponseMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m QueryBalanceResponseMultiError) AllErrors() []error { return m }
+
+// QueryBalanceResponseValidationError is the validation error returned by
+// QueryBalanceResponse.Validate if the designated constraints aren't met.
+type QueryBalanceResponseValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e QueryBalanceResponseValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e QueryBalanceResponseValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e QueryBalanceResponseValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e QueryBalanceResponseValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e QueryBalanceResponseValidationError) ErrorName() string {
+	return "QueryBalanceResponseValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e QueryBalanceResponseValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sQueryBalanceResponse.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = QueryBalanceResponseValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = QueryBalanceResponseValidationError{}

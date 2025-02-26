@@ -208,3 +208,8 @@ func (s *SparkServer) QueryUnusedDepositAddresses(ctx context.Context, req *pb.Q
 	treeQueryHandler := handler.NewTreeQueryHandler(s.config)
 	return wrapWithGRPCError(treeQueryHandler.QueryUnusedDepositAddresses(ctx, req))
 }
+
+func (s *SparkServer) QueryBalance(ctx context.Context, req *pb.QueryBalanceRequest) (*pb.QueryBalanceResponse, error) {
+	treeQueryHandler := handler.NewTreeQueryHandler(s.config)
+	return wrapWithGRPCError(treeQueryHandler.QueryBalance(ctx, req))
+}

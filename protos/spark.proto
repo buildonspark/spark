@@ -34,6 +34,8 @@ service SparkService {
 
     rpc query_nodes(QueryNodesRequest) returns (QueryNodesResponse) {}
 
+    rpc query_balance(QueryBalanceRequest) returns (QueryBalanceResponse) {}
+
     rpc query_user_signed_refunds(QueryUserSignedRefundsRequest) returns (QueryUserSignedRefundsResponse) {}
 
     // Token RPCs
@@ -690,4 +692,13 @@ message DepositAddressQueryResult {
 
 message QueryUnusedDepositAddressesResponse {
     repeated DepositAddressQueryResult deposit_addresses = 1;
+}
+
+message QueryBalanceRequest {
+    bytes identity_public_key = 1;
+}
+
+message QueryBalanceResponse {
+    uint64 balance = 1;
+    map<string, uint64> node_balances = 2;
 }

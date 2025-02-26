@@ -71,6 +71,31 @@ func (h *TreeQueryHandler) QueryNodes(ctx context.Context, req *pb.QueryNodesReq
 	}, nil
 }
 
+func (h *TreeQueryHandler) QueryBalance(ctx context.Context, req *pb.QueryBalanceRequest) (*pb.QueryBalanceResponse, error) {
+	db := ent.GetDbFromContext(ctx)
+
+	query := db.TreeNode.Query()
+	query = query.Where(treenode.StatusNotIn(schema.TreeNodeStatusCreating, schema.TreeNodeStatusSplitted)).
+		Where(treenode.OwnerIdentityPubkey(req.GetIdentityPublicKey()))
+
+	nodes, err := query.All(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	balance := uint64(0)
+	nodeBalances := make(map[string]uint64)
+	for _, node := range nodes {
+		balance += node.Value
+		nodeBalances[node.ID.String()] = node.Value
+	}
+
+	return &pb.QueryBalanceResponse{
+		Balance:      balance,
+		NodeBalances: nodeBalances,
+	}, nil
+}
+
 func getAncestorChain(ctx context.Context, db *ent.Tx, node *ent.TreeNode, nodeMap map[string]*pb.TreeNode) error {
 	parent, err := node.QueryParent().Only(ctx)
 	if err != nil {
