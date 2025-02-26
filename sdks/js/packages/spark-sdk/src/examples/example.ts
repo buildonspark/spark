@@ -5,7 +5,6 @@ import { generateMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english";
 import readline from "readline";
 import { SparkWallet } from "../../dist/spark-sdk";
-import { getTxFromRawTxHex } from "../../dist/utils/bitcoin";
 import { Network } from "../../dist/utils/network";
 
 // Initialize Spark Wallet
@@ -24,15 +23,10 @@ async function runCLI() {
   initwallet <mnemonic>                           - Create a new wallet from a mnemonic
   getpubkey                                       - Get the wallet's identity public key
   gendepositaddr                                  - Generate a new deposit address, will poll to auto claim
-  completedeposit <pubkey> <verifyingKey> <rawtx> - Complete a deposit
   createinvoice <amount> <memo>                   - Create a new lightning invoice
   payinvoice <invoice> <amount>                   - Pay a lightning invoice
-  swap <targetAmount>                             - Swap leaves for a target amount
   balance                                         - Show current wallet balance
-  getleaves                                       - Show current leaves
   sendtransfer <amount> <receiverPubKey>          - Send a transfer
-  pendingtransfers                                - Show pending transfers
-  claimtransfer <transferId>                      - Claim a pending transfer
   claimall                                        - Claim all pending transfers
   coopexit <onchainAddress> <targetAmount>        - Coop exit
   clear                                           - Cancel all sender initiated transfers
@@ -84,13 +78,8 @@ async function runCLI() {
           break;
         }
 
-        const leafPubKey = hexToBytes(await wallet.generatePublicKey());
-        const depositAddress = await wallet.generateDepositAddress(leafPubKey);
-        console.log("Deposit address:", depositAddress.depositAddress?.address);
-        if (!depositAddress.depositAddress) {
-          console.log("No deposit address");
-          break;
-        }
+        const depositAddress = await wallet.generateDepositAddress();
+        console.log("Deposit address:", depositAddress);
 
         while (true) {
           const nodes = await wallet.claimDeposits();
@@ -105,21 +94,6 @@ async function runCLI() {
         break;
       case "clear":
         await wallet.cancelAllSenderInitiatedTransfers();
-        break;
-      case "completedeposit":
-        if (!wallet.isInitialized()) {
-          console.log("No wallet initialized");
-          break;
-        }
-        const depositTx = getTxFromRawTxHex(args[2]);
-
-        const treeResp = await wallet.finalizeDeposit(
-          hexToBytes(args[0]),
-          hexToBytes(args[1]),
-          depositTx,
-          0
-        );
-        console.log("Tree root:", treeResp);
         break;
       case "createinvoice":
         if (!wallet.isInitialized()) {

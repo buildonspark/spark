@@ -134,7 +134,7 @@ export class DepositService {
       throw new Error("No deposit address response from coordinator");
     }
 
-    this.validateDepositAddress({
+    await this.validateDepositAddress({
       address: depositResp.depositAddress,
       userPubkey: signingPubkey,
     });

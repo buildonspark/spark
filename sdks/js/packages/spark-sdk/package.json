@@ -112,6 +112,7 @@
     "@scure/bip32": "^1.6.2",
     "@scure/bip39": "^1.5.4",
     "@scure/btc-signer": "^1.5.0",
+    "async-mutex": "^0.5.0",
     "auto-bind": "^5.0.1",
     "buffer": "^6.0.3",
     "eciesjs": "^0.4.13",
