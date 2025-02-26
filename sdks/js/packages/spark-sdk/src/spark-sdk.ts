@@ -84,7 +84,6 @@ type DepositParams = {
   vout: number;
 };
 
-const mutex = new Mutex();
 export class SparkWallet {
   protected config: WalletConfigService;
 
@@ -227,7 +226,7 @@ export class SparkWallet {
         $case: "ownerIdentityPubkey",
         ownerIdentityPubkey: await this.config.signer.getIdentityPublicKey(),
       },
-      includeParents: true,
+      includeParents: false,
     });
     return Object.entries(leaves.nodes)
       .filter(([_, node]) => node.status === "AVAILABLE")
@@ -360,7 +359,9 @@ export class SparkWallet {
     const { transfer, signatureMap } =
       await this.transferService.sendTransferSignRefund(
         leafKeyTweaks,
-        await this.config.signer.getSspIdentityPublicKey(),
+        await this.config.signer.getSspIdentityPublicKey(
+          this.config.getNetwork(),
+        ),
         new Date(Date.now() + 10 * 60 * 1000),
       );
     try {
@@ -447,6 +448,7 @@ export class SparkWallet {
             nodeIds: request.swapLeaves.map((leaf) => leaf.leafId),
           },
         },
+        includeParents: false,
       });
 
       if (Object.values(nodes.nodes).length !== request.swapLeaves.length) {
@@ -514,9 +516,11 @@ export class SparkWallet {
     balance: bigint;
     tokenBalance: Map<string, { balance: bigint; leafCount: number }>;
   }> {
-    await this.claimTransfers();
-    await this.claimDeposits();
-    await this.syncTokenLeaves();
+    await Promise.all([
+      this.claimTransfers(),
+      this.claimDeposits(),
+      this.syncTokenLeaves(),
+    ]);
 
     const leaves = await this.getLeaves();
     const balance = leaves.reduce((acc, leaf) => acc + BigInt(leaf.value), 0n);
@@ -851,8 +855,9 @@ export class SparkWallet {
 
     const swapResponse = await this.lightningService.swapNodesForPreimage({
       leaves: leavesToSend,
-      receiverIdentityPubkey:
-        await this.config.signer.getSspIdentityPublicKey(),
+      receiverIdentityPubkey: await this.config.signer.getSspIdentityPublicKey(
+        this.config.getNetwork(),
+      ),
       paymentHash: hexToBytes(paymentHash),
       isInboundPayment: false,
       invoiceString: invoice,
@@ -998,8 +1003,9 @@ export class SparkWallet {
       });
     }
 
-    const sspPubIdentityKey =
-      await this.config.signer.getSspIdentityPublicKey();
+    const sspPubIdentityKey = await this.config.signer.getSspIdentityPublicKey(
+      this.config.getNetwork(),
+    );
 
     const transfer = await this.coopExitService.getConnectorRefundSignatures({
       leaves: leafKeyTweaks,

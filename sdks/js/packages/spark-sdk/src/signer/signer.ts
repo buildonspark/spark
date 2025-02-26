@@ -13,6 +13,7 @@ import * as ecies from "eciesjs";
 import { TreeNode } from "../proto/spark.js";
 import { generateAdaptorFromSignature } from "../utils/adaptor-signature.js";
 import { subtractPrivateKeys } from "../utils/keys.js";
+import { Network } from "../utils/network.js";
 import {
   splitSecretWithProofs,
   VerifiableSecretShare,
@@ -108,7 +109,7 @@ interface SparkSigner {
   decryptEcies(ciphertext: Uint8Array): Promise<Uint8Array>;
 
   getRandomSigningCommitment(): Promise<SigningCommitment>;
-  getSspIdentityPublicKey(): Promise<Uint8Array>;
+  getSspIdentityPublicKey(network: Network): Promise<Uint8Array>;
 
   hashRandomPrivateKey(): Promise<Uint8Array>;
   generateAdaptorFromSignature(signature: Uint8Array): Promise<{
@@ -442,10 +443,16 @@ class DefaultSparkSigner implements SparkSigner {
   }
 
   // Hardcode this for default ssp
-  async getSspIdentityPublicKey(): Promise<Uint8Array> {
-    return hexToBytes(
-      "028c094a432d46a0ac95349d792c2e3730bd60c29188db716f56a99e39b95338b4",
-    );
+  async getSspIdentityPublicKey(network: Network): Promise<Uint8Array> {
+    if (network === Network.MAINNET) {
+      return hexToBytes(
+        "02e0b8d42c5d3b5fe4c5beb6ea796ab3bc8aaf28a3d3195407482c67e0b58228a5",
+      );
+    } else {
+      return hexToBytes(
+        "028c094a432d46a0ac95349d792c2e3730bd60c29188db716f56a99e39b95338b4",
+      );
+    }
   }
 
   async hashRandomPrivateKey(): Promise<Uint8Array> {
