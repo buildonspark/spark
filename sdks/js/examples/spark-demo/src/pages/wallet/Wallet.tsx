@@ -15,14 +15,10 @@ import { useWallet } from "../../store/wallet";
 export default function Wallet() {
   const navigate = useNavigate();
   const notify = () => toast("Copied!");
-  const {
-    balance: satsBalance,
-    satsUsdPrice,
-    getMasterPublicKey,
-    isInitialized,
-  } = useWallet();
+  const { btcBalance, satsUsdPrice, getMasterPublicKey, isInitialized } =
+    useWallet();
   const [pubkey, setPubkey] = useState("");
-  const satsFiatBalance = (satsBalance.value * satsUsdPrice.value).toFixed(2);
+  const satsFiatBalance = (btcBalance.value * satsUsdPrice.value).toFixed(2);
   useEffect(() => {
     console.log("isInitialized", isInitialized);
     if (isInitialized) {
@@ -38,7 +34,7 @@ export default function Wallet() {
   return (
     <div>
       <StyledContainer className="flex h-[180px] w-full flex-col items-center justify-center p-6">
-        {satsBalance.isLoading ? (
+        {btcBalance.isLoading ? (
           <LoadingSpinner size={40} />
         ) : (
           <>
@@ -63,7 +59,7 @@ export default function Wallet() {
             <div className="flex h-[140px] w-full flex-col items-start justify-end gap-2">
               <div className="text-[24px] font-bold">${satsFiatBalance}</div>
               <div className="text-[13px] text-[#F9F9F999]">
-                {satsBalance.value} SATs
+                {btcBalance.value} SATs
               </div>
             </div>
           </>

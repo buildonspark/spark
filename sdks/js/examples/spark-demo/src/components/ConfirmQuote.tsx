@@ -7,7 +7,6 @@ const decodeLnInvoiceSafely = (invoice: string) => {
   try {
     return decode(invoice);
   } catch (error) {
-    console.error(error);
     return null;
   }
 };
@@ -48,7 +47,7 @@ export default function ConfirmQuote({
   return (
     <div>
       <div
-        className="bg-opacity-4 mb-10 flex h-[200px] flex-col items-center justify-center rounded-lg bg-[white]"
+        className="mb-10 flex h-[200px] flex-col items-center justify-center rounded-lg bg-[white] bg-opacity-4"
         style={{
           border: "0.5px solid rgba(249, 249, 249, 0.1)",
         }}

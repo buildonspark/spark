@@ -6,14 +6,14 @@ import { useWallet } from "../../store/wallet";
 
 export default function BitcoinDepositAddress() {
   const [depositAddress, setDepositAddress] = useState<string | null>(null);
-  const { generateDepositAddress } = useWallet();
+  const { getBitcoinDepositAddress } = useWallet();
   const notify = () => toast("Copied!");
 
   useEffect(() => {
-    generateDepositAddress().then((address) => {
+    getBitcoinDepositAddress().then((address) => {
       setDepositAddress(address);
     });
-  }, [generateDepositAddress]);
+  }, [getBitcoinDepositAddress]);
 
   return (
     <div className="flex flex-col gap-4">

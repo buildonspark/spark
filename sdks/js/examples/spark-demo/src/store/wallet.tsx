@@ -1,6 +1,5 @@
 import { SparkWallet } from "@buildonspark/spark-sdk";
 import { Network } from "@buildonspark/spark-sdk/utils";
-import { hexToBytes } from "@lightsparkdev/core";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { create } from "zustand";
 import MxnLogo from "../icons/test_logo/MxnLogo";
@@ -54,7 +53,6 @@ interface WalletState {
   isInitialized: boolean;
   mnemonic: string | null;
   activeInputCurrency: Currency;
-
   activeAsset: Currency;
   assets: Record<string, Currency>;
 }
@@ -63,7 +61,7 @@ interface WalletActions {
   initWallet: (mnemonic: string) => Promise<void>;
   initWalletFromSeed: (seed: string) => Promise<void>;
   getMasterPublicKey: () => Promise<string>;
-  generateDepositAddress: () => Promise<string>;
+  getBitcoinDepositAddress: () => Promise<string>;
   createLightningInvoice: (amount: number, memo: string) => Promise<string>;
   sendTransfer: (amount: number, recipient: string) => Promise<void>;
   payLightningInvoice: (invoice: string) => Promise<void>;
@@ -78,7 +76,7 @@ interface WalletActions {
   ) => Promise<void>;
   setActiveAsset: (asset: Currency) => void;
   setActiveInputCurrency: (currency: Currency) => void;
-  withdrawToBtc: (address: string, amount: number) => Promise<void>;
+  withdrawOnchain: (address: string, amount: number) => Promise<void>;
   loadStoredWallet: () => Promise<boolean>;
 }
 
@@ -146,16 +144,14 @@ const useWalletStore = create<WalletStore>((set, get) => ({
     const { wallet } = get();
     return await wallet.getIdentityPublicKey();
   },
-  generateDepositAddress: async () => {
+  getBitcoinDepositAddress: async () => {
     const { wallet } = get();
-    const leafPubKey = await wallet.generatePublicKey();
-    const address = await wallet.generateDepositAddress(hexToBytes(leafPubKey));
+    const btcDepositAddress = await wallet.getDepositAddress();
 
-    if (!address.depositAddress) {
+    if (!btcDepositAddress) {
       throw new Error("Failed to generate deposit address");
     }
-
-    return address.depositAddress.address;
+    return btcDepositAddress;
   },
   loadStoredWallet: async () => {
     const storedMnemonic = sessionStorage.getItem(MNEMONIC_STORAGE_KEY);
@@ -171,9 +167,9 @@ const useWalletStore = create<WalletStore>((set, get) => ({
   },
   sendTransfer: async (amount: number, recipient: string) => {
     const { wallet } = get();
-    await wallet.sendTransfer({
+    await wallet.sendSparkTransfer({
       amount,
-      receiverPubKey: hexToBytes(recipient),
+      receiverSparkAddress: recipient,
     });
   },
   createLightningInvoice: async (amountSats: number, memo: string) => {
@@ -181,14 +177,15 @@ const useWalletStore = create<WalletStore>((set, get) => ({
     const invoice = await wallet.createLightningInvoice({
       amountSats,
       memo,
-      expirySeconds: 60 * 60 * 24,
     });
     return invoice;
   },
-  withdrawToBtc: async (address: string, amount: number) => {
-    console.log("withdrawing to btc", address, amount);
+  withdrawOnchain: async (address: string, amount: number) => {
     const { wallet } = get();
-    await wallet.coopExit(address, amount);
+    await wallet.withdraw({
+      onchainAddress: address,
+      targetAmountSats: amount,
+    });
   },
   payLightningInvoice: async (invoice: string) => {
     const { wallet } = get();
@@ -223,64 +220,8 @@ export function useWallet() {
     },
     refetchOnMount: true,
     enabled: isInitialized,
-    staleTime: 5000,
-    refetchInterval: 5000,
-  });
-
-  const usdcBalanceQuery = useQuery({
-    queryKey: ["wallet, usdcBalance"],
-    queryFn: async () => {
-      try {
-        console.log("wallet pubkey:", await wallet.getIdentityPublicKey());
-        return await wallet.getTokenBalance(
-          "03269c03f240fd2764e048284bceeb09f8b256b60a3bc2737cb119a61127358c1f",
-        );
-      } catch (e) {
-        console.log(e);
-        return BigInt(0);
-      }
-    },
-    refetchOnMount: true,
-    enabled: isInitialized,
-    staleTime: 5000,
-  });
-
-  const mxpBalanceQuery = useQuery({
-    queryKey: ["wallet, mxpBalance"],
-    queryFn: async () => {
-      try {
-        return await wallet.getTokenBalance(
-          "02773f9ebfaf81126d6dde46227374eac7c2de7f5a99f76a2ef93780e9960e355f",
-        );
-      } catch (e) {
-        console.log(e);
-        return BigInt(0);
-      }
-    },
-    refetchOnMount: true,
-    enabled: isInitialized,
-    staleTime: 5000,
-  });
-
-  useQuery({
-    queryKey: ["wallet", "claimDeposits"],
-    queryFn: async () => {
-      const nodes = await wallet.claimDeposits();
-
-      if (nodes.length > 0) {
-        queryClient.invalidateQueries({
-          queryKey: ["wallet", "balance"],
-          exact: true,
-        });
-      }
-
-      return true;
-    },
-    enabled: isInitialized,
-    refetchInterval: 5000,
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
-    staleTime: 5000,
+    staleTime: 3000,
+    refetchInterval: 3000,
   });
 
   const satsUsdPriceQuery = useQuery({
@@ -326,8 +267,16 @@ export function useWallet() {
     assets: state.assets,
     activeAsset: state.activeAsset,
     setActiveAsset: state.setActiveAsset,
-    balance: {
-      value: Number(balanceQuery.data ?? 0),
+    btcBalance: {
+      value: Number(balanceQuery.data?.balance ?? 0),
+      isLoading: balanceQuery.isLoading || !isInitialized,
+      error: balanceQuery.error,
+    },
+    tokenBalances: {
+      value: (balanceQuery.data?.tokenBalances ?? {}) as Record<
+        string,
+        { balance: bigint; leafCount: number }
+      >,
       isLoading: balanceQuery.isLoading || !isInitialized,
       error: balanceQuery.error,
     },
@@ -337,27 +286,17 @@ export function useWallet() {
       error: satsUsdPriceQuery.error,
     },
     isInitialized,
-    usdcBalance: {
-      value: Number(usdcBalanceQuery.data ?? 0),
-      isLoading: usdcBalanceQuery.isLoading,
-      error: usdcBalanceQuery.error,
-    },
-    mxpBalance: {
-      value: Number(mxpBalanceQuery.data ?? 0),
-      isLoading: mxpBalanceQuery.isLoading,
-      error: mxpBalanceQuery.error,
-    },
     getTokenBalance: state.getTokenBalance,
     transferTokens: state.transferTokens,
     initWallet,
     initWalletFromSeed,
     getMasterPublicKey: state.getMasterPublicKey,
-    generateDepositAddress: state.generateDepositAddress,
+    getBitcoinDepositAddress: state.getBitcoinDepositAddress,
     sendTransfer: state.sendTransfer,
     createLightningInvoice: state.createLightningInvoice,
     payLightningInvoice: state.payLightningInvoice,
     loadStoredWallet: state.loadStoredWallet,
-    withdrawToBtc: state.withdrawToBtc,
+    withdrawOnchain: state.withdrawOnchain,
   };
 }
 

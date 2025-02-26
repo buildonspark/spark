@@ -1,6 +1,6 @@
+import { Transfer } from "@buildonspark/spark-sdk/proto/spark";
 import { useCallback, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Transfer } from "@buildonspark/spark-sdk/proto/spark";
 import AddressInput from "../../components/AddressInput";
 import AmountInput from "../../components/AmountInput";
 import CardForm from "../../components/CardForm";
@@ -39,7 +39,7 @@ export default function Send() {
     activeInputCurrency,
     sendTransfer,
     payLightningInvoice,
-    withdrawToBtc,
+    withdrawOnchain,
     setActiveAsset,
     getMasterPublicKey,
   } = useWallet();
@@ -134,7 +134,7 @@ export default function Send() {
         } else if (sendAddressNetwork === Network.SPARK) {
           await sendTransfer(satsToSend, sendAddress);
         } else if (sendAddressNetwork === Network.BITCOIN) {
-          await withdrawToBtc(sendAddress, satsToSend);
+          await withdrawOnchain(sendAddress, satsToSend);
         } else if (sendAddressNetwork === Network.PHONE) {
           const response = await fetch(
             `https://api.dev.dev.sparkinfra.net/graphql/spark/rc`,
@@ -212,7 +212,7 @@ export default function Send() {
     payLightningInvoice,
     sendAddress,
     sendTransfer,
-    withdrawToBtc,
+    withdrawOnchain,
     getMasterPublicKey,
   ]);
 
