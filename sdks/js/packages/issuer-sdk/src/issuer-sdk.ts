@@ -72,6 +72,13 @@ export class IssuerWallet {
     return this.initialized && this.bitcoinWallet !== undefined;
   }
 
+  getL1FundingAddress(): string {
+    if (!this.isL1Initialized()) {
+      throw new Error("L1 wallet not initialized");
+    }
+    return this.getBitcoinWallet().p2wpkhAddress;
+  }
+
   async getTokenPublicKey(): Promise<string> {
     if (!this.isSparkInitialized()) {
       throw new Error("Spark wallet not initialized");

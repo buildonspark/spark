@@ -73,8 +73,7 @@ async function runCLI() {
           console.log("Spark Address:", tokenPublicKey);
 
           if (wallet.isL1Initialized()) {
-            let lrcWallet = wallet.getBitcoinWallet();
-            console.log("L1 Address:", lrcWallet.p2wpkhAddress);
+            console.log("L1 Address:", wallet.getL1FundingAddress());
           }
           break;
         case "mint":
