@@ -1,7 +1,8 @@
 import { bytesToHex, equalBytes } from "@noble/curves/abstract/utils";
 import { secp256k1 } from "@noble/curves/secp256k1";
-//import { getCrypto } from "./crypto.js";
-import { sha256 } from "@scure/btc-signer/utils";
+import { getCrypto } from "./crypto.js";
+
+const crypto = getCrypto();
 
 type Polynomial = {
   fieldModulus: bigint;
@@ -20,33 +21,6 @@ export type VerifiableSecretShare = SecretShare & {
   proofs: Uint8Array[];
 };
 
-/**
- * Returns a deterministic BigInt in [0, max), derived from the given secretSeed.
- */
-export function getRandomBigInt(
-  max: bigint,
-  secretSeed: bigint,
-  coefficient: number,
-): bigint {
-  // Convert the secretSeed into a hex string
-  const hexSeed = secretSeed.toString(16);
-
-  // Create a SHA-256 hash from the secretSeed and coefficient
-  const data = Buffer.concat([
-    Buffer.from(hexSeed),
-    Buffer.from(coefficient.toString()),
-  ]);
-  const hash = sha256(data);
-  const digest = bytesToHex(hash);
-
-  // Convert the hash to a BigInt and reduce modulo "max"
-  const randomVal = BigInt("0x" + digest);
-  return randomVal % max;
-}
-
-/**
- * TODO: Reactivate after resolving race consition
- // Generate a secure random bigint using crypto.getRandomValues
 export function getRandomBigInt(max: bigint): bigint {
   const byteLength = (max.toString(2).length + 7) >> 3;
   const maxBigInt = max;
@@ -62,7 +36,6 @@ export function getRandomBigInt(max: bigint): bigint {
     }
   }
 }
-*/
 
 // Modular inverse using extended euclidean algorithm
 export function modInverse(a: bigint, m: bigint): bigint {
@@ -107,7 +80,7 @@ export function evaluatePolynomial(polynomial: Polynomial, x: bigint): bigint {
 export function fieldDiv(
   numerator: bigint,
   denominator: bigint,
-  fieldModulus: bigint,
+  fieldModulus: bigint
 ): bigint {
   if (denominator === 0n) {
     throw new Error("Division by zero");
@@ -120,7 +93,7 @@ export function fieldDiv(
 // Computes the Lagrange coefficient for a given index and a set of points
 export function computerLagrangeCoefficients(
   index: bigint,
-  points: SecretShare[],
+  points: SecretShare[]
 ) {
   let numerator = 1n;
   let denominator = 1n;
@@ -145,7 +118,7 @@ export function computerLagrangeCoefficients(
 export function generatePolynomialForSecretSharing(
   fieldModulus: bigint,
   secret: bigint,
-  degree: number,
+  degree: number
 ): Polynomial {
   const coefficients: bigint[] = new Array(degree);
   const proofs: Uint8Array[] = new Array(degree);
@@ -154,7 +127,7 @@ export function generatePolynomialForSecretSharing(
   proofs[0] = secp256k1.ProjectivePoint.fromPrivateKey(secret).toRawBytes(true);
 
   for (let i = 1; i < degree; i++) {
-    const coefficient = getRandomBigInt(fieldModulus, secret, i);
+    const coefficient = getRandomBigInt(fieldModulus);
     coefficients[i] = coefficient;
     proofs[i] =
       secp256k1.ProjectivePoint.fromPrivateKey(coefficient).toRawBytes(true);
@@ -171,12 +144,12 @@ export function splitSecret(
   fieldModulus: bigint,
   secret: bigint,
   threshold: number,
-  numberOfShares: number,
+  numberOfShares: number
 ) {
   const polynomial = generatePolynomialForSecretSharing(
     fieldModulus,
     secret,
-    threshold,
+    threshold
   );
 
   const shares: SecretShare[] = [];
@@ -198,12 +171,12 @@ export function splitSecretWithProofs(
   secret: bigint,
   fieldModulus: bigint,
   threshold: number,
-  numberOfShares: number,
+  numberOfShares: number
 ) {
   const polynomial = generatePolynomialForSecretSharing(
     fieldModulus,
     secret,
-    threshold - 1,
+    threshold - 1
   );
 
   const shares: VerifiableSecretShare[] = [];
@@ -250,7 +223,7 @@ export function recoverSecret(shares: VerifiableSecretShare[]) {
 // Validates a share of a secret
 export function validateShare(share: VerifiableSecretShare) {
   const targetPubkey = secp256k1.ProjectivePoint.fromPrivateKey(
-    share.share,
+    share.share
   ).toRawBytes(true);
 
   let resultPubkey = share.proofs[0];
