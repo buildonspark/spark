@@ -1643,6 +1643,18 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@buildonspark/nodejs-scripts@workspace:examples/nodejs-scripts":
+  version: 0.0.0-use.local
+  resolution: "@buildonspark/nodejs-scripts@workspace:examples/nodejs-scripts"
+  dependencies:
+    "@buildonspark/spark-sdk": "npm:0.0.4"
+    "@types/node": "npm:^22.13.2"
+    prettier: "npm:^3.5.1"
+    tsx: "npm:^4.19.3"
+    typescript: "npm:^5.7.3"
+  languageName: unknown
+  linkType: soft
+
 "@buildonspark/spark-sdk@npm:0.0.4, @buildonspark/spark-sdk@npm:^0.0.4, @buildonspark/spark-sdk@workspace:packages/spark-sdk":
   version: 0.0.0-use.local
   resolution: "@buildonspark/spark-sdk@workspace:packages/spark-sdk"

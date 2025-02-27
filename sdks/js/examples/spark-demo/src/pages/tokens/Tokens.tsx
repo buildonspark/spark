@@ -202,6 +202,7 @@ export default function Tokens() {
         updateAssets(newAssets);
       }
     }
+  /* eslint-disable-next-line react-hooks/exhaustive-deps */
   }, []);
 
   return (

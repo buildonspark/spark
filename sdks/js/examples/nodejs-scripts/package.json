@@ -1,0 +1,29 @@
+{
+  "name": "@buildonspark/nodejs-scripts",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Example NodeJS scripts for Spark SDK",
+  "main": "index.js",
+  "scripts": {
+    "clean": "rm -rf dist",
+    "format:fix": "prettier src --write",
+    "format": "prettier src --check",
+    "build": "tsc",
+    "types": "tsc"
+  },
+  "type": "module",
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/node": "^22.13.2",
+    "prettier": "^3.5.1",
+    "typescript": "^5.7.3"
+  },
+  "dependencies": {
+    "@buildonspark/spark-sdk": "0.0.4",
+    "tsx": "^4.19.3"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
