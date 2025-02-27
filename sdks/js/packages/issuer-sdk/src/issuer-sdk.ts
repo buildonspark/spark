@@ -25,7 +25,13 @@ export class IssuerWallet {
     mnemonicOrSeed?: Uint8Array | string,
     // Set to true to enable L1 Token Announcements.
     enableL1Wallet: boolean = true,
-  ): Promise<void> {
+  ): Promise<{
+    balance: bigint;
+    tokenBalance: Map<string, {
+        balance: bigint;
+    }>;
+    mnemonic?: string | undefined;
+}> {
     let result = await this.sparkWallet.initWallet(mnemonicOrSeed);
 
     if (enableL1Wallet) {
@@ -48,6 +54,8 @@ export class IssuerWallet {
       );
     }
     this.initialized = true;
+
+    return result;
   }
 
   getSparkWallet(): IssuerSparkWallet {
