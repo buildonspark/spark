@@ -1,11 +1,8 @@
 // @ts-nocheck
 
-import { hexToBytes } from "@noble/curves/abstract/utils";
-import { generateMnemonic } from "@scure/bip39";
-import { wordlist } from "@scure/bip39/wordlists/english";
+import { Network } from "@buildonspark/spark-sdk/utils";
 import readline from "readline";
 import { IssuerWallet } from "../issuer-sdk";
-import { Network } from "@buildonspark/spark-sdk/utils";
 
 // Initialize Issuer Wallet
 const walletMnemonic =
@@ -61,10 +58,6 @@ async function runCLI() {
       switch (lowerCommand) {
         case "help":
           console.log(helpMessage);
-          break;
-        case "genmnemonic":
-          const mnemonic = generateMnemonic(wordlist);
-          console.log(mnemonic);
           break;
         case "initwallet":
           const result = await wallet.initWallet(args.join(" "));

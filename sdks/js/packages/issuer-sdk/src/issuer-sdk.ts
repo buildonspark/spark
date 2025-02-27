@@ -1,10 +1,10 @@
-import { hexToBytes, bytesToHex } from "@noble/curves/abstract/utils";
-import { Network } from "@buildonspark/spark-sdk/utils";
-import { IssuerSparkWallet } from "./services/spark/wallet.js";
-import * as bip39 from "@scure/bip39";
-import { HDKey } from "@scure/bip32";
 import lrc20sdk from "@buildonspark/lrc20-sdk";
+import { Network } from "@buildonspark/spark-sdk/utils";
+import { bytesToHex } from "@noble/curves/abstract/utils";
+import { HDKey } from "@scure/bip32";
+import * as bip39 from "@scure/bip39";
 import { announceTokenL1 } from "./services/lrc20/announce.js";
+import { IssuerSparkWallet } from "./services/spark/wallet.js";
 import {
   LRC_WALLET_NETWORK,
   LRC_WALLET_NETWORK_TYPE,
@@ -83,7 +83,7 @@ export class IssuerWallet {
    * Gets token balance and number of held leaves.
    * @returns An object containing the token balance and the number of owned leaves
    */
-  async getBalance(): Promise<{ balance: bigint; leafCount: number }> {
+  async getBalance(): Promise<{ balance: bigint }> {
     if (!this.isSparkInitialized()) {
       throw new Error("Spark wallet not initialized");
     }
@@ -93,12 +93,10 @@ export class IssuerWallet {
     if (!balanceObj.tokenBalances || !balanceObj.tokenBalances.has(publicKey)) {
       return {
         balance: 0n,
-        leafCount: 0,
       };
     }
     return {
       balance: balanceObj.tokenBalances.get(publicKey)!.balance,
-      leafCount: balanceObj.tokenBalances.get(publicKey)!.leafCount,
     };
   }
 
