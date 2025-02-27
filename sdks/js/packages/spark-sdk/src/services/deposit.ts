@@ -36,7 +36,7 @@ export type CreateTreeRootParams = {
   vout: number;
 };
 
-const INITIAL_TIME_LOCK = 2000;
+const INITIAL_TIME_LOCK = 60000;
 
 export class DepositService {
   private readonly config: WalletConfigService;
@@ -44,7 +44,7 @@ export class DepositService {
 
   constructor(
     config: WalletConfigService,
-    connectionManager: ConnectionManager
+    connectionManager: ConnectionManager,
   ) {
     this.config = config;
     this.connectionManager = connectionManager;
@@ -60,7 +60,7 @@ export class DepositService {
       !address.depositAddressProof.addressSignatures
     ) {
       throw new Error(
-        "proof of possession signature or address signatures is null"
+        "proof of possession signature or address signatures is null",
       );
     }
 
@@ -68,19 +68,19 @@ export class DepositService {
     const msg = proofOfPossessionMessageHashForDepositAddress(
       await this.config.signer.getIdentityPublicKey(),
       operatorPubkey,
-      address.address
+      address.address,
     );
 
     const taprootKey = p2tr(
       operatorPubkey.slice(1, 33),
       undefined,
-      getNetwork(this.config.getNetwork())
+      getNetwork(this.config.getNetwork()),
     ).tweakedPubkey;
 
     const isVerified = schnorr.verify(
       address.depositAddressProof.proofOfPossessionSignature,
       msg,
-      taprootKey
+      taprootKey,
     );
 
     if (!isVerified) {
@@ -89,7 +89,7 @@ export class DepositService {
 
     const addrHash = sha256(address.address);
     for (const operator of Object.values(
-      this.config.getConfig().signingOperators
+      this.config.getConfig().signingOperators,
     )) {
       if (
         operator.identifier === this.config.getConfig().coodinatorIdentifier
@@ -116,7 +116,7 @@ export class DepositService {
     signingPubkey,
   }: GenerateDepositAddressParams): Promise<GenerateDepositAddressResponse> {
     const sparkClient = await this.connectionManager.createSparkClient(
-      this.config.getCoordinatorAddress()
+      this.config.getCoordinatorAddress(),
     );
 
     let depositResp: GenerateDepositAddressResponse;
@@ -185,7 +185,7 @@ export class DepositService {
 
     const refundP2trAddress = getP2TRAddressFromPublicKey(
       signingPubKey,
-      this.config.getNetwork()
+      this.config.getNetwork(),
     );
     const refundAddress = btc
       .Address(getNetwork(this.config.getNetwork()))
@@ -202,7 +202,7 @@ export class DepositService {
     const refundTxSighash = getSigHashFromTx(refundTx, 0, output);
 
     const sparkClient = await this.connectionManager.createSparkClient(
-      this.config.getCoordinatorAddress()
+      this.config.getCoordinatorAddress(),
     );
 
     let treeResp: StartTreeCreationResponse;

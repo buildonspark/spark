@@ -8,12 +8,12 @@ import {
 } from "./bitcoin.js";
 import { Network } from "./network.js";
 
-const TIME_LOCK_INTERVAL = 100;
+const TIME_LOCK_INTERVAL = 10;
 
 export function createRefundTx(
   leaf: TreeNode,
   receivingPubkey: Uint8Array,
-  network: Network
+  network: Network,
 ): { refundTx: Transaction; sighash: Uint8Array } {
   const tx = getTxFromRawTxBytes(leaf.nodeTx);
   const refundTx = getTxFromRawTxBytes(leaf.refundTx);
