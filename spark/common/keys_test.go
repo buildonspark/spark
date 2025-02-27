@@ -49,14 +49,14 @@ func TestSumOfPrivateKeys(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sumBytes := sum.Bytes()
+	sumPriv := secp256k1.PrivKeyFromBytes(sum.Bytes())
 
 	sum2 := keys[0]
 	for i := 1; i < len(keys); i++ {
 		sum2, _ = AddPrivateKeys(sum2, keys[i])
 	}
 
-	if !bytes.Equal(sumBytes, sum2) {
+	if !bytes.Equal(sumPriv.Serialize(), sum2) {
 		t.Fatal("sum of private keys does not match")
 	}
 }
@@ -87,7 +87,8 @@ func TestPrivateKeyTweakWithTarget(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.Equal(sum.Bytes(), target.Serialize()) {
+	subPriv := secp256k1.PrivKeyFromBytes(sum.Bytes())
+	if !bytes.Equal(subPriv.Serialize(), target.Serialize()) {
 		t.Fatal("private key tweak with target does not match")
 	}
 }
