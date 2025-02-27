@@ -16,7 +16,33 @@ import { Network } from "./Networks";
     }, wait);
   };
 } */
+const formatPhoneNumber = (input: string) => {
+  // Remove all non-digit characters
+  let digitsOnly = input.replace(/\D/g, "");
 
+  // If the number starts with 1 and has more than 10 digits, it likely includes the country code
+  if (digitsOnly.length > 10 && digitsOnly.startsWith("1")) {
+    digitsOnly = digitsOnly.substring(1); // Remove the leading 1
+  }
+
+  // Format as +1 (000) 000-0000
+  if (digitsOnly.length >= 10) {
+    return `+1 (${digitsOnly.slice(0, 3)}) ${digitsOnly.slice(3, 6)}-${digitsOnly.slice(6, 10)}`;
+  } else if (digitsOnly.length > 6) {
+    return `+1 (${digitsOnly.slice(0, 3)}) ${digitsOnly.slice(3, 6)}-${digitsOnly.slice(6)}`;
+  } else if (digitsOnly.length > 3) {
+    return `+1 (${digitsOnly.slice(0, 3)}) ${digitsOnly.slice(3)}`;
+  } else if (digitsOnly.length > 0) {
+    return `+1 (${digitsOnly})`;
+  }
+  return "";
+};
+
+const isValidPhoneNumber = (input: string) => {
+  const digitsOnly = input.replace(/\D/g, "");
+  // Check if it's exactly 10 digits, or 11 digits starting with 1
+  return /^[0-9]{10}$/.test(digitsOnly) || /^1[0-9]{10}$/.test(digitsOnly);
+};
 const capitalizeFirstLetter = (str: string) => {
   return str.charAt(0).toUpperCase() + str.slice(1);
 };
@@ -37,7 +63,7 @@ const validateAddress = (address: string): Network => {
     return Network.LIGHTNING;
   if (isValidBitcoinAddress(address)) return Network.BITCOIN;
   if (/^(02|03)[a-fA-F0-9]{64}$/.test(address)) return Network.SPARK;
-  if (/^[0-9]{10}$/.test(address)) return Network.PHONE;
+  if (isValidPhoneNumber(address)) return Network.PHONE;
   return Network.NONE;
 };
 
@@ -95,15 +121,15 @@ export default function AddressInput({ onAddressSelect }: AddressInputProps) {
       {inputAddressNetwork === Network.PHONE && (
         <DetailsRow
           logoLeft={<PhoneIcon />}
-          title={`+1 (${inputAddress.slice(0, 3)}) ${inputAddress.slice(
-            3,
-            6,
-          )}-${inputAddress.slice(6, 10)}`}
+          title={`${formatPhoneNumber(inputAddress)}`}
           subtitle={`Send money via text`}
           logoRight={<ChevronIcon />}
           logoLeftCircleBackground={true}
           onClick={() => {
-            onAddressSelect(`+1${inputAddress}`, inputAddressNetwork);
+            const digitsOnly = inputAddress.replace(/\D/g, "");
+            const parsedAddress =
+              digitsOnly.length === 10 ? `+1${digitsOnly}` : `+${digitsOnly}`;
+            onAddressSelect(parsedAddress, inputAddressNetwork);
           }}
           logoRightMargin={0}
         />
