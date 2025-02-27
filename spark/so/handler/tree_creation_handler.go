@@ -336,6 +336,7 @@ func (h *TreeCreationHandler) PrepareTreeAddress(ctx context.Context, req *pb.Pr
 		if err != nil {
 			return nil, err
 		}
+		defer conn.Close()
 		client := pbinternal.NewSparkInternalServiceClient(conn)
 
 		protoNetwork, err := common.ProtoNetworkFromNetwork(network)
