@@ -224,8 +224,8 @@ func (s *States) ReceivedRound2Packages(requestID string, identifier string, rou
 // We can proceed to round 3 if we have received the round 2 packages from all operators as well as we got our own round 2 package.
 // If we can, it will perform the round 3.
 func (s *States) ProceedToRound3(ctx context.Context, requestID string, frostConnection *grpc.ClientConn, config *so.Config) error {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	state, ok := s.states[requestID]
 	if !ok {
