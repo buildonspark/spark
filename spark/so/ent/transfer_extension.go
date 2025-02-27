@@ -55,6 +55,8 @@ func (t *Transfer) getProtoStatus() (*pb.TransferStatus, error) {
 		return pb.TransferStatus_TRANSFER_STATUS_COMPLETED.Enum(), nil
 	case schema.TransferStatusExpired:
 		return pb.TransferStatus_TRANSFER_STATUS_EXPIRED.Enum(), nil
+	case schema.TransferStatusReturned:
+		return pb.TransferStatus_TRANSFER_STATUS_RETURNED.Enum(), nil
 	}
 	return nil, fmt.Errorf("unknown transfer status %s", t.Status)
 }
