@@ -7,7 +7,10 @@ const walletMnemonic =
   "cctypical stereo dose party penalty decline neglect feel harvest abstract stage winter";
 
 async function runCLI() {
-  let wallet = new SparkWallet(Network.REGTEST);
+  // Get network from command line args
+  const network = process.argv.includes("mainnet") ? Network.MAINNET : Network.REGTEST;
+  let wallet = new SparkWallet(network);
+  
   const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout,
@@ -45,7 +48,7 @@ async function runCLI() {
         console.log(helpMessage);
         break;
       case "initwallet":
-        wallet = new SparkWallet(Network.REGTEST);
+        wallet = new SparkWallet(network);
         const result = await wallet.initWallet(args.join(" "));
         console.log(result);
         break;
@@ -91,5 +94,6 @@ async function runCLI() {
     }
   }
 }
+
 
 runCLI();
