@@ -280,6 +280,7 @@ export default function Send() {
         <SendDetails
           inputAmount={rawInputAmount}
           sendAddress={sendAddress}
+          sendAddressNetwork={sendAddressNetwork}
           success={true}
         />
       )}
@@ -287,6 +288,7 @@ export default function Send() {
         <SendDetails
           inputAmount={rawInputAmount}
           sendAddress={sendAddress}
+          sendAddressNetwork={sendAddressNetwork}
           success={false}
         />
       )}

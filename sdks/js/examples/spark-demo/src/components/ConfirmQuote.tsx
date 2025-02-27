@@ -1,15 +1,7 @@
-import { decode } from "light-bolt11-decoder";
 import { useWallet } from "../store/wallet";
 import { CurrencyType } from "../utils/currency";
+import { decodeLnInvoiceSafely } from "../utils/utils";
 import { Network } from "./Networks";
-
-const decodeLnInvoiceSafely = (invoice: string) => {
-  try {
-    return decode(invoice);
-  } catch (error) {
-    return null;
-  }
-};
 
 export default function ConfirmQuote({
   inputAmount,

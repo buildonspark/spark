@@ -2,38 +2,52 @@ import ArrowUpRight from "../icons/ArrowUpRight";
 import WarningIcon from "../icons/WarningIcon";
 import { useWallet } from "../store/wallet";
 import { CurrencyType } from "../utils/currency";
+import { decodeLnInvoiceSafely } from "../utils/utils";
+import { Network } from "./Networks";
 
 export default function SendDetails({
   inputAmount,
   sendAddress,
+  sendAddressNetwork,
   success,
 }: {
   inputAmount: string;
   sendAddress: string;
+  sendAddressNetwork?: string;
   success?: boolean;
 }) {
   const { satsUsdPrice, activeAsset, activeInputCurrency } = useWallet();
+  const decodedLnInvoice = decodeLnInvoiceSafely(sendAddress) || null;
+  const decodedLnSatsAmount: number =
+    Number(
+      decodedLnInvoice?.sections.find((section) => section.name === "amount")
+        ?.value,
+    ) / 1000 || 0;
   const sendFiatAmount =
-    activeInputCurrency.type === CurrencyType.FIAT
-      ? inputAmount
-      : (
-          Number(inputAmount) *
-          (activeAsset.type === CurrencyType.TOKEN
-            ? (activeAsset.usdPrice ?? 1)
-            : satsUsdPrice.value)
-        ).toFixed(2);
+    sendAddressNetwork === Network.LIGHTNING
+      ? `${(decodedLnSatsAmount * satsUsdPrice.value).toFixed(2)}`
+      : activeInputCurrency.type === CurrencyType.FIAT
+        ? inputAmount
+        : (
+            Number(inputAmount) *
+            (activeAsset.type === CurrencyType.TOKEN
+              ? (activeAsset.usdPrice ?? 1)
+              : satsUsdPrice.value)
+          ).toFixed(2);
   const sendAssetAmount =
-    activeInputCurrency.type === CurrencyType.FIAT
-      ? (
-          Number(inputAmount) /
-          (activeAsset.type === CurrencyType.TOKEN
-            ? (activeAsset.usdPrice ?? 1)
-            : satsUsdPrice.value)
-        ).toFixed(0)
-      : inputAmount;
+    sendAddressNetwork === Network.LIGHTNING
+      ? decodedLnSatsAmount
+      : activeInputCurrency.type === CurrencyType.FIAT
+        ? (
+            Number(inputAmount) /
+            (activeAsset.type === CurrencyType.TOKEN
+              ? (activeAsset.usdPrice ?? 1)
+              : satsUsdPrice.value)
+          ).toFixed(0)
+        : inputAmount;
   return (
     <div className="mb-10 mt-4 flex flex-col items-center justify-center">
-      <div className="bg-opacity-4 mb-4 mt-4 flex h-32 w-32 items-center justify-center rounded-full bg-[white]">
+      <div className="mb-4 mt-4 flex h-32 w-32 items-center justify-center rounded-full bg-[white] bg-opacity-4">
         <div className="flex items-center justify-center">
           {success ? <ArrowUpRight /> : <WarningIcon />}
         </div>

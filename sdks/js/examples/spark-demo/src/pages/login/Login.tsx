@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
+import { Network } from "@buildonspark/spark-sdk/utils";
+import { useEffect, useMemo, useState } from "react";
 import { isValidPhoneNumber } from "react-phone-number-input";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import Button from "../../components/Button";
 import PhoneInput from "../../components/PhoneInput";
 import VerificationCode from "../../components/VerificationCode";
@@ -20,6 +21,8 @@ export default function Login() {
   const [verificationCode, setVerificationCode] = useState<string | undefined>(
     "",
   );
+  const [searchParams] = useSearchParams();
+
   const isValidPhone = useMemo(() => {
     return phoneNumber && isValidPhoneNumber(phoneNumber);
   }, [phoneNumber]);
@@ -33,9 +36,15 @@ export default function Login() {
     setVerificationCode(numbersOnly);
   };
 
-  const { initWalletFromSeed } = useWallet();
+  const { initWalletFromSeed, setInitWalletNetwork, initWalletNetwork } =
+    useWallet();
 
   const navigate = useNavigate();
+
+  // default the app to regtest on login.
+  useEffect(() => {
+    localStorage.setItem("spark_wallet_network", Network.REGTEST.toString());
+  }, []);
 
   const handleSubmit = async () => {
     if (loginState === LoginState.PhoneInput) {
@@ -82,7 +91,6 @@ export default function Login() {
 
       const data = await response.json();
       const seed = data.data.complete_seed_release.seed;
-      console.log("Received seed:", seed);
 
       await initWalletFromSeed(seed);
 
@@ -92,6 +100,47 @@ export default function Login() {
 
   return (
     <div className="flex flex-col items-center justify-center">
+      {searchParams.get("user") === "davidmarcus" && (
+        <div className="mb-1 flex w-full flex-row items-center justify-end">
+          <div
+            className={`mr-2 text-center font-decimal text-[13px] ${
+              initWalletNetwork === Network.MAINNET
+                ? "text-[#ffffff]"
+                : "text-[#ffffff]"
+            }`}
+          >
+            {initWalletNetwork === Network.MAINNET ? "Mainnet" : "Regtest"}
+          </div>
+          <div>
+            <button
+              onClick={() => {
+                const newNetwork =
+                  initWalletNetwork === Network.MAINNET
+                    ? Network.REGTEST
+                    : Network.MAINNET;
+                localStorage.setItem(
+                  "spark_wallet_network",
+                  newNetwork.toString(),
+                );
+                setInitWalletNetwork(newNetwork);
+              }}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                initWalletNetwork === Network.MAINNET
+                  ? "bg-white"
+                  : "bg-[#696969]"
+              }`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full transition-transform ${
+                  initWalletNetwork === Network.MAINNET
+                    ? "translate-x-6 bg-black"
+                    : "translate-x-1 bg-white"
+                }`}
+              />
+            </button>
+          </div>
+        </div>
+      )}
       <div className="font-inter mt-4 text-center text-[13px] text-[#ffffff] opacity-40">
         A Spark-enabled, self-custody
         <br />

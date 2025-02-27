@@ -8,8 +8,8 @@ export default function SparkWithTextLogo() {
       xmlns="http://www.w3.org/2000/svg"
     >
       <path
-        fill-rule="evenodd"
-        clip-rule="evenodd"
+        fillRule="evenodd"
+        clipRule="evenodd"
         d="M7.54945 4.62293L7.76614 0H5.05904L5.27574 4.62298L0.945916 2.98828L0.109375 5.56289L4.57317 6.7854L1.68056 10.3981L3.87065 11.9893L6.41278 8.12163L8.95481 11.9891L11.1449 10.3979L8.25232 6.78528L12.7156 5.5629L11.8791 2.98829L7.54945 4.62293ZM6.41258 6.18777L6.41255 6.18766H6.41247L6.41239 6.18791L6.41258 6.18777Z"
         fill="#F9F9F9"
       />

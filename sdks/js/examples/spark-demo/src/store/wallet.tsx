@@ -52,9 +52,24 @@ export const PERMANENT_CURRENCIES: Map<string, Currency> = new Map([
   // },
 ]);
 
+const getLocalStorageWalletNetwork = (): Network => {
+  try {
+    const storedNetwork = localStorage.getItem("spark_wallet_network");
+    if (storedNetwork !== null) {
+      return Number(storedNetwork) === Network.MAINNET
+        ? Network.MAINNET
+        : Network.REGTEST;
+    }
+  } catch (e) {
+    console.error("Error getting initial wallet network", e);
+  }
+  return Network.REGTEST;
+};
+
 interface WalletState {
   wallet: SparkWallet;
   isInitialized: boolean;
+  initWalletNetwork: Network;
   mnemonic: string | null;
   activeInputCurrency: Currency;
   activeAsset: Currency;
@@ -64,6 +79,8 @@ interface WalletState {
 interface WalletActions {
   initWallet: (mnemonic: string) => Promise<void>;
   initWalletFromSeed: (seed: string) => Promise<void>;
+  setInitWalletNetwork: (network: Network) => void;
+  setWallet: (wallet: SparkWallet) => void;
   getMasterPublicKey: () => Promise<string>;
   getBitcoinDepositAddress: () => Promise<string>;
   createLightningInvoice: (amount: number, memo: string) => Promise<string>;
@@ -87,7 +104,14 @@ const MNEMONIC_STORAGE_KEY = "spark_wallet_mnemonic";
 const SEED_STORAGE_KEY = "spark_wallet_seed";
 
 const useWalletStore = create<WalletStore>((set, get) => ({
-  wallet: new SparkWallet(Network.REGTEST),
+  wallet: new SparkWallet(getLocalStorageWalletNetwork()),
+  initWalletNetwork: Network.REGTEST,
+  setInitWalletNetwork: (network: Network) => {
+    set({ initWalletNetwork: network });
+  },
+  setWallet: (wallet: SparkWallet) => {
+    set({ wallet });
+  },
   isInitialized: false,
   mnemonic: null,
   activeInputCurrency: PERMANENT_CURRENCIES.get("USD")!,
@@ -120,14 +144,19 @@ const useWalletStore = create<WalletStore>((set, get) => ({
   },
   btcAddressInfo: {},
   initWallet: async (mnemonic: string) => {
-    console.log("initWallet", mnemonic);
-    const { wallet } = get();
+    const { wallet, initWalletNetwork } = get();
+    if (initWalletNetwork === Network.MAINNET) {
+      set({ wallet: new SparkWallet(Network.MAINNET) });
+    }
     await wallet.initWallet(mnemonic);
     sessionStorage.setItem(MNEMONIC_STORAGE_KEY, mnemonic);
     set({ isInitialized: true, mnemonic });
   },
   initWalletFromSeed: async (seed: string) => {
-    const { wallet } = get();
+    const { wallet, initWalletNetwork } = get();
+    if (initWalletNetwork === Network.MAINNET) {
+      set({ wallet: new SparkWallet(Network.MAINNET) });
+    }
     await wallet.initWallet(seed);
     sessionStorage.setItem(SEED_STORAGE_KEY, seed);
     set({ isInitialized: true });
@@ -148,8 +177,6 @@ const useWalletStore = create<WalletStore>((set, get) => ({
   loadStoredWallet: async () => {
     const storedMnemonic = sessionStorage.getItem(MNEMONIC_STORAGE_KEY);
     const storedSeed = sessionStorage.getItem(SEED_STORAGE_KEY);
-
-    console.log("storedMnemonic", storedMnemonic);
     if (storedSeed) {
       await get().initWalletFromSeed(storedSeed);
     } else if (storedMnemonic) {
@@ -160,7 +187,7 @@ const useWalletStore = create<WalletStore>((set, get) => ({
   sendTransfer: async (amountSats: number, recipient: string) => {
     const { wallet } = get();
     await wallet.sendSparkTransfer({
-      amountSats,
+      amountSats: amountSats,
       receiverSparkAddress: recipient,
     });
   },
@@ -198,6 +225,7 @@ export function useWallet() {
       if (result) {
         queryClient.invalidateQueries({ queryKey: ["wallet", "balance"] });
       }
+      return result;
     },
     refetchOnMount: false,
     refetchOnWindowFocus: false,
@@ -207,7 +235,8 @@ export function useWallet() {
   const balanceQuery = useQuery({
     queryKey: ["wallet", "balance"],
     queryFn: async () => {
-      return await wallet.getBalance();
+      const balance = await wallet.getBalance(true);
+      return balance;
     },
     refetchOnMount: true,
     enabled: isInitialized,
@@ -277,10 +306,12 @@ export function useWallet() {
       error: satsUsdPriceQuery.error,
     },
     isInitialized,
-    transferTokens: state.transferTokens,
-    updateAssets: state.updateAssets,
     initWallet,
     initWalletFromSeed,
+    initWalletNetwork: state.initWalletNetwork,
+    setInitWalletNetwork: state.setInitWalletNetwork,
+    transferTokens: state.transferTokens,
+    updateAssets: state.updateAssets,
     getMasterPublicKey: state.getMasterPublicKey,
     getBitcoinDepositAddress: state.getBitcoinDepositAddress,
     sendTransfer: state.sendTransfer,

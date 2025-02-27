@@ -180,7 +180,6 @@ export default function Tokens() {
       { balance: bigint; leafCount: number }
     >;
     if (balances) {
-      console.log("balances: ", balances);
       const newAssets: Map<string, Currency> = new Map();
       balances.forEach((value, key) => {
         newAssets.set(key, {
@@ -202,7 +201,7 @@ export default function Tokens() {
         updateAssets(newAssets);
       }
     }
-  /* eslint-disable-next-line react-hooks/exhaustive-deps */
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
   }, []);
 
   return (

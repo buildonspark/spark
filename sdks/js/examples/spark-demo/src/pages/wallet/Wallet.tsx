@@ -19,11 +19,10 @@ export default function Wallet() {
     useWallet();
   const [pubkey, setPubkey] = useState("");
   const satsFiatBalance = (btcBalance.value * satsUsdPrice.value).toFixed(2);
+
   useEffect(() => {
-    console.log("isInitialized", isInitialized);
     if (isInitialized) {
       getMasterPublicKey().then((pubkey) => {
-        console.log("pubkey", pubkey);
         if (pubkey) {
           setPubkey(pubkey);
         }

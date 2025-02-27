@@ -1,3 +1,5 @@
+import { decode } from "light-bolt11-decoder";
+
 interface BtcPriceUsdResponse {
   bitcoin: {
     usd: number;
@@ -39,3 +41,11 @@ export const getFontSizeForCard = (input: string) =>
 
 export const delay = (ms: number) =>
   new Promise((resolve) => setTimeout(resolve, ms));
+
+export const decodeLnInvoiceSafely = (invoice: string) => {
+  try {
+    return decode(invoice);
+  } catch (error) {
+    return null;
+  }
+};
