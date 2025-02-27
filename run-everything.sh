@@ -713,18 +713,19 @@ run_dir=$(create_run_dir)
 echo "Working with directory: $run_dir"
 
 run_bitcoind_tmux "$run_dir" $WIPE
-run_electrs_tmux "$run_dir"
-
-if ! check_electrs_ready "$run_dir"; then
-        echo "Failed to start electrs"
-        exit 1
-    fi
 
 if [ "$DISABLE_TOKENS" = false ]; then
     run_lrcd_tmux "$run_dir"
 
     if ! check_lrc_nodes_ready "$run_dir"; then
         echo "Failed to start all LRC-20 nodes"
+        exit 1
+    fi
+
+    run_electrs_tmux "$run_dir"
+
+    if ! check_electrs_ready "$run_dir"; then
+        echo "Failed to start electrs"
         exit 1
     fi
 else
