@@ -40,7 +40,7 @@ export class TokenTransactionService {
 
   public async constructTransferTokenTransaction(
     selectedLeaves: LeafWithPreviousTransactionData[],
-    recipientPublicKey: Uint8Array,
+    receiverSparkAddress: Uint8Array,
     tokenPublicKey: Uint8Array,
     tokenAmount: bigint,
   ): Promise<TokenTransaction> {
@@ -59,7 +59,7 @@ export class TokenTransactionService {
         },
         outputLeaves: [
           {
-            ownerPublicKey: recipientPublicKey,
+            ownerPublicKey: receiverSparkAddress,
             tokenPublicKey: tokenPublicKey,
             tokenAmount: numberToBytesBE(tokenAmount, 16),
           },
@@ -82,7 +82,7 @@ export class TokenTransactionService {
         },
         outputLeaves: [
           {
-            ownerPublicKey: recipientPublicKey,
+            ownerPublicKey: receiverSparkAddress,
             tokenPublicKey: tokenPublicKey,
             tokenAmount: numberToBytesBE(tokenAmount, 16),
           },

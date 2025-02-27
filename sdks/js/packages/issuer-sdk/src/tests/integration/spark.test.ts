@@ -140,11 +140,11 @@ describe("token integration test", () => {
     );
     expect(userBalanceAfterTransfer.balance).toEqual(tokenAmount);
 
-    await userWallet.transferTokens(
-      tokenPublicKeyHex,
+    await userWallet.sendSparkTokenTransfer({
+      tokenPublicKey: tokenPublicKeyHex,
       tokenAmount,
-      tokenPublicKeyHex,
-    );
+      receiverSparkAddress: tokenPublicKeyHex,
+    });
 
     const userBalanceAfterTransferBack = await getSparkWalletTokenBalanceOrZero(
       userWallet,

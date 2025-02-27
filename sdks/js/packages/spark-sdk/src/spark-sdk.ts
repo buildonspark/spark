@@ -1475,25 +1475,31 @@ export class SparkWallet {
   /**
    * Transfers tokens to another user.
    *
-   * @param {string} tokenPublicKey - The public key of the token to transfer
-   * @param {bigint} tokenAmount - The amount of tokens to transfer
-   * @param {string} recipientPublicKey - The recipient's public key
-   * @param {LeafWithPreviousTransactionData[]} [selectedLeaves] - Optional specific leaves to use for the transfer
+   * @param {Object} params - Parameters for the token transfer
+   * @param {string} params.tokenPublicKey - The public key of the token to transfer
+   * @param {bigint} params.tokenAmount - The amount of tokens to transfer
+   * @param {string} params.receiverSparkAddress - The recipient's public key
+   * @param {LeafWithPreviousTransactionData[]} [params.selectedLeaves] - Optional specific leaves to use for the transfer
    * @returns {Promise<string>} The transaction ID of the token transfer
    */
-  public async transferTokens(
-    tokenPublicKey: string,
-    tokenAmount: bigint,
-    recipientPublicKey: string,
-    selectedLeaves?: LeafWithPreviousTransactionData[],
-  ): Promise<string> {
+  public async sendSparkTokenTransfer({
+    tokenPublicKey,
+    tokenAmount,
+    receiverSparkAddress,
+    selectedLeaves,
+  }: {
+    tokenPublicKey: string;
+    tokenAmount: bigint;
+    receiverSparkAddress: string;
+    selectedLeaves?: LeafWithPreviousTransactionData[];
+  }): Promise<string> {
     await this.syncTokenLeaves();
     if (!this.tokenLeaves.has(tokenPublicKey)) {
       throw new Error("No token leaves with the given tokenPublicKey");
     }
 
     const tokenPublicKeyBytes = hexToBytes(tokenPublicKey);
-    const recipientPublicKeyBytes = hexToBytes(recipientPublicKey);
+    const receiverSparkAddressBytes = hexToBytes(receiverSparkAddress);
 
     if (selectedLeaves) {
       if (
@@ -1516,7 +1522,7 @@ export class SparkWallet {
     const tokenTransaction =
       await this.tokenTransactionService.constructTransferTokenTransaction(
         selectedLeaves,
-        recipientPublicKeyBytes,
+        receiverSparkAddressBytes,
         tokenPublicKeyBytes,
         tokenAmount,
       );

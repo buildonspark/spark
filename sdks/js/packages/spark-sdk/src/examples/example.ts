@@ -19,17 +19,17 @@ async function runCLI() {
   });
   const helpMessage = `
   Available commands:
-  initwallet [mnemonic | seed]                                - Create a new wallet from a mnemonic or seed. If no mnemonic or seed is provided, a new mnemonic will be generated.
-  getbalance                                                  - Get the wallet's balance
-  getdepositaddress                                           - Get an address to deposit funds from L1 to Spark
-  getsparkaddress                                             - Get the wallet's spark address
-  createinvoice <amount> <memo>                               - Create a new lightning invoice
-  payinvoice <invoice>                                        - Pay a lightning invoice
-  sendtransfer <amount> <receiverSparkAddress>                - Send a spark transfer
-  withdraw <onchainAddress> <amount>                          - Withdraw funds to an L1 address
-  tokentransfer <tokenPubKey> <amount> <receiverSparkAddress> - Transfer tokens
-  help                                                        - Show this help message
-  exit/quit                                                   - Exit the program
+  initwallet [mnemonic | seed]                                    - Create a new wallet from a mnemonic or seed. If no mnemonic or seed is provided, a new mnemonic will be generated.
+  getbalance                                                      - Get the wallet's balance
+  getdepositaddress                                               - Get an address to deposit funds from L1 to Spark
+  getsparkaddress                                                 - Get the wallet's spark address
+  createinvoice <amount> <memo>                                   - Create a new lightning invoice
+  payinvoice <invoice>                                            - Pay a lightning invoice
+  sendtransfer <amount> <receiverSparkAddress>                    - Send a spark transfer
+  withdraw <onchainAddress> <amount>                              - Withdraw funds to an L1 address
+  sendtokentransfer <tokenPubKey> <amount> <receiverSparkAddress> - Transfer tokens
+  help                                                            - Show this help message
+  exit/quit                                                       - Exit the program
 `;
   console.log(helpMessage);
 
@@ -97,10 +97,10 @@ async function runCLI() {
         });
         console.log(transfer);
         break;
-      case "tokentransfer":
+      case "sendtokentransfer":
         if (args.length < 3) {
           console.log(
-            "Usage: tokentransfer <tokenPubKey> <amount> <receiverPubKey>",
+            "Usage: sendtokentransfer <tokenPubKey> <amount> <receiverPubKey>",
           );
           break;
         }
@@ -110,14 +110,12 @@ async function runCLI() {
         const tokenReceiverPubKey = args[2];
 
         try {
-          await wallet.transferTokens(
-            tokenPubKey,
-            tokenAmount,
-            tokenReceiverPubKey,
-          );
-          console.log(
-            `Successfully transferred ${tokenAmount} tokens to ${tokenReceiverPubKey}`,
-          );
+          const result = await wallet.sendSparkTokenTransfer({
+            tokenPublicKey: tokenPubKey,
+            tokenAmount: tokenAmount,
+            receiverSparkAddress: tokenReceiverPubKey,
+          });
+          console.log(result);
         } catch (error) {
           console.error("Failed to transfer tokens:", error.message);
         }

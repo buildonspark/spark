@@ -91,10 +91,10 @@ interface WalletActions {
   createLightningInvoice: (amount: number, memo: string) => Promise<string>;
   sendTransfer: (amount: number, recipient: string) => Promise<void>;
   payLightningInvoice: (invoice: string) => Promise<void>;
-  transferTokens: (
+  sendSparkTokenTransfer: (
     tokenPublicKey: string,
     tokenAmount: bigint,
-    recipientPublicKey: string,
+    receiverSparkAddress: string,
   ) => Promise<void>;
   setActiveAsset: (asset: Currency) => void;
   updateAssets: (assets: Map<string, Currency>) => void;
@@ -128,17 +128,17 @@ const useWalletStore = create<WalletStore>((set, get) => ({
   setActiveAsset: (asset: Currency) => {
     set({ activeAsset: asset });
   },
-  transferTokens: async (
+  sendSparkTokenTransfer: async (
     tokenPublicKey: string,
     tokenAmount: bigint,
-    recipientPublicKey: string,
+    receiverSparkAddress: string,
   ) => {
     const { wallet } = get();
-    await wallet.transferTokens(
+    await wallet.sendSparkTokenTransfer({
       tokenPublicKey,
       tokenAmount,
-      recipientPublicKey,
-    );
+      receiverSparkAddress,
+    });
   },
   updateAssets: (newAssets: Map<string, Currency>) => {
     const currentAssets = get().assets;
@@ -343,7 +343,7 @@ export function useWallet() {
     initWalletFromSeed,
     initWalletNetwork: state.initWalletNetwork,
     setInitWalletNetwork: state.setInitWalletNetwork,
-    transferTokens: state.transferTokens,
+    sendSparkTokenTransfer: state.sendSparkTokenTransfer,
     updateAssets: state.updateAssets,
     getMasterPublicKey: state.getMasterPublicKey,
     getBitcoinDepositAddress: state.getBitcoinDepositAddress,

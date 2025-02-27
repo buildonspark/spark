@@ -60,26 +60,28 @@ export class IssuerSparkWallet extends SparkWallet {
 
   async transferIssuerTokens(
     tokenAmount: bigint,
-    recipientPublicKey: string,
+    receiverSparkAddress: string,
+    selectedLeaves?: LeafWithPreviousTransactionData[],
   ): Promise<string> {
     const tokenPublicKey = await super.getIdentityPublicKey();
-    return await super.transferTokens(
+    return await super.sendSparkTokenTransfer({
       tokenPublicKey,
       tokenAmount,
-      recipientPublicKey,
-    );
+      receiverSparkAddress,
+      selectedLeaves,
+    });
   }
 
   async burnIssuerTokens(
     tokenAmount: bigint,
     selectedLeaves?: LeafWithPreviousTransactionData[],
   ): Promise<string> {
-    return await this.transferTokens(
-      await super.getIdentityPublicKey(),
+    return await this.sendSparkTokenTransfer({
+      tokenPublicKey: await super.getIdentityPublicKey(),
       tokenAmount,
-      BURN_ADDRESS,
+      receiverSparkAddress: BURN_ADDRESS,
       selectedLeaves,
-    );
+    });
   }
 
   async freezeIssuerTokens(

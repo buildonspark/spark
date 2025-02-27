@@ -117,7 +117,7 @@ export class IssuerWallet {
    */
   async transferTokens(
     amountToTransfer: bigint,
-    recipientPublicKey: string,
+    receiverSparkAddress: string,
   ): Promise<string> {
     if (!this.isSparkInitialized()) {
       throw new Error("Spark wallet not initialized");
@@ -125,7 +125,7 @@ export class IssuerWallet {
 
     return await this.sparkWallet.transferIssuerTokens(
       amountToTransfer,
-      recipientPublicKey,
+      receiverSparkAddress,
     );
   }
 

@@ -38,7 +38,7 @@ export default function Tokens() {
     activeInputCurrency,
     tokenBalances,
     updateAssets,
-    transferTokens,
+    sendSparkTokenTransfer,
     setActiveAsset,
     setActiveInputCurrency,
   } = useWallet();
@@ -54,7 +54,7 @@ export default function Tokens() {
       if (!activeAsset.pubkey) {
         throw new Error("Active asset pubkey is not set");
       }
-      await transferTokens(
+      await sendSparkTokenTransfer(
         activeAsset.pubkey,
         assetsToSendValue,
         sendTokenAddress,
@@ -67,7 +67,7 @@ export default function Tokens() {
     setCurrentStep(TokensStep.SendTokenSuccess);
   }, [
     setCurrentStep,
-    transferTokens,
+    sendSparkTokenTransfer,
     activeAsset,
     rawInputAmount,
     sendTokenAddress,
