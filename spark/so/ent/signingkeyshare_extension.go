@@ -135,23 +135,6 @@ func MarkSigningKeysharesAsUsed(ctx context.Context, config *so.Config, ids []uu
 		return nil, fmt.Errorf("some keyshares are not available in %v", ids)
 	}
 
-	remainingKeyshares, err := db.SigningKeyshare.Query().Where(
-		signingkeyshare.StatusEQ(schema.KeyshareStatusAvailable),
-		signingkeyshare.CoordinatorIndexEQ(config.Index),
-	).Count(context.Background())
-	if err != nil {
-		return nil, err
-	}
-	log.Printf("Remaining keyshares: %v", remainingKeyshares)
-	if uint64(remainingKeyshares) < spark.DKGKeyThreshold && (config.DKGLimitOverride == 0 || uint64(remainingKeyshares) < config.DKGLimitOverride) {
-		go func() {
-			err := RunDKG(context.Background(), config)
-			if err != nil {
-				log.Printf("Error running DKG: %v", err)
-			}
-		}()
-	}
-
 	// Return the keyshares that were marked as used in case the caller wants to make use of them.
 	return keysharesMap, nil
 }
