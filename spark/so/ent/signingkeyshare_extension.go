@@ -71,6 +71,7 @@ func GetUnusedSigningKeyshares(ctx context.Context, dbClient *Client, config *so
 	signingKeyshares, err := tx.SigningKeyshare.Query().Where(
 		signingkeyshare.StatusEQ(schema.KeyshareStatusAvailable),
 		signingkeyshare.CoordinatorIndexEQ(config.Index),
+		signingkeyshare.IDGT(uuid.MustParse("01954639-8d50-7e47-b3f0-ddb307fab7c2")),
 	).
 		Limit(keyshareCount).
 		ForUpdate().

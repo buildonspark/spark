@@ -23,12 +23,12 @@ type Task struct {
 // AllTasks returns all the tasks that are scheduled to run.
 func AllTasks() []Task {
 	return []Task{
-		// {
-		// 	Duration: 10 * time.Second,
-		// 	Task: func(config *so.Config, db *ent.Client) error {
-		// 		return ent.RunDKGIfNeeded(db, config)
-		// 	},
-		// },
+		{
+			Duration: 10 * time.Second,
+			Task: func(config *so.Config, db *ent.Client) error {
+				return ent.RunDKGIfNeeded(db, config)
+			},
+		},
 		{
 			Duration: 10 * time.Minute,
 			Task: func(config *so.Config, db *ent.Client) error {
