@@ -97,6 +97,31 @@ async function runCLI() {
         });
         console.log(transfer);
         break;
+      case "tokentransfer":
+        if (args.length < 3) {
+          console.log(
+            "Usage: tokentransfer <tokenPubKey> <amount> <receiverPubKey>",
+          );
+          break;
+        }
+
+        const tokenPubKey = args[0];
+        const tokenAmount = BigInt(parseInt(args[1]));
+        const tokenReceiverPubKey = args[2];
+
+        try {
+          await wallet.transferTokens(
+            tokenPubKey,
+            tokenAmount,
+            tokenReceiverPubKey,
+          );
+          console.log(
+            `Successfully transferred ${tokenAmount} tokens to ${tokenReceiverPubKey}`,
+          );
+        } catch (error) {
+          console.error("Failed to transfer tokens:", error.message);
+        }
+        break;
       case "withdraw":
         const withdrawal = await wallet.withdraw({
           onchainAddress: args[0],

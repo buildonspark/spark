@@ -61,7 +61,7 @@ async function runCLI() {
           break;
         case "initwallet":
           const result = await wallet.initWallet(args.join(" "));
-          console.log("Wallet initialized successfully");
+          console.log(result);
           break;
         case "getaddresses":
           if (!wallet.isSparkInitialized()) {

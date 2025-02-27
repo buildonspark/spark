@@ -89,7 +89,7 @@ export class IssuerWallet {
     }
 
     const publicKey = await this.sparkWallet.getIdentityPublicKey();
-    const balanceObj = await this.sparkWallet.getBalance();
+    const balanceObj = await this.sparkWallet.getBalance(true);
     if (!balanceObj.tokenBalances || !balanceObj.tokenBalances.has(publicKey)) {
       return {
         balance: 0n,
