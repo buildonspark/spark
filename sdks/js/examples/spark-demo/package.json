@@ -3,7 +3,7 @@
   "version": "0.0.4",
   "private": true,
   "dependencies": {
-    "@buildonspark/spark-sdk": "^0.0.4",
+    "@buildonspark/spark-sdk": "0.0.5",
     "@lightsparkdev/ui": "^1.0.17",
     "@radix-ui/react-popover": "^1.1.6",
     "@tanstack/react-query": "^5.66.8",

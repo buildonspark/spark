@@ -20,7 +20,7 @@
     "typescript": "^5.7.3"
   },
   "dependencies": {
-    "@buildonspark/spark-sdk": "0.0.4",
+    "@buildonspark/spark-sdk": "0.0.5",
     "tsx": "^4.19.3"
   },
   "engines": {
