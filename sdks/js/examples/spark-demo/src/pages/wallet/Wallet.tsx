@@ -15,7 +15,6 @@ import { Routes } from "../../routes";
 import { PERMANENT_CURRENCIES, useWallet } from "../../store/wallet";
 
 export default function Wallet() {
-  const deconder = new TextDecoder("utf-8");
   const navigate = useNavigate();
   const notify = () => toast("Copied!");
   const {

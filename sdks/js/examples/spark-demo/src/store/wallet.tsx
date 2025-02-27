@@ -153,7 +153,7 @@ const useWalletStore = create<WalletStore>((set, get) => ({
     let mainnetwallet = new SparkWallet(Network.MAINNET);
     if (initWalletNetwork === Network.MAINNET) {
       set({ wallet: mainnetwallet });
-      mainnetwallet.initWallet(mnemonic);
+      await mainnetwallet.initWallet(mnemonic);
     } else {
       await wallet.initWallet(mnemonic);
     }
@@ -165,7 +165,7 @@ const useWalletStore = create<WalletStore>((set, get) => ({
     const mainnetwallet = new SparkWallet(Network.MAINNET);
     if (initWalletNetwork === Network.MAINNET) {
       set({ wallet: mainnetwallet });
-      mainnetwallet.initWallet(seed);
+      await mainnetwallet.initWallet(seed);
     } else {
       await wallet.initWallet(seed);
     }
