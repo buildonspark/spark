@@ -148,9 +148,9 @@ mutation CompleteCoopExit(
 const RequestLeavesSwapMutation = `
 mutation RequestLeavesSwap(
   $adaptor_pubkey: String!
-  $total_amount_sats: Int!
-  $target_amount_sats: Int!
-  $fee_sats: Int!
+  $total_amount_sats: Long!
+  $target_amount_sats: Long!
+  $fee_sats: Long!
   $network: BitcoinNetwork!
   $user_leaves: [UserLeafInput!]!
 ) {
