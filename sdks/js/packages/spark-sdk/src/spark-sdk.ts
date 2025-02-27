@@ -86,6 +86,11 @@ type DepositParams = {
   vout: number;
 };
 
+/**
+ * The SparkWallet class is the primary interface for interacting with the Spark network.
+ * It provides methods for creating and managing wallets, handling deposits, executing transfers,
+ * and interacting with the Lightning Network.
+ */
 export class SparkWallet {
   protected config: WalletConfigService;
 
@@ -260,14 +265,39 @@ export class SparkWallet {
     return this.sspClient !== null && this.wasmModule !== null;
   }
 
+  /**
+   * Gets the identity public key of the wallet.
+   * 
+   * @returns {Promise<string>} The identity public key as a hex string.
+   */
   public async getIdentityPublicKey(): Promise<string> {
     return bytesToHex(await this.config.signer.getIdentityPublicKey());
   }
 
+  /**
+   * Gets the Spark address of the wallet.
+   * 
+   * @returns {Promise<string>} The Spark address as a hex string.
+   */
   public async getSparkAddress(): Promise<string> {
     return bytesToHex(await this.config.signer.getIdentityPublicKey());
   }
 
+  /**
+   * Initializes the wallet using either a mnemonic phrase or a raw seed.
+   * initWallet will also claim any pending incoming lightning payment, spark transfer, 
+   * or bitcoin deposit.
+   *
+   * @param {Uint8Array | string} [mnemonicOrSeed] - (Optional) Either:
+   *   - A BIP-39 mnemonic phrase as string
+   *   - A raw seed as Uint8Array or hex string
+   *   If not provided, generates a new mnemonic and uses it to create a new wallet
+   * 
+   * @returns {Promise<Object>} Object containing:
+   *   - mnemonic: The mnemonic if one was generated (undefined for raw seed)
+   *   - balance: The wallet's initial balance in satoshis
+   *   - tokenBalance: Map of token balances and leaf counts
+   */
   public async initWallet(mnemonicOrSeed?: Uint8Array | string) {
     const returnMnemonic = !mnemonicOrSeed;
     if (!mnemonicOrSeed) {
@@ -313,6 +343,13 @@ export class SparkWallet {
     return identityPublicKey;
   }
 
+/**
+   * Initializes a wallet from a seed.
+   * 
+   * @param {Uint8Array | string} seed - The seed to initialize the wallet from
+   * @returns {Promise<string>} The identity public key
+   * @private
+   */
   private async initWalletFromSeed(seed: Uint8Array | string) {
     const identityPublicKey =
       await this.config.signer.createSparkWalletFromSeed(seed);
@@ -320,6 +357,15 @@ export class SparkWallet {
     return identityPublicKey;
   }
 
+  /**
+   * Requests a swap of leaves to optimize wallet structure.
+   * 
+   * @param {Object} params - Parameters for the leaves swap
+   * @param {number} [params.targetAmount] - Target amount for the swap
+   * @param {TreeNode[]} [params.leaves] - Specific leaves to swap
+   * @returns {Promise<Object>} The completed swap response
+   * @private
+   */
   private async requestLeavesSwap({
     targetAmount,
     leaves,
@@ -513,6 +559,13 @@ export class SparkWallet {
     }
   }
 
+  /**
+   * Gets all transfers for the wallet.
+   *
+   * @param {number} [limit=20] - Maximum number of transfers to return
+   * @param {number} [offset=0] - Offset for pagination
+   * @returns {Promise<QueryAllTransfersResponse>} Response containing the list of transfers
+   */
   public async getAllTransfers(
     limit: number = 20,
     offset: number = 0,
@@ -520,6 +573,16 @@ export class SparkWallet {
     return await this.transferService.queryAllTransfers(limit, offset);
   }
 
+  /**
+   * Gets the current balance of the wallet.
+   * You can use the forceRefetch option to synchronize your wallet and claim any 
+   * pending incoming lightning payment, spark transfer, or bitcoin deposit before returning the balance.
+   *
+   * @param {boolean} [forceRefetch=false] - Synchronizes the wallet before returning the balance
+   * @returns {Promise<Object>} Object containing:
+   *   - balance: The wallet's current balance in satoshis
+   *   - tokenBalances: Map of token balances and leaf counts
+   */
   public async getBalance(forceRefetch = false): Promise<{
     balance: bigint;
     tokenBalances: Map<string, { balance: bigint; leafCount: number }>;
@@ -558,10 +621,25 @@ export class SparkWallet {
   }
 
   // ***** Deposit Flow *****
+
+  /**
+   * Generates a new deposit address for receiving bitcoin funds.
+   * Note that this function returns a bitcoin address, not a spark address.
+   * For Layer 1 Bitcoin deposits, Spark generates Pay to Taproot (P2TR) addresses.
+   * These addresses start with "bc1p" and can be used to receive Bitcoin from any wallet.
+   *
+   * @returns {Promise<string>} A Bitcoin address for depositing funds
+   */
   public async getDepositAddress(): Promise<string> {
     return await this.generateDepositAddress();
   }
 
+  /**
+   * Generates a deposit address for receiving funds.
+   * 
+   * @returns {Promise<string>} A deposit address
+   * @private
+   */
   private async generateDepositAddress(): Promise<string> {
     const signingPubkey = await this.config.signer.getDepositSigningKey();
     const address = await this.depositService!.generateDepositAddress({
@@ -573,6 +651,13 @@ export class SparkWallet {
     return address.depositAddress.address;
   }
 
+  /**
+   * Finalizes a deposit to the wallet.
+   * 
+   * @param {DepositParams} params - Parameters for finalizing the deposit
+   * @returns {Promise<TreeNode[] | undefined>} The nodes created from the deposit
+   * @private
+   */
   private async finalizeDeposit({
     signingPubKey,
     verifyingKey,
@@ -589,6 +674,12 @@ export class SparkWallet {
     return await this.transferDepositToSelf(response.nodes, signingPubKey);
   }
 
+  /**
+   * Claims any pending deposits to the wallet.
+   * 
+   * @returns {Promise<TreeNode[]>} The nodes created from the claimed deposits
+   * @private
+   */
   private async claimDeposits() {
     const sparkClient = await this.connectionManager.createSparkClient(
       this.config.getCoordinatorAddress(),
@@ -624,6 +715,13 @@ export class SparkWallet {
     return depositNodes;
   }
 
+  /**
+   * Queries the mempool for transactions associated with an address.
+   * 
+   * @param {string} address - The address to query
+   * @returns {Promise<{depositTx: Transaction, vout: number} | null>} Transaction details or null if none found
+   * @private
+   */
   private async queryMempoolTxs(address: string) {
     const network = getNetworkFromAddress(address) || this.config.getNetwork();
     const baseUrl =
@@ -667,6 +765,14 @@ export class SparkWallet {
     return null;
   }
 
+  /**
+   * Transfers deposit to self to claim ownership.
+   * 
+   * @param {TreeNode[]} leaves - The leaves to transfer
+   * @param {Uint8Array} signingPubKey - The signing public key
+   * @returns {Promise<TreeNode[] | undefined>} The nodes resulting from the transfer
+   * @private
+   */
   private async transferDepositToSelf(
     leaves: TreeNode[],
     signingPubKey: Uint8Array,
@@ -695,6 +801,14 @@ export class SparkWallet {
   }
   // ***** Transfer Flow *****
 
+  /**
+   * Sends a transfer to another Spark user.
+   *
+   * @param {Object} params - Parameters for the transfer
+   * @param {string} params.receiverSparkAddress - The recipient's Spark address
+   * @param {number} params.amountSats - Amount to send in satoshis
+   * @returns {Promise<Transfer>} The completed transfer details
+   */
   public async sendSparkTransfer({
     receiverSparkAddress,
     amountSats,
@@ -708,6 +822,13 @@ export class SparkWallet {
     });
   }
 
+  /**
+   * Internal method to send a transfer.
+   * 
+   * @param {SendTransferParams} params - Parameters for the transfer
+   * @returns {Promise<Transfer>} The completed transfer details
+   * @private
+   */
   private async _sendTransfer({
     amount,
     receiverPubKey,
@@ -749,6 +870,13 @@ export class SparkWallet {
     });
   }
 
+  /**
+   * Claims a specific transfer.
+   * 
+   * @param {Transfer} transfer - The transfer to claim
+   * @returns {Promise<Object>} The claim result
+   * @private
+   */
   private async claimTransfer(transfer: Transfer) {
     return await this.claimTransferMutex.runExclusive(async () => {
       const leafPubKeyMap =
@@ -775,6 +903,12 @@ export class SparkWallet {
     });
   }
 
+  /**
+   * Claims all pending transfers.
+   * 
+   * @returns {Promise<boolean>} True if any transfers were claimed
+   * @private
+   */
   private async claimTransfers(): Promise<boolean> {
     const transfers = await this.transferService.queryPendingTransfers();
     let claimed = false;
@@ -794,6 +928,12 @@ export class SparkWallet {
     return claimed;
   }
 
+  /**
+   * Cancels all sender-initiated transfers.
+   * 
+   * @returns {Promise<void>}
+   * @private
+   */
   private async cancelAllSenderInitiatedTransfers() {
     const transfers =
       await this.transferService.queryPendingTransfersBySender();
@@ -805,6 +945,15 @@ export class SparkWallet {
   }
 
   // ***** Lightning Flow *****
+
+  /**
+   * Creates a Lightning invoice for receiving payments.
+   *
+   * @param {Object} params - Parameters for the lightning invoice
+   * @param {number} params.amountSats - Amount in satoshis
+   * @param {string} params.memo - Description for the invoice
+   * @returns {Promise<string>} BOLT11 encoded invoice
+   */
   public async createLightningInvoice({
     amountSats,
     memo,
@@ -845,6 +994,13 @@ export class SparkWallet {
     });
   }
 
+  /**
+   * Pays a Lightning invoice.
+   *
+   * @param {Object} params - Parameters for paying the invoice
+   * @param {string} params.invoice - The BOLT11-encoded Lightning invoice to pay
+   * @returns {Promise<LightningSendRequest>} The Lightning payment request details
+   */
   public async payLightningInvoice({ invoice }: PayLightningInvoiceParams) {
     if (!this.sspClient) {
       throw new Error("SSP client not initialized");
@@ -920,6 +1076,13 @@ export class SparkWallet {
     return sspResponse;
   }
 
+  /**
+   * Gets fee estimate for receiving Lightning payments.
+   * 
+   * @param {LightningReceiveFeeEstimateInput} params - Input parameters for fee estimation
+   * @returns {Promise<LightningReceiveFeeEstimateOutput | null>} Fee estimate for receiving Lightning payments
+   * @private
+   */
   private async getLightningReceiveFeeEstimate({
     amountSats,
     network,
@@ -934,6 +1097,13 @@ export class SparkWallet {
     );
   }
 
+  /**
+   * Gets fee estimate for sending Lightning payments.
+   * 
+   * @param {LightningSendFeeEstimateInput} params - Input parameters for fee estimation
+   * @returns {Promise<LightningSendFeeEstimateOutput | null>} Fee estimate for sending Lightning payments
+   * @private
+   */
   private async getLightningSendFeeEstimate({
     encodedInvoice,
   }: LightningSendFeeEstimateInput): Promise<LightningSendFeeEstimateOutput | null> {
@@ -945,6 +1115,17 @@ export class SparkWallet {
   }
 
   // ***** Tree Creation Flow *****
+  
+  /**
+   * Generates a deposit address for a tree.
+   * 
+   * @param {number} vout - The vout index
+   * @param {Uint8Array} parentSigningPubKey - The parent signing public key
+   * @param {Transaction} [parentTx] - Optional parent transaction
+   * @param {TreeNode} [parentNode] - Optional parent node
+   * @returns {Promise<Object>} Deposit address information
+   * @private
+   */
   private async generateDepositAddressForTree(
     vout: number,
     parentSigningPubKey: Uint8Array,
@@ -959,6 +1140,17 @@ export class SparkWallet {
     );
   }
 
+  /**
+   * Creates a tree structure.
+   * 
+   * @param {number} vout - The vout index
+   * @param {DepositAddressTree} root - The root of the tree
+   * @param {boolean} createLeaves - Whether to create leaves
+   * @param {Transaction} [parentTx] - Optional parent transaction
+   * @param {TreeNode} [parentNode] - Optional parent node
+   * @returns {Promise<Object>} The created tree
+   * @private
+   */
   private async createTree(
     vout: number,
     root: DepositAddressTree,
@@ -974,8 +1166,17 @@ export class SparkWallet {
       parentNode,
     );
   }
+  
   // ***** Cooperative Exit Flow *****
 
+  /**
+   * Initiates a withdrawal to move funds from the Spark network to an on-chain Bitcoin address.
+   *
+   * @param {Object} params - Parameters for the withdrawal
+   * @param {string} params.onchainAddress - The Bitcoin address where the funds should be sent
+   * @param {number} [params.targetAmountSats] - The amount in satoshis to withdraw. If not specified, attempts to withdraw all available funds
+   * @returns {Promise<CoopExitRequest | null | undefined>} The withdrawal request details, or null/undefined if the request cannot be completed
+   */
   public async withdraw({
     onchainAddress,
     targetAmountSats,
@@ -986,6 +1187,14 @@ export class SparkWallet {
     return this.coopExit(onchainAddress, targetAmountSats);
   }
 
+/**
+   * Internal method to perform a cooperative exit (withdrawal).
+   * 
+   * @param {string} onchainAddress - The Bitcoin address where the funds should be sent
+   * @param {number} [targetAmountSats] - The amount in satoshis to withdraw
+   * @returns {Promise<Object | null | undefined>} The exit request details
+   * @private
+   */
   private async coopExit(onchainAddress: string, targetAmountSats?: number) {
     let leavesToSend: TreeNode[] = [];
     if (targetAmountSats) {
@@ -1049,6 +1258,13 @@ export class SparkWallet {
     return completeResponse;
   }
 
+  /**
+   * Gets fee estimate for cooperative exit (on-chain withdrawal).
+   * 
+   * @param {CoopExitFeeEstimateInput} params - Input parameters for fee estimation
+   * @returns {Promise<CoopExitFeeEstimateOutput | null>} Fee estimate for the withdrawal
+   * @private
+   */
   private async getCoopExitFeeEstimate({
     leafExternalIds,
     withdrawalAddress,
@@ -1065,6 +1281,12 @@ export class SparkWallet {
 
   // ***** Token Flow *****
 
+  /**
+   * Synchronizes token leaves for the wallet.
+   * 
+   * @returns {Promise<void>}
+   * @private
+   */
   protected async syncTokenLeaves() {
     this.tokenLeaves.clear();
 
@@ -1095,6 +1317,12 @@ export class SparkWallet {
     this.tokenLeaves = groupedLeaves;
   }
 
+  /**
+   * Gets all token balances.
+   * 
+   * @returns {Promise<Map<string, { balance: bigint, leafCount: number }>>} Map of token balances and leaf counts
+   * @private
+   */
   private async getAllTokenBalances(): Promise<
     Map<
       string,
@@ -1116,6 +1344,15 @@ export class SparkWallet {
     return balances;
   }
 
+  /**
+   * Transfers tokens to another user.
+   * 
+   * @param {string} tokenPublicKey - The public key of the token to transfer
+   * @param {bigint} tokenAmount - The amount of tokens to transfer
+   * @param {string} recipientPublicKey - The recipient's public key
+   * @param {LeafWithPreviousTransactionData[]} [selectedLeaves] - Optional specific leaves to use for the transfer
+   * @returns {Promise<string>} The transaction ID of the token transfer
+   */
   public async transferTokens(
     tokenPublicKey: string,
     tokenAmount: bigint,
@@ -1163,6 +1400,14 @@ export class SparkWallet {
     );
   }
 
+  /**
+   * Selects token leaves for a transfer.
+   * 
+   * @param {string} tokenPublicKey - The public key of the token
+   * @param {bigint} tokenAmount - The amount of tokens to select leaves for
+   * @returns {LeafWithPreviousTransactionData[]} The selected leaves
+   * @private
+   */
   private selectTokenLeaves(
     tokenPublicKey: string,
     tokenAmount: bigint,
@@ -1174,6 +1419,12 @@ export class SparkWallet {
   }
 }
 
+/**
+ * Utility function to determine the network from a Bitcoin address.
+ * 
+ * @param {string} address - The Bitcoin address
+ * @returns {BitcoinNetwork | null} The detected network or null if not detected
+ */
 function getNetworkFromAddress(address: string) {
   try {
     const decoded = bitcoin.address.fromBech32(address);
