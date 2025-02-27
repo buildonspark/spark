@@ -32,6 +32,5 @@ func ConnectToLrc20Node(config *so.Config) (*grpc.ClientConn, error) {
 		log.Printf("Failed to connect to the lrc20 node to verify a token transaction: %v", err)
 		return nil, err
 	}
-	defer conn.Close()
 	return conn, nil
 }

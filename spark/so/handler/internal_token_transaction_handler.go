@@ -32,6 +32,8 @@ func NewInternalTokenTransactionHandler(config *so.Config) *InternalTokenTransac
 }
 
 func (h *InternalTokenTransactionHandler) StartTokenTransactionInternal(ctx context.Context, config *so.Config, req *pbinternal.StartTokenTransactionInternalRequest) (*emptypb.Empty, error) {
+	logger := helper.GetLoggerFromContext(ctx)
+	logger.Info("Starting token transaction", "key share ids", len(req.KeyshareIds))
 	keyshareUUIDs := make([]uuid.UUID, len(req.KeyshareIds))
 	// Ensure that the coordinator SO did not pass duplicate keyshare UUIDs for different leaves.
 	seenUUIDs := make(map[uuid.UUID]bool)
@@ -47,11 +49,13 @@ func (h *InternalTokenTransactionHandler) StartTokenTransactionInternal(ctx cont
 		seenUUIDs[uuid] = true
 		keyshareUUIDs[i] = uuid
 	}
+	logger.Info("Marking keyshares as used")
 	keysharesMap, err := ent.MarkSigningKeysharesAsUsed(ctx, config, keyshareUUIDs)
 	if err != nil {
 		log.Printf("Failed to mark keyshares as used: %v", err)
 		return nil, err
 	}
+	logger.Info("Keyshares marked as used")
 	expectedRevocationPublicKeys := make([][]byte, len(req.KeyshareIds))
 	for i, id := range keyshareUUIDs {
 		keyshare, ok := keysharesMap[id]
@@ -61,6 +65,7 @@ func (h *InternalTokenTransactionHandler) StartTokenTransactionInternal(ctx cont
 		expectedRevocationPublicKeys[i] = keyshare.PublicKey
 	}
 
+	logger.Info("Validating final token transaction")
 	// Validate the final token transaction.
 	err = validateFinalTokenTransaction(config, req.FinalTokenTransaction, req.TokenTransactionSignatures, expectedRevocationPublicKeys)
 	if err != nil {
@@ -91,12 +96,14 @@ func (h *InternalTokenTransactionHandler) StartTokenTransactionInternal(ctx cont
 			return nil, fmt.Errorf("error validating transfer using previous leaf data: %w", err)
 		}
 	}
+	logger.Info("Final token transaction validated")
 
+	logger.Info("Verifying token transaction with LRC20 node")
 	err = h.VerifyTokenTransactionWithLrc20Node(ctx, config, req.FinalTokenTransaction)
 	if err != nil {
 		return nil, err
 	}
-
+	logger.Info("Token transaction verified with LRC20 node")
 	// Save the token transaction receipt, created leaf ents, and update the leaves to spend.
 	_, err = ent.CreateStartedTransactionEntities(ctx, req.FinalTokenTransaction, req.TokenTransactionSignatures, req.KeyshareIds, leafToSpendEnts)
 	if err != nil {
