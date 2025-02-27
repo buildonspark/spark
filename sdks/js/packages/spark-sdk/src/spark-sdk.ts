@@ -816,10 +816,17 @@ export class SparkWallet {
       paymentHash: Uint8Array,
       memo: string,
     ) => {
+      const network = this.config.getNetwork();
+      let bitcoinNetwork: BitcoinNetwork = BitcoinNetwork.REGTEST;
+      if (network === Network.MAINNET) {
+        bitcoinNetwork = BitcoinNetwork.MAINNET;
+      } else if (network === Network.REGTEST) {
+        bitcoinNetwork = BitcoinNetwork.REGTEST;
+      }
+
       const invoice = await this.sspClient!.requestLightningReceive({
         amountSats,
-        // TODO: Map config network to ssp network
-        network: BitcoinNetwork.REGTEST,
+        network: bitcoinNetwork,
         paymentHash: bytesToHex(paymentHash),
         expirySecs: expirySeconds,
         memo,
