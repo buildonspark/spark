@@ -68,7 +68,7 @@ export default function Send() {
         }
         break;
       default:
-        setActiveAsset(PERMANENT_CURRENCIES.BTC);
+        setActiveAsset(PERMANENT_CURRENCIES.get("BTC")!);
         navigate(Routes.Wallet);
         break;
     }
@@ -197,7 +197,7 @@ export default function Send() {
         break;
       case SendStep.Success:
       default:
-        setActiveAsset(PERMANENT_CURRENCIES.BTC);
+        setActiveAsset(PERMANENT_CURRENCIES.get("BTC")!);
         navigate(Routes.Wallet);
         break;
     }
@@ -228,7 +228,7 @@ export default function Send() {
     switch (currentStep) {
       case SendStep.Failed:
       default:
-        setActiveAsset(PERMANENT_CURRENCIES.BTC);
+        setActiveAsset(PERMANENT_CURRENCIES.get("BTC")!);
         navigate(Routes.Wallet);
         break;
     }

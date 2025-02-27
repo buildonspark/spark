@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AddressInput from "../../components/AddressInput";
 import AmountInput from "../../components/AmountInput";
@@ -11,7 +11,7 @@ import ArrowLeft from "../../icons/ArrowLeft";
 import CloseIcon from "../../icons/CloseIcon";
 import { Routes } from "../../routes";
 import { PERMANENT_CURRENCIES, useWallet } from "../../store/wallet";
-import { CurrencyType } from "../../utils/currency";
+import { Currency, CurrencyType } from "../../utils/currency";
 
 export enum TokensStep {
   SelectToken = "SelectToken",
@@ -36,6 +36,8 @@ export default function Tokens() {
     assets,
     activeAsset,
     activeInputCurrency,
+    tokenBalances,
+    updateAssets,
     transferTokens,
     setActiveAsset,
     setActiveInputCurrency,
@@ -75,11 +77,11 @@ export default function Tokens() {
   const logoLeftClickHandler = useCallback(async () => {
     switch (currentStep) {
       case TokensStep.SelectToken:
-        setActiveAsset(PERMANENT_CURRENCIES.BTC);
+        setActiveAsset(PERMANENT_CURRENCIES.get("BTC")!);
         navigate(Routes.Wallet);
         break;
       case TokensStep.TokenDetails:
-        setActiveAsset(PERMANENT_CURRENCIES.BTC);
+        setActiveAsset(PERMANENT_CURRENCIES.get("BTC")!);
         setCurrentStep(TokensStep.SelectToken);
         break;
       case TokensStep.SendTokenAddressInput:
@@ -93,7 +95,7 @@ export default function Tokens() {
         break;
       case TokensStep.SendTokenSuccess:
       default:
-        setActiveAsset(PERMANENT_CURRENCIES.BTC);
+        setActiveAsset(PERMANENT_CURRENCIES.get("BTC")!);
         navigate(Routes.Wallet);
         break;
     }
@@ -108,7 +110,7 @@ export default function Tokens() {
         await handleTokenSend();
         break;
       default:
-        setActiveAsset(PERMANENT_CURRENCIES.BTC);
+        setActiveAsset(PERMANENT_CURRENCIES.get("BTC")!);
         navigate(Routes.Wallet);
         break;
     }
@@ -171,6 +173,37 @@ export default function Tokens() {
         return null;
     }
   }, [currentStep, activeAsset]);
+
+  useEffect(() => {
+    let balances = tokenBalances.value as Map<
+      string,
+      { balance: bigint; leafCount: number }
+    >;
+    if (balances) {
+      console.log("balances: ", balances);
+      const newAssets: Map<string, Currency> = new Map();
+      balances.forEach((value, key) => {
+        newAssets.set(key, {
+          name: key,
+          decimals: 0,
+          type: CurrencyType.TOKEN,
+          balance: Number(value.balance),
+          logo: null,
+          pubkey: key,
+          usdPrice: 1,
+        });
+      });
+      const isDifferent = Array.from(newAssets.keys()).some(
+        (key) =>
+          !assets.get(key) ||
+          newAssets.get(key)?.balance !== assets.get(key)?.balance,
+      );
+      if (isDifferent) {
+        updateAssets(newAssets);
+      }
+    }
+  }, []);
+
   return (
     <CardForm
       headerDisabled={
@@ -205,24 +238,37 @@ export default function Tokens() {
       logoRight={logoRight}
     >
       {currentStep === TokensStep.SelectToken && (
-        <div className="flex max-h-[600px] flex-col overflow-y-auto p-2">
-          {Object.values(assets)
-            .filter((asset) => asset.type === CurrencyType.TOKEN)
-            .map((token) => {
+        <div className="flex max-h-[420px] flex-col overflow-y-auto p-2">
+          {(() => {
+            const filteredAssets = Array.from(assets.values()).filter(
+              (asset) => asset.type === CurrencyType.TOKEN,
+            );
+
+            if (filteredAssets.length === 0) {
               return (
-                <CurrencyBalanceDetails
-                  key={token.name}
-                  logo={token.logo}
-                  currency={token.name}
-                  fiatBalance={token.balance?.toString() ?? "0"}
-                  onClick={() => {
-                    setActiveAsset(token);
-                    setCurrentStep(TokensStep.TokenDetails);
-                  }}
-                  logoBorderEnabled={false}
-                />
+                <div className="flex flex-col items-center justify-center p-6 text-center text-gray-500">
+                  <p>No tokens found</p>
+                  <p className="mt-4 text-sm">
+                    Tokens will appear here once found
+                  </p>
+                </div>
               );
-            })}
+            }
+
+            return filteredAssets.map((token) => (
+              <CurrencyBalanceDetails
+                key={token.name}
+                logo={token.logo}
+                currency={token.name}
+                fiatBalance={token.balance?.toString() ?? "0"}
+                onClick={() => {
+                  setActiveAsset(token);
+                  setCurrentStep(TokensStep.TokenDetails);
+                }}
+                logoBorderEnabled={false}
+              />
+            ));
+          })()}
         </div>
       )}
       {currentStep === TokensStep.TokenDetails && (

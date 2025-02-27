@@ -23,16 +23,24 @@ export default function CurrencyBalanceDetails({
       onClick={onClick}
     >
       <div className="flex flex-row items-center gap-2">
+        {logo && (
+          <div
+            className={`flex h-10 w-10 items-center justify-center rounded-xl ${
+              logoBorderEnabled
+                ? "border border-[#f9f9f9] border-opacity-10 bg-gradient-to-b from-[#10151C] via-[#11161D] to-[#141A22]"
+                : ""
+            }`}
+          >
+            {logo}
+          </div>
+        )}
         <div
-          className={`flex h-10 w-10 items-center justify-center rounded-xl ${
-            logoBorderEnabled
-              ? "border border-[#f9f9f9] border-opacity-10 bg-gradient-to-b from-[#10151C] via-[#11161D] to-[#141A22]"
-              : ""
+          className={`max-w-[150px] overflow-hidden text-ellipsis whitespace-nowrap text-xs font-medium ${
+            !logo && "ml-4"
           }`}
         >
-          {logo}
+          {currency}
         </div>
-        <div>{currency}</div>
       </div>
       {/* <div>{fiatBalance}</div> */}
       <div>

@@ -7,8 +7,8 @@ export enum CurrencyType {
 export interface Currency {
   type: CurrencyType;
   name: string;
-  code: string;
-  decimals: number;
+  code?: string;
+  decimals?: number;
   symbol?: string;
   balance?: number;
   logo?: React.ReactNode;

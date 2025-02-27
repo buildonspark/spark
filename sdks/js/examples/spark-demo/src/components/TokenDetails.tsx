@@ -9,15 +9,13 @@ export default function TokenDetails({
 }: {
   onSendButtonClick: () => void;
 }) {
-  const { activeAsset, tokenBalances } = useWallet();
-  const tokenBalance: bigint =
-    tokenBalances.value[activeAsset?.pubkey ?? ""]?.balance || BigInt(0);
+  const { activeAsset } = useWallet();
   return (
     <div className="">
       <StyledContainer className="flex h-[180px] w-full flex-col items-center justify-center">
         <WalletBalance
           asset={activeAsset}
-          assetBalance={Number(tokenBalance)}
+          assetBalance={activeAsset.balance}
           assetFiatConversion={1 / (activeAsset.usdPrice ?? 1)}
         />
       </StyledContainer>

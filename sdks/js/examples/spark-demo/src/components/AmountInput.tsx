@@ -171,7 +171,7 @@ export default function AmountInput({
                 const removeCommas = fiatAmountString.replace(/,/g, ""); // remove commas
                 const cleanedInput = removeCommas.replace(/\.00$/, ""); // remove trailing .00
                 setRawInputAmount(cleanedInput);
-                setActiveInputCurrency(PERMANENT_CURRENCIES.USD);
+                setActiveInputCurrency(PERMANENT_CURRENCIES.get("USD")!);
               } else {
                 const parsedInput = assetAmountString.replace(/,/g, ""); // remove commas
                 setRawInputAmount(parsedInput.length > 0 ? parsedInput : "0");

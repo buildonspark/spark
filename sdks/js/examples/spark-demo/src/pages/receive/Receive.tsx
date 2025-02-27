@@ -65,7 +65,7 @@ export default function Receive() {
         break;
       case ReceiveStep.ShareQuote:
       default:
-        setActiveAsset(PERMANENT_CURRENCIES.BTC);
+        setActiveAsset(PERMANENT_CURRENCIES.get("BTC")!);
         navigate(Routes.Wallet);
         break;
     }

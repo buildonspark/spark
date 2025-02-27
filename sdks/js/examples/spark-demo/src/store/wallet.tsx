@@ -2,51 +2,55 @@ import { SparkWallet } from "@buildonspark/spark-sdk";
 import { Network } from "@buildonspark/spark-sdk/utils";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { create } from "zustand";
-import MxnLogo from "../icons/test_logo/MxnLogo";
-import UsdcLogo from "../icons/test_logo/UsdcLogo";
 import { Currency, CurrencyType } from "../utils/currency";
 
-export const PERMANENT_CURRENCIES: Record<string, Currency> = {
-  BTC: {
-    name: "Bitcoin",
-    code: "BTC",
-    decimals: 8,
-    type: CurrencyType.BLOCKCHAIN,
-    balance: 1231,
-    symbol: "₿",
-  },
-  USD: {
-    name: "US Dollar",
-    code: "USD",
-    decimals: 2,
-    type: CurrencyType.FIAT,
-    symbol: "$",
-  },
-  MXPC: {
-    name: "MXP Coin",
-    code: "MXPC",
-    decimals: 2,
-    type: CurrencyType.TOKEN,
-    balance: 0,
-    symbol: "MXN",
-    logo: <MxnLogo />,
-    pubkey:
-      "02773f9ebfaf81126d6dde46227374eac7c2de7f5a99f76a2ef93780e9960e355f",
-    usdPrice: 20.46,
-  },
-  USDC: {
-    name: "USD Coin",
-    code: "USDC",
-    decimals: 2,
-    type: CurrencyType.TOKEN,
-    balance: 0,
-    symbol: "USDC",
-    logo: <UsdcLogo />,
-    pubkey:
-      "03269c03f240fd2764e048284bceeb09f8b256b60a3bc2737cb119a61127358c1f",
-    usdPrice: 1.0,
-  },
-};
+export const PERMANENT_CURRENCIES: Map<string, Currency> = new Map([
+  [
+    "BTC",
+    {
+      name: "Bitcoin",
+      code: "BTC",
+      decimals: 8,
+      type: CurrencyType.BLOCKCHAIN,
+      balance: 1231,
+      symbol: "₿",
+    },
+  ],
+  [
+    "USD",
+    {
+      name: "US Dollar",
+      code: "USD",
+      decimals: 2,
+      type: CurrencyType.FIAT,
+      symbol: "$",
+    },
+  ],
+  // MXPC: {
+  //   name: "MXP Coin",
+  //   code: "MXPC",
+  //   decimals: 2,
+  //   type: CurrencyType.TOKEN,
+  //   balance: 0,
+  //   symbol: "MXN",
+  //   logo: <MxnLogo />,
+  //   pubkey:
+  //     "02773f9ebfaf81126d6dde46227374eac7c2de7f5a99f76a2ef93780e9960e355f",
+  //   usdPrice: 20.46,
+  // },
+  // USDC: {
+  //   name: "USD Coin",
+  //   code: "USDC",
+  //   decimals: 2,
+  //   type: CurrencyType.TOKEN,
+  //   balance: 0,
+  //   symbol: "USDC",
+  //   logo: <UsdcLogo />,
+  //   pubkey:
+  //     "03269c03f240fd2764e048284bceeb09f8b256b60a3bc2737cb119a61127358c1f",
+  //   usdPrice: 1.0,
+  // },
+]);
 
 interface WalletState {
   wallet: SparkWallet;
@@ -54,7 +58,7 @@ interface WalletState {
   mnemonic: string | null;
   activeInputCurrency: Currency;
   activeAsset: Currency;
-  assets: Record<string, Currency>;
+  assets: Map<string, Currency>;
 }
 
 interface WalletActions {
@@ -65,16 +69,13 @@ interface WalletActions {
   createLightningInvoice: (amount: number, memo: string) => Promise<string>;
   sendTransfer: (amount: number, recipient: string) => Promise<void>;
   payLightningInvoice: (invoice: string) => Promise<void>;
-  getTokenBalance: (tokenPublicKey: string) => Promise<{
-    balance: bigint;
-    leafCount: number;
-  }>;
   transferTokens: (
     tokenPublicKey: string,
     tokenAmount: bigint,
     recipientPublicKey: string,
   ) => Promise<void>;
   setActiveAsset: (asset: Currency) => void;
+  updateAssets: (assets: Map<string, Currency>) => void;
   setActiveInputCurrency: (currency: Currency) => void;
   withdrawOnchain: (address: string, amount: number) => Promise<void>;
   loadStoredWallet: () => Promise<boolean>;
@@ -89,30 +90,14 @@ const useWalletStore = create<WalletStore>((set, get) => ({
   wallet: new SparkWallet(Network.REGTEST),
   isInitialized: false,
   mnemonic: null,
-  activeInputCurrency: PERMANENT_CURRENCIES.USD,
+  activeInputCurrency: PERMANENT_CURRENCIES.get("USD")!,
   setActiveInputCurrency: (currency: Currency) => {
     set({ activeInputCurrency: currency });
   },
   assets: PERMANENT_CURRENCIES,
-  activeAsset: PERMANENT_CURRENCIES.BTC,
+  activeAsset: PERMANENT_CURRENCIES.get("BTC")!,
   setActiveAsset: (asset: Currency) => {
     set({ activeAsset: asset });
-  },
-  getTokenBalance: async (tokenPublicKey: string) => {
-    const { wallet } = get();
-    const balanceObj = await wallet.getBalance();
-    if (!balanceObj.tokenBalances) {
-      return {
-        balance: BigInt(0),
-        leafCount: 0,
-      };
-    }
-    return (
-      balanceObj.tokenBalances.get(tokenPublicKey) || {
-        balance: BigInt(0),
-        leafCount: 0,
-      }
-    );
   },
   transferTokens: async (
     tokenPublicKey: string,
@@ -125,6 +110,13 @@ const useWalletStore = create<WalletStore>((set, get) => ({
       tokenAmount,
       recipientPublicKey,
     );
+  },
+  updateAssets: (newAssets: Map<string, Currency>) => {
+    const currentAssets = get().assets;
+    newAssets.forEach((value, key) => {
+      currentAssets.set(key, value);
+    });
+    set({ assets: currentAssets });
   },
   btcAddressInfo: {},
   initWallet: async (mnemonic: string) => {
@@ -215,7 +207,6 @@ export function useWallet() {
   const balanceQuery = useQuery({
     queryKey: ["wallet", "balance"],
     queryFn: async () => {
-      console.log("fetching");
       return await wallet.getBalance();
     },
     refetchOnMount: true,
@@ -273,7 +264,7 @@ export function useWallet() {
       error: balanceQuery.error,
     },
     tokenBalances: {
-      value: (balanceQuery.data?.tokenBalances ?? {}) as Record<
+      value: (balanceQuery.data?.tokenBalances ?? new Map()) as Map<
         string,
         { balance: bigint; leafCount: number }
       >,
@@ -286,8 +277,8 @@ export function useWallet() {
       error: satsUsdPriceQuery.error,
     },
     isInitialized,
-    getTokenBalance: state.getTokenBalance,
     transferTokens: state.transferTokens,
+    updateAssets: state.updateAssets,
     initWallet,
     initWalletFromSeed,
     getMasterPublicKey: state.getMasterPublicKey,
