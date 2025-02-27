@@ -90,7 +90,7 @@ type DepositParams = {
 
 type InitWalletResponse = {
   balance: bigint;
-  tokenBalance: Map<string, { balance: bigint; leafCount: number }>;
+  tokenBalance: Map<string, { balance: bigint }>;
   mnemonic?: string | undefined;
 };
 
@@ -604,7 +604,7 @@ export class SparkWallet {
    */
   public async getBalance(forceRefetch = false): Promise<{
     balance: bigint;
-    tokenBalances: Map<string, { balance: bigint; leafCount: number }>;
+    tokenBalances: Map<string, { balance: bigint }>;
   }> {
     if (forceRefetch) {
       await Promise.all([
@@ -615,15 +615,11 @@ export class SparkWallet {
       this.leaves = await this.getLeaves();
     }
 
-    const tokenBalances = new Map<
-      string,
-      { balance: bigint; leafCount: number }
-    >();
+    const tokenBalances = new Map<string, { balance: bigint }>();
 
     for (const [tokenPublicKey, leaves] of this.tokenLeaves.entries()) {
       tokenBalances.set(tokenPublicKey, {
         balance: calculateAvailableTokenAmount(leaves),
-        leafCount: leaves.length,
       });
     }
 
@@ -1448,7 +1444,7 @@ export class SparkWallet {
   /**
    * Gets all token balances.
    *
-   * @returns {Promise<Map<string, { balance: bigint, leafCount: number }>>} Map of token balances and leaf counts
+   * @returns {Promise<Map<string, { balance: bigint }>>} Map of token balances and leaf counts
    * @private
    */
   private async getAllTokenBalances(): Promise<
@@ -1456,17 +1452,15 @@ export class SparkWallet {
       string,
       {
         balance: bigint;
-        leafCount: number;
       }
     >
   > {
     await this.syncTokenLeaves();
 
-    const balances = new Map<string, { balance: bigint; leafCount: number }>();
+    const balances = new Map<string, { balance: bigint }>();
     for (const [tokenPublicKey, leaves] of this.tokenLeaves.entries()) {
       balances.set(tokenPublicKey, {
         balance: calculateAvailableTokenAmount(leaves),
-        leafCount: leaves.length,
       });
     }
     return balances;

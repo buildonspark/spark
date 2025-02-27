@@ -328,7 +328,7 @@ export function useWallet() {
     tokenBalances: {
       value: (balanceQuery.data?.tokenBalances ?? new Map()) as Map<
         string,
-        { balance: bigint; leafCount: number }
+        { balance: bigint }
       >,
       isLoading: balanceQuery.isLoading || !isInitialized,
       error: balanceQuery.error,

@@ -139,7 +139,6 @@ async function runCLI() {
           const balanceInfo = await wallet.getBalance(true);
           // Display token balances if available
           console.log(`Token Balance: ${balanceInfo.balance}`);
-          console.log(`Leaf Count: ${balanceInfo.leafCount}`);
           break;
         case "announce": {
           if (!wallet.isL1Initialized()) {

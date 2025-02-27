@@ -28,19 +28,16 @@ export class IssuerSparkWallet extends SparkWallet {
 
   async getIssuerTokenBalance(): Promise<{
     balance: bigint;
-    leafCount: number;
   }> {
     const publicKey = await super.getIdentityPublicKey();
     const balanceObj = await this.getBalance(true);
     if (!balanceObj.tokenBalances || !balanceObj.tokenBalances.has(publicKey)) {
       return {
         balance: 0n,
-        leafCount: 0,
       };
     }
     return {
       balance: balanceObj.tokenBalances.get(publicKey)!.balance,
-      leafCount: balanceObj.tokenBalances.get(publicKey)!.leafCount,
     };
   }
 

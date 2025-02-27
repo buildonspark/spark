@@ -168,11 +168,9 @@ async function getSparkWalletTokenBalanceOrZero(sparkWallet, publicKey) {
   if (!balanceObj.tokenBalances || !balanceObj.tokenBalances.has(publicKey)) {
     return {
       balance: 0n,
-      leafCount: 0,
     };
   }
   return {
     balance: balanceObj.tokenBalance,
-    leafCount: balanceObj.leafCount,
   };
 }

@@ -175,10 +175,7 @@ export default function Tokens() {
   }, [currentStep, activeAsset]);
 
   useEffect(() => {
-    let balances = tokenBalances.value as Map<
-      string,
-      { balance: bigint; leafCount: number }
-    >;
+    let balances = tokenBalances.value as Map<string, { balance: bigint }>;
     if (balances) {
       const newAssets: Map<string, Currency> = new Map();
       balances.forEach((value, key) => {
