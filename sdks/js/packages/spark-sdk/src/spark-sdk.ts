@@ -1,6 +1,6 @@
 import { bytesToHex, hexToBytes } from "@noble/curves/abstract/utils";
 import { secp256k1 } from "@noble/curves/secp256k1";
-import { Transaction } from "@scure/btc-signer";
+import { Address, Transaction } from "@scure/btc-signer";
 import { TransactionInput } from "@scure/btc-signer/psbt";
 import { sha256 } from "@scure/btc-signer/utils";
 import { decode } from "light-bolt11-decoder";
@@ -58,6 +58,7 @@ import {
 } from "./utils/token-transactions.js";
 import { initWasm } from "./utils/wasm-wrapper.js";
 import { InitOutput } from "./wasm/spark_bindings.js";
+import bitcoin from "bitcoinjs-lib";
 
 // Add this constant at the file level
 const MAX_TOKEN_LEAVES = 100;
@@ -624,15 +625,22 @@ export class SparkWallet {
   }
 
   private async queryMempoolTxs(address: string) {
-    const baseUrl = "https://regtest-mempool.dev.dev.sparkinfra.net/api";
+    const network = getNetworkFromAddress(address) || this.config.getNetwork();
+    const baseUrl =
+      network === BitcoinNetwork.REGTEST
+        ? "https://regtest-mempool.dev.dev.sparkinfra.net/api"
+        : "https://mempool.space/docs/api/rest";
     const auth = btoa("spark-sdk:mCMk1JqlBNtetUNy");
 
-    const response = await fetch(`${baseUrl}/address/${address}/txs`, {
-      headers: {
-        Authorization: `Basic ${auth}`,
-        "Content-Type": "application/json",
-      },
-    });
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+
+    if (network === BitcoinNetwork.REGTEST) {
+      headers["Authorization"] = `Basic ${auth}`;
+    }
+
+    const response = await fetch(`${baseUrl}/address/${address}/txs`, { headers });
 
     const addressTxs = await response.json();
 
@@ -647,12 +655,7 @@ export class SparkWallet {
         return null;
       }
 
-      const txResponse = await fetch(`${baseUrl}/tx/${latestTx.txid}/hex`, {
-        headers: {
-          Authorization: `Basic ${auth}`,
-          "Content-Type": "application/json",
-        },
-      });
+      const txResponse = await fetch(`${baseUrl}/tx/${latestTx.txid}/hex`, { headers });
       const txHex = await txResponse.text();
       const depositTx = getTxFromRawTxHex(txHex);
 
@@ -1169,4 +1172,19 @@ export class SparkWallet {
       tokenAmount,
     );
   }
+}
+
+function getNetworkFromAddress(address: string) {
+  try {
+    const decoded = bitcoin.address.fromBech32(address);
+    // HRP (human-readable part) determines the network
+    if (decoded.prefix === "bc") {
+      return BitcoinNetwork.MAINNET;
+    } else if (decoded.prefix === "bcrt") {
+      return BitcoinNetwork.REGTEST;
+    }
+  } catch (err) {
+    throw new Error("Invalid Bitcoin address");
+  }
+  return null;
 }
