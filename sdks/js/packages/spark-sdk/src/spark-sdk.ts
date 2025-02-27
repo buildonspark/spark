@@ -86,6 +86,12 @@ type DepositParams = {
   vout: number;
 };
 
+type InitWalletResponse = {
+  balance: bigint;
+  tokenBalance: Map<string, { balance: bigint; leafCount: number }>;
+  mnemonic?: string | undefined;
+}
+
 /**
  * The SparkWallet class is the primary interface for interacting with the Spark network.
  * It provides methods for creating and managing wallets, handling deposits, executing transfers,
@@ -298,7 +304,7 @@ export class SparkWallet {
    *   - balance: The wallet's initial balance in satoshis
    *   - tokenBalance: Map of token balances and leaf counts
    */
-  public async initWallet(mnemonicOrSeed?: Uint8Array | string) {
+  public async initWallet(mnemonicOrSeed?: Uint8Array | string): Promise<InitWalletResponse> {
     const returnMnemonic = !mnemonicOrSeed;
     if (!mnemonicOrSeed) {
       mnemonicOrSeed = await this.config.signer.generateMnemonic();
