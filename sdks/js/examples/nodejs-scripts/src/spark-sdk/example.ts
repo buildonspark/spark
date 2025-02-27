@@ -7,4 +7,4 @@ const network = Network.REGTEST;
 const wallet = new SparkWallet(network);
 
 console.log("Network:", network);
-console.log("Wallet:", wallet);
+
