@@ -81,7 +81,7 @@ async function runCLI() {
         break;
       case "sendtransfer":
         const transfer = await wallet.sendSparkTransfer({
-          amount: parseInt(args[0]),
+          amountSats: parseInt(args[0]),
           receiverSparkAddress: args[1],
         });
         console.log(transfer);

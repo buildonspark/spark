@@ -168,7 +168,7 @@ const useWalletStore = create<WalletStore>((set, get) => ({
   sendTransfer: async (amount: number, recipient: string) => {
     const { wallet } = get();
     await wallet.sendSparkTransfer({
-      amount,
+      amountSats,
       receiverSparkAddress: recipient,
     });
   },
