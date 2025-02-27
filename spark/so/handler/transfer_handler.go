@@ -507,22 +507,24 @@ func (h *TransferHandler) QueryAllTransfers(ctx context.Context, req *pb.QueryAl
 
 const CoopExitConfirmationThreshold = 6
 
-func checkCoopExitTxBroadcasted(ctx context.Context, db *ent.Tx, transferID uuid.UUID, networks []common.Network) error {
+func checkCoopExitTxBroadcasted(ctx context.Context, db *ent.Tx, transfer *ent.Transfer) error {
 	coopExit, err := db.CooperativeExit.Query().Where(
-		cooperativeexit.HasTransferWith(enttransfer.ID(transferID)),
+		cooperativeexit.HasTransferWith(enttransfer.ID(transfer.ID)),
 	).Only(ctx)
 	if ent.IsNotFound(err) {
 		return nil
 	}
 	if err != nil {
-		return fmt.Errorf("failed to find coop exit for transfer %s: %v", transferID.String(), err)
+		return fmt.Errorf("failed to find coop exit for transfer %s: %v", transfer.ID.String(), err)
 	}
-	schemaNetworks := []schema.Network{}
-	for _, network := range networks {
-		schemaNetworks = append(schemaNetworks, common.SchemaNetwork(network))
+
+	tree, err := transfer.QueryTransferLeaves().QueryLeaf().QueryTree().Only(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to find leaf for transfer %s: %v", transfer.ID.String(), err)
 	}
+
 	blockHeight, err := db.BlockHeight.Query().Where(
-		blockheight.NetworkIn(schemaNetworks...),
+		blockheight.NetworkEQ(tree.Network),
 	).Only(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to find block height: %v", err)
@@ -552,7 +554,7 @@ func (h *TransferHandler) ClaimTransferTweakKeys(ctx context.Context, req *pb.Cl
 	}
 
 	db := ent.GetDbFromContext(ctx)
-	if err := checkCoopExitTxBroadcasted(ctx, db, transfer.ID, h.config.SupportedNetworks); err != nil {
+	if err := checkCoopExitTxBroadcasted(ctx, db, transfer); err != nil {
 		return fmt.Errorf("failed to unlock transfer %s: %v", req.TransferId, err)
 	}
 
