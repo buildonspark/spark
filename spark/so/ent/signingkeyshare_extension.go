@@ -350,6 +350,7 @@ func RunDKGIfNeeded(db *Client, config *so.Config) error {
 	count, err := db.SigningKeyshare.Query().Where(
 		signingkeyshare.StatusEQ(schema.KeyshareStatusAvailable),
 		signingkeyshare.CoordinatorIndexEQ(config.Index),
+		signingkeyshare.IDGT(uuid.MustParse("01954639-8d50-7e47-b3f0-ddb307fab7c2")),
 	).Count(context.Background())
 	if err != nil {
 		return err
