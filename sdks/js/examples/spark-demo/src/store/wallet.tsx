@@ -1,4 +1,5 @@
 import { SparkWallet } from "@buildonspark/spark-sdk";
+import { QueryAllTransfersResponse } from "@buildonspark/spark-sdk/proto/spark";
 import { Network } from "@buildonspark/spark-sdk/utils";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { create } from "zustand";
@@ -82,6 +83,10 @@ interface WalletActions {
   setInitWalletNetwork: (network: Network) => void;
   setWallet: (wallet: SparkWallet) => void;
   getMasterPublicKey: () => Promise<string>;
+  getAllTransfers: (
+    limit: number,
+    offset: number,
+  ) => Promise<QueryAllTransfersResponse>;
   getBitcoinDepositAddress: () => Promise<string>;
   createLightningInvoice: (amount: number, memo: string) => Promise<string>;
   sendTransfer: (amount: number, recipient: string) => Promise<void>;
@@ -105,7 +110,7 @@ const SEED_STORAGE_KEY = "spark_wallet_seed";
 
 const useWalletStore = create<WalletStore>((set, get) => ({
   wallet: new SparkWallet(getLocalStorageWalletNetwork()),
-  initWalletNetwork: Network.REGTEST,
+  initWalletNetwork: getLocalStorageWalletNetwork(),
   setInitWalletNetwork: (network: Network) => {
     set({ initWalletNetwork: network });
   },
@@ -145,19 +150,25 @@ const useWalletStore = create<WalletStore>((set, get) => ({
   btcAddressInfo: {},
   initWallet: async (mnemonic: string) => {
     const { wallet, initWalletNetwork } = get();
+    let mainnetwallet = new SparkWallet(Network.MAINNET);
     if (initWalletNetwork === Network.MAINNET) {
-      set({ wallet: new SparkWallet(Network.MAINNET) });
+      set({ wallet: mainnetwallet });
+      mainnetwallet.initWallet(mnemonic);
+    } else {
+      await wallet.initWallet(mnemonic);
     }
-    await wallet.initWallet(mnemonic);
     sessionStorage.setItem(MNEMONIC_STORAGE_KEY, mnemonic);
     set({ isInitialized: true, mnemonic });
   },
   initWalletFromSeed: async (seed: string) => {
     const { wallet, initWalletNetwork } = get();
+    const mainnetwallet = new SparkWallet(Network.MAINNET);
     if (initWalletNetwork === Network.MAINNET) {
-      set({ wallet: new SparkWallet(Network.MAINNET) });
+      set({ wallet: mainnetwallet });
+      mainnetwallet.initWallet(seed);
+    } else {
+      await wallet.initWallet(seed);
     }
-    await wallet.initWallet(seed);
     sessionStorage.setItem(SEED_STORAGE_KEY, seed);
     set({ isInitialized: true });
   },
@@ -173,6 +184,10 @@ const useWalletStore = create<WalletStore>((set, get) => ({
       throw new Error("Failed to generate deposit address");
     }
     return btcDepositAddress;
+  },
+  getAllTransfers: async (limit: number, offset: number) => {
+    const { wallet } = get();
+    return await wallet.getAllTransfers(limit, offset);
   },
   loadStoredWallet: async () => {
     const storedMnemonic = sessionStorage.getItem(MNEMONIC_STORAGE_KEY);
@@ -244,6 +259,18 @@ export function useWallet() {
     refetchInterval: 3000,
   });
 
+  const getAllTransfersQuery = useQuery({
+    queryKey: ["wallet", "transfers"],
+    queryFn: async () => {
+      const transfers = await wallet.getAllTransfers();
+      return transfers;
+    },
+    refetchOnMount: true,
+    enabled: isInitialized,
+    // staleTime: 3000,
+    // refetchInterval: 3000,
+  });
+
   const satsUsdPriceQuery = useQuery({
     queryKey: ["satsUsdPrice"],
     queryFn: async () => {
@@ -292,6 +319,12 @@ export function useWallet() {
       isLoading: balanceQuery.isLoading || !isInitialized,
       error: balanceQuery.error,
     },
+    allTransfers: {
+      value: getAllTransfersQuery.data as QueryAllTransfersResponse,
+      isLoading: getAllTransfersQuery.isLoading || !isInitialized,
+      error: getAllTransfersQuery.error,
+    },
+    getAllTransfers: state.getAllTransfers,
     tokenBalances: {
       value: (balanceQuery.data?.tokenBalances ?? new Map()) as Map<
         string,
