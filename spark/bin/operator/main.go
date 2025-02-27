@@ -350,9 +350,9 @@ func main() {
 }
 
 func runDKGOnStartup(dbClient *ent.Client, config *so.Config) {
-	time.Sleep(5 * time.Second)
-	err := ent.RunDKGIfNeeded(dbClient, config)
-	if err != nil {
-		log.Printf("Failed to run DKG: %v", err)
-	}
+	// time.Sleep(5 * time.Second)
+	// err := ent.RunDKGIfNeeded(dbClient, config)
+	// if err != nil {
+	// 	log.Printf("Failed to run DKG: %v", err)
+	// }
 }
