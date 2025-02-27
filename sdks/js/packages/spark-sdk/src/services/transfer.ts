@@ -19,18 +19,31 @@ import {
   QueryAllTransfersResponse,
   QueryPendingTransfersResponse,
   SendLeafKeyTweak,
+  SigningJob,
   StartSendTransferResponse,
   Transfer,
   TransferStatus,
   TreeNode,
 } from "../proto/spark.js";
 import { SigningCommitment } from "../signer/signer.js";
-import { getSigHashFromTx, getTxFromRawTxBytes } from "../utils/bitcoin.js";
+import {
+  getSigHashFromTx,
+  getTxFromRawTxBytes,
+  getTxId,
+} from "../utils/bitcoin.js";
 import { getCrypto } from "../utils/crypto.js";
 import { VerifiableSecretShare } from "../utils/secret-sharing.js";
-import { createRefundTx } from "../utils/transaction.js";
+import {
+  createRefundTx,
+  getNextTransactionSequence,
+} from "../utils/transaction.js";
 import { WalletConfigService } from "./config.js";
 import { ConnectionManager } from "./connection.js";
+const INITIAL_TIME_LOCK = 2000;
+
+function initialSequence() {
+  return (1 << 30) | INITIAL_TIME_LOCK;
+}
 
 const crypto = getCrypto();
 
@@ -820,5 +833,203 @@ export class TransferService extends BaseTransferService {
     } catch (error) {
       throw new Error(`Error querying pending transfers by sender: ${error}`);
     }
+  }
+
+  async refreshTimelockNodes(
+    nodes: TreeNode[],
+    parentNode: TreeNode,
+    signingPubKey: Uint8Array,
+  ) {
+    if (nodes.length === 0) {
+      throw Error("no nodes to refresh");
+    }
+
+    const signingJobs: SigningJob[] = [];
+    const newNodeTxs: Transaction[] = [];
+
+    for (let i = 0; i < nodes.length; i++) {
+      const node = nodes[i];
+      if (!node) {
+        throw Error("could not get node");
+      }
+      const nodeTx = getTxFromRawTxBytes(node?.nodeTx);
+      const input = nodeTx.getInput(0);
+
+      if (!input) {
+        throw Error("Could not fetch tx input");
+      }
+
+      const newTx = new Transaction({ allowUnknownOutputs: true });
+      for (let j = 0; j < nodeTx.outputsLength; j++) {
+        newTx.addOutput(nodeTx.getOutput(j));
+      }
+      if (i === 0) {
+        const currSequence = input.sequence;
+
+        newTx.addInput({
+          ...input,
+          sequence: getNextTransactionSequence(currSequence),
+        });
+      } else {
+        newTx.addInput({
+          ...input,
+          sequence: initialSequence(),
+          txid: newNodeTxs[i - 1]?.id,
+        });
+      }
+
+      signingJobs.push({
+        signingPublicKey: signingPubKey,
+        rawTx: newTx.toBytes(),
+        signingNonceCommitment:
+          await this.config.signer.getRandomSigningCommitment(),
+      });
+      newNodeTxs[i] = newTx;
+    }
+
+    const leaf = nodes[nodes.length - 1];
+    if (!leaf?.refundTx) {
+      throw Error("leaf does not have refund tx");
+    }
+    const refundTx = getTxFromRawTxBytes(leaf?.refundTx);
+    const newRefundTx = new Transaction({ allowUnknownOutputs: true });
+
+    for (let j = 0; j < refundTx.outputsLength; j++) {
+      newRefundTx.addOutput(refundTx.getOutput(j));
+    }
+
+    const refundTxInput = refundTx.getInput(0);
+    if (!refundTxInput) {
+      throw Error("refund tx doesn't have input");
+    }
+
+    if (!newNodeTxs[newNodeTxs.length - 1]) {
+      throw Error("Could not get last node tx");
+    }
+    newRefundTx.addInput({
+      ...refundTxInput,
+      sequence: initialSequence(),
+      txid: getTxId(newNodeTxs[newNodeTxs.length - 1]!),
+    });
+
+    const refundSigningJob = {
+      signingPublicKey: signingPubKey,
+      rawTx: newRefundTx.toBytes(),
+      signingNonceCommitment:
+        await this.config.signer.getRandomSigningCommitment(),
+    };
+
+    signingJobs.push(refundSigningJob);
+
+    const sparkClient = await this.connectionManager.createSparkClient(
+      this.config.getCoordinatorAddress(),
+    );
+
+    const response = await sparkClient.refresh_timelock({
+      leafId: leaf.id,
+      ownerIdentityPublicKey: await this.config.signer.getIdentityPublicKey(),
+      signingJobs,
+    });
+
+    if (signingJobs.length !== response.signingResults.length) {
+      throw Error(
+        `number of signing jobs and signing results do not match: ${signingJobs.length} !== ${response.signingResults.length}`,
+      );
+    }
+
+    let nodeSignatures: NodeSignatures[] = [];
+    let leafSignature: Uint8Array | undefined;
+    let refundSignature: Uint8Array | undefined;
+    let leafNodeId: string | undefined;
+    for (let i = 0; i < response.signingResults.length; i++) {
+      const signingResult = response.signingResults[i];
+      const signingJob = signingJobs[i];
+      if (!signingJob || !signingResult) {
+        throw Error("Signing job does not exist");
+      }
+
+      if (!signingJob.signingNonceCommitment) {
+        throw Error("nonce commitment does not exist");
+      }
+      const rawTx = getTxFromRawTxBytes(signingJob.rawTx);
+
+      let parentTx: Transaction | undefined;
+      let nodeId: string | undefined;
+      let vout: number | undefined;
+
+      if (i === nodes.length) {
+        nodeId = nodes[i - 1]?.id;
+        parentTx = newNodeTxs[i - 1];
+        vout = 0;
+      } else if (i === 0) {
+        nodeId = nodes[i]?.id;
+        parentTx = getTxFromRawTxBytes(parentNode.nodeTx);
+        vout = nodes[i]?.vout;
+      } else {
+        nodeId = nodes[i]?.id;
+        parentTx = newNodeTxs[i - 1];
+        vout = nodes[i]?.vout;
+      }
+
+      if (!parentTx || !nodeId || vout === undefined) {
+        throw Error("Could not parse signing results");
+      }
+
+      const txOut = parentTx.getOutput(vout);
+
+      const rawTxSighash = getSigHashFromTx(rawTx, 0, txOut);
+
+      const userSignature = await this.config.signer.signFrost({
+        message: rawTxSighash,
+        privateAsPubKey: signingPubKey,
+        publicKey: signingPubKey,
+        verifyingKey: signingResult.verifyingKey,
+        selfCommitment: signingJob.signingNonceCommitment,
+        statechainCommitments:
+          signingResult.signingResult?.signingNonceCommitments,
+        adaptorPubKey: new Uint8Array(),
+      });
+
+      const signature = await this.config.signer.aggregateFrost({
+        message: rawTxSighash,
+        statechainSignatures: signingResult.signingResult?.signatureShares,
+        statechainPublicKeys: signingResult.signingResult?.publicKeys,
+        verifyingKey: signingResult.verifyingKey,
+        statechainCommitments:
+          signingResult.signingResult?.signingNonceCommitments,
+        selfCommitment: signingJob.signingNonceCommitment,
+        publicKey: signingPubKey,
+        selfSignature: userSignature,
+        adaptorPubKey: new Uint8Array(),
+      });
+
+      if (i !== nodes.length && i !== nodes.length - 1) {
+        nodeSignatures.push({
+          nodeId: nodeId,
+          nodeTxSignature: signature,
+          refundTxSignature: new Uint8Array(),
+        });
+      } else if (i === nodes.length) {
+        refundSignature = signature;
+      } else if (i === nodes.length - 1) {
+        leafNodeId = nodeId;
+        leafSignature = signature;
+      }
+    }
+
+    if (!leafSignature || !refundSignature || !leafNodeId) {
+      throw Error("leaf or refund signature does not exist");
+    }
+
+    nodeSignatures.push({
+      nodeId: leafNodeId,
+      nodeTxSignature: leafSignature,
+      refundTxSignature: refundSignature,
+    });
+
+    return await sparkClient.finalize_node_signatures({
+      intent: SignatureIntent.REFRESH,
+      nodeSignatures,
+    });
   }
 }

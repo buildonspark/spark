@@ -1,6 +1,6 @@
 import { bytesToHex, hexToBytes } from "@noble/curves/abstract/utils";
 import { secp256k1 } from "@noble/curves/secp256k1";
-import { Address, Transaction } from "@scure/btc-signer";
+import { Transaction } from "@scure/btc-signer";
 import { TransactionInput } from "@scure/btc-signer/psbt";
 import { sha256 } from "@scure/btc-signer/utils";
 import { decode } from "light-bolt11-decoder";
@@ -34,6 +34,7 @@ import { LeafKeyTweak, TransferService } from "./services/transfer.js";
 import { validateMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english";
 import { Mutex } from "async-mutex";
+import bitcoin from "bitcoinjs-lib";
 import {
   DepositAddressTree,
   TreeCreationService,
@@ -56,9 +57,9 @@ import {
   calculateAvailableTokenAmount,
   checkIfSelectedLeavesAreAvailable,
 } from "./utils/token-transactions.js";
+import { getNextTransactionSequence } from "./utils/transaction.js";
 import { initWasm } from "./utils/wasm-wrapper.js";
 import { InitOutput } from "./wasm/spark_bindings.js";
-import bitcoin from "bitcoinjs-lib";
 
 // Add this constant at the file level
 const MAX_TOKEN_LEAVES = 100;
@@ -260,11 +261,14 @@ export class SparkWallet {
   }
 
   private async syncWallet() {
-    await this.claimTransfers();
-    await this.claimDeposits();
-    await this.syncTokenLeaves();
+    await Promise.all([
+      this.claimTransfers(),
+      this.claimDeposits(),
+      this.syncTokenLeaves(),
+    ]);
     this.leaves = await this.getLeaves();
-    await this.optimizeLeaves();
+    await this.#refreshTimelockNodes();
+    // await this.optimizeLeaves();
   }
 
   private isInitialized(): boolean {
@@ -346,7 +350,10 @@ export class SparkWallet {
 
   private async initWalletFromMnemonic(mnemonic: string) {
     const identityPublicKey =
-      await this.config.signer.createSparkWalletFromMnemonic(mnemonic);
+      await this.config.signer.createSparkWalletFromMnemonic(
+        mnemonic,
+        this.config.getNetwork(),
+      );
     await this.initializeWallet(identityPublicKey);
     return identityPublicKey;
   }
@@ -360,7 +367,10 @@ export class SparkWallet {
    */
   private async initWalletFromSeed(seed: Uint8Array | string) {
     const identityPublicKey =
-      await this.config.signer.createSparkWalletFromSeed(seed);
+      await this.config.signer.createSparkWalletFromSeed(
+        seed,
+        this.config.getNetwork(),
+      );
     await this.initializeWallet(identityPublicKey);
     return identityPublicKey;
   }
@@ -858,6 +868,8 @@ export class SparkWallet {
         throw new Error("Must provide amount or leaves");
       }
 
+      await this.#refreshTimelockNodes();
+
       const leafKeyTweaks = await Promise.all(
         leavesToSend.map(async (leaf) => ({
           leaf,
@@ -879,6 +891,95 @@ export class SparkWallet {
 
       return transfer;
     });
+  }
+
+  /**
+   * Internal method to refresh timelock nodes.
+   *
+   * @param {string} nodeId - The optional ID of the node to refresh. If not provided, all nodes will be checked.
+   * @returns {Promise<void>}
+   * @private
+   */
+  async #refreshTimelockNodes(nodeId?: string) {
+    const nodesToRefresh: TreeNode[] = [];
+    const nodeIds: string[] = [];
+
+    if (nodeId) {
+      for (const node of this.leaves) {
+        if (node.id === nodeId) {
+          nodesToRefresh.push(node);
+          nodeIds.push(node.id);
+          break;
+        }
+      }
+      if (nodesToRefresh.length === 0) {
+        throw new Error(`node ${nodeId} not found`);
+      }
+    } else {
+      for (const node of this.leaves) {
+        const refundTx = getTxFromRawTxBytes(node.refundTx);
+        const nextSequence = getNextTransactionSequence(
+          refundTx.getInput(0).sequence,
+        );
+        const needRefresh = nextSequence <= 0;
+        if (needRefresh) {
+          nodesToRefresh.push(node);
+          nodeIds.push(node.id);
+        }
+      }
+    }
+
+    if (nodesToRefresh.length === 0) {
+      return;
+    }
+
+    const sparkClient = await this.connectionManager.createSparkClient(
+      this.config.getCoordinatorAddress(),
+    );
+
+    const nodesResp = await sparkClient.query_nodes({
+      source: {
+        $case: "nodeIds",
+        nodeIds: {
+          nodeIds,
+        },
+      },
+      includeParents: true,
+    });
+
+    const nodesMap = new Map<string, TreeNode>();
+    for (const node of Object.values(nodesResp.nodes)) {
+      nodesMap.set(node.id, node);
+    }
+
+    for (const node of nodesToRefresh) {
+      if (!node.parentNodeId) {
+        throw new Error(`node ${node.id} has no parent`);
+      }
+
+      const parentNode = nodesMap.get(node.parentNodeId);
+      if (!parentNode) {
+        throw new Error(`parent node ${node.parentNodeId} not found`);
+      }
+
+      const { nodes } = await this.transferService.refreshTimelockNodes(
+        [node],
+        parentNode,
+        await this.config.signer.generatePublicKey(sha256(node.id)),
+      );
+
+      if (nodes.length !== 1) {
+        throw new Error(`expected 1 node, got ${nodes.length}`);
+      }
+
+      const newNode = nodes[0];
+      if (!newNode) {
+        throw new Error("Failed to refresh timelock node");
+      }
+
+      this.leaves = this.leaves.filter((leaf) => leaf.id !== node.id);
+      this.leaves.push(newNode);
+    }
   }
 
   /**
@@ -910,7 +1011,15 @@ export class SparkWallet {
         }
       }
 
-      return await this.transferService.claimTransfer(transfer, leavesToClaim);
+      const response = await this.transferService.claimTransfer(
+        transfer,
+        leavesToClaim,
+      );
+
+      this.leaves.push(...response.nodes);
+      await this.#refreshTimelockNodes();
+
+      return response;
     });
   }
 
@@ -1041,6 +1150,8 @@ export class SparkWallet {
     // fetch leaves for amount
 
     const leaves = await this.selectLeaves(amountSats);
+
+    await this.#refreshTimelockNodes();
 
     const leavesToSend = await Promise.all(
       leaves.map(async (leaf) => ({

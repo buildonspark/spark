@@ -6,6 +6,7 @@ import {
 import { schnorr, secp256k1 } from "@noble/curves/secp256k1";
 import { HDKey } from "@scure/bip32";
 import * as bip39 from "@scure/bip39";
+import { generateMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english";
 import { sha256 } from "@scure/btc-signer/utils";
 import { Buffer } from "buffer";
@@ -26,7 +27,6 @@ import {
 } from "../utils/signing.js";
 import { aggregateFrost, signFrost } from "../utils/wasm.js";
 import { KeyPackage } from "../wasm/spark_bindings.js";
-
 globalThis.Buffer = Buffer;
 export type SigningNonce = {
   binding: Uint8Array;
@@ -67,8 +67,14 @@ interface SparkSigner {
   getIdentityPublicKey(): Promise<Uint8Array>;
 
   generateMnemonic(): Promise<string>;
-  createSparkWalletFromMnemonic(mnemonic: string): Promise<string>;
-  createSparkWalletFromSeed(seed: Uint8Array | string): Promise<string>;
+  createSparkWalletFromMnemonic(
+    mnemonic: string,
+    network: Network,
+  ): Promise<string>;
+  createSparkWalletFromSeed(
+    seed: Uint8Array | string,
+    network: Network,
+  ): Promise<string>;
 
   restoreSigningKeysFromLeafs(leafs: TreeNode[]): Promise<void>;
   getTrackedPublicKeys(): Promise<Uint8Array[]>;
@@ -197,12 +203,15 @@ class DefaultSparkSigner implements SparkSigner {
   }
 
   async generateMnemonic(): Promise<string> {
-    return bip39.generateMnemonic(wordlist);
+    return generateMnemonic(wordlist);
   }
 
-  async createSparkWalletFromMnemonic(mnemonic: string): Promise<string> {
+  async createSparkWalletFromMnemonic(
+    mnemonic: string,
+    network: Network,
+  ): Promise<string> {
     const seed = await bip39.mnemonicToSeed(mnemonic);
-    return this.createSparkWalletFromSeed(seed);
+    return this.createSparkWalletFromSeed(seed, network);
   }
 
   async getTrackedPublicKeys(): Promise<Uint8Array[]> {
@@ -350,12 +359,17 @@ class DefaultSparkSigner implements SparkSigner {
     });
   }
 
-  async createSparkWalletFromSeed(seed: Uint8Array): Promise<string> {
+  async createSparkWalletFromSeed(
+    seed: Uint8Array | string,
+    network: Network,
+  ): Promise<string> {
     if (typeof seed === "string") {
       seed = hexToBytes(seed);
     }
 
-    const hdkey = HDKey.fromMasterSeed(seed).derive("m/0");
+    const hdkey = HDKey.fromMasterSeed(seed).derive(
+      `m/${network === Network.REGTEST ? "0" : "1"}`,
+    );
 
     if (!hdkey.privateKey) {
       throw new Error("Could not derive private key from seed");
