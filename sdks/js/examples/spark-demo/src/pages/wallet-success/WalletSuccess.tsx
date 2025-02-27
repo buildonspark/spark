@@ -33,7 +33,7 @@ export default function WalletSuccess() {
     <div className="mx-6">
       <div className="flex items-center justify-center gap-2">
         <WalletIcon className="h-[18px] w-[16px]" />
-        <div className="font-decimal text-[24px] font-black">Wallet</div>
+        <div className="font-inter text-[24px] font-black">Wallet</div>
       </div>
       <StyledContainer className="mt-9 flex min-h-[180px] w-full items-center justify-center">
         <div className="flex h-full w-full flex-wrap">

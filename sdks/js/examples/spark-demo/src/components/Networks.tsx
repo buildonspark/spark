@@ -26,7 +26,7 @@ export default function Networks({ onSelectNetwork }: NetworksProps) {
       >
         <div className="flex items-center gap-3">
           <LightningIcon />
-          <div className="flex flex-grow flex-col gap-[4px] font-decimal">
+          <div className="font-inter flex flex-grow flex-col gap-[4px]">
             <div className="text-left text-[13px]">Lightning invoice</div>
             <div className="flex items-center gap-[1px] text-[12px] opacity-80">
               <div className="rounded-l-[5px] bg-[#232E3D] px-[6px]">
@@ -47,7 +47,7 @@ export default function Networks({ onSelectNetwork }: NetworksProps) {
       >
         <div className="flex items-center gap-3">
           <SparkIcon />
-          <div className="flex flex-grow flex-col gap-[4px] font-decimal">
+          <div className="font-inter flex flex-grow flex-col gap-[4px]">
             <div className="text-left text-[13px]">Spark</div>
             <div className="flex items-center gap-[1px] text-[12px] opacity-80">
               <div className="rounded-l-[5px] bg-[#232E3D] px-[6px]">
@@ -68,7 +68,7 @@ export default function Networks({ onSelectNetwork }: NetworksProps) {
       >
         <div className="flex items-center gap-3">
           <BitcoinIcon />
-          <div className="flex flex-grow flex-col gap-[4px] font-decimal">
+          <div className="font-inter flex flex-grow flex-col gap-[4px]">
             <div className="text-left text-[13px]">Bitcoin</div>
             <div className="flex items-center gap-[1px] text-[12px] opacity-80">
               <div className="rounded-l-[5px] bg-[#232E3D] px-[6px]">

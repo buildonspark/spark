@@ -92,7 +92,7 @@ export default function Login() {
 
   return (
     <div className="flex flex-col items-center justify-center">
-      <div className="mt-4 text-center font-decimal text-[13px] text-[#ffffff] opacity-40">
+      <div className="font-inter mt-4 text-center text-[13px] text-[#ffffff] opacity-40">
         A Spark-enabled, self-custody
         <br />
         Bitcoin wallet

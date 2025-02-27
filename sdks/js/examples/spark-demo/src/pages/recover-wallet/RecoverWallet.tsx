@@ -48,7 +48,7 @@ export default function RecoverWallet() {
         "flex flex-col items-center rounded-3xl border-[0.5px] border-[#f9f9f9] border-opacity-25 p-8 pb-16"
       }
     >
-      <div className="font-decimal text-[18px]">Recover your wallet</div>
+      <div className="font-inter text-[18px]">Recover your wallet</div>
       <div className="text-[13px] opacity-50">Past your Seed Phrase</div>
       <StyledContainer className="mb-6 mt-9 flex min-h-[180px] w-full items-center justify-center px-12 py-9">
         <div className="flex flex-1 flex-col">

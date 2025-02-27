@@ -35,7 +35,7 @@ export default function CardForm({
   return (
     <div className="mt-2 flex w-full flex-col items-center justify-between">
       {!headerDisabled && (
-        <div className="mb-8 flex w-full flex-row items-center text-center font-decimal text-[15px]">
+        <div className="font-inter mb-8 flex w-full flex-row items-center text-center text-[15px]">
           <div
             className="ml-2 h-6 w-6 cursor-pointer outline-none"
             onClick={logoLeftClick}

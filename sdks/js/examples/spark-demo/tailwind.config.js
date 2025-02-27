@@ -4,9 +4,8 @@ const config = {
   theme: {
     extend: {
       fontFamily: {
-        decimal: ["var(--font-decimal)", "sans-serif"],
-        "geist-sans": ["var(--font-geist-sans)", "sans-serif"],
-        "geist-mono": ["var(--font-geist-mono)", "monospace"],
+        inter: ["var(--font-inter)", "sans-serif"],
+        sans: ["var(--font-inter)", "sans-serif"],
       },
       opacity: {
         4: "0.04",

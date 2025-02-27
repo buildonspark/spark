@@ -62,7 +62,7 @@ const StyledButton = styled.button<{
   gap: 12px;
   border: 1px solid rgba(249, 249, 249, 0.1);
   border-radius: 8px;
-  font-family: "Decimal";
+  font-family: "Inter";
 
   font-size: 15px;
   line-height: 38px;
