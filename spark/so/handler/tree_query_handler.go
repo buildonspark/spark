@@ -75,7 +75,7 @@ func (h *TreeQueryHandler) QueryBalance(ctx context.Context, req *pb.QueryBalanc
 	db := ent.GetDbFromContext(ctx)
 
 	query := db.TreeNode.Query()
-	query = query.Where(treenode.StatusNotIn(schema.TreeNodeStatusCreating, schema.TreeNodeStatusSplitted)).
+	query = query.Where(treenode.StatusEQ(schema.TreeNodeStatusAvailable)).
 		Where(treenode.OwnerIdentityPubkey(req.GetIdentityPublicKey()))
 
 	nodes, err := query.All(ctx)
