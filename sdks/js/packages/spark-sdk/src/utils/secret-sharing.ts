@@ -37,7 +37,6 @@ export function getRandomBigInt(
     Buffer.from(coefficient.toString()),
   ]);
   const hash = sha256(data);
-  console.log("hash: " + hash);
   const digest = bytesToHex(hash);
 
   // Convert the hash to a BigInt and reduce modulo "max"
