@@ -34,7 +34,7 @@
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
-    "test": "react-scripts test",
+    "test": "echo \"Error: no tests yet\"",
     "eject": "react-scripts eject",
     "build:css": "postcss src/index.css -o src/tailwind-output.css",
     "lint": "prettier --check .",
