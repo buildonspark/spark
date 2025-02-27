@@ -67,6 +67,7 @@ const MAX_TOKEN_LEAVES = 100;
 export type CreateLightningInvoiceParams = {
   amountSats: number;
   memo: string;
+  expirySeconds?: number;
 };
 
 export type PayLightningInvoiceParams = {
@@ -1072,13 +1073,14 @@ export class SparkWallet {
    * @param {Object} params - Parameters for the lightning invoice
    * @param {number} params.amountSats - Amount in satoshis
    * @param {string} params.memo - Description for the invoice
+   * @param {number} [params.expirySeconds] - Optional expiry time in seconds
    * @returns {Promise<string>} BOLT11 encoded invoice
    */
   public async createLightningInvoice({
     amountSats,
     memo,
+    expirySeconds = 60 * 60 * 24 * 30,
   }: CreateLightningInvoiceParams) {
-    const expirySeconds = 60 * 60 * 24 * 30;
     if (!this.sspClient) {
       throw new Error("SSP client not initialized");
     }
