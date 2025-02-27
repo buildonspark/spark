@@ -8,9 +8,11 @@ const walletMnemonic =
 
 async function runCLI() {
   // Get network from command line args
-  const network = process.argv.includes("mainnet") ? Network.MAINNET : Network.REGTEST;
+  const network = process.argv.includes("mainnet")
+    ? Network.MAINNET
+    : Network.REGTEST;
   let wallet = new SparkWallet(network);
-  
+
   const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout,
@@ -94,6 +96,5 @@ async function runCLI() {
     }
   }
 }
-
 
 runCLI();

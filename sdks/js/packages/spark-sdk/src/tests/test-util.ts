@@ -34,6 +34,15 @@ export const REGTEST_WALLET_CONFIG = {
   signingOperators: getRegtestSigningOperators(),
 };
 
+export const MAINNET_WALLET_CONFIG = {
+  network: Network.MAINNET,
+  coodinatorIdentifier:
+    "0000000000000000000000000000000000000000000000000000000000000001",
+  frostSignerAddress: "unix:///tmp/frost_0.sock",
+  threshold: 3,
+  signingOperators: getRegtestSigningOperators(),
+};
+
 export function getRegtestSigningOperators(): Record<string, SigningOperator> {
   const pubkeys = [
     "03acd9a5a88db102730ff83dee69d69088cc4c9d93bbee893e90fd5051b7da9651",
@@ -126,7 +135,7 @@ export function getTestWalletConfig(): WalletConfig {
 }
 
 export function getTestWalletConfigWithIdentityKey(
-  identityPrivateKey: Uint8Array
+  identityPrivateKey: Uint8Array,
 ): WalletConfig {
   return {
     ...LOCAL_WALLET_CONFIG,
@@ -138,13 +147,13 @@ export async function createNewTree(
   wallet: SparkWalletTesting,
   pubKey: Uint8Array,
   faucet: BitcoinFaucet,
-  amountSats: bigint = 100_000n
+  amountSats: bigint = 100_000n,
 ): Promise<TreeNode> {
   const faucetCoin = await faucet.fund();
 
   const configService = new WalletConfigService(
     Network.LOCAL,
-    wallet.getSigner()
+    wallet.getSigner(),
   );
   const connectionManager = new ConnectionManager(configService);
   const depositService = new DepositService(configService, connectionManager);
@@ -162,7 +171,7 @@ export async function createNewTree(
 
   // Add the main output
   const addr = Address(getNetwork(Network.LOCAL)).decode(
-    depositResp.depositAddress.address
+    depositResp.depositAddress.address,
   );
   const script = OutScript.encode(addr);
   depositTx.addOutput({ script, amount: amountSats });
@@ -177,7 +186,7 @@ export async function createNewTree(
   const signedDepositTx = await faucet.signFaucetCoin(
     depositTx,
     faucetCoin.txout,
-    faucetCoin.key
+    faucetCoin.key,
   );
 
   await faucet.broadcastTx(signedDepositTx.hex);
@@ -187,7 +196,7 @@ export async function createNewTree(
   const randomPubKey = secp256k1.getPublicKey(randomKey);
   const randomAddress = getP2TRAddressFromPublicKey(
     randomPubKey,
-    Network.LOCAL
+    Network.LOCAL,
   );
 
   await faucet.generateToAddress(1, randomAddress);
