@@ -14,7 +14,7 @@ describe("Tree Creation", () => {
     "test tree creation address generation",
     async () => {
       const wallet = new SparkWalletTesting(Network.LOCAL);
-      await wallet.initWalletFromMnemonic();
+      await wallet.initWallet();
 
       const pubKey = await wallet.getSigner().generatePublicKey();
 

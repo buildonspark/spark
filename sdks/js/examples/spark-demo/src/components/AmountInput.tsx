@@ -130,7 +130,7 @@ export default function AmountInput({
       fiatAmountString,
       assetAmountString,
     };
-  }, [satsUsdPrice, rawInputAmount, activeInputCurrency]);
+  }, [satsUsdPrice, rawInputAmount, activeInputCurrency, activeAsset]);
 
   useEffect(() => {
     resolveCurrencyDisplay();
@@ -163,7 +163,7 @@ export default function AmountInput({
         </div>
         <div className="flex items-center justify-center gap-2">
           <div
-            className="font-inter mt-2 flex inline-flex items-center gap-2 rounded-full bg-[#F9F9F9] bg-opacity-20 px-2 py-1 text-center text-[13px] opacity-40 active:bg-opacity-40"
+            className="font-inter mt-2 inline-flex items-center gap-2 rounded-full bg-[#F9F9F9] bg-opacity-20 px-2 py-1 text-center text-[13px] opacity-40 active:bg-opacity-40"
             onClick={() => {
               const { fiatAmountString, assetAmountString } =
                 resolveCurrencyDisplay();

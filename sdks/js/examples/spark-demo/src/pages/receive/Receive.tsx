@@ -25,7 +25,7 @@ enum ReceiveStep {
 export default function Receive() {
   const [rawInputAmount, setRawInputAmount] = useState("0");
   const [lightningInvoice, setLightningInvoice] = useState<string | null>(null);
-  const [paymentNetwork, setPaymentNetwork] = useState<Network>(Network.NONE);
+  const [, setPaymentNetwork] = useState<Network>(Network.NONE);
   const [primaryButtonLoading, setPrimaryButtonLoading] =
     useState<boolean>(false);
   const [qrCodeModalVisible, setQrCodeModalVisible] = useState<boolean>(false);

@@ -1,4 +1,4 @@
-import { Transfer } from "@buildonspark/spark-sdk/proto/spark";
+/* import { Transfer } from "@buildonspark/spark-sdk/proto/spark"; */
 import { useCallback, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AddressInput from "../../components/AddressInput";
@@ -31,9 +31,9 @@ export default function Send() {
   const [rawInputAmount, setRawInputAmount] = useState<string>("0");
   const [primaryButtonLoading, setPrimaryButtonLoading] =
     useState<boolean>(false);
-  const [sendResponse, setSendResponse] = useState<Transfer | string | null>(
+/*   const [sendResponse, setSendResponse] = useState<Transfer | string | null>(
     null,
-  );
+  ); */
   const {
     satsUsdPrice,
     activeInputCurrency,

@@ -7,7 +7,7 @@ import SparkIcon from "../icons/SparkIcon";
 import DetailsRow from "./DetailsRow";
 import { Network } from "./Networks";
 
-function debounce<T extends (...args: any[]) => void>(func: T, wait: number) {
+/* function debounce<T extends (...args: any[]) => void>(func: T, wait: number) {
   let timeout: ReturnType<typeof setTimeout> | null = null;
   return function (...args: Parameters<T>) {
     if (timeout) clearTimeout(timeout);
@@ -15,7 +15,7 @@ function debounce<T extends (...args: any[]) => void>(func: T, wait: number) {
       func(...args);
     }, wait);
   };
-}
+} */
 
 const capitalizeFirstLetter = (str: string) => {
   return str.charAt(0).toUpperCase() + str.slice(1);

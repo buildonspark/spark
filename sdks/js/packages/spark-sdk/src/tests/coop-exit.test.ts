@@ -39,7 +39,7 @@ describe("coop exit", () => {
 
       // Setup user with leaves
       const userWallet = new SparkWalletTesting(Network.LOCAL);
-      await userWallet.initWalletFromMnemonic();
+      await userWallet.initWallet();
 
       const configService = new WalletConfigService(
         Network.LOCAL,
@@ -63,7 +63,7 @@ describe("coop exit", () => {
 
       // Setup ssp
       const sspWallet = new SparkWalletTesting(Network.LOCAL);
-      await sspWallet.initWalletFromMnemonic();
+      await sspWallet.initWallet();
       const sspPubkey = await sspWallet.getIdentityPublicKey();
 
       const sspConfigService = new WalletConfigService(

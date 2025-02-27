@@ -10,7 +10,7 @@ import { Routes } from "../../routes";
 import { useWallet } from "../../store/wallet";
 
 export default function WalletSuccess() {
-  const [mnemonic, setMnemonic] = useState<string | null>(null);
+  const [mnemonic, /* setMnemonic */] = useState<string | null>(null);
   const notify = () => toast("Copied!");
   const navigate = useNavigate();
   const { initWallet } = useWallet();

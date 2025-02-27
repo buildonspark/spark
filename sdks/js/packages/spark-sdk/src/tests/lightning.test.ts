@@ -12,6 +12,8 @@ import { Network } from "../utils/network.js";
 import { createNewTree, getTestWalletConfig } from "./test-util.js";
 import { SparkWalletTesting } from "./utils/spark-testing-wallet.js";
 import { BitcoinFaucet } from "./utils/test-faucet.js";
+import { generateMnemonic } from "@scure/bip39";
+import { wordlist } from "@scure/bip39/wordlists/english";
 
 async function cleanUp() {
   const config = getTestWalletConfig();
@@ -50,14 +52,15 @@ describe("LightningService", () => {
 
   beforeAll(async () => {
     userWallet = new SparkWalletTesting(Network.LOCAL);
-    await userWallet.initWalletFromMnemonic();
+    const userMnemonic = generateMnemonic(wordlist);
+    await userWallet.initWallet(userMnemonic);
     userConfig = new WalletConfigService(Network.LOCAL, userWallet.getSigner());
     const connectionManager = new ConnectionManager(userConfig);
     lightningService = new LightningService(userConfig, connectionManager);
     transferService = new TransferService(userConfig, connectionManager);
 
     sspWallet = new SparkWalletTesting(Network.LOCAL);
-    await sspWallet.initWalletFromMnemonic();
+    await sspWallet.initWallet();
 
     sspConfig = new WalletConfigService(Network.LOCAL, sspWallet.getSigner());
     const sspConnectionManager = new ConnectionManager(sspConfig);

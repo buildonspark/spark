@@ -18,7 +18,7 @@ describe("deposit", () => {
       const mnemonic =
         "raise benefit echo client clutch short pyramid grass fall core slogan boil device plastic drastic discover decide penalty middle appear medal elbow original income";
       const sdk = new SparkWalletTesting(Network.LOCAL);
-      await sdk.initWalletFromMnemonic(mnemonic);
+      await sdk.initWallet(mnemonic);
 
       const pubKey = await sdk.getSigner().generatePublicKey();
 
@@ -41,7 +41,7 @@ describe("deposit", () => {
       const coin = await faucet.fund();
 
       const sdk = new SparkWalletTesting(Network.LOCAL);
-      await sdk.initWalletFromMnemonic();
+      await sdk.initWallet();
 
       // Generate private/public key pair
       const pubKey = await sdk.getSigner().generatePublicKey();
