@@ -31,7 +31,7 @@ export class IssuerSparkWallet extends SparkWallet {
     leafCount: number;
   }> {
     const publicKey = await super.getIdentityPublicKey();
-    const balanceObj = await this.getBalance();
+    const balanceObj = await this.getBalance(true);
     if (!balanceObj.tokenBalances || !balanceObj.tokenBalances.has(publicKey)) {
       return {
         balance: 0n,
