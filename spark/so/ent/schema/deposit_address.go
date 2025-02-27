@@ -23,6 +23,8 @@ func (DepositAddress) Mixin() []ent.Mixin {
 func (DepositAddress) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("address"),
+		index.Fields("owner_identity_pubkey"),
+		index.Fields("owner_signing_pubkey"),
 	}
 }
 
