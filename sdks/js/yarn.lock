@@ -1589,8 +1589,8 @@ __metadata:
   resolution: "@buildonspark/issuer-sdk@workspace:packages/issuer-sdk"
   dependencies:
     "@bufbuild/protobuf": "npm:^2.2.3"
-    "@buildonspark/lrc20-sdk": "npm:0.0.3"
-    "@buildonspark/spark-sdk": "npm:0.0.5"
+    "@buildonspark/lrc20-sdk": "npm:0.0.4"
+    "@buildonspark/spark-sdk": "npm:0.0.6"
     "@grpc/grpc-js": "npm:^1.12.5"
     "@noble/curves": "npm:^1.8.0"
     "@noble/secp256k1": "npm:^2.2.3"
@@ -1618,7 +1618,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@buildonspark/lrc20-sdk@npm:0.0.3, @buildonspark/lrc20-sdk@workspace:packages/lrc20-sdk":
+"@buildonspark/lrc20-sdk@npm:0.0.4, @buildonspark/lrc20-sdk@workspace:packages/lrc20-sdk":
   version: 0.0.0-use.local
   resolution: "@buildonspark/lrc20-sdk@workspace:packages/lrc20-sdk"
   dependencies:
@@ -1647,7 +1647,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@buildonspark/nodejs-scripts@workspace:examples/nodejs-scripts"
   dependencies:
-    "@buildonspark/spark-sdk": "npm:0.0.5"
+    "@buildonspark/spark-sdk": "npm:0.0.6"
     "@types/node": "npm:^22.13.2"
     prettier: "npm:^3.5.1"
     tsx: "npm:^4.19.3"
@@ -1655,7 +1655,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@buildonspark/spark-sdk@npm:0.0.5, @buildonspark/spark-sdk@workspace:packages/spark-sdk":
+"@buildonspark/spark-sdk@npm:0.0.6, @buildonspark/spark-sdk@workspace:packages/spark-sdk":
   version: 0.0.0-use.local
   resolution: "@buildonspark/spark-sdk@workspace:packages/spark-sdk"
   dependencies:
@@ -18569,7 +18569,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "spark-demo@workspace:examples/spark-demo"
   dependencies:
-    "@buildonspark/spark-sdk": "npm:0.0.5"
+    "@buildonspark/spark-sdk": "npm:0.0.6"
     "@lightsparkdev/ui": "npm:^1.0.17"
     "@radix-ui/react-popover": "npm:^1.1.6"
     "@tanstack/react-query": "npm:^5.66.8"
