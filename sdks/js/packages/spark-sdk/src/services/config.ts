@@ -1,6 +1,7 @@
 import { DefaultSparkSigner, SparkSigner } from "../signer/signer.js";
 import {
   LOCAL_WALLET_CONFIG,
+  MAINNET_WALLET_CONFIG,
   REGTEST_WALLET_CONFIG,
 } from "../tests/test-util.js";
 import { Network, NetworkToProto } from "../utils/network.js";
@@ -25,8 +26,17 @@ export class WalletConfigService {
   public readonly signer: SparkSigner;
 
   constructor(network: Network, signer?: SparkSigner) {
-    this.config =
-      network === Network.LOCAL ? LOCAL_WALLET_CONFIG : REGTEST_WALLET_CONFIG;
+    switch (network) {
+      case Network.MAINNET:
+        this.config = MAINNET_WALLET_CONFIG;
+        break;
+      case Network.REGTEST:
+        this.config = REGTEST_WALLET_CONFIG;
+        break;
+      default:
+        this.config = LOCAL_WALLET_CONFIG;
+        break;
+    }
     this.signer = signer || new DefaultSparkSigner();
   }
 
@@ -35,7 +45,7 @@ export class WalletConfigService {
       this.config.signingOperators[this.config.coodinatorIdentifier];
     if (!coordinator) {
       throw new Error(
-        `Coordinator ${this.config.coodinatorIdentifier} not found`
+        `Coordinator ${this.config.coodinatorIdentifier} not found`,
       );
     }
     return coordinator.address;
