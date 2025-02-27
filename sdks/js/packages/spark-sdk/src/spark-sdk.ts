@@ -1327,8 +1327,6 @@ export class SparkWallet {
       }));
     }
 
-    const pubkey = await this.config.signer.getIdentityPublicKey();
-
     const leafKeyTweaks = await Promise.all(
       leavesToSend.map(async (leaf) => ({
         leaf,
@@ -1351,12 +1349,18 @@ export class SparkWallet {
     const connectorTx = getTxFromRawTxHex(
       coopExitRequest.rawConnectorTransaction,
     );
-    const coopExitTxId = getTxId(connectorTx);
+
+    const coopExitTxId = connectorTx.getInput(0).txid;
+    const connectorTxId = getTxId(connectorTx);
+
+    if (!coopExitTxId) {
+      throw new Error("Failed to get coop exit tx id");
+    }
 
     const connectorOutputs: TransactionInput[] = [];
     for (let i = 0; i < connectorTx.outputsLength - 1; i++) {
       connectorOutputs.push({
-        txid: hexToBytes(coopExitTxId),
+        txid: hexToBytes(connectorTxId),
         index: i,
       });
     }
@@ -1367,7 +1371,7 @@ export class SparkWallet {
 
     const transfer = await this.coopExitService.getConnectorRefundSignatures({
       leaves: leafKeyTweaks,
-      exitTxId: hexToBytes(coopExitTxId),
+      exitTxId: coopExitTxId,
       connectorOutputs,
       receiverPubKey: sspPubIdentityKey,
     });
