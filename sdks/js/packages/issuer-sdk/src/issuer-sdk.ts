@@ -4,10 +4,10 @@ import { IssuerSparkWallet } from "./services/spark/wallet.js";
 import * as bip39 from "@scure/bip39";
 import { HDKey } from "@scure/bip32";
 import lrc20sdk from "@buildonspark/lrc20-sdk";
-import {announceTokenL1} from "./services/lrc20/announce.js";
+import { announceTokenL1 } from "./services/lrc20/announce.js";
 import {
   LRC_WALLET_NETWORK,
-  LRC_WALLET_NETWORK_TYPE
+  LRC_WALLET_NETWORK_TYPE,
 } from "./utils/constants.js";
 
 export class IssuerWallet {
@@ -29,7 +29,7 @@ export class IssuerWallet {
     let result = await this.sparkWallet.initWallet(mnemonicOrSeed);
 
     if (enableL1Wallet) {
-      if(!mnemonicOrSeed) {
+      if (!mnemonicOrSeed) {
         mnemonicOrSeed = result.mnemonic!;
       }
 
@@ -42,9 +42,9 @@ export class IssuerWallet {
 
       const hdkey = HDKey.fromMasterSeed(seed).derive("m/0").privateKey!;
       this.bitcoinWallet = new lrc20sdk.LRCWallet(
-         bytesToHex(hdkey),
-         LRC_WALLET_NETWORK[this.network],
-         LRC_WALLET_NETWORK_TYPE[this.network]
+        bytesToHex(hdkey),
+        LRC_WALLET_NETWORK[this.network],
+        LRC_WALLET_NETWORK_TYPE[this.network],
       );
     }
     this.initialized = true;
@@ -83,12 +83,23 @@ export class IssuerWallet {
    * Gets token balance and number of held leaves.
    * @returns An object containing the token balance and the number of owned leaves
    */
-  async getTokenBalance(): Promise<{ balance: bigint; leafCount: number }> {
+  async getBalance(): Promise<{ balance: bigint; leafCount: number }> {
     if (!this.isSparkInitialized()) {
       throw new Error("Spark wallet not initialized");
     }
 
-    return await this.sparkWallet.getIssuerTokenBalance();
+    const publicKey = await this.sparkWallet.getIdentityPublicKey();
+    const balanceObj = await this.sparkWallet.getBalance();
+    if (!balanceObj.tokenBalances || !balanceObj.tokenBalances.has(publicKey)) {
+      return {
+        balance: 0n,
+        leafCount: 0,
+      };
+    }
+    return {
+      balance: balanceObj.tokenBalances.get(publicKey)!.balance,
+      leafCount: balanceObj.tokenBalances.get(publicKey)!.leafCount,
+    };
   }
 
   /**
@@ -106,7 +117,10 @@ export class IssuerWallet {
   /**
    * Transfers tokens to the specified receipient.
    */
-  async transferTokens(amountToTransfer: bigint, recipientPublicKey: string): Promise<string> {
+  async transferTokens(
+    amountToTransfer: bigint,
+    recipientPublicKey: string,
+  ): Promise<string> {
     if (!this.isSparkInitialized()) {
       throw new Error("Spark wallet not initialized");
     }
@@ -157,11 +171,24 @@ export class IssuerWallet {
   /**
    * Announces LRC20 token on L1
    */
-  async announceTokenL1(tokenName: string, tokenTicker: string, decimals: number, maxSupply: bigint, isFreezable: boolean): Promise<{txid: string}> {
-    if(!this.isL1Initialized()) {
+  async announceTokenL1(
+    tokenName: string,
+    tokenTicker: string,
+    decimals: number,
+    maxSupply: bigint,
+    isFreezable: boolean,
+  ): Promise<{ txid: string }> {
+    if (!this.isL1Initialized()) {
       throw new Error("L1 wallet not initialized");
     }
 
-    return await announceTokenL1(this.bitcoinWallet!, tokenName, tokenTicker, decimals, maxSupply, isFreezable)
+    return await announceTokenL1(
+      this.bitcoinWallet!,
+      tokenName,
+      tokenTicker,
+      decimals,
+      maxSupply,
+      isFreezable,
+    );
   }
 }

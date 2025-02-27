@@ -19,16 +19,17 @@ async function runCLI() {
   });
   const helpMessage = `
   Available commands:
-  initwallet <mnemonic | seed>                      - Create a new wallet from a mnemonic or seed. If no mnemonic or seed is provided, a new mnemonic will be generated.
-  getbalance                                        - Get the wallet's balance
-  getdepositaddress                                 - Get an address to deposit funds from L1 to Spark
-  getsparkaddress                                   - Get the wallet's spark address
-  createinvoice <amount> <memo>                     - Create a new lightning invoice
-  payinvoice <invoice>                              - Pay a lightning invoice
-  sendtransfer <amount> <receiverSparkAddress>      - Send a spark transfer
-  withdraw <onchainAddress> <amount>                - Withdraw funds to an L1 address
-  help                                              - Show this help message
-  exit/quit                                         - Exit the program
+  initwallet [mnemonic | seed]                                - Create a new wallet from a mnemonic or seed. If no mnemonic or seed is provided, a new mnemonic will be generated.
+  getbalance                                                  - Get the wallet's balance
+  getdepositaddress                                           - Get an address to deposit funds from L1 to Spark
+  getsparkaddress                                             - Get the wallet's spark address
+  createinvoice <amount> <memo>                               - Create a new lightning invoice
+  payinvoice <invoice>                                        - Pay a lightning invoice
+  sendtransfer <amount> <receiverSparkAddress>                - Send a spark transfer
+  withdraw <onchainAddress> <amount>                          - Withdraw funds to an L1 address
+  tokentransfer <tokenPubKey> <amount> <receiverSparkAddress> - Transfer tokens
+  help                                                        - Show this help message
+  exit/quit                                                   - Exit the program
 `;
   console.log(helpMessage);
 
@@ -55,8 +56,18 @@ async function runCLI() {
         console.log(result);
         break;
       case "getbalance":
-        const balance = await wallet.getBalance(true);
-        console.log(balance);
+        const balanceInfo = await wallet.getBalance(true);
+        console.log("Sats Balance: " + balanceInfo.balance);
+        if (balanceInfo.tokenBalances && balanceInfo.tokenBalances.size > 0) {
+          console.log("\nToken Balances:");
+          for (const [
+            tokenPublicKey,
+            tokenInfo,
+          ] of balanceInfo.tokenBalances.entries()) {
+            console.log(`  Token (${tokenPublicKey}):`);
+            console.log(`    Balance: ${tokenInfo.balance}`);
+          }
+        }
         break;
       case "getdepositaddress":
         const depositAddress = await wallet.getDepositAddress();

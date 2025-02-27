@@ -18,16 +18,10 @@ async function runCLI() {
     output: process.stdout,
   });
   const helpMessage = `
-  Available commands:
+  General commands:
   genmnemonic                                - Generate a new mnemonic
-  initwallet <mnemonic>                      - Create a new wallet from a mnemonic
-  tokenpublickey                             - Get the token public key
-  mint <amount>                              - Mint new tokens
-  transfer <amount> <receiverPubKey>         - Transfer tokens to a recipient
-  burn <amount>                              - Burn tokens
-  freeze <publicKey>                         - Freeze tokens at the specified public key
-  unfreeze <publicKey>                       - Unfreeze tokens at the specified public key
-  balance                                    - Show current wallet balance
+  initwallet [mnemonic | seed]               - Create a new wallet from a mnemonic
+  getaddresses                               - Get Spark and L1 addresses for this issuer
   help                                       - Show this help message
   exit/quit                                  - Exit the program
 
@@ -38,6 +32,15 @@ async function runCLI() {
            <decimals>    - uint8
            <maxSupply>   - uint128, set 0 if no restrictions are needed
            <isFreezable> - boolean, true/false
+
+
+  Spark commands:
+  getbalance                                 - Show current wallet balance
+  mint <amount>                              - Mint new tokens
+  transfer <amount> <receiverPubKey>         - Transfer tokens to a recipient
+  burn <amount>                              - Burn tokens
+  freeze <publicKey>                         - Freeze tokens at the specified public key
+  unfreeze <publicKey>                       - Unfreeze tokens at the specified public key
 `;
   console.log(helpMessage);
 
@@ -64,12 +67,10 @@ async function runCLI() {
           console.log(mnemonic);
           break;
         case "initwallet":
-          await wallet.initWallet(
-            args.length > 0 ? args.join(" ") : walletMnemonic,
-          );
+          const result = await wallet.initWallet(args.join(" "));
           console.log("Wallet initialized successfully");
           break;
-        case "tokenpublickey":
+        case "getaddresses":
           if (!wallet.isSparkInitialized()) {
             console.log("No wallet initialized");
             break;
@@ -77,10 +78,11 @@ async function runCLI() {
 
           const tokenPublicKey = await wallet.getTokenPublicKey();
           console.log("Token Public Key:", tokenPublicKey);
+          console.log("Spark Address:", tokenPublicKey);
+
           if (wallet.isL1Initialized()) {
             let lrcWallet = wallet.getBitcoinWallet();
-            console.log("P2TR   (only for receiving LRC20 tokens):", lrcWallet.p2trAddress);
-            console.log("P2WPKH (only for receiving BTC):         ", lrcWallet.p2wpkhAddress);
+            console.log("L1 Address:", lrcWallet.p2wpkhAddress);
           }
           break;
         case "mint":
@@ -136,14 +138,15 @@ async function runCLI() {
           const unfreezeResult = await wallet.unfreezeTokens(unfreezePublicKey);
           console.log("Unfreeze result:", unfreezeResult);
           break;
-        case "balance":
+        case "getbalance":
           if (!wallet.isSparkInitialized()) {
             console.log("No wallet initialized");
             break;
           }
-          const balanceInfo = await wallet.getTokenBalance();
-          console.log("Balance:", balanceInfo.balance);
-          console.log("Number of token leaves:", balanceInfo.leafCount);
+          const balanceInfo = await wallet.getBalance(true);
+          // Display token balances if available
+          console.log(`Token Balance: ${balanceInfo.balance}`);
+          console.log(`Leaf Count: ${balanceInfo.leafCount}`);
           break;
         case "announce": {
           if (!wallet.isL1Initialized()) {
@@ -155,30 +158,36 @@ async function runCLI() {
           const tokenTicker = args[1];
           const decimals = parseInt(args[2]);
           const maxSupply = BigInt(parseInt(args[3]));
-          const isFreezable = args[4] === 'true';
+          const isFreezable = args[4] === "true";
 
-          if(tokenName.length < 3 || tokenName.length > 20) {
+          if (tokenName.length < 3 || tokenName.length > 20) {
             console.log("Invalid tokenName length");
             break;
           }
 
-          if(tokenTicker.length < 3 || tokenTicker.length > 6) {
+          if (tokenTicker.length < 3 || tokenTicker.length > 6) {
             console.log("Invalid tokenTicker length");
             break;
           }
 
-          if(decimals < 0) {
+          if (decimals < 0) {
             console.log("Invalid decimals. Should be >= 0");
             break;
           }
 
-          if(maxSupply < 0) {
+          if (maxSupply < 0) {
             console.log("Invalid maxSupply. Should be >= 0");
             break;
           }
 
-          let {txid} = await wallet.announceTokenL1(tokenName, tokenTicker, decimals, maxSupply, isFreezable);
-          console.log("Announcement tx:", txid);
+          let { txid } = await wallet.announceTokenL1(
+            tokenName,
+            tokenTicker,
+            decimals,
+            maxSupply,
+            isFreezable,
+          );
+          console.log("L1 Token Announcement Transaction ID:", txid);
           break;
         }
         default:
