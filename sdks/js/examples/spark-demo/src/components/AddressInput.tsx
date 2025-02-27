@@ -94,7 +94,7 @@ export default function AddressInput({ onAddressSelect }: AddressInputProps) {
     <div className="flex w-full flex-col gap-2">
       <input
         className="h-12 w-full rounded-lg border border-solid border-[rgba(249,249,249,0.12)] bg-[#121E2D] px-4 text-[12px]"
-        placeholder="Wallet address, Lightning invoice"
+        placeholder="Phone number, Wallet address, Lightning invoice"
         type="text"
         value={inputAddress}
         onChange={handleInputChange}
