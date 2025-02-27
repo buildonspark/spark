@@ -42,8 +42,9 @@ export default function Login() {
 
   // default the app to regtest on login.
   useEffect(() => {
-    localStorage.setItem("spark_wallet_network", Network.REGTEST.toString());
-  }, []);
+    localStorage.setItem("spark_wallet_network", Network.MAINNET.toString());
+    setInitWalletNetwork(Network.MAINNET);
+  }, [setInitWalletNetwork]);
 
   const handleSubmit = async () => {
     if (loginState === LoginState.PhoneInput) {

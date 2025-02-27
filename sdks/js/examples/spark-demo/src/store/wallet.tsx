@@ -62,9 +62,9 @@ const getLocalStorageWalletNetwork = (): Network => {
         : Network.REGTEST;
     }
   } catch (e) {
-    console.error("Error getting initial wallet network", e);
+    console.log("Error getting initial wallet network", e);
   }
-  return Network.REGTEST;
+  return Network.MAINNET; // default to mainnet.
 };
 
 interface WalletState {
@@ -150,10 +150,10 @@ const useWalletStore = create<WalletStore>((set, get) => ({
   btcAddressInfo: {},
   initWallet: async (mnemonic: string) => {
     const { wallet, initWalletNetwork } = get();
-    let mainnetwallet = new SparkWallet(Network.MAINNET);
-    if (initWalletNetwork === Network.MAINNET) {
-      set({ wallet: mainnetwallet });
-      await mainnetwallet.initWallet(mnemonic);
+    let regtestWallet = new SparkWallet(Network.REGTEST);
+    if (initWalletNetwork === Network.REGTEST) {
+      set({ wallet: regtestWallet });
+      await regtestWallet.initWallet(mnemonic);
     } else {
       await wallet.initWallet(mnemonic);
     }
@@ -162,10 +162,10 @@ const useWalletStore = create<WalletStore>((set, get) => ({
   },
   initWalletFromSeed: async (seed: string) => {
     const { wallet, initWalletNetwork } = get();
-    const mainnetwallet = new SparkWallet(Network.MAINNET);
-    if (initWalletNetwork === Network.MAINNET) {
-      set({ wallet: mainnetwallet });
-      await mainnetwallet.initWallet(seed);
+    const regtestWallet = new SparkWallet(Network.REGTEST);
+    if (initWalletNetwork === Network.REGTEST) {
+      set({ wallet: regtestWallet });
+      await regtestWallet.initWallet(seed);
     } else {
       await wallet.initWallet(seed);
     }
