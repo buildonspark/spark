@@ -16,7 +16,6 @@ async function runCLI() {
   });
   const helpMessage = `
   General commands:
-  genmnemonic                                - Generate a new mnemonic
   initwallet [mnemonic | seed]               - Create a new wallet from a mnemonic
   getaddresses                               - Get Spark and L1 addresses for this issuer
   help                                       - Show this help message
