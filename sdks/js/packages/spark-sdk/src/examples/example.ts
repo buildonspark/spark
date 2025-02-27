@@ -55,7 +55,7 @@ async function runCLI() {
         console.log(result);
         break;
       case "getbalance":
-        const balance = await wallet.getBalance();
+        const balance = await wallet.getBalance(true);
         console.log(balance);
         break;
       case "getdepositaddress":
