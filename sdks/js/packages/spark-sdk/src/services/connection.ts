@@ -10,6 +10,7 @@ import {
   createClientFactory,
   Metadata,
 } from "nice-grpc";
+import { retryMiddleware } from 'nice-grpc-client-middleware-retry';
 import { MockServiceClient, MockServiceDefinition } from "../proto/mock.js";
 import { SparkServiceClient, SparkServiceDefinition } from "../proto/spark.js";
 import {
@@ -17,6 +18,7 @@ import {
   SparkAuthnServiceClient,
   SparkAuthnServiceDefinition,
 } from "../proto/spark_authn.js";
+import { SparkCallOptions } from "../types/grpc.js";
 import { WalletConfigService } from "./config.js";
 
 // TODO: Some sort of client cleanup
@@ -77,11 +79,11 @@ export class ConnectionManager {
     const authToken = await this.authenticate(address);
     const channel = ConnectionManager.createChannelWithTLS(address, certPath);
 
-    const middleware = this.createMiddleWare(address, authToken);
+    const authMiddleware = this.createAuthMiddleWare(address, authToken);
     const client = this.createGrpcClient<SparkServiceClient>(
       SparkServiceDefinition,
       channel,
-      middleware
+      authMiddleware
     );
 
     this.clients[address] = { client, authToken };
@@ -130,11 +132,11 @@ export class ConnectionManager {
     const channel = ConnectionManager.createChannelWithTLS(address, certPath);
     return this.createGrpcClient<SparkAuthnServiceClient>(
       SparkAuthnServiceDefinition,
-      channel
+      channel,
     );
   }
 
-  private createMiddleWare(address: string, authToken: string) {
+  private createAuthMiddleWare(address: string, authToken: string) {
     if (typeof window === "undefined") {
       return this.createNodeMiddleware(address, authToken);
     } else {
@@ -146,7 +148,7 @@ export class ConnectionManager {
     return async function* (
       this: ConnectionManager,
       call: ClientMiddlewareCall<any, any>,
-      options: CallOptions
+      options: SparkCallOptions
     ) {
       try {
         yield* call.next(call.request, {
@@ -179,7 +181,7 @@ export class ConnectionManager {
     return async function* (
       this: ConnectionManager,
       call: ClientMiddlewareCall<any, any>,
-      options: CallOptions
+      options: SparkCallOptions
     ) {
       try {
         yield* call.next(call.request, {
@@ -218,12 +220,16 @@ export class ConnectionManager {
     channel: ChannelImplementation,
     middleware?: any
   ): T & { close?: () => void } {
-    const clientFactory = createClientFactory();
+    const clientFactory = createClientFactory().use(retryMiddleware);
     if (middleware) {
       clientFactory.use(middleware);
     }
 
-    const client = clientFactory.create(defintion, channel) as T;
+    const client = clientFactory.create(defintion, channel, {
+      '*': {
+        retry: false,
+      }
+    }) as T;
     return {
       ...client,
       close: channel.close?.bind(channel),

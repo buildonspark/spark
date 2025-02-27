@@ -25,6 +25,7 @@ import {
 } from "../utils/token-transactions.js";
 import { WalletConfigService } from "./config.js";
 import { ConnectionManager } from "./connection.js";
+import { SparkCallOptions } from "../types/grpc.js";
 
 export class TokenTransactionService {
   protected readonly config: WalletConfigService;
@@ -257,7 +258,11 @@ export class TokenTransactionService {
             finalTokenTransaction,
             operatorSpecificSignatures,
             identityPublicKey,
-          });
+          },
+          {
+            retry: true,
+            retryMaxAttempts: 5,
+          } as SparkCallOptions);
 
           return {
             index,
@@ -359,7 +364,10 @@ export class TokenTransactionService {
           finalTokenTransaction,
           leafToSpendRevocationKeys,
           identityPublicKey,
-        });
+        }, {
+          retry: true,
+          retryMaxAttempts: 5,
+        } as SparkCallOptions);
 
         return {
           identifier,

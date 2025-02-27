@@ -1690,6 +1690,7 @@ __metadata:
     light-bolt11-decoder: "npm:^3.2.0"
     long: "npm:^5.2.4"
     nice-grpc: "npm:^2.1.10"
+    nice-grpc-client-middleware-retry: "npm:^3.1.10"
     nice-grpc-web: "npm:^3.3.5"
     prettier: "npm:^3.5.1"
     protobufjs: "npm:^7.4.0"
@@ -14668,6 +14669,16 @@ __metadata:
   bin:
     next: dist/bin/next
   checksum: 10/8befc8dc4f09aaba9bdf85b12dad7b7d1ca6bd2f60baf87e1f4310476c0ec38cbda2bf8d39c0012736c152660b2c7bd11099d32baad1a28462e6f5edc3ba72e5
+  languageName: node
+  linkType: hard
+
+"nice-grpc-client-middleware-retry@npm:^3.1.10":
+  version: 3.1.10
+  resolution: "nice-grpc-client-middleware-retry@npm:3.1.10"
+  dependencies:
+    abort-controller-x: "npm:^0.4.0"
+    nice-grpc-common: "npm:^2.0.2"
+  checksum: 10/fbaa1e6be0a21f446fb40944998e6906d925dc6d9a5f4c6a35e3e37296bd89689c7c1ccda606a8fb7daee1d33979917859b9044cfcaae2799d093857c0d571a0
   languageName: node
   linkType: hard
 

@@ -76,7 +76,7 @@
     "test:integration": "yarn test-cmd src/tests/integration/*.test.ts",
     "types:watch": "tsc-absolute --watch",
     "types": "tsc",
-    "generate:proto": "PATH=\"$PATH:./node_modules/.bin\" protoc --ts_proto_out=./src/proto --ts_proto_opt=outputServices=nice-grpc,useExactTypes=false,outputServices=generic-definitions,oneof=unions,importSuffix=.js --proto_path=../../protos spark.proto mock.proto spark_authn.proto"
+    "generate:proto": "PATH=\"$PATH:./node_modules/.bin\" protoc --ts_proto_out=./src/proto --ts_proto_opt=outputServices=nice-grpc,useExactTypes=false,outputServices=generic-definitions,oneof=unions,importSuffix=.js --proto_path=../../../../protos spark.proto mock.proto spark_authn.proto"
   },
   "author": "",
   "license": "ISC",
@@ -121,6 +121,7 @@
     "light-bolt11-decoder": "^3.2.0",
     "long": "^5.2.4",
     "nice-grpc": "^2.1.10",
+    "nice-grpc-client-middleware-retry": "^3.1.10",
     "nice-grpc-web": "^3.3.5",
     "protobufjs": "^7.4.0",
     "react-toastify": "^11.0.5",
