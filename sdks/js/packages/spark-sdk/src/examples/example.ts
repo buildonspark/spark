@@ -16,12 +16,12 @@ async function runCLI() {
   Available commands:
   initwallet <mnemonic | seed>                      - Create a new wallet from a mnemonic or seed. If no mnemonic or seed is provided, a new mnemonic will be generated.
   getbalance                                        - Get the wallet's balance
-  getdepositaddress                                 - Get the wallet's deposit address
+  getdepositaddress                                 - Get an address to deposit funds from L1 to Spark
   getsparkaddress                                   - Get the wallet's spark address
   createinvoice <amount> <memo>                     - Create a new lightning invoice
   payinvoice <invoice>                              - Pay a lightning invoice
-  sendtransfer <amount> <receiverSparkAddress>       - Send a spark transfer
-  withdraw <onchainAddress> <amount>                - Withdraw funds to an onchain address
+  sendtransfer <amount> <receiverSparkAddress>      - Send a spark transfer
+  withdraw <onchainAddress> <amount>                - Withdraw funds to an L1 address
   help                                              - Show this help message
   exit/quit                                         - Exit the program
 `;
