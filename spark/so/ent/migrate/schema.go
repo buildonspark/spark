@@ -83,6 +83,16 @@ var (
 				Unique:  false,
 				Columns: []*schema.Column{DepositAddressesColumns[3]},
 			},
+			{
+				Name:    "depositaddress_owner_identity_pubkey",
+				Unique:  false,
+				Columns: []*schema.Column{DepositAddressesColumns[4]},
+			},
+			{
+				Name:    "depositaddress_owner_signing_pubkey",
+				Unique:  false,
+				Columns: []*schema.Column{DepositAddressesColumns[5]},
+			},
 		},
 	}
 	// PreimageRequestsColumns holds the columns for the "preimage_requests" table.
