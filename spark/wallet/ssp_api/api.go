@@ -90,7 +90,6 @@ func (s *SparkServiceAPI) RequestLeavesSwap(
 		"total_amount_sats":  totalAmountSats,
 		"target_amount_sats": targetAmountSats,
 		"fee_sats":           feeSats,
-		"network":            strings.ToUpper(network.String()),
 		"user_leaves":        userLeaves,
 	}
 

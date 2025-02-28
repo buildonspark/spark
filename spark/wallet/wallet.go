@@ -349,9 +349,9 @@ func (w *SingleKeyWallet) RequestLeavesSwap(ctx context.Context, targetAmount in
 
 	requestID, leaves, err := api.RequestLeavesSwap(hex.EncodeToString(adaptorPubKey.SerializeCompressed()), uint64(totalAmount), uint64(targetAmount), 0, w.Config.Network, userLeaves)
 	if err != nil {
-		_, err = CancelSendTransfer(ctx, w.Config, transfer)
-		if err != nil {
-			return nil, fmt.Errorf("failed to cancel send transfer: %w", err)
+		_, cancelErr := CancelSendTransfer(ctx, w.Config, transfer)
+		if cancelErr != nil {
+			return nil, fmt.Errorf("failed to cancel send transfer: %w", cancelErr)
 		}
 		fmt.Printf("cancelled send transfer %s\n", transfer.Id)
 		return nil, fmt.Errorf("failed to request leaves swap: %w", err)

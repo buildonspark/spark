@@ -151,7 +151,6 @@ mutation RequestLeavesSwap(
   $total_amount_sats: Long!
   $target_amount_sats: Long!
   $fee_sats: Long!
-  $network: BitcoinNetwork!
   $user_leaves: [UserLeafInput!]!
 ) {
   request_leaves_swap(input: {
@@ -159,7 +158,6 @@ mutation RequestLeavesSwap(
     total_amount_sats: $total_amount_sats
     target_amount_sats: $target_amount_sats
     fee_sats: $fee_sats
-    network: $network
     user_leaves: $user_leaves
   }) {
     request {
