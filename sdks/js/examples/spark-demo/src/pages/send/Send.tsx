@@ -7,7 +7,7 @@ import CardForm from "../../components/CardForm";
 import ConfirmQuote from "../../components/ConfirmQuote";
 import { Network } from "../../components/Networks";
 import SendDetails from "../../components/SendDetails";
-import ArrowLeft from "../../icons/ArrowLeft";
+import ChevronIcon from "../../icons/ChevronIcon";
 import { Routes } from "../../routes";
 import { PERMANENT_CURRENCIES, useWallet } from "../../store/wallet";
 import { CurrencyType } from "../../utils/currency";
@@ -31,7 +31,7 @@ export default function Send() {
   const [rawInputAmount, setRawInputAmount] = useState<string>("0");
   const [primaryButtonLoading, setPrimaryButtonLoading] =
     useState<boolean>(false);
-/*   const [sendResponse, setSendResponse] = useState<Transfer | string | null>(
+  /*   const [sendResponse, setSendResponse] = useState<Transfer | string | null>(
     null,
   ); */
   const {
@@ -50,7 +50,15 @@ export default function Send() {
       case SendStep.Success:
         return null;
       default:
-        return <ArrowLeft />;
+        return (
+          <ChevronIcon
+            direction="left"
+            opacity={1}
+            height={24}
+            width={24}
+            strokeWidth={2}
+          />
+        );
     }
   }, [currentStep]);
 
@@ -96,7 +104,7 @@ export default function Send() {
   const primaryButtonText = useMemo(() => {
     switch (currentStep) {
       case SendStep.AmountInput:
-        return "Continue";
+        return "Preview";
       case SendStep.ConfirmQuote:
         return "Send";
       case SendStep.Success:

@@ -48,7 +48,7 @@ function Slot(props: SlotProps) {
   return (
     <div
       className={clsx(
-        "relative flex h-14 w-14 items-center justify-center rounded-md border-2 border-[#f9f9f914] text-sm transition-all",
+        "relative flex h-12 w-12 items-center justify-center rounded-md border-2 border-[#f9f9f914] text-sm transition-all",
         props.isActive && "z-10 !border-[#f9f9f9]",
       )}
     >

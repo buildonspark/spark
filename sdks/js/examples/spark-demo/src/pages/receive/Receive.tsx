@@ -4,7 +4,7 @@ import AmountInput from "../../components/AmountInput";
 import CardForm from "../../components/CardForm";
 import Networks, { Network } from "../../components/Networks";
 import ReceiveDetails from "../../components/ReceiveDetails";
-import ArrowLeft from "../../icons/ArrowLeft";
+import ChevronIcon from "../../icons/ChevronIcon";
 import { Routes } from "../../routes";
 import { PERMANENT_CURRENCIES, useWallet } from "../../store/wallet";
 import { CurrencyType } from "../../utils/currency";
@@ -127,7 +127,15 @@ export default function Receive() {
       case ReceiveStep.ShareQuote:
         return null;
       default:
-        return <ArrowLeft strokeWidth="1.5" />;
+        return (
+          <ChevronIcon
+            direction="left"
+            opacity={1}
+            height={24}
+            width={24}
+            strokeWidth={2}
+          />
+        );
     }
   }, [currentStep]);
 

@@ -1,4 +1,5 @@
 import { useCallback, useEffect } from "react";
+import { isMobile } from "react-device-detect";
 import styled from "styled-components";
 import DeleteIcon from "../icons/DeleteIcon";
 import ToggleIcon from "../icons/ToggleIcon";
@@ -163,7 +164,7 @@ export default function AmountInput({
         </div>
         <div className="flex items-center justify-center gap-2">
           <div
-            className="font-inter mt-2 inline-flex items-center gap-2 rounded-full bg-[#F9F9F9] bg-opacity-20 px-2 py-1 text-center text-[13px] opacity-40 active:bg-opacity-40"
+            className="font-inter mb-8 mt-6 inline-flex items-center gap-2 rounded-lg bg-[#fafafa16] bg-opacity-20 px-2 py-1 text-center text-[13px] active:bg-opacity-40"
             onClick={() => {
               const { fiatAmountString, assetAmountString } =
                 resolveCurrencyDisplay();
@@ -190,52 +191,54 @@ export default function AmountInput({
           </div>
         </div>
       </div>
-      <div className="font-inter flex flex-col gap-2 text-[22px]">
-        <div className="flex gap-2">
-          <AmountInputButton onClick={() => handleKey("1")}>
-            1
-          </AmountInputButton>
-          <AmountInputButton onClick={() => handleKey("2")}>
-            2
-          </AmountInputButton>
-          <AmountInputButton onClick={() => handleKey("3")}>
-            3
-          </AmountInputButton>
+      {isMobile && (
+        <div className="font-inter flex flex-col gap-2 text-[22px]">
+          <div className="flex gap-2">
+            <AmountInputButton onClick={() => handleKey("1")}>
+              1
+            </AmountInputButton>
+            <AmountInputButton onClick={() => handleKey("2")}>
+              2
+            </AmountInputButton>
+            <AmountInputButton onClick={() => handleKey("3")}>
+              3
+            </AmountInputButton>
+          </div>
+          <div className="flex gap-2">
+            <AmountInputButton onClick={() => handleKey("4")}>
+              4
+            </AmountInputButton>
+            <AmountInputButton onClick={() => handleKey("5")}>
+              5
+            </AmountInputButton>
+            <AmountInputButton onClick={() => handleKey("6")}>
+              6
+            </AmountInputButton>
+          </div>
+          <div className="flex gap-2">
+            <AmountInputButton onClick={() => handleKey("7")}>
+              7
+            </AmountInputButton>
+            <AmountInputButton onClick={() => handleKey("8")}>
+              8
+            </AmountInputButton>
+            <AmountInputButton onClick={() => handleKey("9")}>
+              9
+            </AmountInputButton>
+          </div>
+          <div className="flex gap-2">
+            <AmountInputButton onClick={() => handleKey(".")}>
+              .
+            </AmountInputButton>
+            <AmountInputButton onClick={() => handleKey("0")}>
+              0
+            </AmountInputButton>
+            <AmountInputButton onClick={() => handleKey("Backspace")}>
+              <DeleteIcon />
+            </AmountInputButton>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <AmountInputButton onClick={() => handleKey("4")}>
-            4
-          </AmountInputButton>
-          <AmountInputButton onClick={() => handleKey("5")}>
-            5
-          </AmountInputButton>
-          <AmountInputButton onClick={() => handleKey("6")}>
-            6
-          </AmountInputButton>
-        </div>
-        <div className="flex gap-2">
-          <AmountInputButton onClick={() => handleKey("7")}>
-            7
-          </AmountInputButton>
-          <AmountInputButton onClick={() => handleKey("8")}>
-            8
-          </AmountInputButton>
-          <AmountInputButton onClick={() => handleKey("9")}>
-            9
-          </AmountInputButton>
-        </div>
-        <div className="flex gap-2">
-          <AmountInputButton onClick={() => handleKey(".")}>
-            .
-          </AmountInputButton>
-          <AmountInputButton onClick={() => handleKey("0")}>
-            0
-          </AmountInputButton>
-          <AmountInputButton onClick={() => handleKey("Backspace")}>
-            <DeleteIcon />
-          </AmountInputButton>
-        </div>
-      </div>
+      )}
     </div>
   );
 }

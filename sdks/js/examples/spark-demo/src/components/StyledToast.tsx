@@ -6,7 +6,7 @@ export default function StyledToast() {
       aria-label="toast-container"
       position="bottom-center"
       toastStyle={{
-        background: "#0E3154",
+        background: "#1a1a1a",
         borderRadius: "8px",
         color: "#fff",
       }}

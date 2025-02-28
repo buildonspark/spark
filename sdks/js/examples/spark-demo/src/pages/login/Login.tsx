@@ -1,7 +1,7 @@
 import { Network } from "@buildonspark/spark-sdk/utils";
 import { useEffect, useMemo, useState } from "react";
 import { isValidPhoneNumber } from "react-phone-number-input";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import Button from "../../components/Button";
 import PhoneInput from "../../components/PhoneInput";
 import VerificationCode from "../../components/VerificationCode";
@@ -17,6 +17,7 @@ export default function Login() {
   const [loginState, setLoginState] = useState<LoginState>(
     LoginState.PhoneInput,
   );
+  const [searchParams] = useSearchParams();
   const [phoneNumber, setPhoneNumber] = useState<string | undefined>("");
   const [verificationCode, setVerificationCode] = useState<string | undefined>(
     "",
@@ -100,45 +101,43 @@ export default function Login() {
 
   return (
     <div className="flex flex-col items-center justify-center">
-      <div className="mb-1 flex w-full flex-row items-center justify-end">
-        <div
-          className={`mr-2 text-center font-decimal text-[13px] ${
-            initWalletNetwork === Network.MAINNET
-              ? "text-[#ffffff]"
-              : "text-[#ffffff]"
-          }`}
-        >
-          {initWalletNetwork === Network.MAINNET ? "Mainnet" : "Regtest"}
-        </div>
-        <div>
-          <button
-            onClick={() => {
-              const newNetwork =
-                initWalletNetwork === Network.MAINNET
-                  ? Network.REGTEST
-                  : Network.MAINNET;
-              localStorage.setItem(
-                "spark_wallet_network",
-                newNetwork.toString(),
-              );
-              setInitWalletNetwork(newNetwork);
-            }}
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-              initWalletNetwork === Network.MAINNET
-                ? "bg-white"
-                : "bg-[#696969]"
-            }`}
+      {searchParams.get("dev") === "true" && (
+        <div className="mb-1 flex w-full flex-row items-center justify-end">
+          <div
+            className={`mr-2 text-center font-decimal text-[13px] text-[#ffffff] opacity-50`}
           >
-            <span
-              className={`inline-block h-4 w-4 transform rounded-full transition-transform ${
+            {initWalletNetwork === Network.MAINNET ? "Mainnet" : "Regtest"}
+          </div>
+          <div>
+            <button
+              onClick={() => {
+                const newNetwork =
+                  initWalletNetwork === Network.MAINNET
+                    ? Network.REGTEST
+                    : Network.MAINNET;
+                localStorage.setItem(
+                  "spark_wallet_network",
+                  newNetwork.toString(),
+                );
+                setInitWalletNetwork(newNetwork);
+              }}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                 initWalletNetwork === Network.MAINNET
-                  ? "translate-x-6 bg-black"
-                  : "translate-x-1 bg-white"
+                  ? "bg-[#FAFAFACD]"
+                  : "bg-[#696969]"
               }`}
-            />
-          </button>
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full transition-transform ${
+                  initWalletNetwork === Network.MAINNET
+                    ? "translate-x-6 bg-[#0A0A0ACD]"
+                    : "translate-x-1 bg-[#FAFAFA70]"
+                }`}
+              />
+            </button>
+          </div>
         </div>
-      </div>
+      )}
       <div className="font-inter mt-4 text-center text-[13px] text-[#ffffff] opacity-40">
         A Spark-enabled, self-custody
         <br />
@@ -156,10 +155,11 @@ export default function Login() {
           />
         )}
       </div>
-      <div className="mt-32 w-full">
+      <div className="mt-4 w-full">
         <Button
-          text="Submit"
+          text="Continue"
           kind="primary"
+          height={44}
           onClick={handleSubmit}
           disabled={
             (loginState === LoginState.PhoneInput && !isValidPhone) ||

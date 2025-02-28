@@ -58,9 +58,7 @@ const StyledButton = styled.button<{
   align-items: center;
   justify-content: center;
 
-  padding: 5px 0px;
   gap: 12px;
-  border: 1px solid rgba(249, 249, 249, 0.1);
   border-radius: 8px;
   font-family: "Inter";
 
@@ -68,8 +66,6 @@ const StyledButton = styled.button<{
   line-height: 38px;
 
   text-align: center;
-  margin-top: 10px;
-
   ${({ disabled }) =>
     disabled &&
     css`
@@ -84,6 +80,7 @@ const StyledButton = styled.button<{
         `
       : css`
           background: #1a1a1a;
+          border: 1px solid #fafafa0a;
         `}
 
   ${({ direction }) =>

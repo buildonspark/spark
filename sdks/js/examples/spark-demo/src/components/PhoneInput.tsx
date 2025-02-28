@@ -23,7 +23,7 @@ export default function PhoneInput({ value, onChange }: PhoneInputProps) {
   return (
     <div className="flex flex-col gap-2">
       <ReactPhoneInput
-        className="flex flex-row rounded-[8px] border-[1px] border-[#f9f9f914] bg-[#1d2b40]"
+        className="flex flex-row rounded-[8px] bg-transparent"
         onChange={onChange}
         defaultCountry="US"
         id="phone"
@@ -32,7 +32,7 @@ export default function PhoneInput({ value, onChange }: PhoneInputProps) {
         countrySelectComponent={CountrySelectComponent}
         flagComponent={FlagComponent}
         countryCallingCodeEditable={false}
-        placeholder="(555) 555-5555"
+        placeholder="Enter phone"
         international={false}
         autoComplete="off"
         addInternationalOption={false}
@@ -71,12 +71,12 @@ const CountrySelectComponent = ({
       <PopoverTrigger>
         <PopoverButton
           className={clsx(
-            "flex gap-1 rounded-e-none rounded-s-lg px-3 py-4 font-bold shadow-none",
+            "mr-2 flex h-10 rounded-lg border border-[#3a3a3a] px-3 py-1 font-bold",
             disabled ? "opacity-50" : "",
           )}
         >
           <FlagComponent country={value} countryName={value} />
-          <ChevronIcon direction="down" />
+          <ChevronIcon direction="down" stroke="#FAFAFA" opacity={1} />
         </PopoverButton>
       </PopoverTrigger>
 
@@ -126,13 +126,11 @@ const FlagComponent = ({ country, countryName }: FlagProps) => {
   return (
     <div className="flex-1 whitespace-nowrap">
       {Flag && (
-        <div className="flex h-4 flex-row items-center gap-[6px]">
-          <div className="w-4">
+        <div className="text-15/20 flex h-4 flex-row items-center border-[#3a3a3a] font-normal">
+          {/* <div className="w-4">
             <Flag title={countryName} />
-          </div>
-          <div>
-            {country} (+{getCountryCallingCode(country)})
-          </div>
+          </div> */}
+          <div>+{getCountryCallingCode(country)}</div>
         </div>
       )}
     </div>
@@ -141,20 +139,25 @@ const FlagComponent = ({ country, countryName }: FlagProps) => {
 
 const PopoverButton = styled.div`
   display: flex;
-  gap: 8px;
   align-items: center;
   justify-content: center;
 `;
 
 const InputComponent = styled.input`
-  height: 56px;
+  height: 40px;
   padding-top: 9px;
-  padding-right: 24px;
-  padding-bottom: 9px;
+  padding: 4px 16px;
   display: flex;
-  width: 100%;
-
-  background: #1d2b40;
+  width: 257px;
+  border-radius: 8px;
+  border: 1px solid #3a3a3a;
+  background: #0a0a0a;
+  color: #fafafa;
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 20px;
+  letter-spacing: -0.187px;
+  font-family: "Inter", sans-serif;
 
   outline: none;
 `;

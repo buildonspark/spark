@@ -21,12 +21,12 @@ export default function Root() {
         <SparkWithTextLogo />
       </div>
       <div
-        className="card-background-gradient mt-[40px] min-h-[480px] rounded-xl"
+        className="card-background-gradient mt-[40px] min-h-[480px] rounded-lg"
         style={{
           padding: "0.5px",
         }}
       >
-        <div className="h-full min-h-[480px] rounded-xl bg-[#0A0A0A] xs:p-8">
+        <div className="h-full min-h-[480px] rounded-lg bg-[#0A0A0A] xs:p-8">
           <RoutesProvider>
             <Route path={Routes.Base} element={<Login />} />
             <Route path={Routes.WalletSuccess} element={<WalletSuccess />} />

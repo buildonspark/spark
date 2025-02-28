@@ -7,7 +7,7 @@ import ConfirmQuote from "../../components/ConfirmQuote";
 import CurrencyBalanceDetails from "../../components/CurrencyBalanceDetails";
 import SendDetails from "../../components/SendDetails";
 import TokenDetails from "../../components/TokenDetails";
-import ArrowLeft from "../../icons/ArrowLeft";
+import ChevronIcon from "../../icons/ChevronIcon";
 import CloseIcon from "../../icons/CloseIcon";
 import { Routes } from "../../routes";
 import { PERMANENT_CURRENCIES, useWallet } from "../../store/wallet";
@@ -228,7 +228,13 @@ export default function Tokens() {
         currentStep === TokensStep.SendTokenSuccess ? (
           <CloseIcon />
         ) : (
-          <ArrowLeft />
+          <ChevronIcon
+            direction="left"
+            opacity={1}
+            height={24}
+            width={24}
+            strokeWidth={2}
+          />
         )
       }
       logoLeftClick={logoLeftClickHandler}

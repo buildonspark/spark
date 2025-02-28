@@ -93,7 +93,7 @@ export default function AddressInput({ onAddressSelect }: AddressInputProps) {
   return (
     <div className="flex w-full flex-col gap-2">
       <input
-        className="h-12 w-full rounded-lg border border-solid border-[rgba(249,249,249,0.12)] bg-[#121E2D] px-4 text-[12px]"
+        className="h-12 w-full rounded-lg border border-solid border-[#3A3A3A] bg-transparent px-4 text-[12px] outline-none focus:border-[#fafafa] focus:border-[rgba(249,249,249,0.3)] focus:outline-none focus:ring-0"
         placeholder="Phone number, Wallet address, Lightning invoice"
         type="text"
         value={inputAddress}
@@ -101,7 +101,7 @@ export default function AddressInput({ onAddressSelect }: AddressInputProps) {
       />
       {inputAddressNetwork === Network.NONE ? (
         <span className="ml-2 text-[12px] text-[#999999]">
-          Works with spark and bitcoin wallet addresses.
+          Works with Spark and Bitcoin wallet addresses.
         </span>
       ) : (
         inputAddressNetwork !== Network.PHONE && (

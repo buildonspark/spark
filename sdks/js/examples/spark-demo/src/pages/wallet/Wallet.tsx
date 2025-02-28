@@ -8,8 +8,6 @@ import { LoadingSpinner } from "../../components/LoadingSpinner";
 import StyledContainer from "../../components/StyledContainer";
 import TransactionDetailRow from "../../components/TransactionDetailRow";
 import CopyIcon from "../../icons/CopyIcon";
-import ReceiveIcon from "../../icons/ReceiveIcon";
-import SendIcon from "../../icons/SendIcon";
 import StableCoinLogo from "../../icons/StableCoinLogo";
 import { Routes } from "../../routes";
 import { PERMANENT_CURRENCIES, useWallet } from "../../store/wallet";
@@ -38,7 +36,7 @@ export default function Wallet() {
   }, [getMasterPublicKey, isInitialized]);
   return (
     <div>
-      <StyledContainer className="flex h-[180px] w-full flex-col items-center justify-center p-6">
+      <StyledContainer className="flex h-[220px] w-full flex-col items-center justify-center p-4">
         {btcBalance.isLoading ? (
           <LoadingSpinner size={40} />
         ) : (
@@ -51,48 +49,49 @@ export default function Wallet() {
                   notify();
                 }}
               >
-                <div className="flex max-w-[80px] flex-row items-center justify-center text-[13px] text-[#F9F9F999]">
+                <div className="flex max-w-[80px] flex-row items-center justify-center text-[13px] text-[#FAFAFA80]">
                   <div className="mr-1 overflow-hidden text-ellipsis whitespace-nowrap">
                     {pubkey ? pubkey : "Loading..."}
                   </div>
                 </div>
                 <div className="flex h-4 w-4 items-center justify-center">
-                  <CopyIcon stroke="#F9F9F999" />
+                  <CopyIcon stroke="#FAFAFA80" />
                 </div>
               </div>
             </div>
-            <div className="flex h-[140px] w-full flex-col items-start justify-end gap-2">
-              <div className="text-[24px] font-bold">${satsFiatBalance}</div>
-              <div className="text-[13px] text-[#F9F9F999]">
+            <div className="flex h-[140px] w-full flex-col items-start justify-end">
+              <div className="text-[32px]">
+                {satsFiatBalance}
+                <span className="text-[15px] text-[#FAFAFA]">{`${" USD"}`}</span>
+              </div>
+              <div className="text-[13px] text-[#FAFAFA80]">
                 {btcBalance.value} SATs
               </div>
             </div>
           </>
         )}
+        <div className="mt-6 flex w-full items-center justify-center gap-2">
+          <Button
+            text="Receive"
+            kind="secondary"
+            direction="vertical"
+            onClick={() => {
+              navigate(Routes.Receive);
+            }}
+            height={44}
+          />
+          <Button
+            text="Send"
+            kind="primary"
+            direction="vertical"
+            onClick={() => {
+              navigate(Routes.Send);
+            }}
+            height={44}
+          />
+        </div>
       </StyledContainer>
-      <div className="mt-6 flex items-center justify-center gap-4">
-        <Button
-          text="Receive"
-          icon={<ReceiveIcon strokeWidth="1.5" />}
-          kind="secondary"
-          direction="vertical"
-          onClick={() => {
-            navigate(Routes.Receive);
-          }}
-          height={84}
-        />
-        <Button
-          text="Send"
-          icon={<SendIcon strokeWidth="1.5" stroke="#0a0a0a" />}
-          kind="primary"
-          direction="vertical"
-          onClick={() => {
-            navigate(Routes.Send);
-          }}
-          height={84}
-        />
-      </div>
-      <div className="mt-12 w-full border-y border-[#f9f9f9] border-opacity-5">
+      <div className="mt-8 w-full border-y border-[#f9f9f9] border-opacity-5">
         <CurrencyBalanceDetails
           logo={<StableCoinLogo strokeWidth="1.50" />}
           currency="Stablecoins"

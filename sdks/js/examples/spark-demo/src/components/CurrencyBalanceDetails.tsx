@@ -25,10 +25,8 @@ export default function CurrencyBalanceDetails({
       <div className="flex flex-row items-center gap-2">
         {logo && (
           <div
-            className={`flex h-10 w-10 items-center justify-center rounded-xl ${
-              logoBorderEnabled
-                ? "border border-[#f9f9f9] border-opacity-10 bg-gradient-to-b from-[#10151C] via-[#11161D] to-[#141A22]"
-                : ""
+            className={`flex h-10 w-10 items-center justify-center rounded-xl bg-[#1a1a1a0A] ${
+              logoBorderEnabled ? "border border-[#fafafa0a]" : ""
             }`}
           >
             {logo}

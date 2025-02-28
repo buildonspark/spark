@@ -13,6 +13,7 @@ const config = {
       screens: {
         xs: "460px",
       },
+      borderColor: ["active"],
     },
   },
   plugins: [],

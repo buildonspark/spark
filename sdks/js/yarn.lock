@@ -18601,6 +18601,7 @@ __metadata:
     prettier-plugin-tailwindcss: "npm:^0.6.11"
     qrcode.react: "npm:^4.2.0"
     react: "npm:^19.0.0"
+    react-device-detect: "npm:^2.2.3"
     react-dom: "npm:^19.0.0"
     react-phone-number-input: "npm:^3.4.12"
     react-router-dom: "npm:^7.2.0"
