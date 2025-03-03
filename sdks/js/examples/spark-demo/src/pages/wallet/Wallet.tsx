@@ -4,7 +4,6 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import Button from "../../components/Button";
 import CurrencyBalanceDetails from "../../components/CurrencyBalanceDetails";
-import { LoadingSpinner } from "../../components/LoadingSpinner";
 import StyledContainer from "../../components/StyledContainer";
 import TransactionDetailRow from "../../components/TransactionDetailRow";
 import CopyIcon from "../../icons/CopyIcon";
@@ -37,29 +36,32 @@ export default function Wallet() {
   return (
     <div>
       <StyledContainer className="flex h-[220px] w-full flex-col items-center justify-center p-4">
-        {btcBalance.isLoading ? (
-          <LoadingSpinner size={40} />
-        ) : (
-          <>
-            <div className="flex h-[40px] w-full flex-row items-center justify-end">
-              <div
-                className="flex cursor-pointer flex-row items-center justify-center"
-                onClick={() => {
-                  navigator.clipboard.writeText(pubkey);
-                  notify();
-                }}
-              >
-                <div className="flex max-w-[80px] flex-row items-center justify-center text-[13px] text-[#FAFAFA80]">
-                  <div className="mr-1 overflow-hidden text-ellipsis whitespace-nowrap">
-                    {pubkey ? pubkey : "Loading..."}
-                  </div>
-                </div>
-                <div className="flex h-4 w-4 items-center justify-center">
-                  <CopyIcon stroke="#FAFAFA80" />
-                </div>
+        <div className="flex h-[40px] w-full flex-row items-center justify-end">
+          <div
+            className="flex cursor-pointer flex-row items-center justify-center"
+            onClick={() => {
+              navigator.clipboard.writeText(pubkey);
+              notify();
+            }}
+          >
+            <div className="flex max-w-[80px] flex-row items-center justify-center text-[13px] text-[#FAFAFA80]">
+              <div className="mr-1 overflow-hidden text-ellipsis whitespace-nowrap">
+                {pubkey ? pubkey : "Loading..."}
               </div>
             </div>
-            <div className="flex h-[140px] w-full flex-col items-start justify-end">
+            <div className="flex h-4 w-4 items-center justify-center">
+              <CopyIcon stroke="#FAFAFA80" />
+            </div>
+          </div>
+        </div>
+        <div className="flex h-[140px] w-full flex-col items-start justify-end">
+          {btcBalance.isLoading ? (
+            <div className="flex w-full flex-col space-y-3">
+              <div className="animate-gradient-x h-10 w-[124px] rounded-md bg-[linear-gradient(90deg,#1A1A1A,#1A1A1A,#5A5A5A,#1A1A1A,#1A1A1A)] bg-[length:1000%_100%]"></div>
+              <div className="animate-gradient-x h-[18px] w-[150px] rounded-md bg-[linear-gradient(90deg,#1A1A1A,#1A1A1A,#5A5A5A,#1A1A1A,#1A1A1A)] bg-[length:1000%_100%]"></div>
+            </div>
+          ) : (
+            <>
               <div className="text-[32px]">
                 {satsFiatBalance}
                 <span className="text-[15px] text-[#FAFAFA]">{`${" USD"}`}</span>
@@ -67,9 +69,9 @@ export default function Wallet() {
               <div className="text-[13px] text-[#FAFAFA80]">
                 {btcBalance.value} SATs
               </div>
-            </div>
-          </>
-        )}
+            </>
+          )}
+        </div>
         <div className="mt-6 flex w-full items-center justify-center gap-2">
           <Button
             text="Receive"

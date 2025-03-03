@@ -14,6 +14,15 @@ const config = {
         xs: "460px",
       },
       borderColor: ["active"],
+      keyframes: {
+        "gradient-x": {
+          "0%": { backgroundPosition: "100% 0%" },
+          "100%": { backgroundPosition: "0% 0%" },
+        },
+      },
+      animation: {
+        "gradient-x": "gradient-x 2.8s linear infinite",
+      },
     },
   },
   plugins: [],
