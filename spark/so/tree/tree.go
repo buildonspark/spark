@@ -24,10 +24,10 @@ const SmallDenominationsMaxPow = 13
 
 // DefaultDenominationsCounts is the target number of leaves of each denomination to maintain.
 var DefaultDenominationsCounts = map[uint64]uint64{
-	1:             5_000,
-	2:             5_000,
-	4:             5_000,
-	8:             5_000,
+	1:             50_000,
+	2:             50_000,
+	4:             50_000,
+	8:             50_000,
 	16:            2_500,
 	32:            2_500,
 	64:            2_500,
