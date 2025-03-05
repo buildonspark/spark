@@ -1,5 +1,10 @@
-import { bytesToNumberBE, numberToBytesBE } from "@noble/curves/abstract/utils";
+import {
+  bytesToNumberBE,
+  hexToBytes,
+  numberToBytesBE,
+} from "@noble/curves/abstract/utils";
 import { secp256k1 } from "@noble/curves/secp256k1";
+import { TransactionInput } from "@scure/btc-signer/psbt";
 import { sha256 } from "@scure/btc-signer/utils";
 import { decode } from "light-bolt11-decoder";
 import {
@@ -12,9 +17,16 @@ import {
   Transfer,
   UserSignedRefund,
 } from "../proto/spark.js";
-import { getTxFromRawTxBytes } from "../utils/bitcoin.js";
+import {
+  getSigHashFromTx,
+  getTxFromRawTxBytes,
+  getTxId,
+} from "../utils/bitcoin.js";
 import { getCrypto } from "../utils/crypto.js";
-import { createRefundTx } from "../utils/transaction.js";
+import {
+  createRefundTx,
+  getNextTransactionSequence,
+} from "../utils/transaction.js";
 import { WalletConfigService } from "./config.js";
 import { ConnectionManager } from "./connection.js";
 import { LeafKeyTweak } from "./transfer.js";
@@ -25,7 +37,7 @@ export type CreateLightningInvoiceParams = {
   invoiceCreator: (
     amountSats: number,
     paymentHash: Uint8Array,
-    memo: string
+    memo: string,
   ) => Promise<string | undefined>;
   amountSats: number;
   memo: string;
@@ -49,7 +61,7 @@ export class LightningService {
 
   constructor(
     config: WalletConfigService,
-    connectionManager: ConnectionManager
+    connectionManager: ConnectionManager,
   ) {
     this.config = config;
     this.connectionManager = connectionManager;
@@ -63,7 +75,7 @@ export class LightningService {
     const randBytes = crypto.getRandomValues(new Uint8Array(32));
     const preimage = numberToBytesBE(
       bytesToNumberBE(randBytes) % secp256k1.CURVE.n,
-      32
+      32,
     );
     return await this.createLightningInvoiceWithPreImage({
       invoiceCreator,
@@ -94,7 +106,7 @@ export class LightningService {
 
     const errors: Error[] = [];
     const promises = Object.entries(
-      this.config.getConfig().signingOperators
+      this.config.getConfig().signingOperators,
     ).map(async ([_, operator]) => {
       const share = shares[operator.id];
       if (!share) {
@@ -102,7 +114,7 @@ export class LightningService {
       }
 
       const sparkClient = await this.connectionManager.createSparkClient(
-        operator.address
+        operator.address,
       );
 
       try {
@@ -139,7 +151,7 @@ export class LightningService {
     isInboundPayment,
   }: SwapNodesForPreimageParams): Promise<InitiatePreimageSwapResponse> {
     const sparkClient = await this.connectionManager.createSparkClient(
-      this.config.getCoordinatorAddress()
+      this.config.getCoordinatorAddress(),
     );
 
     let signingCommitments: GetSigningCommitmentsResponse;
@@ -154,7 +166,7 @@ export class LightningService {
     const userSignedRefunds = await this.signRefunds(
       leaves,
       signingCommitments.signingCommitments,
-      receiverIdentityPubkey
+      receiverIdentityPubkey,
     );
 
     const transferId = crypto.randomUUID();
@@ -166,7 +178,7 @@ export class LightningService {
       try {
         amountMsats = Number(
           decodedInvoice.sections.find((section) => section.name === "amount")
-            ?.value
+            ?.value,
         );
       } catch (error) {
         console.error("Error decoding invoice", error);
@@ -209,10 +221,10 @@ export class LightningService {
   }
 
   async queryUserSignedRefunds(
-    paymentHash: Uint8Array
+    paymentHash: Uint8Array,
   ): Promise<UserSignedRefund[]> {
     const sparkClient = await this.connectionManager.createSparkClient(
-      this.config.getCoordinatorAddress()
+      this.config.getCoordinatorAddress(),
     );
 
     let response: QueryUserSignedRefundsResponse;
@@ -235,7 +247,7 @@ export class LightningService {
 
   async providePreimage(preimage: Uint8Array): Promise<Transfer> {
     const sparkClient = await this.connectionManager.createSparkClient(
-      this.config.getCoordinatorAddress()
+      this.config.getCoordinatorAddress(),
     );
 
     const paymentHash = sha256(preimage);
@@ -259,7 +271,7 @@ export class LightningService {
   private async signRefunds(
     leaves: LeafKeyTweak[],
     signingCommitments: RequestedSigningCommitments[],
-    receiverIdentityPubkey: Uint8Array
+    receiverIdentityPubkey: Uint8Array,
   ): Promise<UserSignedRefund[]> {
     const userSignedRefunds: UserSignedRefund[] = [];
     for (let i = 0; i < leaves.length; i++) {
@@ -267,11 +279,31 @@ export class LightningService {
       if (!leaf?.leaf) {
         throw new Error("Leaf not found in signRefunds");
       }
-      const { refundTx, sighash } = createRefundTx(
-        leaf.leaf,
-        receiverIdentityPubkey,
-        this.config.getNetwork()
+
+      const nodeTx = getTxFromRawTxBytes(leaf.leaf.nodeTx);
+      const nodeOutPoint: TransactionInput = {
+        txid: hexToBytes(getTxId(nodeTx)),
+        index: 0,
+      };
+
+      const currRefundTx = getTxFromRawTxBytes(leaf.leaf.refundTx);
+      const nextSequence = getNextTransactionSequence(
+        currRefundTx.getInput(0).sequence,
       );
+      const amountSats = currRefundTx.getOutput(0).amount;
+      if (amountSats === undefined) {
+        throw new Error("Amount not found in signRefunds");
+      }
+
+      const refundTx = createRefundTx(
+        nextSequence,
+        nodeOutPoint,
+        amountSats,
+        receiverIdentityPubkey,
+        this.config.getNetwork(),
+      );
+
+      const sighash = getSigHashFromTx(refundTx, 0, nodeTx.getOutput(0));
 
       const signingCommitment =
         await this.config.signer.getRandomSigningCommitment();

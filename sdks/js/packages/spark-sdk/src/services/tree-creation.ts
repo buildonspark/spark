@@ -22,6 +22,7 @@ import {
   getTxId,
 } from "../utils/bitcoin.js";
 import { getNetwork, Network } from "../utils/network.js";
+import { getEphemeralAnchorOutput } from "../utils/transaction.js";
 import { WalletConfigService } from "./config.js";
 import { ConnectionManager } from "./connection.js";
 
@@ -45,7 +46,7 @@ export class TreeCreationService {
 
   constructor(
     config: WalletConfigService,
-    connectionManager: ConnectionManager
+    connectionManager: ConnectionManager,
   ) {
     this.config = config;
     this.connectionManager = connectionManager;
@@ -55,7 +56,7 @@ export class TreeCreationService {
     vout: number,
     parentSigningPublicKey: Uint8Array,
     parentTx?: Transaction,
-    parentNode?: TreeNode
+    parentNode?: TreeNode,
   ): Promise<DepositAddressTree> {
     if (!parentTx && !parentNode) {
       throw new Error("No parent tx or parent node provided");
@@ -65,13 +66,13 @@ export class TreeCreationService {
 
     const tree = await this.createDepositAddressTree(
       parentSigningPublicKey,
-      id
+      id,
     );
 
     const addressRequestNodes =
       this.createAddressRequestNodeFromTreeNodes(tree);
     const sparkClient = await this.connectionManager.createSparkClient(
-      this.config.getCoordinatorAddress()
+      this.config.getCoordinatorAddress(),
     );
 
     const request: PrepareTreeAddressRequest = {
@@ -134,7 +135,7 @@ export class TreeCreationService {
     root: DepositAddressTree,
     createLeaves: boolean,
     parentTx?: Transaction,
-    parentNode?: TreeNode
+    parentNode?: TreeNode,
   ): Promise<FinalizeNodeSignaturesResponse> {
     const request: CreateTreeRequest = {
       userIdentityPublicKey: await this.config.signer.getIdentityPublicKey(),
@@ -173,13 +174,13 @@ export class TreeCreationService {
       createLeaves,
       this.config.getNetwork(),
       root,
-      tx
+      tx,
     );
 
     request.node = rootCreationNode;
 
     const sparkClient = await this.connectionManager.createSparkClient(
-      this.config.getCoordinatorAddress()
+      this.config.getCoordinatorAddress(),
     );
 
     let response: CreateTreeResponse;
@@ -200,7 +201,7 @@ export class TreeCreationService {
       vout,
       root,
       rootCreationNode,
-      creationResultTreeRoot
+      creationResultTreeRoot,
     );
 
     let finalizeResp: FinalizeNodeSignaturesResponse;
@@ -210,7 +211,7 @@ export class TreeCreationService {
       });
     } catch (error) {
       throw new Error(
-        `Error finalizing node signatures in tree creation: ${error}`
+        `Error finalizing node signatures in tree creation: ${error}`,
       );
     }
 
@@ -219,7 +220,7 @@ export class TreeCreationService {
 
   private async createDepositAddressTree(
     targetSigningPublicKey: Uint8Array,
-    nodeId: string
+    nodeId: string,
   ): Promise<DepositAddressTree[]> {
     const leftKey = await this.config.signer.generatePublicKey(sha256(nodeId));
     const leftNode: DepositAddressTree = {
@@ -230,7 +231,7 @@ export class TreeCreationService {
     const rightKey =
       await this.config.signer.subtractPrivateKeysGivenPublicKeys(
         targetSigningPublicKey,
-        leftKey
+        leftKey,
       );
 
     const rightNode: DepositAddressTree = {
@@ -241,7 +242,7 @@ export class TreeCreationService {
   }
 
   private createAddressRequestNodeFromTreeNodes(
-    treeNodes: DepositAddressTree[]
+    treeNodes: DepositAddressTree[],
   ): AddressRequestNode[] {
     const results: AddressRequestNode[] = [];
     for (const node of treeNodes) {
@@ -256,7 +257,7 @@ export class TreeCreationService {
 
   private applyAddressNodesToTree(
     tree: DepositAddressTree[],
-    addressNodes: AddressNode[]
+    addressNodes: AddressNode[],
   ) {
     for (let i = 0; i < tree.length; i++) {
       if (!tree[i]) {
@@ -278,7 +279,7 @@ export class TreeCreationService {
     node: DepositAddressTree,
     parentTx: Transaction,
     vout: number,
-    network: Network
+    network: Network,
   ): Promise<CreationNodeWithNonces> {
     // internal node
     const internalCreationNode: CreationNodeWithNonces = {
@@ -304,7 +305,7 @@ export class TreeCreationService {
     });
 
     // Add ephemeral anchor
-    tx.addOutput(this.ephemeralAnchorOutput());
+    tx.addOutput(getEphemeralAnchorOutput());
 
     const signingNonceCommitment =
       await this.config.signer.getRandomSigningCommitment();
@@ -339,7 +340,7 @@ export class TreeCreationService {
     });
 
     // Add ephemeral anchor
-    childTx.addOutput(this.ephemeralAnchorOutput());
+    childTx.addOutput(getEphemeralAnchorOutput());
 
     const childSigningNonceCommitment =
       await this.config.signer.getRandomSigningCommitment();
@@ -361,10 +362,10 @@ export class TreeCreationService {
 
     const refundP2trAddress = getP2TRAddressFromPublicKey(
       node.signingPublicKey,
-      network
+      network,
     );
     const refundAddress = Address(getNetwork(network)).decode(
-      refundP2trAddress
+      refundP2trAddress,
     );
     const refundPkScript = OutScript.encode(refundAddress);
     refundTx.addOutput({
@@ -388,19 +389,12 @@ export class TreeCreationService {
     return internalCreationNode;
   }
 
-  private ephemeralAnchorOutput(): { script: Uint8Array; amount: bigint } {
-    return {
-      script: new Uint8Array([0x51]), // OP_TRUE
-      amount: 0n,
-    };
-  }
-
   private async buildCreationNodesFromTree(
     vout: number,
     createLeaves: boolean,
     network: Network,
     root: DepositAddressTree,
-    parentTx: Transaction
+    parentTx: Transaction,
   ): Promise<CreationNodeWithNonces> {
     const parentTxOutput = parentTx.getOutput(vout);
     if (!parentTxOutput?.script || !parentTxOutput?.amount) {
@@ -426,7 +420,7 @@ export class TreeCreationService {
     }
 
     // Add ephemeral anchor output
-    const anchor = this.ephemeralAnchorOutput();
+    const anchor = getEphemeralAnchorOutput();
     rootNodeTx.addOutput(anchor);
 
     const rootNodeSigningCommitment =
@@ -453,13 +447,13 @@ export class TreeCreationService {
       leftChild,
       rootNodeTx,
       0,
-      network
+      network,
     );
     const rightChildCreationNode = await this.buildChildCreationNode(
       rightChild,
       rootNodeTx,
       1,
-      network
+      network,
     );
 
     rootCreationNode.children.push(leftChildCreationNode);
@@ -473,7 +467,7 @@ export class TreeCreationService {
     vout: number,
     internalNode: DepositAddressTree,
     creationNode: CreationNodeWithNonces,
-    creationResponseNode: CreationResponseNode
+    creationResponseNode: CreationResponseNode,
   ): Promise<{ tx: Transaction; signature: NodeSignatures }> {
     if (
       !creationNode.nodeTxSigningJob?.signingPublicKey ||
@@ -569,14 +563,14 @@ export class TreeCreationService {
     vout: number,
     root: DepositAddressTree,
     rootCreationNode: CreationNodeWithNonces,
-    creationResultTreeRoot: CreationResponseNode
+    creationResultTreeRoot: CreationResponseNode,
   ): Promise<NodeSignatures[]> {
     const rootSignature = await this.signNodeCreation(
       tx,
       vout,
       root,
       rootCreationNode,
-      creationResultTreeRoot
+      creationResultTreeRoot,
     );
 
     const firstRootChild = root.children[0];
@@ -602,7 +596,7 @@ export class TreeCreationService {
       0,
       firstRootChild,
       firstRootChildCreationNode,
-      firstRootChildCreationResult
+      firstRootChildCreationResult,
     );
 
     const rightChildSignature = await this.signNodeCreation(
@@ -610,7 +604,7 @@ export class TreeCreationService {
       1,
       secondRootChild,
       secondRootChildCreationNode,
-      secondRootChildCreationResult
+      secondRootChildCreationResult,
     );
 
     const signatures = [

@@ -268,7 +268,7 @@ export class SparkWallet {
       this.syncTokenLeaves(),
     ]);
     this.leaves = await this.getLeaves();
-    await this.#refreshTimelockNodes();
+    await this.refreshTimelockNodes();
     // await this.optimizeLeaves();
   }
 
@@ -865,7 +865,7 @@ export class SparkWallet {
         throw new Error("Must provide amount or leaves");
       }
 
-      await this.#refreshTimelockNodes();
+      await this.refreshTimelockNodes();
 
       const leafKeyTweaks = await Promise.all(
         leavesToSend.map(async (leaf) => ({
@@ -895,9 +895,8 @@ export class SparkWallet {
    *
    * @param {string} nodeId - The optional ID of the node to refresh. If not provided, all nodes will be checked.
    * @returns {Promise<void>}
-   * @private
    */
-  async #refreshTimelockNodes(nodeId?: string) {
+  public async refreshTimelockNodes(nodeId?: string) {
     const nodesToRefresh: TreeNode[] = [];
     const nodeIds: string[] = [];
 
@@ -1014,7 +1013,7 @@ export class SparkWallet {
       );
 
       this.leaves.push(...response.nodes);
-      await this.#refreshTimelockNodes();
+      await this.refreshTimelockNodes();
 
       return response;
     });
@@ -1149,7 +1148,7 @@ export class SparkWallet {
 
     const leaves = await this.selectLeaves(amountSats);
 
-    await this.#refreshTimelockNodes();
+    await this.refreshTimelockNodes();
 
     const leavesToSend = await Promise.all(
       leaves.map(async (leaf) => ({

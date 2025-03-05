@@ -1,10 +1,12 @@
 import {
   bytesToHex,
   equalBytes,
+  hexToBytes,
   numberToBytesBE,
 } from "@noble/curves/abstract/utils";
 import { secp256k1 } from "@noble/curves/secp256k1";
 import { Transaction } from "@scure/btc-signer";
+import { TransactionInput } from "@scure/btc-signer/psbt";
 import { sha256 } from "@scure/btc-signer/utils";
 import * as ecies from "eciesjs";
 import { SignatureIntent } from "../proto/common.js";
@@ -35,6 +37,7 @@ import { getCrypto } from "../utils/crypto.js";
 import { VerifiableSecretShare } from "../utils/secret-sharing.js";
 import {
   createRefundTx,
+  getEphemeralAnchorOutput,
   getNextTransactionSequence,
 } from "../utils/transaction.js";
 import { WalletConfigService } from "./config.js";
@@ -618,8 +621,25 @@ export class TransferService extends BaseTransferService {
         throw new Error(`Leaf data not found for leaf ${leaf.leaf.id}`);
       }
 
-      const { refundTx } = createRefundTx(
-        leaf.leaf,
+      const nodeTx = getTxFromRawTxBytes(leaf.leaf.nodeTx);
+      const nodeOutPoint: TransactionInput = {
+        txid: hexToBytes(getTxId(nodeTx)),
+        index: 0,
+      };
+
+      const currRefundTx = getTxFromRawTxBytes(leaf.leaf.refundTx);
+      const nextSequence = getNextTransactionSequence(
+        currRefundTx.getInput(0).sequence,
+      );
+      const amountSats = currRefundTx.getOutput(0).amount;
+      if (amountSats === undefined) {
+        throw new Error("Amount not found in signRefunds");
+      }
+
+      const refundTx = createRefundTx(
+        nextSequence,
+        nodeOutPoint,
+        amountSats,
         refundSigningData.receivingPubkey,
         this.config.getNetwork(),
       );
@@ -1030,6 +1050,136 @@ export class TransferService extends BaseTransferService {
     return await sparkClient.finalize_node_signatures({
       intent: SignatureIntent.REFRESH,
       nodeSignatures,
+    });
+  }
+
+  private async extendTimelock(node: TreeNode, signingPubKey: Uint8Array) {
+    const nodeTx = getTxFromRawTxBytes(node.nodeTx);
+    const refundTx = getTxFromRawTxBytes(node.refundTx);
+
+    const refundSequence = refundTx.getInput(0).sequence || 0;
+    const newNodeOutPoint: TransactionInput = {
+      txid: hexToBytes(nodeTx.id),
+      index: 0,
+    };
+
+    const newNodeSequence = getNextTransactionSequence(refundSequence);
+    const newNodeTx = new Transaction({ allowUnknownOutputs: true });
+    newNodeTx.addInput({ ...newNodeOutPoint, sequence: newNodeSequence });
+    newNodeTx.addOutput(nodeTx.getOutput(0));
+    newNodeTx.addOutput(getEphemeralAnchorOutput());
+
+    const newRefundOutPoint: TransactionInput = {
+      txid: hexToBytes(getTxId(newNodeTx)!),
+      index: 0,
+    };
+
+    const amountSats = refundTx.getOutput(0).amount;
+    if (amountSats === undefined) {
+      throw new Error("Amount not found in extendTimelock");
+    }
+
+    const newRefundTx = createRefundTx(
+      initialSequence(),
+      newRefundOutPoint,
+      amountSats,
+      signingPubKey,
+      this.config.getNetwork(),
+    );
+
+    const nodeSighash = getSigHashFromTx(newNodeTx, 0, nodeTx.getOutput(0));
+    const refundSighash = getSigHashFromTx(newRefundTx, 0, nodeTx.getOutput(0));
+
+    const newNodeSigningJob = {
+      signingPublicKey: signingPubKey,
+      rawTx: newNodeTx.toBytes(),
+      signingNonceCommitment:
+        await this.config.signer.getRandomSigningCommitment(),
+    };
+
+    const newRefundSigningJob = {
+      signingPublicKey: signingPubKey,
+      rawTx: newRefundTx.toBytes(),
+      signingNonceCommitment:
+        await this.config.signer.getRandomSigningCommitment(),
+    };
+
+    const sparkClient = await this.connectionManager.createSparkClient(
+      this.config.getCoordinatorAddress(),
+    );
+
+    const response = await sparkClient.extend_leaf({
+      leafId: node.id,
+      ownerIdentityPublicKey: await this.config.signer.getIdentityPublicKey(),
+      nodeTxSigningJob: newNodeSigningJob,
+      refundTxSigningJob: newRefundSigningJob,
+    });
+
+    if (!response.nodeTxSigningResult || !response.refundTxSigningResult) {
+      throw new Error("Signing result does not exist");
+    }
+
+    const nodeUserSig = await this.config.signer.signFrost({
+      message: nodeSighash,
+      privateAsPubKey: signingPubKey,
+      publicKey: signingPubKey,
+      verifyingKey: response.nodeTxSigningResult.verifyingKey,
+      selfCommitment: newNodeSigningJob.signingNonceCommitment,
+      statechainCommitments:
+        response.nodeTxSigningResult.signingResult?.signingNonceCommitments,
+      adaptorPubKey: new Uint8Array(),
+    });
+
+    const refundUserSig = await this.config.signer.signFrost({
+      message: refundSighash,
+      privateAsPubKey: signingPubKey,
+      publicKey: signingPubKey,
+      verifyingKey: response.refundTxSigningResult.verifyingKey,
+      selfCommitment: newRefundSigningJob.signingNonceCommitment,
+      statechainCommitments:
+        response.refundTxSigningResult.signingResult?.signingNonceCommitments,
+      adaptorPubKey: new Uint8Array(),
+    });
+
+    const nodeSig = await this.config.signer.aggregateFrost({
+      message: nodeSighash,
+      statechainSignatures:
+        response.nodeTxSigningResult.signingResult?.signatureShares,
+      statechainPublicKeys:
+        response.nodeTxSigningResult.signingResult?.publicKeys,
+      verifyingKey: response.nodeTxSigningResult.verifyingKey,
+      statechainCommitments:
+        response.nodeTxSigningResult.signingResult?.signingNonceCommitments,
+      selfCommitment: newNodeSigningJob.signingNonceCommitment,
+      publicKey: signingPubKey,
+      selfSignature: nodeUserSig,
+      adaptorPubKey: new Uint8Array(),
+    });
+
+    const refundSig = await this.config.signer.aggregateFrost({
+      message: refundSighash,
+      statechainSignatures:
+        response.refundTxSigningResult.signingResult?.signatureShares,
+      statechainPublicKeys:
+        response.refundTxSigningResult.signingResult?.publicKeys,
+      verifyingKey: response.refundTxSigningResult.verifyingKey,
+      statechainCommitments:
+        response.refundTxSigningResult.signingResult?.signingNonceCommitments,
+      selfCommitment: newRefundSigningJob.signingNonceCommitment,
+      publicKey: signingPubKey,
+      selfSignature: refundUserSig,
+      adaptorPubKey: new Uint8Array(),
+    });
+
+    return await sparkClient.finalize_node_signatures({
+      intent: SignatureIntent.EXTEND,
+      nodeSignatures: [
+        {
+          nodeId: response.leafId,
+          nodeTxSignature: nodeSig,
+          refundTxSignature: refundSig,
+        },
+      ],
     });
   }
 }

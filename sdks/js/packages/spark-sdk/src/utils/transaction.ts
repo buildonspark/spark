@@ -1,45 +1,32 @@
 import { Transaction } from "@scure/btc-signer";
-import { TreeNode } from "../proto/spark.js";
-import {
-  getP2TRScriptFromPublicKey,
-  getSigHashFromTx,
-  getTxFromRawTxBytes,
-  getTxId,
-} from "./bitcoin.js";
+import { TransactionInput, TransactionOutput } from "@scure/btc-signer/psbt";
+import { getP2TRScriptFromPublicKey } from "./bitcoin.js";
 import { Network } from "./network.js";
 
-const TIME_LOCK_INTERVAL = 10;
+const TIME_LOCK_INTERVAL = 100;
 
 export function createRefundTx(
-  leaf: TreeNode,
+  sequence: number,
+  nodeOutPoint: TransactionInput,
+  amountSats: bigint,
   receivingPubkey: Uint8Array,
   network: Network,
-): { refundTx: Transaction; sighash: Uint8Array } {
-  const tx = getTxFromRawTxBytes(leaf.nodeTx);
-  const refundTx = getTxFromRawTxBytes(leaf.refundTx);
-
-  const newRefundTx = new Transaction();
-  const sequence = getNextTransactionSequence(refundTx.getInput(0).sequence);
+): Transaction {
+  const newRefundTx = new Transaction({ allowUnknownOutputs: true });
   newRefundTx.addInput({
-    txid: getTxId(tx),
-    index: 0,
+    ...nodeOutPoint,
     sequence,
   });
 
   const refundPkScript = getP2TRScriptFromPublicKey(receivingPubkey, network);
 
-  const amount = refundTx.getOutput(0).amount;
-  if (!amount) {
-    throw new Error(`Amount not found for refund tx`);
-  }
   newRefundTx.addOutput({
     script: refundPkScript,
-    amount,
+    amount: amountSats,
   });
+  newRefundTx.addOutput(getEphemeralAnchorOutput());
 
-  const sighash = getSigHashFromTx(newRefundTx, 0, tx.getOutput(0));
-
-  return { refundTx: newRefundTx, sighash };
+  return newRefundTx;
 }
 
 export function getNextTransactionSequence(currSequence?: number): number {
@@ -48,4 +35,11 @@ export function getNextTransactionSequence(currSequence?: number): number {
     throw new Error("timelock interval is less or equal to 0");
   }
   return (1 << 30) | (currentTimelock - TIME_LOCK_INTERVAL);
+}
+
+export function getEphemeralAnchorOutput(): TransactionOutput {
+  return {
+    script: new Uint8Array([0x51]), // OP_TRUE
+    amount: 0n,
+  };
 }
