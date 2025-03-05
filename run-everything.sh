@@ -665,7 +665,7 @@ reset_databases() {
     cd spark
     for i in $(seq 0 $max_count); do
         db="operator_$i"
-        atlas migrate apply --dir "file://so/ent/migrate/migrations" --url "postgresql://127.0.0.1:5432/operator_0?sslmode=disable"
+        atlas migrate apply --dir "file://so/ent/migrate/migrations" --url "postgresql://127.0.0.1:5432/$db?sslmode=disable"
     done
     cd -
 
