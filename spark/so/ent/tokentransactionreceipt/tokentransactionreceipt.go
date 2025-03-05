@@ -3,11 +3,13 @@
 package tokentransactionreceipt
 
 import (
+	"fmt"
 	"time"
 
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark-go/so/ent/schema"
 )
 
 const (
@@ -25,6 +27,8 @@ const (
 	FieldFinalizedTokenTransactionHash = "finalized_token_transaction_hash"
 	// FieldOperatorSignature holds the string denoting the operator_signature field in the database.
 	FieldOperatorSignature = "operator_signature"
+	// FieldStatus holds the string denoting the status field in the database.
+	FieldStatus = "status"
 	// EdgeSpentLeaf holds the string denoting the spent_leaf edge name in mutations.
 	EdgeSpentLeaf = "spent_leaf"
 	// EdgeCreatedLeaf holds the string denoting the created_leaf edge name in mutations.
@@ -64,6 +68,7 @@ var Columns = []string{
 	FieldPartialTokenTransactionHash,
 	FieldFinalizedTokenTransactionHash,
 	FieldOperatorSignature,
+	FieldStatus,
 }
 
 // ForeignKeys holds the SQL foreign-keys that are owned by the "token_transaction_receipts"
@@ -102,6 +107,16 @@ var (
 	DefaultID func() uuid.UUID
 )
 
+// StatusValidator is a validator for the "status" field enum values. It is called by the builders before save.
+func StatusValidator(s schema.TokenTransactionStatus) error {
+	switch s {
+	case "STARTED", "SIGNED", "FINALIZED":
+		return nil
+	default:
+		return fmt.Errorf("tokentransactionreceipt: invalid enum value for status field: %q", s)
+	}
+}
+
 // OrderOption defines the ordering options for the TokenTransactionReceipt queries.
 type OrderOption func(*sql.Selector)
 
@@ -118,6 +133,11 @@ func ByCreateTime(opts ...sql.OrderTermOption) OrderOption {
 // ByUpdateTime orders the results by the update_time field.
 func ByUpdateTime(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldUpdateTime, opts...).ToFunc()
+}
+
+// ByStatus orders the results by the status field.
+func ByStatus(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldStatus, opts...).ToFunc()
 }
 
 // BySpentLeafCount orders the results by spent_leaf count.

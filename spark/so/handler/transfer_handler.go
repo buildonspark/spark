@@ -463,12 +463,6 @@ func (h *TransferHandler) QueryAllTransfers(ctx context.Context, req *pb.QueryAl
 		),
 	)
 
-	// Get total count first
-	total, err := baseQuery.Count(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("unable to get total count: %v", err)
-	}
-
 	query := baseQuery.Order(ent.Desc(enttransfer.FieldUpdateTime))
 
 	if req.Limit > 100 || req.Limit == 0 {
@@ -494,8 +488,10 @@ func (h *TransferHandler) QueryAllTransfers(ctx context.Context, req *pb.QueryAl
 		transferProtos = append(transferProtos, transferProto)
 	}
 
-	nextOffset := req.Offset + int64(len(transfers))
-	if nextOffset >= int64(total) {
+	var nextOffset int64
+	if len(transfers) == int(req.Limit) {
+		nextOffset = req.Offset + int64(len(transfers))
+	} else {
 		nextOffset = -1
 	}
 

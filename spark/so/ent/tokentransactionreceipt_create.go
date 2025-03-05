@@ -11,6 +11,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark-go/so/ent/schema"
 	"github.com/lightsparkdev/spark-go/so/ent/tokenleaf"
 	"github.com/lightsparkdev/spark-go/so/ent/tokenmint"
 	"github.com/lightsparkdev/spark-go/so/ent/tokentransactionreceipt"
@@ -66,6 +67,12 @@ func (ttrc *TokenTransactionReceiptCreate) SetFinalizedTokenTransactionHash(b []
 // SetOperatorSignature sets the "operator_signature" field.
 func (ttrc *TokenTransactionReceiptCreate) SetOperatorSignature(b []byte) *TokenTransactionReceiptCreate {
 	ttrc.mutation.SetOperatorSignature(b)
+	return ttrc
+}
+
+// SetStatus sets the "status" field.
+func (ttrc *TokenTransactionReceiptCreate) SetStatus(sts schema.TokenTransactionStatus) *TokenTransactionReceiptCreate {
+	ttrc.mutation.SetStatus(sts)
 	return ttrc
 }
 
@@ -205,6 +212,14 @@ func (ttrc *TokenTransactionReceiptCreate) check() error {
 			return &ValidationError{Name: "finalized_token_transaction_hash", err: fmt.Errorf(`ent: validator failed for field "TokenTransactionReceipt.finalized_token_transaction_hash": %w`, err)}
 		}
 	}
+	if _, ok := ttrc.mutation.Status(); !ok {
+		return &ValidationError{Name: "status", err: errors.New(`ent: missing required field "TokenTransactionReceipt.status"`)}
+	}
+	if v, ok := ttrc.mutation.Status(); ok {
+		if err := tokentransactionreceipt.StatusValidator(v); err != nil {
+			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "TokenTransactionReceipt.status": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -259,6 +274,10 @@ func (ttrc *TokenTransactionReceiptCreate) createSpec() (*TokenTransactionReceip
 	if value, ok := ttrc.mutation.OperatorSignature(); ok {
 		_spec.SetField(tokentransactionreceipt.FieldOperatorSignature, field.TypeBytes, value)
 		_node.OperatorSignature = value
+	}
+	if value, ok := ttrc.mutation.Status(); ok {
+		_spec.SetField(tokentransactionreceipt.FieldStatus, field.TypeEnum, value)
+		_node.Status = value
 	}
 	if nodes := ttrc.mutation.SpentLeafIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{

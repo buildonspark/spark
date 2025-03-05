@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
+	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
 	"github.com/lightsparkdev/spark-go/so/ent/tokenleaf"
 	"github.com/lightsparkdev/spark-go/so/ent/tokentransactionreceipt"
@@ -59,7 +60,8 @@ func CreateStartedTransactionEntities(
 
 	txReceiptUpdate := db.TokenTransactionReceipt.Create().
 		SetPartialTokenTransactionHash(partialTokenTransactionHash).
-		SetFinalizedTokenTransactionHash(finalTokenTransactionHash)
+		SetFinalizedTokenTransactionHash(finalTokenTransactionHash).
+		SetStatus(schema.TokenTransactionStatusStarted)
 	if tokenMintEnt != nil {
 		txReceiptUpdate.SetMintID(tokenMintEnt.ID)
 	}
@@ -129,20 +131,21 @@ func CreateStartedTransactionEntities(
 	return tokenTransactionReceipt, nil
 }
 
-// UpdateSignedTransactionLeaves updates the status and ownership signatures of the input + output leaves
+// UpdateSignedTransaction updates the status and ownership signatures of the input + output leaves
 // and the issuer signature (if applicable).
-func UpdateSignedTransactionLeaves(
+func UpdateSignedTransaction(
 	ctx context.Context,
 	tokenTransactionReceipt *TokenTransactionReceipt,
 	operatorSpecificOwnershipSignatures [][]byte,
 	operatorSignature []byte,
 ) error {
-	// Update the token transaction receipt with the operator signature
+	// Update the token transaction receipt with the operator signature and new status
 	_, err := GetDbFromContext(ctx).TokenTransactionReceipt.UpdateOne(tokenTransactionReceipt).
 		SetOperatorSignature(operatorSignature).
+		SetStatus(schema.TokenTransactionStatusSigned).
 		Save(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to update token transaction receipt with operator signature: %w", err)
+		return fmt.Errorf("failed to update token transaction receipt with operator signature and status: %w", err)
 	}
 
 	newInputLeafStatus := schema.TokenLeafStatusSpentSigned
@@ -212,13 +215,20 @@ func UpdateSignedTransactionLeaves(
 	return nil
 }
 
-// UpdateFinalizedTransactionInputs updates the status and ownership signatures of the finalized input + output
-// leaves.
-func UpdateFinalizedTransactionLeaves(
+// UpdateFinalizedTransaction updates the status and ownership signatures of the finalized input + output leaves.
+func UpdateFinalizedTransaction(
 	ctx context.Context,
 	tokenTransactionReceipt *TokenTransactionReceipt,
 	revocationKeys [][]byte,
 ) error {
+	// Update the token transaction receipt with the operator signature and new status
+	_, err := GetDbFromContext(ctx).TokenTransactionReceipt.UpdateOne(tokenTransactionReceipt).
+		SetStatus(schema.TokenTransactionStatusFinalized).
+		Save(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to update token transaction receipt with finalized status: %w", err)
+	}
+
 	spentLeaves := tokenTransactionReceipt.Edges.SpentLeaf
 	if len(spentLeaves) == 0 {
 		return fmt.Errorf("no spent leaves found for transaction. cannot finalize")
@@ -247,7 +257,7 @@ func UpdateFinalizedTransactionLeaves(
 	for i, leaf := range tokenTransactionReceipt.Edges.CreatedLeaf {
 		leafIDs[i] = leaf.ID
 	}
-	_, err := GetDbFromContext(ctx).TokenLeaf.Update().
+	_, err = GetDbFromContext(ctx).TokenLeaf.Update().
 		Where(tokenleaf.IDIn(leafIDs...)).
 		SetStatus(schema.TokenLeafStatusCreatedFinalized).
 		Save(ctx)
@@ -297,4 +307,70 @@ func FetchTokenTransactionData(ctx context.Context, finalTokenTransaction *pb.To
 		)
 	}
 	return tokenTransctionReceipt, nil
+}
+
+// MarshalProto converts a TokenTransactionReceipt to a spark protobuf TokenTransaction.
+// This assumes the receipt already has all its relationships loaded.
+func (r *TokenTransactionReceipt) MarshalProto(config *so.Config) (*pb.TokenTransaction, error) {
+	// TODO: When adding support for adding/removing, we will need to save this per transaction rather than
+	// pulling from the config.
+	operatorPublicKeys := make([][]byte, 0, len(config.SigningOperatorMap))
+	for _, operator := range config.SigningOperatorMap {
+		operatorPublicKeys = append(operatorPublicKeys, operator.IdentityPublicKey)
+	}
+
+	// Create a new TokenTransaction
+	tokenTransaction := &pb.TokenTransaction{
+		OutputLeaves: make([]*pb.TokenLeafOutput, len(r.Edges.CreatedLeaf)),
+		// Get all operator identity public keys from the config
+		SparkOperatorIdentityPublicKeys: operatorPublicKeys,
+	}
+
+	// Set up output leaves
+	for i, leaf := range r.Edges.CreatedLeaf {
+		idStr := leaf.ID.String()
+		tokenTransaction.OutputLeaves[i] = &pb.TokenLeafOutput{
+			Id:                            &idStr,
+			OwnerPublicKey:                leaf.OwnerPublicKey,
+			RevocationPublicKey:           leaf.WithdrawRevocationPublicKey,
+			WithdrawBondSats:              &leaf.WithdrawBondSats,
+			WithdrawRelativeBlockLocktime: &leaf.WithdrawRelativeBlockLocktime,
+			TokenPublicKey:                leaf.TokenPublicKey,
+			TokenAmount:                   leaf.TokenAmount,
+		}
+	}
+
+	// Determine if this is a mint or transfer transaction
+	if r.Edges.Mint != nil {
+		// This is a mint transaction
+		tokenTransaction.TokenInput = &pb.TokenTransaction_MintInput{
+			MintInput: &pb.MintInput{
+				IssuerPublicKey:         r.Edges.Mint.IssuerPublicKey,
+				IssuerProvidedTimestamp: r.Edges.Mint.WalletProvidedTimestamp,
+			},
+		}
+	} else if len(r.Edges.SpentLeaf) > 0 {
+		// This is a transfer transaction
+		transferInput := &pb.TransferInput{
+			LeavesToSpend: make([]*pb.TokenLeafToSpend, len(r.Edges.SpentLeaf)),
+		}
+
+		for i, leaf := range r.Edges.SpentLeaf {
+			// Since we assume all relationships are loaded, we can directly access the created transaction receipt
+			if leaf.Edges.LeafCreatedTokenTransactionReceipt == nil {
+				return nil, fmt.Errorf("leaf created transaction receipt edge not loaded for leaf %s", leaf.ID)
+			}
+
+			transferInput.LeavesToSpend[i] = &pb.TokenLeafToSpend{
+				PrevTokenTransactionHash:     leaf.Edges.LeafCreatedTokenTransactionReceipt.FinalizedTokenTransactionHash,
+				PrevTokenTransactionLeafVout: leaf.LeafCreatedTransactionOutputVout,
+			}
+		}
+
+		tokenTransaction.TokenInput = &pb.TokenTransaction_TransferInput{
+			TransferInput: transferInput,
+		}
+	}
+
+	return tokenTransaction, nil
 }

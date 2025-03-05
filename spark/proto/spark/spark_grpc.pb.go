@@ -49,6 +49,7 @@ const (
 	SparkService_FinalizeTokenTransaction_FullMethodName    = "/spark.SparkService/finalize_token_transaction"
 	SparkService_FreezeTokens_FullMethodName                = "/spark.SparkService/freeze_tokens"
 	SparkService_GetOwnedTokenLeaves_FullMethodName         = "/spark.SparkService/get_owned_token_leaves"
+	SparkService_QueryTokenTransactions_FullMethodName      = "/spark.SparkService/query_token_transactions"
 	SparkService_ReturnLightningPayment_FullMethodName      = "/spark.SparkService/return_lightning_payment"
 	SparkService_CancelSendTransfer_FullMethodName          = "/spark.SparkService/cancel_send_transfer"
 	SparkService_QueryUnusedDepositAddresses_FullMethodName = "/spark.SparkService/query_unused_deposit_addresses"
@@ -88,6 +89,7 @@ type SparkServiceClient interface {
 	FinalizeTokenTransaction(ctx context.Context, in *FinalizeTokenTransactionRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	FreezeTokens(ctx context.Context, in *FreezeTokensRequest, opts ...grpc.CallOption) (*FreezeTokensResponse, error)
 	GetOwnedTokenLeaves(ctx context.Context, in *GetOwnedTokenLeavesRequest, opts ...grpc.CallOption) (*GetOwnedTokenLeavesResponse, error)
+	QueryTokenTransactions(ctx context.Context, in *QueryTokenTransactionsRequest, opts ...grpc.CallOption) (*QueryTokenTransactionsResponse, error)
 	ReturnLightningPayment(ctx context.Context, in *ReturnLightningPaymentRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	CancelSendTransfer(ctx context.Context, in *CancelSendTransferRequest, opts ...grpc.CallOption) (*CancelSendTransferResponse, error)
 	QueryUnusedDepositAddresses(ctx context.Context, in *QueryUnusedDepositAddressesRequest, opts ...grpc.CallOption) (*QueryUnusedDepositAddressesResponse, error)
@@ -391,6 +393,16 @@ func (c *sparkServiceClient) GetOwnedTokenLeaves(ctx context.Context, in *GetOwn
 	return out, nil
 }
 
+func (c *sparkServiceClient) QueryTokenTransactions(ctx context.Context, in *QueryTokenTransactionsRequest, opts ...grpc.CallOption) (*QueryTokenTransactionsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(QueryTokenTransactionsResponse)
+	err := c.cc.Invoke(ctx, SparkService_QueryTokenTransactions_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *sparkServiceClient) ReturnLightningPayment(ctx context.Context, in *ReturnLightningPaymentRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(emptypb.Empty)
@@ -455,6 +467,7 @@ type SparkServiceServer interface {
 	FinalizeTokenTransaction(context.Context, *FinalizeTokenTransactionRequest) (*emptypb.Empty, error)
 	FreezeTokens(context.Context, *FreezeTokensRequest) (*FreezeTokensResponse, error)
 	GetOwnedTokenLeaves(context.Context, *GetOwnedTokenLeavesRequest) (*GetOwnedTokenLeavesResponse, error)
+	QueryTokenTransactions(context.Context, *QueryTokenTransactionsRequest) (*QueryTokenTransactionsResponse, error)
 	ReturnLightningPayment(context.Context, *ReturnLightningPaymentRequest) (*emptypb.Empty, error)
 	CancelSendTransfer(context.Context, *CancelSendTransferRequest) (*CancelSendTransferResponse, error)
 	QueryUnusedDepositAddresses(context.Context, *QueryUnusedDepositAddressesRequest) (*QueryUnusedDepositAddressesResponse, error)
@@ -554,6 +567,9 @@ func (UnimplementedSparkServiceServer) FreezeTokens(context.Context, *FreezeToke
 }
 func (UnimplementedSparkServiceServer) GetOwnedTokenLeaves(context.Context, *GetOwnedTokenLeavesRequest) (*GetOwnedTokenLeavesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetOwnedTokenLeaves not implemented")
+}
+func (UnimplementedSparkServiceServer) QueryTokenTransactions(context.Context, *QueryTokenTransactionsRequest) (*QueryTokenTransactionsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method QueryTokenTransactions not implemented")
 }
 func (UnimplementedSparkServiceServer) ReturnLightningPayment(context.Context, *ReturnLightningPaymentRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ReturnLightningPayment not implemented")
@@ -1107,6 +1123,24 @@ func _SparkService_GetOwnedTokenLeaves_Handler(srv interface{}, ctx context.Cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SparkService_QueryTokenTransactions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QueryTokenTransactionsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkServiceServer).QueryTokenTransactions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkService_QueryTokenTransactions_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkServiceServer).QueryTokenTransactions(ctx, req.(*QueryTokenTransactionsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _SparkService_ReturnLightningPayment_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ReturnLightningPaymentRequest)
 	if err := dec(in); err != nil {
@@ -1283,6 +1317,10 @@ var SparkService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "get_owned_token_leaves",
 			Handler:    _SparkService_GetOwnedTokenLeaves_Handler,
+		},
+		{
+			MethodName: "query_token_transactions",
+			Handler:    _SparkService_QueryTokenTransactions_Handler,
 		},
 		{
 			MethodName: "return_lightning_payment",

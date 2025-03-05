@@ -208,49 +208,126 @@ func TestBroadcastTokenTransactionIssueAndTransferTokens(t *testing.T) {
 	}
 	log.Printf("transfer broadcast finalized token transaction: %v", transferTokenTransactionResponse)
 
-	// Test GetOwnedTokenLeaves
-	ownedLeavesResponse, err := wallet.GetOwnedTokenLeaves(
+	// Query token transactions with pagination - first page
+	tokenTransactionsPage1, err := wallet.QueryTokenTransactions(
 		context.Background(),
 		config,
-		[][]byte{userLeaf3PubKeyBytes},
-		[][]byte{tokenIdentityPubKeyBytes},
+		[][]byte{tokenIdentityPubKeyBytes}, // token public key
+		nil,                                // owner public keys
+		nil,                                // leaf IDs
+		nil,                                // transaction hashes
+		0,                                  // offset
+		1,                                  // limit - only get 1 transaction
 	)
 	if err != nil {
-		t.Fatalf("failed to get owned token leaves: %v", err)
+		t.Fatalf("failed to query token transactions page 1: %v", err)
+	}
+	log.Printf("RETURNED TOKEN TRANSACTIONS PAGE 1: %v", tokenTransactionsPage1)
+
+	// Verify we got exactly 1 transaction
+	if len(tokenTransactionsPage1.TokenTransactionsWithStatus) != 1 {
+		t.Fatalf("expected 1 token transaction in page 1, got %d", len(tokenTransactionsPage1.TokenTransactionsWithStatus))
 	}
 
-	// Validate the response
-	if len(ownedLeavesResponse.LeavesWithPreviousTransactionData) != 1 {
-		t.Fatalf("expected 1 owned leaf, got %d", len(ownedLeavesResponse.LeavesWithPreviousTransactionData))
+	// Verify the offset is 1 (indicating there are more results)
+	if tokenTransactionsPage1.Offset != 1 {
+		t.Fatalf("expected next offset 1 for page 1, got %d", tokenTransactionsPage1.Offset)
 	}
 
-	leaf := ownedLeavesResponse.LeavesWithPreviousTransactionData[0]
-
-	// Validate leaf details
-	if !bytes.Equal(leaf.Leaf.OwnerPublicKey, userLeaf3PubKeyBytes) {
-		t.Fatalf("leaf owner public key does not match expected")
-	}
-	if !bytes.Equal(leaf.Leaf.TokenPublicKey, tokenIdentityPubKeyBytes) {
-		t.Fatalf("leaf token public key does not match expected")
+	// First transaction should be the transfer (reverse chronological)
+	transferTx := tokenTransactionsPage1.TokenTransactionsWithStatus[0].TokenTransaction
+	if transferTx.GetTransferInput() == nil {
+		t.Fatal("first transaction should be a transfer transaction")
 	}
 
-	// Validate amount
-	expectedAmount := new(big.Int).SetBytes(int64ToUint128Bytes(0, TestTransferLeaf1Amount))
-	actualAmount := new(big.Int).SetBytes(leaf.Leaf.TokenAmount)
-	if actualAmount.Cmp(expectedAmount) != 0 {
-		t.Fatalf("leaf token amount %d does not match expected %d", actualAmount, expectedAmount)
-	}
-
-	// Validate previous transaction data
-	transferTokenTransactionResponseHash, err := utils.HashTokenTransaction(transferTokenTransactionResponse, false)
+	// Query token transactions with pagination - second page
+	tokenTransactionsPage2, err := wallet.QueryTokenTransactions(
+		context.Background(),
+		config,
+		[][]byte{tokenIdentityPubKeyBytes}, // token public key
+		nil,                                // owner public keys
+		nil,                                // leaf IDs
+		nil,                                // transaction hashes
+		tokenTransactionsPage1.Offset,      // offset - use the offset from previous response (1)
+		1,                                  // limit - only get 1 transaction
+	)
 	if err != nil {
-		t.Fatalf("failed to hash final transfer token transaction: %v", err)
+		t.Fatalf("failed to query token transactions page 2: %v", err)
 	}
-	if !bytes.Equal(leaf.PreviousTransactionHash, transferTokenTransactionResponseHash) {
-		t.Fatalf("previous transaction hash does not match expected")
+	log.Printf("RETURNED TOKEN TRANSACTIONS PAGE 2: %v", tokenTransactionsPage2)
+
+	// Verify we got exactly 1 transaction
+	if len(tokenTransactionsPage2.TokenTransactionsWithStatus) != 1 {
+		t.Fatalf("expected 1 token transaction in page 2, got %d", len(tokenTransactionsPage2.TokenTransactionsWithStatus))
 	}
-	if leaf.PreviousTransactionVout != 0 {
-		t.Fatalf("previous transaction vout expected 0, got %d", leaf.PreviousTransactionVout)
+
+	// Verify the offset is 2 (indicating there are more results)
+	if tokenTransactionsPage2.Offset != 2 {
+		t.Fatalf("expected next offset 2 for page 2, got %d", tokenTransactionsPage2.Offset)
+	}
+
+	// Second transaction should be the mint (reverse chronological)
+	mintTx := tokenTransactionsPage2.TokenTransactionsWithStatus[0].TokenTransaction
+	if mintTx.GetMintInput() == nil {
+		t.Fatal("second transaction should be a mint transaction")
+	}
+	if !bytes.Equal(mintTx.GetMintInput().GetIssuerPublicKey(), tokenIdentityPubKeyBytes) {
+		t.Fatal("mint transaction issuer public key does not match expected")
+	}
+
+	// Query token transactions with pagination - third page (should be empty)
+	tokenTransactionsPage3, err := wallet.QueryTokenTransactions(
+		context.Background(),
+		config,
+		[][]byte{tokenIdentityPubKeyBytes}, // token public key
+		nil,                                // owner public keys
+		nil,                                // leaf IDs
+		nil,                                // transaction hashes
+		tokenTransactionsPage2.Offset,      // offset - use the offset from previous response
+		1,                                  // limit - only get 1 transaction
+	)
+	if err != nil {
+		t.Fatalf("failed to query token transactions page 3: %v", err)
+	}
+	log.Printf("RETURNED TOKEN TRANSACTIONS PAGE 3: %v", tokenTransactionsPage3)
+
+	// Verify we got no transactions
+	if len(tokenTransactionsPage3.TokenTransactionsWithStatus) != 0 {
+		t.Fatalf("expected 0 token transactions in page 3, got %d", len(tokenTransactionsPage3.TokenTransactionsWithStatus))
+	}
+
+	// Verify the offset is -1 (indicating end of results)
+	if tokenTransactionsPage3.Offset != -1 {
+		t.Fatalf("expected next offset -1 for page 3, got %d", tokenTransactionsPage3.Offset)
+	}
+
+	// Now validate the transaction details from the paginated results
+	// Validate transfer output leaf
+	if len(transferTx.OutputLeaves) != 1 {
+		t.Fatalf("expected 1 output leaf in transfer transaction, got %d", len(transferTx.OutputLeaves))
+	}
+	transferAmount := new(big.Int).SetBytes(transferTx.OutputLeaves[0].TokenAmount)
+	expectedTransferAmount := new(big.Int).SetBytes(int64ToUint128Bytes(0, TestTransferLeaf1Amount))
+	if transferAmount.Cmp(expectedTransferAmount) != 0 {
+		t.Fatalf("transfer amount %d does not match expected %d", transferAmount, expectedTransferAmount)
+	}
+	if !bytes.Equal(transferTx.OutputLeaves[0].OwnerPublicKey, userLeaf3PubKeyBytes) {
+		t.Fatal("transfer output leaf owner public key does not match expected")
+	}
+
+	// Validate mint output leaves
+	if len(mintTx.OutputLeaves) != 2 {
+		t.Fatalf("expected 2 output leaves in mint transaction, got %d", len(mintTx.OutputLeaves))
+	}
+	mintLeaf1Amount := new(big.Int).SetBytes(mintTx.OutputLeaves[0].TokenAmount)
+	mintLeaf2Amount := new(big.Int).SetBytes(mintTx.OutputLeaves[1].TokenAmount)
+	expectedLeaf1Amount := new(big.Int).SetBytes(int64ToUint128Bytes(0, TestIssueLeaf1Amount))
+	expectedLeaf2Amount := new(big.Int).SetBytes(int64ToUint128Bytes(0, TestIssueLeaf2Amount))
+	if mintLeaf1Amount.Cmp(expectedLeaf1Amount) != 0 {
+		t.Fatalf("mint leaf 1 amount %d does not match expected %d", mintLeaf1Amount, expectedLeaf1Amount)
+	}
+	if mintLeaf2Amount.Cmp(expectedLeaf2Amount) != 0 {
+		t.Fatalf("mint leaf 2 amount %d does not match expected %d", mintLeaf2Amount, expectedLeaf2Amount)
 	}
 }
 

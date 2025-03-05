@@ -13,6 +13,7 @@ import (
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/so/ent/predicate"
+	"github.com/lightsparkdev/spark-go/so/ent/schema"
 	"github.com/lightsparkdev/spark-go/so/ent/tokenleaf"
 	"github.com/lightsparkdev/spark-go/so/ent/tokenmint"
 	"github.com/lightsparkdev/spark-go/so/ent/tokentransactionreceipt"
@@ -58,6 +59,20 @@ func (ttru *TokenTransactionReceiptUpdate) SetOperatorSignature(b []byte) *Token
 // ClearOperatorSignature clears the value of the "operator_signature" field.
 func (ttru *TokenTransactionReceiptUpdate) ClearOperatorSignature() *TokenTransactionReceiptUpdate {
 	ttru.mutation.ClearOperatorSignature()
+	return ttru
+}
+
+// SetStatus sets the "status" field.
+func (ttru *TokenTransactionReceiptUpdate) SetStatus(sts schema.TokenTransactionStatus) *TokenTransactionReceiptUpdate {
+	ttru.mutation.SetStatus(sts)
+	return ttru
+}
+
+// SetNillableStatus sets the "status" field if the given value is not nil.
+func (ttru *TokenTransactionReceiptUpdate) SetNillableStatus(sts *schema.TokenTransactionStatus) *TokenTransactionReceiptUpdate {
+	if sts != nil {
+		ttru.SetStatus(*sts)
+	}
 	return ttru
 }
 
@@ -211,6 +226,11 @@ func (ttru *TokenTransactionReceiptUpdate) check() error {
 			return &ValidationError{Name: "finalized_token_transaction_hash", err: fmt.Errorf(`ent: validator failed for field "TokenTransactionReceipt.finalized_token_transaction_hash": %w`, err)}
 		}
 	}
+	if v, ok := ttru.mutation.Status(); ok {
+		if err := tokentransactionreceipt.StatusValidator(v); err != nil {
+			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "TokenTransactionReceipt.status": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -240,6 +260,9 @@ func (ttru *TokenTransactionReceiptUpdate) sqlSave(ctx context.Context) (n int, 
 	}
 	if ttru.mutation.OperatorSignatureCleared() {
 		_spec.ClearField(tokentransactionreceipt.FieldOperatorSignature, field.TypeBytes)
+	}
+	if value, ok := ttru.mutation.Status(); ok {
+		_spec.SetField(tokentransactionreceipt.FieldStatus, field.TypeEnum, value)
 	}
 	if ttru.mutation.SpentLeafCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -410,6 +433,20 @@ func (ttruo *TokenTransactionReceiptUpdateOne) ClearOperatorSignature() *TokenTr
 	return ttruo
 }
 
+// SetStatus sets the "status" field.
+func (ttruo *TokenTransactionReceiptUpdateOne) SetStatus(sts schema.TokenTransactionStatus) *TokenTransactionReceiptUpdateOne {
+	ttruo.mutation.SetStatus(sts)
+	return ttruo
+}
+
+// SetNillableStatus sets the "status" field if the given value is not nil.
+func (ttruo *TokenTransactionReceiptUpdateOne) SetNillableStatus(sts *schema.TokenTransactionStatus) *TokenTransactionReceiptUpdateOne {
+	if sts != nil {
+		ttruo.SetStatus(*sts)
+	}
+	return ttruo
+}
+
 // AddSpentLeafIDs adds the "spent_leaf" edge to the TokenLeaf entity by IDs.
 func (ttruo *TokenTransactionReceiptUpdateOne) AddSpentLeafIDs(ids ...uuid.UUID) *TokenTransactionReceiptUpdateOne {
 	ttruo.mutation.AddSpentLeafIDs(ids...)
@@ -573,6 +610,11 @@ func (ttruo *TokenTransactionReceiptUpdateOne) check() error {
 			return &ValidationError{Name: "finalized_token_transaction_hash", err: fmt.Errorf(`ent: validator failed for field "TokenTransactionReceipt.finalized_token_transaction_hash": %w`, err)}
 		}
 	}
+	if v, ok := ttruo.mutation.Status(); ok {
+		if err := tokentransactionreceipt.StatusValidator(v); err != nil {
+			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "TokenTransactionReceipt.status": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -619,6 +661,9 @@ func (ttruo *TokenTransactionReceiptUpdateOne) sqlSave(ctx context.Context) (_no
 	}
 	if ttruo.mutation.OperatorSignatureCleared() {
 		_spec.ClearField(tokentransactionreceipt.FieldOperatorSignature, field.TypeBytes)
+	}
+	if value, ok := ttruo.mutation.Status(); ok {
+		_spec.SetField(tokentransactionreceipt.FieldStatus, field.TypeEnum, value)
 	}
 	if ttruo.mutation.SpentLeafCleared() {
 		edge := &sqlgraph.EdgeSpec{

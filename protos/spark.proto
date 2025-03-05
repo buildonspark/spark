@@ -44,6 +44,7 @@ service SparkService {
     rpc finalize_token_transaction(FinalizeTokenTransactionRequest) returns (google.protobuf.Empty) {}
     rpc freeze_tokens(FreezeTokensRequest) returns (FreezeTokensResponse) {}
     rpc get_owned_token_leaves(GetOwnedTokenLeavesRequest) returns (GetOwnedTokenLeavesResponse) {}
+    rpc query_token_transactions(QueryTokenTransactionsRequest) returns (QueryTokenTransactionsResponse) {}
 
     rpc return_lightning_payment(ReturnLightningPaymentRequest) returns (google.protobuf.Empty) {}
 
@@ -185,6 +186,18 @@ message TokenTransaction {
     repeated bytes spark_operator_identity_public_keys = 4 [(validate.rules).repeated.items.bytes.len = 33];
 }
 
+
+enum TokenTransactionStatus {
+    TOKEN_TRANSACTION_STARTED = 0; 
+    TOKEN_TRANSACTION_SIGNED = 1; 
+    TOKEN_TRANSACTION_FINALIZED = 2;
+}
+
+message TokenTransactionWithStatus {
+    TokenTransaction token_transaction = 1;
+    TokenTransactionStatus status = 2;
+}
+
 message TokenTransactionSignatures {
       // Filled by signing the partial token transaction hash with the owner/issuer private key.
       // For mint transactions this will be one signature for the input issuer_public_key
@@ -266,6 +279,25 @@ message GetOwnedTokenLeavesRequest {
     repeated bytes owner_public_keys = 1 [(validate.rules).repeated.items.bytes.len = 33];
     // Optionally provide token public keys. If not set return leaves for all tokens.
     repeated bytes token_public_keys = 2 [(validate.rules).repeated.items.bytes.len = 33];
+}
+
+// Request constraints are combined using an AND relation.
+message QueryTokenTransactionsRequest {
+    // Returns transactions that have one of these leaf ids in the input or output. 
+    repeated string leaf_ids = 1 [(validate.rules).repeated.items.string.uuid = true];
+    // Returns transactions that have this owner public key as the sender or receiver in one or more of the input/output leaves.
+    repeated bytes owner_public_keys = 2 [(validate.rules).repeated.items.bytes.len = 33];
+    // Returns transactions that related to this token public key.
+    repeated bytes token_public_keys = 3 [(validate.rules).repeated.items.bytes.len = 33];
+    // Returns transactions that match the provided transaction hashes.
+    repeated bytes token_transaction_hashes = 4 [(validate.rules).repeated.items.bytes.len = 32];
+    int64 limit = 5;
+    int64 offset = 6;
+}
+
+message QueryTokenTransactionsResponse {
+    repeated TokenTransactionWithStatus token_transactions_with_status = 1;
+    int64 offset = 2;
 }
 
 message LeafWithPreviousTransactionData {

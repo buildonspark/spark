@@ -10,6 +10,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark-go/so/ent/schema"
 	"github.com/lightsparkdev/spark-go/so/ent/tokenmint"
 	"github.com/lightsparkdev/spark-go/so/ent/tokentransactionreceipt"
 )
@@ -29,6 +30,8 @@ type TokenTransactionReceipt struct {
 	FinalizedTokenTransactionHash []byte `json:"finalized_token_transaction_hash,omitempty"`
 	// OperatorSignature holds the value of the "operator_signature" field.
 	OperatorSignature []byte `json:"operator_signature,omitempty"`
+	// Status holds the value of the "status" field.
+	Status schema.TokenTransactionStatus `json:"status,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the TokenTransactionReceiptQuery when eager-loading is set.
 	Edges                          TokenTransactionReceiptEdges `json:"edges"`
@@ -85,6 +88,8 @@ func (*TokenTransactionReceipt) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case tokentransactionreceipt.FieldPartialTokenTransactionHash, tokentransactionreceipt.FieldFinalizedTokenTransactionHash, tokentransactionreceipt.FieldOperatorSignature:
 			values[i] = new([]byte)
+		case tokentransactionreceipt.FieldStatus:
+			values[i] = new(sql.NullString)
 		case tokentransactionreceipt.FieldCreateTime, tokentransactionreceipt.FieldUpdateTime:
 			values[i] = new(sql.NullTime)
 		case tokentransactionreceipt.FieldID:
@@ -141,6 +146,12 @@ func (ttr *TokenTransactionReceipt) assignValues(columns []string, values []any)
 				return fmt.Errorf("unexpected type %T for field operator_signature", values[i])
 			} else if value != nil {
 				ttr.OperatorSignature = *value
+			}
+		case tokentransactionreceipt.FieldStatus:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field status", values[i])
+			} else if value.Valid {
+				ttr.Status = schema.TokenTransactionStatus(value.String)
 			}
 		case tokentransactionreceipt.ForeignKeys[0]:
 			if value, ok := values[i].(*sql.NullScanner); !ok {
@@ -214,6 +225,9 @@ func (ttr *TokenTransactionReceipt) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("operator_signature=")
 	builder.WriteString(fmt.Sprintf("%v", ttr.OperatorSignature))
+	builder.WriteString(", ")
+	builder.WriteString("status=")
+	builder.WriteString(fmt.Sprintf("%v", ttr.Status))
 	builder.WriteByte(')')
 	return builder.String()
 }

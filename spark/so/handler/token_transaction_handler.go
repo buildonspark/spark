@@ -18,6 +18,8 @@ import (
 	"github.com/lightsparkdev/spark-go/so/authz"
 	"github.com/lightsparkdev/spark-go/so/ent"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
+	"github.com/lightsparkdev/spark-go/so/ent/tokenleaf"
+	"github.com/lightsparkdev/spark-go/so/ent/tokentransactionreceipt"
 	"github.com/lightsparkdev/spark-go/so/helper"
 	"github.com/lightsparkdev/spark-go/so/utils"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -232,7 +234,7 @@ func (o TokenTransactionHandler) SignTokenTransaction(
 	for i, sig := range req.OperatorSpecificSignatures {
 		operatorSpecificSignature[i] = sig.OwnerSignature
 	}
-	err = ent.UpdateSignedTransactionLeaves(ctx, tokenTransactionReceipt, operatorSpecificSignature, operatorSignature.Serialize())
+	err = ent.UpdateSignedTransaction(ctx, tokenTransactionReceipt, operatorSpecificSignature, operatorSignature.Serialize())
 	if err != nil {
 		log.Printf("Failed to update leaves after signing: %v", err)
 		return nil, err
@@ -326,7 +328,7 @@ func (o TokenTransactionHandler) FinalizeTokenTransaction(
 		return nil, err
 	}
 
-	err = ent.UpdateFinalizedTransactionLeaves(ctx, tokenTransactionReceipt, req.LeafToSpendRevocationKeys)
+	err = ent.UpdateFinalizedTransaction(ctx, tokenTransactionReceipt, req.LeafToSpendRevocationKeys)
 	if err != nil {
 		log.Printf("Failed to update leaves after finalizing: %v", err)
 		return nil, err
@@ -477,6 +479,126 @@ func (o TokenTransactionHandler) FreezeTokensOnLRC20Node(
 	}
 
 	return nil
+}
+
+// QueryTokenTransactions returns SO provided data about specific token transactions along with their status.
+// Allows caller to specify data to be returned related to:
+// a) transactions associated with a particular set of leaf ids
+// b) transactions associated with a particular set of transaction hashes
+// c) all transactions associated with a particular token public key
+func (o TokenTransactionHandler) QueryTokenTransactions(ctx context.Context, config *so.Config, req *pb.QueryTokenTransactionsRequest) (*pb.QueryTokenTransactionsResponse, error) {
+	db := ent.GetDbFromContext(ctx)
+
+	// Start with a base query for token transaction receipts
+	baseQuery := db.TokenTransactionReceipt.Query()
+
+	// Apply filters based on request parameters
+	if len(req.LeafIds) > 0 {
+		// Convert string IDs to UUIDs
+		leafUUIDs := make([]uuid.UUID, 0, len(req.LeafIds))
+		for _, idStr := range req.LeafIds {
+			id, err := uuid.Parse(idStr)
+			if err != nil {
+				return nil, fmt.Errorf("invalid leaf ID format: %v", err)
+			}
+			leafUUIDs = append(leafUUIDs, id)
+		}
+
+		// Find transactions that created or spent these leaves
+		baseQuery = baseQuery.Where(
+			tokentransactionreceipt.Or(
+				tokentransactionreceipt.HasCreatedLeafWith(tokenleaf.IDIn(leafUUIDs...)),
+				tokentransactionreceipt.HasSpentLeafWith(tokenleaf.IDIn(leafUUIDs...)),
+			),
+		)
+	}
+
+	if len(req.TokenTransactionHashes) > 0 {
+		baseQuery = baseQuery.Where(tokentransactionreceipt.FinalizedTokenTransactionHashIn(req.TokenTransactionHashes...))
+	}
+
+	if len(req.TokenPublicKeys) > 0 {
+		baseQuery = baseQuery.Where(
+			tokentransactionreceipt.Or(
+				tokentransactionreceipt.HasCreatedLeafWith(tokenleaf.TokenPublicKeyIn(req.TokenPublicKeys...)),
+				tokentransactionreceipt.HasSpentLeafWith(tokenleaf.TokenPublicKeyIn(req.TokenPublicKeys...)),
+			),
+		)
+	}
+
+	// Apply sorting, limit and offset
+	query := baseQuery.Order(ent.Desc(tokentransactionreceipt.FieldUpdateTime))
+
+	if req.Limit > 100 || req.Limit == 0 {
+		req.Limit = 100
+	}
+	query = query.Limit(int(req.Limit))
+
+	if req.Offset > 0 {
+		query = query.Offset(int(req.Offset))
+	}
+
+	// This join respects the query limitations provided above and should only load the necessary relations.
+	query = query.
+		WithCreatedLeaf().
+		WithSpentLeaf(func(slq *ent.TokenLeafQuery) {
+			slq.WithLeafCreatedTokenTransactionReceipt()
+		}).WithMint()
+
+	// Execute the query
+	receipts, err := query.All(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to query token transactions: %v", err)
+	}
+
+	// Convert to response protos
+	transactionsWithStatus := make([]*pb.TokenTransactionWithStatus, 0, len(receipts))
+	for _, receipt := range receipts {
+		// Determine transaction status based on leaf statuses
+		status := pb.TokenTransactionStatus_TOKEN_TRANSACTION_STARTED
+
+		// Check spent leaves status
+		spentLeafStatuses := make(map[schema.TokenLeafStatus]int)
+
+		for _, leaf := range receipt.Edges.SpentLeaf {
+			// Verify that this spent leaf is actually associated with this transaction
+			if leaf.Edges.LeafSpentTokenTransactionReceipt == nil ||
+				leaf.Edges.LeafSpentTokenTransactionReceipt.ID != receipt.ID {
+				log.Printf("Warning: Spent leaf %s not properly associated with transaction %s",
+					leaf.ID.String(), receipt.ID.String())
+				continue
+			}
+			spentLeafStatuses[leaf.Status]++
+		}
+
+		// Reconstruct the token transaction from the receipt data
+		tokenTransaction, err := receipt.MarshalProto(config)
+		if err != nil {
+			log.Printf("Failed to marshal token transaction: %v", err)
+			return nil, err
+		}
+
+		// This would require reconstructing the transaction from the database
+		// For now, we'll just include the transaction hash
+
+		transactionsWithStatus = append(transactionsWithStatus, &pb.TokenTransactionWithStatus{
+			TokenTransaction: tokenTransaction,
+			Status:           status,
+		})
+	}
+
+	// Calculate next offset
+	var nextOffset int64
+	if len(receipts) == int(req.Limit) {
+		nextOffset = req.Offset + int64(len(receipts))
+	} else {
+		nextOffset = -1
+	}
+
+	return &pb.QueryTokenTransactionsResponse{
+		TokenTransactionsWithStatus: transactionsWithStatus,
+		Offset:                      nextOffset,
+	}, nil
 }
 
 func (o TokenTransactionHandler) GetOwnedTokenLeaves(

@@ -9,6 +9,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/so/ent/predicate"
+	"github.com/lightsparkdev/spark-go/so/ent/schema"
 )
 
 // ID filters vertices based on their ID field.
@@ -289,6 +290,36 @@ func OperatorSignatureIsNil() predicate.TokenTransactionReceipt {
 // OperatorSignatureNotNil applies the NotNil predicate on the "operator_signature" field.
 func OperatorSignatureNotNil() predicate.TokenTransactionReceipt {
 	return predicate.TokenTransactionReceipt(sql.FieldNotNull(FieldOperatorSignature))
+}
+
+// StatusEQ applies the EQ predicate on the "status" field.
+func StatusEQ(v schema.TokenTransactionStatus) predicate.TokenTransactionReceipt {
+	vc := v
+	return predicate.TokenTransactionReceipt(sql.FieldEQ(FieldStatus, vc))
+}
+
+// StatusNEQ applies the NEQ predicate on the "status" field.
+func StatusNEQ(v schema.TokenTransactionStatus) predicate.TokenTransactionReceipt {
+	vc := v
+	return predicate.TokenTransactionReceipt(sql.FieldNEQ(FieldStatus, vc))
+}
+
+// StatusIn applies the In predicate on the "status" field.
+func StatusIn(vs ...schema.TokenTransactionStatus) predicate.TokenTransactionReceipt {
+	v := make([]any, len(vs))
+	for i := range v {
+		v[i] = vs[i]
+	}
+	return predicate.TokenTransactionReceipt(sql.FieldIn(FieldStatus, v...))
+}
+
+// StatusNotIn applies the NotIn predicate on the "status" field.
+func StatusNotIn(vs ...schema.TokenTransactionStatus) predicate.TokenTransactionReceipt {
+	v := make([]any, len(vs))
+	for i := range v {
+		v[i] = vs[i]
+	}
+	return predicate.TokenTransactionReceipt(sql.FieldNotIn(FieldStatus, v...))
 }
 
 // HasSpentLeaf applies the HasEdge predicate on the "spent_leaf" edge.

@@ -7823,6 +7823,7 @@ type TokenTransactionReceiptMutation struct {
 	partial_token_transaction_hash   *[]byte
 	finalized_token_transaction_hash *[]byte
 	operator_signature               *[]byte
+	status                           *schema.TokenTransactionStatus
 	clearedFields                    map[string]struct{}
 	spent_leaf                       map[uuid.UUID]struct{}
 	removedspent_leaf                map[uuid.UUID]struct{}
@@ -8134,6 +8135,42 @@ func (m *TokenTransactionReceiptMutation) ResetOperatorSignature() {
 	delete(m.clearedFields, tokentransactionreceipt.FieldOperatorSignature)
 }
 
+// SetStatus sets the "status" field.
+func (m *TokenTransactionReceiptMutation) SetStatus(sts schema.TokenTransactionStatus) {
+	m.status = &sts
+}
+
+// Status returns the value of the "status" field in the mutation.
+func (m *TokenTransactionReceiptMutation) Status() (r schema.TokenTransactionStatus, exists bool) {
+	v := m.status
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStatus returns the old "status" field's value of the TokenTransactionReceipt entity.
+// If the TokenTransactionReceipt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenTransactionReceiptMutation) OldStatus(ctx context.Context) (v schema.TokenTransactionStatus, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStatus is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStatus requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStatus: %w", err)
+	}
+	return oldValue.Status, nil
+}
+
+// ResetStatus resets all changes to the "status" field.
+func (m *TokenTransactionReceiptMutation) ResetStatus() {
+	m.status = nil
+}
+
 // AddSpentLeafIDs adds the "spent_leaf" edge to the TokenLeaf entity by ids.
 func (m *TokenTransactionReceiptMutation) AddSpentLeafIDs(ids ...uuid.UUID) {
 	if m.spent_leaf == nil {
@@ -8315,7 +8352,7 @@ func (m *TokenTransactionReceiptMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *TokenTransactionReceiptMutation) Fields() []string {
-	fields := make([]string, 0, 5)
+	fields := make([]string, 0, 6)
 	if m.create_time != nil {
 		fields = append(fields, tokentransactionreceipt.FieldCreateTime)
 	}
@@ -8330,6 +8367,9 @@ func (m *TokenTransactionReceiptMutation) Fields() []string {
 	}
 	if m.operator_signature != nil {
 		fields = append(fields, tokentransactionreceipt.FieldOperatorSignature)
+	}
+	if m.status != nil {
+		fields = append(fields, tokentransactionreceipt.FieldStatus)
 	}
 	return fields
 }
@@ -8349,6 +8389,8 @@ func (m *TokenTransactionReceiptMutation) Field(name string) (ent.Value, bool) {
 		return m.FinalizedTokenTransactionHash()
 	case tokentransactionreceipt.FieldOperatorSignature:
 		return m.OperatorSignature()
+	case tokentransactionreceipt.FieldStatus:
+		return m.Status()
 	}
 	return nil, false
 }
@@ -8368,6 +8410,8 @@ func (m *TokenTransactionReceiptMutation) OldField(ctx context.Context, name str
 		return m.OldFinalizedTokenTransactionHash(ctx)
 	case tokentransactionreceipt.FieldOperatorSignature:
 		return m.OldOperatorSignature(ctx)
+	case tokentransactionreceipt.FieldStatus:
+		return m.OldStatus(ctx)
 	}
 	return nil, fmt.Errorf("unknown TokenTransactionReceipt field %s", name)
 }
@@ -8411,6 +8455,13 @@ func (m *TokenTransactionReceiptMutation) SetField(name string, value ent.Value)
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetOperatorSignature(v)
+		return nil
+	case tokentransactionreceipt.FieldStatus:
+		v, ok := value.(schema.TokenTransactionStatus)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStatus(v)
 		return nil
 	}
 	return fmt.Errorf("unknown TokenTransactionReceipt field %s", name)
@@ -8484,6 +8535,9 @@ func (m *TokenTransactionReceiptMutation) ResetField(name string) error {
 		return nil
 	case tokentransactionreceipt.FieldOperatorSignature:
 		m.ResetOperatorSignature()
+		return nil
+	case tokentransactionreceipt.FieldStatus:
+		m.ResetStatus()
 		return nil
 	}
 	return fmt.Errorf("unknown TokenTransactionReceipt field %s", name)
