@@ -19,6 +19,7 @@ export type WalletConfig = {
   coodinatorIdentifier: string;
   frostSignerAddress: string;
   threshold: number;
+  useTokenTransactionSchnorrSignatures: boolean;
 };
 
 export class WalletConfigService {

@@ -85,6 +85,7 @@ interface SparkSigner {
   getSchnorrPublicKey(publicKey: Uint8Array): Promise<Uint8Array>;
 
   signSchnorr(message: Uint8Array, publicKey: Uint8Array): Promise<Uint8Array>;
+  signSchnorrWithIdentityKey(message: Uint8Array): Promise<Uint8Array>;
 
   subtractPrivateKeysGivenPublicKeys(
     first: Uint8Array,
@@ -192,6 +193,21 @@ class DefaultSparkSigner implements SparkSigner {
     }
 
     return schnorr.sign(message, hexToBytes(privateKey));
+  }
+
+  async signSchnorrWithIdentityKey(
+    message: Uint8Array,
+  ): Promise<Uint8Array> {
+    if (!this.identityPrivateKey?.privateKey) {
+      throw new Error("Private key is not set");
+    }
+
+    const signature = schnorr.sign(
+      message,
+      this.identityPrivateKey.privateKey,
+    );
+
+    return signature;
   }
 
   async getIdentityPublicKey(): Promise<Uint8Array> {

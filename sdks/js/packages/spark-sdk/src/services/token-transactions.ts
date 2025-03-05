@@ -234,8 +234,12 @@ export class TokenTransactionService {
     if (tokenTransaction.tokenInput!.$case === "transferInput") {
       const transferInput = tokenTransaction.tokenInput!.transferInput;
       for (let i = 0; i < transferInput.leavesToSpend.length; i++) {
-        const ownerSignature =
-          await this.config.signer.signMessageWithIdentityKey(payloadHash);
+        let ownerSignature: Uint8Array;
+        if (this.config.getConfig().useTokenTransactionSchnorrSignatures) {
+          ownerSignature = await this.config.signer.signSchnorrWithIdentityKey(payloadHash);
+        } else {
+          ownerSignature = await this.config.signer.signMessageWithIdentityKey(payloadHash);
+        }
 
         operatorSpecificSignatures.push({
           ownerPublicKey: await this.config.signer.getIdentityPublicKey(),
@@ -470,12 +474,23 @@ export class TokenTransactionService {
       bytesToHex(publicKey) ===
       bytesToHex(await this.config.signer.getIdentityPublicKey())
     ) {
-      return await this.config.signer.signMessageWithIdentityKey(message);
+      if (this.config.getConfig().useTokenTransactionSchnorrSignatures) {
+        return await this.config.signer.signSchnorrWithIdentityKey(message);
+      } else {
+        return await this.config.signer.signMessageWithIdentityKey(message);
+      }
     } else {
-      return await this.config.signer.signMessageWithPublicKey(
-        message,
-        publicKey,
-      );
+      if (this.config.getConfig().useTokenTransactionSchnorrSignatures) {
+        return await this.config.signer.signSchnorr(
+          message,
+          publicKey,
+        );
+      } else {
+        return await this.config.signer.signMessageWithPublicKey(
+          message,
+          publicKey,
+        );
+      }
     }
   }
 }

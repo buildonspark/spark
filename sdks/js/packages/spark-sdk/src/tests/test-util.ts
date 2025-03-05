@@ -23,6 +23,7 @@ export const LOCAL_WALLET_CONFIG = {
   frostSignerAddress: "unix:///tmp/frost_0.sock",
   threshold: 3,
   signingOperators: getLocalSigningOperators(),
+  useTokenTransactionSchnorrSignatures: true,
 };
 
 export const REGTEST_WALLET_CONFIG = {
@@ -32,6 +33,7 @@ export const REGTEST_WALLET_CONFIG = {
   frostSignerAddress: "unix:///tmp/frost_0.sock",
   threshold: 3,
   signingOperators: getRegtestSigningOperators(),
+  useTokenTransactionSchnorrSignatures: true,
 };
 
 export const MAINNET_WALLET_CONFIG = {
@@ -41,6 +43,7 @@ export const MAINNET_WALLET_CONFIG = {
   frostSignerAddress: "unix:///tmp/frost_0.sock",
   threshold: 3,
   signingOperators: getRegtestSigningOperators(),
+  useTokenTransactionSchnorrSignatures: true,
 };
 
 export function getRegtestSigningOperators(): Record<string, SigningOperator> {
