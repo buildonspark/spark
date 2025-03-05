@@ -2,7 +2,6 @@ import { ChannelImplementation } from "@grpc/grpc-js/build/src/channel.js";
 import { sha256 } from "@scure/btc-signer/utils";
 import * as fs from "fs";
 import {
-  CallOptions,
   ChannelCredentials,
   ClientMiddlewareCall,
   createChannel,
@@ -10,7 +9,7 @@ import {
   createClientFactory,
   Metadata,
 } from "nice-grpc";
-import { retryMiddleware } from 'nice-grpc-client-middleware-retry';
+import { retryMiddleware } from "nice-grpc-client-middleware-retry";
 import { MockServiceClient, MockServiceDefinition } from "../proto/mock.js";
 import { SparkServiceClient, SparkServiceDefinition } from "../proto/spark.js";
 import {
@@ -59,7 +58,7 @@ export class ConnectionManager {
             ? ChannelCredentials.createSsl(null, null, null, {
                 rejectUnauthorized: false,
               })
-            : undefined
+            : undefined,
         );
       }
     } catch (error) {
@@ -70,7 +69,7 @@ export class ConnectionManager {
 
   async createSparkClient(
     address: string,
-    certPath?: string
+    certPath?: string,
   ): Promise<SparkServiceClient & { close?: () => void }> {
     if (this.clients[address]) {
       return this.clients[address].client;
@@ -83,7 +82,7 @@ export class ConnectionManager {
     const client = this.createGrpcClient<SparkServiceClient>(
       SparkServiceDefinition,
       channel,
-      authMiddleware
+      authMiddleware,
     );
 
     this.clients[address] = { client, authToken };
@@ -104,7 +103,7 @@ export class ConnectionManager {
       }
 
       const challengeBytes = Challenge.encode(
-        challengeResp.protectedChallenge.challenge
+        challengeResp.protectedChallenge.challenge,
       ).finish();
       const hash = sha256(challengeBytes);
 
@@ -127,7 +126,7 @@ export class ConnectionManager {
 
   private createSparkAuthnGrpcConnection(
     address: string,
-    certPath?: string
+    certPath?: string,
   ): SparkAuthnServiceClient & { close?: () => void } {
     const channel = ConnectionManager.createChannelWithTLS(address, certPath);
     return this.createGrpcClient<SparkAuthnServiceClient>(
@@ -148,14 +147,14 @@ export class ConnectionManager {
     return async function* (
       this: ConnectionManager,
       call: ClientMiddlewareCall<any, any>,
-      options: SparkCallOptions
+      options: SparkCallOptions,
     ) {
       try {
         yield* call.next(call.request, {
           ...options,
           metadata: Metadata(options.metadata).set(
             "Authorization",
-            `Bearer ${this.clients[address]?.authToken || initialAuthToken}`
+            `Bearer ${this.clients[address]?.authToken || initialAuthToken}`,
           ),
         });
       } catch (error: any) {
@@ -168,7 +167,7 @@ export class ConnectionManager {
             ...options,
             metadata: Metadata(options.metadata).set(
               "Authorization",
-              `Bearer ${newAuthToken}`
+              `Bearer ${newAuthToken}`,
             ),
           });
         }
@@ -181,7 +180,7 @@ export class ConnectionManager {
     return async function* (
       this: ConnectionManager,
       call: ClientMiddlewareCall<any, any>,
-      options: SparkCallOptions
+      options: SparkCallOptions,
     ) {
       try {
         yield* call.next(call.request, {
@@ -189,7 +188,7 @@ export class ConnectionManager {
           metadata: Metadata(options.metadata)
             .set(
               "Authorization",
-              `Bearer ${this.clients[address]?.authToken || initialAuthToken}`
+              `Bearer ${this.clients[address]?.authToken || initialAuthToken}`,
             )
             .set("X-Requested-With", "XMLHttpRequest")
             .set("X-Grpc-Web", "1")
@@ -218,7 +217,7 @@ export class ConnectionManager {
   private createGrpcClient<T>(
     defintion: SparkAuthnServiceDefinition | SparkServiceDefinition,
     channel: ChannelImplementation,
-    middleware?: any
+    middleware?: any,
   ): T & { close?: () => void } {
     const clientFactory = createClientFactory().use(retryMiddleware);
     if (middleware) {
@@ -226,9 +225,10 @@ export class ConnectionManager {
     }
 
     const client = clientFactory.create(defintion, channel, {
-      '*': {
-        retry: false,
-      }
+      "*": {
+        retry: true,
+        retryMaxAttempts: 3,
+      },
     }) as T;
     return {
       ...client,
