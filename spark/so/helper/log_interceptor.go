@@ -3,6 +3,7 @@ package helper
 import (
 	"context"
 	"log/slog"
+	"time"
 
 	"github.com/google/uuid"
 	"google.golang.org/grpc"
@@ -21,13 +22,15 @@ func LogInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServer
 	if ok {
 		logger.Info("grpc call started", "request", proto.MessageName(reqProto))
 	}
+	startTime := time.Now()
 	response, err := handler(ctx, req)
+	duration := time.Since(startTime)
 	if err != nil {
-		logger.Error("error in grpc", "error", err)
+		logger.Error("error in grpc", "error", err, "duration", duration)
 	} else {
 		responseProto, ok := response.(proto.Message)
 		if ok {
-			logger.Info("grpc call successful", "response", proto.MessageName(responseProto))
+			logger.Info("grpc call successful", "response", proto.MessageName(responseProto), "duration", duration)
 		}
 	}
 	return response, err
