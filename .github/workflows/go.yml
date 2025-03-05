@@ -9,11 +9,12 @@ on:
     paths:
       - "spark/**"
       - ".github/workflows/go.yml"
+      - "Dockerfile"
   pull_request:
     paths:
       - "spark/**"
       - ".github/workflows/go.yml"
-
+      - "Dockerfile"
 permissions:
   contents: read
   checks: write
