@@ -189,8 +189,8 @@ message TokenTransactionSignatures {
       // Filled by signing the partial token transaction hash with the owner/issuer private key.
       // For mint transactions this will be one signature for the input issuer_public_key
       // For transfer transactions this will be one for each leaf for the leaf owner_public_key
-      // This is a DER signature which can be between 68 and 73 bytes.
-      repeated bytes owner_signatures = 1 [(validate.rules).repeated.items.bytes.min_len = 68, (validate.rules).repeated.items.bytes.max_len = 73];
+      // This is a Schnorr or ECDSA DER signature which can be between 64 and 73 bytes.
+      repeated bytes owner_signatures = 1 [(validate.rules).repeated.items.bytes.min_len = 64, (validate.rules).repeated.items.bytes.max_len = 73];
 }
 
 message StartTokenTransactionRequest {
@@ -218,8 +218,8 @@ message OperatorSpecificTokenTransactionSignablePayload {
 // that it owns a leaf to an SO when requesting signing and release of the  revocation keyshare.  
 message OperatorSpecificTokenTransactionSignature {
     bytes owner_public_key = 1 [(validate.rules).bytes.len = 33];
-    // This is a DER signature which can be between 68 and 73 bytes.
-    bytes owner_signature = 2 [(validate.rules).bytes.min_len = 68, (validate.rules).bytes.max_len = 73];
+    // This is a Schnorr or ECDSA DER signature which can be between 64 and 73 bytes.
+    bytes owner_signature = 2 [(validate.rules).bytes.min_len = 64, (validate.rules).bytes.max_len = 73];
     OperatorSpecificTokenTransactionSignablePayload payload = 3;
 }
 
@@ -230,7 +230,7 @@ message SignTokenTransactionRequest {
 }
 
 message SignTokenTransactionResponse {
-    bytes spark_operator_signature = 1 [(validate.rules).bytes.min_len = 68, (validate.rules).bytes.max_len = 73];
+    bytes spark_operator_signature = 1 [(validate.rules).bytes.min_len = 64, (validate.rules).bytes.max_len = 73];
     repeated bytes token_transaction_revocation_keyshares = 2 [(validate.rules).repeated.items.bytes.len = 32];
 }
 
@@ -253,8 +253,8 @@ message FreezeTokensPayload {
 
 message FreezeTokensRequest {
     FreezeTokensPayload freeze_tokens_payload = 1;
-    // This is a DER signature which can be between 68 and 73 bytes.
-    bytes issuer_signature = 2 [(validate.rules).bytes.min_len = 68, (validate.rules).bytes.max_len = 73];
+    // This is a Schnorr or ECDSA DER signature which can be between 64 and 73 bytes.
+    bytes issuer_signature = 2 [(validate.rules).bytes.min_len = 64, (validate.rules).bytes.max_len = 73];
 }
 
 message FreezeTokensResponse {

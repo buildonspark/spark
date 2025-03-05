@@ -23,6 +23,8 @@ type Config struct {
 	Threshold int
 	// SparkServiceProviderIdentityPublicKey is the identity public key of the Spark service provider.
 	SparkServiceProviderIdentityPublicKey []byte
+	// UseTokenTransactionSchnorrSignatures determines whether to use Schnorr signatures (true) or ECDSA signatures (false)
+	UseTokenTransactionSchnorrSignatures bool
 }
 
 // CoodinatorAddress returns coodinator address.

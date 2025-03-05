@@ -875,3 +875,99 @@ func TestBroadcastTokenTransactionIssueAndTransferTokensDoubleSign(t *testing.T)
 		t.Fatalf("previous transaction vout expected 0, got %d", leaf.PreviousTransactionVout)
 	}
 }
+
+func TestBroadcastTokenTransactionIssueAndTransferTokensSchnorr(t *testing.T) {
+	config, err := testutil.TestWalletConfigWithTokenTransactionSchnorr()
+	if err != nil {
+		t.Fatalf("failed to create wallet config: %v", err)
+	}
+
+	tokenPrivKey := config.IdentityPrivateKey
+	tokenIdentityPubKeyBytes := tokenPrivKey.PubKey().SerializeCompressed()
+	issueTokenTransaction, userLeaf1PrivKey, userLeaf2PrivKey, err := createTestTokenIssuanceTransaction(tokenIdentityPubKeyBytes)
+	if err != nil {
+		t.Fatalf("failed to create test token issuance transaction: %v", err)
+	}
+
+	// Broadcast the token transaction
+	finalIssueTokenTransaction, err := wallet.BroadcastTokenTransaction(
+		context.Background(), config, issueTokenTransaction,
+		[]*secp256k1.PrivateKey{&tokenPrivKey},
+		[][]byte{})
+	if err != nil {
+		t.Fatalf("failed to broadcast issuance token transaction: %v", err)
+	}
+	log.Printf("issuance broadcast finalized token transaction: %v", finalIssueTokenTransaction)
+
+	// Validate withdrawal params match config
+	for i, leaf := range finalIssueTokenTransaction.OutputLeaves {
+		if leaf.GetWithdrawBondSats() != WithdrawalBondSatsInConfig {
+			t.Errorf("leaf %d: expected withdrawal bond sats 1000000, got %d", i, leaf.GetWithdrawBondSats())
+		}
+		if leaf.GetWithdrawRelativeBlockLocktime() != WithdrawalRelativeBlockLocktimeInConfig {
+			t.Errorf("leaf %d: expected withdrawal relative block locktime 1000, got %d", i, leaf.GetWithdrawRelativeBlockLocktime())
+		}
+	}
+
+	finalIssueTokenTransactionHash, err := utils.HashTokenTransaction(finalIssueTokenTransaction, false)
+	if err != nil {
+		t.Fatalf("failed to hash final issuance token transaction: %v", err)
+	}
+
+	transferTokenTransaction, _, err := createTestTokenTransferTransaction(
+		finalIssueTokenTransactionHash,
+		tokenIdentityPubKeyBytes,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	revPubKey1 := finalIssueTokenTransaction.OutputLeaves[0].RevocationPublicKey
+	revPubKey2 := finalIssueTokenTransaction.OutputLeaves[1].RevocationPublicKey
+
+	// Broadcast the token transaction
+	transferTokenTransactionResponse, err := wallet.BroadcastTokenTransaction(
+		context.Background(), config, transferTokenTransaction,
+		[]*secp256k1.PrivateKey{userLeaf1PrivKey, userLeaf2PrivKey},
+		[][]byte{revPubKey1, revPubKey2},
+	)
+	if err != nil {
+		t.Fatalf("failed to broadcast transfer token transaction: %v", err)
+	}
+	log.Printf("transfer broadcast finalized token transaction: %v", transferTokenTransactionResponse)
+}
+
+func TestFreezeAndUnfreezeTokensSchnorr(t *testing.T) {
+	config, err := testutil.TestWalletConfigWithTokenTransactionSchnorr()
+	if err != nil {
+		t.Fatalf("failed to create wallet config: %v", err)
+	}
+
+	tokenPrivKey := config.IdentityPrivateKey
+	tokenIdentityPubKeyBytes := tokenPrivKey.PubKey().SerializeCompressed()
+	issueTokenTransaction, _, _, err := createTestTokenIssuanceTransaction(tokenIdentityPubKeyBytes)
+	if err != nil {
+		t.Fatalf("failed to create test token issuance transaction: %v", err)
+	}
+
+	// Broadcast the token transaction
+	finalIssueTokenTransaction, err := wallet.BroadcastTokenTransaction(
+		context.Background(), config, issueTokenTransaction,
+		[]*secp256k1.PrivateKey{&tokenPrivKey},
+		[][]byte{})
+	if err != nil {
+		t.Fatalf("failed to broadcast issuance token transaction: %v", err)
+	}
+
+	// Call FreezeTokens to freeze the output leaf
+	_, err = wallet.FreezeTokens(
+		context.Background(),
+		config,
+		finalIssueTokenTransaction.OutputLeaves[0].OwnerPublicKey,
+		tokenIdentityPubKeyBytes,
+		false,
+	)
+	if err != nil {
+		t.Fatalf("failed to freeze tokens: %v", err)
+	}
+}

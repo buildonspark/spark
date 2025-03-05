@@ -8,7 +8,9 @@ import (
 	"math/big"
 	"sort"
 
+	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/ecdsa"
+	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	secp256k1 "github.com/decred/dcrd/dcrec/secp256k1/v4"
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
 )
@@ -398,6 +400,7 @@ func ValidatePartialTokenTransaction(
 
 // ValidateOwnershipSignature validates the ownership signature of a token transaction and that it matches
 // a predefined public key attached to the leaf being spent or the token being created and the submitted transaction.
+// It supports both ECDSA DER signatures and Schnorr signatures.
 func ValidateOwnershipSignature(ownershipSignature []byte, partialTokenTransactionHash []byte, ownerPublicKey []byte) error {
 	if ownershipSignature == nil {
 		return fmt.Errorf("ownership signature cannot be nil")
@@ -409,9 +412,37 @@ func ValidateOwnershipSignature(ownershipSignature []byte, partialTokenTransacti
 		return fmt.Errorf("owner public key cannot be nil")
 	}
 
+	// Check if it's a Schnorr signature (64 bytes fixed length) or try to parse as ECDSA DER
+	if len(ownershipSignature) == 64 {
+		// Try to parse as Schnorr signature
+		schnorrSig, err := schnorr.ParseSignature(ownershipSignature)
+		if err == nil {
+			// It's a valid Schnorr signature
+			pubKey, err := secp256k1.ParsePubKey(ownerPublicKey)
+			if err != nil {
+				return fmt.Errorf("failed to parse public key: %w", err)
+			}
+			if pubKey == nil {
+				return fmt.Errorf("parsed public key is nil")
+			}
+
+			// Convert to btcec.PublicKey for Schnorr verification
+			btcecPubKey := btcec.PublicKey(*pubKey)
+
+			// Verify the Schnorr signature
+			if !schnorrSig.Verify(partialTokenTransactionHash, &btcecPubKey) {
+				return fmt.Errorf("invalid Schnorr signature")
+			}
+
+			return nil
+		}
+		// If Schnorr parsing failed, fall through to try DER parsing, which in rare cases could be 64 bytes.
+	}
+
+	// Try to parse as ECDSA DER signature
 	sig, err := ecdsa.ParseDERSignature(ownershipSignature)
 	if err != nil {
-		return fmt.Errorf("failed to parse DER signature: %w", err)
+		return fmt.Errorf("failed to parse signature as either Schnorr or DER: %w", err)
 	}
 	if sig == nil {
 		return fmt.Errorf("parsed signature is nil")

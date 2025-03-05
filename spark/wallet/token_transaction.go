@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 	"github.com/lightsparkdev/spark-go/common"
@@ -64,11 +65,17 @@ func StartTokenTransaction(
 	var ownerSignatures [][]byte
 	if tokenTransaction.GetMintInput() != nil {
 		signingPrivKeySecp := secp256k1.PrivKeyFromBytes(config.IdentityPrivateKey.Serialize())
-		sig := ecdsa.Sign(signingPrivKeySecp, partialTokenTransactionHash).Serialize()
+		sig, err := createTokenTransactionSignature(config, signingPrivKeySecp, partialTokenTransactionHash)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("failed to create signature: %v", err)
+		}
 		ownerSignatures = append(ownerSignatures, sig)
 	} else if tokenTransaction.GetTransferInput() != nil {
 		for i := range leafToSpendPrivateKeys {
-			sig := ecdsa.Sign(leafToSpendPrivateKeys[i], partialTokenTransactionHash).Serialize()
+			sig, err := createTokenTransactionSignature(config, leafToSpendPrivateKeys[i], partialTokenTransactionHash)
+			if err != nil {
+				return nil, nil, nil, fmt.Errorf("failed to create signature: %v", err)
+			}
 			ownerSignatures = append(ownerSignatures, sig)
 		}
 	}
@@ -136,10 +143,11 @@ func SignTokenTransaction(
 
 	// For mint transactions
 	if finalTx.GetMintInput() != nil {
-		sig := ecdsa.Sign(
-			secp256k1.PrivKeyFromBytes(config.IdentityPrivateKey.Serialize()),
-			payloadHash,
-		).Serialize()
+		privKey := secp256k1.PrivKeyFromBytes(config.IdentityPrivateKey.Serialize())
+		sig, err := createTokenTransactionSignature(config, privKey, payloadHash)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create signature: %v", err)
+		}
 		operatorSpecificSignatures = append(operatorSpecificSignatures, &pb.OperatorSpecificTokenTransactionSignature{
 			OwnerPublicKey: config.IdentityPublicKey(),
 			OwnerSignature: sig,
@@ -150,7 +158,10 @@ func SignTokenTransaction(
 	// For transfer transactions
 	if finalTx.GetTransferInput() != nil {
 		for i := range finalTx.GetTransferInput().GetLeavesToSpend() {
-			sig := ecdsa.Sign(leafToSpendPrivateKeys[i], payloadHash).Serialize()
+			sig, err := createTokenTransactionSignature(config, leafToSpendPrivateKeys[i], payloadHash)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create signature: %v", err)
+			}
 			operatorSpecificSignatures = append(operatorSpecificSignatures, &pb.OperatorSpecificTokenTransactionSignature{
 				OwnerPublicKey: leafToSpendPrivateKeys[i].PubKey().SerializeCompressed(),
 				OwnerSignature: sig,
@@ -372,7 +383,11 @@ func FreezeTokens(
 		}
 
 		signingPrivKeySecp := secp256k1.PrivKeyFromBytes(config.IdentityPrivateKey.Serialize())
-		issuerSignature := ecdsa.Sign(signingPrivKeySecp, payloadHash).Serialize()
+		sig, err := createTokenTransactionSignature(config, signingPrivKeySecp, payloadHash)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create signature: %v", err)
+		}
+		issuerSignature := sig
 
 		request := &pb.FreezeTokensRequest{
 			FreezeTokensPayload: payload,
@@ -423,4 +438,18 @@ func GetOwnedTokenLeaves(
 func parseHexIdentifierToUint64(binaryIdentifier string) uint64 {
 	value, _ := strconv.ParseUint(binaryIdentifier, 16, 64)
 	return value
+}
+
+// Helper function to create either Schnorr or ECDSA signature
+func createTokenTransactionSignature(config *Config, privKey *secp256k1.PrivateKey, hash []byte) ([]byte, error) {
+	if config.UseTokenTransactionSchnorrSignatures {
+		sig, err := schnorr.Sign(privKey, hash)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create Schnorr signature: %v", err)
+		}
+		return sig.Serialize(), nil
+	}
+
+	sig := ecdsa.Sign(privKey, hash)
+	return sig.Serialize(), nil
 }

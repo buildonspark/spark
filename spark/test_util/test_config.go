@@ -133,6 +133,15 @@ func TestWalletConfig() (*wallet.Config, error) {
 	return TestWalletConfigWithIdentityKey(*identityPrivKey)
 }
 
+func TestWalletConfigWithTokenTransactionSchnorr() (*wallet.Config, error) {
+	config, err := TestWalletConfig()
+	if err != nil {
+		return nil, err
+	}
+	config.UseTokenTransactionSchnorrSignatures = true
+	return config, nil
+}
+
 // TestWalletConfigWithIdentityKey returns a wallet configuration with specified identity key that can be used for testing.
 func TestWalletConfigWithIdentityKey(identityPrivKey secp256k1.PrivateKey) (*wallet.Config, error) {
 	signingOperators, err := GetAllSigningOperators()

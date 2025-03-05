@@ -2535,10 +2535,10 @@ func (m *TokenTransactionSignatures) validate(all bool) error {
 	for idx, item := range m.GetOwnerSignatures() {
 		_, _ = idx, item
 
-		if l := len(item); l < 68 || l > 73 {
+		if l := len(item); l < 64 || l > 73 {
 			err := TokenTransactionSignaturesValidationError{
 				field:  fmt.Sprintf("OwnerSignatures[%v]", idx),
-				reason: "value length must be between 68 and 73 bytes, inclusive",
+				reason: "value length must be between 64 and 73 bytes, inclusive",
 			}
 			if !all {
 				return err
@@ -3129,10 +3129,10 @@ func (m *OperatorSpecificTokenTransactionSignature) validate(all bool) error {
 		errors = append(errors, err)
 	}
 
-	if l := len(m.GetOwnerSignature()); l < 68 || l > 73 {
+	if l := len(m.GetOwnerSignature()); l < 64 || l > 73 {
 		err := OperatorSpecificTokenTransactionSignatureValidationError{
 			field:  "OwnerSignature",
-			reason: "value length must be between 68 and 73 bytes, inclusive",
+			reason: "value length must be between 64 and 73 bytes, inclusive",
 		}
 		if !all {
 			return err
@@ -3450,10 +3450,10 @@ func (m *SignTokenTransactionResponse) validate(all bool) error {
 
 	var errors []error
 
-	if l := len(m.GetSparkOperatorSignature()); l < 68 || l > 73 {
+	if l := len(m.GetSparkOperatorSignature()); l < 64 || l > 73 {
 		err := SignTokenTransactionResponseValidationError{
 			field:  "SparkOperatorSignature",
-			reason: "value length must be between 68 and 73 bytes, inclusive",
+			reason: "value length must be between 64 and 73 bytes, inclusive",
 		}
 		if !all {
 			return err
@@ -3907,10 +3907,10 @@ func (m *FreezeTokensRequest) validate(all bool) error {
 		}
 	}
 
-	if l := len(m.GetIssuerSignature()); l < 68 || l > 73 {
+	if l := len(m.GetIssuerSignature()); l < 64 || l > 73 {
 		err := FreezeTokensRequestValidationError{
 			field:  "IssuerSignature",
-			reason: "value length must be between 68 and 73 bytes, inclusive",
+			reason: "value length must be between 64 and 73 bytes, inclusive",
 		}
 		if !all {
 			return err
