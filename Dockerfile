@@ -24,18 +24,22 @@ COPY signer signer
 
 RUN cd signer && cargo build --target "$(cat /tmp/arch)-unknown-${TARGETOS}-gnu" --release
 
+FROM --platform=$BUILDPLATFORM arigaio/atlas:0.31.0 AS atlas
+
 FROM debian:bookworm-slim AS final
 
 RUN addgroup --system --gid 1000 spark
 RUN adduser --system --uid 1000 --home /home/spark --ingroup spark spark
 
-RUN apt-get update && apt-get -y install libzmq5 ca-certificates && rm -rf /var/lib/apt/lists
+RUN apt-get update && apt-get -y install libzmq5 ca-certificates gettext-base && rm -rf /var/lib/apt/lists
 
 EXPOSE 9735 10009
 ENTRYPOINT ["spark-operator"]
 
+COPY --from=atlas /atlas /usr/local/bin/atlas
 COPY --from=builder-go /go/bin/main /usr/local/bin/spark-operator
 COPY --from=builder-rust /signer/target/*/release/spark-frost-signer /usr/local/bin/spark-frost-signer
+COPY spark/so/ent/migrate/migrations /opt/spark/migrations
 
 # Install security updates
 RUN apt-get update && apt-get -y upgrade && apt-get clean && rm -rf /var/lib/apt/lists
