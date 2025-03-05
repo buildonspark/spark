@@ -212,10 +212,6 @@ func main() {
 		sqliteDb.Close()
 	}
 
-	if err := dbClient.Schema.Create(ctx); err != nil {
-		log.Fatalf("failed creating schema resources: %v", err)
-	}
-
 	frostConnection, err := common.NewGRPCConnectionWithoutTLS(args.SignerAddress)
 	if err != nil {
 		log.Fatalf("Failed to create frost client: %v", err)

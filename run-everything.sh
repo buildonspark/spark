@@ -657,10 +657,17 @@ reset_databases() {
                 echo "Creating $db as it doesn't exist..."
                 createdb "$db" > /dev/null 2>&1
             else
-                echo "Database $db already exists, skipping..."
+                echo "Database $db already exists, skipping creation..."
             fi
         done
     fi
+
+    cd spark
+    for i in $(seq 0 $max_count); do
+        db="operator_$i"
+        atlas migrate apply --dir "file://so/ent/migrate/migrations" --url "postgresql://127.0.0.1:5432/operator_0?sslmode=disable"
+    done
+    cd -
 
     echo "Database operation complete!"
 }

@@ -28,7 +28,7 @@ clean:
 
 ent:
 	cd spark && go run -mod=mod entgo.io/ent/cmd/ent generate --feature sql/lock ./so/ent/schema
-	@echo "Ents generated. Remember to add migration changes! See README.md for more info."
+	@echo "\n!!!!\nEnts generated. Remember to add migration changes with atlas! See README.md for more info.\n!!!!\n"
 
 copy-protos:
 	cp protos/common.proto signer/spark-frost/protos/

@@ -57,13 +57,19 @@ dropdb operator_temp
 ```
 
 - When running `run-everything.sh`, the migration will be automatically
-  applied to each operator's database. But if you want to apply a migration manually, you can run:
+  applied to each operator's database. But if you want to apply a migration manually, you can run (e.g. DB name is `operator_0`):
 
 ```
-atlas migrate apply --dir "file://so/ent/migrate/migrations" --url "postgresql://127.0.0.1:5432/operator_0?sslmode=disable" --baseline 20250219194108
+atlas migrate apply --dir "file://so/ent/migrate/migrations" --url "postgresql://127.0.0.1:5432/operator_0?sslmode=disable"
 ```
 
 - Commit the migration files, and submit a PR.
+
+If you are adding atlas migrations for the first time to an existing DB, you will need to run the migration command with the `--baseline` flag.
+
+```
+atlas migrate apply --dir "file://so/ent/migrate/migrations" --url "postgresql://127.0.0.1:5432/operator_0?sslmode=disable" --baseline 20250228224813
+```
 
 ## VSCode
 

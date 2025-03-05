@@ -1,0 +1,56 @@
+name: DB Migration Lint
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - "spark/so/ent/**"
+      - ".github/workflows/db.yml"
+  pull_request:
+    paths:
+      - "spark/so/ent/**"
+      - ".github/workflows/db.yml"
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./spark
+    
+    services:
+      postgres:
+        image: postgres:latest
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Atlas
+        run: |
+          curl -sSf https://atlasgo.sh | sh
+          atlas version  # Verify installation
+
+      - name: Init temporary database
+        run: |
+          PGPASSWORD=postgres psql -h localhost -U postgres -c "CREATE DATABASE operator_temp;"
+
+      - name: Run Atlas lint
+        run: |
+          atlas migrate lint \
+            --dir "file://so/ent/migrate/migrations" \
+            --dev-url "postgresql://postgres:postgres@localhost:5432/operator_temp?sslmode=disable&search_path=public" \
+            --latest=1
+          
+      - name: Clean up
+        run: |
+          PGPASSWORD=postgres psql -h localhost -U postgres -c "DROP DATABASE operator_temp;"
