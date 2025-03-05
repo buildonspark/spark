@@ -30,7 +30,7 @@ export class IssuerSparkWallet extends SparkWallet {
     balance: bigint;
   }> {
     const publicKey = await super.getIdentityPublicKey();
-    const balanceObj = await this.getBalance(true);
+    const balanceObj = await this.getBalance();
     if (!balanceObj.tokenBalances || !balanceObj.tokenBalances.has(publicKey)) {
       return {
         balance: 0n,

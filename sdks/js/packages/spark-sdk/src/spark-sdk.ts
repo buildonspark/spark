@@ -597,12 +597,12 @@ export class SparkWallet {
    * You can use the forceRefetch option to synchronize your wallet and claim any
    * pending incoming lightning payment, spark transfer, or bitcoin deposit before returning the balance.
    *
-   * @param {boolean} [forceRefetch=false] - Synchronizes the wallet before returning the balance
+   * @param {boolean} [forceRefetch=true] - Synchronizes the wallet before returning the balance
    * @returns {Promise<Object>} Object containing:
    *   - balance: The wallet's current balance in satoshis
    *   - tokenBalances: Map of token balances and leaf counts
    */
-  public async getBalance(forceRefetch = false): Promise<{
+  public async getBalance(forceRefetch = true): Promise<{
     balance: bigint;
     tokenBalances: Map<string, { balance: bigint }>;
   }> {

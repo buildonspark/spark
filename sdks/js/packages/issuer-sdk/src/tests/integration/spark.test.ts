@@ -41,7 +41,6 @@ describe("token integration test", () => {
       tokenAmount,
       await destinationWallet.getIdentityPublicKey(),
     );
-    await new Promise((resolve) => setTimeout(resolve, 3000));
     const sourceBalance = await issuerWallet.getIssuerTokenBalance();
     expect(sourceBalance.balance).toEqual(0n);
 
@@ -77,8 +76,7 @@ describe("token integration test", () => {
     expect(issuerBalanceAfterTransfer.balance).toEqual(0n);
 
     const tokenPublicKey = await issuerWallet.getIdentityPublicKey();
-    const userBalanceAfterTransfer = (await userWallet.getBalance())
-      .tokenBalances[tokenPublicKey];
+    const userBalanceAfterTransfer = await getSparkWalletTokenBalanceOrZero(userWallet, tokenPublicKey);
     expect(userBalanceAfterTransfer.balance).toEqual(tokenAmount);
 
     const freezeResult =
@@ -163,7 +161,7 @@ describe("token integration test", () => {
   });
 });
 
-async function getSparkWalletTokenBalanceOrZero(sparkWallet, publicKey) {
+async function getSparkWalletTokenBalanceOrZero(sparkWallet: SparkWallet, publicKey: string): Promise<{ balance: bigint }> {
   const balanceObj = await sparkWallet.getBalance();
   if (!balanceObj.tokenBalances || !balanceObj.tokenBalances.has(publicKey)) {
     return {
@@ -171,6 +169,6 @@ async function getSparkWalletTokenBalanceOrZero(sparkWallet, publicKey) {
     };
   }
   return {
-    balance: balanceObj.tokenBalance,
+    balance: balanceObj.tokenBalances.get(publicKey)!.balance,
   };
 }
