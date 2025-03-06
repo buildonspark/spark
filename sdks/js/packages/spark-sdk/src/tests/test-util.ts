@@ -26,6 +26,26 @@ export const LOCAL_WALLET_CONFIG = {
   useTokenTransactionSchnorrSignatures: true,
 };
 
+export const LOCAL_WALLET_CONFIG_SCHNORR = {
+  network: Network.REGTEST,
+  coodinatorIdentifier:
+    "0000000000000000000000000000000000000000000000000000000000000001",
+  frostSignerAddress: "unix:///tmp/frost_0.sock",
+  threshold: 3,
+  signingOperators: getLocalSigningOperators(),
+  useTokenTransactionSchnorrSignatures: true,
+};
+
+export const LOCAL_WALLET_CONFIG_ECDSA = {
+  network: Network.REGTEST,
+  coodinatorIdentifier:
+    "0000000000000000000000000000000000000000000000000000000000000001",
+  frostSignerAddress: "unix:///tmp/frost_0.sock",
+  threshold: 3,
+  signingOperators: getLocalSigningOperators(),
+  useTokenTransactionSchnorrSignatures: false,
+};
+
 export const REGTEST_WALLET_CONFIG = {
   network: Network.REGTEST,
   coodinatorIdentifier:

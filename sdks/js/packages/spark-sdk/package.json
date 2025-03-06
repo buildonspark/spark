@@ -21,6 +21,16 @@
       "require": "./dist/signer/signer.js",
       "import": "./dist/signer/signer.js"
     },
+    "./services/config": {
+      "types": "./dist/services/config.d.ts",
+      "require": "./dist/services/config.js",
+      "import": "./dist/services/config.js"
+    },
+    "./test-util": {
+      "types": "./dist/tests/test-util.d.ts",
+      "require": "./dist/tests/test-util.js",
+      "import": "./dist/tests/test-util.js"
+    },
     "./utils": {
       "types": "./dist/utils/index.d.ts",
       "require": "./dist/utils/index.js",

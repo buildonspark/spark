@@ -5,6 +5,7 @@ import { LeafWithPreviousTransactionData } from "@buildonspark/spark-sdk/proto/s
 import { Network } from "@buildonspark/spark-sdk/utils";
 import { IssuerTokenTransactionService } from "./token-transactions.js";
 import { TokenFreezeService } from "../freeze.js";
+import { WalletConfig } from "@buildonspark/spark-sdk/services/config";
 
 const BURN_ADDRESS =
   "020202020202020202020202020202020202020202020202020202020202020202";
@@ -13,8 +14,8 @@ export class IssuerSparkWallet extends SparkWallet {
   private issuerTokenTransactionService: IssuerTokenTransactionService;
   private tokenFreezeService: TokenFreezeService;
 
-  constructor(network: Network, signer?: SparkSigner) {
-    super(network, signer);
+  constructor(network: Network, signer?: SparkSigner, config?: WalletConfig) {
+    super(network, signer, config);
 
     this.issuerTokenTransactionService = new IssuerTokenTransactionService(
       this.config,
