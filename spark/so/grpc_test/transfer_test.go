@@ -13,6 +13,7 @@ import (
 	testutil "github.com/lightsparkdev/spark-go/test_util"
 	"github.com/lightsparkdev/spark-go/wallet"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestTransfer(t *testing.T) {
@@ -430,7 +431,11 @@ func TestQueryTransfers(t *testing.T) {
 	signature := senderRefundSignatureMap[senderRootNode.Id]
 	assert.NotNil(t, signature, "expected refund signature for root node")
 	leafData := leafDataMap[senderRootNode.Id]
-	assert.NotNil(t, leafData, "expected leaf data for root node")
+	require.NotNil(t, leafData, "expected leaf data for root node")
+	require.NotNil(t, leafData.RefundTx, "expected refund tx")
+	require.NotNil(t, leafData.Tx, "expected tx")
+	require.NotNil(t, leafData.Tx.TxOut, "expected tx out")
+	require.NotNil(t, leafData.Vout, "expected Vout")
 
 	sighash, err := common.SigHashFromTx(leafData.RefundTx, 0, leafData.Tx.TxOut[leafData.Vout])
 	assert.NoError(t, err)
