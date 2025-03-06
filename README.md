@@ -26,7 +26,7 @@ Spark consists of several key components that work together to power transaction
 
    - Manages user key material
    - Initiates transactions
-   - Communicates with the Server Operator via gRPC
+   - Communicates with the Spark Operator via gRPC
 
 4. **LRC20 Token Support** - Extended functionality for token operations:
    - Token creation, minting, and management
@@ -125,7 +125,7 @@ psql -U postgres -c "SHOW data_directory;"
    cd spark
    ```
 
-2. **Run the entire stack** (Server Operator, Bitcoin regtest, FROST signer, LRC20 node):
+2. **Run the entire stack** (Spark Operator, Bitcoin node, FROST signer, LRC20 node):
    ```bash
    ./run-everything.sh
    ```
@@ -217,7 +217,7 @@ golangci-lint run
 
 ## Troubleshooting
 
-1. **Logs**: Server operator and signer logs are located in `_data/run_X/logs/`
+1. **Logs**: Spark operator and signer logs are located in `_data/run_X/logs/`
 
 2. **tmux Sessions**: Use the following to connect to the tmux session:
 
@@ -242,4 +242,4 @@ For more detailed information about specific components:
 
 - See [/spark/README.md](/spark/README.md) for details on the core implementation
 - See [/signer/README.md](/signer/README.md) for documentation on the FROST signer
-- See [/spark/so/README.md](/spark/so/README.md) for details on the Server Operator
+- See [/spark/so/README.md](/spark/so/README.md) for details on the Spark Operator
