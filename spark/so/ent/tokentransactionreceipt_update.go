@@ -76,12 +76,6 @@ func (ttru *TokenTransactionReceiptUpdate) SetNillableStatus(sts *schema.TokenTr
 	return ttru
 }
 
-// ClearStatus clears the value of the "status" field.
-func (ttru *TokenTransactionReceiptUpdate) ClearStatus() *TokenTransactionReceiptUpdate {
-	ttru.mutation.ClearStatus()
-	return ttru
-}
-
 // AddSpentLeafIDs adds the "spent_leaf" edge to the TokenLeaf entity by IDs.
 func (ttru *TokenTransactionReceiptUpdate) AddSpentLeafIDs(ids ...uuid.UUID) *TokenTransactionReceiptUpdate {
 	ttru.mutation.AddSpentLeafIDs(ids...)
@@ -270,9 +264,6 @@ func (ttru *TokenTransactionReceiptUpdate) sqlSave(ctx context.Context) (n int, 
 	if value, ok := ttru.mutation.Status(); ok {
 		_spec.SetField(tokentransactionreceipt.FieldStatus, field.TypeEnum, value)
 	}
-	if ttru.mutation.StatusCleared() {
-		_spec.ClearField(tokentransactionreceipt.FieldStatus, field.TypeEnum)
-	}
 	if ttru.mutation.SpentLeafCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.O2M,
@@ -453,12 +444,6 @@ func (ttruo *TokenTransactionReceiptUpdateOne) SetNillableStatus(sts *schema.Tok
 	if sts != nil {
 		ttruo.SetStatus(*sts)
 	}
-	return ttruo
-}
-
-// ClearStatus clears the value of the "status" field.
-func (ttruo *TokenTransactionReceiptUpdateOne) ClearStatus() *TokenTransactionReceiptUpdateOne {
-	ttruo.mutation.ClearStatus()
 	return ttruo
 }
 
@@ -679,9 +664,6 @@ func (ttruo *TokenTransactionReceiptUpdateOne) sqlSave(ctx context.Context) (_no
 	}
 	if value, ok := ttruo.mutation.Status(); ok {
 		_spec.SetField(tokentransactionreceipt.FieldStatus, field.TypeEnum, value)
-	}
-	if ttruo.mutation.StatusCleared() {
-		_spec.ClearField(tokentransactionreceipt.FieldStatus, field.TypeEnum)
 	}
 	if ttruo.mutation.SpentLeafCleared() {
 		edge := &sqlgraph.EdgeSpec{

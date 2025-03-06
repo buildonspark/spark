@@ -98,7 +98,7 @@ func TokenAmount(v []byte) predicate.TokenLeaf {
 }
 
 // LeafCreatedTransactionOutputVout applies equality check predicate on the "leaf_created_transaction_output_vout" field. It's identical to LeafCreatedTransactionOutputVoutEQ.
-func LeafCreatedTransactionOutputVout(v int32) predicate.TokenLeaf {
+func LeafCreatedTransactionOutputVout(v uint32) predicate.TokenLeaf {
 	return predicate.TokenLeaf(sql.FieldEQ(FieldLeafCreatedTransactionOutputVout, v))
 }
 
@@ -113,7 +113,7 @@ func LeafSpentOperatorSpecificOwnershipSignature(v []byte) predicate.TokenLeaf {
 }
 
 // LeafSpentTransactionInputVout applies equality check predicate on the "leaf_spent_transaction_input_vout" field. It's identical to LeafSpentTransactionInputVoutEQ.
-func LeafSpentTransactionInputVout(v int32) predicate.TokenLeaf {
+func LeafSpentTransactionInputVout(v uint32) predicate.TokenLeaf {
 	return predicate.TokenLeaf(sql.FieldEQ(FieldLeafSpentTransactionInputVout, v))
 }
 
@@ -473,42 +473,42 @@ func TokenAmountLTE(v []byte) predicate.TokenLeaf {
 }
 
 // LeafCreatedTransactionOutputVoutEQ applies the EQ predicate on the "leaf_created_transaction_output_vout" field.
-func LeafCreatedTransactionOutputVoutEQ(v int32) predicate.TokenLeaf {
+func LeafCreatedTransactionOutputVoutEQ(v uint32) predicate.TokenLeaf {
 	return predicate.TokenLeaf(sql.FieldEQ(FieldLeafCreatedTransactionOutputVout, v))
 }
 
 // LeafCreatedTransactionOutputVoutNEQ applies the NEQ predicate on the "leaf_created_transaction_output_vout" field.
-func LeafCreatedTransactionOutputVoutNEQ(v int32) predicate.TokenLeaf {
+func LeafCreatedTransactionOutputVoutNEQ(v uint32) predicate.TokenLeaf {
 	return predicate.TokenLeaf(sql.FieldNEQ(FieldLeafCreatedTransactionOutputVout, v))
 }
 
 // LeafCreatedTransactionOutputVoutIn applies the In predicate on the "leaf_created_transaction_output_vout" field.
-func LeafCreatedTransactionOutputVoutIn(vs ...int32) predicate.TokenLeaf {
+func LeafCreatedTransactionOutputVoutIn(vs ...uint32) predicate.TokenLeaf {
 	return predicate.TokenLeaf(sql.FieldIn(FieldLeafCreatedTransactionOutputVout, vs...))
 }
 
 // LeafCreatedTransactionOutputVoutNotIn applies the NotIn predicate on the "leaf_created_transaction_output_vout" field.
-func LeafCreatedTransactionOutputVoutNotIn(vs ...int32) predicate.TokenLeaf {
+func LeafCreatedTransactionOutputVoutNotIn(vs ...uint32) predicate.TokenLeaf {
 	return predicate.TokenLeaf(sql.FieldNotIn(FieldLeafCreatedTransactionOutputVout, vs...))
 }
 
 // LeafCreatedTransactionOutputVoutGT applies the GT predicate on the "leaf_created_transaction_output_vout" field.
-func LeafCreatedTransactionOutputVoutGT(v int32) predicate.TokenLeaf {
+func LeafCreatedTransactionOutputVoutGT(v uint32) predicate.TokenLeaf {
 	return predicate.TokenLeaf(sql.FieldGT(FieldLeafCreatedTransactionOutputVout, v))
 }
 
 // LeafCreatedTransactionOutputVoutGTE applies the GTE predicate on the "leaf_created_transaction_output_vout" field.
-func LeafCreatedTransactionOutputVoutGTE(v int32) predicate.TokenLeaf {
+func LeafCreatedTransactionOutputVoutGTE(v uint32) predicate.TokenLeaf {
 	return predicate.TokenLeaf(sql.FieldGTE(FieldLeafCreatedTransactionOutputVout, v))
 }
 
 // LeafCreatedTransactionOutputVoutLT applies the LT predicate on the "leaf_created_transaction_output_vout" field.
-func LeafCreatedTransactionOutputVoutLT(v int32) predicate.TokenLeaf {
+func LeafCreatedTransactionOutputVoutLT(v uint32) predicate.TokenLeaf {
 	return predicate.TokenLeaf(sql.FieldLT(FieldLeafCreatedTransactionOutputVout, v))
 }
 
 // LeafCreatedTransactionOutputVoutLTE applies the LTE predicate on the "leaf_created_transaction_output_vout" field.
-func LeafCreatedTransactionOutputVoutLTE(v int32) predicate.TokenLeaf {
+func LeafCreatedTransactionOutputVoutLTE(v uint32) predicate.TokenLeaf {
 	return predicate.TokenLeaf(sql.FieldLTE(FieldLeafCreatedTransactionOutputVout, v))
 }
 
@@ -613,42 +613,42 @@ func LeafSpentOperatorSpecificOwnershipSignatureNotNil() predicate.TokenLeaf {
 }
 
 // LeafSpentTransactionInputVoutEQ applies the EQ predicate on the "leaf_spent_transaction_input_vout" field.
-func LeafSpentTransactionInputVoutEQ(v int32) predicate.TokenLeaf {
+func LeafSpentTransactionInputVoutEQ(v uint32) predicate.TokenLeaf {
 	return predicate.TokenLeaf(sql.FieldEQ(FieldLeafSpentTransactionInputVout, v))
 }
 
 // LeafSpentTransactionInputVoutNEQ applies the NEQ predicate on the "leaf_spent_transaction_input_vout" field.
-func LeafSpentTransactionInputVoutNEQ(v int32) predicate.TokenLeaf {
+func LeafSpentTransactionInputVoutNEQ(v uint32) predicate.TokenLeaf {
 	return predicate.TokenLeaf(sql.FieldNEQ(FieldLeafSpentTransactionInputVout, v))
 }
 
 // LeafSpentTransactionInputVoutIn applies the In predicate on the "leaf_spent_transaction_input_vout" field.
-func LeafSpentTransactionInputVoutIn(vs ...int32) predicate.TokenLeaf {
+func LeafSpentTransactionInputVoutIn(vs ...uint32) predicate.TokenLeaf {
 	return predicate.TokenLeaf(sql.FieldIn(FieldLeafSpentTransactionInputVout, vs...))
 }
 
 // LeafSpentTransactionInputVoutNotIn applies the NotIn predicate on the "leaf_spent_transaction_input_vout" field.
-func LeafSpentTransactionInputVoutNotIn(vs ...int32) predicate.TokenLeaf {
+func LeafSpentTransactionInputVoutNotIn(vs ...uint32) predicate.TokenLeaf {
 	return predicate.TokenLeaf(sql.FieldNotIn(FieldLeafSpentTransactionInputVout, vs...))
 }
 
 // LeafSpentTransactionInputVoutGT applies the GT predicate on the "leaf_spent_transaction_input_vout" field.
-func LeafSpentTransactionInputVoutGT(v int32) predicate.TokenLeaf {
+func LeafSpentTransactionInputVoutGT(v uint32) predicate.TokenLeaf {
 	return predicate.TokenLeaf(sql.FieldGT(FieldLeafSpentTransactionInputVout, v))
 }
 
 // LeafSpentTransactionInputVoutGTE applies the GTE predicate on the "leaf_spent_transaction_input_vout" field.
-func LeafSpentTransactionInputVoutGTE(v int32) predicate.TokenLeaf {
+func LeafSpentTransactionInputVoutGTE(v uint32) predicate.TokenLeaf {
 	return predicate.TokenLeaf(sql.FieldGTE(FieldLeafSpentTransactionInputVout, v))
 }
 
 // LeafSpentTransactionInputVoutLT applies the LT predicate on the "leaf_spent_transaction_input_vout" field.
-func LeafSpentTransactionInputVoutLT(v int32) predicate.TokenLeaf {
+func LeafSpentTransactionInputVoutLT(v uint32) predicate.TokenLeaf {
 	return predicate.TokenLeaf(sql.FieldLT(FieldLeafSpentTransactionInputVout, v))
 }
 
 // LeafSpentTransactionInputVoutLTE applies the LTE predicate on the "leaf_spent_transaction_input_vout" field.
-func LeafSpentTransactionInputVoutLTE(v int32) predicate.TokenLeaf {
+func LeafSpentTransactionInputVoutLTE(v uint32) predicate.TokenLeaf {
 	return predicate.TokenLeaf(sql.FieldLTE(FieldLeafSpentTransactionInputVout, v))
 }
 

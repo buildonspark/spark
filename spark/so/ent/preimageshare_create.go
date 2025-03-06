@@ -63,8 +63,8 @@ func (psc *PreimageShareCreate) SetPreimageShare(b []byte) *PreimageShareCreate 
 }
 
 // SetThreshold sets the "threshold" field.
-func (psc *PreimageShareCreate) SetThreshold(i int32) *PreimageShareCreate {
-	psc.mutation.SetThreshold(i)
+func (psc *PreimageShareCreate) SetThreshold(u uint32) *PreimageShareCreate {
+	psc.mutation.SetThreshold(u)
 	return psc
 }
 
@@ -257,7 +257,7 @@ func (psc *PreimageShareCreate) createSpec() (*PreimageShare, *sqlgraph.CreateSp
 		_node.PreimageShare = value
 	}
 	if value, ok := psc.mutation.Threshold(); ok {
-		_spec.SetField(preimageshare.FieldThreshold, field.TypeInt32, value)
+		_spec.SetField(preimageshare.FieldThreshold, field.TypeUint32, value)
 		_node.Threshold = value
 	}
 	if value, ok := psc.mutation.OwnerIdentityPubkey(); ok {

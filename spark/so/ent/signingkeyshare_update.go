@@ -68,23 +68,23 @@ func (sku *SigningKeyshareUpdate) SetPublicKey(b []byte) *SigningKeyshareUpdate 
 }
 
 // SetMinSigners sets the "min_signers" field.
-func (sku *SigningKeyshareUpdate) SetMinSigners(i int32) *SigningKeyshareUpdate {
+func (sku *SigningKeyshareUpdate) SetMinSigners(u uint32) *SigningKeyshareUpdate {
 	sku.mutation.ResetMinSigners()
-	sku.mutation.SetMinSigners(i)
+	sku.mutation.SetMinSigners(u)
 	return sku
 }
 
 // SetNillableMinSigners sets the "min_signers" field if the given value is not nil.
-func (sku *SigningKeyshareUpdate) SetNillableMinSigners(i *int32) *SigningKeyshareUpdate {
-	if i != nil {
-		sku.SetMinSigners(*i)
+func (sku *SigningKeyshareUpdate) SetNillableMinSigners(u *uint32) *SigningKeyshareUpdate {
+	if u != nil {
+		sku.SetMinSigners(*u)
 	}
 	return sku
 }
 
-// AddMinSigners adds i to the "min_signers" field.
-func (sku *SigningKeyshareUpdate) AddMinSigners(i int32) *SigningKeyshareUpdate {
-	sku.mutation.AddMinSigners(i)
+// AddMinSigners adds u to the "min_signers" field.
+func (sku *SigningKeyshareUpdate) AddMinSigners(u int32) *SigningKeyshareUpdate {
+	sku.mutation.AddMinSigners(u)
 	return sku
 }
 
@@ -188,10 +188,10 @@ func (sku *SigningKeyshareUpdate) sqlSave(ctx context.Context) (n int, err error
 		_spec.SetField(signingkeyshare.FieldPublicKey, field.TypeBytes, value)
 	}
 	if value, ok := sku.mutation.MinSigners(); ok {
-		_spec.SetField(signingkeyshare.FieldMinSigners, field.TypeInt32, value)
+		_spec.SetField(signingkeyshare.FieldMinSigners, field.TypeUint32, value)
 	}
 	if value, ok := sku.mutation.AddedMinSigners(); ok {
-		_spec.AddField(signingkeyshare.FieldMinSigners, field.TypeInt32, value)
+		_spec.AddField(signingkeyshare.FieldMinSigners, field.TypeUint32, value)
 	}
 	if value, ok := sku.mutation.CoordinatorIndex(); ok {
 		_spec.SetField(signingkeyshare.FieldCoordinatorIndex, field.TypeUint64, value)
@@ -258,23 +258,23 @@ func (skuo *SigningKeyshareUpdateOne) SetPublicKey(b []byte) *SigningKeyshareUpd
 }
 
 // SetMinSigners sets the "min_signers" field.
-func (skuo *SigningKeyshareUpdateOne) SetMinSigners(i int32) *SigningKeyshareUpdateOne {
+func (skuo *SigningKeyshareUpdateOne) SetMinSigners(u uint32) *SigningKeyshareUpdateOne {
 	skuo.mutation.ResetMinSigners()
-	skuo.mutation.SetMinSigners(i)
+	skuo.mutation.SetMinSigners(u)
 	return skuo
 }
 
 // SetNillableMinSigners sets the "min_signers" field if the given value is not nil.
-func (skuo *SigningKeyshareUpdateOne) SetNillableMinSigners(i *int32) *SigningKeyshareUpdateOne {
-	if i != nil {
-		skuo.SetMinSigners(*i)
+func (skuo *SigningKeyshareUpdateOne) SetNillableMinSigners(u *uint32) *SigningKeyshareUpdateOne {
+	if u != nil {
+		skuo.SetMinSigners(*u)
 	}
 	return skuo
 }
 
-// AddMinSigners adds i to the "min_signers" field.
-func (skuo *SigningKeyshareUpdateOne) AddMinSigners(i int32) *SigningKeyshareUpdateOne {
-	skuo.mutation.AddMinSigners(i)
+// AddMinSigners adds u to the "min_signers" field.
+func (skuo *SigningKeyshareUpdateOne) AddMinSigners(u int32) *SigningKeyshareUpdateOne {
+	skuo.mutation.AddMinSigners(u)
 	return skuo
 }
 
@@ -408,10 +408,10 @@ func (skuo *SigningKeyshareUpdateOne) sqlSave(ctx context.Context) (_node *Signi
 		_spec.SetField(signingkeyshare.FieldPublicKey, field.TypeBytes, value)
 	}
 	if value, ok := skuo.mutation.MinSigners(); ok {
-		_spec.SetField(signingkeyshare.FieldMinSigners, field.TypeInt32, value)
+		_spec.SetField(signingkeyshare.FieldMinSigners, field.TypeUint32, value)
 	}
 	if value, ok := skuo.mutation.AddedMinSigners(); ok {
-		_spec.AddField(signingkeyshare.FieldMinSigners, field.TypeInt32, value)
+		_spec.AddField(signingkeyshare.FieldMinSigners, field.TypeUint32, value)
 	}
 	if value, ok := skuo.mutation.CoordinatorIndex(); ok {
 		_spec.SetField(signingkeyshare.FieldCoordinatorIndex, field.TypeUint64, value)

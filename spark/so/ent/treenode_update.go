@@ -71,23 +71,23 @@ func (tnu *TreeNodeUpdate) SetRawTx(b []byte) *TreeNodeUpdate {
 }
 
 // SetVout sets the "vout" field.
-func (tnu *TreeNodeUpdate) SetVout(i int16) *TreeNodeUpdate {
+func (tnu *TreeNodeUpdate) SetVout(u uint16) *TreeNodeUpdate {
 	tnu.mutation.ResetVout()
-	tnu.mutation.SetVout(i)
+	tnu.mutation.SetVout(u)
 	return tnu
 }
 
 // SetNillableVout sets the "vout" field if the given value is not nil.
-func (tnu *TreeNodeUpdate) SetNillableVout(i *int16) *TreeNodeUpdate {
-	if i != nil {
-		tnu.SetVout(*i)
+func (tnu *TreeNodeUpdate) SetNillableVout(u *uint16) *TreeNodeUpdate {
+	if u != nil {
+		tnu.SetVout(*u)
 	}
 	return tnu
 }
 
-// AddVout adds i to the "vout" field.
-func (tnu *TreeNodeUpdate) AddVout(i int16) *TreeNodeUpdate {
-	tnu.mutation.AddVout(i)
+// AddVout adds u to the "vout" field.
+func (tnu *TreeNodeUpdate) AddVout(u int16) *TreeNodeUpdate {
+	tnu.mutation.AddVout(u)
 	return tnu
 }
 
@@ -298,10 +298,10 @@ func (tnu *TreeNodeUpdate) sqlSave(ctx context.Context) (n int, err error) {
 		_spec.SetField(treenode.FieldRawTx, field.TypeBytes, value)
 	}
 	if value, ok := tnu.mutation.Vout(); ok {
-		_spec.SetField(treenode.FieldVout, field.TypeInt16, value)
+		_spec.SetField(treenode.FieldVout, field.TypeUint16, value)
 	}
 	if value, ok := tnu.mutation.AddedVout(); ok {
-		_spec.AddField(treenode.FieldVout, field.TypeInt16, value)
+		_spec.AddField(treenode.FieldVout, field.TypeUint16, value)
 	}
 	if value, ok := tnu.mutation.RawRefundTx(); ok {
 		_spec.SetField(treenode.FieldRawRefundTx, field.TypeBytes, value)
@@ -500,23 +500,23 @@ func (tnuo *TreeNodeUpdateOne) SetRawTx(b []byte) *TreeNodeUpdateOne {
 }
 
 // SetVout sets the "vout" field.
-func (tnuo *TreeNodeUpdateOne) SetVout(i int16) *TreeNodeUpdateOne {
+func (tnuo *TreeNodeUpdateOne) SetVout(u uint16) *TreeNodeUpdateOne {
 	tnuo.mutation.ResetVout()
-	tnuo.mutation.SetVout(i)
+	tnuo.mutation.SetVout(u)
 	return tnuo
 }
 
 // SetNillableVout sets the "vout" field if the given value is not nil.
-func (tnuo *TreeNodeUpdateOne) SetNillableVout(i *int16) *TreeNodeUpdateOne {
-	if i != nil {
-		tnuo.SetVout(*i)
+func (tnuo *TreeNodeUpdateOne) SetNillableVout(u *uint16) *TreeNodeUpdateOne {
+	if u != nil {
+		tnuo.SetVout(*u)
 	}
 	return tnuo
 }
 
-// AddVout adds i to the "vout" field.
-func (tnuo *TreeNodeUpdateOne) AddVout(i int16) *TreeNodeUpdateOne {
-	tnuo.mutation.AddVout(i)
+// AddVout adds u to the "vout" field.
+func (tnuo *TreeNodeUpdateOne) AddVout(u int16) *TreeNodeUpdateOne {
+	tnuo.mutation.AddVout(u)
 	return tnuo
 }
 
@@ -757,10 +757,10 @@ func (tnuo *TreeNodeUpdateOne) sqlSave(ctx context.Context) (_node *TreeNode, er
 		_spec.SetField(treenode.FieldRawTx, field.TypeBytes, value)
 	}
 	if value, ok := tnuo.mutation.Vout(); ok {
-		_spec.SetField(treenode.FieldVout, field.TypeInt16, value)
+		_spec.SetField(treenode.FieldVout, field.TypeUint16, value)
 	}
 	if value, ok := tnuo.mutation.AddedVout(); ok {
-		_spec.AddField(treenode.FieldVout, field.TypeInt16, value)
+		_spec.AddField(treenode.FieldVout, field.TypeUint16, value)
 	}
 	if value, ok := tnuo.mutation.RawRefundTx(); ok {
 		_spec.SetField(treenode.FieldRawRefundTx, field.TypeBytes, value)

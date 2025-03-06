@@ -43,7 +43,7 @@ func (TokenTransactionReceipt) Fields() []ent.Field {
 		field.Bytes("partial_token_transaction_hash").NotEmpty(),
 		field.Bytes("finalized_token_transaction_hash").NotEmpty().Unique(),
 		field.Bytes("operator_signature").Optional().Unique(),
-		field.Enum("status").GoType(TokenTransactionStatus(TokenTransactionStatusStarted)).Optional(),
+		field.Enum("status").GoType(TokenTransactionStatus(TokenTransactionStatusStarted)),
 	}
 }
 

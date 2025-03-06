@@ -149,7 +149,7 @@ func (h *InternalDepositHandler) FinalizeTreeCreation(ctx context.Context, req *
 			SetValue(node.Value).
 			SetVerifyingPubkey(node.VerifyingPubkey).
 			SetSigningKeyshareID(signingKeyshareID).
-			SetVout(int16(node.Vout)).
+			SetVout(uint16(node.Vout)).
 			SetRawTx(node.RawTx).
 			SetRawRefundTx(node.RawRefundTx)
 
