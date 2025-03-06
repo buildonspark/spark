@@ -28,7 +28,7 @@ type PreimageShare struct {
 	// PreimageShare holds the value of the "preimage_share" field.
 	PreimageShare []byte `json:"preimage_share,omitempty"`
 	// Threshold holds the value of the "threshold" field.
-	Threshold int32 `json:"threshold,omitempty"`
+	Threshold uint32 `json:"threshold,omitempty"`
 	// OwnerIdentityPubkey holds the value of the "owner_identity_pubkey" field.
 	OwnerIdentityPubkey []byte `json:"owner_identity_pubkey,omitempty"`
 	// InvoiceString holds the value of the "invoice_string" field.
@@ -126,7 +126,7 @@ func (ps *PreimageShare) assignValues(columns []string, values []any) error {
 			if value, ok := values[i].(*sql.NullInt64); !ok {
 				return fmt.Errorf("unexpected type %T for field threshold", values[i])
 			} else if value.Valid {
-				ps.Threshold = int32(value.Int64)
+				ps.Threshold = uint32(value.Int64)
 			}
 		case preimageshare.FieldOwnerIdentityPubkey:
 			if value, ok := values[i].(*[]byte); !ok {

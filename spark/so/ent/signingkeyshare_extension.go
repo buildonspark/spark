@@ -57,7 +57,7 @@ func (keyshare *SigningKeyshare) MarshalProto() *pb.SigningKeyshare {
 
 	return &pb.SigningKeyshare{
 		OwnerIdentifiers: ownerIdentifiers,
-		Threshold:        uint32(keyshare.MinSigners),
+		Threshold:        keyshare.MinSigners,
 	}
 }
 
@@ -151,7 +151,7 @@ func GetKeyPackage(ctx context.Context, config *so.Config, keyshareID uuid.UUID)
 		SecretShare:  keyshare.SecretShare,
 		PublicShares: keyshare.PublicShares,
 		PublicKey:    keyshare.PublicKey,
-		MinSigners:   uint32(keyshare.MinSigners),
+		MinSigners:   keyshare.MinSigners,
 	}
 
 	return keyPackage, nil
@@ -173,7 +173,7 @@ func GetKeyPackages(ctx context.Context, config *so.Config, keyshareIDs []uuid.U
 			SecretShare:  keyshare.SecretShare,
 			PublicShares: keyshare.PublicShares,
 			PublicKey:    keyshare.PublicKey,
-			MinSigners:   uint32(keyshare.MinSigners),
+			MinSigners:   keyshare.MinSigners,
 		}
 	}
 

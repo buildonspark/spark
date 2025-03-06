@@ -33,7 +33,7 @@ type SigningKeyshare struct {
 	// PublicKey holds the value of the "public_key" field.
 	PublicKey []byte `json:"public_key,omitempty"`
 	// MinSigners holds the value of the "min_signers" field.
-	MinSigners int32 `json:"min_signers,omitempty"`
+	MinSigners uint32 `json:"min_signers,omitempty"`
 	// CoordinatorIndex holds the value of the "coordinator_index" field.
 	CoordinatorIndex uint64 `json:"coordinator_index,omitempty"`
 	selectValues     sql.SelectValues
@@ -117,7 +117,7 @@ func (sk *SigningKeyshare) assignValues(columns []string, values []any) error {
 			if value, ok := values[i].(*sql.NullInt64); !ok {
 				return fmt.Errorf("unexpected type %T for field min_signers", values[i])
 			} else if value.Valid {
-				sk.MinSigners = int32(value.Int64)
+				sk.MinSigners = uint32(value.Int64)
 			}
 		case signingkeyshare.FieldCoordinatorIndex:
 			if value, ok := values[i].(*sql.NullInt64); !ok {

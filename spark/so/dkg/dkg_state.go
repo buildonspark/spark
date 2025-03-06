@@ -284,7 +284,7 @@ func (s *State) Round3(ctx context.Context, requestID string, frostConnection *g
 		db.SigningKeyshare.Create().
 			SetID(keyID).
 			SetStatus(schema.KeyshareStatusAvailable).
-			SetMinSigners(int32(s.MinSigners)).
+			SetMinSigners(uint32(s.MinSigners)).
 			SetSecretShare(key.SecretShare).
 			SetPublicShares(key.PublicShares).
 			SetPublicKey(key.PublicKey).

@@ -76,23 +76,23 @@ func (tlu *TokenLeafUpdate) ClearLeafSpentOperatorSpecificOwnershipSignature() *
 }
 
 // SetLeafSpentTransactionInputVout sets the "leaf_spent_transaction_input_vout" field.
-func (tlu *TokenLeafUpdate) SetLeafSpentTransactionInputVout(i int32) *TokenLeafUpdate {
+func (tlu *TokenLeafUpdate) SetLeafSpentTransactionInputVout(u uint32) *TokenLeafUpdate {
 	tlu.mutation.ResetLeafSpentTransactionInputVout()
-	tlu.mutation.SetLeafSpentTransactionInputVout(i)
+	tlu.mutation.SetLeafSpentTransactionInputVout(u)
 	return tlu
 }
 
 // SetNillableLeafSpentTransactionInputVout sets the "leaf_spent_transaction_input_vout" field if the given value is not nil.
-func (tlu *TokenLeafUpdate) SetNillableLeafSpentTransactionInputVout(i *int32) *TokenLeafUpdate {
-	if i != nil {
-		tlu.SetLeafSpentTransactionInputVout(*i)
+func (tlu *TokenLeafUpdate) SetNillableLeafSpentTransactionInputVout(u *uint32) *TokenLeafUpdate {
+	if u != nil {
+		tlu.SetLeafSpentTransactionInputVout(*u)
 	}
 	return tlu
 }
 
-// AddLeafSpentTransactionInputVout adds i to the "leaf_spent_transaction_input_vout" field.
-func (tlu *TokenLeafUpdate) AddLeafSpentTransactionInputVout(i int32) *TokenLeafUpdate {
-	tlu.mutation.AddLeafSpentTransactionInputVout(i)
+// AddLeafSpentTransactionInputVout adds u to the "leaf_spent_transaction_input_vout" field.
+func (tlu *TokenLeafUpdate) AddLeafSpentTransactionInputVout(u int32) *TokenLeafUpdate {
+	tlu.mutation.AddLeafSpentTransactionInputVout(u)
 	return tlu
 }
 
@@ -249,13 +249,13 @@ func (tlu *TokenLeafUpdate) sqlSave(ctx context.Context) (n int, err error) {
 		_spec.ClearField(tokenleaf.FieldLeafSpentOperatorSpecificOwnershipSignature, field.TypeBytes)
 	}
 	if value, ok := tlu.mutation.LeafSpentTransactionInputVout(); ok {
-		_spec.SetField(tokenleaf.FieldLeafSpentTransactionInputVout, field.TypeInt32, value)
+		_spec.SetField(tokenleaf.FieldLeafSpentTransactionInputVout, field.TypeUint32, value)
 	}
 	if value, ok := tlu.mutation.AddedLeafSpentTransactionInputVout(); ok {
-		_spec.AddField(tokenleaf.FieldLeafSpentTransactionInputVout, field.TypeInt32, value)
+		_spec.AddField(tokenleaf.FieldLeafSpentTransactionInputVout, field.TypeUint32, value)
 	}
 	if tlu.mutation.LeafSpentTransactionInputVoutCleared() {
-		_spec.ClearField(tokenleaf.FieldLeafSpentTransactionInputVout, field.TypeInt32)
+		_spec.ClearField(tokenleaf.FieldLeafSpentTransactionInputVout, field.TypeUint32)
 	}
 	if value, ok := tlu.mutation.LeafSpentRevocationPrivateKey(); ok {
 		_spec.SetField(tokenleaf.FieldLeafSpentRevocationPrivateKey, field.TypeBytes, value)
@@ -386,23 +386,23 @@ func (tluo *TokenLeafUpdateOne) ClearLeafSpentOperatorSpecificOwnershipSignature
 }
 
 // SetLeafSpentTransactionInputVout sets the "leaf_spent_transaction_input_vout" field.
-func (tluo *TokenLeafUpdateOne) SetLeafSpentTransactionInputVout(i int32) *TokenLeafUpdateOne {
+func (tluo *TokenLeafUpdateOne) SetLeafSpentTransactionInputVout(u uint32) *TokenLeafUpdateOne {
 	tluo.mutation.ResetLeafSpentTransactionInputVout()
-	tluo.mutation.SetLeafSpentTransactionInputVout(i)
+	tluo.mutation.SetLeafSpentTransactionInputVout(u)
 	return tluo
 }
 
 // SetNillableLeafSpentTransactionInputVout sets the "leaf_spent_transaction_input_vout" field if the given value is not nil.
-func (tluo *TokenLeafUpdateOne) SetNillableLeafSpentTransactionInputVout(i *int32) *TokenLeafUpdateOne {
-	if i != nil {
-		tluo.SetLeafSpentTransactionInputVout(*i)
+func (tluo *TokenLeafUpdateOne) SetNillableLeafSpentTransactionInputVout(u *uint32) *TokenLeafUpdateOne {
+	if u != nil {
+		tluo.SetLeafSpentTransactionInputVout(*u)
 	}
 	return tluo
 }
 
-// AddLeafSpentTransactionInputVout adds i to the "leaf_spent_transaction_input_vout" field.
-func (tluo *TokenLeafUpdateOne) AddLeafSpentTransactionInputVout(i int32) *TokenLeafUpdateOne {
-	tluo.mutation.AddLeafSpentTransactionInputVout(i)
+// AddLeafSpentTransactionInputVout adds u to the "leaf_spent_transaction_input_vout" field.
+func (tluo *TokenLeafUpdateOne) AddLeafSpentTransactionInputVout(u int32) *TokenLeafUpdateOne {
+	tluo.mutation.AddLeafSpentTransactionInputVout(u)
 	return tluo
 }
 
@@ -589,13 +589,13 @@ func (tluo *TokenLeafUpdateOne) sqlSave(ctx context.Context) (_node *TokenLeaf, 
 		_spec.ClearField(tokenleaf.FieldLeafSpentOperatorSpecificOwnershipSignature, field.TypeBytes)
 	}
 	if value, ok := tluo.mutation.LeafSpentTransactionInputVout(); ok {
-		_spec.SetField(tokenleaf.FieldLeafSpentTransactionInputVout, field.TypeInt32, value)
+		_spec.SetField(tokenleaf.FieldLeafSpentTransactionInputVout, field.TypeUint32, value)
 	}
 	if value, ok := tluo.mutation.AddedLeafSpentTransactionInputVout(); ok {
-		_spec.AddField(tokenleaf.FieldLeafSpentTransactionInputVout, field.TypeInt32, value)
+		_spec.AddField(tokenleaf.FieldLeafSpentTransactionInputVout, field.TypeUint32, value)
 	}
 	if tluo.mutation.LeafSpentTransactionInputVoutCleared() {
-		_spec.ClearField(tokenleaf.FieldLeafSpentTransactionInputVout, field.TypeInt32)
+		_spec.ClearField(tokenleaf.FieldLeafSpentTransactionInputVout, field.TypeUint32)
 	}
 	if value, ok := tluo.mutation.LeafSpentRevocationPrivateKey(); ok {
 		_spec.SetField(tokenleaf.FieldLeafSpentRevocationPrivateKey, field.TypeBytes, value)

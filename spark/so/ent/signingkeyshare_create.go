@@ -75,8 +75,8 @@ func (skc *SigningKeyshareCreate) SetPublicKey(b []byte) *SigningKeyshareCreate 
 }
 
 // SetMinSigners sets the "min_signers" field.
-func (skc *SigningKeyshareCreate) SetMinSigners(i int32) *SigningKeyshareCreate {
-	skc.mutation.SetMinSigners(i)
+func (skc *SigningKeyshareCreate) SetMinSigners(u uint32) *SigningKeyshareCreate {
+	skc.mutation.SetMinSigners(u)
 	return skc
 }
 
@@ -240,7 +240,7 @@ func (skc *SigningKeyshareCreate) createSpec() (*SigningKeyshare, *sqlgraph.Crea
 		_node.PublicKey = value
 	}
 	if value, ok := skc.mutation.MinSigners(); ok {
-		_spec.SetField(signingkeyshare.FieldMinSigners, field.TypeInt32, value)
+		_spec.SetField(signingkeyshare.FieldMinSigners, field.TypeUint32, value)
 		_node.MinSigners = value
 	}
 	if value, ok := skc.mutation.CoordinatorIndex(); ok {

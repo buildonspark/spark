@@ -77,7 +77,7 @@ func PreimageShare(v []byte) predicate.PreimageShare {
 }
 
 // Threshold applies equality check predicate on the "threshold" field. It's identical to ThresholdEQ.
-func Threshold(v int32) predicate.PreimageShare {
+func Threshold(v uint32) predicate.PreimageShare {
 	return predicate.PreimageShare(sql.FieldEQ(FieldThreshold, v))
 }
 
@@ -252,42 +252,42 @@ func PreimageShareLTE(v []byte) predicate.PreimageShare {
 }
 
 // ThresholdEQ applies the EQ predicate on the "threshold" field.
-func ThresholdEQ(v int32) predicate.PreimageShare {
+func ThresholdEQ(v uint32) predicate.PreimageShare {
 	return predicate.PreimageShare(sql.FieldEQ(FieldThreshold, v))
 }
 
 // ThresholdNEQ applies the NEQ predicate on the "threshold" field.
-func ThresholdNEQ(v int32) predicate.PreimageShare {
+func ThresholdNEQ(v uint32) predicate.PreimageShare {
 	return predicate.PreimageShare(sql.FieldNEQ(FieldThreshold, v))
 }
 
 // ThresholdIn applies the In predicate on the "threshold" field.
-func ThresholdIn(vs ...int32) predicate.PreimageShare {
+func ThresholdIn(vs ...uint32) predicate.PreimageShare {
 	return predicate.PreimageShare(sql.FieldIn(FieldThreshold, vs...))
 }
 
 // ThresholdNotIn applies the NotIn predicate on the "threshold" field.
-func ThresholdNotIn(vs ...int32) predicate.PreimageShare {
+func ThresholdNotIn(vs ...uint32) predicate.PreimageShare {
 	return predicate.PreimageShare(sql.FieldNotIn(FieldThreshold, vs...))
 }
 
 // ThresholdGT applies the GT predicate on the "threshold" field.
-func ThresholdGT(v int32) predicate.PreimageShare {
+func ThresholdGT(v uint32) predicate.PreimageShare {
 	return predicate.PreimageShare(sql.FieldGT(FieldThreshold, v))
 }
 
 // ThresholdGTE applies the GTE predicate on the "threshold" field.
-func ThresholdGTE(v int32) predicate.PreimageShare {
+func ThresholdGTE(v uint32) predicate.PreimageShare {
 	return predicate.PreimageShare(sql.FieldGTE(FieldThreshold, v))
 }
 
 // ThresholdLT applies the LT predicate on the "threshold" field.
-func ThresholdLT(v int32) predicate.PreimageShare {
+func ThresholdLT(v uint32) predicate.PreimageShare {
 	return predicate.PreimageShare(sql.FieldLT(FieldThreshold, v))
 }
 
 // ThresholdLTE applies the LTE predicate on the "threshold" field.
-func ThresholdLTE(v int32) predicate.PreimageShare {
+func ThresholdLTE(v uint32) predicate.PreimageShare {
 	return predicate.PreimageShare(sql.FieldLTE(FieldThreshold, v))
 }
 

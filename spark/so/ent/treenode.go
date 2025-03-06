@@ -38,7 +38,7 @@ type TreeNode struct {
 	// RawTx holds the value of the "raw_tx" field.
 	RawTx []byte `json:"raw_tx,omitempty"`
 	// Vout holds the value of the "vout" field.
-	Vout int16 `json:"vout,omitempty"`
+	Vout uint16 `json:"vout,omitempty"`
 	// RawRefundTx holds the value of the "raw_refund_tx" field.
 	RawRefundTx []byte `json:"raw_refund_tx,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
@@ -201,7 +201,7 @@ func (tn *TreeNode) assignValues(columns []string, values []any) error {
 			if value, ok := values[i].(*sql.NullInt64); !ok {
 				return fmt.Errorf("unexpected type %T for field vout", values[i])
 			} else if value.Valid {
-				tn.Vout = int16(value.Int64)
+				tn.Vout = uint16(value.Int64)
 			}
 		case treenode.FieldRawRefundTx:
 			if value, ok := values[i].(*[]byte); !ok {
