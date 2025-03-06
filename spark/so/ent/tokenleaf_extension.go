@@ -56,7 +56,7 @@ func FetchInputLeaves(ctx context.Context, leavesToSpend []*pb.TokenLeafToSpend)
 
 		var foundLeaf *TokenLeaf
 		for _, createdLeaf := range receipt.Edges.CreatedLeaf {
-			if createdLeaf.LeafCreatedTransactionOutputVout == leaf.PrevTokenTransactionLeafVout {
+			if createdLeaf.LeafCreatedTransactionOutputVout == int32(leaf.PrevTokenTransactionLeafVout) {
 				foundLeaf = createdLeaf
 				break
 			}

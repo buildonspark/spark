@@ -65,10 +65,10 @@ func (TokenLeaf) Fields() []ent.Field {
 		field.Bytes("withdraw_revocation_public_key").Immutable(),
 		field.Bytes("token_public_key").NotEmpty().Immutable(),
 		field.Bytes("token_amount").NotEmpty().Immutable(),
-		field.Uint32("leaf_created_transaction_output_vout").Immutable(),
+		field.Int32("leaf_created_transaction_output_vout").Immutable(),
 		field.Bytes("leaf_spent_ownership_signature").Optional(),
 		field.Bytes("leaf_spent_operator_specific_ownership_signature").Optional(),
-		field.Uint32("leaf_spent_transaction_input_vout").Optional(),
+		field.Int32("leaf_spent_transaction_input_vout").Optional(),
 		field.Bytes("leaf_spent_revocation_private_key").Optional(),
 	}
 }

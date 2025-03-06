@@ -77,7 +77,7 @@ func PublicKey(v []byte) predicate.SigningKeyshare {
 }
 
 // MinSigners applies equality check predicate on the "min_signers" field. It's identical to MinSignersEQ.
-func MinSigners(v uint32) predicate.SigningKeyshare {
+func MinSigners(v int32) predicate.SigningKeyshare {
 	return predicate.SigningKeyshare(sql.FieldEQ(FieldMinSigners, v))
 }
 
@@ -277,42 +277,42 @@ func PublicKeyLTE(v []byte) predicate.SigningKeyshare {
 }
 
 // MinSignersEQ applies the EQ predicate on the "min_signers" field.
-func MinSignersEQ(v uint32) predicate.SigningKeyshare {
+func MinSignersEQ(v int32) predicate.SigningKeyshare {
 	return predicate.SigningKeyshare(sql.FieldEQ(FieldMinSigners, v))
 }
 
 // MinSignersNEQ applies the NEQ predicate on the "min_signers" field.
-func MinSignersNEQ(v uint32) predicate.SigningKeyshare {
+func MinSignersNEQ(v int32) predicate.SigningKeyshare {
 	return predicate.SigningKeyshare(sql.FieldNEQ(FieldMinSigners, v))
 }
 
 // MinSignersIn applies the In predicate on the "min_signers" field.
-func MinSignersIn(vs ...uint32) predicate.SigningKeyshare {
+func MinSignersIn(vs ...int32) predicate.SigningKeyshare {
 	return predicate.SigningKeyshare(sql.FieldIn(FieldMinSigners, vs...))
 }
 
 // MinSignersNotIn applies the NotIn predicate on the "min_signers" field.
-func MinSignersNotIn(vs ...uint32) predicate.SigningKeyshare {
+func MinSignersNotIn(vs ...int32) predicate.SigningKeyshare {
 	return predicate.SigningKeyshare(sql.FieldNotIn(FieldMinSigners, vs...))
 }
 
 // MinSignersGT applies the GT predicate on the "min_signers" field.
-func MinSignersGT(v uint32) predicate.SigningKeyshare {
+func MinSignersGT(v int32) predicate.SigningKeyshare {
 	return predicate.SigningKeyshare(sql.FieldGT(FieldMinSigners, v))
 }
 
 // MinSignersGTE applies the GTE predicate on the "min_signers" field.
-func MinSignersGTE(v uint32) predicate.SigningKeyshare {
+func MinSignersGTE(v int32) predicate.SigningKeyshare {
 	return predicate.SigningKeyshare(sql.FieldGTE(FieldMinSigners, v))
 }
 
 // MinSignersLT applies the LT predicate on the "min_signers" field.
-func MinSignersLT(v uint32) predicate.SigningKeyshare {
+func MinSignersLT(v int32) predicate.SigningKeyshare {
 	return predicate.SigningKeyshare(sql.FieldLT(FieldMinSigners, v))
 }
 
 // MinSignersLTE applies the LTE predicate on the "min_signers" field.
-func MinSignersLTE(v uint32) predicate.SigningKeyshare {
+func MinSignersLTE(v int32) predicate.SigningKeyshare {
 	return predicate.SigningKeyshare(sql.FieldLTE(FieldMinSigners, v))
 }
 

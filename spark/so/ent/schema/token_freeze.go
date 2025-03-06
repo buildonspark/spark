@@ -57,7 +57,9 @@ func (TokenFreeze) Edges() []ent.Edge {
 func (TokenFreeze) Indexes() []ent.Index {
 	return []ent.Index{
 		// Enforce uniqueness to ensure idempotency.
-		index.Fields("owner_public_key", "token_public_key", "wallet_provided_freeze_timestamp").Unique(),
-		index.Fields("owner_public_key", "token_public_key", "wallet_provided_thaw_timestamp").Unique(),
+		index.Fields("owner_public_key", "token_public_key", "wallet_provided_freeze_timestamp").Unique().
+			StorageKey("tokenfreeze_owner_public_key_token_public_key_wallet_provided_f"),
+		index.Fields("owner_public_key", "token_public_key", "wallet_provided_thaw_timestamp").Unique().
+			StorageKey("tokenfreeze_owner_public_key_token_public_key_wallet_provided_t"),
 	}
 }

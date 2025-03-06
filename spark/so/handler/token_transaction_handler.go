@@ -625,7 +625,7 @@ func (o TokenTransactionHandler) GetOwnedTokenLeaves(
 				TokenAmount:                   leaf.TokenAmount,
 			},
 			PreviousTransactionHash: leaf.Edges.LeafCreatedTokenTransactionReceipt.FinalizedTokenTransactionHash,
-			PreviousTransactionVout: leaf.LeafCreatedTransactionOutputVout,
+			PreviousTransactionVout: uint32(leaf.LeafCreatedTransactionOutputVout),
 		}
 	}
 
