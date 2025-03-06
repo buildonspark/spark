@@ -1,6 +1,6 @@
 import { bytesToHex, hexToBytes } from "@noble/curves/abstract/utils";
 import { secp256k1 } from "@noble/curves/secp256k1";
-import { Transaction } from "@scure/btc-signer";
+import { Address, OutScript, Transaction } from "@scure/btc-signer";
 import { TransactionInput } from "@scure/btc-signer/psbt";
 import { sha256 } from "@scure/btc-signer/utils";
 import { decode } from "light-bolt11-decoder";
@@ -17,6 +17,7 @@ import {
   UserLeafInput,
 } from "./graphql/objects/index.js";
 import {
+  DepositAddressQueryResult,
   LeafWithPreviousTransactionData,
   QueryAllTransfersResponse,
   Transfer,
@@ -52,7 +53,7 @@ import {
   getTxFromRawTxHex,
   getTxId,
 } from "./utils/bitcoin.js";
-import { Network } from "./utils/network.js";
+import { getNetwork, Network } from "./utils/network.js";
 import {
   calculateAvailableTokenAmount,
   checkIfSelectedLeavesAreAvailable,
@@ -182,10 +183,10 @@ export class SparkWallet {
   }
 
   private async initializeWallet(identityPublicKey: string) {
+    await this.connectionManager.createClients();
     this.sspClient = new SspClient(identityPublicKey);
     await Promise.all([
       this.initWasm(),
-      this.config.signer.restoreSigningKeysFromLeafs(this.leaves),
       // Hacky but do this to store the deposit signing key in the signer
       this.config.signer.getDepositSigningKey(),
     ]);
@@ -293,11 +294,6 @@ export class SparkWallet {
       }
     }
 
-    console.log({
-      leavesLength: this.leaves.length,
-      optimalLeavesLength,
-    });
-
     return this.leaves.length > optimalLeavesLength * 5;
   }
 
@@ -320,13 +316,10 @@ export class SparkWallet {
   }
 
   private async syncWallet() {
-    await Promise.all([
-      this.claimTransfers(),
-      this.claimDeposits(),
-      this.syncTokenLeaves(),
-    ]);
+    await Promise.all([this.claimTransfers(), this.syncTokenLeaves()]);
     this.leaves = await this.getLeaves();
     await this.refreshTimelockNodes();
+    await this.config.signer.restoreSigningKeysFromLeafs(this.leaves);
 
     this.optimizeLeaves().catch((e) => {
       console.error("Failed to optimize leaves", e);
@@ -677,11 +670,7 @@ export class SparkWallet {
     tokenBalances: Map<string, { balance: bigint }>;
   }> {
     if (forceRefetch) {
-      await Promise.all([
-        this.claimTransfers(),
-        this.claimDeposits(),
-        this.syncTokenLeaves(),
-      ]);
+      await Promise.all([this.claimTransfers(), this.syncTokenLeaves()]);
       this.leaves = await this.getLeaves();
     }
 
@@ -753,45 +742,73 @@ export class SparkWallet {
     return await this.transferDepositToSelf(response.nodes, signingPubKey);
   }
 
-  /**
-   * Claims any pending deposits to the wallet.
-   *
-   * @returns {Promise<TreeNode[]>} The nodes created from the claimed deposits
-   * @private
-   */
-  private async claimDeposits() {
+  public async claimDeposit(txid: string) {
+    const baseUrl =
+      this.config.getNetwork() === Network.REGTEST
+        ? "https://regtest-mempool.dev.dev.sparkinfra.net/api"
+        : "https://mempool.space/api";
+    const auth = btoa("spark-sdk:mCMk1JqlBNtetUNy");
+
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+
+    if (this.config.getNetwork() === Network.REGTEST) {
+      headers["Authorization"] = `Basic ${auth}`;
+    }
+
+    const response = await fetch(`${baseUrl}/tx/${txid}/hex`, {
+      headers,
+    });
+
+    const txHex = await response.text();
+    if (!/^[0-9A-Fa-f]+$/.test(txHex)) {
+      throw new Error("Transaction not found");
+    }
+    const depositTx = getTxFromRawTxHex(txHex);
+
     const sparkClient = await this.connectionManager.createSparkClient(
       this.config.getCoordinatorAddress(),
     );
 
-    const identityPublicKey = await this.config.signer.getIdentityPublicKey();
-    const deposits = await sparkClient.query_unused_deposit_addresses({
-      identityPublicKey,
-    });
+    const unusedDepositAddresses: Map<string, DepositAddressQueryResult> =
+      new Map(
+        (
+          await sparkClient.query_unused_deposit_addresses({
+            identityPublicKey: await this.config.signer.getIdentityPublicKey(),
+          })
+        ).depositAddresses.map((addr) => [addr.depositAddress, addr]),
+      );
 
-    const depositNodes: TreeNode[] = [];
-    for (const deposit of deposits.depositAddresses) {
-      const tx = await this.queryMempoolTxs(deposit.depositAddress);
-
-      if (!tx) {
+    let depositAddress: DepositAddressQueryResult | undefined;
+    let vout = 0;
+    for (let i = 0; i < depositTx.outputsLength; i++) {
+      const output = depositTx.getOutput(i);
+      if (!output) {
         continue;
       }
-
-      const { depositTx, vout } = tx;
-
-      const nodes = await this.finalizeDeposit({
-        signingPubKey: deposit.userSigningPublicKey,
-        verifyingKey: deposit.verifyingPublicKey,
-        depositTx,
-        vout,
-      });
-
-      if (nodes) {
-        depositNodes.push(...nodes);
+      const parsedScript = OutScript.decode(output.script!);
+      const address = Address(getNetwork(this.config.getNetwork())).encode(
+        parsedScript,
+      );
+      if (unusedDepositAddresses.has(address)) {
+        vout = i;
+        depositAddress = unusedDepositAddresses.get(address);
+        break;
       }
     }
+    if (!depositAddress) {
+      throw new Error("Deposit address not found");
+    }
 
-    return depositNodes;
+    const nodes = await this.finalizeDeposit({
+      signingPubKey: depositAddress.userSigningPublicKey,
+      verifyingKey: depositAddress.verifyingPublicKey,
+      depositTx,
+      vout,
+    });
+
+    return nodes;
   }
 
   /**
@@ -806,7 +823,7 @@ export class SparkWallet {
     const baseUrl =
       network === BitcoinNetwork.REGTEST
         ? "https://regtest-mempool.dev.dev.sparkinfra.net/api"
-        : "https://mempool.space/docs/api/rest";
+        : "https://mempool.space/docs/api";
     const auth = btoa("spark-sdk:mCMk1JqlBNtetUNy");
 
     const headers: Record<string, string> = {

@@ -23,17 +23,29 @@ import { WalletConfigService } from "./config.js";
 // TODO: Some sort of client cleanup
 export class ConnectionManager {
   private config: WalletConfigService;
-  private clients: Record<
+  private clients: Map<
     string,
     {
       client: SparkServiceClient & { close?: () => void };
       authToken: string;
     }
-  > = {};
+  > = new Map();
 
   constructor(config: WalletConfigService) {
     this.config = config;
   }
+
+  // When initializing wallet, go ahead and instantiate all clients
+  public async createClients() {
+    await Promise.all(
+      Object.values(this.config.getConfig().signingOperators).map(
+        (operator) => {
+          this.createSparkClient(operator.address);
+        },
+      ),
+    );
+  }
+
   static createMockClient(address: string): MockServiceClient & {
     close: () => void;
   } {
@@ -71,8 +83,8 @@ export class ConnectionManager {
     address: string,
     certPath?: string,
   ): Promise<SparkServiceClient & { close?: () => void }> {
-    if (this.clients[address]) {
-      return this.clients[address].client;
+    if (this.clients.has(address)) {
+      return this.clients.get(address)!.client;
     }
 
     const authToken = await this.authenticate(address);
@@ -85,7 +97,7 @@ export class ConnectionManager {
       authMiddleware,
     );
 
-    this.clients[address] = { client, authToken };
+    this.clients.set(address, { client, authToken });
     return client;
   }
 
@@ -154,14 +166,14 @@ export class ConnectionManager {
           ...options,
           metadata: Metadata(options.metadata).set(
             "Authorization",
-            `Bearer ${this.clients[address]?.authToken || initialAuthToken}`,
+            `Bearer ${this.clients.get(address)?.authToken || initialAuthToken}`,
           ),
         });
       } catch (error: any) {
         if (error.message?.includes("token has expired")) {
           const newAuthToken = await this.authenticate(address);
           // @ts-ignore - We can only get here if the client exists
-          this.clients[address].authToken = newAuthToken;
+          this.clients.get(address).authToken = newAuthToken;
 
           yield* call.next(call.request, {
             ...options,
@@ -188,7 +200,7 @@ export class ConnectionManager {
           metadata: Metadata(options.metadata)
             .set(
               "Authorization",
-              `Bearer ${this.clients[address]?.authToken || initialAuthToken}`,
+              `Bearer ${this.clients.get(address)?.authToken || initialAuthToken}`,
             )
             .set("X-Requested-With", "XMLHttpRequest")
             .set("X-Grpc-Web", "1")
@@ -198,7 +210,7 @@ export class ConnectionManager {
         if (error.message?.includes("token has expired")) {
           const newAuthToken = await this.authenticate(address);
           // @ts-ignore - We can only get here if the client exists
-          this.clients[address].authToken = newAuthToken;
+          this.clients.get(address).authToken = newAuthToken;
 
           yield* call.next(call.request, {
             ...options,

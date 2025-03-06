@@ -23,6 +23,7 @@ async function runCLI() {
   getbalance                                                      - Get the wallet's balance
   getdepositaddress                                               - Get an address to deposit funds from L1 to Spark
   getsparkaddress                                                 - Get the wallet's spark address
+  claimdeposit <txid>                                             - Claim any pending deposits to the wallet
   createinvoice <amount> <memo>                                   - Create a new lightning invoice
   payinvoice <invoice>                                            - Pay a lightning invoice
   sendtransfer <amount> <receiverSparkAddress>                    - Send a spark transfer
@@ -49,6 +50,10 @@ async function runCLI() {
     switch (lowerCommand) {
       case "help":
         console.log(helpMessage);
+        break;
+      case "claimdeposit":
+        const depositResult = await wallet.claimDeposit(args[0]);
+        console.log(depositResult);
         break;
       case "initwallet":
         wallet = new SparkWallet(network);
