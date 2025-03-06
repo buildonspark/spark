@@ -1,6 +1,3 @@
-import fs from "fs/promises";
-import path from "path";
-import { fileURLToPath } from "url";
 import init, { InitOutput } from "../wasm/spark_bindings.js";
 
 export async function initWasm(): Promise<InitOutput> {
@@ -9,6 +6,10 @@ export async function initWasm(): Promise<InitOutput> {
   try {
     if (typeof window === "undefined") {
       // Node.js environment
+      const fs = await import("fs/promises");
+      const path = await import("path");
+      const { fileURLToPath } = await import("url");
+
       const __filename = fileURLToPath(import.meta.url);
       const __dirname = path.dirname(__filename);
 
