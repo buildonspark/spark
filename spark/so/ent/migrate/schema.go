@@ -388,6 +388,8 @@ var (
 		{Name: "previous_refund_tx", Type: field.TypeBytes},
 		{Name: "intermediate_refund_tx", Type: field.TypeBytes},
 		{Name: "key_tweak", Type: field.TypeBytes, Nullable: true},
+		{Name: "sender_key_tweak_proof", Type: field.TypeBytes, Nullable: true},
+		{Name: "receiver_key_tweak", Type: field.TypeBytes, Nullable: true},
 		{Name: "transfer_leaf_transfer", Type: field.TypeUUID},
 		{Name: "transfer_leaf_leaf", Type: field.TypeUUID},
 	}
@@ -399,13 +401,13 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "transfer_leafs_transfers_transfer",
-				Columns:    []*schema.Column{TransferLeafsColumns[8]},
+				Columns:    []*schema.Column{TransferLeafsColumns[10]},
 				RefColumns: []*schema.Column{TransfersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "transfer_leafs_tree_nodes_leaf",
-				Columns:    []*schema.Column{TransferLeafsColumns[9]},
+				Columns:    []*schema.Column{TransferLeafsColumns[11]},
 				RefColumns: []*schema.Column{TreeNodesColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -414,12 +416,12 @@ var (
 			{
 				Name:    "transferleaf_transfer_leaf_transfer",
 				Unique:  false,
-				Columns: []*schema.Column{TransferLeafsColumns[8]},
+				Columns: []*schema.Column{TransferLeafsColumns[10]},
 			},
 			{
 				Name:    "transferleaf_transfer_leaf_leaf",
 				Unique:  false,
-				Columns: []*schema.Column{TransferLeafsColumns[9]},
+				Columns: []*schema.Column{TransferLeafsColumns[11]},
 			},
 		},
 	}

@@ -19,6 +19,8 @@ const (
 	TransferStatusSenderKeyTweaked TransferStatus = "SENDER_KEY_TWEAKED"
 	// TransferStatusReceiverKeyTweaked is the status of transfer where key has been tweaked.
 	TransferStatusReceiverKeyTweaked TransferStatus = "RECEIVER_KEY_TWEAKED"
+	// TransferStatusReceiverKeyTweakLocked is the status of transfer where key has been tweaked and locked.
+	TransferStatusReceiverKeyTweakLocked TransferStatus = "RECEIVER_KEY_TWEAK_LOCKED"
 	// TransferStatusReceiverRefundSigned is the status of transfer where refund transaction has been signed.
 	TransferStatusReceiverRefundSigned TransferStatus = "RECEIVER_REFUND_SIGNED"
 	// TransferStatusCompleted is the status of transfer that has completed.
@@ -36,6 +38,7 @@ func (TransferStatus) Values() []string {
 		string(TransferStatusSenderKeyTweakPending),
 		string(TransferStatusSenderKeyTweaked),
 		string(TransferStatusReceiverKeyTweaked),
+		string(TransferStatusReceiverKeyTweakLocked),
 		string(TransferStatusReceiverRefundSigned),
 		string(TransferStatusCompleted),
 		string(TransferStatusExpired),

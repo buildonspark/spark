@@ -34,6 +34,10 @@ type TransferLeaf struct {
 	IntermediateRefundTx []byte `json:"intermediate_refund_tx,omitempty"`
 	// KeyTweak holds the value of the "key_tweak" field.
 	KeyTweak []byte `json:"key_tweak,omitempty"`
+	// SenderKeyTweakProof holds the value of the "sender_key_tweak_proof" field.
+	SenderKeyTweakProof []byte `json:"sender_key_tweak_proof,omitempty"`
+	// ReceiverKeyTweak holds the value of the "receiver_key_tweak" field.
+	ReceiverKeyTweak []byte `json:"receiver_key_tweak,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the TransferLeafQuery when eager-loading is set.
 	Edges                  TransferLeafEdges `json:"edges"`
@@ -80,7 +84,7 @@ func (*TransferLeaf) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case transferleaf.FieldSecretCipher, transferleaf.FieldSignature, transferleaf.FieldPreviousRefundTx, transferleaf.FieldIntermediateRefundTx, transferleaf.FieldKeyTweak:
+		case transferleaf.FieldSecretCipher, transferleaf.FieldSignature, transferleaf.FieldPreviousRefundTx, transferleaf.FieldIntermediateRefundTx, transferleaf.FieldKeyTweak, transferleaf.FieldSenderKeyTweakProof, transferleaf.FieldReceiverKeyTweak:
 			values[i] = new([]byte)
 		case transferleaf.FieldCreateTime, transferleaf.FieldUpdateTime:
 			values[i] = new(sql.NullTime)
@@ -152,6 +156,18 @@ func (tl *TransferLeaf) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field key_tweak", values[i])
 			} else if value != nil {
 				tl.KeyTweak = *value
+			}
+		case transferleaf.FieldSenderKeyTweakProof:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field sender_key_tweak_proof", values[i])
+			} else if value != nil {
+				tl.SenderKeyTweakProof = *value
+			}
+		case transferleaf.FieldReceiverKeyTweak:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field receiver_key_tweak", values[i])
+			} else if value != nil {
+				tl.ReceiverKeyTweak = *value
 			}
 		case transferleaf.ForeignKeys[0]:
 			if value, ok := values[i].(*sql.NullScanner); !ok {
@@ -233,6 +249,12 @@ func (tl *TransferLeaf) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("key_tweak=")
 	builder.WriteString(fmt.Sprintf("%v", tl.KeyTweak))
+	builder.WriteString(", ")
+	builder.WriteString("sender_key_tweak_proof=")
+	builder.WriteString(fmt.Sprintf("%v", tl.SenderKeyTweakProof))
+	builder.WriteString(", ")
+	builder.WriteString("receiver_key_tweak=")
+	builder.WriteString(fmt.Sprintf("%v", tl.ReceiverKeyTweak))
 	builder.WriteByte(')')
 	return builder.String()
 }

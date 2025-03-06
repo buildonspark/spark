@@ -85,7 +85,16 @@ func (h *InternalTransferHandler) InitiateTransfer(ctx context.Context, req *pbi
 	for _, leaf := range req.Leaves {
 		leafRefundMap[leaf.LeafId] = leaf.RawRefundTx
 	}
-	_, _, err := h.createTransfer(ctx, req.TransferId, schema.TransferTypeTransfer, req.ExpiryTime.AsTime(), req.SenderIdentityPublicKey, req.ReceiverIdentityPublicKey, leafRefundMap)
+	_, _, err := h.createTransfer(
+		ctx,
+		req.TransferId,
+		schema.TransferTypeTransfer,
+		req.ExpiryTime.AsTime(),
+		req.SenderIdentityPublicKey,
+		req.ReceiverIdentityPublicKey,
+		leafRefundMap,
+		req.SenderKeyTweakProofs,
+	)
 	return err
 }
 
@@ -97,7 +106,16 @@ func (h *InternalTransferHandler) InitiateCooperativeExit(ctx context.Context, r
 	for _, leaf := range transferReq.Leaves {
 		leafRefundMap[leaf.LeafId] = leaf.RawRefundTx
 	}
-	transfer, _, err := h.createTransfer(ctx, transferReq.TransferId, schema.TransferTypeCooperativeExit, transferReq.ExpiryTime.AsTime(), transferReq.SenderIdentityPublicKey, transferReq.ReceiverIdentityPublicKey, leafRefundMap)
+	transfer, _, err := h.createTransfer(
+		ctx,
+		transferReq.TransferId,
+		schema.TransferTypeCooperativeExit,
+		transferReq.ExpiryTime.AsTime(),
+		transferReq.SenderIdentityPublicKey,
+		transferReq.ReceiverIdentityPublicKey,
+		leafRefundMap,
+		transferReq.SenderKeyTweakProofs,
+	)
 	if err != nil {
 		return err
 	}

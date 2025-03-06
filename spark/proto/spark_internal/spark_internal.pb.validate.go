@@ -2695,6 +2695,52 @@ func (m *InitiateTransferRequest) validate(all bool) error {
 
 	}
 
+	{
+		sorted_keys := make([]string, len(m.GetSenderKeyTweakProofs()))
+		i := 0
+		for key := range m.GetSenderKeyTweakProofs() {
+			sorted_keys[i] = key
+			i++
+		}
+		sort.Slice(sorted_keys, func(i, j int) bool { return sorted_keys[i] < sorted_keys[j] })
+		for _, key := range sorted_keys {
+			val := m.GetSenderKeyTweakProofs()[key]
+			_ = val
+
+			// no validation rules for SenderKeyTweakProofs[key]
+
+			if all {
+				switch v := interface{}(val).(type) {
+				case interface{ ValidateAll() error }:
+					if err := v.ValidateAll(); err != nil {
+						errors = append(errors, InitiateTransferRequestValidationError{
+							field:  fmt.Sprintf("SenderKeyTweakProofs[%v]", key),
+							reason: "embedded message failed validation",
+							cause:  err,
+						})
+					}
+				case interface{ Validate() error }:
+					if err := v.Validate(); err != nil {
+						errors = append(errors, InitiateTransferRequestValidationError{
+							field:  fmt.Sprintf("SenderKeyTweakProofs[%v]", key),
+							reason: "embedded message failed validation",
+							cause:  err,
+						})
+					}
+				}
+			} else if v, ok := interface{}(val).(interface{ Validate() error }); ok {
+				if err := v.Validate(); err != nil {
+					return InitiateTransferRequestValidationError{
+						field:  fmt.Sprintf("SenderKeyTweakProofs[%v]", key),
+						reason: "embedded message failed validation",
+						cause:  err,
+					}
+				}
+			}
+
+		}
+	}
+
 	if len(errors) > 0 {
 		return InitiateTransferRequestMultiError(errors)
 	}
@@ -3316,3 +3362,263 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = StartTokenTransactionInternalResponseValidationError{}
+
+// Validate checks the field values on InitiateSettleReceiverKeyTweakRequest
+// with the rules defined in the proto definition for this message. If any
+// rules are violated, the first error encountered is returned, or nil if
+// there are no violations.
+func (m *InitiateSettleReceiverKeyTweakRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on InitiateSettleReceiverKeyTweakRequest
+// with the rules defined in the proto definition for this message. If any
+// rules are violated, the result is a list of violation errors wrapped in
+// InitiateSettleReceiverKeyTweakRequestMultiError, or nil if none found.
+func (m *InitiateSettleReceiverKeyTweakRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *InitiateSettleReceiverKeyTweakRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for TransferId
+
+	{
+		sorted_keys := make([]string, len(m.GetKeyTweakProofs()))
+		i := 0
+		for key := range m.GetKeyTweakProofs() {
+			sorted_keys[i] = key
+			i++
+		}
+		sort.Slice(sorted_keys, func(i, j int) bool { return sorted_keys[i] < sorted_keys[j] })
+		for _, key := range sorted_keys {
+			val := m.GetKeyTweakProofs()[key]
+			_ = val
+
+			// no validation rules for KeyTweakProofs[key]
+
+			if all {
+				switch v := interface{}(val).(type) {
+				case interface{ ValidateAll() error }:
+					if err := v.ValidateAll(); err != nil {
+						errors = append(errors, InitiateSettleReceiverKeyTweakRequestValidationError{
+							field:  fmt.Sprintf("KeyTweakProofs[%v]", key),
+							reason: "embedded message failed validation",
+							cause:  err,
+						})
+					}
+				case interface{ Validate() error }:
+					if err := v.Validate(); err != nil {
+						errors = append(errors, InitiateSettleReceiverKeyTweakRequestValidationError{
+							field:  fmt.Sprintf("KeyTweakProofs[%v]", key),
+							reason: "embedded message failed validation",
+							cause:  err,
+						})
+					}
+				}
+			} else if v, ok := interface{}(val).(interface{ Validate() error }); ok {
+				if err := v.Validate(); err != nil {
+					return InitiateSettleReceiverKeyTweakRequestValidationError{
+						field:  fmt.Sprintf("KeyTweakProofs[%v]", key),
+						reason: "embedded message failed validation",
+						cause:  err,
+					}
+				}
+			}
+
+		}
+	}
+
+	if len(errors) > 0 {
+		return InitiateSettleReceiverKeyTweakRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// InitiateSettleReceiverKeyTweakRequestMultiError is an error wrapping
+// multiple validation errors returned by
+// InitiateSettleReceiverKeyTweakRequest.ValidateAll() if the designated
+// constraints aren't met.
+type InitiateSettleReceiverKeyTweakRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m InitiateSettleReceiverKeyTweakRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m InitiateSettleReceiverKeyTweakRequestMultiError) AllErrors() []error { return m }
+
+// InitiateSettleReceiverKeyTweakRequestValidationError is the validation error
+// returned by InitiateSettleReceiverKeyTweakRequest.Validate if the
+// designated constraints aren't met.
+type InitiateSettleReceiverKeyTweakRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e InitiateSettleReceiverKeyTweakRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e InitiateSettleReceiverKeyTweakRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e InitiateSettleReceiverKeyTweakRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e InitiateSettleReceiverKeyTweakRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e InitiateSettleReceiverKeyTweakRequestValidationError) ErrorName() string {
+	return "InitiateSettleReceiverKeyTweakRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e InitiateSettleReceiverKeyTweakRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sInitiateSettleReceiverKeyTweakRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = InitiateSettleReceiverKeyTweakRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = InitiateSettleReceiverKeyTweakRequestValidationError{}
+
+// Validate checks the field values on SettleReceiverKeyTweakRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *SettleReceiverKeyTweakRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on SettleReceiverKeyTweakRequest with
+// the rules defined in the proto definition for this message. If any rules
+// are violated, the result is a list of violation errors wrapped in
+// SettleReceiverKeyTweakRequestMultiError, or nil if none found.
+func (m *SettleReceiverKeyTweakRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *SettleReceiverKeyTweakRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for TransferId
+
+	// no validation rules for TweakKey
+
+	if len(errors) > 0 {
+		return SettleReceiverKeyTweakRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// SettleReceiverKeyTweakRequestMultiError is an error wrapping multiple
+// validation errors returned by SettleReceiverKeyTweakRequest.ValidateAll()
+// if the designated constraints aren't met.
+type SettleReceiverKeyTweakRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m SettleReceiverKeyTweakRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m SettleReceiverKeyTweakRequestMultiError) AllErrors() []error { return m }
+
+// SettleReceiverKeyTweakRequestValidationError is the validation error
+// returned by SettleReceiverKeyTweakRequest.Validate if the designated
+// constraints aren't met.
+type SettleReceiverKeyTweakRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e SettleReceiverKeyTweakRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e SettleReceiverKeyTweakRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e SettleReceiverKeyTweakRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e SettleReceiverKeyTweakRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e SettleReceiverKeyTweakRequestValidationError) ErrorName() string {
+	return "SettleReceiverKeyTweakRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e SettleReceiverKeyTweakRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sSettleReceiverKeyTweakRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = SettleReceiverKeyTweakRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = SettleReceiverKeyTweakRequestValidationError{}

@@ -21,6 +21,7 @@ import (
 	enttransferleaf "github.com/lightsparkdev/spark-go/so/ent/transferleaf"
 	"github.com/lightsparkdev/spark-go/so/ent/treenode"
 	"github.com/lightsparkdev/spark-go/so/helper"
+	"google.golang.org/protobuf/proto"
 )
 
 // BaseTransferHandler is the base transfer handler that is shared for internal and external transfer handlers.
@@ -104,6 +105,7 @@ func (h *BaseTransferHandler) createTransfer(
 	senderIdentityPublicKey []byte,
 	receiverIdentityPublicKey []byte,
 	leafRefundMap map[string][]byte,
+	senderKeyTweakProofs map[string]*pbspark.SecretProof,
 ) (*ent.Transfer, map[string]*ent.TreeNode, error) {
 	transferUUID, err := uuid.Parse(transferID)
 	if err != nil {
@@ -143,7 +145,7 @@ func (h *BaseTransferHandler) createTransfer(
 		return nil, nil, fmt.Errorf("unable to validate transfer leaves: %v", err)
 	}
 
-	err = createTransferLeaves(ctx, db, transfer, leaves, leafRefundMap)
+	err = createTransferLeaves(ctx, db, transfer, leaves, leafRefundMap, senderKeyTweakProofs)
 	if err != nil {
 		return nil, nil, fmt.Errorf("unable to create transfer leaves: %v", err)
 	}
@@ -253,15 +255,31 @@ func (h *BaseTransferHandler) leafAvailableToTransfer(ctx context.Context, leaf 
 	return nil
 }
 
-func createTransferLeaves(ctx context.Context, db *ent.Tx, transfer *ent.Transfer, leaves []*ent.TreeNode, leafRefundMap map[string][]byte) error {
+func createTransferLeaves(
+	ctx context.Context,
+	db *ent.Tx,
+	transfer *ent.Transfer,
+	leaves []*ent.TreeNode,
+	leafRefundMap map[string][]byte,
+	senderKeyTweakProofs map[string]*pbspark.SecretProof,
+) error {
 	for _, leaf := range leaves {
 		rawRefundTx := leafRefundMap[leaf.ID.String()]
-		_, err := db.TransferLeaf.Create().
+		mutator := db.TransferLeaf.Create().
 			SetTransfer(transfer).
 			SetLeaf(leaf).
 			SetPreviousRefundTx(leaf.RawRefundTx).
-			SetIntermediateRefundTx(rawRefundTx).
-			Save(ctx)
+			SetIntermediateRefundTx(rawRefundTx)
+
+		if senderKeyTweakProofs != nil {
+			proof := senderKeyTweakProofs[leaf.ID.String()]
+			proofBytes, err := proto.Marshal(proof)
+			if err != nil {
+				return fmt.Errorf("unable to marshal sender key tweak proof: %v", err)
+			}
+			mutator = mutator.SetSenderKeyTweakProof(proofBytes)
+		}
+		_, err := mutator.Save(ctx)
 		if err != nil {
 			return fmt.Errorf("unable to create transfer leaf: %v", err)
 		}
@@ -410,7 +428,7 @@ func (h *BaseTransferHandler) loadTransfer(ctx context.Context, transferID strin
 	}
 
 	db := ent.GetDbFromContext(ctx)
-	transfer, err := db.Transfer.Get(ctx, transferUUID)
+	transfer, err := db.Transfer.Query().Where(enttransfer.ID(transferUUID)).ForUpdate().Only(ctx)
 	if err != nil || transfer == nil {
 		return nil, fmt.Errorf("unable to find transfer %s: %v", transferID, err)
 	}

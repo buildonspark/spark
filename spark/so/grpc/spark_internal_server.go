@@ -291,3 +291,13 @@ func (s *SparkInternalServer) CancelSendTransfer(ctx context.Context, req *pbspa
 	_, err := transferHandler.CancelSendTransfer(ctx, req, handler.CancelSendTransferIntentInternal)
 	return wrapWithGRPCError(&emptypb.Empty{}, err)
 }
+
+func (s *SparkInternalServer) InitiateSettleReceiverKeyTweak(ctx context.Context, req *pb.InitiateSettleReceiverKeyTweakRequest) (*emptypb.Empty, error) {
+	transferHandler := handler.NewTransferHandler(s.config)
+	return wrapWithGRPCError(&emptypb.Empty{}, transferHandler.InitiateSettleReceiverKeyTweak(ctx, req))
+}
+
+func (s *SparkInternalServer) SettleReceiverKeyTweak(ctx context.Context, req *pb.SettleReceiverKeyTweakRequest) (*emptypb.Empty, error) {
+	transferHandler := handler.NewTransferHandler(s.config)
+	return wrapWithGRPCError(&emptypb.Empty{}, transferHandler.SettleReceiverKeyTweak(ctx, req))
+}

@@ -42,6 +42,9 @@ service SparkInternalService {
     rpc start_token_transaction_internal(StartTokenTransactionInternalRequest) returns (google.protobuf.Empty) {}
 
     rpc cancel_send_transfer(spark.CancelSendTransferRequest) returns (google.protobuf.Empty) {}
+
+    rpc initiate_settle_receiver_key_tweak(InitiateSettleReceiverKeyTweakRequest) returns (google.protobuf.Empty) {}
+    rpc settle_receiver_key_tweak(SettleReceiverKeyTweakRequest) returns (google.protobuf.Empty) {}
 }
 
 message MarkKeysharesAsUsedRequest {
@@ -178,6 +181,7 @@ message InitiateTransferRequest {
     bytes receiver_identity_public_key = 3;
     google.protobuf.Timestamp expiry_time = 4;
     repeated InitiateTransferLeaf leaves = 5;
+    map<string, spark.SecretProof> sender_key_tweak_proofs = 6;
 }
 
 message InitiateCooperativeExitRequest {
@@ -201,4 +205,14 @@ message StartTokenTransactionInternalRequest {
 
 message StartTokenTransactionInternalResponse {
     spark.TokenTransaction final_token_transaction = 1;
+}
+
+message InitiateSettleReceiverKeyTweakRequest {
+    string transfer_id = 1;
+    map<string, spark.SecretProof> key_tweak_proofs = 2;
+}
+
+message SettleReceiverKeyTweakRequest {
+    string transfer_id = 1;
+    bool tweak_key = 2;
 }

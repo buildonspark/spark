@@ -9618,6 +9618,8 @@ type TransferLeafMutation struct {
 	previous_refund_tx     *[]byte
 	intermediate_refund_tx *[]byte
 	key_tweak              *[]byte
+	sender_key_tweak_proof *[]byte
+	receiver_key_tweak     *[]byte
 	clearedFields          map[string]struct{}
 	transfer               *uuid.UUID
 	clearedtransfer        bool
@@ -10023,6 +10025,104 @@ func (m *TransferLeafMutation) ResetKeyTweak() {
 	delete(m.clearedFields, transferleaf.FieldKeyTweak)
 }
 
+// SetSenderKeyTweakProof sets the "sender_key_tweak_proof" field.
+func (m *TransferLeafMutation) SetSenderKeyTweakProof(b []byte) {
+	m.sender_key_tweak_proof = &b
+}
+
+// SenderKeyTweakProof returns the value of the "sender_key_tweak_proof" field in the mutation.
+func (m *TransferLeafMutation) SenderKeyTweakProof() (r []byte, exists bool) {
+	v := m.sender_key_tweak_proof
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSenderKeyTweakProof returns the old "sender_key_tweak_proof" field's value of the TransferLeaf entity.
+// If the TransferLeaf object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TransferLeafMutation) OldSenderKeyTweakProof(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSenderKeyTweakProof is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSenderKeyTweakProof requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSenderKeyTweakProof: %w", err)
+	}
+	return oldValue.SenderKeyTweakProof, nil
+}
+
+// ClearSenderKeyTweakProof clears the value of the "sender_key_tweak_proof" field.
+func (m *TransferLeafMutation) ClearSenderKeyTweakProof() {
+	m.sender_key_tweak_proof = nil
+	m.clearedFields[transferleaf.FieldSenderKeyTweakProof] = struct{}{}
+}
+
+// SenderKeyTweakProofCleared returns if the "sender_key_tweak_proof" field was cleared in this mutation.
+func (m *TransferLeafMutation) SenderKeyTweakProofCleared() bool {
+	_, ok := m.clearedFields[transferleaf.FieldSenderKeyTweakProof]
+	return ok
+}
+
+// ResetSenderKeyTweakProof resets all changes to the "sender_key_tweak_proof" field.
+func (m *TransferLeafMutation) ResetSenderKeyTweakProof() {
+	m.sender_key_tweak_proof = nil
+	delete(m.clearedFields, transferleaf.FieldSenderKeyTweakProof)
+}
+
+// SetReceiverKeyTweak sets the "receiver_key_tweak" field.
+func (m *TransferLeafMutation) SetReceiverKeyTweak(b []byte) {
+	m.receiver_key_tweak = &b
+}
+
+// ReceiverKeyTweak returns the value of the "receiver_key_tweak" field in the mutation.
+func (m *TransferLeafMutation) ReceiverKeyTweak() (r []byte, exists bool) {
+	v := m.receiver_key_tweak
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldReceiverKeyTweak returns the old "receiver_key_tweak" field's value of the TransferLeaf entity.
+// If the TransferLeaf object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TransferLeafMutation) OldReceiverKeyTweak(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldReceiverKeyTweak is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldReceiverKeyTweak requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldReceiverKeyTweak: %w", err)
+	}
+	return oldValue.ReceiverKeyTweak, nil
+}
+
+// ClearReceiverKeyTweak clears the value of the "receiver_key_tweak" field.
+func (m *TransferLeafMutation) ClearReceiverKeyTweak() {
+	m.receiver_key_tweak = nil
+	m.clearedFields[transferleaf.FieldReceiverKeyTweak] = struct{}{}
+}
+
+// ReceiverKeyTweakCleared returns if the "receiver_key_tweak" field was cleared in this mutation.
+func (m *TransferLeafMutation) ReceiverKeyTweakCleared() bool {
+	_, ok := m.clearedFields[transferleaf.FieldReceiverKeyTweak]
+	return ok
+}
+
+// ResetReceiverKeyTweak resets all changes to the "receiver_key_tweak" field.
+func (m *TransferLeafMutation) ResetReceiverKeyTweak() {
+	m.receiver_key_tweak = nil
+	delete(m.clearedFields, transferleaf.FieldReceiverKeyTweak)
+}
+
 // SetTransferID sets the "transfer" edge to the Transfer entity by id.
 func (m *TransferLeafMutation) SetTransferID(id uuid.UUID) {
 	m.transfer = &id
@@ -10135,7 +10235,7 @@ func (m *TransferLeafMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *TransferLeafMutation) Fields() []string {
-	fields := make([]string, 0, 7)
+	fields := make([]string, 0, 9)
 	if m.create_time != nil {
 		fields = append(fields, transferleaf.FieldCreateTime)
 	}
@@ -10156,6 +10256,12 @@ func (m *TransferLeafMutation) Fields() []string {
 	}
 	if m.key_tweak != nil {
 		fields = append(fields, transferleaf.FieldKeyTweak)
+	}
+	if m.sender_key_tweak_proof != nil {
+		fields = append(fields, transferleaf.FieldSenderKeyTweakProof)
+	}
+	if m.receiver_key_tweak != nil {
+		fields = append(fields, transferleaf.FieldReceiverKeyTweak)
 	}
 	return fields
 }
@@ -10179,6 +10285,10 @@ func (m *TransferLeafMutation) Field(name string) (ent.Value, bool) {
 		return m.IntermediateRefundTx()
 	case transferleaf.FieldKeyTweak:
 		return m.KeyTweak()
+	case transferleaf.FieldSenderKeyTweakProof:
+		return m.SenderKeyTweakProof()
+	case transferleaf.FieldReceiverKeyTweak:
+		return m.ReceiverKeyTweak()
 	}
 	return nil, false
 }
@@ -10202,6 +10312,10 @@ func (m *TransferLeafMutation) OldField(ctx context.Context, name string) (ent.V
 		return m.OldIntermediateRefundTx(ctx)
 	case transferleaf.FieldKeyTweak:
 		return m.OldKeyTweak(ctx)
+	case transferleaf.FieldSenderKeyTweakProof:
+		return m.OldSenderKeyTweakProof(ctx)
+	case transferleaf.FieldReceiverKeyTweak:
+		return m.OldReceiverKeyTweak(ctx)
 	}
 	return nil, fmt.Errorf("unknown TransferLeaf field %s", name)
 }
@@ -10260,6 +10374,20 @@ func (m *TransferLeafMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetKeyTweak(v)
 		return nil
+	case transferleaf.FieldSenderKeyTweakProof:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSenderKeyTweakProof(v)
+		return nil
+	case transferleaf.FieldReceiverKeyTweak:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetReceiverKeyTweak(v)
+		return nil
 	}
 	return fmt.Errorf("unknown TransferLeaf field %s", name)
 }
@@ -10299,6 +10427,12 @@ func (m *TransferLeafMutation) ClearedFields() []string {
 	if m.FieldCleared(transferleaf.FieldKeyTweak) {
 		fields = append(fields, transferleaf.FieldKeyTweak)
 	}
+	if m.FieldCleared(transferleaf.FieldSenderKeyTweakProof) {
+		fields = append(fields, transferleaf.FieldSenderKeyTweakProof)
+	}
+	if m.FieldCleared(transferleaf.FieldReceiverKeyTweak) {
+		fields = append(fields, transferleaf.FieldReceiverKeyTweak)
+	}
 	return fields
 }
 
@@ -10321,6 +10455,12 @@ func (m *TransferLeafMutation) ClearField(name string) error {
 		return nil
 	case transferleaf.FieldKeyTweak:
 		m.ClearKeyTweak()
+		return nil
+	case transferleaf.FieldSenderKeyTweakProof:
+		m.ClearSenderKeyTweakProof()
+		return nil
+	case transferleaf.FieldReceiverKeyTweak:
+		m.ClearReceiverKeyTweak()
 		return nil
 	}
 	return fmt.Errorf("unknown TransferLeaf nullable field %s", name)
@@ -10350,6 +10490,12 @@ func (m *TransferLeafMutation) ResetField(name string) error {
 		return nil
 	case transferleaf.FieldKeyTweak:
 		m.ResetKeyTweak()
+		return nil
+	case transferleaf.FieldSenderKeyTweakProof:
+		m.ResetSenderKeyTweakProof()
+		return nil
+	case transferleaf.FieldReceiverKeyTweak:
+		m.ResetReceiverKeyTweak()
 		return nil
 	}
 	return fmt.Errorf("unknown TransferLeaf field %s", name)

@@ -405,7 +405,16 @@ func (h *LightningHandler) GetPreimageShare(ctx context.Context, req *pb.Initiat
 	}
 
 	transferHandler := NewTransferHandler(h.config)
-	transfer, _, err := transferHandler.createTransfer(ctx, req.Transfer.TransferId, schema.TransferTypePreimageSwap, req.Transfer.ExpiryTime.AsTime(), req.Transfer.OwnerIdentityPublicKey, req.Transfer.ReceiverIdentityPublicKey, leafRefundMap)
+	transfer, _, err := transferHandler.createTransfer(
+		ctx,
+		req.Transfer.TransferId,
+		schema.TransferTypePreimageSwap,
+		req.Transfer.ExpiryTime.AsTime(),
+		req.Transfer.OwnerIdentityPublicKey,
+		req.Transfer.ReceiverIdentityPublicKey,
+		leafRefundMap,
+		req.Transfer.KeyTweakProofs,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create transfer: %v", err)
 	}
@@ -475,7 +484,16 @@ func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pb.Ini
 	}
 
 	transferHandler := NewTransferHandler(h.config)
-	transfer, _, err := transferHandler.createTransfer(ctx, req.Transfer.TransferId, schema.TransferTypePreimageSwap, req.Transfer.ExpiryTime.AsTime(), req.Transfer.OwnerIdentityPublicKey, req.Transfer.ReceiverIdentityPublicKey, leafRefundMap)
+	transfer, _, err := transferHandler.createTransfer(
+		ctx,
+		req.Transfer.TransferId,
+		schema.TransferTypePreimageSwap,
+		req.Transfer.ExpiryTime.AsTime(),
+		req.Transfer.OwnerIdentityPublicKey,
+		req.Transfer.ReceiverIdentityPublicKey,
+		leafRefundMap,
+		req.Transfer.KeyTweakProofs,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create transfer: %v", err)
 	}
@@ -680,33 +698,31 @@ func (h *LightningHandler) ProvidePreimageInternal(ctx context.Context, req *pb.
 	if err != nil {
 		return nil, fmt.Errorf("unable to get transfer leaves: %v", err)
 	}
-	slog.Debug("ProvidePreimage: transfer leaves loaded")
+
 	for _, leaf := range transferLeaves {
-		slog.Debug("ProvidePreimage: tweaking leaf key started", "leafID", leaf.ID.String())
 		keyTweak := &pb.SendLeafKeyTweak{}
 		err := proto.Unmarshal(leaf.KeyTweak, keyTweak)
 		if err != nil {
 			return nil, fmt.Errorf("unable to unmarshal key tweak: %v", err)
 		}
-		slog.Debug("ProvidePreimage: key tweak unmarshalled")
 		treeNode, err := leaf.QueryLeaf().Only(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("unable to get tree node: %v", err)
 		}
-		slog.Debug("ProvidePreimage: treeNode loaded")
 		err = transferHandler.tweakLeafKey(ctx, treeNode, keyTweak, nil)
 		if err != nil {
 			return nil, fmt.Errorf("unable to tweak leaf key: %v", err)
 		}
-		slog.Debug("ProvidePreimage: tweaking leaf key ended")
+		_, err = leaf.Update().SetKeyTweak(nil).Save(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("unable to update leaf key tweak: %v", err)
+		}
 	}
-	slog.Debug("ProvidePreimage: key tweaked")
 
 	transfer, err = transfer.Update().SetStatus(schema.TransferStatusSenderKeyTweaked).Save(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to update transfer status: %v", err)
 	}
-	slog.Debug("ProvidePreimage: transfer updated")
 
 	return transfer, nil
 }

@@ -339,6 +339,10 @@ message SecretShare {
     repeated bytes proofs = 2;
 }
 
+message SecretProof {
+    repeated bytes proofs = 1;
+}
+
 message LeafRefundTxSigningJob {
     string leaf_id = 1;
     SigningJob refund_tx_signing_job = 2;
@@ -356,6 +360,7 @@ message StartSendTransferRequest {
     repeated LeafRefundTxSigningJob leaves_to_send = 3;
     bytes receiver_identity_public_key = 4;
     google.protobuf.Timestamp expiry_time = 5;
+    map<string, SecretProof> key_tweak_proofs = 6;
 }
 
 message StartSendTransferResponse {
@@ -439,8 +444,8 @@ message ClaimTransferSignRefundsRequest {
     string transfer_id = 1;
     bytes owner_identity_public_key = 2;
     repeated LeafRefundTxSigningJob signing_jobs = 3;
+    map<string, SecretProof> key_tweak_proofs = 4;
 }
-
 
 message ClaimTransferSignRefundsResponse {
     repeated LeafRefundTxSigningResult signing_results = 1;
