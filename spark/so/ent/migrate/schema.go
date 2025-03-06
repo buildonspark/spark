@@ -371,6 +371,11 @@ var (
 				Unique:  false,
 				Columns: []*schema.Column{TransfersColumns[6]},
 			},
+			{
+				Name:    "transfer_update_time",
+				Unique:  false,
+				Columns: []*schema.Column{TransfersColumns[2]},
+			},
 		},
 	}
 	// TransferLeafsColumns holds the columns for the "transfer_leafs" table.
