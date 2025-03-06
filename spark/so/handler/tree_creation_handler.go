@@ -509,7 +509,7 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 			SetSigningKeyshare(currentElement.keyshare).
 			SetRawTx(currentElement.node.NodeTxSigningJob.RawTx).
 			SetRawRefundTx(rawRefundTx).
-			SetVout(uint16(currentElement.vout))
+			SetVout(int16(currentElement.vout))
 
 		if parentNodeID != nil {
 			createNode.SetParentID(*parentNodeID)

@@ -76,6 +76,14 @@ func (ttrc *TokenTransactionReceiptCreate) SetStatus(sts schema.TokenTransaction
 	return ttrc
 }
 
+// SetNillableStatus sets the "status" field if the given value is not nil.
+func (ttrc *TokenTransactionReceiptCreate) SetNillableStatus(sts *schema.TokenTransactionStatus) *TokenTransactionReceiptCreate {
+	if sts != nil {
+		ttrc.SetStatus(*sts)
+	}
+	return ttrc
+}
+
 // SetID sets the "id" field.
 func (ttrc *TokenTransactionReceiptCreate) SetID(u uuid.UUID) *TokenTransactionReceiptCreate {
 	ttrc.mutation.SetID(u)
@@ -211,9 +219,6 @@ func (ttrc *TokenTransactionReceiptCreate) check() error {
 		if err := tokentransactionreceipt.FinalizedTokenTransactionHashValidator(v); err != nil {
 			return &ValidationError{Name: "finalized_token_transaction_hash", err: fmt.Errorf(`ent: validator failed for field "TokenTransactionReceipt.finalized_token_transaction_hash": %w`, err)}
 		}
-	}
-	if _, ok := ttrc.mutation.Status(); !ok {
-		return &ValidationError{Name: "status", err: errors.New(`ent: missing required field "TokenTransactionReceipt.status"`)}
 	}
 	if v, ok := ttrc.mutation.Status(); ok {
 		if err := tokentransactionreceipt.StatusValidator(v); err != nil {

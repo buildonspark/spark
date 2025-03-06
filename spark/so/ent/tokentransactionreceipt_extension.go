@@ -86,7 +86,7 @@ func CreateStartedTransactionEntities(
 				SetStatus(schema.TokenLeafStatusSpentStarted).
 				SetLeafSpentTokenTransactionReceiptID(tokenTransactionReceipt.ID).
 				SetLeafSpentOwnershipSignature(ownershipSignatures[leafIndex]).
-				SetLeafSpentTransactionInputVout(uint32(leafIndex)).
+				SetLeafSpentTransactionInputVout(int32(leafIndex)).
 				Save(ctx)
 			if err != nil {
 				log.Printf("Failed to update leaf to spent: %v", err)
@@ -118,7 +118,7 @@ func CreateStartedTransactionEntities(
 				SetWithdrawRevocationPublicKey(outputLeaf.RevocationPublicKey).
 				SetTokenPublicKey(outputLeaf.TokenPublicKey).
 				SetTokenAmount(outputLeaf.TokenAmount).
-				SetLeafCreatedTransactionOutputVout(uint32(leafIndex)).
+				SetLeafCreatedTransactionOutputVout(int32(leafIndex)).
 				SetRevocationKeyshareID(revocationUUID).
 				SetLeafCreatedTokenTransactionReceiptID(tokenTransactionReceipt.ID),
 		)
@@ -363,7 +363,7 @@ func (r *TokenTransactionReceipt) MarshalProto(config *so.Config) (*pb.TokenTran
 
 			transferInput.LeavesToSpend[i] = &pb.TokenLeafToSpend{
 				PrevTokenTransactionHash:     leaf.Edges.LeafCreatedTokenTransactionReceipt.FinalizedTokenTransactionHash,
-				PrevTokenTransactionLeafVout: leaf.LeafCreatedTransactionOutputVout,
+				PrevTokenTransactionLeafVout: uint32(leaf.LeafCreatedTransactionOutputVout),
 			}
 		}
 

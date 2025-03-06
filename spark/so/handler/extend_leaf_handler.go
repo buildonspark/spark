@@ -127,7 +127,7 @@ func (h *ExtendLeafHandler) ExtendLeaf(ctx context.Context, req *pb.ExtendLeafRe
 		SetSigningKeyshareID(signingKeyshare.ID).
 		SetRawTx(req.NodeTxSigningJob.RawTx).
 		SetRawRefundTx(req.RefundTxSigningJob.RawTx).
-		SetVout(uint16(0)).
+		SetVout(int16(0)).
 		SetParentID(leaf.ID).
 		Save(ctx)
 	if err != nil {
