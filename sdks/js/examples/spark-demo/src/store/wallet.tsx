@@ -149,25 +149,29 @@ const useWalletStore = create<WalletStore>((set, get) => ({
   },
   btcAddressInfo: {},
   initWallet: async (mnemonic: string) => {
-    const { wallet, initWalletNetwork } = get();
-    let regtestWallet = new SparkWallet(Network.REGTEST);
+    const { initWalletNetwork } = get();
+    const mainnetWallet = new SparkWallet(Network.MAINNET);
+    const regtestWallet = new SparkWallet(Network.REGTEST);
     if (initWalletNetwork === Network.REGTEST) {
       set({ wallet: regtestWallet });
       await regtestWallet.initWallet(mnemonic);
     } else {
-      await wallet.initWallet(mnemonic);
+      set({ wallet: mainnetWallet });
+      await mainnetWallet.initWallet(mnemonic);
     }
     sessionStorage.setItem(MNEMONIC_STORAGE_KEY, mnemonic);
     set({ isInitialized: true, mnemonic });
   },
   initWalletFromSeed: async (seed: string) => {
-    const { wallet, initWalletNetwork } = get();
+    const { initWalletNetwork } = get();
+    const mainnetWallet = new SparkWallet(Network.MAINNET);
     const regtestWallet = new SparkWallet(Network.REGTEST);
     if (initWalletNetwork === Network.REGTEST) {
       set({ wallet: regtestWallet });
       await regtestWallet.initWallet(seed);
     } else {
-      await wallet.initWallet(seed);
+      set({ wallet: mainnetWallet });
+      await mainnetWallet.initWallet(seed);
     }
     sessionStorage.setItem(SEED_STORAGE_KEY, seed);
     set({ isInitialized: true });

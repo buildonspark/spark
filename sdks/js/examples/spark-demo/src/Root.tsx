@@ -2,6 +2,7 @@ import {
   Route,
   BrowserRouter as Router,
   Routes as RoutesProvider,
+  useLocation,
 } from "react-router-dom";
 import StyledToast from "./components/StyledToast";
 import SparkWithTextLogo from "./icons/SparkWithTextLogo";
@@ -17,16 +18,28 @@ import { Routes } from "./routes";
 export default function Root() {
   return (
     <Router>
-      <div className="flex justify-center p-8">
-        <SparkWithTextLogo />
+      <AppContent />
+    </Router>
+  );
+}
+
+const AppContent = () => {
+  const location = useLocation();
+  const isLoginPage =
+    location.pathname === Routes.Base || location.pathname === "/";
+
+  return (
+    <>
+      <div className="p-xl h-9xl flex justify-center">
+        {!isLoginPage && <SparkWithTextLogo />}
       </div>
       <div
-        className="card-background-gradient mt-[40px] min-h-[480px] rounded-lg"
+        className={`card-background-gradient min-h-[480px] rounded-xl`}
         style={{
           padding: "0.5px",
         }}
       >
-        <div className="h-full min-h-[480px] rounded-lg bg-[#0A0A0A] xs:p-8">
+        <div className="h-full min-h-[480px] rounded-xl bg-[#0A0A0A] xs:p-8">
           <RoutesProvider>
             <Route path={Routes.Base} element={<Login />} />
             <Route path={Routes.WalletSuccess} element={<WalletSuccess />} />
@@ -40,6 +53,6 @@ export default function Root() {
           <StyledToast />
         </div>
       </div>
-    </Router>
+    </>
   );
-}
+};

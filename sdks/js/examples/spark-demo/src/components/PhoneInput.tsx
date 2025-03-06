@@ -100,7 +100,7 @@ const CountrySelectComponent = ({
               <button
                 key={option.value}
                 onClick={() => onChange(option.value)}
-                className="border- flex w-full items-center justify-between px-3 py-4 font-bold hover:bg-[#f9f9f924]"
+                className="flex w-full items-center justify-between px-3 py-4 font-bold hover:bg-[#f9f9f924]"
               >
                 <div className="flex items-center gap-2">
                   <div className="w-6">

@@ -5,6 +5,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import Button from "../../components/Button";
 import PhoneInput from "../../components/PhoneInput";
 import VerificationCode from "../../components/VerificationCode";
+import SparkWithTextLogo from "../../icons/SparkWithTextLogo";
 import { Routes } from "../../routes";
 import { useWallet } from "../../store/wallet";
 
@@ -41,7 +42,7 @@ export default function Login() {
 
   const navigate = useNavigate();
 
-  // default the app to regtest on login.
+  // default the app to mainnet on load.
   useEffect(() => {
     localStorage.setItem("spark_wallet_network", Network.MAINNET.toString());
     setInitWalletNetwork(Network.MAINNET);
@@ -138,12 +139,15 @@ export default function Login() {
           </div>
         </div>
       )}
-      <div className="font-inter mt-4 text-center text-[13px] text-[#ffffff] opacity-40">
+      <div className="mt-md flex justify-center">
+        <SparkWithTextLogo />
+      </div>
+      <div className="font-inter mt-xl text-center text-[13px] text-[#ffffff] opacity-40">
         A Spark-enabled, self-custody
         <br />
         Bitcoin wallet
       </div>
-      <div className="mt-16">
+      <div className="mt-xl">
         {loginState === LoginState.PhoneInput && (
           <PhoneInput value={phoneNumber} onChange={setPhoneNumber} />
         )}
@@ -155,7 +159,7 @@ export default function Login() {
           />
         )}
       </div>
-      <div className="mt-4 w-full">
+      <div className="mt-lg w-full">
         <Button
           text="Continue"
           kind="primary"
@@ -168,6 +172,35 @@ export default function Login() {
           }
         />
       </div>
+      {loginState !== LoginState.VerificationCode && (
+        <>
+          <div className="my-lg flex h-[18px] w-full items-center">
+            <div className="border-white-24 flex-grow border-t opacity-70"></div>
+            <span className="mx-md text-sm text-gray-400">or</span>
+            <div className="border-white-24 flex-grow border-t opacity-70"></div>
+          </div>
+          <div className="gap-md flex w-full flex-col">
+            <Button
+              text="Add existing wallet"
+              kind="secondary"
+              height={44}
+              disabled={true}
+              onClick={() => {
+                // navigate(Routes.RecoverWallet);
+              }}
+            />
+            <Button
+              text="Setup manually"
+              kind="secondary"
+              height={44}
+              disabled={true}
+              onClick={() => {
+                // navigate(Routes.WalletSuccess);
+              }}
+            />
+          </div>
+        </>
+      )}
     </div>
   );
 }
