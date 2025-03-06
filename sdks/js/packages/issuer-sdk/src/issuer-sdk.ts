@@ -16,6 +16,8 @@ export class IssuerWallet {
   private initialized: boolean = false;
   private network: Network;
 
+  private tokenPublicKeyInfo: lrc20sdk.TokenPubkeyInfo | undefined;
+
   constructor(network: Network) {
     this.sparkWallet = new IssuerSparkWallet(network);
     this.network = network;
@@ -203,5 +205,24 @@ export class IssuerWallet {
       maxSupply,
       isFreezable,
     );
+  }
+
+  /**
+   * Announces LRC20 token on L1
+   */
+  async getTokenPublicKeyInfo(): Promise<lrc20sdk.TokenPubkeyInfo | undefined> {
+    if (!this.isL1Initialized()) {
+      throw new Error("L1 wallet not initialized");
+    }
+
+    if (this.tokenPublicKeyInfo) {
+      return this.tokenPublicKeyInfo
+    }
+
+    let tokenPublicKey = bytesToHex(this.bitcoinWallet!.pubkey);
+
+    this.tokenPublicKeyInfo = await this.bitcoinWallet!.getTokenPubkeyInfo(tokenPublicKey);
+
+    return this.tokenPublicKeyInfo
   }
 }

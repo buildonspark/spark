@@ -35,5 +35,6 @@ export const LRC_NODE_URL = Object.freeze({
   [NetworkType.MAINNET]: "http://54.219.77.43:18333",
   [NetworkType.TESTNET]: "https://rpc.lrc20d.mutiny.18.215.149.26.sslip.io",
   [NetworkType.DEVNET]: "https://rpc.lrc20.stage.18.215.149.26.sslip.io",
+  [NetworkType.LS_REGTEST]: "https://regtest.lrc20.dev.dev.sparkinfra.net",
   default: "http://127.0.0.1:18333",
 });

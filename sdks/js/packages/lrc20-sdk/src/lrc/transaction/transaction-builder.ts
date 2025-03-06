@@ -49,12 +49,12 @@ export class TransactionBuilder {
   }
 
   async buildAnnouncementOutput(tokenPubkeyAnnouncement: TokenPubkeyAnnouncement) {
-    const opReturnPrefixBuff = Buffer.from([121, 117, 118, 0, 0]);
+    const opReturnPrefixBuff = Buffer.from([121, 117, 118, 0, 0, 118, 50]);
     console.log("buildAnnouncementOutput: ", tokenPubkeyAnnouncement);
     return {
       type: "OPReturnOutput",
       satoshis: 0,
-      data: [opReturnPrefixBuff, tokenPubkeyAnnouncement.toBuffer()],
+      data: [Buffer.concat([opReturnPrefixBuff, tokenPubkeyAnnouncement.toBuffer()])],
     };
   }
 

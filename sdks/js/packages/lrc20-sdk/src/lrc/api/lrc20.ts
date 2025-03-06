@@ -47,8 +47,12 @@ export class Lrc20JsonRPC {
     this.auth = auth;
   }
 
-  async getTokenPubkeyInfo(tokenPubkey: string): Promise<TokenPubkeyInfo> {
-    let data = await this.makeJsonRpcCall<TokenPubkeyInfoDto>("gettokenPubkeyinfo", [tokenPubkey]);
+  async getTokenPubkeyInfo(tokenPubkey: string): Promise<TokenPubkeyInfo | undefined> {
+    let data = await this.makeJsonRpcCall<TokenPubkeyInfoDto | undefined>("gettoken_pubkeyinfo", [tokenPubkey]);
+
+    if(!data) {
+      return
+    }
 
     return TokenPubkeyInfo.fromTokenPubkeyInfoDto(data);
   }

@@ -59,6 +59,6 @@ for i in $(seq 0 4); do
 done
 rm -rf _data
 rm -rf temp_config_*
-rm -rf lrc20.dev/.yuvd
+rm -rf lrc20.dev/lrc20
 rm -rf electrs.dev/electrs_data
 rm -rf electrs.dev/db

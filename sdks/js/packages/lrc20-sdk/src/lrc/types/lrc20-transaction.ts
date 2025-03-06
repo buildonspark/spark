@@ -85,21 +85,21 @@ export class TokenPubkeyAnnouncement {
 
   public toBuffer(): Buffer {
     const decimalBytes: Buffer = Buffer.alloc(1, this.decimal);
-    // console.log("DECIMAL_BYTES", decimalBytes.toString("hex"))
-    // decimalBytes.writeUint8(this.decimal);
-
-    // const maxSupplyBytes: Buffer = Buffer.alloc(16);
-    // maxSupplyBytes.writeUInt16LE(this.decimal);
 
     const isFreezableBytes: Buffer = Buffer.alloc(1, this.isFreezable ? 1 : 0);
-    // isFreezableBytes.writeUInt8(this.isFreezable ? 1 : 0, 0);
+    let maxSupplyBytes = Buffer.from(this.maxSupply.toString(16), "hex");
+    if (maxSupplyBytes.length < 16) {
+      maxSupplyBytes = Buffer.concat([Buffer.alloc(16 - maxSupplyBytes.length, 0), maxSupplyBytes])
+    }
 
     return Buffer.concat([
       this.tokenPubkey.inner,
+      Buffer.alloc(1, this.name.length),
       Buffer.from(this.name, "utf-8"),
+      Buffer.alloc(1, this.symbol.length),
       Buffer.from(this.symbol, "utf-8"),
       decimalBytes,
-      Buffer.from(this.maxSupply.toString(16), "hex"),
+      maxSupplyBytes,
       isFreezableBytes,
     ]);
   }

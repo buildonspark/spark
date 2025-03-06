@@ -74,6 +74,21 @@ async function runCLI() {
 
           if (wallet.isL1Initialized()) {
             console.log("L1 Address:", wallet.getL1FundingAddress());
+
+            const tokenPublicKeyInfo = await wallet.getTokenPublicKeyInfo();
+            if(tokenPublicKeyInfo) {
+              let announcement = tokenPublicKeyInfo.announcement;
+
+              console.log("TokenInfo:");
+              console.log("    Name:       ", announcement.name);
+              console.log("    Ticker:     ", announcement.symbol);
+              console.log("    Decimals:   ", announcement.decimal);
+              console.log("    MaxSupply:  ", announcement.maxSupply == 0 ? "unlimited" : announcement.maxSupply);
+              console.log("    TotalSupply:", tokenPublicKeyInfo.totalSupply);
+              console.log("    Freezable:  ", announcement.isFreezable);
+            } else {
+              console.log("No TokenInfo found. You should announce the token on L1")
+            }
           }
           break;
         case "mint":
