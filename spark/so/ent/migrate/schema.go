@@ -416,11 +416,6 @@ var (
 				Unique:  false,
 				Columns: []*schema.Column{TransferLeafsColumns[9]},
 			},
-			{
-				Name:    "transferleaf_update_time",
-				Unique:  false,
-				Columns: []*schema.Column{TransferLeafsColumns[2]},
-			},
 		},
 	}
 	// TreesColumns holds the columns for the "trees" table.

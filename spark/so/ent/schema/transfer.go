@@ -102,6 +102,5 @@ func (Transfer) Indexes() []ent.Index {
 		index.Fields("sender_identity_pubkey"),
 		index.Fields("receiver_identity_pubkey"),
 		index.Fields("status"),
-		index.Fields("update_time"),
 	}
 }
