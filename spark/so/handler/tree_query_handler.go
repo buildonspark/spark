@@ -118,7 +118,11 @@ func (h *TreeQueryHandler) QueryUnusedDepositAddresses(ctx context.Context, req 
 	db := ent.GetDbFromContext(ctx)
 
 	query := db.DepositAddress.Query()
-	query = query.Where(depositaddress.OwnerIdentityPubkey(req.GetIdentityPublicKey())).WithSigningKeyshare()
+	query = query.
+		Where(depositaddress.OwnerIdentityPubkey(req.GetIdentityPublicKey())).
+		Order(ent.Desc(depositaddress.FieldID)).
+		WithSigningKeyshare().
+		Limit(10)
 
 	depositAddresses, err := query.All(ctx)
 	if err != nil {
