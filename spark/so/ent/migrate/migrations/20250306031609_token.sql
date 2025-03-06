@@ -1,0 +1,4 @@
+-- Modify "token_transaction_receipts" table
+ALTER TABLE "token_transaction_receipts" ADD COLUMN "status" character varying NOT NULL;
+-- Modify "token_leafs" table
+ALTER TABLE "token_leafs" DROP CONSTRAINT "token_leafs_token_transaction_receipts_leaf_created_token_trans", DROP CONSTRAINT "token_leafs_token_transaction_receipts_leaf_spent_token_transac", ADD CONSTRAINT "token_leafs_token_transaction__75c99b38b4c6cdb582c58b9435317865" FOREIGN KEY ("token_leaf_leaf_created_token_transaction_receipt") REFERENCES "token_transaction_receipts" ("id") ON UPDATE NO ACTION ON DELETE SET NULL, ADD CONSTRAINT "token_leafs_token_transaction__bb513b59f0a301bdb1166b6a6381fe6b" FOREIGN KEY ("token_leaf_leaf_spent_token_transaction_receipt") REFERENCES "token_transaction_receipts" ("id") ON UPDATE NO ACTION ON DELETE SET NULL;

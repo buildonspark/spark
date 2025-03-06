@@ -95,8 +95,8 @@ func (tlc *TokenLeafCreate) SetTokenAmount(b []byte) *TokenLeafCreate {
 }
 
 // SetLeafCreatedTransactionOutputVout sets the "leaf_created_transaction_output_vout" field.
-func (tlc *TokenLeafCreate) SetLeafCreatedTransactionOutputVout(u uint32) *TokenLeafCreate {
-	tlc.mutation.SetLeafCreatedTransactionOutputVout(u)
+func (tlc *TokenLeafCreate) SetLeafCreatedTransactionOutputVout(i int32) *TokenLeafCreate {
+	tlc.mutation.SetLeafCreatedTransactionOutputVout(i)
 	return tlc
 }
 
@@ -113,15 +113,15 @@ func (tlc *TokenLeafCreate) SetLeafSpentOperatorSpecificOwnershipSignature(b []b
 }
 
 // SetLeafSpentTransactionInputVout sets the "leaf_spent_transaction_input_vout" field.
-func (tlc *TokenLeafCreate) SetLeafSpentTransactionInputVout(u uint32) *TokenLeafCreate {
-	tlc.mutation.SetLeafSpentTransactionInputVout(u)
+func (tlc *TokenLeafCreate) SetLeafSpentTransactionInputVout(i int32) *TokenLeafCreate {
+	tlc.mutation.SetLeafSpentTransactionInputVout(i)
 	return tlc
 }
 
 // SetNillableLeafSpentTransactionInputVout sets the "leaf_spent_transaction_input_vout" field if the given value is not nil.
-func (tlc *TokenLeafCreate) SetNillableLeafSpentTransactionInputVout(u *uint32) *TokenLeafCreate {
-	if u != nil {
-		tlc.SetLeafSpentTransactionInputVout(*u)
+func (tlc *TokenLeafCreate) SetNillableLeafSpentTransactionInputVout(i *int32) *TokenLeafCreate {
+	if i != nil {
+		tlc.SetLeafSpentTransactionInputVout(*i)
 	}
 	return tlc
 }
@@ -371,7 +371,7 @@ func (tlc *TokenLeafCreate) createSpec() (*TokenLeaf, *sqlgraph.CreateSpec) {
 		_node.TokenAmount = value
 	}
 	if value, ok := tlc.mutation.LeafCreatedTransactionOutputVout(); ok {
-		_spec.SetField(tokenleaf.FieldLeafCreatedTransactionOutputVout, field.TypeUint32, value)
+		_spec.SetField(tokenleaf.FieldLeafCreatedTransactionOutputVout, field.TypeInt32, value)
 		_node.LeafCreatedTransactionOutputVout = value
 	}
 	if value, ok := tlc.mutation.LeafSpentOwnershipSignature(); ok {
@@ -383,7 +383,7 @@ func (tlc *TokenLeafCreate) createSpec() (*TokenLeaf, *sqlgraph.CreateSpec) {
 		_node.LeafSpentOperatorSpecificOwnershipSignature = value
 	}
 	if value, ok := tlc.mutation.LeafSpentTransactionInputVout(); ok {
-		_spec.SetField(tokenleaf.FieldLeafSpentTransactionInputVout, field.TypeUint32, value)
+		_spec.SetField(tokenleaf.FieldLeafSpentTransactionInputVout, field.TypeInt32, value)
 		_node.LeafSpentTransactionInputVout = value
 	}
 	if value, ok := tlc.mutation.LeafSpentRevocationPrivateKey(); ok {

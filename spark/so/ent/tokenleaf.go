@@ -40,13 +40,13 @@ type TokenLeaf struct {
 	// TokenAmount holds the value of the "token_amount" field.
 	TokenAmount []byte `json:"token_amount,omitempty"`
 	// LeafCreatedTransactionOutputVout holds the value of the "leaf_created_transaction_output_vout" field.
-	LeafCreatedTransactionOutputVout uint32 `json:"leaf_created_transaction_output_vout,omitempty"`
+	LeafCreatedTransactionOutputVout int32 `json:"leaf_created_transaction_output_vout,omitempty"`
 	// LeafSpentOwnershipSignature holds the value of the "leaf_spent_ownership_signature" field.
 	LeafSpentOwnershipSignature []byte `json:"leaf_spent_ownership_signature,omitempty"`
 	// LeafSpentOperatorSpecificOwnershipSignature holds the value of the "leaf_spent_operator_specific_ownership_signature" field.
 	LeafSpentOperatorSpecificOwnershipSignature []byte `json:"leaf_spent_operator_specific_ownership_signature,omitempty"`
 	// LeafSpentTransactionInputVout holds the value of the "leaf_spent_transaction_input_vout" field.
-	LeafSpentTransactionInputVout uint32 `json:"leaf_spent_transaction_input_vout,omitempty"`
+	LeafSpentTransactionInputVout int32 `json:"leaf_spent_transaction_input_vout,omitempty"`
 	// LeafSpentRevocationPrivateKey holds the value of the "leaf_spent_revocation_private_key" field.
 	LeafSpentRevocationPrivateKey []byte `json:"leaf_spent_revocation_private_key,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
@@ -204,7 +204,7 @@ func (tl *TokenLeaf) assignValues(columns []string, values []any) error {
 			if value, ok := values[i].(*sql.NullInt64); !ok {
 				return fmt.Errorf("unexpected type %T for field leaf_created_transaction_output_vout", values[i])
 			} else if value.Valid {
-				tl.LeafCreatedTransactionOutputVout = uint32(value.Int64)
+				tl.LeafCreatedTransactionOutputVout = int32(value.Int64)
 			}
 		case tokenleaf.FieldLeafSpentOwnershipSignature:
 			if value, ok := values[i].(*[]byte); !ok {
@@ -222,7 +222,7 @@ func (tl *TokenLeaf) assignValues(columns []string, values []any) error {
 			if value, ok := values[i].(*sql.NullInt64); !ok {
 				return fmt.Errorf("unexpected type %T for field leaf_spent_transaction_input_vout", values[i])
 			} else if value.Valid {
-				tl.LeafSpentTransactionInputVout = uint32(value.Int64)
+				tl.LeafSpentTransactionInputVout = int32(value.Int64)
 			}
 		case tokenleaf.FieldLeafSpentRevocationPrivateKey:
 			if value, ok := values[i].(*[]byte); !ok {

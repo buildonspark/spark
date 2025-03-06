@@ -31,7 +31,7 @@ func (PreimageShare) Fields() []ent.Field {
 	return []ent.Field{
 		field.Bytes("payment_hash").NotEmpty().Immutable().Unique(),
 		field.Bytes("preimage_share").NotEmpty().Immutable(),
-		field.Uint32("threshold").Immutable(),
+		field.Int32("threshold").Immutable(),
 		field.Bytes("owner_identity_pubkey").NotEmpty().Immutable(),
 		field.String("invoice_string").NotEmpty().Immutable(),
 	}

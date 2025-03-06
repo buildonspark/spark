@@ -58,7 +58,7 @@ func (h *InternalExtendLeafHandler) FinalizeExtendLeaf(ctx context.Context, req 
 		SetSigningKeyshareID(signingKeyshareID).
 		SetRawTx(node.RawTx).
 		SetRawRefundTx(node.RawTx).
-		SetVout(uint16(0)).
+		SetVout(int16(0)).
 		SetParentID(parentID).
 		Save(ctx)
 	if err != nil {
