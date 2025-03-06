@@ -1,4 +1,5 @@
 import { decode } from "light-bolt11-decoder";
+import { Currency } from "./currency";
 
 interface BtcPriceUsdResponse {
   bitcoin: {
@@ -48,4 +49,55 @@ export const decodeLnInvoiceSafely = (invoice: string) => {
   } catch (error) {
     return null;
   }
+};
+
+/**
+ * Formats an asset amount as a fiat currency string
+ * @param assetAmount - The amount of the asset
+ * @param fiatPerAsset - The fiat value per unit of asset
+ * @param fiatAsset - The fiat currency type of type Currency
+ * @param includeCode - Whether to include the currency code in the output
+ * @returns Formatted fiat amount string
+ */
+export const formatFiatAmountDisplayString = (
+  assetAmount: number,
+  fiatPerAsset: number,
+  fiatAsset: Currency,
+  includeCode: boolean = false,
+) => {
+  const fiatAmount = new Intl.NumberFormat("en-US", {
+    style: "decimal",
+    minimumFractionDigits: fiatAsset.decimals,
+    maximumFractionDigits: fiatAsset.decimals,
+  }).format(assetAmount * fiatPerAsset);
+  return `${fiatAmount}${includeCode ? ` ${fiatAsset.code}` : ""}`;
+};
+
+/**
+ * Formats an asset amount as a fiat currency string
+ * @param assetAmount - The amount of the asset
+ * @param asset - The asset type of type Currency
+ * @param includeCode - Whether to include the currency code in the output
+ * @returns Formatted fiat amount string
+ */
+export const formatAssetAmountDisplayString = (
+  assetAmount: number,
+  asset: Currency,
+  includeCode: boolean = false,
+) => {
+  let formattedAssetAmount = new Intl.NumberFormat("en-US", {
+    style: "decimal",
+    minimumFractionDigits: asset.decimals,
+    maximumFractionDigits: asset.decimals,
+  }).format(
+    asset.code === "BTC" && assetAmount >= 100_000
+      ? assetAmount / 100_000_000
+      : assetAmount,
+  );
+  // return string with trailing zeros removed
+  return `${formattedAssetAmount.replace(/\.?0+$/, "")}${
+    includeCode
+      ? ` ${asset.code === "BTC" && assetAmount < 100_000 ? "SATs" : asset.code}`
+      : ""
+  }`;
 };

@@ -10,6 +10,10 @@ import CopyIcon from "../../icons/CopyIcon";
 import StableCoinLogo from "../../icons/StableCoinLogo";
 import { Routes } from "../../routes";
 import { PERMANENT_CURRENCIES, useWallet } from "../../store/wallet";
+import {
+  formatAssetAmountDisplayString,
+  formatFiatAmountDisplayString,
+} from "../../utils/utils";
 
 export default function Wallet() {
   const navigate = useNavigate();
@@ -22,8 +26,6 @@ export default function Wallet() {
     allTransfers,
   } = useWallet();
   const [pubkey, setPubkey] = useState("");
-  const satsFiatBalance = (btcBalance.value * satsUsdPrice.value).toFixed(2);
-
   useEffect(() => {
     if (isInitialized) {
       getMasterPublicKey().then((pubkey) => {
@@ -63,11 +65,20 @@ export default function Wallet() {
           ) : (
             <>
               <div className="text-[32px]">
-                {satsFiatBalance}
+                {formatFiatAmountDisplayString(
+                  btcBalance.value,
+                  satsUsdPrice.value,
+                  PERMANENT_CURRENCIES.get("USD")!,
+                  false,
+                )}
                 <span className="text-[15px] text-[#FAFAFA]">{`${" USD"}`}</span>
               </div>
               <div className="text-[13px] text-[#FAFAFA80]">
-                {btcBalance.value} SATs
+                {formatAssetAmountDisplayString(
+                  btcBalance.value,
+                  PERMANENT_CURRENCIES.get("BTC")!,
+                  true,
+                )}
               </div>
             </>
           )}

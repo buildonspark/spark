@@ -55,11 +55,12 @@ const config = {
           800: "#8A8A8A",
           900: "#9A9A9A",
         },
-        blue: "#15B9EB",
-        orange: "#FF8C42",
-        purple: "#8A2BE2",
         red: "#FF4D4D",
+        orange: "#FF8C42",
         yellow: "#F2E863",
+        green: "#00C896",
+        blue: "#15B9EB",
+        purple: "#8A2BE2",
       },
       spacing: {
         "4xs": "0.125rem", // 2px  (0.125 × 16px)

@@ -79,8 +79,9 @@ const StyledButton = styled.button<{
           color: #0a0a0a;
         `
       : css`
-          background: #1a1a1a;
-          border: 1px solid #fafafa0a;
+          background: rgba(250, 250, 250, 0.08);
+          border: 1px solid rgba(250, 250, 250, 0.04);
+          color: rgba(250, 250, 250, 0.8);
         `}
 
   ${({ direction }) =>

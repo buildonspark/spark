@@ -234,6 +234,7 @@ export default function Tokens() {
             height={24}
             width={24}
             strokeWidth={2}
+            stroke="rgba(250, 250, 250, 0.80)"
           />
         )
       }

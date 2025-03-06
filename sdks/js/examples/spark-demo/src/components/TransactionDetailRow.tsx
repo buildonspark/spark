@@ -1,5 +1,9 @@
-import { useWallet } from "../store/wallet";
+import { PERMANENT_CURRENCIES, useWallet } from "../store/wallet";
 import { Currency, CurrencyType } from "../utils/currency";
+import {
+  formatAssetAmountDisplayString,
+  formatFiatAmountDisplayString,
+} from "../utils/utils";
 
 export default function TransactionDetailRow({
   transactionType,
@@ -13,10 +17,7 @@ export default function TransactionDetailRow({
   counterparty: string;
 }) {
   const { satsUsdPrice } = useWallet();
-  const fiatTransactionAmount =
-    asset.type === CurrencyType.TOKEN
-      ? (assetAmount * (asset.usdPrice ?? 1)).toFixed(2)
-      : (assetAmount * satsUsdPrice.value).toFixed(2);
+
   return (
     <div className="flex flex-row justify-between p-2">
       <div className="max-w-[100px] text-[13px] font-medium">
@@ -30,14 +31,20 @@ export default function TransactionDetailRow({
       <div className="flex flex-col items-end">
         <div
           className={`text-[13px] font-medium ${
-            transactionType === "receive" ? "text-green-500" : ""
+            transactionType === "receive" ? "text-green" : ""
           }`}
         >
-          {transactionType === "receive" ? "+" : ""}$
-          {fiatTransactionAmount}{" "}
+          {formatFiatAmountDisplayString(
+            assetAmount,
+            asset.type === CurrencyType.TOKEN
+              ? (asset.usdPrice ?? 1)
+              : satsUsdPrice.value,
+            PERMANENT_CURRENCIES.get("USD")!,
+            true,
+          )}
         </div>
         <div className="text-[11px] text-[#F9F9F999]">
-          {assetAmount} {asset.code === "BTC" ? "SATs" : asset.code}
+          {formatAssetAmountDisplayString(assetAmount, asset, true)}
         </div>
       </div>
     </div>

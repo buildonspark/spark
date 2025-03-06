@@ -37,13 +37,13 @@ export default function CardForm({
       {!headerDisabled && (
         <div className="font-inter text-sm/20 mb-8 flex w-full flex-row items-center text-center font-semibold">
           <div
-            className="ml-2 h-6 w-6 cursor-pointer outline-none"
+            className="bg-white-8 flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border"
             onClick={logoLeftClick}
           >
             {logoLeft}
           </div>
           <div className="flex-grow">{topTitle}</div>
-          <div className="mr-2 flex h-6 w-6 items-center justify-center">
+          <div className="flex h-8 w-8 items-center justify-center">
             {logoRight}
           </div>
         </div>

@@ -16,7 +16,7 @@ export default function ChevronIcon({
 }: ChevronIconProps) {
   const paths = {
     right: "M10 16L14 12L10 8",
-    left: "M15 20L7 12L15 4", // Chevron left is larger than the other directions
+    left: "M14.6667 18.0001L9.33342 12.6667L14.6667 7.33342",
     up: "M8 14L12 10L16 14",
     down: "M8 10L12 14L16 10",
   };
