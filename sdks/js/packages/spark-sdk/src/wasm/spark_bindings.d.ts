@@ -60,6 +60,7 @@ export interface InitOutput {
   readonly uniffi_spark_frost_checksum_func_encrypt_ecies: () => number;
   readonly uniffi_spark_frost_checksum_func_frost_nonce: () => number;
   readonly uniffi_spark_frost_checksum_func_sign_frost: () => number;
+  readonly uniffi_spark_frost_checksum_func_validate_signature_share: () => number;
   readonly ffi_spark_frost_uniffi_contract_version: () => number;
   readonly ffi_spark_frost_rustbuffer_alloc: (a: number, b: bigint, c: number) => void;
   readonly ffi_spark_frost_rustbuffer_from_bytes: (a: number, b: number, c: number, d: number) => void;
@@ -126,6 +127,7 @@ export interface InitOutput {
   readonly uniffi_spark_frost_fn_func_encrypt_ecies: (a: number, b: bigint, c: bigint, d: number, e: number, f: bigint, g: bigint, h: number, i: number, j: number) => void;
   readonly uniffi_spark_frost_fn_func_frost_nonce: (a: number, b: bigint, c: bigint, d: number, e: number, f: number) => void;
   readonly uniffi_spark_frost_fn_func_sign_frost: (a: number, b: bigint, c: bigint, d: number, e: number, f: bigint, g: bigint, h: number, i: number, j: bigint, k: bigint, l: number, m: number, n: bigint, o: bigint, p: number, q: number, r: bigint, s: bigint, t: number, u: number, v: bigint, w: bigint, x: number, y: number, z: number) => void;
+  readonly uniffi_spark_frost_fn_func_validate_signature_share: (a: bigint, b: bigint, c: number, d: number, e: bigint, f: bigint, g: number, h: number, i: bigint, j: bigint, k: number, l: number, m: bigint, n: bigint, o: number, p: number, q: bigint, r: bigint, s: number, t: number, u: bigint, v: bigint, w: number, x: number, y: number) => number;
   readonly __wbg_signingnonce_free: (a: number, b: number) => void;
   readonly __wbg_signingcommitment_free: (a: number, b: number) => void;
   readonly signingcommitment_new: (a: number, b: number, c: number, d: number) => number;

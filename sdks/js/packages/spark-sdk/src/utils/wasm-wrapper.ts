@@ -1,7 +1,7 @@
-import path from "path";
-import init, { InitOutput } from "../wasm/spark_bindings.js";
 import fs from "fs/promises";
+import path from "path";
 import { fileURLToPath } from "url";
+import init, { InitOutput } from "../wasm/spark_bindings.js";
 
 export async function initWasm(): Promise<InitOutput> {
   let wasmModule: InitOutput;
@@ -14,13 +14,13 @@ export async function initWasm(): Promise<InitOutput> {
 
       const wasmPath = path.resolve(
         __dirname,
-        "../wasm/spark_bindings_bg.wasm"
+        "../wasm/spark_bindings_bg.wasm",
       );
 
       const wasmBuffer = await fs.readFile(wasmPath);
 
       // Initialize with proper memory configuration for Node.js
-      wasmModule = await init(wasmBuffer).catch((e) => {
+      wasmModule = await init({ module_or_path: wasmBuffer }).catch((e) => {
         console.error("WASM initialization error:", e);
         throw e;
       });
