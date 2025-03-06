@@ -1,0 +1,8 @@
+linters:
+  enable:
+    - gofumpt
+    - revive
+
+issues:
+  new: true
+  new-from-rev: "HEAD~1"

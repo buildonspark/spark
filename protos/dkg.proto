@@ -1,0 +1,156 @@
+syntax = "proto3";
+
+package dkg;
+
+option go_package = "github.com/lightsparkdev/spark-go/proto/dkg";
+
+import "common.proto";
+import "google/protobuf/empty.proto";
+
+/*
+ * Distributed Key Generation Service
+ *
+ * This service is used to coordinate the Distributed Key Generation protocol for each participant
+ * signing operator in a batch.
+ */
+service DKGService {
+    /*
+     * Start the Distributed Key Generation protocol for a participant.
+     *
+     * This call will be made by a signing operator to the DKG coordinator to start the DKG
+     * protocol.
+     */
+    rpc start_dkg(StartDkgRequest) returns (google.protobuf.Empty) {}
+
+    /*
+     * Initiate the Distributed Key Generation protocol for a participant.
+     *
+     * This will be called by the coordinator to initiate the DKG protocol. The call will be made
+     * to each participant in the signing group.
+     *
+     * This will return the round1 package for the participant.
+     */
+    rpc initiate_dkg(InitiateDkgRequest) returns (InitiateDkgResponse) {}
+
+    /*
+     * Deliver round 1 packages to participants
+     *
+     * This will be called by the coordinator to deliver the round1 packages to the participants,
+     * after the coordinator has received the round1 packages from all participants.
+     *
+     * This will return the signature on the hash of the round1 packages by the participant to
+     * ensure integrity of the packages.
+     */
+    rpc round1_packages(Round1PackagesRequest) returns (Round1PackagesResponse) {}
+
+
+    /*
+     * Deliver all round 1 package siganture to participants
+     *
+     * This will be called by the coordinator to deliver the round1 package signatures to the
+     * participants, after the coordinator has received the round1 package signatures from all
+     * participants.
+     *
+     * This will return the result of the validation of the round1 package signatures by the
+     * participants.
+     */
+    rpc round1_signature(Round1SignatureRequest) returns (Round1SignatureResponse) {}
+
+    /*
+     * Deliver round 2 packages to participants
+     *
+     * This will be called by each participant to deliver the round2 packages to the other
+     * participants. After received all round2 packages from all participants, the participant will
+     * be able to generate the shared secret by calling round3.
+     *
+     * This will return the acknowledgement of the round2 packages by the participant.
+     */
+    rpc round2_packages(Round2PackagesRequest) returns (Round2PackagesResponse) {}
+}
+
+/*
+ * Initiate Distributed Key Generation Request
+ */
+message InitiateDkgRequest {
+    // An uuid to identify the request. 
+    string request_id = 1;
+
+    // The number of keys to generate.
+    uint64 key_count = 2;
+
+    // The minimum number of signers, this is the threshold for the threshold signature scheme.
+    uint64 min_signers = 3;
+
+    // The maximum number of signers, this is the size of the threshold signature scheme.
+    uint64 max_signers = 4;
+
+    // The coordinator index.
+    uint64 coordinator_index = 5;
+}
+
+
+/*
+ * Initiate Distributed Key Generation Response
+ */
+message InitiateDkgResponse {
+    // The identifier of the participant.
+    string identifier = 1;
+
+    // The round1 package for the participant.
+    repeated bytes round1_package = 2;
+}
+
+message Round1PackagesRequest {
+    // An uuid to identify the request.
+    string request_id = 1;
+
+    // The round1 packages from the participants.
+    repeated common.PackageMap round1_packages = 2;
+}
+
+message Round1PackagesResponse {
+    // The identifier of the participant.
+    string identifier = 1;
+
+    // The round1 package signature from the participant.
+    bytes round1_signature = 2;
+}
+
+message Round1SignatureRequest {
+    // An uuid to identify the request.
+    string request_id = 1;
+
+    // The round1 package signatures from the participants.
+    map<string, bytes> round1_signatures = 2;
+}
+
+message Round1SignatureResponse {
+    // The identifier of the participant.
+    string identifier = 1;
+
+    // The identifiers of the participants that failed the validation of the round1 package
+    // signatures.
+    repeated string validation_failures = 2;
+}
+
+message Round2PackagesRequest {
+    // An uuid to identify the request.
+    string request_id = 1;
+
+    // The identifier of the participant.
+    string identifier = 2;
+
+    // The round2 packages from the participant.
+    repeated bytes round2_packages = 3;
+
+    // The signature on the hash of the round2 packages by the participant.
+    bytes round2_signature = 4;
+}
+
+// Acknowledge the round2 packages from the participant.
+message Round2PackagesResponse {}
+
+message StartDkgRequest {
+    // The number of participants in the signing group.
+    int32 count = 1;
+}

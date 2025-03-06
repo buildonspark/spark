@@ -1,0 +1,204 @@
+syntax = "proto3";
+
+package spark_internal;
+
+option go_package = "github.com/lightsparkdev/spark-go/proto/spark_internal";
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+import "common.proto";
+import "spark.proto";
+
+service SparkInternalService {
+    rpc mark_keyshares_as_used(MarkKeysharesAsUsedRequest) returns (google.protobuf.Empty) {}
+    rpc mark_keyshare_for_deposit_address(MarkKeyshareForDepositAddressRequest) returns (MarkKeyshareForDepositAddressResponse) {}
+    rpc finalize_tree_creation(FinalizeTreeCreationRequest) returns (google.protobuf.Empty) {}
+
+    rpc frost_round1(FrostRound1Request) returns (FrostRound1Response) {}
+    rpc frost_round2(FrostRound2Request) returns (FrostRound2Response) {}
+
+    rpc prepare_split_keyshares(PrepareSplitKeysharesRequest) returns (google.protobuf.Empty) {}
+
+    rpc aggregate_nodes(spark.AggregateNodesRequest) returns (google.protobuf.Empty) {}
+    rpc finalize_nodes_aggregation(FinalizeNodesAggregationRequest) returns (google.protobuf.Empty) {}
+
+    rpc finalize_transfer(FinalizeTransferRequest) returns (google.protobuf.Empty) {}
+
+    rpc finalize_refresh_timelock(FinalizeRefreshTimelockRequest) returns (google.protobuf.Empty) {}
+
+    rpc finalize_extend_leaf(FinalizeExtendLeafRequest) returns (google.protobuf.Empty) {}
+
+    rpc initiate_preimage_swap(spark.InitiatePreimageSwapRequest) returns (InitiatePreimageSwapResponse) {}
+    rpc provide_preimage(spark.ProvidePreimageRequest) returns (google.protobuf.Empty) {}
+    rpc update_preimage_request(UpdatePreimageRequestRequest) returns (google.protobuf.Empty) {}
+
+    rpc prepare_tree_address(PrepareTreeAddressRequest) returns (PrepareTreeAddressResponse) {}
+
+    rpc initiate_transfer(InitiateTransferRequest) returns (google.protobuf.Empty) {}
+
+    rpc initiate_cooperative_exit(InitiateCooperativeExitRequest) returns (google.protobuf.Empty) {}
+
+    rpc return_lightning_payment(spark.ReturnLightningPaymentRequest) returns (google.protobuf.Empty) {}
+
+    rpc start_token_transaction_internal(StartTokenTransactionInternalRequest) returns (google.protobuf.Empty) {}
+
+    rpc cancel_send_transfer(spark.CancelSendTransferRequest) returns (google.protobuf.Empty) {}
+}
+
+message MarkKeysharesAsUsedRequest {
+    repeated string keyshare_id = 1;
+}
+
+message MarkKeyshareForDepositAddressRequest {
+    string keyshare_id = 1;
+    string address = 2;
+    bytes owner_identity_public_key = 3;
+    bytes owner_signing_public_key = 4;
+}
+
+message MarkKeyshareForDepositAddressResponse {
+    bytes address_signature = 1;
+}
+
+message FrostRound1Request {
+    repeated string keyshare_ids = 1;
+}
+
+message FrostRound1Response {   
+    repeated common.SigningCommitment signing_commitments = 1;
+}
+
+message SigningJob {
+    // The unique identifier for the signing job.
+    string job_id = 1;
+    
+    // The message to sign.
+    bytes message = 2;
+
+    // The secret package from DKG round 3.
+    string keyshare_id = 3;
+
+    // The verifying key. This should be the total public key for both user and StatechainEntity.
+    bytes verifying_key = 4;
+
+    // The commitments for all participants of the statechain.
+    map<string, common.SigningCommitment> commitments = 5;
+
+    // The commitments for all participants of the user.
+    common.SigningCommitment user_commitments = 6;
+
+    // The adaptor for the message.
+    bytes adaptor_public_key = 7;
+}
+
+message FrostRound2Request {
+    repeated SigningJob signing_jobs = 1;
+}
+
+message FrostRound2Response {
+    map<string, common.SigningResult> results = 1;
+}
+
+message PrepareSplitKeysharesRequest {
+    string node_id = 1;
+    string target_keyshare_id = 2;
+    repeated string selected_keyshare_ids = 3;
+    string last_keyshare_id = 4;
+}
+
+message FinalizeTreeCreationRequest {
+    repeated TreeNode nodes = 1;
+    spark.Network network = 2;
+}
+
+message FinalizeNodesAggregationRequest {
+    repeated TreeNode nodes = 1;
+}
+
+message FinalizeTransferRequest {
+    string transfer_id = 1;
+    repeated TreeNode nodes = 2;
+    google.protobuf.Timestamp timestamp = 3;
+}
+
+message FinalizeRefreshTimelockRequest {
+    repeated TreeNode nodes = 1;
+}
+
+message FinalizeExtendLeafRequest {
+    TreeNode node = 1;
+}
+
+message TreeNode {
+    string id = 1;
+    uint64 value = 2;
+    bytes verifying_pubkey = 3;
+    bytes owner_identity_pubkey = 4;
+    bytes owner_signing_pubkey = 5;
+    bytes raw_tx = 6;
+    bytes raw_refund_tx = 7;
+    string tree_id = 8;
+    optional string parent_node_id = 9;
+    string signing_keyshare_id = 10;
+    uint32 vout = 11;
+    uint32 refund_timelock = 12;
+}
+
+message InitiatePreimageSwapResponse {
+    bytes preimage_share = 1;
+}
+
+message PrepareTreeAddressNode {
+    string signing_keyshare_id = 1;
+    bytes user_public_key = 2;
+    repeated PrepareTreeAddressNode children = 3;
+}
+
+message PrepareTreeAddressRequest {
+    string target_keyshare_id = 1;
+    PrepareTreeAddressNode node = 2;
+
+    // TODO: This should be removed once we have a proper auth process.
+    bytes user_identity_public_key = 3;
+    spark.Network network = 4;
+}
+
+message PrepareTreeAddressResponse {
+    map<string, bytes> signatures = 1;
+}
+
+
+message InitiateTransferLeaf {
+    string leaf_id = 1;
+    bytes raw_refund_tx = 2;
+}
+
+message InitiateTransferRequest {
+    string transfer_id = 1;
+    bytes sender_identity_public_key = 2;
+    bytes receiver_identity_public_key = 3;
+    google.protobuf.Timestamp expiry_time = 4;
+    repeated InitiateTransferLeaf leaves = 5;
+}
+
+message InitiateCooperativeExitRequest {
+    InitiateTransferRequest transfer = 1;
+    string exit_id = 2;
+    bytes exit_txid = 3;
+}
+
+message UpdatePreimageRequestRequest {
+    string preimage_request_id = 1;
+    bytes preimage = 2;
+    bytes identity_public_key = 3;
+}
+
+message StartTokenTransactionInternalRequest {
+    spark.TokenTransaction final_token_transaction = 1;
+    spark.TokenTransactionSignatures token_transaction_signatures = 2;
+    repeated string keyshare_ids = 3;
+}
+
+
+message StartTokenTransactionInternalResponse {
+    spark.TokenTransaction final_token_transaction = 1;
+}

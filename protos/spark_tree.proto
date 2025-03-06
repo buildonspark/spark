@@ -1,0 +1,48 @@
+syntax = "proto3";
+
+package spark;
+
+option go_package = "github.com/lightsparkdev/spark-go/proto/spark_tree";
+import "spark.proto";
+
+service SparkTreeService {
+    rpc get_leaf_denomination_counts(GetLeafDenominationCountsRequest) returns (GetLeafDenominationCountsResponse) {}
+    rpc propose_tree_denominations(ProposeTreeDenominationsRequest) returns (ProposeTreeDenominationsResponse) {}
+    rpc fetch_polarity_scores(FetchPolarityScoreRequest) returns (stream PolarityScore) {}
+}
+
+message GetLeafDenominationCountsRequest {
+    bytes owner_identity_public_key = 1;
+    spark.Network network = 2;
+}
+
+message GetLeafDenominationCountsResponse {
+    map<uint64, uint64> counts = 1;
+}
+
+message ProposeTreeDenominationsRequest {
+    bytes ssp_identity_public_key = 1;
+    uint64 max_amount_sats = 2;
+    uint64 max_tree_depth = 3;
+    uint64 min_tree_depth = 4;
+    spark.Network network = 5;
+}
+
+message ProposeTree {
+    bool is_small = 1;
+    repeated uint64 leaves = 2;
+}
+
+message ProposeTreeDenominationsResponse {
+    repeated ProposeTree trees = 1;
+}
+
+message FetchPolarityScoreRequest {
+    repeated bytes public_keys = 1;
+}
+
+message PolarityScore {
+    string leaf_id = 1;
+    bytes public_key = 2;
+    float score = 3;
+}

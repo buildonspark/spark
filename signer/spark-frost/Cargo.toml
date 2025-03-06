@@ -1,0 +1,20 @@
+[package]
+name = "spark-frost"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+prost = { workspace = true }
+frost-secp256k1-tr = { workspace = true }
+frost-core = { workspace = true }
+hex = { workspace = true }
+tracing = { workspace = true }
+rand = { workspace = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+tonic = { workspace = true }
+
+[build-dependencies]
+tonic-build = { workspace = true }
+prost-build = "0.11"
+

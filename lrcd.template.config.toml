@@ -1,0 +1,41 @@
+network = "regtest"
+
+[p2p]
+address = "{P2P_ADDRESS}"
+max_inbound_connections = 16
+max_outbound_connections = 8
+bootnodes = [{BOOTNODES}]
+
+[rpc]
+address = "{RPC_ADDRESS}"
+grpc_address = "{GRPC_ADDRESS}"
+max_items_per_request = 1
+max_request_size_kb = 20480
+
+[storage]
+path = "{STORAGE_PATH}"
+create_if_missing = true
+tx_per_page = 100
+flush_period = 100
+
+[bnode]
+url = "http://127.0.0.1:18443"
+auth = { username = "admin1", password = "123" }
+
+[logger]
+level = "TRACE"
+
+[indexer]
+polling_period = { secs = 0, nanos = 1000000 }
+max_confirmation_time = { secs = 86400, nanos = 0 }
+
+[controller]
+max_inv_size = 3
+inv_sharing_interval = 10
+
+[graph_builder]
+cleanup_period = { secs = 3600, nanos = 0 }
+tx_outdated_duration = { secs = 86400, nanos = 0 }
+
+[spark]
+database_url = "{POSTGRES}"

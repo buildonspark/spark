@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package mock;
+
+option go_package = "github.com/lightsparkdev/spark-go/proto/mock";
+import "google/protobuf/empty.proto";
+
+service MockService {
+    rpc clean_up_preimage_share(CleanUpPreimageShareRequest) returns (google.protobuf.Empty) {}
+}
+
+message CleanUpPreimageShareRequest {
+    bytes payment_hash = 1;
+}
