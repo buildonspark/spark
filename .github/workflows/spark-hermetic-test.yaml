@@ -1,0 +1,181 @@
+name: "Spark Hermetic Tests"
+
+on:
+  workflow_call:
+    inputs:
+      spark_tag:
+        description: "Spark image tag to use for both operator and signer"
+        required: false
+        default: "latest"
+        type: string
+  workflow_dispatch:
+    inputs:
+      spark_tag:
+        description: "Spark image tag to use for both operator and signer"
+        required: false
+        default: "latest"
+        type: string
+  pull_request:
+    paths:
+      - ".github/workflows/spark-hermetic-test.yaml"
+      - "scripts/collect-container-logs.sh"
+      - "scripts/ecr-secrets.sh"
+      - "scripts/export-minikube-ca.sh"
+      - "scripts/lightspark-helm.sh"
+      - "scripts/minikube-deploy-basic-services.sh"
+      - "scripts/minikube-deploy-spark-services.sh"
+      - "scripts/port-forwarding.sh"
+      - "scripts/run-local-signer-container.sh"
+
+env:
+  GO_VERSION: "1.23.0"
+  SPARK_TAG: ${{ inputs.spark_tag || 'latest' }}
+  USE_LIGHTSPARK_HELM_REPO: "true"
+
+jobs:
+  hermetic-test:
+    runs-on: "ubuntu-22.04-2-arm"
+    permissions:
+      id-token: write
+      contents: write
+    concurrency:
+      group: hermetic-tests-${{ github.event.pull_request.number || github.ref }}
+      cancel-in-progress: true
+    steps:
+      - name: "Configure AWS credentials"
+        uses: "aws-actions/configure-aws-credentials@v4"
+        with:
+          role-to-assume: "arn:aws:iam::674966927423:role/github-actions-spark"
+          aws-region: "us-west-2"
+
+      - name: "Log into ECR"
+        id: ecr-login
+        uses: "aws-actions/amazon-ecr-login@v2"
+
+      - name: "Checkout spark-go"
+        uses: "actions/checkout@v4"
+        
+      - name: "Setup Go"
+        uses: "actions/setup-go@v5"
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: "spark/go.sum"
+
+      - name: Install ZMQ dependencies
+        run: sudo apt-get update && sudo apt-get install -y libzmq3-dev
+
+      - name: "Install Helm"
+        run: |
+          HELM_CHECKSUM_SHA256="c86c9b23602d4abbfae39d9634e25ab1d0ea6c4c16c5b154113efe316a402547 */tmp/helm.tar.gz"
+          wget -O /tmp/helm.tar.gz https://get.helm.sh/helm-v3.17.1-linux-arm64.tar.gz
+          if $(echo "$HELM_CHECKSUM_SHA256" | shasum -c | grep -q FAILED); then
+            echo "Mismatched checksum for Helm binary. Cannot install Helm."
+            exit 1
+          fi
+          tar -f /tmp/helm.tar.gz -xzv --strip-components=1 -C /usr/local/bin/
+
+      - name: "Configure Helm repos"
+        run: |
+          helm repo add --username helm --password "${{ secrets.HELM_PASSWORD }}" lightspark https://helm.sparkinfra.net/
+          helm repo add jetstack https://charts.jetstack.io
+          helm repo update
+
+      - name: "Start Minikube"
+        timeout-minutes: 3
+        uses: "medyagh/setup-minikube@master"
+        with:
+          memory: "4G"
+          start-args: >
+            --extra-config=apiserver.service-node-port-range=1024-65535
+            --extra-config=kubelet.container-log-max-size=50Mi
+            --extra-config=kubelet.container-log-max-files=10
+
+      - name: "Configure DNS resolution"
+        id: dns
+        run: |
+          MINIKUBE_IP="$(minikube ip)"
+          echo "minikube_ip=$MINIKUBE_IP" >> $GITHUB_OUTPUT
+
+          if ! $(docker network ls | grep -q minikube); then
+            echo "Docker network isn't properly configured, ensure the setup-minikube action completed without errors"
+            exit 1
+          fi
+
+          BRIDGE="$(docker network ls | grep minikube | awk '{print $1}')"
+          sudo resolvectl dns "br-$BRIDGE" "$MINIKUBE_IP"
+          sudo resolvectl domain "br-$BRIDGE" "~minikube.local"
+
+      - name: "Deploy basic services"
+        run: "./scripts/minikube-deploy-basic-services.sh"
+
+      - name: "Deploy Spark services"
+        run: "./scripts/minikube-deploy-spark-services.sh"
+
+      - name: "Export Minikube CA"
+        run: "./scripts/export-minikube-ca.sh"
+
+      - name: "Setup local signer"
+        run: "./scripts/run-local-signer-container.sh"
+
+      - name: "Run integration tests"
+        working-directory: ./spark
+        env:
+          HERMETIC_TEST: "true"
+          RUN_DKG: "true"
+        run: |
+          go run gotest.tools/gotestsum@latest \
+          --format testname \
+          --rerun-fails \
+          --rerun-fails-max-failures=1000 \
+          --junitfile ../test_results/TEST-grpc-test.xml \
+          --jsonfile ../test_results/TEST-grpc-test.json \
+          --packages=./so/grpc_test/... \
+          -- -v -p 2
+
+      - name: Test Summary
+        if: always()
+        uses: test-summary/action@v2
+        with:
+          paths: "test_results/TEST-grpc-test.xml"
+          output: "test_results/TEST-grpc-test-summary.md"
+
+      - name: Upload test summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: "grpc-tests-summary"
+          path: "test_results/TEST-grpc-test-summary.md"
+
+      - name: Annotate test failures
+        if: always()
+        uses: guyarb/golang-test-annotations@v0.8.0
+        with:
+          test-results: "test_results/TEST-grpc-test.json"
+
+      - uses: robherley/go-test-action@v0
+        with:
+          moduleDirectory: "spark"
+          fromJSONFile: "test_results/TEST-grpc-test.json"
+
+      - name: "Gather logs"
+        if: always()
+        run: |
+          mkdir -p logs/k8s
+          kubectl get pods -A > logs/k8s/pods.txt
+          kubectl describe nodes > logs/k8s/nodes.txt
+          source ./scripts/collect-container-logs.sh
+          collect_logs "spark" "spark" "operator" "signer" "atlas"
+          collect_logs "lrc20" "yuvd" "yuvd" "sqlx"
+          collect_logs "bitcoin-spark" "bitcoind" "bitcoind"
+
+      - name: "Upload log artifacts"
+        if: always()
+        uses: "actions/upload-artifact@v4"
+        with:
+          name: "logs-${{ github.run_id }}"
+          path: logs
+          retention-days: 5
+
+      - name: "Cleanup minikube"
+        if: always()
+        run: "minikube delete"

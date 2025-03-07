@@ -183,11 +183,14 @@ OR
 # Hermetic/Minikube environment
 #
 # Env variables:
-# RESET_DBS={default:true}      - resets the operator databases and bitcoin blockchain
-# USE_DEV_SPARK={default:false} - use the dev spark image built into the minikube container cluster
-#                                 (rebuild the the image with ./scripts/build.sh)
-# SPARK_TAG={default:latest}    - the image tag to use for both Spark operator and signer
-# LRC20_TAG={default:latest}    - the image tag to use for LRC20
+# RESET_DBS={default:true}                 - resets the operator databases and bitcoin blockchain
+# USE_DEV_SPARK={default:false}            - use the dev spark image built into the minikube 
+#                                            container cluster
+#                                            (rebuild the the image with ./scripts/build.sh)
+# SPARK_TAG={default:latest}               - the image to use for both Spark operator and signer
+# LRC20_TAG={default:latest}               - the image to use for LRC20
+# USE_LIGHTSPARK_HELM_REPO={default:false} - whether to fetch the helm charts from the remote repo
+#                                            instead of a local ops repo in the workspace.
 
 ./scripts/local-test.sh
 
@@ -198,6 +201,14 @@ Then in the spark folder:
 
 ```
 go test -failfast=false -p=2 ./so/grpc_test/...
+
+# OR if you want prettier results and retries
+
+go run gotest.tools/gotestsum@latest \
+            --format testname \
+            --rerun-fails \
+            --packages=./so/grpc_test/... \
+            -- -v -p 2
 ```
 
 #### Troubleshooting

@@ -7,14 +7,15 @@ on:
   push:
     branches: [ main ]
     paths:
-      - "spark/**"
       - ".github/workflows/go.yml"
       - "Dockerfile"
+      - "spark/**"
   pull_request:
     paths:
-      - "spark/**"
       - ".github/workflows/go.yml"
       - "Dockerfile"
+      - "spark/**"
+
 permissions:
   contents: read
   checks: write
@@ -77,8 +78,9 @@ jobs:
 
   build:
     needs: ["test", "lint"]
-    if: "github.event_name == 'push'"
     runs-on: "ubuntu-22.04-2-arm"
+    outputs:
+      spark_tag: ${{ steps.set-spark_tag.outputs.spark_tag }}
     permissions:
       id-token: write
       contents: read
@@ -105,6 +107,10 @@ jobs:
           GIT_HASH="$(git log -1 --format='%H' spark signer)"
           echo "hash_short=${GIT_HASH:0:8}" >> $GITHUB_OUTPUT
           echo "date=$(date -u '+%Y%m%d')" >> $GITHUB_OUTPUT
+      - name: "Set spark_tag"
+        id: set-spark_tag
+        run: |
+          echo "spark_tag=git_${{ steps.metadata.outputs.date }}_${{ steps.metadata.outputs.hash_short }}" >> $GITHUB_OUTPUT
       - name: "Docker metadata"
         id: docker-meta
         uses: "docker/metadata-action@v4"
@@ -130,8 +136,23 @@ jobs:
           push: true
           provenance: false # skopeo can't handle this
 
+  trigger-hermetic:
+    needs: ["build"]
+    if: |
+      always () &&
+      github.event_name == 'pull_request' &&
+      needs.build.result == 'success'
+    uses: ./.github/workflows/spark-hermetic-test.yaml
+    secrets: inherit
+    permissions:
+      id-token: write
+      contents: write
+    with:
+      spark_tag: ${{ needs.build.outputs.spark_tag }}
+
   deploy:
     needs: ["build"]
+    if: "github.event_name == 'push'"
     runs-on: "self-hosted"
     permissions:
       id-token: write

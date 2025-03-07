@@ -1,10 +1,10 @@
 #!/bin/bash
 
-set -ex
+set -e
 
 source "$(dirname "$0")/ecr-secret.sh"
 source "$(dirname "$0")/port-forwarding.sh"
-
+source "$(dirname "$0")/lightspark-helm.sh"
 
 # Forces the DBs to be recreated
 : "${RESET_DBS:=true}"
@@ -13,6 +13,8 @@ source "$(dirname "$0")/port-forwarding.sh"
 : "${HELM_INSTALL_TIMEOUT:=2m0s}"
 : "${SPARK_TAG:=latest}"
 : "${LRC20_TAG:=latest}"
+# shellcheck disable=SC2119
+HELM_REPO_PREFIX=$(get_helm_prefix)
 
 PRIV_KEYS=(
     "5eaae81bcf1fd43fbb92432b82dbafc8273bb3287b42cb4cf3c851fcee2212a5"
@@ -62,7 +64,7 @@ helm upgrade \
     --set testutil.enabled=true \
     --set priority_class.enabled=false \
     regtest \
-    $OPS_DIR/helm/bitcoind &
+    "$HELM_REPO_PREFIX"/bitcoind &
 
 last_so_index=$((${#PRIV_KEYS[@]} - 1))
 
@@ -127,7 +129,7 @@ fi
 
 operator_cmd+=(
     regtest
-    $OPS_DIR/helm/spark
+    "$HELM_REPO_PREFIX"/spark
 )
 
 "${operator_cmd[@]}" &
@@ -148,7 +150,7 @@ helm install \
     --set imagePullSecret="ecr" \
     --set config.extra.indexer.confirmations_number=1 \
     regtest \
-    $OPS_DIR/helm/yuvd &
+    "$HELM_REPO_PREFIX"/yuvd &
 
 check_service_readiness() {
     local namespace=$1

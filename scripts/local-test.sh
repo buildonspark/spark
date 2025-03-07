@@ -5,7 +5,6 @@ set -e
 : "${RESET_DBS:=true}"
 HERMETIC_TEST_FILE="/tmp/spark_hermetic"
 MINIKUBE_CA_FILE="/tmp/minikube-ca.pem"
-SIGNER_SCRIPT="$(dirname "$0")/run-local-signer-container.sh"
 
 source "$(dirname "$0")/port-forwarding.sh"
 
@@ -92,13 +91,10 @@ setup_port_forward default pod/postgres-0 15432 5432
 
 touch "$HERMETIC_TEST_FILE"
 
-# Start the local signer
-"$SIGNER_SCRIPT" &
-SIGNER_SCRIPT_PID=$!
+"$(dirname "$0")/run-local-signer-container.sh" &
+"$(dirname "$0")/export-minikube-ca.sh"
 
-kubectl get configmap cluster-ca --template='{{index .data "ca.crt"}}' > "$MINIKUBE_CA_FILE"
-
-echo "Run your tests now (go test ./so/grpc_test/...). Ctrl-C when done."
+echo "Run your tests now (go test ./so/grpc_test/... or gotestsum --format testname --packages="./so/grpc_test/..." -- -v -p 2). Ctrl-C when done."
 while true; do
     sleep 10
 done
