@@ -91,7 +91,7 @@ interface WalletActions {
   createLightningInvoice: (amount: number, memo: string) => Promise<string>;
   sendTransfer: (amount: number, recipient: string) => Promise<void>;
   payLightningInvoice: (invoice: string) => Promise<void>;
-  sendSparkTokenTransfer: (
+  transferTokens: (
     tokenPublicKey: string,
     tokenAmount: bigint,
     receiverSparkAddress: string,
@@ -128,13 +128,13 @@ const useWalletStore = create<WalletStore>((set, get) => ({
   setActiveAsset: (asset: Currency) => {
     set({ activeAsset: asset });
   },
-  sendSparkTokenTransfer: async (
+  transferTokens: async (
     tokenPublicKey: string,
     tokenAmount: bigint,
     receiverSparkAddress: string,
   ) => {
     const { wallet } = get();
-    await wallet.sendSparkTokenTransfer({
+    await wallet.transferTokens({
       tokenPublicKey,
       tokenAmount,
       receiverSparkAddress,
@@ -347,7 +347,7 @@ export function useWallet() {
     initWalletFromSeed,
     initWalletNetwork: state.initWalletNetwork,
     setInitWalletNetwork: state.setInitWalletNetwork,
-    sendSparkTokenTransfer: state.sendSparkTokenTransfer,
+    sendSparkTokenTransfer: state.transferTokens,
     updateAssets: state.updateAssets,
     getMasterPublicKey: state.getMasterPublicKey,
     getBitcoinDepositAddress: state.getBitcoinDepositAddress,

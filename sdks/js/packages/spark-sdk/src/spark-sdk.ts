@@ -88,7 +88,7 @@ type DepositParams = {
   vout: number;
 };
 
-type InitWalletResponse = {
+export type InitWalletResponse = {
   balance: bigint;
   tokenBalance: Map<string, { balance: bigint }>;
   mnemonic?: string | undefined;
@@ -1580,7 +1580,7 @@ export class SparkWallet {
    * @param {LeafWithPreviousTransactionData[]} [params.selectedLeaves] - Optional specific leaves to use for the transfer
    * @returns {Promise<string>} The transaction ID of the token transfer
    */
-  public async sendSparkTokenTransfer({
+  public async transferTokens({
     tokenPublicKey,
     tokenAmount,
     receiverSparkAddress,

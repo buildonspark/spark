@@ -118,7 +118,7 @@ async function runCLI() {
         const tokenReceiverPubKey = args[2];
 
         try {
-          const result = await wallet.sendSparkTokenTransfer({
+          const result = await wallet.transferTokens({
             tokenPublicKey: tokenPubKey,
             tokenAmount: tokenAmount,
             receiverSparkAddress: tokenReceiverPubKey,
