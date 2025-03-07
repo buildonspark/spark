@@ -1,5 +1,6 @@
-const fs = require("fs");
-const { replaceTscAliasPaths } = require("tsc-alias");
+import fs from "fs";
+import { replaceTscAliasPaths } from "tsc-alias";
+import path from 'path';
 
 const writeFile = (path, data) => {
   fs.writeFile(path, JSON.stringify(data), (err) => {
@@ -20,4 +21,4 @@ const postBuild = (dirpath) => {
     outDir: `${dirpath}/dist/types`,
   });
 };
-postBuild(__dirname);
+postBuild(path.resolve());

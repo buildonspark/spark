@@ -1,10 +1,8 @@
 import { address, networks, opcodes, Payment, payments, script } from "bitcoinjs-lib";
-import { Receipt } from "./receipt";
-import { ReceiptProof, ReceiptProofType } from "./receipt-proof";
-import { Bech32Result } from "bitcoinjs-lib/src/address";
-import { toEvenParity } from "../utils/buffer";
-import { toXOnly } from "../../utils";
-import { SparkExitMetadata } from "./spark";
+import { Receipt } from "./receipt.ts";
+import { ReceiptProof, ReceiptProofType } from "./receipt-proof.ts";
+import { toXOnly } from "../../utils.ts";
+import { SparkExitMetadata } from "./spark.ts";
 
 export class TxOutput {
   type: string;
@@ -18,7 +16,7 @@ export class TxOutput {
 
 export class BitcoinOutput extends TxOutput {
   receiverPubKey: Buffer;
-  bech32Result: Bech32Result;
+  bech32Result: address.Bech32Result;
 
   constructor(receiverPubKey: Buffer, satoshis: number) {
     super("BitcoinOutput", satoshis); // Initialize the base class with the type
@@ -81,7 +79,7 @@ export class SparkExitOutput extends TxOutput {
     locktime: number,
     satoshis: number,
     receipt: Receipt,
-    metadata?: SparkExitMetadata
+    metadata?: SparkExitMetadata,
   ) {
     super("SparkExitOutput", satoshis);
     this.revocationPubkey = revocationPubkey;
@@ -97,7 +95,7 @@ export class SparkExitOutput extends TxOutput {
     locktime: number,
     satoshis: number,
     receipt: Receipt,
-    metadata?: SparkExitMetadata
+    metadata?: SparkExitMetadata,
   ) {
     return new SparkExitOutput(revocationPubkey, delayPubley, locktime, satoshis, receipt, metadata); // Pass metadata
   }
@@ -131,7 +129,7 @@ export class MultisigReceiptOutput extends TxOutput {
     satoshis: number,
     receipt: Receipt,
     locktime?: number,
-    expiryKey?: Buffer
+    expiryKey?: Buffer,
   ) {
     super("MultisigReceiptOutput", satoshis);
     this.receiversPubKeys = receiversPubKeys;
@@ -147,7 +145,7 @@ export class MultisigReceiptOutput extends TxOutput {
     satoshis: number,
     receipt: Receipt,
     locktime?: number,
-    expiryKey?: Buffer
+    expiryKey?: Buffer,
   ): MultisigReceiptOutput {
     return new MultisigReceiptOutput(receiversPubKeys, m, satoshis, receipt, locktime, expiryKey);
   }
@@ -177,7 +175,7 @@ export class MultisigReceiptOutput extends TxOutput {
     m: number,
     pubkeys: Buffer[],
     expirySpenderKey: Buffer,
-    cltvOutputLocktime?: number
+    cltvOutputLocktime?: number,
   ): Payment {
     const p2ms = payments.p2ms({
       m: m,

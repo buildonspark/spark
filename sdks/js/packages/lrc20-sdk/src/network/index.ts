@@ -1,4 +1,4 @@
-import { bitcoin } from "../bitcoin-core";
+import { bitcoin } from "../bitcoin-core.ts";
 
 export enum NetworkType {
   MAINNET,

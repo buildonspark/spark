@@ -1,4 +1,4 @@
-import { BitcoinUtxo } from "../types/bitcoin-utxo";
+import { BitcoinUtxo } from "../types/index.ts";
 
 export function filterUniqueUtxo<T extends BitcoinUtxo>(oldUtxos: Array<T>, newUtxos: Array<T>): Array<T> {
   return newUtxos.filter((newUtxo) => {

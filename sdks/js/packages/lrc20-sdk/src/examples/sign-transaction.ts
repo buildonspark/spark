@@ -5,7 +5,7 @@ import { NetworkType } from "../network";
 let wallet = new LRCWallet(
   "4799979d5e417e3d6d00cf89a77d4f3c0354d295810326c6b0bf4b45aedb38f3",
   networks.testnet,
-  NetworkType.TESTNET
+  NetworkType.TESTNET,
 );
 
 async function main() {

@@ -1,5 +1,4 @@
-import { reverseBuffer } from "../utils/buffer";
-import { BLINDING_FACTOR_SIZE, TOKEN_AMOUNT_SIZE } from "../utils/constants";
+import { BLINDING_FACTOR_SIZE, TOKEN_AMOUNT_SIZE } from "../utils/index.ts";
 
 export class TokenAmount {
   amount: bigint;
@@ -8,7 +7,7 @@ export class TokenAmount {
   constructor(amount: bigint, blindingFactor?: Uint8Array) {
     this.amount = BigInt(amount);
     if (blindingFactor) {
-      this.blindingFactor = blindingFactor;
+      this.blindingFactor = Buffer.from(blindingFactor);
     }
   }
 

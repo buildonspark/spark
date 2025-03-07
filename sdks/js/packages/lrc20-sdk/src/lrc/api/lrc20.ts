@@ -1,6 +1,6 @@
 import { classToPlain, instanceToPlain } from "class-transformer";
 import { url } from "inspector";
-import { BitcoinTxOut } from "../types/bitcoin-utxo";
+import { BitcoinTxOut } from "../types/index.ts";
 import {
   ReceiptProofDto,
   ReceiptProofType,
@@ -8,17 +8,16 @@ import {
   MultisigReceiptProofDataDto,
   EmptyReceiptProofData,
   EmptyReceiptProofDataDto,
-} from "../types/receipt-proof";
-import {
   Lrc20TransactionStatusDto,
   Lrc20TransactionDto,
   Lrc20TransactionTypeEnum,
   IssueDataDto,
   TransferDataDto,
   Lrc20Transaction,
-} from "../types/lrc20-transaction";
-import { JSONStringify } from "../utils/json";
-import { TokenPubkeyInfo, TokenPubkeyInfoDto } from "../types/token-pubkey";
+  TokenPubkeyInfo,
+  TokenPubkeyInfoDto,
+} from "../types/index.js";
+import { JSONStringify } from "../utils/index.ts";
 
 interface RpcResponse<T> {
   result: T;
@@ -50,8 +49,8 @@ export class Lrc20JsonRPC {
   async getTokenPubkeyInfo(tokenPubkey: string): Promise<TokenPubkeyInfo | undefined> {
     let data = await this.makeJsonRpcCall<TokenPubkeyInfoDto | undefined>("gettoken_pubkeyinfo", [tokenPubkey]);
 
-    if(!data) {
-      return
+    if (!data) {
+      return;
     }
 
     return TokenPubkeyInfo.fromTokenPubkeyInfoDto(data);
@@ -189,7 +188,7 @@ export class Lrc20JsonRPC {
       throw new Error(`RPC call failed: ${response.status}`);
     }
 
-    const data: RpcResponse<T> = await response.json();
+    const data: RpcResponse<T> = await JSON.parse(await response.text());
 
     if (data.error) {
       throw new Error(`RPC error: ${JSON.stringify(data.error)}`);

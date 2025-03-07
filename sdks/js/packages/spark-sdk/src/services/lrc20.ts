@@ -1,4 +1,4 @@
-import lrc20sdk from "@buildonspark/lrc20-sdk";
+import {LRCWallet, Lrc20TransactionDto} from "@buildonspark/lrc20-sdk";
 
 import {bytesToHex, bytesToNumberBE} from "@noble/curves/abstract/utils";
 import {LeafWithPreviousTransactionData} from "../proto/spark.js";
@@ -8,7 +8,7 @@ const WITHDRAW_BOND_SATS = 10000;
 const WITHDRAW_RELATIVE_BLOCK_LOCKTIME = 100;
 
 export async function broadcastL1Withdrawal(
-  lrcWallet: lrc20sdk.LRCWallet,
+  lrcWallet: LRCWallet,
   leavesToExit: LeafWithPreviousTransactionData[],
   receiverPublicKey: string,
   feeRateSatsPerVb: number = 2.0,
@@ -30,7 +30,7 @@ export async function broadcastL1Withdrawal(
 
   const tx = await lrcWallet.prepareSparkExit(payments, feeRateSatsPerVb);
 
-  let txDto = lrc20sdk.Lrc20TransactionDto.fromLrc20Transaction(tx);
+  let txDto = Lrc20TransactionDto.fromLrc20Transaction(tx);
 
   let txid = await lrcWallet.broadcast(txDto);//.broadcastRawBtcTransaction(tx.bitcoin_tx.toHex());
 

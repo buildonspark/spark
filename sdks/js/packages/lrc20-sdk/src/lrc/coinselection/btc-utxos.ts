@@ -1,4 +1,4 @@
-import { BitcoinUtxo, Lrc20Utxo } from "../types/bitcoin-utxo";
+import { BitcoinUtxo, Lrc20Utxo } from "../types/index.ts";
 
 export class BtcUtxosCoinSelection {
   private utxos: Array<BitcoinUtxo | Lrc20Utxo>;
@@ -14,9 +14,9 @@ export class BtcUtxosCoinSelection {
     lrc20InputsAmount: number,
     outputsAmount: number,
     feeRateVb: number,
-    onlyBtcUtxos: boolean = false,
-    minimalAmount: bigint = 0n,
-    customIncrementalValue: bigint = 0n
+    onlyBtcUtxos = false,
+    minimalAmount = 0n,
+    customIncrementalValue = 0n,
   ): Array<BitcoinUtxo | Lrc20Utxo> {
     // All inputs + new input
     const numInputs = inputsAmount + lrc20InputsAmount + 1;
@@ -28,7 +28,7 @@ export class BtcUtxosCoinSelection {
     return this.coinSelection(
       approximateFee + minimalAmount,
       customIncrementalValue || defaultIncrementalValue,
-      onlyBtcUtxos
+      onlyBtcUtxos,
     );
   }
 
@@ -38,7 +38,7 @@ export class BtcUtxosCoinSelection {
     // Check if total UTXOs value is equal to target
     const utxos = (onlyBtcUtxos ? this.utxos.filter((utxo) => !(utxo instanceof Lrc20Utxo)) : this.utxos).filter(
       (utxo) =>
-        this.reservedUtxos.findIndex((reserved) => reserved.txid == utxo.txid && reserved.vout == utxo.vout) == -1
+        this.reservedUtxos.findIndex((reserved) => reserved.txid == utxo.txid && reserved.vout == utxo.vout) == -1,
     );
     const totalValue = utxos.reduce((acc, utxo) => acc + BigInt(utxo.satoshis), 0n);
     if (totalValue === targetOnFirstIteration + BigInt(utxos.length) * utxoIncrementValue) {
@@ -63,7 +63,7 @@ export class BtcUtxosCoinSelection {
     utxos: Array<BitcoinUtxo | Lrc20Utxo>,
     totalValue: bigint,
     target: bigint,
-    utxoIncrementValue: bigint
+    utxoIncrementValue: bigint,
   ): Array<BitcoinUtxo | Lrc20Utxo> {
     // Sort UTXOs by descending value
     utxos.sort((a, b) => b.satoshis - a.satoshis);

@@ -1,4 +1,4 @@
-import { PARITY } from "./constants";
+import { PARITY } from "./constants.ts";
 
 export function reverseBuffer(buffer: Buffer): Buffer {
   if (buffer.length < 1) return buffer;

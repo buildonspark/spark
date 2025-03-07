@@ -1,5 +1,5 @@
-import { Receipt } from "./receipt";
-import { ReceiptProof, ReceiptProofType } from "./receipt-proof";
+import { Receipt } from "./receipt.ts";
+import { ReceiptProof, ReceiptProofType } from "./receipt-proof.ts";
 
 export class TxInput {
   type: string;
@@ -40,8 +40,8 @@ export class ReceiptInput extends TxInput {
     satoshis: number,
     proof: Receipt,
     innerKey: string,
-    isP2WSH: boolean = false,
-    script?: string
+    isP2WSH = false,
+    script?: string,
   ) {
     super("ReceiptInput", txId, index, hex, satoshis);
     this.proof = proof;
@@ -57,8 +57,8 @@ export class ReceiptInput extends TxInput {
     satoshis: number,
     proof: Receipt,
     innerKey: string,
-    isP2WSH: boolean = false,
-    script?: string
+    isP2WSH = false,
+    script?: string,
   ) {
     return new ReceiptInput(txId, index, hex, satoshis, proof, innerKey, isP2WSH, script);
   }
@@ -109,7 +109,7 @@ export class MultisigReceiptInput extends TxInput {
     proof: Receipt,
     innerKeys: Array<string>,
     m: number,
-    script: Buffer
+    script: Buffer,
   ) {
     super("MultisigReceiptInput", txId, index, hex, satoshis);
     this.proof = proof;
@@ -126,7 +126,7 @@ export class MultisigReceiptInput extends TxInput {
     proof: Receipt,
     innerKeys: Array<string>,
     m: number,
-    script: Buffer
+    script: Buffer,
   ) {
     return new MultisigReceiptInput(txId, index, hex, satoshis, proof, innerKeys, m, script);
   }

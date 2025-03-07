@@ -3,7 +3,6 @@
 import { Network } from "@buildonspark/spark-sdk/utils";
 import readline from "readline";
 import { IssuerWallet } from "../issuer-sdk";
-import lrc20sdk from "@buildonspark/lrc20-sdk";
 
 // Initialize Issuer Wallet
 const walletMnemonic =

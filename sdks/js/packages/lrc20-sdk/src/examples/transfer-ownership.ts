@@ -8,7 +8,7 @@ import { JSONStringify } from "../lrc/utils";
 let wallet = new LRCWallet(
   "917a8999adaad1685e1fa5b50283ada23f910481da8e51867cdd7a9329874733",
   networks.testnet,
-  NetworkType.TESTNET
+  NetworkType.TESTNET,
 );
 
 async function main() {
@@ -17,7 +17,7 @@ async function main() {
   let newOwner = fromBech32("tb1ppfwjeshkreeq9kl7tmj7wa638pj2kck0kc8zkq94r238nasejegqs6ptv3");
   let transferOwnership = new TransferOwnershipAnnouncement(
     new TokenPubkey(Buffer.from("6c0c308af25ace8219cdf44c7981edd5908e9f1f9f4e4155e86828957a432df6", "hex")),
-    newOwner.data
+    newOwner.data,
   );
 
   let transferOwnershipTx = await wallet.prepareTransferOwnership(transferOwnership, 1.0);

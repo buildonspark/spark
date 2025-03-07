@@ -12,7 +12,7 @@ const SATOSHIS = 15000;
 const wallet = new LRCWallet(
   "4799979d5e417e3d6d00cf89a77d4f3c0354d295810326c6b0bf4b45aedb38f3",
   networks.regtest,
-  NetworkType.REGTEST
+  NetworkType.REGTEST,
 );
 
 const main = async () => {

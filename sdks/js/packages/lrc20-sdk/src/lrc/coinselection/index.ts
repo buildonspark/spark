@@ -1,2 +1,2 @@
-export * from "./btc-utxos";
-export * from "./lrc20-utxos";
+export { BtcUtxosCoinSelection } from "./btc-utxos.ts";
+export { Lrc20UtxosCoinSelection } from "./lrc20-utxos.ts";

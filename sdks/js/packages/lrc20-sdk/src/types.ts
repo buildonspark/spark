@@ -1,4 +1,4 @@
-import { ReceiptProof } from "./lrc/types/receipt-proof";
+import { ReceiptProof } from "./lrc/types/index.ts";
 
 interface BaseUserToSignInput {
   index: number;

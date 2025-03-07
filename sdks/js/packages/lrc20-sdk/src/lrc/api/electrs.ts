@@ -1,7 +1,5 @@
-import { basicAuth, BasicAuth } from ".";
-import { ElectrsTransaction } from "../types";
-import { BitcoinUtxo, BitcoinUtxoDto, BitcoinUtxoSpentStatus } from "../types/bitcoin-utxo";
-
+import { basicAuth, BasicAuth } from "./index.ts";
+import { ElectrsTransaction, BitcoinUtxo, BitcoinUtxoDto, BitcoinUtxoSpentStatus } from "../types/index.ts";
 export class ElectrsApi {
   private readonly electrsUrl: string;
   private readonly auth: BasicAuth | null;
@@ -67,7 +65,7 @@ export class ElectrsApi {
         throw new Error(`API http call failed: ${response.status}`);
       }
 
-      const data: Array<BitcoinUtxoDto> = await response.json();
+      const data: Array<BitcoinUtxoDto> = await JSON.parse(await response.text());
 
       return data.map(BitcoinUtxo.fromBitcoinUtxoDto);
     } catch (error) {
@@ -89,7 +87,7 @@ export class ElectrsApi {
       throw new Error(`API http call failed: ${response.status}`);
     }
 
-    const data: BitcoinUtxoSpentStatus = await response.json();
+    const data: BitcoinUtxoSpentStatus = await JSON.parse(await response.text());
 
     return data;
   }
@@ -129,6 +127,6 @@ export class ElectrsApi {
       throw new Error(`API http call failed: ${response.status}`);
     }
 
-    return await response.json();
+    return await JSON.parse(await response.text());
   }
 }

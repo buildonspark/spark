@@ -1,4 +1,4 @@
-import { SparkExitMetadata } from "./spark";
+import { SparkExitMetadata } from "./spark.ts";
 
 export interface Payment {
   recipient?: string | Array<string>;

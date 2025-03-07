@@ -1,14 +1,16 @@
-import { Network, Transaction } from "bitcoinjs-lib";
+import { address, Network, Transaction } from "bitcoinjs-lib";
 import { instanceToPlain, plainToInstance } from "class-transformer";
-import { BitcoinTransactionDto } from "./bitcoin-transaction";
-import { TokenPubkey } from "./token-pubkey";
-import { ReceiptProof, ReceiptProofDto, ReceiptProofType } from "./receipt-proof";
+import { BitcoinTransactionDto } from "./bitcoin-transaction.ts";
+import { TokenPubkey } from "./token-pubkey.ts";
+import { ReceiptProof, ReceiptProofDto, ReceiptProofType } from "./receipt-proof.ts";
 import { Buffer } from "buffer";
-import { TokenAmount } from "./token-amount";
-import { toBech32 } from "bitcoinjs-lib/src/address";
+import { TokenAmount } from "./token-amount.ts";
 
 export class Lrc20Transaction {
-  constructor(public bitcoin_tx: Transaction, public tx_type: Lrc20TransactionType) {}
+  constructor(
+    public bitcoin_tx: Transaction,
+    public tx_type: Lrc20TransactionType,
+  ) {}
 
   public static fromLrc20TransactionDto(dto: Lrc20TransactionDto): Lrc20Transaction {
     let bitcoinTx = BitcoinTransactionDto.toTransaction(dto.bitcoin_tx);
@@ -72,7 +74,7 @@ export class TokenPubkeyAnnouncement {
     public symbol: string,
     public decimal: number,
     public maxSupply: bigint,
-    public isFreezable: boolean
+    public isFreezable: boolean,
   ) {}
 
   public static fromTokenPubkeyAnnouncementDto(announcement: TokenPubkeyAnnouncementDto): TokenPubkeyAnnouncement {
@@ -83,7 +85,7 @@ export class TokenPubkeyAnnouncement {
       symbol,
       decimal,
       max_supply,
-      is_freezable
+      is_freezable,
     );
   }
 
@@ -93,7 +95,7 @@ export class TokenPubkeyAnnouncement {
     const isFreezableBytes: Buffer = Buffer.alloc(1, this.isFreezable ? 1 : 0);
     let maxSupplyBytes = Buffer.from(this.maxSupply.toString(16), "hex");
     if (maxSupplyBytes.length < 16) {
-      maxSupplyBytes = Buffer.concat([Buffer.alloc(16 - maxSupplyBytes.length, 0), maxSupplyBytes])
+      maxSupplyBytes = Buffer.concat([Buffer.alloc(16 - maxSupplyBytes.length, 0), maxSupplyBytes]);
     }
 
     return Buffer.concat([
@@ -110,19 +112,25 @@ export class TokenPubkeyAnnouncement {
 }
 
 export class TransferOwnershipAnnouncement {
-  constructor(public tokenPubkey: TokenPubkey, public new_owner: Buffer) {}
+  constructor(
+    public tokenPubkey: TokenPubkey,
+    public new_owner: Buffer,
+  ) {}
 
   public toBuffer(): Buffer {
     return Buffer.concat([this.tokenPubkey.inner, this.new_owner]);
   }
 
   getAddress(network: Network): string {
-    return toBech32(this.new_owner, this.new_owner.length === 32 ? 1 : 0, network.bech32);
+    return address.toBech32(this.new_owner, this.new_owner.length === 32 ? 1 : 0, network.bech32);
   }
 }
 
 export class IssueAnnouncement {
-  constructor(public tokenPubkey: TokenPubkey, public amount: bigint) {}
+  constructor(
+    public tokenPubkey: TokenPubkey,
+    public amount: bigint,
+  ) {}
 
   public toReceiptAnnouncementData() {
     return { tokenPubkey: this.tokenPubkey.pubkey.toString("hex"), amount: this.amount };
@@ -130,11 +138,17 @@ export class IssueAnnouncement {
 }
 
 export class TxFreezeAnnouncement {
-  constructor(public tokenPubkey: TokenPubkey, public outpoint: FreezeTxToggle) {}
+  constructor(
+    public tokenPubkey: TokenPubkey,
+    public outpoint: FreezeTxToggle,
+  ) {}
 }
 
 export class PubkeyFreezeAnnouncement {
-  constructor(public tokenPubkey: TokenPubkey, public ownerPubkey: Buffer) {}
+  constructor(
+    public tokenPubkey: TokenPubkey,
+    public ownerPubkey: Buffer,
+  ) {}
 }
 
 export interface IssueData {
@@ -165,12 +179,15 @@ export enum Lrc20TransactionStatus {
 }
 
 export class Lrc20TransactionDto {
-  constructor(public bitcoin_tx: BitcoinTransactionDto, public tx_type: Lrc20TransactionTypeDto) {}
+  constructor(
+    public bitcoin_tx: BitcoinTransactionDto,
+    public tx_type: Lrc20TransactionTypeDto,
+  ) {}
 
   public static fromLrc20Transaction(tx: Lrc20Transaction): Lrc20TransactionDto {
     return new Lrc20TransactionDto(
       BitcoinTransactionDto.fromBitcoinTransaction(tx.bitcoin_tx),
-      Lrc20TransactionTypeDto.fromLrc20TransactionType(tx.tx_type)
+      Lrc20TransactionTypeDto.fromLrc20TransactionType(tx.tx_type),
     );
   }
 
@@ -185,7 +202,10 @@ export class Lrc20TransactionDto {
 }
 
 export class Lrc20TransactionTypeDto {
-  constructor(public type: Lrc20TransactionTypeEnum, public data: Lrc20TransactionTypeDataDto) {}
+  constructor(
+    public type: Lrc20TransactionTypeEnum,
+    public data: Lrc20TransactionTypeDataDto,
+  ) {}
 
   public static fromLrc20TransactionType(txType: Lrc20TransactionType): Lrc20TransactionTypeDto {
     let data: Lrc20TransactionTypeDataDto;
@@ -323,7 +343,7 @@ export class Lrc20TransactionTypeDto {
         data = {
           announcement: {
             tokenPubkey: announcement.token_pubkey,
-            amount: announcement.amount
+            amount: announcement.amount,
           },
           output_proofs: outputProofs,
         } as IssueData;
@@ -492,13 +512,13 @@ export class Lrc20TransactionParser {
           Object.entries(lrc20Tx.tx_type.data.input_proofs).map(([key, value]) => [
             Number(key),
             this.castReceiptProof(value as ReceiptProof),
-          ])
+          ]),
         );
         const output_proofs: Map<number, ReceiptProof> = new Map(
           Object.entries(lrc20Tx.tx_type.data.output_proofs).map(([key, value]) => [
             Number(key),
             this.castReceiptProof(value as ReceiptProof),
-          ])
+          ]),
         );
 
         lrc20Tx.tx_type = {
@@ -526,11 +546,11 @@ export class Lrc20TransactionParser {
     switch (receiptProof.type) {
       case ReceiptProofType.Sig:
         receiptProof.data.receipt.tokenPubkey = new TokenPubkey(
-          Buffer.from(receiptProof.data.receipt.tokenPubkey.pubkey)
+          Buffer.from(receiptProof.data.receipt.tokenPubkey.pubkey),
         );
         const tokenAmount = new TokenAmount(
           receiptProof.data.receipt.tokenAmount.amount,
-          receiptProof.data.receipt.tokenAmount.blindingFactor
+          receiptProof.data.receipt.tokenAmount.blindingFactor,
         );
         receiptProof.data.receipt.tokenAmount = tokenAmount;
 
@@ -551,7 +571,7 @@ export function parseAnnouncementData(txData: any): AnnouncementData {
       symbol,
       decimal,
       max_supply,
-      is_freezable
+      is_freezable,
     ) as AnnouncementData;
   } else if (txData[AnnouncementDataType.Issue]) {
     let announcement = txData[AnnouncementDataType.Issue] as IssueAnnouncementDto;
@@ -570,7 +590,7 @@ export function parseAnnouncementData(txData: any): AnnouncementData {
     let announcementDto = txData[AnnouncementDataType.PubkeyFreeze] as PubkeyFreezeAnnouncementDto;
     let announcement = new PubkeyFreezeAnnouncement(
       new TokenPubkey(Buffer.from(announcementDto.token_pubkey, "hex")),
-      Buffer.from(announcementDto.pubkey, "hex")
+      Buffer.from(announcementDto.pubkey, "hex"),
     );
     return announcement as AnnouncementData;
   } else if (txData[AnnouncementDataType.TransferOwnership]) {
@@ -578,7 +598,7 @@ export function parseAnnouncementData(txData: any): AnnouncementData {
     let { token_pubkey, new_owner } = announcement;
     return new TransferOwnershipAnnouncement(
       new TokenPubkey(Buffer.from(token_pubkey, "hex")),
-      Buffer.from(new_owner, "hex")
+      Buffer.from(new_owner, "hex"),
     ) as AnnouncementData;
   }
 

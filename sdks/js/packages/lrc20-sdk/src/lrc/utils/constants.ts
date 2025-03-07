@@ -1,5 +1,5 @@
 import { initEccLib, networks } from "bitcoinjs-lib";
-import { NetworkType } from "../../network";
+import { NetworkType } from "../../network/index.ts";
 
 // Secp256k1 base point.
 export const G = Buffer.from("0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798", "hex");

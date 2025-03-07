@@ -1,8 +1,7 @@
 import { plainToInstance } from "class-transformer";
-import { TokenAmount } from "./token-amount";
-import { Receipt, ReceiptDto } from "./receipt";
-import { SparkExitMetadata } from "./spark";
-import { SparkExitData } from "./lrc20-transaction";
+import { TokenAmount } from "./token-amount.ts";
+import { Receipt, ReceiptDto } from "./receipt.ts";
+import { SparkExitMetadata } from "./spark.ts";
 
 export type ReceiptProof =
   | EmptyReceiptProof
@@ -140,9 +139,9 @@ export function getReceiptDataFromProof(receiptProof: ReceiptProof) {
           sigTokenAmountAmount,
           receiptProof.data.receipt.tokenAmount.blindingFactor.length === 0
             ? Uint8Array.from([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
-            : receiptProof.data.receipt.tokenAmount.blindingFactor
+            : receiptProof.data.receipt.tokenAmount.blindingFactor,
         ),
-        receiptProof.data.receipt.tokenPubkey
+        receiptProof.data.receipt.tokenPubkey,
       );
       return { receipt: sigReceipt, innerKey: receiptProof.data.innerKey };
     case ReceiptProofType.P2WSH:
@@ -156,9 +155,9 @@ export function getReceiptDataFromProof(receiptProof: ReceiptProof) {
           p2wshTokenAmountAmount,
           receiptProof.data.receipt.tokenAmount.blindingFactor.length === 0
             ? Uint8Array.from([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
-            : receiptProof.data.receipt.tokenAmount.blindingFactor
+            : receiptProof.data.receipt.tokenAmount.blindingFactor,
         ),
-        receiptProof.data.receipt.tokenPubkey
+        receiptProof.data.receipt.tokenPubkey,
       );
       return { receipt: p2wshReceipt, innerKey: receiptProof.data.innerKey, script: receiptProof.data.script };
     case ReceiptProofType.Multisig:
@@ -177,9 +176,9 @@ export function getReceiptDataFromProof(receiptProof: ReceiptProof) {
           multisigTokenAmountAmount,
           receiptProof.data.receipt.tokenAmount.blindingFactor.length === 0
             ? Uint8Array.from([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
-            : receiptProof.data.receipt.tokenAmount.blindingFactor
+            : receiptProof.data.receipt.tokenAmount.blindingFactor,
         ),
-        receiptProof.data.receipt.tokenPubkey
+        receiptProof.data.receipt.tokenPubkey,
       );
       return { receipt: multisigReceipt, innerKeys: receiptProof.data.innerKeys, m: m as number };
     case ReceiptProofType.EmptyReceipt:
@@ -190,7 +189,10 @@ export function getReceiptDataFromProof(receiptProof: ReceiptProof) {
 }
 
 export class ReceiptProofDto {
-  constructor(public type: ReceiptProofType, public data: ReceiptProofDataDto) {}
+  constructor(
+    public type: ReceiptProofType,
+    public data: ReceiptProofDataDto,
+  ) {}
 
   public static fromReceiptProof(proof: ReceiptProof): ReceiptProofDto {
     let data: ReceiptProofDataDto;
@@ -278,7 +280,10 @@ export class EmptyReceiptProofDataDto {
 }
 
 export class SigReceiptProofDataDto {
-  constructor(public receipt: ReceiptDto, public inner_key: string) {}
+  constructor(
+    public receipt: ReceiptDto,
+    public inner_key: string,
+  ) {}
 
   public static fromReceiptProofData(data: ReceiptProofData): ReceiptProofDataDto {
     let proofData = data as SigReceiptProofData;
@@ -297,7 +302,11 @@ export class SigReceiptProofDataDto {
 }
 
 export class MultisigReceiptProofDataDto {
-  constructor(public receipt: ReceiptDto, public inner_keys: Array<string>, public m: number) {}
+  constructor(
+    public receipt: ReceiptDto,
+    public inner_keys: Array<string>,
+    public m: number,
+  ) {}
 
   public static fromReceiptProofData(data: ReceiptProofData): ReceiptProofDataDto {
     let proofData = data as MultisigReceiptProofData;
@@ -321,7 +330,7 @@ export class LightningCommitmentProofDataDto {
     public receipt: ReceiptDto,
     public revocationPubkey: string,
     public toSelfDelay: number,
-    public localDelayedPubkey: string
+    public localDelayedPubkey: string,
   ) {}
 
   public static fromReceiptProofData(data: ReceiptProofData): ReceiptProofDataDto {
@@ -332,7 +341,7 @@ export class LightningCommitmentProofDataDto {
       receipt,
       proofData.revocationPubkey,
       proofData.toSelfDelay,
-      proofData.localDelayedPubkey
+      proofData.localDelayedPubkey,
     );
   }
 
@@ -348,7 +357,10 @@ export class LightningCommitmentProofDataDto {
 }
 
 export class LightningHtlcProofDataDto {
-  constructor(public receipt: ReceiptDto, public data: LightningHtlcData) {}
+  constructor(
+    public receipt: ReceiptDto,
+    public data: LightningHtlcData,
+  ) {}
 
   public static fromReceiptProofData(data: ReceiptProofData): ReceiptProofDataDto {
     let proofData = data as LightningHtlcProofData;
@@ -367,7 +379,11 @@ export class LightningHtlcProofDataDto {
 }
 
 export class P2WSHProofDataDto {
-  constructor(public receipt: ReceiptDto, public inner_key: string, public script: string) {}
+  constructor(
+    public receipt: ReceiptDto,
+    public inner_key: string,
+    public script: string,
+  ) {}
 
   public static fromReceiptProofData(data: ReceiptProofData): ReceiptProofDataDto {
     let proofData = data as P2WSHProofData;
@@ -390,7 +406,7 @@ export class SparkExitProofDataDto {
   constructor(
     public receipt: ReceiptDto,
     public script: SparkExitProofDataScript,
-    public metadata: SparkExitMetadata
+    public metadata: SparkExitMetadata,
   ) {}
 
   public static fromReceiptProofData(data: ReceiptProofData): ReceiptProofDataDto {

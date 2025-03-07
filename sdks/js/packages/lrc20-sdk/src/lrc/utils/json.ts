@@ -1,7 +1,7 @@
 export const JSONStringify = (data: any) => {
   const bigInts = /([\[:])?"(-?\d+)n"([,\}\]])/g;
   const preliminaryJSON = JSON.stringify(data, (_, value) =>
-    typeof value === "bigint" ? value.toString() + "n" : value
+    typeof value === "bigint" ? value.toString() + "n" : value,
   );
   const finalJSON = preliminaryJSON.replace(bigInts, "$1$2$3");
 

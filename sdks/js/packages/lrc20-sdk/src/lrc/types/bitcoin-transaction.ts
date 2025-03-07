@@ -1,5 +1,5 @@
 import { Transaction } from "bitcoinjs-lib";
-import { reverseBuffer } from "../utils/buffer";
+import { reverseBuffer } from "../utils/index.ts";
 import { plainToInstance } from "class-transformer";
 
 export class BitcoinTransactionDto {
@@ -7,7 +7,7 @@ export class BitcoinTransactionDto {
     public version: number,
     public lock_time: number,
     public input: Array<TxIn>,
-    public output: Array<TxOut>
+    public output: Array<TxOut>,
   ) {}
 
   public static fromBitcoinTransaction(tx: Transaction): BitcoinTransactionDto {
@@ -44,7 +44,7 @@ export class BitcoinTransactionDto {
         reverseBuffer(Buffer.from(txid, "hex")),
         parseInt(index),
         input.sequence,
-        Buffer.from(input.script_sig, "hex")
+        Buffer.from(input.script_sig, "hex"),
       );
       tx.ins[inputIndex].witness = input.witness.map((witness) => Buffer.from(witness, "hex"));
     });

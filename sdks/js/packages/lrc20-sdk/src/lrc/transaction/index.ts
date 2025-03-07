@@ -1,1 +1,1 @@
-export * from "./transaction-builder";
+export { TransactionBuilder } from "./transaction-builder.ts";

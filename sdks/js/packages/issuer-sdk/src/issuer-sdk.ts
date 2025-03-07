@@ -13,8 +13,6 @@ import { LRCWallet, TokenPubkey, TokenPubkeyAnnouncement, TokenPubkeyInfo, Netwo
 const BURN_ADDRESS = "02".repeat(32);
 
 export class IssuerSparkWallet extends SparkWallet implements IssuerWalletInterface {
-  private lrc20Wallet: LRCWallet;
-
   private issuerTokenTransactionService: IssuerTokenTransactionService;
   private tokenFreezeService: TokenFreezeService;
   private tokenPublicKeyInfo?: TokenPubkeyInfo;
@@ -123,9 +121,9 @@ export class IssuerSparkWallet extends SparkWallet implements IssuerWalletInterf
     isFreezable,
     feeRateSatsPerVb = 2.0,
   }): Promise<string> {
-    await this.lrc20Wallet.syncWallet();
+    await this.lrc20Wallet!.syncWallet();
   
-    const tokenPublicKey = new TokenPubkey(this.lrc20Wallet.pubkey);
+    const tokenPublicKey = new TokenPubkey(this.lrc20Wallet!.pubkey);
   
     const announcement = new TokenPubkeyAnnouncement(
       tokenPublicKey,
@@ -136,12 +134,12 @@ export class IssuerSparkWallet extends SparkWallet implements IssuerWalletInterf
       isFreezable,
     );
   
-    const tx = await this.lrc20Wallet.prepareAnnouncement(
+    const tx = await this.lrc20Wallet!.prepareAnnouncement(
       announcement,
       feeRateSatsPerVb,
     );
   
-    return await this.lrc20Wallet.broadcastRawBtcTransaction(tx.bitcoin_tx.toHex());
+    return await this.lrc20Wallet!.broadcastRawBtcTransaction(tx.bitcoin_tx.toHex());
   }
 
   mintTokensL1(tokenAmount: bigint): Promise<string> {

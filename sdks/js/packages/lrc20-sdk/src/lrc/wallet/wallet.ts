@@ -1,24 +1,35 @@
 import { address, crypto, networks, payments, Psbt, script, Transaction } from "bitcoinjs-lib";
 import { instanceToPlain, plainToInstance } from "class-transformer";
 import { ECPairInterface } from "ecpair";
-import { publicKeyToAddress } from "../../address";
-import { NetworkType, toNetworkType, toPsbtNetwork } from "../../network";
-import { AddressType } from "../../types";
-import { ElectrsApi } from "../api/electrs";
-import { Lrc20JsonRPC } from "../api/lrc20";
-import { BtcUtxosCoinSelection } from "../coinselection/btc-utxos";
-import { Lrc20UtxosCoinSelection } from "../coinselection/lrc20-utxos";
-import { TransactionBuilder } from "../transaction/transaction-builder";
-import { BitcoinTransactionDto, BtcMetadata } from "../types/bitcoin-transaction";
-import { BitcoinUtxo, Lrc20Utxo } from "../types/bitcoin-utxo";
-import { TokenPubkey, TokenPubkeyInfo } from "../types/token-pubkey";
-import { BitcoinInput, MultisigReceiptInput, ReceiptInput, TxInput } from "../types/input";
-import { TokenAmount } from "../types/token-amount";
-import { BitcoinOutput, MultisigReceiptOutput, ReceiptOutput, SparkExitOutput, TxOutput } from "../types/output";
-import { Payment } from "../types/payment";
-import { Receipt } from "../types/receipt";
-import { getReceiptDataFromProof, ReceiptProof, ReceiptProofType, SigReceiptProofData } from "../types/receipt-proof";
+import { publicKeyToAddress } from "../../address/index.ts";
+import { NetworkType, toNetworkType, toPsbtNetwork } from "../../network/index.ts";
+import { AddressType } from "../../types.ts";
+import { ElectrsApi, Lrc20JsonRPC, BasicAuth } from "../api/index.ts";
+import { BtcUtxosCoinSelection, Lrc20UtxosCoinSelection } from "../coinselection/index.ts";
+import { TransactionBuilder } from "../transaction/index.ts";
 import {
+  BitcoinTransactionDto,
+  BtcMetadata,
+  BitcoinUtxo,
+  Lrc20Utxo,
+  TokenPubkey,
+  TokenPubkeyInfo,
+  BitcoinInput,
+  MultisigReceiptInput,
+  ReceiptInput,
+  TxInput,
+  TokenAmount,
+  BitcoinOutput,
+  MultisigReceiptOutput,
+  ReceiptOutput,
+  SparkExitOutput,
+  TxOutput,
+  Payment,
+  Receipt,
+  getReceiptDataFromProof,
+  ReceiptProof,
+  ReceiptProofType,
+  SigReceiptProofData,
   AnnouncementData,
   TokenPubkeyAnnouncement,
   TxFreezeAnnouncement as TxFreezeAnnouncement,
@@ -29,25 +40,28 @@ import {
   Lrc20TransactionType,
   Lrc20TransactionTypeEnum,
   PubkeyFreezeAnnouncement,
-} from "../types/lrc20-transaction";
-import { filterUniqueUtxo } from "../utils/bitcoin";
-import { reverseBuffer, toEvenParity, toXOnly } from "../utils/buffer";
+  SparkExitMetadata,
+  ElectrsTransactionOutput,
+} from "../types/index.ts";
 import {
+  filterUniqueUtxo,
+  reverseBuffer,
+  toEvenParity,
+  toXOnly,
   DUST_AMOUNT,
   EMPTY_TOKEN_PUBKEY,
   LRC_NODE_URL,
   ELECTRS_URL,
-} from "../utils/constants";
-import { JSONParse, JSONStringify, JSONStringifyBodyDown } from "../utils/json";
-import { ECPair } from "../../bitcoin-core";
-import { SparkExitMetadata } from "../types/spark";
-import { ElectrsTransactionOutput } from "../types";
-import {BasicAuth} from "../api";
+  JSONParse,
+  JSONStringify,
+  JSONStringifyBodyDown,
+} from "../utils/index.ts";
+import { ECPair } from "../../bitcoin-core.ts";
 
 export interface LRC20WalletApiConfig {
-  lrc20NodeUrl: string,
-  electrsUrl: string,
-  electrsCredentials?: BasicAuth
+  lrc20NodeUrl: string;
+  electrsUrl: string;
+  electrsCredentials?: BasicAuth;
 }
 
 export class LRCWallet {
@@ -61,7 +75,7 @@ export class LRCWallet {
   public spentLrc20Utxos: Array<Lrc20Utxo> = [];
 
   private emptyLrc20Utxos: Array<Lrc20Utxo> = [];
-  private lastLrc20Page: number = 0;
+  private lastLrc20Page = 0;
   private unspentBtcUtxo: Array<Lrc20Utxo | BitcoinUtxo> = [];
   private networkType: NetworkType;
   private builder: TransactionBuilder;
@@ -73,7 +87,12 @@ export class LRCWallet {
 
   private readonly privateKeyHex: string;
 
-  constructor(privateKeyHex: string, btcNetwork: networks.Network, networkType: NetworkType, apiConfig?: LRC20WalletApiConfig) {
+  constructor(
+    privateKeyHex: string,
+    btcNetwork: networks.Network,
+    networkType: NetworkType,
+    apiConfig?: LRC20WalletApiConfig,
+  ) {
     this.privateKeyHex = privateKeyHex;
     this.network = btcNetwork;
     this.networkType = networkType;
@@ -102,14 +121,8 @@ export class LRCWallet {
     const bech32 = this.network.bech32;
 
     this.electrsApi = apiConfig
-      ? new ElectrsApi(
-          apiConfig.electrsUrl,
-          apiConfig.electrsCredentials
-        )
-      : new ElectrsApi(
-          ELECTRS_URL[this.networkType] || ELECTRS_URL["default"],
-          null
-        );
+      ? new ElectrsApi(apiConfig.electrsUrl, apiConfig.electrsCredentials)
+      : new ElectrsApi(ELECTRS_URL[this.networkType] || ELECTRS_URL["default"], null);
     this.lrcNodeApi = apiConfig
       ? new Lrc20JsonRPC(apiConfig.lrc20NodeUrl)
       : new Lrc20JsonRPC(LRC_NODE_URL[this.networkType] || LRC_NODE_URL["default"]);
@@ -136,7 +149,7 @@ export class LRCWallet {
       btcUtxos.map(async (utxo) => ({
         ...utxo,
         hex: await this.electrsApi.getTransactionHex(utxo.txid),
-      }))
+      })),
     );
 
     this.btcUtxos = btcUtxos;
@@ -243,12 +256,12 @@ export class LRCWallet {
   public async prepareSendBTC(
     transfers: Array<{ receiverP2WPKH: string; sats: number }>,
     feeRateVb: number,
-    locktime: number = 0,
-    sequence: number = 0
+    locktime = 0,
+    sequence = 0,
   ): Promise<Transaction> {
     const satsAmount = transfers.reduce((acc, transfer) => acc + BigInt(transfer.sats), BigInt(0));
     const inputs = await this.createInputsFromUtxos(
-      new BtcUtxosCoinSelection(this.btcUtxos).selectUtxos(0, 0, transfers.length, feeRateVb, false, satsAmount)
+      new BtcUtxosCoinSelection(this.btcUtxos).selectUtxos(0, 0, transfers.length, feeRateVb, false, satsAmount),
     );
 
     const outputs = transfers.map((transfer) => {
@@ -263,13 +276,13 @@ export class LRCWallet {
   public async prepareAnnouncement(
     announcement: TokenPubkeyAnnouncement,
     feeRateVb: number,
-    locktime: number = 0,
-    sequence: number = 0
+    locktime = 0,
+    sequence = 0,
   ): Promise<Lrc20Transaction> {
     const tokenPubkeyAnnouncementOutput = await this.builder.buildAnnouncementOutput(announcement);
     const changeOutput = this.createRawBtcChangeOutput();
     const inputs = await this.createInputsFromUtxos(
-      new BtcUtxosCoinSelection(this.btcUtxos).selectUtxos(0, 0, 2, feeRateVb, true)
+      new BtcUtxosCoinSelection(this.btcUtxos).selectUtxos(0, 0, 2, feeRateVb, true),
     );
 
     const tx = this.builder.buildAndSignTransaction(
@@ -279,7 +292,7 @@ export class LRCWallet {
       feeRateVb,
       [],
       locktime,
-      sequence
+      sequence,
     );
 
     return this.convertToLrc20Transaction(
@@ -287,20 +300,20 @@ export class LRCWallet {
       [tokenPubkeyAnnouncementOutput, changeOutput],
       tx,
       Lrc20TransactionTypeEnum.Announcement,
-      announcement
+      announcement,
     );
   }
 
   public async prepareTransferOwnership(
     announcement: TransferOwnershipAnnouncement,
     feeRateVb: number,
-    locktime: number = 0,
-    sequence: number = 0
+    locktime = 0,
+    sequence = 0,
   ): Promise<Lrc20Transaction> {
     const transferOwnershipOutput = await this.builder.buildTransferOwnershipOutput(announcement);
     const changeOutput = this.createRawBtcChangeOutput();
     const inputs = await this.createInputsFromUtxos(
-      new BtcUtxosCoinSelection(this.btcUtxos).selectUtxos(0, 0, 2, feeRateVb, true)
+      new BtcUtxosCoinSelection(this.btcUtxos).selectUtxos(0, 0, 2, feeRateVb, true),
     );
 
     const tx = this.builder.buildAndSignTransaction(
@@ -310,7 +323,7 @@ export class LRCWallet {
       feeRateVb,
       [],
       locktime,
-      sequence
+      sequence,
     );
 
     return this.convertToLrc20Transaction(
@@ -318,7 +331,7 @@ export class LRCWallet {
       [transferOwnershipOutput, changeOutput],
       tx,
       Lrc20TransactionTypeEnum.Announcement,
-      announcement
+      announcement,
     );
   }
 
@@ -327,14 +340,14 @@ export class LRCWallet {
     feeRateVb: number,
     btcAddress: string,
     btcAmount: number,
-    locktime: number = 0,
-    sequence: number = 0
+    locktime = 0,
+    sequence = 0,
   ): Promise<Lrc20Transaction> {
     const tokenPubkeyAnnouncementOutput = await this.builder.buildAnnouncementOutput(announcement);
     const changeOutput = this.createReceiptBtcChangeOutput();
     const btcOutput = BitcoinOutput.createFromRaw(btcAddress, btcAmount);
     const inputs = await this.createInputsFromUtxos(
-      new BtcUtxosCoinSelection(this.btcUtxos).selectUtxos(0, 0, 3, feeRateVb)
+      new BtcUtxosCoinSelection(this.btcUtxos).selectUtxos(0, 0, 3, feeRateVb),
     );
 
     const tx = this.builder.buildAndSignTransaction(
@@ -344,7 +357,7 @@ export class LRCWallet {
       feeRateVb,
       [],
       locktime,
-      sequence
+      sequence,
     );
 
     return this.convertToLrc20Transaction(
@@ -352,20 +365,20 @@ export class LRCWallet {
       [tokenPubkeyAnnouncementOutput, btcOutput, changeOutput],
       tx,
       Lrc20TransactionTypeEnum.Announcement,
-      announcement
+      announcement,
     );
   }
 
   public async prepareFreeze(
     freeze: TxFreezeAnnouncement | PubkeyFreezeAnnouncement,
     feeRateVb: number,
-    locktime: number = 0,
-    sequence: number = 0
+    locktime = 0,
+    sequence = 0,
   ): Promise<Lrc20Transaction> {
     const freezeAnnouncementOutput = await this.builder.buildFreezeOutput(freeze);
     const changeOutput = this.createRawBtcChangeOutput();
     const inputs = await this.createInputsFromUtxos(
-      new BtcUtxosCoinSelection(this.btcUtxos).selectUtxos(0, 0, 2, feeRateVb, true)
+      new BtcUtxosCoinSelection(this.btcUtxos).selectUtxos(0, 0, 2, feeRateVb, true),
     );
 
     const tx = this.builder.buildAndSignTransaction(
@@ -375,7 +388,7 @@ export class LRCWallet {
       feeRateVb,
       [],
       locktime,
-      sequence
+      sequence,
     );
 
     return this.convertToLrc20Transaction(
@@ -383,13 +396,13 @@ export class LRCWallet {
       [freezeAnnouncementOutput, changeOutput],
       tx,
       Lrc20TransactionTypeEnum.Announcement,
-      freeze
+      freeze,
     );
   }
 
   public async prepareIssuance(tokens: Array<Payment>, feeRateVb: number): Promise<Lrc20Transaction> {
     const inputs = await this.createInputsFromUtxos(
-      new BtcUtxosCoinSelection(this.btcUtxos).selectUtxos(0, 0, tokens.length + 2, feeRateVb)
+      new BtcUtxosCoinSelection(this.btcUtxos).selectUtxos(0, 0, tokens.length + 2, feeRateVb),
     );
 
     return this.prepareIssuanceDefineInputs(inputs, tokens, feeRateVb);
@@ -399,8 +412,8 @@ export class LRCWallet {
     inputs: Array<TxInput>,
     tokens: Array<Payment>,
     feeRateVb: number,
-    locktime: number = 0,
-    sequence: number = 0
+    locktime = 0,
+    sequence = 0,
   ): Promise<Lrc20Transaction> {
     const issuanceOutputs = this.createOutputs(tokens);
     const issuanceAnnouncementOutput = await this.builder.buildIssuanceOutput(issuanceOutputs);
@@ -413,20 +426,20 @@ export class LRCWallet {
       feeRateVb,
       [],
       locktime,
-      sequence
+      sequence,
     );
 
     return this.convertToLrc20Transaction(
       inputs,
       [issuanceAnnouncementOutput, ...issuanceOutputs, changeOutput],
       tx,
-      Lrc20TransactionTypeEnum.Issue
+      Lrc20TransactionTypeEnum.Issue,
     );
   }
 
   public async prepareSparkExit(tokens: Array<Payment>, feeRateVb: number): Promise<Lrc20Transaction> {
     const inputs = await this.createInputsFromUtxos(
-      new BtcUtxosCoinSelection(this.btcUtxos).selectUtxos(0, 0, tokens.length + 1, feeRateVb)
+      new BtcUtxosCoinSelection(this.btcUtxos).selectUtxos(0, 0, tokens.length + 1, feeRateVb),
     );
 
     return this.prepareSparkExitDefineInputs(inputs, tokens, feeRateVb);
@@ -436,8 +449,8 @@ export class LRCWallet {
     inputs: Array<TxInput>,
     tokens: Array<Payment>,
     feeRateVb: number,
-    locktime: number = 0,
-    sequence: number = 0
+    locktime = 0,
+    sequence = 0,
   ): Promise<Lrc20Transaction> {
     const exitOutputs = this.createOutputs(tokens);
     const changeOutput = this.createReceiptBtcChangeOutput();
@@ -449,22 +462,22 @@ export class LRCWallet {
       feeRateVb,
       [],
       locktime,
-      sequence
+      sequence,
     );
 
     return this.convertToLrc20Transaction(
       inputs,
       [...exitOutputs, changeOutput],
       tx,
-      Lrc20TransactionTypeEnum.SparkExit
+      Lrc20TransactionTypeEnum.SparkExit,
     );
   }
 
   public async prepareTransfer(
     tokens: Array<Payment>,
     feeRateVb: number,
-    locktime: number = 0,
-    sequence: number = 0
+    locktime = 0,
+    sequence = 0,
   ): Promise<Lrc20Transaction> {
     const lrc20Outputs = this.createOutputs(tokens);
     const selectedLrc20Utxos = new Lrc20UtxosCoinSelection(this.lrc20Utxos).selectUtxos(tokens);
@@ -476,8 +489,8 @@ export class LRCWallet {
         0,
         [...lrc20Inputs].length,
         [...lrc20Outputs, ...changeLrc20Outputs, changeBtcOutput].length,
-        feeRateVb
-      )
+        feeRateVb,
+      ),
     );
 
     const tx = this.builder.buildAndSignTransaction(
@@ -487,14 +500,14 @@ export class LRCWallet {
       feeRateVb,
       [],
       locktime,
-      sequence
+      sequence,
     );
 
     return this.convertToLrc20Transaction(
       [...btcInputs, ...lrc20Inputs],
       [...lrc20Outputs, ...changeLrc20Outputs, changeBtcOutput],
       tx,
-      Lrc20TransactionTypeEnum.Transfer
+      Lrc20TransactionTypeEnum.Transfer,
     );
   }
 
@@ -503,8 +516,8 @@ export class LRCWallet {
     feeRateVb: number,
     btcInputs: Array<BitcoinInput>,
     lrc20Inputs: Array<ReceiptInput>,
-    locktime: number = 0,
-    sequence: number = 0
+    locktime = 0,
+    sequence = 0,
   ): Promise<Lrc20Transaction> {
     const lrc20Outputs = this.createOutputs(tokens);
 
@@ -518,14 +531,14 @@ export class LRCWallet {
       feeRateVb,
       [],
       locktime,
-      sequence
+      sequence,
     );
 
     return this.convertToLrc20Transaction(
       [...btcInputs, ...lrc20Inputs],
       [...lrc20Outputs, ...changeLrc20Outputs, changeBtcOutput],
       tx,
-      Lrc20TransactionTypeEnum.Transfer
+      Lrc20TransactionTypeEnum.Transfer,
     );
   }
 
@@ -534,8 +547,8 @@ export class LRCWallet {
     privateKeys: Array<ECPairInterface>,
     tokens: Array<Payment>,
     feeRateVb: number,
-    locktime: number = 0,
-    sequence: number = 0
+    locktime = 0,
+    sequence = 0,
   ): Promise<Lrc20Transaction> {
     const lrc20Outputs = this.createOutputs(tokens);
     const multisigInputTx = await this.lrcNodeApi.getRawLrc20Tx(txid);
@@ -550,8 +563,8 @@ export class LRCWallet {
         [...lrc20Inputs].length,
         [...lrc20Outputs, ...changeLrc20Outputs, changeBtcOutput].length,
         feeRateVb,
-        false
-      )
+        false,
+      ),
     );
 
     const tx = this.builder.buildAndSignTransaction(
@@ -561,20 +574,20 @@ export class LRCWallet {
       feeRateVb,
       privateKeys,
       locktime,
-      sequence
+      sequence,
     );
 
     return this.convertToLrc20Transaction(
       [...btcInputs, ...lrc20Inputs],
       [...lrc20Outputs, ...changeLrc20Outputs, changeBtcOutput],
       tx,
-      Lrc20TransactionTypeEnum.Transfer
+      Lrc20TransactionTypeEnum.Transfer,
     );
   }
 
   public async prepareSingleInputTx(
     giveData: { amount: bigint; tokenPubkey: string },
-    feeRateVb: number
+    feeRateVb: number,
   ): Promise<Lrc20Transaction> {
     let selectedUtxos: Array<Lrc20Utxo | BitcoinUtxo> = [];
 
@@ -593,7 +606,7 @@ export class LRCWallet {
 
     if (inputs.length > 1) {
       throw new Error(
-        `Amount of inputs (${inputs.length}) is greater than expected (1). Perhaps, you forgot to prepare an output`
+        `Amount of inputs (${inputs.length}) is greater than expected (1). Perhaps, you forgot to prepare an output`,
       );
     }
 
@@ -605,9 +618,9 @@ export class LRCWallet {
   public async prepareTakerPsbt(
     giveData: { amount: bigint; tokenPubkey: string },
     receiveData: { amount: bigint; tokenPubkey: string },
-    allowSendMore: boolean = false,
+    allowSendMore = false,
     feeRateVb?: number,
-    total_tx_fee?: number
+    total_tx_fee?: number,
   ): Promise<Lrc20Transaction> {
     await this.syncWallet();
 
@@ -650,7 +663,7 @@ export class LRCWallet {
         throw new Error(
           `You are about to send ${
             lrc20InputSum - giveData.amount
-          } more tokens. Provide allowSendMore = true argument to send more tokens then you want to.`
+          } more tokens. Provide allowSendMore = true argument to send more tokens then you want to.`,
         );
       }
     } else {
@@ -661,11 +674,11 @@ export class LRCWallet {
           1,
           feeRateVb,
           false,
-          giveData.amount
+          giveData.amount,
         );
       } else {
         selectedLrc20Utxos = new BtcUtxosCoinSelection(
-          this.btcUtxos
+          this.btcUtxos,
           // Including extra input and extra output
         ).coinSelection(BigInt(total_tx_fee), 148n + 34n);
       }
@@ -708,7 +721,7 @@ export class LRCWallet {
         tx.data.bitcoin_tx.version,
         tx.data.bitcoin_tx.lock_time,
         tx.data.bitcoin_tx.input,
-        tx.data.bitcoin_tx.output
+        tx.data.bitcoin_tx.output,
       );
       const txHex = BitcoinTransactionDto.toTransaction(parsedTx).toHex();
 
@@ -729,8 +742,8 @@ export class LRCWallet {
               txHex,
               tx.data.bitcoin_tx.output[transaction.bitcoin_tx.ins[0].index].value,
               input_proof.data.receipt,
-              input_proof.data.innerKey!
-            )
+              input_proof.data.innerKey!,
+            ),
           );
         }
       }
@@ -763,8 +776,8 @@ export class LRCWallet {
           new ReceiptOutput(
             Buffer.from(takerOutputProof.data.innerKey, "hex"),
             transaction.bitcoin_tx.outs[0].value,
-            new Receipt(takerOutputProof.data.receipt.tokenAmount, takerOutputProof.data.receipt.tokenPubkey)
-          )
+            new Receipt(takerOutputProof.data.receipt.tokenAmount, takerOutputProof.data.receipt.tokenPubkey),
+          ),
         );
       }
     }
@@ -786,13 +799,13 @@ export class LRCWallet {
     // Form makers's change from selected input
     const takerLrc20InputSum = selectedLrc20Utxos.reduce(
       (accumulator, currentValue) => accumulator + currentValue.receipt.data.receipt.tokenAmount.amount,
-      BigInt(0)
+      BigInt(0),
     );
     if (takerLrc20InputSum - takerAmount.valueOf() > 0) {
       makerOuts.push(
         this.createLrc20ChangeOutput(
-          new Receipt(new TokenAmount(takerLrc20InputSum - takerAmount.valueOf()), takerTokenPubkey)
-        )
+          new Receipt(new TokenAmount(takerLrc20InputSum - takerAmount.valueOf()), takerTokenPubkey),
+        ),
       );
     }
 
@@ -800,7 +813,7 @@ export class LRCWallet {
       transactions.length,
       takerInputs.length,
       takerOutputs.length + makerOuts.length,
-      feeRateVb
+      feeRateVb,
     );
     const makerInputs = await this.createInputsFromUtxos([...selectedLrc20Utxos, ...btcInputs]);
 
@@ -809,14 +822,14 @@ export class LRCWallet {
       takerInputs,
       makerInputs,
       [...makerOuts, changeBtcOutput],
-      feeRateVb
+      feeRateVb,
     );
 
     let lrc20Tx = this.convertToLrc20Transaction(
       [...takerInputs, ...makerInputs],
       [...takerOutputs, ...makerOuts, changeBtcOutput],
       tx,
-      Lrc20TransactionTypeEnum.Transfer
+      Lrc20TransactionTypeEnum.Transfer,
     );
 
     // Change mocked taker' witnesses to it's real one
@@ -830,7 +843,7 @@ export class LRCWallet {
   public async signPsbt(
     takerTxs: Lrc20Transaction[],
     makerTx: Lrc20Transaction,
-    feeRateVb: number
+    feeRateVb: number,
   ): Promise<Lrc20Transaction> {
     await this.syncWallet();
 
@@ -853,7 +866,7 @@ export class LRCWallet {
         tx.data.bitcoin_tx.version,
         tx.data.bitcoin_tx.lock_time,
         tx.data.bitcoin_tx.input,
-        tx.data.bitcoin_tx.output
+        tx.data.bitcoin_tx.output,
       );
       const txHex = BitcoinTransactionDto.toTransaction(parsedTx).toHex();
 
@@ -874,8 +887,8 @@ export class LRCWallet {
               txHex,
               tx.data.bitcoin_tx.output[transaction.bitcoin_tx.ins[0].index].value,
               input_proof.data.receipt,
-              input_proof.data.innerKey!
-            )
+              input_proof.data.innerKey!,
+            ),
           );
         }
       }
@@ -908,8 +921,8 @@ export class LRCWallet {
           new ReceiptOutput(
             Buffer.from(takerOutputProof.data.innerKey, "hex"),
             transaction.bitcoin_tx.outs[0].value,
-            new Receipt(takerOutputProof.data.receipt.tokenAmount, takerOutputProof.data.receipt.tokenPubkey)
-          )
+            new Receipt(takerOutputProof.data.receipt.tokenAmount, takerOutputProof.data.receipt.tokenPubkey),
+          ),
         );
       }
     }
@@ -923,7 +936,7 @@ export class LRCWallet {
       makerRawTx.data.bitcoin_tx.version,
       makerRawTx.data.bitcoin_tx.lock_time,
       makerRawTx.data.bitcoin_tx.input,
-      makerRawTx.data.bitcoin_tx.output
+      makerRawTx.data.bitcoin_tx.output,
     );
     const txHex = BitcoinTransactionDto.toTransaction(parsedTx).toHex();
 
@@ -945,8 +958,8 @@ export class LRCWallet {
             txHex,
             makerRawTx.data.bitcoin_tx.output[makerTx.bitcoin_tx.ins[0].index].value,
             input_proof.data.receipt,
-            input_proof.data.innerKey!
-          )
+            input_proof.data.innerKey!,
+          ),
         );
       }
     }
@@ -954,7 +967,7 @@ export class LRCWallet {
     let makerOuts: ReceiptOutput[] = [];
     makerReceival.forEach((value, tokenPubkey) => {
       makerOuts.push(
-        this.createLrc20ChangeOutput(new Receipt(new TokenAmount(value.valueOf()), tokenPubkey), makerPubKey)
+        this.createLrc20ChangeOutput(new Receipt(new TokenAmount(value.valueOf()), tokenPubkey), makerPubKey),
       );
     });
 
@@ -964,7 +977,7 @@ export class LRCWallet {
       0,
       [...takerInputs].length,
       [...takerOutputs, ...makerOuts].length,
-      feeRateVb
+      feeRateVb,
     );
     const makerInputs = await this.createInputsFromUtxos([...btcInputs]);
 
@@ -973,14 +986,14 @@ export class LRCWallet {
       takerInputs,
       makerInputs,
       [...makerOuts, changeBtcOutput],
-      feeRateVb
+      feeRateVb,
     );
 
     let lrc20Tx = this.convertToLrc20Transaction(
       [...takerInputs, ...makerInputs],
       [...takerOutputs, ...makerOuts, changeBtcOutput],
       tx,
-      Lrc20TransactionTypeEnum.Transfer
+      Lrc20TransactionTypeEnum.Transfer,
     );
 
     // Change mocked taker' witnesses to it's real one
@@ -1005,17 +1018,17 @@ export class LRCWallet {
   public arePsbtsAsExpected(
     transactions: Lrc20Transaction[],
     payAmount: bigint,
-    receive: { amount: bigint; tokenPubkey: string }[]
+    receive: { amount: bigint; tokenPubkey: string }[],
   ): boolean {
     let inputTokens: Map<string, bigint> = new Map();
-    let outputTokens: bigint = 0n;
+    let outputTokens = 0n;
     for (let i = 0; i < transactions.length; i++) {
       if (transactions[i].tx_type.type == Lrc20TransactionTypeEnum.Transfer) {
         const input_proof = (transactions[i].tx_type.data as TransferData).input_proofs.get(0)!;
         if (input_proof.type === ReceiptProofType.Sig) {
           const tweakedPubKey = Receipt.receiptPublicKey(
             Buffer.from(input_proof.data.innerKey, "hex"),
-            input_proof.data.receipt
+            input_proof.data.receipt,
           ).toString("hex");
           if (tweakedPubKey !== transactions[i].bitcoin_tx.ins[0].witness[1].toString("hex")) {
             return false;
@@ -1027,7 +1040,7 @@ export class LRCWallet {
           }
           inputTokens.set(
             input_proof.data.receipt.tokenPubkey.inner.toString("hex"),
-            tokensAmount + input_proof.data.receipt.tokenAmount.amount
+            tokensAmount + input_proof.data.receipt.tokenAmount.amount,
           );
         }
 
@@ -1035,7 +1048,7 @@ export class LRCWallet {
         if ((output_proof.type = ReceiptProofType.Sig)) {
           const tweakedPubKey = Receipt.receiptPublicKey(
             Buffer.from((output_proof.data as SigReceiptProofData).innerKey, "hex"),
-            output_proof.data.receipt
+            output_proof.data.receipt,
           );
           if (!this.pubkeyInScript(tweakedPubKey, transactions[i].bitcoin_tx.outs[0].script)) {
             return false;
@@ -1096,7 +1109,7 @@ export class LRCWallet {
 
     // Fetch all tokenPubkey info in parallel
     const tokenPubkeyInfoPromises = Array.from(tokenPubkeyHexesToFetch).map((tokenPubkeyHex) =>
-      this.getTokenPubkeyInfo(tokenPubkeyHex)
+      this.getTokenPubkeyInfo(tokenPubkeyHex),
     );
     const tokenPubkeyInfos = await Promise.all(tokenPubkeyInfoPromises);
 
@@ -1155,7 +1168,7 @@ export class LRCWallet {
         }
 
         return utxoValue;
-      })
+      }),
     ).then((values) => values.reduce((sum, value) => sum + value, 0));
 
     // Calculate fees paid
@@ -1174,7 +1187,7 @@ export class LRCWallet {
     outputs: Array<TxOutput>,
     transaction: Transaction,
     type: Lrc20TransactionTypeEnum,
-    announcement?: AnnouncementData
+    announcement?: AnnouncementData,
   ): Lrc20Transaction {
     const outputStartIndex =
       type === Lrc20TransactionTypeEnum.Announcement || type === Lrc20TransactionTypeEnum.Issue ? 1 : 0;
@@ -1271,8 +1284,8 @@ export class LRCWallet {
       if (changeAmount > 0) {
         changeOutputs.push(
           this.createLrc20ChangeOutput(
-            new Receipt(new TokenAmount(changeAmount), new TokenPubkey(Buffer.from(key, "hex")))
-          )
+            new Receipt(new TokenAmount(changeAmount), new TokenPubkey(Buffer.from(key, "hex"))),
+          ),
         );
       }
     });
@@ -1282,7 +1295,7 @@ export class LRCWallet {
 
   private createLrc20ChangeOutput(
     changeReceipt: Receipt,
-    receiverPubKey: Buffer = this.addressInnerKey
+    receiverPubKey: Buffer = this.addressInnerKey,
   ): ReceiptOutput {
     return ReceiptOutput.createFromRaw(receiverPubKey, 1000, changeReceipt);
   }
@@ -1387,7 +1400,7 @@ export class LRCWallet {
     return new BitcoinOutput(this.keyPair.publicKey, 1000);
   }
 
-  private createOutputProofs(outputs: TxOutput[], index: number = 0): Map<number, ReceiptProof> {
+  private createOutputProofs(outputs: TxOutput[], index = 0): Map<number, ReceiptProof> {
     const outputProofs = new Map<number, ReceiptProof>();
     outputs.forEach((output) => {
       if (output instanceof ReceiptOutput) {
@@ -1411,9 +1424,9 @@ export class LRCWallet {
           utxo.txid,
           Number(utxo.vout),
           await this.electrsApi.getTransactionHex(utxo.txid),
-          utxo.satoshis
+          utxo.satoshis,
         );
-      })
+      }),
     );
   }
 
@@ -1428,7 +1441,7 @@ export class LRCWallet {
       revocationKey?: string;
       expiryKey?: string;
       metadata?: SparkExitMetadata;
-    }>
+    }>,
   ): Array<TxOutput> {
     if (amounts.filter((amount) => amount.metadata).length > 1) {
       throw new Error("Only 1 LTTXO can be withdrawn in 1 transaction");
@@ -1449,7 +1462,7 @@ export class LRCWallet {
           token.cltvOutputLocktime,
           token.sats,
           receipt,
-          token.metadata
+          token.metadata,
         );
       } else if (typeof token.recipient === "string") {
         const addressParsed = address.fromBech32(token.recipient);
@@ -1467,7 +1480,7 @@ export class LRCWallet {
           token.sats || 1000,
           receipt,
           token.cltvOutputLocktime,
-          expiryReceiptKey
+          expiryReceiptKey,
         );
       }
     });
@@ -1513,7 +1526,7 @@ export class LRCWallet {
       selectedUtxo = this.lrc20Utxos.find(
         (utxo) =>
           utxo.receipt.data.receipt.tokenPubkey.inner.toString("hex") === tokenPubkey &&
-          utxo.receipt.data.receipt.tokenAmount.amount >= amount
+          utxo.receipt.data.receipt.tokenAmount.amount >= amount,
       );
     } else {
       // Select BitcoinUtxo
@@ -1527,11 +1540,7 @@ export class LRCWallet {
     return selectedUtxo;
   }
 
-  public async coinselect(
-    tokenPubkey: string,
-    amount: bigint,
-    feeRate: number = 1.0
-  ): Promise<Array<BitcoinUtxo | Lrc20Utxo>> {
+  public async coinselect(tokenPubkey: string, amount: bigint, feeRate = 1.0): Promise<Array<BitcoinUtxo | Lrc20Utxo>> {
     if (tokenPubkey.length > 0) {
       const tokens = [{ tokenPubkey, amount }];
       const selectedLrc20Utxos = new Lrc20UtxosCoinSelection(this.lrc20Utxos).selectUtxos(tokens);
@@ -1553,7 +1562,7 @@ export class LRCWallet {
         1,
         feeRate,
         false,
-        amount + BigInt(DUST_AMOUNT * feeRate)
+        amount + BigInt(DUST_AMOUNT * feeRate),
       );
     }
   }
@@ -1601,7 +1610,7 @@ export class LRCWallet {
         let hex = await this.electrsApi.getTransactionHex(txid);
 
         prevouts.set(hash, hex);
-      })
+      }),
     );
 
     return this.builder.signRawTransaction(unsignedTx, prevouts);

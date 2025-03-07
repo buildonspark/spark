@@ -1,8 +1,8 @@
-import { bitcoin } from "../bitcoin-core";
+import { bitcoin } from "../bitcoin-core.ts";
 
-import { toXOnly } from "../lrc/utils/buffer";
-import { NetworkType, toPsbtNetwork } from "../network";
-import { AddressType } from "../types";
+import { toXOnly } from "../lrc/utils/index.ts";
+import { NetworkType, toPsbtNetwork } from "../network/index.ts";
+import { AddressType } from "../types.ts";
 
 /**
  * Convert public key to bitcoin payment object.
@@ -184,7 +184,7 @@ export function scriptPkToAddress(scriptPk: string | Buffer, networkType: Networ
   try {
     const address = bitcoin.address.fromOutputScript(
       typeof scriptPk === "string" ? Buffer.from(scriptPk, "hex") : scriptPk,
-      network
+      network,
     );
     return address;
   } catch (e) {

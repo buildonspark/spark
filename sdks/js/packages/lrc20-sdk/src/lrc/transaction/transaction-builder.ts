@@ -6,28 +6,22 @@ import {
   ReceiptOutput,
   SparkExitOutput,
   TxOutput,
-} from "../types/output";
-import {
   TokenPubkeyAnnouncement,
   TxFreezeAnnouncement,
   FreezeTxToggle,
   TransferOwnershipAnnouncement,
   PubkeyFreezeAnnouncement,
-} from "../types/lrc20-transaction";
-import { findNotFirstUsingFind } from "../utils/array";
-import { reverseBuffer, toEvenParity } from "../utils/buffer";
+  BitcoinInput,
+  MultisigReceiptInput,
+  ReceiptInput,
+  TxInput,
+  Receipt,
+} from "../types/index.ts";
+import { findNotFirstUsingFind, reverseBuffer, toEvenParity, PARITY, toXOnly } from "../utils/index.ts";
 import { Psbt, Payment, payments, networks, Transaction, address, script, opcodes } from "bitcoinjs-lib";
-import { BitcoinInput, MultisigReceiptInput, ReceiptInput, TxInput } from "../types/input";
-import { Receipt } from "../types/receipt";
-import { PARITY } from "../utils/constants";
-import { TokenPubkey } from "../types/token-pubkey";
-import { TokenAmount } from "../types/token-amount";
-import { ReceiptProof } from "../types/receipt-proof";
 import * as varuint from "varuint-bitcoin";
-import { toXOnly } from "../../utils";
 import { privateNegate } from "@bitcoinerlab/secp256k1";
-import { ECPair } from "../../bitcoin-core";
-import { Tapleaf } from "bitcoinjs-lib/src/types";
+import { ECPair } from "../../bitcoin-core.ts";
 
 export class TransactionBuilder {
   private keyPair: ECPairInterface;
@@ -70,10 +64,10 @@ export class TransactionBuilder {
     const opReturnPrefixBuff = Buffer.from([121, 117, 118, 0, 2]);
     const receiptsSum = receiptsOutputs.reduce(
       (acc, currentValue) => acc + (currentValue as ReceiptOutput).receipt.tokenAmount.amount,
-      BigInt(0)
+      BigInt(0),
     );
     const receiptsSumLEBuff = reverseBuffer(
-      Buffer.from(receiptsSum.toString(16).padStart(32, "0").slice(0, 32), "hex")
+      Buffer.from(receiptsSum.toString(16).padStart(32, "0").slice(0, 32), "hex"),
     );
     const tokenPubkeyBuff = receiptsOutputs[0].receipt.tokenPubkey.pubkey;
     return {
@@ -116,8 +110,8 @@ export class TransactionBuilder {
     changeOutput: TxOutput,
     feeRateVb: number,
     privateKeys?: Array<ECPairInterface>,
-    locktime: number = 0,
-    sequence?: number
+    locktime = 0,
+    sequence?: number,
   ): Transaction {
     const psbt = new Psbt({ network: this.network });
     psbt.setVersion(2);
@@ -130,7 +124,7 @@ export class TransactionBuilder {
       changeOutput,
       feeRateVb,
       sequence,
-      privateKeys
+      privateKeys,
     );
 
     this.constructPsbtFromInsAndOuts(psbt, [...inputs], [...outputs, changeOutputConstructed], privateKeys, sequence);
@@ -143,7 +137,7 @@ export class TransactionBuilder {
     inputs: TxInput[],
     outputs: TxOutput[],
     privateKeys: Array<ECPairInterface> = [],
-    sequence?: number
+    sequence?: number,
   ): Psbt {
     outputs.forEach((output) => {
       psbt.addOutput({
@@ -197,7 +191,7 @@ export class TransactionBuilder {
 
           const multisigReceiptPrivateKey = Receipt.receiptPrivateKey(
             privateKeys[0],
-            (input as MultisigReceiptInput).proof
+            (input as MultisigReceiptInput).proof,
           );
 
           const multisigTweakedKeyPair = ECPair.fromPrivateKey(multisigReceiptPrivateKey, { network: this.network });
@@ -238,11 +232,11 @@ export class TransactionBuilder {
   }
 
   private witnessStackToScriptWitness(witness: Buffer[]): Buffer {
-    let buffer = Buffer.from([]);
+    let buffer = Buffer.alloc(0);
 
-    buffer = this.writeVarInt(witness.length, buffer);
+    buffer = Buffer.from(this.writeVarInt(witness.length, buffer));
     witness.forEach((witnessElement) => {
-      buffer = this.writeVarInt(witnessElement.length, buffer);
+      buffer = Buffer.from(this.writeVarInt(witnessElement.length, buffer));
       buffer = Buffer.concat([buffer, Buffer.from(witnessElement)]);
     });
 
@@ -265,14 +259,14 @@ export class TransactionBuilder {
     changeOutput: TxOutput,
     feeRateVb: number,
     sequence?: number,
-    privateKeys?: Array<ECPairInterface>
+    privateKeys?: Array<ECPairInterface>,
   ) {
     const psbtToEstimate = this.constructPsbtFromInsAndOuts(
       psbt,
       inputs,
       [...outputs, changeOutput],
       privateKeys,
-      sequence
+      sequence,
     );
     const fee = Math.ceil(this.estimateFee(psbtToEstimate, feeRateVb));
 
@@ -325,7 +319,7 @@ export class TransactionBuilder {
       case "ReceiptOutput":
         const receiptKey = Receipt.receiptPublicKey(
           (output as ReceiptOutput).receiverPubKey,
-          (output as ReceiptOutput).receipt
+          (output as ReceiptOutput).receipt,
         );
 
         payment = payments.p2wpkh({
@@ -352,7 +346,7 @@ export class TransactionBuilder {
           opcodes.OP_CHECKSIG,
         ]);
 
-        const tapLeaf: Tapleaf = { output: scriptPathScript, version: 0 };
+        const tapLeaf = { output: scriptPathScript, version: 0 };
 
         payment = payments.p2tr({
           internalPubkey: toXOnly(revocationPubkey),
@@ -519,7 +513,7 @@ export class TransactionBuilder {
     makerInputs: TxInput[],
     takerInputs: TxInput[],
     outputs: TxOutput[],
-    feeRateVb: number
+    feeRateVb: number,
   ): Transaction {
     let inputsToSign = Array.from({ length: takerInputs.length }, (_, index) => index);
     this.updateTakerPsbtChangeOutput(psbt.clone(), makerInputs, takerInputs, outputs, inputsToSign, feeRateVb);
@@ -542,7 +536,7 @@ export class TransactionBuilder {
     takerInputs: TxInput[],
     outputs: TxOutput[],
     inputsToSign: number[],
-    feeRateVb: number
+    feeRateVb: number,
   ) {
     const psbtToEstimate = this.constructTakerPsbtFromInsAndOuts(psbt, takerInputs, outputs, inputsToSign);
 
@@ -570,7 +564,7 @@ export class TransactionBuilder {
     psbt: Psbt,
     inputs: TxInput[],
     outputs: TxOutput[],
-    inputsToSign: number[]
+    inputsToSign: number[],
   ): Psbt {
     outputs.forEach((output) => {
       psbt.addOutput({

@@ -1,18 +1,17 @@
 {
   "name": "@buildonspark/lrc20-sdk",
+  "type": "module",
   "version": "0.0.6",
-  "main": "./dist/cjs/index.js",
-  "module": "./dist/esm/index.js",
-  "browser": "./dist/esm/index.js",
-  "node": "./dist/cjs/index.js",
-  "types": "index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/types/index.d.ts",
-      "require": "./dist/cjs/index.js",
-      "node": "./dist/cjs/index.js",
-      "import": "./dist/esm/index.js",
-      "default": "./dist/esm/index.js"
+      "require": {
+        "default": "./dist/cjs/index.js",
+        "types": "./dist/types/index.d.ts"
+      },
+      "import": {
+        "default": "./dist/esm/index.js",
+        "types": "./dist/types/index.d.ts"
+      }
     }
   },
   "files": [
@@ -24,7 +23,7 @@
     "build": "yarn clean && yarn build:types && yarn build:cjs && yarn build:esm && yarn build:tsc-alias",
     "build:types": "tsc -p tsconfig.build.json --outDir ./dist/types --declaration --emitDeclarationOnly",
     "build:cjs": "npx swc src -d ./dist/cjs --strip-leading-paths --config-file .swcrc -C module.type=commonjs",
-    "build:esm": "npx swc src -d ./dist/esm --strip-leading-paths --config-file .swcrc -C isModule=true -C module.type=es6",
+    "build:esm": "npx swc src -d ./dist/esm --strip-leading-paths --config-file .swcrc -C isModule=true -C module.type=es6 -C module.resolveFully=true",
     "build:tsc-alias": "node ./postbuild.js",
     "clean": "rm -rf dist",
     "test": "echo \"Error: no tests yet\"",
@@ -37,6 +36,7 @@
   "dependencies": {
     "@bitcoinerlab/secp256k1": "^1.1.1",
     "@sapphire/utilities": "^3.17.0",
+    "@swc/plugin-transform-imports": "^7.0.0",
     "bignumber.js": "^9.1.2",
     "bip65": "^1.0.3",
     "bitcoinjs-lib": "git+https://github.com/velykodnyi/bitcoinjs-lib.git#v6.1.6+sighash",

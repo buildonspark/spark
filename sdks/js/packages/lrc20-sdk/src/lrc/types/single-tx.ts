@@ -1,12 +1,12 @@
-import { Input } from "bitcoinjs-lib/src/transaction";
-import { ReceiptProof } from "./receipt-proof";
+import { TxInput } from "bitcoinjs-lib";
+import { ReceiptProof } from "./receipt-proof.ts";
 import { instanceToPlain } from "class-transformer";
 
 export class SingleInput {
-  input: Input;
+  input: TxInput;
   proof: ReceiptProof;
 
-  constructor(input: Input, proof: ReceiptProof) {
+  constructor(input: TxInput, proof: ReceiptProof) {
     this.input = input;
     this.proof = proof;
   }

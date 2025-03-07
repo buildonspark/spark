@@ -1,7 +1,6 @@
-import { toEvenParity } from "../utils/buffer";
-import { TokenPubkey } from "./token-pubkey";
-import { TokenAmount } from "./token-amount";
-import { Receipt } from "./receipt";
+import { TokenPubkey } from "./token-pubkey.ts";
+import { TokenAmount } from "./token-amount.ts";
+import { Receipt } from "./receipt.ts";
 import {
   EmptyReceiptProof,
   EmptyReceiptProofData,
@@ -10,8 +9,8 @@ import {
   SigReceiptProof,
   SigReceiptProofData,
   getReceiptDataFromProof,
-} from "./receipt-proof";
-import { Lrc20Transaction, Lrc20TransactionTypeEnum, IssueData, TransferData } from "./lrc20-transaction";
+} from "./receipt-proof.ts";
+import { Lrc20Transaction, Lrc20TransactionTypeEnum, IssueData, TransferData } from "./lrc20-transaction.ts";
 
 export interface BitcoinUtxoDto {
   txid: string;
@@ -34,7 +33,7 @@ export class BitcoinUtxo {
     public vout: bigint,
     public satoshis: number,
     public status: BitcoinUtxoStatus,
-    public hex: string = ""
+    public hex: string = "",
   ) {}
 
   public static fromBitcoinUtxoDto(utxo: BitcoinUtxoDto): BitcoinUtxo {
@@ -42,7 +41,7 @@ export class BitcoinUtxo {
       utxo.txid,
       utxo.vout,
       utxo.value,
-      utxo.status ? BitcoinUtxoStatus.fromBitcoinUtxoStatusDto(utxo.status) : new BitcoinUtxoStatus()
+      utxo.status ? BitcoinUtxoStatus.fromBitcoinUtxoStatusDto(utxo.status) : new BitcoinUtxoStatus(),
     );
   }
 }
@@ -70,7 +69,7 @@ export class Lrc20Utxo extends BitcoinUtxo {
     status: BitcoinUtxoStatus,
     public receipt: ReceiptProof,
     innerKey: string,
-    script?: string
+    script?: string,
   ) {
     super(txid, vout, satoshis, status);
     this.innerKey = innerKey;
@@ -190,5 +189,10 @@ export interface ScriptPubKey {
 }
 
 export class BitcoinUtxoSpentStatus {
-  constructor(public spent: boolean, public txid: string, public vin: bigint, public status: BitcoinUtxoStatus) {}
+  constructor(
+    public spent: boolean,
+    public txid: string,
+    public vin: bigint,
+    public status: BitcoinUtxoStatus,
+  ) {}
 }

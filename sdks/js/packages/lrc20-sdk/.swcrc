@@ -16,14 +16,27 @@
     },
     "baseUrl": ".",
     "transform": null,
-    "target": "es2020",
-    "loose": false,
-    "externalHelpers": false,
+    "target": "esnext",
+    "loose": true,
+    "externalHelpers": true,
     "keepClassNames": true,
     "preserveAllComments": true,
     "paths": {
       "@/*": [
         "src/*"
+      ]
+    },
+    "experimental": {
+      "plugins": [
+          [
+            "@swc/plugin-transform-imports",
+            {
+              "^(.*?)\\.ts(x)?$": {
+                "skipDefaultConversion": true,
+                "transform": "{{matches.[1]}}.js"
+              }
+            }
+          ]
       ]
     }
   },

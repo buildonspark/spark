@@ -1,7 +1,7 @@
 import * as btc from "@scure/btc-signer";
 import { Network as NetworkProto } from "../proto/spark.js";
 import {networks} from "bitcoinjs-lib";
-import lrc20sdk from "@buildonspark/lrc20-sdk";
+import {NetworkType} from "@buildonspark/lrc20-sdk";
 
 export enum Network {
   MAINNET,
@@ -39,9 +39,9 @@ export const LRC_WALLET_NETWORK = Object.freeze({
 });
 
 export const LRC_WALLET_NETWORK_TYPE = Object.freeze({
-  [Network.MAINNET]: lrc20sdk.NetworkType.MAINNET,
-  [Network.TESTNET]: lrc20sdk.NetworkType.TESTNET,
-  [Network.SIGNET]: lrc20sdk.NetworkType.TESTNET,
-  [Network.REGTEST]: lrc20sdk.NetworkType.REGTEST,
-  [Network.LOCAL]: lrc20sdk.NetworkType.REGTEST,
+  [Network.MAINNET]: NetworkType.MAINNET,
+  [Network.TESTNET]: NetworkType.TESTNET,
+  [Network.SIGNET]: NetworkType.TESTNET,
+  [Network.REGTEST]: NetworkType.REGTEST,
+  [Network.LOCAL]: NetworkType.REGTEST,
 });

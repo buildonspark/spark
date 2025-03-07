@@ -68,9 +68,9 @@ import { getNextTransactionSequence } from "./utils/transaction.js";
 import { initWasm } from "./utils/wasm-wrapper.js";
 import { InitOutput } from "./wasm/spark_bindings.js";
 
-import lrc20sdk from "@buildonspark/lrc20-sdk";
-import { broadcastL1Withdrawal } from "./services/lrc20.js";
-import { getMasterHDKeyFromSeed } from "./utils/index.js";
+import {broadcastL1Withdrawal} from "./services/lrc20.js";
+import {getMasterHDKeyFromSeed} from "./utils/index.js";
+import {LRCWallet, LRC20WalletApiConfig} from "@buildonspark/lrc20-sdk";
 
 // Add this constant at the file level
 const MAX_TOKEN_LEAVES = 100;
@@ -132,7 +132,7 @@ export class SparkWallet {
 
   protected connectionManager: ConnectionManager;
 
-  protected lrc20Wallet: lrc20sdk.LRCWallet | undefined;
+  protected lrc20Wallet: LRCWallet | undefined;
 
   private depositService: DepositService;
   protected transferService: TransferService;
@@ -385,7 +385,7 @@ export class SparkWallet {
   public async initWallet(
     mnemonicOrSeed?: Uint8Array | string,
     enableLRC20Wallet: boolean = true,
-    lrc20WalletApiConfig?: lrc20sdk.LRC20WalletApiConfig,
+    lrc20WalletApiConfig?: LRC20WalletApiConfig,
   ): Promise<InitWalletResponse> {
     const returnMnemonic = !mnemonicOrSeed;
     if (!mnemonicOrSeed) {
@@ -419,11 +419,8 @@ export class SparkWallet {
       }
 
       const network = this.config.getNetwork();
-      const masterPrivateKey = getMasterHDKeyFromSeed(
-        seed,
-        network == Network.REGTEST ? 0 : 1,
-      ).privateKey!;
-      this.lrc20Wallet = new lrc20sdk.LRCWallet(
+      const masterPrivateKey = getMasterHDKeyFromSeed(seed, network == Network.REGTEST ? 0 : 1).privateKey!;
+      this.lrc20Wallet = new LRCWallet(
         bytesToHex(masterPrivateKey),
         LRC_WALLET_NETWORK[network],
         LRC_WALLET_NETWORK_TYPE[network],

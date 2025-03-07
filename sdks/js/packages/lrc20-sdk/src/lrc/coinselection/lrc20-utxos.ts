@@ -1,5 +1,4 @@
-import { Lrc20Utxo } from "../types/bitcoin-utxo";
-import { getReceiptDataFromProof } from "../types/receipt-proof";
+import { Lrc20Utxo, getReceiptDataFromProof } from "../types/index.ts";
 
 export class Lrc20UtxosCoinSelection {
   private utxos: Array<Lrc20Utxo>;
@@ -25,7 +24,8 @@ export class Lrc20UtxosCoinSelection {
       .map((token) => {
         const utxosToSpend = [];
         const tokenUtxos = this.utxos.filter(
-          (utxo) => getReceiptDataFromProof(utxo.receipt!)!.receipt!.tokenPubkey.inner.toString("hex") === token.tokenPubkey
+          (utxo) =>
+            getReceiptDataFromProof(utxo.receipt!)!.receipt!.tokenPubkey.inner.toString("hex") === token.tokenPubkey,
         );
         let totalAmount = BigInt(0);
         while (totalAmount < token.amount) {
@@ -68,7 +68,7 @@ export class Lrc20UtxosCoinSelection {
     utxos: Array<Lrc20Utxo>,
     totalValue: bigint,
     target: bigint,
-    utxoIncrementValue: bigint
+    utxoIncrementValue: bigint,
   ): Array<Lrc20Utxo> {
     // Sort UTXOs by descending value
     utxos.sort((a, b) => b.satoshis - a.satoshis);
