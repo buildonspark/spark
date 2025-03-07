@@ -1,9 +1,9 @@
-import {bytesToHex, hexToBytes} from "@noble/curves/abstract/utils";
-import {secp256k1} from "@noble/curves/secp256k1";
-import {Address, OutScript, Transaction} from "@scure/btc-signer";
-import {TransactionInput} from "@scure/btc-signer/psbt";
-import {sha256} from "@scure/btc-signer/utils";
-import {decode} from "light-bolt11-decoder";
+import { bytesToHex, hexToBytes } from "@noble/curves/abstract/utils";
+import { secp256k1 } from "@noble/curves/secp256k1";
+import { Address, OutScript, Transaction } from "@scure/btc-signer";
+import { TransactionInput } from "@scure/btc-signer/psbt";
+import { sha256 } from "@scure/btc-signer/utils";
+import { decode } from "light-bolt11-decoder";
 import SspClient from "./graphql/client.js";
 import {
   BitcoinNetwork,
@@ -24,21 +24,24 @@ import {
   TransferStatus,
   TreeNode,
 } from "./proto/spark.js";
-import {WalletConfig, WalletConfigService} from "./services/config.js";
-import {ConnectionManager} from "./services/connection.js";
-import {CoopExitService} from "./services/coop-exit.js";
-import {DepositService} from "./services/deposit.js";
-import {LightningService} from "./services/lightning.js";
-import {TokenTransactionService} from "./services/token-transactions.js";
-import {LeafKeyTweak, TransferService} from "./services/transfer.js";
+import { WalletConfig, WalletConfigService } from "./services/config.js";
+import { ConnectionManager } from "./services/connection.js";
+import { CoopExitService } from "./services/coop-exit.js";
+import { DepositService } from "./services/deposit.js";
+import { LightningService } from "./services/lightning.js";
+import { TokenTransactionService } from "./services/token-transactions.js";
+import { LeafKeyTweak, TransferService } from "./services/transfer.js";
 
 import * as bip39 from "@scure/bip39";
-import {validateMnemonic} from "@scure/bip39";
-import {wordlist} from "@scure/bip39/wordlists/english";
-import {Mutex} from "async-mutex";
+import { validateMnemonic } from "@scure/bip39";
+import { wordlist } from "@scure/bip39/wordlists/english";
+import { Mutex } from "async-mutex";
 import bitcoin from "bitcoinjs-lib";
-import {DepositAddressTree, TreeCreationService,} from "./services/tree-creation.js";
-import {SparkSigner} from "./signer/signer.js";
+import {
+  DepositAddressTree,
+  TreeCreationService,
+} from "./services/tree-creation.js";
+import { SparkSigner } from "./signer/signer.js";
 import {
   applyAdaptorToSignature,
   generateAdaptorFromSignature,
@@ -51,15 +54,23 @@ import {
   getTxFromRawTxHex,
   getTxId,
 } from "./utils/bitcoin.js";
-import {getNetwork, LRC_WALLET_NETWORK, LRC_WALLET_NETWORK_TYPE, Network} from "./utils/network.js";
-import {calculateAvailableTokenAmount, checkIfSelectedLeavesAreAvailable,} from "./utils/token-transactions.js";
-import {getNextTransactionSequence} from "./utils/transaction.js";
-import {initWasm} from "./utils/wasm-wrapper.js";
-import {InitOutput} from "./wasm/spark_bindings.js";
+import {
+  getNetwork,
+  LRC_WALLET_NETWORK,
+  LRC_WALLET_NETWORK_TYPE,
+  Network,
+} from "./utils/network.js";
+import {
+  calculateAvailableTokenAmount,
+  checkIfSelectedLeavesAreAvailable,
+} from "./utils/token-transactions.js";
+import { getNextTransactionSequence } from "./utils/transaction.js";
+import { initWasm } from "./utils/wasm-wrapper.js";
+import { InitOutput } from "./wasm/spark_bindings.js";
 
 import lrc20sdk from "@buildonspark/lrc20-sdk";
-import {broadcastL1Withdrawal} from "./services/lrc20.js";
-import {getMasterHDKeyFromSeed} from "./utils/index.js";
+import { broadcastL1Withdrawal } from "./services/lrc20.js";
+import { getMasterHDKeyFromSeed } from "./utils/index.js";
 
 // Add this constant at the file level
 const MAX_TOKEN_LEAVES = 100;
@@ -218,7 +229,7 @@ export class SparkWallet {
 
     const leaves = await this.getLeaves();
     if (leaves.length === 0) {
-      return [];
+      throw new Error("No owned leaves found");
     }
 
     leaves.sort((a, b) => b.value - a.value);
@@ -267,9 +278,7 @@ export class SparkWallet {
     }
 
     if (amount < targetAmount) {
-      throw new Error(
-        "You don't have enough nodes to swap for the target amount",
-      );
+      throw new Error("Not enough leaves to swap for the target amount");
     }
 
     return nodes;
@@ -410,12 +419,15 @@ export class SparkWallet {
       }
 
       const network = this.config.getNetwork();
-      const masterPrivateKey = getMasterHDKeyFromSeed(seed, network == Network.REGTEST ? 0 : 1).privateKey!;
+      const masterPrivateKey = getMasterHDKeyFromSeed(
+        seed,
+        network == Network.REGTEST ? 0 : 1,
+      ).privateKey!;
       this.lrc20Wallet = new lrc20sdk.LRCWallet(
         bytesToHex(masterPrivateKey),
         LRC_WALLET_NETWORK[network],
         LRC_WALLET_NETWORK_TYPE[network],
-        lrc20WalletApiConfig
+        lrc20WalletApiConfig,
       );
     }
 
@@ -1650,8 +1662,11 @@ export class SparkWallet {
     );
   }
 
-
-  public async withdrawTokens(tokenPublicKey: string, receiverPublicKey?: string, leafIds?: string[]): Promise<{txid: string} | undefined> {
+  public async withdrawTokens(
+    tokenPublicKey: string,
+    receiverPublicKey?: string,
+    leafIds?: string[],
+  ): Promise<{ txid: string } | undefined> {
     if (!this.lrc20Wallet) {
       throw new Error("LRC20 wallet not initialized");
     }
@@ -1661,29 +1676,35 @@ export class SparkWallet {
     let leavesToExit = this.tokenLeaves.get(tokenPublicKey);
 
     if (leavesToExit && leafIds) {
-      leavesToExit = leavesToExit.filter(({leaf}) => leafIds.findIndex((leafId) => leafId == leaf!.id) != -1)
+      leavesToExit = leavesToExit.filter(
+        ({ leaf }) => leafIds.findIndex((leafId) => leafId == leaf!.id) != -1,
+      );
     }
 
-    if(!leavesToExit) {
+    if (!leavesToExit) {
       throw new Error("No leaves to exit");
     }
 
-    if(!receiverPublicKey) {
+    if (!receiverPublicKey) {
       receiverPublicKey = await this.getIdentityPublicKey();
     }
 
     try {
-      return await broadcastL1Withdrawal(this.lrc20Wallet!, leavesToExit, receiverPublicKey);
-    } catch(err: any) {
+      return await broadcastL1Withdrawal(
+        this.lrc20Wallet!,
+        leavesToExit,
+        receiverPublicKey,
+      );
+    } catch (err: any) {
       if (err.message === "Not enough UTXOs") {
         console.error(
           "Error: No L1 UTXOs available to cover exit fees. Please send sats to the address associated with your Wallet:",
-          this.lrc20Wallet!.p2wpkhAddress
+          this.lrc20Wallet!.p2wpkhAddress,
         );
       } else {
         console.error("Unexpected error:", err);
       }
-      return
+      return;
     }
   }
 }
