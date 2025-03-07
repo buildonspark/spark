@@ -268,8 +268,61 @@ func UpdateFinalizedTransaction(
 	return nil
 }
 
-// FetchTokenTransactionReceipt refetches the receipt with all its relations.
-func FetchTokenTransactionData(ctx context.Context, finalTokenTransaction *pb.TokenTransaction) (*TokenTransactionReceipt, error) {
+// UpdateCancelledTransaction updates the status and ownership signatures input + output leaves in response to a cancelled transaction.
+func UpdateCancelledTransaction(
+	ctx context.Context,
+	tokenTransactionReceipt *TokenTransactionReceipt,
+) error {
+	// Update the token transaction receipt with the operator signature and new status
+	_, err := GetDbFromContext(ctx).TokenTransactionReceipt.UpdateOne(tokenTransactionReceipt).
+		SetStatus(schema.TokenTransactionStatus(schema.TokenTransactionStatusSignedCancelled)).
+		Save(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to update token transaction receipt with finalized status: %w", err)
+	}
+
+	// Change input leaf statuses back to CREATED_FINALIZED to re-enable spending.
+	spentLeaves := tokenTransactionReceipt.Edges.SpentLeaf
+	for _, leafToSpendEnt := range spentLeaves {
+		if leafToSpendEnt.Status != schema.TokenLeafStatusSpentSigned {
+			return fmt.Errorf("spent leaf ID %s has status %s, expected %s",
+				leafToSpendEnt.ID.String(),
+				leafToSpendEnt.Status,
+				schema.TokenLeafStatusSpentSigned)
+		}
+		_, err := GetDbFromContext(ctx).TokenLeaf.UpdateOne(leafToSpendEnt).
+			SetStatus(schema.TokenLeafStatusCreatedFinalized).
+			Save(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to cancel transaction and update spent leaf back to CREATED_FINALIZED: %w", err)
+		}
+	}
+
+	// Change output leaf statuses to SIGNED_CANCELLED to invalidate them.
+	leafIDs := make([]uuid.UUID, len(tokenTransactionReceipt.Edges.CreatedLeaf))
+	for i, leaf := range tokenTransactionReceipt.Edges.CreatedLeaf {
+		leafIDs[i] = leaf.ID
+		// Verify leaf is in the expected state
+		if leaf.Status != schema.TokenLeafStatusCreatedSigned {
+			return fmt.Errorf("created leaf ID %s has status %s, expected %s",
+				leaf.ID.String(),
+				leaf.Status,
+				schema.TokenLeafStatusCreatedSigned)
+		}
+	}
+	_, err = GetDbFromContext(ctx).TokenLeaf.Update().
+		Where(tokenleaf.IDIn(leafIDs...)).
+		SetStatus(schema.TokenLeafStatusCreatedSignedCancelled).
+		Save(ctx)
+	if err != nil {
+		log.Printf("Failed to bulk update leaf status to signed: %v", err)
+		return err
+	}
+	return nil
+}
+
+// FetchTokenTransactionData refetches the receipt with all its relations.
+func FetchAndLockTokenTransactionData(ctx context.Context, finalTokenTransaction *pb.TokenTransaction) (*TokenTransactionReceipt, error) {
 	finalTokenTransactionHash, err := utils.HashTokenTransaction(finalTokenTransaction, false)
 	if err != nil {
 		return nil, err
@@ -280,6 +333,7 @@ func FetchTokenTransactionData(ctx context.Context, finalTokenTransaction *pb.To
 		WithCreatedLeaf().
 		WithSpentLeaf().
 		WithMint().
+		ForUpdate().
 		Only(ctx)
 	if err != nil {
 		return nil, err

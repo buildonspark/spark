@@ -240,7 +240,7 @@ var (
 		{Name: "id", Type: field.TypeUUID},
 		{Name: "create_time", Type: field.TypeTime},
 		{Name: "update_time", Type: field.TypeTime},
-		{Name: "status", Type: field.TypeEnum, Enums: []string{"CREATED_STARTED", "CREATED_SIGNED", "CREATED_FINALIZED", "SPENT_STARTED", "SPENT_SIGNED", "SPENT_FINALIZED"}},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"CREATED_STARTED", "CREATED_SIGNED", "CREATED_SIGNED_CANCELLED", "CREATED_FINALIZED", "SPENT_STARTED", "SPENT_SIGNED", "SPENT_FINALIZED"}},
 		{Name: "owner_public_key", Type: field.TypeBytes},
 		{Name: "withdraw_bond_sats", Type: field.TypeUint64},
 		{Name: "withdraw_relative_block_locktime", Type: field.TypeUint64},
@@ -313,7 +313,7 @@ var (
 		{Name: "partial_token_transaction_hash", Type: field.TypeBytes},
 		{Name: "finalized_token_transaction_hash", Type: field.TypeBytes, Unique: true},
 		{Name: "operator_signature", Type: field.TypeBytes, Unique: true, Nullable: true},
-		{Name: "status", Type: field.TypeEnum, Nullable: true, Enums: []string{"STARTED", "SIGNED", "FINALIZED"}},
+		{Name: "status", Type: field.TypeEnum, Nullable: true, Enums: []string{"STARTED", "SIGNED", "SIGNED_CANCELLED", "FINALIZED"}},
 		{Name: "token_transaction_receipt_mint", Type: field.TypeUUID, Nullable: true},
 	}
 	// TokenTransactionReceiptsTable holds the schema information for the "token_transaction_receipts" table.

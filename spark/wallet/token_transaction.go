@@ -14,6 +14,7 @@ import (
 	"github.com/lightsparkdev/spark-go/common"
 	secretsharing "github.com/lightsparkdev/spark-go/common/secret_sharing"
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
+	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/utils"
 )
 
@@ -119,12 +120,14 @@ func StartTokenTransaction(
 // SignTokenTransaction calls each signing operator to sign the final token transaction and
 // optionally return keyshares (for transfer transactions). It returns a 2D slice of
 // KeyshareWithOperatorIndex for each leaf if transfer, or an empty structure if mint.
+// If specificOperatorIDs is provided and not empty, only those operators will be contacted.
 func SignTokenTransaction(
 	ctx context.Context,
 	config *Config,
 	finalTx *pb.TokenTransaction,
 	finalTxHash []byte,
 	leafToSpendPrivateKeys []*secp256k1.PrivateKey,
+	specificOperatorIDs ...string,
 ) ([][]*KeyshareWithOperatorIndex, error) {
 	// ---------------------------------------------------------------------
 	// (A) Build operator-specific signatures
@@ -174,7 +177,23 @@ func SignTokenTransaction(
 	// (B) Contact each operator to sign
 	// ---------------------------------------------------------------------
 	leafRevocationKeyshares := make([][]*KeyshareWithOperatorIndex, len(finalTx.GetTransferInput().GetLeavesToSpend()))
-	for _, operator := range config.SigningOperators {
+
+	// Determine which operators to contact
+	operatorsToContact := config.SigningOperators
+
+	// If specific operators are requested, filter the map
+	if len(specificOperatorIDs) > 0 {
+		operatorsToContact = make(map[string]*so.SigningOperator)
+		for _, opID := range specificOperatorIDs {
+			if operator, exists := config.SigningOperators[opID]; exists {
+				operatorsToContact[opID] = operator
+			} else {
+				return nil, fmt.Errorf("specified operator ID %s not found in signing operators", opID)
+			}
+		}
+	}
+
+	for _, operator := range operatorsToContact {
 		operatorConn, err := common.NewGRPCConnectionWithTestTLS(operator.Address)
 		if err != nil {
 			log.Printf("Error while establishing gRPC connection to operator at %s: %v", operator.Address, err)
@@ -475,6 +494,58 @@ func QueryTokenTransactions(
 	}
 
 	return response, nil
+}
+
+// CancelTokenTransaction cancels a token transaction that has been signed but not yet finalized.
+// This is only possible if fewer than (total operators - threshold) operators have signed the transaction.
+// If specificOperatorIDs is provided and not empty, only those operators will be contacted.
+func CancelTokenTransaction(
+	ctx context.Context,
+	config *Config,
+	finalTokenTransaction *pb.TokenTransaction,
+	specificOperatorIDs ...string,
+) error {
+	// Determine which operators to contact
+	operatorsToContact := config.SigningOperators
+
+	// If specific operators are requested, filter the map
+	if len(specificOperatorIDs) > 0 {
+		operatorsToContact = make(map[string]*so.SigningOperator)
+		for _, opID := range specificOperatorIDs {
+			if operator, exists := config.SigningOperators[opID]; exists {
+				operatorsToContact[opID] = operator
+			} else {
+				return fmt.Errorf("specified operator ID %s not found in signing operators", opID)
+			}
+		}
+	}
+
+	// Now cancel with each operator
+	for _, operator := range operatorsToContact {
+		operatorConn, err := common.NewGRPCConnectionWithTestTLS(operator.Address)
+		if err != nil {
+			log.Printf("Error while establishing gRPC connection to operator at %s: %v", operator.Address, err)
+			return err
+		}
+		defer operatorConn.Close()
+
+		operatorToken, err := AuthenticateWithConnection(ctx, config, operatorConn)
+		if err != nil {
+			return fmt.Errorf("failed to authenticate with operator %s: %v", operator.Identifier, err)
+		}
+		operatorCtx := ContextWithToken(ctx, operatorToken)
+		operatorClient := pb.NewSparkServiceClient(operatorConn)
+
+		_, err = operatorClient.CancelSignedTokenTransaction(operatorCtx, &pb.CancelSignedTokenTransactionRequest{
+			FinalTokenTransaction:   finalTokenTransaction,
+			SenderIdentityPublicKey: config.IdentityPublicKey(),
+		})
+		if err != nil {
+			return fmt.Errorf("failed to cancel token transaction with operator %s: %v", operator.Identifier, err)
+		}
+	}
+
+	return nil
 }
 
 func parseHexIdentifierToUint64(binaryIdentifier string) uint64 {

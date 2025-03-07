@@ -45,6 +45,7 @@ service SparkService {
     rpc freeze_tokens(FreezeTokensRequest) returns (FreezeTokensResponse) {}
     rpc get_owned_token_leaves(GetOwnedTokenLeavesRequest) returns (GetOwnedTokenLeavesResponse) {}
     rpc query_token_transactions(QueryTokenTransactionsRequest) returns (QueryTokenTransactionsResponse) {}
+    rpc cancel_signed_token_transaction(CancelSignedTokenTransactionRequest) returns (google.protobuf.Empty) {}
 
     rpc return_lightning_payment(ReturnLightningPaymentRequest) returns (google.protobuf.Empty) {}
 
@@ -308,6 +309,11 @@ message LeafWithPreviousTransactionData {
 
 message GetOwnedTokenLeavesResponse {
     repeated LeafWithPreviousTransactionData leaves_with_previous_transaction_data = 1;
+}
+
+message CancelSignedTokenTransactionRequest {
+    TokenTransaction final_token_transaction = 1;
+    bytes sender_identity_public_key = 2 [(validate.rules).bytes.len = 33];
 }
 
 message TreeNode {

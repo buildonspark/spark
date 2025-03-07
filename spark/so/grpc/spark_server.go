@@ -219,3 +219,11 @@ func (s *SparkServer) QueryBalance(ctx context.Context, req *pb.QueryBalanceRequ
 	treeQueryHandler := handler.NewTreeQueryHandler(s.config)
 	return wrapWithGRPCError(treeQueryHandler.QueryBalance(ctx, req))
 }
+
+// CancelSignedTokenTransaction cancels a token transaction that has been signed but not yet finalized,
+// if fewer than the required threshold of operators have signed it.
+func (s *SparkServer) CancelSignedTokenTransaction(ctx context.Context, req *pb.CancelSignedTokenTransactionRequest) (*emptypb.Empty, error) {
+	tokenTransactionHandler := handler.NewTokenTransactionHandler(s.config, s.db)
+	_, err := tokenTransactionHandler.CancelSignedTokenTransaction(ctx, s.config, req)
+	return wrapWithGRPCError(emptyResponse, err)
+}

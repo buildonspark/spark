@@ -176,7 +176,7 @@ func (o TokenTransactionHandler) SignTokenTransaction(
 		log.Printf("Failed to hash final token transaction: %v", err)
 		return nil, err
 	}
-	tokenTransactionReceipt, err := ent.FetchTokenTransactionData(ctx, req.FinalTokenTransaction)
+	tokenTransactionReceipt, err := ent.FetchAndLockTokenTransactionData(ctx, req.FinalTokenTransaction)
 	if err != nil {
 		log.Printf("Sign request for token transaction did not map to a previously started transaction: %v", err)
 		return nil, err
@@ -293,7 +293,7 @@ func (o TokenTransactionHandler) FinalizeTokenTransaction(
 		return nil, err
 	}
 
-	tokenTransactionReceipt, err := ent.FetchTokenTransactionData(ctx, req.FinalTokenTransaction)
+	tokenTransactionReceipt, err := ent.FetchAndLockTokenTransactionData(ctx, req.FinalTokenTransaction)
 	if err != nil {
 		log.Printf("Failed to fetch matching transaction receipt: %v", err)
 		return nil, fmt.Errorf("failed to fetch transaction receipt: %w", err)
@@ -632,4 +632,90 @@ func (o TokenTransactionHandler) GetOwnedTokenLeaves(
 	return &pb.GetOwnedTokenLeavesResponse{
 		LeavesWithPreviousTransactionData: leavesWithPrevTxData,
 	}, nil
+}
+
+func (o TokenTransactionHandler) CancelSignedTokenTransaction(
+	ctx context.Context,
+	config *so.Config,
+	req *pb.CancelSignedTokenTransactionRequest,
+) (*emptypb.Empty, error) {
+	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, o.config, req.SenderIdentityPublicKey); err != nil {
+		return nil, err
+	}
+
+	tokenTransactionReceipt, err := ent.FetchAndLockTokenTransactionData(ctx, req.FinalTokenTransaction)
+	if err != nil {
+		log.Printf("Failed to fetch matching transaction receipt: %v", err)
+		return nil, fmt.Errorf("failed to fetch transaction receipt: %w", err)
+	}
+
+	// Verify that the transaction is in a signed state locally
+	if tokenTransactionReceipt.Status != schema.TokenTransactionStatusSigned {
+		return nil, fmt.Errorf("transaction is in status %s, but must be in SIGNED status to cancel", tokenTransactionReceipt.Status)
+	}
+
+	// Verify with the other SOs that the transaction is in a cancellable state.
+	// Each SO verifies that:
+	// 1. No SO has moved the transaction to a 'Finalized' state.
+	// 2. (# of SOs) - threshold have not progressed the transaction to a 'Signed' state.
+	// TODO: In the future it may be possible to optimize these constraints in two ways:
+	// a) Don't check for (1) because if a user finalizes before threshold has signed and then tries to cancel afterwords they effectively sacrifice their funds.
+	// b) Update (2) to not ping every SO in parallel but ping one at a time until # SOs - threshold have validated that they have not yet signed.
+	allSelection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionAll}
+	responses, err := helper.ExecuteTaskWithAllOperators(ctx, config, &allSelection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
+		conn, err := common.NewGRPCConnectionWithCert(operator.Address, operator.CertPath)
+		if err != nil {
+			log.Printf("Failed to connect to operator for validating transaction state before cancelling: %v", err)
+			return nil, err
+		}
+		defer conn.Close()
+
+		client := pb.NewSparkServiceClient(conn)
+		internalResp, err := client.QueryTokenTransactions(ctx, &pb.QueryTokenTransactionsRequest{
+			TokenTransactionHashes: [][]byte{tokenTransactionReceipt.FinalizedTokenTransactionHash},
+		})
+		if err != nil {
+			log.Printf("Failed to execute start token transaction task with operator %s: %v", operator.Identifier, err)
+			return nil, err
+		}
+		return internalResp, err
+	})
+	if err != nil {
+		log.Printf("Failed to successfully execute start token transaction task with all operators: %v", err)
+		return nil, err
+	}
+
+	// Check if any operator has finalized the transaction
+	signedCount := 0
+	for _, resp := range responses {
+		queryResp, ok := resp.(*pb.QueryTokenTransactionsResponse)
+		if !ok || queryResp == nil {
+			return nil, fmt.Errorf("invalid response from operator")
+		}
+
+		for _, txWithStatus := range queryResp.TokenTransactionsWithStatus {
+			if txWithStatus.Status == pb.TokenTransactionStatus_TOKEN_TRANSACTION_FINALIZED {
+				return nil, fmt.Errorf("transaction has already been finalized by at least one operator, cannot cancel")
+			}
+			if txWithStatus.Status == pb.TokenTransactionStatus_TOKEN_TRANSACTION_SIGNED {
+				signedCount++
+			}
+		}
+	}
+
+	// Check if too many operators have already signed
+	operatorCount := len(config.GetSigningOperatorList())
+	threshold := int(config.Threshold)
+	if signedCount > operatorCount-threshold {
+		return nil, fmt.Errorf("transaction has been signed by %d operators, which exceeds the cancellation threshold of %d",
+			signedCount, operatorCount-threshold)
+	}
+
+	err = ent.UpdateCancelledTransaction(ctx, tokenTransactionReceipt)
+	if err != nil {
+		log.Printf("Failed to update leaves after canceling: %v", err)
+		return nil, err
+	}
+
+	return &emptypb.Empty{}, nil
 }

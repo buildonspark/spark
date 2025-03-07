@@ -17,7 +17,10 @@ const (
 	// TokenLeafStatusSigned is the status after a leaf has been signed by the operator
 	// but before the transaction has been finalized.
 	TokenLeafStatusCreatedSigned TokenLeafStatus = "CREATED_SIGNED"
-	// TokenLeafStatusFinalized is the status after a leaf has been finalized by the
+	// TokenLeafStatusFinalized is the status if a transaction creating this leaf was signed
+	// but then cancelled due to a threshold of SOs not responding. These leaves are permanently invalid.
+	TokenLeafStatusCreatedSignedCancelled TokenLeafStatus = "CREATED_SIGNED_CANCELLED"
+	// TokenLeafStatusCreatedFinalized is the status after a leaf has been finalized by the
 	// operator and is ready for spending.
 	TokenLeafStatusCreatedFinalized TokenLeafStatus = "CREATED_FINALIZED"
 	// TokenLeafStatusSpentStarted is the status of a leaf after a tx has come in to start
@@ -36,6 +39,7 @@ func (TokenLeafStatus) Values() []string {
 	return []string{
 		string(TokenLeafStatusCreatedStarted),
 		string(TokenLeafStatusCreatedSigned),
+		string(TokenLeafStatusCreatedSignedCancelled),
 		string(TokenLeafStatusCreatedFinalized),
 		string(TokenLeafStatusSpentStarted),
 		string(TokenLeafStatusSpentSigned),

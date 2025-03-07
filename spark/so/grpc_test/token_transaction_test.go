@@ -1048,3 +1048,169 @@ func TestFreezeAndUnfreezeTokensSchnorr(t *testing.T) {
 		t.Fatalf("failed to freeze tokens: %v", err)
 	}
 }
+
+func TestCancelTokenTransaction(t *testing.T) {
+	config, err := testutil.TestWalletConfig()
+	if err != nil {
+		t.Fatalf("failed to create wallet config: %v", err)
+	}
+
+	// Get half of the operator IDs
+	var halfOperatorIDs []string
+	i := 0
+	for operatorID := range config.SigningOperators {
+		if i < len(config.SigningOperators)/2 {
+			halfOperatorIDs = append(halfOperatorIDs, operatorID)
+			i++
+		} else {
+			break
+		}
+	}
+	var remainingOperatorIDs []string
+	for operatorID := range config.SigningOperators {
+		found := false
+		for _, halfID := range halfOperatorIDs {
+			if operatorID == halfID {
+				found = true
+				break
+			}
+		}
+		if !found {
+			remainingOperatorIDs = append(remainingOperatorIDs, operatorID)
+		}
+	}
+
+	tokenPrivKey := config.IdentityPrivateKey
+	tokenIdentityPubKeyBytes := tokenPrivKey.PubKey().SerializeCompressed()
+	issueTokenTransaction, userLeaf1PrivKey, userLeaf2PrivKey, err := createTestTokenIssuanceTransaction(tokenIdentityPubKeyBytes)
+	if err != nil {
+		t.Fatalf("failed to create test token issuance transaction: %v", err)
+	}
+
+	// Step 1: Start the token transaction
+	startResp, _, finalTxHash, err := wallet.StartTokenTransaction(
+		context.Background(),
+		config,
+		issueTokenTransaction,
+		[]*secp256k1.PrivateKey{&tokenPrivKey},
+		[][]byte{},
+	)
+	if err != nil {
+		t.Fatalf("failed to start token transaction: %v", err)
+	}
+	finalIssueTokenTransaction := startResp.FinalTokenTransaction
+
+	// Step 3: Verify that the transaction was canceled by attempting to sign it
+	// This should fail because the transaction has been canceled
+	_, err = wallet.SignTokenTransaction(
+		context.Background(),
+		config,
+		startResp.FinalTokenTransaction,
+		finalTxHash,
+		[]*secp256k1.PrivateKey{&tokenPrivKey},
+		halfOperatorIDs..., // Only sign with half of the operators
+	)
+	if err != nil {
+		t.Fatalf("failed to sign the mint transaction with the first half of SOs: %v", err)
+	}
+	// Step 2: Cancel the token transaction
+	err = wallet.CancelTokenTransaction(
+		context.Background(),
+		config,
+		startResp.FinalTokenTransaction,
+		halfOperatorIDs..., // Only sign with half of the operators
+	)
+	if err == nil {
+		t.Fatalf("expected cancel failure on mint transaction. Mint cancellation is not supported: %v", err)
+	}
+	_, err = wallet.SignTokenTransaction(
+		context.Background(),
+		config,
+		startResp.FinalTokenTransaction,
+		finalTxHash,
+		[]*secp256k1.PrivateKey{&tokenPrivKey},
+		remainingOperatorIDs...,
+	)
+	if err != nil {
+		t.Fatalf("failed to sign the mint transaction with the second half of SOs: %v", err)
+	}
+
+	// Test cancellation of a transfer transaction
+	finalIssueTokenTransactionHash, err := utils.HashTokenTransaction(finalIssueTokenTransaction, false)
+	if err != nil {
+		t.Fatalf("failed to hash final issuance token transaction: %v", err)
+	}
+
+	transferTokenTransaction, _, err := createTestTokenTransferTransaction(
+		finalIssueTokenTransactionHash,
+		tokenIdentityPubKeyBytes,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	revPubKey1 := finalIssueTokenTransaction.OutputLeaves[0].RevocationPublicKey
+	revPubKey2 := finalIssueTokenTransaction.OutputLeaves[1].RevocationPublicKey
+
+	// Start the transfer transaction
+	transferStartResp, _, transferFinalTxHash, err := wallet.StartTokenTransaction(
+		context.Background(),
+		config,
+		transferTokenTransaction,
+		[]*secp256k1.PrivateKey{userLeaf1PrivKey, userLeaf2PrivKey},
+		[][]byte{revPubKey1, revPubKey2},
+	)
+	if err != nil {
+		t.Fatalf("failed to start transfer transaction: %v", err)
+	}
+
+	log.Printf("transfer tx hash: %x", transferFinalTxHash)
+
+	// Sign with only half of the operators
+	_, err = wallet.SignTokenTransaction(
+		context.Background(),
+		config,
+		transferStartResp.FinalTokenTransaction,
+		transferFinalTxHash,
+		[]*secp256k1.PrivateKey{userLeaf1PrivKey, userLeaf2PrivKey},
+		halfOperatorIDs..., // Only sign with half of the operators
+	)
+	if err != nil {
+		t.Fatalf("failed partial signing: %v", err)
+	}
+
+	// Cancel the transfer transaction after partial signing
+	err = wallet.CancelTokenTransaction(
+		context.Background(),
+		config,
+		transferStartResp.FinalTokenTransaction,
+		halfOperatorIDs..., // Cancel for the half of the operators that signed.
+	)
+	if err != nil {
+		t.Fatalf("failed to cancel partially signed transfer token transaction: %v", err)
+	}
+
+	// Attempt to cancel the transaction with the SOs that did not sign
+	err = wallet.CancelTokenTransaction(
+		context.Background(),
+		config,
+		transferStartResp.FinalTokenTransaction,
+		remainingOperatorIDs..., // Only sign with half of the operators
+	)
+	if err == nil {
+		t.Fatal("expected error when trying to cancel transfer transaction with remaining operators, got nil")
+	}
+
+	// Verify we can create a new transfer transaction after cancellation
+	transferTokenTransactionResponse, err := wallet.BroadcastTokenTransaction(
+		context.Background(),
+		config,
+		transferTokenTransaction,
+		[]*secp256k1.PrivateKey{userLeaf1PrivKey, userLeaf2PrivKey},
+		[][]byte{revPubKey1, revPubKey2},
+	)
+	if err != nil {
+		t.Fatalf("failed to broadcast transfer token transaction after cancellation: %v", err)
+	}
+	log.Printf("successfully transferred tokens after cancellation: %v", transferTokenTransactionResponse)
+}
