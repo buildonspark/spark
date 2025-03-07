@@ -163,7 +163,7 @@ func (s *States) ReceivedRound1Packages(requestID string, selfIdentifier string,
 
 // ReceivedRound1Signature receives the round 1 signatures from other operators.
 // If the state is not in the round 1 signature state, it returns an error.
-func (s *States) ReceivedRound1Signature(requestID string, selfIdentifier string, round1Signatures map[string][]byte, operatorMap map[string]*so.SigningOperator) ([]string, error) {
+func (s *States) ReceivedRound1Signature(requestID string, _ string, round1Signatures map[string][]byte, operatorMap map[string]*so.SigningOperator) ([]string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -192,7 +192,7 @@ func (s *States) ReceivedRound1Signature(requestID string, selfIdentifier string
 
 // ReceivedRound2Packages receives the round 2 packages from other operators.
 // If the state is not in the round 1 signature or round 2 state, it returns an error.
-func (s *States) ReceivedRound2Packages(requestID string, identifier string, round2Packages [][]byte, round2Signature []byte, frostConnection *grpc.ClientConn, config *so.Config) error {
+func (s *States) ReceivedRound2Packages(requestID string, identifier string, round2Packages [][]byte, _ []byte, _ *grpc.ClientConn, _ *so.Config) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -249,7 +249,7 @@ func (s *States) ProceedToRound3(ctx context.Context, requestID string, frostCon
 
 // Round3 performs the round 3 of the DKG protocol.
 // This will generate the keyshares and store them in the database.
-func (s *State) Round3(ctx context.Context, requestID string, frostConnection *grpc.ClientConn, config *so.Config) error {
+func (s *State) Round3(ctx context.Context, requestID string, frostConnection *grpc.ClientConn, _ *so.Config) error {
 	round1PackagesMaps := make([]*pbcommon.PackageMap, len(s.ReceivedRound1Packages))
 	for i, p := range s.ReceivedRound1Packages {
 		round1PackagesMaps[i] = &pbcommon.PackageMap{

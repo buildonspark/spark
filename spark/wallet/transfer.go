@@ -391,7 +391,7 @@ func QueryPendingTransfersBySender(
 
 // VerifyPendingTransfer verifies signature and decrypt secret cipher for all leaves in the transfer.
 func VerifyPendingTransfer(
-	ctx context.Context,
+	_ context.Context,
 	config *Config,
 	transfer *pb.Transfer,
 ) (*map[string][]byte, error) {
@@ -756,7 +756,10 @@ func prepareRefundSoSigningJobs(
 		}
 		refundSigningData.RefundTx = refundTx
 		var refundBuf bytes.Buffer
-		refundTx.Serialize(&refundBuf)
+		err = refundTx.Serialize(&refundBuf)
+		if err != nil {
+			return nil, fmt.Errorf("failed to serialize refund tx: %v", err)
+		}
 		refundNonceCommitmentProto, _ := refundSigningData.Nonce.SigningCommitment().MarshalProto()
 
 		signingPubkey := refundSigningData.SigningPrivKey.PubKey().SerializeCompressed()

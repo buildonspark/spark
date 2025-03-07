@@ -32,7 +32,7 @@ func StartTokenTransaction(
 	config *Config,
 	tokenTransaction *pb.TokenTransaction,
 	leafToSpendPrivateKeys []*secp256k1.PrivateKey,
-	leafToSpendRevocationPublicKeys [][]byte,
+	_ [][]byte,
 ) (*pb.StartTokenTransactionResponse, []byte, []byte, error) {
 	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
 	if err != nil {

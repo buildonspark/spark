@@ -138,16 +138,16 @@ func (h *LightningHandler) GetSigningCommitments(ctx context.Context, req *pb.Ge
 	}
 
 	db := ent.GetDbFromContext(ctx)
-	nodeIds := make([]uuid.UUID, len(req.NodeIds))
+	nodeIDs := make([]uuid.UUID, len(req.NodeIds))
 	for i, nodeID := range req.NodeIds {
 		nodeID, err := uuid.Parse(nodeID)
 		if err != nil {
 			return nil, fmt.Errorf("unable to parse node id: %v", err)
 		}
-		nodeIds[i] = nodeID
+		nodeIDs[i] = nodeID
 	}
 
-	nodes, err := db.TreeNode.Query().Where(treenode.IDIn(nodeIds...)).All(ctx)
+	nodes, err := db.TreeNode.Query().Where(treenode.IDIn(nodeIDs...)).All(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get nodes: %v", err)
 	}
@@ -351,9 +351,10 @@ func (h *LightningHandler) storeUserSignedTransactions(
 		if err != nil {
 			return nil, fmt.Errorf("unable to get node: %v", err)
 		}
-		db.TreeNode.UpdateOne(node).
-			SetStatus(schema.TreeNodeStatusTransferLocked).
-			Exec(ctx)
+		_, err = db.TreeNode.UpdateOne(node).SetStatus(schema.TreeNodeStatusTransferLocked).Save(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("unable to update node status: %v", err)
+		}
 	}
 	return preimageRequest, nil
 }

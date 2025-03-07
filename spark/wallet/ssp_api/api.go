@@ -82,7 +82,6 @@ func (s *SparkServiceAPI) RequestLeavesSwap(
 	totalAmountSats uint64,
 	targetAmountSats uint64,
 	feeSats uint64,
-	network common.Network,
 	userLeaves []SwapLeaf,
 ) (string, []SwapLeaf, error) {
 	variables := map[string]interface{}{

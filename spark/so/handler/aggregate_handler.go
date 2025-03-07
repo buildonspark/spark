@@ -74,7 +74,7 @@ func (h *AggregateHandler) validateAggregateNodesRequest(ctx context.Context, re
 	return parentNode, nodes, nil
 }
 
-func (h *AggregateHandler) prepareSigningJob(ctx context.Context, parentNode *ent.TreeNode, keyshare *ent.SigningKeyshare, req *pb.AggregateNodesRequest) (*helper.SigningJob, error) {
+func (h *AggregateHandler) prepareSigningJob(_ context.Context, parentNode *ent.TreeNode, keyshare *ent.SigningKeyshare, req *pb.AggregateNodesRequest) (*helper.SigningJob, error) {
 	parentNodeTx, err := common.TxFromRawTxBytes(parentNode.RawTx)
 	if err != nil {
 		return nil, err

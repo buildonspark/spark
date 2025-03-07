@@ -70,7 +70,10 @@ func AggregateTreeNodes(
 		return nil, err
 	}
 	var refundBuf bytes.Buffer
-	newRefundTx.Serialize(&refundBuf)
+	err = newRefundTx.Serialize(&refundBuf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to serialize refund tx: %v", err)
+	}
 
 	signingNonce, err := objects.RandomSigningNonce()
 	if err != nil {

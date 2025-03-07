@@ -434,3 +434,17 @@ func (h *BaseTransferHandler) loadTransfer(ctx context.Context, transferID strin
 	}
 	return transfer, nil
 }
+
+func (h *BaseTransferHandler) loadTransferWithoutUpdate(ctx context.Context, transferID string) (*ent.Transfer, error) {
+	transferUUID, err := uuid.Parse(transferID)
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse transfer_id as a uuid %s: %v", transferID, err)
+	}
+
+	db := ent.GetDbFromContext(ctx)
+	transfer, err := db.Transfer.Query().Where(enttransfer.ID(transferUUID)).Only(ctx)
+	if err != nil || transfer == nil {
+		return nil, fmt.Errorf("unable to find transfer %s: %v", transferID, err)
+	}
+	return transfer, nil
+}

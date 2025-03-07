@@ -73,7 +73,7 @@ func (s *Server) InitiateDkg(ctx context.Context, req *pbdkg.InitiateDkgRequest)
 // It will be called by the coordinator. This function will deliver the round 1 packages from the other operators.
 // The packages will be signed with this operator's identity key and sent the signature back to the coordinator.
 // It is used as a confirmation that the operator has received the round 1 packages.
-func (s *Server) Round1Packages(ctx context.Context, req *pbdkg.Round1PackagesRequest) (*pbdkg.Round1PackagesResponse, error) {
+func (s *Server) Round1Packages(_ context.Context, req *pbdkg.Round1PackagesRequest) (*pbdkg.Round1PackagesResponse, error) {
 	round1Packages := make([]map[string][]byte, len(req.Round1Packages))
 	for i, p := range req.Round1Packages {
 		round1Packages[i] = p.Packages

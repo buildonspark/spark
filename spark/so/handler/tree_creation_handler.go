@@ -30,7 +30,7 @@ func NewTreeCreationHandler(config *so.Config, db *ent.Client) *TreeCreationHand
 	return &TreeCreationHandler{config: config, db: db}
 }
 
-func (h *TreeCreationHandler) findParentOutputFromUtxo(ctx context.Context, utxo *pb.UTXO) (*wire.TxOut, error) {
+func (h *TreeCreationHandler) findParentOutputFromUtxo(_ context.Context, utxo *pb.UTXO) (*wire.TxOut, error) {
 	tx, err := common.TxFromRawTxBytes(utxo.RawTx)
 	if err != nil {
 		return nil, err
@@ -492,7 +492,7 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 			return nil, nil, err
 		}
 
-		var rawRefundTx []byte = nil
+		var rawRefundTx []byte
 		if currentElement.node.RefundTxSigningJob != nil {
 			rawRefundTx = currentElement.node.RefundTxSigningJob.RawTx
 		}

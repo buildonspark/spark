@@ -30,32 +30,31 @@ func NewGRPCConnectionWithCert(address string, certPath string) (*grpc.ClientCon
 	var creds credentials.TransportCredentials
 	if len(certPath) == 0 {
 		return NewGRPCConnectionWithoutTLS(address)
-	} else {
-		certPool := x509.NewCertPool()
-		serverCert, err := os.ReadFile(certPath)
-		if err != nil {
-			return nil, err
-		}
-
-		if !certPool.AppendCertsFromPEM(serverCert) {
-			return nil, errors.New("failed to append certificate")
-		}
-
-		url, err := url.Parse(address)
-		if err != nil {
-			return nil, err
-		}
-		host := url.Hostname()
-		if strings.Contains(address, "localhost") {
-			host = "localhost"
-		}
-
-		creds = credentials.NewTLS(&tls.Config{
-			InsecureSkipVerify: host == "localhost",
-			RootCAs:            certPool,
-			ServerName:         host,
-		})
 	}
+	certPool := x509.NewCertPool()
+	serverCert, err := os.ReadFile(certPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if !certPool.AppendCertsFromPEM(serverCert) {
+		return nil, errors.New("failed to append certificate")
+	}
+
+	url, err := url.Parse(address)
+	if err != nil {
+		return nil, err
+	}
+	host := url.Hostname()
+	if strings.Contains(address, "localhost") {
+		host = "localhost"
+	}
+
+	creds = credentials.NewTLS(&tls.Config{
+		InsecureSkipVerify: host == "localhost",
+		RootCAs:            certPool,
+		ServerName:         host,
+	})
 
 	conn, err := grpc.NewClient(address, grpc.WithTransportCredentials(creds), grpc.WithDefaultServiceConfig(retryPolicy))
 	if err != nil {

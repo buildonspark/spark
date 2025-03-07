@@ -12,7 +12,6 @@ import (
 	"github.com/lightsparkdev/spark-go/common"
 	secretsharing "github.com/lightsparkdev/spark-go/common/secret_sharing"
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
-	pbspark "github.com/lightsparkdev/spark-go/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark-go/proto/spark_internal"
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/authz"
@@ -321,7 +320,7 @@ func (h *TransferHandler) completeSendLeaf(ctx context.Context, transfer *ent.Tr
 
 	// Optional verify if the sender key tweak proof is the same as the one in previous call.
 	if transferLeaf.SenderKeyTweakProof != nil {
-		proof := &pbspark.SecretProof{}
+		proof := &pb.SecretProof{}
 		err = proto.Unmarshal(transferLeaf.SenderKeyTweakProof, proof)
 		if err != nil {
 			return fmt.Errorf("unable to unmarshal sender key tweak proof: %v", err)
@@ -607,7 +606,10 @@ func (h *TransferHandler) ClaimTransferTweakKeys(ctx context.Context, req *pb.Cl
 		if err != nil {
 			return fmt.Errorf("unable to marshal leaf tweak: %v", err)
 		}
-		leaf.Update().SetKeyTweak(leafTweakBytes)
+		leaf, err = leaf.Update().SetKeyTweak(leafTweakBytes).Save(ctx)
+		if err != nil {
+			return fmt.Errorf("unable to update leaf %s: %v", leaf.ID.String(), err)
+		}
 	}
 
 	// Update transfer status
@@ -681,7 +683,7 @@ func (h *TransferHandler) getLeavesFromTransfer(ctx context.Context, transfer *e
 	return &leaves, nil
 }
 
-func (h *TransferHandler) ValidateKeyTweakProof(ctx context.Context, transferLeaves []*ent.TransferLeaf, keyTweakProofs map[string]*pbspark.SecretProof) error {
+func (h *TransferHandler) ValidateKeyTweakProof(ctx context.Context, transferLeaves []*ent.TransferLeaf, keyTweakProofs map[string]*pb.SecretProof) error {
 	for _, leaf := range transferLeaves {
 		treeNode, err := leaf.QueryLeaf().Only(ctx)
 		if err != nil {
@@ -691,7 +693,7 @@ func (h *TransferHandler) ValidateKeyTweakProof(ctx context.Context, transferLea
 		if !exists {
 			return fmt.Errorf("key tweak proof for leaf %s not found", leaf.ID.String())
 		}
-		keyTweakProto := &pbspark.ClaimLeafKeyTweak{}
+		keyTweakProto := &pb.ClaimLeafKeyTweak{}
 		err = proto.Unmarshal(leaf.KeyTweak, keyTweakProto)
 		if err != nil {
 			return fmt.Errorf("unable to unmarshal key tweak for leaf %s: %v", leaf.ID.String(), err)
@@ -719,59 +721,30 @@ func (h *TransferHandler) revertClaimTransfer(ctx context.Context, transfer *ent
 	return nil
 }
 
-func (h *TransferHandler) settleReceiverKeyTweak(ctx context.Context, transfer *ent.Transfer, transferLeaves []*ent.TransferLeaf, keyTweakProofs map[string]*pbspark.SecretProof) error {
+func (h *TransferHandler) settleReceiverKeyTweak(ctx context.Context, transfer *ent.Transfer, keyTweakProofs map[string]*pb.SecretProof) error {
+	tweakKey := true
 	if keyTweakProofs != nil {
 		// Only validate key tweak proof if it is provided for backward compatibility.
-		err := h.ValidateKeyTweakProof(ctx, transferLeaves, keyTweakProofs)
-		if err == nil {
-			selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
-			_, err = helper.ExecuteTaskWithAllOperators(ctx, h.config, &selection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
-				conn, err := common.NewGRPCConnectionWithCert(operator.Address, operator.CertPath)
-				if err != nil {
-					return nil, err
-				}
-				defer conn.Close()
-				client := pbinternal.NewSparkInternalServiceClient(conn)
-				return client.InitiateSettleReceiverKeyTweak(ctx, &pbinternal.InitiateSettleReceiverKeyTweakRequest{
-					TransferId:     transfer.ID.String(),
-					KeyTweakProofs: keyTweakProofs,
-				})
-			})
-		}
-		if err != nil {
-			err = h.revertClaimTransfer(ctx, transfer, transferLeaves)
+		selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
+		_, err := helper.ExecuteTaskWithAllOperators(ctx, h.config, &selection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
+			conn, err := common.NewGRPCConnectionWithCert(operator.Address, operator.CertPath)
 			if err != nil {
-				logger := helper.GetLoggerFromContext(ctx)
-				logger.Error("unable to revert claim transfer: %v", "error", err)
+				return nil, err
 			}
-			selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
-			_, newErr := helper.ExecuteTaskWithAllOperators(ctx, h.config, &selection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
-				conn, err := common.NewGRPCConnectionWithCert(operator.Address, operator.CertPath)
-				if err != nil {
-					return nil, err
-				}
-				defer conn.Close()
-				client := pbinternal.NewSparkInternalServiceClient(conn)
-				return client.SettleReceiverKeyTweak(ctx, &pbinternal.SettleReceiverKeyTweakRequest{
-					TransferId: transfer.ID.String(),
-					TweakKey:   false,
-				})
+			defer conn.Close()
+			client := pbinternal.NewSparkInternalServiceClient(conn)
+			return client.InitiateSettleReceiverKeyTweak(ctx, &pbinternal.InitiateSettleReceiverKeyTweakRequest{
+				TransferId:     transfer.ID.String(),
+				KeyTweakProofs: keyTweakProofs,
 			})
-			if newErr != nil {
-				return fmt.Errorf("unable to settle receiver key tweak: %v", newErr)
-			}
-
-			return fmt.Errorf("unable to initiate settle receiver key tweak: %v", err)
+		})
+		if err != nil {
+			tweakKey = false
 		}
 	}
 
-	transfer, err := transfer.Update().SetStatus(schema.TransferStatusReceiverKeyTweakLocked).Save(ctx)
-	if err != nil {
-		return fmt.Errorf("unable to update transfer status %s: %v", transfer.ID.String(), err)
-	}
-
-	selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
-	_, err = helper.ExecuteTaskWithAllOperators(ctx, h.config, &selection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
+	selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionAll}
+	_, err := helper.ExecuteTaskWithAllOperators(ctx, h.config, &selection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
 		conn, err := common.NewGRPCConnectionWithCert(operator.Address, operator.CertPath)
 		if err != nil {
 			return nil, err
@@ -780,30 +753,16 @@ func (h *TransferHandler) settleReceiverKeyTweak(ctx context.Context, transfer *
 		client := pbinternal.NewSparkInternalServiceClient(conn)
 		return client.SettleReceiverKeyTweak(ctx, &pbinternal.SettleReceiverKeyTweakRequest{
 			TransferId: transfer.ID.String(),
-			TweakKey:   true,
+			TweakKey:   tweakKey,
 		})
 	})
 	if err != nil {
 		// At this point, this is not recoverable. But this should not happen in theory.
 		return fmt.Errorf("unable to settle receiver key tweak: %v", err)
 	}
-
-	for _, leaf := range transferLeaves {
-		keyTweakProto := &pbspark.ClaimLeafKeyTweak{}
-		err := proto.Unmarshal(leaf.KeyTweak, keyTweakProto)
-		if err != nil {
-			return fmt.Errorf("unable to unmarshal key tweak for leaf %s: %v", leaf.ID.String(), err)
-		}
-		treeNode, err := leaf.QueryLeaf().Only(ctx)
-		if err != nil {
-			return fmt.Errorf("unable to get tree node for leaf %s: %v", leaf.ID.String(), err)
-		}
-		err = h.claimLeafTweakKey(ctx, treeNode, keyTweakProto, transfer.ReceiverIdentityPubkey)
-		if err != nil {
-			return fmt.Errorf("unable to claim leaf tweak key for leaf %s: %v", leaf.ID.String(), err)
-		}
+	if !tweakKey {
+		return fmt.Errorf("unable to settle receiver key tweak: %v, you might have a race condition in your implementation", err)
 	}
-
 	return nil
 }
 
@@ -813,7 +772,7 @@ func (h *TransferHandler) ClaimTransferSignRefunds(ctx context.Context, req *pb.
 		return nil, err
 	}
 
-	transfer, err := h.loadTransfer(ctx, req.TransferId)
+	transfer, err := h.loadTransferWithoutUpdate(ctx, req.TransferId)
 	if err != nil {
 		return nil, fmt.Errorf("unable to load transfer %s: %v", req.TransferId, err)
 	}
@@ -835,9 +794,11 @@ func (h *TransferHandler) ClaimTransferSignRefunds(ctx context.Context, req *pb.
 		return nil, err
 	}
 
-	err = h.settleReceiverKeyTweak(ctx, transfer, leavesToTransfer, req.KeyTweakProofs)
-	if err != nil {
-		return nil, fmt.Errorf("unable to settle receiver key tweak: %v", err)
+	if transfer.Status != schema.TransferStatusReceiverRefundSigned {
+		err = h.settleReceiverKeyTweak(ctx, transfer, req.KeyTweakProofs)
+		if err != nil {
+			return nil, fmt.Errorf("unable to settle receiver key tweak: %v", err)
+		}
 	}
 
 	signingJobs := []*helper.SigningJob{}
@@ -924,7 +885,7 @@ func (h *TransferHandler) InitiateSettleReceiverKeyTweak(ctx context.Context, re
 		return fmt.Errorf("unable to validate key tweak proof: %v", err)
 	}
 
-	transfer, err = transfer.Update().SetStatus(schema.TransferStatusReceiverKeyTweakLocked).Save(ctx)
+	_, err = transfer.Update().SetStatus(schema.TransferStatusReceiverKeyTweakLocked).Save(ctx)
 	if err != nil {
 		return fmt.Errorf("unable to update transfer status %s: %v", transfer.ID.String(), err)
 	}
@@ -949,7 +910,7 @@ func (h *TransferHandler) SettleReceiverKeyTweak(ctx context.Context, req *pbint
 			if err != nil {
 				return fmt.Errorf("unable to get tree node for leaf %s: %v", leaf.ID.String(), err)
 			}
-			keyTweakProto := &pbspark.ClaimLeafKeyTweak{}
+			keyTweakProto := &pb.ClaimLeafKeyTweak{}
 			err = proto.Unmarshal(leaf.KeyTweak, keyTweakProto)
 			if err != nil {
 				return fmt.Errorf("unable to unmarshal key tweak for leaf %s: %v", leaf.ID.String(), err)

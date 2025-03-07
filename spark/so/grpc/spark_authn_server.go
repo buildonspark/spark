@@ -99,7 +99,7 @@ func NewAuthnServer(
 
 // GetChallenge generates a new challenge for the given public key.
 // This is the first step of the authentication process.
-func (s *AuthnServer) GetChallenge(ctx context.Context, req *pb.GetChallengeRequest) (*pb.GetChallengeResponse, error) {
+func (s *AuthnServer) GetChallenge(_ context.Context, req *pb.GetChallengeRequest) (*pb.GetChallengeResponse, error) {
 	if req == nil {
 		return nil, fmt.Errorf("invalid request: request cannot be nil")
 	}
@@ -147,7 +147,7 @@ func (s *AuthnServer) GetChallenge(ctx context.Context, req *pb.GetChallengeRequ
 
 // VerifyChallenge verifies the client's signature on the challenge and returns a session token.
 // This is the second step of the authentication process.
-func (s *AuthnServer) VerifyChallenge(ctx context.Context, req *pb.VerifyChallengeRequest) (*pb.VerifyChallengeResponse, error) {
+func (s *AuthnServer) VerifyChallenge(_ context.Context, req *pb.VerifyChallengeRequest) (*pb.VerifyChallengeResponse, error) {
 	if req == nil {
 		return nil, fmt.Errorf("invalid request: request cannot be nil")
 	}

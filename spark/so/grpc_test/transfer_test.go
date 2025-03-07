@@ -104,7 +104,7 @@ func TestTransfer(t *testing.T) {
 		NewSigningPrivKey: finalLeafPrivKey.Serialize(),
 	}
 	leavesToClaim := [1]wallet.LeafKeyTweak{claimingNode}
-	_, err = wallet.ClaimTransfer(
+	res, err := wallet.ClaimTransfer(
 		receiverCtx,
 		receiverTransfer,
 		receiverConfig,
@@ -113,6 +113,7 @@ func TestTransfer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to ClaimTransfer: %v", err)
 	}
+	assert.Equal(t, res[0].Id, claimingNode.Leaf.Id)
 }
 
 func TestTransferWithSeparateSteps(t *testing.T) {
@@ -643,8 +644,8 @@ func TestQueryTransfers(t *testing.T) {
 	if len(transfers) != 1 {
 		t.Fatalf("expected 1 transfer, got %d", len(transfers))
 	}
-	if offset != -1 {
-		t.Fatalf("expected offset -1, got %d", offset)
+	if offset != 2 {
+		t.Fatalf("expected offset 2, got %d", offset)
 	}
 
 	transfers, _, err = wallet.QueryAllTransfers(context.Background(), senderConfig, 100, 0)
@@ -756,6 +757,7 @@ func TestDoubleClaimTransfer(t *testing.T) {
 				leavesToClaim[:],
 			)
 			if err != nil {
+				fmt.Println("Error: ", err)
 				errCount++
 			}
 		}()
@@ -764,7 +766,7 @@ func TestDoubleClaimTransfer(t *testing.T) {
 
 	fmt.Println("Error count: ", errCount)
 	if errCount == 2 {
-		_, err = wallet.ClaimTransfer(
+		res, err := wallet.ClaimTransfer(
 			receiverCtx,
 			receiverTransfer,
 			receiverConfig,
@@ -773,5 +775,6 @@ func TestDoubleClaimTransfer(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to ClaimTransfer: %v", err)
 		}
+		assert.Equal(t, res[0].Id, claimingNode.Leaf.Id)
 	}
 }

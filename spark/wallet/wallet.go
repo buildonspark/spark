@@ -347,7 +347,7 @@ func (w *SingleKeyWallet) RequestLeavesSwap(ctx context.Context, targetAmount in
 	}
 	api := sspapi.NewSparkServiceAPI(requester)
 
-	requestID, leaves, err := api.RequestLeavesSwap(hex.EncodeToString(adaptorPubKey.SerializeCompressed()), uint64(totalAmount), uint64(targetAmount), 0, w.Config.Network, userLeaves)
+	requestID, leaves, err := api.RequestLeavesSwap(hex.EncodeToString(adaptorPubKey.SerializeCompressed()), uint64(totalAmount), uint64(targetAmount), 0, userLeaves)
 	if err != nil {
 		_, cancelErr := CancelSendTransfer(ctx, w.Config, transfer)
 		if cancelErr != nil {

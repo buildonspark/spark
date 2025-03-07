@@ -30,7 +30,7 @@ func (h *InternalTransferHandler) FinalizeTransfer(ctx context.Context, req *pbi
 		return fmt.Errorf("unable to load transfer %s: %v", req.TransferId, err)
 	}
 
-	if transfer.Status != schema.TransferStatusReceiverKeyTweaked {
+	if transfer.Status != schema.TransferStatusReceiverKeyTweaked && transfer.Status != schema.TransferStatusReceiverKeyTweakLocked {
 		return fmt.Errorf("transfer is not in receiver key tweaked status")
 	}
 	if err := checkCoopExitTxBroadcasted(ctx, db, transfer); err != nil {
