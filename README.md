@@ -48,19 +48,19 @@ To make a migration, follow these steps:
 - Generate migration files by running (from spark directory):
 
 ```
-createdb operator_temp
+createdb sparkoperator_temp
 atlas migrate diff <diff_name> \
 --dir "file://so/ent/migrate/migrations" \
 --to "ent://so/ent/schema" \
---dev-url "postgresql://127.0.0.1:5432/operator_temp?sslmode=disable&search_path=public"
-dropdb operator_temp
+--dev-url "postgresql://127.0.0.1:5432/sparkoperator_temp?sslmode=disable&search_path=public"
+dropdb sparkoperator_temp
 ```
 
 - When running `run-everything.sh`, the migration will be automatically
-  applied to each operator's database. But if you want to apply a migration manually, you can run (e.g. DB name is `operator_0`):
+  applied to each operator's database. But if you want to apply a migration manually, you can run (e.g. DB name is `sparkoperator_0`):
 
 ```
-atlas migrate apply --dir "file://so/ent/migrate/migrations" --url "postgresql://127.0.0.1:5432/operator_0?sslmode=disable"
+atlas migrate apply --dir "file://so/ent/migrate/migrations" --url "postgresql://127.0.0.1:5432/sparkoperator_0?sslmode=disable"
 ```
 
 - Commit the migration files, and submit a PR.
@@ -68,7 +68,7 @@ atlas migrate apply --dir "file://so/ent/migrate/migrations" --url "postgresql:/
 If you are adding atlas migrations for the first time to an existing DB, you will need to run the migration command with the `--baseline` flag.
 
 ```
-atlas migrate apply --dir "file://so/ent/migrate/migrations" --url "postgresql://127.0.0.1:5432/operator_0?sslmode=disable" --baseline 20250228224813
+atlas migrate apply --dir "file://so/ent/migrate/migrations" --url "postgresql://127.0.0.1:5432/sparkoperator_0?sslmode=disable" --baseline 20250228224813
 ```
 
 ## VSCode
@@ -107,21 +107,22 @@ In spark folder, run:
 go test $(go list ./... | grep -v -E "so/grpc_test|so/tree")
 ```
 
-### E2E tests
+## E2E tests
 
-#### Prerequisites
+The E2E test environment can be run locally via `./run-everything.sh` or in minikube via `./scripts/local-test.sh` for hermetic testing.
 
-##### tmux
+### Prerequisites
 
-`brew install tmux`
+#### Local Setup (`./run-everything.sh`)
+```
+brew install tmux
+brew install sqlx-cli # required for LRC20 Node
+brew install cargo # required for LRC20 Node
+```
 
 ##### bitcoind
 
 See bitcoin section above.
-
-##### sqlx-cli (required for LRC20 Node)
-
-`brew install sqlx-cli`
 
 ##### postgres
 
@@ -155,29 +156,53 @@ host    all       all   127.0.0.1/32 trust
 host    all       all   ::1/128      trust
 ```
 
-##### cargo
+#### Hermetic/Minikube Setup (`./scripts/local-test.sh`)
 
-`brew install cargo`
+##### minikube
 
-#### Running tests
+See: [ops/minikube/README.md](https://github.com/lightsparkdev/ops/blob/main/minikube/README.md)
+
+Please run: ops/minikube/setup.sh
+
+### Running tests
 
 All E2E tests live in the spark/so/grpc_test folder.
 
 In the root folder, run:
 
+
 ```
+# Local environment
+
 ./run-everything.sh
+```
+
+OR
+
+```
+# Hermetic/Minikube environment
+#
+# Env variables:
+# RESET_DBS={default:true}      - resets the operator databases and bitcoin blockchain
+# USE_DEV_SPARK={default:false} - use the dev spark image built into the minikube container cluster
+#                                 (rebuild the the image with ./scripts/build.sh)
+# SPARK_TAG={default:latest}    - the image tag to use for both Spark operator and signer
+# LRC20_TAG={default:latest}    - the image tag to use for LRC20
+
+./scripts/local-test.sh
+
+# CTR-C when done to remove shut down port forwarding
 ```
 
 Then in the spark folder:
 
 ```
-go test ./so/grpc_test/...
+go test -failfast=false -p=2 ./so/grpc_test/...
 ```
 
 #### Troubleshooting
 
-1. Operator (go) and signer (rust) logs are found in `_data/run_X/logs`.
+1. For local testing, operator (go) and signer (rust) logs are found in `_data/run_X/logs`. For minikube, logs are found via kubernetes.
 2. If you don't want to deal with `tmux` commands yourself, you can easily interact with tmux using the `iterm2` GUI and tmux control-center.
    From within `iterm2`, you can run:
 

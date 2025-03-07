@@ -30,7 +30,7 @@ bitcoin-cli -regtest -rpcuser="$bitcoind_username" -rpcpassword="$bitcoind_passw
 
 # Terminate all relevant connections first
 for i in $(seq 0 4); do
-    db="operator_$i"
+    db="sparkoperator_$i"
     psql postgres -c "
     SELECT pg_terminate_backend(pid) 
     FROM pg_stat_activity 
@@ -47,7 +47,7 @@ done
 
 # Drop and recreate
 for i in $(seq 0 4); do
-    db="operator_$i"
+    db="sparkoperator_$i"
     echo "Resetting $db..."
     dropdb --if-exists "$db" > /dev/null 2>&1
     createdb "$db" > /dev/null 2>&1

@@ -51,8 +51,9 @@ func NewGRPCConnectionWithCert(address string, certPath string) (*grpc.ClientCon
 		}
 
 		creds = credentials.NewTLS(&tls.Config{
-			RootCAs:    certPool,
-			ServerName: host,
+			InsecureSkipVerify: host == "localhost",
+			RootCAs:            certPool,
+			ServerName:         host,
 		})
 	}
 

@@ -19,8 +19,8 @@ tx_per_page = 100
 flush_period = 100
 
 [bnode]
-url = "http://127.0.0.1:18443"
-auth = { username = "admin1", password = "123" }
+url = "http://127.0.0.1:8332"
+auth = { username = "testutil", password = "testutilpassword" }
 
 [logger]
 level = "TRACE"

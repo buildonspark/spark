@@ -17,9 +17,9 @@ import (
 // config for our integration tests.
 func NewRegtestClient() (*rpcclient.Client, error) {
 	connConfig := rpcclient.ConnConfig{
-		Host:         "127.0.0.1:18443",
-		User:         "admin1",
-		Pass:         "123",
+		Host:         "127.0.0.1:8332",
+		User:         "testutil",
+		Pass:         "testutilpassword",
 		Params:       "regtest",
 		DisableTLS:   true,
 		HTTPPostMode: true,
