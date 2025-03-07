@@ -19,7 +19,7 @@ export default function TransactionDetailRow({
   const { satsUsdPrice } = useWallet();
 
   return (
-    <div className="flex flex-row justify-between p-2">
+    <div className="flex flex-row justify-between p-2 text-white">
       <div className="max-w-[100px] text-[13px] font-medium">
         {transactionType === "receive" ? "Received" : "Sent"} {asset.code}
         <div className="overflow-hidden text-ellipsis whitespace-nowrap text-[11px] text-[#F9F9F999]">
@@ -44,7 +44,7 @@ export default function TransactionDetailRow({
           )}
         </div>
         <div className="text-[11px] text-[#F9F9F999]">
-          {formatAssetAmountDisplayString(assetAmount, asset, true)}
+          {formatAssetAmountDisplayString(assetAmount, asset, true)}{" "}
         </div>
       </div>
     </div>

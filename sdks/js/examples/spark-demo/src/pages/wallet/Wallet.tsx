@@ -6,6 +6,7 @@ import Button from "../../components/Button";
 import CurrencyBalanceDetails from "../../components/CurrencyBalanceDetails";
 import StyledContainer from "../../components/StyledContainer";
 import TransactionDetailRow from "../../components/TransactionDetailRow";
+import { usePaginatedTransfers } from "../../hooks/usePaginatedTransfers";
 import CopyIcon from "../../icons/CopyIcon";
 import StableCoinLogo from "../../icons/StableCoinLogo";
 import { Routes } from "../../routes";
@@ -18,14 +19,13 @@ import {
 export default function Wallet() {
   const navigate = useNavigate();
   const notify = () => toast("Copied!");
-  const {
-    btcBalance,
-    satsUsdPrice,
-    getMasterPublicKey,
-    isInitialized,
-    allTransfers,
-  } = useWallet();
+  const { btcBalance, satsUsdPrice, getMasterPublicKey, isInitialized } =
+    useWallet();
   const [pubkey, setPubkey] = useState("");
+  const transfersQuery = usePaginatedTransfers({
+    limit: 5,
+    offset: 0,
+  });
   useEffect(() => {
     if (isInitialized) {
       getMasterPublicKey().then((pubkey) => {
@@ -114,7 +114,9 @@ export default function Wallet() {
           }}
         />
       </div>
-      {allTransfers?.value?.transfers?.length === 0 && (
+      {(transfersQuery.isLoading ||
+        !transfersQuery.data?.transfers ||
+        transfersQuery.data?.transfers?.length === 0) && (
         <div className="mb-8 mt-12 flex flex-col items-center justify-center text-[15px]">
           <span>Your wallet activity starts now</span>
           <div className="mt-2 flex flex-col items-center justify-center text-[13px] text-[#F9F9F999]">
@@ -123,48 +125,51 @@ export default function Wallet() {
           </div>
         </div>
       )}
-      {allTransfers?.value?.transfers?.length > 0 && (
-        <div className="mt-4">
-          <div className="flex flex-row items-center justify-between p-2">
-            <div className="text-[15px] font-medium text-[#F9F9F999]">
-              Recent activity
+      {transfersQuery?.data?.transfers?.length &&
+        transfersQuery?.data?.transfers?.length > 0 && (
+          <div className="mt-4">
+            <div className="flex flex-row items-center justify-between p-2">
+              <div className="text-[15px] font-medium text-[#F9F9F999]">
+                Recent activity
+              </div>
+              <div
+                className="cursor-pointer text-[13px] font-medium"
+                onClick={() => {
+                  navigate(Routes.Transactions);
+                }}
+              >
+                View all
+              </div>
             </div>
-            <div
-              className="cursor-pointer text-[13px] font-medium"
-              onClick={() => {
-                navigate(Routes.Transactions);
-              }}
-            >
-              View all
-            </div>
+            {transfersQuery?.data?.transfers?.map((transfer, index) => {
+              if (index >= 3) return null;
+              const sender = bytesToHex(transfer.senderIdentityPublicKey);
+              if (sender === pubkey) {
+                return (
+                  <TransactionDetailRow
+                    key={`${index}`}
+                    transactionType="send"
+                    asset={PERMANENT_CURRENCIES.get("BTC")!}
+                    assetAmount={transfer.totalValue}
+                    counterparty={bytesToHex(
+                      transfer.receiverIdentityPublicKey,
+                    )}
+                  />
+                );
+              } else {
+                return (
+                  <TransactionDetailRow
+                    key={`${index}`}
+                    transactionType="receive"
+                    asset={PERMANENT_CURRENCIES.get("BTC")!}
+                    assetAmount={transfer.totalValue}
+                    counterparty={bytesToHex(transfer.senderIdentityPublicKey)}
+                  />
+                );
+              }
+            })}
           </div>
-          {allTransfers?.value?.transfers?.map((transfer, index) => {
-            if (index >= 3) return null;
-            const sender = bytesToHex(transfer.senderIdentityPublicKey);
-            if (sender === pubkey) {
-              return (
-                <TransactionDetailRow
-                  key={`${index}`}
-                  transactionType="send"
-                  asset={PERMANENT_CURRENCIES.get("BTC")!}
-                  assetAmount={transfer.totalValue}
-                  counterparty={bytesToHex(transfer.receiverIdentityPublicKey)}
-                />
-              );
-            } else {
-              return (
-                <TransactionDetailRow
-                  key={`${index}`}
-                  transactionType="receive"
-                  asset={PERMANENT_CURRENCIES.get("BTC")!}
-                  assetAmount={transfer.totalValue}
-                  counterparty={bytesToHex(transfer.senderIdentityPublicKey)}
-                />
-              );
-            }
-          })}
-        </div>
-      )}
+        )}
     </div>
   );
 }
