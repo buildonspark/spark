@@ -2,7 +2,7 @@ name: DB Migration Lint
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
     paths:
       - "spark/so/ent/**"
       - ".github/workflows/db.yml"
@@ -11,13 +11,18 @@ on:
       - "spark/so/ent/**"
       - ".github/workflows/db.yml"
 
+# Add this permissions block to grant write access to issues/PRs
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   lint:
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: ./spark
-    
+
     services:
       postgres:
         image: postgres:latest
@@ -50,7 +55,62 @@ jobs:
             --dir "file://so/ent/migrate/migrations" \
             --dev-url "postgresql://postgres:postgres@localhost:5432/operator_temp?sslmode=disable&search_path=public" \
             --latest=1
-          
+
       - name: Clean up
         run: |
           PGPASSWORD=postgres psql -h localhost -U postgres -c "DROP DATABASE operator_temp;"
+
+  non-optional-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for new non-optional fields
+        id: detect_non_optional
+        run: |
+          echo "Checking for newly added, non-optional fields..."
+
+          # Use pull_request base/head if available; fallback to HEAD^ and HEAD for direct pushes
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_SHA="${{ github.event.pull_request.base.sha }}"
+            HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          else
+            BASE_SHA=$(git rev-parse HEAD^ || echo "")
+            HEAD_SHA=$(git rev-parse HEAD)
+          fi
+
+          if [ -z "$BASE_SHA" ]; then
+            echo "No valid base commit found. Skipping new field check."
+            echo "has_required_fields=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          CHANGES=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" | grep "spark/so/ent/schema" || true)
+          if [ -n "$CHANGES" ]; then
+            DIFF_LINES=$(git diff "$BASE_SHA" "$HEAD_SHA" -- $CHANGES | grep '^+' | grep "field\." || true)
+            REQUIRED_ONLY=$(echo "$DIFF_LINES" | grep -v "\.Optional()" | grep -v "\.Nillable()" || true)
+            
+            if [ -n "$REQUIRED_ONLY" ]; then
+              echo "has_required_fields=true" >> $GITHUB_OUTPUT
+              echo "Found non-optional fields."
+            else
+              echo "has_required_fields=false" >> $GITHUB_OUTPUT
+              echo "No non-optional fields found."
+            fi
+          else
+            echo "has_required_fields=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Comment on PR if new required fields exist
+        if: ${{ github.event_name == 'pull_request' && steps.detect_non_optional.outputs.has_required_fields == 'true' }}
+        uses: actions/github-script@v6
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `**WARNING: Potential new required field(s) detected.**\n\nConsider first adding fields as optional, backfilling data, and then making them non-nullable.`
+            });
