@@ -9,19 +9,19 @@ export interface TransactionInput {
   outputs: TxOutput[];
 }
 
-export interface EsploraTransaction {
+export interface ElectrsTransaction {
   txid: string;
-  vin: EsploraTransactionInput[];
-  vout: EsploraTransactionOutput[];
+  vin: ElectrsTransactionInput[];
+  vout: ElectrsTransactionOutput[];
   status: BitcoinTransactionStatus;
 }
 
-export interface EsploraTransactionInput {
+export interface ElectrsTransactionInput {
   txid: string;
   vout: number;
 }
 
-export interface EsploraTransactionOutput {
+export interface ElectrsTransactionOutput {
   value: number;
   scriptpubkey_address: string;
 }

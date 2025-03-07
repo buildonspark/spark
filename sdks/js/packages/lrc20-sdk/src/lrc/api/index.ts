@@ -1,4 +1,4 @@
-export * from "./esplora";
+export * from "./electrs";
 export * from "./lrc20";
 
 export interface BasicAuth {

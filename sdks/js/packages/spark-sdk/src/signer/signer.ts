@@ -13,7 +13,7 @@ import { Buffer } from "buffer";
 import * as ecies from "eciesjs";
 import { TreeNode } from "../proto/spark.js";
 import { generateAdaptorFromSignature } from "../utils/adaptor-signature.js";
-import { subtractPrivateKeys } from "../utils/keys.js";
+import {getMasterHDKeyFromSeed, subtractPrivateKeys} from "../utils/keys.js";
 import { Network } from "../utils/network.js";
 import {
   splitSecretWithProofs,
@@ -383,9 +383,7 @@ class DefaultSparkSigner implements SparkSigner {
       seed = hexToBytes(seed);
     }
 
-    const hdkey = HDKey.fromMasterSeed(seed).derive(
-      `m/${network === Network.REGTEST ? "0" : "1"}`,
-    );
+    const hdkey = getMasterHDKeyFromSeed(seed, network == Network.REGTEST ? 0 : 1);
 
     if (!hdkey.privateKey) {
       throw new Error("Could not derive private key from seed");

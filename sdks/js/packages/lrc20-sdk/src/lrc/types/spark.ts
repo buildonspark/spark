@@ -1,4 +1,4 @@
 export interface SparkExitMetadata {
-  txHash: string; // Token transaction hash
-  index: number; // Index of the LTTXO
+  token_tx_hash: string; // Token transaction hash
+  exit_leaf_index: number; // Index of the LTTXO
 }

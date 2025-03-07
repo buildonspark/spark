@@ -30,7 +30,10 @@ async function runCLI() {
   withdraw <onchainAddress> <amount>                              - Withdraw funds to an L1 address
   sendtokentransfer <tokenPubKey> <amount> <receiverSparkAddress> - Transfer tokens
   help                                                            - Show this help message
-  exit/quit                                                       - Exit the program
+  exit/quit
+
+  L1 commands:
+  tokenwithdraw <tokenPublicKey> [receiverPublicKey] - Unilaterally withdraw tokens to L1- Exit the program
 `;
   console.log(helpMessage);
 
@@ -132,6 +135,16 @@ async function runCLI() {
         });
         console.log(withdrawal);
         break;
+      case "tokenwithdraw": {
+        const tokenPublicKey = args[0];
+        const receiverPublicKey = args[1];
+
+        let withdrawResult = await wallet.withdrawTokens(tokenPublicKey, receiverPublicKey);
+        if (withdrawResult) {
+          console.log("Withdrawal L1 Transaction ID:", withdrawResult.txid);
+        }
+        break;
+      }
     }
   }
 }

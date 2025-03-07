@@ -5,7 +5,6 @@ export enum NetworkType {
   TESTNET,
   DEVNET,
   REGTEST,
-  LS_REGTEST
 }
 
 export const networks = new Map<string, NetworkType>([
@@ -13,7 +12,6 @@ export const networks = new Map<string, NetworkType>([
   ["TESTNET", NetworkType.TESTNET],
   ["DEVNET", NetworkType.DEVNET],
   ["REGTEST", NetworkType.REGTEST],
-  ["LS_REGTEST", NetworkType.LS_REGTEST],
 ]);
 
 /**

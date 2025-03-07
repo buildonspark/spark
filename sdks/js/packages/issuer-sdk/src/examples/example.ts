@@ -3,12 +3,24 @@
 import { Network } from "@buildonspark/spark-sdk/utils";
 import readline from "readline";
 import { IssuerWallet } from "../issuer-sdk";
+import lrc20sdk from "@buildonspark/lrc20-sdk";
 
 // Initialize Issuer Wallet
 const walletMnemonic =
   "cctypical huge dose party penalty decline neglect feel harvest abstract stage winter";
 
 async function runCLI() {
+  let electrsCredentials = {
+    username: "hackathon",
+    password: "MakeBitcoinMoneyAgain"
+  }
+
+  let lrc20WalletApiConfig = {
+    lrc20NodeUrl: "https://regtest.lrc20.dev.dev.sparkinfra.net",
+    electrsUrl: "https://regtest-mempool.dev.dev.sparkinfra.net/api",
+    electrsCredentials
+  };
+
   let wallet = new IssuerWallet(Network.REGTEST);
   const rl = readline.createInterface({
     input: process.stdin,
@@ -28,7 +40,7 @@ async function runCLI() {
            <decimals>    - uint8
            <maxSupply>   - uint128, set 0 if no restrictions are needed
            <isFreezable> - boolean, true/false
-
+  withdraw [receiverPublicKey] - Unilaterally withdraw tokens to L1
 
   Spark commands:
   getbalance                                 - Show current wallet balance
@@ -59,7 +71,7 @@ async function runCLI() {
           console.log(helpMessage);
           break;
         case "initwallet":
-          const result = await wallet.initWallet(args.join(" "));
+          const result = await wallet.initWallet(args.join(" "), true, lrc20WalletApiConfig);
           console.log(result);
           break;
         case "getaddresses":
@@ -185,14 +197,24 @@ async function runCLI() {
             break;
           }
 
-          let { txid } = await wallet.announceTokenL1(
-            tokenName,
-            tokenTicker,
-            decimals,
-            maxSupply,
-            isFreezable,
-          );
-          console.log("L1 Token Announcement Transaction ID:", txid);
+          let announcementResult = await wallet.announceTokenL1(tokenName, tokenTicker, decimals, maxSupply, isFreezable);
+          if(announcementResult) {
+            console.log("Token Announcement L1 Transaction ID:", announcementResult.txid);
+          }
+          break;
+        }
+        case "withdraw": {
+          if (!wallet.isL1Initialized()) {
+            console.log("No L1 wallet initialized");
+            break;
+          }
+
+          const receiverPublicKey = args[0];
+
+          let withdrawResult = await wallet.withdrawTokens(receiverPublicKey);
+          if (withdrawResult) {
+            console.log("Withdrawal L1 Transaction ID:", withdrawResult.txid);
+          }
           break;
         }
         default:

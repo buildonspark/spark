@@ -2,6 +2,7 @@ import { plainToInstance } from "class-transformer";
 import { TokenAmount } from "./token-amount";
 import { Receipt, ReceiptDto } from "./receipt";
 import { SparkExitMetadata } from "./spark";
+import { SparkExitData } from "./lrc20-transaction";
 
 export type ReceiptProof =
   | EmptyReceiptProof
@@ -54,7 +55,7 @@ export interface P2WSH {
 
 export interface SparkExit {
   type: ReceiptProofType.SparkExit;
-  data: SparkExitData;
+  data: SparkExitProofData;
 }
 
 export type ReceiptProofData =
@@ -63,7 +64,8 @@ export type ReceiptProofData =
   | MultisigReceiptProofData
   | LightningCommitmentProofData
   | LightningHtlcProofData
-  | P2WSHProofData;
+  | P2WSHProofData
+  | SparkExitProofData;
 
 export interface EmptyReceiptProofData {
   receipt: Receipt;
@@ -107,14 +109,16 @@ export interface P2WSHProofData {
   script: string;
 }
 
-export interface SparkExitData {
+export interface SparkExitProofData {
   receipt: Receipt;
-  script: {
-    revocationKey: string;
-    delayKey: string;
-    locktime: number;
-  };
+  script: SparkExitProofDataScript;
   metadata?: SparkExitMetadata;
+}
+
+export interface SparkExitProofDataScript {
+  revocation_key: string;
+  delay_key: string;
+  locktime: number;
 }
 
 export type HtlcScriptKind = "offered" | ReceivedHtlc;
@@ -209,6 +213,9 @@ export class ReceiptProofDto {
       case ReceiptProofType.P2WSH:
         data = P2WSHProofDataDto.fromReceiptProofData(proof.data);
         break;
+      case ReceiptProofType.SparkExit:
+        data = SparkExitProofDataDto.fromReceiptProofData(proof.data);
+        break;
     }
 
     return new ReceiptProofDto(proof.type, data);
@@ -235,6 +242,9 @@ export class ReceiptProofDto {
       case ReceiptProofType.P2WSH:
         data = plainToInstance(P2WSHProofDataDto, dto.data);
         break;
+      case ReceiptProofType.SparkExit:
+        data = plainToInstance(SparkExitProofDataDto, dto.data);
+        break;
     }
     return {
       type: dto.type,
@@ -249,7 +259,8 @@ export type ReceiptProofDataDto =
   | MultisigReceiptProofDataDto
   | LightningCommitmentProofDataDto
   | LightningHtlcProofDataDto
-  | P2WSHProofDataDto;
+  | P2WSHProofDataDto
+  | SparkExitProofDataDto;
 
 export class EmptyReceiptProofDataDto {
   constructor(public inner_key: string) {}
@@ -372,5 +383,29 @@ export class P2WSHProofDataDto {
       innerKey: this.inner_key,
       script: this.script,
     } as P2WSHProofData;
+  }
+}
+
+export class SparkExitProofDataDto {
+  constructor(
+    public receipt: ReceiptDto,
+    public script: SparkExitProofDataScript,
+    public metadata: SparkExitMetadata
+  ) {}
+
+  public static fromReceiptProofData(data: ReceiptProofData): ReceiptProofDataDto {
+    let proofData = data as SparkExitProofData;
+    let receipt = ReceiptDto.fromReceipt(proofData.receipt);
+
+    return new SparkExitProofDataDto(receipt, proofData.script, proofData.metadata);
+  }
+
+  public toReceiptProofData(): ReceiptProofData {
+    let receipt = plainToInstance(ReceiptDto, this.receipt);
+    return {
+      receipt: receipt.toReceipt(),
+      script: this.script,
+      metadata: this.metadata,
+    } as SparkExitProofData;
   }
 }

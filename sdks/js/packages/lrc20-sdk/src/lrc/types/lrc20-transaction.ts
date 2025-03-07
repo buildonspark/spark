@@ -28,11 +28,15 @@ export type Lrc20TransactionType =
       data: TransferData;
     }
   | {
+      type: Lrc20TransactionTypeEnum.SparkExit;
+      data: SparkExitData;
+    }
+  | {
       type: Lrc20TransactionTypeEnum.Announcement;
       data: AnnouncementData;
     };
 
-export type Lrc20TransactionTypeData = IssueData | TransferData | AnnouncementData;
+export type Lrc20TransactionTypeData = IssueData | TransferData | AnnouncementData | SparkExitData;
 
 export enum Lrc20TransactionTypeEnum {
   Announcement = "Announcement",
@@ -144,6 +148,10 @@ export interface TransferData {
   output_proofs: Map<number, ReceiptProof>;
 }
 
+export interface SparkExitData {
+  output_proofs: Map<number, ReceiptProof>;
+}
+
 export interface FreezeTxToggle {
   txid: string;
   vout: number;
@@ -219,6 +227,20 @@ export class Lrc20TransactionTypeDto {
 
         data = {
           input_proofs: inputProofs,
+          output_proofs: outputProofs,
+        };
+        break;
+      }
+      case Lrc20TransactionTypeEnum.SparkExit: {
+        let txData = txType.data as SparkExitData;
+
+        let outputProofs = new Map<number, ReceiptProofDto>();
+        for (let [key, value] of txData.output_proofs.entries()) {
+          let receiptProof = ReceiptProofDto.fromReceiptProof(value);
+          outputProofs = outputProofs.set(key, receiptProof);
+        }
+
+        data = {
           output_proofs: outputProofs,
         };
         break;
@@ -343,6 +365,28 @@ export class Lrc20TransactionTypeDto {
 
         break;
       }
+      case Lrc20TransactionTypeEnum.SparkExit: {
+        let txData = dto.data as SparkExitDataDto;
+
+        let outputProofs = new Map<number, ReceiptProof>();
+        if (txData.output_proofs instanceof Map) {
+          txData.output_proofs.forEach((proof, index) => {
+            outputProofs = outputProofs.set(index, ReceiptProofDto.toReceiptProof(proof));
+          });
+        } else {
+          for (let key in txData.output_proofs) {
+            let receiptProof = txData.output_proofs[key] as ReceiptProofDto;
+            receiptProof = plainToInstance(ReceiptProofDto, receiptProof);
+            outputProofs = outputProofs.set(+key, ReceiptProofDto.toReceiptProof(receiptProof));
+          }
+        }
+
+        data = {
+          output_proofs: outputProofs,
+        } as SparkExitData;
+
+        break;
+      }
       case Lrc20TransactionTypeEnum.Announcement: {
         let txData = dto.data as any;
 
@@ -357,7 +401,7 @@ export class Lrc20TransactionTypeDto {
   }
 }
 
-export type Lrc20TransactionTypeDataDto = IssueDataDto | TransferDataDto | AnnouncementDataDto;
+export type Lrc20TransactionTypeDataDto = IssueDataDto | TransferDataDto | AnnouncementDataDto | SparkExitDataDto;
 
 export interface IssueDataDto {
   output_proofs: any;
@@ -366,6 +410,10 @@ export interface IssueDataDto {
 
 export interface TransferDataDto {
   input_proofs: any;
+  output_proofs: any;
+}
+
+export interface SparkExitDataDto {
   output_proofs: any;
 }
 

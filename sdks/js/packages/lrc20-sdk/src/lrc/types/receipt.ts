@@ -10,7 +10,10 @@ export class ReceiptDto {
   constructor(public token_amount: TokenAmountDto, public token_pubkey: string) {}
 
   public static fromReceipt(receipt: Receipt): ReceiptDto {
-    return new ReceiptDto(TokenAmountDto.fromTokenAmount(receipt.tokenAmount), receipt.tokenPubkey.pubkey.toString("hex"));
+    return new ReceiptDto(
+      TokenAmountDto.fromTokenAmount(receipt.tokenAmount),
+      receipt.tokenPubkey.pubkey.toString("hex")
+    );
   }
 
   public toReceipt(): Receipt {

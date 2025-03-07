@@ -1,20 +1,17 @@
 import { networks } from "bitcoinjs-lib";
-import { TokenPubkey, Lrc20TransactionDto } from "../lrc/types";
+import { Lrc20TransactionDto } from "../lrc/types";
 import { LRCWallet } from "../lrc/wallet";
 import { NetworkType } from "../network";
-import { JSONStringify } from "../lrc/utils";
 
-const REVOCATION_ADDRESS = "tb1ppfwjeshkreeq9kl7tmj7wa638pj2kck0kc8zkq94r238nasejegqs6ptv3";
-const DELAY_ADDRESS = "tb1ppfwjeshkreeq9kl7tmj7wa638pj2kck0kc8zkq94r238nasejegqs6ptv3";
+const REVOCATION_KEY = "02e85316cc097bd7dffbc97c2ceeeb2ff984eccb227cdac6b29bad0b1e02146c0d";
+const DELAY_KEY = "02e85316cc097bd7dffbc97c2ceeeb2ff984eccb227cdac6b29bad0b1e02146c0d";
 const LOCKTIME = 150;
-const TOKEN_PUBKEY = new TokenPubkey(
-  Buffer.from("e85316cc097bd7dffbc97c2ceeeb2ff984eccb227cdac6b29bad0b1e02146c0d", "hex")
-);
+const TOKEN_PUBKEY = "02e85316cc097bd7dffbc97c2ceeeb2ff984eccb227cdac6b29bad0b1e02146c0d";
 const SATOSHIS = 15000;
 
 const wallet = new LRCWallet(
   "4799979d5e417e3d6d00cf89a77d4f3c0354d295810326c6b0bf4b45aedb38f3",
-  networks.testnet,
+  networks.regtest,
   NetworkType.REGTEST
 );
 
@@ -23,18 +20,21 @@ const main = async () => {
 
   const payment = {
     amount: BigInt(1000),
-    tokenPubkey: "tb1ppfwjeshkreeq9kl7tmj7wa638pj2kck0kc8zkq94r238nasejegqs6ptv3",
+    tokenPubkey: TOKEN_PUBKEY,
     sats: SATOSHIS,
     cltvOutputLocktime: LOCKTIME,
-    recipient: REVOCATION_ADDRESS,
-    expiryKey: DELAY_ADDRESS,
-    metadata: { txHash: "63e7487c274aa618552071b468bb7f9ef2c34fda93de28b49fa9b9baf1b2f1a9", index: 2 },
+    revocationKey: REVOCATION_KEY,
+    expiryKey: DELAY_KEY,
+    metadata: { token_tx_hash: "63e7487c274aa618552071b468bb7f9ef2c34fda93de28b49fa9b9baf1b2f1a9", exit_leaf_index: 2 },
   };
 
-  let exitTx = await wallet.prepareSparkExit([payment], 1.0);
+  const exitTx = await wallet.prepareSparkExit([payment], 1.0);
 
-  let txDto = Lrc20TransactionDto.fromLrc20Transaction(exitTx);
-  console.log(JSONStringify(txDto));
+  const txDto = Lrc20TransactionDto.fromLrc20Transaction(exitTx);
+
+  const result = await wallet.broadcast(txDto);
+
+  console.log(result);
 };
 
 main();

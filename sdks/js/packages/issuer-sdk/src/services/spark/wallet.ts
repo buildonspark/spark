@@ -6,6 +6,7 @@ import { Network } from "@buildonspark/spark-sdk/utils";
 import { IssuerTokenTransactionService } from "./token-transactions.js";
 import { TokenFreezeService } from "../freeze.js";
 import { WalletConfig } from "@buildonspark/spark-sdk/services/config";
+import lrc20sdk from "@buildonspark/lrc20-sdk";
 
 const BURN_ADDRESS =
   "020202020202020202020202020202020202020202020202020202020202020202";
@@ -118,5 +119,9 @@ export class IssuerSparkWallet extends SparkWallet {
       impactedLeafIds: response.impactedLeafIds,
       impactedTokenAmount: tokenAmount,
     };
+  }
+
+  getLRC20Wallet(): lrc20sdk.LRCWallet | undefined {
+    return this.lrc20Wallet
   }
 }

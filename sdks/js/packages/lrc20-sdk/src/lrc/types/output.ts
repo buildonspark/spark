@@ -107,8 +107,8 @@ export class SparkExitOutput extends TxOutput {
       type: ReceiptProofType.SparkExit,
       data: {
         script: {
-          revocationKey: this.revocationPubkey.toString("hex"),
-          delayKey: this.delayPubkey.toString("hex"),
+          revocation_key: this.revocationPubkey.toString("hex"),
+          delay_key: this.delayPubkey.toString("hex"),
           locktime: this.locktime,
         },
         receipt: this.receipt,

@@ -1,18 +1,18 @@
 import { basicAuth, BasicAuth } from ".";
-import { EsploraTransaction } from "../types";
+import { ElectrsTransaction } from "../types";
 import { BitcoinUtxo, BitcoinUtxoDto, BitcoinUtxoSpentStatus } from "../types/bitcoin-utxo";
 
-export class EsploraApi {
-  private readonly esploraUrl: string;
+export class ElectrsApi {
+  private readonly electrsUrl: string;
   private readonly auth: BasicAuth | null;
 
-  constructor(esploraUrl: string, auth: BasicAuth | null) {
-    this.esploraUrl = esploraUrl;
+  constructor(electrsUrl: string, auth: BasicAuth | null) {
+    this.electrsUrl = electrsUrl;
     this.auth = auth;
   }
 
   async sendTransaction(txHex: string): Promise<string> {
-    const url = `${this.esploraUrl}/tx`;
+    const url = `${this.electrsUrl}/tx`;
 
     const response = await fetch(url, {
       method: "POST",
@@ -32,7 +32,7 @@ export class EsploraApi {
   }
 
   async getTransactionHex(txid: string): Promise<string> {
-    const url = `${this.esploraUrl}/tx/${txid}/hex`;
+    const url = `${this.electrsUrl}/tx/${txid}/hex`;
 
     const response = await fetch(url, {
       method: "GET",
@@ -51,8 +51,7 @@ export class EsploraApi {
   }
 
   async listBitcoinUtxo(address: string): Promise<Array<BitcoinUtxo>> {
-    const url = `${this.esploraUrl}/address/${address}/utxo`;
-    console.log(url);
+    const url = `${this.electrsUrl}/address/${address}/utxo`;
 
     try {
       const response = await fetch(url, {
@@ -77,7 +76,7 @@ export class EsploraApi {
   }
 
   async getSpendingStatus(txid: string, vout: bigint): Promise<BitcoinUtxoSpentStatus> {
-    const url = `${this.esploraUrl}/tx/${txid}/outspend/${vout}`;
+    const url = `${this.electrsUrl}/tx/${txid}/outspend/${vout}`;
 
     const response = await fetch(url, {
       method: "GET",
@@ -96,7 +95,7 @@ export class EsploraApi {
   }
 
   async getUtxoValue(txid: string, vout: number): Promise<number> {
-    const url = `${this.esploraUrl}/tx/${txid}`;
+    const url = `${this.electrsUrl}/tx/${txid}`;
 
     const response = await fetch(url, {
       method: "GET",
@@ -116,8 +115,8 @@ export class EsploraApi {
     return utxoValue;
   }
 
-  async listTransactions(address: string): Promise<EsploraTransaction[]> {
-    const url = `${this.esploraUrl}/address/${address}/txs`;
+  async listTransactions(address: string): Promise<ElectrsTransaction[]> {
+    const url = `${this.electrsUrl}/address/${address}/txs`;
 
     const response = await fetch(url, {
       method: "GET",

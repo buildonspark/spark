@@ -11,53 +11,32 @@ import {
 } from "./utils/constants.js";
 
 export class IssuerWallet {
-  private bitcoinWallet: lrc20sdk.LRCWallet | undefined;
   private sparkWallet: IssuerSparkWallet;
   private initialized: boolean = false;
-  private network: Network;
 
   private tokenPublicKeyInfo: lrc20sdk.TokenPubkeyInfo | undefined;
 
   constructor(network: Network) {
     this.sparkWallet = new IssuerSparkWallet(network);
-    this.network = network;
   }
 
   async initWallet(
     mnemonicOrSeed?: Uint8Array | string,
     // Set to true to enable L1 Token Announcements.
     enableL1Wallet: boolean = true,
+    lrc20WalletApiConfig?: lrc20sdk.LRC20WalletApiConfig,
   ): Promise<{
     balance: bigint;
     tokenBalance: Map<string, {
         balance: bigint;
     }>;
     mnemonic?: string | undefined;
-}> {
-    let result = await this.sparkWallet.initWallet(mnemonicOrSeed);
+  }> {
+      let result = await this.sparkWallet.initWallet(mnemonicOrSeed, enableL1Wallet, lrc20WalletApiConfig);
 
-    if (enableL1Wallet) {
-      if (!mnemonicOrSeed) {
-        mnemonicOrSeed = result.mnemonic!;
-      }
+      this.initialized = true;
 
-      let seed;
-      if (typeof mnemonicOrSeed === "string") {
-        seed = await bip39.mnemonicToSeed(mnemonicOrSeed);
-      } else {
-        seed = mnemonicOrSeed;
-      }
-
-      const hdkey = HDKey.fromMasterSeed(seed).derive("m/0").privateKey!;
-      this.bitcoinWallet = new lrc20sdk.LRCWallet(
-        bytesToHex(hdkey),
-        LRC_WALLET_NETWORK[this.network],
-        LRC_WALLET_NETWORK_TYPE[this.network],
-      );
-    }
-    this.initialized = true;
-
-    return result;
+      return result;
   }
 
   getSparkWallet(): IssuerSparkWallet {
@@ -67,11 +46,12 @@ export class IssuerWallet {
     return this.sparkWallet;
   }
 
-  getBitcoinWallet(): lrc20sdk.LRCWallet {
-    if (!this.initialized || !this.bitcoinWallet) {
+  getLRC20Wallet(): lrc20sdk.LRCWallet {
+    if (!this.isL1Initialized()) {
       throw new Error("Bitcoin wallet not initialized");
     }
-    return this.bitcoinWallet;
+
+    return this.sparkWallet.getLRC20Wallet()!;
   }
 
   isSparkInitialized(): boolean {
@@ -79,14 +59,14 @@ export class IssuerWallet {
   }
 
   isL1Initialized(): boolean {
-    return this.initialized && this.bitcoinWallet !== undefined;
+    return this.initialized && this.sparkWallet.getLRC20Wallet() !== undefined;
   }
 
   getL1FundingAddress(): string {
     if (!this.isL1Initialized()) {
       throw new Error("L1 wallet not initialized");
     }
-    return this.getBitcoinWallet().p2wpkhAddress;
+    return this.getLRC20Wallet().p2wpkhAddress;
   }
 
   async getTokenPublicKey(): Promise<string> {
@@ -186,29 +166,54 @@ export class IssuerWallet {
   /**
    * Announces LRC20 token on L1
    */
-  async announceTokenL1(
-    tokenName: string,
-    tokenTicker: string,
-    decimals: number,
-    maxSupply: bigint,
-    isFreezable: boolean,
-  ): Promise<{ txid: string }> {
-    if (!this.isL1Initialized()) {
+  async announceTokenL1(tokenName: string, tokenTicker: string, decimals: number, maxSupply: bigint, isFreezable: boolean): Promise<{txid: string} | undefined> {
+    if(!this.isL1Initialized()) {
       throw new Error("L1 wallet not initialized");
     }
+    let bitcoinWallet = this.getLRC20Wallet()!;
 
-    return await announceTokenL1(
-      this.bitcoinWallet!,
-      tokenName,
-      tokenTicker,
-      decimals,
-      maxSupply,
-      isFreezable,
-    );
+    try {
+      return await announceTokenL1(bitcoinWallet, tokenName, tokenTicker, decimals, maxSupply, isFreezable)
+    } catch(err: any) {
+      if (err.message === "Not enough UTXOs") {
+        console.error(
+          "Error: No L1 UTXOs available to cover announcement fees. Please send sats to the address associated with your Issuer Wallet:",
+          bitcoinWallet.p2wpkhAddress
+        );
+      } else {
+        console.error("Unexpected error:", err);
+      }
+      return
+    }
   }
 
   /**
-   * Announces LRC20 token on L1
+   * Withdraws LRC20 tokens to L1
+   */
+  async withdrawTokens(receiverPublicKey?: string): Promise<{txid: string} | undefined> {
+    if(!this.isL1Initialized()) {
+      throw new Error("L1 wallet not initialized");
+    }
+
+    let tokenPublicKey = bytesToHex(this.getLRC20Wallet()!.pubkey);
+
+    try {
+      return await this.sparkWallet.withdrawTokens(tokenPublicKey, receiverPublicKey)
+    } catch(err: any) {
+      if (err.message === "Not enough UTXOs") {
+        console.error(
+          "Error: No L1 UTXOs available to cover exit fees. Please send sats to the address associated with your Issuer Wallet:",
+          this.getLRC20Wallet()!.p2wpkhAddress
+        );
+      } else {
+        console.error("Unexpected error:", err);
+      }
+      return
+    }
+  }
+
+  /**
+   * Gets LRC20 token info
    */
   async getTokenPublicKeyInfo(): Promise<lrc20sdk.TokenPubkeyInfo | undefined> {
     if (!this.isL1Initialized()) {
@@ -219,9 +224,11 @@ export class IssuerWallet {
       return this.tokenPublicKeyInfo
     }
 
-    let tokenPublicKey = bytesToHex(this.bitcoinWallet!.pubkey);
+    const wallet = this.getLRC20Wallet();
 
-    this.tokenPublicKeyInfo = await this.bitcoinWallet!.getTokenPubkeyInfo(tokenPublicKey);
+    let tokenPublicKey = bytesToHex(wallet.pubkey);
+
+    this.tokenPublicKeyInfo = await wallet.getTokenPubkeyInfo(tokenPublicKey);
 
     return this.tokenPublicKeyInfo
   }

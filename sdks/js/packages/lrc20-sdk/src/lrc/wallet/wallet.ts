@@ -1,10 +1,10 @@
 import { address, crypto, networks, payments, Psbt, script, Transaction } from "bitcoinjs-lib";
-import { plainToInstance } from "class-transformer";
+import { instanceToPlain, plainToInstance } from "class-transformer";
 import { ECPairInterface } from "ecpair";
 import { publicKeyToAddress } from "../../address";
 import { NetworkType, toNetworkType, toPsbtNetwork } from "../../network";
 import { AddressType } from "../../types";
-import { EsploraApi } from "../api/esplora";
+import { ElectrsApi } from "../api/electrs";
 import { Lrc20JsonRPC } from "../api/lrc20";
 import { BtcUtxosCoinSelection } from "../coinselection/btc-utxos";
 import { Lrc20UtxosCoinSelection } from "../coinselection/lrc20-utxos";
@@ -35,14 +35,20 @@ import { reverseBuffer, toEvenParity, toXOnly } from "../utils/buffer";
 import {
   DUST_AMOUNT,
   EMPTY_TOKEN_PUBKEY,
-  ESPLORA_URL,
-  ESPLORA_AUTH,
   LRC_NODE_URL,
+  ELECTRS_URL,
 } from "../utils/constants";
-import { JSONParse, JSONStringifyBodyDown } from "../utils/json";
+import { JSONParse, JSONStringify, JSONStringifyBodyDown } from "../utils/json";
 import { ECPair } from "../../bitcoin-core";
 import { SparkExitMetadata } from "../types/spark";
-import { EsploraTransactionOutput } from "../types";
+import { ElectrsTransactionOutput } from "../types";
+import {BasicAuth} from "../api";
+
+export interface LRC20WalletApiConfig {
+  lrc20NodeUrl: string,
+  electrsUrl: string,
+  electrsCredentials?: BasicAuth
+}
 
 export class LRCWallet {
   public p2trAddress: string;
@@ -61,18 +67,18 @@ export class LRCWallet {
   private builder: TransactionBuilder;
   private keyPair: ECPairInterface;
   private network: networks.Network;
-  private esploraApi: EsploraApi;
+  private electrsApi: ElectrsApi;
   private lrcNodeApi: Lrc20JsonRPC;
   private tokenInfoMap: Map<string, TokenPubkeyInfo> = new Map();
 
   private readonly privateKeyHex: string;
 
-  constructor(privateKeyHex: string, btcNetwork: networks.Network, networkType: NetworkType) {
+  constructor(privateKeyHex: string, btcNetwork: networks.Network, networkType: NetworkType, apiConfig?: LRC20WalletApiConfig) {
     this.privateKeyHex = privateKeyHex;
     this.network = btcNetwork;
     this.networkType = networkType;
 
-    this.init();
+    this.init(apiConfig);
   }
 
   public getNetwork(): networks.Network {
@@ -83,11 +89,11 @@ export class LRCWallet {
     return this.keyPair;
   }
 
-  public getEsploraApi(): EsploraApi {
-    return this.esploraApi;
+  public getElectrsApi(): ElectrsApi {
+    return this.electrsApi;
   }
 
-  protected init() {
+  protected init(apiConfig?: LRC20WalletApiConfig) {
     this.keyPair = ECPair.fromPrivateKey(Buffer.from(this.privateKeyHex, "hex"), { network: this.network });
     this.pubkey = this.keyPair.publicKey;
     this.builder = new TransactionBuilder(this.keyPair, this.network);
@@ -95,8 +101,18 @@ export class LRCWallet {
 
     const bech32 = this.network.bech32;
 
-    this.esploraApi = new EsploraApi(ESPLORA_URL[this.networkType] || ESPLORA_URL["default"], ESPLORA_AUTH[this.networkType] || null);
-    this.lrcNodeApi = new Lrc20JsonRPC(LRC_NODE_URL[this.networkType] || LRC_NODE_URL["default"]);
+    this.electrsApi = apiConfig
+      ? new ElectrsApi(
+          apiConfig.electrsUrl,
+          apiConfig.electrsCredentials
+        )
+      : new ElectrsApi(
+          ELECTRS_URL[this.networkType] || ELECTRS_URL["default"],
+          null
+        );
+    this.lrcNodeApi = apiConfig
+      ? new Lrc20JsonRPC(apiConfig.lrc20NodeUrl)
+      : new Lrc20JsonRPC(LRC_NODE_URL[this.networkType] || LRC_NODE_URL["default"]);
 
     const pubkeyHex = this.keyPair.publicKey.toString("hex");
     const networkType = toNetworkType(this.network);
@@ -119,7 +135,7 @@ export class LRCWallet {
     btcUtxos = await Promise.all(
       btcUtxos.map(async (utxo) => ({
         ...utxo,
-        hex: await this.esploraApi.getTransactionHex(utxo.txid),
+        hex: await this.electrsApi.getTransactionHex(utxo.txid),
       }))
     );
 
@@ -130,10 +146,10 @@ export class LRCWallet {
   }
 
   private async fetchUtxos(address: string): Promise<BitcoinUtxo[]> {
-    let txs = await this.esploraApi.listTransactions(address);
+    let txs = await this.electrsApi.listTransactions(address);
 
     let inputs = [];
-    let outputs = new Map<{ txid: string; vout: number }, EsploraTransactionOutput>();
+    let outputs = new Map<{ txid: string; vout: number }, ElectrsTransactionOutput>();
     let txStatuses = {};
     txs.forEach((tx) => {
       inputs = [...inputs, ...tx.vin];
@@ -1119,7 +1135,7 @@ export class LRCWallet {
       tx.bitcoin_tx.ins.map(async (input, index) => {
         const prevTxid = input.hash.reverse().toString("hex");
         const prevVout = input.index;
-        const utxoValue = await this.esploraApi.getUtxoValue(prevTxid, prevVout);
+        const utxoValue = await this.electrsApi.getUtxoValue(prevTxid, prevVout);
 
         const utxoData = {
           txid: prevTxid,
@@ -1204,6 +1220,14 @@ export class LRCWallet {
           },
         };
         break;
+      case Lrc20TransactionTypeEnum.SparkExit:
+        txType = {
+          type: Lrc20TransactionTypeEnum.SparkExit,
+          data: {
+            output_proofs: outputProofs,
+          },
+        };
+        break;
       default:
         throw new Error("Unsupported transaction type");
     }
@@ -1284,7 +1308,10 @@ export class LRCWallet {
       }
       let tx = Lrc20Transaction.fromLrc20TransactionDto(transaction);
       let isBroadcasted = false;
-      if (transaction.tx_type.type === Lrc20TransactionTypeEnum.Transfer) {
+      if (
+        transaction.tx_type.type === Lrc20TransactionTypeEnum.Transfer ||
+        transaction.tx_type.type === Lrc20TransactionTypeEnum.SparkExit
+      ) {
         isBroadcasted = await this.lrcNodeApi.sendRawLrc20Tx(tx);
       } else if (
         transaction.tx_type.type === Lrc20TransactionTypeEnum.Announcement ||
@@ -1306,7 +1333,7 @@ export class LRCWallet {
   }
 
   public broadcastRawBtcTransaction(txHex: string): Promise<string> {
-    return this.esploraApi.sendTransaction(txHex);
+    return this.electrsApi.sendTransaction(txHex);
   }
 
   public spentUtxo(tx: Lrc20Transaction) {
@@ -1366,10 +1393,14 @@ export class LRCWallet {
       if (output instanceof ReceiptOutput) {
         outputProofs.set(index++, (output as ReceiptOutput).toReceiptProof());
       }
+      if (output instanceof SparkExitOutput) {
+        outputProofs.set(index++, (output as SparkExitOutput).toReceiptProof());
+      }
       if (output instanceof MultisigReceiptOutput) {
         outputProofs.set(index++, (output as MultisigReceiptOutput).toReceiptProof(this.network));
       }
     });
+
     return outputProofs;
   }
 
@@ -1379,7 +1410,7 @@ export class LRCWallet {
         return BitcoinInput.createFromRaw(
           utxo.txid,
           Number(utxo.vout),
-          await this.esploraApi.getTransactionHex(utxo.txid),
+          await this.electrsApi.getTransactionHex(utxo.txid),
           utxo.satoshis
         );
       })
@@ -1388,16 +1419,21 @@ export class LRCWallet {
 
   public createOutputs(
     amounts: Array<{
-      recipient: string | Array<string>;
+      recipient?: string | Array<string>;
       amount: bigint;
       tokenPubkey: string;
       sats?: number;
       m?: number;
       cltvOutputLocktime?: number;
+      revocationKey?: string;
       expiryKey?: string;
       metadata?: SparkExitMetadata;
     }>
   ): Array<TxOutput> {
+    if (amounts.filter((amount) => amount.metadata).length > 1) {
+      throw new Error("Only 1 LTTXO can be withdrawn in 1 transaction");
+    }
+
     return amounts.map((token) => {
       const tokenPubkeyBuf = Buffer.from(token.tokenPubkey, "hex");
 
@@ -1406,10 +1442,10 @@ export class LRCWallet {
           ? Receipt.emptyReceipt()
           : new Receipt(new TokenAmount(token.amount), new TokenPubkey(tokenPubkeyBuf));
 
-      if (token.metadata && typeof token.recipient === "string") {
+      if (token.metadata) {
         return SparkExitOutput.createFromRaw(
-          address.fromBech32(token.recipient).data,
-          address.fromBech32(token.expiryKey).data,
+          Buffer.from(token.revocationKey, "hex"),
+          Buffer.from(token.expiryKey, "hex"),
           token.cltvOutputLocktime,
           token.sats,
           receipt,
@@ -1420,10 +1456,7 @@ export class LRCWallet {
         return ReceiptOutput.createFromRaw(toEvenParity(addressParsed.data), token.sats || 1000, receipt);
       } else if (Array.isArray(token.recipient)) {
         const expiryPublicKey = token.expiryKey ? token.expiryKey : token.recipient[0];
-        const expiryReceiptKey = Receipt.receiptPublicKey(
-          toEvenParity(address.fromBech32(expiryPublicKey).data),
-          receipt
-        );
+        const expiryReceiptKey = Receipt.receiptPublicKey(address.fromBech32(expiryPublicKey).data, receipt);
 
         return MultisigReceiptOutput.createFromRaw(
           token.recipient.map((addr) => {
@@ -1565,7 +1598,7 @@ export class LRCWallet {
       unsignedTx.ins.map(async (input) => {
         let hash = input.hash.toString("hex");
         let txid = reverseBuffer(input.hash).toString("hex");
-        let hex = await this.esploraApi.getTransactionHex(txid);
+        let hex = await this.electrsApi.getTransactionHex(txid);
 
         prevouts.set(hash, hex);
       })
