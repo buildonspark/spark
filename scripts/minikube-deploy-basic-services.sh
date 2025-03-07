@@ -37,6 +37,30 @@ helm install \
     ca \
     "$(get_helm_prefix "$OPS_DIR/terraform/cluster")/ca"
 
+kubectl apply -n kube-system -f - <<-EOF
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: ingress
+spec:
+  duration: 8760h
+  subject:
+    organizations:
+      - Lightspark
+  commonName: "ingress.${PROFILE}.local"
+  secretName: ingress-tls
+  usages:
+    - server auth
+  dnsNames:
+    - "*.${PROFILE}.local"
+    - "*.lrc20.${PROFILE}.local"
+    - "*.spark.${PROFILE}.local"
+    - "*.yuvd.${PROFILE}.local"
+  issuerRef:
+    name: ca
+    kind: ClusterIssuer
+EOF
+
 postgres_installed=false
 for _ in $(seq 3); do
     if helm install \

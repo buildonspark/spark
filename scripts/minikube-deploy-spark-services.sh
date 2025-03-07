@@ -105,7 +105,7 @@ operator_cmd=(
     --set config.threshold=3
     --set config.withdrawbondsats=1000000
     --set ingress.enabled=true
-    --set ingress.domain=minikube.local
+    --set ingress.domain=spark.minikube.local
     --set imagePullSecret="ecr"
     --set-json "pubkeys=$pubkeys_json"
     --set yuvd.namespace="lrc20"
@@ -145,7 +145,7 @@ helm install \
     --set config.database_url="postgresql://postgres@postgres.default:5432/lrc20_\${INDEX}" \
     --set config.extra.bnode.url="http://regtest-bitcoind.bitcoin-spark:8332" \
     --set ingress.enabled=true \
-    --set ingress.domain=minikube.local \
+    --set ingress.domain=lrc20.minikube.local \
     --set storage.class="standard" \
     --set imagePullSecret="ecr" \
     --set config.extra.indexer.confirmations_number=1 \
