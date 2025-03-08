@@ -13,7 +13,7 @@ import { Buffer } from "buffer";
 import * as ecies from "eciesjs";
 import { TreeNode } from "../proto/spark.js";
 import { generateAdaptorFromSignature } from "../utils/adaptor-signature.js";
-import {getMasterHDKeyFromSeed, subtractPrivateKeys} from "../utils/keys.js";
+import { getMasterHDKeyFromSeed, subtractPrivateKeys } from "../utils/keys.js";
 import { Network } from "../utils/network.js";
 import {
   splitSecretWithProofs,
@@ -195,17 +195,12 @@ class DefaultSparkSigner implements SparkSigner {
     return schnorr.sign(message, hexToBytes(privateKey));
   }
 
-  async signSchnorrWithIdentityKey(
-    message: Uint8Array,
-  ): Promise<Uint8Array> {
+  async signSchnorrWithIdentityKey(message: Uint8Array): Promise<Uint8Array> {
     if (!this.identityPrivateKey?.privateKey) {
       throw new Error("Private key is not set");
     }
 
-    const signature = schnorr.sign(
-      message,
-      this.identityPrivateKey.privateKey,
-    );
+    const signature = schnorr.sign(message, this.identityPrivateKey.privateKey);
 
     return signature;
   }
@@ -383,7 +378,10 @@ class DefaultSparkSigner implements SparkSigner {
       seed = hexToBytes(seed);
     }
 
-    const hdkey = getMasterHDKeyFromSeed(seed, network == Network.REGTEST ? 0 : 1);
+    const hdkey = getMasterHDKeyFromSeed(
+      seed,
+      network == Network.REGTEST ? 0 : 1,
+    );
 
     if (!hdkey.privateKey) {
       throw new Error("Could not derive private key from seed");

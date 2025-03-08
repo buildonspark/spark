@@ -22,7 +22,7 @@ export class BitcoinFaucet {
   constructor(
     private url: string,
     private username: string,
-    private password: string
+    private password: string,
   ) {
     if (BitcoinFaucet.instance) {
       return BitcoinFaucet.instance;
@@ -65,7 +65,7 @@ export class BitcoinFaucet {
     const randomPubKey = secp256k1.getPublicKey(randomKey);
     const randomAddress = getP2TRAddressFromPublicKey(
       randomPubKey,
-      Network.LOCAL
+      Network.LOCAL,
     );
     await this.generateToAddress(100, randomAddress);
 
@@ -97,7 +97,7 @@ export class BitcoinFaucet {
     const signedSplitTx = await this.signFaucetCoin(
       splitTx,
       fundingTx.getOutput(0)!,
-      key
+      key,
     );
 
     await this.broadcastTx(bytesToHex(signedSplitTx.extract()));
@@ -120,7 +120,7 @@ export class BitcoinFaucet {
   async signFaucetCoin(
     unsignedTx: Transaction,
     fundingTxOut: TransactionOutput,
-    key: Uint8Array
+    key: Uint8Array,
   ): Promise<Transaction> {
     const pubKey = secp256k1.getPublicKey(key);
     const internalKey = pubKey.slice(1); // Remove the 0x02/0x03 prefix
@@ -139,7 +139,7 @@ export class BitcoinFaucet {
       0,
       new Array(unsignedTx.inputsLength).fill(script),
       SigHash.DEFAULT,
-      new Array(unsignedTx.inputsLength).fill(fundingTxOut.amount!)
+      new Array(unsignedTx.inputsLength).fill(fundingTxOut.amount!),
     );
 
     const merkleRoot = new Uint8Array();

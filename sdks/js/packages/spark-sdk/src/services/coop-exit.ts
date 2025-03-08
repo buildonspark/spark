@@ -33,7 +33,7 @@ export type GetConnectorRefundSignaturesParams = {
 export class CoopExitService extends BaseTransferService {
   constructor(
     config: WalletConfigService,
-    connectionManager: ConnectionManager
+    connectionManager: ConnectionManager,
   ) {
     super(config, connectionManager);
   }
@@ -51,12 +51,12 @@ export class CoopExitService extends BaseTransferService {
       leaves,
       exitTxId,
       connectorOutputs,
-      receiverPubKey
+      receiverPubKey,
     );
     const transferTweak = await this.sendTransferTweakKey(
       transfer,
       leaves,
-      signaturesMap
+      signaturesMap,
     );
 
     return { transfer: transferTweak, signaturesMap };
@@ -67,7 +67,7 @@ export class CoopExitService extends BaseTransferService {
     nodeOutPoint: TransactionInput,
     connectorOutput: TransactionInput,
     amountSats: bigint,
-    receiverPubKey: Uint8Array
+    receiverPubKey: Uint8Array,
   ): Transaction {
     const refundTx = new Transaction();
     if (!nodeOutPoint.txid || nodeOutPoint.index === undefined) {
@@ -82,7 +82,7 @@ export class CoopExitService extends BaseTransferService {
     refundTx.addInput(connectorOutput);
     const receiverScript = getP2TRScriptFromPublicKey(
       receiverPubKey,
-      this.config.getNetwork()
+      this.config.getNetwork(),
     );
 
     refundTx.addOutput({
@@ -96,7 +96,7 @@ export class CoopExitService extends BaseTransferService {
     leaves: LeafKeyTweak[],
     exitTxId: Uint8Array,
     connectorOutputs: TransactionInput[],
-    receiverPubKey: Uint8Array
+    receiverPubKey: Uint8Array,
   ): Promise<{ transfer: Transfer; signaturesMap: Map<string, Uint8Array> }> {
     if (leaves.length !== connectorOutputs.length) {
       throw new Error("Number of leaves and connector outputs must match");
@@ -117,7 +117,7 @@ export class CoopExitService extends BaseTransferService {
       const currentRefundTx = getTxFromRawTxBytes(leaf.leaf.refundTx);
 
       const sequence = getNextTransactionSequence(
-        currentRefundTx.getInput(0).sequence
+        currentRefundTx.getInput(0).sequence,
       );
 
       const refundTx = this.createConnectorRefundTransaction(
@@ -125,7 +125,7 @@ export class CoopExitService extends BaseTransferService {
         currentRefundTx.getInput(0),
         connectorOutput,
         BigInt(leaf.leaf.value),
-        receiverPubKey
+        receiverPubKey,
       );
 
       const signingNonceCommitment =
@@ -152,7 +152,7 @@ export class CoopExitService extends BaseTransferService {
     }
 
     const sparkClient = await this.connectionManager.createSparkClient(
-      this.config.getCoordinatorAddress()
+      this.config.getCoordinatorAddress(),
     );
 
     let response: CooperativeExitResponse;
@@ -179,7 +179,7 @@ export class CoopExitService extends BaseTransferService {
 
     const signatures = await this.signRefunds(
       leafDataMap,
-      response.signingResults
+      response.signingResults,
     );
 
     const signaturesMap: Map<string, Uint8Array> = new Map();

@@ -1,6 +1,6 @@
 import { secp256k1 } from "@noble/curves/secp256k1";
 import { numberToBytesBE } from "@noble/curves/abstract/utils";
-import {HDKey} from "@scure/bip32";
+import { HDKey } from "@scure/bip32";
 
 export function addPublicKeys(a: Uint8Array, b: Uint8Array): Uint8Array {
   if (a.length !== 33 || b.length !== 33) {
@@ -13,7 +13,7 @@ export function addPublicKeys(a: Uint8Array, b: Uint8Array): Uint8Array {
 
 export function applyAdditiveTweakToPublicKey(
   pubkey: Uint8Array,
-  tweak: Uint8Array
+  tweak: Uint8Array,
 ) {
   if (pubkey.length !== 33) {
     throw new Error("Public key must be 33 bytes");
@@ -87,5 +87,5 @@ export function lastKeyWithTarget(target: Uint8Array, keys: Uint8Array[]) {
 }
 
 export function getMasterHDKeyFromSeed(seed: Uint8Array, path: number): HDKey {
-    return HDKey.fromMasterSeed(seed).derive(`m/${path}`);
+  return HDKey.fromMasterSeed(seed).derive(`m/${path}`);
 }

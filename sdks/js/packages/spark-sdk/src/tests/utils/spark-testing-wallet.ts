@@ -21,7 +21,7 @@ export class SparkWalletTesting
   }
 
   public async verifyPendingTransfer(
-    transfer: Transfer
+    transfer: Transfer,
   ): Promise<Map<string, Uint8Array>> {
     return await this.transferService.verifyPendingTransfer(transfer);
   }

@@ -139,7 +139,10 @@ async function runCLI() {
         const tokenPublicKey = args[0];
         const receiverPublicKey = args[1];
 
-        let withdrawResult = await wallet.withdrawTokens(tokenPublicKey, receiverPublicKey);
+        let withdrawResult = await wallet.withdrawTokens(
+          tokenPublicKey,
+          receiverPublicKey,
+        );
         if (withdrawResult) {
           console.log("Withdrawal L1 Transaction ID:", withdrawResult.txid);
         }

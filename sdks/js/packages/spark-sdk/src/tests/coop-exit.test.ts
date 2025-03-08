@@ -30,7 +30,7 @@ describe("coop exit", () => {
       const faucet = new BitcoinFaucet(
         "http://127.0.0.1:18443",
         "admin1",
-        "123"
+        "123",
       );
 
       const faucetCoin = await faucet.fund();
@@ -43,12 +43,12 @@ describe("coop exit", () => {
 
       const configService = new WalletConfigService(
         Network.LOCAL,
-        userWallet.getSigner()
+        userWallet.getSigner(),
       );
       const connectionManager = new ConnectionManager(configService);
       const coopExitService = new CoopExitService(
         configService,
-        connectionManager
+        connectionManager,
       );
 
       const leafPubKey = await userWallet
@@ -58,7 +58,7 @@ describe("coop exit", () => {
         userWallet,
         leafPubKey,
         faucet,
-        amountSats
+        amountSats,
       );
 
       // Setup ssp
@@ -68,24 +68,24 @@ describe("coop exit", () => {
 
       const sspConfigService = new WalletConfigService(
         Network.LOCAL,
-        sspWallet.getSigner()
+        sspWallet.getSigner(),
       );
       const sspConnectionManager = new ConnectionManager(sspConfigService);
       const sspTransferService = new TransferService(
         sspConfigService,
-        sspConnectionManager
+        sspConnectionManager,
       );
 
       const sspIntermediateAddressScript = getP2TRScriptFromPublicKey(
         hexToBytes(sspPubkey),
-        Network.LOCAL
+        Network.LOCAL,
       );
 
       // Setup withdraw
       const withdrawPubKey = await userWallet.getSigner().generatePublicKey();
       const withdrawAddressScript = getP2TRScriptFromPublicKey(
         withdrawPubKey,
-        Network.LOCAL
+        Network.LOCAL,
       );
 
       const leafCount = 1;
@@ -116,7 +116,7 @@ describe("coop exit", () => {
           .generatePublicKey();
         const connectorP2trAddr = getP2TRAddressFromPublicKey(
           connectorPubKey,
-          Network.LOCAL
+          Network.LOCAL,
         );
         connectorP2trAddrs.push(connectorP2trAddr);
       }
@@ -128,7 +128,7 @@ describe("coop exit", () => {
       for (const addr of [...connectorP2trAddrs, feeBumpAddr]) {
         connectorTx.addOutput({
           script: OutScript.encode(
-            Address(getNetwork(Network.LOCAL)).decode(addr)
+            Address(getNetwork(Network.LOCAL)).decode(addr),
           ),
           amount: BigInt(intermediateAmountSats / connectorP2trAddrs.length),
         });
@@ -156,7 +156,7 @@ describe("coop exit", () => {
           exitTxId: hexToBytes(getTxIdNoReverse(exitTx)),
           connectorOutputs,
           receiverPubKey: hexToBytes(sspPubkey),
-        }
+        },
       );
 
       const pendingTransfer = await sspWallet.queryPendingTransfers();
@@ -166,14 +166,13 @@ describe("coop exit", () => {
       const receiverTransfer = pendingTransfer.transfers[0];
       expect(receiverTransfer.id).toBe(senderTransfer.transfer.id);
 
-      const leafPubKeyMap = await sspWallet.verifyPendingTransfer(
-        receiverTransfer
-      );
+      const leafPubKeyMap =
+        await sspWallet.verifyPendingTransfer(receiverTransfer);
 
       expect(leafPubKeyMap.size).toBe(1);
       expect(leafPubKeyMap.get(rootNode.id)).toBeDefined();
       expect(equalBytes(leafPubKeyMap.get(rootNode.id)!, newLeafPubKey)).toBe(
-        true
+        true,
       );
 
       // Try to claim leaf before exit tx confirms -> should fail
@@ -201,7 +200,7 @@ describe("coop exit", () => {
       const signedExitTx = await faucet.signFaucetCoin(
         exitTx,
         faucetCoin.txout,
-        faucetCoin.key
+        faucetCoin.key,
       );
 
       await faucet.broadcastTx(signedExitTx.hex);
@@ -211,7 +210,7 @@ describe("coop exit", () => {
       const randomPubKey = secp256k1.getPublicKey(randomKey);
       const randomAddress = getP2TRAddressFromPublicKey(
         randomPubKey,
-        Network.LOCAL
+        Network.LOCAL,
       );
       // Confirm extra buffer to scan more blocks than needed
       // So that we don't race the chain watcher in this test
@@ -220,6 +219,6 @@ describe("coop exit", () => {
       // Claim leaf
       await sspTransferService.claimTransfer(receiverTransfer, leavesToClaim);
     },
-    30000
+    30000,
   );
 });

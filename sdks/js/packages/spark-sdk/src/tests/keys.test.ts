@@ -43,7 +43,7 @@ describe("keys", () => {
 
   it("test sum of private keys", () => {
     const keys = Array.from({ length: 10 }, () =>
-      secp256k1.utils.randomPrivateKey()
+      secp256k1.utils.randomPrivateKey(),
     );
     const sum = sumOfPrivateKeys(keys);
     let sum2 = keys[0];
@@ -56,7 +56,7 @@ describe("keys", () => {
   it("test private key tweak with target", () => {
     const privKey = secp256k1.utils.randomPrivateKey();
     const keys = Array.from({ length: 10 }, () =>
-      secp256k1.utils.randomPrivateKey()
+      secp256k1.utils.randomPrivateKey(),
     );
 
     const tweak = lastKeyWithTarget(privKey, keys);

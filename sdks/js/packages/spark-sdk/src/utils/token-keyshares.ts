@@ -12,7 +12,7 @@ export interface KeyshareWithOperatorIndex {
 
 export function recoverPrivateKeyFromKeyshares(
   keyshares: KeyshareWithOperatorIndex[],
-  threshold: number
+  threshold: number,
 ): Uint8Array {
   // Convert keyshares to secret shares format
   const shares: VerifiableSecretShare[] = keyshares.map((keyshare) => ({

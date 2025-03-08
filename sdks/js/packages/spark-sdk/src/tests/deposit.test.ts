@@ -26,7 +26,7 @@ describe("deposit", () => {
 
       expect(depositAddress.depositAddress).toBeDefined();
     },
-    30000
+    30000,
   );
 
   testFn(
@@ -35,7 +35,7 @@ describe("deposit", () => {
       const faucet = new BitcoinFaucet(
         "http://127.0.0.1:18443",
         "admin1",
-        "123"
+        "123",
       );
 
       const coin = await faucet.fund();
@@ -53,7 +53,7 @@ describe("deposit", () => {
       }
 
       const addr = Address(getNetwork(Network.LOCAL)).decode(
-        depositResp.depositAddress.address
+        depositResp.depositAddress.address,
       );
       const script = OutScript.encode(addr);
 
@@ -74,7 +74,7 @@ describe("deposit", () => {
       const signedTx = await faucet.signFaucetCoin(
         depositTx,
         coin.txout,
-        coin.key
+        coin.key,
       );
 
       await faucet.broadcastTx(signedTx.hex);
@@ -83,7 +83,7 @@ describe("deposit", () => {
       const randomPubKey = secp256k1.getPublicKey(randomPrivKey);
       const randomAddr = getP2TRAddressFromPublicKey(
         randomPubKey,
-        Network.LOCAL
+        Network.LOCAL,
       );
 
       await faucet.generateToAddress(1, randomAddr);
@@ -93,11 +93,11 @@ describe("deposit", () => {
         pubKey,
         depositResp.depositAddress.verifyingKey,
         depositTx,
-        vout
+        vout,
       );
 
       console.log("tree created:", treeResp);
     },
-    30000
+    30000,
   );
 });

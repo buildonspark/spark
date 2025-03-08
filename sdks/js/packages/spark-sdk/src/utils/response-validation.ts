@@ -5,7 +5,7 @@ export function validateResponses<T>(
   const successfulResponses = responses
     .filter(
       (result): result is PromiseFulfilledResult<T> =>
-        result.status === "fulfilled"
+        result.status === "fulfilled",
     )
     .map((result) => result.value);
 
@@ -14,14 +14,12 @@ export function validateResponses<T>(
     const errors = responses
       .filter(
         (result): result is PromiseRejectedResult =>
-          result.status === "rejected"
+          result.status === "rejected",
       )
       .map((result) => result.reason)
       .join("\n");
 
-    throw new Error(
-      `All requests failed.\nErrors:\n${errors}`
-    );
+    throw new Error(`All requests failed.\nErrors:\n${errors}`);
   }
 
   return successfulResponses;

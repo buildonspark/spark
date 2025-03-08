@@ -31,10 +31,10 @@ describe("Secret Sharing", () => {
 
     it("should throw error when modular inverse doesn't exist", () => {
       expect(() => modInverse(4n, 8n)).toThrow(
-        "Modular inverse does not exist"
+        "Modular inverse does not exist",
       );
       expect(() => modInverse(6n, 9n)).toThrow(
-        "Modular inverse does not exist"
+        "Modular inverse does not exist",
       );
     });
   });
@@ -50,7 +50,7 @@ describe("Secret Sharing", () => {
       secret,
       fieldModulus,
       threshold,
-      numberOfShares
+      numberOfShares,
     );
 
     for (const share of shares) {

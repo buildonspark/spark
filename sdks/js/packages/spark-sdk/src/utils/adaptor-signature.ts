@@ -4,7 +4,7 @@ import { schnorr, secp256k1 } from "@noble/curves/secp256k1";
 
 export function generateSignatureFromExistingAdaptor(
   signature: Uint8Array,
-  adaptorPrivateKeyBytes: Uint8Array
+  adaptorPrivateKeyBytes: Uint8Array,
 ): Uint8Array {
   const { r, s } = parseSignature(signature);
 
@@ -44,14 +44,14 @@ export function validateOutboundAdaptorSignature(
   pubkey: Uint8Array,
   hash: Uint8Array,
   signature: Uint8Array,
-  adaptorPubkey: Uint8Array
+  adaptorPubkey: Uint8Array,
 ): boolean {
   return schnorrVerifyWithAdaptor(
     signature,
     hash,
     pubkey,
     adaptorPubkey,
-    false
+    false,
   );
 }
 
@@ -59,7 +59,7 @@ export function applyAdaptorToSignature(
   pubkey: Uint8Array,
   hash: Uint8Array,
   signature: Uint8Array,
-  adaptorPrivateKeyBytes: Uint8Array
+  adaptorPrivateKeyBytes: Uint8Array,
 ): Uint8Array {
   // Parse the signature
   const { r, s } = parseSignature(signature);
@@ -98,7 +98,7 @@ function schnorrVerifyWithAdaptor(
   hash: Uint8Array,
   pubKeyBytes: Uint8Array,
   adaptorPubkey: Uint8Array,
-  inbound: boolean
+  inbound: boolean,
 ): boolean {
   // Step 1: Verify message length
   if (hash.length !== 32) {
@@ -118,7 +118,7 @@ function schnorrVerifyWithAdaptor(
     "BIP0340/challenge",
     r,
     pubKey.toRawBytes().slice(1),
-    hash
+    hash,
   );
   if (commitmenet.length > 32) {
     throw new Error("hash of (r || P || m) too big");
@@ -131,7 +131,7 @@ function schnorrVerifyWithAdaptor(
   const R = secp256k1.ProjectivePoint.BASE.multiplyAndAddUnsafe(
     pubKey,
     bytesToNumberBE(s),
-    negE
+    negE,
   );
   if (!R) {
     throw new Error("R is undefined");

@@ -56,7 +56,7 @@ export function signFrost({
     nonce,
     selfCommitment,
     statechainCommitments,
-    adaptorPubKey
+    adaptorPubKey,
   );
 }
 
@@ -80,7 +80,7 @@ export function aggregateFrost({
     statechainPublicKeys,
     selfPublicKey,
     verifyingKey,
-    adaptorPubKey
+    adaptorPubKey,
   );
 }
 

@@ -6,16 +6,16 @@ import {
 import { hashTokenTransaction } from "./token-hashing.js";
 
 export function getTokenLeavesSum(
-  leaves: LeafWithPreviousTransactionData[]
+  leaves: LeafWithPreviousTransactionData[],
 ): bigint {
   return leaves.reduce(
     (sum, leaf) => sum + BigInt(bytesToNumberBE(leaf.leaf!.tokenAmount!)),
-    BigInt(0)
+    BigInt(0),
   );
 }
 
 export function extractOutputLeaves(
-  fullTokenTransaction: TokenTransaction
+  fullTokenTransaction: TokenTransaction,
 ): LeafWithPreviousTransactionData[] {
   const outputLeaves: LeafWithPreviousTransactionData[] = [];
   const hash = hashTokenTransaction(fullTokenTransaction, true);
@@ -31,18 +31,18 @@ export function extractOutputLeaves(
 }
 
 export function calculateAvailableTokenAmount(
-  outputLeaves: LeafWithPreviousTransactionData[]
+  outputLeaves: LeafWithPreviousTransactionData[],
 ): bigint {
   return outputLeaves.reduce(
     (sum, leaf) => sum + BigInt(bytesToNumberBE(leaf.leaf!.tokenAmount!)),
-    BigInt(0)
+    BigInt(0),
   );
 }
 
 export function checkIfSelectedLeavesAreAvailable(
   selectedLeaves: LeafWithPreviousTransactionData[],
   tokenLeaves: Map<string, LeafWithPreviousTransactionData[]>,
-  tokenPublicKey: Uint8Array
+  tokenPublicKey: Uint8Array,
 ) {
   const tokenPubKeyHex = bytesToHex(tokenPublicKey);
   const tokenLeavesAvailable = tokenLeaves.get(tokenPubKeyHex);
@@ -58,7 +58,7 @@ export function checkIfSelectedLeavesAreAvailable(
 
   // Create a Set of available leaf IDs for O(n + m) lookup
   const availableLeafIds = new Set(
-    tokenLeavesAvailable.map((leaf) => leaf.leaf!.id)
+    tokenLeavesAvailable.map((leaf) => leaf.leaf!.id),
   );
 
   for (const selectedLeaf of selectedLeaves) {

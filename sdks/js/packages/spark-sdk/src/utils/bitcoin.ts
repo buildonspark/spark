@@ -32,7 +32,7 @@ export function computeTaprootKeyNoScript(pubkey: Uint8Array): Uint8Array {
 
 export function getP2TRScriptFromPublicKey(
   pubKey: Uint8Array,
-  network: Network
+  network: Network,
 ): Uint8Array {
   if (pubKey.length !== 33) {
     throw new Error("Public key must be 33 bytes");
@@ -42,7 +42,7 @@ export function getP2TRScriptFromPublicKey(
   const script = btc.p2tr(
     internalKey.toRawBytes().slice(1, 33),
     undefined,
-    getNetwork(network)
+    getNetwork(network),
   ).script;
   if (!script) {
     throw new Error("Failed to get P2TR address");
@@ -52,7 +52,7 @@ export function getP2TRScriptFromPublicKey(
 
 export function getP2TRAddressFromPublicKey(
   pubKey: Uint8Array,
-  network: Network
+  network: Network,
 ): string {
   if (pubKey.length !== 33) {
     throw new Error("Public key must be 33 bytes");
@@ -62,7 +62,7 @@ export function getP2TRAddressFromPublicKey(
   const address = btc.p2tr(
     internalKey.toRawBytes().slice(1, 33),
     undefined,
-    getNetwork(network)
+    getNetwork(network),
   ).address;
   if (!address) {
     throw new Error("Failed to get P2TR address");
@@ -72,7 +72,7 @@ export function getP2TRAddressFromPublicKey(
 
 export function getP2TRAddressFromPkScript(
   pkScript: Uint8Array,
-  network: Network
+  network: Network,
 ): string {
   if (pkScript.length !== 34 || pkScript[0] !== 0x51 || pkScript[1] !== 0x20) {
     throw new Error("Invalid pkscript");
@@ -108,7 +108,7 @@ export function getTxFromRawTxBytes(rawTxBytes: Uint8Array): btc.Transaction {
 export function getSigHashFromTx(
   tx: btc.Transaction,
   inputIndex: number,
-  prevOutput: TransactionOutput
+  prevOutput: TransactionOutput,
 ): Uint8Array {
   // For Taproot, we use preimageWitnessV1 with SIGHASH_DEFAULT (0x00)
   const prevScript = prevOutput.script;
@@ -125,7 +125,7 @@ export function getSigHashFromTx(
     inputIndex,
     new Array(tx.inputsLength).fill(prevScript),
     btc.SigHash.DEFAULT,
-    new Array(tx.inputsLength).fill(amount)
+    new Array(tx.inputsLength).fill(amount),
   );
 }
 

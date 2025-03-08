@@ -64,7 +64,7 @@ export default class SspClient {
       "https://api.dev.dev.sparkinfra.net",
       DefaultCrypto,
       this.signingKey,
-      fetchFunction
+      fetchFunction,
     );
   }
 
@@ -74,7 +74,7 @@ export default class SspClient {
 
   async getLightningReceiveFeeEstimate(
     amountSats: number,
-    network: BitcoinNetwork
+    network: BitcoinNetwork,
   ): Promise<LightningReceiveFeeEstimateOutput | null> {
     return await this.executeRawQuery({
       queryPayload: LightningReceiveFeeEstimate,
@@ -84,14 +84,14 @@ export default class SspClient {
       },
       constructObject: (response: { lightning_receive_fee_estimate: any }) => {
         return LightningReceiveFeeEstimateOutputFromJson(
-          response.lightning_receive_fee_estimate
+          response.lightning_receive_fee_estimate,
         );
       },
     });
   }
 
   async getLightningSendFeeEstimate(
-    encodedInvoice: string
+    encodedInvoice: string,
   ): Promise<LightningSendFeeEstimateOutput | null> {
     return await this.executeRawQuery({
       queryPayload: LightningSendFeeEstimate,
@@ -100,7 +100,7 @@ export default class SspClient {
       },
       constructObject: (response: { lightning_send_fee_estimate: any }) => {
         return LightningSendFeeEstimateOutputFromJson(
-          response.lightning_send_fee_estimate
+          response.lightning_send_fee_estimate,
         );
       },
     });
@@ -118,7 +118,7 @@ export default class SspClient {
       },
       constructObject: (response: { coop_exit_fee_estimate: any }) => {
         return CoopExitFeeEstimateOutputFromJson(
-          response.coop_exit_fee_estimate
+          response.coop_exit_fee_estimate,
         );
       },
     });
@@ -180,7 +180,7 @@ export default class SspClient {
       },
       constructObject: (response: { request_lightning_receive: any }) => {
         return LightningReceiveRequestFromJson(
-          response.request_lightning_receive.request
+          response.request_lightning_receive.request,
         );
       },
     });
@@ -198,7 +198,7 @@ export default class SspClient {
       },
       constructObject: (response: { request_lightning_send: any }) => {
         return LightningSendRequestFromJson(
-          response.request_lightning_send.request
+          response.request_lightning_send.request,
         );
       },
     });
@@ -258,7 +258,7 @@ class SparkAuthProvider implements AuthProvider {
   }
 
   async addAuthHeaders(
-    headers: Record<string, string>
+    headers: Record<string, string>,
   ): Promise<Record<string, string>> {
     const _headers = {
       "Spark-Identity-Public-Key": this.publicKey,
@@ -272,7 +272,7 @@ class SparkAuthProvider implements AuthProvider {
   }
 
   async addWsConnectionParams(
-    params: Record<string, unknown>
+    params: Record<string, unknown>,
   ): Promise<Record<string, unknown>> {
     return Promise.resolve({
       ...params,

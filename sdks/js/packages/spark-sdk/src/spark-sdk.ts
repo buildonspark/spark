@@ -68,9 +68,9 @@ import { getNextTransactionSequence } from "./utils/transaction.js";
 import { initWasm } from "./utils/wasm-wrapper.js";
 import { InitOutput } from "./wasm/spark_bindings.js";
 
-import {broadcastL1Withdrawal} from "./services/lrc20.js";
-import {getMasterHDKeyFromSeed} from "./utils/index.js";
-import {LRCWallet, LRC20WalletApiConfig} from "@buildonspark/lrc20-sdk";
+import { broadcastL1Withdrawal } from "./services/lrc20.js";
+import { getMasterHDKeyFromSeed } from "./utils/index.js";
+import { LRCWallet, LRC20WalletApiConfig } from "@buildonspark/lrc20-sdk";
 
 // Add this constant at the file level
 const MAX_TOKEN_LEAVES = 100;
@@ -419,7 +419,10 @@ export class SparkWallet {
       }
 
       const network = this.config.getNetwork();
-      const masterPrivateKey = getMasterHDKeyFromSeed(seed, network == Network.REGTEST ? 0 : 1).privateKey!;
+      const masterPrivateKey = getMasterHDKeyFromSeed(
+        seed,
+        network == Network.REGTEST ? 0 : 1,
+      ).privateKey!;
       this.lrc20Wallet = new LRCWallet(
         bytesToHex(masterPrivateKey),
         LRC_WALLET_NETWORK[network],

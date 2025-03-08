@@ -19,7 +19,7 @@ async function cleanUp() {
   const config = getTestWalletConfig();
 
   const preimage = hexToBytes(
-    "2d059c3ede82a107aa1452c0bea47759be3c5c6e5342be6a310f6c3a907d9f4c"
+    "2d059c3ede82a107aa1452c0bea47759be3c5c6e5342be6a310f6c3a907d9f4c",
   );
   const paymentHash = sha256(preimage);
 
@@ -73,7 +73,7 @@ describe("LightningService", () => {
 
   testFn("should create an invoice", async () => {
     const preimage = hexToBytes(
-      "2d059c3ede82a107aa1452c0bea47759be3c5c6e5342be6a310f6c3a907d9f4c"
+      "2d059c3ede82a107aa1452c0bea47759be3c5c6e5342be6a310f6c3a907d9f4c",
     );
 
     const invoice = await lightningService.createLightningInvoiceWithPreImage({
@@ -92,11 +92,11 @@ describe("LightningService", () => {
       const faucet = new BitcoinFaucet(
         "http://127.0.0.1:18443",
         "admin1",
-        "123"
+        "123",
       );
 
       const preimage = hexToBytes(
-        "2d059c3ede82a107aa1452c0bea47759be3c5c6e5342be6a310f6c3a907d9f4c"
+        "2d059c3ede82a107aa1452c0bea47759be3c5c6e5342be6a310f6c3a907d9f4c",
       );
       const paymentHash = sha256(preimage);
 
@@ -106,7 +106,7 @@ describe("LightningService", () => {
           amountSats: 100,
           memo: "test",
           preimage,
-        }
+        },
       );
 
       expect(invoice).toBeDefined();
@@ -116,7 +116,7 @@ describe("LightningService", () => {
         sspWallet,
         sspLeafPubKey,
         faucet,
-        12345n
+        12345n,
       );
 
       const newLeafPubKey = await sspWallet
@@ -147,11 +147,11 @@ describe("LightningService", () => {
       const transfer = await sspTransferService.sendTransferTweakKey(
         senderTransfer!,
         leaves,
-        new Map()
+        new Map(),
       );
 
       expect(transfer.status).toEqual(
-        TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAKED
+        TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAKED,
       );
 
       const pendingTransfer = await transferService.queryPendingTransfers();
@@ -162,14 +162,13 @@ describe("LightningService", () => {
 
       expect(receiverTransfer.id).toEqual(senderTransfer!.id);
 
-      const leafPrivKeyMap = await transferService.verifyPendingTransfer(
-        receiverTransfer
-      );
+      const leafPrivKeyMap =
+        await transferService.verifyPendingTransfer(receiverTransfer);
 
       expect(leafPrivKeyMap.size).toBe(1);
       expect(leafPrivKeyMap.has(nodeToSend.id)).toBe(true);
       expect(
-        equalBytes(leafPrivKeyMap.get(nodeToSend.id)!, newLeafPubKey)
+        equalBytes(leafPrivKeyMap.get(nodeToSend.id)!, newLeafPubKey),
       ).toBe(true);
 
       const finalLeafPubKey = await userWallet.getSigner().generatePublicKey();
@@ -185,7 +184,7 @@ describe("LightningService", () => {
 
       await transferService.claimTransfer(receiverTransfer, [claimingNode]);
     },
-    60000
+    60000,
   );
 
   testFn(
@@ -194,11 +193,11 @@ describe("LightningService", () => {
       const faucet = new BitcoinFaucet(
         "http://127.0.0.1:18443",
         "admin1",
-        "123"
+        "123",
       );
 
       const preimage = hexToBytes(
-        "2d059c3ede82a107aa1452c0bea47759be3c5c6e5342be6a310f6c3a907d9f4c"
+        "2d059c3ede82a107aa1452c0bea47759be3c5c6e5342be6a310f6c3a907d9f4c",
       );
       const paymentHash = sha256(preimage);
 
@@ -209,7 +208,7 @@ describe("LightningService", () => {
         userWallet,
         userLeafPubKey,
         faucet,
-        12345n
+        12345n,
       );
 
       const newLeafPubKey = await userWallet
@@ -249,30 +248,28 @@ describe("LightningService", () => {
       const transfer = await transferService.sendTransferTweakKey(
         response.transfer!,
         leaves,
-        new Map()
+        new Map(),
       );
 
       expect(transfer.status).toEqual(
-        TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING
+        TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING,
       );
 
-      const receiverTransfer = await sspLightningService.providePreimage(
-        preimage
-      );
+      const receiverTransfer =
+        await sspLightningService.providePreimage(preimage);
 
       expect(receiverTransfer.status).toEqual(
-        TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAKED
+        TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAKED,
       );
       expect(receiverTransfer.id).toEqual(transfer.id);
 
-      const leafPrivKeyMap = await sspTransferService.verifyPendingTransfer(
-        receiverTransfer
-      );
+      const leafPrivKeyMap =
+        await sspTransferService.verifyPendingTransfer(receiverTransfer);
 
       expect(leafPrivKeyMap.size).toBe(1);
       expect(leafPrivKeyMap.has(nodeToSend.id)).toBe(true);
       expect(
-        equalBytes(leafPrivKeyMap.get(nodeToSend.id)!, newLeafPubKey)
+        equalBytes(leafPrivKeyMap.get(nodeToSend.id)!, newLeafPubKey),
       ).toBe(true);
 
       const finalLeafPubKey = await sspWallet
@@ -289,6 +286,6 @@ describe("LightningService", () => {
 
       await sspTransferService.claimTransfer(receiverTransfer, [claimingNode]);
     },
-    60000
+    60000,
   );
 });

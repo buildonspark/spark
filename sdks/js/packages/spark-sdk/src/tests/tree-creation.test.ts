@@ -39,18 +39,18 @@ describe("Tree Creation", () => {
       const treeResp = await wallet.generateDepositAddressForTree(
         vout,
         pubKey,
-        depositTx
+        depositTx,
       );
 
       const treeNodes = await wallet.createTree(
         vout,
         treeResp,
         true,
-        depositTx
+        depositTx,
       );
 
       console.log("tree nodes:", treeNodes);
     },
-    30000
+    30000,
   );
 });

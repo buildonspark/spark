@@ -6,7 +6,7 @@ import {
 
 export function hashTokenTransaction(
   tokenTransaction: TokenTransaction,
-  partialHash: boolean = false
+  partialHash: boolean = false,
 ): Uint8Array {
   if (!tokenTransaction) {
     throw new Error("token transaction cannot be nil");
@@ -29,7 +29,7 @@ export function hashTokenTransaction(
       new DataView(voutBytes.buffer).setUint32(
         0,
         leaf.prevTokenTransactionLeafVout,
-        false
+        false,
       ); // false for big-endian
       hashObj.update(voutBytes);
 
@@ -48,7 +48,7 @@ export function hashTokenTransaction(
       new DataView(timestampBytes.buffer).setBigUint64(
         0,
         BigInt(tokenTransaction.tokenInput.mintInput!.issuerProvidedTimestamp),
-        true // true for little-endian to match Go implementation
+        true, // true for little-endian to match Go implementation
       );
       hashObj.update(timestampBytes);
     }
@@ -75,7 +75,7 @@ export function hashTokenTransaction(
       new DataView(bondBytes.buffer).setBigUint64(
         0,
         BigInt(leaf.withdrawBondSats!),
-        false
+        false,
       );
       hashObj.update(bondBytes);
     }
@@ -85,7 +85,7 @@ export function hashTokenTransaction(
       new DataView(locktimeBytes.buffer).setBigUint64(
         0,
         BigInt(leaf.withdrawRelativeBlockLocktime!),
-        false
+        false,
       );
       hashObj.update(locktimeBytes);
     }
@@ -123,7 +123,7 @@ export function hashTokenTransaction(
   // Final hash of all concatenated hashes
   const finalHashObj = sha256.create();
   const concatenatedHashes = new Uint8Array(
-    allHashes.reduce((sum, hash) => sum + hash.length, 0)
+    allHashes.reduce((sum, hash) => sum + hash.length, 0),
   );
   let offset = 0;
   for (const hash of allHashes) {
@@ -135,7 +135,7 @@ export function hashTokenTransaction(
 }
 
 export function hashOperatorSpecificTokenTransactionSignablePayload(
-  payload: OperatorSpecificTokenTransactionSignablePayload
+  payload: OperatorSpecificTokenTransactionSignablePayload,
 ): Uint8Array {
   if (!payload) {
     throw new Error("revocation keyshare signable payload cannot be nil");

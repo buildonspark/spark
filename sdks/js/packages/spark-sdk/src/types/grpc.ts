@@ -1,8 +1,8 @@
-import { CallOptions } from 'nice-grpc';
+import { CallOptions } from "nice-grpc";
 
 export interface RetryOptions {
   retry?: boolean;
   retryMaxAttempts?: number;
 }
 
-export type SparkCallOptions = CallOptions & RetryOptions; 
+export type SparkCallOptions = CallOptions & RetryOptions;

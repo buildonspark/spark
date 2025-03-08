@@ -236,9 +236,11 @@ export class TokenTransactionService {
       for (let i = 0; i < transferInput.leavesToSpend.length; i++) {
         let ownerSignature: Uint8Array;
         if (this.config.getConfig().useTokenTransactionSchnorrSignatures) {
-          ownerSignature = await this.config.signer.signSchnorrWithIdentityKey(payloadHash);
+          ownerSignature =
+            await this.config.signer.signSchnorrWithIdentityKey(payloadHash);
         } else {
-          ownerSignature = await this.config.signer.signMessageWithIdentityKey(payloadHash);
+          ownerSignature =
+            await this.config.signer.signMessageWithIdentityKey(payloadHash);
         }
 
         operatorSpecificSignatures.push({
@@ -258,15 +260,17 @@ export class TokenTransactionService {
           const identityPublicKey =
             await this.config.signer.getIdentityPublicKey();
 
-          const response = await internalSparkClient.sign_token_transaction({
-            finalTokenTransaction,
-            operatorSpecificSignatures,
-            identityPublicKey,
-          },
-          {
-            retry: true,
-            retryMaxAttempts: 5,
-          } as SparkCallOptions);
+          const response = await internalSparkClient.sign_token_transaction(
+            {
+              finalTokenTransaction,
+              operatorSpecificSignatures,
+              identityPublicKey,
+            },
+            {
+              retry: true,
+              retryMaxAttempts: 5,
+            } as SparkCallOptions,
+          );
 
           return {
             index,
@@ -364,14 +368,17 @@ export class TokenTransactionService {
         const identityPublicKey =
           await this.config.signer.getIdentityPublicKey();
 
-        const response = await internalSparkClient.finalize_token_transaction({
-          finalTokenTransaction,
-          leafToSpendRevocationKeys,
-          identityPublicKey,
-        }, {
-          retry: true,
-          retryMaxAttempts: 5,
-        } as SparkCallOptions);
+        const response = await internalSparkClient.finalize_token_transaction(
+          {
+            finalTokenTransaction,
+            leafToSpendRevocationKeys,
+            identityPublicKey,
+          },
+          {
+            retry: true,
+            retryMaxAttempts: 5,
+          } as SparkCallOptions,
+        );
 
         return {
           identifier,
@@ -481,10 +488,7 @@ export class TokenTransactionService {
       }
     } else {
       if (this.config.getConfig().useTokenTransactionSchnorrSignatures) {
-        return await this.config.signer.signSchnorr(
-          message,
-          publicKey,
-        );
+        return await this.config.signer.signSchnorr(message, publicKey);
       } else {
         return await this.config.signer.signMessageWithPublicKey(
           message,

@@ -41,7 +41,10 @@ export class WalletConfigService {
     this.signer = signer || new DefaultSparkSigner();
   }
 
-  static withConfig(config: WalletConfig, signer?: SparkSigner): WalletConfigService {
+  static withConfig(
+    config: WalletConfig,
+    signer?: SparkSigner,
+  ): WalletConfigService {
     const service = new WalletConfigService(config.network, signer);
     service.config = config;
     return service;

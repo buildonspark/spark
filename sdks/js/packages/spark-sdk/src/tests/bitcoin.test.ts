@@ -79,7 +79,7 @@ describe("bitcoin", () => {
 
   it("test sig hash from tx", () => {
     const prevTx = getTxFromRawTxHex(
-      "020000000001010cb9feccc0bdaac30304e469c50b4420c13c43d466e13813fcf42a73defd3f010000000000ffffffff018038010000000000225120d21e50e12ae122b4a5662c09b67cec7449c8182913bc06761e8b65f0fa2242f701400536f9b7542799f98739eeb6c6adaeb12d7bd418771bc5c6847f2abd19297bd466153600af26ccf0accb605c11ad667c842c5713832af4b7b11f1bcebe57745900000000"
+      "020000000001010cb9feccc0bdaac30304e469c50b4420c13c43d466e13813fcf42a73defd3f010000000000ffffffff018038010000000000225120d21e50e12ae122b4a5662c09b67cec7449c8182913bc06761e8b65f0fa2242f701400536f9b7542799f98739eeb6c6adaeb12d7bd418771bc5c6847f2abd19297bd466153600af26ccf0accb605c11ad667c842c5713832af4b7b11f1bcebe57745900000000",
     );
 
     const tx = new Transaction();
@@ -104,7 +104,7 @@ describe("bitcoin", () => {
     const sighash = getSigHashFromTx(tx, 0, prevOut);
 
     expect(bytesToHex(sighash)).toBe(
-      "8da5e7aa2b03491d7c2f4359ea4968dd58f69adf9af1a2c6881be0295591c293"
+      "8da5e7aa2b03491d7c2f4359ea4968dd58f69adf9af1a2c6881be0295591c293",
     );
   });
 
@@ -113,10 +113,10 @@ describe("bitcoin", () => {
       "03ef261da8259f5ea86abe1b7d658ebd13fe2b2ce2418dabe854ccec67bdb9ba87";
     const script = getP2TRScriptFromPublicKey(
       hexToBytes(pubKey),
-      Network.MAINNET
+      Network.MAINNET,
     );
     expect(bytesToHex(script)).toEqual(
-      "51208af8e5e92783248418d5c68007dc8659a2100261b5bb561efc28dde94ec8cb93"
+      "51208af8e5e92783248418d5c68007dc8659a2100261b5bb561efc28dde94ec8cb93",
     );
   });
 });

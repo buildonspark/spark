@@ -80,7 +80,7 @@ export function evaluatePolynomial(polynomial: Polynomial, x: bigint): bigint {
 export function fieldDiv(
   numerator: bigint,
   denominator: bigint,
-  fieldModulus: bigint
+  fieldModulus: bigint,
 ): bigint {
   if (denominator === 0n) {
     throw new Error("Division by zero");
@@ -93,7 +93,7 @@ export function fieldDiv(
 // Computes the Lagrange coefficient for a given index and a set of points
 export function computerLagrangeCoefficients(
   index: bigint,
-  points: SecretShare[]
+  points: SecretShare[],
 ) {
   let numerator = 1n;
   let denominator = 1n;
@@ -118,7 +118,7 @@ export function computerLagrangeCoefficients(
 export function generatePolynomialForSecretSharing(
   fieldModulus: bigint,
   secret: bigint,
-  degree: number
+  degree: number,
 ): Polynomial {
   const coefficients: bigint[] = new Array(degree);
   const proofs: Uint8Array[] = new Array(degree);
@@ -144,12 +144,12 @@ export function splitSecret(
   fieldModulus: bigint,
   secret: bigint,
   threshold: number,
-  numberOfShares: number
+  numberOfShares: number,
 ) {
   const polynomial = generatePolynomialForSecretSharing(
     fieldModulus,
     secret,
-    threshold
+    threshold,
   );
 
   const shares: SecretShare[] = [];
@@ -171,12 +171,12 @@ export function splitSecretWithProofs(
   secret: bigint,
   fieldModulus: bigint,
   threshold: number,
-  numberOfShares: number
+  numberOfShares: number,
 ) {
   const polynomial = generatePolynomialForSecretSharing(
     fieldModulus,
     secret,
-    threshold - 1
+    threshold - 1,
   );
 
   const shares: VerifiableSecretShare[] = [];
@@ -223,7 +223,7 @@ export function recoverSecret(shares: VerifiableSecretShare[]) {
 // Validates a share of a secret
 export function validateShare(share: VerifiableSecretShare) {
   const targetPubkey = secp256k1.ProjectivePoint.fromPrivateKey(
-    share.share
+    share.share,
   ).toRawBytes(true);
 
   let resultPubkey = share.proofs[0];

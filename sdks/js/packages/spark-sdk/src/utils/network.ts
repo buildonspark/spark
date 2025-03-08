@@ -1,7 +1,7 @@
+import { NetworkType } from "@buildonspark/lrc20-sdk";
 import * as btc from "@scure/btc-signer";
+import { networks } from "bitcoinjs-lib";
 import { Network as NetworkProto } from "../proto/spark.js";
-import {networks} from "bitcoinjs-lib";
-import {NetworkType} from "@buildonspark/lrc20-sdk";
 
 export enum Network {
   MAINNET,

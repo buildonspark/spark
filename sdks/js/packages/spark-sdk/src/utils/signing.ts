@@ -13,7 +13,7 @@ export function getRandomSigningNonce(): SigningNonce {
 
 export function createSigningNonce(
   binding: Uint8Array,
-  hiding: Uint8Array
+  hiding: Uint8Array,
 ): SigningNonce {
   if (binding.length !== 32 || hiding.length !== 32) {
     throw new Error("Invalid nonce length");
@@ -26,7 +26,7 @@ export function createSigningNonce(
 }
 
 export function getSigningCommitmentFromNonce(
-  nonce: SigningNonce
+  nonce: SigningNonce,
 ): SigningCommitment {
   const bindingPubKey = secp256k1.getPublicKey(nonce.binding, true);
   const hidingPubKey = secp256k1.getPublicKey(nonce.hiding, true);
@@ -52,7 +52,7 @@ export function decodeBytesToSigningNonce(bytes: Uint8Array): SigningNonce {
 
 export function createSigningCommitment(
   binding: Uint8Array,
-  hiding: Uint8Array
+  hiding: Uint8Array,
 ): SigningCommitment {
   if (binding.length !== 33 || hiding.length !== 33) {
     throw new Error("Invalid nonce commitment length");
@@ -64,7 +64,7 @@ export function createSigningCommitment(
 }
 
 export function encodeSigningCommitmentToBytes(
-  commitment: SigningCommitment
+  commitment: SigningCommitment,
 ): Uint8Array {
   if (commitment.binding.length !== 33 || commitment.hiding.length !== 33) {
     throw new Error("Invalid nonce commitment length");
@@ -74,7 +74,7 @@ export function encodeSigningCommitmentToBytes(
 }
 
 export function decodeBytesToSigningCommitment(
-  bytes: Uint8Array
+  bytes: Uint8Array,
 ): SigningCommitment {
   if (bytes.length !== 66) {
     throw new Error("Invalid nonce commitment length");
@@ -90,7 +90,7 @@ export function createWasmSigningNonce(nonce: SigningNonce): WasmSigningNonce {
 }
 
 export function createWasmSigningCommitment(
-  commitment: SigningCommitment
+  commitment: SigningCommitment,
 ): WasmSigningCommitment {
   return new WasmSigningCommitment(commitment.hiding, commitment.binding);
 }

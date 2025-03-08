@@ -29,7 +29,7 @@ describe("swap", () => {
       const faucet = new BitcoinFaucet(
         "http://127.0.0.1:18443",
         "admin1",
-        "123"
+        "123",
       );
       // Initiate sender
       const senderWallet = new SparkWalletTesting(Network.LOCAL);
@@ -38,12 +38,12 @@ describe("swap", () => {
 
       const senderConfig = new WalletConfigService(
         Network.LOCAL,
-        senderWallet.getSigner()
+        senderWallet.getSigner(),
       );
       const senderConnectionManager = new ConnectionManager(senderConfig);
       const senderTransferService = new TransferService(
         senderConfig,
-        senderConnectionManager
+        senderConnectionManager,
       );
 
       // Initiate receiver
@@ -53,12 +53,12 @@ describe("swap", () => {
 
       const receiverConfig = new WalletConfigService(
         Network.LOCAL,
-        receiverWallet.getSigner()
+        receiverWallet.getSigner(),
       );
       const receiverConnectionManager = new ConnectionManager(receiverConfig);
       const receiverTransferService = new TransferService(
         receiverConfig,
-        receiverConnectionManager
+        receiverConnectionManager,
       );
 
       const senderLeafPubKey = await senderWallet
@@ -67,7 +67,7 @@ describe("swap", () => {
       const senderRootNode = await createNewTree(
         senderWallet,
         senderLeafPubKey,
-        faucet
+        faucet,
       );
 
       const receiverLeafPubKey = await receiverWallet
@@ -76,7 +76,7 @@ describe("swap", () => {
       const receiverRootNode = await createNewTree(
         receiverWallet,
         receiverLeafPubKey,
-        faucet
+        faucet,
       );
 
       // Sender initiates transfer
@@ -98,7 +98,7 @@ describe("swap", () => {
       } = await senderTransferService.sendTransferSignRefund(
         senderLeavesToTransfer,
         hexToBytes(receiverPubkey),
-        new Date(Date.now() + 10 * 60 * 1000)
+        new Date(Date.now() + 10 * 60 * 1000),
       );
 
       expect(senderRefundSignatureMap.size).toBe(1);
@@ -130,7 +130,7 @@ describe("swap", () => {
         receiverLeavesToTransfer,
         hexToBytes(senderPubkey),
         new Date(Date.now() + 10 * 60 * 1000),
-        adaptorPubKey
+        adaptorPubKey,
       );
 
       const newReceiverRefundSignatureMap = new Map<string, Uint8Array>();
@@ -142,7 +142,7 @@ describe("swap", () => {
         const sighash = getSigHashFromTx(
           leafData.refundTx,
           0,
-          leafData.tx.getOutput(leafData.vout)
+          leafData.tx.getOutput(leafData.vout),
         );
         let verifyingPubkey: Uint8Array | undefined;
         for (const signingResult of operatorSigningResults) {
@@ -152,13 +152,13 @@ describe("swap", () => {
         }
         expect(verifyingPubkey).toBeDefined();
         const taprootKey = computeTaprootKeyNoScript(
-          verifyingPubkey!.slice(1, 33)
+          verifyingPubkey!.slice(1, 33),
         );
         const adaptorSig = applyAdaptorToSignature(
           taprootKey.slice(1, 33),
           sighash,
           signature,
-          adaptorPrivateKey
+          adaptorPrivateKey,
         );
         newReceiverRefundSignatureMap.set(nodeId, adaptorSig);
       }
@@ -166,7 +166,7 @@ describe("swap", () => {
         await senderTransferService.sendTransferTweakKey(
           senderTransfer,
           senderLeavesToTransfer,
-          senderRefundSignatureMap
+          senderRefundSignatureMap,
         );
 
       const pendingTransfer =
@@ -177,14 +177,14 @@ describe("swap", () => {
 
       const leafPrivKeyMap =
         await receiverTransferService.verifyPendingTransfer(
-          receiverPendingTransfer
+          receiverPendingTransfer,
         );
 
       expect(leafPrivKeyMap.size).toBe(1);
       expect(leafPrivKeyMap.get(senderRootNode.id)).toBeDefined();
       const bytesEqual = equalBytes(
         leafPrivKeyMap.get(senderRootNode.id)!,
-        senderNewLeafPubKey
+        senderNewLeafPubKey,
       );
       expect(bytesEqual).toBe(true);
       expect(receiverPendingTransfer.leaves[0].leaf).toBeDefined();
@@ -199,12 +199,12 @@ describe("swap", () => {
       const leavesToClaim = [claimingNode];
       await receiverTransferService.claimTransfer(
         receiverPendingTransfer,
-        leavesToClaim
+        leavesToClaim,
       );
       await receiverTransferService.sendTransferTweakKey(
         receiverTransfer,
         receiverLeavesToTransfer,
-        newReceiverRefundSignatureMap
+        newReceiverRefundSignatureMap,
       );
 
       const sPendingTransfer =
@@ -215,13 +215,13 @@ describe("swap", () => {
 
       const senderLeafPrivKeyMap =
         await senderTransferService.verifyPendingTransfer(
-          senderPendingTransfer
+          senderPendingTransfer,
         );
       expect(senderLeafPrivKeyMap.size).toBe(1);
       expect(senderLeafPrivKeyMap.get(receiverRootNode.id)).toBeDefined();
       const bytesEqual_1 = equalBytes(
         senderLeafPrivKeyMap.get(receiverRootNode.id)!,
-        receiverNewLeafPubKey
+        receiverNewLeafPubKey,
       );
       expect(bytesEqual_1).toBe(true);
       expect(senderPendingTransfer.leaves[0].leaf).toBeDefined();
@@ -237,9 +237,9 @@ describe("swap", () => {
       const leavesToClaim_1 = [claimingNode_1];
       await senderTransferService.claimTransfer(
         senderPendingTransfer,
-        leavesToClaim_1
+        leavesToClaim_1,
       );
     },
-    30000
+    30000,
   );
 });
