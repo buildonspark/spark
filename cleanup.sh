@@ -1,5 +1,7 @@
 #!/bin/bash
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 parse_bitcoin_config() {
     local config_file="bitcoin_regtest.conf"
     local rpcuser=""
@@ -26,7 +28,7 @@ tmux kill-session -t electrs
 tmux kill-session -t bitcoind
 
 read -r bitcoind_username bitcoind_password <<< "$(parse_bitcoin_config)"
-bitcoin-cli -regtest -rpcuser="$bitcoind_username" -rpcpassword="$bitcoind_password" stop
+bitcoin-cli -regtest -rpcuser="$bitcoind_username" -rpcpassword="$bitcoind_password" --conf="$SCRIPT_DIR/bitcoin_regtest.conf" stop
 
 # Terminate all relevant connections first
 for i in $(seq 0 4); do
