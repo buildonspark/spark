@@ -117,45 +117,39 @@ jobs:
       - name: "Setup local signer"
         run: "./scripts/run-local-signer-container.sh"
 
+      - name: Install gotestsum
+        uses: jaxxstorm/action-install-gh-release@v1
+        with:
+          repo: gotestyourself/gotestsum
+          tag: v1.12.0
+          cache: enable
+
       - name: "Run integration tests"
         working-directory: ./spark
         env:
           HERMETIC_TEST: "true"
           RUN_DKG: "true"
         run: |
-          go run gotest.tools/gotestsum@latest \
+          gotestsum \
           --format testname \
           --rerun-fails \
           --rerun-fails-max-failures=1000 \
-          --junitfile ../test_results/TEST-grpc-test.xml \
-          --jsonfile ../test_results/TEST-grpc-test.json \
-          --packages=./so/grpc_test/... \
-          -- -v -p 2
+          --junitfile ../test_results/grpc-test.xml \
+          --jsonfile ../test_results/grpc-test.json \
+          --packages=./so/grpc_test/...
 
-      - name: Test Summary
+      - name: Create test summary
         if: always()
         uses: test-summary/action@v2
         with:
-          paths: "test_results/TEST-grpc-test.xml"
-          output: "test_results/TEST-grpc-test-summary.md"
+          paths: "test_results/grpc-test.xml"
 
-      - name: Upload test summary
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: "grpc-tests-summary"
-          path: "test_results/TEST-grpc-test-summary.md"
 
       - name: Annotate test failures
         if: always()
         uses: guyarb/golang-test-annotations@v0.8.0
         with:
-          test-results: "test_results/TEST-grpc-test.json"
-
-      - uses: robherley/go-test-action@v0
-        with:
-          moduleDirectory: "spark"
-          fromJSONFile: "test_results/TEST-grpc-test.json"
+          test-results: "test_results/grpc-test.json"
 
       - name: "Gather logs"
         if: always()

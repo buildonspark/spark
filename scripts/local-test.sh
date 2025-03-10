@@ -100,7 +100,7 @@ touch "$HERMETIC_TEST_FILE"
 "$(dirname "$0")/run-local-signer-container.sh" &
 "$(dirname "$0")/export-minikube-ca.sh"
 
-echo "Run your tests now (go test ./so/grpc_test/... or gotestsum --format testname --packages="./so/grpc_test/..." -- -v -p 2). Ctrl-C when done."
+echo "Run your tests now (go test ./so/grpc_test/... or gotestsum --format testname ./so/grpc_test/... ). Ctrl-C when done."
 while true; do
     sleep 10
 done

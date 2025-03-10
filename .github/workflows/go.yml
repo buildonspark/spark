@@ -48,8 +48,20 @@ jobs:
     - name: Build
       run: go build -v ./...
 
+    - name: Install gotestsum
+      uses: jaxxstorm/action-install-gh-release@v1
+      with:
+        repo: gotestyourself/gotestsum
+        tag: v1.12.0
+        cache: enable
+
     - name: Run unit tests
-      run: go test $(go list ./... | grep -v -E "so/grpc_test|so/tree")
+      run: |
+        gotestsum \
+        --format testname \
+        --junitfile ../test_results/unit-test.xml \
+        --jsonfile ../test_results/unit-test.json \
+        $(go list ./... | grep -v -E "so/grpc_test|so/tree")
 
     - name: Run go fmt
       run: |
@@ -58,6 +70,18 @@ jobs:
           gofmt -l .
           exit 1
         fi
+
+    - name: Create test summary
+      if: always()
+      uses: test-summary/action@v2
+      with:
+        paths: "test_results/unit-test.xml"
+
+    - name: Annotate test failures
+      if: always()
+      uses: guyarb/golang-test-annotations@v0.8.0
+      with:
+        test-results: "test_results/unit-test.json"
 
   lint:
     runs-on: ubuntu-latest
@@ -92,7 +116,7 @@ jobs:
           aws-region: "us-west-2"
       - name: "Log into ECR"
         id: ecr-login
-        uses: "aws-actions/amazon-ecr-login@v1"
+        uses: "aws-actions/amazon-ecr-login@v2"
       - name: "Setup QEMU"
         uses: "docker/setup-qemu-action@v3"
       - name: "Setup builder"

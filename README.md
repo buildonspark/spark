@@ -207,8 +207,9 @@ go test -failfast=false -p=2 ./so/grpc_test/...
 go run gotest.tools/gotestsum@latest \
             --format testname \
             --rerun-fails \
-            --packages=./so/grpc_test/... \
-            -- -v -p 2
+            ./so/grpc_test/...
+
+# or install it via go install gotest.tools/gotestsum@latest
 ```
 
 #### Troubleshooting
