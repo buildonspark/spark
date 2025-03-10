@@ -6,7 +6,6 @@ import (
 
 	"github.com/btcsuite/btcd/wire"
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark-go"
 	"github.com/lightsparkdev/spark-go/common"
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
 	"github.com/lightsparkdev/spark-go/so"
@@ -46,7 +45,7 @@ func (h *ExtendLeafHandler) ExtendLeaf(ctx context.Context, req *pb.ExtendLeafRe
 	}
 
 	if leaf.Status != schema.TreeNodeStatusAvailable {
-		return nil, fmt.Errorf("Leaf %s is not available, status: %s", leafUUID, leaf.Status)
+		return nil, fmt.Errorf("leaf %s is not available, status: %s", leafUUID, leaf.Status)
 	}
 
 	nodeTx, err := common.TxFromRawTxBytes(leaf.RawTx)
@@ -71,15 +70,9 @@ func (h *ExtendLeafHandler) ExtendLeaf(ctx context.Context, req *pb.ExtendLeafRe
 
 	// Validate new transactions
 	// TODO: make some shared validation across different handlers
-	expectedNextSequence, err := spark.NextSequence(refundTx.TxIn[0].Sequence)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get next sequence: %w", err)
+	if newNodeTx.TxIn[0].Sequence >= refundTx.TxIn[0].Sequence {
+		return nil, fmt.Errorf("new node tx sequence must be less than the refund tx sequence %d, got %d", refundTx.TxIn[0].Sequence, newNodeTx.TxIn[0].Sequence)
 	}
-	if newNodeTx.TxIn[0].Sequence > expectedNextSequence {
-		return nil, fmt.Errorf("new node tx sequence must be less than or equal to decremented refund tx sequence, expected %d, got %d", expectedNextSequence, newNodeTx.TxIn[0].Sequence)
-	}
-
-	fmt.Println("nodeTxid", nodeTx.TxHash())
 
 	newNodeOutPoint := newNodeTx.TxIn[0].PreviousOutPoint
 	refundOutPoint := refundTx.TxIn[0].PreviousOutPoint
@@ -137,10 +130,11 @@ func (h *ExtendLeafHandler) ExtendLeaf(ctx context.Context, req *pb.ExtendLeafRe
 	_, err = db.
 		TreeNode.
 		UpdateOneID(leaf.ID).
+		SetStatus(schema.TreeNodeStatusSplitLocked).
 		SetRawRefundTx(nil).
 		Save(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to nullify refund tx: %w", err)
+		return nil, fmt.Errorf("failed to update the node to extend: %w", err)
 	}
 
 	// Sign frost

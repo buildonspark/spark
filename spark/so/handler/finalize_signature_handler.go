@@ -213,7 +213,7 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 	}
 
 	var nodeTxBytes []byte
-	if intent == pbcommon.SignatureIntent_CREATION || (intent == pbcommon.SignatureIntent_REFRESH && nodeSignatures.NodeTxSignature != nil) {
+	if intent == pbcommon.SignatureIntent_CREATION || ((intent == pbcommon.SignatureIntent_REFRESH || intent == pbcommon.SignatureIntent_EXTEND) && nodeSignatures.NodeTxSignature != nil) {
 		nodeTxBytes, err = common.UpdateTxWithSignature(node.RawTx, 0, nodeSignatures.NodeTxSignature)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to update tx with signature: %v", err)
