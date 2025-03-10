@@ -13,6 +13,10 @@ source "$(dirname "$0")/lightspark-helm.sh"
 : "${HELM_INSTALL_TIMEOUT:=2m0s}"
 : "${SPARK_TAG:=latest}"
 : "${LRC20_TAG:=latest}"
+# The k8 namespace for the bitcoin services. If you want isolation between the
+# spark k8 environment and some other development environment, set this to
+# something else like "bitcoin-spark".
+: "${BITCOIN_NAMESPACE:=bitcoin}"
 # shellcheck disable=SC2119
 HELM_REPO_PREFIX=$(get_helm_prefix)
 
@@ -49,15 +53,15 @@ else
     echo "Using remote spark image: ${SPARK_REPO:-ecr}:${SPARK_TAG:-latest}"
 fi
 
-for NAMESPACE in spark lrc20 bitcoin-spark; do
-    kubectl get namespace $NAMESPACE >/dev/null 2>&1 || kubectl create namespace $NAMESPACE
-    create_ecr_secret $NAMESPACE
+for NAMESPACE in spark lrc20 "$BITCOIN_NAMESPACE"; do
+    kubectl get namespace "$NAMESPACE" >/dev/null 2>&1 || kubectl create namespace "$NAMESPACE"
+    create_ecr_secret "$NAMESPACE"
 done
 
 helm upgrade \
     --install \
     --timeout "$HELM_INSTALL_TIMEOUT" \
-    --namespace bitcoin-spark \
+    --namespace "$BITCOIN_NAMESPACE" \
     --set imagePullSecret=ecr \
     --set resources.requests.memory=1Gi \
     --set config.network=regtest \
@@ -109,7 +113,7 @@ operator_cmd=(
     --set imagePullSecret="ecr"
     --set-json "pubkeys=$pubkeys_json"
     --set yuvd.namespace="lrc20"
-    --set bitcoind.namespace="bitcoin-spark"
+    --set bitcoind.namespace="$BITCOIN_NAMESPACE"
     --set operator.image.tag="$SPARK_TAG"
     --set signer.image.tag="$SPARK_TAG"
 )
@@ -143,7 +147,7 @@ helm install \
     --set config.network="regtest" \
     --set image.tag="$LRC20_TAG" \
     --set config.database_url="postgresql://postgres@postgres.default:5432/lrc20_\${INDEX}" \
-    --set config.extra.bnode.url="http://regtest-bitcoind.bitcoin-spark:8332" \
+    --set config.extra.bnode.url="http://regtest-bitcoind.${BITCOIN_NAMESPACE}:8332" \
     --set ingress.enabled=true \
     --set ingress.domain=lrc20.minikube.local \
     --set storage.class="standard" \
@@ -216,7 +220,7 @@ for attempt in $(seq 1 $max_attempts); do
     all_ready=true
 
     check_service_readiness "spark" "spark" || all_ready=false
-    check_service_readiness "bitcoin-spark" "bitcoind" || all_ready=false
+    check_service_readiness "$BITCOIN_NAMESPACE" "bitcoind" || all_ready=false
     check_service_readiness "lrc20" "yuvd" || all_ready=false
 
     if $all_ready; then
@@ -235,9 +239,9 @@ done
 
 rm -f /tmp/spark /tmp/bitcoind /tmp/lrc20
 
-setup_port_forward bitcoin-spark service/regtest-bitcoind 8332 8332
-setup_port_forward bitcoin-spark service/regtest-bitcoind 8330 8330
-setup_port_forward bitcoin-spark service/regtest-bitcoind 8331 8331
+setup_port_forward "$BITCOIN_NAMESPACE" service/regtest-bitcoind 8332 8332
+setup_port_forward "$BITCOIN_NAMESPACE" service/regtest-bitcoind 8330 8330
+setup_port_forward "$BITCOIN_NAMESPACE" service/regtest-bitcoind 8331 8331
 
 for i in $(seq 0 $last_so_index); do
     setup_port_forward spark service/regtest-spark-"${i}" $((8535 + i)) 8000

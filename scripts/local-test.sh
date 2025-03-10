@@ -3,6 +3,11 @@ set -e
 
 # Forces the DBs to be recreated
 : "${RESET_DBS:=true}"
+# The k8 namespace for the bitcoin services. If you want isolation between the
+# spark k8 environment and some other development environment, set this to
+# something else like "bitcoin-spark".
+: "${BITCOIN_NAMESPACE:=bitcoin}"
+export BITCOIN_NAMESPACE
 HERMETIC_TEST_FILE="/tmp/spark_hermetic"
 MINIKUBE_CA_FILE="/tmp/minikube-ca.pem"
 
@@ -30,7 +35,7 @@ cleanup_k8s() {
     echo "Cleaning up previous deployments..."
     helm uninstall -n spark regtest --ignore-not-found 2>/dev/null || true
     helm uninstall -n lrc20 regtest --ignore-not-found 2>/dev/null || true
-    helm uninstall -n bitcoin-spark regtest --ignore-not-found 2>/dev/null || true
+    helm uninstall -n "$BITCOIN_NAMESPACE" regtest --ignore-not-found 2>/dev/null || true
 
     kubectl delete namespace spark --ignore-not-found &
     kubectl delete namespace lrc20 --ignore-not-found &
@@ -43,13 +48,13 @@ cleanup_k8s() {
     kubectl wait --for=delete namespace/test-signer --timeout=60s 2>/dev/null &
     WAIT_TEST_SIGNER_PID=$!
 
-    wait_pids=($WAIT_SPARK_PID $WAIT_LRC20_PID $WAIT_TEST_SIGNER_PID)
+    wait_pids=("$WAIT_SPARK_PID" "$WAIT_LRC20_PID" "$WAIT_TEST_SIGNER_PID")
 
     if [ "$RESET_DBS" = "true" ]; then
-        kubectl delete namespace bitcoin-spark --ignore-not-found &
-        kubectl wait --for=delete namespace/bitcoin-spark --timeout=60s 2>/dev/null &
+        kubectl delete namespace "$BITCOIN_NAMESPACE" --ignore-not-found &
+        kubectl wait --for=delete namespace/"$BITCOIN_NAMESPACE" --timeout=60s 2>/dev/null &
         WAIT_BITCOIN_SPARK_PID=$!
-        wait_pids+=($WAIT_BITCOIN_SPARK_PID)
+        wait_pids+=("$WAIT_BITCOIN_SPARK_PID")
     fi
 
     wait "${wait_pids[@]}" || true
@@ -60,6 +65,7 @@ if [ -z "$OPS_DIR" ]; then
     for path in "./ops" "../ops" "../../ops"; do
         if [ -d "$path" ]; then
             OPS_DIR=$(cd "$path" && pwd)  # Get absolute path
+            export OPS_DIR
             break
         fi
     done
@@ -86,7 +92,7 @@ fi
 check_minikube_setup
 cleanup_k8s
 
-OPS_DIR=$OPS_DIR ./scripts/minikube-deploy-spark-services.sh
+./scripts/minikube-deploy-spark-services.sh
 setup_port_forward default pod/postgres-0 15432 5432
 
 touch "$HERMETIC_TEST_FILE"
