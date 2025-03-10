@@ -6,7 +6,6 @@ import (
 	"log"
 
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark-go/common"
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark-go/proto/spark_internal"
 	"github.com/lightsparkdev/spark-go/so"
@@ -123,7 +122,7 @@ func (h *TransferHandler) syncCoopExitInit(ctx context.Context, req *pb.Cooperat
 		Option: helper.OperatorSelectionOptionExcludeSelf,
 	}
 	_, err := helper.ExecuteTaskWithAllOperators(ctx, h.config, &selection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
-		conn, err := common.NewGRPCConnectionWithCert(operator.Address, operator.CertPath)
+		conn, err := operator.NewGRPCConnection()
 		if err != nil {
 			log.Printf("Failed to connect to operator: %v", err)
 			return nil, err

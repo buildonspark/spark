@@ -5,7 +5,6 @@ import (
 	"sync"
 
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark-go/common"
 	pbcommon "github.com/lightsparkdev/spark-go/proto/common"
 	pbdkg "github.com/lightsparkdev/spark-go/proto/dkg"
 	"github.com/lightsparkdev/spark-go/so"
@@ -16,7 +15,7 @@ func GenerateKeys(ctx context.Context, config *so.Config, keyCount uint64) error
 	// Init clients
 	clientMap := make(map[string]pbdkg.DKGServiceClient)
 	for identifier, operator := range config.SigningOperatorMap {
-		connection, err := common.NewGRPCConnectionWithCert(operator.Address, operator.CertPath)
+		connection, err := operator.NewGRPCConnection()
 		if err != nil {
 			return err
 		}

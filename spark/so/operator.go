@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/lightsparkdev/spark-go/common"
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
 	"github.com/lightsparkdev/spark-go/so/utils"
+	"google.golang.org/grpc"
 )
 
 // SigningOperator is the information about a signing operator.
@@ -21,18 +23,18 @@ type SigningOperator struct {
 	// IdentityPublicKey is the identity public key of the signing operator.
 	IdentityPublicKey []byte
 	// ServerCertPath is the path to the server certificate.
-	CertPath string
+	CertPath *string
 	// ExternalAddress is the external address of the signing operator.
 	ExternalAddress string
 }
 
 // jsonSigningOperator is used for JSON unmarshaling
 type jsonSigningOperator struct {
-	ID                uint64 `json:"id"`
-	Address           string `json:"address"`
-	IdentityPublicKey string `json:"identity_public_key"`
-	CertPath          string `json:"cert_path"`
-	ExternalAddress   string `json:"external_address"`
+	ID                uint64  `json:"id"`
+	Address           string  `json:"address"`
+	IdentityPublicKey string  `json:"identity_public_key"`
+	CertPath          *string `json:"cert_path"`
+	ExternalAddress   string  `json:"external_address"`
 }
 
 // UnmarshalJSON implements json.Unmarshaler interface
@@ -64,4 +66,9 @@ func (s *SigningOperator) MarshalProto() *pb.SigningOperatorInfo {
 		PublicKey:  s.IdentityPublicKey,
 		Address:    s.ExternalAddress,
 	}
+}
+
+// NewGRPConnection creates a new gRPC connection to the signing operator.
+func (s *SigningOperator) NewGRPCConnection() (*grpc.ClientConn, error) {
+	return common.NewGRPCConnection(s.Address, s.CertPath)
 }

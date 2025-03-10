@@ -82,7 +82,7 @@ func (o TokenTransactionHandler) StartTokenTransaction(ctx context.Context, conf
 	// This property should be help because the coordinator blocks on the other SO responses.
 	allSelection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionAll}
 	_, err = helper.ExecuteTaskWithAllOperators(ctx, config, &allSelection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
-		conn, err := common.NewGRPCConnectionWithCert(operator.Address, operator.CertPath)
+		conn, err := operator.NewGRPCConnection()
 		if err != nil {
 			log.Printf("Failed to connect to operator for marking token transaction keyshare: %v", err)
 			return nil, err
@@ -663,7 +663,7 @@ func (o TokenTransactionHandler) CancelSignedTokenTransaction(
 	// b) Update (2) to not ping every SO in parallel but ping one at a time until # SOs - threshold have validated that they have not yet signed.
 	allSelection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionAll}
 	responses, err := helper.ExecuteTaskWithAllOperators(ctx, config, &allSelection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
-		conn, err := common.NewGRPCConnectionWithCert(operator.Address, operator.CertPath)
+		conn, err := operator.NewGRPCConnection()
 		if err != nil {
 			log.Printf("Failed to connect to operator for validating transaction state before cancelling: %v", err)
 			return nil, err

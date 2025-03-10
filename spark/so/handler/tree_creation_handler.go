@@ -332,7 +332,7 @@ func (h *TreeCreationHandler) PrepareTreeAddress(ctx context.Context, req *pb.Pr
 	}
 	// TODO: Extract the address signature from response and adds to the proofs.
 	_, err = helper.ExecuteTaskWithAllOperators(ctx, h.config, operatorSelection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
-		conn, err := common.NewGRPCConnectionWithCert(operator.Address, operator.CertPath)
+		conn, err := operator.NewGRPCConnection()
 		if err != nil {
 			return nil, err
 		}

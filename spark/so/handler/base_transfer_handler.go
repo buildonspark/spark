@@ -363,7 +363,7 @@ func (h *BaseTransferHandler) CancelSendTransfer(
 	if intent != CancelSendTransferIntentInternal {
 		operatorSelection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
 		_, err = helper.ExecuteTaskWithAllOperators(ctx, h.config, &operatorSelection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
-			conn, err := common.NewGRPCConnectionWithCert(operator.Address, operator.CertPath)
+			conn, err := operator.NewGRPCConnection()
 			if err != nil {
 				return nil, err
 			}

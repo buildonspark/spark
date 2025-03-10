@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -315,8 +316,6 @@ func main() {
 	grpc_health_v1.RegisterHealthServer(grpcServer, healthService)
 	healthService.SetServingStatus("spark-operator", grpc_health_v1.HealthCheckResponse_SERVING)
 
-	log.Printf("Serving on port %d\n", args.Port)
-
 	go runDKGOnStartup(dbClient, config)
 
 	wrappedGrpc := grpcweb.WrapServer(grpcServer,
@@ -334,14 +333,27 @@ func main() {
 		wrappedGrpc.ServeHTTP(w, r)
 	})
 
-	server := &http.Server{
-		Addr:      fmt.Sprintf(":%d", args.Port),
-		Handler:   handler,
-		TLSConfig: tlsConfig,
-	}
+	if tlsConfig != nil {
+		server := &http.Server{
+			Addr:      fmt.Sprintf(":%d", args.Port),
+			Handler:   handler,
+			TLSConfig: tlsConfig,
+		}
 
-	if err := server.ListenAndServeTLS(args.ServerCertPath, args.ServerKeyPath); err != nil {
-		log.Fatalf("Failed to serve: %v", err)
+		log.Printf("Serving on port %d (TLS)\n", args.Port)
+		if err := server.ListenAndServeTLS(args.ServerCertPath, args.ServerKeyPath); err != nil {
+			log.Fatalf("Failed to serve: %v", err)
+		}
+	} else {
+		lis, err := net.Listen("tcp", fmt.Sprintf(":%d", args.Port))
+		if err != nil {
+			log.Fatalf("Failed to listen: %v", err)
+		}
+
+		log.Printf("Serving on port %d (non-TLS)\n", args.Port)
+		if err := grpcServer.Serve(lis); err != nil {
+			log.Fatalf("Failed to serve: %v", err)
+		}
 	}
 }
 

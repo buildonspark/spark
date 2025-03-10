@@ -349,7 +349,10 @@ func RunDKGIfNeeded(db *Client, config *so.Config) error {
 }
 
 func RunDKG(ctx context.Context, config *so.Config) error {
-	connection, err := common.NewGRPCConnectionWithCert(config.DKGCoordinatorAddress, config.SigningOperatorMap[config.Identifier].CertPath)
+	connection, err := common.NewGRPCConnection(
+		config.DKGCoordinatorAddress,
+		config.SigningOperatorMap[config.Identifier].CertPath,
+	)
 	if err != nil {
 		log.Printf("Failed to create connection to DKG coordinator: %v, cert path: %v", err, config.SigningOperatorMap[config.Identifier].CertPath)
 		return err

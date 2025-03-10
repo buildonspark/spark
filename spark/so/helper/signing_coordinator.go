@@ -54,7 +54,7 @@ func (s *SigningResult) MarshalProto() (*pbspark.SigningResult, error) {
 // frostRound1 performs the first round of the Frost signing. It gathers the signing commitments from all operators.
 func frostRound1(ctx context.Context, config *so.Config, signingKeyshareIDs []uuid.UUID, operatorSelection *OperatorSelection) (map[string][]objects.SigningCommitment, error) {
 	return ExecuteTaskWithAllOperators(ctx, config, operatorSelection, func(ctx context.Context, operator *so.SigningOperator) ([]objects.SigningCommitment, error) {
-		conn, err := common.NewGRPCConnectionWithCert(operator.Address, operator.CertPath)
+		conn, err := operator.NewGRPCConnection()
 		if err != nil {
 			return nil, err
 		}
@@ -99,7 +99,7 @@ func frostRound2(
 		logger.Info("FrostRound2 signing job verifying key", "verifyingKey", hex.EncodeToString(job.VerifyingKey))
 	}
 	operatorResult, err := ExecuteTaskWithAllOperators(ctx, config, operatorSelection, func(ctx context.Context, operator *so.SigningOperator) (map[string][]byte, error) {
-		conn, err := common.NewGRPCConnectionWithCert(operator.Address, operator.CertPath)
+		conn, err := operator.NewGRPCConnection()
 		if err != nil {
 			return nil, err
 		}

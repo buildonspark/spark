@@ -25,6 +25,15 @@ var retryPolicy = `{
 		  }
 		}]}`
 
+// NewGRPCConnection creates a new gRPC connection to the given address. If certPath is nil, it
+// will create a connection without TLS.
+func NewGRPCConnection(address string, certPath *string) (*grpc.ClientConn, error) {
+	if certPath == nil {
+		return NewGRPCConnectionWithoutTLS(address)
+	}
+	return NewGRPCConnectionWithCert(address, *certPath)
+}
+
 // NewGRPCConnection creates a new gRPC connection to the given address.
 func NewGRPCConnectionWithCert(address string, certPath string) (*grpc.ClientConn, error) {
 	var creds credentials.TransportCredentials

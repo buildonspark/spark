@@ -512,7 +512,7 @@ func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pb.Ini
 
 	selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
 	result, err := helper.ExecuteTaskWithAllOperators(ctx, h.config, &selection, func(ctx context.Context, operator *so.SigningOperator) ([]byte, error) {
-		conn, err := common.NewGRPCConnectionWithCert(operator.Address, operator.CertPath)
+		conn, err := operator.NewGRPCConnection()
 		if err != nil {
 			return nil, err
 		}
@@ -744,7 +744,7 @@ func (h *LightningHandler) ProvidePreimage(ctx context.Context, req *pb.ProvideP
 
 	operatorSelection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
 	_, err = helper.ExecuteTaskWithAllOperators(ctx, h.config, &operatorSelection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
-		conn, err := common.NewGRPCConnectionWithCert(operator.Address, operator.CertPath)
+		conn, err := operator.NewGRPCConnection()
 		if err != nil {
 			return nil, err
 		}
@@ -827,7 +827,7 @@ func (h *LightningHandler) ReturnLightningPayment(ctx context.Context, req *pb.R
 	if !internal {
 		operatorSelection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
 		_, err = helper.ExecuteTaskWithAllOperators(ctx, h.config, &operatorSelection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
-			conn, err := common.NewGRPCConnectionWithCert(operator.Address, operator.CertPath)
+			conn, err := operator.NewGRPCConnection()
 			if err != nil {
 				return nil, err
 			}

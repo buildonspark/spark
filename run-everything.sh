@@ -409,7 +409,8 @@ run_bitcoind_tmux() {
 # Function to create operator config JSON
 create_operator_config() {
     local run_dir=$1
-    shift  # Remove first argument
+    local tls=$2
+    shift 2 # Remove first two arguments
     local pub_keys=("$@")  # Get remaining arguments as pub_keys array
     local config_file="${run_dir}/config.json"
     
@@ -420,12 +421,12 @@ create_operator_config() {
         if [ $i -ne 0 ]; then
             json+=","
         fi
-        
+
         # Calculate port
         local port=$((8535 + i))
-        
-        # Add operator entry
-        json+=$(cat <<EOF
+
+        if [ "$tls" = true ]; then
+            json+=$(cat <<EOF
 {
     "id": $i,
     "address": "localhost:$port",
@@ -435,6 +436,18 @@ create_operator_config() {
 }
 EOF
 )
+        else
+            json+=$(cat <<EOF
+{
+    "id": $i,
+    "address": "localhost:$port",
+    "external_address": "localhost:$port",
+    "identity_public_key": "${pub_keys[$i]}"
+}
+EOF
+)
+        fi
+
     done
     json+="]"
     
@@ -749,7 +762,7 @@ build_go_operator "$run_dir" || {
 }
 
 # Create operator config
-create_operator_config "$run_dir" "${PUB_KEYS[@]}"
+create_operator_config "$run_dir" "$TLS" "${PUB_KEYS[@]}"
 create_private_key_files "$run_dir" "${PRIV_KEYS[@]}"
 
 if ! check_signers_ready "$run_dir"; then

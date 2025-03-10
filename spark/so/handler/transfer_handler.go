@@ -144,7 +144,7 @@ func (h *TransferHandler) syncTransferInit(ctx context.Context, req *pb.StartSen
 		Option: helper.OperatorSelectionOptionExcludeSelf,
 	}
 	_, err := helper.ExecuteTaskWithAllOperators(ctx, h.config, &selection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
-		conn, err := common.NewGRPCConnectionWithCert(operator.Address, operator.CertPath)
+		conn, err := operator.NewGRPCConnection()
 		if err != nil {
 			return nil, err
 		}
@@ -727,7 +727,7 @@ func (h *TransferHandler) settleReceiverKeyTweak(ctx context.Context, transfer *
 		// Only validate key tweak proof if it is provided for backward compatibility.
 		selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
 		_, err := helper.ExecuteTaskWithAllOperators(ctx, h.config, &selection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
-			conn, err := common.NewGRPCConnectionWithCert(operator.Address, operator.CertPath)
+			conn, err := operator.NewGRPCConnection()
 			if err != nil {
 				return nil, err
 			}
@@ -745,7 +745,7 @@ func (h *TransferHandler) settleReceiverKeyTweak(ctx context.Context, transfer *
 
 	selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionAll}
 	_, err := helper.ExecuteTaskWithAllOperators(ctx, h.config, &selection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
-		conn, err := common.NewGRPCConnectionWithCert(operator.Address, operator.CertPath)
+		conn, err := operator.NewGRPCConnection()
 		if err != nil {
 			return nil, err
 		}
