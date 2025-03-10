@@ -269,6 +269,8 @@ func TestStartTreeCreationOffchain(t *testing.T) {
 	_, err = client.GenerateToAddress(1, randomAddress, nil)
 	assert.NoError(t, err)
 
+	time.Sleep(100 * time.Millisecond)
+
 	// After L1 tx confirms, user should be able to transfer funds
 	_, err = wallet.SendTransfer(
 		context.Background(),
