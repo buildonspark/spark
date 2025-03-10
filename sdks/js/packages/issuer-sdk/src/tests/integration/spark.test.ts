@@ -1,10 +1,12 @@
-import { IssuerSparkWallet } from "../../issuer-sdk.js";
-import { Network } from "@buildonspark/spark-sdk/utils";
-import { wordlist } from "@scure/bip39/wordlists/english";
-import { generateMnemonic } from "@scure/bip39";
 import { SparkWallet } from "@buildonspark/spark-sdk";
+import {
+  LOCAL_WALLET_CONFIG_ECDSA,
+  LOCAL_WALLET_CONFIG_SCHNORR,
+} from "@buildonspark/spark-sdk/test-util";
 import { jest } from "@jest/globals";
-import { LOCAL_WALLET_CONFIG_ECDSA, LOCAL_WALLET_CONFIG_SCHNORR } from "@buildonspark/spark-sdk/test-util";
+import { generateMnemonic } from "@scure/bip39";
+import { wordlist } from "@scure/bip39/wordlists/english";
+import { IssuerSparkWallet } from "../../issuer-sdk.js";
 
 describe("token integration test", () => {
   // Skip all tests if running in GitHub Actions
@@ -15,7 +17,12 @@ describe("token integration test", () => {
 
   it("should issue a single token with ECDSA", async () => {
     const tokenAmount: bigint = 1000n;
-    const wallet = new IssuerSparkWallet(Network.LOCAL, "4799979d5e417e3d6d00cf89a77d4f3c0354d295810326c6b0bf4b45aedb38f3", undefined, LOCAL_WALLET_CONFIG_ECDSA)
+    const wallet = new IssuerSparkWallet(
+      "LOCAL",
+      "4799979d5e417e3d6d00cf89a77d4f3c0354d295810326c6b0bf4b45aedb38f3",
+      undefined,
+      LOCAL_WALLET_CONFIG_ECDSA,
+    );
     const mnemonic = generateMnemonic(wordlist);
     await wallet.initWallet(mnemonic);
 
@@ -27,7 +34,12 @@ describe("token integration test", () => {
 
   it("should issue a single token with Schnorr", async () => {
     const tokenAmount: bigint = 1000n;
-    const wallet = new IssuerSparkWallet(Network.LOCAL, "4799979d5e417e3d6d00cf89a77d4f3c0354d295810326c6b0bf4b45aedb38f3", undefined, LOCAL_WALLET_CONFIG_SCHNORR)
+    const wallet = new IssuerSparkWallet(
+      "LOCAL",
+      "4799979d5e417e3d6d00cf89a77d4f3c0354d295810326c6b0bf4b45aedb38f3",
+      undefined,
+      LOCAL_WALLET_CONFIG_SCHNORR,
+    );
     const mnemonic = generateMnemonic(wordlist);
     await wallet.initWallet(mnemonic);
 
@@ -40,11 +52,20 @@ describe("token integration test", () => {
   it("should issue a single token and transfer it with ECDSA", async () => {
     const tokenAmount: bigint = 1000n;
 
-    const issuerWallet = new IssuerSparkWallet(Network.LOCAL, "4799979d5e417e3d6d00cf89a77d4f3c0354d295810326c6b0bf4b45aedb38f3", undefined, LOCAL_WALLET_CONFIG_ECDSA);
+    const issuerWallet = new IssuerSparkWallet(
+      "LOCAL",
+      "4799979d5e417e3d6d00cf89a77d4f3c0354d295810326c6b0bf4b45aedb38f3",
+      undefined,
+      LOCAL_WALLET_CONFIG_ECDSA,
+    );
     const mnemonic = generateMnemonic(wordlist);
     await issuerWallet.initWallet(mnemonic);
 
-    const destinationWallet = new SparkWallet(Network.LOCAL, undefined,LOCAL_WALLET_CONFIG_ECDSA);
+    const destinationWallet = new SparkWallet(
+      "LOCAL",
+      undefined,
+      LOCAL_WALLET_CONFIG_ECDSA,
+    );
     const destinationMnemonic = generateMnemonic(wordlist);
     await destinationWallet.initWallet(destinationMnemonic);
 
@@ -68,11 +89,20 @@ describe("token integration test", () => {
   it("should issue a single token and transfer it with Schnorr", async () => {
     const tokenAmount: bigint = 1000n;
 
-    const issuerWallet = new IssuerSparkWallet(Network.LOCAL, "4799979d5e417e3d6d00cf89a77d4f3c0354d295810326c6b0bf4b45aedb38f3", undefined, LOCAL_WALLET_CONFIG_SCHNORR);
+    const issuerWallet = new IssuerSparkWallet(
+      "LOCAL",
+      "4799979d5e417e3d6d00cf89a77d4f3c0354d295810326c6b0bf4b45aedb38f3",
+      undefined,
+      LOCAL_WALLET_CONFIG_SCHNORR,
+    );
     const mnemonic = generateMnemonic(wordlist);
     await issuerWallet.initWallet(mnemonic);
 
-    const destinationWallet = new SparkWallet(Network.LOCAL, undefined, LOCAL_WALLET_CONFIG_SCHNORR);
+    const destinationWallet = new SparkWallet(
+      "LOCAL",
+      undefined,
+      LOCAL_WALLET_CONFIG_SCHNORR,
+    );
     const destinationMnemonic = generateMnemonic(wordlist);
     await destinationWallet.initWallet(destinationMnemonic);
 
@@ -95,7 +125,12 @@ describe("token integration test", () => {
 
   it("should freeze tokens with ECDSA", async () => {
     const tokenAmount: bigint = 1000n;
-    const issuerWallet = new IssuerSparkWallet(Network.LOCAL, "4799979d5e417e3d6d00cf89a77d4f3c0354d295810326c6b0bf4b45aedb38f3", undefined, LOCAL_WALLET_CONFIG_ECDSA);
+    const issuerWallet = new IssuerSparkWallet(
+      "LOCAL",
+      "4799979d5e417e3d6d00cf89a77d4f3c0354d295810326c6b0bf4b45aedb38f3",
+      undefined,
+      LOCAL_WALLET_CONFIG_ECDSA,
+    );
     const issuerMnemonic = generateMnemonic(wordlist);
     await issuerWallet.initWallet(issuerMnemonic);
 
@@ -105,7 +140,7 @@ describe("token integration test", () => {
     const issuerBalanceAfterMint = await issuerWallet.getIssuerTokenBalance();
     expect(issuerBalanceAfterMint.balance).toEqual(tokenAmount);
 
-    const userWallet = new SparkWallet(Network.LOCAL);
+    const userWallet = new SparkWallet("LOCAL");
     const userMnemonic = generateMnemonic(wordlist);
     await userWallet.initWallet(userMnemonic);
     const userWalletPublicKey = await userWallet.getIdentityPublicKey();
@@ -113,7 +148,7 @@ describe("token integration test", () => {
     await issuerWallet.transferTokens({
       tokenAmount,
       tokenPublicKey: await issuerWallet.getIdentityPublicKey(),
-      receiverSparkAddress: userWalletPublicKey
+      receiverSparkAddress: userWalletPublicKey,
     });
 
     const issuerBalanceAfterTransfer =
@@ -121,7 +156,10 @@ describe("token integration test", () => {
     expect(issuerBalanceAfterTransfer.balance).toEqual(0n);
 
     const tokenPublicKey = await issuerWallet.getIdentityPublicKey();
-    const userBalanceAfterTransfer = await getSparkWalletTokenBalanceOrZero(userWallet, tokenPublicKey);
+    const userBalanceAfterTransfer = await getSparkWalletTokenBalanceOrZero(
+      userWallet,
+      tokenPublicKey,
+    );
     expect(userBalanceAfterTransfer.balance).toEqual(tokenAmount);
 
     // Freeze tokens
@@ -130,14 +168,20 @@ describe("token integration test", () => {
     expect(freezeResponse.impactedTokenAmount).toEqual(tokenAmount);
 
     // Unfreeze tokens
-    const unfreezeResponse = await issuerWallet.unfreezeTokens(userWalletPublicKey);
+    const unfreezeResponse =
+      await issuerWallet.unfreezeTokens(userWalletPublicKey);
     expect(unfreezeResponse.impactedLeafIds.length).toBeGreaterThan(0);
     expect(unfreezeResponse.impactedTokenAmount).toEqual(tokenAmount);
   });
 
   it("should freeze tokens with Schnorr", async () => {
     const tokenAmount: bigint = 1000n;
-    const issuerWallet = new IssuerSparkWallet(Network.LOCAL, "4799979d5e417e3d6d00cf89a77d4f3c0354d295810326c6b0bf4b45aedb38f3", undefined, LOCAL_WALLET_CONFIG_SCHNORR);
+    const issuerWallet = new IssuerSparkWallet(
+      "LOCAL",
+      "4799979d5e417e3d6d00cf89a77d4f3c0354d295810326c6b0bf4b45aedb38f3",
+      undefined,
+      LOCAL_WALLET_CONFIG_SCHNORR,
+    );
     const issuerMnemonic = generateMnemonic(wordlist);
     await issuerWallet.initWallet(issuerMnemonic);
 
@@ -147,15 +191,15 @@ describe("token integration test", () => {
     const issuerBalanceAfterMint = await issuerWallet.getIssuerTokenBalance();
     expect(issuerBalanceAfterMint.balance).toEqual(tokenAmount);
 
-    const userWallet = new SparkWallet(Network.LOCAL);
+    const userWallet = new SparkWallet("LOCAL");
     const userMnemonic = generateMnemonic(wordlist);
     await userWallet.initWallet(userMnemonic);
     const userWalletPublicKey = await userWallet.getIdentityPublicKey();
 
     await issuerWallet.transferTokens({
-      tokenAmount, 
+      tokenAmount,
       tokenPublicKey: await issuerWallet.getIdentityPublicKey(),
-      receiverSparkAddress: userWalletPublicKey
+      receiverSparkAddress: userWalletPublicKey,
     });
 
     const issuerBalanceAfterTransfer =
@@ -163,11 +207,13 @@ describe("token integration test", () => {
     expect(issuerBalanceAfterTransfer.balance).toEqual(0n);
 
     const tokenPublicKey = await issuerWallet.getIdentityPublicKey();
-    const userBalanceAfterTransfer = await getSparkWalletTokenBalanceOrZero(userWallet, tokenPublicKey);
+    const userBalanceAfterTransfer = await getSparkWalletTokenBalanceOrZero(
+      userWallet,
+      tokenPublicKey,
+    );
     expect(userBalanceAfterTransfer.balance).toEqual(tokenAmount);
 
-    const freezeResult =
-      await issuerWallet.freezeTokens(userWalletPublicKey);
+    const freezeResult = await issuerWallet.freezeTokens(userWalletPublicKey);
     expect(freezeResult.impactedLeafIds.length).toBe(1);
     expect(freezeResult.impactedTokenAmount).toBe(1000n);
 
@@ -179,7 +225,12 @@ describe("token integration test", () => {
 
   it("should burn tokens with ECDSA", async () => {
     const tokenAmount: bigint = 200n;
-    const issuerWallet = new IssuerSparkWallet(Network.LOCAL, "4799979d5e417e3d6d00cf89a77d4f3c0354d295810326c6b0bf4b45aedb38f3", undefined, LOCAL_WALLET_CONFIG_ECDSA);
+    const issuerWallet = new IssuerSparkWallet(
+      "LOCAL",
+      "4799979d5e417e3d6d00cf89a77d4f3c0354d295810326c6b0bf4b45aedb38f3",
+      undefined,
+      LOCAL_WALLET_CONFIG_ECDSA,
+    );
     const issuerMnemonic = generateMnemonic(wordlist);
     await issuerWallet.initWallet(issuerMnemonic);
     await issuerWallet.mintTokens(tokenAmount);
@@ -196,7 +247,12 @@ describe("token integration test", () => {
 
   it("should burn tokens with Schnorr", async () => {
     const tokenAmount: bigint = 200n;
-    const issuerWallet = new IssuerSparkWallet(Network.LOCAL, "4799979d5e417e3d6d00cf89a77d4f3c0354d295810326c6b0bf4b45aedb38f3", undefined, LOCAL_WALLET_CONFIG_SCHNORR);
+    const issuerWallet = new IssuerSparkWallet(
+      "LOCAL",
+      "4799979d5e417e3d6d00cf89a77d4f3c0354d295810326c6b0bf4b45aedb38f3",
+      undefined,
+      LOCAL_WALLET_CONFIG_SCHNORR,
+    );
     const issuerMnemonic = generateMnemonic(wordlist);
     await issuerWallet.initWallet(issuerMnemonic);
     await issuerWallet.mintTokens(tokenAmount);
@@ -214,11 +270,20 @@ describe("token integration test", () => {
   it("mint, transfer to user, user transfer to issuer, burn with ECDSA", async () => {
     const tokenAmount: bigint = 1000n;
 
-    const issuerWallet = new IssuerSparkWallet(Network.LOCAL, "4799979d5e417e3d6d00cf89a77d4f3c0354d295810326c6b0bf4b45aedb38f3", undefined, LOCAL_WALLET_CONFIG_ECDSA);
+    const issuerWallet = new IssuerSparkWallet(
+      "LOCAL",
+      "4799979d5e417e3d6d00cf89a77d4f3c0354d295810326c6b0bf4b45aedb38f3",
+      undefined,
+      LOCAL_WALLET_CONFIG_ECDSA,
+    );
     const issuerMnemonic = generateMnemonic(wordlist);
     await issuerWallet.initWallet(issuerMnemonic);
 
-    const userWallet = new SparkWallet(Network.LOCAL, undefined, LOCAL_WALLET_CONFIG_ECDSA);
+    const userWallet = new SparkWallet(
+      "LOCAL",
+      undefined,
+      LOCAL_WALLET_CONFIG_ECDSA,
+    );
     const userMnemonic = generateMnemonic(wordlist);
     await userWallet.initWallet(userMnemonic);
 
@@ -230,9 +295,9 @@ describe("token integration test", () => {
     const userWalletPublicKey = await userWallet.getIdentityPublicKey();
 
     await issuerWallet.transferTokens({
-      tokenAmount, 
+      tokenAmount,
       tokenPublicKey: await issuerWallet.getIdentityPublicKey(),
-      receiverSparkAddress: userWalletPublicKey
+      receiverSparkAddress: userWalletPublicKey,
     });
 
     const issuerBalanceAfterTransfer =
@@ -271,11 +336,20 @@ describe("token integration test", () => {
   it("mint, transfer to user, user transfer to issuer, burn with Schnorr", async () => {
     const tokenAmount: bigint = 1000n;
 
-    const issuerWallet = new IssuerSparkWallet(Network.LOCAL, "4799979d5e417e3d6d00cf89a77d4f3c0354d295810326c6b0bf4b45aedb38f3", undefined, LOCAL_WALLET_CONFIG_SCHNORR);
+    const issuerWallet = new IssuerSparkWallet(
+      "LOCAL",
+      "4799979d5e417e3d6d00cf89a77d4f3c0354d295810326c6b0bf4b45aedb38f3",
+      undefined,
+      LOCAL_WALLET_CONFIG_SCHNORR,
+    );
     const issuerMnemonic = generateMnemonic(wordlist);
     await issuerWallet.initWallet(issuerMnemonic);
 
-    const userWallet = new SparkWallet(Network.LOCAL, undefined, LOCAL_WALLET_CONFIG_SCHNORR);
+    const userWallet = new SparkWallet(
+      "LOCAL",
+      undefined,
+      LOCAL_WALLET_CONFIG_SCHNORR,
+    );
     const userMnemonic = generateMnemonic(wordlist);
     await userWallet.initWallet(userMnemonic);
 
@@ -287,7 +361,11 @@ describe("token integration test", () => {
 
     const userWalletPublicKey = await userWallet.getIdentityPublicKey();
 
-    await issuerWallet.transferTokens({tokenAmount, tokenPublicKey, receiverSparkAddress: userWalletPublicKey});
+    await issuerWallet.transferTokens({
+      tokenAmount,
+      tokenPublicKey,
+      receiverSparkAddress: userWalletPublicKey,
+    });
 
     const issuerBalanceAfterTransfer =
       await issuerWallet.getIssuerTokenBalance();
@@ -323,7 +401,10 @@ describe("token integration test", () => {
   });
 });
 
-async function getSparkWalletTokenBalanceOrZero(sparkWallet: SparkWallet, publicKey: string): Promise<{ balance: bigint }> {
+async function getSparkWalletTokenBalanceOrZero(
+  sparkWallet: SparkWallet,
+  publicKey: string,
+): Promise<{ balance: bigint }> {
   const balanceObj = await sparkWallet.getBalance();
   if (!balanceObj.tokenBalances || !balanceObj.tokenBalances.has(publicKey)) {
     return {

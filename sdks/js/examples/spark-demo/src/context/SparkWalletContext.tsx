@@ -1,6 +1,5 @@
-import { createContext, useContext, useState } from "react";
 import { SparkWallet } from "@buildonspark/spark-sdk";
-import { Network } from "@buildonspark/spark-sdk/utils";
+import { createContext, useContext, useState } from "react";
 
 interface SparkWalletContextType {
   wallet: SparkWallet;
@@ -23,9 +22,7 @@ export const SparkWalletProvider = ({
 }: {
   children: React.ReactNode;
 }) => {
-  const [wallet] = useState<SparkWallet>(
-    () => new SparkWallet(Network.REGTEST),
-  );
+  const [wallet] = useState<SparkWallet>(() => new SparkWallet("REGTEST"));
   return (
     <SparkWalletContext.Provider value={{ wallet }}>
       {children}

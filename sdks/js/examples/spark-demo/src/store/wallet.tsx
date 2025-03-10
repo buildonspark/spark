@@ -1,6 +1,6 @@
 import { SparkWallet } from "@buildonspark/spark-sdk";
 import { QueryAllTransfersResponse } from "@buildonspark/spark-sdk/proto/spark";
-import { Network } from "@buildonspark/spark-sdk/utils";
+import { NetworkType } from "@buildonspark/spark-sdk/utils";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { create } from "zustand";
 import { Currency, CurrencyType } from "../utils/currency";
@@ -53,25 +53,23 @@ export const PERMANENT_CURRENCIES: Map<string, Currency> = new Map([
   // },
 ]);
 
-const getLocalStorageWalletNetwork = (): Network => {
+const getLocalStorageWalletNetwork = (): NetworkType => {
   try {
     const storedNetwork = localStorage.getItem("spark_wallet_network");
     if (storedNetwork !== null) {
-      return Number(storedNetwork) === Network.MAINNET
-        ? Network.MAINNET
-        : Network.REGTEST;
+      return storedNetwork as NetworkType;
     }
   } catch (e) {
     console.log("Error getting initial wallet network", e);
   }
-  return Network.MAINNET; // default to mainnet.
+  return "MAINNET"; // default to mainnet.
 };
 
 interface WalletState {
   wallet: SparkWallet;
   sparkAddress: string;
   isInitialized: boolean;
-  initWalletNetwork: Network;
+  initWalletNetwork: NetworkType;
   mnemonic: string | null;
   activeInputCurrency: Currency;
   activeAsset: Currency;
@@ -81,7 +79,7 @@ interface WalletState {
 interface WalletActions {
   initWallet: (mnemonic: string) => Promise<void>;
   initWalletFromSeed: (seed: string) => Promise<void>;
-  setInitWalletNetwork: (network: Network) => void;
+  setInitWalletNetwork: (network: NetworkType) => void;
   setWallet: (wallet: SparkWallet) => void;
   setSparkAddress: (sparkAddress: string) => void;
   getMasterPublicKey: () => Promise<string>;
@@ -113,7 +111,7 @@ const SEED_STORAGE_KEY = "spark_wallet_seed";
 const useWalletStore = create<WalletStore>((set, get) => ({
   wallet: new SparkWallet(getLocalStorageWalletNetwork()),
   initWalletNetwork: getLocalStorageWalletNetwork(),
-  setInitWalletNetwork: (network: Network) => {
+  setInitWalletNetwork: (network: NetworkType) => {
     set({ initWalletNetwork: network });
   },
   setWallet: (wallet: SparkWallet) => {
@@ -156,9 +154,9 @@ const useWalletStore = create<WalletStore>((set, get) => ({
   btcAddressInfo: {},
   initWallet: async (mnemonic: string) => {
     const { initWalletNetwork, setSparkAddress } = get();
-    const mainnetWallet = new SparkWallet(Network.MAINNET);
-    const regtestWallet = new SparkWallet(Network.REGTEST);
-    if (initWalletNetwork === Network.REGTEST) {
+    const mainnetWallet = new SparkWallet("MAINNET");
+    const regtestWallet = new SparkWallet("REGTEST");
+    if (initWalletNetwork === "REGTEST") {
       set({ wallet: regtestWallet });
       await regtestWallet.initWallet(mnemonic);
       setSparkAddress(await regtestWallet.getSparkAddress());
@@ -172,9 +170,9 @@ const useWalletStore = create<WalletStore>((set, get) => ({
   },
   initWalletFromSeed: async (seed: string) => {
     const { initWalletNetwork, setSparkAddress } = get();
-    const mainnetWallet = new SparkWallet(Network.MAINNET);
-    const regtestWallet = new SparkWallet(Network.REGTEST);
-    if (initWalletNetwork === Network.REGTEST) {
+    const mainnetWallet = new SparkWallet("MAINNET");
+    const regtestWallet = new SparkWallet("REGTEST");
+    if (initWalletNetwork === "REGTEST") {
       set({ wallet: regtestWallet });
       await regtestWallet.initWallet(seed);
       setSparkAddress(await regtestWallet.getSparkAddress());

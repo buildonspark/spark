@@ -1,27 +1,49 @@
-import { bytesToNumberBE, hexToBytes, bytesToHex } from "@noble/curves/abstract/utils";
+import {
+  LRCWallet,
+  NetworkType,
+  TokenPubkey,
+  TokenPubkeyAnnouncement,
+  TokenPubkeyInfo,
+} from "@buildonspark/lrc20-sdk";
 import { SparkWallet } from "@buildonspark/spark-sdk";
-import { SparkSigner } from "@buildonspark/spark-sdk/signer";
 import { LeafWithPreviousTransactionData } from "@buildonspark/spark-sdk/proto/spark";
-import { Network } from "@buildonspark/spark-sdk/utils";
 import { WalletConfig } from "@buildonspark/spark-sdk/services/config";
-import { IssuerTokenTransactionService } from "./services/token-transactions.js";
-import { TokenFreezeService } from "./services/freeze.js";
-import { IssuerWalletInterface } from "./interface/wallet-interface.js";
+import { SparkSigner } from "@buildonspark/spark-sdk/signer";
+import { NetworkType as SparkNetworkType } from "@buildonspark/spark-sdk/utils";
+import {
+  bytesToHex,
+  bytesToNumberBE,
+  hexToBytes,
+} from "@noble/curves/abstract/utils";
 import { networks } from "bitcoinjs-lib";
-import { LRCWallet, TokenPubkey, TokenPubkeyAnnouncement, TokenPubkeyInfo, NetworkType } from "@buildonspark/lrc20-sdk";
+import { IssuerWalletInterface } from "./interface/wallet-interface.js";
+import { TokenFreezeService } from "./services/freeze.js";
+import { IssuerTokenTransactionService } from "./services/token-transactions.js";
 
 const BURN_ADDRESS = "02".repeat(32);
 
-export class IssuerSparkWallet extends SparkWallet implements IssuerWalletInterface {
+export class IssuerSparkWallet
+  extends SparkWallet
+  implements IssuerWalletInterface
+{
   private issuerTokenTransactionService: IssuerTokenTransactionService;
   private tokenFreezeService: TokenFreezeService;
   private tokenPublicKeyInfo?: TokenPubkeyInfo;
 
-  constructor(network: Network, privateKey: string, signer?: SparkSigner, config?: WalletConfig) {
+  constructor(
+    network: SparkNetworkType,
+    privateKey: string,
+    signer?: SparkSigner,
+    config?: WalletConfig,
+  ) {
     super(network, signer, config);
 
     // TODO: For now
-    this.lrc20Wallet = new LRCWallet(privateKey, networks.regtest, NetworkType.REGTEST);
+    this.lrc20Wallet = new LRCWallet(
+      privateKey,
+      networks.regtest,
+      NetworkType.REGTEST,
+    );
 
     this.issuerTokenTransactionService = new IssuerTokenTransactionService(
       this.config,
@@ -122,9 +144,9 @@ export class IssuerSparkWallet extends SparkWallet implements IssuerWalletInterf
     feeRateSatsPerVb = 2.0,
   }): Promise<string> {
     await this.lrc20Wallet!.syncWallet();
-  
+
     const tokenPublicKey = new TokenPubkey(this.lrc20Wallet!.pubkey);
-  
+
     const announcement = new TokenPubkeyAnnouncement(
       tokenPublicKey,
       tokenName,
@@ -133,13 +155,15 @@ export class IssuerSparkWallet extends SparkWallet implements IssuerWalletInterf
       maxSupply,
       isFreezable,
     );
-  
+
     const tx = await this.lrc20Wallet!.prepareAnnouncement(
       announcement,
       feeRateSatsPerVb,
     );
-  
-    return await this.lrc20Wallet!.broadcastRawBtcTransaction(tx.bitcoin_tx.toHex());
+
+    return await this.lrc20Wallet!.broadcastRawBtcTransaction(
+      tx.bitcoin_tx.toHex(),
+    );
   }
 
   mintTokensL1(tokenAmount: bigint): Promise<string> {
@@ -152,12 +176,13 @@ export class IssuerSparkWallet extends SparkWallet implements IssuerWalletInterf
 
   async getTokenPublicKeyInfo(): Promise<TokenPubkeyInfo> {
     if (this.tokenPublicKeyInfo) {
-      return this.tokenPublicKeyInfo
+      return this.tokenPublicKeyInfo;
     }
 
     let tokenPublicKey = bytesToHex(this.lrc20Wallet!.pubkey);
 
-    this.tokenPublicKeyInfo = await this.lrc20Wallet!.getTokenPubkeyInfo(tokenPublicKey);
-    return this.tokenPublicKeyInfo
+    this.tokenPublicKeyInfo =
+      await this.lrc20Wallet!.getTokenPubkeyInfo(tokenPublicKey);
+    return this.tokenPublicKeyInfo;
   }
 }

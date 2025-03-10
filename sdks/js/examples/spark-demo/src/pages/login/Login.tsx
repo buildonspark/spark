@@ -1,4 +1,3 @@
-import { Network } from "@buildonspark/spark-sdk/utils";
 import { useEffect, useMemo, useState } from "react";
 import { isValidPhoneNumber } from "react-phone-number-input";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -44,8 +43,8 @@ export default function Login() {
 
   // default the app to mainnet on load.
   useEffect(() => {
-    localStorage.setItem("spark_wallet_network", Network.MAINNET.toString());
-    setInitWalletNetwork(Network.MAINNET);
+    localStorage.setItem("spark_wallet_network", "MAINNET");
+    setInitWalletNetwork("MAINNET");
   }, [setInitWalletNetwork]);
 
   const handleSubmit = async () => {
@@ -105,17 +104,15 @@ export default function Login() {
       {searchParams.get("dev") === "true" && (
         <div className="mb-1 flex w-full flex-row items-center justify-end">
           <div
-            className={`mr-2 text-center font-decimal text-[13px] text-[#ffffff] opacity-50`}
+            className={`font-decimal mr-2 text-center text-[13px] text-[#ffffff] opacity-50`}
           >
-            {initWalletNetwork === Network.MAINNET ? "Mainnet" : "Regtest"}
+            {initWalletNetwork === "MAINNET" ? "Mainnet" : "Regtest"}
           </div>
           <div>
             <button
               onClick={() => {
                 const newNetwork =
-                  initWalletNetwork === Network.MAINNET
-                    ? Network.REGTEST
-                    : Network.MAINNET;
+                  initWalletNetwork === "MAINNET" ? "REGTEST" : "MAINNET";
                 localStorage.setItem(
                   "spark_wallet_network",
                   newNetwork.toString(),
@@ -123,14 +120,14 @@ export default function Login() {
                 setInitWalletNetwork(newNetwork);
               }}
               className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                initWalletNetwork === Network.MAINNET
+                initWalletNetwork === "MAINNET"
                   ? "bg-[#FAFAFACD]"
                   : "bg-[#696969]"
               }`}
             >
               <span
                 className={`inline-block h-4 w-4 transform rounded-full transition-transform ${
-                  initWalletNetwork === Network.MAINNET
+                  initWalletNetwork === "MAINNET"
                     ? "translate-x-6 bg-[#0A0A0ACD]"
                     : "translate-x-1 bg-[#FAFAFA70]"
                 }`}
@@ -142,7 +139,7 @@ export default function Login() {
       <div className="mt-md flex justify-center">
         <SparkWithTextLogo />
       </div>
-      <div className="font-inter mt-xl text-center text-[13px] text-[#ffffff] opacity-40">
+      <div className="mt-xl text-center font-inter text-[13px] text-[#ffffff] opacity-40">
         A Spark-enabled, self-custody
         <br />
         Bitcoin wallet
