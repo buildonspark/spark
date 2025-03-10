@@ -59,6 +59,7 @@ import {
   LRC_WALLET_NETWORK,
   LRC_WALLET_NETWORK_TYPE,
   Network,
+  NetworkType,
 } from "./utils/network.js";
 import {
   calculateAvailableTokenAmount,
@@ -68,9 +69,9 @@ import { getNextTransactionSequence } from "./utils/transaction.js";
 import { initWasm } from "./utils/wasm-wrapper.js";
 import { InitOutput } from "./wasm/spark_bindings.js";
 
+import { LRC20WalletApiConfig, LRCWallet } from "@buildonspark/lrc20-sdk";
 import { broadcastL1Withdrawal } from "./services/lrc20.js";
 import { getMasterHDKeyFromSeed } from "./utils/index.js";
-import { LRCWallet, LRC20WalletApiConfig } from "@buildonspark/lrc20-sdk";
 
 // Add this constant at the file level
 const MAX_TOKEN_LEAVES = 100;
@@ -151,11 +152,15 @@ export class SparkWallet {
   protected tokenLeaves: Map<string, LeafWithPreviousTransactionData[]> =
     new Map();
 
-  constructor(network: Network, signer?: SparkSigner, config?: WalletConfig) {
+  constructor(
+    network: NetworkType,
+    signer?: SparkSigner,
+    config?: WalletConfig,
+  ) {
     if (config) {
       this.config = WalletConfigService.withConfig(config, signer);
     } else {
-      this.config = new WalletConfigService(network, signer);
+      this.config = new WalletConfigService(Network[network], signer);
     }
 
     this.connectionManager = new ConnectionManager(this.config);

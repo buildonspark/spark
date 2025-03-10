@@ -6,7 +6,6 @@ import {
   generateAdaptorFromSignature,
   validateOutboundAdaptorSignature,
 } from "../utils/adaptor-signature.js";
-import { Network } from "../utils/network.js";
 import { SparkWalletTesting } from "./utils/spark-testing-wallet.js";
 
 describe("adaptor signature", () => {
@@ -17,7 +16,7 @@ describe("adaptor signature", () => {
     async () => {
       let failures = 0;
 
-      const wallet = new SparkWalletTesting(Network.LOCAL);
+      const wallet = new SparkWalletTesting("LOCAL");
       await wallet.initWallet();
 
       const msg = "test";
