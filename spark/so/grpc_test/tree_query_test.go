@@ -37,25 +37,18 @@ func TestTreeQuery(t *testing.T) {
 	// Create test nodes with parent chain
 	rootPrivKey, err := secp256k1.GeneratePrivateKey()
 	require.NoError(t, err)
-	rootPubKeyBytes := rootPrivKey.PubKey().SerializeCompressed()
 
-	// Generate deposit address using wallet helper
-	depositResp, err := wallet.GenerateDepositAddress(ctx, config, rootPubKeyBytes)
-	require.NoError(t, err)
-
-	// Create deposit transaction with value
-	const txValue = int64(65536)
-	depositTx, err := testutil.CreateTestP2TRTransaction(depositResp.DepositAddress.Address, txValue)
+	tree, err := testutil.CreateNewTree(config, faucet, rootPrivKey, 65536)
 	require.NoError(t, err)
 
 	// Generate tree structure for root with 2 levels
-	rootTree, err := wallet.GenerateDepositAddressesForTree(ctx, config, depositTx, nil, uint32(0), rootPrivKey.Serialize(), 2)
+	rootTree, err := wallet.GenerateDepositAddressesForTree(ctx, config, nil, tree, uint32(0), rootPrivKey.Serialize(), 1)
 	require.NoError(t, err)
 
 	// Create initial tree with 2 levels
-	treeNodes, err := wallet.CreateTree(ctx, config, depositTx, nil, uint32(0), rootTree, false)
+	treeNodes, err := wallet.CreateTree(ctx, config, nil, tree, uint32(0), rootTree, true)
 	require.NoError(t, err)
-	require.Len(t, treeNodes.Nodes, 3) // Root + 2 children
+	require.Len(t, treeNodes.Nodes, 5) // Root + 2 children + 2 leaves
 
 	leafNode := treeNodes.Nodes[1]
 
@@ -67,7 +60,7 @@ func TestTreeQuery(t *testing.T) {
 
 		resp, err := client.QueryNodes(ctx, req)
 		require.NoError(t, err)
-		require.Len(t, resp.Nodes, 3)
+		require.Len(t, resp.Nodes, 6)
 	})
 
 	t.Run("query by node id without parents", func(t *testing.T) {
@@ -93,7 +86,7 @@ func TestTreeQuery(t *testing.T) {
 		resp, err := client.QueryNodes(ctx, req)
 		require.NoError(t, err)
 
-		require.Len(t, resp.Nodes, 2)
+		require.Len(t, resp.Nodes, 3)
 		_, exists := resp.Nodes[leafNode.Id]
 		require.True(t, exists)
 		_, exists = resp.Nodes[treeNodes.Nodes[0].Id]
