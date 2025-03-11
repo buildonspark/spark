@@ -1,5 +1,11 @@
 # @buildonspark/lrc20-sdk
 
+## 0.0.9
+
+### Patch Changes
+
+- Fixes
+
 ## 0.0.8
 
 ### Patch Changes
