@@ -305,7 +305,10 @@ describe("Transfer", () => {
       new Date(Date.now() + 10 * 60 * 1000),
     );
 
-    await senderTransferService.cancelSendTransfer(senderTransfer.transfer);
+    await senderTransferService.cancelSendTransfer(
+      senderTransfer.transfer,
+      senderConfigService.getCoordinatorAddress(),
+    );
 
     const newSenderTransfer = await senderTransferService.sendTransfer(
       [transferNode],

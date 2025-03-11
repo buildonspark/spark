@@ -820,10 +820,13 @@ export class TransferService extends BaseTransferService {
     }
   }
 
-  async cancelSendTransfer(transfer: Transfer): Promise<Transfer | undefined> {
-    const sparkClient = await this.connectionManager.createSparkClient(
-      this.config.getCoordinatorAddress(),
-    );
+  async cancelSendTransfer(
+    transfer: Transfer,
+    operatorAddress: string,
+  ): Promise<Transfer | undefined> {
+    const sparkClient =
+      await this.connectionManager.createSparkClient(operatorAddress);
+
     try {
       const response = await sparkClient.cancel_send_transfer({
         transferId: transfer.id,
@@ -837,10 +840,11 @@ export class TransferService extends BaseTransferService {
     }
   }
 
-  async queryPendingTransfersBySender(): Promise<QueryPendingTransfersResponse> {
-    const sparkClient = await this.connectionManager.createSparkClient(
-      this.config.getCoordinatorAddress(),
-    );
+  async queryPendingTransfersBySender(
+    operatorAddress: string,
+  ): Promise<QueryPendingTransfersResponse> {
+    const sparkClient =
+      await this.connectionManager.createSparkClient(operatorAddress);
     try {
       return await sparkClient.query_pending_transfers({
         participant: {

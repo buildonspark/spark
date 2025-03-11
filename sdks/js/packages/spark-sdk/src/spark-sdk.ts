@@ -1161,11 +1161,21 @@ export class SparkWallet {
    * @private
    */
   private async cancelAllSenderInitiatedTransfers() {
-    const transfers =
-      await this.transferService.queryPendingTransfersBySender();
-    for (const transfer of transfers.transfers) {
-      if (transfer.status === TransferStatus.TRANSFER_STATUS_SENDER_INITIATED) {
-        await this.transferService.cancelSendTransfer(transfer);
+    for (const operator of Object.values(this.config.getSigningOperators())) {
+      const transfers =
+        await this.transferService.queryPendingTransfersBySender(
+          operator.address,
+        );
+
+      for (const transfer of transfers.transfers) {
+        if (
+          transfer.status === TransferStatus.TRANSFER_STATUS_SENDER_INITIATED
+        ) {
+          await this.transferService.cancelSendTransfer(
+            transfer,
+            operator.address,
+          );
+        }
       }
     }
   }
