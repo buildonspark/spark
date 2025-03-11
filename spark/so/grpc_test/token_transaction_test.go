@@ -222,7 +222,6 @@ func TestBroadcastTokenTransactionIssueAndTransferTokens(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to query token transactions page 1: %v", err)
 	}
-	log.Printf("RETURNED TOKEN TRANSACTIONS PAGE 1: %v", tokenTransactionsPage1)
 
 	// Verify we got exactly 1 transaction
 	if len(tokenTransactionsPage1.TokenTransactionsWithStatus) != 1 {
@@ -254,7 +253,6 @@ func TestBroadcastTokenTransactionIssueAndTransferTokens(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to query token transactions page 2: %v", err)
 	}
-	log.Printf("RETURNED TOKEN TRANSACTIONS PAGE 2: %v", tokenTransactionsPage2)
 
 	// Verify we got exactly 1 transaction
 	if len(tokenTransactionsPage2.TokenTransactionsWithStatus) != 1 {
@@ -289,7 +287,6 @@ func TestBroadcastTokenTransactionIssueAndTransferTokens(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to query token transactions page 3: %v", err)
 	}
-	log.Printf("RETURNED TOKEN TRANSACTIONS PAGE 3: %v", tokenTransactionsPage3)
 
 	// Verify we got no transactions
 	if len(tokenTransactionsPage3.TokenTransactionsWithStatus) != 0 {
@@ -1213,4 +1210,116 @@ func TestCancelTokenTransaction(t *testing.T) {
 		t.Fatalf("failed to broadcast transfer token transaction after cancellation: %v", err)
 	}
 	log.Printf("successfully transferred tokens after cancellation: %v", transferTokenTransactionResponse)
+}
+
+func TestBroadcastTokenTransactionWithInvalidPrevTxHash(t *testing.T) {
+	config, err := testutil.TestWalletConfig()
+	if err != nil {
+		t.Fatalf("failed to create wallet config: %v", err)
+	}
+
+	tokenPrivKey := config.IdentityPrivateKey
+	tokenIdentityPubKeyBytes := tokenPrivKey.PubKey().SerializeCompressed()
+	issueTokenTransaction, userLeaf1PrivKey, userLeaf2PrivKey, err := createTestTokenIssuanceTransaction(tokenIdentityPubKeyBytes)
+	if err != nil {
+		t.Fatalf("failed to create test token issuance transaction: %v", err)
+	}
+
+	// Broadcast the token transaction
+	finalIssueTokenTransaction, err := wallet.BroadcastTokenTransaction(
+		context.Background(), config, issueTokenTransaction,
+		[]*secp256k1.PrivateKey{&tokenPrivKey},
+		[][]byte{})
+	if err != nil {
+		t.Fatalf("failed to broadcast issuance token transaction: %v", err)
+	}
+	log.Printf("issuance broadcast finalized token transaction: %v", finalIssueTokenTransaction)
+
+	finalIssueTokenTransactionHash, err := utils.HashTokenTransaction(finalIssueTokenTransaction, false)
+	if err != nil {
+		t.Fatalf("failed to hash final issuance token transaction: %v", err)
+	}
+
+	// Corrupt the transaction hash by adding a byte
+	corruptedHash := append(finalIssueTokenTransactionHash, 0xFF)
+
+	// Create transfer transaction with corrupted hash
+	transferTokenTransaction := &pb.TokenTransaction{
+		TokenInput: &pb.TokenTransaction_TransferInput{
+			TransferInput: &pb.TransferInput{
+				LeavesToSpend: []*pb.TokenLeafToSpend{
+					{
+						PrevTokenTransactionHash:     corruptedHash, // Corrupted hash
+						PrevTokenTransactionLeafVout: 0,
+					},
+					{
+						PrevTokenTransactionHash:     finalIssueTokenTransactionHash,
+						PrevTokenTransactionLeafVout: 1,
+					},
+				},
+			},
+		},
+		OutputLeaves: []*pb.TokenLeafOutput{
+			{
+				OwnerPublicKey: userLeaf1PrivKey.PubKey().SerializeCompressed(),
+				TokenPublicKey: tokenIdentityPubKeyBytes,
+				TokenAmount:    int64ToUint128Bytes(0, TestTransferLeaf1Amount),
+			},
+		},
+	}
+
+	revPubKey1 := finalIssueTokenTransaction.OutputLeaves[0].RevocationPublicKey
+	revPubKey2 := finalIssueTokenTransaction.OutputLeaves[1].RevocationPublicKey
+
+	// Attempt to broadcast the transfer transaction with corrupted hash
+	// This should fail validation
+	_, err = wallet.BroadcastTokenTransaction(
+		context.Background(), config, transferTokenTransaction,
+		[]*secp256k1.PrivateKey{userLeaf1PrivKey, userLeaf2PrivKey},
+		[][]byte{revPubKey1, revPubKey2},
+	)
+
+	// We expect this to fail because the transaction hash is invalid
+	if err == nil {
+		t.Fatal("expected transaction with invalid hash to be rejected, but it succeeded")
+	}
+	log.Printf("successfully detected invalid transaction hash: %v", err)
+
+	// Try with only the second hash corrupted
+	transferTokenTransaction2 := &pb.TokenTransaction{
+		TokenInput: &pb.TokenTransaction_TransferInput{
+			TransferInput: &pb.TransferInput{
+				LeavesToSpend: []*pb.TokenLeafToSpend{
+					{
+						PrevTokenTransactionHash:     finalIssueTokenTransactionHash,
+						PrevTokenTransactionLeafVout: 0,
+					},
+					{
+						PrevTokenTransactionHash:     append(finalIssueTokenTransactionHash, 0xAA), // Corrupted hash
+						PrevTokenTransactionLeafVout: 1,
+					},
+				},
+			},
+		},
+		OutputLeaves: []*pb.TokenLeafOutput{
+			{
+				OwnerPublicKey: userLeaf1PrivKey.PubKey().SerializeCompressed(),
+				TokenPublicKey: tokenIdentityPubKeyBytes,
+				TokenAmount:    int64ToUint128Bytes(0, TestTransferLeaf1Amount),
+			},
+		},
+	}
+
+	// Attempt to broadcast the second transfer transaction with corrupted hash
+	_, err = wallet.BroadcastTokenTransaction(
+		context.Background(), config, transferTokenTransaction2,
+		[]*secp256k1.PrivateKey{userLeaf1PrivKey, userLeaf2PrivKey},
+		[][]byte{revPubKey1, revPubKey2},
+	)
+
+	// We expect this to fail as well
+	if err == nil {
+		t.Fatal("expected transaction with second invalid hash to be rejected, but it succeeded")
+	}
+	log.Printf("successfully detected second invalid transaction hash: %v", err)
 }

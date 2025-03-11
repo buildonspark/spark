@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"runtime/debug"
 
 	"github.com/google/uuid"
 	"google.golang.org/grpc"
@@ -77,23 +76,12 @@ func validateArrayLengths(req interface{}, requestID string, method string) erro
 }
 
 func ValidationInterceptor() grpc.UnaryServerInterceptor {
-	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
 		requestID := uuid.New().String()
 		logger := slog.Default().With(
 			"request_id", requestID,
 			"method", info.FullMethod,
 		)
-
-		// Recover from panics
-		defer func() {
-			if r := recover(); r != nil {
-				stack := debug.Stack()
-				logger.Error("Panic in validation interceptor",
-					"panic", r,
-					"stack", string(stack),
-				)
-			}
-		}()
 
 		// Check request size
 		if err := validateRequestSize(req, requestID, info.FullMethod); err != nil {
@@ -122,16 +110,18 @@ func ValidationInterceptor() grpc.UnaryServerInterceptor {
 		}
 
 		// Pass the request on down the chain
-		resp, err := handler(ctx, req)
+		resp, err = handler(ctx, req)
 		if err != nil {
 			return nil, err
 		}
 
 		// Validate the response proto if it implements Validate()
-		if v, ok := resp.(interface{ Validate() error }); ok {
-			if err := v.Validate(); err != nil {
-				logger.Error("Response validation failed", "error", err)
-				return nil, status.Errorf(codes.Internal, "invalid response: %v", err)
+		if resp != nil {
+			if v, ok := resp.(interface{ Validate() error }); ok {
+				if err := v.Validate(); err != nil {
+					logger.Error("Response validation failed", "error", err)
+					return nil, status.Errorf(codes.Internal, "invalid response: %v", err)
+				}
 			}
 		}
 

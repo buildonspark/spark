@@ -60,6 +60,8 @@ type Config struct {
 	DKGLimitOverride uint64
 	// RunDirectory is the base directory for resolving relative paths
 	RunDirectory string
+	// If true, return the details of the panic to the client instead of just 'Internal Server Error'
+	ReturnDetailedPanicErrors bool
 }
 
 // DatabaseDriver returns the database driver based on the database path.
@@ -118,6 +120,7 @@ func NewConfig(
 	serverKeyPath string,
 	dkgLimitOverride uint64,
 	runDirectory string,
+	returnDetailedPanicErrors bool,
 ) (*Config, error) {
 	identityPrivateKeyHexStringBytes, err := os.ReadFile(identityPrivateKeyFilePath)
 	if err != nil {
@@ -150,23 +153,24 @@ func NewConfig(
 	}
 
 	return &Config{
-		Index:                 index,
-		Identifier:            identifier,
-		IdentityPrivateKey:    identityPrivateKeyBytes,
-		SigningOperatorMap:    signingOperatorMap,
-		Threshold:             threshold,
-		SignerAddress:         signerAddress,
-		DatabasePath:          databasePath,
-		authzEnforced:         authzEnforced,
-		DKGCoordinatorAddress: dkgCoordinatorAddress,
-		SupportedNetworks:     supportedNetworks,
-		BitcoindConfigs:       nodes.Bitcoind,
-		Lrc20Configs:          nodes.Lrc20,
-		AWS:                   aws,
-		ServerCertPath:        serverCertPath,
-		ServerKeyPath:         serverKeyPath,
-		DKGLimitOverride:      dkgLimitOverride,
-		RunDirectory:          runDirectory,
+		Index:                     index,
+		Identifier:                identifier,
+		IdentityPrivateKey:        identityPrivateKeyBytes,
+		SigningOperatorMap:        signingOperatorMap,
+		Threshold:                 threshold,
+		SignerAddress:             signerAddress,
+		DatabasePath:              databasePath,
+		authzEnforced:             authzEnforced,
+		DKGCoordinatorAddress:     dkgCoordinatorAddress,
+		SupportedNetworks:         supportedNetworks,
+		BitcoindConfigs:           nodes.Bitcoind,
+		Lrc20Configs:              nodes.Lrc20,
+		AWS:                       aws,
+		ServerCertPath:            serverCertPath,
+		ServerKeyPath:             serverKeyPath,
+		DKGLimitOverride:          dkgLimitOverride,
+		RunDirectory:              runDirectory,
+		ReturnDetailedPanicErrors: returnDetailedPanicErrors,
 	}, nil
 }
 

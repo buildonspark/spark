@@ -67,6 +67,7 @@ type args struct {
 	ServerKeyPath              string
 	DKGLimitOverride           uint64
 	RunDirectory               string
+	ReturnDetailedPanicErrors  bool
 }
 
 func (a *args) SupportedNetworksList() []common.Network {
@@ -112,6 +113,8 @@ func loadArgs() (*args, error) {
 	flag.StringVar(&args.ServerKeyPath, "server-key", "", "Path to server key")
 	flag.Uint64Var(&args.DKGLimitOverride, "dkg-limit-override", 0, "Override the DKG limit")
 	flag.StringVar(&args.RunDirectory, "run-dir", "", "Run directory for resolving relative paths")
+	// TODO(CNT-154): Consider setting to false by default before productionization.
+	flag.BoolVar(&args.ReturnDetailedPanicErrors, "return-detailed-panic-errors", true, "Return detailed panic errors to client")
 	// Parse flags
 	flag.Parse()
 
@@ -185,6 +188,7 @@ func main() {
 		args.ServerKeyPath,
 		args.DKGLimitOverride,
 		args.RunDirectory,
+		args.ReturnDetailedPanicErrors,
 	)
 	if err != nil {
 		log.Fatalf("Failed to create config: %v", err)
@@ -249,6 +253,7 @@ func main() {
 	}
 
 	serverOpts := grpc.UnaryInterceptor(grpc_middleware.ChainUnaryServer(
+		sparkgrpc.PanicRecoveryInterceptor(config.ReturnDetailedPanicErrors),
 		helper.LogInterceptor,
 		ent.DbSessionMiddleware(dbClient),
 		authn.NewAuthnInterceptor(sessionTokenCreatorVerifier).AuthnInterceptor,
