@@ -1,7 +1,7 @@
-//@ts-nocheck
-
 import { afterEach, beforeAll, describe, expect, it } from "@jest/globals";
 import { hexToBytes } from "@noble/curves/abstract/utils";
+import { generateMnemonic } from "@scure/bip39";
+import { wordlist } from "@scure/bip39/wordlists/english";
 import { equalBytes, sha256 } from "@scure/btc-signer/utils";
 import { TransferStatus } from "../proto/spark.js";
 import { WalletConfigService } from "../services/config.js";
@@ -12,8 +12,6 @@ import { Network } from "../utils/network.js";
 import { createNewTree, getTestWalletConfig } from "./test-util.js";
 import { SparkWalletTesting } from "./utils/spark-testing-wallet.js";
 import { BitcoinFaucet } from "./utils/test-faucet.js";
-import { generateMnemonic } from "@scure/bip39";
-import { wordlist } from "@scure/bip39/wordlists/english";
 
 async function cleanUp() {
   const config = getTestWalletConfig();
@@ -23,8 +21,8 @@ async function cleanUp() {
   );
   const paymentHash = sha256(preimage);
 
-  for (const operator of Object.values(config.signingOperators)) {
-    const client = ConnectionManager.createMockClient(operator.address);
+  for (const operator of Object.values(config.signingOperators!)) {
+    const client = ConnectionManager.createMockClient(operator!.address);
     await client.clean_up_preimage_share({
       paymentHash,
     });
@@ -51,18 +49,22 @@ describe("LightningService", () => {
   const testFn = process.env.GITHUB_ACTIONS ? it.skip : it;
 
   beforeAll(async () => {
-    userWallet = new SparkWalletTesting(Network.LOCAL);
+    userWallet = new SparkWalletTesting("LOCAL");
     const userMnemonic = generateMnemonic(wordlist);
     await userWallet.initWallet(userMnemonic);
-    userConfig = new WalletConfigService(Network.LOCAL, userWallet.getSigner());
+    userConfig = new WalletConfigService(Network.LOCAL, {
+      signer: userWallet.getSigner(),
+    });
     const connectionManager = new ConnectionManager(userConfig);
     lightningService = new LightningService(userConfig, connectionManager);
     transferService = new TransferService(userConfig, connectionManager);
 
-    sspWallet = new SparkWalletTesting(Network.LOCAL);
+    sspWallet = new SparkWalletTesting("LOCAL");
     await sspWallet.initWallet();
 
-    sspConfig = new WalletConfigService(Network.LOCAL, sspWallet.getSigner());
+    sspConfig = new WalletConfigService(Network.LOCAL, {
+      signer: sspWallet.getSigner(),
+    });
     const sspConnectionManager = new ConnectionManager(sspConfig);
     sspLightningService = new LightningService(sspConfig, sspConnectionManager);
     sspTransferService = new TransferService(sspConfig, sspConnectionManager);
@@ -160,10 +162,11 @@ describe("LightningService", () => {
 
       const receiverTransfer = pendingTransfer.transfers[0];
 
-      expect(receiverTransfer.id).toEqual(senderTransfer!.id);
+      expect(receiverTransfer!.id).toEqual(senderTransfer!.id);
 
-      const leafPrivKeyMap =
-        await transferService.verifyPendingTransfer(receiverTransfer);
+      const leafPrivKeyMap = await transferService.verifyPendingTransfer(
+        receiverTransfer!,
+      );
 
       expect(leafPrivKeyMap.size).toBe(1);
       expect(leafPrivKeyMap.has(nodeToSend.id)).toBe(true);
@@ -173,7 +176,7 @@ describe("LightningService", () => {
 
       const finalLeafPubKey = await userWallet.getSigner().generatePublicKey();
 
-      const leaf = receiverTransfer.leaves[0].leaf;
+      const leaf = receiverTransfer!.leaves[0]!.leaf;
       expect(leaf).toBeDefined();
 
       const claimingNode = {
@@ -182,7 +185,7 @@ describe("LightningService", () => {
         newSigningPubKey: finalLeafPubKey,
       };
 
-      await transferService.claimTransfer(receiverTransfer, [claimingNode]);
+      await transferService.claimTransfer(receiverTransfer!, [claimingNode]);
     },
     60000,
   );
@@ -276,10 +279,10 @@ describe("LightningService", () => {
         .getSigner()
         .generatePublicKey(sha256("2"));
 
-      expect(receiverTransfer.leaves[0].leaf).toBeDefined();
+      expect(receiverTransfer.leaves[0]!.leaf).toBeDefined();
 
       const claimingNode = {
-        leaf: receiverTransfer.leaves[0].leaf!,
+        leaf: receiverTransfer.leaves[0]!.leaf!,
         signingPubKey: newLeafPubKey,
         newSigningPubKey: finalLeafPubKey,
       };

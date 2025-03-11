@@ -1,5 +1,3 @@
-//@ts-nocheck
-
 import { describe, expect, it } from "@jest/globals";
 import { equalBytes, hexToBytes } from "@noble/curves/abstract/utils";
 import { secp256k1 } from "@noble/curves/secp256k1";
@@ -32,14 +30,13 @@ describe("swap", () => {
         "123",
       );
       // Initiate sender
-      const senderWallet = new SparkWalletTesting(Network.LOCAL);
+      const senderWallet = new SparkWalletTesting("LOCAL");
       await senderWallet.initWallet();
       const senderPubkey = await senderWallet.getIdentityPublicKey();
 
-      const senderConfig = new WalletConfigService(
-        Network.LOCAL,
-        senderWallet.getSigner(),
-      );
+      const senderConfig = new WalletConfigService(Network.LOCAL, {
+        signer: senderWallet.getSigner(),
+      });
       const senderConnectionManager = new ConnectionManager(senderConfig);
       const senderTransferService = new TransferService(
         senderConfig,
@@ -47,14 +44,13 @@ describe("swap", () => {
       );
 
       // Initiate receiver
-      const receiverWallet = new SparkWalletTesting(Network.LOCAL);
+      const receiverWallet = new SparkWalletTesting("LOCAL");
       await receiverWallet.initWallet();
       const receiverPubkey = await receiverWallet.getIdentityPublicKey();
 
-      const receiverConfig = new WalletConfigService(
-        Network.LOCAL,
-        receiverWallet.getSigner(),
-      );
+      const receiverConfig = new WalletConfigService(Network.LOCAL, {
+        signer: receiverWallet.getSigner(),
+      });
       const receiverConnectionManager = new ConnectionManager(receiverConfig);
       const receiverTransferService = new TransferService(
         receiverConfig,
@@ -173,11 +169,11 @@ describe("swap", () => {
         await receiverTransferService.queryPendingTransfers();
       expect(pendingTransfer.transfers.length).toBe(1);
       const receiverPendingTransfer = pendingTransfer.transfers[0];
-      expect(receiverPendingTransfer.id).toBe(senderTransferTweakKey.id);
+      expect(receiverPendingTransfer!.id).toBe(senderTransferTweakKey.id);
 
       const leafPrivKeyMap =
         await receiverTransferService.verifyPendingTransfer(
-          receiverPendingTransfer,
+          receiverPendingTransfer!,
         );
 
       expect(leafPrivKeyMap.size).toBe(1);
@@ -187,18 +183,18 @@ describe("swap", () => {
         senderNewLeafPubKey,
       );
       expect(bytesEqual).toBe(true);
-      expect(receiverPendingTransfer.leaves[0].leaf).toBeDefined();
+      expect(receiverPendingTransfer!.leaves[0]!.leaf).toBeDefined();
       const finalLeafPubKey = await receiverWallet
         .getSigner()
         .generatePublicKey(sha256("2"));
       const claimingNode: LeafKeyTweak = {
-        leaf: receiverPendingTransfer.leaves[0].leaf!,
+        leaf: receiverPendingTransfer!.leaves[0]!.leaf!,
         signingPubKey: senderNewLeafPubKey,
         newSigningPubKey: finalLeafPubKey,
       };
       const leavesToClaim = [claimingNode];
       await receiverTransferService.claimTransfer(
-        receiverPendingTransfer,
+        receiverPendingTransfer!,
         leavesToClaim,
       );
       await receiverTransferService.sendTransferTweakKey(
@@ -211,11 +207,11 @@ describe("swap", () => {
         await senderTransferService.queryPendingTransfers();
       expect(sPendingTransfer.transfers.length).toBe(1);
       const senderPendingTransfer = sPendingTransfer.transfers[0];
-      expect(senderPendingTransfer.id).toBe(receiverTransfer.id);
+      expect(senderPendingTransfer!.id).toBe(receiverTransfer.id);
 
       const senderLeafPrivKeyMap =
         await senderTransferService.verifyPendingTransfer(
-          senderPendingTransfer,
+          senderPendingTransfer!,
         );
       expect(senderLeafPrivKeyMap.size).toBe(1);
       expect(senderLeafPrivKeyMap.get(receiverRootNode.id)).toBeDefined();
@@ -224,19 +220,19 @@ describe("swap", () => {
         receiverNewLeafPubKey,
       );
       expect(bytesEqual_1).toBe(true);
-      expect(senderPendingTransfer.leaves[0].leaf).toBeDefined();
+      expect(senderPendingTransfer!.leaves[0]!.leaf).toBeDefined();
 
       const finalLeafPubKey_1 = await senderWallet
         .getSigner()
         .generatePublicKey(sha256("3"));
       const claimingNode_1: LeafKeyTweak = {
-        leaf: senderPendingTransfer.leaves[0].leaf!,
+        leaf: senderPendingTransfer!.leaves[0]!.leaf!,
         signingPubKey: receiverNewLeafPubKey,
         newSigningPubKey: finalLeafPubKey_1,
       };
       const leavesToClaim_1 = [claimingNode_1];
       await senderTransferService.claimTransfer(
-        senderPendingTransfer,
+        senderPendingTransfer!,
         leavesToClaim_1,
       );
     },

@@ -1,5 +1,3 @@
-//@ts-nocheck
-
 import { describe, expect, it } from "@jest/globals";
 import { secp256k1 } from "@noble/curves/secp256k1";
 import {
@@ -48,7 +46,7 @@ describe("keys", () => {
     const sum = sumOfPrivateKeys(keys);
     let sum2 = keys[0];
     for (let i = 1; i < keys.length; i++) {
-      sum2 = addPrivateKeys(sum2, keys[i]);
+      sum2 = addPrivateKeys(sum2!, keys[i]!);
     }
     expect(sum).toStrictEqual(sum2);
   });

@@ -1,6 +1,5 @@
 import readline from "readline";
 import { SparkWallet } from "../../dist/spark-sdk";
-import { Network } from "../../dist/utils/network";
 
 // Initialize Spark Wallet
 const walletMnemonic =
@@ -8,9 +7,7 @@ const walletMnemonic =
 
 async function runCLI() {
   // Get network from command line args
-  const network = process.argv.includes("mainnet")
-    ? Network.MAINNET
-    : Network.REGTEST;
+  const network = process.argv.includes("mainnet") ? "MAINNET" : "REGTEST";
   let wallet = new SparkWallet(network);
 
   const rl = readline.createInterface({

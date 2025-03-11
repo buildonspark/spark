@@ -1,5 +1,3 @@
-//@ts-nocheck
-
 import { describe, expect, it } from "@jest/globals";
 import { hexToBytes } from "@noble/curves/abstract/utils";
 import { secp256k1 } from "@noble/curves/secp256k1";
@@ -38,13 +36,12 @@ describe("coop exit", () => {
       const amountSats = 100_000n;
 
       // Setup user with leaves
-      const userWallet = new SparkWalletTesting(Network.LOCAL);
+      const userWallet = new SparkWalletTesting("LOCAL");
       await userWallet.initWallet();
 
-      const configService = new WalletConfigService(
-        Network.LOCAL,
-        userWallet.getSigner(),
-      );
+      const configService = new WalletConfigService(Network.LOCAL, {
+        signer: userWallet.getSigner(),
+      });
       const connectionManager = new ConnectionManager(configService);
       const coopExitService = new CoopExitService(
         configService,
@@ -62,14 +59,13 @@ describe("coop exit", () => {
       );
 
       // Setup ssp
-      const sspWallet = new SparkWalletTesting(Network.LOCAL);
+      const sspWallet = new SparkWalletTesting("LOCAL");
       await sspWallet.initWallet();
       const sspPubkey = await sspWallet.getIdentityPublicKey();
 
-      const sspConfigService = new WalletConfigService(
-        Network.LOCAL,
-        sspWallet.getSigner(),
-      );
+      const sspConfigService = new WalletConfigService(Network.LOCAL, {
+        signer: sspWallet.getSigner(),
+      });
       const sspConnectionManager = new ConnectionManager(sspConfigService);
       const sspTransferService = new TransferService(
         sspConfigService,
@@ -93,7 +89,7 @@ describe("coop exit", () => {
       const intermediateAmountSats = (leafCount + 1) * dustAmountSats;
 
       const exitTx = new Transaction();
-      exitTx.addInput(faucetCoin.outpoint);
+      exitTx.addInput(faucetCoin!.outpoint);
       exitTx.addOutput({
         script: withdrawAddressScript,
         amount: amountSats,
@@ -128,7 +124,7 @@ describe("coop exit", () => {
       for (const addr of [...connectorP2trAddrs, feeBumpAddr]) {
         connectorTx.addOutput({
           script: OutScript.encode(
-            Address(getNetwork(Network.LOCAL)).decode(addr),
+            Address(getNetwork(Network.LOCAL)).decode(addr!),
           ),
           amount: BigInt(intermediateAmountSats / connectorP2trAddrs.length),
         });
@@ -164,10 +160,11 @@ describe("coop exit", () => {
       expect(pendingTransfer.transfers.length).toBe(1);
 
       const receiverTransfer = pendingTransfer.transfers[0];
-      expect(receiverTransfer.id).toBe(senderTransfer.transfer.id);
+      expect(receiverTransfer!.id).toBe(senderTransfer.transfer.id);
 
-      const leafPubKeyMap =
-        await sspWallet.verifyPendingTransfer(receiverTransfer);
+      const leafPubKeyMap = await sspWallet.verifyPendingTransfer(
+        receiverTransfer!,
+      );
 
       expect(leafPubKeyMap.size).toBe(1);
       expect(leafPubKeyMap.get(rootNode.id)).toBeDefined();
@@ -182,7 +179,7 @@ describe("coop exit", () => {
 
       const leavesToClaim: LeafKeyTweak[] = [
         {
-          leaf: receiverTransfer.leaves[0].leaf!,
+          leaf: receiverTransfer!.leaves[0]!.leaf!,
           signingPubKey: newLeafPubKey,
           newSigningPubKey: finalLeafPubKey,
         },
@@ -190,7 +187,10 @@ describe("coop exit", () => {
 
       let hasError = false;
       try {
-        await sspTransferService.claimTransfer(receiverTransfer, leavesToClaim);
+        await sspTransferService.claimTransfer(
+          receiverTransfer!,
+          leavesToClaim,
+        );
       } catch (e) {
         hasError = true;
       }
@@ -199,8 +199,8 @@ describe("coop exit", () => {
       // Sign an exit tx and broadcast
       const signedExitTx = await faucet.signFaucetCoin(
         exitTx,
-        faucetCoin.txout,
-        faucetCoin.key,
+        faucetCoin!.txout,
+        faucetCoin!.key,
       );
 
       await faucet.broadcastTx(signedExitTx.hex);
@@ -217,7 +217,7 @@ describe("coop exit", () => {
       await faucet.generateToAddress(30, randomAddress);
 
       // Claim leaf
-      await sspTransferService.claimTransfer(receiverTransfer, leavesToClaim);
+      await sspTransferService.claimTransfer(receiverTransfer!, leavesToClaim);
     },
     30000,
   );

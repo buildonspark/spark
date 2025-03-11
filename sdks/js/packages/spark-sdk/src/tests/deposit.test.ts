@@ -1,5 +1,3 @@
-//@ts-nocheck
-
 import { describe, expect, it } from "@jest/globals";
 import { secp256k1 } from "@noble/curves/secp256k1";
 import { Address, OutScript, Transaction } from "@scure/btc-signer";
@@ -17,14 +15,12 @@ describe("deposit", () => {
     async () => {
       const mnemonic =
         "raise benefit echo client clutch short pyramid grass fall core slogan boil device plastic drastic discover decide penalty middle appear medal elbow original income";
-      const sdk = new SparkWalletTesting(Network.LOCAL);
+      const sdk = new SparkWalletTesting("LOCAL");
       await sdk.initWallet(mnemonic);
 
-      const pubKey = await sdk.getSigner().generatePublicKey();
+      const depositAddress = await sdk.getDepositAddress();
 
-      const depositAddress = await sdk.generateDepositAddress(pubKey);
-
-      expect(depositAddress.depositAddress).toBeDefined();
+      expect(depositAddress).toBeDefined();
     },
     30000,
   );
@@ -40,25 +36,23 @@ describe("deposit", () => {
 
       const coin = await faucet.fund();
 
-      const sdk = new SparkWalletTesting(Network.LOCAL);
+      const sdk = new SparkWalletTesting("LOCAL");
       await sdk.initWallet();
 
       // Generate private/public key pair
       const pubKey = await sdk.getSigner().generatePublicKey();
 
       // Generate deposit address
-      const depositResp = await sdk.generateDepositAddress(pubKey);
-      if (!depositResp.depositAddress) {
+      const depositResp = await sdk.getDepositAddress();
+      if (!depositResp) {
         throw new Error("deposit address not found");
       }
 
-      const addr = Address(getNetwork(Network.LOCAL)).decode(
-        depositResp.depositAddress.address,
-      );
+      const addr = Address(getNetwork(Network.LOCAL)).decode(depositResp);
       const script = OutScript.encode(addr);
 
       const depositTx = new Transaction();
-      depositTx.addInput(coin.outpoint);
+      depositTx.addInput(coin!.outpoint);
       depositTx.addOutput({
         script,
         amount: 100_000n,
@@ -73,8 +67,8 @@ describe("deposit", () => {
       // Set mock transaction
       const signedTx = await faucet.signFaucetCoin(
         depositTx,
-        coin.txout,
-        coin.key,
+        coin!.txout,
+        coin!.key,
       );
 
       await faucet.broadcastTx(signedTx.hex);
@@ -89,12 +83,7 @@ describe("deposit", () => {
       await faucet.generateToAddress(1, randomAddr);
 
       // Create tree root
-      const treeResp = await sdk.finalizeDeposit(
-        pubKey,
-        depositResp.depositAddress.verifyingKey,
-        depositTx,
-        vout,
-      );
+      const treeResp = await sdk.claimDeposit(signedTx.id);
 
       console.log("tree created:", treeResp);
     },

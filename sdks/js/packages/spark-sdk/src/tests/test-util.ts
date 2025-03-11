@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { hexToBytes } from "@noble/curves/abstract/utils";
 import { secp256k1 } from "@noble/curves/secp256k1";
 import { Address, OutScript, Transaction } from "@scure/btc-signer";
@@ -83,7 +82,7 @@ export function getRegtestSigningOperators(): Record<string, SigningOperator> {
         "0000000000000000000000000000000000000000000000000000000000000001",
       address: "https://0.spark.dev.dev.sparkinfra.net",
 
-      identityPublicKey: pubkeyBytesArray[0],
+      identityPublicKey: pubkeyBytesArray[0]!,
     },
     "0000000000000000000000000000000000000000000000000000000000000002": {
       id: 1,
@@ -91,14 +90,14 @@ export function getRegtestSigningOperators(): Record<string, SigningOperator> {
         "0000000000000000000000000000000000000000000000000000000000000002",
       address: "https://1.spark.dev.dev.sparkinfra.net",
 
-      identityPublicKey: pubkeyBytesArray[1],
+      identityPublicKey: pubkeyBytesArray[1]!,
     },
     "0000000000000000000000000000000000000000000000000000000000000003": {
       id: 2,
       identifier:
         "0000000000000000000000000000000000000000000000000000000000000003",
       address: "https://2.spark.dev.dev.sparkinfra.net",
-      identityPublicKey: pubkeyBytesArray[2],
+      identityPublicKey: pubkeyBytesArray[2]!,
     },
   };
 }
@@ -120,51 +119,51 @@ export function getLocalSigningOperators(): Record<string, SigningOperator> {
       identifier:
         "0000000000000000000000000000000000000000000000000000000000000001",
       address: "https://localhost:8535",
-      identityPublicKey: pubkeyBytesArray[0],
+      identityPublicKey: pubkeyBytesArray[0]!,
     },
     "0000000000000000000000000000000000000000000000000000000000000002": {
       id: 1,
       identifier:
         "0000000000000000000000000000000000000000000000000000000000000002",
       address: "https://localhost:8536",
-      identityPublicKey: pubkeyBytesArray[1],
+      identityPublicKey: pubkeyBytesArray[1]!,
     },
     "0000000000000000000000000000000000000000000000000000000000000003": {
       id: 2,
       identifier:
         "0000000000000000000000000000000000000000000000000000000000000003",
       address: "https://localhost:8537",
-      identityPublicKey: pubkeyBytesArray[2],
+      identityPublicKey: pubkeyBytesArray[2]!,
     },
     "0000000000000000000000000000000000000000000000000000000000000004": {
       id: 3,
       identifier:
         "0000000000000000000000000000000000000000000000000000000000000004",
       address: "https://localhost:8538",
-      identityPublicKey: pubkeyBytesArray[3],
+      identityPublicKey: pubkeyBytesArray[3]!,
     },
     "0000000000000000000000000000000000000000000000000000000000000005": {
       id: 4,
       identifier:
         "0000000000000000000000000000000000000000000000000000000000000005",
       address: "https://localhost:8539",
-      identityPublicKey: pubkeyBytesArray[4],
+      identityPublicKey: pubkeyBytesArray[4]!,
     },
   };
 }
 
-export function getTestWalletConfig(): WalletConfig {
+export function getTestWalletConfig() {
   const identityPrivateKey = secp256k1.utils.randomPrivateKey();
   return getTestWalletConfigWithIdentityKey(identityPrivateKey);
 }
 
 export function getTestWalletConfigWithIdentityKey(
   identityPrivateKey: Uint8Array,
-): WalletConfig {
+) {
   return {
     ...LOCAL_WALLET_CONFIG,
     identityPrivateKey,
-  } as WalletConfig;
+  } as ConfigOptions;
 }
 
 export async function createNewTree(
@@ -175,10 +174,9 @@ export async function createNewTree(
 ): Promise<TreeNode> {
   const faucetCoin = await faucet.fund();
 
-  const configService = new WalletConfigService(
-    Network.LOCAL,
-    wallet.getSigner(),
-  );
+  const configService = new WalletConfigService(Network.LOCAL, {
+    signer: wallet.getSigner(),
+  });
   const connectionManager = new ConnectionManager(configService);
   const depositService = new DepositService(configService, connectionManager);
 
@@ -191,7 +189,7 @@ export async function createNewTree(
   }
 
   const depositTx = new Transaction();
-  depositTx.addInput(faucetCoin.outpoint);
+  depositTx.addInput(faucetCoin!.outpoint);
 
   // Add the main output
   const addr = Address(getNetwork(Network.LOCAL)).decode(
@@ -209,8 +207,8 @@ export async function createNewTree(
 
   const signedDepositTx = await faucet.signFaucetCoin(
     depositTx,
-    faucetCoin.txout,
-    faucetCoin.key,
+    faucetCoin!.txout,
+    faucetCoin!.key,
   );
 
   await faucet.broadcastTx(signedDepositTx.hex);
@@ -226,5 +224,5 @@ export async function createNewTree(
   await faucet.generateToAddress(1, randomAddress);
 
   await new Promise((resolve) => setTimeout(resolve, 100));
-  return treeResp.nodes[0];
+  return treeResp.nodes[0]!;
 }
