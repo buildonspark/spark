@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"log/slog"
 	"time"
 
 	"github.com/btcsuite/btcd/wire"
@@ -356,7 +355,7 @@ func (h *BaseTransferHandler) CancelSendTransfer(
 		return nil, fmt.Errorf("unable to unlock leaves in the transfer: %v", err)
 	}
 
-	err = h.cancelTransferCancelRequest(ctx, transfer)
+	err = h.cancelTransferCancelRequest(ctx, transfer, intent)
 	if err != nil {
 		return nil, fmt.Errorf("unable to cancel associated request: %v", err)
 	}
@@ -378,7 +377,7 @@ func (h *BaseTransferHandler) CancelSendTransfer(
 			return nil, nil
 		})
 		if err != nil {
-			slog.Error("CancelSendTransfer: unable to execute task with all operators", "error", err)
+			return nil, fmt.Errorf("unable to execute task with all operators: %v", err)
 		}
 	}
 
@@ -404,12 +403,15 @@ func (h *BaseTransferHandler) cancelTransferUnlockLeaves(ctx context.Context, tr
 	return nil
 }
 
-func (h *BaseTransferHandler) cancelTransferCancelRequest(ctx context.Context, transfer *ent.Transfer) error {
+func (h *BaseTransferHandler) cancelTransferCancelRequest(ctx context.Context, transfer *ent.Transfer, intent CancelSendTransferIntent) error {
 	if transfer.Type == schema.TransferTypePreimageSwap {
 		db := ent.GetDbFromContext(ctx)
 		preimageRequest, err := db.PreimageRequest.Query().Where(preimagerequest.HasTransfersWith(enttransfer.ID(transfer.ID))).Only(ctx)
 		if err != nil || preimageRequest == nil {
 			return fmt.Errorf("cannot find preimage request for transfer %s", transfer.ID.String())
+		}
+		if intent != CancelSendTransferIntentInternal && preimageRequest.Status != schema.PreimageRequestStatusWaitingForPreimage {
+			return fmt.Errorf("preimage request is not in the waiting for preimage status")
 		}
 		err = preimageRequest.Update().SetStatus(schema.PreimageRequestStatusReturned).Exec(ctx)
 		if err != nil {

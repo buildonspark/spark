@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"testing"
+	"time"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lightsparkdev/spark-go/common"
@@ -413,4 +414,78 @@ func TestSendLightningPaymentWithRejection(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+}
+
+func TestReceiveLightningPaymentWithWrongPreimage(t *testing.T) {
+	// Create user and ssp configs
+	userConfig, err := testutil.TestWalletConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	sspConfig, err := testutil.TestWalletConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// User creates an invoice
+	preimage, err := hex.DecodeString("2d059c3ede82a107aa1452c0bea47759be3c5c6e5342be6a310f6c3a907d9f4c")
+	if err != nil {
+		t.Fatal(err)
+	}
+	paymentHash := sha256.Sum256(preimage)
+	wrongPaymentHash := sha256.Sum256(preimage)
+	wrongPaymentHash[0] = ^wrongPaymentHash[0]
+	fakeInvoiceCreator := &FakeLightningInvoiceCreator{}
+
+	defer cleanUp(t, userConfig, paymentHash[:])
+
+	invoice, _, err := wallet.CreateLightningInvoiceWithPreimage(context.Background(), userConfig, fakeInvoiceCreator, 100, "test", preimage)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.NotNil(t, invoice)
+
+	// SSP creates a node of 12345 sats
+	sspLeafPrivKey, err := secp256k1.GeneratePrivateKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	feeSats := uint64(2)
+	nodeToSend, err := testutil.CreateNewTree(sspConfig, faucet, sspLeafPrivKey, 12343)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	newLeafPrivKey, err := secp256k1.GeneratePrivateKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	leaves := []wallet.LeafKeyTweak{}
+	leaves = append(leaves, wallet.LeafKeyTweak{
+		Leaf:              nodeToSend,
+		SigningPrivKey:    sspLeafPrivKey.Serialize(),
+		NewSigningPrivKey: newLeafPrivKey.Serialize(),
+	})
+
+	_, err = wallet.SwapNodesForPreimage(
+		context.Background(),
+		sspConfig,
+		leaves,
+		userConfig.IdentityPublicKey(),
+		wrongPaymentHash[:],
+		nil,
+		feeSats,
+		true,
+	)
+	if err == nil {
+		t.Fatalf("expected error")
+	}
+
+	transfer, err := wallet.SendTransfer(context.Background(), sspConfig, leaves, userConfig.IdentityPublicKey(), time.Unix(0, 0))
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, transfer.Status, spark.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED)
 }
