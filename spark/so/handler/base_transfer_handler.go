@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/btcsuite/btcd/wire"
@@ -377,7 +378,7 @@ func (h *BaseTransferHandler) CancelSendTransfer(
 			return nil, nil
 		})
 		if err != nil {
-			return nil, fmt.Errorf("unable to execute task with all operators: %v", err)
+			slog.Error("CancelSendTransfer: unable to execute task with all operators", "error", err)
 		}
 	}
 
