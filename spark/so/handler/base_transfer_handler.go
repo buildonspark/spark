@@ -411,9 +411,6 @@ func (h *BaseTransferHandler) cancelTransferCancelRequest(ctx context.Context, t
 		if err != nil || preimageRequest == nil {
 			return fmt.Errorf("cannot find preimage request for transfer %s", transfer.ID.String())
 		}
-		if preimageRequest.Status != schema.PreimageRequestStatusWaitingForPreimage {
-			return fmt.Errorf("preimage request is not in the waiting for preimage status")
-		}
 		err = preimageRequest.Update().SetStatus(schema.PreimageRequestStatusReturned).Exec(ctx)
 		if err != nil {
 			return fmt.Errorf("unable to update preimage request status: %v", err)
