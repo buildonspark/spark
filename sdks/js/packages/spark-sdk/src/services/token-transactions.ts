@@ -10,6 +10,7 @@ import {
   OperatorSpecificTokenTransactionSignature,
   TokenTransaction,
 } from "../proto/spark.js";
+import { SparkCallOptions } from "../types/grpc.js";
 import { validateResponses } from "../utils/response-validation.js";
 import {
   hashOperatorSpecificTokenTransactionSignablePayload,
@@ -19,13 +20,9 @@ import {
   KeyshareWithOperatorIndex,
   recoverPrivateKeyFromKeyshares,
 } from "../utils/token-keyshares.js";
-import {
-  calculateAvailableTokenAmount,
-  getTokenLeavesSum,
-} from "../utils/token-transactions.js";
+import { calculateAvailableTokenAmount } from "../utils/token-transactions.js";
 import { WalletConfigService } from "./config.js";
 import { ConnectionManager } from "./connection.js";
-import { SparkCallOptions } from "../types/grpc.js";
 
 export class TokenTransactionService {
   protected readonly config: WalletConfigService;
@@ -102,7 +99,7 @@ export class TokenTransactionService {
   public collectOperatorIdentityPublicKeys(): Uint8Array[] {
     const operatorKeys: Uint8Array[] = [];
     for (const [_, operator] of Object.entries(
-      this.config.getConfig().signingOperators,
+      this.config.getSigningOperators(),
     )) {
       operatorKeys.push(operator.identityPublicKey);
     }
@@ -119,7 +116,7 @@ export class TokenTransactionService {
       this.config.getCoordinatorAddress(),
     );
 
-    const signingOperators = this.config.getConfig().signingOperators;
+    const signingOperators = this.config.getSigningOperators();
 
     const partialTokenTransactionHash = hashTokenTransaction(
       tokenTransaction,
@@ -235,7 +232,7 @@ export class TokenTransactionService {
       const transferInput = tokenTransaction.tokenInput!.transferInput;
       for (let i = 0; i < transferInput.leavesToSpend.length; i++) {
         let ownerSignature: Uint8Array;
-        if (this.config.getConfig().useTokenTransactionSchnorrSignatures) {
+        if (this.config.shouldSignTokenTransactionsWithSchnorr()) {
           ownerSignature =
             await this.config.signer.signSchnorrWithIdentityKey(payloadHash);
         } else {
@@ -359,7 +356,7 @@ export class TokenTransactionService {
     leafToSpendRevocationKeys: Uint8Array[],
     threshold: number,
   ): Promise<TokenTransaction> {
-    const signingOperators = this.config.getConfig().signingOperators;
+    const signingOperators = this.config.getSigningOperators();
     // Submit finalize_token_transaction to all SOs in parallel
     const soResponses = await Promise.allSettled(
       Object.entries(signingOperators).map(async ([identifier, operator]) => {
@@ -477,17 +474,19 @@ export class TokenTransactionService {
     message: Uint8Array,
     publicKey: Uint8Array,
   ): Promise<Uint8Array> {
+    const signWithSchnorr =
+      this.config.shouldSignTokenTransactionsWithSchnorr();
     if (
       bytesToHex(publicKey) ===
       bytesToHex(await this.config.signer.getIdentityPublicKey())
     ) {
-      if (this.config.getConfig().useTokenTransactionSchnorrSignatures) {
+      if (signWithSchnorr) {
         return await this.config.signer.signSchnorrWithIdentityKey(message);
       } else {
         return await this.config.signer.signMessageWithIdentityKey(message);
       }
     } else {
-      if (this.config.getConfig().useTokenTransactionSchnorrSignatures) {
+      if (signWithSchnorr) {
         return await this.config.signer.signSchnorr(message, publicKey);
       } else {
         return await this.config.signer.signMessageWithPublicKey(

@@ -88,12 +88,8 @@ export class DepositService {
     }
 
     const addrHash = sha256(address.address);
-    for (const operator of Object.values(
-      this.config.getConfig().signingOperators,
-    )) {
-      if (
-        operator.identifier === this.config.getConfig().coodinatorIdentifier
-      ) {
+    for (const operator of Object.values(this.config.getSigningOperators())) {
+      if (operator.identifier === this.config.getCoordinatorIdentifier()) {
         continue;
       }
 

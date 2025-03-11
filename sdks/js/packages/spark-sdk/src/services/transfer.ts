@@ -98,48 +98,50 @@ export class BaseTransferService {
 
     let updatedTransfer: Transfer | undefined;
     const errors: Error[] = [];
-    const promises = Object.entries(
-      this.config.getConfig().signingOperators,
-    ).map(async ([identifier, operator]) => {
-      const sparkClient = await this.connectionManager.createSparkClient(
-        operator.address,
-      );
+    const promises = Object.entries(this.config.getSigningOperators()).map(
+      async ([identifier, operator]) => {
+        const sparkClient = await this.connectionManager.createSparkClient(
+          operator.address,
+        );
 
-      const leavesToSend = keyTweakInputMap.get(identifier);
-      if (!leavesToSend) {
-        errors.push(new Error(`No leaves to send for operator ${identifier}`));
-        return;
-      }
-      let transferResp: CompleteSendTransferResponse;
-      try {
-        transferResp = await sparkClient.complete_send_transfer({
-          transferId: transfer.id,
-          ownerIdentityPublicKey:
-            await this.config.signer.getIdentityPublicKey(),
-          leavesToSend,
-        });
-      } catch (error) {
-        errors.push(new Error(`Error completing send transfer: ${error}`));
-        return;
-      }
-
-      if (!updatedTransfer) {
-        updatedTransfer = transferResp.transfer;
-      } else {
-        if (!transferResp.transfer) {
+        const leavesToSend = keyTweakInputMap.get(identifier);
+        if (!leavesToSend) {
           errors.push(
-            new Error(`No transfer response from operator ${identifier}`),
+            new Error(`No leaves to send for operator ${identifier}`),
           );
           return;
         }
-
-        if (!this.compareTransfers(updatedTransfer, transferResp.transfer)) {
-          errors.push(
-            new Error(`Inconsistent transfer response from operators`),
-          );
+        let transferResp: CompleteSendTransferResponse;
+        try {
+          transferResp = await sparkClient.complete_send_transfer({
+            transferId: transfer.id,
+            ownerIdentityPublicKey:
+              await this.config.signer.getIdentityPublicKey(),
+            leavesToSend,
+          });
+        } catch (error) {
+          errors.push(new Error(`Error completing send transfer: ${error}`));
+          return;
         }
-      }
-    });
+
+        if (!updatedTransfer) {
+          updatedTransfer = transferResp.transfer;
+        } else {
+          if (!transferResp.transfer) {
+            errors.push(
+              new Error(`No transfer response from operator ${identifier}`),
+            );
+            return;
+          }
+
+          if (!this.compareTransfers(updatedTransfer, transferResp.transfer)) {
+            errors.push(
+              new Error(`Inconsistent transfer response from operators`),
+            );
+          }
+        }
+      },
+    );
 
     await Promise.all(promises);
 
@@ -254,6 +256,7 @@ export class BaseTransferService {
     receiverEciesPubKey: ecies.PublicKey,
     refundSignature?: Uint8Array,
   ): Promise<Map<string, SendLeafKeyTweak>> {
+    const signingOperators = this.config.getSigningOperators();
     const pubKeyTweak =
       await this.config.signer.subtractPrivateKeysGivenPublicKeys(
         leaf.signingPubKey,
@@ -263,15 +266,13 @@ export class BaseTransferService {
     const shares = await this.config.signer.splitSecretWithProofs({
       secret: pubKeyTweak,
       curveOrder: secp256k1.CURVE.n,
-      threshold: this.config.getConfig().threshold,
-      numShares: Object.keys(this.config.getConfig().signingOperators).length,
+      threshold: this.config.getThreshold(),
+      numShares: Object.keys(signingOperators).length,
       isSecretPubkey: true,
     });
 
     const pubkeySharesTweak = new Map<string, Uint8Array>();
-    for (const [identifier, operator] of Object.entries(
-      this.config.getConfig().signingOperators,
-    )) {
+    for (const [identifier, operator] of Object.entries(signingOperators)) {
       const share = this.findShare(shares, operator.id);
       if (!share) {
         throw new Error(`Share not found for operator ${operator.id}`);
@@ -303,9 +304,7 @@ export class BaseTransferService {
     );
 
     const leafTweaksMap = new Map<string, SendLeafKeyTweak>();
-    for (const [identifier, operator] of Object.entries(
-      this.config.getConfig().signingOperators,
-    )) {
+    for (const [identifier, operator] of Object.entries(signingOperators)) {
       const share = this.findShare(shares, operator.id);
       if (!share) {
         throw new Error(`Share not found for operator ${operator.id}`);
@@ -667,33 +666,35 @@ export class TransferService extends BaseTransferService {
 
     const errors: Error[] = [];
 
-    const promises = Object.entries(
-      this.config.getConfig().signingOperators,
-    ).map(async ([identifier, operator]) => {
-      const sparkClient = await this.connectionManager.createSparkClient(
-        operator.address,
-      );
-
-      const leavesToReceive = leavesTweaksMap.get(identifier);
-      if (!leavesToReceive) {
-        errors.push(
-          new Error(`No leaves to receive for operator ${identifier}`),
+    const promises = Object.entries(this.config.getSigningOperators()).map(
+      async ([identifier, operator]) => {
+        const sparkClient = await this.connectionManager.createSparkClient(
+          operator.address,
         );
-        return;
-      }
 
-      try {
-        await sparkClient.claim_transfer_tweak_keys({
-          transferId: transfer.id,
-          ownerIdentityPublicKey:
-            await this.config.signer.getIdentityPublicKey(),
-          leavesToReceive,
-        });
-      } catch (error) {
-        errors.push(new Error(`Error claiming transfer tweak keys: ${error}`));
-        return;
-      }
-    });
+        const leavesToReceive = leavesTweaksMap.get(identifier);
+        if (!leavesToReceive) {
+          errors.push(
+            new Error(`No leaves to receive for operator ${identifier}`),
+          );
+          return;
+        }
+
+        try {
+          await sparkClient.claim_transfer_tweak_keys({
+            transferId: transfer.id,
+            ownerIdentityPublicKey:
+              await this.config.signer.getIdentityPublicKey(),
+            leavesToReceive,
+          });
+        } catch (error) {
+          errors.push(
+            new Error(`Error claiming transfer tweak keys: ${error}`),
+          );
+          return;
+        }
+      },
+    );
 
     await Promise.all(promises);
 
@@ -721,6 +722,8 @@ export class TransferService extends BaseTransferService {
   private async prepareClaimLeafKeyTweaks(
     leaf: LeafKeyTweak,
   ): Promise<Map<string, ClaimLeafKeyTweak>> {
+    const signingOperators = this.config.getSigningOperators();
+
     const pubKeyTweak =
       await this.config.signer.subtractPrivateKeysGivenPublicKeys(
         leaf.signingPubKey,
@@ -730,16 +733,14 @@ export class TransferService extends BaseTransferService {
     const shares = await this.config.signer.splitSecretWithProofs({
       secret: pubKeyTweak,
       curveOrder: secp256k1.CURVE.n,
-      threshold: this.config.getConfig().threshold,
-      numShares: Object.keys(this.config.getConfig().signingOperators).length,
+      threshold: this.config.getThreshold(),
+      numShares: Object.keys(signingOperators).length,
       isSecretPubkey: true,
     });
 
     const pubkeySharesTweak = new Map<string, Uint8Array>();
 
-    for (const [identifier, operator] of Object.entries(
-      this.config.getConfig().signingOperators,
-    )) {
+    for (const [identifier, operator] of Object.entries(signingOperators)) {
       const share = this.findShare(shares, operator.id);
       if (!share) {
         throw new Error(`Share not found for operator ${operator.id}`);
@@ -751,9 +752,7 @@ export class TransferService extends BaseTransferService {
     }
 
     const leafTweaksMap = new Map<string, ClaimLeafKeyTweak>();
-    for (const [identifier, operator] of Object.entries(
-      this.config.getConfig().signingOperators,
-    )) {
+    for (const [identifier, operator] of Object.entries(signingOperators)) {
       const share = this.findShare(shares, operator.id);
       if (!share) {
         throw new Error(`Share not found for operator ${operator.id}`);

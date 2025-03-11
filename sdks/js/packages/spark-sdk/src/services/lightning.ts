@@ -100,39 +100,39 @@ export class LightningService {
     const shares = await this.config.signer.splitSecretWithProofs({
       secret: preimage,
       curveOrder: secp256k1.CURVE.n,
-      threshold: this.config.getConfig().threshold,
-      numShares: Object.keys(this.config.getConfig().signingOperators).length,
+      threshold: this.config.getThreshold(),
+      numShares: Object.keys(this.config.getSigningOperators()).length,
     });
 
     const errors: Error[] = [];
-    const promises = Object.entries(
-      this.config.getConfig().signingOperators,
-    ).map(async ([_, operator]) => {
-      const share = shares[operator.id];
-      if (!share) {
-        throw new Error("Share not found");
-      }
+    const promises = Object.entries(this.config.getSigningOperators()).map(
+      async ([_, operator]) => {
+        const share = shares[operator.id];
+        if (!share) {
+          throw new Error("Share not found");
+        }
 
-      const sparkClient = await this.connectionManager.createSparkClient(
-        operator.address,
-      );
+        const sparkClient = await this.connectionManager.createSparkClient(
+          operator.address,
+        );
 
-      try {
-        await sparkClient.store_preimage_share({
-          paymentHash,
-          preimageShare: {
-            secretShare: numberToBytesBE(share.share, 32),
-            proofs: share.proofs,
-          },
-          threshold: this.config.getConfig().threshold,
-          invoiceString: invoice,
-          userIdentityPublicKey:
-            await this.config.signer.getIdentityPublicKey(),
-        });
-      } catch (e: any) {
-        errors.push(e);
-      }
-    });
+        try {
+          await sparkClient.store_preimage_share({
+            paymentHash,
+            preimageShare: {
+              secretShare: numberToBytesBE(share.share, 32),
+              proofs: share.proofs,
+            },
+            threshold: this.config.getThreshold(),
+            invoiceString: invoice,
+            userIdentityPublicKey:
+              await this.config.signer.getIdentityPublicKey(),
+          });
+        } catch (e: any) {
+          errors.push(e);
+        }
+      },
+    );
 
     await Promise.all(promises);
 

@@ -1,23 +1,24 @@
-//@ts-nocheck
-
+// @ts-nocheck
 import { hexToBytes } from "@noble/curves/abstract/utils";
 import { secp256k1 } from "@noble/curves/secp256k1";
 import { Address, OutScript, Transaction } from "@scure/btc-signer";
 import { TreeNode } from "../proto/spark.js";
 import {
+  ConfigOptions,
   SigningOperator,
-  WalletConfig,
   WalletConfigService,
 } from "../services/config.js";
 import { ConnectionManager } from "../services/connection.js";
 import { DepositService } from "../services/deposit.js";
 import { getP2TRAddressFromPublicKey } from "../utils/bitcoin.js";
 import { getNetwork, Network } from "../utils/network.js";
+import { DefaultSparkSigner } from "./../signer/signer.js";
 import { SparkWalletTesting } from "./utils/spark-testing-wallet.js";
 import { BitcoinFaucet } from "./utils/test-faucet.js";
 
-export const LOCAL_WALLET_CONFIG = {
-  network: Network.REGTEST,
+const DEFAULT_SPARK_SIGNER = new DefaultSparkSigner();
+export const LOCAL_WALLET_CONFIG: Required<ConfigOptions> = {
+  signer: DEFAULT_SPARK_SIGNER,
   coodinatorIdentifier:
     "0000000000000000000000000000000000000000000000000000000000000001",
   frostSignerAddress: "unix:///tmp/frost_0.sock",
@@ -26,8 +27,8 @@ export const LOCAL_WALLET_CONFIG = {
   useTokenTransactionSchnorrSignatures: true,
 };
 
-export const LOCAL_WALLET_CONFIG_SCHNORR = {
-  network: Network.REGTEST,
+export const LOCAL_WALLET_CONFIG_SCHNORR: Required<ConfigOptions> = {
+  signer: DEFAULT_SPARK_SIGNER,
   coodinatorIdentifier:
     "0000000000000000000000000000000000000000000000000000000000000001",
   frostSignerAddress: "unix:///tmp/frost_0.sock",
@@ -36,8 +37,8 @@ export const LOCAL_WALLET_CONFIG_SCHNORR = {
   useTokenTransactionSchnorrSignatures: true,
 };
 
-export const LOCAL_WALLET_CONFIG_ECDSA = {
-  network: Network.REGTEST,
+export const LOCAL_WALLET_CONFIG_ECDSA: Required<ConfigOptions> = {
+  signer: DEFAULT_SPARK_SIGNER,
   coodinatorIdentifier:
     "0000000000000000000000000000000000000000000000000000000000000001",
   frostSignerAddress: "unix:///tmp/frost_0.sock",
@@ -46,8 +47,8 @@ export const LOCAL_WALLET_CONFIG_ECDSA = {
   useTokenTransactionSchnorrSignatures: false,
 };
 
-export const REGTEST_WALLET_CONFIG = {
-  network: Network.REGTEST,
+export const REGTEST_WALLET_CONFIG: Required<ConfigOptions> = {
+  signer: DEFAULT_SPARK_SIGNER,
   coodinatorIdentifier:
     "0000000000000000000000000000000000000000000000000000000000000001",
   frostSignerAddress: "unix:///tmp/frost_0.sock",
@@ -56,8 +57,8 @@ export const REGTEST_WALLET_CONFIG = {
   useTokenTransactionSchnorrSignatures: true,
 };
 
-export const MAINNET_WALLET_CONFIG = {
-  network: Network.MAINNET,
+export const MAINNET_WALLET_CONFIG: Required<ConfigOptions> = {
+  signer: DEFAULT_SPARK_SIGNER,
   coodinatorIdentifier:
     "0000000000000000000000000000000000000000000000000000000000000001",
   frostSignerAddress: "unix:///tmp/frost_0.sock",

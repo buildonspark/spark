@@ -38,11 +38,9 @@ export class ConnectionManager {
   // When initializing wallet, go ahead and instantiate all clients
   public async createClients() {
     await Promise.all(
-      Object.values(this.config.getConfig().signingOperators).map(
-        (operator) => {
-          this.createSparkClient(operator.address);
-        },
-      ),
+      Object.values(this.config.getSigningOperators()).map((operator) => {
+        this.createSparkClient(operator.address);
+      }),
     );
   }
 

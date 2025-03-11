@@ -24,7 +24,7 @@ import {
   TransferStatus,
   TreeNode,
 } from "./proto/spark.js";
-import { WalletConfig, WalletConfigService } from "./services/config.js";
+import { ConfigOptions, WalletConfigService } from "./services/config.js";
 import { ConnectionManager } from "./services/connection.js";
 import { CoopExitService } from "./services/coop-exit.js";
 import { DepositService } from "./services/deposit.js";
@@ -41,7 +41,6 @@ import {
   DepositAddressTree,
   TreeCreationService,
 } from "./services/tree-creation.js";
-import { SparkSigner } from "./signer/signer.js";
 import {
   applyAdaptorToSignature,
   generateAdaptorFromSignature,
@@ -152,17 +151,8 @@ export class SparkWallet {
   protected tokenLeaves: Map<string, LeafWithPreviousTransactionData[]> =
     new Map();
 
-  constructor(
-    network: NetworkType,
-    signer?: SparkSigner,
-    config?: WalletConfig,
-  ) {
-    if (config) {
-      this.config = WalletConfigService.withConfig(config, signer);
-    } else {
-      this.config = new WalletConfigService(Network[network], signer);
-    }
-
+  constructor(network: NetworkType, configOptions?: ConfigOptions) {
+    this.config = new WalletConfigService(Network[network], configOptions);
     this.connectionManager = new ConnectionManager(this.config);
 
     this.depositService = new DepositService(

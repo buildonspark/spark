@@ -7,8 +7,7 @@ import {
 } from "@buildonspark/lrc20-sdk";
 import { SparkWallet } from "@buildonspark/spark-sdk";
 import { LeafWithPreviousTransactionData } from "@buildonspark/spark-sdk/proto/spark";
-import { WalletConfig } from "@buildonspark/spark-sdk/services/config";
-import { SparkSigner } from "@buildonspark/spark-sdk/signer";
+import { ConfigOptions } from "@buildonspark/spark-sdk/services/config";
 import { NetworkType as SparkNetworkType } from "@buildonspark/spark-sdk/utils";
 import {
   bytesToHex,
@@ -33,10 +32,9 @@ export class IssuerSparkWallet
   constructor(
     network: SparkNetworkType,
     privateKey: string,
-    signer?: SparkSigner,
-    config?: WalletConfig,
+    configOptions?: ConfigOptions,
   ) {
-    super(network, signer, config);
+    super(network, configOptions);
 
     // TODO: For now
     this.lrc20Wallet = new LRCWallet(

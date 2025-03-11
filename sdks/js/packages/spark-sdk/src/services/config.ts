@@ -1,4 +1,4 @@
-import { DefaultSparkSigner, SparkSigner } from "../signer/signer.js";
+import { SparkSigner } from "../signer/signer.js";
 import {
   LOCAL_WALLET_CONFIG,
   MAINNET_WALLET_CONFIG,
@@ -7,50 +7,49 @@ import {
 import { Network, NetworkToProto } from "../utils/network.js";
 
 export type SigningOperator = {
-  id: number;
-  identifier: string;
-  address: string;
-  identityPublicKey: Uint8Array;
+  readonly id: number;
+  readonly identifier: string;
+  readonly address: string;
+  readonly identityPublicKey: Uint8Array;
 };
 
-export type WalletConfig = {
-  network: Network;
-  signingOperators: Record<string, SigningOperator>;
-  coodinatorIdentifier: string;
-  frostSignerAddress: string;
-  threshold: number;
-  useTokenTransactionSchnorrSignatures: boolean;
+export type ConfigOptions = {
+  readonly signer?: SparkSigner;
+  readonly signingOperators?: Readonly<Record<string, SigningOperator>>;
+  readonly coodinatorIdentifier?: string;
+  readonly frostSignerAddress?: string;
+  readonly threshold?: number;
+  readonly useTokenTransactionSchnorrSignatures?: boolean;
 };
 
 export class WalletConfigService {
-  private config: WalletConfig;
+  private readonly config: Required<ConfigOptions>;
   public readonly signer: SparkSigner;
 
-  constructor(network: Network, signer?: SparkSigner) {
+  constructor(
+    private readonly network: Network,
+    options?: ConfigOptions,
+  ) {
+    this.config = {
+      ...this.getDefaultConfig(network),
+      ...options,
+    };
+
+    this.signer = this.config.signer;
+  }
+
+  private getDefaultConfig(network: Network): Required<ConfigOptions> {
     switch (network) {
       case Network.MAINNET:
-        this.config = MAINNET_WALLET_CONFIG;
-        break;
+        return MAINNET_WALLET_CONFIG;
       case Network.REGTEST:
-        this.config = REGTEST_WALLET_CONFIG;
-        break;
+        return REGTEST_WALLET_CONFIG;
       default:
-        this.config = LOCAL_WALLET_CONFIG;
-        break;
+        return LOCAL_WALLET_CONFIG;
     }
-    this.signer = signer || new DefaultSparkSigner();
   }
 
-  static withConfig(
-    config: WalletConfig,
-    signer?: SparkSigner,
-  ): WalletConfigService {
-    const service = new WalletConfigService(config.network, signer);
-    service.config = config;
-    return service;
-  }
-
-  getCoordinatorAddress() {
+  public getCoordinatorAddress(): string {
     const coordinator =
       this.config.signingOperators[this.config.coodinatorIdentifier];
     if (!coordinator) {
@@ -61,15 +60,27 @@ export class WalletConfigService {
     return coordinator.address;
   }
 
-  getConfig() {
-    return this.config;
+  public getSigningOperators(): Readonly<Record<string, SigningOperator>> {
+    return this.config.signingOperators;
   }
 
-  getNetwork() {
-    return this.config.network;
+  public getThreshold(): number {
+    return this.config.threshold;
   }
 
-  getNetworkProto() {
-    return NetworkToProto[this.config.network];
+  public getCoordinatorIdentifier(): string {
+    return this.config.coodinatorIdentifier;
+  }
+
+  public getNetwork(): Network {
+    return this.network;
+  }
+
+  public getNetworkProto(): number {
+    return NetworkToProto[this.network];
+  }
+
+  public shouldSignTokenTransactionsWithSchnorr(): boolean {
+    return this.config.useTokenTransactionSchnorrSignatures;
   }
 }

@@ -1,8 +1,10 @@
 import { WalletConfigService } from "@buildonspark/spark-sdk/config";
 import { ConnectionManager } from "@buildonspark/spark-sdk/connection";
-import { FreezeTokensPayload, FreezeTokensResponse } from "@buildonspark/spark-sdk/proto/spark";
+import {
+  FreezeTokensPayload,
+  FreezeTokensResponse,
+} from "@buildonspark/spark-sdk/proto/spark";
 import { validateResponses } from "@buildonspark/spark-sdk/utils";
-import { bytesToHex } from "@noble/curves/abstract/utils";
 import { hashFreezeTokensPayload } from "../utils/token-hashing.js";
 
 export class TokenFreezeService {
@@ -36,7 +38,7 @@ export class TokenFreezeService {
     tokenPublicKey: Uint8Array,
     shouldUnfreeze: boolean,
   ): Promise<FreezeTokensResponse> {
-    const signingOperators = this.config.getConfig().signingOperators;
+    const signingOperators = this.config.getSigningOperators();
     const issuerProvidedTimestamp = Date.now();
 
     // Submit freeze_tokens to all SOs in parallel
@@ -57,9 +59,7 @@ export class TokenFreezeService {
           hashFreezeTokensPayload(freezeTokensPayload);
 
         const issuerSignature =
-          await this.config.signer.signMessageWithIdentityKey(
-            hashedPayload,
-          );
+          await this.config.signer.signMessageWithIdentityKey(hashedPayload);
 
         const response = await internalSparkClient.freeze_tokens({
           freezeTokensPayload,

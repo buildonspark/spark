@@ -20,7 +20,6 @@ describe("token integration test", () => {
     const wallet = new IssuerSparkWallet(
       "LOCAL",
       "4799979d5e417e3d6d00cf89a77d4f3c0354d295810326c6b0bf4b45aedb38f3",
-      undefined,
       LOCAL_WALLET_CONFIG_ECDSA,
     );
     const mnemonic = generateMnemonic(wordlist);
@@ -37,7 +36,6 @@ describe("token integration test", () => {
     const wallet = new IssuerSparkWallet(
       "LOCAL",
       "4799979d5e417e3d6d00cf89a77d4f3c0354d295810326c6b0bf4b45aedb38f3",
-      undefined,
       LOCAL_WALLET_CONFIG_SCHNORR,
     );
     const mnemonic = generateMnemonic(wordlist);
@@ -55,7 +53,6 @@ describe("token integration test", () => {
     const issuerWallet = new IssuerSparkWallet(
       "LOCAL",
       "4799979d5e417e3d6d00cf89a77d4f3c0354d295810326c6b0bf4b45aedb38f3",
-      undefined,
       LOCAL_WALLET_CONFIG_ECDSA,
     );
     const mnemonic = generateMnemonic(wordlist);
@@ -63,7 +60,6 @@ describe("token integration test", () => {
 
     const destinationWallet = new SparkWallet(
       "LOCAL",
-      undefined,
       LOCAL_WALLET_CONFIG_ECDSA,
     );
     const destinationMnemonic = generateMnemonic(wordlist);
@@ -92,7 +88,6 @@ describe("token integration test", () => {
     const issuerWallet = new IssuerSparkWallet(
       "LOCAL",
       "4799979d5e417e3d6d00cf89a77d4f3c0354d295810326c6b0bf4b45aedb38f3",
-      undefined,
       LOCAL_WALLET_CONFIG_SCHNORR,
     );
     const mnemonic = generateMnemonic(wordlist);
@@ -100,7 +95,6 @@ describe("token integration test", () => {
 
     const destinationWallet = new SparkWallet(
       "LOCAL",
-      undefined,
       LOCAL_WALLET_CONFIG_SCHNORR,
     );
     const destinationMnemonic = generateMnemonic(wordlist);
@@ -128,7 +122,6 @@ describe("token integration test", () => {
     const issuerWallet = new IssuerSparkWallet(
       "LOCAL",
       "4799979d5e417e3d6d00cf89a77d4f3c0354d295810326c6b0bf4b45aedb38f3",
-      undefined,
       LOCAL_WALLET_CONFIG_ECDSA,
     );
     const issuerMnemonic = generateMnemonic(wordlist);
@@ -179,7 +172,6 @@ describe("token integration test", () => {
     const issuerWallet = new IssuerSparkWallet(
       "LOCAL",
       "4799979d5e417e3d6d00cf89a77d4f3c0354d295810326c6b0bf4b45aedb38f3",
-      undefined,
       LOCAL_WALLET_CONFIG_SCHNORR,
     );
     const issuerMnemonic = generateMnemonic(wordlist);
@@ -228,7 +220,6 @@ describe("token integration test", () => {
     const issuerWallet = new IssuerSparkWallet(
       "LOCAL",
       "4799979d5e417e3d6d00cf89a77d4f3c0354d295810326c6b0bf4b45aedb38f3",
-      undefined,
       LOCAL_WALLET_CONFIG_ECDSA,
     );
     const issuerMnemonic = generateMnemonic(wordlist);
@@ -250,7 +241,6 @@ describe("token integration test", () => {
     const issuerWallet = new IssuerSparkWallet(
       "LOCAL",
       "4799979d5e417e3d6d00cf89a77d4f3c0354d295810326c6b0bf4b45aedb38f3",
-      undefined,
       LOCAL_WALLET_CONFIG_SCHNORR,
     );
     const issuerMnemonic = generateMnemonic(wordlist);
@@ -273,17 +263,12 @@ describe("token integration test", () => {
     const issuerWallet = new IssuerSparkWallet(
       "LOCAL",
       "4799979d5e417e3d6d00cf89a77d4f3c0354d295810326c6b0bf4b45aedb38f3",
-      undefined,
       LOCAL_WALLET_CONFIG_ECDSA,
     );
     const issuerMnemonic = generateMnemonic(wordlist);
     await issuerWallet.initWallet(issuerMnemonic);
 
-    const userWallet = new SparkWallet(
-      "LOCAL",
-      undefined,
-      LOCAL_WALLET_CONFIG_ECDSA,
-    );
+    const userWallet = new SparkWallet("LOCAL", LOCAL_WALLET_CONFIG_ECDSA);
     const userMnemonic = generateMnemonic(wordlist);
     await userWallet.initWallet(userMnemonic);
 
@@ -339,17 +324,12 @@ describe("token integration test", () => {
     const issuerWallet = new IssuerSparkWallet(
       "LOCAL",
       "4799979d5e417e3d6d00cf89a77d4f3c0354d295810326c6b0bf4b45aedb38f3",
-      undefined,
       LOCAL_WALLET_CONFIG_SCHNORR,
     );
     const issuerMnemonic = generateMnemonic(wordlist);
     await issuerWallet.initWallet(issuerMnemonic);
 
-    const userWallet = new SparkWallet(
-      "LOCAL",
-      undefined,
-      LOCAL_WALLET_CONFIG_SCHNORR,
-    );
+    const userWallet = new SparkWallet("LOCAL", LOCAL_WALLET_CONFIG_SCHNORR);
     const userMnemonic = generateMnemonic(wordlist);
     await userWallet.initWallet(userMnemonic);
 
