@@ -25,6 +25,7 @@
     "build:cjs": "npx swc src -d ./dist/cjs --strip-leading-paths --config-file .swcrc -C module.type=commonjs",
     "build:esm": "npx swc src -d ./dist/esm --strip-leading-paths --config-file .swcrc -C isModule=true -C module.type=es6 -C module.resolveFully=true",
     "build:tsc-alias": "node ./postbuild.js",
+    "circular-deps": "madge --circular --extensions ts,tsx src",
     "clean": "rm -rf dist",
     "test": "echo \"Error: no tests yet\"",
     "typecheck": "tsc --noEmit",
@@ -52,11 +53,22 @@
     "@typescript-eslint/parser": "^5.59.1",
     "husky": "^7.0.2",
     "jest": "^29.7.0",
+    "madge": "^8.0.0",
     "prettier": "^3.5.1",
     "tsc-alias": "^1.8.10",
     "typescript": "^5.7.3"
   },
   "engines": {
     "node": ">=14.0.0"
+  },
+  "madge": {
+    "detectiveOptions": {
+      "ts": {
+        "skipTypeImports": true
+      },
+      "tsx": {
+        "skipTypeImports": true
+      }
+    }
   }
 }
