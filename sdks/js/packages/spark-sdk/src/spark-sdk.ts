@@ -24,7 +24,8 @@ import {
   TransferStatus,
   TreeNode,
 } from "./proto/spark.js";
-import { ConfigOptions, WalletConfigService } from "./services/config.js";
+import { WalletConfigService } from "./services/config.js";
+import { ConfigOptions } from "./services/wallet-config.js";
 import { ConnectionManager } from "./services/connection.js";
 import { CoopExitService } from "./services/coop-exit.js";
 import { DepositService } from "./services/deposit.js";

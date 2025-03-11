@@ -3,24 +3,10 @@ import {
   LOCAL_WALLET_CONFIG,
   MAINNET_WALLET_CONFIG,
   REGTEST_WALLET_CONFIG,
-} from "../tests/test-util.js";
+  ConfigOptions,
+  SigningOperator,
+} from "./wallet-config.js";
 import { Network, NetworkToProto } from "../utils/network.js";
-
-export type SigningOperator = {
-  readonly id: number;
-  readonly identifier: string;
-  readonly address: string;
-  readonly identityPublicKey: Uint8Array;
-};
-
-export type ConfigOptions = {
-  readonly signer?: SparkSigner;
-  readonly signingOperators?: Readonly<Record<string, SigningOperator>>;
-  readonly coodinatorIdentifier?: string;
-  readonly frostSignerAddress?: string;
-  readonly threshold?: number;
-  readonly useTokenTransactionSchnorrSignatures?: boolean;
-};
 
 export class WalletConfigService {
   private readonly config: Required<ConfigOptions>;

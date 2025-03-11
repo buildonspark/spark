@@ -2,7 +2,7 @@ import { SparkWallet } from "@buildonspark/spark-sdk";
 import {
   LOCAL_WALLET_CONFIG_ECDSA,
   LOCAL_WALLET_CONFIG_SCHNORR,
-} from "@buildonspark/spark-sdk/test-util";
+} from "@buildonspark/spark-sdk/services/wallet-config";
 import { jest } from "@jest/globals";
 import { generateMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english";

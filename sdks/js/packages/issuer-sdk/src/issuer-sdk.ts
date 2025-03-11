@@ -7,7 +7,7 @@ import {
 } from "@buildonspark/lrc20-sdk";
 import { SparkWallet } from "@buildonspark/spark-sdk";
 import { LeafWithPreviousTransactionData } from "@buildonspark/spark-sdk/proto/spark";
-import { ConfigOptions } from "@buildonspark/spark-sdk/services/config";
+import { ConfigOptions } from "@buildonspark/spark-sdk/services/wallet-config";
 import { NetworkType as SparkNetworkType } from "@buildonspark/spark-sdk/utils";
 import {
   bytesToHex,

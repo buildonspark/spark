@@ -26,6 +26,11 @@
       "require": "./dist/services/config.js",
       "import": "./dist/services/config.js"
     },
+    "./services/wallet-config": {
+      "types": "./dist/services/wallet-config.d.ts",
+      "require": "./dist/services/wallet-config.js",
+      "import": "./dist/services/wallet-config.js"
+    },
     "./test-util": {
       "types": "./dist/tests/test-util.d.ts",
       "require": "./dist/tests/test-util.js",
