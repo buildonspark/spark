@@ -434,10 +434,6 @@ func (h *TransferHandler) QueryPendingTransfers(ctx context.Context, req *pb.Que
 				schema.TransferStatusReceiverKeyTweaked,
 				schema.TransferStatusReceiverRefundSigned,
 			),
-			enttransfer.Or(
-				enttransfer.ExpiryTimeGT(time.Now()),
-				enttransfer.ExpiryTimeEQ(time.Unix(0, 0)),
-			),
 		)
 	case *pb.QueryPendingTransfersRequest_SenderIdentityPublicKey:
 		if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, req.GetSenderIdentityPublicKey()); err != nil {

@@ -341,8 +341,8 @@ func (h *BaseTransferHandler) CancelSendTransfer(
 	if transfer.Status == schema.TransferStatusReturned {
 		return &pbspark.CancelSendTransferResponse{}, nil
 	}
-	if transfer.Status != schema.TransferStatusSenderInitiated {
-		return nil, fmt.Errorf("transfer %s is expected to be at status TransferStatusSenderInitiated but %s found", req.TransferId, transfer.Status)
+	if transfer.Status != schema.TransferStatusSenderInitiated && transfer.Status != schema.TransferStatusSenderKeyTweakPending {
+		return nil, fmt.Errorf("transfer %s is expected to be at status TransferStatusSenderInitiated or TransferStatusSenderKeyTweakPending but %s found", req.TransferId, transfer.Status)
 	}
 
 	transfer, err = transfer.Update().SetStatus(schema.TransferStatusReturned).Save(ctx)
