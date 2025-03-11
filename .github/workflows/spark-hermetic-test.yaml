@@ -160,7 +160,7 @@ jobs:
           source ./scripts/collect-container-logs.sh
           collect_logs "spark" "spark" "operator" "signer" "atlas"
           collect_logs "lrc20" "yuvd" "yuvd" "sqlx"
-          collect_logs "bitcoin-spark" "bitcoind" "bitcoind"
+          collect_logs "bitcoin" "bitcoind" "bitcoind"
 
       - name: "Upload log artifacts"
         if: always()
