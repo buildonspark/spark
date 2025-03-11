@@ -1,7 +1,7 @@
 // Copyright ©, 2023-present, Lightspark Group, Inc. - All Rights Reserved
 
 import autoBind from "auto-bind";
-import LightsparkClient from "../client.js";
+import type LightsparkClient from "../client.js";
 import CurrencyAmount, {
   CurrencyAmountFromJson,
   CurrencyAmountToJson,
@@ -16,7 +16,7 @@ class Transfer {
     public readonly totalAmount: CurrencyAmount,
     /** The id of the transfer known at signing operators. If not set, the transfer hasn't been
      * initialized. **/
-    public readonly sparkId?: string | undefined
+    public readonly sparkId?: string | undefined,
   ) {
     autoBind(this);
   }
@@ -24,7 +24,7 @@ class Transfer {
   public async getLeaves(
     client: LightsparkClient,
     first: number | undefined = undefined,
-    after: string | undefined = undefined
+    after: string | undefined = undefined,
   ): Promise<SparkTransferToLeavesConnection> {
     return (await client.executeRawQuery({
       queryPayload: ` 
@@ -77,7 +77,7 @@ query FetchSparkTransferToLeavesConnection($entity_id: ID!, $first: Int, $after:
 export const TransferFromJson = (obj: any): Transfer => {
   return new Transfer(
     CurrencyAmountFromJson(obj["transfer_total_amount"]),
-    obj["transfer_spark_id"]
+    obj["transfer_spark_id"],
   );
 };
 
