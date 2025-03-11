@@ -68,8 +68,8 @@
     }
   },
   "scripts": {
-    "build": "tsc && copyfiles -u 1 'src/wasm/**/*.wasm' dist/",
-    "prepare": "npm run build",
+    "build": "yarn clean && tsc && copyfiles -u 1 'src/wasm/**/*.wasm' dist/",
+    "prepare": "yarn run build",
     "build:watch": "yarn build --watch --clean=false",
     "clean": "rm -rf dist",
     "dev": "yarn build -- --watch",

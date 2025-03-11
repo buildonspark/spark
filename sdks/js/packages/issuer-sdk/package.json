@@ -15,8 +15,8 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsc",
-    "prepare": "npm run build",
+    "build": "yarn clean && tsc",
+    "prepare": "yarn run build",
     "build:watch": "yarn build --watch --clean=false",
     "clean": "rm -rf dist",
     "dev": "yarn build -- --watch",
