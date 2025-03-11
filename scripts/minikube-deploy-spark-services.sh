@@ -211,7 +211,7 @@ check_service_readiness() {
     fi
 }
 
-sleep 10s
+sleep 10
 
 echo "Waiting for all services to be ready..."
 max_attempts=12
@@ -234,7 +234,7 @@ for attempt in $(seq 1 $max_attempts); do
     fi
 
     echo "Waiting 10 seconds before next check..."
-    sleep 10s
+    sleep 10
 done
 
 rm -f /tmp/spark /tmp/bitcoind /tmp/lrc20

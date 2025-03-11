@@ -20,7 +20,7 @@ helm install \
     cert-manager \
     jetstack/cert-manager
 
-sleep 5s
+sleep 5
 
 helm install \
     --atomic \
