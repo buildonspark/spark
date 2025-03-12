@@ -1,6 +1,6 @@
 import { QueryPendingTransfersResponse, Transfer } from "../../proto/spark.js";
 import { SparkSigner } from "../../signer/signer.js";
-import { SparkWallet } from "../../spark-sdk.js";
+import { SparkWallet, SparkWalletProps } from "../../spark-sdk.js";
 
 interface ISparkWalletTesting extends SparkWallet {
   getSigner(): SparkSigner;
@@ -12,6 +12,17 @@ export class SparkWalletTesting
   extends SparkWallet
   implements ISparkWalletTesting
 {
+  static async create(props: SparkWalletProps) {
+    const wallet = new SparkWalletTesting(props.options, props.signer);
+    const initResponse = await wallet.initWallet(props.mnemonicOrSeed);
+    return {
+      wallet,
+      mnemonic: initResponse.mnemonic,
+      balance: initResponse.balance,
+      tokenBalance: initResponse.tokenBalance,
+    };
+  }
+
   public getSigner(): SparkSigner {
     return this.config.signer;
   }

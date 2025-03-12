@@ -10,7 +10,7 @@ import { sha256 } from "@scure/btc-signer/utils";
 import { WalletConfigService } from "../services/config.js";
 import { ConnectionManager } from "../services/connection.js";
 import { LeafKeyTweak, TransferService } from "../services/transfer.js";
-import { Network } from "../utils/network.js";
+import { ConfigOptions } from "../services/wallet-config.js";
 import { createNewTree } from "./test-util.js";
 import { SparkWalletTesting } from "./utils/spark-testing-wallet.js";
 import { BitcoinFaucet } from "./utils/test-faucet.js";
@@ -27,12 +27,18 @@ describe("Transfer", () => {
         "123",
       );
 
-      const senderWallet = new SparkWalletTesting("LOCAL");
-      await senderWallet.initWallet();
+      const options: ConfigOptions = {
+        network: "LOCAL",
+      };
 
-      const senderConfigService = new WalletConfigService(Network.LOCAL, {
-        signer: senderWallet.getSigner(),
+      const { wallet: senderWallet } = await SparkWalletTesting.create({
+        options,
       });
+
+      const senderConfigService = new WalletConfigService(
+        options,
+        senderWallet.getSigner(),
+      );
       const senderConnectionManager = new ConnectionManager(
         senderConfigService,
       );
@@ -51,13 +57,15 @@ describe("Transfer", () => {
 
       const newLeafPubKey = await senderWallet.getSigner().generatePublicKey();
 
-      const receiverWallet = new SparkWalletTesting("LOCAL");
-      await receiverWallet.initWallet();
+      const { wallet: receiverWallet } = await SparkWalletTesting.create({
+        options,
+      });
       const receiverPubkey = await receiverWallet.getIdentityPublicKey();
 
-      const receiverConfigService = new WalletConfigService(Network.LOCAL, {
-        signer: receiverWallet.getSigner(),
-      });
+      const receiverConfigService = new WalletConfigService(
+        options,
+        receiverWallet.getSigner(),
+      );
       const receiverConnectionManager = new ConnectionManager(
         receiverConfigService,
       );
@@ -111,8 +119,11 @@ describe("Transfer", () => {
         claimingNode,
       ]);
 
-      const newReceiverWallet = new SparkWalletTesting("LOCAL");
-      await newReceiverWallet.initWallet();
+      const { wallet: newReceiverWallet } = await SparkWalletTesting.create({
+        options: {
+          network: "LOCAL",
+        },
+      });
       const newReceiverPubkey = await newReceiverWallet.getIdentityPublicKey();
 
       await receiverWallet.sendSparkTransfer({
@@ -132,25 +143,32 @@ describe("Transfer", () => {
   testFn("test transfer with separate", async () => {
     const faucet = new BitcoinFaucet("http://127.0.0.1:18443", "admin1", "123");
 
-    const senderWallet = new SparkWalletTesting("LOCAL");
-    await senderWallet.initWallet();
-
-    const senderConfigService = new WalletConfigService(Network.LOCAL, {
-      signer: senderWallet.getSigner(),
+    const options: ConfigOptions = {
+      network: "LOCAL",
+    };
+    const { wallet: senderWallet } = await SparkWalletTesting.create({
+      options,
     });
+
+    const senderConfigService = new WalletConfigService(
+      options,
+      senderWallet.getSigner(),
+    );
     const senderConnectionManager = new ConnectionManager(senderConfigService);
     const senderTransferService = new TransferService(
       senderConfigService,
       senderConnectionManager,
     );
 
-    const receiverWallet = new SparkWalletTesting("LOCAL");
-    await receiverWallet.initWallet();
+    const { wallet: receiverWallet } = await SparkWalletTesting.create({
+      options,
+    });
     const receiverPubkey = await receiverWallet.getIdentityPublicKey();
 
-    const receiverConfigService = new WalletConfigService(Network.LOCAL, {
-      signer: receiverWallet.getSigner(),
-    });
+    const receiverConfigService = new WalletConfigService(
+      options,
+      receiverWallet.getSigner(),
+    );
     const receiverConnectionManager = new ConnectionManager(
       receiverConfigService,
     );
@@ -255,17 +273,23 @@ describe("Transfer", () => {
   testFn("cancel transfer", async () => {
     const faucet = new BitcoinFaucet("http://127.0.0.1:18443", "admin1", "123");
 
-    const senderWallet = new SparkWalletTesting("LOCAL");
+    const options: ConfigOptions = {
+      network: "LOCAL",
+    };
+    const { wallet: senderWallet } = await SparkWalletTesting.create({
+      options,
+    });
     const mnemonic = generateMnemonic(wordlist);
-    await senderWallet.initWallet();
 
-    const receiverWallet = new SparkWalletTesting("LOCAL");
-    await receiverWallet.initWallet();
+    const { wallet: receiverWallet } = await SparkWalletTesting.create({
+      options,
+    });
     const receiverPubkey = await receiverWallet.getIdentityPublicKey();
 
-    const receiverConfigService = new WalletConfigService(Network.LOCAL, {
-      signer: receiverWallet.getSigner(),
-    });
+    const receiverConfigService = new WalletConfigService(
+      options,
+      receiverWallet.getSigner(),
+    );
     const receiverConnectionManager = new ConnectionManager(
       receiverConfigService,
     );
@@ -290,9 +314,10 @@ describe("Transfer", () => {
       newSigningPubKey: newLeafPubKey,
     };
 
-    const senderConfigService = new WalletConfigService(Network.LOCAL, {
-      signer: senderWallet.getSigner(),
-    });
+    const senderConfigService = new WalletConfigService(
+      options,
+      senderWallet.getSigner(),
+    );
     const senderConnectionManager = new ConnectionManager(senderConfigService);
     const senderTransferService = new TransferService(
       senderConfigService,

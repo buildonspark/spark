@@ -1,5 +1,5 @@
 import { hexToBytes } from "@noble/curves/abstract/utils";
-import { DefaultSparkSigner, SparkSigner } from "../signer/signer.js";
+import { NetworkType } from "../utils/network.js";
 
 export type SigningOperator = {
   readonly id: number;
@@ -9,7 +9,7 @@ export type SigningOperator = {
 };
 
 export type ConfigOptions = {
-  readonly signer?: SparkSigner;
+  readonly network?: NetworkType;
   readonly signingOperators?: Readonly<Record<string, SigningOperator>>;
   readonly coodinatorIdentifier?: string;
   readonly frostSignerAddress?: string;
@@ -17,26 +17,8 @@ export type ConfigOptions = {
   readonly useTokenTransactionSchnorrSignatures?: boolean;
 };
 
-export function createWalletConfigWithSigner(
-  config: ConfigOptions,
-  signer?: SparkSigner,
-): Required<ConfigOptions> {
-  if (!signer) {
-    signer = new DefaultSparkSigner();
-  }
-  return {
-    signer,
-    signingOperators: config.signingOperators ?? {},
-    coodinatorIdentifier: config.coodinatorIdentifier ?? "",
-    frostSignerAddress: config.frostSignerAddress ?? "",
-    threshold: config.threshold ?? 0,
-    useTokenTransactionSchnorrSignatures:
-      config.useTokenTransactionSchnorrSignatures ?? false,
-  };
-}
-
-export const LOCAL_WALLET_CONFIG: ConfigOptions = {
-  signer: undefined,
+const BASE_CONFIG: Required<ConfigOptions> = {
+  network: "LOCAL",
   coodinatorIdentifier:
     "0000000000000000000000000000000000000000000000000000000000000001",
   frostSignerAddress: "unix:///tmp/frost_0.sock",
@@ -45,44 +27,29 @@ export const LOCAL_WALLET_CONFIG: ConfigOptions = {
   useTokenTransactionSchnorrSignatures: true,
 };
 
-export const LOCAL_WALLET_CONFIG_SCHNORR: ConfigOptions = {
-  signer: undefined,
-  coodinatorIdentifier:
-    "0000000000000000000000000000000000000000000000000000000000000001",
-  frostSignerAddress: "unix:///tmp/frost_0.sock",
-  threshold: 3,
-  signingOperators: getLocalSigningOperators(),
-  useTokenTransactionSchnorrSignatures: true,
+export const LOCAL_WALLET_CONFIG: Required<ConfigOptions> = {
+  ...BASE_CONFIG,
 };
 
-export const LOCAL_WALLET_CONFIG_ECDSA: ConfigOptions = {
-  signer: undefined,
-  coodinatorIdentifier:
-    "0000000000000000000000000000000000000000000000000000000000000001",
-  frostSignerAddress: "unix:///tmp/frost_0.sock",
-  threshold: 3,
-  signingOperators: getLocalSigningOperators(),
+export const LOCAL_WALLET_CONFIG_SCHNORR: Required<ConfigOptions> = {
+  ...BASE_CONFIG,
+};
+
+export const LOCAL_WALLET_CONFIG_ECDSA: Required<ConfigOptions> = {
+  ...BASE_CONFIG,
   useTokenTransactionSchnorrSignatures: false,
 };
 
-export const REGTEST_WALLET_CONFIG: ConfigOptions = {
-  signer: undefined,
-  coodinatorIdentifier:
-    "0000000000000000000000000000000000000000000000000000000000000001",
-  frostSignerAddress: "unix:///tmp/frost_0.sock",
-  threshold: 3,
+export const REGTEST_WALLET_CONFIG: Required<ConfigOptions> = {
+  ...BASE_CONFIG,
+  network: "REGTEST",
   signingOperators: getRegtestSigningOperators(),
-  useTokenTransactionSchnorrSignatures: true,
 };
 
-export const MAINNET_WALLET_CONFIG: ConfigOptions = {
-  signer: undefined,
-  coodinatorIdentifier:
-    "0000000000000000000000000000000000000000000000000000000000000001",
-  frostSignerAddress: "unix:///tmp/frost_0.sock",
-  threshold: 3,
+export const MAINNET_WALLET_CONFIG: Required<ConfigOptions> = {
+  ...BASE_CONFIG,
+  network: "MAINNET",
   signingOperators: getRegtestSigningOperators(),
-  useTokenTransactionSchnorrSignatures: true,
 };
 
 export function getRegtestSigningOperators(): Record<string, SigningOperator> {

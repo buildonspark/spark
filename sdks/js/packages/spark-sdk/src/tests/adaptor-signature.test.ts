@@ -16,8 +16,11 @@ describe("adaptor signature", () => {
     async () => {
       let failures = 0;
 
-      const wallet = new SparkWalletTesting("LOCAL");
-      await wallet.initWallet();
+      const { wallet } = await SparkWalletTesting.create({
+        options: {
+          network: "LOCAL",
+        },
+      });
 
       const msg = "test";
       const hash = sha256(msg);

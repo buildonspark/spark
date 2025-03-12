@@ -5,10 +5,9 @@ import {
   TokenPubkeyAnnouncement,
   TokenPubkeyInfo,
 } from "@buildonspark/lrc20-sdk";
-import { SparkWallet } from "@buildonspark/spark-sdk";
+import { SparkWallet, SparkWalletProps } from "@buildonspark/spark-sdk";
 import { LeafWithPreviousTransactionData } from "@buildonspark/spark-sdk/proto/spark";
 import { ConfigOptions } from "@buildonspark/spark-sdk/services/wallet-config";
-import { NetworkType as SparkNetworkType } from "@buildonspark/spark-sdk/utils";
 import {
   bytesToHex,
   bytesToNumberBE,
@@ -29,12 +28,20 @@ export class IssuerSparkWallet
   private tokenFreezeService: TokenFreezeService;
   private tokenPublicKeyInfo?: TokenPubkeyInfo;
 
-  constructor(
-    network: SparkNetworkType,
-    privateKey: string,
-    configOptions?: ConfigOptions,
-  ) {
-    super(network, configOptions);
+  public static async create({
+    ...props
+  }: SparkWalletProps & { privateKey: string }) {
+    const wallet = new IssuerSparkWallet(props.privateKey, props.options);
+
+    const initResponse = await wallet.initWallet(props.mnemonicOrSeed);
+    return {
+      wallet,
+      ...initResponse,
+    };
+  }
+
+  private constructor(privateKey: string, configOptions?: ConfigOptions) {
+    super(configOptions);
 
     // TODO: For now
     this.lrc20Wallet = new LRCWallet(

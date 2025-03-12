@@ -6,7 +6,7 @@ export function usePaginatedTransfers(pageParams: {
   offset: number;
 }) {
   const getAllTransfers = useWalletStore((state) => state.getAllTransfers);
-  const isInitialized = useWalletStore((state) => state.isInitialized);
+  const isInitialized = useWalletStore((state) => !!state.wallet);
 
   return useQuery({
     queryKey: ["wallet", "transfers", pageParams],

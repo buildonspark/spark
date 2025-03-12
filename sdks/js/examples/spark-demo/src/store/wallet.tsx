@@ -66,9 +66,8 @@ const getLocalStorageWalletNetwork = (): NetworkType => {
 };
 
 interface WalletState {
-  wallet: SparkWallet;
+  wallet?: SparkWallet;
   sparkAddress: string;
-  isInitialized: boolean;
   initWalletNetwork: NetworkType;
   mnemonic: string | null;
   activeInputCurrency: Currency;
@@ -109,7 +108,6 @@ const MNEMONIC_STORAGE_KEY = "spark_wallet_mnemonic";
 const SEED_STORAGE_KEY = "spark_wallet_seed";
 
 const useWalletStore = create<WalletStore>((set, get) => ({
-  wallet: new SparkWallet(getLocalStorageWalletNetwork()),
   initWalletNetwork: getLocalStorageWalletNetwork(),
   setInitWalletNetwork: (network: NetworkType) => {
     set({ initWalletNetwork: network });
@@ -121,7 +119,6 @@ const useWalletStore = create<WalletStore>((set, get) => ({
   setSparkAddress: (sparkAddress: string) => {
     set({ sparkAddress });
   },
-  isInitialized: false,
   mnemonic: null,
   activeInputCurrency: PERMANENT_CURRENCIES.get("USD")!,
   setActiveInputCurrency: (currency: Currency) => {
@@ -138,6 +135,9 @@ const useWalletStore = create<WalletStore>((set, get) => ({
     receiverSparkAddress: string,
   ) => {
     const { wallet } = get();
+    if (!wallet) {
+      throw new Error("Wallet not initialized");
+    }
     await wallet.transferTokens({
       tokenPublicKey,
       tokenAmount,
@@ -154,46 +154,71 @@ const useWalletStore = create<WalletStore>((set, get) => ({
   btcAddressInfo: {},
   initWallet: async (mnemonic: string) => {
     const { initWalletNetwork, setSparkAddress } = get();
-    const mainnetWallet = new SparkWallet("MAINNET");
-    const regtestWallet = new SparkWallet("REGTEST");
+
     if (initWalletNetwork === "REGTEST") {
-      set({ wallet: regtestWallet });
-      await regtestWallet.initWallet(mnemonic);
-      setSparkAddress(await regtestWallet.getSparkAddress());
+      const { wallet } = await SparkWallet.create({
+        mnemonicOrSeed: mnemonic,
+        options: {
+          network: initWalletNetwork,
+        },
+      });
+      set({ wallet });
+      setSparkAddress(await wallet.getSparkAddress());
     } else {
-      set({ wallet: mainnetWallet });
-      await mainnetWallet.initWallet(mnemonic);
-      setSparkAddress(await mainnetWallet.getSparkAddress());
+      const { wallet } = await SparkWallet.create({
+        mnemonicOrSeed: mnemonic,
+        options: {
+          network: initWalletNetwork,
+        },
+      });
+      set({ wallet });
+      setSparkAddress(await wallet.getSparkAddress());
     }
     sessionStorage.setItem(MNEMONIC_STORAGE_KEY, mnemonic);
-    set({ isInitialized: true, mnemonic });
+    set({ mnemonic });
   },
   initWalletFromSeed: async (seed: string) => {
     const { initWalletNetwork, setSparkAddress } = get();
-    const mainnetWallet = new SparkWallet("MAINNET");
-    const regtestWallet = new SparkWallet("REGTEST");
     if (initWalletNetwork === "REGTEST") {
-      set({ wallet: regtestWallet });
-      await regtestWallet.initWallet(seed);
-      setSparkAddress(await regtestWallet.getSparkAddress());
+      const { wallet } = await SparkWallet.create({
+        mnemonicOrSeed: seed,
+        options: {
+          network: initWalletNetwork,
+        },
+      });
+      set({ wallet });
+      setSparkAddress(await wallet.getSparkAddress());
     } else {
-      set({ wallet: mainnetWallet });
-      await mainnetWallet.initWallet(seed);
-      setSparkAddress(await mainnetWallet.getSparkAddress());
+      const { wallet } = await SparkWallet.create({
+        mnemonicOrSeed: seed,
+        options: {
+          network: initWalletNetwork,
+        },
+      });
+      set({ wallet });
+      setSparkAddress(await wallet.getSparkAddress());
     }
     sessionStorage.setItem(SEED_STORAGE_KEY, seed);
-    set({ isInitialized: true });
   },
   getMasterPublicKey: async () => {
     const { wallet } = get();
+    if (!wallet) {
+      throw new Error("Wallet not initialized");
+    }
     return await wallet.getIdentityPublicKey();
   },
   getAllTransfers: async (limit: number, offset: number) => {
     const { wallet } = get();
+    if (!wallet) {
+      throw new Error("Wallet not initialized");
+    }
     return await wallet.getAllTransfers(limit, offset);
   },
   getBitcoinDepositAddress: async () => {
     const { wallet } = get();
+    if (!wallet) {
+      throw new Error("Wallet not initialized");
+    }
     const btcDepositAddress = await wallet.getDepositAddress();
 
     if (!btcDepositAddress) {
@@ -213,6 +238,9 @@ const useWalletStore = create<WalletStore>((set, get) => ({
   },
   sendTransfer: async (amountSats: number, recipient: string) => {
     const { wallet } = get();
+    if (!wallet) {
+      throw new Error("Wallet not initialized");
+    }
     await wallet.sendSparkTransfer({
       amountSats: amountSats,
       receiverSparkAddress: recipient,
@@ -220,6 +248,9 @@ const useWalletStore = create<WalletStore>((set, get) => ({
   },
   createLightningInvoice: async (amountSats: number, memo: string) => {
     const { wallet } = get();
+    if (!wallet) {
+      throw new Error("Wallet not initialized");
+    }
     const invoice = await wallet.createLightningInvoice({
       amountSats,
       memo,
@@ -228,6 +259,9 @@ const useWalletStore = create<WalletStore>((set, get) => ({
   },
   withdrawOnchain: async (address: string, amount: number) => {
     const { wallet } = get();
+    if (!wallet) {
+      throw new Error("Wallet not initialized");
+    }
     await wallet.withdraw({
       onchainAddress: address,
       targetAmountSats: amount,
@@ -235,6 +269,9 @@ const useWalletStore = create<WalletStore>((set, get) => ({
   },
   payLightningInvoice: async (invoice: string) => {
     const { wallet } = get();
+    if (!wallet) {
+      throw new Error("Wallet not initialized");
+    }
     await wallet.payLightningInvoice({
       invoice,
     });
@@ -242,7 +279,7 @@ const useWalletStore = create<WalletStore>((set, get) => ({
 }));
 
 export function useWallet() {
-  const { wallet, isInitialized } = useWalletStore();
+  const { wallet } = useWalletStore();
   const queryClient = useQueryClient();
 
   useQuery({
@@ -262,11 +299,14 @@ export function useWallet() {
   const balanceQuery = useQuery({
     queryKey: ["wallet", "balance"],
     queryFn: async () => {
+      if (!wallet) {
+        throw new Error("Wallet not initialized");
+      }
       const balance = await wallet.getBalance(true);
       return balance;
     },
     refetchOnMount: true,
-    enabled: isInitialized,
+    enabled: !!wallet,
     staleTime: 3000,
     refetchInterval: 3000,
   });
@@ -316,7 +356,7 @@ export function useWallet() {
     setActiveAsset: state.setActiveAsset,
     btcBalance: {
       value: Number(balanceQuery.data?.balance ?? 0),
-      isLoading: balanceQuery.isLoading || !isInitialized,
+      isLoading: balanceQuery.isLoading || !wallet,
       error: balanceQuery.error,
     },
     getAllTransfers: state.getAllTransfers,
@@ -325,7 +365,7 @@ export function useWallet() {
         string,
         { balance: bigint }
       >,
-      isLoading: balanceQuery.isLoading || !isInitialized,
+      isLoading: balanceQuery.isLoading || !wallet,
       error: balanceQuery.error,
     },
     satsUsdPrice: {
@@ -333,7 +373,7 @@ export function useWallet() {
       isLoading: satsUsdPriceQuery.isLoading,
       error: satsUsdPriceQuery.error,
     },
-    isInitialized,
+    isInitialized: !!wallet,
     initWallet,
     initWalletFromSeed,
     initWalletNetwork: state.initWalletNetwork,

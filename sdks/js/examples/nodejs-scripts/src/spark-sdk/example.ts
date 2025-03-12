@@ -3,6 +3,10 @@ import { SparkWallet } from "@buildonspark/spark-sdk";
 console.log("Spark SDK Example");
 
 const network = "REGTEST";
-const wallet = new SparkWallet(network);
+const { wallet, mnemonic: walletMnemonic } = await SparkWallet.create({
+  options: {
+    network,
+  },
+});
 
 console.log("Network:", network);

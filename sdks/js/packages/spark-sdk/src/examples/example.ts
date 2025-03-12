@@ -7,10 +7,9 @@ const walletMnemonic =
   "cctypical stereo dose party penalty decline neglect feel harvest abstract stage winter";
 
 async function runCLI() {
-
   // Get network from command line args
   const network = process.argv.includes("mainnet") ? "MAINNET" : "REGTEST";
-  let wallet = new SparkWallet(network);
+  let wallet: SparkWallet | undefined;
 
   const rl = readline.createInterface({
     input: process.stdin,
@@ -59,15 +58,28 @@ async function runCLI() {
         console.log(latestTx);
         break;
       case "claimdeposit":
+        if (!wallet) {
+          console.log("Please initialize a wallet first");
+          break;
+        }
         const depositResult = await wallet.claimDeposit(args[0]);
         console.log(depositResult);
         break;
       case "initwallet":
-        wallet = new SparkWallet(network);
-        const result = await wallet.initWallet(args.join(" "));
-        console.log(result);
+        const mnemonicOrSeed = args.join(" ");
+        const { wallet: newWallet } = await SparkWallet.create({
+          mnemonicOrSeed,
+          options: {
+            network,
+          },
+        });
+        wallet = newWallet;
         break;
       case "getbalance":
+        if (!wallet) {
+          console.log("Please initialize a wallet first");
+          break;
+        }
         const balanceInfo = await wallet.getBalance(true);
         console.log("Sats Balance: " + balanceInfo.balance);
         if (balanceInfo.tokenBalances && balanceInfo.tokenBalances.size > 0) {
@@ -82,14 +94,26 @@ async function runCLI() {
         }
         break;
       case "getdepositaddress":
+        if (!wallet) {
+          console.log("Please initialize a wallet first");
+          break;
+        }
         const depositAddress = await wallet.getDepositAddress();
         console.log(depositAddress);
         break;
       case "getsparkaddress":
+        if (!wallet) {
+          console.log("Please initialize a wallet first");
+          break;
+        }
         const sparkAddress = await wallet.getSparkAddress();
         console.log(sparkAddress);
         break;
       case "createinvoice":
+        if (!wallet) {
+          console.log("Please initialize a wallet first");
+          break;
+        }
         const invoice = await wallet.createLightningInvoice({
           amountSats: parseInt(args[0]),
           memo: args[1],
@@ -97,12 +121,20 @@ async function runCLI() {
         console.log(invoice);
         break;
       case "payinvoice":
+        if (!wallet) {
+          console.log("Please initialize a wallet first");
+          break;
+        }
         const payment = await wallet.payLightningInvoice({
           invoice: args[0],
         });
         console.log(payment);
         break;
       case "sendtransfer":
+        if (!wallet) {
+          console.log("Please initialize a wallet first");
+          break;
+        }
         const transfer = await wallet.sendSparkTransfer({
           amountSats: parseInt(args[0]),
           receiverSparkAddress: args[1],
@@ -110,6 +142,10 @@ async function runCLI() {
         console.log(transfer);
         break;
       case "sendtokentransfer":
+        if (!wallet) {
+          console.log("Please initialize a wallet first");
+          break;
+        }
         if (args.length < 3) {
           console.log(
             "Usage: sendtokentransfer <tokenPubKey> <amount> <receiverPubKey>",
@@ -133,6 +169,10 @@ async function runCLI() {
         }
         break;
       case "withdraw":
+        if (!wallet) {
+          console.log("Please initialize a wallet first");
+          break;
+        }
         const withdrawal = await wallet.withdraw({
           onchainAddress: args[0],
           targetAmountSats: parseInt(args[1]),
@@ -140,6 +180,10 @@ async function runCLI() {
         console.log(withdrawal);
         break;
       case "tokenwithdraw": {
+        if (!wallet) {
+          console.log("Please initialize a wallet first");
+          break;
+        }
         const tokenPublicKey = args[0];
         const receiverPublicKey = args[1];
 

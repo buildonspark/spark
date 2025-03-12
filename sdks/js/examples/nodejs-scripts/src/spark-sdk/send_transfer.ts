@@ -6,10 +6,14 @@ async function main() {
   const receiverAddress = process.argv[3] || "your_receiver_address_here";
 
   // Initialize wallet with configuration object
-  const wallet = new SparkWallet("REGTEST");
+  const { wallet, mnemonic: walletMnemonic } = await SparkWallet.create({
+    mnemonicOrSeed: mnemonic,
+    options: {
+      network: "REGTEST",
+    },
+  });
 
-  const wallet_mnemonic = await wallet.initWallet(mnemonic);
-  console.log("wallet mnemonic phrase:", wallet_mnemonic);
+  console.log("wallet mnemonic phrase:", walletMnemonic);
 
   const balance = await wallet.getBalance();
   console.log("Balance:", balance);

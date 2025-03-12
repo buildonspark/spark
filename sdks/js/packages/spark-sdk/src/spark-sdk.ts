@@ -25,13 +25,13 @@ import {
   TreeNode,
 } from "./proto/spark.js";
 import { WalletConfigService } from "./services/config.js";
-import { ConfigOptions } from "./services/wallet-config.js";
 import { ConnectionManager } from "./services/connection.js";
 import { CoopExitService } from "./services/coop-exit.js";
 import { DepositService } from "./services/deposit.js";
 import { LightningService } from "./services/lightning.js";
 import { TokenTransactionService } from "./services/token-transactions.js";
 import { LeafKeyTweak, TransferService } from "./services/transfer.js";
+import { ConfigOptions } from "./services/wallet-config.js";
 
 import * as bip39 from "@scure/bip39";
 import { validateMnemonic } from "@scure/bip39";
@@ -59,7 +59,6 @@ import {
   LRC_WALLET_NETWORK,
   LRC_WALLET_NETWORK_TYPE,
   Network,
-  NetworkType,
 } from "./utils/network.js";
 import {
   calculateAvailableTokenAmount,
@@ -71,6 +70,7 @@ import { InitOutput } from "./wasm/spark_bindings.js";
 
 import { LRC20WalletApiConfig, LRCWallet } from "@buildonspark/lrc20-sdk";
 import { broadcastL1Withdrawal } from "./services/lrc20.js";
+import { SparkSigner } from "./signer/signer.js";
 import { getMasterHDKeyFromSeed } from "./utils/index.js";
 
 // Add this constant at the file level
@@ -106,21 +106,10 @@ export type InitWalletResponse = {
   mnemonic?: string | undefined;
 };
 
-class LeafOperationError extends Error {
-  constructor(
-    message: string,
-    public readonly cause?: Error,
-  ) {
-    super(message);
-    this.name = "LeafOperationError";
-  }
-}
-
-class LeafOperationTimeoutError extends LeafOperationError {
-  constructor(message: string) {
-    super(message);
-    this.name = "LeafOperationTimeoutError";
-  }
+export interface SparkWalletProps {
+  mnemonicOrSeed?: Uint8Array | string;
+  signer?: SparkSigner;
+  options?: ConfigOptions;
 }
 
 /**
@@ -152,8 +141,8 @@ export class SparkWallet {
   protected tokenLeaves: Map<string, LeafWithPreviousTransactionData[]> =
     new Map();
 
-  constructor(network: NetworkType, configOptions?: ConfigOptions) {
-    this.config = new WalletConfigService(Network[network], configOptions);
+  protected constructor(options?: ConfigOptions, signer?: SparkSigner) {
+    this.config = new WalletConfigService(options, signer);
     this.connectionManager = new ConnectionManager(this.config);
 
     this.depositService = new DepositService(
@@ -180,6 +169,19 @@ export class SparkWallet {
       this.config,
       this.connectionManager,
     );
+  }
+
+  public static async create({
+    mnemonicOrSeed,
+    signer,
+    options,
+  }: SparkWalletProps) {
+    const wallet = new SparkWallet(options, signer);
+    const initResponse = await wallet.initWallet(mnemonicOrSeed);
+    return {
+      wallet,
+      ...initResponse,
+    };
   }
 
   private async initWasm() {
@@ -377,8 +379,9 @@ export class SparkWallet {
    *   - mnemonic: The mnemonic if one was generated (undefined for raw seed)
    *   - balance: The wallet's initial balance in satoshis
    *   - tokenBalance: Map of token balances and leaf counts
+   * @private
    */
-  public async initWallet(
+  protected async initWallet(
     mnemonicOrSeed?: Uint8Array | string,
     enableLRC20Wallet: boolean = true,
     lrc20WalletApiConfig?: LRC20WalletApiConfig,
@@ -393,11 +396,14 @@ export class SparkWallet {
     }
 
     let mnemonic: string | undefined;
+    let seed: Uint8Array;
     if (validateMnemonic(mnemonicOrSeed, wordlist)) {
       mnemonic = mnemonicOrSeed;
+      seed = await bip39.mnemonicToSeed(mnemonicOrSeed);
       await this.initWalletFromMnemonic(mnemonicOrSeed);
     } else {
-      await this.initWalletFromSeed(mnemonicOrSeed);
+      seed = hexToBytes(mnemonicOrSeed);
+      await this.initWalletFromSeed(seed);
     }
     const balance = this.leaves.reduce(
       (acc, leaf) => acc + BigInt(leaf.value),
@@ -406,18 +412,6 @@ export class SparkWallet {
     const tokenBalance = await this.getAllTokenBalances();
 
     if (enableLRC20Wallet) {
-      let seed;
-      // if mnemonicOrSeed is a 12-24 word mnemonic, generate the corresponding seed.
-      if (validateMnemonic(mnemonicOrSeed, wordlist)) {
-        seed = await bip39.mnemonicToSeed(mnemonicOrSeed);
-      } else {
-        // if mnemonicOrSeed is the seed as a hex string, convert it to a Uint8Array
-        seed =
-          typeof mnemonicOrSeed === "string"
-            ? hexToBytes(mnemonicOrSeed)
-            : mnemonicOrSeed;
-      }
-
       const network = this.config.getNetwork();
       const masterPrivateKey = getMasterHDKeyFromSeed(
         seed,

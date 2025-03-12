@@ -4,9 +4,13 @@ import { SparkWallet } from "@buildonspark/spark-sdk";
 const mnemonic = process.argv[2] || "your_mnemonic_here";
 const memo = process.argv[3] || "test invoice";
 
-const wallet = new SparkWallet("REGTEST");
-const wallet_mnemonic = await wallet.initWallet(mnemonic);
-console.log("wallet mnemonic phrase:", wallet_mnemonic);
+const { wallet, mnemonic: walletMnemonic } = await SparkWallet.create({
+  mnemonicOrSeed: mnemonic,
+  options: {
+    network: "REGTEST",
+  },
+});
+console.log("wallet mnemonic phrase:", walletMnemonic);
 
 // Create an invoice for 100 sats
 const invoice = await wallet.createLightningInvoice({

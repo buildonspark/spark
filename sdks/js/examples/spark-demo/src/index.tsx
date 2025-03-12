@@ -1,7 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { SparkWalletProvider } from "./context/SparkWalletContext";
 import "./index.css";
 import Root from "./Root";
 
@@ -12,10 +11,8 @@ const root = ReactDOM.createRoot(
 );
 root.render(
   <React.StrictMode>
-    <SparkWalletProvider>
-      <QueryClientProvider client={queryClient}>
-        <Root />
-      </QueryClientProvider>
-    </SparkWalletProvider>
+    <QueryClientProvider client={queryClient}>
+      <Root />
+    </QueryClientProvider>
   </React.StrictMode>,
 );

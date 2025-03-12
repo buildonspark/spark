@@ -3,9 +3,13 @@ import { SparkWallet } from "@buildonspark/spark-sdk";
 // Get mnemonic from command line arguments
 const mnemonic = process.argv[2] || "your_mnemonic_here";
 
-const wallet = new SparkWallet("REGTEST");
-const wallet_mnemonic = await wallet.initWallet(mnemonic);
-console.log("wallet mnemonic:", wallet_mnemonic);
+const { wallet, mnemonic: walletMnemonic } = await SparkWallet.create({
+  mnemonicOrSeed: mnemonic,
+  options: {
+    network: "REGTEST",
+  },
+});
+console.log("wallet mnemonic:", walletMnemonic);
 
 // Get invoice from command line arguments
 const invoice = process.argv[3] || "your_invoice_here";

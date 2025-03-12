@@ -1,18 +1,25 @@
-import { LeafWithPreviousTransactionData } from "@buildonspark/spark-sdk/proto/spark";
-import { QueryAllTransfersResponse, Transfer } from "@buildonspark/spark-sdk/proto/spark";
-import { CreateLightningInvoiceParams, PayLightningInvoiceParams, InitWalletResponse } from "@buildonspark/spark-sdk";
 import { LRCWallet } from "@buildonspark/lrc20-sdk";
+import {
+  CreateLightningInvoiceParams,
+  PayLightningInvoiceParams,
+} from "@buildonspark/spark-sdk";
+import {
+  LeafWithPreviousTransactionData,
+  QueryAllTransfersResponse,
+  Transfer,
+} from "@buildonspark/spark-sdk/proto/spark";
 
 /**
  * Interface for the IssuerSparkWallet that includes all functions from both SparkWallet and IssuerSparkWallet
  */
 export interface IssuerWalletInterface {
-
   // SparkWallet methods
   getIdentityPublicKey(): Promise<string>;
   getSparkAddress(): Promise<string>;
-  initWallet(mnemonicOrSeed?: Uint8Array | string): Promise<InitWalletResponse>;
-  getAllTransfers(limit?: number, offset?: number): Promise<QueryAllTransfersResponse>;
+  getAllTransfers(
+    limit?: number,
+    offset?: number,
+  ): Promise<QueryAllTransfersResponse>;
   getBalance(forceRefetch?: boolean): Promise<{
     balance: bigint;
     tokenBalances: Map<string, { balance: bigint }>;
@@ -23,10 +30,13 @@ export interface IssuerWalletInterface {
     amountSats: number;
   }): Promise<Transfer | string>;
   refreshTimelockNodes(nodeId?: string): Promise<void>;
-  createLightningInvoice(params: CreateLightningInvoiceParams): Promise<string | {
-    invoice: string;
-    paymentHash: string;
-  }>;
+  createLightningInvoice(params: CreateLightningInvoiceParams): Promise<
+    | string
+    | {
+        invoice: string;
+        paymentHash: string;
+      }
+  >;
   payLightningInvoice(params: PayLightningInvoiceParams): Promise<any>;
   withdraw(params: {
     onchainAddress: string;
@@ -46,13 +56,13 @@ export interface IssuerWalletInterface {
   mintTokens(tokenAmount: bigint): Promise<string>;
   burnTokens(
     tokenAmount: bigint,
-    selectedLeaves?: LeafWithPreviousTransactionData[]
+    selectedLeaves?: LeafWithPreviousTransactionData[],
   ): Promise<string>;
   freezeTokens(
-    ownerPublicKey: string
+    ownerPublicKey: string,
   ): Promise<{ impactedLeafIds: string[]; impactedTokenAmount: bigint }>;
   unfreezeTokens(
-    ownerPublicKey: string
+    ownerPublicKey: string,
   ): Promise<{ impactedLeafIds: string[]; impactedTokenAmount: bigint }>;
   announceTokenL1(params: {
     lrc20Wallet: LRCWallet;

@@ -1,14 +1,11 @@
 import { afterEach, beforeAll, describe, expect, it } from "@jest/globals";
 import { hexToBytes } from "@noble/curves/abstract/utils";
-import { generateMnemonic } from "@scure/bip39";
-import { wordlist } from "@scure/bip39/wordlists/english";
 import { equalBytes, sha256 } from "@scure/btc-signer/utils";
 import { TransferStatus } from "../proto/spark.js";
 import { WalletConfigService } from "../services/config.js";
 import { ConnectionManager } from "../services/connection.js";
 import { LightningService } from "../services/lightning.js";
 import { LeafKeyTweak, TransferService } from "../services/transfer.js";
-import { Network } from "../utils/network.js";
 import { createNewTree, getTestWalletConfig } from "./test-util.js";
 import { SparkWalletTesting } from "./utils/spark-testing-wallet.js";
 import { BitcoinFaucet } from "./utils/test-faucet.js";
@@ -49,22 +46,38 @@ describe("LightningService", () => {
   const testFn = process.env.GITHUB_ACTIONS ? it.skip : it;
 
   beforeAll(async () => {
-    userWallet = new SparkWalletTesting("LOCAL");
-    const userMnemonic = generateMnemonic(wordlist);
-    await userWallet.initWallet(userMnemonic);
-    userConfig = new WalletConfigService(Network.LOCAL, {
-      signer: userWallet.getSigner(),
+    const { wallet: wallet1 } = await SparkWalletTesting.create({
+      options: {
+        network: "LOCAL",
+      },
     });
+
+    userWallet = wallet1;
+
+    userConfig = new WalletConfigService(
+      {
+        network: "LOCAL",
+      },
+      userWallet.getSigner(),
+    );
     const connectionManager = new ConnectionManager(userConfig);
     lightningService = new LightningService(userConfig, connectionManager);
     transferService = new TransferService(userConfig, connectionManager);
 
-    sspWallet = new SparkWalletTesting("LOCAL");
-    await sspWallet.initWallet();
-
-    sspConfig = new WalletConfigService(Network.LOCAL, {
-      signer: sspWallet.getSigner(),
+    const { wallet: wallet2 } = await SparkWalletTesting.create({
+      options: {
+        network: "LOCAL",
+      },
     });
+
+    sspWallet = wallet2;
+
+    sspConfig = new WalletConfigService(
+      {
+        network: "LOCAL",
+      },
+      sspWallet.getSigner(),
+    );
     const sspConnectionManager = new ConnectionManager(sspConfig);
     sspLightningService = new LightningService(sspConfig, sspConnectionManager);
     sspTransferService = new TransferService(sspConfig, sspConnectionManager);

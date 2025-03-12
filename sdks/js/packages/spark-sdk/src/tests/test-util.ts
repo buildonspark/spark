@@ -4,14 +4,14 @@ import { TreeNode } from "../proto/spark.js";
 import { WalletConfigService } from "../services/config.js";
 import { ConnectionManager } from "../services/connection.js";
 import { DepositService } from "../services/deposit.js";
-import { getP2TRAddressFromPublicKey } from "../utils/bitcoin.js";
-import { getNetwork, Network } from "../utils/network.js";
-import { SparkWalletTesting } from "./utils/spark-testing-wallet.js";
-import { BitcoinFaucet } from "./utils/test-faucet.js";
 import {
   ConfigOptions,
   LOCAL_WALLET_CONFIG,
 } from "../services/wallet-config.js";
+import { getP2TRAddressFromPublicKey } from "../utils/bitcoin.js";
+import { getNetwork, Network } from "../utils/network.js";
+import { SparkWalletTesting } from "./utils/spark-testing-wallet.js";
+import { BitcoinFaucet } from "./utils/test-faucet.js";
 
 export function getTestWalletConfig() {
   const identityPrivateKey = secp256k1.utils.randomPrivateKey();
@@ -35,9 +35,12 @@ export async function createNewTree(
 ): Promise<TreeNode> {
   const faucetCoin = await faucet.fund();
 
-  const configService = new WalletConfigService(Network.LOCAL, {
-    signer: wallet.getSigner(),
-  });
+  const configService = new WalletConfigService(
+    {
+      network: "LOCAL",
+    },
+    wallet.getSigner(),
+  );
   const connectionManager = new ConnectionManager(configService);
   const depositService = new DepositService(configService, connectionManager);
 

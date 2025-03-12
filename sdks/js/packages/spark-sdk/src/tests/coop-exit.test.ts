@@ -8,6 +8,7 @@ import { WalletConfigService } from "../services/config.js";
 import { ConnectionManager } from "../services/connection.js";
 import { CoopExitService } from "../services/coop-exit.js";
 import { LeafKeyTweak, TransferService } from "../services/transfer.js";
+import { ConfigOptions } from "../services/wallet-config.js";
 import {
   getP2TRAddressFromPublicKey,
   getP2TRScriptFromPublicKey,
@@ -35,13 +36,19 @@ describe("coop exit", () => {
 
       const amountSats = 100_000n;
 
-      // Setup user with leaves
-      const userWallet = new SparkWalletTesting("LOCAL");
-      await userWallet.initWallet();
+      const options: ConfigOptions = {
+        network: "LOCAL",
+      };
 
-      const configService = new WalletConfigService(Network.LOCAL, {
-        signer: userWallet.getSigner(),
+      // Setup user with leaves
+      const { wallet: userWallet } = await SparkWalletTesting.create({
+        options,
       });
+
+      const configService = new WalletConfigService(
+        options,
+        userWallet.getSigner(),
+      );
       const connectionManager = new ConnectionManager(configService);
       const coopExitService = new CoopExitService(
         configService,
@@ -59,13 +66,15 @@ describe("coop exit", () => {
       );
 
       // Setup ssp
-      const sspWallet = new SparkWalletTesting("LOCAL");
-      await sspWallet.initWallet();
+      const { wallet: sspWallet } = await SparkWalletTesting.create({
+        options,
+      });
       const sspPubkey = await sspWallet.getIdentityPublicKey();
 
-      const sspConfigService = new WalletConfigService(Network.LOCAL, {
-        signer: sspWallet.getSigner(),
-      });
+      const sspConfigService = new WalletConfigService(
+        options,
+        sspWallet.getSigner(),
+      );
       const sspConnectionManager = new ConnectionManager(sspConfigService);
       const sspTransferService = new TransferService(
         sspConfigService,

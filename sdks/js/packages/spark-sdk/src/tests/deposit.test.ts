@@ -15,8 +15,11 @@ describe("deposit", () => {
     async () => {
       const mnemonic =
         "raise benefit echo client clutch short pyramid grass fall core slogan boil device plastic drastic discover decide penalty middle appear medal elbow original income";
-      const sdk = new SparkWalletTesting("LOCAL");
-      await sdk.initWallet(mnemonic);
+      const { wallet: sdk } = await SparkWalletTesting.create({
+        options: {
+          network: "LOCAL",
+        },
+      });
 
       const depositAddress = await sdk.getDepositAddress();
 
@@ -36,8 +39,11 @@ describe("deposit", () => {
 
       const coin = await faucet.fund();
 
-      const sdk = new SparkWalletTesting("LOCAL");
-      await sdk.initWallet();
+      const { wallet: sdk } = await SparkWalletTesting.create({
+        options: {
+          network: "LOCAL",
+        },
+      });
 
       // Generate private/public key pair
       const pubKey = await sdk.getSigner().generatePublicKey();

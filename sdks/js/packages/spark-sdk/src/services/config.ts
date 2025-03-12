@@ -1,8 +1,7 @@
-import { SparkSigner } from "../signer/signer.js";
+import { DefaultSparkSigner, SparkSigner } from "../signer/signer.js";
 import { Network, NetworkToProto } from "../utils/network.js";
 import {
   ConfigOptions,
-  createWalletConfigWithSigner,
   LOCAL_WALLET_CONFIG,
   MAINNET_WALLET_CONFIG,
   REGTEST_WALLET_CONFIG,
@@ -13,32 +12,26 @@ export class WalletConfigService {
   private readonly config: Required<ConfigOptions>;
   public readonly signer: SparkSigner;
 
-  constructor(
-    private readonly network: Network,
-    options?: ConfigOptions,
-  ) {
+  constructor(options?: ConfigOptions, signer?: SparkSigner) {
+    const network = options?.network ?? "REGTEST";
+
     this.config = {
-      ...this.getDefaultConfig(network),
+      ...this.getDefaultConfig(Network[network]),
       ...options,
     };
 
-    this.signer = this.config.signer;
+    this.signer = signer ?? new DefaultSparkSigner();
   }
 
   private getDefaultConfig(network: Network): Required<ConfigOptions> {
-    let configWithoutSigner: ConfigOptions;
     switch (network) {
       case Network.MAINNET:
-        configWithoutSigner = MAINNET_WALLET_CONFIG;
-        break;
+        return MAINNET_WALLET_CONFIG;
       case Network.REGTEST:
-        configWithoutSigner = REGTEST_WALLET_CONFIG;
-        break;
+        return REGTEST_WALLET_CONFIG;
       default:
-        configWithoutSigner = LOCAL_WALLET_CONFIG;
-        break;
+        return LOCAL_WALLET_CONFIG;
     }
-    return createWalletConfigWithSigner(configWithoutSigner);
   }
 
   public getCoordinatorAddress(): string {
@@ -65,11 +58,11 @@ export class WalletConfigService {
   }
 
   public getNetwork(): Network {
-    return this.network;
+    return Network[this.config.network];
   }
 
   public getNetworkProto(): number {
-    return NetworkToProto[this.network];
+    return NetworkToProto[this.config.network];
   }
 
   public shouldSignTokenTransactionsWithSchnorr(): boolean {
