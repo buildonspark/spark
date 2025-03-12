@@ -9,6 +9,7 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lightsparkdev/spark-go/common"
+	"github.com/lightsparkdev/spark-go/proto/spark"
 	"github.com/lightsparkdev/spark-go/so/handler"
 	testutil "github.com/lightsparkdev/spark-go/test_util"
 	"github.com/lightsparkdev/spark-go/wallet"
@@ -98,42 +99,24 @@ func TestCoopExit(t *testing.T) {
 		sspPubkey,
 	)
 	assert.NoError(t, err)
+	assert.Equal(t, senderTransfer.Status, spark.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING)
 
 	sspToken, err := wallet.AuthenticateWithServer(context.Background(), sspConfig)
 	assert.NoError(t, err)
 	sspCtx := wallet.ContextWithToken(context.Background(), sspToken)
 
-	pendingTransfer, err := wallet.QueryPendingTransfers(sspCtx, sspConfig)
-	assert.NoError(t, err)
-	if len(pendingTransfer.Transfers) != 1 {
-		t.Fatalf("expected 1 pending transfer, got %d", len(pendingTransfer.Transfers))
-	}
-	receiverTransfer := pendingTransfer.Transfers[0]
-	if receiverTransfer.Id != senderTransfer.Id {
-		t.Fatalf("expected transfer id %s, got %s", senderTransfer.Id, receiverTransfer.Id)
-	}
-
-	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(context.Background(), sspConfig, receiverTransfer)
-	assert.NoError(t, err)
-	if len(*leafPrivKeyMap) != 1 {
-		t.Fatalf("Expected 1 leaf to transfer, got %d", len(*leafPrivKeyMap))
-	}
-	if !bytes.Equal((*leafPrivKeyMap)[rootNode.Id], newLeafPrivKey.Serialize()) {
-		t.Fatalf("wrong leaf signing private key")
-	}
-
 	// Try to claim leaf before exit tx confirms -> should fail
 	finalLeafPrivKey, err := secp256k1.GeneratePrivateKey()
 	assert.NoError(t, err)
 	claimingNode := wallet.LeafKeyTweak{
-		Leaf:              receiverTransfer.Leaves[0].Leaf,
+		Leaf:              senderTransfer.Leaves[0].Leaf,
 		SigningPrivKey:    newLeafPrivKey.Serialize(),
 		NewSigningPrivKey: finalLeafPrivKey.Serialize(),
 	}
 	leavesToClaim := [1]wallet.LeafKeyTweak{claimingNode}
 	_, err = wallet.ClaimTransfer(
 		sspCtx,
-		receiverTransfer,
+		senderTransfer,
 		sspConfig,
 		leavesToClaim[:],
 	)
@@ -159,14 +142,44 @@ func TestCoopExit(t *testing.T) {
 	_, err = client.GenerateToAddress(handler.CoopExitConfirmationThreshold+6, randomAddress, nil)
 	assert.NoError(t, err)
 
-	time.Sleep(100 * time.Millisecond)
-
-	// Claim leaf
-	_, err = wallet.ClaimTransfer(
-		sspCtx,
-		receiverTransfer,
-		sspConfig,
-		leavesToClaim[:],
-	)
+	// Wait until tx is confirmed and picked up by SO
+	pendingTransfer, err := wallet.QueryPendingTransfers(sspCtx, sspConfig)
 	assert.NoError(t, err)
+	startTime := time.Now()
+	for len(pendingTransfer.Transfers) == 0 {
+		if time.Since(startTime) > 10*time.Second {
+			t.Fatalf("timed out waiting for key to be tweaked from tx confirmation")
+		}
+		time.Sleep(100 * time.Millisecond)
+		pendingTransfer, err = wallet.QueryPendingTransfers(sspCtx, sspConfig)
+		assert.NoError(t, err)
+	}
+	receiverTransfer := pendingTransfer.Transfers[0]
+	assert.Equal(t, receiverTransfer.Id, senderTransfer.Id)
+	assert.Equal(t, receiverTransfer.Status, spark.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED)
+
+	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(context.Background(), sspConfig, receiverTransfer)
+	assert.NoError(t, err)
+	assert.Equal(t, len(*leafPrivKeyMap), 1)
+	assert.True(t, bytes.Equal((*leafPrivKeyMap)[rootNode.Id], newLeafPrivKey.Serialize()))
+
+	// Claim leaf. This requires a loop because sometimes there are
+	// delays in processing blocks, and after the tx initially confirms,
+	// the SO will still reject a claim until the tx has enough confirmations.
+	startTime = time.Now()
+	for {
+		_, err = wallet.ClaimTransfer(
+			sspCtx,
+			receiverTransfer,
+			sspConfig,
+			leavesToClaim[:],
+		)
+		if err == nil {
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+		if time.Since(startTime) > 10*time.Second {
+			t.Fatalf("timed out waiting for tx to confirm")
+		}
+	}
 }

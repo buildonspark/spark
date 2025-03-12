@@ -716,7 +716,6 @@ func (h *LightningHandler) ProvidePreimageInternal(ctx context.Context, req *pb.
 	slog.Debug("ProvidePreimage: transfer loaded")
 
 	// apply key tweaks for all transfer_leaves
-	transferHandler := NewTransferHandler(h.config)
 	transferLeaves, err := transfer.QueryTransferLeaves().All(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get transfer leaves: %v", err)
@@ -732,7 +731,7 @@ func (h *LightningHandler) ProvidePreimageInternal(ctx context.Context, req *pb.
 		if err != nil {
 			return nil, fmt.Errorf("unable to get tree node: %v", err)
 		}
-		err = transferHandler.tweakLeafKey(ctx, treeNode, keyTweak, nil)
+		err = helper.TweakLeafKey(ctx, treeNode, keyTweak, nil)
 		if err != nil {
 			return nil, fmt.Errorf("unable to tweak leaf key: %v", err)
 		}

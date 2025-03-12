@@ -6,8 +6,18 @@ import (
 	"github.com/lightsparkdev/spark-go/common"
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
 	"github.com/lightsparkdev/spark-go/so"
-	"github.com/lightsparkdev/spark-go/so/chain"
 )
+
+func RPCClientConfig(cfg so.BitcoindConfig) rpcclient.ConnConfig {
+	return rpcclient.ConnConfig{
+		Host:         cfg.Host,
+		User:         cfg.User,
+		Pass:         cfg.Password,
+		Params:       cfg.Network,
+		DisableTLS:   true, // TODO: PE help
+		HTTPPostMode: true,
+	}
+}
 
 func CheckUTXOOnchain(config *so.Config, utxo *pb.UTXO) bool {
 	network, err := common.NetworkFromString(utxo.Network.String())
@@ -23,7 +33,7 @@ func CheckUTXOOnchain(config *so.Config, utxo *pb.UTXO) bool {
 }
 
 func CheckTxIDOnchain(config *so.Config, txid []byte, network common.Network) bool {
-	connConfig := chain.RPCClientConfig(config.BitcoindConfigs[network.String()])
+	connConfig := RPCClientConfig(config.BitcoindConfigs[network.String()])
 	client, err := rpcclient.New(&connConfig, nil)
 	if err != nil {
 		return false

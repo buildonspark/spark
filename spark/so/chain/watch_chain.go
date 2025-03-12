@@ -15,6 +15,7 @@ import (
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/lightsparkdev/spark-go/common"
+	pb "github.com/lightsparkdev/spark-go/proto/spark"
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/ent"
 	"github.com/lightsparkdev/spark-go/so/ent/blockheight"
@@ -23,19 +24,10 @@ import (
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
 	"github.com/lightsparkdev/spark-go/so/ent/signingkeyshare"
 	"github.com/lightsparkdev/spark-go/so/ent/treenode"
+	"github.com/lightsparkdev/spark-go/so/helper"
 	"github.com/pebbe/zmq4"
+	"google.golang.org/protobuf/proto"
 )
-
-func RPCClientConfig(cfg so.BitcoindConfig) rpcclient.ConnConfig {
-	return rpcclient.ConnConfig{
-		Host:         cfg.Host,
-		User:         cfg.User,
-		Pass:         cfg.Password,
-		Params:       cfg.Network,
-		DisableTLS:   true, // TODO: PE help
-		HTTPPostMode: true,
-	}
-}
 
 func initZmq(endpoint string) (*zmq4.Context, *zmq4.Socket, error) {
 	zmqCtx, err := zmq4.NewContext()
@@ -59,6 +51,21 @@ func initZmq(endpoint string) (*zmq4.Context, *zmq4.Socket, error) {
 	}
 
 	return zmqCtx, subscriber, nil
+}
+
+func pollInterval(network common.Network) time.Duration {
+	switch network {
+	case common.Mainnet:
+		return 1 * time.Minute
+	case common.Testnet:
+		return 1 * time.Minute
+	case common.Regtest:
+		return 5 * time.Second
+	case common.Signet:
+		return 5 * time.Second
+	default:
+		return 1 * time.Minute
+	}
 }
 
 // Tip represents the tip of a blockchain.
@@ -135,7 +142,7 @@ func WatchChain(dbClient *ent.Client, cfg so.BitcoindConfig) error {
 	if err != nil {
 		return err
 	}
-	connConfig := RPCClientConfig(cfg)
+	connConfig := helper.RPCClientConfig(cfg)
 	client, err := rpcclient.New(&connConfig, nil)
 	if err != nil {
 		return err
@@ -219,7 +226,7 @@ func WatchChain(dbClient *ent.Client, cfg so.BitcoindConfig) error {
 	for {
 		select {
 		case <-newBlockNotification:
-		case <-time.After(1 * time.Minute):
+		case <-time.After(pollInterval(network)):
 		}
 
 		// We don't actually do anything with the block receive since
@@ -328,7 +335,7 @@ func handleBlock(ctx context.Context, dbTx *ent.Tx, txs []wire.MsgTx, blockHeigh
 	if err != nil {
 		return err
 	}
-	confirmedTxids := make([][]byte, 0)
+	confirmedTxidSet := make(map[[32]byte]bool)
 	debitedAddresses := make([]string, 0)
 	for _, tx := range txs {
 		for _, txOut := range tx.TxOut {
@@ -341,16 +348,22 @@ func handleBlock(ctx context.Context, dbTx *ent.Tx, txs []wire.MsgTx, blockHeigh
 			}
 		}
 		txid := tx.TxHash()
-		confirmedTxids = append(confirmedTxids, txid[:])
+		confirmedTxidSet[txid] = true
 	}
 
-	_, err = dbTx.CooperativeExit.Update().
-		Where(cooperativeexit.ConfirmationHeightIsNil()).
-		Where(cooperativeexit.ExitTxidIn(confirmedTxids...)).
-		SetConfirmationHeight(blockHeight).
-		Save(ctx)
+	// TODO: expire pending coop exits after some time so this doesn't become too large
+	pendingCoopExits, err := dbTx.CooperativeExit.Query().Where(cooperativeexit.ConfirmationHeightIsNil()).All(ctx)
 	if err != nil {
 		return err
+	}
+	for _, coopExit := range pendingCoopExits {
+		if _, ok := confirmedTxidSet[[32]byte(coopExit.ExitTxid)]; !ok {
+			continue
+		}
+		err = handleCoopExitConfirmation(ctx, coopExit, blockHeight)
+		if err != nil {
+			return fmt.Errorf("failed to handle coop exit confirmation: %v", err)
+		}
 	}
 
 	confirmedDeposits, err := dbTx.DepositAddress.Query().
@@ -388,17 +401,10 @@ func handleBlock(ctx context.Context, dbTx *ent.Tx, txs []wire.MsgTx, blockHeigh
 			logger.Info("Expected tree status to be pending", "status", tree.Status)
 			continue
 		}
-		foundTx := false
-		for _, tx := range confirmedTxids {
-			if bytes.Equal(tx, tree.BaseTxid) {
-				foundTx = true
-				break
-			}
-		}
-		if !foundTx {
+		if _, ok := confirmedTxidSet[[32]byte(tree.BaseTxid)]; !ok {
 			logger.Debug("Base txid not found in confirmed txids", "base_txid", hex.EncodeToString(tree.BaseTxid))
-			for _, txid := range confirmedTxids {
-				logger.Debug("confirmed txid", "txid", hex.EncodeToString(txid))
+			for txid := range confirmedTxidSet {
+				logger.Debug("confirmed txid", "txid", hex.EncodeToString(txid[:]))
 			}
 			continue
 		}
@@ -443,5 +449,46 @@ func handleBlock(ctx context.Context, dbTx *ent.Tx, txs []wire.MsgTx, blockHeigh
 		}
 	}
 
+	return nil
+}
+
+func handleCoopExitConfirmation(ctx context.Context, coopExit *ent.CooperativeExit, blockHeight int64) error {
+	transfer, err := coopExit.QueryTransfer().Only(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to query transfer: %v", err)
+	}
+	transferLeaves, err := transfer.QueryTransferLeaves().All(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to query transfer leaves: %v", err)
+	}
+	for _, leaf := range transferLeaves {
+		keyTweak := &pb.SendLeafKeyTweak{}
+		err := proto.Unmarshal(leaf.KeyTweak, keyTweak)
+		if err != nil {
+			return fmt.Errorf("failed to unmarshal key tweak: %v", err)
+		}
+		treeNode, err := leaf.QueryLeaf().Only(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to query leaf: %v", err)
+		}
+		err = helper.TweakLeafKey(ctx, treeNode, keyTweak, nil)
+		if err != nil {
+			return fmt.Errorf("failed to tweak leaf key: %v", err)
+		}
+		_, err = leaf.Update().SetKeyTweak(nil).Save(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to clear key tweak: %v", err)
+		}
+	}
+
+	_, err = transfer.Update().SetStatus(schema.TransferStatusSenderKeyTweaked).Save(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to update transfer status: %v", err)
+	}
+
+	_, err = coopExit.Update().SetConfirmationHeight(blockHeight).Save(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to update coop exit: %v", err)
+	}
 	return nil
 }
