@@ -1,13 +1,13 @@
 import { SparkSigner } from "../signer/signer.js";
+import { Network, NetworkToProto } from "../utils/network.js";
 import {
+  ConfigOptions,
   createWalletConfigWithSigner,
   LOCAL_WALLET_CONFIG,
   MAINNET_WALLET_CONFIG,
   REGTEST_WALLET_CONFIG,
-  ConfigOptions,
   SigningOperator,
 } from "./wallet-config.js";
-import { Network, NetworkToProto } from "../utils/network.js";
 
 export class WalletConfigService {
   private readonly config: Required<ConfigOptions>;
@@ -30,10 +30,13 @@ export class WalletConfigService {
     switch (network) {
       case Network.MAINNET:
         configWithoutSigner = MAINNET_WALLET_CONFIG;
+        break;
       case Network.REGTEST:
         configWithoutSigner = REGTEST_WALLET_CONFIG;
+        break;
       default:
         configWithoutSigner = LOCAL_WALLET_CONFIG;
+        break;
     }
     return createWalletConfigWithSigner(configWithoutSigner);
   }
