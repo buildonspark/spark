@@ -294,7 +294,7 @@ func (c *Config) GetSigningOperatorList() map[string]*pb.SigningOperatorInfo {
 
 // AuthzEnforced returns whether authorization is enforced
 func (c *Config) AuthzEnforced() bool {
-	return false
+	return c.authzEnforced
 }
 
 func (c *Config) IdentityPublicKey() []byte {

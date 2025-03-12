@@ -161,7 +161,7 @@ func loadArgs() (*args, error) {
 		return nil, errors.New("database path is required")
 	}
 
-	log.Printf("args: %v", args)
+	log.Printf("args: %+v", args)
 
 	return args, nil
 }
