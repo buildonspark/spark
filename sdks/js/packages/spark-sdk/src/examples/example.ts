@@ -1,5 +1,6 @@
 import readline from "readline";
 import { SparkWallet } from "../../dist/spark-sdk";
+import { getLatestDepositTxId } from "../../dist/utils/mempool.js";
 
 // Initialize Spark Wallet
 const walletMnemonic =
@@ -21,6 +22,7 @@ async function runCLI() {
   getbalance                                                      - Get the wallet's balance
   getdepositaddress                                               - Get an address to deposit funds from L1 to Spark
   getsparkaddress                                                 - Get the wallet's spark address
+  getlatesttx <address>                                           - Get the latest deposit transaction id for an address
   claimdeposit <txid>                                             - Claim any pending deposits to the wallet
   createinvoice <amount> <memo>                                   - Create a new lightning invoice
   payinvoice <invoice>                                            - Pay a lightning invoice
@@ -51,6 +53,10 @@ async function runCLI() {
     switch (lowerCommand) {
       case "help":
         console.log(helpMessage);
+        break;
+      case "getlatesttx":
+        const latestTx = await getLatestDepositTxId(args[0]);
+        console.log(latestTx);
         break;
       case "claimdeposit":
         const depositResult = await wallet.claimDeposit(args[0]);

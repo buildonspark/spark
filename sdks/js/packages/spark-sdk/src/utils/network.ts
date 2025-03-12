@@ -1,7 +1,8 @@
 import { NetworkType as Lrc20NetworkType } from "@buildonspark/lrc20-sdk";
 import * as btc from "@scure/btc-signer";
-import { networks } from "bitcoinjs-lib";
+import * as bitcoin from "bitcoinjs-lib";
 import { Network as NetworkProto } from "../proto/spark.js";
+import { BitcoinNetwork } from "../types/index.js";
 export enum Network {
   MAINNET,
   TESTNET,
@@ -32,11 +33,11 @@ export const getNetwork = (network: Network): typeof btc.NETWORK =>
   NetworkConfig[network];
 
 export const LRC_WALLET_NETWORK = Object.freeze({
-  [Network.MAINNET]: networks.bitcoin,
-  [Network.TESTNET]: networks.testnet,
-  [Network.SIGNET]: networks.testnet,
-  [Network.REGTEST]: networks.regtest,
-  [Network.LOCAL]: networks.regtest,
+  [Network.MAINNET]: bitcoin.networks.bitcoin,
+  [Network.TESTNET]: bitcoin.networks.testnet,
+  [Network.SIGNET]: bitcoin.networks.testnet,
+  [Network.REGTEST]: bitcoin.networks.regtest,
+  [Network.LOCAL]: bitcoin.networks.regtest,
 });
 
 export const LRC_WALLET_NETWORK_TYPE = Object.freeze({
@@ -46,3 +47,24 @@ export const LRC_WALLET_NETWORK_TYPE = Object.freeze({
   [Network.REGTEST]: Lrc20NetworkType.REGTEST,
   [Network.LOCAL]: Lrc20NetworkType.REGTEST,
 });
+
+/**
+ * Utility function to determine the network from a Bitcoin address.
+ *
+ * @param {string} address - The Bitcoin address
+ * @returns {BitcoinNetwork | null} The detected network or null if not detected
+ */
+export function getNetworkFromAddress(address: string) {
+  try {
+    const decoded = bitcoin.address.fromBech32(address);
+    // HRP (human-readable part) determines the network
+    if (decoded.prefix === "bc") {
+      return BitcoinNetwork.MAINNET;
+    } else if (decoded.prefix === "bcrt") {
+      return BitcoinNetwork.REGTEST;
+    }
+  } catch (err) {
+    throw new Error("Invalid Bitcoin address");
+  }
+  return null;
+}
