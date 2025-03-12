@@ -442,7 +442,7 @@ func (h *TransferHandler) QueryPendingTransfers(ctx context.Context, req *pb.Que
 		transferPredicate = append(transferPredicate, enttransfer.SenderIdentityPubkeyEQ(req.GetSenderIdentityPublicKey()))
 		transferPredicate = append(transferPredicate,
 			enttransfer.StatusIn(
-				schema.TransferStatusSenderKeyTweaked,
+				schema.TransferStatusSenderKeyTweakPending,
 				schema.TransferStatusSenderInitiated,
 			),
 		)
