@@ -17,9 +17,26 @@ export type ConfigOptions = {
   readonly useTokenTransactionSchnorrSignatures?: boolean;
 };
 
-const DEFAULT_SPARK_SIGNER = new DefaultSparkSigner();
-export const LOCAL_WALLET_CONFIG: Required<ConfigOptions> = {
-  signer: DEFAULT_SPARK_SIGNER,
+export function createWalletConfigWithSigner(
+  config: ConfigOptions,
+  signer?: SparkSigner,
+): Required<ConfigOptions> {
+  if (!signer) {
+    signer = new DefaultSparkSigner();
+  }
+  return {
+    signer,
+    signingOperators: config.signingOperators ?? {},
+    coodinatorIdentifier: config.coodinatorIdentifier ?? "",
+    frostSignerAddress: config.frostSignerAddress ?? "",
+    threshold: config.threshold ?? 0,
+    useTokenTransactionSchnorrSignatures:
+      config.useTokenTransactionSchnorrSignatures ?? false,
+  };
+}
+
+export const LOCAL_WALLET_CONFIG: ConfigOptions = {
+  signer: undefined,
   coodinatorIdentifier:
     "0000000000000000000000000000000000000000000000000000000000000001",
   frostSignerAddress: "unix:///tmp/frost_0.sock",
@@ -28,8 +45,8 @@ export const LOCAL_WALLET_CONFIG: Required<ConfigOptions> = {
   useTokenTransactionSchnorrSignatures: true,
 };
 
-export const LOCAL_WALLET_CONFIG_SCHNORR: Required<ConfigOptions> = {
-  signer: DEFAULT_SPARK_SIGNER,
+export const LOCAL_WALLET_CONFIG_SCHNORR: ConfigOptions = {
+  signer: undefined,
   coodinatorIdentifier:
     "0000000000000000000000000000000000000000000000000000000000000001",
   frostSignerAddress: "unix:///tmp/frost_0.sock",
@@ -38,8 +55,8 @@ export const LOCAL_WALLET_CONFIG_SCHNORR: Required<ConfigOptions> = {
   useTokenTransactionSchnorrSignatures: true,
 };
 
-export const LOCAL_WALLET_CONFIG_ECDSA: Required<ConfigOptions> = {
-  signer: DEFAULT_SPARK_SIGNER,
+export const LOCAL_WALLET_CONFIG_ECDSA: ConfigOptions = {
+  signer: undefined,
   coodinatorIdentifier:
     "0000000000000000000000000000000000000000000000000000000000000001",
   frostSignerAddress: "unix:///tmp/frost_0.sock",
@@ -48,8 +65,8 @@ export const LOCAL_WALLET_CONFIG_ECDSA: Required<ConfigOptions> = {
   useTokenTransactionSchnorrSignatures: false,
 };
 
-export const REGTEST_WALLET_CONFIG: Required<ConfigOptions> = {
-  signer: DEFAULT_SPARK_SIGNER,
+export const REGTEST_WALLET_CONFIG: ConfigOptions = {
+  signer: undefined,
   coodinatorIdentifier:
     "0000000000000000000000000000000000000000000000000000000000000001",
   frostSignerAddress: "unix:///tmp/frost_0.sock",
@@ -58,8 +75,8 @@ export const REGTEST_WALLET_CONFIG: Required<ConfigOptions> = {
   useTokenTransactionSchnorrSignatures: true,
 };
 
-export const MAINNET_WALLET_CONFIG: Required<ConfigOptions> = {
-  signer: DEFAULT_SPARK_SIGNER,
+export const MAINNET_WALLET_CONFIG: ConfigOptions = {
+  signer: undefined,
   coodinatorIdentifier:
     "0000000000000000000000000000000000000000000000000000000000000001",
   frostSignerAddress: "unix:///tmp/frost_0.sock",

@@ -6,6 +6,7 @@ const walletMnemonic =
   "cctypical stereo dose party penalty decline neglect feel harvest abstract stage winter";
 
 async function runCLI() {
+
   // Get network from command line args
   const network = process.argv.includes("mainnet") ? "MAINNET" : "REGTEST";
   let wallet = new SparkWallet(network);

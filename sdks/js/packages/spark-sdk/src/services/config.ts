@@ -1,5 +1,6 @@
 import { SparkSigner } from "../signer/signer.js";
 import {
+  createWalletConfigWithSigner,
   LOCAL_WALLET_CONFIG,
   MAINNET_WALLET_CONFIG,
   REGTEST_WALLET_CONFIG,
@@ -25,14 +26,16 @@ export class WalletConfigService {
   }
 
   private getDefaultConfig(network: Network): Required<ConfigOptions> {
+    let configWithoutSigner: ConfigOptions;
     switch (network) {
       case Network.MAINNET:
-        return MAINNET_WALLET_CONFIG;
+        configWithoutSigner = MAINNET_WALLET_CONFIG;
       case Network.REGTEST:
-        return REGTEST_WALLET_CONFIG;
+        configWithoutSigner = REGTEST_WALLET_CONFIG;
       default:
-        return LOCAL_WALLET_CONFIG;
+        configWithoutSigner = LOCAL_WALLET_CONFIG;
     }
+    return createWalletConfigWithSigner(configWithoutSigner);
   }
 
   public getCoordinatorAddress(): string {
