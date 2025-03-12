@@ -36,7 +36,7 @@ export type CreateTreeRootParams = {
   vout: number;
 };
 
-const INITIAL_TIME_LOCK = 60000;
+const INITIAL_TIME_LOCK = 2000;
 
 export class DepositService {
   private readonly config: WalletConfigService;

@@ -21,8 +21,6 @@ import {
 
 const crypto = getCrypto();
 
-const TIME_LOCK_INTERVAL = 100;
-
 export type GetConnectorRefundSignaturesParams = {
   leaves: LeafKeyTweak[];
   exitTxId: Uint8Array;
