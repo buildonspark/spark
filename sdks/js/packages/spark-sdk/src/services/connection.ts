@@ -1,7 +1,7 @@
-import { ChannelImplementation } from "@grpc/grpc-js/build/src/channel.js";
 import { sha256 } from "@scure/btc-signer/utils";
 import * as fs from "fs";
 import {
+  Channel,
   ChannelCredentials,
   ClientMiddlewareCall,
   createChannel,
@@ -226,7 +226,7 @@ export class ConnectionManager {
 
   private createGrpcClient<T>(
     defintion: SparkAuthnServiceDefinition | SparkServiceDefinition,
-    channel: ChannelImplementation,
+    channel: Channel,
     middleware?: any,
   ): T & { close?: () => void } {
     const clientFactory = createClientFactory().use(retryMiddleware);

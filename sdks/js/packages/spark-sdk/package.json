@@ -121,7 +121,6 @@
   },
   "dependencies": {
     "@buildonspark/lrc20-sdk": "0.0.9",
-    "@grpc/grpc-js": "^1.12.5",
     "@lightsparkdev/core": "^1.2.7",
     "@mempool/mempool.js": "^3.0.0",
     "@noble/curves": "^1.8.0",
