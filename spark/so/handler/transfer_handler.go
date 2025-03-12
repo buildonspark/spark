@@ -413,6 +413,7 @@ func (h *TransferHandler) QueryPendingTransfers(ctx context.Context, req *pb.Que
 				schema.TransferStatusSenderKeyTweakPending,
 				schema.TransferStatusSenderInitiated,
 			),
+			enttransfer.ExpiryTimeLT(time.Now()),
 		)
 	}
 	if req.TransferIds != nil {
