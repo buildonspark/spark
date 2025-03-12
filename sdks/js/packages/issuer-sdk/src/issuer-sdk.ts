@@ -19,7 +19,7 @@ import { IssuerWalletInterface } from "./interface/wallet-interface.js";
 import { TokenFreezeService } from "./services/freeze.js";
 import { IssuerTokenTransactionService } from "./services/token-transactions.js";
 
-const BURN_ADDRESS = "02".repeat(32);
+const BURN_ADDRESS = "02".repeat(33);
 
 export class IssuerSparkWallet
   extends SparkWallet
