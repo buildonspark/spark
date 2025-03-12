@@ -399,7 +399,6 @@ export class SparkWallet {
     } else {
       await this.initWalletFromSeed(mnemonicOrSeed);
     }
-
     const balance = this.leaves.reduce(
       (acc, leaf) => acc + BigInt(leaf.value),
       0n,
@@ -408,10 +407,15 @@ export class SparkWallet {
 
     if (enableLRC20Wallet) {
       let seed;
-      if (typeof mnemonicOrSeed === "string") {
+      // if mnemonicOrSeed is a 12-24 word mnemonic, generate the corresponding seed.
+      if (validateMnemonic(mnemonicOrSeed, wordlist)) {
         seed = await bip39.mnemonicToSeed(mnemonicOrSeed);
       } else {
-        seed = mnemonicOrSeed;
+        // if mnemonicOrSeed is the seed as a hex string, convert it to a Uint8Array
+        seed =
+          typeof mnemonicOrSeed === "string"
+            ? hexToBytes(mnemonicOrSeed)
+            : mnemonicOrSeed;
       }
 
       const network = this.config.getNetwork();
