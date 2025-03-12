@@ -162,7 +162,7 @@ export class CoopExitService extends BaseTransferService {
           ownerIdentityPublicKey:
             await this.config.signer.getIdentityPublicKey(),
           receiverIdentityPublicKey: receiverPubKey,
-          expiryTime: new Date(Date.now() + 2 * 60 * 1000),
+          expiryTime: new Date(Date.now() + 3 * 60 * 60 * 1000), // 3 hours
         },
         exitId: crypto.randomUUID(),
         exitTxid: exitTxId,
