@@ -111,7 +111,9 @@ func findDifference(currChainTip, newChainTip Tip, client *rpcclient.Client) (Di
 
 		// Walk back the chain, finding blocks needed to connect and disconnect. Only walk back
 		// the header with the greater height, or both if equal heights (i.e. same height, different hashes!).
-		if newChainTip.Height <= currChainTip.Height {
+		newHeight := newChainTip.Height
+		currHeight := currChainTip.Height
+		if newHeight <= currHeight {
 			disconnected = append(disconnected, currChainTip)
 			prevChainTip, err := findPreviousChainTip(currChainTip, client)
 			if err != nil {
@@ -119,7 +121,7 @@ func findDifference(currChainTip, newChainTip Tip, client *rpcclient.Client) (Di
 			}
 			currChainTip = prevChainTip
 		}
-		if newChainTip.Height >= currChainTip.Height {
+		if newHeight >= currHeight {
 			connected = append(connected, newChainTip)
 			prevChainTip, err := findPreviousChainTip(newChainTip, client)
 			if err != nil {
