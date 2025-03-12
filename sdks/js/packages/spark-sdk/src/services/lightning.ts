@@ -209,6 +209,7 @@ export class LightningService {
           ownerIdentityPublicKey:
             await this.config.signer.getIdentityPublicKey(),
           receiverIdentityPublicKey: receiverIdentityPubkey,
+          expiryTime: new Date(Date.now() + 2 * 60 * 1000),
         },
         receiverIdentityPublicKey: receiverIdentityPubkey,
         feeSats: 0,

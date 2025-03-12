@@ -520,7 +520,7 @@ export class SparkWallet {
         await this.config.signer.getSspIdentityPublicKey(
           this.config.getNetwork(),
         ),
-        new Date(Date.now() + 10 * 60 * 1000),
+        new Date(Date.now() + 2 * 60 * 1000),
       );
     try {
       if (!transfer.leaves[0]?.leaf) {
