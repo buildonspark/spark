@@ -54,7 +54,7 @@ jobs:
 
       - name: "Checkout spark-go"
         uses: "actions/checkout@v4"
-        
+
       - name: "Setup Go"
         uses: "actions/setup-go@v5"
         with:
@@ -124,11 +124,17 @@ jobs:
           tag: v1.12.0
           cache: enable
 
-      - name: "Run integration tests"
-        working-directory: ./spark
+      - name: "Run DKG"
+        working-directory: "./spark"
         env:
           HERMETIC_TEST: "true"
-          RUN_DKG: "true"
+        run: |
+          ../scripts/run-development-dkg.sh
+
+      - name: "Run integration tests"
+        working-directory: "./spark"
+        env:
+          HERMETIC_TEST: "true"
         run: |
           gotestsum \
           --format testname \

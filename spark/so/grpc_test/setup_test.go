@@ -34,7 +34,9 @@ func TestMain(m *testing.M) {
 			log.Printf("DKG setup completed successfully")
 		}
 	} else {
-		log.Printf("DKG not run for test setup. Set %s=true to run DKG if tests fail, or re-run tests as they may work on retry", EnvRunDKG)
+		log.Printf("DKG not run for test setup. Set %s=true to run DKG if tests fail, "+
+			"run scripts/run-development-dkg.sh, or re-run tests as they may work on retry",
+			EnvRunDKG)
 	}
 
 	// Run tests
