@@ -21,6 +21,7 @@ import (
 	"github.com/lightsparkdev/spark-go/so/ent/tokenleaf"
 	"github.com/lightsparkdev/spark-go/so/ent/tokentransactionreceipt"
 	"github.com/lightsparkdev/spark-go/so/helper"
+	"github.com/lightsparkdev/spark-go/so/lrc20"
 	"github.com/lightsparkdev/spark-go/so/utils"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
@@ -337,6 +338,7 @@ func (o TokenTransactionHandler) FinalizeTokenTransaction(
 	return &emptypb.Empty{}, nil
 }
 
+// SendTransactionToLRC20Node sends a token transaction to the LRC20 node.
 func (o TokenTransactionHandler) SendTransactionToLRC20Node(
 	ctx context.Context,
 	config *so.Config,
@@ -367,23 +369,11 @@ func (o TokenTransactionHandler) SendTransactionToLRC20Node(
 		LeavesToSpendData:              leavesToSpendData,
 	}
 
-	conn, err := helper.ConnectToLrc20Node(config)
-	if err != nil {
-		return fmt.Errorf("failed to connect to LRC20 node: %w", err)
-	}
-	defer conn.Close()
-	lrc20Client := pblrc20.NewSparkServiceClient(conn)
-
-	_, err = lrc20Client.SendSparkSignature(ctx, &pblrc20.SendSparkSignatureRequest{
-		SignatureData: signatureData,
-	})
-	if err != nil {
-		return err
-	}
-
-	return nil
+	lrc20Client := lrc20.NewClient(config)
+	return lrc20Client.SendSparkSignature(ctx, signatureData)
 }
 
+// FreezeTokens freezes or unfreezes tokens on the LRC20 node.
 func (o TokenTransactionHandler) FreezeTokens(
 	ctx context.Context,
 	config *so.Config,
@@ -455,30 +445,14 @@ func (o TokenTransactionHandler) FreezeTokens(
 	}, nil
 }
 
+// FreezeTokensOnLRC20Node freezes or unfreezes tokens on the LRC20 node.
 func (o TokenTransactionHandler) FreezeTokensOnLRC20Node(
 	ctx context.Context,
 	config *so.Config,
 	req *pb.FreezeTokensRequest,
 ) error {
-	network := common.Regtest.String() // TODO: Get network from transaction
-	if lrc20Config, ok := config.Lrc20Configs[network]; ok && lrc20Config.DisableRpcs {
-		log.Printf("Skipping LRC20 node call due to DisableRpcs flag")
-		return nil
-	}
-
-	conn, err := helper.ConnectToLrc20Node(config)
-	if err != nil {
-		return fmt.Errorf("failed to connect to LRC20 node: %w", err)
-	}
-	defer conn.Close()
-	lrc20Client := pblrc20.NewSparkServiceClient(conn)
-
-	_, err = lrc20Client.FreezeTokens(ctx, req)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	lrc20Client := lrc20.NewClient(config)
+	return lrc20Client.FreezeTokens(ctx, req)
 }
 
 // QueryTokenTransactions returns SO provided data about specific token transactions along with their status.

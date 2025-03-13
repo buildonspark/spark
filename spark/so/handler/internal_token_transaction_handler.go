@@ -10,13 +10,13 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/common"
-	pblrc20 "github.com/lightsparkdev/spark-go/proto/lrc20"
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark-go/proto/spark_internal"
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/ent"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
 	"github.com/lightsparkdev/spark-go/so/helper"
+	"github.com/lightsparkdev/spark-go/so/lrc20"
 	"github.com/lightsparkdev/spark-go/so/utils"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
@@ -114,28 +114,8 @@ func (h *InternalTokenTransactionHandler) StartTokenTransactionInternal(ctx cont
 }
 
 func (h *InternalTokenTransactionHandler) VerifyTokenTransactionWithLrc20Node(ctx context.Context, config *so.Config, tokenTransaction *pb.TokenTransaction) error {
-	network := common.Regtest.String() // TODO: Get network from transaction
-	if lrc20Config, ok := config.Lrc20Configs[network]; ok && lrc20Config.DisableRpcs {
-		log.Printf("Skipping LRC20 node call due to DisableRpcs flag")
-		return nil
-	}
-
-	conn, err := helper.ConnectToLrc20Node(config)
-	if err != nil {
-		return fmt.Errorf("failed to connect to LRC20 node: %w", err)
-	}
-	defer conn.Close()
-	lrc20Client := pblrc20.NewSparkServiceClient(conn)
-	res, err := lrc20Client.VerifySparkTx(ctx, &pblrc20.VerifySparkTxRequest{FinalTokenTransaction: tokenTransaction})
-	if err != nil {
-		return err
-	}
-
-	// TODO: Remove is_valid boolean in response and use error codes only instead.
-	if !res.IsValid {
-		return fmt.Errorf("LRC20 node validation: invalid token transaction")
-	}
-	return nil
+	client := lrc20.NewClient(config)
+	return client.VerifySparkTx(ctx, tokenTransaction)
 }
 
 func ValidateMintSignature(
