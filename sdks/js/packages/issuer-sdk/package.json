@@ -1,6 +1,6 @@
 {
   "name": "@buildonspark/issuer-sdk",
-  "version": "0.0.11",
+  "version": "0.0.12",
   "description": "Spark Issuer SDK for token issuance",
   "module": "./dist/issuer-sdk.js",
   "types": "./dist/issuer-sdk.d.ts",
@@ -38,8 +38,8 @@
   },
   "dependencies": {
     "@bufbuild/protobuf": "^2.2.3",
-    "@buildonspark/lrc20-sdk": "0.0.9",
-    "@buildonspark/spark-sdk": "0.0.11",
+    "@buildonspark/lrc20-sdk": "0.0.10",
+    "@buildonspark/spark-sdk": "0.0.12",
     "@noble/curves": "^1.8.0",
     "@noble/secp256k1": "^2.2.3",
     "@scure/btc-signer": "^1.5.0",
