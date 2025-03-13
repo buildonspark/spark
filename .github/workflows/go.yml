@@ -143,6 +143,18 @@ jobs:
           labels: |
             org.opencontainers.image.vendor=Lightspark
             org.opencontainers.image.title=spark
+      - name: Set Docker tags
+        id: docker-tags
+        run: |
+          TAGS="${{ steps.ecr-login.outputs.registry }}/spark-go:git_${{ steps.metadata.outputs.hash_short }},"
+          TAGS+="${{ steps.ecr-login.outputs.registry }}/spark-go:git_${{ steps.metadata.outputs.date }}_${{ steps.metadata.outputs.hash_short }}"
+
+          if [[ "${{ github.event_name }}" == "push" ]]; then
+            TAGS="${{ steps.ecr-login.outputs.registry }}/spark-go:latest,$TAGS"
+          fi
+
+          echo "tags=$TAGS" >> $GITHUB_OUTPUT
+
       - name: "Build and push image"
         uses: "docker/build-push-action@v3"
         with:
@@ -153,10 +165,7 @@ jobs:
           cache-from: type=registry,ref=${{ steps.ecr-login.outputs.registry }}/spark-go:cache
           cache-to: type=registry,ref=${{ steps.ecr-login.outputs.registry }}/spark-go:cache,mode=max,image-manifest=true,oci-mediatypes=true
           labels: ${{ steps.docker-meta.outputs.labels }}
-          tags: |
-            ${{ steps.ecr-login.outputs.registry }}/spark-go:latest,
-            ${{ steps.ecr-login.outputs.registry }}/spark-go:git_${{ steps.metadata.outputs.hash_short }},
-            ${{ steps.ecr-login.outputs.registry }}/spark-go:git_${{ steps.metadata.outputs.date }}_${{ steps.metadata.outputs.hash_short }}
+          tags: ${{ steps.docker-tags.outputs.tags }}
           push: true
           provenance: false # skopeo can't handle this
 
