@@ -6,7 +6,8 @@ create_ecr_secret() {
     if [ -f "/home/runner/.docker/config.json" ]; then
         # GitHub Actions environment
         kubectl -n "$namespace" create secret docker-registry ecr \
-            --from-file=.dockerconfigjson=/home/runner/.docker/config.json
+            --from-file=.dockerconfigjson=/home/runner/.docker/config.json \
+            --dry-run=client -o yaml | kubectl apply -f -
     else
         PASSWORD="$(aws ecr get-login-password)"
         SERVER="674966927423.dkr.ecr.us-west-2.amazonaws.com"

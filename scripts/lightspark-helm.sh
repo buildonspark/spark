@@ -1,7 +1,7 @@
 #!/bin/bash
 
 : "${USE_LIGHTSPARK_HELM_REPO:=false}"
-: "${OPS_DIR:=$(dirname "$0")/ops}"
+: "${OPS_DIR:=$(dirname "$0")/../../ops}"
 LIGHTSPARK_HELM_REPO="lightspark"
 DEFAULT_OPS_PREFIX="${OPS_DIR}/helm"
 
