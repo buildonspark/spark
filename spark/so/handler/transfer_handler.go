@@ -840,6 +840,10 @@ func (h *TransferHandler) InitiateSettleReceiverKeyTweak(ctx context.Context, re
 		return fmt.Errorf("unable to load transfer %s: %v", req.TransferId, err)
 	}
 
+	if transfer.Status != schema.TransferStatusReceiverKeyTweaked {
+		return fmt.Errorf("transfer %s is expected to be at status TransferStatusReceiverKeyTweaked but %s found", req.TransferId, transfer.Status)
+	}
+
 	leaves, err := transfer.QueryTransferLeaves().All(ctx)
 	if err != nil {
 		return fmt.Errorf("unable to get leaves from transfer %s: %v", req.TransferId, err)
