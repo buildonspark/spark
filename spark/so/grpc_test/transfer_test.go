@@ -298,16 +298,24 @@ func TestCancelTransfer(t *testing.T) {
 		NewSigningPrivKey: newLeafPrivKey.Serialize(),
 	}
 	leavesToTransfer := [1]wallet.LeafKeyTweak{transferNode}
+	expiryDelta := 2 * time.Second
 	senderTransfer, _, _, err := wallet.SendTransferSignRefund(
 		context.Background(),
 		senderConfig,
 		leavesToTransfer[:],
 		receiverPrivKey.PubKey().SerializeCompressed(),
-		time.Now().Add(10*time.Minute),
+		time.Now().Add(expiryDelta),
 	)
 	if err != nil {
 		t.Fatalf("failed to transfer tree node: %v", err)
 	}
+
+	_, err = wallet.CancelSendTransfer(context.Background(), senderConfig, senderTransfer)
+	if err == nil {
+		t.Fatalf("expected to fail to cancel transfer, but succeeded")
+	}
+
+	time.Sleep(expiryDelta)
 
 	_, err = wallet.CancelSendTransfer(context.Background(), senderConfig, senderTransfer)
 	if err != nil {

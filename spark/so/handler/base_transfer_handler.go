@@ -345,7 +345,7 @@ func (h *BaseTransferHandler) CancelSendTransfer(
 		return nil, fmt.Errorf("transfer %s is expected to be at status TransferStatusSenderInitiated or TransferStatusSenderKeyTweakPending but %s found", req.TransferId, transfer.Status)
 	}
 	if intent == CancelSendTransferIntentExternal && transfer.ExpiryTime.After(time.Now()) {
-		return nil, fmt.Errorf("transfer %s has not expired", req.TransferId)
+		return nil, fmt.Errorf("transfer %s has not expired, expires at %s", req.TransferId, transfer.ExpiryTime.String())
 	}
 
 	transfer, err = transfer.Update().SetStatus(schema.TransferStatusReturned).Save(ctx)
