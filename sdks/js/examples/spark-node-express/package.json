@@ -1,0 +1,21 @@
+{
+  "name": "spark-node-express",
+  "version": "0.0.1",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node dist/index.js",
+    "dev": "nodemon src/index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "description": "basic express server consuming the @buildonspark/spark-sdk and @buildonspark/issuer-sdk",
+  "dependencies": {
+    "@buildonspark/issuer-sdk": "^0.0.11",
+    "@buildonspark/spark-sdk": "^0.0.11",
+    "express": "^4.21.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.9"
+  }
+}

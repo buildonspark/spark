@@ -1605,6 +1605,29 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@buildonspark/issuer-sdk@npm:^0.0.11":
+  version: 0.0.11
+  resolution: "@buildonspark/issuer-sdk@npm:0.0.11"
+  dependencies:
+    "@bufbuild/protobuf": "npm:^2.2.3"
+    "@buildonspark/lrc20-sdk": "npm:0.0.9"
+    "@buildonspark/spark-sdk": "npm:0.0.11"
+    "@grpc/grpc-js": "npm:^1.12.5"
+    "@noble/curves": "npm:^1.8.0"
+    "@noble/secp256k1": "npm:^2.2.3"
+    "@scure/btc-signer": "npm:^1.5.0"
+    bitcoinjs-lib: "npm:^6.1.5"
+    crypto-js: "npm:^4.2.0"
+    grpc-tools: "npm:^1.12.4"
+    nice-grpc: "npm:^2.1.10"
+    nice-grpc-common: "npm:^2.0.2"
+    nice-grpc-web: "npm:^3.3.5"
+    protobufjs: "npm:^7.4.0"
+    ts-proto: "npm:^2.6.1"
+  checksum: 10/39b0ff34d58b4b8afc09e6911acca9cc29d14889fac71f020744668d047ea5dd68692be19047af41ab543660819128486cd57caa5d263c7293577cfbdc9ba255
+  languageName: node
+  linkType: hard
+
 "@buildonspark/issuer-sdk@workspace:packages/issuer-sdk":
   version: 0.0.0-use.local
   resolution: "@buildonspark/issuer-sdk@workspace:packages/issuer-sdk"
@@ -1665,6 +1688,23 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@buildonspark/lrc20-sdk@npm:0.0.9":
+  version: 0.0.9
+  resolution: "@buildonspark/lrc20-sdk@npm:0.0.9"
+  dependencies:
+    "@bitcoinerlab/secp256k1": "npm:^1.1.1"
+    "@sapphire/utilities": "npm:^3.17.0"
+    "@swc/plugin-transform-imports": "npm:^7.0.0"
+    bignumber.js: "npm:^9.1.2"
+    bip65: "npm:^1.0.3"
+    bitcoinjs-lib: "git+https://github.com/velykodnyi/bitcoinjs-lib.git#v6.1.6+sighash"
+    class-transformer: "npm:^0.5.1"
+    ecpair: "npm:^2.1.0"
+    tiny-secp256k1: "npm:^2.2.3"
+  checksum: 10/8ba826116ee8867f6e5659a5fdb513be7f8313d62fc7ad2165be392bb0168c0f038a91e4d308ef23f66bc1ed2bae6e673896ce6cc66635fb52f64707298e44db
+  languageName: node
+  linkType: hard
+
 "@buildonspark/nodejs-scripts@workspace:examples/nodejs-scripts":
   version: 0.0.0-use.local
   resolution: "@buildonspark/nodejs-scripts@workspace:examples/nodejs-scripts"
@@ -1676,6 +1716,41 @@ __metadata:
     typescript: "npm:^5.7.3"
   languageName: unknown
   linkType: soft
+
+"@buildonspark/spark-sdk@npm:0.0.11, @buildonspark/spark-sdk@npm:^0.0.11":
+  version: 0.0.11
+  resolution: "@buildonspark/spark-sdk@npm:0.0.11"
+  dependencies:
+    "@buildonspark/lrc20-sdk": "npm:0.0.9"
+    "@grpc/grpc-js": "npm:^1.12.5"
+    "@lightsparkdev/core": "npm:^1.2.7"
+    "@mempool/mempool.js": "npm:^3.0.0"
+    "@noble/curves": "npm:^1.8.0"
+    "@noble/secp256k1": "npm:^2.2.3"
+    "@scure/base": "npm:^1.2.1"
+    "@scure/bip32": "npm:^1.6.2"
+    "@scure/bip39": "npm:^1.5.4"
+    "@scure/btc-signer": "npm:^1.5.0"
+    async-mutex: "npm:^0.5.0"
+    auto-bind: "npm:^5.0.1"
+    bitcoinjs-lib: "npm:^6.1.5"
+    buffer: "npm:^6.0.3"
+    eciesjs: "npm:^0.4.13"
+    grpc-tools: "npm:^1.12.4"
+    light-bolt11-decoder: "npm:^3.2.0"
+    long: "npm:^5.2.4"
+    nice-grpc: "npm:^2.1.10"
+    nice-grpc-client-middleware-retry: "npm:^3.1.10"
+    nice-grpc-web: "npm:^3.3.5"
+    protobufjs: "npm:^7.4.0"
+    react-toastify: "npm:^11.0.5"
+    secp256k1: "npm:^5.0.1"
+    ts-proto: "npm:^2.6.1"
+    uuid: "npm:^11.1.0"
+    ws: "npm:^8.18.0"
+  checksum: 10/dfdb3c2b80b70600584057a2658bc9524d83898a4dad6c41e347fc72ff45d682e34e2857edca23c6b61da586a13a9d5321da4550613c88af327bb054a5d09462
+  languageName: node
+  linkType: hard
 
 "@buildonspark/spark-sdk@npm:0.0.12, @buildonspark/spark-sdk@workspace:packages/spark-sdk":
   version: 0.0.0-use.local
@@ -2609,6 +2684,16 @@ __metadata:
     "@grpc/proto-loader": "npm:^0.7.13"
     "@js-sdsl/ordered-map": "npm:^4.4.2"
   checksum: 10/775ed5a3f15e571af403603da109a9ef2067829fa07e8dbb884368f2b2f696214cdc78652e0647c782119a8398f58c3d77b69d9095fda612aff153181ca1a114
+  languageName: node
+  linkType: hard
+
+"@grpc/grpc-js@npm:^1.12.5":
+  version: 1.13.0
+  resolution: "@grpc/grpc-js@npm:1.13.0"
+  dependencies:
+    "@grpc/proto-loader": "npm:^0.7.13"
+    "@js-sdsl/ordered-map": "npm:^4.4.2"
+  checksum: 10/b98a559438d47ddd469af3c29c343d903421288df29c1c917551222bf47f25184c0b0a4ec1dc5f52903480815aade8ffc74af92227bac3c9ae3a52e59b876dea
   languageName: node
   linkType: hard
 
@@ -7535,6 +7620,20 @@ __metadata:
   languageName: node
   linkType: hard
 
+"bitcoinjs-lib@git+https://github.com/velykodnyi/bitcoinjs-lib.git#v6.1.6+sighash":
+  version: 6.1.6
+  resolution: "bitcoinjs-lib@https://github.com/velykodnyi/bitcoinjs-lib.git#commit=45e20e0bb35bf503c3c252678de9a253367d4aa8"
+  dependencies:
+    "@noble/hashes": "npm:^1.2.0"
+    bech32: "npm:^2.0.0"
+    bip174: "npm:^2.1.1"
+    bs58check: "npm:^3.0.1"
+    typeforce: "npm:^1.11.3"
+    varuint-bitcoin: "npm:^1.1.2"
+  checksum: 10/51fb076aa7e536f0b626256c6a58c92e09553721d2ce613828701c238b7567684ab387ccd3f1ebbe19087ee748373db1a94cbf7a1091031f7791edab5c89d7c4
+  languageName: node
+  linkType: hard
+
 "bitcoinjs-lib@npm:^6.1.5, bitcoinjs-lib@npm:^6.1.6":
   version: 6.1.7
   resolution: "bitcoinjs-lib@npm:6.1.7"
@@ -8101,7 +8200,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"chokidar@npm:^3.4.2, chokidar@npm:^3.5.3, chokidar@npm:^3.6.0":
+"chokidar@npm:^3.4.2, chokidar@npm:^3.5.2, chokidar@npm:^3.5.3, chokidar@npm:^3.6.0":
   version: 3.6.0
   resolution: "chokidar@npm:3.6.0"
   dependencies:
@@ -9119,7 +9218,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"debug@npm:4, debug@npm:^4.1.0, debug@npm:^4.1.1, debug@npm:^4.3.1, debug@npm:^4.3.2, debug@npm:^4.3.4":
+"debug@npm:4, debug@npm:^4, debug@npm:^4.1.0, debug@npm:^4.1.1, debug@npm:^4.3.1, debug@npm:^4.3.2, debug@npm:^4.3.4":
   version: 4.4.0
   resolution: "debug@npm:4.4.0"
   dependencies:
@@ -10773,7 +10872,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"express@npm:^4.17.3":
+"express@npm:^4.17.3, express@npm:^4.21.2":
   version: 4.21.2
   resolution: "express@npm:4.21.2"
   dependencies:
@@ -12180,6 +12279,13 @@ __metadata:
   version: 1.2.1
   resolution: "ieee754@npm:1.2.1"
   checksum: 10/d9f2557a59036f16c282aaeb107832dc957a93d73397d89bbad4eb1130560560eb695060145e8e6b3b498b15ab95510226649a0b8f52ae06583575419fe10fc4
+  languageName: node
+  linkType: hard
+
+"ignore-by-default@npm:^1.0.1":
+  version: 1.0.1
+  resolution: "ignore-by-default@npm:1.0.1"
+  checksum: 10/441509147b3615e0365e407a3c18e189f78c07af08564176c680be1fabc94b6c789cad1342ad887175d4ecd5225de86f73d376cec8e06b42fd9b429505ffcf8a
   languageName: node
   linkType: hard
 
@@ -15327,6 +15433,26 @@ __metadata:
   languageName: node
   linkType: hard
 
+"nodemon@npm:^3.1.9":
+  version: 3.1.9
+  resolution: "nodemon@npm:3.1.9"
+  dependencies:
+    chokidar: "npm:^3.5.2"
+    debug: "npm:^4"
+    ignore-by-default: "npm:^1.0.1"
+    minimatch: "npm:^3.1.2"
+    pstree.remy: "npm:^1.1.8"
+    semver: "npm:^7.5.3"
+    simple-update-notifier: "npm:^2.0.0"
+    supports-color: "npm:^5.5.0"
+    touch: "npm:^3.1.0"
+    undefsafe: "npm:^2.0.5"
+  bin:
+    nodemon: bin/nodemon.js
+  checksum: 10/7c01ddfa30815f4147006f5b7c015a1f75017118cf398ee8c4ba3ac904667f4555b91cca6b7b191e0f6ccf5072727aa20224a1456d5446f3f6053e15132068a2
+  languageName: node
+  linkType: hard
+
 "noms@npm:0.0.0":
   version: 0.0.0
   resolution: "noms@npm:0.0.0"
@@ -17333,6 +17459,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"pstree.remy@npm:^1.1.8":
+  version: 1.1.8
+  resolution: "pstree.remy@npm:1.1.8"
+  checksum: 10/ef13b1b5896b35f67dbd4fb7ba54bb2a5da1a5c317276cbad4bcad4159bf8f7b5e1748dc244bf36865f3d560d2fc952521581280a91468c9c2df166cc760c8c1
+  languageName: node
+  linkType: hard
+
 "public-encrypt@npm:^4.0.3":
   version: 4.0.3
   resolution: "public-encrypt@npm:4.0.3"
@@ -19070,6 +19203,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"simple-update-notifier@npm:^2.0.0":
+  version: 2.0.0
+  resolution: "simple-update-notifier@npm:2.0.0"
+  dependencies:
+    semver: "npm:^7.5.3"
+  checksum: 10/40bd4f96aa89aedbf717ae9f4ab8fca70e8f7511e8b766feb15471cca3f6fe4fe673743309b08b4ba8abfe0965c9cd927e1de46550a757b819b70fc7430cc85d
+  languageName: node
+  linkType: hard
+
 "sisteransi@npm:^1.0.5":
   version: 1.0.5
   resolution: "sisteransi@npm:1.0.5"
@@ -19280,6 +19422,17 @@ __metadata:
     typescript: "npm:^5.7.3"
     web-vitals: "npm:^2.1.0"
     zustand: "npm:^5.0.3"
+  languageName: unknown
+  linkType: soft
+
+"spark-node-express@workspace:examples/spark-node-express":
+  version: 0.0.0-use.local
+  resolution: "spark-node-express@workspace:examples/spark-node-express"
+  dependencies:
+    "@buildonspark/issuer-sdk": "npm:^0.0.11"
+    "@buildonspark/spark-sdk": "npm:^0.0.11"
+    express: "npm:^4.21.2"
+    nodemon: "npm:^3.1.9"
   languageName: unknown
   linkType: soft
 
@@ -19793,7 +19946,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"supports-color@npm:^5.3.0":
+"supports-color@npm:^5.3.0, supports-color@npm:^5.5.0":
   version: 5.5.0
   resolution: "supports-color@npm:5.5.0"
   dependencies:
@@ -20098,6 +20251,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"tiny-secp256k1@npm:^2.2.3":
+  version: 2.2.3
+  resolution: "tiny-secp256k1@npm:2.2.3"
+  dependencies:
+    uint8array-tools: "npm:0.0.7"
+  checksum: 10/9975134c5c86587bb0e9886dd2e66a7a9b79931cb2c3e32b24bcfc2096216781828bb7c5482c0fa18a632ce1b907f6cc86bf12238704ec9cd43d1e81d8af502e
+  languageName: node
+  linkType: hard
+
 "tiny-warning@npm:^1.0.0":
   version: 1.0.3
   resolution: "tiny-warning@npm:1.0.3"
@@ -20151,6 +20313,15 @@ __metadata:
     "@tokenizer/token": "npm:^0.3.0"
     ieee754: "npm:^1.2.1"
   checksum: 10/0985369bbea9f53a5ccd79bb9899717b41401a813deb2c7fb1add5d0baf2f702aaf6da78f6e0ccf346d5a9f7acaa7cb5efed7d092d89d8c1e6962959e9509bc0
+  languageName: node
+  linkType: hard
+
+"touch@npm:^3.1.0":
+  version: 3.1.1
+  resolution: "touch@npm:3.1.1"
+  bin:
+    nodetouch: bin/nodetouch.js
+  checksum: 10/853e763a1f4903302c5654ed353f84ad85baf757dac62c2d37ab67e0477cfd271e8c64771fcfad42310aff7c9d284ddb435ee5ca13ff36d0f3693fedd8e971d1
   languageName: node
   linkType: hard
 
@@ -20708,6 +20879,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"uint8array-tools@npm:0.0.7":
+  version: 0.0.7
+  resolution: "uint8array-tools@npm:0.0.7"
+  checksum: 10/6ffc45c7d2136757d63c6e556eb8345f908948618a9de37c805fec1249d989c265187b3fbef6cffc4ce5129083204829025b3c58800a0f24c8548e243d42ba13
+  languageName: node
+  linkType: hard
+
 "unbox-primitive@npm:^1.1.0":
   version: 1.1.0
   resolution: "unbox-primitive@npm:1.1.0"
@@ -20717,6 +20895,13 @@ __metadata:
     has-symbols: "npm:^1.1.0"
     which-boxed-primitive: "npm:^1.1.1"
   checksum: 10/fadb347020f66b2c8aeacf8b9a79826fa34cc5e5457af4eb0bbc4e79bd87fed0fa795949825df534320f7c13f199259516ad30abc55a6e7b91d8d996ca069e50
+  languageName: node
+  linkType: hard
+
+"undefsafe@npm:^2.0.5":
+  version: 2.0.5
+  resolution: "undefsafe@npm:2.0.5"
+  checksum: 10/f42ab3b5770fedd4ada175fc1b2eb775b78f609156f7c389106aafd231bfc210813ee49f54483d7191d7b76e483bc7f537b5d92d19ded27156baf57592eb02cc
   languageName: node
   linkType: hard
 
