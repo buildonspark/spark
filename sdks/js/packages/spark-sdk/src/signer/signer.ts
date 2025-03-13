@@ -68,10 +68,8 @@ interface SparkSigner {
   getDepositSigningKey(): Promise<Uint8Array>;
 
   generateMnemonic(): Promise<string>;
-  createSparkWalletFromMnemonic(
-    mnemonic: string,
-    network: Network,
-  ): Promise<string>;
+  mnemonicToSeed(mnemonic: string): Promise<Uint8Array>;
+
   createSparkWalletFromSeed(
     seed: Uint8Array | string,
     network: Network,
@@ -225,12 +223,8 @@ class DefaultSparkSigner implements SparkSigner {
     return generateMnemonic(wordlist);
   }
 
-  async createSparkWalletFromMnemonic(
-    mnemonic: string,
-    network: Network,
-  ): Promise<string> {
-    const seed = await bip39.mnemonicToSeed(mnemonic);
-    return this.createSparkWalletFromSeed(seed, network);
+  async mnemonicToSeed(mnemonic: string): Promise<Uint8Array> {
+    return await bip39.mnemonicToSeed(mnemonic);
   }
 
   async getTrackedPublicKeys(): Promise<Uint8Array[]> {

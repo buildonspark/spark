@@ -29,7 +29,6 @@ export interface IssuerWalletInterface {
     receiverSparkAddress: string;
     amountSats: number;
   }): Promise<Transfer | string>;
-  refreshTimelockNodes(nodeId?: string): Promise<void>;
   createLightningInvoice(params: CreateLightningInvoiceParams): Promise<
     | string
     | {

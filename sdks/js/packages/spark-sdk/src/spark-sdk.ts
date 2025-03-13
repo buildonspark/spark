@@ -33,7 +33,6 @@ import { TokenTransactionService } from "./services/token-transactions.js";
 import { LeafKeyTweak, TransferService } from "./services/transfer.js";
 import { ConfigOptions } from "./services/wallet-config.js";
 
-import * as bip39 from "@scure/bip39";
 import { validateMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english";
 import { Mutex } from "async-mutex";
@@ -99,8 +98,6 @@ type DepositParams = {
 };
 
 export type InitWalletResponse = {
-  balance: bigint;
-  tokenBalance: Map<string, { balance: bigint }>;
   mnemonic?: string | undefined;
 };
 
@@ -108,6 +105,7 @@ export interface SparkWalletProps {
   mnemonicOrSeed?: Uint8Array | string;
   signer?: SparkSigner;
   options?: ConfigOptions;
+  lrc20WalletApiConfig?: LRC20WalletApiConfig;
 }
 
 /**
@@ -173,9 +171,13 @@ export class SparkWallet {
     mnemonicOrSeed,
     signer,
     options,
+    lrc20WalletApiConfig,
   }: SparkWalletProps) {
     const wallet = new SparkWallet(options, signer);
-    const initResponse = await wallet.initWallet(mnemonicOrSeed);
+    const initResponse = await wallet.initWallet(
+      mnemonicOrSeed,
+      lrc20WalletApiConfig,
+    );
     return {
       wallet,
       ...initResponse,
@@ -191,14 +193,10 @@ export class SparkWallet {
   }
 
   private async initializeWallet(identityPublicKey: string) {
-    await this.connectionManager.createClients();
     this.sspClient = new SspClient(identityPublicKey);
-    await Promise.all([
-      this.initWasm(),
-      // Hacky but do this to store the deposit signing key in the signer
-      this.config.signer.getDepositSigningKey(),
-    ]);
+    await this.connectionManager.createClients();
 
+    await this.initWasm();
     await this.syncWallet();
   }
 
@@ -326,7 +324,6 @@ export class SparkWallet {
     this.leaves = await this.getLeaves();
     await this.config.signer.restoreSigningKeysFromLeafs(this.leaves);
     await this.refreshTimelockNodes();
-    await this.config.signer.restoreSigningKeysFromLeafs(this.leaves);
 
     this.optimizeLeaves().catch((e) => {
       console.error("Failed to optimize leaves", e);
@@ -340,10 +337,6 @@ export class SparkWallet {
     } finally {
       release();
     }
-  }
-
-  private isInitialized(): boolean {
-    return this.sspClient !== null && this.wasmModule !== null;
   }
 
   /**
@@ -382,35 +375,28 @@ export class SparkWallet {
    */
   protected async initWallet(
     mnemonicOrSeed?: Uint8Array | string,
-    enableLRC20Wallet: boolean = true,
     lrc20WalletApiConfig?: LRC20WalletApiConfig,
-  ): Promise<InitWalletResponse> {
+  ): Promise<InitWalletResponse | undefined> {
     const returnMnemonic = !mnemonicOrSeed;
+    let mnemonic: string | undefined;
     if (!mnemonicOrSeed) {
       mnemonicOrSeed = await this.config.signer.generateMnemonic();
     }
 
-    if (typeof mnemonicOrSeed !== "string") {
-      mnemonicOrSeed = bytesToHex(mnemonicOrSeed);
-    }
-
-    let mnemonic: string | undefined;
     let seed: Uint8Array;
-    if (validateMnemonic(mnemonicOrSeed, wordlist)) {
-      mnemonic = mnemonicOrSeed;
-      seed = await bip39.mnemonicToSeed(mnemonicOrSeed);
-      await this.initWalletFromMnemonic(mnemonicOrSeed);
+    if (typeof mnemonicOrSeed !== "string") {
+      seed = mnemonicOrSeed;
     } else {
-      seed = hexToBytes(mnemonicOrSeed);
-      await this.initWalletFromSeed(seed);
+      if (validateMnemonic(mnemonicOrSeed, wordlist)) {
+        seed = await this.config.signer.mnemonicToSeed(mnemonicOrSeed);
+      } else {
+        seed = hexToBytes(mnemonicOrSeed);
+      }
     }
-    const balance = this.leaves.reduce(
-      (acc, leaf) => acc + BigInt(leaf.value),
-      0n,
-    );
-    const tokenBalance = await this.getAllTokenBalances();
 
-    if (enableLRC20Wallet) {
+    await this.initWalletFromSeed(seed);
+
+    if (lrc20WalletApiConfig) {
       const network = this.config.getNetwork();
       const masterPrivateKey = getMasterHDKeyFromSeed(
         seed,
@@ -427,25 +413,10 @@ export class SparkWallet {
     if (returnMnemonic) {
       return {
         mnemonic,
-        balance,
-        tokenBalance,
       };
     }
 
-    return {
-      balance,
-      tokenBalance,
-    };
-  }
-
-  private async initWalletFromMnemonic(mnemonic: string) {
-    const identityPublicKey =
-      await this.config.signer.createSparkWalletFromMnemonic(
-        mnemonic,
-        this.config.getNetwork(),
-      );
-    await this.initializeWallet(identityPublicKey);
-    return identityPublicKey;
+    return;
   }
 
   /**
@@ -933,8 +904,9 @@ export class SparkWallet {
    *
    * @param {string} nodeId - The optional ID of the node to refresh. If not provided, all nodes will be checked.
    * @returns {Promise<void>}
+   * @private
    */
-  public async refreshTimelockNodes(nodeId?: string) {
+  private async refreshTimelockNodes(nodeId?: string) {
     const nodesToRefresh: TreeNode[] = [];
     const nodeIds: string[] = [];
 

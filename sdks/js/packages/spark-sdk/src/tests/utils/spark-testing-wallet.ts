@@ -17,9 +17,7 @@ export class SparkWalletTesting
     const initResponse = await wallet.initWallet(props.mnemonicOrSeed);
     return {
       wallet,
-      mnemonic: initResponse.mnemonic,
-      balance: initResponse.balance,
-      tokenBalance: initResponse.tokenBalance,
+      mnemonic: initResponse?.mnemonic,
     };
   }
 
