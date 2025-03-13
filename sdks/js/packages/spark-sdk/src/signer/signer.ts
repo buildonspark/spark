@@ -65,6 +65,7 @@ export type SplitSecretWithProofsParams = {
 // TODO: Properly clean up keys when they are no longer needed
 interface SparkSigner {
   getIdentityPublicKey(): Promise<Uint8Array>;
+  getDepositSigningKey(): Promise<Uint8Array>;
 
   generateMnemonic(): Promise<string>;
   createSparkWalletFromMnemonic(
@@ -128,7 +129,11 @@ interface SparkSigner {
 }
 
 class DefaultSparkSigner implements SparkSigner {
-  private identityPrivateKey: HDKey | null = null;
+  private masterKey: HDKey | null = null;
+  private identityKey: HDKey | null = null;
+  private signingKey: HDKey | null = null;
+  private depositKey: HDKey | null = null;
+
   // <hex, hex>
   private publicKeyToPrivateKeyMap: Map<string, string> = new Map();
 
@@ -136,19 +141,14 @@ class DefaultSparkSigner implements SparkSigner {
     new Map();
 
   private deriveSigningKey(hash: Uint8Array): Uint8Array {
-    if (!this.identityPrivateKey) {
+    if (!this.masterKey) {
       throw new Error("Private key is not set");
     }
 
-    let amount = 0;
-    for (let i = 0; i < 8; i++) {
-      const view = new DataView(hash.buffer, i * 4, 4);
-      amount += view.getUint32(0, false);
-      amount = amount % 0x80000000;
-    }
-    const newPrivateKey = this.identityPrivateKey.deriveChild(
-      Number(amount) + 0x80000000,
-    ).privateKey;
+    const view = new DataView(hash.buffer);
+    const amount = (view.getUint32(0, false) % 0x80000000) + 0x80000000;
+
+    const newPrivateKey = this.signingKey?.deriveChild(amount).privateKey;
 
     if (!newPrivateKey) {
       throw new Error("Failed to recover signing key");
@@ -158,7 +158,7 @@ class DefaultSparkSigner implements SparkSigner {
   }
 
   async restoreSigningKeysFromLeafs(leafs: TreeNode[]) {
-    if (!this.identityPrivateKey) {
+    if (!this.masterKey) {
       throw new Error("Private key is not set");
     }
 
@@ -196,21 +196,29 @@ class DefaultSparkSigner implements SparkSigner {
   }
 
   async signSchnorrWithIdentityKey(message: Uint8Array): Promise<Uint8Array> {
-    if (!this.identityPrivateKey?.privateKey) {
+    if (!this.identityKey?.privateKey) {
       throw new Error("Private key is not set");
     }
 
-    const signature = schnorr.sign(message, this.identityPrivateKey.privateKey);
+    const signature = schnorr.sign(message, this.identityKey.privateKey);
 
     return signature;
   }
 
   async getIdentityPublicKey(): Promise<Uint8Array> {
-    if (!this.identityPrivateKey?.privateKey) {
+    if (!this.identityKey?.publicKey) {
       throw new Error("Private key is not set");
     }
 
-    return secp256k1.getPublicKey(this.identityPrivateKey.privateKey);
+    return this.identityKey.publicKey;
+  }
+
+  async getDepositSigningKey(): Promise<Uint8Array> {
+    if (!this.depositKey?.publicKey) {
+      throw new Error("Deposit key is not set");
+    }
+
+    return this.depositKey.publicKey;
   }
 
   async generateMnemonic(): Promise<string> {
@@ -230,7 +238,7 @@ class DefaultSparkSigner implements SparkSigner {
   }
 
   async generatePublicKey(hash?: Uint8Array): Promise<Uint8Array> {
-    if (!this.identityPrivateKey) {
+    if (!this.masterKey) {
       throw new Error("Private key is not set");
     }
 
@@ -383,13 +391,40 @@ class DefaultSparkSigner implements SparkSigner {
       network == Network.REGTEST ? 0 : 1,
     );
 
-    if (!hdkey.privateKey) {
+    if (!hdkey.privateKey || !hdkey.publicKey) {
       throw new Error("Could not derive private key from seed");
     }
 
-    this.identityPrivateKey = hdkey;
+    const identityKey = hdkey.derive("m/8797555'/0'/0'");
+    const signingKey = hdkey.derive("m/8797555'/0'/1'");
+    const depositKey = hdkey.derive("m/8797555'/0'/2'");
 
-    return bytesToHex(secp256k1.getPublicKey(hdkey.privateKey, true));
+    if (
+      !identityKey.privateKey ||
+      !depositKey.privateKey ||
+      !signingKey.privateKey ||
+      !identityKey.publicKey ||
+      !depositKey.publicKey ||
+      !signingKey.publicKey
+    ) {
+      throw new Error("Could not derive keys from seed");
+    }
+
+    this.masterKey = hdkey;
+    this.identityKey = identityKey;
+    this.depositKey = depositKey;
+    this.signingKey = signingKey;
+
+    this.publicKeyToPrivateKeyMap.set(
+      bytesToHex(identityKey.publicKey),
+      bytesToHex(identityKey.privateKey),
+    );
+    this.publicKeyToPrivateKeyMap.set(
+      bytesToHex(depositKey.publicKey),
+      bytesToHex(depositKey.privateKey),
+    );
+
+    return bytesToHex(identityKey.publicKey);
   }
 
   async signMessageWithPublicKey(
@@ -417,14 +452,11 @@ class DefaultSparkSigner implements SparkSigner {
     message: Uint8Array,
     compact?: boolean,
   ): Promise<Uint8Array> {
-    if (!this.identityPrivateKey?.privateKey) {
+    if (!this.identityKey?.privateKey) {
       throw new Error("Private key is not set");
     }
 
-    const signature = secp256k1.sign(
-      message,
-      this.identityPrivateKey.privateKey,
-    );
+    const signature = secp256k1.sign(message, this.identityKey.privateKey);
 
     if (compact) {
       return signature.toCompactRawBytes();
@@ -447,11 +479,11 @@ class DefaultSparkSigner implements SparkSigner {
   }
 
   async decryptEcies(ciphertext: Uint8Array): Promise<Uint8Array> {
-    if (!this.identityPrivateKey?.privateKey) {
+    if (!this.identityKey?.privateKey) {
       throw new Error("Private key is not set");
     }
     const receiverEciesPrivKey = ecies.PrivateKey.fromHex(
-      bytesToHex(this.identityPrivateKey.privateKey),
+      bytesToHex(this.identityKey.privateKey),
     );
     const privateKey = ecies.decrypt(receiverEciesPrivKey.toHex(), ciphertext);
     const publicKey = secp256k1.getPublicKey(privateKey);
@@ -502,26 +534,6 @@ class DefaultSparkSigner implements SparkSigner {
       adaptorSignature: signature,
       adaptorPublicKey: adaptorPublicKey,
     };
-  }
-
-  async getDepositSigningKey(): Promise<Uint8Array> {
-    if (!this.identityPrivateKey?.privateKey) {
-      throw new Error("Private key is not set");
-    }
-
-    const depositSigningKey =
-      this.identityPrivateKey.derive("M/8797555'/0'/2'");
-
-    if (!depositSigningKey.privateKey) {
-      throw new Error("Could not derive deposit signing key");
-    }
-
-    this.publicKeyToPrivateKeyMap.set(
-      bytesToHex(secp256k1.getPublicKey(depositSigningKey.privateKey)),
-      bytesToHex(depositSigningKey.privateKey),
-    );
-
-    return secp256k1.getPublicKey(depositSigningKey.privateKey);
   }
 }
 export { DefaultSparkSigner };
