@@ -84,7 +84,6 @@ describe("Transfer", () => {
       const senderTransfer = await senderTransferService.sendTransfer(
         [transferNode],
         hexToBytes(receiverPubkey),
-        new Date(Date.now() + 10 * 60 * 1000),
       );
 
       const pendingTransfer = await receiverWallet.queryPendingTransfers();
@@ -126,7 +125,7 @@ describe("Transfer", () => {
       });
       const newReceiverPubkey = await newReceiverWallet.getIdentityPublicKey();
 
-      await receiverWallet.sendSparkTransfer({
+      await receiverWallet.transfer({
         amountSats: 1000,
         receiverSparkAddress: newReceiverPubkey,
       });
@@ -199,7 +198,6 @@ describe("Transfer", () => {
     const senderTransfer = await senderTransferService.sendTransfer(
       leavesToTransfer,
       hexToBytes(receiverPubkey),
-      new Date(Date.now() + 10 * 60 * 1000),
     );
 
     // Receiver queries pending transfer
@@ -338,7 +336,6 @@ describe("Transfer", () => {
     const newSenderTransfer = await senderTransferService.sendTransfer(
       [transferNode],
       hexToBytes(receiverPubkey),
-      new Date(Date.now() + 10 * 60 * 1000),
     );
 
     const pendingTransfer = await receiverWallet.queryPendingTransfers();

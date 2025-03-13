@@ -86,11 +86,9 @@ export type PayLightningInvoiceParams = {
   invoice: string;
 };
 
-export type SendTransferParams = {
-  amount?: number;
-  leaves?: TreeNode[];
-  receiverPubKey: string;
-  expiryTime?: Date;
+export type TransferParams = {
+  amountSats: number;
+  receiverSparkAddress: string;
 };
 
 type DepositParams = {
@@ -473,9 +471,8 @@ export class SparkWallet {
    * @param {number} [params.targetAmount] - Target amount for the swap
    * @param {TreeNode[]} [params.leaves] - Specific leaves to swap
    * @returns {Promise<Object>} The completed swap response
-   * @private
    */
-  private async requestLeavesSwap({
+  public async requestLeavesSwap({
     targetAmount,
     leaves,
   }: {
@@ -675,7 +672,7 @@ export class SparkWallet {
    * @param {number} [offset=0] - Offset for pagination
    * @returns {Promise<QueryAllTransfersResponse>} Response containing the list of transfers
    */
-  public async getAllTransfers(
+  public async getTransfers(
     limit: number = 20,
     offset: number = 0,
   ): Promise<QueryAllTransfersResponse> {
@@ -769,6 +766,27 @@ export class SparkWallet {
     return await this.transferDepositToSelf(response.nodes, signingPubKey);
   }
 
+  /**
+   * Gets all unused deposit addresses for the wallet.
+   *
+   * @returns {Promise<string[]>} The unused deposit addresses
+   */
+  public async getUnusedDepositAddresses(): Promise<string[]> {
+    const sparkClient = await this.connectionManager.createSparkClient(
+      this.config.getCoordinatorAddress(),
+    );
+    return (
+      await sparkClient.query_unused_deposit_addresses({
+        identityPublicKey: await this.config.signer.getIdentityPublicKey(),
+      })
+    ).depositAddresses.map((addr) => addr.depositAddress);
+  }
+  /**
+   * Claims a deposit to the wallet.
+   *
+   * @param {string} txid - The transaction ID of the deposit
+   * @returns {Promise<TreeNode[] | undefined>} The nodes resulting from the deposit
+   */
   public async claimDeposit(txid: string) {
     const baseUrl =
       this.config.getNetwork() === Network.REGTEST
@@ -839,60 +857,6 @@ export class SparkWallet {
   }
 
   /**
-   * Queries the mempool for transactions associated with an address.
-   *
-   * @param {string} address - The address to query
-   * @returns {Promise<{depositTx: Transaction, vout: number} | null>} Transaction details or null if none found
-   * @private
-   */
-  private async queryMempoolTxs(address: string) {
-    const network = getNetworkFromAddress(address) || this.config.getNetwork();
-    const baseUrl =
-      network === BitcoinNetwork.REGTEST
-        ? "https://regtest-mempool.dev.dev.sparkinfra.net/api"
-        : "https://mempool.space/docs/api";
-    const auth = btoa("spark-sdk:mCMk1JqlBNtetUNy");
-
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-    };
-
-    if (network === BitcoinNetwork.REGTEST) {
-      headers["Authorization"] = `Basic ${auth}`;
-    }
-
-    const response = await fetch(`${baseUrl}/address/${address}/txs`, {
-      headers,
-    });
-
-    const addressTxs = await response.json();
-
-    if (addressTxs && addressTxs.length > 0) {
-      const latestTx = addressTxs[0];
-
-      const outputIndex: number = latestTx.vout.findIndex(
-        (output: any) => output.scriptpubkey_address === address,
-      );
-
-      if (outputIndex === -1) {
-        return null;
-      }
-
-      const txResponse = await fetch(`${baseUrl}/tx/${latestTx.txid}/hex`, {
-        headers,
-      });
-      const txHex = await txResponse.text();
-      const depositTx = getTxFromRawTxHex(txHex);
-
-      return {
-        depositTx,
-        vout: outputIndex,
-      };
-    }
-    return null;
-  }
-
-  /**
    * Transfers deposit to self to claim ownership.
    *
    * @param {TreeNode[]} leaves - The leaves to transfer
@@ -915,7 +879,6 @@ export class SparkWallet {
     await this.transferService.sendTransfer(
       leafKeyTweaks,
       await this.config.signer.getIdentityPublicKey(),
-      new Date(Date.now() + 10 * 60 * 1000),
     );
 
     const pendingTransfers = await this.transferService.queryPendingTransfers();
@@ -931,72 +894,37 @@ export class SparkWallet {
   /**
    * Sends a transfer to another Spark user.
    *
-   * @param {Object} params - Parameters for the transfer
+   * @param {TransferParams} params - Parameters for the transfer
    * @param {string} params.receiverSparkAddress - The recipient's Spark address
    * @param {number} params.amountSats - Amount to send in satoshis
    * @returns {Promise<Transfer>} The completed transfer details
    */
-  public async sendSparkTransfer({
-    receiverSparkAddress,
-    amountSats,
-  }: {
-    receiverSparkAddress: string;
-    amountSats: number;
-  }) {
+  public async transfer({ amountSats, receiverSparkAddress }: TransferParams) {
     return await this.withLeaves(async () => {
-      return await this._sendTransfer({
-        receiverPubKey: receiverSparkAddress,
-        amount: amountSats,
-      });
+      const leavesToSend = await this.selectLeaves(amountSats);
+
+      await this.refreshTimelockNodes();
+
+      const leafKeyTweaks = await Promise.all(
+        leavesToSend.map(async (leaf) => ({
+          leaf,
+          signingPubKey: await this.config.signer.generatePublicKey(
+            sha256(leaf.id),
+          ),
+          newSigningPubKey: await this.config.signer.generatePublicKey(),
+        })),
+      );
+
+      const transfer = await this.transferService.sendTransfer(
+        leafKeyTweaks,
+        hexToBytes(receiverSparkAddress),
+      );
+
+      const leavesToRemove = new Set(leavesToSend.map((leaf) => leaf.id));
+      this.leaves = this.leaves.filter((leaf) => !leavesToRemove.has(leaf.id));
+
+      return transfer;
     });
-  }
-
-  /**
-   * Internal method to send a transfer.
-   *
-   * @param {SendTransferParams} params - Parameters for the transfer
-   * @returns {Promise<Transfer>} The completed transfer details
-   * @private
-   */
-  private async _sendTransfer({
-    amount,
-    receiverPubKey,
-    leaves,
-    expiryTime = new Date(Date.now() + 10 * 60 * 1000),
-  }: SendTransferParams) {
-    let leavesToSend: TreeNode[] = [];
-    if (leaves) {
-      leavesToSend = leaves.map((leaf) => ({
-        ...leaf,
-      }));
-    } else if (amount) {
-      leavesToSend = await this.selectLeaves(amount);
-    } else {
-      throw new Error("Must provide amount or leaves");
-    }
-
-    await this.refreshTimelockNodes();
-
-    const leafKeyTweaks = await Promise.all(
-      leavesToSend.map(async (leaf) => ({
-        leaf,
-        signingPubKey: await this.config.signer.generatePublicKey(
-          sha256(leaf.id),
-        ),
-        newSigningPubKey: await this.config.signer.generatePublicKey(),
-      })),
-    );
-
-    const transfer = await this.transferService.sendTransfer(
-      leafKeyTweaks,
-      hexToBytes(receiverPubKey),
-      expiryTime,
-    );
-
-    const leavesToRemove = new Set(leavesToSend.map((leaf) => leaf.id));
-    this.leaves = this.leaves.filter((leaf) => !leavesToRemove.has(leaf.id));
-
-    return transfer;
   }
 
   /**
@@ -1088,13 +1016,21 @@ export class SparkWallet {
   }
 
   /**
+   * Gets all pending transfers.
+   *
+   * @returns {Promise<Transfer[]>} The pending transfers
+   */
+  public async getPendingTransfers() {
+    return (await this.transferService.queryPendingTransfers()).transfers;
+  }
+
+  /**
    * Claims a specific transfer.
    *
    * @param {Transfer} transfer - The transfer to claim
    * @returns {Promise<Object>} The claim result
-   * @private
    */
-  private async claimTransfer(transfer: Transfer) {
+  public async claimTransfer(transfer: Transfer) {
     return await this.claimTransferMutex.runExclusive(async () => {
       const leafPubKeyMap =
         await this.transferService.verifyPendingTransfer(transfer);
@@ -1132,9 +1068,8 @@ export class SparkWallet {
    * Claims all pending transfers.
    *
    * @returns {Promise<boolean>} True if any transfers were claimed
-   * @private
    */
-  private async claimTransfers(): Promise<boolean> {
+  public async claimTransfers(): Promise<boolean> {
     const transfers = await this.transferService.queryPendingTransfers();
     let claimed = false;
     for (const transfer of transfers.transfers) {
@@ -1319,9 +1254,8 @@ export class SparkWallet {
    *
    * @param {LightningReceiveFeeEstimateInput} params - Input parameters for fee estimation
    * @returns {Promise<LightningReceiveFeeEstimateOutput | null>} Fee estimate for receiving Lightning payments
-   * @private
    */
-  private async getLightningReceiveFeeEstimate({
+  public async getLightningReceiveFeeEstimate({
     amountSats,
     network,
   }: LightningReceiveFeeEstimateInput): Promise<LightningReceiveFeeEstimateOutput | null> {
@@ -1340,9 +1274,8 @@ export class SparkWallet {
    *
    * @param {LightningSendFeeEstimateInput} params - Input parameters for fee estimation
    * @returns {Promise<LightningSendFeeEstimateOutput | null>} Fee estimate for sending Lightning payments
-   * @private
    */
-  private async getLightningSendFeeEstimate({
+  public async getLightningSendFeeEstimate({
     encodedInvoice,
   }: LightningSendFeeEstimateInput): Promise<LightningSendFeeEstimateOutput | null> {
     if (!this.sspClient) {
@@ -1507,9 +1440,8 @@ export class SparkWallet {
    *
    * @param {CoopExitFeeEstimateInput} params - Input parameters for fee estimation
    * @returns {Promise<CoopExitFeeEstimateOutput | null>} Fee estimate for the withdrawal
-   * @private
    */
-  private async getCoopExitFeeEstimate({
+  public async getCoopExitFeeEstimate({
     leafExternalIds,
     withdrawalAddress,
   }: CoopExitFeeEstimateInput): Promise<CoopExitFeeEstimateOutput | null> {

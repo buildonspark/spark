@@ -212,7 +212,7 @@ const useWalletStore = create<WalletStore>((set, get) => ({
     if (!wallet) {
       throw new Error("Wallet not initialized");
     }
-    return await wallet.getAllTransfers(limit, offset);
+    return await wallet.getTransfers(limit, offset);
   },
   getBitcoinDepositAddress: async () => {
     const { wallet } = get();
@@ -241,7 +241,7 @@ const useWalletStore = create<WalletStore>((set, get) => ({
     if (!wallet) {
       throw new Error("Wallet not initialized");
     }
-    await wallet.sendSparkTransfer({
+    await wallet.transfer({
       amountSats: amountSats,
       receiverSparkAddress: recipient,
     });

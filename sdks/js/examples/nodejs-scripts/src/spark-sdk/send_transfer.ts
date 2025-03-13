@@ -18,7 +18,7 @@ async function main() {
   const balance = await wallet.getBalance();
   console.log("Balance:", balance);
 
-  const transfer = await wallet.sendSparkTransfer({
+  const transfer = await wallet.transfer({
     receiverSparkAddress: receiverAddress,
     amountSats: 100,
   });

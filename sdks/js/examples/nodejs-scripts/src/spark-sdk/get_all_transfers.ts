@@ -11,5 +11,5 @@ const { wallet, mnemonic: walletMnemonic } = await SparkWallet.create({
 });
 console.log("wallet mnemonic phrase:", walletMnemonic);
 
-const transfers = await wallet.getAllTransfers(20, 0);
+const transfers = await wallet.getTransfers(20, 0);
 console.log("Transfers:", transfers);

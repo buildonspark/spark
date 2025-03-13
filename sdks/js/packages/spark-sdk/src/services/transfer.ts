@@ -362,12 +362,10 @@ export class TransferService extends BaseTransferService {
   async sendTransfer(
     leaves: LeafKeyTweak[],
     receiverIdentityPubkey: Uint8Array,
-    expiryTime: Date,
   ): Promise<Transfer> {
     const { transfer, signatureMap } = await this.sendTransferSignRefund(
       leaves,
       receiverIdentityPubkey,
-      expiryTime,
     );
 
     const transferWithTweakedKeys = await this.sendTransferTweakKey(
@@ -544,7 +542,7 @@ export class TransferService extends BaseTransferService {
   async sendTransferSignRefund(
     leaves: LeafKeyTweak[],
     receiverIdentityPubkey: Uint8Array,
-    expiryTime: Date,
+    expiryTime?: Date,
   ): Promise<{
     transfer: Transfer;
     signatureMap: Map<string, Uint8Array>;

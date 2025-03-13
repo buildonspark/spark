@@ -1,3 +1,4 @@
+import { Transfer } from "@buildonspark/spark-sdk/proto/spark";
 import { bytesToHex } from "@noble/hashes/utils";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -34,25 +35,27 @@ export default function Transactions() {
   const processedData = useMemo(() => {
     if (!transfersQuery.data) return { transactions: [], hasMore: false };
 
-    const transactions = transfersQuery.data.transfers.map((transfer) => {
-      const txType: "send" | "receive" =
-        bytesToHex(transfer.senderIdentityPublicKey) === sparkAddress
-          ? "send"
-          : "receive";
+    const transactions = transfersQuery.data.transfers.map(
+      (transfer: Transfer) => {
+        const txType: "send" | "receive" =
+          bytesToHex(transfer.senderIdentityPublicKey) === sparkAddress
+            ? "send"
+            : "receive";
 
-      const counterparty =
-        txType === "send"
-          ? bytesToHex(transfer.receiverIdentityPublicKey)
-          : bytesToHex(transfer.senderIdentityPublicKey);
+        const counterparty =
+          txType === "send"
+            ? bytesToHex(transfer.receiverIdentityPublicKey)
+            : bytesToHex(transfer.senderIdentityPublicKey);
 
-      return {
-        id: transfer.id,
-        value: transfer.totalValue,
-        asset: PERMANENT_CURRENCIES.get("BTC")!,
-        counterparty,
-        transactionType: txType,
-      };
-    });
+        return {
+          id: transfer.id,
+          value: transfer.totalValue,
+          asset: PERMANENT_CURRENCIES.get("BTC")!,
+          counterparty,
+          transactionType: txType,
+        };
+      },
+    );
 
     const hasMore = transfersQuery.data.transfers.length >= pageParams.limit;
     setHasMore(hasMore);
@@ -159,7 +162,7 @@ export default function Transactions() {
             ))}
             <div
               ref={observerTarget}
-              className="h-lg m-2xs flex items-center justify-center"
+              className="m-2xs flex h-lg items-center justify-center"
             >
               {transfersQuery.isLoading ? (
                 <span>Loading more transactions...</span>

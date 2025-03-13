@@ -16,7 +16,7 @@ export interface IssuerWalletInterface {
   // SparkWallet methods
   getIdentityPublicKey(): Promise<string>;
   getSparkAddress(): Promise<string>;
-  getAllTransfers(
+  getTransfers(
     limit?: number,
     offset?: number,
   ): Promise<QueryAllTransfersResponse>;
@@ -25,7 +25,7 @@ export interface IssuerWalletInterface {
     tokenBalances: Map<string, { balance: bigint }>;
   }>;
   getDepositAddress(): Promise<string>;
-  sendSparkTransfer(params: {
+  transfer(params: {
     receiverSparkAddress: string;
     amountSats: number;
   }): Promise<Transfer | string>;

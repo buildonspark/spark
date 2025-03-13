@@ -1,3 +1,4 @@
+import { Transfer } from "@buildonspark/spark-sdk/proto/spark";
 import { bytesToHex } from "@noble/hashes/utils";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -59,8 +60,8 @@ export default function Wallet() {
         <div className="flex h-[140px] w-full flex-col items-start justify-end">
           {btcBalance.isLoading ? (
             <div className="flex w-full flex-col space-y-3">
-              <div className="animate-gradient-x h-10 w-[124px] rounded-md bg-[linear-gradient(90deg,#1A1A1A,#1A1A1A,#5A5A5A,#1A1A1A,#1A1A1A)] bg-[length:1000%_100%]"></div>
-              <div className="animate-gradient-x h-[18px] w-[150px] rounded-md bg-[linear-gradient(90deg,#1A1A1A,#1A1A1A,#5A5A5A,#1A1A1A,#1A1A1A)] bg-[length:1000%_100%]"></div>
+              <div className="h-10 w-[124px] animate-gradient-x rounded-md bg-[linear-gradient(90deg,#1A1A1A,#1A1A1A,#5A5A5A,#1A1A1A,#1A1A1A)] bg-[length:1000%_100%]"></div>
+              <div className="h-[18px] w-[150px] animate-gradient-x rounded-md bg-[linear-gradient(90deg,#1A1A1A,#1A1A1A,#5A5A5A,#1A1A1A,#1A1A1A)] bg-[length:1000%_100%]"></div>
             </div>
           ) : (
             <>
@@ -141,33 +142,37 @@ export default function Wallet() {
                 View all
               </div>
             </div>
-            {transfersQuery?.data?.transfers?.map((transfer, index) => {
-              if (index >= 3) return null;
-              const sender = bytesToHex(transfer.senderIdentityPublicKey);
-              if (sender === pubkey) {
-                return (
-                  <TransactionDetailRow
-                    key={`${index}`}
-                    transactionType="send"
-                    asset={PERMANENT_CURRENCIES.get("BTC")!}
-                    assetAmount={transfer.totalValue}
-                    counterparty={bytesToHex(
-                      transfer.receiverIdentityPublicKey,
-                    )}
-                  />
-                );
-              } else {
-                return (
-                  <TransactionDetailRow
-                    key={`${index}`}
-                    transactionType="receive"
-                    asset={PERMANENT_CURRENCIES.get("BTC")!}
-                    assetAmount={transfer.totalValue}
-                    counterparty={bytesToHex(transfer.senderIdentityPublicKey)}
-                  />
-                );
-              }
-            })}
+            {transfersQuery?.data?.transfers?.map(
+              (transfer: Transfer, index: number) => {
+                if (index >= 3) return null;
+                const sender = bytesToHex(transfer.senderIdentityPublicKey);
+                if (sender === pubkey) {
+                  return (
+                    <TransactionDetailRow
+                      key={`${index}`}
+                      transactionType="send"
+                      asset={PERMANENT_CURRENCIES.get("BTC")!}
+                      assetAmount={transfer.totalValue}
+                      counterparty={bytesToHex(
+                        transfer.receiverIdentityPublicKey,
+                      )}
+                    />
+                  );
+                } else {
+                  return (
+                    <TransactionDetailRow
+                      key={`${index}`}
+                      transactionType="receive"
+                      asset={PERMANENT_CURRENCIES.get("BTC")!}
+                      assetAmount={transfer.totalValue}
+                      counterparty={bytesToHex(
+                        transfer.senderIdentityPublicKey,
+                      )}
+                    />
+                  );
+                }
+              },
+            )}
           </div>
         )}
     </div>
