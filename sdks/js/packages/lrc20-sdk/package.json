@@ -60,6 +60,15 @@
   "engines": {
     "node": ">=14.0.0"
   },
+  "browser": {
+    "assert": false,
+    "buffer": "buffer",
+    "crypto": false,
+    "fs": false,
+    "fs/promises": false,
+    "path": false,
+    "url": false
+  },
   "madge": {
     "detectiveOptions": {
       "ts": {

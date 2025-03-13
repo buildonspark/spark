@@ -1,5 +1,5 @@
 import { sha256 } from "@scure/btc-signer/utils";
-import * as fs from "fs";
+
 import {
   Channel,
   ChannelCredentials,
@@ -56,20 +56,36 @@ export class ConnectionManager {
   // TODO: Web transport handles TLS differently, verify that we don't need to do anything
   private static createChannelWithTLS(address: string, certPath?: string) {
     try {
-      if (certPath && typeof window === "undefined") {
-        // TODO: Verify that this is the correct way to create a channel with TLS
-        const cert = fs.readFileSync(certPath);
-        return createChannel(address, ChannelCredentials.createSsl(cert));
-      } else {
-        // Fallback to insecure for development
-        return createChannel(
-          address,
-          typeof window === "undefined"
-            ? ChannelCredentials.createSsl(null, null, null, {
+      if (typeof window === "undefined") {
+        // Node.js environment
+        if (certPath) {
+          try {
+            // Dynamic import for Node.js only
+            const fs = require('fs');
+            const cert = fs.readFileSync(certPath);
+            return createChannel(address, ChannelCredentials.createSsl(cert));
+          } catch (error) {
+            console.error("Error reading certificate:", error);
+            // Fallback to insecure for development
+            return createChannel(
+              address,
+              ChannelCredentials.createSsl(null, null, null, {
                 rejectUnauthorized: false,
               })
-            : undefined,
-        );
+            );
+          }
+        } else {
+          // No cert provided, use insecure SSL for development
+          return createChannel(
+            address,
+            ChannelCredentials.createSsl(null, null, null, {
+              rejectUnauthorized: false,
+            })
+          );
+        }
+      } else {
+        // Browser environment - nice-grpc-web handles TLS automatically
+        return createChannel(address);
       }
     } catch (error) {
       console.error("Channel creation error:", error);
