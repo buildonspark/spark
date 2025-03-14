@@ -428,6 +428,7 @@ message QueryPendingTransfersRequest {
         bytes sender_identity_public_key = 2;
     }
     repeated string transfer_ids = 3;
+    Network network = 4;
 }
 
 message QueryPendingTransfersResponse {
@@ -698,6 +699,7 @@ message QueryNodesRequest {
         TreeNodeIds node_ids = 2;
     }
     bool include_parents = 3;
+    Network network = 4;
 }
 
 message QueryNodesResponse {
@@ -740,6 +742,7 @@ message QueryUnusedDepositAddressesResponse {
 
 message QueryBalanceRequest {
     bytes identity_public_key = 1;
+    Network network = 2;
 }
 
 message QueryBalanceResponse {

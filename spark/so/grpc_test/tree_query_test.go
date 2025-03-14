@@ -56,6 +56,7 @@ func TestTreeQuery(t *testing.T) {
 		req := &pb.QueryNodesRequest{
 			Source:         &pb.QueryNodesRequest_OwnerIdentityPubkey{OwnerIdentityPubkey: leafNode.OwnerIdentityPublicKey},
 			IncludeParents: true,
+			Network:        pb.Network_REGTEST,
 		}
 
 		resp, err := client.QueryNodes(ctx, req)
@@ -67,6 +68,7 @@ func TestTreeQuery(t *testing.T) {
 		req := &pb.QueryNodesRequest{
 			Source:         &pb.QueryNodesRequest_NodeIds{NodeIds: &pb.TreeNodeIds{NodeIds: []string{leafNode.Id}}},
 			IncludeParents: false,
+			Network:        pb.Network_REGTEST,
 		}
 
 		resp, err := client.QueryNodes(ctx, req)
@@ -81,6 +83,7 @@ func TestTreeQuery(t *testing.T) {
 		req := &pb.QueryNodesRequest{
 			Source:         &pb.QueryNodesRequest_NodeIds{NodeIds: &pb.TreeNodeIds{NodeIds: []string{leafNode.Id}}},
 			IncludeParents: true,
+			Network:        pb.Network_REGTEST,
 		}
 
 		resp, err := client.QueryNodes(ctx, req)
