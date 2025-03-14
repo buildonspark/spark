@@ -5,6 +5,7 @@ import {
   formatTransferResponse,
 } from "../utils/utils.js";
 import { SparkWallet } from "@buildonspark/spark-sdk";
+import { IssuerSparkWallet } from "@buildonspark/issuer-sdk";
 const SPARK_MNEMONIC_PATH = ".spark-mnemonic";
 const wallet = new SparkWallet("REGTEST"); // or "MAINNET" for production
 

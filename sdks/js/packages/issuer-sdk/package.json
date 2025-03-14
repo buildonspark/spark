@@ -7,8 +7,7 @@
   "type": "module",
   "exports": {
     ".": {
-      "types": "./dist/issuer-sdk.d.ts",
-      "import": "./dist/issuer-sdk.js"
+      "import": "./dist/issuer-sdk/src/issuer-sdk.js"
     }
   },
   "files": [
@@ -28,6 +27,7 @@
     "lint:fix:continue": "eslint --fix . || exit 0",
     "lint:watch": "esw ./src -w --ext .ts,.tsx,.js --color",
     "lint": "eslint .",
+    "package-types": "yarn attw --pack .",
     "postversion": "yarn build",
     "test-cmd": "node --experimental-vm-modules $(yarn bin jest) --no-cache --runInBand --bail",
     "test": "echo \"Error: no tests yet\"",
@@ -53,6 +53,7 @@
     "ts-proto": "^2.6.1"
   },
   "devDependencies": {
+    "@arethetypeswrong/cli": "^0.17.4",
     "@types/jest": "^29.5.14",
     "@types/node": "^22.13.2",
     "@types/secp256k1": "^4.0.6",
