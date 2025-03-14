@@ -127,7 +127,7 @@ describe("token integration test", () => {
     try {
       const response = await wallet.withdrawTokens(
         await wallet.getIdentityPublicKey(),
-        bytesToHex(l1WalletPubKey),
+        await wallet.getIdentityPublicKey(),
       );
       console.log("Withdraw token txid: " + response?.txid);
     } catch (error: any) {

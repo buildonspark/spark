@@ -11,8 +11,9 @@ service SparkService {
   rpc SendSparkSignature(SendSparkSignatureRequest) returns (google.protobuf.Empty);
   rpc ListSparkTxs(ListSparkTxsRequest) returns (ListSparkTxsResponse);
   rpc GetSparkTx(GetSparkTxRequest) returns (GetSparkTxResponse);
-  rpc VerifySparkTx(VerifySparkTxRequest) returns (VerifySparkTxResponse);
+  rpc VerifySparkTx(VerifySparkTxRequest) returns (google.protobuf.Empty);
   rpc FreezeTokens(spark.FreezeTokensRequest) returns (spark.FreezeTokensResponse);
+  rpc ListWithdrawnLeaves(ListWithdrawnLeavesRequest) returns (ListWithdrawnLeavesResponse);  
 }
 
 message SendSparkTxRequest {
@@ -50,10 +51,6 @@ message ListSparkTxsRequest {
   optional uint32 page_size = 2;
 }
 
-message VerifySparkTxResponse {
-  bool is_valid = 1;
-}
-
 message ListSparkTxsResponse {
   repeated TokenTransactionResponse token_transactions = 1;
   optional bytes next_page_token = 2;
@@ -66,4 +63,15 @@ message GetSparkTxResponse {
 message TokenTransactionResponse {
   bool finalized = 1;
   spark.TokenTransaction final_token_transaction = 2;
+}
+
+message ListWithdrawnLeavesRequest {
+  optional bytes blockhash = 1;
+  optional string page_token = 2;
+  optional uint32 page_size = 3;
+}
+
+message ListWithdrawnLeavesResponse {
+  repeated spark.TokenLeafOutput leaves = 1;
+  optional string next_page_token = 2;
 }

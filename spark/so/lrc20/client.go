@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"slices"
+	"time"
 
 	"github.com/lightsparkdev/spark-go/common"
 	pblrc20 "github.com/lightsparkdev/spark-go/proto/lrc20"
@@ -72,17 +73,13 @@ func (c *Client) VerifySparkTx(
 	tokenTransaction *pb.TokenTransaction,
 ) error {
 	return c.exceuteLrc20Call(func(client pblrc20.SparkServiceClient) error {
-		res, err := client.VerifySparkTx(ctx, &pblrc20.VerifySparkTxRequest{
+		_, err := client.VerifySparkTx(ctx, &pblrc20.VerifySparkTxRequest{
 			FinalTokenTransaction: tokenTransaction,
 		})
 		if err != nil {
 			return err
 		}
-
-		// TODO(DL-92): Remove is_valid boolean in response and use error codes only instead.
-		if !res.IsValid {
-			return fmt.Errorf("LRC20 node validation: invalid token transaction")
-		}
+		// If the error response is null the transaction is valid.
 		return nil
 	})
 }
@@ -112,8 +109,8 @@ func (c *Client) connectToLrc20Node() (*grpc.ClientConn, error) {
 	// and the LRC20 may not have the block info when the SO makes the first call).
 	retryConfig := common.RetryPolicyConfig{
 		MaxAttempts:          5,
-		InitialBackoffSecs:   1,
-		MaxBackoffSecs:       20,
+		InitialBackoffSecs:   1 * time.Second,
+		MaxBackoffSecs:       20 * time.Second,
 		BackoffMultiplier:    2.0,
 		RetryableStatusCodes: []string{"UNAVAILABLE", "NOT_FOUND"},
 	}
