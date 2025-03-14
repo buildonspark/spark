@@ -7,12 +7,14 @@ import {
 } from "@buildonspark/lrc20-sdk";
 import { SparkWallet, SparkWalletProps } from "@buildonspark/spark-sdk";
 import { LeafWithPreviousTransactionData } from "@buildonspark/spark-sdk/proto/spark";
-import { ConfigOptions } from "@buildonspark/spark-sdk/services/wallet-config";
+import { getMasterHDKeyFromSeed } from "@buildonspark/spark-sdk/utils";
 import {
   bytesToHex,
   bytesToNumberBE,
   hexToBytes,
 } from "@noble/curves/abstract/utils";
+import { validateMnemonic } from "@scure/bip39";
+import { wordlist } from "@scure/bip39/wordlists/english";
 import { networks } from "bitcoinjs-lib";
 import { IssuerWalletInterface } from "./interface/wallet-interface.js";
 import { TokenFreezeService } from "./services/freeze.js";
@@ -28,26 +30,18 @@ export class IssuerSparkWallet
   private tokenFreezeService: TokenFreezeService;
   private tokenPublicKeyInfo?: TokenPubkeyInfo;
 
-  public static async create({
-    ...props
-  }: SparkWalletProps & { privateKey: string }) {
-    const wallet = new IssuerSparkWallet(props.privateKey, props.options);
+  public static async create(options: SparkWalletProps) {
+    const wallet = new IssuerSparkWallet(options);
 
-    const initResponse = await wallet.initWallet(props.mnemonicOrSeed);
+    const initResponse = await wallet.initIssuerWallet(options.mnemonicOrSeed);
     return {
       wallet,
       ...initResponse,
     };
   }
 
-  private constructor(privateKey: string, configOptions?: ConfigOptions) {
-    super(configOptions);
-
-    this.lrc20Wallet = new LRCWallet(
-      privateKey,
-      networks.regtest,
-      NetworkType.REGTEST,
-    );
+  private constructor(options: SparkWalletProps) {
+    super(options.options, options.signer);
 
     this.issuerTokenTransactionService = new IssuerTokenTransactionService(
       this.config,
@@ -57,6 +51,35 @@ export class IssuerSparkWallet
       this.config,
       this.connectionManager,
     );
+  }
+
+  private async initIssuerWallet(mnemonicOrSeed?: string | Uint8Array) {
+    const initResponse = await super.initWallet(mnemonicOrSeed);
+
+    // TODO: Remove this in subsequent PRs when LRC20Wallet has a proper signer interface
+    mnemonicOrSeed = mnemonicOrSeed || initResponse?.mnemonic;
+    if (mnemonicOrSeed) {
+      let seed: Uint8Array;
+      if (typeof mnemonicOrSeed !== "string") {
+        seed = mnemonicOrSeed;
+      } else {
+        if (validateMnemonic(mnemonicOrSeed, wordlist)) {
+          seed = await this.config.signer.mnemonicToSeed(mnemonicOrSeed);
+        } else {
+          seed = hexToBytes(mnemonicOrSeed);
+        }
+      }
+
+      const hdkey = getMasterHDKeyFromSeed(seed);
+
+      this.lrc20Wallet = new LRCWallet(
+        bytesToHex(hdkey.privateKey!),
+        networks.regtest,
+        NetworkType.REGTEST,
+      );
+    }
+
+    return initResponse;
   }
 
   public async getIssuerTokenPublicKey() {

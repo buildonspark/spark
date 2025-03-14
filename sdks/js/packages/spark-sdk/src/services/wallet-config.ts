@@ -15,6 +15,7 @@ export type ConfigOptions = {
   readonly frostSignerAddress?: string;
   readonly threshold?: number;
   readonly useTokenTransactionSchnorrSignatures?: boolean;
+  readonly enableLrc20?: boolean;
 };
 
 const BASE_CONFIG: Required<ConfigOptions> = {
@@ -25,6 +26,7 @@ const BASE_CONFIG: Required<ConfigOptions> = {
   threshold: 3,
   signingOperators: getLocalSigningOperators(),
   useTokenTransactionSchnorrSignatures: true,
+  enableLrc20: true,
 };
 
 export const LOCAL_WALLET_CONFIG: Required<ConfigOptions> = {

@@ -176,6 +176,7 @@ export class SparkWallet {
     const wallet = new SparkWallet(options, signer);
     const initResponse = await wallet.initWallet(
       mnemonicOrSeed,
+      options?.enableLrc20,
       lrc20WalletApiConfig,
     );
     return {
@@ -376,6 +377,7 @@ export class SparkWallet {
    */
   protected async initWallet(
     mnemonicOrSeed?: Uint8Array | string,
+    enableLrc20?: boolean,
     lrc20WalletApiConfig?: LRC20WalletApiConfig,
   ): Promise<InitWalletResponse | undefined> {
     const returnMnemonic = !mnemonicOrSeed;
@@ -398,7 +400,7 @@ export class SparkWallet {
 
     await this.initWalletFromSeed(seed);
 
-    if (lrc20WalletApiConfig) {
+    if (enableLrc20) {
       const network = this.config.getNetwork();
       // TODO: remove this once we move it back to the signer
       const masterPrivateKey = getMasterHDKeyFromSeed(seed).privateKey!;

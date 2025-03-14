@@ -1662,6 +1662,7 @@ __metadata:
     "@buildonspark/spark-sdk": "npm:0.0.15"
     "@noble/curves": "npm:^1.8.0"
     "@noble/secp256k1": "npm:^2.2.3"
+    "@scure/bip39": "npm:^1.5.4"
     "@scure/btc-signer": "npm:^1.5.0"
     "@types/jest": "npm:^29.5.14"
     "@types/node": "npm:^22.13.2"

@@ -4,10 +4,9 @@ import {
   LOCAL_WALLET_CONFIG_SCHNORR,
 } from "@buildonspark/spark-sdk/services/wallet-config";
 import { jest } from "@jest/globals";
-import { IssuerSparkWallet } from "../../issuer-sdk.js";
+import { hexToBytes } from "@noble/curves/abstract/utils";
 import { BitcoinFaucet } from "../../../../spark-sdk/src/tests/utils/test-faucet.js";
-import { secp256k1 } from "@noble/curves/secp256k1";
-import { bytesToHex } from "@noble/curves/abstract/utils";
+import { IssuerSparkWallet } from "../../issuer-sdk.js";
 
 describe("token integration test", () => {
   // Skip all tests if running in GitHub Actions
@@ -19,7 +18,7 @@ describe("token integration test", () => {
   it("should issue a single token with ECDSA", async () => {
     const tokenAmount: bigint = 1000n;
     const { wallet } = await IssuerSparkWallet.create({
-      privateKey:
+      mnemonicOrSeed:
         "4799979d5e417e3d6d00cf89a77d4f3c0354d295810326c6b0bf4b45aedb38f3",
       options: LOCAL_WALLET_CONFIG_ECDSA,
     });
@@ -33,7 +32,7 @@ describe("token integration test", () => {
   it("should issue a single token with Schnorr", async () => {
     const tokenAmount: bigint = 1000n;
     const { wallet } = await IssuerSparkWallet.create({
-      privateKey:
+      mnemonicOrSeed:
         "4799979d5e417e3d6d00cf89a77d4f3c0354d295810326c6b0bf4b45aedb38f3",
       options: LOCAL_WALLET_CONFIG_SCHNORR,
     });
@@ -46,10 +45,10 @@ describe("token integration test", () => {
 
   it("should announce and issue a single token", async () => {
     const tokenAmount: bigint = 1000n;
-    const privateKey =
+    const seed =
       "4799979d5e417e3d6d00cf89a77d4f3c0354d295810326c6b0bf4b45aedb38f3";
     const { wallet } = await IssuerSparkWallet.create({
-      privateKey: privateKey,
+      mnemonicOrSeed: seed,
       options: LOCAL_WALLET_CONFIG_SCHNORR,
     });
 
@@ -60,9 +59,8 @@ describe("token integration test", () => {
       "testutil",
       "testutilpassword",
     );
-
-    const l1WalletPubKey = secp256k1.getPublicKey(privateKey);
-    await faucet.sendFaucetCoinToP2WPKHAddress(l1WalletPubKey);
+    const l1WalletPubKey = await wallet.getIdentityPublicKey();
+    await faucet.sendFaucetCoinToP2WPKHAddress(hexToBytes(l1WalletPubKey));
 
     try {
       const response = await wallet.announceTokenL1({
@@ -87,10 +85,10 @@ describe("token integration test", () => {
 
   it("should announce, issue, and withdraw a single token", async () => {
     const tokenAmount: bigint = 1000n;
-    const privateKey =
+    const seed =
       "4799979d5e417e3d6d00cf89a77d4f3c0354d295810326c6b0bf4b45aedb38f3";
     const { wallet } = await IssuerSparkWallet.create({
-      privateKey: privateKey,
+      mnemonicOrSeed: seed,
       options: LOCAL_WALLET_CONFIG_SCHNORR,
     });
 
@@ -101,8 +99,8 @@ describe("token integration test", () => {
       "testutil",
       "testutilpassword",
     );
-    const l1WalletPubKey = secp256k1.getPublicKey(privateKey);
-    await faucet.sendFaucetCoinToP2WPKHAddress(l1WalletPubKey);
+    const l1WalletPubKey = await wallet.getIdentityPublicKey();
+    await faucet.sendFaucetCoinToP2WPKHAddress(hexToBytes(l1WalletPubKey));
 
     try {
       const response = await wallet.announceTokenL1({
@@ -126,8 +124,8 @@ describe("token integration test", () => {
 
     try {
       const response = await wallet.withdrawTokens(
-        await wallet.getIdentityPublicKey(),
-        await wallet.getIdentityPublicKey(),
+        l1WalletPubKey,
+        l1WalletPubKey,
       );
       console.log("Withdraw token txid: " + response?.txid);
     } catch (error: any) {
@@ -141,7 +139,7 @@ describe("token integration test", () => {
     const tokenAmount: bigint = 1000n;
 
     const { wallet: issuerWallet } = await IssuerSparkWallet.create({
-      privateKey:
+      mnemonicOrSeed:
         "4799979d5e417e3d6d00cf89a77d4f3c0354d295810326c6b0bf4b45aedb38f3",
       options: LOCAL_WALLET_CONFIG_ECDSA,
     });
@@ -171,7 +169,7 @@ describe("token integration test", () => {
     const tokenAmount: bigint = 1000n;
 
     const { wallet: issuerWallet } = await IssuerSparkWallet.create({
-      privateKey:
+      mnemonicOrSeed:
         "4799979d5e417e3d6d00cf89a77d4f3c0354d295810326c6b0bf4b45aedb38f3",
       options: LOCAL_WALLET_CONFIG_SCHNORR,
     });
@@ -200,7 +198,7 @@ describe("token integration test", () => {
   it("should freeze tokens with ECDSA", async () => {
     const tokenAmount: bigint = 1000n;
     const { wallet: issuerWallet } = await IssuerSparkWallet.create({
-      privateKey:
+      mnemonicOrSeed:
         "4799979d5e417e3d6d00cf89a77d4f3c0354d295810326c6b0bf4b45aedb38f3",
       options: LOCAL_WALLET_CONFIG_ECDSA,
     });
@@ -248,7 +246,7 @@ describe("token integration test", () => {
   it("should freeze tokens with Schnorr", async () => {
     const tokenAmount: bigint = 1000n;
     const { wallet: issuerWallet } = await IssuerSparkWallet.create({
-      privateKey:
+      mnemonicOrSeed:
         "4799979d5e417e3d6d00cf89a77d4f3c0354d295810326c6b0bf4b45aedb38f3",
       options: LOCAL_WALLET_CONFIG_SCHNORR,
     });
@@ -294,7 +292,7 @@ describe("token integration test", () => {
   it("should burn tokens with ECDSA", async () => {
     const tokenAmount: bigint = 200n;
     const { wallet: issuerWallet } = await IssuerSparkWallet.create({
-      privateKey:
+      mnemonicOrSeed:
         "4799979d5e417e3d6d00cf89a77d4f3c0354d295810326c6b0bf4b45aedb38f3",
       options: LOCAL_WALLET_CONFIG_ECDSA,
     });
@@ -313,7 +311,7 @@ describe("token integration test", () => {
   it("should burn tokens with Schnorr", async () => {
     const tokenAmount: bigint = 200n;
     const { wallet: issuerWallet } = await IssuerSparkWallet.create({
-      privateKey:
+      mnemonicOrSeed:
         "4799979d5e417e3d6d00cf89a77d4f3c0354d295810326c6b0bf4b45aedb38f3",
       options: LOCAL_WALLET_CONFIG_SCHNORR,
     });
@@ -333,7 +331,7 @@ describe("token integration test", () => {
     const tokenAmount: bigint = 1000n;
 
     const { wallet: issuerWallet } = await IssuerSparkWallet.create({
-      privateKey:
+      mnemonicOrSeed:
         "4799979d5e417e3d6d00cf89a77d4f3c0354d295810326c6b0bf4b45aedb38f3",
       options: LOCAL_WALLET_CONFIG_ECDSA,
     });
@@ -392,7 +390,7 @@ describe("token integration test", () => {
     const tokenAmount: bigint = 1000n;
 
     const { wallet: issuerWallet } = await IssuerSparkWallet.create({
-      privateKey:
+      mnemonicOrSeed:
         "4799979d5e417e3d6d00cf89a77d4f3c0354d295810326c6b0bf4b45aedb38f3",
       options: LOCAL_WALLET_CONFIG_SCHNORR,
     });
