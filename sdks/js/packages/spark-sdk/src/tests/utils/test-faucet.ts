@@ -201,6 +201,19 @@ export class BitcoinFaucet {
     return unsignedTx;
   }
 
+  // MineBlocks mines the specified number of blocks to a random address
+  // and returns the block hashes.
+  async mineBlocks(numBlocks: number) {
+    // Mine 100 blocks to make funds spendable
+    const randomKey = secp256k1.utils.randomPrivateKey();
+    const randomPubKey = secp256k1.getPublicKey(randomKey);
+    const randomAddress = getP2TRAddressFromPublicKey(
+      randomPubKey,
+      Network.LOCAL,
+    );
+    return await this.generateToAddress(100, randomAddress);
+  }
+
   private async call(method: string, params: any[]) {
     try {
       const response = await fetch(this.url, {

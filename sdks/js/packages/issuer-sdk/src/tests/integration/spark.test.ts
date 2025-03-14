@@ -60,6 +60,7 @@ describe("token integration test", () => {
       "testutil",
       "testutilpassword",
     );
+
     const l1WalletPubKey = secp256k1.getPublicKey(privateKey);
     await faucet.sendFaucetCoinToP2WPKHAddress(l1WalletPubKey);
 
@@ -76,6 +77,8 @@ describe("token integration test", () => {
       // Check that the error has the expected name
       fail("Expected announceTokenL1() to succeed with fauceted funds");
     }
+    faucet.mineBlocks(6);
+
     await wallet.mintTokens(tokenAmount);
 
     const sourceBalance = await wallet.getIssuerTokenBalance();
@@ -114,6 +117,8 @@ describe("token integration test", () => {
       // Check that the error has the expected name
       fail("Expected announceTokenL1() to succeed with fauceted funds");
     }
+    faucet.mineBlocks(6);
+
     await wallet.mintTokens(tokenAmount);
 
     const sourceBalance = await wallet.getIssuerTokenBalance();
@@ -129,6 +134,7 @@ describe("token integration test", () => {
       // Check that the error has the expected name
       fail("Expected withdrawTokens() to succeed");
     }
+    faucet.mineBlocks(6);
   });
 
   it("should issue a single token and transfer it with ECDSA", async () => {
