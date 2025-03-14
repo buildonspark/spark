@@ -54,6 +54,9 @@ service SparkService {
     rpc query_unused_deposit_addresses(QueryUnusedDepositAddressesRequest) returns (QueryUnusedDepositAddressesResponse) {}
 }
 
+/**
+ * Network is the network type of the bitcoin network.
+ */
 enum Network {
     MAINNET = 0;
     REGTEST = 1;
@@ -61,79 +64,171 @@ enum Network {
     SIGNET = 3;
 }
 
+/**
+ * DepositAddressProof is the proof of possession of the deposit address.
+ * When a user wants to generate a deposit address, they are sending their public key to the SE,
+ * and the SE will respond with an address of user's public key + SE's public key.
+ *
+ * In the trusty deposit flow, user will need to know that this address is valid, and no single SE
+ * can generate this address.
+ *
+ * The SE will need to sign the address with their identity keys, and have a proof of possession of
+ * the signing key piece that the SE holds.
+ */
 message DepositAddressProof {
+    // The signatures of the address by the SE's identity keys.
     map<string, bytes> address_signatures = 1;
+    // The proof of possession of the signing key piece by the SE.
     bytes proof_of_possession_signature = 2;
 }
 
+/**
+ * GenerateDepositAddressRequest is the request to generate a deposit address.
+ * The user will send their public key to the SE, and the SE will respond with an address of user's
+ * public key + SE's public key.
+ */
 message GenerateDepositAddressRequest {
+    // The signing public key of the user.
     bytes signing_public_key = 1;
+    // The identity public key of the user.
     bytes identity_public_key = 2;
+    // The network of the bitcoin network.
     Network network = 3;
 }
 
+/**
+ * Address is the address of the user's public key + SE's public key.
+ */
 message Address {
+    // The p2tr address of the user's public key + SE's public key.
     string address = 1;
+    // The verifying key of the address, which is user's public key + SE's public key.
     bytes verifying_key = 2;
+    // The proof of possession of the address by the SE.
     DepositAddressProof deposit_address_proof = 3;
 }
 
+/**
+ * GenerateDepositAddressResponse is the response to the request to generate a deposit address.
+ */
 message GenerateDepositAddressResponse {
     Address deposit_address = 1;
 }
 
+/**
+ * UTXO represents a utxo on the bitcoin network.
+ * The UTXO is used to create a tree on Spark, it can also be an off-chain utxo so that the user
+ * can create the tree first and the broadcast the transaction.
+ */
 message UTXO {
+    // The raw transaction of the utxo.
     bytes raw_tx = 1;
+    // The vout of the raw transaction for the utxo, which will be used to create the tree.
     uint32 vout = 2;
+    // The network of the bitcoin network.
     Network network = 3;
 }
 
+/**
+ * NodeOutput represents a node on the tree.
+ * This is similar to a UTXO, which is used to create a subtree on Spark. But instead of using
+ * a utxo, a existing node on the tree is used as the utxo.
+ */
 message NodeOutput {
+    // The id of the node.
     string node_id = 1;
+    // The vout of the raw transaction for the node, which will be used to create the tree.
     uint32 vout = 2;
 }
 
+/**
+ * SigningJob is the job for signing a transaction.
+ * The signing job is used to sign a bitcoin transaction using Spark FROST.
+ */
 message SigningJob {
+    // The signing public key of the user.
     bytes signing_public_key = 1;
+    // The unsigned raw transaction to be signed.
     bytes raw_tx = 2;
+    // The signing nonce commitment of the user.
     common.SigningCommitment signing_nonce_commitment = 3;
 }
 
+/**
+ * SigningKeyshare is the keyshare information of the SE keyshare group.
+ */
 message SigningKeyshare {
+    // The identifiers of the owners of the keyshare.
     repeated string owner_identifiers = 1;
+    // The threshold of the keyshare.
     uint32 threshold = 2;
 }
 
-
+/**
+ * SigningResult is the result of the signing job from the SE keyshare group.
+ * It contains all the information for user to sign their part. After user signs, the signature
+ * can be aggregated to form the final signature.
+ */
 message SigningResult {
+    // The public keys of the SE keyshare group.
     map<string, bytes> public_keys = 1;
+    // The signing nonce commitments of the SE keyshare group.
     map<string, common.SigningCommitment> signing_nonce_commitments = 2;
+    // The signature shares of the SE keyshare group.
     map<string, bytes> signature_shares = 3;
+    // The keyshare information of the SE keyshare group.
     SigningKeyshare signing_keyshare = 4;
 }
 
+/**
+ * NodeSignatureShares is the signature shares for a node on the tree.
+ * For each tree node, the verifying key stays the same for both transactions.
+ */
 message NodeSignatureShares {
+    // The id of the node.
     string node_id = 1;
+    // The signing result of the node's transaction. This transaction is to pay to self.
     SigningResult node_tx_signing_result = 2;
+    // The signing result of the node's refund transaction. This transaction is to pay to the user.
     SigningResult refund_tx_signing_result = 3;
+    // The verifying key of the node.
     bytes verifying_key = 4;
 }
 
+/**
+ * NodeSignatures is the final signatures for a node on the tree.
+ * It contains the signature for the node's transaction and refund transaction.
+ */
 message NodeSignatures {
+    // The id of the node.
     string node_id = 1;
+    // The final signature of the node's transaction. This transaction is to pay to self.
     bytes node_tx_signature = 2;
+    // The final signature of the node's refund transaction. This transaction is to pay to the user.
     bytes refund_tx_signature = 3;
 }
 
+/**
+ * StartTreeCreationRequest is the request to start the tree creation for a tree root node.
+ */
 message StartTreeCreationRequest {
+    // The identity public key of the user.
     bytes identity_public_key = 1;
+    // The on-chain utxo to be used to be spent by the root node.
     UTXO on_chain_utxo = 2;
+    // The signing job for the root node's transaction.
     SigningJob root_tx_signing_job = 3;
+    // The signing job for the root node's refund transaction.
     SigningJob refund_tx_signing_job = 4;
 }
 
+/**
+ * StartTreeCreationResponse is the response to the request to start the tree creation for a tree root node.
+ */
 message StartTreeCreationResponse {
+    // The id of the tree.
     string tree_id = 1;
+    // The signature shares for the root node.
     NodeSignatureShares root_node_signature_shares = 2;
 }
 
@@ -316,36 +411,73 @@ message CancelSignedTokenTransactionRequest {
     bytes sender_identity_public_key = 2 [(validate.rules).bytes.len = 33];
 }
 
+/**
+ * TreeNode represents a node on the tree.
+ */
 message TreeNode {
+    // The id of the node.
     string id = 1;
+    // The id of the tree for this node .
     string tree_id = 2;
+    // The value that this node holds.
     uint64 value = 3;
+    // The id of the parent node.
     optional string parent_node_id = 4;
+    // The transaction of the node, this transaction is to pay to the same address as the node.
     bytes node_tx = 5;
+    // The refund transaction of the node, this transaction is to pay to the user.
     bytes refund_tx = 6;
+    // This vout is the vout to spend the previous transaction, which is in the parent node.
     uint32 vout = 7;
+    // The verifying public key of the node.
     bytes verifying_public_key = 8;
+    // The identity public key of the owner of the node.
     bytes owner_identity_public_key = 9;
+    // The signing keyshare information of the node on the SE side.
     SigningKeyshare signing_keyshare = 10;
+    // The status of the node.
     string status = 11;
+    // The network of the node.
     Network network = 12;
 }
 
+/**
+ * FinalizeNodeSignaturesRequest is the request to finalize the signatures for a node.
+ */
 message FinalizeNodeSignaturesRequest {
+    // The intent of the signature.
     common.SignatureIntent intent = 1;
+    // The signatures for the node.
     repeated NodeSignatures node_signatures = 2;
 }
 
+/**
+ * FinalizeNodeSignaturesResponse is the response to the request to finalize the signatures for a node.
+ */
 message FinalizeNodeSignaturesResponse {
+    // The nodes that are finalized.
     repeated TreeNode nodes = 1;
 }
 
+/**
+ * SecretShare is a secret share of a secret, using Feldman VSS.
+ * The secret share is in the field of secp256k1 scalar field.
+ */
 message SecretShare {
+    // The secret share.
     bytes secret_share = 1;
+    // The proofs for the secret share. They are the compressed public keys in secp256k1 curve.
+    // proofs[0] is the public key of the secret, while proofs[1..n] are the public key of the polynomial.
     repeated bytes proofs = 2;
 }
 
+/**
+ * SecretProof is the proof for a secret share using Feldman VSS.
+ * The proof is the compressed public keys in secp256k1 curve.
+ */
 message SecretProof {
+    // The proofs for the secret share.
+    // proofs[0] is the public key of the secret, while proofs[1..n] are the public key of the polynomial.
     repeated bytes proofs = 1;
 }
 
