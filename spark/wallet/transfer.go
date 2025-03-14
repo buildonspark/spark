@@ -364,15 +364,10 @@ func QueryPendingTransfers(
 	defer sparkConn.Close()
 
 	sparkClient := pb.NewSparkServiceClient(sparkConn)
-	network, err := common.ProtoNetworkFromNetwork(config.Network)
-	if err != nil {
-		return nil, err
-	}
 	return sparkClient.QueryPendingTransfers(ctx, &pb.QueryPendingTransfersRequest{
 		Participant: &pb.QueryPendingTransfersRequest_ReceiverIdentityPublicKey{
 			ReceiverIdentityPublicKey: config.IdentityPublicKey(),
 		},
-		Network: network,
 	})
 }
 
@@ -387,15 +382,10 @@ func QueryPendingTransfersBySender(
 	defer sparkConn.Close()
 
 	sparkClient := pb.NewSparkServiceClient(sparkConn)
-	network, err := common.ProtoNetworkFromNetwork(config.Network)
-	if err != nil {
-		return nil, err
-	}
 	return sparkClient.QueryPendingTransfers(ctx, &pb.QueryPendingTransfersRequest{
 		Participant: &pb.QueryPendingTransfersRequest_SenderIdentityPublicKey{
 			SenderIdentityPublicKey: config.IdentityPublicKey(),
 		},
-		Network: network,
 	})
 }
 
