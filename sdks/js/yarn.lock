@@ -1605,30 +1605,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@buildonspark/issuer-sdk@npm:^0.0.11":
-  version: 0.0.11
-  resolution: "@buildonspark/issuer-sdk@npm:0.0.11"
-  dependencies:
-    "@bufbuild/protobuf": "npm:^2.2.3"
-    "@buildonspark/lrc20-sdk": "npm:0.0.9"
-    "@buildonspark/spark-sdk": "npm:0.0.11"
-    "@grpc/grpc-js": "npm:^1.12.5"
-    "@noble/curves": "npm:^1.8.0"
-    "@noble/secp256k1": "npm:^2.2.3"
-    "@scure/btc-signer": "npm:^1.5.0"
-    bitcoinjs-lib: "npm:^6.1.5"
-    crypto-js: "npm:^4.2.0"
-    grpc-tools: "npm:^1.12.4"
-    nice-grpc: "npm:^2.1.10"
-    nice-grpc-common: "npm:^2.0.2"
-    nice-grpc-web: "npm:^3.3.5"
-    protobufjs: "npm:^7.4.0"
-    ts-proto: "npm:^2.6.1"
-  checksum: 10/39b0ff34d58b4b8afc09e6911acca9cc29d14889fac71f020744668d047ea5dd68692be19047af41ab543660819128486cd57caa5d263c7293577cfbdc9ba255
-  languageName: node
-  linkType: hard
-
-"@buildonspark/issuer-sdk@workspace:packages/issuer-sdk":
+"@buildonspark/issuer-sdk@npm:^0.0.14, @buildonspark/issuer-sdk@workspace:packages/issuer-sdk":
   version: 0.0.0-use.local
   resolution: "@buildonspark/issuer-sdk@workspace:packages/issuer-sdk"
   dependencies:
@@ -1676,7 +1653,7 @@ __metadata:
     "@typescript-eslint/parser": "npm:^5.59.1"
     bignumber.js: "npm:^9.1.2"
     bip65: "npm:^1.0.3"
-    bitcoinjs-lib: "npm:^6.1.6"
+    bitcoinjs-lib: "npm:^6.1.5"
     class-transformer: "npm:^0.5.1"
     ecpair: "npm:^2.1.0"
     husky: "npm:^7.0.2"
@@ -1688,23 +1665,6 @@ __metadata:
     typescript: "npm:^5.7.3"
   languageName: unknown
   linkType: soft
-
-"@buildonspark/lrc20-sdk@npm:0.0.9":
-  version: 0.0.9
-  resolution: "@buildonspark/lrc20-sdk@npm:0.0.9"
-  dependencies:
-    "@bitcoinerlab/secp256k1": "npm:^1.1.1"
-    "@sapphire/utilities": "npm:^3.17.0"
-    "@swc/plugin-transform-imports": "npm:^7.0.0"
-    bignumber.js: "npm:^9.1.2"
-    bip65: "npm:^1.0.3"
-    bitcoinjs-lib: "git+https://github.com/velykodnyi/bitcoinjs-lib.git#v6.1.6+sighash"
-    class-transformer: "npm:^0.5.1"
-    ecpair: "npm:^2.1.0"
-    tiny-secp256k1: "npm:^2.2.3"
-  checksum: 10/8ba826116ee8867f6e5659a5fdb513be7f8313d62fc7ad2165be392bb0168c0f038a91e4d308ef23f66bc1ed2bae6e673896ce6cc66635fb52f64707298e44db
-  languageName: node
-  linkType: hard
 
 "@buildonspark/nodejs-scripts@workspace:examples/nodejs-scripts":
   version: 0.0.0-use.local
@@ -1718,42 +1678,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@buildonspark/spark-sdk@npm:0.0.11, @buildonspark/spark-sdk@npm:^0.0.11":
-  version: 0.0.11
-  resolution: "@buildonspark/spark-sdk@npm:0.0.11"
-  dependencies:
-    "@buildonspark/lrc20-sdk": "npm:0.0.9"
-    "@grpc/grpc-js": "npm:^1.12.5"
-    "@lightsparkdev/core": "npm:^1.2.7"
-    "@mempool/mempool.js": "npm:^3.0.0"
-    "@noble/curves": "npm:^1.8.0"
-    "@noble/secp256k1": "npm:^2.2.3"
-    "@scure/base": "npm:^1.2.1"
-    "@scure/bip32": "npm:^1.6.2"
-    "@scure/bip39": "npm:^1.5.4"
-    "@scure/btc-signer": "npm:^1.5.0"
-    async-mutex: "npm:^0.5.0"
-    auto-bind: "npm:^5.0.1"
-    bitcoinjs-lib: "npm:^6.1.5"
-    buffer: "npm:^6.0.3"
-    eciesjs: "npm:^0.4.13"
-    grpc-tools: "npm:^1.12.4"
-    light-bolt11-decoder: "npm:^3.2.0"
-    long: "npm:^5.2.4"
-    nice-grpc: "npm:^2.1.10"
-    nice-grpc-client-middleware-retry: "npm:^3.1.10"
-    nice-grpc-web: "npm:^3.3.5"
-    protobufjs: "npm:^7.4.0"
-    react-toastify: "npm:^11.0.5"
-    secp256k1: "npm:^5.0.1"
-    ts-proto: "npm:^2.6.1"
-    uuid: "npm:^11.1.0"
-    ws: "npm:^8.18.0"
-  checksum: 10/dfdb3c2b80b70600584057a2658bc9524d83898a4dad6c41e347fc72ff45d682e34e2857edca23c6b61da586a13a9d5321da4550613c88af327bb054a5d09462
-  languageName: node
-  linkType: hard
-
-"@buildonspark/spark-sdk@npm:0.0.14, @buildonspark/spark-sdk@workspace:packages/spark-sdk":
+"@buildonspark/spark-sdk@npm:0.0.14, @buildonspark/spark-sdk@npm:^0.0.14, @buildonspark/spark-sdk@workspace:packages/spark-sdk":
   version: 0.0.0-use.local
   resolution: "@buildonspark/spark-sdk@workspace:packages/spark-sdk"
   dependencies:
@@ -2685,16 +2610,6 @@ __metadata:
     "@grpc/proto-loader": "npm:^0.7.13"
     "@js-sdsl/ordered-map": "npm:^4.4.2"
   checksum: 10/775ed5a3f15e571af403603da109a9ef2067829fa07e8dbb884368f2b2f696214cdc78652e0647c782119a8398f58c3d77b69d9095fda612aff153181ca1a114
-  languageName: node
-  linkType: hard
-
-"@grpc/grpc-js@npm:^1.12.5":
-  version: 1.13.0
-  resolution: "@grpc/grpc-js@npm:1.13.0"
-  dependencies:
-    "@grpc/proto-loader": "npm:^0.7.13"
-    "@js-sdsl/ordered-map": "npm:^4.4.2"
-  checksum: 10/b98a559438d47ddd469af3c29c343d903421288df29c1c917551222bf47f25184c0b0a4ec1dc5f52903480815aade8ffc74af92227bac3c9ae3a52e59b876dea
   languageName: node
   linkType: hard
 
@@ -3768,7 +3683,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@noble/curves@npm:^1.6.0, @noble/curves@npm:^1.7.0, @noble/curves@npm:^1.8.0, @noble/curves@npm:^1.8.1, @noble/curves@npm:~1.8.1":
+"@noble/curves@npm:^1.6.0, @noble/curves@npm:^1.7.0, @noble/curves@npm:^1.8.0, @noble/curves@npm:~1.8.1":
   version: 1.8.1
   resolution: "@noble/curves@npm:1.8.1"
   dependencies:
@@ -7621,21 +7536,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"bitcoinjs-lib@git+https://github.com/velykodnyi/bitcoinjs-lib.git#v6.1.6+sighash":
-  version: 6.1.6
-  resolution: "bitcoinjs-lib@https://github.com/velykodnyi/bitcoinjs-lib.git#commit=45e20e0bb35bf503c3c252678de9a253367d4aa8"
-  dependencies:
-    "@noble/hashes": "npm:^1.2.0"
-    bech32: "npm:^2.0.0"
-    bip174: "npm:^2.1.1"
-    bs58check: "npm:^3.0.1"
-    typeforce: "npm:^1.11.3"
-    varuint-bitcoin: "npm:^1.1.2"
-  checksum: 10/51fb076aa7e536f0b626256c6a58c92e09553721d2ce613828701c238b7567684ab387ccd3f1ebbe19087ee748373db1a94cbf7a1091031f7791edab5c89d7c4
-  languageName: node
-  linkType: hard
-
-"bitcoinjs-lib@npm:^6.1.5, bitcoinjs-lib@npm:^6.1.6":
+"bitcoinjs-lib@npm:^6.1.5":
   version: 6.1.7
   resolution: "bitcoinjs-lib@npm:6.1.7"
   dependencies:
@@ -19438,9 +19339,9 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "spark-node-express@workspace:examples/spark-node-express"
   dependencies:
-    "@buildonspark/issuer-sdk": "npm:^0.0.11"
-    "@buildonspark/spark-sdk": "npm:^0.0.11"
-    "@noble/curves": "npm:^1.8.1"
+    "@buildonspark/issuer-sdk": "npm:^0.0.14"
+    "@buildonspark/spark-sdk": "npm:^0.0.14"
+    "@noble/curves": "npm:^1.8.0"
     express: "npm:^4.21.2"
     nodemon: "npm:^3.1.9"
   languageName: unknown
@@ -20270,15 +20171,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"tiny-secp256k1@npm:^2.2.3":
-  version: 2.2.3
-  resolution: "tiny-secp256k1@npm:2.2.3"
-  dependencies:
-    uint8array-tools: "npm:0.0.7"
-  checksum: 10/9975134c5c86587bb0e9886dd2e66a7a9b79931cb2c3e32b24bcfc2096216781828bb7c5482c0fa18a632ce1b907f6cc86bf12238704ec9cd43d1e81d8af502e
-  languageName: node
-  linkType: hard
-
 "tiny-warning@npm:^1.0.0":
   version: 1.0.3
   resolution: "tiny-warning@npm:1.0.3"
@@ -20895,13 +20787,6 @@ __metadata:
   bin:
     ua-parser-js: script/cli.js
   checksum: 10/7fced5f74ed570c83addffd4d367888d90c58803ff4bdd4a7b04b3f01d293263b8605e92ac560eb1c6a201ef3b11fcc46f3dbcbe764fbe54974924d542bc0135
-  languageName: node
-  linkType: hard
-
-"uint8array-tools@npm:0.0.7":
-  version: 0.0.7
-  resolution: "uint8array-tools@npm:0.0.7"
-  checksum: 10/6ffc45c7d2136757d63c6e556eb8345f908948618a9de37c805fec1249d989c265187b3fbef6cffc4ce5129083204829025b3c58800a0f24c8548e243d42ba13
   languageName: node
   linkType: hard
 

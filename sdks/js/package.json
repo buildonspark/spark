@@ -20,7 +20,7 @@
     "lint": "turbo run lint",
     "lint:fix": "turbo run lint:fix",
     "release": "turbo build && changeset publish",
-    "test": "turbo run test",
+    "test": "yarn deps:check && turbo run test",
     "types": "turbo run types"
   },
   "workspaces": [
