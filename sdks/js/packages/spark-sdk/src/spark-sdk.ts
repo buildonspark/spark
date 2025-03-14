@@ -380,7 +380,8 @@ export class SparkWallet {
     const returnMnemonic = !mnemonicOrSeed;
     let mnemonic: string | undefined;
     if (!mnemonicOrSeed) {
-      mnemonicOrSeed = await this.config.signer.generateMnemonic();
+      mnemonic = await this.config.signer.generateMnemonic();
+      mnemonicOrSeed = mnemonic;
     }
 
     let seed: Uint8Array;

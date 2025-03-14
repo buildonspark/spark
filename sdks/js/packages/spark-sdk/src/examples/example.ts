@@ -1,4 +1,5 @@
 import readline from "readline";
+import { ConfigOptions } from "../../dist/services/wallet-config.js";
 import { SparkWallet } from "../../dist/spark-sdk";
 import { getLatestDepositTxId } from "../../dist/utils/mempool.js";
 
@@ -67,13 +68,16 @@ async function runCLI() {
         break;
       case "initwallet":
         const mnemonicOrSeed = args.join(" ");
-        const { wallet: newWallet } = await SparkWallet.create({
-          mnemonicOrSeed,
-          options: {
-            network,
-          },
-        });
+        const options: ConfigOptions = {
+          network: "REGTEST",
+        };
+        const { wallet: newWallet, mnemonic: newMnemonic } =
+          await SparkWallet.create({
+            mnemonicOrSeed,
+            options,
+          });
         wallet = newWallet;
+        console.log("Mnemonic:", newMnemonic);
         break;
       case "getbalance":
         if (!wallet) {
