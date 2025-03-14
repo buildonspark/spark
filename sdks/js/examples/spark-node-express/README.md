@@ -7,15 +7,15 @@ Contained is a simple express server example written in plain javascript that ca
 To get started:
 
 ```
-npm install
-npm run dev
-```
-
-or
-
-```
 yarn
 yarn dev
+```
+
+or if you'd like you can copy this directory as a starting template for your own project and use a different package manager like npm:
+
+```
+npm install
+npm run dev
 ```
 
 To init your wallet, make a call to either
