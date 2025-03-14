@@ -1,19 +1,25 @@
 import { bytesToHex, hexToBytes } from "@noble/curves/abstract/utils";
 import { schnorr, secp256k1 } from "@noble/curves/secp256k1";
-import { SigHash, Transaction } from "@scure/btc-signer";
+import { Address, OutScript, SigHash, Transaction } from "@scure/btc-signer";
 import { TransactionInput, TransactionOutput } from "@scure/btc-signer/psbt";
 import { taprootTweakPrivKey } from "@scure/btc-signer/utils";
 import {
   getP2TRAddressFromPublicKey,
   getP2TRScriptFromPublicKey,
 } from "../../utils/bitcoin.js";
-import { Network } from "../../utils/network.js";
+import { getNetwork, Network } from "../../utils/network.js";
+import { SparkWallet } from "../../spark-sdk.js";
+import { sha256 } from "@noble/hashes/sha256";
+import * as btc from "@scure/btc-signer";
+import { ripemd160 } from "@noble/hashes/ripemd160";
 
 export type FaucetCoin = {
   key: Uint8Array;
   outpoint: TransactionInput;
   txout: TransactionOutput;
 };
+
+const COIN_AMOUNT = 10_000_000n;
 
 export class BitcoinFaucet {
   private coins: FaucetCoin[] = [];
@@ -115,6 +121,43 @@ export class BitcoinFaucet {
         txout: signedSplitTx.getOutput(i)!,
       });
     }
+  }
+  async sendFaucetCoinToP2WPKHAddress(pubKey: Uint8Array) {
+    const sendToPubKeyTx = new Transaction();
+
+    // For P2WPKH, we need to hash the public key
+
+    // Create a P2WPKH address
+    const p2wpkhAddress = btc.p2wpkh(pubKey, getNetwork(Network.LOCAL)).address;
+    if (!p2wpkhAddress) {
+      throw new Error("Invalid P2WPKH address");
+    }
+
+    // Get the coin to spend
+    const coinToSend = await this.fund();
+    if (!coinToSend) {
+      throw new Error("No coins available");
+    }
+
+    // Add the input
+    sendToPubKeyTx.addInput(coinToSend.outpoint);
+
+    // Add the output using the address directly
+    sendToPubKeyTx.addOutputAddress(
+      p2wpkhAddress,
+      100_000n,
+      getNetwork(Network.LOCAL),
+    );
+
+    // Sign the transaction and get the signed result
+    const signedTx = await this.signFaucetCoin(
+      sendToPubKeyTx,
+      coinToSend.txout,
+      coinToSend.key,
+    );
+
+    // Broadcast the signed transaction
+    await this.broadcastTx(bytesToHex(signedTx.extract()));
   }
 
   async signFaucetCoin(

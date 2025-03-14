@@ -19,7 +19,7 @@ export const ELECTRS_URL = Object.freeze({
   [NetworkType.REGTEST]: "http://127.0.0.1:30000",
   [NetworkType.TESTNET]: "https://electrs.mutiny.18.215.149.26.sslip.io",
   [NetworkType.DEVNET]: "https://electrs.stage.18.215.149.26.sslip.io",
-  default: "https://mutinynet.com/api",
+  default: "http://127.0.0.1:30000",
 });
 
 export const LRC_NODE_URL = Object.freeze({

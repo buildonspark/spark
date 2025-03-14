@@ -142,9 +142,7 @@ export class LRCWallet {
       pubkey: this.keyPair.publicKey,
       network: this.network,
     }).address!;
-
     let btcUtxos = await this.fetchUtxos(bech32Address);
-
     btcUtxos = await Promise.all(
       btcUtxos.map(async (utxo) => ({
         ...utxo,
@@ -155,7 +153,6 @@ export class LRCWallet {
     this.btcUtxos = btcUtxos;
 
     const allTimeEndTime = new Date();
-    console.log(`Time taken for all: ${allTimeEndTime.getTime() - allTimeStartTime.getTime()}ms`);
   }
 
   private async fetchUtxos(address: string): Promise<BitcoinUtxo[]> {
@@ -1545,7 +1542,7 @@ export class LRCWallet {
       const tokens = [{ tokenPubkey, amount }];
       const selectedLrc20Utxos = new Lrc20UtxosCoinSelection(this.lrc20Utxos).selectUtxos(tokens);
       const changeBtcOutput = this.createReceiptBtcChangeOutput();
-      const lrc20Inputs = await this.createInputsFromUtxos(selectedLrc20Utxos); // Convert Lrc20Utxo to TxInput
+      const lrc20Inputs = await this.createInputsFromUtxos(selectedLrc20Utxos);
       const changeLrc20Outputs = this.createLrc20ChangeOutputs(lrc20Inputs, []);
       // const btcInputs = new BtcUtxosCoinSelection(this.btcUtxos).selectUtxos(
       //   0,
