@@ -332,6 +332,7 @@ export class LightningService {
         signingCommitments: {
           signingCommitments: signingNonceCommitments,
         },
+        network: this.config.getNetworkProto(),
       });
     }
 

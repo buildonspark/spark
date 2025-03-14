@@ -210,6 +210,7 @@ export class SparkWallet {
         ownerIdentityPubkey: await this.config.signer.getIdentityPublicKey(),
       },
       includeParents: false,
+      network: this.config.getNetworkProto(),
     });
     return Object.entries(leaves.nodes)
       .filter(([_, node]) => node.status === "AVAILABLE")
@@ -399,10 +400,8 @@ export class SparkWallet {
 
     if (lrc20WalletApiConfig) {
       const network = this.config.getNetwork();
-      const masterPrivateKey = getMasterHDKeyFromSeed(
-        seed,
-        network == Network.REGTEST ? 0 : 1,
-      ).privateKey!;
+      // TODO: remove this once we move it back to the signer
+      const masterPrivateKey = getMasterHDKeyFromSeed(seed).privateKey!;
       this.lrc20Wallet = new LRCWallet(
         bytesToHex(masterPrivateKey),
         LRC_WALLET_NETWORK[network],
@@ -575,6 +574,7 @@ export class SparkWallet {
           },
         },
         includeParents: false,
+        network: this.config.getNetworkProto(),
       });
 
       if (Object.values(nodes.nodes).length !== request.swapLeaves.length) {
@@ -952,6 +952,7 @@ export class SparkWallet {
         },
       },
       includeParents: true,
+      network: this.config.getNetworkProto(),
     });
 
     const nodesMap = new Map<string, TreeNode>();

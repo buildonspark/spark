@@ -380,10 +380,7 @@ class DefaultSparkSigner implements SparkSigner {
       seed = hexToBytes(seed);
     }
 
-    const hdkey = getMasterHDKeyFromSeed(
-      seed,
-      network == Network.REGTEST ? 0 : 1,
-    );
+    const hdkey = getMasterHDKeyFromSeed(seed);
 
     if (!hdkey.privateKey || !hdkey.publicKey) {
       throw new Error("Could not derive private key from seed");

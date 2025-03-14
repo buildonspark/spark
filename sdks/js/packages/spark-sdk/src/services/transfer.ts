@@ -398,6 +398,7 @@ export class TransferService extends BaseTransferService {
           receiverIdentityPublicKey:
             await this.config.signer.getIdentityPublicKey(),
         },
+        network: this.config.getNetworkProto(),
       });
     } catch (error) {
       throw new Error(`Error querying pending transfers: ${error}`);
@@ -850,6 +851,7 @@ export class TransferService extends BaseTransferService {
           senderIdentityPublicKey:
             await this.config.signer.getIdentityPublicKey(),
         },
+        network: this.config.getNetworkProto(),
       });
     } catch (error) {
       throw new Error(`Error querying pending transfers by sender: ${error}`);
