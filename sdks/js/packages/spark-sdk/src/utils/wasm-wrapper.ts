@@ -8,9 +8,9 @@ export async function initWasm(): Promise<InitOutput> {
       // Node.js environment
       try {
         // Dynamic imports for Node.js modules to avoid browser compatibility issues
-        const fs = await import('fs/promises');
-        const path = await import('path');
-        const url = await import('url');
+        const fs = await import("fs/promises");
+        const path = await import("path");
+        const url = await import("url");
 
         const __filename = url.fileURLToPath(import.meta.url);
         const __dirname = path.dirname(__filename);
@@ -30,25 +30,28 @@ export async function initWasm(): Promise<InitOutput> {
 
         return wasmModule;
       } catch (e) {
-        console.error("Error with Node.js-specific WASM loading, falling back to standard initialization:", e);
+        console.error(
+          "Error with Node.js-specific WASM loading, falling back to standard initialization:",
+          e,
+        );
         // Fall back to standard initialization if dynamic imports fail
         wasmModule = await init();
         return wasmModule;
       }
     } else {
       // Browser environment
-      wasmModule = await init();
+      const response = await fetch(
+        new URL("../wasm/spark_bindings_bg.wasm", import.meta.url),
+      );
+      if (!response.ok) {
+        throw new Error(`Failed to load WASM file: ${response.statusText}`);
+      }
+      const wasmBuffer = await response.arrayBuffer();
+      wasmModule = await init({ module_or_path: wasmBuffer });
       return wasmModule;
     }
   } catch (e) {
     console.error("WASM initialization error:", e);
     throw e;
   }
-
-  // Verify the module is properly initialized
-  if (!wasmModule || typeof wasmModule !== "object") {
-    throw new Error("WASM module not properly initialized");
-  }
-
-  return wasmModule;
 }
