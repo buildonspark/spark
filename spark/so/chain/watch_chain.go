@@ -60,9 +60,9 @@ func pollInterval(network common.Network) time.Duration {
 	case common.Testnet:
 		return 1 * time.Minute
 	case common.Regtest:
-		return 5 * time.Second
+		return 3 * time.Second
 	case common.Signet:
-		return 5 * time.Second
+		return 3 * time.Second
 	default:
 		return 1 * time.Minute
 	}

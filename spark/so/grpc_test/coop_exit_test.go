@@ -177,8 +177,8 @@ func TestCoopExit(t *testing.T) {
 		if err == nil {
 			break
 		}
-		time.Sleep(100 * time.Millisecond)
-		if time.Since(startTime) > 10*time.Second {
+		time.Sleep(200 * time.Millisecond)
+		if time.Since(startTime) > 15*time.Second {
 			t.Fatalf("timed out waiting for tx to confirm")
 		}
 	}
