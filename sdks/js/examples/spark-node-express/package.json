@@ -13,6 +13,7 @@
   "dependencies": {
     "@buildonspark/issuer-sdk": "^0.0.11",
     "@buildonspark/spark-sdk": "^0.0.11",
+    "@noble/curves": "^1.8.1",
     "express": "^4.21.2"
   },
   "devDependencies": {

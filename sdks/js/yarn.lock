@@ -3767,7 +3767,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@noble/curves@npm:^1.6.0, @noble/curves@npm:^1.7.0, @noble/curves@npm:^1.8.0, @noble/curves@npm:~1.8.1":
+"@noble/curves@npm:^1.6.0, @noble/curves@npm:^1.7.0, @noble/curves@npm:^1.8.0, @noble/curves@npm:^1.8.1, @noble/curves@npm:~1.8.1":
   version: 1.8.1
   resolution: "@noble/curves@npm:1.8.1"
   dependencies:
@@ -19431,6 +19431,7 @@ __metadata:
   dependencies:
     "@buildonspark/issuer-sdk": "npm:^0.0.11"
     "@buildonspark/spark-sdk": "npm:^0.0.11"
+    "@noble/curves": "npm:^1.8.1"
     express: "npm:^4.21.2"
     nodemon: "npm:^3.1.9"
   languageName: unknown
