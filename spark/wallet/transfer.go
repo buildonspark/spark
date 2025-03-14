@@ -782,8 +782,14 @@ func CancelSendTransfer(ctx context.Context, config *Config, transfer *pb.Transf
 	}
 	defer sparkConn.Close()
 
+	token, err := AuthenticateWithConnection(ctx, config, sparkConn)
+	if err != nil {
+		return nil, fmt.Errorf("failed to authenticate with server: %v", err)
+	}
+	authCtx := ContextWithToken(ctx, token)
+
 	sparkClient := pb.NewSparkServiceClient(sparkConn)
-	response, err := sparkClient.CancelSendTransfer(ctx, &pb.CancelSendTransferRequest{
+	response, err := sparkClient.CancelSendTransfer(authCtx, &pb.CancelSendTransferRequest{
 		TransferId:              transfer.Id,
 		SenderIdentityPublicKey: config.IdentityPublicKey(),
 	})
