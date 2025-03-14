@@ -81,7 +81,7 @@ func RefreshTimelockRefundTx(
 	nonces = append(nonces, nonce)
 
 	// Connect and call GRPC
-	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
+	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress(), nil)
 	if err != nil {
 		return fmt.Errorf("failed to create grpc connection: %v", err)
 	}
@@ -162,7 +162,7 @@ func RefreshTimelockRefundTx(
 		jobToNodeIDMap[userSigningJobID] = leaf.Id
 	}
 
-	frostConn, _ := common.NewGRPCConnectionWithoutTLS(config.FrostSignerAddress)
+	frostConn, _ := common.NewGRPCConnectionWithoutTLS(config.FrostSignerAddress, nil)
 	defer frostConn.Close()
 	frostClient := pbfrost.NewFrostServiceClient(frostConn)
 	userSignatures, err := frostClient.SignFrost(context.Background(), &pbfrost.SignFrostRequest{
@@ -285,7 +285,7 @@ func RefreshTimelockNodes(
 	nonces[len(nonces)-1] = nonce
 
 	// Connect and call GRPC
-	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
+	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create grpc connection: %v", err)
 	}
@@ -394,7 +394,7 @@ func RefreshTimelockNodes(
 		jobToNodeIDMap[userSigningJobID] = nodeID
 	}
 
-	frostConn, _ := common.NewGRPCConnectionWithoutTLS(config.FrostSignerAddress)
+	frostConn, _ := common.NewGRPCConnectionWithoutTLS(config.FrostSignerAddress, nil)
 	defer frostConn.Close()
 	frostClient := pbfrost.NewFrostServiceClient(frostConn)
 	userSignatures, err := frostClient.SignFrost(context.Background(), &pbfrost.SignFrostRequest{
@@ -497,7 +497,7 @@ func ExtendTimelock(
 	}
 
 	// Send to SO to sign
-	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
+	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress(), nil)
 	if err != nil {
 		return fmt.Errorf("failed to create grpc connection: %v", err)
 	}
@@ -530,7 +530,7 @@ func ExtendTimelock(
 		return fmt.Errorf("failed to create refund frost signing job: %v", err)
 	}
 
-	frostConn, _ := common.NewGRPCConnectionWithoutTLS(config.FrostSignerAddress)
+	frostConn, _ := common.NewGRPCConnectionWithoutTLS(config.FrostSignerAddress, nil)
 	defer frostConn.Close()
 	frostClient := pbfrost.NewFrostServiceClient(frostConn)
 	userSignatures, err := frostClient.SignFrost(context.Background(), &pbfrost.SignFrostRequest{

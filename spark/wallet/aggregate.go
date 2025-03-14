@@ -28,7 +28,7 @@ func AggregateTreeNodes(
 	parentNode *pb.TreeNode,
 	aggregatedSigningKey []byte,
 ) (*pb.FinalizeNodeSignaturesResponse, error) {
-	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
+	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -128,7 +128,7 @@ func AggregateTreeNodes(
 		UserCommitments: signingNonceCommitmentProto,
 	})
 
-	frostConn, err := common.NewGRPCConnectionWithoutTLS(config.FrostSignerAddress)
+	frostConn, err := common.NewGRPCConnectionWithoutTLS(config.FrostSignerAddress, nil)
 	if err != nil {
 		return nil, err
 	}

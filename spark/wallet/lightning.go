@@ -29,7 +29,7 @@ func SwapNodesForPreimage(
 	isInboundPayment bool,
 ) (*pb.InitiatePreimageSwapResponse, error) {
 	// SSP asks for signing commitment
-	conn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
+	conn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -54,7 +54,7 @@ func SwapNodesForPreimage(
 	}
 
 	// SSP signs partial refund tx to receiver
-	signerConn, err := common.NewGRPCConnectionWithoutTLS(config.FrostSignerAddress)
+	signerConn, err := common.NewGRPCConnectionWithoutTLS(config.FrostSignerAddress, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -231,7 +231,7 @@ func ReturnLightningPayment(
 	config *Config,
 	paymentHash []byte,
 ) error {
-	conn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
+	conn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress(), nil)
 	if err != nil {
 		return err
 	}

@@ -34,7 +34,7 @@ func StartTokenTransaction(
 	leafToSpendPrivateKeys []*secp256k1.PrivateKey,
 	_ [][]byte,
 ) (*pb.StartTokenTransactionResponse, []byte, []byte, error) {
-	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
+	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress(), nil)
 	if err != nil {
 		log.Printf("Error while establishing gRPC connection to coordinator at %s: %v", config.CoodinatorAddress(), err)
 		return nil, nil, nil, err
@@ -194,7 +194,7 @@ func SignTokenTransaction(
 	}
 
 	for _, operator := range operatorsToContact {
-		operatorConn, err := common.NewGRPCConnectionWithTestTLS(operator.Address)
+		operatorConn, err := common.NewGRPCConnectionWithTestTLS(operator.Address, nil)
 		if err != nil {
 			log.Printf("Error while establishing gRPC connection to operator at %s: %v", operator.Address, err)
 			return nil, err
@@ -283,7 +283,7 @@ func FinalizeTokenTransaction(
 
 	// For each operator, finalize the transaction
 	for _, operator := range config.SigningOperators {
-		operatorConn, err := common.NewGRPCConnectionWithTestTLS(operator.Address)
+		operatorConn, err := common.NewGRPCConnectionWithTestTLS(operator.Address, nil)
 		if err != nil {
 			log.Printf("Error while establishing gRPC connection to operator at %s: %v", operator.Address, err)
 			return err
@@ -364,7 +364,7 @@ func FreezeTokens(
 	tokenPublicKey []byte,
 	shouldUnfreeze bool,
 ) (*pb.FreezeTokensResponse, error) {
-	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
+	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress(), nil)
 	if err != nil {
 		log.Printf("Error while establishing gRPC connection to coordinator at %s: %v", config.CoodinatorAddress(), err)
 		return nil, err
@@ -374,7 +374,7 @@ func FreezeTokens(
 	var lastResponse *pb.FreezeTokensResponse
 	timestamp := uint64(time.Now().UnixMilli())
 	for _, operator := range config.SigningOperators {
-		operatorConn, err := common.NewGRPCConnectionWithTestTLS(operator.Address)
+		operatorConn, err := common.NewGRPCConnectionWithTestTLS(operator.Address, nil)
 		if err != nil {
 			log.Printf("Error while establishing gRPC connection to coordinator at %s: %v", operator.Address, err)
 			return nil, err
@@ -428,7 +428,7 @@ func GetOwnedTokenLeaves(
 	ownerPublicKeys [][]byte,
 	tokenPublicKeys [][]byte,
 ) (*pb.GetOwnedTokenLeavesResponse, error) {
-	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
+	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress(), nil)
 	if err != nil {
 		log.Printf("Error while establishing gRPC connection to coordinator at %s: %v", config.CoodinatorAddress(), err)
 		return nil, err
@@ -465,7 +465,7 @@ func QueryTokenTransactions(
 	offset int64,
 	limit int64,
 ) (*pb.QueryTokenTransactionsResponse, error) {
-	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
+	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress(), nil)
 	if err != nil {
 		log.Printf("Error while establishing gRPC connection to coordinator at %s: %v", config.CoodinatorAddress(), err)
 		return nil, err
@@ -522,7 +522,7 @@ func CancelTokenTransaction(
 
 	// Now cancel with each operator
 	for _, operator := range operatorsToContact {
-		operatorConn, err := common.NewGRPCConnectionWithTestTLS(operator.Address)
+		operatorConn, err := common.NewGRPCConnectionWithTestTLS(operator.Address, nil)
 		if err != nil {
 			log.Printf("Error while establishing gRPC connection to operator at %s: %v", operator.Address, err)
 			return err

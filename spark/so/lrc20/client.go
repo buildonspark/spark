@@ -106,11 +106,23 @@ func (c *Client) connectToLrc20Node() (*grpc.ClientConn, error) {
 	var conn *grpc.ClientConn
 	var err error
 
+	// Increase retries from 3 to 5 and retry on NOT_FOUND status code
+	// NOT_FOUND retries are expected in response to withdraw updates
+	// (the SO asks LRC20 node for block info, but its a race condition
+	// and the LRC20 may not have the block info when the SO makes the first call).
+	retryConfig := common.RetryPolicyConfig{
+		MaxAttempts:          5,
+		InitialBackoffSecs:   1,
+		MaxBackoffSecs:       20,
+		BackoffMultiplier:    2.0,
+		RetryableStatusCodes: []string{"UNAVAILABLE", "NOT_FOUND"},
+	}
+
 	if lrc20Config.RelativeCertPath != "" {
 		certPath := fmt.Sprintf("%s/%s", c.config.RunDirectory, lrc20Config.RelativeCertPath)
-		conn, err = common.NewGRPCConnectionWithCert(lrc20Config.Host, certPath)
+		conn, err = common.NewGRPCConnectionWithCert(lrc20Config.Host, certPath, &retryConfig)
 	} else {
-		conn, err = common.NewGRPCConnectionWithoutTLS(lrc20Config.Host)
+		conn, err = common.NewGRPCConnectionWithoutTLS(lrc20Config.Host, &retryConfig)
 	}
 	if err != nil {
 		log.Printf("Failed to connect to the lrc20 node to verify a token transaction: %v", err)

@@ -70,5 +70,5 @@ func (s *SigningOperator) MarshalProto() *pb.SigningOperatorInfo {
 
 // NewGRPConnection creates a new gRPC connection to the signing operator.
 func (s *SigningOperator) NewGRPCConnection() (*grpc.ClientConn, error) {
-	return common.NewGRPCConnection(s.Address, s.CertPath)
+	return common.NewGRPCConnection(s.Address, s.CertPath, nil)
 }

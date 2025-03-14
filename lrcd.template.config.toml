@@ -26,8 +26,11 @@ auth = { username = "testutil", password = "testutilpassword" }
 level = "TRACE"
 
 [indexer]
-polling_period = { secs = 0, nanos = 1000000 }
+polling_period = { secs = 0, nanos = 10000000 }
 max_confirmation_time = { secs = 86400, nanos = 0 }
+max_restart_attempts = 100
+restart_interval = { secs = 30, nanos = 0 }
+confirmations_number = 1
 
 [controller]
 max_inv_size = 3

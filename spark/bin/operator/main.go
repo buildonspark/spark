@@ -217,7 +217,7 @@ func main() {
 		sqliteDb.Close()
 	}
 
-	frostConnection, err := common.NewGRPCConnectionWithoutTLS(args.SignerAddress)
+	frostConnection, err := common.NewGRPCConnectionWithoutTLS(args.SignerAddress, nil)
 	if err != nil {
 		log.Fatalf("Failed to create frost client: %v", err)
 	}

@@ -70,7 +70,7 @@ func SendTransferTweakKey(
 		wg.Add(1)
 		go func(identifier string, operator *so.SigningOperator) {
 			defer wg.Done()
-			sparkConn, err := common.NewGRPCConnectionWithTestTLS(operator.Address)
+			sparkConn, err := common.NewGRPCConnectionWithTestTLS(operator.Address, nil)
 			if err != nil {
 				results <- err
 				return
@@ -144,7 +144,7 @@ func SendSwapSignRefund(
 		return nil, nil, nil, nil, fmt.Errorf("failed to prepare signing jobs for sending transfer: %v", err)
 	}
 
-	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
+	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress(), nil)
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
@@ -218,7 +218,7 @@ func SendTransferSignRefund(
 		return nil, nil, nil, fmt.Errorf("failed to prepare signing jobs for sending transfer: %v", err)
 	}
 
-	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
+	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress(), nil)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -357,7 +357,7 @@ func QueryPendingTransfers(
 	ctx context.Context,
 	config *Config,
 ) (*pb.QueryPendingTransfersResponse, error) {
-	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
+	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -375,7 +375,7 @@ func QueryPendingTransfersBySender(
 	ctx context.Context,
 	config *Config,
 ) (*pb.QueryPendingTransfersResponse, error) {
-	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
+	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -475,7 +475,7 @@ func ClaimTransferTweakKeys(
 		wg.Add(1)
 		go func(identifier string, operator *so.SigningOperator) {
 			defer wg.Done()
-			sparkConn, err := common.NewGRPCConnectionWithTestTLS(operator.Address)
+			sparkConn, err := common.NewGRPCConnectionWithTestTLS(operator.Address, nil)
 			if err != nil {
 				results <- err
 				return
@@ -606,7 +606,7 @@ func ClaimTransferSignRefunds(
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare signing jobs for claiming transfer: %v", err)
 	}
-	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
+	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -636,7 +636,7 @@ func finalizeTransfer(
 	config *Config,
 	signatures []*pb.NodeSignatures,
 ) ([]*pb.TreeNode, error) {
-	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
+	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -698,7 +698,7 @@ func signRefunds(
 		}
 	}
 
-	frostConn, _ := common.NewGRPCConnectionWithoutTLS(config.FrostSignerAddress)
+	frostConn, _ := common.NewGRPCConnectionWithoutTLS(config.FrostSignerAddress, nil)
 	defer frostConn.Close()
 	frostClient := pbfrost.NewFrostServiceClient(frostConn)
 	userSignatures, err := frostClient.SignFrost(context.Background(), &pbfrost.SignFrostRequest{
@@ -776,7 +776,7 @@ func prepareRefundSoSigningJobs(
 }
 
 func CancelSendTransfer(ctx context.Context, config *Config, transfer *pb.Transfer) (*pb.Transfer, error) {
-	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
+	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -800,7 +800,7 @@ func CancelSendTransfer(ctx context.Context, config *Config, transfer *pb.Transf
 }
 
 func QueryAllTransfers(ctx context.Context, config *Config, limit int64, offset int64) ([]*pb.Transfer, int64, error) {
-	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
+	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress(), nil)
 	if err != nil {
 		return nil, 0, err
 	}

@@ -138,7 +138,7 @@ func (s *Server) Round1Signature(ctx context.Context, req *pbdkg.Round1Signature
 		wg.Add(1)
 		go func(identifier string, addr string) {
 			defer wg.Done()
-			connection, err := common.NewGRPCConnection(addr, operator.CertPath)
+			connection, err := common.NewGRPCConnection(addr, operator.CertPath, nil)
 			if err != nil {
 				return
 			}

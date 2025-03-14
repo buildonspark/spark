@@ -195,7 +195,7 @@ func (h *LightningHandler) validateGetPreimageRequest(
 	reason pb.InitiatePreimageSwapRequest_Reason,
 ) error {
 	// Step 1 validate all signatures are valid
-	conn, err := common.NewGRPCConnectionWithoutTLS(h.config.SignerAddress)
+	conn, err := common.NewGRPCConnectionWithoutTLS(h.config.SignerAddress, nil)
 	if err != nil {
 		return fmt.Errorf("unable to connect to signer: %v", err)
 	}
