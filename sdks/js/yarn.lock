@@ -19399,6 +19399,7 @@ __metadata:
     "@buildonspark/spark-sdk": "npm:0.0.14"
     "@lightsparkdev/ui": "npm:^1.0.17"
     "@radix-ui/react-popover": "npm:^1.1.6"
+    "@scure/bip39": "npm:^1.5.4"
     "@tanstack/react-query": "npm:^5.66.8"
     "@testing-library/jest-dom": "npm:^5.14.1"
     "@testing-library/react": "npm:^13.0.0"

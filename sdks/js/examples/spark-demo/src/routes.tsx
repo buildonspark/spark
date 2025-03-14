@@ -4,11 +4,9 @@ export const Routes = {
 
   // App routes
   Login: "/login",
-  WalletSuccess: "/wallet-success",
   Wallet: "/wallet",
   Receive: "/receive",
   Send: "/send",
-  RecoverWallet: "/recover-wallet",
   Tokens: "/tokens",
   Transactions: "/transactions",
 };

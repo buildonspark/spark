@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
 import AmountInput from "../../components/AmountInput";
 import CardForm from "../../components/CardForm";
 import Networks, { Network } from "../../components/Networks";
@@ -81,14 +82,17 @@ export default function Receive() {
   ]);
 
   const onSecondaryButtonClick = useCallback(() => {
+    const notify = () => toast("Copied!");
+
     switch (currentStep) {
       case ReceiveStep.ShareQuote:
-        setQrCodeModalVisible(true);
+        navigator.clipboard.writeText(lightningInvoice || "");
+        notify();
         break;
       default:
         return null;
     }
-  }, [currentStep, setQrCodeModalVisible]);
+  }, [currentStep, lightningInvoice]);
 
   const onLogoLeftClick = useCallback(() => {
     switch (currentStep) {
@@ -96,8 +100,10 @@ export default function Receive() {
         setRawInputAmount("0");
         setCurrentStep(ReceiveStep.NetworkSelect);
         break;
-      case ReceiveStep.NetworkSelect:
       case ReceiveStep.ShareQuote:
+        setCurrentStep(ReceiveStep.InputAmount);
+        break;
+      case ReceiveStep.NetworkSelect:
         navigate(Routes.Wallet);
         break;
       case ReceiveStep.BitcoinDepositAddress:
@@ -117,6 +123,8 @@ export default function Receive() {
         return "Spark deposit address";
       case ReceiveStep.BitcoinDepositAddress:
         return "Bitcoin deposit address";
+      case ReceiveStep.ShareQuote:
+        return "Receive with Lightning";
       default:
         return "Receive";
     }
@@ -124,8 +132,6 @@ export default function Receive() {
 
   const logoLeft = useMemo(() => {
     switch (currentStep) {
-      case ReceiveStep.ShareQuote:
-        return null;
       default:
         return (
           <ChevronIcon
@@ -154,7 +160,6 @@ export default function Receive() {
   return (
     <div>
       <CardForm
-        headerDisabled={currentStep === ReceiveStep.ShareQuote}
         topTitle={topTitle}
         logoLeft={logoLeft}
         logoLeftClick={onLogoLeftClick}

@@ -16,7 +16,6 @@ import {
   formatAssetAmountDisplayString,
   formatFiatAmountDisplayString,
 } from "../../utils/utils";
-
 export default function Wallet() {
   const navigate = useNavigate();
   const notify = () => toast("Copied!");
@@ -127,54 +126,52 @@ export default function Wallet() {
         </div>
       )}
       {transfersQuery?.data?.transfers?.length &&
-        transfersQuery?.data?.transfers?.length > 0 && (
-          <div className="mt-4">
-            <div className="flex flex-row items-center justify-between p-2">
-              <div className="text-[15px] font-medium text-[#F9F9F999]">
-                Recent activity
-              </div>
-              <div
-                className="cursor-pointer text-[13px] font-medium"
-                onClick={() => {
-                  navigate(Routes.Transactions);
-                }}
-              >
-                View all
-              </div>
+      transfersQuery?.data?.transfers?.length > 0 ? (
+        <div className="mt-4">
+          <div className="flex flex-row items-center justify-between p-2">
+            <div className="text-[15px] font-medium text-[#F9F9F999]">
+              Recent activity
             </div>
-            {transfersQuery?.data?.transfers?.map(
-              (transfer: Transfer, index: number) => {
-                if (index >= 3) return null;
-                const sender = bytesToHex(transfer.senderIdentityPublicKey);
-                if (sender === pubkey) {
-                  return (
-                    <TransactionDetailRow
-                      key={`${index}`}
-                      transactionType="send"
-                      asset={PERMANENT_CURRENCIES.get("BTC")!}
-                      assetAmount={transfer.totalValue}
-                      counterparty={bytesToHex(
-                        transfer.receiverIdentityPublicKey,
-                      )}
-                    />
-                  );
-                } else {
-                  return (
-                    <TransactionDetailRow
-                      key={`${index}`}
-                      transactionType="receive"
-                      asset={PERMANENT_CURRENCIES.get("BTC")!}
-                      assetAmount={transfer.totalValue}
-                      counterparty={bytesToHex(
-                        transfer.senderIdentityPublicKey,
-                      )}
-                    />
-                  );
-                }
-              },
-            )}
+            <div
+              className="cursor-pointer text-[13px] font-medium"
+              onClick={() => {
+                navigate(Routes.Transactions);
+              }}
+            >
+              View all
+            </div>
           </div>
-        )}
+          {transfersQuery?.data?.transfers?.map(
+            (transfer: Transfer, index: number) => {
+              if (index >= 3) return null;
+              const sender = bytesToHex(transfer.senderIdentityPublicKey);
+              if (sender === pubkey) {
+                return (
+                  <TransactionDetailRow
+                    key={`${index}`}
+                    transactionType="send"
+                    asset={PERMANENT_CURRENCIES.get("BTC")!}
+                    assetAmount={transfer.totalValue}
+                    counterparty={bytesToHex(
+                      transfer.receiverIdentityPublicKey,
+                    )}
+                  />
+                );
+              } else {
+                return (
+                  <TransactionDetailRow
+                    key={`${index}`}
+                    transactionType="receive"
+                    asset={PERMANENT_CURRENCIES.get("BTC")!}
+                    assetAmount={transfer.totalValue}
+                    counterparty={bytesToHex(transfer.senderIdentityPublicKey)}
+                  />
+                );
+              }
+            },
+          )}
+        </div>
+      ) : null}
     </div>
   );
 }

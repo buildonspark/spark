@@ -6,6 +6,7 @@
     "@buildonspark/spark-sdk": "0.0.14",
     "@lightsparkdev/ui": "^1.0.17",
     "@radix-ui/react-popover": "^1.1.6",
+    "@scure/bip39": "^1.5.4",
     "@tanstack/react-query": "^5.66.8",
     "@testing-library/jest-dom": "^5.14.1",
     "@testing-library/react": "^13.0.0",

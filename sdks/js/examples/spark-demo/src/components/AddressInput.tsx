@@ -7,15 +7,6 @@ import SparkIcon from "../icons/SparkIcon";
 import DetailsRow from "./DetailsRow";
 import { Network } from "./Networks";
 
-/* function debounce<T extends (...args: any[]) => void>(func: T, wait: number) {
-  let timeout: ReturnType<typeof setTimeout> | null = null;
-  return function (...args: Parameters<T>) {
-    if (timeout) clearTimeout(timeout);
-    timeout = setTimeout(() => {
-      func(...args);
-    }, wait);
-  };
-} */
 const formatPhoneNumber = (input: string) => {
   // Remove all non-digit characters
   let digitsOnly = input.replace(/\D/g, "");

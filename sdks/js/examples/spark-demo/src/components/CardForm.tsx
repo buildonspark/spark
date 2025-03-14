@@ -35,21 +35,21 @@ export default function CardForm({
   return (
     <div className="mt-2 flex w-full flex-col items-center justify-between">
       {!headerDisabled && (
-        <div className="font-inter text-sm/20 mb-8 flex w-full flex-row items-center text-center font-semibold">
+        <div className="mb-8 flex w-full flex-row items-center text-center font-inter font-semibold">
           <div
-            className="bg-white-8 flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border"
+            className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border bg-white-8"
             onClick={logoLeftClick}
           >
             {logoLeft}
           </div>
-          <div className="flex-grow">{topTitle}</div>
+          <div className="flex-grow text-[15px] leading-[20px]">{topTitle}</div>
           <div className="flex h-8 w-8 items-center justify-center">
             {logoRight}
           </div>
         </div>
       )}
       <div className="flex w-full flex-col">{children}</div>
-      <div className="mt-4 flex w-full flex-col gap-2">
+      <div className="mt-xl flex w-full flex-col gap-md">
         {!secondaryButtonDisabled && (
           <CardFormButton
             text={secondaryButtonText || "Cancel"}
@@ -114,8 +114,9 @@ const StyledCardFormButton = styled.button<StyledCardFormButtonProps>`
   width: 100%;
   height: ${({ height = 44 }) => height}px;
   border-radius: 8px;
-  font-weight: 600;
+  font-weight: 500;
   font-size: 15px;
+  line-height: 20px;
   ${({ kind = "primary" }) =>
     kind === "primary"
       ? css`
