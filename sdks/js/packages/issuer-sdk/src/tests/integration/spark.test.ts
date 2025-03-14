@@ -7,6 +7,7 @@ import { jest } from "@jest/globals";
 import { IssuerSparkWallet } from "../../issuer-sdk.js";
 import { BitcoinFaucet } from "../../../../spark-sdk/src/tests/utils/test-faucet.js";
 import { secp256k1 } from "@noble/curves/secp256k1";
+import { bytesToHex } from "@noble/curves/abstract/utils";
 
 describe("token integration test", () => {
   // Skip all tests if running in GitHub Actions
@@ -64,8 +65,8 @@ describe("token integration test", () => {
 
     try {
       const response = await wallet.announceTokenL1({
-        tokenName: "TestToken",
-        tokenTicker: "TT",
+        tokenName: "TestToken1",
+        tokenTicker: "TT1",
         decimals: 0,
         maxSupply: 0,
         isFreezable: false,
@@ -79,6 +80,55 @@ describe("token integration test", () => {
 
     const sourceBalance = await wallet.getIssuerTokenBalance();
     expect(sourceBalance.balance).toEqual(tokenAmount);
+  });
+
+  it("should announce, issue, and withdraw a single token", async () => {
+    const tokenAmount: bigint = 1000n;
+    const privateKey =
+      "4799979d5e417e3d6d00cf89a77d4f3c0354d295810326c6b0bf4b45aedb38f3";
+    const { wallet } = await IssuerSparkWallet.create({
+      privateKey: privateKey,
+      options: LOCAL_WALLET_CONFIG_SCHNORR,
+    });
+
+    // Faucet funds to the Issuer wallet because announcing a token
+    // requires ownership of an L1 UTXO.
+    const faucet = new BitcoinFaucet(
+      "http://127.0.0.1:8332",
+      "testutil",
+      "testutilpassword",
+    );
+    const l1WalletPubKey = secp256k1.getPublicKey(privateKey);
+    await faucet.sendFaucetCoinToP2WPKHAddress(l1WalletPubKey);
+
+    try {
+      const response = await wallet.announceTokenL1({
+        tokenName: "TestToken2",
+        tokenTicker: "TT2",
+        decimals: 0,
+        maxSupply: 0,
+        isFreezable: false,
+      });
+      console.log("Announce token response: " + response);
+    } catch (error: any) {
+      // Check that the error has the expected name
+      fail("Expected announceTokenL1() to succeed with fauceted funds");
+    }
+    await wallet.mintTokens(tokenAmount);
+
+    const sourceBalance = await wallet.getIssuerTokenBalance();
+    expect(sourceBalance.balance).toEqual(tokenAmount);
+
+    try {
+      const response = await wallet.withdrawTokens(
+        await wallet.getIdentityPublicKey(),
+        bytesToHex(l1WalletPubKey),
+      );
+      console.log("Withdraw token txid: " + response?.txid);
+    } catch (error: any) {
+      // Check that the error has the expected name
+      fail("Expected withdrawTokens() to succeed");
+    }
   });
 
   it("should issue a single token and transfer it with ECDSA", async () => {
