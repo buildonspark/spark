@@ -414,6 +414,21 @@ func TestSendLightningPaymentWithRejection(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	// Test the invoice can be paid again
+	_, err = wallet.SwapNodesForPreimage(
+		context.Background(),
+		userConfig,
+		leaves,
+		sspConfig.IdentityPublicKey(),
+		paymentHash[:],
+		&invoice,
+		feeSats,
+		false,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestReceiveLightningPaymentWithWrongPreimage(t *testing.T) {
@@ -488,4 +503,145 @@ func TestReceiveLightningPaymentWithWrongPreimage(t *testing.T) {
 		t.Fatal(err)
 	}
 	assert.Equal(t, transfer.Status, spark.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED)
+}
+
+func TestSendLightningPaymentTwice(t *testing.T) {
+	// Create user and ssp configs
+	userConfig, err := testutil.TestWalletConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	sspConfig, err := testutil.TestWalletConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// User creates an invoice
+	preimage, err := hex.DecodeString("2d059c3ede82a107aa1452c0bea47759be3c5c6e5342be6a310f6c3a907d9f4c")
+	if err != nil {
+		t.Fatal(err)
+	}
+	paymentHash := sha256.Sum256(preimage)
+	invoice := "lnbcrt123450n1pnj6uf4pp5l26hsdxssmr52vd4xmn5xran7puzx34hpr6uevaq7ta0ayzrp8esdqqcqzpgxqyz5vqrzjqtr2vd60g57hu63rdqk87u3clac6jlfhej4kldrrjvfcw3mphcw8sqqqqzp3jlj6zyqqqqqqqqqqqqqq9qsp5w22fd8aqn7sdum7hxdf59ptgk322fkv589ejxjltngvgehlcqcyq9qxpqysgqvykwsxdx64qrj0s5pgcgygmrpj8w25jsjgltwn09yp24l9nvghe3dl3y0ycy70ksrlqmcn42hxn24e0ucuy3g9fjltudvhv4lrhhamgq3stqgp"
+
+	defer cleanUp(t, userConfig, paymentHash[:])
+
+	// User creates a node of 12345 sats
+	userLeafPrivKey, err := secp256k1.GeneratePrivateKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	feeSats := uint64(2)
+	nodeToSend, err := testutil.CreateNewTree(userConfig, faucet, userLeafPrivKey, 12347)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	newLeafPrivKey, err := secp256k1.GeneratePrivateKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	leaves := []wallet.LeafKeyTweak{}
+	leaves = append(leaves, wallet.LeafKeyTweak{
+		Leaf:              nodeToSend,
+		SigningPrivKey:    userLeafPrivKey.Serialize(),
+		NewSigningPrivKey: newLeafPrivKey.Serialize(),
+	})
+
+	response, err := wallet.SwapNodesForPreimage(
+		context.Background(),
+		userConfig,
+		leaves,
+		sspConfig.IdentityPublicKey(),
+		paymentHash[:],
+		&invoice,
+		feeSats,
+		false,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = wallet.SwapNodesForPreimage(
+		context.Background(),
+		userConfig,
+		leaves,
+		sspConfig.IdentityPublicKey(),
+		paymentHash[:],
+		&invoice,
+		feeSats,
+		false,
+	)
+	if err == nil {
+		t.Fatalf("expected error")
+	}
+
+	transfer, err := wallet.SendTransferTweakKey(context.Background(), userConfig, response.Transfer, leaves, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, transfer.Status, spark.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING)
+
+	refunds, err := wallet.QueryUserSignedRefunds(context.Background(), sspConfig, paymentHash[:])
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var totalValue int64
+	for _, refund := range refunds {
+		value, err := wallet.ValidateUserSignedRefund(refund)
+		if err != nil {
+			t.Fatal(err)
+		}
+		totalValue += value
+	}
+	assert.Equal(t, totalValue, int64(12345+feeSats))
+
+	receiverTransfer, err := wallet.ProvidePreimage(context.Background(), sspConfig, preimage)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, receiverTransfer.Status, spark.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED)
+
+	receiverToken, err := wallet.AuthenticateWithServer(context.Background(), sspConfig)
+	if err != nil {
+		t.Fatalf("failed to authenticate receiver: %v", err)
+	}
+	receiverCtx := wallet.ContextWithToken(context.Background(), receiverToken)
+	if receiverTransfer.Id != transfer.Id {
+		t.Fatalf("expected transfer id %s, got %s", transfer.Id, receiverTransfer.Id)
+	}
+
+	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(context.Background(), sspConfig, receiverTransfer)
+	if err != nil {
+		t.Fatalf("unable to verify pending transfer: %v", err)
+	}
+	if len(*leafPrivKeyMap) != 1 {
+		t.Fatalf("Expected 1 leaf to transfer, got %d", len(*leafPrivKeyMap))
+	}
+	if !bytes.Equal((*leafPrivKeyMap)[nodeToSend.Id], newLeafPrivKey.Serialize()) {
+		t.Fatalf("wrong leaf signing private key")
+	}
+
+	finalLeafPrivKey, err := secp256k1.GeneratePrivateKey()
+	if err != nil {
+		t.Fatalf("failed to create new node signing private key: %v", err)
+	}
+	claimingNode := wallet.LeafKeyTweak{
+		Leaf:              receiverTransfer.Leaves[0].Leaf,
+		SigningPrivKey:    newLeafPrivKey.Serialize(),
+		NewSigningPrivKey: finalLeafPrivKey.Serialize(),
+	}
+	leavesToClaim := [1]wallet.LeafKeyTweak{claimingNode}
+	_, err = wallet.ClaimTransfer(
+		receiverCtx,
+		receiverTransfer,
+		sspConfig,
+		leavesToClaim[:],
+	)
+	if err != nil {
+		t.Fatalf("failed to ClaimTransfer: %v", err)
+	}
 }

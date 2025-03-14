@@ -188,12 +188,27 @@ func (h *LightningHandler) GetSigningCommitments(ctx context.Context, req *pb.Ge
 
 func (h *LightningHandler) validateGetPreimageRequest(
 	ctx context.Context,
+	paymentHash []byte,
 	transactions []*pb.UserSignedRefund,
 	amount *pb.InvoiceAmount,
 	destinationPubkey []byte,
 	feeSats uint64,
 	reason pb.InitiatePreimageSwapRequest_Reason,
 ) error {
+	// Step 0 Validate that there's no existing preimage request for this payment hash
+	db := ent.GetDbFromContext(ctx)
+	preimageRequests, err := db.PreimageRequest.Query().Where(
+		preimagerequest.PaymentHashEQ(paymentHash),
+		preimagerequest.ReceiverIdentityPubkeyEQ(destinationPubkey),
+		preimagerequest.StatusNEQ(schema.PreimageRequestStatusReturned),
+	).All(ctx)
+	if err != nil {
+		return fmt.Errorf("unable to get preimage request: %v", err)
+	}
+	if len(preimageRequests) > 0 {
+		return fmt.Errorf("preimage request already exists")
+	}
+
 	// Step 1 validate all signatures are valid
 	conn, err := common.NewGRPCConnectionWithoutTLS(h.config.SignerAddress, nil)
 	if err != nil {
@@ -202,7 +217,6 @@ func (h *LightningHandler) validateGetPreimageRequest(
 	defer conn.Close()
 
 	client := pbfrost.NewFrostServiceClient(conn)
-	db := ent.GetDbFromContext(ctx)
 	for _, transaction := range transactions {
 		// First fetch the node tx in order to calculate the sighash
 		nodeID, err := uuid.Parse(transaction.NodeId)
@@ -390,6 +404,7 @@ func (h *LightningHandler) GetPreimageShare(ctx context.Context, req *pb.Initiat
 
 	err := h.validateGetPreimageRequest(
 		ctx,
+		req.PaymentHash,
 		req.UserSignedRefunds,
 		invoiceAmount,
 		req.ReceiverIdentityPublicKey,
@@ -469,6 +484,7 @@ func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pb.Ini
 
 	err := h.validateGetPreimageRequest(
 		ctx,
+		req.PaymentHash,
 		req.UserSignedRefunds,
 		invoiceAmount,
 		req.ReceiverIdentityPublicKey,

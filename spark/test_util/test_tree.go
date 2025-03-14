@@ -98,7 +98,8 @@ func CreateNewTree(config *wallet.Config, faucet *Faucet, privKey *secp256k1.Pri
 		}
 		time.Sleep(100 * time.Millisecond)
 		nodesResp, err := sparkClient.QueryNodes(authCtx, &pb.QueryNodesRequest{
-			Source: &pb.QueryNodesRequest_NodeIds{NodeIds: &pb.TreeNodeIds{NodeIds: []string{resp.Nodes[0].Id}}},
+			Source:  &pb.QueryNodesRequest_NodeIds{NodeIds: &pb.TreeNodeIds{NodeIds: []string{resp.Nodes[0].Id}}},
+			Network: pb.Network_REGTEST,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to query nodes: %v", err)
