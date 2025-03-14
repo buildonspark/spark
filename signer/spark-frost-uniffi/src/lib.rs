@@ -409,10 +409,11 @@ pub fn construct_node_tx(
         lock_time: LockTime::ZERO,
         input: vec![input],
         output: vec![
-            output,  // Original output
-            TxOut {  // Ephemeral anchor output
+            output, // Original output
+            TxOut {
+                // Ephemeral anchor output
                 value: Amount::from_sat(0),
-                script_pubkey: ScriptBuf::from_bytes(vec![0x51]),  // OP_TRUE
+                script_pubkey: ScriptBuf::from_bytes(vec![0x51]), // OP_TRUE
             },
         ],
     };
@@ -493,7 +494,14 @@ pub fn construct_refund_tx(
         version: Version::TWO,
         lock_time: LockTime::ZERO,
         input: vec![input],
-        output: vec![output],
+        output: vec![
+            output,
+            TxOut {
+                // Ephemeral anchor output
+                value: Amount::from_sat(0),
+                script_pubkey: ScriptBuf::from_bytes(vec![0x51]), // OP_TRUE
+            },
+        ],
     };
 
     let sighash = SighashCache::new(&new_tx)
