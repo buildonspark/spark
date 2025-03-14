@@ -37,16 +37,16 @@ type FaucetCoin struct {
 }
 
 type Faucet struct {
-	client *rpcclient.Client
-	coins  []FaucetCoin
-	mu     sync.Mutex
+	client  *rpcclient.Client
+	coinsMu sync.Mutex
+	coins   []FaucetCoin
 }
 
 func NewFaucet(client *rpcclient.Client) *Faucet {
 	return &Faucet{
-		client: client,
-		coins:  make([]FaucetCoin, 0),
-		mu:     sync.Mutex{},
+		client:  client,
+		coinsMu: sync.Mutex{},
+		coins:   make([]FaucetCoin, 0),
 	}
 }
 
@@ -58,20 +58,20 @@ func (f *Faucet) Fund() (FaucetCoin, error) {
 			return FaucetCoin{}, err
 		}
 	}
-	f.mu.Lock()
-	defer f.mu.Unlock()
+	f.coinsMu.Lock()
+	defer f.coinsMu.Unlock()
 	coin := f.coins[0]
 	f.coins = f.coins[1:]
 	return coin, nil
 }
 
 // Refill mines a block to the faucet, mines 100 blocks to make
-// that output spendabled, then splits it into a bunch outputs
-// (coins) in a new transaction, which are then freely given away for
+// that output spendable, then crafts a new transaction to split it
+// into a bunch outputs (coins), which are then freely given away for
 // various tests to use.
 func (f *Faucet) Refill() error {
-	f.mu.Lock()
-	defer f.mu.Unlock()
+	f.coinsMu.Lock()
+	defer f.coinsMu.Unlock()
 	// Mine a block sending some coins to an address
 	key, err := secp256k1.GeneratePrivateKey()
 	if err != nil {
@@ -96,7 +96,9 @@ func (f *Faucet) Refill() error {
 		return err
 	}
 
-	// Mine 100 blocks to allow funds to be spendable
+	// Mine 100 blocks to a random address to allow funds to be spendable.
+	// This is necessary because coinbase transactions require 100 confirmations
+	// to be spendable.
 	randomKey, err := secp256k1.GeneratePrivateKey()
 	if err != nil {
 		return err
@@ -112,14 +114,18 @@ func (f *Faucet) Refill() error {
 	}
 
 	// Split the output into 1 BTC outputs
+	splitTx := wire.NewMsgTx(2)
+
 	fundingTxid := fundingTx.TxHash()
 	fundingOutPoint := wire.NewOutPoint(&fundingTxid, 0)
-	splitTx := wire.NewMsgTx(2)
 	splitTx.AddTxIn(wire.NewTxIn(fundingOutPoint, nil, nil))
-	initialValue := fundingTx.TxOut[0].Value
-	coinAmount := int64(10_000_000)
+
+	initialValueSats := fundingTx.TxOut[0].Value
+	coinAmountSats := int64(10_000_000)
+	feeSats := int64(100_000) // Arbitrary large fee to ensure we have enough
 	coinKeys := make([]*secp256k1.PrivateKey, 0)
-	for initialValue > coinAmount+100_000 { // 100_000 for a fee buffer
+	coinCount := (initialValueSats - feeSats) / coinAmountSats
+	for i := int64(0); i < coinCount; i++ {
 		coinKey, err := secp256k1.GeneratePrivateKey()
 		if err != nil {
 			return err
@@ -130,8 +136,7 @@ func (f *Faucet) Refill() error {
 		if err != nil {
 			return err
 		}
-		splitTx.AddTxOut(wire.NewTxOut(coinAmount, coinScript))
-		initialValue -= coinAmount
+		splitTx.AddTxOut(wire.NewTxOut(coinAmountSats, coinScript))
 	}
 	signedSplitTx, err := SignFaucetCoin(splitTx, fundingTx.TxOut[0], key)
 	if err != nil {
@@ -142,12 +147,13 @@ func (f *Faucet) Refill() error {
 		return err
 	}
 
+	// Add coins (outputs of the split tx) to the faucets bag
 	splitTxid := signedSplitTx.TxHash()
-	for i := 0; i < len(signedSplitTx.TxOut); i++ {
+	for i, txOut := range signedSplitTx.TxOut {
 		faucetCoin := FaucetCoin{
 			Key:      coinKeys[i],
 			OutPoint: wire.NewOutPoint(&splitTxid, uint32(i)),
-			TxOut:    signedSplitTx.TxOut[i],
+			TxOut:    txOut,
 		}
 		f.coins = append(f.coins, faucetCoin)
 	}
@@ -156,42 +162,42 @@ func (f *Faucet) Refill() error {
 	return nil
 }
 
-// SignOnChainTx signs the first input of the given transaction with the given key,
+// SignFaucetCoin signs the first input of the given transaction with the given key,
 // and returns the signed transaction. Note this expects to be spending
-// a taproot output, mainly created by `faucet.Fund()`.
-func SignFaucetCoin(unsignedTx *wire.MsgTx, fundingTxOut *wire.TxOut, key *secp256k1.PrivateKey) (*wire.MsgTx, error) {
+// a taproot output, with the spendingTxOut and key coming from a FaucetCoin from `faucet.Fund()`.
+func SignFaucetCoin(unsignedTx *wire.MsgTx, spendingTxOut *wire.TxOut, key *secp256k1.PrivateKey) (*wire.MsgTx, error) {
 	prevOutputFetcher := txscript.NewCannedPrevOutputFetcher(
-		fundingTxOut.PkScript, fundingTxOut.Value,
+		spendingTxOut.PkScript, spendingTxOut.Value,
 	)
 	sighashes := txscript.NewTxSigHashes(unsignedTx, prevOutputFetcher)
 	fakeTapscriptRootHash := []byte{}
 	sig, err := txscript.RawTxInTaprootSignature(
-		unsignedTx, sighashes, 0, fundingTxOut.Value, fundingTxOut.PkScript,
+		unsignedTx, sighashes, 0, spendingTxOut.Value, spendingTxOut.PkScript,
 		fakeTapscriptRootHash, txscript.SigHashDefault, key,
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	var exitTxBuf bytes.Buffer
-	err = unsignedTx.Serialize(&exitTxBuf)
+	var signedTxBuf bytes.Buffer
+	err = unsignedTx.Serialize(&signedTxBuf)
 	if err != nil {
 		return nil, err
 	}
 
-	signedExitTxBytes, err := common.UpdateTxWithSignature(exitTxBuf.Bytes(), 0, sig)
+	signedTxBytes, err := common.UpdateTxWithSignature(signedTxBuf.Bytes(), 0, sig)
 	if err != nil {
 		return nil, err
 	}
-	signedExitTx, err := common.TxFromRawTxBytes(signedExitTxBytes)
-	if err != nil {
-		return nil, err
-	}
-
-	err = common.VerifySignature(signedExitTx, 0, fundingTxOut)
+	signedTx, err := common.TxFromRawTxBytes(signedTxBytes)
 	if err != nil {
 		return nil, err
 	}
 
-	return signedExitTx, nil
+	err = common.VerifySignature(signedTx, 0, spendingTxOut)
+	if err != nil {
+		return nil, err
+	}
+
+	return signedTx, nil
 }
