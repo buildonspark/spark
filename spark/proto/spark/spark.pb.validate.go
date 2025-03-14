@@ -7158,6 +7158,8 @@ func (m *QueryPendingTransfersRequest) validate(all bool) error {
 
 	var errors []error
 
+	// no validation rules for Network
+
 	switch v := m.Participant.(type) {
 	case *QueryPendingTransfersRequest_ReceiverIdentityPublicKey:
 		if v == nil {
@@ -13620,6 +13622,8 @@ func (m *QueryNodesRequest) validate(all bool) error {
 
 	// no validation rules for IncludeParents
 
+	// no validation rules for Network
+
 	switch v := m.Source.(type) {
 	case *QueryNodesRequest_OwnerIdentityPubkey:
 		if v == nil {
@@ -14766,6 +14770,8 @@ func (m *QueryBalanceRequest) validate(all bool) error {
 	var errors []error
 
 	// no validation rules for IdentityPublicKey
+
+	// no validation rules for Network
 
 	if len(errors) > 0 {
 		return QueryBalanceRequestMultiError(errors)
