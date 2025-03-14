@@ -62,7 +62,7 @@ POST /issuer-wallet/wallet/init
 
 ```json
 {
-  "mnemonicOrSeed": "string" // Optional: Mnemonic phrase or seed
+  "mnemonicOrSeed": Optional[string]
 }
 ```
 
@@ -79,14 +79,6 @@ GET /spark-wallet/wallet/identity-public-key
 GET /issuer-wallet/wallet/identity-public-key
 ```
 
-**Response:**
-
-```json
-{
-  "identityPublicKey": "string"
-}
-```
-
 ---
 
 ### Get Spark Address
@@ -98,14 +90,6 @@ GET /spark-wallet/wallet/spark-address
 GET /issuer-wallet/wallet/spark-address
 ```
 
-**Response:**
-
-```json
-{
-  "sparkAddress": "string"
-}
-```
-
 ---
 
 ### Get Wallet Balance
@@ -115,27 +99,6 @@ Returns the current wallet balance, including token balances.
 ```http
 GET /spark-wallet/wallet/balance
 GET /issuer-wallet/wallet/balance
-```
-
-**Request Body:**
-
-```json
-{
-  "forceRefetch?": "boolean" // Optional: Passing true forces the wallet to sync and claim any incoming lightning payments, spark transfers, or bitcoin deposits.
-}
-```
-
-**Response:**
-
-```json
-{
-  "balance": "bigint",
-  "tokenBalances": {
-    "token"  {
-        "balance": "bigint"
-    }
-  }
-}
 ```
 
 ---
@@ -165,15 +128,6 @@ POST /spark-wallet/spark/send-transfer
 POST /issuer-wallet/spark/send-transfer
 ```
 
-**Request Body:**
-
-```json
-{
-  "receiverSparkAddress": "string",
-  "amountSats": number
-}
-```
-
 ---
 
 ### Create Lightning Invoice
@@ -190,8 +144,8 @@ POST /issuer-wallet/lightning/create-invoice
 ```json
 {
   "amountSats": number,
-  "memo": "string",
-  "expirySeconds": number
+  "memo": Optional[string],
+  "expirySeconds": Optional[number]
 }
 ```
 
@@ -210,7 +164,7 @@ POST /issuer-wallet/lightning/pay-invoice
 
 ```json
 {
-  "invoice": "string"
+  "invoice": string
 }
 ```
 
@@ -240,7 +194,7 @@ POST /issuer-wallet/bitcoin/withdraw
 
 ```json
 {
-  "onchainAddress": "string",
+  "onchainAddress": string,
   "targetAmountSats": number
 }
 ```
@@ -260,9 +214,9 @@ POST /issuer-wallet/tokens/transfer
 
 ```json
 {
-  "tokenPublicKey": "string",
+  "tokenPublicKey": string,
   "tokenAmount": number,
-  "receiverSparkAddress": "string"
+  "receiverSparkAddress": string
 }
 ```
 
@@ -281,8 +235,8 @@ POST /issuer-wallet/tokens/withdraw
 
 ```json
 {
-  "tokenPublicKey": "string",
-  "receiverPublicKey": "string",
+  "tokenPublicKey": string,
+  "receiverPublicKey": string,
   "leafIds": string[]
 }
 ```
@@ -299,32 +253,12 @@ Returns the issuer's token balance.
 GET /issuer-wallet/token-balance
 ```
 
-**Response:**
-
-```json
-{
-  "balance": "bigint"
-}
-```
-
----
-
 ### Get Token Public Key Info
 
 Returns information about the token's public key.
 
 ```http
 GET /issuer-wallet/token-public-key-info
-```
-
-**Response:**
-
-```json
-{
-  "tokenPublicKeyInfo": {
-    // Token public key details
-  }
-}
 ```
 
 ---
@@ -341,17 +275,7 @@ POST /issuer-wallet/spark/mint-tokens
 
 ```json
 {
-  "tokenAmount": "string" // Amount to mint (will be converted to BigInt)
-}
-```
-
-**Response:**
-
-```json
-{
-  "mintedTokens": {
-    // Minted tokens details
-  }
+  "tokenAmount": string // Amount to mint (will be converted to BigInt)
 }
 ```
 
@@ -373,16 +297,6 @@ POST /issuer-wallet/spark/burn-tokens
 }
 ```
 
-**Response:**
-
-```json
-{
-  "burnedTokens": {
-    // Burned tokens details
-  }
-}
-```
-
 ---
 
 ### Freeze Tokens
@@ -397,17 +311,7 @@ POST /issuer-wallet/spark/freeze-tokens
 
 ```json
 {
-  "ownerPublicKey": "string"
-}
-```
-
-**Response:**
-
-```json
-{
-  "frozenTokens": {
-    // Frozen tokens details
-  }
+  "ownerPublicKey": string
 }
 ```
 
@@ -425,17 +329,7 @@ POST /issuer-wallet/spark/unfreeze-tokens
 
 ```json
 {
-  "ownerPublicKey": "string"
-}
-```
-
-**Response:**
-
-```json
-{
-  "unfrozenTokens": {
-    // Unfrozen tokens details
-  }
+  "ownerPublicKey": string
 }
 ```
 
@@ -455,22 +349,12 @@ POST /issuer-wallet/on-chain/announce-token
 
 ```json
 {
-  "tokenName": "string",
-  "tokenTicker": "string",
+  "tokenName": string,
+  "tokenTicker": string,
   "decimals": number,
   "maxSupply": number,
   "isFreezable": boolean,
   "feeRateSatsPerVb": number
-}
-```
-
-**Response:**
-
-```json
-{
-  "tokenL1": {
-    // Token L1 announcement details
-  }
 }
 ```
 
@@ -492,16 +376,6 @@ POST /issuer-wallet/on-chain/mint-tokens
 }
 ```
 
-**Response:**
-
-```json
-{
-  "mintedTokensL1": {
-    // L1 minted tokens details
-  }
-}
-```
-
 ---
 
 #### Transfer Tokens L1
@@ -517,17 +391,7 @@ POST /issuer-wallet/on-chain/transfer-tokens
 ```json
 {
   "tokenAmount": number,
-  "receiverPublicKey": "string"
-}
-```
-
-**Response:**
-
-```json
-{
-  "transferredTokensL1": {
-    // L1 transferred tokens details
-  }
+  "receiverPublicKey": string
 }
 ```
 

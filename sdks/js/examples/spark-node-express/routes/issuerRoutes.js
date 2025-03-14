@@ -2,11 +2,11 @@ import { IssuerSparkWallet } from "@buildonspark/issuer-sdk";
 import { createSparkRouter } from "./sparkRoutes.js";
 
 const ISSUER_MNEMONIC_PATH = ".issuer-mnemonic";
-const PRIVATE_KEY =
-  process.env.ISSUER_PRIVATE_KEY || new Uint8Array(32).fill(1);
-const privateKeyBuffer = Buffer.from(PRIVATE_KEY, "hex");
-const wallet = new IssuerSparkWallet("REGTEST", privateKeyBuffer);
-const router = createSparkRouter(wallet, ISSUER_MNEMONIC_PATH);
+
+const { router, getWallet } = await createSparkRouter(
+  IssuerSparkWallet,
+  ISSUER_MNEMONIC_PATH
+);
 
 /**
  * Gets the balance of the issuer's token
@@ -24,6 +24,7 @@ const router = createSparkRouter(wallet, ISSUER_MNEMONIC_PATH);
  * }
  */
 router.get("/token-balance", async (req, res) => {
+  const wallet = getWallet();
   try {
     const balance = await wallet.getIssuerTokenBalance();
     res.json({
@@ -66,6 +67,7 @@ router.get("/token-balance", async (req, res) => {
  * }
  */
 router.get("/token-public-key-info", async (req, res) => {
+  const wallet = getWallet();
   try {
     const tokenPublicKeyInfo = await wallet.getTokenPublicKeyInfo();
     res.json({
@@ -102,10 +104,10 @@ router.get("/token-public-key-info", async (req, res) => {
  * }
  */
 router.post("/spark/mint-tokens", async (req, res) => {
+  const wallet = getWallet();
   try {
     const { tokenAmount } = req.body;
-    const amountToMint = BigInt(tokenAmount);
-    const tokensMinted = await wallet.mintTokens(amountToMint);
+    const tokensMinted = await wallet.mintTokens(BigInt(tokenAmount));
     res.json({
       data: { tokensMinted },
     });
@@ -140,10 +142,10 @@ router.post("/spark/mint-tokens", async (req, res) => {
  * }
  */
 router.post("/spark/burn-tokens", async (req, res) => {
+  const wallet = getWallet();
   try {
     const { tokenAmount } = req.body;
-    const amountToBurn = BigInt(tokenAmount);
-    const tokensBurned = await wallet.burnTokens(amountToBurn);
+    const tokensBurned = await wallet.burnTokens(BigInt(tokenAmount));
     res.json({
       data: { tokensBurned },
     });
@@ -181,6 +183,7 @@ router.post("/spark/burn-tokens", async (req, res) => {
  */
 
 router.post("/spark/freeze-tokens", async (req, res) => {
+  const wallet = getWallet();
   try {
     const { ownerPublicKey } = req.body;
     const frozenTokens = await wallet.freezeTokens(ownerPublicKey);
@@ -223,14 +226,21 @@ router.post("/spark/freeze-tokens", async (req, res) => {
  * }
  */
 router.post("/spark/unfreeze-tokens", async (req, res) => {
-  const { ownerPublicKey } = req.body;
-  const thawedTokens = await wallet.unfreezeTokens(ownerPublicKey);
-  res.json({
-    data: {
-      impactedLeafIds: thawedTokens.impactedLeafIds,
-      impactedTokenAmount: thawedTokens.impactedTokenAmount,
-    },
-  });
+  const wallet = getWallet();
+  try {
+    const { ownerPublicKey } = req.body;
+    const thawedTokens = await wallet.unfreezeTokens(ownerPublicKey);
+    res.json({
+      data: {
+        impactedLeafIds: thawedTokens.impactedLeafIds,
+        impactedTokenAmount: thawedTokens.impactedTokenAmount,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: error.message,
+    });
+  }
 });
 
 /**
@@ -263,20 +273,22 @@ router.post("/spark/unfreeze-tokens", async (req, res) => {
  * }
  */
 router.post("/on-chain/announce-token", async (req, res) => {
-  const {
-    tokenName,
-    tokenTicker,
-    decimals,
-    maxSupply,
-    isFreezable,
-    feeRateSatsPerVb,
-  } = req.body;
+  const wallet = getWallet();
   try {
-    const announcementTx = await wallet.announceTokenL1(
+    console.log(req.body);
+    const {
       tokenName,
       tokenTicker,
       decimals,
       maxSupply,
+      isFreezable,
+      feeRateSatsPerVb,
+    } = req.body;
+    const announcementTx = await wallet.announceTokenL1(
+      tokenName,
+      tokenTicker,
+      Number(decimals),
+      BigInt(maxSupply),
       isFreezable,
       feeRateSatsPerVb
     );
@@ -284,6 +296,7 @@ router.post("/on-chain/announce-token", async (req, res) => {
       data: { announcementTx },
     });
   } catch (error) {
+    console.log(error);
     res.status(500).json({
       error: error.message,
     });
@@ -314,9 +327,10 @@ router.post("/on-chain/announce-token", async (req, res) => {
  * }
  */
 router.post("/on-chain/mint-tokens", async (req, res) => {
+  const wallet = getWallet();
   try {
     const { tokenAmount } = req.body;
-    const tokensMinted = await wallet.mintTokensL1(tokenAmount);
+    const tokensMinted = await wallet.mintTokensL1(BigInt(tokenAmount));
     res.json({
       data: { tokensMinted },
     });
@@ -353,10 +367,11 @@ router.post("/on-chain/mint-tokens", async (req, res) => {
  * }
  */
 router.post("/on-chain/transfer-tokens", async (req, res) => {
+  const wallet = getWallet();
   try {
     const { tokenAmount, receiverPublicKey } = req.body;
     const tokensTransferred = await wallet.transferTokensL1(
-      tokenAmount,
+      BigInt(tokenAmount),
       receiverPublicKey
     );
     res.json({

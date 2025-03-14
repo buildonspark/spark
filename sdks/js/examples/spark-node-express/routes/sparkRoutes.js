@@ -7,19 +7,68 @@ import {
 import { SparkWallet } from "@buildonspark/spark-sdk";
 import { IssuerSparkWallet } from "@buildonspark/issuer-sdk";
 const SPARK_MNEMONIC_PATH = ".spark-mnemonic";
-const wallet = new SparkWallet("REGTEST"); // or "MAINNET" for production
 
-export const createSparkRouter = (wallet, mnemonicPath) => {
+// Issuer Wallet Private Key
+const ISSUER_PRIVATE_KEY =
+  process.env.ISSUER_PRIVATE_KEY || new Uint8Array(32).fill(1);
+const issuerPrivateKeyBuffer = Buffer.from(ISSUER_PRIVATE_KEY, "hex");
+
+// walletClass is a class of SparkWallet or IssuerSparkWallet
+export const createSparkRouter = (walletClass, mnemonicPath) => {
   const router = Router();
+
+  let walletInstance = null;
+
+  const initWallet = async (mnemonicOrSeed) => {
+    if (!walletInstance) {
+      let res = undefined;
+      if (walletClass === SparkWallet) {
+        res = await SparkWallet.create({
+          mnemonicOrSeed: mnemonicOrSeed,
+          configOptions: {
+            network: "REGTEST",
+          },
+        });
+      } else if (walletClass === IssuerSparkWallet) {
+        res = await walletClass.create({
+          mnemonicOrSeed: mnemonicOrSeed,
+          privateKey: issuerPrivateKeyBuffer,
+          configOptions: {
+            network: "REGTEST",
+          },
+        });
+      }
+      walletInstance = res.wallet;
+    }
+    return walletInstance;
+  };
+
+  const getWallet = () => {
+    if (!walletInstance) {
+      throw new Error("Wallet not initialized");
+    }
+    return walletInstance;
+  };
+
   // Get wallet
   router.get("/wallet", async (req, res) => {
-    res.json(wallet);
+    res.json(getWallet());
   });
 
   /**
    * Initialize wallet
    * @route POST /wallet/init
-   * @param {string} [mnemonicOrSeed] - The mnemonic or seed to initialize the wallet
+   * @param {string} [mnemonicOrSeed]
+   *  - The mnemonic or seed to initialize the wallet.
+   *      - If not provided:
+   *        - If you have a mnemonic saved in the file system, it will be used.
+   *        - Otherwise:
+   *          - The wallet will be initialized with a random mnemonic.
+   *          - The mnemonic will be saved to the file system.
+   *          - The mnemonic will be returned in the response.
+   *      - If provided:
+   *        - The wallet will be initialized with the provided mnemonic or seed.
+   *        - The mnemonic or seed will not be saved to the file system.
    * @returns {Promise<{
    *   data: {
    *     message: string,
@@ -47,7 +96,7 @@ export const createSparkRouter = (wallet, mnemonicPath) => {
       if (!mnemonicOrSeed) {
         mnemonicOrSeed = await loadMnemonic(mnemonicPath);
       }
-      const response = await wallet.initWallet(mnemonicOrSeed || undefined);
+      const response = await initWallet(mnemonicOrSeed);
       if (!mnemonicOrSeed && response.mnemonic) {
         await saveMnemonic(mnemonicPath, response.mnemonic);
       }
@@ -80,6 +129,7 @@ export const createSparkRouter = (wallet, mnemonicPath) => {
    * }
    */
   router.get("/wallet/identity-public-key", async (req, res) => {
+    const wallet = getWallet();
     try {
       const identityPublicKey = await wallet.getIdentityPublicKey();
       res.json({
@@ -108,6 +158,7 @@ export const createSparkRouter = (wallet, mnemonicPath) => {
    * }
    */
   router.get("/wallet/spark-address", async (req, res) => {
+    const wallet = getWallet();
     try {
       const sparkAddress = await wallet.getSparkAddress();
       res.json({
@@ -149,6 +200,7 @@ export const createSparkRouter = (wallet, mnemonicPath) => {
    * }
    */
   router.get("/wallet/balance", async (req, res) => {
+    const wallet = getWallet();
     try {
       const balance = await wallet.getBalance(true);
       const tokenBalances = balance.tokenBalances
@@ -234,9 +286,10 @@ export const createSparkRouter = (wallet, mnemonicPath) => {
    * }
    */
   router.get("/wallet/transfers", async (req, res) => {
+    const wallet = getWallet();
     try {
       const { limit = 20, offset = 0 } = req.query;
-      const transfers = await wallet.getAllTransfers(
+      const transfers = await wallet.getTransfers(
         Number(limit),
         Number(offset)
       );
@@ -248,6 +301,79 @@ export const createSparkRouter = (wallet, mnemonicPath) => {
           transfers: transferResponse,
           offset: transfers.offset,
         },
+      });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  /**
+   * Get pending transfers
+   * @route GET /wallet/pending-transfers
+   * @returns {Promise<{
+   *   data: {
+   *     pendingTransfers: {
+   *       id: string
+   *       senderIdentityPublicKey: string // hex string of Uint8Array
+   *       receiverIdentityPublicKey: string // hex string of Uint8Array
+   *       status: string // mapped from TRANSFER_STATUS enum
+   *       amount: string // bigint serialized to string
+   *       expiryTime: string | null // ISO date string or null
+   *       leaves: {
+   *         leaf: {
+   *           id: string
+   *           treeId: string
+   *           value: number
+   *           parentNodeId?: string
+   *           nodeTx: string // hex string of Uint8Array
+   *           refundTx: string // hex string of Uint8Array
+   *           vout: number
+   *           verifyingPublicKey: string // hex string of Uint8Array
+   *           ownerIdentityPublicKey: string // hex string of Uint8Array
+   *           signingKeyshare: {
+   *             ownerIdentifiers: string[]
+   *             threshold: number
+   *           }
+   *           status: string
+   *           network: string // mapped from NETWORK_MAP
+   *         }[]
+   *         secretCipher: string // hex string of Uint8Array
+   *         signature: string // hex string of Uint8Array
+   *         intermediateRefundTx: string // hex string of Uint8Array
+   *       }[]
+   *     }[]
+   *   }
+   * }>}
+   */
+  router.get("/wallet/pending-transfers", async (req, res) => {
+    const wallet = getWallet();
+    try {
+      const pendingTransfers = await wallet.getPendingTransfers();
+      const transferResponse = pendingTransfers.map((transfer) =>
+        formatTransferResponse(transfer)
+      );
+      res.json({
+        data: { pendingTransfers: transferResponse },
+      });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  /**
+   * Claim all pending transfers
+   * @route POST /wallet/claim-pending-transfers
+   * @returns {Promise<{
+   *   data: {
+   *     message: boolean
+   * }>}
+   */
+  router.post("/wallet/claim-transfers", async (req, res) => {
+    const wallet = getWallet();
+    try {
+      const message = await wallet.claimTransfers();
+      res.json({
+        data: { message },
       });
     } catch (error) {
       res.status(500).json({ error: error.message });
@@ -324,6 +450,7 @@ export const createSparkRouter = (wallet, mnemonicPath) => {
    * }
    */
   router.post("/spark/send-transfer", async (req, res) => {
+    const wallet = getWallet();
     try {
       const { receiverSparkAddress, amountSats } = req.body;
       const transfer = await wallet.sendSparkTransfer({
@@ -352,6 +479,7 @@ export const createSparkRouter = (wallet, mnemonicPath) => {
    * }>}
    */
   router.post("/lightning/create-invoice", async (req, res) => {
+    const wallet = getWallet();
     try {
       const { amountSats, memo, expirySeconds } = req.body;
       const invoice = await wallet.createLightningInvoice({
@@ -400,6 +528,7 @@ export const createSparkRouter = (wallet, mnemonicPath) => {
    * }>}
    */
   router.post("/lightning/pay-invoice", async (req, res) => {
+    const wallet = getWallet();
     try {
       const { invoice } = req.body;
       const payment = await wallet.payLightningInvoice({ invoice });
@@ -421,10 +550,50 @@ export const createSparkRouter = (wallet, mnemonicPath) => {
    * }>}
    */
   router.get("/bitcoin/deposit-address", async (req, res) => {
+    const wallet = getWallet();
     try {
       const address = await wallet.getDepositAddress();
       res.json({
         data: { address },
+      });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  /**
+   * Claim deposit
+   * @route POST /bitcoin/claim-deposit
+   * @param {string} txid - The transaction ID of the deposit
+   * @returns {Promise<{
+   *   data: {
+   *     leaves: {
+   *       id: string
+   *       treeId: string
+   *       value: number
+   *       parentNodeId?: string
+   *       nodeTx: string // hex string of Uint8Array
+   *       refundTx: string // hex string of Uint8Array
+   *       vout: number
+   *       verifyingPublicKey: string // hex string of Uint8Array
+   *       ownerIdentityPublicKey: string // hex string of Uint8Array
+   *       signingKeyshare: {
+   *         ownerIdentifiers: string[]
+   *         threshold: number
+   *       }
+   *       status: string
+   *       network: string // mapped from NETWORK_MAP
+   *     }[]
+   *   }
+   * }>}
+   */
+  router.post("/bitcoin/claim-deposit", async (req, res) => {
+    const wallet = getWallet();
+    try {
+      const { txid } = req.body;
+      const leaves = await wallet.claimDeposit(txid);
+      res.json({
+        data: { leaves },
       });
     } catch (error) {
       res.status(500).json({ error: error.message });
@@ -457,6 +626,7 @@ export const createSparkRouter = (wallet, mnemonicPath) => {
    * }>}
    */
   router.post("/bitcoin/withdraw", async (req, res) => {
+    const wallet = getWallet();
     try {
       const { onchainAddress, targetAmountSats } = req.body;
       const withdrawal = await wallet.withdraw({
@@ -484,6 +654,7 @@ export const createSparkRouter = (wallet, mnemonicPath) => {
    * }>}
    */
   router.post("/tokens/transfer", async (req, res) => {
+    const wallet = getWallet();
     try {
       const { tokenPublicKey, tokenAmount, receiverSparkAddress } = req.body;
       const transferTx = await wallet.transferTokens({
@@ -512,6 +683,7 @@ export const createSparkRouter = (wallet, mnemonicPath) => {
    * }>}
    */
   router.post("/tokens/withdraw", async (req, res) => {
+    const wallet = getWallet();
     try {
       const { tokenPublicKey, receiverPublicKey, leafIds } = req.body;
       const withdrawalTx = await wallet.withdrawTokens(
@@ -526,7 +698,7 @@ export const createSparkRouter = (wallet, mnemonicPath) => {
       res.status(500).json({ error: error.message });
     }
   });
-  return router;
+  return { router, getWallet };
 };
 
-export default createSparkRouter(wallet, SPARK_MNEMONIC_PATH);
+export default createSparkRouter(SparkWallet, SPARK_MNEMONIC_PATH).router;
