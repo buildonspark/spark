@@ -42,7 +42,8 @@
     "bip65": "^1.0.3",
     "bitcoinjs-lib": "^6.1.6",
     "class-transformer": "^0.5.1",
-    "ecpair": "^2.1.0"
+    "ecpair": "^2.1.0",
+    "stream": "^0.0.3"
   },
   "devDependencies": {
     "@swc/cli": "^0.4.0",
