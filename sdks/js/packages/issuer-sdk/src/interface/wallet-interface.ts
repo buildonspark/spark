@@ -47,8 +47,8 @@ export interface IssuerWalletInterface {
     receiverSparkAddress: string;
     selectedLeaves?: LeafWithPreviousTransactionData[];
   }): Promise<string>;
-
   // IssuerSparkWallet methods
+  getIssuerTokenPublicKey(): Promise<string>;
   getIssuerTokenBalance(): Promise<{
     balance: bigint;
   }>;
@@ -63,6 +63,7 @@ export interface IssuerWalletInterface {
   unfreezeTokens(
     ownerPublicKey: string,
   ): Promise<{ impactedLeafIds: string[]; impactedTokenAmount: bigint }>;
+  getL1Address(): string;
   announceTokenL1(params: {
     lrc20Wallet: LRCWallet;
     tokenName: string;

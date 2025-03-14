@@ -43,7 +43,6 @@ export class IssuerSparkWallet
   private constructor(privateKey: string, configOptions?: ConfigOptions) {
     super(configOptions);
 
-    // TODO: For now
     this.lrc20Wallet = new LRCWallet(
       privateKey,
       networks.regtest,
@@ -58,6 +57,10 @@ export class IssuerSparkWallet
       this.config,
       this.connectionManager,
     );
+  }
+
+  public async getIssuerTokenPublicKey() {
+    return await super.getIdentityPublicKey();
   }
 
   public async getIssuerTokenBalance(): Promise<{
@@ -140,7 +143,14 @@ export class IssuerSparkWallet
     };
   }
 
-  async announceTokenL1({
+  public getL1Address(): string {
+    if (!this.lrc20Wallet) {
+      throw new Error("L1 Wallet not initialized");
+    }
+    return this.lrc20Wallet.p2wpkhAddress;
+  }
+
+  public async announceTokenL1({
     tokenName,
     tokenTicker,
     decimals,
@@ -171,15 +181,18 @@ export class IssuerSparkWallet
     );
   }
 
-  mintTokensL1(tokenAmount: bigint): Promise<string> {
+  public mintTokensL1(tokenAmount: bigint): Promise<string> {
     throw new Error("Not implemented");
   }
 
-  transferTokensL1(tokenAmount: bigint, p2trAddress: string): Promise<string> {
+  public transferTokensL1(
+    tokenAmount: bigint,
+    p2trAddress: string,
+  ): Promise<string> {
     throw new Error("Not implemented");
   }
 
-  async getTokenPublicKeyInfo(): Promise<TokenPubkeyInfo> {
+  public async getTokenPublicKeyInfo(): Promise<TokenPubkeyInfo> {
     if (this.tokenPublicKeyInfo) {
       return this.tokenPublicKeyInfo;
     }
