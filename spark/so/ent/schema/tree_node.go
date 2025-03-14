@@ -93,5 +93,6 @@ func (TreeNode) Indexes() []ent.Index {
 		index.Edges("parent"),
 		index.Edges("tree"),
 		index.Fields("owner_identity_pubkey"),
+		index.Fields("owner_identity_pubkey", "status"),
 	}
 }

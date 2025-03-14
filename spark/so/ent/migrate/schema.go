@@ -449,6 +449,18 @@ var (
 				OnDelete:   schema.SetNull,
 			},
 		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "tree_status",
+				Unique:  false,
+				Columns: []*schema.Column{TreesColumns[4]},
+			},
+			{
+				Name:    "tree_network",
+				Unique:  false,
+				Columns: []*schema.Column{TreesColumns[5]},
+			},
+		},
 	}
 	// TreeNodesColumns holds the columns for the "tree_nodes" table.
 	TreeNodesColumns = []*schema.Column{
@@ -507,6 +519,11 @@ var (
 				Name:    "treenode_owner_identity_pubkey",
 				Unique:  false,
 				Columns: []*schema.Column{TreeNodesColumns[6]},
+			},
+			{
+				Name:    "treenode_owner_identity_pubkey_status",
+				Unique:  false,
+				Columns: []*schema.Column{TreeNodesColumns[6], TreeNodesColumns[4]},
 			},
 		},
 	}
