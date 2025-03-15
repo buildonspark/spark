@@ -37,10 +37,10 @@ export type CreateLightningInvoiceParams = {
   invoiceCreator: (
     amountSats: number,
     paymentHash: Uint8Array,
-    memo: string,
+    memo?: string,
   ) => Promise<string | undefined>;
   amountSats: number;
-  memo: string;
+  memo?: string;
 };
 
 export type CreateLightningInvoiceWithPreimageParams = {

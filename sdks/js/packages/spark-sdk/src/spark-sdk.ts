@@ -78,7 +78,7 @@ const MAX_TOKEN_LEAVES = 100;
 
 export type CreateLightningInvoiceParams = {
   amountSats: number;
-  memo: string;
+  memo?: string;
   expirySeconds?: number;
 };
 
@@ -1109,7 +1109,7 @@ export class SparkWallet {
     const requestLightningInvoice = async (
       amountSats: number,
       paymentHash: Uint8Array,
-      memo: string,
+      memo?: string,
     ) => {
       const network = this.config.getNetwork();
       let bitcoinNetwork: BitcoinNetwork = BitcoinNetwork.REGTEST;
