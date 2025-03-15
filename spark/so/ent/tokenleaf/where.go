@@ -122,6 +122,11 @@ func LeafSpentRevocationPrivateKey(v []byte) predicate.TokenLeaf {
 	return predicate.TokenLeaf(sql.FieldEQ(FieldLeafSpentRevocationPrivateKey, v))
 }
 
+// ConfirmedWithdrawBlockHash applies equality check predicate on the "confirmed_withdraw_block_hash" field. It's identical to ConfirmedWithdrawBlockHashEQ.
+func ConfirmedWithdrawBlockHash(v []byte) predicate.TokenLeaf {
+	return predicate.TokenLeaf(sql.FieldEQ(FieldConfirmedWithdrawBlockHash, v))
+}
+
 // CreateTimeEQ applies the EQ predicate on the "create_time" field.
 func CreateTimeEQ(v time.Time) predicate.TokenLeaf {
 	return predicate.TokenLeaf(sql.FieldEQ(FieldCreateTime, v))
@@ -710,6 +715,56 @@ func LeafSpentRevocationPrivateKeyIsNil() predicate.TokenLeaf {
 // LeafSpentRevocationPrivateKeyNotNil applies the NotNil predicate on the "leaf_spent_revocation_private_key" field.
 func LeafSpentRevocationPrivateKeyNotNil() predicate.TokenLeaf {
 	return predicate.TokenLeaf(sql.FieldNotNull(FieldLeafSpentRevocationPrivateKey))
+}
+
+// ConfirmedWithdrawBlockHashEQ applies the EQ predicate on the "confirmed_withdraw_block_hash" field.
+func ConfirmedWithdrawBlockHashEQ(v []byte) predicate.TokenLeaf {
+	return predicate.TokenLeaf(sql.FieldEQ(FieldConfirmedWithdrawBlockHash, v))
+}
+
+// ConfirmedWithdrawBlockHashNEQ applies the NEQ predicate on the "confirmed_withdraw_block_hash" field.
+func ConfirmedWithdrawBlockHashNEQ(v []byte) predicate.TokenLeaf {
+	return predicate.TokenLeaf(sql.FieldNEQ(FieldConfirmedWithdrawBlockHash, v))
+}
+
+// ConfirmedWithdrawBlockHashIn applies the In predicate on the "confirmed_withdraw_block_hash" field.
+func ConfirmedWithdrawBlockHashIn(vs ...[]byte) predicate.TokenLeaf {
+	return predicate.TokenLeaf(sql.FieldIn(FieldConfirmedWithdrawBlockHash, vs...))
+}
+
+// ConfirmedWithdrawBlockHashNotIn applies the NotIn predicate on the "confirmed_withdraw_block_hash" field.
+func ConfirmedWithdrawBlockHashNotIn(vs ...[]byte) predicate.TokenLeaf {
+	return predicate.TokenLeaf(sql.FieldNotIn(FieldConfirmedWithdrawBlockHash, vs...))
+}
+
+// ConfirmedWithdrawBlockHashGT applies the GT predicate on the "confirmed_withdraw_block_hash" field.
+func ConfirmedWithdrawBlockHashGT(v []byte) predicate.TokenLeaf {
+	return predicate.TokenLeaf(sql.FieldGT(FieldConfirmedWithdrawBlockHash, v))
+}
+
+// ConfirmedWithdrawBlockHashGTE applies the GTE predicate on the "confirmed_withdraw_block_hash" field.
+func ConfirmedWithdrawBlockHashGTE(v []byte) predicate.TokenLeaf {
+	return predicate.TokenLeaf(sql.FieldGTE(FieldConfirmedWithdrawBlockHash, v))
+}
+
+// ConfirmedWithdrawBlockHashLT applies the LT predicate on the "confirmed_withdraw_block_hash" field.
+func ConfirmedWithdrawBlockHashLT(v []byte) predicate.TokenLeaf {
+	return predicate.TokenLeaf(sql.FieldLT(FieldConfirmedWithdrawBlockHash, v))
+}
+
+// ConfirmedWithdrawBlockHashLTE applies the LTE predicate on the "confirmed_withdraw_block_hash" field.
+func ConfirmedWithdrawBlockHashLTE(v []byte) predicate.TokenLeaf {
+	return predicate.TokenLeaf(sql.FieldLTE(FieldConfirmedWithdrawBlockHash, v))
+}
+
+// ConfirmedWithdrawBlockHashIsNil applies the IsNil predicate on the "confirmed_withdraw_block_hash" field.
+func ConfirmedWithdrawBlockHashIsNil() predicate.TokenLeaf {
+	return predicate.TokenLeaf(sql.FieldIsNull(FieldConfirmedWithdrawBlockHash))
+}
+
+// ConfirmedWithdrawBlockHashNotNil applies the NotNil predicate on the "confirmed_withdraw_block_hash" field.
+func ConfirmedWithdrawBlockHashNotNil() predicate.TokenLeaf {
+	return predicate.TokenLeaf(sql.FieldNotNull(FieldConfirmedWithdrawBlockHash))
 }
 
 // HasRevocationKeyshare applies the HasEdge predicate on the "revocation_keyshare" edge.

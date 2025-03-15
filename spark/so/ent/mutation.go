@@ -5649,6 +5649,7 @@ type TokenLeafMutation struct {
 	leaf_spent_transaction_input_vout                *int32
 	addleaf_spent_transaction_input_vout             *int32
 	leaf_spent_revocation_private_key                *[]byte
+	confirmed_withdraw_block_hash                    *[]byte
 	clearedFields                                    map[string]struct{}
 	revocation_keyshare                              *uuid.UUID
 	clearedrevocation_keyshare                       bool
@@ -6402,6 +6403,55 @@ func (m *TokenLeafMutation) ResetLeafSpentRevocationPrivateKey() {
 	delete(m.clearedFields, tokenleaf.FieldLeafSpentRevocationPrivateKey)
 }
 
+// SetConfirmedWithdrawBlockHash sets the "confirmed_withdraw_block_hash" field.
+func (m *TokenLeafMutation) SetConfirmedWithdrawBlockHash(b []byte) {
+	m.confirmed_withdraw_block_hash = &b
+}
+
+// ConfirmedWithdrawBlockHash returns the value of the "confirmed_withdraw_block_hash" field in the mutation.
+func (m *TokenLeafMutation) ConfirmedWithdrawBlockHash() (r []byte, exists bool) {
+	v := m.confirmed_withdraw_block_hash
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldConfirmedWithdrawBlockHash returns the old "confirmed_withdraw_block_hash" field's value of the TokenLeaf entity.
+// If the TokenLeaf object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenLeafMutation) OldConfirmedWithdrawBlockHash(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldConfirmedWithdrawBlockHash is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldConfirmedWithdrawBlockHash requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldConfirmedWithdrawBlockHash: %w", err)
+	}
+	return oldValue.ConfirmedWithdrawBlockHash, nil
+}
+
+// ClearConfirmedWithdrawBlockHash clears the value of the "confirmed_withdraw_block_hash" field.
+func (m *TokenLeafMutation) ClearConfirmedWithdrawBlockHash() {
+	m.confirmed_withdraw_block_hash = nil
+	m.clearedFields[tokenleaf.FieldConfirmedWithdrawBlockHash] = struct{}{}
+}
+
+// ConfirmedWithdrawBlockHashCleared returns if the "confirmed_withdraw_block_hash" field was cleared in this mutation.
+func (m *TokenLeafMutation) ConfirmedWithdrawBlockHashCleared() bool {
+	_, ok := m.clearedFields[tokenleaf.FieldConfirmedWithdrawBlockHash]
+	return ok
+}
+
+// ResetConfirmedWithdrawBlockHash resets all changes to the "confirmed_withdraw_block_hash" field.
+func (m *TokenLeafMutation) ResetConfirmedWithdrawBlockHash() {
+	m.confirmed_withdraw_block_hash = nil
+	delete(m.clearedFields, tokenleaf.FieldConfirmedWithdrawBlockHash)
+}
+
 // SetRevocationKeyshareID sets the "revocation_keyshare" edge to the SigningKeyshare entity by id.
 func (m *TokenLeafMutation) SetRevocationKeyshareID(id uuid.UUID) {
 	m.revocation_keyshare = &id
@@ -6553,7 +6603,7 @@ func (m *TokenLeafMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *TokenLeafMutation) Fields() []string {
-	fields := make([]string, 0, 14)
+	fields := make([]string, 0, 15)
 	if m.create_time != nil {
 		fields = append(fields, tokenleaf.FieldCreateTime)
 	}
@@ -6596,6 +6646,9 @@ func (m *TokenLeafMutation) Fields() []string {
 	if m.leaf_spent_revocation_private_key != nil {
 		fields = append(fields, tokenleaf.FieldLeafSpentRevocationPrivateKey)
 	}
+	if m.confirmed_withdraw_block_hash != nil {
+		fields = append(fields, tokenleaf.FieldConfirmedWithdrawBlockHash)
+	}
 	return fields
 }
 
@@ -6632,6 +6685,8 @@ func (m *TokenLeafMutation) Field(name string) (ent.Value, bool) {
 		return m.LeafSpentTransactionInputVout()
 	case tokenleaf.FieldLeafSpentRevocationPrivateKey:
 		return m.LeafSpentRevocationPrivateKey()
+	case tokenleaf.FieldConfirmedWithdrawBlockHash:
+		return m.ConfirmedWithdrawBlockHash()
 	}
 	return nil, false
 }
@@ -6669,6 +6724,8 @@ func (m *TokenLeafMutation) OldField(ctx context.Context, name string) (ent.Valu
 		return m.OldLeafSpentTransactionInputVout(ctx)
 	case tokenleaf.FieldLeafSpentRevocationPrivateKey:
 		return m.OldLeafSpentRevocationPrivateKey(ctx)
+	case tokenleaf.FieldConfirmedWithdrawBlockHash:
+		return m.OldConfirmedWithdrawBlockHash(ctx)
 	}
 	return nil, fmt.Errorf("unknown TokenLeaf field %s", name)
 }
@@ -6776,6 +6833,13 @@ func (m *TokenLeafMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetLeafSpentRevocationPrivateKey(v)
 		return nil
+	case tokenleaf.FieldConfirmedWithdrawBlockHash:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetConfirmedWithdrawBlockHash(v)
+		return nil
 	}
 	return fmt.Errorf("unknown TokenLeaf field %s", name)
 }
@@ -6869,6 +6933,9 @@ func (m *TokenLeafMutation) ClearedFields() []string {
 	if m.FieldCleared(tokenleaf.FieldLeafSpentRevocationPrivateKey) {
 		fields = append(fields, tokenleaf.FieldLeafSpentRevocationPrivateKey)
 	}
+	if m.FieldCleared(tokenleaf.FieldConfirmedWithdrawBlockHash) {
+		fields = append(fields, tokenleaf.FieldConfirmedWithdrawBlockHash)
+	}
 	return fields
 }
 
@@ -6894,6 +6961,9 @@ func (m *TokenLeafMutation) ClearField(name string) error {
 		return nil
 	case tokenleaf.FieldLeafSpentRevocationPrivateKey:
 		m.ClearLeafSpentRevocationPrivateKey()
+		return nil
+	case tokenleaf.FieldConfirmedWithdrawBlockHash:
+		m.ClearConfirmedWithdrawBlockHash()
 		return nil
 	}
 	return fmt.Errorf("unknown TokenLeaf nullable field %s", name)
@@ -6944,6 +7014,9 @@ func (m *TokenLeafMutation) ResetField(name string) error {
 		return nil
 	case tokenleaf.FieldLeafSpentRevocationPrivateKey:
 		m.ResetLeafSpentRevocationPrivateKey()
+		return nil
+	case tokenleaf.FieldConfirmedWithdrawBlockHash:
+		m.ResetConfirmedWithdrawBlockHash()
 		return nil
 	}
 	return fmt.Errorf("unknown TokenLeaf field %s", name)

@@ -112,6 +112,8 @@ describe("token integration test", () => {
     const sourceBalance = await wallet.getIssuerTokenBalance();
     expect(sourceBalance.balance).toEqual(tokenAmount);
 
+    await new Promise((resolve) => setTimeout(resolve, 5000));
+
     try {
       const response = await wallet.withdrawTokens(
         l1WalletPubKey,

@@ -252,6 +252,7 @@ var (
 		{Name: "leaf_spent_operator_specific_ownership_signature", Type: field.TypeBytes, Nullable: true},
 		{Name: "leaf_spent_transaction_input_vout", Type: field.TypeInt32, Nullable: true},
 		{Name: "leaf_spent_revocation_private_key", Type: field.TypeBytes, Nullable: true},
+		{Name: "confirmed_withdraw_block_hash", Type: field.TypeBytes, Nullable: true},
 		{Name: "token_leaf_revocation_keyshare", Type: field.TypeUUID},
 		{Name: "token_leaf_leaf_created_token_transaction_receipt", Type: field.TypeUUID, Nullable: true},
 		{Name: "token_leaf_leaf_spent_token_transaction_receipt", Type: field.TypeUUID, Nullable: true},
@@ -264,19 +265,19 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "token_leafs_signing_keyshares_revocation_keyshare",
-				Columns:    []*schema.Column{TokenLeafsColumns[15]},
+				Columns:    []*schema.Column{TokenLeafsColumns[16]},
 				RefColumns: []*schema.Column{SigningKeysharesColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "token_leafs_token_transaction_receipts_leaf_created_token_transaction_receipt",
-				Columns:    []*schema.Column{TokenLeafsColumns[16]},
+				Columns:    []*schema.Column{TokenLeafsColumns[17]},
 				RefColumns: []*schema.Column{TokenTransactionReceiptsColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "token_leafs_token_transaction_receipts_leaf_spent_token_transaction_receipt",
-				Columns:    []*schema.Column{TokenLeafsColumns[17]},
+				Columns:    []*schema.Column{TokenLeafsColumns[18]},
 				RefColumns: []*schema.Column{TokenTransactionReceiptsColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
@@ -286,6 +287,11 @@ var (
 				Name:    "tokenleaf_owner_public_key_token_public_key",
 				Unique:  false,
 				Columns: []*schema.Column{TokenLeafsColumns[4], TokenLeafsColumns[8]},
+			},
+			{
+				Name:    "tokenleaf_confirmed_withdraw_block_hash",
+				Unique:  false,
+				Columns: []*schema.Column{TokenLeafsColumns[15]},
 			},
 		},
 	}

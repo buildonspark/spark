@@ -49,6 +49,8 @@ type TokenLeaf struct {
 	LeafSpentTransactionInputVout int32 `json:"leaf_spent_transaction_input_vout,omitempty"`
 	// LeafSpentRevocationPrivateKey holds the value of the "leaf_spent_revocation_private_key" field.
 	LeafSpentRevocationPrivateKey []byte `json:"leaf_spent_revocation_private_key,omitempty"`
+	// ConfirmedWithdrawBlockHash holds the value of the "confirmed_withdraw_block_hash" field.
+	ConfirmedWithdrawBlockHash []byte `json:"confirmed_withdraw_block_hash,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the TokenLeafQuery when eager-loading is set.
 	Edges                                             TokenLeafEdges `json:"edges"`
@@ -109,7 +111,7 @@ func (*TokenLeaf) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case tokenleaf.FieldOwnerPublicKey, tokenleaf.FieldWithdrawRevocationPublicKey, tokenleaf.FieldTokenPublicKey, tokenleaf.FieldTokenAmount, tokenleaf.FieldLeafSpentOwnershipSignature, tokenleaf.FieldLeafSpentOperatorSpecificOwnershipSignature, tokenleaf.FieldLeafSpentRevocationPrivateKey:
+		case tokenleaf.FieldOwnerPublicKey, tokenleaf.FieldWithdrawRevocationPublicKey, tokenleaf.FieldTokenPublicKey, tokenleaf.FieldTokenAmount, tokenleaf.FieldLeafSpentOwnershipSignature, tokenleaf.FieldLeafSpentOperatorSpecificOwnershipSignature, tokenleaf.FieldLeafSpentRevocationPrivateKey, tokenleaf.FieldConfirmedWithdrawBlockHash:
 			values[i] = new([]byte)
 		case tokenleaf.FieldWithdrawBondSats, tokenleaf.FieldWithdrawRelativeBlockLocktime, tokenleaf.FieldLeafCreatedTransactionOutputVout, tokenleaf.FieldLeafSpentTransactionInputVout:
 			values[i] = new(sql.NullInt64)
@@ -230,6 +232,12 @@ func (tl *TokenLeaf) assignValues(columns []string, values []any) error {
 			} else if value != nil {
 				tl.LeafSpentRevocationPrivateKey = *value
 			}
+		case tokenleaf.FieldConfirmedWithdrawBlockHash:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field confirmed_withdraw_block_hash", values[i])
+			} else if value != nil {
+				tl.ConfirmedWithdrawBlockHash = *value
+			}
 		case tokenleaf.ForeignKeys[0]:
 			if value, ok := values[i].(*sql.NullScanner); !ok {
 				return fmt.Errorf("unexpected type %T for field token_leaf_revocation_keyshare", values[i])
@@ -343,6 +351,9 @@ func (tl *TokenLeaf) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("leaf_spent_revocation_private_key=")
 	builder.WriteString(fmt.Sprintf("%v", tl.LeafSpentRevocationPrivateKey))
+	builder.WriteString(", ")
+	builder.WriteString("confirmed_withdraw_block_hash=")
+	builder.WriteString(fmt.Sprintf("%v", tl.ConfirmedWithdrawBlockHash))
 	builder.WriteByte(')')
 	return builder.String()
 }

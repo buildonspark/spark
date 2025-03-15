@@ -4,15 +4,24 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"log/slog"
 	"slices"
 	"time"
 
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/common"
 	pblrc20 "github.com/lightsparkdev/spark-go/proto/lrc20"
+	"github.com/lightsparkdev/spark-go/proto/spark"
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
 	"github.com/lightsparkdev/spark-go/so"
+	"github.com/lightsparkdev/spark-go/so/ent"
+	"github.com/lightsparkdev/spark-go/so/ent/tokenleaf"
 	"google.golang.org/grpc"
 )
+
+// DefaultPageSize defines the default number of results to fetch per page in paginated requests
+const DefaultPageSize = 200
 
 // Client provides methods for interacting with the LRC20 node with built-in retries
 type Client struct {
@@ -126,4 +135,124 @@ func (c *Client) connectToLrc20Node() (*grpc.ClientConn, error) {
 		return nil, err
 	}
 	return conn, nil
+}
+
+// MarkWithdrawnTokenLeaves gets a list of withdrawn token leaves from the LRC20 node.  This
+// marks these leaves as 'Withdrawn' and accordingly does not return them as 'owned leaves'
+// when requested by wallets / external parties (which also allows for updating balance).
+func (c *Client) MarkWithdrawnTokenLeaves(
+	ctx context.Context,
+	network common.Network,
+	dbTx *ent.Tx,
+	blockHash *chainhash.Hash,
+) error {
+	networkStr := network.String()
+	if lrc20Config, ok := c.config.Lrc20Configs[networkStr]; ok && lrc20Config.DisableRpcs {
+		log.Printf("Skipping LRC20 node call due to DisableRpcs flag")
+		return nil
+	}
+	allLeaves := []*spark.TokenLeafOutput{}
+
+	pageResponse, err := func(ctx context.Context) (*pblrc20.ListWithdrawnLeavesResponse, error) {
+		conn, err := c.connectToLrc20Node()
+		if err != nil {
+			return nil, err
+		}
+		defer conn.Close()
+
+		client := pblrc20.NewSparkServiceClient(conn)
+		pageSize := uint32(DefaultPageSize)
+		return client.ListWithdrawnLeaves(ctx, &pblrc20.ListWithdrawnLeavesRequest{
+			// TODO(DL-99): Fetch just for the latest blockhash instead of all withdrawn leaves.
+			// TODO(DL-98): Add support for pagination.
+			PageSize: &pageSize,
+		})
+	}(ctx)
+	if err != nil {
+		return fmt.Errorf("error fetching withdrawn leaves: %w", err)
+	}
+
+	// Add the current page of results to our collection
+	allLeaves = append(allLeaves, pageResponse.Leaves...)
+
+	slog.Info("Completed fetching all withdrawn leaves", "total", len(allLeaves))
+
+	// Mark each leaf as withdrawn in the database
+	if len(allLeaves) > 0 {
+		client := dbTx.TokenLeaf
+		var leafIDs []uuid.UUID
+
+		// First collect all valid leaf IDs
+		for _, leaf := range allLeaves {
+			leafUUID, err := uuid.Parse(*leaf.Id)
+			if err != nil {
+				slog.Warn("Failed to parse leaf ID as UUID",
+					"leaf_id", leaf.Id,
+					"error", err)
+				continue
+			}
+			leafIDs = append(leafIDs, leafUUID)
+		}
+
+		if len(leafIDs) > 0 {
+			_, err := client.Update().
+				Where(tokenleaf.IDIn(leafIDs...)).
+				SetConfirmedWithdrawBlockHash(blockHash.CloneBytes()).
+				Save(ctx)
+			if err != nil {
+				return fmt.Errorf("failed to bulk update token leaves: %w", err)
+			}
+
+			slog.Debug("Successfully marked token leaves as withdrawn",
+				"count", len(leafIDs))
+		}
+	}
+
+	return nil
+}
+
+// UnmarkWithdrawnTokenLeaves clears the withdrawn status for token leaves that were previously
+// marked as withdrawn in a specific block. This is used during blockchain reorganizations to
+// restore token leaves that were withdrawn in blocks that are no longer part of the main chain.
+func (c *Client) UnmarkWithdrawnTokenLeaves(
+	ctx context.Context,
+	dbTx *ent.Tx,
+	blockHash *chainhash.Hash,
+) error {
+	// Get all token leaves that were marked as withdrawn in this block
+	tokenLeaves, err := dbTx.TokenLeaf.Query().
+		Where(tokenleaf.ConfirmedWithdrawBlockHashEQ(blockHash.CloneBytes())).
+		All(ctx)
+	if err != nil {
+		return fmt.Errorf("error querying withdrawn leaves for block %s: %w", blockHash.String(), err)
+	}
+
+	count := len(tokenLeaves)
+	if count == 0 {
+		slog.Info("No withdrawn token leaves found for block", "block_hash", blockHash.String())
+		return nil
+	}
+
+	slog.Info("Unmarking withdrawn token leaves due to reorg",
+		"block_hash", blockHash.String(),
+		"count", count)
+
+	// Clear the confirmed_withdraw_block_hash field for all affected leaves
+	leafIDs := make([]uuid.UUID, len(tokenLeaves))
+	for i, leaf := range tokenLeaves {
+		leafIDs[i] = leaf.ID
+	}
+	_, err = dbTx.TokenLeaf.Update().
+		Where(tokenleaf.IDIn(leafIDs...)).
+		ClearConfirmedWithdrawBlockHash().
+		Save(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to clear withdraw block hash for leaves: %w", err)
+	}
+
+	slog.Info("Successfully unmarked token leaves",
+		"block_hash", blockHash.String(),
+		"count", count)
+
+	return nil
 }

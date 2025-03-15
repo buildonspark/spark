@@ -205,6 +205,10 @@ func (o TokenTransactionHandler) SignTokenTransaction(
 				invalidLeaves = append(invalidLeaves, fmt.Sprintf("input leaf %x has invalid status %s, expected SPENT_STARTED",
 					leaf.ID, leaf.Status))
 			}
+			if leaf.ConfirmedWithdrawBlockHash != nil {
+				invalidLeaves = append(invalidLeaves, fmt.Sprintf("input leaf %x is already withdrawn",
+					leaf.ID))
+			}
 		}
 		if len(invalidLeaves) > 0 {
 			return nil, fmt.Errorf("found invalid input leaves: %s", strings.Join(invalidLeaves, "; "))
@@ -298,6 +302,37 @@ func (o TokenTransactionHandler) FinalizeTokenTransaction(
 	if err != nil {
 		log.Printf("Failed to fetch matching transaction receipt: %v", err)
 		return nil, fmt.Errorf("failed to fetch transaction receipt: %w", err)
+	}
+
+	// Verify that the transaction is in a signed state before finalizing
+	if tokenTransactionReceipt.Status != schema.TokenTransactionStatusSigned {
+		return nil, fmt.Errorf("transaction is in status %s, but must be in SIGNED status to finalize", tokenTransactionReceipt.Status)
+	}
+
+	// Verify status of output leaves
+	var invalidLeaves []string
+	for i, leaf := range tokenTransactionReceipt.Edges.CreatedLeaf {
+		if leaf.Status != schema.TokenLeafStatusCreatedSigned {
+			invalidLeaves = append(invalidLeaves, fmt.Sprintf("output leaf %d has invalid status %s, expected CREATED_STARTED", i, leaf.Status))
+		}
+	}
+
+	// Verify status of spent leaves
+	if len(tokenTransactionReceipt.Edges.SpentLeaf) > 0 {
+		for _, leaf := range tokenTransactionReceipt.Edges.SpentLeaf {
+			if leaf.Status != schema.TokenLeafStatusSpentSigned {
+				invalidLeaves = append(invalidLeaves, fmt.Sprintf("input leaf %x has invalid status %s, expected SPENT_STARTED",
+					leaf.ID, leaf.Status))
+			}
+			if leaf.ConfirmedWithdrawBlockHash != nil {
+				invalidLeaves = append(invalidLeaves, fmt.Sprintf("input leaf %x is already withdrawn",
+					leaf.ID))
+			}
+		}
+	}
+
+	if len(invalidLeaves) > 0 {
+		return nil, fmt.Errorf("found invalid leaves: %s", strings.Join(invalidLeaves, "; "))
 	}
 
 	// Extract revocation public keys from spent leaves

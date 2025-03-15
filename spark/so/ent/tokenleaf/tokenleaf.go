@@ -45,6 +45,8 @@ const (
 	FieldLeafSpentTransactionInputVout = "leaf_spent_transaction_input_vout"
 	// FieldLeafSpentRevocationPrivateKey holds the string denoting the leaf_spent_revocation_private_key field in the database.
 	FieldLeafSpentRevocationPrivateKey = "leaf_spent_revocation_private_key"
+	// FieldConfirmedWithdrawBlockHash holds the string denoting the confirmed_withdraw_block_hash field in the database.
+	FieldConfirmedWithdrawBlockHash = "confirmed_withdraw_block_hash"
 	// EdgeRevocationKeyshare holds the string denoting the revocation_keyshare edge name in mutations.
 	EdgeRevocationKeyshare = "revocation_keyshare"
 	// EdgeLeafCreatedTokenTransactionReceipt holds the string denoting the leaf_created_token_transaction_receipt edge name in mutations.
@@ -93,6 +95,7 @@ var Columns = []string{
 	FieldLeafSpentOperatorSpecificOwnershipSignature,
 	FieldLeafSpentTransactionInputVout,
 	FieldLeafSpentRevocationPrivateKey,
+	FieldConfirmedWithdrawBlockHash,
 }
 
 // ForeignKeys holds the SQL foreign-keys that are owned by the "token_leafs"

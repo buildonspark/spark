@@ -224,7 +224,9 @@ func main() {
 
 	for network, bitcoindConfig := range config.BitcoindConfigs {
 		go func() {
-			err := chain.WatchChain(dbClient, bitcoindConfig)
+			err := chain.WatchChain(dbClient,
+				*config,
+				bitcoindConfig)
 			if err != nil {
 				log.Fatalf("Failed to watch %s chain: %v", network, err)
 			}

@@ -74,6 +74,7 @@ func (TokenLeaf) Fields() []ent.Field {
 		field.Bytes("leaf_spent_operator_specific_ownership_signature").Optional(),
 		field.Int32("leaf_spent_transaction_input_vout").Optional(),
 		field.Bytes("leaf_spent_revocation_private_key").Optional(),
+		field.Bytes("confirmed_withdraw_block_hash").Optional(),
 	}
 }
 
@@ -98,5 +99,7 @@ func (TokenLeaf) Indexes() []ent.Index {
 		// Enable fast fetching of all leaves owned by a token owner, or optionally all token leaves
 		// owned by a token owner for a specific token type.
 		index.Fields("owner_public_key", "token_public_key"),
+		// Enables quick unmarking of withdrawn leaves in response to block reorgs.
+		index.Fields("confirmed_withdraw_block_hash"),
 	}
 }

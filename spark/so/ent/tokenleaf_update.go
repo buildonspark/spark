@@ -114,6 +114,18 @@ func (tlu *TokenLeafUpdate) ClearLeafSpentRevocationPrivateKey() *TokenLeafUpdat
 	return tlu
 }
 
+// SetConfirmedWithdrawBlockHash sets the "confirmed_withdraw_block_hash" field.
+func (tlu *TokenLeafUpdate) SetConfirmedWithdrawBlockHash(b []byte) *TokenLeafUpdate {
+	tlu.mutation.SetConfirmedWithdrawBlockHash(b)
+	return tlu
+}
+
+// ClearConfirmedWithdrawBlockHash clears the value of the "confirmed_withdraw_block_hash" field.
+func (tlu *TokenLeafUpdate) ClearConfirmedWithdrawBlockHash() *TokenLeafUpdate {
+	tlu.mutation.ClearConfirmedWithdrawBlockHash()
+	return tlu
+}
+
 // SetLeafCreatedTokenTransactionReceiptID sets the "leaf_created_token_transaction_receipt" edge to the TokenTransactionReceipt entity by ID.
 func (tlu *TokenLeafUpdate) SetLeafCreatedTokenTransactionReceiptID(id uuid.UUID) *TokenLeafUpdate {
 	tlu.mutation.SetLeafCreatedTokenTransactionReceiptID(id)
@@ -262,6 +274,12 @@ func (tlu *TokenLeafUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if tlu.mutation.LeafSpentRevocationPrivateKeyCleared() {
 		_spec.ClearField(tokenleaf.FieldLeafSpentRevocationPrivateKey, field.TypeBytes)
+	}
+	if value, ok := tlu.mutation.ConfirmedWithdrawBlockHash(); ok {
+		_spec.SetField(tokenleaf.FieldConfirmedWithdrawBlockHash, field.TypeBytes, value)
+	}
+	if tlu.mutation.ConfirmedWithdrawBlockHashCleared() {
+		_spec.ClearField(tokenleaf.FieldConfirmedWithdrawBlockHash, field.TypeBytes)
 	}
 	if tlu.mutation.LeafCreatedTokenTransactionReceiptCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -421,6 +439,18 @@ func (tluo *TokenLeafUpdateOne) SetLeafSpentRevocationPrivateKey(b []byte) *Toke
 // ClearLeafSpentRevocationPrivateKey clears the value of the "leaf_spent_revocation_private_key" field.
 func (tluo *TokenLeafUpdateOne) ClearLeafSpentRevocationPrivateKey() *TokenLeafUpdateOne {
 	tluo.mutation.ClearLeafSpentRevocationPrivateKey()
+	return tluo
+}
+
+// SetConfirmedWithdrawBlockHash sets the "confirmed_withdraw_block_hash" field.
+func (tluo *TokenLeafUpdateOne) SetConfirmedWithdrawBlockHash(b []byte) *TokenLeafUpdateOne {
+	tluo.mutation.SetConfirmedWithdrawBlockHash(b)
+	return tluo
+}
+
+// ClearConfirmedWithdrawBlockHash clears the value of the "confirmed_withdraw_block_hash" field.
+func (tluo *TokenLeafUpdateOne) ClearConfirmedWithdrawBlockHash() *TokenLeafUpdateOne {
+	tluo.mutation.ClearConfirmedWithdrawBlockHash()
 	return tluo
 }
 
@@ -602,6 +632,12 @@ func (tluo *TokenLeafUpdateOne) sqlSave(ctx context.Context) (_node *TokenLeaf, 
 	}
 	if tluo.mutation.LeafSpentRevocationPrivateKeyCleared() {
 		_spec.ClearField(tokenleaf.FieldLeafSpentRevocationPrivateKey, field.TypeBytes)
+	}
+	if value, ok := tluo.mutation.ConfirmedWithdrawBlockHash(); ok {
+		_spec.SetField(tokenleaf.FieldConfirmedWithdrawBlockHash, field.TypeBytes, value)
+	}
+	if tluo.mutation.ConfirmedWithdrawBlockHashCleared() {
+		_spec.ClearField(tokenleaf.FieldConfirmedWithdrawBlockHash, field.TypeBytes)
 	}
 	if tluo.mutation.LeafCreatedTokenTransactionReceiptCleared() {
 		edge := &sqlgraph.EdgeSpec{

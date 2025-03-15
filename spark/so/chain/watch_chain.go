@@ -25,6 +25,7 @@ import (
 	"github.com/lightsparkdev/spark-go/so/ent/signingkeyshare"
 	"github.com/lightsparkdev/spark-go/so/ent/treenode"
 	"github.com/lightsparkdev/spark-go/so/helper"
+	"github.com/lightsparkdev/spark-go/so/lrc20"
 	"github.com/pebbe/zmq4"
 	"google.golang.org/protobuf/proto"
 )
@@ -138,13 +139,16 @@ func findDifference(currChainTip, newChainTip Tip, client *rpcclient.Client) (Di
 	}, nil
 }
 
-func WatchChain(dbClient *ent.Client, cfg so.BitcoindConfig) error {
+func WatchChain(dbClient *ent.Client,
+	soConfig so.Config,
+	bitcoindConfig so.BitcoindConfig,
+) error {
 	logger := slog.Default().With("method", "watch_chain.WatchChain")
-	network, err := common.NetworkFromString(cfg.Network)
+	network, err := common.NetworkFromString(bitcoindConfig.Network)
 	if err != nil {
 		return err
 	}
-	connConfig := helper.RPCClientConfig(cfg)
+	connConfig := helper.RPCClientConfig(bitcoindConfig)
 	client, err := rpcclient.New(&connConfig, nil)
 	if err != nil {
 		return err
@@ -189,14 +193,16 @@ func WatchChain(dbClient *ent.Client, cfg so.BitcoindConfig) error {
 		return fmt.Errorf("failed to disconnect blocks: %v", err)
 	}
 
-	err = connectBlocks(ctx, dbClient, client, difference.Connected, network)
+	err = connectBlocks(ctx,
+		&soConfig,
+		dbClient, client, difference.Connected, network)
 	if err != nil {
 		return fmt.Errorf("failed to connect blocks: %v", err)
 	}
 
 	chainTip = latestChainTip
 
-	zmqCtx, subscriber, err := initZmq(cfg.ZmqPubRawBlock)
+	zmqCtx, subscriber, err := initZmq(bitcoindConfig.ZmqPubRawBlock)
 	if err != nil {
 		return err
 	}
@@ -211,7 +217,7 @@ func WatchChain(dbClient *ent.Client, cfg so.BitcoindConfig) error {
 		}
 	}()
 
-	logger.Info("Listening for block notifications via ZMQ endpoint", "endpoint", cfg.ZmqPubRawBlock)
+	logger.Info("Listening for block notifications via ZMQ endpoint", "endpoint", bitcoindConfig.ZmqPubRawBlock)
 
 	newBlockNotification := make(chan struct{})
 	go func() {
@@ -258,7 +264,9 @@ func WatchChain(dbClient *ent.Client, cfg so.BitcoindConfig) error {
 			continue
 		}
 
-		err = connectBlocks(ctx, dbClient, client, difference.Connected, network)
+		err = connectBlocks(ctx,
+			&soConfig,
+			dbClient, client, difference.Connected, network)
 		if err != nil {
 			logger.Error("Failed to connect blocks", "error", err)
 			continue
@@ -269,10 +277,11 @@ func WatchChain(dbClient *ent.Client, cfg so.BitcoindConfig) error {
 }
 
 func disconnectBlocks(_ context.Context, _ *ent.Client, _ []Tip, _ common.Network) error {
+	// TODO(DL-100): Add handling for disconnected token withdrawal transactions.
 	return nil
 }
 
-func connectBlocks(ctx context.Context, dbClient *ent.Client, client *rpcclient.Client, chainTips []Tip, network common.Network) error {
+func connectBlocks(ctx context.Context, soConfig *so.Config, dbClient *ent.Client, client *rpcclient.Client, chainTips []Tip, network common.Network) error {
 	logger := slog.Default().With("method", "watch_chain.connectBlocks").With("network", network.String())
 	for _, chainTip := range chainTips {
 		blockHash, err := client.GetBlockHash(chainTip.Height)
@@ -296,7 +305,11 @@ func connectBlocks(ctx context.Context, dbClient *ent.Client, client *rpcclient.
 		if err != nil {
 			return err
 		}
-		err = handleBlock(ctx, dbTx, txs, chainTip.Height, network)
+		err = handleBlock(ctx,
+			soConfig,
+			dbTx, txs, chainTip.Height,
+			blockHash,
+			network)
 		if err != nil {
 			logger.Error("Failed to handle block", "error", err)
 			rollbackErr := dbTx.Rollback()
@@ -327,7 +340,11 @@ func TxFromRPCTx(txs btcjson.TxRawResult) (wire.MsgTx, error) {
 	return tx, nil
 }
 
-func handleBlock(ctx context.Context, dbTx *ent.Tx, txs []wire.MsgTx, blockHeight int64, network common.Network) error {
+func handleBlock(ctx context.Context,
+	soConfig *so.Config,
+	dbTx *ent.Tx, txs []wire.MsgTx, blockHeight int64, blockHash *chainhash.Hash,
+	network common.Network,
+) error {
 	logger := slog.Default().With("method", "watch_chain.handleBlock")
 	networkParams := common.NetworkParams(network)
 	_, err := dbTx.BlockHeight.Update().
@@ -449,6 +466,16 @@ func handleBlock(ctx context.Context, dbTx *ent.Tx, txs []wire.MsgTx, blockHeigh
 		if err != nil {
 			return err
 		}
+	}
+
+	logger.Info("Checking for withdrawn token leaves in block", "height", blockHeight)
+
+	// Use the lrc20 client to sync withdrawn leaves - it will handle all the processing internally
+	lrc20Client := lrc20.NewClient(soConfig)
+	err = lrc20Client.MarkWithdrawnTokenLeaves(ctx, network, dbTx, blockHash)
+	if err != nil {
+		logger.Error("Failed to sync withdrawn leaves", "error", err)
+		return err
 	}
 
 	return nil

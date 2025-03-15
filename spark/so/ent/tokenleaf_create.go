@@ -132,6 +132,12 @@ func (tlc *TokenLeafCreate) SetLeafSpentRevocationPrivateKey(b []byte) *TokenLea
 	return tlc
 }
 
+// SetConfirmedWithdrawBlockHash sets the "confirmed_withdraw_block_hash" field.
+func (tlc *TokenLeafCreate) SetConfirmedWithdrawBlockHash(b []byte) *TokenLeafCreate {
+	tlc.mutation.SetConfirmedWithdrawBlockHash(b)
+	return tlc
+}
+
 // SetID sets the "id" field.
 func (tlc *TokenLeafCreate) SetID(u uuid.UUID) *TokenLeafCreate {
 	tlc.mutation.SetID(u)
@@ -389,6 +395,10 @@ func (tlc *TokenLeafCreate) createSpec() (*TokenLeaf, *sqlgraph.CreateSpec) {
 	if value, ok := tlc.mutation.LeafSpentRevocationPrivateKey(); ok {
 		_spec.SetField(tokenleaf.FieldLeafSpentRevocationPrivateKey, field.TypeBytes, value)
 		_node.LeafSpentRevocationPrivateKey = value
+	}
+	if value, ok := tlc.mutation.ConfirmedWithdrawBlockHash(); ok {
+		_spec.SetField(tokenleaf.FieldConfirmedWithdrawBlockHash, field.TypeBytes, value)
+		_node.ConfirmedWithdrawBlockHash = value
 	}
 	if nodes := tlc.mutation.RevocationKeyshareIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{

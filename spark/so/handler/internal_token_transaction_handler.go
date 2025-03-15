@@ -193,16 +193,33 @@ func ValidateTransferSignaturesUsingPreviousTransactionData(
 	}
 
 	for i, leafEnt := range leafToSpendEnts {
-		if !isLeafSpendable(leafEnt.Status) {
-			return fmt.Errorf("leaf %d is not in a spendable state - current status: %s", i, leafEnt.Status)
+		err := validateLeafIsSpendable(i, leafEnt)
+		if err != nil {
+			return err
 		}
 	}
 
 	return nil
 }
 
-// isLeafSpendable checks if a leaf's status allows it to be spent.
-func isLeafSpendable(status schema.TokenLeafStatus) bool {
+// validateLeafIsSpendable checks if a leaf is eligible to be spent by verifying:
+// 1. The leaf has an appropriate status (Created+Finalized or already marked as SpentStarted)
+// 2. The leaf hasn't been withdrawn already
+func validateLeafIsSpendable(index int, leaf *ent.TokenLeaf) error {
+	if !isValidLeafStatus(leaf.Status) {
+		return fmt.Errorf("leaf %d cannot be spent: invalid status %s (must be CreatedFinalized or SpentStarted)",
+			index, leaf.Status)
+	}
+
+	if leaf.ConfirmedWithdrawBlockHash != nil {
+		return fmt.Errorf("leaf %d cannot be spent: already withdrawn", index)
+	}
+
+	return nil
+}
+
+// isValidLeafStatus checks if a leaf's status allows it to be spent.
+func isValidLeafStatus(status schema.TokenLeafStatus) bool {
 	return status == schema.TokenLeafStatusCreatedFinalized ||
 		status == schema.TokenLeafStatusSpentStarted
 }
