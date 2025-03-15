@@ -1,6 +1,7 @@
 import express from "express";
 import sparkRoutes from "../routes/sparkRoutes.js";
 import issuerRoutes from "../routes/issuerRoutes.js";
+import { isError } from "@lightsparkdev/core";
 
 const app = express();
 app.use(express.json());
@@ -23,10 +24,10 @@ app.get("/", (req, res) => {
   res.send("Hello World");
 });
 
-const startPort = 5000;
-const maxPort = 5010;
+const startPort = 4000;
+const maxPort = 4010;
 
-function startServer(port) {
+function startServer(port: number) {
   if (port > maxPort) {
     console.error("No available ports found in range");
     process.exit(1);
@@ -38,11 +39,12 @@ function startServer(port) {
       console.log(`Spark API running on port ${port}`);
     })
     .on("error", (err) => {
-      if (err.code === "EADDRINUSE") {
+      const errorMsg = isError(err) ? err.message : "Unknown error";
+      if (isError(err) && (err as any).code === "EADDRINUSE") {
         console.log(`Port ${port} is busy, trying ${port + 1}...`);
         startServer(port + 1);
       } else {
-        console.error("Server error:", err);
+        console.error("Server error:", errorMsg);
       }
     });
 }

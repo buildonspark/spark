@@ -1,11 +1,12 @@
 {
   "name": "spark-node-express",
   "version": "0.0.3",
-  "main": "src/index.js",
+  "main": "dist/index.js",
   "type": "module",
   "scripts": {
+    "build": "tsc",
     "start": "node dist/index.js",
-    "dev": "nodemon src/index.js"
+    "dev": "NODE_OPTIONS=\"--loader ts-node/esm\" nodemon src/index.ts"
   },
   "keywords": [],
   "author": "",
@@ -13,10 +14,16 @@
   "dependencies": {
     "@buildonspark/issuer-sdk": "^0.0.16",
     "@buildonspark/spark-sdk": "^0.0.16",
+    "@lightsparkdev/core": "^1.2.7",
     "@noble/curves": "^1.8.0",
     "express": "^4.21.2"
   },
   "devDependencies": {
-    "nodemon": "^3.1.9"
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.13.2",
+    "nodemon": "^3.1.9",
+    "ts-node": "^10.9.2",
+    "tslib": "^2.8.1",
+    "typescript": "^5.7.3"
   }
 }

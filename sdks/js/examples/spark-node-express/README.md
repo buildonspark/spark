@@ -119,6 +119,26 @@ GET /issuer-wallet/wallet/transfers?limit=20&offset=0
 
 ---
 
+### Get Pending Transfers
+
+Returns a list of pending transfers.
+
+```http
+GET /spark-wallet/wallet/pending-transfers
+GET /issuer-wallet/wallet/pending-transfers
+```
+
+### Claim Pending Transfers
+
+Claim all pending transfers.
+
+```http
+POST /spark-wallet/wallet/claim-transfers
+POST /issuer-wallet/wallet/claim-transfers
+```
+
+---
+
 ### Send Spark Transfer
 
 Send a Spark transfer to another address.
@@ -126,6 +146,15 @@ Send a Spark transfer to another address.
 ```http
 POST /spark-wallet/spark/send-transfer
 POST /issuer-wallet/spark/send-transfer
+```
+
+**Request Body:**
+
+```json
+{
+  "receiverSparkAddress": string,
+  "amountSats": number
+}
 ```
 
 ---
@@ -177,6 +206,25 @@ Generate a Bitcoin deposit address associated with the current wallet.
 ```http
 GET /spark-wallet/bitcoin/deposit-address
 GET /issuer-wallet/bitcoin/deposit-address
+```
+
+---
+
+### Claim Deposit
+
+Claim a Bitcoin deposit.
+
+```http
+POST /spark-wallet/bitcoin/claim-deposit
+POST /issuer-wallet/bitcoin/claim-deposit
+```
+
+**Request Body:**
+
+```json
+{
+  "txid": string
+}
 ```
 
 ---
