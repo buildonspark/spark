@@ -380,7 +380,8 @@ func (h *BaseTransferHandler) CancelSendTransfer(
 			return nil, nil
 		})
 		if err != nil {
-			return nil, fmt.Errorf("unable to execute task with all operators: %v", err)
+			logger := helper.GetLoggerFromContext(ctx)
+			logger.Error("unable to execute task with all operators", "error", err)
 		}
 	}
 
