@@ -1,7 +1,7 @@
 {
   "name": "@buildonspark/lrc20-sdk",
   "type": "module",
-  "version": "0.0.15",
+  "version": "0.0.16",
   "exports": {
     ".": {
       "require": {

@@ -1,6 +1,6 @@
 {
   "name": "@buildonspark/spark-sdk",
-  "version": "0.0.17",
+  "version": "0.0.18",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
@@ -121,7 +121,7 @@
     "wasm-loader": "^1.3.0"
   },
   "dependencies": {
-    "@buildonspark/lrc20-sdk": "0.0.15",
+    "@buildonspark/lrc20-sdk": "0.0.16",
     "@lightsparkdev/core": "^1.2.7",
     "@mempool/mempool.js": "^3.0.0",
     "@noble/curves": "^1.8.0",
