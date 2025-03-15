@@ -62,7 +62,7 @@ POST /issuer-wallet/wallet/init
 
 ```json
 {
-  "mnemonicOrSeed": Optional[string]
+  mnemonicOrSeed?: string | undefined
 }
 ```
 
@@ -152,8 +152,8 @@ POST /issuer-wallet/spark/send-transfer
 
 ```json
 {
-  "receiverSparkAddress": string,
-  "amountSats": number
+  receiverSparkAddress: string,
+  amountSats: number
 }
 ```
 
@@ -172,9 +172,9 @@ POST /issuer-wallet/lightning/create-invoice
 
 ```json
 {
-  "amountSats": number,
-  "memo": Optional[string],
-  "expirySeconds": Optional[number]
+  amountSats: number,
+  memo?: string | undefined,
+  expirySeconds?: number | undefined
 }
 ```
 
@@ -193,7 +193,7 @@ POST /issuer-wallet/lightning/pay-invoice
 
 ```json
 {
-  "invoice": string
+  invoice: string
 }
 ```
 
@@ -223,7 +223,7 @@ POST /issuer-wallet/bitcoin/claim-deposit
 
 ```json
 {
-  "txid": string
+  txid: string
 }
 ```
 
@@ -242,8 +242,8 @@ POST /issuer-wallet/bitcoin/withdraw
 
 ```json
 {
-  "onchainAddress": string,
-  "targetAmountSats": number
+  onchainAddress: string,
+  targetAmountSats?: number | undefined
 }
 ```
 
@@ -262,9 +262,9 @@ POST /issuer-wallet/tokens/transfer
 
 ```json
 {
-  "tokenPublicKey": string,
-  "tokenAmount": number,
-  "receiverSparkAddress": string
+  tokenPublicKey: string,
+  tokenAmount: number,
+  receiverSparkAddress: string
 }
 ```
 
@@ -283,9 +283,9 @@ POST /issuer-wallet/tokens/withdraw
 
 ```json
 {
-  "tokenPublicKey": string,
-  "receiverPublicKey": string,
-  "leafIds": string[]
+  tokenPublicKey: string,
+  receiverPublicKey?: string | undefined,
+  leafIds?: string[] | undefined
 }
 ```
 
@@ -323,7 +323,7 @@ POST /issuer-wallet/spark/mint-tokens
 
 ```json
 {
-  "tokenAmount": string // Amount to mint (will be converted to BigInt)
+  tokenAmount: string // Amount to mint (will be converted to BigInt)
 }
 ```
 
@@ -341,7 +341,7 @@ POST /issuer-wallet/spark/burn-tokens
 
 ```json
 {
-  "tokenAmount": "string" // Amount to burn (will be converted to BigInt)
+  tokenAmount: string // Amount to burn (will be converted to BigInt)
 }
 ```
 
@@ -359,7 +359,7 @@ POST /issuer-wallet/spark/freeze-tokens
 
 ```json
 {
-  "ownerPublicKey": string
+  ownerPublicKey: string
 }
 ```
 
@@ -377,7 +377,7 @@ POST /issuer-wallet/spark/unfreeze-tokens
 
 ```json
 {
-  "ownerPublicKey": string
+  ownerPublicKey: string
 }
 ```
 
@@ -397,12 +397,12 @@ POST /issuer-wallet/on-chain/announce-token
 
 ```json
 {
-  "tokenName": string,
-  "tokenTicker": string,
-  "decimals": number,
-  "maxSupply": number,
-  "isFreezable": boolean,
-  "feeRateSatsPerVb": number
+  tokenName: string,
+  tokenTicker: string,
+  decimals: number,
+  maxSupply: number,
+  isFreezable: boolean,
+  feeRateSatsPerVb?: number | undefined
 }
 ```
 
@@ -420,7 +420,7 @@ POST /issuer-wallet/on-chain/mint-tokens
 
 ```json
 {
-  "tokenAmount": number
+  tokenAmount: number
 }
 ```
 
@@ -438,8 +438,8 @@ POST /issuer-wallet/on-chain/transfer-tokens
 
 ```json
 {
-  "tokenAmount": number,
-  "receiverPublicKey": string
+  tokenAmount: number,
+  receiverPublicKey: string
 }
 ```
 

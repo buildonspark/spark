@@ -29,7 +29,7 @@ export const createSparkRouter = (
   const initWallet = async (mnemonicOrSeed: string) => {
     let res:
       | {
-          mnemonic?: string;
+          mnemonic?: string | null;
           wallet: SparkWallet | IssuerSparkWallet;
         }
       | undefined = undefined;
@@ -188,9 +188,9 @@ export const createSparkRouter = (
       const tokenBalances: Record<string, { balance: string }> =
         balance.tokenBalances
           ? Object.fromEntries(
-              Object.entries(balance.tokenBalances).map(([key, value]) => [
+              [...balance.tokenBalances].map(([key, value]) => [
                 key,
-                { balance: value.toString() },
+                { balance: value.balance.toString() },
               ])
             )
           : {};
@@ -224,8 +224,8 @@ export const createSparkRouter = (
     const wallet = getWallet();
     try {
       const { limit = 20, offset = 0 } = req.query as {
-        limit?: number;
-        offset?: number;
+        limit?: number | undefined;
+        offset?: number | undefined;
       };
       const transfers = await wallet!.getTransfers(
         Number(limit),
@@ -260,8 +260,8 @@ export const createSparkRouter = (
     const wallet = getWallet();
     try {
       const pendingTransfers = await wallet!.getPendingTransfers();
-      const transferResponse = pendingTransfers.map((transfer) =>
-        formatTransferResponse(transfer)
+      const transferResponse = pendingTransfers.map(
+        (transfer: SparkProto.Transfer) => formatTransferResponse(transfer)
       );
       res.json({
         data: { pendingTransfers: transferResponse },
@@ -346,8 +346,8 @@ export const createSparkRouter = (
     try {
       const { amountSats, memo, expirySeconds } = req.body as {
         amountSats: number;
-        memo: string;
-        expirySeconds: number;
+        memo: string | undefined;
+        expirySeconds: number | undefined;
       };
       const invoice = await wallet!.createLightningInvoice({
         amountSats,
@@ -463,7 +463,9 @@ export const createSparkRouter = (
   router.post("/bitcoin/claim-deposit", async (req, res) => {
     const wallet = getWallet();
     try {
-      const { txid } = req.body as { txid: string };
+      const { txid } = req.body as {
+        txid: string;
+      };
       const leaves = await wallet!.claimDeposit(txid);
       res.json({
         data: { leaves },
@@ -479,7 +481,7 @@ export const createSparkRouter = (
    * Withdraw to Bitcoin address
    * @route POST /bitcoin/withdraw
    * @param {string} onchainAddress - The Bitcoin address to withdraw to
-   * @param {string} targetAmountSats - The amount to withdraw in satoshis
+   * @param {string} [targetAmountSats] - The amount to withdraw in satoshis
    * @returns {Promise<{
    *   data: {
    *     withdrawal: {
@@ -505,7 +507,7 @@ export const createSparkRouter = (
     try {
       const { onchainAddress, targetAmountSats } = req.body as {
         onchainAddress: string;
-        targetAmountSats: number;
+        targetAmountSats: number | undefined;
       };
       const withdrawal = await wallet!.withdraw({
         onchainAddress,

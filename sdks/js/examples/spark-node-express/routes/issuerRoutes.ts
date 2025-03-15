@@ -289,7 +289,7 @@ router.post("/on-chain/announce-token", async (req, res) => {
       decimals: number;
       maxSupply: number;
       isFreezable: boolean;
-      feeRateSatsPerVb: number;
+      feeRateSatsPerVb: number | undefined;
     };
     const announcementTx = await wallet!.announceTokenL1({
       tokenName,
