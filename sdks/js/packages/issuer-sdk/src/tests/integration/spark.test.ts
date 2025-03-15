@@ -2,7 +2,7 @@ import { SparkWallet } from "@buildonspark/spark-sdk";
 import {
   LOCAL_WALLET_CONFIG_ECDSA,
   LOCAL_WALLET_CONFIG_SCHNORR,
-} from "@buildonspark/spark-sdk/services/wallet-config";
+} from "../../../../spark-sdk/src/services/wallet-config.js";
 import { jest } from "@jest/globals";
 import { hexToBytes } from "@noble/curves/abstract/utils";
 import { BitcoinFaucet } from "../../../../spark-sdk/src/tests/utils/test-faucet.js";
