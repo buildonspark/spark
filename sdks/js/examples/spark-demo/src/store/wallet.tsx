@@ -302,7 +302,7 @@ export function useWallet() {
       if (!wallet) {
         throw new Error("Wallet not initialized");
       }
-      const balance = await wallet.getBalance(true);
+      const balance = await wallet.getBalance();
       return balance;
     },
     refetchOnMount: true,

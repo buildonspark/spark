@@ -20,8 +20,6 @@ import {
   DepositAddressQueryResult,
   LeafWithPreviousTransactionData,
   QueryAllTransfersResponse,
-  QueryTokenTransactionsRequest,
-  TokenTransactionStatus,
   TokenTransactionWithStatus,
   Transfer,
   TransferStatus,
@@ -70,10 +68,10 @@ import { getNextTransactionSequence } from "./utils/transaction.js";
 import { initWasm } from "./utils/wasm-wrapper.js";
 import { InitOutput } from "./wasm/spark_bindings.js";
 
+import { LRC20WalletApiConfig, LRCWallet } from "@buildonspark/lrc20-sdk";
+import { broadcastL1Withdrawal } from "./services/lrc20.js";
 import { SparkSigner } from "./signer/signer.js";
 import { getMasterHDKeyFromSeed } from "./utils/index.js";
-import { LRCWallet, LRC20WalletApiConfig, ListAllTokenTransactionsCursor, ListAllTokenTransactionsResponse } from "@buildonspark/lrc20-sdk";
-import { broadcastL1Withdrawal } from "./services/lrc20.js";
 
 // Add this constant at the file level
 const MAX_TOKEN_LEAVES = 100;
@@ -659,19 +657,16 @@ export class SparkWallet {
    * You can use the forceRefetch option to synchronize your wallet and claim any
    * pending incoming lightning payment, spark transfer, or bitcoin deposit before returning the balance.
    *
-   * @param {boolean} [forceRefetch=true] - Synchronizes the wallet before returning the balance
    * @returns {Promise<Object>} Object containing:
    *   - balance: The wallet's current balance in satoshis
    *   - tokenBalances: Map of token balances and leaf counts
    */
-  public async getBalance(forceRefetch = true): Promise<{
+  public async getBalance(): Promise<{
     balance: bigint;
     tokenBalances: Map<string, { balance: bigint }>;
   }> {
-    if (forceRefetch) {
-      await Promise.all([this.claimTransfers(), this.syncTokenLeaves()]);
-      this.leaves = await this.getLeaves();
-    }
+    this.leaves = await this.getLeaves();
+    await this.syncTokenLeaves();
 
     const tokenBalances = new Map<string, { balance: bigint }>();
 
@@ -1559,22 +1554,24 @@ export class SparkWallet {
 
   public async getTokenTransactions(
     tokenPublicKeys: string[],
-    tokenTransactionHashes?: string[]
+    tokenTransactionHashes?: string[],
   ): Promise<TokenTransactionWithStatus[]> {
-    const sparkClient = await this.connectionManager.createSparkClient(this.config.getCoordinatorAddress());
+    const sparkClient = await this.connectionManager.createSparkClient(
+      this.config.getCoordinatorAddress(),
+    );
 
     let queryParams;
     if (tokenTransactionHashes?.length) {
       queryParams = {
         tokenPublicKeys: tokenPublicKeys?.map(hexToBytes)!,
         ownerPublicKeys: [hexToBytes(await this.getIdentityPublicKey())],
-        tokenTransactionHashes: tokenTransactionHashes.map(hexToBytes)
-      }
+        tokenTransactionHashes: tokenTransactionHashes.map(hexToBytes),
+      };
     } else {
       queryParams = {
         tokenPublicKeys: tokenPublicKeys?.map(hexToBytes)!,
-        ownerPublicKeys: [hexToBytes(await this.getIdentityPublicKey())]
-      }
+        ownerPublicKeys: [hexToBytes(await this.getIdentityPublicKey())],
+      };
     }
 
     const response = await sparkClient.query_token_transactions(queryParams);

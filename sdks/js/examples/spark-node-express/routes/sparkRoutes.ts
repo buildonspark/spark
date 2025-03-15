@@ -1,13 +1,13 @@
-import { Router } from "express";
-import {
-  loadMnemonic,
-  saveMnemonic,
-  formatTransferResponse,
-} from "../utils/utils.js";
-import { SparkWallet } from "@buildonspark/spark-sdk";
 import { IssuerSparkWallet } from "@buildonspark/issuer-sdk";
+import { SparkWallet } from "@buildonspark/spark-sdk";
 import { SparkProto } from "@buildonspark/spark-sdk/types";
 import { isError } from "@lightsparkdev/core";
+import { Router } from "express";
+import {
+  formatTransferResponse,
+  loadMnemonic,
+  saveMnemonic,
+} from "../utils/utils.js";
 
 const SPARK_MNEMONIC_PATH = ".spark-mnemonic";
 
@@ -184,7 +184,7 @@ export const createSparkRouter = (
   router.get("/wallet/balance", async (req, res) => {
     const wallet = getWallet();
     try {
-      const balance = await wallet!.getBalance(true);
+      const balance = await wallet!.getBalance();
       const tokenBalances: Record<string, { balance: string }> =
         balance.tokenBalances
           ? Object.fromEntries(

@@ -84,7 +84,7 @@ async function runCLI() {
           console.log("Please initialize a wallet first");
           break;
         }
-        const balanceInfo = await wallet.getBalance(true);
+        const balanceInfo = await wallet.getBalance();
         console.log("Sats Balance: " + balanceInfo.balance);
         if (balanceInfo.tokenBalances && balanceInfo.tokenBalances.size > 0) {
           console.log("\nToken Balances:");
