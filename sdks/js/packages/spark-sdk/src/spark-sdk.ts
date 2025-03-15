@@ -68,7 +68,7 @@ import { getNextTransactionSequence } from "./utils/transaction.js";
 import { initWasm } from "./utils/wasm-wrapper.js";
 import { InitOutput } from "./wasm/spark_bindings.js";
 
-import { LRC20WalletApiConfig, LRCWallet } from "@buildonspark/lrc20-sdk";
+import { LRCWallet } from "@buildonspark/lrc20-sdk";
 import { broadcastL1Withdrawal } from "./services/lrc20.js";
 import { SparkSigner } from "./signer/signer.js";
 import { getMasterHDKeyFromSeed } from "./utils/index.js";
@@ -106,7 +106,6 @@ export interface SparkWalletProps {
   mnemonicOrSeed?: Uint8Array | string;
   signer?: SparkSigner;
   options?: ConfigOptions;
-  lrc20WalletApiConfig?: LRC20WalletApiConfig;
 }
 
 /**
@@ -170,17 +169,9 @@ export class SparkWallet {
     mnemonicOrSeed,
     signer,
     options,
-    lrc20WalletApiConfig,
   }: SparkWalletProps) {
-    // TODO: Remove once we support other networks
-    if (options?.network !== "REGTEST") {
-      throw new Error("Only REGTEST is supported for now");
-    }
     const wallet = new SparkWallet(options, signer);
-    const initResponse = await wallet.initWallet(
-      mnemonicOrSeed,
-      lrc20WalletApiConfig,
-    );
+    const initResponse = await wallet.initWallet(mnemonicOrSeed);
     return {
       wallet,
       ...initResponse,
@@ -379,7 +370,6 @@ export class SparkWallet {
    */
   protected async initWallet(
     mnemonicOrSeed?: Uint8Array | string,
-    lrc20WalletApiConfig?: LRC20WalletApiConfig,
   ): Promise<InitWalletResponse | undefined> {
     const returnMnemonic = !mnemonicOrSeed;
     let mnemonic: string | undefined;
@@ -408,7 +398,6 @@ export class SparkWallet {
       bytesToHex(masterPrivateKey),
       LRC_WALLET_NETWORK[network],
       LRC_WALLET_NETWORK_TYPE[network],
-      lrc20WalletApiConfig,
     );
 
     if (returnMnemonic) {

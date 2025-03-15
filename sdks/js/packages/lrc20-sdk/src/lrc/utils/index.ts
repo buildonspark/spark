@@ -10,7 +10,6 @@ export {
   DUST_AMOUNT,
   PARITY,
   EMPTY_TOKEN_PUBKEY,
-  ELECTRS_CREDENTIALS,
   ELECTRS_URL,
   LRC_NODE_URL,
 } from "./constants.ts";

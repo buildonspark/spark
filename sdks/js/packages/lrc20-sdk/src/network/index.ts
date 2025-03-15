@@ -5,6 +5,7 @@ export enum NetworkType {
   TESTNET,
   DEVNET,
   REGTEST,
+  LOCAL,
 }
 
 export const networks = new Map<string, NetworkType>([
@@ -12,6 +13,7 @@ export const networks = new Map<string, NetworkType>([
   ["TESTNET", NetworkType.TESTNET],
   ["DEVNET", NetworkType.DEVNET],
   ["REGTEST", NetworkType.REGTEST],
+  ["LOCAL", NetworkType.LOCAL],
 ]);
 
 /**
@@ -25,6 +27,7 @@ export function toPsbtNetwork(networkType: NetworkType) {
   } else if (networkType === NetworkType.DEVNET) {
     return bitcoin.networks.testnet;
   } else {
+    // Map local to regtest network type.
     return bitcoin.networks.regtest;
   }
 }

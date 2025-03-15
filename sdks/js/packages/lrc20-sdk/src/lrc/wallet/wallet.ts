@@ -47,7 +47,6 @@ import {
 import {
   DUST_AMOUNT,
   ELECTRS_URL,
-  ELECTRS_CREDENTIALS,
   EMPTY_TOKEN_PUBKEY,
   filterUniqueUtxo,
   JSONParse,
@@ -117,11 +116,17 @@ export class LRCWallet {
     this.pubkey = this.keyPair.publicKey;
     this.builder = new TransactionBuilder(this.keyPair, this.network);
     this.addressInnerKey = this.keyPair.publicKey;
-    this.electrsApi = new ElectrsApi(
-      ELECTRS_URL[this.networkType] || ELECTRS_URL["default"],
-      ELECTRS_CREDENTIALS[this.networkType] || ELECTRS_CREDENTIALS["default"],
-    );
-    this.lrcNodeApi = new Lrc20JsonRPC(LRC_NODE_URL[this.networkType] || LRC_NODE_URL["default"]);
+
+    this.electrsApi = apiConfig
+      ? new ElectrsApi(apiConfig.electrsUrl, apiConfig.electrsCredentials)
+      : // TODO: Handle auth better, this is a hack for regtest prod
+        new ElectrsApi(ELECTRS_URL[this.networkType] || ELECTRS_URL["default"], {
+          username: "spark-sdk",
+          password: "mCMk1JqlBNtetUNy",
+        });
+    this.lrcNodeApi = apiConfig
+      ? new Lrc20JsonRPC(apiConfig.lrc20NodeUrl)
+      : new Lrc20JsonRPC(LRC_NODE_URL[this.networkType] || LRC_NODE_URL["default"]);
 
     const pubkeyHex = this.keyPair.publicKey.toString("hex");
     const networkType = toNetworkType(this.network);

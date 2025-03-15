@@ -115,7 +115,6 @@ export class ElectrsApi {
 
   async listTransactions(address: string): Promise<ElectrsTransaction[]> {
     const url = `${this.electrsUrl}/address/${address}/txs`;
-
     const response = await fetch(url, {
       method: "GET",
       headers: {
@@ -126,7 +125,6 @@ export class ElectrsApi {
     if (!response.ok) {
       throw new Error(`API http call failed: ${response.status}`);
     }
-
     return await JSON.parse(await response.text());
   }
 }

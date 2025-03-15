@@ -45,7 +45,7 @@ export const LRC_WALLET_NETWORK_TYPE = Object.freeze({
   [Network.TESTNET]: Lrc20NetworkType.TESTNET,
   [Network.SIGNET]: Lrc20NetworkType.TESTNET,
   [Network.REGTEST]: Lrc20NetworkType.REGTEST,
-  [Network.LOCAL]: Lrc20NetworkType.REGTEST,
+  [Network.LOCAL]: Lrc20NetworkType.LOCAL,
 });
 
 /**

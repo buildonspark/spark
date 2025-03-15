@@ -54,6 +54,9 @@ describe("token integration test", () => {
     );
     const l1WalletPubKey = await wallet.getIdentityPublicKey();
     await faucet.sendFaucetCoinToP2WPKHAddress(hexToBytes(l1WalletPubKey));
+    await faucet.mineBlocks(6);
+
+    await new Promise((resolve) => setTimeout(resolve, 5000));
 
     try {
       const response = await wallet.announceTokenL1({
@@ -66,9 +69,28 @@ describe("token integration test", () => {
       console.warn("Announce token response: " + response);
     } catch (error: any) {
       // Check that the error has the expected name
-      fail("Expected announceTokenL1() to succeed with fauceted funds");
+      fail(
+        "Expected announceTokenL1() to succeed with fauceted funds: " + error,
+      );
     }
-    faucet.mineBlocks(6);
+    await faucet.mineBlocks(6);
+
+    // Wait for LRC20 processing.
+    await new Promise((resolve) => setTimeout(resolve, 50000));
+
+    const publicKeyInfo = await wallet.getTokenPublicKeyInfo();
+
+    // Assert token public key info values
+    expect(publicKeyInfo).toEqual({
+      tokenPubkey: expect.objectContaining({
+        pubkey: expect.any(Buffer),
+      }),
+      name: "TestToken1",
+      symbol: "TT1",
+      decimal: 0,
+      maxSupply: 0,
+      isFreezable: false,
+    });
 
     await wallet.mintTokens(tokenAmount);
 
@@ -91,6 +113,9 @@ describe("token integration test", () => {
     );
     const l1WalletPubKey = await wallet.getIdentityPublicKey();
     await faucet.sendFaucetCoinToP2WPKHAddress(hexToBytes(l1WalletPubKey));
+    await faucet.mineBlocks(6);
+
+    await new Promise((resolve) => setTimeout(resolve, 5000));
 
     try {
       const response = await wallet.announceTokenL1({
@@ -102,11 +127,12 @@ describe("token integration test", () => {
       });
       console.log("Announce token response: " + response);
     } catch (error: any) {
-      // Check that the error has the expected name
-      fail("Expected announceTokenL1() to succeed with fauceted funds");
+      console.error(
+        "Expected announceTokenL1() to succeed with fauceted funds: " + error,
+      );
+      fail();
     }
-    faucet.mineBlocks(6);
-
+    await faucet.mineBlocks(6);
     await wallet.mintTokens(tokenAmount);
 
     const sourceBalance = await wallet.getIssuerTokenBalance();
@@ -121,10 +147,23 @@ describe("token integration test", () => {
       );
       console.log("Withdraw token txid: " + response?.txid);
     } catch (error: any) {
-      // Check that the error has the expected name
-      fail("Expected withdrawTokens() to succeed");
+      fail("Expected withdrawTokens() to succeed: " + error);
     }
-    faucet.mineBlocks(6);
+    // Mine blocks to confirm the transaction and  make LRC20 aware
+    // of the withdrawal.
+    await faucet.mineBlocks(6);
+
+    // Wait for LRC20 processing.
+    await new Promise((resolve) => setTimeout(resolve, 30000));
+
+    // Mine more blocks to trigger SO fetching of withdrawals from LRC.
+    await faucet.mineBlocks(6);
+
+    // Wait for SO processing.
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+
+    const sourceBalanceAfterWithdrawal = await wallet.getIssuerTokenBalance();
+    expect(sourceBalanceAfterWithdrawal.balance).toEqual(0);
   });
 
   it("should issue a single token and transfer it with ECDSA", async () => {
@@ -181,7 +220,7 @@ describe("token integration test", () => {
       tokenPublicKey,
     );
     expect(destinationBalance.balance).toEqual(tokenAmount);
-    
+
     const issuerOperations = await issuerWallet.getIssuerTokenActivity();
     expect(issuerOperations.transactions.length).toBe(1);
     const issuerOperationTx = issuerOperations.transactions[0].transaction;

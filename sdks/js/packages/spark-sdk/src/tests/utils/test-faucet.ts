@@ -211,7 +211,7 @@ export class BitcoinFaucet {
       randomPubKey,
       Network.LOCAL,
     );
-    return await this.generateToAddress(100, randomAddress);
+    return await this.generateToAddress(numBlocks, randomAddress);
   }
 
   private async call(method: string, params: any[]) {
@@ -252,6 +252,7 @@ export class BitcoinFaucet {
   }
 
   async broadcastTx(txHex: string) {
-    return await this.call("sendrawtransaction", [txHex, 0]);
+    let response = await this.call("sendrawtransaction", [txHex, 0]);
+    return response;
   }
 }

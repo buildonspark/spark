@@ -1,13 +1,19 @@
 import {
   LRCWallet,
-  NetworkType,
   TokenPubkey,
   TokenPubkeyAnnouncement,
   TokenPubkeyInfo,
+  ListAllTokenTransactionsResponse,
+  ListAllTokenTransactionsCursor,
 } from "@buildonspark/lrc20-sdk";
 import { SparkWallet, SparkWalletProps } from "@buildonspark/spark-sdk";
 import { LeafWithPreviousTransactionData } from "@buildonspark/spark-sdk/proto/spark";
-import { getMasterHDKeyFromSeed } from "@buildonspark/spark-sdk/utils";
+import {
+  getMasterHDKeyFromSeed,
+  LRC_WALLET_NETWORK,
+  LRC_WALLET_NETWORK_TYPE,
+  Network,
+} from "@buildonspark/spark-sdk/utils";
 import {
   bytesToHex,
   bytesToNumberBE,
@@ -15,25 +21,28 @@ import {
 } from "@noble/curves/abstract/utils";
 import { validateMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english";
-import { networks } from "bitcoinjs-lib";
 import { IssuerWalletInterface } from "./interface/wallet-interface.js";
 import { TokenFreezeService } from "./services/freeze.js";
 import { IssuerTokenTransactionService } from "./services/token-transactions.js";
-import { ListAllTokenTransactionsResponse, ListAllTokenTransactionsCursor } from "@buildonspark/lrc20-sdk"
 import { ConfigOptions } from "@buildonspark/spark-sdk/services/wallet-config";
-import { createLrc20ConnectionManager, Lrc20SparkClient } from "@buildonspark/lrc20-sdk/grpc";
+import {
+  createLrc20ConnectionManager,
+  Lrc20SparkClient,
+} from "@buildonspark/lrc20-sdk/grpc";
 import { ILrc20ConnectionManager } from "@buildonspark/lrc20-sdk/grpc";
 import { OperationType } from "../../lrc20-sdk/dist/types/proto/rpc/v1/types.js";
 
 const BURN_ADDRESS = "02".repeat(33);
 
-export class IssuerSparkWallet extends SparkWallet implements IssuerWalletInterface {
+export class IssuerSparkWallet
+  extends SparkWallet
+  implements IssuerWalletInterface
+{
   private lrc20ConnectionManager: ILrc20ConnectionManager;
   private lrc20Client: Lrc20SparkClient | undefined;
   private issuerTokenTransactionService: IssuerTokenTransactionService;
   private tokenFreezeService: TokenFreezeService;
   private tokenPublicKeyInfo?: TokenPubkeyInfo;
-
 
   public static async create(options: SparkWalletProps) {
     const wallet = new IssuerSparkWallet(options.options);
@@ -47,7 +56,9 @@ export class IssuerSparkWallet extends SparkWallet implements IssuerWalletInterf
 
   private constructor(configOptions?: ConfigOptions) {
     super(configOptions);
-    this.lrc20ConnectionManager = createLrc20ConnectionManager(this.config.getLrc20Address());
+    this.lrc20ConnectionManager = createLrc20ConnectionManager(
+      this.config.getLrc20Address(),
+    );
     this.issuerTokenTransactionService = new IssuerTokenTransactionService(
       this.config,
       this.connectionManager,
@@ -78,15 +89,22 @@ export class IssuerSparkWallet extends SparkWallet implements IssuerWalletInterf
       }
 
       const hdkey = getMasterHDKeyFromSeed(seed);
+      const accountType = this.config.getNetwork() === Network.REGTEST ? 0 : 1;
+      const identityKey = hdkey.derive(`m/8797555'/${accountType}'/0'`);
 
+      const network = this.config.getNetwork();
       this.lrc20Wallet = new LRCWallet(
-        bytesToHex(hdkey.privateKey!),
-        networks.regtest,
-        NetworkType.REGTEST,
+        bytesToHex(identityKey.privateKey!),
+        LRC_WALLET_NETWORK[network],
+        LRC_WALLET_NETWORK_TYPE[network],
       );
     }
 
     return initResponse;
+  }
+
+  public async getIssuerTokenPublicKeyInfo() {
+    return await this.getTokenPublicKeyInfo();
   }
 
   public async getIssuerTokenPublicKey() {
@@ -192,7 +210,7 @@ export class IssuerSparkWallet extends SparkWallet implements IssuerWalletInterf
       afterTimestamp,
       operationTypes,
     });
-    return transactions
+    return transactions;
   }
 
   public async getIssuerTokenActivity(
@@ -215,7 +233,7 @@ export class IssuerSparkWallet extends SparkWallet implements IssuerWalletInterf
       afterTimestamp,
       operationTypes,
     });
-    return transactions
+    return transactions;
   }
 
   public getL1Address(): string {
