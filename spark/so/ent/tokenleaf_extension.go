@@ -119,6 +119,7 @@ func GetOwnedLeaves(ctx context.Context, ownerPublicKeys [][]byte, tokenPublicKe
 				schema.TokenLeafStatusCreatedFinalized,
 				schema.TokenLeafStatusSpentStarted,
 			),
+			tokenleaf.ConfirmedWithdrawBlockHashIsNil(),
 		)
 	// Only filter by tokenPublicKey if it's provided.
 	if len(tokenPublicKeys) > 0 {

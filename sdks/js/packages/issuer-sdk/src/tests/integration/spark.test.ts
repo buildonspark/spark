@@ -81,16 +81,19 @@ describe("token integration test", () => {
     const publicKeyInfo = await wallet.getTokenPublicKeyInfo();
 
     // Assert token public key info values
-    expect(publicKeyInfo).toEqual({
-      tokenPubkey: expect.objectContaining({
-        pubkey: expect.any(Buffer),
-      }),
-      name: "TestToken1",
-      symbol: "TT1",
-      decimal: 0,
-      maxSupply: 0,
-      isFreezable: false,
-    });
+    const identityPublicKey = await wallet.getIdentityPublicKey();
+    expect(publicKeyInfo.announcement?.name).toEqual("TestToken1");
+    expect(publicKeyInfo.announcement?.symbol).toEqual("TT1");
+    expect(publicKeyInfo.announcement?.decimal).toEqual(0);
+    expect(publicKeyInfo.announcement?.maxSupply).toEqual(0);
+    expect(publicKeyInfo.announcement?.isFreezable).toEqual(false);
+
+    // Compare the public key using bytesToHex
+    const pubkeyBuffer = publicKeyInfo.announcement?.tokenPubkey.pubkey;
+    const pubkeyHex = Buffer.isBuffer(pubkeyBuffer)
+      ? pubkeyBuffer.toString("hex")
+      : Buffer.from((pubkeyBuffer as any).data).toString("hex");
+    expect(pubkeyHex).toEqual(identityPublicKey);
 
     await wallet.mintTokens(tokenAmount);
 
@@ -149,6 +152,7 @@ describe("token integration test", () => {
     } catch (error: any) {
       fail("Expected withdrawTokens() to succeed: " + error);
     }
+
     // Mine blocks to confirm the transaction and  make LRC20 aware
     // of the withdrawal.
     await faucet.mineBlocks(6);
@@ -163,7 +167,7 @@ describe("token integration test", () => {
     await new Promise((resolve) => setTimeout(resolve, 3000));
 
     const sourceBalanceAfterWithdrawal = await wallet.getIssuerTokenBalance();
-    expect(sourceBalanceAfterWithdrawal.balance).toEqual(0);
+    expect(sourceBalanceAfterWithdrawal.balance).toEqual(0n);
   });
 
   it("should issue a single token and transfer it with ECDSA", async () => {
