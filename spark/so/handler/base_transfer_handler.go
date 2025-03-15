@@ -358,7 +358,7 @@ func (h *BaseTransferHandler) CancelSendTransfer(
 		return nil, fmt.Errorf("unable to unlock leaves in the transfer: %v", err)
 	}
 
-	err = h.cancelTransferCancelRequest(ctx, transfer, intent)
+	err = h.cancelTransferCancelRequest(ctx, transfer)
 	if err != nil {
 		return nil, fmt.Errorf("unable to cancel associated request: %v", err)
 	}
@@ -407,7 +407,7 @@ func (h *BaseTransferHandler) cancelTransferUnlockLeaves(ctx context.Context, tr
 	return nil
 }
 
-func (h *BaseTransferHandler) cancelTransferCancelRequest(ctx context.Context, transfer *ent.Transfer, intent CancelSendTransferIntent) error {
+func (h *BaseTransferHandler) cancelTransferCancelRequest(ctx context.Context, transfer *ent.Transfer) error {
 	if transfer.Type == schema.TransferTypePreimageSwap {
 		db := ent.GetDbFromContext(ctx)
 		preimageRequest, err := db.PreimageRequest.Query().Where(preimagerequest.HasTransfersWith(enttransfer.ID(transfer.ID))).Only(ctx)
