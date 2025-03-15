@@ -30,14 +30,12 @@ func (h *TreeQueryHandler) QueryNodes(ctx context.Context, req *pb.QueryNodesReq
 	db := ent.GetDbFromContext(ctx)
 
 	query := db.TreeNode.Query()
-	filterNetwork := true
 	switch req.Source.(type) {
 	case *pb.QueryNodesRequest_OwnerIdentityPubkey:
 		query = query.
 			Where(treenode.StatusNotIn(schema.TreeNodeStatusCreating, schema.TreeNodeStatusSplitted)).
 			Where(treenode.OwnerIdentityPubkey(req.GetOwnerIdentityPubkey()))
 	case *pb.QueryNodesRequest_NodeIds:
-		filterNetwork = false
 		nodeIDs := make([]uuid.UUID, len(req.GetNodeIds().NodeIds))
 		for _, nodeID := range req.GetNodeIds().NodeIds {
 			nodeUUID, err := uuid.Parse(nodeID)
@@ -60,10 +58,6 @@ func (h *TreeQueryHandler) QueryNodes(ctx context.Context, req *pb.QueryNodesReq
 		if err != nil {
 			return nil, fmt.Errorf("unable to marshal node %s: %v", node.ID.String(), err)
 		}
-		if filterNetwork && protoNodeMap[node.ID.String()].Network != req.Network {
-			delete(protoNodeMap, node.ID.String())
-			continue
-		}
 		if req.IncludeParents {
 			err := getAncestorChain(ctx, db, node, protoNodeMap)
 			if err != nil {
@@ -82,7 +76,6 @@ func (h *TreeQueryHandler) QueryBalance(ctx context.Context, req *pb.QueryBalanc
 
 	query := db.TreeNode.Query()
 	query = query.Where(treenode.StatusEQ(schema.TreeNodeStatusAvailable)).
-		WithTree().
 		Where(treenode.OwnerIdentityPubkey(req.GetIdentityPublicKey()))
 
 	nodes, err := query.All(ctx)
@@ -92,18 +85,7 @@ func (h *TreeQueryHandler) QueryBalance(ctx context.Context, req *pb.QueryBalanc
 
 	balance := uint64(0)
 	nodeBalances := make(map[string]uint64)
-	reqNetwork, err := common.NetworkFromProtoNetwork(req.Network)
-	if err != nil {
-		return nil, err
-	}
 	for _, node := range nodes {
-		network, err := common.NetworkFromSchemaNetwork(node.Edges.Tree.Network)
-		if err != nil {
-			return nil, err
-		}
-		if network != reqNetwork {
-			continue
-		}
 		balance += node.Value
 		nodeBalances[node.ID.String()] = node.Value
 	}

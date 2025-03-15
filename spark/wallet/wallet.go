@@ -241,14 +241,9 @@ func (w *SingleKeyWallet) SyncWallet(ctx context.Context) error {
 	}
 	defer conn.Close()
 
-	network, err := common.ProtoNetworkFromNetwork(w.Config.Network)
-	if err != nil {
-		return fmt.Errorf("failed to get proto network: %w", err)
-	}
 	response, err := (*client).QueryNodes(ctx, &pb.QueryNodesRequest{
 		Source:         &pb.QueryNodesRequest_OwnerIdentityPubkey{OwnerIdentityPubkey: w.Config.IdentityPublicKey()},
 		IncludeParents: true,
-		Network:        network,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to get owned nodes: %w", err)

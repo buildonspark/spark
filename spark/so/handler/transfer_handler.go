@@ -440,9 +440,7 @@ func (h *TransferHandler) QueryPendingTransfers(ctx context.Context, req *pb.Que
 		if err != nil {
 			return nil, fmt.Errorf("unable to marshal transfer: %v", err)
 		}
-		if transferProto.Leaves[0].Leaf.Network == req.Network {
-			transferProtos = append(transferProtos, transferProto)
-		}
+		transferProtos = append(transferProtos, transferProto)
 	}
 	return &pb.QueryPendingTransfersResponse{Transfers: transferProtos}, nil
 }
