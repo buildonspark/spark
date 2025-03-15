@@ -1568,6 +1568,13 @@ export class SparkWallet {
     return response.tokenTransactionsWithStatus;
   }
 
+  public getTokenL1Address(): string {
+    if (!this.lrc20Wallet) {
+      throw new Error("L1 Wallet not initialized");
+    }
+    return this.lrc20Wallet.p2wpkhAddress;
+  }
+
   /**
    * Selects token leaves for a transfer.
    *

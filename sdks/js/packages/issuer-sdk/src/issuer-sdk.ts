@@ -236,13 +236,6 @@ export class IssuerSparkWallet
     return transactions;
   }
 
-  public getL1Address(): string {
-    if (!this.lrc20Wallet) {
-      throw new Error("L1 Wallet not initialized");
-    }
-    return this.lrc20Wallet.p2wpkhAddress;
-  }
-
   public async announceTokenL1({
     tokenName,
     tokenTicker,
