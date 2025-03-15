@@ -16,7 +16,7 @@ export const EMPTY_TOKEN_PUBKEY = Buffer.from(Array(33).fill(2));
 
 export const ELECTRS_URL = Object.freeze({
   [NetworkType.MAINNET]: "https://mempool.space/api",
-  [NetworkType.REGTEST]: "https://regtest-mempool.dev.dev.sparkinfra.net/api",
+  [NetworkType.REGTEST]: "https://regtest-mempool.us-west-2.sparkinfra.net/api",
   [NetworkType.TESTNET]: "https://electrs.mutiny.18.215.149.26.sslip.io",
   [NetworkType.DEVNET]: "https://electrs.stage.18.215.149.26.sslip.io",
   default: "http://127.0.0.1:30000",
