@@ -172,6 +172,10 @@ export class SparkWallet {
     options,
     lrc20WalletApiConfig,
   }: SparkWalletProps) {
+    // TODO: Remove once we support other networks
+    if (options?.network !== "REGTEST") {
+      throw new Error("Only REGTEST is supported for now");
+    }
     const wallet = new SparkWallet(options, signer);
     const initResponse = await wallet.initWallet(
       mnemonicOrSeed,
@@ -760,7 +764,7 @@ export class SparkWallet {
   public async claimDeposit(txid: string) {
     const baseUrl =
       this.config.getNetwork() === Network.REGTEST
-        ? "https://regtest-mempool.dev.dev.sparkinfra.net/api"
+        ? "https://regtest-mempool.us-west-2.sparkinfra.net/"
         : "https://mempool.space/api";
     const auth = btoa("spark-sdk:mCMk1JqlBNtetUNy");
 

@@ -1,62 +1,61 @@
 import { address, crypto, networks, payments, Psbt, script, Transaction } from "bitcoinjs-lib";
-import { instanceToPlain, plainToInstance } from "class-transformer";
+import { plainToInstance } from "class-transformer";
 import { ECPairInterface } from "ecpair";
 import { publicKeyToAddress } from "../../address/index.ts";
+import { ECPair } from "../../bitcoin-core.ts";
 import { NetworkType, toNetworkType, toPsbtNetwork } from "../../network/index.ts";
 import { AddressType } from "../../types.ts";
-import { ElectrsApi, Lrc20JsonRPC, BasicAuth } from "../api/index.ts";
+import { BasicAuth, ElectrsApi, Lrc20JsonRPC } from "../api/index.ts";
 import { BtcUtxosCoinSelection, Lrc20UtxosCoinSelection } from "../coinselection/index.ts";
 import { TransactionBuilder } from "../transaction/index.ts";
 import {
-  BitcoinTransactionDto,
-  BtcMetadata,
-  BitcoinUtxo,
-  Lrc20Utxo,
-  TokenPubkey,
-  TokenPubkeyInfo,
-  BitcoinInput,
-  MultisigReceiptInput,
-  ReceiptInput,
-  TxInput,
-  TokenAmount,
-  BitcoinOutput,
-  MultisigReceiptOutput,
-  ReceiptOutput,
-  SparkExitOutput,
-  TxOutput,
-  Payment,
-  Receipt,
-  getReceiptDataFromProof,
-  ReceiptProof,
-  ReceiptProofType,
-  SigReceiptProofData,
   AnnouncementData,
-  TokenPubkeyAnnouncement,
-  TxFreezeAnnouncement as TxFreezeAnnouncement,
-  TransferData,
-  TransferOwnershipAnnouncement,
+  BitcoinInput,
+  BitcoinOutput,
+  BitcoinTransactionDto,
+  BitcoinUtxo,
+  BtcMetadata,
+  ElectrsTransactionOutput,
+  getReceiptDataFromProof,
   Lrc20Transaction,
   Lrc20TransactionDto,
   Lrc20TransactionType,
   Lrc20TransactionTypeEnum,
+  Lrc20Utxo,
+  MultisigReceiptInput,
+  MultisigReceiptOutput,
+  Payment,
   PubkeyFreezeAnnouncement,
+  Receipt,
+  ReceiptInput,
+  ReceiptOutput,
+  ReceiptProof,
+  ReceiptProofType,
+  SigReceiptProofData,
   SparkExitMetadata,
-  ElectrsTransactionOutput,
+  SparkExitOutput,
+  TokenAmount,
+  TokenPubkey,
+  TokenPubkeyAnnouncement,
+  TokenPubkeyInfo,
+  TransferData,
+  TransferOwnershipAnnouncement,
+  TxFreezeAnnouncement,
+  TxInput,
+  TxOutput,
 } from "../types/index.ts";
 import {
+  DUST_AMOUNT,
+  ELECTRS_URL,
+  EMPTY_TOKEN_PUBKEY,
   filterUniqueUtxo,
+  JSONParse,
+  JSONStringifyBodyDown,
+  LRC_NODE_URL,
   reverseBuffer,
   toEvenParity,
   toXOnly,
-  DUST_AMOUNT,
-  EMPTY_TOKEN_PUBKEY,
-  LRC_NODE_URL,
-  ELECTRS_URL,
-  JSONParse,
-  JSONStringify,
-  JSONStringifyBodyDown,
 } from "../utils/index.ts";
-import { ECPair } from "../../bitcoin-core.ts";
 
 export interface LRC20WalletApiConfig {
   lrc20NodeUrl: string;
@@ -122,7 +121,11 @@ export class LRCWallet {
 
     this.electrsApi = apiConfig
       ? new ElectrsApi(apiConfig.electrsUrl, apiConfig.electrsCredentials)
-      : new ElectrsApi(ELECTRS_URL[this.networkType] || ELECTRS_URL["default"], null);
+      : // TODO: Handle auth better, this is a hack for regtest prod
+        new ElectrsApi(ELECTRS_URL[this.networkType] || ELECTRS_URL["default"], {
+          username: "spark-sdk",
+          password: "mCMk1JqlBNtetUNy",
+        });
     this.lrcNodeApi = apiConfig
       ? new Lrc20JsonRPC(apiConfig.lrc20NodeUrl)
       : new Lrc20JsonRPC(LRC_NODE_URL[this.networkType] || LRC_NODE_URL["default"]);

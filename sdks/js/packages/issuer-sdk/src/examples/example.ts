@@ -10,14 +10,12 @@ const walletMnemonic =
 
 async function runCLI() {
   let electrsCredentials = {
-    username: "hackathon",
-    password: "MakeBitcoinMoneyAgain"
-  }
+    username: "spark-sdk",
+    password: "mCMk1JqlBNtetUNy",
+  };
 
   let lrc20WalletApiConfig = {
-    lrc20NodeUrl: "https://regtest.lrc20.dev.dev.sparkinfra.net",
-    electrsUrl: "https://regtest-mempool.dev.dev.sparkinfra.net/api",
-    electrsCredentials
+    electrsCredentials,
   };
 
   let wallet = new IssuerWallet(Network.REGTEST);
@@ -70,7 +68,11 @@ async function runCLI() {
           console.log(helpMessage);
           break;
         case "initwallet":
-          const result = await wallet.initWallet(args.join(" "), true, lrc20WalletApiConfig);
+          const result = await wallet.initWallet(
+            args.join(" "),
+            true,
+            lrc20WalletApiConfig,
+          );
           console.log(result);
           break;
         case "getaddresses":
@@ -87,18 +89,25 @@ async function runCLI() {
             console.log("L1 Address:", wallet.getL1FundingAddress());
 
             const tokenPublicKeyInfo = await wallet.getTokenPublicKeyInfo();
-            if(tokenPublicKeyInfo) {
+            if (tokenPublicKeyInfo) {
               let announcement = tokenPublicKeyInfo.announcement;
 
               console.log("TokenInfo:");
               console.log("    Name:       ", announcement.name);
               console.log("    Ticker:     ", announcement.symbol);
               console.log("    Decimals:   ", announcement.decimal);
-              console.log("    MaxSupply:  ", announcement.maxSupply == 0 ? "unlimited" : announcement.maxSupply);
+              console.log(
+                "    MaxSupply:  ",
+                announcement.maxSupply == 0
+                  ? "unlimited"
+                  : announcement.maxSupply,
+              );
               console.log("    TotalSupply:", tokenPublicKeyInfo.totalSupply);
               console.log("    Freezable:  ", announcement.isFreezable);
             } else {
-              console.log("No TokenInfo found. You should announce the token on L1")
+              console.log(
+                "No TokenInfo found. You should announce the token on L1",
+              );
             }
           }
           break;
@@ -196,9 +205,18 @@ async function runCLI() {
             break;
           }
 
-          let announcementResult = await wallet.announceTokenL1(tokenName, tokenTicker, decimals, maxSupply, isFreezable);
-          if(announcementResult) {
-            console.log("Token Announcement L1 Transaction ID:", announcementResult.txid);
+          let announcementResult = await wallet.announceTokenL1(
+            tokenName,
+            tokenTicker,
+            decimals,
+            maxSupply,
+            isFreezable,
+          );
+          if (announcementResult) {
+            console.log(
+              "Token Announcement L1 Transaction ID:",
+              announcementResult.txid,
+            );
           }
           break;
         }

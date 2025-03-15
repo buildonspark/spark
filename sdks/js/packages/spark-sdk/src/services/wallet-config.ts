@@ -25,7 +25,7 @@ const BASE_CONFIG: Required<ConfigOptions> = {
   coodinatorIdentifier:
     "0000000000000000000000000000000000000000000000000000000000000001",
   frostSignerAddress: "unix:///tmp/frost_0.sock",
-  threshold: 3,
+  threshold: 2,
   signingOperators: getLocalSigningOperators(),
   useTokenTransactionSchnorrSignatures: true,
   enableLrc20: true,
@@ -57,37 +57,35 @@ export const MAINNET_WALLET_CONFIG: Required<ConfigOptions> = {
 };
 
 export function getRegtestSigningOperators(): Record<string, SigningOperator> {
-  const pubkeys = [
-    "03acd9a5a88db102730ff83dee69d69088cc4c9d93bbee893e90fd5051b7da9651",
-    "02d2d103cacb1d6355efeab27637c74484e2a7459e49110c3fe885210369782e23",
-    "0350f07ffc21bfd59d31e0a7a600e2995273938444447cb9bc4c75b8a895dbb853",
-  ];
-
-  const pubkeyBytesArray = pubkeys.map((pubkey) => hexToBytes(pubkey));
-
   return {
     "0000000000000000000000000000000000000000000000000000000000000001": {
       id: 0,
       identifier:
         "0000000000000000000000000000000000000000000000000000000000000001",
-      address: "https://0.spark.dev.dev.sparkinfra.net",
+      address: "https://0.spark.us-west-2.sparkinfra.net",
 
-      identityPublicKey: pubkeyBytesArray[0]!,
+      identityPublicKey: hexToBytes(
+        "03dfbdff4b6332c220f8fa2ba8ed496c698ceada563fa01b67d9983bfc5c95e763",
+      ),
     },
     "0000000000000000000000000000000000000000000000000000000000000002": {
       id: 1,
       identifier:
         "0000000000000000000000000000000000000000000000000000000000000002",
-      address: "https://1.spark.dev.dev.sparkinfra.net",
+      address: "https://1.spark.us-west-2.sparkinfra.net",
 
-      identityPublicKey: pubkeyBytesArray[1]!,
+      identityPublicKey: hexToBytes(
+        "03e625e9768651c9be268e287245cc33f96a68ce9141b0b4769205db027ee8ed77",
+      ),
     },
     "0000000000000000000000000000000000000000000000000000000000000003": {
       id: 2,
       identifier:
         "0000000000000000000000000000000000000000000000000000000000000003",
-      address: "https://2.spark.dev.dev.sparkinfra.net",
-      identityPublicKey: pubkeyBytesArray[2]!,
+      address: "https://2.spark.us-west-2.sparkinfra.net",
+      identityPublicKey: hexToBytes(
+        "022eda13465a59205413086130a65dc0ed1b8f8e51937043161f8be0c369b1a410",
+      ),
     },
   };
 }
