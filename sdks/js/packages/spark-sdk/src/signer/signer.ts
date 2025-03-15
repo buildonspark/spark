@@ -386,9 +386,10 @@ class DefaultSparkSigner implements SparkSigner {
       throw new Error("Could not derive private key from seed");
     }
 
-    const identityKey = hdkey.derive("m/8797555'/0'/0'");
-    const signingKey = hdkey.derive("m/8797555'/0'/1'");
-    const depositKey = hdkey.derive("m/8797555'/0'/2'");
+    const accountType = network === Network.REGTEST ? 0 : 1;
+    const identityKey = hdkey.derive(`m/8797555'/${accountType}'/0'`);
+    const signingKey = hdkey.derive(`m/8797555'/${accountType}'/1'`);
+    const depositKey = hdkey.derive(`m/8797555'/${accountType}'/2'`);
 
     if (
       !identityKey.privateKey ||

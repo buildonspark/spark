@@ -62,7 +62,7 @@ export class WalletConfigService {
   }
 
   public getNetworkProto(): number {
-    return NetworkToProto[this.config.network];
+    return NetworkToProto[Network[this.config.network]];
   }
 
   public shouldSignTokenTransactionsWithSchnorr(): boolean {

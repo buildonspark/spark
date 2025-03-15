@@ -139,7 +139,7 @@ async function runCLI() {
           console.log("Please initialize a wallet first");
           break;
         }
-        const transfer = await wallet.sendSparkTransfer({
+        const transfer = await wallet.transfer({
           amountSats: parseInt(args[0]),
           receiverSparkAddress: args[1],
         });
