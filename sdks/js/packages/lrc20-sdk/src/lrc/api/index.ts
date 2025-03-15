@@ -1,5 +1,6 @@
 export { ElectrsApi } from "./electrs.ts";
 export { Lrc20JsonRPC } from "./lrc20.ts";
+export { Lrc20ConnectionManager } from "./grpc/index.js";
 export type { JsonRpcAuth } from "./lrc20.ts";
 
 export interface BasicAuth {

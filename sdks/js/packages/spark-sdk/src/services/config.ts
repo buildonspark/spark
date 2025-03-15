@@ -45,6 +45,10 @@ export class WalletConfigService {
     return coordinator.address;
   }
 
+  public getLrc20Address(): string {
+    return this.config.lrc20Address;
+  }
+
   public getSigningOperators(): Readonly<Record<string, SigningOperator>> {
     return this.config.signingOperators;
   }

@@ -20,6 +20,9 @@ import {
   DepositAddressQueryResult,
   LeafWithPreviousTransactionData,
   QueryAllTransfersResponse,
+  QueryTokenTransactionsRequest,
+  TokenTransactionStatus,
+  TokenTransactionWithStatus,
   Transfer,
   TransferStatus,
   TreeNode,
@@ -67,10 +70,10 @@ import { getNextTransactionSequence } from "./utils/transaction.js";
 import { initWasm } from "./utils/wasm-wrapper.js";
 import { InitOutput } from "./wasm/spark_bindings.js";
 
-import { LRC20WalletApiConfig, LRCWallet } from "@buildonspark/lrc20-sdk";
-import { broadcastL1Withdrawal } from "./services/lrc20.js";
 import { SparkSigner } from "./signer/signer.js";
 import { getMasterHDKeyFromSeed } from "./utils/index.js";
+import { LRCWallet, LRC20WalletApiConfig, ListAllTokenTransactionsCursor, ListAllTokenTransactionsResponse } from "@buildonspark/lrc20-sdk";
+import { broadcastL1Withdrawal } from "./services/lrc20.js";
 
 // Add this constant at the file level
 const MAX_TOKEN_LEAVES = 100;
@@ -117,7 +120,6 @@ export class SparkWallet {
   protected config: WalletConfigService;
 
   protected connectionManager: ConnectionManager;
-
   protected lrc20Wallet: LRCWallet | undefined;
 
   private depositService: DepositService;
@@ -140,7 +142,6 @@ export class SparkWallet {
   protected constructor(options?: ConfigOptions, signer?: SparkSigner) {
     this.config = new WalletConfigService(options, signer);
     this.connectionManager = new ConnectionManager(this.config);
-
     this.depositService = new DepositService(
       this.config,
       this.connectionManager,
@@ -408,7 +409,6 @@ export class SparkWallet {
         bytesToHex(masterPrivateKey),
         LRC_WALLET_NETWORK[network],
         LRC_WALLET_NETWORK_TYPE[network],
-        lrc20WalletApiConfig,
       );
     }
 
@@ -1555,6 +1555,30 @@ export class SparkWallet {
       selectedLeaves.map((leaf) => leaf.leaf!.ownerPublicKey),
       selectedLeaves.map((leaf) => leaf.leaf!.revocationPublicKey!),
     );
+  }
+
+  public async getTokenTransactions(
+    tokenPublicKeys: string[],
+    tokenTransactionHashes?: string[]
+  ): Promise<TokenTransactionWithStatus[]> {
+    const sparkClient = await this.connectionManager.createSparkClient(this.config.getCoordinatorAddress());
+
+    let queryParams;
+    if (tokenTransactionHashes?.length) {
+      queryParams = {
+        tokenPublicKeys: tokenPublicKeys?.map(hexToBytes)!,
+        ownerPublicKeys: [hexToBytes(await this.getIdentityPublicKey())],
+        tokenTransactionHashes: tokenTransactionHashes.map(hexToBytes)
+      }
+    } else {
+      queryParams = {
+        tokenPublicKeys: tokenPublicKeys?.map(hexToBytes)!,
+        ownerPublicKeys: [hexToBytes(await this.getIdentityPublicKey())]
+      }
+    }
+
+    const response = await sparkClient.query_token_transactions(queryParams);
+    return response.tokenTransactionsWithStatus;
   }
 
   /**

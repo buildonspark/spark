@@ -18,8 +18,6 @@ describe("token integration test", () => {
   it("should issue a single token with ECDSA", async () => {
     const tokenAmount: bigint = 1000n;
     const { wallet } = await IssuerSparkWallet.create({
-      mnemonicOrSeed:
-        "4799979d5e417e3d6d00cf89a77d4f3c0354d295810326c6b0bf4b45aedb38f3",
       options: LOCAL_WALLET_CONFIG_ECDSA,
     });
 
@@ -32,8 +30,6 @@ describe("token integration test", () => {
   it("should issue a single token with Schnorr", async () => {
     const tokenAmount: bigint = 1000n;
     const { wallet } = await IssuerSparkWallet.create({
-      mnemonicOrSeed:
-        "4799979d5e417e3d6d00cf89a77d4f3c0354d295810326c6b0bf4b45aedb38f3",
       options: LOCAL_WALLET_CONFIG_SCHNORR,
     });
 
@@ -45,10 +41,7 @@ describe("token integration test", () => {
 
   it("should announce and issue a single token", async () => {
     const tokenAmount: bigint = 1000n;
-    const seed =
-      "4799979d5e417e3d6d00cf89a77d4f3c0354d295810326c6b0bf4b45aedb38f3";
     const { wallet } = await IssuerSparkWallet.create({
-      mnemonicOrSeed: seed,
       options: LOCAL_WALLET_CONFIG_SCHNORR,
     });
 
@@ -85,10 +78,7 @@ describe("token integration test", () => {
 
   it("should announce, issue, and withdraw a single token", async () => {
     const tokenAmount: bigint = 1000n;
-    const seed =
-      "4799979d5e417e3d6d00cf89a77d4f3c0354d295810326c6b0bf4b45aedb38f3";
     const { wallet } = await IssuerSparkWallet.create({
-      mnemonicOrSeed: seed,
       options: LOCAL_WALLET_CONFIG_SCHNORR,
     });
 
@@ -139,8 +129,6 @@ describe("token integration test", () => {
     const tokenAmount: bigint = 1000n;
 
     const { wallet: issuerWallet } = await IssuerSparkWallet.create({
-      mnemonicOrSeed:
-        "4799979d5e417e3d6d00cf89a77d4f3c0354d295810326c6b0bf4b45aedb38f3",
       options: LOCAL_WALLET_CONFIG_ECDSA,
     });
 
@@ -165,12 +153,46 @@ describe("token integration test", () => {
     expect(destinationBalance.balance).toEqual(tokenAmount);
   });
 
+  it("monitoring operations", async () => {
+    const tokenAmount: bigint = 1000n;
+
+    const { wallet: issuerWallet } = await IssuerSparkWallet.create({
+      options: LOCAL_WALLET_CONFIG_ECDSA,
+    });
+
+    const { wallet: destinationWallet } = await SparkWallet.create({
+      options: LOCAL_WALLET_CONFIG_ECDSA,
+    });
+
+    await issuerWallet.mintTokens(tokenAmount);
+    await issuerWallet.transferTokens({
+      tokenAmount,
+      tokenPublicKey: await issuerWallet.getIdentityPublicKey(),
+      receiverSparkAddress: await destinationWallet.getIdentityPublicKey(),
+    });
+    const sourceBalance = await issuerWallet.getIssuerTokenBalance();
+    expect(sourceBalance.balance).toEqual(0n);
+
+    const tokenPublicKey = await issuerWallet.getIdentityPublicKey();
+    const destinationBalance = await getSparkWalletTokenBalanceOrZero(
+      destinationWallet,
+      tokenPublicKey,
+    );
+    expect(destinationBalance.balance).toEqual(tokenAmount);
+    
+    const issuerOperations = await issuerWallet.getIssuerTokenActivity();
+    expect(issuerOperations.transactions.length).toBe(1);
+    const issuerOperationTx = issuerOperations.transactions[0].transaction;
+    expect(issuerOperationTx?.$case).toBe("spark");
+    if (issuerOperationTx?.$case === "spark") {
+      expect(issuerOperationTx.spark.operationType).toBe(3);
+    }
+  });
+
   it("should issue a single token and transfer it with Schnorr", async () => {
     const tokenAmount: bigint = 1000n;
 
     const { wallet: issuerWallet } = await IssuerSparkWallet.create({
-      mnemonicOrSeed:
-        "4799979d5e417e3d6d00cf89a77d4f3c0354d295810326c6b0bf4b45aedb38f3",
       options: LOCAL_WALLET_CONFIG_SCHNORR,
     });
 
@@ -198,8 +220,6 @@ describe("token integration test", () => {
   it("should freeze tokens with ECDSA", async () => {
     const tokenAmount: bigint = 1000n;
     const { wallet: issuerWallet } = await IssuerSparkWallet.create({
-      mnemonicOrSeed:
-        "4799979d5e417e3d6d00cf89a77d4f3c0354d295810326c6b0bf4b45aedb38f3",
       options: LOCAL_WALLET_CONFIG_ECDSA,
     });
 
@@ -246,8 +266,6 @@ describe("token integration test", () => {
   it("should freeze tokens with Schnorr", async () => {
     const tokenAmount: bigint = 1000n;
     const { wallet: issuerWallet } = await IssuerSparkWallet.create({
-      mnemonicOrSeed:
-        "4799979d5e417e3d6d00cf89a77d4f3c0354d295810326c6b0bf4b45aedb38f3",
       options: LOCAL_WALLET_CONFIG_SCHNORR,
     });
 
@@ -292,8 +310,6 @@ describe("token integration test", () => {
   it("should burn tokens with ECDSA", async () => {
     const tokenAmount: bigint = 200n;
     const { wallet: issuerWallet } = await IssuerSparkWallet.create({
-      mnemonicOrSeed:
-        "4799979d5e417e3d6d00cf89a77d4f3c0354d295810326c6b0bf4b45aedb38f3",
       options: LOCAL_WALLET_CONFIG_ECDSA,
     });
     await issuerWallet.mintTokens(tokenAmount);
@@ -311,8 +327,6 @@ describe("token integration test", () => {
   it("should burn tokens with Schnorr", async () => {
     const tokenAmount: bigint = 200n;
     const { wallet: issuerWallet } = await IssuerSparkWallet.create({
-      mnemonicOrSeed:
-        "4799979d5e417e3d6d00cf89a77d4f3c0354d295810326c6b0bf4b45aedb38f3",
       options: LOCAL_WALLET_CONFIG_SCHNORR,
     });
     await issuerWallet.mintTokens(tokenAmount);
@@ -331,8 +345,6 @@ describe("token integration test", () => {
     const tokenAmount: bigint = 1000n;
 
     const { wallet: issuerWallet } = await IssuerSparkWallet.create({
-      mnemonicOrSeed:
-        "4799979d5e417e3d6d00cf89a77d4f3c0354d295810326c6b0bf4b45aedb38f3",
       options: LOCAL_WALLET_CONFIG_ECDSA,
     });
 
@@ -390,8 +402,6 @@ describe("token integration test", () => {
     const tokenAmount: bigint = 1000n;
 
     const { wallet: issuerWallet } = await IssuerSparkWallet.create({
-      mnemonicOrSeed:
-        "4799979d5e417e3d6d00cf89a77d4f3c0354d295810326c6b0bf4b45aedb38f3",
       options: LOCAL_WALLET_CONFIG_SCHNORR,
     });
 

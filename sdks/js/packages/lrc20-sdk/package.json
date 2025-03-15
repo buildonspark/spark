@@ -5,14 +5,33 @@
   "exports": {
     ".": {
       "require": {
+        "node": "./dist/cjs/index.js",
         "default": "./dist/cjs/index.js",
         "types": "./dist/types/index.d.ts"
       },
       "import": {
+        "node": "./dist/esm/index.js",
         "default": "./dist/esm/index.js",
         "types": "./dist/types/index.d.ts"
       }
+    },
+    "./grpc": {
+      "require": {
+        "node": "./dist/cjs/lrc/api/grpc/node.js",
+        "browser": "./dist/cjs/lrc/api/grpc/browser.js",
+        "default": "./dist/cjs/lrc/api/grpc/node.js",
+        "types": "./dist/types/lrc/api/grpc/interface.d.ts"
+      },
+      "import": {
+        "node": "./dist/esm/lrc/api/grpc/node.js",
+        "browser": "./dist/esm/lrc/api/grpc/browser.js",
+        "default": "./dist/esm/lrc/api/grpc/node.js",
+        "types": "./dist/types/lrc/api/grpc/interface.d.ts"
+      }
     }
+  },
+  "engines": {
+    "node": ">=16.0.0"
   },
   "files": [
     "dist",
@@ -33,7 +52,8 @@
     "lint-fix": "npm run lint-ts-fix && npm run lint-js-fix && npm run lint-json-fix",
     "lint-ts-fix": "prettier --write \"./**/*.ts\"",
     "lint-js-fix": "prettier --write \"./**/*.js\"",
-    "lint-json-fix": "prettier --write \"./[a-zA-Z0-9.]+(?!-lock).json\""
+    "lint-json-fix": "prettier --write \"./[a-zA-Z0-9.]+(?!-lock).json\"",
+    "generate:proto": "PATH=\"$PATH:./node_modules/.bin\" protoc --ts_proto_out=./src/proto --ts_proto_opt=outputServices=nice-grpc,useExactTypes=false,outputServices=generic-definitions,oneof=unions,importSuffix=.js --proto_path=./protos rpc/v1/service.proto"
   },
   "dependencies": {
     "@bitcoinerlab/secp256k1": "^1.1.1",
@@ -44,7 +64,14 @@
     "bitcoinjs-lib": "^6.1.5",
     "class-transformer": "^0.5.1",
     "ecpair": "^2.1.0",
-    "stream": "^0.0.3"
+    "grpc-tools": "^1.12.4",
+    "nice-grpc": "^2.1.10",
+    "nice-grpc-common": "^2.0.2",
+    "nice-grpc-web": "^3.3.5",
+    "protobufjs": "^7.4.0",
+    "stream": "^0.0.3",
+    "tiny-secp256k1": "^2.2.3",
+    "ts-proto": "^2.6.1"
   },
   "devDependencies": {
     "@swc/cli": "^0.4.0",
@@ -58,9 +85,6 @@
     "prettier": "^3.5.1",
     "tsc-alias": "^1.8.10",
     "typescript": "^5.7.3"
-  },
-  "engines": {
-    "node": ">=14.0.0"
   },
   "browser": {
     "assert": false,

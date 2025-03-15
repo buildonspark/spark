@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package rpc.v1;
+
+import "rpc/v1/types.proto";
+import "google/protobuf/timestamp.proto";
+
+service SparkService {
+  rpc ListTransactions(ListAllTokenTransactionsRequest) returns (ListAllTokenTransactionsResponse);
+}
+
+message ListAllTokenTransactionsRequest {
+    optional ListAllTokenTransactionsCursor cursor = 1;
+    optional uint32 page_size = 2;
+
+    // optional filters
+    optional bytes owner_public_key = 3;
+    optional bytes token_public_key = 4;
+    optional google.protobuf.Timestamp before_timestamp = 5;
+    optional google.protobuf.Timestamp after_timestamp = 6;
+    repeated OperationType operation_types = 7;
+}
+
+message ListAllTokenTransactionsResponse {
+    repeated Transaction transactions = 1;
+
+    optional ListAllTokenTransactionsCursor next_cursor = 2;
+}

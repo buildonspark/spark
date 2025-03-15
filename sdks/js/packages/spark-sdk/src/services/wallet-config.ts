@@ -13,6 +13,7 @@ export type ConfigOptions = {
   readonly signingOperators?: Readonly<Record<string, SigningOperator>>;
   readonly coodinatorIdentifier?: string;
   readonly frostSignerAddress?: string;
+  readonly lrc20Address?: string;
   readonly threshold?: number;
   readonly useTokenTransactionSchnorrSignatures?: boolean;
   readonly enableLrc20?: boolean;
@@ -20,6 +21,7 @@ export type ConfigOptions = {
 
 const BASE_CONFIG: Required<ConfigOptions> = {
   network: "LOCAL",
+  lrc20Address: "http://127.0.0.1:18530",
   coodinatorIdentifier:
     "0000000000000000000000000000000000000000000000000000000000000001",
   frostSignerAddress: "unix:///tmp/frost_0.sock",

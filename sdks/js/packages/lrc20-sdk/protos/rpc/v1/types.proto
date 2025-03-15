@@ -1,0 +1,105 @@
+syntax = "proto3";
+
+package rpc.v1;
+import "google/protobuf/timestamp.proto";
+
+message Transaction {
+    oneof transaction {
+        OnChainTransaction on_chain = 1;
+        SparkTransaction spark = 2;
+    }
+}
+
+enum Layer {
+  L1 = 0;
+  SPARK = 1;
+}
+
+message ListAllTokenTransactionsCursor {
+    // tx_hash of the last tx fetched
+    bytes last_transaction_hash = 1;
+
+    // whether the last_tx_hash is on chain
+    Layer layer = 2;
+}
+
+enum OperationType {
+    // User operations
+    USER_TRANSFER = 0;
+    USER_BURN = 1;
+
+    // Issuer operations
+    ISSUER_ANNOUNCE = 2;
+    ISSUER_MINT = 3;
+    ISSUER_TRANSFER = 4;
+    ISSUER_FREEZE = 5;
+    ISSUER_UNFREEZE = 6;
+    ISSUER_BURN = 7;
+}
+
+enum OnChainTransactionStatus {
+    PENDING = 0;
+    CONFIRMED = 1;
+    WAITING_MINED = 2;
+    MINED = 3;
+    ATTACHING = 4;
+    ATTACHED = 5;
+}
+
+message OnChainTokenOutput {
+  bytes raw_tx = 1;
+  uint32 vout = 2;
+  uint64 amount_sats = 3;
+
+  optional string token_public_key = 4;
+  optional bytes token_amount = 5;
+}
+
+message OnChainTransaction {
+    OperationType operation_type = 1;
+    bytes transaction_hash = 2;
+    bytes rawtx = 3;
+    OnChainTransactionStatus status = 4;
+
+    repeated OnChainTokenOutput inputs = 5;
+    repeated OnChainTokenOutput outputs = 6; 
+
+    google.protobuf.Timestamp broadcasted_at = 7;
+    google.protobuf.Timestamp confirmed_at = 8;
+}
+
+enum SparkTransactionStatus {
+    STARTED = 0;
+    SIGNED = 1;
+    FINALIZED = 2;
+}
+
+message SparkTransaction {
+    OperationType operation_type = 1;
+    bytes transaction_hash = 2;
+    SparkTransactionStatus status = 3;
+
+    google.protobuf.Timestamp confirmed_at = 4;
+
+    repeated SparkLeaf leaves_to_create = 5;
+    repeated SparkLeaf leaves_to_spend = 6;
+
+    repeated bytes spark_operator_identity_public_keys = 7;
+}
+
+message SparkLeaf {
+    bytes token_public_key = 1;
+    string id = 2;
+    bytes owner_public_key = 3;
+    bytes revocation_public_key = 4;
+    uint64 withdrawal_bond_sats = 5;
+    uint64 withdrawal_locktime = 6;
+    bytes token_amount = 7;
+
+    bytes create_tx_hash = 8;
+    uint32 create_tx_vout_index = 9;
+
+    optional bytes spend_tx_hash = 10;
+    optional uint32 spend_tx_vout_index = 11;
+    optional bool is_frozen = 12;
+}
