@@ -45,14 +45,14 @@ export const LOCAL_WALLET_CONFIG_ECDSA: Required<ConfigOptions> = {
 export const REGTEST_WALLET_CONFIG: Required<ConfigOptions> = {
   ...BASE_CONFIG,
   network: "REGTEST",
-  lrc20Address: "https://regtest.lrc20.us-west-2.sparkinfra.net:18530",
+  lrc20Address: "https://regtest.lrc20.us-west-2.sparkinfra.net:443",
   signingOperators: getRegtestSigningOperators(),
 };
 
 export const MAINNET_WALLET_CONFIG: Required<ConfigOptions> = {
   ...BASE_CONFIG,
   network: "MAINNET",
-  lrc20Address: "https://mainnet.lrc20.us-west-2.sparkinfra.net:18530",
+  lrc20Address: "https://mainnet.lrc20.us-west-2.sparkinfra.net:443",
   signingOperators: getRegtestSigningOperators(),
 };
 

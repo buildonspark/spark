@@ -37,7 +37,7 @@ class NodeLrc20ConnectionManager extends Lrc20ConnectionManager {
 
   public async createLrc20Client(): Promise<SparkServiceClient & { close?: () => void }> {
     console.log("Creating LRC20 client (Node.js version)");
-    const channel = createChannel(this.lrc20ApiUrl);
+    const channel = this.createChannelWithTLS(this.lrc20ApiUrl);
     const client = this.createGrpcClient<SparkServiceClient>(SparkServiceDefinition, channel);
     return client;
   }
