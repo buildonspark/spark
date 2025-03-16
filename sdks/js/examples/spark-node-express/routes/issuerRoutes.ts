@@ -1,13 +1,13 @@
 import { IssuerSparkWallet } from "@buildonspark/issuer-sdk";
+
 import { Lrc20Protos } from "@buildonspark/lrc20-sdk";
 import { createSparkRouter } from "./sparkRoutes.js";
 import { isError } from "@lightsparkdev/core";
 import { hexToBytes } from "@noble/curves/abstract/utils";
 import {
-  formatNextCursor,
-  formatTokenTransactionResponse,
-} from "../utils/utils.js";
-
+  Transaction,
+  ListAllTokenTransactionsCursor,
+} from "@buildonspark/issuer-sdk/types";
 const ISSUER_MNEMONIC_PATH = ".issuer-mnemonic";
 
 const { router, getWallet, checkWalletInitialized } = createSparkRouter(
@@ -76,7 +76,8 @@ router.get(
  * @param {Lrc20Protos.ListAllTokenTransactionsCursor} cursor - The cursor to start from
  * @returns {Promise<{
  *   data: {
- *     transactions: Lrc20Protos.Transaction[]
+ *     transactions: Transaction[]
+ *     nextCursor: ListAllTokenTransactionsCursor
  *   }
  * }>}
  */
@@ -103,14 +104,10 @@ router.get("/token-activity", checkWalletInitialized, async (req, res) => {
       Number(pageSize),
       cursor ? cursor : undefined
     );
-    const response = tokenActivity.transactions.map((transaction) =>
-      formatTokenTransactionResponse(transaction)
-    );
-
     res.json({
       data: {
-        transactions: response,
-        nextCursor: formatNextCursor(tokenActivity.nextCursor),
+        transactions: tokenActivity.transactions,
+        nextCursor: tokenActivity.nextCursor,
       },
     });
   } catch (error) {
@@ -128,7 +125,8 @@ router.get("/token-activity", checkWalletInitialized, async (req, res) => {
  * @param {string} [layer] - The layer of the last transaction "L1" or "SPARK"
  * @returns {Promise<{
  *   data: {
- *     issuerTokenActivity: Lrc20Protos.Transaction[]
+ *     issuerTokenActivity: Transaction[]
+ *     nextCursor: ListAllTokenTransactionsCursor
  *   }
  * }>}
  */
@@ -158,13 +156,10 @@ router.get(
         pageSize ? Number(pageSize) : undefined,
         cursor ? cursor : undefined
       );
-      const response = issuerTokenActivity.transactions.map((transaction) =>
-        formatTokenTransactionResponse(transaction)
-      );
       res.json({
         data: {
-          issuerTokenActivity: response,
-          nextCursor: formatNextCursor(issuerTokenActivity.nextCursor),
+          issuerTokenActivity: issuerTokenActivity.transactions,
+          nextCursor: issuerTokenActivity.nextCursor,
         },
       });
     } catch (error) {
@@ -308,7 +303,9 @@ router.get(
     const wallet = getWallet() as IssuerSparkWallet;
     try {
       const address = wallet!.getTokenL1Address();
-      res.json({ data: { address } });
+      res.json({
+        data: { address },
+      });
     } catch (error) {
       console.error(error);
       const errorMsg = isError(error) ? error.message : "Unknown error";

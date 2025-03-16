@@ -8,6 +8,9 @@
   "exports": {
     ".": {
       "import": "./dist/issuer-sdk/src/issuer-sdk.js"
+    },
+    "./types": {
+      "import": "./dist/issuer-sdk/src/types.js"
     }
   },
   "files": [

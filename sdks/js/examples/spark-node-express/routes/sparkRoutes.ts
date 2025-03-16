@@ -375,7 +375,9 @@ export const createSparkRouter = (
           memo,
           expirySeconds,
         });
-        res.json({ invoice });
+        res.json({
+          data: { invoice },
+        });
       } catch (error) {
         console.error(error);
         const errorMsg = isError(error) ? error.message : "Unknown error";
