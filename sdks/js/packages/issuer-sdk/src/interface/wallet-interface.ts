@@ -11,6 +11,7 @@ import {
   TokenTransactionWithStatus,
   Transfer,
 } from "@buildonspark/spark-sdk/proto/spark";
+import { GetTokenActivityResponse } from "../types.js";
 
 /**
  * Interface for the IssuerSparkWallet that includes all functions from both SparkWallet and IssuerSparkWallet
@@ -61,14 +62,14 @@ export interface IssuerWalletInterface {
     cursor?: Lrc20Protos.ListAllTokenTransactionsCursor,
     operationTypes?: Lrc20Protos.OperationType[],
     beforeTimestamp?: Date,
-  ): Promise<ListAllTokenTransactionsResponse>;
+  ): Promise<GetTokenActivityResponse>;
   getIssuerTokenActivity(
     pageSize: number,
     cursor?: Lrc20Protos.ListAllTokenTransactionsCursor,
     operationTypes?: Lrc20Protos.OperationType[],
     beforeTimestamp?: Date,
     afterTimestamp?: Date,
-  ): Promise<ListAllTokenTransactionsResponse>;
+  ): Promise<GetTokenActivityResponse>;
   getTokenTransactions(
     tokenPublicKeys: string[],
     tokenTransactionHashes?: string[],

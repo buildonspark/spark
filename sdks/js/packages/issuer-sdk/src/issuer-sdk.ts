@@ -27,10 +27,11 @@ import { IssuerTokenTransactionService } from "./services/token-transactions.js"
 import { ConfigOptions } from "@buildonspark/spark-sdk/services/wallet-config";
 import {
   createLrc20ConnectionManager,
+  ILrc20ConnectionManager,
   Lrc20SparkClient,
 } from "@buildonspark/lrc20-sdk/grpc";
-import { ILrc20ConnectionManager } from "@buildonspark/lrc20-sdk/grpc";
-import { OperationType } from "../../lrc20-sdk/dist/types/proto/rpc/v1/types.js";
+import { GetTokenActivityResponse, TokenPubKeyInfoResponse } from "./types.js";
+import { convertTokenActivityToHexEncoded, convertToTokenPubKeyInfoResponse } from "./utils/types.js";
 
 const BURN_ADDRESS = "02".repeat(33);
 
@@ -103,14 +104,6 @@ export class IssuerSparkWallet
     return initResponse;
   }
 
-  public async getIssuerTokenPublicKeyInfo() {
-    return await this.getTokenPublicKeyInfo();
-  }
-
-  public async getIssuerTokenPublicKey() {
-    return await super.getIdentityPublicKey();
-  }
-
   public async getIssuerTokenBalance(): Promise<{
     balance: bigint;
   }> {
@@ -125,6 +118,26 @@ export class IssuerSparkWallet
     return {
       balance: balanceObj.tokenBalances.get(publicKey)!.balance,
     };
+  }
+
+  public async getTokenPublicKeyInfo(): Promise<TokenPubKeyInfoResponse> {
+    if (this.tokenPublicKeyInfo) {
+      return convertToTokenPubKeyInfoResponse(this.tokenPublicKeyInfo);
+    }
+
+    const tokenPublicKey = bytesToHex(this.lrc20Wallet!.pubkey);
+    const rawTokenPubkeyInfo = await this.lrc20Wallet!.getTokenPubkeyInfo(tokenPublicKey);
+    
+    this.tokenPublicKeyInfo = rawTokenPubkeyInfo;
+    return convertToTokenPubKeyInfoResponse(rawTokenPubkeyInfo);
+  }
+
+  public async getIssuerTokenPublicKeyInfo(): Promise<TokenPubKeyInfoResponse> {
+    return await this.getTokenPublicKeyInfo();
+  }
+
+  public async getIssuerTokenPublicKey() {
+    return await super.getIdentityPublicKey();
   }
 
   public async mintTokens(tokenAmount: bigint): Promise<string> {
@@ -197,7 +210,7 @@ export class IssuerSparkWallet
     operationTypes?: Lrc20Protos.OperationType[],
     beforeTimestamp?: Date,
     afterTimestamp?: Date,
-  ): Promise<ListAllTokenTransactionsResponse> {
+  ): Promise<GetTokenActivityResponse> {
     if (!this.lrc20Client) {
       throw new Error("LRC20 client not initialized");
     }
@@ -210,7 +223,8 @@ export class IssuerSparkWallet
       afterTimestamp,
       operationTypes,
     });
-    return transactions;
+
+    return convertTokenActivityToHexEncoded(transactions);
   }
 
   public async getIssuerTokenActivity(
@@ -219,7 +233,7 @@ export class IssuerSparkWallet
     operationTypes?: Lrc20Protos.OperationType[],
     beforeTimestamp?: Date,
     afterTimestamp?: Date,
-  ): Promise<ListAllTokenTransactionsResponse> {
+  ): Promise<GetTokenActivityResponse> {
     if (!this.lrc20Client) {
       throw new Error("LRC20 client not initialized");
     }
@@ -233,7 +247,8 @@ export class IssuerSparkWallet
       afterTimestamp,
       operationTypes,
     });
-    return transactions;
+
+    return convertTokenActivityToHexEncoded(transactions);
   }
 
   public async announceTokenL1({
@@ -276,17 +291,5 @@ export class IssuerSparkWallet
     p2trAddress: string,
   ): Promise<string> {
     throw new Error("Not implemented");
-  }
-
-  public async getTokenPublicKeyInfo(): Promise<TokenPubkeyInfo> {
-    if (this.tokenPublicKeyInfo) {
-      return this.tokenPublicKeyInfo;
-    }
-
-    let tokenPublicKey = bytesToHex(this.lrc20Wallet!.pubkey);
-
-    this.tokenPublicKeyInfo =
-      await this.lrc20Wallet!.getTokenPubkeyInfo(tokenPublicKey);
-    return this.tokenPublicKeyInfo;
   }
 }
