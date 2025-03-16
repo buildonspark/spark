@@ -2,16 +2,29 @@ import express from "express";
 import sparkRoutes from "../routes/sparkRoutes.js";
 import issuerRoutes from "../routes/issuerRoutes.js";
 import { isError } from "@lightsparkdev/core";
+import { bytesToHex } from "@noble/curves/abstract/utils";
 
 const app = express();
+
+enum BitcoinNetwork {
+  MAINNET = "MAINNET",
+  REGTEST = "REGTEST",
+}
+export const BITCOIN_NETWORK = BitcoinNetwork.REGTEST;
+
 app.use(express.json());
-// parse bigint to string
+// parse bigint and Uint8Array to string
 app.use((req, res, next) => {
   res.json = function (data) {
     return res.send(
-      JSON.stringify(data, (key, value) =>
-        typeof value === "bigint" ? value.toString() : value
-      )
+      JSON.stringify(data, (key, value) => {
+        if (typeof value === "bigint") {
+          return value.toString();
+        } else if (value instanceof Uint8Array) {
+          return bytesToHex(value);
+        }
+        return value;
+      })
     );
   };
   next();

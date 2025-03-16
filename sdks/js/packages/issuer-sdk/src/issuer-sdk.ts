@@ -4,7 +4,7 @@ import {
   TokenPubkeyAnnouncement,
   TokenPubkeyInfo,
   ListAllTokenTransactionsResponse,
-  ListAllTokenTransactionsCursor,
+  Lrc20Protos,
 } from "@buildonspark/lrc20-sdk";
 import { SparkWallet, SparkWalletProps } from "@buildonspark/spark-sdk";
 import { LeafWithPreviousTransactionData } from "@buildonspark/spark-sdk/proto/spark";
@@ -193,8 +193,8 @@ export class IssuerSparkWallet
 
   public async getTokenActivity(
     pageSize: number = 100,
-    cursor?: ListAllTokenTransactionsCursor,
-    operationTypes?: OperationType[],
+    cursor?: Lrc20Protos.ListAllTokenTransactionsCursor,
+    operationTypes?: Lrc20Protos.OperationType[],
     beforeTimestamp?: Date,
     afterTimestamp?: Date,
   ): Promise<ListAllTokenTransactionsResponse> {
@@ -215,8 +215,8 @@ export class IssuerSparkWallet
 
   public async getIssuerTokenActivity(
     pageSize: number = 100,
-    cursor?: ListAllTokenTransactionsCursor,
-    operationTypes?: OperationType[],
+    cursor?: Lrc20Protos.ListAllTokenTransactionsCursor,
+    operationTypes?: Lrc20Protos.OperationType[],
     beforeTimestamp?: Date,
     afterTimestamp?: Date,
   ): Promise<ListAllTokenTransactionsResponse> {

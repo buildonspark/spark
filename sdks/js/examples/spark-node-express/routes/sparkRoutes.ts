@@ -8,6 +8,7 @@ import {
   loadMnemonic,
   saveMnemonic,
 } from "../utils/utils.js";
+import { BITCOIN_NETWORK } from "../src/index.js";
 
 const SPARK_MNEMONIC_PATH = ".spark-mnemonic";
 
@@ -38,7 +39,7 @@ export const createSparkRouter = (
         res = await SparkWallet.create({
           mnemonicOrSeed: mnemonicOrSeed,
           options: {
-            network: "REGTEST",
+            network: BITCOIN_NETWORK,
           },
         });
       } else if (walletClass === IssuerSparkWallet) {
@@ -175,7 +176,7 @@ export const createSparkRouter = (
    *     balance: string
    *     tokenBalances: {
    *       [tokenPublicKey: string]: {
-   *         balance: string
+   *         balance: string // BigInt converted to string in middleware
    *       }
    *     }
    *   }
@@ -185,12 +186,12 @@ export const createSparkRouter = (
     const wallet = getWallet();
     try {
       const balance = await wallet!.getBalance();
-      const tokenBalances: Record<string, { balance: string }> =
+      const tokenBalances: Record<string, { balance: BigInt }> =
         balance.tokenBalances
           ? Object.fromEntries(
               [...balance.tokenBalances].map(([key, value]) => [
                 key,
-                { balance: value.balance.toString() },
+                { balance: value.balance },
               ])
             )
           : {};

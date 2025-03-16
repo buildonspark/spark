@@ -132,4 +132,4 @@ export type {
 } from "./types.ts";
 
 export * from "./proto/rpc/v1/service.ts";
-export { ListAllTokenTransactionsCursor, Transaction, OperationType } from "./proto/rpc/v1/types.js";
+export * as Lrc20Protos from "./proto/rpc/v1/types.js";

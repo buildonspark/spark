@@ -1,6 +1,9 @@
 import { ListAllTokenTransactionsResponse } from "@buildonspark/lrc20-sdk";
-import { CreateLightningInvoiceParams, PayLightningInvoiceParams } from "@buildonspark/spark-sdk";
-import { LRCWallet, ListAllTokenTransactionsCursor } from "@buildonspark/lrc20-sdk";
+import {
+  CreateLightningInvoiceParams,
+  PayLightningInvoiceParams,
+} from "@buildonspark/spark-sdk";
+import { LRCWallet, Lrc20Protos } from "@buildonspark/lrc20-sdk";
 import {
   LeafWithPreviousTransactionData,
   QueryAllTransfersResponse,
@@ -8,7 +11,6 @@ import {
   TokenTransactionWithStatus,
   Transfer,
 } from "@buildonspark/spark-sdk/proto/spark";
-import { OperationType } from "@buildonspark/lrc20-sdk";
 
 /**
  * Interface for the IssuerSparkWallet that includes all functions from both SparkWallet and IssuerSparkWallet
@@ -54,9 +56,23 @@ export interface IssuerWalletInterface {
     balance: bigint;
   }>;
   mintTokens(tokenAmount: bigint): Promise<string>;
-  getTokenActivity(pageSize: number, cursor?: ListAllTokenTransactionsCursor, operationTypes?: OperationType[], beforeTimestamp?: Date): Promise<ListAllTokenTransactionsResponse>;
-  getIssuerTokenActivity(pageSize: number, cursor?: ListAllTokenTransactionsCursor, operationTypes?: OperationType[], beforeTimestamp?: Date, afterTimestamp?: Date): Promise<ListAllTokenTransactionsResponse>;
-  getTokenTransactions(tokenPublicKeys: string[], tokenTransactionHashes?: string[]): Promise<TokenTransactionWithStatus[]>;
+  getTokenActivity(
+    pageSize: number,
+    cursor?: Lrc20Protos.ListAllTokenTransactionsCursor,
+    operationTypes?: Lrc20Protos.OperationType[],
+    beforeTimestamp?: Date,
+  ): Promise<ListAllTokenTransactionsResponse>;
+  getIssuerTokenActivity(
+    pageSize: number,
+    cursor?: Lrc20Protos.ListAllTokenTransactionsCursor,
+    operationTypes?: Lrc20Protos.OperationType[],
+    beforeTimestamp?: Date,
+    afterTimestamp?: Date,
+  ): Promise<ListAllTokenTransactionsResponse>;
+  getTokenTransactions(
+    tokenPublicKeys: string[],
+    tokenTransactionHashes?: string[],
+  ): Promise<TokenTransactionWithStatus[]>;
 
   burnTokens(
     tokenAmount: bigint,

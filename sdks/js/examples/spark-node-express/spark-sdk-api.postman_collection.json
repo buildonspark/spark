@@ -1,0 +1,891 @@
+{
+	"info": {
+		"_postman_id": "51f0ecff-d4f2-4231-b5d6-6657da5b66e3",
+		"name": "Spark SDK API",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "41482439"
+	},
+	"item": [
+		{
+			"name": "Spark Wallet",
+			"item": [
+				{
+					"name": "Init Wallet",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "localhost:4000/spark-wallet/wallet/init",
+							"host": [
+								"localhost"
+							],
+							"port": "4000",
+							"path": [
+								"spark-wallet",
+								"wallet",
+								"init"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Identity Public Key",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "localhost:4000/spark-wallet/wallet/identity-public-key",
+							"host": [
+								"localhost"
+							],
+							"port": "4000",
+							"path": [
+								"spark-wallet",
+								"wallet",
+								"identity-public-key"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Spark Address",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "localhost:4000/spark-wallet/wallet/spark-address",
+							"host": [
+								"localhost"
+							],
+							"port": "4000",
+							"path": [
+								"spark-wallet",
+								"wallet",
+								"spark-address"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Balance",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "localhost:4000/spark-wallet/wallet/balance",
+							"host": [
+								"localhost"
+							],
+							"port": "4000",
+							"path": [
+								"spark-wallet",
+								"wallet",
+								"balance"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Transfers",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "localhost:4000/spark-wallet/wallet/transfers",
+							"host": [
+								"localhost"
+							],
+							"port": "4000",
+							"path": [
+								"spark-wallet",
+								"wallet",
+								"transfers"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Pending Transfers",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "localhost:4000/spark-wallet/wallet/pending-transfers",
+							"host": [
+								"localhost"
+							],
+							"port": "4000",
+							"path": [
+								"spark-wallet",
+								"wallet",
+								"pending-transfers"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Claim Transfers",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "localhost:4000/spark-wallet/wallet/claim-transfers/",
+							"host": [
+								"localhost"
+							],
+							"port": "4000",
+							"path": [
+								"spark-wallet",
+								"wallet",
+								"claim-transfers",
+								""
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Send Spark Transfer",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"receiverSparkAddress\": \"placeholder\",\n    \"amountSats\": 1000\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "localhost:4000/spark-wallet/spark/send-transfer",
+							"host": [
+								"localhost"
+							],
+							"port": "4000",
+							"path": [
+								"spark-wallet",
+								"spark",
+								"send-transfer"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create Lightning Invoice",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"amountSats\": 10000\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "localhost:4000/spark-wallet/lightning/create-invoice",
+							"host": [
+								"localhost"
+							],
+							"port": "4000",
+							"path": [
+								"spark-wallet",
+								"lightning",
+								"create-invoice"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Pay Lightning Invoice",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"invoice\": \"lightning-invoice\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "localhost:4000/spark-wallet/lightning/pay-invoice",
+							"host": [
+								"localhost"
+							],
+							"port": "4000",
+							"path": [
+								"spark-wallet",
+								"lightning",
+								"pay-invoice"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get L1 Deposit Address",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "localhost:4000/spark-wallet/bitcoin/deposit-address",
+							"host": [
+								"localhost"
+							],
+							"port": "4000",
+							"path": [
+								"spark-wallet",
+								"bitcoin",
+								"deposit-address"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Claim L1 Deposit",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"txid\": \"transaction-id\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "localhost:4000/spark-wallet/bitcoin/claim-deposit",
+							"host": [
+								"localhost"
+							],
+							"port": "4000",
+							"path": [
+								"spark-wallet",
+								"bitcoin",
+								"claim-deposit"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Withdraw to L1",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"onChainAddress\": \"onChainAddress...\",\n    \"targetAmountSats\": 1000\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "localhost:4000/spark-wallet/bitcoin/withdraw",
+							"host": [
+								"localhost"
+							],
+							"port": "4000",
+							"path": [
+								"spark-wallet",
+								"bitcoin",
+								"withdraw"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Transfer Tokens",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"tokenPublicKey\": \"placeholder\",\n    \"tokenAmount\": 10,\n    \"receiverSparkAddress\": \"placeholder\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "localhost:4000/spark-wallet/tokens/transfer",
+							"host": [
+								"localhost"
+							],
+							"port": "4000",
+							"path": [
+								"spark-wallet",
+								"tokens",
+								"transfer"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Withdraw Tokens",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"tokenPublicKey\": \"placeholder\",\n    \"receiverPublicKey\": \"Optional: placeholder\",\n    \"leafIds\": [\"Optional\", \"array\"]\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "localhost:4000/spark-wallet/tokens/withdraw",
+							"host": [
+								"localhost"
+							],
+							"port": "4000",
+							"path": [
+								"spark-wallet",
+								"tokens",
+								"withdraw"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Issuer Wallet",
+			"item": [
+				{
+					"name": "Init Wallet",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "localhost:4000/issuer-wallet/wallet/init",
+							"host": [
+								"localhost"
+							],
+							"port": "4000",
+							"path": [
+								"issuer-wallet",
+								"wallet",
+								"init"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Identity Public Key",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "localhost:4000/issuer-wallet/wallet/identity-public-key",
+							"host": [
+								"localhost"
+							],
+							"port": "4000",
+							"path": [
+								"issuer-wallet",
+								"wallet",
+								"identity-public-key"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Spark Address",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "localhost:4000/issuer-wallet/wallet/spark-address",
+							"host": [
+								"localhost"
+							],
+							"port": "4000",
+							"path": [
+								"issuer-wallet",
+								"wallet",
+								"spark-address"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Balance",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "localhost:4000/issuer-wallet/wallet/balance",
+							"host": [
+								"localhost"
+							],
+							"port": "4000",
+							"path": [
+								"issuer-wallet",
+								"wallet",
+								"balance"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Token Activity",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "localhost:4000/issuer-wallet/token-activity",
+							"host": [
+								"localhost"
+							],
+							"port": "4000",
+							"path": [
+								"issuer-wallet",
+								"token-activity"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Issuer Token Activity",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "localhost:4000/issuer-wallet/issuer-token-activity",
+							"host": [
+								"localhost"
+							],
+							"port": "4000",
+							"path": [
+								"issuer-wallet",
+								"issuer-token-activity"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Transfers",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "localhost:4000/issuer-wallet/wallet/transfers",
+							"host": [
+								"localhost"
+							],
+							"port": "4000",
+							"path": [
+								"issuer-wallet",
+								"wallet",
+								"transfers"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Pending Transfers",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "localhost:4000/issuer-wallet/wallet/pending-transfers",
+							"host": [
+								"localhost"
+							],
+							"port": "4000",
+							"path": [
+								"issuer-wallet",
+								"wallet",
+								"pending-transfers"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Claim Transfers",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "localhost:4000/issuer-wallet/wallet/claim-transfers/",
+							"host": [
+								"localhost"
+							],
+							"port": "4000",
+							"path": [
+								"issuer-wallet",
+								"wallet",
+								"claim-transfers",
+								""
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Issuer Token Balance",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "localhost:4000/issuer-wallet/token-balance",
+							"host": [
+								"localhost"
+							],
+							"port": "4000",
+							"path": [
+								"issuer-wallet",
+								"token-balance"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Token Public Key Info",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "localhost:4000/issuer-wallet/token-public-key-info",
+							"host": [
+								"localhost"
+							],
+							"port": "4000",
+							"path": [
+								"issuer-wallet",
+								"token-public-key-info"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "[Spark] Mint Tokens",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"tokenAmount\": 1000\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "localhost:4000/issuer-wallet/spark/mint-tokens",
+							"host": [
+								"localhost"
+							],
+							"port": "4000",
+							"path": [
+								"issuer-wallet",
+								"spark",
+								"mint-tokens"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "[Spark] Transfer Tokens",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"tokenPublicKey\": \"placeholder\",\n    \"tokenAmount\": 10,\n    \"receiverSparkAddress\": \"placeholder\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "localhost:4000/issuer-wallet/tokens/transfer",
+							"host": [
+								"localhost"
+							],
+							"port": "4000",
+							"path": [
+								"issuer-wallet",
+								"tokens",
+								"transfer"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "[Spark] Withdraw Tokens",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"tokenPublicKey\": \"placeholder\",\n    \"receiverPublicKey\": \"Optional: placeholder\",\n    \"leafIds\": [\"Optional\", \"array\"]\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "localhost:4000/issuer-wallet/tokens/withdraw",
+							"host": [
+								"localhost"
+							],
+							"port": "4000",
+							"path": [
+								"issuer-wallet",
+								"tokens",
+								"withdraw"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "[Spark] Burn Tokens",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"tokenAmount\": 10\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "localhost:4000/issuer-wallet/spark/burn-tokens",
+							"host": [
+								"localhost"
+							],
+							"port": "4000",
+							"path": [
+								"issuer-wallet",
+								"spark",
+								"burn-tokens"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "[Spark] Freeze Tokens",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"ownerPublicKey\": \"in hex\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "localhost:4000/issuer-wallet/spark/freeze-tokens",
+							"host": [
+								"localhost"
+							],
+							"port": "4000",
+							"path": [
+								"issuer-wallet",
+								"spark",
+								"freeze-tokens"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "[Spark] Unfreeze Tokens",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"ownerPublicKey\": \"in hex\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "localhost:4000/issuer-wallet/spark/unfreeze-tokens",
+							"host": [
+								"localhost"
+							],
+							"port": "4000",
+							"path": [
+								"issuer-wallet",
+								"spark",
+								"unfreeze-tokens"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Issuer L1 Address",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "localhost:4000/issuer-wallet/on-chain/issuer-address",
+							"host": [
+								"localhost"
+							],
+							"port": "4000",
+							"path": [
+								"issuer-wallet",
+								"on-chain",
+								"issuer-address"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Announce Token L1",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"tokenName\": \"SparkToken\",\n    \"tokenTicker\": \"SKT\",\n    \"decimals\": 2,\n    \"maxSupply\": 100000,\n    \"isFreezable\": true\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "localhost:4000/issuer-wallet/on-chain/announce-token",
+							"host": [
+								"localhost"
+							],
+							"port": "4000",
+							"path": [
+								"issuer-wallet",
+								"on-chain",
+								"announce-token"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Mint Tokens L1",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"tokenAmount\": 1000\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "localhost:4000/issuer-wallet/on-chain/mint-tokens",
+							"host": [
+								"localhost"
+							],
+							"port": "4000",
+							"path": [
+								"issuer-wallet",
+								"on-chain",
+								"mint-tokens"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Transfer Tokens L1",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"tokenAmount\": 10,\n    \"receiverPublicKey\": \"placeholder\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "localhost:4000/issuer-wallet/on-chain/transfer-tokens",
+							"host": [
+								"localhost"
+							],
+							"port": "4000",
+							"path": [
+								"issuer-wallet",
+								"on-chain",
+								"transfer-tokens"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	]
+}

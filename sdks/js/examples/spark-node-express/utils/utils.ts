@@ -1,6 +1,7 @@
 import { promises as fs } from "fs";
 import { bytesToHex } from "@noble/hashes/utils";
 import { SparkProto } from "@buildonspark/spark-sdk/types";
+import { Lrc20Protos } from "@buildonspark/lrc20-sdk";
 
 // Helper functions for mnemonic persistence
 export async function saveMnemonic(path: string, mnemonic: string) {
@@ -101,5 +102,130 @@ export function formatTransferResponse(transfer: SparkProto.Transfer) {
   } catch (error) {
     console.error("Error formatting transfer:", error);
     throw new Error("Failed to format transfer response");
+  }
+}
+
+export function formatTokenTransactionResponse(
+  transaction: Lrc20Protos.Transaction
+) {
+  if (!transaction) return null;
+  try {
+    if (transaction.transaction) {
+      switch (transaction.transaction.$case) {
+        case "onChain":
+          return {
+            type: "OnChain",
+            details: formatOnChainTokenTransactionResponse(
+              transaction.transaction.onChain
+            ),
+          };
+        case "spark":
+          return {
+            type: "Spark",
+            details: formatSparkTokenTransactionResponse(
+              transaction.transaction.spark
+            ),
+          };
+        default:
+          throw new Error("Unknown transaction type");
+      }
+    }
+  } catch (error) {
+    console.error("Error formatting token transaction:", error);
+    throw new Error("Failed to format token transaction response");
+  }
+}
+
+export function formatOnChainTokenTransactionResponse(
+  transaction: Lrc20Protos.OnChainTransaction
+) {
+  if (!transaction) return null;
+  try {
+    return {
+      id: transaction.transactionHash,
+      operationType: Lrc20Protos.OperationType[transaction.operationType],
+      status: Lrc20Protos.OnChainTransactionStatus[transaction.status],
+      rawTx: transaction.rawtx,
+      inputs: transaction.inputs.map((input) => ({
+        rawTx: input.rawTx,
+        vout: input.vout,
+        amountSats: input.amountSats,
+        tokenPublicKey: input.tokenPublicKey,
+        tokenAmount: input.tokenAmount,
+      })),
+      outputs: transaction.outputs.map((output) => ({
+        rawTx: output.rawTx,
+        vout: output.vout,
+        amountSats: output.amountSats,
+        tokenPublicKey: output.tokenPublicKey,
+        tokenAmount: output.tokenAmount,
+      })),
+      broadcastedAt: transaction.broadcastedAt,
+      confirmedAt: transaction.confirmedAt,
+    };
+  } catch (error) {
+    console.error("Error formatting on-chain token transaction:", error);
+    throw new Error("Failed to format on-chain token transaction response");
+  }
+}
+
+export function formatSparkTokenTransactionResponse(
+  transaction: Lrc20Protos.SparkTransaction
+) {
+  if (!transaction) return null;
+  try {
+    return {
+      id: transaction.transactionHash,
+      operationType: Lrc20Protos.OperationType[transaction.operationType],
+      status: Lrc20Protos.SparkTransactionStatus[transaction.status],
+      confirmedAt: transaction.confirmedAt,
+      leavesToCreate: transaction.leavesToCreate.map((leaf) => ({
+        id: leaf.id,
+        tokenPublicKey: leaf.tokenPublicKey,
+        ownerPublicKey: leaf.ownerPublicKey,
+        revocationPublicKey: leaf.revocationPublicKey,
+        tokenAmount: leaf.tokenAmount,
+        createTxHash: leaf.createTxHash,
+        createTxVoutIndex: leaf.createTxVoutIndex,
+        spendTxHash: leaf.spendTxHash,
+        spendTxVoutIndex: leaf.spendTxVoutIndex,
+        isFrozen: leaf.isFrozen,
+      })),
+    };
+  } catch (error) {
+    console.error("Error formatting spark token transaction:", error);
+    throw new Error("Failed to format spark token transaction response");
+  }
+}
+
+const LAYER_MAP = {
+  [Lrc20Protos.Layer.L1]: "L1",
+  [Lrc20Protos.Layer.SPARK]: "SPARK",
+  [Lrc20Protos.Layer.UNRECOGNIZED]: "UNRECOGNIZED",
+};
+
+/**
+ * Formats a next cursor object for API response
+ * @param {Lrc20Protos.ListAllTokenTransactionsCursor} nextCursor - The next cursor object from SDK
+ * @returns {{
+ *   lastTransactionHash: string,
+ *   layer: string
+ * }} Formatted next cursor response
+ */
+export function formatNextCursor(
+  nextCursor: Lrc20Protos.ListAllTokenTransactionsCursor | undefined
+) {
+  if (!nextCursor) return null;
+  try {
+    return {
+      lastTransactionHash: bytesToHex(nextCursor.lastTransactionHash),
+      layer:
+        nextCursor.layer in LAYER_MAP
+          ? LAYER_MAP[nextCursor.layer as keyof typeof LAYER_MAP]
+          : "UNRECOGNIZED",
+    };
+  } catch (error) {
+    console.error("Error formatting next cursor:", error);
+    throw new Error("Failed to format next cursor");
   }
 }
