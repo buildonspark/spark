@@ -45,6 +45,7 @@ To change the bitcoin network, update the `BITCOIN_NETWORK` variable in [`./src/
 ## Postman Collection for testing:
 
 You can import the below collection into postman to test the endpoints in dev.
+There are default values set in the `body` > `raw` of POST requests that you can easily edit.
 
 [Spark SDK API](./spark-sdk-api.postman_collection.json)
 
@@ -241,6 +242,18 @@ POST /issuer-wallet/bitcoin/claim-deposit
 {
   txid: string
 }
+```
+
+---
+
+### Get Token L1 Address
+
+Returns the L1 address of the embedded LRC20 wallet.
+This address is used for funding L1 token transactions like withdraw.
+
+```http
+GET /spark-wallet/bitcoin/token-l1-address
+GET /issuer-wallet/bitcoin/token-l1-address
 ```
 
 ---

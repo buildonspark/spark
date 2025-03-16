@@ -345,6 +345,26 @@
 					"response": []
 				},
 				{
+					"name": "Get Token L1 Address",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "localhost:4000/spark-wallet/bitcoin/token-l1-address",
+							"host": [
+								"localhost"
+							],
+							"port": "4000",
+							"path": [
+								"spark-wallet",
+								"bitcoin",
+								"token-l1-address"
+							]
+						}
+					},
+					"response": []
+				},
+				{
 					"name": "Withdraw Tokens",
 					"request": {
 						"method": "POST",

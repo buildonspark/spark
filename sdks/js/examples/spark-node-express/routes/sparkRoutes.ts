@@ -437,7 +437,7 @@ export const createSparkRouter = (
 
   /**
    * Get L1 Address used for funding L1 token transactions like announce and withdraw.
-   * @route GET /bitcoin/spark-address
+   * @route GET /bitcoin/token-l1-address
    * @returns {Promise<{
    *   data: {
    *     sparkAddress: string
