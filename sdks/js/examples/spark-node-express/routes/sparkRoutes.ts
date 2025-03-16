@@ -436,6 +436,29 @@ export const createSparkRouter = (
   });
 
   /**
+   * Get L1 Address used for funding L1 token transactions like announce and withdraw.
+   * @route GET /bitcoin/spark-address
+   * @returns {Promise<{
+   *   data: {
+   *     sparkAddress: string
+   *   }
+   * }>}
+   */
+  router.get("/bitcoin/token-l1-address", async (req, res) => {
+    const wallet = getWallet();
+    try {
+      const address = await wallet!.getTokenL1Address();
+      res.json({
+        data: { address },
+      });
+    } catch (error) {
+      console.error(error);
+      const errorMsg = isError(error) ? error.message : "Unknown error";
+      res.status(500).json({ error: errorMsg });
+    }
+  });
+
+  /**
    * Claim deposit
    * @route POST /bitcoin/claim-deposit
    * @param {string} txid - The transaction ID of the deposit
