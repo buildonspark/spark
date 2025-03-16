@@ -24,8 +24,8 @@ export const ELECTRS_URL = Object.freeze({
 });
 
 export const LRC_NODE_URL = Object.freeze({
-  [NetworkType.MAINNET]: "https://mainnet.lrc20.dev.dev.sparkinfra.net",
-  [NetworkType.REGTEST]: "https://regtest.lrc20.dev.dev.sparkinfra.net",
+  [NetworkType.MAINNET]: "https://mainnet.lrc20.us-west-2.sparkinfra.net",
+  [NetworkType.REGTEST]: "https://regtest.lrc20.us-west-2.sparkinfra.net",
   [NetworkType.TESTNET]: "https://rpc.lrc20d.mutiny.18.215.149.26.sslip.io",
   [NetworkType.DEVNET]: "https://rpc.lrc20.stage.18.215.149.26.sslip.io",
   [NetworkType.LOCAL]: "http://127.0.0.1:18333",
