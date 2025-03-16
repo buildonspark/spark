@@ -5,6 +5,8 @@ import { Lrc20ConnectionManager } from './interface.js';
 
 // Browser-specific implementation of ConnectionManager functionality
 class BrowserLrc20ConnectionManager extends Lrc20ConnectionManager {
+  private lrc20Client: SparkServiceClient | undefined;
+
   constructor(lrc20ApiUrl: string) {
     super(lrc20ApiUrl);
   }
@@ -19,9 +21,13 @@ class BrowserLrc20ConnectionManager extends Lrc20ConnectionManager {
   }
 
   public async createLrc20Client(): Promise<SparkServiceClient & { close?: () => void }> {
-    console.log("Creating LRC20 client (Browser version)");
+    if (this.lrc20Client) {
+      return this.lrc20Client;
+    }
+
     const channel = this.createChannel(this.lrc20ApiUrl);
     const client = this.createGrpcClient<SparkServiceClient>(SparkServiceDefinition, channel);
+    this.lrc20Client = client;
     return client;
   }
 
