@@ -10,7 +10,7 @@ import {
 
 const ISSUER_MNEMONIC_PATH = ".issuer-mnemonic";
 
-const { router, getWallet } = createSparkRouter(
+const { router, getWallet, checkWalletInitialized } = createSparkRouter(
   IssuerSparkWallet,
   ISSUER_MNEMONIC_PATH
 );
@@ -22,7 +22,7 @@ const { router, getWallet } = createSparkRouter(
  *  data: {balance: string},
  * }>}
  */
-router.get("/token-balance", async (req, res) => {
+router.get("/token-balance", checkWalletInitialized, async (req, res) => {
   const wallet = getWallet() as IssuerSparkWallet;
   try {
     const balance = await wallet!.getIssuerTokenBalance();
@@ -48,20 +48,24 @@ router.get("/token-balance", async (req, res) => {
  *   },
  * }>}
  */
-router.get("/token-public-key-info", async (req, res) => {
-  const wallet = getWallet() as IssuerSparkWallet;
-  try {
-    const tokenPublicKeyInfo = await wallet!.getTokenPublicKeyInfo();
-    console.log("response: ", tokenPublicKeyInfo);
-    res.json({
-      data: { tokenPublicKeyInfo },
-    });
-  } catch (error) {
-    console.error(error);
-    const errorMsg = isError(error) ? error.message : "Unknown error";
-    res.status(500).json({ error: errorMsg });
+router.get(
+  "/token-public-key-info",
+  checkWalletInitialized,
+  async (req, res) => {
+    const wallet = getWallet() as IssuerSparkWallet;
+    try {
+      const tokenPublicKeyInfo = await wallet!.getTokenPublicKeyInfo();
+      console.log("response: ", tokenPublicKeyInfo);
+      res.json({
+        data: { tokenPublicKeyInfo },
+      });
+    } catch (error) {
+      console.error(error);
+      const errorMsg = isError(error) ? error.message : "Unknown error";
+      res.status(500).json({ error: errorMsg });
+    }
   }
-});
+);
 
 /**
  * Gets the activity of the issuer's token
@@ -76,7 +80,7 @@ router.get("/token-public-key-info", async (req, res) => {
  *   }
  * }>}
  */
-router.get("/token-activity", async (req, res) => {
+router.get("/token-activity", checkWalletInitialized, async (req, res) => {
   const {
     pageSize = 20,
     lastTransactionHash,
@@ -128,44 +132,48 @@ router.get("/token-activity", async (req, res) => {
  *   }
  * }>}
  */
-router.get("/issuer-token-activity", async (req, res) => {
-  const {
-    pageSize = 20,
-    lastTransactionHash,
-    layer,
-  } = req.query as {
-    pageSize: number | undefined;
-    lastTransactionHash: string | undefined;
-    layer: string | undefined;
-  };
-  const wallet = getWallet() as IssuerSparkWallet;
-  const cursor =
-    lastTransactionHash && layer
-      ? {
-          lastTransactionHash: hexToBytes(lastTransactionHash),
-          layer: Lrc20Protos.Layer[layer as keyof typeof Lrc20Protos.Layer],
-        }
-      : undefined;
-  try {
-    const issuerTokenActivity = await wallet!.getIssuerTokenActivity(
-      pageSize ? Number(pageSize) : undefined,
-      cursor ? cursor : undefined
-    );
-    const response = issuerTokenActivity.transactions.map((transaction) =>
-      formatTokenTransactionResponse(transaction)
-    );
-    res.json({
-      data: {
-        issuerTokenActivity: response,
-        nextCursor: formatNextCursor(issuerTokenActivity.nextCursor),
-      },
-    });
-  } catch (error) {
-    console.error(error);
-    const errorMsg = isError(error) ? error.message : "Unknown error";
-    res.status(500).json({ error: errorMsg });
+router.get(
+  "/issuer-token-activity",
+  checkWalletInitialized,
+  async (req, res) => {
+    const {
+      pageSize = 20,
+      lastTransactionHash,
+      layer,
+    } = req.query as {
+      pageSize: number | undefined;
+      lastTransactionHash: string | undefined;
+      layer: string | undefined;
+    };
+    const wallet = getWallet() as IssuerSparkWallet;
+    const cursor =
+      lastTransactionHash && layer
+        ? {
+            lastTransactionHash: hexToBytes(lastTransactionHash),
+            layer: Lrc20Protos.Layer[layer as keyof typeof Lrc20Protos.Layer],
+          }
+        : undefined;
+    try {
+      const issuerTokenActivity = await wallet!.getIssuerTokenActivity(
+        pageSize ? Number(pageSize) : undefined,
+        cursor ? cursor : undefined
+      );
+      const response = issuerTokenActivity.transactions.map((transaction) =>
+        formatTokenTransactionResponse(transaction)
+      );
+      res.json({
+        data: {
+          issuerTokenActivity: response,
+          nextCursor: formatNextCursor(issuerTokenActivity.nextCursor),
+        },
+      });
+    } catch (error) {
+      console.error(error);
+      const errorMsg = isError(error) ? error.message : "Unknown error";
+      res.status(500).json({ error: errorMsg });
+    }
   }
-});
+);
 
 /**
  * Mint tokens
@@ -177,7 +185,7 @@ router.get("/issuer-token-activity", async (req, res) => {
  *   }
  * }>}
  */
-router.post("/spark/mint-tokens", async (req, res) => {
+router.post("/spark/mint-tokens", checkWalletInitialized, async (req, res) => {
   const wallet = getWallet() as IssuerSparkWallet;
   try {
     const { tokenAmount } = req.body as { tokenAmount: number };
@@ -202,7 +210,7 @@ router.post("/spark/mint-tokens", async (req, res) => {
  *   }
  * }>}
  */
-router.post("/spark/burn-tokens", async (req, res) => {
+router.post("/spark/burn-tokens", checkWalletInitialized, async (req, res) => {
   const wallet = getWallet() as IssuerSparkWallet;
   try {
     const { tokenAmount } = req.body as { tokenAmount: number };
@@ -229,23 +237,27 @@ router.post("/spark/burn-tokens", async (req, res) => {
  * }>}
  */
 
-router.post("/spark/freeze-tokens", async (req, res) => {
-  const wallet = getWallet() as IssuerSparkWallet;
-  try {
-    const { ownerPublicKey } = req.body as { ownerPublicKey: string };
-    const frozenTokens = await wallet!.freezeTokens(ownerPublicKey);
-    res.json({
-      data: {
-        impactedLeafIds: frozenTokens.impactedLeafIds,
-        impactedTokenAmount: frozenTokens.impactedTokenAmount,
-      },
-    });
-  } catch (error) {
-    console.error(error);
-    const errorMsg = isError(error) ? error.message : "Unknown error";
-    res.status(500).json({ error: errorMsg });
+router.post(
+  "/spark/freeze-tokens",
+  checkWalletInitialized,
+  async (req, res) => {
+    const wallet = getWallet() as IssuerSparkWallet;
+    try {
+      const { ownerPublicKey } = req.body as { ownerPublicKey: string };
+      const frozenTokens = await wallet!.freezeTokens(ownerPublicKey);
+      res.json({
+        data: {
+          impactedLeafIds: frozenTokens.impactedLeafIds,
+          impactedTokenAmount: frozenTokens.impactedTokenAmount,
+        },
+      });
+    } catch (error) {
+      console.error(error);
+      const errorMsg = isError(error) ? error.message : "Unknown error";
+      res.status(500).json({ error: errorMsg });
+    }
   }
-});
+);
 
 /**
  * Unfreeze tokens
@@ -258,23 +270,27 @@ router.post("/spark/freeze-tokens", async (req, res) => {
  *   }
  * }>}
  */
-router.post("/spark/unfreeze-tokens", async (req, res) => {
-  const wallet = getWallet() as IssuerSparkWallet;
-  try {
-    const { ownerPublicKey } = req.body as { ownerPublicKey: string };
-    const thawedTokens = await wallet!.unfreezeTokens(ownerPublicKey);
-    res.json({
-      data: {
-        impactedLeafIds: thawedTokens.impactedLeafIds,
-        impactedTokenAmount: thawedTokens.impactedTokenAmount,
-      },
-    });
-  } catch (error) {
-    console.error(error);
-    const errorMsg = isError(error) ? error.message : "Unknown error";
-    res.status(500).json({ error: errorMsg });
+router.post(
+  "/spark/unfreeze-tokens",
+  checkWalletInitialized,
+  async (req, res) => {
+    const wallet = getWallet() as IssuerSparkWallet;
+    try {
+      const { ownerPublicKey } = req.body as { ownerPublicKey: string };
+      const thawedTokens = await wallet!.unfreezeTokens(ownerPublicKey);
+      res.json({
+        data: {
+          impactedLeafIds: thawedTokens.impactedLeafIds,
+          impactedTokenAmount: thawedTokens.impactedTokenAmount,
+        },
+      });
+    } catch (error) {
+      console.error(error);
+      const errorMsg = isError(error) ? error.message : "Unknown error";
+      res.status(500).json({ error: errorMsg });
+    }
   }
-});
+);
 
 /**
  * Gets the L1 address of the issuer wallet. You must deposit to this address before you can announce on L1.
@@ -285,17 +301,21 @@ router.post("/spark/unfreeze-tokens", async (req, res) => {
  *   }
  * }>}
  */
-router.get("/on-chain/issuer-address", async (req, res) => {
-  const wallet = getWallet() as IssuerSparkWallet;
-  try {
-    const address = wallet!.getTokenL1Address();
-    res.json({ data: { address } });
-  } catch (error) {
-    console.error(error);
-    const errorMsg = isError(error) ? error.message : "Unknown error";
-    res.status(500).json({ error: errorMsg });
+router.get(
+  "/on-chain/issuer-address",
+  checkWalletInitialized,
+  async (req, res) => {
+    const wallet = getWallet() as IssuerSparkWallet;
+    try {
+      const address = wallet!.getTokenL1Address();
+      res.json({ data: { address } });
+    } catch (error) {
+      console.error(error);
+      const errorMsg = isError(error) ? error.message : "Unknown error";
+      res.status(500).json({ error: errorMsg });
+    }
   }
-});
+);
 
 /**
  * Announce token L1
@@ -319,41 +339,45 @@ router.get("/on-chain/issuer-address", async (req, res) => {
  *   "feeRateSatsPerVb": 2.0,
  * }
  */
-router.post("/on-chain/announce-token", async (req, res) => {
-  const wallet = getWallet() as IssuerSparkWallet;
-  try {
-    const {
-      tokenName,
-      tokenTicker,
-      decimals,
-      maxSupply,
-      isFreezable,
-      feeRateSatsPerVb,
-    } = req.body as {
-      tokenName: string;
-      tokenTicker: string;
-      decimals: number;
-      maxSupply: number;
-      isFreezable: boolean;
-      feeRateSatsPerVb: number | undefined;
-    };
-    const announcementTx = await wallet!.announceTokenL1({
-      tokenName,
-      tokenTicker,
-      decimals: Number(decimals),
-      maxSupply: BigInt(maxSupply),
-      isFreezable,
-      feeRateSatsPerVb,
-    });
-    res.json({
-      data: { announcementTx },
-    });
-  } catch (error) {
-    console.error(error);
-    const errorMsg = isError(error) ? error.message : "Unknown error";
-    res.status(500).json({ error: errorMsg });
+router.post(
+  "/on-chain/announce-token",
+  checkWalletInitialized,
+  async (req, res) => {
+    const wallet = getWallet() as IssuerSparkWallet;
+    try {
+      const {
+        tokenName,
+        tokenTicker,
+        decimals,
+        maxSupply,
+        isFreezable,
+        feeRateSatsPerVb,
+      } = req.body as {
+        tokenName: string;
+        tokenTicker: string;
+        decimals: number;
+        maxSupply: number;
+        isFreezable: boolean;
+        feeRateSatsPerVb: number | undefined;
+      };
+      const announcementTx = await wallet!.announceTokenL1({
+        tokenName,
+        tokenTicker,
+        decimals: Number(decimals),
+        maxSupply: BigInt(maxSupply),
+        isFreezable,
+        feeRateSatsPerVb,
+      });
+      res.json({
+        data: { announcementTx },
+      });
+    } catch (error) {
+      console.error(error);
+      const errorMsg = isError(error) ? error.message : "Unknown error";
+      res.status(500).json({ error: errorMsg });
+    }
   }
-});
+);
 
 /**
  * Mint tokens L1
@@ -365,20 +389,24 @@ router.post("/on-chain/announce-token", async (req, res) => {
  *   }
  * }>}
  */
-router.post("/on-chain/mint-tokens", async (req, res) => {
-  const wallet = getWallet() as IssuerSparkWallet;
-  try {
-    const { tokenAmount } = req.body as { tokenAmount: number };
-    const tokensMinted = await wallet!.mintTokensL1(BigInt(tokenAmount));
-    res.json({
-      data: { tokensMinted },
-    });
-  } catch (error) {
-    console.error(error);
-    const errorMsg = isError(error) ? error.message : "Unknown error";
-    res.status(500).json({ error: errorMsg });
+router.post(
+  "/on-chain/mint-tokens",
+  checkWalletInitialized,
+  async (req, res) => {
+    const wallet = getWallet() as IssuerSparkWallet;
+    try {
+      const { tokenAmount } = req.body as { tokenAmount: number };
+      const tokensMinted = await wallet!.mintTokensL1(BigInt(tokenAmount));
+      res.json({
+        data: { tokensMinted },
+      });
+    } catch (error) {
+      console.error(error);
+      const errorMsg = isError(error) ? error.message : "Unknown error";
+      res.status(500).json({ error: errorMsg });
+    }
   }
-});
+);
 
 /**
  * Transfer tokens L1
@@ -391,25 +419,29 @@ router.post("/on-chain/mint-tokens", async (req, res) => {
  *   }
  * }>}
  */
-router.post("/on-chain/transfer-tokens", async (req, res) => {
-  const wallet = getWallet() as IssuerSparkWallet;
-  try {
-    const { tokenAmount, receiverPublicKey } = req.body as {
-      tokenAmount: number;
-      receiverPublicKey: string;
-    };
-    const tokensTransferred = await wallet!.transferTokensL1(
-      BigInt(tokenAmount),
-      receiverPublicKey
-    );
-    res.json({
-      data: { tokensTransferred },
-    });
-  } catch (error) {
-    console.error(error);
-    const errorMsg = isError(error) ? error.message : "Unknown error";
-    res.status(500).json({ error: errorMsg });
+router.post(
+  "/on-chain/transfer-tokens",
+  checkWalletInitialized,
+  async (req, res) => {
+    const wallet = getWallet() as IssuerSparkWallet;
+    try {
+      const { tokenAmount, receiverPublicKey } = req.body as {
+        tokenAmount: number;
+        receiverPublicKey: string;
+      };
+      const tokensTransferred = await wallet!.transferTokensL1(
+        BigInt(tokenAmount),
+        receiverPublicKey
+      );
+      res.json({
+        data: { tokensTransferred },
+      });
+    } catch (error) {
+      console.error(error);
+      const errorMsg = isError(error) ? error.message : "Unknown error";
+      res.status(500).json({ error: errorMsg });
+    }
   }
-});
+);
 
 export default router;

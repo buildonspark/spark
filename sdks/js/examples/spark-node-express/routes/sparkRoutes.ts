@@ -2,7 +2,7 @@ import { IssuerSparkWallet } from "@buildonspark/issuer-sdk";
 import { SparkWallet } from "@buildonspark/spark-sdk";
 import { SparkProto } from "@buildonspark/spark-sdk/types";
 import { isError } from "@lightsparkdev/core";
-import { Router } from "express";
+import { NextFunction, Router, Response, Request } from "express";
 import {
   formatTransferResponse,
   loadMnemonic,
@@ -12,16 +12,17 @@ import { BITCOIN_NETWORK } from "../src/index.js";
 
 const SPARK_MNEMONIC_PATH = ".spark-mnemonic";
 
-// Issuer Wallet Private Key
-const ISSUER_PRIVATE_KEY = new Uint8Array(32).fill(1);
-const issuerPrivateKeyBuffer = Buffer.from(ISSUER_PRIVATE_KEY);
-
 export const createSparkRouter = (
   walletClass: typeof SparkWallet | typeof IssuerSparkWallet,
   mnemonicPath: string
 ): {
   router: Router;
   getWallet: () => SparkWallet | IssuerSparkWallet | undefined;
+  checkWalletInitialized: (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ) => void;
 } => {
   const router: Router = Router();
 
@@ -35,23 +36,12 @@ export const createSparkRouter = (
         }
       | undefined = undefined;
     if (!walletInstance) {
-      if (walletClass === SparkWallet) {
-        res = await SparkWallet.create({
-          mnemonicOrSeed: mnemonicOrSeed,
-          options: {
-            network: BITCOIN_NETWORK,
-          },
-        });
-      } else if (walletClass === IssuerSparkWallet) {
-        res = await walletClass.create({
-          mnemonicOrSeed: mnemonicOrSeed,
-          // @ts-ignore: underlying call requires buffer,
-          privateKey: issuerPrivateKeyBuffer,
-          options: {
-            network: "REGTEST",
-          },
-        });
-      }
+      res = await walletClass.create({
+        mnemonicOrSeed: mnemonicOrSeed,
+        options: {
+          network: BITCOIN_NETWORK,
+        },
+      });
       walletInstance = res?.wallet;
     }
     return res;
@@ -65,8 +55,23 @@ export const createSparkRouter = (
     return walletInstance;
   };
 
+  const checkWalletInitialized = (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): void => {
+    const wallet = getWallet();
+    if (!wallet) {
+      res.status(400).json({
+        error: "Wallet not initialized. Please initialize the wallet first.",
+      });
+      return;
+    }
+    next();
+  };
+
   // Get wallet
-  router.get("/wallet", async (req, res) => {
+  router.get("/wallet", checkWalletInitialized, async (req, res) => {
     res.json(getWallet());
   });
 
@@ -122,28 +127,24 @@ export const createSparkRouter = (
    *     identityPublicKey: string
    *   }
    * }>}
-   *
-   * @example
-   * // Response
-   * {
-   *   "data": {
-   *     "identityPublicKey": "0x1234567890abcdef"
-   *   }
-   * }
    */
-  router.get("/wallet/identity-public-key", async (req, res) => {
-    const wallet = getWallet();
-    try {
-      const identityPublicKey = await wallet!.getIdentityPublicKey();
-      res.json({
-        data: { identityPublicKey },
-      });
-    } catch (error) {
-      console.error(error);
-      const errorMsg = isError(error) ? error.message : "Unknown error";
-      res.status(500).json({ error: errorMsg });
+  router.get(
+    "/wallet/identity-public-key",
+    checkWalletInitialized,
+    async (req, res) => {
+      const wallet = getWallet();
+      try {
+        const identityPublicKey = await wallet!.getIdentityPublicKey();
+        res.json({
+          data: { identityPublicKey },
+        });
+      } catch (error) {
+        console.error(error);
+        const errorMsg = isError(error) ? error.message : "Unknown error";
+        res.status(500).json({ error: errorMsg });
+      }
     }
-  });
+  );
 
   /**
    * Get wallet spark address
@@ -154,19 +155,23 @@ export const createSparkRouter = (
    *   }
    * }>}
    */
-  router.get("/wallet/spark-address", async (req, res) => {
-    const wallet = getWallet();
-    try {
-      const sparkAddress = await wallet!.getSparkAddress();
-      res.json({
-        data: { sparkAddress },
-      });
-    } catch (error) {
-      console.error(error);
-      const errorMsg = isError(error) ? error.message : "Unknown error";
-      res.status(500).json({ error: errorMsg });
+  router.get(
+    "/wallet/spark-address",
+    checkWalletInitialized,
+    async (req, res) => {
+      const wallet = getWallet();
+      try {
+        const sparkAddress = await wallet!.getSparkAddress();
+        res.json({
+          data: { sparkAddress },
+        });
+      } catch (error) {
+        console.error(error);
+        const errorMsg = isError(error) ? error.message : "Unknown error";
+        res.status(500).json({ error: errorMsg });
+      }
     }
-  });
+  );
 
   /**
    * Get wallet balance
@@ -182,7 +187,7 @@ export const createSparkRouter = (
    *   }
    * }>}
    */
-  router.get("/wallet/balance", async (req, res) => {
+  router.get("/wallet/balance", checkWalletInitialized, async (req, res) => {
     const wallet = getWallet();
     try {
       const balance = await wallet!.getBalance();
@@ -221,7 +226,7 @@ export const createSparkRouter = (
    *   }
    * }>}
    */
-  router.get("/wallet/transfers", async (req, res) => {
+  router.get("/wallet/transfers", checkWalletInitialized, async (req, res) => {
     const wallet = getWallet();
     try {
       const { limit = 20, offset = 0 } = req.query as {
@@ -257,22 +262,26 @@ export const createSparkRouter = (
    *   }
    * }>}
    */
-  router.get("/wallet/pending-transfers", async (req, res) => {
-    const wallet = getWallet();
-    try {
-      const pendingTransfers = await wallet!.getPendingTransfers();
-      const transferResponse = pendingTransfers.map(
-        (transfer: SparkProto.Transfer) => formatTransferResponse(transfer)
-      );
-      res.json({
-        data: { pendingTransfers: transferResponse },
-      });
-    } catch (error) {
-      console.error(error);
-      const errorMsg = isError(error) ? error.message : "Unknown error";
-      res.status(500).json({ error: errorMsg });
+  router.get(
+    "/wallet/pending-transfers",
+    checkWalletInitialized,
+    async (req, res) => {
+      const wallet = getWallet();
+      try {
+        const pendingTransfers = await wallet!.getPendingTransfers();
+        const transferResponse = pendingTransfers.map(
+          (transfer: SparkProto.Transfer) => formatTransferResponse(transfer)
+        );
+        res.json({
+          data: { pendingTransfers: transferResponse },
+        });
+      } catch (error) {
+        console.error(error);
+        const errorMsg = isError(error) ? error.message : "Unknown error";
+        res.status(500).json({ error: errorMsg });
+      }
     }
-  });
+  );
 
   /**
    * Claim all pending transfers
@@ -282,19 +291,23 @@ export const createSparkRouter = (
    *     message: boolean
    * }>}
    */
-  router.post("/wallet/claim-transfers", async (req, res) => {
-    const wallet = getWallet();
-    try {
-      const message = await wallet!.claimTransfers();
-      res.json({
-        data: { message },
-      });
-    } catch (error) {
-      console.error(error);
-      const errorMsg = isError(error) ? error.message : "Unknown error";
-      res.status(500).json({ error: errorMsg });
+  router.post(
+    "/wallet/claim-transfers",
+    checkWalletInitialized,
+    async (req, res) => {
+      const wallet = getWallet();
+      try {
+        const message = await wallet!.claimTransfers();
+        res.json({
+          data: { message },
+        });
+      } catch (error) {
+        console.error(error);
+        const errorMsg = isError(error) ? error.message : "Unknown error";
+        res.status(500).json({ error: errorMsg });
+      }
     }
-  });
+  );
 
   /**
    * Send Spark Transfer
@@ -308,27 +321,31 @@ export const createSparkRouter = (
    *   }
    * }>}
    */
-  router.post("/spark/send-transfer", async (req, res) => {
-    const wallet = getWallet();
-    try {
-      const { receiverSparkAddress, amountSats } = req.body as {
-        receiverSparkAddress: string;
-        amountSats: number;
-      };
-      const transfer = await wallet!.transfer({
-        receiverSparkAddress,
-        amountSats,
-      });
-      const transferResponse = formatTransferResponse(transfer);
-      res.json({
-        data: { transfer: transferResponse },
-      });
-    } catch (error) {
-      console.error(error);
-      const errorMsg = isError(error) ? error.message : "Unknown error";
-      res.status(500).json({ error: errorMsg });
+  router.post(
+    "/spark/send-transfer",
+    checkWalletInitialized,
+    async (req, res) => {
+      const wallet = getWallet();
+      try {
+        const { receiverSparkAddress, amountSats } = req.body as {
+          receiverSparkAddress: string;
+          amountSats: number;
+        };
+        const transfer = await wallet!.transfer({
+          receiverSparkAddress,
+          amountSats,
+        });
+        const transferResponse = formatTransferResponse(transfer);
+        res.json({
+          data: { transfer: transferResponse },
+        });
+      } catch (error) {
+        console.error(error);
+        const errorMsg = isError(error) ? error.message : "Unknown error";
+        res.status(500).json({ error: errorMsg });
+      }
     }
-  });
+  );
 
   /**
    * Create lightning invoice
@@ -342,26 +359,30 @@ export const createSparkRouter = (
    *   }
    * }>}
    */
-  router.post("/lightning/create-invoice", async (req, res) => {
-    const wallet = getWallet();
-    try {
-      const { amountSats, memo, expirySeconds } = req.body as {
-        amountSats: number;
-        memo: string | undefined;
-        expirySeconds: number | undefined;
-      };
-      const invoice = await wallet!.createLightningInvoice({
-        amountSats,
-        memo,
-        expirySeconds,
-      });
-      res.json({ invoice });
-    } catch (error) {
-      console.error(error);
-      const errorMsg = isError(error) ? error.message : "Unknown error";
-      res.status(500).json({ error: errorMsg });
+  router.post(
+    "/lightning/create-invoice",
+    checkWalletInitialized,
+    async (req, res) => {
+      const wallet = getWallet();
+      try {
+        const { amountSats, memo, expirySeconds } = req.body as {
+          amountSats: number;
+          memo: string | undefined;
+          expirySeconds: number | undefined;
+        };
+        const invoice = await wallet!.createLightningInvoice({
+          amountSats,
+          memo,
+          expirySeconds,
+        });
+        res.json({ invoice });
+      } catch (error) {
+        console.error(error);
+        const errorMsg = isError(error) ? error.message : "Unknown error";
+        res.status(500).json({ error: errorMsg });
+      }
     }
-  });
+  );
 
   /**
    * Pay lightning invoice
@@ -397,20 +418,24 @@ export const createSparkRouter = (
    *   }
    * }>}
    */
-  router.post("/lightning/pay-invoice", async (req, res) => {
-    const wallet = getWallet();
-    try {
-      const { invoice } = req.body as { invoice: string };
-      const payment = await wallet!.payLightningInvoice({ invoice });
-      res.json({
-        data: { payment },
-      });
-    } catch (error) {
-      console.error(error);
-      const errorMsg = isError(error) ? error.message : "Unknown error";
-      res.status(500).json({ error: errorMsg });
+  router.post(
+    "/lightning/pay-invoice",
+    checkWalletInitialized,
+    async (req, res) => {
+      const wallet = getWallet();
+      try {
+        const { invoice } = req.body as { invoice: string };
+        const payment = await wallet!.payLightningInvoice({ invoice });
+        res.json({
+          data: { payment },
+        });
+      } catch (error) {
+        console.error(error);
+        const errorMsg = isError(error) ? error.message : "Unknown error";
+        res.status(500).json({ error: errorMsg });
+      }
     }
-  });
+  );
 
   /**
    * Generate deposit address
@@ -421,19 +446,23 @@ export const createSparkRouter = (
    *   }
    * }>}
    */
-  router.get("/bitcoin/deposit-address", async (req, res) => {
-    const wallet = getWallet();
-    try {
-      const address = await wallet!.getDepositAddress();
-      res.json({
-        data: { address },
-      });
-    } catch (error) {
-      console.error(error);
-      const errorMsg = isError(error) ? error.message : "Unknown error";
-      res.status(500).json({ error: errorMsg });
+  router.get(
+    "/bitcoin/deposit-address",
+    checkWalletInitialized,
+    async (req, res) => {
+      const wallet = getWallet();
+      try {
+        const address = await wallet!.getDepositAddress();
+        res.json({
+          data: { address },
+        });
+      } catch (error) {
+        console.error(error);
+        const errorMsg = isError(error) ? error.message : "Unknown error";
+        res.status(500).json({ error: errorMsg });
+      }
     }
-  });
+  );
 
   /**
    * Get L1 Address used for funding L1 token transactions like announce and withdraw.
@@ -444,19 +473,23 @@ export const createSparkRouter = (
    *   }
    * }>}
    */
-  router.get("/bitcoin/token-l1-address", async (req, res) => {
-    const wallet = getWallet();
-    try {
-      const address = await wallet!.getTokenL1Address();
-      res.json({
-        data: { address },
-      });
-    } catch (error) {
-      console.error(error);
-      const errorMsg = isError(error) ? error.message : "Unknown error";
-      res.status(500).json({ error: errorMsg });
+  router.get(
+    "/bitcoin/token-l1-address",
+    checkWalletInitialized,
+    async (req, res) => {
+      const wallet = getWallet();
+      try {
+        const address = await wallet!.getTokenL1Address();
+        res.json({
+          data: { address },
+        });
+      } catch (error) {
+        console.error(error);
+        const errorMsg = isError(error) ? error.message : "Unknown error";
+        res.status(500).json({ error: errorMsg });
+      }
     }
-  });
+  );
 
   /**
    * Claim deposit
@@ -484,22 +517,26 @@ export const createSparkRouter = (
    *   }
    * }>}
    */
-  router.post("/bitcoin/claim-deposit", async (req, res) => {
-    const wallet = getWallet();
-    try {
-      const { txid } = req.body as {
-        txid: string;
-      };
-      const leaves = await wallet!.claimDeposit(txid);
-      res.json({
-        data: { leaves },
-      });
-    } catch (error) {
-      console.error(error);
-      const errorMsg = isError(error) ? error.message : "Unknown error";
-      res.status(500).json({ error: errorMsg });
+  router.post(
+    "/bitcoin/claim-deposit",
+    checkWalletInitialized,
+    async (req, res) => {
+      const wallet = getWallet();
+      try {
+        const { txid } = req.body as {
+          txid: string;
+        };
+        const leaves = await wallet!.claimDeposit(txid);
+        res.json({
+          data: { leaves },
+        });
+      } catch (error) {
+        console.error(error);
+        const errorMsg = isError(error) ? error.message : "Unknown error";
+        res.status(500).json({ error: errorMsg });
+      }
     }
-  });
+  );
 
   /**
    * Withdraw to Bitcoin address
@@ -526,7 +563,7 @@ export const createSparkRouter = (
    *   }
    * }>}
    */
-  router.post("/bitcoin/withdraw", async (req, res) => {
+  router.post("/bitcoin/withdraw", checkWalletInitialized, async (req, res) => {
     const wallet = getWallet();
     try {
       const { onchainAddress, targetAmountSats } = req.body as {
@@ -559,7 +596,7 @@ export const createSparkRouter = (
    *   }
    * }>}
    */
-  router.post("/tokens/transfer", async (req, res) => {
+  router.post("/tokens/transfer", checkWalletInitialized, async (req, res) => {
     const wallet = getWallet();
     try {
       const { tokenPublicKey, tokenAmount, receiverSparkAddress } =
@@ -595,7 +632,7 @@ export const createSparkRouter = (
    *   }
    * }>}
    */
-  router.post("/tokens/withdraw", async (req, res) => {
+  router.post("/tokens/withdraw", checkWalletInitialized, async (req, res) => {
     const wallet = getWallet();
     try {
       const { tokenPublicKey, receiverPublicKey, leafIds } = req.body as {
@@ -617,7 +654,7 @@ export const createSparkRouter = (
       res.status(500).json({ error: errorMsg });
     }
   });
-  return { router, getWallet };
+  return { router, getWallet, checkWalletInitialized };
 };
 
 export default createSparkRouter(SparkWallet, SPARK_MNEMONIC_PATH).router;

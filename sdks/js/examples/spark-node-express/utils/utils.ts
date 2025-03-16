@@ -1,9 +1,12 @@
 import { promises as fs } from "fs";
-import { bytesToHex } from "@noble/hashes/utils";
 import { SparkProto } from "@buildonspark/spark-sdk/types";
 import { Lrc20Protos } from "@buildonspark/lrc20-sdk";
 
-// Helper functions for mnemonic persistence
+/**
+ * Saves a mnemonic to a file
+ * @param {string} path - The path to save the mnemonic
+ * @param {string} mnemonic - The mnemonic to save
+ */
 export async function saveMnemonic(path: string, mnemonic: string) {
   try {
     await fs.writeFile(path, mnemonic, "utf8");
@@ -12,6 +15,11 @@ export async function saveMnemonic(path: string, mnemonic: string) {
   }
 }
 
+/**
+ * Loads a mnemonic from a file
+ * @param {string} path - The path to load the mnemonic from
+ * @returns {string | null} The mnemonic
+ */
 export async function loadMnemonic(path: string) {
   try {
     const mnemonic = await fs.readFile(path, "utf8");
@@ -50,13 +58,13 @@ export function formatTransferResponse(transfer: SparkProto.Transfer) {
   try {
     return {
       id: transfer.id,
-      senderIdentityPublicKey: bytesToHex(transfer.senderIdentityPublicKey),
-      receiverIdentityPublicKey: bytesToHex(transfer.receiverIdentityPublicKey),
+      senderIdentityPublicKey: transfer.senderIdentityPublicKey,
+      receiverIdentityPublicKey: transfer.receiverIdentityPublicKey,
       status:
         TRANSFER_STATUS_MAP[
           transfer.status as keyof typeof TRANSFER_STATUS_MAP
         ] ?? "UNKNOWN",
-      amount: transfer.totalValue, // BigInt handled by middleware
+      amount: transfer.totalValue,
       expiryTime: transfer.expiryTime
         ? new Date(transfer.expiryTime).toISOString()
         : null,
@@ -65,21 +73,13 @@ export function formatTransferResponse(transfer: SparkProto.Transfer) {
           leaf: {
             id: leaf.leaf?.id,
             treeId: leaf.leaf?.treeId,
-            value: leaf.leaf?.value, // BigInt handled by middleware
+            value: leaf.leaf?.value,
             parentNodeId: leaf.leaf?.parentNodeId,
-            nodeTx: leaf.leaf?.nodeTx
-              ? bytesToHex(leaf.leaf?.nodeTx)
-              : undefined,
-            refundTx: leaf.leaf?.refundTx
-              ? bytesToHex(leaf.leaf?.refundTx)
-              : undefined,
+            nodeTx: leaf.leaf?.nodeTx,
+            refundTx: leaf.leaf?.refundTx,
             vout: Number(leaf.leaf?.vout),
-            verifyingPublicKey: leaf.leaf?.verifyingPublicKey
-              ? bytesToHex(leaf.leaf?.verifyingPublicKey)
-              : undefined,
-            ownerIdentityPublicKey: leaf.leaf?.ownerIdentityPublicKey
-              ? bytesToHex(leaf.leaf?.ownerIdentityPublicKey)
-              : undefined,
+            verifyingPublicKey: leaf.leaf?.verifyingPublicKey,
+            ownerIdentityPublicKey: leaf.leaf?.ownerIdentityPublicKey,
             signingKeyshare: {
               ownerIdentifiers:
                 leaf.leaf?.signingKeyshare?.ownerIdentifiers ?? [],
@@ -90,13 +90,9 @@ export function formatTransferResponse(transfer: SparkProto.Transfer) {
               NETWORK_MAP[leaf.leaf?.network as keyof typeof NETWORK_MAP] ??
               "UNKNOWN",
           },
-          secretCipher: leaf.secretCipher
-            ? bytesToHex(leaf.secretCipher)
-            : undefined,
-          signature: leaf.signature ? bytesToHex(leaf.signature) : undefined,
-          intermediateRefundTx: leaf.intermediateRefundTx
-            ? bytesToHex(leaf.intermediateRefundTx)
-            : undefined,
+          secretCipher: leaf.secretCipher,
+          signature: leaf.signature,
+          intermediateRefundTx: leaf.intermediateRefundTx,
         })) ?? [],
     };
   } catch (error) {
@@ -105,6 +101,11 @@ export function formatTransferResponse(transfer: SparkProto.Transfer) {
   }
 }
 
+/**
+ * Formats a token transaction object for API response
+ * @param {Lrc20Protos.Transaction} transaction - The token transaction object from SDK
+ * @returns {Object} Formatted token transaction response
+ */
 export function formatTokenTransactionResponse(
   transaction: Lrc20Protos.Transaction
 ) {
@@ -136,6 +137,11 @@ export function formatTokenTransactionResponse(
   }
 }
 
+/**
+ * Formats an on-chain token transaction object for API response
+ * @param {Lrc20Protos.OnChainTransaction} transaction - The on-chain transaction object from SDK
+ * @returns {Object} Formatted on-chain transaction response
+ */
 export function formatOnChainTokenTransactionResponse(
   transaction: Lrc20Protos.OnChainTransaction
 ) {
@@ -218,7 +224,7 @@ export function formatNextCursor(
   if (!nextCursor) return null;
   try {
     return {
-      lastTransactionHash: bytesToHex(nextCursor.lastTransactionHash),
+      lastTransactionHash: nextCursor.lastTransactionHash,
       layer:
         nextCursor.layer in LAYER_MAP
           ? LAYER_MAP[nextCursor.layer as keyof typeof LAYER_MAP]
