@@ -20,7 +20,7 @@ export default function BitcoinDepositAddress() {
       <div className="rounded-lg border-[1px] border-[#2d3845]">
         <DetailsRow
           title="Bitcoin Deposit Address"
-          subtitle={depositAddress}
+          subtitle={depositAddress ? depositAddress : "Loading..."}
           logoRight={<CopyIcon />}
           onClick={() => {
             navigator.clipboard.writeText(depositAddress || "");

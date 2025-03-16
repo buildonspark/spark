@@ -49,20 +49,25 @@ function isValidBitcoinAddress(address: string): boolean {
 }
 
 // THIS IS NOT A COMPREHENSIVE VALIDATION. DEMO PURPOSE ONLY.
-const validateAddress = (address: string): Network => {
+const validateAddress = (address: string, tokensFlow: boolean): Network => {
+  if (/^(02|03)[a-fA-F0-9]{64}$/.test(address)) return Network.SPARK;
+  if (tokensFlow) return Network.NONE;
   if (/^ln(bc|tb|bcrt)[0-9]{1,}[a-z0-9]+$/.test(address))
     return Network.LIGHTNING;
   if (isValidBitcoinAddress(address)) return Network.BITCOIN;
-  if (/^(02|03)[a-fA-F0-9]{64}$/.test(address)) return Network.SPARK;
   if (isValidPhoneNumber(address)) return Network.PHONE;
   return Network.NONE;
 };
 
 interface AddressInputProps {
   onAddressSelect: (address: string, addressNetwork: Network) => void;
+  tokensFlow?: boolean;
 }
 
-export default function AddressInput({ onAddressSelect }: AddressInputProps) {
+export default function AddressInput({
+  onAddressSelect,
+  tokensFlow = false,
+}: AddressInputProps) {
   const [inputAddress, setInputAddress] = useState<string>("");
   const [inputAddressNetwork, setInputAddressNetwork] = useState<Network>(
     Network.NONE,
@@ -71,7 +76,7 @@ export default function AddressInput({ onAddressSelect }: AddressInputProps) {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const inputValue = e.target.value;
     setInputAddress(inputValue);
-    setInputAddressNetwork(validateAddress(inputValue));
+    setInputAddressNetwork(validateAddress(inputValue, tokensFlow));
   };
 
   const logoLeft = useMemo(() => {
@@ -85,14 +90,14 @@ export default function AddressInput({ onAddressSelect }: AddressInputProps) {
     <div className="flex w-full flex-col gap-2">
       <input
         className="h-12 w-full rounded-lg border border-solid border-[#3A3A3A] bg-transparent px-4 text-[12px] outline-none focus:border-[#fafafa] focus:border-[rgba(249,249,249,0.3)] focus:outline-none focus:ring-0"
-        placeholder="Phone number, Wallet address, Lightning invoice"
+        placeholder={`Phone number, ${tokensFlow ? "Spark address" : "Wallet address, Lightning invoice"}`}
         type="text"
         value={inputAddress}
         onChange={handleInputChange}
       />
       {inputAddressNetwork === Network.NONE ? (
         <span className="ml-2 text-[12px] text-[#999999]">
-          Works with Spark and Bitcoin wallet addresses.
+          {`Works with Spark ${tokensFlow ? "" : "and Bitcoin wallet "} addresses.`}
         </span>
       ) : (
         inputAddressNetwork !== Network.PHONE && (

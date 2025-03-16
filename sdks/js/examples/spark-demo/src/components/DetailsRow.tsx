@@ -64,9 +64,7 @@ export default function DetailsRow({
         </div>
       </div>
       {logoRight && (
-        <div
-          className={`mr-${logoRightMargin / 4} flex flex-col items-center justify-between`}
-        >
+        <div className={`mr-4 flex flex-col items-center justify-between`}>
           {logoRight}
         </div>
       )}

@@ -88,7 +88,7 @@ export default function Tokens() {
         setCurrentStep(TokensStep.TokenDetails);
         break;
       case TokensStep.SendTokenInput:
-        setCurrentStep(TokensStep.TokenDetails);
+        setCurrentStep(TokensStep.SendTokenAddressInput);
         break;
       case TokensStep.SendTokenConfirmQuote:
         setCurrentStep(TokensStep.SendTokenInput);
@@ -290,6 +290,7 @@ export default function Tokens() {
             setSendTokenAddressNetwork(addressNetwork);
             setCurrentStep(TokensStep.SendTokenInput);
           }}
+          tokensFlow={true}
         />
       )}
       {currentStep === TokensStep.SendTokenInput && (
