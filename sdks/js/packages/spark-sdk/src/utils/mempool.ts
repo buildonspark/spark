@@ -7,10 +7,9 @@ export async function getLatestDepositTxId(
   const network = getNetworkFromAddress(address);
   const baseUrl =
     network === BitcoinNetwork.REGTEST
-      ? "https://regtest-mempool.us-west-2.sparkinfra.net/"
-      : "https://mempool.space/docs/api";
+      ? "https://regtest-mempool.us-west-2.sparkinfra.net/api"
+      : "https://mempool.space/api";
   const auth = btoa("spark-sdk:mCMk1JqlBNtetUNy");
-
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
@@ -18,7 +17,6 @@ export async function getLatestDepositTxId(
   if (network === BitcoinNetwork.REGTEST) {
     headers["Authorization"] = `Basic ${auth}`;
   }
-
   const response = await fetch(`${baseUrl}/address/${address}/txs`, {
     headers,
   });

@@ -750,7 +750,7 @@ export class SparkWallet {
   public async claimDeposit(txid: string) {
     const baseUrl =
       this.config.getNetwork() === Network.REGTEST
-        ? "https://regtest-mempool.us-west-2.sparkinfra.net/"
+        ? "https://regtest-mempool.us-west-2.sparkinfra.net/api"
         : "https://mempool.space/api";
     const auth = btoa("spark-sdk:mCMk1JqlBNtetUNy");
 
