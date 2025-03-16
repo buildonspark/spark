@@ -62,7 +62,7 @@ const getLocalStorageWalletNetwork = (): NetworkType => {
   } catch (e) {
     console.log("Error getting initial wallet network", e);
   }
-  return "MAINNET"; // default to mainnet.
+  return "REGTEST"; // default to mainnet.
 };
 
 interface WalletState {

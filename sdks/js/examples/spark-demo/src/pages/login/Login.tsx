@@ -62,10 +62,10 @@ export default function Login() {
 
   const navigate = useNavigate();
 
-  // default the app to mainnet on load.
+  // default the app to REGTEST on load.
   useEffect(() => {
-    localStorage.setItem("spark_wallet_network", "MAINNET");
-    setInitWalletNetwork("MAINNET");
+    localStorage.setItem("spark_wallet_network", "REGTEST");
+    setInitWalletNetwork("REGTEST");
   }, [setInitWalletNetwork]);
 
   const handleSubmit = async () => {
