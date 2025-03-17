@@ -7,7 +7,7 @@ export async function getLatestDepositTxId(
   const network = getNetworkFromAddress(address);
   const baseUrl =
     network === BitcoinNetwork.REGTEST
-      ? "https://regtest-mempool.us-west-2.sparkinfra.net/api"
+      ? "https://regtest-mempool.dev.dev.sparkinfra.net/api"
       : "https://mempool.space/api";
   const auth = btoa("spark-sdk:mCMk1JqlBNtetUNy");
   const headers: Record<string, string> = {
