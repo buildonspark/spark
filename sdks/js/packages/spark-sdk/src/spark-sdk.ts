@@ -1317,6 +1317,9 @@ export class SparkWallet {
     onchainAddress: string;
     targetAmountSats?: number;
   }) {
+    if (targetAmountSats && targetAmountSats < 10000) {
+      throw new Error("The minimum amount for a withdrawal is 10000 sats");
+    }
     return await this.withLeaves(async () => {
       return await this.coopExit(onchainAddress, targetAmountSats);
     });
@@ -1338,6 +1341,10 @@ export class SparkWallet {
       leavesToSend = this.leaves.map((leaf) => ({
         ...leaf,
       }));
+    }
+
+    if (leavesToSend.reduce((acc, leaf) => acc + leaf.value, 0) < 10000) {
+      throw new Error("The minimum amount for a withdrawal is 10000 sats");
     }
 
     const leafKeyTweaks = await Promise.all(
