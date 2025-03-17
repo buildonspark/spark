@@ -1,13 +1,18 @@
 import {
+  Lrc20Protos,
   LRCWallet,
   TokenPubkey,
   TokenPubkeyAnnouncement,
   TokenPubkeyInfo,
-  ListAllTokenTransactionsResponse,
-  Lrc20Protos,
 } from "@buildonspark/lrc20-sdk";
+import {
+  createLrc20ConnectionManager,
+  ILrc20ConnectionManager,
+  Lrc20SparkClient,
+} from "@buildonspark/lrc20-sdk/grpc";
 import { SparkWallet, SparkWalletProps } from "@buildonspark/spark-sdk";
 import { LeafWithPreviousTransactionData } from "@buildonspark/spark-sdk/proto/spark";
+import { ConfigOptions } from "@buildonspark/spark-sdk/services/wallet-config";
 import {
   getMasterHDKeyFromSeed,
   LRC_WALLET_NETWORK,
@@ -24,14 +29,11 @@ import { wordlist } from "@scure/bip39/wordlists/english";
 import { IssuerWalletInterface } from "./interface/wallet-interface.js";
 import { TokenFreezeService } from "./services/freeze.js";
 import { IssuerTokenTransactionService } from "./services/token-transactions.js";
-import { ConfigOptions } from "@buildonspark/spark-sdk/services/wallet-config";
-import {
-  createLrc20ConnectionManager,
-  ILrc20ConnectionManager,
-  Lrc20SparkClient,
-} from "@buildonspark/lrc20-sdk/grpc";
 import { GetTokenActivityResponse, TokenPubKeyInfoResponse } from "./types.js";
-import { convertTokenActivityToHexEncoded, convertToTokenPubKeyInfoResponse } from "./utils/type-mappers.js";
+import {
+  convertTokenActivityToHexEncoded,
+  convertToTokenPubKeyInfoResponse,
+} from "./utils/type-mappers.js";
 
 const BURN_ADDRESS = "02".repeat(33);
 
@@ -45,7 +47,7 @@ export class IssuerSparkWallet
   private tokenFreezeService: TokenFreezeService;
   private tokenPublicKeyInfo?: TokenPubkeyInfo;
 
-  public static async create(options: SparkWalletProps) {
+  public static async intialize(options: SparkWalletProps) {
     const wallet = new IssuerSparkWallet(options.options);
 
     const initResponse = await wallet.initIssuerWallet(options.mnemonicOrSeed);
@@ -126,8 +128,9 @@ export class IssuerSparkWallet
     }
 
     const tokenPublicKey = bytesToHex(this.lrc20Wallet!.pubkey);
-    const rawTokenPubkeyInfo = await this.lrc20Wallet!.getTokenPubkeyInfo(tokenPublicKey);
-    
+    const rawTokenPubkeyInfo =
+      await this.lrc20Wallet!.getTokenPubkeyInfo(tokenPublicKey);
+
     this.tokenPublicKeyInfo = rawTokenPubkeyInfo;
     if (!rawTokenPubkeyInfo) {
       return null;

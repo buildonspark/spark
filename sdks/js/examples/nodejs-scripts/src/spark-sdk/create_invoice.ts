@@ -4,7 +4,7 @@ import { SparkWallet } from "@buildonspark/spark-sdk";
 const mnemonic = process.argv[2] || "your_mnemonic_here";
 const memo = process.argv[3] || "test invoice";
 
-const { wallet, mnemonic: walletMnemonic } = await SparkWallet.create({
+const { wallet, mnemonic: walletMnemonic } = await SparkWallet.intialize({
   mnemonicOrSeed: mnemonic,
   options: {
     network: "REGTEST",

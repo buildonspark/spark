@@ -15,7 +15,7 @@ describe("deposit", () => {
     async () => {
       const mnemonic =
         "raise benefit echo client clutch short pyramid grass fall core slogan boil device plastic drastic discover decide penalty middle appear medal elbow original income";
-      const { wallet: sdk } = await SparkWalletTesting.create({
+      const { wallet: sdk } = await SparkWalletTesting.intialize({
         options: {
           network: "LOCAL",
         },
@@ -39,7 +39,7 @@ describe("deposit", () => {
 
       const coin = await faucet.fund();
 
-      const { wallet: sdk } = await SparkWalletTesting.create({
+      const { wallet: sdk } = await SparkWalletTesting.intialize({
         options: {
           network: "LOCAL",
         },

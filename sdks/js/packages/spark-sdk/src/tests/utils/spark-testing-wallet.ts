@@ -12,7 +12,7 @@ export class SparkWalletTesting
   extends SparkWallet
   implements ISparkWalletTesting
 {
-  static async create(props: SparkWalletProps) {
+  static async intialize(props: SparkWalletProps) {
     const wallet = new SparkWalletTesting(props.options, props.signer);
     const initResponse = await wallet.initWallet(props.mnemonicOrSeed);
     return {

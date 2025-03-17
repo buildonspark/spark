@@ -41,7 +41,7 @@ describe("coop exit", () => {
       };
 
       // Setup user with leaves
-      const { wallet: userWallet } = await SparkWalletTesting.create({
+      const { wallet: userWallet } = await SparkWalletTesting.intialize({
         options,
       });
 
@@ -66,7 +66,7 @@ describe("coop exit", () => {
       );
 
       // Setup ssp
-      const { wallet: sspWallet } = await SparkWalletTesting.create({
+      const { wallet: sspWallet } = await SparkWalletTesting.intialize({
         options,
       });
       const sspPubkey = await sspWallet.getIdentityPublicKey();

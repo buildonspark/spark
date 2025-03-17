@@ -3,7 +3,7 @@ import { SparkWallet } from "@buildonspark/spark-sdk";
 // Get mnemonic from command line arguments
 const mnemonic = process.argv[2] || "your_mnemonic_here";
 
-const { wallet, mnemonic: walletMnemonic } = await SparkWallet.create({
+const { wallet, mnemonic: walletMnemonic } = await SparkWallet.intialize({
   mnemonicOrSeed: mnemonic,
   options: {
     network: "REGTEST",

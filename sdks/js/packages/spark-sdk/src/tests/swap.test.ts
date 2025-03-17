@@ -29,7 +29,7 @@ describe("swap", () => {
         "123",
       );
       // Initiate sender
-      const { wallet: senderWallet } = await SparkWalletTesting.create({
+      const { wallet: senderWallet } = await SparkWalletTesting.intialize({
         options: {
           network: "LOCAL",
         },
@@ -49,7 +49,7 @@ describe("swap", () => {
       );
 
       // Initiate receiver
-      const { wallet: receiverWallet } = await SparkWalletTesting.create({
+      const { wallet: receiverWallet } = await SparkWalletTesting.intialize({
         options: {
           network: "LOCAL",
         },

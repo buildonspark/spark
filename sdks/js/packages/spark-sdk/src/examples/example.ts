@@ -81,7 +81,7 @@ async function runCLI() {
           network: "REGTEST",
         };
         const { wallet: newWallet, mnemonic: newMnemonic } =
-          await SparkWallet.create({
+          await SparkWallet.intialize({
             mnemonicOrSeed,
             options,
           });

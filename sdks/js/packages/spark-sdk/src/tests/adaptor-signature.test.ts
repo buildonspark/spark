@@ -16,7 +16,7 @@ describe("adaptor signature", () => {
     async () => {
       let failures = 0;
 
-      const { wallet } = await SparkWalletTesting.create({
+      const { wallet } = await SparkWalletTesting.intialize({
         options: {
           network: "LOCAL",
         },

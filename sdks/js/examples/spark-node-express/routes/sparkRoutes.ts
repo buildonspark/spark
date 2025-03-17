@@ -2,13 +2,13 @@ import { IssuerSparkWallet } from "@buildonspark/issuer-sdk";
 import { SparkWallet } from "@buildonspark/spark-sdk";
 import { SparkProto } from "@buildonspark/spark-sdk/types";
 import { isError } from "@lightsparkdev/core";
-import { NextFunction, Router, Response, Request } from "express";
+import { NextFunction, Request, Response, Router } from "express";
+import { BITCOIN_NETWORK } from "../src/index.js";
 import {
   formatTransferResponse,
   loadMnemonic,
   saveMnemonic,
 } from "../utils/utils.js";
-import { BITCOIN_NETWORK } from "../src/index.js";
 
 const SPARK_MNEMONIC_PATH = ".spark-mnemonic";
 
@@ -36,7 +36,7 @@ export const createSparkRouter = (
         }
       | undefined = undefined;
     if (!walletInstance) {
-      res = await walletClass.create({
+      res = await walletClass.intialize({
         mnemonicOrSeed: mnemonicOrSeed,
         options: {
           network: BITCOIN_NETWORK,
