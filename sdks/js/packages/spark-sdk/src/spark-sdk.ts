@@ -1,7 +1,7 @@
 import {
   bytesToHex,
-  hexToBytes,
   bytesToNumberBE,
+  hexToBytes,
 } from "@noble/curves/abstract/utils";
 import { secp256k1 } from "@noble/curves/secp256k1";
 import { Address, OutScript, Transaction } from "@scure/btc-signer";
@@ -42,7 +42,6 @@ import { ConfigOptions } from "./services/wallet-config.js";
 import { validateMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english";
 import { Mutex } from "async-mutex";
-import bitcoin from "bitcoinjs-lib";
 import {
   DepositAddressTree,
   TreeCreationService,
@@ -1757,25 +1756,21 @@ export class SparkWallet {
       return;
     }
   }
-}
 
-/**
- * Utility function to determine the network from a Bitcoin address.
- *
- * @param {string} address - The Bitcoin address
- * @returns {BitcoinNetwork | null} The detected network or null if not detected
- */
-function getNetworkFromAddress(address: string) {
-  try {
-    const decoded = bitcoin.address.fromBech32(address);
-    // HRP (human-readable part) determines the network
-    if (decoded.prefix === "bc") {
-      return BitcoinNetwork.MAINNET;
-    } else if (decoded.prefix === "bcrt") {
-      return BitcoinNetwork.REGTEST;
-    }
-  } catch (err) {
-    throw new Error("Invalid Bitcoin address");
+  /**
+   * Signs a message with the identity key.
+   *
+   * @param {string} message - Unhashed message to sign
+   * @param {boolean} [compact] - Whether to use compact encoding. If false, the message will be encoded as DER.
+   * @returns {Promise<string>} The signed message
+   */
+  public async signMessage(
+    message: string,
+    compact?: boolean,
+  ): Promise<string> {
+    const hash = sha256(message);
+    return bytesToHex(
+      await this.config.signer.signMessageWithIdentityKey(hash, compact),
+    );
   }
-  return null;
 }
