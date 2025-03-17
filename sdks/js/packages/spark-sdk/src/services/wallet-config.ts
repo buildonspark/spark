@@ -45,14 +45,14 @@ export const LOCAL_WALLET_CONFIG_ECDSA: Required<ConfigOptions> = {
 export const REGTEST_WALLET_CONFIG: Required<ConfigOptions> = {
   ...BASE_CONFIG,
   network: "REGTEST",
-  lrc20Address: "https://regtest.lrc20.us-west-2.sparkinfra.net:443",
+  lrc20Address: "https://regtest.lrc20.dev.dev.sparkinfra.net:443",
   signingOperators: getRegtestSigningOperators(),
 };
 
 export const MAINNET_WALLET_CONFIG: Required<ConfigOptions> = {
   ...BASE_CONFIG,
   network: "MAINNET",
-  lrc20Address: "https://mainnet.lrc20.us-west-2.sparkinfra.net:443",
+  lrc20Address: "https://mainnet.lrc20.dev.dev.sparkinfra.net:443",
   signingOperators: getRegtestSigningOperators(),
 };
 
@@ -62,7 +62,7 @@ export function getRegtestSigningOperators(): Record<string, SigningOperator> {
       id: 0,
       identifier:
         "0000000000000000000000000000000000000000000000000000000000000001",
-      address: "https://0.spark.us-west-2.sparkinfra.net",
+      address: "https://0.spark.dev.dev.sparkinfra.net",
 
       identityPublicKey: hexToBytes(
         "03dfbdff4b6332c220f8fa2ba8ed496c698ceada563fa01b67d9983bfc5c95e763",
@@ -72,7 +72,7 @@ export function getRegtestSigningOperators(): Record<string, SigningOperator> {
       id: 1,
       identifier:
         "0000000000000000000000000000000000000000000000000000000000000002",
-      address: "https://1.spark.us-west-2.sparkinfra.net",
+      address: "https://1.spark.dev.dev.sparkinfra.net",
 
       identityPublicKey: hexToBytes(
         "03e625e9768651c9be268e287245cc33f96a68ce9141b0b4769205db027ee8ed77",
@@ -82,7 +82,7 @@ export function getRegtestSigningOperators(): Record<string, SigningOperator> {
       id: 2,
       identifier:
         "0000000000000000000000000000000000000000000000000000000000000003",
-      address: "https://2.spark.us-west-2.sparkinfra.net",
+      address: "https://2.spark.dev.dev.sparkinfra.net",
       identityPublicKey: hexToBytes(
         "022eda13465a59205413086130a65dc0ed1b8f8e51937043161f8be0c369b1a410",
       ),
