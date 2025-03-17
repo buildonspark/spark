@@ -1,14 +1,16 @@
 import { IssuerSparkWallet } from "@buildonspark/issuer-sdk";
 import { SparkWallet } from "@buildonspark/spark-sdk";
 import { SparkProto } from "@buildonspark/spark-sdk/types";
+import { getLatestDepositTxId } from "@buildonspark/spark-sdk/utils";
 import { isError } from "@lightsparkdev/core";
 import { NextFunction, Request, Response, Router } from "express";
-import { BITCOIN_NETWORK } from "../src/index.js";
 import {
   formatTransferResponse,
   loadMnemonic,
   saveMnemonic,
 } from "../utils/utils.js";
+import { BITCOIN_NETWORK } from "../src/index.js";
+import { TreeNode } from "@buildonspark/spark-sdk/proto/spark";
 
 const SPARK_MNEMONIC_PATH = ".spark-mnemonic";
 
@@ -310,6 +312,40 @@ export const createSparkRouter = (
   );
 
   /**
+   * Requests a swap of leaves to optimize wallet structure.
+   * @route POST /wallet/request-leaves-swap
+   * @param {number} targetAmount - The target amount to swap to
+   * @param {TreeNode[]} [leaves] - The leaves to swap
+   * @returns {Promise<{
+   *   data: {
+   *     leavesSwap: LeavesSwapRequest
+   *   }
+   * }>}
+   */
+  router.post(
+    "/wallet/request-leaves-swap",
+    checkWalletInitialized,
+    async (req, res) => {
+      const wallet = getWallet();
+      try {
+        const { targetAmount, leaves } = req.body as {
+          targetAmount: number;
+          leaves?: TreeNode[];
+        };
+        const leavesSwap = await wallet!.requestLeavesSwap({
+          targetAmount,
+          leaves,
+        });
+        res.json({ data: { leavesSwap } });
+      } catch (error) {
+        console.error(error);
+        const errorMsg = isError(error) ? error.message : "Unknown error";
+        res.status(500).json({ error: errorMsg });
+      }
+    }
+  );
+
+  /**
    * Send Spark Transfer
    * @route POST /spark/send-transfer
    * @param {string} receiverSparkAddress - The Spark address of the receiver
@@ -440,16 +476,91 @@ export const createSparkRouter = (
   );
 
   /**
-   * Generate deposit address
-   * @route GET /bitcoin/deposit-address
+   * Get lightning receive fee estimate
+   * @route GET /lightning/receive-fee-estimate
+   * @param {string} amountSats - The amount to get the fee estimate for in satoshis
    * @returns {Promise<{
+   *   data: {
+   *     feeEstimate: {
+   *       originalValue: number
+   *       originalUnit: string
+   *       preferredCurrencyUnit: string
+   *       preferredCurrencyValueRounded: number
+   *       preferredCurrencyValueApprox: number
+   *     }
+   *   }
+   * }>}
+   */
+  router.get(
+    "/lightning/receive-fee-estimate",
+    checkWalletInitialized,
+    async (req, res) => {
+      const wallet = getWallet();
+      try {
+        const { amountSats } = req.query as { amountSats: string };
+        const feeEstimate = await wallet!.getLightningReceiveFeeEstimate({
+          amountSats: Number(amountSats),
+          network: BITCOIN_NETWORK,
+        });
+        res.json({
+          data: { feeEstimate },
+        });
+      } catch (error) {
+        console.error(error);
+        const errorMsg = isError(error) ? error.message : "Unknown error";
+        res.status(500).json({ error: errorMsg });
+      }
+    }
+  );
+
+  /**
+   * Get lightning send fee estimate
+   * @route GET /lightning/send-fee-estimate
+   * @param {string} invoice - The encoded invoice to get the fee estimate for
+   * @returns {Promise<{
+   *   data: {
+   *     feeEstimate: {
+   *       originalValue: number
+   *       originalUnit: string
+   *       preferredCurrencyUnit: string
+   *       preferredCurrencyValueRounded: number
+   *       preferredCurrencyValueApprox: number
+   *     }
+   *   }
+   * }>}
+   */
+  router.get(
+    "/lightning/send-fee-estimate",
+    checkWalletInitialized,
+    async (req, res) => {
+      const wallet = getWallet();
+      try {
+        const { invoice } = req.query as { invoice: string };
+        const feeEstimate = await wallet!.getLightningSendFeeEstimate({
+          encodedInvoice: invoice,
+        });
+        res.json({
+          data: { feeEstimate },
+        });
+      } catch (error) {
+        console.error(error);
+        const errorMsg = isError(error) ? error.message : "Unknown error";
+        res.status(500).json({ error: errorMsg });
+      }
+    }
+  );
+
+  /**
+   * Generate deposit address
+   * @returns {Promise<{
+   * @route GET /on-chain/spark-deposit-address
    *   data: {
    *     address: string
    *   }
    * }>}
    */
   router.get(
-    "/bitcoin/deposit-address",
+    "/on-chain/spark-deposit-address",
     checkWalletInitialized,
     async (req, res) => {
       const wallet = getWallet();
@@ -467,23 +578,23 @@ export const createSparkRouter = (
   );
 
   /**
-   * Get L1 Address used for funding L1 token transactions like announce and withdraw.
-   * @route GET /bitcoin/token-l1-address
+   * Returns previously generated deposit addresses associated with this Spark Wallet.
+   * @route GET /on-chain/unused-deposit-addresses
    * @returns {Promise<{
    *   data: {
-   *     sparkAddress: string
+   *     addresses: string[]
    *   }
    * }>}
    */
   router.get(
-    "/bitcoin/token-l1-address",
+    "/on-chain/unused-deposit-addresses",
     checkWalletInitialized,
     async (req, res) => {
       const wallet = getWallet();
       try {
-        const address = await wallet!.getTokenL1Address();
+        const addresses = await wallet!.getUnusedDepositAddresses();
         res.json({
-          data: { address },
+          data: { addresses },
         });
       } catch (error) {
         console.error(error);
@@ -494,8 +605,33 @@ export const createSparkRouter = (
   );
 
   /**
+   * Returns the latest transaction ID deposited to the given Bitcoin address.
+   * This txid can be used to claim the deposit using /bitcoin/claim-deposit.
+   * @route GET /on-chain/latest-deposit-txid
+   * @param {string} btcAddress - The Bitcoin address to get the latest deposit transaction ID for
+   * @returns {Promise<{
+   *   data: {
+   *     txid: string
+   *   }
+   * }>}
+   */
+  router.get("/on-chain/latest-deposit-txid", async (req, res) => {
+    const { btcAddress } = req.query as { btcAddress: string };
+    try {
+      const txid = await getLatestDepositTxId(btcAddress);
+      res.json({
+        data: { txid },
+      });
+    } catch (error) {
+      console.error(error);
+      const errorMsg = isError(error) ? error.message : "Unknown error";
+      res.status(500).json({ error: errorMsg });
+    }
+  });
+
+  /**
    * Claim deposit
-   * @route POST /bitcoin/claim-deposit
+   * @route POST /on-chain/claim-deposit
    * @param {string} txid - The transaction ID of the deposit
    * @returns {Promise<{
    *   data: {
@@ -520,7 +656,7 @@ export const createSparkRouter = (
    * }>}
    */
   router.post(
-    "/bitcoin/claim-deposit",
+    "/on-chain/claim-deposit",
     checkWalletInitialized,
     async (req, res) => {
       const wallet = getWallet();
@@ -542,7 +678,7 @@ export const createSparkRouter = (
 
   /**
    * Withdraw to Bitcoin address
-   * @route POST /bitcoin/withdraw
+   * @route POST /on-chain/withdraw
    * @param {string} onchainAddress - The Bitcoin address to withdraw to
    * @param {string} [targetAmountSats] - The amount to withdraw in satoshis
    * @returns {Promise<{
@@ -565,30 +701,76 @@ export const createSparkRouter = (
    *   }
    * }>}
    */
-  router.post("/bitcoin/withdraw", checkWalletInitialized, async (req, res) => {
-    const wallet = getWallet();
-    try {
-      const { onchainAddress, targetAmountSats } = req.body as {
-        onchainAddress: string;
-        targetAmountSats: number | undefined;
-      };
-      const withdrawal = await wallet!.withdraw({
-        onchainAddress,
-        targetAmountSats,
-      });
-      res.json({
-        data: { withdrawal },
-      });
-    } catch (error) {
-      console.error(error);
-      const errorMsg = isError(error) ? error.message : "Unknown error";
-      res.status(500).json({ error: errorMsg });
+  router.post(
+    "/on-chain/withdraw",
+    checkWalletInitialized,
+    async (req, res) => {
+      const wallet = getWallet();
+      try {
+        const { onchainAddress, targetAmountSats } = req.body as {
+          onchainAddress: string;
+          targetAmountSats: number | undefined;
+        };
+        const withdrawal = await wallet!.withdraw({
+          onchainAddress,
+          targetAmountSats,
+        });
+        res.json({
+          data: { withdrawal },
+        });
+      } catch (error) {
+        console.error(error);
+        const errorMsg = isError(error) ? error.message : "Unknown error";
+        res.status(500).json({ error: errorMsg });
+      }
     }
-  });
+  );
+
+  /**
+   * Gets fee estimate for cooperative exit (on-chain withdrawal).
+   * @route POST /on-chain/get-coop-exit-fee-estimate
+   * @param {string[]} leafExternalIds - The external IDs of the leaves to get the fee estimate for
+   * @param {string} withdrawalAddress - The address to withdraw to
+   * @returns {Promise<{
+   *   data: {
+   *     feeEstimate: {
+   *       originalValue: number
+   *       originalUnit: string
+   *       preferredCurrencyUnit: string
+   *       preferredCurrencyValueRounded: number
+   *       preferredCurrencyValueApprox: number
+   *     }
+   *   }
+   * }>}
+   */
+  router.post(
+    "/on-chain/get-coop-exit-fee-estimate",
+    checkWalletInitialized,
+    async (req, res) => {
+      const wallet = getWallet();
+      try {
+        const { leafExternalIds, withdrawalAddress } = req.body as {
+          leafExternalIds: string[];
+          withdrawalAddress: string;
+        };
+        const feeEstimate = await wallet!.getCoopExitFeeEstimate({
+          leafExternalIds,
+          withdrawalAddress,
+        });
+        res.json({
+          data: { feeEstimate },
+        });
+      } catch (error) {
+        console.error(error);
+        const errorMsg = isError(error) ? error.message : "Unknown error";
+        res.status(500).json({ error: errorMsg });
+      }
+    }
+  );
 
   /**
    * Transfer tokens
-   * @route POST /tokens/transfer
+   * @route POST /tokens/spark/transfer
    * @param {string} tokenPublicKey - The public key of the token to transfer
    * @param {number} tokenAmount - The amount to transfer
    * @param {string} receiverSparkAddress - The Spark address of the receiver
@@ -598,62 +780,96 @@ export const createSparkRouter = (
    *   }
    * }>}
    */
-  router.post("/tokens/transfer", checkWalletInitialized, async (req, res) => {
-    const wallet = getWallet();
-    try {
-      const { tokenPublicKey, tokenAmount, receiverSparkAddress } =
-        req.body as {
-          tokenPublicKey: string;
-          tokenAmount: number;
-          receiverSparkAddress: string;
-        };
-      const transferTx = await wallet!.transferTokens({
-        tokenPublicKey,
-        tokenAmount: BigInt(tokenAmount),
-        receiverSparkAddress,
-      });
-      res.json({
-        data: { transferTx },
-      });
-    } catch (error) {
-      console.error(error);
-      const errorMsg = isError(error) ? error.message : "Unknown error";
-      res.status(500).json({ error: errorMsg });
+  router.post(
+    "/tokens/spark/transfer",
+    checkWalletInitialized,
+    async (req, res) => {
+      const wallet = getWallet();
+      try {
+        const { tokenPublicKey, tokenAmount, receiverSparkAddress } =
+          req.body as {
+            tokenPublicKey: string;
+            tokenAmount: number;
+            receiverSparkAddress: string;
+          };
+        const transferTx = await wallet!.transferTokens({
+          tokenPublicKey,
+          tokenAmount: BigInt(tokenAmount),
+          receiverSparkAddress,
+        });
+        res.json({
+          data: { transferTx },
+        });
+      } catch (error) {
+        console.error(error);
+        const errorMsg = isError(error) ? error.message : "Unknown error";
+        res.status(500).json({ error: errorMsg });
+      }
     }
-  });
+  );
+
+  /**
+   * Get L1 Address used for funding L1 token transactions like announce and withdraw.
+   * @route GET /tokens/on-chain/token-l1-address
+   * @returns {Promise<{
+   *   data: {
+   *     sparkAddress: string
+   *   }
+   * }>}
+   */
+  router.get(
+    "/tokens/on-chain/token-l1-address",
+    checkWalletInitialized,
+    async (req, res) => {
+      const wallet = getWallet();
+      try {
+        const address = await wallet!.getTokenL1Address();
+        res.json({
+          data: { address },
+        });
+      } catch (error) {
+        console.error(error);
+        const errorMsg = isError(error) ? error.message : "Unknown error";
+        res.status(500).json({ error: errorMsg });
+      }
+    }
+  );
 
   /**
    * Withdraw tokens
-   * @route POST /tokens/withdraw
+   * @route POST /tokens/on-chain/withdraw
    * @param {string} tokenPublicKey - The public key of the token to withdraw
-   * @param {string} [receiverPublicKey] - The public key of the receiver
-   * @param {string[]} [leafIds] - The IDs of the leaves to withdraw
+   * @param {number} tokenAmount - The amount to withdraw
    * @returns {Promise<{
    *   data: {
    *     withdrawal: string
    *   }
    * }>}
    */
-  router.post("/tokens/withdraw", checkWalletInitialized, async (req, res) => {
-    const wallet = getWallet();
-    try {
-      const { tokenPublicKey, tokenAmount } = req.body as {
-        tokenPublicKey: string;
-        tokenAmount: bigint | undefined;
-      };
-      const withdrawalTx = await wallet!.withdrawTokens(
-        tokenPublicKey,
-        tokenAmount ?? undefined
-      );
-      res.json({
-        data: { withdrawalTx },
-      });
-    } catch (error) {
-      console.error(error);
-      const errorMsg = isError(error) ? error.message : "Unknown error";
-      res.status(500).json({ error: errorMsg });
+  router.post(
+    "/tokens/on-chain/withdraw",
+    checkWalletInitialized,
+    async (req, res) => {
+      const wallet = getWallet();
+      try {
+        const { tokenPublicKey, tokenAmount } = req.body as {
+          tokenPublicKey: string;
+          tokenAmount: number;
+        };
+        const withdrawalTx = await wallet!.withdrawTokens(
+          tokenPublicKey,
+          BigInt(tokenAmount)
+        );
+        res.json({
+          data: { withdrawalTx },
+        });
+      } catch (error) {
+        console.error(error);
+        const errorMsg = isError(error) ? error.message : "Unknown error";
+        res.status(500).json({ error: errorMsg });
+      }
     }
-  });
+  );
   return { router, getWallet, checkWalletInitialized };
 };
 

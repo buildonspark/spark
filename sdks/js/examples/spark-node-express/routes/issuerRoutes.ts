@@ -4,10 +4,7 @@ import { Lrc20Protos } from "@buildonspark/lrc20-sdk";
 import { createSparkRouter } from "./sparkRoutes.js";
 import { isError } from "@lightsparkdev/core";
 import { hexToBytes } from "@noble/curves/abstract/utils";
-import {
-  Transaction,
-  ListAllTokenTransactionsCursor,
-} from "@buildonspark/issuer-sdk/types";
+
 const ISSUER_MNEMONIC_PATH = ".issuer-mnemonic";
 
 const { router, getWallet, checkWalletInitialized } = createSparkRouter(
@@ -17,28 +14,32 @@ const { router, getWallet, checkWalletInitialized } = createSparkRouter(
 
 /**
  * Gets the balance of the issuer's token
- * @route GET /issuer-wallet/token-balance
+ * @route GET /issuer-wallet/tokens/token-balance
  * @returns {Promise<{
  *  data: {balance: string},
  * }>}
  */
-router.get("/token-balance", checkWalletInitialized, async (req, res) => {
-  const wallet = getWallet() as IssuerSparkWallet;
-  try {
-    const balance = await wallet!.getIssuerTokenBalance();
-    res.json({
-      data: { balance: balance.balance },
-    });
-  } catch (error) {
-    console.error(error);
-    const errorMsg = isError(error) ? error.message : "Unknown error";
-    res.status(500).json({ error: errorMsg });
+router.get(
+  "/tokens/token-balance",
+  checkWalletInitialized,
+  async (req, res) => {
+    const wallet = getWallet() as IssuerSparkWallet;
+    try {
+      const balance = await wallet!.getIssuerTokenBalance();
+      res.json({
+        data: { balance: balance.balance },
+      });
+    } catch (error) {
+      console.error(error);
+      const errorMsg = isError(error) ? error.message : "Unknown error";
+      res.status(500).json({ error: errorMsg });
+    }
   }
-});
+);
 
 /**
  * Gets the public key info of the issuer's token
- * @route GET /issuer-wallet/token-public-key-info
+ * @route GET /issuer-wallet/tokens/token-public-key-info
  * @returns {Promise<{
  *   data: {
  *     tokenPublicKeyInfo: {
@@ -49,7 +50,7 @@ router.get("/token-balance", checkWalletInitialized, async (req, res) => {
  * }>}
  */
 router.get(
-  "/token-public-key-info",
+  "/tokens/token-public-key-info",
   checkWalletInitialized,
   async (req, res) => {
     const wallet = getWallet() as IssuerSparkWallet;
@@ -69,7 +70,7 @@ router.get(
 
 /**
  * Gets the activity of the issuer's token
- * @route GET /issuer-wallet/token-activity
+ * @route GET /issuer-wallet/tokens/token-activity
  * @param {number} [pageSize = 20] - The number of transactions to return
  * @param {string} [lastTransactionHash] - The hash of the last transaction as a hex string
  * @param {string} [layer] - The layer of the last transaction "L1" or "SPARK"
@@ -81,45 +82,49 @@ router.get(
  *   }
  * }>}
  */
-router.get("/token-activity", checkWalletInitialized, async (req, res) => {
-  const {
-    pageSize = 20,
-    lastTransactionHash,
-    layer,
-  } = req.query as {
-    pageSize: number | undefined;
-    lastTransactionHash: string | undefined;
-    layer: string | undefined;
-  };
-  const wallet = getWallet() as IssuerSparkWallet;
-  const cursor =
-    lastTransactionHash && layer
-      ? {
-          lastTransactionHash: hexToBytes(lastTransactionHash),
-          layer: Lrc20Protos.Layer[layer as keyof typeof Lrc20Protos.Layer],
-        }
-      : undefined;
-  try {
-    const tokenActivity = await wallet!.getTokenActivity(
-      Number(pageSize),
-      cursor ? cursor : undefined
-    );
-    res.json({
-      data: {
-        transactions: tokenActivity.transactions,
-        nextCursor: tokenActivity.nextCursor,
-      },
-    });
-  } catch (error) {
-    console.error(error);
-    const errorMsg = isError(error) ? error.message : "Unknown error";
-    res.status(500).json({ error: errorMsg });
+router.get(
+  "/tokens/token-activity",
+  checkWalletInitialized,
+  async (req, res) => {
+    const {
+      pageSize = 20,
+      lastTransactionHash,
+      layer,
+    } = req.query as {
+      pageSize: number | undefined;
+      lastTransactionHash: string | undefined;
+      layer: string | undefined;
+    };
+    const wallet = getWallet() as IssuerSparkWallet;
+    const cursor =
+      lastTransactionHash && layer
+        ? {
+            lastTransactionHash: hexToBytes(lastTransactionHash),
+            layer: Lrc20Protos.Layer[layer as keyof typeof Lrc20Protos.Layer],
+          }
+        : undefined;
+    try {
+      const tokenActivity = await wallet!.getTokenActivity(
+        Number(pageSize),
+        cursor ? cursor : undefined
+      );
+      res.json({
+        data: {
+          transactions: tokenActivity.transactions,
+          nextCursor: tokenActivity.nextCursor,
+        },
+      });
+    } catch (error) {
+      console.error(error);
+      const errorMsg = isError(error) ? error.message : "Unknown error";
+      res.status(500).json({ error: errorMsg });
+    }
   }
-});
+);
 
 /**
  * Gets the activity of the issuer's token
- * @route GET /issuer-wallet/issuer-token-activity
+ * @route GET /issuer-wallet/tokens/issuer-token-activity
  * @param {number} [pageSize = 20] - The number of transactions to return
  * @param {string} [lastTransactionHash] - The hash of the last transaction as a hex string
  * @param {string} [layer] - The layer of the last transaction "L1" or "SPARK"
@@ -131,7 +136,7 @@ router.get("/token-activity", checkWalletInitialized, async (req, res) => {
  * }>}
  */
 router.get(
-  "/issuer-token-activity",
+  "/tokens/issuer-token-activity",
   checkWalletInitialized,
   async (req, res) => {
     const {
@@ -172,7 +177,7 @@ router.get(
 
 /**
  * Mint tokens
- * @route POST /issuer-wallet/spark/mint-tokens
+ * @route POST /issuer-wallet/tokens/spark/mint-tokens
  * @param {number} tokenAmount - The amount of tokens to mint
  * @returns {Promise<{
  *   data: {
@@ -180,24 +185,28 @@ router.get(
  *   }
  * }>}
  */
-router.post("/spark/mint-tokens", checkWalletInitialized, async (req, res) => {
-  const wallet = getWallet() as IssuerSparkWallet;
-  try {
-    const { tokenAmount } = req.body as { tokenAmount: number };
-    const tokensMinted = await wallet!.mintTokens(BigInt(tokenAmount));
-    res.json({
-      data: { tokensMinted },
-    });
-  } catch (error) {
-    console.error(error);
-    const errorMsg = isError(error) ? error.message : "Unknown error";
-    res.status(500).json({ error: errorMsg });
+router.post(
+  "/tokens/spark/mint-tokens",
+  checkWalletInitialized,
+  async (req, res) => {
+    const wallet = getWallet() as IssuerSparkWallet;
+    try {
+      const { tokenAmount } = req.body as { tokenAmount: number };
+      const tokensMinted = await wallet!.mintTokens(BigInt(tokenAmount));
+      res.json({
+        data: { tokensMinted },
+      });
+    } catch (error) {
+      console.error(error);
+      const errorMsg = isError(error) ? error.message : "Unknown error";
+      res.status(500).json({ error: errorMsg });
+    }
   }
-});
+);
 
 /**
  * Burn tokens
- * @route POST /issuer-wallet/spark/burn-tokens
+ * @route POST /issuer-wallet/tokens/spark/burn-tokens
  * @param {number} tokenAmount - The amount of tokens to burn
  * @returns {Promise<{
  *   data: {
@@ -205,24 +214,28 @@ router.post("/spark/mint-tokens", checkWalletInitialized, async (req, res) => {
  *   }
  * }>}
  */
-router.post("/spark/burn-tokens", checkWalletInitialized, async (req, res) => {
-  const wallet = getWallet() as IssuerSparkWallet;
-  try {
-    const { tokenAmount } = req.body as { tokenAmount: number };
-    const tokensBurned = await wallet!.burnTokens(BigInt(tokenAmount));
-    res.json({
-      data: { tokensBurned },
-    });
-  } catch (error) {
-    console.error(error);
-    const errorMsg = isError(error) ? error.message : "Unknown error";
-    res.status(500).json({ error: errorMsg });
+router.post(
+  "/tokens/spark/burn-tokens",
+  checkWalletInitialized,
+  async (req, res) => {
+    const wallet = getWallet() as IssuerSparkWallet;
+    try {
+      const { tokenAmount } = req.body as { tokenAmount: number };
+      const tokensBurned = await wallet!.burnTokens(BigInt(tokenAmount));
+      res.json({
+        data: { tokensBurned },
+      });
+    } catch (error) {
+      console.error(error);
+      const errorMsg = isError(error) ? error.message : "Unknown error";
+      res.status(500).json({ error: errorMsg });
+    }
   }
-});
+);
 
 /**
  * Freeze tokens
- * @route POST /issuer-wallet/spark/freeze-tokens
+ * @route POST /issuer-wallet/tokens/spark/freeze-tokens
  * @param {string} ownerPublicKey - The public key of the owner
  * @returns {Promise<{
  *   data: {
@@ -233,7 +246,7 @@ router.post("/spark/burn-tokens", checkWalletInitialized, async (req, res) => {
  */
 
 router.post(
-  "/spark/freeze-tokens",
+  "/tokens/spark/freeze-tokens",
   checkWalletInitialized,
   async (req, res) => {
     const wallet = getWallet() as IssuerSparkWallet;
@@ -256,7 +269,7 @@ router.post(
 
 /**
  * Unfreeze tokens
- * @route POST /issuer-wallet/spark/unfreeze-tokens
+ * @route POST /issuer-wallet/tokens/spark/unfreeze-tokens
  * @param {string} ownerPublicKey - The public key of the owner
  * @returns {Promise<{
  *   data: {
@@ -266,7 +279,7 @@ router.post(
  * }>}
  */
 router.post(
-  "/spark/unfreeze-tokens",
+  "/tokens/spark/unfreeze-tokens",
   checkWalletInitialized,
   async (req, res) => {
     const wallet = getWallet() as IssuerSparkWallet;
@@ -288,35 +301,8 @@ router.post(
 );
 
 /**
- * Gets the L1 address of the issuer wallet. You must deposit to this address before you can announce on L1.
- * @route GET /issuer-wallet/on-chain/issuer-address
- * @returns {Promise<{
- *   data: {
- *     address: string
- *   }
- * }>}
- */
-router.get(
-  "/on-chain/issuer-address",
-  checkWalletInitialized,
-  async (req, res) => {
-    const wallet = getWallet() as IssuerSparkWallet;
-    try {
-      const address = wallet!.getTokenL1Address();
-      res.json({
-        data: { address },
-      });
-    } catch (error) {
-      console.error(error);
-      const errorMsg = isError(error) ? error.message : "Unknown error";
-      res.status(500).json({ error: errorMsg });
-    }
-  }
-);
-
-/**
  * Announce token L1
- * @route POST /issuer-wallet/on-chain/announce-token
+ * @route POST /issuer-wallet/tokens/on-chain/announce-token
  * @param {string} tokenName - The name of the token
  * @param {string} tokenTicker - The ticker of the token
  * @param {number} decimals - The number of decimals of the token
@@ -337,7 +323,7 @@ router.get(
  * }
  */
 router.post(
-  "/on-chain/announce-token",
+  "/tokens/on-chain/announce-token",
   checkWalletInitialized,
   async (req, res) => {
     const wallet = getWallet() as IssuerSparkWallet;
@@ -378,7 +364,7 @@ router.post(
 
 /**
  * Mint tokens L1
- * @route POST /issuer-wallet/on-chain/mint-tokens
+ * @route POST /issuer-wallet/tokens/on-chain/mint-tokens
  * @param {number} tokenAmount - The amount of tokens to mint
  * @returns {Promise<{
  *   data: {
@@ -387,7 +373,7 @@ router.post(
  * }>}
  */
 router.post(
-  "/on-chain/mint-tokens",
+  "/tokens/on-chain/mint-tokens",
   checkWalletInitialized,
   async (req, res) => {
     const wallet = getWallet() as IssuerSparkWallet;
@@ -407,7 +393,7 @@ router.post(
 
 /**
  * Transfer tokens L1
- * @route POST /issuer-wallet/on-chain/transfer-tokens
+ * @route POST /issuer-wallet/tokens/on-chain/transfer-tokens
  * @param {number} tokenAmount - The amount of tokens to transfer
  * @param {string} receiverPublicKey - The public key of the receiver
  * @returns {Promise<{
@@ -417,7 +403,7 @@ router.post(
  * }>}
  */
 router.post(
-  "/on-chain/transfer-tokens",
+  "/tokens/on-chain/transfer-tokens",
   checkWalletInitialized,
   async (req, res) => {
     const wallet = getWallet() as IssuerSparkWallet;
