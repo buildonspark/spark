@@ -20,6 +20,8 @@ USD = "USD",
 MXN = "MXN",
 /** Philippine Peso. **/
 PHP = "PHP",
+/** Euro. **/
+EUR = "EUR",
 /** 0.000000001 (10e-9) Bitcoin or a billionth of a Bitcoin. We recommend using the Satoshi unit instead when possible. **/
 NANOBITCOIN = "NANOBITCOIN",
 /** 0.000001 (10e-6) Bitcoin or a millionth of a Bitcoin. We recommend using the Satoshi unit instead when possible. **/

@@ -22,12 +22,14 @@ import {
   CompleteLeavesSwapInput,
   CoopExitFeeEstimateInput,
   CoopExitFeeEstimateOutput,
+  LeavesSwapFeeEstimateOutput,
   LightningSendRequest,
   RequestCoopExitInput,
   RequestLeavesSwapInput,
   RequestLightningReceiveInput,
   RequestLightningSendInput,
 } from "./objects/index.js";
+import { LeavesSwapFeeEstimateOutputFromJson } from "./objects/LeavesSwapFeeEstimateOutput.js";
 import LeavesSwapRequest, {
   LeavesSwapRequestFromJson,
 } from "./objects/LeavesSwapRequest.js";
@@ -42,6 +44,7 @@ import LightningSendFeeEstimateOutput, {
 } from "./objects/LightningSendFeeEstimateOutput.js";
 import { LightningSendRequestFromJson } from "./objects/LightningSendRequest.js";
 import { CoopExitFeeEstimate } from "./queries/CoopExitFeeEstimate.js";
+import { LeavesSwapFeeEstimate } from "./queries/LeavesSwapFeeEstimate.js";
 import { LightningReceiveFeeEstimate } from "./queries/LightningReceiveFeeEstimate.js";
 import { LightningSendFeeEstimate } from "./queries/LightningSendFeeEstimate.js";
 
@@ -70,6 +73,22 @@ export default class SspClient {
 
   async executeRawQuery<T>(query: Query<T>): Promise<T | null> {
     return await this.requester.executeQuery(query);
+  }
+
+  async getSwapFeeEstimate(
+    amountSats: number,
+  ): Promise<LeavesSwapFeeEstimateOutput | null> {
+    return await this.executeRawQuery({
+      queryPayload: LeavesSwapFeeEstimate,
+      variables: {
+        total_amount_sats: amountSats,
+      },
+      constructObject: (response: { leaves_swap_fee_estimate: any }) => {
+        return LeavesSwapFeeEstimateOutputFromJson(
+          response.leaves_swap_fee_estimate,
+        );
+      },
+    });
   }
 
   async getLightningReceiveFeeEstimate(

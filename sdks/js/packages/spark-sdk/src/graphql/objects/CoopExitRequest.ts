@@ -1,12 +1,14 @@
 
 // Copyright ©, 2023-present, Lightspark Group, Inc. - All Rights Reserved
 
+import UserRequest from './UserRequest.js';
 import Entity from './Entity.js';
+import BitcoinNetwork from './BitcoinNetwork.js';
 import {CurrencyAmountToJson} from './CurrencyAmount.js';
 import {CurrencyAmountFromJson} from './CurrencyAmount.js';
-import SparkCoopExitRequestStatus from './SparkCoopExitRequestStatus.js';
 import CurrencyAmount from './CurrencyAmount.js';
 import { Query, isObject } from '@lightsparkdev/core';
+import SparkCoopExitRequestStatus from './SparkCoopExitRequestStatus.js';
 
 
 interface CoopExitRequest {
@@ -23,6 +25,9 @@ createdAt: string;
 
     /** The date and time when the entity was last updated. **/
 updatedAt: string;
+
+    /** The network the lightning send request is on. **/
+network: BitcoinNetwork;
 
     /**
  * The fee includes what user pays for the coop exit and the L1 broadcast fee. The amount user will
@@ -52,6 +57,7 @@ export const CoopExitRequestFromJson = (obj: any): CoopExitRequest => {
         id: obj["coop_exit_request_id"],
         createdAt: obj["coop_exit_request_created_at"],
         updatedAt: obj["coop_exit_request_updated_at"],
+        network: BitcoinNetwork[obj["coop_exit_request_network"]] ?? BitcoinNetwork.FUTURE_VALUE,
         fee: CurrencyAmountFromJson(obj["coop_exit_request_fee"]),
         status: SparkCoopExitRequestStatus[obj["coop_exit_request_status"]] ?? SparkCoopExitRequestStatus.FUTURE_VALUE,
         expiresAt: obj["coop_exit_request_expires_at"],
@@ -65,6 +71,7 @@ return {
 __typename: "CoopExitRequest",coop_exit_request_id: obj.id,
 coop_exit_request_created_at: obj.createdAt,
 coop_exit_request_updated_at: obj.updatedAt,
+coop_exit_request_network: obj.network,
 coop_exit_request_fee: CurrencyAmountToJson(obj.fee),
 coop_exit_request_status: obj.status,
 coop_exit_request_expires_at: obj.expiresAt,
@@ -81,6 +88,7 @@ fragment CoopExitRequestFragment on CoopExitRequest {
     coop_exit_request_id: id
     coop_exit_request_created_at: created_at
     coop_exit_request_updated_at: updated_at
+    coop_exit_request_network: network
     coop_exit_request_fee: fee {
         __typename
         currency_amount_original_value: original_value

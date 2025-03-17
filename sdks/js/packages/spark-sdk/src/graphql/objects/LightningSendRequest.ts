@@ -1,14 +1,16 @@
 
 // Copyright ©, 2023-present, Lightspark Group, Inc. - All Rights Reserved
 
+import UserRequest from './UserRequest.js';
 import Entity from './Entity.js';
+import BitcoinNetwork from './BitcoinNetwork.js';
 import {CurrencyAmountToJson} from './CurrencyAmount.js';
 import {CurrencyAmountFromJson} from './CurrencyAmount.js';
-import LightningSendRequestStatus from './LightningSendRequestStatus.js';
 import {TransferFromJson} from './Transfer.js';
 import CurrencyAmount from './CurrencyAmount.js';
-import { Query, isObject } from '@lightsparkdev/core';
 import Transfer from './Transfer.js';
+import { Query, isObject } from '@lightsparkdev/core';
+import LightningSendRequestStatus from './LightningSendRequestStatus.js';
 
 
 interface LightningSendRequest {
@@ -25,6 +27,9 @@ createdAt: string;
 
     /** The date and time when the entity was last updated. **/
 updatedAt: string;
+
+    /** The network the lightning send request is on. **/
+network: BitcoinNetwork;
 
     /** The lightning invoice user requested to pay. **/
 encodedInvoice: string;
@@ -54,6 +59,7 @@ export const LightningSendRequestFromJson = (obj: any): LightningSendRequest => 
         id: obj["lightning_send_request_id"],
         createdAt: obj["lightning_send_request_created_at"],
         updatedAt: obj["lightning_send_request_updated_at"],
+        network: BitcoinNetwork[obj["lightning_send_request_network"]] ?? BitcoinNetwork.FUTURE_VALUE,
         encodedInvoice: obj["lightning_send_request_encoded_invoice"],
         fee: CurrencyAmountFromJson(obj["lightning_send_request_fee"]),
         idempotencyKey: obj["lightning_send_request_idempotency_key"],
@@ -68,6 +74,7 @@ return {
 __typename: "LightningSendRequest",lightning_send_request_id: obj.id,
 lightning_send_request_created_at: obj.createdAt,
 lightning_send_request_updated_at: obj.updatedAt,
+lightning_send_request_network: obj.network,
 lightning_send_request_encoded_invoice: obj.encodedInvoice,
 lightning_send_request_fee: CurrencyAmountToJson(obj.fee),
 lightning_send_request_idempotency_key: obj.idempotencyKey,
@@ -85,6 +92,7 @@ fragment LightningSendRequestFragment on LightningSendRequest {
     lightning_send_request_id: id
     lightning_send_request_created_at: created_at
     lightning_send_request_updated_at: updated_at
+    lightning_send_request_network: network
     lightning_send_request_encoded_invoice: encoded_invoice
     lightning_send_request_fee: fee {
         __typename

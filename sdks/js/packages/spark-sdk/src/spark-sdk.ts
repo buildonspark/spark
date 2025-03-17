@@ -9,6 +9,7 @@ import {
   BitcoinNetwork,
   CoopExitFeeEstimateInput,
   CoopExitFeeEstimateOutput,
+  LeavesSwapFeeEstimateOutput,
   LeavesSwapRequest,
   LightningReceiveFeeEstimateInput,
   LightningReceiveFeeEstimateOutput,
@@ -426,6 +427,27 @@ export class SparkWallet {
       );
     await this.initializeWallet(identityPublicKey);
     return identityPublicKey;
+  }
+
+  /**
+   * Gets the estimated fee for a swap of leaves.
+   *
+   * @param amountSats - The amount of sats to swap
+   *  @returns {Promise<LeavesSwapFeeEstimateOutput>}  The estimated fee for the swap
+   */
+  public async getSwapFeeEstimate(
+    amountSats: number,
+  ): Promise<LeavesSwapFeeEstimateOutput> {
+    if (!this.sspClient) {
+      throw new Error("SSP client not initialized");
+    }
+
+    const feeEstimate = await this.sspClient.getSwapFeeEstimate(amountSats);
+    if (!feeEstimate) {
+      throw new Error("Failed to get swap fee estimate");
+    }
+
+    return feeEstimate;
   }
 
   /**
@@ -1226,10 +1248,16 @@ export class SparkWallet {
       throw new Error("SSP client not initialized");
     }
 
-    return await this.sspClient.getLightningReceiveFeeEstimate(
+    const feeEstimate = await this.sspClient.getLightningReceiveFeeEstimate(
       amountSats,
       network,
     );
+
+    if (!feeEstimate) {
+      throw new Error("Failed to get lightning receive fee estimate");
+    }
+
+    return feeEstimate;
   }
 
   /**
@@ -1245,7 +1273,13 @@ export class SparkWallet {
       throw new Error("SSP client not initialized");
     }
 
-    return await this.sspClient.getLightningSendFeeEstimate(encodedInvoice);
+    const feeEstimate =
+      await this.sspClient.getLightningSendFeeEstimate(encodedInvoice);
+
+    if (!feeEstimate) {
+      throw new Error("Failed to get lightning send fee estimate");
+    }
+    return feeEstimate;
   }
 
   // ***** Tree Creation Flow *****

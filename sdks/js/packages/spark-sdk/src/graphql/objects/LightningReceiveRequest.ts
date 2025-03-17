@@ -1,16 +1,18 @@
 
 // Copyright ©, 2023-present, Lightspark Group, Inc. - All Rights Reserved
 
+import UserRequest from './UserRequest.js';
 import Entity from './Entity.js';
+import BitcoinNetwork from './BitcoinNetwork.js';
+import {InvoiceFromJson} from './Invoice.js';
 import {CurrencyAmountToJson} from './CurrencyAmount.js';
 import {CurrencyAmountFromJson} from './CurrencyAmount.js';
-import Invoice from './Invoice.js';
-import {InvoiceFromJson} from './Invoice.js';
 import {TransferFromJson} from './Transfer.js';
+import Invoice from './Invoice.js';
 import LightningReceiveRequestStatus from './LightningReceiveRequestStatus.js';
 import CurrencyAmount from './CurrencyAmount.js';
-import { Query, isObject } from '@lightsparkdev/core';
 import Transfer from './Transfer.js';
+import { Query, isObject } from '@lightsparkdev/core';
 import {InvoiceToJson} from './Invoice.js';
 
 
@@ -28,6 +30,9 @@ createdAt: string;
 
     /** The date and time when the entity was last updated. **/
 updatedAt: string;
+
+    /** The network the lightning send request is on. **/
+network: BitcoinNetwork;
 
     /** The lightning invoice generated to receive lightning payment. **/
 invoice: Invoice;
@@ -54,6 +59,7 @@ export const LightningReceiveRequestFromJson = (obj: any): LightningReceiveReque
         id: obj["lightning_receive_request_id"],
         createdAt: obj["lightning_receive_request_created_at"],
         updatedAt: obj["lightning_receive_request_updated_at"],
+        network: BitcoinNetwork[obj["lightning_receive_request_network"]] ?? BitcoinNetwork.FUTURE_VALUE,
         invoice: InvoiceFromJson(obj["lightning_receive_request_invoice"]),
         fee: CurrencyAmountFromJson(obj["lightning_receive_request_fee"]),
         status: LightningReceiveRequestStatus[obj["lightning_receive_request_status"]] ?? LightningReceiveRequestStatus.FUTURE_VALUE,
@@ -67,6 +73,7 @@ return {
 __typename: "LightningReceiveRequest",lightning_receive_request_id: obj.id,
 lightning_receive_request_created_at: obj.createdAt,
 lightning_receive_request_updated_at: obj.updatedAt,
+lightning_receive_request_network: obj.network,
 lightning_receive_request_invoice: InvoiceToJson(obj.invoice),
 lightning_receive_request_fee: CurrencyAmountToJson(obj.fee),
 lightning_receive_request_status: obj.status,
@@ -83,6 +90,7 @@ fragment LightningReceiveRequestFragment on LightningReceiveRequest {
     lightning_receive_request_id: id
     lightning_receive_request_created_at: created_at
     lightning_receive_request_updated_at: updated_at
+    lightning_receive_request_network: network
     lightning_receive_request_invoice: invoice {
         __typename
         invoice_encoded_envoice: encoded_envoice

@@ -61,6 +61,7 @@ export { default as StartSeedReleaseInput } from "./StartSeedReleaseInput.js";
 export { default as SwapLeaf } from "./SwapLeaf.js";
 export { default as Transfer } from "./Transfer.js";
 export { default as UserLeafInput } from "./UserLeafInput.js";
+export { getUserRequestQuery, default as UserRequest } from "./UserRequest.js";
 export { default as VerifyChallengeInput } from "./VerifyChallengeInput.js";
 export { default as VerifyChallengeOutput } from "./VerifyChallengeOutput.js";
 export { default as WalletUserIdentityPublicKeyInput } from "./WalletUserIdentityPublicKeyInput.js";

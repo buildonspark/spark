@@ -40,6 +40,7 @@ fragment EntityFragment on Entity {
         coop_exit_request_id: id
         coop_exit_request_created_at: created_at
         coop_exit_request_updated_at: updated_at
+        coop_exit_request_network: network
         coop_exit_request_fee: fee {
             __typename
             currency_amount_original_value: original_value
@@ -57,6 +58,7 @@ fragment EntityFragment on Entity {
         leaves_swap_request_id: id
         leaves_swap_request_created_at: created_at
         leaves_swap_request_updated_at: updated_at
+        leaves_swap_request_network: network
         leaves_swap_request_status: status
         leaves_swap_request_total_amount: total_amount {
             __typename
@@ -119,6 +121,7 @@ fragment EntityFragment on Entity {
         lightning_receive_request_id: id
         lightning_receive_request_created_at: created_at
         lightning_receive_request_updated_at: updated_at
+        lightning_receive_request_network: network
         lightning_receive_request_invoice: invoice {
             __typename
             invoice_encoded_envoice: encoded_envoice
@@ -163,6 +166,7 @@ fragment EntityFragment on Entity {
         lightning_send_request_id: id
         lightning_send_request_created_at: created_at
         lightning_send_request_updated_at: updated_at
+        lightning_send_request_network: network
         lightning_send_request_encoded_invoice: encoded_invoice
         lightning_send_request_fee: fee {
             __typename
