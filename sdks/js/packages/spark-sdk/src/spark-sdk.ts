@@ -315,7 +315,7 @@ export class SparkWallet {
   }
 
   private async syncWallet() {
-    await Promise.all([this.claimTransfers(), this.syncTokenLeaves()]);
+    await this.syncTokenLeaves();
     this.leaves = await this.getLeaves();
     await this.config.signer.restoreSigningKeysFromLeafs(this.leaves);
     await this.refreshTimelockNodes();

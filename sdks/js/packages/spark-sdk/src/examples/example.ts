@@ -24,6 +24,7 @@ async function runCLI() {
   getsparkaddress                                                 - Get the wallet's spark address
   getlatesttx <address>                                           - Get the latest deposit transaction id for an address
   claimdeposit <txid>                                             - Claim any pending deposits to the wallet
+  claimtransfers                                                 - Claim any pending transfers to the wallet
   createinvoice <amount> <memo>                                   - Create a new lightning invoice
   payinvoice <invoice>                                            - Pay a lightning invoice
   sendtransfer <amount> <receiverSparkAddress>                    - Send a spark transfer
@@ -65,6 +66,14 @@ async function runCLI() {
         }
         const depositResult = await wallet.claimDeposit(args[0]);
         console.log(depositResult);
+        break;
+      case "claimtransfers":
+        if (!wallet) {
+          console.log("Please initialize a wallet first");
+          break;
+        }
+        const transferResult = await wallet.claimTransfers();
+        console.log(transferResult);
         break;
       case "initwallet":
         const mnemonicOrSeed = args.join(" ");
