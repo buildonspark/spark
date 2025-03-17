@@ -637,15 +637,13 @@ export const createSparkRouter = (
   router.post("/tokens/withdraw", checkWalletInitialized, async (req, res) => {
     const wallet = getWallet();
     try {
-      const { tokenPublicKey, receiverPublicKey, leafIds } = req.body as {
+      const { tokenPublicKey, tokenAmount } = req.body as {
         tokenPublicKey: string;
-        receiverPublicKey: string | undefined;
-        leafIds: string[] | undefined;
+        tokenAmount: bigint | undefined;
       };
       const withdrawalTx = await wallet!.withdrawTokens(
         tokenPublicKey,
-        receiverPublicKey ?? undefined,
-        leafIds ?? undefined
+        tokenAmount ?? undefined
       );
       res.json({
         data: { withdrawalTx },

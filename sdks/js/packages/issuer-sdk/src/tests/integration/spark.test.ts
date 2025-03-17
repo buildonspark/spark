@@ -89,11 +89,8 @@ describe("token integration test", () => {
     expect(publicKeyInfo?.announcement?.isFreezable).toEqual(false);
 
     // Compare the public key using bytesToHex
-    const pubkeyBuffer = publicKeyInfo?.announcement?.tokenPubkey.pubkey;
-    const pubkeyHex = Buffer.isBuffer(pubkeyBuffer)
-      ? pubkeyBuffer.toString("hex")
-      : Buffer.from((pubkeyBuffer as any).data).toString("hex");
-    expect(pubkeyHex).toEqual(identityPublicKey);
+    const pubKeyHex = publicKeyInfo?.announcement?.tokenPubkey.pubkey;
+    expect(pubKeyHex).toEqual(identityPublicKey);
 
     await wallet.mintTokens(tokenAmount);
 
@@ -137,21 +134,26 @@ describe("token integration test", () => {
     }
     await faucet.mineBlocks(6);
     await wallet.mintTokens(tokenAmount);
+    // Mint a second time to ensure that multiple leaves are handled correctly
+    // (a self transfer should first be broadcast to enable withdrawal in a single TX).
+    await wallet.mintTokens(tokenAmount);
 
     const sourceBalance = await wallet.getIssuerTokenBalance();
-    expect(sourceBalance.balance).toEqual(tokenAmount);
+    expect(sourceBalance.balance).toEqual(tokenAmount * 2n);
 
     await new Promise((resolve) => setTimeout(resolve, 5000));
 
     try {
-      const response = await wallet.withdrawTokens(
-        l1WalletPubKey,
-        l1WalletPubKey,
-      );
+      const response = await wallet.withdrawTokens(l1WalletPubKey);
       console.log("Withdraw token txid: " + response?.txid);
     } catch (error: any) {
       fail("Expected withdrawTokens() to succeed: " + error);
     }
+    // Wallet should update balance immediately by marking the leafs as withdrawn in memory in the wallet.
+    // (note that if re-initializing the wallet this will currently revert balance until confirmation).
+    const sourceBalanceImmediatelyAfterWithdrawal =
+      await wallet.getIssuerTokenBalance();
+    expect(sourceBalanceImmediatelyAfterWithdrawal.balance).toEqual(0n);
 
     // Mine blocks to confirm the transaction and  make LRC20 aware
     // of the withdrawal.
@@ -166,6 +168,7 @@ describe("token integration test", () => {
     // Wait for SO processing.
     await new Promise((resolve) => setTimeout(resolve, 3000));
 
+    // Ensure that after LRC20 processing that balance is still 0.
     const sourceBalanceAfterWithdrawal = await wallet.getIssuerTokenBalance();
     expect(sourceBalanceAfterWithdrawal.balance).toEqual(0n);
   });
