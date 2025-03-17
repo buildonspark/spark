@@ -180,6 +180,35 @@
 					"response": []
 				},
 				{
+					"name": "Request Leaves Swap",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"targetAmount\": 20\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "localhost:4000/spark-wallet/wallet/request-leaves-swap",
+							"host": [
+								"localhost"
+							],
+							"port": "4000",
+							"path": [
+								"spark-wallet",
+								"wallet",
+								"request-leaves-swap"
+							]
+						}
+					},
+					"response": []
+				},
+				{
 					"name": "Get Lighting Receive Fee Estimate",
 					"request": {
 						"method": "GET",
@@ -284,35 +313,6 @@
 								"spark-wallet",
 								"lightning",
 								"pay-invoice"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Request Leaves Swap",
-					"request": {
-						"method": "POST",
-						"header": [],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"targetAmount\": 20\n}",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
-						"url": {
-							"raw": "localhost:4000/spark-wallet/wallet/request-leaves-swap",
-							"host": [
-								"localhost"
-							],
-							"port": "4000",
-							"path": [
-								"spark-wallet",
-								"wallet",
-								"request-leaves-swap"
 							]
 						}
 					},
@@ -547,6 +547,35 @@
 								"tokens",
 								"on-chain",
 								"withdraw"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Sign Message With Identity Key",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"message\": \"message to sign\",\n    \"compactEncoding\": false\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "localhost:4000/spark-wallet/wallet/sign-message",
+							"host": [
+								"localhost"
+							],
+							"port": "4000",
+							"path": [
+								"spark-wallet",
+								"wallet",
+								"sign-message"
 							]
 						}
 					},

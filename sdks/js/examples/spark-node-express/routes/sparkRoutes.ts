@@ -346,6 +346,47 @@ export const createSparkRouter = (
   );
 
   /**
+   * Signs a message with the identity key.
+   * This method can be useful if you have your own auth model for other APIs.
+   *
+   * @route POST /wallet/sign-message
+   * @param {string} message - The message to sign
+   * @param {boolean} [compactEncoding] - Whether or not to use compact encoding
+   *  - If true, the message will be returned in ECDSA compact format
+   *  - If false, the message will be returned in DER format
+   *  - If not provided, the message will be returned in DER format
+   * @returns {Promise<{
+   *   data: {
+   *     signedMessage: string
+   *   }
+   * }>}
+   */
+  router.post(
+    "/wallet/sign-message",
+    checkWalletInitialized,
+    async (req, res) => {
+      const wallet = getWallet();
+      try {
+        const { message, compactEncoding = false } = req.body as {
+          message: string;
+          compactEncoding: boolean;
+        };
+        const signedMessage = await wallet!.signMessage(
+          message,
+          compactEncoding
+        );
+        res.json({
+          data: { signedMessage },
+        });
+      } catch (error) {
+        console.error(error);
+        const errorMsg = isError(error) ? error.message : "Unknown error";
+        res.status(500).json({ error: errorMsg });
+      }
+    }
+  );
+
+  /**
    * Send Spark Transfer
    * @route POST /spark/send-transfer
    * @param {string} receiverSparkAddress - The Spark address of the receiver
