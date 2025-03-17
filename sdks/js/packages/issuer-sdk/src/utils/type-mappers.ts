@@ -7,7 +7,7 @@ export function convertToTokenPubKeyInfoResponse(
   tokenPubkeyInfo: TokenPubkeyInfo
 ): TokenPubKeyInfoResponse {
   return {
-    announcement: tokenPubkeyInfo.announcement ? {
+    announcement: tokenPubkeyInfo?.announcement ? {
       tokenPubkey: {
         pubkey: bytesToHex(tokenPubkeyInfo.announcement.tokenPubkey.pubkey)
       },
@@ -17,7 +17,7 @@ export function convertToTokenPubKeyInfoResponse(
       maxSupply: tokenPubkeyInfo.announcement.maxSupply,
       isFreezable: tokenPubkeyInfo.announcement.isFreezable
     } : null,
-    totalSupply: tokenPubkeyInfo.totalSupply
+    totalSupply: tokenPubkeyInfo?.totalSupply ?? "0"
   };
 }
 

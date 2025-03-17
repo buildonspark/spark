@@ -31,7 +31,7 @@ import {
   Lrc20SparkClient,
 } from "@buildonspark/lrc20-sdk/grpc";
 import { GetTokenActivityResponse, TokenPubKeyInfoResponse } from "./types.js";
-import { convertTokenActivityToHexEncoded, convertToTokenPubKeyInfoResponse } from "./utils/types.js";
+import { convertTokenActivityToHexEncoded, convertToTokenPubKeyInfoResponse } from "./utils/type-mappers.js";
 
 const BURN_ADDRESS = "02".repeat(33);
 
@@ -120,7 +120,7 @@ export class IssuerSparkWallet
     };
   }
 
-  public async getTokenPublicKeyInfo(): Promise<TokenPubKeyInfoResponse> {
+  public async getTokenPublicKeyInfo(): Promise<TokenPubKeyInfoResponse | null> {
     if (this.tokenPublicKeyInfo) {
       return convertToTokenPubKeyInfoResponse(this.tokenPublicKeyInfo);
     }
@@ -129,11 +129,10 @@ export class IssuerSparkWallet
     const rawTokenPubkeyInfo = await this.lrc20Wallet!.getTokenPubkeyInfo(tokenPublicKey);
     
     this.tokenPublicKeyInfo = rawTokenPubkeyInfo;
+    if (!rawTokenPubkeyInfo) {
+      return null;
+    }
     return convertToTokenPubKeyInfoResponse(rawTokenPubkeyInfo);
-  }
-
-  public async getIssuerTokenPublicKeyInfo(): Promise<TokenPubKeyInfoResponse> {
-    return await this.getTokenPublicKeyInfo();
   }
 
   public async getIssuerTokenPublicKey() {

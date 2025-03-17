@@ -82,14 +82,14 @@ describe("token integration test", () => {
 
     // Assert token public key info values
     const identityPublicKey = await wallet.getIdentityPublicKey();
-    expect(publicKeyInfo.announcement?.name).toEqual("TestToken1");
-    expect(publicKeyInfo.announcement?.symbol).toEqual("TT1");
-    expect(publicKeyInfo.announcement?.decimal).toEqual(0);
-    expect(publicKeyInfo.announcement?.maxSupply).toEqual(0);
-    expect(publicKeyInfo.announcement?.isFreezable).toEqual(false);
+    expect(publicKeyInfo?.announcement?.name).toEqual("TestToken1");
+    expect(publicKeyInfo?.announcement?.symbol).toEqual("TT1");
+    expect(publicKeyInfo?.announcement?.decimal).toEqual(0);
+    expect(publicKeyInfo?.announcement?.maxSupply).toEqual(0);
+    expect(publicKeyInfo?.announcement?.isFreezable).toEqual(false);
 
     // Compare the public key using bytesToHex
-    const pubkeyBuffer = publicKeyInfo.announcement?.tokenPubkey.pubkey;
+    const pubkeyBuffer = publicKeyInfo?.announcement?.tokenPubkey.pubkey;
     const pubkeyHex = Buffer.isBuffer(pubkeyBuffer)
       ? pubkeyBuffer.toString("hex")
       : Buffer.from((pubkeyBuffer as any).data).toString("hex");

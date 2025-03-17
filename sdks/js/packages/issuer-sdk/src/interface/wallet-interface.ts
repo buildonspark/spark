@@ -11,7 +11,7 @@ import {
   TokenTransactionWithStatus,
   Transfer,
 } from "@buildonspark/spark-sdk/proto/spark";
-import { GetTokenActivityResponse } from "../types.js";
+import { GetTokenActivityResponse, TokenPubKeyInfoResponse } from "../types.js";
 
 /**
  * Interface for the IssuerSparkWallet that includes all functions from both SparkWallet and IssuerSparkWallet
@@ -75,6 +75,7 @@ export interface IssuerWalletInterface {
     tokenTransactionHashes?: string[],
   ): Promise<TokenTransactionWithStatus[]>;
 
+  getTokenPublicKeyInfo(): Promise<TokenPubKeyInfoResponse | null>;
   burnTokens(
     tokenAmount: bigint,
     selectedLeaves?: LeafWithPreviousTransactionData[],
