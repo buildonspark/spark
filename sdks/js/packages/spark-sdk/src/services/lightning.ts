@@ -288,7 +288,7 @@ export class LightningService {
       };
 
       const currRefundTx = getTxFromRawTxBytes(leaf.leaf.refundTx);
-      const nextSequence = getNextTransactionSequence(
+      const { nextSequence } = getNextTransactionSequence(
         currRefundTx.getInput(0).sequence,
       );
       const amountSats = currRefundTx.getOutput(0).amount;

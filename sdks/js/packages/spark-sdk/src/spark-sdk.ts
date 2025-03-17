@@ -914,10 +914,9 @@ export class SparkWallet {
     } else {
       for (const node of this.leaves) {
         const refundTx = getTxFromRawTxBytes(node.refundTx);
-        const nextSequence = getNextTransactionSequence(
+        const { needRefresh } = getNextTransactionSequence(
           refundTx.getInput(0).sequence,
         );
-        const needRefresh = nextSequence <= 0;
         if (needRefresh) {
           nodesToRefresh.push(node);
           nodeIds.push(node.id);
@@ -1445,11 +1444,15 @@ export class SparkWallet {
       );
 
     const filteredTokenLeaves = unsortedTokenLeaves.filter(
-      (leaf) => !this.pendingWithdrawnLeafIds.includes(leaf.leaf?.id || '')
+      (leaf) => !this.pendingWithdrawnLeafIds.includes(leaf.leaf?.id || ""),
     );
 
-    const fetchedLeafIds = new Set(unsortedTokenLeaves.map(leaf => leaf.leaf?.id).filter(Boolean));
-    this.pendingWithdrawnLeafIds = this.pendingWithdrawnLeafIds.filter(id => fetchedLeafIds.has(id));
+    const fetchedLeafIds = new Set(
+      unsortedTokenLeaves.map((leaf) => leaf.leaf?.id).filter(Boolean),
+    );
+    this.pendingWithdrawnLeafIds = this.pendingWithdrawnLeafIds.filter((id) =>
+      fetchedLeafIds.has(id),
+    );
 
     // Group leaves by token key
     const groupedLeaves = new Map<string, LeafWithPreviousTransactionData[]>();

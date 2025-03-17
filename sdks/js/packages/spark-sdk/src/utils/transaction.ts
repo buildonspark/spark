@@ -29,12 +29,20 @@ export function createRefundTx(
   return newRefundTx;
 }
 
-export function getNextTransactionSequence(currSequence?: number): number {
+export function getNextTransactionSequence(currSequence?: number): {
+  nextSequence: number;
+  needRefresh: boolean;
+} {
   const currentTimelock = (currSequence || 0) & 0xffff;
-  if (currentTimelock - TIME_LOCK_INTERVAL <= 0) {
+  const nextTimelock = currentTimelock - TIME_LOCK_INTERVAL;
+  if (nextTimelock <= 0) {
     throw new Error("timelock interval is less or equal to 0");
   }
-  return (1 << 30) | (currentTimelock - TIME_LOCK_INTERVAL);
+
+  return {
+    nextSequence: (1 << 30) | nextTimelock,
+    needRefresh: nextTimelock <= 100,
+  };
 }
 
 export function getEphemeralAnchorOutput(): TransactionOutput {

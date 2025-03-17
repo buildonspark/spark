@@ -626,7 +626,7 @@ export class TransferService extends BaseTransferService {
       };
 
       const currRefundTx = getTxFromRawTxBytes(leaf.leaf.refundTx);
-      const nextSequence = getNextTransactionSequence(
+      const { nextSequence } = getNextTransactionSequence(
         currRefundTx.getInput(0).sequence,
       );
       const amountSats = currRefundTx.getOutput(0).amount;
@@ -891,7 +891,7 @@ export class TransferService extends BaseTransferService {
 
         newTx.addInput({
           ...input,
-          sequence: getNextTransactionSequence(currSequence),
+          sequence: getNextTransactionSequence(currSequence).nextSequence,
         });
       } else {
         newTx.addInput({
@@ -1066,7 +1066,8 @@ export class TransferService extends BaseTransferService {
       index: 0,
     };
 
-    const newNodeSequence = getNextTransactionSequence(refundSequence);
+    const { nextSequence: newNodeSequence } =
+      getNextTransactionSequence(refundSequence);
     const newNodeTx = new Transaction({ allowUnknownOutputs: true });
     newNodeTx.addInput({ ...newNodeOutPoint, sequence: newNodeSequence });
     newNodeTx.addOutput(nodeTx.getOutput(0));

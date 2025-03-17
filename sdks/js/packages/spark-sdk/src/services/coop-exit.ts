@@ -114,12 +114,12 @@ export class CoopExitService extends BaseTransferService {
       }
       const currentRefundTx = getTxFromRawTxBytes(leaf.leaf.refundTx);
 
-      const sequence = getNextTransactionSequence(
+      const { nextSequence } = getNextTransactionSequence(
         currentRefundTx.getInput(0).sequence,
       );
 
       const refundTx = this.createConnectorRefundTransaction(
-        sequence,
+        nextSequence,
         currentRefundTx.getInput(0),
         connectorOutput,
         BigInt(leaf.leaf.value),
