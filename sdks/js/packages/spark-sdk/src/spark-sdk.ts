@@ -132,6 +132,8 @@ export class SparkWallet {
   private sspClient: SspClient | null = null;
   private wasmModule: InitOutput | null = null;
 
+  private pendingWithdrawnLeafIds: string[] = [];
+
   protected leaves: TreeNode[] = [];
   protected tokenLeaves: Map<string, LeafWithPreviousTransactionData[]> =
     new Map();
@@ -1442,10 +1444,17 @@ export class SparkWallet {
         [],
       );
 
+    const filteredTokenLeaves = unsortedTokenLeaves.filter(
+      (leaf) => !this.pendingWithdrawnLeafIds.includes(leaf.leaf?.id || '')
+    );
+
+    const fetchedLeafIds = new Set(unsortedTokenLeaves.map(leaf => leaf.leaf?.id).filter(Boolean));
+    this.pendingWithdrawnLeafIds = this.pendingWithdrawnLeafIds.filter(id => fetchedLeafIds.has(id));
+
     // Group leaves by token key
     const groupedLeaves = new Map<string, LeafWithPreviousTransactionData[]>();
 
-    unsortedTokenLeaves.forEach((leaf) => {
+    filteredTokenLeaves.forEach((leaf) => {
       const tokenKey = bytesToHex(leaf.leaf!.tokenPublicKey!);
       const index = leaf.previousTransactionVout!;
 
@@ -1621,6 +1630,12 @@ export class SparkWallet {
 
     if (!leavesToExit) {
       throw new Error("No leaves to exit");
+    }
+
+    for (const item of leavesToExit) {
+      if (item.leaf && item.leaf.id) {
+        this.pendingWithdrawnLeafIds.push(item.leaf.id);
+      }
     }
 
     if (!receiverPublicKey) {
