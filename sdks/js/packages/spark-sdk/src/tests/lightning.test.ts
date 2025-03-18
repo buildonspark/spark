@@ -46,7 +46,7 @@ describe("LightningService", () => {
   const testFn = process.env.GITHUB_ACTIONS ? it.skip : it;
 
   beforeAll(async () => {
-    const { wallet: wallet1 } = await SparkWalletTesting.intialize({
+    const { wallet: wallet1 } = await SparkWalletTesting.initialize({
       options: {
         network: "LOCAL",
       },
@@ -64,7 +64,7 @@ describe("LightningService", () => {
     lightningService = new LightningService(userConfig, connectionManager);
     transferService = new TransferService(userConfig, connectionManager);
 
-    const { wallet: wallet2 } = await SparkWalletTesting.intialize({
+    const { wallet: wallet2 } = await SparkWalletTesting.initialize({
       options: {
         network: "LOCAL",
       },

@@ -38,7 +38,7 @@ export const createSparkRouter = (
         }
       | undefined = undefined;
     if (!walletInstance) {
-      res = await walletClass.intialize({
+      res = await walletClass.initialize({
         mnemonicOrSeed: mnemonicOrSeed,
         options: {
           network: BITCOIN_NETWORK,

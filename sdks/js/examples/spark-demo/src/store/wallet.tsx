@@ -156,7 +156,7 @@ const useWalletStore = create<WalletStore>((set, get) => ({
     const { initWalletNetwork, setSparkAddress } = get();
 
     if (initWalletNetwork === "REGTEST") {
-      const { wallet } = await SparkWallet.intialize({
+      const { wallet } = await SparkWallet.initialize({
         mnemonicOrSeed: mnemonic,
         options: {
           network: initWalletNetwork,
@@ -165,7 +165,7 @@ const useWalletStore = create<WalletStore>((set, get) => ({
       set({ wallet });
       setSparkAddress(await wallet.getSparkAddress());
     } else {
-      const { wallet } = await SparkWallet.intialize({
+      const { wallet } = await SparkWallet.initialize({
         mnemonicOrSeed: mnemonic,
         options: {
           network: initWalletNetwork,
@@ -180,7 +180,7 @@ const useWalletStore = create<WalletStore>((set, get) => ({
   initWalletFromSeed: async (seed: string) => {
     const { initWalletNetwork, setSparkAddress } = get();
     if (initWalletNetwork === "REGTEST") {
-      const { wallet } = await SparkWallet.intialize({
+      const { wallet } = await SparkWallet.initialize({
         mnemonicOrSeed: seed,
         options: {
           network: initWalletNetwork,
@@ -189,7 +189,7 @@ const useWalletStore = create<WalletStore>((set, get) => ({
       set({ wallet });
       setSparkAddress(await wallet.getSparkAddress());
     } else {
-      const { wallet } = await SparkWallet.intialize({
+      const { wallet } = await SparkWallet.initialize({
         mnemonicOrSeed: seed,
         options: {
           network: initWalletNetwork,

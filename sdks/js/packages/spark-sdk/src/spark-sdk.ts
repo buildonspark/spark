@@ -171,7 +171,7 @@ export class SparkWallet {
     );
   }
 
-  public static async intialize({
+  public static async initialize({
     mnemonicOrSeed,
     signer,
     options,

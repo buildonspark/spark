@@ -17,7 +17,7 @@ describe("token integration test", () => {
 
   it("should issue a single token with ECDSA", async () => {
     const tokenAmount: bigint = 1000n;
-    const { wallet } = await IssuerSparkWallet.intialize({
+    const { wallet } = await IssuerSparkWallet.initialize({
       options: LOCAL_WALLET_CONFIG_ECDSA,
     });
 
@@ -29,7 +29,7 @@ describe("token integration test", () => {
 
   it("should issue a single token with Schnorr", async () => {
     const tokenAmount: bigint = 1000n;
-    const { wallet } = await IssuerSparkWallet.intialize({
+    const { wallet } = await IssuerSparkWallet.initialize({
       options: LOCAL_WALLET_CONFIG_SCHNORR,
     });
 
@@ -41,7 +41,7 @@ describe("token integration test", () => {
 
   it("should announce and issue a single token", async () => {
     const tokenAmount: bigint = 1000n;
-    const { wallet } = await IssuerSparkWallet.intialize({
+    const { wallet } = await IssuerSparkWallet.initialize({
       options: LOCAL_WALLET_CONFIG_SCHNORR,
     });
 
@@ -100,7 +100,7 @@ describe("token integration test", () => {
 
   it("should announce, issue, and withdraw a single token", async () => {
     const tokenAmount: bigint = 1000n;
-    const { wallet } = await IssuerSparkWallet.intialize({
+    const { wallet } = await IssuerSparkWallet.initialize({
       options: LOCAL_WALLET_CONFIG_SCHNORR,
     });
 
@@ -176,11 +176,11 @@ describe("token integration test", () => {
   it("should issue a single token and transfer it with ECDSA", async () => {
     const tokenAmount: bigint = 1000n;
 
-    const { wallet: issuerWallet } = await IssuerSparkWallet.intialize({
+    const { wallet: issuerWallet } = await IssuerSparkWallet.initialize({
       options: LOCAL_WALLET_CONFIG_ECDSA,
     });
 
-    const { wallet: destinationWallet } = await SparkWallet.intialize({
+    const { wallet: destinationWallet } = await SparkWallet.initialize({
       options: LOCAL_WALLET_CONFIG_ECDSA,
     });
 
@@ -204,11 +204,11 @@ describe("token integration test", () => {
   it("monitoring operations", async () => {
     const tokenAmount: bigint = 1000n;
 
-    const { wallet: issuerWallet } = await IssuerSparkWallet.intialize({
+    const { wallet: issuerWallet } = await IssuerSparkWallet.initialize({
       options: LOCAL_WALLET_CONFIG_ECDSA,
     });
 
-    const { wallet: destinationWallet } = await SparkWallet.intialize({
+    const { wallet: destinationWallet } = await SparkWallet.initialize({
       options: LOCAL_WALLET_CONFIG_ECDSA,
     });
 
@@ -240,11 +240,11 @@ describe("token integration test", () => {
   it("should issue a single token and transfer it with Schnorr", async () => {
     const tokenAmount: bigint = 1000n;
 
-    const { wallet: issuerWallet } = await IssuerSparkWallet.intialize({
+    const { wallet: issuerWallet } = await IssuerSparkWallet.initialize({
       options: LOCAL_WALLET_CONFIG_SCHNORR,
     });
 
-    const { wallet: destinationWallet } = await SparkWallet.intialize({
+    const { wallet: destinationWallet } = await SparkWallet.initialize({
       options: LOCAL_WALLET_CONFIG_SCHNORR,
     });
 
@@ -267,7 +267,7 @@ describe("token integration test", () => {
 
   it("should freeze tokens with ECDSA", async () => {
     const tokenAmount: bigint = 1000n;
-    const { wallet: issuerWallet } = await IssuerSparkWallet.intialize({
+    const { wallet: issuerWallet } = await IssuerSparkWallet.initialize({
       options: LOCAL_WALLET_CONFIG_ECDSA,
     });
 
@@ -277,7 +277,7 @@ describe("token integration test", () => {
     const issuerBalanceAfterMint = await issuerWallet.getIssuerTokenBalance();
     expect(issuerBalanceAfterMint.balance).toEqual(tokenAmount);
 
-    const { wallet: userWallet } = await SparkWallet.intialize({
+    const { wallet: userWallet } = await SparkWallet.initialize({
       options: LOCAL_WALLET_CONFIG_ECDSA,
     });
     const userWalletPublicKey = await userWallet.getIdentityPublicKey();
@@ -313,7 +313,7 @@ describe("token integration test", () => {
 
   it("should freeze tokens with Schnorr", async () => {
     const tokenAmount: bigint = 1000n;
-    const { wallet: issuerWallet } = await IssuerSparkWallet.intialize({
+    const { wallet: issuerWallet } = await IssuerSparkWallet.initialize({
       options: LOCAL_WALLET_CONFIG_SCHNORR,
     });
 
@@ -323,7 +323,7 @@ describe("token integration test", () => {
     const issuerBalanceAfterMint = await issuerWallet.getIssuerTokenBalance();
     expect(issuerBalanceAfterMint.balance).toEqual(tokenAmount);
 
-    const { wallet: userWallet } = await SparkWallet.intialize({
+    const { wallet: userWallet } = await SparkWallet.initialize({
       options: LOCAL_WALLET_CONFIG_SCHNORR,
     });
     const userWalletPublicKey = await userWallet.getIdentityPublicKey();
@@ -357,7 +357,7 @@ describe("token integration test", () => {
 
   it("should burn tokens with ECDSA", async () => {
     const tokenAmount: bigint = 200n;
-    const { wallet: issuerWallet } = await IssuerSparkWallet.intialize({
+    const { wallet: issuerWallet } = await IssuerSparkWallet.initialize({
       options: LOCAL_WALLET_CONFIG_ECDSA,
     });
     await issuerWallet.mintTokens(tokenAmount);
@@ -374,7 +374,7 @@ describe("token integration test", () => {
 
   it("should burn tokens with Schnorr", async () => {
     const tokenAmount: bigint = 200n;
-    const { wallet: issuerWallet } = await IssuerSparkWallet.intialize({
+    const { wallet: issuerWallet } = await IssuerSparkWallet.initialize({
       options: LOCAL_WALLET_CONFIG_SCHNORR,
     });
     await issuerWallet.mintTokens(tokenAmount);
@@ -392,11 +392,11 @@ describe("token integration test", () => {
   it("mint, transfer to user, user transfer to issuer, burn with ECDSA", async () => {
     const tokenAmount: bigint = 1000n;
 
-    const { wallet: issuerWallet } = await IssuerSparkWallet.intialize({
+    const { wallet: issuerWallet } = await IssuerSparkWallet.initialize({
       options: LOCAL_WALLET_CONFIG_ECDSA,
     });
 
-    const { wallet: userWallet } = await SparkWallet.intialize({
+    const { wallet: userWallet } = await SparkWallet.initialize({
       options: LOCAL_WALLET_CONFIG_ECDSA,
     });
 
@@ -449,11 +449,11 @@ describe("token integration test", () => {
   it("mint, transfer to user, user transfer to issuer, burn with Schnorr", async () => {
     const tokenAmount: bigint = 1000n;
 
-    const { wallet: issuerWallet } = await IssuerSparkWallet.intialize({
+    const { wallet: issuerWallet } = await IssuerSparkWallet.initialize({
       options: LOCAL_WALLET_CONFIG_SCHNORR,
     });
 
-    const { wallet: userWallet } = await SparkWallet.intialize({
+    const { wallet: userWallet } = await SparkWallet.initialize({
       options: LOCAL_WALLET_CONFIG_SCHNORR,
     });
 

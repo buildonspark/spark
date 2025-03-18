@@ -47,7 +47,7 @@ export class IssuerSparkWallet
   private tokenFreezeService: TokenFreezeService;
   private tokenPublicKeyInfo?: TokenPubkeyInfo;
 
-  public static async intialize(options: SparkWalletProps) {
+  public static async initialize(options: SparkWalletProps) {
     const wallet = new IssuerSparkWallet(options.options);
 
     const initResponse = await wallet.initIssuerWallet(options.mnemonicOrSeed);

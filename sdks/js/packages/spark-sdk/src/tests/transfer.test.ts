@@ -31,7 +31,7 @@ describe("Transfer", () => {
         network: "LOCAL",
       };
 
-      const { wallet: senderWallet } = await SparkWalletTesting.intialize({
+      const { wallet: senderWallet } = await SparkWalletTesting.initialize({
         options,
       });
 
@@ -57,7 +57,7 @@ describe("Transfer", () => {
 
       const newLeafPubKey = await senderWallet.getSigner().generatePublicKey();
 
-      const { wallet: receiverWallet } = await SparkWalletTesting.intialize({
+      const { wallet: receiverWallet } = await SparkWalletTesting.initialize({
         options,
       });
       const receiverPubkey = await receiverWallet.getIdentityPublicKey();
@@ -118,7 +118,7 @@ describe("Transfer", () => {
         claimingNode,
       ]);
 
-      const { wallet: newReceiverWallet } = await SparkWalletTesting.intialize({
+      const { wallet: newReceiverWallet } = await SparkWalletTesting.initialize({
         options: {
           network: "LOCAL",
         },
@@ -145,7 +145,7 @@ describe("Transfer", () => {
     const options: ConfigOptions = {
       network: "LOCAL",
     };
-    const { wallet: senderWallet } = await SparkWalletTesting.intialize({
+    const { wallet: senderWallet } = await SparkWalletTesting.initialize({
       options,
     });
 
@@ -159,7 +159,7 @@ describe("Transfer", () => {
       senderConnectionManager,
     );
 
-    const { wallet: receiverWallet } = await SparkWalletTesting.intialize({
+    const { wallet: receiverWallet } = await SparkWalletTesting.initialize({
       options,
     });
     const receiverPubkey = await receiverWallet.getIdentityPublicKey();
@@ -274,12 +274,12 @@ describe("Transfer", () => {
     const options: ConfigOptions = {
       network: "LOCAL",
     };
-    const { wallet: senderWallet } = await SparkWalletTesting.intialize({
+    const { wallet: senderWallet } = await SparkWalletTesting.initialize({
       options,
     });
     const mnemonic = generateMnemonic(wordlist);
 
-    const { wallet: receiverWallet } = await SparkWalletTesting.intialize({
+    const { wallet: receiverWallet } = await SparkWalletTesting.initialize({
       options,
     });
     const receiverPubkey = await receiverWallet.getIdentityPublicKey();
