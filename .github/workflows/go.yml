@@ -149,9 +149,10 @@ jobs:
           TAGS="${{ steps.ecr-login.outputs.registry }}/spark-go:git_${{ steps.metadata.outputs.hash_short }},"
           TAGS+="${{ steps.ecr-login.outputs.registry }}/spark-go:git_${{ steps.metadata.outputs.date }}_${{ steps.metadata.outputs.hash_short }}"
 
-          if [[ "${{ github.event_name }}" == "push" ]]; then
-            TAGS="${{ steps.ecr-login.outputs.registry }}/spark-go:latest,$TAGS"
-          fi
+          # TODO(mhr): Re-enable this after the hackathon.
+          # if [[ "${{ github.event_name }}" == "push" ]]; then
+          #   TAGS="${{ steps.ecr-login.outputs.registry }}/spark-go:latest,$TAGS"
+          # fi
 
           echo "tags=$TAGS" >> $GITHUB_OUTPUT
 
@@ -185,7 +186,9 @@ jobs:
 
   deploy:
     needs: ["build"]
-    if: "github.event_name == 'push'"
+    # TODO(mhr): Re-enable this after the hackathon.
+    # if: "github.event_name == 'push'"
+    if: false
     runs-on: "self-hosted"
     permissions:
       id-token: write
