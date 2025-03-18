@@ -863,18 +863,12 @@ export class SparkWallet {
       })),
     );
 
-    await this.transferService.sendTransfer(
+    const transfer = await this.transferService.sendTransfer(
       leafKeyTweaks,
       await this.config.signer.getIdentityPublicKey(),
     );
 
-    const pendingTransfers = await this.transferService.queryPendingTransfers();
-    if (pendingTransfers.transfers.length > 0) {
-      // @ts-ignore - We check the length, so the first element is guaranteed to exist
-      return (await this.claimTransfer(pendingTransfers.transfers[0])).nodes;
-    }
-
-    return;
+    return await this.claimTransfer(transfer);
   }
   // ***** Transfer Flow *****
 
