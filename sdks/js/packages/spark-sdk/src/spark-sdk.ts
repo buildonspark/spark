@@ -136,6 +136,8 @@ export class SparkWallet {
   private sspClient: SspClient | null = null;
   private wasmModule: InitOutput | null = null;
 
+  private mutexes: Map<string, Mutex> = new Map();
+
   private pendingWithdrawnLeafIds: string[] = [];
 
   protected leaves: TreeNode[] = [];
@@ -775,70 +777,83 @@ export class SparkWallet {
    * @returns {Promise<TreeNode[] | undefined>} The nodes resulting from the deposit
    */
   public async claimDeposit(txid: string) {
-    const baseUrl =
-      this.config.getNetwork() === Network.REGTEST
-        ? "https://regtest-mempool.dev.dev.sparkinfra.net/api"
-        : "https://mempool.space/api";
-    const auth = btoa("spark-sdk:mCMk1JqlBNtetUNy");
-
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-    };
-
-    if (this.config.getNetwork() === Network.REGTEST) {
-      headers["Authorization"] = `Basic ${auth}`;
+    let mutex = this.mutexes.get(txid);
+    if (!mutex) {
+      mutex = new Mutex();
+      this.mutexes.set(txid, mutex);
     }
 
-    const response = await fetch(`${baseUrl}/tx/${txid}/hex`, {
-      headers,
-    });
+    const nodes = await mutex.runExclusive(async () => {
+      const baseUrl =
+        this.config.getNetwork() === Network.REGTEST
+          ? "https://regtest-mempool.dev.dev.sparkinfra.net/api"
+          : "https://mempool.space/api";
+      const auth = btoa("spark-sdk:mCMk1JqlBNtetUNy");
 
-    const txHex = await response.text();
-    if (!/^[0-9A-Fa-f]+$/.test(txHex)) {
-      throw new Error("Transaction not found");
-    }
-    const depositTx = getTxFromRawTxHex(txHex);
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
 
-    const sparkClient = await this.connectionManager.createSparkClient(
-      this.config.getCoordinatorAddress(),
-    );
+      if (this.config.getNetwork() === Network.REGTEST) {
+        headers["Authorization"] = `Basic ${auth}`;
+      }
 
-    const unusedDepositAddresses: Map<string, DepositAddressQueryResult> =
-      new Map(
-        (
-          await sparkClient.query_unused_deposit_addresses({
-            identityPublicKey: await this.config.signer.getIdentityPublicKey(),
-          })
-        ).depositAddresses.map((addr) => [addr.depositAddress, addr]),
+      const response = await fetch(`${baseUrl}/tx/${txid}/hex`, {
+        headers,
+      });
+
+      const txHex = await response.text();
+      if (!/^[0-9A-Fa-f]+$/.test(txHex)) {
+        throw new Error("Transaction not found");
+      }
+      const depositTx = getTxFromRawTxHex(txHex);
+
+      const sparkClient = await this.connectionManager.createSparkClient(
+        this.config.getCoordinatorAddress(),
       );
 
-    let depositAddress: DepositAddressQueryResult | undefined;
-    let vout = 0;
-    for (let i = 0; i < depositTx.outputsLength; i++) {
-      const output = depositTx.getOutput(i);
-      if (!output) {
-        continue;
-      }
-      const parsedScript = OutScript.decode(output.script!);
-      const address = Address(getNetwork(this.config.getNetwork())).encode(
-        parsedScript,
-      );
-      if (unusedDepositAddresses.has(address)) {
-        vout = i;
-        depositAddress = unusedDepositAddresses.get(address);
-        break;
-      }
-    }
-    if (!depositAddress) {
-      throw new Error("Deposit address not found");
-    }
+      const unusedDepositAddresses: Map<string, DepositAddressQueryResult> =
+        new Map(
+          (
+            await sparkClient.query_unused_deposit_addresses({
+              identityPublicKey:
+                await this.config.signer.getIdentityPublicKey(),
+            })
+          ).depositAddresses.map((addr) => [addr.depositAddress, addr]),
+        );
 
-    const nodes = await this.finalizeDeposit({
-      signingPubKey: depositAddress.userSigningPublicKey,
-      verifyingKey: depositAddress.verifyingPublicKey,
-      depositTx,
-      vout,
+      let depositAddress: DepositAddressQueryResult | undefined;
+      let vout = 0;
+      for (let i = 0; i < depositTx.outputsLength; i++) {
+        const output = depositTx.getOutput(i);
+        if (!output) {
+          continue;
+        }
+        const parsedScript = OutScript.decode(output.script!);
+        const address = Address(getNetwork(this.config.getNetwork())).encode(
+          parsedScript,
+        );
+        if (unusedDepositAddresses.has(address)) {
+          vout = i;
+          depositAddress = unusedDepositAddresses.get(address);
+          break;
+        }
+      }
+      if (!depositAddress) {
+        return [];
+      }
+
+      const nodes = await this.finalizeDeposit({
+        signingPubKey: depositAddress.userSigningPublicKey,
+        verifyingKey: depositAddress.verifyingPublicKey,
+        depositTx,
+        vout,
+      });
+
+      return nodes;
     });
+
+    this.mutexes.delete(txid);
 
     return nodes;
   }
