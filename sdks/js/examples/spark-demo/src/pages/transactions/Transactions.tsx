@@ -38,9 +38,9 @@ export default function Transactions() {
     const transactions = transfersQuery.data.transfers.map(
       (transfer: Transfer) => {
         const txType: "send" | "receive" =
-          bytesToHex(transfer.senderIdentityPublicKey) === sparkAddress
-            ? "send"
-            : "receive";
+          bytesToHex(transfer.receiverIdentityPublicKey) === sparkAddress
+            ? "receive"
+            : "send";
 
         const counterparty =
           txType === "send"

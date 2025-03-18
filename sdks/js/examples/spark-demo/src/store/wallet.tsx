@@ -296,6 +296,11 @@ export function useWallet() {
       const setOnchainDepositAddresses =
         useWalletStore.getState().setOnchainDepositAddresses;
       setOnchainDepositAddresses(unClaimedAddresses);
+      try {
+        await wallet.claimTransfers();
+      } catch (e) {
+        console.error("error claiming transfers", e);
+      }
       const balance = await wallet.getBalance();
       return balance;
     },

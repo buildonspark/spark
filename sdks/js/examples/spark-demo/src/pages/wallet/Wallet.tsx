@@ -144,12 +144,12 @@ export default function Wallet() {
           {transfersQuery?.data?.transfers?.map(
             (transfer: Transfer, index: number) => {
               if (index >= 3) return null;
-              const sender = bytesToHex(transfer.senderIdentityPublicKey);
-              if (sender === pubkey) {
+              const receiver = bytesToHex(transfer.receiverIdentityPublicKey);
+              if (receiver === pubkey) {
                 return (
                   <TransactionDetailRow
                     key={`${index}`}
-                    transactionType="send"
+                    transactionType="receive"
                     asset={PERMANENT_CURRENCIES.get("BTC")!}
                     assetAmount={transfer.totalValue}
                     counterparty={bytesToHex(
@@ -161,7 +161,7 @@ export default function Wallet() {
                 return (
                   <TransactionDetailRow
                     key={`${index}`}
-                    transactionType="receive"
+                    transactionType="send"
                     asset={PERMANENT_CURRENCIES.get("BTC")!}
                     assetAmount={transfer.totalValue}
                     counterparty={bytesToHex(transfer.senderIdentityPublicKey)}
