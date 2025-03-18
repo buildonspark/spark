@@ -1,6 +1,9 @@
 import { SparkWallet } from "@buildonspark/spark-sdk";
 import { QueryAllTransfersResponse } from "@buildonspark/spark-sdk/proto/spark";
-import { NetworkType } from "@buildonspark/spark-sdk/utils";
+import {
+  getLatestDepositTxId,
+  NetworkType,
+} from "@buildonspark/spark-sdk/utils";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { create } from "zustand";
 import { Currency, CurrencyType } from "../utils/currency";
@@ -27,30 +30,6 @@ export const PERMANENT_CURRENCIES: Map<string, Currency> = new Map([
       symbol: "$",
     },
   ],
-  // MXPC: {
-  //   name: "MXP Coin",
-  //   code: "MXPC",
-  //   decimals: 2,
-  //   type: CurrencyType.TOKEN,
-  //   balance: 0,
-  //   symbol: "MXN",
-  //   logo: <MxnLogo />,
-  //   pubkey:
-  //     "02773f9ebfaf81126d6dde46227374eac7c2de7f5a99f76a2ef93780e9960e355f",
-  //   usdPrice: 20.46,
-  // },
-  // USDC: {
-  //   name: "USD Coin",
-  //   code: "USDC",
-  //   decimals: 2,
-  //   type: CurrencyType.TOKEN,
-  //   balance: 0,
-  //   symbol: "USDC",
-  //   logo: <UsdcLogo />,
-  //   pubkey:
-  //     "03269c03f240fd2764e048284bceeb09f8b256b60a3bc2737cb119a61127358c1f",
-  //   usdPrice: 1.0,
-  // },
 ]);
 
 const getLocalStorageWalletNetwork = (): NetworkType => {
@@ -73,6 +52,7 @@ interface WalletState {
   activeInputCurrency: Currency;
   activeAsset: Currency;
   assets: Map<string, Currency>;
+  onchainDepositAddresses: Set<string>;
 }
 
 interface WalletActions {
@@ -100,6 +80,7 @@ interface WalletActions {
   setActiveInputCurrency: (currency: Currency) => void;
   withdrawOnchain: (address: string, amount: number) => Promise<void>;
   loadStoredWallet: () => Promise<boolean>;
+  setOnchainDepositAddresses: (addresses: Set<string>) => void;
 }
 
 type WalletStore = WalletState & WalletActions;
@@ -153,51 +134,36 @@ const useWalletStore = create<WalletStore>((set, get) => ({
   },
   btcAddressInfo: {},
   initWallet: async (mnemonic: string) => {
-    const { initWalletNetwork, setSparkAddress } = get();
-
-    if (initWalletNetwork === "REGTEST") {
-      const { wallet } = await SparkWallet.initialize({
-        mnemonicOrSeed: mnemonic,
-        options: {
-          network: initWalletNetwork,
-        },
-      });
-      set({ wallet });
-      setSparkAddress(await wallet.getSparkAddress());
-    } else {
-      const { wallet } = await SparkWallet.initialize({
-        mnemonicOrSeed: mnemonic,
-        options: {
-          network: initWalletNetwork,
-        },
-      });
-      set({ wallet });
-      setSparkAddress(await wallet.getSparkAddress());
-    }
+    const { initWalletNetwork, setSparkAddress, setOnchainDepositAddresses } =
+      get();
+    const { wallet } = await SparkWallet.initialize({
+      mnemonicOrSeed: mnemonic,
+      options: {
+        network: initWalletNetwork,
+      },
+    });
+    set({ wallet });
+    setSparkAddress(await wallet.getSparkAddress());
+    setOnchainDepositAddresses(
+      new Set(await wallet.getUnusedDepositAddresses()),
+    );
     sessionStorage.setItem(MNEMONIC_STORAGE_KEY, mnemonic);
     set({ mnemonic });
   },
   initWalletFromSeed: async (seed: string) => {
-    const { initWalletNetwork, setSparkAddress } = get();
-    if (initWalletNetwork === "REGTEST") {
-      const { wallet } = await SparkWallet.initialize({
-        mnemonicOrSeed: seed,
-        options: {
-          network: initWalletNetwork,
-        },
-      });
-      set({ wallet });
-      setSparkAddress(await wallet.getSparkAddress());
-    } else {
-      const { wallet } = await SparkWallet.initialize({
-        mnemonicOrSeed: seed,
-        options: {
-          network: initWalletNetwork,
-        },
-      });
-      set({ wallet });
-      setSparkAddress(await wallet.getSparkAddress());
-    }
+    const { initWalletNetwork, setSparkAddress, setOnchainDepositAddresses } =
+      get();
+    const { wallet } = await SparkWallet.initialize({
+      mnemonicOrSeed: seed,
+      options: {
+        network: initWalletNetwork,
+      },
+    });
+    set({ wallet });
+    setSparkAddress(await wallet.getSparkAddress());
+    setOnchainDepositAddresses(
+      new Set(await wallet.getUnusedDepositAddresses()),
+    );
     sessionStorage.setItem(SEED_STORAGE_KEY, seed);
   },
   getMasterPublicKey: async () => {
@@ -215,12 +181,17 @@ const useWalletStore = create<WalletStore>((set, get) => ({
     return await wallet.getTransfers(limit, offset);
   },
   getBitcoinDepositAddress: async () => {
-    const { wallet } = get();
+    const { wallet, onchainDepositAddresses } = get();
     if (!wallet) {
       throw new Error("Wallet not initialized");
     }
     const btcDepositAddress = await wallet.getDepositAddress();
-
+    set({
+      onchainDepositAddresses: new Set([
+        btcDepositAddress,
+        ...Array.from(onchainDepositAddresses),
+      ]),
+    });
     if (!btcDepositAddress) {
       throw new Error("Failed to generate deposit address");
     }
@@ -276,6 +247,10 @@ const useWalletStore = create<WalletStore>((set, get) => ({
       invoice,
     });
   },
+  onchainDepositAddresses: new Set(),
+  setOnchainDepositAddresses: (addresses: Set<string>) => {
+    set({ onchainDepositAddresses: addresses });
+  },
 }));
 
 export function useWallet() {
@@ -302,6 +277,25 @@ export function useWallet() {
       if (!wallet) {
         throw new Error("Wallet not initialized");
       }
+      const onchainAddresses =
+        useWalletStore.getState().onchainDepositAddresses;
+      const unClaimedAddresses: Set<string> = new Set(
+        Array.from(onchainAddresses),
+      );
+      onchainAddresses.forEach(async (addr) => {
+        const latestDepositTxId = await getLatestDepositTxId(addr);
+        if (latestDepositTxId) {
+          try {
+            await wallet.claimDeposit(latestDepositTxId);
+            unClaimedAddresses.delete(addr);
+          } catch (e) {
+            console.error("error claiming deposit", e);
+          }
+        }
+      });
+      const setOnchainDepositAddresses =
+        useWalletStore.getState().setOnchainDepositAddresses;
+      setOnchainDepositAddresses(unClaimedAddresses);
       const balance = await wallet.getBalance();
       return balance;
     },
