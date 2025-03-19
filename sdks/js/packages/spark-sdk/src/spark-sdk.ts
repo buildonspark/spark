@@ -1458,15 +1458,24 @@ export class SparkWallet {
    * @returns {Promise<CoopExitFeeEstimateOutput | null>} Fee estimate for the withdrawal
    */
   public async getCoopExitFeeEstimate({
-    leafExternalIds,
+    amountSats,
     withdrawalAddress,
-  }: CoopExitFeeEstimateInput): Promise<CoopExitFeeEstimateOutput | null> {
+  }: {
+    amountSats: number;
+    withdrawalAddress: string;
+  }): Promise<CoopExitFeeEstimateOutput | null> {
     if (!this.sspClient) {
       throw new Error("SSP client not initialized");
     }
 
+    if (amountSats < 10000) {
+      throw new Error("The minimum amount for a withdrawal is 10000 sats");
+    }
+
+    const leaves = await this.selectLeaves(amountSats);
+
     return await this.sspClient.getCoopExitFeeEstimate({
-      leafExternalIds,
+      leafExternalIds: leaves.map((leaf) => leaf.id),
       withdrawalAddress,
     });
   }

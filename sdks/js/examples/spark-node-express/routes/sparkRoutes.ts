@@ -1,16 +1,16 @@
 import { IssuerSparkWallet } from "@buildonspark/issuer-sdk";
 import { SparkWallet } from "@buildonspark/spark-sdk";
+import { TreeNode } from "@buildonspark/spark-sdk/proto/spark";
 import { SparkProto } from "@buildonspark/spark-sdk/types";
 import { getLatestDepositTxId } from "@buildonspark/spark-sdk/utils";
 import { isError } from "@lightsparkdev/core";
 import { NextFunction, Request, Response, Router } from "express";
+import { BITCOIN_NETWORK } from "../src/index.js";
 import {
   formatTransferResponse,
   loadMnemonic,
   saveMnemonic,
 } from "../utils/utils.js";
-import { BITCOIN_NETWORK } from "../src/index.js";
-import { TreeNode } from "@buildonspark/spark-sdk/proto/spark";
 
 const SPARK_MNEMONIC_PATH = ".spark-mnemonic";
 
@@ -770,7 +770,7 @@ export const createSparkRouter = (
   /**
    * Gets fee estimate for cooperative exit (on-chain withdrawal).
    * @route POST /on-chain/get-coop-exit-fee-estimate
-   * @param {string[]} leafExternalIds - The external IDs of the leaves to get the fee estimate for
+   * @param {number} amountSats - The amount to withdraw in satoshis
    * @param {string} withdrawalAddress - The address to withdraw to
    * @returns {Promise<{
    *   data: {
@@ -790,12 +790,12 @@ export const createSparkRouter = (
     async (req, res) => {
       const wallet = getWallet();
       try {
-        const { leafExternalIds, withdrawalAddress } = req.body as {
-          leafExternalIds: string[];
+        const { amountSats, withdrawalAddress } = req.body as {
+          amountSats: number;
           withdrawalAddress: string;
         };
         const feeEstimate = await wallet!.getCoopExitFeeEstimate({
-          leafExternalIds,
+          amountSats,
           withdrawalAddress,
         });
         res.json({

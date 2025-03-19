@@ -1,6 +1,7 @@
 import readline from "readline";
 import { ConfigOptions } from "../../dist/services/wallet-config.js";
 import { SparkWallet } from "../../dist/spark-sdk";
+import { BitcoinNetwork } from "../../dist/types/index.js";
 import { getLatestDepositTxId } from "../../dist/utils/mempool.js";
 
 // Initialize Spark Wallet
@@ -18,23 +19,26 @@ async function runCLI() {
   });
   const helpMessage = `
   Available commands:
-  initwallet [mnemonic | seed]                                    - Create a new wallet from a mnemonic or seed. If no mnemonic or seed is provided, a new mnemonic will be generated.
-  getbalance                                                      - Get the wallet's balance
-  getdepositaddress                                               - Get an address to deposit funds from L1 to Spark
-  getsparkaddress                                                 - Get the wallet's spark address
-  getlatesttx <address>                                           - Get the latest deposit transaction id for an address
-  claimdeposit <txid>                                             - Claim any pending deposits to the wallet
-  claimtransfers                                                 - Claim any pending transfers to the wallet
-  createinvoice <amount> <memo>                                   - Create a new lightning invoice
-  payinvoice <invoice>                                            - Pay a lightning invoice
-  sendtransfer <amount> <receiverSparkAddress>                    - Send a spark transfer
-  withdraw <onchainAddress> <amount>                              - Withdraw funds to an L1 address
-  sendtokentransfer <tokenPubKey> <amount> <receiverSparkAddress> - Transfer tokens
-  help                                                            - Show this help message
+  initwallet [mnemonic | seed]                                        - Create a new wallet from a mnemonic or seed. If no mnemonic or seed is provided, a new mnemonic will be generated.
+  getbalance                                                          - Get the wallet's balance
+  getdepositaddress                                                   - Get an address to deposit funds from L1 to Spark
+  getsparkaddress                                                     - Get the wallet's spark address
+  getlatesttx <address>                                               - Get the latest deposit transaction id for an address
+  claimdeposit <txid>                                                 - Claim any pending deposits to the wallet
+  claimtransfers                                                      - Claim any pending transfers to the wallet
+  createinvoice <amount> <memo>                                       - Create a new lightning invoice
+  payinvoice <invoice>                                                - Pay a lightning invoice
+  sendtransfer <amount> <receiverSparkAddress>                        - Send a spark transfer
+  withdraw <onchainAddress> <amount>                                  - Withdraw funds to an L1 address
+  coopfee <amount> <withdrawalAddress>                                - Get a fee estimate for a cooperative exit
+  lightningsendfee <invoice>                                          - Get a fee estimate for a lightning send
+  lightningreceivefee <amount> <REGTEST | MAINNET | TESTNET | SIGNET> - Get a fee estimate for a lightning receive
+  sendtokentransfer <tokenPubKey> <amount> <receiverSparkAddress>     - Transfer tokens
+  help                                                                - Show this help message
   exit/quit
 
   L1 commands:
-  tokenwithdraw <tokenPublicKey> [receiverPublicKey] - Unilaterally withdraw tokens to L1- Exit the program
+  tokenwithdraw <tokenPublicKey> [tokenAmount] - Unilaterally withdraw tokens to L1- Exit the program
 `;
   console.log(helpMessage);
 
@@ -198,15 +202,52 @@ async function runCLI() {
           break;
         }
         const tokenPublicKey = args[0];
-        const receiverPublicKey = args[1];
+        const amount = BigInt(parseInt(args[1]));
 
         let withdrawResult = await wallet.withdrawTokens(
           tokenPublicKey,
-          receiverPublicKey,
+          amount,
         );
         if (withdrawResult) {
           console.log("Withdrawal L1 Transaction ID:", withdrawResult.txid);
         }
+        break;
+      }
+      case "coopfee": {
+        if (!wallet) {
+          console.log("Please initialize a wallet first");
+          break;
+        }
+        const fee = await wallet.getCoopExitFeeEstimate({
+          amountSats: parseInt(args[0]),
+          withdrawalAddress: args[1],
+        });
+
+        console.log(fee);
+        break;
+      }
+      case "lightningsendfee": {
+        if (!wallet) {
+          console.log("Please initialize a wallet first");
+          break;
+        }
+        const fee = await wallet.getLightningSendFeeEstimate({
+          encodedInvoice: args[0],
+        });
+        console.log(fee);
+        break;
+      }
+      case "lightningreceivefee": {
+        if (!wallet) {
+          console.log("Please initialize a wallet first");
+          break;
+        }
+        const network = args[1] as BitcoinNetwork;
+        const fee = await wallet.getLightningReceiveFeeEstimate({
+          amountSats: parseInt(args[0]),
+          network,
+        });
+        console.log(fee);
         break;
       }
     }
