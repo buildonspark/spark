@@ -20,6 +20,11 @@
     "test": {
       "dependsOn": ["^build"]
     },
+    "start": {
+      "cache": false,
+      "persistent": true,
+      "dependsOn": ["^build"]
+    },
     "types": {
       "dependsOn": ["^build"]
     }
