@@ -17,6 +17,7 @@ import {
   LeavesSwapRequest,
   LightningReceiveFeeEstimateInput,
   LightningReceiveFeeEstimateOutput,
+  LightningReceiveRequest,
   LightningSendFeeEstimateInput,
   LightningSendFeeEstimateOutput,
   UserLeafInput,
@@ -1120,13 +1121,13 @@ export class SparkWallet {
    * @param {number} params.amountSats - Amount in satoshis
    * @param {string} params.memo - Description for the invoice
    * @param {number} [params.expirySeconds] - Optional expiry time in seconds
-   * @returns {Promise<string>} BOLT11 encoded invoice
+   * @returns {Promise<LightningReceiveRequest>} BOLT11 encoded invoice
    */
   public async createLightningInvoice({
     amountSats,
     memo,
     expirySeconds = 60 * 60 * 24 * 30,
-  }: CreateLightningInvoiceParams) {
+  }: CreateLightningInvoiceParams): Promise<LightningReceiveRequest> {
     if (!this.sspClient) {
       throw new Error("SSP client not initialized");
     }
@@ -1152,14 +1153,16 @@ export class SparkWallet {
         memo,
       });
 
-      return invoice?.invoice.encodedEnvoice;
+      return invoice;
     };
 
-    return this.lightningService!.createLightningInvoice({
+    const invoice = await this.lightningService!.createLightningInvoice({
       amountSats,
       memo,
       invoiceCreator: requestLightningInvoice,
     });
+
+    return invoice;
   }
 
   /**

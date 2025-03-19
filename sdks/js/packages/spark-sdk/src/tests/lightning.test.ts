@@ -1,11 +1,17 @@
 import { afterEach, beforeAll, describe, expect, it } from "@jest/globals";
 import { hexToBytes } from "@noble/curves/abstract/utils";
 import { equalBytes, sha256 } from "@scure/btc-signer/utils";
+import LightningReceiveRequest from "../graphql/objects/LightningReceiveRequest.js";
 import { TransferStatus } from "../proto/spark.js";
 import { WalletConfigService } from "../services/config.js";
 import { ConnectionManager } from "../services/connection.js";
 import { LightningService } from "../services/lightning.js";
 import { LeafKeyTweak, TransferService } from "../services/transfer.js";
+import {
+  BitcoinNetwork,
+  CurrencyUnit,
+  LightningReceiveRequestStatus,
+} from "../types/index.js";
 import { createNewTree, getTestWalletConfig } from "./test-util.js";
 import { SparkWalletTesting } from "./utils/spark-testing-wallet.js";
 import { BitcoinFaucet } from "./utils/test-faucet.js";
@@ -27,8 +33,38 @@ async function cleanUp() {
   }
 }
 
-const fakeInvoiceCreator = async () => {
-  return "lnbcrt123450n1pnj6uf4pp5l26hsdxssmr52vd4xmn5xran7puzx34hpr6uevaq7ta0ayzrp8esdqqcqzpgxqyz5vqrzjqtr2vd60g57hu63rdqk87u3clac6jlfhej4kldrrjvfcw3mphcw8sqqqqzp3jlj6zyqqqqqqqqqqqqqq9qsp5w22fd8aqn7sdum7hxdf59ptgk322fkv589ejxjltngvgehlcqcyq9qxpqysgqvykwsxdx64qrj0s5pgcgygmrpj8w25jsjgltwn09yp24l9nvghe3dl3y0ycy70ksrlqmcn42hxn24e0ucuy3g9fjltudvhv4lrhhamgq3stqgp";
+const fakeInvoiceCreator = async (): Promise<LightningReceiveRequest> => {
+  return {
+    id: "123",
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    network: BitcoinNetwork.REGTEST,
+    fee: {
+      originalValue: 1000,
+      originalUnit: CurrencyUnit.SATOSHI,
+      preferredCurrencyUnit: CurrencyUnit.SATOSHI,
+      preferredCurrencyValueRounded: 1000,
+      preferredCurrencyValueApprox: 1000,
+    },
+    status: LightningReceiveRequestStatus.INVOICE_CREATED,
+    typename: "LightningReceiveRequest",
+    invoice: {
+      encodedEnvoice:
+        "lnbcrt123450n1pnj6uf4pp5l26hsdxssmr52vd4xmn5xran7puzx34hpr6uevaq7ta0ayzrp8esdqqcqzpgxqyz5vqrzjqtr2vd60g57hu63rdqk87u3clac6jlfhej4kldrrjvfcw3mphcw8sqqqqzp3jlj6zyqqqqqqqqqqqqqq9qsp5w22fd8aqn7sdum7hxdf59ptgk322fkv589ejxjltngvgehlcqcyq9qxpqysgqvykwsxdx64qrj0s5pgcgygmrpj8w25jsjgltwn09yp24l9nvghe3dl3y0ycy70ksrlqmcn42hxn24e0ucuy3g9fjltudvhv4lrhhamgq3stqgp",
+      bitcoinNetwork: BitcoinNetwork.REGTEST,
+      paymentHash:
+        "2d059c3ede82a107aa1452c0bea47759be3c5c6e5342be6a310f6c3a907d9f4c",
+      amount: {
+        originalValue: 10000,
+        originalUnit: CurrencyUnit.SATOSHI,
+        preferredCurrencyUnit: CurrencyUnit.SATOSHI,
+        preferredCurrencyValueRounded: 10000,
+        preferredCurrencyValueApprox: 10000,
+      },
+      createdAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString(),
+    },
+  };
 };
 
 describe("LightningService", () => {
@@ -244,7 +280,7 @@ describe("LightningService", () => {
         receiverIdentityPubkey: await sspConfig.signer.getIdentityPublicKey(),
         paymentHash,
         isInboundPayment: false,
-        invoiceString: await fakeInvoiceCreator(),
+        invoiceString: (await fakeInvoiceCreator()).invoice.encodedEnvoice,
       });
 
       expect(response.transfer).toBeDefined();

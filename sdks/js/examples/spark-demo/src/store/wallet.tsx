@@ -1,5 +1,6 @@
 import { SparkWallet } from "@buildonspark/spark-sdk";
 import { QueryAllTransfersResponse } from "@buildonspark/spark-sdk/proto/spark";
+import { LightningReceiveRequest } from "@buildonspark/spark-sdk/types";
 import {
   getLatestDepositTxId,
   NetworkType,
@@ -67,7 +68,10 @@ interface WalletActions {
     offset: number,
   ) => Promise<QueryAllTransfersResponse>;
   getBitcoinDepositAddress: () => Promise<string>;
-  createLightningInvoice: (amount: number, memo: string) => Promise<string>;
+  createLightningInvoice: (
+    amount: number,
+    memo: string,
+  ) => Promise<LightningReceiveRequest>;
   sendTransfer: (amount: number, recipient: string) => Promise<void>;
   payLightningInvoice: (invoice: string) => Promise<void>;
   transferTokens: (

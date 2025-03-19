@@ -7,6 +7,7 @@ import { secp256k1 } from "@noble/curves/secp256k1";
 import { TransactionInput } from "@scure/btc-signer/psbt";
 import { sha256 } from "@scure/btc-signer/utils";
 import { decode } from "light-bolt11-decoder";
+import LightningReceiveRequest from "../graphql/objects/LightningReceiveRequest.js";
 import {
   GetSigningCommitmentsResponse,
   InitiatePreimageSwapRequest_Reason,
@@ -38,7 +39,7 @@ export type CreateLightningInvoiceParams = {
     amountSats: number,
     paymentHash: Uint8Array,
     memo?: string,
-  ) => Promise<string | undefined>;
+  ) => Promise<LightningReceiveRequest | null>;
   amountSats: number;
   memo?: string;
 };
@@ -71,7 +72,7 @@ export class LightningService {
     invoiceCreator,
     amountSats,
     memo,
-  }: CreateLightningInvoiceParams): Promise<string> {
+  }: CreateLightningInvoiceParams): Promise<LightningReceiveRequest> {
     const randBytes = crypto.getRandomValues(new Uint8Array(32));
     const preimage = numberToBytesBE(
       bytesToNumberBE(randBytes) % secp256k1.CURVE.n,
@@ -90,7 +91,7 @@ export class LightningService {
     amountSats,
     memo,
     preimage,
-  }: CreateLightningInvoiceWithPreimageParams): Promise<string> {
+  }: CreateLightningInvoiceWithPreimageParams): Promise<LightningReceiveRequest> {
     const paymentHash = sha256(preimage);
     const invoice = await invoiceCreator(amountSats, paymentHash, memo);
     if (!invoice) {
@@ -124,7 +125,7 @@ export class LightningService {
               proofs: share.proofs,
             },
             threshold: this.config.getThreshold(),
-            invoiceString: invoice,
+            invoiceString: invoice.invoice.encodedEnvoice,
             userIdentityPublicKey:
               await this.config.signer.getIdentityPublicKey(),
           });

@@ -1,16 +1,15 @@
-import { ListAllTokenTransactionsResponse } from "@buildonspark/lrc20-sdk";
+import { LRCWallet, Lrc20Protos } from "@buildonspark/lrc20-sdk";
 import {
   CreateLightningInvoiceParams,
   PayLightningInvoiceParams,
 } from "@buildonspark/spark-sdk";
-import { LRCWallet, Lrc20Protos } from "@buildonspark/lrc20-sdk";
 import {
   LeafWithPreviousTransactionData,
   QueryAllTransfersResponse,
-  TokenTransactionStatus,
   TokenTransactionWithStatus,
   Transfer,
 } from "@buildonspark/spark-sdk/proto/spark";
+import { LightningReceiveRequest } from "@buildonspark/spark-sdk/types";
 import { GetTokenActivityResponse, TokenPubKeyInfoResponse } from "../types.js";
 
 /**
@@ -33,13 +32,9 @@ export interface IssuerWalletInterface {
     receiverSparkAddress: string;
     amountSats: number;
   }): Promise<Transfer | string>;
-  createLightningInvoice(params: CreateLightningInvoiceParams): Promise<
-    | string
-    | {
-        invoice: string;
-        paymentHash: string;
-      }
-  >;
+  createLightningInvoice(
+    params: CreateLightningInvoiceParams,
+  ): Promise<LightningReceiveRequest>;
   payLightningInvoice(params: PayLightningInvoiceParams): Promise<any>;
   withdraw(params: {
     onchainAddress: string;
