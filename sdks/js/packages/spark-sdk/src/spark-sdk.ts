@@ -328,7 +328,7 @@ export class SparkWallet {
     this.leaves = await this.getLeaves();
     await this.config.signer.restoreSigningKeysFromLeafs(this.leaves);
     await this.refreshTimelockNodes();
-
+    await this.extendTimeLockNodes();
     this.optimizeLeaves().catch((e) => {
       console.error("Failed to optimize leaves", e);
     });
@@ -901,6 +901,7 @@ export class SparkWallet {
       const leavesToSend = await this.selectLeaves(amountSats);
 
       await this.refreshTimelockNodes();
+      await this.extendTimeLockNodes();
 
       const leafKeyTweaks = await Promise.all(
         leavesToSend.map(async (leaf) => ({
@@ -922,6 +923,29 @@ export class SparkWallet {
 
       return transfer;
     });
+  }
+
+  private async extendTimeLockNodes() {
+    const nodesToExtend: TreeNode[] = [];
+    const nodeIds: string[] = [];
+
+    for (const node of this.leaves) {
+      const nodeTx = getTxFromRawTxBytes(node.nodeTx);
+      const nextSequence = getNextTransactionSequence(
+        nodeTx.getInput(0).sequence,
+      );
+      if (nextSequence <= 0) {
+        nodesToExtend.push(node);
+        nodeIds.push(node.id);
+      }
+    }
+
+    for (const node of nodesToExtend) {
+      await this.transferService.extendTimelock(
+        node,
+        await this.config.signer.generatePublicKey(sha256(node.id)),
+      );
+    }
   }
 
   /**
@@ -1057,6 +1081,7 @@ export class SparkWallet {
 
       this.leaves.push(...response.nodes);
       await this.refreshTimelockNodes();
+      await this.extendTimeLockNodes();
 
       return response.nodes;
     });
@@ -1202,6 +1227,8 @@ export class SparkWallet {
       const leaves = await this.selectLeaves(amountSats);
 
       await this.refreshTimelockNodes();
+      await this.extendTimeLockNodes();
+
       const leavesToSend = await Promise.all(
         leaves.map(async (leaf) => ({
           leaf,

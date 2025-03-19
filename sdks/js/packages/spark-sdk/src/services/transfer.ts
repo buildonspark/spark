@@ -1056,7 +1056,7 @@ export class TransferService extends BaseTransferService {
     });
   }
 
-  private async extendTimelock(node: TreeNode, signingPubKey: Uint8Array) {
+  async extendTimelock(node: TreeNode, signingPubKey: Uint8Array) {
     const nodeTx = getTxFromRawTxBytes(node.nodeTx);
     const refundTx = getTxFromRawTxBytes(node.refundTx);
 
