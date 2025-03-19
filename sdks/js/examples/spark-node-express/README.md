@@ -364,7 +364,7 @@ POST /issuer-wallet/on-chain/withdraw
 ```json
 {
   onchainAddress: string,
-  targetAmountSats?: number | undefined
+  amountSats?: number | undefined
 }
 ```
 

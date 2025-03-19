@@ -721,7 +721,7 @@ export const createSparkRouter = (
    * Withdraw to Bitcoin address
    * @route POST /on-chain/withdraw
    * @param {string} onchainAddress - The Bitcoin address to withdraw to
-   * @param {string} [targetAmountSats] - The amount to withdraw in satoshis
+   * @param {string} [amountSats] - The amount to withdraw in satoshis
    * @returns {Promise<{
    *   data: {
    *     withdrawal: {
@@ -748,13 +748,13 @@ export const createSparkRouter = (
     async (req, res) => {
       const wallet = getWallet();
       try {
-        const { onchainAddress, targetAmountSats } = req.body as {
+        const { onchainAddress, amountSats } = req.body as {
           onchainAddress: string;
-          targetAmountSats: number | undefined;
+          amountSats: number | undefined;
         };
         const withdrawal = await wallet!.withdraw({
           onchainAddress,
-          targetAmountSats,
+          amountSats,
         });
         res.json({
           data: { withdrawal },

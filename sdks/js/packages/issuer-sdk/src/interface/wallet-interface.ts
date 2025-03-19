@@ -38,7 +38,7 @@ export interface IssuerWalletInterface {
   payLightningInvoice(params: PayLightningInvoiceParams): Promise<any>;
   withdraw(params: {
     onchainAddress: string;
-    targetAmountSats?: number;
+    amountSats?: number;
   }): Promise<any>;
   transferTokens(params: {
     tokenPublicKey: string;

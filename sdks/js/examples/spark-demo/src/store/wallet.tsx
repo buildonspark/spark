@@ -239,7 +239,7 @@ const useWalletStore = create<WalletStore>((set, get) => ({
     }
     await wallet.withdraw({
       onchainAddress: address,
-      targetAmountSats: amount,
+      amountSats: amount,
     });
   },
   payLightningInvoice: async (invoice: string) => {

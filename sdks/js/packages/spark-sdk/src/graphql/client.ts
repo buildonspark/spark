@@ -47,6 +47,7 @@ import { CoopExitFeeEstimate } from "./queries/CoopExitFeeEstimate.js";
 import { LeavesSwapFeeEstimate } from "./queries/LeavesSwapFeeEstimate.js";
 import { LightningReceiveFeeEstimate } from "./queries/LightningReceiveFeeEstimate.js";
 import { LightningSendFeeEstimate } from "./queries/LightningSendFeeEstimate.js";
+import { UserRequest } from "./queries/UserRequest.js";
 
 export default class SspClient {
   private readonly requester: Requester;
@@ -264,6 +265,58 @@ export default class SspClient {
       },
       constructObject: (response: { complete_leaves_swap: any }) => {
         return LeavesSwapRequestFromJson(response.complete_leaves_swap.request);
+      },
+    });
+  }
+
+  async getLightningReceiveRequest(
+    id: string,
+  ): Promise<LightningReceiveRequest | null> {
+    return await this.executeRawQuery({
+      queryPayload: UserRequest,
+      variables: {
+        request_id: id,
+      },
+      constructObject: (response: { user_request: any }) => {
+        return LightningReceiveRequestFromJson(response.user_request);
+      },
+    });
+  }
+
+  async getLightningSendRequest(
+    id: string,
+  ): Promise<LightningSendRequest | null> {
+    return await this.executeRawQuery({
+      queryPayload: UserRequest,
+      variables: {
+        request_id: id,
+      },
+      constructObject: (response: { user_request: any }) => {
+        return LightningSendRequestFromJson(response.user_request);
+      },
+    });
+  }
+
+  async getLeaveSwapRequest(id: string): Promise<LeavesSwapRequest | null> {
+    return await this.executeRawQuery({
+      queryPayload: UserRequest,
+      variables: {
+        request_id: id,
+      },
+      constructObject: (response: { user_request: any }) => {
+        return LeavesSwapRequestFromJson(response.user_request);
+      },
+    });
+  }
+
+  async getCoopExitRequest(id: string): Promise<CoopExitRequest | null> {
+    return await this.executeRawQuery({
+      queryPayload: UserRequest,
+      variables: {
+        request_id: id,
+      },
+      constructObject: (response: { user_request: any }) => {
+        return CoopExitRequestFromJson(response.user_request);
       },
     });
   }

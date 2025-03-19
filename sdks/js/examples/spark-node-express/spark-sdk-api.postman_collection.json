@@ -317,7 +317,7 @@
             "header": [],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"onChainAddress\": \"bcrt1...\",\n    \"targetAmountSats\": 2000\n}",
+              "raw": "{\n    \"onChainAddress\": \"bcrt1...\",\n    \"amountSats\": 10000\n}",
               "options": {
                 "raw": {
                   "language": "json"

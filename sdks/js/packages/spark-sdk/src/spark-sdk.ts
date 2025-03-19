@@ -11,8 +11,8 @@ import { decode } from "light-bolt11-decoder";
 import SspClient from "./graphql/client.js";
 import {
   BitcoinNetwork,
-  CoopExitFeeEstimateInput,
   CoopExitFeeEstimateOutput,
+  CoopExitRequest,
   LeavesSwapFeeEstimateOutput,
   LeavesSwapRequest,
   LightningReceiveFeeEstimateInput,
@@ -20,6 +20,7 @@ import {
   LightningReceiveRequest,
   LightningSendFeeEstimateInput,
   LightningSendFeeEstimateOutput,
+  LightningSendRequest,
   UserLeafInput,
 } from "./graphql/objects/index.js";
 import {
@@ -1384,21 +1385,21 @@ export class SparkWallet {
    *
    * @param {Object} params - Parameters for the withdrawal
    * @param {string} params.onchainAddress - The Bitcoin address where the funds should be sent
-   * @param {number} [params.targetAmountSats] - The amount in satoshis to withdraw. If not specified, attempts to withdraw all available funds
+   * @param {number} [params.amountSats] - The amount in satoshis to withdraw. If not specified, attempts to withdraw all available funds
    * @returns {Promise<CoopExitRequest | null | undefined>} The withdrawal request details, or null/undefined if the request cannot be completed
    */
   public async withdraw({
     onchainAddress,
-    targetAmountSats,
+    amountSats,
   }: {
     onchainAddress: string;
-    targetAmountSats?: number;
+    amountSats?: number;
   }) {
-    if (targetAmountSats && targetAmountSats < 10000) {
+    if (amountSats && amountSats < 10000) {
       throw new Error("The minimum amount for a withdrawal is 10000 sats");
     }
     return await this.withLeaves(async () => {
-      return await this.coopExit(onchainAddress, targetAmountSats);
+      return await this.coopExit(onchainAddress, amountSats);
     });
   }
 
@@ -1484,7 +1485,9 @@ export class SparkWallet {
   /**
    * Gets fee estimate for cooperative exit (on-chain withdrawal).
    *
-   * @param {CoopExitFeeEstimateInput} params - Input parameters for fee estimation
+   * @param {Object} params - Input parameters for fee estimation
+   * @param {number} params.amountSats - The amount in satoshis to withdraw
+   * @param {string} params.withdrawalAddress - The Bitcoin address where the funds should be sent
    * @returns {Promise<CoopExitFeeEstimateOutput | null>} Fee estimate for the withdrawal
    */
   public async getCoopExitFeeEstimate({
@@ -1820,5 +1823,51 @@ export class SparkWallet {
     return bytesToHex(
       await this.config.signer.signMessageWithIdentityKey(hash, compact),
     );
+  }
+
+  /**
+   * Get a Lightning receive request by ID.
+   *
+   * @param {string} id - The ID of the Lightning receive request
+   * @returns {Promise<LightningReceiveRequest | null>} The Lightning receive request
+   */
+  public async getLightningReceiveRequest(
+    id: string,
+  ): Promise<LightningReceiveRequest | null> {
+    if (!this.sspClient) {
+      throw new Error("SSP client not initialized");
+    }
+
+    return await this.sspClient.getLightningReceiveRequest(id);
+  }
+
+  /**
+   * Get a Lightning send request by ID.
+   *
+   * @param {string} id - The ID of the Lightning send request
+   * @returns {Promise<LightningSendRequest | null>} The Lightning send request
+   */
+  public async getLightningSendRequest(
+    id: string,
+  ): Promise<LightningSendRequest | null> {
+    if (!this.sspClient) {
+      throw new Error("SSP client not initialized");
+    }
+
+    return await this.sspClient.getLightningSendRequest(id);
+  }
+
+  /**
+   * Get a coop exit request by ID.
+   *
+   * @param {string} id - The ID of the coop exit request
+   * @returns {Promise<CoopExitRequest | null>} The coop exit request
+   */
+  public async getCoopExitRequest(id: string): Promise<CoopExitRequest | null> {
+    if (!this.sspClient) {
+      throw new Error("SSP client not initialized");
+    }
+
+    return await this.sspClient.getCoopExitRequest(id);
   }
 }

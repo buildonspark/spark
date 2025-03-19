@@ -29,10 +29,13 @@ async function runCLI() {
   createinvoice <amount> <memo>                                       - Create a new lightning invoice
   payinvoice <invoice>                                                - Pay a lightning invoice
   sendtransfer <amount> <receiverSparkAddress>                        - Send a spark transfer
-  withdraw <onchainAddress> <amount>                                  - Withdraw funds to an L1 address
+  withdraw <amount> <onchainAddress>                                   - Withdraw funds to an L1 address
   coopfee <amount> <withdrawalAddress>                                - Get a fee estimate for a cooperative exit
   lightningsendfee <invoice>                                          - Get a fee estimate for a lightning send
   lightningreceivefee <amount> <REGTEST | MAINNET | TESTNET | SIGNET> - Get a fee estimate for a lightning receive
+  getlightningsendrequest <requestId>                                 - Get a lightning send request by ID
+  getlightningreceiverequest <requestId>                              - Get a lightning receive request by ID
+  getcoopexitrequest <requestId>                                      - Get a coop exit request by ID
   sendtokentransfer <tokenPubKey> <amount> <receiverSparkAddress>     - Transfer tokens
   help                                                                - Show this help message
   exit/quit
@@ -70,6 +73,42 @@ async function runCLI() {
         }
         const depositResult = await wallet.claimDeposit(args[0]);
         console.log(depositResult);
+        break;
+      case "pendingtransfers":
+        if (!wallet) {
+          console.log("Please initialize a wallet first");
+          break;
+        }
+        const pendingTransfers = await wallet.getPendingTransfers();
+        console.log(pendingTransfers);
+        break;
+      case "getlightningsendrequest":
+        if (!wallet) {
+          console.log("Please initialize a wallet first");
+          break;
+        }
+        const lightningSendRequest = await wallet.getLightningSendRequest(
+          args[0],
+        );
+        console.log(lightningSendRequest);
+        break;
+      case "getlightningreceiverequest":
+        if (!wallet) {
+          console.log("Please initialize a wallet first");
+          break;
+        }
+        const lightningReceiveRequest = await wallet.getLightningReceiveRequest(
+          args[0],
+        );
+        console.log(lightningReceiveRequest);
+        break;
+      case "getcoopexitrequest":
+        if (!wallet) {
+          console.log("Please initialize a wallet first");
+          break;
+        }
+        const coopExitRequest = await wallet.getCoopExitRequest(args[0]);
+        console.log(coopExitRequest);
         break;
       case "claimtransfers":
         if (!wallet) {
@@ -191,8 +230,8 @@ async function runCLI() {
           break;
         }
         const withdrawal = await wallet.withdraw({
-          onchainAddress: args[0],
-          targetAmountSats: parseInt(args[1]),
+          amountSats: parseInt(args[0]),
+          onchainAddress: args[1],
         });
         console.log(withdrawal);
         break;
