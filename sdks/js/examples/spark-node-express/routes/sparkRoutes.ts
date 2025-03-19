@@ -1,10 +1,20 @@
 import { IssuerSparkWallet } from "@buildonspark/issuer-sdk";
 import { SparkWallet } from "@buildonspark/spark-sdk";
-import { TreeNode } from "@buildonspark/spark-sdk/proto/spark";
-import { SparkProto } from "@buildonspark/spark-sdk/types";
+import { type TreeNode } from "@buildonspark/spark-sdk/proto/spark";
+import {
+  SparkProto,
+  type LightningReceiveRequest,
+  type LightningSendRequest,
+  type CoopExitRequest,
+} from "@buildonspark/spark-sdk/types";
 import { getLatestDepositTxId } from "@buildonspark/spark-sdk/utils";
 import { isError } from "@lightsparkdev/core";
-import { NextFunction, Request, Response, Router } from "express";
+import {
+  Router,
+  type NextFunction,
+  type Request,
+  type Response,
+} from "express";
 import { BITCOIN_NETWORK } from "../src/index.js";
 import {
   formatTransferResponse,
@@ -432,7 +442,7 @@ export const createSparkRouter = (
    * @param {number} [expirySeconds] - The expiry time for the invoice in seconds
    * @returns {Promise<{
    *   data: {
-   *     invoice: string
+   *     invoice: LightningReceiveRequest
    *   }
    * }>}
    */
@@ -447,11 +457,12 @@ export const createSparkRouter = (
           memo: string | undefined;
           expirySeconds: number | undefined;
         };
-        const invoice = await wallet!.createLightningInvoice({
-          amountSats,
-          memo,
-          expirySeconds,
-        });
+        const invoice: LightningReceiveRequest | null =
+          await wallet!.createLightningInvoice({
+            amountSats,
+            memo,
+            expirySeconds,
+          });
         res.json({
           data: { invoice },
         });
@@ -469,31 +480,7 @@ export const createSparkRouter = (
    * @param {string} invoice - The invoice to pay
    * @returns {Promise<{
    *   data: {
-   *     payment: {
-   *       id: string
-   *       createdAt: string
-   *       updatedAt: string
-   *       encodedInvoice: string
-   *       fee: {
-   *         originalValue: number
-   *         originalUnit: string
-   *         preferredCurrencyUnit: string
-   *         preferredCurrencyValueRounded: number
-   *         preferredCurrencyValueApprox: number
-   *       }
-   *       idempotencyKey: string
-   *       status: string
-   *       transfer: {
-   *         id: string
-   *         totalAmount: {
-   *           originalValue: number
-   *           originalUnit: string
-   *           preferredCurrencyUnit: string
-   *           preferredCurrencyValueRounded: number
-   *           preferredCurrencyValueApprox: number
-   *         }
-   *       }
-   *     }
+   *     payment: LightningSendRequest
    *   }
    * }>}
    */
@@ -504,7 +491,8 @@ export const createSparkRouter = (
       const wallet = getWallet();
       try {
         const { invoice } = req.body as { invoice: string };
-        const payment = await wallet!.payLightningInvoice({ invoice });
+        const payment: LightningSendRequest | null =
+          await wallet!.payLightningInvoice({ invoice });
         res.json({
           data: { payment },
         });
@@ -545,6 +533,66 @@ export const createSparkRouter = (
         });
         res.json({
           data: { feeEstimate },
+        });
+      } catch (error) {
+        console.error(error);
+        const errorMsg = isError(error) ? error.message : "Unknown error";
+        res.status(500).json({ error: errorMsg });
+      }
+    }
+  );
+
+  /**
+   * Get lightning receive request by Lightspark ID.
+   * @route GET /lightning/receive-request
+   * @param {string} id - The ID of the lightning receive request
+   * @returns {Promise<{
+   *   data: {
+   *     receiveRequest: LightningReceiveRequest
+   *   }
+   * }>}
+   */
+  router.get(
+    "/lightning/receive-request",
+    checkWalletInitialized,
+    async (req, res) => {
+      const wallet = getWallet();
+      try {
+        const { id } = req.query as { id: string };
+        const receiveRequest: LightningReceiveRequest | null =
+          await wallet!.getLightningReceiveRequest(id);
+        res.json({
+          data: { receiveRequest },
+        });
+      } catch (error) {
+        console.error(error);
+        const errorMsg = isError(error) ? error.message : "Unknown error";
+        res.status(500).json({ error: errorMsg });
+      }
+    }
+  );
+
+  /**
+   * Get lightning send request by Lightspark ID.
+   * @route GET /lightning/send-request
+   * @param {string} id - The ID of the lightning send request
+   * @returns {Promise<{
+   *   data: {
+   *     sendRequest: LightningSendRequest
+   *   }
+   * }>}
+   */
+  router.get(
+    "/lightning/send-request",
+    checkWalletInitialized,
+    async (req, res) => {
+      const wallet = getWallet();
+      try {
+        const { id } = req.query as { id: string };
+        const sendRequest: LightningSendRequest | null =
+          await wallet!.getLightningSendRequest(id);
+        res.json({
+          data: { sendRequest },
         });
       } catch (error) {
         console.error(error);
@@ -647,7 +695,7 @@ export const createSparkRouter = (
 
   /**
    * Returns the latest transaction ID deposited to the given Bitcoin address.
-   * This txid can be used to claim the deposit using /bitcoin/claim-deposit.
+   * This txid can be used to claim the deposit using /on-chain/claim-deposit.
    * @route GET /on-chain/latest-deposit-txid
    * @param {string} btcAddress - The Bitcoin address to get the latest deposit transaction ID for
    * @returns {Promise<{
@@ -769,7 +817,7 @@ export const createSparkRouter = (
 
   /**
    * Gets fee estimate for cooperative exit (on-chain withdrawal).
-   * @route POST /on-chain/get-coop-exit-fee-estimate
+   * @route GET /on-chain/get-coop-exit-fee-estimate
    * @param {number} amountSats - The amount to withdraw in satoshis
    * @param {string} withdrawalAddress - The address to withdraw to
    * @returns {Promise<{
@@ -784,22 +832,52 @@ export const createSparkRouter = (
    *   }
    * }>}
    */
-  router.post(
+  router.get(
     "/on-chain/get-coop-exit-fee-estimate",
     checkWalletInitialized,
     async (req, res) => {
       const wallet = getWallet();
       try {
-        const { amountSats, withdrawalAddress } = req.body as {
-          amountSats: number;
+        const { amountSats, withdrawalAddress } = req.query as {
+          amountSats: string;
           withdrawalAddress: string;
         };
         const feeEstimate = await wallet!.getCoopExitFeeEstimate({
-          amountSats,
+          amountSats: Number(amountSats),
           withdrawalAddress,
         });
         res.json({
           data: { feeEstimate },
+        });
+      } catch (error) {
+        console.error(error);
+        const errorMsg = isError(error) ? error.message : "Unknown error";
+        res.status(500).json({ error: errorMsg });
+      }
+    }
+  );
+
+  /**
+   * Get coop exit request by Lightspark ID.
+   * @route GET /on-chain/coop-exit-request
+   * @param {string} id - The ID of the coop exit request
+   * @returns {Promise<{
+   *   data: {
+   *     coopExitRequest: CoopExitRequest
+   *   }
+   * }>}
+   */
+  router.get(
+    "/on-chain/coop-exit-request",
+    checkWalletInitialized,
+    async (req, res) => {
+      const wallet = getWallet();
+      try {
+        const { id } = req.query as { id: string };
+        const coopExitRequest: CoopExitRequest | null =
+          await wallet!.getCoopExitRequest(id);
+        res.json({
+          data: { coopExitRequest },
         });
       } catch (error) {
         console.error(error);

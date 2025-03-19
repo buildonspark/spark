@@ -275,6 +275,36 @@ GET /issuer-wallet/lightning/receive-fee-estimate?amountSats=number
 
 ---
 
+### Get Lighting Receive Request
+
+Get a Lightning receive request by ID.
+
+```http
+GET /spark-wallet/lightning/receive-request?id=string
+GET /issuer-wallet/lightning/receive-request?id=string
+```
+
+**Query Parameters:**
+
+- `id` (required String): The ID of the Lightning receive request
+
+---
+
+### Get Lightning Send Request
+
+Get a Lightning send request by ID.
+
+```http
+GET /spark-wallet/lightning/send-request?id=string
+GET /issuer-wallet/lightning/send-request?id=string
+```
+
+**Query Parameters:**
+
+- `id` (required String): The ID of the Lightning send request
+
+---
+
 ### Get Lightning Send Fee Estimate
 
 Get a fee estimate for sending Lightning payments.
@@ -370,6 +400,37 @@ POST /issuer-wallet/on-chain/withdraw
 
 ---
 
+### Get Coop Exit Fee Estimate
+
+Get a fee estimate for coop exiting.
+
+```http
+GET /spark-wallet/on-chain/get-coop-exit-fee-estimate?amountSats=number&withdrawalAddress=string
+GET /issuer-wallet/on-chain/get-coop-exit-fee-estimate?amountSats=number&withdrawalAddress=string
+```
+
+**Query Parameters:**
+
+- `amountSats` (required Number): The amount to get the fee estimate for in satoshis
+- `withdrawalAddress` (required String): The Bitcoin address where the funds should be sent
+
+---
+
+### Get Coop Exit Request
+
+Get a coop exit request by ID.
+
+```http
+GET /spark-wallet/on-chain/coop-exit-request?id=string
+GET /issuer-wallet/on-chain/coop-exit-request?id=string
+```
+
+**Query Parameters:**
+
+- `id` (required String): The ID of the coop exit request
+
+---
+
 ### Transfer Tokens
 
 Transfer tokens to another Spark Wallet.
@@ -422,6 +483,8 @@ POST /issuer-wallet/tokens/on-chain/withdraw
   tokenAmount: number
 }
 ```
+
+---
 
 ## Issuer only methods
 
