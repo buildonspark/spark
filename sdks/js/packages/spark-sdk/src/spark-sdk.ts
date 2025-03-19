@@ -931,7 +931,7 @@ export class SparkWallet {
 
     for (const node of this.leaves) {
       const nodeTx = getTxFromRawTxBytes(node.nodeTx);
-      const nextSequence = getNextTransactionSequence(
+      const { nextSequence } = getNextTransactionSequence(
         nodeTx.getInput(0).sequence,
       );
       if (nextSequence <= 0) {
