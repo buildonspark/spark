@@ -728,7 +728,7 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "localhost:4000/spark-wallet/bitcoin/token-l1-address",
+              "raw": "localhost:4000/issuer-wallet/bitcoin/token-l1-address",
               "host": ["localhost"],
               "port": "4000",
               "path": ["spark-wallet", "bitcoin", "token-l1-address"]
