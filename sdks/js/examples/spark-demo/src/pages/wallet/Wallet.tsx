@@ -1,6 +1,6 @@
 import { Transfer } from "@buildonspark/spark-sdk/proto/spark";
 import { bytesToHex } from "@noble/hashes/utils";
-import NumberFlow from "@number-flow/react";
+import NumberFlow, { NumberFlowGroup } from "@number-flow/react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -76,7 +76,7 @@ export default function Wallet() {
               <div className="h-[18px] w-[150px] animate-gradient-x rounded-md bg-[linear-gradient(90deg,#1A1A1A,#1A1A1A,#5A5A5A,#1A1A1A,#1A1A1A)] bg-[length:1000%_100%]"></div>
             </div>
           ) : (
-            <>
+            <NumberFlowGroup>
               <div className="text-[32px]">
                 <NumberFlow
                   value={assetBalance.amount}
@@ -90,7 +90,7 @@ export default function Wallet() {
                   suffix={btcBalanceDisplay.code}
                 />
               </div>
-            </>
+            </NumberFlowGroup>
           )}
         </div>
         <div className="mt-6 flex w-full items-center justify-center gap-2">
