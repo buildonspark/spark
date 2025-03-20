@@ -1,12 +1,19 @@
 import {
+  createLrc20ConnectionManager,
+  ILrc20ConnectionManager,
+} from "@buildonspark/lrc20-sdk/grpc";
+import {
   bytesToHex,
   bytesToNumberBE,
   hexToBytes,
 } from "@noble/curves/abstract/utils";
 import { secp256k1 } from "@noble/curves/secp256k1";
+import { validateMnemonic } from "@scure/bip39";
+import { wordlist } from "@scure/bip39/wordlists/english";
 import { Address, OutScript, Transaction } from "@scure/btc-signer";
 import { TransactionInput } from "@scure/btc-signer/psbt";
 import { sha256 } from "@scure/btc-signer/utils";
+import { Mutex } from "async-mutex";
 import { decode } from "light-bolt11-decoder";
 import SspClient from "./graphql/client.js";
 import {
@@ -39,19 +46,11 @@ import { DepositService } from "./services/deposit.js";
 import { LightningService } from "./services/lightning.js";
 import { TokenTransactionService } from "./services/token-transactions.js";
 import { LeafKeyTweak, TransferService } from "./services/transfer.js";
-import { ConfigOptions } from "./services/wallet-config.js";
-import {
-  createLrc20ConnectionManager,
-  ILrc20ConnectionManager,
-  Lrc20SparkClient,
-} from "@buildonspark/lrc20-sdk/grpc";
-import { validateMnemonic } from "@scure/bip39";
-import { wordlist } from "@scure/bip39/wordlists/english";
-import { Mutex } from "async-mutex";
 import {
   DepositAddressTree,
   TreeCreationService,
 } from "./services/tree-creation.js";
+import { ConfigOptions } from "./services/wallet-config.js";
 import {
   applyAdaptorToSignature,
   generateAdaptorFromSignature,
@@ -114,7 +113,7 @@ export type TokenInfo = {
   tokenSymbol: string;
   tokenDecimals: number;
   tokenSupply: bigint;
-}
+};
 
 export type InitWalletResponse = {
   mnemonic?: string | undefined;
@@ -162,7 +161,9 @@ export class SparkWallet {
   protected constructor(options?: ConfigOptions, signer?: SparkSigner) {
     this.config = new WalletConfigService(options, signer);
     this.connectionManager = new ConnectionManager(this.config);
-    this.lrc20ConnectionManager = createLrc20ConnectionManager(this.config.getLrc20Address());
+    this.lrc20ConnectionManager = createLrc20ConnectionManager(
+      this.config.getLrc20Address(),
+    );
     this.depositService = new DepositService(
       this.config,
       this.connectionManager,
@@ -692,9 +693,9 @@ export class SparkWallet {
 
     const lrc20Client = await this.lrc20ConnectionManager.createLrc20Client();
     const { balance, tokenBalances } = await this.getBalance();
-    
+
     const tokenInfo = await lrc20Client.getTokenPubkeyInfo({
-      publicKeys: Array.from(tokenBalances.keys()).map(hexToBytes)
+      publicKeys: Array.from(tokenBalances.keys()).map(hexToBytes),
     });
 
     return tokenInfo.tokenPubkeyInfos.map((info) => ({
@@ -1009,6 +1010,7 @@ export class SparkWallet {
         const refundTx = getTxFromRawTxBytes(node.refundTx);
         const { needRefresh } = getNextTransactionSequence(
           refundTx.getInput(0).sequence,
+          true,
         );
         if (needRefresh) {
           nodesToRefresh.push(node);
