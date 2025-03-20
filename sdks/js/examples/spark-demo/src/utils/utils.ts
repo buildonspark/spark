@@ -57,20 +57,28 @@ export const decodeLnInvoiceSafely = (invoice: string) => {
  * @param fiatPerAsset - The fiat value per unit of asset
  * @param fiatAsset - The fiat currency type of type Currency
  * @param includeCode - Whether to include the currency code in the output
- * @returns Formatted fiat amount string
+ * @returns {amount: number, code: string, displayString: string}
  */
-export const formatFiatAmountDisplayString = (
+export const formatFiatAmount = (
   assetAmount: number,
   fiatPerAsset: number,
   fiatAsset: Currency,
   includeCode: boolean = false,
 ) => {
+  const amount = assetAmount * fiatPerAsset;
   const fiatAmount = new Intl.NumberFormat("en-US", {
     style: "decimal",
     minimumFractionDigits: fiatAsset.decimals,
     maximumFractionDigits: fiatAsset.decimals,
-  }).format(assetAmount * fiatPerAsset);
-  return `${fiatAmount}${includeCode ? ` ${fiatAsset.code}` : ""}`;
+  }).format(amount);
+  const code = includeCode ? ` ${fiatAsset.code}` : "";
+  const displayString = `${fiatAmount}${code}`;
+
+  return {
+    amount: roundDown(amount, fiatAsset.decimals ?? 2),
+    code,
+    displayString,
+  };
 };
 
 /**
@@ -78,26 +86,31 @@ export const formatFiatAmountDisplayString = (
  * @param assetAmount - The amount of the asset
  * @param asset - The asset type of type Currency
  * @param includeCode - Whether to include the currency code in the output
- * @returns Formatted fiat amount string
+ * @returns {amount: number, code: string, displayString: string}
  */
-export const formatAssetAmountDisplayString = (
+export const formatAssetAmount = (
   assetAmount: number,
   asset: Currency,
   includeCode: boolean = false,
 ) => {
+  const amount =
+    asset.code === "BTC" && assetAmount >= 100_000
+      ? assetAmount / 100_000_000
+      : assetAmount;
   let formattedAssetAmount = new Intl.NumberFormat("en-US", {
     style: "decimal",
     minimumFractionDigits: asset.decimals,
     maximumFractionDigits: asset.decimals,
-  }).format(
-    asset.code === "BTC" && assetAmount >= 100_000
-      ? assetAmount / 100_000_000
-      : assetAmount,
-  );
+  }).format(amount);
   // return string with trailing zeros removed
-  return `${formattedAssetAmount.replace(/\.?0+$/, "")}${
-    includeCode
-      ? ` ${asset.code === "BTC" && assetAmount < 100_000 ? "SATs" : asset.code}`
-      : ""
-  }`;
+  const amountString = formattedAssetAmount.replace(/\.?0+$/, "");
+  const code = includeCode
+    ? ` ${asset.code === "BTC" && assetAmount < 100_000 ? "SATs" : asset.code}`
+    : "";
+  const displayString = `${amountString}${code}`;
+  return {
+    amount: roundDown(amount, asset.decimals ?? 8),
+    code,
+    displayString,
+  };
 };

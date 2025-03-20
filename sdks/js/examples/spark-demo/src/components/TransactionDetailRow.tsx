@@ -1,9 +1,6 @@
 import { PERMANENT_CURRENCIES, useWallet } from "../store/wallet";
 import { Currency, CurrencyType } from "../utils/currency";
-import {
-  formatAssetAmountDisplayString,
-  formatFiatAmountDisplayString,
-} from "../utils/utils";
+import { formatAssetAmount, formatFiatAmount } from "../utils/utils";
 
 export default function TransactionDetailRow({
   transactionType,
@@ -34,17 +31,19 @@ export default function TransactionDetailRow({
             transactionType === "receive" ? "text-green" : ""
           }`}
         >
-          {formatFiatAmountDisplayString(
-            assetAmount,
-            asset.type === CurrencyType.TOKEN
-              ? (asset.usdPrice ?? 1)
-              : satsUsdPrice.value,
-            PERMANENT_CURRENCIES.get("USD")!,
-            true,
-          )}
+          {
+            formatFiatAmount(
+              assetAmount,
+              asset.type === CurrencyType.TOKEN
+                ? (asset.usdPrice ?? 1)
+                : satsUsdPrice.value,
+              PERMANENT_CURRENCIES.get("USD")!,
+              true,
+            ).displayString
+          }
         </div>
         <div className="text-[11px] text-[#F9F9F999]">
-          {formatAssetAmountDisplayString(assetAmount, asset, true)}{" "}
+          {formatAssetAmount(assetAmount, asset, true).displayString}{" "}
         </div>
       </div>
     </div>

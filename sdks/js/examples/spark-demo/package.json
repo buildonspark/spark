@@ -5,6 +5,7 @@
   "dependencies": {
     "@buildonspark/spark-sdk": "0.0.22",
     "@lightsparkdev/ui": "^1.0.17",
+    "@number-flow/react": "^0.5.7",
     "@radix-ui/react-popover": "^1.1.6",
     "@scure/bip39": "^1.5.4",
     "@tanstack/react-query": "^5.66.8",
@@ -21,6 +22,7 @@
     "postcss": "^8.5.2",
     "qrcode.react": "^4.2.0",
     "react": "^19.0.0",
+    "react-animated-numbers": "^1.0.0",
     "react-app-rewired": "^2.2.1",
     "react-device-detect": "^2.2.3",
     "react-dom": "^19.0.0",

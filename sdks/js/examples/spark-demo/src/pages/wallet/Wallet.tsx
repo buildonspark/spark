@@ -1,5 +1,6 @@
 import { Transfer } from "@buildonspark/spark-sdk/proto/spark";
 import { bytesToHex } from "@noble/hashes/utils";
+import NumberFlow from "@number-flow/react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -12,15 +13,13 @@ import CopyIcon from "../../icons/CopyIcon";
 import StableCoinLogo from "../../icons/StableCoinLogo";
 import { Routes } from "../../routes";
 import { PERMANENT_CURRENCIES, useWallet } from "../../store/wallet";
-import {
-  formatAssetAmountDisplayString,
-  formatFiatAmountDisplayString,
-} from "../../utils/utils";
+import { formatAssetAmount, formatFiatAmount } from "../../utils/utils";
 export default function Wallet() {
   const navigate = useNavigate();
   const notify = () => toast("Copied!");
   const { btcBalance, satsUsdPrice, getMasterPublicKey, isInitialized } =
     useWallet();
+
   const [pubkey, setPubkey] = useState("");
   const transfersQuery = usePaginatedTransfers({
     limit: 5,
@@ -35,6 +34,20 @@ export default function Wallet() {
       });
     }
   }, [getMasterPublicKey, isInitialized]);
+
+  const assetBalance = formatFiatAmount(
+    btcBalance.value,
+    satsUsdPrice.value,
+    PERMANENT_CURRENCIES.get("USD")!,
+    false,
+  );
+
+  const btcBalanceDisplay = formatAssetAmount(
+    btcBalance.value,
+    PERMANENT_CURRENCIES.get("BTC")!,
+    true,
+  );
+
   return (
     <div>
       <StyledContainer className="flex h-[220px] w-full flex-col items-center justify-center p-4">
@@ -65,20 +78,17 @@ export default function Wallet() {
           ) : (
             <>
               <div className="text-[32px]">
-                {formatFiatAmountDisplayString(
-                  btcBalance.value,
-                  satsUsdPrice.value,
-                  PERMANENT_CURRENCIES.get("USD")!,
-                  false,
-                )}
+                <NumberFlow
+                  value={assetBalance.amount}
+                  suffix={assetBalance.code}
+                />
                 <span className="text-[15px] text-[#FAFAFA]">{`${" USD"}`}</span>
               </div>
               <div className="text-[13px] text-[#FAFAFA80]">
-                {formatAssetAmountDisplayString(
-                  btcBalance.value,
-                  PERMANENT_CURRENCIES.get("BTC")!,
-                  true,
-                )}
+                <NumberFlow
+                  value={btcBalanceDisplay.amount}
+                  suffix={btcBalanceDisplay.code}
+                />
               </div>
             </>
           )}

@@ -3806,6 +3806,19 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@number-flow/react@npm:^0.5.7":
+  version: 0.5.7
+  resolution: "@number-flow/react@npm:0.5.7"
+  dependencies:
+    esm-env: "npm:^1.1.4"
+    number-flow: "npm:0.5.5"
+  peerDependencies:
+    react: ^18 || ^19
+    react-dom: ^18 || ^19
+  checksum: 10/7d4b63ac8ce927b03048e092a660b5cba36b0f07cc924a2c6e94a85ca133bbafb670ed551981f690f47bf2f11c2c0bc634b8832d32e79d38d2750f5127b56984
+  languageName: node
+  linkType: hard
+
 "@octokit/app@npm:^15.1.4":
   version: 15.1.5
   resolution: "@octokit/app@npm:15.1.5"
@@ -10683,6 +10696,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"esm-env@npm:^1.1.4":
+  version: 1.2.2
+  resolution: "esm-env@npm:1.2.2"
+  checksum: 10/caf5f3cc2bc7107494585b4e38835787f48ef77b670aeb2d765a5b6b64c41102d20bbdd34bda32474291b6b8d819d4d02ce92570a0886baca6cef70f5fe689f3
+  languageName: node
+  linkType: hard
+
 "espree@npm:^9.6.0, espree@npm:^9.6.1":
   version: 9.6.1
   resolution: "espree@npm:9.6.1"
@@ -11350,6 +11370,28 @@ __metadata:
   version: 4.3.7
   resolution: "fraction.js@npm:4.3.7"
   checksum: 10/bb5ebcdeeffcdc37b68ead3bdfc244e68de188e0c64e9702197333c72963b95cc798883ad16adc21588088b942bca5b6a6ff4aeb1362d19f6f3b629035dc15f5
+  languageName: node
+  linkType: hard
+
+"framer-motion@npm:^11.18.2":
+  version: 11.18.2
+  resolution: "framer-motion@npm:11.18.2"
+  dependencies:
+    motion-dom: "npm:^11.18.1"
+    motion-utils: "npm:^11.18.1"
+    tslib: "npm:^2.4.0"
+  peerDependencies:
+    "@emotion/is-prop-valid": "*"
+    react: ^18.0.0 || ^19.0.0
+    react-dom: ^18.0.0 || ^19.0.0
+  peerDependenciesMeta:
+    "@emotion/is-prop-valid":
+      optional: true
+    react:
+      optional: true
+    react-dom:
+      optional: true
+  checksum: 10/f8805f9f5664b86aad6b9ed280a79b10e7ed4e31048728d4c3767d95a5c9feeb0279844bbe613dcb3741bb784cdf6ad761e726249fa4feeec9bec4a29f78a397
   languageName: node
   linkType: hard
 
@@ -15167,6 +15209,43 @@ __metadata:
   languageName: node
   linkType: hard
 
+"motion-dom@npm:^11.18.1":
+  version: 11.18.1
+  resolution: "motion-dom@npm:11.18.1"
+  dependencies:
+    motion-utils: "npm:^11.18.1"
+  checksum: 10/d9172638e05998486800b1045fd2060dce13c748bdef2071b8d6f94adf87da9f5e11d44367a6ea2b4d2a8701d150a21427c1676b023dfe0e48f36c0383b2ceec
+  languageName: node
+  linkType: hard
+
+"motion-utils@npm:^11.18.1":
+  version: 11.18.1
+  resolution: "motion-utils@npm:11.18.1"
+  checksum: 10/8af61c8260ed6abe9c0d4e1037bd80de95a461a62c89daaf26bfdcdccc96799eed5c45adbdff90ea78614336bf2e3b91f4eb6ecb4e4028a3bce53977b54822a2
+  languageName: node
+  linkType: hard
+
+"motion@npm:^11.16.0":
+  version: 11.18.2
+  resolution: "motion@npm:11.18.2"
+  dependencies:
+    framer-motion: "npm:^11.18.2"
+    tslib: "npm:^2.4.0"
+  peerDependencies:
+    "@emotion/is-prop-valid": "*"
+    react: ^18.0.0 || ^19.0.0
+    react-dom: ^18.0.0 || ^19.0.0
+  peerDependenciesMeta:
+    "@emotion/is-prop-valid":
+      optional: true
+    react:
+      optional: true
+    react-dom:
+      optional: true
+  checksum: 10/bbb40214ec19f6af809c4181d7efc7a6f3cfbc013df8deb73c88f5cd4edd71cf09bbd816e9443cf4bf3cc8b23ed59ea7e1a790b3b6f710baf5575eead00f5697
+  languageName: node
+  linkType: hard
+
 "mri@npm:^1.2.0":
   version: 1.2.0
   resolution: "mri@npm:1.2.0"
@@ -15624,6 +15703,15 @@ __metadata:
   dependencies:
     boolbase: "npm:^1.0.0"
   checksum: 10/5afc3dafcd1573b08877ca8e6148c52abd565f1d06b1eb08caf982e3fa289a82f2cae697ffb55b5021e146d60443f1590a5d6b944844e944714a5b549675bcd3
+  languageName: node
+  linkType: hard
+
+"number-flow@npm:0.5.5":
+  version: 0.5.5
+  resolution: "number-flow@npm:0.5.5"
+  dependencies:
+    esm-env: "npm:^1.1.4"
+  checksum: 10/2337e44189d63f7e93f822d29e409a808285972fb3def886ebe25ab82163b02bde0875a03638e4cc9194a252f26ea8a10eff592b85c3dc47a774677f6ccd718d
   languageName: node
   linkType: hard
 
@@ -17716,6 +17804,18 @@ __metadata:
   languageName: node
   linkType: hard
 
+"react-animated-numbers@npm:^1.0.0":
+  version: 1.0.0
+  resolution: "react-animated-numbers@npm:1.0.0"
+  dependencies:
+    motion: "npm:^11.16.0"
+  peerDependencies:
+    react: ">=16.8.0"
+    react-dom: ">=16.8.0"
+  checksum: 10/b33db7d24ad8125bc72b0f46df44f2b2314a5c6793c26dbb77ef1cbb29ac25e42578e2410931924f64c4c6e328030b3f06a3b1f49fef1441a3a5e149e4298f89
+  languageName: node
+  linkType: hard
+
 "react-app-polyfill@npm:^3.0.0":
   version: 3.0.0
   resolution: "react-app-polyfill@npm:3.0.0"
@@ -19490,6 +19590,7 @@ __metadata:
   dependencies:
     "@buildonspark/spark-sdk": "npm:0.0.22"
     "@lightsparkdev/ui": "npm:^1.0.17"
+    "@number-flow/react": "npm:^0.5.7"
     "@radix-ui/react-popover": "npm:^1.1.6"
     "@scure/bip39": "npm:^1.5.4"
     "@tanstack/react-query": "npm:^5.66.8"
@@ -19510,6 +19611,7 @@ __metadata:
     prettier-plugin-tailwindcss: "npm:^0.6.11"
     qrcode.react: "npm:^4.2.0"
     react: "npm:^19.0.0"
+    react-animated-numbers: "npm:^1.0.0"
     react-app-rewired: "npm:^2.2.1"
     react-device-detect: "npm:^2.2.3"
     react-dom: "npm:^19.0.0"
