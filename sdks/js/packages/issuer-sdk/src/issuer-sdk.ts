@@ -5,11 +5,6 @@ import {
   TokenPubkeyAnnouncement,
   TokenPubkeyInfo,
 } from "@buildonspark/lrc20-sdk";
-import {
-  createLrc20ConnectionManager,
-  ILrc20ConnectionManager,
-  Lrc20SparkClient,
-} from "@buildonspark/lrc20-sdk/grpc";
 import { SparkWallet, SparkWalletProps } from "@buildonspark/spark-sdk";
 import { LeafWithPreviousTransactionData } from "@buildonspark/spark-sdk/proto/spark";
 import { ConfigOptions } from "@buildonspark/spark-sdk/services/wallet-config";
@@ -41,8 +36,6 @@ export class IssuerSparkWallet
   extends SparkWallet
   implements IssuerWalletInterface
 {
-  private lrc20ConnectionManager: ILrc20ConnectionManager;
-  private lrc20Client: Lrc20SparkClient | undefined;
   private issuerTokenTransactionService: IssuerTokenTransactionService;
   private tokenFreezeService: TokenFreezeService;
   private tokenPublicKeyInfo?: TokenPubkeyInfo;
@@ -59,9 +52,6 @@ export class IssuerSparkWallet
 
   private constructor(configOptions?: ConfigOptions) {
     super(configOptions);
-    this.lrc20ConnectionManager = createLrc20ConnectionManager(
-      this.config.getLrc20Address(),
-    );
     this.issuerTokenTransactionService = new IssuerTokenTransactionService(
       this.config,
       this.connectionManager,
@@ -74,8 +64,6 @@ export class IssuerSparkWallet
 
   private async initIssuerWallet(mnemonicOrSeed?: string | Uint8Array) {
     const initResponse = await super.initWallet(mnemonicOrSeed);
-
-    this.lrc20Client = await this.lrc20ConnectionManager.createLrc20Client();
 
     // TODO: Remove this in subsequent PRs when LRC20Wallet has a proper signer interface
     mnemonicOrSeed = mnemonicOrSeed || initResponse?.mnemonic;
@@ -122,7 +110,7 @@ export class IssuerSparkWallet
     };
   }
 
-  public async getTokenPublicKeyInfo(): Promise<TokenPubKeyInfoResponse | null> {
+  public async getIssuerTokenInfo(): Promise<TokenPubKeyInfoResponse | null> {
     if (this.tokenPublicKeyInfo) {
       return convertToTokenPubKeyInfoResponse(this.tokenPublicKeyInfo);
     }
@@ -213,11 +201,9 @@ export class IssuerSparkWallet
     beforeTimestamp?: Date,
     afterTimestamp?: Date,
   ): Promise<GetTokenActivityResponse> {
-    if (!this.lrc20Client) {
-      throw new Error("LRC20 client not initialized");
-    }
+    const lrc20Client = await this.lrc20ConnectionManager.createLrc20Client();
 
-    const transactions = await this.lrc20Client.listTransactions({
+    const transactions = await lrc20Client.listTransactions({
       tokenPublicKey: hexToBytes(await super.getIdentityPublicKey()),
       cursor,
       pageSize,
@@ -236,11 +222,9 @@ export class IssuerSparkWallet
     beforeTimestamp?: Date,
     afterTimestamp?: Date,
   ): Promise<GetTokenActivityResponse> {
-    if (!this.lrc20Client) {
-      throw new Error("LRC20 client not initialized");
-    }
+    const lrc20Client = await this.lrc20ConnectionManager.createLrc20Client();
 
-    const transactions = await this.lrc20Client.listTransactions({
+    const transactions = await lrc20Client.listTransactions({
       tokenPublicKey: hexToBytes(await super.getIdentityPublicKey()),
       ownerPublicKey: hexToBytes(await super.getIdentityPublicKey()),
       cursor,

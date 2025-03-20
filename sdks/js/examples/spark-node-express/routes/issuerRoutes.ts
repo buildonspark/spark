@@ -55,7 +55,7 @@ router.get(
   async (req, res) => {
     const wallet = getWallet() as IssuerSparkWallet;
     try {
-      const tokenPublicKeyInfo = await wallet!.getTokenPublicKeyInfo();
+      const tokenPublicKeyInfo = await wallet!.getIssuerTokenInfo();
       console.log("response: ", tokenPublicKeyInfo);
       res.json({
         data: { tokenPublicKeyInfo },

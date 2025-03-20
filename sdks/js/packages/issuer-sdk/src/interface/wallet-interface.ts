@@ -2,6 +2,7 @@ import { LRCWallet, Lrc20Protos } from "@buildonspark/lrc20-sdk";
 import {
   CreateLightningInvoiceParams,
   PayLightningInvoiceParams,
+  TokenInfo,
 } from "@buildonspark/spark-sdk";
 import {
   LeafWithPreviousTransactionData,
@@ -70,7 +71,8 @@ export interface IssuerWalletInterface {
     tokenTransactionHashes?: string[],
   ): Promise<TokenTransactionWithStatus[]>;
 
-  getTokenPublicKeyInfo(): Promise<TokenPubKeyInfoResponse | null>;
+  getTokenInfo(): Promise<TokenInfo[]>;
+  getIssuerTokenInfo(): Promise<TokenPubKeyInfoResponse | null>;
   burnTokens(
     tokenAmount: bigint,
     selectedLeaves?: LeafWithPreviousTransactionData[],

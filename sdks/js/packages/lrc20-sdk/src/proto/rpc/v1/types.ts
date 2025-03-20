@@ -210,6 +210,88 @@ export function sparkTransactionStatusToJSON(object: SparkTransactionStatus): st
   }
 }
 
+export interface SparkSignatureData {
+  sparkOperatorSignature: Uint8Array;
+  sparkOperatorIdentityPublicKey: Uint8Array;
+  leavesToSpendData: SparkSignatureLeafData[];
+  finalTokenTransaction: TokenTransaction | undefined;
+}
+
+export interface SparkSignatureLeafData {
+  spentLeafIndex: number;
+  revocationPrivateKey?: Uint8Array | undefined;
+}
+
+/**
+ * This proto is constructed by the wallet to specify leaves it wants to create
+ * as part of a token transaction.
+ */
+export interface TokenLeafOutput {
+  id: string;
+  ownerPublicKey: Uint8Array;
+  revocationPublicKey: Uint8Array;
+  withdrawalBondSats: number;
+  withdrawalLocktime: number;
+  /** Public key representing the token. */
+  tokenPublicKey: Uint8Array;
+  /** Amount of tokens contained within this leaf (uint128). */
+  tokenAmount: Uint8Array;
+  isFrozen?: boolean | undefined;
+}
+
+/**
+ * This proto is constructed by the wallet and is the core transaction data structure.
+ * This proto is deterministically hashed to generate the token_transaction_hash that
+ * is cooperatively signed by the SO group to confirm a token transaction.
+ */
+export interface TokenTransaction {
+  /**
+   * For mint transactions issuer_public_key will be specified without any leaves_to_spend.
+   * For transfer transactions the token amount in the input leaves must match the token amount in the output leaves.
+   */
+  tokenInput?:
+    | { $case: "mintInput"; mintInput: MintInput }
+    | { $case: "transferInput"; transferInput: TransferInput }
+    | undefined;
+  outputLeaves: TokenLeafOutput[];
+  sparkOperatorIdentityPublicKeys: Uint8Array[];
+}
+
+export interface TransferInput {
+  leavesToSpend: TokenLeafToSpend[];
+}
+
+export interface MintInput {
+  issuerPublicKey: Uint8Array;
+  issuerProvidedTimestamp: number;
+}
+
+/**
+ * This proto is constructed by the wallet (without a revocation private key initially)
+ * to specify leaves it wants to spend as part of a token transaction. Upon sending
+ * the private key field will be filled and returned by the Coordinator SO so that the
+ * wallet can validate the full transaction hash before finalizng the transaction.
+ */
+export interface TokenLeafToSpend {
+  prevTokenTransactionHash: Uint8Array;
+  prevTokenTransactionLeafVout: number;
+}
+
+export interface FreezeTokensPayload {
+  ownerPublicKey: Uint8Array;
+  tokenPublicKey: Uint8Array;
+  timestamp: number;
+  operatorIdentityPublicKey: Uint8Array;
+  /** Set to false when requesting a freeze. */
+  shouldUnfreeze: boolean;
+}
+
+export interface TokenTransactionResponse {
+  finalized: boolean;
+  finalTokenTransaction: TokenTransaction | undefined;
+  finalTokenTransactionHash: Uint8Array;
+}
+
 export interface Transaction {
   transaction?:
     | { $case: "onChain"; onChain: OnChainTransaction }
@@ -267,6 +349,1007 @@ export interface SparkLeaf {
   spendTxVoutIndex?: number | undefined;
   isFrozen?: boolean | undefined;
 }
+
+export interface Token {
+  name: string;
+  symbol: string;
+  publicKey: string;
+  decimals?: number | undefined;
+  isFreezable?: boolean | undefined;
+  maxSupply?: Uint8Array | undefined;
+  totalSupply: Uint8Array;
+  l1Supply: Uint8Array;
+  sparkSupply: Uint8Array;
+  totalOwnedByIssuer: Uint8Array;
+  totalFrozen: Uint8Array;
+}
+
+export interface BlockInfo {
+  blockHash: Uint8Array;
+  blockHeight: number;
+  minedAt: Date | undefined;
+}
+
+export interface TokenPubkey {
+  publicKey: Uint8Array;
+}
+
+export interface TokenPubkeyAnnouncement {
+  publicKey: TokenPubkey | undefined;
+  name: string;
+  symbol: string;
+  decimal: Uint8Array;
+  /** u128 */
+  maxSupply: Uint8Array;
+  isFreezable: boolean;
+}
+
+function createBaseSparkSignatureData(): SparkSignatureData {
+  return {
+    sparkOperatorSignature: new Uint8Array(0),
+    sparkOperatorIdentityPublicKey: new Uint8Array(0),
+    leavesToSpendData: [],
+    finalTokenTransaction: undefined,
+  };
+}
+
+export const SparkSignatureData: MessageFns<SparkSignatureData> = {
+  encode(message: SparkSignatureData, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.sparkOperatorSignature.length !== 0) {
+      writer.uint32(10).bytes(message.sparkOperatorSignature);
+    }
+    if (message.sparkOperatorIdentityPublicKey.length !== 0) {
+      writer.uint32(18).bytes(message.sparkOperatorIdentityPublicKey);
+    }
+    for (const v of message.leavesToSpendData) {
+      SparkSignatureLeafData.encode(v!, writer.uint32(26).fork()).join();
+    }
+    if (message.finalTokenTransaction !== undefined) {
+      TokenTransaction.encode(message.finalTokenTransaction, writer.uint32(34).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): SparkSignatureData {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseSparkSignatureData();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.sparkOperatorSignature = reader.bytes();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.sparkOperatorIdentityPublicKey = reader.bytes();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.leavesToSpendData.push(SparkSignatureLeafData.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.finalTokenTransaction = TokenTransaction.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): SparkSignatureData {
+    return {
+      sparkOperatorSignature: isSet(object.sparkOperatorSignature)
+        ? bytesFromBase64(object.sparkOperatorSignature)
+        : new Uint8Array(0),
+      sparkOperatorIdentityPublicKey: isSet(object.sparkOperatorIdentityPublicKey)
+        ? bytesFromBase64(object.sparkOperatorIdentityPublicKey)
+        : new Uint8Array(0),
+      leavesToSpendData: globalThis.Array.isArray(object?.leavesToSpendData)
+        ? object.leavesToSpendData.map((e: any) => SparkSignatureLeafData.fromJSON(e))
+        : [],
+      finalTokenTransaction: isSet(object.finalTokenTransaction)
+        ? TokenTransaction.fromJSON(object.finalTokenTransaction)
+        : undefined,
+    };
+  },
+
+  toJSON(message: SparkSignatureData): unknown {
+    const obj: any = {};
+    if (message.sparkOperatorSignature.length !== 0) {
+      obj.sparkOperatorSignature = base64FromBytes(message.sparkOperatorSignature);
+    }
+    if (message.sparkOperatorIdentityPublicKey.length !== 0) {
+      obj.sparkOperatorIdentityPublicKey = base64FromBytes(message.sparkOperatorIdentityPublicKey);
+    }
+    if (message.leavesToSpendData?.length) {
+      obj.leavesToSpendData = message.leavesToSpendData.map((e) => SparkSignatureLeafData.toJSON(e));
+    }
+    if (message.finalTokenTransaction !== undefined) {
+      obj.finalTokenTransaction = TokenTransaction.toJSON(message.finalTokenTransaction);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<SparkSignatureData>): SparkSignatureData {
+    return SparkSignatureData.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<SparkSignatureData>): SparkSignatureData {
+    const message = createBaseSparkSignatureData();
+    message.sparkOperatorSignature = object.sparkOperatorSignature ?? new Uint8Array(0);
+    message.sparkOperatorIdentityPublicKey = object.sparkOperatorIdentityPublicKey ?? new Uint8Array(0);
+    message.leavesToSpendData = object.leavesToSpendData?.map((e) => SparkSignatureLeafData.fromPartial(e)) || [];
+    message.finalTokenTransaction =
+      (object.finalTokenTransaction !== undefined && object.finalTokenTransaction !== null)
+        ? TokenTransaction.fromPartial(object.finalTokenTransaction)
+        : undefined;
+    return message;
+  },
+};
+
+function createBaseSparkSignatureLeafData(): SparkSignatureLeafData {
+  return { spentLeafIndex: 0, revocationPrivateKey: undefined };
+}
+
+export const SparkSignatureLeafData: MessageFns<SparkSignatureLeafData> = {
+  encode(message: SparkSignatureLeafData, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.spentLeafIndex !== 0) {
+      writer.uint32(8).uint32(message.spentLeafIndex);
+    }
+    if (message.revocationPrivateKey !== undefined) {
+      writer.uint32(18).bytes(message.revocationPrivateKey);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): SparkSignatureLeafData {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseSparkSignatureLeafData();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.spentLeafIndex = reader.uint32();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.revocationPrivateKey = reader.bytes();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): SparkSignatureLeafData {
+    return {
+      spentLeafIndex: isSet(object.spentLeafIndex) ? globalThis.Number(object.spentLeafIndex) : 0,
+      revocationPrivateKey: isSet(object.revocationPrivateKey)
+        ? bytesFromBase64(object.revocationPrivateKey)
+        : undefined,
+    };
+  },
+
+  toJSON(message: SparkSignatureLeafData): unknown {
+    const obj: any = {};
+    if (message.spentLeafIndex !== 0) {
+      obj.spentLeafIndex = Math.round(message.spentLeafIndex);
+    }
+    if (message.revocationPrivateKey !== undefined) {
+      obj.revocationPrivateKey = base64FromBytes(message.revocationPrivateKey);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<SparkSignatureLeafData>): SparkSignatureLeafData {
+    return SparkSignatureLeafData.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<SparkSignatureLeafData>): SparkSignatureLeafData {
+    const message = createBaseSparkSignatureLeafData();
+    message.spentLeafIndex = object.spentLeafIndex ?? 0;
+    message.revocationPrivateKey = object.revocationPrivateKey ?? undefined;
+    return message;
+  },
+};
+
+function createBaseTokenLeafOutput(): TokenLeafOutput {
+  return {
+    id: "",
+    ownerPublicKey: new Uint8Array(0),
+    revocationPublicKey: new Uint8Array(0),
+    withdrawalBondSats: 0,
+    withdrawalLocktime: 0,
+    tokenPublicKey: new Uint8Array(0),
+    tokenAmount: new Uint8Array(0),
+    isFrozen: undefined,
+  };
+}
+
+export const TokenLeafOutput: MessageFns<TokenLeafOutput> = {
+  encode(message: TokenLeafOutput, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.id !== "") {
+      writer.uint32(10).string(message.id);
+    }
+    if (message.ownerPublicKey.length !== 0) {
+      writer.uint32(18).bytes(message.ownerPublicKey);
+    }
+    if (message.revocationPublicKey.length !== 0) {
+      writer.uint32(26).bytes(message.revocationPublicKey);
+    }
+    if (message.withdrawalBondSats !== 0) {
+      writer.uint32(32).uint64(message.withdrawalBondSats);
+    }
+    if (message.withdrawalLocktime !== 0) {
+      writer.uint32(40).uint64(message.withdrawalLocktime);
+    }
+    if (message.tokenPublicKey.length !== 0) {
+      writer.uint32(50).bytes(message.tokenPublicKey);
+    }
+    if (message.tokenAmount.length !== 0) {
+      writer.uint32(58).bytes(message.tokenAmount);
+    }
+    if (message.isFrozen !== undefined) {
+      writer.uint32(64).bool(message.isFrozen);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): TokenLeafOutput {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseTokenLeafOutput();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.id = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.ownerPublicKey = reader.bytes();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.revocationPublicKey = reader.bytes();
+          continue;
+        }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.withdrawalBondSats = longToNumber(reader.uint64());
+          continue;
+        }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.withdrawalLocktime = longToNumber(reader.uint64());
+          continue;
+        }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.tokenPublicKey = reader.bytes();
+          continue;
+        }
+        case 7: {
+          if (tag !== 58) {
+            break;
+          }
+
+          message.tokenAmount = reader.bytes();
+          continue;
+        }
+        case 8: {
+          if (tag !== 64) {
+            break;
+          }
+
+          message.isFrozen = reader.bool();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): TokenLeafOutput {
+    return {
+      id: isSet(object.id) ? globalThis.String(object.id) : "",
+      ownerPublicKey: isSet(object.ownerPublicKey) ? bytesFromBase64(object.ownerPublicKey) : new Uint8Array(0),
+      revocationPublicKey: isSet(object.revocationPublicKey)
+        ? bytesFromBase64(object.revocationPublicKey)
+        : new Uint8Array(0),
+      withdrawalBondSats: isSet(object.withdrawalBondSats) ? globalThis.Number(object.withdrawalBondSats) : 0,
+      withdrawalLocktime: isSet(object.withdrawalLocktime) ? globalThis.Number(object.withdrawalLocktime) : 0,
+      tokenPublicKey: isSet(object.tokenPublicKey) ? bytesFromBase64(object.tokenPublicKey) : new Uint8Array(0),
+      tokenAmount: isSet(object.tokenAmount) ? bytesFromBase64(object.tokenAmount) : new Uint8Array(0),
+      isFrozen: isSet(object.isFrozen) ? globalThis.Boolean(object.isFrozen) : undefined,
+    };
+  },
+
+  toJSON(message: TokenLeafOutput): unknown {
+    const obj: any = {};
+    if (message.id !== "") {
+      obj.id = message.id;
+    }
+    if (message.ownerPublicKey.length !== 0) {
+      obj.ownerPublicKey = base64FromBytes(message.ownerPublicKey);
+    }
+    if (message.revocationPublicKey.length !== 0) {
+      obj.revocationPublicKey = base64FromBytes(message.revocationPublicKey);
+    }
+    if (message.withdrawalBondSats !== 0) {
+      obj.withdrawalBondSats = Math.round(message.withdrawalBondSats);
+    }
+    if (message.withdrawalLocktime !== 0) {
+      obj.withdrawalLocktime = Math.round(message.withdrawalLocktime);
+    }
+    if (message.tokenPublicKey.length !== 0) {
+      obj.tokenPublicKey = base64FromBytes(message.tokenPublicKey);
+    }
+    if (message.tokenAmount.length !== 0) {
+      obj.tokenAmount = base64FromBytes(message.tokenAmount);
+    }
+    if (message.isFrozen !== undefined) {
+      obj.isFrozen = message.isFrozen;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<TokenLeafOutput>): TokenLeafOutput {
+    return TokenLeafOutput.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<TokenLeafOutput>): TokenLeafOutput {
+    const message = createBaseTokenLeafOutput();
+    message.id = object.id ?? "";
+    message.ownerPublicKey = object.ownerPublicKey ?? new Uint8Array(0);
+    message.revocationPublicKey = object.revocationPublicKey ?? new Uint8Array(0);
+    message.withdrawalBondSats = object.withdrawalBondSats ?? 0;
+    message.withdrawalLocktime = object.withdrawalLocktime ?? 0;
+    message.tokenPublicKey = object.tokenPublicKey ?? new Uint8Array(0);
+    message.tokenAmount = object.tokenAmount ?? new Uint8Array(0);
+    message.isFrozen = object.isFrozen ?? undefined;
+    return message;
+  },
+};
+
+function createBaseTokenTransaction(): TokenTransaction {
+  return { tokenInput: undefined, outputLeaves: [], sparkOperatorIdentityPublicKeys: [] };
+}
+
+export const TokenTransaction: MessageFns<TokenTransaction> = {
+  encode(message: TokenTransaction, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    switch (message.tokenInput?.$case) {
+      case "mintInput":
+        MintInput.encode(message.tokenInput.mintInput, writer.uint32(10).fork()).join();
+        break;
+      case "transferInput":
+        TransferInput.encode(message.tokenInput.transferInput, writer.uint32(18).fork()).join();
+        break;
+    }
+    for (const v of message.outputLeaves) {
+      TokenLeafOutput.encode(v!, writer.uint32(26).fork()).join();
+    }
+    for (const v of message.sparkOperatorIdentityPublicKeys) {
+      writer.uint32(34).bytes(v!);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): TokenTransaction {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseTokenTransaction();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.tokenInput = { $case: "mintInput", mintInput: MintInput.decode(reader, reader.uint32()) };
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.tokenInput = { $case: "transferInput", transferInput: TransferInput.decode(reader, reader.uint32()) };
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.outputLeaves.push(TokenLeafOutput.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.sparkOperatorIdentityPublicKeys.push(reader.bytes());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): TokenTransaction {
+    return {
+      tokenInput: isSet(object.mintInput)
+        ? { $case: "mintInput", mintInput: MintInput.fromJSON(object.mintInput) }
+        : isSet(object.transferInput)
+        ? { $case: "transferInput", transferInput: TransferInput.fromJSON(object.transferInput) }
+        : undefined,
+      outputLeaves: globalThis.Array.isArray(object?.outputLeaves)
+        ? object.outputLeaves.map((e: any) => TokenLeafOutput.fromJSON(e))
+        : [],
+      sparkOperatorIdentityPublicKeys: globalThis.Array.isArray(object?.sparkOperatorIdentityPublicKeys)
+        ? object.sparkOperatorIdentityPublicKeys.map((e: any) => bytesFromBase64(e))
+        : [],
+    };
+  },
+
+  toJSON(message: TokenTransaction): unknown {
+    const obj: any = {};
+    if (message.tokenInput?.$case === "mintInput") {
+      obj.mintInput = MintInput.toJSON(message.tokenInput.mintInput);
+    } else if (message.tokenInput?.$case === "transferInput") {
+      obj.transferInput = TransferInput.toJSON(message.tokenInput.transferInput);
+    }
+    if (message.outputLeaves?.length) {
+      obj.outputLeaves = message.outputLeaves.map((e) => TokenLeafOutput.toJSON(e));
+    }
+    if (message.sparkOperatorIdentityPublicKeys?.length) {
+      obj.sparkOperatorIdentityPublicKeys = message.sparkOperatorIdentityPublicKeys.map((e) => base64FromBytes(e));
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<TokenTransaction>): TokenTransaction {
+    return TokenTransaction.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<TokenTransaction>): TokenTransaction {
+    const message = createBaseTokenTransaction();
+    switch (object.tokenInput?.$case) {
+      case "mintInput": {
+        if (object.tokenInput?.mintInput !== undefined && object.tokenInput?.mintInput !== null) {
+          message.tokenInput = { $case: "mintInput", mintInput: MintInput.fromPartial(object.tokenInput.mintInput) };
+        }
+        break;
+      }
+      case "transferInput": {
+        if (object.tokenInput?.transferInput !== undefined && object.tokenInput?.transferInput !== null) {
+          message.tokenInput = {
+            $case: "transferInput",
+            transferInput: TransferInput.fromPartial(object.tokenInput.transferInput),
+          };
+        }
+        break;
+      }
+    }
+    message.outputLeaves = object.outputLeaves?.map((e) => TokenLeafOutput.fromPartial(e)) || [];
+    message.sparkOperatorIdentityPublicKeys = object.sparkOperatorIdentityPublicKeys?.map((e) => e) || [];
+    return message;
+  },
+};
+
+function createBaseTransferInput(): TransferInput {
+  return { leavesToSpend: [] };
+}
+
+export const TransferInput: MessageFns<TransferInput> = {
+  encode(message: TransferInput, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.leavesToSpend) {
+      TokenLeafToSpend.encode(v!, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): TransferInput {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseTransferInput();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.leavesToSpend.push(TokenLeafToSpend.decode(reader, reader.uint32()));
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): TransferInput {
+    return {
+      leavesToSpend: globalThis.Array.isArray(object?.leavesToSpend)
+        ? object.leavesToSpend.map((e: any) => TokenLeafToSpend.fromJSON(e))
+        : [],
+    };
+  },
+
+  toJSON(message: TransferInput): unknown {
+    const obj: any = {};
+    if (message.leavesToSpend?.length) {
+      obj.leavesToSpend = message.leavesToSpend.map((e) => TokenLeafToSpend.toJSON(e));
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<TransferInput>): TransferInput {
+    return TransferInput.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<TransferInput>): TransferInput {
+    const message = createBaseTransferInput();
+    message.leavesToSpend = object.leavesToSpend?.map((e) => TokenLeafToSpend.fromPartial(e)) || [];
+    return message;
+  },
+};
+
+function createBaseMintInput(): MintInput {
+  return { issuerPublicKey: new Uint8Array(0), issuerProvidedTimestamp: 0 };
+}
+
+export const MintInput: MessageFns<MintInput> = {
+  encode(message: MintInput, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.issuerPublicKey.length !== 0) {
+      writer.uint32(10).bytes(message.issuerPublicKey);
+    }
+    if (message.issuerProvidedTimestamp !== 0) {
+      writer.uint32(16).uint64(message.issuerProvidedTimestamp);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): MintInput {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseMintInput();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.issuerPublicKey = reader.bytes();
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.issuerProvidedTimestamp = longToNumber(reader.uint64());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): MintInput {
+    return {
+      issuerPublicKey: isSet(object.issuerPublicKey) ? bytesFromBase64(object.issuerPublicKey) : new Uint8Array(0),
+      issuerProvidedTimestamp: isSet(object.issuerProvidedTimestamp)
+        ? globalThis.Number(object.issuerProvidedTimestamp)
+        : 0,
+    };
+  },
+
+  toJSON(message: MintInput): unknown {
+    const obj: any = {};
+    if (message.issuerPublicKey.length !== 0) {
+      obj.issuerPublicKey = base64FromBytes(message.issuerPublicKey);
+    }
+    if (message.issuerProvidedTimestamp !== 0) {
+      obj.issuerProvidedTimestamp = Math.round(message.issuerProvidedTimestamp);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<MintInput>): MintInput {
+    return MintInput.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<MintInput>): MintInput {
+    const message = createBaseMintInput();
+    message.issuerPublicKey = object.issuerPublicKey ?? new Uint8Array(0);
+    message.issuerProvidedTimestamp = object.issuerProvidedTimestamp ?? 0;
+    return message;
+  },
+};
+
+function createBaseTokenLeafToSpend(): TokenLeafToSpend {
+  return { prevTokenTransactionHash: new Uint8Array(0), prevTokenTransactionLeafVout: 0 };
+}
+
+export const TokenLeafToSpend: MessageFns<TokenLeafToSpend> = {
+  encode(message: TokenLeafToSpend, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.prevTokenTransactionHash.length !== 0) {
+      writer.uint32(10).bytes(message.prevTokenTransactionHash);
+    }
+    if (message.prevTokenTransactionLeafVout !== 0) {
+      writer.uint32(16).uint32(message.prevTokenTransactionLeafVout);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): TokenLeafToSpend {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseTokenLeafToSpend();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.prevTokenTransactionHash = reader.bytes();
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.prevTokenTransactionLeafVout = reader.uint32();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): TokenLeafToSpend {
+    return {
+      prevTokenTransactionHash: isSet(object.prevTokenTransactionHash)
+        ? bytesFromBase64(object.prevTokenTransactionHash)
+        : new Uint8Array(0),
+      prevTokenTransactionLeafVout: isSet(object.prevTokenTransactionLeafVout)
+        ? globalThis.Number(object.prevTokenTransactionLeafVout)
+        : 0,
+    };
+  },
+
+  toJSON(message: TokenLeafToSpend): unknown {
+    const obj: any = {};
+    if (message.prevTokenTransactionHash.length !== 0) {
+      obj.prevTokenTransactionHash = base64FromBytes(message.prevTokenTransactionHash);
+    }
+    if (message.prevTokenTransactionLeafVout !== 0) {
+      obj.prevTokenTransactionLeafVout = Math.round(message.prevTokenTransactionLeafVout);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<TokenLeafToSpend>): TokenLeafToSpend {
+    return TokenLeafToSpend.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<TokenLeafToSpend>): TokenLeafToSpend {
+    const message = createBaseTokenLeafToSpend();
+    message.prevTokenTransactionHash = object.prevTokenTransactionHash ?? new Uint8Array(0);
+    message.prevTokenTransactionLeafVout = object.prevTokenTransactionLeafVout ?? 0;
+    return message;
+  },
+};
+
+function createBaseFreezeTokensPayload(): FreezeTokensPayload {
+  return {
+    ownerPublicKey: new Uint8Array(0),
+    tokenPublicKey: new Uint8Array(0),
+    timestamp: 0,
+    operatorIdentityPublicKey: new Uint8Array(0),
+    shouldUnfreeze: false,
+  };
+}
+
+export const FreezeTokensPayload: MessageFns<FreezeTokensPayload> = {
+  encode(message: FreezeTokensPayload, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.ownerPublicKey.length !== 0) {
+      writer.uint32(10).bytes(message.ownerPublicKey);
+    }
+    if (message.tokenPublicKey.length !== 0) {
+      writer.uint32(18).bytes(message.tokenPublicKey);
+    }
+    if (message.timestamp !== 0) {
+      writer.uint32(24).uint64(message.timestamp);
+    }
+    if (message.operatorIdentityPublicKey.length !== 0) {
+      writer.uint32(34).bytes(message.operatorIdentityPublicKey);
+    }
+    if (message.shouldUnfreeze !== false) {
+      writer.uint32(40).bool(message.shouldUnfreeze);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): FreezeTokensPayload {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseFreezeTokensPayload();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.ownerPublicKey = reader.bytes();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.tokenPublicKey = reader.bytes();
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.timestamp = longToNumber(reader.uint64());
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.operatorIdentityPublicKey = reader.bytes();
+          continue;
+        }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.shouldUnfreeze = reader.bool();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): FreezeTokensPayload {
+    return {
+      ownerPublicKey: isSet(object.ownerPublicKey) ? bytesFromBase64(object.ownerPublicKey) : new Uint8Array(0),
+      tokenPublicKey: isSet(object.tokenPublicKey) ? bytesFromBase64(object.tokenPublicKey) : new Uint8Array(0),
+      timestamp: isSet(object.timestamp) ? globalThis.Number(object.timestamp) : 0,
+      operatorIdentityPublicKey: isSet(object.operatorIdentityPublicKey)
+        ? bytesFromBase64(object.operatorIdentityPublicKey)
+        : new Uint8Array(0),
+      shouldUnfreeze: isSet(object.shouldUnfreeze) ? globalThis.Boolean(object.shouldUnfreeze) : false,
+    };
+  },
+
+  toJSON(message: FreezeTokensPayload): unknown {
+    const obj: any = {};
+    if (message.ownerPublicKey.length !== 0) {
+      obj.ownerPublicKey = base64FromBytes(message.ownerPublicKey);
+    }
+    if (message.tokenPublicKey.length !== 0) {
+      obj.tokenPublicKey = base64FromBytes(message.tokenPublicKey);
+    }
+    if (message.timestamp !== 0) {
+      obj.timestamp = Math.round(message.timestamp);
+    }
+    if (message.operatorIdentityPublicKey.length !== 0) {
+      obj.operatorIdentityPublicKey = base64FromBytes(message.operatorIdentityPublicKey);
+    }
+    if (message.shouldUnfreeze !== false) {
+      obj.shouldUnfreeze = message.shouldUnfreeze;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<FreezeTokensPayload>): FreezeTokensPayload {
+    return FreezeTokensPayload.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<FreezeTokensPayload>): FreezeTokensPayload {
+    const message = createBaseFreezeTokensPayload();
+    message.ownerPublicKey = object.ownerPublicKey ?? new Uint8Array(0);
+    message.tokenPublicKey = object.tokenPublicKey ?? new Uint8Array(0);
+    message.timestamp = object.timestamp ?? 0;
+    message.operatorIdentityPublicKey = object.operatorIdentityPublicKey ?? new Uint8Array(0);
+    message.shouldUnfreeze = object.shouldUnfreeze ?? false;
+    return message;
+  },
+};
+
+function createBaseTokenTransactionResponse(): TokenTransactionResponse {
+  return { finalized: false, finalTokenTransaction: undefined, finalTokenTransactionHash: new Uint8Array(0) };
+}
+
+export const TokenTransactionResponse: MessageFns<TokenTransactionResponse> = {
+  encode(message: TokenTransactionResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.finalized !== false) {
+      writer.uint32(8).bool(message.finalized);
+    }
+    if (message.finalTokenTransaction !== undefined) {
+      TokenTransaction.encode(message.finalTokenTransaction, writer.uint32(18).fork()).join();
+    }
+    if (message.finalTokenTransactionHash.length !== 0) {
+      writer.uint32(26).bytes(message.finalTokenTransactionHash);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): TokenTransactionResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseTokenTransactionResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.finalized = reader.bool();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.finalTokenTransaction = TokenTransaction.decode(reader, reader.uint32());
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.finalTokenTransactionHash = reader.bytes();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): TokenTransactionResponse {
+    return {
+      finalized: isSet(object.finalized) ? globalThis.Boolean(object.finalized) : false,
+      finalTokenTransaction: isSet(object.finalTokenTransaction)
+        ? TokenTransaction.fromJSON(object.finalTokenTransaction)
+        : undefined,
+      finalTokenTransactionHash: isSet(object.finalTokenTransactionHash)
+        ? bytesFromBase64(object.finalTokenTransactionHash)
+        : new Uint8Array(0),
+    };
+  },
+
+  toJSON(message: TokenTransactionResponse): unknown {
+    const obj: any = {};
+    if (message.finalized !== false) {
+      obj.finalized = message.finalized;
+    }
+    if (message.finalTokenTransaction !== undefined) {
+      obj.finalTokenTransaction = TokenTransaction.toJSON(message.finalTokenTransaction);
+    }
+    if (message.finalTokenTransactionHash.length !== 0) {
+      obj.finalTokenTransactionHash = base64FromBytes(message.finalTokenTransactionHash);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<TokenTransactionResponse>): TokenTransactionResponse {
+    return TokenTransactionResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<TokenTransactionResponse>): TokenTransactionResponse {
+    const message = createBaseTokenTransactionResponse();
+    message.finalized = object.finalized ?? false;
+    message.finalTokenTransaction =
+      (object.finalTokenTransaction !== undefined && object.finalTokenTransaction !== null)
+        ? TokenTransaction.fromPartial(object.finalTokenTransaction)
+        : undefined;
+    message.finalTokenTransactionHash = object.finalTokenTransactionHash ?? new Uint8Array(0);
+    return message;
+  },
+};
 
 function createBaseTransaction(): Transaction {
   return { transaction: undefined };
@@ -1167,6 +2250,539 @@ export const SparkLeaf: MessageFns<SparkLeaf> = {
     message.spendTxHash = object.spendTxHash ?? undefined;
     message.spendTxVoutIndex = object.spendTxVoutIndex ?? undefined;
     message.isFrozen = object.isFrozen ?? undefined;
+    return message;
+  },
+};
+
+function createBaseToken(): Token {
+  return {
+    name: "",
+    symbol: "",
+    publicKey: "",
+    decimals: undefined,
+    isFreezable: undefined,
+    maxSupply: undefined,
+    totalSupply: new Uint8Array(0),
+    l1Supply: new Uint8Array(0),
+    sparkSupply: new Uint8Array(0),
+    totalOwnedByIssuer: new Uint8Array(0),
+    totalFrozen: new Uint8Array(0),
+  };
+}
+
+export const Token: MessageFns<Token> = {
+  encode(message: Token, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.name !== "") {
+      writer.uint32(10).string(message.name);
+    }
+    if (message.symbol !== "") {
+      writer.uint32(18).string(message.symbol);
+    }
+    if (message.publicKey !== "") {
+      writer.uint32(26).string(message.publicKey);
+    }
+    if (message.decimals !== undefined) {
+      writer.uint32(32).uint32(message.decimals);
+    }
+    if (message.isFreezable !== undefined) {
+      writer.uint32(40).bool(message.isFreezable);
+    }
+    if (message.maxSupply !== undefined) {
+      writer.uint32(50).bytes(message.maxSupply);
+    }
+    if (message.totalSupply.length !== 0) {
+      writer.uint32(58).bytes(message.totalSupply);
+    }
+    if (message.l1Supply.length !== 0) {
+      writer.uint32(66).bytes(message.l1Supply);
+    }
+    if (message.sparkSupply.length !== 0) {
+      writer.uint32(74).bytes(message.sparkSupply);
+    }
+    if (message.totalOwnedByIssuer.length !== 0) {
+      writer.uint32(82).bytes(message.totalOwnedByIssuer);
+    }
+    if (message.totalFrozen.length !== 0) {
+      writer.uint32(90).bytes(message.totalFrozen);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): Token {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseToken();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.name = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.symbol = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.publicKey = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.decimals = reader.uint32();
+          continue;
+        }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.isFreezable = reader.bool();
+          continue;
+        }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.maxSupply = reader.bytes();
+          continue;
+        }
+        case 7: {
+          if (tag !== 58) {
+            break;
+          }
+
+          message.totalSupply = reader.bytes();
+          continue;
+        }
+        case 8: {
+          if (tag !== 66) {
+            break;
+          }
+
+          message.l1Supply = reader.bytes();
+          continue;
+        }
+        case 9: {
+          if (tag !== 74) {
+            break;
+          }
+
+          message.sparkSupply = reader.bytes();
+          continue;
+        }
+        case 10: {
+          if (tag !== 82) {
+            break;
+          }
+
+          message.totalOwnedByIssuer = reader.bytes();
+          continue;
+        }
+        case 11: {
+          if (tag !== 90) {
+            break;
+          }
+
+          message.totalFrozen = reader.bytes();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): Token {
+    return {
+      name: isSet(object.name) ? globalThis.String(object.name) : "",
+      symbol: isSet(object.symbol) ? globalThis.String(object.symbol) : "",
+      publicKey: isSet(object.publicKey) ? globalThis.String(object.publicKey) : "",
+      decimals: isSet(object.decimals) ? globalThis.Number(object.decimals) : undefined,
+      isFreezable: isSet(object.isFreezable) ? globalThis.Boolean(object.isFreezable) : undefined,
+      maxSupply: isSet(object.maxSupply) ? bytesFromBase64(object.maxSupply) : undefined,
+      totalSupply: isSet(object.totalSupply) ? bytesFromBase64(object.totalSupply) : new Uint8Array(0),
+      l1Supply: isSet(object.l1Supply) ? bytesFromBase64(object.l1Supply) : new Uint8Array(0),
+      sparkSupply: isSet(object.sparkSupply) ? bytesFromBase64(object.sparkSupply) : new Uint8Array(0),
+      totalOwnedByIssuer: isSet(object.totalOwnedByIssuer)
+        ? bytesFromBase64(object.totalOwnedByIssuer)
+        : new Uint8Array(0),
+      totalFrozen: isSet(object.totalFrozen) ? bytesFromBase64(object.totalFrozen) : new Uint8Array(0),
+    };
+  },
+
+  toJSON(message: Token): unknown {
+    const obj: any = {};
+    if (message.name !== "") {
+      obj.name = message.name;
+    }
+    if (message.symbol !== "") {
+      obj.symbol = message.symbol;
+    }
+    if (message.publicKey !== "") {
+      obj.publicKey = message.publicKey;
+    }
+    if (message.decimals !== undefined) {
+      obj.decimals = Math.round(message.decimals);
+    }
+    if (message.isFreezable !== undefined) {
+      obj.isFreezable = message.isFreezable;
+    }
+    if (message.maxSupply !== undefined) {
+      obj.maxSupply = base64FromBytes(message.maxSupply);
+    }
+    if (message.totalSupply.length !== 0) {
+      obj.totalSupply = base64FromBytes(message.totalSupply);
+    }
+    if (message.l1Supply.length !== 0) {
+      obj.l1Supply = base64FromBytes(message.l1Supply);
+    }
+    if (message.sparkSupply.length !== 0) {
+      obj.sparkSupply = base64FromBytes(message.sparkSupply);
+    }
+    if (message.totalOwnedByIssuer.length !== 0) {
+      obj.totalOwnedByIssuer = base64FromBytes(message.totalOwnedByIssuer);
+    }
+    if (message.totalFrozen.length !== 0) {
+      obj.totalFrozen = base64FromBytes(message.totalFrozen);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<Token>): Token {
+    return Token.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<Token>): Token {
+    const message = createBaseToken();
+    message.name = object.name ?? "";
+    message.symbol = object.symbol ?? "";
+    message.publicKey = object.publicKey ?? "";
+    message.decimals = object.decimals ?? undefined;
+    message.isFreezable = object.isFreezable ?? undefined;
+    message.maxSupply = object.maxSupply ?? undefined;
+    message.totalSupply = object.totalSupply ?? new Uint8Array(0);
+    message.l1Supply = object.l1Supply ?? new Uint8Array(0);
+    message.sparkSupply = object.sparkSupply ?? new Uint8Array(0);
+    message.totalOwnedByIssuer = object.totalOwnedByIssuer ?? new Uint8Array(0);
+    message.totalFrozen = object.totalFrozen ?? new Uint8Array(0);
+    return message;
+  },
+};
+
+function createBaseBlockInfo(): BlockInfo {
+  return { blockHash: new Uint8Array(0), blockHeight: 0, minedAt: undefined };
+}
+
+export const BlockInfo: MessageFns<BlockInfo> = {
+  encode(message: BlockInfo, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.blockHash.length !== 0) {
+      writer.uint32(10).bytes(message.blockHash);
+    }
+    if (message.blockHeight !== 0) {
+      writer.uint32(16).uint32(message.blockHeight);
+    }
+    if (message.minedAt !== undefined) {
+      Timestamp.encode(toTimestamp(message.minedAt), writer.uint32(34).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): BlockInfo {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseBlockInfo();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.blockHash = reader.bytes();
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.blockHeight = reader.uint32();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.minedAt = fromTimestamp(Timestamp.decode(reader, reader.uint32()));
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): BlockInfo {
+    return {
+      blockHash: isSet(object.blockHash) ? bytesFromBase64(object.blockHash) : new Uint8Array(0),
+      blockHeight: isSet(object.blockHeight) ? globalThis.Number(object.blockHeight) : 0,
+      minedAt: isSet(object.minedAt) ? fromJsonTimestamp(object.minedAt) : undefined,
+    };
+  },
+
+  toJSON(message: BlockInfo): unknown {
+    const obj: any = {};
+    if (message.blockHash.length !== 0) {
+      obj.blockHash = base64FromBytes(message.blockHash);
+    }
+    if (message.blockHeight !== 0) {
+      obj.blockHeight = Math.round(message.blockHeight);
+    }
+    if (message.minedAt !== undefined) {
+      obj.minedAt = message.minedAt.toISOString();
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<BlockInfo>): BlockInfo {
+    return BlockInfo.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<BlockInfo>): BlockInfo {
+    const message = createBaseBlockInfo();
+    message.blockHash = object.blockHash ?? new Uint8Array(0);
+    message.blockHeight = object.blockHeight ?? 0;
+    message.minedAt = object.minedAt ?? undefined;
+    return message;
+  },
+};
+
+function createBaseTokenPubkey(): TokenPubkey {
+  return { publicKey: new Uint8Array(0) };
+}
+
+export const TokenPubkey: MessageFns<TokenPubkey> = {
+  encode(message: TokenPubkey, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.publicKey.length !== 0) {
+      writer.uint32(10).bytes(message.publicKey);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): TokenPubkey {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseTokenPubkey();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.publicKey = reader.bytes();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): TokenPubkey {
+    return { publicKey: isSet(object.publicKey) ? bytesFromBase64(object.publicKey) : new Uint8Array(0) };
+  },
+
+  toJSON(message: TokenPubkey): unknown {
+    const obj: any = {};
+    if (message.publicKey.length !== 0) {
+      obj.publicKey = base64FromBytes(message.publicKey);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<TokenPubkey>): TokenPubkey {
+    return TokenPubkey.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<TokenPubkey>): TokenPubkey {
+    const message = createBaseTokenPubkey();
+    message.publicKey = object.publicKey ?? new Uint8Array(0);
+    return message;
+  },
+};
+
+function createBaseTokenPubkeyAnnouncement(): TokenPubkeyAnnouncement {
+  return {
+    publicKey: undefined,
+    name: "",
+    symbol: "",
+    decimal: new Uint8Array(0),
+    maxSupply: new Uint8Array(0),
+    isFreezable: false,
+  };
+}
+
+export const TokenPubkeyAnnouncement: MessageFns<TokenPubkeyAnnouncement> = {
+  encode(message: TokenPubkeyAnnouncement, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.publicKey !== undefined) {
+      TokenPubkey.encode(message.publicKey, writer.uint32(10).fork()).join();
+    }
+    if (message.name !== "") {
+      writer.uint32(18).string(message.name);
+    }
+    if (message.symbol !== "") {
+      writer.uint32(26).string(message.symbol);
+    }
+    if (message.decimal.length !== 0) {
+      writer.uint32(34).bytes(message.decimal);
+    }
+    if (message.maxSupply.length !== 0) {
+      writer.uint32(42).bytes(message.maxSupply);
+    }
+    if (message.isFreezable !== false) {
+      writer.uint32(48).bool(message.isFreezable);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): TokenPubkeyAnnouncement {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseTokenPubkeyAnnouncement();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.publicKey = TokenPubkey.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.name = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.symbol = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.decimal = reader.bytes();
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.maxSupply = reader.bytes();
+          continue;
+        }
+        case 6: {
+          if (tag !== 48) {
+            break;
+          }
+
+          message.isFreezable = reader.bool();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): TokenPubkeyAnnouncement {
+    return {
+      publicKey: isSet(object.publicKey) ? TokenPubkey.fromJSON(object.publicKey) : undefined,
+      name: isSet(object.name) ? globalThis.String(object.name) : "",
+      symbol: isSet(object.symbol) ? globalThis.String(object.symbol) : "",
+      decimal: isSet(object.decimal) ? bytesFromBase64(object.decimal) : new Uint8Array(0),
+      maxSupply: isSet(object.maxSupply) ? bytesFromBase64(object.maxSupply) : new Uint8Array(0),
+      isFreezable: isSet(object.isFreezable) ? globalThis.Boolean(object.isFreezable) : false,
+    };
+  },
+
+  toJSON(message: TokenPubkeyAnnouncement): unknown {
+    const obj: any = {};
+    if (message.publicKey !== undefined) {
+      obj.publicKey = TokenPubkey.toJSON(message.publicKey);
+    }
+    if (message.name !== "") {
+      obj.name = message.name;
+    }
+    if (message.symbol !== "") {
+      obj.symbol = message.symbol;
+    }
+    if (message.decimal.length !== 0) {
+      obj.decimal = base64FromBytes(message.decimal);
+    }
+    if (message.maxSupply.length !== 0) {
+      obj.maxSupply = base64FromBytes(message.maxSupply);
+    }
+    if (message.isFreezable !== false) {
+      obj.isFreezable = message.isFreezable;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<TokenPubkeyAnnouncement>): TokenPubkeyAnnouncement {
+    return TokenPubkeyAnnouncement.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<TokenPubkeyAnnouncement>): TokenPubkeyAnnouncement {
+    const message = createBaseTokenPubkeyAnnouncement();
+    message.publicKey = (object.publicKey !== undefined && object.publicKey !== null)
+      ? TokenPubkey.fromPartial(object.publicKey)
+      : undefined;
+    message.name = object.name ?? "";
+    message.symbol = object.symbol ?? "";
+    message.decimal = object.decimal ?? new Uint8Array(0);
+    message.maxSupply = object.maxSupply ?? new Uint8Array(0);
+    message.isFreezable = object.isFreezable ?? false;
     return message;
   },
 };

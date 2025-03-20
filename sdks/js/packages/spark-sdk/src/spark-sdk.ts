@@ -40,7 +40,11 @@ import { LightningService } from "./services/lightning.js";
 import { TokenTransactionService } from "./services/token-transactions.js";
 import { LeafKeyTweak, TransferService } from "./services/transfer.js";
 import { ConfigOptions } from "./services/wallet-config.js";
-
+import {
+  createLrc20ConnectionManager,
+  ILrc20ConnectionManager,
+  Lrc20SparkClient,
+} from "@buildonspark/lrc20-sdk/grpc";
 import { validateMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english";
 import { Mutex } from "async-mutex";
@@ -104,6 +108,14 @@ type DepositParams = {
   vout: number;
 };
 
+export type TokenInfo = {
+  tokenPublicKey: string;
+  tokenName: string;
+  tokenSymbol: string;
+  tokenDecimals: number;
+  tokenSupply: bigint;
+}
+
 export type InitWalletResponse = {
   mnemonic?: string | undefined;
 };
@@ -123,6 +135,7 @@ export class SparkWallet {
   protected config: WalletConfigService;
 
   protected connectionManager: ConnectionManager;
+  protected lrc20ConnectionManager: ILrc20ConnectionManager;
   protected lrc20Wallet: LRCWallet | undefined;
 
   private depositService: DepositService;
@@ -149,6 +162,7 @@ export class SparkWallet {
   protected constructor(options?: ConfigOptions, signer?: SparkSigner) {
     this.config = new WalletConfigService(options, signer);
     this.connectionManager = new ConnectionManager(this.config);
+    this.lrc20ConnectionManager = createLrc20ConnectionManager(this.config.getLrc20Address());
     this.depositService = new DepositService(
       this.config,
       this.connectionManager,
@@ -671,6 +685,25 @@ export class SparkWallet {
     offset: number = 0,
   ): Promise<QueryAllTransfersResponse> {
     return await this.transferService.queryAllTransfers(limit, offset);
+  }
+
+  public async getTokenInfo(): Promise<TokenInfo[]> {
+    await this.syncTokenLeaves();
+
+    const lrc20Client = await this.lrc20ConnectionManager.createLrc20Client();
+    const { balance, tokenBalances } = await this.getBalance();
+    
+    const tokenInfo = await lrc20Client.getTokenPubkeyInfo({
+      publicKeys: Array.from(tokenBalances.keys()).map(hexToBytes)
+    });
+
+    return tokenInfo.tokenPubkeyInfos.map((info) => ({
+      tokenPublicKey: bytesToHex(info.announcement!.publicKey!.publicKey),
+      tokenName: info.announcement!.name,
+      tokenSymbol: info.announcement!.symbol,
+      tokenDecimals: Number(bytesToNumberBE(info.announcement!.decimal)),
+      tokenSupply: bytesToNumberBE(info.totalSupply),
+    }));
   }
 
   /**

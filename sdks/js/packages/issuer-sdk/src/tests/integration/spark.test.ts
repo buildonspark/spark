@@ -78,7 +78,7 @@ describe("token integration test", () => {
     // Wait for LRC20 processing.
     await new Promise((resolve) => setTimeout(resolve, 50000));
 
-    const publicKeyInfo = await wallet.getTokenPublicKeyInfo();
+    const publicKeyInfo = await wallet.getIssuerTokenInfo();
 
     // Assert token public key info values
     const identityPublicKey = await wallet.getIdentityPublicKey();
@@ -96,6 +96,12 @@ describe("token integration test", () => {
 
     const sourceBalance = await wallet.getIssuerTokenBalance();
     expect(sourceBalance.balance).toEqual(tokenAmount);
+
+    const tokenInfo = await wallet.getTokenInfo();
+    expect(tokenInfo[0].tokenName).toEqual("TestToken1");
+    expect(tokenInfo[0].tokenSymbol).toEqual("TT1");
+    expect(tokenInfo[0].tokenDecimals).toEqual(0);
+    expect(tokenInfo[0].tokenSupply).toEqual(tokenAmount);
   });
 
   it("should announce, issue, and withdraw a single token", async () => {
@@ -233,7 +239,7 @@ describe("token integration test", () => {
     const issuerOperationTx = issuerOperations.transactions[0].transaction;
     expect(issuerOperationTx?.$case).toBe("spark");
     if (issuerOperationTx?.$case === "spark") {
-      expect(issuerOperationTx.spark.operationType).toBe(3);
+      expect(issuerOperationTx.spark.operationType).toBe("ISSUER_MINT");
     }
   });
 

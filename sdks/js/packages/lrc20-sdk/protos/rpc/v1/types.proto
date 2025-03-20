@@ -3,6 +3,79 @@ syntax = "proto3";
 package rpc.v1;
 import "google/protobuf/timestamp.proto";
 
+message SparkSignatureData {
+  bytes spark_operator_signature = 1;
+  bytes spark_operator_identity_public_key = 2;
+  repeated SparkSignatureLeafData leaves_to_spend_data = 3;
+
+  TokenTransaction final_token_transaction = 4;
+}
+
+message SparkSignatureLeafData {
+  uint32 spent_leaf_index = 1;
+  optional bytes revocation_private_key = 2;
+}
+
+// This proto is constructed by the wallet to specify leaves it wants to create
+// as part of a token transaction.
+message TokenLeafOutput {
+  string id = 1;
+  bytes owner_public_key = 2;
+  bytes revocation_public_key = 3;
+  uint64 withdrawal_bond_sats = 4;
+  uint64 withdrawal_locktime = 5;
+  bytes token_public_key = 6; // Public key representing the token.
+  bytes token_amount = 7;  // Amount of tokens contained within this leaf (uint128).
+  optional bool is_frozen = 8;
+}
+
+// This proto is constructed by the wallet and is the core transaction data structure.
+// This proto is deterministically hashed to generate the token_transaction_hash that 
+// is cooperatively signed by the SO group to confirm a token transaction.
+message TokenTransaction {    
+  // For mint transactions issuer_public_key will be specified without any leaves_to_spend.
+  // For transfer transactions the token amount in the input leaves must match the token amount in the output leaves.
+  oneof token_input {
+      MintInput mint_input = 1;
+      TransferInput transfer_input = 2;
+  }
+  repeated TokenLeafOutput output_leaves = 3;
+  repeated bytes spark_operator_identity_public_keys = 4;
+}
+
+message TransferInput {
+  repeated TokenLeafToSpend leaves_to_spend = 1;
+}
+
+message MintInput {
+  bytes issuer_public_key = 1;
+  uint64 issuer_provided_timestamp = 2;
+}
+
+// This proto is constructed by the wallet (without a revocation private key initially)
+// to specify leaves it wants to spend as part of a token transaction. Upon sending
+// the private key field will be filled and returned by the Coordinator SO so that the
+// wallet can validate the full transaction hash before finalizng the transaction.
+message TokenLeafToSpend {
+  bytes prev_token_transaction_hash = 1;
+  uint32 prev_token_transaction_leaf_vout = 2;
+}
+
+message FreezeTokensPayload {
+  bytes owner_public_key = 1;
+  bytes token_public_key = 2;
+  uint64 timestamp = 3;
+  bytes operator_identity_public_key = 4;
+  // Set to false when requesting a freeze.
+  bool should_unfreeze = 5;  
+}
+
+message TokenTransactionResponse {
+  bool finalized = 1;
+  TokenTransaction final_token_transaction = 2;
+  bytes final_token_transaction_hash = 3;
+}
+
 message Transaction {
     oneof transaction {
         OnChainTransaction on_chain = 1;
@@ -103,3 +176,38 @@ message SparkLeaf {
     optional uint32 spend_tx_vout_index = 11;
     optional bool is_frozen = 12;
 }
+
+message Token {
+    string name = 1;
+    string symbol = 2;
+    string public_key = 3;
+    optional uint32 decimals = 4;
+    optional bool is_freezable = 5;
+    optional bytes max_supply = 6;
+    bytes total_supply = 7;
+    bytes l1_supply = 8;
+    bytes spark_supply = 9;
+    bytes total_owned_by_issuer = 10;
+    bytes total_frozen = 11;
+}
+
+message BlockInfo {
+  bytes block_hash = 1;
+  uint32 block_height = 2;
+  google.protobuf.Timestamp mined_at = 4;
+}
+
+message TokenPubkey {
+  bytes public_key = 1;
+}
+
+message TokenPubkeyAnnouncement {
+  TokenPubkey public_key = 1;
+  string name = 2;
+  string symbol = 3;
+  bytes decimal = 4;
+  bytes max_supply = 5; //u128
+  bool is_freezable = 6;
+}
+
+

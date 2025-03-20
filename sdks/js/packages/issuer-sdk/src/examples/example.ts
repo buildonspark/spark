@@ -88,7 +88,7 @@ async function runCLI() {
           if (wallet.isL1Initialized()) {
             console.log("L1 Address:", wallet.getL1FundingAddress());
 
-            const tokenPublicKeyInfo = await wallet.getTokenPublicKeyInfo();
+            const tokenPublicKeyInfo = await wallet.getIssuerTokenInfo();
             if (tokenPublicKeyInfo) {
               let announcement = tokenPublicKeyInfo.announcement;
 
