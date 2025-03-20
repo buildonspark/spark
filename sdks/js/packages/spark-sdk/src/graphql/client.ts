@@ -278,6 +278,10 @@ export default class SspClient {
         request_id: id,
       },
       constructObject: (response: { user_request: any }) => {
+        if (!response.user_request) {
+          return null;
+        }
+
         return LightningReceiveRequestFromJson(response.user_request);
       },
     });
@@ -292,6 +296,10 @@ export default class SspClient {
         request_id: id,
       },
       constructObject: (response: { user_request: any }) => {
+        if (!response.user_request) {
+          return null;
+        }
+
         return LightningSendRequestFromJson(response.user_request);
       },
     });
@@ -304,6 +312,10 @@ export default class SspClient {
         request_id: id,
       },
       constructObject: (response: { user_request: any }) => {
+        if (!response.user_request) {
+          return null;
+        }
+
         return LeavesSwapRequestFromJson(response.user_request);
       },
     });
@@ -316,6 +328,10 @@ export default class SspClient {
         request_id: id,
       },
       constructObject: (response: { user_request: any }) => {
+        if (!response.user_request) {
+          return null;
+        }
+
         return CoopExitRequestFromJson(response.user_request);
       },
     });
