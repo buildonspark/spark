@@ -66,6 +66,20 @@
           "response": []
         },
         {
+          "name": "Get Held Tokens Info",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "localhost:4000/spark-wallet/tokens/info",
+              "host": ["localhost"],
+              "port": "4000",
+              "path": ["spark-wallet", "tokens", "info"]
+            }
+          },
+          "response": []
+        },
+        {
           "name": "Get Transfers",
           "request": {
             "method": "GET",
@@ -375,6 +389,9 @@
         },
         {
           "name": "Get Coop Exit Fee Estimate",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
           "request": {
             "method": "GET",
             "header": [],
@@ -556,6 +573,20 @@
               "host": ["localhost"],
               "port": "4000",
               "path": ["issuer-wallet", "wallet", "spark-address"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Held Tokens Info",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "localhost:4000/issuer-wallet/tokens/info",
+              "host": ["localhost"],
+              "port": "4000",
+              "path": ["issuer-wallet", "tokens", "info"]
             }
           },
           "response": []

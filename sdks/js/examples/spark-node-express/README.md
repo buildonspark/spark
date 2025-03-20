@@ -121,6 +121,17 @@ GET /issuer-wallet/wallet/balance
 
 ---
 
+### Get Token Info
+
+Returns the token information for all tokens held in this wallet.
+
+```http
+GET /spark-wallet/tokens/info
+GET /issuer-wallet/tokens/info
+```
+
+---
+
 ### Get Transfer History
 
 Returns a list of transfers.
