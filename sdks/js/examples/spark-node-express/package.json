@@ -1,6 +1,6 @@
 {
   "name": "spark-node-express",
-  "version": "0.0.8",
+  "version": "0.0.9",
   "main": "dist/index.js",
   "type": "module",
   "private": true,
@@ -13,8 +13,8 @@
   "author": "",
   "description": "basic express server consuming the @buildonspark/spark-sdk and @buildonspark/issuer-sdk",
   "dependencies": {
-    "@buildonspark/issuer-sdk": "^0.0.21",
-    "@buildonspark/spark-sdk": "^0.0.21",
+    "@buildonspark/issuer-sdk": "^0.0.22",
+    "@buildonspark/spark-sdk": "^0.0.22",
     "@lightsparkdev/core": "^1.2.7",
     "@noble/curves": "^1.8.0",
     "express": "^4.21.2"
