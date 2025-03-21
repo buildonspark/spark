@@ -124,6 +124,7 @@ interface SparkSigner {
   }>;
 
   getDepositSigningKey(): Promise<Uint8Array>;
+  getMasterPublicKey(): Promise<Uint8Array>;
 }
 
 class DefaultSparkSigner implements SparkSigner {
@@ -526,6 +527,14 @@ class DefaultSparkSigner implements SparkSigner {
       adaptorSignature: signature,
       adaptorPublicKey: adaptorPublicKey,
     };
+  }
+
+  async getMasterPublicKey(): Promise<Uint8Array> {
+    if (!this.masterKey?.publicKey) {
+      throw new Error("Private key is not set");
+    }
+
+    return this.masterKey.publicKey;
   }
 }
 export { DefaultSparkSigner };

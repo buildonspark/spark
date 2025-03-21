@@ -83,6 +83,21 @@ export function getP2TRAddressFromPkScript(
   return btc.Address(getNetwork(network)).encode(parsedScript);
 }
 
+export function getP2WPKHAddressFromPublicKey(
+  pubKey: Uint8Array,
+  network: Network,
+): string {
+  if (pubKey.length !== 33) {
+    throw new Error("Public key must be 33 bytes");
+  }
+
+  const address = btc.p2wpkh(pubKey, getNetwork(network)).address;
+  if (!address) {
+    throw new Error("Failed to get P2WPKH address");
+  }
+  return address;
+}
+
 export function getTxFromRawTxHex(rawTxHex: string): btc.Transaction {
   const txBytes = hexToBytes(rawTxHex);
   const tx = btc.Transaction.fromRaw(txBytes, {

@@ -58,6 +58,7 @@ import {
 } from "./utils/adaptor-signature.js";
 import {
   computeTaprootKeyNoScript,
+  getP2WPKHAddressFromPublicKey,
   getSigHashFromTx,
   getTxFromRawTxBytes,
   getTxFromRawTxHex,
@@ -1710,11 +1711,11 @@ export class SparkWallet {
     return response.tokenTransactionsWithStatus;
   }
 
-  public getTokenL1Address(): string {
-    if (!this.lrc20Wallet) {
-      throw new Error("L1 Wallet not initialized");
-    }
-    return this.lrc20Wallet.p2wpkhAddress;
+  public async getTokenL1Address(): Promise<string> {
+    return getP2WPKHAddressFromPublicKey(
+      await this.config.signer.getMasterPublicKey(),
+      this.config.getNetwork(),
+    );
   }
 
   /**

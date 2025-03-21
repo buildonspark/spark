@@ -83,7 +83,7 @@ export interface IssuerWalletInterface {
   unfreezeTokens(
     ownerPublicKey: string,
   ): Promise<{ impactedLeafIds: string[]; impactedTokenAmount: bigint }>;
-  getTokenL1Address(): string;
+  getTokenL1Address(): Promise<string>;
   announceTokenL1(params: {
     lrc20Wallet: LRCWallet;
     tokenName: string;
