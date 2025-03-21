@@ -47,11 +47,7 @@ describe("token integration test", () => {
 
     // Faucet funds to the Issuer wallet because announcing a token
     // requires ownership of an L1 UTXO.
-    const faucet = new BitcoinFaucet(
-      "http://127.0.0.1:8332",
-      "testutil",
-      "testutilpassword",
-    );
+    const faucet = new BitcoinFaucet();
     const l1WalletPubKey = await wallet.getIdentityPublicKey();
     await faucet.sendFaucetCoinToP2WPKHAddress(hexToBytes(l1WalletPubKey));
     await faucet.mineBlocks(6);
@@ -68,7 +64,6 @@ describe("token integration test", () => {
       });
       console.warn("Announce token response: " + response);
     } catch (error: any) {
-      // Check that the error has the expected name
       fail(
         "Expected announceTokenL1() to succeed with fauceted funds: " + error,
       );
@@ -112,11 +107,7 @@ describe("token integration test", () => {
 
     // Faucet funds to the Issuer wallet because announcing a token
     // requires ownership of an L1 UTXO.
-    const faucet = new BitcoinFaucet(
-      "http://127.0.0.1:8332",
-      "testutil",
-      "testutilpassword",
-    );
+    const faucet = new BitcoinFaucet();
     const l1WalletPubKey = await wallet.getIdentityPublicKey();
     await faucet.sendFaucetCoinToP2WPKHAddress(hexToBytes(l1WalletPubKey));
     await faucet.mineBlocks(6);

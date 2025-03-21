@@ -31,11 +31,7 @@ describe("deposit", () => {
   testFn(
     "should create a tree root",
     async () => {
-      const faucet = new BitcoinFaucet(
-        "http://127.0.0.1:18443",
-        "admin1",
-        "123",
-      );
+      const faucet = new BitcoinFaucet();
 
       const coin = await faucet.fund();
 

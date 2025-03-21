@@ -33,7 +33,7 @@
     "lint": "eslint .",
     "package-types": "yarn attw --pack .",
     "postversion": "yarn build",
-    "test-cmd": "node --experimental-vm-modules $(yarn bin jest) --no-cache --runInBand --bail",
+    "test-cmd": "node --experimental-vm-modules $(yarn bin jest) --no-cache --runInBand",
     "test": "echo \"Error: no tests yet\"",
     "test:integration": "yarn test-cmd src/tests/integration/*.test.ts",
     "types:watch": "tsc-absolute --watch",

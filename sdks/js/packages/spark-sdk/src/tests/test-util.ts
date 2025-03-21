@@ -1,5 +1,6 @@
 import { secp256k1 } from "@noble/curves/secp256k1";
 import { Address, OutScript, Transaction } from "@scure/btc-signer";
+import fs from "fs";
 import { TreeNode } from "../proto/spark.js";
 import { WalletConfigService } from "../services/config.js";
 import { ConnectionManager } from "../services/connection.js";
@@ -12,6 +13,18 @@ import { getP2TRAddressFromPublicKey } from "../utils/bitcoin.js";
 import { getNetwork, Network } from "../utils/network.js";
 import { SparkWalletTesting } from "./utils/spark-testing-wallet.js";
 import { BitcoinFaucet } from "./utils/test-faucet.js";
+
+/**
+ * Checks if the current environment is a hermetic test environment.
+ * A hermetic test environment is identified by either:
+ * 1. The existence of a marker file at /tmp/spark_hermetic
+ * 2. The HERMETIC_TEST environment variable being set to "true"
+ *
+ * @returns {boolean} True if running in a hermetic test environment, false otherwise
+ */
+export function isHermeticTest(): boolean {
+  return fs.existsSync("/tmp/spark_hermetic") || process.env.HERMETIC_TEST === "true";
+}
 
 export function getTestWalletConfig() {
   const identityPrivateKey = secp256k1.utils.randomPrivateKey();

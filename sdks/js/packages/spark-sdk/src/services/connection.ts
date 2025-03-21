@@ -115,10 +115,10 @@ export class ConnectionManager {
     return client;
   }
 
-  private async authenticate(address: string) {
+  private async authenticate(address: string, certPath?: string) {
     try {
       const identityPublicKey = await this.config.signer.getIdentityPublicKey();
-      const sparkAuthnClient = this.createSparkAuthnGrpcConnection(address);
+      const sparkAuthnClient = this.createSparkAuthnGrpcConnection(address, certPath);
 
       const challengeResp = await sparkAuthnClient.get_challenge({
         publicKey: identityPublicKey,
@@ -176,7 +176,7 @@ export class ConnectionManager {
       options: SparkCallOptions,
     ) {
       try {
-        yield* call.next(call.request, {
+        return yield* call.next(call.request, {
           ...options,
           metadata: Metadata(options.metadata).set(
             "Authorization",
@@ -189,7 +189,7 @@ export class ConnectionManager {
           // @ts-ignore - We can only get here if the client exists
           this.clients.get(address).authToken = newAuthToken;
 
-          yield* call.next(call.request, {
+          return yield* call.next(call.request, {
             ...options,
             metadata: Metadata(options.metadata).set(
               "Authorization",
@@ -245,9 +245,9 @@ export class ConnectionManager {
     channel: Channel,
     middleware?: any,
   ): T & { close?: () => void } {
-    const clientFactory = createClientFactory().use(retryMiddleware);
+    let clientFactory = createClientFactory().use(retryMiddleware);
     if (middleware) {
-      clientFactory.use(middleware);
+      clientFactory = clientFactory.use(middleware);
     }
 
     const client = clientFactory.create(defintion, channel, {

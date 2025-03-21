@@ -1,5 +1,7 @@
+
 import { hexToBytes } from "@noble/curves/abstract/utils";
 import { NetworkType } from "../utils/network.js";
+import { isHermeticTest } from "../tests/test-util.js";
 
 export type SigningOperator = {
   readonly id: number;
@@ -30,12 +32,17 @@ const PROD_PUBKEYS = [
   "022eda13465a59205413086130a65dc0ed1b8f8e51937043161f8be0c369b1a410",
 ];
 
+
+function getLocalFrostSignerAddress(): string {
+  return isHermeticTest() ? "localhost:9999" : "unix:///tmp/frost_0.sock";
+}
+
 const BASE_CONFIG: Required<ConfigOptions> = {
   network: "LOCAL",
   lrc20Address: "http://127.0.0.1:18530",
   coodinatorIdentifier:
     "0000000000000000000000000000000000000000000000000000000000000001",
-  frostSignerAddress: "unix:///tmp/frost_0.sock",
+  frostSignerAddress: getLocalFrostSignerAddress(),
   threshold: 2,
   signingOperators: getLocalSigningOperators(),
   useTokenTransactionSchnorrSignatures: true,

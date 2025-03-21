@@ -1,14 +1,17 @@
-import crypto from "crypto";
+import nodeCrypto from "crypto";
 
 export const getCrypto = (): Crypto => {
-  // Browser environment
-  if (typeof window !== "undefined" && window.crypto) {
-    return window.crypto;
+  let cryptoImpl: any = typeof window !== "undefined" ? window.crypto :
+                        typeof global !== "undefined" ? global.crypto :
+                        nodeCrypto;
+
+  // Add randomUUID if it doesn't exist
+  if (!cryptoImpl.randomUUID && nodeCrypto.randomUUID) {
+    cryptoImpl = {
+      ...cryptoImpl,
+      randomUUID: nodeCrypto.randomUUID
+    };
   }
-  // Node.js environment
-  if (typeof global !== "undefined" && global.crypto) {
-    return global.crypto;
-  }
-  // Node.js environment without global.crypto (older versions)
-  return crypto as Crypto;
+
+  return cryptoImpl as Crypto;
 };

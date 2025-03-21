@@ -26,11 +26,7 @@ describe("coop exit", () => {
   testFn(
     "test coop exit",
     async () => {
-      const faucet = new BitcoinFaucet(
-        "http://127.0.0.1:18443",
-        "admin1",
-        "123",
-      );
+      const faucet = new BitcoinFaucet();
 
       const faucetCoin = await faucet.fund();
 

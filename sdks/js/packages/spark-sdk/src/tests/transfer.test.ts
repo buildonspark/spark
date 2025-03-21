@@ -21,11 +21,7 @@ describe("Transfer", () => {
   testFn(
     "test transfer",
     async () => {
-      const faucet = new BitcoinFaucet(
-        "http://127.0.0.1:18443",
-        "admin1",
-        "123",
-      );
+      const faucet = new BitcoinFaucet();
 
       const options: ConfigOptions = {
         network: "LOCAL",
@@ -140,7 +136,7 @@ describe("Transfer", () => {
   );
 
   testFn("test transfer with separate", async () => {
-    const faucet = new BitcoinFaucet("http://127.0.0.1:18443", "admin1", "123");
+    const faucet = new BitcoinFaucet();
 
     const options: ConfigOptions = {
       network: "LOCAL",
@@ -269,7 +265,7 @@ describe("Transfer", () => {
   });
 
   testFn("cancel transfer", async () => {
-    const faucet = new BitcoinFaucet("http://127.0.0.1:18443", "admin1", "123");
+    const faucet = new BitcoinFaucet();
 
     const options: ConfigOptions = {
       network: "LOCAL",

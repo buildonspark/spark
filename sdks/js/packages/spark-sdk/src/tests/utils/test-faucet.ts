@@ -26,9 +26,9 @@ export class BitcoinFaucet {
   private static instance: BitcoinFaucet | null = null;
 
   constructor(
-    private url: string,
-    private username: string,
-    private password: string,
+    private url: string = "http://127.0.0.1:8332",
+    private username: string = "testutil",
+    private password: string = "testutilpassword",
   ) {
     if (BitcoinFaucet.instance) {
       return BitcoinFaucet.instance;
@@ -84,10 +84,9 @@ export class BitcoinFaucet {
     const splitTx = new Transaction();
     splitTx.addInput(fundingOutpoint);
     let initialValue = fundingTx.getOutput(0)!.amount!;
-    const coinAmount = 10_000_000n;
     const coinKeys: Uint8Array[] = [];
 
-    while (initialValue > coinAmount + 100_000n) {
+    while (initialValue > COIN_AMOUNT + 100_000n) {
       const coinKey = secp256k1.utils.randomPrivateKey();
       const coinPubKey = secp256k1.getPublicKey(coinKey);
       coinKeys.push(coinKey);
@@ -95,9 +94,9 @@ export class BitcoinFaucet {
       const script = getP2TRScriptFromPublicKey(coinPubKey, Network.LOCAL);
       splitTx.addOutput({
         script,
-        amount: coinAmount,
+        amount: COIN_AMOUNT,
       });
-      initialValue -= coinAmount;
+      initialValue -= COIN_AMOUNT;
     }
     // Sign and broadcast
     const signedSplitTx = await this.signFaucetCoin(

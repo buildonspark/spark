@@ -88,7 +88,7 @@
     "lint:watch": "esw ./src -w --ext .ts,.tsx,.js --color",
     "lint": "eslint .",
     "postversion": "yarn build",
-    "test-cmd": "node --experimental-vm-modules $(yarn bin jest) --no-cache --runInBand --bail",
+    "test-cmd": "node --experimental-vm-modules $(yarn bin jest) --no-cache --runInBand",
     "test": "yarn test-cmd src/tests/*.test.ts",
     "test:integration": "yarn test-cmd src/tests/integration/*.test.ts",
     "types:watch": "tsc-absolute --watch",
