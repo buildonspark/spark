@@ -23,7 +23,10 @@ import { BitcoinFaucet } from "./utils/test-faucet.js";
  * @returns {boolean} True if running in a hermetic test environment, false otherwise
  */
 export function isHermeticTest(): boolean {
-  return fs.existsSync("/tmp/spark_hermetic") || process.env.HERMETIC_TEST === "true";
+  return (
+    (fs?.existsSync?.("/tmp/spark_hermetic") ?? false) ||
+    process.env.HERMETIC_TEST === "true"
+  );
 }
 
 export function getTestWalletConfig() {

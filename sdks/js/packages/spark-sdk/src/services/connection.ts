@@ -61,7 +61,7 @@ export class ConnectionManager {
         if (certPath) {
           try {
             // Dynamic import for Node.js only
-            const fs = require('fs');
+            const fs = require("fs");
             const cert = fs.readFileSync(certPath);
             return createChannel(address, ChannelCredentials.createSsl(cert));
           } catch (error) {
@@ -71,7 +71,7 @@ export class ConnectionManager {
               address,
               ChannelCredentials.createSsl(null, null, null, {
                 rejectUnauthorized: false,
-              })
+              }),
             );
           }
         } else {
@@ -80,7 +80,7 @@ export class ConnectionManager {
             address,
             ChannelCredentials.createSsl(null, null, null, {
               rejectUnauthorized: false,
-            })
+            }),
           );
         }
       } else {
@@ -118,7 +118,10 @@ export class ConnectionManager {
   private async authenticate(address: string, certPath?: string) {
     try {
       const identityPublicKey = await this.config.signer.getIdentityPublicKey();
-      const sparkAuthnClient = this.createSparkAuthnGrpcConnection(address, certPath);
+      const sparkAuthnClient = this.createSparkAuthnGrpcConnection(
+        address,
+        certPath,
+      );
 
       const challengeResp = await sparkAuthnClient.get_challenge({
         publicKey: identityPublicKey,
@@ -209,7 +212,7 @@ export class ConnectionManager {
       options: SparkCallOptions,
     ) {
       try {
-        yield* call.next(call.request, {
+        return yield* call.next(call.request, {
           ...options,
           metadata: Metadata(options.metadata)
             .set(
@@ -226,7 +229,7 @@ export class ConnectionManager {
           // @ts-ignore - We can only get here if the client exists
           this.clients.get(address).authToken = newAuthToken;
 
-          yield* call.next(call.request, {
+          return yield* call.next(call.request, {
             ...options,
             metadata: Metadata(options.metadata)
               .set("Authorization", `Bearer ${newAuthToken}`)
