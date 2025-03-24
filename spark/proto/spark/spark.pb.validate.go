@@ -2345,6 +2345,8 @@ func (m *TokenTransaction) validate(all bool) error {
 
 	}
 
+	// no validation rules for Network
+
 	switch v := m.TokenInput.(type) {
 	case *TokenTransaction_MintInput:
 		if v == nil {

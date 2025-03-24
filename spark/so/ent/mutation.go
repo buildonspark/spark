@@ -5650,6 +5650,7 @@ type TokenLeafMutation struct {
 	addleaf_spent_transaction_input_vout             *int32
 	leaf_spent_revocation_private_key                *[]byte
 	confirmed_withdraw_block_hash                    *[]byte
+	network                                          *schema.Network
 	clearedFields                                    map[string]struct{}
 	revocation_keyshare                              *uuid.UUID
 	clearedrevocation_keyshare                       bool
@@ -6452,6 +6453,55 @@ func (m *TokenLeafMutation) ResetConfirmedWithdrawBlockHash() {
 	delete(m.clearedFields, tokenleaf.FieldConfirmedWithdrawBlockHash)
 }
 
+// SetNetwork sets the "network" field.
+func (m *TokenLeafMutation) SetNetwork(s schema.Network) {
+	m.network = &s
+}
+
+// Network returns the value of the "network" field in the mutation.
+func (m *TokenLeafMutation) Network() (r schema.Network, exists bool) {
+	v := m.network
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldNetwork returns the old "network" field's value of the TokenLeaf entity.
+// If the TokenLeaf object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenLeafMutation) OldNetwork(ctx context.Context) (v schema.Network, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldNetwork is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldNetwork requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldNetwork: %w", err)
+	}
+	return oldValue.Network, nil
+}
+
+// ClearNetwork clears the value of the "network" field.
+func (m *TokenLeafMutation) ClearNetwork() {
+	m.network = nil
+	m.clearedFields[tokenleaf.FieldNetwork] = struct{}{}
+}
+
+// NetworkCleared returns if the "network" field was cleared in this mutation.
+func (m *TokenLeafMutation) NetworkCleared() bool {
+	_, ok := m.clearedFields[tokenleaf.FieldNetwork]
+	return ok
+}
+
+// ResetNetwork resets all changes to the "network" field.
+func (m *TokenLeafMutation) ResetNetwork() {
+	m.network = nil
+	delete(m.clearedFields, tokenleaf.FieldNetwork)
+}
+
 // SetRevocationKeyshareID sets the "revocation_keyshare" edge to the SigningKeyshare entity by id.
 func (m *TokenLeafMutation) SetRevocationKeyshareID(id uuid.UUID) {
 	m.revocation_keyshare = &id
@@ -6603,7 +6653,7 @@ func (m *TokenLeafMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *TokenLeafMutation) Fields() []string {
-	fields := make([]string, 0, 15)
+	fields := make([]string, 0, 16)
 	if m.create_time != nil {
 		fields = append(fields, tokenleaf.FieldCreateTime)
 	}
@@ -6649,6 +6699,9 @@ func (m *TokenLeafMutation) Fields() []string {
 	if m.confirmed_withdraw_block_hash != nil {
 		fields = append(fields, tokenleaf.FieldConfirmedWithdrawBlockHash)
 	}
+	if m.network != nil {
+		fields = append(fields, tokenleaf.FieldNetwork)
+	}
 	return fields
 }
 
@@ -6687,6 +6740,8 @@ func (m *TokenLeafMutation) Field(name string) (ent.Value, bool) {
 		return m.LeafSpentRevocationPrivateKey()
 	case tokenleaf.FieldConfirmedWithdrawBlockHash:
 		return m.ConfirmedWithdrawBlockHash()
+	case tokenleaf.FieldNetwork:
+		return m.Network()
 	}
 	return nil, false
 }
@@ -6726,6 +6781,8 @@ func (m *TokenLeafMutation) OldField(ctx context.Context, name string) (ent.Valu
 		return m.OldLeafSpentRevocationPrivateKey(ctx)
 	case tokenleaf.FieldConfirmedWithdrawBlockHash:
 		return m.OldConfirmedWithdrawBlockHash(ctx)
+	case tokenleaf.FieldNetwork:
+		return m.OldNetwork(ctx)
 	}
 	return nil, fmt.Errorf("unknown TokenLeaf field %s", name)
 }
@@ -6840,6 +6897,13 @@ func (m *TokenLeafMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetConfirmedWithdrawBlockHash(v)
 		return nil
+	case tokenleaf.FieldNetwork:
+		v, ok := value.(schema.Network)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetNetwork(v)
+		return nil
 	}
 	return fmt.Errorf("unknown TokenLeaf field %s", name)
 }
@@ -6936,6 +7000,9 @@ func (m *TokenLeafMutation) ClearedFields() []string {
 	if m.FieldCleared(tokenleaf.FieldConfirmedWithdrawBlockHash) {
 		fields = append(fields, tokenleaf.FieldConfirmedWithdrawBlockHash)
 	}
+	if m.FieldCleared(tokenleaf.FieldNetwork) {
+		fields = append(fields, tokenleaf.FieldNetwork)
+	}
 	return fields
 }
 
@@ -6964,6 +7031,9 @@ func (m *TokenLeafMutation) ClearField(name string) error {
 		return nil
 	case tokenleaf.FieldConfirmedWithdrawBlockHash:
 		m.ClearConfirmedWithdrawBlockHash()
+		return nil
+	case tokenleaf.FieldNetwork:
+		m.ClearNetwork()
 		return nil
 	}
 	return fmt.Errorf("unknown TokenLeaf nullable field %s", name)
@@ -7017,6 +7087,9 @@ func (m *TokenLeafMutation) ResetField(name string) error {
 		return nil
 	case tokenleaf.FieldConfirmedWithdrawBlockHash:
 		m.ResetConfirmedWithdrawBlockHash()
+		return nil
+	case tokenleaf.FieldNetwork:
+		m.ResetNetwork()
 		return nil
 	}
 	return fmt.Errorf("unknown TokenLeaf field %s", name)

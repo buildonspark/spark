@@ -82,11 +82,17 @@ func CreateStartedTransactionEntities(
 		}
 
 		for leafIndex, leafToSpendEnt := range leafToSpendEnts {
+			var network schema.Network
+			err := network.UnmarshalProto(tokenTransaction.Network)
+			if err != nil {
+				return nil, err
+			}
 			_, err = db.TokenLeaf.UpdateOne(leafToSpendEnt).
 				SetStatus(schema.TokenLeafStatusSpentStarted).
 				SetLeafSpentTokenTransactionReceiptID(tokenTransactionReceipt.ID).
 				SetLeafSpentOwnershipSignature(ownershipSignatures[leafIndex]).
 				SetLeafSpentTransactionInputVout(int32(leafIndex)).
+				SetNetwork(network).
 				Save(ctx)
 			if err != nil {
 				log.Printf("Failed to update leaf to spent: %v", err)

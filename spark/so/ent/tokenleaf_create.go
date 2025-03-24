@@ -138,6 +138,20 @@ func (tlc *TokenLeafCreate) SetConfirmedWithdrawBlockHash(b []byte) *TokenLeafCr
 	return tlc
 }
 
+// SetNetwork sets the "network" field.
+func (tlc *TokenLeafCreate) SetNetwork(s schema.Network) *TokenLeafCreate {
+	tlc.mutation.SetNetwork(s)
+	return tlc
+}
+
+// SetNillableNetwork sets the "network" field if the given value is not nil.
+func (tlc *TokenLeafCreate) SetNillableNetwork(s *schema.Network) *TokenLeafCreate {
+	if s != nil {
+		tlc.SetNetwork(*s)
+	}
+	return tlc
+}
+
 // SetID sets the "id" field.
 func (tlc *TokenLeafCreate) SetID(u uuid.UUID) *TokenLeafCreate {
 	tlc.mutation.SetID(u)
@@ -302,6 +316,11 @@ func (tlc *TokenLeafCreate) check() error {
 	if _, ok := tlc.mutation.LeafCreatedTransactionOutputVout(); !ok {
 		return &ValidationError{Name: "leaf_created_transaction_output_vout", err: errors.New(`ent: missing required field "TokenLeaf.leaf_created_transaction_output_vout"`)}
 	}
+	if v, ok := tlc.mutation.Network(); ok {
+		if err := tokenleaf.NetworkValidator(v); err != nil {
+			return &ValidationError{Name: "network", err: fmt.Errorf(`ent: validator failed for field "TokenLeaf.network": %w`, err)}
+		}
+	}
 	if len(tlc.mutation.RevocationKeyshareIDs()) == 0 {
 		return &ValidationError{Name: "revocation_keyshare", err: errors.New(`ent: missing required edge "TokenLeaf.revocation_keyshare"`)}
 	}
@@ -399,6 +418,10 @@ func (tlc *TokenLeafCreate) createSpec() (*TokenLeaf, *sqlgraph.CreateSpec) {
 	if value, ok := tlc.mutation.ConfirmedWithdrawBlockHash(); ok {
 		_spec.SetField(tokenleaf.FieldConfirmedWithdrawBlockHash, field.TypeBytes, value)
 		_node.ConfirmedWithdrawBlockHash = value
+	}
+	if value, ok := tlc.mutation.Network(); ok {
+		_spec.SetField(tokenleaf.FieldNetwork, field.TypeEnum, value)
+		_node.Network = value
 	}
 	if nodes := tlc.mutation.RevocationKeyshareIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{

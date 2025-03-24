@@ -767,6 +767,46 @@ func ConfirmedWithdrawBlockHashNotNil() predicate.TokenLeaf {
 	return predicate.TokenLeaf(sql.FieldNotNull(FieldConfirmedWithdrawBlockHash))
 }
 
+// NetworkEQ applies the EQ predicate on the "network" field.
+func NetworkEQ(v schema.Network) predicate.TokenLeaf {
+	vc := v
+	return predicate.TokenLeaf(sql.FieldEQ(FieldNetwork, vc))
+}
+
+// NetworkNEQ applies the NEQ predicate on the "network" field.
+func NetworkNEQ(v schema.Network) predicate.TokenLeaf {
+	vc := v
+	return predicate.TokenLeaf(sql.FieldNEQ(FieldNetwork, vc))
+}
+
+// NetworkIn applies the In predicate on the "network" field.
+func NetworkIn(vs ...schema.Network) predicate.TokenLeaf {
+	v := make([]any, len(vs))
+	for i := range v {
+		v[i] = vs[i]
+	}
+	return predicate.TokenLeaf(sql.FieldIn(FieldNetwork, v...))
+}
+
+// NetworkNotIn applies the NotIn predicate on the "network" field.
+func NetworkNotIn(vs ...schema.Network) predicate.TokenLeaf {
+	v := make([]any, len(vs))
+	for i := range v {
+		v[i] = vs[i]
+	}
+	return predicate.TokenLeaf(sql.FieldNotIn(FieldNetwork, v...))
+}
+
+// NetworkIsNil applies the IsNil predicate on the "network" field.
+func NetworkIsNil() predicate.TokenLeaf {
+	return predicate.TokenLeaf(sql.FieldIsNull(FieldNetwork))
+}
+
+// NetworkNotNil applies the NotNil predicate on the "network" field.
+func NetworkNotNil() predicate.TokenLeaf {
+	return predicate.TokenLeaf(sql.FieldNotNull(FieldNetwork))
+}
+
 // HasRevocationKeyshare applies the HasEdge predicate on the "revocation_keyshare" edge.
 func HasRevocationKeyshare() predicate.TokenLeaf {
 	return predicate.TokenLeaf(func(s *sql.Selector) {

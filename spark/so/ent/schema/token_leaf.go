@@ -75,6 +75,7 @@ func (TokenLeaf) Fields() []ent.Field {
 		field.Int32("leaf_spent_transaction_input_vout").Optional(),
 		field.Bytes("leaf_spent_revocation_private_key").Optional(),
 		field.Bytes("confirmed_withdraw_block_hash").Optional(),
+		field.Enum("network").GoType(Network("")).Optional(),
 	}
 }
 

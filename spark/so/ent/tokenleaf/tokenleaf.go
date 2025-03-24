@@ -47,6 +47,8 @@ const (
 	FieldLeafSpentRevocationPrivateKey = "leaf_spent_revocation_private_key"
 	// FieldConfirmedWithdrawBlockHash holds the string denoting the confirmed_withdraw_block_hash field in the database.
 	FieldConfirmedWithdrawBlockHash = "confirmed_withdraw_block_hash"
+	// FieldNetwork holds the string denoting the network field in the database.
+	FieldNetwork = "network"
 	// EdgeRevocationKeyshare holds the string denoting the revocation_keyshare edge name in mutations.
 	EdgeRevocationKeyshare = "revocation_keyshare"
 	// EdgeLeafCreatedTokenTransactionReceipt holds the string denoting the leaf_created_token_transaction_receipt edge name in mutations.
@@ -96,6 +98,7 @@ var Columns = []string{
 	FieldLeafSpentTransactionInputVout,
 	FieldLeafSpentRevocationPrivateKey,
 	FieldConfirmedWithdrawBlockHash,
+	FieldNetwork,
 }
 
 // ForeignKeys holds the SQL foreign-keys that are owned by the "token_leafs"
@@ -148,6 +151,16 @@ func StatusValidator(s schema.TokenLeafStatus) error {
 	}
 }
 
+// NetworkValidator is a validator for the "network" field enum values. It is called by the builders before save.
+func NetworkValidator(n schema.Network) error {
+	switch n {
+	case "MAINNET", "REGTEST", "TESTNET", "SIGNET":
+		return nil
+	default:
+		return fmt.Errorf("tokenleaf: invalid enum value for network field: %q", n)
+	}
+}
+
 // OrderOption defines the ordering options for the TokenLeaf queries.
 type OrderOption func(*sql.Selector)
 
@@ -189,6 +202,11 @@ func ByLeafCreatedTransactionOutputVout(opts ...sql.OrderTermOption) OrderOption
 // ByLeafSpentTransactionInputVout orders the results by the leaf_spent_transaction_input_vout field.
 func ByLeafSpentTransactionInputVout(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldLeafSpentTransactionInputVout, opts...).ToFunc()
+}
+
+// ByNetwork orders the results by the network field.
+func ByNetwork(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldNetwork, opts...).ToFunc()
 }
 
 // ByRevocationKeyshareField orders the results by revocation_keyshare field.

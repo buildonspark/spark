@@ -67,7 +67,7 @@ func (h *InternalTokenTransactionHandler) StartTokenTransactionInternal(ctx cont
 
 	logger.Info("Validating final token transaction")
 	// Validate the final token transaction.
-	err = validateFinalTokenTransaction(config, req.FinalTokenTransaction, req.TokenTransactionSignatures, expectedRevocationPublicKeys)
+	err = validateFinalTokenTransaction(ctx, config, req.FinalTokenTransaction, req.TokenTransactionSignatures, expectedRevocationPublicKeys)
 	if err != nil {
 		return nil, fmt.Errorf("invalid final token transaction: %w", err)
 	}
@@ -91,7 +91,7 @@ func (h *InternalTokenTransactionHandler) StartTokenTransactionInternal(ctx cont
 			return nil, fmt.Errorf("failed to fetch all leaves to spend: got %d leaves, expected %d", len(leafToSpendEnts), len(req.FinalTokenTransaction.GetTransferInput().GetLeavesToSpend()))
 		}
 
-		err = ValidateTransferSignaturesUsingPreviousTransactionData(req.FinalTokenTransaction, req.TokenTransactionSignatures, leafToSpendEnts)
+		err = ValidateTokenTransactionUsingPreviousTransactionData(req.FinalTokenTransaction, req.TokenTransactionSignatures, leafToSpendEnts)
 		if err != nil {
 			return nil, fmt.Errorf("error validating transfer using previous leaf data: %w", err)
 		}
@@ -136,7 +136,7 @@ func ValidateMintSignature(
 	return nil
 }
 
-func ValidateTransferSignaturesUsingPreviousTransactionData(
+func ValidateTokenTransactionUsingPreviousTransactionData(
 	tokenTransaction *pb.TokenTransaction,
 	tokenTransactionSignatures *pb.TokenTransactionSignatures,
 	leafToSpendEnts []*ent.TokenLeaf,
@@ -156,6 +156,17 @@ func ValidateTransferSignaturesUsingPreviousTransactionData(
 	for i, leafEnt := range leafToSpendEnts {
 		if !bytes.Equal(leafEnt.TokenPublicKey, expectedTokenPubKey) {
 			return fmt.Errorf("token public key mismatch for leaf %d - input leaves must be for the same token public key as the output", i)
+		}
+
+		// TODO(DL-104): For now we allow the network to be nil to support old leaves. In the future we should require it to be set.
+		if leafEnt.Network != schema.Network("") {
+			entNetwork, err := leafEnt.Network.MarshalProto()
+			if err != nil {
+				return fmt.Errorf("failed to marshal network: %w", err)
+			}
+			if entNetwork != tokenTransaction.Network {
+				return fmt.Errorf("network mismatch for leaf %d - input leaves network must match the network of the transaction (leaf.network = %d; tx.network = %d)", i, entNetwork, tokenTransaction.Network)
+			}
 		}
 	}
 
@@ -225,16 +236,23 @@ func isValidLeafStatus(status schema.TokenLeafStatus) bool {
 }
 
 func validateFinalTokenTransaction(
+	ctx context.Context,
 	config *so.Config,
 	tokenTransaction *pb.TokenTransaction,
 	tokenTransactionSignatures *pb.TokenTransactionSignatures,
 	expectedRevocationPublicKeys [][]byte,
 ) error {
-	expectedBondSats := config.Lrc20Configs[common.Regtest.String()].WithdrawBondSats
-	expectedRelativeBlockLocktime := config.Lrc20Configs[common.Regtest.String()].WithdrawRelativeBlockLocktime
+	logger := helper.GetLoggerFromContext(ctx)
+	network, err := common.NetworkFromProtoNetwork(tokenTransaction.Network)
+	if err != nil {
+		logger.Error("Failed to get network from proto network", "error", err)
+		return err
+	}
+	expectedBondSats := config.Lrc20Configs[network.String()].WithdrawBondSats
+	expectedRelativeBlockLocktime := config.Lrc20Configs[network.String()].WithdrawRelativeBlockLocktime
 	sparkOperatorsFromConfig := config.GetSigningOperatorList()
 	// Repeat same validations as for the partial token transaction.
-	err := utils.ValidatePartialTokenTransaction(tokenTransaction, tokenTransactionSignatures, sparkOperatorsFromConfig)
+	err = utils.ValidatePartialTokenTransaction(tokenTransaction, tokenTransactionSignatures, sparkOperatorsFromConfig, config.SupportedNetworks)
 	if err != nil {
 		return fmt.Errorf("failed to validate final token transaction: %w", err)
 	}

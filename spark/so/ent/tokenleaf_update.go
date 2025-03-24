@@ -126,6 +126,26 @@ func (tlu *TokenLeafUpdate) ClearConfirmedWithdrawBlockHash() *TokenLeafUpdate {
 	return tlu
 }
 
+// SetNetwork sets the "network" field.
+func (tlu *TokenLeafUpdate) SetNetwork(s schema.Network) *TokenLeafUpdate {
+	tlu.mutation.SetNetwork(s)
+	return tlu
+}
+
+// SetNillableNetwork sets the "network" field if the given value is not nil.
+func (tlu *TokenLeafUpdate) SetNillableNetwork(s *schema.Network) *TokenLeafUpdate {
+	if s != nil {
+		tlu.SetNetwork(*s)
+	}
+	return tlu
+}
+
+// ClearNetwork clears the value of the "network" field.
+func (tlu *TokenLeafUpdate) ClearNetwork() *TokenLeafUpdate {
+	tlu.mutation.ClearNetwork()
+	return tlu
+}
+
 // SetLeafCreatedTokenTransactionReceiptID sets the "leaf_created_token_transaction_receipt" edge to the TokenTransactionReceipt entity by ID.
 func (tlu *TokenLeafUpdate) SetLeafCreatedTokenTransactionReceiptID(id uuid.UUID) *TokenLeafUpdate {
 	tlu.mutation.SetLeafCreatedTokenTransactionReceiptID(id)
@@ -224,6 +244,11 @@ func (tlu *TokenLeafUpdate) check() error {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "TokenLeaf.status": %w`, err)}
 		}
 	}
+	if v, ok := tlu.mutation.Network(); ok {
+		if err := tokenleaf.NetworkValidator(v); err != nil {
+			return &ValidationError{Name: "network", err: fmt.Errorf(`ent: validator failed for field "TokenLeaf.network": %w`, err)}
+		}
+	}
 	if tlu.mutation.RevocationKeyshareCleared() && len(tlu.mutation.RevocationKeyshareIDs()) > 0 {
 		return errors.New(`ent: clearing a required unique edge "TokenLeaf.revocation_keyshare"`)
 	}
@@ -280,6 +305,12 @@ func (tlu *TokenLeafUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if tlu.mutation.ConfirmedWithdrawBlockHashCleared() {
 		_spec.ClearField(tokenleaf.FieldConfirmedWithdrawBlockHash, field.TypeBytes)
+	}
+	if value, ok := tlu.mutation.Network(); ok {
+		_spec.SetField(tokenleaf.FieldNetwork, field.TypeEnum, value)
+	}
+	if tlu.mutation.NetworkCleared() {
+		_spec.ClearField(tokenleaf.FieldNetwork, field.TypeEnum)
 	}
 	if tlu.mutation.LeafCreatedTokenTransactionReceiptCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -454,6 +485,26 @@ func (tluo *TokenLeafUpdateOne) ClearConfirmedWithdrawBlockHash() *TokenLeafUpda
 	return tluo
 }
 
+// SetNetwork sets the "network" field.
+func (tluo *TokenLeafUpdateOne) SetNetwork(s schema.Network) *TokenLeafUpdateOne {
+	tluo.mutation.SetNetwork(s)
+	return tluo
+}
+
+// SetNillableNetwork sets the "network" field if the given value is not nil.
+func (tluo *TokenLeafUpdateOne) SetNillableNetwork(s *schema.Network) *TokenLeafUpdateOne {
+	if s != nil {
+		tluo.SetNetwork(*s)
+	}
+	return tluo
+}
+
+// ClearNetwork clears the value of the "network" field.
+func (tluo *TokenLeafUpdateOne) ClearNetwork() *TokenLeafUpdateOne {
+	tluo.mutation.ClearNetwork()
+	return tluo
+}
+
 // SetLeafCreatedTokenTransactionReceiptID sets the "leaf_created_token_transaction_receipt" edge to the TokenTransactionReceipt entity by ID.
 func (tluo *TokenLeafUpdateOne) SetLeafCreatedTokenTransactionReceiptID(id uuid.UUID) *TokenLeafUpdateOne {
 	tluo.mutation.SetLeafCreatedTokenTransactionReceiptID(id)
@@ -565,6 +616,11 @@ func (tluo *TokenLeafUpdateOne) check() error {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "TokenLeaf.status": %w`, err)}
 		}
 	}
+	if v, ok := tluo.mutation.Network(); ok {
+		if err := tokenleaf.NetworkValidator(v); err != nil {
+			return &ValidationError{Name: "network", err: fmt.Errorf(`ent: validator failed for field "TokenLeaf.network": %w`, err)}
+		}
+	}
 	if tluo.mutation.RevocationKeyshareCleared() && len(tluo.mutation.RevocationKeyshareIDs()) > 0 {
 		return errors.New(`ent: clearing a required unique edge "TokenLeaf.revocation_keyshare"`)
 	}
@@ -638,6 +694,12 @@ func (tluo *TokenLeafUpdateOne) sqlSave(ctx context.Context) (_node *TokenLeaf, 
 	}
 	if tluo.mutation.ConfirmedWithdrawBlockHashCleared() {
 		_spec.ClearField(tokenleaf.FieldConfirmedWithdrawBlockHash, field.TypeBytes)
+	}
+	if value, ok := tluo.mutation.Network(); ok {
+		_spec.SetField(tokenleaf.FieldNetwork, field.TypeEnum, value)
+	}
+	if tluo.mutation.NetworkCleared() {
+		_spec.ClearField(tokenleaf.FieldNetwork, field.TypeEnum)
 	}
 	if tluo.mutation.LeafCreatedTokenTransactionReceiptCleared() {
 		edge := &sqlgraph.EdgeSpec{

@@ -46,7 +46,7 @@ func (o TokenTransactionHandler) StartTokenTransaction(ctx context.Context, conf
 		return nil, err
 	}
 
-	if err := utils.ValidatePartialTokenTransaction(req.PartialTokenTransaction, req.TokenTransactionSignatures, config.GetSigningOperatorList()); err != nil {
+	if err := utils.ValidatePartialTokenTransaction(req.PartialTokenTransaction, req.TokenTransactionSignatures, config.GetSigningOperatorList(), config.SupportedNetworks); err != nil {
 		return nil, err
 	}
 
@@ -90,6 +90,12 @@ func (o TokenTransactionHandler) StartTokenTransaction(ctx context.Context, conf
 		}
 		defer conn.Close()
 
+		network, err := common.NetworkFromProtoNetwork(req.PartialTokenTransaction.Network)
+		if err != nil {
+			log.Printf("Failed to get network from proto network: %v", err)
+			return nil, err
+		}
+
 		// Fill revocation public keys and withdrawal bond/locktime for each leaf.
 		finalTokenTransaction := req.PartialTokenTransaction
 		for i, leaf := range finalTokenTransaction.OutputLeaves {
@@ -97,9 +103,9 @@ func (o TokenTransactionHandler) StartTokenTransaction(ctx context.Context, conf
 			leaf.Id = &leafID
 			leaf.RevocationPublicKey = keyshares[i].PublicKey
 			// TODO: Support non-regtest configs by providing network as a field in the transaction.
-			withdrawalBondSats := config.Lrc20Configs[common.Regtest.String()].WithdrawBondSats
+			withdrawalBondSats := config.Lrc20Configs[network.String()].WithdrawBondSats
 			leaf.WithdrawBondSats = &withdrawalBondSats
-			withdrawRelativeBlockLocktime := config.Lrc20Configs[common.Regtest.String()].WithdrawRelativeBlockLocktime
+			withdrawRelativeBlockLocktime := config.Lrc20Configs[network.String()].WithdrawRelativeBlockLocktime
 			leaf.WithdrawRelativeBlockLocktime = &withdrawRelativeBlockLocktime
 		}
 
@@ -381,8 +387,11 @@ func (o TokenTransactionHandler) SendTransactionToLRC20Node(
 	operatorSignature []byte,
 	revocationKeys [][]byte,
 ) error {
-	network := common.Regtest.String() // TODO: Get network from transaction
-	if lrc20Config, ok := config.Lrc20Configs[network]; ok && lrc20Config.DisableRpcs {
+	network, err := common.NetworkFromProtoNetwork(finalTokenTransaction.Network)
+	if err != nil {
+		log.Printf("Failed to get network from proto network: %v", err)
+	}
+	if lrc20Config, ok := config.Lrc20Configs[network.String()]; ok && lrc20Config.DisableRpcs {
 		log.Printf("Skipping LRC20 node call due to DisableRpcs flag")
 		return nil
 	}

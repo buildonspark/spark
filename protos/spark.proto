@@ -280,6 +280,7 @@ message TokenTransaction {
     }
     repeated TokenLeafOutput output_leaves = 3;
     repeated bytes spark_operator_identity_public_keys = 4 [(validate.rules).repeated.items.bytes.len = 33];
+    Network network = 10;
 }
 
 

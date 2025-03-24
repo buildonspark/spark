@@ -51,6 +51,8 @@ type TokenLeaf struct {
 	LeafSpentRevocationPrivateKey []byte `json:"leaf_spent_revocation_private_key,omitempty"`
 	// ConfirmedWithdrawBlockHash holds the value of the "confirmed_withdraw_block_hash" field.
 	ConfirmedWithdrawBlockHash []byte `json:"confirmed_withdraw_block_hash,omitempty"`
+	// Network holds the value of the "network" field.
+	Network schema.Network `json:"network,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the TokenLeafQuery when eager-loading is set.
 	Edges                                             TokenLeafEdges `json:"edges"`
@@ -115,7 +117,7 @@ func (*TokenLeaf) scanValues(columns []string) ([]any, error) {
 			values[i] = new([]byte)
 		case tokenleaf.FieldWithdrawBondSats, tokenleaf.FieldWithdrawRelativeBlockLocktime, tokenleaf.FieldLeafCreatedTransactionOutputVout, tokenleaf.FieldLeafSpentTransactionInputVout:
 			values[i] = new(sql.NullInt64)
-		case tokenleaf.FieldStatus:
+		case tokenleaf.FieldStatus, tokenleaf.FieldNetwork:
 			values[i] = new(sql.NullString)
 		case tokenleaf.FieldCreateTime, tokenleaf.FieldUpdateTime:
 			values[i] = new(sql.NullTime)
@@ -238,6 +240,12 @@ func (tl *TokenLeaf) assignValues(columns []string, values []any) error {
 			} else if value != nil {
 				tl.ConfirmedWithdrawBlockHash = *value
 			}
+		case tokenleaf.FieldNetwork:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field network", values[i])
+			} else if value.Valid {
+				tl.Network = schema.Network(value.String)
+			}
 		case tokenleaf.ForeignKeys[0]:
 			if value, ok := values[i].(*sql.NullScanner); !ok {
 				return fmt.Errorf("unexpected type %T for field token_leaf_revocation_keyshare", values[i])
@@ -354,6 +362,9 @@ func (tl *TokenLeaf) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("confirmed_withdraw_block_hash=")
 	builder.WriteString(fmt.Sprintf("%v", tl.ConfirmedWithdrawBlockHash))
+	builder.WriteString(", ")
+	builder.WriteString("network=")
+	builder.WriteString(fmt.Sprintf("%v", tl.Network))
 	builder.WriteByte(')')
 	return builder.String()
 }

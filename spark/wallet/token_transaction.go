@@ -54,6 +54,7 @@ func StartTokenTransaction(
 		operatorKeys = append(operatorKeys, operator.IdentityPublicKey)
 	}
 	tokenTransaction.SparkOperatorIdentityPublicKeys = operatorKeys
+	tokenTransaction.Network = pb.Network(config.Network)
 
 	// Hash the partial token transaction
 	partialTokenTransactionHash, err := utils.HashTokenTransaction(tokenTransaction, true)
