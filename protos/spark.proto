@@ -541,6 +541,8 @@ message Transfer {
     uint64 total_value = 5;
     google.protobuf.Timestamp expiry_time = 6;
     repeated TransferLeaf leaves = 7;
+    google.protobuf.Timestamp created_time = 8;
+    google.protobuf.Timestamp updated_time = 9;
 }
 
 message TransferLeaf {
