@@ -4,7 +4,7 @@
   "private": true,
   "dependencies": {
     "@buildonspark/spark-sdk": "0.0.22",
-    "@lightsparkdev/ui": "^1.0.17",
+    "@lightsparkdev/ui": "^1.1.0",
     "@number-flow/react": "^0.5.7",
     "@radix-ui/react-popover": "^1.1.6",
     "@scure/bip39": "^1.5.4",
@@ -14,8 +14,8 @@
     "@testing-library/user-event": "^13.2.1",
     "@types/jest": "^29.5.14",
     "@types/node": "^22.13.2",
-    "@types/react": "^18.0.0",
-    "@types/react-dom": "^18.0.0",
+    "@types/react": "^19.0.10",
+    "@types/react-dom": "^19.0.4",
     "autoprefixer": "^10.4.20",
     "clsx": "^2.1.1",
     "input-otp": "^1.4.2",
@@ -38,7 +38,7 @@
     "zustand": "^5.0.3"
   },
   "scripts": {
-    "start": "react-app-rewired start",
+    "start": "rm -rf node_modules/.cache && react-app-rewired start",
     "build": "react-app-rewired build",
     "test": "echo \"Error: no tests yet\"",
     "eject": "react-scripts eject",
@@ -69,5 +69,8 @@
     "prettier": "^3.5.1",
     "prettier-plugin-organize-imports": "^4.1.0",
     "prettier-plugin-tailwindcss": "^0.6.11"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }

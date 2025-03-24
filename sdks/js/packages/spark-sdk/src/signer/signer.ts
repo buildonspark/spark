@@ -9,7 +9,6 @@ import * as bip39 from "@scure/bip39";
 import { generateMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english";
 import { sha256 } from "@scure/btc-signer/utils";
-import { Buffer } from "buffer";
 import * as ecies from "eciesjs";
 import { TreeNode } from "../proto/spark.js";
 import { generateAdaptorFromSignature } from "../utils/adaptor-signature.js";
@@ -27,7 +26,7 @@ import {
 } from "../utils/signing.js";
 import { aggregateFrost, signFrost } from "../utils/wasm.js";
 import { KeyPackage } from "../wasm/spark_bindings.js";
-globalThis.Buffer = Buffer;
+
 export type SigningNonce = {
   binding: Uint8Array;
   hiding: Uint8Array;

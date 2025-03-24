@@ -1,5 +1,5 @@
-import {Network} from "@buildonspark/spark-sdk/utils";
-import {networks} from "bitcoinjs-lib";
+import { Network } from "@buildonspark/spark-sdk/utils";
+import { networks } from "bitcoinjs-lib";
 import { NetworkType } from "@buildonspark/lrc20-sdk";
 
 export const LRC_WALLET_NETWORK = Object.freeze({

@@ -14,6 +14,7 @@ import { ConfigOptions } from "../services/wallet-config.js";
 import { createNewTree } from "./test-util.js";
 import { SparkWalletTesting } from "./utils/spark-testing-wallet.js";
 import { BitcoinFaucet } from "./utils/test-faucet.js";
+
 describe("Transfer", () => {
   // Skip all tests if running in GitHub Actions
   const testFn = process.env.GITHUB_ACTIONS ? it.skip : it;

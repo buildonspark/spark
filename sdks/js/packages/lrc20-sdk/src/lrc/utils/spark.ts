@@ -1,4 +1,4 @@
-import { crypto } from "bitcoinjs-lib";
+import * as bitcoin from "bitcoinjs-lib";
 
 export class TokenLeaf {
   id: string;
@@ -28,18 +28,18 @@ export function tokenLeafHash(tokenLeaf: TokenLeaf): Buffer {
   tokenAmountBuffer.writeBigInt64BE(BigInt(tokenLeaf.tokenAmount));
 
   const hashData = Buffer.concat([
-    crypto.sha256(tokenLeaf.verifyingPublicKey),
-    crypto.sha256(tokenLeaf.ownerIdentityPublicKey),
-    crypto.sha256(tokenLeaf.revocationPublicKey),
-    crypto.sha256(tokenLeaf.verifyingPublicKey),
-    crypto.sha256(withdrawalFeeRateVbBuffer),
-    crypto.sha256(withdrawalBondSatsBuffer),
-    crypto.sha256(withdrawalLocktimeBuffer),
-    crypto.sha256(tokenLeaf.tokenId),
-    crypto.sha256(tokenAmountBuffer),
+    bitcoin.crypto.sha256(tokenLeaf.verifyingPublicKey),
+    bitcoin.crypto.sha256(tokenLeaf.ownerIdentityPublicKey),
+    bitcoin.crypto.sha256(tokenLeaf.revocationPublicKey),
+    bitcoin.crypto.sha256(tokenLeaf.verifyingPublicKey),
+    bitcoin.crypto.sha256(withdrawalFeeRateVbBuffer),
+    bitcoin.crypto.sha256(withdrawalBondSatsBuffer),
+    bitcoin.crypto.sha256(withdrawalLocktimeBuffer),
+    bitcoin.crypto.sha256(tokenLeaf.tokenId),
+    bitcoin.crypto.sha256(tokenAmountBuffer),
   ]);
 
-  return crypto.sha256(hashData);
+  return bitcoin.crypto.sha256(hashData);
 }
 
 export function tokenTransactionHash(tokenTransaction: TokenTransaction): Buffer {
@@ -55,5 +55,5 @@ export function tokenTransactionHash(tokenTransaction: TokenTransaction): Buffer
   }
 
   let hashData = Buffer.concat(hashes);
-  return crypto.sha256(hashData);
+  return bitcoin.crypto.sha256(hashData);
 }

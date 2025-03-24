@@ -1,4 +1,5 @@
 import { networks } from "bitcoinjs-lib";
+import { Buffer } from "buffer";
 import { NetworkType } from "../../network/index.ts";
 
 // Secp256k1 base point.

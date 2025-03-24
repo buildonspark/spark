@@ -2,7 +2,7 @@
 
 import { Network } from "@buildonspark/spark-sdk/utils";
 import readline from "readline";
-import { IssuerWallet } from "../issuer-sdk";
+import { IssuerWallet } from "../issuer-spark-wallet";
 
 // Initialize Issuer Wallet
 const walletMnemonic =

@@ -1,5 +1,4 @@
 import { Lrc20Protos } from "@buildonspark/lrc20-sdk";
-import { Layer } from "../../lrc20-sdk/dist/types/proto/rpc/v1/types.js";
 
 // String enums to replace numeric enums
 export enum LayerType {

@@ -1,2 +1,5 @@
-wasm-pack build --target web --out-dir ../../sdks/js/packages/spark-sdk/src/wasm --out-name spark_bindings --no-pack
-rm ../../sdks/js/packages/spark-sdk/src/wasm/.gitignore
+wasm-pack build --target nodejs --out-dir ../../sdks/js/packages/spark-sdk/wasm/nodejs --out-name spark_bindings_nodejs --no-pack
+cd ../../sdks/js/packages/spark-sdk/wasm/nodejs
+rm .gitignore
+yarn
+yarn patch-wasm

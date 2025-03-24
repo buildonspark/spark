@@ -1,10 +1,10 @@
-import { networks } from "bitcoinjs-lib";
+import { Network } from "bitcoinjs-lib";
 import { TxInput } from "./input.ts";
 import { TxOutput } from "./output.ts";
 
 export interface TransactionInput {
   privateKeyWIF: string;
-  network: networks.Network;
+  network: Network;
   inputs: TxInput[];
   outputs: TxOutput[];
 }

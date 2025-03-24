@@ -1,8 +1,7 @@
 import { IssuerSparkWallet } from "@buildonspark/issuer-sdk";
 import { SparkWallet, type TokenInfo } from "@buildonspark/spark-sdk";
-import { type TreeNode } from "@buildonspark/spark-sdk/proto/spark";
+import { Transfer, type TreeNode } from "@buildonspark/spark-sdk/proto/spark";
 import {
-  SparkProto,
   type LightningReceiveRequest,
   type LightningSendRequest,
   type CoopExitRequest,
@@ -233,7 +232,7 @@ export const createSparkRouter = (
    * @param {number} [offset=0] - The offset to start the transfers from
    * @returns {Promise<{
    *   data: {
-   *     transfers: SparkProto.Transfer[]
+   *     transfers: Transfer[]
    *     offset: number
    *   }
    * }>}
@@ -250,7 +249,7 @@ export const createSparkRouter = (
         Number(offset)
       );
       const transferResponse = transfers.transfers.map(
-        (transfer: SparkProto.Transfer) => formatTransferResponse(transfer)
+        (transfer: Transfer) => formatTransferResponse(transfer)
       );
       res.json({
         data: {
@@ -270,7 +269,7 @@ export const createSparkRouter = (
    * @route GET /wallet/pending-transfers
    * @returns {Promise<{
    *   data: {
-   *     pendingTransfers: SparkProto.Transfer[]
+   *     pendingTransfers: Transfer[]
    *   }
    * }>}
    */
@@ -282,7 +281,7 @@ export const createSparkRouter = (
       try {
         const pendingTransfers = await wallet!.getPendingTransfers();
         const transferResponse = pendingTransfers.map(
-          (transfer: SparkProto.Transfer) => formatTransferResponse(transfer)
+          (transfer: Transfer) => formatTransferResponse(transfer)
         );
         res.json({
           data: { pendingTransfers: transferResponse },
@@ -404,7 +403,7 @@ export const createSparkRouter = (
    * @returns {Promise<{
    *   Promise<{
    *   data: {
-   *     transfer: SparkProto.Transfer
+   *     transfer: Transfer
    *   }
    * }>}
    */

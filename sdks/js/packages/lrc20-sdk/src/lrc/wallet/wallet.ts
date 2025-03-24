@@ -1,4 +1,13 @@
-import { address, crypto, networks, payments, Psbt, script, Transaction } from "bitcoinjs-lib";
+import {
+  address,
+  networks,
+  payments,
+  Psbt,
+  script,
+  Transaction,
+  crypto as bitcoinJsCrypto,
+  type Network as BitcoinJsNetwork,
+} from "bitcoinjs-lib";
 import { plainToInstance } from "class-transformer";
 import { ECPairInterface } from "ecpair";
 import { publicKeyToAddress } from "../../address/index.ts";
@@ -79,7 +88,7 @@ export class LRCWallet {
   private networkType: NetworkType;
   private builder: TransactionBuilder;
   private keyPair: ECPairInterface;
-  private network: networks.Network;
+  private network: BitcoinJsNetwork;
   private electrsApi: ElectrsApi;
   private lrcNodeApi: Lrc20JsonRPC;
   private tokenInfoMap: Map<string, TokenPubkeyInfo> = new Map();
@@ -88,7 +97,7 @@ export class LRCWallet {
 
   constructor(
     privateKeyHex: string,
-    btcNetwork: networks.Network,
+    btcNetwork: BitcoinJsNetwork,
     networkType: NetworkType,
     apiConfig?: LRC20WalletApiConfig,
   ) {
@@ -99,7 +108,7 @@ export class LRCWallet {
     this.init(apiConfig);
   }
 
-  public getNetwork(): networks.Network {
+  public getNetwork(): BitcoinJsNetwork {
     return this.network;
   }
 
@@ -1481,7 +1490,7 @@ export class LRCWallet {
   }
 
   private pubkeyPositionInScript(pubkey: Buffer, outScript: Buffer) {
-    const pubkeyHash = crypto.hash160(pubkey);
+    const pubkeyHash = bitcoinJsCrypto.hash160(pubkey);
     const pubkeyXOnly = pubkey.slice(1, 33);
     const decompiled = script.decompile(outScript);
     if (decompiled === null) throw new Error("Unknown script error");

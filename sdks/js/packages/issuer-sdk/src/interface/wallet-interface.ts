@@ -1,4 +1,4 @@
-import { LRCWallet, Lrc20Protos } from "@buildonspark/lrc20-sdk";
+import { LRCWallet } from "@buildonspark/lrc20-sdk";
 import {
   CreateLightningInvoiceParams,
   PayLightningInvoiceParams,
@@ -12,6 +12,7 @@ import {
 } from "@buildonspark/spark-sdk/proto/spark";
 import { LightningReceiveRequest } from "@buildonspark/spark-sdk/types";
 import { GetTokenActivityResponse, TokenPubKeyInfoResponse } from "../types.js";
+import { ListAllTokenTransactionsCursor, OperationType } from "@buildonspark/lrc20-sdk/proto/rpc/v1/types";
 
 /**
  * Interface for the IssuerSparkWallet that includes all functions from both SparkWallet and IssuerSparkWallet
@@ -55,14 +56,14 @@ export interface IssuerWalletInterface {
   mintTokens(tokenAmount: bigint): Promise<string>;
   getTokenActivity(
     pageSize: number,
-    cursor?: Lrc20Protos.ListAllTokenTransactionsCursor,
-    operationTypes?: Lrc20Protos.OperationType[],
+    cursor?: ListAllTokenTransactionsCursor,
+    operationTypes?: OperationType[],
     beforeTimestamp?: Date,
   ): Promise<GetTokenActivityResponse>;
   getIssuerTokenActivity(
     pageSize: number,
-    cursor?: Lrc20Protos.ListAllTokenTransactionsCursor,
-    operationTypes?: Lrc20Protos.OperationType[],
+    cursor?: ListAllTokenTransactionsCursor,
+    operationTypes?: OperationType[],
     beforeTimestamp?: Date,
     afterTimestamp?: Date,
   ): Promise<GetTokenActivityResponse>;

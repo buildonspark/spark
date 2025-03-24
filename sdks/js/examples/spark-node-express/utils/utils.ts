@@ -1,5 +1,4 @@
 import { promises as fs } from "fs";
-import { SparkProto } from "@buildonspark/spark-sdk/types";
 import { Lrc20Protos } from "@buildonspark/lrc20-sdk";
 import {
   Transaction as IssuerTransaction,
@@ -7,6 +6,7 @@ import {
   OnChainTransaction,
   SparkTransaction,
 } from "@buildonspark/issuer-sdk/types";
+import { Transfer, TransferInput, TransferLeaf } from "@buildonspark/spark-sdk/proto/spark";
 /**
  * Saves a mnemonic to a file
  * @param {string} path - The path to save the mnemonic
@@ -55,10 +55,10 @@ const NETWORK_MAP = {
 
 /**
  * Formats a transfer object for API response
- * @param {SparkProto.Transfer} transfer - The transfer object from SDK
+ * @param {Transfer} transfer - The transfer object from SDK
  * @returns {Object} Formatted transfer response
  */
-export function formatTransferResponse(transfer: SparkProto.Transfer) {
+export function formatTransferResponse(transfer: Transfer) {
   if (!transfer) return null;
   try {
     return {
@@ -74,7 +74,7 @@ export function formatTransferResponse(transfer: SparkProto.Transfer) {
         ? new Date(transfer.expiryTime).toISOString()
         : null,
       leaves:
-        transfer.leaves?.map((leaf: SparkProto.TransferLeaf) => ({
+        transfer.leaves?.map((leaf: TransferLeaf) => ({
           leaf: {
             id: leaf.leaf?.id,
             treeId: leaf.leaf?.treeId,

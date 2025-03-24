@@ -1,4 +1,13 @@
-import { address, networks, opcodes, Payment, payments, script } from "bitcoinjs-lib";
+import {
+  address,
+  networks,
+  opcodes,
+  type Payment,
+  type Network,
+  payments,
+  script,
+} from "bitcoinjs-lib";
+import * as bitcoin from "bitcoinjs-lib";
 import { Receipt } from "./receipt.ts";
 import { ReceiptProof, ReceiptProofType } from "./receipt-proof.ts";
 import { toXOnly } from "../../utils.ts";
@@ -16,7 +25,7 @@ export class TxOutput {
 
 export class BitcoinOutput extends TxOutput {
   receiverPubKey: Buffer;
-  bech32Result: address.Bech32Result;
+  bech32Result: bitcoin.address.Bech32Result;
 
   constructor(receiverPubKey: Buffer, satoshis: number) {
     super("BitcoinOutput", satoshis); // Initialize the base class with the type
@@ -150,7 +159,7 @@ export class MultisigReceiptOutput extends TxOutput {
     return new MultisigReceiptOutput(receiversPubKeys, m, satoshis, receipt, locktime, expiryKey);
   }
 
-  public toReceiptProof(network: networks.Network): ReceiptProof {
+  public toReceiptProof(network: Network): ReceiptProof {
     return {
       type: ReceiptProofType.P2WSH,
       data: {
@@ -161,7 +170,7 @@ export class MultisigReceiptOutput extends TxOutput {
     };
   }
 
-  public toScript(network: networks.Network): Payment {
+  public toScript(network: Network): Payment {
     let pubkeys = Array.from(this.receiversPubKeys);
     pubkeys.sort((a, b) => toXOnly(a).compare(toXOnly(b)));
 
@@ -171,7 +180,7 @@ export class MultisigReceiptOutput extends TxOutput {
   }
 
   private multisigScriptPubKey(
-    network: networks.Network,
+    network: Network,
     m: number,
     pubkeys: Buffer[],
     expirySpenderKey: Buffer,

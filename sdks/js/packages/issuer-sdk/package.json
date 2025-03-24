@@ -2,27 +2,39 @@
   "name": "@buildonspark/issuer-sdk",
   "version": "0.0.22",
   "description": "Spark Issuer SDK for token issuance",
-  "module": "./dist/issuer-sdk.js",
-  "types": "./dist/issuer-sdk.d.ts",
+  "license": "Apache-2.0",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "type": "module",
   "exports": {
     ".": {
-      "import": "./dist/issuer-sdk/src/issuer-sdk.js"
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
     },
     "./types": {
-      "import": "./dist/issuer-sdk/src/types.js"
+      "import": "./dist/types.js",
+      "require": "./dist/types.cjs"
     }
+  },
+  "browser": {
+    "assert": false,
+    "crypto": false,
+    "fs": false,
+    "fs/promises": false,
+    "path": false,
+    "url": false
   },
   "files": [
     "dist",
     "src"
   ],
   "scripts": {
-    "build": "yarn clean && tsc",
+    "build": "yarn tsc && tsup",
     "prepare": "yarn run build",
     "build:watch": "yarn build --watch --clean=false",
     "clean": "rm -rf dist",
     "circular-deps": "madge --circular --extensions ts,tsx src",
+    "depcheck": "depcheck --ignores=buffer,ts-proto,jest,ts-jest",
     "dev": "yarn build -- --watch",
     "docs": "typedoc src",
     "format:fix": "prettier src --write",
@@ -31,7 +43,7 @@
     "lint:fix:continue": "eslint --fix . || exit 0",
     "lint:watch": "esw ./src -w --ext .ts,.tsx,.js --color",
     "lint": "eslint .",
-    "package-types": "yarn attw --pack .",
+    "package:checks": "yarn depcheck && yarn publint && yarn attw --pack . && echo \"\nPackage checks passed successfully!\"",
     "postversion": "yarn build",
     "test-cmd": "node --experimental-vm-modules $(yarn bin jest) --no-cache --runInBand",
     "test": "echo \"Error: no tests yet\"",
@@ -41,46 +53,33 @@
     "generate:proto": "PATH=\"$PATH:./node_modules/.bin\" protoc --ts_proto_out=./src/proto --ts_proto_opt=outputServices=nice-grpc,useExactTypes=false,outputServices=generic-definitions,oneof=unions,importSuffix=.js --proto_path=../../protos spark.proto mock.proto spark_authn.proto"
   },
   "dependencies": {
-    "@bufbuild/protobuf": "^2.2.3",
+    "@bufbuild/protobuf": "^2.2.5",
     "@buildonspark/lrc20-sdk": "0.0.20",
     "@buildonspark/spark-sdk": "0.0.22",
     "@noble/curves": "^1.8.0",
-    "@noble/secp256k1": "^2.2.3",
     "@scure/bip39": "^1.5.4",
     "@scure/btc-signer": "^1.5.0",
     "bitcoinjs-lib": "^6.1.5",
-    "crypto-js": "^4.2.0",
-    "grpc-tools": "^1.12.4",
-    "nice-grpc": "^2.1.10",
+    "buffer": "^6.0.3",
     "nice-grpc-common": "^2.0.2",
-    "nice-grpc-web": "^3.3.5",
-    "protobufjs": "^7.4.0",
     "ts-proto": "^2.6.1"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.17.4",
+    "@jest/globals": "^29.7.0",
     "@types/jest": "^29.5.14",
     "@types/node": "^22.13.2",
-    "@types/secp256k1": "^4.0.6",
-    "@types/uuid": "^10.0.0",
-    "@types/ws": "^8",
-    "copyfiles": "^2.4.1",
+    "depcheck": "^1.4.7",
     "jest": "^29.7.0",
     "madge": "^8.0.0",
     "node-fetch": "^3.3.2",
+    "publint": "^0.3.9",
     "ts-jest": "^29.2.5",
-    "ts-node": "^10.9.2",
-    "typescript": "^5.7.3",
-    "wasm-loader": "^1.3.0"
+    "tsup": "^8.4.0",
+    "typescript": "^5.7.3"
   },
-  "browser": {
-    "assert": false,
-    "crypto": false,
-    "fs": false,
-    "fs/promises": false,
-    "nice-grpc": "nice-grpc-web",
-    "path": false,
-    "url": false
+  "engines": {
+    "node": ">=18.0.0"
   },
   "madge": {
     "detectiveOptions": {

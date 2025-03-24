@@ -1,5 +1,6 @@
 import { BigNumber } from "bignumber.js";
-import { ECPair, bitcoin, ecc } from "./bitcoin-core.ts";
+import * as bitcoin from "bitcoinjs-lib";
+import { ECPair, ecc } from "./bitcoin-core.ts";
 
 export const toXOnly = (pubKey: Buffer) => (pubKey.length === 32 ? pubKey : pubKey.slice(1, 33));
 

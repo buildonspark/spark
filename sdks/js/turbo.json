@@ -1,6 +1,7 @@
 {
   "$schema": "https://turbo.build/schema.json",
-  "pipeline": {
+  "globalEnv": ["GITHUB_ACTIONS"],
+  "tasks": {
     "build": {
       "dependsOn": ["^build"],
       "outputs": ["dist/**", "build/**"]
@@ -16,6 +17,9 @@
     },
     "lint:fix": {
       "dependsOn": ["^build"]
+    },
+    "package:checks": {
+      "dependsOn": []
     },
     "test": {
       "dependsOn": ["^build"]

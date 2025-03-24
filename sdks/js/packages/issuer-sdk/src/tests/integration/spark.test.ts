@@ -6,7 +6,7 @@ import {
   LOCAL_WALLET_CONFIG_SCHNORR,
 } from "../../../../spark-sdk/src/services/wallet-config.js";
 import { BitcoinFaucet } from "../../../../spark-sdk/src/tests/utils/test-faucet.js";
-import { IssuerSparkWallet } from "../../issuer-sdk.js";
+import { IssuerSparkWallet } from "../../issuer-spark-wallet.js";
 
 describe("token integration test", () => {
   // Skip all tests if running in GitHub Actions

@@ -25,7 +25,7 @@ async function cleanUp() {
   const paymentHash = sha256(preimage);
 
   for (const operator of Object.values(config.signingOperators!)) {
-    const client = ConnectionManager.createMockClient(operator!.address);
+    const client = await ConnectionManager.createMockClient(operator!.address);
     await client.clean_up_preimage_share({
       paymentHash,
     });

@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "noEmit": false,
+    "noEmit": true,
     "target": "ES2022",
     "module": "node16",
     "allowJs": true,

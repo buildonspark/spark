@@ -1,10 +1,11 @@
-import { address, Network, Transaction } from "bitcoinjs-lib";
+import { address, type Network, type Transaction } from "bitcoinjs-lib";
 import { instanceToPlain, plainToInstance } from "class-transformer";
 import { BitcoinTransactionDto } from "./bitcoin-transaction.ts";
 import { TokenPubkey } from "./token-pubkey.ts";
 import { ReceiptProof, ReceiptProofDto, ReceiptProofType } from "./receipt-proof.ts";
-import { Buffer } from "buffer";
+// import { Buffer } from "buffer";
 import { TokenAmount } from "./token-amount.ts";
+type Browser = any;
 
 export class Lrc20Transaction {
   constructor(

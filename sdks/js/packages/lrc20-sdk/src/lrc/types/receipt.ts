@@ -1,4 +1,4 @@
-import { crypto } from "bitcoinjs-lib";
+import * as bitcoin from "bitcoinjs-lib";
 import { plainToInstance } from "class-transformer";
 import { ECPairInterface } from "ecpair";
 import { privateNegate, privateAdd, pointMultiply, pointAdd } from "@bitcoinerlab/secp256k1";
@@ -79,7 +79,7 @@ export class Receipt {
     }
 
     // hash(pxh, innerKey)
-    const pxhPubkey = crypto.sha256(Buffer.concat([pxh, innerKey]));
+    const pxhPubkey = bitcoin.crypto.sha256(Buffer.concat([pxh, innerKey]));
 
     const receiptProof = privateAdd(privateKey, pxhPubkey)!;
     return Buffer.from(receiptProof);
@@ -90,11 +90,11 @@ export class Receipt {
     const uv = receipt.tokenPubkey;
 
     // hash(Y)
-    const yHash = crypto.sha256(Buffer.from(y.toBytes()));
+    const yHash = bitcoin.crypto.sha256(Buffer.from(y.toBytes()));
     // Ensure uv.inner is defined
     const uvInner = uv.pubkey || EMPTY_TOKEN_PUBKEY;
     // hash(hash(Y),UV)
-    const pxh = crypto.sha256(Buffer.concat([yHash, Buffer.from(uvInner)]));
+    const pxh = bitcoin.crypto.sha256(Buffer.concat([yHash, Buffer.from(uvInner)]));
     return pxh;
   }
 
@@ -103,7 +103,7 @@ export class Receipt {
     const pxh = Receipt.receiptHash(receipt);
 
     // hash(pxh, innerKey)
-    const pxhPubkey = crypto.sha256(Buffer.concat([pxh, innerKey]));
+    const pxhPubkey = bitcoin.crypto.sha256(Buffer.concat([pxh, innerKey]));
 
     // hash(pxh, innerKey) * G
     const pxhPubkeyPoint = pointMultiply(G, pxhPubkey)!;

@@ -118,7 +118,7 @@ export {
 } from "./lrc/utils/index.ts";
 export { type LRC20WalletApiConfig, LRCWallet } from "./lrc/wallet/index.ts";
 
-export { ECPair, bitcoin, ecc } from "./bitcoin-core.ts";
+export { ECPair, ecc } from "./bitcoin-core.ts";
 export { toPsbtNetwork, toNetworkType, getNetwork, NetworkType, networks } from "./network/index.ts";
 
 export { AddressType } from "./types.ts";
@@ -133,3 +133,4 @@ export type {
 
 export * from "./proto/rpc/v1/service.ts";
 export * as Lrc20Protos from "./proto/rpc/v1/types.js";
+

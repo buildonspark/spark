@@ -1,5 +1,4 @@
-import { bitcoin } from "../bitcoin-core.ts";
-
+import * as bitcoin from "bitcoinjs-lib";
 import { toXOnly } from "../lrc/utils/index.ts";
 import { NetworkType, toPsbtNetwork } from "../network/index.ts";
 import { AddressType } from "../types.ts";

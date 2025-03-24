@@ -8,7 +8,7 @@ import {
   getP2TRScriptFromPublicKey,
 } from "../../utils/bitcoin.js";
 import { getNetwork, Network } from "../../utils/network.js";
-import { SparkWallet } from "../../spark-sdk.js";
+import { SparkWallet } from "../../spark-wallet.js";
 import { sha256 } from "@noble/hashes/sha256";
 import * as btc from "@scure/btc-signer";
 import { ripemd160 } from "@noble/hashes/ripemd160";

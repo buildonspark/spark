@@ -8,7 +8,7 @@
   "scripts": {
     "build-no-cache": "yarn build --force",
     "build": "turbo run build",
-    "checks": "yarn deps:check && turbo lint format test circular-deps",
+    "checks": "yarn deps:check && turbo run lint format test circular-deps package:checks",
     "circular-deps": "turbo run circular-deps",
     "clean": "turbo run clean",
     "clean-all": "./clean-all.sh",
@@ -19,9 +19,10 @@
     "format:fix": "turbo run format:fix",
     "lint": "turbo run lint",
     "lint:fix": "turbo run lint:fix",
-    "release": "turbo build && changeset publish",
+    "release": "turbo run build && changeset publish",
+    "package:checks": "turbo run package:checks",
     "start": "turbo run start",
-    "test": "yarn deps:check && turbo run test",
+    "test": "yarn deps:check && turbo run package:checks && turbo run test",
     "types": "turbo run types"
   },
   "workspaces": [
@@ -34,10 +35,7 @@
     "@octokit/auth-action": "^4.0.1",
     "octokit": "^4.0.2",
     "ts-prune": "^0.10.3",
-    "turbo": "^1.13.3"
-  },
-  "engines": {
-    "node": ">=18"
+    "turbo": "^2.4.4"
   },
   "packageManager": "yarn@4.5.0"
 }

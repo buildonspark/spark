@@ -8,5 +8,4 @@ export * from "./response-validation.js";
 export * from "./secret-sharing.js";
 export * from "./signing.js";
 export * from "./transaction.js";
-export * from "./wasm-wrapper.js";
 export * from "./wasm.js";
