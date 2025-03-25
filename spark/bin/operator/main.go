@@ -104,7 +104,7 @@ func loadArgs() (*args, error) {
 	flag.BoolVar(&args.RunningLocally, "local", false, "Running locally")
 	flag.DurationVar(&args.ChallengeTimeout, "challenge-timeout", time.Duration(time.Minute), "Challenge timeout")
 	flag.DurationVar(&args.SessionDuration, "session-duration", time.Duration(time.Minute*15), "Session duration")
-	flag.BoolVar(&args.AuthzEnforced, "authz-enforced", false, "Enforce authorization checks")
+	flag.BoolVar(&args.AuthzEnforced, "authz-enforced", true, "Enforce authorization checks")
 	flag.StringVar(&args.DKGCoordinatorAddress, "dkg-address", "", "DKG coordinator address")
 	flag.BoolVar(&args.DisableDKG, "disable-dkg", false, "Disable DKG")
 	flag.StringVar(&args.SupportedNetworks, "supported-networks", "", "Supported networks")
