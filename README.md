@@ -65,7 +65,6 @@ In this architecture:
 2. **User Wallets** interact with a threshold of these operators (M out of N) to:
 
    - Initiate and process transactions
-   - Perform distributed key generation and signing operations
    - Ensure security through threshold cryptography
 
 3. All operations ultimately yield a signed Bitcoin transaction which can be used to unilaterally exit.
