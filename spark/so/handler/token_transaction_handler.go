@@ -387,15 +387,6 @@ func (o TokenTransactionHandler) SendTransactionToLRC20Node(
 	operatorSignature []byte,
 	revocationKeys [][]byte,
 ) error {
-	network, err := common.NetworkFromProtoNetwork(finalTokenTransaction.Network)
-	if err != nil {
-		log.Printf("Failed to get network from proto network: %v", err)
-	}
-	if lrc20Config, ok := config.Lrc20Configs[network.String()]; ok && lrc20Config.DisableRpcs {
-		log.Printf("Skipping LRC20 node call due to DisableRpcs flag")
-		return nil
-	}
-
 	leavesToSpendData := make([]*pblrc20.SparkSignatureLeafData, len(revocationKeys))
 	for i, revocationKey := range revocationKeys {
 		leavesToSpendData[i] = &pblrc20.SparkSignatureLeafData{

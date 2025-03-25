@@ -35,8 +35,8 @@ func NewClient(config *so.Config) *Client {
 	}
 }
 
-// exceuteLrc20Call handles common LRC20 RPC call pattern with proper connection management
-func (c *Client) exceuteLrc20Call(operation func(client pblrc20.SparkServiceClient) error) error {
+// executeLrc20Call handles common LRC20 RPC call pattern with proper connection management
+func (c *Client) executeLrc20Call(operation func(client pblrc20.SparkServiceClient) error) error {
 	network := common.Regtest.String()
 	if c.shouldSkipLrc20Call(network) {
 		return nil
@@ -57,7 +57,7 @@ func (c *Client) SendSparkSignature(
 	ctx context.Context,
 	signatureData *pblrc20.SparkSignatureData,
 ) error {
-	return c.exceuteLrc20Call(func(client pblrc20.SparkServiceClient) error {
+	return c.executeLrc20Call(func(client pblrc20.SparkServiceClient) error {
 		_, err := client.SendSparkSignature(ctx, &pblrc20.SendSparkSignatureRequest{
 			SignatureData: signatureData,
 		})
@@ -70,7 +70,7 @@ func (c *Client) FreezeTokens(
 	ctx context.Context,
 	req *pb.FreezeTokensRequest,
 ) error {
-	return c.exceuteLrc20Call(func(client pblrc20.SparkServiceClient) error {
+	return c.executeLrc20Call(func(client pblrc20.SparkServiceClient) error {
 		_, err := client.FreezeTokens(ctx, req)
 		return err
 	})
@@ -81,7 +81,7 @@ func (c *Client) VerifySparkTx(
 	ctx context.Context,
 	tokenTransaction *pb.TokenTransaction,
 ) error {
-	return c.exceuteLrc20Call(func(client pblrc20.SparkServiceClient) error {
+	return c.executeLrc20Call(func(client pblrc20.SparkServiceClient) error {
 		_, err := client.VerifySparkTx(ctx, &pblrc20.VerifySparkTxRequest{
 			FinalTokenTransaction: tokenTransaction,
 		})
@@ -142,32 +142,28 @@ func (c *Client) connectToLrc20Node() (*grpc.ClientConn, error) {
 // when requested by wallets / external parties (which also allows for updating balance).
 func (c *Client) MarkWithdrawnTokenLeaves(
 	ctx context.Context,
-	network common.Network,
+	_ common.Network,
 	dbTx *ent.Tx,
 	blockHash *chainhash.Hash,
 ) error {
-	networkStr := network.String()
-	if lrc20Config, ok := c.config.Lrc20Configs[networkStr]; ok && lrc20Config.DisableRpcs {
+	network := common.Regtest.String()
+	if lrc20Config, ok := c.config.Lrc20Configs[network]; ok && lrc20Config.DisableRpcs {
 		log.Printf("Skipping LRC20 node call due to DisableRpcs flag")
 		return nil
 	}
 	allLeaves := []*spark.TokenLeafOutput{}
 
-	pageResponse, err := func(ctx context.Context) (*pblrc20.ListWithdrawnLeavesResponse, error) {
-		conn, err := c.connectToLrc20Node()
-		if err != nil {
-			return nil, err
-		}
-		defer conn.Close()
-
-		client := pblrc20.NewSparkServiceClient(conn)
+	var pageResponse *pblrc20.ListWithdrawnLeavesResponse
+	err := c.executeLrc20Call(func(client pblrc20.SparkServiceClient) error {
 		pageSize := uint32(DefaultPageSize)
-		return client.ListWithdrawnLeaves(ctx, &pblrc20.ListWithdrawnLeavesRequest{
+		var err error
+		pageResponse, err = client.ListWithdrawnLeaves(ctx, &pblrc20.ListWithdrawnLeavesRequest{
 			// TODO(DL-99): Fetch just for the latest blockhash instead of all withdrawn leaves.
 			// TODO(DL-98): Add support for pagination.
 			PageSize: &pageSize,
 		})
-	}(ctx)
+		return err
+	})
 	if err != nil {
 		return fmt.Errorf("error fetching withdrawn leaves: %w", err)
 	}
