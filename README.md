@@ -1,6 +1,9 @@
 # Spark
 
+![spark](https://github.com/user-attachments/assets/43912570-4cf2-49cb-ab8a-397aceca90a6)
+
 A simple shared signing protocol that makes Bitcoin fast, cheap, and self-custodial at scale — that’s Spark.
+
 
 ## Architecture Overview
 
