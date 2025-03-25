@@ -322,6 +322,16 @@ func StatusNotIn(vs ...schema.TokenTransactionStatus) predicate.TokenTransaction
 	return predicate.TokenTransactionReceipt(sql.FieldNotIn(FieldStatus, v...))
 }
 
+// StatusIsNil applies the IsNil predicate on the "status" field.
+func StatusIsNil() predicate.TokenTransactionReceipt {
+	return predicate.TokenTransactionReceipt(sql.FieldIsNull(FieldStatus))
+}
+
+// StatusNotNil applies the NotNil predicate on the "status" field.
+func StatusNotNil() predicate.TokenTransactionReceipt {
+	return predicate.TokenTransactionReceipt(sql.FieldNotNull(FieldStatus))
+}
+
 // HasSpentLeaf applies the HasEdge predicate on the "spent_leaf" edge.
 func HasSpentLeaf() predicate.TokenTransactionReceipt {
 	return predicate.TokenTransactionReceipt(func(s *sql.Selector) {

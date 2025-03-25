@@ -10,6 +10,7 @@ import (
 	testutil "github.com/lightsparkdev/spark-go/test_util"
 	"github.com/lightsparkdev/spark-go/wallet"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRefreshTimelock(t *testing.T) {
@@ -20,6 +21,7 @@ func TestRefreshTimelock(t *testing.T) {
 	tree, nodes, err := testutil.CreateNewTreeWithLevels(senderConfig, faucet, senderLeafPrivKey, 100_000, 1)
 	assert.NoError(t, err)
 	fmt.Println("node count:", len(nodes))
+	require.NotEqual(t, 0, len(nodes), "no nodes created when creating tree")
 	node := nodes[len(nodes)-1]
 
 	signingKeyBytes := tree.Children[1].SigningPrivateKey
@@ -59,6 +61,7 @@ func TestExtendLeaf(t *testing.T) {
 	tree, nodes, err := testutil.CreateNewTreeWithLevels(senderConfig, faucet, senderLeafPrivKey, 100_000, 1)
 	assert.NoError(t, err)
 	fmt.Println("node count:", len(nodes))
+	require.NotEqual(t, 0, len(nodes), "no nodes created when creating tree")
 	node := nodes[len(nodes)-1]
 
 	signingKeyBytes := tree.Children[1].SigningPrivateKey

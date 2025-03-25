@@ -28,7 +28,7 @@ func AggregateTreeNodes(
 	parentNode *pb.TreeNode,
 	aggregatedSigningKey []byte,
 ) (*pb.FinalizeNodeSignaturesResponse, error) {
-	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
+	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -70,7 +70,10 @@ func AggregateTreeNodes(
 		return nil, err
 	}
 	var refundBuf bytes.Buffer
-	newRefundTx.Serialize(&refundBuf)
+	err = newRefundTx.Serialize(&refundBuf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to serialize refund tx: %v", err)
+	}
 
 	signingNonce, err := objects.RandomSigningNonce()
 	if err != nil {
@@ -125,7 +128,7 @@ func AggregateTreeNodes(
 		UserCommitments: signingNonceCommitmentProto,
 	})
 
-	frostConn, err := common.NewGRPCConnectionWithoutTLS(config.FrostSignerAddress)
+	frostConn, err := common.NewGRPCConnectionWithoutTLS(config.FrostSignerAddress, nil)
 	if err != nil {
 		return nil, err
 	}

@@ -21,6 +21,7 @@ import (
 	enttransferleaf "github.com/lightsparkdev/spark-go/so/ent/transferleaf"
 	"github.com/lightsparkdev/spark-go/so/ent/treenode"
 	"github.com/lightsparkdev/spark-go/so/helper"
+	"google.golang.org/protobuf/proto"
 )
 
 // BaseTransferHandler is the base transfer handler that is shared for internal and external transfer handlers.
@@ -57,7 +58,7 @@ func validateLeafRefundTxInput(refundTx *wire.MsgTx, oldSequence uint32, leafOut
 	newTimeLock := refundTx.TxIn[0].Sequence & 0xFFFF
 	oldTimeLock := oldSequence & 0xFFFF
 	if newTimeLock >= oldTimeLock {
-		return fmt.Errorf("time lock on the new refund tx, %d, must be less than the old one, %d", newTimeLock, oldTimeLock)
+		return fmt.Errorf("time lock on the new refund tx %d must be less than the old one %d", newTimeLock, oldTimeLock)
 	}
 	if len(refundTx.TxIn) != int(expectedInputCount) {
 		return fmt.Errorf("refund tx should have %d inputs, but has %d", expectedInputCount, len(refundTx.TxIn))
@@ -104,6 +105,7 @@ func (h *BaseTransferHandler) createTransfer(
 	senderIdentityPublicKey []byte,
 	receiverIdentityPublicKey []byte,
 	leafRefundMap map[string][]byte,
+	senderKeyTweakProofs map[string]*pbspark.SecretProof,
 ) (*ent.Transfer, map[string]*ent.TreeNode, error) {
 	transferUUID, err := uuid.Parse(transferID)
 	if err != nil {
@@ -143,7 +145,7 @@ func (h *BaseTransferHandler) createTransfer(
 		return nil, nil, fmt.Errorf("unable to validate transfer leaves: %v", err)
 	}
 
-	err = createTransferLeaves(ctx, db, transfer, leaves, leafRefundMap)
+	err = createTransferLeaves(ctx, db, transfer, leaves, leafRefundMap, senderKeyTweakProofs)
 	if err != nil {
 		return nil, nil, fmt.Errorf("unable to create transfer leaves: %v", err)
 	}
@@ -253,15 +255,31 @@ func (h *BaseTransferHandler) leafAvailableToTransfer(ctx context.Context, leaf 
 	return nil
 }
 
-func createTransferLeaves(ctx context.Context, db *ent.Tx, transfer *ent.Transfer, leaves []*ent.TreeNode, leafRefundMap map[string][]byte) error {
+func createTransferLeaves(
+	ctx context.Context,
+	db *ent.Tx,
+	transfer *ent.Transfer,
+	leaves []*ent.TreeNode,
+	leafRefundMap map[string][]byte,
+	senderKeyTweakProofs map[string]*pbspark.SecretProof,
+) error {
 	for _, leaf := range leaves {
 		rawRefundTx := leafRefundMap[leaf.ID.String()]
-		_, err := db.TransferLeaf.Create().
+		mutator := db.TransferLeaf.Create().
 			SetTransfer(transfer).
 			SetLeaf(leaf).
 			SetPreviousRefundTx(leaf.RawRefundTx).
-			SetIntermediateRefundTx(rawRefundTx).
-			Save(ctx)
+			SetIntermediateRefundTx(rawRefundTx)
+
+		if senderKeyTweakProofs != nil {
+			proof := senderKeyTweakProofs[leaf.ID.String()]
+			proofBytes, err := proto.Marshal(proof)
+			if err != nil {
+				return fmt.Errorf("unable to marshal sender key tweak proof: %v", err)
+			}
+			mutator = mutator.SetSenderKeyTweakProof(proofBytes)
+		}
+		_, err := mutator.Save(ctx)
 		if err != nil {
 			return fmt.Errorf("unable to create transfer leaf: %v", err)
 		}
@@ -323,8 +341,11 @@ func (h *BaseTransferHandler) CancelSendTransfer(
 	if transfer.Status == schema.TransferStatusReturned {
 		return &pbspark.CancelSendTransferResponse{}, nil
 	}
-	if transfer.Status != schema.TransferStatusSenderInitiated {
-		return nil, fmt.Errorf("transfer %s is expected to be at status TransferStatusSenderInitiated but %s found", req.TransferId, transfer.Status)
+	if transfer.Status != schema.TransferStatusSenderInitiated && transfer.Status != schema.TransferStatusSenderKeyTweakPending {
+		return nil, fmt.Errorf("transfer %s is expected to be at status TransferStatusSenderInitiated or TransferStatusSenderKeyTweakPending but %s found", req.TransferId, transfer.Status)
+	}
+	if intent == CancelSendTransferIntentExternal && transfer.Status != schema.TransferStatusSenderInitiated && transfer.ExpiryTime.After(time.Now()) {
+		return nil, fmt.Errorf("transfer %s has not expired, expires at %s", req.TransferId, transfer.ExpiryTime.String())
 	}
 
 	transfer, err = transfer.Update().SetStatus(schema.TransferStatusReturned).Save(ctx)
@@ -345,7 +366,7 @@ func (h *BaseTransferHandler) CancelSendTransfer(
 	if intent != CancelSendTransferIntentInternal {
 		operatorSelection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
 		_, err = helper.ExecuteTaskWithAllOperators(ctx, h.config, &operatorSelection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
-			conn, err := common.NewGRPCConnectionWithCert(operator.Address, operator.CertPath)
+			conn, err := operator.NewGRPCConnection()
 			if err != nil {
 				return nil, err
 			}
@@ -359,7 +380,8 @@ func (h *BaseTransferHandler) CancelSendTransfer(
 			return nil, nil
 		})
 		if err != nil {
-			return nil, fmt.Errorf("unable to execute task with all operators: %v", err)
+			logger := helper.GetLoggerFromContext(ctx)
+			logger.Error("unable to execute task with all operators", "error", err)
 		}
 	}
 
@@ -392,9 +414,6 @@ func (h *BaseTransferHandler) cancelTransferCancelRequest(ctx context.Context, t
 		if err != nil || preimageRequest == nil {
 			return fmt.Errorf("cannot find preimage request for transfer %s", transfer.ID.String())
 		}
-		if preimageRequest.Status != schema.PreimageRequestStatusWaitingForPreimage {
-			return fmt.Errorf("preimage request is not in the waiting for preimage status")
-		}
 		err = preimageRequest.Update().SetStatus(schema.PreimageRequestStatusReturned).Exec(ctx)
 		if err != nil {
 			return fmt.Errorf("unable to update preimage request status: %v", err)
@@ -410,7 +429,21 @@ func (h *BaseTransferHandler) loadTransfer(ctx context.Context, transferID strin
 	}
 
 	db := ent.GetDbFromContext(ctx)
-	transfer, err := db.Transfer.Get(ctx, transferUUID)
+	transfer, err := db.Transfer.Query().Where(enttransfer.ID(transferUUID)).ForUpdate().Only(ctx)
+	if err != nil || transfer == nil {
+		return nil, fmt.Errorf("unable to find transfer %s: %v", transferID, err)
+	}
+	return transfer, nil
+}
+
+func (h *BaseTransferHandler) loadTransferWithoutUpdate(ctx context.Context, transferID string) (*ent.Transfer, error) {
+	transferUUID, err := uuid.Parse(transferID)
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse transfer_id as a uuid %s: %v", transferID, err)
+	}
+
+	db := ent.GetDbFromContext(ctx)
+	transfer, err := db.Transfer.Query().Where(enttransfer.ID(transferUUID)).Only(ctx)
 	if err != nil || transfer == nil {
 		return nil, fmt.Errorf("unable to find transfer %s: %v", transferID, err)
 	}

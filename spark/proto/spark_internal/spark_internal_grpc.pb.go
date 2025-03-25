@@ -21,26 +21,28 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	SparkInternalService_MarkKeysharesAsUsed_FullMethodName           = "/spark_internal.SparkInternalService/mark_keyshares_as_used"
-	SparkInternalService_MarkKeyshareForDepositAddress_FullMethodName = "/spark_internal.SparkInternalService/mark_keyshare_for_deposit_address"
-	SparkInternalService_FinalizeTreeCreation_FullMethodName          = "/spark_internal.SparkInternalService/finalize_tree_creation"
-	SparkInternalService_FrostRound1_FullMethodName                   = "/spark_internal.SparkInternalService/frost_round1"
-	SparkInternalService_FrostRound2_FullMethodName                   = "/spark_internal.SparkInternalService/frost_round2"
-	SparkInternalService_PrepareSplitKeyshares_FullMethodName         = "/spark_internal.SparkInternalService/prepare_split_keyshares"
-	SparkInternalService_AggregateNodes_FullMethodName                = "/spark_internal.SparkInternalService/aggregate_nodes"
-	SparkInternalService_FinalizeNodesAggregation_FullMethodName      = "/spark_internal.SparkInternalService/finalize_nodes_aggregation"
-	SparkInternalService_FinalizeTransfer_FullMethodName              = "/spark_internal.SparkInternalService/finalize_transfer"
-	SparkInternalService_FinalizeRefreshTimelock_FullMethodName       = "/spark_internal.SparkInternalService/finalize_refresh_timelock"
-	SparkInternalService_FinalizeExtendLeaf_FullMethodName            = "/spark_internal.SparkInternalService/finalize_extend_leaf"
-	SparkInternalService_InitiatePreimageSwap_FullMethodName          = "/spark_internal.SparkInternalService/initiate_preimage_swap"
-	SparkInternalService_ProvidePreimage_FullMethodName               = "/spark_internal.SparkInternalService/provide_preimage"
-	SparkInternalService_UpdatePreimageRequest_FullMethodName         = "/spark_internal.SparkInternalService/update_preimage_request"
-	SparkInternalService_PrepareTreeAddress_FullMethodName            = "/spark_internal.SparkInternalService/prepare_tree_address"
-	SparkInternalService_InitiateTransfer_FullMethodName              = "/spark_internal.SparkInternalService/initiate_transfer"
-	SparkInternalService_InitiateCooperativeExit_FullMethodName       = "/spark_internal.SparkInternalService/initiate_cooperative_exit"
-	SparkInternalService_ReturnLightningPayment_FullMethodName        = "/spark_internal.SparkInternalService/return_lightning_payment"
-	SparkInternalService_StartTokenTransactionInternal_FullMethodName = "/spark_internal.SparkInternalService/start_token_transaction_internal"
-	SparkInternalService_CancelSendTransfer_FullMethodName            = "/spark_internal.SparkInternalService/cancel_send_transfer"
+	SparkInternalService_MarkKeysharesAsUsed_FullMethodName            = "/spark_internal.SparkInternalService/mark_keyshares_as_used"
+	SparkInternalService_MarkKeyshareForDepositAddress_FullMethodName  = "/spark_internal.SparkInternalService/mark_keyshare_for_deposit_address"
+	SparkInternalService_FinalizeTreeCreation_FullMethodName           = "/spark_internal.SparkInternalService/finalize_tree_creation"
+	SparkInternalService_FrostRound1_FullMethodName                    = "/spark_internal.SparkInternalService/frost_round1"
+	SparkInternalService_FrostRound2_FullMethodName                    = "/spark_internal.SparkInternalService/frost_round2"
+	SparkInternalService_PrepareSplitKeyshares_FullMethodName          = "/spark_internal.SparkInternalService/prepare_split_keyshares"
+	SparkInternalService_AggregateNodes_FullMethodName                 = "/spark_internal.SparkInternalService/aggregate_nodes"
+	SparkInternalService_FinalizeNodesAggregation_FullMethodName       = "/spark_internal.SparkInternalService/finalize_nodes_aggregation"
+	SparkInternalService_FinalizeTransfer_FullMethodName               = "/spark_internal.SparkInternalService/finalize_transfer"
+	SparkInternalService_FinalizeRefreshTimelock_FullMethodName        = "/spark_internal.SparkInternalService/finalize_refresh_timelock"
+	SparkInternalService_FinalizeExtendLeaf_FullMethodName             = "/spark_internal.SparkInternalService/finalize_extend_leaf"
+	SparkInternalService_InitiatePreimageSwap_FullMethodName           = "/spark_internal.SparkInternalService/initiate_preimage_swap"
+	SparkInternalService_ProvidePreimage_FullMethodName                = "/spark_internal.SparkInternalService/provide_preimage"
+	SparkInternalService_UpdatePreimageRequest_FullMethodName          = "/spark_internal.SparkInternalService/update_preimage_request"
+	SparkInternalService_PrepareTreeAddress_FullMethodName             = "/spark_internal.SparkInternalService/prepare_tree_address"
+	SparkInternalService_InitiateTransfer_FullMethodName               = "/spark_internal.SparkInternalService/initiate_transfer"
+	SparkInternalService_InitiateCooperativeExit_FullMethodName        = "/spark_internal.SparkInternalService/initiate_cooperative_exit"
+	SparkInternalService_ReturnLightningPayment_FullMethodName         = "/spark_internal.SparkInternalService/return_lightning_payment"
+	SparkInternalService_StartTokenTransactionInternal_FullMethodName  = "/spark_internal.SparkInternalService/start_token_transaction_internal"
+	SparkInternalService_CancelSendTransfer_FullMethodName             = "/spark_internal.SparkInternalService/cancel_send_transfer"
+	SparkInternalService_InitiateSettleReceiverKeyTweak_FullMethodName = "/spark_internal.SparkInternalService/initiate_settle_receiver_key_tweak"
+	SparkInternalService_SettleReceiverKeyTweak_FullMethodName         = "/spark_internal.SparkInternalService/settle_receiver_key_tweak"
 )
 
 // SparkInternalServiceClient is the client API for SparkInternalService service.
@@ -67,6 +69,8 @@ type SparkInternalServiceClient interface {
 	ReturnLightningPayment(ctx context.Context, in *spark.ReturnLightningPaymentRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	StartTokenTransactionInternal(ctx context.Context, in *StartTokenTransactionInternalRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	CancelSendTransfer(ctx context.Context, in *spark.CancelSendTransferRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	InitiateSettleReceiverKeyTweak(ctx context.Context, in *InitiateSettleReceiverKeyTweakRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	SettleReceiverKeyTweak(ctx context.Context, in *SettleReceiverKeyTweakRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type sparkInternalServiceClient struct {
@@ -277,6 +281,26 @@ func (c *sparkInternalServiceClient) CancelSendTransfer(ctx context.Context, in 
 	return out, nil
 }
 
+func (c *sparkInternalServiceClient) InitiateSettleReceiverKeyTweak(ctx context.Context, in *InitiateSettleReceiverKeyTweakRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, SparkInternalService_InitiateSettleReceiverKeyTweak_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *sparkInternalServiceClient) SettleReceiverKeyTweak(ctx context.Context, in *SettleReceiverKeyTweakRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, SparkInternalService_SettleReceiverKeyTweak_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SparkInternalServiceServer is the server API for SparkInternalService service.
 // All implementations must embed UnimplementedSparkInternalServiceServer
 // for forward compatibility.
@@ -301,6 +325,8 @@ type SparkInternalServiceServer interface {
 	ReturnLightningPayment(context.Context, *spark.ReturnLightningPaymentRequest) (*emptypb.Empty, error)
 	StartTokenTransactionInternal(context.Context, *StartTokenTransactionInternalRequest) (*emptypb.Empty, error)
 	CancelSendTransfer(context.Context, *spark.CancelSendTransferRequest) (*emptypb.Empty, error)
+	InitiateSettleReceiverKeyTweak(context.Context, *InitiateSettleReceiverKeyTweakRequest) (*emptypb.Empty, error)
+	SettleReceiverKeyTweak(context.Context, *SettleReceiverKeyTweakRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedSparkInternalServiceServer()
 }
 
@@ -370,6 +396,12 @@ func (UnimplementedSparkInternalServiceServer) StartTokenTransactionInternal(con
 }
 func (UnimplementedSparkInternalServiceServer) CancelSendTransfer(context.Context, *spark.CancelSendTransferRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CancelSendTransfer not implemented")
+}
+func (UnimplementedSparkInternalServiceServer) InitiateSettleReceiverKeyTweak(context.Context, *InitiateSettleReceiverKeyTweakRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method InitiateSettleReceiverKeyTweak not implemented")
+}
+func (UnimplementedSparkInternalServiceServer) SettleReceiverKeyTweak(context.Context, *SettleReceiverKeyTweakRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SettleReceiverKeyTweak not implemented")
 }
 func (UnimplementedSparkInternalServiceServer) mustEmbedUnimplementedSparkInternalServiceServer() {}
 func (UnimplementedSparkInternalServiceServer) testEmbeddedByValue()                              {}
@@ -752,6 +784,42 @@ func _SparkInternalService_CancelSendTransfer_Handler(srv interface{}, ctx conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SparkInternalService_InitiateSettleReceiverKeyTweak_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(InitiateSettleReceiverKeyTweakRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkInternalServiceServer).InitiateSettleReceiverKeyTweak(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkInternalService_InitiateSettleReceiverKeyTweak_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkInternalServiceServer).InitiateSettleReceiverKeyTweak(ctx, req.(*InitiateSettleReceiverKeyTweakRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SparkInternalService_SettleReceiverKeyTweak_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SettleReceiverKeyTweakRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkInternalServiceServer).SettleReceiverKeyTweak(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkInternalService_SettleReceiverKeyTweak_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkInternalServiceServer).SettleReceiverKeyTweak(ctx, req.(*SettleReceiverKeyTweakRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // SparkInternalService_ServiceDesc is the grpc.ServiceDesc for SparkInternalService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -838,6 +906,14 @@ var SparkInternalService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "cancel_send_transfer",
 			Handler:    _SparkInternalService_CancelSendTransfer_Handler,
+		},
+		{
+			MethodName: "initiate_settle_receiver_key_tweak",
+			Handler:    _SparkInternalService_InitiateSettleReceiverKeyTweak_Handler,
+		},
+		{
+			MethodName: "settle_receiver_key_tweak",
+			Handler:    _SparkInternalService_SettleReceiverKeyTweak_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

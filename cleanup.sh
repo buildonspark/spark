@@ -1,5 +1,7 @@
 #!/bin/bash
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 parse_bitcoin_config() {
     local config_file="bitcoin_regtest.conf"
     local rpcuser=""
@@ -26,11 +28,11 @@ tmux kill-session -t electrs
 tmux kill-session -t bitcoind
 
 read -r bitcoind_username bitcoind_password <<< "$(parse_bitcoin_config)"
-bitcoin-cli -regtest -rpcuser="$bitcoind_username" -rpcpassword="$bitcoind_password" stop
+bitcoin-cli -regtest -rpcuser="$bitcoind_username" -rpcpassword="$bitcoind_password" --conf="$SCRIPT_DIR/bitcoin_regtest.conf" stop
 
 # Terminate all relevant connections first
 for i in $(seq 0 4); do
-    db="operator_$i"
+    db="sparkoperator_$i"
     psql postgres -c "
     SELECT pg_terminate_backend(pid) 
     FROM pg_stat_activity 
@@ -47,7 +49,7 @@ done
 
 # Drop and recreate
 for i in $(seq 0 4); do
-    db="operator_$i"
+    db="sparkoperator_$i"
     echo "Resetting $db..."
     dropdb --if-exists "$db" > /dev/null 2>&1
     createdb "$db" > /dev/null 2>&1
@@ -59,6 +61,6 @@ for i in $(seq 0 4); do
 done
 rm -rf _data
 rm -rf temp_config_*
-rm -rf lrc20.dev/.yuvd
+rm -rf lrc20.dev/lrc20
 rm -rf electrs.dev/electrs_data
 rm -rf electrs.dev/db

@@ -79,6 +79,30 @@ func (tlu *TransferLeafUpdate) ClearKeyTweak() *TransferLeafUpdate {
 	return tlu
 }
 
+// SetSenderKeyTweakProof sets the "sender_key_tweak_proof" field.
+func (tlu *TransferLeafUpdate) SetSenderKeyTweakProof(b []byte) *TransferLeafUpdate {
+	tlu.mutation.SetSenderKeyTweakProof(b)
+	return tlu
+}
+
+// ClearSenderKeyTweakProof clears the value of the "sender_key_tweak_proof" field.
+func (tlu *TransferLeafUpdate) ClearSenderKeyTweakProof() *TransferLeafUpdate {
+	tlu.mutation.ClearSenderKeyTweakProof()
+	return tlu
+}
+
+// SetReceiverKeyTweak sets the "receiver_key_tweak" field.
+func (tlu *TransferLeafUpdate) SetReceiverKeyTweak(b []byte) *TransferLeafUpdate {
+	tlu.mutation.SetReceiverKeyTweak(b)
+	return tlu
+}
+
+// ClearReceiverKeyTweak clears the value of the "receiver_key_tweak" field.
+func (tlu *TransferLeafUpdate) ClearReceiverKeyTweak() *TransferLeafUpdate {
+	tlu.mutation.ClearReceiverKeyTweak()
+	return tlu
+}
+
 // SetTransferID sets the "transfer" edge to the Transfer entity by ID.
 func (tlu *TransferLeafUpdate) SetTransferID(id uuid.UUID) *TransferLeafUpdate {
 	tlu.mutation.SetTransferID(id)
@@ -206,6 +230,18 @@ func (tlu *TransferLeafUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if tlu.mutation.KeyTweakCleared() {
 		_spec.ClearField(transferleaf.FieldKeyTweak, field.TypeBytes)
 	}
+	if value, ok := tlu.mutation.SenderKeyTweakProof(); ok {
+		_spec.SetField(transferleaf.FieldSenderKeyTweakProof, field.TypeBytes, value)
+	}
+	if tlu.mutation.SenderKeyTweakProofCleared() {
+		_spec.ClearField(transferleaf.FieldSenderKeyTweakProof, field.TypeBytes)
+	}
+	if value, ok := tlu.mutation.ReceiverKeyTweak(); ok {
+		_spec.SetField(transferleaf.FieldReceiverKeyTweak, field.TypeBytes, value)
+	}
+	if tlu.mutation.ReceiverKeyTweakCleared() {
+		_spec.ClearField(transferleaf.FieldReceiverKeyTweak, field.TypeBytes)
+	}
 	if tlu.mutation.TransferCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2O,
@@ -329,6 +365,30 @@ func (tluo *TransferLeafUpdateOne) SetKeyTweak(b []byte) *TransferLeafUpdateOne 
 // ClearKeyTweak clears the value of the "key_tweak" field.
 func (tluo *TransferLeafUpdateOne) ClearKeyTweak() *TransferLeafUpdateOne {
 	tluo.mutation.ClearKeyTweak()
+	return tluo
+}
+
+// SetSenderKeyTweakProof sets the "sender_key_tweak_proof" field.
+func (tluo *TransferLeafUpdateOne) SetSenderKeyTweakProof(b []byte) *TransferLeafUpdateOne {
+	tluo.mutation.SetSenderKeyTweakProof(b)
+	return tluo
+}
+
+// ClearSenderKeyTweakProof clears the value of the "sender_key_tweak_proof" field.
+func (tluo *TransferLeafUpdateOne) ClearSenderKeyTweakProof() *TransferLeafUpdateOne {
+	tluo.mutation.ClearSenderKeyTweakProof()
+	return tluo
+}
+
+// SetReceiverKeyTweak sets the "receiver_key_tweak" field.
+func (tluo *TransferLeafUpdateOne) SetReceiverKeyTweak(b []byte) *TransferLeafUpdateOne {
+	tluo.mutation.SetReceiverKeyTweak(b)
+	return tluo
+}
+
+// ClearReceiverKeyTweak clears the value of the "receiver_key_tweak" field.
+func (tluo *TransferLeafUpdateOne) ClearReceiverKeyTweak() *TransferLeafUpdateOne {
+	tluo.mutation.ClearReceiverKeyTweak()
 	return tluo
 }
 
@@ -488,6 +548,18 @@ func (tluo *TransferLeafUpdateOne) sqlSave(ctx context.Context) (_node *Transfer
 	}
 	if tluo.mutation.KeyTweakCleared() {
 		_spec.ClearField(transferleaf.FieldKeyTweak, field.TypeBytes)
+	}
+	if value, ok := tluo.mutation.SenderKeyTweakProof(); ok {
+		_spec.SetField(transferleaf.FieldSenderKeyTweakProof, field.TypeBytes, value)
+	}
+	if tluo.mutation.SenderKeyTweakProofCleared() {
+		_spec.ClearField(transferleaf.FieldSenderKeyTweakProof, field.TypeBytes)
+	}
+	if value, ok := tluo.mutation.ReceiverKeyTweak(); ok {
+		_spec.SetField(transferleaf.FieldReceiverKeyTweak, field.TypeBytes, value)
+	}
+	if tluo.mutation.ReceiverKeyTweakCleared() {
+		_spec.ClearField(transferleaf.FieldReceiverKeyTweak, field.TypeBytes)
 	}
 	if tluo.mutation.TransferCleared() {
 		edge := &sqlgraph.EdgeSpec{

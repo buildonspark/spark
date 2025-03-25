@@ -38,7 +38,7 @@ func AllTasks() []Task {
 					time := time.Now()
 					query := db.Transfer.Query().Where(
 						transfer.And(
-							transfer.StatusEQ(schema.TransferStatusSenderInitiated),
+							transfer.StatusIn(schema.TransferStatusSenderInitiated, schema.TransferStatusSenderKeyTweakPending),
 							transfer.ExpiryTimeLT(time),
 						),
 					)

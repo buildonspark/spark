@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -66,6 +67,7 @@ type args struct {
 	ServerKeyPath              string
 	DKGLimitOverride           uint64
 	RunDirectory               string
+	ReturnDetailedPanicErrors  bool
 }
 
 func (a *args) SupportedNetworksList() []common.Network {
@@ -102,7 +104,7 @@ func loadArgs() (*args, error) {
 	flag.BoolVar(&args.RunningLocally, "local", false, "Running locally")
 	flag.DurationVar(&args.ChallengeTimeout, "challenge-timeout", time.Duration(time.Minute), "Challenge timeout")
 	flag.DurationVar(&args.SessionDuration, "session-duration", time.Duration(time.Minute*15), "Session duration")
-	flag.BoolVar(&args.AuthzEnforced, "authz-enforced", false, "Enforce authorization checks")
+	flag.BoolVar(&args.AuthzEnforced, "authz-enforced", true, "Enforce authorization checks")
 	flag.StringVar(&args.DKGCoordinatorAddress, "dkg-address", "", "DKG coordinator address")
 	flag.BoolVar(&args.DisableDKG, "disable-dkg", false, "Disable DKG")
 	flag.StringVar(&args.SupportedNetworks, "supported-networks", "", "Supported networks")
@@ -111,6 +113,8 @@ func loadArgs() (*args, error) {
 	flag.StringVar(&args.ServerKeyPath, "server-key", "", "Path to server key")
 	flag.Uint64Var(&args.DKGLimitOverride, "dkg-limit-override", 0, "Override the DKG limit")
 	flag.StringVar(&args.RunDirectory, "run-dir", "", "Run directory for resolving relative paths")
+	// TODO(CNT-154): Consider setting to false by default before productionization.
+	flag.BoolVar(&args.ReturnDetailedPanicErrors, "return-detailed-panic-errors", true, "Return detailed panic errors to client")
 	// Parse flags
 	flag.Parse()
 
@@ -157,7 +161,7 @@ func loadArgs() (*args, error) {
 		return nil, errors.New("database path is required")
 	}
 
-	log.Printf("args: %v", args)
+	log.Printf("args: %+v", args)
 
 	return args, nil
 }
@@ -184,6 +188,7 @@ func main() {
 		args.ServerKeyPath,
 		args.DKGLimitOverride,
 		args.RunDirectory,
+		args.ReturnDetailedPanicErrors,
 	)
 	if err != nil {
 		log.Fatalf("Failed to create config: %v", err)
@@ -212,14 +217,16 @@ func main() {
 		sqliteDb.Close()
 	}
 
-	frostConnection, err := common.NewGRPCConnectionWithoutTLS(args.SignerAddress)
+	frostConnection, err := common.NewGRPCConnectionWithoutTLS(args.SignerAddress, nil)
 	if err != nil {
 		log.Fatalf("Failed to create frost client: %v", err)
 	}
 
 	for network, bitcoindConfig := range config.BitcoindConfigs {
 		go func() {
-			err := chain.WatchChain(dbClient, bitcoindConfig)
+			err := chain.WatchChain(dbClient,
+				*config,
+				bitcoindConfig)
 			if err != nil {
 				log.Fatalf("Failed to watch %s chain: %v", network, err)
 			}
@@ -248,6 +255,7 @@ func main() {
 	}
 
 	serverOpts := grpc.UnaryInterceptor(grpc_middleware.ChainUnaryServer(
+		sparkgrpc.PanicRecoveryInterceptor(config.ReturnDetailedPanicErrors),
 		helper.LogInterceptor,
 		ent.DbSessionMiddleware(dbClient),
 		authn.NewAuthnInterceptor(sessionTokenCreatorVerifier).AuthnInterceptor,
@@ -315,8 +323,6 @@ func main() {
 	grpc_health_v1.RegisterHealthServer(grpcServer, healthService)
 	healthService.SetServingStatus("spark-operator", grpc_health_v1.HealthCheckResponse_SERVING)
 
-	log.Printf("Serving on port %d\n", args.Port)
-
 	go runDKGOnStartup(dbClient, config)
 
 	wrappedGrpc := grpcweb.WrapServer(grpcServer,
@@ -334,14 +340,27 @@ func main() {
 		wrappedGrpc.ServeHTTP(w, r)
 	})
 
-	server := &http.Server{
-		Addr:      fmt.Sprintf(":%d", args.Port),
-		Handler:   handler,
-		TLSConfig: tlsConfig,
-	}
+	if tlsConfig != nil {
+		server := &http.Server{
+			Addr:      fmt.Sprintf(":%d", args.Port),
+			Handler:   handler,
+			TLSConfig: tlsConfig,
+		}
 
-	if err := server.ListenAndServeTLS(args.ServerCertPath, args.ServerKeyPath); err != nil {
-		log.Fatalf("Failed to serve: %v", err)
+		log.Printf("Serving on port %d (TLS)\n", args.Port)
+		if err := server.ListenAndServeTLS(args.ServerCertPath, args.ServerKeyPath); err != nil {
+			log.Fatalf("Failed to serve: %v", err)
+		}
+	} else {
+		lis, err := net.Listen("tcp", fmt.Sprintf(":%d", args.Port))
+		if err != nil {
+			log.Fatalf("Failed to listen: %v", err)
+		}
+
+		log.Printf("Serving on port %d (non-TLS)\n", args.Port)
+		if err := grpcServer.Serve(lis); err != nil {
+			log.Fatalf("Failed to serve: %v", err)
+		}
 	}
 }
 

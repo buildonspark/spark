@@ -2801,7 +2801,7 @@ type PreimageShareMutation struct {
 	update_time             *time.Time
 	payment_hash            *[]byte
 	preimage_share          *[]byte
-	threshold               *uint32
+	threshold               *int32
 	addthreshold            *int32
 	owner_identity_pubkey   *[]byte
 	invoice_string          *string
@@ -3062,13 +3062,13 @@ func (m *PreimageShareMutation) ResetPreimageShare() {
 }
 
 // SetThreshold sets the "threshold" field.
-func (m *PreimageShareMutation) SetThreshold(u uint32) {
-	m.threshold = &u
+func (m *PreimageShareMutation) SetThreshold(i int32) {
+	m.threshold = &i
 	m.addthreshold = nil
 }
 
 // Threshold returns the value of the "threshold" field in the mutation.
-func (m *PreimageShareMutation) Threshold() (r uint32, exists bool) {
+func (m *PreimageShareMutation) Threshold() (r int32, exists bool) {
 	v := m.threshold
 	if v == nil {
 		return
@@ -3079,7 +3079,7 @@ func (m *PreimageShareMutation) Threshold() (r uint32, exists bool) {
 // OldThreshold returns the old "threshold" field's value of the PreimageShare entity.
 // If the PreimageShare object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PreimageShareMutation) OldThreshold(ctx context.Context) (v uint32, err error) {
+func (m *PreimageShareMutation) OldThreshold(ctx context.Context) (v int32, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldThreshold is only allowed on UpdateOne operations")
 	}
@@ -3093,12 +3093,12 @@ func (m *PreimageShareMutation) OldThreshold(ctx context.Context) (v uint32, err
 	return oldValue.Threshold, nil
 }
 
-// AddThreshold adds u to the "threshold" field.
-func (m *PreimageShareMutation) AddThreshold(u int32) {
+// AddThreshold adds i to the "threshold" field.
+func (m *PreimageShareMutation) AddThreshold(i int32) {
 	if m.addthreshold != nil {
-		*m.addthreshold += u
+		*m.addthreshold += i
 	} else {
-		m.addthreshold = &u
+		m.addthreshold = &i
 	}
 }
 
@@ -3367,7 +3367,7 @@ func (m *PreimageShareMutation) SetField(name string, value ent.Value) error {
 		m.SetPreimageShare(v)
 		return nil
 	case preimageshare.FieldThreshold:
-		v, ok := value.(uint32)
+		v, ok := value.(int32)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
@@ -3562,7 +3562,7 @@ type SigningKeyshareMutation struct {
 	secret_share         *[]byte
 	public_shares        *map[string][]uint8
 	public_key           *[]byte
-	min_signers          *uint32
+	min_signers          *int32
 	addmin_signers       *int32
 	coordinator_index    *uint64
 	addcoordinator_index *int64
@@ -3893,13 +3893,13 @@ func (m *SigningKeyshareMutation) ResetPublicKey() {
 }
 
 // SetMinSigners sets the "min_signers" field.
-func (m *SigningKeyshareMutation) SetMinSigners(u uint32) {
-	m.min_signers = &u
+func (m *SigningKeyshareMutation) SetMinSigners(i int32) {
+	m.min_signers = &i
 	m.addmin_signers = nil
 }
 
 // MinSigners returns the value of the "min_signers" field in the mutation.
-func (m *SigningKeyshareMutation) MinSigners() (r uint32, exists bool) {
+func (m *SigningKeyshareMutation) MinSigners() (r int32, exists bool) {
 	v := m.min_signers
 	if v == nil {
 		return
@@ -3910,7 +3910,7 @@ func (m *SigningKeyshareMutation) MinSigners() (r uint32, exists bool) {
 // OldMinSigners returns the old "min_signers" field's value of the SigningKeyshare entity.
 // If the SigningKeyshare object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *SigningKeyshareMutation) OldMinSigners(ctx context.Context) (v uint32, err error) {
+func (m *SigningKeyshareMutation) OldMinSigners(ctx context.Context) (v int32, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldMinSigners is only allowed on UpdateOne operations")
 	}
@@ -3924,12 +3924,12 @@ func (m *SigningKeyshareMutation) OldMinSigners(ctx context.Context) (v uint32, 
 	return oldValue.MinSigners, nil
 }
 
-// AddMinSigners adds u to the "min_signers" field.
-func (m *SigningKeyshareMutation) AddMinSigners(u int32) {
+// AddMinSigners adds i to the "min_signers" field.
+func (m *SigningKeyshareMutation) AddMinSigners(i int32) {
 	if m.addmin_signers != nil {
-		*m.addmin_signers += u
+		*m.addmin_signers += i
 	} else {
-		m.addmin_signers = &u
+		m.addmin_signers = &i
 	}
 }
 
@@ -4164,7 +4164,7 @@ func (m *SigningKeyshareMutation) SetField(name string, value ent.Value) error {
 		m.SetPublicKey(v)
 		return nil
 	case signingkeyshare.FieldMinSigners:
-		v, ok := value.(uint32)
+		v, ok := value.(int32)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
@@ -5642,13 +5642,15 @@ type TokenLeafMutation struct {
 	withdraw_revocation_public_key                   *[]byte
 	token_public_key                                 *[]byte
 	token_amount                                     *[]byte
-	leaf_created_transaction_output_vout             *uint32
+	leaf_created_transaction_output_vout             *int32
 	addleaf_created_transaction_output_vout          *int32
 	leaf_spent_ownership_signature                   *[]byte
 	leaf_spent_operator_specific_ownership_signature *[]byte
-	leaf_spent_transaction_input_vout                *uint32
+	leaf_spent_transaction_input_vout                *int32
 	addleaf_spent_transaction_input_vout             *int32
 	leaf_spent_revocation_private_key                *[]byte
+	confirmed_withdraw_block_hash                    *[]byte
+	network                                          *schema.Network
 	clearedFields                                    map[string]struct{}
 	revocation_keyshare                              *uuid.UUID
 	clearedrevocation_keyshare                       bool
@@ -6130,13 +6132,13 @@ func (m *TokenLeafMutation) ResetTokenAmount() {
 }
 
 // SetLeafCreatedTransactionOutputVout sets the "leaf_created_transaction_output_vout" field.
-func (m *TokenLeafMutation) SetLeafCreatedTransactionOutputVout(u uint32) {
-	m.leaf_created_transaction_output_vout = &u
+func (m *TokenLeafMutation) SetLeafCreatedTransactionOutputVout(i int32) {
+	m.leaf_created_transaction_output_vout = &i
 	m.addleaf_created_transaction_output_vout = nil
 }
 
 // LeafCreatedTransactionOutputVout returns the value of the "leaf_created_transaction_output_vout" field in the mutation.
-func (m *TokenLeafMutation) LeafCreatedTransactionOutputVout() (r uint32, exists bool) {
+func (m *TokenLeafMutation) LeafCreatedTransactionOutputVout() (r int32, exists bool) {
 	v := m.leaf_created_transaction_output_vout
 	if v == nil {
 		return
@@ -6147,7 +6149,7 @@ func (m *TokenLeafMutation) LeafCreatedTransactionOutputVout() (r uint32, exists
 // OldLeafCreatedTransactionOutputVout returns the old "leaf_created_transaction_output_vout" field's value of the TokenLeaf entity.
 // If the TokenLeaf object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *TokenLeafMutation) OldLeafCreatedTransactionOutputVout(ctx context.Context) (v uint32, err error) {
+func (m *TokenLeafMutation) OldLeafCreatedTransactionOutputVout(ctx context.Context) (v int32, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldLeafCreatedTransactionOutputVout is only allowed on UpdateOne operations")
 	}
@@ -6161,12 +6163,12 @@ func (m *TokenLeafMutation) OldLeafCreatedTransactionOutputVout(ctx context.Cont
 	return oldValue.LeafCreatedTransactionOutputVout, nil
 }
 
-// AddLeafCreatedTransactionOutputVout adds u to the "leaf_created_transaction_output_vout" field.
-func (m *TokenLeafMutation) AddLeafCreatedTransactionOutputVout(u int32) {
+// AddLeafCreatedTransactionOutputVout adds i to the "leaf_created_transaction_output_vout" field.
+func (m *TokenLeafMutation) AddLeafCreatedTransactionOutputVout(i int32) {
 	if m.addleaf_created_transaction_output_vout != nil {
-		*m.addleaf_created_transaction_output_vout += u
+		*m.addleaf_created_transaction_output_vout += i
 	} else {
-		m.addleaf_created_transaction_output_vout = &u
+		m.addleaf_created_transaction_output_vout = &i
 	}
 }
 
@@ -6284,13 +6286,13 @@ func (m *TokenLeafMutation) ResetLeafSpentOperatorSpecificOwnershipSignature() {
 }
 
 // SetLeafSpentTransactionInputVout sets the "leaf_spent_transaction_input_vout" field.
-func (m *TokenLeafMutation) SetLeafSpentTransactionInputVout(u uint32) {
-	m.leaf_spent_transaction_input_vout = &u
+func (m *TokenLeafMutation) SetLeafSpentTransactionInputVout(i int32) {
+	m.leaf_spent_transaction_input_vout = &i
 	m.addleaf_spent_transaction_input_vout = nil
 }
 
 // LeafSpentTransactionInputVout returns the value of the "leaf_spent_transaction_input_vout" field in the mutation.
-func (m *TokenLeafMutation) LeafSpentTransactionInputVout() (r uint32, exists bool) {
+func (m *TokenLeafMutation) LeafSpentTransactionInputVout() (r int32, exists bool) {
 	v := m.leaf_spent_transaction_input_vout
 	if v == nil {
 		return
@@ -6301,7 +6303,7 @@ func (m *TokenLeafMutation) LeafSpentTransactionInputVout() (r uint32, exists bo
 // OldLeafSpentTransactionInputVout returns the old "leaf_spent_transaction_input_vout" field's value of the TokenLeaf entity.
 // If the TokenLeaf object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *TokenLeafMutation) OldLeafSpentTransactionInputVout(ctx context.Context) (v uint32, err error) {
+func (m *TokenLeafMutation) OldLeafSpentTransactionInputVout(ctx context.Context) (v int32, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldLeafSpentTransactionInputVout is only allowed on UpdateOne operations")
 	}
@@ -6315,12 +6317,12 @@ func (m *TokenLeafMutation) OldLeafSpentTransactionInputVout(ctx context.Context
 	return oldValue.LeafSpentTransactionInputVout, nil
 }
 
-// AddLeafSpentTransactionInputVout adds u to the "leaf_spent_transaction_input_vout" field.
-func (m *TokenLeafMutation) AddLeafSpentTransactionInputVout(u int32) {
+// AddLeafSpentTransactionInputVout adds i to the "leaf_spent_transaction_input_vout" field.
+func (m *TokenLeafMutation) AddLeafSpentTransactionInputVout(i int32) {
 	if m.addleaf_spent_transaction_input_vout != nil {
-		*m.addleaf_spent_transaction_input_vout += u
+		*m.addleaf_spent_transaction_input_vout += i
 	} else {
-		m.addleaf_spent_transaction_input_vout = &u
+		m.addleaf_spent_transaction_input_vout = &i
 	}
 }
 
@@ -6400,6 +6402,104 @@ func (m *TokenLeafMutation) LeafSpentRevocationPrivateKeyCleared() bool {
 func (m *TokenLeafMutation) ResetLeafSpentRevocationPrivateKey() {
 	m.leaf_spent_revocation_private_key = nil
 	delete(m.clearedFields, tokenleaf.FieldLeafSpentRevocationPrivateKey)
+}
+
+// SetConfirmedWithdrawBlockHash sets the "confirmed_withdraw_block_hash" field.
+func (m *TokenLeafMutation) SetConfirmedWithdrawBlockHash(b []byte) {
+	m.confirmed_withdraw_block_hash = &b
+}
+
+// ConfirmedWithdrawBlockHash returns the value of the "confirmed_withdraw_block_hash" field in the mutation.
+func (m *TokenLeafMutation) ConfirmedWithdrawBlockHash() (r []byte, exists bool) {
+	v := m.confirmed_withdraw_block_hash
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldConfirmedWithdrawBlockHash returns the old "confirmed_withdraw_block_hash" field's value of the TokenLeaf entity.
+// If the TokenLeaf object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenLeafMutation) OldConfirmedWithdrawBlockHash(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldConfirmedWithdrawBlockHash is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldConfirmedWithdrawBlockHash requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldConfirmedWithdrawBlockHash: %w", err)
+	}
+	return oldValue.ConfirmedWithdrawBlockHash, nil
+}
+
+// ClearConfirmedWithdrawBlockHash clears the value of the "confirmed_withdraw_block_hash" field.
+func (m *TokenLeafMutation) ClearConfirmedWithdrawBlockHash() {
+	m.confirmed_withdraw_block_hash = nil
+	m.clearedFields[tokenleaf.FieldConfirmedWithdrawBlockHash] = struct{}{}
+}
+
+// ConfirmedWithdrawBlockHashCleared returns if the "confirmed_withdraw_block_hash" field was cleared in this mutation.
+func (m *TokenLeafMutation) ConfirmedWithdrawBlockHashCleared() bool {
+	_, ok := m.clearedFields[tokenleaf.FieldConfirmedWithdrawBlockHash]
+	return ok
+}
+
+// ResetConfirmedWithdrawBlockHash resets all changes to the "confirmed_withdraw_block_hash" field.
+func (m *TokenLeafMutation) ResetConfirmedWithdrawBlockHash() {
+	m.confirmed_withdraw_block_hash = nil
+	delete(m.clearedFields, tokenleaf.FieldConfirmedWithdrawBlockHash)
+}
+
+// SetNetwork sets the "network" field.
+func (m *TokenLeafMutation) SetNetwork(s schema.Network) {
+	m.network = &s
+}
+
+// Network returns the value of the "network" field in the mutation.
+func (m *TokenLeafMutation) Network() (r schema.Network, exists bool) {
+	v := m.network
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldNetwork returns the old "network" field's value of the TokenLeaf entity.
+// If the TokenLeaf object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenLeafMutation) OldNetwork(ctx context.Context) (v schema.Network, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldNetwork is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldNetwork requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldNetwork: %w", err)
+	}
+	return oldValue.Network, nil
+}
+
+// ClearNetwork clears the value of the "network" field.
+func (m *TokenLeafMutation) ClearNetwork() {
+	m.network = nil
+	m.clearedFields[tokenleaf.FieldNetwork] = struct{}{}
+}
+
+// NetworkCleared returns if the "network" field was cleared in this mutation.
+func (m *TokenLeafMutation) NetworkCleared() bool {
+	_, ok := m.clearedFields[tokenleaf.FieldNetwork]
+	return ok
+}
+
+// ResetNetwork resets all changes to the "network" field.
+func (m *TokenLeafMutation) ResetNetwork() {
+	m.network = nil
+	delete(m.clearedFields, tokenleaf.FieldNetwork)
 }
 
 // SetRevocationKeyshareID sets the "revocation_keyshare" edge to the SigningKeyshare entity by id.
@@ -6553,7 +6653,7 @@ func (m *TokenLeafMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *TokenLeafMutation) Fields() []string {
-	fields := make([]string, 0, 14)
+	fields := make([]string, 0, 16)
 	if m.create_time != nil {
 		fields = append(fields, tokenleaf.FieldCreateTime)
 	}
@@ -6596,6 +6696,12 @@ func (m *TokenLeafMutation) Fields() []string {
 	if m.leaf_spent_revocation_private_key != nil {
 		fields = append(fields, tokenleaf.FieldLeafSpentRevocationPrivateKey)
 	}
+	if m.confirmed_withdraw_block_hash != nil {
+		fields = append(fields, tokenleaf.FieldConfirmedWithdrawBlockHash)
+	}
+	if m.network != nil {
+		fields = append(fields, tokenleaf.FieldNetwork)
+	}
 	return fields
 }
 
@@ -6632,6 +6738,10 @@ func (m *TokenLeafMutation) Field(name string) (ent.Value, bool) {
 		return m.LeafSpentTransactionInputVout()
 	case tokenleaf.FieldLeafSpentRevocationPrivateKey:
 		return m.LeafSpentRevocationPrivateKey()
+	case tokenleaf.FieldConfirmedWithdrawBlockHash:
+		return m.ConfirmedWithdrawBlockHash()
+	case tokenleaf.FieldNetwork:
+		return m.Network()
 	}
 	return nil, false
 }
@@ -6669,6 +6779,10 @@ func (m *TokenLeafMutation) OldField(ctx context.Context, name string) (ent.Valu
 		return m.OldLeafSpentTransactionInputVout(ctx)
 	case tokenleaf.FieldLeafSpentRevocationPrivateKey:
 		return m.OldLeafSpentRevocationPrivateKey(ctx)
+	case tokenleaf.FieldConfirmedWithdrawBlockHash:
+		return m.OldConfirmedWithdrawBlockHash(ctx)
+	case tokenleaf.FieldNetwork:
+		return m.OldNetwork(ctx)
 	}
 	return nil, fmt.Errorf("unknown TokenLeaf field %s", name)
 }
@@ -6742,7 +6856,7 @@ func (m *TokenLeafMutation) SetField(name string, value ent.Value) error {
 		m.SetTokenAmount(v)
 		return nil
 	case tokenleaf.FieldLeafCreatedTransactionOutputVout:
-		v, ok := value.(uint32)
+		v, ok := value.(int32)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
@@ -6763,7 +6877,7 @@ func (m *TokenLeafMutation) SetField(name string, value ent.Value) error {
 		m.SetLeafSpentOperatorSpecificOwnershipSignature(v)
 		return nil
 	case tokenleaf.FieldLeafSpentTransactionInputVout:
-		v, ok := value.(uint32)
+		v, ok := value.(int32)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
@@ -6775,6 +6889,20 @@ func (m *TokenLeafMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetLeafSpentRevocationPrivateKey(v)
+		return nil
+	case tokenleaf.FieldConfirmedWithdrawBlockHash:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetConfirmedWithdrawBlockHash(v)
+		return nil
+	case tokenleaf.FieldNetwork:
+		v, ok := value.(schema.Network)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetNetwork(v)
 		return nil
 	}
 	return fmt.Errorf("unknown TokenLeaf field %s", name)
@@ -6869,6 +6997,12 @@ func (m *TokenLeafMutation) ClearedFields() []string {
 	if m.FieldCleared(tokenleaf.FieldLeafSpentRevocationPrivateKey) {
 		fields = append(fields, tokenleaf.FieldLeafSpentRevocationPrivateKey)
 	}
+	if m.FieldCleared(tokenleaf.FieldConfirmedWithdrawBlockHash) {
+		fields = append(fields, tokenleaf.FieldConfirmedWithdrawBlockHash)
+	}
+	if m.FieldCleared(tokenleaf.FieldNetwork) {
+		fields = append(fields, tokenleaf.FieldNetwork)
+	}
 	return fields
 }
 
@@ -6894,6 +7028,12 @@ func (m *TokenLeafMutation) ClearField(name string) error {
 		return nil
 	case tokenleaf.FieldLeafSpentRevocationPrivateKey:
 		m.ClearLeafSpentRevocationPrivateKey()
+		return nil
+	case tokenleaf.FieldConfirmedWithdrawBlockHash:
+		m.ClearConfirmedWithdrawBlockHash()
+		return nil
+	case tokenleaf.FieldNetwork:
+		m.ClearNetwork()
 		return nil
 	}
 	return fmt.Errorf("unknown TokenLeaf nullable field %s", name)
@@ -6944,6 +7084,12 @@ func (m *TokenLeafMutation) ResetField(name string) error {
 		return nil
 	case tokenleaf.FieldLeafSpentRevocationPrivateKey:
 		m.ResetLeafSpentRevocationPrivateKey()
+		return nil
+	case tokenleaf.FieldConfirmedWithdrawBlockHash:
+		m.ResetConfirmedWithdrawBlockHash()
+		return nil
+	case tokenleaf.FieldNetwork:
+		m.ResetNetwork()
 		return nil
 	}
 	return fmt.Errorf("unknown TokenLeaf field %s", name)
@@ -8166,9 +8312,22 @@ func (m *TokenTransactionReceiptMutation) OldStatus(ctx context.Context) (v sche
 	return oldValue.Status, nil
 }
 
+// ClearStatus clears the value of the "status" field.
+func (m *TokenTransactionReceiptMutation) ClearStatus() {
+	m.status = nil
+	m.clearedFields[tokentransactionreceipt.FieldStatus] = struct{}{}
+}
+
+// StatusCleared returns if the "status" field was cleared in this mutation.
+func (m *TokenTransactionReceiptMutation) StatusCleared() bool {
+	_, ok := m.clearedFields[tokentransactionreceipt.FieldStatus]
+	return ok
+}
+
 // ResetStatus resets all changes to the "status" field.
 func (m *TokenTransactionReceiptMutation) ResetStatus() {
 	m.status = nil
+	delete(m.clearedFields, tokentransactionreceipt.FieldStatus)
 }
 
 // AddSpentLeafIDs adds the "spent_leaf" edge to the TokenLeaf entity by ids.
@@ -8496,6 +8655,9 @@ func (m *TokenTransactionReceiptMutation) ClearedFields() []string {
 	if m.FieldCleared(tokentransactionreceipt.FieldOperatorSignature) {
 		fields = append(fields, tokentransactionreceipt.FieldOperatorSignature)
 	}
+	if m.FieldCleared(tokentransactionreceipt.FieldStatus) {
+		fields = append(fields, tokentransactionreceipt.FieldStatus)
+	}
 	return fields
 }
 
@@ -8512,6 +8674,9 @@ func (m *TokenTransactionReceiptMutation) ClearField(name string) error {
 	switch name {
 	case tokentransactionreceipt.FieldOperatorSignature:
 		m.ClearOperatorSignature()
+		return nil
+	case tokentransactionreceipt.FieldStatus:
+		m.ClearStatus()
 		return nil
 	}
 	return fmt.Errorf("unknown TokenTransactionReceipt nullable field %s", name)
@@ -9599,6 +9764,8 @@ type TransferLeafMutation struct {
 	previous_refund_tx     *[]byte
 	intermediate_refund_tx *[]byte
 	key_tweak              *[]byte
+	sender_key_tweak_proof *[]byte
+	receiver_key_tweak     *[]byte
 	clearedFields          map[string]struct{}
 	transfer               *uuid.UUID
 	clearedtransfer        bool
@@ -10004,6 +10171,104 @@ func (m *TransferLeafMutation) ResetKeyTweak() {
 	delete(m.clearedFields, transferleaf.FieldKeyTweak)
 }
 
+// SetSenderKeyTweakProof sets the "sender_key_tweak_proof" field.
+func (m *TransferLeafMutation) SetSenderKeyTweakProof(b []byte) {
+	m.sender_key_tweak_proof = &b
+}
+
+// SenderKeyTweakProof returns the value of the "sender_key_tweak_proof" field in the mutation.
+func (m *TransferLeafMutation) SenderKeyTweakProof() (r []byte, exists bool) {
+	v := m.sender_key_tweak_proof
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSenderKeyTweakProof returns the old "sender_key_tweak_proof" field's value of the TransferLeaf entity.
+// If the TransferLeaf object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TransferLeafMutation) OldSenderKeyTweakProof(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSenderKeyTweakProof is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSenderKeyTweakProof requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSenderKeyTweakProof: %w", err)
+	}
+	return oldValue.SenderKeyTweakProof, nil
+}
+
+// ClearSenderKeyTweakProof clears the value of the "sender_key_tweak_proof" field.
+func (m *TransferLeafMutation) ClearSenderKeyTweakProof() {
+	m.sender_key_tweak_proof = nil
+	m.clearedFields[transferleaf.FieldSenderKeyTweakProof] = struct{}{}
+}
+
+// SenderKeyTweakProofCleared returns if the "sender_key_tweak_proof" field was cleared in this mutation.
+func (m *TransferLeafMutation) SenderKeyTweakProofCleared() bool {
+	_, ok := m.clearedFields[transferleaf.FieldSenderKeyTweakProof]
+	return ok
+}
+
+// ResetSenderKeyTweakProof resets all changes to the "sender_key_tweak_proof" field.
+func (m *TransferLeafMutation) ResetSenderKeyTweakProof() {
+	m.sender_key_tweak_proof = nil
+	delete(m.clearedFields, transferleaf.FieldSenderKeyTweakProof)
+}
+
+// SetReceiverKeyTweak sets the "receiver_key_tweak" field.
+func (m *TransferLeafMutation) SetReceiverKeyTweak(b []byte) {
+	m.receiver_key_tweak = &b
+}
+
+// ReceiverKeyTweak returns the value of the "receiver_key_tweak" field in the mutation.
+func (m *TransferLeafMutation) ReceiverKeyTweak() (r []byte, exists bool) {
+	v := m.receiver_key_tweak
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldReceiverKeyTweak returns the old "receiver_key_tweak" field's value of the TransferLeaf entity.
+// If the TransferLeaf object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TransferLeafMutation) OldReceiverKeyTweak(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldReceiverKeyTweak is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldReceiverKeyTweak requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldReceiverKeyTweak: %w", err)
+	}
+	return oldValue.ReceiverKeyTweak, nil
+}
+
+// ClearReceiverKeyTweak clears the value of the "receiver_key_tweak" field.
+func (m *TransferLeafMutation) ClearReceiverKeyTweak() {
+	m.receiver_key_tweak = nil
+	m.clearedFields[transferleaf.FieldReceiverKeyTweak] = struct{}{}
+}
+
+// ReceiverKeyTweakCleared returns if the "receiver_key_tweak" field was cleared in this mutation.
+func (m *TransferLeafMutation) ReceiverKeyTweakCleared() bool {
+	_, ok := m.clearedFields[transferleaf.FieldReceiverKeyTweak]
+	return ok
+}
+
+// ResetReceiverKeyTweak resets all changes to the "receiver_key_tweak" field.
+func (m *TransferLeafMutation) ResetReceiverKeyTweak() {
+	m.receiver_key_tweak = nil
+	delete(m.clearedFields, transferleaf.FieldReceiverKeyTweak)
+}
+
 // SetTransferID sets the "transfer" edge to the Transfer entity by id.
 func (m *TransferLeafMutation) SetTransferID(id uuid.UUID) {
 	m.transfer = &id
@@ -10116,7 +10381,7 @@ func (m *TransferLeafMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *TransferLeafMutation) Fields() []string {
-	fields := make([]string, 0, 7)
+	fields := make([]string, 0, 9)
 	if m.create_time != nil {
 		fields = append(fields, transferleaf.FieldCreateTime)
 	}
@@ -10137,6 +10402,12 @@ func (m *TransferLeafMutation) Fields() []string {
 	}
 	if m.key_tweak != nil {
 		fields = append(fields, transferleaf.FieldKeyTweak)
+	}
+	if m.sender_key_tweak_proof != nil {
+		fields = append(fields, transferleaf.FieldSenderKeyTweakProof)
+	}
+	if m.receiver_key_tweak != nil {
+		fields = append(fields, transferleaf.FieldReceiverKeyTweak)
 	}
 	return fields
 }
@@ -10160,6 +10431,10 @@ func (m *TransferLeafMutation) Field(name string) (ent.Value, bool) {
 		return m.IntermediateRefundTx()
 	case transferleaf.FieldKeyTweak:
 		return m.KeyTweak()
+	case transferleaf.FieldSenderKeyTweakProof:
+		return m.SenderKeyTweakProof()
+	case transferleaf.FieldReceiverKeyTweak:
+		return m.ReceiverKeyTweak()
 	}
 	return nil, false
 }
@@ -10183,6 +10458,10 @@ func (m *TransferLeafMutation) OldField(ctx context.Context, name string) (ent.V
 		return m.OldIntermediateRefundTx(ctx)
 	case transferleaf.FieldKeyTweak:
 		return m.OldKeyTweak(ctx)
+	case transferleaf.FieldSenderKeyTweakProof:
+		return m.OldSenderKeyTweakProof(ctx)
+	case transferleaf.FieldReceiverKeyTweak:
+		return m.OldReceiverKeyTweak(ctx)
 	}
 	return nil, fmt.Errorf("unknown TransferLeaf field %s", name)
 }
@@ -10241,6 +10520,20 @@ func (m *TransferLeafMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetKeyTweak(v)
 		return nil
+	case transferleaf.FieldSenderKeyTweakProof:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSenderKeyTweakProof(v)
+		return nil
+	case transferleaf.FieldReceiverKeyTweak:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetReceiverKeyTweak(v)
+		return nil
 	}
 	return fmt.Errorf("unknown TransferLeaf field %s", name)
 }
@@ -10280,6 +10573,12 @@ func (m *TransferLeafMutation) ClearedFields() []string {
 	if m.FieldCleared(transferleaf.FieldKeyTweak) {
 		fields = append(fields, transferleaf.FieldKeyTweak)
 	}
+	if m.FieldCleared(transferleaf.FieldSenderKeyTweakProof) {
+		fields = append(fields, transferleaf.FieldSenderKeyTweakProof)
+	}
+	if m.FieldCleared(transferleaf.FieldReceiverKeyTweak) {
+		fields = append(fields, transferleaf.FieldReceiverKeyTweak)
+	}
 	return fields
 }
 
@@ -10302,6 +10601,12 @@ func (m *TransferLeafMutation) ClearField(name string) error {
 		return nil
 	case transferleaf.FieldKeyTweak:
 		m.ClearKeyTweak()
+		return nil
+	case transferleaf.FieldSenderKeyTweakProof:
+		m.ClearSenderKeyTweakProof()
+		return nil
+	case transferleaf.FieldReceiverKeyTweak:
+		m.ClearReceiverKeyTweak()
 		return nil
 	}
 	return fmt.Errorf("unknown TransferLeaf nullable field %s", name)
@@ -10331,6 +10636,12 @@ func (m *TransferLeafMutation) ResetField(name string) error {
 		return nil
 	case transferleaf.FieldKeyTweak:
 		m.ResetKeyTweak()
+		return nil
+	case transferleaf.FieldSenderKeyTweakProof:
+		m.ResetSenderKeyTweakProof()
+		return nil
+	case transferleaf.FieldReceiverKeyTweak:
+		m.ResetReceiverKeyTweak()
 		return nil
 	}
 	return fmt.Errorf("unknown TransferLeaf field %s", name)
@@ -11219,7 +11530,7 @@ type TreeNodeMutation struct {
 	owner_identity_pubkey   *[]byte
 	owner_signing_pubkey    *[]byte
 	raw_tx                  *[]byte
-	vout                    *uint16
+	vout                    *int16
 	addvout                 *int16
 	raw_refund_tx           *[]byte
 	clearedFields           map[string]struct{}
@@ -11650,13 +11961,13 @@ func (m *TreeNodeMutation) ResetRawTx() {
 }
 
 // SetVout sets the "vout" field.
-func (m *TreeNodeMutation) SetVout(u uint16) {
-	m.vout = &u
+func (m *TreeNodeMutation) SetVout(i int16) {
+	m.vout = &i
 	m.addvout = nil
 }
 
 // Vout returns the value of the "vout" field in the mutation.
-func (m *TreeNodeMutation) Vout() (r uint16, exists bool) {
+func (m *TreeNodeMutation) Vout() (r int16, exists bool) {
 	v := m.vout
 	if v == nil {
 		return
@@ -11667,7 +11978,7 @@ func (m *TreeNodeMutation) Vout() (r uint16, exists bool) {
 // OldVout returns the old "vout" field's value of the TreeNode entity.
 // If the TreeNode object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *TreeNodeMutation) OldVout(ctx context.Context) (v uint16, err error) {
+func (m *TreeNodeMutation) OldVout(ctx context.Context) (v int16, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldVout is only allowed on UpdateOne operations")
 	}
@@ -11681,12 +11992,12 @@ func (m *TreeNodeMutation) OldVout(ctx context.Context) (v uint16, err error) {
 	return oldValue.Vout, nil
 }
 
-// AddVout adds u to the "vout" field.
-func (m *TreeNodeMutation) AddVout(u int16) {
+// AddVout adds i to the "vout" field.
+func (m *TreeNodeMutation) AddVout(i int16) {
 	if m.addvout != nil {
-		*m.addvout += u
+		*m.addvout += i
 	} else {
-		m.addvout = &u
+		m.addvout = &i
 	}
 }
 
@@ -12113,7 +12424,7 @@ func (m *TreeNodeMutation) SetField(name string, value ent.Value) error {
 		m.SetRawTx(v)
 		return nil
 	case treenode.FieldVout:
-		v, ok := value.(uint16)
+		v, ok := value.(int16)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}

@@ -51,7 +51,7 @@ func (SigningKeyshare) Fields() []ent.Field {
 		field.Bytes("secret_share"),
 		field.JSON("public_shares", map[string][]byte{}),
 		field.Bytes("public_key").Unique(),
-		field.Uint32("min_signers"),
+		field.Int32("min_signers"),
 		field.Uint64("coordinator_index"),
 	}
 }

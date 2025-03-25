@@ -72,7 +72,7 @@ func (s *SparkInternalServer) FrostRound1(ctx context.Context, req *pb.FrostRoun
 		keyPackagesArray = append(keyPackagesArray, keyPackages[uuid])
 	}
 
-	frostConn, err := common.NewGRPCConnectionWithoutTLS(s.config.SignerAddress)
+	frostConn, err := common.NewGRPCConnectionWithoutTLS(s.config.SignerAddress, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -174,7 +174,7 @@ func (s *SparkInternalServer) FrostRound2(ctx context.Context, req *pb.FrostRoun
 		signingJobProtos = append(signingJobProtos, signingJobProto)
 	}
 
-	frostConn, err := common.NewGRPCConnectionWithoutTLS(s.config.SignerAddress)
+	frostConn, err := common.NewGRPCConnectionWithoutTLS(s.config.SignerAddress, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -290,4 +290,14 @@ func (s *SparkInternalServer) CancelSendTransfer(ctx context.Context, req *pbspa
 	transferHandler := handler.NewInternalTransferHandler(s.config)
 	_, err := transferHandler.CancelSendTransfer(ctx, req, handler.CancelSendTransferIntentInternal)
 	return wrapWithGRPCError(&emptypb.Empty{}, err)
+}
+
+func (s *SparkInternalServer) InitiateSettleReceiverKeyTweak(ctx context.Context, req *pb.InitiateSettleReceiverKeyTweakRequest) (*emptypb.Empty, error) {
+	transferHandler := handler.NewTransferHandler(s.config)
+	return wrapWithGRPCError(&emptypb.Empty{}, transferHandler.InitiateSettleReceiverKeyTweak(ctx, req))
+}
+
+func (s *SparkInternalServer) SettleReceiverKeyTweak(ctx context.Context, req *pb.SettleReceiverKeyTweakRequest) (*emptypb.Empty, error) {
+	transferHandler := handler.NewTransferHandler(s.config)
+	return wrapWithGRPCError(&emptypb.Empty{}, transferHandler.SettleReceiverKeyTweak(ctx, req))
 }

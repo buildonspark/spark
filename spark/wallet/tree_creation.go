@@ -115,7 +115,7 @@ func GenerateDepositAddressesForTree(
 	}
 	addressRequestNodes := createAddressRequestNodeFromTreeNodes(tree)
 
-	conn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
+	conn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -237,7 +237,10 @@ func buildCreationNodesFromTree(
 			}
 
 			var txBuf bytes.Buffer
-			tx.Serialize(&txBuf)
+			err := tx.Serialize(&txBuf)
+			if err != nil {
+				return nil, nil, err
+			}
 			pubkey := secp256k1.PrivKeyFromBytes(currentElement.node.SigningPrivateKey).PubKey()
 			signingNonce, err := objects.RandomSigningNonce()
 			if err != nil {
@@ -265,7 +268,10 @@ func buildCreationNodesFromTree(
 					wire.NewTxOut(parentTxOut.Value, parentTxOut.PkScript),
 				)
 				var txBuf bytes.Buffer
-				tx.Serialize(&txBuf)
+				err := tx.Serialize(&txBuf)
+				if err != nil {
+					return nil, nil, err
+				}
 
 				pubkey := secp256k1.PrivKeyFromBytes(currentElement.node.SigningPrivateKey).PubKey()
 				signingNonce, err := objects.RandomSigningNonce()
@@ -291,7 +297,10 @@ func buildCreationNodesFromTree(
 					return nil, nil, err
 				}
 				var refundTxBuf bytes.Buffer
-				refundTx.Serialize(&refundTxBuf)
+				err = refundTx.Serialize(&refundTxBuf)
+				if err != nil {
+					return nil, nil, err
+				}
 				refundSigningNonce, err := objects.RandomSigningNonce()
 				if err != nil {
 					return nil, nil, err
@@ -312,7 +321,10 @@ func buildCreationNodesFromTree(
 				parentTxOut := currentElement.parentTx.TxOut[currentElement.vout]
 				tx := createNodeTx(&parentOutPoint, wire.NewTxOut(parentTxOut.Value, parentTxOut.PkScript))
 				var txBuf bytes.Buffer
-				tx.Serialize(&txBuf)
+				err := tx.Serialize(&txBuf)
+				if err != nil {
+					return nil, nil, err
+				}
 
 				pubkey := secp256k1.PrivKeyFromBytes(currentElement.node.SigningPrivateKey).PubKey()
 				signingNonce, err := objects.RandomSigningNonce()
@@ -366,7 +378,7 @@ func signTreeCreation(
 		creationResponseNode: creationResultTreeRoot,
 	})
 
-	conn, err := common.NewGRPCConnectionWithoutTLS(config.FrostSignerAddress)
+	conn, err := common.NewGRPCConnectionWithoutTLS(config.FrostSignerAddress, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -573,7 +585,7 @@ func CreateTree(
 
 	request.Node = rootNode
 
-	conn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
+	conn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress(), nil)
 	if err != nil {
 		return nil, err
 	}

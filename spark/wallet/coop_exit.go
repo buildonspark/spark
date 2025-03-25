@@ -94,6 +94,14 @@ func signCoopExitRefunds(
 	leafDataMap := make(map[string]*LeafRefundSigningData)
 	for i, leaf := range leaves {
 		connectorOutput := connectorOutputs[i]
+
+		if leaf.Leaf == nil {
+			return nil, nil, fmt.Errorf("leaf at index %d has nil Leaf field", i)
+		}
+		if leaf.Leaf.RefundTx == nil {
+			return nil, nil, fmt.Errorf("leaf at index %d has nil RefundTx field", i)
+		}
+
 		currentRefundTx, err := common.TxFromRawTxBytes(leaf.Leaf.RefundTx)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to parse refund tx: %v", err)
@@ -130,7 +138,7 @@ func signCoopExitRefunds(
 		}
 	}
 
-	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
+	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress(), nil)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create grpc connection: %v", err)
 	}

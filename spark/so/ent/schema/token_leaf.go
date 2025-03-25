@@ -17,7 +17,10 @@ const (
 	// TokenLeafStatusSigned is the status after a leaf has been signed by the operator
 	// but before the transaction has been finalized.
 	TokenLeafStatusCreatedSigned TokenLeafStatus = "CREATED_SIGNED"
-	// TokenLeafStatusFinalized is the status after a leaf has been finalized by the
+	// TokenLeafStatusFinalized is the status if a transaction creating this leaf was signed
+	// but then cancelled due to a threshold of SOs not responding. These leaves are permanently invalid.
+	TokenLeafStatusCreatedSignedCancelled TokenLeafStatus = "CREATED_SIGNED_CANCELLED"
+	// TokenLeafStatusCreatedFinalized is the status after a leaf has been finalized by the
 	// operator and is ready for spending.
 	TokenLeafStatusCreatedFinalized TokenLeafStatus = "CREATED_FINALIZED"
 	// TokenLeafStatusSpentStarted is the status of a leaf after a tx has come in to start
@@ -36,6 +39,7 @@ func (TokenLeafStatus) Values() []string {
 	return []string{
 		string(TokenLeafStatusCreatedStarted),
 		string(TokenLeafStatusCreatedSigned),
+		string(TokenLeafStatusCreatedSignedCancelled),
 		string(TokenLeafStatusCreatedFinalized),
 		string(TokenLeafStatusSpentStarted),
 		string(TokenLeafStatusSpentSigned),
@@ -65,11 +69,13 @@ func (TokenLeaf) Fields() []ent.Field {
 		field.Bytes("withdraw_revocation_public_key").Immutable(),
 		field.Bytes("token_public_key").NotEmpty().Immutable(),
 		field.Bytes("token_amount").NotEmpty().Immutable(),
-		field.Uint32("leaf_created_transaction_output_vout").Immutable(),
+		field.Int32("leaf_created_transaction_output_vout").Immutable(),
 		field.Bytes("leaf_spent_ownership_signature").Optional(),
 		field.Bytes("leaf_spent_operator_specific_ownership_signature").Optional(),
-		field.Uint32("leaf_spent_transaction_input_vout").Optional(),
+		field.Int32("leaf_spent_transaction_input_vout").Optional(),
 		field.Bytes("leaf_spent_revocation_private_key").Optional(),
+		field.Bytes("confirmed_withdraw_block_hash").Optional(),
+		field.Enum("network").GoType(Network("")).Optional(),
 	}
 }
 
@@ -94,5 +100,7 @@ func (TokenLeaf) Indexes() []ent.Index {
 		// Enable fast fetching of all leaves owned by a token owner, or optionally all token leaves
 		// owned by a token owner for a specific token type.
 		index.Fields("owner_public_key", "token_public_key"),
+		// Enables quick unmarking of withdrawn leaves in response to block reorgs.
+		index.Fields("confirmed_withdraw_block_hash"),
 	}
 }

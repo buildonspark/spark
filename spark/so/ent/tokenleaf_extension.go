@@ -56,7 +56,7 @@ func FetchInputLeaves(ctx context.Context, leavesToSpend []*pb.TokenLeafToSpend)
 
 		var foundLeaf *TokenLeaf
 		for _, createdLeaf := range receipt.Edges.CreatedLeaf {
-			if createdLeaf.LeafCreatedTransactionOutputVout == leaf.PrevTokenTransactionLeafVout {
+			if createdLeaf.LeafCreatedTransactionOutputVout == int32(leaf.PrevTokenTransactionLeafVout) {
 				foundLeaf = createdLeaf
 				break
 			}
@@ -119,6 +119,7 @@ func GetOwnedLeaves(ctx context.Context, ownerPublicKeys [][]byte, tokenPublicKe
 				schema.TokenLeafStatusCreatedFinalized,
 				schema.TokenLeafStatusSpentStarted,
 			),
+			tokenleaf.ConfirmedWithdrawBlockHashIsNil(),
 		)
 	// Only filter by tokenPublicKey if it's provided.
 	if len(tokenPublicKeys) > 0 {

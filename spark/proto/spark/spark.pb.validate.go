@@ -2345,6 +2345,8 @@ func (m *TokenTransaction) validate(all bool) error {
 
 	}
 
+	// no validation rules for Network
+
 	switch v := m.TokenInput.(type) {
 	case *TokenTransaction_MintInput:
 		if v == nil {
@@ -4995,6 +4997,151 @@ var _ interface {
 	ErrorName() string
 } = GetOwnedTokenLeavesResponseValidationError{}
 
+// Validate checks the field values on CancelSignedTokenTransactionRequest with
+// the rules defined in the proto definition for this message. If any rules
+// are violated, the first error encountered is returned, or nil if there are
+// no violations.
+func (m *CancelSignedTokenTransactionRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on CancelSignedTokenTransactionRequest
+// with the rules defined in the proto definition for this message. If any
+// rules are violated, the result is a list of violation errors wrapped in
+// CancelSignedTokenTransactionRequestMultiError, or nil if none found.
+func (m *CancelSignedTokenTransactionRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *CancelSignedTokenTransactionRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if all {
+		switch v := interface{}(m.GetFinalTokenTransaction()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, CancelSignedTokenTransactionRequestValidationError{
+					field:  "FinalTokenTransaction",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, CancelSignedTokenTransactionRequestValidationError{
+					field:  "FinalTokenTransaction",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetFinalTokenTransaction()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return CancelSignedTokenTransactionRequestValidationError{
+				field:  "FinalTokenTransaction",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(m.GetSenderIdentityPublicKey()) != 33 {
+		err := CancelSignedTokenTransactionRequestValidationError{
+			field:  "SenderIdentityPublicKey",
+			reason: "value length must be 33 bytes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if len(errors) > 0 {
+		return CancelSignedTokenTransactionRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// CancelSignedTokenTransactionRequestMultiError is an error wrapping multiple
+// validation errors returned by
+// CancelSignedTokenTransactionRequest.ValidateAll() if the designated
+// constraints aren't met.
+type CancelSignedTokenTransactionRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m CancelSignedTokenTransactionRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m CancelSignedTokenTransactionRequestMultiError) AllErrors() []error { return m }
+
+// CancelSignedTokenTransactionRequestValidationError is the validation error
+// returned by CancelSignedTokenTransactionRequest.Validate if the designated
+// constraints aren't met.
+type CancelSignedTokenTransactionRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e CancelSignedTokenTransactionRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e CancelSignedTokenTransactionRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e CancelSignedTokenTransactionRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e CancelSignedTokenTransactionRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e CancelSignedTokenTransactionRequestValidationError) ErrorName() string {
+	return "CancelSignedTokenTransactionRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e CancelSignedTokenTransactionRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sCancelSignedTokenTransactionRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = CancelSignedTokenTransactionRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = CancelSignedTokenTransactionRequestValidationError{}
+
 // Validate checks the field values on TreeNode with the rules defined in the
 // proto definition for this message. If any rules are violated, the first
 // error encountered is returned, or nil if there are no violations.
@@ -5524,6 +5671,105 @@ var _ interface {
 	ErrorName() string
 } = SecretShareValidationError{}
 
+// Validate checks the field values on SecretProof with the rules defined in
+// the proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *SecretProof) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on SecretProof with the rules defined in
+// the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in SecretProofMultiError, or
+// nil if none found.
+func (m *SecretProof) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *SecretProof) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if len(errors) > 0 {
+		return SecretProofMultiError(errors)
+	}
+
+	return nil
+}
+
+// SecretProofMultiError is an error wrapping multiple validation errors
+// returned by SecretProof.ValidateAll() if the designated constraints aren't met.
+type SecretProofMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m SecretProofMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m SecretProofMultiError) AllErrors() []error { return m }
+
+// SecretProofValidationError is the validation error returned by
+// SecretProof.Validate if the designated constraints aren't met.
+type SecretProofValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e SecretProofValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e SecretProofValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e SecretProofValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e SecretProofValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e SecretProofValidationError) ErrorName() string { return "SecretProofValidationError" }
+
+// Error satisfies the builtin error interface
+func (e SecretProofValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sSecretProof.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = SecretProofValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = SecretProofValidationError{}
+
 // Validate checks the field values on LeafRefundTxSigningJob with the rules
 // defined in the proto definition for this message. If any rules are
 // violated, the first error encountered is returned, or nil if there are no violations.
@@ -5880,6 +6126,52 @@ func (m *StartSendTransferRequest) validate(all bool) error {
 				reason: "embedded message failed validation",
 				cause:  err,
 			}
+		}
+	}
+
+	{
+		sorted_keys := make([]string, len(m.GetKeyTweakProofs()))
+		i := 0
+		for key := range m.GetKeyTweakProofs() {
+			sorted_keys[i] = key
+			i++
+		}
+		sort.Slice(sorted_keys, func(i, j int) bool { return sorted_keys[i] < sorted_keys[j] })
+		for _, key := range sorted_keys {
+			val := m.GetKeyTweakProofs()[key]
+			_ = val
+
+			// no validation rules for KeyTweakProofs[key]
+
+			if all {
+				switch v := interface{}(val).(type) {
+				case interface{ ValidateAll() error }:
+					if err := v.ValidateAll(); err != nil {
+						errors = append(errors, StartSendTransferRequestValidationError{
+							field:  fmt.Sprintf("KeyTweakProofs[%v]", key),
+							reason: "embedded message failed validation",
+							cause:  err,
+						})
+					}
+				case interface{ Validate() error }:
+					if err := v.Validate(); err != nil {
+						errors = append(errors, StartSendTransferRequestValidationError{
+							field:  fmt.Sprintf("KeyTweakProofs[%v]", key),
+							reason: "embedded message failed validation",
+							cause:  err,
+						})
+					}
+				}
+			} else if v, ok := interface{}(val).(interface{ Validate() error }); ok {
+				if err := v.Validate(); err != nil {
+					return StartSendTransferRequestValidationError{
+						field:  fmt.Sprintf("KeyTweakProofs[%v]", key),
+						reason: "embedded message failed validation",
+						cause:  err,
+					}
+				}
+			}
+
 		}
 	}
 
@@ -6501,6 +6793,64 @@ func (m *Transfer) validate(all bool) error {
 			}
 		}
 
+	}
+
+	if all {
+		switch v := interface{}(m.GetCreatedTime()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, TransferValidationError{
+					field:  "CreatedTime",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, TransferValidationError{
+					field:  "CreatedTime",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetCreatedTime()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return TransferValidationError{
+				field:  "CreatedTime",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if all {
+		switch v := interface{}(m.GetUpdatedTime()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, TransferValidationError{
+					field:  "UpdatedTime",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, TransferValidationError{
+					field:  "UpdatedTime",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetUpdatedTime()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return TransferValidationError{
+				field:  "UpdatedTime",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
 	}
 
 	if len(errors) > 0 {
@@ -7449,6 +7799,52 @@ func (m *ClaimTransferSignRefundsRequest) validate(all bool) error {
 			}
 		}
 
+	}
+
+	{
+		sorted_keys := make([]string, len(m.GetKeyTweakProofs()))
+		i := 0
+		for key := range m.GetKeyTweakProofs() {
+			sorted_keys[i] = key
+			i++
+		}
+		sort.Slice(sorted_keys, func(i, j int) bool { return sorted_keys[i] < sorted_keys[j] })
+		for _, key := range sorted_keys {
+			val := m.GetKeyTweakProofs()[key]
+			_ = val
+
+			// no validation rules for KeyTweakProofs[key]
+
+			if all {
+				switch v := interface{}(val).(type) {
+				case interface{ ValidateAll() error }:
+					if err := v.ValidateAll(); err != nil {
+						errors = append(errors, ClaimTransferSignRefundsRequestValidationError{
+							field:  fmt.Sprintf("KeyTweakProofs[%v]", key),
+							reason: "embedded message failed validation",
+							cause:  err,
+						})
+					}
+				case interface{ Validate() error }:
+					if err := v.Validate(); err != nil {
+						errors = append(errors, ClaimTransferSignRefundsRequestValidationError{
+							field:  fmt.Sprintf("KeyTweakProofs[%v]", key),
+							reason: "embedded message failed validation",
+							cause:  err,
+						})
+					}
+				}
+			} else if v, ok := interface{}(val).(interface{ Validate() error }); ok {
+				if err := v.Validate(); err != nil {
+					return ClaimTransferSignRefundsRequestValidationError{
+						field:  fmt.Sprintf("KeyTweakProofs[%v]", key),
+						reason: "embedded message failed validation",
+						cause:  err,
+					}
+				}
+			}
+
+		}
 	}
 
 	if len(errors) > 0 {

@@ -76,23 +76,23 @@ func (tlu *TokenLeafUpdate) ClearLeafSpentOperatorSpecificOwnershipSignature() *
 }
 
 // SetLeafSpentTransactionInputVout sets the "leaf_spent_transaction_input_vout" field.
-func (tlu *TokenLeafUpdate) SetLeafSpentTransactionInputVout(u uint32) *TokenLeafUpdate {
+func (tlu *TokenLeafUpdate) SetLeafSpentTransactionInputVout(i int32) *TokenLeafUpdate {
 	tlu.mutation.ResetLeafSpentTransactionInputVout()
-	tlu.mutation.SetLeafSpentTransactionInputVout(u)
+	tlu.mutation.SetLeafSpentTransactionInputVout(i)
 	return tlu
 }
 
 // SetNillableLeafSpentTransactionInputVout sets the "leaf_spent_transaction_input_vout" field if the given value is not nil.
-func (tlu *TokenLeafUpdate) SetNillableLeafSpentTransactionInputVout(u *uint32) *TokenLeafUpdate {
-	if u != nil {
-		tlu.SetLeafSpentTransactionInputVout(*u)
+func (tlu *TokenLeafUpdate) SetNillableLeafSpentTransactionInputVout(i *int32) *TokenLeafUpdate {
+	if i != nil {
+		tlu.SetLeafSpentTransactionInputVout(*i)
 	}
 	return tlu
 }
 
-// AddLeafSpentTransactionInputVout adds u to the "leaf_spent_transaction_input_vout" field.
-func (tlu *TokenLeafUpdate) AddLeafSpentTransactionInputVout(u int32) *TokenLeafUpdate {
-	tlu.mutation.AddLeafSpentTransactionInputVout(u)
+// AddLeafSpentTransactionInputVout adds i to the "leaf_spent_transaction_input_vout" field.
+func (tlu *TokenLeafUpdate) AddLeafSpentTransactionInputVout(i int32) *TokenLeafUpdate {
+	tlu.mutation.AddLeafSpentTransactionInputVout(i)
 	return tlu
 }
 
@@ -111,6 +111,38 @@ func (tlu *TokenLeafUpdate) SetLeafSpentRevocationPrivateKey(b []byte) *TokenLea
 // ClearLeafSpentRevocationPrivateKey clears the value of the "leaf_spent_revocation_private_key" field.
 func (tlu *TokenLeafUpdate) ClearLeafSpentRevocationPrivateKey() *TokenLeafUpdate {
 	tlu.mutation.ClearLeafSpentRevocationPrivateKey()
+	return tlu
+}
+
+// SetConfirmedWithdrawBlockHash sets the "confirmed_withdraw_block_hash" field.
+func (tlu *TokenLeafUpdate) SetConfirmedWithdrawBlockHash(b []byte) *TokenLeafUpdate {
+	tlu.mutation.SetConfirmedWithdrawBlockHash(b)
+	return tlu
+}
+
+// ClearConfirmedWithdrawBlockHash clears the value of the "confirmed_withdraw_block_hash" field.
+func (tlu *TokenLeafUpdate) ClearConfirmedWithdrawBlockHash() *TokenLeafUpdate {
+	tlu.mutation.ClearConfirmedWithdrawBlockHash()
+	return tlu
+}
+
+// SetNetwork sets the "network" field.
+func (tlu *TokenLeafUpdate) SetNetwork(s schema.Network) *TokenLeafUpdate {
+	tlu.mutation.SetNetwork(s)
+	return tlu
+}
+
+// SetNillableNetwork sets the "network" field if the given value is not nil.
+func (tlu *TokenLeafUpdate) SetNillableNetwork(s *schema.Network) *TokenLeafUpdate {
+	if s != nil {
+		tlu.SetNetwork(*s)
+	}
+	return tlu
+}
+
+// ClearNetwork clears the value of the "network" field.
+func (tlu *TokenLeafUpdate) ClearNetwork() *TokenLeafUpdate {
+	tlu.mutation.ClearNetwork()
 	return tlu
 }
 
@@ -212,6 +244,11 @@ func (tlu *TokenLeafUpdate) check() error {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "TokenLeaf.status": %w`, err)}
 		}
 	}
+	if v, ok := tlu.mutation.Network(); ok {
+		if err := tokenleaf.NetworkValidator(v); err != nil {
+			return &ValidationError{Name: "network", err: fmt.Errorf(`ent: validator failed for field "TokenLeaf.network": %w`, err)}
+		}
+	}
 	if tlu.mutation.RevocationKeyshareCleared() && len(tlu.mutation.RevocationKeyshareIDs()) > 0 {
 		return errors.New(`ent: clearing a required unique edge "TokenLeaf.revocation_keyshare"`)
 	}
@@ -249,19 +286,31 @@ func (tlu *TokenLeafUpdate) sqlSave(ctx context.Context) (n int, err error) {
 		_spec.ClearField(tokenleaf.FieldLeafSpentOperatorSpecificOwnershipSignature, field.TypeBytes)
 	}
 	if value, ok := tlu.mutation.LeafSpentTransactionInputVout(); ok {
-		_spec.SetField(tokenleaf.FieldLeafSpentTransactionInputVout, field.TypeUint32, value)
+		_spec.SetField(tokenleaf.FieldLeafSpentTransactionInputVout, field.TypeInt32, value)
 	}
 	if value, ok := tlu.mutation.AddedLeafSpentTransactionInputVout(); ok {
-		_spec.AddField(tokenleaf.FieldLeafSpentTransactionInputVout, field.TypeUint32, value)
+		_spec.AddField(tokenleaf.FieldLeafSpentTransactionInputVout, field.TypeInt32, value)
 	}
 	if tlu.mutation.LeafSpentTransactionInputVoutCleared() {
-		_spec.ClearField(tokenleaf.FieldLeafSpentTransactionInputVout, field.TypeUint32)
+		_spec.ClearField(tokenleaf.FieldLeafSpentTransactionInputVout, field.TypeInt32)
 	}
 	if value, ok := tlu.mutation.LeafSpentRevocationPrivateKey(); ok {
 		_spec.SetField(tokenleaf.FieldLeafSpentRevocationPrivateKey, field.TypeBytes, value)
 	}
 	if tlu.mutation.LeafSpentRevocationPrivateKeyCleared() {
 		_spec.ClearField(tokenleaf.FieldLeafSpentRevocationPrivateKey, field.TypeBytes)
+	}
+	if value, ok := tlu.mutation.ConfirmedWithdrawBlockHash(); ok {
+		_spec.SetField(tokenleaf.FieldConfirmedWithdrawBlockHash, field.TypeBytes, value)
+	}
+	if tlu.mutation.ConfirmedWithdrawBlockHashCleared() {
+		_spec.ClearField(tokenleaf.FieldConfirmedWithdrawBlockHash, field.TypeBytes)
+	}
+	if value, ok := tlu.mutation.Network(); ok {
+		_spec.SetField(tokenleaf.FieldNetwork, field.TypeEnum, value)
+	}
+	if tlu.mutation.NetworkCleared() {
+		_spec.ClearField(tokenleaf.FieldNetwork, field.TypeEnum)
 	}
 	if tlu.mutation.LeafCreatedTokenTransactionReceiptCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -386,23 +435,23 @@ func (tluo *TokenLeafUpdateOne) ClearLeafSpentOperatorSpecificOwnershipSignature
 }
 
 // SetLeafSpentTransactionInputVout sets the "leaf_spent_transaction_input_vout" field.
-func (tluo *TokenLeafUpdateOne) SetLeafSpentTransactionInputVout(u uint32) *TokenLeafUpdateOne {
+func (tluo *TokenLeafUpdateOne) SetLeafSpentTransactionInputVout(i int32) *TokenLeafUpdateOne {
 	tluo.mutation.ResetLeafSpentTransactionInputVout()
-	tluo.mutation.SetLeafSpentTransactionInputVout(u)
+	tluo.mutation.SetLeafSpentTransactionInputVout(i)
 	return tluo
 }
 
 // SetNillableLeafSpentTransactionInputVout sets the "leaf_spent_transaction_input_vout" field if the given value is not nil.
-func (tluo *TokenLeafUpdateOne) SetNillableLeafSpentTransactionInputVout(u *uint32) *TokenLeafUpdateOne {
-	if u != nil {
-		tluo.SetLeafSpentTransactionInputVout(*u)
+func (tluo *TokenLeafUpdateOne) SetNillableLeafSpentTransactionInputVout(i *int32) *TokenLeafUpdateOne {
+	if i != nil {
+		tluo.SetLeafSpentTransactionInputVout(*i)
 	}
 	return tluo
 }
 
-// AddLeafSpentTransactionInputVout adds u to the "leaf_spent_transaction_input_vout" field.
-func (tluo *TokenLeafUpdateOne) AddLeafSpentTransactionInputVout(u int32) *TokenLeafUpdateOne {
-	tluo.mutation.AddLeafSpentTransactionInputVout(u)
+// AddLeafSpentTransactionInputVout adds i to the "leaf_spent_transaction_input_vout" field.
+func (tluo *TokenLeafUpdateOne) AddLeafSpentTransactionInputVout(i int32) *TokenLeafUpdateOne {
+	tluo.mutation.AddLeafSpentTransactionInputVout(i)
 	return tluo
 }
 
@@ -421,6 +470,38 @@ func (tluo *TokenLeafUpdateOne) SetLeafSpentRevocationPrivateKey(b []byte) *Toke
 // ClearLeafSpentRevocationPrivateKey clears the value of the "leaf_spent_revocation_private_key" field.
 func (tluo *TokenLeafUpdateOne) ClearLeafSpentRevocationPrivateKey() *TokenLeafUpdateOne {
 	tluo.mutation.ClearLeafSpentRevocationPrivateKey()
+	return tluo
+}
+
+// SetConfirmedWithdrawBlockHash sets the "confirmed_withdraw_block_hash" field.
+func (tluo *TokenLeafUpdateOne) SetConfirmedWithdrawBlockHash(b []byte) *TokenLeafUpdateOne {
+	tluo.mutation.SetConfirmedWithdrawBlockHash(b)
+	return tluo
+}
+
+// ClearConfirmedWithdrawBlockHash clears the value of the "confirmed_withdraw_block_hash" field.
+func (tluo *TokenLeafUpdateOne) ClearConfirmedWithdrawBlockHash() *TokenLeafUpdateOne {
+	tluo.mutation.ClearConfirmedWithdrawBlockHash()
+	return tluo
+}
+
+// SetNetwork sets the "network" field.
+func (tluo *TokenLeafUpdateOne) SetNetwork(s schema.Network) *TokenLeafUpdateOne {
+	tluo.mutation.SetNetwork(s)
+	return tluo
+}
+
+// SetNillableNetwork sets the "network" field if the given value is not nil.
+func (tluo *TokenLeafUpdateOne) SetNillableNetwork(s *schema.Network) *TokenLeafUpdateOne {
+	if s != nil {
+		tluo.SetNetwork(*s)
+	}
+	return tluo
+}
+
+// ClearNetwork clears the value of the "network" field.
+func (tluo *TokenLeafUpdateOne) ClearNetwork() *TokenLeafUpdateOne {
+	tluo.mutation.ClearNetwork()
 	return tluo
 }
 
@@ -535,6 +616,11 @@ func (tluo *TokenLeafUpdateOne) check() error {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "TokenLeaf.status": %w`, err)}
 		}
 	}
+	if v, ok := tluo.mutation.Network(); ok {
+		if err := tokenleaf.NetworkValidator(v); err != nil {
+			return &ValidationError{Name: "network", err: fmt.Errorf(`ent: validator failed for field "TokenLeaf.network": %w`, err)}
+		}
+	}
 	if tluo.mutation.RevocationKeyshareCleared() && len(tluo.mutation.RevocationKeyshareIDs()) > 0 {
 		return errors.New(`ent: clearing a required unique edge "TokenLeaf.revocation_keyshare"`)
 	}
@@ -589,19 +675,31 @@ func (tluo *TokenLeafUpdateOne) sqlSave(ctx context.Context) (_node *TokenLeaf, 
 		_spec.ClearField(tokenleaf.FieldLeafSpentOperatorSpecificOwnershipSignature, field.TypeBytes)
 	}
 	if value, ok := tluo.mutation.LeafSpentTransactionInputVout(); ok {
-		_spec.SetField(tokenleaf.FieldLeafSpentTransactionInputVout, field.TypeUint32, value)
+		_spec.SetField(tokenleaf.FieldLeafSpentTransactionInputVout, field.TypeInt32, value)
 	}
 	if value, ok := tluo.mutation.AddedLeafSpentTransactionInputVout(); ok {
-		_spec.AddField(tokenleaf.FieldLeafSpentTransactionInputVout, field.TypeUint32, value)
+		_spec.AddField(tokenleaf.FieldLeafSpentTransactionInputVout, field.TypeInt32, value)
 	}
 	if tluo.mutation.LeafSpentTransactionInputVoutCleared() {
-		_spec.ClearField(tokenleaf.FieldLeafSpentTransactionInputVout, field.TypeUint32)
+		_spec.ClearField(tokenleaf.FieldLeafSpentTransactionInputVout, field.TypeInt32)
 	}
 	if value, ok := tluo.mutation.LeafSpentRevocationPrivateKey(); ok {
 		_spec.SetField(tokenleaf.FieldLeafSpentRevocationPrivateKey, field.TypeBytes, value)
 	}
 	if tluo.mutation.LeafSpentRevocationPrivateKeyCleared() {
 		_spec.ClearField(tokenleaf.FieldLeafSpentRevocationPrivateKey, field.TypeBytes)
+	}
+	if value, ok := tluo.mutation.ConfirmedWithdrawBlockHash(); ok {
+		_spec.SetField(tokenleaf.FieldConfirmedWithdrawBlockHash, field.TypeBytes, value)
+	}
+	if tluo.mutation.ConfirmedWithdrawBlockHashCleared() {
+		_spec.ClearField(tokenleaf.FieldConfirmedWithdrawBlockHash, field.TypeBytes)
+	}
+	if value, ok := tluo.mutation.Network(); ok {
+		_spec.SetField(tokenleaf.FieldNetwork, field.TypeEnum, value)
+	}
+	if tluo.mutation.NetworkCleared() {
+		_spec.ClearField(tokenleaf.FieldNetwork, field.TypeEnum)
 	}
 	if tluo.mutation.LeafCreatedTokenTransactionReceiptCleared() {
 		edge := &sqlgraph.EdgeSpec{

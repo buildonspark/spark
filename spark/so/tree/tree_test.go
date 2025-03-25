@@ -10,7 +10,7 @@ import (
 )
 
 func TestGetLeafDenominationCounts(t *testing.T) {
-	conn, err := common.NewGRPCConnectionWithTestTLS("localhost:8535")
+	conn, err := common.NewGRPCConnectionWithTestTLS("localhost:8535", nil)
 	if err != nil {
 		t.Fatalf("failed to connect to operator: %v", err)
 	}

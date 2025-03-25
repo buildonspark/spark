@@ -81,6 +81,18 @@ func (tlc *TransferLeafCreate) SetKeyTweak(b []byte) *TransferLeafCreate {
 	return tlc
 }
 
+// SetSenderKeyTweakProof sets the "sender_key_tweak_proof" field.
+func (tlc *TransferLeafCreate) SetSenderKeyTweakProof(b []byte) *TransferLeafCreate {
+	tlc.mutation.SetSenderKeyTweakProof(b)
+	return tlc
+}
+
+// SetReceiverKeyTweak sets the "receiver_key_tweak" field.
+func (tlc *TransferLeafCreate) SetReceiverKeyTweak(b []byte) *TransferLeafCreate {
+	tlc.mutation.SetReceiverKeyTweak(b)
+	return tlc
+}
+
 // SetID sets the "id" field.
 func (tlc *TransferLeafCreate) SetID(u uuid.UUID) *TransferLeafCreate {
 	tlc.mutation.SetID(u)
@@ -258,6 +270,14 @@ func (tlc *TransferLeafCreate) createSpec() (*TransferLeaf, *sqlgraph.CreateSpec
 	if value, ok := tlc.mutation.KeyTweak(); ok {
 		_spec.SetField(transferleaf.FieldKeyTweak, field.TypeBytes, value)
 		_node.KeyTweak = value
+	}
+	if value, ok := tlc.mutation.SenderKeyTweakProof(); ok {
+		_spec.SetField(transferleaf.FieldSenderKeyTweakProof, field.TypeBytes, value)
+		_node.SenderKeyTweakProof = value
+	}
+	if value, ok := tlc.mutation.ReceiverKeyTweak(); ok {
+		_spec.SetField(transferleaf.FieldReceiverKeyTweak, field.TypeBytes, value)
+		_node.ReceiverKeyTweak = value
 	}
 	if nodes := tlc.mutation.TransferIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{

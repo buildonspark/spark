@@ -61,7 +61,7 @@ func (o *DepositHandler) GenerateDepositAddress(ctx context.Context, config *so.
 
 	selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
 	_, err = helper.ExecuteTaskWithAllOperators(ctx, config, &selection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
-		conn, err := common.NewGRPCConnectionWithCert(operator.Address, operator.CertPath)
+		conn, err := operator.NewGRPCConnection()
 		if err != nil {
 			return nil, err
 		}
@@ -96,7 +96,7 @@ func (o *DepositHandler) GenerateDepositAddress(ctx context.Context, config *so.
 	}
 
 	response, err := helper.ExecuteTaskWithAllOperators(ctx, config, &selection, func(ctx context.Context, operator *so.SigningOperator) ([]byte, error) {
-		conn, err := common.NewGRPCConnectionWithCert(operator.Address, operator.CertPath)
+		conn, err := operator.NewGRPCConnection()
 		if err != nil {
 			return nil, err
 		}
@@ -290,7 +290,7 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 		SetSigningKeyshare(signingKeyShare).
 		SetRawTx(req.RootTxSigningJob.RawTx).
 		SetRawRefundTx(req.RefundTxSigningJob.RawTx).
-		SetVout(uint16(req.OnChainUtxo.Vout)).
+		SetVout(int16(req.OnChainUtxo.Vout)).
 		Save(ctx)
 	if err != nil {
 		return nil, err
