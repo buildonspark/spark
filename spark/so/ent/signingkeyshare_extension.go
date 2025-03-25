@@ -57,7 +57,7 @@ func (keyshare *SigningKeyshare) MarshalProto() *pb.SigningKeyshare {
 
 	return &pb.SigningKeyshare{
 		OwnerIdentifiers: ownerIdentifiers,
-		Threshold:        keyshare.MinSigners,
+		Threshold:        uint32(keyshare.MinSigners),
 	}
 }
 
@@ -109,7 +109,7 @@ func GetUnusedSigningKeyshares(ctx context.Context, dbClient *Client, config *so
 
 // MarkSigningKeysharesAsUsed marks the given keyshares as used. If any of the keyshares are not
 // found or not available, it returns an error.
-func MarkSigningKeysharesAsUsed(ctx context.Context, config *so.Config, ids []uuid.UUID) (map[uuid.UUID]*SigningKeyshare, error) {
+func MarkSigningKeysharesAsUsed(ctx context.Context, _ *so.Config, ids []uuid.UUID) (map[uuid.UUID]*SigningKeyshare, error) {
 	db := GetDbFromContext(ctx)
 	log.Printf("Marking keyshares as used: %v", ids)
 
@@ -151,7 +151,7 @@ func GetKeyPackage(ctx context.Context, config *so.Config, keyshareID uuid.UUID)
 		SecretShare:  keyshare.SecretShare,
 		PublicShares: keyshare.PublicShares,
 		PublicKey:    keyshare.PublicKey,
-		MinSigners:   keyshare.MinSigners,
+		MinSigners:   uint32(keyshare.MinSigners),
 	}
 
 	return keyPackage, nil
@@ -173,7 +173,7 @@ func GetKeyPackages(ctx context.Context, config *so.Config, keyshareIDs []uuid.U
 			SecretShare:  keyshare.SecretShare,
 			PublicShares: keyshare.PublicShares,
 			PublicKey:    keyshare.PublicKey,
-			MinSigners:   keyshare.MinSigners,
+			MinSigners:   uint32(keyshare.MinSigners),
 		}
 	}
 
@@ -246,7 +246,7 @@ func sumOfSigningKeyshares(keyshares []*SigningKeyshare) (*SigningKeyshare, erro
 
 // CalculateAndStoreLastKey calculates the last key from the given keyshares and stores it in the database.
 // The target = sum(keyshares) + last_key
-func CalculateAndStoreLastKey(ctx context.Context, config *so.Config, target *SigningKeyshare, keyshares []*SigningKeyshare, id uuid.UUID) (*SigningKeyshare, error) {
+func CalculateAndStoreLastKey(ctx context.Context, _ *so.Config, target *SigningKeyshare, keyshares []*SigningKeyshare, id uuid.UUID) (*SigningKeyshare, error) {
 	if len(keyshares) == 0 {
 		return target, nil
 	}
@@ -265,7 +265,7 @@ func CalculateAndStoreLastKey(ctx context.Context, config *so.Config, target *Si
 	if err != nil {
 		return nil, err
 	}
-	if bytes.Compare(verifyLastKey, target.SecretShare) != 0 {
+	if !bytes.Equal(verifyLastKey, target.SecretShare) {
 		return nil, fmt.Errorf("last key verification failed")
 	}
 
@@ -278,7 +278,7 @@ func CalculateAndStoreLastKey(ctx context.Context, config *so.Config, target *Si
 	if err != nil {
 		return nil, err
 	}
-	if bytes.Compare(verifyVerifyingKey, target.PublicKey) != 0 {
+	if !bytes.Equal(verifyVerifyingKey, target.PublicKey) {
 		return nil, fmt.Errorf("verifying key verification failed")
 	}
 
@@ -309,7 +309,7 @@ func CalculateAndStoreLastKey(ctx context.Context, config *so.Config, target *Si
 }
 
 // AggregateKeyshares aggregates the given keyshares and updates the keyshare in the database.
-func AggregateKeyshares(ctx context.Context, config *so.Config, keyshares []*SigningKeyshare, updateKeyshareID uuid.UUID) (*SigningKeyshare, error) {
+func AggregateKeyshares(ctx context.Context, _ *so.Config, keyshares []*SigningKeyshare, updateKeyshareID uuid.UUID) (*SigningKeyshare, error) {
 	sumKeyshare, err := sumOfSigningKeyshares(keyshares)
 	if err != nil {
 		return nil, err
@@ -349,7 +349,11 @@ func RunDKGIfNeeded(db *Client, config *so.Config) error {
 }
 
 func RunDKG(ctx context.Context, config *so.Config) error {
-	connection, err := common.NewGRPCConnectionWithCert(config.DKGCoordinatorAddress, config.SigningOperatorMap[config.Identifier].CertPath)
+	connection, err := common.NewGRPCConnection(
+		config.DKGCoordinatorAddress,
+		config.SigningOperatorMap[config.Identifier].CertPath,
+		nil,
+	)
 	if err != nil {
 		log.Printf("Failed to create connection to DKG coordinator: %v, cert path: %v", err, config.SigningOperatorMap[config.Identifier].CertPath)
 		return err

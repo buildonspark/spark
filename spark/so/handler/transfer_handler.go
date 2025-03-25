@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"log"
-	"log/slog"
 	"math/big"
 	"time"
 
@@ -52,7 +50,16 @@ func (h *TransferHandler) StartSendTransfer(ctx context.Context, req *pb.StartSe
 	for _, leaf := range req.LeavesToSend {
 		leafRefundMap[leaf.LeafId] = leaf.RefundTxSigningJob.RawTx
 	}
-	transfer, leafMap, err := h.createTransfer(ctx, req.TransferId, schema.TransferTypeTransfer, req.ExpiryTime.AsTime(), req.OwnerIdentityPublicKey, req.ReceiverIdentityPublicKey, leafRefundMap)
+	transfer, leafMap, err := h.createTransfer(
+		ctx,
+		req.TransferId,
+		schema.TransferTypeTransfer,
+		req.ExpiryTime.AsTime(),
+		req.OwnerIdentityPublicKey,
+		req.ReceiverIdentityPublicKey,
+		leafRefundMap,
+		req.KeyTweakProofs,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +93,16 @@ func (h *TransferHandler) InitiateLeafSwap(ctx context.Context, req *pb.LeafSwap
 	for _, leaf := range reqTransfer.LeavesToSend {
 		leafRefundMap[leaf.LeafId] = leaf.RefundTxSigningJob.RawTx
 	}
-	transfer, leafMap, err := h.createTransfer(ctx, reqTransfer.TransferId, schema.TransferTypeTransfer, reqTransfer.ExpiryTime.AsTime(), reqTransfer.OwnerIdentityPublicKey, reqTransfer.ReceiverIdentityPublicKey, leafRefundMap)
+	transfer, leafMap, err := h.createTransfer(
+		ctx,
+		reqTransfer.TransferId,
+		schema.TransferTypeTransfer,
+		reqTransfer.ExpiryTime.AsTime(),
+		reqTransfer.OwnerIdentityPublicKey,
+		reqTransfer.ReceiverIdentityPublicKey,
+		leafRefundMap,
+		reqTransfer.KeyTweakProofs,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -128,9 +144,8 @@ func (h *TransferHandler) syncTransferInit(ctx context.Context, req *pb.StartSen
 		Option: helper.OperatorSelectionOptionExcludeSelf,
 	}
 	_, err := helper.ExecuteTaskWithAllOperators(ctx, h.config, &selection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
-		conn, err := common.NewGRPCConnectionWithCert(operator.Address, operator.CertPath)
+		conn, err := operator.NewGRPCConnection()
 		if err != nil {
-			log.Printf("Failed to connect to operator: %v", err)
 			return nil, err
 		}
 		defer conn.Close()
@@ -232,10 +247,12 @@ func (h *TransferHandler) CompleteSendTransfer(ctx context.Context, req *pb.Comp
 			return nil, fmt.Errorf("unable to find preimage request for transfer %s: %v", transfer.ID.String(), err)
 		}
 		shouldTweakKey = preimageRequest.Status == schema.PreimageRequestStatusPreimageShared
+	} else if transfer.Type == schema.TransferTypeCooperativeExit {
+		err = checkCoopExitTxBroadcasted(ctx, db, transfer)
+		shouldTweakKey = err == nil
 	}
 
 	for _, leaf := range req.LeavesToSend {
-		log.Printf("complete send leaf %s shouldTweakKey: %v", leaf.LeafId, shouldTweakKey)
 		err = h.completeSendLeaf(ctx, transfer, leaf, shouldTweakKey)
 		if err != nil {
 			return nil, fmt.Errorf("unable to complete send leaf transfer for leaf %s: %v", leaf.LeafId, err)
@@ -304,6 +321,21 @@ func (h *TransferHandler) completeSendLeaf(ctx context.Context, transfer *ent.Tr
 		return fmt.Errorf("unable to get transfer leaf %s: %v", req.LeafId, err)
 	}
 
+	// Optional verify if the sender key tweak proof is the same as the one in previous call.
+	if transferLeaf.SenderKeyTweakProof != nil {
+		proof := &pb.SecretProof{}
+		err = proto.Unmarshal(transferLeaf.SenderKeyTweakProof, proof)
+		if err != nil {
+			return fmt.Errorf("unable to unmarshal sender key tweak proof: %v", err)
+		}
+		shareProof := req.SecretShareTweak.Proofs
+		for i, proof := range proof.Proofs {
+			if !bytes.Equal(proof, shareProof[i]) {
+				return fmt.Errorf("sender key tweak proof mismatch")
+			}
+		}
+	}
+
 	refundTxBytes, err := common.UpdateTxWithSignature(transferLeaf.IntermediateRefundTx, 0, req.RefundSignature)
 	if err != nil {
 		return fmt.Errorf("unable to update refund tx with signature: %v", err)
@@ -346,50 +378,12 @@ func (h *TransferHandler) completeSendLeaf(ctx context.Context, transfer *ent.Tr
 	}
 
 	if shouldTweakKey {
-		err = h.tweakLeafKey(ctx, leaf, req, refundTxBytes)
+		err = helper.TweakLeafKey(ctx, leaf, req, refundTxBytes)
 		if err != nil {
 			return fmt.Errorf("unable to tweak leaf key: %v", err)
 		}
 	}
 
-	return nil
-}
-
-func (h *TransferHandler) tweakLeafKey(ctx context.Context, leaf *ent.TreeNode, req *pb.SendLeafKeyTweak, updatedRefundTx []byte) error {
-	// Tweak keyshare
-	keyshare, err := leaf.QuerySigningKeyshare().First(ctx)
-	if err != nil || keyshare == nil {
-		return fmt.Errorf("unable to load keyshare for leaf %s: %v", req.LeafId, err)
-	}
-	slog.Debug("Transfer tweak key: keyshare loaded")
-	keyshare, err = keyshare.TweakKeyShare(
-		ctx,
-		req.SecretShareTweak.SecretShare,
-		req.SecretShareTweak.Proofs[0],
-		req.PubkeySharesTweak,
-	)
-	if err != nil || keyshare == nil {
-		return fmt.Errorf("unable to tweak keyshare %s for leaf %s: %v", keyshare.ID.String(), req.LeafId, err)
-	}
-	slog.Debug("Transfer tweak key: keyshare tweaked")
-
-	// Update leaf
-	signingPubkey, err := common.SubtractPublicKeys(leaf.VerifyingPubkey, keyshare.PublicKey)
-	if err != nil {
-		return fmt.Errorf("unable to calculate new signing pubkey for leaf %s: %v", req.LeafId, err)
-	}
-	slog.Debug("Transfer tweak key: signingPubkey calculated")
-	leafMutator := leaf.
-		Update().
-		SetOwnerSigningPubkey(signingPubkey)
-	if updatedRefundTx != nil {
-		leafMutator.SetRawRefundTx(updatedRefundTx)
-	}
-	leaf, err = leafMutator.Save(ctx)
-	if err != nil || leaf == nil {
-		return fmt.Errorf("unable to update leaf %s: %v", req.LeafId, err)
-	}
-	slog.Debug("Transfer tweak key: leaf updated")
 	return nil
 }
 
@@ -408,10 +402,6 @@ func (h *TransferHandler) QueryPendingTransfers(ctx context.Context, req *pb.Que
 				schema.TransferStatusReceiverKeyTweaked,
 				schema.TransferStatusReceiverRefundSigned,
 			),
-			enttransfer.Or(
-				enttransfer.ExpiryTimeGT(time.Now()),
-				enttransfer.ExpiryTimeEQ(time.Unix(0, 0)),
-			),
 		)
 	case *pb.QueryPendingTransfersRequest_SenderIdentityPublicKey:
 		if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, req.GetSenderIdentityPublicKey()); err != nil {
@@ -420,9 +410,10 @@ func (h *TransferHandler) QueryPendingTransfers(ctx context.Context, req *pb.Que
 		transferPredicate = append(transferPredicate, enttransfer.SenderIdentityPubkeyEQ(req.GetSenderIdentityPublicKey()))
 		transferPredicate = append(transferPredicate,
 			enttransfer.StatusIn(
-				schema.TransferStatusSenderKeyTweaked,
+				schema.TransferStatusSenderKeyTweakPending,
 				schema.TransferStatusSenderInitiated,
 			),
+			enttransfer.ExpiryTimeLT(time.Now()),
 		)
 	}
 	if req.TransferIds != nil {
@@ -545,8 +536,10 @@ func (h *TransferHandler) ClaimTransferTweakKeys(ctx context.Context, req *pb.Cl
 		return fmt.Errorf("unable to load transfer %s: %v", req.TransferId, err)
 	}
 	// TODO (yun): Check with other SO if expires
-	if !bytes.Equal(transfer.ReceiverIdentityPubkey, req.OwnerIdentityPublicKey) || transfer.Status != schema.TransferStatusSenderKeyTweaked || (transfer.ExpiryTime.Unix() != 0 && transfer.ExpiryTime.Before(time.Now())) {
-		return fmt.Errorf("transfer cannot be claimed %s", req.TransferId)
+	if !bytes.Equal(transfer.ReceiverIdentityPubkey, req.OwnerIdentityPublicKey) ||
+		(transfer.Status != schema.TransferStatusSenderKeyTweaked && transfer.Status != schema.TransferStatusReceiverKeyTweaked) ||
+		(transfer.ExpiryTime.Unix() != 0 && transfer.ExpiryTime.Before(time.Now())) {
+		return fmt.Errorf("transfer cannot be claimed %s, status: %s, expiry time: %s", req.TransferId, transfer.Status, transfer.ExpiryTime)
 	}
 
 	db := ent.GetDbFromContext(ctx)
@@ -555,23 +548,32 @@ func (h *TransferHandler) ClaimTransferTweakKeys(ctx context.Context, req *pb.Cl
 	}
 
 	// Validate leaves count
-	leaves, err := h.getLeavesFromTransfer(ctx, transfer)
+	transferLeaves, err := transfer.QueryTransferLeaves().WithLeaf().All(ctx)
 	if err != nil {
-		return fmt.Errorf("unable to get leaves from transfer %s: %v", req.TransferId, err)
+		return fmt.Errorf("unable to get transfer leaves for transfer %s: %v", req.TransferId, err)
 	}
-	if len(*leaves) != len(req.LeavesToReceive) {
+	if len(transferLeaves) != len(req.LeavesToReceive) {
 		return fmt.Errorf("inconsistent leaves to claim for transfer %s", req.TransferId)
 	}
 
-	// Tweak keys
+	leafMap := make(map[string]*ent.TransferLeaf)
+	for _, leaf := range transferLeaves {
+		leafMap[leaf.Edges.Leaf.ID.String()] = leaf
+	}
+
+	// Store key tweaks
 	for _, leafTweak := range req.LeavesToReceive {
-		leaf, exists := (*leaves)[leafTweak.LeafId]
+		leaf, exists := leafMap[leafTweak.LeafId]
 		if !exists {
 			return fmt.Errorf("unexpected leaf id %s", leafTweak.LeafId)
 		}
-		err = h.claimLeafTweakKey(ctx, leaf, leafTweak, req.OwnerIdentityPublicKey)
+		leafTweakBytes, err := proto.Marshal(leafTweak)
 		if err != nil {
-			return fmt.Errorf("unable to tweak key for leaf %s: %v", leafTweak.LeafId, err)
+			return fmt.Errorf("unable to marshal leaf tweak: %v", err)
+		}
+		leaf, err = leaf.Update().SetKeyTweak(leafTweakBytes).Save(ctx)
+		if err != nil {
+			return fmt.Errorf("unable to update leaf %s: %v", leaf.ID.String(), err)
 		}
 	}
 
@@ -635,19 +637,98 @@ func (h *TransferHandler) claimLeafTweakKey(ctx context.Context, leaf *ent.TreeN
 }
 
 func (h *TransferHandler) getLeavesFromTransfer(ctx context.Context, transfer *ent.Transfer) (*map[string]*ent.TreeNode, error) {
-	transferLeaves, err := transfer.QueryTransferLeaves().All(ctx)
+	transferLeaves, err := transfer.QueryTransferLeaves().WithLeaf().All(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get leaves for transfer %s: %v", transfer.ID.String(), err)
 	}
 	leaves := make(map[string]*ent.TreeNode)
 	for _, transferLeaf := range transferLeaves {
-		leaf, err := transferLeaf.QueryLeaf().First(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("unable to get leaf %s: %v", transferLeaf.ID.String(), err)
-		}
-		leaves[leaf.ID.String()] = leaf
+		leaves[transferLeaf.Edges.Leaf.ID.String()] = transferLeaf.Edges.Leaf
 	}
 	return &leaves, nil
+}
+
+func (h *TransferHandler) ValidateKeyTweakProof(ctx context.Context, transferLeaves []*ent.TransferLeaf, keyTweakProofs map[string]*pb.SecretProof) error {
+	for _, leaf := range transferLeaves {
+		treeNode, err := leaf.QueryLeaf().Only(ctx)
+		if err != nil {
+			return fmt.Errorf("unable to get tree node for leaf %s: %v", leaf.ID.String(), err)
+		}
+		proof, exists := keyTweakProofs[treeNode.ID.String()]
+		if !exists {
+			return fmt.Errorf("key tweak proof for leaf %s not found", leaf.ID.String())
+		}
+		keyTweakProto := &pb.ClaimLeafKeyTweak{}
+		err = proto.Unmarshal(leaf.KeyTweak, keyTweakProto)
+		if err != nil {
+			return fmt.Errorf("unable to unmarshal key tweak for leaf %s: %v", leaf.ID.String(), err)
+		}
+		for i, proof := range proof.Proofs {
+			if !bytes.Equal(keyTweakProto.SecretShareTweak.Proofs[i], proof) {
+				return fmt.Errorf("key tweak proof for leaf %s is invalid, the proof provided is not the same as key tweak proof. please check your implementation to see if you are claiming the same transfer multiple times at the same time", leaf.ID.String())
+			}
+		}
+	}
+	return nil
+}
+
+func (h *TransferHandler) revertClaimTransfer(ctx context.Context, transfer *ent.Transfer, transferLeaves []*ent.TransferLeaf) error {
+	_, err := transfer.Update().SetStatus(schema.TransferStatusSenderKeyTweaked).Save(ctx)
+	if err != nil {
+		return fmt.Errorf("unable to update transfer status %s: %v", transfer.ID.String(), err)
+	}
+	for _, leaf := range transferLeaves {
+		leaf, err := leaf.Update().SetKeyTweak(nil).Save(ctx)
+		if err != nil {
+			return fmt.Errorf("unable to update leaf %s: %v", leaf.ID.String(), err)
+		}
+	}
+	return nil
+}
+
+func (h *TransferHandler) settleReceiverKeyTweak(ctx context.Context, transfer *ent.Transfer, keyTweakProofs map[string]*pb.SecretProof) error {
+	tweakKey := true
+	if keyTweakProofs != nil {
+		// Only validate key tweak proof if it is provided for backward compatibility.
+		selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
+		_, err := helper.ExecuteTaskWithAllOperators(ctx, h.config, &selection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
+			conn, err := operator.NewGRPCConnection()
+			if err != nil {
+				return nil, err
+			}
+			defer conn.Close()
+			client := pbinternal.NewSparkInternalServiceClient(conn)
+			return client.InitiateSettleReceiverKeyTweak(ctx, &pbinternal.InitiateSettleReceiverKeyTweakRequest{
+				TransferId:     transfer.ID.String(),
+				KeyTweakProofs: keyTweakProofs,
+			})
+		})
+		if err != nil {
+			tweakKey = false
+		}
+	}
+
+	selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionAll}
+	_, err := helper.ExecuteTaskWithAllOperators(ctx, h.config, &selection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
+		conn, err := operator.NewGRPCConnection()
+		if err != nil {
+			return nil, err
+		}
+		defer conn.Close()
+		client := pbinternal.NewSparkInternalServiceClient(conn)
+		return client.SettleReceiverKeyTweak(ctx, &pbinternal.SettleReceiverKeyTweakRequest{
+			TransferId: transfer.ID.String(),
+			TweakKey:   tweakKey,
+		})
+	})
+	if err != nil {
+		// At this point, this is not recoverable. But this should not happen in theory.
+		return fmt.Errorf("unable to settle receiver key tweak: %v", err)
+	}
+	if !tweakKey {
+		return fmt.Errorf("unable to settle receiver key tweak: %v, you might have a race condition in your implementation", err)
+	}
+	return nil
 }
 
 // ClaimTransferSignRefunds signs new refund transactions as part of the transfer.
@@ -656,7 +737,7 @@ func (h *TransferHandler) ClaimTransferSignRefunds(ctx context.Context, req *pb.
 		return nil, err
 	}
 
-	transfer, err := h.loadTransfer(ctx, req.TransferId)
+	transfer, err := h.loadTransferWithoutUpdate(ctx, req.TransferId)
 	if err != nil {
 		return nil, fmt.Errorf("unable to load transfer %s: %v", req.TransferId, err)
 	}
@@ -677,6 +758,14 @@ func (h *TransferHandler) ClaimTransferSignRefunds(ctx context.Context, req *pb.
 	if err != nil {
 		return nil, err
 	}
+
+	if transfer.Status != schema.TransferStatusReceiverRefundSigned {
+		err = h.settleReceiverKeyTweak(ctx, transfer, req.KeyTweakProofs)
+		if err != nil {
+			return nil, fmt.Errorf("unable to settle receiver key tweak: %v", err)
+		}
+	}
+
 	signingJobs := []*helper.SigningJob{}
 	jobToLeafMap := make(map[string]uuid.UUID)
 	for _, job := range req.SigningJobs {
@@ -743,4 +832,66 @@ func (h *TransferHandler) getRefundTxSigningJob(ctx context.Context, leaf *ent.T
 		return nil, fmt.Errorf("unable to create signing job for leaf %s: %v", leaf.ID.String(), err)
 	}
 	return refundSigningJob, nil
+}
+
+func (h *TransferHandler) InitiateSettleReceiverKeyTweak(ctx context.Context, req *pbinternal.InitiateSettleReceiverKeyTweakRequest) error {
+	transfer, err := h.loadTransfer(ctx, req.TransferId)
+	if err != nil {
+		return fmt.Errorf("unable to load transfer %s: %v", req.TransferId, err)
+	}
+
+	if transfer.Status != schema.TransferStatusReceiverKeyTweaked {
+		return fmt.Errorf("transfer %s is expected to be at status TransferStatusReceiverKeyTweaked but %s found", req.TransferId, transfer.Status)
+	}
+
+	leaves, err := transfer.QueryTransferLeaves().All(ctx)
+	if err != nil {
+		return fmt.Errorf("unable to get leaves from transfer %s: %v", req.TransferId, err)
+	}
+
+	err = h.ValidateKeyTweakProof(ctx, leaves, req.KeyTweakProofs)
+	if err != nil {
+		return fmt.Errorf("unable to validate key tweak proof: %v", err)
+	}
+
+	_, err = transfer.Update().SetStatus(schema.TransferStatusReceiverKeyTweakLocked).Save(ctx)
+	if err != nil {
+		return fmt.Errorf("unable to update transfer status %s: %v", transfer.ID.String(), err)
+	}
+
+	return nil
+}
+
+func (h *TransferHandler) SettleReceiverKeyTweak(ctx context.Context, req *pbinternal.SettleReceiverKeyTweakRequest) error {
+	transfer, err := h.loadTransfer(ctx, req.TransferId)
+	if err != nil {
+		return fmt.Errorf("unable to load transfer %s: %v", req.TransferId, err)
+	}
+
+	leaves, err := transfer.QueryTransferLeaves().All(ctx)
+	if err != nil {
+		return fmt.Errorf("unable to get leaves from transfer %s: %v", req.TransferId, err)
+	}
+
+	if req.TweakKey {
+		for _, leaf := range leaves {
+			treeNode, err := leaf.QueryLeaf().Only(ctx)
+			if err != nil {
+				return fmt.Errorf("unable to get tree node for leaf %s: %v", leaf.ID.String(), err)
+			}
+			keyTweakProto := &pb.ClaimLeafKeyTweak{}
+			err = proto.Unmarshal(leaf.KeyTweak, keyTweakProto)
+			if err != nil {
+				return fmt.Errorf("unable to unmarshal key tweak for leaf %s: %v", leaf.ID.String(), err)
+			}
+			err = h.claimLeafTweakKey(ctx, treeNode, keyTweakProto, transfer.ReceiverIdentityPubkey)
+			if err != nil {
+				return fmt.Errorf("unable to claim leaf tweak key for leaf %s: %v", leaf.ID.String(), err)
+			}
+		}
+	} else {
+		return h.revertClaimTransfer(ctx, transfer, leaves)
+	}
+
+	return nil
 }

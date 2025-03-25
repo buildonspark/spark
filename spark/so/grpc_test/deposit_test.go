@@ -70,7 +70,7 @@ func TestStartTreeCreation(t *testing.T) {
 		t.Fatalf("failed to create wallet config: %v", err)
 	}
 
-	conn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
+	conn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress(), nil)
 	if err != nil {
 		t.Fatalf("failed to connect to operator: %v", err)
 	}
@@ -174,7 +174,7 @@ func TestStartTreeCreationOffchain(t *testing.T) {
 	}
 
 	// Setup Mock tx
-	conn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
+	conn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress(), nil)
 	if err != nil {
 		t.Fatalf("failed to connect to operator: %v", err)
 	}
@@ -268,6 +268,8 @@ func TestStartTreeCreationOffchain(t *testing.T) {
 	assert.NoError(t, err)
 	_, err = client.GenerateToAddress(1, randomAddress, nil)
 	assert.NoError(t, err)
+
+	time.Sleep(100 * time.Millisecond)
 
 	// After L1 tx confirms, user should be able to transfer funds
 	_, err = wallet.SendTransfer(

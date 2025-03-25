@@ -35,18 +35,20 @@ func (o *MockServer) CleanUpPreimageShare(ctx context.Context, req *pbmock.Clean
 	if preimageRequestQuery.CountX(ctx) == 0 {
 		return nil, nil
 	}
-	preimageRequest, err := preimageRequestQuery.First(ctx)
+	preimageRequests, err := preimageRequestQuery.All(ctx)
 	if err != nil {
 		return nil, err
 	}
-	txs, err := preimageRequest.QueryTransactions().All(ctx)
-	if err != nil {
-		return nil, err
-	}
-	for _, tx := range txs {
-		_, err = db.UserSignedTransaction.Delete().Where(usersignedtransaction.IDEQ(tx.ID)).Exec(ctx)
+	for _, preimageRequest := range preimageRequests {
+		txs, err := preimageRequest.QueryTransactions().All(ctx)
 		if err != nil {
 			return nil, err
+		}
+		for _, tx := range txs {
+			_, err = db.UserSignedTransaction.Delete().Where(usersignedtransaction.IDEQ(tx.ID)).Exec(ctx)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 	_, err = db.PreimageRequest.Delete().Where(preimagerequest.PaymentHashEQ(req.PaymentHash)).Exec(ctx)

@@ -140,7 +140,7 @@ func (s *SparkServer) CreateTree(ctx context.Context, req *pb.CreateTreeRequest)
 }
 
 // GetSigningOperatorList gets the list of signing operators.
-func (s *SparkServer) GetSigningOperatorList(ctx context.Context, req *emptypb.Empty) (*pb.GetSigningOperatorListResponse, error) {
+func (s *SparkServer) GetSigningOperatorList(_ context.Context, _ *emptypb.Empty) (*pb.GetSigningOperatorListResponse, error) {
 	return &pb.GetSigningOperatorListResponse{SigningOperators: s.config.GetSigningOperatorList()}, nil
 }
 
@@ -218,4 +218,12 @@ func (s *SparkServer) QueryUnusedDepositAddresses(ctx context.Context, req *pb.Q
 func (s *SparkServer) QueryBalance(ctx context.Context, req *pb.QueryBalanceRequest) (*pb.QueryBalanceResponse, error) {
 	treeQueryHandler := handler.NewTreeQueryHandler(s.config)
 	return wrapWithGRPCError(treeQueryHandler.QueryBalance(ctx, req))
+}
+
+// CancelSignedTokenTransaction cancels a token transaction that has been signed but not yet finalized,
+// if fewer than the required threshold of operators have signed it.
+func (s *SparkServer) CancelSignedTokenTransaction(ctx context.Context, req *pb.CancelSignedTokenTransactionRequest) (*emptypb.Empty, error) {
+	tokenTransactionHandler := handler.NewTokenTransactionHandler(s.config, s.db)
+	_, err := tokenTransactionHandler.CancelSignedTokenTransaction(ctx, s.config, req)
+	return wrapWithGRPCError(emptyResponse, err)
 }

@@ -29,6 +29,10 @@ const (
 	FieldIntermediateRefundTx = "intermediate_refund_tx"
 	// FieldKeyTweak holds the string denoting the key_tweak field in the database.
 	FieldKeyTweak = "key_tweak"
+	// FieldSenderKeyTweakProof holds the string denoting the sender_key_tweak_proof field in the database.
+	FieldSenderKeyTweakProof = "sender_key_tweak_proof"
+	// FieldReceiverKeyTweak holds the string denoting the receiver_key_tweak field in the database.
+	FieldReceiverKeyTweak = "receiver_key_tweak"
 	// EdgeTransfer holds the string denoting the transfer edge name in mutations.
 	EdgeTransfer = "transfer"
 	// EdgeLeaf holds the string denoting the leaf edge name in mutations.
@@ -61,6 +65,8 @@ var Columns = []string{
 	FieldPreviousRefundTx,
 	FieldIntermediateRefundTx,
 	FieldKeyTweak,
+	FieldSenderKeyTweakProof,
+	FieldReceiverKeyTweak,
 }
 
 // ForeignKeys holds the SQL foreign-keys that are owned by the "transfer_leafs"

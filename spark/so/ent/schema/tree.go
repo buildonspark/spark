@@ -4,6 +4,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
+	"entgo.io/ent/schema/index"
 )
 
 // TreeStatus is the status of a tree node.
@@ -52,5 +53,13 @@ func (Tree) Edges() []ent.Edge {
 		edge.To("root", TreeNode.Type).
 			Unique(),
 		edge.From("nodes", TreeNode.Type).Ref("tree"),
+	}
+}
+
+// Indexes are the indexes for the trees table.
+func (Tree) Indexes() []ent.Index {
+	return []ent.Index{
+		index.Fields("status"),
+		index.Fields("network"),
 	}
 }

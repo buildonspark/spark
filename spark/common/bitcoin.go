@@ -253,7 +253,10 @@ func UpdateTxWithSignature(rawTxBytes []byte, vin int, signature []byte) ([]byte
 	}
 	tx.TxIn[vin].Witness = wire.TxWitness{signature}
 	var buf bytes.Buffer
-	tx.Serialize(&buf)
+	err = tx.Serialize(&buf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to serialize tx: %v", err)
+	}
 	return buf.Bytes(), nil
 }
 

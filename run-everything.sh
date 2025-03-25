@@ -290,7 +290,7 @@ run_electrs_tmux() {
 
     read -r bitcoind_username bitcoind_password <<< "$(parse_bitcoin_config)"
 
-    local cmd="cd electrs.dev && cargo run --release --bin electrs -- -vvvv --network regtest --daemon-dir ${run_dir}/electrs_data --daemon-rpc-addr 0.0.0.0:18443 --cookie ${bitcoind_username}:${bitcoind_password} --http-addr 0.0.0.0:30000 --electrum-rpc-addr 0.0.0.0:50000 --cors \"*\" --jsonrpc-import 2>&1 | tee '${log_file}'"
+    local cmd="cd electrs.dev && cargo run --release --bin electrs -- -vvvv --network regtest --daemon-dir ${run_dir}/electrs_data --daemon-rpc-addr 0.0.0.0:8332 --cookie ${bitcoind_username}:${bitcoind_password} --http-addr 0.0.0.0:30000 --electrum-rpc-addr 0.0.0.0:50000 --cors \"*\" --jsonrpc-import 2>&1 | tee '${log_file}'"
 
     tmux send-keys -t "$session_name" "$cmd" C-m
 
@@ -409,7 +409,8 @@ run_bitcoind_tmux() {
 # Function to create operator config JSON
 create_operator_config() {
     local run_dir=$1
-    shift  # Remove first argument
+    local tls=$2
+    shift 2 # Remove first two arguments
     local pub_keys=("$@")  # Get remaining arguments as pub_keys array
     local config_file="${run_dir}/config.json"
     
@@ -420,12 +421,12 @@ create_operator_config() {
         if [ $i -ne 0 ]; then
             json+=","
         fi
-        
+
         # Calculate port
         local port=$((8535 + i))
-        
-        # Add operator entry
-        json+=$(cat <<EOF
+
+        if [ "$tls" = true ]; then
+            json+=$(cat <<EOF
 {
     "id": $i,
     "address": "localhost:$port",
@@ -435,6 +436,18 @@ create_operator_config() {
 }
 EOF
 )
+        else
+            json+=$(cat <<EOF
+{
+    "id": $i,
+    "address": "localhost:$port",
+    "external_address": "localhost:$port",
+    "identity_public_key": "${pub_keys[$i]}"
+}
+EOF
+)
+        fi
+
     done
     json+="]"
     
@@ -477,9 +490,9 @@ run_operators_tmux() {
            so.template.config.yaml >"$temp_config_file"
 
        # Construct paths
-       local log_file="${run_dir}/logs/operator_${i}.log"
-       local db_file="postgresql://127.0.0.1:5432/operator_${i}?sslmode=disable"
-    #    local db_file="${run_dir}/db/operator_${i}.sqlite?_fk=1"
+       local log_file="${run_dir}/logs/sparkoperator_${i}.log"
+       local db_file="postgresql://127.0.0.1:5432/sparkoperator_${i}?sslmode=disable"
+    #    local db_file="${run_dir}/db/sparkoperator_${i}.sqlite?_fk=1"
        local signer_socket="unix:///tmp/frost_${i}.sock"
 
        local priv_key_file="${run_dir}/operator_${i}.key"
@@ -543,7 +556,7 @@ check_operators_ready() {
        
        # Check each operator's log file existence
        for i in {0..4}; do
-           local log_file="${run_dir}/logs/operator_${i}.log"
+           local log_file="${run_dir}/logs/sparkoperator_${i}.log"
            
            if [ ! -f "$log_file" ]; then
                all_ready=false
@@ -615,7 +628,7 @@ reset_databases() {
         
         # Terminate all relevant connections first
         for i in $(seq 0 $max_count); do
-            db="operator_$i"
+            db="sparkoperator_$i"
             psql postgres -c "
             SELECT pg_terminate_backend(pid) 
             FROM pg_stat_activity 
@@ -632,7 +645,7 @@ reset_databases() {
 
         # Drop and recreate
         for i in $(seq 0 $max_count); do
-            db="operator_$i"
+            db="sparkoperator_$i"
             echo "Resetting $db..."
             dropdb --if-exists "$db" > /dev/null 2>&1
             createdb "$db" > /dev/null 2>&1
@@ -646,7 +659,7 @@ reset_databases() {
         echo "Soft reset: creating databases only if they don't exist (0 to $max_count)..."
         
         for i in $(seq 0 $max_count); do
-            db="operator_$i"
+            db="sparkoperator_$i"
             if ! psql -lqt | cut -d \| -f 1 | grep -qw "$db"; then
                 echo "Creating $db as it doesn't exist..."
                 createdb "$db" > /dev/null 2>&1
@@ -664,7 +677,7 @@ reset_databases() {
 
     cd spark
     for i in $(seq 0 $max_count); do
-        db="operator_$i"
+        db="sparkoperator_$i"
         atlas migrate apply --dir "file://so/ent/migrate/migrations" --url "postgresql://127.0.0.1:5432/$db?sslmode=disable"
     done
     cd -
@@ -749,7 +762,7 @@ build_go_operator "$run_dir" || {
 }
 
 # Create operator config
-create_operator_config "$run_dir" "${PUB_KEYS[@]}"
+create_operator_config "$run_dir" "$TLS" "${PUB_KEYS[@]}"
 create_private_key_files "$run_dir" "${PRIV_KEYS[@]}"
 
 if ! check_signers_ready "$run_dir"; then

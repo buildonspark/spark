@@ -57,8 +57,8 @@ func (h *InternalExtendLeafHandler) FinalizeExtendLeaf(ctx context.Context, req 
 		SetVerifyingPubkey(node.VerifyingPubkey).
 		SetSigningKeyshareID(signingKeyshareID).
 		SetRawTx(node.RawTx).
-		SetRawRefundTx(node.RawTx).
-		SetVout(uint16(0)).
+		SetRawRefundTx(node.RawRefundTx).
+		SetVout(int16(0)).
 		SetParentID(parentID).
 		Save(ctx)
 	if err != nil {
@@ -69,6 +69,7 @@ func (h *InternalExtendLeafHandler) FinalizeExtendLeaf(ctx context.Context, req 
 		TreeNode.
 		UpdateOneID(parentID).
 		SetRawRefundTx(nil).
+		SetStatus(schema.TreeNodeStatusSplitted).
 		Save(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to nullify refund tx: %w", err)

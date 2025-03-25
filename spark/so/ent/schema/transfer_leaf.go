@@ -27,6 +27,8 @@ func (TransferLeaf) Fields() []ent.Field {
 		field.Bytes("previous_refund_tx").NotEmpty().Immutable(),
 		field.Bytes("intermediate_refund_tx").NotEmpty(),
 		field.Bytes("key_tweak").Optional(),
+		field.Bytes("sender_key_tweak_proof").Optional(),
+		field.Bytes("receiver_key_tweak").Optional(),
 	}
 }
 

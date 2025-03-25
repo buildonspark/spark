@@ -30,7 +30,7 @@ func NewTreeCreationHandler(config *so.Config, db *ent.Client) *TreeCreationHand
 	return &TreeCreationHandler{config: config, db: db}
 }
 
-func (h *TreeCreationHandler) findParentOutputFromUtxo(ctx context.Context, utxo *pb.UTXO) (*wire.TxOut, error) {
+func (h *TreeCreationHandler) findParentOutputFromUtxo(_ context.Context, utxo *pb.UTXO) (*wire.TxOut, error) {
 	tx, err := common.TxFromRawTxBytes(utxo.RawTx)
 	if err != nil {
 		return nil, err
@@ -332,7 +332,7 @@ func (h *TreeCreationHandler) PrepareTreeAddress(ctx context.Context, req *pb.Pr
 	}
 	// TODO: Extract the address signature from response and adds to the proofs.
 	_, err = helper.ExecuteTaskWithAllOperators(ctx, h.config, operatorSelection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
-		conn, err := common.NewGRPCConnectionWithCert(operator.Address, operator.CertPath)
+		conn, err := operator.NewGRPCConnection()
 		if err != nil {
 			return nil, err
 		}
@@ -492,7 +492,7 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 			return nil, nil, err
 		}
 
-		var rawRefundTx []byte = nil
+		var rawRefundTx []byte
 		if currentElement.node.RefundTxSigningJob != nil {
 			rawRefundTx = currentElement.node.RefundTxSigningJob.RawTx
 		}
@@ -509,7 +509,7 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 			SetSigningKeyshare(currentElement.keyshare).
 			SetRawTx(currentElement.node.NodeTxSigningJob.RawTx).
 			SetRawRefundTx(rawRefundTx).
-			SetVout(uint16(currentElement.vout))
+			SetVout(int16(currentElement.vout))
 
 		if parentNodeID != nil {
 			createNode.SetParentID(*parentNodeID)

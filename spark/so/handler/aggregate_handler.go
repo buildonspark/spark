@@ -74,7 +74,7 @@ func (h *AggregateHandler) validateAggregateNodesRequest(ctx context.Context, re
 	return parentNode, nodes, nil
 }
 
-func (h *AggregateHandler) prepareSigningJob(ctx context.Context, parentNode *ent.TreeNode, keyshare *ent.SigningKeyshare, req *pb.AggregateNodesRequest) (*helper.SigningJob, error) {
+func (h *AggregateHandler) prepareSigningJob(_ context.Context, parentNode *ent.TreeNode, keyshare *ent.SigningKeyshare, req *pb.AggregateNodesRequest) (*helper.SigningJob, error) {
 	parentNodeTx, err := common.TxFromRawTxBytes(parentNode.RawTx)
 	if err != nil {
 		return nil, err
@@ -159,7 +159,7 @@ func (h *AggregateHandler) AggregateNodes(ctx context.Context, req *pb.Aggregate
 		Option: helper.OperatorSelectionOptionExcludeSelf,
 	}
 	_, err = helper.ExecuteTaskWithAllOperators(ctx, h.config, &selection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
-		conn, err := common.NewGRPCConnectionWithCert(operator.Address, operator.CertPath)
+		conn, err := operator.NewGRPCConnection()
 		if err != nil {
 			log.Printf("Failed to connect to operator: %v", err)
 			return nil, err

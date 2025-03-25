@@ -9,6 +9,7 @@ import (
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lightsparkdev/spark-go/common"
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
+	"github.com/lightsparkdev/spark-go/so/ent/schema"
 	"github.com/lightsparkdev/spark-go/wallet"
 )
 
@@ -19,7 +20,7 @@ func CreateNewTree(config *wallet.Config, faucet *Faucet, privKey *secp256k1.Pri
 		return nil, fmt.Errorf("failed to fund faucet: %v", err)
 	}
 
-	conn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
+	conn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to operator: %v", err)
 	}
@@ -54,6 +55,9 @@ func CreateNewTree(config *wallet.Config, faucet *Faucet, privKey *secp256k1.Pri
 	if err != nil {
 		return nil, fmt.Errorf("failed to create tree: %v", err)
 	}
+	if len(resp.Nodes) == 0 {
+		return nil, fmt.Errorf("no nodes found after creating tree")
+	}
 
 	// Sign, broadcast, mine deposit tx
 	signedExitTx, err := SignFaucetCoin(depositTx, coin.TxOut, coin.Key)
@@ -83,9 +87,29 @@ func CreateNewTree(config *wallet.Config, faucet *Faucet, privKey *secp256k1.Pri
 		return nil, fmt.Errorf("failed to mine deposit tx: %v", err)
 	}
 
-	time.Sleep(100 * time.Millisecond)
+	// Wait until the deposited leaf is available
+	sparkClient := pb.NewSparkServiceClient(conn)
+	authCtx := wallet.ContextWithToken(ctx, token)
+	startTime := time.Now()
+	node := resp.Nodes[0]
+	for node.Status != string(schema.TreeNodeStatusAvailable) {
+		if time.Since(startTime) >= 10*time.Second {
+			return nil, fmt.Errorf("timed out waiting for node to be unavailable")
+		}
+		time.Sleep(100 * time.Millisecond)
+		nodesResp, err := sparkClient.QueryNodes(authCtx, &pb.QueryNodesRequest{
+			Source: &pb.QueryNodesRequest_NodeIds{NodeIds: &pb.TreeNodeIds{NodeIds: []string{resp.Nodes[0].Id}}},
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to query nodes: %v", err)
+		}
+		if len(nodesResp.Nodes) != 1 {
+			return nil, fmt.Errorf("expected 1 node, got %d", len(nodesResp.Nodes))
+		}
+		node = nodesResp.Nodes[resp.Nodes[0].Id]
+	}
 
-	return resp.Nodes[0], nil
+	return node, nil
 }
 
 // CreateNewTree creates a new Tree
@@ -95,7 +119,7 @@ func CreateNewTreeWithLevels(config *wallet.Config, faucet *Faucet, privKey *sec
 		return nil, nil, fmt.Errorf("failed to fund faucet: %v", err)
 	}
 
-	conn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
+	conn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress(), nil)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to connect to operator: %v", err)
 	}

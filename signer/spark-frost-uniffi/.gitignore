@@ -1,0 +1,17 @@
+# Swift
+spark-frost-swift/spark_frostFFI.xcframework/*/spark_frostFFI.framework/*
+spark-frost-swift/spark_frostFFI.xcframework/*/spark_frostFFI.framework/Headers/*
+!spark-frost-swift/spark_frostFFI.xcframework/*/spark_frostFFI.framework/Headers
+!spark-frost-swift/spark_frostFFI.xcframework/*/spark_frostFFI.framework/Headers/spark_frostFFI-umbrella.h
+!spark-frost-swift/spark_frostFFI.xcframework/*/spark_frostFFI.framework/Modules
+!spark-frost-swift/spark_frostFFI.xcframework/*/spark_frostFFI.framework/Modules/module.modulemap
+
+# Python
+spark-frost-python/build/
+spark-frost-python/dist/
+spark-frost-python/*.egg-info/
+*.dylib
+*.dll
+*.so
+spark-frost-python/src/spark_frost/spark_frost.py
+__pycache__

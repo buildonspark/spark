@@ -95,8 +95,8 @@ func (tlc *TokenLeafCreate) SetTokenAmount(b []byte) *TokenLeafCreate {
 }
 
 // SetLeafCreatedTransactionOutputVout sets the "leaf_created_transaction_output_vout" field.
-func (tlc *TokenLeafCreate) SetLeafCreatedTransactionOutputVout(u uint32) *TokenLeafCreate {
-	tlc.mutation.SetLeafCreatedTransactionOutputVout(u)
+func (tlc *TokenLeafCreate) SetLeafCreatedTransactionOutputVout(i int32) *TokenLeafCreate {
+	tlc.mutation.SetLeafCreatedTransactionOutputVout(i)
 	return tlc
 }
 
@@ -113,15 +113,15 @@ func (tlc *TokenLeafCreate) SetLeafSpentOperatorSpecificOwnershipSignature(b []b
 }
 
 // SetLeafSpentTransactionInputVout sets the "leaf_spent_transaction_input_vout" field.
-func (tlc *TokenLeafCreate) SetLeafSpentTransactionInputVout(u uint32) *TokenLeafCreate {
-	tlc.mutation.SetLeafSpentTransactionInputVout(u)
+func (tlc *TokenLeafCreate) SetLeafSpentTransactionInputVout(i int32) *TokenLeafCreate {
+	tlc.mutation.SetLeafSpentTransactionInputVout(i)
 	return tlc
 }
 
 // SetNillableLeafSpentTransactionInputVout sets the "leaf_spent_transaction_input_vout" field if the given value is not nil.
-func (tlc *TokenLeafCreate) SetNillableLeafSpentTransactionInputVout(u *uint32) *TokenLeafCreate {
-	if u != nil {
-		tlc.SetLeafSpentTransactionInputVout(*u)
+func (tlc *TokenLeafCreate) SetNillableLeafSpentTransactionInputVout(i *int32) *TokenLeafCreate {
+	if i != nil {
+		tlc.SetLeafSpentTransactionInputVout(*i)
 	}
 	return tlc
 }
@@ -129,6 +129,26 @@ func (tlc *TokenLeafCreate) SetNillableLeafSpentTransactionInputVout(u *uint32) 
 // SetLeafSpentRevocationPrivateKey sets the "leaf_spent_revocation_private_key" field.
 func (tlc *TokenLeafCreate) SetLeafSpentRevocationPrivateKey(b []byte) *TokenLeafCreate {
 	tlc.mutation.SetLeafSpentRevocationPrivateKey(b)
+	return tlc
+}
+
+// SetConfirmedWithdrawBlockHash sets the "confirmed_withdraw_block_hash" field.
+func (tlc *TokenLeafCreate) SetConfirmedWithdrawBlockHash(b []byte) *TokenLeafCreate {
+	tlc.mutation.SetConfirmedWithdrawBlockHash(b)
+	return tlc
+}
+
+// SetNetwork sets the "network" field.
+func (tlc *TokenLeafCreate) SetNetwork(s schema.Network) *TokenLeafCreate {
+	tlc.mutation.SetNetwork(s)
+	return tlc
+}
+
+// SetNillableNetwork sets the "network" field if the given value is not nil.
+func (tlc *TokenLeafCreate) SetNillableNetwork(s *schema.Network) *TokenLeafCreate {
+	if s != nil {
+		tlc.SetNetwork(*s)
+	}
 	return tlc
 }
 
@@ -296,6 +316,11 @@ func (tlc *TokenLeafCreate) check() error {
 	if _, ok := tlc.mutation.LeafCreatedTransactionOutputVout(); !ok {
 		return &ValidationError{Name: "leaf_created_transaction_output_vout", err: errors.New(`ent: missing required field "TokenLeaf.leaf_created_transaction_output_vout"`)}
 	}
+	if v, ok := tlc.mutation.Network(); ok {
+		if err := tokenleaf.NetworkValidator(v); err != nil {
+			return &ValidationError{Name: "network", err: fmt.Errorf(`ent: validator failed for field "TokenLeaf.network": %w`, err)}
+		}
+	}
 	if len(tlc.mutation.RevocationKeyshareIDs()) == 0 {
 		return &ValidationError{Name: "revocation_keyshare", err: errors.New(`ent: missing required edge "TokenLeaf.revocation_keyshare"`)}
 	}
@@ -371,7 +396,7 @@ func (tlc *TokenLeafCreate) createSpec() (*TokenLeaf, *sqlgraph.CreateSpec) {
 		_node.TokenAmount = value
 	}
 	if value, ok := tlc.mutation.LeafCreatedTransactionOutputVout(); ok {
-		_spec.SetField(tokenleaf.FieldLeafCreatedTransactionOutputVout, field.TypeUint32, value)
+		_spec.SetField(tokenleaf.FieldLeafCreatedTransactionOutputVout, field.TypeInt32, value)
 		_node.LeafCreatedTransactionOutputVout = value
 	}
 	if value, ok := tlc.mutation.LeafSpentOwnershipSignature(); ok {
@@ -383,12 +408,20 @@ func (tlc *TokenLeafCreate) createSpec() (*TokenLeaf, *sqlgraph.CreateSpec) {
 		_node.LeafSpentOperatorSpecificOwnershipSignature = value
 	}
 	if value, ok := tlc.mutation.LeafSpentTransactionInputVout(); ok {
-		_spec.SetField(tokenleaf.FieldLeafSpentTransactionInputVout, field.TypeUint32, value)
+		_spec.SetField(tokenleaf.FieldLeafSpentTransactionInputVout, field.TypeInt32, value)
 		_node.LeafSpentTransactionInputVout = value
 	}
 	if value, ok := tlc.mutation.LeafSpentRevocationPrivateKey(); ok {
 		_spec.SetField(tokenleaf.FieldLeafSpentRevocationPrivateKey, field.TypeBytes, value)
 		_node.LeafSpentRevocationPrivateKey = value
+	}
+	if value, ok := tlc.mutation.ConfirmedWithdrawBlockHash(); ok {
+		_spec.SetField(tokenleaf.FieldConfirmedWithdrawBlockHash, field.TypeBytes, value)
+		_node.ConfirmedWithdrawBlockHash = value
+	}
+	if value, ok := tlc.mutation.Network(); ok {
+		_spec.SetField(tokenleaf.FieldNetwork, field.TypeEnum, value)
+		_node.Network = value
 	}
 	if nodes := tlc.mutation.RevocationKeyshareIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{

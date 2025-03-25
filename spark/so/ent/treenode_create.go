@@ -89,8 +89,8 @@ func (tnc *TreeNodeCreate) SetRawTx(b []byte) *TreeNodeCreate {
 }
 
 // SetVout sets the "vout" field.
-func (tnc *TreeNodeCreate) SetVout(u uint16) *TreeNodeCreate {
-	tnc.mutation.SetVout(u)
+func (tnc *TreeNodeCreate) SetVout(i int16) *TreeNodeCreate {
+	tnc.mutation.SetVout(i)
 	return tnc
 }
 
@@ -347,7 +347,7 @@ func (tnc *TreeNodeCreate) createSpec() (*TreeNode, *sqlgraph.CreateSpec) {
 		_node.RawTx = value
 	}
 	if value, ok := tnc.mutation.Vout(); ok {
-		_spec.SetField(treenode.FieldVout, field.TypeUint16, value)
+		_spec.SetField(treenode.FieldVout, field.TypeInt16, value)
 		_node.Vout = value
 	}
 	if value, ok := tnc.mutation.RawRefundTx(); ok {

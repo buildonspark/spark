@@ -1,0 +1,66 @@
+namespace spark_frost { 
+    [Throws=Error]
+    NonceResult frost_nonce(KeyPackage key_package);
+
+    [Throws=Error]
+    bytes sign_frost(bytes msg, KeyPackage key_package, SigningNonce nonce, SigningCommitment self_commitment, record<string, SigningCommitment> statechain_commitments, bytes? adaptor_public_key);
+
+    [Throws=Error]
+    bytes aggregate_frost(bytes msg, record<string, SigningCommitment> statechain_commitments, SigningCommitment self_commitment, record<string, bytes> statechain_signatures, bytes self_signature, record<string, bytes> statechain_public_keys, bytes self_public_key, bytes verifying_key, bytes? adaptor_public_key);
+
+    boolean validate_signature_share(bytes msg, record<string, SigningCommitment> statechain_commitments, SigningCommitment self_commitment, bytes signature_share, bytes public_share, bytes verifying_key);
+
+    [Throws=Error]
+    TransactionResult construct_node_tx(bytes tx, u32 vout, string address, u16 locktime);
+
+    [Throws=Error]
+    TransactionResult construct_refund_tx(bytes tx, u32 vout, bytes pubkey, string network, u16 locktime);
+
+    [Throws=Error]
+    TransactionResult construct_split_tx(bytes tx, u32 vout, sequence<string> addresses, u16 locktime);
+
+    [Throws=Error]
+    DummyTx create_dummy_tx(string address, u64 amount_sats);
+
+    [Throws=Error]
+    bytes encrypt_ecies(bytes msg, bytes public_key);
+
+    [Throws=Error]
+    bytes decrypt_ecies(bytes encrypted_msg, bytes private_key);
+};
+
+[Error]
+enum Error {
+    "Spark",
+};
+
+dictionary SigningNonce {
+    bytes hiding;
+    bytes binding;
+};
+
+dictionary SigningCommitment {
+    bytes hiding;
+    bytes binding;
+};
+
+dictionary NonceResult {
+    SigningNonce nonce;
+    SigningCommitment commitment;
+};
+
+dictionary KeyPackage {
+    bytes secret_key;
+    bytes public_key;
+    bytes verifying_key;
+};
+
+dictionary TransactionResult {
+    bytes tx;
+    bytes sighash;
+};
+
+dictionary DummyTx {
+    bytes tx;
+    string txid;
+};

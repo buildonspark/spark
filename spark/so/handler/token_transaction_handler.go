@@ -21,6 +21,7 @@ import (
 	"github.com/lightsparkdev/spark-go/so/ent/tokenleaf"
 	"github.com/lightsparkdev/spark-go/so/ent/tokentransactionreceipt"
 	"github.com/lightsparkdev/spark-go/so/helper"
+	"github.com/lightsparkdev/spark-go/so/lrc20"
 	"github.com/lightsparkdev/spark-go/so/utils"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
@@ -45,7 +46,7 @@ func (o TokenTransactionHandler) StartTokenTransaction(ctx context.Context, conf
 		return nil, err
 	}
 
-	if err := utils.ValidatePartialTokenTransaction(req.PartialTokenTransaction, req.TokenTransactionSignatures, config.GetSigningOperatorList()); err != nil {
+	if err := utils.ValidatePartialTokenTransaction(req.PartialTokenTransaction, req.TokenTransactionSignatures, config.GetSigningOperatorList(), config.SupportedNetworks); err != nil {
 		return nil, err
 	}
 
@@ -82,12 +83,18 @@ func (o TokenTransactionHandler) StartTokenTransaction(ctx context.Context, conf
 	// This property should be help because the coordinator blocks on the other SO responses.
 	allSelection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionAll}
 	_, err = helper.ExecuteTaskWithAllOperators(ctx, config, &allSelection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
-		conn, err := common.NewGRPCConnectionWithCert(operator.Address, operator.CertPath)
+		conn, err := operator.NewGRPCConnection()
 		if err != nil {
 			log.Printf("Failed to connect to operator for marking token transaction keyshare: %v", err)
 			return nil, err
 		}
 		defer conn.Close()
+
+		network, err := common.NetworkFromProtoNetwork(req.PartialTokenTransaction.Network)
+		if err != nil {
+			log.Printf("Failed to get network from proto network: %v", err)
+			return nil, err
+		}
 
 		// Fill revocation public keys and withdrawal bond/locktime for each leaf.
 		finalTokenTransaction := req.PartialTokenTransaction
@@ -96,9 +103,9 @@ func (o TokenTransactionHandler) StartTokenTransaction(ctx context.Context, conf
 			leaf.Id = &leafID
 			leaf.RevocationPublicKey = keyshares[i].PublicKey
 			// TODO: Support non-regtest configs by providing network as a field in the transaction.
-			withdrawalBondSats := config.Lrc20Configs[common.Regtest.String()].WithdrawBondSats
+			withdrawalBondSats := config.Lrc20Configs[network.String()].WithdrawBondSats
 			leaf.WithdrawBondSats = &withdrawalBondSats
-			withdrawRelativeBlockLocktime := config.Lrc20Configs[common.Regtest.String()].WithdrawRelativeBlockLocktime
+			withdrawRelativeBlockLocktime := config.Lrc20Configs[network.String()].WithdrawRelativeBlockLocktime
 			leaf.WithdrawRelativeBlockLocktime = &withdrawRelativeBlockLocktime
 		}
 
@@ -176,7 +183,7 @@ func (o TokenTransactionHandler) SignTokenTransaction(
 		log.Printf("Failed to hash final token transaction: %v", err)
 		return nil, err
 	}
-	tokenTransactionReceipt, err := ent.FetchTokenTransactionData(ctx, req.FinalTokenTransaction)
+	tokenTransactionReceipt, err := ent.FetchAndLockTokenTransactionData(ctx, req.FinalTokenTransaction)
 	if err != nil {
 		log.Printf("Sign request for token transaction did not map to a previously started transaction: %v", err)
 		return nil, err
@@ -203,6 +210,10 @@ func (o TokenTransactionHandler) SignTokenTransaction(
 			if leaf.Status != schema.TokenLeafStatusSpentStarted {
 				invalidLeaves = append(invalidLeaves, fmt.Sprintf("input leaf %x has invalid status %s, expected SPENT_STARTED",
 					leaf.ID, leaf.Status))
+			}
+			if leaf.ConfirmedWithdrawBlockHash != nil {
+				invalidLeaves = append(invalidLeaves, fmt.Sprintf("input leaf %x is already withdrawn",
+					leaf.ID))
 			}
 		}
 		if len(invalidLeaves) > 0 {
@@ -293,10 +304,41 @@ func (o TokenTransactionHandler) FinalizeTokenTransaction(
 		return nil, err
 	}
 
-	tokenTransactionReceipt, err := ent.FetchTokenTransactionData(ctx, req.FinalTokenTransaction)
+	tokenTransactionReceipt, err := ent.FetchAndLockTokenTransactionData(ctx, req.FinalTokenTransaction)
 	if err != nil {
 		log.Printf("Failed to fetch matching transaction receipt: %v", err)
 		return nil, fmt.Errorf("failed to fetch transaction receipt: %w", err)
+	}
+
+	// Verify that the transaction is in a signed state before finalizing
+	if tokenTransactionReceipt.Status != schema.TokenTransactionStatusSigned {
+		return nil, fmt.Errorf("transaction is in status %s, but must be in SIGNED status to finalize", tokenTransactionReceipt.Status)
+	}
+
+	// Verify status of output leaves
+	var invalidLeaves []string
+	for i, leaf := range tokenTransactionReceipt.Edges.CreatedLeaf {
+		if leaf.Status != schema.TokenLeafStatusCreatedSigned {
+			invalidLeaves = append(invalidLeaves, fmt.Sprintf("output leaf %d has invalid status %s, expected CREATED_STARTED", i, leaf.Status))
+		}
+	}
+
+	// Verify status of spent leaves
+	if len(tokenTransactionReceipt.Edges.SpentLeaf) > 0 {
+		for _, leaf := range tokenTransactionReceipt.Edges.SpentLeaf {
+			if leaf.Status != schema.TokenLeafStatusSpentSigned {
+				invalidLeaves = append(invalidLeaves, fmt.Sprintf("input leaf %x has invalid status %s, expected SPENT_STARTED",
+					leaf.ID, leaf.Status))
+			}
+			if leaf.ConfirmedWithdrawBlockHash != nil {
+				invalidLeaves = append(invalidLeaves, fmt.Sprintf("input leaf %x is already withdrawn",
+					leaf.ID))
+			}
+		}
+	}
+
+	if len(invalidLeaves) > 0 {
+		return nil, fmt.Errorf("found invalid leaves: %s", strings.Join(invalidLeaves, "; "))
 	}
 
 	// Extract revocation public keys from spent leaves
@@ -337,6 +379,7 @@ func (o TokenTransactionHandler) FinalizeTokenTransaction(
 	return &emptypb.Empty{}, nil
 }
 
+// SendTransactionToLRC20Node sends a token transaction to the LRC20 node.
 func (o TokenTransactionHandler) SendTransactionToLRC20Node(
 	ctx context.Context,
 	config *so.Config,
@@ -344,8 +387,11 @@ func (o TokenTransactionHandler) SendTransactionToLRC20Node(
 	operatorSignature []byte,
 	revocationKeys [][]byte,
 ) error {
-	network := common.Regtest.String() // TODO: Get network from transaction
-	if lrc20Config, ok := config.Lrc20Configs[network]; ok && lrc20Config.DisableRpcs {
+	network, err := common.NetworkFromProtoNetwork(finalTokenTransaction.Network)
+	if err != nil {
+		log.Printf("Failed to get network from proto network: %v", err)
+	}
+	if lrc20Config, ok := config.Lrc20Configs[network.String()]; ok && lrc20Config.DisableRpcs {
 		log.Printf("Skipping LRC20 node call due to DisableRpcs flag")
 		return nil
 	}
@@ -367,23 +413,11 @@ func (o TokenTransactionHandler) SendTransactionToLRC20Node(
 		LeavesToSpendData:              leavesToSpendData,
 	}
 
-	conn, err := helper.ConnectToLrc20Node(config)
-	if err != nil {
-		return fmt.Errorf("failed to connect to LRC20 node: %w", err)
-	}
-	defer conn.Close()
-	lrc20Client := pblrc20.NewSparkServiceClient(conn)
-
-	_, err = lrc20Client.SendSparkSignature(ctx, &pblrc20.SendSparkSignatureRequest{
-		SignatureData: signatureData,
-	})
-	if err != nil {
-		return err
-	}
-
-	return nil
+	lrc20Client := lrc20.NewClient(config)
+	return lrc20Client.SendSparkSignature(ctx, signatureData)
 }
 
+// FreezeTokens freezes or unfreezes tokens on the LRC20 node.
 func (o TokenTransactionHandler) FreezeTokens(
 	ctx context.Context,
 	config *so.Config,
@@ -455,30 +489,14 @@ func (o TokenTransactionHandler) FreezeTokens(
 	}, nil
 }
 
+// FreezeTokensOnLRC20Node freezes or unfreezes tokens on the LRC20 node.
 func (o TokenTransactionHandler) FreezeTokensOnLRC20Node(
 	ctx context.Context,
 	config *so.Config,
 	req *pb.FreezeTokensRequest,
 ) error {
-	network := common.Regtest.String() // TODO: Get network from transaction
-	if lrc20Config, ok := config.Lrc20Configs[network]; ok && lrc20Config.DisableRpcs {
-		log.Printf("Skipping LRC20 node call due to DisableRpcs flag")
-		return nil
-	}
-
-	conn, err := helper.ConnectToLrc20Node(config)
-	if err != nil {
-		return fmt.Errorf("failed to connect to LRC20 node: %w", err)
-	}
-	defer conn.Close()
-	lrc20Client := pblrc20.NewSparkServiceClient(conn)
-
-	_, err = lrc20Client.FreezeTokens(ctx, req)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	lrc20Client := lrc20.NewClient(config)
+	return lrc20Client.FreezeTokens(ctx, req)
 }
 
 // QueryTokenTransactions returns SO provided data about specific token transactions along with their status.
@@ -625,11 +643,97 @@ func (o TokenTransactionHandler) GetOwnedTokenLeaves(
 				TokenAmount:                   leaf.TokenAmount,
 			},
 			PreviousTransactionHash: leaf.Edges.LeafCreatedTokenTransactionReceipt.FinalizedTokenTransactionHash,
-			PreviousTransactionVout: leaf.LeafCreatedTransactionOutputVout,
+			PreviousTransactionVout: uint32(leaf.LeafCreatedTransactionOutputVout),
 		}
 	}
 
 	return &pb.GetOwnedTokenLeavesResponse{
 		LeavesWithPreviousTransactionData: leavesWithPrevTxData,
 	}, nil
+}
+
+func (o TokenTransactionHandler) CancelSignedTokenTransaction(
+	ctx context.Context,
+	config *so.Config,
+	req *pb.CancelSignedTokenTransactionRequest,
+) (*emptypb.Empty, error) {
+	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, o.config, req.SenderIdentityPublicKey); err != nil {
+		return nil, err
+	}
+
+	tokenTransactionReceipt, err := ent.FetchAndLockTokenTransactionData(ctx, req.FinalTokenTransaction)
+	if err != nil {
+		log.Printf("Failed to fetch matching transaction receipt: %v", err)
+		return nil, fmt.Errorf("failed to fetch transaction receipt: %w", err)
+	}
+
+	// Verify that the transaction is in a signed state locally
+	if tokenTransactionReceipt.Status != schema.TokenTransactionStatusSigned {
+		return nil, fmt.Errorf("transaction is in status %s, but must be in SIGNED status to cancel", tokenTransactionReceipt.Status)
+	}
+
+	// Verify with the other SOs that the transaction is in a cancellable state.
+	// Each SO verifies that:
+	// 1. No SO has moved the transaction to a 'Finalized' state.
+	// 2. (# of SOs) - threshold have not progressed the transaction to a 'Signed' state.
+	// TODO: In the future it may be possible to optimize these constraints in two ways:
+	// a) Don't check for (1) because if a user finalizes before threshold has signed and then tries to cancel afterwords they effectively sacrifice their funds.
+	// b) Update (2) to not ping every SO in parallel but ping one at a time until # SOs - threshold have validated that they have not yet signed.
+	allSelection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionAll}
+	responses, err := helper.ExecuteTaskWithAllOperators(ctx, config, &allSelection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
+		conn, err := operator.NewGRPCConnection()
+		if err != nil {
+			log.Printf("Failed to connect to operator for validating transaction state before cancelling: %v", err)
+			return nil, err
+		}
+		defer conn.Close()
+
+		client := pb.NewSparkServiceClient(conn)
+		internalResp, err := client.QueryTokenTransactions(ctx, &pb.QueryTokenTransactionsRequest{
+			TokenTransactionHashes: [][]byte{tokenTransactionReceipt.FinalizedTokenTransactionHash},
+		})
+		if err != nil {
+			log.Printf("Failed to execute start token transaction task with operator %s: %v", operator.Identifier, err)
+			return nil, err
+		}
+		return internalResp, err
+	})
+	if err != nil {
+		log.Printf("Failed to successfully execute start token transaction task with all operators: %v", err)
+		return nil, err
+	}
+
+	// Check if any operator has finalized the transaction
+	signedCount := 0
+	for _, resp := range responses {
+		queryResp, ok := resp.(*pb.QueryTokenTransactionsResponse)
+		if !ok || queryResp == nil {
+			return nil, fmt.Errorf("invalid response from operator")
+		}
+
+		for _, txWithStatus := range queryResp.TokenTransactionsWithStatus {
+			if txWithStatus.Status == pb.TokenTransactionStatus_TOKEN_TRANSACTION_FINALIZED {
+				return nil, fmt.Errorf("transaction has already been finalized by at least one operator, cannot cancel")
+			}
+			if txWithStatus.Status == pb.TokenTransactionStatus_TOKEN_TRANSACTION_SIGNED {
+				signedCount++
+			}
+		}
+	}
+
+	// Check if too many operators have already signed
+	operatorCount := len(config.GetSigningOperatorList())
+	threshold := int(config.Threshold)
+	if signedCount > operatorCount-threshold {
+		return nil, fmt.Errorf("transaction has been signed by %d operators, which exceeds the cancellation threshold of %d",
+			signedCount, operatorCount-threshold)
+	}
+
+	err = ent.UpdateCancelledTransaction(ctx, tokenTransactionReceipt)
+	if err != nil {
+		log.Printf("Failed to update leaves after canceling: %v", err)
+		return nil, err
+	}
+
+	return &emptypb.Empty{}, nil
 }

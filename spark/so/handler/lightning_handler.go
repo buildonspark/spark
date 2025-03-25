@@ -45,9 +45,6 @@ func NewLightningHandler(config *so.Config) *LightningHandler {
 
 // StorePreimageShare stores the preimage share for the given payment hash.
 func (h *LightningHandler) StorePreimageShare(ctx context.Context, req *pb.StorePreimageShareRequest) error {
-	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, req.UserIdentityPublicKey); err != nil {
-		return err
-	}
 	err := secretsharing.ValidateShare(
 		&secretsharing.VerifiableSecretShare{
 			SecretShare: secretsharing.SecretShare{
@@ -81,7 +78,7 @@ func (h *LightningHandler) StorePreimageShare(ctx context.Context, req *pb.Store
 	_, err = db.PreimageShare.Create().
 		SetPaymentHash(req.PaymentHash).
 		SetPreimageShare(req.PreimageShare.SecretShare).
-		SetThreshold(req.Threshold).
+		SetThreshold(int32(req.Threshold)).
 		SetInvoiceString(req.InvoiceString).
 		SetOwnerIdentityPubkey(req.UserIdentityPublicKey).
 		Save(ctx)
@@ -138,16 +135,16 @@ func (h *LightningHandler) GetSigningCommitments(ctx context.Context, req *pb.Ge
 	}
 
 	db := ent.GetDbFromContext(ctx)
-	nodeIds := make([]uuid.UUID, len(req.NodeIds))
+	nodeIDs := make([]uuid.UUID, len(req.NodeIds))
 	for i, nodeID := range req.NodeIds {
 		nodeID, err := uuid.Parse(nodeID)
 		if err != nil {
 			return nil, fmt.Errorf("unable to parse node id: %v", err)
 		}
-		nodeIds[i] = nodeID
+		nodeIDs[i] = nodeID
 	}
 
-	nodes, err := db.TreeNode.Query().Where(treenode.IDIn(nodeIds...)).All(ctx)
+	nodes, err := db.TreeNode.Query().Where(treenode.IDIn(nodeIDs...)).All(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get nodes: %v", err)
 	}
@@ -188,21 +185,35 @@ func (h *LightningHandler) GetSigningCommitments(ctx context.Context, req *pb.Ge
 
 func (h *LightningHandler) validateGetPreimageRequest(
 	ctx context.Context,
+	paymentHash []byte,
 	transactions []*pb.UserSignedRefund,
 	amount *pb.InvoiceAmount,
 	destinationPubkey []byte,
 	feeSats uint64,
 	reason pb.InitiatePreimageSwapRequest_Reason,
 ) error {
+	// Step 0 Validate that there's no existing preimage request for this payment hash
+	db := ent.GetDbFromContext(ctx)
+	preimageRequests, err := db.PreimageRequest.Query().Where(
+		preimagerequest.PaymentHashEQ(paymentHash),
+		preimagerequest.ReceiverIdentityPubkeyEQ(destinationPubkey),
+		preimagerequest.StatusNEQ(schema.PreimageRequestStatusReturned),
+	).All(ctx)
+	if err != nil {
+		return fmt.Errorf("unable to get preimage request: %v", err)
+	}
+	if len(preimageRequests) > 0 {
+		return fmt.Errorf("preimage request already exists")
+	}
+
 	// Step 1 validate all signatures are valid
-	conn, err := common.NewGRPCConnectionWithoutTLS(h.config.SignerAddress)
+	conn, err := common.NewGRPCConnectionWithoutTLS(h.config.SignerAddress, nil)
 	if err != nil {
 		return fmt.Errorf("unable to connect to signer: %v", err)
 	}
 	defer conn.Close()
 
 	client := pbfrost.NewFrostServiceClient(conn)
-	db := ent.GetDbFromContext(ctx)
 	for _, transaction := range transactions {
 		// First fetch the node tx in order to calculate the sighash
 		nodeID, err := uuid.Parse(transaction.NodeId)
@@ -351,9 +362,10 @@ func (h *LightningHandler) storeUserSignedTransactions(
 		if err != nil {
 			return nil, fmt.Errorf("unable to get node: %v", err)
 		}
-		db.TreeNode.UpdateOne(node).
-			SetStatus(schema.TreeNodeStatusTransferLocked).
-			Exec(ctx)
+		_, err = db.TreeNode.UpdateOne(node).SetStatus(schema.TreeNodeStatusTransferLocked).Save(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("unable to update node status: %v", err)
+		}
 	}
 	return preimageRequest, nil
 }
@@ -389,6 +401,7 @@ func (h *LightningHandler) GetPreimageShare(ctx context.Context, req *pb.Initiat
 
 	err := h.validateGetPreimageRequest(
 		ctx,
+		req.PaymentHash,
 		req.UserSignedRefunds,
 		invoiceAmount,
 		req.ReceiverIdentityPublicKey,
@@ -405,7 +418,16 @@ func (h *LightningHandler) GetPreimageShare(ctx context.Context, req *pb.Initiat
 	}
 
 	transferHandler := NewTransferHandler(h.config)
-	transfer, _, err := transferHandler.createTransfer(ctx, req.Transfer.TransferId, schema.TransferTypePreimageSwap, req.Transfer.ExpiryTime.AsTime(), req.Transfer.OwnerIdentityPublicKey, req.Transfer.ReceiverIdentityPublicKey, leafRefundMap)
+	transfer, _, err := transferHandler.createTransfer(
+		ctx,
+		req.Transfer.TransferId,
+		schema.TransferTypePreimageSwap,
+		req.Transfer.ExpiryTime.AsTime(),
+		req.Transfer.OwnerIdentityPublicKey,
+		req.Transfer.ReceiverIdentityPublicKey,
+		leafRefundMap,
+		req.Transfer.KeyTweakProofs,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create transfer: %v", err)
 	}
@@ -459,6 +481,7 @@ func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pb.Ini
 
 	err := h.validateGetPreimageRequest(
 		ctx,
+		req.PaymentHash,
 		req.UserSignedRefunds,
 		invoiceAmount,
 		req.ReceiverIdentityPublicKey,
@@ -475,7 +498,16 @@ func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pb.Ini
 	}
 
 	transferHandler := NewTransferHandler(h.config)
-	transfer, _, err := transferHandler.createTransfer(ctx, req.Transfer.TransferId, schema.TransferTypePreimageSwap, req.Transfer.ExpiryTime.AsTime(), req.Transfer.OwnerIdentityPublicKey, req.Transfer.ReceiverIdentityPublicKey, leafRefundMap)
+	transfer, _, err := transferHandler.createTransfer(
+		ctx,
+		req.Transfer.TransferId,
+		schema.TransferTypePreimageSwap,
+		req.Transfer.ExpiryTime.AsTime(),
+		req.Transfer.OwnerIdentityPublicKey,
+		req.Transfer.ReceiverIdentityPublicKey,
+		leafRefundMap,
+		req.Transfer.KeyTweakProofs,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create transfer: %v", err)
 	}
@@ -493,7 +525,7 @@ func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pb.Ini
 
 	selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
 	result, err := helper.ExecuteTaskWithAllOperators(ctx, h.config, &selection, func(ctx context.Context, operator *so.SigningOperator) ([]byte, error) {
-		conn, err := common.NewGRPCConnectionWithCert(operator.Address, operator.CertPath)
+		conn, err := operator.NewGRPCConnection()
 		if err != nil {
 			return nil, err
 		}
@@ -544,6 +576,28 @@ func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pb.Ini
 
 	hash := sha256.Sum256(secret.Bytes())
 	if !bytes.Equal(hash[:], req.PaymentHash) {
+		selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
+		_, err := helper.ExecuteTaskWithAllOperators(ctx, h.config, &selection, func(ctx context.Context, operator *so.SigningOperator) ([]byte, error) {
+			conn, err := operator.NewGRPCConnection()
+			if err != nil {
+				return nil, err
+			}
+			defer conn.Close()
+
+			client := pbinternal.NewSparkInternalServiceClient(conn)
+			_, err = client.CancelSendTransfer(ctx, &pb.CancelSendTransferRequest{
+				TransferId:              req.Transfer.TransferId,
+				SenderIdentityPublicKey: req.Transfer.OwnerIdentityPublicKey,
+			})
+			if err != nil {
+				return nil, fmt.Errorf("unable to cancel send transfer: %v", err)
+			}
+			return nil, nil
+		})
+		if err != nil {
+			slog.Error("InitiatePreimageSwap: unable to cancel send transfer", "error", err)
+		}
+
 		return nil, fmt.Errorf("invalid preimage")
 	}
 
@@ -675,38 +729,35 @@ func (h *LightningHandler) ProvidePreimageInternal(ctx context.Context, req *pb.
 	slog.Debug("ProvidePreimage: transfer loaded")
 
 	// apply key tweaks for all transfer_leaves
-	transferHandler := NewTransferHandler(h.config)
 	transferLeaves, err := transfer.QueryTransferLeaves().All(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get transfer leaves: %v", err)
 	}
-	slog.Debug("ProvidePreimage: transfer leaves loaded")
+
 	for _, leaf := range transferLeaves {
-		slog.Debug("ProvidePreimage: tweaking leaf key started", "leafID", leaf.ID.String())
 		keyTweak := &pb.SendLeafKeyTweak{}
 		err := proto.Unmarshal(leaf.KeyTweak, keyTweak)
 		if err != nil {
 			return nil, fmt.Errorf("unable to unmarshal key tweak: %v", err)
 		}
-		slog.Debug("ProvidePreimage: key tweak unmarshalled")
 		treeNode, err := leaf.QueryLeaf().Only(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("unable to get tree node: %v", err)
 		}
-		slog.Debug("ProvidePreimage: treeNode loaded")
-		err = transferHandler.tweakLeafKey(ctx, treeNode, keyTweak, nil)
+		err = helper.TweakLeafKey(ctx, treeNode, keyTweak, nil)
 		if err != nil {
 			return nil, fmt.Errorf("unable to tweak leaf key: %v", err)
 		}
-		slog.Debug("ProvidePreimage: tweaking leaf key ended")
+		_, err = leaf.Update().SetKeyTweak(nil).Save(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("unable to update leaf key tweak: %v", err)
+		}
 	}
-	slog.Debug("ProvidePreimage: key tweaked")
 
 	transfer, err = transfer.Update().SetStatus(schema.TransferStatusSenderKeyTweaked).Save(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to update transfer status: %v", err)
 	}
-	slog.Debug("ProvidePreimage: transfer updated")
 
 	return transfer, nil
 }
@@ -727,7 +778,7 @@ func (h *LightningHandler) ProvidePreimage(ctx context.Context, req *pb.ProvideP
 
 	operatorSelection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
 	_, err = helper.ExecuteTaskWithAllOperators(ctx, h.config, &operatorSelection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
-		conn, err := common.NewGRPCConnectionWithCert(operator.Address, operator.CertPath)
+		conn, err := operator.NewGRPCConnection()
 		if err != nil {
 			return nil, err
 		}
@@ -810,7 +861,7 @@ func (h *LightningHandler) ReturnLightningPayment(ctx context.Context, req *pb.R
 	if !internal {
 		operatorSelection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
 		_, err = helper.ExecuteTaskWithAllOperators(ctx, h.config, &operatorSelection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
-			conn, err := common.NewGRPCConnectionWithCert(operator.Address, operator.CertPath)
+			conn, err := operator.NewGRPCConnection()
 			if err != nil {
 				return nil, err
 			}

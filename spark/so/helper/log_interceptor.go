@@ -24,7 +24,7 @@ func LogInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServer
 	}
 	startTime := time.Now()
 	response, err := handler(ctx, req)
-	duration := time.Since(startTime)
+	duration := time.Since(startTime).Seconds()
 	if err != nil {
 		logger.Error("error in grpc", "error", err, "duration", duration)
 	} else {

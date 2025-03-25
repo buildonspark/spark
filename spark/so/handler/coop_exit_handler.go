@@ -6,7 +6,6 @@ import (
 	"log"
 
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark-go/common"
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark-go/proto/spark_internal"
 	"github.com/lightsparkdev/spark-go/so"
@@ -42,7 +41,16 @@ func (h *CooperativeExitHandler) CooperativeExit(ctx context.Context, req *pb.Co
 		leafRefundMap[job.LeafId] = job.RefundTxSigningJob.RawTx
 	}
 
-	transfer, leafMap, err := transferHandler.createTransfer(ctx, req.Transfer.TransferId, schema.TransferTypeCooperativeExit, req.Transfer.ExpiryTime.AsTime(), req.Transfer.OwnerIdentityPublicKey, req.Transfer.ReceiverIdentityPublicKey, leafRefundMap)
+	transfer, leafMap, err := transferHandler.createTransfer(
+		ctx,
+		req.Transfer.TransferId,
+		schema.TransferTypeCooperativeExit,
+		req.Transfer.ExpiryTime.AsTime(),
+		req.Transfer.OwnerIdentityPublicKey,
+		req.Transfer.ReceiverIdentityPublicKey,
+		leafRefundMap,
+		req.Transfer.KeyTweakProofs,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create transfer: %v", err)
 	}
@@ -114,7 +122,7 @@ func (h *TransferHandler) syncCoopExitInit(ctx context.Context, req *pb.Cooperat
 		Option: helper.OperatorSelectionOptionExcludeSelf,
 	}
 	_, err := helper.ExecuteTaskWithAllOperators(ctx, h.config, &selection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
-		conn, err := common.NewGRPCConnectionWithCert(operator.Address, operator.CertPath)
+		conn, err := operator.NewGRPCConnection()
 		if err != nil {
 			log.Printf("Failed to connect to operator: %v", err)
 			return nil, err

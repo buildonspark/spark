@@ -8,7 +8,7 @@ import (
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 )
 
-func TestSignAndVerifyMessage(t *testing.T) {
+func TestSignAndVerifyMessage(_ *testing.T) {
 	msg := []byte("hello world")
 	messageHash := sha256.Sum256(msg)
 	priv, _ := secp256k1.GeneratePrivateKey()

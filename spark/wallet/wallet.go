@@ -219,7 +219,7 @@ func (w *SingleKeyWallet) PayInvoice(ctx context.Context, invoice string) (strin
 }
 
 func (w *SingleKeyWallet) grpcClient(ctx context.Context) (context.Context, *pb.SparkServiceClient, *grpc.ClientConn, error) {
-	conn, err := common.NewGRPCConnectionWithTestTLS(w.Config.CoodinatorAddress())
+	conn, err := common.NewGRPCConnectionWithTestTLS(w.Config.CoodinatorAddress(), nil)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to connect to operator: %w", err)
 	}
@@ -347,7 +347,7 @@ func (w *SingleKeyWallet) RequestLeavesSwap(ctx context.Context, targetAmount in
 	}
 	api := sspapi.NewSparkServiceAPI(requester)
 
-	requestID, leaves, err := api.RequestLeavesSwap(hex.EncodeToString(adaptorPubKey.SerializeCompressed()), uint64(totalAmount), uint64(targetAmount), 0, w.Config.Network, userLeaves)
+	requestID, leaves, err := api.RequestLeavesSwap(hex.EncodeToString(adaptorPubKey.SerializeCompressed()), uint64(totalAmount), uint64(targetAmount), 0, userLeaves)
 	if err != nil {
 		_, cancelErr := CancelSendTransfer(ctx, w.Config, transfer)
 		if cancelErr != nil {
@@ -623,7 +623,7 @@ func (w *SingleKeyWallet) RefreshTimelocks(ctx context.Context, nodeUUID *uuid.U
 
 // For simplicity always mint directly to the issuer wallet (eg. owner == token public key)
 func (w *SingleKeyWallet) MintTokens(ctx context.Context, amount uint64) error {
-	conn, err := common.NewGRPCConnectionWithTestTLS(w.Config.CoodinatorAddress())
+	conn, err := common.NewGRPCConnectionWithTestTLS(w.Config.CoodinatorAddress(), nil)
 	if err != nil {
 		return fmt.Errorf("failed to connect to operator: %w", err)
 	}
@@ -668,7 +668,7 @@ func (w *SingleKeyWallet) MintTokens(ctx context.Context, amount uint64) error {
 
 // TransferTokens transfers tokens to a receiver. If tokenPublicKey is nil, the wallet's identity public key is used.
 func (w *SingleKeyWallet) TransferTokens(ctx context.Context, amount uint64, receiverPubKey []byte, tokenPublicKey []byte) error {
-	conn, err := common.NewGRPCConnectionWithTestTLS(w.Config.CoodinatorAddress())
+	conn, err := common.NewGRPCConnectionWithTestTLS(w.Config.CoodinatorAddress(), nil)
 	if err != nil {
 		return fmt.Errorf("failed to connect to operator: %w", err)
 	}

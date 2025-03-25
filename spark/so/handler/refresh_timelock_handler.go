@@ -65,8 +65,8 @@ func (h *RefreshTimelockHandler) RefreshTimelock(ctx context.Context, req *pb.Re
 			}
 			rawTxBytes = node.RawTx
 		}
-		if node.Status != schema.TreeNodeStatusAvailable {
-			return nil, fmt.Errorf("Cannot refresh node %s because it is not available", node.ID)
+		if i == len(req.SigningJobs)-1 && node.Status != schema.TreeNodeStatusAvailable {
+			return nil, fmt.Errorf("Cannot refresh leaf node %s because it is not available", node.ID)
 		}
 
 		currentTx, err := common.TxFromRawTxBytes(rawTxBytes)

@@ -12,6 +12,7 @@ import (
 	"github.com/btcsuite/btcd/btcec/v2/ecdsa"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	secp256k1 "github.com/decred/dcrd/dcrec/secp256k1/v4"
+	"github.com/lightsparkdev/spark-go/common"
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
 )
 
@@ -170,6 +171,13 @@ func HashTokenTransaction(tokenTransaction *pb.TokenTransaction, partialHash boo
 		allHashes = append(allHashes, h.Sum(nil)...)
 	}
 
+	// Hash the network field
+	h.Reset()
+	networkBytes := make([]byte, 4)
+	binary.BigEndian.PutUint32(networkBytes, uint32(tokenTransaction.GetNetwork()))
+	h.Write(networkBytes)
+	allHashes = append(allHashes, h.Sum(nil)...)
+
 	// Final hash of all concatenated hashes
 	h.Reset()
 	h.Write(allHashes)
@@ -293,6 +301,7 @@ func ValidatePartialTokenTransaction(
 	tokenTransaction *pb.TokenTransaction,
 	tokenTransactionSignatures *pb.TokenTransactionSignatures,
 	sparkOperatorsFromConfig map[string]*pb.SigningOperatorInfo,
+	supportedNetworks []common.Network,
 ) error {
 	if tokenTransaction == nil {
 		return fmt.Errorf("token transaction cannot be nil")
@@ -305,6 +314,14 @@ func ValidatePartialTokenTransaction(
 	}
 	if len(tokenTransaction.OutputLeaves) > MaxInputOrOutputTokenTransactionLeaves {
 		return fmt.Errorf("too many output leaves, maximum is %d", MaxInputOrOutputTokenTransactionLeaves)
+	}
+	network, err := common.NetworkFromProtoNetwork(tokenTransaction.Network)
+	if err != nil {
+		return fmt.Errorf("failed to convert network: %w", err)
+	}
+
+	if !isNetworkSupported(network, supportedNetworks) {
+		return fmt.Errorf("network %s is not supported", network)
 	}
 
 	// Validate all output leaves have the same token public key
@@ -351,17 +368,13 @@ func ValidatePartialTokenTransaction(
 			return fmt.Errorf("mint signature cannot be nil")
 		}
 
-		// Validate mint amounts
-		totalMintAmount := new(big.Int)
+		// Validate mint amounts > 0
 		for i, leaf := range tokenTransaction.OutputLeaves {
 			amount := new(big.Int).SetBytes(leaf.GetTokenAmount())
 
 			if amount.Cmp(Zero) == 0 {
 				return fmt.Errorf("mint amount for leaf %d cannot be 0", i)
 			}
-
-			// Add to total
-			totalMintAmount.Add(totalMintAmount, amount)
 		}
 	}
 
@@ -518,4 +531,16 @@ func ValidateRevocationKeys(revocationPrivateKeys [][]byte, expectedRevocationPu
 		}
 	}
 	return nil
+}
+
+func isNetworkSupported(network common.Network, supportedNetworks []common.Network) bool {
+	supportedNetworkMap := make(map[common.Network]struct{})
+
+	// Create a map for quick lookup of supported networks
+	for _, n := range supportedNetworks {
+		supportedNetworkMap[n] = struct{}{}
+	}
+	// Check if the network is supported
+	_, exists := supportedNetworkMap[network]
+	return exists
 }

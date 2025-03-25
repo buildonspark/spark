@@ -2,7 +2,7 @@
 resolver = "2"
 members = [
     "spark-frost",
-    "spark-frost-signer",
+    "spark-frost-signer", "spark-frost-uniffi",
     # "spark-frost-uniffi",
 ]
 

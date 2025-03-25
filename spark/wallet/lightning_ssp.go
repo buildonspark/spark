@@ -10,7 +10,7 @@ import (
 )
 
 func QueryUserSignedRefunds(ctx context.Context, config *Config, paymentHash []byte) ([]*pb.UserSignedRefund, error) {
-	conn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
+	conn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("unable to connect to coordinator: %v", err)
 	}
@@ -46,7 +46,7 @@ func ValidateUserSignedRefund(userSignedRefund *pb.UserSignedRefund) (int64, err
 }
 
 func ProvidePreimage(ctx context.Context, config *Config, preimage []byte) (*pb.Transfer, error) {
-	conn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
+	conn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("unable to connect to coordinator: %v", err)
 	}

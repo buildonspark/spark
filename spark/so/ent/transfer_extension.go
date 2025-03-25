@@ -36,6 +36,8 @@ func (t *Transfer) MarshalProto(ctx context.Context) (*pb.Transfer, error) {
 		TotalValue:                t.TotalValue,
 		ExpiryTime:                timestamppb.New(t.ExpiryTime),
 		Leaves:                    leavesProto,
+		CreatedTime:               timestamppb.New(t.CreateTime),
+		UpdatedTime:               timestamppb.New(t.UpdateTime),
 	}, nil
 }
 

@@ -70,7 +70,7 @@ func SendTransferTweakKey(
 		wg.Add(1)
 		go func(identifier string, operator *so.SigningOperator) {
 			defer wg.Done()
-			sparkConn, err := common.NewGRPCConnectionWithTestTLS(operator.Address)
+			sparkConn, err := common.NewGRPCConnectionWithTestTLS(operator.Address, nil)
 			if err != nil {
 				results <- err
 				return
@@ -144,7 +144,7 @@ func SendSwapSignRefund(
 		return nil, nil, nil, nil, fmt.Errorf("failed to prepare signing jobs for sending transfer: %v", err)
 	}
 
-	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
+	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress(), nil)
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
@@ -218,7 +218,7 @@ func SendTransferSignRefund(
 		return nil, nil, nil, fmt.Errorf("failed to prepare signing jobs for sending transfer: %v", err)
 	}
 
-	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
+	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress(), nil)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -357,7 +357,7 @@ func QueryPendingTransfers(
 	ctx context.Context,
 	config *Config,
 ) (*pb.QueryPendingTransfersResponse, error) {
-	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
+	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -375,7 +375,7 @@ func QueryPendingTransfersBySender(
 	ctx context.Context,
 	config *Config,
 ) (*pb.QueryPendingTransfersResponse, error) {
-	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
+	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -391,7 +391,7 @@ func QueryPendingTransfersBySender(
 
 // VerifyPendingTransfer verifies signature and decrypt secret cipher for all leaves in the transfer.
 func VerifyPendingTransfer(
-	ctx context.Context,
+	_ context.Context,
 	config *Config,
 	transfer *pb.Transfer,
 ) (*map[string][]byte, error) {
@@ -440,14 +440,16 @@ func ClaimTransfer(
 	config *Config,
 	leaves []LeafKeyTweak,
 ) ([]*pb.TreeNode, error) {
+	proofMap := make(map[string][][]byte)
 	if transfer.Status == pb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED {
-		err := ClaimTransferTweakKeys(ctx, transfer, config, leaves)
+		var err error
+		proofMap, err = ClaimTransferTweakKeys(ctx, transfer, config, leaves)
 		if err != nil {
 			return nil, fmt.Errorf("failed to tweak keys when claiming leaves: %v", err)
 		}
 	}
 
-	signatures, err := ClaimTransferSignRefunds(ctx, transfer, config, leaves)
+	signatures, err := ClaimTransferSignRefunds(ctx, transfer, config, leaves, proofMap)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign refunds when claiming leaves: %v", err)
 	}
@@ -460,10 +462,10 @@ func ClaimTransferTweakKeys(
 	transfer *pb.Transfer,
 	config *Config,
 	leaves []LeafKeyTweak,
-) error {
-	leavesTweaksMap, err := prepareClaimLeavesKeyTweaks(config, leaves)
+) (map[string][][]byte, error) {
+	leavesTweaksMap, proofMap, err := prepareClaimLeavesKeyTweaks(config, leaves)
 	if err != nil {
-		return fmt.Errorf("failed to prepare transfer data: %v", err)
+		return nil, fmt.Errorf("failed to prepare transfer data: %v", err)
 	}
 
 	wg := sync.WaitGroup{}
@@ -473,7 +475,7 @@ func ClaimTransferTweakKeys(
 		wg.Add(1)
 		go func(identifier string, operator *so.SigningOperator) {
 			defer wg.Done()
-			sparkConn, err := common.NewGRPCConnectionWithTestTLS(operator.Address)
+			sparkConn, err := common.NewGRPCConnectionWithTestTLS(operator.Address, nil)
 			if err != nil {
 				results <- err
 				return
@@ -500,30 +502,32 @@ func ClaimTransferTweakKeys(
 	close(results)
 	for result := range results {
 		if result != nil {
-			return result
+			return nil, result
 		}
 	}
-	return nil
+	return proofMap, nil
 }
 
-func prepareClaimLeavesKeyTweaks(config *Config, leaves []LeafKeyTweak) (*map[string][]*pb.ClaimLeafKeyTweak, error) {
+func prepareClaimLeavesKeyTweaks(config *Config, leaves []LeafKeyTweak) (*map[string][]*pb.ClaimLeafKeyTweak, map[string][][]byte, error) {
 	leavesTweaksMap := make(map[string][]*pb.ClaimLeafKeyTweak)
+	proofMap := make(map[string][][]byte)
 	for _, leaf := range leaves {
-		leafTweaksMap, err := prepareClaimLeafKeyTweaks(config, leaf)
+		leafTweaksMap, proof, err := prepareClaimLeafKeyTweaks(config, leaf)
 		if err != nil {
-			return nil, fmt.Errorf("failed to prepare single leaf transfer: %v", err)
+			return nil, nil, fmt.Errorf("failed to prepare single leaf transfer: %v", err)
 		}
+		proofMap[leaf.Leaf.Id] = proof
 		for identifier, leafTweak := range *leafTweaksMap {
 			leavesTweaksMap[identifier] = append(leavesTweaksMap[identifier], leafTweak)
 		}
 	}
-	return &leavesTweaksMap, nil
+	return &leavesTweaksMap, proofMap, nil
 }
 
-func prepareClaimLeafKeyTweaks(config *Config, leaf LeafKeyTweak) (*map[string]*pb.ClaimLeafKeyTweak, error) {
+func prepareClaimLeafKeyTweaks(config *Config, leaf LeafKeyTweak) (*map[string]*pb.ClaimLeafKeyTweak, [][]byte, error) {
 	privKeyTweak, err := common.SubtractPrivateKeys(leaf.SigningPrivKey, leaf.NewSigningPrivKey)
 	if err != nil {
-		return nil, fmt.Errorf("fail to calculate private key tweak: %v", err)
+		return nil, nil, fmt.Errorf("fail to calculate private key tweak: %v", err)
 	}
 
 	// Calculate secret tweak shares
@@ -534,7 +538,7 @@ func prepareClaimLeafKeyTweaks(config *Config, leaf LeafKeyTweak) (*map[string]*
 		len(config.SigningOperators),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("fail to split private key tweak: %v", err)
+		return nil, nil, fmt.Errorf("fail to split private key tweak: %v", err)
 	}
 
 	// Calculate pubkey shares tweak
@@ -542,7 +546,7 @@ func prepareClaimLeafKeyTweaks(config *Config, leaf LeafKeyTweak) (*map[string]*
 	for identifier, operator := range config.SigningOperators {
 		share := findShare(shares, operator.ID)
 		if share == nil {
-			return nil, fmt.Errorf("failed to find share for operator %d", operator.ID)
+			return nil, nil, fmt.Errorf("failed to find share for operator %d", operator.ID)
 		}
 		var shareScalar secp256k1.ModNScalar
 		shareScalar.SetByteSlice(share.Share.Bytes())
@@ -554,7 +558,7 @@ func prepareClaimLeafKeyTweaks(config *Config, leaf LeafKeyTweak) (*map[string]*
 	for identifier, operator := range config.SigningOperators {
 		share := findShare(shares, operator.ID)
 		if share == nil {
-			return nil, fmt.Errorf("failed to find share for operator %d", operator.ID)
+			return nil, nil, fmt.Errorf("failed to find share for operator %d", operator.ID)
 		}
 		leafTweaksMap[identifier] = &pb.ClaimLeafKeyTweak{
 			LeafId: leaf.Leaf.Id,
@@ -565,7 +569,7 @@ func prepareClaimLeafKeyTweaks(config *Config, leaf LeafKeyTweak) (*map[string]*
 			PubkeySharesTweak: pubkeySharesTweak,
 		}
 	}
-	return &leafTweaksMap, nil
+	return &leafTweaksMap, shares[0].Proofs, nil
 }
 
 type LeafRefundSigningData struct {
@@ -582,6 +586,7 @@ func ClaimTransferSignRefunds(
 	transfer *pb.Transfer,
 	config *Config,
 	leafKeys []LeafKeyTweak,
+	proofMap map[string][][]byte,
 ) ([]*pb.NodeSignatures, error) {
 	leafDataMap := make(map[string]*LeafRefundSigningData)
 	for _, leafKey := range leafKeys {
@@ -601,16 +606,23 @@ func ClaimTransferSignRefunds(
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare signing jobs for claiming transfer: %v", err)
 	}
-	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
+	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress(), nil)
 	if err != nil {
 		return nil, err
 	}
 	defer sparkConn.Close()
 	sparkClient := pb.NewSparkServiceClient(sparkConn)
+	secretProofMap := make(map[string]*pb.SecretProof)
+	for leafID, proof := range proofMap {
+		secretProofMap[leafID] = &pb.SecretProof{
+			Proofs: proof,
+		}
+	}
 	response, err := sparkClient.ClaimTransferSignRefunds(ctx, &pb.ClaimTransferSignRefundsRequest{
 		TransferId:             transfer.Id,
 		OwnerIdentityPublicKey: config.IdentityPublicKey(),
 		SigningJobs:            signingJobs,
+		KeyTweakProofs:         secretProofMap,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to call ClaimTransferSignRefunds: %v", err)
@@ -624,7 +636,7 @@ func finalizeTransfer(
 	config *Config,
 	signatures []*pb.NodeSignatures,
 ) ([]*pb.TreeNode, error) {
-	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
+	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -686,7 +698,7 @@ func signRefunds(
 		}
 	}
 
-	frostConn, _ := common.NewGRPCConnectionWithoutTLS(config.FrostSignerAddress)
+	frostConn, _ := common.NewGRPCConnectionWithoutTLS(config.FrostSignerAddress, nil)
 	defer frostConn.Close()
 	frostClient := pbfrost.NewFrostServiceClient(frostConn)
 	userSignatures, err := frostClient.SignFrost(context.Background(), &pbfrost.SignFrostRequest{
@@ -744,7 +756,10 @@ func prepareRefundSoSigningJobs(
 		}
 		refundSigningData.RefundTx = refundTx
 		var refundBuf bytes.Buffer
-		refundTx.Serialize(&refundBuf)
+		err = refundTx.Serialize(&refundBuf)
+		if err != nil {
+			return nil, fmt.Errorf("failed to serialize refund tx: %v", err)
+		}
 		refundNonceCommitmentProto, _ := refundSigningData.Nonce.SigningCommitment().MarshalProto()
 
 		signingPubkey := refundSigningData.SigningPrivKey.PubKey().SerializeCompressed()
@@ -761,14 +776,20 @@ func prepareRefundSoSigningJobs(
 }
 
 func CancelSendTransfer(ctx context.Context, config *Config, transfer *pb.Transfer) (*pb.Transfer, error) {
-	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
+	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress(), nil)
 	if err != nil {
 		return nil, err
 	}
 	defer sparkConn.Close()
 
+	token, err := AuthenticateWithConnection(ctx, config, sparkConn)
+	if err != nil {
+		return nil, fmt.Errorf("failed to authenticate with server: %v", err)
+	}
+	authCtx := ContextWithToken(ctx, token)
+
 	sparkClient := pb.NewSparkServiceClient(sparkConn)
-	response, err := sparkClient.CancelSendTransfer(ctx, &pb.CancelSendTransferRequest{
+	response, err := sparkClient.CancelSendTransfer(authCtx, &pb.CancelSendTransferRequest{
 		TransferId:              transfer.Id,
 		SenderIdentityPublicKey: config.IdentityPublicKey(),
 	})
@@ -779,7 +800,7 @@ func CancelSendTransfer(ctx context.Context, config *Config, transfer *pb.Transf
 }
 
 func QueryAllTransfers(ctx context.Context, config *Config, limit int64, offset int64) ([]*pb.Transfer, int64, error) {
-	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress())
+	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress(), nil)
 	if err != nil {
 		return nil, 0, err
 	}

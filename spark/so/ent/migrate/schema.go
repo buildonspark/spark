@@ -133,7 +133,7 @@ var (
 		{Name: "update_time", Type: field.TypeTime},
 		{Name: "payment_hash", Type: field.TypeBytes, Unique: true},
 		{Name: "preimage_share", Type: field.TypeBytes},
-		{Name: "threshold", Type: field.TypeUint32},
+		{Name: "threshold", Type: field.TypeInt32},
 		{Name: "owner_identity_pubkey", Type: field.TypeBytes},
 		{Name: "invoice_string", Type: field.TypeString},
 		{Name: "preimage_request_preimage_shares", Type: field.TypeUUID, Unique: true, Nullable: true},
@@ -168,7 +168,7 @@ var (
 		{Name: "secret_share", Type: field.TypeBytes},
 		{Name: "public_shares", Type: field.TypeJSON},
 		{Name: "public_key", Type: field.TypeBytes, Unique: true},
-		{Name: "min_signers", Type: field.TypeUint32},
+		{Name: "min_signers", Type: field.TypeInt32},
 		{Name: "coordinator_index", Type: field.TypeUint64},
 	}
 	// SigningKeysharesTable holds the schema information for the "signing_keyshares" table.
@@ -224,12 +224,12 @@ var (
 		PrimaryKey: []*schema.Column{TokenFreezesColumns[0]},
 		Indexes: []*schema.Index{
 			{
-				Name:    "tokenfreeze_owner_public_key_token_public_key_wallet_provided_freeze_timestamp",
+				Name:    "tokenfreeze_owner_public_key_token_public_key_wallet_provided_f",
 				Unique:  true,
 				Columns: []*schema.Column{TokenFreezesColumns[4], TokenFreezesColumns[5], TokenFreezesColumns[7]},
 			},
 			{
-				Name:    "tokenfreeze_owner_public_key_token_public_key_wallet_provided_thaw_timestamp",
+				Name:    "tokenfreeze_owner_public_key_token_public_key_wallet_provided_t",
 				Unique:  true,
 				Columns: []*schema.Column{TokenFreezesColumns[4], TokenFreezesColumns[5], TokenFreezesColumns[8]},
 			},
@@ -240,18 +240,20 @@ var (
 		{Name: "id", Type: field.TypeUUID},
 		{Name: "create_time", Type: field.TypeTime},
 		{Name: "update_time", Type: field.TypeTime},
-		{Name: "status", Type: field.TypeEnum, Enums: []string{"CREATED_STARTED", "CREATED_SIGNED", "CREATED_FINALIZED", "SPENT_STARTED", "SPENT_SIGNED", "SPENT_FINALIZED"}},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"CREATED_STARTED", "CREATED_SIGNED", "CREATED_SIGNED_CANCELLED", "CREATED_FINALIZED", "SPENT_STARTED", "SPENT_SIGNED", "SPENT_FINALIZED"}},
 		{Name: "owner_public_key", Type: field.TypeBytes},
 		{Name: "withdraw_bond_sats", Type: field.TypeUint64},
 		{Name: "withdraw_relative_block_locktime", Type: field.TypeUint64},
 		{Name: "withdraw_revocation_public_key", Type: field.TypeBytes},
 		{Name: "token_public_key", Type: field.TypeBytes},
 		{Name: "token_amount", Type: field.TypeBytes},
-		{Name: "leaf_created_transaction_output_vout", Type: field.TypeUint32},
+		{Name: "leaf_created_transaction_output_vout", Type: field.TypeInt32},
 		{Name: "leaf_spent_ownership_signature", Type: field.TypeBytes, Nullable: true},
 		{Name: "leaf_spent_operator_specific_ownership_signature", Type: field.TypeBytes, Nullable: true},
-		{Name: "leaf_spent_transaction_input_vout", Type: field.TypeUint32, Nullable: true},
+		{Name: "leaf_spent_transaction_input_vout", Type: field.TypeInt32, Nullable: true},
 		{Name: "leaf_spent_revocation_private_key", Type: field.TypeBytes, Nullable: true},
+		{Name: "confirmed_withdraw_block_hash", Type: field.TypeBytes, Nullable: true},
+		{Name: "network", Type: field.TypeEnum, Nullable: true, Enums: []string{"MAINNET", "REGTEST", "TESTNET", "SIGNET"}},
 		{Name: "token_leaf_revocation_keyshare", Type: field.TypeUUID},
 		{Name: "token_leaf_leaf_created_token_transaction_receipt", Type: field.TypeUUID, Nullable: true},
 		{Name: "token_leaf_leaf_spent_token_transaction_receipt", Type: field.TypeUUID, Nullable: true},
@@ -264,19 +266,19 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "token_leafs_signing_keyshares_revocation_keyshare",
-				Columns:    []*schema.Column{TokenLeafsColumns[15]},
+				Columns:    []*schema.Column{TokenLeafsColumns[17]},
 				RefColumns: []*schema.Column{SigningKeysharesColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "token_leafs_token_transaction_receipts_leaf_created_token_transaction_receipt",
-				Columns:    []*schema.Column{TokenLeafsColumns[16]},
+				Columns:    []*schema.Column{TokenLeafsColumns[18]},
 				RefColumns: []*schema.Column{TokenTransactionReceiptsColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "token_leafs_token_transaction_receipts_leaf_spent_token_transaction_receipt",
-				Columns:    []*schema.Column{TokenLeafsColumns[17]},
+				Columns:    []*schema.Column{TokenLeafsColumns[19]},
 				RefColumns: []*schema.Column{TokenTransactionReceiptsColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
@@ -286,6 +288,11 @@ var (
 				Name:    "tokenleaf_owner_public_key_token_public_key",
 				Unique:  false,
 				Columns: []*schema.Column{TokenLeafsColumns[4], TokenLeafsColumns[8]},
+			},
+			{
+				Name:    "tokenleaf_confirmed_withdraw_block_hash",
+				Unique:  false,
+				Columns: []*schema.Column{TokenLeafsColumns[15]},
 			},
 		},
 	}
@@ -313,7 +320,7 @@ var (
 		{Name: "partial_token_transaction_hash", Type: field.TypeBytes},
 		{Name: "finalized_token_transaction_hash", Type: field.TypeBytes, Unique: true},
 		{Name: "operator_signature", Type: field.TypeBytes, Unique: true, Nullable: true},
-		{Name: "status", Type: field.TypeEnum, Enums: []string{"STARTED", "SIGNED", "FINALIZED"}},
+		{Name: "status", Type: field.TypeEnum, Nullable: true, Enums: []string{"STARTED", "SIGNED", "SIGNED_CANCELLED", "FINALIZED"}},
 		{Name: "token_transaction_receipt_mint", Type: field.TypeUUID, Nullable: true},
 	}
 	// TokenTransactionReceiptsTable holds the schema information for the "token_transaction_receipts" table.
@@ -345,7 +352,7 @@ var (
 		{Name: "sender_identity_pubkey", Type: field.TypeBytes},
 		{Name: "receiver_identity_pubkey", Type: field.TypeBytes},
 		{Name: "total_value", Type: field.TypeUint64},
-		{Name: "status", Type: field.TypeEnum, Enums: []string{"SENDER_INITIATED", "SENDER_KEY_TWEAK_PENDING", "SENDER_KEY_TWEAKED", "RECEIVER_KEY_TWEAKED", "RECEIVER_REFUND_SIGNED", "COMPLETED", "EXPIRED", "RETURNED"}},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"SENDER_INITIATED", "SENDER_KEY_TWEAK_PENDING", "SENDER_KEY_TWEAKED", "RECEIVER_KEY_TWEAKED", "RECEIVER_KEY_TWEAK_LOCKED", "RECEIVER_REFUND_SIGNED", "COMPLETED", "EXPIRED", "RETURNED"}},
 		{Name: "type", Type: field.TypeEnum, Enums: []string{"PREIMAGE_SWAP", "COOPERATIVE_EXIT", "TRANSFER"}},
 		{Name: "expiry_time", Type: field.TypeTime},
 		{Name: "completion_time", Type: field.TypeTime, Nullable: true},
@@ -371,6 +378,11 @@ var (
 				Unique:  false,
 				Columns: []*schema.Column{TransfersColumns[6]},
 			},
+			{
+				Name:    "transfer_update_time",
+				Unique:  false,
+				Columns: []*schema.Column{TransfersColumns[2]},
+			},
 		},
 	}
 	// TransferLeafsColumns holds the columns for the "transfer_leafs" table.
@@ -383,6 +395,8 @@ var (
 		{Name: "previous_refund_tx", Type: field.TypeBytes},
 		{Name: "intermediate_refund_tx", Type: field.TypeBytes},
 		{Name: "key_tweak", Type: field.TypeBytes, Nullable: true},
+		{Name: "sender_key_tweak_proof", Type: field.TypeBytes, Nullable: true},
+		{Name: "receiver_key_tweak", Type: field.TypeBytes, Nullable: true},
 		{Name: "transfer_leaf_transfer", Type: field.TypeUUID},
 		{Name: "transfer_leaf_leaf", Type: field.TypeUUID},
 	}
@@ -394,13 +408,13 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "transfer_leafs_transfers_transfer",
-				Columns:    []*schema.Column{TransferLeafsColumns[8]},
+				Columns:    []*schema.Column{TransferLeafsColumns[10]},
 				RefColumns: []*schema.Column{TransfersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "transfer_leafs_tree_nodes_leaf",
-				Columns:    []*schema.Column{TransferLeafsColumns[9]},
+				Columns:    []*schema.Column{TransferLeafsColumns[11]},
 				RefColumns: []*schema.Column{TreeNodesColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -409,12 +423,12 @@ var (
 			{
 				Name:    "transferleaf_transfer_leaf_transfer",
 				Unique:  false,
-				Columns: []*schema.Column{TransferLeafsColumns[8]},
+				Columns: []*schema.Column{TransferLeafsColumns[10]},
 			},
 			{
 				Name:    "transferleaf_transfer_leaf_leaf",
 				Unique:  false,
-				Columns: []*schema.Column{TransferLeafsColumns[9]},
+				Columns: []*schema.Column{TransferLeafsColumns[11]},
 			},
 		},
 	}
@@ -442,6 +456,18 @@ var (
 				OnDelete:   schema.SetNull,
 			},
 		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "tree_status",
+				Unique:  false,
+				Columns: []*schema.Column{TreesColumns[4]},
+			},
+			{
+				Name:    "tree_network",
+				Unique:  false,
+				Columns: []*schema.Column{TreesColumns[5]},
+			},
+		},
 	}
 	// TreeNodesColumns holds the columns for the "tree_nodes" table.
 	TreeNodesColumns = []*schema.Column{
@@ -454,7 +480,7 @@ var (
 		{Name: "owner_identity_pubkey", Type: field.TypeBytes},
 		{Name: "owner_signing_pubkey", Type: field.TypeBytes},
 		{Name: "raw_tx", Type: field.TypeBytes},
-		{Name: "vout", Type: field.TypeUint16},
+		{Name: "vout", Type: field.TypeInt16},
 		{Name: "raw_refund_tx", Type: field.TypeBytes, Nullable: true},
 		{Name: "tree_node_tree", Type: field.TypeUUID},
 		{Name: "tree_node_parent", Type: field.TypeUUID, Nullable: true},
@@ -500,6 +526,11 @@ var (
 				Name:    "treenode_owner_identity_pubkey",
 				Unique:  false,
 				Columns: []*schema.Column{TreeNodesColumns[6]},
+			},
+			{
+				Name:    "treenode_owner_identity_pubkey_status",
+				Unique:  false,
+				Columns: []*schema.Column{TreeNodesColumns[6], TreeNodesColumns[4]},
 			},
 		},
 	}
