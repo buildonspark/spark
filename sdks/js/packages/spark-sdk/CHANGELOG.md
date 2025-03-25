@@ -1,5 +1,13 @@
 # @buildonspark/spark-sdk
 
+## 0.0.23
+
+### Patch Changes
+
+- CJS support and package improvements
+- Updated dependencies
+  - @buildonspark/lrc20-sdk@0.0.21
+
 ## 0.0.22
 
 ### Patch Changes
