@@ -1,6 +1,6 @@
 # Spark
 
-Spark is a Bitcoin layer 2 scaling solution that enables secure and fast transactions through a novel shared signature scheme that powers off-chain transfers of native BTC and other assets.
+A simple shared signing protocol that makes Bitcoin fast, cheap, and self-custodial at scale — that’s Spark.
 
 ## Architecture Overview
 
@@ -29,9 +29,7 @@ Spark consists of several key components that work together to power transaction
    - Communicates with the Spark Operator via gRPC
 
 4. **LRC20 Token Support** - Extended functionality for token operations:
-   - Token creation, minting, and management
-   - Token transfer operations
-   - Tree-based representation of token ownership
+   - Token creation, minting, transfer etc.
 
 ### System Architecture
 
