@@ -716,7 +716,10 @@ func (h *LightningHandler) ProvidePreimageInternal(ctx context.Context, req *pb.
 	}
 	slog.Debug("ProvidePreimage: preimage request found")
 
-	preimageRequest, err = preimageRequest.Update().SetStatus(schema.PreimageRequestStatusPreimageShared).Save(ctx)
+	preimageRequest, err = preimageRequest.Update().
+		SetStatus(schema.PreimageRequestStatusPreimageShared).
+		SetPreimage(req.Preimage).
+		Save(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to update preimage request status: %v", err)
 	}

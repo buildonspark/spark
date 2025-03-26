@@ -71,6 +71,18 @@ func (pru *PreimageRequestUpdate) ClearReceiverIdentityPubkey() *PreimageRequest
 	return pru
 }
 
+// SetPreimage sets the "preimage" field.
+func (pru *PreimageRequestUpdate) SetPreimage(b []byte) *PreimageRequestUpdate {
+	pru.mutation.SetPreimage(b)
+	return pru
+}
+
+// ClearPreimage clears the value of the "preimage" field.
+func (pru *PreimageRequestUpdate) ClearPreimage() *PreimageRequestUpdate {
+	pru.mutation.ClearPreimage()
+	return pru
+}
+
 // AddTransactionIDs adds the "transactions" edge to the UserSignedTransaction entity by IDs.
 func (pru *PreimageRequestUpdate) AddTransactionIDs(ids ...uuid.UUID) *PreimageRequestUpdate {
 	pru.mutation.AddTransactionIDs(ids...)
@@ -240,6 +252,12 @@ func (pru *PreimageRequestUpdate) sqlSave(ctx context.Context) (n int, err error
 	if pru.mutation.ReceiverIdentityPubkeyCleared() {
 		_spec.ClearField(preimagerequest.FieldReceiverIdentityPubkey, field.TypeBytes)
 	}
+	if value, ok := pru.mutation.Preimage(); ok {
+		_spec.SetField(preimagerequest.FieldPreimage, field.TypeBytes, value)
+	}
+	if pru.mutation.PreimageCleared() {
+		_spec.ClearField(preimagerequest.FieldPreimage, field.TypeBytes)
+	}
 	if pru.mutation.TransactionsCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.O2M,
@@ -398,6 +416,18 @@ func (pruo *PreimageRequestUpdateOne) SetReceiverIdentityPubkey(b []byte) *Preim
 // ClearReceiverIdentityPubkey clears the value of the "receiver_identity_pubkey" field.
 func (pruo *PreimageRequestUpdateOne) ClearReceiverIdentityPubkey() *PreimageRequestUpdateOne {
 	pruo.mutation.ClearReceiverIdentityPubkey()
+	return pruo
+}
+
+// SetPreimage sets the "preimage" field.
+func (pruo *PreimageRequestUpdateOne) SetPreimage(b []byte) *PreimageRequestUpdateOne {
+	pruo.mutation.SetPreimage(b)
+	return pruo
+}
+
+// ClearPreimage clears the value of the "preimage" field.
+func (pruo *PreimageRequestUpdateOne) ClearPreimage() *PreimageRequestUpdateOne {
+	pruo.mutation.ClearPreimage()
 	return pruo
 }
 
@@ -599,6 +629,12 @@ func (pruo *PreimageRequestUpdateOne) sqlSave(ctx context.Context) (_node *Preim
 	}
 	if pruo.mutation.ReceiverIdentityPubkeyCleared() {
 		_spec.ClearField(preimagerequest.FieldReceiverIdentityPubkey, field.TypeBytes)
+	}
+	if value, ok := pruo.mutation.Preimage(); ok {
+		_spec.SetField(preimagerequest.FieldPreimage, field.TypeBytes, value)
+	}
+	if pruo.mutation.PreimageCleared() {
+		_spec.ClearField(preimagerequest.FieldPreimage, field.TypeBytes)
 	}
 	if pruo.mutation.TransactionsCleared() {
 		edge := &sqlgraph.EdgeSpec{

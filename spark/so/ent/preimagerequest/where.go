@@ -77,6 +77,11 @@ func ReceiverIdentityPubkey(v []byte) predicate.PreimageRequest {
 	return predicate.PreimageRequest(sql.FieldEQ(FieldReceiverIdentityPubkey, v))
 }
 
+// Preimage applies equality check predicate on the "preimage" field. It's identical to PreimageEQ.
+func Preimage(v []byte) predicate.PreimageRequest {
+	return predicate.PreimageRequest(sql.FieldEQ(FieldPreimage, v))
+}
+
 // CreateTimeEQ applies the EQ predicate on the "create_time" field.
 func CreateTimeEQ(v time.Time) predicate.PreimageRequest {
 	return predicate.PreimageRequest(sql.FieldEQ(FieldCreateTime, v))
@@ -275,6 +280,56 @@ func ReceiverIdentityPubkeyIsNil() predicate.PreimageRequest {
 // ReceiverIdentityPubkeyNotNil applies the NotNil predicate on the "receiver_identity_pubkey" field.
 func ReceiverIdentityPubkeyNotNil() predicate.PreimageRequest {
 	return predicate.PreimageRequest(sql.FieldNotNull(FieldReceiverIdentityPubkey))
+}
+
+// PreimageEQ applies the EQ predicate on the "preimage" field.
+func PreimageEQ(v []byte) predicate.PreimageRequest {
+	return predicate.PreimageRequest(sql.FieldEQ(FieldPreimage, v))
+}
+
+// PreimageNEQ applies the NEQ predicate on the "preimage" field.
+func PreimageNEQ(v []byte) predicate.PreimageRequest {
+	return predicate.PreimageRequest(sql.FieldNEQ(FieldPreimage, v))
+}
+
+// PreimageIn applies the In predicate on the "preimage" field.
+func PreimageIn(vs ...[]byte) predicate.PreimageRequest {
+	return predicate.PreimageRequest(sql.FieldIn(FieldPreimage, vs...))
+}
+
+// PreimageNotIn applies the NotIn predicate on the "preimage" field.
+func PreimageNotIn(vs ...[]byte) predicate.PreimageRequest {
+	return predicate.PreimageRequest(sql.FieldNotIn(FieldPreimage, vs...))
+}
+
+// PreimageGT applies the GT predicate on the "preimage" field.
+func PreimageGT(v []byte) predicate.PreimageRequest {
+	return predicate.PreimageRequest(sql.FieldGT(FieldPreimage, v))
+}
+
+// PreimageGTE applies the GTE predicate on the "preimage" field.
+func PreimageGTE(v []byte) predicate.PreimageRequest {
+	return predicate.PreimageRequest(sql.FieldGTE(FieldPreimage, v))
+}
+
+// PreimageLT applies the LT predicate on the "preimage" field.
+func PreimageLT(v []byte) predicate.PreimageRequest {
+	return predicate.PreimageRequest(sql.FieldLT(FieldPreimage, v))
+}
+
+// PreimageLTE applies the LTE predicate on the "preimage" field.
+func PreimageLTE(v []byte) predicate.PreimageRequest {
+	return predicate.PreimageRequest(sql.FieldLTE(FieldPreimage, v))
+}
+
+// PreimageIsNil applies the IsNil predicate on the "preimage" field.
+func PreimageIsNil() predicate.PreimageRequest {
+	return predicate.PreimageRequest(sql.FieldIsNull(FieldPreimage))
+}
+
+// PreimageNotNil applies the NotNil predicate on the "preimage" field.
+func PreimageNotNil() predicate.PreimageRequest {
+	return predicate.PreimageRequest(sql.FieldNotNull(FieldPreimage))
 }
 
 // HasTransactions applies the HasEdge predicate on the "transactions" edge.
