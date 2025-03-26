@@ -13,6 +13,7 @@ import { Timestamp } from "./google/protobuf/timestamp.js";
 
 export const protobufPackage = "spark";
 
+/** Network is the network type of the bitcoin network. */
 export enum Network {
   MAINNET = 0,
   REGTEST = 1,
@@ -166,8 +167,21 @@ export function transferStatusToJSON(object: TransferStatus): string {
   }
 }
 
+/**
+ * DepositAddressProof is the proof of possession of the deposit address.
+ * When a user wants to generate a deposit address, they are sending their public key to the SE,
+ * and the SE will respond with an address of user's public key + SE's public key.
+ *
+ * In the trusty deposit flow, user will need to know that this address is valid, and no single SE
+ * can generate this address.
+ *
+ * The SE will need to sign the address with their identity keys, and have a proof of possession of
+ * the signing key piece that the SE holds.
+ */
 export interface DepositAddressProof {
+  /** The signatures of the address by the SE's identity keys. */
   addressSignatures: { [key: string]: Uint8Array };
+  /** The proof of possession of the signing key piece by the SE. */
   proofOfPossessionSignature: Uint8Array;
 }
 
@@ -176,48 +190,95 @@ export interface DepositAddressProof_AddressSignaturesEntry {
   value: Uint8Array;
 }
 
+/**
+ * GenerateDepositAddressRequest is the request to generate a deposit address.
+ * The user will send their public key to the SE, and the SE will respond with an address of user's
+ * public key + SE's public key.
+ */
 export interface GenerateDepositAddressRequest {
+  /** The signing public key of the user. */
   signingPublicKey: Uint8Array;
+  /** The identity public key of the user. */
   identityPublicKey: Uint8Array;
+  /** The network of the bitcoin network. */
   network: Network;
 }
 
+/** Address is the address of the user's public key + SE's public key. */
 export interface Address {
+  /** The p2tr address of the user's public key + SE's public key. */
   address: string;
+  /** The verifying key of the address, which is user's public key + SE's public key. */
   verifyingKey: Uint8Array;
+  /** The proof of possession of the address by the SE. */
   depositAddressProof: DepositAddressProof | undefined;
 }
 
+/** GenerateDepositAddressResponse is the response to the request to generate a deposit address. */
 export interface GenerateDepositAddressResponse {
   depositAddress: Address | undefined;
 }
 
+/**
+ * UTXO represents a utxo on the bitcoin network.
+ * The UTXO is used to create a tree on Spark, it can also be an off-chain utxo so that the user
+ * can create the tree first and the broadcast the transaction.
+ */
 export interface UTXO {
+  /** The raw transaction of the utxo. */
   rawTx: Uint8Array;
+  /** The vout of the raw transaction for the utxo, which will be used to create the tree. */
   vout: number;
+  /** The network of the bitcoin network. */
   network: Network;
 }
 
+/**
+ * NodeOutput represents a node on the tree.
+ * This is similar to a UTXO, which is used to create a subtree on Spark. But instead of using
+ * a utxo, a existing node on the tree is used as the utxo.
+ */
 export interface NodeOutput {
+  /** The id of the node. */
   nodeId: string;
+  /** The vout of the raw transaction for the node, which will be used to create the tree. */
   vout: number;
 }
 
+/**
+ * SigningJob is the job for signing a transaction.
+ * The signing job is used to sign a bitcoin transaction using Spark FROST.
+ */
 export interface SigningJob {
+  /** The signing public key of the user. */
   signingPublicKey: Uint8Array;
+  /** The unsigned raw transaction to be signed. */
   rawTx: Uint8Array;
+  /** The signing nonce commitment of the user. */
   signingNonceCommitment: SigningCommitment | undefined;
 }
 
+/** SigningKeyshare is the keyshare information of the SE keyshare group. */
 export interface SigningKeyshare {
+  /** The identifiers of the owners of the keyshare. */
   ownerIdentifiers: string[];
+  /** The threshold of the keyshare. */
   threshold: number;
 }
 
+/**
+ * SigningResult is the result of the signing job from the SE keyshare group.
+ * It contains all the information for user to sign their part. After user signs, the signature
+ * can be aggregated to form the final signature.
+ */
 export interface SigningResult {
+  /** The public keys of the SE keyshare group. */
   publicKeys: { [key: string]: Uint8Array };
+  /** The signing nonce commitments of the SE keyshare group. */
   signingNonceCommitments: { [key: string]: SigningCommitment };
+  /** The signature shares of the SE keyshare group. */
   signatureShares: { [key: string]: Uint8Array };
+  /** The keyshare information of the SE keyshare group. */
   signingKeyshare: SigningKeyshare | undefined;
 }
 
@@ -236,28 +297,59 @@ export interface SigningResult_SignatureSharesEntry {
   value: Uint8Array;
 }
 
+/**
+ * NodeSignatureShares is the signature shares for a node on the tree.
+ * For each tree node, the verifying key stays the same for both transactions.
+ */
 export interface NodeSignatureShares {
+  /** The id of the node. */
   nodeId: string;
-  nodeTxSigningResult: SigningResult | undefined;
-  refundTxSigningResult: SigningResult | undefined;
+  /** The signing result of the node's transaction. This transaction is to pay to self. */
+  nodeTxSigningResult:
+    | SigningResult
+    | undefined;
+  /** The signing result of the node's refund transaction. This transaction is to pay to the user. */
+  refundTxSigningResult:
+    | SigningResult
+    | undefined;
+  /** The verifying key of the node. */
   verifyingKey: Uint8Array;
 }
 
+/**
+ * NodeSignatures is the final signatures for a node on the tree.
+ * It contains the signature for the node's transaction and refund transaction.
+ */
 export interface NodeSignatures {
+  /** The id of the node. */
   nodeId: string;
+  /** The final signature of the node's transaction. This transaction is to pay to self. */
   nodeTxSignature: Uint8Array;
+  /** The final signature of the node's refund transaction. This transaction is to pay to the user. */
   refundTxSignature: Uint8Array;
 }
 
+/** StartTreeCreationRequest is the request to start the tree creation for a tree root node. */
 export interface StartTreeCreationRequest {
+  /** The identity public key of the user. */
   identityPublicKey: Uint8Array;
-  onChainUtxo: UTXO | undefined;
-  rootTxSigningJob: SigningJob | undefined;
+  /** The on-chain utxo to be used to be spent by the root node. */
+  onChainUtxo:
+    | UTXO
+    | undefined;
+  /** The signing job for the root node's transaction. */
+  rootTxSigningJob:
+    | SigningJob
+    | undefined;
+  /** The signing job for the root node's refund transaction. */
   refundTxSigningJob: SigningJob | undefined;
 }
 
+/** StartTreeCreationResponse is the response to the request to start the tree creation for a tree root node. */
 export interface StartTreeCreationResponse {
+  /** The id of the tree. */
   treeId: string;
+  /** The signature shares for the root node. */
   rootNodeSignatureShares: NodeSignatureShares | undefined;
 }
 
@@ -463,36 +555,75 @@ export interface CancelSignedTokenTransactionRequest {
   senderIdentityPublicKey: Uint8Array;
 }
 
+/** TreeNode represents a node on the tree. */
 export interface TreeNode {
+  /** The id of the node. */
   id: string;
+  /** The id of the tree for this node . */
   treeId: string;
+  /** The value that this node holds. */
   value: number;
-  parentNodeId?: string | undefined;
+  /** The id of the parent node. */
+  parentNodeId?:
+    | string
+    | undefined;
+  /** The transaction of the node, this transaction is to pay to the same address as the node. */
   nodeTx: Uint8Array;
+  /** The refund transaction of the node, this transaction is to pay to the user. */
   refundTx: Uint8Array;
+  /** This vout is the vout to spend the previous transaction, which is in the parent node. */
   vout: number;
+  /** The verifying public key of the node. */
   verifyingPublicKey: Uint8Array;
+  /** The identity public key of the owner of the node. */
   ownerIdentityPublicKey: Uint8Array;
-  signingKeyshare: SigningKeyshare | undefined;
+  /** The signing keyshare information of the node on the SE side. */
+  signingKeyshare:
+    | SigningKeyshare
+    | undefined;
+  /** The status of the node. */
   status: string;
+  /** The network of the node. */
   network: Network;
 }
 
+/** FinalizeNodeSignaturesRequest is the request to finalize the signatures for a node. */
 export interface FinalizeNodeSignaturesRequest {
+  /** The intent of the signature. */
   intent: SignatureIntent;
+  /** The signatures for the node. */
   nodeSignatures: NodeSignatures[];
 }
 
+/** FinalizeNodeSignaturesResponse is the response to the request to finalize the signatures for a node. */
 export interface FinalizeNodeSignaturesResponse {
+  /** The nodes that are finalized. */
   nodes: TreeNode[];
 }
 
+/**
+ * SecretShare is a secret share of a secret, using Feldman VSS.
+ * The secret share is in the field of secp256k1 scalar field.
+ */
 export interface SecretShare {
+  /** The secret share. */
   secretShare: Uint8Array;
+  /**
+   * The proofs for the secret share. They are the compressed public keys in secp256k1 curve.
+   * proofs[0] is the public key of the secret, while proofs[1..n] are the public key of the polynomial.
+   */
   proofs: Uint8Array[];
 }
 
+/**
+ * SecretProof is the proof for a secret share using Feldman VSS.
+ * The proof is the compressed public keys in secp256k1 curve.
+ */
 export interface SecretProof {
+  /**
+   * The proofs for the secret share.
+   * proofs[0] is the public key of the secret, while proofs[1..n] are the public key of the polynomial.
+   */
   proofs: Uint8Array[];
 }
 
@@ -555,6 +686,8 @@ export interface Transfer {
   totalValue: number;
   expiryTime: Date | undefined;
   leaves: TransferLeaf[];
+  createdTime: Date | undefined;
+  updatedTime: Date | undefined;
 }
 
 export interface TransferLeaf {
@@ -574,7 +707,6 @@ export interface QueryPendingTransfersRequest {
     senderIdentityPublicKey: Uint8Array;
   } | undefined;
   transferIds: string[];
-  network: Network;
 }
 
 export interface QueryPendingTransfersResponse {
@@ -909,7 +1041,6 @@ export interface QueryNodesRequest {
     nodeIds: TreeNodeIds;
   } | undefined;
   includeParents: boolean;
-  network: Network;
 }
 
 export interface QueryNodesResponse {
@@ -957,7 +1088,6 @@ export interface QueryUnusedDepositAddressesResponse {
 
 export interface QueryBalanceRequest {
   identityPublicKey: Uint8Array;
-  network: Network;
 }
 
 export interface QueryBalanceResponse {
@@ -6136,6 +6266,8 @@ function createBaseTransfer(): Transfer {
     totalValue: 0,
     expiryTime: undefined,
     leaves: [],
+    createdTime: undefined,
+    updatedTime: undefined,
   };
 }
 
@@ -6161,6 +6293,12 @@ export const Transfer: MessageFns<Transfer> = {
     }
     for (const v of message.leaves) {
       TransferLeaf.encode(v!, writer.uint32(58).fork()).join();
+    }
+    if (message.createdTime !== undefined) {
+      Timestamp.encode(toTimestamp(message.createdTime), writer.uint32(66).fork()).join();
+    }
+    if (message.updatedTime !== undefined) {
+      Timestamp.encode(toTimestamp(message.updatedTime), writer.uint32(74).fork()).join();
     }
     return writer;
   },
@@ -6228,6 +6366,22 @@ export const Transfer: MessageFns<Transfer> = {
           message.leaves.push(TransferLeaf.decode(reader, reader.uint32()));
           continue;
         }
+        case 8: {
+          if (tag !== 66) {
+            break;
+          }
+
+          message.createdTime = fromTimestamp(Timestamp.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 9: {
+          if (tag !== 74) {
+            break;
+          }
+
+          message.updatedTime = fromTimestamp(Timestamp.decode(reader, reader.uint32()));
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -6250,6 +6404,8 @@ export const Transfer: MessageFns<Transfer> = {
       totalValue: isSet(object.totalValue) ? globalThis.Number(object.totalValue) : 0,
       expiryTime: isSet(object.expiryTime) ? fromJsonTimestamp(object.expiryTime) : undefined,
       leaves: globalThis.Array.isArray(object?.leaves) ? object.leaves.map((e: any) => TransferLeaf.fromJSON(e)) : [],
+      createdTime: isSet(object.createdTime) ? fromJsonTimestamp(object.createdTime) : undefined,
+      updatedTime: isSet(object.updatedTime) ? fromJsonTimestamp(object.updatedTime) : undefined,
     };
   },
 
@@ -6276,6 +6432,12 @@ export const Transfer: MessageFns<Transfer> = {
     if (message.leaves?.length) {
       obj.leaves = message.leaves.map((e) => TransferLeaf.toJSON(e));
     }
+    if (message.createdTime !== undefined) {
+      obj.createdTime = message.createdTime.toISOString();
+    }
+    if (message.updatedTime !== undefined) {
+      obj.updatedTime = message.updatedTime.toISOString();
+    }
     return obj;
   },
 
@@ -6291,6 +6453,8 @@ export const Transfer: MessageFns<Transfer> = {
     message.totalValue = object.totalValue ?? 0;
     message.expiryTime = object.expiryTime ?? undefined;
     message.leaves = object.leaves?.map((e) => TransferLeaf.fromPartial(e)) || [];
+    message.createdTime = object.createdTime ?? undefined;
+    message.updatedTime = object.updatedTime ?? undefined;
     return message;
   },
 };
@@ -6471,7 +6635,7 @@ export const CompleteSendTransferResponse: MessageFns<CompleteSendTransferRespon
 };
 
 function createBaseQueryPendingTransfersRequest(): QueryPendingTransfersRequest {
-  return { participant: undefined, transferIds: [], network: 0 };
+  return { participant: undefined, transferIds: [] };
 }
 
 export const QueryPendingTransfersRequest: MessageFns<QueryPendingTransfersRequest> = {
@@ -6486,9 +6650,6 @@ export const QueryPendingTransfersRequest: MessageFns<QueryPendingTransfersReque
     }
     for (const v of message.transferIds) {
       writer.uint32(26).string(v!);
-    }
-    if (message.network !== 0) {
-      writer.uint32(32).int32(message.network);
     }
     return writer;
   },
@@ -6524,14 +6685,6 @@ export const QueryPendingTransfersRequest: MessageFns<QueryPendingTransfersReque
           message.transferIds.push(reader.string());
           continue;
         }
-        case 4: {
-          if (tag !== 32) {
-            break;
-          }
-
-          message.network = reader.int32() as any;
-          continue;
-        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -6554,7 +6707,6 @@ export const QueryPendingTransfersRequest: MessageFns<QueryPendingTransfersReque
       transferIds: globalThis.Array.isArray(object?.transferIds)
         ? object.transferIds.map((e: any) => globalThis.String(e))
         : [],
-      network: isSet(object.network) ? networkFromJSON(object.network) : 0,
     };
   },
 
@@ -6567,9 +6719,6 @@ export const QueryPendingTransfersRequest: MessageFns<QueryPendingTransfersReque
     }
     if (message.transferIds?.length) {
       obj.transferIds = message.transferIds;
-    }
-    if (message.network !== 0) {
-      obj.network = networkToJSON(message.network);
     }
     return obj;
   },
@@ -6606,7 +6755,6 @@ export const QueryPendingTransfersRequest: MessageFns<QueryPendingTransfersReque
       }
     }
     message.transferIds = object.transferIds?.map((e) => e) || [];
-    message.network = object.network ?? 0;
     return message;
   },
 };
@@ -11025,7 +11173,7 @@ export const TreeNodeIds: MessageFns<TreeNodeIds> = {
 };
 
 function createBaseQueryNodesRequest(): QueryNodesRequest {
-  return { source: undefined, includeParents: false, network: 0 };
+  return { source: undefined, includeParents: false };
 }
 
 export const QueryNodesRequest: MessageFns<QueryNodesRequest> = {
@@ -11040,9 +11188,6 @@ export const QueryNodesRequest: MessageFns<QueryNodesRequest> = {
     }
     if (message.includeParents !== false) {
       writer.uint32(24).bool(message.includeParents);
-    }
-    if (message.network !== 0) {
-      writer.uint32(32).int32(message.network);
     }
     return writer;
   },
@@ -11078,14 +11223,6 @@ export const QueryNodesRequest: MessageFns<QueryNodesRequest> = {
           message.includeParents = reader.bool();
           continue;
         }
-        case 4: {
-          if (tag !== 32) {
-            break;
-          }
-
-          message.network = reader.int32() as any;
-          continue;
-        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -11103,7 +11240,6 @@ export const QueryNodesRequest: MessageFns<QueryNodesRequest> = {
         ? { $case: "nodeIds", nodeIds: TreeNodeIds.fromJSON(object.nodeIds) }
         : undefined,
       includeParents: isSet(object.includeParents) ? globalThis.Boolean(object.includeParents) : false,
-      network: isSet(object.network) ? networkFromJSON(object.network) : 0,
     };
   },
 
@@ -11116,9 +11252,6 @@ export const QueryNodesRequest: MessageFns<QueryNodesRequest> = {
     }
     if (message.includeParents !== false) {
       obj.includeParents = message.includeParents;
-    }
-    if (message.network !== 0) {
-      obj.network = networkToJSON(message.network);
     }
     return obj;
   },
@@ -11143,7 +11276,6 @@ export const QueryNodesRequest: MessageFns<QueryNodesRequest> = {
       }
     }
     message.includeParents = object.includeParents ?? false;
-    message.network = object.network ?? 0;
     return message;
   },
 };
@@ -11836,16 +11968,13 @@ export const QueryUnusedDepositAddressesResponse: MessageFns<QueryUnusedDepositA
 };
 
 function createBaseQueryBalanceRequest(): QueryBalanceRequest {
-  return { identityPublicKey: new Uint8Array(0), network: 0 };
+  return { identityPublicKey: new Uint8Array(0) };
 }
 
 export const QueryBalanceRequest: MessageFns<QueryBalanceRequest> = {
   encode(message: QueryBalanceRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.identityPublicKey.length !== 0) {
       writer.uint32(10).bytes(message.identityPublicKey);
-    }
-    if (message.network !== 0) {
-      writer.uint32(16).int32(message.network);
     }
     return writer;
   },
@@ -11865,14 +11994,6 @@ export const QueryBalanceRequest: MessageFns<QueryBalanceRequest> = {
           message.identityPublicKey = reader.bytes();
           continue;
         }
-        case 2: {
-          if (tag !== 16) {
-            break;
-          }
-
-          message.network = reader.int32() as any;
-          continue;
-        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -11887,7 +12008,6 @@ export const QueryBalanceRequest: MessageFns<QueryBalanceRequest> = {
       identityPublicKey: isSet(object.identityPublicKey)
         ? bytesFromBase64(object.identityPublicKey)
         : new Uint8Array(0),
-      network: isSet(object.network) ? networkFromJSON(object.network) : 0,
     };
   },
 
@@ -11895,9 +12015,6 @@ export const QueryBalanceRequest: MessageFns<QueryBalanceRequest> = {
     const obj: any = {};
     if (message.identityPublicKey.length !== 0) {
       obj.identityPublicKey = base64FromBytes(message.identityPublicKey);
-    }
-    if (message.network !== 0) {
-      obj.network = networkToJSON(message.network);
     }
     return obj;
   },
@@ -11908,7 +12025,6 @@ export const QueryBalanceRequest: MessageFns<QueryBalanceRequest> = {
   fromPartial(object: DeepPartial<QueryBalanceRequest>): QueryBalanceRequest {
     const message = createBaseQueryBalanceRequest();
     message.identityPublicKey = object.identityPublicKey ?? new Uint8Array(0);
-    message.network = object.network ?? 0;
     return message;
   },
 };
