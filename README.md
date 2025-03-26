@@ -69,12 +69,6 @@ In this architecture:
 
 3. All operations ultimately yield a signed Bitcoin transaction which can be used to unilaterally exit.
 
-### Key Features
-
-- **MPC**: Uses FROST (Flexible Round-Optimized Schnorr Threshold) signatures for secure, distributed signing
-- **Tree-Based Transaction Structure**: Efficient and parallel representation of transaction history and ownership
-- **Token Support**: Extended functionality to support token issuance and transfers via LRC20
-
 ## Getting Started
 
 ### Prerequisites
