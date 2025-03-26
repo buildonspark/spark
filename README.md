@@ -11,28 +11,27 @@ A simple shared signing protocol that makes Bitcoin fast, cheap, and self-custod
 
 Spark consists of several key components that work together to power transactions:
 
-1. **Spark Operator (SO)** - The primary service responsible for:
+1. **Spark Operator (SO)** - The central coordinator responsible for:
 
-   - Managing state and the transaction tree
-   - Coordinating distributed key generation
-   - Processing deposits, transfers, and withdrawals
-   - Managing key tweaks and key deletion
-   - Providing a gRPC API for clients
+   - Managing user state and the global transaction DAG
+   - Orchestrating distributed keygen and key lifecycle (tweaks, revocation)
+   - Handling asset flow: deposits, transfers, withdrawals
+   - Exposing a gRPC API for wallet and app integrations
 
-2. **FROST Signer** - A Rust-based service implementing our custom Spark-FROST threshold signatures:
+2. **FROST Signer** - A Rust-native service implementing Spark-FROST:
 
-   - Provides distributed key generation capabilities
-   - Handles cryptographic operations for multi-party signatures
+   - Threshold signing over distributed key shares
+   - Zero single point of key custody
    - Enables secure transaction signing without any party having the full key
 
 3. **User Wallet** - Client-side implementation for end users:
 
-   - Manages user key material
-   - Initiates transactions
-   - Communicates with the Spark Operator via gRPC
+   - Handles key managagement
+   - Constructs and signs transactions
+   - Speaks gRPC with the Operator
 
-4. **LRC20 Token Support** - Extended functionality for token operations:
-   - Token creation, minting, transfer etc.
+4. **LRC20 Support** - Token layer built on top of Spark:
+   - Enables token issuance, minting, transfers
 
 ### System Architecture
 
