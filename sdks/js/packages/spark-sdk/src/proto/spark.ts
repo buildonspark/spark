@@ -412,6 +412,7 @@ export interface TokenTransaction {
     | undefined;
   outputLeaves: TokenLeafOutput[];
   sparkOperatorIdentityPublicKeys: Uint8Array[];
+  network: Network;
 }
 
 export interface TokenTransactionWithStatus {
@@ -1098,6 +1099,11 @@ export interface QueryBalanceResponse {
 export interface QueryBalanceResponse_NodeBalancesEntry {
   key: string;
   value: number;
+}
+
+export interface SparkAddress {
+  identityPublicKey: Uint8Array;
+  network: string;
 }
 
 function createBaseDepositAddressProof(): DepositAddressProof {
@@ -3086,7 +3092,7 @@ export const TokenLeafOutput: MessageFns<TokenLeafOutput> = {
 };
 
 function createBaseTokenTransaction(): TokenTransaction {
-  return { tokenInput: undefined, outputLeaves: [], sparkOperatorIdentityPublicKeys: [] };
+  return { tokenInput: undefined, outputLeaves: [], sparkOperatorIdentityPublicKeys: [], network: 0 };
 }
 
 export const TokenTransaction: MessageFns<TokenTransaction> = {
@@ -3104,6 +3110,9 @@ export const TokenTransaction: MessageFns<TokenTransaction> = {
     }
     for (const v of message.sparkOperatorIdentityPublicKeys) {
       writer.uint32(34).bytes(v!);
+    }
+    if (message.network !== 0) {
+      writer.uint32(80).int32(message.network);
     }
     return writer;
   },
@@ -3147,6 +3156,14 @@ export const TokenTransaction: MessageFns<TokenTransaction> = {
           message.sparkOperatorIdentityPublicKeys.push(reader.bytes());
           continue;
         }
+        case 10: {
+          if (tag !== 80) {
+            break;
+          }
+
+          message.network = reader.int32() as any;
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -3169,6 +3186,7 @@ export const TokenTransaction: MessageFns<TokenTransaction> = {
       sparkOperatorIdentityPublicKeys: globalThis.Array.isArray(object?.sparkOperatorIdentityPublicKeys)
         ? object.sparkOperatorIdentityPublicKeys.map((e: any) => bytesFromBase64(e))
         : [],
+      network: isSet(object.network) ? networkFromJSON(object.network) : 0,
     };
   },
 
@@ -3184,6 +3202,9 @@ export const TokenTransaction: MessageFns<TokenTransaction> = {
     }
     if (message.sparkOperatorIdentityPublicKeys?.length) {
       obj.sparkOperatorIdentityPublicKeys = message.sparkOperatorIdentityPublicKeys.map((e) => base64FromBytes(e));
+    }
+    if (message.network !== 0) {
+      obj.network = networkToJSON(message.network);
     }
     return obj;
   },
@@ -3212,6 +3233,7 @@ export const TokenTransaction: MessageFns<TokenTransaction> = {
     }
     message.outputLeaves = object.outputLeaves?.map((e) => TokenLeafOutput.fromPartial(e)) || [];
     message.sparkOperatorIdentityPublicKeys = object.sparkOperatorIdentityPublicKeys?.map((e) => e) || [];
+    message.network = object.network ?? 0;
     return message;
   },
 };
@@ -12199,6 +12221,84 @@ export const QueryBalanceResponse_NodeBalancesEntry: MessageFns<QueryBalanceResp
     const message = createBaseQueryBalanceResponse_NodeBalancesEntry();
     message.key = object.key ?? "";
     message.value = object.value ?? 0;
+    return message;
+  },
+};
+
+function createBaseSparkAddress(): SparkAddress {
+  return { identityPublicKey: new Uint8Array(0), network: "" };
+}
+
+export const SparkAddress: MessageFns<SparkAddress> = {
+  encode(message: SparkAddress, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.identityPublicKey.length !== 0) {
+      writer.uint32(10).bytes(message.identityPublicKey);
+    }
+    if (message.network !== "") {
+      writer.uint32(18).string(message.network);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): SparkAddress {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseSparkAddress();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.identityPublicKey = reader.bytes();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.network = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): SparkAddress {
+    return {
+      identityPublicKey: isSet(object.identityPublicKey)
+        ? bytesFromBase64(object.identityPublicKey)
+        : new Uint8Array(0),
+      network: isSet(object.network) ? globalThis.String(object.network) : "",
+    };
+  },
+
+  toJSON(message: SparkAddress): unknown {
+    const obj: any = {};
+    if (message.identityPublicKey.length !== 0) {
+      obj.identityPublicKey = base64FromBytes(message.identityPublicKey);
+    }
+    if (message.network !== "") {
+      obj.network = message.network;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<SparkAddress>): SparkAddress {
+    return SparkAddress.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<SparkAddress>): SparkAddress {
+    const message = createBaseSparkAddress();
+    message.identityPublicKey = object.identityPublicKey ?? new Uint8Array(0);
+    message.network = object.network ?? "";
     return message;
   },
 };

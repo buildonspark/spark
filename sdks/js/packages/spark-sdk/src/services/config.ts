@@ -1,5 +1,5 @@
 import { DefaultSparkSigner, SparkSigner } from "../signer/signer.js";
-import { Network, NetworkToProto } from "../utils/network.js";
+import { Network, NetworkToProto, NetworkType } from "../utils/network.js";
 import {
   ConfigOptions,
   LOCAL_WALLET_CONFIG,
@@ -63,6 +63,10 @@ export class WalletConfigService {
 
   public getNetwork(): Network {
     return Network[this.config.network];
+  }
+
+  public getNetworkType(): NetworkType {
+    return this.config.network;
   }
 
   public getNetworkProto(): number {

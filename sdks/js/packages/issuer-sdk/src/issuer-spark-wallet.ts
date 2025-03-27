@@ -4,9 +4,13 @@ import {
   TokenPubkeyAnnouncement,
   TokenPubkeyInfo,
 } from "@buildonspark/lrc20-sdk";
+import {
+  ListAllTokenTransactionsCursor,
+  OperationType,
+} from "@buildonspark/lrc20-sdk/proto/rpc/v1/types";
 import { SparkWallet, SparkWalletProps } from "@buildonspark/spark-sdk";
+import { encodeSparkAddress } from "@buildonspark/spark-sdk/address";
 import { LeafWithPreviousTransactionData } from "@buildonspark/spark-sdk/proto/spark";
-import { ListAllTokenTransactionsCursor, OperationType } from "@buildonspark/lrc20-sdk/proto/rpc/v1/types";
 import { ConfigOptions } from "@buildonspark/spark-sdk/services/wallet-config";
 import {
   getMasterHDKeyFromSeed,
@@ -148,10 +152,14 @@ export class IssuerSparkWallet
     tokenAmount: bigint,
     selectedLeaves?: LeafWithPreviousTransactionData[],
   ): Promise<string> {
+    const burnAddress = encodeSparkAddress({
+      identityPublicKey: BURN_ADDRESS,
+      network: this.config.getNetworkType(),
+    });
     return await this.transferTokens({
       tokenPublicKey: await super.getIdentityPublicKey(),
       tokenAmount,
-      receiverSparkAddress: BURN_ADDRESS,
+      receiverSparkAddress: burnAddress,
       selectedLeaves,
     });
   }

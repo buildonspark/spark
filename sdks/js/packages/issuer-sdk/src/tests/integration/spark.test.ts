@@ -185,7 +185,7 @@ describe("token integration test", () => {
     await issuerWallet.transferTokens({
       tokenAmount,
       tokenPublicKey: await issuerWallet.getIdentityPublicKey(),
-      receiverSparkAddress: await destinationWallet.getIdentityPublicKey(),
+      receiverSparkAddress: await destinationWallet.getSparkAddress(),
     });
     const sourceBalance = await issuerWallet.getIssuerTokenBalance();
     expect(sourceBalance.balance).toEqual(0n);
@@ -213,7 +213,7 @@ describe("token integration test", () => {
     await issuerWallet.transferTokens({
       tokenAmount,
       tokenPublicKey: await issuerWallet.getIdentityPublicKey(),
-      receiverSparkAddress: await destinationWallet.getIdentityPublicKey(),
+      receiverSparkAddress: await destinationWallet.getSparkAddress(),
     });
     const sourceBalance = await issuerWallet.getIssuerTokenBalance();
     expect(sourceBalance.balance).toEqual(0n);
@@ -249,7 +249,7 @@ describe("token integration test", () => {
     await issuerWallet.transferTokens({
       tokenPublicKey: await issuerWallet.getIdentityPublicKey(),
       tokenAmount,
-      receiverSparkAddress: await destinationWallet.getIdentityPublicKey(),
+      receiverSparkAddress: await destinationWallet.getSparkAddress(),
     });
     const sourceBalance = await issuerWallet.getIssuerTokenBalance();
     expect(sourceBalance.balance).toEqual(0n);
@@ -277,7 +277,7 @@ describe("token integration test", () => {
     const { wallet: userWallet } = await SparkWallet.initialize({
       options: LOCAL_WALLET_CONFIG_ECDSA,
     });
-    const userWalletPublicKey = await userWallet.getIdentityPublicKey();
+    const userWalletPublicKey = await userWallet.getSparkAddress();
 
     await issuerWallet.transferTokens({
       tokenAmount,
@@ -323,7 +323,7 @@ describe("token integration test", () => {
     const { wallet: userWallet } = await SparkWallet.initialize({
       options: LOCAL_WALLET_CONFIG_SCHNORR,
     });
-    const userWalletPublicKey = await userWallet.getIdentityPublicKey();
+    const userWalletPublicKey = await userWallet.getSparkAddress();
 
     await issuerWallet.transferTokens({
       tokenAmount,
@@ -402,7 +402,7 @@ describe("token integration test", () => {
     const issuerBalanceAfterMint = await issuerWallet.getIssuerTokenBalance();
     expect(issuerBalanceAfterMint.balance).toEqual(tokenAmount);
 
-    const userWalletPublicKey = await userWallet.getIdentityPublicKey();
+    const userWalletPublicKey = await userWallet.getSparkAddress();
 
     await issuerWallet.transferTokens({
       tokenAmount,
@@ -415,6 +415,7 @@ describe("token integration test", () => {
     expect(issuerBalanceAfterTransfer.balance).toEqual(0n);
 
     const tokenPublicKeyHex = await issuerWallet.getIdentityPublicKey();
+    const userWalletPublicKeyHex = await userWallet.getSparkAddress();
     const userBalanceAfterTransfer = await getSparkWalletTokenBalanceOrZero(
       userWallet,
       tokenPublicKeyHex,
@@ -424,7 +425,7 @@ describe("token integration test", () => {
     await userWallet.transferTokens({
       tokenPublicKey: tokenPublicKeyHex,
       tokenAmount,
-      receiverSparkAddress: tokenPublicKeyHex,
+      receiverSparkAddress: userWalletPublicKeyHex,
     });
 
     const userBalanceAfterTransferBack = await getSparkWalletTokenBalanceOrZero(
@@ -460,7 +461,7 @@ describe("token integration test", () => {
     const issuerBalanceAfterMint = await issuerWallet.getIssuerTokenBalance();
     expect(issuerBalanceAfterMint.balance).toEqual(tokenAmount);
 
-    const userWalletPublicKey = await userWallet.getIdentityPublicKey();
+    const userWalletPublicKey = await userWallet.getSparkAddress();
 
     await issuerWallet.transferTokens({
       tokenAmount,
@@ -473,6 +474,7 @@ describe("token integration test", () => {
     expect(issuerBalanceAfterTransfer.balance).toEqual(0n);
 
     const tokenPublicKeyHex = await issuerWallet.getIdentityPublicKey();
+    const userWalletPublicKeyHex = await userWallet.getSparkAddress();
     const userBalanceAfterTransfer = await getSparkWalletTokenBalanceOrZero(
       userWallet,
       tokenPublicKeyHex,
@@ -482,7 +484,7 @@ describe("token integration test", () => {
     await userWallet.transferTokens({
       tokenPublicKey: tokenPublicKeyHex,
       tokenAmount,
-      receiverSparkAddress: tokenPublicKeyHex,
+      receiverSparkAddress: userWalletPublicKeyHex,
     });
 
     const userBalanceAfterTransferBack = await getSparkWalletTokenBalanceOrZero(

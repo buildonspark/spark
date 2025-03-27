@@ -115,12 +115,14 @@ describe("Transfer", () => {
         claimingNode,
       ]);
 
-      const { wallet: newReceiverWallet } = await SparkWalletTesting.initialize({
-        options: {
-          network: "LOCAL",
+      const { wallet: newReceiverWallet } = await SparkWalletTesting.initialize(
+        {
+          options: {
+            network: "LOCAL",
+          },
         },
-      });
-      const newReceiverPubkey = await newReceiverWallet.getIdentityPublicKey();
+      );
+      const newReceiverPubkey = await newReceiverWallet.getSparkAddress();
 
       await receiverWallet.transfer({
         amountSats: 1000,

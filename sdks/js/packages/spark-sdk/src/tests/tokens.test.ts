@@ -1,4 +1,5 @@
 import { numberToBytesBE } from "@noble/curves/abstract/utils";
+import { Network } from "../proto/spark.js";
 import { hashTokenTransaction } from "../utils/token-hashing.js";
 
 describe("hash token transaction", () => {
@@ -16,6 +17,7 @@ describe("hash token transaction", () => {
     ]);
 
     const tokenTransaction = {
+      network: Network.REGTEST,
       tokenInput: {
         $case: "mintInput" as const,
         mintInput: {

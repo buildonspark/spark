@@ -1897,6 +1897,7 @@ __metadata:
     "@lightsparkdev/core": "npm:^1.3.0"
     "@noble/curves": "npm:^1.8.0"
     "@noble/hashes": "npm:^1.7.1"
+    "@scure/base": "npm:^1.2.4"
     "@scure/bip32": "npm:^1.6.2"
     "@scure/bip39": "npm:^1.5.4"
     "@scure/btc-signer": "npm:^1.5.0"
@@ -5340,7 +5341,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@scure/base@npm:~1.2.2, @scure/base@npm:~1.2.4":
+"@scure/base@npm:^1.2.4, @scure/base@npm:~1.2.2, @scure/base@npm:~1.2.4":
   version: 1.2.4
   resolution: "@scure/base@npm:1.2.4"
   checksum: 10/4b61679209af40143b49ce7b7570e1d9157c19df311ea6f57cd212d764b0b82222dbe3707334f08bec181caf1f047aca31aa91193c678d6548312cb3f9c82ab1

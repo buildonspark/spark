@@ -46,6 +46,7 @@ export class TokenTransactionService {
 
     if (availableTokenAmount === tokenAmount) {
       return {
+        network: this.config.getNetworkProto(),
         tokenInput: {
           $case: "transferInput",
           transferInput: {
@@ -69,6 +70,7 @@ export class TokenTransactionService {
       const tokenAmountDifference = availableTokenAmount - tokenAmount;
 
       return {
+        network: this.config.getNetworkProto(),
         tokenInput: {
           $case: "transferInput",
           transferInput: {

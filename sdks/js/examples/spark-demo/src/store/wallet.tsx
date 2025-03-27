@@ -126,7 +126,7 @@ const useWalletStore = create<WalletStore>((set, get) => ({
     await wallet.transferTokens({
       tokenPublicKey,
       tokenAmount,
-      receiverSparkAddress,
+      receiverSparkAddress: receiverSparkAddress,
     });
   },
   updateAssets: (newAssets: Map<string, Currency>) => {

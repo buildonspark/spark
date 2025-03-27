@@ -1,7 +1,7 @@
-import readline from "readline";
-import { ConfigOptions } from "@buildonspark/spark-sdk/services/wallet-config";
 import { getLatestDepositTxId, SparkWallet } from "@buildonspark/spark-sdk";
+import { ConfigOptions } from "@buildonspark/spark-sdk/services/wallet-config";
 import { BitcoinNetwork } from "@buildonspark/spark-sdk/types";
+import readline from "readline";
 
 // Initialize Spark Wallet
 const walletMnemonic =
@@ -87,7 +87,7 @@ async function runCLI() {
           break;
         }
         const lightningSendRequest = await wallet.getLightningSendRequest(
-          args[0],
+          args[0]
         );
         console.log(lightningSendRequest);
         break;
@@ -97,7 +97,7 @@ async function runCLI() {
           break;
         }
         const lightningReceiveRequest = await wallet.getLightningReceiveRequest(
-          args[0],
+          args[0]
         );
         console.log(lightningReceiveRequest);
         break;
@@ -203,7 +203,7 @@ async function runCLI() {
         }
         if (args.length < 3) {
           console.log(
-            "Usage: sendtokentransfer <tokenPubKey> <amount> <receiverPubKey>",
+            "Usage: sendtokentransfer <tokenPubKey> <amount> <receiverPubKey>"
           );
           break;
         }
@@ -248,7 +248,7 @@ async function runCLI() {
 
         let withdrawResult = await wallet.withdrawTokens(
           tokenPublicKey,
-          amount,
+          amount
         );
         if (withdrawResult) {
           console.log("Withdrawal L1 Transaction ID:", withdrawResult.txid);

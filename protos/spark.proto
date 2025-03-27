@@ -881,3 +881,8 @@ message QueryBalanceResponse {
     uint64 balance = 1;
     map<string, uint64> node_balances = 2;
 }
+
+message SparkAddress {
+    bytes identity_public_key = 1;
+    string network = 2;
+}

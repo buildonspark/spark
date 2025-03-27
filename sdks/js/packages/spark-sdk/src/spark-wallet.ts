@@ -75,6 +75,11 @@ import {
 import { getNextTransactionSequence } from "./utils/transaction.js";
 
 import { LRCWallet } from "@buildonspark/lrc20-sdk";
+import {
+  decodeSparkAddress,
+  encodeSparkAddress,
+  SparkAddressFormat,
+} from "./address/index.js";
 import { broadcastL1Withdrawal } from "./services/lrc20.js";
 import { SparkSigner } from "./signer/signer.js";
 import { getMasterHDKeyFromSeed } from "./utils/index.js";
@@ -149,6 +154,8 @@ export class SparkWallet {
   private mutexes: Map<string, Mutex> = new Map();
 
   private pendingWithdrawnLeafIds: string[] = [];
+
+  private sparkAddress: SparkAddressFormat | undefined;
 
   protected leaves: TreeNode[] = [];
   protected tokenLeaves: Map<string, LeafWithPreviousTransactionData[]> =
@@ -359,8 +366,17 @@ export class SparkWallet {
    *
    * @returns {Promise<string>} The Spark address as a hex string.
    */
-  public async getSparkAddress(): Promise<string> {
-    return bytesToHex(await this.config.signer.getIdentityPublicKey());
+  public async getSparkAddress(): Promise<SparkAddressFormat> {
+    if (!this.sparkAddress) {
+      this.sparkAddress = encodeSparkAddress({
+        identityPublicKey: bytesToHex(
+          await this.config.signer.getIdentityPublicKey(),
+        ),
+        network: this.config.getNetworkType(),
+      });
+    }
+
+    return this.sparkAddress;
   }
 
   /**
@@ -434,7 +450,13 @@ export class SparkWallet {
         this.config.getNetwork(),
       );
     await this.initializeWallet(identityPublicKey);
-    return identityPublicKey;
+
+    this.sparkAddress = encodeSparkAddress({
+      identityPublicKey: identityPublicKey,
+      network: this.config.getNetworkType(),
+    });
+
+    return this.sparkAddress;
   }
 
   /**
@@ -917,6 +939,11 @@ export class SparkWallet {
    * @returns {Promise<Transfer>} The completed transfer details
    */
   public async transfer({ amountSats, receiverSparkAddress }: TransferParams) {
+    const receiverAddress = decodeSparkAddress(
+      receiverSparkAddress,
+      this.config.getNetworkType(),
+    ).identityPublicKey;
+
     return await this.withLeaves(async () => {
       const leavesToSend = await this.selectLeaves(amountSats);
 
@@ -935,7 +962,7 @@ export class SparkWallet {
 
       const transfer = await this.transferService.sendTransfer(
         leafKeyTweaks,
-        hexToBytes(receiverSparkAddress),
+        hexToBytes(receiverAddress),
       );
 
       const leavesToRemove = new Set(leavesToSend.map((leaf) => leaf.id));
@@ -1627,13 +1654,18 @@ export class SparkWallet {
     receiverSparkAddress: string;
     selectedLeaves?: LeafWithPreviousTransactionData[];
   }): Promise<string> {
+    const receiverAddress = decodeSparkAddress(
+      receiverSparkAddress,
+      this.config.getNetworkType(),
+    ).identityPublicKey;
+
     await this.syncTokenLeaves();
     if (!this.tokenLeaves.has(tokenPublicKey)) {
       throw new Error("No token leaves with the given tokenPublicKey");
     }
 
     const tokenPublicKeyBytes = hexToBytes(tokenPublicKey);
-    const receiverSparkAddressBytes = hexToBytes(receiverSparkAddress);
+    const receiverSparkAddressBytes = hexToBytes(receiverAddress);
 
     if (selectedLeaves) {
       if (

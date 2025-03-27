@@ -2,9 +2,9 @@ import { IssuerSparkWallet } from "@buildonspark/issuer-sdk";
 import { SparkWallet, type TokenInfo } from "@buildonspark/spark-sdk";
 import { Transfer, type TreeNode } from "@buildonspark/spark-sdk/proto/spark";
 import {
+  type CoopExitRequest,
   type LightningReceiveRequest,
   type LightningSendRequest,
-  type CoopExitRequest,
 } from "@buildonspark/spark-sdk/types";
 import { getLatestDepositTxId } from "@buildonspark/spark-sdk/utils";
 import { isError } from "@lightsparkdev/core";
@@ -248,8 +248,8 @@ export const createSparkRouter = (
         Number(limit),
         Number(offset)
       );
-      const transferResponse = transfers.transfers.map(
-        (transfer: Transfer) => formatTransferResponse(transfer)
+      const transferResponse = transfers.transfers.map((transfer: Transfer) =>
+        formatTransferResponse(transfer)
       );
       res.json({
         data: {
@@ -280,8 +280,8 @@ export const createSparkRouter = (
       const wallet = getWallet();
       try {
         const pendingTransfers = await wallet!.getPendingTransfers();
-        const transferResponse = pendingTransfers.map(
-          (transfer: Transfer) => formatTransferResponse(transfer)
+        const transferResponse = pendingTransfers.map((transfer: Transfer) =>
+          formatTransferResponse(transfer)
         );
         res.json({
           data: { pendingTransfers: transferResponse },
@@ -418,7 +418,7 @@ export const createSparkRouter = (
           amountSats: number;
         };
         const transfer = await wallet!.transfer({
-          receiverSparkAddress,
+          receiverSparkAddress: receiverSparkAddress,
           amountSats,
         });
         const transferResponse = formatTransferResponse(transfer);
@@ -936,7 +936,7 @@ export const createSparkRouter = (
         const transferTx = await wallet!.transferTokens({
           tokenPublicKey,
           tokenAmount: BigInt(tokenAmount),
-          receiverSparkAddress,
+          receiverSparkAddress: receiverSparkAddress,
         });
         res.json({
           data: { transferTx },

@@ -19,17 +19,20 @@ const commonConfig = {
     "src/proto/spark.ts",
     "src/graphql/objects/index.ts",
     "src/types/index.ts",
-    "src/nice-grpc-web.ts"
+    "src/nice-grpc-web.ts",
+    "src/address/index.ts",
   ],
-  inject: ['./buffer.js'],
+  inject: ["./buffer.js"],
 };
 
-export default defineConfig([{
-  ...commonConfig,
-  format: ["cjs", "esm"],
-  outDir: "dist",
-}, /* {
+export default defineConfig([
+  {
+    ...commonConfig,
+    format: ["cjs", "esm"],
+    outDir: "dist",
+  } /* {
   ...commonConfig,
   format: ["esm"],
   outDir: "dist/browser",
-} */]);
+} */,
+]);
