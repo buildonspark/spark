@@ -1,7 +1,6 @@
-
 import { hexToBytes } from "@noble/curves/abstract/utils";
-import { NetworkType } from "../utils/network.js";
 import { isHermeticTest } from "../tests/test-util.js";
+import { NetworkType } from "../utils/network.js";
 
 export type SigningOperator = {
   readonly id: number;
@@ -31,7 +30,6 @@ const PROD_PUBKEYS = [
   "03e625e9768651c9be268e287245cc33f96a68ce9141b0b4769205db027ee8ed77",
   "022eda13465a59205413086130a65dc0ed1b8f8e51937043161f8be0c369b1a410",
 ];
-
 
 function getLocalFrostSignerAddress(): string {
   return isHermeticTest() ? "localhost:9999" : "unix:///tmp/frost_0.sock";
@@ -64,25 +62,36 @@ export const LOCAL_WALLET_CONFIG_ECDSA: Required<ConfigOptions> = {
 export const REGTEST_WALLET_CONFIG: Required<ConfigOptions> = {
   ...BASE_CONFIG,
   network: "REGTEST",
-  lrc20Address: "https://regtest.lrc20.dev.dev.sparkinfra.net:443",
+  lrc20Address:
+    process.env.NODE_ENV === "development"
+      ? "https://regtest.lrc20.dev.dev.sparkinfra.net:443"
+      : "https://regtest.lrc20.us-west-2.sparkinfra.net:443",
   signingOperators: getRegtestSigningOperators(),
 };
 
 export const MAINNET_WALLET_CONFIG: Required<ConfigOptions> = {
   ...BASE_CONFIG,
   network: "MAINNET",
-  lrc20Address: "https://mainnet.lrc20.dev.dev.sparkinfra.net:443",
+  lrc20Address:
+    process.env.NODE_ENV === "development"
+      ? "https://mainnet.lrc20.dev.dev.sparkinfra.net:443"
+      : "https://mainnet.lrc20.us-west-2.sparkinfra.net:443",
   signingOperators: getRegtestSigningOperators(),
 };
 
 export function getRegtestSigningOperators(): Record<string, SigningOperator> {
+  return process.env.NODE_ENV === "development"
+    ? getDevSigningOperators()
+    : getProdSigningOperators();
+}
+
+function getDevSigningOperators(): Record<string, SigningOperator> {
   return {
     "0000000000000000000000000000000000000000000000000000000000000001": {
       id: 0,
       identifier:
         "0000000000000000000000000000000000000000000000000000000000000001",
       address: "https://0.spark.dev.dev.sparkinfra.net",
-
       identityPublicKey: hexToBytes(DEV_PUBKEYS[0]!),
     },
     "0000000000000000000000000000000000000000000000000000000000000002": {
@@ -90,7 +99,6 @@ export function getRegtestSigningOperators(): Record<string, SigningOperator> {
       identifier:
         "0000000000000000000000000000000000000000000000000000000000000002",
       address: "https://1.spark.dev.dev.sparkinfra.net",
-
       identityPublicKey: hexToBytes(DEV_PUBKEYS[1]!),
     },
     "0000000000000000000000000000000000000000000000000000000000000003": {
@@ -99,6 +107,32 @@ export function getRegtestSigningOperators(): Record<string, SigningOperator> {
         "0000000000000000000000000000000000000000000000000000000000000003",
       address: "https://2.spark.dev.dev.sparkinfra.net",
       identityPublicKey: hexToBytes(DEV_PUBKEYS[2]!),
+    },
+  };
+}
+
+function getProdSigningOperators(): Record<string, SigningOperator> {
+  return {
+    "0000000000000000000000000000000000000000000000000000000000000001": {
+      id: 0,
+      identifier:
+        "0000000000000000000000000000000000000000000000000000000000000001",
+      address: "https://0.spark.us-west-2.sparkinfra.net",
+      identityPublicKey: hexToBytes(PROD_PUBKEYS[0]!),
+    },
+    "0000000000000000000000000000000000000000000000000000000000000002": {
+      id: 1,
+      identifier:
+        "0000000000000000000000000000000000000000000000000000000000000002",
+      address: "https://1.spark.us-west-2.sparkinfra.net",
+      identityPublicKey: hexToBytes(PROD_PUBKEYS[1]!),
+    },
+    "0000000000000000000000000000000000000000000000000000000000000003": {
+      id: 2,
+      identifier:
+        "0000000000000000000000000000000000000000000000000000000000000003",
+      address: "https://2.spark.us-west-2.sparkinfra.net",
+      identityPublicKey: hexToBytes(PROD_PUBKEYS[2]!),
     },
   };
 }

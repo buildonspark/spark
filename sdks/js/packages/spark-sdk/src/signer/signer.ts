@@ -494,14 +494,25 @@ class DefaultSparkSigner implements SparkSigner {
 
   // Hardcode this for default ssp
   async getSspIdentityPublicKey(network: Network): Promise<Uint8Array> {
-    // prod regtest key - 022bf283544b16c0622daecb79422007d167eca6ce9f0c98c0c49833b1f7170bfe
+    const PROD_REGTEST_KEY =
+      "022bf283544b16c0622daecb79422007d167eca6ce9f0c98c0c49833b1f7170bfe";
+    const DEV_REGTEST_KEY =
+      "028c094a432d46a0ac95349d792c2e3730bd60c29188db716f56a99e39b95338b4";
+
+    const PROD_MAINNET_KEY = "";
+    const DEV_MAINNET_KEY =
+      "02e0b8d42c5d3b5fe4c5beb6ea796ab3bc8aaf28a3d3195407482c67e0b58228a5";
     if (network === Network.MAINNET) {
-      return hexToBytes(
-        "02e0b8d42c5d3b5fe4c5beb6ea796ab3bc8aaf28a3d3195407482c67e0b58228a5",
-      );
+      if (process.env.NODE_ENV !== "development") {
+        throw new Error("Mainnet key is not set");
+      } else {
+        return hexToBytes(DEV_MAINNET_KEY);
+      }
     } else {
       return hexToBytes(
-        "028c094a432d46a0ac95349d792c2e3730bd60c29188db716f56a99e39b95338b4",
+        process.env.NODE_ENV === "development"
+          ? DEV_REGTEST_KEY
+          : PROD_REGTEST_KEY,
       );
     }
   }

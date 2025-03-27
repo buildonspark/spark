@@ -82,7 +82,7 @@ import {
 } from "./address/index.js";
 import { broadcastL1Withdrawal } from "./services/lrc20.js";
 import { SparkSigner } from "./signer/signer.js";
-import { getMasterHDKeyFromSeed } from "./utils/index.js";
+import { getMasterHDKeyFromSeed, MEMPOOL_URL } from "./utils/index.js";
 
 // Add this constant at the file level
 const MAX_TOKEN_LEAVES = 100;
@@ -829,7 +829,7 @@ export class SparkWallet {
     const nodes = await mutex.runExclusive(async () => {
       const baseUrl =
         this.config.getNetwork() === Network.REGTEST
-          ? "https://regtest-mempool.dev.dev.sparkinfra.net/api"
+          ? MEMPOOL_URL
           : "https://mempool.space/api";
       const auth = btoa("spark-sdk:mCMk1JqlBNtetUNy");
 

@@ -68,7 +68,8 @@
     "url": false
   },
   "scripts": {
-    "build": "yarn tsc && tsup",
+    "build": "NODE_ENV=development yarn tsc && tsup",
+    "build:prod": "NODE_ENV=production yarn tsc && tsup",
     "prepare": "yarn run build",
     "build:watch": "yarn build --watch --clean=false",
     "clean": "rm -rf dist",
