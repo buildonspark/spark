@@ -1,5 +1,6 @@
 import { sha256 } from "@scure/btc-signer/utils";
 
+import { isNode } from "@lightsparkdev/core";
 import {
   Channel,
   ClientMiddlewareCall,
@@ -7,8 +8,8 @@ import {
   createClient,
   createClientFactory,
 } from "nice-grpc";
-import { Metadata } from "nice-grpc-common";
 import { retryMiddleware } from "nice-grpc-client-middleware-retry";
+import { Metadata } from "nice-grpc-common";
 import { MockServiceClient, MockServiceDefinition } from "../proto/mock.js";
 import { SparkServiceClient, SparkServiceDefinition } from "../proto/spark.js";
 import {
@@ -18,7 +19,6 @@ import {
 } from "../proto/spark_authn.js";
 import { SparkCallOptions } from "../types/grpc.js";
 import { WalletConfigService } from "./config.js";
-import { isNode } from "@lightsparkdev/core";
 
 // TODO: Some sort of client cleanup
 export class ConnectionManager {
@@ -44,9 +44,11 @@ export class ConnectionManager {
     );
   }
 
-  static async createMockClient(address: string): Promise<MockServiceClient & {
-    close: () => void;
-  }> {
+  static async createMockClient(address: string): Promise<
+    MockServiceClient & {
+      close: () => void;
+    }
+  > {
     const channel = await this.createChannelWithTLS(address);
 
     const client = createClient(MockServiceDefinition, channel);
@@ -54,7 +56,10 @@ export class ConnectionManager {
   }
 
   // TODO: Web transport handles TLS differently, verify that we don't need to do anything
-  private static async createChannelWithTLS(address: string, certPath?: string) {
+  private static async createChannelWithTLS(
+    address: string,
+    certPath?: string,
+  ) {
     try {
       if (isNode) {
         const { ChannelCredentials } = await import("nice-grpc");
@@ -102,7 +107,10 @@ export class ConnectionManager {
     }
 
     const authToken = await this.authenticate(address);
-    const channel = await ConnectionManager.createChannelWithTLS(address, certPath);
+    const channel = await ConnectionManager.createChannelWithTLS(
+      address,
+      certPath,
+    );
 
     const authMiddleware = this.createAuthMiddleWare(address, authToken);
     const client = this.createGrpcClient<SparkServiceClient>(
@@ -157,7 +165,10 @@ export class ConnectionManager {
     address: string,
     certPath?: string,
   ): Promise<SparkAuthnServiceClient & { close?: () => void }> {
-    const channel = await ConnectionManager.createChannelWithTLS(address, certPath);
+    const channel = await ConnectionManager.createChannelWithTLS(
+      address,
+      certPath,
+    );
     return this.createGrpcClient<SparkAuthnServiceClient>(
       SparkAuthnServiceDefinition,
       channel,
@@ -181,10 +192,12 @@ export class ConnectionManager {
       try {
         return yield* call.next(call.request, {
           ...options,
-          metadata: Metadata(options.metadata).set(
-            "Authorization",
-            `Bearer ${this.clients.get(address)?.authToken || initialAuthToken}`,
-          ),
+          metadata: Metadata(options.metadata)
+            .set(
+              "Authorization",
+              `Bearer ${this.clients.get(address)?.authToken || initialAuthToken}`,
+            )
+            .set("User-Agent", "spark-js-sdk"),
         });
       } catch (error: any) {
         if (error.message?.includes("token has expired")) {
@@ -194,10 +207,9 @@ export class ConnectionManager {
 
           return yield* call.next(call.request, {
             ...options,
-            metadata: Metadata(options.metadata).set(
-              "Authorization",
-              `Bearer ${newAuthToken}`,
-            ),
+            metadata: Metadata(options.metadata)
+              .set("Authorization", `Bearer ${newAuthToken}`)
+              .set("User-Agent", "spark-js-sdk"),
           });
         }
         throw error;
@@ -221,7 +233,8 @@ export class ConnectionManager {
             )
             .set("X-Requested-With", "XMLHttpRequest")
             .set("X-Grpc-Web", "1")
-            .set("Content-Type", "application/grpc-web+proto"),
+            .set("Content-Type", "application/grpc-web+proto")
+            .set("User-Agent", "spark-js-sdk"),
         });
       } catch (error: any) {
         if (error.message?.includes("token has expired")) {
@@ -235,7 +248,8 @@ export class ConnectionManager {
               .set("Authorization", `Bearer ${newAuthToken}`)
               .set("X-Requested-With", "XMLHttpRequest")
               .set("X-Grpc-Web", "1")
-              .set("Content-Type", "application/grpc-web+proto"),
+              .set("Content-Type", "application/grpc-web+proto")
+              .set("User-Agent", "spark-js-sdk"),
           });
         }
         throw error;
