@@ -43,7 +43,7 @@ export class TransactionBuilder {
   }
 
   async buildTransferOwnershipOutput(transferAnnouncement: TransferOwnershipAnnouncement) {
-    const opReturnPrefixBuff = Buffer.from([121, 117, 118, 0, 3]);
+    const opReturnPrefixBuff = Buffer.from([76, 82, 67, 50, 48, 0, 3]);
     console.log("buildTransferOwnershipOutput: ", transferAnnouncement);
     return {
       type: "OPReturnOutput",
@@ -53,7 +53,7 @@ export class TransactionBuilder {
   }
 
   async buildAnnouncementOutput(tokenPubkeyAnnouncement: TokenPubkeyAnnouncement) {
-    const opReturnPrefixBuff = Buffer.from([121, 117, 118, 0, 0, 118, 50]);
+    const opReturnPrefixBuff = Buffer.from([76, 82, 67, 50, 48, 0, 0, 118, 50]);
     console.log("buildAnnouncementOutput: ", tokenPubkeyAnnouncement);
     return {
       type: "OPReturnOutput",
@@ -71,7 +71,7 @@ export class TransactionBuilder {
       throw new Error("Found other tokenPubkeys");
     }
 
-    const opReturnPrefixBuff = Buffer.from([121, 117, 118, 0, 2]);
+    const opReturnPrefixBuff = Buffer.from([76, 82, 67, 50, 48, 0, 2]);
     const receiptsSum = receiptsOutputs.reduce(
       (acc, currentValue) => acc + (currentValue as ReceiptOutput).receipt.tokenAmount.amount,
       BigInt(0),
@@ -89,7 +89,7 @@ export class TransactionBuilder {
 
   // TODO: build freeze
   async buildFreezeOutput(freeze: TxFreezeAnnouncement | PubkeyFreezeAnnouncement) {
-    const opReturnPrefixBuff = Buffer.from([121, 117, 118, 0, 1]);
+    const opReturnPrefixBuff = Buffer.from([76, 82, 67, 50, 48, 0, 1]);
 
     if (freeze instanceof PubkeyFreezeAnnouncement) {
       const tokenPubkeyBuff = freeze.tokenPubkey.inner;
