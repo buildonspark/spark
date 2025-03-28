@@ -297,16 +297,6 @@ func BaseTxidLTE(v []byte) predicate.Tree {
 	return predicate.Tree(sql.FieldLTE(FieldBaseTxid, v))
 }
 
-// BaseTxidIsNil applies the IsNil predicate on the "base_txid" field.
-func BaseTxidIsNil() predicate.Tree {
-	return predicate.Tree(sql.FieldIsNull(FieldBaseTxid))
-}
-
-// BaseTxidNotNil applies the NotNil predicate on the "base_txid" field.
-func BaseTxidNotNil() predicate.Tree {
-	return predicate.Tree(sql.FieldNotNull(FieldBaseTxid))
-}
-
 // HasRoot applies the HasEdge predicate on the "root" edge.
 func HasRoot() predicate.Tree {
 	return predicate.Tree(func(s *sql.Selector) {

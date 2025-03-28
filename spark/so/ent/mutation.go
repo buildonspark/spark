@@ -11150,22 +11150,9 @@ func (m *TreeMutation) OldBaseTxid(ctx context.Context) (v []byte, err error) {
 	return oldValue.BaseTxid, nil
 }
 
-// ClearBaseTxid clears the value of the "base_txid" field.
-func (m *TreeMutation) ClearBaseTxid() {
-	m.base_txid = nil
-	m.clearedFields[tree.FieldBaseTxid] = struct{}{}
-}
-
-// BaseTxidCleared returns if the "base_txid" field was cleared in this mutation.
-func (m *TreeMutation) BaseTxidCleared() bool {
-	_, ok := m.clearedFields[tree.FieldBaseTxid]
-	return ok
-}
-
 // ResetBaseTxid resets all changes to the "base_txid" field.
 func (m *TreeMutation) ResetBaseTxid() {
 	m.base_txid = nil
-	delete(m.clearedFields, tree.FieldBaseTxid)
 }
 
 // SetRootID sets the "root" edge to the TreeNode entity by id.
@@ -11435,11 +11422,7 @@ func (m *TreeMutation) AddField(name string, value ent.Value) error {
 // ClearedFields returns all nullable fields that were cleared during this
 // mutation.
 func (m *TreeMutation) ClearedFields() []string {
-	var fields []string
-	if m.FieldCleared(tree.FieldBaseTxid) {
-		fields = append(fields, tree.FieldBaseTxid)
-	}
-	return fields
+	return nil
 }
 
 // FieldCleared returns a boolean indicating if a field with the given name was
@@ -11452,11 +11435,6 @@ func (m *TreeMutation) FieldCleared(name string) bool {
 // ClearField clears the value of the field with the given name. It returns an
 // error if the field is not defined in the schema.
 func (m *TreeMutation) ClearField(name string) error {
-	switch name {
-	case tree.FieldBaseTxid:
-		m.ClearBaseTxid()
-		return nil
-	}
 	return fmt.Errorf("unknown Tree nullable field %s", name)
 }
 

@@ -204,6 +204,14 @@ func (tc *TreeCreate) check() error {
 			return &ValidationError{Name: "network", err: fmt.Errorf(`ent: validator failed for field "Tree.network": %w`, err)}
 		}
 	}
+	if _, ok := tc.mutation.BaseTxid(); !ok {
+		return &ValidationError{Name: "base_txid", err: errors.New(`ent: missing required field "Tree.base_txid"`)}
+	}
+	if v, ok := tc.mutation.BaseTxid(); ok {
+		if err := tree.BaseTxidValidator(v); err != nil {
+			return &ValidationError{Name: "base_txid", err: fmt.Errorf(`ent: validator failed for field "Tree.base_txid": %w`, err)}
+		}
+	}
 	return nil
 }
 

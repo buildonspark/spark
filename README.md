@@ -45,17 +45,7 @@ We use atlas to manage our database migrations. Install it [here](https://atlasg
 To make a migration, follow these steps:
 
 - Make your change to the schema, run `make ent`
-- Generate migration files by running (from spark directory):
-
-```
-createdb sparkoperator_temp
-atlas migrate diff <diff_name> \
---dir "file://so/ent/migrate/migrations" \
---to "ent://so/ent/schema" \
---dev-url "postgresql://127.0.0.1:5432/sparkoperator_temp?sslmode=disable&search_path=public"
-dropdb sparkoperator_temp
-```
-
+- Generate migration files by running `./scripts/gen-migration.sh <name>`:
 - When running `run-everything.sh`, the migration will be automatically
   applied to each operator's database. But if you want to apply a migration manually, you can run (e.g. DB name is `sparkoperator_0`):
 

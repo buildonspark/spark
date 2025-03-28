@@ -383,6 +383,10 @@ func init() {
 	treeDescOwnerIdentityPubkey := treeFields[0].Descriptor()
 	// tree.OwnerIdentityPubkeyValidator is a validator for the "owner_identity_pubkey" field. It is called by the builders before save.
 	tree.OwnerIdentityPubkeyValidator = treeDescOwnerIdentityPubkey.Validators[0].(func([]byte) error)
+	// treeDescBaseTxid is the schema descriptor for base_txid field.
+	treeDescBaseTxid := treeFields[3].Descriptor()
+	// tree.BaseTxidValidator is a validator for the "base_txid" field. It is called by the builders before save.
+	tree.BaseTxidValidator = treeDescBaseTxid.Validators[0].(func([]byte) error)
 	// treeDescID is the schema descriptor for id field.
 	treeDescID := treeMixinFields0[0].Descriptor()
 	// tree.DefaultID holds the default value on creation for the id field.
