@@ -120,6 +120,17 @@ export function hashTokenTransaction(
     allHashes.push(hashObj.digest());
   }
 
+  // Hash the network field
+  const hashObj = sha256.create();
+  const networkBytes = new Uint8Array(4);
+  new DataView(networkBytes.buffer).setUint32(
+    0,
+    tokenTransaction.network,
+    false, // false for big-endian
+  );
+  hashObj.update(networkBytes);
+  allHashes.push(hashObj.digest());
+
   // Final hash of all concatenated hashes
   const finalHashObj = sha256.create();
   const concatenatedHashes = new Uint8Array(

@@ -167,6 +167,45 @@ export function transferStatusToJSON(object: TransferStatus): string {
   }
 }
 
+export enum TransferType {
+  PREIMAGE_SWAP = 0,
+  COOPERATIVE_EXIT = 1,
+  TRANSFER = 2,
+  UNRECOGNIZED = -1,
+}
+
+export function transferTypeFromJSON(object: any): TransferType {
+  switch (object) {
+    case 0:
+    case "PREIMAGE_SWAP":
+      return TransferType.PREIMAGE_SWAP;
+    case 1:
+    case "COOPERATIVE_EXIT":
+      return TransferType.COOPERATIVE_EXIT;
+    case 2:
+    case "TRANSFER":
+      return TransferType.TRANSFER;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return TransferType.UNRECOGNIZED;
+  }
+}
+
+export function transferTypeToJSON(object: TransferType): string {
+  switch (object) {
+    case TransferType.PREIMAGE_SWAP:
+      return "PREIMAGE_SWAP";
+    case TransferType.COOPERATIVE_EXIT:
+      return "COOPERATIVE_EXIT";
+    case TransferType.TRANSFER:
+      return "TRANSFER";
+    case TransferType.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
 /**
  * DepositAddressProof is the proof of possession of the deposit address.
  * When a user wants to generate a deposit address, they are sending their public key to the SE,
@@ -689,6 +728,7 @@ export interface Transfer {
   leaves: TransferLeaf[];
   createdTime: Date | undefined;
   updatedTime: Date | undefined;
+  type: TransferType;
 }
 
 export interface TransferLeaf {
@@ -6290,6 +6330,7 @@ function createBaseTransfer(): Transfer {
     leaves: [],
     createdTime: undefined,
     updatedTime: undefined,
+    type: 0,
   };
 }
 
@@ -6321,6 +6362,9 @@ export const Transfer: MessageFns<Transfer> = {
     }
     if (message.updatedTime !== undefined) {
       Timestamp.encode(toTimestamp(message.updatedTime), writer.uint32(74).fork()).join();
+    }
+    if (message.type !== 0) {
+      writer.uint32(80).int32(message.type);
     }
     return writer;
   },
@@ -6404,6 +6448,14 @@ export const Transfer: MessageFns<Transfer> = {
           message.updatedTime = fromTimestamp(Timestamp.decode(reader, reader.uint32()));
           continue;
         }
+        case 10: {
+          if (tag !== 80) {
+            break;
+          }
+
+          message.type = reader.int32() as any;
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -6428,6 +6480,7 @@ export const Transfer: MessageFns<Transfer> = {
       leaves: globalThis.Array.isArray(object?.leaves) ? object.leaves.map((e: any) => TransferLeaf.fromJSON(e)) : [],
       createdTime: isSet(object.createdTime) ? fromJsonTimestamp(object.createdTime) : undefined,
       updatedTime: isSet(object.updatedTime) ? fromJsonTimestamp(object.updatedTime) : undefined,
+      type: isSet(object.type) ? transferTypeFromJSON(object.type) : 0,
     };
   },
 
@@ -6460,6 +6513,9 @@ export const Transfer: MessageFns<Transfer> = {
     if (message.updatedTime !== undefined) {
       obj.updatedTime = message.updatedTime.toISOString();
     }
+    if (message.type !== 0) {
+      obj.type = transferTypeToJSON(message.type);
+    }
     return obj;
   },
 
@@ -6477,6 +6533,7 @@ export const Transfer: MessageFns<Transfer> = {
     message.leaves = object.leaves?.map((e) => TransferLeaf.fromPartial(e)) || [];
     message.createdTime = object.createdTime ?? undefined;
     message.updatedTime = object.updatedTime ?? undefined;
+    message.type = object.type ?? 0;
     return message;
   },
 };
