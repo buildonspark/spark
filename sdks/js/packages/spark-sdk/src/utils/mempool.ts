@@ -1,11 +1,6 @@
+import { ELECTRS_CREDENTIALS, getElectrsUrl } from "../services/wallet-config.js";
 import { BitcoinNetwork } from "../types/index.js";
 import { getNetworkFromAddress } from "./network.js";
-
-const DEV_MEMPOOL_URL = "https://regtest-mempool.dev.dev.sparkinfra.net/api";
-const PROD_MEMPOOL_URL = "https://regtest-mempool.us-west-2.sparkinfra.net/api";
-
-export const MEMPOOL_URL =
-  process.env.NODE_ENV === "development" ? DEV_MEMPOOL_URL : PROD_MEMPOOL_URL;
 
 export async function getLatestDepositTxId(
   address: string,
@@ -13,14 +8,14 @@ export async function getLatestDepositTxId(
   const network = getNetworkFromAddress(address);
   const baseUrl =
     network === BitcoinNetwork.REGTEST
-      ? MEMPOOL_URL
-      : "https://mempool.space/api";
-  const auth = btoa("spark-sdk:mCMk1JqlBNtetUNy");
+      ? getElectrsUrl("REGTEST")
+      : getElectrsUrl("MAINNET");
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
 
   if (network === BitcoinNetwork.REGTEST) {
+    const auth = btoa(`${ELECTRS_CREDENTIALS.username}:${ELECTRS_CREDENTIALS.password}`);
     headers["Authorization"] = `Basic ${auth}`;
   }
   const response = await fetch(`${baseUrl}/address/${address}/txs`, {

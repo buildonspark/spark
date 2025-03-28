@@ -48,7 +48,7 @@ import {
   DepositAddressTree,
   TreeCreationService,
 } from "./services/tree-creation.js";
-import { ConfigOptions } from "./services/wallet-config.js";
+import { ConfigOptions, ELECTRS_CREDENTIALS } from "./services/wallet-config.js";
 import {
   applyAdaptorToSignature,
   generateAdaptorFromSignature,
@@ -82,7 +82,7 @@ import {
 } from "./address/index.js";
 import { broadcastL1Withdrawal } from "./services/lrc20.js";
 import { SparkSigner } from "./signer/signer.js";
-import { getMasterHDKeyFromSeed, MEMPOOL_URL } from "./utils/index.js";
+import { getMasterHDKeyFromSeed } from "./utils/index.js";
 
 // Add this constant at the file level
 const MAX_TOKEN_LEAVES = 100;
@@ -827,17 +827,13 @@ export class SparkWallet {
     }
 
     const nodes = await mutex.runExclusive(async () => {
-      const baseUrl =
-        this.config.getNetwork() === Network.REGTEST
-          ? MEMPOOL_URL
-          : "https://mempool.space/api";
-      const auth = btoa("spark-sdk:mCMk1JqlBNtetUNy");
-
+      const baseUrl = this.config.getElectrsUrl();
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
       };
 
       if (this.config.getNetwork() === Network.REGTEST) {
+        const auth = btoa(`${ELECTRS_CREDENTIALS.username}:${ELECTRS_CREDENTIALS.password}`);
         headers["Authorization"] = `Basic ${auth}`;
       }
 

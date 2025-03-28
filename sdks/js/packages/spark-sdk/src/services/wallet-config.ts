@@ -2,6 +2,67 @@ import { hexToBytes } from "@noble/curves/abstract/utils";
 import { isHermeticTest } from "../tests/test-util.js";
 import { NetworkType } from "../utils/network.js";
 
+const isDevelopment = process.env.NODE_ENV === "development";
+
+const URL_CONFIG = {
+  LOCAL: {
+    ELECTRS: "http://127.0.0.1:30000",
+    LRC20: "http://127.0.0.1:18530",
+  },
+  REGTEST: {
+    DEV: {
+      ELECTRS: "https://regtest-mempool.dev.dev.sparkinfra.net/api",
+      LRC20: "https://regtest.lrc20.dev.dev.sparkinfra.net:443",
+    },
+    PROD: {
+      ELECTRS: "https://regtest-mempool.us-west-2.sparkinfra.net/api",
+      LRC20: "https://regtest.lrc20.us-west-2.sparkinfra.net:443",
+    },
+  },
+  MAINNET: {
+    DEV: {
+      ELECTRS: "https://mempool.space/api",
+      LRC20: "https://mainnet.lrc20.dev.dev.sparkinfra.net:443",
+    },
+    PROD: {
+      ELECTRS: "https://mempool.space/api",
+      LRC20: "https://mainnet.lrc20.us-west-2.sparkinfra.net:443",
+    },
+  },
+} as const;
+
+export const ELECTRS_CREDENTIALS = {
+  username: "spark-sdk",
+  password: "mCMk1JqlBNtetUNy",
+};
+
+
+export function getElectrsUrl(network: NetworkType): string {
+  switch (network) {
+    case "LOCAL":
+      return URL_CONFIG.LOCAL.ELECTRS;
+    case "REGTEST":
+      return isDevelopment ? URL_CONFIG.REGTEST.DEV.ELECTRS : URL_CONFIG.REGTEST.PROD.ELECTRS;
+    case "MAINNET":
+      return isDevelopment ? URL_CONFIG.MAINNET.DEV.ELECTRS : URL_CONFIG.MAINNET.PROD.ELECTRS;
+    default:
+      return URL_CONFIG.LOCAL.ELECTRS;
+  }
+}
+
+export function getLrc20Url(network: NetworkType): string {
+  switch (network) {
+    case "LOCAL":
+      return URL_CONFIG.LOCAL.LRC20;
+    case "REGTEST":
+      return isDevelopment ? URL_CONFIG.REGTEST.DEV.LRC20 : URL_CONFIG.REGTEST.PROD.LRC20;
+    case "MAINNET":
+      return isDevelopment ? URL_CONFIG.MAINNET.DEV.LRC20 : URL_CONFIG.MAINNET.PROD.LRC20;
+    default:
+      return URL_CONFIG.LOCAL.LRC20;
+  }
+}
+
 export type SigningOperator = {
   readonly id: number;
   readonly identifier: string;
@@ -17,6 +78,7 @@ export type ConfigOptions = {
   readonly lrc20Address?: string;
   readonly threshold?: number;
   readonly useTokenTransactionSchnorrSignatures?: boolean;
+  readonly electrsUrl?: string;
 };
 
 const DEV_PUBKEYS = [
@@ -37,13 +99,14 @@ function getLocalFrostSignerAddress(): string {
 
 const BASE_CONFIG: Required<ConfigOptions> = {
   network: "LOCAL",
-  lrc20Address: "http://127.0.0.1:18530",
+  lrc20Address: getLrc20Url("LOCAL"),
   coodinatorIdentifier:
     "0000000000000000000000000000000000000000000000000000000000000001",
   frostSignerAddress: getLocalFrostSignerAddress(),
   threshold: 2,
   signingOperators: getLocalSigningOperators(),
   useTokenTransactionSchnorrSignatures: true,
+  electrsUrl: getElectrsUrl("LOCAL"),
 };
 
 export const LOCAL_WALLET_CONFIG: Required<ConfigOptions> = {
@@ -62,27 +125,21 @@ export const LOCAL_WALLET_CONFIG_ECDSA: Required<ConfigOptions> = {
 export const REGTEST_WALLET_CONFIG: Required<ConfigOptions> = {
   ...BASE_CONFIG,
   network: "REGTEST",
-  lrc20Address:
-    process.env.NODE_ENV === "development"
-      ? "https://regtest.lrc20.dev.dev.sparkinfra.net:443"
-      : "https://regtest.lrc20.us-west-2.sparkinfra.net:443",
+  lrc20Address: getLrc20Url("REGTEST"),
   signingOperators: getRegtestSigningOperators(),
+  electrsUrl: getElectrsUrl("REGTEST"),
 };
 
 export const MAINNET_WALLET_CONFIG: Required<ConfigOptions> = {
   ...BASE_CONFIG,
   network: "MAINNET",
-  lrc20Address:
-    process.env.NODE_ENV === "development"
-      ? "https://mainnet.lrc20.dev.dev.sparkinfra.net:443"
-      : "https://mainnet.lrc20.us-west-2.sparkinfra.net:443",
+  lrc20Address: getLrc20Url("MAINNET"),
   signingOperators: getRegtestSigningOperators(),
+  electrsUrl: getElectrsUrl("MAINNET"),
 };
 
 export function getRegtestSigningOperators(): Record<string, SigningOperator> {
-  return process.env.NODE_ENV === "development"
-    ? getDevSigningOperators()
-    : getProdSigningOperators();
+  return isDevelopment ? getDevSigningOperators() : getProdSigningOperators();
 }
 
 function getDevSigningOperators(): Record<string, SigningOperator> {

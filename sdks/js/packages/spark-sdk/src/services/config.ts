@@ -76,4 +76,8 @@ export class WalletConfigService {
   public shouldSignTokenTransactionsWithSchnorr(): boolean {
     return this.config.useTokenTransactionSchnorrSignatures;
   }
+
+  public getElectrsUrl(): string {
+    return this.config.electrsUrl;
+  }
 }
