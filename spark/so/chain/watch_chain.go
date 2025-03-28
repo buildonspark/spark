@@ -105,11 +105,7 @@ func findDifference(currChainTip, newChainTip Tip, client *rpcclient.Client) (Di
 	disconnected := []Tip{}
 	connected := []Tip{}
 
-	for {
-		if currChainTip.Hash.IsEqual(&newChainTip.Hash) {
-			break
-		}
-
+	for !currChainTip.Hash.IsEqual(&newChainTip.Hash) {
 		// Walk back the chain, finding blocks needed to connect and disconnect. Only walk back
 		// the header with the greater height, or both if equal heights (i.e. same height, different hashes!).
 		newHeight := newChainTip.Height
@@ -313,7 +309,7 @@ func connectBlocks(ctx context.Context, soConfig *so.Config, dbClient *ent.Clien
 		if err != nil {
 			logger.Error("Failed to handle block", "error", err)
 			rollbackErr := dbTx.Rollback()
-			if err != nil {
+			if rollbackErr != nil {
 				return rollbackErr
 			}
 			return err

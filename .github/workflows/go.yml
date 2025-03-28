@@ -94,9 +94,9 @@ jobs:
       - name: Install ZMQ dependencies
         run: sudo apt-get update && sudo apt-get install -y libzmq3-dev
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@v7
         with:
-          version: v1.64.6
+          version: v2.0.2
           working-directory: ./spark
           args:  --timeout 5m
 

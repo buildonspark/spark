@@ -345,7 +345,7 @@ func prepareSingleSendTransferKeyTweak(config *Config, transferID string, leaf L
 func findShare(shares []*secretsharing.VerifiableSecretShare, operatorID uint64) *secretsharing.VerifiableSecretShare {
 	targetShareIndex := big.NewInt(int64(operatorID + 1))
 	for _, s := range shares {
-		if s.SecretShare.Index.Cmp(targetShareIndex) == 0 {
+		if s.Index.Cmp(targetShareIndex) == 0 {
 			return s
 		}
 	}

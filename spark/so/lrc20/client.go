@@ -12,7 +12,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/common"
 	pblrc20 "github.com/lightsparkdev/spark-go/proto/lrc20"
-	"github.com/lightsparkdev/spark-go/proto/spark"
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/ent"
@@ -118,8 +117,8 @@ func (c *Client) connectToLrc20Node() (*grpc.ClientConn, error) {
 	// and the LRC20 may not have the block info when the SO makes the first call).
 	retryConfig := common.RetryPolicyConfig{
 		MaxAttempts:          5,
-		InitialBackoffSecs:   1 * time.Second,
-		MaxBackoffSecs:       20 * time.Second,
+		InitialBackoff:       1 * time.Second,
+		MaxBackoff:           20 * time.Second,
 		BackoffMultiplier:    2.0,
 		RetryableStatusCodes: []string{"UNAVAILABLE", "NOT_FOUND"},
 	}
@@ -151,7 +150,7 @@ func (c *Client) MarkWithdrawnTokenLeaves(
 		log.Printf("Skipping LRC20 node call due to DisableRpcs flag")
 		return nil
 	}
-	allLeaves := []*spark.TokenLeafOutput{}
+	allLeaves := []*pb.TokenLeafOutput{}
 
 	var pageResponse *pblrc20.ListWithdrawnLeavesResponse
 	err := c.executeLrc20Call(func(client pblrc20.SparkServiceClient) error {

@@ -241,13 +241,14 @@ func (h *TransferHandler) CompleteSendTransfer(ctx context.Context, req *pb.Comp
 
 	db := ent.GetDbFromContext(ctx)
 	shouldTweakKey := true
-	if transfer.Type == schema.TransferTypePreimageSwap {
+	switch transfer.Type {
+	case schema.TransferTypePreimageSwap:
 		preimageRequest, err := db.PreimageRequest.Query().Where(preimagerequest.HasTransfersWith(enttransfer.ID(transfer.ID))).Only(ctx)
 		if err != nil || preimageRequest == nil {
 			return nil, fmt.Errorf("unable to find preimage request for transfer %s: %v", transfer.ID.String(), err)
 		}
 		shouldTweakKey = preimageRequest.Status == schema.PreimageRequestStatusPreimageShared
-	} else if transfer.Type == schema.TransferTypeCooperativeExit {
+	case schema.TransferTypeCooperativeExit:
 		err = checkCoopExitTxBroadcasted(ctx, db, transfer)
 		shouldTweakKey = err == nil
 	}

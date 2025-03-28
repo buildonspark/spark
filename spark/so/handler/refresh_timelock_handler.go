@@ -66,7 +66,7 @@ func (h *RefreshTimelockHandler) RefreshTimelock(ctx context.Context, req *pb.Re
 			rawTxBytes = node.RawTx
 		}
 		if i == len(req.SigningJobs)-1 && node.Status != schema.TreeNodeStatusAvailable {
-			return nil, fmt.Errorf("Cannot refresh leaf node %s because it is not available", node.ID)
+			return nil, fmt.Errorf("cannot refresh leaf node %s because it is not available", node.ID)
 		}
 
 		currentTx, err := common.TxFromRawTxBytes(rawTxBytes)
@@ -97,7 +97,7 @@ func (h *RefreshTimelockHandler) RefreshTimelock(ctx context.Context, req *pb.Re
 			return nil, fmt.Errorf("unexpected number of outputs on current tx: %d", len(currentTx.TxOut))
 		}
 		if signingTx.TxOut[0].Value != currentTx.TxOut[0].Value {
-			return nil, fmt.Errorf("Expected output value to be %d, got %d", currentTx.TxOut[0].Value, signingTx.TxOut[0].Value)
+			return nil, fmt.Errorf("expected output value to be %d, got %d", currentTx.TxOut[0].Value, signingTx.TxOut[0].Value)
 		}
 
 		signingSequence := signingTx.TxIn[0].Sequence

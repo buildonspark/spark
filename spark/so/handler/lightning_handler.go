@@ -299,9 +299,10 @@ func (h *LightningHandler) validateGetPreimageRequest(
 		}
 		totalAmount += uint64(refundTx.TxOut[0].Value)
 	}
-	if reason == pb.InitiatePreimageSwapRequest_REASON_SEND {
+	switch reason {
+	case pb.InitiatePreimageSwapRequest_REASON_SEND:
 		totalAmount -= feeSats
-	} else if reason == pb.InitiatePreimageSwapRequest_REASON_RECEIVE {
+	case pb.InitiatePreimageSwapRequest_REASON_RECEIVE:
 		totalAmount += feeSats
 	}
 	if totalAmount != amount.ValueSats {
