@@ -123,7 +123,7 @@ func findDifference(currChainTip, newChainTip Tip, client *rpcclient.Client) (Di
 			currChainTip = prevChainTip
 		}
 		if newHeight >= currHeight {
-			connected = append(connected, newChainTip)
+			connected = append([]Tip{newChainTip}, connected...)
 			prevChainTip, err := findPreviousChainTip(newChainTip, client)
 			if err != nil {
 				return Difference{}, err
