@@ -14,6 +14,7 @@ import (
 	testutil "github.com/lightsparkdev/spark-go/test_util"
 	"github.com/lightsparkdev/spark-go/wallet"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCoopExit(t *testing.T) {
@@ -157,6 +158,7 @@ func TestCoopExit(t *testing.T) {
 	receiverTransfer := pendingTransfer.Transfers[0]
 	assert.Equal(t, receiverTransfer.Id, senderTransfer.Id)
 	assert.Equal(t, receiverTransfer.Status, spark.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED)
+	require.Equal(t, receiverTransfer.Type, spark.TransferType_COOPERATIVE_EXIT)
 
 	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(context.Background(), sspConfig, receiverTransfer)
 	assert.NoError(t, err)

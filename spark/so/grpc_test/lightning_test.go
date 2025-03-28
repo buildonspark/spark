@@ -15,6 +15,7 @@ import (
 	testutil "github.com/lightsparkdev/spark-go/test_util"
 	"github.com/lightsparkdev/spark-go/wallet"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // FakeLightningInvoiceCreator is a fake implementation of the LightningInvoiceCreator interface.
@@ -170,6 +171,7 @@ func TestReceiveLightningPayment(t *testing.T) {
 	if receiverTransfer.Id != senderTransfer.Id {
 		t.Fatalf("expected transfer id %s, got %s", senderTransfer.Id, receiverTransfer.Id)
 	}
+	require.Equal(t, receiverTransfer.Type, spark.TransferType_PREIMAGE_SWAP)
 
 	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(context.Background(), userConfig, receiverTransfer)
 	if err != nil {

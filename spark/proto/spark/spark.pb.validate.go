@@ -6853,6 +6853,8 @@ func (m *Transfer) validate(all bool) error {
 		}
 	}
 
+	// no validation rules for Type
+
 	if len(errors) > 0 {
 		return TransferMultiError(errors)
 	}
@@ -15012,3 +15014,106 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = QueryBalanceResponseValidationError{}
+
+// Validate checks the field values on SparkAddress with the rules defined in
+// the proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *SparkAddress) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on SparkAddress with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in SparkAddressMultiError, or
+// nil if none found.
+func (m *SparkAddress) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *SparkAddress) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for IdentityPublicKey
+
+	// no validation rules for Network
+
+	if len(errors) > 0 {
+		return SparkAddressMultiError(errors)
+	}
+
+	return nil
+}
+
+// SparkAddressMultiError is an error wrapping multiple validation errors
+// returned by SparkAddress.ValidateAll() if the designated constraints aren't met.
+type SparkAddressMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m SparkAddressMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m SparkAddressMultiError) AllErrors() []error { return m }
+
+// SparkAddressValidationError is the validation error returned by
+// SparkAddress.Validate if the designated constraints aren't met.
+type SparkAddressValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e SparkAddressValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e SparkAddressValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e SparkAddressValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e SparkAddressValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e SparkAddressValidationError) ErrorName() string { return "SparkAddressValidationError" }
+
+// Error satisfies the builtin error interface
+func (e SparkAddressValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sSparkAddress.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = SparkAddressValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = SparkAddressValidationError{}
