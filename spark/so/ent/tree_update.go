@@ -77,6 +77,12 @@ func (tu *TreeUpdate) SetBaseTxid(b []byte) *TreeUpdate {
 	return tu
 }
 
+// ClearBaseTxid clears the value of the "base_txid" field.
+func (tu *TreeUpdate) ClearBaseTxid() *TreeUpdate {
+	tu.mutation.ClearBaseTxid()
+	return tu
+}
+
 // SetRootID sets the "root" edge to the TreeNode entity by ID.
 func (tu *TreeUpdate) SetRootID(id uuid.UUID) *TreeUpdate {
 	tu.mutation.SetRootID(id)
@@ -196,11 +202,6 @@ func (tu *TreeUpdate) check() error {
 			return &ValidationError{Name: "network", err: fmt.Errorf(`ent: validator failed for field "Tree.network": %w`, err)}
 		}
 	}
-	if v, ok := tu.mutation.BaseTxid(); ok {
-		if err := tree.BaseTxidValidator(v); err != nil {
-			return &ValidationError{Name: "base_txid", err: fmt.Errorf(`ent: validator failed for field "Tree.base_txid": %w`, err)}
-		}
-	}
 	return nil
 }
 
@@ -230,6 +231,9 @@ func (tu *TreeUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if value, ok := tu.mutation.BaseTxid(); ok {
 		_spec.SetField(tree.FieldBaseTxid, field.TypeBytes, value)
+	}
+	if tu.mutation.BaseTxidCleared() {
+		_spec.ClearField(tree.FieldBaseTxid, field.TypeBytes)
 	}
 	if tu.mutation.RootCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -371,6 +375,12 @@ func (tuo *TreeUpdateOne) SetBaseTxid(b []byte) *TreeUpdateOne {
 	return tuo
 }
 
+// ClearBaseTxid clears the value of the "base_txid" field.
+func (tuo *TreeUpdateOne) ClearBaseTxid() *TreeUpdateOne {
+	tuo.mutation.ClearBaseTxid()
+	return tuo
+}
+
 // SetRootID sets the "root" edge to the TreeNode entity by ID.
 func (tuo *TreeUpdateOne) SetRootID(id uuid.UUID) *TreeUpdateOne {
 	tuo.mutation.SetRootID(id)
@@ -503,11 +513,6 @@ func (tuo *TreeUpdateOne) check() error {
 			return &ValidationError{Name: "network", err: fmt.Errorf(`ent: validator failed for field "Tree.network": %w`, err)}
 		}
 	}
-	if v, ok := tuo.mutation.BaseTxid(); ok {
-		if err := tree.BaseTxidValidator(v); err != nil {
-			return &ValidationError{Name: "base_txid", err: fmt.Errorf(`ent: validator failed for field "Tree.base_txid": %w`, err)}
-		}
-	}
 	return nil
 }
 
@@ -554,6 +559,9 @@ func (tuo *TreeUpdateOne) sqlSave(ctx context.Context) (_node *Tree, err error) 
 	}
 	if value, ok := tuo.mutation.BaseTxid(); ok {
 		_spec.SetField(tree.FieldBaseTxid, field.TypeBytes, value)
+	}
+	if tuo.mutation.BaseTxidCleared() {
+		_spec.ClearField(tree.FieldBaseTxid, field.TypeBytes)
 	}
 	if tuo.mutation.RootCleared() {
 		edge := &sqlgraph.EdgeSpec{
