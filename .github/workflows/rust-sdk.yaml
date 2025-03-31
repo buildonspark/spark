@@ -1,0 +1,46 @@
+name: "Rust SDK"
+
+on:
+  pull_request:
+    paths:
+      - "sdks/rs/**"
+      - ".github/workflows/rust-sdk.yaml"
+  push:
+    branches:
+      - main
+    paths:
+      - "sdks/rs/**"
+      - ".github/workflows/rust-sdk.yaml"
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sdks/rs
+    steps:
+      - name: "Checkout"
+        uses: actions/checkout@v4
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: "Setup Rust"
+        uses: "actions-rust-lang/setup-rust-toolchain@v1"
+        with:
+          cache: false
+          rustflags: ""
+      - name: "Setup Rust cache"
+        uses: "Swatinem/rust-cache@v2"
+        with:
+          workspaces: "sdks/rs"
+      - name: "Run cargo fmt"
+        run: "cargo fmt --all --check"
+      - name: "Run cargo clippy"
+        run: "cargo clippy --workspace --all-targets --locked -- -D warnings"
+      - name: "Run cargo test"
+        run: "cargo test --workspace --all-targets --locked"
+      - name: "Run cargo test --doc"
+        run: "cargo test --workspace --doc --locked"
+      - name: "Run cargo check"
+        run: "cargo check --workspace --all-targets --release --locked"
