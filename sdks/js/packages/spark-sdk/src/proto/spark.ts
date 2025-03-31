@@ -15,25 +15,29 @@ export const protobufPackage = "spark";
 
 /** Network is the network type of the bitcoin network. */
 export enum Network {
-  MAINNET = 0,
-  REGTEST = 1,
-  TESTNET = 2,
-  SIGNET = 3,
+  UNSPECIFIED = 0,
+  MAINNET = 10,
+  REGTEST = 20,
+  TESTNET = 30,
+  SIGNET = 40,
   UNRECOGNIZED = -1,
 }
 
 export function networkFromJSON(object: any): Network {
   switch (object) {
     case 0:
+    case "UNSPECIFIED":
+      return Network.UNSPECIFIED;
+    case 10:
     case "MAINNET":
       return Network.MAINNET;
-    case 1:
+    case 20:
     case "REGTEST":
       return Network.REGTEST;
-    case 2:
+    case 30:
     case "TESTNET":
       return Network.TESTNET;
-    case 3:
+    case 40:
     case "SIGNET":
       return Network.SIGNET;
     case -1:
@@ -45,6 +49,8 @@ export function networkFromJSON(object: any): Network {
 
 export function networkToJSON(object: Network): string {
   switch (object) {
+    case Network.UNSPECIFIED:
+      return "UNSPECIFIED";
     case Network.MAINNET:
       return "MAINNET";
     case Network.REGTEST:
