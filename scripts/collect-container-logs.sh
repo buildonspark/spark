@@ -1,7 +1,5 @@
 #!/bin/bash
 
-set -e
-
 LOG_DIR="${LOG_DIR:-logs}"
 mkdir -p "$LOG_DIR"
 

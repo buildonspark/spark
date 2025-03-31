@@ -70,6 +70,26 @@ helm upgrade \
     regtest \
     "$HELM_REPO_PREFIX"/bitcoind &
 
+helm upgrade \
+    --install \
+    --timeout "$HELM_INSTALL_TIMEOUT" \
+    --namespace "$BITCOIN_NAMESPACE" \
+    --set imagePullSecret=ecr \
+    --set network="regtest" \
+    --set yuvd.namespace="lrc20" \
+    --set ingress.domain=mempool.minikube.local \
+    regtest-mempool \
+    "$HELM_REPO_PREFIX"/mempool &
+
+helm upgrade \
+    --install \
+    --timeout "$HELM_INSTALL_TIMEOUT" \
+    --namespace "$BITCOIN_NAMESPACE" \
+    --set imagePullSecret=ecr \
+    --set network="regtest" \
+    regtest-electrs \
+    "$HELM_REPO_PREFIX"/electrs &
+
 last_so_index=$((${#PRIV_KEYS[@]} - 1))
 
 if [ "$RESET_DBS" = "true" ]; then
@@ -221,6 +241,8 @@ for attempt in $(seq 1 $max_attempts); do
 
     check_service_readiness "spark" "spark" || all_ready=false
     check_service_readiness "$BITCOIN_NAMESPACE" "bitcoind" || all_ready=false
+    check_service_readiness "$BITCOIN_NAMESPACE" "electrs" || all_ready=false
+    check_service_readiness "$BITCOIN_NAMESPACE" "mempool" || all_ready=false
     check_service_readiness "lrc20" "yuvd" || all_ready=false
 
     if $all_ready; then
@@ -236,8 +258,6 @@ for attempt in $(seq 1 $max_attempts); do
     echo "Waiting 10 seconds before next check..."
     sleep 10
 done
-
-rm -f /tmp/spark /tmp/bitcoind /tmp/lrc20
 
 setup_port_forward "$BITCOIN_NAMESPACE" service/regtest-bitcoind 8332 8332
 setup_port_forward "$BITCOIN_NAMESPACE" service/regtest-bitcoind 8330 8330

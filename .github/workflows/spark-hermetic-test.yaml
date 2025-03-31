@@ -160,13 +160,17 @@ jobs:
       - name: "Gather logs"
         if: always()
         run: |
+          set +e
           mkdir -p logs/k8s
           kubectl get pods -A > logs/k8s/pods.txt
           kubectl describe nodes > logs/k8s/nodes.txt
+          kubectl describe -A statefulset > logs/k8s/statefulset.txt
           source ./scripts/collect-container-logs.sh
           collect_logs "spark" "spark" "operator" "signer" "atlas"
           collect_logs "lrc20" "yuvd" "yuvd" "sqlx"
           collect_logs "bitcoin" "bitcoind" "bitcoind"
+          collect_logs "bitcoin" "electrs" "electrs"
+          collect_logs "bitcoin" "mempool" "backend" "frontend"
 
       - name: "Upload log artifacts"
         if: always()

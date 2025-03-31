@@ -1,3 +1,4 @@
+import { LRC20WalletApiConfig, MayHaveLrc20WalletApiConfig } from "@buildonspark/lrc20-sdk";
 import { hexToBytes } from "@noble/curves/abstract/utils";
 import { isHermeticTest } from "../tests/test-util.js";
 import { NetworkType } from "../utils/network.js";
@@ -8,25 +9,30 @@ const URL_CONFIG = {
   LOCAL: {
     ELECTRS: "http://127.0.0.1:30000",
     LRC20: "http://127.0.0.1:18530",
+    LRC20_NODE: "http://127.0.0.1:18332",
   },
   REGTEST: {
     DEV: {
       ELECTRS: "https://regtest-mempool.dev.dev.sparkinfra.net/api",
       LRC20: "https://regtest.lrc20.dev.dev.sparkinfra.net:443",
+      LRC20_NODE: "https://regtest.lrc20.dev.dev.sparkinfra.net",
     },
     PROD: {
       ELECTRS: "https://regtest-mempool.us-west-2.sparkinfra.net/api",
       LRC20: "https://regtest.lrc20.us-west-2.sparkinfra.net:443",
+      LRC20_NODE: "https://regtest.lrc20.us-west-2.sparkinfra.net",
     },
   },
   MAINNET: {
     DEV: {
       ELECTRS: "https://mempool.space/api",
       LRC20: "https://mainnet.lrc20.dev.dev.sparkinfra.net:443",
+      LRC20_NODE: "https://mainnet.lrc20.dev.dev.sparkinfra.net",
     },
     PROD: {
       ELECTRS: "https://mempool.space/api",
       LRC20: "https://mainnet.lrc20.us-west-2.sparkinfra.net:443",
+      LRC20_NODE: "https://mainnet.lrc20.us-west-2.sparkinfra.net",
     },
   },
 } as const;
@@ -40,7 +46,7 @@ export const ELECTRS_CREDENTIALS = {
 export function getElectrsUrl(network: NetworkType): string {
   switch (network) {
     case "LOCAL":
-      return URL_CONFIG.LOCAL.ELECTRS;
+      return isHermeticTest() ? "http://mempool.minikube.local/api" : URL_CONFIG.LOCAL.ELECTRS;
     case "REGTEST":
       return isDevelopment ? URL_CONFIG.REGTEST.DEV.ELECTRS : URL_CONFIG.REGTEST.PROD.ELECTRS;
     case "MAINNET":
@@ -63,6 +69,20 @@ export function getLrc20Url(network: NetworkType): string {
   }
 }
 
+export function getLrc20NodeUrl(network: NetworkType): string {
+  switch (network) {
+    case "LOCAL":
+      return URL_CONFIG.LOCAL.LRC20_NODE;
+    case "REGTEST":
+      return isDevelopment ? URL_CONFIG.REGTEST.DEV.LRC20_NODE : URL_CONFIG.REGTEST.PROD.LRC20_NODE;
+    case "MAINNET":
+      return isDevelopment ? URL_CONFIG.MAINNET.DEV.LRC20_NODE : URL_CONFIG.MAINNET.PROD.LRC20_NODE;
+    default:
+      return URL_CONFIG.LOCAL.LRC20_NODE;
+  }
+}
+
+
 export type SigningOperator = {
   readonly id: number;
   readonly identifier: string;
@@ -70,7 +90,7 @@ export type SigningOperator = {
   readonly identityPublicKey: Uint8Array;
 };
 
-export type ConfigOptions = {
+export type ConfigOptions = MayHaveLrc20WalletApiConfig & {
   readonly network?: NetworkType;
   readonly signingOperators?: Readonly<Record<string, SigningOperator>>;
   readonly coodinatorIdentifier?: string;
@@ -79,6 +99,7 @@ export type ConfigOptions = {
   readonly threshold?: number;
   readonly useTokenTransactionSchnorrSignatures?: boolean;
   readonly electrsUrl?: string;
+  readonly lrc20ApiConfig?: LRC20WalletApiConfig;
 };
 
 const DEV_PUBKEYS = [
@@ -107,6 +128,11 @@ const BASE_CONFIG: Required<ConfigOptions> = {
   signingOperators: getLocalSigningOperators(),
   useTokenTransactionSchnorrSignatures: true,
   electrsUrl: getElectrsUrl("LOCAL"),
+  lrc20ApiConfig: {
+    electrsUrl: getElectrsUrl("LOCAL"),
+    lrc20NodeUrl: getLrc20NodeUrl("LOCAL"),
+    electrsCredentials: ELECTRS_CREDENTIALS,
+  },
 };
 
 export const LOCAL_WALLET_CONFIG: Required<ConfigOptions> = {
@@ -128,6 +154,11 @@ export const REGTEST_WALLET_CONFIG: Required<ConfigOptions> = {
   lrc20Address: getLrc20Url("REGTEST"),
   signingOperators: getRegtestSigningOperators(),
   electrsUrl: getElectrsUrl("REGTEST"),
+  lrc20ApiConfig: {
+    electrsUrl: getElectrsUrl("REGTEST"),
+    lrc20NodeUrl: getLrc20NodeUrl("REGTEST"),
+    electrsCredentials: ELECTRS_CREDENTIALS,
+  },
 };
 
 export const MAINNET_WALLET_CONFIG: Required<ConfigOptions> = {
@@ -136,6 +167,10 @@ export const MAINNET_WALLET_CONFIG: Required<ConfigOptions> = {
   lrc20Address: getLrc20Url("MAINNET"),
   signingOperators: getRegtestSigningOperators(),
   electrsUrl: getElectrsUrl("MAINNET"),
+  lrc20ApiConfig: {
+    electrsUrl: getElectrsUrl("MAINNET"),
+    lrc20NodeUrl: getLrc20NodeUrl("MAINNET"),
+  },
 };
 
 export function getRegtestSigningOperators(): Record<string, SigningOperator> {

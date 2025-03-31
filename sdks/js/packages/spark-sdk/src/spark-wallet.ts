@@ -425,6 +425,7 @@ export class SparkWallet {
       bytesToHex(masterPrivateKey),
       LRC_WALLET_NETWORK[network],
       LRC_WALLET_NETWORK_TYPE[network],
+      this.config.lrc20ApiConfig,
     );
 
     if (returnMnemonic) {

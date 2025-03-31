@@ -36,6 +36,9 @@ cleanup_k8s() {
     helm uninstall -n spark regtest --ignore-not-found 2>/dev/null || true
     helm uninstall -n lrc20 regtest --ignore-not-found 2>/dev/null || true
     helm uninstall -n "$BITCOIN_NAMESPACE" regtest --ignore-not-found 2>/dev/null || true
+    helm uninstall -n "$BITCOIN_NAMESPACE" regtest-mempool --ignore-not-found 2>/dev/null || true
+    helm uninstall -n "$BITCOIN_NAMESPACE" regtest-electrs --ignore-not-found 2>/dev/null || true
+
 
     kubectl delete namespace spark --ignore-not-found &
     kubectl delete namespace lrc20 --ignore-not-found &

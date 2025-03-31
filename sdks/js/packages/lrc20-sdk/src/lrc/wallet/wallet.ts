@@ -1,12 +1,11 @@
 import {
   address,
-  networks,
+  crypto as bitcoinJsCrypto,
   payments,
   Psbt,
   script,
   Transaction,
-  crypto as bitcoinJsCrypto,
-  type Network as BitcoinJsNetwork,
+  type Network as BitcoinJsNetwork
 } from "bitcoinjs-lib";
 import { plainToInstance } from "class-transformer";
 import { ECPairInterface } from "ecpair";
@@ -72,6 +71,14 @@ export interface LRC20WalletApiConfig {
   electrsCredentials?: BasicAuth;
 }
 
+export interface HasLrc20WalletApiConfig {
+  readonly lrc20ApiConfig: LRC20WalletApiConfig;
+}
+
+export interface MayHaveLrc20WalletApiConfig {
+  readonly lrc20ApiConfig?: LRC20WalletApiConfig;
+}
+
 export class LRCWallet {
   public p2trAddress: string;
   public p2wpkhAddress: string;
@@ -126,13 +133,20 @@ export class LRCWallet {
     this.builder = new TransactionBuilder(this.keyPair, this.network);
     this.addressInnerKey = this.keyPair.publicKey;
 
-    this.electrsApi = apiConfig
-      ? new ElectrsApi(apiConfig.electrsUrl, apiConfig.electrsCredentials)
-      : // TODO: Handle auth better, this is a hack for regtest prod
-        new ElectrsApi(ELECTRS_URL[this.networkType] || ELECTRS_URL["default"], {
-          username: "spark-sdk",
-          password: "mCMk1JqlBNtetUNy",
-        });
+    const electrsUrl = apiConfig?.electrsUrl || ELECTRS_URL[this.networkType] || ELECTRS_URL["default"];
+
+    let electrsCredentials;
+    if (apiConfig !== undefined) {
+      electrsCredentials = apiConfig.electrsCredentials;
+    } else if (this.networkType !== NetworkType.MAINNET) {
+      electrsCredentials = {
+        username: "spark-sdk",
+        password: "mCMk1JqlBNtetUNy",
+      };
+    }
+
+    this.electrsApi = new ElectrsApi(electrsUrl, electrsCredentials);
+
     this.lrcNodeApi = apiConfig
       ? new Lrc20JsonRPC(apiConfig.lrc20NodeUrl)
       : new Lrc20JsonRPC(LRC_NODE_URL[this.networkType] || LRC_NODE_URL["default"]);

@@ -116,7 +116,8 @@ export {
   JSONStringify,
   JSONParse,
 } from "./lrc/utils/index.ts";
-export { type LRC20WalletApiConfig, LRCWallet } from "./lrc/wallet/index.ts";
+export { LRCWallet } from "./lrc/wallet/index.ts";
+export type { HasLrc20WalletApiConfig, LRC20WalletApiConfig, MayHaveLrc20WalletApiConfig } from "./lrc/wallet/index.ts";
 
 export { ECPair, ecc } from "./bitcoin-core.ts";
 export { toPsbtNetwork, toNetworkType, getNetwork, NetworkType, networks } from "./network/index.ts";

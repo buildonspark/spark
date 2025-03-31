@@ -1,3 +1,4 @@
+import { LRC20WalletApiConfig, HasLrc20WalletApiConfig } from "@buildonspark/lrc20-sdk";
 import { DefaultSparkSigner, SparkSigner } from "../signer/signer.js";
 import { Network, NetworkToProto, NetworkType } from "../utils/network.js";
 import {
@@ -8,9 +9,10 @@ import {
   SigningOperator,
 } from "./wallet-config.js";
 
-export class WalletConfigService {
+export class WalletConfigService implements HasLrc20WalletApiConfig {
   private readonly config: Required<ConfigOptions>;
   public readonly signer: SparkSigner;
+  public readonly lrc20ApiConfig: LRC20WalletApiConfig;
 
   constructor(options?: ConfigOptions, signer?: SparkSigner) {
     const network = options?.network ?? "REGTEST";
@@ -21,6 +23,7 @@ export class WalletConfigService {
     };
 
     this.signer = signer ?? new DefaultSparkSigner();
+    this.lrc20ApiConfig = this.config.lrc20ApiConfig;
   }
 
   private getDefaultConfig(network: Network): Required<ConfigOptions> {
