@@ -202,8 +202,13 @@ func SignTokenTransaction(
 		}
 		defer operatorConn.Close()
 
+		operatorToken, err := AuthenticateWithConnection(ctx, config, operatorConn)
+		if err != nil {
+			return nil, fmt.Errorf("failed to authenticate with operator %s: %v", operator.Identifier, err)
+		}
+		operatorCtx := ContextWithToken(ctx, operatorToken)
 		operatorClient := pb.NewSparkServiceClient(operatorConn)
-		signTokenTransactionResponse, err := operatorClient.SignTokenTransaction(ctx, &pb.SignTokenTransactionRequest{
+		signTokenTransactionResponse, err := operatorClient.SignTokenTransaction(operatorCtx, &pb.SignTokenTransactionRequest{
 			FinalTokenTransaction:      finalTx,
 			OperatorSpecificSignatures: operatorSpecificSignatures,
 			IdentityPublicKey:          config.IdentityPublicKey(),
@@ -212,7 +217,6 @@ func SignTokenTransaction(
 			log.Printf("Error while calling SignTokenTransaction with operator %s: %v", operator.Identifier, err)
 			return nil, err
 		}
-
 		// Validate signature
 		operatorSig := signTokenTransactionResponse.SparkOperatorSignature
 		if err := utils.ValidateOwnershipSignature(operatorSig, finalTxHash, operator.IdentityPublicKey); err != nil {
@@ -291,8 +295,14 @@ func FinalizeTokenTransaction(
 		}
 		defer operatorConn.Close()
 
+		operatorToken, err := AuthenticateWithConnection(ctx, config, operatorConn)
+		if err != nil {
+			return fmt.Errorf("failed to authenticate with operator %s: %v", operator.Identifier, err)
+		}
+		operatorCtx := ContextWithToken(ctx, operatorToken)
 		operatorClient := pb.NewSparkServiceClient(operatorConn)
-		_, err = operatorClient.FinalizeTokenTransaction(ctx, &pb.FinalizeTokenTransactionRequest{
+
+		_, err = operatorClient.FinalizeTokenTransaction(operatorCtx, &pb.FinalizeTokenTransactionRequest{
 			FinalTokenTransaction:     startResponse.FinalTokenTransaction,
 			LeafToSpendRevocationKeys: leafRecoveredSecrets,
 			IdentityPublicKey:         config.IdentityPublicKey(),
