@@ -1143,7 +1143,6 @@ export interface QueryBalanceResponse_NodeBalancesEntry {
 
 export interface SparkAddress {
   identityPublicKey: Uint8Array;
-  network: string;
 }
 
 function createBaseDepositAddressProof(): DepositAddressProof {
@@ -12283,16 +12282,13 @@ export const QueryBalanceResponse_NodeBalancesEntry: MessageFns<QueryBalanceResp
 };
 
 function createBaseSparkAddress(): SparkAddress {
-  return { identityPublicKey: new Uint8Array(0), network: "" };
+  return { identityPublicKey: new Uint8Array(0) };
 }
 
 export const SparkAddress: MessageFns<SparkAddress> = {
   encode(message: SparkAddress, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.identityPublicKey.length !== 0) {
       writer.uint32(10).bytes(message.identityPublicKey);
-    }
-    if (message.network !== "") {
-      writer.uint32(18).string(message.network);
     }
     return writer;
   },
@@ -12312,14 +12308,6 @@ export const SparkAddress: MessageFns<SparkAddress> = {
           message.identityPublicKey = reader.bytes();
           continue;
         }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.network = reader.string();
-          continue;
-        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -12334,7 +12322,6 @@ export const SparkAddress: MessageFns<SparkAddress> = {
       identityPublicKey: isSet(object.identityPublicKey)
         ? bytesFromBase64(object.identityPublicKey)
         : new Uint8Array(0),
-      network: isSet(object.network) ? globalThis.String(object.network) : "",
     };
   },
 
@@ -12342,9 +12329,6 @@ export const SparkAddress: MessageFns<SparkAddress> = {
     const obj: any = {};
     if (message.identityPublicKey.length !== 0) {
       obj.identityPublicKey = base64FromBytes(message.identityPublicKey);
-    }
-    if (message.network !== "") {
-      obj.network = message.network;
     }
     return obj;
   },
@@ -12355,7 +12339,6 @@ export const SparkAddress: MessageFns<SparkAddress> = {
   fromPartial(object: DeepPartial<SparkAddress>): SparkAddress {
     const message = createBaseSparkAddress();
     message.identityPublicKey = object.identityPublicKey ?? new Uint8Array(0);
-    message.network = object.network ?? "";
     return message;
   },
 };

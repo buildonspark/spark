@@ -892,5 +892,4 @@ message QueryBalanceResponse {
 
 message SparkAddress {
     bytes identity_public_key = 1;
-    string network = 2;
 }

@@ -4,7 +4,16 @@ import { bech32m } from "@scure/base";
 import { SparkAddress } from "../proto/spark.js";
 import { NetworkType } from "../utils/network.js";
 
-export type SparkAddressFormat = `sp1${string}`;
+const AddressNetwork: Record<NetworkType, string> = {
+  MAINNET: "sp",
+  TESTNET: "spt",
+  REGTEST: "sprt",
+  SIGNET: "sps",
+  LOCAL: "spl",
+} as const;
+
+export type SparkAddressFormat =
+  `${(typeof AddressNetwork)[keyof typeof AddressNetwork]}1${string}`;
 
 export interface SparkAddressData {
   identityPublicKey: string;
@@ -18,37 +27,34 @@ export function encodeSparkAddress(
 
   const sparkAddressProto = SparkAddress.create({
     identityPublicKey: hexToBytes(payload.identityPublicKey),
-    network: payload.network,
   });
 
   const serializedPayload = SparkAddress.encode(sparkAddressProto).finish();
   const words = bech32m.toWords(serializedPayload);
-  return bech32m.encode("sp", words, 200) as SparkAddressFormat;
+
+  return bech32m.encode(
+    AddressNetwork[payload.network],
+    words,
+    200,
+  ) as SparkAddressFormat;
 }
 
 export function decodeSparkAddress(
   address: string,
   network: NetworkType,
-): SparkAddressData {
-  if (!address.startsWith("sp1")) {
+): string {
+  if (!address.startsWith(AddressNetwork[network])) {
     throw new Error("Invalid Spark address");
   }
 
   const decoded = bech32m.decode(address as SparkAddressFormat, 200);
   const payload = SparkAddress.decode(bech32m.fromWords(decoded.words));
 
-  if (network !== payload.network) {
-    throw new Error("Network mismatch");
-  }
-
   const publicKey = bytesToHex(payload.identityPublicKey);
 
   isValidPublicKey(publicKey);
 
-  return {
-    identityPublicKey: publicKey,
-    network: payload.network as NetworkType,
-  };
+  return publicKey;
 }
 
 export function isValidSparkAddress(address: string) {}

@@ -938,7 +938,7 @@ export class SparkWallet {
     const receiverAddress = decodeSparkAddress(
       receiverSparkAddress,
       this.config.getNetworkType(),
-    ).identityPublicKey;
+    );
 
     return await this.withLeaves(async () => {
       const leavesToSend = await this.selectLeaves(amountSats);
@@ -1653,7 +1653,7 @@ export class SparkWallet {
     const receiverAddress = decodeSparkAddress(
       receiverSparkAddress,
       this.config.getNetworkType(),
-    ).identityPublicKey;
+    );
 
     await this.syncTokenLeaves();
     if (!this.tokenLeaves.has(tokenPublicKey)) {
