@@ -12,10 +12,11 @@ import (
 type Network string
 
 const (
-	NetworkMainnet Network = "MAINNET"
-	NetworkRegtest Network = "REGTEST"
-	NetworkTestnet Network = "TESTNET"
-	NetworkSignet  Network = "SIGNET"
+	NetworkUnspecified Network = "UNSPECIFIED"
+	NetworkMainnet     Network = "MAINNET"
+	NetworkRegtest     Network = "REGTEST"
+	NetworkTestnet     Network = "TESTNET"
+	NetworkSignet      Network = "SIGNET"
 )
 
 // MarshalProto converts a Network to a spark protobuf Network.
@@ -30,7 +31,7 @@ func (n Network) MarshalProto() (pb.Network, error) {
 	case NetworkSignet:
 		return pb.Network_SIGNET, nil
 	}
-	return pb.Network_MAINNET, fmt.Errorf("unknown network: %s", n)
+	return pb.Network_UNSPECIFIED, fmt.Errorf("unknown network: %s", n)
 }
 
 // UnmarshalProto converts a spark protobuf Network to a Network.
@@ -53,6 +54,7 @@ func (n *Network) UnmarshalProto(proto pb.Network) error {
 // Values returns the values for the Network type.
 func (Network) Values() []string {
 	return []string{
+		string(NetworkUnspecified),
 		string(NetworkMainnet),
 		string(NetworkRegtest),
 		string(NetworkTestnet),

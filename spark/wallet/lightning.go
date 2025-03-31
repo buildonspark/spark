@@ -84,6 +84,7 @@ func SwapNodesForPreimage(
 		signingResults.Results,
 		userCommitments,
 		signingCommitments.SigningCommitments,
+		config.ProtoNetwork(),
 	)
 	if err != nil {
 		return nil, err
@@ -206,6 +207,7 @@ func prepareUserSignedRefunds(
 	signingResults map[string]*pbcommon.SigningResult,
 	userCommitments []*objects.SigningCommitment,
 	signingCommitments []*pb.RequestedSigningCommitments,
+	network pb.Network,
 ) ([]*pb.UserSignedRefund, error) {
 	userSignedRefunds := []*pb.UserSignedRefund{}
 	for i, leaf := range leaves {
@@ -221,6 +223,7 @@ func prepareUserSignedRefunds(
 				SigningCommitments: signingCommitments[i].SigningNonceCommitments,
 			},
 			UserSignatureCommitment: userCommitmentProto,
+			Network:                 network,
 		})
 	}
 	return userSignedRefunds, nil

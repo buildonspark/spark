@@ -58,10 +58,11 @@ service SparkService {
  * Network is the network type of the bitcoin network.
  */
 enum Network {
-    MAINNET = 0;
-    REGTEST = 1;
-    TESTNET = 2;
-    SIGNET = 3;
+    UNSPECIFIED = 0;
+    MAINNET = 10;
+    REGTEST = 20;
+    TESTNET = 30;
+    SIGNET = 40;
 }
 
 /**
@@ -93,7 +94,7 @@ message GenerateDepositAddressRequest {
     // The identity public key of the user.
     bytes identity_public_key = 2;
     // The network of the bitcoin network.
-    Network network = 3;
+    Network network = 3 [(validate.rules).enum = {not_in: [0]}];
 }
 
 /**
@@ -126,7 +127,7 @@ message UTXO {
     // The vout of the raw transaction for the utxo, which will be used to create the tree.
     uint32 vout = 2;
     // The network of the bitcoin network.
-    Network network = 3;
+    Network network = 3 [(validate.rules).enum = {not_in: [0]}];
 }
 
 /**
@@ -280,7 +281,7 @@ message TokenTransaction {
     }
     repeated TokenLeafOutput output_leaves = 3;
     repeated bytes spark_operator_identity_public_keys = 4 [(validate.rules).repeated.items.bytes.len = 33];
-    Network network = 10;
+    Network network = 10 [(validate.rules).enum = {not_in: [0]}];
 }
 
 
@@ -643,7 +644,7 @@ message UserSignedRefund {
     bytes user_signature = 3;
     SigningCommitments signing_commitments = 4;
     common.SigningCommitment user_signature_commitment = 5;
-    Network network = 6;
+    Network network = 6 [(validate.rules).enum = {not_in: [0]}];
 }
 
 message InvoiceAmountProof {

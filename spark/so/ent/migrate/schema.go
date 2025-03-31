@@ -14,7 +14,7 @@ var (
 		{Name: "create_time", Type: field.TypeTime},
 		{Name: "update_time", Type: field.TypeTime},
 		{Name: "height", Type: field.TypeInt64},
-		{Name: "network", Type: field.TypeEnum, Enums: []string{"MAINNET", "REGTEST", "TESTNET", "SIGNET"}},
+		{Name: "network", Type: field.TypeEnum, Enums: []string{"MAINNET", "REGTEST", "TESTNET", "SIGNET", "UNSPECIFIED"}},
 	}
 	// BlockHeightsTable holds the schema information for the "block_heights" table.
 	BlockHeightsTable = &schema.Table{
@@ -254,7 +254,7 @@ var (
 		{Name: "leaf_spent_transaction_input_vout", Type: field.TypeInt32, Nullable: true},
 		{Name: "leaf_spent_revocation_private_key", Type: field.TypeBytes, Nullable: true},
 		{Name: "confirmed_withdraw_block_hash", Type: field.TypeBytes, Nullable: true},
-		{Name: "network", Type: field.TypeEnum, Nullable: true, Enums: []string{"MAINNET", "REGTEST", "TESTNET", "SIGNET"}},
+		{Name: "network", Type: field.TypeEnum, Nullable: true, Enums: []string{"MAINNET", "REGTEST", "TESTNET", "SIGNET", "UNSPECIFIED"}},
 		{Name: "token_leaf_revocation_keyshare", Type: field.TypeUUID},
 		{Name: "token_leaf_leaf_created_token_transaction_receipt", Type: field.TypeUUID, Nullable: true},
 		{Name: "token_leaf_leaf_spent_token_transaction_receipt", Type: field.TypeUUID, Nullable: true},
@@ -440,7 +440,7 @@ var (
 		{Name: "update_time", Type: field.TypeTime},
 		{Name: "owner_identity_pubkey", Type: field.TypeBytes},
 		{Name: "status", Type: field.TypeEnum, Enums: []string{"PENDING", "AVAILABLE"}},
-		{Name: "network", Type: field.TypeEnum, Enums: []string{"MAINNET", "REGTEST", "TESTNET", "SIGNET"}},
+		{Name: "network", Type: field.TypeEnum, Enums: []string{"MAINNET", "REGTEST", "TESTNET", "SIGNET", "UNSPECIFIED"}},
 		{Name: "base_txid", Type: field.TypeBytes, Nullable: true},
 		{Name: "tree_root", Type: field.TypeUUID, Nullable: true},
 	}

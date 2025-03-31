@@ -61,7 +61,7 @@ var (
 // NetworkValidator is a validator for the "network" field enum values. It is called by the builders before save.
 func NetworkValidator(n schema.Network) error {
 	switch n {
-	case "MAINNET", "REGTEST", "TESTNET", "SIGNET":
+	case "MAINNET", "REGTEST", "TESTNET", "SIGNET", "UNSPECIFIED":
 		return nil
 	default:
 		return fmt.Errorf("blockheight: invalid enum value for network field: %q", n)

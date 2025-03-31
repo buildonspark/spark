@@ -174,7 +174,16 @@ func (m *GenerateDepositAddressRequest) validate(all bool) error {
 
 	// no validation rules for IdentityPublicKey
 
-	// no validation rules for Network
+	if _, ok := _GenerateDepositAddressRequest_Network_NotInLookup[m.GetNetwork()]; ok {
+		err := GenerateDepositAddressRequestValidationError{
+			field:  "Network",
+			reason: "value must not be in list [UNSPECIFIED]",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
 
 	if len(errors) > 0 {
 		return GenerateDepositAddressRequestMultiError(errors)
@@ -256,6 +265,10 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = GenerateDepositAddressRequestValidationError{}
+
+var _GenerateDepositAddressRequest_Network_NotInLookup = map[Network]struct{}{
+	0: {},
+}
 
 // Validate checks the field values on Address with the rules defined in the
 // proto definition for this message. If any rules are violated, the first
@@ -545,7 +558,16 @@ func (m *UTXO) validate(all bool) error {
 
 	// no validation rules for Vout
 
-	// no validation rules for Network
+	if _, ok := _UTXO_Network_NotInLookup[m.GetNetwork()]; ok {
+		err := UTXOValidationError{
+			field:  "Network",
+			reason: "value must not be in list [UNSPECIFIED]",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
 
 	if len(errors) > 0 {
 		return UTXOMultiError(errors)
@@ -623,6 +645,10 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = UTXOValidationError{}
+
+var _UTXO_Network_NotInLookup = map[Network]struct{}{
+	0: {},
+}
 
 // Validate checks the field values on NodeOutput with the rules defined in the
 // proto definition for this message. If any rules are violated, the first
@@ -2345,7 +2371,16 @@ func (m *TokenTransaction) validate(all bool) error {
 
 	}
 
-	// no validation rules for Network
+	if _, ok := _TokenTransaction_Network_NotInLookup[m.GetNetwork()]; ok {
+		err := TokenTransactionValidationError{
+			field:  "Network",
+			reason: "value must not be in list [UNSPECIFIED]",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
 
 	switch v := m.TokenInput.(type) {
 	case *TokenTransaction_MintInput:
@@ -2511,6 +2546,10 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = TokenTransactionValidationError{}
+
+var _TokenTransaction_Network_NotInLookup = map[Network]struct{}{
+	0: {},
+}
 
 // Validate checks the field values on TokenTransactionWithStatus with the
 // rules defined in the proto definition for this message. If any rules are
@@ -9101,7 +9140,16 @@ func (m *UserSignedRefund) validate(all bool) error {
 		}
 	}
 
-	// no validation rules for Network
+	if _, ok := _UserSignedRefund_Network_NotInLookup[m.GetNetwork()]; ok {
+		err := UserSignedRefundValidationError{
+			field:  "Network",
+			reason: "value must not be in list [UNSPECIFIED]",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
 
 	if len(errors) > 0 {
 		return UserSignedRefundMultiError(errors)
@@ -9180,6 +9228,10 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = UserSignedRefundValidationError{}
+
+var _UserSignedRefund_Network_NotInLookup = map[Network]struct{}{
+	0: {},
+}
 
 // Validate checks the field values on InvoiceAmountProof with the rules
 // defined in the proto definition for this message. If any rules are
