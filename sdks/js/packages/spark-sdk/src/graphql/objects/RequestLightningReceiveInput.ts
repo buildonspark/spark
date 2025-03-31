@@ -17,7 +17,7 @@ amountSats: number;
     /** The 32-byte hash of the payment preimage to use when generating the lightning invoice. **/
 paymentHash: string;
 
-    /** The expiry of the lightning invoice in seconds. Default value is 3600 (1 hour). **/
+    /** The expiry of the lightning invoice in seconds. Default value is 86400 (1 day). **/
 expirySecs?: number | undefined;
 
     /** The memo to include in the lightning invoice. **/

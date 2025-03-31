@@ -52,6 +52,18 @@ fragment EntityFragment on Entity {
         coop_exit_request_status: status
         coop_exit_request_expires_at: expires_at
         coop_exit_request_raw_connector_transaction: raw_connector_transaction
+        coop_exit_request_transfer: transfer {
+            __typename
+            transfer_total_amount: total_amount {
+                __typename
+                currency_amount_original_value: original_value
+                currency_amount_original_unit: original_unit
+                currency_amount_preferred_currency_unit: preferred_currency_unit
+                currency_amount_preferred_currency_value_rounded: preferred_currency_value_rounded
+                currency_amount_preferred_currency_value_approx: preferred_currency_value_approx
+            }
+            transfer_spark_id: spark_id
+        }
     }
     ... on LeavesSwapRequest {
         __typename

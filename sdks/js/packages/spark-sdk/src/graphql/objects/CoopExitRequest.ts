@@ -3,12 +3,14 @@
 
 import UserRequest from './UserRequest.js';
 import Entity from './Entity.js';
+import SparkCoopExitRequestStatus from './SparkCoopExitRequestStatus.js';
 import BitcoinNetwork from './BitcoinNetwork.js';
-import {CurrencyAmountToJson} from './CurrencyAmount.js';
+import Transfer from './Transfer.js';
 import {CurrencyAmountFromJson} from './CurrencyAmount.js';
 import CurrencyAmount from './CurrencyAmount.js';
 import { Query, isObject } from '@lightsparkdev/core';
-import SparkCoopExitRequestStatus from './SparkCoopExitRequestStatus.js';
+import {TransferFromJson} from './Transfer.js';
+import {CurrencyAmountToJson} from './CurrencyAmount.js';
 
 
 interface CoopExitRequest {
@@ -47,6 +49,9 @@ rawConnectorTransaction: string;
     /** The typename of the object **/
 typename: string;
 
+    /** The swap transfer. **/
+transfer?: Transfer | undefined;
+
 
 
 
@@ -62,7 +67,8 @@ export const CoopExitRequestFromJson = (obj: any): CoopExitRequest => {
         status: SparkCoopExitRequestStatus[obj["coop_exit_request_status"]] ?? SparkCoopExitRequestStatus.FUTURE_VALUE,
         expiresAt: obj["coop_exit_request_expires_at"],
         rawConnectorTransaction: obj["coop_exit_request_raw_connector_transaction"],
-typename: "CoopExitRequest",
+typename: "CoopExitRequest",        transfer: (!!obj["coop_exit_request_transfer"] ? TransferFromJson(obj["coop_exit_request_transfer"]) : undefined),
+
         } as CoopExitRequest;
 
 }
@@ -76,6 +82,7 @@ coop_exit_request_fee: CurrencyAmountToJson(obj.fee),
 coop_exit_request_status: obj.status,
 coop_exit_request_expires_at: obj.expiresAt,
 coop_exit_request_raw_connector_transaction: obj.rawConnectorTransaction,
+coop_exit_request_transfer: (obj.transfer ? obj.transfer.toJson() : undefined),
 
         }
 
@@ -100,6 +107,18 @@ fragment CoopExitRequestFragment on CoopExitRequest {
     coop_exit_request_status: status
     coop_exit_request_expires_at: expires_at
     coop_exit_request_raw_connector_transaction: raw_connector_transaction
+    coop_exit_request_transfer: transfer {
+        __typename
+        transfer_total_amount: total_amount {
+            __typename
+            currency_amount_original_value: original_value
+            currency_amount_original_unit: original_unit
+            currency_amount_preferred_currency_unit: preferred_currency_unit
+            currency_amount_preferred_currency_value_rounded: preferred_currency_value_rounded
+            currency_amount_preferred_currency_value_approx: preferred_currency_value_approx
+        }
+        transfer_spark_id: spark_id
+    }
 }`;
 
 

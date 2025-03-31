@@ -3,11 +3,11 @@
 
 import Connection from './Connection.js';
 import {PageInfoToJson} from './PageInfo.js';
-import {PageInfoFromJson} from './PageInfo.js';
-import PageInfo from './PageInfo.js';
 import {LeafFromJson} from './Leaf.js';
-import {LeafToJson} from './Leaf.js';
 import Leaf from './Leaf.js';
+import {LeafToJson} from './Leaf.js';
+import PageInfo from './PageInfo.js';
+import {PageInfoFromJson} from './PageInfo.js';
 
 
 interface SparkTransferToLeavesConnection {
