@@ -48,7 +48,10 @@ import {
   DepositAddressTree,
   TreeCreationService,
 } from "./services/tree-creation.js";
-import { ConfigOptions, ELECTRS_CREDENTIALS } from "./services/wallet-config.js";
+import {
+  ConfigOptions,
+  ELECTRS_CREDENTIALS,
+} from "./services/wallet-config.js";
 import {
   applyAdaptorToSignature,
   generateAdaptorFromSignature,
@@ -488,8 +491,9 @@ export class SparkWallet {
    * @param {number} [params.targetAmount] - Target amount for the swap
    * @param {TreeNode[]} [params.leaves] - Specific leaves to swap
    * @returns {Promise<Object>} The completed swap response
+   * @private
    */
-  public async requestLeavesSwap({
+  private async requestLeavesSwap({
     targetAmount,
     leaves,
   }: {
@@ -834,7 +838,9 @@ export class SparkWallet {
       };
 
       if (this.config.getNetwork() === Network.REGTEST) {
-        const auth = btoa(`${ELECTRS_CREDENTIALS.username}:${ELECTRS_CREDENTIALS.password}`);
+        const auth = btoa(
+          `${ELECTRS_CREDENTIALS.username}:${ELECTRS_CREDENTIALS.password}`,
+        );
         headers["Authorization"] = `Basic ${auth}`;
       }
 
