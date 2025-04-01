@@ -8,24 +8,14 @@ on:
         required: false
         default: "latest"
         type: string
-  workflow_dispatch:
-    inputs:
-      spark_tag:
-        description: "Spark image tag to use for both operator and signer"
+      test_type:
+        description: "Type of test to run. Options: 'go' (default), 'js'"
         required: false
-        default: "latest"
+        default: "go"
         type: string
-  pull_request:
-    paths:
-      - ".github/workflows/spark-hermetic-test.yaml"
-      - "scripts/collect-container-logs.sh"
-      - "scripts/ecr-secrets.sh"
-      - "scripts/export-minikube-ca.sh"
-      - "scripts/lightspark-helm.sh"
-      - "scripts/minikube-deploy-basic-services.sh"
-      - "scripts/minikube-deploy-spark-services.sh"
-      - "scripts/port-forwarding.sh"
-      - "scripts/run-local-signer-container.sh"
+    secrets:
+      HELM_PASSWORD:
+        required: true
 
 env:
   GO_VERSION: "1.23.0"
@@ -33,13 +23,13 @@ env:
   USE_LIGHTSPARK_HELM_REPO: "true"
 
 jobs:
-  hermetic-test:
+  run-hermetic-test:
     runs-on: "ubuntu-22.04-2-arm"
     permissions:
       id-token: write
       contents: write
     concurrency:
-      group: hermetic-tests-${{ github.event.pull_request.number || github.ref }}
+      group: hermetic-tests-${{ inputs.test_type }}-${{ github.event.pull_request.number || github.ref }}
       cancel-in-progress: true
     steps:
       - name: "Configure AWS credentials"
@@ -117,13 +107,6 @@ jobs:
       - name: "Setup local signer"
         run: "./scripts/run-local-signer-container.sh"
 
-      - name: Install gotestsum
-        uses: jaxxstorm/action-install-gh-release@v1
-        with:
-          repo: gotestyourself/gotestsum
-          tag: v1.12.0
-          cache: enable
-
       - name: "Run DKG"
         working-directory: "./spark"
         env:
@@ -131,7 +114,16 @@ jobs:
         run: |
           ../scripts/run-development-dkg.sh
 
-      - name: "Run integration tests"
+      # GO TESTS
+      - name: Install gotestsum
+        uses: jaxxstorm/action-install-gh-release@v1
+        with:
+          repo: gotestyourself/gotestsum
+          tag: v1.12.0
+          cache: enable
+
+      - name: "Run go integration tests"
+        if: inputs.test_type == 'go'
         working-directory: "./spark"
         env:
           HERMETIC_TEST: "true"
@@ -145,17 +137,48 @@ jobs:
           --packages=./so/grpc_test/...
 
       - name: Create test summary
-        if: always()
+        id: go-create-test-summary
+        if: always() && inputs.test_type == 'go'
         uses: test-summary/action@v2
         with:
           paths: "test_results/grpc-test.xml"
 
-
       - name: Annotate test failures
-        if: always()
+        if: |
+          always() && inputs.test_type == 'go' &&
+          steps.go-create-test-summary.outcome == 'success'
         uses: guyarb/golang-test-annotations@v0.8.0
         with:
           test-results: "test_results/grpc-test.json"
+
+      # JS TESTS
+      - name: Enable Corepack
+        if: inputs.test_type == 'js'
+        working-directory: sdks/js
+        run: corepack enable
+
+      - name: Setup Node.js
+        if: inputs.test_type == 'js'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "yarn"
+          cache-dependency-path: sdks/js/yarn.lock
+
+      - name: Install dependencies
+        if: inputs.test_type == 'js'
+        working-directory: sdks/js
+        run: yarn install --frozen-lockfile
+
+      - name: Run JS build
+        if: inputs.test_type == 'js'
+        working-directory: sdks/js
+        run: yarn run build
+
+      - name: Run JS tests
+        if: inputs.test_type == 'js'
+        working-directory: sdks/js
+        run: yarn run test:integration
 
       - name: "Gather logs"
         if: always()
@@ -176,7 +199,7 @@ jobs:
         if: always()
         uses: "actions/upload-artifact@v4"
         with:
-          name: "logs-${{ github.run_id }}"
+          name: "logs-${{ inputs.test_type }}-${{ github.run_id }}"
           path: logs
           retention-days: 5
 

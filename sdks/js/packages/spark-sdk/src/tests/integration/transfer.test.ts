@@ -7,19 +7,16 @@ import {
 import { generateMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english";
 import { sha256 } from "@scure/btc-signer/utils";
-import { WalletConfigService } from "../services/config.js";
-import { ConnectionManager } from "../services/connection.js";
-import { LeafKeyTweak, TransferService } from "../services/transfer.js";
-import { ConfigOptions } from "../services/wallet-config.js";
-import { createNewTree } from "./test-util.js";
-import { SparkWalletTesting } from "./utils/spark-testing-wallet.js";
-import { BitcoinFaucet } from "./utils/test-faucet.js";
+import { WalletConfigService } from "../../services/config.js";
+import { ConnectionManager } from "../../services/connection.js";
+import { LeafKeyTweak, TransferService } from "../../services/transfer.js";
+import { ConfigOptions } from "../../services/wallet-config.js";
+import { createNewTree } from "../../tests/test-util.js";
+import { SparkWalletTesting } from "../utils/spark-testing-wallet.js";
+import { BitcoinFaucet } from "../utils/test-faucet.js";
 
 describe("Transfer", () => {
-  // Skip all tests if running in GitHub Actions
-  const testFn = process.env.GITHUB_ACTIONS ? it.skip : it;
-
-  testFn(
+  it(
     "test transfer",
     async () => {
       const faucet = new BitcoinFaucet();
@@ -138,7 +135,7 @@ describe("Transfer", () => {
     30000,
   );
 
-  testFn("test transfer with separate", async () => {
+  it("test transfer with separate", async () => {
     const faucet = new BitcoinFaucet();
 
     const options: ConfigOptions = {
@@ -267,7 +264,7 @@ describe("Transfer", () => {
     );
   });
 
-  testFn("cancel transfer", async () => {
+  it("cancel transfer", async () => {
     const faucet = new BitcoinFaucet();
 
     const options: ConfigOptions = {

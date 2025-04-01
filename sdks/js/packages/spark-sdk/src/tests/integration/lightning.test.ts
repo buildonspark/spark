@@ -1,20 +1,20 @@
 import { afterEach, beforeAll, describe, expect, it } from "@jest/globals";
 import { hexToBytes } from "@noble/curves/abstract/utils";
 import { equalBytes, sha256 } from "@scure/btc-signer/utils";
-import LightningReceiveRequest from "../graphql/objects/LightningReceiveRequest.js";
-import { TransferStatus } from "../proto/spark.js";
-import { WalletConfigService } from "../services/config.js";
-import { ConnectionManager } from "../services/connection.js";
-import { LightningService } from "../services/lightning.js";
-import { LeafKeyTweak, TransferService } from "../services/transfer.js";
+import LightningReceiveRequest from "../../graphql/objects/LightningReceiveRequest.js";
+import { TransferStatus } from "../../proto/spark.js";
+import { WalletConfigService } from "../../services/config.js";
+import { ConnectionManager } from "../../services/connection.js";
+import { LightningService } from "../../services/lightning.js";
+import { LeafKeyTweak, TransferService } from "../../services/transfer.js";
 import {
   BitcoinNetwork,
   CurrencyUnit,
   LightningReceiveRequestStatus,
-} from "../types/index.js";
-import { createNewTree, getTestWalletConfig } from "./test-util.js";
-import { SparkWalletTesting } from "./utils/spark-testing-wallet.js";
-import { BitcoinFaucet } from "./utils/test-faucet.js";
+} from "../../types/index.js";
+import { createNewTree, getTestWalletConfig } from "../test-util.js";
+import { SparkWalletTesting } from "../utils/spark-testing-wallet.js";
+import { BitcoinFaucet } from "../utils/test-faucet.js";
 
 async function cleanUp() {
   const config = getTestWalletConfig();
@@ -78,9 +78,6 @@ describe("LightningService", () => {
   let sspLightningService: LightningService;
   let sspTransferService: TransferService;
 
-  // Skip all tests if running in GitHub Actions
-  const testFn = process.env.GITHUB_ACTIONS ? it.skip : it;
-
   beforeAll(async () => {
     const { wallet: wallet1 } = await SparkWalletTesting.initialize({
       options: {
@@ -122,7 +119,7 @@ describe("LightningService", () => {
     await cleanUp();
   });
 
-  testFn("should create an invoice", async () => {
+  it("should create an invoice", async () => {
     const preimage = hexToBytes(
       "2d059c3ede82a107aa1452c0bea47759be3c5c6e5342be6a310f6c3a907d9f4c",
     );
@@ -137,7 +134,7 @@ describe("LightningService", () => {
     expect(invoice).toBeDefined();
   });
 
-  testFn(
+  it(
     "test receive lightning payment",
     async () => {
       const faucet = new BitcoinFaucet();
@@ -235,7 +232,7 @@ describe("LightningService", () => {
     60000,
   );
 
-  testFn(
+  it(
     "test send lightning payment",
     async () => {
       const faucet = new BitcoinFaucet();

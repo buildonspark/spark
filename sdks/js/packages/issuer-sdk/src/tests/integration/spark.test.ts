@@ -9,10 +9,6 @@ import { BitcoinFaucet } from "../../../../spark-sdk/src/tests/utils/test-faucet
 import { IssuerSparkWallet } from "../../issuer-spark-wallet.js";
 
 describe("token integration test", () => {
-  // Skip all tests if running in GitHub Actions
-  process.env.GITHUB_ACTIONS ? it.skip : it;
-
-  // Increase timeout for all tests in this suite
   jest.setTimeout(60000);
 
   it("should issue a single token with ECDSA", async () => {

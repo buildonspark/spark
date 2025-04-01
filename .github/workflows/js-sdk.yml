@@ -40,3 +40,12 @@ jobs:
 
       - name: Run tests
         run: yarn run test
+
+  trigger-hermetic:
+    uses: ./.github/workflows/spark-hermetic-tests.yaml
+    secrets: inherit
+    permissions:
+      id-token: write
+      contents: write
+    with:
+      test_type: "js"

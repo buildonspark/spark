@@ -1,0 +1,64 @@
+name: "Spark Hermetic Tests"
+
+on:
+  workflow_call:
+    inputs:
+      spark_tag:
+        description: "Spark image tag to use for both operator and signer"
+        required: false
+        default: "latest"
+        type: string
+      test_type:
+        description: "Type of tests to run. Options: 'go', 'js', 'all' (default)"
+        required: false
+        default: "all"
+        type: string
+  workflow_dispatch:
+    inputs:
+      spark_tag:
+        description: "Spark image tag to use for both operator and signer"
+        required: false
+        default: "latest"
+        type: string
+      test_type:
+        description: "Type of tests to run. Options: 'go', 'js', 'all' (default)"
+        required: false
+        default: "all"
+        type: string
+  pull_request:
+    paths:
+      - ".github/workflows/spark-hermetic-tests.yaml"
+      - ".github/workflows/run-spark-hermetic-test.yaml"
+      - "scripts/collect-container-logs.sh"
+      - "scripts/ecr-secrets.sh"
+      - "scripts/export-minikube-ca.sh"
+      - "scripts/lightspark-helm.sh"
+      - "scripts/minikube-deploy-basic-services.sh"
+      - "scripts/minikube-deploy-spark-services.sh"
+      - "scripts/port-forwarding.sh"
+      - "scripts/run-local-signer-container.sh"
+
+jobs:
+  go-hermetic-test:
+    if: inputs.test_type == 'all' || inputs.test_type == 'go'
+    uses: ./.github/workflows/run-spark-hermetic-test.yaml
+    with:
+      spark_tag: ${{ inputs.spark_tag || 'latest' }}
+      test_type: "go"
+    secrets:
+      HELM_PASSWORD: ${{ secrets.HELM_PASSWORD }}
+    permissions:
+      id-token: write
+      contents: write
+
+  js-hermetic-test:
+    if: inputs.test_type == 'all' || inputs.test_type == 'js'
+    uses: ./.github/workflows/run-spark-hermetic-test.yaml
+    with:
+      spark_tag: ${{ inputs.spark_tag || 'latest' }}
+      test_type: "js"
+    secrets:
+      HELM_PASSWORD: ${{ secrets.HELM_PASSWORD }}
+    permissions:
+      id-token: write
+      contents: write

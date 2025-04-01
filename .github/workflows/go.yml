@@ -175,13 +175,14 @@ jobs:
       always () &&
       github.event_name == 'pull_request' &&
       needs.build.result == 'success'
-    uses: ./.github/workflows/spark-hermetic-test.yaml
+    uses: ./.github/workflows/spark-hermetic-tests.yaml
     secrets: inherit
     permissions:
       id-token: write
       contents: write
     with:
       spark_tag: ${{ needs.build.outputs.spark_tag }}
+      test_type: "all"
 
   deploy:
     needs: ["build"]

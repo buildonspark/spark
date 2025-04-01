@@ -23,6 +23,8 @@
     "package:checks": "turbo run package:checks",
     "start": "turbo run start",
     "test": "yarn deps:check && turbo run package:checks && turbo run test",
+    "test:all": "yarn deps:check && turbo run test test:integration",
+    "test:integration": "yarn deps:check && turbo run test:integration",
     "types": "turbo run types"
   },
   "workspaces": [
