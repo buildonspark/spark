@@ -1,6 +1,6 @@
 import { IssuerSparkWallet } from "@buildonspark/issuer-sdk";
 import { SparkWallet, type TokenInfo } from "@buildonspark/spark-sdk";
-import { Transfer, type TreeNode } from "@buildonspark/spark-sdk/proto/spark";
+import { Transfer } from "@buildonspark/spark-sdk/proto/spark";
 import {
   type CoopExitRequest,
   type LightningReceiveRequest,
@@ -312,40 +312,6 @@ export const createSparkRouter = (
         res.json({
           data: { message },
         });
-      } catch (error) {
-        console.error(error);
-        const errorMsg = isError(error) ? error.message : "Unknown error";
-        res.status(500).json({ error: errorMsg });
-      }
-    }
-  );
-
-  /**
-   * Requests a swap of leaves to optimize wallet structure.
-   * @route POST /wallet/request-leaves-swap
-   * @param {number} targetAmount - The target amount to swap to
-   * @param {TreeNode[]} [leaves] - The leaves to swap
-   * @returns {Promise<{
-   *   data: {
-   *     leavesSwap: LeavesSwapRequest
-   *   }
-   * }>}
-   */
-  router.post(
-    "/wallet/request-leaves-swap",
-    checkWalletInitialized,
-    async (req, res) => {
-      const wallet = getWallet();
-      try {
-        const { targetAmount, leaves } = req.body as {
-          targetAmount: number;
-          leaves?: TreeNode[];
-        };
-        const leavesSwap = await wallet!.requestLeavesSwap({
-          targetAmount,
-          leaves,
-        });
-        res.json({ data: { leavesSwap } });
       } catch (error) {
         console.error(error);
         const errorMsg = isError(error) ? error.message : "Unknown error";

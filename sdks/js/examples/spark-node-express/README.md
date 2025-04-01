@@ -172,11 +172,6 @@ POST /issuer-wallet/wallet/claim-transfers
 
 Request a swap of leaves to optimize wallet structure.
 
-```http
-POST /spark-wallet/wallet/request-leaves-swap
-POST /issuer-wallet/wallet/request-leaves-swap
-```
-
 **Request Body:**
 
 ```json

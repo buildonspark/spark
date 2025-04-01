@@ -145,29 +145,6 @@
           "response": []
         },
         {
-          "name": "Request Leaves Swap",
-          "request": {
-            "method": "POST",
-            "header": [],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n    \"targetAmount\": 20\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            },
-            "url": {
-              "raw": "localhost:4000/spark-wallet/wallet/request-leaves-swap",
-              "host": ["localhost"],
-              "port": "4000",
-              "path": ["spark-wallet", "wallet", "request-leaves-swap"]
-            }
-          },
-          "response": []
-        },
-        {
           "name": "Get Lighting Receive Fee Estimate",
           "request": {
             "method": "GET",
