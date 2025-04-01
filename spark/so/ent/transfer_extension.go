@@ -76,6 +76,10 @@ func (t *Transfer) getProtoType() (*pb.TransferType, error) {
 		return pb.TransferType_COOPERATIVE_EXIT.Enum(), nil
 	case schema.TransferTypeTransfer:
 		return pb.TransferType_TRANSFER.Enum(), nil
+	case schema.TransferTypeSwap:
+		return pb.TransferType_SWAP.Enum(), nil
+	case schema.TransferTypeCounterSwap:
+		return pb.TransferType_COUNTER_SWAP.Enum(), nil
 	}
 	return nil, fmt.Errorf("unknown transfer type %s", t.Type)
 }

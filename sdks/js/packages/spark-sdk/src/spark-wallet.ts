@@ -531,7 +531,7 @@ export class SparkWallet {
     );
 
     const { transfer, signatureMap } =
-      await this.transferService.sendTransferSignRefund(
+      await this.transferService.startSwapSignRefund(
         leafKeyTweaks,
         await this.config.signer.getSspIdentityPublicKey(
           this.config.getNetwork(),

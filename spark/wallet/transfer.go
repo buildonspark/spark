@@ -112,12 +112,46 @@ func SendTransferTweakKey(
 	return updatedTransfer, nil
 }
 
-func SendSwapSignRefund(
+func SendTransferSignRefund(
 	ctx context.Context,
 	config *Config,
 	leaves []LeafKeyTweak,
 	receiverIdentityPubkey []byte,
 	expiryTime time.Time,
+) (*pb.Transfer, map[string][]byte, map[string]*LeafRefundSigningData, error) {
+	senderTransfer, senderRefundSignatureMap, leafDataMap, _, err := sendTransferSignRefund(ctx, config, leaves, receiverIdentityPubkey, expiryTime, false, nil)
+	return senderTransfer, senderRefundSignatureMap, leafDataMap, err
+}
+
+func StartSwapSignRefund(
+	ctx context.Context,
+	config *Config,
+	leaves []LeafKeyTweak,
+	receiverIdentityPubkey []byte,
+	expiryTime time.Time,
+) (*pb.Transfer, map[string][]byte, map[string]*LeafRefundSigningData, error) {
+	senderTransfer, senderRefundSignatureMap, leafDataMap, _, err := sendTransferSignRefund(ctx, config, leaves, receiverIdentityPubkey, expiryTime, true, nil)
+	return senderTransfer, senderRefundSignatureMap, leafDataMap, err
+}
+
+func CounterSwapSignRefund(
+	ctx context.Context,
+	config *Config,
+	leaves []LeafKeyTweak,
+	receiverIdentityPubkey []byte,
+	expiryTime time.Time,
+	adaptorPublicKey *secp256k1.PublicKey,
+) (*pb.Transfer, map[string][]byte, map[string]*LeafRefundSigningData, []*pb.LeafRefundTxSigningResult, error) {
+	return sendTransferSignRefund(ctx, config, leaves, receiverIdentityPubkey, expiryTime, true, adaptorPublicKey)
+}
+
+func sendTransferSignRefund(
+	ctx context.Context,
+	config *Config,
+	leaves []LeafKeyTweak,
+	receiverIdentityPubkey []byte,
+	expiryTime time.Time,
+	forSwap bool,
 	adaptorPublicKey *secp256k1.PublicKey,
 ) (*pb.Transfer, map[string][]byte, map[string]*LeafRefundSigningData, []*pb.LeafRefundTxSigningResult, error) {
 	transferID, err := uuid.NewRandom()
@@ -157,26 +191,49 @@ func SendSwapSignRefund(
 	tmpCtx := ContextWithToken(ctx, token)
 
 	sparkClient := pb.NewSparkServiceClient(sparkConn)
-	swapID, err := uuid.NewV7()
-	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("failed to generate swap id: %v", err)
+	startSendTransferRequest := &pb.StartSendTransferRequest{
+		TransferId:                transferID.String(),
+		LeavesToSend:              signingJobs,
+		OwnerIdentityPublicKey:    config.IdentityPublicKey(),
+		ReceiverIdentityPublicKey: receiverIdentityPubkey,
+		ExpiryTime:                timestamppb.New(expiryTime),
 	}
-	response, err := sparkClient.LeafSwap(tmpCtx, &pb.LeafSwapRequest{
-		Transfer: &pb.StartSendTransferRequest{
-			TransferId:                transferID.String(),
-			LeavesToSend:              signingJobs,
-			OwnerIdentityPublicKey:    config.IdentityPublicKey(),
-			ReceiverIdentityPublicKey: receiverIdentityPubkey,
-			ExpiryTime:                timestamppb.New(expiryTime),
-		},
-		SwapId:           swapID.String(),
-		AdaptorPublicKey: adaptorPublicKey.SerializeCompressed(),
-	})
-	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("failed to start send transfer: %v", err)
+	// Whether it's a swap or normal transfer, we're doing the same thing and getting
+	// back the same results.
+	var transfer *pb.Transfer
+	var signingResults []*pb.LeafRefundTxSigningResult
+	if adaptorPublicKey != nil {
+		swapID, err := uuid.NewV7()
+		if err != nil {
+			return nil, nil, nil, nil, fmt.Errorf("failed to generate swap id: %v", err)
+		}
+		response, err := sparkClient.CounterLeafSwap(tmpCtx, &pb.CounterLeafSwapRequest{
+			Transfer:         startSendTransferRequest,
+			SwapId:           swapID.String(),
+			AdaptorPublicKey: adaptorPublicKey.SerializeCompressed(),
+		})
+		if err != nil {
+			return nil, nil, nil, nil, fmt.Errorf("failed to start send transfer: %v", err)
+		}
+		transfer = response.Transfer
+		signingResults = response.SigningResults
+	} else if forSwap {
+		response, err := sparkClient.StartLeafSwap(tmpCtx, startSendTransferRequest)
+		if err != nil {
+			return nil, nil, nil, nil, fmt.Errorf("failed to start send transfer: %v", err)
+		}
+		transfer = response.Transfer
+		signingResults = response.SigningResults
+	} else {
+		response, err := sparkClient.StartSendTransfer(tmpCtx, startSendTransferRequest)
+		if err != nil {
+			return nil, nil, nil, nil, fmt.Errorf("failed to start send transfer: %v", err)
+		}
+		transfer = response.Transfer
+		signingResults = response.SigningResults
 	}
 
-	signatures, err := signRefunds(config, leafDataMap, response.SigningResults, adaptorPublicKey)
+	signatures, err := signRefunds(config, leafDataMap, signingResults, adaptorPublicKey)
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("failed to sign refunds for send: %v", err)
 	}
@@ -184,73 +241,7 @@ func SendSwapSignRefund(
 	for _, signature := range signatures {
 		signatureMap[signature.NodeId] = signature.RefundTxSignature
 	}
-	return response.Transfer, signatureMap, leafDataMap, response.SigningResults, nil
-}
-
-func SendTransferSignRefund(
-	ctx context.Context,
-	config *Config,
-	leaves []LeafKeyTweak,
-	receiverIdentityPubkey []byte,
-	expiryTime time.Time,
-) (*pb.Transfer, map[string][]byte, map[string]*LeafRefundSigningData, error) {
-	transferID, err := uuid.NewRandom()
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to generate transfer id: %v", err)
-	}
-
-	leafDataMap := make(map[string]*LeafRefundSigningData)
-	for _, leafKey := range leaves {
-		privKey := secp256k1.PrivKeyFromBytes(leafKey.SigningPrivKey)
-		nonce, _ := objects.RandomSigningNonce()
-		tx, _ := common.TxFromRawTxBytes(leafKey.Leaf.NodeTx)
-		leafDataMap[leafKey.Leaf.Id] = &LeafRefundSigningData{
-			SigningPrivKey:  privKey,
-			ReceivingPubkey: receiverIdentityPubkey,
-			Nonce:           nonce,
-			Tx:              tx,
-			Vout:            int(leafKey.Leaf.Vout),
-		}
-	}
-
-	signingJobs, err := prepareRefundSoSigningJobs(leaves, leafDataMap)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to prepare signing jobs for sending transfer: %v", err)
-	}
-
-	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress(), nil)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	defer sparkConn.Close()
-
-	token, err := AuthenticateWithConnection(ctx, config, sparkConn)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to authenticate with server: %v", err)
-	}
-	tmpCtx := ContextWithToken(ctx, token)
-
-	sparkClient := pb.NewSparkServiceClient(sparkConn)
-	response, err := sparkClient.StartSendTransfer(tmpCtx, &pb.StartSendTransferRequest{
-		TransferId:                transferID.String(),
-		LeavesToSend:              signingJobs,
-		OwnerIdentityPublicKey:    config.IdentityPublicKey(),
-		ReceiverIdentityPublicKey: receiverIdentityPubkey,
-		ExpiryTime:                timestamppb.New(expiryTime),
-	})
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to start send transfer: %v", err)
-	}
-
-	signatures, err := signRefunds(config, leafDataMap, response.SigningResults, nil)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to sign refunds for send: %v", err)
-	}
-	signatureMap := make(map[string][]byte)
-	for _, signature := range signatures {
-		signatureMap[signature.NodeId] = signature.RefundTxSignature
-	}
-	return response.Transfer, signatureMap, leafDataMap, nil
+	return transfer, signatureMap, leafDataMap, signingResults, nil
 }
 
 func compareTransfers(transfer1, transfer2 *pb.Transfer) bool {

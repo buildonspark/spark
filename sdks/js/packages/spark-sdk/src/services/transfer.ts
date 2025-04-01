@@ -16,7 +16,7 @@ import {
   CompleteSendTransferResponse,
   LeafRefundTxSigningJob,
   LeafRefundTxSigningResult,
-  LeafSwapResponse,
+  CounterLeafSwapResponse,
   NodeSignatures,
   QueryAllTransfersResponse,
   QueryPendingTransfersResponse,
@@ -43,6 +43,8 @@ import {
 import { WalletConfigService } from "./config.js";
 import { ConnectionManager } from "./connection.js";
 const INITIAL_TIME_LOCK = 2000;
+
+const DEFAULT_EXPIRY_TIME = 10 * 60 * 1000;
 
 function initialSequence() {
   return (1 << 30) | INITIAL_TIME_LOCK;
@@ -366,6 +368,7 @@ export class TransferService extends BaseTransferService {
     const { transfer, signatureMap } = await this.sendTransferSignRefund(
       leaves,
       receiverIdentityPubkey,
+      new Date(Date.now() + DEFAULT_EXPIRY_TIME),
     );
 
     const transferWithTweakedKeys = await this.sendTransferTweakKey(
@@ -462,10 +465,79 @@ export class TransferService extends BaseTransferService {
     return leafPubKeyMap;
   }
 
-  async sendSwapSignRefund(
+  async sendTransferSignRefund(
     leaves: LeafKeyTweak[],
     receiverIdentityPubkey: Uint8Array,
     expiryTime: Date,
+  ): Promise<{
+    transfer: Transfer;
+    signatureMap: Map<string, Uint8Array>;
+    leafDataMap: Map<string, LeafRefundSigningData>;
+  }> {
+    const { transfer, signatureMap, leafDataMap } =
+      await this.sendTransferSignRefundInternal(
+        leaves,
+        receiverIdentityPubkey,
+        expiryTime,
+        false,
+      );
+
+    return {
+      transfer,
+      signatureMap,
+      leafDataMap,
+    };
+  }
+
+  async startSwapSignRefund(
+    leaves: LeafKeyTweak[],
+    receiverIdentityPubkey: Uint8Array,
+    expiryTime: Date,
+  ): Promise<{
+    transfer: Transfer;
+    signatureMap: Map<string, Uint8Array>;
+    leafDataMap: Map<string, LeafRefundSigningData>;
+  }> {
+    const { transfer, signatureMap, leafDataMap } =
+      await this.sendTransferSignRefundInternal(
+        leaves,
+        receiverIdentityPubkey,
+        expiryTime,
+        true,
+      );
+
+    return {
+      transfer,
+      signatureMap,
+      leafDataMap,
+    };
+  }
+
+  async counterSwapSignRefund(
+    leaves: LeafKeyTweak[],
+    receiverIdentityPubkey: Uint8Array,
+    expiryTime: Date,
+    adaptorPubKey?: Uint8Array,
+  ): Promise<{
+    transfer: Transfer;
+    signatureMap: Map<string, Uint8Array>;
+    leafDataMap: Map<string, LeafRefundSigningData>;
+    signingResults: LeafRefundTxSigningResult[];
+  }> {
+    return this.sendTransferSignRefundInternal(
+      leaves,
+      receiverIdentityPubkey,
+      expiryTime,
+      true,
+      adaptorPubKey,
+    );
+  }
+
+  async sendTransferSignRefundInternal(
+    leaves: LeafKeyTweak[],
+    receiverIdentityPubkey: Uint8Array,
+    expiryTime: Date,
+    forSwap: boolean,
     adaptorPubKey?: Uint8Array,
   ): Promise<{
     transfer: Transfer;
@@ -498,22 +570,42 @@ export class TransferService extends BaseTransferService {
       this.config.getCoordinatorAddress(),
     );
 
-    let response: LeafSwapResponse;
+    let response: CounterLeafSwapResponse;
     try {
-      response = await sparkClient.leaf_swap({
-        transfer: {
+      if (adaptorPubKey !== undefined) {
+        response = await sparkClient.counter_leaf_swap({
+          transfer: {
+            transferId,
+            leavesToSend: signingJobs,
+            ownerIdentityPublicKey:
+              await this.config.signer.getIdentityPublicKey(),
+            receiverIdentityPublicKey: receiverIdentityPubkey,
+            expiryTime: expiryTime,
+          },
+          swapId: crypto.randomUUID(),
+          adaptorPublicKey: adaptorPubKey || new Uint8Array(),
+        });
+      } else if (forSwap) {
+        response = await sparkClient.start_leaf_swap({
           transferId,
           leavesToSend: signingJobs,
           ownerIdentityPublicKey:
             await this.config.signer.getIdentityPublicKey(),
           receiverIdentityPublicKey: receiverIdentityPubkey,
           expiryTime: expiryTime,
-        },
-        swapId: crypto.randomUUID(),
-        adaptorPublicKey: adaptorPubKey || new Uint8Array(),
-      });
+        });
+      } else {
+        response = await sparkClient.start_send_transfer({
+          transferId,
+          leavesToSend: signingJobs,
+          ownerIdentityPublicKey:
+            await this.config.signer.getIdentityPublicKey(),
+          receiverIdentityPublicKey: receiverIdentityPubkey,
+          expiryTime: expiryTime,
+        });
+      }
     } catch (error) {
-      throw new Error(`Error initiating leaf swap: ${error}`);
+      throw new Error(`Error starting send transfer: ${error}`);
     }
 
     if (!response.transfer) {
@@ -536,74 +628,6 @@ export class TransferService extends BaseTransferService {
       signatureMap,
       leafDataMap,
       signingResults: response.signingResults,
-    };
-  }
-
-  async sendTransferSignRefund(
-    leaves: LeafKeyTweak[],
-    receiverIdentityPubkey: Uint8Array,
-    expiryTime?: Date,
-  ): Promise<{
-    transfer: Transfer;
-    signatureMap: Map<string, Uint8Array>;
-    leafDataMap: Map<string, LeafRefundSigningData>;
-  }> {
-    const transferID = crypto.randomUUID();
-
-    const leafDataMap = new Map<string, LeafRefundSigningData>();
-    for (const leaf of leaves) {
-      const signingNonceCommitment =
-        await this.config.signer.getRandomSigningCommitment();
-
-      const tx = getTxFromRawTxBytes(leaf.leaf.nodeTx);
-      const refundTx = getTxFromRawTxBytes(leaf.leaf.refundTx);
-      leafDataMap.set(leaf.leaf.id, {
-        signingPubKey: leaf.signingPubKey,
-        receivingPubkey: receiverIdentityPubkey,
-        signingNonceCommitment,
-        tx,
-        refundTx,
-        vout: leaf.leaf.vout,
-      });
-    }
-
-    const signingJobs = this.prepareRefundSoSigningJobs(leaves, leafDataMap);
-
-    const sparkClient = await this.connectionManager.createSparkClient(
-      this.config.getCoordinatorAddress(),
-    );
-
-    let response: StartSendTransferResponse;
-    try {
-      response = await sparkClient.start_send_transfer({
-        transferId: transferID,
-        leavesToSend: signingJobs,
-        ownerIdentityPublicKey: await this.config.signer.getIdentityPublicKey(),
-        receiverIdentityPublicKey: receiverIdentityPubkey,
-        expiryTime: expiryTime,
-      });
-    } catch (error) {
-      throw new Error(`Error starting send transfer: ${error}`);
-    }
-
-    const signatures = await this.signRefunds(
-      leafDataMap,
-      response.signingResults,
-    );
-
-    const signatureMap = new Map<string, Uint8Array>();
-    for (const signature of signatures) {
-      signatureMap.set(signature.nodeId, signature.refundTxSignature);
-    }
-
-    if (!response.transfer) {
-      throw new Error("No transfer response from coordinator");
-    }
-
-    return {
-      transfer: response.transfer,
-      signatureMap,
-      leafDataMap,
     };
   }
 

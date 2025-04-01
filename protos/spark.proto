@@ -24,7 +24,16 @@ service SparkService {
     rpc cooperative_exit(CooperativeExitRequest) returns (CooperativeExitResponse) {}
     rpc initiate_preimage_swap(InitiatePreimageSwapRequest) returns (InitiatePreimageSwapResponse) {}
     rpc provide_preimage(ProvidePreimageRequest) returns (ProvidePreimageResponse) {}
-    rpc leaf_swap(LeafSwapRequest) returns (LeafSwapResponse) {}
+    // This is the exact same as start_send_transfer, but expresses to the SO
+    // this transfer is specifically for a leaf swap.
+    rpc start_leaf_swap(StartSendTransferRequest) returns (StartSendTransferResponse) {}
+    // This is deprecated, please use counter_leaf_swap instead.
+    rpc leaf_swap(CounterLeafSwapRequest) returns (CounterLeafSwapResponse) {
+        option deprecated = true;
+    }
+    // This is the exact same as start_leaf_swap, but signs with
+    // an adaptor public key after a counterparty has begun the swap via start_leaf_swap.
+    rpc counter_leaf_swap(CounterLeafSwapRequest) returns (CounterLeafSwapResponse) {}
     rpc refresh_timelock(RefreshTimelockRequest) returns (RefreshTimelockResponse) {}
     rpc extend_leaf(ExtendLeafRequest) returns (ExtendLeafResponse) {}
 
@@ -539,6 +548,8 @@ enum TransferType {
     PREIMAGE_SWAP = 0;
     COOPERATIVE_EXIT = 1;
     TRANSFER = 2;
+    SWAP = 30;
+    COUNTER_SWAP = 40;
 }
 
 message Transfer {
@@ -693,13 +704,13 @@ message CooperativeExitResponse {
     repeated LeafRefundTxSigningResult signing_results = 2;
 }
 
-message LeafSwapRequest {
+message CounterLeafSwapRequest {
     StartSendTransferRequest transfer = 1;
     string swap_id = 2;
     bytes adaptor_public_key = 3;
 }
 
-message LeafSwapResponse {
+message CounterLeafSwapResponse {
     Transfer transfer = 1;
     repeated LeafRefundTxSigningResult signing_results = 2;
 }

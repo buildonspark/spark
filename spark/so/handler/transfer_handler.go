@@ -40,8 +40,9 @@ func NewTransferHandler(config *so.Config) *TransferHandler {
 	return &TransferHandler{BaseTransferHandler: NewBaseTransferHandler(config), config: config}
 }
 
-// StartSendTransfer initiates a transfer from sender.
-func (h *TransferHandler) StartSendTransfer(ctx context.Context, req *pb.StartSendTransferRequest) (*pb.StartSendTransferResponse, error) {
+// startSendTransferInternal starts a transfer, signing refunds, and saving the transfer to the DB
+// for the first time. This optionally takes an adaptorPubKey to modify the refund signatures.
+func (h *TransferHandler) startSendTransferInternal(ctx context.Context, req *pb.StartSendTransferRequest, transferType schema.TransferType, adaptorPubKey []byte) (*pb.StartSendTransferResponse, error) {
 	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, req.OwnerIdentityPublicKey); err != nil {
 		return nil, err
 	}
@@ -53,7 +54,7 @@ func (h *TransferHandler) StartSendTransfer(ctx context.Context, req *pb.StartSe
 	transfer, leafMap, err := h.createTransfer(
 		ctx,
 		req.TransferId,
-		schema.TransferTypeTransfer,
+		transferType,
 		req.ExpiryTime.AsTime(),
 		req.OwnerIdentityPublicKey,
 		req.ReceiverIdentityPublicKey,
@@ -69,7 +70,7 @@ func (h *TransferHandler) StartSendTransfer(ctx context.Context, req *pb.StartSe
 		return nil, fmt.Errorf("unable to marshal transfer: %v", err)
 	}
 
-	signingResults, err := h.sendTransferSignRefunds(ctx, req.LeavesToSend, leafMap)
+	signingResults, err := signRefunds(ctx, h.config, req.LeavesToSend, leafMap, adaptorPubKey)
 	if err != nil {
 		return nil, err
 	}
@@ -82,47 +83,22 @@ func (h *TransferHandler) StartSendTransfer(ctx context.Context, req *pb.StartSe
 	return &pb.StartSendTransferResponse{Transfer: transferProto, SigningResults: signingResults}, nil
 }
 
-// InitiateLeafSwap initiates a leaf swap.
-func (h *TransferHandler) InitiateLeafSwap(ctx context.Context, req *pb.LeafSwapRequest) (*pb.LeafSwapResponse, error) {
-	reqTransfer := req.Transfer
-	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, reqTransfer.OwnerIdentityPublicKey); err != nil {
-		return nil, err
-	}
+// StartSendTransfer initiates a transfer from sender.
+func (h *TransferHandler) StartSendTransfer(ctx context.Context, req *pb.StartSendTransferRequest) (*pb.StartSendTransferResponse, error) {
+	return h.startSendTransferInternal(ctx, req, schema.TransferTypeTransfer, nil)
+}
 
-	leafRefundMap := make(map[string][]byte)
-	for _, leaf := range reqTransfer.LeavesToSend {
-		leafRefundMap[leaf.LeafId] = leaf.RefundTxSigningJob.RawTx
-	}
-	transfer, leafMap, err := h.createTransfer(
-		ctx,
-		reqTransfer.TransferId,
-		schema.TransferTypeTransfer,
-		reqTransfer.ExpiryTime.AsTime(),
-		reqTransfer.OwnerIdentityPublicKey,
-		reqTransfer.ReceiverIdentityPublicKey,
-		leafRefundMap,
-		reqTransfer.KeyTweakProofs,
-	)
+func (h *TransferHandler) StartLeafSwap(ctx context.Context, req *pb.StartSendTransferRequest) (*pb.StartSendTransferResponse, error) {
+	return h.startSendTransferInternal(ctx, req, schema.TransferTypeSwap, nil)
+}
+
+// CounterLeafSwap initiates a leaf swap for the other side, signing refunds with an adaptor public key.
+func (h *TransferHandler) CounterLeafSwap(ctx context.Context, req *pb.CounterLeafSwapRequest) (*pb.CounterLeafSwapResponse, error) {
+	startSendResponse, err := h.startSendTransferInternal(ctx, req.Transfer, schema.TransferTypeCounterSwap, req.AdaptorPublicKey)
 	if err != nil {
 		return nil, err
 	}
-
-	transferProto, err := transfer.MarshalProto(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("unable to marshal transfer: %v", err)
-	}
-
-	signingResults, err := signRefunds(ctx, h.config, reqTransfer.LeavesToSend, leafMap, req.AdaptorPublicKey)
-	if err != nil {
-		return nil, err
-	}
-
-	err = h.syncTransferInit(ctx, reqTransfer)
-	if err != nil {
-		return nil, err
-	}
-
-	return &pb.LeafSwapResponse{Transfer: transferProto, SigningResults: signingResults}, nil
+	return &pb.CounterLeafSwapResponse{Transfer: startSendResponse.Transfer, SigningResults: startSendResponse.SigningResults}, nil
 }
 
 func (h *TransferHandler) syncTransferInit(ctx context.Context, req *pb.StartSendTransferRequest) error {
@@ -154,10 +130,6 @@ func (h *TransferHandler) syncTransferInit(ctx context.Context, req *pb.StartSen
 		return client.InitiateTransfer(ctx, initTransferRequest)
 	})
 	return err
-}
-
-func (h *TransferHandler) sendTransferSignRefunds(ctx context.Context, requests []*pb.LeafRefundTxSigningJob, leafMap map[string]*ent.TreeNode) ([]*pb.LeafRefundTxSigningResult, error) {
-	return signRefunds(ctx, h.config, requests, leafMap, nil)
 }
 
 func signRefunds(ctx context.Context, config *so.Config, requests []*pb.LeafRefundTxSigningJob, leafMap map[string]*ent.TreeNode, adaptorPubKey []byte) ([]*pb.LeafRefundTxSigningResult, error) {

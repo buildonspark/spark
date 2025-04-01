@@ -100,7 +100,7 @@ func StatusValidator(s schema.TransferStatus) error {
 // TypeValidator is a validator for the "type" field enum values. It is called by the builders before save.
 func TypeValidator(_type schema.TransferType) error {
 	switch _type {
-	case "PREIMAGE_SWAP", "COOPERATIVE_EXIT", "TRANSFER":
+	case "PREIMAGE_SWAP", "COOPERATIVE_EXIT", "TRANSFER", "SWAP", "COUNTER_SWAP":
 		return nil
 	default:
 		return fmt.Errorf("transfer: invalid enum value for type field: %q", _type)

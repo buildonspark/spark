@@ -476,7 +476,7 @@ func TestQueryTransfers(t *testing.T) {
 		NewSigningPrivKey: receiverNewLeafPrivKey.Serialize(),
 	}
 	receiverLeavesToTransfer := [1]wallet.LeafKeyTweak{receiverTransferNode}
-	receiverTransfer, receiverRefundSignatureMap, leafDataMap, operatorSigningResults, err := wallet.SendSwapSignRefund(
+	receiverTransfer, receiverRefundSignatureMap, leafDataMap, operatorSigningResults, err := wallet.CounterSwapSignRefund(
 		context.Background(),
 		receiverConfig,
 		receiverLeavesToTransfer[:],

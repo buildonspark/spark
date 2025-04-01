@@ -298,7 +298,7 @@ func (w *SingleKeyWallet) RequestLeavesSwap(ctx context.Context, targetAmount in
 	}
 
 	// Get signature for refunds (normal flow)
-	transfer, refundSignatureMap, _, err := SendTransferSignRefund(
+	transfer, refundSignatureMap, _, err := StartSwapSignRefund(
 		ctx,
 		w.Config,
 		leafKeyTweaks[:],

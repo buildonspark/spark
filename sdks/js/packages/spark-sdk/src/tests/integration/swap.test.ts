@@ -94,7 +94,7 @@ describe("swap", () => {
       transfer: senderTransfer,
       signatureMap: senderRefundSignatureMap,
       leafDataMap: senderLeafDataMap,
-    } = await senderTransferService.sendTransferSignRefund(
+    } = await senderTransferService.startSwapSignRefund(
       senderLeavesToTransfer,
       hexToBytes(receiverPubkey),
       new Date(Date.now() + 10 * 60 * 1000),
@@ -125,7 +125,7 @@ describe("swap", () => {
       signatureMap: receiverRefundSignatureMap,
       leafDataMap: receiverLeafDataMap,
       signingResults: operatorSigningResults,
-    } = await receiverTransferService.sendSwapSignRefund(
+    } = await receiverTransferService.counterSwapSignRefund(
       receiverLeavesToTransfer,
       hexToBytes(senderPubkey),
       new Date(Date.now() + 10 * 60 * 1000),

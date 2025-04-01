@@ -177,6 +177,8 @@ export enum TransferType {
   PREIMAGE_SWAP = 0,
   COOPERATIVE_EXIT = 1,
   TRANSFER = 2,
+  SWAP = 3,
+  COUNTER_SWAP = 4,
   UNRECOGNIZED = -1,
 }
 
@@ -191,6 +193,12 @@ export function transferTypeFromJSON(object: any): TransferType {
     case 2:
     case "TRANSFER":
       return TransferType.TRANSFER;
+    case 3:
+    case "SWAP":
+      return TransferType.SWAP;
+    case 4:
+    case "COUNTER_SWAP":
+      return TransferType.COUNTER_SWAP;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -206,6 +214,10 @@ export function transferTypeToJSON(object: TransferType): string {
       return "COOPERATIVE_EXIT";
     case TransferType.TRANSFER:
       return "TRANSFER";
+    case TransferType.SWAP:
+      return "SWAP";
+    case TransferType.COUNTER_SWAP:
+      return "COUNTER_SWAP";
     case TransferType.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
@@ -927,13 +939,13 @@ export interface CooperativeExitResponse {
   signingResults: LeafRefundTxSigningResult[];
 }
 
-export interface LeafSwapRequest {
+export interface CounterLeafSwapRequest {
   transfer: StartSendTransferRequest | undefined;
   swapId: string;
   adaptorPublicKey: Uint8Array;
 }
 
-export interface LeafSwapResponse {
+export interface CounterLeafSwapResponse {
   transfer: Transfer | undefined;
   signingResults: LeafRefundTxSigningResult[];
 }
@@ -9079,12 +9091,12 @@ export const CooperativeExitResponse: MessageFns<CooperativeExitResponse> = {
   },
 };
 
-function createBaseLeafSwapRequest(): LeafSwapRequest {
+function createBaseCounterLeafSwapRequest(): CounterLeafSwapRequest {
   return { transfer: undefined, swapId: "", adaptorPublicKey: new Uint8Array(0) };
 }
 
-export const LeafSwapRequest: MessageFns<LeafSwapRequest> = {
-  encode(message: LeafSwapRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+export const CounterLeafSwapRequest: MessageFns<CounterLeafSwapRequest> = {
+  encode(message: CounterLeafSwapRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.transfer !== undefined) {
       StartSendTransferRequest.encode(message.transfer, writer.uint32(10).fork()).join();
     }
@@ -9097,10 +9109,10 @@ export const LeafSwapRequest: MessageFns<LeafSwapRequest> = {
     return writer;
   },
 
-  decode(input: BinaryReader | Uint8Array, length?: number): LeafSwapRequest {
+  decode(input: BinaryReader | Uint8Array, length?: number): CounterLeafSwapRequest {
     const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseLeafSwapRequest();
+    const message = createBaseCounterLeafSwapRequest();
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
@@ -9137,7 +9149,7 @@ export const LeafSwapRequest: MessageFns<LeafSwapRequest> = {
     return message;
   },
 
-  fromJSON(object: any): LeafSwapRequest {
+  fromJSON(object: any): CounterLeafSwapRequest {
     return {
       transfer: isSet(object.transfer) ? StartSendTransferRequest.fromJSON(object.transfer) : undefined,
       swapId: isSet(object.swapId) ? globalThis.String(object.swapId) : "",
@@ -9145,7 +9157,7 @@ export const LeafSwapRequest: MessageFns<LeafSwapRequest> = {
     };
   },
 
-  toJSON(message: LeafSwapRequest): unknown {
+  toJSON(message: CounterLeafSwapRequest): unknown {
     const obj: any = {};
     if (message.transfer !== undefined) {
       obj.transfer = StartSendTransferRequest.toJSON(message.transfer);
@@ -9159,11 +9171,11 @@ export const LeafSwapRequest: MessageFns<LeafSwapRequest> = {
     return obj;
   },
 
-  create(base?: DeepPartial<LeafSwapRequest>): LeafSwapRequest {
-    return LeafSwapRequest.fromPartial(base ?? {});
+  create(base?: DeepPartial<CounterLeafSwapRequest>): CounterLeafSwapRequest {
+    return CounterLeafSwapRequest.fromPartial(base ?? {});
   },
-  fromPartial(object: DeepPartial<LeafSwapRequest>): LeafSwapRequest {
-    const message = createBaseLeafSwapRequest();
+  fromPartial(object: DeepPartial<CounterLeafSwapRequest>): CounterLeafSwapRequest {
+    const message = createBaseCounterLeafSwapRequest();
     message.transfer = (object.transfer !== undefined && object.transfer !== null)
       ? StartSendTransferRequest.fromPartial(object.transfer)
       : undefined;
@@ -9173,12 +9185,12 @@ export const LeafSwapRequest: MessageFns<LeafSwapRequest> = {
   },
 };
 
-function createBaseLeafSwapResponse(): LeafSwapResponse {
+function createBaseCounterLeafSwapResponse(): CounterLeafSwapResponse {
   return { transfer: undefined, signingResults: [] };
 }
 
-export const LeafSwapResponse: MessageFns<LeafSwapResponse> = {
-  encode(message: LeafSwapResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+export const CounterLeafSwapResponse: MessageFns<CounterLeafSwapResponse> = {
+  encode(message: CounterLeafSwapResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.transfer !== undefined) {
       Transfer.encode(message.transfer, writer.uint32(10).fork()).join();
     }
@@ -9188,10 +9200,10 @@ export const LeafSwapResponse: MessageFns<LeafSwapResponse> = {
     return writer;
   },
 
-  decode(input: BinaryReader | Uint8Array, length?: number): LeafSwapResponse {
+  decode(input: BinaryReader | Uint8Array, length?: number): CounterLeafSwapResponse {
     const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseLeafSwapResponse();
+    const message = createBaseCounterLeafSwapResponse();
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
@@ -9220,7 +9232,7 @@ export const LeafSwapResponse: MessageFns<LeafSwapResponse> = {
     return message;
   },
 
-  fromJSON(object: any): LeafSwapResponse {
+  fromJSON(object: any): CounterLeafSwapResponse {
     return {
       transfer: isSet(object.transfer) ? Transfer.fromJSON(object.transfer) : undefined,
       signingResults: globalThis.Array.isArray(object?.signingResults)
@@ -9229,7 +9241,7 @@ export const LeafSwapResponse: MessageFns<LeafSwapResponse> = {
     };
   },
 
-  toJSON(message: LeafSwapResponse): unknown {
+  toJSON(message: CounterLeafSwapResponse): unknown {
     const obj: any = {};
     if (message.transfer !== undefined) {
       obj.transfer = Transfer.toJSON(message.transfer);
@@ -9240,11 +9252,11 @@ export const LeafSwapResponse: MessageFns<LeafSwapResponse> = {
     return obj;
   },
 
-  create(base?: DeepPartial<LeafSwapResponse>): LeafSwapResponse {
-    return LeafSwapResponse.fromPartial(base ?? {});
+  create(base?: DeepPartial<CounterLeafSwapResponse>): CounterLeafSwapResponse {
+    return CounterLeafSwapResponse.fromPartial(base ?? {});
   },
-  fromPartial(object: DeepPartial<LeafSwapResponse>): LeafSwapResponse {
-    const message = createBaseLeafSwapResponse();
+  fromPartial(object: DeepPartial<CounterLeafSwapResponse>): CounterLeafSwapResponse {
+    const message = createBaseCounterLeafSwapResponse();
     message.transfer = (object.transfer !== undefined && object.transfer !== null)
       ? Transfer.fromPartial(object.transfer)
       : undefined;
@@ -12474,11 +12486,36 @@ export const SparkServiceDefinition = {
       responseStream: false,
       options: {},
     },
+    /**
+     * This is the exact same as start_send_transfer, but expresses to the SO
+     * this transfer is specifically for a leaf swap.
+     */
+    start_leaf_swap: {
+      name: "start_leaf_swap",
+      requestType: StartSendTransferRequest,
+      requestStream: false,
+      responseType: StartSendTransferResponse,
+      responseStream: false,
+      options: {},
+    },
+    /** This is deprecated, please use counter_leaf_swap instead. */
     leaf_swap: {
       name: "leaf_swap",
-      requestType: LeafSwapRequest,
+      requestType: CounterLeafSwapRequest,
       requestStream: false,
-      responseType: LeafSwapResponse,
+      responseType: CounterLeafSwapResponse,
+      responseStream: false,
+      options: {},
+    },
+    /**
+     * This is the exact same as start_leaf_swap, but signs with
+     * an adaptor public key after a counterparty has begun the swap via start_leaf_swap.
+     */
+    counter_leaf_swap: {
+      name: "counter_leaf_swap",
+      requestType: CounterLeafSwapRequest,
+      requestStream: false,
+      responseType: CounterLeafSwapResponse,
       responseStream: false,
       options: {},
     },
@@ -12691,7 +12728,27 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
     request: ProvidePreimageRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<ProvidePreimageResponse>>;
-  leaf_swap(request: LeafSwapRequest, context: CallContext & CallContextExt): Promise<DeepPartial<LeafSwapResponse>>;
+  /**
+   * This is the exact same as start_send_transfer, but expresses to the SO
+   * this transfer is specifically for a leaf swap.
+   */
+  start_leaf_swap(
+    request: StartSendTransferRequest,
+    context: CallContext & CallContextExt,
+  ): Promise<DeepPartial<StartSendTransferResponse>>;
+  /** This is deprecated, please use counter_leaf_swap instead. */
+  leaf_swap(
+    request: CounterLeafSwapRequest,
+    context: CallContext & CallContextExt,
+  ): Promise<DeepPartial<CounterLeafSwapResponse>>;
+  /**
+   * This is the exact same as start_leaf_swap, but signs with
+   * an adaptor public key after a counterparty has begun the swap via start_leaf_swap.
+   */
+  counter_leaf_swap(
+    request: CounterLeafSwapRequest,
+    context: CallContext & CallContextExt,
+  ): Promise<DeepPartial<CounterLeafSwapResponse>>;
   refresh_timelock(
     request: RefreshTimelockRequest,
     context: CallContext & CallContextExt,
@@ -12828,7 +12885,27 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
     request: DeepPartial<ProvidePreimageRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<ProvidePreimageResponse>;
-  leaf_swap(request: DeepPartial<LeafSwapRequest>, options?: CallOptions & CallOptionsExt): Promise<LeafSwapResponse>;
+  /**
+   * This is the exact same as start_send_transfer, but expresses to the SO
+   * this transfer is specifically for a leaf swap.
+   */
+  start_leaf_swap(
+    request: DeepPartial<StartSendTransferRequest>,
+    options?: CallOptions & CallOptionsExt,
+  ): Promise<StartSendTransferResponse>;
+  /** This is deprecated, please use counter_leaf_swap instead. */
+  leaf_swap(
+    request: DeepPartial<CounterLeafSwapRequest>,
+    options?: CallOptions & CallOptionsExt,
+  ): Promise<CounterLeafSwapResponse>;
+  /**
+   * This is the exact same as start_leaf_swap, but signs with
+   * an adaptor public key after a counterparty has begun the swap via start_leaf_swap.
+   */
+  counter_leaf_swap(
+    request: DeepPartial<CounterLeafSwapRequest>,
+    options?: CallOptions & CallOptionsExt,
+  ): Promise<CounterLeafSwapResponse>;
   refresh_timelock(
     request: DeepPartial<RefreshTimelockRequest>,
     options?: CallOptions & CallOptionsExt,

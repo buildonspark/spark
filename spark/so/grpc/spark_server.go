@@ -110,10 +110,24 @@ func (s *SparkServer) CooperativeExit(ctx context.Context, req *pb.CooperativeEx
 	return wrapWithGRPCError(coopExitHandler.CooperativeExit(ctx, req))
 }
 
-// LeafSwap initiates a swap of leaves between two users.
-func (s *SparkServer) LeafSwap(ctx context.Context, req *pb.LeafSwapRequest) (*pb.LeafSwapResponse, error) {
+// StartLeafSwap initiates a swap of leaves between two users.
+func (s *SparkServer) StartLeafSwap(ctx context.Context, req *pb.StartSendTransferRequest) (*pb.StartSendTransferResponse, error) {
 	transferHander := handler.NewTransferHandler(s.config)
-	return wrapWithGRPCError(transferHander.InitiateLeafSwap(ctx, req))
+	return wrapWithGRPCError(transferHander.StartLeafSwap(ctx, req))
+}
+
+// LeafSwap starts the reverse side of a swap of leaves between two users.
+// This is deprecated but remains for backwards compatibility,
+// CounterLeafSwap should be used instead.
+func (s *SparkServer) LeafSwap(ctx context.Context, req *pb.CounterLeafSwapRequest) (*pb.CounterLeafSwapResponse, error) {
+	transferHander := handler.NewTransferHandler(s.config)
+	return wrapWithGRPCError(transferHander.CounterLeafSwap(ctx, req))
+}
+
+// CounterLeafSwap starts the reverse side of a swap of leaves between two users.
+func (s *SparkServer) CounterLeafSwap(ctx context.Context, req *pb.CounterLeafSwapRequest) (*pb.CounterLeafSwapResponse, error) {
+	transferHander := handler.NewTransferHandler(s.config)
+	return wrapWithGRPCError(transferHander.CounterLeafSwap(ctx, req))
 }
 
 // RefreshTimelock refreshes the timelocks of a leaf and its ancestors.

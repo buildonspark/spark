@@ -10208,22 +10208,22 @@ var _ interface {
 	ErrorName() string
 } = CooperativeExitResponseValidationError{}
 
-// Validate checks the field values on LeafSwapRequest with the rules defined
-// in the proto definition for this message. If any rules are violated, the
-// first error encountered is returned, or nil if there are no violations.
-func (m *LeafSwapRequest) Validate() error {
+// Validate checks the field values on CounterLeafSwapRequest with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *CounterLeafSwapRequest) Validate() error {
 	return m.validate(false)
 }
 
-// ValidateAll checks the field values on LeafSwapRequest with the rules
+// ValidateAll checks the field values on CounterLeafSwapRequest with the rules
 // defined in the proto definition for this message. If any rules are
 // violated, the result is a list of violation errors wrapped in
-// LeafSwapRequestMultiError, or nil if none found.
-func (m *LeafSwapRequest) ValidateAll() error {
+// CounterLeafSwapRequestMultiError, or nil if none found.
+func (m *CounterLeafSwapRequest) ValidateAll() error {
 	return m.validate(true)
 }
 
-func (m *LeafSwapRequest) validate(all bool) error {
+func (m *CounterLeafSwapRequest) validate(all bool) error {
 	if m == nil {
 		return nil
 	}
@@ -10234,7 +10234,7 @@ func (m *LeafSwapRequest) validate(all bool) error {
 		switch v := interface{}(m.GetTransfer()).(type) {
 		case interface{ ValidateAll() error }:
 			if err := v.ValidateAll(); err != nil {
-				errors = append(errors, LeafSwapRequestValidationError{
+				errors = append(errors, CounterLeafSwapRequestValidationError{
 					field:  "Transfer",
 					reason: "embedded message failed validation",
 					cause:  err,
@@ -10242,7 +10242,7 @@ func (m *LeafSwapRequest) validate(all bool) error {
 			}
 		case interface{ Validate() error }:
 			if err := v.Validate(); err != nil {
-				errors = append(errors, LeafSwapRequestValidationError{
+				errors = append(errors, CounterLeafSwapRequestValidationError{
 					field:  "Transfer",
 					reason: "embedded message failed validation",
 					cause:  err,
@@ -10251,7 +10251,7 @@ func (m *LeafSwapRequest) validate(all bool) error {
 		}
 	} else if v, ok := interface{}(m.GetTransfer()).(interface{ Validate() error }); ok {
 		if err := v.Validate(); err != nil {
-			return LeafSwapRequestValidationError{
+			return CounterLeafSwapRequestValidationError{
 				field:  "Transfer",
 				reason: "embedded message failed validation",
 				cause:  err,
@@ -10264,19 +10264,19 @@ func (m *LeafSwapRequest) validate(all bool) error {
 	// no validation rules for AdaptorPublicKey
 
 	if len(errors) > 0 {
-		return LeafSwapRequestMultiError(errors)
+		return CounterLeafSwapRequestMultiError(errors)
 	}
 
 	return nil
 }
 
-// LeafSwapRequestMultiError is an error wrapping multiple validation errors
-// returned by LeafSwapRequest.ValidateAll() if the designated constraints
-// aren't met.
-type LeafSwapRequestMultiError []error
+// CounterLeafSwapRequestMultiError is an error wrapping multiple validation
+// errors returned by CounterLeafSwapRequest.ValidateAll() if the designated
+// constraints aren't met.
+type CounterLeafSwapRequestMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
-func (m LeafSwapRequestMultiError) Error() string {
+func (m CounterLeafSwapRequestMultiError) Error() string {
 	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
@@ -10285,11 +10285,11 @@ func (m LeafSwapRequestMultiError) Error() string {
 }
 
 // AllErrors returns a list of validation violation errors.
-func (m LeafSwapRequestMultiError) AllErrors() []error { return m }
+func (m CounterLeafSwapRequestMultiError) AllErrors() []error { return m }
 
-// LeafSwapRequestValidationError is the validation error returned by
-// LeafSwapRequest.Validate if the designated constraints aren't met.
-type LeafSwapRequestValidationError struct {
+// CounterLeafSwapRequestValidationError is the validation error returned by
+// CounterLeafSwapRequest.Validate if the designated constraints aren't met.
+type CounterLeafSwapRequestValidationError struct {
 	field  string
 	reason string
 	cause  error
@@ -10297,22 +10297,24 @@ type LeafSwapRequestValidationError struct {
 }
 
 // Field function returns field value.
-func (e LeafSwapRequestValidationError) Field() string { return e.field }
+func (e CounterLeafSwapRequestValidationError) Field() string { return e.field }
 
 // Reason function returns reason value.
-func (e LeafSwapRequestValidationError) Reason() string { return e.reason }
+func (e CounterLeafSwapRequestValidationError) Reason() string { return e.reason }
 
 // Cause function returns cause value.
-func (e LeafSwapRequestValidationError) Cause() error { return e.cause }
+func (e CounterLeafSwapRequestValidationError) Cause() error { return e.cause }
 
 // Key function returns key value.
-func (e LeafSwapRequestValidationError) Key() bool { return e.key }
+func (e CounterLeafSwapRequestValidationError) Key() bool { return e.key }
 
 // ErrorName returns error name.
-func (e LeafSwapRequestValidationError) ErrorName() string { return "LeafSwapRequestValidationError" }
+func (e CounterLeafSwapRequestValidationError) ErrorName() string {
+	return "CounterLeafSwapRequestValidationError"
+}
 
 // Error satisfies the builtin error interface
-func (e LeafSwapRequestValidationError) Error() string {
+func (e CounterLeafSwapRequestValidationError) Error() string {
 	cause := ""
 	if e.cause != nil {
 		cause = fmt.Sprintf(" | caused by: %v", e.cause)
@@ -10324,14 +10326,14 @@ func (e LeafSwapRequestValidationError) Error() string {
 	}
 
 	return fmt.Sprintf(
-		"invalid %sLeafSwapRequest.%s: %s%s",
+		"invalid %sCounterLeafSwapRequest.%s: %s%s",
 		key,
 		e.field,
 		e.reason,
 		cause)
 }
 
-var _ error = LeafSwapRequestValidationError{}
+var _ error = CounterLeafSwapRequestValidationError{}
 
 var _ interface {
 	Field() string
@@ -10339,24 +10341,24 @@ var _ interface {
 	Key() bool
 	Cause() error
 	ErrorName() string
-} = LeafSwapRequestValidationError{}
+} = CounterLeafSwapRequestValidationError{}
 
-// Validate checks the field values on LeafSwapResponse with the rules defined
-// in the proto definition for this message. If any rules are violated, the
-// first error encountered is returned, or nil if there are no violations.
-func (m *LeafSwapResponse) Validate() error {
+// Validate checks the field values on CounterLeafSwapResponse with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *CounterLeafSwapResponse) Validate() error {
 	return m.validate(false)
 }
 
-// ValidateAll checks the field values on LeafSwapResponse with the rules
-// defined in the proto definition for this message. If any rules are
+// ValidateAll checks the field values on CounterLeafSwapResponse with the
+// rules defined in the proto definition for this message. If any rules are
 // violated, the result is a list of violation errors wrapped in
-// LeafSwapResponseMultiError, or nil if none found.
-func (m *LeafSwapResponse) ValidateAll() error {
+// CounterLeafSwapResponseMultiError, or nil if none found.
+func (m *CounterLeafSwapResponse) ValidateAll() error {
 	return m.validate(true)
 }
 
-func (m *LeafSwapResponse) validate(all bool) error {
+func (m *CounterLeafSwapResponse) validate(all bool) error {
 	if m == nil {
 		return nil
 	}
@@ -10367,7 +10369,7 @@ func (m *LeafSwapResponse) validate(all bool) error {
 		switch v := interface{}(m.GetTransfer()).(type) {
 		case interface{ ValidateAll() error }:
 			if err := v.ValidateAll(); err != nil {
-				errors = append(errors, LeafSwapResponseValidationError{
+				errors = append(errors, CounterLeafSwapResponseValidationError{
 					field:  "Transfer",
 					reason: "embedded message failed validation",
 					cause:  err,
@@ -10375,7 +10377,7 @@ func (m *LeafSwapResponse) validate(all bool) error {
 			}
 		case interface{ Validate() error }:
 			if err := v.Validate(); err != nil {
-				errors = append(errors, LeafSwapResponseValidationError{
+				errors = append(errors, CounterLeafSwapResponseValidationError{
 					field:  "Transfer",
 					reason: "embedded message failed validation",
 					cause:  err,
@@ -10384,7 +10386,7 @@ func (m *LeafSwapResponse) validate(all bool) error {
 		}
 	} else if v, ok := interface{}(m.GetTransfer()).(interface{ Validate() error }); ok {
 		if err := v.Validate(); err != nil {
-			return LeafSwapResponseValidationError{
+			return CounterLeafSwapResponseValidationError{
 				field:  "Transfer",
 				reason: "embedded message failed validation",
 				cause:  err,
@@ -10399,7 +10401,7 @@ func (m *LeafSwapResponse) validate(all bool) error {
 			switch v := interface{}(item).(type) {
 			case interface{ ValidateAll() error }:
 				if err := v.ValidateAll(); err != nil {
-					errors = append(errors, LeafSwapResponseValidationError{
+					errors = append(errors, CounterLeafSwapResponseValidationError{
 						field:  fmt.Sprintf("SigningResults[%v]", idx),
 						reason: "embedded message failed validation",
 						cause:  err,
@@ -10407,7 +10409,7 @@ func (m *LeafSwapResponse) validate(all bool) error {
 				}
 			case interface{ Validate() error }:
 				if err := v.Validate(); err != nil {
-					errors = append(errors, LeafSwapResponseValidationError{
+					errors = append(errors, CounterLeafSwapResponseValidationError{
 						field:  fmt.Sprintf("SigningResults[%v]", idx),
 						reason: "embedded message failed validation",
 						cause:  err,
@@ -10416,7 +10418,7 @@ func (m *LeafSwapResponse) validate(all bool) error {
 			}
 		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
 			if err := v.Validate(); err != nil {
-				return LeafSwapResponseValidationError{
+				return CounterLeafSwapResponseValidationError{
 					field:  fmt.Sprintf("SigningResults[%v]", idx),
 					reason: "embedded message failed validation",
 					cause:  err,
@@ -10427,19 +10429,19 @@ func (m *LeafSwapResponse) validate(all bool) error {
 	}
 
 	if len(errors) > 0 {
-		return LeafSwapResponseMultiError(errors)
+		return CounterLeafSwapResponseMultiError(errors)
 	}
 
 	return nil
 }
 
-// LeafSwapResponseMultiError is an error wrapping multiple validation errors
-// returned by LeafSwapResponse.ValidateAll() if the designated constraints
-// aren't met.
-type LeafSwapResponseMultiError []error
+// CounterLeafSwapResponseMultiError is an error wrapping multiple validation
+// errors returned by CounterLeafSwapResponse.ValidateAll() if the designated
+// constraints aren't met.
+type CounterLeafSwapResponseMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
-func (m LeafSwapResponseMultiError) Error() string {
+func (m CounterLeafSwapResponseMultiError) Error() string {
 	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
@@ -10448,11 +10450,11 @@ func (m LeafSwapResponseMultiError) Error() string {
 }
 
 // AllErrors returns a list of validation violation errors.
-func (m LeafSwapResponseMultiError) AllErrors() []error { return m }
+func (m CounterLeafSwapResponseMultiError) AllErrors() []error { return m }
 
-// LeafSwapResponseValidationError is the validation error returned by
-// LeafSwapResponse.Validate if the designated constraints aren't met.
-type LeafSwapResponseValidationError struct {
+// CounterLeafSwapResponseValidationError is the validation error returned by
+// CounterLeafSwapResponse.Validate if the designated constraints aren't met.
+type CounterLeafSwapResponseValidationError struct {
 	field  string
 	reason string
 	cause  error
@@ -10460,22 +10462,24 @@ type LeafSwapResponseValidationError struct {
 }
 
 // Field function returns field value.
-func (e LeafSwapResponseValidationError) Field() string { return e.field }
+func (e CounterLeafSwapResponseValidationError) Field() string { return e.field }
 
 // Reason function returns reason value.
-func (e LeafSwapResponseValidationError) Reason() string { return e.reason }
+func (e CounterLeafSwapResponseValidationError) Reason() string { return e.reason }
 
 // Cause function returns cause value.
-func (e LeafSwapResponseValidationError) Cause() error { return e.cause }
+func (e CounterLeafSwapResponseValidationError) Cause() error { return e.cause }
 
 // Key function returns key value.
-func (e LeafSwapResponseValidationError) Key() bool { return e.key }
+func (e CounterLeafSwapResponseValidationError) Key() bool { return e.key }
 
 // ErrorName returns error name.
-func (e LeafSwapResponseValidationError) ErrorName() string { return "LeafSwapResponseValidationError" }
+func (e CounterLeafSwapResponseValidationError) ErrorName() string {
+	return "CounterLeafSwapResponseValidationError"
+}
 
 // Error satisfies the builtin error interface
-func (e LeafSwapResponseValidationError) Error() string {
+func (e CounterLeafSwapResponseValidationError) Error() string {
 	cause := ""
 	if e.cause != nil {
 		cause = fmt.Sprintf(" | caused by: %v", e.cause)
@@ -10487,14 +10491,14 @@ func (e LeafSwapResponseValidationError) Error() string {
 	}
 
 	return fmt.Sprintf(
-		"invalid %sLeafSwapResponse.%s: %s%s",
+		"invalid %sCounterLeafSwapResponse.%s: %s%s",
 		key,
 		e.field,
 		e.reason,
 		cause)
 }
 
-var _ error = LeafSwapResponseValidationError{}
+var _ error = CounterLeafSwapResponseValidationError{}
 
 var _ interface {
 	Field() string
@@ -10502,7 +10506,7 @@ var _ interface {
 	Key() bool
 	Cause() error
 	ErrorName() string
-} = LeafSwapResponseValidationError{}
+} = CounterLeafSwapResponseValidationError{}
 
 // Validate checks the field values on RefreshTimelockRequest with the rules
 // defined in the proto definition for this message. If any rules are

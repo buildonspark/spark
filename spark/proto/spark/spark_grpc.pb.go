@@ -35,7 +35,9 @@ const (
 	SparkService_CooperativeExit_FullMethodName              = "/spark.SparkService/cooperative_exit"
 	SparkService_InitiatePreimageSwap_FullMethodName         = "/spark.SparkService/initiate_preimage_swap"
 	SparkService_ProvidePreimage_FullMethodName              = "/spark.SparkService/provide_preimage"
+	SparkService_StartLeafSwap_FullMethodName                = "/spark.SparkService/start_leaf_swap"
 	SparkService_LeafSwap_FullMethodName                     = "/spark.SparkService/leaf_swap"
+	SparkService_CounterLeafSwap_FullMethodName              = "/spark.SparkService/counter_leaf_swap"
 	SparkService_RefreshTimelock_FullMethodName              = "/spark.SparkService/refresh_timelock"
 	SparkService_ExtendLeaf_FullMethodName                   = "/spark.SparkService/extend_leaf"
 	SparkService_PrepareTreeAddress_FullMethodName           = "/spark.SparkService/prepare_tree_address"
@@ -75,7 +77,15 @@ type SparkServiceClient interface {
 	CooperativeExit(ctx context.Context, in *CooperativeExitRequest, opts ...grpc.CallOption) (*CooperativeExitResponse, error)
 	InitiatePreimageSwap(ctx context.Context, in *InitiatePreimageSwapRequest, opts ...grpc.CallOption) (*InitiatePreimageSwapResponse, error)
 	ProvidePreimage(ctx context.Context, in *ProvidePreimageRequest, opts ...grpc.CallOption) (*ProvidePreimageResponse, error)
-	LeafSwap(ctx context.Context, in *LeafSwapRequest, opts ...grpc.CallOption) (*LeafSwapResponse, error)
+	// This is the exact same as start_send_transfer, but expresses to the SO
+	// this transfer is specifically for a leaf swap.
+	StartLeafSwap(ctx context.Context, in *StartSendTransferRequest, opts ...grpc.CallOption) (*StartSendTransferResponse, error)
+	// Deprecated: Do not use.
+	// This is deprecated, please use counter_leaf_swap instead.
+	LeafSwap(ctx context.Context, in *CounterLeafSwapRequest, opts ...grpc.CallOption) (*CounterLeafSwapResponse, error)
+	// This is the exact same as start_leaf_swap, but signs with
+	// an adaptor public key after a counterparty has begun the swap via start_leaf_swap.
+	CounterLeafSwap(ctx context.Context, in *CounterLeafSwapRequest, opts ...grpc.CallOption) (*CounterLeafSwapResponse, error)
 	RefreshTimelock(ctx context.Context, in *RefreshTimelockRequest, opts ...grpc.CallOption) (*RefreshTimelockResponse, error)
 	ExtendLeaf(ctx context.Context, in *ExtendLeafRequest, opts ...grpc.CallOption) (*ExtendLeafResponse, error)
 	PrepareTreeAddress(ctx context.Context, in *PrepareTreeAddressRequest, opts ...grpc.CallOption) (*PrepareTreeAddressResponse, error)
@@ -255,10 +265,31 @@ func (c *sparkServiceClient) ProvidePreimage(ctx context.Context, in *ProvidePre
 	return out, nil
 }
 
-func (c *sparkServiceClient) LeafSwap(ctx context.Context, in *LeafSwapRequest, opts ...grpc.CallOption) (*LeafSwapResponse, error) {
+func (c *sparkServiceClient) StartLeafSwap(ctx context.Context, in *StartSendTransferRequest, opts ...grpc.CallOption) (*StartSendTransferResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(LeafSwapResponse)
+	out := new(StartSendTransferResponse)
+	err := c.cc.Invoke(ctx, SparkService_StartLeafSwap_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// Deprecated: Do not use.
+func (c *sparkServiceClient) LeafSwap(ctx context.Context, in *CounterLeafSwapRequest, opts ...grpc.CallOption) (*CounterLeafSwapResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CounterLeafSwapResponse)
 	err := c.cc.Invoke(ctx, SparkService_LeafSwap_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *sparkServiceClient) CounterLeafSwap(ctx context.Context, in *CounterLeafSwapRequest, opts ...grpc.CallOption) (*CounterLeafSwapResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CounterLeafSwapResponse)
+	err := c.cc.Invoke(ctx, SparkService_CounterLeafSwap_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -464,7 +495,15 @@ type SparkServiceServer interface {
 	CooperativeExit(context.Context, *CooperativeExitRequest) (*CooperativeExitResponse, error)
 	InitiatePreimageSwap(context.Context, *InitiatePreimageSwapRequest) (*InitiatePreimageSwapResponse, error)
 	ProvidePreimage(context.Context, *ProvidePreimageRequest) (*ProvidePreimageResponse, error)
-	LeafSwap(context.Context, *LeafSwapRequest) (*LeafSwapResponse, error)
+	// This is the exact same as start_send_transfer, but expresses to the SO
+	// this transfer is specifically for a leaf swap.
+	StartLeafSwap(context.Context, *StartSendTransferRequest) (*StartSendTransferResponse, error)
+	// Deprecated: Do not use.
+	// This is deprecated, please use counter_leaf_swap instead.
+	LeafSwap(context.Context, *CounterLeafSwapRequest) (*CounterLeafSwapResponse, error)
+	// This is the exact same as start_leaf_swap, but signs with
+	// an adaptor public key after a counterparty has begun the swap via start_leaf_swap.
+	CounterLeafSwap(context.Context, *CounterLeafSwapRequest) (*CounterLeafSwapResponse, error)
 	RefreshTimelock(context.Context, *RefreshTimelockRequest) (*RefreshTimelockResponse, error)
 	ExtendLeaf(context.Context, *ExtendLeafRequest) (*ExtendLeafResponse, error)
 	PrepareTreeAddress(context.Context, *PrepareTreeAddressRequest) (*PrepareTreeAddressResponse, error)
@@ -539,8 +578,14 @@ func (UnimplementedSparkServiceServer) InitiatePreimageSwap(context.Context, *In
 func (UnimplementedSparkServiceServer) ProvidePreimage(context.Context, *ProvidePreimageRequest) (*ProvidePreimageResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ProvidePreimage not implemented")
 }
-func (UnimplementedSparkServiceServer) LeafSwap(context.Context, *LeafSwapRequest) (*LeafSwapResponse, error) {
+func (UnimplementedSparkServiceServer) StartLeafSwap(context.Context, *StartSendTransferRequest) (*StartSendTransferResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method StartLeafSwap not implemented")
+}
+func (UnimplementedSparkServiceServer) LeafSwap(context.Context, *CounterLeafSwapRequest) (*CounterLeafSwapResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method LeafSwap not implemented")
+}
+func (UnimplementedSparkServiceServer) CounterLeafSwap(context.Context, *CounterLeafSwapRequest) (*CounterLeafSwapResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CounterLeafSwap not implemented")
 }
 func (UnimplementedSparkServiceServer) RefreshTimelock(context.Context, *RefreshTimelockRequest) (*RefreshTimelockResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RefreshTimelock not implemented")
@@ -887,8 +932,26 @@ func _SparkService_ProvidePreimage_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SparkService_StartLeafSwap_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StartSendTransferRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkServiceServer).StartLeafSwap(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkService_StartLeafSwap_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkServiceServer).StartLeafSwap(ctx, req.(*StartSendTransferRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _SparkService_LeafSwap_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(LeafSwapRequest)
+	in := new(CounterLeafSwapRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -900,7 +963,25 @@ func _SparkService_LeafSwap_Handler(srv interface{}, ctx context.Context, dec fu
 		FullMethod: SparkService_LeafSwap_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SparkServiceServer).LeafSwap(ctx, req.(*LeafSwapRequest))
+		return srv.(SparkServiceServer).LeafSwap(ctx, req.(*CounterLeafSwapRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SparkService_CounterLeafSwap_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CounterLeafSwapRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkServiceServer).CounterLeafSwap(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkService_CounterLeafSwap_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkServiceServer).CounterLeafSwap(ctx, req.(*CounterLeafSwapRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1297,8 +1378,16 @@ var SparkService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _SparkService_ProvidePreimage_Handler,
 		},
 		{
+			MethodName: "start_leaf_swap",
+			Handler:    _SparkService_StartLeafSwap_Handler,
+		},
+		{
 			MethodName: "leaf_swap",
 			Handler:    _SparkService_LeafSwap_Handler,
+		},
+		{
+			MethodName: "counter_leaf_swap",
+			Handler:    _SparkService_CounterLeafSwap_Handler,
 		},
 		{
 			MethodName: "refresh_timelock",
