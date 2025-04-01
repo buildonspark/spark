@@ -503,16 +503,16 @@ class DefaultSparkSigner implements SparkSigner {
     const DEV_MAINNET_KEY =
       "02e0b8d42c5d3b5fe4c5beb6ea796ab3bc8aaf28a3d3195407482c67e0b58228a5";
     if (network === Network.MAINNET) {
-      if (process.env.NODE_ENV !== "development") {
+      if (process.env.NODE_ENV === "production") {
         throw new Error("Mainnet key is not set");
       } else {
         return hexToBytes(DEV_MAINNET_KEY);
       }
     } else {
       return hexToBytes(
-        process.env.NODE_ENV === "development"
-          ? DEV_REGTEST_KEY
-          : PROD_REGTEST_KEY,
+        process.env.NODE_ENV === "production"
+          ? PROD_REGTEST_KEY
+          : DEV_REGTEST_KEY,
       );
     }
   }

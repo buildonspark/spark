@@ -1,9 +1,12 @@
-import { LRC20WalletApiConfig, MayHaveLrc20WalletApiConfig } from "@buildonspark/lrc20-sdk";
+import {
+  LRC20WalletApiConfig,
+  MayHaveLrc20WalletApiConfig,
+} from "@buildonspark/lrc20-sdk";
 import { hexToBytes } from "@noble/curves/abstract/utils";
 import { isHermeticTest } from "../tests/test-util.js";
 import { NetworkType } from "../utils/network.js";
 
-const isDevelopment = process.env.NODE_ENV === "development";
+const isProduction = process.env.NODE_ENV === "production";
 
 const URL_CONFIG = {
   LOCAL: {
@@ -42,15 +45,20 @@ export const ELECTRS_CREDENTIALS = {
   password: "mCMk1JqlBNtetUNy",
 };
 
-
 export function getElectrsUrl(network: NetworkType): string {
   switch (network) {
     case "LOCAL":
-      return isHermeticTest() ? "http://mempool.minikube.local/api" : URL_CONFIG.LOCAL.ELECTRS;
+      return isHermeticTest()
+        ? "http://mempool.minikube.local/api"
+        : URL_CONFIG.LOCAL.ELECTRS;
     case "REGTEST":
-      return isDevelopment ? URL_CONFIG.REGTEST.DEV.ELECTRS : URL_CONFIG.REGTEST.PROD.ELECTRS;
+      return isProduction
+        ? URL_CONFIG.REGTEST.PROD.ELECTRS
+        : URL_CONFIG.REGTEST.DEV.ELECTRS;
     case "MAINNET":
-      return isDevelopment ? URL_CONFIG.MAINNET.DEV.ELECTRS : URL_CONFIG.MAINNET.PROD.ELECTRS;
+      return isProduction
+        ? URL_CONFIG.MAINNET.PROD.ELECTRS
+        : URL_CONFIG.MAINNET.DEV.ELECTRS;
     default:
       return URL_CONFIG.LOCAL.ELECTRS;
   }
@@ -61,9 +69,13 @@ export function getLrc20Url(network: NetworkType): string {
     case "LOCAL":
       return URL_CONFIG.LOCAL.LRC20;
     case "REGTEST":
-      return isDevelopment ? URL_CONFIG.REGTEST.DEV.LRC20 : URL_CONFIG.REGTEST.PROD.LRC20;
+      return isProduction
+        ? URL_CONFIG.REGTEST.PROD.LRC20
+        : URL_CONFIG.REGTEST.DEV.LRC20;
     case "MAINNET":
-      return isDevelopment ? URL_CONFIG.MAINNET.DEV.LRC20 : URL_CONFIG.MAINNET.PROD.LRC20;
+      return isProduction
+        ? URL_CONFIG.MAINNET.PROD.LRC20
+        : URL_CONFIG.MAINNET.DEV.LRC20;
     default:
       return URL_CONFIG.LOCAL.LRC20;
   }
@@ -74,14 +86,17 @@ export function getLrc20NodeUrl(network: NetworkType): string {
     case "LOCAL":
       return URL_CONFIG.LOCAL.LRC20_NODE;
     case "REGTEST":
-      return isDevelopment ? URL_CONFIG.REGTEST.DEV.LRC20_NODE : URL_CONFIG.REGTEST.PROD.LRC20_NODE;
+      return isProduction
+        ? URL_CONFIG.REGTEST.PROD.LRC20_NODE
+        : URL_CONFIG.REGTEST.DEV.LRC20_NODE;
     case "MAINNET":
-      return isDevelopment ? URL_CONFIG.MAINNET.DEV.LRC20_NODE : URL_CONFIG.MAINNET.PROD.LRC20_NODE;
+      return isProduction
+        ? URL_CONFIG.MAINNET.PROD.LRC20_NODE
+        : URL_CONFIG.MAINNET.PROD.LRC20_NODE;
     default:
       return URL_CONFIG.LOCAL.LRC20_NODE;
   }
 }
-
 
 export type SigningOperator = {
   readonly id: number;
@@ -174,7 +189,7 @@ export const MAINNET_WALLET_CONFIG: Required<ConfigOptions> = {
 };
 
 export function getRegtestSigningOperators(): Record<string, SigningOperator> {
-  return isDevelopment ? getDevSigningOperators() : getProdSigningOperators();
+  return isProduction ? getProdSigningOperators() : getDevSigningOperators();
 }
 
 function getDevSigningOperators(): Record<string, SigningOperator> {

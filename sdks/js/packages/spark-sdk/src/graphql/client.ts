@@ -65,9 +65,9 @@ export default class SspClient {
       "graphql/spark/rc",
       `spark-sdk/0.0.0`,
       new SparkAuthProvider(identityPublicKey),
-      process.env.NODE_ENV === "development"
-        ? "https://api.dev.dev.sparkinfra.net"
-        : "https://api.lightspark.com",
+      process.env.NODE_ENV === "production"
+        ? "https://api.lightspark.com"
+        : "https://api.dev.dev.sparkinfra.net",
       DefaultCrypto,
       this.signingKey,
       fetchFunction,

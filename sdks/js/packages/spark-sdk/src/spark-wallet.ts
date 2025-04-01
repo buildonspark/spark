@@ -1318,7 +1318,7 @@ export class SparkWallet {
       if (!sspResponse) {
         throw new Error("Failed to contact SSP");
       }
-
+      // test
       const leavesToRemove = new Set(leavesToSend.map((leaf) => leaf.leaf.id));
       this.leaves = this.leaves.filter((leaf) => !leavesToRemove.has(leaf.id));
 
