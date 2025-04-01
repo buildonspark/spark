@@ -1,6 +1,6 @@
 import { numberToBytesBE } from "@noble/curves/abstract/utils";
-import { Network } from "../proto/spark.js";
 import { hashTokenTransaction } from "../utils/token-hashing.js";
+import { Network } from "../proto/spark.js";
 
 describe("hash token transaction", () => {
   it("should produce the exact same hash", () => {
@@ -17,7 +17,6 @@ describe("hash token transaction", () => {
     ]);
 
     const tokenTransaction = {
-      network: Network.REGTEST,
       tokenInput: {
         $case: "mintInput" as const,
         mintInput: {
@@ -30,20 +29,20 @@ describe("hash token transaction", () => {
           id: "db1a4e48-0fc5-4f6c-8a80-d9d6c561a436",
           ownerPublicKey: identityPubKey,
           withdrawBondSats: 10000,
-          withdrawLocktime: 100,
+          withdrawRelativeBlockLocktime: 100,
           tokenPublicKey: tokenPublicKey,
           tokenAmount: numberToBytesBE(tokenAmount, 16),
-          revocationPublicKey: new Uint8Array(0),
+          revocationPublicKey: identityPubKey,
         },
       ],
       sparkOperatorIdentityPublicKeys: [],
+      network: Network.REGTEST,
     };
 
     const hash = hashTokenTransaction(tokenTransaction, false);
 
     expect(Array.from(hash)).toEqual([
-      202, 173, 255, 5, 254, 110, 122, 187, 70, 125, 122, 81, 11, 189, 136, 107,
-      235, 187, 48, 203, 81, 134, 103, 57, 227, 64, 203, 126, 62, 111, 134, 74,
+      39, 154, 106, 90, 228, 192, 20, 72, 126, 11, 34, 149, 35, 65, 184, 120, 112, 131, 70, 59, 179, 34, 60, 184, 120, 169, 124, 135, 175, 146, 103, 167,
     ]);
   });
 });
