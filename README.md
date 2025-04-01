@@ -156,7 +156,8 @@ Please run: ops/minikube/setup.sh
 
 ### Running tests
 
-All E2E tests live in the spark/so/grpc_test folder.
+Golang integration tests are in the spark/so/grpc_test folder.
+JS SDK integration tests are across the different JS packages, but can be run together in the js/sdks directory, or in each package's own directory, via `yarn test:integration`.
 
 In the root folder, run:
 
@@ -174,7 +175,7 @@ OR
 #
 # Env variables:
 # RESET_DBS={default:true}                 - resets the operator databases and bitcoin blockchain
-# USE_DEV_SPARK={default:false}            - use the dev spark image built into the minikube 
+# USE_DEV_SPARK={default:false}            - use the dev spark image built into the minikube
 #                                            container cluster
 #                                            (rebuild the the image with ./scripts/build.sh)
 # SPARK_TAG={default:latest}               - the image to use for both Spark operator and signer
@@ -202,9 +203,16 @@ go run gotest.tools/gotestsum@latest \
 # or install it via go install gotest.tools/gotestsum@latest
 ```
 
+In the sdks/js folder, you can run:
+```
+yarn install
+yarn build
+yarn test:integration
+```
+
 #### Troubleshooting
 
-1. For local testing, operator (go) and signer (rust) logs are found in `_data/run_X/logs`. For minikube, logs are found via kubernetes.
+1. For local testing, operator (go) and signer (rust) logs are found in `_data/run_X/logs`. For minikube, logs are found via kubernetes. [k9s](https://k9scli.io/) is a great tool to investigate your minikube k8 cluster.
 2. If you don't want to deal with `tmux` commands yourself, you can easily interact with tmux using the `iterm2` GUI and tmux control-center.
    From within `iterm2`, you can run:
 
