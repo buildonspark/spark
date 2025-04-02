@@ -312,17 +312,16 @@ func TestCancelTransfer(t *testing.T) {
 		t.Fatalf("failed to transfer tree node: %v", err)
 	}
 
-	_, err = wallet.CancelSendTransfer(context.Background(), senderConfig, senderTransfer)
-	if err == nil {
-		t.Fatalf("expected to fail to cancel transfer, but succeeded")
-	}
-
-	time.Sleep(expiryDelta)
-
+	// We don't need to wait for the expiry because we haven't
+	// tweaked our key yet.
 	_, err = wallet.CancelSendTransfer(context.Background(), senderConfig, senderTransfer)
 	if err != nil {
 		t.Fatalf("failed to cancel transfer: %v", err)
 	}
+
+	transfers, _, err := wallet.QueryAllTransfers(context.Background(), senderConfig, 1, 0)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(transfers))
 
 	senderTransfer, err = wallet.SendTransfer(
 		context.Background(),
