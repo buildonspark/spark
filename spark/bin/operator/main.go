@@ -344,6 +344,9 @@ func main() {
 	)
 
 	mux := http.NewServeMux()
+	mux.Handle("/-/ready", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
 	mux.Handle("/metrics", promhttp.Handler())
 	mux.HandleFunc("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.ToLower(r.Header.Get("Content-Type")) == "application/grpc" {
