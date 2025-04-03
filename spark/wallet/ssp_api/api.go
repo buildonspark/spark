@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/hex"
 	"log"
+	"slices"
 	"strings"
 
 	"github.com/btcsuite/btcd/wire"
@@ -159,6 +160,7 @@ func (s *SparkServiceAPI) InitiateCoopExit(
 		return "", nil, nil, err
 	}
 	coopExitTxid := connectorTx.TxIn[0].PreviousOutPoint.Hash[:]
+	slices.Reverse(coopExitTxid)
 
 	return coopExitID, coopExitTxid, &connectorTx, nil
 }

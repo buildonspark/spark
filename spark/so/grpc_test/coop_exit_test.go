@@ -3,6 +3,7 @@ package grpctest
 import (
 	"bytes"
 	"context"
+	"slices"
 	"testing"
 	"time"
 
@@ -91,11 +92,13 @@ func TestCoopExit(t *testing.T) {
 		NewSigningPrivKey: newLeafPrivKey.Serialize(),
 	}
 
+	exitTxID := exitTxHash.CloneBytes()
+	slices.Reverse(exitTxID[:])
 	senderTransfer, _, err := wallet.GetConnectorRefundSignatures(
 		context.Background(),
 		config,
 		[]wallet.LeafKeyTweak{transferNode},
-		exitTxHash.CloneBytes(),
+		exitTxID,
 		connectorOutputs,
 		sspPubkey,
 	)

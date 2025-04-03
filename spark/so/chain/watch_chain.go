@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"log/slog"
+	"slices"
 	"time"
 
 	"github.com/btcsuite/btcd/btcjson"
@@ -350,7 +351,7 @@ func handleBlock(ctx context.Context,
 	if err != nil {
 		return err
 	}
-	confirmedTxidSet := make(map[[32]byte]bool)
+	confirmedTxHashSet := make(map[[32]byte]bool)
 	debitedAddresses := make([]string, 0)
 	for _, tx := range txs {
 		for _, txOut := range tx.TxOut {
@@ -363,7 +364,7 @@ func handleBlock(ctx context.Context,
 			}
 		}
 		txid := tx.TxHash()
-		confirmedTxidSet[txid] = true
+		confirmedTxHashSet[txid] = true
 	}
 
 	// TODO: expire pending coop exits after some time so this doesn't become too large
@@ -372,7 +373,9 @@ func handleBlock(ctx context.Context,
 		return err
 	}
 	for _, coopExit := range pendingCoopExits {
-		if _, ok := confirmedTxidSet[[32]byte(coopExit.ExitTxid)]; !ok {
+		txHash := coopExit.ExitTxid
+		slices.Reverse(txHash)
+		if _, ok := confirmedTxHashSet[[32]byte(txHash)]; !ok {
 			continue
 		}
 		err = handleCoopExitConfirmation(ctx, coopExit, blockHeight)
@@ -416,9 +419,9 @@ func handleBlock(ctx context.Context,
 			logger.Info("Expected tree status to be pending", "status", tree.Status)
 			continue
 		}
-		if _, ok := confirmedTxidSet[[32]byte(tree.BaseTxid)]; !ok {
+		if _, ok := confirmedTxHashSet[[32]byte(tree.BaseTxid)]; !ok {
 			logger.Debug("Base txid not found in confirmed txids", "base_txid", hex.EncodeToString(tree.BaseTxid))
-			for txid := range confirmedTxidSet {
+			for txid := range confirmedTxHashSet {
 				logger.Debug("confirmed txid", "txid", hex.EncodeToString(txid[:]))
 			}
 			continue
