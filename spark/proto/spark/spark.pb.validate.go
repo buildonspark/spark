@@ -6103,6 +6103,17 @@ func (m *StartSendTransferRequest) validate(all bool) error {
 
 	// no validation rules for OwnerIdentityPublicKey
 
+	if len(m.GetLeavesToSend()) < 1 {
+		err := StartSendTransferRequestValidationError{
+			field:  "LeavesToSend",
+			reason: "value must contain at least 1 item(s)",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
 	for idx, item := range m.GetLeavesToSend() {
 		_, _ = idx, item
 
@@ -15094,8 +15105,6 @@ func (m *SparkAddress) validate(all bool) error {
 	var errors []error
 
 	// no validation rules for IdentityPublicKey
-
-	// no validation rules for Network
 
 	if len(errors) > 0 {
 		return SparkAddressMultiError(errors)

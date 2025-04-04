@@ -118,6 +118,24 @@ func TestTransfer(t *testing.T) {
 	assert.Equal(t, res[0].Id, claimingNode.Leaf.Id)
 }
 
+func TestTransferZeroLeaves(t *testing.T) {
+	senderConfig, err := testutil.TestWalletConfig()
+	require.NoError(t, err, "failed to create sender wallet config: %v", err)
+
+	receiverPrivKey, err := secp256k1.GeneratePrivateKey()
+	require.NoError(t, err, "failed to create receiver private key: %v", err)
+
+	leavesToTransfer := []wallet.LeafKeyTweak{}
+	_, err = wallet.SendTransfer(
+		context.Background(),
+		senderConfig,
+		leavesToTransfer[:],
+		receiverPrivKey.PubKey().SerializeCompressed(),
+		time.Now().Add(10*time.Minute),
+	)
+	require.Error(t, err, "expected error when transferring zero leaves")
+}
+
 func TestTransferWithSeparateSteps(t *testing.T) {
 	// Sender initiates transfer
 	senderConfig, err := testutil.TestWalletConfig()

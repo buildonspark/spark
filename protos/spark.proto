@@ -506,7 +506,7 @@ message LeafRefundTxSigningResult {
 message StartSendTransferRequest {
     string transfer_id = 1;
     bytes owner_identity_public_key = 2;
-    repeated LeafRefundTxSigningJob leaves_to_send = 3;
+    repeated LeafRefundTxSigningJob leaves_to_send = 3 [(validate.rules).repeated.min_items = 1];
     bytes receiver_identity_public_key = 4;
     google.protobuf.Timestamp expiry_time = 5;
     map<string, SecretProof> key_tweak_proofs = 6;

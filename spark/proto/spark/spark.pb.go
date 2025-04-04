@@ -6742,7 +6742,6 @@ func (x *QueryBalanceResponse) GetNodeBalances() map[string]uint64 {
 type SparkAddress struct {
 	state             protoimpl.MessageState `protogen:"open.v1"`
 	IdentityPublicKey []byte                 `protobuf:"bytes,1,opt,name=identity_public_key,json=identityPublicKey,proto3" json:"identity_public_key,omitempty"`
-	Network           string                 `protobuf:"bytes,2,opt,name=network,proto3" json:"network,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
@@ -6782,13 +6781,6 @@ func (x *SparkAddress) GetIdentityPublicKey() []byte {
 		return x.IdentityPublicKey
 	}
 	return nil
-}
-
-func (x *SparkAddress) GetNetwork() string {
-	if x != nil {
-		return x.Network
-	}
-	return ""
 }
 
 var File_spark_proto protoreflect.FileDescriptor
@@ -6986,12 +6978,12 @@ const file_spark_proto_rawDesc = "" +
 	"\x19LeafRefundTxSigningResult\x12\x17\n" +
 	"\aleaf_id\x18\x01 \x01(\tR\x06leafId\x12M\n" +
 	"\x18refund_tx_signing_result\x18\x02 \x01(\v2\x14.spark.SigningResultR\x15refundTxSigningResult\x12#\n" +
-	"\rverifying_key\x18\x03 \x01(\fR\fverifyingKey\"\xef\x03\n" +
+	"\rverifying_key\x18\x03 \x01(\fR\fverifyingKey\"\xf9\x03\n" +
 	"\x18StartSendTransferRequest\x12\x1f\n" +
 	"\vtransfer_id\x18\x01 \x01(\tR\n" +
 	"transferId\x129\n" +
-	"\x19owner_identity_public_key\x18\x02 \x01(\fR\x16ownerIdentityPublicKey\x12C\n" +
-	"\x0eleaves_to_send\x18\x03 \x03(\v2\x1d.spark.LeafRefundTxSigningJobR\fleavesToSend\x12?\n" +
+	"\x19owner_identity_public_key\x18\x02 \x01(\fR\x16ownerIdentityPublicKey\x12M\n" +
+	"\x0eleaves_to_send\x18\x03 \x03(\v2\x1d.spark.LeafRefundTxSigningJobB\b\xfaB\x05\x92\x01\x02\b\x01R\fleavesToSend\x12?\n" +
 	"\x1creceiver_identity_public_key\x18\x04 \x01(\fR\x19receiverIdentityPublicKey\x12;\n" +
 	"\vexpiry_time\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"expiryTime\x12]\n" +

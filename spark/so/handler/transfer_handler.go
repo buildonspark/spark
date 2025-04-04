@@ -478,10 +478,13 @@ func checkCoopExitTxBroadcasted(ctx context.Context, db *ent.Tx, transfer *ent.T
 		return fmt.Errorf("failed to find coop exit for transfer %s: %v", transfer.ID.String(), err)
 	}
 
-	tree, err := transfer.QueryTransferLeaves().QueryLeaf().QueryTree().Only(ctx)
+	transferLeaves, err := transfer.QueryTransferLeaves().All(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to find leaf for transfer %s: %v", transfer.ID.String(), err)
+		return fmt.Errorf("failed to find leaves for transfer %s: %v", transfer.ID.String(), err)
 	}
+	// Leaf and tree are required to exist by our schema and
+	// transfers must be initialized with at least 1 leaf
+	tree := transferLeaves[0].QueryLeaf().QueryTree().OnlyX(ctx)
 
 	blockHeight, err := db.BlockHeight.Query().Where(
 		blockheight.NetworkEQ(tree.Network),
