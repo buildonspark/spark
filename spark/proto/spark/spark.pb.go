@@ -3521,6 +3521,8 @@ type QueryPendingTransfersRequest struct {
 	//	*QueryPendingTransfersRequest_SenderIdentityPublicKey
 	Participant   isQueryPendingTransfersRequest_Participant `protobuf_oneof:"participant"`
 	TransferIds   []string                                   `protobuf:"bytes,3,rep,name=transfer_ids,json=transferIds,proto3" json:"transfer_ids,omitempty"`
+	Limit         int64                                      `protobuf:"varint,4,opt,name=limit,proto3" json:"limit,omitempty"`
+	Offset        int64                                      `protobuf:"varint,5,opt,name=offset,proto3" json:"offset,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3587,6 +3589,20 @@ func (x *QueryPendingTransfersRequest) GetTransferIds() []string {
 	return nil
 }
 
+func (x *QueryPendingTransfersRequest) GetLimit() int64 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+func (x *QueryPendingTransfersRequest) GetOffset() int64 {
+	if x != nil {
+		return x.Offset
+	}
+	return 0
+}
+
 type isQueryPendingTransfersRequest_Participant interface {
 	isQueryPendingTransfersRequest_Participant()
 }
@@ -3608,6 +3624,7 @@ func (*QueryPendingTransfersRequest_SenderIdentityPublicKey) isQueryPendingTrans
 type QueryPendingTransfersResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Transfers     []*Transfer            `protobuf:"bytes,1,rep,name=transfers,proto3" json:"transfers,omitempty"`
+	Offset        int64                  `protobuf:"varint,2,opt,name=offset,proto3" json:"offset,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3647,6 +3664,13 @@ func (x *QueryPendingTransfersResponse) GetTransfers() []*Transfer {
 		return x.Transfers
 	}
 	return nil
+}
+
+func (x *QueryPendingTransfersResponse) GetOffset() int64 {
+	if x != nil {
+		return x.Offset
+	}
+	return 0
 }
 
 type ClaimLeafKeyTweak struct {
@@ -7013,14 +7037,17 @@ const file_spark_proto_rawDesc = "" +
 	"\tsignature\x18\x03 \x01(\fR\tsignature\x124\n" +
 	"\x16intermediate_refund_tx\x18\x04 \x01(\fR\x14intermediateRefundTx\"K\n" +
 	"\x1cCompleteSendTransferResponse\x12+\n" +
-	"\btransfer\x18\x01 \x01(\v2\x0f.spark.TransferR\btransfer\"\xd2\x01\n" +
+	"\btransfer\x18\x01 \x01(\v2\x0f.spark.TransferR\btransfer\"\x80\x02\n" +
 	"\x1cQueryPendingTransfersRequest\x12A\n" +
 	"\x1creceiver_identity_public_key\x18\x01 \x01(\fH\x00R\x19receiverIdentityPublicKey\x12=\n" +
 	"\x1asender_identity_public_key\x18\x02 \x01(\fH\x00R\x17senderIdentityPublicKey\x12!\n" +
-	"\ftransfer_ids\x18\x03 \x03(\tR\vtransferIdsB\r\n" +
-	"\vparticipant\"N\n" +
+	"\ftransfer_ids\x18\x03 \x03(\tR\vtransferIds\x12\x14\n" +
+	"\x05limit\x18\x04 \x01(\x03R\x05limit\x12\x16\n" +
+	"\x06offset\x18\x05 \x01(\x03R\x06offsetB\r\n" +
+	"\vparticipant\"f\n" +
 	"\x1dQueryPendingTransfersResponse\x12-\n" +
-	"\ttransfers\x18\x01 \x03(\v2\x0f.spark.TransferR\ttransfers\"\x95\x02\n" +
+	"\ttransfers\x18\x01 \x03(\v2\x0f.spark.TransferR\ttransfers\x12\x16\n" +
+	"\x06offset\x18\x02 \x01(\x03R\x06offset\"\x95\x02\n" +
 	"\x11ClaimLeafKeyTweak\x12\x17\n" +
 	"\aleaf_id\x18\x01 \x01(\tR\x06leafId\x12@\n" +
 	"\x12secret_share_tweak\x18\x02 \x01(\v2\x12.spark.SecretShareR\x10secretShareTweak\x12_\n" +
@@ -7238,10 +7265,9 @@ const file_spark_proto_rawDesc = "" +
 	"\rnode_balances\x18\x02 \x03(\v2-.spark.QueryBalanceResponse.NodeBalancesEntryR\fnodeBalances\x1a?\n" +
 	"\x11NodeBalancesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\x04R\x05value:\x028\x01\"X\n" +
+	"\x05value\x18\x02 \x01(\x04R\x05value:\x028\x01\">\n" +
 	"\fSparkAddress\x12.\n" +
-	"\x13identity_public_key\x18\x01 \x01(\fR\x11identityPublicKey\x12\x18\n" +
-	"\anetwork\x18\x02 \x01(\tR\anetwork*M\n" +
+	"\x13identity_public_key\x18\x01 \x01(\fR\x11identityPublicKey*M\n" +
 	"\aNetwork\x12\x0f\n" +
 	"\vUNSPECIFIED\x10\x00\x12\v\n" +
 	"\aMAINNET\x10\n" +

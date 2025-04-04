@@ -582,10 +582,13 @@ message QueryPendingTransfersRequest {
         bytes sender_identity_public_key = 2;
     }
     repeated string transfer_ids = 3;
+    int64 limit = 40;
+    int64 offset = 50;
 }
 
 message QueryPendingTransfersResponse {
     repeated Transfer transfers = 1;
+    int64 offset = 2;
 }
 
 message ClaimLeafKeyTweak {
