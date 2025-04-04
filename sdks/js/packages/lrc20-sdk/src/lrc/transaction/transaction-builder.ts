@@ -18,17 +18,7 @@ import {
   Receipt,
 } from "../types/index.ts";
 import { findNotFirstUsingFind, reverseBuffer, toEvenParity, PARITY, toXOnly } from "../utils/index.ts";
-import {
-  Psbt,
-  Payment,
-  payments,
-  networks,
-  Transaction,
-  address,
-  script,
-  opcodes,
-  type Network,
-} from "bitcoinjs-lib";
+import { Psbt, Payment, payments, networks, Transaction, address, script, opcodes, type Network } from "bitcoinjs-lib";
 import * as varuint from "varuint-bitcoin";
 import { privateNegate } from "@bitcoinerlab/secp256k1";
 import { ECPair } from "../../bitcoin-core.ts";

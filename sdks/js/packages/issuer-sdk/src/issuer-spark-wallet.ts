@@ -2,9 +2,12 @@ import {
   LRCWallet,
   TokenPubkey,
   TokenPubkeyAnnouncement,
-  TokenPubkeyInfo
+  TokenPubkeyInfo,
 } from "@buildonspark/lrc20-sdk";
-import { ListAllTokenTransactionsCursor, OperationType } from "@buildonspark/lrc20-sdk/proto/rpc/v1/types";
+import {
+  ListAllTokenTransactionsCursor,
+  OperationType,
+} from "@buildonspark/lrc20-sdk/proto/rpc/v1/types";
 import { SparkWallet, SparkWalletProps } from "@buildonspark/spark-sdk";
 import { encodeSparkAddress } from "@buildonspark/spark-sdk/address";
 import { LeafWithPreviousTransactionData } from "@buildonspark/spark-sdk/proto/spark";
@@ -30,12 +33,14 @@ import {
   convertTokenActivityToHexEncoded,
   convertToTokenPubKeyInfoResponse,
 } from "./utils/type-mappers.js";
+import { decodeSparkAddress } from "@buildonspark/spark-sdk/address";
 
 const BURN_ADDRESS = "02".repeat(33);
 
 export class IssuerSparkWallet
   extends SparkWallet
-  implements IssuerWalletInterface {
+  implements IssuerWalletInterface
+{
   private issuerTokenTransactionService: IssuerTokenTransactionService;
   private tokenFreezeService: TokenFreezeService;
   private tokenPublicKeyInfo?: TokenPubkeyInfo;
@@ -88,7 +93,7 @@ export class IssuerSparkWallet
         bytesToHex(identityKey.privateKey!),
         LRC_WALLET_NETWORK[network],
         LRC_WALLET_NETWORK_TYPE[network],
-        this.config.lrc20ApiConfig
+        this.config.lrc20ApiConfig,
       );
     }
 
@@ -115,11 +120,9 @@ export class IssuerSparkWallet
     if (this.tokenPublicKeyInfo) {
       return convertToTokenPubKeyInfoResponse(this.tokenPublicKeyInfo);
     }
-
     const tokenPublicKey = bytesToHex(this.lrc20Wallet!.pubkey);
     const rawTokenPubkeyInfo =
       await this.lrc20Wallet!.getTokenPubkeyInfo(tokenPublicKey);
-
     this.tokenPublicKeyInfo = rawTokenPubkeyInfo;
     if (!rawTokenPubkeyInfo) {
       return null;
@@ -166,9 +169,12 @@ export class IssuerSparkWallet
   ): Promise<{ impactedLeafIds: string[]; impactedTokenAmount: bigint }> {
     await this.syncTokenLeaves();
     const tokenPublicKey = await super.getIdentityPublicKey();
-
+    const decodedOwnerPubkey = decodeSparkAddress(
+      ownerPublicKey,
+      this.config.getNetworkType(),
+    );
     const response = await this.tokenFreezeService!.freezeTokens(
-      hexToBytes(ownerPublicKey),
+      hexToBytes(decodedOwnerPubkey),
       hexToBytes(tokenPublicKey),
     );
 
@@ -186,9 +192,12 @@ export class IssuerSparkWallet
   ): Promise<{ impactedLeafIds: string[]; impactedTokenAmount: bigint }> {
     await this.syncTokenLeaves();
     const tokenPublicKey = await super.getIdentityPublicKey();
-
+    const decodedOwnerPubkey = decodeSparkAddress(
+      ownerPublicKey,
+      this.config.getNetworkType(),
+    );
     const response = await this.tokenFreezeService!.unfreezeTokens(
-      hexToBytes(ownerPublicKey),
+      hexToBytes(decodedOwnerPubkey),
       hexToBytes(tokenPublicKey),
     );
     const tokenAmount = bytesToNumberBE(response.impactedTokenAmount);
