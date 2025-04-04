@@ -3,6 +3,7 @@ import {
   MayHaveLrc20WalletApiConfig,
 } from "@buildonspark/lrc20-sdk";
 import { hexToBytes } from "@noble/curves/abstract/utils";
+import { MayHaveSspClientOptions, SspClientOptions } from "../graphql/client.js";
 import { isHermeticTest } from "../tests/test-util.js";
 import { NetworkType } from "../utils/network.js";
 
@@ -10,17 +11,20 @@ const isProduction = process.env.NODE_ENV === "production";
 
 const URL_CONFIG = {
   LOCAL: {
+    SSP: "http://localhost:5000",
     ELECTRS: "http://127.0.0.1:30000",
     LRC20: "http://127.0.0.1:18530",
     LRC20_NODE: "http://127.0.0.1:18332",
   },
   REGTEST: {
     DEV: {
+      SSP: "https://api.dev.dev.sparkinfra.net",
       ELECTRS: "https://regtest-mempool.dev.dev.sparkinfra.net/api",
       LRC20: "https://regtest.lrc20.dev.dev.sparkinfra.net:443",
       LRC20_NODE: "https://regtest.lrc20.dev.dev.sparkinfra.net",
     },
     PROD: {
+      SSP: "https://api.lightspark.com",
       ELECTRS: "https://regtest-mempool.us-west-2.sparkinfra.net/api",
       LRC20: "https://regtest.lrc20.us-west-2.sparkinfra.net:443",
       LRC20_NODE: "https://regtest.lrc20.us-west-2.sparkinfra.net",
@@ -28,11 +32,13 @@ const URL_CONFIG = {
   },
   MAINNET: {
     DEV: {
+      SSP: "https://api.dev.dev.sparkinfra.net",
       ELECTRS: "https://mempool.space/api",
       LRC20: "https://mainnet.lrc20.dev.dev.sparkinfra.net:443",
       LRC20_NODE: "https://mainnet.lrc20.dev.dev.sparkinfra.net",
     },
     PROD: {
+      SSP: "https://api.lightspark.com",
       ELECTRS: "https://mempool.space/api",
       LRC20: "https://mainnet.lrc20.us-west-2.sparkinfra.net:443",
       LRC20_NODE: "https://mainnet.lrc20.us-west-2.sparkinfra.net",
@@ -98,6 +104,19 @@ export function getLrc20NodeUrl(network: NetworkType): string {
   }
 }
 
+export function getSspUrl(network: NetworkType): string {
+  switch (network) {
+    case "LOCAL":
+      return isHermeticTest() ? "http://app.minikube.local" : URL_CONFIG.LOCAL.SSP;
+    case "REGTEST":
+      return isProduction ? URL_CONFIG.REGTEST.PROD.SSP : URL_CONFIG.REGTEST.DEV.SSP;
+    case "MAINNET":
+      return isProduction ? URL_CONFIG.MAINNET.PROD.SSP : URL_CONFIG.MAINNET.DEV.SSP;
+    default:
+      return URL_CONFIG.LOCAL.SSP;
+  }
+}
+
 export type SigningOperator = {
   readonly id: number;
   readonly identifier: string;
@@ -105,7 +124,7 @@ export type SigningOperator = {
   readonly identityPublicKey: Uint8Array;
 };
 
-export type ConfigOptions = MayHaveLrc20WalletApiConfig & {
+export type ConfigOptions = MayHaveLrc20WalletApiConfig & MayHaveSspClientOptions & {
   readonly network?: NetworkType;
   readonly signingOperators?: Readonly<Record<string, SigningOperator>>;
   readonly coodinatorIdentifier?: string;
@@ -115,6 +134,7 @@ export type ConfigOptions = MayHaveLrc20WalletApiConfig & {
   readonly useTokenTransactionSchnorrSignatures?: boolean;
   readonly electrsUrl?: string;
   readonly lrc20ApiConfig?: LRC20WalletApiConfig;
+  readonly sspClientOptions?: SspClientOptions;
 };
 
 const DEV_PUBKEYS = [
@@ -148,6 +168,9 @@ const BASE_CONFIG: Required<ConfigOptions> = {
     lrc20NodeUrl: getLrc20NodeUrl("LOCAL"),
     electrsCredentials: ELECTRS_CREDENTIALS,
   },
+  sspClientOptions: {
+    baseUrl: getSspUrl("LOCAL"),
+  },
 };
 
 export const LOCAL_WALLET_CONFIG: Required<ConfigOptions> = {
@@ -174,6 +197,9 @@ export const REGTEST_WALLET_CONFIG: Required<ConfigOptions> = {
     lrc20NodeUrl: getLrc20NodeUrl("REGTEST"),
     electrsCredentials: ELECTRS_CREDENTIALS,
   },
+  sspClientOptions: {
+    baseUrl: getSspUrl("REGTEST"),
+  },
 };
 
 export const MAINNET_WALLET_CONFIG: Required<ConfigOptions> = {
@@ -185,6 +211,9 @@ export const MAINNET_WALLET_CONFIG: Required<ConfigOptions> = {
   lrc20ApiConfig: {
     electrsUrl: getElectrsUrl("MAINNET"),
     lrc20NodeUrl: getLrc20NodeUrl("MAINNET"),
+  },
+  sspClientOptions: {
+    baseUrl: getSspUrl("MAINNET"),
   },
 };
 

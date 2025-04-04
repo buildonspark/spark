@@ -210,7 +210,7 @@ export class SparkWallet {
   }
 
   private async initializeWallet(identityPublicKey: string) {
-    this.sspClient = new SspClient(identityPublicKey);
+    this.sspClient = new SspClient(identityPublicKey, this.config);
     await this.connectionManager.createClients();
 
     await this.syncWallet();

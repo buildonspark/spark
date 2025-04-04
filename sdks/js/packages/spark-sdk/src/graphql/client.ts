@@ -3,8 +3,7 @@ import {
   DefaultCrypto,
   NodeKeyCache,
   Query,
-  Requester,
-  SigningKey,
+  Requester
 } from "@lightsparkdev/core";
 import { CompleteCoopExit } from "./mutations/CompleteCoopExit.js";
 import { CompleteLeavesSwap } from "./mutations/CompleteLeavesSwap.js";
@@ -49,27 +48,37 @@ import { LightningReceiveFeeEstimate } from "./queries/LightningReceiveFeeEstima
 import { LightningSendFeeEstimate } from "./queries/LightningSendFeeEstimate.js";
 import { UserRequest } from "./queries/UserRequest.js";
 
+export interface SspClientOptions {
+  baseUrl: string;
+  schemaEndpoint?: string;
+}
+
+export interface MayHaveSspClientOptions {
+  readonly sspClientOptions?: SspClientOptions;
+}
+
+export interface HasSspClientOptions {
+  readonly sspClientOptions: SspClientOptions;
+}
+
 export default class SspClient {
   private readonly requester: Requester;
   private identityPublicKey: string;
-  private readonly signingKey?: SigningKey;
 
-  constructor(identityPublicKey: string) {
+  constructor(identityPublicKey: string, config: HasSspClientOptions) {
     this.identityPublicKey = identityPublicKey;
 
-    const fetchFunction =
-      typeof window !== "undefined" ? window.fetch.bind(window) : fetch;
+    const fetchFunction = typeof window !== "undefined" ? window.fetch.bind(window) : fetch;
+    const options = config.sspClientOptions;
 
     this.requester = new Requester(
       new NodeKeyCache(DefaultCrypto),
-      "graphql/spark/rc",
+      options.schemaEndpoint || "graphql/spark/rc",
       `spark-sdk/0.0.0`,
       new SparkAuthProvider(identityPublicKey),
-      process.env.NODE_ENV === "production"
-        ? "https://api.lightspark.com"
-        : "https://api.dev.dev.sparkinfra.net",
+      options.baseUrl,
       DefaultCrypto,
-      this.signingKey,
+      undefined,
       fetchFunction,
     );
   }
