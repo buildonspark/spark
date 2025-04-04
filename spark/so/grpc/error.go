@@ -11,6 +11,30 @@ type Error interface {
 	ToGRPCError() error
 }
 
+// grpcError resembles grpc's status.Error but it retains the original
+// error cause such that functions up the stack can inspect it with
+// errors.Unwrap() or errors.Is().
+type grpcError struct {
+	Code  codes.Code
+	Cause error
+}
+
+// newGRPCError creates a new gRPC error with the given code and cause
+func newGRPCError(code codes.Code, cause error) *grpcError {
+	return &grpcError{
+		Code:  code,
+		Cause: cause,
+	}
+}
+
+func (e *grpcError) Error() string {
+	return status.Error(e.Code, e.Cause.Error()).Error()
+}
+
+func (e *grpcError) Unwrap() error {
+	return e.Cause
+}
+
 // wrapWithGRPCError wraps a response and an error into a gRPC error
 func wrapWithGRPCError[T any](resp T, err error) (T, error) {
 	if err != nil {
@@ -30,5 +54,5 @@ func toGRPCError(err error) error {
 	}
 
 	// Default to Internal error
-	return status.Error(codes.Internal, err.Error())
+	return newGRPCError(codes.Internal, err)
 }

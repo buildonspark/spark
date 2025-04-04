@@ -577,8 +577,17 @@ func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pb.Ini
 
 	hash := sha256.Sum256(secret.Bytes())
 	if !bytes.Equal(hash[:], req.PaymentHash) {
+		baseHandler := NewBaseTransferHandler(h.config)
+		_, err := baseHandler.CancelSendTransfer(ctx, &pb.CancelSendTransferRequest{
+			TransferId:              transfer.ID.String(),
+			SenderIdentityPublicKey: transfer.SenderIdentityPubkey,
+		}, CancelSendTransferIntentTask)
+		if err != nil {
+			slog.Error("InitiatePreimageSwap: unable to cancel own send transfer", "error", err)
+		}
+
 		selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
-		_, err := helper.ExecuteTaskWithAllOperators(ctx, h.config, &selection, func(ctx context.Context, operator *so.SigningOperator) ([]byte, error) {
+		_, err = helper.ExecuteTaskWithAllOperators(ctx, h.config, &selection, func(ctx context.Context, operator *so.SigningOperator) ([]byte, error) {
 			conn, err := operator.NewGRPCConnection()
 			if err != nil {
 				return nil, err
@@ -591,7 +600,7 @@ func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pb.Ini
 				SenderIdentityPublicKey: req.Transfer.OwnerIdentityPublicKey,
 			})
 			if err != nil {
-				return nil, fmt.Errorf("unable to cancel send transfer: %v", err)
+				return nil, fmt.Errorf("unable to cancel other operator's send transfer: %v", err)
 			}
 			return nil, nil
 		})
@@ -599,7 +608,7 @@ func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pb.Ini
 			slog.Error("InitiatePreimageSwap: unable to cancel send transfer", "error", err)
 		}
 
-		return nil, fmt.Errorf("invalid preimage")
+		return nil, fmt.Errorf("recovered preimage did not match payment hash: %w", ent.ErrNoRollback)
 	}
 
 	err = preimageRequest.Update().SetStatus(schema.PreimageRequestStatusPreimageShared).Exec(ctx)

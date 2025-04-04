@@ -402,7 +402,8 @@ func TestReceiveLightningPaymentWithWrongPreimage(t *testing.T) {
 
 	transfers, _, err := wallet.QueryAllTransfers(context.Background(), sspConfig, 1, 0)
 	require.NoError(t, err)
-	require.Equal(t, 0, len(transfers))
+	require.Equal(t, 1, len(transfers))
+	require.Equal(t, transfers[0].Status, spark.TransferStatus_TRANSFER_STATUS_RETURNED)
 
 	transfer, err := wallet.SendTransfer(context.Background(), sspConfig, leaves, userConfig.IdentityPublicKey(), time.Unix(0, 0))
 	require.NoError(t, err)
