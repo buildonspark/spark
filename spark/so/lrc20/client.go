@@ -3,7 +3,6 @@ package lrc20
 import (
 	"context"
 	"fmt"
-	"log"
 	"log/slog"
 	"slices"
 	"time"
@@ -95,7 +94,7 @@ func (c *Client) VerifySparkTx(
 // shouldSkipLrc20Call checks if LRC20 RPCs are disabled for the given network
 func (c *Client) shouldSkipLrc20Call(network string) bool {
 	if lrc20Config, ok := c.config.Lrc20Configs[network]; ok && lrc20Config.DisableRpcs {
-		log.Printf("Skipping LRC20 node call due to DisableRpcs flag")
+		slog.Info("Skipping LRC20 node call due to DisableRpcs flag")
 		return true
 	}
 	return false
@@ -130,7 +129,7 @@ func (c *Client) connectToLrc20Node() (*grpc.ClientConn, error) {
 		conn, err = common.NewGRPCConnectionWithoutTLS(lrc20Config.Host, &retryConfig)
 	}
 	if err != nil {
-		log.Printf("Failed to connect to the lrc20 node to verify a token transaction: %v", err)
+		slog.Error("Failed to connect to the lrc20 node to verify a token transaction", "error", err)
 		return nil, err
 	}
 	return conn, nil
@@ -147,9 +146,14 @@ func (c *Client) MarkWithdrawnTokenLeaves(
 ) error {
 	network := common.Regtest.String()
 	if lrc20Config, ok := c.config.Lrc20Configs[network]; ok && lrc20Config.DisableRpcs {
-		log.Printf("Skipping LRC20 node call due to DisableRpcs flag")
+		slog.Info("Skipping LRC20 node call due to DisableRpcs flag")
 		return nil
 	}
+	if lrc20Config, ok := c.config.Lrc20Configs[network]; ok && lrc20Config.DisableL1 {
+		slog.Info("Skipping LRC20 node call due to DisableL1 flag")
+		return nil
+	}
+
 	allLeaves := []*pb.TokenLeafOutput{}
 
 	var pageResponse *pblrc20.ListWithdrawnLeavesResponse
