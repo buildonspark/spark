@@ -1757,14 +1757,14 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@buildonspark/issuer-sdk@npm:0.0.26, @buildonspark/issuer-sdk@npm:^0.0.26, @buildonspark/issuer-sdk@workspace:packages/issuer-sdk":
+"@buildonspark/issuer-sdk@npm:0.0.27, @buildonspark/issuer-sdk@npm:^0.0.27, @buildonspark/issuer-sdk@workspace:packages/issuer-sdk":
   version: 0.0.0-use.local
   resolution: "@buildonspark/issuer-sdk@workspace:packages/issuer-sdk"
   dependencies:
     "@arethetypeswrong/cli": "npm:^0.17.4"
     "@bufbuild/protobuf": "npm:^2.2.5"
-    "@buildonspark/lrc20-sdk": "npm:0.0.24"
-    "@buildonspark/spark-sdk": "npm:0.0.26"
+    "@buildonspark/lrc20-sdk": "npm:0.0.25"
+    "@buildonspark/spark-sdk": "npm:0.0.27"
     "@jest/globals": "npm:^29.7.0"
     "@noble/curves": "npm:^1.8.0"
     "@scure/bip39": "npm:^1.5.4"
@@ -1786,7 +1786,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@buildonspark/lrc20-sdk@npm:0.0.24, @buildonspark/lrc20-sdk@workspace:packages/lrc20-sdk":
+"@buildonspark/lrc20-sdk@npm:0.0.25, @buildonspark/lrc20-sdk@workspace:packages/lrc20-sdk":
   version: 0.0.0-use.local
   resolution: "@buildonspark/lrc20-sdk@workspace:packages/lrc20-sdk"
   dependencies:
@@ -1827,7 +1827,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@buildonspark/nestjs-app@workspace:examples/nestjs-app"
   dependencies:
-    "@buildonspark/spark-sdk": "npm:0.0.26"
+    "@buildonspark/spark-sdk": "npm:0.0.27"
     "@nestjs/cli": "npm:^10.0.0"
     "@nestjs/common": "npm:^10.0.0"
     "@nestjs/core": "npm:^10.0.0"
@@ -1862,8 +1862,8 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@buildonspark/nodejs-scripts@workspace:examples/nodejs-scripts"
   dependencies:
-    "@buildonspark/issuer-sdk": "npm:0.0.26"
-    "@buildonspark/spark-sdk": "npm:0.0.26"
+    "@buildonspark/issuer-sdk": "npm:0.0.27"
+    "@buildonspark/spark-sdk": "npm:0.0.27"
     "@types/jest": "npm:^29.5.14"
     "@types/node": "npm:^22.13.2"
     jest: "npm:^29.7.0"
@@ -1878,7 +1878,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@buildonspark/spark-cli@workspace:examples/spark-cli"
   dependencies:
-    "@buildonspark/spark-sdk": "npm:0.0.26"
+    "@buildonspark/spark-sdk": "npm:0.0.27"
     "@types/node": "npm:^22.13.2"
     prettier: "npm:^3.5.1"
     tsx: "npm:^4.19.3"
@@ -1886,13 +1886,13 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@buildonspark/spark-sdk@npm:0.0.26, @buildonspark/spark-sdk@npm:^0.0.26, @buildonspark/spark-sdk@workspace:packages/spark-sdk":
+"@buildonspark/spark-sdk@npm:0.0.27, @buildonspark/spark-sdk@npm:^0.0.27, @buildonspark/spark-sdk@workspace:packages/spark-sdk":
   version: 0.0.0-use.local
   resolution: "@buildonspark/spark-sdk@workspace:packages/spark-sdk"
   dependencies:
     "@arethetypeswrong/cli": "npm:^0.17.4"
     "@bufbuild/protobuf": "npm:^2.2.5"
-    "@buildonspark/lrc20-sdk": "npm:0.0.24"
+    "@buildonspark/lrc20-sdk": "npm:0.0.25"
     "@jest/globals": "npm:^29.7.0"
     "@lightsparkdev/core": "npm:^1.3.0"
     "@noble/curves": "npm:^1.8.0"
@@ -1929,7 +1929,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@buildonspark/spark-vite-app@workspace:examples/spark-vite-app"
   dependencies:
-    "@buildonspark/spark-sdk": "npm:0.0.26"
+    "@buildonspark/spark-sdk": "npm:0.0.27"
     "@types/react": "npm:^19.0.10"
     "@types/react-dom": "npm:^19.0.4"
     "@vitejs/plugin-react": "npm:^4.3.4"
@@ -20608,7 +20608,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "spark-demo@workspace:examples/spark-demo"
   dependencies:
-    "@buildonspark/spark-sdk": "npm:0.0.26"
+    "@buildonspark/spark-sdk": "npm:0.0.27"
     "@lightsparkdev/ui": "npm:^1.1.0"
     "@number-flow/react": "npm:^0.5.7"
     "@radix-ui/react-popover": "npm:^1.1.6"
@@ -20652,8 +20652,8 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "spark-node-express@workspace:examples/spark-node-express"
   dependencies:
-    "@buildonspark/issuer-sdk": "npm:^0.0.26"
-    "@buildonspark/spark-sdk": "npm:^0.0.26"
+    "@buildonspark/issuer-sdk": "npm:^0.0.27"
+    "@buildonspark/spark-sdk": "npm:^0.0.27"
     "@lightsparkdev/core": "npm:^1.3.0"
     "@noble/curves": "npm:^1.8.0"
     "@types/express": "npm:^5.0.0"
