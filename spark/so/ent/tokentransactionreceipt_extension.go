@@ -82,17 +82,11 @@ func CreateStartedTransactionEntities(
 		}
 
 		for leafIndex, leafToSpendEnt := range leafToSpendEnts {
-			var network schema.Network
-			err := network.UnmarshalProto(tokenTransaction.Network)
-			if err != nil {
-				return nil, err
-			}
 			_, err = db.TokenLeaf.UpdateOne(leafToSpendEnt).
 				SetStatus(schema.TokenLeafStatusSpentStarted).
 				SetLeafSpentTokenTransactionReceiptID(tokenTransactionReceipt.ID).
 				SetLeafSpentOwnershipSignature(ownershipSignatures[leafIndex]).
 				SetLeafSpentTransactionInputVout(int32(leafIndex)).
-				SetNetwork(network).
 				Save(ctx)
 			if err != nil {
 				log.Printf("Failed to update leaf to spent: %v", err)
@@ -111,6 +105,11 @@ func CreateStartedTransactionEntities(
 		if err != nil {
 			return nil, err
 		}
+		var network schema.Network
+		err = network.UnmarshalProto(tokenTransaction.Network)
+		if err != nil {
+			return nil, err
+		}
 		outputLeaves = append(
 			outputLeaves,
 			db.TokenLeaf.
@@ -126,7 +125,8 @@ func CreateStartedTransactionEntities(
 				SetTokenAmount(outputLeaf.TokenAmount).
 				SetLeafCreatedTransactionOutputVout(int32(leafIndex)).
 				SetRevocationKeyshareID(revocationUUID).
-				SetLeafCreatedTokenTransactionReceiptID(tokenTransactionReceipt.ID),
+				SetLeafCreatedTokenTransactionReceiptID(tokenTransactionReceipt.ID).
+				SetNetwork(network),
 		)
 	}
 	_, err = db.TokenLeaf.CreateBulk(outputLeaves...).Save(ctx)
@@ -430,6 +430,19 @@ func (r *TokenTransactionReceipt) MarshalProto(config *so.Config) (*pb.TokenTran
 		tokenTransaction.TokenInput = &pb.TokenTransaction_TransferInput{
 			TransferInput: transferInput,
 		}
+	}
+
+	// Set the network field based on the network values stored in the first created leaf.
+	// All token transaction outputs must have the same network (confirmed in validation when signing
+	// the transaction, so its safe to use the first output).
+	if len(r.Edges.CreatedLeaf) > 0 {
+		networkProto, err := r.Edges.CreatedLeaf[0].Network.MarshalProto()
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal network from created leaf: %w", err)
+		}
+		tokenTransaction.Network = networkProto
+	} else {
+		return nil, fmt.Errorf("no outputs were found when reconstructing token transaction with ID: %s", r.ID)
 	}
 
 	return tokenTransaction, nil
