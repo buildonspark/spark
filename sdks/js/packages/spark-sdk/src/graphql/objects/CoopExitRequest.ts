@@ -3,14 +3,14 @@
 
 import UserRequest from './UserRequest.js';
 import Entity from './Entity.js';
-import SparkCoopExitRequestStatus from './SparkCoopExitRequestStatus.js';
+import {TransferFromJson} from './Transfer.js';
+import { Query, isObject } from '@lightsparkdev/core';
+import {CurrencyAmountFromJson} from './CurrencyAmount.js';
+import {CurrencyAmountToJson} from './CurrencyAmount.js';
 import BitcoinNetwork from './BitcoinNetwork.js';
 import Transfer from './Transfer.js';
-import {CurrencyAmountFromJson} from './CurrencyAmount.js';
 import CurrencyAmount from './CurrencyAmount.js';
-import { Query, isObject } from '@lightsparkdev/core';
-import {TransferFromJson} from './Transfer.js';
-import {CurrencyAmountToJson} from './CurrencyAmount.js';
+import SparkCoopExitRequestStatus from './SparkCoopExitRequestStatus.js';
 
 
 interface CoopExitRequest {

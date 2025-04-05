@@ -2,13 +2,16 @@
 // Copyright ©, 2023-present, Lightspark Group, Inc. - All Rights Reserved
 
 
-import {PageInfoToJson} from './PageInfo.js';
-import {LeafFromJson} from './Leaf.js';
-import SparkTransferToLeavesConnection from './SparkTransferToLeavesConnection.js';
 import {LeafToJson} from './Leaf.js';
 import PageInfo from './PageInfo.js';
-import {PageInfoFromJson} from './PageInfo.js';
 import { LightsparkException } from '@lightsparkdev/core';
+import {PageInfoToJson} from './PageInfo.js';
+import SparkWalletUserToUserRequestsConnection from './SparkWalletUserToUserRequestsConnection.js';
+import SparkTransferToLeavesConnection from './SparkTransferToLeavesConnection.js';
+import {PageInfoFromJson} from './PageInfo.js';
+import {LeafFromJson} from './Leaf.js';
+import {UserRequestFromJson} from './UserRequest.js';
+import {UserRequestToJson} from './UserRequest.js';
 
 
 interface Connection {
@@ -40,6 +43,14 @@ export const ConnectionFromJson = (obj: any): Connection => {
 typename: "SparkTransferToLeavesConnection",
         } as SparkTransferToLeavesConnection;
 
+}    if (obj["__typename"] == "SparkWalletUserToUserRequestsConnection") {
+        return {
+            count: obj["spark_wallet_user_to_user_requests_connection_count"],
+            pageInfo: PageInfoFromJson(obj["spark_wallet_user_to_user_requests_connection_page_info"]),
+            entities: obj["spark_wallet_user_to_user_requests_connection_entities"].map((e) => UserRequestFromJson(e)),
+typename: "SparkWalletUserToUserRequestsConnection",
+        } as SparkWalletUserToUserRequestsConnection;
+
 }    throw new LightsparkException("DeserializationError", `Couldn't find a concrete type for interface Connection corresponding to the typename=${obj["__typename"]}`)
 }
 export const ConnectionToJson = (obj: Connection): any => {
@@ -49,6 +60,15 @@ return {
 __typename: "SparkTransferToLeavesConnection",spark_transfer_to_leaves_connection_count: sparkTransferToLeavesConnection.count,
 spark_transfer_to_leaves_connection_page_info: PageInfoToJson(sparkTransferToLeavesConnection.pageInfo),
 spark_transfer_to_leaves_connection_entities: sparkTransferToLeavesConnection.entities.map((e) => LeafToJson(e)),
+
+        }
+
+}    if (obj.typename == "SparkWalletUserToUserRequestsConnection") {
+       const sparkWalletUserToUserRequestsConnection = obj as SparkWalletUserToUserRequestsConnection;
+return {
+__typename: "SparkWalletUserToUserRequestsConnection",spark_wallet_user_to_user_requests_connection_count: sparkWalletUserToUserRequestsConnection.count,
+spark_wallet_user_to_user_requests_connection_page_info: PageInfoToJson(sparkWalletUserToUserRequestsConnection.pageInfo),
+spark_wallet_user_to_user_requests_connection_entities: sparkWalletUserToUserRequestsConnection.entities.map((e) => UserRequestToJson(e)),
 
         }
 
@@ -80,6 +100,20 @@ fragment ConnectionFragment on Connection {
                 currency_amount_preferred_currency_value_approx: preferred_currency_value_approx
             }
             leaf_spark_node_id: spark_node_id
+        }
+    }
+    ... on SparkWalletUserToUserRequestsConnection {
+        __typename
+        spark_wallet_user_to_user_requests_connection_count: count
+        spark_wallet_user_to_user_requests_connection_page_info: page_info {
+            __typename
+            page_info_has_next_page: has_next_page
+            page_info_has_previous_page: has_previous_page
+            page_info_start_cursor: start_cursor
+            page_info_end_cursor: end_cursor
+        }
+        spark_wallet_user_to_user_requests_connection_entities: entities {
+            id
         }
     }
 }`;

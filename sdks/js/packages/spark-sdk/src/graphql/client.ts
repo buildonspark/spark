@@ -3,7 +3,7 @@ import {
   DefaultCrypto,
   NodeKeyCache,
   Query,
-  Requester
+  Requester,
 } from "@lightsparkdev/core";
 import { CompleteCoopExit } from "./mutations/CompleteCoopExit.js";
 import { CompleteLeavesSwap } from "./mutations/CompleteLeavesSwap.js";
@@ -68,7 +68,8 @@ export default class SspClient {
   constructor(identityPublicKey: string, config: HasSspClientOptions) {
     this.identityPublicKey = identityPublicKey;
 
-    const fetchFunction = typeof window !== "undefined" ? window.fetch.bind(window) : fetch;
+    const fetchFunction =
+      typeof window !== "undefined" ? window.fetch.bind(window) : fetch;
     const options = config.sspClientOptions;
 
     this.requester = new Requester(
@@ -179,12 +180,14 @@ export default class SspClient {
   async requestCoopExit({
     leafExternalIds,
     withdrawalAddress,
+    idempotencyKey,
   }: RequestCoopExitInput): Promise<CoopExitRequest | null> {
     return await this.executeRawQuery({
       queryPayload: RequestCoopExit,
       variables: {
         leaf_external_ids: leafExternalIds,
         withdrawal_address: withdrawalAddress,
+        idempotency_key: idempotencyKey,
       },
       constructObject: (response: { request_coop_exit: any }) => {
         return CoopExitRequestFromJson(response.request_coop_exit.request);

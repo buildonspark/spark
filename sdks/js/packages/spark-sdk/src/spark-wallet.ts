@@ -85,7 +85,9 @@ import {
 } from "./address/index.js";
 import { broadcastL1Withdrawal } from "./services/lrc20.js";
 import { SparkSigner } from "./signer/signer.js";
+import { getCrypto } from "./utils/crypto.js";
 import { getMasterHDKeyFromSeed } from "./utils/index.js";
+const crypto = getCrypto();
 
 // Add this constant at the file level
 const MAX_TOKEN_LEAVES = 100;
@@ -1487,6 +1489,7 @@ export class SparkWallet {
     const coopExitRequest = await this.sspClient?.requestCoopExit({
       leafExternalIds: leavesToSend.map((leaf) => leaf.id),
       withdrawalAddress: onchainAddress,
+      idempotencyKey: crypto.randomUUID(),
     });
 
     if (!coopExitRequest?.rawConnectorTransaction) {

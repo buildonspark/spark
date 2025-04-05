@@ -2,24 +2,24 @@
 // Copyright ©, 2023-present, Lightspark Group, Inc. - All Rights Reserved
 
 import Entity from './Entity.js';
-import LeavesSwapRequest from './LeavesSwapRequest.js';
-import SparkCoopExitRequestStatus from './SparkCoopExitRequestStatus.js';
-import BitcoinNetwork from './BitcoinNetwork.js';
-import SparkLeavesSwapRequestStatus from './SparkLeavesSwapRequestStatus.js';
-import CoopExitRequest from './CoopExitRequest.js';
-import {SwapLeafToJson} from './SwapLeaf.js';
-import {InvoiceToJson} from './Invoice.js';
-import {CurrencyAmountFromJson} from './CurrencyAmount.js';
-import { Query, isObject } from '@lightsparkdev/core';
-import {SwapLeafFromJson} from './SwapLeaf.js';
-import LightningReceiveRequest from './LightningReceiveRequest.js';
-import {InvoiceFromJson} from './Invoice.js';
-import LightningSendRequest from './LightningSendRequest.js';
 import {TransferFromJson} from './Transfer.js';
-import {CurrencyAmountToJson} from './CurrencyAmount.js';
-import LightningReceiveRequestStatus from './LightningReceiveRequestStatus.js';
+import {InvoiceToJson} from './Invoice.js';
+import { Query, isObject } from '@lightsparkdev/core';
+import CoopExitRequest from './CoopExitRequest.js';
+import {CurrencyAmountFromJson} from './CurrencyAmount.js';
 import { LightsparkException } from '@lightsparkdev/core';
 import LightningSendRequestStatus from './LightningSendRequestStatus.js';
+import {SwapLeafFromJson} from './SwapLeaf.js';
+import SparkLeavesSwapRequestStatus from './SparkLeavesSwapRequestStatus.js';
+import {SwapLeafToJson} from './SwapLeaf.js';
+import LightningSendRequest from './LightningSendRequest.js';
+import BitcoinNetwork from './BitcoinNetwork.js';
+import {InvoiceFromJson} from './Invoice.js';
+import LightningReceiveRequest from './LightningReceiveRequest.js';
+import {CurrencyAmountToJson} from './CurrencyAmount.js';
+import LightningReceiveRequestStatus from './LightningReceiveRequestStatus.js';
+import LeavesSwapRequest from './LeavesSwapRequest.js';
+import SparkCoopExitRequestStatus from './SparkCoopExitRequestStatus.js';
 
 
 interface UserRequest {

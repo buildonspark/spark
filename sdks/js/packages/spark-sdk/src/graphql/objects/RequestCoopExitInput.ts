@@ -12,6 +12,8 @@ interface RequestCoopExitInput {
 
     withdrawalAddress: string;
 
+    idempotencyKey: string;
+
 
 
 
@@ -21,6 +23,7 @@ export const RequestCoopExitInputFromJson = (obj: any): RequestCoopExitInput => 
     return {
         leafExternalIds: obj["request_coop_exit_input_leaf_external_ids"],
         withdrawalAddress: obj["request_coop_exit_input_withdrawal_address"],
+        idempotencyKey: obj["request_coop_exit_input_idempotency_key"],
 
         } as RequestCoopExitInput;
 
@@ -29,6 +32,7 @@ export const RequestCoopExitInputToJson = (obj: RequestCoopExitInput): any => {
 return {
 request_coop_exit_input_leaf_external_ids: obj.leafExternalIds,
 request_coop_exit_input_withdrawal_address: obj.withdrawalAddress,
+request_coop_exit_input_idempotency_key: obj.idempotencyKey,
 
         }
 

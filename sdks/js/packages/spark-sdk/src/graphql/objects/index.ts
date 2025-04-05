@@ -53,10 +53,10 @@ export { default as RequestLightningSendOutput } from "./RequestLightningSendOut
 export { default as SparkCoopExitRequestStatus } from "./SparkCoopExitRequestStatus.js";
 export { default as SparkLeavesSwapRequestStatus } from "./SparkLeavesSwapRequestStatus.js";
 export { default as SparkTransferToLeavesConnection } from "./SparkTransferToLeavesConnection.js";
-export {
-  getSparkWalletUserQuery,
-  default as SparkWalletUser,
-} from "./SparkWalletUser.js";
+export { default as SparkUserRequestStatus } from "./SparkUserRequestStatus.js";
+export { default as SparkUserRequestType } from "./SparkUserRequestType.js";
+export { default as SparkWalletUser } from "./SparkWalletUser.js";
+export { default as SparkWalletUserToUserRequestsConnection } from "./SparkWalletUserToUserRequestsConnection.js";
 export { default as StartSeedReleaseInput } from "./StartSeedReleaseInput.js";
 export { default as SwapLeaf } from "./SwapLeaf.js";
 export { default as Transfer } from "./Transfer.js";
