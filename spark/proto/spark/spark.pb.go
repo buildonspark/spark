@@ -3521,8 +3521,8 @@ type QueryPendingTransfersRequest struct {
 	//	*QueryPendingTransfersRequest_SenderIdentityPublicKey
 	Participant   isQueryPendingTransfersRequest_Participant `protobuf_oneof:"participant"`
 	TransferIds   []string                                   `protobuf:"bytes,3,rep,name=transfer_ids,json=transferIds,proto3" json:"transfer_ids,omitempty"`
-	Limit         int64                                      `protobuf:"varint,4,opt,name=limit,proto3" json:"limit,omitempty"`
-	Offset        int64                                      `protobuf:"varint,5,opt,name=offset,proto3" json:"offset,omitempty"`
+	Limit         int64                                      `protobuf:"varint,40,opt,name=limit,proto3" json:"limit,omitempty"`
+	Offset        int64                                      `protobuf:"varint,50,opt,name=offset,proto3" json:"offset,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -6978,12 +6978,12 @@ const file_spark_proto_rawDesc = "" +
 	"\x19LeafRefundTxSigningResult\x12\x17\n" +
 	"\aleaf_id\x18\x01 \x01(\tR\x06leafId\x12M\n" +
 	"\x18refund_tx_signing_result\x18\x02 \x01(\v2\x14.spark.SigningResultR\x15refundTxSigningResult\x12#\n" +
-	"\rverifying_key\x18\x03 \x01(\fR\fverifyingKey\"\xf9\x03\n" +
+	"\rverifying_key\x18\x03 \x01(\fR\fverifyingKey\"\xef\x03\n" +
 	"\x18StartSendTransferRequest\x12\x1f\n" +
 	"\vtransfer_id\x18\x01 \x01(\tR\n" +
 	"transferId\x129\n" +
-	"\x19owner_identity_public_key\x18\x02 \x01(\fR\x16ownerIdentityPublicKey\x12M\n" +
-	"\x0eleaves_to_send\x18\x03 \x03(\v2\x1d.spark.LeafRefundTxSigningJobB\b\xfaB\x05\x92\x01\x02\b\x01R\fleavesToSend\x12?\n" +
+	"\x19owner_identity_public_key\x18\x02 \x01(\fR\x16ownerIdentityPublicKey\x12C\n" +
+	"\x0eleaves_to_send\x18\x03 \x03(\v2\x1d.spark.LeafRefundTxSigningJobR\fleavesToSend\x12?\n" +
 	"\x1creceiver_identity_public_key\x18\x04 \x01(\fR\x19receiverIdentityPublicKey\x12;\n" +
 	"\vexpiry_time\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"expiryTime\x12]\n" +
@@ -7034,8 +7034,8 @@ const file_spark_proto_rawDesc = "" +
 	"\x1creceiver_identity_public_key\x18\x01 \x01(\fH\x00R\x19receiverIdentityPublicKey\x12=\n" +
 	"\x1asender_identity_public_key\x18\x02 \x01(\fH\x00R\x17senderIdentityPublicKey\x12!\n" +
 	"\ftransfer_ids\x18\x03 \x03(\tR\vtransferIds\x12\x14\n" +
-	"\x05limit\x18\x04 \x01(\x03R\x05limit\x12\x16\n" +
-	"\x06offset\x18\x05 \x01(\x03R\x06offsetB\r\n" +
+	"\x05limit\x18( \x01(\x03R\x05limit\x12\x16\n" +
+	"\x06offset\x182 \x01(\x03R\x06offsetB\r\n" +
 	"\vparticipant\"f\n" +
 	"\x1dQueryPendingTransfersResponse\x12-\n" +
 	"\ttransfers\x18\x01 \x03(\v2\x0f.spark.TransferR\ttransfers\x12\x16\n" +

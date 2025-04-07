@@ -6103,17 +6103,6 @@ func (m *StartSendTransferRequest) validate(all bool) error {
 
 	// no validation rules for OwnerIdentityPublicKey
 
-	if len(m.GetLeavesToSend()) < 1 {
-		err := StartSendTransferRequestValidationError{
-			field:  "LeavesToSend",
-			reason: "value must contain at least 1 item(s)",
-		}
-		if !all {
-			return err
-		}
-		errors = append(errors, err)
-	}
-
 	for idx, item := range m.GetLeavesToSend() {
 		_, _ = idx, item
 
@@ -7270,6 +7259,10 @@ func (m *QueryPendingTransfersRequest) validate(all bool) error {
 
 	var errors []error
 
+	// no validation rules for Limit
+
+	// no validation rules for Offset
+
 	switch v := m.Participant.(type) {
 	case *QueryPendingTransfersRequest_ReceiverIdentityPublicKey:
 		if v == nil {
@@ -7435,6 +7428,8 @@ func (m *QueryPendingTransfersResponse) validate(all bool) error {
 		}
 
 	}
+
+	// no validation rules for Offset
 
 	if len(errors) > 0 {
 		return QueryPendingTransfersResponseMultiError(errors)
