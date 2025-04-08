@@ -277,8 +277,18 @@ func LoadOperators(filePath string) (map[string]*SigningOperator, error) {
 		return nil, err
 	}
 
+	var yamlObj interface{}
+	if err := yaml.Unmarshal(data, &yamlObj); err != nil {
+		return nil, err
+	}
+
+	jsonStr, err := json.Marshal(yamlObj)
+	if err != nil {
+		return nil, err
+	}
+
 	var operatorList []*SigningOperator
-	if err := json.Unmarshal(data, &operatorList); err != nil {
+	if err := json.Unmarshal(jsonStr, &operatorList); err != nil {
 		return nil, err
 	}
 
