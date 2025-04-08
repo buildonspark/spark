@@ -562,9 +562,6 @@ func (w *SingleKeyWallet) RefreshTimelocks(ctx context.Context, nodeUUID *uuid.U
 			}
 			_, err = spark.NextSequence(refundTx.TxIn[0].Sequence)
 			needRefresh := err != nil
-			if err != nil {
-				return fmt.Errorf("failed to check if node needs to be refreshed: %w", err)
-			}
 			if needRefresh {
 				nodesToRefresh = append(nodesToRefresh, node)
 				nodeIDs = append(nodeIDs, node.Id)
