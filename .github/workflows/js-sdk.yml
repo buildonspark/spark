@@ -13,7 +13,13 @@ on:
       - ".github/workflows/js-sdk.yml"
 
 jobs:
-  checks:
+  check:
+    if: false
+    runs-on: "ubuntu-latest"
+    steps:
+      - run: "true"
+
+  test:
     runs-on: ubuntu-latest
     defaults:
       run:

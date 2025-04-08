@@ -17,7 +17,7 @@ permissions:
   pull-requests: write
 
 jobs:
-  lint:
+  check:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -55,17 +55,6 @@ jobs:
             --dir "file://so/ent/migrate/migrations" \
             --dev-url "postgresql://postgres:postgres@localhost:5432/operator_temp?sslmode=disable&search_path=public" \
             --latest=1
-
-      - name: Clean up
-        run: |
-          PGPASSWORD=postgres psql -h localhost -U postgres -c "DROP DATABASE operator_temp;"
-
-  non-optional-check:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Check for new non-optional fields
         id: detect_non_optional
@@ -114,3 +103,8 @@ jobs:
               issue_number: context.issue.number,
               body: `**WARNING: Potential new required field(s) detected.**\n\nConsider first adding fields as optional, backfilling data, and then making them non-nullable.`
             });
+
+      - name: Clean up
+        if: always()
+        run: |
+          PGPASSWORD=postgres psql -h localhost -U postgres -c "DROP DATABASE operator_temp;"
