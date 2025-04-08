@@ -1,6 +1,6 @@
 {
   "$schema": "https://turbo.build/schema.json",
-  "globalEnv": ["GITHUB_ACTIONS"],
+  "globalEnv": ["GITHUB_ACTIONS", "HERMETIC_TEST"],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
@@ -24,7 +24,13 @@
     "test": {
       "dependsOn": ["^build"]
     },
+    "test:all": {
+      "dependsOn": ["^build"]
+    },
     "test:integration": {
+      "dependsOn": ["^build"]
+    },
+    "test:integration:ssp": {
       "dependsOn": ["^build"]
     },
     "start": {

@@ -19,7 +19,8 @@ export type FaucetCoin = {
   txout: TransactionOutput;
 };
 
-const COIN_AMOUNT = 10_000_000n;
+const COIN_AMOUNT = 100_000_000n;
+const FEE_AMOUNT = 1000n;
 
 export class BitcoinFaucet {
   private coins: FaucetCoin[] = [];
@@ -144,7 +145,7 @@ export class BitcoinFaucet {
     // Add the output using the address directly
     sendToPubKeyTx.addOutputAddress(
       p2wpkhAddress,
-      100_000n,
+      COIN_AMOUNT,
       getNetwork(Network.LOCAL),
     );
 
@@ -253,5 +254,42 @@ export class BitcoinFaucet {
   async broadcastTx(txHex: string) {
     let response = await this.call("sendrawtransaction", [txHex, 0]);
     return response;
+  }
+
+  async getNewAddress(): Promise<string> {
+    const key = secp256k1.utils.randomPrivateKey();
+    const pubKey = secp256k1.getPublicKey(key);
+    return getP2TRAddressFromPublicKey(pubKey, Network.LOCAL);
+  }
+
+  async sendToAddress(address: string, amount: bigint): Promise<Transaction> {
+    const coin = await this.fund();
+    if (!coin) {
+      throw new Error("No coins available");
+    }
+
+    const tx = new Transaction();
+    tx.addInput(coin.outpoint);
+
+    const availableAmount = COIN_AMOUNT - FEE_AMOUNT;
+
+    tx.addOutputAddress(address, amount, getNetwork(Network.LOCAL));
+
+    const changeAmount = availableAmount - amount;
+    if (changeAmount > 0) {
+      const changeKey = secp256k1.utils.randomPrivateKey();
+      const changePubKey = secp256k1.getPublicKey(changeKey);
+      const changeScript = getP2TRScriptFromPublicKey(changePubKey, Network.LOCAL);
+      tx.addOutput({
+        script: changeScript,
+        amount: changeAmount,
+      });
+    }
+
+    const signedTx = await this.signFaucetCoin(tx, coin.txout, coin.key);
+    const txHex = bytesToHex(signedTx.extract());
+    await this.broadcastTx(txHex);
+
+    return signedTx;
   }
 }

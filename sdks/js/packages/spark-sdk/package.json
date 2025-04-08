@@ -88,6 +88,7 @@
     "test-cmd": "node --experimental-vm-modules $(yarn bin jest) --no-cache --runInBand",
     "test": "yarn test-cmd src/tests/*.test.ts",
     "test:integration": "yarn test-cmd src/tests/integration/*.test.ts",
+    "test:integration:ssp": "yarn test-cmd src/tests/integration/ssp/*.test.ts",
     "types:watch": "tsc-absolute --watch",
     "types": "tsc",
     "patch-wasm": "node ./wasm/patch-wasm.mjs",
