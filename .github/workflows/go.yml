@@ -101,7 +101,7 @@ jobs:
           args:  --timeout 5m
 
   build:
-    needs: ["test", "lint"]
+    needs: ["test", "check"]
     runs-on: "ubuntu-22.04-2-arm"
     outputs:
       spark_tag: ${{ steps.set-spark_tag.outputs.spark_tag }}
