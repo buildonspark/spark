@@ -9,6 +9,7 @@ on:
       - 'apps/**'
       - 'protos/**'
       - 'scripts/**'
+      - "sdks/js/**"
       - 'signer/**'
       - 'tools/**'
   merge_group:
@@ -19,6 +20,7 @@ on:
       - 'apps/**'
       - 'protos/**'
       - 'scripts/**'
+      - "sdks/js/**"
       - 'signer/**'
       - 'tools/**'
 
