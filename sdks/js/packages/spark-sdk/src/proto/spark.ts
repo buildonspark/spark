@@ -386,8 +386,8 @@ export interface NodeSignatures {
   refundTxSignature: Uint8Array;
 }
 
-/** StartTreeCreationRequest is the request to start the tree creation for a tree root node. */
-export interface StartTreeCreationRequest {
+/** StartDepositTreeCreationRequest is the request to start the tree creation for a tree root node. */
+export interface StartDepositTreeCreationRequest {
   /** The identity public key of the user. */
   identityPublicKey: Uint8Array;
   /** The on-chain utxo to be used to be spent by the root node. */
@@ -402,8 +402,8 @@ export interface StartTreeCreationRequest {
   refundTxSigningJob: SigningJob | undefined;
 }
 
-/** StartTreeCreationResponse is the response to the request to start the tree creation for a tree root node. */
-export interface StartTreeCreationResponse {
+/** StartDepositTreeCreationResponse is the response to the request to start the tree creation for a tree root node. */
+export interface StartDepositTreeCreationResponse {
   /** The id of the tree. */
   treeId: string;
   /** The signature shares for the root node. */
@@ -2560,7 +2560,7 @@ export const NodeSignatures: MessageFns<NodeSignatures> = {
   },
 };
 
-function createBaseStartTreeCreationRequest(): StartTreeCreationRequest {
+function createBaseStartDepositTreeCreationRequest(): StartDepositTreeCreationRequest {
   return {
     identityPublicKey: new Uint8Array(0),
     onChainUtxo: undefined,
@@ -2569,8 +2569,8 @@ function createBaseStartTreeCreationRequest(): StartTreeCreationRequest {
   };
 }
 
-export const StartTreeCreationRequest: MessageFns<StartTreeCreationRequest> = {
-  encode(message: StartTreeCreationRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+export const StartDepositTreeCreationRequest: MessageFns<StartDepositTreeCreationRequest> = {
+  encode(message: StartDepositTreeCreationRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.identityPublicKey.length !== 0) {
       writer.uint32(10).bytes(message.identityPublicKey);
     }
@@ -2586,10 +2586,10 @@ export const StartTreeCreationRequest: MessageFns<StartTreeCreationRequest> = {
     return writer;
   },
 
-  decode(input: BinaryReader | Uint8Array, length?: number): StartTreeCreationRequest {
+  decode(input: BinaryReader | Uint8Array, length?: number): StartDepositTreeCreationRequest {
     const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseStartTreeCreationRequest();
+    const message = createBaseStartDepositTreeCreationRequest();
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
@@ -2634,7 +2634,7 @@ export const StartTreeCreationRequest: MessageFns<StartTreeCreationRequest> = {
     return message;
   },
 
-  fromJSON(object: any): StartTreeCreationRequest {
+  fromJSON(object: any): StartDepositTreeCreationRequest {
     return {
       identityPublicKey: isSet(object.identityPublicKey)
         ? bytesFromBase64(object.identityPublicKey)
@@ -2645,7 +2645,7 @@ export const StartTreeCreationRequest: MessageFns<StartTreeCreationRequest> = {
     };
   },
 
-  toJSON(message: StartTreeCreationRequest): unknown {
+  toJSON(message: StartDepositTreeCreationRequest): unknown {
     const obj: any = {};
     if (message.identityPublicKey.length !== 0) {
       obj.identityPublicKey = base64FromBytes(message.identityPublicKey);
@@ -2662,11 +2662,11 @@ export const StartTreeCreationRequest: MessageFns<StartTreeCreationRequest> = {
     return obj;
   },
 
-  create(base?: DeepPartial<StartTreeCreationRequest>): StartTreeCreationRequest {
-    return StartTreeCreationRequest.fromPartial(base ?? {});
+  create(base?: DeepPartial<StartDepositTreeCreationRequest>): StartDepositTreeCreationRequest {
+    return StartDepositTreeCreationRequest.fromPartial(base ?? {});
   },
-  fromPartial(object: DeepPartial<StartTreeCreationRequest>): StartTreeCreationRequest {
-    const message = createBaseStartTreeCreationRequest();
+  fromPartial(object: DeepPartial<StartDepositTreeCreationRequest>): StartDepositTreeCreationRequest {
+    const message = createBaseStartDepositTreeCreationRequest();
     message.identityPublicKey = object.identityPublicKey ?? new Uint8Array(0);
     message.onChainUtxo = (object.onChainUtxo !== undefined && object.onChainUtxo !== null)
       ? UTXO.fromPartial(object.onChainUtxo)
@@ -2681,12 +2681,12 @@ export const StartTreeCreationRequest: MessageFns<StartTreeCreationRequest> = {
   },
 };
 
-function createBaseStartTreeCreationResponse(): StartTreeCreationResponse {
+function createBaseStartDepositTreeCreationResponse(): StartDepositTreeCreationResponse {
   return { treeId: "", rootNodeSignatureShares: undefined };
 }
 
-export const StartTreeCreationResponse: MessageFns<StartTreeCreationResponse> = {
-  encode(message: StartTreeCreationResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+export const StartDepositTreeCreationResponse: MessageFns<StartDepositTreeCreationResponse> = {
+  encode(message: StartDepositTreeCreationResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.treeId !== "") {
       writer.uint32(10).string(message.treeId);
     }
@@ -2696,10 +2696,10 @@ export const StartTreeCreationResponse: MessageFns<StartTreeCreationResponse> = 
     return writer;
   },
 
-  decode(input: BinaryReader | Uint8Array, length?: number): StartTreeCreationResponse {
+  decode(input: BinaryReader | Uint8Array, length?: number): StartDepositTreeCreationResponse {
     const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseStartTreeCreationResponse();
+    const message = createBaseStartDepositTreeCreationResponse();
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
@@ -2728,7 +2728,7 @@ export const StartTreeCreationResponse: MessageFns<StartTreeCreationResponse> = 
     return message;
   },
 
-  fromJSON(object: any): StartTreeCreationResponse {
+  fromJSON(object: any): StartDepositTreeCreationResponse {
     return {
       treeId: isSet(object.treeId) ? globalThis.String(object.treeId) : "",
       rootNodeSignatureShares: isSet(object.rootNodeSignatureShares)
@@ -2737,7 +2737,7 @@ export const StartTreeCreationResponse: MessageFns<StartTreeCreationResponse> = 
     };
   },
 
-  toJSON(message: StartTreeCreationResponse): unknown {
+  toJSON(message: StartDepositTreeCreationResponse): unknown {
     const obj: any = {};
     if (message.treeId !== "") {
       obj.treeId = message.treeId;
@@ -2748,11 +2748,11 @@ export const StartTreeCreationResponse: MessageFns<StartTreeCreationResponse> = 
     return obj;
   },
 
-  create(base?: DeepPartial<StartTreeCreationResponse>): StartTreeCreationResponse {
-    return StartTreeCreationResponse.fromPartial(base ?? {});
+  create(base?: DeepPartial<StartDepositTreeCreationResponse>): StartDepositTreeCreationResponse {
+    return StartDepositTreeCreationResponse.fromPartial(base ?? {});
   },
-  fromPartial(object: DeepPartial<StartTreeCreationResponse>): StartTreeCreationResponse {
-    const message = createBaseStartTreeCreationResponse();
+  fromPartial(object: DeepPartial<StartDepositTreeCreationResponse>): StartDepositTreeCreationResponse {
+    const message = createBaseStartDepositTreeCreationResponse();
     message.treeId = object.treeId ?? "";
     message.rootNodeSignatureShares =
       (object.rootNodeSignatureShares !== undefined && object.rootNodeSignatureShares !== null)
@@ -12374,11 +12374,11 @@ export const SparkServiceDefinition = {
       responseStream: false,
       options: {},
     },
-    start_tree_creation: {
-      name: "start_tree_creation",
-      requestType: StartTreeCreationRequest,
+    start_deposit_tree_creation: {
+      name: "start_deposit_tree_creation",
+      requestType: StartDepositTreeCreationRequest,
       requestStream: false,
-      responseType: StartTreeCreationResponse,
+      responseType: StartDepositTreeCreationResponse,
       responseStream: false,
       options: {},
     },
@@ -12672,10 +12672,10 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
     request: GenerateDepositAddressRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<GenerateDepositAddressResponse>>;
-  start_tree_creation(
-    request: StartTreeCreationRequest,
+  start_deposit_tree_creation(
+    request: StartDepositTreeCreationRequest,
     context: CallContext & CallContextExt,
-  ): Promise<DeepPartial<StartTreeCreationResponse>>;
+  ): Promise<DeepPartial<StartDepositTreeCreationResponse>>;
   finalize_node_signatures(
     request: FinalizeNodeSignaturesRequest,
     context: CallContext & CallContextExt,
@@ -12829,10 +12829,10 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
     request: DeepPartial<GenerateDepositAddressRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<GenerateDepositAddressResponse>;
-  start_tree_creation(
-    request: DeepPartial<StartTreeCreationRequest>,
+  start_deposit_tree_creation(
+    request: DeepPartial<StartDepositTreeCreationRequest>,
     options?: CallOptions & CallOptionsExt,
-  ): Promise<StartTreeCreationResponse>;
+  ): Promise<StartDepositTreeCreationResponse>;
   finalize_node_signatures(
     request: DeepPartial<FinalizeNodeSignaturesRequest>,
     options?: CallOptions & CallOptionsExt,

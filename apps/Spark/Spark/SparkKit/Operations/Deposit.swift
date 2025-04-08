@@ -51,7 +51,7 @@ func createTree(
     let rootNonce = try frostNonce(keyPackage: keyPackage)
     let refundNonce = try frostNonce(keyPackage: keyPackage)
 
-    var request = Spark_StartTreeCreationRequest()
+    var request = Spark_StartDepositTreeCreationRequest()
     request.identityPublicKey = identityPublicKey
 
     request.onChainUtxo.txid = onchainTxId
@@ -66,7 +66,7 @@ func createTree(
     request.refundTxSigningJob.signingPublicKey = signingPublicKey.dataRepresentation
     request.refundTxSigningJob.signingNonceCommitment.hiding = refundNonce.commitment.hiding
     request.refundTxSigningJob.signingNonceCommitment.binding = refundNonce.commitment.binding
-    let response = try await client.start_tree_creation(request)
+    let response = try await client.start_deposit_tree_creation(request)
 
     let rootSECommitments = response.rootNodeSignatureShares.nodeTxSigningResult.signingNonceCommitments.mapValues {
         value in

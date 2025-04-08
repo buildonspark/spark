@@ -247,7 +247,7 @@ public struct Spark_NodeSignatures: @unchecked Sendable {
   public init() {}
 }
 
-public struct Spark_StartTreeCreationRequest: @unchecked Sendable {
+public struct Spark_StartDepositTreeCreationRequest: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -290,7 +290,7 @@ public struct Spark_StartTreeCreationRequest: @unchecked Sendable {
   fileprivate var _refundTxSigningJob: Spark_SigningJob? = nil
 }
 
-public struct Spark_StartTreeCreationResponse: Sendable {
+public struct Spark_StartDepositTreeCreationResponse: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1254,8 +1254,8 @@ extension Spark_NodeSignatures: SwiftProtobuf.Message, SwiftProtobuf._MessageImp
   }
 }
 
-extension Spark_StartTreeCreationRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".StartTreeCreationRequest"
+extension Spark_StartDepositTreeCreationRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".StartDepositTreeCreationRequest"
   public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
     1: .standard(proto: "identity_public_key"),
     2: .standard(proto: "on_chain_utxo"),
@@ -1298,7 +1298,7 @@ extension Spark_StartTreeCreationRequest: SwiftProtobuf.Message, SwiftProtobuf._
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: Spark_StartTreeCreationRequest, rhs: Spark_StartTreeCreationRequest) -> Bool {
+  public static func ==(lhs: Spark_StartDepositTreeCreationRequest, rhs: Spark_StartDepositTreeCreationRequest) -> Bool {
     if lhs.identityPublicKey != rhs.identityPublicKey {return false}
     if lhs._onChainUtxo != rhs._onChainUtxo {return false}
     if lhs._rootTxSigningJob != rhs._rootTxSigningJob {return false}
@@ -1308,8 +1308,8 @@ extension Spark_StartTreeCreationRequest: SwiftProtobuf.Message, SwiftProtobuf._
   }
 }
 
-extension Spark_StartTreeCreationResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".StartTreeCreationResponse"
+extension Spark_StartDepositTreeCreationResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".StartDepositTreeCreationResponse"
   public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
     1: .standard(proto: "tree_id"),
     2: .standard(proto: "root_node_signature_shares"),
@@ -1342,7 +1342,7 @@ extension Spark_StartTreeCreationResponse: SwiftProtobuf.Message, SwiftProtobuf.
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: Spark_StartTreeCreationResponse, rhs: Spark_StartTreeCreationResponse) -> Bool {
+  public static func ==(lhs: Spark_StartDepositTreeCreationResponse, rhs: Spark_StartDepositTreeCreationResponse) -> Bool {
     if lhs.treeID != rhs.treeID {return false}
     if lhs._rootNodeSignatureShares != rhs._rootNodeSignatureShares {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}

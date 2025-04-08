@@ -7,7 +7,7 @@ import {
   Address,
   FinalizeNodeSignaturesResponse,
   GenerateDepositAddressResponse,
-  StartTreeCreationResponse,
+  StartDepositTreeCreationResponse,
 } from "../proto/spark.js";
 import {
   getP2TRAddressFromPublicKey,
@@ -201,10 +201,10 @@ export class DepositService {
       this.config.getCoordinatorAddress(),
     );
 
-    let treeResp: StartTreeCreationResponse;
+    let treeResp: StartDepositTreeCreationResponse;
 
     try {
-      treeResp = await sparkClient.start_tree_creation({
+      treeResp = await sparkClient.start_deposit_tree_creation({
         identityPublicKey: await this.config.signer.getIdentityPublicKey(),
         onChainUtxo: {
           vout: vout,

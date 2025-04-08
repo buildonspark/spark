@@ -199,7 +199,7 @@ func CreateTreeRoot(
 	defer sparkConn.Close()
 	sparkClient := pb.NewSparkServiceClient(sparkConn)
 
-	treeResponse, err := sparkClient.StartTreeCreation(ctx, &pb.StartTreeCreationRequest{
+	treeResponse, err := sparkClient.StartDepositTreeCreation(ctx, &pb.StartDepositTreeCreationRequest{
 		IdentityPublicKey: config.IdentityPublicKey(),
 		OnChainUtxo: &pb.UTXO{
 			Vout:    uint32(vout),

@@ -65,7 +65,7 @@ func TestGenerateDepositAddress(t *testing.T) {
 	}
 }
 
-func TestStartTreeCreation(t *testing.T) {
+func TestStartDepositTreeCreation(t *testing.T) {
 	config, err := testutil.TestWalletConfig()
 	if err != nil {
 		t.Fatalf("failed to create wallet config: %v", err)
@@ -160,7 +160,7 @@ func TestStartTreeCreation(t *testing.T) {
 	}
 }
 
-func TestStartTreeCreationConcurrentWithSameTx(t *testing.T) {
+func TestStartDepositTreeCreationConcurrentWithSameTx(t *testing.T) {
 	// FIXME(mhr): Skipping this test because we can't make base_txid unique yet...
 	t.SkipNow()
 
@@ -286,7 +286,7 @@ func TestStartTreeCreationConcurrentWithSameTx(t *testing.T) {
 
 // Test that we can get refund signatures for a tree before depositing funds on-chain,
 // and that after we confirm funds on-chain, our leaves are available for transfer.
-func TestStartTreeCreationOffchain(t *testing.T) {
+func TestStartDepositTreeCreationOffchain(t *testing.T) {
 	client, err := testutil.NewRegtestClient()
 	assert.NoError(t, err)
 

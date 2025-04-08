@@ -31,7 +31,13 @@ func (s *SparkServer) GenerateDepositAddress(ctx context.Context, req *pb.Genera
 	return wrapWithGRPCError(depositHandler.GenerateDepositAddress(ctx, s.config, req))
 }
 
-// StartTreeCreation verifies the on chain utxo, and then verifies and signs the offchain root and refund transactions.
+// StartDepositTreeCreation verifies the on chain utxo, and then verifies and signs the offchain root and refund transactions.
+func (s *SparkServer) StartDepositTreeCreation(ctx context.Context, req *pb.StartDepositTreeCreationRequest) (*pb.StartDepositTreeCreationResponse, error) {
+	depositHandler := handler.NewDepositHandler(s.config, s.db)
+	return wrapWithGRPCError(depositHandler.StartDepositTreeCreation(ctx, s.config, req))
+}
+
+// This is deprecated, please use StartDepsitTreeCreation instead.
 func (s *SparkServer) StartTreeCreation(ctx context.Context, req *pb.StartTreeCreationRequest) (*pb.StartTreeCreationResponse, error) {
 	depositHandler := handler.NewDepositHandler(s.config, s.db)
 	return wrapWithGRPCError(depositHandler.StartTreeCreation(ctx, s.config, req))

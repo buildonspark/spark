@@ -10,7 +10,11 @@ import "common.proto";
 
 service SparkService {
     rpc generate_deposit_address(GenerateDepositAddressRequest) returns (GenerateDepositAddressResponse) {}
-    rpc start_tree_creation(StartTreeCreationRequest) returns (StartTreeCreationResponse) {}
+    rpc start_deposit_tree_creation(StartDepositTreeCreationRequest) returns (StartDepositTreeCreationResponse) {}
+    // This is deprecated, please use start_deposit_tree_creation instead.
+    rpc start_tree_creation(StartTreeCreationRequest) returns (StartTreeCreationResponse) {
+        option deprecated = true;
+    }
     rpc finalize_node_signatures(FinalizeNodeSignaturesRequest) returns (FinalizeNodeSignaturesResponse) {}
     rpc start_send_transfer(StartSendTransferRequest) returns (StartSendTransferResponse) {}
     rpc complete_send_transfer(CompleteSendTransferRequest) returns (CompleteSendTransferResponse) {}
@@ -236,6 +240,30 @@ message StartTreeCreationRequest {
  * StartTreeCreationResponse is the response to the request to start the tree creation for a tree root node.
  */
 message StartTreeCreationResponse {
+    // The id of the tree.
+    string tree_id = 1;
+    // The signature shares for the root node.
+    NodeSignatureShares root_node_signature_shares = 2;
+}
+
+/**
+ * StartDepositTreeCreationRequest is the request to start the tree creation for a tree root node.
+ */
+message StartDepositTreeCreationRequest {
+    // The identity public key of the user.
+    bytes identity_public_key = 1;
+    // The on-chain utxo to be used to be spent by the root node.
+    UTXO on_chain_utxo = 2;
+    // The signing job for the root node's transaction.
+    SigningJob root_tx_signing_job = 3;
+    // The signing job for the root node's refund transaction.
+    SigningJob refund_tx_signing_job = 4;
+}
+
+/**
+ * StartDepositTreeCreationResponse is the response to the request to start the tree creation for a tree root node.
+ */
+message StartDepositTreeCreationResponse {
     // The id of the tree.
     string tree_id = 1;
     // The signature shares for the root node.

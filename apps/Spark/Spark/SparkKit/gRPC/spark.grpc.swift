@@ -21,10 +21,10 @@ public protocol Spark_SparkServiceClientProtocol: GRPCClient {
     callOptions: CallOptions?
   ) -> UnaryCall<Spark_GenerateDepositAddressRequest, Spark_GenerateDepositAddressResponse>
 
-  func start_tree_creation(
-    _ request: Spark_StartTreeCreationRequest,
+  func start_deposit_tree_creation(
+    _ request: Spark_StartDepositTreeCreationRequest,
     callOptions: CallOptions?
-  ) -> UnaryCall<Spark_StartTreeCreationRequest, Spark_StartTreeCreationResponse>
+  ) -> UnaryCall<Spark_StartDepositTreeCreationRequest, Spark_StartDepositTreeCreationResponse>
 
   func prepare_split_address(
     _ request: Spark_PrepareSplitAddressRequest,
@@ -90,21 +90,21 @@ extension Spark_SparkServiceClientProtocol {
     )
   }
 
-  /// Unary call to start_tree_creation
+  /// Unary call to start_deposit_tree_creation
   ///
   /// - Parameters:
-  ///   - request: Request to send to start_tree_creation.
+  ///   - request: Request to send to start_deposit_tree_creation.
   ///   - callOptions: Call options.
   /// - Returns: A `UnaryCall` with futures for the metadata, status and response.
-  public func start_tree_creation(
-    _ request: Spark_StartTreeCreationRequest,
+  public func start_deposit_tree_creation(
+    _ request: Spark_StartDepositTreeCreationRequest,
     callOptions: CallOptions? = nil
-  ) -> UnaryCall<Spark_StartTreeCreationRequest, Spark_StartTreeCreationResponse> {
+  ) -> UnaryCall<Spark_StartDepositTreeCreationRequest, Spark_StartDepositTreeCreationResponse> {
     return self.makeUnaryCall(
-      path: Spark_SparkServiceClientMetadata.Methods.start_tree_creation.path,
+      path: Spark_SparkServiceClientMetadata.Methods.start_deposit_tree_creation.path,
       request: request,
       callOptions: callOptions ?? self.defaultCallOptions,
-      interceptors: self.interceptors?.makestart_tree_creationInterceptors() ?? []
+      interceptors: self.interceptors?.makestart_deposit_tree_creationInterceptors() ?? []
     )
   }
 
@@ -320,10 +320,10 @@ public protocol Spark_SparkServiceAsyncClientProtocol: GRPCClient {
     callOptions: CallOptions?
   ) -> GRPCAsyncUnaryCall<Spark_GenerateDepositAddressRequest, Spark_GenerateDepositAddressResponse>
 
-  func makeStartTreeCreationCall(
-    _ request: Spark_StartTreeCreationRequest,
+  func makeStartDepositTreeCreationCall(
+    _ request: Spark_StartDepositTreeCreationRequest,
     callOptions: CallOptions?
-  ) -> GRPCAsyncUnaryCall<Spark_StartTreeCreationRequest, Spark_StartTreeCreationResponse>
+  ) -> GRPCAsyncUnaryCall<Spark_StartDepositTreeCreationRequest, Spark_StartDepositTreeCreationResponse>
 
   func makePrepareSplitAddressCall(
     _ request: Spark_PrepareSplitAddressRequest,
@@ -388,15 +388,15 @@ extension Spark_SparkServiceAsyncClientProtocol {
     )
   }
 
-  public func makeStartTreeCreationCall(
-    _ request: Spark_StartTreeCreationRequest,
+  public func makeStartDepositTreeCreationCall(
+    _ request: Spark_StartDepositTreeCreationRequest,
     callOptions: CallOptions? = nil
-  ) -> GRPCAsyncUnaryCall<Spark_StartTreeCreationRequest, Spark_StartTreeCreationResponse> {
+  ) -> GRPCAsyncUnaryCall<Spark_StartDepositTreeCreationRequest, Spark_StartDepositTreeCreationResponse> {
     return self.makeAsyncUnaryCall(
-      path: Spark_SparkServiceClientMetadata.Methods.start_tree_creation.path,
+      path: Spark_SparkServiceClientMetadata.Methods.start_deposit_tree_creation.path,
       request: request,
       callOptions: callOptions ?? self.defaultCallOptions,
-      interceptors: self.interceptors?.makestart_tree_creationInterceptors() ?? []
+      interceptors: self.interceptors?.makestart_deposit_tree_creationInterceptors() ?? []
     )
   }
 
@@ -511,15 +511,15 @@ extension Spark_SparkServiceAsyncClientProtocol {
     )
   }
 
-  public func start_tree_creation(
-    _ request: Spark_StartTreeCreationRequest,
+  public func start_deposit_tree_creation(
+    _ request: Spark_StartDepositTreeCreationRequest,
     callOptions: CallOptions? = nil
-  ) async throws -> Spark_StartTreeCreationResponse {
+  ) async throws -> Spark_StartDepositTreeCreationResponse {
     return try await self.performAsyncUnaryCall(
-      path: Spark_SparkServiceClientMetadata.Methods.start_tree_creation.path,
+      path: Spark_SparkServiceClientMetadata.Methods.start_deposit_tree_creation.path,
       request: request,
       callOptions: callOptions ?? self.defaultCallOptions,
-      interceptors: self.interceptors?.makestart_tree_creationInterceptors() ?? []
+      interceptors: self.interceptors?.makestart_deposit_tree_creationInterceptors() ?? []
     )
   }
 
@@ -642,8 +642,8 @@ public protocol Spark_SparkServiceClientInterceptorFactoryProtocol: Sendable {
   /// - Returns: Interceptors to use when invoking 'generate_deposit_address'.
   func makegenerate_deposit_addressInterceptors() -> [ClientInterceptor<Spark_GenerateDepositAddressRequest, Spark_GenerateDepositAddressResponse>]
 
-  /// - Returns: Interceptors to use when invoking 'start_tree_creation'.
-  func makestart_tree_creationInterceptors() -> [ClientInterceptor<Spark_StartTreeCreationRequest, Spark_StartTreeCreationResponse>]
+  /// - Returns: Interceptors to use when invoking 'start_deposit_tree_creation'.
+  func makestart_deposit_tree_creationInterceptors() -> [ClientInterceptor<Spark_StartDepositTreeCreationRequest, Spark_StartDepositTreeCreationResponse>]
 
   /// - Returns: Interceptors to use when invoking 'prepare_split_address'.
   func makeprepare_split_addressInterceptors() -> [ClientInterceptor<Spark_PrepareSplitAddressRequest, Spark_PrepareSplitAddressResponse>]
@@ -676,7 +676,7 @@ public enum Spark_SparkServiceClientMetadata {
     fullName: "spark.SparkService",
     methods: [
       Spark_SparkServiceClientMetadata.Methods.generate_deposit_address,
-      Spark_SparkServiceClientMetadata.Methods.start_tree_creation,
+      Spark_SparkServiceClientMetadata.Methods.start_deposit_tree_creation,
       Spark_SparkServiceClientMetadata.Methods.prepare_split_address,
       Spark_SparkServiceClientMetadata.Methods.split_node,
       Spark_SparkServiceClientMetadata.Methods.finalize_node_signatures,
@@ -695,9 +695,9 @@ public enum Spark_SparkServiceClientMetadata {
       type: GRPCCallType.unary
     )
 
-    public static let start_tree_creation = GRPCMethodDescriptor(
-      name: "start_tree_creation",
-      path: "/spark.SparkService/start_tree_creation",
+    public static let start_deposit_tree_creation = GRPCMethodDescriptor(
+      name: "start_deposit_tree_creation",
+      path: "/spark.SparkService/start_deposit_tree_creation",
       type: GRPCCallType.unary
     )
 
@@ -757,7 +757,7 @@ public protocol Spark_SparkServiceProvider: CallHandlerProvider {
 
   func generate_deposit_address(request: Spark_GenerateDepositAddressRequest, context: StatusOnlyCallContext) -> EventLoopFuture<Spark_GenerateDepositAddressResponse>
 
-  func start_tree_creation(request: Spark_StartTreeCreationRequest, context: StatusOnlyCallContext) -> EventLoopFuture<Spark_StartTreeCreationResponse>
+  func start_deposit_tree_creation(request: Spark_StartDepositTreeCreationRequest, context: StatusOnlyCallContext) -> EventLoopFuture<Spark_StartDepositTreeCreationResponse>
 
   func prepare_split_address(request: Spark_PrepareSplitAddressRequest, context: StatusOnlyCallContext) -> EventLoopFuture<Spark_PrepareSplitAddressResponse>
 
@@ -797,13 +797,13 @@ extension Spark_SparkServiceProvider {
         userFunction: self.generate_deposit_address(request:context:)
       )
 
-    case "start_tree_creation":
+    case "start_deposit_tree_creation":
       return UnaryServerHandler(
         context: context,
-        requestDeserializer: ProtobufDeserializer<Spark_StartTreeCreationRequest>(),
-        responseSerializer: ProtobufSerializer<Spark_StartTreeCreationResponse>(),
-        interceptors: self.interceptors?.makestart_tree_creationInterceptors() ?? [],
-        userFunction: self.start_tree_creation(request:context:)
+        requestDeserializer: ProtobufDeserializer<Spark_StartDepositTreeCreationRequest>(),
+        responseSerializer: ProtobufSerializer<Spark_StartDepositTreeCreationResponse>(),
+        interceptors: self.interceptors?.makestart_deposit_tree_creationInterceptors() ?? [],
+        userFunction: self.start_deposit_tree_creation(request:context:)
       )
 
     case "prepare_split_address":
@@ -895,10 +895,10 @@ public protocol Spark_SparkServiceAsyncProvider: CallHandlerProvider, Sendable {
     context: GRPCAsyncServerCallContext
   ) async throws -> Spark_GenerateDepositAddressResponse
 
-  func start_tree_creation(
-    request: Spark_StartTreeCreationRequest,
+  func start_deposit_tree_creation(
+    request: Spark_StartDepositTreeCreationRequest,
     context: GRPCAsyncServerCallContext
-  ) async throws -> Spark_StartTreeCreationResponse
+  ) async throws -> Spark_StartDepositTreeCreationResponse
 
   func prepare_split_address(
     request: Spark_PrepareSplitAddressRequest,
@@ -969,13 +969,13 @@ extension Spark_SparkServiceAsyncProvider {
         wrapping: { try await self.generate_deposit_address(request: $0, context: $1) }
       )
 
-    case "start_tree_creation":
+    case "start_deposit_tree_creation":
       return GRPCAsyncServerHandler(
         context: context,
-        requestDeserializer: ProtobufDeserializer<Spark_StartTreeCreationRequest>(),
-        responseSerializer: ProtobufSerializer<Spark_StartTreeCreationResponse>(),
-        interceptors: self.interceptors?.makestart_tree_creationInterceptors() ?? [],
-        wrapping: { try await self.start_tree_creation(request: $0, context: $1) }
+        requestDeserializer: ProtobufDeserializer<Spark_StartDepositTreeCreationRequest>(),
+        responseSerializer: ProtobufSerializer<Spark_StartDepositTreeCreationResponse>(),
+        interceptors: self.interceptors?.makestart_deposit_tree_creationInterceptors() ?? [],
+        wrapping: { try await self.start_deposit_tree_creation(request: $0, context: $1) }
       )
 
     case "prepare_split_address":
@@ -1062,9 +1062,9 @@ public protocol Spark_SparkServiceServerInterceptorFactoryProtocol: Sendable {
   ///   Defaults to calling `self.makeInterceptors()`.
   func makegenerate_deposit_addressInterceptors() -> [ServerInterceptor<Spark_GenerateDepositAddressRequest, Spark_GenerateDepositAddressResponse>]
 
-  /// - Returns: Interceptors to use when handling 'start_tree_creation'.
+  /// - Returns: Interceptors to use when handling 'start_deposit_tree_creation'.
   ///   Defaults to calling `self.makeInterceptors()`.
-  func makestart_tree_creationInterceptors() -> [ServerInterceptor<Spark_StartTreeCreationRequest, Spark_StartTreeCreationResponse>]
+  func makestart_deposit_tree_creationInterceptors() -> [ServerInterceptor<Spark_StartDepositTreeCreationRequest, Spark_StartDepositTreeCreationResponse>]
 
   /// - Returns: Interceptors to use when handling 'prepare_split_address'.
   ///   Defaults to calling `self.makeInterceptors()`.
@@ -1105,7 +1105,7 @@ public enum Spark_SparkServiceServerMetadata {
     fullName: "spark.SparkService",
     methods: [
       Spark_SparkServiceServerMetadata.Methods.generate_deposit_address,
-      Spark_SparkServiceServerMetadata.Methods.start_tree_creation,
+      Spark_SparkServiceServerMetadata.Methods.start_deposit_tree_creation,
       Spark_SparkServiceServerMetadata.Methods.prepare_split_address,
       Spark_SparkServiceServerMetadata.Methods.split_node,
       Spark_SparkServiceServerMetadata.Methods.finalize_node_signatures,
@@ -1124,9 +1124,9 @@ public enum Spark_SparkServiceServerMetadata {
       type: GRPCCallType.unary
     )
 
-    public static let start_tree_creation = GRPCMethodDescriptor(
-      name: "start_tree_creation",
-      path: "/spark.SparkService/start_tree_creation",
+    public static let start_deposit_tree_creation = GRPCMethodDescriptor(
+      name: "start_deposit_tree_creation",
+      path: "/spark.SparkService/start_deposit_tree_creation",
       type: GRPCCallType.unary
     )
 
