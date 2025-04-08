@@ -4,6 +4,7 @@ import {
   TokenTransaction,
 } from "../proto/spark.js";
 import { hashTokenTransaction } from "./token-hashing.js";
+import { type SparkWallet } from "../spark-wallet.js";
 
 export function getTokenLeavesSum(
   leaves: LeafWithPreviousTransactionData[],
@@ -68,4 +69,23 @@ export function checkIfSelectedLeavesAreAvailable(
   }
 
   return true;
+}
+
+export function filterTokenBalanceForTokenPublicKey(
+  tokenBalances: Map<
+    string,
+    {
+      balance: bigint;
+    }
+  >,
+  publicKey: string,
+): { balance: bigint } {
+  if (!tokenBalances || !tokenBalances.has(publicKey)) {
+    return {
+      balance: 0n,
+    };
+  }
+  return {
+    balance: tokenBalances.get(publicKey)!.balance,
+  };
 }

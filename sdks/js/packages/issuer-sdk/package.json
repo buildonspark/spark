@@ -48,6 +48,7 @@
     "test-cmd": "node --experimental-vm-modules $(yarn bin jest) --no-cache --runInBand",
     "test": "echo \"Error: no tests yet\"",
     "test:integration": "yarn test-cmd src/tests/integration/*.test.ts",
+    "test:stress": "yarn test-cmd src/tests/stress/*.test.ts",
     "types:watch": "tsc-absolute --watch",
     "types": "tsc",
     "generate:proto": "PATH=\"$PATH:./node_modules/.bin\" protoc --ts_proto_out=./src/proto --ts_proto_opt=outputServices=nice-grpc,useExactTypes=false,outputServices=generic-definitions,oneof=unions,importSuffix=.js --proto_path=../../protos spark.proto mock.proto spark_authn.proto"
