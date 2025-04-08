@@ -48,7 +48,7 @@ export class IssuerSparkWallet
   public static async initialize(options: SparkWalletProps) {
     const wallet = new IssuerSparkWallet(options.options);
 
-    const initResponse = await wallet.initIssuerWallet(options.mnemonicOrSeed);
+    const initResponse = await wallet.initWallet(options.mnemonicOrSeed);
     return {
       wallet,
       ...initResponse,
@@ -65,39 +65,6 @@ export class IssuerSparkWallet
       this.config,
       this.connectionManager,
     );
-  }
-
-  private async initIssuerWallet(mnemonicOrSeed?: string | Uint8Array) {
-    const initResponse = await super.initWallet(mnemonicOrSeed);
-
-    // TODO: Remove this in subsequent PRs when LRC20Wallet has a proper signer interface
-    mnemonicOrSeed = mnemonicOrSeed || initResponse?.mnemonic;
-    if (mnemonicOrSeed) {
-      let seed: Uint8Array;
-      if (typeof mnemonicOrSeed !== "string") {
-        seed = mnemonicOrSeed;
-      } else {
-        if (validateMnemonic(mnemonicOrSeed, wordlist)) {
-          seed = await this.config.signer.mnemonicToSeed(mnemonicOrSeed);
-        } else {
-          seed = hexToBytes(mnemonicOrSeed);
-        }
-      }
-
-      const hdkey = getMasterHDKeyFromSeed(seed);
-      const accountType = this.config.getNetwork() === Network.REGTEST ? 0 : 1;
-      const identityKey = hdkey.derive(`m/8797555'/${accountType}'/0'`);
-
-      const network = this.config.getNetwork();
-      this.lrc20Wallet = new LRCWallet(
-        bytesToHex(identityKey.privateKey!),
-        LRC_WALLET_NETWORK[network],
-        LRC_WALLET_NETWORK_TYPE[network],
-        this.config.lrc20ApiConfig,
-      );
-    }
-
-    return initResponse;
   }
 
   public async getIssuerTokenBalance(): Promise<{
