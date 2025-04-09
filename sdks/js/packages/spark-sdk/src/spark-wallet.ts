@@ -535,9 +535,7 @@ export class SparkWallet {
     const { transfer, signatureMap } =
       await this.transferService.startSwapSignRefund(
         leafKeyTweaks,
-        await this.config.signer.getSspIdentityPublicKey(
-          this.config.getNetwork(),
-        ),
+        hexToBytes(this.config.getSspIdentityPublicKey()),
         new Date(Date.now() + 2 * 60 * 1000),
       );
     try {
@@ -1293,10 +1291,9 @@ export class SparkWallet {
 
       const swapResponse = await this.lightningService.swapNodesForPreimage({
         leaves: leavesToSend,
-        receiverIdentityPubkey:
-          await this.config.signer.getSspIdentityPublicKey(
-            this.config.getNetwork(),
-          ),
+        receiverIdentityPubkey: hexToBytes(
+          this.config.getSspIdentityPublicKey(),
+        ),
         paymentHash: hexToBytes(paymentHash),
         isInboundPayment: false,
         invoiceString: invoice,
@@ -1515,9 +1512,7 @@ export class SparkWallet {
       });
     }
 
-    const sspPubIdentityKey = await this.config.signer.getSspIdentityPublicKey(
-      this.config.getNetwork(),
-    );
+    const sspPubIdentityKey = hexToBytes(this.config.getSspIdentityPublicKey());
 
     const transfer = await this.coopExitService.getConnectorRefundSignatures({
       leaves: leafKeyTweaks,

@@ -3,11 +3,26 @@ import {
   MayHaveLrc20WalletApiConfig,
 } from "@buildonspark/lrc20-sdk";
 import { hexToBytes } from "@noble/curves/abstract/utils";
-import { MayHaveSspClientOptions, SspClientOptions } from "../graphql/client.js";
+import {
+  MayHaveSspClientOptions,
+  SspClientOptions,
+} from "../graphql/client.js";
 import { isHermeticTest } from "../tests/test-util.js";
 import { NetworkType } from "../utils/network.js";
 
 const isProduction = process.env.NODE_ENV === "production";
+
+const SSP_IDENTITY_PUBLIC_KEYS = {
+  LOCAL: "028c094a432d46a0ac95349d792c2e3730bd60c29188db716f56a99e39b95338b4",
+  REGTEST: {
+    DEV: "028c094a432d46a0ac95349d792c2e3730bd60c29188db716f56a99e39b95338b4",
+    PROD: "022bf283544b16c0622daecb79422007d167eca6ce9f0c98c0c49833b1f7170bfe",
+  },
+  MAINNET: {
+    DEV: "02e0b8d42c5d3b5fe4c5beb6ea796ab3bc8aaf28a3d3195407482c67e0b58228a5",
+    PROD: "023e33e2920326f64ea31058d44777442d97d7d5cbfcf54e3060bc1695e5261c93",
+  },
+};
 
 const URL_CONFIG = {
   LOCAL: {
@@ -104,14 +119,37 @@ export function getLrc20NodeUrl(network: NetworkType): string {
   }
 }
 
+export function getSspIdentityPublicKey(network: NetworkType): string {
+  switch (network) {
+    case "LOCAL":
+      return SSP_IDENTITY_PUBLIC_KEYS.LOCAL;
+    case "REGTEST":
+      return isProduction
+        ? SSP_IDENTITY_PUBLIC_KEYS.REGTEST.PROD
+        : SSP_IDENTITY_PUBLIC_KEYS.REGTEST.DEV;
+    case "MAINNET":
+      return isProduction
+        ? SSP_IDENTITY_PUBLIC_KEYS.MAINNET.PROD
+        : SSP_IDENTITY_PUBLIC_KEYS.MAINNET.DEV;
+    default:
+      return SSP_IDENTITY_PUBLIC_KEYS.LOCAL;
+  }
+}
+
 export function getSspUrl(network: NetworkType): string {
   switch (network) {
     case "LOCAL":
-      return isHermeticTest() ? "http://app.minikube.local" : URL_CONFIG.LOCAL.SSP;
+      return isHermeticTest()
+        ? "http://app.minikube.local"
+        : URL_CONFIG.LOCAL.SSP;
     case "REGTEST":
-      return isProduction ? URL_CONFIG.REGTEST.PROD.SSP : URL_CONFIG.REGTEST.DEV.SSP;
+      return isProduction
+        ? URL_CONFIG.REGTEST.PROD.SSP
+        : URL_CONFIG.REGTEST.DEV.SSP;
     case "MAINNET":
-      return isProduction ? URL_CONFIG.MAINNET.PROD.SSP : URL_CONFIG.MAINNET.DEV.SSP;
+      return isProduction
+        ? URL_CONFIG.MAINNET.PROD.SSP
+        : URL_CONFIG.MAINNET.DEV.SSP;
     default:
       return URL_CONFIG.LOCAL.SSP;
   }
@@ -124,18 +162,19 @@ export type SigningOperator = {
   readonly identityPublicKey: Uint8Array;
 };
 
-export type ConfigOptions = MayHaveLrc20WalletApiConfig & MayHaveSspClientOptions & {
-  readonly network?: NetworkType;
-  readonly signingOperators?: Readonly<Record<string, SigningOperator>>;
-  readonly coodinatorIdentifier?: string;
-  readonly frostSignerAddress?: string;
-  readonly lrc20Address?: string;
-  readonly threshold?: number;
-  readonly useTokenTransactionSchnorrSignatures?: boolean;
-  readonly electrsUrl?: string;
-  readonly lrc20ApiConfig?: LRC20WalletApiConfig;
-  readonly sspClientOptions?: SspClientOptions;
-};
+export type ConfigOptions = MayHaveLrc20WalletApiConfig &
+  MayHaveSspClientOptions & {
+    readonly network?: NetworkType;
+    readonly signingOperators?: Readonly<Record<string, SigningOperator>>;
+    readonly coodinatorIdentifier?: string;
+    readonly frostSignerAddress?: string;
+    readonly lrc20Address?: string;
+    readonly threshold?: number;
+    readonly useTokenTransactionSchnorrSignatures?: boolean;
+    readonly electrsUrl?: string;
+    readonly lrc20ApiConfig?: LRC20WalletApiConfig;
+    readonly sspClientOptions?: SspClientOptions;
+  };
 
 const DEV_PUBKEYS = [
   "03acd9a5a88db102730ff83dee69d69088cc4c9d93bbee893e90fd5051b7da9651",
@@ -170,6 +209,7 @@ const BASE_CONFIG: Required<ConfigOptions> = {
   },
   sspClientOptions: {
     baseUrl: getSspUrl("LOCAL"),
+    identityPublicKey: getSspIdentityPublicKey("LOCAL"),
   },
 };
 
@@ -199,6 +239,7 @@ export const REGTEST_WALLET_CONFIG: Required<ConfigOptions> = {
   },
   sspClientOptions: {
     baseUrl: getSspUrl("REGTEST"),
+    identityPublicKey: getSspIdentityPublicKey("REGTEST"),
   },
 };
 
@@ -214,6 +255,7 @@ export const MAINNET_WALLET_CONFIG: Required<ConfigOptions> = {
   },
   sspClientOptions: {
     baseUrl: getSspUrl("MAINNET"),
+    identityPublicKey: getSspIdentityPublicKey("MAINNET"),
   },
 };
 

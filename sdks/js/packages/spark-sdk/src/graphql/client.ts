@@ -50,6 +50,7 @@ import { UserRequest } from "./queries/UserRequest.js";
 
 export interface SspClientOptions {
   baseUrl: string;
+  identityPublicKey: string;
   schemaEndpoint?: string;
 }
 
@@ -63,11 +64,8 @@ export interface HasSspClientOptions {
 
 export default class SspClient {
   private readonly requester: Requester;
-  private identityPublicKey: string;
 
   constructor(identityPublicKey: string, config: HasSspClientOptions) {
-    this.identityPublicKey = identityPublicKey;
-
     const fetchFunction =
       typeof window !== "undefined" ? window.fetch.bind(window) : fetch;
     const options = config.sspClientOptions;
