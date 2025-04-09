@@ -1,13 +1,60 @@
 #!/bin/bash
+#
+# local-test.sh - Script to run Spark tests in a hermetic minikube environment
+#
+# This script sets up a local minikube environment for running Spark hermetictests,
+# including deploying necessary services and setting up port forwarding.
+#
+# Usage:
+#   ./scripts/local-test.sh [--dev-spark] [--keep-data]
+#
+# Options:
+#   --dev-spark         - Sets USE_DEV_SPARK=true to use the locally built dev spark image
+#   --keep-data         - Sets RESET_DBS=false to preserve existing test data (databases and blockchain)
+#
+# Environment Variables:
+#   RESET_DBS           - Whether to reset operator databases and bitcoin blockchain (default: true)
+#   USE_DEV_SPARK       - Whether to use the dev spark image built into minikube (default: false)
+#   SPARK_TAG           - Image tag to use for both Spark operator and signer (default: latest)
+#   LRC20_TAG           - Image tag to use for LRC20 (default: latest)
+#   USE_LIGHTSPARK_HELM_REPO - Whether to fetch helm charts from remote repo (default: false)
+#   OPS_DIR             - Path to the Lightspark ops repository which contains helm charts (auto-detected if not set)
+#
+# Example:
+#   # Run with default settings
+#   ./scripts/local-test.sh
+#
+#   # Run with dev spark image and keep existing test data
+#   ./scripts/local-test.sh --dev-spark --keep-data
+#
+#   # Run with custom environment variables
+#   SPARK_TAG=v1.0.0 ./scripts/local-test.sh
+
 set -e
 
-# Forces the DBs to be recreated
+: "${USE_DEV_SPARK:=false}"
 : "${RESET_DBS:=true}"
-# The k8 namespace for the bitcoin services. If you want isolation between the
-# spark k8 environment and some other development environment, set this to
-# something else like "bitcoin-spark".
-: "${BITCOIN_NAMESPACE:=bitcoin}"
-export BITCOIN_NAMESPACE
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --dev-spark)
+            USE_DEV_SPARK=true
+            shift
+            ;;
+        --keep-data)
+            RESET_DBS=false
+            shift
+            ;;
+        *)
+            echo "Unknown option: $1"
+            exit 1
+            ;;
+    esac
+done
+
+export USE_DEV_SPARK
+export RESET_DBS
+
 HERMETIC_TEST_FILE="/tmp/spark_hermetic"
 MINIKUBE_CA_FILE="/tmp/minikube-ca.pem"
 
@@ -35,9 +82,9 @@ cleanup_k8s() {
     echo "Cleaning up previous deployments..."
     helm uninstall -n spark regtest --ignore-not-found 2>/dev/null || true
     helm uninstall -n lrc20 regtest --ignore-not-found 2>/dev/null || true
-    helm uninstall -n "$BITCOIN_NAMESPACE" regtest --ignore-not-found 2>/dev/null || true
-    helm uninstall -n "$BITCOIN_NAMESPACE" regtest-mempool --ignore-not-found 2>/dev/null || true
-    helm uninstall -n "$BITCOIN_NAMESPACE" regtest-electrs --ignore-not-found 2>/dev/null || true
+    helm uninstall -n bitcoin regtest --ignore-not-found 2>/dev/null || true
+    helm uninstall -n bitcoin regtest-mempool --ignore-not-found 2>/dev/null || true
+    helm uninstall -n bitcoin regtest-electrs --ignore-not-found 2>/dev/null || true
 
 
     kubectl delete namespace spark --ignore-not-found &
@@ -54,8 +101,8 @@ cleanup_k8s() {
     wait_pids=("$WAIT_SPARK_PID" "$WAIT_LRC20_PID" "$WAIT_TEST_SIGNER_PID")
 
     if [ "$RESET_DBS" = "true" ]; then
-        kubectl delete namespace "$BITCOIN_NAMESPACE" --ignore-not-found &
-        kubectl wait --for=delete namespace/"$BITCOIN_NAMESPACE" --timeout=60s 2>/dev/null &
+        kubectl delete namespace bitcoin --ignore-not-found &
+        kubectl wait --for=delete namespace/bitcoin --timeout=60s 2>/dev/null &
         WAIT_BITCOIN_SPARK_PID=$!
         wait_pids+=("$WAIT_BITCOIN_SPARK_PID")
     fi

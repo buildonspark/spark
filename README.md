@@ -1,12 +1,14 @@
-# spark-go
+# Spark
 
-## Generate proto files
+## [mise](https://mise.jdx.dev/)
 
 To install all of our protobuf, rust, and go toolchains install [mise](https://mise.jdx.dev/getting-started.html), then run:
 ```
+mise trust
 mise install
 ```
 
+## Generate proto files
 
 After modifying the proto files, you can generate the Go files with the following command:
 
@@ -38,7 +40,7 @@ To make a migration, follow these steps:
 
 - Make your change to the schema, run `make ent`
 - Generate migration files by running `./scripts/gen-migration.sh <name>`:
-- When running `run-everything.sh`, the migration will be automatically
+- When running in minikube or `run-everything.sh`, the migration will be automatically
   applied to each operator's database. But if you want to apply a migration manually, you can run (e.g. DB name is `sparkoperator_0`):
 
 ```
@@ -93,7 +95,7 @@ go test $(go list ./... | grep -v -E "so/grpc_test|so/tree")
 
 ## E2E tests
 
-The E2E test environment can be run locally via `./run-everything.sh` or in minikube via `./scripts/local-test.sh` for hermetic testing.
+The E2E test environment can be run locally in minikube via `./scripts/local-test.sh` for hermetic testing (recommended) or run locally via `./run-everything.sh`.
 
 #### Local Setup (`./run-everything.sh`)
 ```
@@ -107,11 +109,6 @@ brew install cargo # required for LRC20 Node
 See bitcoin section above.
 
 ##### postgres
-
-If you run `mise run-everything`, it will also ensure the DB is running, but if you want to run it manually, you can do so with the following command:
-```
-mise db-up
-```
 
 You also need to enable TCP/IP connections to the database.
 You might need to edit the following files found in your `postgres` data directory. If you installed `postgres` via homebrew, it is probably in `/usr/local/var/postgres`. If you can connect to the database via `psql`, you can find the data directory by running `psql -U postgres -c "SHOW data_directory;"`.
@@ -142,7 +139,17 @@ host    all       all   ::1/128      trust
 
 See: [ops/minikube/README.md](https://github.com/lightsparkdev/ops/blob/main/minikube/README.md)
 
-Please run: ops/minikube/setup.sh
+Please run: `ops/minikube/setup.sh`, then `./scripts/local-test.sh`. If want to make local code changes visible in minikube, you'll need to
+
+```
+# 1. Build the image
+./scripts/build.sh  # from the repo root
+# OR
+mise build-so-dev-image  # from any directory
+
+# 2. Run minikube with the local image
+./scripts/local-test.sh --dev-spark
+```
 
 ### Running tests
 
@@ -161,34 +168,38 @@ OR
 ```
 # Hermetic/Minikube environment
 #
-# Env variables:
-# RESET_DBS={default:true}                 - resets the operator databases and bitcoin blockchain
-# USE_DEV_SPARK={default:false}            - use the dev spark image built into the minikube
-#                                            container cluster
-#                                            (rebuild the the image with ./scripts/build.sh)
-# SPARK_TAG={default:latest}               - the image to use for both Spark operator and signer
-# LRC20_TAG={default:latest}               - the image to use for LRC20
-# USE_LIGHTSPARK_HELM_REPO={default:false} - whether to fetch the helm charts from the remote repo
-#                                            instead of a local ops repo in the workspace.
+# Usage:
+#   ./scripts/local-test.sh [--dev-spark] [--keep-data]
+#
+# Options:
+#   --dev-spark         - Sets USE_DEV_SPARK=true to use the locally built dev spark image
+#   --keep-data         - Sets RESET_DBS=false to preserve existing test data (databases and blockchain)
+#
+# Environment Variables:
+#   RESET_DBS           - Whether to reset operator databases and bitcoin blockchain (default: true)
+#   USE_DEV_SPARK       - Whether to use the dev spark image built into minikube (default: false)
+#   SPARK_TAG           - Image tag to use for both Spark operator and signer (default: latest)
+#   LRC20_TAG           - Image tag to use for LRC20 (default: latest)
+#   USE_LIGHTSPARK_HELM_REPO - Whether to fetch helm charts from remote repo (default: false)
+#   OPS_DIR             - Path to the Lightspark ops repository which contains helm charts (auto-detected if not set)
 
 ./scripts/local-test.sh
 
 # CTR-C when done to remove shut down port forwarding
 ```
 
-Then
-```
-mise test-grpc
-```
-or in the spark folder:
+then run your tests
 
 ```
-go test -failfast=false -p=2 ./so/grpc_test/...
+mise test-grpc  # from anywhere in the repo
 
-# OR if you want prettier results and retries
+# OR
 
-gotestsum --format testname --rerun-fails ./so/grpc_test/...
+go test -failfast=false -p=2 ./so/grpc_test/...  # in the spark folder
 
+# OR
+
+gotestsum --format testname --rerun-fails ./so/grpc_test/...  # if you want prettier results and retries
 ```
 
 In the sdks/js folder, you can run:
@@ -207,3 +218,5 @@ From within `iterm2`, you can run:
 ```tmux -CC attach -t operator```
 
 3. The first time you run `run-everything.sh` it will take a while to start up. You might actually need to run it a couple of times for everything to work properly. Attach to the `operator` session and check out the logs.
+
+4. Having trouble with mise? You can always run `mise implode` and it will remove mise entirely so you can start over.
