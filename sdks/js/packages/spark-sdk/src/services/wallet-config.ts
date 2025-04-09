@@ -26,7 +26,7 @@ const SSP_IDENTITY_PUBLIC_KEYS = {
 
 const URL_CONFIG = {
   LOCAL: {
-    SSP: "http://localhost:5000",
+    SSP: "http://127.0.0.1:5000",
     ELECTRS: "http://127.0.0.1:30000",
     LRC20: "http://127.0.0.1:18530",
     LRC20_NODE: "http://127.0.0.1:18332",
@@ -41,8 +41,8 @@ const URL_CONFIG = {
     PROD: {
       SSP: "https://api.lightspark.com",
       ELECTRS: "https://regtest-mempool.us-west-2.sparkinfra.net/api",
-      LRC20: "https://regtest.lrc20.us-west-2.sparkinfra.net:443",
-      LRC20_NODE: "https://regtest.lrc20.us-west-2.sparkinfra.net",
+      LRC20: "https://regtest.lrc20.lightspark.com:443",
+      LRC20_NODE: "https://regtest.lrc20.lightspark.com",
     },
   },
   MAINNET: {
@@ -55,8 +55,8 @@ const URL_CONFIG = {
     PROD: {
       SSP: "https://api.lightspark.com",
       ELECTRS: "https://mempool.space/api",
-      LRC20: "https://mainnet.lrc20.us-west-2.sparkinfra.net:443",
-      LRC20_NODE: "https://mainnet.lrc20.us-west-2.sparkinfra.net",
+      LRC20: "https://mainnet.lrc20.lightspark.com:443",
+      LRC20_NODE: "https://mainnet.lrc20.lightspark.com",
     },
   },
 } as const;
@@ -295,21 +295,21 @@ function getProdSigningOperators(): Record<string, SigningOperator> {
       id: 0,
       identifier:
         "0000000000000000000000000000000000000000000000000000000000000001",
-      address: "https://0.spark.us-west-2.sparkinfra.net",
+      address: "https://0.spark.lightspark.com",
       identityPublicKey: hexToBytes(PROD_PUBKEYS[0]!),
     },
     "0000000000000000000000000000000000000000000000000000000000000002": {
       id: 1,
       identifier:
         "0000000000000000000000000000000000000000000000000000000000000002",
-      address: "https://1.spark.us-west-2.sparkinfra.net",
+      address: "https://1.spark.lightspark.com",
       identityPublicKey: hexToBytes(PROD_PUBKEYS[1]!),
     },
     "0000000000000000000000000000000000000000000000000000000000000003": {
       id: 2,
       identifier:
         "0000000000000000000000000000000000000000000000000000000000000003",
-      address: "https://2.spark.us-west-2.sparkinfra.net",
+      address: "https://2.spark.flashnet.xyz",
       identityPublicKey: hexToBytes(PROD_PUBKEYS[2]!),
     },
   };
