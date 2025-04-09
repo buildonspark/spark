@@ -116,6 +116,7 @@ kubectl create secret generic -n spark regtest-spark \
 pubkeys_json=$(printf '%s\n' "${PUB_KEYS[@]}" | jq -R . | jq -s .)
 operator_cmd=(
     helm install
+    --version 0.1.1
     --timeout "$HELM_INSTALL_TIMEOUT"
     --namespace spark
     --set config.network="regtest"
