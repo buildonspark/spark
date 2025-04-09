@@ -19,9 +19,7 @@ jobs:
     steps:
       - run: "true"
 
-  # TODO(mhr): Rename this to `test` and remove the `sdks/js/**` path from dummy.yaml to make the
-  # check required.
-  tests:
+  test:
     runs-on: ubuntu-latest
     defaults:
       run:
