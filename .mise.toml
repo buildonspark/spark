@@ -1,0 +1,24 @@
+[tools]
+atlas = "latest"
+go = "latest"
+golangci-lint = "latest"
+gotestsum = "latest"
+node = "latest"
+protoc = "latest"
+protoc-gen-go = "latest"
+protoc-gen-go-grpc = "latest"
+protoc-gen-validate = "latest"
+rust = "latest"
+
+[env]
+MISE_NODE_COREPACK = true
+
+[tasks]
+test-go = { dir = "{{config_root}}/spark", run = 'mise test' }
+test-grpc = { dir = "{{config_root}}/spark", run = 'mise test-grpc' }
+test-js = { dir = "{{config_root}}/sdks/js", run = 'yarn install && yarn test' }
+test-js-integration = { dir = "{{config_root}}/sdks/js", run = 'yarn install && yarn test:integration' }
+
+[settings]
+activate_aggressive = true
+disable_backends = ["asdf"]

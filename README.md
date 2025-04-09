@@ -2,19 +2,11 @@
 
 ## Generate proto files
 
-Protobuf needs to be installed in order to build the project.
+To install all of our protobuf, rust, and go toolchains install [mise](https://mise.jdx.dev/getting-started.html), then run:
+```
+mise install
+```
 
-```
-brew install protobuf
-```
-
-Go protobuf tools need to be installed as well:
-
-```
-go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
-go install github.com/envoyproxy/protoc-gen-validate@latest
-```
 
 After modifying the proto files, you can generate the Go files with the following command:
 
@@ -40,7 +32,7 @@ brew install bitcoin
 
 ## DB Migrations
 
-We use atlas to manage our database migrations. Install it [here](https://atlasgo.io/getting-started/#installation).
+We use atlas to manage our database migrations. Install via `mise install`.
 
 To make a migration, follow these steps:
 
@@ -73,23 +65,25 @@ If spark_frost.udl file has issue with VSCode, you can add the following to your
 
 ## Linting
 
-Linting uses `golang-ci`, install it [according to your platform](https://golangci-lint.run/welcome/install/). Note that it is discouraged to install from sources via `go install`.
+Golang linting uses `golang-ci`, installed with `mise install`.
 
+
+To run the linters, use either of
 ```
-# MacOS
-brew install golangci-lint
+mise lint
 
-```
-
-To run the linters, use
-
-```
 golangci-lint run
 ```
 
 ## Run tests
 
 ### Unit tests
+
+```
+mise test-go # works from any directory
+mise test # works from the spark folder
+```
+or
 
 In spark folder, run:
 
@@ -100,8 +94,6 @@ go test $(go list ./... | grep -v -E "so/grpc_test|so/tree")
 ## E2E tests
 
 The E2E test environment can be run locally via `./run-everything.sh` or in minikube via `./scripts/local-test.sh` for hermetic testing.
-
-### Prerequisites
 
 #### Local Setup (`./run-everything.sh`)
 ```
@@ -116,11 +108,9 @@ See bitcoin section above.
 
 ##### postgres
 
-A local version `postgres` with access for your local user.
-If you have a fresh installation of `postgres`, you may need to add your user yourself:
-
+If you run `mise run-everything`, it will also ensure the DB is running, but if you want to run it manually, you can do so with the following command:
 ```
-psql -U postgres -c "CREATE ROLE $USER WITH LOGIN SUPERUSER;"
+mise db-up
 ```
 
 You also need to enable TCP/IP connections to the database.
@@ -161,10 +151,8 @@ JS SDK integration tests are across the different JS packages, but can be run to
 
 In the root folder, run:
 
-
 ```
 # Local environment
-
 ./run-everything.sh
 ```
 
@@ -188,19 +176,19 @@ OR
 # CTR-C when done to remove shut down port forwarding
 ```
 
-Then in the spark folder:
+Then
+```
+mise test-grpc
+```
+or in the spark folder:
 
 ```
 go test -failfast=false -p=2 ./so/grpc_test/...
 
 # OR if you want prettier results and retries
 
-go run gotest.tools/gotestsum@latest \
-            --format testname \
-            --rerun-fails \
-            ./so/grpc_test/...
+gotestsum --format testname --rerun-fails ./so/grpc_test/...
 
-# or install it via go install gotest.tools/gotestsum@latest
 ```
 
 In the sdks/js folder, you can run:
@@ -214,8 +202,8 @@ yarn test:integration
 
 1. For local testing, operator (go) and signer (rust) logs are found in `_data/run_X/logs`. For minikube, logs are found via kubernetes. [k9s](https://k9scli.io/) is a great tool to investigate your minikube k8 cluster.
 2. If you don't want to deal with `tmux` commands yourself, you can easily interact with tmux using the `iterm2` GUI and tmux control-center.
-   From within `iterm2`, you can run:
+From within `iterm2`, you can run:
 
-`tmux -CC attach -t operator`
+```tmux -CC attach -t operator```
 
 3. The first time you run `run-everything.sh` it will take a while to start up. You might actually need to run it a couple of times for everything to work properly. Attach to the `operator` session and check out the logs.
