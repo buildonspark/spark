@@ -30,7 +30,6 @@
   ],
   "scripts": {
     "build": "yarn tsc && tsup",
-    "prepare": "yarn run build",
     "build:watch": "yarn build --watch --clean=false",
     "clean": "rm -rf dist",
     "circular-deps": "madge --circular --extensions ts,tsx src",

@@ -54,7 +54,6 @@
     "src"
   ],
   "scripts": {
-    "prepare": "yarn run build",
     "pre-commit-config": "npx husky install",
     "build": "yarn tsc && tsup",
     "circular-deps": "madge --circular --extensions ts,tsx src",
