@@ -113,7 +113,11 @@ kubectl create secret generic -n spark regtest-spark \
     --from-literal="operator4.key=${PRIV_KEYS[4]}" \
     --dry-run=client -o yaml | kubectl apply -f -
 
-pubkeys_json=$(printf '%s\n' "${PUB_KEYS[@]}" | jq -R . | jq -s .)
+# Create operators array with id and pubkey for each operator
+operators_json=$(for i in $(seq 0 $last_so_index); do
+    echo "{\"id\": $i, \"pubkey\": \"${PUB_KEYS[$i]}\"}"
+done | jq -s .)
+
 operator_cmd=(
     helm install
     --version 0.1.1
@@ -128,7 +132,8 @@ operator_cmd=(
     --set ingress.enabled=true
     --set ingress.domain=spark.minikube.local
     --set imagePullSecret="ecr"
-    --set-json "pubkeys=$pubkeys_json"
+    --set replicas=$((last_so_index + 1))
+    --set-json "operators=$operators_json"
     --set yuvd.namespace="lrc20"
     --set bitcoind.namespace="bitcoin"
     --set operator.image.tag="$SPARK_TAG"
