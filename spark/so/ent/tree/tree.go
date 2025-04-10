@@ -29,6 +29,8 @@ const (
 	FieldNetwork = "network"
 	// FieldBaseTxid holds the string denoting the base_txid field in the database.
 	FieldBaseTxid = "base_txid"
+	// FieldVout holds the string denoting the vout field in the database.
+	FieldVout = "vout"
 	// EdgeRoot holds the string denoting the root edge name in mutations.
 	EdgeRoot = "root"
 	// EdgeNodes holds the string denoting the nodes edge name in mutations.
@@ -60,6 +62,7 @@ var Columns = []string{
 	FieldStatus,
 	FieldNetwork,
 	FieldBaseTxid,
+	FieldVout,
 }
 
 // ForeignKeys holds the SQL foreign-keys that are owned by the "trees"
@@ -144,6 +147,11 @@ func ByStatus(opts ...sql.OrderTermOption) OrderOption {
 // ByNetwork orders the results by the network field.
 func ByNetwork(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldNetwork, opts...).ToFunc()
+}
+
+// ByVout orders the results by the vout field.
+func ByVout(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldVout, opts...).ToFunc()
 }
 
 // ByRootField orders the results by root field.

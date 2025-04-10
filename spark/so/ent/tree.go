@@ -32,6 +32,8 @@ type Tree struct {
 	Network schema.Network `json:"network,omitempty"`
 	// BaseTxid holds the value of the "base_txid" field.
 	BaseTxid []byte `json:"base_txid,omitempty"`
+	// Vout holds the value of the "vout" field.
+	Vout int16 `json:"vout,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the TreeQuery when eager-loading is set.
 	Edges        TreeEdges `json:"edges"`
@@ -77,6 +79,8 @@ func (*Tree) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case tree.FieldOwnerIdentityPubkey, tree.FieldBaseTxid:
 			values[i] = new([]byte)
+		case tree.FieldVout:
+			values[i] = new(sql.NullInt64)
 		case tree.FieldStatus, tree.FieldNetwork:
 			values[i] = new(sql.NullString)
 		case tree.FieldCreateTime, tree.FieldUpdateTime:
@@ -141,6 +145,12 @@ func (t *Tree) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field base_txid", values[i])
 			} else if value != nil {
 				t.BaseTxid = *value
+			}
+		case tree.FieldVout:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field vout", values[i])
+			} else if value.Valid {
+				t.Vout = int16(value.Int64)
 			}
 		case tree.ForeignKeys[0]:
 			if value, ok := values[i].(*sql.NullScanner); !ok {
@@ -212,6 +222,9 @@ func (t *Tree) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("base_txid=")
 	builder.WriteString(fmt.Sprintf("%v", t.BaseTxid))
+	builder.WriteString(", ")
+	builder.WriteString("vout=")
+	builder.WriteString(fmt.Sprintf("%v", t.Vout))
 	builder.WriteByte(')')
 	return builder.String()
 }

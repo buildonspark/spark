@@ -268,7 +268,11 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 		return nil, err
 	}
 	txid := onChainTx.TxHash()
-	treeMutator := db.Tree.Create().SetOwnerIdentityPubkey(depositAddress.OwnerIdentityPubkey).SetNetwork(schemaNetwork).SetBaseTxid(txid[:])
+	treeMutator := db.Tree.
+		Create().
+		SetOwnerIdentityPubkey(depositAddress.OwnerIdentityPubkey).
+		SetNetwork(schemaNetwork).SetBaseTxid(txid[:]).
+		SetVout(int16(req.OnChainUtxo.Vout))
 	if txConfirmed {
 		treeMutator.SetStatus(schema.TreeStatusAvailable)
 	} else {
@@ -439,7 +443,12 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 		return nil, err
 	}
 	txid := onChainTx.TxHash()
-	treeMutator := db.Tree.Create().SetOwnerIdentityPubkey(depositAddress.OwnerIdentityPubkey).SetNetwork(schemaNetwork).SetBaseTxid(txid[:])
+	treeMutator := db.Tree.
+		Create().
+		SetOwnerIdentityPubkey(depositAddress.OwnerIdentityPubkey).
+		SetNetwork(schemaNetwork).
+		SetBaseTxid(txid[:]).
+		SetVout(int16(req.OnChainUtxo.Vout))
 	if txConfirmed {
 		treeMutator.SetStatus(schema.TreeStatusAvailable)
 	} else {

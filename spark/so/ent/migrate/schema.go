@@ -442,6 +442,7 @@ var (
 		{Name: "status", Type: field.TypeEnum, Enums: []string{"PENDING", "AVAILABLE"}},
 		{Name: "network", Type: field.TypeEnum, Enums: []string{"UNSPECIFIED", "MAINNET", "REGTEST", "TESTNET", "SIGNET"}},
 		{Name: "base_txid", Type: field.TypeBytes},
+		{Name: "vout", Type: field.TypeInt16, Nullable: true},
 		{Name: "tree_root", Type: field.TypeUUID, Nullable: true},
 	}
 	// TreesTable holds the schema information for the "trees" table.
@@ -452,7 +453,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "trees_tree_nodes_root",
-				Columns:    []*schema.Column{TreesColumns[7]},
+				Columns:    []*schema.Column{TreesColumns[8]},
 				RefColumns: []*schema.Column{TreeNodesColumns[0]},
 				OnDelete:   schema.SetNull,
 			},

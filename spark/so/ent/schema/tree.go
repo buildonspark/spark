@@ -44,6 +44,7 @@ func (Tree) Fields() []ent.Field {
 		field.Enum("status").GoType(TreeStatus("")),
 		field.Enum("network").GoType(Network("")),
 		field.Bytes("base_txid").NotEmpty(),
+		field.Int16("vout").Optional(),
 	}
 }
 

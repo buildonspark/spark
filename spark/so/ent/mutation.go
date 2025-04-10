@@ -10824,6 +10824,8 @@ type TreeMutation struct {
 	status                *schema.TreeStatus
 	network               *schema.Network
 	base_txid             *[]byte
+	vout                  *int16
+	addvout               *int16
 	clearedFields         map[string]struct{}
 	root                  *uuid.UUID
 	clearedroot           bool
@@ -11155,6 +11157,76 @@ func (m *TreeMutation) ResetBaseTxid() {
 	m.base_txid = nil
 }
 
+// SetVout sets the "vout" field.
+func (m *TreeMutation) SetVout(i int16) {
+	m.vout = &i
+	m.addvout = nil
+}
+
+// Vout returns the value of the "vout" field in the mutation.
+func (m *TreeMutation) Vout() (r int16, exists bool) {
+	v := m.vout
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldVout returns the old "vout" field's value of the Tree entity.
+// If the Tree object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TreeMutation) OldVout(ctx context.Context) (v int16, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldVout is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldVout requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldVout: %w", err)
+	}
+	return oldValue.Vout, nil
+}
+
+// AddVout adds i to the "vout" field.
+func (m *TreeMutation) AddVout(i int16) {
+	if m.addvout != nil {
+		*m.addvout += i
+	} else {
+		m.addvout = &i
+	}
+}
+
+// AddedVout returns the value that was added to the "vout" field in this mutation.
+func (m *TreeMutation) AddedVout() (r int16, exists bool) {
+	v := m.addvout
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearVout clears the value of the "vout" field.
+func (m *TreeMutation) ClearVout() {
+	m.vout = nil
+	m.addvout = nil
+	m.clearedFields[tree.FieldVout] = struct{}{}
+}
+
+// VoutCleared returns if the "vout" field was cleared in this mutation.
+func (m *TreeMutation) VoutCleared() bool {
+	_, ok := m.clearedFields[tree.FieldVout]
+	return ok
+}
+
+// ResetVout resets all changes to the "vout" field.
+func (m *TreeMutation) ResetVout() {
+	m.vout = nil
+	m.addvout = nil
+	delete(m.clearedFields, tree.FieldVout)
+}
+
 // SetRootID sets the "root" edge to the TreeNode entity by id.
 func (m *TreeMutation) SetRootID(id uuid.UUID) {
 	m.root = &id
@@ -11282,7 +11354,7 @@ func (m *TreeMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *TreeMutation) Fields() []string {
-	fields := make([]string, 0, 6)
+	fields := make([]string, 0, 7)
 	if m.create_time != nil {
 		fields = append(fields, tree.FieldCreateTime)
 	}
@@ -11300,6 +11372,9 @@ func (m *TreeMutation) Fields() []string {
 	}
 	if m.base_txid != nil {
 		fields = append(fields, tree.FieldBaseTxid)
+	}
+	if m.vout != nil {
+		fields = append(fields, tree.FieldVout)
 	}
 	return fields
 }
@@ -11321,6 +11396,8 @@ func (m *TreeMutation) Field(name string) (ent.Value, bool) {
 		return m.Network()
 	case tree.FieldBaseTxid:
 		return m.BaseTxid()
+	case tree.FieldVout:
+		return m.Vout()
 	}
 	return nil, false
 }
@@ -11342,6 +11419,8 @@ func (m *TreeMutation) OldField(ctx context.Context, name string) (ent.Value, er
 		return m.OldNetwork(ctx)
 	case tree.FieldBaseTxid:
 		return m.OldBaseTxid(ctx)
+	case tree.FieldVout:
+		return m.OldVout(ctx)
 	}
 	return nil, fmt.Errorf("unknown Tree field %s", name)
 }
@@ -11393,6 +11472,13 @@ func (m *TreeMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetBaseTxid(v)
 		return nil
+	case tree.FieldVout:
+		v, ok := value.(int16)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetVout(v)
+		return nil
 	}
 	return fmt.Errorf("unknown Tree field %s", name)
 }
@@ -11400,13 +11486,21 @@ func (m *TreeMutation) SetField(name string, value ent.Value) error {
 // AddedFields returns all numeric fields that were incremented/decremented during
 // this mutation.
 func (m *TreeMutation) AddedFields() []string {
-	return nil
+	var fields []string
+	if m.addvout != nil {
+		fields = append(fields, tree.FieldVout)
+	}
+	return fields
 }
 
 // AddedField returns the numeric value that was incremented/decremented on a field
 // with the given name. The second boolean return value indicates that this field
 // was not set, or was not defined in the schema.
 func (m *TreeMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case tree.FieldVout:
+		return m.AddedVout()
+	}
 	return nil, false
 }
 
@@ -11415,6 +11509,13 @@ func (m *TreeMutation) AddedField(name string) (ent.Value, bool) {
 // type.
 func (m *TreeMutation) AddField(name string, value ent.Value) error {
 	switch name {
+	case tree.FieldVout:
+		v, ok := value.(int16)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddVout(v)
+		return nil
 	}
 	return fmt.Errorf("unknown Tree numeric field %s", name)
 }
@@ -11422,7 +11523,11 @@ func (m *TreeMutation) AddField(name string, value ent.Value) error {
 // ClearedFields returns all nullable fields that were cleared during this
 // mutation.
 func (m *TreeMutation) ClearedFields() []string {
-	return nil
+	var fields []string
+	if m.FieldCleared(tree.FieldVout) {
+		fields = append(fields, tree.FieldVout)
+	}
+	return fields
 }
 
 // FieldCleared returns a boolean indicating if a field with the given name was
@@ -11435,6 +11540,11 @@ func (m *TreeMutation) FieldCleared(name string) bool {
 // ClearField clears the value of the field with the given name. It returns an
 // error if the field is not defined in the schema.
 func (m *TreeMutation) ClearField(name string) error {
+	switch name {
+	case tree.FieldVout:
+		m.ClearVout()
+		return nil
+	}
 	return fmt.Errorf("unknown Tree nullable field %s", name)
 }
 
@@ -11459,6 +11569,9 @@ func (m *TreeMutation) ResetField(name string) error {
 		return nil
 	case tree.FieldBaseTxid:
 		m.ResetBaseTxid()
+		return nil
+	case tree.FieldVout:
+		m.ResetVout()
 		return nil
 	}
 	return fmt.Errorf("unknown Tree field %s", name)

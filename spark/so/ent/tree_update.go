@@ -77,6 +77,33 @@ func (tu *TreeUpdate) SetBaseTxid(b []byte) *TreeUpdate {
 	return tu
 }
 
+// SetVout sets the "vout" field.
+func (tu *TreeUpdate) SetVout(i int16) *TreeUpdate {
+	tu.mutation.ResetVout()
+	tu.mutation.SetVout(i)
+	return tu
+}
+
+// SetNillableVout sets the "vout" field if the given value is not nil.
+func (tu *TreeUpdate) SetNillableVout(i *int16) *TreeUpdate {
+	if i != nil {
+		tu.SetVout(*i)
+	}
+	return tu
+}
+
+// AddVout adds i to the "vout" field.
+func (tu *TreeUpdate) AddVout(i int16) *TreeUpdate {
+	tu.mutation.AddVout(i)
+	return tu
+}
+
+// ClearVout clears the value of the "vout" field.
+func (tu *TreeUpdate) ClearVout() *TreeUpdate {
+	tu.mutation.ClearVout()
+	return tu
+}
+
 // SetRootID sets the "root" edge to the TreeNode entity by ID.
 func (tu *TreeUpdate) SetRootID(id uuid.UUID) *TreeUpdate {
 	tu.mutation.SetRootID(id)
@@ -231,6 +258,15 @@ func (tu *TreeUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if value, ok := tu.mutation.BaseTxid(); ok {
 		_spec.SetField(tree.FieldBaseTxid, field.TypeBytes, value)
 	}
+	if value, ok := tu.mutation.Vout(); ok {
+		_spec.SetField(tree.FieldVout, field.TypeInt16, value)
+	}
+	if value, ok := tu.mutation.AddedVout(); ok {
+		_spec.AddField(tree.FieldVout, field.TypeInt16, value)
+	}
+	if tu.mutation.VoutCleared() {
+		_spec.ClearField(tree.FieldVout, field.TypeInt16)
+	}
 	if tu.mutation.RootCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2O,
@@ -368,6 +404,33 @@ func (tuo *TreeUpdateOne) SetNillableNetwork(s *schema.Network) *TreeUpdateOne {
 // SetBaseTxid sets the "base_txid" field.
 func (tuo *TreeUpdateOne) SetBaseTxid(b []byte) *TreeUpdateOne {
 	tuo.mutation.SetBaseTxid(b)
+	return tuo
+}
+
+// SetVout sets the "vout" field.
+func (tuo *TreeUpdateOne) SetVout(i int16) *TreeUpdateOne {
+	tuo.mutation.ResetVout()
+	tuo.mutation.SetVout(i)
+	return tuo
+}
+
+// SetNillableVout sets the "vout" field if the given value is not nil.
+func (tuo *TreeUpdateOne) SetNillableVout(i *int16) *TreeUpdateOne {
+	if i != nil {
+		tuo.SetVout(*i)
+	}
+	return tuo
+}
+
+// AddVout adds i to the "vout" field.
+func (tuo *TreeUpdateOne) AddVout(i int16) *TreeUpdateOne {
+	tuo.mutation.AddVout(i)
+	return tuo
+}
+
+// ClearVout clears the value of the "vout" field.
+func (tuo *TreeUpdateOne) ClearVout() *TreeUpdateOne {
+	tuo.mutation.ClearVout()
 	return tuo
 }
 
@@ -554,6 +617,15 @@ func (tuo *TreeUpdateOne) sqlSave(ctx context.Context) (_node *Tree, err error) 
 	}
 	if value, ok := tuo.mutation.BaseTxid(); ok {
 		_spec.SetField(tree.FieldBaseTxid, field.TypeBytes, value)
+	}
+	if value, ok := tuo.mutation.Vout(); ok {
+		_spec.SetField(tree.FieldVout, field.TypeInt16, value)
+	}
+	if value, ok := tuo.mutation.AddedVout(); ok {
+		_spec.AddField(tree.FieldVout, field.TypeInt16, value)
+	}
+	if tuo.mutation.VoutCleared() {
+		_spec.ClearField(tree.FieldVout, field.TypeInt16)
 	}
 	if tuo.mutation.RootCleared() {
 		edge := &sqlgraph.EdgeSpec{

@@ -75,6 +75,20 @@ func (tc *TreeCreate) SetBaseTxid(b []byte) *TreeCreate {
 	return tc
 }
 
+// SetVout sets the "vout" field.
+func (tc *TreeCreate) SetVout(i int16) *TreeCreate {
+	tc.mutation.SetVout(i)
+	return tc
+}
+
+// SetNillableVout sets the "vout" field if the given value is not nil.
+func (tc *TreeCreate) SetNillableVout(i *int16) *TreeCreate {
+	if i != nil {
+		tc.SetVout(*i)
+	}
+	return tc
+}
+
 // SetID sets the "id" field.
 func (tc *TreeCreate) SetID(u uuid.UUID) *TreeCreate {
 	tc.mutation.SetID(u)
@@ -270,6 +284,10 @@ func (tc *TreeCreate) createSpec() (*Tree, *sqlgraph.CreateSpec) {
 	if value, ok := tc.mutation.BaseTxid(); ok {
 		_spec.SetField(tree.FieldBaseTxid, field.TypeBytes, value)
 		_node.BaseTxid = value
+	}
+	if value, ok := tc.mutation.Vout(); ok {
+		_spec.SetField(tree.FieldVout, field.TypeInt16, value)
+		_node.Vout = value
 	}
 	if nodes := tc.mutation.RootIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
