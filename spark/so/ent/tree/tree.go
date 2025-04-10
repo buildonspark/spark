@@ -92,6 +92,8 @@ var (
 	UpdateDefaultUpdateTime func() time.Time
 	// OwnerIdentityPubkeyValidator is a validator for the "owner_identity_pubkey" field. It is called by the builders before save.
 	OwnerIdentityPubkeyValidator func([]byte) error
+	// BaseTxidValidator is a validator for the "base_txid" field. It is called by the builders before save.
+	BaseTxidValidator func([]byte) error
 	// DefaultID holds the default value on creation for the "id" field.
 	DefaultID func() uuid.UUID
 )

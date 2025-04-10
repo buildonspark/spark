@@ -441,7 +441,7 @@ var (
 		{Name: "owner_identity_pubkey", Type: field.TypeBytes},
 		{Name: "status", Type: field.TypeEnum, Enums: []string{"PENDING", "AVAILABLE"}},
 		{Name: "network", Type: field.TypeEnum, Enums: []string{"UNSPECIFIED", "MAINNET", "REGTEST", "TESTNET", "SIGNET"}},
-		{Name: "base_txid", Type: field.TypeBytes, Nullable: true},
+		{Name: "base_txid", Type: field.TypeBytes},
 		{Name: "tree_root", Type: field.TypeUUID, Nullable: true},
 	}
 	// TreesTable holds the schema information for the "trees" table.
