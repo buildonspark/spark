@@ -16,12 +16,12 @@ permissions:
   contents: read
   pull-requests: write
 
+env:
+  GO_VERSION: "1.23.0"
+
 jobs:
   check:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./spark
 
     services:
       postgres:
@@ -40,6 +40,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: "spark/go.sum"
+
       - name: Install Atlas
         run: |
           curl -sSf https://atlasgo.sh | sh
@@ -50,13 +56,25 @@ jobs:
           PGPASSWORD=postgres psql -h localhost -U postgres -c "CREATE DATABASE operator_temp;"
 
       - name: Run Atlas lint
+        working-directory: spark
         run: |
           atlas migrate lint \
             --dir "file://so/ent/migrate/migrations" \
             --dev-url "postgresql://postgres:postgres@localhost:5432/operator_temp?sslmode=disable&search_path=public" \
             --latest=1
 
+      - name: Run make ents
+        run: make ent
+      - name: Check that generated Ent code is up to date
+        run: |
+          if [ "$(git status -s)" ]; then
+            echo 'Generated Ent code is not up to date!'
+            echo 'Did you forget to run `make ent`?'
+            git diff
+            exit 1
+          fi
       - name: Check for new non-optional fields
+        working-directory: spark
         id: detect_non_optional
         run: |
           echo "Checking for newly added, non-optional fields..."
