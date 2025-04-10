@@ -605,6 +605,7 @@ export class SparkWallet {
         ),
         // TODO: Request fee from SSP
         feeSats: 0,
+        idempotencyKey: crypto.randomUUID(),
       });
 
       if (!request) {

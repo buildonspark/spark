@@ -242,6 +242,7 @@ export default class SspClient {
     targetAmountSats,
     feeSats,
     userLeaves,
+    idempotencyKey,
   }: RequestLeavesSwapInput): Promise<LeavesSwapRequest | null> {
     const query = {
       queryPayload: RequestSwapLeaves,
@@ -251,6 +252,7 @@ export default class SspClient {
         target_amount_sats: targetAmountSats,
         fee_sats: feeSats,
         user_leaves: userLeaves,
+        idempotency_key: idempotencyKey,
       },
       constructObject: (response: { request_leaves_swap: any }) => {
         if (!response.request_leaves_swap) {
