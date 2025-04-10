@@ -2,7 +2,7 @@ import { FRAGMENT as LeavesSwapRequestFragment } from "../objects/LeavesSwapRequ
 
 export const RequestSwapLeaves = `
   mutation RequestSwapLeaves(
-    $adaptor_pubkey: String!
+    $adaptor_pubkey: PublicKey!
     $total_amount_sats: Long!
     $target_amount_sats: Long!
     $fee_sats: Long!
