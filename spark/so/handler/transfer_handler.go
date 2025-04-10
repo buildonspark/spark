@@ -563,6 +563,12 @@ func (h *TransferHandler) ClaimTransferTweakKeys(ctx context.Context, req *pb.Cl
 }
 
 func (h *TransferHandler) claimLeafTweakKey(ctx context.Context, leaf *ent.TreeNode, req *pb.ClaimLeafKeyTweak, ownerIdentityPubkey []byte) error {
+	if req.SecretShareTweak == nil {
+		return fmt.Errorf("secret share tweak is required")
+	}
+	if len(req.SecretShareTweak.SecretShare) == 0 {
+		return fmt.Errorf("secret share is required")
+	}
 	err := secretsharing.ValidateShare(
 		&secretsharing.VerifiableSecretShare{
 			SecretShare: secretsharing.SecretShare{
@@ -854,6 +860,9 @@ func (h *TransferHandler) SettleReceiverKeyTweak(ctx context.Context, req *pbint
 			treeNode, err := leaf.QueryLeaf().Only(ctx)
 			if err != nil {
 				return fmt.Errorf("unable to get tree node for leaf %s: %v", leaf.ID.String(), err)
+			}
+			if len(leaf.KeyTweak) == 0 {
+				return fmt.Errorf("key tweak for leaf %s is not set", leaf.ID.String())
 			}
 			keyTweakProto := &pb.ClaimLeafKeyTweak{}
 			err = proto.Unmarshal(leaf.KeyTweak, keyTweakProto)
