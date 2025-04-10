@@ -342,16 +342,6 @@ func VoutLTE(v int16) predicate.Tree {
 	return predicate.Tree(sql.FieldLTE(FieldVout, v))
 }
 
-// VoutIsNil applies the IsNil predicate on the "vout" field.
-func VoutIsNil() predicate.Tree {
-	return predicate.Tree(sql.FieldIsNull(FieldVout))
-}
-
-// VoutNotNil applies the NotNil predicate on the "vout" field.
-func VoutNotNil() predicate.Tree {
-	return predicate.Tree(sql.FieldNotNull(FieldVout))
-}
-
 // HasRoot applies the HasEdge predicate on the "root" edge.
 func HasRoot() predicate.Tree {
 	return predicate.Tree(func(s *sql.Selector) {

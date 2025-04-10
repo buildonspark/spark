@@ -11207,24 +11207,10 @@ func (m *TreeMutation) AddedVout() (r int16, exists bool) {
 	return *v, true
 }
 
-// ClearVout clears the value of the "vout" field.
-func (m *TreeMutation) ClearVout() {
-	m.vout = nil
-	m.addvout = nil
-	m.clearedFields[tree.FieldVout] = struct{}{}
-}
-
-// VoutCleared returns if the "vout" field was cleared in this mutation.
-func (m *TreeMutation) VoutCleared() bool {
-	_, ok := m.clearedFields[tree.FieldVout]
-	return ok
-}
-
 // ResetVout resets all changes to the "vout" field.
 func (m *TreeMutation) ResetVout() {
 	m.vout = nil
 	m.addvout = nil
-	delete(m.clearedFields, tree.FieldVout)
 }
 
 // SetRootID sets the "root" edge to the TreeNode entity by id.
@@ -11523,11 +11509,7 @@ func (m *TreeMutation) AddField(name string, value ent.Value) error {
 // ClearedFields returns all nullable fields that were cleared during this
 // mutation.
 func (m *TreeMutation) ClearedFields() []string {
-	var fields []string
-	if m.FieldCleared(tree.FieldVout) {
-		fields = append(fields, tree.FieldVout)
-	}
-	return fields
+	return nil
 }
 
 // FieldCleared returns a boolean indicating if a field with the given name was
@@ -11540,11 +11522,6 @@ func (m *TreeMutation) FieldCleared(name string) bool {
 // ClearField clears the value of the field with the given name. It returns an
 // error if the field is not defined in the schema.
 func (m *TreeMutation) ClearField(name string) error {
-	switch name {
-	case tree.FieldVout:
-		m.ClearVout()
-		return nil
-	}
 	return fmt.Errorf("unknown Tree nullable field %s", name)
 }
 

@@ -98,12 +98,6 @@ func (tu *TreeUpdate) AddVout(i int16) *TreeUpdate {
 	return tu
 }
 
-// ClearVout clears the value of the "vout" field.
-func (tu *TreeUpdate) ClearVout() *TreeUpdate {
-	tu.mutation.ClearVout()
-	return tu
-}
-
 // SetRootID sets the "root" edge to the TreeNode entity by ID.
 func (tu *TreeUpdate) SetRootID(id uuid.UUID) *TreeUpdate {
 	tu.mutation.SetRootID(id)
@@ -228,6 +222,11 @@ func (tu *TreeUpdate) check() error {
 			return &ValidationError{Name: "base_txid", err: fmt.Errorf(`ent: validator failed for field "Tree.base_txid": %w`, err)}
 		}
 	}
+	if v, ok := tu.mutation.Vout(); ok {
+		if err := tree.VoutValidator(v); err != nil {
+			return &ValidationError{Name: "vout", err: fmt.Errorf(`ent: validator failed for field "Tree.vout": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -263,9 +262,6 @@ func (tu *TreeUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if value, ok := tu.mutation.AddedVout(); ok {
 		_spec.AddField(tree.FieldVout, field.TypeInt16, value)
-	}
-	if tu.mutation.VoutCleared() {
-		_spec.ClearField(tree.FieldVout, field.TypeInt16)
 	}
 	if tu.mutation.RootCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -428,12 +424,6 @@ func (tuo *TreeUpdateOne) AddVout(i int16) *TreeUpdateOne {
 	return tuo
 }
 
-// ClearVout clears the value of the "vout" field.
-func (tuo *TreeUpdateOne) ClearVout() *TreeUpdateOne {
-	tuo.mutation.ClearVout()
-	return tuo
-}
-
 // SetRootID sets the "root" edge to the TreeNode entity by ID.
 func (tuo *TreeUpdateOne) SetRootID(id uuid.UUID) *TreeUpdateOne {
 	tuo.mutation.SetRootID(id)
@@ -571,6 +561,11 @@ func (tuo *TreeUpdateOne) check() error {
 			return &ValidationError{Name: "base_txid", err: fmt.Errorf(`ent: validator failed for field "Tree.base_txid": %w`, err)}
 		}
 	}
+	if v, ok := tuo.mutation.Vout(); ok {
+		if err := tree.VoutValidator(v); err != nil {
+			return &ValidationError{Name: "vout", err: fmt.Errorf(`ent: validator failed for field "Tree.vout": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -623,9 +618,6 @@ func (tuo *TreeUpdateOne) sqlSave(ctx context.Context) (_node *Tree, err error) 
 	}
 	if value, ok := tuo.mutation.AddedVout(); ok {
 		_spec.AddField(tree.FieldVout, field.TypeInt16, value)
-	}
-	if tuo.mutation.VoutCleared() {
-		_spec.ClearField(tree.FieldVout, field.TypeInt16)
 	}
 	if tuo.mutation.RootCleared() {
 		edge := &sqlgraph.EdgeSpec{

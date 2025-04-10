@@ -81,14 +81,6 @@ func (tc *TreeCreate) SetVout(i int16) *TreeCreate {
 	return tc
 }
 
-// SetNillableVout sets the "vout" field if the given value is not nil.
-func (tc *TreeCreate) SetNillableVout(i *int16) *TreeCreate {
-	if i != nil {
-		tc.SetVout(*i)
-	}
-	return tc
-}
-
 // SetID sets the "id" field.
 func (tc *TreeCreate) SetID(u uuid.UUID) *TreeCreate {
 	tc.mutation.SetID(u)
@@ -224,6 +216,14 @@ func (tc *TreeCreate) check() error {
 	if v, ok := tc.mutation.BaseTxid(); ok {
 		if err := tree.BaseTxidValidator(v); err != nil {
 			return &ValidationError{Name: "base_txid", err: fmt.Errorf(`ent: validator failed for field "Tree.base_txid": %w`, err)}
+		}
+	}
+	if _, ok := tc.mutation.Vout(); !ok {
+		return &ValidationError{Name: "vout", err: errors.New(`ent: missing required field "Tree.vout"`)}
+	}
+	if v, ok := tc.mutation.Vout(); ok {
+		if err := tree.VoutValidator(v); err != nil {
+			return &ValidationError{Name: "vout", err: fmt.Errorf(`ent: validator failed for field "Tree.vout": %w`, err)}
 		}
 	}
 	return nil

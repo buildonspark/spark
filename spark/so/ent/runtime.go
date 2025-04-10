@@ -387,6 +387,10 @@ func init() {
 	treeDescBaseTxid := treeFields[3].Descriptor()
 	// tree.BaseTxidValidator is a validator for the "base_txid" field. It is called by the builders before save.
 	tree.BaseTxidValidator = treeDescBaseTxid.Validators[0].(func([]byte) error)
+	// treeDescVout is the schema descriptor for vout field.
+	treeDescVout := treeFields[4].Descriptor()
+	// tree.VoutValidator is a validator for the "vout" field. It is called by the builders before save.
+	tree.VoutValidator = treeDescVout.Validators[0].(func(int16) error)
 	// treeDescID is the schema descriptor for id field.
 	treeDescID := treeMixinFields0[0].Descriptor()
 	// tree.DefaultID holds the default value on creation for the id field.
