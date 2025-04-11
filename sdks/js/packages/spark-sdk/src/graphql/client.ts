@@ -95,7 +95,7 @@ export default class SspClient {
 
     this.requester = new Requester(
       new NodeKeyCache(DefaultCrypto),
-      options.schemaEndpoint || `graphql/spark/${SPARK_SCHEMA_VERSION}`,
+      options.schemaEndpoint || `graphql/spark/rc`,
       `spark-sdk/0.0.0`,
       this.authProvider,
       options.baseUrl,
