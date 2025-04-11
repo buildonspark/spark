@@ -19,7 +19,8 @@ export type FaucetCoin = {
   txout: TransactionOutput;
 };
 
-const COIN_AMOUNT = 100_000_000n;
+// The amount of satoshis to put in each faucet coin to be used in tests
+const COIN_AMOUNT = 10_000_000n;
 const FEE_AMOUNT = 1000n;
 
 export class BitcoinFaucet {
