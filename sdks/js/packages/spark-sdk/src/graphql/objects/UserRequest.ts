@@ -2,24 +2,24 @@
 // Copyright ©, 2023-present, Lightspark Group, Inc. - All Rights Reserved
 
 import Entity from './Entity.js';
-import {TransferFromJson} from './Transfer.js';
-import {InvoiceToJson} from './Invoice.js';
-import { Query, isObject } from '@lightsparkdev/core';
-import CoopExitRequest from './CoopExitRequest.js';
-import {CurrencyAmountFromJson} from './CurrencyAmount.js';
-import { LightsparkException } from '@lightsparkdev/core';
-import LightningSendRequestStatus from './LightningSendRequestStatus.js';
-import {SwapLeafFromJson} from './SwapLeaf.js';
-import SparkLeavesSwapRequestStatus from './SparkLeavesSwapRequestStatus.js';
 import {SwapLeafToJson} from './SwapLeaf.js';
-import LightningSendRequest from './LightningSendRequest.js';
-import BitcoinNetwork from './BitcoinNetwork.js';
-import {InvoiceFromJson} from './Invoice.js';
-import LightningReceiveRequest from './LightningReceiveRequest.js';
-import {CurrencyAmountToJson} from './CurrencyAmount.js';
-import LightningReceiveRequestStatus from './LightningReceiveRequestStatus.js';
-import LeavesSwapRequest from './LeavesSwapRequest.js';
 import SparkCoopExitRequestStatus from './SparkCoopExitRequestStatus.js';
+import {SwapLeafFromJson} from './SwapLeaf.js';
+import LightningReceiveRequest from './LightningReceiveRequest.js';
+import CoopExitRequest from './CoopExitRequest.js';
+import {TransferFromJson} from './Transfer.js';
+import {InvoiceFromJson} from './Invoice.js';
+import BitcoinNetwork from './BitcoinNetwork.js';
+import LeavesSwapRequest from './LeavesSwapRequest.js';
+import LightningReceiveRequestStatus from './LightningReceiveRequestStatus.js';
+import LightningSendRequest from './LightningSendRequest.js';
+import {InvoiceToJson} from './Invoice.js';
+import LightningSendRequestStatus from './LightningSendRequestStatus.js';
+import { Query, isObject } from '@lightsparkdev/core';
+import {CurrencyAmountToJson} from './CurrencyAmount.js';
+import { LightsparkException } from '@lightsparkdev/core';
+import SparkLeavesSwapRequestStatus from './SparkLeavesSwapRequestStatus.js';
+import {CurrencyAmountFromJson} from './CurrencyAmount.js';
 
 
 interface UserRequest {
@@ -59,6 +59,7 @@ export const UserRequestFromJson = (obj: any): UserRequest => {
             status: SparkCoopExitRequestStatus[obj["coop_exit_request_status"]] ?? SparkCoopExitRequestStatus.FUTURE_VALUE,
             expiresAt: obj["coop_exit_request_expires_at"],
             rawConnectorTransaction: obj["coop_exit_request_raw_connector_transaction"],
+            coopExitTxid: obj["coop_exit_request_coop_exit_txid"],
 typename: "CoopExitRequest",            transfer: (!!obj["coop_exit_request_transfer"] ? TransferFromJson(obj["coop_exit_request_transfer"]) : undefined),
 
         } as CoopExitRequest;
@@ -121,6 +122,7 @@ coop_exit_request_fee: CurrencyAmountToJson(coopExitRequest.fee),
 coop_exit_request_status: coopExitRequest.status,
 coop_exit_request_expires_at: coopExitRequest.expiresAt,
 coop_exit_request_raw_connector_transaction: coopExitRequest.rawConnectorTransaction,
+coop_exit_request_coop_exit_txid: coopExitRequest.coopExitTxid,
 coop_exit_request_transfer: (coopExitRequest.transfer ? coopExitRequest.transfer.toJson() : undefined),
 
         }
@@ -196,6 +198,7 @@ fragment UserRequestFragment on UserRequest {
         coop_exit_request_status: status
         coop_exit_request_expires_at: expires_at
         coop_exit_request_raw_connector_transaction: raw_connector_transaction
+        coop_exit_request_coop_exit_txid: coop_exit_txid
         coop_exit_request_transfer: transfer {
             __typename
             transfer_total_amount: total_amount {

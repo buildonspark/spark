@@ -12,7 +12,7 @@ interface RequestCoopExitInput {
 
     withdrawalAddress: string;
 
-    idempotencyKey: string;
+    idempotencyKey?: string | undefined;
 
 
 

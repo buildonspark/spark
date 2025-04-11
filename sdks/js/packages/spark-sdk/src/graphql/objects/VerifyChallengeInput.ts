@@ -2,9 +2,9 @@
 // Copyright ©, 2023-present, Lightspark Group, Inc. - All Rights Reserved
 
 
-import Provider from './Provider.js';
-import {ProviderFromJson} from './Provider.js';
 import {ProviderToJson} from './Provider.js';
+import {ProviderFromJson} from './Provider.js';
+import Provider from './Provider.js';
 
 
 interface VerifyChallengeInput {

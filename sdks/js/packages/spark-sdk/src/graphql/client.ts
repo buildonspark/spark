@@ -1,26 +1,33 @@
 import {
   AuthProvider,
+  bytesToHex,
   DefaultCrypto,
   NodeKeyCache,
   Query,
   Requester,
 } from "@lightsparkdev/core";
+import { sha256 } from "@noble/hashes/sha256";
+import { SparkSigner } from "../signer/signer.js";
 import { CompleteCoopExit } from "./mutations/CompleteCoopExit.js";
 import { CompleteLeavesSwap } from "./mutations/CompleteLeavesSwap.js";
+import { GetChallenge } from "./mutations/GetChallenge.js";
 import { RequestCoopExit } from "./mutations/RequestCoopExit.js";
 import { RequestLightningReceive } from "./mutations/RequestLightningReceive.js";
 import { RequestLightningSend } from "./mutations/RequestLightningSend.js";
 import { RequestSwapLeaves } from "./mutations/RequestSwapLeaves.js";
+import { VerifyChallenge } from "./mutations/VerifyChallenge.js";
 import { CoopExitFeeEstimateOutputFromJson } from "./objects/CoopExitFeeEstimateOutput.js";
 import CoopExitRequest, {
   CoopExitRequestFromJson,
 } from "./objects/CoopExitRequest.js";
+import { GetChallengeOutputFromJson } from "./objects/GetChallengeOutput.js";
 import {
   BitcoinNetwork,
   CompleteCoopExitInput,
   CompleteLeavesSwapInput,
   CoopExitFeeEstimateInput,
   CoopExitFeeEstimateOutput,
+  GetChallengeOutput,
   LeavesSwapFeeEstimateOutput,
   LightningSendRequest,
   RequestCoopExitInput,
@@ -42,6 +49,9 @@ import LightningSendFeeEstimateOutput, {
   LightningSendFeeEstimateOutputFromJson,
 } from "./objects/LightningSendFeeEstimateOutput.js";
 import { LightningSendRequestFromJson } from "./objects/LightningSendRequest.js";
+import VerifyChallengeOutput, {
+  VerifyChallengeOutputFromJson,
+} from "./objects/VerifyChallengeOutput.js";
 import { CoopExitFeeEstimate } from "./queries/CoopExitFeeEstimate.js";
 import { LeavesSwapFeeEstimate } from "./queries/LeavesSwapFeeEstimate.js";
 import { LightningReceiveFeeEstimate } from "./queries/LightningReceiveFeeEstimate.js";
@@ -62,28 +72,53 @@ export interface HasSspClientOptions {
   readonly sspClientOptions: SspClientOptions;
 }
 
+const isProduction = process.env.NODE_ENV === "production";
+const SPARK_SCHEMA_VERSION = isProduction ? "2025-03-19" : "rc";
+
 export default class SspClient {
   private readonly requester: Requester;
 
-  constructor(identityPublicKey: string, config: HasSspClientOptions) {
+  private readonly signer: SparkSigner;
+  private readonly authProvider: SparkAuthProvider;
+
+  constructor(
+    config: HasSspClientOptions & {
+      signer: SparkSigner;
+    },
+  ) {
+    this.signer = config.signer;
+    this.authProvider = new SparkAuthProvider();
+
     const fetchFunction =
       typeof window !== "undefined" ? window.fetch.bind(window) : fetch;
     const options = config.sspClientOptions;
 
     this.requester = new Requester(
       new NodeKeyCache(DefaultCrypto),
-      options.schemaEndpoint || "graphql/spark/rc",
+      options.schemaEndpoint || `graphql/spark/${SPARK_SCHEMA_VERSION}`,
       `spark-sdk/0.0.0`,
-      new SparkAuthProvider(identityPublicKey),
+      this.authProvider,
       options.baseUrl,
       DefaultCrypto,
       undefined,
       fetchFunction,
     );
+    this.authenticate();
   }
 
   async executeRawQuery<T>(query: Query<T>): Promise<T | null> {
-    return await this.requester.executeQuery(query);
+    try {
+      return await this.requester.executeQuery(query);
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        error.message.toLowerCase().includes("unauthorized")
+      ) {
+        await this.authenticate();
+        return await this.requester.executeQuery(query);
+      }
+      throw error;
+    }
   }
 
   async getSwapFeeEstimate(
@@ -350,35 +385,112 @@ export default class SspClient {
       },
     });
   }
+
+  async getChallenge(): Promise<GetChallengeOutput | null> {
+    return await this.executeRawQuery({
+      queryPayload: GetChallenge,
+      variables: {
+        public_key: bytesToHex(await this.signer.getIdentityPublicKey()),
+      },
+      constructObject: (response: { get_challenge: any }) => {
+        return GetChallengeOutputFromJson(response.get_challenge);
+      },
+    });
+  }
+
+  async verifyChallenge(
+    signature: string,
+    protectedChallenge: string,
+  ): Promise<VerifyChallengeOutput | null> {
+    return await this.executeRawQuery({
+      queryPayload: VerifyChallenge,
+      variables: {
+        protected_challenge: protectedChallenge,
+        signature: signature,
+        identity_public_key: bytesToHex(
+          await this.signer.getIdentityPublicKey(),
+        ),
+      },
+      constructObject: (response: any) => {
+        return VerifyChallengeOutputFromJson(response.verify_challenge);
+      },
+    });
+  }
+
+  async authenticate() {
+    this.authProvider.removeAuth();
+
+    const challenge = await this.getChallenge();
+    if (!challenge) {
+      throw new Error("Failed to get challenge");
+    }
+
+    const challengeBytes = Buffer.from(challenge.protectedChallenge, "base64");
+    const signature = await this.signer.signMessageWithIdentityKey(
+      sha256(challengeBytes),
+    );
+
+    const verifyChallenge = await this.verifyChallenge(
+      Buffer.from(signature).toString("base64"),
+      challenge.protectedChallenge,
+    );
+    if (!verifyChallenge) {
+      throw new Error("Failed to verify challenge");
+    }
+
+    this.authProvider.setAuth(
+      verifyChallenge.sessionToken,
+      new Date(verifyChallenge.validUntil),
+    );
+  }
 }
 
 class SparkAuthProvider implements AuthProvider {
-  private publicKey: string;
-
-  constructor(publicKey: string) {
-    this.publicKey = publicKey;
-  }
+  private sessionToken: string | undefined;
+  private validUntil: Date | undefined;
 
   async addAuthHeaders(
     headers: Record<string, string>,
   ): Promise<Record<string, string>> {
     const _headers = {
-      "Spark-Identity-Public-Key": this.publicKey,
       "Content-Type": "application/json",
+      ...headers,
     };
+
+    if (this.sessionToken) {
+      _headers["Authorization"] = `Bearer ${this.sessionToken}`;
+    }
+
     return Promise.resolve(_headers);
   }
 
   async isAuthorized(): Promise<boolean> {
-    return Promise.resolve(true);
+    return (
+      !!this.sessionToken && !!this.validUntil && this.validUntil > new Date()
+    );
   }
 
   async addWsConnectionParams(
     params: Record<string, unknown>,
   ): Promise<Record<string, unknown>> {
-    return Promise.resolve({
+    const _params = {
       ...params,
-      "Spark-Identity-Public-Key": this.publicKey,
-    });
+    };
+
+    if (this.sessionToken) {
+      _params["Authorization"] = `Bearer ${this.sessionToken}`;
+    }
+
+    return Promise.resolve(_params);
+  }
+
+  setAuth(sessionToken: string, validUntil: Date) {
+    this.sessionToken = sessionToken;
+    this.validUntil = validUntil;
+  }
+
+  removeAuth() {
+    this.sessionToken = undefined;
+    this.validUntil = undefined;
   }
 }

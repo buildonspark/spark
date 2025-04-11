@@ -72,6 +72,7 @@ query FetchSparkWalletUserToUserRequestsConnection($entity_id: ID!, $first: Int,
                         coop_exit_request_status: status
                         coop_exit_request_expires_at: expires_at
                         coop_exit_request_raw_connector_transaction: raw_connector_transaction
+                        coop_exit_request_coop_exit_txid: coop_exit_txid
                         coop_exit_request_transfer: transfer {
                             __typename
                             transfer_total_amount: total_amount {
