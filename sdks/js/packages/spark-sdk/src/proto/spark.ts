@@ -177,8 +177,8 @@ export enum TransferType {
   PREIMAGE_SWAP = 0,
   COOPERATIVE_EXIT = 1,
   TRANSFER = 2,
-  SWAP = 3,
-  COUNTER_SWAP = 4,
+  SWAP = 30,
+  COUNTER_SWAP = 40,
   UNRECOGNIZED = -1,
 }
 
@@ -193,10 +193,10 @@ export function transferTypeFromJSON(object: any): TransferType {
     case 2:
     case "TRANSFER":
       return TransferType.TRANSFER;
-    case 3:
+    case 30:
     case "SWAP":
       return TransferType.SWAP;
-    case 4:
+    case 40:
     case "COUNTER_SWAP":
       return TransferType.COUNTER_SWAP;
     case -1:
@@ -386,6 +386,30 @@ export interface NodeSignatures {
   refundTxSignature: Uint8Array;
 }
 
+/** StartTreeCreationRequest is the request to start the tree creation for a tree root node. */
+export interface StartTreeCreationRequest {
+  /** The identity public key of the user. */
+  identityPublicKey: Uint8Array;
+  /** The on-chain utxo to be used to be spent by the root node. */
+  onChainUtxo:
+    | UTXO
+    | undefined;
+  /** The signing job for the root node's transaction. */
+  rootTxSigningJob:
+    | SigningJob
+    | undefined;
+  /** The signing job for the root node's refund transaction. */
+  refundTxSigningJob: SigningJob | undefined;
+}
+
+/** StartTreeCreationResponse is the response to the request to start the tree creation for a tree root node. */
+export interface StartTreeCreationResponse {
+  /** The id of the tree. */
+  treeId: string;
+  /** The signature shares for the root node. */
+  rootNodeSignatureShares: NodeSignatureShares | undefined;
+}
+
 /** StartDepositTreeCreationRequest is the request to start the tree creation for a tree root node. */
 export interface StartDepositTreeCreationRequest {
   /** The identity public key of the user. */
@@ -573,7 +597,7 @@ export interface FreezeTokensResponse {
   impactedTokenAmount: Uint8Array;
 }
 
-export interface GetOwnedTokenLeavesRequest {
+export interface QueryTokenOutputsRequest {
   ownerPublicKeys: Uint8Array[];
   /** Optionally provide token public keys. If not set return leaves for all tokens. */
   tokenPublicKeys: Uint8Array[];
@@ -604,7 +628,7 @@ export interface LeafWithPreviousTransactionData {
   previousTransactionVout: number;
 }
 
-export interface GetOwnedTokenLeavesResponse {
+export interface QueryTokenOutputsResponse {
   leavesWithPreviousTransactionData: LeafWithPreviousTransactionData[];
 }
 
@@ -766,10 +790,13 @@ export interface QueryPendingTransfersRequest {
     senderIdentityPublicKey: Uint8Array;
   } | undefined;
   transferIds: string[];
+  limit: number;
+  offset: number;
 }
 
 export interface QueryPendingTransfersResponse {
   transfers: Transfer[];
+  offset: number;
 }
 
 export interface ClaimLeafKeyTweak {
@@ -2556,6 +2583,208 @@ export const NodeSignatures: MessageFns<NodeSignatures> = {
     message.nodeId = object.nodeId ?? "";
     message.nodeTxSignature = object.nodeTxSignature ?? new Uint8Array(0);
     message.refundTxSignature = object.refundTxSignature ?? new Uint8Array(0);
+    return message;
+  },
+};
+
+function createBaseStartTreeCreationRequest(): StartTreeCreationRequest {
+  return {
+    identityPublicKey: new Uint8Array(0),
+    onChainUtxo: undefined,
+    rootTxSigningJob: undefined,
+    refundTxSigningJob: undefined,
+  };
+}
+
+export const StartTreeCreationRequest: MessageFns<StartTreeCreationRequest> = {
+  encode(message: StartTreeCreationRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.identityPublicKey.length !== 0) {
+      writer.uint32(10).bytes(message.identityPublicKey);
+    }
+    if (message.onChainUtxo !== undefined) {
+      UTXO.encode(message.onChainUtxo, writer.uint32(18).fork()).join();
+    }
+    if (message.rootTxSigningJob !== undefined) {
+      SigningJob.encode(message.rootTxSigningJob, writer.uint32(26).fork()).join();
+    }
+    if (message.refundTxSigningJob !== undefined) {
+      SigningJob.encode(message.refundTxSigningJob, writer.uint32(34).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): StartTreeCreationRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseStartTreeCreationRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.identityPublicKey = reader.bytes();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.onChainUtxo = UTXO.decode(reader, reader.uint32());
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.rootTxSigningJob = SigningJob.decode(reader, reader.uint32());
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.refundTxSigningJob = SigningJob.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): StartTreeCreationRequest {
+    return {
+      identityPublicKey: isSet(object.identityPublicKey)
+        ? bytesFromBase64(object.identityPublicKey)
+        : new Uint8Array(0),
+      onChainUtxo: isSet(object.onChainUtxo) ? UTXO.fromJSON(object.onChainUtxo) : undefined,
+      rootTxSigningJob: isSet(object.rootTxSigningJob) ? SigningJob.fromJSON(object.rootTxSigningJob) : undefined,
+      refundTxSigningJob: isSet(object.refundTxSigningJob) ? SigningJob.fromJSON(object.refundTxSigningJob) : undefined,
+    };
+  },
+
+  toJSON(message: StartTreeCreationRequest): unknown {
+    const obj: any = {};
+    if (message.identityPublicKey.length !== 0) {
+      obj.identityPublicKey = base64FromBytes(message.identityPublicKey);
+    }
+    if (message.onChainUtxo !== undefined) {
+      obj.onChainUtxo = UTXO.toJSON(message.onChainUtxo);
+    }
+    if (message.rootTxSigningJob !== undefined) {
+      obj.rootTxSigningJob = SigningJob.toJSON(message.rootTxSigningJob);
+    }
+    if (message.refundTxSigningJob !== undefined) {
+      obj.refundTxSigningJob = SigningJob.toJSON(message.refundTxSigningJob);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<StartTreeCreationRequest>): StartTreeCreationRequest {
+    return StartTreeCreationRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<StartTreeCreationRequest>): StartTreeCreationRequest {
+    const message = createBaseStartTreeCreationRequest();
+    message.identityPublicKey = object.identityPublicKey ?? new Uint8Array(0);
+    message.onChainUtxo = (object.onChainUtxo !== undefined && object.onChainUtxo !== null)
+      ? UTXO.fromPartial(object.onChainUtxo)
+      : undefined;
+    message.rootTxSigningJob = (object.rootTxSigningJob !== undefined && object.rootTxSigningJob !== null)
+      ? SigningJob.fromPartial(object.rootTxSigningJob)
+      : undefined;
+    message.refundTxSigningJob = (object.refundTxSigningJob !== undefined && object.refundTxSigningJob !== null)
+      ? SigningJob.fromPartial(object.refundTxSigningJob)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseStartTreeCreationResponse(): StartTreeCreationResponse {
+  return { treeId: "", rootNodeSignatureShares: undefined };
+}
+
+export const StartTreeCreationResponse: MessageFns<StartTreeCreationResponse> = {
+  encode(message: StartTreeCreationResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.treeId !== "") {
+      writer.uint32(10).string(message.treeId);
+    }
+    if (message.rootNodeSignatureShares !== undefined) {
+      NodeSignatureShares.encode(message.rootNodeSignatureShares, writer.uint32(18).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): StartTreeCreationResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseStartTreeCreationResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.treeId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.rootNodeSignatureShares = NodeSignatureShares.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): StartTreeCreationResponse {
+    return {
+      treeId: isSet(object.treeId) ? globalThis.String(object.treeId) : "",
+      rootNodeSignatureShares: isSet(object.rootNodeSignatureShares)
+        ? NodeSignatureShares.fromJSON(object.rootNodeSignatureShares)
+        : undefined,
+    };
+  },
+
+  toJSON(message: StartTreeCreationResponse): unknown {
+    const obj: any = {};
+    if (message.treeId !== "") {
+      obj.treeId = message.treeId;
+    }
+    if (message.rootNodeSignatureShares !== undefined) {
+      obj.rootNodeSignatureShares = NodeSignatureShares.toJSON(message.rootNodeSignatureShares);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<StartTreeCreationResponse>): StartTreeCreationResponse {
+    return StartTreeCreationResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<StartTreeCreationResponse>): StartTreeCreationResponse {
+    const message = createBaseStartTreeCreationResponse();
+    message.treeId = object.treeId ?? "";
+    message.rootNodeSignatureShares =
+      (object.rootNodeSignatureShares !== undefined && object.rootNodeSignatureShares !== null)
+        ? NodeSignatureShares.fromPartial(object.rootNodeSignatureShares)
+        : undefined;
     return message;
   },
 };
@@ -4396,12 +4625,12 @@ export const FreezeTokensResponse: MessageFns<FreezeTokensResponse> = {
   },
 };
 
-function createBaseGetOwnedTokenLeavesRequest(): GetOwnedTokenLeavesRequest {
+function createBaseQueryTokenOutputsRequest(): QueryTokenOutputsRequest {
   return { ownerPublicKeys: [], tokenPublicKeys: [] };
 }
 
-export const GetOwnedTokenLeavesRequest: MessageFns<GetOwnedTokenLeavesRequest> = {
-  encode(message: GetOwnedTokenLeavesRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+export const QueryTokenOutputsRequest: MessageFns<QueryTokenOutputsRequest> = {
+  encode(message: QueryTokenOutputsRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     for (const v of message.ownerPublicKeys) {
       writer.uint32(10).bytes(v!);
     }
@@ -4411,10 +4640,10 @@ export const GetOwnedTokenLeavesRequest: MessageFns<GetOwnedTokenLeavesRequest> 
     return writer;
   },
 
-  decode(input: BinaryReader | Uint8Array, length?: number): GetOwnedTokenLeavesRequest {
+  decode(input: BinaryReader | Uint8Array, length?: number): QueryTokenOutputsRequest {
     const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseGetOwnedTokenLeavesRequest();
+    const message = createBaseQueryTokenOutputsRequest();
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
@@ -4443,7 +4672,7 @@ export const GetOwnedTokenLeavesRequest: MessageFns<GetOwnedTokenLeavesRequest> 
     return message;
   },
 
-  fromJSON(object: any): GetOwnedTokenLeavesRequest {
+  fromJSON(object: any): QueryTokenOutputsRequest {
     return {
       ownerPublicKeys: globalThis.Array.isArray(object?.ownerPublicKeys)
         ? object.ownerPublicKeys.map((e: any) => bytesFromBase64(e))
@@ -4454,7 +4683,7 @@ export const GetOwnedTokenLeavesRequest: MessageFns<GetOwnedTokenLeavesRequest> 
     };
   },
 
-  toJSON(message: GetOwnedTokenLeavesRequest): unknown {
+  toJSON(message: QueryTokenOutputsRequest): unknown {
     const obj: any = {};
     if (message.ownerPublicKeys?.length) {
       obj.ownerPublicKeys = message.ownerPublicKeys.map((e) => base64FromBytes(e));
@@ -4465,11 +4694,11 @@ export const GetOwnedTokenLeavesRequest: MessageFns<GetOwnedTokenLeavesRequest> 
     return obj;
   },
 
-  create(base?: DeepPartial<GetOwnedTokenLeavesRequest>): GetOwnedTokenLeavesRequest {
-    return GetOwnedTokenLeavesRequest.fromPartial(base ?? {});
+  create(base?: DeepPartial<QueryTokenOutputsRequest>): QueryTokenOutputsRequest {
+    return QueryTokenOutputsRequest.fromPartial(base ?? {});
   },
-  fromPartial(object: DeepPartial<GetOwnedTokenLeavesRequest>): GetOwnedTokenLeavesRequest {
-    const message = createBaseGetOwnedTokenLeavesRequest();
+  fromPartial(object: DeepPartial<QueryTokenOutputsRequest>): QueryTokenOutputsRequest {
+    const message = createBaseQueryTokenOutputsRequest();
     message.ownerPublicKeys = object.ownerPublicKeys?.map((e) => e) || [];
     message.tokenPublicKeys = object.tokenPublicKeys?.map((e) => e) || [];
     return message;
@@ -4801,22 +5030,22 @@ export const LeafWithPreviousTransactionData: MessageFns<LeafWithPreviousTransac
   },
 };
 
-function createBaseGetOwnedTokenLeavesResponse(): GetOwnedTokenLeavesResponse {
+function createBaseQueryTokenOutputsResponse(): QueryTokenOutputsResponse {
   return { leavesWithPreviousTransactionData: [] };
 }
 
-export const GetOwnedTokenLeavesResponse: MessageFns<GetOwnedTokenLeavesResponse> = {
-  encode(message: GetOwnedTokenLeavesResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+export const QueryTokenOutputsResponse: MessageFns<QueryTokenOutputsResponse> = {
+  encode(message: QueryTokenOutputsResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     for (const v of message.leavesWithPreviousTransactionData) {
       LeafWithPreviousTransactionData.encode(v!, writer.uint32(10).fork()).join();
     }
     return writer;
   },
 
-  decode(input: BinaryReader | Uint8Array, length?: number): GetOwnedTokenLeavesResponse {
+  decode(input: BinaryReader | Uint8Array, length?: number): QueryTokenOutputsResponse {
     const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseGetOwnedTokenLeavesResponse();
+    const message = createBaseQueryTokenOutputsResponse();
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
@@ -4839,7 +5068,7 @@ export const GetOwnedTokenLeavesResponse: MessageFns<GetOwnedTokenLeavesResponse
     return message;
   },
 
-  fromJSON(object: any): GetOwnedTokenLeavesResponse {
+  fromJSON(object: any): QueryTokenOutputsResponse {
     return {
       leavesWithPreviousTransactionData: globalThis.Array.isArray(object?.leavesWithPreviousTransactionData)
         ? object.leavesWithPreviousTransactionData.map((e: any) => LeafWithPreviousTransactionData.fromJSON(e))
@@ -4847,7 +5076,7 @@ export const GetOwnedTokenLeavesResponse: MessageFns<GetOwnedTokenLeavesResponse
     };
   },
 
-  toJSON(message: GetOwnedTokenLeavesResponse): unknown {
+  toJSON(message: QueryTokenOutputsResponse): unknown {
     const obj: any = {};
     if (message.leavesWithPreviousTransactionData?.length) {
       obj.leavesWithPreviousTransactionData = message.leavesWithPreviousTransactionData.map((e) =>
@@ -4857,11 +5086,11 @@ export const GetOwnedTokenLeavesResponse: MessageFns<GetOwnedTokenLeavesResponse
     return obj;
   },
 
-  create(base?: DeepPartial<GetOwnedTokenLeavesResponse>): GetOwnedTokenLeavesResponse {
-    return GetOwnedTokenLeavesResponse.fromPartial(base ?? {});
+  create(base?: DeepPartial<QueryTokenOutputsResponse>): QueryTokenOutputsResponse {
+    return QueryTokenOutputsResponse.fromPartial(base ?? {});
   },
-  fromPartial(object: DeepPartial<GetOwnedTokenLeavesResponse>): GetOwnedTokenLeavesResponse {
-    const message = createBaseGetOwnedTokenLeavesResponse();
+  fromPartial(object: DeepPartial<QueryTokenOutputsResponse>): QueryTokenOutputsResponse {
+    const message = createBaseQueryTokenOutputsResponse();
     message.leavesWithPreviousTransactionData =
       object.leavesWithPreviousTransactionData?.map((e) => LeafWithPreviousTransactionData.fromPartial(e)) || [];
     return message;
@@ -6731,7 +6960,7 @@ export const CompleteSendTransferResponse: MessageFns<CompleteSendTransferRespon
 };
 
 function createBaseQueryPendingTransfersRequest(): QueryPendingTransfersRequest {
-  return { participant: undefined, transferIds: [] };
+  return { participant: undefined, transferIds: [], limit: 0, offset: 0 };
 }
 
 export const QueryPendingTransfersRequest: MessageFns<QueryPendingTransfersRequest> = {
@@ -6746,6 +6975,12 @@ export const QueryPendingTransfersRequest: MessageFns<QueryPendingTransfersReque
     }
     for (const v of message.transferIds) {
       writer.uint32(26).string(v!);
+    }
+    if (message.limit !== 0) {
+      writer.uint32(320).int64(message.limit);
+    }
+    if (message.offset !== 0) {
+      writer.uint32(400).int64(message.offset);
     }
     return writer;
   },
@@ -6781,6 +7016,22 @@ export const QueryPendingTransfersRequest: MessageFns<QueryPendingTransfersReque
           message.transferIds.push(reader.string());
           continue;
         }
+        case 40: {
+          if (tag !== 320) {
+            break;
+          }
+
+          message.limit = longToNumber(reader.int64());
+          continue;
+        }
+        case 50: {
+          if (tag !== 400) {
+            break;
+          }
+
+          message.offset = longToNumber(reader.int64());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -6803,6 +7054,8 @@ export const QueryPendingTransfersRequest: MessageFns<QueryPendingTransfersReque
       transferIds: globalThis.Array.isArray(object?.transferIds)
         ? object.transferIds.map((e: any) => globalThis.String(e))
         : [],
+      limit: isSet(object.limit) ? globalThis.Number(object.limit) : 0,
+      offset: isSet(object.offset) ? globalThis.Number(object.offset) : 0,
     };
   },
 
@@ -6815,6 +7068,12 @@ export const QueryPendingTransfersRequest: MessageFns<QueryPendingTransfersReque
     }
     if (message.transferIds?.length) {
       obj.transferIds = message.transferIds;
+    }
+    if (message.limit !== 0) {
+      obj.limit = Math.round(message.limit);
+    }
+    if (message.offset !== 0) {
+      obj.offset = Math.round(message.offset);
     }
     return obj;
   },
@@ -6851,18 +7110,23 @@ export const QueryPendingTransfersRequest: MessageFns<QueryPendingTransfersReque
       }
     }
     message.transferIds = object.transferIds?.map((e) => e) || [];
+    message.limit = object.limit ?? 0;
+    message.offset = object.offset ?? 0;
     return message;
   },
 };
 
 function createBaseQueryPendingTransfersResponse(): QueryPendingTransfersResponse {
-  return { transfers: [] };
+  return { transfers: [], offset: 0 };
 }
 
 export const QueryPendingTransfersResponse: MessageFns<QueryPendingTransfersResponse> = {
   encode(message: QueryPendingTransfersResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     for (const v of message.transfers) {
       Transfer.encode(v!, writer.uint32(10).fork()).join();
+    }
+    if (message.offset !== 0) {
+      writer.uint32(16).int64(message.offset);
     }
     return writer;
   },
@@ -6882,6 +7146,14 @@ export const QueryPendingTransfersResponse: MessageFns<QueryPendingTransfersResp
           message.transfers.push(Transfer.decode(reader, reader.uint32()));
           continue;
         }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.offset = longToNumber(reader.int64());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -6896,6 +7168,7 @@ export const QueryPendingTransfersResponse: MessageFns<QueryPendingTransfersResp
       transfers: globalThis.Array.isArray(object?.transfers)
         ? object.transfers.map((e: any) => Transfer.fromJSON(e))
         : [],
+      offset: isSet(object.offset) ? globalThis.Number(object.offset) : 0,
     };
   },
 
@@ -6903,6 +7176,9 @@ export const QueryPendingTransfersResponse: MessageFns<QueryPendingTransfersResp
     const obj: any = {};
     if (message.transfers?.length) {
       obj.transfers = message.transfers.map((e) => Transfer.toJSON(e));
+    }
+    if (message.offset !== 0) {
+      obj.offset = Math.round(message.offset);
     }
     return obj;
   },
@@ -6913,6 +7189,7 @@ export const QueryPendingTransfersResponse: MessageFns<QueryPendingTransfersResp
   fromPartial(object: DeepPartial<QueryPendingTransfersResponse>): QueryPendingTransfersResponse {
     const message = createBaseQueryPendingTransfersResponse();
     message.transfers = object.transfers?.map((e) => Transfer.fromPartial(e)) || [];
+    message.offset = object.offset ?? 0;
     return message;
   },
 };
@@ -12382,6 +12659,19 @@ export const SparkServiceDefinition = {
       responseStream: false,
       options: {},
     },
+    /**
+     * This is deprecated, please use start_deposit_tree_creation instead.
+     *
+     * @deprecated
+     */
+    start_tree_creation: {
+      name: "start_tree_creation",
+      requestType: StartTreeCreationRequest,
+      requestStream: false,
+      responseType: StartTreeCreationResponse,
+      responseStream: false,
+      options: {},
+    },
     finalize_node_signatures: {
       name: "finalize_node_signatures",
       requestType: FinalizeNodeSignaturesRequest,
@@ -12498,7 +12788,11 @@ export const SparkServiceDefinition = {
       responseStream: false,
       options: {},
     },
-    /** This is deprecated, please use counter_leaf_swap instead. */
+    /**
+     * This is deprecated, please use counter_leaf_swap instead.
+     *
+     * @deprecated
+     */
     leaf_swap: {
       name: "leaf_swap",
       requestType: CounterLeafSwapRequest,
@@ -12616,11 +12910,11 @@ export const SparkServiceDefinition = {
       responseStream: false,
       options: {},
     },
-    get_owned_token_leaves: {
-      name: "get_owned_token_leaves",
-      requestType: GetOwnedTokenLeavesRequest,
+    query_token_outputs: {
+      name: "query_token_outputs",
+      requestType: QueryTokenOutputsRequest,
       requestStream: false,
-      responseType: GetOwnedTokenLeavesResponse,
+      responseType: QueryTokenOutputsResponse,
       responseStream: false,
       options: {},
     },
@@ -12676,6 +12970,15 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
     request: StartDepositTreeCreationRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<StartDepositTreeCreationResponse>>;
+  /**
+   * This is deprecated, please use start_deposit_tree_creation instead.
+   *
+   * @deprecated
+   */
+  start_tree_creation(
+    request: StartTreeCreationRequest,
+    context: CallContext & CallContextExt,
+  ): Promise<DeepPartial<StartTreeCreationResponse>>;
   finalize_node_signatures(
     request: FinalizeNodeSignaturesRequest,
     context: CallContext & CallContextExt,
@@ -12736,7 +13039,11 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
     request: StartSendTransferRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<StartSendTransferResponse>>;
-  /** This is deprecated, please use counter_leaf_swap instead. */
+  /**
+   * This is deprecated, please use counter_leaf_swap instead.
+   *
+   * @deprecated
+   */
   leaf_swap(
     request: CounterLeafSwapRequest,
     context: CallContext & CallContextExt,
@@ -12798,10 +13105,10 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
     request: FreezeTokensRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<FreezeTokensResponse>>;
-  get_owned_token_leaves(
-    request: GetOwnedTokenLeavesRequest,
+  query_token_outputs(
+    request: QueryTokenOutputsRequest,
     context: CallContext & CallContextExt,
-  ): Promise<DeepPartial<GetOwnedTokenLeavesResponse>>;
+  ): Promise<DeepPartial<QueryTokenOutputsResponse>>;
   query_token_transactions(
     request: QueryTokenTransactionsRequest,
     context: CallContext & CallContextExt,
@@ -12833,6 +13140,15 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
     request: DeepPartial<StartDepositTreeCreationRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<StartDepositTreeCreationResponse>;
+  /**
+   * This is deprecated, please use start_deposit_tree_creation instead.
+   *
+   * @deprecated
+   */
+  start_tree_creation(
+    request: DeepPartial<StartTreeCreationRequest>,
+    options?: CallOptions & CallOptionsExt,
+  ): Promise<StartTreeCreationResponse>;
   finalize_node_signatures(
     request: DeepPartial<FinalizeNodeSignaturesRequest>,
     options?: CallOptions & CallOptionsExt,
@@ -12893,7 +13209,11 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
     request: DeepPartial<StartSendTransferRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<StartSendTransferResponse>;
-  /** This is deprecated, please use counter_leaf_swap instead. */
+  /**
+   * This is deprecated, please use counter_leaf_swap instead.
+   *
+   * @deprecated
+   */
   leaf_swap(
     request: DeepPartial<CounterLeafSwapRequest>,
     options?: CallOptions & CallOptionsExt,
@@ -12955,10 +13275,10 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
     request: DeepPartial<FreezeTokensRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<FreezeTokensResponse>;
-  get_owned_token_leaves(
-    request: DeepPartial<GetOwnedTokenLeavesRequest>,
+  query_token_outputs(
+    request: DeepPartial<QueryTokenOutputsRequest>,
     options?: CallOptions & CallOptionsExt,
-  ): Promise<GetOwnedTokenLeavesResponse>;
+  ): Promise<QueryTokenOutputsResponse>;
   query_token_transactions(
     request: DeepPartial<QueryTokenTransactionsRequest>,
     options?: CallOptions & CallOptionsExt,

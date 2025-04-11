@@ -399,7 +399,7 @@ export class TokenTransactionService {
       this.config.getCoordinatorAddress(),
     );
 
-    const result = await sparkClient.get_owned_token_leaves({
+    const result = await sparkClient.query_token_outputs({
       ownerPublicKeys,
       tokenPublicKeys,
     });

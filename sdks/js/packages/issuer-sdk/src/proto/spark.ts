@@ -13,26 +13,31 @@ import { Timestamp } from "./google/protobuf/timestamp.js";
 
 export const protobufPackage = "spark";
 
+/** Network is the network type of the bitcoin network. */
 export enum Network {
-  MAINNET = 0,
-  REGTEST = 1,
-  TESTNET = 2,
-  SIGNET = 3,
+  UNSPECIFIED = 0,
+  MAINNET = 10,
+  REGTEST = 20,
+  TESTNET = 30,
+  SIGNET = 40,
   UNRECOGNIZED = -1,
 }
 
 export function networkFromJSON(object: any): Network {
   switch (object) {
     case 0:
+    case "UNSPECIFIED":
+      return Network.UNSPECIFIED;
+    case 10:
     case "MAINNET":
       return Network.MAINNET;
-    case 1:
+    case 20:
     case "REGTEST":
       return Network.REGTEST;
-    case 2:
+    case 30:
     case "TESTNET":
       return Network.TESTNET;
-    case 3:
+    case 40:
     case "SIGNET":
       return Network.SIGNET;
     case -1:
@@ -44,6 +49,8 @@ export function networkFromJSON(object: any): Network {
 
 export function networkToJSON(object: Network): string {
   switch (object) {
+    case Network.UNSPECIFIED:
+      return "UNSPECIFIED";
     case Network.MAINNET:
       return "MAINNET";
     case Network.REGTEST:
@@ -58,6 +65,45 @@ export function networkToJSON(object: Network): string {
   }
 }
 
+export enum TokenTransactionStatus {
+  TOKEN_TRANSACTION_STARTED = 0,
+  TOKEN_TRANSACTION_SIGNED = 1,
+  TOKEN_TRANSACTION_FINALIZED = 2,
+  UNRECOGNIZED = -1,
+}
+
+export function tokenTransactionStatusFromJSON(object: any): TokenTransactionStatus {
+  switch (object) {
+    case 0:
+    case "TOKEN_TRANSACTION_STARTED":
+      return TokenTransactionStatus.TOKEN_TRANSACTION_STARTED;
+    case 1:
+    case "TOKEN_TRANSACTION_SIGNED":
+      return TokenTransactionStatus.TOKEN_TRANSACTION_SIGNED;
+    case 2:
+    case "TOKEN_TRANSACTION_FINALIZED":
+      return TokenTransactionStatus.TOKEN_TRANSACTION_FINALIZED;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return TokenTransactionStatus.UNRECOGNIZED;
+  }
+}
+
+export function tokenTransactionStatusToJSON(object: TokenTransactionStatus): string {
+  switch (object) {
+    case TokenTransactionStatus.TOKEN_TRANSACTION_STARTED:
+      return "TOKEN_TRANSACTION_STARTED";
+    case TokenTransactionStatus.TOKEN_TRANSACTION_SIGNED:
+      return "TOKEN_TRANSACTION_SIGNED";
+    case TokenTransactionStatus.TOKEN_TRANSACTION_FINALIZED:
+      return "TOKEN_TRANSACTION_FINALIZED";
+    case TokenTransactionStatus.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
 export enum TransferStatus {
   TRANSFER_STATUS_SENDER_INITIATED = 0,
   TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING = 1,
@@ -66,6 +112,7 @@ export enum TransferStatus {
   TRANSFER_STATUSR_RECEIVER_REFUND_SIGNED = 4,
   TRANSFER_STATUS_COMPLETED = 5,
   TRANSFER_STATUS_EXPIRED = 6,
+  TRANSFER_STATUS_RETURNED = 7,
   UNRECOGNIZED = -1,
 }
 
@@ -92,6 +139,9 @@ export function transferStatusFromJSON(object: any): TransferStatus {
     case 6:
     case "TRANSFER_STATUS_EXPIRED":
       return TransferStatus.TRANSFER_STATUS_EXPIRED;
+    case 7:
+    case "TRANSFER_STATUS_RETURNED":
+      return TransferStatus.TRANSFER_STATUS_RETURNED;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -115,14 +165,80 @@ export function transferStatusToJSON(object: TransferStatus): string {
       return "TRANSFER_STATUS_COMPLETED";
     case TransferStatus.TRANSFER_STATUS_EXPIRED:
       return "TRANSFER_STATUS_EXPIRED";
+    case TransferStatus.TRANSFER_STATUS_RETURNED:
+      return "TRANSFER_STATUS_RETURNED";
     case TransferStatus.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
   }
 }
 
+export enum TransferType {
+  PREIMAGE_SWAP = 0,
+  COOPERATIVE_EXIT = 1,
+  TRANSFER = 2,
+  SWAP = 30,
+  COUNTER_SWAP = 40,
+  UNRECOGNIZED = -1,
+}
+
+export function transferTypeFromJSON(object: any): TransferType {
+  switch (object) {
+    case 0:
+    case "PREIMAGE_SWAP":
+      return TransferType.PREIMAGE_SWAP;
+    case 1:
+    case "COOPERATIVE_EXIT":
+      return TransferType.COOPERATIVE_EXIT;
+    case 2:
+    case "TRANSFER":
+      return TransferType.TRANSFER;
+    case 30:
+    case "SWAP":
+      return TransferType.SWAP;
+    case 40:
+    case "COUNTER_SWAP":
+      return TransferType.COUNTER_SWAP;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return TransferType.UNRECOGNIZED;
+  }
+}
+
+export function transferTypeToJSON(object: TransferType): string {
+  switch (object) {
+    case TransferType.PREIMAGE_SWAP:
+      return "PREIMAGE_SWAP";
+    case TransferType.COOPERATIVE_EXIT:
+      return "COOPERATIVE_EXIT";
+    case TransferType.TRANSFER:
+      return "TRANSFER";
+    case TransferType.SWAP:
+      return "SWAP";
+    case TransferType.COUNTER_SWAP:
+      return "COUNTER_SWAP";
+    case TransferType.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
+/**
+ * DepositAddressProof is the proof of possession of the deposit address.
+ * When a user wants to generate a deposit address, they are sending their public key to the SE,
+ * and the SE will respond with an address of user's public key + SE's public key.
+ *
+ * In the trusty deposit flow, user will need to know that this address is valid, and no single SE
+ * can generate this address.
+ *
+ * The SE will need to sign the address with their identity keys, and have a proof of possession of
+ * the signing key piece that the SE holds.
+ */
 export interface DepositAddressProof {
+  /** The signatures of the address by the SE's identity keys. */
   addressSignatures: { [key: string]: Uint8Array };
+  /** The proof of possession of the signing key piece by the SE. */
   proofOfPossessionSignature: Uint8Array;
 }
 
@@ -131,48 +247,95 @@ export interface DepositAddressProof_AddressSignaturesEntry {
   value: Uint8Array;
 }
 
+/**
+ * GenerateDepositAddressRequest is the request to generate a deposit address.
+ * The user will send their public key to the SE, and the SE will respond with an address of user's
+ * public key + SE's public key.
+ */
 export interface GenerateDepositAddressRequest {
+  /** The signing public key of the user. */
   signingPublicKey: Uint8Array;
+  /** The identity public key of the user. */
   identityPublicKey: Uint8Array;
+  /** The network of the bitcoin network. */
   network: Network;
 }
 
+/** Address is the address of the user's public key + SE's public key. */
 export interface Address {
+  /** The p2tr address of the user's public key + SE's public key. */
   address: string;
+  /** The verifying key of the address, which is user's public key + SE's public key. */
   verifyingKey: Uint8Array;
+  /** The proof of possession of the address by the SE. */
   depositAddressProof: DepositAddressProof | undefined;
 }
 
+/** GenerateDepositAddressResponse is the response to the request to generate a deposit address. */
 export interface GenerateDepositAddressResponse {
   depositAddress: Address | undefined;
 }
 
+/**
+ * UTXO represents a utxo on the bitcoin network.
+ * The UTXO is used to create a tree on Spark, it can also be an off-chain utxo so that the user
+ * can create the tree first and the broadcast the transaction.
+ */
 export interface UTXO {
+  /** The raw transaction of the utxo. */
   rawTx: Uint8Array;
+  /** The vout of the raw transaction for the utxo, which will be used to create the tree. */
   vout: number;
+  /** The network of the bitcoin network. */
   network: Network;
 }
 
+/**
+ * NodeOutput represents a node on the tree.
+ * This is similar to a UTXO, which is used to create a subtree on Spark. But instead of using
+ * a utxo, a existing node on the tree is used as the utxo.
+ */
 export interface NodeOutput {
+  /** The id of the node. */
   nodeId: string;
+  /** The vout of the raw transaction for the node, which will be used to create the tree. */
   vout: number;
 }
 
+/**
+ * SigningJob is the job for signing a transaction.
+ * The signing job is used to sign a bitcoin transaction using Spark FROST.
+ */
 export interface SigningJob {
+  /** The signing public key of the user. */
   signingPublicKey: Uint8Array;
+  /** The unsigned raw transaction to be signed. */
   rawTx: Uint8Array;
+  /** The signing nonce commitment of the user. */
   signingNonceCommitment: SigningCommitment | undefined;
 }
 
+/** SigningKeyshare is the keyshare information of the SE keyshare group. */
 export interface SigningKeyshare {
+  /** The identifiers of the owners of the keyshare. */
   ownerIdentifiers: string[];
+  /** The threshold of the keyshare. */
   threshold: number;
 }
 
+/**
+ * SigningResult is the result of the signing job from the SE keyshare group.
+ * It contains all the information for user to sign their part. After user signs, the signature
+ * can be aggregated to form the final signature.
+ */
 export interface SigningResult {
+  /** The public keys of the SE keyshare group. */
   publicKeys: { [key: string]: Uint8Array };
+  /** The signing nonce commitments of the SE keyshare group. */
   signingNonceCommitments: { [key: string]: SigningCommitment };
+  /** The signature shares of the SE keyshare group. */
   signatureShares: { [key: string]: Uint8Array };
+  /** The keyshare information of the SE keyshare group. */
   signingKeyshare: SigningKeyshare | undefined;
 }
 
@@ -191,28 +354,83 @@ export interface SigningResult_SignatureSharesEntry {
   value: Uint8Array;
 }
 
+/**
+ * NodeSignatureShares is the signature shares for a node on the tree.
+ * For each tree node, the verifying key stays the same for both transactions.
+ */
 export interface NodeSignatureShares {
+  /** The id of the node. */
   nodeId: string;
-  nodeTxSigningResult: SigningResult | undefined;
-  refundTxSigningResult: SigningResult | undefined;
+  /** The signing result of the node's transaction. This transaction is to pay to self. */
+  nodeTxSigningResult:
+    | SigningResult
+    | undefined;
+  /** The signing result of the node's refund transaction. This transaction is to pay to the user. */
+  refundTxSigningResult:
+    | SigningResult
+    | undefined;
+  /** The verifying key of the node. */
   verifyingKey: Uint8Array;
 }
 
+/**
+ * NodeSignatures is the final signatures for a node on the tree.
+ * It contains the signature for the node's transaction and refund transaction.
+ */
 export interface NodeSignatures {
+  /** The id of the node. */
   nodeId: string;
+  /** The final signature of the node's transaction. This transaction is to pay to self. */
   nodeTxSignature: Uint8Array;
+  /** The final signature of the node's refund transaction. This transaction is to pay to the user. */
   refundTxSignature: Uint8Array;
 }
 
-export interface StartDepositTreeCreationRequest {
+/** StartTreeCreationRequest is the request to start the tree creation for a tree root node. */
+export interface StartTreeCreationRequest {
+  /** The identity public key of the user. */
   identityPublicKey: Uint8Array;
-  onChainUtxo: UTXO | undefined;
-  rootTxSigningJob: SigningJob | undefined;
+  /** The on-chain utxo to be used to be spent by the root node. */
+  onChainUtxo:
+    | UTXO
+    | undefined;
+  /** The signing job for the root node's transaction. */
+  rootTxSigningJob:
+    | SigningJob
+    | undefined;
+  /** The signing job for the root node's refund transaction. */
   refundTxSigningJob: SigningJob | undefined;
 }
 
-export interface StartDepositTreeCreationResponse {
+/** StartTreeCreationResponse is the response to the request to start the tree creation for a tree root node. */
+export interface StartTreeCreationResponse {
+  /** The id of the tree. */
   treeId: string;
+  /** The signature shares for the root node. */
+  rootNodeSignatureShares: NodeSignatureShares | undefined;
+}
+
+/** StartDepositTreeCreationRequest is the request to start the tree creation for a tree root node. */
+export interface StartDepositTreeCreationRequest {
+  /** The identity public key of the user. */
+  identityPublicKey: Uint8Array;
+  /** The on-chain utxo to be used to be spent by the root node. */
+  onChainUtxo:
+    | UTXO
+    | undefined;
+  /** The signing job for the root node's transaction. */
+  rootTxSigningJob:
+    | SigningJob
+    | undefined;
+  /** The signing job for the root node's refund transaction. */
+  refundTxSigningJob: SigningJob | undefined;
+}
+
+/** StartDepositTreeCreationResponse is the response to the request to start the tree creation for a tree root node. */
+export interface StartDepositTreeCreationResponse {
+  /** The id of the tree. */
+  treeId: string;
+  /** The signature shares for the root node. */
   rootNodeSignatureShares: NodeSignatureShares | undefined;
 }
 
@@ -275,6 +493,12 @@ export interface TokenTransaction {
     | undefined;
   outputLeaves: TokenLeafOutput[];
   sparkOperatorIdentityPublicKeys: Uint8Array[];
+  network: Network;
+}
+
+export interface TokenTransactionWithStatus {
+  tokenTransaction: TokenTransaction | undefined;
+  status: TokenTransactionStatus;
 }
 
 export interface TokenTransactionSignatures {
@@ -282,7 +506,7 @@ export interface TokenTransactionSignatures {
    * Filled by signing the partial token transaction hash with the owner/issuer private key.
    * For mint transactions this will be one signature for the input issuer_public_key
    * For transfer transactions this will be one for each leaf for the leaf owner_public_key
-   * This is a DER signature which can be between 68 and 73 bytes.
+   * This is a Schnorr or ECDSA DER signature which can be between 64 and 73 bytes.
    */
   ownerSignatures: Uint8Array[];
 }
@@ -322,7 +546,7 @@ export interface OperatorSpecificTokenTransactionSignablePayload {
  */
 export interface OperatorSpecificTokenTransactionSignature {
   ownerPublicKey: Uint8Array;
-  /** This is a DER signature which can be between 68 and 73 bytes. */
+  /** This is a Schnorr or ECDSA DER signature which can be between 64 and 73 bytes. */
   ownerSignature: Uint8Array;
   payload: OperatorSpecificTokenTransactionSignablePayload | undefined;
 }
@@ -363,7 +587,7 @@ export interface FreezeTokensRequest {
   freezeTokensPayload:
     | FreezeTokensPayload
     | undefined;
-  /** This is a DER signature which can be between 68 and 73 bytes. */
+  /** This is a Schnorr or ECDSA DER signature which can be between 64 and 73 bytes. */
   issuerSignature: Uint8Array;
 }
 
@@ -373,10 +597,29 @@ export interface FreezeTokensResponse {
   impactedTokenAmount: Uint8Array;
 }
 
-export interface GetOwnedTokenLeavesRequest {
+export interface QueryTokenOutputsRequest {
   ownerPublicKeys: Uint8Array[];
   /** Optionally provide token public keys. If not set return leaves for all tokens. */
   tokenPublicKeys: Uint8Array[];
+}
+
+/** Request constraints are combined using an AND relation. */
+export interface QueryTokenTransactionsRequest {
+  /** Returns transactions that have one of these leaf ids in the input or output. */
+  leafIds: string[];
+  /** Returns transactions that have this owner public key as the sender or receiver in one or more of the input/output leaves. */
+  ownerPublicKeys: Uint8Array[];
+  /** Returns transactions that related to this token public key. */
+  tokenPublicKeys: Uint8Array[];
+  /** Returns transactions that match the provided transaction hashes. */
+  tokenTransactionHashes: Uint8Array[];
+  limit: number;
+  offset: number;
+}
+
+export interface QueryTokenTransactionsResponse {
+  tokenTransactionsWithStatus: TokenTransactionWithStatus[];
+  offset: number;
 }
 
 export interface LeafWithPreviousTransactionData {
@@ -385,36 +628,84 @@ export interface LeafWithPreviousTransactionData {
   previousTransactionVout: number;
 }
 
-export interface GetOwnedTokenLeavesResponse {
+export interface QueryTokenOutputsResponse {
   leavesWithPreviousTransactionData: LeafWithPreviousTransactionData[];
 }
 
+export interface CancelSignedTokenTransactionRequest {
+  finalTokenTransaction: TokenTransaction | undefined;
+  senderIdentityPublicKey: Uint8Array;
+}
+
+/** TreeNode represents a node on the tree. */
 export interface TreeNode {
+  /** The id of the node. */
   id: string;
+  /** The id of the tree for this node . */
   treeId: string;
+  /** The value that this node holds. */
   value: number;
-  parentNodeId?: string | undefined;
+  /** The id of the parent node. */
+  parentNodeId?:
+    | string
+    | undefined;
+  /** The transaction of the node, this transaction is to pay to the same address as the node. */
   nodeTx: Uint8Array;
+  /** The refund transaction of the node, this transaction is to pay to the user. */
   refundTx: Uint8Array;
+  /** This vout is the vout to spend the previous transaction, which is in the parent node. */
   vout: number;
+  /** The verifying public key of the node. */
   verifyingPublicKey: Uint8Array;
+  /** The identity public key of the owner of the node. */
   ownerIdentityPublicKey: Uint8Array;
-  signingKeyshare: SigningKeyshare | undefined;
+  /** The signing keyshare information of the node on the SE side. */
+  signingKeyshare:
+    | SigningKeyshare
+    | undefined;
+  /** The status of the node. */
   status: string;
+  /** The network of the node. */
   network: Network;
 }
 
+/** FinalizeNodeSignaturesRequest is the request to finalize the signatures for a node. */
 export interface FinalizeNodeSignaturesRequest {
+  /** The intent of the signature. */
   intent: SignatureIntent;
+  /** The signatures for the node. */
   nodeSignatures: NodeSignatures[];
 }
 
+/** FinalizeNodeSignaturesResponse is the response to the request to finalize the signatures for a node. */
 export interface FinalizeNodeSignaturesResponse {
+  /** The nodes that are finalized. */
   nodes: TreeNode[];
 }
 
+/**
+ * SecretShare is a secret share of a secret, using Feldman VSS.
+ * The secret share is in the field of secp256k1 scalar field.
+ */
 export interface SecretShare {
+  /** The secret share. */
   secretShare: Uint8Array;
+  /**
+   * The proofs for the secret share. They are the compressed public keys in secp256k1 curve.
+   * proofs[0] is the public key of the secret, while proofs[1..n] are the public key of the polynomial.
+   */
+  proofs: Uint8Array[];
+}
+
+/**
+ * SecretProof is the proof for a secret share using Feldman VSS.
+ * The proof is the compressed public keys in secp256k1 curve.
+ */
+export interface SecretProof {
+  /**
+   * The proofs for the secret share.
+   * proofs[0] is the public key of the secret, while proofs[1..n] are the public key of the polynomial.
+   */
   proofs: Uint8Array[];
 }
 
@@ -435,6 +726,12 @@ export interface StartSendTransferRequest {
   leavesToSend: LeafRefundTxSigningJob[];
   receiverIdentityPublicKey: Uint8Array;
   expiryTime: Date | undefined;
+  keyTweakProofs: { [key: string]: SecretProof };
+}
+
+export interface StartSendTransferRequest_KeyTweakProofsEntry {
+  key: string;
+  value: SecretProof | undefined;
 }
 
 export interface StartSendTransferResponse {
@@ -471,6 +768,9 @@ export interface Transfer {
   totalValue: number;
   expiryTime: Date | undefined;
   leaves: TransferLeaf[];
+  createdTime: Date | undefined;
+  updatedTime: Date | undefined;
+  type: TransferType;
 }
 
 export interface TransferLeaf {
@@ -490,10 +790,13 @@ export interface QueryPendingTransfersRequest {
     senderIdentityPublicKey: Uint8Array;
   } | undefined;
   transferIds: string[];
+  limit: number;
+  offset: number;
 }
 
 export interface QueryPendingTransfersResponse {
   transfers: Transfer[];
+  offset: number;
 }
 
 export interface ClaimLeafKeyTweak {
@@ -517,6 +820,12 @@ export interface ClaimTransferSignRefundsRequest {
   transferId: string;
   ownerIdentityPublicKey: Uint8Array;
   signingJobs: LeafRefundTxSigningJob[];
+  keyTweakProofs: { [key: string]: SecretProof };
+}
+
+export interface ClaimTransferSignRefundsRequest_KeyTweakProofsEntry {
+  key: string;
+  value: SecretProof | undefined;
 }
 
 export interface ClaimTransferSignRefundsResponse {
@@ -579,6 +888,7 @@ export interface UserSignedRefund {
   userSignature: Uint8Array;
   signingCommitments: SigningCommitments | undefined;
   userSignatureCommitment: SigningCommitment | undefined;
+  network: Network;
 }
 
 export interface InvoiceAmountProof {
@@ -656,13 +966,13 @@ export interface CooperativeExitResponse {
   signingResults: LeafRefundTxSigningResult[];
 }
 
-export interface LeafSwapRequest {
+export interface CounterLeafSwapRequest {
   transfer: StartSendTransferRequest | undefined;
   swapId: string;
   adaptorPublicKey: Uint8Array;
 }
 
-export interface LeafSwapResponse {
+export interface CounterLeafSwapResponse {
   transfer: Transfer | undefined;
   signingResults: LeafRefundTxSigningResult[];
 }
@@ -860,6 +1170,24 @@ export interface DepositAddressQueryResult {
 
 export interface QueryUnusedDepositAddressesResponse {
   depositAddresses: DepositAddressQueryResult[];
+}
+
+export interface QueryBalanceRequest {
+  identityPublicKey: Uint8Array;
+}
+
+export interface QueryBalanceResponse {
+  balance: number;
+  nodeBalances: { [key: string]: number };
+}
+
+export interface QueryBalanceResponse_NodeBalancesEntry {
+  key: string;
+  value: number;
+}
+
+export interface SparkAddress {
+  identityPublicKey: Uint8Array;
 }
 
 function createBaseDepositAddressProof(): DepositAddressProof {
@@ -2259,6 +2587,208 @@ export const NodeSignatures: MessageFns<NodeSignatures> = {
   },
 };
 
+function createBaseStartTreeCreationRequest(): StartTreeCreationRequest {
+  return {
+    identityPublicKey: new Uint8Array(0),
+    onChainUtxo: undefined,
+    rootTxSigningJob: undefined,
+    refundTxSigningJob: undefined,
+  };
+}
+
+export const StartTreeCreationRequest: MessageFns<StartTreeCreationRequest> = {
+  encode(message: StartTreeCreationRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.identityPublicKey.length !== 0) {
+      writer.uint32(10).bytes(message.identityPublicKey);
+    }
+    if (message.onChainUtxo !== undefined) {
+      UTXO.encode(message.onChainUtxo, writer.uint32(18).fork()).join();
+    }
+    if (message.rootTxSigningJob !== undefined) {
+      SigningJob.encode(message.rootTxSigningJob, writer.uint32(26).fork()).join();
+    }
+    if (message.refundTxSigningJob !== undefined) {
+      SigningJob.encode(message.refundTxSigningJob, writer.uint32(34).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): StartTreeCreationRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseStartTreeCreationRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.identityPublicKey = reader.bytes();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.onChainUtxo = UTXO.decode(reader, reader.uint32());
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.rootTxSigningJob = SigningJob.decode(reader, reader.uint32());
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.refundTxSigningJob = SigningJob.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): StartTreeCreationRequest {
+    return {
+      identityPublicKey: isSet(object.identityPublicKey)
+        ? bytesFromBase64(object.identityPublicKey)
+        : new Uint8Array(0),
+      onChainUtxo: isSet(object.onChainUtxo) ? UTXO.fromJSON(object.onChainUtxo) : undefined,
+      rootTxSigningJob: isSet(object.rootTxSigningJob) ? SigningJob.fromJSON(object.rootTxSigningJob) : undefined,
+      refundTxSigningJob: isSet(object.refundTxSigningJob) ? SigningJob.fromJSON(object.refundTxSigningJob) : undefined,
+    };
+  },
+
+  toJSON(message: StartTreeCreationRequest): unknown {
+    const obj: any = {};
+    if (message.identityPublicKey.length !== 0) {
+      obj.identityPublicKey = base64FromBytes(message.identityPublicKey);
+    }
+    if (message.onChainUtxo !== undefined) {
+      obj.onChainUtxo = UTXO.toJSON(message.onChainUtxo);
+    }
+    if (message.rootTxSigningJob !== undefined) {
+      obj.rootTxSigningJob = SigningJob.toJSON(message.rootTxSigningJob);
+    }
+    if (message.refundTxSigningJob !== undefined) {
+      obj.refundTxSigningJob = SigningJob.toJSON(message.refundTxSigningJob);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<StartTreeCreationRequest>): StartTreeCreationRequest {
+    return StartTreeCreationRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<StartTreeCreationRequest>): StartTreeCreationRequest {
+    const message = createBaseStartTreeCreationRequest();
+    message.identityPublicKey = object.identityPublicKey ?? new Uint8Array(0);
+    message.onChainUtxo = (object.onChainUtxo !== undefined && object.onChainUtxo !== null)
+      ? UTXO.fromPartial(object.onChainUtxo)
+      : undefined;
+    message.rootTxSigningJob = (object.rootTxSigningJob !== undefined && object.rootTxSigningJob !== null)
+      ? SigningJob.fromPartial(object.rootTxSigningJob)
+      : undefined;
+    message.refundTxSigningJob = (object.refundTxSigningJob !== undefined && object.refundTxSigningJob !== null)
+      ? SigningJob.fromPartial(object.refundTxSigningJob)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseStartTreeCreationResponse(): StartTreeCreationResponse {
+  return { treeId: "", rootNodeSignatureShares: undefined };
+}
+
+export const StartTreeCreationResponse: MessageFns<StartTreeCreationResponse> = {
+  encode(message: StartTreeCreationResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.treeId !== "") {
+      writer.uint32(10).string(message.treeId);
+    }
+    if (message.rootNodeSignatureShares !== undefined) {
+      NodeSignatureShares.encode(message.rootNodeSignatureShares, writer.uint32(18).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): StartTreeCreationResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseStartTreeCreationResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.treeId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.rootNodeSignatureShares = NodeSignatureShares.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): StartTreeCreationResponse {
+    return {
+      treeId: isSet(object.treeId) ? globalThis.String(object.treeId) : "",
+      rootNodeSignatureShares: isSet(object.rootNodeSignatureShares)
+        ? NodeSignatureShares.fromJSON(object.rootNodeSignatureShares)
+        : undefined,
+    };
+  },
+
+  toJSON(message: StartTreeCreationResponse): unknown {
+    const obj: any = {};
+    if (message.treeId !== "") {
+      obj.treeId = message.treeId;
+    }
+    if (message.rootNodeSignatureShares !== undefined) {
+      obj.rootNodeSignatureShares = NodeSignatureShares.toJSON(message.rootNodeSignatureShares);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<StartTreeCreationResponse>): StartTreeCreationResponse {
+    return StartTreeCreationResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<StartTreeCreationResponse>): StartTreeCreationResponse {
+    const message = createBaseStartTreeCreationResponse();
+    message.treeId = object.treeId ?? "";
+    message.rootNodeSignatureShares =
+      (object.rootNodeSignatureShares !== undefined && object.rootNodeSignatureShares !== null)
+        ? NodeSignatureShares.fromPartial(object.rootNodeSignatureShares)
+        : undefined;
+    return message;
+  },
+};
+
 function createBaseStartDepositTreeCreationRequest(): StartDepositTreeCreationRequest {
   return {
     identityPublicKey: new Uint8Array(0),
@@ -2848,7 +3378,7 @@ export const TokenLeafOutput: MessageFns<TokenLeafOutput> = {
 };
 
 function createBaseTokenTransaction(): TokenTransaction {
-  return { tokenInput: undefined, outputLeaves: [], sparkOperatorIdentityPublicKeys: [] };
+  return { tokenInput: undefined, outputLeaves: [], sparkOperatorIdentityPublicKeys: [], network: 0 };
 }
 
 export const TokenTransaction: MessageFns<TokenTransaction> = {
@@ -2866,6 +3396,9 @@ export const TokenTransaction: MessageFns<TokenTransaction> = {
     }
     for (const v of message.sparkOperatorIdentityPublicKeys) {
       writer.uint32(34).bytes(v!);
+    }
+    if (message.network !== 0) {
+      writer.uint32(80).int32(message.network);
     }
     return writer;
   },
@@ -2909,6 +3442,14 @@ export const TokenTransaction: MessageFns<TokenTransaction> = {
           message.sparkOperatorIdentityPublicKeys.push(reader.bytes());
           continue;
         }
+        case 10: {
+          if (tag !== 80) {
+            break;
+          }
+
+          message.network = reader.int32() as any;
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -2931,6 +3472,7 @@ export const TokenTransaction: MessageFns<TokenTransaction> = {
       sparkOperatorIdentityPublicKeys: globalThis.Array.isArray(object?.sparkOperatorIdentityPublicKeys)
         ? object.sparkOperatorIdentityPublicKeys.map((e: any) => bytesFromBase64(e))
         : [],
+      network: isSet(object.network) ? networkFromJSON(object.network) : 0,
     };
   },
 
@@ -2946,6 +3488,9 @@ export const TokenTransaction: MessageFns<TokenTransaction> = {
     }
     if (message.sparkOperatorIdentityPublicKeys?.length) {
       obj.sparkOperatorIdentityPublicKeys = message.sparkOperatorIdentityPublicKeys.map((e) => base64FromBytes(e));
+    }
+    if (message.network !== 0) {
+      obj.network = networkToJSON(message.network);
     }
     return obj;
   },
@@ -2974,6 +3519,85 @@ export const TokenTransaction: MessageFns<TokenTransaction> = {
     }
     message.outputLeaves = object.outputLeaves?.map((e) => TokenLeafOutput.fromPartial(e)) || [];
     message.sparkOperatorIdentityPublicKeys = object.sparkOperatorIdentityPublicKeys?.map((e) => e) || [];
+    message.network = object.network ?? 0;
+    return message;
+  },
+};
+
+function createBaseTokenTransactionWithStatus(): TokenTransactionWithStatus {
+  return { tokenTransaction: undefined, status: 0 };
+}
+
+export const TokenTransactionWithStatus: MessageFns<TokenTransactionWithStatus> = {
+  encode(message: TokenTransactionWithStatus, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.tokenTransaction !== undefined) {
+      TokenTransaction.encode(message.tokenTransaction, writer.uint32(10).fork()).join();
+    }
+    if (message.status !== 0) {
+      writer.uint32(16).int32(message.status);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): TokenTransactionWithStatus {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseTokenTransactionWithStatus();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.tokenTransaction = TokenTransaction.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.status = reader.int32() as any;
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): TokenTransactionWithStatus {
+    return {
+      tokenTransaction: isSet(object.tokenTransaction) ? TokenTransaction.fromJSON(object.tokenTransaction) : undefined,
+      status: isSet(object.status) ? tokenTransactionStatusFromJSON(object.status) : 0,
+    };
+  },
+
+  toJSON(message: TokenTransactionWithStatus): unknown {
+    const obj: any = {};
+    if (message.tokenTransaction !== undefined) {
+      obj.tokenTransaction = TokenTransaction.toJSON(message.tokenTransaction);
+    }
+    if (message.status !== 0) {
+      obj.status = tokenTransactionStatusToJSON(message.status);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<TokenTransactionWithStatus>): TokenTransactionWithStatus {
+    return TokenTransactionWithStatus.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<TokenTransactionWithStatus>): TokenTransactionWithStatus {
+    const message = createBaseTokenTransactionWithStatus();
+    message.tokenTransaction = (object.tokenTransaction !== undefined && object.tokenTransaction !== null)
+      ? TokenTransaction.fromPartial(object.tokenTransaction)
+      : undefined;
+    message.status = object.status ?? 0;
     return message;
   },
 };
@@ -4001,12 +4625,12 @@ export const FreezeTokensResponse: MessageFns<FreezeTokensResponse> = {
   },
 };
 
-function createBaseGetOwnedTokenLeavesRequest(): GetOwnedTokenLeavesRequest {
+function createBaseQueryTokenOutputsRequest(): QueryTokenOutputsRequest {
   return { ownerPublicKeys: [], tokenPublicKeys: [] };
 }
 
-export const GetOwnedTokenLeavesRequest: MessageFns<GetOwnedTokenLeavesRequest> = {
-  encode(message: GetOwnedTokenLeavesRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+export const QueryTokenOutputsRequest: MessageFns<QueryTokenOutputsRequest> = {
+  encode(message: QueryTokenOutputsRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     for (const v of message.ownerPublicKeys) {
       writer.uint32(10).bytes(v!);
     }
@@ -4016,10 +4640,10 @@ export const GetOwnedTokenLeavesRequest: MessageFns<GetOwnedTokenLeavesRequest> 
     return writer;
   },
 
-  decode(input: BinaryReader | Uint8Array, length?: number): GetOwnedTokenLeavesRequest {
+  decode(input: BinaryReader | Uint8Array, length?: number): QueryTokenOutputsRequest {
     const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseGetOwnedTokenLeavesRequest();
+    const message = createBaseQueryTokenOutputsRequest();
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
@@ -4048,7 +4672,7 @@ export const GetOwnedTokenLeavesRequest: MessageFns<GetOwnedTokenLeavesRequest> 
     return message;
   },
 
-  fromJSON(object: any): GetOwnedTokenLeavesRequest {
+  fromJSON(object: any): QueryTokenOutputsRequest {
     return {
       ownerPublicKeys: globalThis.Array.isArray(object?.ownerPublicKeys)
         ? object.ownerPublicKeys.map((e: any) => bytesFromBase64(e))
@@ -4059,7 +4683,7 @@ export const GetOwnedTokenLeavesRequest: MessageFns<GetOwnedTokenLeavesRequest> 
     };
   },
 
-  toJSON(message: GetOwnedTokenLeavesRequest): unknown {
+  toJSON(message: QueryTokenOutputsRequest): unknown {
     const obj: any = {};
     if (message.ownerPublicKeys?.length) {
       obj.ownerPublicKeys = message.ownerPublicKeys.map((e) => base64FromBytes(e));
@@ -4070,13 +4694,240 @@ export const GetOwnedTokenLeavesRequest: MessageFns<GetOwnedTokenLeavesRequest> 
     return obj;
   },
 
-  create(base?: DeepPartial<GetOwnedTokenLeavesRequest>): GetOwnedTokenLeavesRequest {
-    return GetOwnedTokenLeavesRequest.fromPartial(base ?? {});
+  create(base?: DeepPartial<QueryTokenOutputsRequest>): QueryTokenOutputsRequest {
+    return QueryTokenOutputsRequest.fromPartial(base ?? {});
   },
-  fromPartial(object: DeepPartial<GetOwnedTokenLeavesRequest>): GetOwnedTokenLeavesRequest {
-    const message = createBaseGetOwnedTokenLeavesRequest();
+  fromPartial(object: DeepPartial<QueryTokenOutputsRequest>): QueryTokenOutputsRequest {
+    const message = createBaseQueryTokenOutputsRequest();
     message.ownerPublicKeys = object.ownerPublicKeys?.map((e) => e) || [];
     message.tokenPublicKeys = object.tokenPublicKeys?.map((e) => e) || [];
+    return message;
+  },
+};
+
+function createBaseQueryTokenTransactionsRequest(): QueryTokenTransactionsRequest {
+  return { leafIds: [], ownerPublicKeys: [], tokenPublicKeys: [], tokenTransactionHashes: [], limit: 0, offset: 0 };
+}
+
+export const QueryTokenTransactionsRequest: MessageFns<QueryTokenTransactionsRequest> = {
+  encode(message: QueryTokenTransactionsRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.leafIds) {
+      writer.uint32(10).string(v!);
+    }
+    for (const v of message.ownerPublicKeys) {
+      writer.uint32(18).bytes(v!);
+    }
+    for (const v of message.tokenPublicKeys) {
+      writer.uint32(26).bytes(v!);
+    }
+    for (const v of message.tokenTransactionHashes) {
+      writer.uint32(34).bytes(v!);
+    }
+    if (message.limit !== 0) {
+      writer.uint32(40).int64(message.limit);
+    }
+    if (message.offset !== 0) {
+      writer.uint32(48).int64(message.offset);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): QueryTokenTransactionsRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseQueryTokenTransactionsRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.leafIds.push(reader.string());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.ownerPublicKeys.push(reader.bytes());
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.tokenPublicKeys.push(reader.bytes());
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.tokenTransactionHashes.push(reader.bytes());
+          continue;
+        }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.limit = longToNumber(reader.int64());
+          continue;
+        }
+        case 6: {
+          if (tag !== 48) {
+            break;
+          }
+
+          message.offset = longToNumber(reader.int64());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): QueryTokenTransactionsRequest {
+    return {
+      leafIds: globalThis.Array.isArray(object?.leafIds) ? object.leafIds.map((e: any) => globalThis.String(e)) : [],
+      ownerPublicKeys: globalThis.Array.isArray(object?.ownerPublicKeys)
+        ? object.ownerPublicKeys.map((e: any) => bytesFromBase64(e))
+        : [],
+      tokenPublicKeys: globalThis.Array.isArray(object?.tokenPublicKeys)
+        ? object.tokenPublicKeys.map((e: any) => bytesFromBase64(e))
+        : [],
+      tokenTransactionHashes: globalThis.Array.isArray(object?.tokenTransactionHashes)
+        ? object.tokenTransactionHashes.map((e: any) => bytesFromBase64(e))
+        : [],
+      limit: isSet(object.limit) ? globalThis.Number(object.limit) : 0,
+      offset: isSet(object.offset) ? globalThis.Number(object.offset) : 0,
+    };
+  },
+
+  toJSON(message: QueryTokenTransactionsRequest): unknown {
+    const obj: any = {};
+    if (message.leafIds?.length) {
+      obj.leafIds = message.leafIds;
+    }
+    if (message.ownerPublicKeys?.length) {
+      obj.ownerPublicKeys = message.ownerPublicKeys.map((e) => base64FromBytes(e));
+    }
+    if (message.tokenPublicKeys?.length) {
+      obj.tokenPublicKeys = message.tokenPublicKeys.map((e) => base64FromBytes(e));
+    }
+    if (message.tokenTransactionHashes?.length) {
+      obj.tokenTransactionHashes = message.tokenTransactionHashes.map((e) => base64FromBytes(e));
+    }
+    if (message.limit !== 0) {
+      obj.limit = Math.round(message.limit);
+    }
+    if (message.offset !== 0) {
+      obj.offset = Math.round(message.offset);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<QueryTokenTransactionsRequest>): QueryTokenTransactionsRequest {
+    return QueryTokenTransactionsRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<QueryTokenTransactionsRequest>): QueryTokenTransactionsRequest {
+    const message = createBaseQueryTokenTransactionsRequest();
+    message.leafIds = object.leafIds?.map((e) => e) || [];
+    message.ownerPublicKeys = object.ownerPublicKeys?.map((e) => e) || [];
+    message.tokenPublicKeys = object.tokenPublicKeys?.map((e) => e) || [];
+    message.tokenTransactionHashes = object.tokenTransactionHashes?.map((e) => e) || [];
+    message.limit = object.limit ?? 0;
+    message.offset = object.offset ?? 0;
+    return message;
+  },
+};
+
+function createBaseQueryTokenTransactionsResponse(): QueryTokenTransactionsResponse {
+  return { tokenTransactionsWithStatus: [], offset: 0 };
+}
+
+export const QueryTokenTransactionsResponse: MessageFns<QueryTokenTransactionsResponse> = {
+  encode(message: QueryTokenTransactionsResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.tokenTransactionsWithStatus) {
+      TokenTransactionWithStatus.encode(v!, writer.uint32(10).fork()).join();
+    }
+    if (message.offset !== 0) {
+      writer.uint32(16).int64(message.offset);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): QueryTokenTransactionsResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseQueryTokenTransactionsResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.tokenTransactionsWithStatus.push(TokenTransactionWithStatus.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.offset = longToNumber(reader.int64());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): QueryTokenTransactionsResponse {
+    return {
+      tokenTransactionsWithStatus: globalThis.Array.isArray(object?.tokenTransactionsWithStatus)
+        ? object.tokenTransactionsWithStatus.map((e: any) => TokenTransactionWithStatus.fromJSON(e))
+        : [],
+      offset: isSet(object.offset) ? globalThis.Number(object.offset) : 0,
+    };
+  },
+
+  toJSON(message: QueryTokenTransactionsResponse): unknown {
+    const obj: any = {};
+    if (message.tokenTransactionsWithStatus?.length) {
+      obj.tokenTransactionsWithStatus = message.tokenTransactionsWithStatus.map((e) =>
+        TokenTransactionWithStatus.toJSON(e)
+      );
+    }
+    if (message.offset !== 0) {
+      obj.offset = Math.round(message.offset);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<QueryTokenTransactionsResponse>): QueryTokenTransactionsResponse {
+    return QueryTokenTransactionsResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<QueryTokenTransactionsResponse>): QueryTokenTransactionsResponse {
+    const message = createBaseQueryTokenTransactionsResponse();
+    message.tokenTransactionsWithStatus =
+      object.tokenTransactionsWithStatus?.map((e) => TokenTransactionWithStatus.fromPartial(e)) || [];
+    message.offset = object.offset ?? 0;
     return message;
   },
 };
@@ -4179,22 +5030,22 @@ export const LeafWithPreviousTransactionData: MessageFns<LeafWithPreviousTransac
   },
 };
 
-function createBaseGetOwnedTokenLeavesResponse(): GetOwnedTokenLeavesResponse {
+function createBaseQueryTokenOutputsResponse(): QueryTokenOutputsResponse {
   return { leavesWithPreviousTransactionData: [] };
 }
 
-export const GetOwnedTokenLeavesResponse: MessageFns<GetOwnedTokenLeavesResponse> = {
-  encode(message: GetOwnedTokenLeavesResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+export const QueryTokenOutputsResponse: MessageFns<QueryTokenOutputsResponse> = {
+  encode(message: QueryTokenOutputsResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     for (const v of message.leavesWithPreviousTransactionData) {
       LeafWithPreviousTransactionData.encode(v!, writer.uint32(10).fork()).join();
     }
     return writer;
   },
 
-  decode(input: BinaryReader | Uint8Array, length?: number): GetOwnedTokenLeavesResponse {
+  decode(input: BinaryReader | Uint8Array, length?: number): QueryTokenOutputsResponse {
     const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseGetOwnedTokenLeavesResponse();
+    const message = createBaseQueryTokenOutputsResponse();
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
@@ -4217,7 +5068,7 @@ export const GetOwnedTokenLeavesResponse: MessageFns<GetOwnedTokenLeavesResponse
     return message;
   },
 
-  fromJSON(object: any): GetOwnedTokenLeavesResponse {
+  fromJSON(object: any): QueryTokenOutputsResponse {
     return {
       leavesWithPreviousTransactionData: globalThis.Array.isArray(object?.leavesWithPreviousTransactionData)
         ? object.leavesWithPreviousTransactionData.map((e: any) => LeafWithPreviousTransactionData.fromJSON(e))
@@ -4225,7 +5076,7 @@ export const GetOwnedTokenLeavesResponse: MessageFns<GetOwnedTokenLeavesResponse
     };
   },
 
-  toJSON(message: GetOwnedTokenLeavesResponse): unknown {
+  toJSON(message: QueryTokenOutputsResponse): unknown {
     const obj: any = {};
     if (message.leavesWithPreviousTransactionData?.length) {
       obj.leavesWithPreviousTransactionData = message.leavesWithPreviousTransactionData.map((e) =>
@@ -4235,13 +5086,96 @@ export const GetOwnedTokenLeavesResponse: MessageFns<GetOwnedTokenLeavesResponse
     return obj;
   },
 
-  create(base?: DeepPartial<GetOwnedTokenLeavesResponse>): GetOwnedTokenLeavesResponse {
-    return GetOwnedTokenLeavesResponse.fromPartial(base ?? {});
+  create(base?: DeepPartial<QueryTokenOutputsResponse>): QueryTokenOutputsResponse {
+    return QueryTokenOutputsResponse.fromPartial(base ?? {});
   },
-  fromPartial(object: DeepPartial<GetOwnedTokenLeavesResponse>): GetOwnedTokenLeavesResponse {
-    const message = createBaseGetOwnedTokenLeavesResponse();
+  fromPartial(object: DeepPartial<QueryTokenOutputsResponse>): QueryTokenOutputsResponse {
+    const message = createBaseQueryTokenOutputsResponse();
     message.leavesWithPreviousTransactionData =
       object.leavesWithPreviousTransactionData?.map((e) => LeafWithPreviousTransactionData.fromPartial(e)) || [];
+    return message;
+  },
+};
+
+function createBaseCancelSignedTokenTransactionRequest(): CancelSignedTokenTransactionRequest {
+  return { finalTokenTransaction: undefined, senderIdentityPublicKey: new Uint8Array(0) };
+}
+
+export const CancelSignedTokenTransactionRequest: MessageFns<CancelSignedTokenTransactionRequest> = {
+  encode(message: CancelSignedTokenTransactionRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.finalTokenTransaction !== undefined) {
+      TokenTransaction.encode(message.finalTokenTransaction, writer.uint32(10).fork()).join();
+    }
+    if (message.senderIdentityPublicKey.length !== 0) {
+      writer.uint32(18).bytes(message.senderIdentityPublicKey);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): CancelSignedTokenTransactionRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseCancelSignedTokenTransactionRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.finalTokenTransaction = TokenTransaction.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.senderIdentityPublicKey = reader.bytes();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): CancelSignedTokenTransactionRequest {
+    return {
+      finalTokenTransaction: isSet(object.finalTokenTransaction)
+        ? TokenTransaction.fromJSON(object.finalTokenTransaction)
+        : undefined,
+      senderIdentityPublicKey: isSet(object.senderIdentityPublicKey)
+        ? bytesFromBase64(object.senderIdentityPublicKey)
+        : new Uint8Array(0),
+    };
+  },
+
+  toJSON(message: CancelSignedTokenTransactionRequest): unknown {
+    const obj: any = {};
+    if (message.finalTokenTransaction !== undefined) {
+      obj.finalTokenTransaction = TokenTransaction.toJSON(message.finalTokenTransaction);
+    }
+    if (message.senderIdentityPublicKey.length !== 0) {
+      obj.senderIdentityPublicKey = base64FromBytes(message.senderIdentityPublicKey);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<CancelSignedTokenTransactionRequest>): CancelSignedTokenTransactionRequest {
+    return CancelSignedTokenTransactionRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<CancelSignedTokenTransactionRequest>): CancelSignedTokenTransactionRequest {
+    const message = createBaseCancelSignedTokenTransactionRequest();
+    message.finalTokenTransaction =
+      (object.finalTokenTransaction !== undefined && object.finalTokenTransaction !== null)
+        ? TokenTransaction.fromPartial(object.finalTokenTransaction)
+        : undefined;
+    message.senderIdentityPublicKey = object.senderIdentityPublicKey ?? new Uint8Array(0);
     return message;
   },
 };
@@ -4713,6 +5647,66 @@ export const SecretShare: MessageFns<SecretShare> = {
   },
 };
 
+function createBaseSecretProof(): SecretProof {
+  return { proofs: [] };
+}
+
+export const SecretProof: MessageFns<SecretProof> = {
+  encode(message: SecretProof, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.proofs) {
+      writer.uint32(10).bytes(v!);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): SecretProof {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseSecretProof();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.proofs.push(reader.bytes());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): SecretProof {
+    return {
+      proofs: globalThis.Array.isArray(object?.proofs) ? object.proofs.map((e: any) => bytesFromBase64(e)) : [],
+    };
+  },
+
+  toJSON(message: SecretProof): unknown {
+    const obj: any = {};
+    if (message.proofs?.length) {
+      obj.proofs = message.proofs.map((e) => base64FromBytes(e));
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<SecretProof>): SecretProof {
+    return SecretProof.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<SecretProof>): SecretProof {
+    const message = createBaseSecretProof();
+    message.proofs = object.proofs?.map((e) => e) || [];
+    return message;
+  },
+};
+
 function createBaseLeafRefundTxSigningJob(): LeafRefundTxSigningJob {
   return { leafId: "", refundTxSigningJob: undefined };
 }
@@ -4895,6 +5889,7 @@ function createBaseStartSendTransferRequest(): StartSendTransferRequest {
     leavesToSend: [],
     receiverIdentityPublicKey: new Uint8Array(0),
     expiryTime: undefined,
+    keyTweakProofs: {},
   };
 }
 
@@ -4915,6 +5910,9 @@ export const StartSendTransferRequest: MessageFns<StartSendTransferRequest> = {
     if (message.expiryTime !== undefined) {
       Timestamp.encode(toTimestamp(message.expiryTime), writer.uint32(42).fork()).join();
     }
+    Object.entries(message.keyTweakProofs).forEach(([key, value]) => {
+      StartSendTransferRequest_KeyTweakProofsEntry.encode({ key: key as any, value }, writer.uint32(50).fork()).join();
+    });
     return writer;
   },
 
@@ -4965,6 +5963,17 @@ export const StartSendTransferRequest: MessageFns<StartSendTransferRequest> = {
           message.expiryTime = fromTimestamp(Timestamp.decode(reader, reader.uint32()));
           continue;
         }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          const entry6 = StartSendTransferRequest_KeyTweakProofsEntry.decode(reader, reader.uint32());
+          if (entry6.value !== undefined) {
+            message.keyTweakProofs[entry6.key] = entry6.value;
+          }
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -4987,6 +5996,12 @@ export const StartSendTransferRequest: MessageFns<StartSendTransferRequest> = {
         ? bytesFromBase64(object.receiverIdentityPublicKey)
         : new Uint8Array(0),
       expiryTime: isSet(object.expiryTime) ? fromJsonTimestamp(object.expiryTime) : undefined,
+      keyTweakProofs: isObject(object.keyTweakProofs)
+        ? Object.entries(object.keyTweakProofs).reduce<{ [key: string]: SecretProof }>((acc, [key, value]) => {
+          acc[key] = SecretProof.fromJSON(value);
+          return acc;
+        }, {})
+        : {},
     };
   },
 
@@ -5007,6 +6022,15 @@ export const StartSendTransferRequest: MessageFns<StartSendTransferRequest> = {
     if (message.expiryTime !== undefined) {
       obj.expiryTime = message.expiryTime.toISOString();
     }
+    if (message.keyTweakProofs) {
+      const entries = Object.entries(message.keyTweakProofs);
+      if (entries.length > 0) {
+        obj.keyTweakProofs = {};
+        entries.forEach(([k, v]) => {
+          obj.keyTweakProofs[k] = SecretProof.toJSON(v);
+        });
+      }
+    }
     return obj;
   },
 
@@ -5020,6 +6044,100 @@ export const StartSendTransferRequest: MessageFns<StartSendTransferRequest> = {
     message.leavesToSend = object.leavesToSend?.map((e) => LeafRefundTxSigningJob.fromPartial(e)) || [];
     message.receiverIdentityPublicKey = object.receiverIdentityPublicKey ?? new Uint8Array(0);
     message.expiryTime = object.expiryTime ?? undefined;
+    message.keyTweakProofs = Object.entries(object.keyTweakProofs ?? {}).reduce<{ [key: string]: SecretProof }>(
+      (acc, [key, value]) => {
+        if (value !== undefined) {
+          acc[key] = SecretProof.fromPartial(value);
+        }
+        return acc;
+      },
+      {},
+    );
+    return message;
+  },
+};
+
+function createBaseStartSendTransferRequest_KeyTweakProofsEntry(): StartSendTransferRequest_KeyTweakProofsEntry {
+  return { key: "", value: undefined };
+}
+
+export const StartSendTransferRequest_KeyTweakProofsEntry: MessageFns<StartSendTransferRequest_KeyTweakProofsEntry> = {
+  encode(
+    message: StartSendTransferRequest_KeyTweakProofsEntry,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
+    if (message.key !== "") {
+      writer.uint32(10).string(message.key);
+    }
+    if (message.value !== undefined) {
+      SecretProof.encode(message.value, writer.uint32(18).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): StartSendTransferRequest_KeyTweakProofsEntry {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseStartSendTransferRequest_KeyTweakProofsEntry();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.key = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.value = SecretProof.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): StartSendTransferRequest_KeyTweakProofsEntry {
+    return {
+      key: isSet(object.key) ? globalThis.String(object.key) : "",
+      value: isSet(object.value) ? SecretProof.fromJSON(object.value) : undefined,
+    };
+  },
+
+  toJSON(message: StartSendTransferRequest_KeyTweakProofsEntry): unknown {
+    const obj: any = {};
+    if (message.key !== "") {
+      obj.key = message.key;
+    }
+    if (message.value !== undefined) {
+      obj.value = SecretProof.toJSON(message.value);
+    }
+    return obj;
+  },
+
+  create(
+    base?: DeepPartial<StartSendTransferRequest_KeyTweakProofsEntry>,
+  ): StartSendTransferRequest_KeyTweakProofsEntry {
+    return StartSendTransferRequest_KeyTweakProofsEntry.fromPartial(base ?? {});
+  },
+  fromPartial(
+    object: DeepPartial<StartSendTransferRequest_KeyTweakProofsEntry>,
+  ): StartSendTransferRequest_KeyTweakProofsEntry {
+    const message = createBaseStartSendTransferRequest_KeyTweakProofsEntry();
+    message.key = object.key ?? "";
+    message.value = (object.value !== undefined && object.value !== null)
+      ? SecretProof.fromPartial(object.value)
+      : undefined;
     return message;
   },
 };
@@ -5456,6 +6574,9 @@ function createBaseTransfer(): Transfer {
     totalValue: 0,
     expiryTime: undefined,
     leaves: [],
+    createdTime: undefined,
+    updatedTime: undefined,
+    type: 0,
   };
 }
 
@@ -5481,6 +6602,15 @@ export const Transfer: MessageFns<Transfer> = {
     }
     for (const v of message.leaves) {
       TransferLeaf.encode(v!, writer.uint32(58).fork()).join();
+    }
+    if (message.createdTime !== undefined) {
+      Timestamp.encode(toTimestamp(message.createdTime), writer.uint32(66).fork()).join();
+    }
+    if (message.updatedTime !== undefined) {
+      Timestamp.encode(toTimestamp(message.updatedTime), writer.uint32(74).fork()).join();
+    }
+    if (message.type !== 0) {
+      writer.uint32(80).int32(message.type);
     }
     return writer;
   },
@@ -5548,6 +6678,30 @@ export const Transfer: MessageFns<Transfer> = {
           message.leaves.push(TransferLeaf.decode(reader, reader.uint32()));
           continue;
         }
+        case 8: {
+          if (tag !== 66) {
+            break;
+          }
+
+          message.createdTime = fromTimestamp(Timestamp.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 9: {
+          if (tag !== 74) {
+            break;
+          }
+
+          message.updatedTime = fromTimestamp(Timestamp.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 10: {
+          if (tag !== 80) {
+            break;
+          }
+
+          message.type = reader.int32() as any;
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -5570,6 +6724,9 @@ export const Transfer: MessageFns<Transfer> = {
       totalValue: isSet(object.totalValue) ? globalThis.Number(object.totalValue) : 0,
       expiryTime: isSet(object.expiryTime) ? fromJsonTimestamp(object.expiryTime) : undefined,
       leaves: globalThis.Array.isArray(object?.leaves) ? object.leaves.map((e: any) => TransferLeaf.fromJSON(e)) : [],
+      createdTime: isSet(object.createdTime) ? fromJsonTimestamp(object.createdTime) : undefined,
+      updatedTime: isSet(object.updatedTime) ? fromJsonTimestamp(object.updatedTime) : undefined,
+      type: isSet(object.type) ? transferTypeFromJSON(object.type) : 0,
     };
   },
 
@@ -5596,6 +6753,15 @@ export const Transfer: MessageFns<Transfer> = {
     if (message.leaves?.length) {
       obj.leaves = message.leaves.map((e) => TransferLeaf.toJSON(e));
     }
+    if (message.createdTime !== undefined) {
+      obj.createdTime = message.createdTime.toISOString();
+    }
+    if (message.updatedTime !== undefined) {
+      obj.updatedTime = message.updatedTime.toISOString();
+    }
+    if (message.type !== 0) {
+      obj.type = transferTypeToJSON(message.type);
+    }
     return obj;
   },
 
@@ -5611,6 +6777,9 @@ export const Transfer: MessageFns<Transfer> = {
     message.totalValue = object.totalValue ?? 0;
     message.expiryTime = object.expiryTime ?? undefined;
     message.leaves = object.leaves?.map((e) => TransferLeaf.fromPartial(e)) || [];
+    message.createdTime = object.createdTime ?? undefined;
+    message.updatedTime = object.updatedTime ?? undefined;
+    message.type = object.type ?? 0;
     return message;
   },
 };
@@ -5791,7 +6960,7 @@ export const CompleteSendTransferResponse: MessageFns<CompleteSendTransferRespon
 };
 
 function createBaseQueryPendingTransfersRequest(): QueryPendingTransfersRequest {
-  return { participant: undefined, transferIds: [] };
+  return { participant: undefined, transferIds: [], limit: 0, offset: 0 };
 }
 
 export const QueryPendingTransfersRequest: MessageFns<QueryPendingTransfersRequest> = {
@@ -5806,6 +6975,12 @@ export const QueryPendingTransfersRequest: MessageFns<QueryPendingTransfersReque
     }
     for (const v of message.transferIds) {
       writer.uint32(26).string(v!);
+    }
+    if (message.limit !== 0) {
+      writer.uint32(320).int64(message.limit);
+    }
+    if (message.offset !== 0) {
+      writer.uint32(400).int64(message.offset);
     }
     return writer;
   },
@@ -5841,6 +7016,22 @@ export const QueryPendingTransfersRequest: MessageFns<QueryPendingTransfersReque
           message.transferIds.push(reader.string());
           continue;
         }
+        case 40: {
+          if (tag !== 320) {
+            break;
+          }
+
+          message.limit = longToNumber(reader.int64());
+          continue;
+        }
+        case 50: {
+          if (tag !== 400) {
+            break;
+          }
+
+          message.offset = longToNumber(reader.int64());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -5863,6 +7054,8 @@ export const QueryPendingTransfersRequest: MessageFns<QueryPendingTransfersReque
       transferIds: globalThis.Array.isArray(object?.transferIds)
         ? object.transferIds.map((e: any) => globalThis.String(e))
         : [],
+      limit: isSet(object.limit) ? globalThis.Number(object.limit) : 0,
+      offset: isSet(object.offset) ? globalThis.Number(object.offset) : 0,
     };
   },
 
@@ -5875,6 +7068,12 @@ export const QueryPendingTransfersRequest: MessageFns<QueryPendingTransfersReque
     }
     if (message.transferIds?.length) {
       obj.transferIds = message.transferIds;
+    }
+    if (message.limit !== 0) {
+      obj.limit = Math.round(message.limit);
+    }
+    if (message.offset !== 0) {
+      obj.offset = Math.round(message.offset);
     }
     return obj;
   },
@@ -5911,18 +7110,23 @@ export const QueryPendingTransfersRequest: MessageFns<QueryPendingTransfersReque
       }
     }
     message.transferIds = object.transferIds?.map((e) => e) || [];
+    message.limit = object.limit ?? 0;
+    message.offset = object.offset ?? 0;
     return message;
   },
 };
 
 function createBaseQueryPendingTransfersResponse(): QueryPendingTransfersResponse {
-  return { transfers: [] };
+  return { transfers: [], offset: 0 };
 }
 
 export const QueryPendingTransfersResponse: MessageFns<QueryPendingTransfersResponse> = {
   encode(message: QueryPendingTransfersResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     for (const v of message.transfers) {
       Transfer.encode(v!, writer.uint32(10).fork()).join();
+    }
+    if (message.offset !== 0) {
+      writer.uint32(16).int64(message.offset);
     }
     return writer;
   },
@@ -5942,6 +7146,14 @@ export const QueryPendingTransfersResponse: MessageFns<QueryPendingTransfersResp
           message.transfers.push(Transfer.decode(reader, reader.uint32()));
           continue;
         }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.offset = longToNumber(reader.int64());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -5956,6 +7168,7 @@ export const QueryPendingTransfersResponse: MessageFns<QueryPendingTransfersResp
       transfers: globalThis.Array.isArray(object?.transfers)
         ? object.transfers.map((e: any) => Transfer.fromJSON(e))
         : [],
+      offset: isSet(object.offset) ? globalThis.Number(object.offset) : 0,
     };
   },
 
@@ -5963,6 +7176,9 @@ export const QueryPendingTransfersResponse: MessageFns<QueryPendingTransfersResp
     const obj: any = {};
     if (message.transfers?.length) {
       obj.transfers = message.transfers.map((e) => Transfer.toJSON(e));
+    }
+    if (message.offset !== 0) {
+      obj.offset = Math.round(message.offset);
     }
     return obj;
   },
@@ -5973,6 +7189,7 @@ export const QueryPendingTransfersResponse: MessageFns<QueryPendingTransfersResp
   fromPartial(object: DeepPartial<QueryPendingTransfersResponse>): QueryPendingTransfersResponse {
     const message = createBaseQueryPendingTransfersResponse();
     message.transfers = object.transfers?.map((e) => Transfer.fromPartial(e)) || [];
+    message.offset = object.offset ?? 0;
     return message;
   },
 };
@@ -6266,7 +7483,7 @@ export const ClaimTransferTweakKeysRequest: MessageFns<ClaimTransferTweakKeysReq
 };
 
 function createBaseClaimTransferSignRefundsRequest(): ClaimTransferSignRefundsRequest {
-  return { transferId: "", ownerIdentityPublicKey: new Uint8Array(0), signingJobs: [] };
+  return { transferId: "", ownerIdentityPublicKey: new Uint8Array(0), signingJobs: [], keyTweakProofs: {} };
 }
 
 export const ClaimTransferSignRefundsRequest: MessageFns<ClaimTransferSignRefundsRequest> = {
@@ -6280,6 +7497,10 @@ export const ClaimTransferSignRefundsRequest: MessageFns<ClaimTransferSignRefund
     for (const v of message.signingJobs) {
       LeafRefundTxSigningJob.encode(v!, writer.uint32(26).fork()).join();
     }
+    Object.entries(message.keyTweakProofs).forEach(([key, value]) => {
+      ClaimTransferSignRefundsRequest_KeyTweakProofsEntry.encode({ key: key as any, value }, writer.uint32(34).fork())
+        .join();
+    });
     return writer;
   },
 
@@ -6314,6 +7535,17 @@ export const ClaimTransferSignRefundsRequest: MessageFns<ClaimTransferSignRefund
           message.signingJobs.push(LeafRefundTxSigningJob.decode(reader, reader.uint32()));
           continue;
         }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          const entry4 = ClaimTransferSignRefundsRequest_KeyTweakProofsEntry.decode(reader, reader.uint32());
+          if (entry4.value !== undefined) {
+            message.keyTweakProofs[entry4.key] = entry4.value;
+          }
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -6332,6 +7564,12 @@ export const ClaimTransferSignRefundsRequest: MessageFns<ClaimTransferSignRefund
       signingJobs: globalThis.Array.isArray(object?.signingJobs)
         ? object.signingJobs.map((e: any) => LeafRefundTxSigningJob.fromJSON(e))
         : [],
+      keyTweakProofs: isObject(object.keyTweakProofs)
+        ? Object.entries(object.keyTweakProofs).reduce<{ [key: string]: SecretProof }>((acc, [key, value]) => {
+          acc[key] = SecretProof.fromJSON(value);
+          return acc;
+        }, {})
+        : {},
     };
   },
 
@@ -6346,6 +7584,15 @@ export const ClaimTransferSignRefundsRequest: MessageFns<ClaimTransferSignRefund
     if (message.signingJobs?.length) {
       obj.signingJobs = message.signingJobs.map((e) => LeafRefundTxSigningJob.toJSON(e));
     }
+    if (message.keyTweakProofs) {
+      const entries = Object.entries(message.keyTweakProofs);
+      if (entries.length > 0) {
+        obj.keyTweakProofs = {};
+        entries.forEach(([k, v]) => {
+          obj.keyTweakProofs[k] = SecretProof.toJSON(v);
+        });
+      }
+    }
     return obj;
   },
 
@@ -6357,6 +7604,102 @@ export const ClaimTransferSignRefundsRequest: MessageFns<ClaimTransferSignRefund
     message.transferId = object.transferId ?? "";
     message.ownerIdentityPublicKey = object.ownerIdentityPublicKey ?? new Uint8Array(0);
     message.signingJobs = object.signingJobs?.map((e) => LeafRefundTxSigningJob.fromPartial(e)) || [];
+    message.keyTweakProofs = Object.entries(object.keyTweakProofs ?? {}).reduce<{ [key: string]: SecretProof }>(
+      (acc, [key, value]) => {
+        if (value !== undefined) {
+          acc[key] = SecretProof.fromPartial(value);
+        }
+        return acc;
+      },
+      {},
+    );
+    return message;
+  },
+};
+
+function createBaseClaimTransferSignRefundsRequest_KeyTweakProofsEntry(): ClaimTransferSignRefundsRequest_KeyTweakProofsEntry {
+  return { key: "", value: undefined };
+}
+
+export const ClaimTransferSignRefundsRequest_KeyTweakProofsEntry: MessageFns<
+  ClaimTransferSignRefundsRequest_KeyTweakProofsEntry
+> = {
+  encode(
+    message: ClaimTransferSignRefundsRequest_KeyTweakProofsEntry,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
+    if (message.key !== "") {
+      writer.uint32(10).string(message.key);
+    }
+    if (message.value !== undefined) {
+      SecretProof.encode(message.value, writer.uint32(18).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ClaimTransferSignRefundsRequest_KeyTweakProofsEntry {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseClaimTransferSignRefundsRequest_KeyTweakProofsEntry();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.key = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.value = SecretProof.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ClaimTransferSignRefundsRequest_KeyTweakProofsEntry {
+    return {
+      key: isSet(object.key) ? globalThis.String(object.key) : "",
+      value: isSet(object.value) ? SecretProof.fromJSON(object.value) : undefined,
+    };
+  },
+
+  toJSON(message: ClaimTransferSignRefundsRequest_KeyTweakProofsEntry): unknown {
+    const obj: any = {};
+    if (message.key !== "") {
+      obj.key = message.key;
+    }
+    if (message.value !== undefined) {
+      obj.value = SecretProof.toJSON(message.value);
+    }
+    return obj;
+  },
+
+  create(
+    base?: DeepPartial<ClaimTransferSignRefundsRequest_KeyTweakProofsEntry>,
+  ): ClaimTransferSignRefundsRequest_KeyTweakProofsEntry {
+    return ClaimTransferSignRefundsRequest_KeyTweakProofsEntry.fromPartial(base ?? {});
+  },
+  fromPartial(
+    object: DeepPartial<ClaimTransferSignRefundsRequest_KeyTweakProofsEntry>,
+  ): ClaimTransferSignRefundsRequest_KeyTweakProofsEntry {
+    const message = createBaseClaimTransferSignRefundsRequest_KeyTweakProofsEntry();
+    message.key = object.key ?? "";
+    message.value = (object.value !== undefined && object.value !== null)
+      ? SecretProof.fromPartial(object.value)
+      : undefined;
     return message;
   },
 };
@@ -7238,6 +8581,7 @@ function createBaseUserSignedRefund(): UserSignedRefund {
     userSignature: new Uint8Array(0),
     signingCommitments: undefined,
     userSignatureCommitment: undefined,
+    network: 0,
   };
 }
 
@@ -7257,6 +8601,9 @@ export const UserSignedRefund: MessageFns<UserSignedRefund> = {
     }
     if (message.userSignatureCommitment !== undefined) {
       SigningCommitment.encode(message.userSignatureCommitment, writer.uint32(42).fork()).join();
+    }
+    if (message.network !== 0) {
+      writer.uint32(48).int32(message.network);
     }
     return writer;
   },
@@ -7308,6 +8655,14 @@ export const UserSignedRefund: MessageFns<UserSignedRefund> = {
           message.userSignatureCommitment = SigningCommitment.decode(reader, reader.uint32());
           continue;
         }
+        case 6: {
+          if (tag !== 48) {
+            break;
+          }
+
+          message.network = reader.int32() as any;
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -7328,6 +8683,7 @@ export const UserSignedRefund: MessageFns<UserSignedRefund> = {
       userSignatureCommitment: isSet(object.userSignatureCommitment)
         ? SigningCommitment.fromJSON(object.userSignatureCommitment)
         : undefined,
+      network: isSet(object.network) ? networkFromJSON(object.network) : 0,
     };
   },
 
@@ -7348,6 +8704,9 @@ export const UserSignedRefund: MessageFns<UserSignedRefund> = {
     if (message.userSignatureCommitment !== undefined) {
       obj.userSignatureCommitment = SigningCommitment.toJSON(message.userSignatureCommitment);
     }
+    if (message.network !== 0) {
+      obj.network = networkToJSON(message.network);
+    }
     return obj;
   },
 
@@ -7366,6 +8725,7 @@ export const UserSignedRefund: MessageFns<UserSignedRefund> = {
       (object.userSignatureCommitment !== undefined && object.userSignatureCommitment !== null)
         ? SigningCommitment.fromPartial(object.userSignatureCommitment)
         : undefined;
+    message.network = object.network ?? 0;
     return message;
   },
 };
@@ -8008,12 +9368,12 @@ export const CooperativeExitResponse: MessageFns<CooperativeExitResponse> = {
   },
 };
 
-function createBaseLeafSwapRequest(): LeafSwapRequest {
+function createBaseCounterLeafSwapRequest(): CounterLeafSwapRequest {
   return { transfer: undefined, swapId: "", adaptorPublicKey: new Uint8Array(0) };
 }
 
-export const LeafSwapRequest: MessageFns<LeafSwapRequest> = {
-  encode(message: LeafSwapRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+export const CounterLeafSwapRequest: MessageFns<CounterLeafSwapRequest> = {
+  encode(message: CounterLeafSwapRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.transfer !== undefined) {
       StartSendTransferRequest.encode(message.transfer, writer.uint32(10).fork()).join();
     }
@@ -8026,10 +9386,10 @@ export const LeafSwapRequest: MessageFns<LeafSwapRequest> = {
     return writer;
   },
 
-  decode(input: BinaryReader | Uint8Array, length?: number): LeafSwapRequest {
+  decode(input: BinaryReader | Uint8Array, length?: number): CounterLeafSwapRequest {
     const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseLeafSwapRequest();
+    const message = createBaseCounterLeafSwapRequest();
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
@@ -8066,7 +9426,7 @@ export const LeafSwapRequest: MessageFns<LeafSwapRequest> = {
     return message;
   },
 
-  fromJSON(object: any): LeafSwapRequest {
+  fromJSON(object: any): CounterLeafSwapRequest {
     return {
       transfer: isSet(object.transfer) ? StartSendTransferRequest.fromJSON(object.transfer) : undefined,
       swapId: isSet(object.swapId) ? globalThis.String(object.swapId) : "",
@@ -8074,7 +9434,7 @@ export const LeafSwapRequest: MessageFns<LeafSwapRequest> = {
     };
   },
 
-  toJSON(message: LeafSwapRequest): unknown {
+  toJSON(message: CounterLeafSwapRequest): unknown {
     const obj: any = {};
     if (message.transfer !== undefined) {
       obj.transfer = StartSendTransferRequest.toJSON(message.transfer);
@@ -8088,11 +9448,11 @@ export const LeafSwapRequest: MessageFns<LeafSwapRequest> = {
     return obj;
   },
 
-  create(base?: DeepPartial<LeafSwapRequest>): LeafSwapRequest {
-    return LeafSwapRequest.fromPartial(base ?? {});
+  create(base?: DeepPartial<CounterLeafSwapRequest>): CounterLeafSwapRequest {
+    return CounterLeafSwapRequest.fromPartial(base ?? {});
   },
-  fromPartial(object: DeepPartial<LeafSwapRequest>): LeafSwapRequest {
-    const message = createBaseLeafSwapRequest();
+  fromPartial(object: DeepPartial<CounterLeafSwapRequest>): CounterLeafSwapRequest {
+    const message = createBaseCounterLeafSwapRequest();
     message.transfer = (object.transfer !== undefined && object.transfer !== null)
       ? StartSendTransferRequest.fromPartial(object.transfer)
       : undefined;
@@ -8102,12 +9462,12 @@ export const LeafSwapRequest: MessageFns<LeafSwapRequest> = {
   },
 };
 
-function createBaseLeafSwapResponse(): LeafSwapResponse {
+function createBaseCounterLeafSwapResponse(): CounterLeafSwapResponse {
   return { transfer: undefined, signingResults: [] };
 }
 
-export const LeafSwapResponse: MessageFns<LeafSwapResponse> = {
-  encode(message: LeafSwapResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+export const CounterLeafSwapResponse: MessageFns<CounterLeafSwapResponse> = {
+  encode(message: CounterLeafSwapResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.transfer !== undefined) {
       Transfer.encode(message.transfer, writer.uint32(10).fork()).join();
     }
@@ -8117,10 +9477,10 @@ export const LeafSwapResponse: MessageFns<LeafSwapResponse> = {
     return writer;
   },
 
-  decode(input: BinaryReader | Uint8Array, length?: number): LeafSwapResponse {
+  decode(input: BinaryReader | Uint8Array, length?: number): CounterLeafSwapResponse {
     const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseLeafSwapResponse();
+    const message = createBaseCounterLeafSwapResponse();
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
@@ -8149,7 +9509,7 @@ export const LeafSwapResponse: MessageFns<LeafSwapResponse> = {
     return message;
   },
 
-  fromJSON(object: any): LeafSwapResponse {
+  fromJSON(object: any): CounterLeafSwapResponse {
     return {
       transfer: isSet(object.transfer) ? Transfer.fromJSON(object.transfer) : undefined,
       signingResults: globalThis.Array.isArray(object?.signingResults)
@@ -8158,7 +9518,7 @@ export const LeafSwapResponse: MessageFns<LeafSwapResponse> = {
     };
   },
 
-  toJSON(message: LeafSwapResponse): unknown {
+  toJSON(message: CounterLeafSwapResponse): unknown {
     const obj: any = {};
     if (message.transfer !== undefined) {
       obj.transfer = Transfer.toJSON(message.transfer);
@@ -8169,11 +9529,11 @@ export const LeafSwapResponse: MessageFns<LeafSwapResponse> = {
     return obj;
   },
 
-  create(base?: DeepPartial<LeafSwapResponse>): LeafSwapResponse {
-    return LeafSwapResponse.fromPartial(base ?? {});
+  create(base?: DeepPartial<CounterLeafSwapResponse>): CounterLeafSwapResponse {
+    return CounterLeafSwapResponse.fromPartial(base ?? {});
   },
-  fromPartial(object: DeepPartial<LeafSwapResponse>): LeafSwapResponse {
-    const message = createBaseLeafSwapResponse();
+  fromPartial(object: DeepPartial<CounterLeafSwapResponse>): CounterLeafSwapResponse {
+    const message = createBaseCounterLeafSwapResponse();
     message.transfer = (object.transfer !== undefined && object.transfer !== null)
       ? Transfer.fromPartial(object.transfer)
       : undefined;
@@ -10980,6 +12340,304 @@ export const QueryUnusedDepositAddressesResponse: MessageFns<QueryUnusedDepositA
   },
 };
 
+function createBaseQueryBalanceRequest(): QueryBalanceRequest {
+  return { identityPublicKey: new Uint8Array(0) };
+}
+
+export const QueryBalanceRequest: MessageFns<QueryBalanceRequest> = {
+  encode(message: QueryBalanceRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.identityPublicKey.length !== 0) {
+      writer.uint32(10).bytes(message.identityPublicKey);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): QueryBalanceRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseQueryBalanceRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.identityPublicKey = reader.bytes();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): QueryBalanceRequest {
+    return {
+      identityPublicKey: isSet(object.identityPublicKey)
+        ? bytesFromBase64(object.identityPublicKey)
+        : new Uint8Array(0),
+    };
+  },
+
+  toJSON(message: QueryBalanceRequest): unknown {
+    const obj: any = {};
+    if (message.identityPublicKey.length !== 0) {
+      obj.identityPublicKey = base64FromBytes(message.identityPublicKey);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<QueryBalanceRequest>): QueryBalanceRequest {
+    return QueryBalanceRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<QueryBalanceRequest>): QueryBalanceRequest {
+    const message = createBaseQueryBalanceRequest();
+    message.identityPublicKey = object.identityPublicKey ?? new Uint8Array(0);
+    return message;
+  },
+};
+
+function createBaseQueryBalanceResponse(): QueryBalanceResponse {
+  return { balance: 0, nodeBalances: {} };
+}
+
+export const QueryBalanceResponse: MessageFns<QueryBalanceResponse> = {
+  encode(message: QueryBalanceResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.balance !== 0) {
+      writer.uint32(8).uint64(message.balance);
+    }
+    Object.entries(message.nodeBalances).forEach(([key, value]) => {
+      QueryBalanceResponse_NodeBalancesEntry.encode({ key: key as any, value }, writer.uint32(18).fork()).join();
+    });
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): QueryBalanceResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseQueryBalanceResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.balance = longToNumber(reader.uint64());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          const entry2 = QueryBalanceResponse_NodeBalancesEntry.decode(reader, reader.uint32());
+          if (entry2.value !== undefined) {
+            message.nodeBalances[entry2.key] = entry2.value;
+          }
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): QueryBalanceResponse {
+    return {
+      balance: isSet(object.balance) ? globalThis.Number(object.balance) : 0,
+      nodeBalances: isObject(object.nodeBalances)
+        ? Object.entries(object.nodeBalances).reduce<{ [key: string]: number }>((acc, [key, value]) => {
+          acc[key] = Number(value);
+          return acc;
+        }, {})
+        : {},
+    };
+  },
+
+  toJSON(message: QueryBalanceResponse): unknown {
+    const obj: any = {};
+    if (message.balance !== 0) {
+      obj.balance = Math.round(message.balance);
+    }
+    if (message.nodeBalances) {
+      const entries = Object.entries(message.nodeBalances);
+      if (entries.length > 0) {
+        obj.nodeBalances = {};
+        entries.forEach(([k, v]) => {
+          obj.nodeBalances[k] = Math.round(v);
+        });
+      }
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<QueryBalanceResponse>): QueryBalanceResponse {
+    return QueryBalanceResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<QueryBalanceResponse>): QueryBalanceResponse {
+    const message = createBaseQueryBalanceResponse();
+    message.balance = object.balance ?? 0;
+    message.nodeBalances = Object.entries(object.nodeBalances ?? {}).reduce<{ [key: string]: number }>(
+      (acc, [key, value]) => {
+        if (value !== undefined) {
+          acc[key] = globalThis.Number(value);
+        }
+        return acc;
+      },
+      {},
+    );
+    return message;
+  },
+};
+
+function createBaseQueryBalanceResponse_NodeBalancesEntry(): QueryBalanceResponse_NodeBalancesEntry {
+  return { key: "", value: 0 };
+}
+
+export const QueryBalanceResponse_NodeBalancesEntry: MessageFns<QueryBalanceResponse_NodeBalancesEntry> = {
+  encode(message: QueryBalanceResponse_NodeBalancesEntry, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.key !== "") {
+      writer.uint32(10).string(message.key);
+    }
+    if (message.value !== 0) {
+      writer.uint32(16).uint64(message.value);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): QueryBalanceResponse_NodeBalancesEntry {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseQueryBalanceResponse_NodeBalancesEntry();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.key = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.value = longToNumber(reader.uint64());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): QueryBalanceResponse_NodeBalancesEntry {
+    return {
+      key: isSet(object.key) ? globalThis.String(object.key) : "",
+      value: isSet(object.value) ? globalThis.Number(object.value) : 0,
+    };
+  },
+
+  toJSON(message: QueryBalanceResponse_NodeBalancesEntry): unknown {
+    const obj: any = {};
+    if (message.key !== "") {
+      obj.key = message.key;
+    }
+    if (message.value !== 0) {
+      obj.value = Math.round(message.value);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<QueryBalanceResponse_NodeBalancesEntry>): QueryBalanceResponse_NodeBalancesEntry {
+    return QueryBalanceResponse_NodeBalancesEntry.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<QueryBalanceResponse_NodeBalancesEntry>): QueryBalanceResponse_NodeBalancesEntry {
+    const message = createBaseQueryBalanceResponse_NodeBalancesEntry();
+    message.key = object.key ?? "";
+    message.value = object.value ?? 0;
+    return message;
+  },
+};
+
+function createBaseSparkAddress(): SparkAddress {
+  return { identityPublicKey: new Uint8Array(0) };
+}
+
+export const SparkAddress: MessageFns<SparkAddress> = {
+  encode(message: SparkAddress, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.identityPublicKey.length !== 0) {
+      writer.uint32(10).bytes(message.identityPublicKey);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): SparkAddress {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseSparkAddress();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.identityPublicKey = reader.bytes();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): SparkAddress {
+    return {
+      identityPublicKey: isSet(object.identityPublicKey)
+        ? bytesFromBase64(object.identityPublicKey)
+        : new Uint8Array(0),
+    };
+  },
+
+  toJSON(message: SparkAddress): unknown {
+    const obj: any = {};
+    if (message.identityPublicKey.length !== 0) {
+      obj.identityPublicKey = base64FromBytes(message.identityPublicKey);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<SparkAddress>): SparkAddress {
+    return SparkAddress.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<SparkAddress>): SparkAddress {
+    const message = createBaseSparkAddress();
+    message.identityPublicKey = object.identityPublicKey ?? new Uint8Array(0);
+    return message;
+  },
+};
+
 export type SparkServiceDefinition = typeof SparkServiceDefinition;
 export const SparkServiceDefinition = {
   name: "SparkService",
@@ -10998,6 +12656,19 @@ export const SparkServiceDefinition = {
       requestType: StartDepositTreeCreationRequest,
       requestStream: false,
       responseType: StartDepositTreeCreationResponse,
+      responseStream: false,
+      options: {},
+    },
+    /**
+     * This is deprecated, please use start_deposit_tree_creation instead.
+     *
+     * @deprecated
+     */
+    start_tree_creation: {
+      name: "start_tree_creation",
+      requestType: StartTreeCreationRequest,
+      requestStream: false,
+      responseType: StartTreeCreationResponse,
       responseStream: false,
       options: {},
     },
@@ -11105,11 +12776,40 @@ export const SparkServiceDefinition = {
       responseStream: false,
       options: {},
     },
+    /**
+     * This is the exact same as start_send_transfer, but expresses to the SO
+     * this transfer is specifically for a leaf swap.
+     */
+    start_leaf_swap: {
+      name: "start_leaf_swap",
+      requestType: StartSendTransferRequest,
+      requestStream: false,
+      responseType: StartSendTransferResponse,
+      responseStream: false,
+      options: {},
+    },
+    /**
+     * This is deprecated, please use counter_leaf_swap instead.
+     *
+     * @deprecated
+     */
     leaf_swap: {
       name: "leaf_swap",
-      requestType: LeafSwapRequest,
+      requestType: CounterLeafSwapRequest,
       requestStream: false,
-      responseType: LeafSwapResponse,
+      responseType: CounterLeafSwapResponse,
+      responseStream: false,
+      options: {},
+    },
+    /**
+     * This is the exact same as start_leaf_swap, but signs with
+     * an adaptor public key after a counterparty has begun the swap via start_leaf_swap.
+     */
+    counter_leaf_swap: {
+      name: "counter_leaf_swap",
+      requestType: CounterLeafSwapRequest,
+      requestStream: false,
+      responseType: CounterLeafSwapResponse,
       responseStream: false,
       options: {},
     },
@@ -11161,6 +12861,14 @@ export const SparkServiceDefinition = {
       responseStream: false,
       options: {},
     },
+    query_balance: {
+      name: "query_balance",
+      requestType: QueryBalanceRequest,
+      requestStream: false,
+      responseType: QueryBalanceResponse,
+      responseStream: false,
+      options: {},
+    },
     query_user_signed_refunds: {
       name: "query_user_signed_refunds",
       requestType: QueryUserSignedRefundsRequest,
@@ -11202,11 +12910,27 @@ export const SparkServiceDefinition = {
       responseStream: false,
       options: {},
     },
-    get_owned_token_leaves: {
-      name: "get_owned_token_leaves",
-      requestType: GetOwnedTokenLeavesRequest,
+    query_token_outputs: {
+      name: "query_token_outputs",
+      requestType: QueryTokenOutputsRequest,
       requestStream: false,
-      responseType: GetOwnedTokenLeavesResponse,
+      responseType: QueryTokenOutputsResponse,
+      responseStream: false,
+      options: {},
+    },
+    query_token_transactions: {
+      name: "query_token_transactions",
+      requestType: QueryTokenTransactionsRequest,
+      requestStream: false,
+      responseType: QueryTokenTransactionsResponse,
+      responseStream: false,
+      options: {},
+    },
+    cancel_signed_token_transaction: {
+      name: "cancel_signed_token_transaction",
+      requestType: CancelSignedTokenTransactionRequest,
+      requestStream: false,
+      responseType: Empty,
       responseStream: false,
       options: {},
     },
@@ -11246,6 +12970,15 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
     request: StartDepositTreeCreationRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<StartDepositTreeCreationResponse>>;
+  /**
+   * This is deprecated, please use start_deposit_tree_creation instead.
+   *
+   * @deprecated
+   */
+  start_tree_creation(
+    request: StartTreeCreationRequest,
+    context: CallContext & CallContextExt,
+  ): Promise<DeepPartial<StartTreeCreationResponse>>;
   finalize_node_signatures(
     request: FinalizeNodeSignaturesRequest,
     context: CallContext & CallContextExt,
@@ -11298,7 +13031,31 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
     request: ProvidePreimageRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<ProvidePreimageResponse>>;
-  leaf_swap(request: LeafSwapRequest, context: CallContext & CallContextExt): Promise<DeepPartial<LeafSwapResponse>>;
+  /**
+   * This is the exact same as start_send_transfer, but expresses to the SO
+   * this transfer is specifically for a leaf swap.
+   */
+  start_leaf_swap(
+    request: StartSendTransferRequest,
+    context: CallContext & CallContextExt,
+  ): Promise<DeepPartial<StartSendTransferResponse>>;
+  /**
+   * This is deprecated, please use counter_leaf_swap instead.
+   *
+   * @deprecated
+   */
+  leaf_swap(
+    request: CounterLeafSwapRequest,
+    context: CallContext & CallContextExt,
+  ): Promise<DeepPartial<CounterLeafSwapResponse>>;
+  /**
+   * This is the exact same as start_leaf_swap, but signs with
+   * an adaptor public key after a counterparty has begun the swap via start_leaf_swap.
+   */
+  counter_leaf_swap(
+    request: CounterLeafSwapRequest,
+    context: CallContext & CallContextExt,
+  ): Promise<DeepPartial<CounterLeafSwapResponse>>;
   refresh_timelock(
     request: RefreshTimelockRequest,
     context: CallContext & CallContextExt,
@@ -11323,6 +13080,10 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
     request: QueryNodesRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<QueryNodesResponse>>;
+  query_balance(
+    request: QueryBalanceRequest,
+    context: CallContext & CallContextExt,
+  ): Promise<DeepPartial<QueryBalanceResponse>>;
   query_user_signed_refunds(
     request: QueryUserSignedRefundsRequest,
     context: CallContext & CallContextExt,
@@ -11344,10 +13105,18 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
     request: FreezeTokensRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<FreezeTokensResponse>>;
-  get_owned_token_leaves(
-    request: GetOwnedTokenLeavesRequest,
+  query_token_outputs(
+    request: QueryTokenOutputsRequest,
     context: CallContext & CallContextExt,
-  ): Promise<DeepPartial<GetOwnedTokenLeavesResponse>>;
+  ): Promise<DeepPartial<QueryTokenOutputsResponse>>;
+  query_token_transactions(
+    request: QueryTokenTransactionsRequest,
+    context: CallContext & CallContextExt,
+  ): Promise<DeepPartial<QueryTokenTransactionsResponse>>;
+  cancel_signed_token_transaction(
+    request: CancelSignedTokenTransactionRequest,
+    context: CallContext & CallContextExt,
+  ): Promise<DeepPartial<Empty>>;
   return_lightning_payment(
     request: ReturnLightningPaymentRequest,
     context: CallContext & CallContextExt,
@@ -11371,6 +13140,15 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
     request: DeepPartial<StartDepositTreeCreationRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<StartDepositTreeCreationResponse>;
+  /**
+   * This is deprecated, please use start_deposit_tree_creation instead.
+   *
+   * @deprecated
+   */
+  start_tree_creation(
+    request: DeepPartial<StartTreeCreationRequest>,
+    options?: CallOptions & CallOptionsExt,
+  ): Promise<StartTreeCreationResponse>;
   finalize_node_signatures(
     request: DeepPartial<FinalizeNodeSignaturesRequest>,
     options?: CallOptions & CallOptionsExt,
@@ -11423,7 +13201,31 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
     request: DeepPartial<ProvidePreimageRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<ProvidePreimageResponse>;
-  leaf_swap(request: DeepPartial<LeafSwapRequest>, options?: CallOptions & CallOptionsExt): Promise<LeafSwapResponse>;
+  /**
+   * This is the exact same as start_send_transfer, but expresses to the SO
+   * this transfer is specifically for a leaf swap.
+   */
+  start_leaf_swap(
+    request: DeepPartial<StartSendTransferRequest>,
+    options?: CallOptions & CallOptionsExt,
+  ): Promise<StartSendTransferResponse>;
+  /**
+   * This is deprecated, please use counter_leaf_swap instead.
+   *
+   * @deprecated
+   */
+  leaf_swap(
+    request: DeepPartial<CounterLeafSwapRequest>,
+    options?: CallOptions & CallOptionsExt,
+  ): Promise<CounterLeafSwapResponse>;
+  /**
+   * This is the exact same as start_leaf_swap, but signs with
+   * an adaptor public key after a counterparty has begun the swap via start_leaf_swap.
+   */
+  counter_leaf_swap(
+    request: DeepPartial<CounterLeafSwapRequest>,
+    options?: CallOptions & CallOptionsExt,
+  ): Promise<CounterLeafSwapResponse>;
   refresh_timelock(
     request: DeepPartial<RefreshTimelockRequest>,
     options?: CallOptions & CallOptionsExt,
@@ -11448,6 +13250,10 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
     request: DeepPartial<QueryNodesRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<QueryNodesResponse>;
+  query_balance(
+    request: DeepPartial<QueryBalanceRequest>,
+    options?: CallOptions & CallOptionsExt,
+  ): Promise<QueryBalanceResponse>;
   query_user_signed_refunds(
     request: DeepPartial<QueryUserSignedRefundsRequest>,
     options?: CallOptions & CallOptionsExt,
@@ -11469,10 +13275,18 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
     request: DeepPartial<FreezeTokensRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<FreezeTokensResponse>;
-  get_owned_token_leaves(
-    request: DeepPartial<GetOwnedTokenLeavesRequest>,
+  query_token_outputs(
+    request: DeepPartial<QueryTokenOutputsRequest>,
     options?: CallOptions & CallOptionsExt,
-  ): Promise<GetOwnedTokenLeavesResponse>;
+  ): Promise<QueryTokenOutputsResponse>;
+  query_token_transactions(
+    request: DeepPartial<QueryTokenTransactionsRequest>,
+    options?: CallOptions & CallOptionsExt,
+  ): Promise<QueryTokenTransactionsResponse>;
+  cancel_signed_token_transaction(
+    request: DeepPartial<CancelSignedTokenTransactionRequest>,
+    options?: CallOptions & CallOptionsExt,
+  ): Promise<Empty>;
   return_lightning_payment(
     request: DeepPartial<ReturnLightningPaymentRequest>,
     options?: CallOptions & CallOptionsExt,
