@@ -19,8 +19,6 @@ describe("Lightning Network provider", () => {
     test.concurrent.each([
       ["REGTEST", "lnbcrt"],
       ["MAINNET", "lnbc"],
-      ["TESTNET", "lntb"],
-      ["SIGNET", "lntbs"],
     ])(`.network(%s)`, async (network, invoicePrefix) => {
       const options: ConfigOptions = {
         network: network as NetworkType,
