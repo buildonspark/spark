@@ -610,10 +610,10 @@ func (o TokenTransactionHandler) QueryTokenTransactions(ctx context.Context, con
 	}, nil
 }
 
-func (o TokenTransactionHandler) GetOwnedTokenLeaves(
+func (o TokenTransactionHandler) QueryTokenOutputs(
 	ctx context.Context,
-	req *pb.GetOwnedTokenLeavesRequest,
-) (*pb.GetOwnedTokenLeavesResponse, error) {
+	req *pb.QueryTokenOutputsRequest,
+) (*pb.QueryTokenOutputsResponse, error) {
 	leaves, err := ent.GetOwnedLeaves(ctx, req.OwnerPublicKeys, req.TokenPublicKeys)
 	if err != nil {
 		log.Printf("Failed to get owned leaf stats: %v", err)
@@ -638,7 +638,7 @@ func (o TokenTransactionHandler) GetOwnedTokenLeaves(
 		}
 	}
 
-	return &pb.GetOwnedTokenLeavesResponse{
+	return &pb.QueryTokenOutputsResponse{
 		LeavesWithPreviousTransactionData: leavesWithPrevTxData,
 	}, nil
 }

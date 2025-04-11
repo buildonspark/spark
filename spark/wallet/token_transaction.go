@@ -431,13 +431,13 @@ func FreezeTokens(
 	return lastResponse, nil
 }
 
-// GetOwnedTokenLeaves retrieves the leaves for a given set of owner and token public keys.
-func GetOwnedTokenLeaves(
+// QueryTokenOutputs retrieves the token outputs for a given set of owner and token public keys.
+func QueryTokenOutputs(
 	ctx context.Context,
 	config *Config,
 	ownerPublicKeys [][]byte,
 	tokenPublicKeys [][]byte,
-) (*pb.GetOwnedTokenLeavesResponse, error) {
+) (*pb.QueryTokenOutputsResponse, error) {
 	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress(), nil)
 	if err != nil {
 		log.Printf("Error while establishing gRPC connection to coordinator at %s: %v", config.CoodinatorAddress(), err)
@@ -452,14 +452,14 @@ func GetOwnedTokenLeaves(
 	tmpCtx := ContextWithToken(ctx, token)
 	sparkClient := pb.NewSparkServiceClient(sparkConn)
 
-	request := &pb.GetOwnedTokenLeavesRequest{
+	request := &pb.QueryTokenOutputsRequest{
 		OwnerPublicKeys: ownerPublicKeys,
 		TokenPublicKeys: tokenPublicKeys,
 	}
 
-	response, err := sparkClient.GetOwnedTokenLeaves(tmpCtx, request)
+	response, err := sparkClient.QueryTokenOutputs(tmpCtx, request)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get owned token leaves: %v", err)
+		return nil, fmt.Errorf("failed to get token outputs: %v", err)
 	}
 	return response, nil
 }

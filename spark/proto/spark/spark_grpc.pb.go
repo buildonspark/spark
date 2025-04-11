@@ -51,7 +51,7 @@ const (
 	SparkService_SignTokenTransaction_FullMethodName         = "/spark.SparkService/sign_token_transaction"
 	SparkService_FinalizeTokenTransaction_FullMethodName     = "/spark.SparkService/finalize_token_transaction"
 	SparkService_FreezeTokens_FullMethodName                 = "/spark.SparkService/freeze_tokens"
-	SparkService_GetOwnedTokenLeaves_FullMethodName          = "/spark.SparkService/get_owned_token_leaves"
+	SparkService_QueryTokenOutputs_FullMethodName            = "/spark.SparkService/query_token_outputs"
 	SparkService_QueryTokenTransactions_FullMethodName       = "/spark.SparkService/query_token_transactions"
 	SparkService_CancelSignedTokenTransaction_FullMethodName = "/spark.SparkService/cancel_signed_token_transaction"
 	SparkService_ReturnLightningPayment_FullMethodName       = "/spark.SparkService/return_lightning_payment"
@@ -103,7 +103,7 @@ type SparkServiceClient interface {
 	SignTokenTransaction(ctx context.Context, in *SignTokenTransactionRequest, opts ...grpc.CallOption) (*SignTokenTransactionResponse, error)
 	FinalizeTokenTransaction(ctx context.Context, in *FinalizeTokenTransactionRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	FreezeTokens(ctx context.Context, in *FreezeTokensRequest, opts ...grpc.CallOption) (*FreezeTokensResponse, error)
-	GetOwnedTokenLeaves(ctx context.Context, in *GetOwnedTokenLeavesRequest, opts ...grpc.CallOption) (*GetOwnedTokenLeavesResponse, error)
+	QueryTokenOutputs(ctx context.Context, in *QueryTokenOutputsRequest, opts ...grpc.CallOption) (*QueryTokenOutputsResponse, error)
 	QueryTokenTransactions(ctx context.Context, in *QueryTokenTransactionsRequest, opts ...grpc.CallOption) (*QueryTokenTransactionsResponse, error)
 	CancelSignedTokenTransaction(ctx context.Context, in *CancelSignedTokenTransactionRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	ReturnLightningPayment(ctx context.Context, in *ReturnLightningPaymentRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
@@ -431,10 +431,10 @@ func (c *sparkServiceClient) FreezeTokens(ctx context.Context, in *FreezeTokensR
 	return out, nil
 }
 
-func (c *sparkServiceClient) GetOwnedTokenLeaves(ctx context.Context, in *GetOwnedTokenLeavesRequest, opts ...grpc.CallOption) (*GetOwnedTokenLeavesResponse, error) {
+func (c *sparkServiceClient) QueryTokenOutputs(ctx context.Context, in *QueryTokenOutputsRequest, opts ...grpc.CallOption) (*QueryTokenOutputsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(GetOwnedTokenLeavesResponse)
-	err := c.cc.Invoke(ctx, SparkService_GetOwnedTokenLeaves_FullMethodName, in, out, cOpts...)
+	out := new(QueryTokenOutputsResponse)
+	err := c.cc.Invoke(ctx, SparkService_QueryTokenOutputs_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -535,7 +535,7 @@ type SparkServiceServer interface {
 	SignTokenTransaction(context.Context, *SignTokenTransactionRequest) (*SignTokenTransactionResponse, error)
 	FinalizeTokenTransaction(context.Context, *FinalizeTokenTransactionRequest) (*emptypb.Empty, error)
 	FreezeTokens(context.Context, *FreezeTokensRequest) (*FreezeTokensResponse, error)
-	GetOwnedTokenLeaves(context.Context, *GetOwnedTokenLeavesRequest) (*GetOwnedTokenLeavesResponse, error)
+	QueryTokenOutputs(context.Context, *QueryTokenOutputsRequest) (*QueryTokenOutputsResponse, error)
 	QueryTokenTransactions(context.Context, *QueryTokenTransactionsRequest) (*QueryTokenTransactionsResponse, error)
 	CancelSignedTokenTransaction(context.Context, *CancelSignedTokenTransactionRequest) (*emptypb.Empty, error)
 	ReturnLightningPayment(context.Context, *ReturnLightningPaymentRequest) (*emptypb.Empty, error)
@@ -644,8 +644,8 @@ func (UnimplementedSparkServiceServer) FinalizeTokenTransaction(context.Context,
 func (UnimplementedSparkServiceServer) FreezeTokens(context.Context, *FreezeTokensRequest) (*FreezeTokensResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method FreezeTokens not implemented")
 }
-func (UnimplementedSparkServiceServer) GetOwnedTokenLeaves(context.Context, *GetOwnedTokenLeavesRequest) (*GetOwnedTokenLeavesResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetOwnedTokenLeaves not implemented")
+func (UnimplementedSparkServiceServer) QueryTokenOutputs(context.Context, *QueryTokenOutputsRequest) (*QueryTokenOutputsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method QueryTokenOutputs not implemented")
 }
 func (UnimplementedSparkServiceServer) QueryTokenTransactions(context.Context, *QueryTokenTransactionsRequest) (*QueryTokenTransactionsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method QueryTokenTransactions not implemented")
@@ -1241,20 +1241,20 @@ func _SparkService_FreezeTokens_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
-func _SparkService_GetOwnedTokenLeaves_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetOwnedTokenLeavesRequest)
+func _SparkService_QueryTokenOutputs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QueryTokenOutputsRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(SparkServiceServer).GetOwnedTokenLeaves(ctx, in)
+		return srv.(SparkServiceServer).QueryTokenOutputs(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: SparkService_GetOwnedTokenLeaves_FullMethodName,
+		FullMethod: SparkService_QueryTokenOutputs_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SparkServiceServer).GetOwnedTokenLeaves(ctx, req.(*GetOwnedTokenLeavesRequest))
+		return srv.(SparkServiceServer).QueryTokenOutputs(ctx, req.(*QueryTokenOutputsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1481,8 +1481,8 @@ var SparkService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _SparkService_FreezeTokens_Handler,
 		},
 		{
-			MethodName: "get_owned_token_leaves",
-			Handler:    _SparkService_GetOwnedTokenLeaves_Handler,
+			MethodName: "query_token_outputs",
+			Handler:    _SparkService_QueryTokenOutputs_Handler,
 		},
 		{
 			MethodName: "query_token_transactions",

@@ -213,16 +213,16 @@ func (s *SparkServer) FreezeTokens(ctx context.Context, req *pb.FreezeTokensRequ
 	return wrapWithGRPCError(tokenTransactionHandler.FreezeTokens(ctx, s.config, req))
 }
 
-// GetOwnedTokenLeaves returns the leaves currently owned by the provided owner public key.
+// QueryTokenTransactions returns the token transactions currently owned by the provided owner public key.
 func (s *SparkServer) QueryTokenTransactions(ctx context.Context, req *pb.QueryTokenTransactionsRequest) (*pb.QueryTokenTransactionsResponse, error) {
 	tokenTransactionHandler := handler.NewTokenTransactionHandler(s.config, s.db)
 	return wrapWithGRPCError(tokenTransactionHandler.QueryTokenTransactions(ctx, s.config, req))
 }
 
-// GetOwnedTokenLeaves returns the leaves currently owned by the provided owner public key.
-func (s *SparkServer) GetOwnedTokenLeaves(ctx context.Context, req *pb.GetOwnedTokenLeavesRequest) (*pb.GetOwnedTokenLeavesResponse, error) {
+// QueryTokenOutputs returns the token outputs currently owned by the provided owner public key.
+func (s *SparkServer) QueryTokenOutputs(ctx context.Context, req *pb.QueryTokenOutputsRequest) (*pb.QueryTokenOutputsResponse, error) {
 	tokenTransactionHandler := handler.NewTokenTransactionHandler(s.config, s.db)
-	return wrapWithGRPCError(tokenTransactionHandler.GetOwnedTokenLeaves(ctx, req))
+	return wrapWithGRPCError(tokenTransactionHandler.QueryTokenOutputs(ctx, req))
 }
 
 func (s *SparkServer) QueryAllTransfers(ctx context.Context, req *pb.QueryAllTransfersRequest) (*pb.QueryAllTransfersResponse, error) {

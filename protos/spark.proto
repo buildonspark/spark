@@ -56,7 +56,7 @@ service SparkService {
     rpc sign_token_transaction(SignTokenTransactionRequest) returns (SignTokenTransactionResponse) {}
     rpc finalize_token_transaction(FinalizeTokenTransactionRequest) returns (google.protobuf.Empty) {}
     rpc freeze_tokens(FreezeTokensRequest) returns (FreezeTokensResponse) {}
-    rpc get_owned_token_leaves(GetOwnedTokenLeavesRequest) returns (GetOwnedTokenLeavesResponse) {}
+    rpc query_token_outputs(QueryTokenOutputsRequest) returns (QueryTokenOutputsResponse) {}
     rpc query_token_transactions(QueryTokenTransactionsRequest) returns (QueryTokenTransactionsResponse) {}
     rpc cancel_signed_token_transaction(CancelSignedTokenTransactionRequest) returns (google.protobuf.Empty) {}
 
@@ -410,7 +410,7 @@ message FreezeTokensResponse {
     bytes impacted_token_amount = 2;  // Decoded uint128
 }
 
-message GetOwnedTokenLeavesRequest {
+message QueryTokenOutputsRequest {
     repeated bytes owner_public_keys = 1 [(validate.rules).repeated.items.bytes.len = 33];
     // Optionally provide token public keys. If not set return leaves for all tokens.
     repeated bytes token_public_keys = 2 [(validate.rules).repeated.items.bytes.len = 33];
@@ -441,7 +441,7 @@ message LeafWithPreviousTransactionData {
 	uint32 previous_transaction_vout = 3;
 }
 
-message GetOwnedTokenLeavesResponse {
+message QueryTokenOutputsResponse {
     repeated LeafWithPreviousTransactionData leaves_with_previous_transaction_data = 1;
 }
 

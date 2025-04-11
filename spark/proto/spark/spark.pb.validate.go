@@ -4629,22 +4629,22 @@ var _ interface {
 	ErrorName() string
 } = FreezeTokensResponseValidationError{}
 
-// Validate checks the field values on GetOwnedTokenLeavesRequest with the
-// rules defined in the proto definition for this message. If any rules are
+// Validate checks the field values on QueryTokenOutputsRequest with the rules
+// defined in the proto definition for this message. If any rules are
 // violated, the first error encountered is returned, or nil if there are no violations.
-func (m *GetOwnedTokenLeavesRequest) Validate() error {
+func (m *QueryTokenOutputsRequest) Validate() error {
 	return m.validate(false)
 }
 
-// ValidateAll checks the field values on GetOwnedTokenLeavesRequest with the
+// ValidateAll checks the field values on QueryTokenOutputsRequest with the
 // rules defined in the proto definition for this message. If any rules are
 // violated, the result is a list of violation errors wrapped in
-// GetOwnedTokenLeavesRequestMultiError, or nil if none found.
-func (m *GetOwnedTokenLeavesRequest) ValidateAll() error {
+// QueryTokenOutputsRequestMultiError, or nil if none found.
+func (m *QueryTokenOutputsRequest) ValidateAll() error {
 	return m.validate(true)
 }
 
-func (m *GetOwnedTokenLeavesRequest) validate(all bool) error {
+func (m *QueryTokenOutputsRequest) validate(all bool) error {
 	if m == nil {
 		return nil
 	}
@@ -4655,7 +4655,7 @@ func (m *GetOwnedTokenLeavesRequest) validate(all bool) error {
 		_, _ = idx, item
 
 		if len(item) != 33 {
-			err := GetOwnedTokenLeavesRequestValidationError{
+			err := QueryTokenOutputsRequestValidationError{
 				field:  fmt.Sprintf("OwnerPublicKeys[%v]", idx),
 				reason: "value length must be 33 bytes",
 			}
@@ -4671,7 +4671,7 @@ func (m *GetOwnedTokenLeavesRequest) validate(all bool) error {
 		_, _ = idx, item
 
 		if len(item) != 33 {
-			err := GetOwnedTokenLeavesRequestValidationError{
+			err := QueryTokenOutputsRequestValidationError{
 				field:  fmt.Sprintf("TokenPublicKeys[%v]", idx),
 				reason: "value length must be 33 bytes",
 			}
@@ -4684,19 +4684,19 @@ func (m *GetOwnedTokenLeavesRequest) validate(all bool) error {
 	}
 
 	if len(errors) > 0 {
-		return GetOwnedTokenLeavesRequestMultiError(errors)
+		return QueryTokenOutputsRequestMultiError(errors)
 	}
 
 	return nil
 }
 
-// GetOwnedTokenLeavesRequestMultiError is an error wrapping multiple
-// validation errors returned by GetOwnedTokenLeavesRequest.ValidateAll() if
-// the designated constraints aren't met.
-type GetOwnedTokenLeavesRequestMultiError []error
+// QueryTokenOutputsRequestMultiError is an error wrapping multiple validation
+// errors returned by QueryTokenOutputsRequest.ValidateAll() if the designated
+// constraints aren't met.
+type QueryTokenOutputsRequestMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
-func (m GetOwnedTokenLeavesRequestMultiError) Error() string {
+func (m QueryTokenOutputsRequestMultiError) Error() string {
 	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
@@ -4705,11 +4705,11 @@ func (m GetOwnedTokenLeavesRequestMultiError) Error() string {
 }
 
 // AllErrors returns a list of validation violation errors.
-func (m GetOwnedTokenLeavesRequestMultiError) AllErrors() []error { return m }
+func (m QueryTokenOutputsRequestMultiError) AllErrors() []error { return m }
 
-// GetOwnedTokenLeavesRequestValidationError is the validation error returned
-// by GetOwnedTokenLeavesRequest.Validate if the designated constraints aren't met.
-type GetOwnedTokenLeavesRequestValidationError struct {
+// QueryTokenOutputsRequestValidationError is the validation error returned by
+// QueryTokenOutputsRequest.Validate if the designated constraints aren't met.
+type QueryTokenOutputsRequestValidationError struct {
 	field  string
 	reason string
 	cause  error
@@ -4717,24 +4717,24 @@ type GetOwnedTokenLeavesRequestValidationError struct {
 }
 
 // Field function returns field value.
-func (e GetOwnedTokenLeavesRequestValidationError) Field() string { return e.field }
+func (e QueryTokenOutputsRequestValidationError) Field() string { return e.field }
 
 // Reason function returns reason value.
-func (e GetOwnedTokenLeavesRequestValidationError) Reason() string { return e.reason }
+func (e QueryTokenOutputsRequestValidationError) Reason() string { return e.reason }
 
 // Cause function returns cause value.
-func (e GetOwnedTokenLeavesRequestValidationError) Cause() error { return e.cause }
+func (e QueryTokenOutputsRequestValidationError) Cause() error { return e.cause }
 
 // Key function returns key value.
-func (e GetOwnedTokenLeavesRequestValidationError) Key() bool { return e.key }
+func (e QueryTokenOutputsRequestValidationError) Key() bool { return e.key }
 
 // ErrorName returns error name.
-func (e GetOwnedTokenLeavesRequestValidationError) ErrorName() string {
-	return "GetOwnedTokenLeavesRequestValidationError"
+func (e QueryTokenOutputsRequestValidationError) ErrorName() string {
+	return "QueryTokenOutputsRequestValidationError"
 }
 
 // Error satisfies the builtin error interface
-func (e GetOwnedTokenLeavesRequestValidationError) Error() string {
+func (e QueryTokenOutputsRequestValidationError) Error() string {
 	cause := ""
 	if e.cause != nil {
 		cause = fmt.Sprintf(" | caused by: %v", e.cause)
@@ -4746,14 +4746,14 @@ func (e GetOwnedTokenLeavesRequestValidationError) Error() string {
 	}
 
 	return fmt.Sprintf(
-		"invalid %sGetOwnedTokenLeavesRequest.%s: %s%s",
+		"invalid %sQueryTokenOutputsRequest.%s: %s%s",
 		key,
 		e.field,
 		e.reason,
 		cause)
 }
 
-var _ error = GetOwnedTokenLeavesRequestValidationError{}
+var _ error = QueryTokenOutputsRequestValidationError{}
 
 var _ interface {
 	Field() string
@@ -4761,7 +4761,7 @@ var _ interface {
 	Key() bool
 	Cause() error
 	ErrorName() string
-} = GetOwnedTokenLeavesRequestValidationError{}
+} = QueryTokenOutputsRequestValidationError{}
 
 // Validate checks the field values on QueryTokenTransactionsRequest with the
 // rules defined in the proto definition for this message. If any rules are
@@ -5227,22 +5227,22 @@ var _ interface {
 	ErrorName() string
 } = LeafWithPreviousTransactionDataValidationError{}
 
-// Validate checks the field values on GetOwnedTokenLeavesResponse with the
-// rules defined in the proto definition for this message. If any rules are
+// Validate checks the field values on QueryTokenOutputsResponse with the rules
+// defined in the proto definition for this message. If any rules are
 // violated, the first error encountered is returned, or nil if there are no violations.
-func (m *GetOwnedTokenLeavesResponse) Validate() error {
+func (m *QueryTokenOutputsResponse) Validate() error {
 	return m.validate(false)
 }
 
-// ValidateAll checks the field values on GetOwnedTokenLeavesResponse with the
+// ValidateAll checks the field values on QueryTokenOutputsResponse with the
 // rules defined in the proto definition for this message. If any rules are
 // violated, the result is a list of violation errors wrapped in
-// GetOwnedTokenLeavesResponseMultiError, or nil if none found.
-func (m *GetOwnedTokenLeavesResponse) ValidateAll() error {
+// QueryTokenOutputsResponseMultiError, or nil if none found.
+func (m *QueryTokenOutputsResponse) ValidateAll() error {
 	return m.validate(true)
 }
 
-func (m *GetOwnedTokenLeavesResponse) validate(all bool) error {
+func (m *QueryTokenOutputsResponse) validate(all bool) error {
 	if m == nil {
 		return nil
 	}
@@ -5256,7 +5256,7 @@ func (m *GetOwnedTokenLeavesResponse) validate(all bool) error {
 			switch v := interface{}(item).(type) {
 			case interface{ ValidateAll() error }:
 				if err := v.ValidateAll(); err != nil {
-					errors = append(errors, GetOwnedTokenLeavesResponseValidationError{
+					errors = append(errors, QueryTokenOutputsResponseValidationError{
 						field:  fmt.Sprintf("LeavesWithPreviousTransactionData[%v]", idx),
 						reason: "embedded message failed validation",
 						cause:  err,
@@ -5264,7 +5264,7 @@ func (m *GetOwnedTokenLeavesResponse) validate(all bool) error {
 				}
 			case interface{ Validate() error }:
 				if err := v.Validate(); err != nil {
-					errors = append(errors, GetOwnedTokenLeavesResponseValidationError{
+					errors = append(errors, QueryTokenOutputsResponseValidationError{
 						field:  fmt.Sprintf("LeavesWithPreviousTransactionData[%v]", idx),
 						reason: "embedded message failed validation",
 						cause:  err,
@@ -5273,7 +5273,7 @@ func (m *GetOwnedTokenLeavesResponse) validate(all bool) error {
 			}
 		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
 			if err := v.Validate(); err != nil {
-				return GetOwnedTokenLeavesResponseValidationError{
+				return QueryTokenOutputsResponseValidationError{
 					field:  fmt.Sprintf("LeavesWithPreviousTransactionData[%v]", idx),
 					reason: "embedded message failed validation",
 					cause:  err,
@@ -5284,19 +5284,19 @@ func (m *GetOwnedTokenLeavesResponse) validate(all bool) error {
 	}
 
 	if len(errors) > 0 {
-		return GetOwnedTokenLeavesResponseMultiError(errors)
+		return QueryTokenOutputsResponseMultiError(errors)
 	}
 
 	return nil
 }
 
-// GetOwnedTokenLeavesResponseMultiError is an error wrapping multiple
-// validation errors returned by GetOwnedTokenLeavesResponse.ValidateAll() if
-// the designated constraints aren't met.
-type GetOwnedTokenLeavesResponseMultiError []error
+// QueryTokenOutputsResponseMultiError is an error wrapping multiple validation
+// errors returned by QueryTokenOutputsResponse.ValidateAll() if the
+// designated constraints aren't met.
+type QueryTokenOutputsResponseMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
-func (m GetOwnedTokenLeavesResponseMultiError) Error() string {
+func (m QueryTokenOutputsResponseMultiError) Error() string {
 	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
@@ -5305,12 +5305,11 @@ func (m GetOwnedTokenLeavesResponseMultiError) Error() string {
 }
 
 // AllErrors returns a list of validation violation errors.
-func (m GetOwnedTokenLeavesResponseMultiError) AllErrors() []error { return m }
+func (m QueryTokenOutputsResponseMultiError) AllErrors() []error { return m }
 
-// GetOwnedTokenLeavesResponseValidationError is the validation error returned
-// by GetOwnedTokenLeavesResponse.Validate if the designated constraints
-// aren't met.
-type GetOwnedTokenLeavesResponseValidationError struct {
+// QueryTokenOutputsResponseValidationError is the validation error returned by
+// QueryTokenOutputsResponse.Validate if the designated constraints aren't met.
+type QueryTokenOutputsResponseValidationError struct {
 	field  string
 	reason string
 	cause  error
@@ -5318,24 +5317,24 @@ type GetOwnedTokenLeavesResponseValidationError struct {
 }
 
 // Field function returns field value.
-func (e GetOwnedTokenLeavesResponseValidationError) Field() string { return e.field }
+func (e QueryTokenOutputsResponseValidationError) Field() string { return e.field }
 
 // Reason function returns reason value.
-func (e GetOwnedTokenLeavesResponseValidationError) Reason() string { return e.reason }
+func (e QueryTokenOutputsResponseValidationError) Reason() string { return e.reason }
 
 // Cause function returns cause value.
-func (e GetOwnedTokenLeavesResponseValidationError) Cause() error { return e.cause }
+func (e QueryTokenOutputsResponseValidationError) Cause() error { return e.cause }
 
 // Key function returns key value.
-func (e GetOwnedTokenLeavesResponseValidationError) Key() bool { return e.key }
+func (e QueryTokenOutputsResponseValidationError) Key() bool { return e.key }
 
 // ErrorName returns error name.
-func (e GetOwnedTokenLeavesResponseValidationError) ErrorName() string {
-	return "GetOwnedTokenLeavesResponseValidationError"
+func (e QueryTokenOutputsResponseValidationError) ErrorName() string {
+	return "QueryTokenOutputsResponseValidationError"
 }
 
 // Error satisfies the builtin error interface
-func (e GetOwnedTokenLeavesResponseValidationError) Error() string {
+func (e QueryTokenOutputsResponseValidationError) Error() string {
 	cause := ""
 	if e.cause != nil {
 		cause = fmt.Sprintf(" | caused by: %v", e.cause)
@@ -5347,14 +5346,14 @@ func (e GetOwnedTokenLeavesResponseValidationError) Error() string {
 	}
 
 	return fmt.Sprintf(
-		"invalid %sGetOwnedTokenLeavesResponse.%s: %s%s",
+		"invalid %sQueryTokenOutputsResponse.%s: %s%s",
 		key,
 		e.field,
 		e.reason,
 		cause)
 }
 
-var _ error = GetOwnedTokenLeavesResponseValidationError{}
+var _ error = QueryTokenOutputsResponseValidationError{}
 
 var _ interface {
 	Field() string
@@ -5362,7 +5361,7 @@ var _ interface {
 	Key() bool
 	Cause() error
 	ErrorName() string
-} = GetOwnedTokenLeavesResponseValidationError{}
+} = QueryTokenOutputsResponseValidationError{}
 
 // Validate checks the field values on CancelSignedTokenTransactionRequest with
 // the rules defined in the proto definition for this message. If any rules

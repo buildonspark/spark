@@ -2316,7 +2316,7 @@ func (x *FreezeTokensResponse) GetImpactedTokenAmount() []byte {
 	return nil
 }
 
-type GetOwnedTokenLeavesRequest struct {
+type QueryTokenOutputsRequest struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
 	OwnerPublicKeys [][]byte               `protobuf:"bytes,1,rep,name=owner_public_keys,json=ownerPublicKeys,proto3" json:"owner_public_keys,omitempty"`
 	// Optionally provide token public keys. If not set return leaves for all tokens.
@@ -2325,20 +2325,20 @@ type GetOwnedTokenLeavesRequest struct {
 	sizeCache       protoimpl.SizeCache
 }
 
-func (x *GetOwnedTokenLeavesRequest) Reset() {
-	*x = GetOwnedTokenLeavesRequest{}
+func (x *QueryTokenOutputsRequest) Reset() {
+	*x = QueryTokenOutputsRequest{}
 	mi := &file_spark_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *GetOwnedTokenLeavesRequest) String() string {
+func (x *QueryTokenOutputsRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*GetOwnedTokenLeavesRequest) ProtoMessage() {}
+func (*QueryTokenOutputsRequest) ProtoMessage() {}
 
-func (x *GetOwnedTokenLeavesRequest) ProtoReflect() protoreflect.Message {
+func (x *QueryTokenOutputsRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_spark_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -2350,19 +2350,19 @@ func (x *GetOwnedTokenLeavesRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use GetOwnedTokenLeavesRequest.ProtoReflect.Descriptor instead.
-func (*GetOwnedTokenLeavesRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use QueryTokenOutputsRequest.ProtoReflect.Descriptor instead.
+func (*QueryTokenOutputsRequest) Descriptor() ([]byte, []int) {
 	return file_spark_proto_rawDescGZIP(), []int{32}
 }
 
-func (x *GetOwnedTokenLeavesRequest) GetOwnerPublicKeys() [][]byte {
+func (x *QueryTokenOutputsRequest) GetOwnerPublicKeys() [][]byte {
 	if x != nil {
 		return x.OwnerPublicKeys
 	}
 	return nil
 }
 
-func (x *GetOwnedTokenLeavesRequest) GetTokenPublicKeys() [][]byte {
+func (x *QueryTokenOutputsRequest) GetTokenPublicKeys() [][]byte {
 	if x != nil {
 		return x.TokenPublicKeys
 	}
@@ -2570,27 +2570,27 @@ func (x *LeafWithPreviousTransactionData) GetPreviousTransactionVout() uint32 {
 	return 0
 }
 
-type GetOwnedTokenLeavesResponse struct {
+type QueryTokenOutputsResponse struct {
 	state                             protoimpl.MessageState             `protogen:"open.v1"`
 	LeavesWithPreviousTransactionData []*LeafWithPreviousTransactionData `protobuf:"bytes,1,rep,name=leaves_with_previous_transaction_data,json=leavesWithPreviousTransactionData,proto3" json:"leaves_with_previous_transaction_data,omitempty"`
 	unknownFields                     protoimpl.UnknownFields
 	sizeCache                         protoimpl.SizeCache
 }
 
-func (x *GetOwnedTokenLeavesResponse) Reset() {
-	*x = GetOwnedTokenLeavesResponse{}
+func (x *QueryTokenOutputsResponse) Reset() {
+	*x = QueryTokenOutputsResponse{}
 	mi := &file_spark_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *GetOwnedTokenLeavesResponse) String() string {
+func (x *QueryTokenOutputsResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*GetOwnedTokenLeavesResponse) ProtoMessage() {}
+func (*QueryTokenOutputsResponse) ProtoMessage() {}
 
-func (x *GetOwnedTokenLeavesResponse) ProtoReflect() protoreflect.Message {
+func (x *QueryTokenOutputsResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_spark_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -2602,12 +2602,12 @@ func (x *GetOwnedTokenLeavesResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use GetOwnedTokenLeavesResponse.ProtoReflect.Descriptor instead.
-func (*GetOwnedTokenLeavesResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use QueryTokenOutputsResponse.ProtoReflect.Descriptor instead.
+func (*QueryTokenOutputsResponse) Descriptor() ([]byte, []int) {
 	return file_spark_proto_rawDescGZIP(), []int{36}
 }
 
-func (x *GetOwnedTokenLeavesResponse) GetLeavesWithPreviousTransactionData() []*LeafWithPreviousTransactionData {
+func (x *QueryTokenOutputsResponse) GetLeavesWithPreviousTransactionData() []*LeafWithPreviousTransactionData {
 	if x != nil {
 		return x.LeavesWithPreviousTransactionData
 	}
@@ -7061,8 +7061,8 @@ const file_spark_proto_rawDesc = "" +
 	"\x14FreezeTokensResponse\x129\n" +
 	"\x11impacted_leaf_ids\x18\x01 \x03(\tB\r\xfaB\n" +
 	"\x92\x01\a\"\x05r\x03\xb0\x01\x01R\x0fimpactedLeafIds\x122\n" +
-	"\x15impacted_token_amount\x18\x02 \x01(\fR\x13impactedTokenAmount\"\x90\x01\n" +
-	"\x1aGetOwnedTokenLeavesRequest\x128\n" +
+	"\x15impacted_token_amount\x18\x02 \x01(\fR\x13impactedTokenAmount\"\x8e\x01\n" +
+	"\x18QueryTokenOutputsRequest\x128\n" +
 	"\x11owner_public_keys\x18\x01 \x03(\fB\f\xfaB\t\x92\x01\x06\"\x04z\x02h!R\x0fownerPublicKeys\x128\n" +
 	"\x11token_public_keys\x18\x02 \x03(\fB\f\xfaB\t\x92\x01\x06\"\x04z\x02h!R\x0ftokenPublicKeys\"\xb3\x02\n" +
 	"\x1dQueryTokenTransactionsRequest\x12(\n" +
@@ -7079,8 +7079,8 @@ const file_spark_proto_rawDesc = "" +
 	"\x1fLeafWithPreviousTransactionData\x12*\n" +
 	"\x04leaf\x18\x01 \x01(\v2\x16.spark.TokenLeafOutputR\x04leaf\x12C\n" +
 	"\x19previous_transaction_hash\x18\x02 \x01(\fB\a\xfaB\x04z\x02h R\x17previousTransactionHash\x12:\n" +
-	"\x19previous_transaction_vout\x18\x03 \x01(\rR\x17previousTransactionVout\"\x97\x01\n" +
-	"\x1bGetOwnedTokenLeavesResponse\x12x\n" +
+	"\x19previous_transaction_vout\x18\x03 \x01(\rR\x17previousTransactionVout\"\x95\x01\n" +
+	"\x19QueryTokenOutputsResponse\x12x\n" +
 	"%leaves_with_previous_transaction_data\x18\x01 \x03(\v2&.spark.LeafWithPreviousTransactionDataR!leavesWithPreviousTransactionData\"\xbc\x01\n" +
 	"#CancelSignedTokenTransactionRequest\x12O\n" +
 	"\x17final_token_transaction\x18\x01 \x01(\v2\x17.spark.TokenTransactionR\x15finalTokenTransaction\x12D\n" +
@@ -7424,7 +7424,7 @@ const file_spark_proto_rawDesc = "" +
 	"\x10COOPERATIVE_EXIT\x10\x01\x12\f\n" +
 	"\bTRANSFER\x10\x02\x12\b\n" +
 	"\x04SWAP\x10\x1e\x12\x10\n" +
-	"\fCOUNTER_SWAP\x10(2\xa7\x1b\n" +
+	"\fCOUNTER_SWAP\x10(2\xa0\x1b\n" +
 	"\fSparkService\x12i\n" +
 	"\x18generate_deposit_address\x12$.spark.GenerateDepositAddressRequest\x1a%.spark.GenerateDepositAddressResponse\"\x00\x12p\n" +
 	"\x1bstart_deposit_tree_creation\x12&.spark.StartDepositTreeCreationRequest\x1a'.spark.StartDepositTreeCreationResponse\"\x00\x12]\n" +
@@ -7456,8 +7456,8 @@ const file_spark_proto_rawDesc = "" +
 	"\x17start_token_transaction\x12#.spark.StartTokenTransactionRequest\x1a$.spark.StartTokenTransactionResponse\"\x00\x12c\n" +
 	"\x16sign_token_transaction\x12\".spark.SignTokenTransactionRequest\x1a#.spark.SignTokenTransactionResponse\"\x00\x12^\n" +
 	"\x1afinalize_token_transaction\x12&.spark.FinalizeTokenTransactionRequest\x1a\x16.google.protobuf.Empty\"\x00\x12J\n" +
-	"\rfreeze_tokens\x12\x1a.spark.FreezeTokensRequest\x1a\x1b.spark.FreezeTokensResponse\"\x00\x12a\n" +
-	"\x16get_owned_token_leaves\x12!.spark.GetOwnedTokenLeavesRequest\x1a\".spark.GetOwnedTokenLeavesResponse\"\x00\x12i\n" +
+	"\rfreeze_tokens\x12\x1a.spark.FreezeTokensRequest\x1a\x1b.spark.FreezeTokensResponse\"\x00\x12Z\n" +
+	"\x13query_token_outputs\x12\x1f.spark.QueryTokenOutputsRequest\x1a .spark.QueryTokenOutputsResponse\"\x00\x12i\n" +
 	"\x18query_token_transactions\x12$.spark.QueryTokenTransactionsRequest\x1a%.spark.QueryTokenTransactionsResponse\"\x00\x12g\n" +
 	"\x1fcancel_signed_token_transaction\x12*.spark.CancelSignedTokenTransactionRequest\x1a\x16.google.protobuf.Empty\"\x00\x12Z\n" +
 	"\x18return_lightning_payment\x12$.spark.ReturnLightningPaymentRequest\x1a\x16.google.protobuf.Empty\"\x00\x12]\n" +
@@ -7516,11 +7516,11 @@ var file_spark_proto_goTypes = []any{
 	(*FreezeTokensPayload)(nil),                             // 34: spark.FreezeTokensPayload
 	(*FreezeTokensRequest)(nil),                             // 35: spark.FreezeTokensRequest
 	(*FreezeTokensResponse)(nil),                            // 36: spark.FreezeTokensResponse
-	(*GetOwnedTokenLeavesRequest)(nil),                      // 37: spark.GetOwnedTokenLeavesRequest
+	(*QueryTokenOutputsRequest)(nil),                        // 37: spark.QueryTokenOutputsRequest
 	(*QueryTokenTransactionsRequest)(nil),                   // 38: spark.QueryTokenTransactionsRequest
 	(*QueryTokenTransactionsResponse)(nil),                  // 39: spark.QueryTokenTransactionsResponse
 	(*LeafWithPreviousTransactionData)(nil),                 // 40: spark.LeafWithPreviousTransactionData
-	(*GetOwnedTokenLeavesResponse)(nil),                     // 41: spark.GetOwnedTokenLeavesResponse
+	(*QueryTokenOutputsResponse)(nil),                       // 41: spark.QueryTokenOutputsResponse
 	(*CancelSignedTokenTransactionRequest)(nil),             // 42: spark.CancelSignedTokenTransactionRequest
 	(*TreeNode)(nil),                                        // 43: spark.TreeNode
 	(*FinalizeNodeSignaturesRequest)(nil),                   // 44: spark.FinalizeNodeSignaturesRequest
@@ -7650,7 +7650,7 @@ var file_spark_proto_depIdxs = []int32{
 	34,  // 35: spark.FreezeTokensRequest.freeze_tokens_payload:type_name -> spark.FreezeTokensPayload
 	25,  // 36: spark.QueryTokenTransactionsResponse.token_transactions_with_status:type_name -> spark.TokenTransactionWithStatus
 	23,  // 37: spark.LeafWithPreviousTransactionData.leaf:type_name -> spark.TokenLeafOutput
-	40,  // 38: spark.GetOwnedTokenLeavesResponse.leaves_with_previous_transaction_data:type_name -> spark.LeafWithPreviousTransactionData
+	40,  // 38: spark.QueryTokenOutputsResponse.leaves_with_previous_transaction_data:type_name -> spark.LeafWithPreviousTransactionData
 	24,  // 39: spark.CancelSignedTokenTransactionRequest.final_token_transaction:type_name -> spark.TokenTransaction
 	12,  // 40: spark.TreeNode.signing_keyshare:type_name -> spark.SigningKeyshare
 	0,   // 41: spark.TreeNode.network:type_name -> spark.Network
@@ -7775,7 +7775,7 @@ var file_spark_proto_depIdxs = []int32{
 	31,  // 160: spark.SparkService.sign_token_transaction:input_type -> spark.SignTokenTransactionRequest
 	33,  // 161: spark.SparkService.finalize_token_transaction:input_type -> spark.FinalizeTokenTransactionRequest
 	35,  // 162: spark.SparkService.freeze_tokens:input_type -> spark.FreezeTokensRequest
-	37,  // 163: spark.SparkService.get_owned_token_leaves:input_type -> spark.GetOwnedTokenLeavesRequest
+	37,  // 163: spark.SparkService.query_token_outputs:input_type -> spark.QueryTokenOutputsRequest
 	38,  // 164: spark.SparkService.query_token_transactions:input_type -> spark.QueryTokenTransactionsRequest
 	42,  // 165: spark.SparkService.cancel_signed_token_transaction:input_type -> spark.CancelSignedTokenTransactionRequest
 	100, // 166: spark.SparkService.return_lightning_payment:input_type -> spark.ReturnLightningPaymentRequest
@@ -7812,7 +7812,7 @@ var file_spark_proto_depIdxs = []int32{
 	32,  // 197: spark.SparkService.sign_token_transaction:output_type -> spark.SignTokenTransactionResponse
 	130, // 198: spark.SparkService.finalize_token_transaction:output_type -> google.protobuf.Empty
 	36,  // 199: spark.SparkService.freeze_tokens:output_type -> spark.FreezeTokensResponse
-	41,  // 200: spark.SparkService.get_owned_token_leaves:output_type -> spark.GetOwnedTokenLeavesResponse
+	41,  // 200: spark.SparkService.query_token_outputs:output_type -> spark.QueryTokenOutputsResponse
 	39,  // 201: spark.SparkService.query_token_transactions:output_type -> spark.QueryTokenTransactionsResponse
 	130, // 202: spark.SparkService.cancel_signed_token_transaction:output_type -> google.protobuf.Empty
 	130, // 203: spark.SparkService.return_lightning_payment:output_type -> google.protobuf.Empty

@@ -472,7 +472,7 @@ func TestBroadcastTokenTransactionIssueAndTransferTokensLotsOfLeaves(t *testing.
 	require.NoError(t, err, "failed to broadcast consolidation transaction")
 
 	// Verify the consolidated amount
-	ownedLeavesResponse, err := wallet.GetOwnedTokenLeaves(
+	tokenOutputsResponse, err := wallet.QueryTokenOutputs(
 		context.Background(),
 		config,
 		[][]byte{consolidatedLeafPubKeyBytes},
@@ -480,7 +480,7 @@ func TestBroadcastTokenTransactionIssueAndTransferTokensLotsOfLeaves(t *testing.
 	)
 	require.NoError(t, err, "failed to get owned token leaves")
 
-	require.Equal(t, 1, len(ownedLeavesResponse.LeavesWithPreviousTransactionData), "expected 1 consolidated leaf")
+	require.Equal(t, 1, len(tokenOutputsResponse.LeavesWithPreviousTransactionData), "expected 1 consolidated leaf")
 }
 
 func TestFreezeAndUnfreezeTokens(t *testing.T) {
@@ -652,8 +652,8 @@ func TestBroadcastTokenTransactionIssueAndTransferTokensDoubleStart(t *testing.T
 	require.NoError(t, err, "failed to broadcast transfer token transaction")
 	log.Printf("transfer broadcast finalized token transaction: %v", transferTokenTransactionResponse)
 
-	// Test GetOwnedTokenLeaves
-	ownedLeavesResponse, err := wallet.GetOwnedTokenLeaves(
+	// Test QueryTokenOutputs
+	tokenOutputsResponse, err := wallet.QueryTokenOutputs(
 		context.Background(),
 		config,
 		[][]byte{userLeaf3PubKeyBytes},
@@ -662,9 +662,9 @@ func TestBroadcastTokenTransactionIssueAndTransferTokensDoubleStart(t *testing.T
 	require.NoError(t, err, "failed to get owned token leaves")
 
 	// Validate the response
-	require.Equal(t, 1, len(ownedLeavesResponse.LeavesWithPreviousTransactionData), "expected 1 owned leaf")
+	require.Equal(t, 1, len(tokenOutputsResponse.LeavesWithPreviousTransactionData), "expected 1 owned leaf")
 
-	leaf := ownedLeavesResponse.LeavesWithPreviousTransactionData[0]
+	leaf := tokenOutputsResponse.LeavesWithPreviousTransactionData[0]
 
 	// Validate leaf details
 	require.True(t, bytes.Equal(leaf.Leaf.OwnerPublicKey, userLeaf3PubKeyBytes), "leaf owner public key does not match expected")
@@ -783,8 +783,8 @@ func TestBroadcastTokenTransactionIssueAndTransferTokensDoubleSign(t *testing.T)
 	transferTokenTransactionResponse := transferStartResp.FinalTokenTransaction
 	log.Printf("transfer transaction finalized: %v", transferTokenTransactionResponse)
 
-	// Test GetOwnedTokenLeaves
-	ownedLeavesResponse, err := wallet.GetOwnedTokenLeaves(
+	// Test QueryTokenOutputs
+	tokenOutputsResponse, err := wallet.QueryTokenOutputs(
 		context.Background(),
 		config,
 		[][]byte{userLeaf3PubKeyBytes},
@@ -793,9 +793,9 @@ func TestBroadcastTokenTransactionIssueAndTransferTokensDoubleSign(t *testing.T)
 	require.NoError(t, err, "failed to get owned token leaves")
 
 	// Validate the response
-	require.Equal(t, 1, len(ownedLeavesResponse.LeavesWithPreviousTransactionData), "expected 1 owned leaf")
+	require.Equal(t, 1, len(tokenOutputsResponse.LeavesWithPreviousTransactionData), "expected 1 owned leaf")
 
-	leaf := ownedLeavesResponse.LeavesWithPreviousTransactionData[0]
+	leaf := tokenOutputsResponse.LeavesWithPreviousTransactionData[0]
 
 	// Validate leaf details
 	require.True(t, bytes.Equal(leaf.Leaf.OwnerPublicKey, userLeaf3PubKeyBytes), "leaf owner public key does not match expected")
