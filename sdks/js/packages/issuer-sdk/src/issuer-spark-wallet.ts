@@ -25,7 +25,6 @@ import {
 } from "@noble/curves/abstract/utils";
 import { validateMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english";
-import { IssuerWalletInterface } from "./interface/wallet-interface.js";
 import { TokenFreezeService } from "./services/freeze.js";
 import { IssuerTokenTransactionService } from "./services/token-transactions.js";
 import { GetTokenActivityResponse, TokenPubKeyInfoResponse } from "./types.js";
@@ -39,7 +38,6 @@ const BURN_ADDRESS = "02".repeat(33);
 
 export class IssuerSparkWallet
   extends SparkWallet
-  implements IssuerWalletInterface
 {
   private issuerTokenTransactionService: IssuerTokenTransactionService;
   private tokenFreezeService: TokenFreezeService;
