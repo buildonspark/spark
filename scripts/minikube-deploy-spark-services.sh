@@ -120,7 +120,7 @@ done | jq -s .)
 
 operator_cmd=(
     helm install
-    --version 0.1.1
+    --version 0.1.2
     --timeout "$HELM_INSTALL_TIMEOUT"
     --namespace spark
     --set config.network="regtest"
