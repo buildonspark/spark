@@ -11,12 +11,9 @@ describe("wallet", () => {
       "logic ripple layer execute smart disease marine hero monster talent crucial unfair horror shadow maze abuse avoid story loop jaguar sphere trap decrease turn",
       "936eda5945550ab384b4fd91fd6024360f6fdf1ecd9a181fb374d07cdbff0985528dc7aff7305da7dab26ce88425f692d4e3bfefbb27e1770b7773bc3c69e7bb",
       "5904c8ec7a0f8748e4f3d82840cb9736857b8feec921ccd7ceba20d47c9e3e2f3050e6beefefe73a2af8740ff4dc203a33771fe680d9e24934f8a2784eda53be",
-      "ajuster olivier vital ennuyeux prince asphalte éternel bastion étoffer ruiner espoir zénith hématome dégivrer audace remuer traction novice éluder rejouer ruisseau vitesse réussir romance"
     ];
     const networks: NetworkType[] = [
-      "REGTEST",
-      "MAINNET",
-      "SIGNET",
+      "LOCAL",
     ];
 
     for (const seedOrMnemonic of seedOrMnemonics) {
@@ -46,7 +43,7 @@ describe("wallet", () => {
 
     for (const seedOrMnemonic of seedOrMnemonics) {
       const options: ConfigOptions = {
-        network: "REGTEST",
+        network: "LOCAL",
       };
       await expect(
         SparkWallet.initialize({

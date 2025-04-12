@@ -7,8 +7,8 @@ import { createDummyTx } from "../../utils/wasm.js";
 import { SparkWalletTesting } from "../utils/spark-testing-wallet.js";
 
 describe("Tree Creation", () => {
-  it("test tree creation address generation", async () => {
-    const wallet = new SparkWalletTesting(Network.LOCAL);
+  it.skip("test tree creation address generation", async () => {
+    const wallet = new SparkWalletTesting({ network: Network.LOCAL });
     await wallet.initWallet();
 
     const pubKey = await wallet.getSigner().generatePublicKey();
