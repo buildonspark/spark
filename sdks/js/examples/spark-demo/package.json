@@ -1,9 +1,9 @@
 {
   "name": "spark-demo",
-  "version": "0.0.28",
+  "version": "0.0.29",
   "private": true,
   "dependencies": {
-    "@buildonspark/spark-sdk": "0.0.29",
+    "@buildonspark/spark-sdk": "0.0.30",
     "@lightsparkdev/ui": "^1.1.0",
     "@number-flow/react": "^0.5.7",
     "@radix-ui/react-popover": "^1.1.6",

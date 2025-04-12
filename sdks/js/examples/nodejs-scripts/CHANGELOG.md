@@ -1,5 +1,13 @@
 # @buildonspark/nodejs-scripts
 
+## 0.0.25
+
+### Patch Changes
+
+- Updated dependencies
+  - @buildonspark/issuer-sdk@0.0.30
+  - @buildonspark/spark-sdk@0.0.30
+
 ## 0.0.24
 
 ### Patch Changes
