@@ -63,7 +63,7 @@ DELETE FROM cooperative_exits WHERE cooperative_exit_transfer IN (
 );
 
 -- Delete the transfer leafs that reference the transfers that will be deleted.
-DELETE FROM transfer_leafs_to_delete WHERE id IN (
+DELETE FROM transfer_leafs WHERE id IN (
     SELECT id FROM transfer_leafs_to_delete
 );
 
