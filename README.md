@@ -4,7 +4,6 @@
 
 A simple shared signing protocol that makes Bitcoin fast, cheap, and self-custodial at scale — that’s Spark.
 
-
 ## Architecture Overview
 
 ### Core Components
@@ -71,107 +70,123 @@ In this architecture:
 
 ## Getting Started
 
-### Prerequisites
+## [mise](https://mise.jdx.dev/)
 
-Before setting up the Spark development environment, ensure you have the following installed:
+To install all of our protobuf, rust, and go toolchains install [mise](https://mise.jdx.dev/getting-started.html), then run:
 
-- **Go** (1.18+)
-- **Rust** (with Cargo)
-- **PostgreSQL**
-- **Bitcoin Core** (with ZMQ support)
-- **tmux** (for running the development environment)
-- **Protocol Buffers**
-
-#### Core Dependencies
-
-```bash
-# Install Go dependencies
-go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
-go install github.com/envoyproxy/protoc-gen-validate@latest
-
-# Install system dependencies (MacOS)
-brew install tmux protobuf zeromq bitcoin postgresql golangci-lint sqlx-cli cargo
+```
+mise trust
+mise install
 ```
 
-#### PostgreSQL Setup
+## Generate proto files
 
-Ensure PostgreSQL is running and properly configured:
+After modifying the proto files, you can generate the Go files with the following command:
 
-```bash
-# Create a role for your user
-psql -U postgres -c "CREATE ROLE $USER WITH LOGIN SUPERUSER;"
-
-# Find your PostgreSQL data directory
-psql -U postgres -c "SHOW data_directory;"
-
-# Configure PostgreSQL to accept TCP/IP connections by editing postgresql.conf and pg_hba.conf
-# Sample configuration available in the Development Environment section below
+```
+make
 ```
 
-### Setup and Build
+## Bitcoind
 
-1. **Clone the repository**:
+Our SO implementation uses ZMQ to listen for block updates from bitcoind. Install it with:
 
-   ```bash
-   git clone -b cleaning https://github.com/lightsparkdev/spark.git
-   cd spark
-   ```
+```
+brew install zeromq
+```
 
-2. **Run the entire stack** (Spark Operator, Bitcoin node, FROST signer, LRC20 node):
-   ```bash
-   ./run-everything.sh
-   ```
+Note: whatever bitcoind you are running will also need to have been compiled with ZMQ.
+The default installation via brew has ZMQ, but binaries downloaded from the bitcoin core
+website do not.
 
-### Running Tests
+```
+brew install bitcoin
+```
 
-#### Unit Tests
+## DB Migrations
 
-```bash
-# In the spark directory
+We use atlas to manage our database migrations. Install via `mise install`.
+
+To make a migration, follow these steps:
+
+- Make your change to the schema, run `make ent`
+- Generate migration files by running `./scripts/gen-migration.sh <name>`:
+- When running in minikube or `run-everything.sh`, the migration will be automatically
+  applied to each operator's database. But if you want to apply a migration manually, you can run (e.g. DB name is `sparkoperator_0`):
+
+```
+atlas migrate apply --dir "file://so/ent/migrate/migrations" --url "postgresql://127.0.0.1:5432/sparkoperator_0?sslmode=disable"
+```
+
+- Commit the migration files, and submit a PR.
+
+If you are adding atlas migrations for the first time to an existing DB, you will need to run the migration command with the `--baseline` flag.
+
+```
+atlas migrate apply --dir "file://so/ent/migrate/migrations" --url "postgresql://127.0.0.1:5432/sparkoperator_0?sslmode=disable" --baseline 20250228224813
+```
+
+## VSCode
+
+If spark_frost.udl file has issue with VSCode, you can add the following to your settings.json file:
+
+```
+"files.associations": {
+    "spark_frost.udl": "plaintext"
+}
+```
+
+## Linting
+
+Golang linting uses `golang-ci`, installed with `mise install`.
+
+To run the linters, use either of
+
+```
+mise lint
+
+golangci-lint run
+```
+
+## Run tests
+
+### Unit tests
+
+```
+mise test-go # works from any directory
+mise test # works from the spark folder
+```
+
+or
+
+In spark folder, run:
+
+```
 go test $(go list ./... | grep -v -E "so/grpc_test|so/tree")
 ```
 
-#### End-to-End Tests
+## E2E tests
 
-After starting the stack with `run-everything.sh`:
+The E2E test environment can be run locally in minikube via `./scripts/local-test.sh` for hermetic testing (recommended) or run locally via `./run-everything.sh`.
 
-```bash
-# In the spark directory
-go test ./so/grpc_test/...
+#### Local Setup (`./run-everything.sh`)
+
+```
+brew install tmux
+brew install sqlx-cli # required for LRC20 Node
+brew install cargo # required for LRC20 Node
 ```
 
-## Development Environment
+##### bitcoind
 
-### Database Migrations
+See bitcoin section above.
 
-We use Atlas to manage database migrations:
+##### postgres
 
-```bash
-# After making schema changes, run:
-make ent
+You also need to enable TCP/IP connections to the database.
+You might need to edit the following files found in your `postgres` data directory. If you installed `postgres` via homebrew, it is probably in `/usr/local/var/postgres`. If you can connect to the database via `psql`, you can find the data directory by running `psql -U postgres -c "SHOW data_directory;"`.
 
-# Generate a new migration
-createdb operator_temp
-atlas migrate diff <diff_name> \
---dir "file://so/ent/migrate/migrations" \
---to "ent://so/ent/schema" \
---dev-url "postgresql://127.0.0.1:5432/operator_temp?sslmode=disable&search_path=public"
-dropdb operator_temp
-
-# Apply migrations manually (if needed)
-atlas migrate apply --dir "file://so/ent/migrate/migrations" --url "postgresql://127.0.0.1:5432/operator_0?sslmode=disable"
-```
-
-For existing databases, you may need the `--baseline` flag:
-
-```bash
-atlas migrate apply --dir "file://so/ent/migrate/migrations" --url "postgresql://127.0.0.1:5432/operator_0?sslmode=disable" --baseline 20250228224813
-```
-
-### PostgreSQL Configuration
-
-Sample `postgresql.conf` settings:
+A sample `postgresql.conf`:
 
 ```
 hba_file = './pg_hba.conf'
@@ -182,7 +197,7 @@ log_line_prefix = '[%p] '
 port = 5432
 ```
 
-Sample `pg_hba.conf` settings:
+A sample `pg_hba.conf`:
 
 ```
 #type  database  user  address       method
@@ -191,48 +206,91 @@ host    all       all   127.0.0.1/32 trust
 host    all       all   ::1/128      trust
 ```
 
-### IDE Configuration
+#### Hermetic/Minikube Setup (`./scripts/local-test.sh`)
 
-For VS Code, add this to your settings if you encounter issues with `.udl` files:
+##### minikube
 
-```json
-"files.associations": {
-    "spark_frost.udl": "plaintext"
-}
+See: [ops/minikube/README.md](https://github.com/lightsparkdev/ops/blob/main/minikube/README.md)
+
+Please run: `ops/minikube/setup.sh`, then `./scripts/local-test.sh`. If want to make local code changes visible in minikube, you'll need to
+
+```
+# 1. Build the image
+./scripts/build.sh  # from the repo root
+# OR
+mise build-so-dev-image  # from any directory
+
+# 2. Run minikube with the local image
+./scripts/local-test.sh --dev-spark
 ```
 
-### Linting
+### Running tests
 
-```bash
-# Run the linter
-golangci-lint run
+Golang integration tests are in the spark/so/grpc_test folder.
+JS SDK integration tests are across the different JS packages, but can be run together in the js/sdks directory, or in each package's own directory, via `yarn test:integration`.
+
+In the root folder, run:
+
+```
+# Local environment
+./run-everything.sh
 ```
 
-## Troubleshooting
+OR
 
-1. **Logs**: Spark operator and signer logs are located in `_data/run_X/logs/`
+```
+# Hermetic/Minikube environment
+#
+# Usage:
+#   ./scripts/local-test.sh [--dev-spark] [--keep-data]
+#
+# Options:
+#   --dev-spark         - Sets USE_DEV_SPARK=true to use the locally built dev spark image
+#   --keep-data         - Sets RESET_DBS=false to preserve existing test data (databases and blockchain)
+#
+# Environment Variables:
+#   RESET_DBS           - Whether to reset operator databases and bitcoin blockchain (default: true)
+#   USE_DEV_SPARK       - Whether to use the dev spark image built into minikube (default: false)
+#   SPARK_TAG           - Image tag to use for both Spark operator and signer (default: latest)
+#   LRC20_TAG           - Image tag to use for LRC20 (default: latest)
+#   USE_LIGHTSPARK_HELM_REPO - Whether to fetch helm charts from remote repo (default: false)
+#   OPS_DIR             - Path to the Lightspark ops repository which contains helm charts (auto-detected if not set)
 
-2. **tmux Sessions**: Use the following to connect to the tmux session:
+./scripts/local-test.sh
 
-   ```bash
-   # Connect to the operator session
-   tmux attach -t operator
+# CTR-C when done to remove shut down port forwarding
+```
 
-   # Alternative for iTerm2 users
-   tmux -CC attach -t operator
-   ```
+then run your tests
 
-3. **First Run**: The first time you run `run-everything.sh`, it may take a while and might need to be run multiple times to properly initialize all components.
+```
+mise test-grpc  # from anywhere in the repo
 
-4. **Bitcoin regtest**: If you need to interact with the Bitcoin regtest node:
-   ```bash
-   bitcoin-cli -conf=/path/to/spark/bitcoin_regtest.conf getblockchaininfo
-   ```
+# OR
 
-## Documentation
+go test -failfast=false -p=2 ./so/grpc_test/...  # in the spark folder
 
-For more detailed information about specific components:
+# OR
 
-- See [/spark/README.md](/spark/README.md) for details on the core implementation
-- See [/signer/README.md](/signer/README.md) for documentation on the FROST signer
-- See [/spark/so/README.md](/spark/so/README.md) for details on the Spark Operator
+gotestsum --format testname --rerun-fails ./so/grpc_test/...  # if you want prettier results and retries
+```
+
+In the sdks/js folder, you can run:
+
+```
+yarn install
+yarn build
+yarn test:integration
+```
+
+#### Troubleshooting
+
+1. For local testing, operator (go) and signer (rust) logs are found in `_data/run_X/logs`. For minikube, logs are found via kubernetes. [k9s](https://k9scli.io/) is a great tool to investigate your minikube k8 cluster.
+2. If you don't want to deal with `tmux` commands yourself, you can easily interact with tmux using the `iterm2` GUI and tmux control-center.
+   From within `iterm2`, you can run:
+
+`tmux -CC attach -t operator`
+
+3. The first time you run `run-everything.sh` it will take a while to start up. You might actually need to run it a couple of times for everything to work properly. Attach to the `operator` session and check out the logs.
+
+4. Having trouble with mise? You can always run `mise implode` and it will remove mise entirely so you can start over.

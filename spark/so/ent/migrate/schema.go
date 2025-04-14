@@ -14,7 +14,7 @@ var (
 		{Name: "create_time", Type: field.TypeTime},
 		{Name: "update_time", Type: field.TypeTime},
 		{Name: "height", Type: field.TypeInt64},
-		{Name: "network", Type: field.TypeEnum, Enums: []string{"MAINNET", "REGTEST", "TESTNET", "SIGNET"}},
+		{Name: "network", Type: field.TypeEnum, Enums: []string{"UNSPECIFIED", "MAINNET", "REGTEST", "TESTNET", "SIGNET"}},
 	}
 	// BlockHeightsTable holds the schema information for the "block_heights" table.
 	BlockHeightsTable = &schema.Table{
@@ -103,6 +103,7 @@ var (
 		{Name: "payment_hash", Type: field.TypeBytes},
 		{Name: "status", Type: field.TypeEnum, Enums: []string{"WAITING_FOR_PREIMAGE", "PREIMAGE_SHARED", "RETURNED"}},
 		{Name: "receiver_identity_pubkey", Type: field.TypeBytes, Nullable: true},
+		{Name: "preimage", Type: field.TypeBytes, Nullable: true},
 		{Name: "preimage_request_transfers", Type: field.TypeUUID, Nullable: true},
 	}
 	// PreimageRequestsTable holds the schema information for the "preimage_requests" table.
@@ -113,7 +114,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "preimage_requests_transfers_transfers",
-				Columns:    []*schema.Column{PreimageRequestsColumns[6]},
+				Columns:    []*schema.Column{PreimageRequestsColumns[7]},
 				RefColumns: []*schema.Column{TransfersColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
@@ -253,7 +254,7 @@ var (
 		{Name: "leaf_spent_transaction_input_vout", Type: field.TypeInt32, Nullable: true},
 		{Name: "leaf_spent_revocation_private_key", Type: field.TypeBytes, Nullable: true},
 		{Name: "confirmed_withdraw_block_hash", Type: field.TypeBytes, Nullable: true},
-		{Name: "network", Type: field.TypeEnum, Nullable: true, Enums: []string{"MAINNET", "REGTEST", "TESTNET", "SIGNET"}},
+		{Name: "network", Type: field.TypeEnum, Nullable: true, Enums: []string{"UNSPECIFIED", "MAINNET", "REGTEST", "TESTNET", "SIGNET"}},
 		{Name: "token_leaf_revocation_keyshare", Type: field.TypeUUID},
 		{Name: "token_leaf_leaf_created_token_transaction_receipt", Type: field.TypeUUID, Nullable: true},
 		{Name: "token_leaf_leaf_spent_token_transaction_receipt", Type: field.TypeUUID, Nullable: true},
@@ -353,7 +354,7 @@ var (
 		{Name: "receiver_identity_pubkey", Type: field.TypeBytes},
 		{Name: "total_value", Type: field.TypeUint64},
 		{Name: "status", Type: field.TypeEnum, Enums: []string{"SENDER_INITIATED", "SENDER_KEY_TWEAK_PENDING", "SENDER_KEY_TWEAKED", "RECEIVER_KEY_TWEAKED", "RECEIVER_KEY_TWEAK_LOCKED", "RECEIVER_REFUND_SIGNED", "COMPLETED", "EXPIRED", "RETURNED"}},
-		{Name: "type", Type: field.TypeEnum, Enums: []string{"PREIMAGE_SWAP", "COOPERATIVE_EXIT", "TRANSFER"}},
+		{Name: "type", Type: field.TypeEnum, Enums: []string{"PREIMAGE_SWAP", "COOPERATIVE_EXIT", "TRANSFER", "SWAP", "COUNTER_SWAP"}},
 		{Name: "expiry_time", Type: field.TypeTime},
 		{Name: "completion_time", Type: field.TypeTime, Nullable: true},
 	}
@@ -439,8 +440,9 @@ var (
 		{Name: "update_time", Type: field.TypeTime},
 		{Name: "owner_identity_pubkey", Type: field.TypeBytes},
 		{Name: "status", Type: field.TypeEnum, Enums: []string{"PENDING", "AVAILABLE"}},
-		{Name: "network", Type: field.TypeEnum, Enums: []string{"MAINNET", "REGTEST", "TESTNET", "SIGNET"}},
-		{Name: "base_txid", Type: field.TypeBytes, Nullable: true},
+		{Name: "network", Type: field.TypeEnum, Enums: []string{"UNSPECIFIED", "MAINNET", "REGTEST", "TESTNET", "SIGNET"}},
+		{Name: "base_txid", Type: field.TypeBytes},
+		{Name: "vout", Type: field.TypeInt16},
 		{Name: "tree_root", Type: field.TypeUUID, Nullable: true},
 	}
 	// TreesTable holds the schema information for the "trees" table.
@@ -451,7 +453,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "trees_tree_nodes_root",
-				Columns:    []*schema.Column{TreesColumns[7]},
+				Columns:    []*schema.Column{TreesColumns[8]},
 				RefColumns: []*schema.Column{TreeNodesColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
@@ -466,6 +468,11 @@ var (
 				Name:    "tree_network",
 				Unique:  false,
 				Columns: []*schema.Column{TreesColumns[5]},
+			},
+			{
+				Name:    "tree_base_txid_vout",
+				Unique:  true,
+				Columns: []*schema.Column{TreesColumns[6], TreesColumns[7]},
 			},
 		},
 	}

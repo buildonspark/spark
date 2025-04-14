@@ -464,9 +464,9 @@ func main() {
 	})
 
 	cli.registry.RegisterCommand(Command{
-		Name:        "refresh [<node_id>]",
+		Name:        "refresh",
 		Description: "Force refresh a node, or refresh all leaves if needed",
-		Usage:       "refresh",
+		Usage:       "refresh [<node_id>]",
 		Handler: func(args []string) error {
 			if len(args) < 1 {
 				fmt.Println("No node ID provided, checking all leaves...")

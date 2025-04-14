@@ -140,7 +140,6 @@ func (o *DepositHandler) GenerateDepositAddress(ctx context.Context, config *so.
 	}, nil
 }
 
-// StartTreeCreation verifies the on chain utxo, and then verifies and signs the offchain root and refund transactions.
 func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Config, req *pb.StartTreeCreationRequest) (*pb.StartTreeCreationResponse, error) {
 	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, o.config, req.IdentityPublicKey); err != nil {
 		return nil, err
@@ -269,7 +268,11 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 		return nil, err
 	}
 	txid := onChainTx.TxHash()
-	treeMutator := db.Tree.Create().SetOwnerIdentityPubkey(depositAddress.OwnerIdentityPubkey).SetNetwork(schemaNetwork).SetBaseTxid(txid[:])
+	treeMutator := db.Tree.
+		Create().
+		SetOwnerIdentityPubkey(depositAddress.OwnerIdentityPubkey).
+		SetNetwork(schemaNetwork).SetBaseTxid(txid[:]).
+		SetVout(int16(req.OnChainUtxo.Vout))
 	if txConfirmed {
 		treeMutator.SetStatus(schema.TreeStatusAvailable)
 	} else {
@@ -301,6 +304,182 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 	}
 
 	return &pb.StartTreeCreationResponse{
+		TreeId: tree.ID.String(),
+		RootNodeSignatureShares: &pb.NodeSignatureShares{
+			NodeId:                root.ID.String(),
+			NodeTxSigningResult:   nodeTxSigningResult,
+			RefundTxSigningResult: refundTxSigningResult,
+			VerifyingKey:          verifyingKeyBytes,
+		},
+	}, nil
+}
+
+// StartDepositTreeCreation verifies the on chain utxo, and then verifies and signs the offchain root and refund transactions.
+func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *so.Config, req *pb.StartDepositTreeCreationRequest) (*pb.StartDepositTreeCreationResponse, error) {
+	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, o.config, req.IdentityPublicKey); err != nil {
+		return nil, err
+	}
+	// Get the on chain tx
+	onChainTx, err := common.TxFromRawTxBytes(req.OnChainUtxo.RawTx)
+	if err != nil {
+		return nil, err
+	}
+	if len(onChainTx.TxOut) <= int(req.OnChainUtxo.Vout) {
+		return nil, fmt.Errorf("utxo index out of bounds")
+	}
+
+	// Verify that the on chain utxo is paid to the registered deposit address
+	if len(onChainTx.TxOut) <= int(req.OnChainUtxo.Vout) {
+		return nil, fmt.Errorf("utxo index out of bounds")
+	}
+	onChainOutput := onChainTx.TxOut[req.OnChainUtxo.Vout]
+	network, err := common.NetworkFromProtoNetwork(req.OnChainUtxo.Network)
+	if err != nil {
+		return nil, err
+	}
+	if !config.IsNetworkSupported(network) {
+		return nil, fmt.Errorf("network not supported")
+	}
+	utxoAddress, err := common.P2TRAddressFromPkScript(onChainOutput.PkScript, network)
+	if err != nil {
+		return nil, err
+	}
+	db := ent.GetDbFromContext(ctx)
+	depositAddress, err := db.DepositAddress.Query().Where(depositaddress.Address(*utxoAddress)).First(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if depositAddress == nil || !bytes.Equal(depositAddress.OwnerIdentityPubkey, req.IdentityPublicKey) {
+		return nil, fmt.Errorf("deposit address not found for address: %s", *utxoAddress)
+	}
+	if !bytes.Equal(depositAddress.OwnerSigningPubkey, req.RootTxSigningJob.SigningPublicKey) || !bytes.Equal(depositAddress.OwnerSigningPubkey, req.RefundTxSigningJob.SigningPublicKey) {
+		return nil, fmt.Errorf("unexpected signing public key")
+	}
+	txConfirmed := helper.CheckUTXOOnchain(config, req.OnChainUtxo)
+
+	// Verify the root transaction
+	rootTx, err := common.TxFromRawTxBytes(req.RootTxSigningJob.RawTx)
+	if err != nil {
+		return nil, err
+	}
+	err = o.verifyRootTransaction(rootTx, onChainTx, req.OnChainUtxo.Vout)
+	if err != nil {
+		return nil, err
+	}
+	rootTxSigHash, err := common.SigHashFromTx(rootTx, 0, onChainOutput)
+	if err != nil {
+		return nil, err
+	}
+
+	// Verify the refund transaction
+	refundTx, err := common.TxFromRawTxBytes(req.RefundTxSigningJob.RawTx)
+	if err != nil {
+		return nil, err
+	}
+	err = o.verifyRefundTransaction(rootTx, refundTx)
+	if err != nil {
+		return nil, err
+	}
+	if len(rootTx.TxOut) <= 0 {
+		return nil, fmt.Errorf("vout out of bounds, root tx has no outputs")
+	}
+	refundTxSigHash, err := common.SigHashFromTx(refundTx, 0, rootTx.TxOut[0])
+	if err != nil {
+		return nil, err
+	}
+
+	// Sign the root and refund transactions
+	signingKeyShare, err := depositAddress.QuerySigningKeyshare().Only(ctx)
+	if err != nil {
+		return nil, err
+	}
+	verifyingKeyBytes, err := common.AddPublicKeys(signingKeyShare.PublicKey, depositAddress.OwnerSigningPubkey)
+	if err != nil {
+		return nil, err
+	}
+
+	signingJobs := make([]*helper.SigningJob, 0)
+	userRootTxNonceCommitment, err := objects.NewSigningCommitment(req.RootTxSigningJob.SigningNonceCommitment.Binding, req.RootTxSigningJob.SigningNonceCommitment.Hiding)
+	if err != nil {
+		return nil, err
+	}
+	userRefundTxNonceCommitment, err := objects.NewSigningCommitment(req.RefundTxSigningJob.SigningNonceCommitment.Binding, req.RefundTxSigningJob.SigningNonceCommitment.Hiding)
+	if err != nil {
+		return nil, err
+	}
+	signingJobs = append(
+		signingJobs,
+		&helper.SigningJob{
+			JobID:             uuid.New().String(),
+			SigningKeyshareID: signingKeyShare.ID,
+			Message:           rootTxSigHash,
+			VerifyingKey:      verifyingKeyBytes,
+			UserCommitment:    userRootTxNonceCommitment,
+		},
+		&helper.SigningJob{
+			JobID:             uuid.New().String(),
+			SigningKeyshareID: signingKeyShare.ID,
+			Message:           refundTxSigHash,
+			VerifyingKey:      verifyingKeyBytes,
+			UserCommitment:    userRefundTxNonceCommitment,
+		},
+	)
+	signingResults, err := helper.SignFrost(ctx, config, signingJobs)
+	if err != nil {
+		return nil, err
+	}
+
+	nodeTxSigningResult, err := signingResults[0].MarshalProto()
+	if err != nil {
+		return nil, err
+	}
+	refundTxSigningResult, err := signingResults[1].MarshalProto()
+	if err != nil {
+		return nil, err
+	}
+	// Create the tree
+	schemaNetwork, err := common.SchemaNetworkFromNetwork(network)
+	if err != nil {
+		return nil, err
+	}
+	txid := onChainTx.TxHash()
+	treeMutator := db.Tree.
+		Create().
+		SetOwnerIdentityPubkey(depositAddress.OwnerIdentityPubkey).
+		SetNetwork(schemaNetwork).
+		SetBaseTxid(txid[:]).
+		SetVout(int16(req.OnChainUtxo.Vout))
+	if txConfirmed {
+		treeMutator.SetStatus(schema.TreeStatusAvailable)
+	} else {
+		treeMutator.SetStatus(schema.TreeStatusPending)
+	}
+	tree, err := treeMutator.Save(ctx)
+	if err != nil {
+		return nil, err
+	}
+	root, err := db.TreeNode.
+		Create().
+		SetTree(tree).
+		SetStatus(schema.TreeNodeStatusCreating).
+		SetOwnerIdentityPubkey(depositAddress.OwnerIdentityPubkey).
+		SetOwnerSigningPubkey(depositAddress.OwnerSigningPubkey).
+		SetValue(uint64(onChainOutput.Value)).
+		SetVerifyingPubkey(verifyingKeyBytes).
+		SetSigningKeyshare(signingKeyShare).
+		SetRawTx(req.RootTxSigningJob.RawTx).
+		SetRawRefundTx(req.RefundTxSigningJob.RawTx).
+		SetVout(int16(req.OnChainUtxo.Vout)).
+		Save(ctx)
+	if err != nil {
+		return nil, err
+	}
+	tree, err = tree.Update().SetRoot(root).Save(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return &pb.StartDepositTreeCreationResponse{
 		TreeId: tree.ID.String(),
 		RootNodeSignatureShares: &pb.NodeSignatureShares{
 			NodeId:                root.ID.String(),

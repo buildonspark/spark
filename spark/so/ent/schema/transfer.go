@@ -56,6 +56,10 @@ const (
 	TransferTypeCooperativeExit TransferType = "COOPERATIVE_EXIT"
 	// TransferTypeTransfer is the type of transfer that is a normal transfer
 	TransferTypeTransfer TransferType = "TRANSFER"
+	// TransferTypeSwap is the type of transfer that is a swap of leaves for other leaves.
+	TransferTypeSwap TransferType = "SWAP"
+	// TransferTypeCounterSwap is the type of transfer that is the other side of a swap.
+	TransferTypeCounterSwap TransferType = "COUNTER_SWAP"
 )
 
 // Values returns the values of the transfer type.
@@ -64,6 +68,8 @@ func (TransferType) Values() []string {
 		string(TransferTypePreimageSwap),
 		string(TransferTypeCooperativeExit),
 		string(TransferTypeTransfer),
+		string(TransferTypeSwap),
+		string(TransferTypeCounterSwap),
 	}
 }
 

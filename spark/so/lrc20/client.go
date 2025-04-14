@@ -3,7 +3,6 @@ package lrc20
 import (
 	"context"
 	"fmt"
-	"log"
 	"log/slog"
 	"slices"
 	"time"
@@ -12,7 +11,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/common"
 	pblrc20 "github.com/lightsparkdev/spark-go/proto/lrc20"
-	"github.com/lightsparkdev/spark-go/proto/spark"
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/ent"
@@ -35,8 +33,8 @@ func NewClient(config *so.Config) *Client {
 	}
 }
 
-// exceuteLrc20Call handles common LRC20 RPC call pattern with proper connection management
-func (c *Client) exceuteLrc20Call(operation func(client pblrc20.SparkServiceClient) error) error {
+// executeLrc20Call handles common LRC20 RPC call pattern with proper connection management
+func (c *Client) executeLrc20Call(operation func(client pblrc20.SparkServiceClient) error) error {
 	network := common.Regtest.String()
 	if c.shouldSkipLrc20Call(network) {
 		return nil
@@ -57,7 +55,7 @@ func (c *Client) SendSparkSignature(
 	ctx context.Context,
 	signatureData *pblrc20.SparkSignatureData,
 ) error {
-	return c.exceuteLrc20Call(func(client pblrc20.SparkServiceClient) error {
+	return c.executeLrc20Call(func(client pblrc20.SparkServiceClient) error {
 		_, err := client.SendSparkSignature(ctx, &pblrc20.SendSparkSignatureRequest{
 			SignatureData: signatureData,
 		})
@@ -70,7 +68,7 @@ func (c *Client) FreezeTokens(
 	ctx context.Context,
 	req *pb.FreezeTokensRequest,
 ) error {
-	return c.exceuteLrc20Call(func(client pblrc20.SparkServiceClient) error {
+	return c.executeLrc20Call(func(client pblrc20.SparkServiceClient) error {
 		_, err := client.FreezeTokens(ctx, req)
 		return err
 	})
@@ -81,7 +79,7 @@ func (c *Client) VerifySparkTx(
 	ctx context.Context,
 	tokenTransaction *pb.TokenTransaction,
 ) error {
-	return c.exceuteLrc20Call(func(client pblrc20.SparkServiceClient) error {
+	return c.executeLrc20Call(func(client pblrc20.SparkServiceClient) error {
 		_, err := client.VerifySparkTx(ctx, &pblrc20.VerifySparkTxRequest{
 			FinalTokenTransaction: tokenTransaction,
 		})
@@ -96,7 +94,7 @@ func (c *Client) VerifySparkTx(
 // shouldSkipLrc20Call checks if LRC20 RPCs are disabled for the given network
 func (c *Client) shouldSkipLrc20Call(network string) bool {
 	if lrc20Config, ok := c.config.Lrc20Configs[network]; ok && lrc20Config.DisableRpcs {
-		log.Printf("Skipping LRC20 node call due to DisableRpcs flag")
+		slog.Info("Skipping LRC20 node call due to DisableRpcs flag")
 		return true
 	}
 	return false
@@ -118,8 +116,8 @@ func (c *Client) connectToLrc20Node() (*grpc.ClientConn, error) {
 	// and the LRC20 may not have the block info when the SO makes the first call).
 	retryConfig := common.RetryPolicyConfig{
 		MaxAttempts:          5,
-		InitialBackoffSecs:   1 * time.Second,
-		MaxBackoffSecs:       20 * time.Second,
+		InitialBackoff:       1 * time.Second,
+		MaxBackoff:           20 * time.Second,
 		BackoffMultiplier:    2.0,
 		RetryableStatusCodes: []string{"UNAVAILABLE", "NOT_FOUND"},
 	}
@@ -131,7 +129,7 @@ func (c *Client) connectToLrc20Node() (*grpc.ClientConn, error) {
 		conn, err = common.NewGRPCConnectionWithoutTLS(lrc20Config.Host, &retryConfig)
 	}
 	if err != nil {
-		log.Printf("Failed to connect to the lrc20 node to verify a token transaction: %v", err)
+		slog.Error("Failed to connect to the lrc20 node to verify a token transaction", "error", err)
 		return nil, err
 	}
 	return conn, nil
@@ -142,32 +140,33 @@ func (c *Client) connectToLrc20Node() (*grpc.ClientConn, error) {
 // when requested by wallets / external parties (which also allows for updating balance).
 func (c *Client) MarkWithdrawnTokenLeaves(
 	ctx context.Context,
-	network common.Network,
+	_ common.Network,
 	dbTx *ent.Tx,
 	blockHash *chainhash.Hash,
 ) error {
-	networkStr := network.String()
-	if lrc20Config, ok := c.config.Lrc20Configs[networkStr]; ok && lrc20Config.DisableRpcs {
-		log.Printf("Skipping LRC20 node call due to DisableRpcs flag")
+	network := common.Regtest.String()
+	if lrc20Config, ok := c.config.Lrc20Configs[network]; ok && lrc20Config.DisableRpcs {
+		slog.Info("Skipping LRC20 node call due to DisableRpcs flag")
 		return nil
 	}
-	allLeaves := []*spark.TokenLeafOutput{}
+	if lrc20Config, ok := c.config.Lrc20Configs[network]; ok && lrc20Config.DisableL1 {
+		slog.Info("Skipping LRC20 node call due to DisableL1 flag")
+		return nil
+	}
 
-	pageResponse, err := func(ctx context.Context) (*pblrc20.ListWithdrawnLeavesResponse, error) {
-		conn, err := c.connectToLrc20Node()
-		if err != nil {
-			return nil, err
-		}
-		defer conn.Close()
+	allLeaves := []*pb.TokenLeafOutput{}
 
-		client := pblrc20.NewSparkServiceClient(conn)
+	var pageResponse *pblrc20.ListWithdrawnLeavesResponse
+	err := c.executeLrc20Call(func(client pblrc20.SparkServiceClient) error {
 		pageSize := uint32(DefaultPageSize)
-		return client.ListWithdrawnLeaves(ctx, &pblrc20.ListWithdrawnLeavesRequest{
+		var err error
+		pageResponse, err = client.ListWithdrawnLeaves(ctx, &pblrc20.ListWithdrawnLeavesRequest{
 			// TODO(DL-99): Fetch just for the latest blockhash instead of all withdrawn leaves.
 			// TODO(DL-98): Add support for pagination.
 			PageSize: &pageSize,
 		})
-	}(ctx)
+		return err
+	})
 	if err != nil {
 		return fmt.Errorf("error fetching withdrawn leaves: %w", err)
 	}

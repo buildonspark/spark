@@ -18,21 +18,21 @@ type LightningInvoiceCreator interface {
 	CreateInvoice(bitcoinNetwork common.Network, amountSats uint64, paymentHash []byte, memo string, expirySecs int) (*string, int64, error)
 }
 
-func CreateLightningInvoiceWithPreimage(
+func CreateLightningInvoiceWithPreimageAndHash(
 	ctx context.Context,
 	config *Config,
 	creator LightningInvoiceCreator,
 	amountSats uint64,
 	memo string,
-	preimage []byte,
+	preimage [32]byte,
+	paymentHash [32]byte,
 ) (*string, int64, error) {
-	paymentHash := sha256.Sum256(preimage)
 	invoice, fees, err := creator.CreateInvoice(config.Network, amountSats, paymentHash[:], memo, 60*60*24*30)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	preimageAsInt := new(big.Int).SetBytes(preimage)
+	preimageAsInt := new(big.Int).SetBytes(preimage[:])
 	shares, err := secretsharing.SplitSecretWithProofs(preimageAsInt, secp256k1.Params().N, config.Threshold, len(config.SigningOperators))
 	if err != nil {
 		return nil, 0, err
@@ -82,6 +82,18 @@ func CreateLightningInvoiceWithPreimage(
 	return invoice, fees, nil
 }
 
+func CreateLightningInvoiceWithPreimage(
+	ctx context.Context,
+	config *Config,
+	creator LightningInvoiceCreator,
+	amountSats uint64,
+	memo string,
+	preimage [32]byte,
+) (*string, int64, error) {
+	paymentHash := sha256.Sum256(preimage[:])
+	return CreateLightningInvoiceWithPreimageAndHash(ctx, config, creator, amountSats, memo, preimage, paymentHash)
+}
+
 // CreateLightningInvoice creates a Lightning invoice and sends the preimage shares to the signing operators.
 func CreateLightningInvoice(ctx context.Context, config *Config, creator LightningInvoiceCreator, amountSats uint64, memo string) (*string, int64, error) {
 	preimagePrivKey, err := secp256k1.GeneratePrivateKey()
@@ -90,5 +102,5 @@ func CreateLightningInvoice(ctx context.Context, config *Config, creator Lightni
 	}
 
 	preimage := preimagePrivKey.Serialize()
-	return CreateLightningInvoiceWithPreimage(ctx, config, creator, amountSats, memo, preimage)
+	return CreateLightningInvoiceWithPreimage(ctx, config, creator, amountSats, memo, [32]byte(preimage))
 }

@@ -20,14 +20,15 @@ import (
 type Network int
 
 const (
+	Unspecified Network = iota
 	// Mainnet is the main Bitcoin network.
-	Mainnet Network = iota
+	Mainnet Network = 10
 	// Regtest is the regression test network.
-	Regtest
+	Regtest Network = 20
 	// Testnet is the test network.
-	Testnet
+	Testnet Network = 30
 	// Signet is the signet network.
-	Signet
+	Signet Network = 40
 )
 
 func (n Network) String() string {
@@ -56,7 +57,7 @@ func NetworkFromString(network string) (Network, error) {
 	case "signet":
 		return Signet, nil
 	default:
-		return Mainnet, fmt.Errorf("invalid network: %s", network)
+		return Unspecified, fmt.Errorf("invalid network: %s", network)
 	}
 }
 
@@ -71,7 +72,7 @@ func NetworkFromProtoNetwork(protoNetwork pb.Network) (Network, error) {
 	case pb.Network_SIGNET:
 		return Signet, nil
 	default:
-		return Mainnet, fmt.Errorf("invalid network")
+		return Unspecified, fmt.Errorf("invalid network")
 	}
 }
 
@@ -86,7 +87,7 @@ func NetworkFromSchemaNetwork(schemaNetwork schema.Network) (Network, error) {
 	case schema.NetworkSignet:
 		return Signet, nil
 	default:
-		return Mainnet, fmt.Errorf("invalid network")
+		return Unspecified, fmt.Errorf("invalid network")
 	}
 }
 
@@ -101,7 +102,7 @@ func SchemaNetworkFromNetwork(network Network) (schema.Network, error) {
 	case Signet:
 		return schema.NetworkSignet, nil
 	default:
-		return schema.NetworkMainnet, fmt.Errorf("invalid network")
+		return schema.NetworkUnspecified, fmt.Errorf("invalid network")
 	}
 }
 

@@ -1,0 +1,45 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "globalEnv": ["GITHUB_ACTIONS", "HERMETIC_TEST"],
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**", "build/**"]
+    },
+    "circular-deps": {},
+    "clean": {
+      "cache": false
+    },
+    "format": {},
+    "format:fix": {},
+    "lint": {
+      "dependsOn": ["^build"]
+    },
+    "lint:fix": {
+      "dependsOn": ["^build"]
+    },
+    "package:checks": {
+      "dependsOn": []
+    },
+    "test": {
+      "dependsOn": ["^build"]
+    },
+    "test:all": {
+      "dependsOn": ["^build"]
+    },
+    "test:integration": {
+      "dependsOn": ["^build"]
+    },
+    "test:integration:ssp": {
+      "dependsOn": ["^build"]
+    },
+    "start": {
+      "cache": false,
+      "persistent": true,
+      "dependsOn": ["^build"]
+    },
+    "types": {
+      "dependsOn": ["^build"]
+    }
+  }
+}
