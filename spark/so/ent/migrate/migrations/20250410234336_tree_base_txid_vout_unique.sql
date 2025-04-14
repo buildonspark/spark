@@ -52,7 +52,7 @@ CREATE TEMP TABLE transfer_leafs_to_delete AS (
 );
 
 CREATE TEMP TABLE transfers_to_delete AS (
-    SELECT DISTINCT transfer_id AS id FROM transfer_leafs_to_delete
+    SELECT transfer_leaf_transfer as id FROM transfer_leafs GROUP BY transfer_leafs.transfer_leaf_transfer HAVING EVERY(transfer_leaf_leaf IN (SELECT id FROM tree_nodes_to_delete))
 );
 
 -- Delete cooperative exits that reference the transfers that will be deleted
