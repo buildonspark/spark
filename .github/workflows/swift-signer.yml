@@ -1,0 +1,58 @@
+name: "Swift Signer"
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'New release version, eg. 0.MINOR.PATCH'
+        required: true
+        type: string
+
+jobs:
+  build-swift:
+    name: Build and package swift library
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+        with:
+          path: build
+
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and package swift
+        working-directory: build/signer/spark-frost-uniffi
+        run: |
+          ./build-swift.sh
+
+      - name: Setup xcframework
+        working-directory: build/signer/spark-frost-uniffi
+        run: |
+          rm spark-frost-uniffi.xcframework.zip || true
+          zip -9 -r spark-frost-uniffi.xcframework.zip spark-frost-swift/spark_frostFFI.xcframework
+      - name: Upload xcframework artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: "spark-frost-uniffi-xcframework"
+          path: "build/signer/spark-frost-uniffi/spark-frost-uniffi.xcframework.zip"
+
+  create-release:
+    name: Create release and tag
+    needs: [build-swift]
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - name: Download ios artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: spark-frost-uniffi-xcframework
+      - name: Create release
+        uses: ncipollo/release-action@v1
+        with:
+          artifacts: "./spark-frost-uniffi*"
+          tag: "swift-signer-${{ inputs.version }}"
+          name: "swift-signer-${{ inputs.version }}"
+          prerelease: true

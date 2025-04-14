@@ -1,0 +1,57 @@
+name: "Licenses"
+ 
+on:
+  pull_request:
+    paths:
+      - "apps/Spark/Spark.xcodeproj/project.pbxproj"
+      - "sdks/js/yarn.lock"
+      - "signer/spark-frost/Cargo.toml"
+      - "signer/Cargo.lock"
+      - "signer/Cargo.toml"
+      - "signer/spark-frost-uniffi/spark-frost-python/requirements.txt"
+      - "signer/spark-frost-uniffi/spark-frost-python/setup.py"
+      - "spark/go.mod"
+      - "spark/go.sum"
+      - "tools/paylightning/Cargo.lock"
+      - "tools/paylightning/Cargo.toml"
+      - ".github/workflows/licenses.yaml"
+  push:
+    branches:
+      - main
+    paths:
+      - "apps/Spark/Spark.xcodeproj/project.pbxproj"
+      - "sdks/js/yarn.lock"
+      - "signer/spark-frost/Cargo.toml"
+      - "signer/Cargo.lock"
+      - "signer/Cargo.toml"
+      - "signer/spark-frost-uniffi/spark-frost-python/requirements.txt"
+      - "signer/spark-frost-uniffi/spark-frost-python/setup.py"
+      - "spark/go.mod"
+      - "spark/go.sum"
+      - "tools/paylightning/Cargo.lock"
+      - "tools/paylightning/Cargo.toml"
+      - ".github/workflows/licenses.yaml"
+
+jobs:
+  fossa:
+    runs-on: "ubuntu-24.04"
+    if: "github.actor != 'dependabot[bot]'"
+    permissions:
+      contents: read
+      pull-requests: read
+    env:
+      FOSSA_API_KEY: ${{ secrets.FOSSA_API_KEY }}
+      BRANCH: ${{ github.ref_name }}
+    steps:
+      - name: "Install fossa"
+        run: |
+          wget --no-verbose -P /tmp https://github.com/fossas/fossa-cli/releases/download/v3.9.37/fossa_3.9.37_linux_amd64.zip
+          echo "49522f1754bd6804b9853ed5c841d6aeef083ade7255c99b9b0fbc3bf17e4fab */tmp/fossa_3.9.37_linux_amd64.zip" | sha256sum -c
+          cd /usr/local/bin
+          unzip /tmp/fossa_*.zip
+
+      - name: "Checkout"
+        uses: "actions/checkout@v4"
+
+      - name: "Run fossa analyze"
+        run: "fossa analyze -b $BRANCH"

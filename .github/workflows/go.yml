@@ -1,0 +1,239 @@
+# This workflow will build a golang project
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-go
+
+name: Go
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - ".github/workflows/go.yml"
+      - "Dockerfile"
+      - "spark/**"
+  pull_request:
+    paths:
+      - ".github/workflows/go.yml"
+      - "Dockerfile"
+      - "spark/**"
+
+permissions:
+  contents: read
+  checks: write
+
+env:
+  GO_VERSION: "1.23.0"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./spark
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install ZMQ dependencies
+      run: sudo apt-get update && sudo apt-get install -y libzmq3-dev
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        cache-dependency-path: "spark/go.sum"
+
+    - name: Verify dependencies
+      run: go mod verify
+
+    - name: Build
+      run: go build -v ./...
+
+    - name: Install gotestsum
+      uses: jaxxstorm/action-install-gh-release@v1
+      with:
+        repo: gotestyourself/gotestsum
+        tag: v1.12.0
+        cache: enable
+
+    - name: Run unit tests
+      run: |
+        gotestsum \
+        --format testname \
+        --junitfile ../test_results/unit-test.xml \
+        --jsonfile ../test_results/unit-test.json \
+        $(go list ./... | grep -v -E "so/grpc_test|so/tree")
+
+    - name: Run go fmt
+      run: |
+        if [ -n "$(gofmt -l .)" ]; then
+          echo "The following files are not formatted correctly:"
+          gofmt -l .
+          exit 1
+        fi
+
+    - name: Create test summary
+      if: always()
+      uses: test-summary/action@v2
+      with:
+        paths: "test_results/unit-test.xml"
+
+    - name: Annotate test failures
+      if: always()
+      uses: guyarb/golang-test-annotations@v0.8.0
+      with:
+        test-results: "test_results/unit-test.json"
+
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: "spark/go.sum"
+      - name: Install ZMQ dependencies
+        run: sudo apt-get update && sudo apt-get install -y libzmq3-dev
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v7
+        with:
+          version: v2.0.2
+          working-directory: ./spark
+          args:  --timeout 5m
+
+  build:
+    needs: ["test", "check"]
+    runs-on: "ubuntu-22.04-2-arm"
+    outputs:
+      spark_tag: ${{ steps.set-spark_tag.outputs.spark_tag }}
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: "Configure AWS credentials"
+        uses: "aws-actions/configure-aws-credentials@v1"
+        with:
+          role-to-assume: "arn:aws:iam::674966927423:role/github-actions-spark"
+          aws-region: "us-west-2"
+      - name: "Log into ECR"
+        id: ecr-login
+        uses: "aws-actions/amazon-ecr-login@v2"
+      - name: "Setup QEMU"
+        uses: "docker/setup-qemu-action@v3"
+      - name: "Setup builder"
+        uses: "docker/setup-buildx-action@v2"
+      - name: "Checkout"
+        uses: "actions/checkout@v3"
+        with:
+          fetch-depth: 20
+      - name: "Determine metadata"
+        id: metadata
+        run: |
+          GIT_HASH="$(git log -1 --format='%H' spark signer)"
+          echo "hash_short=${GIT_HASH:0:8}" >> $GITHUB_OUTPUT
+          echo "date=$(date -u '+%Y%m%d')" >> $GITHUB_OUTPUT
+      - name: "Set spark_tag"
+        id: set-spark_tag
+        run: |
+          echo "spark_tag=git_${{ steps.metadata.outputs.date }}_${{ steps.metadata.outputs.hash_short }}" >> $GITHUB_OUTPUT
+      - name: "Docker metadata"
+        id: docker-meta
+        uses: "docker/metadata-action@v4"
+        with:
+          images: ${{ steps.ecr-login.outputs.registry }}/spark-go
+          labels: |
+            org.opencontainers.image.vendor=Lightspark
+            org.opencontainers.image.title=spark
+      - name: Set Docker tags
+        id: docker-tags
+        run: |
+          TAGS="${{ steps.ecr-login.outputs.registry }}/spark-go:git_${{ steps.metadata.outputs.hash_short }},"
+          TAGS+="${{ steps.ecr-login.outputs.registry }}/spark-go:git_${{ steps.metadata.outputs.date }}_${{ steps.metadata.outputs.hash_short }}"
+
+          if [[ "${{ github.event_name }}" == "push" ]]; then
+            TAGS="${{ steps.ecr-login.outputs.registry }}/spark-go:latest,$TAGS"
+          fi
+
+          echo "tags=$TAGS" >> $GITHUB_OUTPUT
+
+      - name: "Build and push image"
+        uses: "docker/build-push-action@v3"
+        with:
+          context: .
+          file: Dockerfile
+          platforms: linux/arm64
+          build-args: BUILDKIT_INLINE_CACHE=1
+          cache-from: type=registry,ref=${{ steps.ecr-login.outputs.registry }}/spark-go:cache
+          cache-to: type=registry,ref=${{ steps.ecr-login.outputs.registry }}/spark-go:cache,mode=max,image-manifest=true,oci-mediatypes=true
+          labels: ${{ steps.docker-meta.outputs.labels }}
+          tags: ${{ steps.docker-tags.outputs.tags }}
+          push: true
+          provenance: false # skopeo can't handle this
+
+  trigger-hermetic:
+    needs: ["build"]
+    if: |
+      always () &&
+      github.event_name == 'pull_request' &&
+      needs.build.result == 'success'
+    uses: ./.github/workflows/spark-hermetic-tests.yaml
+    secrets: inherit
+    permissions:
+      id-token: write
+      contents: write
+    with:
+      spark_tag: ${{ needs.build.outputs.spark_tag }}
+      test_type: "all"
+
+  trigger-ssp-hermetic:
+    needs: ["build"]
+    runs-on: "ubuntu-latest"
+    if: |
+      always () &&
+      github.event_name == 'pull_request' &&
+      needs.build.result == 'success'
+    steps:
+      - name: "Trigger SSP Hermetic Test"
+        uses: the-actions-org/workflow-dispatch@v4
+        env:
+          RUN_NAME: "spark/#${{ github.event.pull_request.number }}-${{ github.event.pull_request.title }}"
+        with:
+          workflow: "ssp-spark-hermetic-test.yaml"
+          token: ${{ secrets.WEBDEV_ACTIONS }}
+          repo: "lightsparkdev/webdev"
+          ref: "main"
+          run-name: ${{ env.RUN_NAME }}
+          inputs: >-
+            {
+              "run_name": "${{ env.RUN_NAME }}",
+              "spark_tag": "${{ needs.build.outputs.spark_tag }}",
+              "spark_commit_ref": "${{ github.event.pull_request.head.sha }}"
+            }
+
+  deploy:
+    needs: ["build"]
+    if: github.event_name == 'push'
+    runs-on: "self-hosted"
+    permissions:
+      id-token: write
+      contents: read
+    env:
+      KUBECONFIG: "/tmp/${{ github.run_id }}.kubeconfig"
+    steps:
+      - name: "Configure AWS credentials"
+        uses: "aws-actions/configure-aws-credentials@v1"
+        with:
+          role-to-assume: "arn:aws:iam::674966927423:role/github-actions-spark"
+          aws-region: "us-west-2"
+      - name: "Configure Kubernetes cluster"
+        run: "aws --region us-west-2 eks update-kubeconfig --name dev"
+      - name: "Restart pods"
+        run: "kubectl -n spark rollout restart sts/spark"
+      - name: "Check pod status"
+        run: |
+          for i in `seq 12`; do
+            sleep 10s
+            date
+            kubectl -n spark get pods -l 'app.kubernetes.io/name=spark' -o jsonpath='{range .items[*]}{.metadata.name} {.status.phase} {.status.conditions[?(@.type=="Ready")].status}{ "\n"}{end}' | grep -v ' Running True$' | tee /tmp/status
+            if [ ! -s /tmp/status ]; then break; fi
+          done
+          if [ -s /tmp/status ]; then exit 1; fi

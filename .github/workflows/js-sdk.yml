@@ -1,0 +1,79 @@
+name: "JS SDK Checks"
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "sdks/js/**"
+      - ".github/workflows/js-sdk.yml"
+  pull_request:
+    paths:
+      - "sdks/js/**"
+      - ".github/workflows/js-sdk.yml"
+
+jobs:
+  check:
+    if: false
+    runs-on: "ubuntu-latest"
+    steps:
+      - run: "true"
+
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sdks/js
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "yarn"
+          cache-dependency-path: sdks/js/yarn.lock
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Run build
+        run: yarn run build
+
+      - name: Run tests
+        run: yarn run test
+
+  trigger-hermetic:
+    uses: ./.github/workflows/spark-hermetic-tests.yaml
+    secrets: inherit
+    permissions:
+      id-token: write
+      contents: write
+    with:
+      test_type: "js"
+
+  trigger-ssp-hermetic:
+    runs-on: "ubuntu-latest"
+    if: |
+      always () &&
+      github.event_name == 'pull_request'
+    steps:
+      - name: "Trigger SSP Hermetic Test"
+        uses: the-actions-org/workflow-dispatch@v4
+        env:
+          RUN_NAME: "spark/#${{ github.event.pull_request.number }}-${{ github.event.pull_request.title }}"
+        with:
+          workflow: "ssp-spark-hermetic-test.yaml"
+          token: ${{ secrets.WEBDEV_ACTIONS }}
+          repo: "lightsparkdev/webdev"
+          ref: "main"
+          run-name: ${{ env.RUN_NAME }}
+          inputs: >-
+            {
+              "run_name": "${{ env.RUN_NAME }}",
+              "spark_commit_ref": "${{ github.event.pull_request.head.sha }}"
+            }

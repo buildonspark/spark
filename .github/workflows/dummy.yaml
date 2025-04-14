@@ -1,0 +1,36 @@
+name: "Dummy"
+
+on:
+  pull_request:
+    paths:
+      - '*'
+      - '.github/*'
+      - '.github/workflows/**'
+      - 'apps/**'
+      - 'protos/**'
+      - 'scripts/**'
+      - 'signer/**'
+      - 'tools/**'
+  merge_group:
+    paths:
+      - '*'
+      - '.github/*'
+      - '.github/workflows/**'
+      - 'apps/**'
+      - 'protos/**'
+      - 'scripts/**'
+      - 'signer/**'
+      - 'tools/**'
+
+jobs:
+  check:
+    if: false
+    runs-on: "ubuntu-24.04"
+    steps:
+      - run: "true"
+
+  test:
+    if: false
+    runs-on: "ubuntu-24.04"
+    steps:
+      - run: "true"
