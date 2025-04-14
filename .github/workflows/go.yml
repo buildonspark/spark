@@ -184,6 +184,31 @@ jobs:
       spark_tag: ${{ needs.build.outputs.spark_tag }}
       test_type: "all"
 
+  trigger-ssp-hermetic:
+    needs: ["build"]
+    runs-on: "ubuntu-latest"
+    if: |
+      always () &&
+      github.event_name == 'pull_request' &&
+      needs.build.result == 'success'
+    steps:
+      - name: "Trigger SSP Hermetic Test"
+        uses: the-actions-org/workflow-dispatch@v4
+        env:
+          RUN_NAME: "spark/#${{ github.event.pull_request.number }}-${{ github.event.pull_request.title }}"
+        with:
+          workflow: "ssp-spark-hermetic-test.yaml"
+          token: ${{ secrets.WEBDEV_ACTIONS }}
+          repo: "lightsparkdev/webdev"
+          ref: "main"
+          run-name: ${{ env.RUN_NAME }}
+          inputs: >-
+            {
+              "run_name": "${{ env.RUN_NAME }}",
+              "spark_tag": "${{ needs.build.outputs.spark_tag }}",
+              "spark_commit_ref": "${{ github.event.pull_request.head.sha }}"
+            }
+
   deploy:
     needs: ["build"]
     if: github.event_name == 'push'
