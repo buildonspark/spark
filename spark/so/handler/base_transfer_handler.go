@@ -130,6 +130,10 @@ func (h *BaseTransferHandler) createTransfer(
 		return nil, nil, fmt.Errorf("unable to create transfer: %v", err)
 	}
 
+	if len(leafRefundMap) == 0 {
+		return nil, nil, fmt.Errorf("must provide at least one leaf for transfer")
+	}
+
 	leaves, err := loadLeaves(ctx, db, leafRefundMap)
 	if err != nil {
 		return nil, nil, fmt.Errorf("unable to load leaves: %v", err)

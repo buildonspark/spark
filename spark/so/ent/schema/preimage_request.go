@@ -56,6 +56,8 @@ func (PreimageRequest) Fields() []ent.Field {
 			GoType(PreimageRequestStatus("")),
 		field.Bytes("receiver_identity_pubkey").
 			Optional(),
+		field.Bytes("preimage").
+			Optional(),
 	}
 }
 

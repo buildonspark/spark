@@ -95,7 +95,12 @@ type Lrc20Config struct {
 	// Although this is primarily intended for testing, even in a production environment
 	// transfers can still be validated and processed without LRC20 communication,
 	// although exits for resulting outputs will be blocked until the data is backfilled.
-	DisableRpcs                   bool   `yaml:"disablerpcs"`
+	DisableRpcs bool `yaml:"disablerpcs"`
+	// DisableL1 removes the ability for clients to move tokens on L1.  All tokens minted in this Spark instance
+	// must then stay within this spark instance. It disables SO chainwatching for withdrawals and disables L1 watchtower logic.
+	// Note that it DOES NOT impact the need for announcing tokens on L1 before minting.
+	// The intention is that if this config value is set in an SO- that any tokens minted do not have Unilateral Exit or L1 deposit capabilities.
+	DisableL1                     bool   `yaml:"disablel1"`
 	Network                       string `yaml:"network"`
 	Host                          string `yaml:"host"`
 	RelativeCertPath              string `yaml:"relativecertpath"`
@@ -272,8 +277,18 @@ func LoadOperators(filePath string) (map[string]*SigningOperator, error) {
 		return nil, err
 	}
 
+	var yamlObj interface{}
+	if err := yaml.Unmarshal(data, &yamlObj); err != nil {
+		return nil, err
+	}
+
+	jsonStr, err := json.Marshal(yamlObj)
+	if err != nil {
+		return nil, err
+	}
+
 	var operatorList []*SigningOperator
-	if err := json.Unmarshal(data, &operatorList); err != nil {
+	if err := json.Unmarshal(jsonStr, &operatorList); err != nil {
 		return nil, err
 	}
 

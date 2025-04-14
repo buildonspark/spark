@@ -1,0 +1,16 @@
+[tasks]
+lint = "golangci-lint run"
+test = """
+  gotestsum \
+    --format testname \
+    --junitfile ../test_results/unit-test.xml \
+    --jsonfile ../test_results/unit-test.json \
+    $(go list ./... | grep -v -E 'so/grpc_test|so/tree')
+"""
+test-grpc = """
+  gotestsum \
+    --format testname \
+    --rerun-fails \
+    --rerun-fails-max-failures=1000 \
+    --packages=./so/grpc_test/...
+"""

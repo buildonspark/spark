@@ -2,6 +2,7 @@ package ent
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 
 	"google.golang.org/grpc"
@@ -12,6 +13,9 @@ type ContextKey string
 
 // TxKey is the context key for the database transaction.
 const TxKey ContextKey = "tx"
+
+// ErrNoRollback is an error indicating that we should not rollback the DB transaction.
+var ErrNoRollback = errors.New("no rollback performed")
 
 // DbSessionMiddleware is a middleware to manage database sessions for each gRPC call.
 func DbSessionMiddleware(dbClient *Client) grpc.UnaryServerInterceptor {
@@ -36,17 +40,23 @@ func DbSessionMiddleware(dbClient *Client) grpc.UnaryServerInterceptor {
 
 		// Call the handler (the actual RPC method)
 		resp, err := handler(ctx, req)
+
 		// Handle transaction commit/rollback
-		if err != nil {
+		if err != nil && !errors.Is(err, ErrNoRollback) {
 			if dberr := tx.Rollback(); dberr != nil {
-				logger.Error("Failed to rollback transaction in %s: %s.\n", info.FullMethod, dberr)
+				logger.Error("Failed to rollback transaction", "error", dberr)
 			}
 			return nil, err
 		}
 
 		if dberr := tx.Commit(); dberr != nil {
-			logger.Error("Failed to commit transaction in %s: %s.\n", info.FullMethod, dberr)
+			logger.Error("Failed to commit transaction", "error", dberr)
 			return nil, dberr
+		}
+
+		if errors.Is(err, ErrNoRollback) {
+			logger.Debug("Skipping rollback", "error", err)
+			return nil, err
 		}
 
 		return resp, nil

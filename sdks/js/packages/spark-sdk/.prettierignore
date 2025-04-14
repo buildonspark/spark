@@ -1,0 +1,9 @@
+dist
+node_modules
+.yarn
+
+# Ignore generated files
+src/proto
+src/wasm
+src/graphql/objects
+src/examples/example.js

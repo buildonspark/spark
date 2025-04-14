@@ -12,6 +12,7 @@ import (
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lightsparkdev/spark-go/common"
+	"github.com/lightsparkdev/spark-go/proto/spark"
 	testutil "github.com/lightsparkdev/spark-go/test_util"
 	"github.com/lightsparkdev/spark-go/wallet"
 	"github.com/stretchr/testify/assert"
@@ -82,6 +83,7 @@ func TestTransfer(t *testing.T) {
 	if receiverTransfer.Id != senderTransfer.Id {
 		t.Fatalf("expected transfer id %s, got %s", senderTransfer.Id, receiverTransfer.Id)
 	}
+	require.Equal(t, receiverTransfer.Type, spark.TransferType_TRANSFER)
 
 	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(context.Background(), receiverConfig, receiverTransfer)
 	if err != nil {
@@ -114,6 +116,24 @@ func TestTransfer(t *testing.T) {
 		t.Fatalf("failed to ClaimTransfer: %v", err)
 	}
 	assert.Equal(t, res[0].Id, claimingNode.Leaf.Id)
+}
+
+func TestTransferZeroLeaves(t *testing.T) {
+	senderConfig, err := testutil.TestWalletConfig()
+	require.NoError(t, err, "failed to create sender wallet config: %v", err)
+
+	receiverPrivKey, err := secp256k1.GeneratePrivateKey()
+	require.NoError(t, err, "failed to create receiver private key: %v", err)
+
+	leavesToTransfer := []wallet.LeafKeyTweak{}
+	_, err = wallet.SendTransfer(
+		context.Background(),
+		senderConfig,
+		leavesToTransfer[:],
+		receiverPrivKey.PubKey().SerializeCompressed(),
+		time.Now().Add(10*time.Minute),
+	)
+	require.Error(t, err, "expected error when transferring zero leaves")
 }
 
 func TestTransferWithSeparateSteps(t *testing.T) {
@@ -310,17 +330,16 @@ func TestCancelTransfer(t *testing.T) {
 		t.Fatalf("failed to transfer tree node: %v", err)
 	}
 
-	_, err = wallet.CancelSendTransfer(context.Background(), senderConfig, senderTransfer)
-	if err == nil {
-		t.Fatalf("expected to fail to cancel transfer, but succeeded")
-	}
-
-	time.Sleep(expiryDelta)
-
+	// We don't need to wait for the expiry because we haven't
+	// tweaked our key yet.
 	_, err = wallet.CancelSendTransfer(context.Background(), senderConfig, senderTransfer)
 	if err != nil {
 		t.Fatalf("failed to cancel transfer: %v", err)
 	}
+
+	transfers, _, err := wallet.QueryAllTransfers(context.Background(), senderConfig, 1, 0)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(transfers))
 
 	senderTransfer, err = wallet.SendTransfer(
 		context.Background(),
@@ -474,7 +493,7 @@ func TestQueryTransfers(t *testing.T) {
 		NewSigningPrivKey: receiverNewLeafPrivKey.Serialize(),
 	}
 	receiverLeavesToTransfer := [1]wallet.LeafKeyTweak{receiverTransferNode}
-	receiverTransfer, receiverRefundSignatureMap, leafDataMap, operatorSigningResults, err := wallet.SendSwapSignRefund(
+	receiverTransfer, receiverRefundSignatureMap, leafDataMap, operatorSigningResults, err := wallet.CounterSwapSignRefund(
 		context.Background(),
 		receiverConfig,
 		receiverLeavesToTransfer[:],

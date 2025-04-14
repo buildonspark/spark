@@ -10,7 +10,11 @@ import "common.proto";
 
 service SparkService {
     rpc generate_deposit_address(GenerateDepositAddressRequest) returns (GenerateDepositAddressResponse) {}
-    rpc start_tree_creation(StartTreeCreationRequest) returns (StartTreeCreationResponse) {}
+    rpc start_deposit_tree_creation(StartDepositTreeCreationRequest) returns (StartDepositTreeCreationResponse) {}
+    // This is deprecated, please use start_deposit_tree_creation instead.
+    rpc start_tree_creation(StartTreeCreationRequest) returns (StartTreeCreationResponse) {
+        option deprecated = true;
+    }
     rpc finalize_node_signatures(FinalizeNodeSignaturesRequest) returns (FinalizeNodeSignaturesResponse) {}
     rpc start_send_transfer(StartSendTransferRequest) returns (StartSendTransferResponse) {}
     rpc complete_send_transfer(CompleteSendTransferRequest) returns (CompleteSendTransferResponse) {}
@@ -24,7 +28,16 @@ service SparkService {
     rpc cooperative_exit(CooperativeExitRequest) returns (CooperativeExitResponse) {}
     rpc initiate_preimage_swap(InitiatePreimageSwapRequest) returns (InitiatePreimageSwapResponse) {}
     rpc provide_preimage(ProvidePreimageRequest) returns (ProvidePreimageResponse) {}
-    rpc leaf_swap(LeafSwapRequest) returns (LeafSwapResponse) {}
+    // This is the exact same as start_send_transfer, but expresses to the SO
+    // this transfer is specifically for a leaf swap.
+    rpc start_leaf_swap(StartSendTransferRequest) returns (StartSendTransferResponse) {}
+    // This is deprecated, please use counter_leaf_swap instead.
+    rpc leaf_swap(CounterLeafSwapRequest) returns (CounterLeafSwapResponse) {
+        option deprecated = true;
+    }
+    // This is the exact same as start_leaf_swap, but signs with
+    // an adaptor public key after a counterparty has begun the swap via start_leaf_swap.
+    rpc counter_leaf_swap(CounterLeafSwapRequest) returns (CounterLeafSwapResponse) {}
     rpc refresh_timelock(RefreshTimelockRequest) returns (RefreshTimelockResponse) {}
     rpc extend_leaf(ExtendLeafRequest) returns (ExtendLeafResponse) {}
 
@@ -43,7 +56,7 @@ service SparkService {
     rpc sign_token_transaction(SignTokenTransactionRequest) returns (SignTokenTransactionResponse) {}
     rpc finalize_token_transaction(FinalizeTokenTransactionRequest) returns (google.protobuf.Empty) {}
     rpc freeze_tokens(FreezeTokensRequest) returns (FreezeTokensResponse) {}
-    rpc get_owned_token_leaves(GetOwnedTokenLeavesRequest) returns (GetOwnedTokenLeavesResponse) {}
+    rpc query_token_outputs(QueryTokenOutputsRequest) returns (QueryTokenOutputsResponse) {}
     rpc query_token_transactions(QueryTokenTransactionsRequest) returns (QueryTokenTransactionsResponse) {}
     rpc cancel_signed_token_transaction(CancelSignedTokenTransactionRequest) returns (google.protobuf.Empty) {}
 
@@ -58,10 +71,11 @@ service SparkService {
  * Network is the network type of the bitcoin network.
  */
 enum Network {
-    MAINNET = 0;
-    REGTEST = 1;
-    TESTNET = 2;
-    SIGNET = 3;
+    UNSPECIFIED = 0;
+    MAINNET = 10;
+    REGTEST = 20;
+    TESTNET = 30;
+    SIGNET = 40;
 }
 
 /**
@@ -93,7 +107,7 @@ message GenerateDepositAddressRequest {
     // The identity public key of the user.
     bytes identity_public_key = 2;
     // The network of the bitcoin network.
-    Network network = 3;
+    Network network = 3 [(validate.rules).enum = {not_in: [0]}];
 }
 
 /**
@@ -126,7 +140,7 @@ message UTXO {
     // The vout of the raw transaction for the utxo, which will be used to create the tree.
     uint32 vout = 2;
     // The network of the bitcoin network.
-    Network network = 3;
+    Network network = 3 [(validate.rules).enum = {not_in: [0]}];
 }
 
 /**
@@ -232,6 +246,30 @@ message StartTreeCreationResponse {
     NodeSignatureShares root_node_signature_shares = 2;
 }
 
+/**
+ * StartDepositTreeCreationRequest is the request to start the tree creation for a tree root node.
+ */
+message StartDepositTreeCreationRequest {
+    // The identity public key of the user.
+    bytes identity_public_key = 1;
+    // The on-chain utxo to be used to be spent by the root node.
+    UTXO on_chain_utxo = 2;
+    // The signing job for the root node's transaction.
+    SigningJob root_tx_signing_job = 3;
+    // The signing job for the root node's refund transaction.
+    SigningJob refund_tx_signing_job = 4;
+}
+
+/**
+ * StartDepositTreeCreationResponse is the response to the request to start the tree creation for a tree root node.
+ */
+message StartDepositTreeCreationResponse {
+    // The id of the tree.
+    string tree_id = 1;
+    // The signature shares for the root node.
+    NodeSignatureShares root_node_signature_shares = 2;
+}
+
 // This proto is constructed by the wallet to specify leaves it wants to spend as
 // part of the token transaction.
 message TokenLeafToSpend {
@@ -280,7 +318,7 @@ message TokenTransaction {
     }
     repeated TokenLeafOutput output_leaves = 3;
     repeated bytes spark_operator_identity_public_keys = 4 [(validate.rules).repeated.items.bytes.len = 33];
-    Network network = 10;
+    Network network = 10 [(validate.rules).enum = {not_in: [0]}];
 }
 
 
@@ -372,7 +410,7 @@ message FreezeTokensResponse {
     bytes impacted_token_amount = 2;  // Decoded uint128
 }
 
-message GetOwnedTokenLeavesRequest {
+message QueryTokenOutputsRequest {
     repeated bytes owner_public_keys = 1 [(validate.rules).repeated.items.bytes.len = 33];
     // Optionally provide token public keys. If not set return leaves for all tokens.
     repeated bytes token_public_keys = 2 [(validate.rules).repeated.items.bytes.len = 33];
@@ -403,7 +441,7 @@ message LeafWithPreviousTransactionData {
 	uint32 previous_transaction_vout = 3;
 }
 
-message GetOwnedTokenLeavesResponse {
+message QueryTokenOutputsResponse {
     repeated LeafWithPreviousTransactionData leaves_with_previous_transaction_data = 1;
 }
 
@@ -534,6 +572,14 @@ enum TransferStatus {
     TRANSFER_STATUS_RETURNED = 7;
 }
 
+enum TransferType {
+    PREIMAGE_SWAP = 0;
+    COOPERATIVE_EXIT = 1;
+    TRANSFER = 2;
+    SWAP = 30;
+    COUNTER_SWAP = 40;
+}
+
 message Transfer {
     string id = 1;
     bytes sender_identity_public_key = 2;
@@ -544,6 +590,7 @@ message Transfer {
     repeated TransferLeaf leaves = 7;
     google.protobuf.Timestamp created_time = 8;
     google.protobuf.Timestamp updated_time = 9;
+    TransferType type = 10;
 }
 
 message TransferLeaf {
@@ -563,10 +610,13 @@ message QueryPendingTransfersRequest {
         bytes sender_identity_public_key = 2;
     }
     repeated string transfer_ids = 3;
+    int64 limit = 40;
+    int64 offset = 50;
 }
 
 message QueryPendingTransfersResponse {
     repeated Transfer transfers = 1;
+    int64 offset = 2;
 }
 
 message ClaimLeafKeyTweak {
@@ -636,7 +686,7 @@ message UserSignedRefund {
     bytes user_signature = 3;
     SigningCommitments signing_commitments = 4;
     common.SigningCommitment user_signature_commitment = 5;
-    Network network = 6;
+    Network network = 6 [(validate.rules).enum = {not_in: [0]}];
 }
 
 message InvoiceAmountProof {
@@ -685,13 +735,13 @@ message CooperativeExitResponse {
     repeated LeafRefundTxSigningResult signing_results = 2;
 }
 
-message LeafSwapRequest {
+message CounterLeafSwapRequest {
     StartSendTransferRequest transfer = 1;
     string swap_id = 2;
     bytes adaptor_public_key = 3;
 }
 
-message LeafSwapResponse {
+message CounterLeafSwapResponse {
     Transfer transfer = 1;
     repeated LeafRefundTxSigningResult signing_results = 2;
 }
@@ -880,4 +930,8 @@ message QueryBalanceRequest {
 message QueryBalanceResponse {
     uint64 balance = 1;
     map<string, uint64> node_balances = 2;
+}
+
+message SparkAddress {
+    bytes identity_public_key = 1;
 }

@@ -1,0 +1,23 @@
+core.workflow(
+    name="default",
+    origin=git.github_origin(
+        url="git@github.com:lightsparkdev/spark.git",
+        ref="main",
+    ),
+    destination=git.github_pr_destination(
+        url="git@github.com:buildonspark/spark-sdk.git",
+        destination_ref="develop",
+        pr_branch="sync",
+        title="Sync from spark",
+    ),
+    # Switch to ITERATIVE mode to import each commit separately.
+    mode="SQUASH",
+    origin_files=glob(
+        ["sdks/**", "tools/**"],
+        exclude=[],
+    ),
+    destination_files=glob(
+        ["**"]
+    ),
+    authoring=authoring.pass_thru("Lightspark Eng <engineering@lightspark.com>"),
+)
