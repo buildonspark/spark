@@ -62,5 +62,6 @@ func (Tree) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("status"),
 		index.Fields("network"),
+		index.Fields("base_txid", "vout").Unique(),
 	}
 }

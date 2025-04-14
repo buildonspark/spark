@@ -469,6 +469,11 @@ var (
 				Unique:  false,
 				Columns: []*schema.Column{TreesColumns[5]},
 			},
+			{
+				Name:    "tree_base_txid_vout",
+				Unique:  true,
+				Columns: []*schema.Column{TreesColumns[6], TreesColumns[7]},
+			},
 		},
 	}
 	// TreeNodesColumns holds the columns for the "tree_nodes" table.
