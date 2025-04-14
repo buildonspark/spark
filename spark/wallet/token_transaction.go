@@ -24,6 +24,9 @@ type KeyshareWithOperatorIndex struct {
 	Index    uint64
 }
 
+// OperatorSignatures maps operator identifiers to their signatures returned as part of the SignTokenTransaction() call.
+type OperatorSignatures map[string][]byte
+
 // StartTokenTransaction requests the coordinator to build the final token transaction and
 // returns the StartTokenTransactionResponse. This includes filling the revocation public keys
 // for outputs, adding leaf ids and withdrawal params, and returning keyshare configuration.
@@ -128,11 +131,12 @@ func SignTokenTransaction(
 	finalTxHash []byte,
 	leafToSpendPrivateKeys []*secp256k1.PrivateKey,
 	specificOperatorIDs ...string,
-) ([][]*KeyshareWithOperatorIndex, error) {
+) ([][]*KeyshareWithOperatorIndex, OperatorSignatures, error) {
 	// ---------------------------------------------------------------------
 	// (A) Build operator-specific signatures
 	// ---------------------------------------------------------------------
 	var operatorSpecificSignatures []*pb.OperatorSpecificTokenTransactionSignature
+	operatorSignaturesMap := make(OperatorSignatures)
 
 	payload := &pb.OperatorSpecificTokenTransactionSignablePayload{
 		FinalTokenTransactionHash: finalTxHash,
@@ -141,7 +145,7 @@ func SignTokenTransaction(
 	payloadHash, err := utils.HashOperatorSpecificTokenTransactionSignablePayload(payload)
 	if err != nil {
 		log.Printf("Error while hashing operator-specific payload: %v", err)
-		return nil, err
+		return nil, nil, err
 	}
 
 	// For mint transactions
@@ -149,7 +153,7 @@ func SignTokenTransaction(
 		privKey := secp256k1.PrivKeyFromBytes(config.IdentityPrivateKey.Serialize())
 		sig, err := createTokenTransactionSignature(config, privKey, payloadHash)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create signature: %v", err)
+			return nil, nil, fmt.Errorf("failed to create signature: %v", err)
 		}
 		operatorSpecificSignatures = append(operatorSpecificSignatures, &pb.OperatorSpecificTokenTransactionSignature{
 			OwnerPublicKey: config.IdentityPublicKey(),
@@ -163,7 +167,7 @@ func SignTokenTransaction(
 		for i := range finalTx.GetTransferInput().GetLeavesToSpend() {
 			sig, err := createTokenTransactionSignature(config, leafToSpendPrivateKeys[i], payloadHash)
 			if err != nil {
-				return nil, fmt.Errorf("failed to create signature: %v", err)
+				return nil, nil, fmt.Errorf("failed to create signature: %v", err)
 			}
 			operatorSpecificSignatures = append(operatorSpecificSignatures, &pb.OperatorSpecificTokenTransactionSignature{
 				OwnerPublicKey: leafToSpendPrivateKeys[i].PubKey().SerializeCompressed(),
@@ -188,7 +192,7 @@ func SignTokenTransaction(
 			if operator, exists := config.SigningOperators[opID]; exists {
 				operatorsToContact[opID] = operator
 			} else {
-				return nil, fmt.Errorf("specified operator ID %s not found in signing operators", opID)
+				return nil, nil, fmt.Errorf("specified operator ID %s not found in signing operators", opID)
 			}
 		}
 	}
@@ -197,13 +201,13 @@ func SignTokenTransaction(
 		operatorConn, err := common.NewGRPCConnectionWithTestTLS(operator.Address, nil)
 		if err != nil {
 			log.Printf("Error while establishing gRPC connection to operator at %s: %v", operator.Address, err)
-			return nil, err
+			return nil, nil, err
 		}
 		defer operatorConn.Close()
 
 		operatorToken, err := AuthenticateWithConnection(ctx, config, operatorConn)
 		if err != nil {
-			return nil, fmt.Errorf("failed to authenticate with operator %s: %v", operator.Identifier, err)
+			return nil, nil, fmt.Errorf("failed to authenticate with operator %s: %v", operator.Identifier, err)
 		}
 		operatorCtx := ContextWithToken(ctx, operatorToken)
 		operatorClient := pb.NewSparkServiceClient(operatorConn)
@@ -214,12 +218,12 @@ func SignTokenTransaction(
 		})
 		if err != nil {
 			log.Printf("Error while calling SignTokenTransaction with operator %s: %v", operator.Identifier, err)
-			return nil, err
+			return nil, nil, err
 		}
 		// Validate signature
 		operatorSig := signTokenTransactionResponse.SparkOperatorSignature
 		if err := utils.ValidateOwnershipSignature(operatorSig, finalTxHash, operator.IdentityPublicKey); err != nil {
-			return nil, fmt.Errorf("invalid signature from operator with public key %x: %v", operator.IdentityPublicKey, err)
+			return nil, nil, fmt.Errorf("invalid signature from operator with public key %x: %v", operator.IdentityPublicKey, err)
 		}
 
 		// Store leaf keyshares if transfer
@@ -232,9 +236,10 @@ func SignTokenTransaction(
 				},
 			)
 		}
+		operatorSignaturesMap[operator.Identifier] = operatorSig
 	}
 
-	return leafRevocationKeyshares, nil
+	return leafRevocationKeyshares, operatorSignaturesMap, nil
 }
 
 // FinalizeTokenTransaction handles the final step for transfer transactions, using the recovered
@@ -337,7 +342,7 @@ func BroadcastTokenTransaction(
 	}
 
 	// 2) Sign token transaction
-	leafRevocationKeyshares, err := SignTokenTransaction(
+	leafRevocationKeyshares, _, err := SignTokenTransaction(
 		ctx,
 		config,
 		startResp.FinalTokenTransaction,

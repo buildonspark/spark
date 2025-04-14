@@ -414,11 +414,11 @@ func ValidatePartialTokenTransaction(
 // ValidateOwnershipSignature validates the ownership signature of a token transaction and that it matches
 // a predefined public key attached to the leaf being spent or the token being created and the submitted transaction.
 // It supports both ECDSA DER signatures and Schnorr signatures.
-func ValidateOwnershipSignature(ownershipSignature []byte, partialTokenTransactionHash []byte, ownerPublicKey []byte) error {
+func ValidateOwnershipSignature(ownershipSignature []byte, tokenTransactionHash []byte, ownerPublicKey []byte) error {
 	if ownershipSignature == nil {
 		return fmt.Errorf("ownership signature cannot be nil")
 	}
-	if partialTokenTransactionHash == nil {
+	if tokenTransactionHash == nil {
 		return fmt.Errorf("partial token transaction hash cannot be nil")
 	}
 	if ownerPublicKey == nil {
@@ -443,7 +443,7 @@ func ValidateOwnershipSignature(ownershipSignature []byte, partialTokenTransacti
 			btcecPubKey := btcec.PublicKey(*pubKey)
 
 			// Verify the Schnorr signature
-			if !schnorrSig.Verify(partialTokenTransactionHash, &btcecPubKey) {
+			if !schnorrSig.Verify(tokenTransactionHash, &btcecPubKey) {
 				return fmt.Errorf("invalid Schnorr signature")
 			}
 
@@ -469,7 +469,7 @@ func ValidateOwnershipSignature(ownershipSignature []byte, partialTokenTransacti
 		return fmt.Errorf("parsed public key is nil")
 	}
 
-	if !sig.Verify(partialTokenTransactionHash, pubKey) {
+	if !sig.Verify(tokenTransactionHash, pubKey) {
 		return fmt.Errorf("invalid ownership signature")
 	}
 	return nil

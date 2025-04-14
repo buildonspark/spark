@@ -15,6 +15,7 @@ import (
 	testutil "github.com/lightsparkdev/spark-go/test_util"
 	"github.com/lightsparkdev/spark-go/wallet"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
 )
 
 // Test token amounts for various operations
@@ -41,7 +42,15 @@ func int64ToUint128Bytes(high, low uint64) []byte {
 	)
 }
 
-func createTestTokenIssuanceTransaction(config *wallet.Config,
+func getSigningOperatorPublicKeys(config *wallet.Config) [][]byte {
+	var publicKeys [][]byte
+	for _, operator := range config.SigningOperators {
+		publicKeys = append(publicKeys, operator.IdentityPublicKey)
+	}
+	return publicKeys
+}
+
+func createTestTokenMintTransaction(config *wallet.Config,
 	tokenIdentityPubKeyBytes []byte,
 ) (*pb.TokenTransaction, *secp256k1.PrivateKey, *secp256k1.PrivateKey, error) {
 	// Generate two user leaf key pairs
@@ -77,7 +86,8 @@ func createTestTokenIssuanceTransaction(config *wallet.Config,
 				TokenAmount:    int64ToUint128Bytes(0, TestIssueLeaf2Amount),
 			},
 		},
-		Network: config.ProtoNetwork(),
+		Network:                         config.ProtoNetwork(),
+		SparkOperatorIdentityPublicKeys: getSigningOperatorPublicKeys(config),
 	}
 
 	return issueTokenTransaction, userLeaf1PrivKey, userLeaf2PrivKey, nil
@@ -116,13 +126,14 @@ func createTestTokenTransferTransaction(
 				TokenAmount:    int64ToUint128Bytes(0, TestTransferLeaf1Amount),
 			},
 		},
-		Network: config.ProtoNetwork(),
+		Network:                         config.ProtoNetwork(),
+		SparkOperatorIdentityPublicKeys: getSigningOperatorPublicKeys(config),
 	}
 
 	return transferTokenTransaction, userLeaf3PrivKey, nil
 }
 
-func createTestTokenIssuanceTransactionWithMultipleOutputLeaves(config *wallet.Config,
+func createTestTokenMintTransactionWithMultipleOutputLeaves(config *wallet.Config,
 	tokenIdentityPubKeyBytes []byte, numLeaves int,
 ) (*pb.TokenTransaction, []*secp256k1.PrivateKey, error) {
 	userLeafPrivKeys := make([]*secp256k1.PrivateKey, numLeaves)
@@ -150,20 +161,53 @@ func createTestTokenIssuanceTransactionWithMultipleOutputLeaves(config *wallet.C
 				IssuerProvidedTimestamp: uint64(time.Now().UnixMilli()),
 			},
 		},
-		OutputLeaves: outputLeaves,
-		Network:      config.ProtoNetwork(),
+		OutputLeaves:                    outputLeaves,
+		Network:                         config.ProtoNetwork(),
+		SparkOperatorIdentityPublicKeys: getSigningOperatorPublicKeys(config),
 	}
 
 	return issueTokenTransaction, userLeafPrivKeys, nil
 }
 
-func TestBroadcastTokenTransactionIssueAndTransferTokens(t *testing.T) {
+// getHalfOperatorIDs returns approximately half of the operator IDs from the config
+func getHalfOperatorIDs(config *wallet.Config) []string {
+	var halfOperatorIDs []string
+	halfOperatorCount := len(config.SigningOperators) / 2
+	for operatorID := range config.SigningOperators {
+		if len(halfOperatorIDs) < halfOperatorCount {
+			halfOperatorIDs = append(halfOperatorIDs, operatorID)
+		} else {
+			break
+		}
+	}
+	return halfOperatorIDs
+}
+
+// getRemainingOperatorIDs returns the operator IDs not included in the provided list
+func getRemainingOperatorIDs(config *wallet.Config, excludedIDs []string) []string {
+	var remainingOperatorIDs []string
+	for operatorID := range config.SigningOperators {
+		found := false
+		for _, excludedID := range excludedIDs {
+			if operatorID == excludedID {
+				found = true
+				break
+			}
+		}
+		if !found {
+			remainingOperatorIDs = append(remainingOperatorIDs, operatorID)
+		}
+	}
+	return remainingOperatorIDs
+}
+
+func TestBroadcastTokenTransactionMintAndTransferTokens(t *testing.T) {
 	config, err := testutil.TestWalletConfig()
 	require.NoError(t, err, "failed to create wallet config")
 
 	tokenPrivKey := config.IdentityPrivateKey
 	tokenIdentityPubKeyBytes := tokenPrivKey.PubKey().SerializeCompressed()
-	issueTokenTransaction, userLeaf1PrivKey, userLeaf2PrivKey, err := createTestTokenIssuanceTransaction(config, tokenIdentityPubKeyBytes)
+	issueTokenTransaction, userLeaf1PrivKey, userLeaf2PrivKey, err := createTestTokenMintTransaction(config, tokenIdentityPubKeyBytes)
 	require.NoError(t, err, "failed to create test token issuance transaction")
 
 	finalIssueTokenTransaction, err := wallet.BroadcastTokenTransaction(
@@ -329,7 +373,7 @@ func TestBroadcastTokenTransactionIssueAndTransferTokens(t *testing.T) {
 	}
 }
 
-func TestBroadcastTokenTransactionIssueAndTransferTokensLotsOfLeaves(t *testing.T) {
+func TestBroadcastTokenTransactionMintAndTransferTokensLotsOfLeaves(t *testing.T) {
 	config, err := testutil.TestWalletConfig()
 	require.NoError(t, err, "failed to create wallet config")
 
@@ -337,7 +381,7 @@ func TestBroadcastTokenTransactionIssueAndTransferTokensLotsOfLeaves(t *testing.
 	tokenIdentityPubKeyBytes := tokenPrivKey.PubKey().SerializeCompressed()
 
 	// Try to create issuance transaction with 101 leaves (should fail)
-	tooBigIssuanceTransaction, _, err := createTestTokenIssuanceTransactionWithMultipleOutputLeaves(config,
+	tooBigIssuanceTransaction, _, err := createTestTokenMintTransactionWithMultipleOutputLeaves(config,
 		tokenIdentityPubKeyBytes, 101)
 	require.NoError(t, err, "failed to create test token issuance transaction")
 
@@ -349,7 +393,7 @@ func TestBroadcastTokenTransactionIssueAndTransferTokensLotsOfLeaves(t *testing.
 	require.Error(t, err, "expected error when broadcasting issuance transaction with more than 100 output leaves")
 
 	// Create issuance transaction with 100 leaves
-	issueTokenTransactionFirst100, userLeafPrivKeysFirst100, err := createTestTokenIssuanceTransactionWithMultipleOutputLeaves(config,
+	issueTokenTransactionFirst100, userLeafPrivKeysFirst100, err := createTestTokenMintTransactionWithMultipleOutputLeaves(config,
 		tokenIdentityPubKeyBytes, ManyLeavesCount)
 	require.NoError(t, err, "failed to create test token issuance transaction")
 
@@ -361,7 +405,7 @@ func TestBroadcastTokenTransactionIssueAndTransferTokensLotsOfLeaves(t *testing.
 	require.NoError(t, err, "failed to broadcast issuance token transaction")
 
 	// Create issuance transaction with 100 leaves
-	issueTokenTransactionSecond100, userLeafPrivKeysSecond100, err := createTestTokenIssuanceTransactionWithMultipleOutputLeaves(config,
+	issueTokenTransactionSecond100, userLeafPrivKeysSecond100, err := createTestTokenMintTransactionWithMultipleOutputLeaves(config,
 		tokenIdentityPubKeyBytes, ManyLeavesCount)
 	require.NoError(t, err, "failed to create test token issuance transaction")
 
@@ -412,7 +456,8 @@ func TestBroadcastTokenTransactionIssueAndTransferTokensLotsOfLeaves(t *testing.
 				TokenAmount:    int64ToUint128Bytes(0, TestIssueMultiplePerLeafAmount*ManyLeavesCount),
 			},
 		},
-		Network: config.ProtoNetwork(),
+		Network:                         config.ProtoNetwork(),
+		SparkOperatorIdentityPublicKeys: getSigningOperatorPublicKeys(config),
 	}
 
 	// Combine private keys from both issuance transactions
@@ -454,7 +499,8 @@ func TestBroadcastTokenTransactionIssueAndTransferTokensLotsOfLeaves(t *testing.
 				TokenAmount:    int64ToUint128Bytes(0, TestIssueMultiplePerLeafAmount*ManyLeavesCount),
 			},
 		},
-		Network: config.ProtoNetwork(),
+		Network:                         config.ProtoNetwork(),
+		SparkOperatorIdentityPublicKeys: getSigningOperatorPublicKeys(config),
 	}
 
 	// Collect all revocation public keys
@@ -489,7 +535,7 @@ func TestFreezeAndUnfreezeTokens(t *testing.T) {
 
 	tokenPrivKey := config.IdentityPrivateKey
 	tokenIdentityPubKeyBytes := tokenPrivKey.PubKey().SerializeCompressed()
-	issueTokenTransaction, userLeaf1PrivKey, userLeaf2PrivKey, err := createTestTokenIssuanceTransaction(config, tokenIdentityPubKeyBytes)
+	issueTokenTransaction, userLeaf1PrivKey, userLeaf2PrivKey, err := createTestTokenMintTransaction(config, tokenIdentityPubKeyBytes)
 	require.NoError(t, err, "failed to create test token issuance transaction")
 
 	// Broadcast the token transaction
@@ -584,13 +630,13 @@ func TestFreezeAndUnfreezeTokens(t *testing.T) {
 	log.Printf("thawed token transfer broadcast finalized token transaction: %v", transferTokenTransactionResponse)
 }
 
-func TestBroadcastTokenTransactionIssueAndTransferTokensDoubleStart(t *testing.T) {
+func TestBroadcastTokenTransactionMintAndTransferTokensDoubleStart(t *testing.T) {
 	config, err := testutil.TestWalletConfig()
 	require.NoError(t, err, "failed to create wallet config")
 
 	tokenPrivKey := config.IdentityPrivateKey
 	tokenIdentityPubKeyBytes := tokenPrivKey.PubKey().SerializeCompressed()
-	issueTokenTransaction, _, _, err := createTestTokenIssuanceTransaction(config, tokenIdentityPubKeyBytes)
+	issueTokenTransaction, _, _, err := createTestTokenMintTransaction(config, tokenIdentityPubKeyBytes)
 	require.NoError(t, err, "failed to create test token issuance transaction")
 
 	// Make a start token transaction that we will not continue.
@@ -598,7 +644,7 @@ func TestBroadcastTokenTransactionIssueAndTransferTokensDoubleStart(t *testing.T
 		[][]byte{})
 
 	// Create a new transaction which will change the issuer timestamp to avoid a DB unique key error.
-	issueTokenTransaction, userLeaf1PrivKey, userLeaf2PrivKey, err := createTestTokenIssuanceTransaction(config, tokenIdentityPubKeyBytes)
+	issueTokenTransaction, userLeaf1PrivKey, userLeaf2PrivKey, err := createTestTokenMintTransaction(config, tokenIdentityPubKeyBytes)
 	require.NoError(t, err, "failed to create test token issuance transaction")
 
 	// Go through the full flow (including start token transaction)
@@ -683,16 +729,21 @@ func TestBroadcastTokenTransactionIssueAndTransferTokensDoubleStart(t *testing.T
 	require.Equal(t, uint32(0), leaf.PreviousTransactionVout, "previous transaction vout expected 0, got %d", leaf.PreviousTransactionVout)
 }
 
-func TestBroadcastTokenTransactionIssueAndTransferTokensDoubleSign(t *testing.T) {
-	config, err := testutil.TestWalletConfig()
-	require.NoError(t, err, "failed to create wallet config")
-
+// Helper function for testing token mint transaction with various signing scenarios
+// Parameters:
+// - t: testing context
+// - config: wallet configuration
+// - testDoubleSign: whether to test double signing
+// - testDifferentTx: whether to test signing with a different transaction than was started
+// - expectedError: whether an error is expected during any of the signing operations
+func testMintTransactionSigningScenarios(t *testing.T, config *wallet.Config,
+	testDoubleSign bool, testDifferentTx bool, expectedError bool,
+) (*pb.TokenTransaction, *secp256k1.PrivateKey, *secp256k1.PrivateKey) {
 	tokenPrivKey := config.IdentityPrivateKey
 	tokenIdentityPubKeyBytes := tokenPrivKey.PubKey().SerializeCompressed()
-	issueTokenTransaction, userLeaf1PrivKey, userLeaf2PrivKey, err := createTestTokenIssuanceTransaction(config, tokenIdentityPubKeyBytes)
-	require.NoError(t, err, "failed to create test token issuance transaction")
+	issueTokenTransaction, userLeaf1PrivKey, userLeaf2PrivKey, err := createTestTokenMintTransaction(config, tokenIdentityPubKeyBytes)
+	require.NoError(t, err, "failed to create test token mint transaction")
 
-	// Step 1: Start the token transaction
 	startResp, _, finalTxHash, err := wallet.StartTokenTransaction(
 		context.Background(),
 		config,
@@ -702,44 +753,91 @@ func TestBroadcastTokenTransactionIssueAndTransferTokensDoubleSign(t *testing.T)
 	)
 	require.NoError(t, err, "failed to start token transaction")
 
-	// Step 2: First sign attempt should succeed
-	_, err = wallet.SignTokenTransaction(
-		context.Background(),
-		config,
-		startResp.FinalTokenTransaction,
-		finalTxHash,
-		[]*secp256k1.PrivateKey{&tokenPrivKey},
-	)
-	require.NoError(t, err, "failed first sign attempt")
+	txToSign := startResp.FinalTokenTransaction
+	if testDifferentTx {
+		differentIssueTokenTransaction, _, _, err := createTestTokenMintTransaction(config, tokenIdentityPubKeyBytes)
+		require.NoError(t, err, "failed to create different test token issuance transaction")
+		txToSign = differentIssueTokenTransaction
+	}
 
-	// Step 2b: Second sign attempt should fail
-	_, err = wallet.SignTokenTransaction(
+	errorOccurred := false
+	var halfSignOperatorSignatures wallet.OperatorSignatures
+	if testDoubleSign {
+		halfOperatorIDs := getHalfOperatorIDs(config)
+		// Sign with half the operators to get in a partial signed state
+		_, halfSignOperatorSignatures, err = wallet.SignTokenTransaction(
+			context.Background(),
+			config,
+			startResp.FinalTokenTransaction, // Always use the original transaction for first sign (if double signing)
+			finalTxHash,
+			[]*secp256k1.PrivateKey{&tokenPrivKey},
+			halfOperatorIDs...,
+		)
+		require.NoError(t, err, "unexpected error during mint half signing")
+	}
+
+	// Complete the transaction signing with either the original or different transaction
+	_, fullSignOperatorSignatures, err := wallet.SignTokenTransaction(
 		context.Background(),
 		config,
-		startResp.FinalTokenTransaction,
+		txToSign,
 		finalTxHash,
 		[]*secp256k1.PrivateKey{&tokenPrivKey},
 	)
-	require.Error(t, err, "expected error when signing same transaction twice")
+	if err != nil {
+		errorOccurred = true
+		log.Printf("error when signing the mint transaction: %v", err)
+	}
+
+	if expectedError {
+		require.True(t, errorOccurred, "expected an error during mint signing operation but none occurred")
+		return nil, nil, nil
+	}
+
+	require.False(t, errorOccurred, "unexpected error during mint signing operation: %v", err)
+	if testDoubleSign {
+		// Verify that all signatures from the half signing operation match the corresponding ones in the full signing
+		for operatorID, halfSig := range halfSignOperatorSignatures {
+			fullSig, exists := fullSignOperatorSignatures[operatorID]
+			require.True(t, exists, "operator signature missing from full mint signing that was present in half signing")
+			require.True(t, bytes.Equal(halfSig, fullSig), "signature mismatch between half and full mint signing for operator %s", operatorID)
+		}
+	}
 
 	finalIssueTokenTransaction := startResp.FinalTokenTransaction
-	log.Printf("issuance transaction finalized: %v", finalIssueTokenTransaction)
+	log.Printf("mint transaction finalized: %v", finalIssueTokenTransaction)
+	return finalIssueTokenTransaction, userLeaf1PrivKey, userLeaf2PrivKey
+}
 
-	// Create transfer transaction
+// Helper function for testing token transfer transaction with various signing scenarios
+// Parameters:
+// - t: testing context
+// - config: wallet configuration
+// - finalIssueTokenTransaction: the finalized mint transaction
+// - userLeaf1PrivKey, userLeaf2PrivKey: private keys for the leaves
+// - testDoubleSign: whether to test double signing
+// - testDifferentTx: whether to test signing with a different transaction than was started
+// - expectedError: whether an error is expected during any of the signing operations
+func testTransferTransactionSigningScenarios(t *testing.T, config *wallet.Config,
+	finalIssueTokenTransaction *pb.TokenTransaction,
+	userLeaf1PrivKey, userLeaf2PrivKey *secp256k1.PrivateKey,
+	testDoubleSign bool, testDifferentTx bool, expectedError bool,
+) {
+	tokenPrivKey := config.IdentityPrivateKey
+	tokenIdentityPubKeyBytes := tokenPrivKey.PubKey().SerializeCompressed()
+
 	finalIssueTokenTransactionHash, err := utils.HashTokenTransaction(finalIssueTokenTransaction, false)
 	require.NoError(t, err, "failed to hash final issuance token transaction")
 
-	transferTokenTransaction, userLeaf3PrivKey, err := createTestTokenTransferTransaction(config,
+	transferTokenTransaction, _, err := createTestTokenTransferTransaction(config,
 		finalIssueTokenTransactionHash,
 		tokenIdentityPubKeyBytes,
 	)
 	require.NoError(t, err, "failed to create test token transfer transaction")
-	userLeaf3PubKeyBytes := userLeaf3PrivKey.PubKey().SerializeCompressed()
 
 	revPubKey1 := finalIssueTokenTransaction.OutputLeaves[0].RevocationPublicKey
 	revPubKey2 := finalIssueTokenTransaction.OutputLeaves[1].RevocationPublicKey
 
-	// Step 1: Start the transfer transaction
 	transferStartResp, _, transferFinalTxHash, err := wallet.StartTokenTransaction(
 		context.Background(),
 		config,
@@ -749,81 +847,172 @@ func TestBroadcastTokenTransactionIssueAndTransferTokensDoubleSign(t *testing.T)
 	)
 	require.NoError(t, err, "failed to start transfer transaction")
 
-	// Step 2: First sign attempt should succeed
-	transferLeafKeyshares, err := wallet.SignTokenTransaction(
+	errorOccurred := false
+	// Prepare transaction to sign - either the original or a modified one
+	txToSign := transferStartResp.FinalTokenTransaction
+	if testDifferentTx {
+		txToSign = cloneTransferTransactionWithDifferentOutputOwner(
+			transferTokenTransaction,
+			userLeaf1PrivKey.PubKey().SerializeCompressed(),
+		)
+	}
+
+	// If testing double signing, first sign with half the operators
+	var halfSignOperatorSignatures wallet.OperatorSignatures
+	if testDoubleSign {
+		halfOperatorIDs := getHalfOperatorIDs(config)
+		_, halfSignOperatorSignatures, err = wallet.SignTokenTransaction(
+			context.Background(),
+			config,
+			transferStartResp.FinalTokenTransaction, // Always use original transaction for first sign
+			transferFinalTxHash,
+			[]*secp256k1.PrivateKey{userLeaf1PrivKey, userLeaf2PrivKey},
+			halfOperatorIDs...,
+		)
+		require.NoError(t, err, "unexpected error during transfer half signing")
+	}
+
+	// Complete the transaction signing with either the original or different transaction
+	signResponseTransferKeyshares, fullSignOperatorSignatures, err := wallet.SignTokenTransaction(
 		context.Background(),
 		config,
-		transferStartResp.FinalTokenTransaction,
+		txToSign,
 		transferFinalTxHash,
 		[]*secp256k1.PrivateKey{userLeaf1PrivKey, userLeaf2PrivKey},
 	)
-	require.NoError(t, err, "failed first transfer sign attempt")
+	if err != nil {
+		errorOccurred = true
+		log.Printf("error when signing the transfer transaction: %v", err)
+	}
 
-	// Step 2b: Second sign attempt should fail
-	_, err = wallet.SignTokenTransaction(
-		context.Background(),
-		config,
-		transferStartResp.FinalTokenTransaction,
-		transferFinalTxHash,
-		[]*secp256k1.PrivateKey{userLeaf1PrivKey, userLeaf2PrivKey},
-	)
-	require.Error(t, err, "expected error when signing same transfer transaction twice")
+	if expectedError {
+		require.True(t, errorOccurred, "expected an error during transfer signing operation but none occurred")
+		return // Don't proceed with finalization if we expected an error
+	}
+	require.False(t, errorOccurred, "unexpected error during transfer signing operation")
+	if testDoubleSign {
+		// Verify that all signatures from the half signing operation match the corresponding ones in the full signing
+		for operatorID, halfSig := range halfSignOperatorSignatures {
+			fullSig, exists := fullSignOperatorSignatures[operatorID]
+			require.True(t, exists, "operator signature missing from full transfer signing that was present in half signing")
+			require.True(t, bytes.Equal(halfSig, fullSig), "signature mismatch between half and full transfer signing for operator %s", operatorID)
+		}
+	}
 
-	// Step 3: Finalize the transfer transaction with the successful keyshares
 	err = wallet.FinalizeTokenTransaction(
 		context.Background(),
 		config,
 		transferStartResp.FinalTokenTransaction,
-		transferLeafKeyshares,
+		signResponseTransferKeyshares,
 		[][]byte{revPubKey1, revPubKey2},
 		transferStartResp,
 	)
-	require.NoError(t, err, "failed to finalize transfer transaction")
+	require.NoError(t, err, "failed to finalize the transfer transaction")
+	log.Printf("transfer transaction finalized: %v", transferStartResp.FinalTokenTransaction)
+}
 
-	transferTokenTransactionResponse := transferStartResp.FinalTokenTransaction
-	log.Printf("transfer transaction finalized: %v", transferTokenTransactionResponse)
-
-	// Test QueryTokenOutputs
-	tokenOutputsResponse, err := wallet.QueryTokenOutputs(
-		context.Background(),
-		config,
-		[][]byte{userLeaf3PubKeyBytes},
-		[][]byte{tokenIdentityPubKeyBytes},
-	)
-	require.NoError(t, err, "failed to get owned token leaves")
-
-	// Validate the response
-	require.Equal(t, 1, len(tokenOutputsResponse.LeavesWithPreviousTransactionData), "expected 1 owned leaf")
-
-	leaf := tokenOutputsResponse.LeavesWithPreviousTransactionData[0]
-
-	// Validate leaf details
-	require.True(t, bytes.Equal(leaf.Leaf.OwnerPublicKey, userLeaf3PubKeyBytes), "leaf owner public key does not match expected")
-	require.True(t, bytes.Equal(leaf.Leaf.TokenPublicKey, tokenIdentityPubKeyBytes), "leaf token public key does not match expected")
-
-	// Validate amount
-	expectedAmount := new(big.Int).SetBytes(int64ToUint128Bytes(0, TestTransferLeaf1Amount))
-	actualAmount := new(big.Int).SetBytes(leaf.Leaf.TokenAmount)
-	require.Equal(t, 0, actualAmount.Cmp(expectedAmount), "leaf token amount %d does not match expected %d", actualAmount, expectedAmount)
-
-	// Validate previous transaction data
-	transferTokenTransactionResponseHash, err := utils.HashTokenTransaction(transferTokenTransactionResponse, false)
-	require.NoError(t, err, "failed to hash final transfer token transaction")
-	if !bytes.Equal(leaf.PreviousTransactionHash, transferTokenTransactionResponseHash) {
-		t.Fatalf("previous transaction hash does not match expected")
+// TestTokenMintTransactionSigning tests various signing scenarios for token mint transactions
+func TestTokenMintTransactionSigning(t *testing.T) {
+	testCases := []struct {
+		name            string
+		doubleMintSign  bool
+		differentMintTx bool
+		expectedError   bool
+	}{
+		{
+			name:            "single sign mint should succeed with the same transaction",
+			doubleMintSign:  false,
+			differentMintTx: false,
+			expectedError:   false,
+		},
+		{
+			name:            "single sign mint should fail with different transaction",
+			doubleMintSign:  false,
+			differentMintTx: true,
+			expectedError:   true,
+		},
+		{
+			name:            "double sign mint should fail with a different transaction",
+			doubleMintSign:  true,
+			differentMintTx: true,
+			expectedError:   true,
+		},
+		{
+			name:            "double sign mint should succeed with same transaction",
+			doubleMintSign:  true,
+			differentMintTx: false,
+			expectedError:   false,
+		},
 	}
-	if leaf.PreviousTransactionVout != 0 {
-		t.Fatalf("previous transaction vout expected 0, got %d", leaf.PreviousTransactionVout)
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			config, err := testutil.TestWalletConfig()
+			require.NoError(t, err, "failed to create wallet config")
+
+			testMintTransactionSigningScenarios(
+				t, config, tc.doubleMintSign, tc.differentMintTx, tc.expectedError)
+		})
 	}
 }
 
-func TestBroadcastTokenTransactionIssueAndTransferTokensSchnorr(t *testing.T) {
+// TestTokenTransferTransactionSigning tests various signing scenarios for token transfer transactions
+func TestTokenTransferTransactionSigning(t *testing.T) {
+	testCases := []struct {
+		name                string
+		doubleTransferSign  bool
+		differentTransferTx bool
+		expectedError       bool
+	}{
+		{
+			name:                "single sign transfer should succeed with the same transaction",
+			doubleTransferSign:  false,
+			differentTransferTx: false,
+			expectedError:       false,
+		},
+		{
+			name:                "single sign transfer  should fail with different transaction",
+			doubleTransferSign:  false,
+			differentTransferTx: true,
+			expectedError:       true,
+		},
+		{
+			name:                "double sign transfer should fail with a different transaction",
+			doubleTransferSign:  true,
+			differentTransferTx: true,
+			expectedError:       true,
+		},
+		{
+			name:                "double sign transfer should succeed with same transaction",
+			doubleTransferSign:  true,
+			differentTransferTx: false,
+			expectedError:       false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			config, err := testutil.TestWalletConfig()
+			require.NoError(t, err, "failed to create wallet config")
+
+			// First create and finalize a mint transaction to use for the transfer tests
+			finalIssueTokenTransaction, userLeaf1PrivKey, userLeaf2PrivKey := testMintTransactionSigningScenarios(
+				t, config, false, false, false) // Simple mint with no errors expected
+
+			testTransferTransactionSigningScenarios(
+				t, config, finalIssueTokenTransaction, userLeaf1PrivKey, userLeaf2PrivKey,
+				tc.doubleTransferSign, tc.differentTransferTx, tc.expectedError)
+		})
+	}
+}
+
+func TestBroadcastTokenTransactionMintAndTransferTokensSchnorr(t *testing.T) {
 	config, err := testutil.TestWalletConfigWithTokenTransactionSchnorr()
 	require.NoError(t, err, "failed to create wallet config")
 
 	tokenPrivKey := config.IdentityPrivateKey
 	tokenIdentityPubKeyBytes := tokenPrivKey.PubKey().SerializeCompressed()
-	issueTokenTransaction, userLeaf1PrivKey, userLeaf2PrivKey, err := createTestTokenIssuanceTransaction(config, tokenIdentityPubKeyBytes)
+	issueTokenTransaction, userLeaf1PrivKey, userLeaf2PrivKey, err := createTestTokenMintTransaction(config, tokenIdentityPubKeyBytes)
 	require.NoError(t, err, "failed to create test token issuance transaction")
 
 	finalIssueTokenTransaction, err := wallet.BroadcastTokenTransaction(
@@ -868,7 +1057,7 @@ func TestFreezeAndUnfreezeTokensSchnorr(t *testing.T) {
 
 	tokenPrivKey := config.IdentityPrivateKey
 	tokenIdentityPubKeyBytes := tokenPrivKey.PubKey().SerializeCompressed()
-	issueTokenTransaction, _, _, err := createTestTokenIssuanceTransaction(config, tokenIdentityPubKeyBytes)
+	issueTokenTransaction, _, _, err := createTestTokenMintTransaction(config, tokenIdentityPubKeyBytes)
 	require.NoError(t, err, "failed to create test token issuance transaction")
 
 	finalIssueTokenTransaction, err := wallet.BroadcastTokenTransaction(
@@ -877,7 +1066,6 @@ func TestFreezeAndUnfreezeTokensSchnorr(t *testing.T) {
 		[][]byte{})
 	require.NoError(t, err, "failed to broadcast issuance token transaction")
 
-	// Call FreezeTokens to freeze the output leaf
 	_, err = wallet.FreezeTokens(
 		context.Background(),
 		config,
@@ -892,37 +1080,14 @@ func TestCancelTokenTransaction(t *testing.T) {
 	config, err := testutil.TestWalletConfig()
 	require.NoError(t, err, "failed to create wallet config")
 
-	// Get half of the operator IDs
-	var halfOperatorIDs []string
-	i := 0
-	for operatorID := range config.SigningOperators {
-		if i < len(config.SigningOperators)/2 {
-			halfOperatorIDs = append(halfOperatorIDs, operatorID)
-			i++
-		} else {
-			break
-		}
-	}
-	var remainingOperatorIDs []string
-	for operatorID := range config.SigningOperators {
-		found := false
-		for _, halfID := range halfOperatorIDs {
-			if operatorID == halfID {
-				found = true
-				break
-			}
-		}
-		if !found {
-			remainingOperatorIDs = append(remainingOperatorIDs, operatorID)
-		}
-	}
+	halfOperatorIDs := getHalfOperatorIDs(config)
+	remainingOperatorIDs := getRemainingOperatorIDs(config, halfOperatorIDs)
 
 	tokenPrivKey := config.IdentityPrivateKey
 	tokenIdentityPubKeyBytes := tokenPrivKey.PubKey().SerializeCompressed()
-	issueTokenTransaction, userLeaf1PrivKey, userLeaf2PrivKey, err := createTestTokenIssuanceTransaction(config, tokenIdentityPubKeyBytes)
+	issueTokenTransaction, userLeaf1PrivKey, userLeaf2PrivKey, err := createTestTokenMintTransaction(config, tokenIdentityPubKeyBytes)
 	require.NoError(t, err, "failed to create test token issuance transaction")
 
-	// Step 1: Start the token transaction
 	startResp, _, finalTxHash, err := wallet.StartTokenTransaction(
 		context.Background(),
 		config,
@@ -933,7 +1098,7 @@ func TestCancelTokenTransaction(t *testing.T) {
 	require.NoError(t, err, "failed to start token transaction")
 	finalIssueTokenTransaction := startResp.FinalTokenTransaction
 
-	_, err = wallet.SignTokenTransaction(
+	_, _, err = wallet.SignTokenTransaction(
 		context.Background(),
 		config,
 		startResp.FinalTokenTransaction,
@@ -947,11 +1112,11 @@ func TestCancelTokenTransaction(t *testing.T) {
 		context.Background(),
 		config,
 		startResp.FinalTokenTransaction,
-		halfOperatorIDs..., // Only sign with half of the operators
+		halfOperatorIDs...,
 	)
 	require.Error(t, err, "expected cancel failure on mint transaction. Mint cancellation is not supported")
 
-	_, err = wallet.SignTokenTransaction(
+	_, _, err = wallet.SignTokenTransaction(
 		context.Background(),
 		config,
 		startResp.FinalTokenTransaction,
@@ -986,7 +1151,7 @@ func TestCancelTokenTransaction(t *testing.T) {
 	log.Printf("transfer tx hash: %x", transferFinalTxHash)
 
 	// Sign with only half of the operators
-	_, err = wallet.SignTokenTransaction(
+	_, _, err = wallet.SignTokenTransaction(
 		context.Background(),
 		config,
 		transferStartResp.FinalTokenTransaction,
@@ -1032,7 +1197,7 @@ func TestBroadcastTokenTransactionWithInvalidPrevTxHash(t *testing.T) {
 
 	tokenPrivKey := config.IdentityPrivateKey
 	tokenIdentityPubKeyBytes := tokenPrivKey.PubKey().SerializeCompressed()
-	issueTokenTransaction, userLeaf1PrivKey, userLeaf2PrivKey, err := createTestTokenIssuanceTransaction(config, tokenIdentityPubKeyBytes)
+	issueTokenTransaction, userLeaf1PrivKey, userLeaf2PrivKey, err := createTestTokenMintTransaction(config, tokenIdentityPubKeyBytes)
 	require.NoError(t, err, "failed to create test token issuance transaction")
 
 	finalIssueTokenTransaction, err := wallet.BroadcastTokenTransaction(
@@ -1071,7 +1236,8 @@ func TestBroadcastTokenTransactionWithInvalidPrevTxHash(t *testing.T) {
 				TokenAmount:    int64ToUint128Bytes(0, TestTransferLeaf1Amount),
 			},
 		},
-		Network: config.ProtoNetwork(),
+		Network:                         config.ProtoNetwork(),
+		SparkOperatorIdentityPublicKeys: getSigningOperatorPublicKeys(config),
 	}
 
 	revPubKey1 := finalIssueTokenTransaction.OutputLeaves[0].RevocationPublicKey
@@ -1111,7 +1277,8 @@ func TestBroadcastTokenTransactionWithInvalidPrevTxHash(t *testing.T) {
 				TokenAmount:    int64ToUint128Bytes(0, TestTransferLeaf1Amount),
 			},
 		},
-		Network: config.ProtoNetwork(),
+		Network:                         config.ProtoNetwork(),
+		SparkOperatorIdentityPublicKeys: getSigningOperatorPublicKeys(config),
 	}
 
 	// Attempt to broadcast the second transfer transaction with corrupted hash
@@ -1131,7 +1298,7 @@ func TestBroadcastTokenTransactionUnspecifiedNetwork(t *testing.T) {
 
 	tokenPrivKey := config.IdentityPrivateKey
 	tokenIdentityPubKeyBytes := tokenPrivKey.PubKey().SerializeCompressed()
-	issueTokenTransaction, _, _, err := createTestTokenIssuanceTransaction(config, tokenIdentityPubKeyBytes)
+	issueTokenTransaction, _, _, err := createTestTokenMintTransaction(config, tokenIdentityPubKeyBytes)
 	require.NoError(t, err, "failed to create test token issuance transaction")
 	issueTokenTransaction.Network = pb.Network_UNSPECIFIED
 
@@ -1142,4 +1309,17 @@ func TestBroadcastTokenTransactionUnspecifiedNetwork(t *testing.T) {
 
 	require.Error(t, err, "expected transaction without a network to be rejected")
 	log.Printf("successfully detected unspecified network and rejected with error: %v", err)
+}
+
+// cloneTransferTransactionWithDifferentOutputOwner creates a copy of a transfer transaction
+// with a modified owner public key in the first output leaf
+func cloneTransferTransactionWithDifferentOutputOwner(
+	tx *pb.TokenTransaction,
+	newOwnerPubKey []byte,
+) *pb.TokenTransaction {
+	clone := proto.Clone(tx).(*pb.TokenTransaction)
+	if len(clone.OutputLeaves) > 0 {
+		clone.OutputLeaves[0].OwnerPublicKey = newOwnerPubKey
+	}
+	return clone
 }
