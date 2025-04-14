@@ -16,14 +16,16 @@ CREATE TEMP TABLE tree_nodes_to_delete AS (
 -- User Signed Transactions / Preimages
 -- ------------------------------------
 CREATE TEMP TABLE user_signed_transactions_to_delete AS (
-    SELECT id, user_signed_transaction_preimage_request FROM user_signed_transactions WHERE user_signed_transaction_tree_node in (
+    SELECT id, user_signed_transaction_preimage_request AS preimage_request_id FROM user_signed_transactions WHERE user_signed_transaction_tree_node in (
         SELECT id FROM tree_nodes_to_delete
     )
 );
 
 CREATE TEMP TABLE preimage_requests_to_delete AS (
-    SELECT id FROM preimage_requests WHERE id in (
-        SELECT user_signed_transaction_preimage_request FROM user_signed_transactions_to_delete
+    SELECT DISTINCT preimage_requests.id FROM preimage_requests WHERE NOT EXISTS (
+        SELECT 1 FROM user_signed_transactions WHERE user_signed_transactions.user_signed_transaction_preimage_request = preimage_requests.id AND user_signed_transactions.id NOT IN (
+            SELECT id FROM user_signed_transactions_to_delete
+        )
     )
 );
 
