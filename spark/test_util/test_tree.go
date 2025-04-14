@@ -94,7 +94,7 @@ func CreateNewTree(config *wallet.Config, faucet *Faucet, privKey *secp256k1.Pri
 	node := resp.Nodes[0]
 	for node.Status != string(schema.TreeNodeStatusAvailable) {
 		if time.Since(startTime) >= 10*time.Second {
-			return nil, fmt.Errorf("timed out waiting for node to be available")
+			return nil, fmt.Errorf("timed out waiting for node to be unavailable")
 		}
 		time.Sleep(100 * time.Millisecond)
 		nodesResp, err := sparkClient.QueryNodes(authCtx, &pb.QueryNodesRequest{

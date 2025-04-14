@@ -18,8 +18,8 @@ import (
 // RetryPolicyConfig represents configuration for gRPC retry policy
 type RetryPolicyConfig struct {
 	MaxAttempts          int
-	InitialBackoff       time.Duration
-	MaxBackoff           time.Duration
+	InitialBackoffSecs   time.Duration
+	MaxBackoffSecs       time.Duration
 	BackoffMultiplier    float64
 	RetryableStatusCodes []string
 }
@@ -27,8 +27,8 @@ type RetryPolicyConfig struct {
 // DefaultRetryPolicy provides the default retry configuration
 var DefaultRetryPolicy = RetryPolicyConfig{
 	MaxAttempts:          3,
-	InitialBackoff:       1 * time.Second,
-	MaxBackoff:           10 * time.Second,
+	InitialBackoffSecs:   1 * time.Second,
+	MaxBackoffSecs:       10 * time.Second,
 	BackoffMultiplier:    2.0,
 	RetryableStatusCodes: []string{"UNAVAILABLE"},
 }
@@ -45,7 +45,7 @@ func CreateRetryPolicy(config RetryPolicyConfig) string {
 			  "BackoffMultiplier": %.1f,
 			  "RetryableStatusCodes": [ "%s" ]
 		  }
-		}]}`, config.MaxAttempts, config.InitialBackoff.String(), config.MaxBackoff.String(),
+		}]}`, config.MaxAttempts, config.InitialBackoffSecs.String(), config.MaxBackoffSecs.String(),
 		config.BackoffMultiplier, strings.Join(config.RetryableStatusCodes, "\", \""))
 }
 

@@ -107,7 +107,6 @@ func (h *InternalDepositHandler) FinalizeTreeCreation(ctx context.Context, req *
 			SetID(treeID).
 			SetOwnerIdentityPubkey(selectedNode.OwnerIdentityPubkey).
 			SetBaseTxid(txid[:]).
-			SetVout(int16(nodeTx.TxIn[0].PreviousOutPoint.Index)).
 			SetNetwork(schemaNetwork)
 
 		if markNodeAsAvailalbe {

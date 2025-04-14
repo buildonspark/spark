@@ -38,11 +38,6 @@ import (
 	"github.com/lightsparkdev/spark-go/so/helper"
 	"github.com/lightsparkdev/spark-go/so/task"
 	_ "github.com/mattn/go-sqlite3"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
-	"go.opentelemetry.io/otel"
-	otelprom "go.opentelemetry.io/otel/exporters/prometheus"
-	"go.opentelemetry.io/otel/sdk/metric"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/health"
@@ -259,23 +254,13 @@ func main() {
 		log.Fatalf("Failed to create token verifier: %v", err)
 	}
 
-	promExporter, err := otelprom.New()
-	if err != nil {
-		log.Fatalf("Failed to create prometheus exporter: %v", err)
-	}
-	meterProvider := metric.NewMeterProvider(metric.WithReader(promExporter))
-	otel.SetMeterProvider(meterProvider)
-
-	serverOpts := []grpc.ServerOption{
-		grpc.StatsHandler(otelgrpc.NewServerHandler()),
-		grpc.UnaryInterceptor(grpc_middleware.ChainUnaryServer(
-			sparkgrpc.PanicRecoveryInterceptor(config.ReturnDetailedPanicErrors),
-			helper.LogInterceptor,
-			ent.DbSessionMiddleware(dbClient),
-			authn.NewAuthnInterceptor(sessionTokenCreatorVerifier).AuthnInterceptor,
-			sparkgrpc.ValidationInterceptor(),
-		)),
-	}
+	serverOpts := grpc.UnaryInterceptor(grpc_middleware.ChainUnaryServer(
+		sparkgrpc.PanicRecoveryInterceptor(config.ReturnDetailedPanicErrors),
+		helper.LogInterceptor,
+		ent.DbSessionMiddleware(dbClient),
+		authn.NewAuthnInterceptor(sessionTokenCreatorVerifier).AuthnInterceptor,
+		sparkgrpc.ValidationInterceptor(),
+	))
 
 	var grpcServer *grpc.Server
 	var tlsConfig *tls.Config
@@ -289,15 +274,19 @@ func main() {
 			ClientAuth:   tls.NoClientCert,
 			MinVersion:   tls.VersionTLS12,
 		})
-		serverOpts = append(serverOpts, grpc.Creds(creds))
-		grpcServer = grpc.NewServer(serverOpts...)
+		grpcServer = grpc.NewServer(
+			grpc.Creds(creds),
+			serverOpts,
+		)
 		log.Printf("Server starting with TLS on: %v", args.ServerCertPath)
 		tlsConfig = &tls.Config{
 			Certificates: []tls.Certificate{cert},
 			MinVersion:   tls.VersionTLS12,
 		}
 	} else {
-		grpcServer = grpc.NewServer(serverOpts...)
+		grpcServer = grpc.NewServer(
+			serverOpts,
+		)
 		tlsConfig = nil
 	}
 
@@ -343,23 +332,18 @@ func main() {
 		grpcweb.WithCorsForRegisteredEndpointsOnly(false),
 	)
 
-	mux := http.NewServeMux()
-	mux.Handle("/-/ready", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	}))
-	mux.Handle("/metrics", promhttp.Handler())
-	mux.HandleFunc("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.ToLower(r.Header.Get("Content-Type")) == "application/grpc" {
 			grpcServer.ServeHTTP(w, r)
 			return
 		}
 		wrappedGrpc.ServeHTTP(w, r)
-	}))
+	})
 
 	if tlsConfig != nil {
 		server := &http.Server{
 			Addr:      fmt.Sprintf(":%d", args.Port),
-			Handler:   mux,
+			Handler:   handler,
 			TLSConfig: tlsConfig,
 		}
 

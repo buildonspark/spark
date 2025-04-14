@@ -31,13 +31,7 @@ func (s *SparkServer) GenerateDepositAddress(ctx context.Context, req *pb.Genera
 	return wrapWithGRPCError(depositHandler.GenerateDepositAddress(ctx, s.config, req))
 }
 
-// StartDepositTreeCreation verifies the on chain utxo, and then verifies and signs the offchain root and refund transactions.
-func (s *SparkServer) StartDepositTreeCreation(ctx context.Context, req *pb.StartDepositTreeCreationRequest) (*pb.StartDepositTreeCreationResponse, error) {
-	depositHandler := handler.NewDepositHandler(s.config, s.db)
-	return wrapWithGRPCError(depositHandler.StartDepositTreeCreation(ctx, s.config, req))
-}
-
-// This is deprecated, please use StartDepsitTreeCreation instead.
+// StartTreeCreation verifies the on chain utxo, and then verifies and signs the offchain root and refund transactions.
 func (s *SparkServer) StartTreeCreation(ctx context.Context, req *pb.StartTreeCreationRequest) (*pb.StartTreeCreationResponse, error) {
 	depositHandler := handler.NewDepositHandler(s.config, s.db)
 	return wrapWithGRPCError(depositHandler.StartTreeCreation(ctx, s.config, req))
@@ -116,24 +110,10 @@ func (s *SparkServer) CooperativeExit(ctx context.Context, req *pb.CooperativeEx
 	return wrapWithGRPCError(coopExitHandler.CooperativeExit(ctx, req))
 }
 
-// StartLeafSwap initiates a swap of leaves between two users.
-func (s *SparkServer) StartLeafSwap(ctx context.Context, req *pb.StartSendTransferRequest) (*pb.StartSendTransferResponse, error) {
+// LeafSwap initiates a swap of leaves between two users.
+func (s *SparkServer) LeafSwap(ctx context.Context, req *pb.LeafSwapRequest) (*pb.LeafSwapResponse, error) {
 	transferHander := handler.NewTransferHandler(s.config)
-	return wrapWithGRPCError(transferHander.StartLeafSwap(ctx, req))
-}
-
-// LeafSwap starts the reverse side of a swap of leaves between two users.
-// This is deprecated but remains for backwards compatibility,
-// CounterLeafSwap should be used instead.
-func (s *SparkServer) LeafSwap(ctx context.Context, req *pb.CounterLeafSwapRequest) (*pb.CounterLeafSwapResponse, error) {
-	transferHander := handler.NewTransferHandler(s.config)
-	return wrapWithGRPCError(transferHander.CounterLeafSwap(ctx, req))
-}
-
-// CounterLeafSwap starts the reverse side of a swap of leaves between two users.
-func (s *SparkServer) CounterLeafSwap(ctx context.Context, req *pb.CounterLeafSwapRequest) (*pb.CounterLeafSwapResponse, error) {
-	transferHander := handler.NewTransferHandler(s.config)
-	return wrapWithGRPCError(transferHander.CounterLeafSwap(ctx, req))
+	return wrapWithGRPCError(transferHander.InitiateLeafSwap(ctx, req))
 }
 
 // RefreshTimelock refreshes the timelocks of a leaf and its ancestors.
@@ -213,16 +193,16 @@ func (s *SparkServer) FreezeTokens(ctx context.Context, req *pb.FreezeTokensRequ
 	return wrapWithGRPCError(tokenTransactionHandler.FreezeTokens(ctx, s.config, req))
 }
 
-// QueryTokenTransactions returns the token transactions currently owned by the provided owner public key.
+// GetOwnedTokenLeaves returns the leaves currently owned by the provided owner public key.
 func (s *SparkServer) QueryTokenTransactions(ctx context.Context, req *pb.QueryTokenTransactionsRequest) (*pb.QueryTokenTransactionsResponse, error) {
 	tokenTransactionHandler := handler.NewTokenTransactionHandler(s.config, s.db)
 	return wrapWithGRPCError(tokenTransactionHandler.QueryTokenTransactions(ctx, s.config, req))
 }
 
-// QueryTokenOutputs returns the token outputs currently owned by the provided owner public key.
-func (s *SparkServer) QueryTokenOutputs(ctx context.Context, req *pb.QueryTokenOutputsRequest) (*pb.QueryTokenOutputsResponse, error) {
+// GetOwnedTokenLeaves returns the leaves currently owned by the provided owner public key.
+func (s *SparkServer) GetOwnedTokenLeaves(ctx context.Context, req *pb.GetOwnedTokenLeavesRequest) (*pb.GetOwnedTokenLeavesResponse, error) {
 	tokenTransactionHandler := handler.NewTokenTransactionHandler(s.config, s.db)
-	return wrapWithGRPCError(tokenTransactionHandler.QueryTokenOutputs(ctx, req))
+	return wrapWithGRPCError(tokenTransactionHandler.GetOwnedTokenLeaves(ctx, req))
 }
 
 func (s *SparkServer) QueryAllTransfers(ctx context.Context, req *pb.QueryAllTransfersRequest) (*pb.QueryAllTransfersResponse, error) {

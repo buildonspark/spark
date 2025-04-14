@@ -86,7 +86,7 @@ func ApplyAdaptorToSignature(pubkey *btcec.PublicKey, hash []byte, signature []b
 
 	newSig = schnorr.NewSignature(&sig.r, &newS)
 	if !newSig.Verify(hash, pubkey) {
-		return nil, fmt.Errorf("cannot apply adaptor to signature")
+		return nil, fmt.Errorf("Cannot apply adaptor to signature")
 	}
 
 	return newSig.Serialize(), nil

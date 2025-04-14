@@ -10,11 +10,9 @@ import (
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lightsparkdev/spark-go/common"
-	"github.com/lightsparkdev/spark-go/proto/spark"
 	testutil "github.com/lightsparkdev/spark-go/test_util"
 	"github.com/lightsparkdev/spark-go/wallet"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestSwap(t *testing.T) {
@@ -62,7 +60,7 @@ func TestSwap(t *testing.T) {
 	senderLeavesToTransfer := [1]wallet.LeafKeyTweak{senderTransferNode}
 
 	// Get signature for refunds (normal flow)
-	senderTransfer, senderRefundSignatureMap, leafDataMap, err := wallet.StartSwapSignRefund(
+	senderTransfer, senderRefundSignatureMap, leafDataMap, err := wallet.SendTransferSignRefund(
 		context.Background(),
 		senderConfig,
 		senderLeavesToTransfer[:],
@@ -101,7 +99,7 @@ func TestSwap(t *testing.T) {
 		NewSigningPrivKey: receiverNewLeafPrivKey.Serialize(),
 	}
 	receiverLeavesToTransfer := [1]wallet.LeafKeyTweak{receiverTransferNode}
-	receiverTransfer, receiverRefundSignatureMap, leafDataMap, operatorSigningResults, err := wallet.CounterSwapSignRefund(
+	receiverTransfer, receiverRefundSignatureMap, leafDataMap, operatorSigningResults, err := wallet.SendSwapSignRefund(
 		context.Background(),
 		receiverConfig,
 		receiverLeavesToTransfer[:],
@@ -169,7 +167,6 @@ func TestSwap(t *testing.T) {
 	if receiverPendingTransfer.Id != senderTransfer.Id {
 		t.Fatalf("expected transfer id %s, got %s", senderTransfer.Id, receiverPendingTransfer.Id)
 	}
-	require.Equal(t, receiverPendingTransfer.Type, spark.TransferType_SWAP)
 
 	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(context.Background(), receiverConfig, receiverPendingTransfer)
 	if err != nil {
@@ -230,7 +227,6 @@ func TestSwap(t *testing.T) {
 	if receiverPendingTransfer.Id != senderTransfer.Id {
 		t.Fatalf("expected transfer id %s, got %s", senderTransfer.Id, receiverPendingTransfer.Id)
 	}
-	require.Equal(t, senderPendingTransfer.Type, spark.TransferType_COUNTER_SWAP)
 
 	leafPrivKeyMap, err = wallet.VerifyPendingTransfer(context.Background(), senderConfig, senderPendingTransfer)
 	if err != nil {

@@ -533,19 +533,14 @@ func ValidateRevocationKeys(revocationPrivateKeys [][]byte, expectedRevocationPu
 	return nil
 }
 
-func isNetworkSupported(providedNetwork common.Network, networks []common.Network) bool {
-	// UNSPECIFIED network should never be considered supported
-	if providedNetwork == common.Unspecified {
-		return false
-	}
-
+func isNetworkSupported(network common.Network, supportedNetworks []common.Network) bool {
 	supportedNetworkMap := make(map[common.Network]struct{})
 
 	// Create a map for quick lookup of supported networks
-	for _, n := range networks {
+	for _, n := range supportedNetworks {
 		supportedNetworkMap[n] = struct{}{}
 	}
 	// Check if the network is supported
-	_, exists := supportedNetworkMap[providedNetwork]
+	_, exists := supportedNetworkMap[network]
 	return exists
 }

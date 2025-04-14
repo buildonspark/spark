@@ -75,12 +75,6 @@ func (tc *TreeCreate) SetBaseTxid(b []byte) *TreeCreate {
 	return tc
 }
 
-// SetVout sets the "vout" field.
-func (tc *TreeCreate) SetVout(i int16) *TreeCreate {
-	tc.mutation.SetVout(i)
-	return tc
-}
-
 // SetID sets the "id" field.
 func (tc *TreeCreate) SetID(u uuid.UUID) *TreeCreate {
 	tc.mutation.SetID(u)
@@ -210,22 +204,6 @@ func (tc *TreeCreate) check() error {
 			return &ValidationError{Name: "network", err: fmt.Errorf(`ent: validator failed for field "Tree.network": %w`, err)}
 		}
 	}
-	if _, ok := tc.mutation.BaseTxid(); !ok {
-		return &ValidationError{Name: "base_txid", err: errors.New(`ent: missing required field "Tree.base_txid"`)}
-	}
-	if v, ok := tc.mutation.BaseTxid(); ok {
-		if err := tree.BaseTxidValidator(v); err != nil {
-			return &ValidationError{Name: "base_txid", err: fmt.Errorf(`ent: validator failed for field "Tree.base_txid": %w`, err)}
-		}
-	}
-	if _, ok := tc.mutation.Vout(); !ok {
-		return &ValidationError{Name: "vout", err: errors.New(`ent: missing required field "Tree.vout"`)}
-	}
-	if v, ok := tc.mutation.Vout(); ok {
-		if err := tree.VoutValidator(v); err != nil {
-			return &ValidationError{Name: "vout", err: fmt.Errorf(`ent: validator failed for field "Tree.vout": %w`, err)}
-		}
-	}
 	return nil
 }
 
@@ -284,10 +262,6 @@ func (tc *TreeCreate) createSpec() (*Tree, *sqlgraph.CreateSpec) {
 	if value, ok := tc.mutation.BaseTxid(); ok {
 		_spec.SetField(tree.FieldBaseTxid, field.TypeBytes, value)
 		_node.BaseTxid = value
-	}
-	if value, ok := tc.mutation.Vout(); ok {
-		_spec.SetField(tree.FieldVout, field.TypeInt16, value)
-		_node.Vout = value
 	}
 	if nodes := tc.mutation.RootIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{

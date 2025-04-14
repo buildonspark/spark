@@ -299,10 +299,9 @@ func (h *LightningHandler) validateGetPreimageRequest(
 		}
 		totalAmount += uint64(refundTx.TxOut[0].Value)
 	}
-	switch reason {
-	case pb.InitiatePreimageSwapRequest_REASON_SEND:
+	if reason == pb.InitiatePreimageSwapRequest_REASON_SEND {
 		totalAmount -= feeSats
-	case pb.InitiatePreimageSwapRequest_REASON_RECEIVE:
+	} else if reason == pb.InitiatePreimageSwapRequest_REASON_RECEIVE {
 		totalAmount += feeSats
 	}
 	if totalAmount != amount.ValueSats {
@@ -577,17 +576,8 @@ func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pb.Ini
 
 	hash := sha256.Sum256(secret.Bytes())
 	if !bytes.Equal(hash[:], req.PaymentHash) {
-		baseHandler := NewBaseTransferHandler(h.config)
-		_, err := baseHandler.CancelSendTransfer(ctx, &pb.CancelSendTransferRequest{
-			TransferId:              transfer.ID.String(),
-			SenderIdentityPublicKey: transfer.SenderIdentityPubkey,
-		}, CancelSendTransferIntentTask)
-		if err != nil {
-			slog.Error("InitiatePreimageSwap: unable to cancel own send transfer", "error", err)
-		}
-
 		selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
-		_, err = helper.ExecuteTaskWithAllOperators(ctx, h.config, &selection, func(ctx context.Context, operator *so.SigningOperator) ([]byte, error) {
+		_, err := helper.ExecuteTaskWithAllOperators(ctx, h.config, &selection, func(ctx context.Context, operator *so.SigningOperator) ([]byte, error) {
 			conn, err := operator.NewGRPCConnection()
 			if err != nil {
 				return nil, err
@@ -600,7 +590,7 @@ func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pb.Ini
 				SenderIdentityPublicKey: req.Transfer.OwnerIdentityPublicKey,
 			})
 			if err != nil {
-				return nil, fmt.Errorf("unable to cancel other operator's send transfer: %v", err)
+				return nil, fmt.Errorf("unable to cancel send transfer: %v", err)
 			}
 			return nil, nil
 		})
@@ -608,7 +598,7 @@ func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pb.Ini
 			slog.Error("InitiatePreimageSwap: unable to cancel send transfer", "error", err)
 		}
 
-		return nil, fmt.Errorf("recovered preimage did not match payment hash: %w", ent.ErrNoRollback)
+		return nil, fmt.Errorf("invalid preimage")
 	}
 
 	err = preimageRequest.Update().SetStatus(schema.PreimageRequestStatusPreimageShared).Exec(ctx)
@@ -726,10 +716,7 @@ func (h *LightningHandler) ProvidePreimageInternal(ctx context.Context, req *pb.
 	}
 	slog.Debug("ProvidePreimage: preimage request found")
 
-	preimageRequest, err = preimageRequest.Update().
-		SetStatus(schema.PreimageRequestStatusPreimageShared).
-		SetPreimage(req.Preimage).
-		Save(ctx)
+	preimageRequest, err = preimageRequest.Update().SetStatus(schema.PreimageRequestStatusPreimageShared).Save(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to update preimage request status: %v", err)
 	}

@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log"
 	"log/slog"
-	"slices"
 	"time"
 
 	"github.com/btcsuite/btcd/btcjson"
@@ -106,7 +105,11 @@ func findDifference(currChainTip, newChainTip Tip, client *rpcclient.Client) (Di
 	disconnected := []Tip{}
 	connected := []Tip{}
 
-	for !currChainTip.Hash.IsEqual(&newChainTip.Hash) {
+	for {
+		if currChainTip.Hash.IsEqual(&newChainTip.Hash) {
+			break
+		}
+
 		// Walk back the chain, finding blocks needed to connect and disconnect. Only walk back
 		// the header with the greater height, or both if equal heights (i.e. same height, different hashes!).
 		newHeight := newChainTip.Height
@@ -120,7 +123,7 @@ func findDifference(currChainTip, newChainTip Tip, client *rpcclient.Client) (Di
 			currChainTip = prevChainTip
 		}
 		if newHeight >= currHeight {
-			connected = append([]Tip{newChainTip}, connected...)
+			connected = append(connected, newChainTip)
 			prevChainTip, err := findPreviousChainTip(newChainTip, client)
 			if err != nil {
 				return Difference{}, err
@@ -134,59 +137,6 @@ func findDifference(currChainTip, newChainTip Tip, client *rpcclient.Client) (Di
 		Disconnected:   disconnected,
 		Connected:      connected,
 	}, nil
-}
-
-func scanChainUpdates(
-	dbClient *ent.Client,
-	soConfig so.Config,
-	client *rpcclient.Client,
-	network common.Network,
-) error {
-	logger := slog.Default().With("method", "watch_chain.scanChainUpdates", "network", network.String())
-	latestBlockHeight, err := client.GetBlockCount()
-	if err != nil {
-		return fmt.Errorf("failed to get block count: %v", err)
-	}
-	latestBlockHash, err := client.GetBlockHash(latestBlockHeight)
-	if err != nil {
-		return fmt.Errorf("failed to get block hash: %v", err)
-	}
-	latestChainTip := NewTip(latestBlockHeight, *latestBlockHash)
-
-	ctx := context.Background()
-	entNetwork := common.SchemaNetwork(network)
-	dbBlockHeight, err := dbClient.BlockHeight.Query().
-		Where(blockheight.NetworkEQ(entNetwork)).
-		Only(ctx)
-	if ent.IsNotFound(err) {
-		startHeight := max(0, latestBlockHeight-6)
-		logger.Info("Block height not found, creating new entry", "height", startHeight)
-		dbBlockHeight, err = dbClient.BlockHeight.Create().SetHeight(startHeight).SetNetwork(entNetwork).Save(ctx)
-	}
-	if err != nil {
-		return fmt.Errorf("failed to query block height: %v", err)
-	}
-	dbBlockHash, err := client.GetBlockHash(dbBlockHeight.Height)
-	if err != nil {
-		return fmt.Errorf("failed to get block hash: %v", err)
-	}
-
-	dbChainTip := NewTip(dbBlockHeight.Height, *dbBlockHash)
-	difference, err := findDifference(dbChainTip, latestChainTip, client)
-	if err != nil {
-		return fmt.Errorf("failed to find difference: %v", err)
-	}
-	err = disconnectBlocks(ctx, dbClient, difference.Disconnected, network)
-	if err != nil {
-		return fmt.Errorf("failed to disconnect blocks: %v", err)
-	}
-	err = connectBlocks(ctx,
-		&soConfig,
-		dbClient, client, difference.Connected, network)
-	if err != nil {
-		return fmt.Errorf("failed to connect blocks: %v", err)
-	}
-	return nil
 }
 
 func WatchChain(dbClient *ent.Client,
@@ -204,10 +154,53 @@ func WatchChain(dbClient *ent.Client,
 		return err
 	}
 
-	err = scanChainUpdates(dbClient, soConfig, client, network)
+	latestBlockHeight, err := client.GetBlockCount()
 	if err != nil {
-		return fmt.Errorf("failed to scan chain updates: %v", err)
+		return err
 	}
+	latestBlockHash, err := client.GetBlockHash(latestBlockHeight)
+	if err != nil {
+		return err
+	}
+	latestChainTip := NewTip(latestBlockHeight, *latestBlockHash)
+
+	// Load the latest scanned block height
+	ctx := context.Background()
+	entNetwork := common.SchemaNetwork(network)
+	entBlockHeight, err := dbClient.BlockHeight.Query().
+		Where(blockheight.NetworkEQ(entNetwork)).
+		Only(ctx)
+	if ent.IsNotFound(err) {
+		startHeight := max(0, latestBlockHeight-6)
+		entBlockHeight, err = dbClient.BlockHeight.Create().SetHeight(startHeight).SetNetwork(entNetwork).Save(ctx)
+	}
+	if err != nil {
+		return err
+	}
+	blockHash, err := client.GetBlockHash(entBlockHeight.Height)
+	if err != nil {
+		return err
+	}
+
+	chainTip := NewTip(entBlockHeight.Height, *blockHash)
+	difference, err := findDifference(chainTip, latestChainTip, client)
+	if err != nil {
+		return fmt.Errorf("failed to find difference: %v", err)
+	}
+
+	err = disconnectBlocks(ctx, dbClient, difference.Disconnected, network)
+	if err != nil {
+		return fmt.Errorf("failed to disconnect blocks: %v", err)
+	}
+
+	err = connectBlocks(ctx,
+		&soConfig,
+		dbClient, client, difference.Connected, network)
+	if err != nil {
+		return fmt.Errorf("failed to connect blocks: %v", err)
+	}
+
+	chainTip = latestChainTip
 
 	zmqCtx, subscriber, err := initZmq(bitcoindConfig.ZmqPubRawBlock)
 	if err != nil {
@@ -243,14 +236,43 @@ func WatchChain(dbClient *ent.Client,
 		case <-newBlockNotification:
 		case <-time.After(pollInterval(network)):
 		}
+
 		// We don't actually do anything with the block receive since
 		// we need to query bitcoind for the height anyway. We just
 		// treat it as a notification that a new block appeared.
-
-		err = scanChainUpdates(dbClient, soConfig, client, network)
+		latestBlockHeight, err = client.GetBlockCount()
 		if err != nil {
-			logger.Error("Failed to scan chain updates", "error", err)
+			logger.Error("Failed to get block count", "error", err)
+			continue
 		}
+		latestBlockHash, err = client.GetBlockHash(latestBlockHeight)
+		if err != nil {
+			logger.Error("Failed to get block hash", "error", err)
+			continue
+		}
+
+		newChainTip := NewTip(latestBlockHeight, *latestBlockHash)
+		difference, err := findDifference(chainTip, newChainTip, client)
+		if err != nil {
+			logger.Error("Failed to find difference", "error", err)
+			continue
+		}
+
+		err = disconnectBlocks(ctx, dbClient, difference.Disconnected, network)
+		if err != nil {
+			logger.Error("Failed to disconnect blocks", "error", err)
+			continue
+		}
+
+		err = connectBlocks(ctx,
+			&soConfig,
+			dbClient, client, difference.Connected, network)
+		if err != nil {
+			logger.Error("Failed to connect blocks", "error", err)
+			continue
+		}
+
+		chainTip = newChainTip
 	}
 }
 
@@ -291,7 +313,7 @@ func connectBlocks(ctx context.Context, soConfig *so.Config, dbClient *ent.Clien
 		if err != nil {
 			logger.Error("Failed to handle block", "error", err)
 			rollbackErr := dbTx.Rollback()
-			if rollbackErr != nil {
+			if err != nil {
 				return rollbackErr
 			}
 			return err
@@ -332,7 +354,7 @@ func handleBlock(ctx context.Context,
 	if err != nil {
 		return err
 	}
-	confirmedTxHashSet := make(map[[32]byte]bool)
+	confirmedTxidSet := make(map[[32]byte]bool)
 	debitedAddresses := make([]string, 0)
 	for _, tx := range txs {
 		for _, txOut := range tx.TxOut {
@@ -345,7 +367,7 @@ func handleBlock(ctx context.Context,
 			}
 		}
 		txid := tx.TxHash()
-		confirmedTxHashSet[txid] = true
+		confirmedTxidSet[txid] = true
 	}
 
 	// TODO: expire pending coop exits after some time so this doesn't become too large
@@ -354,9 +376,7 @@ func handleBlock(ctx context.Context,
 		return err
 	}
 	for _, coopExit := range pendingCoopExits {
-		txHash := coopExit.ExitTxid
-		slices.Reverse(txHash)
-		if _, ok := confirmedTxHashSet[[32]byte(txHash)]; !ok {
+		if _, ok := confirmedTxidSet[[32]byte(coopExit.ExitTxid)]; !ok {
 			continue
 		}
 		err = handleCoopExitConfirmation(ctx, coopExit, blockHeight)
@@ -400,9 +420,9 @@ func handleBlock(ctx context.Context,
 			logger.Info("Expected tree status to be pending", "status", tree.Status)
 			continue
 		}
-		if _, ok := confirmedTxHashSet[[32]byte(tree.BaseTxid)]; !ok {
+		if _, ok := confirmedTxidSet[[32]byte(tree.BaseTxid)]; !ok {
 			logger.Debug("Base txid not found in confirmed txids", "base_txid", hex.EncodeToString(tree.BaseTxid))
-			for txid := range confirmedTxHashSet {
+			for txid := range confirmedTxidSet {
 				logger.Debug("confirmed txid", "txid", hex.EncodeToString(txid[:]))
 			}
 			continue

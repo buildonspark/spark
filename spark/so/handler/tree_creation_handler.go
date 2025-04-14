@@ -468,12 +468,7 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 				return nil, nil, err
 			}
 			txid := tx.TxHash()
-			treeMutator := db.Tree.
-				Create().
-				SetOwnerIdentityPubkey(req.UserIdentityPublicKey).
-				SetNetwork(schemaNetwork).
-				SetBaseTxid(txid[:]).
-				SetVout(int16(req.GetOnChainUtxo().Vout))
+			treeMutator := db.Tree.Create().SetOwnerIdentityPubkey(req.UserIdentityPublicKey).SetNetwork(schemaNetwork).SetBaseTxid(txid[:])
 			if onchain {
 				treeMutator.SetStatus(schema.TreeStatusAvailable)
 			} else {

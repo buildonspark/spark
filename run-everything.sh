@@ -141,7 +141,7 @@ build_go_operator() {
 clone_or_pull_lrcd() {
     if [ ! -d "lrc20.dev" ]; then
         echo "Cloning LRC-20 git repo"
-        git clone git@github.com:lightsparkdev/lrc20.git lrc20.dev 
+        git clone git@github.com:lightsparkdev/lrc20.git lrc20.dev
     else
         echo "Entering existing LRC-20 directory and pulling latest changes"
         cd lrc20.dev || {
@@ -463,8 +463,6 @@ run_operators_tmux() {
    local session_name="operators"
    local operator_config_file="${run_dir}/config.json"
    local tls=$3
-   local disable_tokens=$4
-   
    # Kill existing session if it exists
    if tmux has-session -t "$session_name" 2>/dev/null; then
        echo "Killing existing session..."
@@ -488,20 +486,13 @@ run_operators_tmux() {
        local lrc20_address="127.0.0.1:1853${i}"
 
        local temp_config_file="temp_config_operator_$i.dev.yaml"
-       
-       # If tokens are disabled, modify the template to set disablerpcs: true
-       if [ "$disable_tokens" = true ]; then
-           sed -e "s|{LRC20_ADDRESS}|$lrc20_address|g" \
-               -e "s|disablerpcs: false|disablerpcs: true|g" \
-               so.template.config.yaml >"$temp_config_file"
-       else
-           sed -e "s|{LRC20_ADDRESS}|$lrc20_address|g" \
-               so.template.config.yaml >"$temp_config_file"
-       fi
+       sed -e "s|{LRC20_ADDRESS}|$lrc20_address|g" \
+           so.template.config.yaml >"$temp_config_file"
 
        # Construct paths
        local log_file="${run_dir}/logs/sparkoperator_${i}.log"
        local db_file="postgresql://127.0.0.1:5432/sparkoperator_${i}?sslmode=disable"
+    #    local db_file="${run_dir}/db/sparkoperator_${i}.sqlite?_fk=1"
        local signer_socket="unix:///tmp/frost_${i}.sock"
 
        local priv_key_file="${run_dir}/operator_${i}.key"
@@ -782,7 +773,7 @@ fi
 echo "All signers are ready"
 
 # Run operators
-run_operators_tmux "$run_dir" "$MIN_SIGNERS" "$TLS" "$DISABLE_TOKENS"
+run_operators_tmux "$run_dir" "$MIN_SIGNERS" "$TLS"
 
 if ! check_operators_ready "$run_dir"; then
     echo "Failed to start all operators"

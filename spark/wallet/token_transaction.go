@@ -54,6 +54,7 @@ func StartTokenTransaction(
 		operatorKeys = append(operatorKeys, operator.IdentityPublicKey)
 	}
 	tokenTransaction.SparkOperatorIdentityPublicKeys = operatorKeys
+	tokenTransaction.Network = pb.Network(config.Network)
 
 	// Hash the partial token transaction
 	partialTokenTransactionHash, err := utils.HashTokenTransaction(tokenTransaction, true)
@@ -201,13 +202,8 @@ func SignTokenTransaction(
 		}
 		defer operatorConn.Close()
 
-		operatorToken, err := AuthenticateWithConnection(ctx, config, operatorConn)
-		if err != nil {
-			return nil, fmt.Errorf("failed to authenticate with operator %s: %v", operator.Identifier, err)
-		}
-		operatorCtx := ContextWithToken(ctx, operatorToken)
 		operatorClient := pb.NewSparkServiceClient(operatorConn)
-		signTokenTransactionResponse, err := operatorClient.SignTokenTransaction(operatorCtx, &pb.SignTokenTransactionRequest{
+		signTokenTransactionResponse, err := operatorClient.SignTokenTransaction(ctx, &pb.SignTokenTransactionRequest{
 			FinalTokenTransaction:      finalTx,
 			OperatorSpecificSignatures: operatorSpecificSignatures,
 			IdentityPublicKey:          config.IdentityPublicKey(),
@@ -216,6 +212,7 @@ func SignTokenTransaction(
 			log.Printf("Error while calling SignTokenTransaction with operator %s: %v", operator.Identifier, err)
 			return nil, err
 		}
+
 		// Validate signature
 		operatorSig := signTokenTransactionResponse.SparkOperatorSignature
 		if err := utils.ValidateOwnershipSignature(operatorSig, finalTxHash, operator.IdentityPublicKey); err != nil {
@@ -294,14 +291,8 @@ func FinalizeTokenTransaction(
 		}
 		defer operatorConn.Close()
 
-		operatorToken, err := AuthenticateWithConnection(ctx, config, operatorConn)
-		if err != nil {
-			return fmt.Errorf("failed to authenticate with operator %s: %v", operator.Identifier, err)
-		}
-		operatorCtx := ContextWithToken(ctx, operatorToken)
 		operatorClient := pb.NewSparkServiceClient(operatorConn)
-
-		_, err = operatorClient.FinalizeTokenTransaction(operatorCtx, &pb.FinalizeTokenTransactionRequest{
+		_, err = operatorClient.FinalizeTokenTransaction(ctx, &pb.FinalizeTokenTransactionRequest{
 			FinalTokenTransaction:     startResponse.FinalTokenTransaction,
 			LeafToSpendRevocationKeys: leafRecoveredSecrets,
 			IdentityPublicKey:         config.IdentityPublicKey(),
@@ -431,13 +422,13 @@ func FreezeTokens(
 	return lastResponse, nil
 }
 
-// QueryTokenOutputs retrieves the token outputs for a given set of owner and token public keys.
-func QueryTokenOutputs(
+// GetOwnedTokenLeaves retrieves the leaves for a given set of owner and token public keys.
+func GetOwnedTokenLeaves(
 	ctx context.Context,
 	config *Config,
 	ownerPublicKeys [][]byte,
 	tokenPublicKeys [][]byte,
-) (*pb.QueryTokenOutputsResponse, error) {
+) (*pb.GetOwnedTokenLeavesResponse, error) {
 	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress(), nil)
 	if err != nil {
 		log.Printf("Error while establishing gRPC connection to coordinator at %s: %v", config.CoodinatorAddress(), err)
@@ -452,14 +443,14 @@ func QueryTokenOutputs(
 	tmpCtx := ContextWithToken(ctx, token)
 	sparkClient := pb.NewSparkServiceClient(sparkConn)
 
-	request := &pb.QueryTokenOutputsRequest{
+	request := &pb.GetOwnedTokenLeavesRequest{
 		OwnerPublicKeys: ownerPublicKeys,
 		TokenPublicKeys: tokenPublicKeys,
 	}
 
-	response, err := sparkClient.QueryTokenOutputs(tmpCtx, request)
+	response, err := sparkClient.GetOwnedTokenLeaves(tmpCtx, request)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get token outputs: %v", err)
+		return nil, fmt.Errorf("failed to get owned token leaves: %v", err)
 	}
 	return response, nil
 }

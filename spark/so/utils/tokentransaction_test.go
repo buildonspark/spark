@@ -9,58 +9,6 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func TestHashTokenTransaction(t *testing.T) {
-	tokenPublicKey := []byte{
-		242, 155, 208, 90, 72, 211, 120, 244, 69, 99, 28, 101, 149, 222, 123, 50,
-		252, 63, 99, 54, 137, 226, 7, 224, 163, 122, 93, 248, 42, 159, 173, 45,
-	}
-
-	identityPubKey := []byte{
-		25, 155, 208, 90, 72, 211, 120, 244, 69, 99, 28, 101, 149, 222, 123, 50,
-		252, 63, 99, 54, 137, 226, 7, 224, 163, 122, 93, 248, 42, 159, 173, 46,
-	}
-
-	leafID := "db1a4e48-0fc5-4f6c-8a80-d9d6c561a436"
-	bondSats := uint64(10000)
-	locktime := uint64(100)
-
-	// Create the token transaction matching the JavaScript object
-	partialTokenTransaction := &pb.TokenTransaction{
-		TokenInput: &pb.TokenTransaction_MintInput{
-			MintInput: &pb.MintInput{
-				IssuerPublicKey:         tokenPublicKey,
-				IssuerProvidedTimestamp: 100,
-			},
-		},
-		OutputLeaves: []*pb.TokenLeafOutput{
-			{
-				Id:                            &leafID,
-				OwnerPublicKey:                identityPubKey,
-				TokenPublicKey:                tokenPublicKey,
-				TokenAmount:                   []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 232}, // 1000n in BE format
-				RevocationPublicKey:           identityPubKey,
-				WithdrawBondSats:              &bondSats,
-				WithdrawRelativeBlockLocktime: &locktime,
-			},
-		},
-		SparkOperatorIdentityPublicKeys: [][]byte{},
-		Network:                         pb.Network_REGTEST,
-	}
-
-	hash, err := HashTokenTransaction(partialTokenTransaction, false)
-	if err != nil {
-		t.Fatalf("failed to hash token transaction: %v", err)
-	}
-
-	expectedHash := []byte{
-		39, 154, 106, 90, 228, 192, 20, 72, 126, 11, 34, 149, 35, 65, 184, 120, 112, 131, 70, 59, 179, 34, 60, 184, 120, 169, 124, 135, 175, 146, 103, 167,
-	}
-
-	if !bytes.Equal(hash, expectedHash) {
-		t.Errorf("hash mismatch\ngot:  %v\nwant: %v", hash, expectedHash)
-	}
-}
-
 // TestHashTokenTransactionNil ensures an error is returned when HashTokenTransaction is called with a nil transaction.
 func TestHashTokenTransactionNil(t *testing.T) {
 	_, err := HashTokenTransaction(nil, false)

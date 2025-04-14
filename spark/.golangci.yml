@@ -1,27 +1,8 @@
-version: "2"
 linters:
   enable:
-    - revive
-  exclusions:
-    generated: lax
-    presets:
-      - comments
-      - common-false-positives
-      - legacy
-      - std-error-handling
-    paths:
-      - third_party$
-      - builtin$
-      - examples$
-issues:
-  new-from-rev: HEAD~1
-  new: true
-formatters:
-  enable:
     - gofumpt
-  exclusions:
-    generated: lax
-    paths:
-      - third_party$
-      - builtin$
-      - examples$
+    - revive
+
+issues:
+  new: true
+  new-from-rev: "HEAD~1"

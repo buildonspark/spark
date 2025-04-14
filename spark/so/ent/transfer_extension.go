@@ -28,10 +28,6 @@ func (t *Transfer) MarshalProto(ctx context.Context) (*pb.Transfer, error) {
 	if err != nil {
 		return nil, err
 	}
-	transferType, err := t.getProtoType()
-	if err != nil {
-		return nil, err
-	}
 	return &pb.Transfer{
 		Id:                        t.ID.String(),
 		SenderIdentityPublicKey:   t.SenderIdentityPubkey,
@@ -42,7 +38,6 @@ func (t *Transfer) MarshalProto(ctx context.Context) (*pb.Transfer, error) {
 		Leaves:                    leavesProto,
 		CreatedTime:               timestamppb.New(t.CreateTime),
 		UpdatedTime:               timestamppb.New(t.UpdateTime),
-		Type:                      *transferType,
 	}, nil
 }
 
@@ -66,20 +61,4 @@ func (t *Transfer) getProtoStatus() (*pb.TransferStatus, error) {
 		return pb.TransferStatus_TRANSFER_STATUS_RETURNED.Enum(), nil
 	}
 	return nil, fmt.Errorf("unknown transfer status %s", t.Status)
-}
-
-func (t *Transfer) getProtoType() (*pb.TransferType, error) {
-	switch t.Type {
-	case schema.TransferTypePreimageSwap:
-		return pb.TransferType_PREIMAGE_SWAP.Enum(), nil
-	case schema.TransferTypeCooperativeExit:
-		return pb.TransferType_COOPERATIVE_EXIT.Enum(), nil
-	case schema.TransferTypeTransfer:
-		return pb.TransferType_TRANSFER.Enum(), nil
-	case schema.TransferTypeSwap:
-		return pb.TransferType_SWAP.Enum(), nil
-	case schema.TransferTypeCounterSwap:
-		return pb.TransferType_COUNTER_SWAP.Enum(), nil
-	}
-	return nil, fmt.Errorf("unknown transfer type %s", t.Type)
 }

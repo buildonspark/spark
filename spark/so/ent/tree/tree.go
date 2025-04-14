@@ -29,8 +29,6 @@ const (
 	FieldNetwork = "network"
 	// FieldBaseTxid holds the string denoting the base_txid field in the database.
 	FieldBaseTxid = "base_txid"
-	// FieldVout holds the string denoting the vout field in the database.
-	FieldVout = "vout"
 	// EdgeRoot holds the string denoting the root edge name in mutations.
 	EdgeRoot = "root"
 	// EdgeNodes holds the string denoting the nodes edge name in mutations.
@@ -62,7 +60,6 @@ var Columns = []string{
 	FieldStatus,
 	FieldNetwork,
 	FieldBaseTxid,
-	FieldVout,
 }
 
 // ForeignKeys holds the SQL foreign-keys that are owned by the "trees"
@@ -95,10 +92,6 @@ var (
 	UpdateDefaultUpdateTime func() time.Time
 	// OwnerIdentityPubkeyValidator is a validator for the "owner_identity_pubkey" field. It is called by the builders before save.
 	OwnerIdentityPubkeyValidator func([]byte) error
-	// BaseTxidValidator is a validator for the "base_txid" field. It is called by the builders before save.
-	BaseTxidValidator func([]byte) error
-	// VoutValidator is a validator for the "vout" field. It is called by the builders before save.
-	VoutValidator func(int16) error
 	// DefaultID holds the default value on creation for the "id" field.
 	DefaultID func() uuid.UUID
 )
@@ -116,7 +109,7 @@ func StatusValidator(s schema.TreeStatus) error {
 // NetworkValidator is a validator for the "network" field enum values. It is called by the builders before save.
 func NetworkValidator(n schema.Network) error {
 	switch n {
-	case "UNSPECIFIED", "MAINNET", "REGTEST", "TESTNET", "SIGNET":
+	case "MAINNET", "REGTEST", "TESTNET", "SIGNET":
 		return nil
 	default:
 		return fmt.Errorf("tree: invalid enum value for network field: %q", n)
@@ -149,11 +142,6 @@ func ByStatus(opts ...sql.OrderTermOption) OrderOption {
 // ByNetwork orders the results by the network field.
 func ByNetwork(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldNetwork, opts...).ToFunc()
-}
-
-// ByVout orders the results by the vout field.
-func ByVout(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldVout, opts...).ToFunc()
 }
 
 // ByRootField orders the results by root field.

@@ -77,24 +77,9 @@ func (tu *TreeUpdate) SetBaseTxid(b []byte) *TreeUpdate {
 	return tu
 }
 
-// SetVout sets the "vout" field.
-func (tu *TreeUpdate) SetVout(i int16) *TreeUpdate {
-	tu.mutation.ResetVout()
-	tu.mutation.SetVout(i)
-	return tu
-}
-
-// SetNillableVout sets the "vout" field if the given value is not nil.
-func (tu *TreeUpdate) SetNillableVout(i *int16) *TreeUpdate {
-	if i != nil {
-		tu.SetVout(*i)
-	}
-	return tu
-}
-
-// AddVout adds i to the "vout" field.
-func (tu *TreeUpdate) AddVout(i int16) *TreeUpdate {
-	tu.mutation.AddVout(i)
+// ClearBaseTxid clears the value of the "base_txid" field.
+func (tu *TreeUpdate) ClearBaseTxid() *TreeUpdate {
+	tu.mutation.ClearBaseTxid()
 	return tu
 }
 
@@ -217,16 +202,6 @@ func (tu *TreeUpdate) check() error {
 			return &ValidationError{Name: "network", err: fmt.Errorf(`ent: validator failed for field "Tree.network": %w`, err)}
 		}
 	}
-	if v, ok := tu.mutation.BaseTxid(); ok {
-		if err := tree.BaseTxidValidator(v); err != nil {
-			return &ValidationError{Name: "base_txid", err: fmt.Errorf(`ent: validator failed for field "Tree.base_txid": %w`, err)}
-		}
-	}
-	if v, ok := tu.mutation.Vout(); ok {
-		if err := tree.VoutValidator(v); err != nil {
-			return &ValidationError{Name: "vout", err: fmt.Errorf(`ent: validator failed for field "Tree.vout": %w`, err)}
-		}
-	}
 	return nil
 }
 
@@ -257,11 +232,8 @@ func (tu *TreeUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if value, ok := tu.mutation.BaseTxid(); ok {
 		_spec.SetField(tree.FieldBaseTxid, field.TypeBytes, value)
 	}
-	if value, ok := tu.mutation.Vout(); ok {
-		_spec.SetField(tree.FieldVout, field.TypeInt16, value)
-	}
-	if value, ok := tu.mutation.AddedVout(); ok {
-		_spec.AddField(tree.FieldVout, field.TypeInt16, value)
+	if tu.mutation.BaseTxidCleared() {
+		_spec.ClearField(tree.FieldBaseTxid, field.TypeBytes)
 	}
 	if tu.mutation.RootCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -403,24 +375,9 @@ func (tuo *TreeUpdateOne) SetBaseTxid(b []byte) *TreeUpdateOne {
 	return tuo
 }
 
-// SetVout sets the "vout" field.
-func (tuo *TreeUpdateOne) SetVout(i int16) *TreeUpdateOne {
-	tuo.mutation.ResetVout()
-	tuo.mutation.SetVout(i)
-	return tuo
-}
-
-// SetNillableVout sets the "vout" field if the given value is not nil.
-func (tuo *TreeUpdateOne) SetNillableVout(i *int16) *TreeUpdateOne {
-	if i != nil {
-		tuo.SetVout(*i)
-	}
-	return tuo
-}
-
-// AddVout adds i to the "vout" field.
-func (tuo *TreeUpdateOne) AddVout(i int16) *TreeUpdateOne {
-	tuo.mutation.AddVout(i)
+// ClearBaseTxid clears the value of the "base_txid" field.
+func (tuo *TreeUpdateOne) ClearBaseTxid() *TreeUpdateOne {
+	tuo.mutation.ClearBaseTxid()
 	return tuo
 }
 
@@ -556,16 +513,6 @@ func (tuo *TreeUpdateOne) check() error {
 			return &ValidationError{Name: "network", err: fmt.Errorf(`ent: validator failed for field "Tree.network": %w`, err)}
 		}
 	}
-	if v, ok := tuo.mutation.BaseTxid(); ok {
-		if err := tree.BaseTxidValidator(v); err != nil {
-			return &ValidationError{Name: "base_txid", err: fmt.Errorf(`ent: validator failed for field "Tree.base_txid": %w`, err)}
-		}
-	}
-	if v, ok := tuo.mutation.Vout(); ok {
-		if err := tree.VoutValidator(v); err != nil {
-			return &ValidationError{Name: "vout", err: fmt.Errorf(`ent: validator failed for field "Tree.vout": %w`, err)}
-		}
-	}
 	return nil
 }
 
@@ -613,11 +560,8 @@ func (tuo *TreeUpdateOne) sqlSave(ctx context.Context) (_node *Tree, err error) 
 	if value, ok := tuo.mutation.BaseTxid(); ok {
 		_spec.SetField(tree.FieldBaseTxid, field.TypeBytes, value)
 	}
-	if value, ok := tuo.mutation.Vout(); ok {
-		_spec.SetField(tree.FieldVout, field.TypeInt16, value)
-	}
-	if value, ok := tuo.mutation.AddedVout(); ok {
-		_spec.AddField(tree.FieldVout, field.TypeInt16, value)
+	if tuo.mutation.BaseTxidCleared() {
+		_spec.ClearField(tree.FieldBaseTxid, field.TypeBytes)
 	}
 	if tuo.mutation.RootCleared() {
 		edge := &sqlgraph.EdgeSpec{

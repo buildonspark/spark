@@ -27,7 +27,7 @@ clean:
 	rm -rf spark/proto/*/*.pb.validate.go
 
 ent:
-	cd spark && go generate ./...
+	cd spark && go run -mod=mod entgo.io/ent/cmd/ent generate --feature sql/lock ./so/ent/schema
 	@echo "\n!!!!\nEnts generated. Remember to add migration changes with atlas! See README.md for more info.\n!!!!\n"
 
 copy-protos:

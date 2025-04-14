@@ -21,7 +21,6 @@ const _ = grpc.SupportPackageIsVersion9
 
 const (
 	SparkService_GenerateDepositAddress_FullMethodName       = "/spark.SparkService/generate_deposit_address"
-	SparkService_StartDepositTreeCreation_FullMethodName     = "/spark.SparkService/start_deposit_tree_creation"
 	SparkService_StartTreeCreation_FullMethodName            = "/spark.SparkService/start_tree_creation"
 	SparkService_FinalizeNodeSignatures_FullMethodName       = "/spark.SparkService/finalize_node_signatures"
 	SparkService_StartSendTransfer_FullMethodName            = "/spark.SparkService/start_send_transfer"
@@ -36,9 +35,7 @@ const (
 	SparkService_CooperativeExit_FullMethodName              = "/spark.SparkService/cooperative_exit"
 	SparkService_InitiatePreimageSwap_FullMethodName         = "/spark.SparkService/initiate_preimage_swap"
 	SparkService_ProvidePreimage_FullMethodName              = "/spark.SparkService/provide_preimage"
-	SparkService_StartLeafSwap_FullMethodName                = "/spark.SparkService/start_leaf_swap"
 	SparkService_LeafSwap_FullMethodName                     = "/spark.SparkService/leaf_swap"
-	SparkService_CounterLeafSwap_FullMethodName              = "/spark.SparkService/counter_leaf_swap"
 	SparkService_RefreshTimelock_FullMethodName              = "/spark.SparkService/refresh_timelock"
 	SparkService_ExtendLeaf_FullMethodName                   = "/spark.SparkService/extend_leaf"
 	SparkService_PrepareTreeAddress_FullMethodName           = "/spark.SparkService/prepare_tree_address"
@@ -51,7 +48,7 @@ const (
 	SparkService_SignTokenTransaction_FullMethodName         = "/spark.SparkService/sign_token_transaction"
 	SparkService_FinalizeTokenTransaction_FullMethodName     = "/spark.SparkService/finalize_token_transaction"
 	SparkService_FreezeTokens_FullMethodName                 = "/spark.SparkService/freeze_tokens"
-	SparkService_QueryTokenOutputs_FullMethodName            = "/spark.SparkService/query_token_outputs"
+	SparkService_GetOwnedTokenLeaves_FullMethodName          = "/spark.SparkService/get_owned_token_leaves"
 	SparkService_QueryTokenTransactions_FullMethodName       = "/spark.SparkService/query_token_transactions"
 	SparkService_CancelSignedTokenTransaction_FullMethodName = "/spark.SparkService/cancel_signed_token_transaction"
 	SparkService_ReturnLightningPayment_FullMethodName       = "/spark.SparkService/return_lightning_payment"
@@ -64,9 +61,6 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type SparkServiceClient interface {
 	GenerateDepositAddress(ctx context.Context, in *GenerateDepositAddressRequest, opts ...grpc.CallOption) (*GenerateDepositAddressResponse, error)
-	StartDepositTreeCreation(ctx context.Context, in *StartDepositTreeCreationRequest, opts ...grpc.CallOption) (*StartDepositTreeCreationResponse, error)
-	// Deprecated: Do not use.
-	// This is deprecated, please use start_deposit_tree_creation instead.
 	StartTreeCreation(ctx context.Context, in *StartTreeCreationRequest, opts ...grpc.CallOption) (*StartTreeCreationResponse, error)
 	FinalizeNodeSignatures(ctx context.Context, in *FinalizeNodeSignaturesRequest, opts ...grpc.CallOption) (*FinalizeNodeSignaturesResponse, error)
 	StartSendTransfer(ctx context.Context, in *StartSendTransferRequest, opts ...grpc.CallOption) (*StartSendTransferResponse, error)
@@ -81,15 +75,7 @@ type SparkServiceClient interface {
 	CooperativeExit(ctx context.Context, in *CooperativeExitRequest, opts ...grpc.CallOption) (*CooperativeExitResponse, error)
 	InitiatePreimageSwap(ctx context.Context, in *InitiatePreimageSwapRequest, opts ...grpc.CallOption) (*InitiatePreimageSwapResponse, error)
 	ProvidePreimage(ctx context.Context, in *ProvidePreimageRequest, opts ...grpc.CallOption) (*ProvidePreimageResponse, error)
-	// This is the exact same as start_send_transfer, but expresses to the SO
-	// this transfer is specifically for a leaf swap.
-	StartLeafSwap(ctx context.Context, in *StartSendTransferRequest, opts ...grpc.CallOption) (*StartSendTransferResponse, error)
-	// Deprecated: Do not use.
-	// This is deprecated, please use counter_leaf_swap instead.
-	LeafSwap(ctx context.Context, in *CounterLeafSwapRequest, opts ...grpc.CallOption) (*CounterLeafSwapResponse, error)
-	// This is the exact same as start_leaf_swap, but signs with
-	// an adaptor public key after a counterparty has begun the swap via start_leaf_swap.
-	CounterLeafSwap(ctx context.Context, in *CounterLeafSwapRequest, opts ...grpc.CallOption) (*CounterLeafSwapResponse, error)
+	LeafSwap(ctx context.Context, in *LeafSwapRequest, opts ...grpc.CallOption) (*LeafSwapResponse, error)
 	RefreshTimelock(ctx context.Context, in *RefreshTimelockRequest, opts ...grpc.CallOption) (*RefreshTimelockResponse, error)
 	ExtendLeaf(ctx context.Context, in *ExtendLeafRequest, opts ...grpc.CallOption) (*ExtendLeafResponse, error)
 	PrepareTreeAddress(ctx context.Context, in *PrepareTreeAddressRequest, opts ...grpc.CallOption) (*PrepareTreeAddressResponse, error)
@@ -103,7 +89,7 @@ type SparkServiceClient interface {
 	SignTokenTransaction(ctx context.Context, in *SignTokenTransactionRequest, opts ...grpc.CallOption) (*SignTokenTransactionResponse, error)
 	FinalizeTokenTransaction(ctx context.Context, in *FinalizeTokenTransactionRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	FreezeTokens(ctx context.Context, in *FreezeTokensRequest, opts ...grpc.CallOption) (*FreezeTokensResponse, error)
-	QueryTokenOutputs(ctx context.Context, in *QueryTokenOutputsRequest, opts ...grpc.CallOption) (*QueryTokenOutputsResponse, error)
+	GetOwnedTokenLeaves(ctx context.Context, in *GetOwnedTokenLeavesRequest, opts ...grpc.CallOption) (*GetOwnedTokenLeavesResponse, error)
 	QueryTokenTransactions(ctx context.Context, in *QueryTokenTransactionsRequest, opts ...grpc.CallOption) (*QueryTokenTransactionsResponse, error)
 	CancelSignedTokenTransaction(ctx context.Context, in *CancelSignedTokenTransactionRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	ReturnLightningPayment(ctx context.Context, in *ReturnLightningPaymentRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
@@ -129,17 +115,6 @@ func (c *sparkServiceClient) GenerateDepositAddress(ctx context.Context, in *Gen
 	return out, nil
 }
 
-func (c *sparkServiceClient) StartDepositTreeCreation(ctx context.Context, in *StartDepositTreeCreationRequest, opts ...grpc.CallOption) (*StartDepositTreeCreationResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(StartDepositTreeCreationResponse)
-	err := c.cc.Invoke(ctx, SparkService_StartDepositTreeCreation_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-// Deprecated: Do not use.
 func (c *sparkServiceClient) StartTreeCreation(ctx context.Context, in *StartTreeCreationRequest, opts ...grpc.CallOption) (*StartTreeCreationResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(StartTreeCreationResponse)
@@ -280,31 +255,10 @@ func (c *sparkServiceClient) ProvidePreimage(ctx context.Context, in *ProvidePre
 	return out, nil
 }
 
-func (c *sparkServiceClient) StartLeafSwap(ctx context.Context, in *StartSendTransferRequest, opts ...grpc.CallOption) (*StartSendTransferResponse, error) {
+func (c *sparkServiceClient) LeafSwap(ctx context.Context, in *LeafSwapRequest, opts ...grpc.CallOption) (*LeafSwapResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(StartSendTransferResponse)
-	err := c.cc.Invoke(ctx, SparkService_StartLeafSwap_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-// Deprecated: Do not use.
-func (c *sparkServiceClient) LeafSwap(ctx context.Context, in *CounterLeafSwapRequest, opts ...grpc.CallOption) (*CounterLeafSwapResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(CounterLeafSwapResponse)
+	out := new(LeafSwapResponse)
 	err := c.cc.Invoke(ctx, SparkService_LeafSwap_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *sparkServiceClient) CounterLeafSwap(ctx context.Context, in *CounterLeafSwapRequest, opts ...grpc.CallOption) (*CounterLeafSwapResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(CounterLeafSwapResponse)
-	err := c.cc.Invoke(ctx, SparkService_CounterLeafSwap_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -431,10 +385,10 @@ func (c *sparkServiceClient) FreezeTokens(ctx context.Context, in *FreezeTokensR
 	return out, nil
 }
 
-func (c *sparkServiceClient) QueryTokenOutputs(ctx context.Context, in *QueryTokenOutputsRequest, opts ...grpc.CallOption) (*QueryTokenOutputsResponse, error) {
+func (c *sparkServiceClient) GetOwnedTokenLeaves(ctx context.Context, in *GetOwnedTokenLeavesRequest, opts ...grpc.CallOption) (*GetOwnedTokenLeavesResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(QueryTokenOutputsResponse)
-	err := c.cc.Invoke(ctx, SparkService_QueryTokenOutputs_FullMethodName, in, out, cOpts...)
+	out := new(GetOwnedTokenLeavesResponse)
+	err := c.cc.Invoke(ctx, SparkService_GetOwnedTokenLeaves_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -496,9 +450,6 @@ func (c *sparkServiceClient) QueryUnusedDepositAddresses(ctx context.Context, in
 // for forward compatibility.
 type SparkServiceServer interface {
 	GenerateDepositAddress(context.Context, *GenerateDepositAddressRequest) (*GenerateDepositAddressResponse, error)
-	StartDepositTreeCreation(context.Context, *StartDepositTreeCreationRequest) (*StartDepositTreeCreationResponse, error)
-	// Deprecated: Do not use.
-	// This is deprecated, please use start_deposit_tree_creation instead.
 	StartTreeCreation(context.Context, *StartTreeCreationRequest) (*StartTreeCreationResponse, error)
 	FinalizeNodeSignatures(context.Context, *FinalizeNodeSignaturesRequest) (*FinalizeNodeSignaturesResponse, error)
 	StartSendTransfer(context.Context, *StartSendTransferRequest) (*StartSendTransferResponse, error)
@@ -513,15 +464,7 @@ type SparkServiceServer interface {
 	CooperativeExit(context.Context, *CooperativeExitRequest) (*CooperativeExitResponse, error)
 	InitiatePreimageSwap(context.Context, *InitiatePreimageSwapRequest) (*InitiatePreimageSwapResponse, error)
 	ProvidePreimage(context.Context, *ProvidePreimageRequest) (*ProvidePreimageResponse, error)
-	// This is the exact same as start_send_transfer, but expresses to the SO
-	// this transfer is specifically for a leaf swap.
-	StartLeafSwap(context.Context, *StartSendTransferRequest) (*StartSendTransferResponse, error)
-	// Deprecated: Do not use.
-	// This is deprecated, please use counter_leaf_swap instead.
-	LeafSwap(context.Context, *CounterLeafSwapRequest) (*CounterLeafSwapResponse, error)
-	// This is the exact same as start_leaf_swap, but signs with
-	// an adaptor public key after a counterparty has begun the swap via start_leaf_swap.
-	CounterLeafSwap(context.Context, *CounterLeafSwapRequest) (*CounterLeafSwapResponse, error)
+	LeafSwap(context.Context, *LeafSwapRequest) (*LeafSwapResponse, error)
 	RefreshTimelock(context.Context, *RefreshTimelockRequest) (*RefreshTimelockResponse, error)
 	ExtendLeaf(context.Context, *ExtendLeafRequest) (*ExtendLeafResponse, error)
 	PrepareTreeAddress(context.Context, *PrepareTreeAddressRequest) (*PrepareTreeAddressResponse, error)
@@ -535,7 +478,7 @@ type SparkServiceServer interface {
 	SignTokenTransaction(context.Context, *SignTokenTransactionRequest) (*SignTokenTransactionResponse, error)
 	FinalizeTokenTransaction(context.Context, *FinalizeTokenTransactionRequest) (*emptypb.Empty, error)
 	FreezeTokens(context.Context, *FreezeTokensRequest) (*FreezeTokensResponse, error)
-	QueryTokenOutputs(context.Context, *QueryTokenOutputsRequest) (*QueryTokenOutputsResponse, error)
+	GetOwnedTokenLeaves(context.Context, *GetOwnedTokenLeavesRequest) (*GetOwnedTokenLeavesResponse, error)
 	QueryTokenTransactions(context.Context, *QueryTokenTransactionsRequest) (*QueryTokenTransactionsResponse, error)
 	CancelSignedTokenTransaction(context.Context, *CancelSignedTokenTransactionRequest) (*emptypb.Empty, error)
 	ReturnLightningPayment(context.Context, *ReturnLightningPaymentRequest) (*emptypb.Empty, error)
@@ -553,9 +496,6 @@ type UnimplementedSparkServiceServer struct{}
 
 func (UnimplementedSparkServiceServer) GenerateDepositAddress(context.Context, *GenerateDepositAddressRequest) (*GenerateDepositAddressResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GenerateDepositAddress not implemented")
-}
-func (UnimplementedSparkServiceServer) StartDepositTreeCreation(context.Context, *StartDepositTreeCreationRequest) (*StartDepositTreeCreationResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method StartDepositTreeCreation not implemented")
 }
 func (UnimplementedSparkServiceServer) StartTreeCreation(context.Context, *StartTreeCreationRequest) (*StartTreeCreationResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method StartTreeCreation not implemented")
@@ -599,14 +539,8 @@ func (UnimplementedSparkServiceServer) InitiatePreimageSwap(context.Context, *In
 func (UnimplementedSparkServiceServer) ProvidePreimage(context.Context, *ProvidePreimageRequest) (*ProvidePreimageResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ProvidePreimage not implemented")
 }
-func (UnimplementedSparkServiceServer) StartLeafSwap(context.Context, *StartSendTransferRequest) (*StartSendTransferResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method StartLeafSwap not implemented")
-}
-func (UnimplementedSparkServiceServer) LeafSwap(context.Context, *CounterLeafSwapRequest) (*CounterLeafSwapResponse, error) {
+func (UnimplementedSparkServiceServer) LeafSwap(context.Context, *LeafSwapRequest) (*LeafSwapResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method LeafSwap not implemented")
-}
-func (UnimplementedSparkServiceServer) CounterLeafSwap(context.Context, *CounterLeafSwapRequest) (*CounterLeafSwapResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method CounterLeafSwap not implemented")
 }
 func (UnimplementedSparkServiceServer) RefreshTimelock(context.Context, *RefreshTimelockRequest) (*RefreshTimelockResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RefreshTimelock not implemented")
@@ -644,8 +578,8 @@ func (UnimplementedSparkServiceServer) FinalizeTokenTransaction(context.Context,
 func (UnimplementedSparkServiceServer) FreezeTokens(context.Context, *FreezeTokensRequest) (*FreezeTokensResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method FreezeTokens not implemented")
 }
-func (UnimplementedSparkServiceServer) QueryTokenOutputs(context.Context, *QueryTokenOutputsRequest) (*QueryTokenOutputsResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method QueryTokenOutputs not implemented")
+func (UnimplementedSparkServiceServer) GetOwnedTokenLeaves(context.Context, *GetOwnedTokenLeavesRequest) (*GetOwnedTokenLeavesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetOwnedTokenLeaves not implemented")
 }
 func (UnimplementedSparkServiceServer) QueryTokenTransactions(context.Context, *QueryTokenTransactionsRequest) (*QueryTokenTransactionsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method QueryTokenTransactions not implemented")
@@ -697,24 +631,6 @@ func _SparkService_GenerateDepositAddress_Handler(srv interface{}, ctx context.C
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(SparkServiceServer).GenerateDepositAddress(ctx, req.(*GenerateDepositAddressRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _SparkService_StartDepositTreeCreation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(StartDepositTreeCreationRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(SparkServiceServer).StartDepositTreeCreation(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: SparkService_StartDepositTreeCreation_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SparkServiceServer).StartDepositTreeCreation(ctx, req.(*StartDepositTreeCreationRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -971,26 +887,8 @@ func _SparkService_ProvidePreimage_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
-func _SparkService_StartLeafSwap_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(StartSendTransferRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(SparkServiceServer).StartLeafSwap(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: SparkService_StartLeafSwap_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SparkServiceServer).StartLeafSwap(ctx, req.(*StartSendTransferRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _SparkService_LeafSwap_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(CounterLeafSwapRequest)
+	in := new(LeafSwapRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -1002,25 +900,7 @@ func _SparkService_LeafSwap_Handler(srv interface{}, ctx context.Context, dec fu
 		FullMethod: SparkService_LeafSwap_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SparkServiceServer).LeafSwap(ctx, req.(*CounterLeafSwapRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _SparkService_CounterLeafSwap_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(CounterLeafSwapRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(SparkServiceServer).CounterLeafSwap(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: SparkService_CounterLeafSwap_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SparkServiceServer).CounterLeafSwap(ctx, req.(*CounterLeafSwapRequest))
+		return srv.(SparkServiceServer).LeafSwap(ctx, req.(*LeafSwapRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1241,20 +1121,20 @@ func _SparkService_FreezeTokens_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
-func _SparkService_QueryTokenOutputs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(QueryTokenOutputsRequest)
+func _SparkService_GetOwnedTokenLeaves_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetOwnedTokenLeavesRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(SparkServiceServer).QueryTokenOutputs(ctx, in)
+		return srv.(SparkServiceServer).GetOwnedTokenLeaves(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: SparkService_QueryTokenOutputs_FullMethodName,
+		FullMethod: SparkService_GetOwnedTokenLeaves_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SparkServiceServer).QueryTokenOutputs(ctx, req.(*QueryTokenOutputsRequest))
+		return srv.(SparkServiceServer).GetOwnedTokenLeaves(ctx, req.(*GetOwnedTokenLeavesRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1361,10 +1241,6 @@ var SparkService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _SparkService_GenerateDepositAddress_Handler,
 		},
 		{
-			MethodName: "start_deposit_tree_creation",
-			Handler:    _SparkService_StartDepositTreeCreation_Handler,
-		},
-		{
 			MethodName: "start_tree_creation",
 			Handler:    _SparkService_StartTreeCreation_Handler,
 		},
@@ -1421,16 +1297,8 @@ var SparkService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _SparkService_ProvidePreimage_Handler,
 		},
 		{
-			MethodName: "start_leaf_swap",
-			Handler:    _SparkService_StartLeafSwap_Handler,
-		},
-		{
 			MethodName: "leaf_swap",
 			Handler:    _SparkService_LeafSwap_Handler,
-		},
-		{
-			MethodName: "counter_leaf_swap",
-			Handler:    _SparkService_CounterLeafSwap_Handler,
 		},
 		{
 			MethodName: "refresh_timelock",
@@ -1481,8 +1349,8 @@ var SparkService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _SparkService_FreezeTokens_Handler,
 		},
 		{
-			MethodName: "query_token_outputs",
-			Handler:    _SparkService_QueryTokenOutputs_Handler,
+			MethodName: "get_owned_token_leaves",
+			Handler:    _SparkService_GetOwnedTokenLeaves_Handler,
 		},
 		{
 			MethodName: "query_token_transactions",

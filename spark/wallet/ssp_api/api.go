@@ -5,12 +5,10 @@ import (
 	"context"
 	"encoding/hex"
 	"log"
-	"slices"
 	"strings"
 
 	"github.com/btcsuite/btcd/wire"
 	"github.com/decred/dcrd/dcrec/secp256k1"
-	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/common"
 )
 
@@ -140,7 +138,6 @@ func (s *SparkServiceAPI) InitiateCoopExit(
 	variables := map[string]interface{}{
 		"leaf_external_ids":  leafExternalIDs,
 		"withdrawal_address": address,
-		"idempotency_key":    uuid.New().String(),
 	}
 
 	response, err := s.Requester.ExecuteGraphqlWithContext(context.Background(), RequestCoopExitMutation, variables)
@@ -162,7 +159,6 @@ func (s *SparkServiceAPI) InitiateCoopExit(
 		return "", nil, nil, err
 	}
 	coopExitTxid := connectorTx.TxIn[0].PreviousOutPoint.Hash[:]
-	slices.Reverse(coopExitTxid)
 
 	return coopExitID, coopExitTxid, &connectorTx, nil
 }

@@ -77,11 +77,6 @@ func BaseTxid(v []byte) predicate.Tree {
 	return predicate.Tree(sql.FieldEQ(FieldBaseTxid, v))
 }
 
-// Vout applies equality check predicate on the "vout" field. It's identical to VoutEQ.
-func Vout(v int16) predicate.Tree {
-	return predicate.Tree(sql.FieldEQ(FieldVout, v))
-}
-
 // CreateTimeEQ applies the EQ predicate on the "create_time" field.
 func CreateTimeEQ(v time.Time) predicate.Tree {
 	return predicate.Tree(sql.FieldEQ(FieldCreateTime, v))
@@ -302,44 +297,14 @@ func BaseTxidLTE(v []byte) predicate.Tree {
 	return predicate.Tree(sql.FieldLTE(FieldBaseTxid, v))
 }
 
-// VoutEQ applies the EQ predicate on the "vout" field.
-func VoutEQ(v int16) predicate.Tree {
-	return predicate.Tree(sql.FieldEQ(FieldVout, v))
+// BaseTxidIsNil applies the IsNil predicate on the "base_txid" field.
+func BaseTxidIsNil() predicate.Tree {
+	return predicate.Tree(sql.FieldIsNull(FieldBaseTxid))
 }
 
-// VoutNEQ applies the NEQ predicate on the "vout" field.
-func VoutNEQ(v int16) predicate.Tree {
-	return predicate.Tree(sql.FieldNEQ(FieldVout, v))
-}
-
-// VoutIn applies the In predicate on the "vout" field.
-func VoutIn(vs ...int16) predicate.Tree {
-	return predicate.Tree(sql.FieldIn(FieldVout, vs...))
-}
-
-// VoutNotIn applies the NotIn predicate on the "vout" field.
-func VoutNotIn(vs ...int16) predicate.Tree {
-	return predicate.Tree(sql.FieldNotIn(FieldVout, vs...))
-}
-
-// VoutGT applies the GT predicate on the "vout" field.
-func VoutGT(v int16) predicate.Tree {
-	return predicate.Tree(sql.FieldGT(FieldVout, v))
-}
-
-// VoutGTE applies the GTE predicate on the "vout" field.
-func VoutGTE(v int16) predicate.Tree {
-	return predicate.Tree(sql.FieldGTE(FieldVout, v))
-}
-
-// VoutLT applies the LT predicate on the "vout" field.
-func VoutLT(v int16) predicate.Tree {
-	return predicate.Tree(sql.FieldLT(FieldVout, v))
-}
-
-// VoutLTE applies the LTE predicate on the "vout" field.
-func VoutLTE(v int16) predicate.Tree {
-	return predicate.Tree(sql.FieldLTE(FieldVout, v))
+// BaseTxidNotNil applies the NotNil predicate on the "base_txid" field.
+func BaseTxidNotNil() predicate.Tree {
+	return predicate.Tree(sql.FieldNotNull(FieldBaseTxid))
 }
 
 // HasRoot applies the HasEdge predicate on the "root" edge.

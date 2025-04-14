@@ -298,7 +298,7 @@ func (w *SingleKeyWallet) RequestLeavesSwap(ctx context.Context, targetAmount in
 	}
 
 	// Get signature for refunds (normal flow)
-	transfer, refundSignatureMap, _, err := StartSwapSignRefund(
+	transfer, refundSignatureMap, _, err := SendTransferSignRefund(
 		ctx,
 		w.Config,
 		leafKeyTweaks[:],
@@ -524,8 +524,7 @@ func (w *SingleKeyWallet) CoopExit(ctx context.Context, targetAmountSats int64, 
 		return nil, fmt.Errorf("failed to parse ssp pubkey: %w", err)
 	}
 
-	transfer, _, err := GetConnectorRefundSignatures(
-		ctx, w.Config, leafKeyTweaks, coopExitTxid, connectorOutputs, sspPubIdentityKey, time.Now().Add(24*time.Hour))
+	transfer, _, err := GetConnectorRefundSignatures(ctx, w.Config, leafKeyTweaks, coopExitTxid, connectorOutputs, sspPubIdentityKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get connector refund signatures: %w", err)
 	}
@@ -563,6 +562,9 @@ func (w *SingleKeyWallet) RefreshTimelocks(ctx context.Context, nodeUUID *uuid.U
 			}
 			_, err = spark.NextSequence(refundTx.TxIn[0].Sequence)
 			needRefresh := err != nil
+			if err != nil {
+				return fmt.Errorf("failed to check if node needs to be refreshed: %w", err)
+			}
 			if needRefresh {
 				nodesToRefresh = append(nodesToRefresh, node)
 				nodeIDs = append(nodeIDs, node.Id)
@@ -765,14 +767,14 @@ type TokenBalance struct {
 
 func (w *SingleKeyWallet) GetAllTokenBalances(ctx context.Context) (map[string]TokenBalance, error) {
 	// Get all token leaves owned by the wallet
-	response, err := QueryTokenOutputs(
+	response, err := GetOwnedTokenLeaves(
 		ctx,
 		w.Config,
 		[][]byte{w.Config.IdentityPublicKey()},
 		nil, // nil to get all tokens
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get token outputs: %w", err)
+		return nil, fmt.Errorf("failed to get owned token leaves: %w", err)
 	}
 
 	// Group leaves by token public key and calculate totals
@@ -801,15 +803,15 @@ func (w *SingleKeyWallet) GetTokenBalance(ctx context.Context, tokenPublicKey []
 		return 0, 0, fmt.Errorf("failed to claim all transfers: %w", err)
 	}
 
-	// Call the QueryTokenOutputs function with the wallet's identity public key
-	response, err := QueryTokenOutputs(
+	// Call the GetOwnedTokenLeaves function with the wallet's identity public key
+	response, err := GetOwnedTokenLeaves(
 		ctx,
 		w.Config,
 		[][]byte{w.Config.IdentityPublicKey()},
 		[][]byte{tokenPublicKey},
 	)
 	if err != nil {
-		return 0, 0, fmt.Errorf("failed to get token outputs: %w", err)
+		return 0, 0, fmt.Errorf("failed to get owned token leaves: %w", err)
 	}
 
 	// Calculate total amount across all leaves
@@ -827,9 +829,9 @@ func (w *SingleKeyWallet) GetTokenBalance(ctx context.Context, tokenPublicKey []
 
 func selectTokenLeaves(ctx context.Context, config *Config, targetAmount uint64, tokenPublicKey []byte, ownerPublicKey []byte) ([]*pb.LeafWithPreviousTransactionData, uint64, error) {
 	// Fetch owned token leaves
-	ownedLeavesResponse, err := QueryTokenOutputs(ctx, config, [][]byte{ownerPublicKey}, [][]byte{tokenPublicKey})
+	ownedLeavesResponse, err := GetOwnedTokenLeaves(ctx, config, [][]byte{ownerPublicKey}, [][]byte{tokenPublicKey})
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to get token outputs: %w", err)
+		return nil, 0, fmt.Errorf("failed to get owned token leaves: %w", err)
 	}
 	leavesWithPrevTxData := ownedLeavesResponse.LeavesWithPreviousTransactionData
 
