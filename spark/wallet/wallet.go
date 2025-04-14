@@ -524,7 +524,8 @@ func (w *SingleKeyWallet) CoopExit(ctx context.Context, targetAmountSats int64, 
 		return nil, fmt.Errorf("failed to parse ssp pubkey: %w", err)
 	}
 
-	transfer, _, err := GetConnectorRefundSignatures(ctx, w.Config, leafKeyTweaks, coopExitTxid, connectorOutputs, sspPubIdentityKey)
+	transfer, _, err := GetConnectorRefundSignatures(
+		ctx, w.Config, leafKeyTweaks, coopExitTxid, connectorOutputs, sspPubIdentityKey, time.Now().Add(24*time.Hour))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get connector refund signatures: %w", err)
 	}

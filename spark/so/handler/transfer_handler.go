@@ -511,11 +511,11 @@ func (h *TransferHandler) ClaimTransferTweakKeys(ctx context.Context, req *pb.Cl
 	if err != nil {
 		return fmt.Errorf("unable to load transfer %s: %v", req.TransferId, err)
 	}
-	// TODO (yun): Check with other SO if expires
-	if !bytes.Equal(transfer.ReceiverIdentityPubkey, req.OwnerIdentityPublicKey) ||
-		(transfer.Status != schema.TransferStatusSenderKeyTweaked && transfer.Status != schema.TransferStatusReceiverKeyTweaked) ||
-		(transfer.ExpiryTime.Unix() != 0 && transfer.ExpiryTime.Before(time.Now())) {
-		return fmt.Errorf("transfer cannot be claimed %s, status: %s, expiry time: %s", req.TransferId, transfer.Status, transfer.ExpiryTime)
+	if !bytes.Equal(transfer.ReceiverIdentityPubkey, req.OwnerIdentityPublicKey) {
+		return fmt.Errorf("cannot claim transfer %s, receiver identity public key mismatch", req.TransferId)
+	}
+	if transfer.Status != schema.TransferStatusSenderKeyTweaked && transfer.Status != schema.TransferStatusReceiverKeyTweaked {
+		return fmt.Errorf("transfer cannot be claimed %s, status: %s", req.TransferId, transfer.Status)
 	}
 
 	db := ent.GetDbFromContext(ctx)
