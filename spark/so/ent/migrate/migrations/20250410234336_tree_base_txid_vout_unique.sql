@@ -1,5 +1,3 @@
--- atlas:txmode none
-
 -- We have to do a bunch of deletions to get the unique constraint to work. To be safe, only do this
 -- with REGTEST. If we need to do this in other networks, it should be done manually with great care!
 CREATE TEMP TABLE trees_to_delete AS (
