@@ -83,8 +83,11 @@ func GetLeafDenominationCounts(ctx context.Context, req *pb.GetLeafDenominationC
 	counts := make(map[uint64]uint64)
 	for _, leaf := range leaves {
 		// Leaves must be a power of 2 and less than or equal to the maximum denomination.
-		if leaf.Value&(leaf.Value-1) != 0 && leaf.Value <= DenominationMax {
-			logger.Info("invalid leaf denomination", slog.Uint64("denomination", leaf.Value))
+		if leaf.Value&(leaf.Value-1) != 0 || leaf.Value > DenominationMax || leaf.Value == 0 {
+			logger.Info("invalid leaf denomination", slog.Uint64("denomination", leaf.Value),
+				slog.Bool("not_power_of_2", leaf.Value&(leaf.Value-1) != 0),
+				slog.Bool("exceeds_max", leaf.Value > DenominationMax),
+				slog.Bool("is_zero", leaf.Value == 0))
 			continue
 		}
 		counts[leaf.Value]++
