@@ -21,7 +21,7 @@ const (
 	// TokenTransactionStatusSigned is the status if a transaction was signed but then cancelled due to a threshold of the
 	// signatures not being acquired.
 	TokenTransactionStatusSignedCancelled TokenTransactionStatus = "SIGNED_CANCELLED"
-	// TokenTransactionStatusFinalized is the status after the revocation keys for output leaves have been shared with the operator.
+	// TokenTransactionStatusFinalized is the status after the revocation keys for outputs have been shared with the operator.
 	TokenTransactionStatusFinalized TokenTransactionStatus = "FINALIZED"
 )
 

@@ -27,7 +27,7 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
-// The TokenTransactionHandler is responsible for handling token transaction requests to spend and create leaves.
+// The TokenTransactionHandler is responsible for handling token transaction requests to spend and create outputs.
 type TokenTransactionHandler struct {
 	config authz.Config
 	db     *ent.Client
@@ -41,7 +41,7 @@ func NewTokenTransactionHandler(config authz.Config, db *ent.Client) *TokenTrans
 	}
 }
 
-// StartTokenTransaction verifies the token leaves, reserves the keyshares for the token transaction, and returns metadata about the operators that possess the keyshares.
+// StartTokenTransaction verifies the token outputs, reserves the keyshares for the token transaction, and returns metadata about the operators that possess the keyshares.
 func (o TokenTransactionHandler) StartTokenTransaction(ctx context.Context, config *so.Config, req *pb.StartTokenTransactionRequest) (*pb.StartTokenTransactionResponse, error) {
 	logger := helper.GetLoggerFromContext(ctx)
 
@@ -53,7 +53,7 @@ func (o TokenTransactionHandler) StartTokenTransaction(ctx context.Context, conf
 		return nil, fmt.Errorf("invalid partial token transaction: %w", err)
 	}
 
-	// Each created leaf requires a keyshare for revocation key generation.
+	// Each created output requires a keyshare for revocation key generation.
 	numRevocationKeysharesNeeded := len(req.PartialTokenTransaction.OutputLeaves)
 	keyshares, err := ent.GetUnusedSigningKeyshares(ctx, o.db, config, numRevocationKeysharesNeeded)
 	if err != nil {
@@ -67,19 +67,19 @@ func (o TokenTransactionHandler) StartTokenTransaction(ctx context.Context, conf
 		keyshareIDStrings[i] = keyshare.ID.String()
 	}
 
-	// Fill revocation public keys and withdrawal bond/locktime for each leaf.
+	// Fill revocation commitments and withdrawal bond/locktime for each output.
 	finalTokenTransaction := req.PartialTokenTransaction
-	for i, leaf := range finalTokenTransaction.OutputLeaves {
+	for i, output := range finalTokenTransaction.OutputLeaves {
 		id, err := uuid.NewV7()
 		if err != nil {
 			return nil, err
 		}
 		idStr := id.String()
-		leaf.Id = &idStr
-		leaf.RevocationPublicKey = keyshares[i].PublicKey
+		output.Id = &idStr
+		output.RevocationPublicKey = keyshares[i].PublicKey
 	}
 
-	// Save the token transaction object to lock in the revocation public keys for each created leaf within this transaction.
+	// Save the token transaction object to lock in the revocation commitments for each created output within this transaction.
 	// Note that atomicity here is very important to ensure that the unused keyshares queried above are not used by another operation.
 	// This property should be help because the coordinator blocks on the other SO responses.
 	allSelection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionAll}
@@ -97,17 +97,17 @@ func (o TokenTransactionHandler) StartTokenTransaction(ctx context.Context, conf
 			return nil, fmt.Errorf("failed to get network from proto network: %w", err)
 		}
 
-		// Fill revocation public keys and withdrawal bond/locktime for each leaf.
+		// Fill revocation commitments and withdrawal bond/locktime for each output.
 		finalTokenTransaction := req.PartialTokenTransaction
-		for i, leaf := range finalTokenTransaction.OutputLeaves {
-			leafID := uuid.New().String()
-			leaf.Id = &leafID
-			leaf.RevocationPublicKey = keyshares[i].PublicKey
+		for i, output := range finalTokenTransaction.OutputLeaves {
+			outputID := uuid.New().String()
+			output.Id = &outputID
+			output.RevocationPublicKey = keyshares[i].PublicKey
 			// TODO: Support non-regtest configs by providing network as a field in the transaction.
 			withdrawalBondSats := config.Lrc20Configs[network.String()].WithdrawBondSats
-			leaf.WithdrawBondSats = &withdrawalBondSats
+			output.WithdrawBondSats = &withdrawalBondSats
 			withdrawRelativeBlockLocktime := config.Lrc20Configs[network.String()].WithdrawRelativeBlockLocktime
-			leaf.WithdrawRelativeBlockLocktime = &withdrawRelativeBlockLocktime
+			output.WithdrawRelativeBlockLocktime = &withdrawRelativeBlockLocktime
 		}
 
 		client := pbinternal.NewSparkInternalServiceClient(conn)
@@ -149,35 +149,35 @@ func (o TokenTransactionHandler) StartTokenTransaction(ctx context.Context, conf
 }
 
 // validateOutputs checks if all created outputs have the expected status
-func validateOutputs(leaves []*ent.TokenOutput, expectedStatus schema.TokenOutputStatus) []string {
-	var invalidLeaves []string
-	for i, leaf := range leaves {
-		if leaf.Status != expectedStatus {
-			invalidLeaves = append(invalidLeaves, fmt.Sprintf("output leaf %d has invalid status %s, expected %s",
-				i, leaf.Status, expectedStatus))
+func validateOutputs(outputs []*ent.TokenOutput, expectedStatus schema.TokenOutputStatus) []string {
+	var invalidOutputs []string
+	for i, output := range outputs {
+		if output.Status != expectedStatus {
+			invalidOutputs = append(invalidOutputs, fmt.Sprintf("output %d has invalid status %s, expected %s",
+				i, output.Status, expectedStatus))
 		}
 	}
-	return invalidLeaves
+	return invalidOutputs
 }
 
 // validateInputs checks if all spent outputs have the expected status and aren't withdrawn
-func validateInputs(leaves []*ent.TokenOutput, expectedStatus schema.TokenOutputStatus) []string {
-	var invalidLeaves []string
-	for _, leaf := range leaves {
-		if leaf.Status != expectedStatus {
-			invalidLeaves = append(invalidLeaves, fmt.Sprintf("input leaf %x has invalid status %s, expected %s",
-				leaf.ID, leaf.Status, expectedStatus))
+func validateInputs(outputs []*ent.TokenOutput, expectedStatus schema.TokenOutputStatus) []string {
+	var invalidOutputs []string
+	for _, output := range outputs {
+		if output.Status != expectedStatus {
+			invalidOutputs = append(invalidOutputs, fmt.Sprintf("input %x has invalid status %s, expected %s",
+				output.ID, output.Status, expectedStatus))
 		}
-		if leaf.ConfirmedWithdrawBlockHash != nil {
-			invalidLeaves = append(invalidLeaves, fmt.Sprintf("input leaf %x is already withdrawn",
-				leaf.ID))
+		if output.ConfirmedWithdrawBlockHash != nil {
+			invalidOutputs = append(invalidOutputs, fmt.Sprintf("input %x is already withdrawn",
+				output.ID))
 		}
 	}
-	return invalidLeaves
+	return invalidOutputs
 }
 
 // SignTokenTransaction signs the token transaction with the operators private key.
-// If it is a transfer it also fetches this operators keyshare for each spent leaf and
+// If it is a transfer it also fetches this operators keyshare for each spent output and
 // returns it to the wallet so it can finalize the transaction.
 func (o TokenTransactionHandler) SignTokenTransaction(
 	ctx context.Context,
@@ -196,29 +196,29 @@ func (o TokenTransactionHandler) SignTokenTransaction(
 		return nil, fmt.Errorf("failed to hash final token transaction: %w", err)
 	}
 
-	// Validate each leaf signature in the request. Each signed payload consists of
+	// Validate each output signature in the request. Each signed payload consists of
 	//   payload.final_token_transaction_hash
 	//   payload.operator_identity_public_key
 	// This verifies that this request for this transaction (and release of the revocation
-	// keyshare) came from the leaf owner and was intended for this specific SO.
-	for _, leafSig := range req.OperatorSpecificSignatures {
-		payloadHash, err := utils.HashOperatorSpecificTokenTransactionSignablePayload(leafSig.Payload)
+	// keyshare) came from the output owner and was intended for this specific SO.
+	for _, outputSig := range req.OperatorSpecificSignatures {
+		payloadHash, err := utils.HashOperatorSpecificTokenTransactionSignablePayload(outputSig.Payload)
 		if err != nil {
 			return nil, fmt.Errorf("failed to hash revocation keyshares payload: %w", err)
 		}
 
 		// Validate that the transaction hash in the payload matches the actual transaction hash
-		if !bytes.Equal(leafSig.Payload.FinalTokenTransactionHash, finalTokenTransactionHash) {
+		if !bytes.Equal(outputSig.Payload.FinalTokenTransactionHash, finalTokenTransactionHash) {
 			return nil, fmt.Errorf("transaction hash in payload (%x) does not match actual transaction hash (%x)",
-				leafSig.Payload.FinalTokenTransactionHash, finalTokenTransactionHash)
+				outputSig.Payload.FinalTokenTransactionHash, finalTokenTransactionHash)
 		}
 
 		if err := utils.ValidateOwnershipSignature(
-			leafSig.OwnerSignature,
+			outputSig.OwnerSignature,
 			payloadHash,
-			leafSig.OwnerPublicKey,
+			outputSig.OwnerPublicKey,
 		); err != nil {
-			return nil, fmt.Errorf("invalid owner signature for leaf: %w", err)
+			return nil, fmt.Errorf("invalid owner signature for output: %w", err)
 		}
 	}
 	tokenTransaction, err := ent.FetchAndLockTokenTransactionData(ctx, req.FinalTokenTransaction)
@@ -231,29 +231,29 @@ func (o TokenTransactionHandler) SignTokenTransaction(
 		return o.regenerateSigningResponseForDuplicateRequest(ctx, logger, config, tokenTransaction, finalTokenTransactionHash)
 	}
 
-	invalidLeaves := validateOutputs(tokenTransaction.Edges.CreatedOutput, schema.TokenOutputStatusCreatedStarted)
-	if len(invalidLeaves) > 0 {
-		return nil, fmt.Errorf("found invalid output leaves: %s", strings.Join(invalidLeaves, "; "))
+	invalidOutputs := validateOutputs(tokenTransaction.Edges.CreatedOutput, schema.TokenOutputStatusCreatedStarted)
+	if len(invalidOutputs) > 0 {
+		return nil, fmt.Errorf("found invalid outputs: %s", strings.Join(invalidOutputs, "; "))
 	}
 
 	// If token outputs are being spent, verify the expected status of inputs and check for active freezes.
 	// For mints this is not necessary and will be skipped because it does not spend outputs.
 	if len(tokenTransaction.Edges.SpentOutput) > 0 {
-		invalidLeaves := validateInputs(tokenTransaction.Edges.SpentOutput, schema.TokenOutputStatusSpentStarted)
-		if len(invalidLeaves) > 0 {
-			return nil, fmt.Errorf("found invalid input leaves: %s", strings.Join(invalidLeaves, "; "))
+		invalidOutputs := validateInputs(tokenTransaction.Edges.SpentOutput, schema.TokenOutputStatusSpentStarted)
+		if len(invalidOutputs) > 0 {
+			return nil, fmt.Errorf("found invalid inputs: %s", strings.Join(invalidOutputs, "; "))
 		}
 
-		// Collect owner public keys for freeze check
+		// Collect owner public keys for freeze check.
 		ownerPublicKeys := make([][]byte, len(tokenTransaction.Edges.SpentOutput))
-		// Assumes that all token public keys are the same as the first leaf. This is asserted when validating
+		// Assumes that all token public keys are the same as the first output. This is asserted when validating
 		// in the StartTokenTransaction() step.
 		tokenPublicKey := tokenTransaction.Edges.SpentOutput[0].TokenPublicKey
-		for i, leaf := range tokenTransaction.Edges.SpentOutput {
-			ownerPublicKeys[i] = leaf.OwnerPublicKey
+		for i, output := range tokenTransaction.Edges.SpentOutput {
+			ownerPublicKeys[i] = output.OwnerPublicKey
 		}
 
-		// Bulk query all input leaf ids to ensure none of them are frozen.
+		// Bulk query all input ids to ensure none of them are frozen.
 		activeFreezes, err := ent.GetActiveFreezes(ctx, ownerPublicKeys, tokenPublicKey)
 		if err != nil {
 			logger.Info("Failed to query token freeze status", "error", err)
@@ -264,7 +264,7 @@ func (o TokenTransactionHandler) SignTokenTransaction(
 			for _, freeze := range activeFreezes {
 				logger.Info("Found active freeze", "owner", freeze.OwnerPublicKey, "token", freeze.TokenPublicKey, "freeze_timestamp", freeze.WalletProvidedFreezeTimestamp)
 			}
-			return nil, fmt.Errorf("at least one input leaf is frozen. Cannot proceed with transaction")
+			return nil, fmt.Errorf("at least one input is frozen. Cannot proceed with transaction")
 		}
 	}
 
@@ -278,7 +278,7 @@ func (o TokenTransactionHandler) SignTokenTransaction(
 	}
 	err = ent.UpdateSignedTransaction(ctx, tokenTransaction, operatorSpecificSignature, operatorSignature.Serialize())
 	if err != nil {
-		logger.Info("Failed to update leaves after signing", "error", err)
+		logger.Info("Failed to update outputs after signing", "error", err)
 		return nil, err
 	}
 
@@ -295,21 +295,21 @@ func (o TokenTransactionHandler) SignTokenTransaction(
 	}
 
 	keyshares := make([]*ent.SigningKeyshare, len(tokenTransaction.Edges.SpentOutput))
-	for _, leaf := range tokenTransaction.Edges.SpentOutput {
-		keyshare, err := leaf.QueryRevocationKeyshare().Only(ctx)
+	for _, output := range tokenTransaction.Edges.SpentOutput {
+		keyshare, err := output.QueryRevocationKeyshare().Only(ctx)
 		if err != nil {
-			logger.Info("Failed to get keyshare for leaf", "error", err)
+			logger.Info("Failed to get keyshare for output", "error", err)
 			return nil, err
 		}
 		// Use the vout index to order the keyshares
-		keyshares[leaf.SpentTransactionInputVout] = keyshare
+		keyshares[output.SpentTransactionInputVout] = keyshare
 
 		// Validate that the keyshare's public key is as expected.
-		if !bytes.Equal(keyshare.PublicKey, leaf.WithdrawRevocationCommitment) {
+		if !bytes.Equal(keyshare.PublicKey, output.WithdrawRevocationCommitment) {
 			return nil, fmt.Errorf(
-				"keyshare public key %x does not match leaf revocation public key %x",
+				"keyshare public key %x does not match output revocation commitment %x",
 				keyshare.PublicKey,
-				leaf.WithdrawRevocationCommitment,
+				output.WithdrawRevocationCommitment,
 			)
 		}
 	}
@@ -339,19 +339,19 @@ func (o TokenTransactionHandler) regenerateSigningResponseForDuplicateRequest(
 ) (*pb.SignTokenTransactionResponse, error) {
 	logger.Info("Regenerating response for a duplicate SignTokenTransaction() Call")
 
-	var invalidLeaves []string
+	var invalidOutputs []string
 	isMint := tokenTransaction.Edges.Mint != nil
-	expectedCreatedLeafStatus := schema.TokenOutputStatusCreatedSigned
+	expectedCreatedOutputStatus := schema.TokenOutputStatusCreatedSigned
 	if isMint {
-		expectedCreatedLeafStatus = schema.TokenOutputStatusCreatedFinalized
+		expectedCreatedOutputStatus = schema.TokenOutputStatusCreatedFinalized
 	}
 
-	invalidLeaves = validateOutputs(tokenTransaction.Edges.CreatedOutput, expectedCreatedLeafStatus)
+	invalidOutputs = validateOutputs(tokenTransaction.Edges.CreatedOutput, expectedCreatedOutputStatus)
 	if len(tokenTransaction.Edges.SpentOutput) > 0 {
-		invalidLeaves = append(invalidLeaves, validateInputs(tokenTransaction.Edges.SpentOutput, schema.TokenOutputStatusSpentSigned)...)
+		invalidOutputs = append(invalidOutputs, validateInputs(tokenTransaction.Edges.SpentOutput, schema.TokenOutputStatusSpentSigned)...)
 	}
-	if len(invalidLeaves) > 0 {
-		return nil, fmt.Errorf("found invalid leaves when regenerating duplicate signing request: %s", strings.Join(invalidLeaves, "; "))
+	if len(invalidOutputs) > 0 {
+		return nil, fmt.Errorf("found invalid outputs when regenerating duplicate signing request: %s", strings.Join(invalidOutputs, "; "))
 	}
 
 	if err := utils.ValidateOwnershipSignature(
@@ -377,7 +377,7 @@ func (o TokenTransactionHandler) regenerateSigningResponseForDuplicateRequest(
 	}, nil
 }
 
-// FinalizeTokenTransaction takes the revocation private keys for spent leaves and updates their status to finalized.
+// FinalizeTokenTransaction takes the revocation private keys for spent outputs and updates their status to finalized.
 func (o TokenTransactionHandler) FinalizeTokenTransaction(
 	ctx context.Context,
 	config *so.Config,
@@ -391,8 +391,8 @@ func (o TokenTransactionHandler) FinalizeTokenTransaction(
 
 	tokenTransaction, err := ent.FetchAndLockTokenTransactionData(ctx, req.FinalTokenTransaction)
 	if err != nil {
-		logger.Info("Failed to fetch matching transaction receipt", "error", err)
-		return nil, fmt.Errorf("failed to fetch transaction receipt: %w", err)
+		logger.Info("Failed to fetch matching transaction", "error", err)
+		return nil, fmt.Errorf("failed to fetch transaction: %w", err)
 	}
 
 	// Verify that the transaction is in a signed state before finalizing
@@ -400,43 +400,27 @@ func (o TokenTransactionHandler) FinalizeTokenTransaction(
 		return nil, fmt.Errorf("transaction is in status %s, but must be in SIGNED status to finalize", tokenTransaction.Status)
 	}
 
-	// Verify status of output leaves
-	var invalidLeaves []string
-	for i, leaf := range tokenTransaction.Edges.CreatedOutput {
-		if leaf.Status != schema.TokenOutputStatusCreatedSigned {
-			invalidLeaves = append(invalidLeaves, fmt.Sprintf("output leaf %d has invalid status %s, expected %s", i, leaf.Status, schema.TokenOutputStatusCreatedSigned))
-		}
-	}
-
-	// Verify status of spent leaves
+	// Verify status of created outputs and spent outputs
+	invalidOutputs := validateOutputs(tokenTransaction.Edges.CreatedOutput, schema.TokenOutputStatusCreatedSigned)
 	if len(tokenTransaction.Edges.SpentOutput) > 0 {
-		for _, leaf := range tokenTransaction.Edges.SpentOutput {
-			if leaf.Status != schema.TokenOutputStatusSpentSigned {
-				invalidLeaves = append(invalidLeaves, fmt.Sprintf("input leaf %x has invalid status %s, expected %s",
-					leaf.ID, leaf.Status, schema.TokenOutputStatusSpentSigned))
-			}
-			if leaf.ConfirmedWithdrawBlockHash != nil {
-				invalidLeaves = append(invalidLeaves, fmt.Sprintf("input leaf %x is already withdrawn",
-					leaf.ID))
-			}
-		}
+		invalidOutputs = append(invalidOutputs, validateInputs(tokenTransaction.Edges.SpentOutput, schema.TokenOutputStatusSpentSigned)...)
 	}
 
-	if len(invalidLeaves) > 0 {
-		return nil, fmt.Errorf("found invalid leaves: %s", strings.Join(invalidLeaves, "; "))
+	if len(invalidOutputs) > 0 {
+		return nil, fmt.Errorf("found invalid outputs: %s", strings.Join(invalidOutputs, "; "))
 	}
 
-	// Extract revocation public keys from spent leaves
+	// Extract revocation commitments from spent outputs.
 	revocationPublicKeys := make([][]byte, len(tokenTransaction.Edges.SpentOutput))
 	if (len(tokenTransaction.Edges.SpentOutput)) != len(req.LeafToSpendRevocationKeys) {
 		return nil, fmt.Errorf(
-			"number of revocation keys (%d) does not match number of spent leaves (%d)",
+			"number of revocation keys (%d) does not match number of spent outputs (%d)",
 			len(req.LeafToSpendRevocationKeys),
 			len(tokenTransaction.Edges.SpentOutput),
 		)
 	}
-	for _, leaf := range tokenTransaction.Edges.SpentOutput {
-		revocationPublicKeys[leaf.SpentTransactionInputVout] = leaf.WithdrawRevocationCommitment
+	for _, output := range tokenTransaction.Edges.SpentOutput {
+		revocationPublicKeys[output.SpentTransactionInputVout] = output.WithdrawRevocationCommitment
 	}
 	err = utils.ValidateRevocationKeys(req.LeafToSpendRevocationKeys, revocationPublicKeys)
 	if err != nil {
@@ -457,7 +441,7 @@ func (o TokenTransactionHandler) FinalizeTokenTransaction(
 
 	err = ent.UpdateFinalizedTransaction(ctx, tokenTransaction, req.LeafToSpendRevocationKeys)
 	if err != nil {
-		logger.Info("Failed to update leaves after finalizing", "error", err)
+		logger.Info("Failed to update outputs after finalizing", "error", err)
 		return nil, err
 	}
 
@@ -472,9 +456,9 @@ func (o TokenTransactionHandler) SendTransactionToLRC20Node(
 	operatorSignature []byte,
 	revocationKeys [][]byte,
 ) error {
-	leavesToSpendData := make([]*pblrc20.SparkSignatureLeafData, len(revocationKeys))
+	outputsToSpendData := make([]*pblrc20.SparkSignatureLeafData, len(revocationKeys))
 	for i, revocationKey := range revocationKeys {
-		leavesToSpendData[i] = &pblrc20.SparkSignatureLeafData{
+		outputsToSpendData[i] = &pblrc20.SparkSignatureLeafData{
 			SpentLeafIndex: uint32(i),
 			// Revocation will be nil if we are sending the transaction at the Sign() step.
 			// It will be filled when sending a transaction in the Finalize() step.
@@ -486,7 +470,7 @@ func (o TokenTransactionHandler) SendTransactionToLRC20Node(
 		SparkOperatorSignature:         operatorSignature,
 		SparkOperatorIdentityPublicKey: config.IdentityPublicKey(),
 		FinalTokenTransaction:          finalTokenTransaction,
-		LeavesToSpendData:              leavesToSpendData,
+		LeavesToSpendData:              outputsToSpendData,
 	}
 
 	lrc20Client := lrc20.NewClient(config)
@@ -552,10 +536,10 @@ func (o TokenTransactionHandler) FreezeTokens(
 		}
 	}
 
-	// Collect information about the frozen leaves.
-	leafIDs, totalAmount, err := ent.GetOwnedLeafTokenStats(ctx, [][]byte{req.FreezeTokensPayload.OwnerPublicKey}, req.FreezeTokensPayload.TokenPublicKey)
+	// Collect information about the frozen outputs.
+	outputIDs, totalAmount, err := ent.GetOwnedTokenOutputStats(ctx, [][]byte{req.FreezeTokensPayload.OwnerPublicKey}, req.FreezeTokensPayload.TokenPublicKey)
 	if err != nil {
-		logger.Info("Failed to get impacted leaf stats", "error", err)
+		logger.Info("Failed to get impacted output stats", "error", err)
 		return nil, err
 	}
 
@@ -566,7 +550,7 @@ func (o TokenTransactionHandler) FreezeTokens(
 	}
 
 	return &pb.FreezeTokensResponse{
-		ImpactedLeafIds:     leafIDs,
+		ImpactedLeafIds:     outputIDs,
 		ImpactedTokenAmount: totalAmount.Bytes(),
 	}, nil
 }
@@ -583,33 +567,33 @@ func (o TokenTransactionHandler) FreezeTokensOnLRC20Node(
 
 // QueryTokenTransactions returns SO provided data about specific token transactions along with their status.
 // Allows caller to specify data to be returned related to:
-// a) transactions associated with a particular set of leaf ids
+// a) transactions associated with a particular set of output ids
 // b) transactions associated with a particular set of transaction hashes
 // c) all transactions associated with a particular token public key
 func (o TokenTransactionHandler) QueryTokenTransactions(ctx context.Context, config *so.Config, req *pb.QueryTokenTransactionsRequest) (*pb.QueryTokenTransactionsResponse, error) {
 	logger := helper.GetLoggerFromContext(ctx)
 	db := ent.GetDbFromContext(ctx)
 
-	// Start with a base query for token transaction receipts
+	// Start with a base query for token transactions
 	baseQuery := db.TokenTransaction.Query()
 
 	// Apply filters based on request parameters
 	if len(req.LeafIds) > 0 {
 		// Convert string IDs to UUIDs
-		leafUUIDs := make([]uuid.UUID, 0, len(req.LeafIds))
+		outputUUIDs := make([]uuid.UUID, 0, len(req.LeafIds))
 		for _, idStr := range req.LeafIds {
 			id, err := uuid.Parse(idStr)
 			if err != nil {
-				return nil, fmt.Errorf("invalid leaf ID format: %v", err)
+				return nil, fmt.Errorf("invalid output ID format: %v", err)
 			}
-			leafUUIDs = append(leafUUIDs, id)
+			outputUUIDs = append(outputUUIDs, id)
 		}
 
-		// Find transactions that created or spent these leaves
+		// Find transactions that created or spent these outputs
 		baseQuery = baseQuery.Where(
 			tokentransaction.Or(
-				tokentransaction.HasCreatedOutputWith(tokenoutput.IDIn(leafUUIDs...)),
-				tokentransaction.HasSpentOutputWith(tokenoutput.IDIn(leafUUIDs...)),
+				tokentransaction.HasCreatedOutputWith(tokenoutput.IDIn(outputUUIDs...)),
+				tokentransaction.HasSpentOutputWith(tokenoutput.IDIn(outputUUIDs...)),
 			),
 		)
 	}
@@ -647,50 +631,49 @@ func (o TokenTransactionHandler) QueryTokenTransactions(ctx context.Context, con
 		}).WithMint()
 
 	// Execute the query
-	receipts, err := query.All(ctx)
+	transactions, err := query.All(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to query token transactions: %v", err)
 	}
 
 	// Convert to response protos
-	transactionsWithStatus := make([]*pb.TokenTransactionWithStatus, 0, len(receipts))
-	for _, tokenTransaction := range receipts {
-		// Determine transaction status based on leaf statuses
+	transactionsWithStatus := make([]*pb.TokenTransactionWithStatus, 0, len(transactions))
+	for _, transaction := range transactions {
+		// Determine transaction status based on output statuses.
 		status := pb.TokenTransactionStatus_TOKEN_TRANSACTION_STARTED
 
-		// Check spent leaves status
-		spentLeafStatuses := make(map[schema.TokenOutputStatus]int)
+		// Check spent outputs status
+		spentOutputStatuses := make(map[schema.TokenOutputStatus]int)
 
-		for _, leaf := range tokenTransaction.Edges.SpentOutput {
-			// Verify that this spent leaf is actually associated with this transaction
-			if leaf.Edges.OutputSpentTokenTransaction == nil ||
-				leaf.Edges.OutputSpentTokenTransaction.ID != tokenTransaction.ID {
-				logger.Info("Warning: Spent leaf not properly associated with transaction", "leaf_id", leaf.ID.String(), "transaction_id", tokenTransaction.ID.String())
+		for _, output := range transaction.Edges.SpentOutput {
+			// Verify that this spent output is actually associated with this transaction.
+			if output.Edges.OutputSpentTokenTransaction == nil ||
+				output.Edges.OutputSpentTokenTransaction.ID != transaction.ID {
+				logger.Info("Warning: Spent output not properly associated with transaction", "output_id", output.ID.String(), "transaction_id", transaction.ID.String())
 				continue
 			}
-			spentLeafStatuses[leaf.Status]++
+			spentOutputStatuses[output.Status]++
 		}
 
-		// Reconstruct the token transaction from the receipt data
-		tokenTransaction, err := tokenTransaction.MarshalProto(config)
+		// Reconstruct the token transaction from the ent data.
+		transaction, err := transaction.MarshalProto(config)
 		if err != nil {
 			logger.Info("Failed to marshal token transaction", "error", err)
 			return nil, err
 		}
 
 		// This would require reconstructing the transaction from the database
-		// For now, we'll just include the transaction hash
-
+		// For now, we'll just include the transaction hash.
 		transactionsWithStatus = append(transactionsWithStatus, &pb.TokenTransactionWithStatus{
-			TokenTransaction: tokenTransaction,
+			TokenTransaction: transaction,
 			Status:           status,
 		})
 	}
 
 	// Calculate next offset
 	var nextOffset int64
-	if len(receipts) == int(req.Limit) {
-		nextOffset = req.Offset + int64(len(receipts))
+	if len(transactions) == int(req.Limit) {
+		nextOffset = req.Offset + int64(len(transactions))
 	} else {
 		nextOffset = -1
 	}
@@ -707,32 +690,32 @@ func (o TokenTransactionHandler) QueryTokenOutputs(
 ) (*pb.QueryTokenOutputsResponse, error) {
 	logger := helper.GetLoggerFromContext(ctx)
 
-	leaves, err := ent.GetOwnedLeaves(ctx, req.OwnerPublicKeys, req.TokenPublicKeys)
+	outputs, err := ent.GetOwnedTokenOutputs(ctx, req.OwnerPublicKeys, req.TokenPublicKeys)
 	if err != nil {
-		logger.Info("Failed to get owned leaf stats", "error", err)
+		logger.Info("Failed to get owned output stats", "error", err)
 		return nil, err
 	}
 
-	leavesWithPrevTxData := make([]*pb.LeafWithPreviousTransactionData, len(leaves))
-	for i, leaf := range leaves {
-		idStr := leaf.ID.String()
-		leavesWithPrevTxData[i] = &pb.LeafWithPreviousTransactionData{
+	outputsWithPrevTxData := make([]*pb.LeafWithPreviousTransactionData, len(outputs))
+	for i, output := range outputs {
+		idStr := output.ID.String()
+		outputsWithPrevTxData[i] = &pb.LeafWithPreviousTransactionData{
 			Leaf: &pb.TokenLeafOutput{
 				Id:                            &idStr,
-				OwnerPublicKey:                leaf.OwnerPublicKey,
-				RevocationPublicKey:           leaf.WithdrawRevocationCommitment,
-				WithdrawBondSats:              &leaf.WithdrawBondSats,
-				WithdrawRelativeBlockLocktime: &leaf.WithdrawRelativeBlockLocktime,
-				TokenPublicKey:                leaf.TokenPublicKey,
-				TokenAmount:                   leaf.TokenAmount,
+				OwnerPublicKey:                output.OwnerPublicKey,
+				RevocationPublicKey:           output.WithdrawRevocationCommitment,
+				WithdrawBondSats:              &output.WithdrawBondSats,
+				WithdrawRelativeBlockLocktime: &output.WithdrawRelativeBlockLocktime,
+				TokenPublicKey:                output.TokenPublicKey,
+				TokenAmount:                   output.TokenAmount,
 			},
-			PreviousTransactionHash: leaf.Edges.OutputCreatedTokenTransaction.FinalizedTokenTransactionHash,
-			PreviousTransactionVout: uint32(leaf.CreatedTransactionOutputVout),
+			PreviousTransactionHash: output.Edges.OutputCreatedTokenTransaction.FinalizedTokenTransactionHash,
+			PreviousTransactionVout: uint32(output.CreatedTransactionOutputVout),
 		}
 	}
 
 	return &pb.QueryTokenOutputsResponse{
-		LeavesWithPreviousTransactionData: leavesWithPrevTxData,
+		LeavesWithPreviousTransactionData: outputsWithPrevTxData,
 	}, nil
 }
 
@@ -749,13 +732,14 @@ func (o TokenTransactionHandler) CancelSignedTokenTransaction(
 
 	tokenTransaction, err := ent.FetchAndLockTokenTransactionData(ctx, req.FinalTokenTransaction)
 	if err != nil {
-		logger.Info("Failed to fetch matching transaction receipt", "error", err)
-		return nil, fmt.Errorf("failed to fetch transaction receipt: %w", err)
+		logger.Info("Failed to fetch matching transaction", "error", err)
+		return nil, fmt.Errorf("failed to fetch transaction: %w", err)
 	}
 
 	// Verify that the transaction is in a signed state locally
 	if tokenTransaction.Status != schema.TokenTransactionStatusSigned {
-		return nil, fmt.Errorf("transaction is in status %s, but must be in SIGNED status to cancel", tokenTransaction.Status)
+		return nil, fmt.Errorf("transaction is in status %s, but must be in %s status to cancel",
+			tokenTransaction.Status, schema.TokenTransactionStatusSigned)
 	}
 
 	// Verify with the other SOs that the transaction is in a cancellable state.
@@ -817,7 +801,7 @@ func (o TokenTransactionHandler) CancelSignedTokenTransaction(
 
 	err = ent.UpdateCancelledTransaction(ctx, tokenTransaction)
 	if err != nil {
-		logger.Info("Failed to update leaves after canceling", "error", err)
+		logger.Info("Failed to update outputs after canceling", "error", err)
 		return nil, err
 	}
 
@@ -828,24 +812,24 @@ func (o TokenTransactionHandler) getRevocationKeysharesForTokenTransaction(ctx c
 	logger := helper.GetLoggerFromContext(ctx)
 
 	keyshares := make([]*ent.SigningKeyshare, len(tokenTransaction.Edges.SpentOutput))
-	for _, leaf := range tokenTransaction.Edges.SpentOutput {
-		keyshare, err := leaf.QueryRevocationKeyshare().Only(ctx)
+	for _, output := range tokenTransaction.Edges.SpentOutput {
+		keyshare, err := output.QueryRevocationKeyshare().Only(ctx)
 		if err != nil {
-			logger.Info("Failed to get keyshare for leaf",
+			logger.Info("Failed to get keyshare for output",
 				"error", err,
-				"output_id", leaf.ID,
+				"output_id", output.ID,
 				"transaction_hash", hex.EncodeToString(tokenTransaction.FinalizedTokenTransactionHash))
 			return nil, err
 		}
 		// Use the vout index to order the keyshares
-		keyshares[leaf.SpentTransactionInputVout] = keyshare
+		keyshares[output.SpentTransactionInputVout] = keyshare
 
 		// Validate that the keyshare's public key is as expected.
-		if !bytes.Equal(keyshare.PublicKey, leaf.WithdrawRevocationCommitment) {
+		if !bytes.Equal(keyshare.PublicKey, output.WithdrawRevocationCommitment) {
 			return nil, fmt.Errorf(
-				"keyshare public key %x does not match leaf revocation public key %x",
+				"keyshare public key %x does not match output revocation commitment %x",
 				keyshare.PublicKey,
-				leaf.WithdrawRevocationCommitment,
+				output.WithdrawRevocationCommitment,
 			)
 		}
 	}

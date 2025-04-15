@@ -656,7 +656,7 @@ func (w *SingleKeyWallet) MintTokens(ctx context.Context, amount uint64) error {
 	if err != nil {
 		return fmt.Errorf("failed to broadcast mint transaction: %w", err)
 	}
-	newOwnedLeaves, err := getOwnedLeavesFromTokenTransaction(finalTokenTransaction, w.Config.IdentityPublicKey())
+	newOwnedLeaves, err := GetOwnedTokenOutputsFromTokenTransaction(finalTokenTransaction, w.Config.IdentityPublicKey())
 	if err != nil {
 		return fmt.Errorf("failed to add owned leaves: %w", err)
 	}
@@ -748,7 +748,7 @@ func (w *SingleKeyWallet) TransferTokens(ctx context.Context, amount uint64, rec
 	w.OwnedTokenLeaves = w.OwnedTokenLeaves[:j]
 
 	// Add the created leaves to the owned leaves list.
-	newOwnedLeaves, err := getOwnedLeavesFromTokenTransaction(finalTokenTransaction, w.Config.IdentityPublicKey())
+	newOwnedLeaves, err := GetOwnedTokenOutputsFromTokenTransaction(finalTokenTransaction, w.Config.IdentityPublicKey())
 	if err != nil {
 		return fmt.Errorf("failed to add owned leaves: %w", err)
 	}
@@ -881,7 +881,7 @@ func int64ToUint128Bytes(high, low uint64) []byte {
 	)
 }
 
-func getOwnedLeavesFromTokenTransaction(leaf *pb.TokenTransaction, walletPublicKey []byte) ([]*pb.LeafWithPreviousTransactionData, error) {
+func GetOwnedTokenOutputsFromTokenTransaction(leaf *pb.TokenTransaction, walletPublicKey []byte) ([]*pb.LeafWithPreviousTransactionData, error) {
 	finalTokenTransactionHash, err := utils.HashTokenTransaction(leaf, false)
 	if err != nil {
 		return nil, err

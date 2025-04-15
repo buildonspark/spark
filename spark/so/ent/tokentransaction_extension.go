@@ -15,15 +15,15 @@ import (
 	"github.com/lightsparkdev/spark-go/so/utils"
 )
 
-func GetReceiptMapFromList(receipts []*TokenTransaction) (map[string]*TokenTransaction, error) {
-	receiptMap := make(map[string]*TokenTransaction)
-	for _, r := range receipts {
+func GetTokenTransactionMapFromList(transactions []*TokenTransaction) (map[string]*TokenTransaction, error) {
+	tokenTransactionMap := make(map[string]*TokenTransaction)
+	for _, r := range transactions {
 		if len(r.FinalizedTokenTransactionHash) > 0 {
 			key := hex.EncodeToString(r.FinalizedTokenTransactionHash)
-			receiptMap[key] = r
+			tokenTransactionMap[key] = r
 		}
 	}
-	return receiptMap, nil
+	return tokenTransactionMap, nil
 }
 
 func CreateStartedTransactionEntities(
@@ -67,7 +67,7 @@ func CreateStartedTransactionEntities(
 	}
 	tokenTransactionEnt, err := txUpdate.Save(ctx)
 	if err != nil {
-		log.Printf("Failed to create token transaction receipt: %v", err)
+		log.Printf("Failed to create token transaction: %v", err)
 		return nil, err
 	}
 
@@ -75,7 +75,7 @@ func CreateStartedTransactionEntities(
 		ownershipSignatures := tokenTransactionSignatures.GetOwnerSignatures()
 		if len(ownershipSignatures) != len(outputToSpendEnts) {
 			return nil, fmt.Errorf(
-				"number of signatures %d doesn't match number of leaves to spend %d",
+				"number of signatures %d doesn't match number of outputs to spend %d",
 				len(ownershipSignatures),
 				len(outputToSpendEnts),
 			)
@@ -95,19 +95,19 @@ func CreateStartedTransactionEntities(
 				SetNetwork(network).
 				Save(ctx)
 			if err != nil {
-				log.Printf("Failed to update output to spent: %v", err)
+				log.Printf("Failed to update output to spend: %v", err)
 				return nil, err
 			}
 		}
 	}
 
 	outputEnts := make([]*TokenOutputCreate, 0, len(tokenTransaction.OutputLeaves))
-	for outputIndex, outputLeaf := range tokenTransaction.OutputLeaves {
+	for outputIndex, output := range tokenTransaction.OutputLeaves {
 		revocationUUID, err := uuid.Parse(outputRevocationKeyshareIDs[outputIndex])
 		if err != nil {
 			return nil, err
 		}
-		outputUUID, err := uuid.Parse(*outputLeaf.Id)
+		outputUUID, err := uuid.Parse(*output.Id)
 		if err != nil {
 			return nil, err
 		}
@@ -118,12 +118,12 @@ func CreateStartedTransactionEntities(
 				// TODO: Consider whether the coordinator instead of the wallet should define this ID.
 				SetID(outputUUID).
 				SetStatus(schema.TokenOutputStatusCreatedStarted).
-				SetOwnerPublicKey(outputLeaf.OwnerPublicKey).
-				SetWithdrawBondSats(*outputLeaf.WithdrawBondSats).
-				SetWithdrawRelativeBlockLocktime(*outputLeaf.WithdrawRelativeBlockLocktime).
-				SetWithdrawRevocationCommitment(outputLeaf.RevocationPublicKey).
-				SetTokenPublicKey(outputLeaf.TokenPublicKey).
-				SetTokenAmount(outputLeaf.TokenAmount).
+				SetOwnerPublicKey(output.OwnerPublicKey).
+				SetWithdrawBondSats(*output.WithdrawBondSats).
+				SetWithdrawRelativeBlockLocktime(*output.WithdrawRelativeBlockLocktime).
+				SetWithdrawRevocationCommitment(output.RevocationPublicKey).
+				SetTokenPublicKey(output.TokenPublicKey).
+				SetTokenAmount(output.TokenAmount).
 				SetCreatedTransactionOutputVout(int32(outputIndex)).
 				SetRevocationKeyshareID(revocationUUID).
 				SetOutputCreatedTokenTransactionID(tokenTransactionEnt.ID),
@@ -131,13 +131,13 @@ func CreateStartedTransactionEntities(
 	}
 	_, err = db.TokenOutput.CreateBulk(outputEnts...).Save(ctx)
 	if err != nil {
-		log.Printf("Failed to create token leaves: %v", err)
+		log.Printf("Failed to create token outputs: %v", err)
 		return nil, err
 	}
 	return tokenTransactionEnt, nil
 }
 
-// UpdateSignedTransaction updates the status and ownership signatures of the input + output leaves
+// UpdateSignedTransaction updates the status and ownership signatures of the inputs + outputs
 // and the issuer signature (if applicable).
 func UpdateSignedTransaction(
 	ctx context.Context,
@@ -145,13 +145,13 @@ func UpdateSignedTransaction(
 	operatorSpecificOwnershipSignatures [][]byte,
 	operatorSignature []byte,
 ) error {
-	// Update the token transaction receipt with the operator signature and new status
+	// Update the token transaction with the operator signature and new status
 	_, err := GetDbFromContext(ctx).TokenTransaction.UpdateOne(tokenTransactionEnt).
 		SetOperatorSignature(operatorSignature).
 		SetStatus(schema.TokenTransactionStatusSigned).
 		Save(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to update token transaction receipt with operator signature and status: %w", err)
+		return fmt.Errorf("failed to update token transaction with operator signature and status: %w", err)
 	}
 
 	newInputStatus := schema.TokenOutputStatusSpentSigned
@@ -176,18 +176,18 @@ func UpdateSignedTransaction(
 		}
 	}
 
-	// Update input leaves.
+	// Update inputs.
 	if tokenTransactionEnt.Edges.SpentOutput != nil {
 		for _, outputToSpendEnt := range tokenTransactionEnt.Edges.SpentOutput {
 			spentLeaves := tokenTransactionEnt.Edges.SpentOutput
 			if len(spentLeaves) == 0 {
-				return fmt.Errorf("no spent leaves found for transaction. cannot finalize")
+				return fmt.Errorf("no spent outputs found for transaction. cannot finalize")
 			}
 
-			// Validate that we have the right number of revocation keys
+			// Validate that we have the right number of revocation keys.
 			if len(operatorSpecificOwnershipSignatures) != len(spentLeaves) {
 				return fmt.Errorf(
-					"number of operator specific ownership signatures (%d) does not match number of spent leaves (%d)",
+					"number of operator specific ownership signatures (%d) does not match number of spent outputs (%d)",
 					len(operatorSpecificOwnershipSignatures),
 					len(spentLeaves),
 				)
@@ -204,7 +204,7 @@ func UpdateSignedTransaction(
 		}
 	}
 
-	// Update output leaves.
+	// Update outputs.
 	outputIDs := make([]uuid.UUID, len(tokenTransactionEnt.Edges.CreatedOutput))
 	for i, output := range tokenTransactionEnt.Edges.CreatedOutput {
 		outputIDs[i] = output.ID
@@ -221,32 +221,32 @@ func UpdateSignedTransaction(
 	return nil
 }
 
-// UpdateFinalizedTransaction updates the status and ownership signatures of the finalized input + output leaves.
+// UpdateFinalizedTransaction updates the status and ownership signatures of the finalized input + output outputs.
 func UpdateFinalizedTransaction(
 	ctx context.Context,
 	tokenTransactionEnt *TokenTransaction,
 	revocationKeys [][]byte,
 ) error {
-	// Update the token transaction receipt with the operator signature and new status
+	// Update the token transaction with the operator signature and new status
 	_, err := GetDbFromContext(ctx).TokenTransaction.UpdateOne(tokenTransactionEnt).
 		SetStatus(schema.TokenTransactionStatusFinalized).
 		Save(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to update token transaction receipt with finalized status: %w", err)
+		return fmt.Errorf("failed to update token transaction with finalized status: %w", err)
 	}
 
 	spentLeaves := tokenTransactionEnt.Edges.SpentOutput
 	if len(spentLeaves) == 0 {
-		return fmt.Errorf("no spent leaves found for transaction. cannot finalize")
+		return fmt.Errorf("no spent outputs found for transaction. cannot finalize")
 	}
 	if len(revocationKeys) != len(spentLeaves) {
 		return fmt.Errorf(
-			"number of revocation keys (%d) does not match number of spent leaves (%d)",
+			"number of revocation keys (%d) does not match number of spent outputs (%d)",
 			len(revocationKeys),
 			len(spentLeaves),
 		)
 	}
-	// Update input leaves.
+	// Update inputs.
 	for _, outputToSpendEnt := range tokenTransactionEnt.Edges.SpentOutput {
 		inputIndex := outputToSpendEnt.SpentTransactionInputVout
 		_, err := GetDbFromContext(ctx).TokenOutput.UpdateOne(outputToSpendEnt).
@@ -258,7 +258,7 @@ func UpdateFinalizedTransaction(
 		}
 	}
 
-	// Update output leaves.
+	// Update outputs.
 	outputIDs := make([]uuid.UUID, len(tokenTransactionEnt.Edges.CreatedOutput))
 	for i, output := range tokenTransactionEnt.Edges.CreatedOutput {
 		outputIDs[i] = output.ID
@@ -274,20 +274,20 @@ func UpdateFinalizedTransaction(
 	return nil
 }
 
-// UpdateCancelledTransaction updates the status and ownership signatures input + output leaves in response to a cancelled transaction.
+// UpdateCancelledTransaction updates the status and ownership signatures in the inputs + outputs in response to a cancelled transaction.
 func UpdateCancelledTransaction(
 	ctx context.Context,
 	tokenTransactionEnt *TokenTransaction,
 ) error {
-	// Update the token transaction receipt with the operator signature and new status
+	// Update the token transaction with the operator signature and new status.
 	_, err := GetDbFromContext(ctx).TokenTransaction.UpdateOne(tokenTransactionEnt).
 		SetStatus(schema.TokenTransactionStatus(schema.TokenTransactionStatusSignedCancelled)).
 		Save(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to update token transaction receipt with finalized status: %w", err)
+		return fmt.Errorf("failed to update token transaction with finalized status: %w", err)
 	}
 
-	// Change input output statuses back to CREATED_FINALIZED to re-enable spending.
+	// Change input statuses back to CREATED_FINALIZED to re-enable spending.
 	spentLeaves := tokenTransactionEnt.Edges.SpentOutput
 	for _, outputToSpendEnt := range spentLeaves {
 		if outputToSpendEnt.Status != schema.TokenOutputStatusSpentSigned {
@@ -308,7 +308,7 @@ func UpdateCancelledTransaction(
 	outputIDs := make([]uuid.UUID, len(tokenTransactionEnt.Edges.CreatedOutput))
 	for i, output := range tokenTransactionEnt.Edges.CreatedOutput {
 		outputIDs[i] = output.ID
-		// Verify output is in the expected state
+		// Verify output is in the expected state.
 		if output.Status != schema.TokenOutputStatusCreatedSigned {
 			return fmt.Errorf("created output ID %s has status %s, expected %s",
 				output.ID.String(),
@@ -327,7 +327,7 @@ func UpdateCancelledTransaction(
 	return nil
 }
 
-// FetchTokenTransactionData refetches the receipt with all its relations.
+// FetchTokenTransactionData refetches the transaction with all its relations.
 func FetchAndLockTokenTransactionData(ctx context.Context, finalTokenTransaction *pb.TokenTransaction) (*TokenTransaction, error) {
 	finalTokenTransactionHash, err := utils.HashTokenTransaction(finalTokenTransaction, false)
 	if err != nil {
@@ -353,7 +353,7 @@ func FetchAndLockTokenTransactionData(ctx context.Context, finalTokenTransaction
 	} else { // Transfer
 		if len(finalTokenTransaction.GetTransferInput().LeavesToSpend) != len(tokenTransction.Edges.SpentOutput) {
 			return nil, fmt.Errorf(
-				"number of input leaves in transaction (%d) does not match number of spent leaves in receipt (%d)",
+				"number of inputs in transaction (%d) does not match number of spent outputs in transaction (%d)",
 				len(finalTokenTransaction.GetTransferInput().LeavesToSpend),
 				len(tokenTransction.Edges.SpentOutput),
 			)
@@ -361,7 +361,7 @@ func FetchAndLockTokenTransactionData(ctx context.Context, finalTokenTransaction
 	}
 	if len(finalTokenTransaction.OutputLeaves) != len(tokenTransction.Edges.CreatedOutput) {
 		return nil, fmt.Errorf(
-			"number of output leaves in transaction (%d) does not match number of created leaves in receipt (%d)",
+			"number of outputs in transaction (%d) does not match number of created outputs in transaction (%d)",
 			len(finalTokenTransaction.OutputLeaves),
 			len(tokenTransction.Edges.CreatedOutput),
 		)
@@ -370,7 +370,7 @@ func FetchAndLockTokenTransactionData(ctx context.Context, finalTokenTransaction
 }
 
 // MarshalProto converts a TokenTransaction to a spark protobuf TokenTransaction.
-// This assumes the receipt already has all its relationships loaded.
+// This assumes the transaction already has all its relationships loaded.
 func (r *TokenTransaction) MarshalProto(config *so.Config) (*pb.TokenTransaction, error) {
 	// TODO: When adding support for adding/removing, we will need to save this per transaction rather than
 	// pulling from the config.
@@ -386,7 +386,7 @@ func (r *TokenTransaction) MarshalProto(config *so.Config) (*pb.TokenTransaction
 		SparkOperatorIdentityPublicKeys: operatorPublicKeys,
 	}
 
-	// Set up output leaves
+	// Set up output outputs
 	for i, output := range r.Edges.CreatedOutput {
 		idStr := output.ID.String()
 		tokenTransaction.OutputLeaves[i] = &pb.TokenLeafOutput{
@@ -400,9 +400,9 @@ func (r *TokenTransaction) MarshalProto(config *so.Config) (*pb.TokenTransaction
 		}
 	}
 
-	// Determine if this is a mint or transfer transaction
+	// Determine if this is a mint or transfer transaction.
 	if r.Edges.Mint != nil {
-		// This is a mint transaction
+		// This is a mint transaction.
 		tokenTransaction.TokenInput = &pb.TokenTransaction_MintInput{
 			MintInput: &pb.MintInput{
 				IssuerPublicKey:         r.Edges.Mint.IssuerPublicKey,
@@ -416,9 +416,9 @@ func (r *TokenTransaction) MarshalProto(config *so.Config) (*pb.TokenTransaction
 		}
 
 		for i, output := range r.Edges.SpentOutput {
-			// Since we assume all relationships are loaded, we can directly access the created transaction receipt
+			// Since we assume all relationships are loaded, we can directly access the created transaction.
 			if output.Edges.OutputCreatedTokenTransaction == nil {
-				return nil, fmt.Errorf("output created transaction receipt edge not loaded for output %s", output.ID)
+				return nil, fmt.Errorf("output created transaction edge not loaded for output %s", output.ID)
 			}
 
 			transferInput.LeavesToSpend[i] = &pb.TokenLeafToSpend{
