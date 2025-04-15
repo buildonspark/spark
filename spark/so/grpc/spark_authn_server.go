@@ -14,6 +14,7 @@ import (
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 	pb "github.com/lightsparkdev/spark-go/proto/spark_authn"
 	"github.com/lightsparkdev/spark-go/so/authninternal"
+	"github.com/patrickmn/go-cache"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -21,7 +22,42 @@ const (
 	currentChallengeVersion  = 1
 	currentProtectionVersion = 1
 	challengeSecretConstant  = "AUTH_CHALLENGE_SECRET_v1"
+	clockSkewSeconds         = 1
 )
+
+// challengeNonceCache tracks used nonces to prevent reuse
+type challengeNonceCache struct {
+	cache *cache.Cache
+}
+
+func newChallengeNonceCache(challengeTimeout time.Duration) *challengeNonceCache {
+	cleanupInterval := challengeTimeout / 10
+	if cleanupInterval < 10*time.Second {
+		cleanupInterval = 10 * time.Second
+	}
+	return &challengeNonceCache{
+		cache: cache.New(challengeTimeout, cleanupInterval),
+	}
+}
+
+// markNonceUsed marks a nonce as used. Returns ErrChallengeReused if the nonce was already used.
+func (cnc *challengeNonceCache) markNonceUsed(nonce []byte) error {
+	// Add is atomic - returns nil only if the key didn't exist and was added
+	err := cnc.cache.Add(string(nonce), true, cache.DefaultExpiration)
+	if err != nil {
+		return ErrChallengeReused
+	}
+	return nil
+}
+
+// generateNonce generates a new nonce for use in a challenge
+func (cnc *challengeNonceCache) generateNonce() ([]byte, error) {
+	nonce := make([]byte, 32)
+	if _, err := rand.Read(nonce); err != nil {
+		return nil, fmt.Errorf("failed to generate secure nonce: %v", err)
+	}
+	return nonce, nil
+}
 
 // AuthnServerConfig contains the configuration for the AuthenticationServer
 type AuthnServerConfig struct {
@@ -42,6 +78,7 @@ type AuthnServer struct {
 	challengeHmacKey            []byte
 	sessionTokenCreatorVerifier *authninternal.SessionTokenCreatorVerifier
 	clock                       authninternal.Clock
+	nonceCache                  *challengeNonceCache
 }
 
 var (
@@ -51,6 +88,8 @@ var (
 	ErrUnsupportedChallengeProtectionVersion = errors.New("unsupported challenge protection version")
 	// ErrChallengeExpired is returned when the challenge has expired.
 	ErrChallengeExpired = errors.New("challenge expired")
+	// ErrChallengeReused is returned when the challenge has been reused.
+	ErrChallengeReused = errors.New("challenge has already been used")
 	// ErrPublicKeyMismatch is returned when the public key does not match the challenge.
 	ErrPublicKeyMismatch = errors.New("public key does not match challenge")
 	// ErrInvalidChallengeHmac is returned when the challenge hmac is invalid.
@@ -59,14 +98,8 @@ var (
 	ErrInvalidPublicKeyFormat = errors.New("invalid public key format")
 	// ErrInvalidSignature is returned when the client signature is invalid.
 	ErrInvalidSignature = errors.New("invalid client signature")
-	// ErrInvalidRequest is returned when the request is malformed or missing required fields.
-	ErrInvalidRequest = errors.New("invalid request")
-	// ErrInvalidInput is returned when function input parameters are invalid.
-	ErrInvalidInput = errors.New("invalid input")
 	// ErrInternalError is returned when an unexpected internal error occurs.
 	ErrInternalError = errors.New("internal error")
-	// ErrMalformedSignature is returned when the signature format is invalid.
-	ErrMalformedSignature = errors.New("malformed signature")
 )
 
 // NewAuthnServer creates a new AuthnServer.
@@ -80,7 +113,11 @@ func NewAuthnServer(
 	}
 
 	if len(config.IdentityPrivateKey) == 0 {
-		return nil, errors.New("identity private key is required")
+		return nil, fmt.Errorf("%w: identity private key is required", ErrInternalError)
+	}
+
+	if config.ChallengeTimeout < time.Second {
+		return nil, fmt.Errorf("%w: challenge timeout must be at least one second", ErrInternalError)
 	}
 
 	// Derive challenge HMAC key from identity key and constant
@@ -94,6 +131,7 @@ func NewAuthnServer(
 		challengeHmacKey:            challengeHmacKey,
 		sessionTokenCreatorVerifier: sessionTokenCreatorVerifier,
 		clock:                       config.Clock,
+		nonceCache:                  newChallengeNonceCache(config.ChallengeTimeout),
 	}, nil
 }
 
@@ -108,12 +146,12 @@ func (s *AuthnServer) GetChallenge(_ context.Context, req *pb.GetChallengeReques
 		return nil, fmt.Errorf("%w: public key cannot be empty", ErrInvalidPublicKeyFormat)
 	}
 
-	nonce := make([]byte, 32)
-	if _, err := rand.Read(nonce); err != nil {
-		return nil, fmt.Errorf("internal error: failed to generate secure nonce: %v", err)
+	nonce, err := s.nonceCache.generateNonce()
+	if err != nil {
+		return nil, fmt.Errorf("internal error: failed to generate nonce: %v", err)
 	}
 
-	_, err := secp256k1.ParsePubKey(req.PublicKey)
+	_, err = secp256k1.ParsePubKey(req.PublicKey)
 	if err != nil {
 		return nil, fmt.Errorf("%w: invalid secp256k1 public key format: %v", ErrInvalidPublicKeyFormat, err)
 	}
@@ -219,7 +257,7 @@ func (s *AuthnServer) validateChallenge(challenge *pb.Challenge, req *pb.VerifyC
 			currentProtectionVersion)
 	}
 
-	challengeAge := s.clock.Now().Unix() - challenge.Timestamp
+	challengeAge := s.clock.Now().Unix() + clockSkewSeconds - challenge.Timestamp
 	if challengeAge > int64(s.config.ChallengeTimeout.Seconds()) {
 		return fmt.Errorf("%w: challenge expired %d seconds ago",
 			ErrChallengeExpired,
@@ -229,6 +267,10 @@ func (s *AuthnServer) validateChallenge(challenge *pb.Challenge, req *pb.VerifyC
 	if !bytes.Equal(req.PublicKey, challenge.PublicKey) {
 		return fmt.Errorf("%w: request public key does not match challenge public key",
 			ErrPublicKeyMismatch)
+	}
+
+	if err := s.nonceCache.markNonceUsed(challenge.Nonce); err != nil {
+		return fmt.Errorf("failed to mark nonce as used: %w", err)
 	}
 
 	return nil

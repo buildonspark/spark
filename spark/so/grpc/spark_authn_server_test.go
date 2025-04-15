@@ -44,7 +44,6 @@ func newTestServerAndTokenVerifier(
 		clock: authninternal.RealClock{},
 	}
 
-	// Apply options
 	for _, opt := range opts {
 		opt(cfg)
 	}
@@ -263,7 +262,66 @@ func TestSparkAuthnServer_VerifyChallenge_TamperedToken(t *testing.T) {
 	}
 }
 
-// Test helpers
+func TestSparkAuthnServer_VerifyChallenge_ReusedChallenge(t *testing.T) {
+	clock := authninternal.NewTestClock(time.Now())
+	server, _ := newTestServerAndTokenVerifier(t, withClock(clock))
+	privKey, pubKey := createTestKeyPair()
+
+	challengeResp, signature := createSignedChallenge(t, server, privKey)
+
+	verifyResp := verifyChallenge(t, server, challengeResp, pubKey, signature)
+	assert.NotNil(t, verifyResp)
+	assert.NotEmpty(t, verifyResp.SessionToken)
+
+	_, err := server.VerifyChallenge(context.Background(), &pb.VerifyChallengeRequest{
+		ProtectedChallenge: challengeResp.ProtectedChallenge,
+		PublicKey:          pubKey.SerializeCompressed(),
+		Signature:          signature,
+	})
+	assert.ErrorIs(t, err, ErrChallengeReused)
+}
+
+func TestSparkAuthnServer_VerifyChallenge_CacheExpiration(t *testing.T) {
+	// Use a very short challenge timeout for testing cache expiration
+	shortTimeout := 1 * time.Second
+	config := AuthnServerConfig{
+		IdentityPrivateKey: testIdentityKeyBytes,
+		ChallengeTimeout:   shortTimeout,
+		SessionDuration:    testSessionDuration,
+		Clock:              authninternal.RealClock{},
+	}
+
+	tokenVerifier, err := authninternal.NewSessionTokenCreatorVerifier(testIdentityKeyBytes, authninternal.RealClock{})
+	require.NoError(t, err)
+
+	server, err := NewAuthnServer(config, tokenVerifier)
+	require.NoError(t, err)
+
+	privKey, pubKey := createTestKeyPair()
+	challengeResp, signature := createSignedChallenge(t, server, privKey)
+
+	verifyResp := verifyChallenge(t, server, challengeResp, pubKey, signature)
+	assert.NotNil(t, verifyResp)
+	assert.NotEmpty(t, verifyResp.SessionToken)
+
+	_, err = server.VerifyChallenge(context.Background(), &pb.VerifyChallengeRequest{
+		ProtectedChallenge: challengeResp.ProtectedChallenge,
+		PublicKey:          pubKey.SerializeCompressed(),
+		Signature:          signature,
+	})
+	assert.ErrorIs(t, err, ErrChallengeReused)
+
+	// Wait for cache to expire
+	time.Sleep(shortTimeout + 50*time.Millisecond)
+
+	_, err = server.VerifyChallenge(context.Background(), &pb.VerifyChallengeRequest{
+		ProtectedChallenge: challengeResp.ProtectedChallenge,
+		PublicKey:          pubKey.SerializeCompressed(),
+		Signature:          signature,
+	})
+	assert.ErrorIs(t, err, ErrChallengeExpired)
+}
+
 func createTestKeyPair() (*secp256k1.PrivateKey, *secp256k1.PublicKey) {
 	privKey, _ := secp256k1.GeneratePrivateKey()
 	return privKey, privKey.PubKey()
@@ -315,7 +373,6 @@ func assertNoSessionInContext(ctx context.Context, t *testing.T) {
 	assert.Error(t, err)
 }
 
-// Helper to create a test token verifier
 func newTestTokenVerifier(t *testing.T) *authninternal.SessionTokenCreatorVerifier {
 	tokenVerifier, err := authninternal.NewSessionTokenCreatorVerifier(testIdentityKeyBytes, authninternal.RealClock{})
 	require.NoError(t, err)
@@ -378,4 +435,21 @@ func TestSparkAuthnServer_VerifyChallenge_InvalidAuth(t *testing.T) {
 			assertNoSessionInContext(tt.ctx, t)
 		})
 	}
+}
+
+func TestNewAuthnServer_InvalidChallengeTimeoutFails(t *testing.T) {
+	tokenVerifier, err := authninternal.NewSessionTokenCreatorVerifier(testIdentityKeyBytes, authninternal.RealClock{})
+	require.NoError(t, err)
+
+	config := AuthnServerConfig{
+		IdentityPrivateKey: testIdentityKeyBytes,
+		ChallengeTimeout:   500 * time.Millisecond, // Less than one second
+		SessionDuration:    testSessionDuration,
+		Clock:              authninternal.RealClock{},
+	}
+
+	server, err := NewAuthnServer(config, tokenVerifier)
+	assert.ErrorIs(t, err, ErrInternalError)
+	assert.Contains(t, err.Error(), "challenge timeout must be at least one second")
+	assert.Nil(t, server)
 }
