@@ -1,0 +1,6 @@
+version: 3
+
+project:
+  id: lightspark/spark
+  name: spark
+  url: https://github.com/lightsparkdev/spark
