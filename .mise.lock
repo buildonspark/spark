@@ -6,11 +6,8 @@ backend = "aqua:ariga/atlas"
 "atlas-darwin-arm64-v0.32.0" = "sha256:a8fb30231d80e2962b121dcbb073fff063a2104b11bb6c1d0f67477db3b728c8"
 
 [tools.go]
-version = "1.23.0"
+version = "1.23.2"
 backend = "core:go"
-
-[tools.go.checksums]
-"go1.23.0.darwin-arm64.tar.gz" = "sha256:b770812aef17d7b2ea406588e2b97689e9557aac7e646fe76218b216e2c51406"
 
 [tools.golangci-lint]
 version = "2.0.2"
@@ -34,11 +31,11 @@ backend = "core:node"
 "node-v20.19.0-darwin-arm64.tar.gz" = "sha256:c016cd1975a264a29dc1b07c6fbe60d5df0a0c2beb4113c0450e3d998d1a0d9c"
 
 [tools.protoc]
-version = "25.6"
+version = "29.3"
 backend = "aqua:protocolbuffers/protobuf/protoc"
 
 [tools.protoc.checksums]
-"protoc-25.6-osx-aarch_64.zip" = "sha256:51a00a881f3ddba4d0be4e84c3f3c8adb9956354031fde6e164878c7d26f2fe8"
+"protoc-29.3-osx-aarch_64.zip" = "sha256:2b8a3403cd097f95f3ba656e14b76c732b6b26d7f183330b11e36ef2bc028765"
 
 [tools.protoc-gen-go]
 version = "1.36.4"
@@ -48,11 +45,8 @@ backend = "aqua:protocolbuffers/protobuf-go/protoc-gen-go"
 "protoc-gen-go.v1.36.4.darwin.arm64.tar.gz" = "sha256:c795ca96cd21ee2776d2d9af503fc06d07804e9ff4781332b31895086266bc27"
 
 [tools.protoc-gen-go-grpc]
-version = "v1.5.1"
+version = "1.5.1"
 backend = "aqua:grpc/grpc-go/protoc-gen-go-grpc"
-
-[tools.protoc-gen-go-grpc.checksums]
-"protoc-gen-go-grpc.v1.5.1.darwin.arm64.tar.gz" = "sha256:d6083feb51dcfe59f26793e99ef01ef5eac68b64294ec2546711f614ac5878f3"
 
 [tools.protoc-gen-validate]
 version = "1.2.1"
