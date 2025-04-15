@@ -36,6 +36,15 @@ import { decodeSparkAddress } from "@buildonspark/spark-sdk/address";
 
 const BURN_ADDRESS = "02".repeat(33);
 
+export type IssuerTokenInfo = {
+  tokenPublicKey: string;
+  tokenName: string;
+  tokenSymbol: string;
+  tokenDecimals: number;
+  maxSupply: bigint;
+  isFreezable: boolean;
+}
+
 export class IssuerSparkWallet
   extends SparkWallet
 {
@@ -81,18 +90,22 @@ export class IssuerSparkWallet
     };
   }
 
-  public async getIssuerTokenInfo(): Promise<TokenPubKeyInfoResponse | null> {
-    if (this.tokenPublicKeyInfo) {
-      return convertToTokenPubKeyInfoResponse(this.tokenPublicKeyInfo);
+  public async getIssuerTokenInfo(): Promise<IssuerTokenInfo | null> {
+    const lrc20Client = await this.lrc20ConnectionManager.createLrc20Client();
+
+    const tokenInfo = await lrc20Client.getTokenPubkeyInfo({
+      publicKeys: [hexToBytes(await super.getIdentityPublicKey())],
+    });
+
+    const info = tokenInfo.tokenPubkeyInfos[0];
+    return {
+      tokenPublicKey: bytesToHex(info.announcement!.publicKey!.publicKey),
+      tokenName: info.announcement!.name,
+      tokenSymbol: info.announcement!.symbol,
+      tokenDecimals: Number(bytesToNumberBE(info.announcement!.decimal)),
+      isFreezable: info.announcement!.isFreezable,
+      maxSupply: bytesToNumberBE(info.totalSupply),
     }
-    const tokenPublicKey = bytesToHex(this.lrc20Wallet!.pubkey);
-    const rawTokenPubkeyInfo =
-      await this.lrc20Wallet!.getTokenPubkeyInfo(tokenPublicKey);
-    this.tokenPublicKeyInfo = rawTokenPubkeyInfo;
-    if (!rawTokenPubkeyInfo) {
-      return null;
-    }
-    return convertToTokenPubKeyInfoResponse(rawTokenPubkeyInfo);
   }
 
   public async getIssuerTokenPublicKey() {

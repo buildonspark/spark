@@ -74,14 +74,14 @@ describe("token integration test", () => {
 
     // Assert token public key info values
     const identityPublicKey = await wallet.getIdentityPublicKey();
-    expect(publicKeyInfo?.announcement?.name).toEqual("TestToken1");
-    expect(publicKeyInfo?.announcement?.symbol).toEqual("TT1");
-    expect(publicKeyInfo?.announcement?.decimal).toEqual(0);
-    expect(publicKeyInfo?.announcement?.maxSupply).toEqual(0);
-    expect(publicKeyInfo?.announcement?.isFreezable).toEqual(false);
+    expect(publicKeyInfo?.tokenName).toEqual("TestToken1");
+    expect(publicKeyInfo?.tokenSymbol).toEqual("TT1");
+    expect(publicKeyInfo?.tokenDecimals).toEqual(0);
+    expect(publicKeyInfo?.maxSupply).toEqual(0);
+    expect(publicKeyInfo?.isFreezable).toEqual(false);
 
     // Compare the public key using bytesToHex
-    const pubKeyHex = publicKeyInfo?.announcement?.tokenPubkey.pubkey;
+    const pubKeyHex = publicKeyInfo?.tokenPublicKey;
     expect(pubKeyHex).toEqual(identityPublicKey);
 
     await wallet.mintTokens(tokenAmount);
@@ -93,7 +93,7 @@ describe("token integration test", () => {
     expect(tokenInfo[0].tokenName).toEqual("TestToken1");
     expect(tokenInfo[0].tokenSymbol).toEqual("TT1");
     expect(tokenInfo[0].tokenDecimals).toEqual(0);
-    expect(tokenInfo[0].tokenSupply).toEqual(tokenAmount);
+    expect(tokenInfo[0].maxSupply).toEqual(tokenAmount);
   });
 
   it("should announce, issue, and withdraw a single token", async () => {

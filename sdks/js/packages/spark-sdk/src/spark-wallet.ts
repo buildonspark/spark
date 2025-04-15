@@ -119,7 +119,7 @@ export type TokenInfo = {
   tokenName: string;
   tokenSymbol: string;
   tokenDecimals: number;
-  tokenSupply: bigint;
+  maxSupply: bigint;
 };
 
 export type InitWalletResponse = {
@@ -716,7 +716,7 @@ export class SparkWallet {
       tokenName: info.announcement!.name,
       tokenSymbol: info.announcement!.symbol,
       tokenDecimals: Number(bytesToNumberBE(info.announcement!.decimal)),
-      tokenSupply: bytesToNumberBE(info.totalSupply),
+      maxSupply: bytesToNumberBE(info.totalSupply),
     }));
   }
 
