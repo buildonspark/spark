@@ -953,30 +953,6 @@ export const createSparkRouter = (
    *   }
    * }>}
    */
-  router.post(
-    "/tokens/on-chain/withdraw",
-    checkWalletInitialized,
-    async (req, res) => {
-      const wallet = getWallet();
-      try {
-        const { tokenPublicKey, tokenAmount } = req.body as {
-          tokenPublicKey: string;
-          tokenAmount: number;
-        };
-        const withdrawalTx = await wallet!.withdrawTokens(
-          tokenPublicKey,
-          BigInt(tokenAmount)
-        );
-        res.json({
-          data: { withdrawalTx },
-        });
-      } catch (error) {
-        console.error(error);
-        const errorMsg = isError(error) ? error.message : "Unknown error";
-        res.status(500).json({ error: errorMsg });
-      }
-    }
-  );
   return { router, getWallet, checkWalletInitialized };
 };
 

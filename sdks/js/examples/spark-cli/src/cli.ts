@@ -238,23 +238,6 @@ async function runCLI() {
         });
         console.log(withdrawal);
         break;
-      case "tokenwithdraw": {
-        if (!wallet) {
-          console.log("Please initialize a wallet first");
-          break;
-        }
-        const tokenPublicKey = args[0];
-        const amount = BigInt(parseInt(args[1]));
-
-        let withdrawResult = await wallet.withdrawTokens(
-          tokenPublicKey,
-          amount
-        );
-        if (withdrawResult) {
-          console.log("Withdrawal L1 Transaction ID:", withdrawResult.txid);
-        }
-        break;
-      }
       case "coopfee": {
         if (!wallet) {
           console.log("Please initialize a wallet first");
