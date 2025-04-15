@@ -22,6 +22,8 @@ import (
 	"github.com/lightsparkdev/spark-go/so/ent/tokenfreeze"
 	"github.com/lightsparkdev/spark-go/so/ent/tokenleaf"
 	"github.com/lightsparkdev/spark-go/so/ent/tokenmint"
+	"github.com/lightsparkdev/spark-go/so/ent/tokenoutput"
+	"github.com/lightsparkdev/spark-go/so/ent/tokentransaction"
 	"github.com/lightsparkdev/spark-go/so/ent/tokentransactionreceipt"
 	"github.com/lightsparkdev/spark-go/so/ent/transfer"
 	"github.com/lightsparkdev/spark-go/so/ent/transferleaf"
@@ -98,6 +100,8 @@ func checkColumn(table, column string) error {
 			tokenfreeze.Table:             tokenfreeze.ValidColumn,
 			tokenleaf.Table:               tokenleaf.ValidColumn,
 			tokenmint.Table:               tokenmint.ValidColumn,
+			tokenoutput.Table:             tokenoutput.ValidColumn,
+			tokentransaction.Table:        tokentransaction.ValidColumn,
 			tokentransactionreceipt.Table: tokentransactionreceipt.ValidColumn,
 			transfer.Table:                transfer.ValidColumn,
 			transferleaf.Table:            transferleaf.ValidColumn,

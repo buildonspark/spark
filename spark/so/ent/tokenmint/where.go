@@ -359,6 +359,29 @@ func HasTokenTransactionReceiptWith(preds ...predicate.TokenTransactionReceipt) 
 	})
 }
 
+// HasTokenTransaction applies the HasEdge predicate on the "token_transaction" edge.
+func HasTokenTransaction() predicate.TokenMint {
+	return predicate.TokenMint(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, true, TokenTransactionTable, TokenTransactionColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasTokenTransactionWith applies the HasEdge predicate on the "token_transaction" edge with a given conditions (other predicates).
+func HasTokenTransactionWith(preds ...predicate.TokenTransaction) predicate.TokenMint {
+	return predicate.TokenMint(func(s *sql.Selector) {
+		step := newTokenTransactionStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
 // And groups predicates with the AND operator between them.
 func And(predicates ...predicate.TokenMint) predicate.TokenMint {
 	return predicate.TokenMint(sql.AndPredicates(predicates...))

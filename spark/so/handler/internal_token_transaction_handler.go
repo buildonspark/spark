@@ -80,7 +80,7 @@ func (h *InternalTokenTransactionHandler) StartTokenTransactionInternal(ctx cont
 			return nil, fmt.Errorf("invalid token transaction: %w", err)
 		}
 	}
-	var leafToSpendEnts []*ent.TokenLeaf
+	var leafToSpendEnts []*ent.TokenOutput
 	if req.FinalTokenTransaction.GetTransferInput() != nil {
 		// Get the leaves to spend from the database.
 		leafToSpendEnts, err = ent.FetchInputLeaves(ctx, req.FinalTokenTransaction.GetTransferInput().GetLeavesToSpend())
@@ -139,7 +139,7 @@ func ValidateMintSignature(
 func ValidateTokenTransactionUsingPreviousTransactionData(
 	tokenTransaction *pb.TokenTransaction,
 	tokenTransactionSignatures *pb.TokenTransactionSignatures,
-	leafToSpendEnts []*ent.TokenLeaf,
+	leafToSpendEnts []*ent.TokenOutput,
 ) error {
 	// Validate that the correct number of signatures were provided
 	if len(tokenTransactionSignatures.GetOwnerSignatures()) != len(leafToSpendEnts) {
@@ -216,7 +216,7 @@ func ValidateTokenTransactionUsingPreviousTransactionData(
 // validateLeafIsSpendable checks if a leaf is eligible to be spent by verifying:
 // 1. The leaf has an appropriate status (Created+Finalized or already marked as SpentStarted)
 // 2. The leaf hasn't been withdrawn already
-func validateLeafIsSpendable(index int, leaf *ent.TokenLeaf) error {
+func validateLeafIsSpendable(index int, leaf *ent.TokenOutput) error {
 	if !isValidLeafStatus(leaf.Status) {
 		return fmt.Errorf("leaf %d cannot be spent: invalid status %s (must be CreatedFinalized or SpentStarted)",
 			index, leaf.Status)
@@ -230,9 +230,9 @@ func validateLeafIsSpendable(index int, leaf *ent.TokenLeaf) error {
 }
 
 // isValidLeafStatus checks if a leaf's status allows it to be spent.
-func isValidLeafStatus(status schema.TokenLeafStatus) bool {
-	return status == schema.TokenLeafStatusCreatedFinalized ||
-		status == schema.TokenLeafStatusSpentStarted
+func isValidLeafStatus(status schema.TokenOutputStatus) bool {
+	return status == schema.TokenOutputStatusCreatedFinalized ||
+		status == schema.TokenOutputStatusSpentStarted
 }
 
 func validateFinalTokenTransaction(

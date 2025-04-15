@@ -29,6 +29,8 @@ const (
 	FieldOperatorSpecificIssuerSignature = "operator_specific_issuer_signature"
 	// EdgeTokenTransactionReceipt holds the string denoting the token_transaction_receipt edge name in mutations.
 	EdgeTokenTransactionReceipt = "token_transaction_receipt"
+	// EdgeTokenTransaction holds the string denoting the token_transaction edge name in mutations.
+	EdgeTokenTransaction = "token_transaction"
 	// Table holds the table name of the tokenmint in the database.
 	Table = "token_mints"
 	// TokenTransactionReceiptTable is the table that holds the token_transaction_receipt relation/edge.
@@ -38,6 +40,13 @@ const (
 	TokenTransactionReceiptInverseTable = "token_transaction_receipts"
 	// TokenTransactionReceiptColumn is the table column denoting the token_transaction_receipt relation/edge.
 	TokenTransactionReceiptColumn = "token_transaction_receipt_mint"
+	// TokenTransactionTable is the table that holds the token_transaction relation/edge.
+	TokenTransactionTable = "token_transactions"
+	// TokenTransactionInverseTable is the table name for the TokenTransaction entity.
+	// It exists in this package in order to avoid circular dependency with the "tokentransaction" package.
+	TokenTransactionInverseTable = "token_transactions"
+	// TokenTransactionColumn is the table column denoting the token_transaction relation/edge.
+	TokenTransactionColumn = "token_transaction_mint"
 )
 
 // Columns holds all SQL columns for tokenmint fields.
@@ -112,10 +121,31 @@ func ByTokenTransactionReceipt(term sql.OrderTerm, terms ...sql.OrderTerm) Order
 		sqlgraph.OrderByNeighborTerms(s, newTokenTransactionReceiptStep(), append([]sql.OrderTerm{term}, terms...)...)
 	}
 }
+
+// ByTokenTransactionCount orders the results by token_transaction count.
+func ByTokenTransactionCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newTokenTransactionStep(), opts...)
+	}
+}
+
+// ByTokenTransaction orders the results by token_transaction terms.
+func ByTokenTransaction(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newTokenTransactionStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
 func newTokenTransactionReceiptStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(TokenTransactionReceiptInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.O2M, true, TokenTransactionReceiptTable, TokenTransactionReceiptColumn),
+	)
+}
+func newTokenTransactionStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(TokenTransactionInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, true, TokenTransactionTable, TokenTransactionColumn),
 	)
 }

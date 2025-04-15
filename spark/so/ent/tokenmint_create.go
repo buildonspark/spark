@@ -12,6 +12,7 @@ import (
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/so/ent/tokenmint"
+	"github.com/lightsparkdev/spark-go/so/ent/tokentransaction"
 	"github.com/lightsparkdev/spark-go/so/ent/tokentransactionreceipt"
 )
 
@@ -101,6 +102,21 @@ func (tmc *TokenMintCreate) AddTokenTransactionReceipt(t ...*TokenTransactionRec
 		ids[i] = t[i].ID
 	}
 	return tmc.AddTokenTransactionReceiptIDs(ids...)
+}
+
+// AddTokenTransactionIDs adds the "token_transaction" edge to the TokenTransaction entity by IDs.
+func (tmc *TokenMintCreate) AddTokenTransactionIDs(ids ...uuid.UUID) *TokenMintCreate {
+	tmc.mutation.AddTokenTransactionIDs(ids...)
+	return tmc
+}
+
+// AddTokenTransaction adds the "token_transaction" edges to the TokenTransaction entity.
+func (tmc *TokenMintCreate) AddTokenTransaction(t ...*TokenTransaction) *TokenMintCreate {
+	ids := make([]uuid.UUID, len(t))
+	for i := range t {
+		ids[i] = t[i].ID
+	}
+	return tmc.AddTokenTransactionIDs(ids...)
 }
 
 // Mutation returns the TokenMintMutation object of the builder.
@@ -247,6 +263,22 @@ func (tmc *TokenMintCreate) createSpec() (*TokenMint, *sqlgraph.CreateSpec) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(tokentransactionreceipt.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := tmc.mutation.TokenTransactionIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: true,
+			Table:   tokenmint.TokenTransactionTable,
+			Columns: []string{tokenmint.TokenTransactionColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(tokentransaction.FieldID, field.TypeUUID),
 			},
 		}
 		for _, k := range nodes {

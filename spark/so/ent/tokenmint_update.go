@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/so/ent/predicate"
 	"github.com/lightsparkdev/spark-go/so/ent/tokenmint"
+	"github.com/lightsparkdev/spark-go/so/ent/tokentransaction"
 	"github.com/lightsparkdev/spark-go/so/ent/tokentransactionreceipt"
 )
 
@@ -63,6 +64,21 @@ func (tmu *TokenMintUpdate) AddTokenTransactionReceipt(t ...*TokenTransactionRec
 	return tmu.AddTokenTransactionReceiptIDs(ids...)
 }
 
+// AddTokenTransactionIDs adds the "token_transaction" edge to the TokenTransaction entity by IDs.
+func (tmu *TokenMintUpdate) AddTokenTransactionIDs(ids ...uuid.UUID) *TokenMintUpdate {
+	tmu.mutation.AddTokenTransactionIDs(ids...)
+	return tmu
+}
+
+// AddTokenTransaction adds the "token_transaction" edges to the TokenTransaction entity.
+func (tmu *TokenMintUpdate) AddTokenTransaction(t ...*TokenTransaction) *TokenMintUpdate {
+	ids := make([]uuid.UUID, len(t))
+	for i := range t {
+		ids[i] = t[i].ID
+	}
+	return tmu.AddTokenTransactionIDs(ids...)
+}
+
 // Mutation returns the TokenMintMutation object of the builder.
 func (tmu *TokenMintUpdate) Mutation() *TokenMintMutation {
 	return tmu.mutation
@@ -87,6 +103,27 @@ func (tmu *TokenMintUpdate) RemoveTokenTransactionReceipt(t ...*TokenTransaction
 		ids[i] = t[i].ID
 	}
 	return tmu.RemoveTokenTransactionReceiptIDs(ids...)
+}
+
+// ClearTokenTransaction clears all "token_transaction" edges to the TokenTransaction entity.
+func (tmu *TokenMintUpdate) ClearTokenTransaction() *TokenMintUpdate {
+	tmu.mutation.ClearTokenTransaction()
+	return tmu
+}
+
+// RemoveTokenTransactionIDs removes the "token_transaction" edge to TokenTransaction entities by IDs.
+func (tmu *TokenMintUpdate) RemoveTokenTransactionIDs(ids ...uuid.UUID) *TokenMintUpdate {
+	tmu.mutation.RemoveTokenTransactionIDs(ids...)
+	return tmu
+}
+
+// RemoveTokenTransaction removes "token_transaction" edges to TokenTransaction entities.
+func (tmu *TokenMintUpdate) RemoveTokenTransaction(t ...*TokenTransaction) *TokenMintUpdate {
+	ids := make([]uuid.UUID, len(t))
+	for i := range t {
+		ids[i] = t[i].ID
+	}
+	return tmu.RemoveTokenTransactionIDs(ids...)
 }
 
 // Save executes the query and returns the number of nodes affected by the update operation.
@@ -188,6 +225,51 @@ func (tmu *TokenMintUpdate) sqlSave(ctx context.Context) (n int, err error) {
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	if tmu.mutation.TokenTransactionCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: true,
+			Table:   tokenmint.TokenTransactionTable,
+			Columns: []string{tokenmint.TokenTransactionColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(tokentransaction.FieldID, field.TypeUUID),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := tmu.mutation.RemovedTokenTransactionIDs(); len(nodes) > 0 && !tmu.mutation.TokenTransactionCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: true,
+			Table:   tokenmint.TokenTransactionTable,
+			Columns: []string{tokenmint.TokenTransactionColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(tokentransaction.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := tmu.mutation.TokenTransactionIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: true,
+			Table:   tokenmint.TokenTransactionTable,
+			Columns: []string{tokenmint.TokenTransactionColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(tokentransaction.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
 	if n, err = sqlgraph.UpdateNodes(ctx, tmu.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{tokenmint.Label}
@@ -241,6 +323,21 @@ func (tmuo *TokenMintUpdateOne) AddTokenTransactionReceipt(t ...*TokenTransactio
 	return tmuo.AddTokenTransactionReceiptIDs(ids...)
 }
 
+// AddTokenTransactionIDs adds the "token_transaction" edge to the TokenTransaction entity by IDs.
+func (tmuo *TokenMintUpdateOne) AddTokenTransactionIDs(ids ...uuid.UUID) *TokenMintUpdateOne {
+	tmuo.mutation.AddTokenTransactionIDs(ids...)
+	return tmuo
+}
+
+// AddTokenTransaction adds the "token_transaction" edges to the TokenTransaction entity.
+func (tmuo *TokenMintUpdateOne) AddTokenTransaction(t ...*TokenTransaction) *TokenMintUpdateOne {
+	ids := make([]uuid.UUID, len(t))
+	for i := range t {
+		ids[i] = t[i].ID
+	}
+	return tmuo.AddTokenTransactionIDs(ids...)
+}
+
 // Mutation returns the TokenMintMutation object of the builder.
 func (tmuo *TokenMintUpdateOne) Mutation() *TokenMintMutation {
 	return tmuo.mutation
@@ -265,6 +362,27 @@ func (tmuo *TokenMintUpdateOne) RemoveTokenTransactionReceipt(t ...*TokenTransac
 		ids[i] = t[i].ID
 	}
 	return tmuo.RemoveTokenTransactionReceiptIDs(ids...)
+}
+
+// ClearTokenTransaction clears all "token_transaction" edges to the TokenTransaction entity.
+func (tmuo *TokenMintUpdateOne) ClearTokenTransaction() *TokenMintUpdateOne {
+	tmuo.mutation.ClearTokenTransaction()
+	return tmuo
+}
+
+// RemoveTokenTransactionIDs removes the "token_transaction" edge to TokenTransaction entities by IDs.
+func (tmuo *TokenMintUpdateOne) RemoveTokenTransactionIDs(ids ...uuid.UUID) *TokenMintUpdateOne {
+	tmuo.mutation.RemoveTokenTransactionIDs(ids...)
+	return tmuo
+}
+
+// RemoveTokenTransaction removes "token_transaction" edges to TokenTransaction entities.
+func (tmuo *TokenMintUpdateOne) RemoveTokenTransaction(t ...*TokenTransaction) *TokenMintUpdateOne {
+	ids := make([]uuid.UUID, len(t))
+	for i := range t {
+		ids[i] = t[i].ID
+	}
+	return tmuo.RemoveTokenTransactionIDs(ids...)
 }
 
 // Where appends a list predicates to the TokenMintUpdate builder.
@@ -389,6 +507,51 @@ func (tmuo *TokenMintUpdateOne) sqlSave(ctx context.Context) (_node *TokenMint, 
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(tokentransactionreceipt.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if tmuo.mutation.TokenTransactionCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: true,
+			Table:   tokenmint.TokenTransactionTable,
+			Columns: []string{tokenmint.TokenTransactionColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(tokentransaction.FieldID, field.TypeUUID),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := tmuo.mutation.RemovedTokenTransactionIDs(); len(nodes) > 0 && !tmuo.mutation.TokenTransactionCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: true,
+			Table:   tokenmint.TokenTransactionTable,
+			Columns: []string{tokenmint.TokenTransactionColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(tokentransaction.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := tmuo.mutation.TokenTransactionIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: true,
+			Table:   tokenmint.TokenTransactionTable,
+			Columns: []string{tokenmint.TokenTransactionColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(tokentransaction.FieldID, field.TypeUUID),
 			},
 		}
 		for _, k := range nodes {

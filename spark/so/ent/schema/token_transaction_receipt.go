@@ -12,29 +12,6 @@ type TokenTransactionReceipt struct {
 	ent.Schema
 }
 
-type TokenTransactionStatus string
-
-const (
-	TokenTransactionStatusStarted TokenTransactionStatus = "STARTED"
-	// TokenTransactionStatusSigned is the status after a transaction has been signed by this operator.
-	TokenTransactionStatusSigned TokenTransactionStatus = "SIGNED"
-	// TokenTransactionStatusSigned is the status if a transaction was signed but then cancelled due to a threshold of the
-	// signatures not being acquired.
-	TokenTransactionStatusSignedCancelled TokenTransactionStatus = "SIGNED_CANCELLED"
-	// TokenTransactionStatusFinalized is the status after the revocation keys for output leaves have been shared with the operator.
-	TokenTransactionStatusFinalized TokenTransactionStatus = "FINALIZED"
-)
-
-// Values returns the values of the token leaf status.
-func (TokenTransactionStatus) Values() []string {
-	return []string{
-		string(TokenTransactionStatusStarted),
-		string(TokenTransactionStatusSigned),
-		string(TokenTransactionStatusSignedCancelled),
-		string(TokenTransactionStatusFinalized),
-	}
-}
-
 // Mixin is the mixin for the tree nodes table.
 func (TokenTransactionReceipt) Mixin() []ent.Mixin {
 	return []ent.Mixin{

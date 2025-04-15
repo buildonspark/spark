@@ -40,9 +40,11 @@ type TokenMint struct {
 type TokenMintEdges struct {
 	// TokenTransactionReceipt holds the value of the token_transaction_receipt edge.
 	TokenTransactionReceipt []*TokenTransactionReceipt `json:"token_transaction_receipt,omitempty"`
+	// TokenTransaction holds the value of the token_transaction edge.
+	TokenTransaction []*TokenTransaction `json:"token_transaction,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [1]bool
+	loadedTypes [2]bool
 }
 
 // TokenTransactionReceiptOrErr returns the TokenTransactionReceipt value or an error if the edge
@@ -52,6 +54,15 @@ func (e TokenMintEdges) TokenTransactionReceiptOrErr() ([]*TokenTransactionRecei
 		return e.TokenTransactionReceipt, nil
 	}
 	return nil, &NotLoadedError{edge: "token_transaction_receipt"}
+}
+
+// TokenTransactionOrErr returns the TokenTransaction value or an error if the edge
+// was not loaded in eager-loading.
+func (e TokenMintEdges) TokenTransactionOrErr() ([]*TokenTransaction, error) {
+	if e.loadedTypes[1] {
+		return e.TokenTransaction, nil
+	}
+	return nil, &NotLoadedError{edge: "token_transaction"}
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -140,6 +151,11 @@ func (tm *TokenMint) Value(name string) (ent.Value, error) {
 // QueryTokenTransactionReceipt queries the "token_transaction_receipt" edge of the TokenMint entity.
 func (tm *TokenMint) QueryTokenTransactionReceipt() *TokenTransactionReceiptQuery {
 	return NewTokenMintClient(tm.config).QueryTokenTransactionReceipt(tm)
+}
+
+// QueryTokenTransaction queries the "token_transaction" edge of the TokenMint entity.
+func (tm *TokenMint) QueryTokenTransaction() *TokenTransactionQuery {
+	return NewTokenMintClient(tm.config).QueryTokenTransaction(tm)
 }
 
 // Update returns a builder for updating this TokenMint.

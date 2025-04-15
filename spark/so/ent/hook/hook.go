@@ -129,6 +129,30 @@ func (f TokenMintFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, e
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.TokenMintMutation", m)
 }
 
+// The TokenOutputFunc type is an adapter to allow the use of ordinary
+// function as TokenOutput mutator.
+type TokenOutputFunc func(context.Context, *ent.TokenOutputMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f TokenOutputFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.TokenOutputMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.TokenOutputMutation", m)
+}
+
+// The TokenTransactionFunc type is an adapter to allow the use of ordinary
+// function as TokenTransaction mutator.
+type TokenTransactionFunc func(context.Context, *ent.TokenTransactionMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f TokenTransactionFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.TokenTransactionMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.TokenTransactionMutation", m)
+}
+
 // The TokenTransactionReceiptFunc type is an adapter to allow the use of ordinary
 // function as TokenTransactionReceipt mutator.
 type TokenTransactionReceiptFunc func(context.Context, *ent.TokenTransactionReceiptMutation) (ent.Value, error)

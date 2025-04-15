@@ -26,6 +26,8 @@ import (
 	"github.com/lightsparkdev/spark-go/so/ent/tokenfreeze"
 	"github.com/lightsparkdev/spark-go/so/ent/tokenleaf"
 	"github.com/lightsparkdev/spark-go/so/ent/tokenmint"
+	"github.com/lightsparkdev/spark-go/so/ent/tokenoutput"
+	"github.com/lightsparkdev/spark-go/so/ent/tokentransaction"
 	"github.com/lightsparkdev/spark-go/so/ent/tokentransactionreceipt"
 	"github.com/lightsparkdev/spark-go/so/ent/transfer"
 	"github.com/lightsparkdev/spark-go/so/ent/transferleaf"
@@ -59,6 +61,10 @@ type Client struct {
 	TokenLeaf *TokenLeafClient
 	// TokenMint is the client for interacting with the TokenMint builders.
 	TokenMint *TokenMintClient
+	// TokenOutput is the client for interacting with the TokenOutput builders.
+	TokenOutput *TokenOutputClient
+	// TokenTransaction is the client for interacting with the TokenTransaction builders.
+	TokenTransaction *TokenTransactionClient
 	// TokenTransactionReceipt is the client for interacting with the TokenTransactionReceipt builders.
 	TokenTransactionReceipt *TokenTransactionReceiptClient
 	// Transfer is the client for interacting with the Transfer builders.
@@ -92,6 +98,8 @@ func (c *Client) init() {
 	c.TokenFreeze = NewTokenFreezeClient(c.config)
 	c.TokenLeaf = NewTokenLeafClient(c.config)
 	c.TokenMint = NewTokenMintClient(c.config)
+	c.TokenOutput = NewTokenOutputClient(c.config)
+	c.TokenTransaction = NewTokenTransactionClient(c.config)
 	c.TokenTransactionReceipt = NewTokenTransactionReceiptClient(c.config)
 	c.Transfer = NewTransferClient(c.config)
 	c.TransferLeaf = NewTransferLeafClient(c.config)
@@ -200,6 +208,8 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		TokenFreeze:             NewTokenFreezeClient(cfg),
 		TokenLeaf:               NewTokenLeafClient(cfg),
 		TokenMint:               NewTokenMintClient(cfg),
+		TokenOutput:             NewTokenOutputClient(cfg),
+		TokenTransaction:        NewTokenTransactionClient(cfg),
 		TokenTransactionReceipt: NewTokenTransactionReceiptClient(cfg),
 		Transfer:                NewTransferClient(cfg),
 		TransferLeaf:            NewTransferLeafClient(cfg),
@@ -235,6 +245,8 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		TokenFreeze:             NewTokenFreezeClient(cfg),
 		TokenLeaf:               NewTokenLeafClient(cfg),
 		TokenMint:               NewTokenMintClient(cfg),
+		TokenOutput:             NewTokenOutputClient(cfg),
+		TokenTransaction:        NewTokenTransactionClient(cfg),
 		TokenTransactionReceipt: NewTokenTransactionReceiptClient(cfg),
 		Transfer:                NewTransferClient(cfg),
 		TransferLeaf:            NewTransferLeafClient(cfg),
@@ -272,8 +284,8 @@ func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
 		c.BlockHeight, c.CooperativeExit, c.DepositAddress, c.PreimageRequest,
 		c.PreimageShare, c.SigningKeyshare, c.SigningNonce, c.TokenFreeze, c.TokenLeaf,
-		c.TokenMint, c.TokenTransactionReceipt, c.Transfer, c.TransferLeaf, c.Tree,
-		c.TreeNode, c.UserSignedTransaction,
+		c.TokenMint, c.TokenOutput, c.TokenTransaction, c.TokenTransactionReceipt,
+		c.Transfer, c.TransferLeaf, c.Tree, c.TreeNode, c.UserSignedTransaction,
 	} {
 		n.Use(hooks...)
 	}
@@ -285,8 +297,8 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
 		c.BlockHeight, c.CooperativeExit, c.DepositAddress, c.PreimageRequest,
 		c.PreimageShare, c.SigningKeyshare, c.SigningNonce, c.TokenFreeze, c.TokenLeaf,
-		c.TokenMint, c.TokenTransactionReceipt, c.Transfer, c.TransferLeaf, c.Tree,
-		c.TreeNode, c.UserSignedTransaction,
+		c.TokenMint, c.TokenOutput, c.TokenTransaction, c.TokenTransactionReceipt,
+		c.Transfer, c.TransferLeaf, c.Tree, c.TreeNode, c.UserSignedTransaction,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -315,6 +327,10 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.TokenLeaf.mutate(ctx, m)
 	case *TokenMintMutation:
 		return c.TokenMint.mutate(ctx, m)
+	case *TokenOutputMutation:
+		return c.TokenOutput.mutate(ctx, m)
+	case *TokenTransactionMutation:
+		return c.TokenTransaction.mutate(ctx, m)
 	case *TokenTransactionReceiptMutation:
 		return c.TokenTransactionReceipt.mutate(ctx, m)
 	case *TransferMutation:
@@ -1797,6 +1813,22 @@ func (c *TokenMintClient) QueryTokenTransactionReceipt(tm *TokenMint) *TokenTran
 	return query
 }
 
+// QueryTokenTransaction queries the token_transaction edge of a TokenMint.
+func (c *TokenMintClient) QueryTokenTransaction(tm *TokenMint) *TokenTransactionQuery {
+	query := (&TokenTransactionClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := tm.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(tokenmint.Table, tokenmint.FieldID, id),
+			sqlgraph.To(tokentransaction.Table, tokentransaction.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, true, tokenmint.TokenTransactionTable, tokenmint.TokenTransactionColumn),
+		)
+		fromV = sqlgraph.Neighbors(tm.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // Hooks returns the client hooks.
 func (c *TokenMintClient) Hooks() []Hook {
 	return c.hooks.TokenMint
@@ -1819,6 +1851,368 @@ func (c *TokenMintClient) mutate(ctx context.Context, m *TokenMintMutation) (Val
 		return (&TokenMintDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown TokenMint mutation op: %q", m.Op())
+	}
+}
+
+// TokenOutputClient is a client for the TokenOutput schema.
+type TokenOutputClient struct {
+	config
+}
+
+// NewTokenOutputClient returns a client for the TokenOutput from the given config.
+func NewTokenOutputClient(c config) *TokenOutputClient {
+	return &TokenOutputClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `tokenoutput.Hooks(f(g(h())))`.
+func (c *TokenOutputClient) Use(hooks ...Hook) {
+	c.hooks.TokenOutput = append(c.hooks.TokenOutput, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `tokenoutput.Intercept(f(g(h())))`.
+func (c *TokenOutputClient) Intercept(interceptors ...Interceptor) {
+	c.inters.TokenOutput = append(c.inters.TokenOutput, interceptors...)
+}
+
+// Create returns a builder for creating a TokenOutput entity.
+func (c *TokenOutputClient) Create() *TokenOutputCreate {
+	mutation := newTokenOutputMutation(c.config, OpCreate)
+	return &TokenOutputCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of TokenOutput entities.
+func (c *TokenOutputClient) CreateBulk(builders ...*TokenOutputCreate) *TokenOutputCreateBulk {
+	return &TokenOutputCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *TokenOutputClient) MapCreateBulk(slice any, setFunc func(*TokenOutputCreate, int)) *TokenOutputCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &TokenOutputCreateBulk{err: fmt.Errorf("calling to TokenOutputClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*TokenOutputCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &TokenOutputCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for TokenOutput.
+func (c *TokenOutputClient) Update() *TokenOutputUpdate {
+	mutation := newTokenOutputMutation(c.config, OpUpdate)
+	return &TokenOutputUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *TokenOutputClient) UpdateOne(to *TokenOutput) *TokenOutputUpdateOne {
+	mutation := newTokenOutputMutation(c.config, OpUpdateOne, withTokenOutput(to))
+	return &TokenOutputUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *TokenOutputClient) UpdateOneID(id uuid.UUID) *TokenOutputUpdateOne {
+	mutation := newTokenOutputMutation(c.config, OpUpdateOne, withTokenOutputID(id))
+	return &TokenOutputUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for TokenOutput.
+func (c *TokenOutputClient) Delete() *TokenOutputDelete {
+	mutation := newTokenOutputMutation(c.config, OpDelete)
+	return &TokenOutputDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *TokenOutputClient) DeleteOne(to *TokenOutput) *TokenOutputDeleteOne {
+	return c.DeleteOneID(to.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *TokenOutputClient) DeleteOneID(id uuid.UUID) *TokenOutputDeleteOne {
+	builder := c.Delete().Where(tokenoutput.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &TokenOutputDeleteOne{builder}
+}
+
+// Query returns a query builder for TokenOutput.
+func (c *TokenOutputClient) Query() *TokenOutputQuery {
+	return &TokenOutputQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeTokenOutput},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a TokenOutput entity by its id.
+func (c *TokenOutputClient) Get(ctx context.Context, id uuid.UUID) (*TokenOutput, error) {
+	return c.Query().Where(tokenoutput.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *TokenOutputClient) GetX(ctx context.Context, id uuid.UUID) *TokenOutput {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryRevocationKeyshare queries the revocation_keyshare edge of a TokenOutput.
+func (c *TokenOutputClient) QueryRevocationKeyshare(to *TokenOutput) *SigningKeyshareQuery {
+	query := (&SigningKeyshareClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := to.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(tokenoutput.Table, tokenoutput.FieldID, id),
+			sqlgraph.To(signingkeyshare.Table, signingkeyshare.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, tokenoutput.RevocationKeyshareTable, tokenoutput.RevocationKeyshareColumn),
+		)
+		fromV = sqlgraph.Neighbors(to.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryOutputCreatedTokenTransaction queries the output_created_token_transaction edge of a TokenOutput.
+func (c *TokenOutputClient) QueryOutputCreatedTokenTransaction(to *TokenOutput) *TokenTransactionQuery {
+	query := (&TokenTransactionClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := to.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(tokenoutput.Table, tokenoutput.FieldID, id),
+			sqlgraph.To(tokentransaction.Table, tokentransaction.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, tokenoutput.OutputCreatedTokenTransactionTable, tokenoutput.OutputCreatedTokenTransactionColumn),
+		)
+		fromV = sqlgraph.Neighbors(to.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryOutputSpentTokenTransaction queries the output_spent_token_transaction edge of a TokenOutput.
+func (c *TokenOutputClient) QueryOutputSpentTokenTransaction(to *TokenOutput) *TokenTransactionQuery {
+	query := (&TokenTransactionClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := to.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(tokenoutput.Table, tokenoutput.FieldID, id),
+			sqlgraph.To(tokentransaction.Table, tokentransaction.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, tokenoutput.OutputSpentTokenTransactionTable, tokenoutput.OutputSpentTokenTransactionColumn),
+		)
+		fromV = sqlgraph.Neighbors(to.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *TokenOutputClient) Hooks() []Hook {
+	return c.hooks.TokenOutput
+}
+
+// Interceptors returns the client interceptors.
+func (c *TokenOutputClient) Interceptors() []Interceptor {
+	return c.inters.TokenOutput
+}
+
+func (c *TokenOutputClient) mutate(ctx context.Context, m *TokenOutputMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&TokenOutputCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&TokenOutputUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&TokenOutputUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&TokenOutputDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown TokenOutput mutation op: %q", m.Op())
+	}
+}
+
+// TokenTransactionClient is a client for the TokenTransaction schema.
+type TokenTransactionClient struct {
+	config
+}
+
+// NewTokenTransactionClient returns a client for the TokenTransaction from the given config.
+func NewTokenTransactionClient(c config) *TokenTransactionClient {
+	return &TokenTransactionClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `tokentransaction.Hooks(f(g(h())))`.
+func (c *TokenTransactionClient) Use(hooks ...Hook) {
+	c.hooks.TokenTransaction = append(c.hooks.TokenTransaction, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `tokentransaction.Intercept(f(g(h())))`.
+func (c *TokenTransactionClient) Intercept(interceptors ...Interceptor) {
+	c.inters.TokenTransaction = append(c.inters.TokenTransaction, interceptors...)
+}
+
+// Create returns a builder for creating a TokenTransaction entity.
+func (c *TokenTransactionClient) Create() *TokenTransactionCreate {
+	mutation := newTokenTransactionMutation(c.config, OpCreate)
+	return &TokenTransactionCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of TokenTransaction entities.
+func (c *TokenTransactionClient) CreateBulk(builders ...*TokenTransactionCreate) *TokenTransactionCreateBulk {
+	return &TokenTransactionCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *TokenTransactionClient) MapCreateBulk(slice any, setFunc func(*TokenTransactionCreate, int)) *TokenTransactionCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &TokenTransactionCreateBulk{err: fmt.Errorf("calling to TokenTransactionClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*TokenTransactionCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &TokenTransactionCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for TokenTransaction.
+func (c *TokenTransactionClient) Update() *TokenTransactionUpdate {
+	mutation := newTokenTransactionMutation(c.config, OpUpdate)
+	return &TokenTransactionUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *TokenTransactionClient) UpdateOne(tt *TokenTransaction) *TokenTransactionUpdateOne {
+	mutation := newTokenTransactionMutation(c.config, OpUpdateOne, withTokenTransaction(tt))
+	return &TokenTransactionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *TokenTransactionClient) UpdateOneID(id uuid.UUID) *TokenTransactionUpdateOne {
+	mutation := newTokenTransactionMutation(c.config, OpUpdateOne, withTokenTransactionID(id))
+	return &TokenTransactionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for TokenTransaction.
+func (c *TokenTransactionClient) Delete() *TokenTransactionDelete {
+	mutation := newTokenTransactionMutation(c.config, OpDelete)
+	return &TokenTransactionDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *TokenTransactionClient) DeleteOne(tt *TokenTransaction) *TokenTransactionDeleteOne {
+	return c.DeleteOneID(tt.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *TokenTransactionClient) DeleteOneID(id uuid.UUID) *TokenTransactionDeleteOne {
+	builder := c.Delete().Where(tokentransaction.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &TokenTransactionDeleteOne{builder}
+}
+
+// Query returns a query builder for TokenTransaction.
+func (c *TokenTransactionClient) Query() *TokenTransactionQuery {
+	return &TokenTransactionQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeTokenTransaction},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a TokenTransaction entity by its id.
+func (c *TokenTransactionClient) Get(ctx context.Context, id uuid.UUID) (*TokenTransaction, error) {
+	return c.Query().Where(tokentransaction.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *TokenTransactionClient) GetX(ctx context.Context, id uuid.UUID) *TokenTransaction {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QuerySpentOutput queries the spent_output edge of a TokenTransaction.
+func (c *TokenTransactionClient) QuerySpentOutput(tt *TokenTransaction) *TokenOutputQuery {
+	query := (&TokenOutputClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := tt.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(tokentransaction.Table, tokentransaction.FieldID, id),
+			sqlgraph.To(tokenoutput.Table, tokenoutput.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, true, tokentransaction.SpentOutputTable, tokentransaction.SpentOutputColumn),
+		)
+		fromV = sqlgraph.Neighbors(tt.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryCreatedOutput queries the created_output edge of a TokenTransaction.
+func (c *TokenTransactionClient) QueryCreatedOutput(tt *TokenTransaction) *TokenOutputQuery {
+	query := (&TokenOutputClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := tt.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(tokentransaction.Table, tokentransaction.FieldID, id),
+			sqlgraph.To(tokenoutput.Table, tokenoutput.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, true, tokentransaction.CreatedOutputTable, tokentransaction.CreatedOutputColumn),
+		)
+		fromV = sqlgraph.Neighbors(tt.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryMint queries the mint edge of a TokenTransaction.
+func (c *TokenTransactionClient) QueryMint(tt *TokenTransaction) *TokenMintQuery {
+	query := (&TokenMintClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := tt.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(tokentransaction.Table, tokentransaction.FieldID, id),
+			sqlgraph.To(tokenmint.Table, tokenmint.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, tokentransaction.MintTable, tokentransaction.MintColumn),
+		)
+		fromV = sqlgraph.Neighbors(tt.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *TokenTransactionClient) Hooks() []Hook {
+	return c.hooks.TokenTransaction
+}
+
+// Interceptors returns the client interceptors.
+func (c *TokenTransactionClient) Interceptors() []Interceptor {
+	return c.inters.TokenTransaction
+}
+
+func (c *TokenTransactionClient) mutate(ctx context.Context, m *TokenTransactionMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&TokenTransactionCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&TokenTransactionUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&TokenTransactionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&TokenTransactionDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown TokenTransaction mutation op: %q", m.Op())
 	}
 }
 
@@ -2848,14 +3242,14 @@ func (c *UserSignedTransactionClient) mutate(ctx context.Context, m *UserSignedT
 type (
 	hooks struct {
 		BlockHeight, CooperativeExit, DepositAddress, PreimageRequest, PreimageShare,
-		SigningKeyshare, SigningNonce, TokenFreeze, TokenLeaf, TokenMint,
-		TokenTransactionReceipt, Transfer, TransferLeaf, Tree, TreeNode,
-		UserSignedTransaction []ent.Hook
+		SigningKeyshare, SigningNonce, TokenFreeze, TokenLeaf, TokenMint, TokenOutput,
+		TokenTransaction, TokenTransactionReceipt, Transfer, TransferLeaf, Tree,
+		TreeNode, UserSignedTransaction []ent.Hook
 	}
 	inters struct {
 		BlockHeight, CooperativeExit, DepositAddress, PreimageRequest, PreimageShare,
-		SigningKeyshare, SigningNonce, TokenFreeze, TokenLeaf, TokenMint,
-		TokenTransactionReceipt, Transfer, TransferLeaf, Tree, TreeNode,
-		UserSignedTransaction []ent.Interceptor
+		SigningKeyshare, SigningNonce, TokenFreeze, TokenLeaf, TokenMint, TokenOutput,
+		TokenTransaction, TokenTransactionReceipt, Transfer, TransferLeaf, Tree,
+		TreeNode, UserSignedTransaction []ent.Interceptor
 	}
 )

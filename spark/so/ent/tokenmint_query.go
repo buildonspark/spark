@@ -16,6 +16,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/so/ent/predicate"
 	"github.com/lightsparkdev/spark-go/so/ent/tokenmint"
+	"github.com/lightsparkdev/spark-go/so/ent/tokentransaction"
 	"github.com/lightsparkdev/spark-go/so/ent/tokentransactionreceipt"
 )
 
@@ -27,6 +28,7 @@ type TokenMintQuery struct {
 	inters                      []Interceptor
 	predicates                  []predicate.TokenMint
 	withTokenTransactionReceipt *TokenTransactionReceiptQuery
+	withTokenTransaction        *TokenTransactionQuery
 	modifiers                   []func(*sql.Selector)
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
@@ -79,6 +81,28 @@ func (tmq *TokenMintQuery) QueryTokenTransactionReceipt() *TokenTransactionRecei
 			sqlgraph.From(tokenmint.Table, tokenmint.FieldID, selector),
 			sqlgraph.To(tokentransactionreceipt.Table, tokentransactionreceipt.FieldID),
 			sqlgraph.Edge(sqlgraph.O2M, true, tokenmint.TokenTransactionReceiptTable, tokenmint.TokenTransactionReceiptColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(tmq.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryTokenTransaction chains the current query on the "token_transaction" edge.
+func (tmq *TokenMintQuery) QueryTokenTransaction() *TokenTransactionQuery {
+	query := (&TokenTransactionClient{config: tmq.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := tmq.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := tmq.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(tokenmint.Table, tokenmint.FieldID, selector),
+			sqlgraph.To(tokentransaction.Table, tokentransaction.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, true, tokenmint.TokenTransactionTable, tokenmint.TokenTransactionColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(tmq.driver.Dialect(), step)
 		return fromU, nil
@@ -279,6 +303,7 @@ func (tmq *TokenMintQuery) Clone() *TokenMintQuery {
 		inters:                      append([]Interceptor{}, tmq.inters...),
 		predicates:                  append([]predicate.TokenMint{}, tmq.predicates...),
 		withTokenTransactionReceipt: tmq.withTokenTransactionReceipt.Clone(),
+		withTokenTransaction:        tmq.withTokenTransaction.Clone(),
 		// clone intermediate query.
 		sql:  tmq.sql.Clone(),
 		path: tmq.path,
@@ -293,6 +318,17 @@ func (tmq *TokenMintQuery) WithTokenTransactionReceipt(opts ...func(*TokenTransa
 		opt(query)
 	}
 	tmq.withTokenTransactionReceipt = query
+	return tmq
+}
+
+// WithTokenTransaction tells the query-builder to eager-load the nodes that are connected to
+// the "token_transaction" edge. The optional arguments are used to configure the query builder of the edge.
+func (tmq *TokenMintQuery) WithTokenTransaction(opts ...func(*TokenTransactionQuery)) *TokenMintQuery {
+	query := (&TokenTransactionClient{config: tmq.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	tmq.withTokenTransaction = query
 	return tmq
 }
 
@@ -374,8 +410,9 @@ func (tmq *TokenMintQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*T
 	var (
 		nodes       = []*TokenMint{}
 		_spec       = tmq.querySpec()
-		loadedTypes = [1]bool{
+		loadedTypes = [2]bool{
 			tmq.withTokenTransactionReceipt != nil,
+			tmq.withTokenTransaction != nil,
 		}
 	)
 	_spec.ScanValues = func(columns []string) ([]any, error) {
@@ -404,6 +441,15 @@ func (tmq *TokenMintQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*T
 			func(n *TokenMint) { n.Edges.TokenTransactionReceipt = []*TokenTransactionReceipt{} },
 			func(n *TokenMint, e *TokenTransactionReceipt) {
 				n.Edges.TokenTransactionReceipt = append(n.Edges.TokenTransactionReceipt, e)
+			}); err != nil {
+			return nil, err
+		}
+	}
+	if query := tmq.withTokenTransaction; query != nil {
+		if err := tmq.loadTokenTransaction(ctx, query, nodes,
+			func(n *TokenMint) { n.Edges.TokenTransaction = []*TokenTransaction{} },
+			func(n *TokenMint, e *TokenTransaction) {
+				n.Edges.TokenTransaction = append(n.Edges.TokenTransaction, e)
 			}); err != nil {
 			return nil, err
 		}
@@ -437,6 +483,37 @@ func (tmq *TokenMintQuery) loadTokenTransactionReceipt(ctx context.Context, quer
 		node, ok := nodeids[*fk]
 		if !ok {
 			return fmt.Errorf(`unexpected referenced foreign-key "token_transaction_receipt_mint" returned %v for node %v`, *fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
+func (tmq *TokenMintQuery) loadTokenTransaction(ctx context.Context, query *TokenTransactionQuery, nodes []*TokenMint, init func(*TokenMint), assign func(*TokenMint, *TokenTransaction)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[uuid.UUID]*TokenMint)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	query.withFKs = true
+	query.Where(predicate.TokenTransaction(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(tokenmint.TokenTransactionColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.token_transaction_mint
+		if fk == nil {
+			return fmt.Errorf(`foreign-key "token_transaction_mint" is nil for node %v`, n.ID)
+		}
+		node, ok := nodeids[*fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "token_transaction_mint" returned %v for node %v`, *fk, n.ID)
 		}
 		assign(node, n)
 	}

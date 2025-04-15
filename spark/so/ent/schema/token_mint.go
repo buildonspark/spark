@@ -28,8 +28,12 @@ func (TokenMint) Fields() []ent.Field {
 
 func (TokenMint) Edges() []ent.Edge {
 	return []ent.Edge{
+		// TODO(DL-122): Clean up in favor of token_transaction once migration is complete.
 		// Maps to the token transaction receipt representing the token mint.
 		edge.From("token_transaction_receipt", TokenTransactionReceipt.Type).
+			Ref("mint"),
+		// Maps to the token transaction representing the token mint.
+		edge.From("token_transaction", TokenTransaction.Type).
 			Ref("mint"),
 	}
 }

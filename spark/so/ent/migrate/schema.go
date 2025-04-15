@@ -313,6 +313,99 @@ var (
 		Columns:    TokenMintsColumns,
 		PrimaryKey: []*schema.Column{TokenMintsColumns[0]},
 	}
+	// TokenOutputsColumns holds the columns for the "token_outputs" table.
+	TokenOutputsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUUID},
+		{Name: "create_time", Type: field.TypeTime},
+		{Name: "update_time", Type: field.TypeTime},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"CREATED_STARTED", "CREATED_SIGNED", "CREATED_SIGNED_CANCELLED", "CREATED_FINALIZED", "SPENT_STARTED", "SPENT_SIGNED", "SPENT_FINALIZED"}},
+		{Name: "owner_public_key", Type: field.TypeBytes},
+		{Name: "withdraw_bond_sats", Type: field.TypeUint64},
+		{Name: "withdraw_relative_block_locktime", Type: field.TypeUint64},
+		{Name: "withdraw_revocation_commitment", Type: field.TypeBytes},
+		{Name: "token_public_key", Type: field.TypeBytes},
+		{Name: "token_amount", Type: field.TypeBytes},
+		{Name: "created_transaction_output_vout", Type: field.TypeInt32},
+		{Name: "spent_ownership_signature", Type: field.TypeBytes, Nullable: true},
+		{Name: "spent_operator_specific_ownership_signature", Type: field.TypeBytes, Nullable: true},
+		{Name: "spent_transaction_input_vout", Type: field.TypeInt32, Nullable: true},
+		{Name: "spent_revocation_secret", Type: field.TypeBytes, Nullable: true},
+		{Name: "confirmed_withdraw_block_hash", Type: field.TypeBytes, Nullable: true},
+		{Name: "network", Type: field.TypeEnum, Nullable: true, Enums: []string{"UNSPECIFIED", "MAINNET", "REGTEST", "TESTNET", "SIGNET"}},
+		{Name: "token_output_revocation_keyshare", Type: field.TypeUUID},
+		{Name: "token_output_output_created_token_transaction", Type: field.TypeUUID, Nullable: true},
+		{Name: "token_output_output_spent_token_transaction", Type: field.TypeUUID, Nullable: true},
+	}
+	// TokenOutputsTable holds the schema information for the "token_outputs" table.
+	TokenOutputsTable = &schema.Table{
+		Name:       "token_outputs",
+		Columns:    TokenOutputsColumns,
+		PrimaryKey: []*schema.Column{TokenOutputsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "token_outputs_signing_keyshares_revocation_keyshare",
+				Columns:    []*schema.Column{TokenOutputsColumns[17]},
+				RefColumns: []*schema.Column{SigningKeysharesColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "token_outputs_token_transactions_output_created_token_transaction",
+				Columns:    []*schema.Column{TokenOutputsColumns[18]},
+				RefColumns: []*schema.Column{TokenTransactionsColumns[0]},
+				OnDelete:   schema.SetNull,
+			},
+			{
+				Symbol:     "token_outputs_token_transactions_output_spent_token_transaction",
+				Columns:    []*schema.Column{TokenOutputsColumns[19]},
+				RefColumns: []*schema.Column{TokenTransactionsColumns[0]},
+				OnDelete:   schema.SetNull,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "tokenoutput_owner_public_key_token_public_key",
+				Unique:  false,
+				Columns: []*schema.Column{TokenOutputsColumns[4], TokenOutputsColumns[8]},
+			},
+			{
+				Name:    "tokenoutput_confirmed_withdraw_block_hash",
+				Unique:  false,
+				Columns: []*schema.Column{TokenOutputsColumns[15]},
+			},
+		},
+	}
+	// TokenTransactionsColumns holds the columns for the "token_transactions" table.
+	TokenTransactionsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUUID},
+		{Name: "create_time", Type: field.TypeTime},
+		{Name: "update_time", Type: field.TypeTime},
+		{Name: "partial_token_transaction_hash", Type: field.TypeBytes},
+		{Name: "finalized_token_transaction_hash", Type: field.TypeBytes, Unique: true},
+		{Name: "operator_signature", Type: field.TypeBytes, Unique: true, Nullable: true},
+		{Name: "status", Type: field.TypeEnum, Nullable: true, Enums: []string{"STARTED", "SIGNED", "SIGNED_CANCELLED", "FINALIZED"}},
+		{Name: "token_transaction_mint", Type: field.TypeUUID, Nullable: true},
+	}
+	// TokenTransactionsTable holds the schema information for the "token_transactions" table.
+	TokenTransactionsTable = &schema.Table{
+		Name:       "token_transactions",
+		Columns:    TokenTransactionsColumns,
+		PrimaryKey: []*schema.Column{TokenTransactionsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "token_transactions_token_mints_mint",
+				Columns:    []*schema.Column{TokenTransactionsColumns[7]},
+				RefColumns: []*schema.Column{TokenMintsColumns[0]},
+				OnDelete:   schema.SetNull,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "tokentransaction_finalized_token_transaction_hash",
+				Unique:  false,
+				Columns: []*schema.Column{TokenTransactionsColumns[4]},
+			},
+		},
+	}
 	// TokenTransactionReceiptsColumns holds the columns for the "token_transaction_receipts" table.
 	TokenTransactionReceiptsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeUUID},
@@ -585,6 +678,8 @@ var (
 		TokenFreezesTable,
 		TokenLeafsTable,
 		TokenMintsTable,
+		TokenOutputsTable,
+		TokenTransactionsTable,
 		TokenTransactionReceiptsTable,
 		TransfersTable,
 		TransferLeafsTable,
@@ -602,6 +697,10 @@ func init() {
 	TokenLeafsTable.ForeignKeys[0].RefTable = SigningKeysharesTable
 	TokenLeafsTable.ForeignKeys[1].RefTable = TokenTransactionReceiptsTable
 	TokenLeafsTable.ForeignKeys[2].RefTable = TokenTransactionReceiptsTable
+	TokenOutputsTable.ForeignKeys[0].RefTable = SigningKeysharesTable
+	TokenOutputsTable.ForeignKeys[1].RefTable = TokenTransactionsTable
+	TokenOutputsTable.ForeignKeys[2].RefTable = TokenTransactionsTable
+	TokenTransactionsTable.ForeignKeys[0].RefTable = TokenMintsTable
 	TokenTransactionReceiptsTable.ForeignKeys[0].RefTable = TokenMintsTable
 	TransferLeafsTable.ForeignKeys[0].RefTable = TransfersTable
 	TransferLeafsTable.ForeignKeys[1].RefTable = TreeNodesTable

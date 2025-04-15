@@ -36,6 +36,12 @@ type TokenLeaf func(*sql.Selector)
 // TokenMint is the predicate function for tokenmint builders.
 type TokenMint func(*sql.Selector)
 
+// TokenOutput is the predicate function for tokenoutput builders.
+type TokenOutput func(*sql.Selector)
+
+// TokenTransaction is the predicate function for tokentransaction builders.
+type TokenTransaction func(*sql.Selector)
+
 // TokenTransactionReceipt is the predicate function for tokentransactionreceipt builders.
 type TokenTransactionReceipt func(*sql.Selector)
 

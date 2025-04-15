@@ -32,6 +32,10 @@ type Tx struct {
 	TokenLeaf *TokenLeafClient
 	// TokenMint is the client for interacting with the TokenMint builders.
 	TokenMint *TokenMintClient
+	// TokenOutput is the client for interacting with the TokenOutput builders.
+	TokenOutput *TokenOutputClient
+	// TokenTransaction is the client for interacting with the TokenTransaction builders.
+	TokenTransaction *TokenTransactionClient
 	// TokenTransactionReceipt is the client for interacting with the TokenTransactionReceipt builders.
 	TokenTransactionReceipt *TokenTransactionReceiptClient
 	// Transfer is the client for interacting with the Transfer builders.
@@ -185,6 +189,8 @@ func (tx *Tx) init() {
 	tx.TokenFreeze = NewTokenFreezeClient(tx.config)
 	tx.TokenLeaf = NewTokenLeafClient(tx.config)
 	tx.TokenMint = NewTokenMintClient(tx.config)
+	tx.TokenOutput = NewTokenOutputClient(tx.config)
+	tx.TokenTransaction = NewTokenTransactionClient(tx.config)
 	tx.TokenTransactionReceipt = NewTokenTransactionReceiptClient(tx.config)
 	tx.Transfer = NewTransferClient(tx.config)
 	tx.TransferLeaf = NewTransferLeafClient(tx.config)
