@@ -16,8 +16,8 @@ import (
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
 )
 
-// MaxOutputLeaves defines the maximum number of input or output leaves allowed in a token transaction.
-const MaxInputOrOutputTokenTransactionLeaves = 100
+// MaxTokenOutputs defines the maximum number of input or token outputs allowed in a token transaction.
+const MaxInputOrOutputTokenTransactionOutputs = 100
 
 // Zero represents a big.Int with value 0, used for amount comparisons.
 var Zero = new(big.Int)
@@ -35,18 +35,18 @@ func HashTokenTransaction(tokenTransaction *pb.TokenTransaction, partialHash boo
 	h := sha256.New()
 	var allHashes []byte
 
-	// Hash input leaves if a transfer.
+	// Hash input outputs if a transfer.
 	if transferSource := tokenTransaction.GetTransferInput(); transferSource != nil {
-		if transferSource.LeavesToSpend == nil {
-			return nil, fmt.Errorf("transfer input leaves cannot be nil")
+		if transferSource.OutputsToSpend == nil {
+			return nil, fmt.Errorf("transfer input outputs cannot be nil")
 		}
-		for i, leaf := range transferSource.GetLeavesToSpend() {
-			if leaf == nil {
-				return nil, fmt.Errorf("transfer input leaf at index %d cannot be nil", i)
+		for i, output := range transferSource.GetOutputsToSpend() {
+			if output == nil {
+				return nil, fmt.Errorf("transfer input token output at index %d cannot be nil", i)
 			}
 			h.Reset()
 
-			txHash := leaf.GetPrevTokenTransactionHash()
+			txHash := output.GetPrevTokenTransactionHash()
 			if txHash != nil {
 				if len(txHash) != 32 {
 					return nil, fmt.Errorf("invalid previous transaction hash length at index %d: expected 32 bytes, got %d", i, len(txHash))
@@ -55,7 +55,7 @@ func HashTokenTransaction(tokenTransaction *pb.TokenTransaction, partialHash boo
 			}
 
 			buf := make([]byte, 4)
-			binary.BigEndian.PutUint32(buf, leaf.GetPrevTokenTransactionLeafVout())
+			binary.BigEndian.PutUint32(buf, output.GetPrevTokenTransactionVout())
 			h.Write(buf)
 			allHashes = append(allHashes, h.Sum(nil)...)
 		}
@@ -80,26 +80,26 @@ func HashTokenTransaction(tokenTransaction *pb.TokenTransaction, partialHash boo
 		allHashes = append(allHashes, h.Sum(nil)...)
 	}
 
-	// Hash output leaves
-	if tokenTransaction.OutputLeaves == nil {
-		return nil, fmt.Errorf("output leaves cannot be nil")
+	// Hash token outputs
+	if tokenTransaction.TokenOutputs == nil {
+		return nil, fmt.Errorf("token outputs cannot be nil")
 	}
-	for i, leaf := range tokenTransaction.OutputLeaves {
-		if leaf == nil {
-			return nil, fmt.Errorf("output leaf at index %d cannot be nil", i)
+	for i, output := range tokenTransaction.TokenOutputs {
+		if output == nil {
+			return nil, fmt.Errorf("token output at index %d cannot be nil", i)
 		}
 		h.Reset()
 
 		// Leaf ID is not set in the partial token transaction.
-		if !partialHash && leaf.GetId() != "" {
-			id := []byte(leaf.GetId())
+		if !partialHash && output.GetId() != "" {
+			id := []byte(output.GetId())
 			if len(id) == 0 {
-				return nil, fmt.Errorf("leaf ID at index %d cannot be empty", i)
+				return nil, fmt.Errorf("token output ID at index %d cannot be empty", i)
 			}
 			h.Write(id)
 		}
 
-		ownerPubKey := leaf.GetOwnerPublicKey()
+		ownerPubKey := output.GetOwnerPublicKey()
 		if ownerPubKey != nil {
 			if len(ownerPubKey) == 0 {
 				return nil, fmt.Errorf("owner public key at index %d cannot be empty", i)
@@ -109,7 +109,7 @@ func HashTokenTransaction(tokenTransaction *pb.TokenTransaction, partialHash boo
 
 		// Revocation public key is not set in the partial token transaction.
 		if !partialHash {
-			revPubKey := leaf.GetRevocationPublicKey()
+			revPubKey := output.GetRevocationCommitment()
 			if revPubKey != nil {
 				if len(revPubKey) == 0 {
 					return nil, fmt.Errorf("revocation public key at index %d cannot be empty", i)
@@ -118,15 +118,15 @@ func HashTokenTransaction(tokenTransaction *pb.TokenTransaction, partialHash boo
 			}
 
 			withdrawalBondBytes := make([]byte, 8)
-			binary.BigEndian.PutUint64(withdrawalBondBytes, leaf.GetWithdrawBondSats())
+			binary.BigEndian.PutUint64(withdrawalBondBytes, output.GetWithdrawBondSats())
 			h.Write(withdrawalBondBytes)
 
 			withdrawalLocktimeBytes := make([]byte, 8)
-			binary.BigEndian.PutUint64(withdrawalLocktimeBytes, leaf.GetWithdrawRelativeBlockLocktime())
+			binary.BigEndian.PutUint64(withdrawalLocktimeBytes, output.GetWithdrawRelativeBlockLocktime())
 			h.Write(withdrawalLocktimeBytes)
 		}
 
-		tokenPubKey := leaf.GetTokenPublicKey()
+		tokenPubKey := output.GetTokenPublicKey()
 		if tokenPubKey != nil {
 			if len(tokenPubKey) == 0 {
 				return nil, fmt.Errorf("token public key at index %d cannot be empty", i)
@@ -134,7 +134,7 @@ func HashTokenTransaction(tokenTransaction *pb.TokenTransaction, partialHash boo
 			h.Write(tokenPubKey)
 		}
 
-		tokenAmount := leaf.GetTokenAmount()
+		tokenAmount := output.GetTokenAmount()
 		if tokenAmount != nil {
 			if len(tokenAmount) == 0 {
 				return nil, fmt.Errorf("token amount at index %d cannot be empty", i)
@@ -306,14 +306,14 @@ func ValidatePartialTokenTransaction(
 	if tokenTransaction == nil {
 		return fmt.Errorf("token transaction cannot be nil")
 	}
-	if tokenTransaction.OutputLeaves == nil {
-		return fmt.Errorf("leaves to create cannot be nil")
+	if tokenTransaction.TokenOutputs == nil {
+		return fmt.Errorf("outputs to create cannot be nil")
 	}
-	if len(tokenTransaction.OutputLeaves) == 0 {
-		return fmt.Errorf("leaves to create cannot be empty")
+	if len(tokenTransaction.TokenOutputs) == 0 {
+		return fmt.Errorf("outputs to create cannot be empty")
 	}
-	if len(tokenTransaction.OutputLeaves) > MaxInputOrOutputTokenTransactionLeaves {
-		return fmt.Errorf("too many output leaves, maximum is %d", MaxInputOrOutputTokenTransactionLeaves)
+	if len(tokenTransaction.TokenOutputs) > MaxInputOrOutputTokenTransactionOutputs {
+		return fmt.Errorf("too many token outputs, maximum is %d", MaxInputOrOutputTokenTransactionOutputs)
 	}
 	network, err := common.NetworkFromProtoNetwork(tokenTransaction.Network)
 	if err != nil {
@@ -324,17 +324,17 @@ func ValidatePartialTokenTransaction(
 		return fmt.Errorf("network %s is not supported", network)
 	}
 
-	// Validate all output leaves have the same token public key
-	expectedTokenPubKey := tokenTransaction.OutputLeaves[0].GetTokenPublicKey()
+	// Validate all token outputs have the same token public key
+	expectedTokenPubKey := tokenTransaction.TokenOutputs[0].GetTokenPublicKey()
 	if expectedTokenPubKey == nil {
 		return fmt.Errorf("token public key cannot be nil")
 	}
-	for _, leaf := range tokenTransaction.OutputLeaves {
-		if leaf.GetTokenPublicKey() == nil {
+	for _, output := range tokenTransaction.TokenOutputs {
+		if output.GetTokenPublicKey() == nil {
 			return fmt.Errorf("token public key cannot be nil")
 		}
-		if !bytes.Equal(leaf.GetTokenPublicKey(), expectedTokenPubKey) {
-			return fmt.Errorf("all leaves must have the same token public key")
+		if !bytes.Equal(output.GetTokenPublicKey(), expectedTokenPubKey) {
+			return fmt.Errorf("all outputs must have the same token public key")
 		}
 	}
 
@@ -351,7 +351,7 @@ func ValidatePartialTokenTransaction(
 			return fmt.Errorf("issuer provided timestamp cannot be 0")
 		}
 
-		// Validate that the token public key on all created leaves
+		// Validate that the token public key on all created outputs
 		// matches the issuer public key.
 		if !bytes.Equal(mintInput.GetIssuerPublicKey(), expectedTokenPubKey) {
 			return fmt.Errorf("token public key must match issuer public key for mint transactions")
@@ -369,27 +369,27 @@ func ValidatePartialTokenTransaction(
 		}
 
 		// Validate mint amounts > 0
-		for i, leaf := range tokenTransaction.OutputLeaves {
-			amount := new(big.Int).SetBytes(leaf.GetTokenAmount())
+		for i, output := range tokenTransaction.TokenOutputs {
+			amount := new(big.Int).SetBytes(output.GetTokenAmount())
 
 			if amount.Cmp(Zero) == 0 {
-				return fmt.Errorf("mint amount for leaf %d cannot be 0", i)
+				return fmt.Errorf("mint amount for output %d cannot be 0", i)
 			}
 		}
 	}
 
 	// Validation for transfer transactions
 	if transferSource := tokenTransaction.GetTransferInput(); transferSource != nil {
-		if len(transferSource.GetLeavesToSpend()) == 0 {
-			return fmt.Errorf("leaves to spend cannot be empty")
+		if len(transferSource.GetOutputsToSpend()) == 0 {
+			return fmt.Errorf("outputs to spend cannot be empty")
 		}
-		if len(tokenTransaction.GetTransferInput().LeavesToSpend) > MaxInputOrOutputTokenTransactionLeaves {
-			return fmt.Errorf("too many leaves to spend, maximum is %d", MaxInputOrOutputTokenTransactionLeaves)
+		if len(tokenTransaction.GetTransferInput().OutputsToSpend) > MaxInputOrOutputTokenTransactionOutputs {
+			return fmt.Errorf("too many outputs to spend, maximum is %d", MaxInputOrOutputTokenTransactionOutputs)
 		}
 
-		// Validate there is the correct number of signatures for leaves to spend.
-		if len(tokenTransactionSignatures.GetOwnerSignatures()) != len(transferSource.GetLeavesToSpend()) {
-			return fmt.Errorf("number of signatures must match number of leaves to spend")
+		// Validate there is the correct number of signatures for outputs to spend.
+		if len(tokenTransactionSignatures.GetOwnerSignatures()) != len(transferSource.GetOutputsToSpend()) {
+			return fmt.Errorf("number of signatures must match number of outputs to spend")
 		}
 	}
 
@@ -412,7 +412,7 @@ func ValidatePartialTokenTransaction(
 }
 
 // ValidateOwnershipSignature validates the ownership signature of a token transaction and that it matches
-// a predefined public key attached to the leaf being spent or the token being created and the submitted transaction.
+// a predefined public key attached to the output being spent or the token being created and the submitted transaction.
 // It supports both ECDSA DER signatures and Schnorr signatures.
 func ValidateOwnershipSignature(ownershipSignature []byte, tokenTransactionHash []byte, ownerPublicKey []byte) error {
 	if ownershipSignature == nil {

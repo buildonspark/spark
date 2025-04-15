@@ -82,13 +82,13 @@ func (h *InternalTokenTransactionHandler) StartTokenTransactionInternal(ctx cont
 	}
 	var outputToSpendEnts []*ent.TokenOutput
 	if req.FinalTokenTransaction.GetTransferInput() != nil {
-		// Get the outputs to spend from the database.
-		outputToSpendEnts, err = ent.FetchTokenInputs(ctx, req.FinalTokenTransaction.GetTransferInput().GetLeavesToSpend())
+		// Get the leaves to spend from the database.
+		outputToSpendEnts, err = ent.FetchTokenInputs(ctx, req.FinalTokenTransaction.GetTransferInput().GetOutputsToSpend())
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch outputs to spend: %w", err)
 		}
-		if len(outputToSpendEnts) != len(req.FinalTokenTransaction.GetTransferInput().GetLeavesToSpend()) {
-			return nil, fmt.Errorf("failed to fetch all outputs to spend: got %d outputs, expected %d", len(outputToSpendEnts), len(req.FinalTokenTransaction.GetTransferInput().GetLeavesToSpend()))
+		if len(outputToSpendEnts) != len(req.FinalTokenTransaction.GetTransferInput().GetOutputsToSpend()) {
+			return nil, fmt.Errorf("failed to fetch all leaves to spend: got %d leaves, expected %d", len(outputToSpendEnts), len(req.FinalTokenTransaction.GetTransferInput().GetOutputsToSpend()))
 		}
 
 		err = ValidateTokenTransactionUsingPreviousTransactionData(req.FinalTokenTransaction, req.TokenTransactionSignatures, outputToSpendEnts)
@@ -149,7 +149,7 @@ func ValidateTokenTransactionUsingPreviousTransactionData(
 	// Validate that all token public keys in outputs to spend match the outputs.
 	// Ok to just check against the first output because output token public key uniformity
 	// is checked in the main ValidateTokenTransaction() call.
-	expectedTokenPubKey := tokenTransaction.OutputLeaves[0].GetTokenPublicKey()
+	expectedTokenPubKey := tokenTransaction.TokenOutputs[0].GetTokenPublicKey()
 	if expectedTokenPubKey == nil {
 		return fmt.Errorf("token public key cannot be nil in outputs")
 	}
@@ -177,7 +177,7 @@ func ValidateTokenTransactionUsingPreviousTransactionData(
 		totalInputAmount.Add(totalInputAmount, inputAmount)
 	}
 	totalOutputAmount := new(big.Int)
-	for _, outputLeaf := range tokenTransaction.OutputLeaves {
+	for _, outputLeaf := range tokenTransaction.TokenOutputs {
 		outputAmount := new(big.Int).SetBytes(outputLeaf.GetTokenAmount())
 		totalOutputAmount.Add(totalOutputAmount, outputAmount)
 	}
@@ -257,13 +257,13 @@ func validateFinalTokenTransaction(
 		return fmt.Errorf("failed to validate final token transaction: %w", err)
 	}
 
-	// Additionally validate the revocation commitments and withdrawal params which were added to make it final.
-	for i, output := range tokenTransaction.OutputLeaves {
-		if output.GetRevocationPublicKey() == nil {
-			return fmt.Errorf("revocation commitment cannot be nil for output %d", i)
+	// Additionally validate the revocation public keys and withdrawal params which were added to make it final.
+	for i, output := range tokenTransaction.TokenOutputs {
+		if output.GetRevocationCommitment() == nil {
+			return fmt.Errorf("revocation public key cannot be nil for output %d", i)
 		}
-		if !bytes.Equal(output.GetRevocationPublicKey(), expectedRevocationPublicKeys[i]) {
-			return fmt.Errorf("revocation commitment mismatch for output %d", i)
+		if !bytes.Equal(output.GetRevocationCommitment(), expectedRevocationPublicKeys[i]) {
+			return fmt.Errorf("revocation public key mismatch for output %d", i)
 		}
 		if output.WithdrawBondSats == nil || output.WithdrawRelativeBlockLocktime == nil {
 			return fmt.Errorf("withdrawal params not set for output %d", i)

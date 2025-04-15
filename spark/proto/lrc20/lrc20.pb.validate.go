@@ -325,7 +325,7 @@ func (m *SparkSignatureData) validate(all bool) error {
 
 	// no validation rules for SparkOperatorIdentityPublicKey
 
-	for idx, item := range m.GetLeavesToSpendData() {
+	for idx, item := range m.GetOutputsToSpendData() {
 		_, _ = idx, item
 
 		if all {
@@ -333,7 +333,7 @@ func (m *SparkSignatureData) validate(all bool) error {
 			case interface{ ValidateAll() error }:
 				if err := v.ValidateAll(); err != nil {
 					errors = append(errors, SparkSignatureDataValidationError{
-						field:  fmt.Sprintf("LeavesToSpendData[%v]", idx),
+						field:  fmt.Sprintf("OutputsToSpendData[%v]", idx),
 						reason: "embedded message failed validation",
 						cause:  err,
 					})
@@ -341,7 +341,7 @@ func (m *SparkSignatureData) validate(all bool) error {
 			case interface{ Validate() error }:
 				if err := v.Validate(); err != nil {
 					errors = append(errors, SparkSignatureDataValidationError{
-						field:  fmt.Sprintf("LeavesToSpendData[%v]", idx),
+						field:  fmt.Sprintf("OutputsToSpendData[%v]", idx),
 						reason: "embedded message failed validation",
 						cause:  err,
 					})
@@ -350,7 +350,7 @@ func (m *SparkSignatureData) validate(all bool) error {
 		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
 			if err := v.Validate(); err != nil {
 				return SparkSignatureDataValidationError{
-					field:  fmt.Sprintf("LeavesToSpendData[%v]", idx),
+					field:  fmt.Sprintf("OutputsToSpendData[%v]", idx),
 					reason: "embedded message failed validation",
 					cause:  err,
 				}
@@ -468,48 +468,48 @@ var _ interface {
 	ErrorName() string
 } = SparkSignatureDataValidationError{}
 
-// Validate checks the field values on SparkSignatureLeafData with the rules
+// Validate checks the field values on SparkSignatureOutputData with the rules
 // defined in the proto definition for this message. If any rules are
 // violated, the first error encountered is returned, or nil if there are no violations.
-func (m *SparkSignatureLeafData) Validate() error {
+func (m *SparkSignatureOutputData) Validate() error {
 	return m.validate(false)
 }
 
-// ValidateAll checks the field values on SparkSignatureLeafData with the rules
-// defined in the proto definition for this message. If any rules are
+// ValidateAll checks the field values on SparkSignatureOutputData with the
+// rules defined in the proto definition for this message. If any rules are
 // violated, the result is a list of violation errors wrapped in
-// SparkSignatureLeafDataMultiError, or nil if none found.
-func (m *SparkSignatureLeafData) ValidateAll() error {
+// SparkSignatureOutputDataMultiError, or nil if none found.
+func (m *SparkSignatureOutputData) ValidateAll() error {
 	return m.validate(true)
 }
 
-func (m *SparkSignatureLeafData) validate(all bool) error {
+func (m *SparkSignatureOutputData) validate(all bool) error {
 	if m == nil {
 		return nil
 	}
 
 	var errors []error
 
-	// no validation rules for SpentLeafIndex
+	// no validation rules for SpentOutputIndex
 
 	if m.RevocationPrivateKey != nil {
 		// no validation rules for RevocationPrivateKey
 	}
 
 	if len(errors) > 0 {
-		return SparkSignatureLeafDataMultiError(errors)
+		return SparkSignatureOutputDataMultiError(errors)
 	}
 
 	return nil
 }
 
-// SparkSignatureLeafDataMultiError is an error wrapping multiple validation
-// errors returned by SparkSignatureLeafData.ValidateAll() if the designated
+// SparkSignatureOutputDataMultiError is an error wrapping multiple validation
+// errors returned by SparkSignatureOutputData.ValidateAll() if the designated
 // constraints aren't met.
-type SparkSignatureLeafDataMultiError []error
+type SparkSignatureOutputDataMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
-func (m SparkSignatureLeafDataMultiError) Error() string {
+func (m SparkSignatureOutputDataMultiError) Error() string {
 	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
@@ -518,11 +518,11 @@ func (m SparkSignatureLeafDataMultiError) Error() string {
 }
 
 // AllErrors returns a list of validation violation errors.
-func (m SparkSignatureLeafDataMultiError) AllErrors() []error { return m }
+func (m SparkSignatureOutputDataMultiError) AllErrors() []error { return m }
 
-// SparkSignatureLeafDataValidationError is the validation error returned by
-// SparkSignatureLeafData.Validate if the designated constraints aren't met.
-type SparkSignatureLeafDataValidationError struct {
+// SparkSignatureOutputDataValidationError is the validation error returned by
+// SparkSignatureOutputData.Validate if the designated constraints aren't met.
+type SparkSignatureOutputDataValidationError struct {
 	field  string
 	reason string
 	cause  error
@@ -530,24 +530,24 @@ type SparkSignatureLeafDataValidationError struct {
 }
 
 // Field function returns field value.
-func (e SparkSignatureLeafDataValidationError) Field() string { return e.field }
+func (e SparkSignatureOutputDataValidationError) Field() string { return e.field }
 
 // Reason function returns reason value.
-func (e SparkSignatureLeafDataValidationError) Reason() string { return e.reason }
+func (e SparkSignatureOutputDataValidationError) Reason() string { return e.reason }
 
 // Cause function returns cause value.
-func (e SparkSignatureLeafDataValidationError) Cause() error { return e.cause }
+func (e SparkSignatureOutputDataValidationError) Cause() error { return e.cause }
 
 // Key function returns key value.
-func (e SparkSignatureLeafDataValidationError) Key() bool { return e.key }
+func (e SparkSignatureOutputDataValidationError) Key() bool { return e.key }
 
 // ErrorName returns error name.
-func (e SparkSignatureLeafDataValidationError) ErrorName() string {
-	return "SparkSignatureLeafDataValidationError"
+func (e SparkSignatureOutputDataValidationError) ErrorName() string {
+	return "SparkSignatureOutputDataValidationError"
 }
 
 // Error satisfies the builtin error interface
-func (e SparkSignatureLeafDataValidationError) Error() string {
+func (e SparkSignatureOutputDataValidationError) Error() string {
 	cause := ""
 	if e.cause != nil {
 		cause = fmt.Sprintf(" | caused by: %v", e.cause)
@@ -559,14 +559,14 @@ func (e SparkSignatureLeafDataValidationError) Error() string {
 	}
 
 	return fmt.Sprintf(
-		"invalid %sSparkSignatureLeafData.%s: %s%s",
+		"invalid %sSparkSignatureOutputData.%s: %s%s",
 		key,
 		e.field,
 		e.reason,
 		cause)
 }
 
-var _ error = SparkSignatureLeafDataValidationError{}
+var _ error = SparkSignatureOutputDataValidationError{}
 
 var _ interface {
 	Field() string
@@ -574,7 +574,7 @@ var _ interface {
 	Key() bool
 	Cause() error
 	ErrorName() string
-} = SparkSignatureLeafDataValidationError{}
+} = SparkSignatureOutputDataValidationError{}
 
 // Validate checks the field values on GetSparkTxRequest with the rules defined
 // in the proto definition for this message. If any rules are violated, the
@@ -1325,22 +1325,22 @@ var _ interface {
 	ErrorName() string
 } = TokenTransactionResponseValidationError{}
 
-// Validate checks the field values on ListWithdrawnLeavesRequest with the
+// Validate checks the field values on ListWithdrawnOutputsRequest with the
 // rules defined in the proto definition for this message. If any rules are
 // violated, the first error encountered is returned, or nil if there are no violations.
-func (m *ListWithdrawnLeavesRequest) Validate() error {
+func (m *ListWithdrawnOutputsRequest) Validate() error {
 	return m.validate(false)
 }
 
-// ValidateAll checks the field values on ListWithdrawnLeavesRequest with the
+// ValidateAll checks the field values on ListWithdrawnOutputsRequest with the
 // rules defined in the proto definition for this message. If any rules are
 // violated, the result is a list of violation errors wrapped in
-// ListWithdrawnLeavesRequestMultiError, or nil if none found.
-func (m *ListWithdrawnLeavesRequest) ValidateAll() error {
+// ListWithdrawnOutputsRequestMultiError, or nil if none found.
+func (m *ListWithdrawnOutputsRequest) ValidateAll() error {
 	return m.validate(true)
 }
 
-func (m *ListWithdrawnLeavesRequest) validate(all bool) error {
+func (m *ListWithdrawnOutputsRequest) validate(all bool) error {
 	if m == nil {
 		return nil
 	}
@@ -1360,19 +1360,19 @@ func (m *ListWithdrawnLeavesRequest) validate(all bool) error {
 	}
 
 	if len(errors) > 0 {
-		return ListWithdrawnLeavesRequestMultiError(errors)
+		return ListWithdrawnOutputsRequestMultiError(errors)
 	}
 
 	return nil
 }
 
-// ListWithdrawnLeavesRequestMultiError is an error wrapping multiple
-// validation errors returned by ListWithdrawnLeavesRequest.ValidateAll() if
+// ListWithdrawnOutputsRequestMultiError is an error wrapping multiple
+// validation errors returned by ListWithdrawnOutputsRequest.ValidateAll() if
 // the designated constraints aren't met.
-type ListWithdrawnLeavesRequestMultiError []error
+type ListWithdrawnOutputsRequestMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
-func (m ListWithdrawnLeavesRequestMultiError) Error() string {
+func (m ListWithdrawnOutputsRequestMultiError) Error() string {
 	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
@@ -1381,11 +1381,12 @@ func (m ListWithdrawnLeavesRequestMultiError) Error() string {
 }
 
 // AllErrors returns a list of validation violation errors.
-func (m ListWithdrawnLeavesRequestMultiError) AllErrors() []error { return m }
+func (m ListWithdrawnOutputsRequestMultiError) AllErrors() []error { return m }
 
-// ListWithdrawnLeavesRequestValidationError is the validation error returned
-// by ListWithdrawnLeavesRequest.Validate if the designated constraints aren't met.
-type ListWithdrawnLeavesRequestValidationError struct {
+// ListWithdrawnOutputsRequestValidationError is the validation error returned
+// by ListWithdrawnOutputsRequest.Validate if the designated constraints
+// aren't met.
+type ListWithdrawnOutputsRequestValidationError struct {
 	field  string
 	reason string
 	cause  error
@@ -1393,24 +1394,24 @@ type ListWithdrawnLeavesRequestValidationError struct {
 }
 
 // Field function returns field value.
-func (e ListWithdrawnLeavesRequestValidationError) Field() string { return e.field }
+func (e ListWithdrawnOutputsRequestValidationError) Field() string { return e.field }
 
 // Reason function returns reason value.
-func (e ListWithdrawnLeavesRequestValidationError) Reason() string { return e.reason }
+func (e ListWithdrawnOutputsRequestValidationError) Reason() string { return e.reason }
 
 // Cause function returns cause value.
-func (e ListWithdrawnLeavesRequestValidationError) Cause() error { return e.cause }
+func (e ListWithdrawnOutputsRequestValidationError) Cause() error { return e.cause }
 
 // Key function returns key value.
-func (e ListWithdrawnLeavesRequestValidationError) Key() bool { return e.key }
+func (e ListWithdrawnOutputsRequestValidationError) Key() bool { return e.key }
 
 // ErrorName returns error name.
-func (e ListWithdrawnLeavesRequestValidationError) ErrorName() string {
-	return "ListWithdrawnLeavesRequestValidationError"
+func (e ListWithdrawnOutputsRequestValidationError) ErrorName() string {
+	return "ListWithdrawnOutputsRequestValidationError"
 }
 
 // Error satisfies the builtin error interface
-func (e ListWithdrawnLeavesRequestValidationError) Error() string {
+func (e ListWithdrawnOutputsRequestValidationError) Error() string {
 	cause := ""
 	if e.cause != nil {
 		cause = fmt.Sprintf(" | caused by: %v", e.cause)
@@ -1422,14 +1423,14 @@ func (e ListWithdrawnLeavesRequestValidationError) Error() string {
 	}
 
 	return fmt.Sprintf(
-		"invalid %sListWithdrawnLeavesRequest.%s: %s%s",
+		"invalid %sListWithdrawnOutputsRequest.%s: %s%s",
 		key,
 		e.field,
 		e.reason,
 		cause)
 }
 
-var _ error = ListWithdrawnLeavesRequestValidationError{}
+var _ error = ListWithdrawnOutputsRequestValidationError{}
 
 var _ interface {
 	Field() string
@@ -1437,47 +1438,47 @@ var _ interface {
 	Key() bool
 	Cause() error
 	ErrorName() string
-} = ListWithdrawnLeavesRequestValidationError{}
+} = ListWithdrawnOutputsRequestValidationError{}
 
-// Validate checks the field values on ListWithdrawnLeavesResponse with the
+// Validate checks the field values on ListWithdrawnOutputsResponse with the
 // rules defined in the proto definition for this message. If any rules are
 // violated, the first error encountered is returned, or nil if there are no violations.
-func (m *ListWithdrawnLeavesResponse) Validate() error {
+func (m *ListWithdrawnOutputsResponse) Validate() error {
 	return m.validate(false)
 }
 
-// ValidateAll checks the field values on ListWithdrawnLeavesResponse with the
+// ValidateAll checks the field values on ListWithdrawnOutputsResponse with the
 // rules defined in the proto definition for this message. If any rules are
 // violated, the result is a list of violation errors wrapped in
-// ListWithdrawnLeavesResponseMultiError, or nil if none found.
-func (m *ListWithdrawnLeavesResponse) ValidateAll() error {
+// ListWithdrawnOutputsResponseMultiError, or nil if none found.
+func (m *ListWithdrawnOutputsResponse) ValidateAll() error {
 	return m.validate(true)
 }
 
-func (m *ListWithdrawnLeavesResponse) validate(all bool) error {
+func (m *ListWithdrawnOutputsResponse) validate(all bool) error {
 	if m == nil {
 		return nil
 	}
 
 	var errors []error
 
-	for idx, item := range m.GetLeaves() {
+	for idx, item := range m.GetOutputs() {
 		_, _ = idx, item
 
 		if all {
 			switch v := interface{}(item).(type) {
 			case interface{ ValidateAll() error }:
 				if err := v.ValidateAll(); err != nil {
-					errors = append(errors, ListWithdrawnLeavesResponseValidationError{
-						field:  fmt.Sprintf("Leaves[%v]", idx),
+					errors = append(errors, ListWithdrawnOutputsResponseValidationError{
+						field:  fmt.Sprintf("Outputs[%v]", idx),
 						reason: "embedded message failed validation",
 						cause:  err,
 					})
 				}
 			case interface{ Validate() error }:
 				if err := v.Validate(); err != nil {
-					errors = append(errors, ListWithdrawnLeavesResponseValidationError{
-						field:  fmt.Sprintf("Leaves[%v]", idx),
+					errors = append(errors, ListWithdrawnOutputsResponseValidationError{
+						field:  fmt.Sprintf("Outputs[%v]", idx),
 						reason: "embedded message failed validation",
 						cause:  err,
 					})
@@ -1485,8 +1486,8 @@ func (m *ListWithdrawnLeavesResponse) validate(all bool) error {
 			}
 		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
 			if err := v.Validate(); err != nil {
-				return ListWithdrawnLeavesResponseValidationError{
-					field:  fmt.Sprintf("Leaves[%v]", idx),
+				return ListWithdrawnOutputsResponseValidationError{
+					field:  fmt.Sprintf("Outputs[%v]", idx),
 					reason: "embedded message failed validation",
 					cause:  err,
 				}
@@ -1500,19 +1501,19 @@ func (m *ListWithdrawnLeavesResponse) validate(all bool) error {
 	}
 
 	if len(errors) > 0 {
-		return ListWithdrawnLeavesResponseMultiError(errors)
+		return ListWithdrawnOutputsResponseMultiError(errors)
 	}
 
 	return nil
 }
 
-// ListWithdrawnLeavesResponseMultiError is an error wrapping multiple
-// validation errors returned by ListWithdrawnLeavesResponse.ValidateAll() if
+// ListWithdrawnOutputsResponseMultiError is an error wrapping multiple
+// validation errors returned by ListWithdrawnOutputsResponse.ValidateAll() if
 // the designated constraints aren't met.
-type ListWithdrawnLeavesResponseMultiError []error
+type ListWithdrawnOutputsResponseMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
-func (m ListWithdrawnLeavesResponseMultiError) Error() string {
+func (m ListWithdrawnOutputsResponseMultiError) Error() string {
 	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
@@ -1521,12 +1522,12 @@ func (m ListWithdrawnLeavesResponseMultiError) Error() string {
 }
 
 // AllErrors returns a list of validation violation errors.
-func (m ListWithdrawnLeavesResponseMultiError) AllErrors() []error { return m }
+func (m ListWithdrawnOutputsResponseMultiError) AllErrors() []error { return m }
 
-// ListWithdrawnLeavesResponseValidationError is the validation error returned
-// by ListWithdrawnLeavesResponse.Validate if the designated constraints
+// ListWithdrawnOutputsResponseValidationError is the validation error returned
+// by ListWithdrawnOutputsResponse.Validate if the designated constraints
 // aren't met.
-type ListWithdrawnLeavesResponseValidationError struct {
+type ListWithdrawnOutputsResponseValidationError struct {
 	field  string
 	reason string
 	cause  error
@@ -1534,24 +1535,24 @@ type ListWithdrawnLeavesResponseValidationError struct {
 }
 
 // Field function returns field value.
-func (e ListWithdrawnLeavesResponseValidationError) Field() string { return e.field }
+func (e ListWithdrawnOutputsResponseValidationError) Field() string { return e.field }
 
 // Reason function returns reason value.
-func (e ListWithdrawnLeavesResponseValidationError) Reason() string { return e.reason }
+func (e ListWithdrawnOutputsResponseValidationError) Reason() string { return e.reason }
 
 // Cause function returns cause value.
-func (e ListWithdrawnLeavesResponseValidationError) Cause() error { return e.cause }
+func (e ListWithdrawnOutputsResponseValidationError) Cause() error { return e.cause }
 
 // Key function returns key value.
-func (e ListWithdrawnLeavesResponseValidationError) Key() bool { return e.key }
+func (e ListWithdrawnOutputsResponseValidationError) Key() bool { return e.key }
 
 // ErrorName returns error name.
-func (e ListWithdrawnLeavesResponseValidationError) ErrorName() string {
-	return "ListWithdrawnLeavesResponseValidationError"
+func (e ListWithdrawnOutputsResponseValidationError) ErrorName() string {
+	return "ListWithdrawnOutputsResponseValidationError"
 }
 
 // Error satisfies the builtin error interface
-func (e ListWithdrawnLeavesResponseValidationError) Error() string {
+func (e ListWithdrawnOutputsResponseValidationError) Error() string {
 	cause := ""
 	if e.cause != nil {
 		cause = fmt.Sprintf(" | caused by: %v", e.cause)
@@ -1563,14 +1564,14 @@ func (e ListWithdrawnLeavesResponseValidationError) Error() string {
 	}
 
 	return fmt.Sprintf(
-		"invalid %sListWithdrawnLeavesResponse.%s: %s%s",
+		"invalid %sListWithdrawnOutputsResponse.%s: %s%s",
 		key,
 		e.field,
 		e.reason,
 		cause)
 }
 
-var _ error = ListWithdrawnLeavesResponseValidationError{}
+var _ error = ListWithdrawnOutputsResponseValidationError{}
 
 var _ interface {
 	Field() string
@@ -1578,4 +1579,4 @@ var _ interface {
 	Key() bool
 	Cause() error
 	ErrorName() string
-} = ListWithdrawnLeavesResponseValidationError{}
+} = ListWithdrawnOutputsResponseValidationError{}

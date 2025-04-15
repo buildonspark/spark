@@ -101,8 +101,8 @@ func CreateStartedTransactionEntities(
 		}
 	}
 
-	outputEnts := make([]*TokenOutputCreate, 0, len(tokenTransaction.OutputLeaves))
-	for outputIndex, output := range tokenTransaction.OutputLeaves {
+	outputEnts := make([]*TokenOutputCreate, 0, len(tokenTransaction.TokenOutputs))
+	for outputIndex, output := range tokenTransaction.TokenOutputs {
 		revocationUUID, err := uuid.Parse(outputRevocationKeyshareIDs[outputIndex])
 		if err != nil {
 			return nil, err
@@ -121,7 +121,7 @@ func CreateStartedTransactionEntities(
 				SetOwnerPublicKey(output.OwnerPublicKey).
 				SetWithdrawBondSats(*output.WithdrawBondSats).
 				SetWithdrawRelativeBlockLocktime(*output.WithdrawRelativeBlockLocktime).
-				SetWithdrawRevocationCommitment(output.RevocationPublicKey).
+				SetWithdrawRevocationCommitment(output.RevocationCommitment).
 				SetTokenPublicKey(output.TokenPublicKey).
 				SetTokenAmount(output.TokenAmount).
 				SetCreatedTransactionOutputVout(int32(outputIndex)).
@@ -334,7 +334,7 @@ func FetchAndLockTokenTransactionData(ctx context.Context, finalTokenTransaction
 		return nil, err
 	}
 
-	tokenTransction, err := GetDbFromContext(ctx).TokenTransaction.Query().
+	tokenTransaction, err := GetDbFromContext(ctx).TokenTransaction.Query().
 		Where(tokentransaction.FinalizedTokenTransactionHash(finalTokenTransactionHash)).
 		WithCreatedOutput().
 		WithSpentOutput().
@@ -347,26 +347,26 @@ func FetchAndLockTokenTransactionData(ctx context.Context, finalTokenTransaction
 
 	// Sanity check that inputs and outputs matching the expected length were found.
 	if finalTokenTransaction.GetMintInput() != nil {
-		if tokenTransction.Edges.Mint == nil {
+		if tokenTransaction.Edges.Mint == nil {
 			return nil, fmt.Errorf("mint transaction must have a mint record, but none was found")
 		}
 	} else { // Transfer
-		if len(finalTokenTransaction.GetTransferInput().LeavesToSpend) != len(tokenTransction.Edges.SpentOutput) {
+		if len(finalTokenTransaction.GetTransferInput().OutputsToSpend) != len(tokenTransaction.Edges.SpentOutput) {
 			return nil, fmt.Errorf(
-				"number of inputs in transaction (%d) does not match number of spent outputs in transaction (%d)",
-				len(finalTokenTransaction.GetTransferInput().LeavesToSpend),
-				len(tokenTransction.Edges.SpentOutput),
+				"number of inputs in proto (%d) does not match number of spent outputs in database (%d)",
+				len(finalTokenTransaction.GetTransferInput().OutputsToSpend),
+				len(tokenTransaction.Edges.SpentOutput),
 			)
 		}
 	}
-	if len(finalTokenTransaction.OutputLeaves) != len(tokenTransction.Edges.CreatedOutput) {
+	if len(finalTokenTransaction.TokenOutputs) != len(tokenTransaction.Edges.CreatedOutput) {
 		return nil, fmt.Errorf(
-			"number of outputs in transaction (%d) does not match number of created outputs in transaction (%d)",
-			len(finalTokenTransaction.OutputLeaves),
-			len(tokenTransction.Edges.CreatedOutput),
+			"number of outputs in proto (%d) does not match number of created outputs in database (%d)",
+			len(finalTokenTransaction.TokenOutputs),
+			len(tokenTransaction.Edges.CreatedOutput),
 		)
 	}
-	return tokenTransction, nil
+	return tokenTransaction, nil
 }
 
 // MarshalProto converts a TokenTransaction to a spark protobuf TokenTransaction.
@@ -381,7 +381,7 @@ func (r *TokenTransaction) MarshalProto(config *so.Config) (*pb.TokenTransaction
 
 	// Create a new TokenTransaction
 	tokenTransaction := &pb.TokenTransaction{
-		OutputLeaves: make([]*pb.TokenLeafOutput, len(r.Edges.CreatedOutput)),
+		TokenOutputs: make([]*pb.TokenOutput, len(r.Edges.CreatedOutput)),
 		// Get all operator identity public keys from the config
 		SparkOperatorIdentityPublicKeys: operatorPublicKeys,
 	}
@@ -389,10 +389,10 @@ func (r *TokenTransaction) MarshalProto(config *so.Config) (*pb.TokenTransaction
 	// Set up output outputs
 	for i, output := range r.Edges.CreatedOutput {
 		idStr := output.ID.String()
-		tokenTransaction.OutputLeaves[i] = &pb.TokenLeafOutput{
+		tokenTransaction.TokenOutputs[i] = &pb.TokenOutput{
 			Id:                            &idStr,
 			OwnerPublicKey:                output.OwnerPublicKey,
-			RevocationPublicKey:           output.WithdrawRevocationCommitment,
+			RevocationCommitment:          output.WithdrawRevocationCommitment,
 			WithdrawBondSats:              &output.WithdrawBondSats,
 			WithdrawRelativeBlockLocktime: &output.WithdrawRelativeBlockLocktime,
 			TokenPublicKey:                output.TokenPublicKey,
@@ -403,16 +403,16 @@ func (r *TokenTransaction) MarshalProto(config *so.Config) (*pb.TokenTransaction
 	// Determine if this is a mint or transfer transaction.
 	if r.Edges.Mint != nil {
 		// This is a mint transaction.
-		tokenTransaction.TokenInput = &pb.TokenTransaction_MintInput{
-			MintInput: &pb.MintInput{
+		tokenTransaction.TokenInputs = &pb.TokenTransaction_MintInput{
+			MintInput: &pb.TokenMintInput{
 				IssuerPublicKey:         r.Edges.Mint.IssuerPublicKey,
 				IssuerProvidedTimestamp: r.Edges.Mint.WalletProvidedTimestamp,
 			},
 		}
 	} else if len(r.Edges.SpentOutput) > 0 {
 		// This is a transfer transaction
-		transferInput := &pb.TransferInput{
-			LeavesToSpend: make([]*pb.TokenLeafToSpend, len(r.Edges.SpentOutput)),
+		transferInput := &pb.TokenTransferInput{
+			OutputsToSpend: make([]*pb.TokenOutputToSpend, len(r.Edges.SpentOutput)),
 		}
 
 		for i, output := range r.Edges.SpentOutput {
@@ -421,13 +421,13 @@ func (r *TokenTransaction) MarshalProto(config *so.Config) (*pb.TokenTransaction
 				return nil, fmt.Errorf("output created transaction edge not loaded for output %s", output.ID)
 			}
 
-			transferInput.LeavesToSpend[i] = &pb.TokenLeafToSpend{
-				PrevTokenTransactionHash:     output.Edges.OutputCreatedTokenTransaction.FinalizedTokenTransactionHash,
-				PrevTokenTransactionLeafVout: uint32(output.CreatedTransactionOutputVout),
+			transferInput.OutputsToSpend[i] = &pb.TokenOutputToSpend{
+				PrevTokenTransactionHash: output.Edges.OutputCreatedTokenTransaction.FinalizedTokenTransactionHash,
+				PrevTokenTransactionVout: uint32(output.CreatedTransactionOutputVout),
 			}
 		}
 
-		tokenTransaction.TokenInput = &pb.TokenTransaction_TransferInput{
+		tokenTransaction.TokenInputs = &pb.TokenTransaction_TransferInput{
 			TransferInput: transferInput,
 		}
 	}

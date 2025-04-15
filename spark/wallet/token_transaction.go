@@ -29,12 +29,12 @@ type OperatorSignatures map[string][]byte
 
 // StartTokenTransaction requests the coordinator to build the final token transaction and
 // returns the StartTokenTransactionResponse. This includes filling the revocation public keys
-// for outputs, adding leaf ids and withdrawal params, and returning keyshare configuration.
+// for outputs, adding output ids and withdrawal params, and returning keyshare configuration.
 func StartTokenTransaction(
 	ctx context.Context,
 	config *Config,
 	tokenTransaction *pb.TokenTransaction,
-	leafToSpendPrivateKeys []*secp256k1.PrivateKey,
+	outputToSpendPrivateKeys []*secp256k1.PrivateKey,
 	_ [][]byte,
 ) (*pb.StartTokenTransactionResponse, []byte, []byte, error) {
 	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress(), nil)
@@ -65,7 +65,7 @@ func StartTokenTransaction(
 		return nil, nil, nil, err
 	}
 
-	// Gather owner (issuer or leaf) signatures
+	// Gather owner (issuer or output) signatures
 	var ownerSignatures [][]byte
 	if tokenTransaction.GetMintInput() != nil {
 		signingPrivKeySecp := secp256k1.PrivKeyFromBytes(config.IdentityPrivateKey.Serialize())
@@ -75,8 +75,8 @@ func StartTokenTransaction(
 		}
 		ownerSignatures = append(ownerSignatures, sig)
 	} else if tokenTransaction.GetTransferInput() != nil {
-		for i := range leafToSpendPrivateKeys {
-			sig, err := createTokenTransactionSignature(config, leafToSpendPrivateKeys[i], partialTokenTransactionHash)
+		for i := range outputToSpendPrivateKeys {
+			sig, err := createTokenTransactionSignature(config, outputToSpendPrivateKeys[i], partialTokenTransactionHash)
 			if err != nil {
 				return nil, nil, nil, fmt.Errorf("failed to create signature: %v", err)
 			}
@@ -122,14 +122,14 @@ func StartTokenTransaction(
 
 // SignTokenTransaction calls each signing operator to sign the final token transaction and
 // optionally return keyshares (for transfer transactions). It returns a 2D slice of
-// KeyshareWithOperatorIndex for each leaf if transfer, or an empty structure if mint.
+// KeyshareWithOperatorIndex for each output if transfer, or an empty structure if mint.
 // If specificOperatorIDs is provided and not empty, only those operators will be contacted.
 func SignTokenTransaction(
 	ctx context.Context,
 	config *Config,
 	finalTx *pb.TokenTransaction,
 	finalTxHash []byte,
-	leafToSpendPrivateKeys []*secp256k1.PrivateKey,
+	outputToSpendPrivateKeys []*secp256k1.PrivateKey,
 	specificOperatorIDs ...string,
 ) ([][]*KeyshareWithOperatorIndex, OperatorSignatures, error) {
 	// ---------------------------------------------------------------------
@@ -164,13 +164,13 @@ func SignTokenTransaction(
 
 	// For transfer transactions
 	if finalTx.GetTransferInput() != nil {
-		for i := range finalTx.GetTransferInput().GetLeavesToSpend() {
-			sig, err := createTokenTransactionSignature(config, leafToSpendPrivateKeys[i], payloadHash)
+		for i := range finalTx.GetTransferInput().GetOutputsToSpend() {
+			sig, err := createTokenTransactionSignature(config, outputToSpendPrivateKeys[i], payloadHash)
 			if err != nil {
 				return nil, nil, fmt.Errorf("failed to create signature: %v", err)
 			}
 			operatorSpecificSignatures = append(operatorSpecificSignatures, &pb.OperatorSpecificTokenTransactionSignature{
-				OwnerPublicKey: leafToSpendPrivateKeys[i].PubKey().SerializeCompressed(),
+				OwnerPublicKey: outputToSpendPrivateKeys[i].PubKey().SerializeCompressed(),
 				OwnerSignature: sig,
 				Payload:        payload,
 			})
@@ -180,7 +180,7 @@ func SignTokenTransaction(
 	// ---------------------------------------------------------------------
 	// (B) Contact each operator to sign
 	// ---------------------------------------------------------------------
-	leafRevocationKeyshares := make([][]*KeyshareWithOperatorIndex, len(finalTx.GetTransferInput().GetLeavesToSpend()))
+	outputRevocationKeyshares := make([][]*KeyshareWithOperatorIndex, len(finalTx.GetTransferInput().GetOutputsToSpend()))
 
 	// Determine which operators to contact
 	operatorsToContact := config.SigningOperators
@@ -226,10 +226,10 @@ func SignTokenTransaction(
 			return nil, nil, fmt.Errorf("invalid signature from operator with public key %x: %v", operator.IdentityPublicKey, err)
 		}
 
-		// Store leaf keyshares if transfer
-		for leafIndex, keyshare := range signTokenTransactionResponse.TokenTransactionRevocationKeyshares {
-			leafRevocationKeyshares[leafIndex] = append(
-				leafRevocationKeyshares[leafIndex],
+		// Store output keyshares if transfer
+		for outputIndex, keyshare := range signTokenTransactionResponse.TokenTransactionRevocationKeyshares {
+			outputRevocationKeyshares[outputIndex] = append(
+				outputRevocationKeyshares[outputIndex],
 				&KeyshareWithOperatorIndex{
 					Keyshare: keyshare,
 					Index:    parseHexIdentifierToUint64(operator.Identifier),
@@ -239,7 +239,7 @@ func SignTokenTransaction(
 		operatorSignaturesMap[operator.Identifier] = operatorSig
 	}
 
-	return leafRevocationKeyshares, operatorSignaturesMap, nil
+	return outputRevocationKeyshares, operatorSignaturesMap, nil
 }
 
 // FinalizeTokenTransaction handles the final step for transfer transactions, using the recovered
@@ -248,29 +248,29 @@ func FinalizeTokenTransaction(
 	ctx context.Context,
 	config *Config,
 	finalTx *pb.TokenTransaction,
-	leafRevocationKeyshares [][]*KeyshareWithOperatorIndex,
-	leafToSpendRevocationPublicKeys [][]byte,
+	outputRevocationKeyshares [][]*KeyshareWithOperatorIndex,
+	outputToSpendRevocationPublicKeys [][]byte,
 	startResponse *pb.StartTokenTransactionResponse,
 ) error {
 	// Recover secrets from keyshares
-	leafRecoveredSecrets := make([][]byte, len(finalTx.GetTransferInput().GetLeavesToSpend()))
-	for i, leafKeyshares := range leafRevocationKeyshares {
+	outputRecoveredSecrets := make([][]byte, len(finalTx.GetTransferInput().GetOutputsToSpend()))
+	for i, outputKeyshares := range outputRevocationKeyshares {
 		// Ensure we have enough shares
-		if len(leafKeyshares) < int(startResponse.KeyshareInfo.Threshold) {
+		if len(outputKeyshares) < int(startResponse.KeyshareInfo.Threshold) {
 			return fmt.Errorf(
-				"insufficient keyshares for leaf %d: got %d, need %d",
-				i, len(leafKeyshares), startResponse.KeyshareInfo.Threshold,
+				"insufficient keyshares for output %d: got %d, need %d",
+				i, len(outputKeyshares), startResponse.KeyshareInfo.Threshold,
 			)
 		}
 		seenIndices := make(map[uint64]bool)
-		for _, keyshare := range leafKeyshares {
+		for _, keyshare := range outputKeyshares {
 			if seenIndices[keyshare.Index] {
-				return fmt.Errorf("duplicate operator index %d for leaf %d", keyshare.Index, i)
+				return fmt.Errorf("duplicate operator index %d for output %d", keyshare.Index, i)
 			}
 			seenIndices[keyshare.Index] = true
 		}
-		shares := make([]*secretsharing.SecretShare, len(leafKeyshares))
-		for j, keyshareWithIndex := range leafKeyshares {
+		shares := make([]*secretsharing.SecretShare, len(outputKeyshares))
+		for j, keyshareWithIndex := range outputKeyshares {
 			shares[j] = &secretsharing.SecretShare{
 				FieldModulus: secp256k1.S256().N,
 				Threshold:    int(startResponse.KeyshareInfo.Threshold),
@@ -280,13 +280,13 @@ func FinalizeTokenTransaction(
 		}
 		recoveredKey, err := secretsharing.RecoverSecret(shares)
 		if err != nil {
-			return fmt.Errorf("failed to recover keyshare for leaf %d: %w", i, err)
+			return fmt.Errorf("failed to recover keyshare for output %d: %w", i, err)
 		}
-		leafRecoveredSecrets[i] = recoveredKey.Bytes()
+		outputRecoveredSecrets[i] = recoveredKey.Bytes()
 	}
 
 	// Validate revocation keys
-	if err := utils.ValidateRevocationKeys(leafRecoveredSecrets, leafToSpendRevocationPublicKeys); err != nil {
+	if err := utils.ValidateRevocationKeys(outputRecoveredSecrets, outputToSpendRevocationPublicKeys); err != nil {
 		return fmt.Errorf("invalid revocation keys: %w", err)
 	}
 
@@ -307,9 +307,9 @@ func FinalizeTokenTransaction(
 		operatorClient := pb.NewSparkServiceClient(operatorConn)
 
 		_, err = operatorClient.FinalizeTokenTransaction(operatorCtx, &pb.FinalizeTokenTransactionRequest{
-			FinalTokenTransaction:     startResponse.FinalTokenTransaction,
-			LeafToSpendRevocationKeys: leafRecoveredSecrets,
-			IdentityPublicKey:         config.IdentityPublicKey(),
+			FinalTokenTransaction:          startResponse.FinalTokenTransaction,
+			OutputToSpendRevocationSecrets: outputRecoveredSecrets,
+			IdentityPublicKey:              config.IdentityPublicKey(),
 		})
 		if err != nil {
 			log.Printf("Error while finalizing token transaction with operator %s: %v", operator.Identifier, err)
@@ -326,28 +326,28 @@ func BroadcastTokenTransaction(
 	ctx context.Context,
 	config *Config,
 	tokenTransaction *pb.TokenTransaction,
-	leafToSpendPrivateKeys []*secp256k1.PrivateKey,
-	leafToSpendRevocationPublicKeys [][]byte,
+	outputToSpendPrivateKeys []*secp256k1.PrivateKey,
+	outputToSpendRevocationPublicKeys [][]byte,
 ) (*pb.TokenTransaction, error) {
 	// 1) Start token transaction
 	startResp, _, finalTxHash, err := StartTokenTransaction(
 		ctx,
 		config,
 		tokenTransaction,
-		leafToSpendPrivateKeys,
-		leafToSpendRevocationPublicKeys,
+		outputToSpendPrivateKeys,
+		outputToSpendRevocationPublicKeys,
 	)
 	if err != nil {
 		return nil, err
 	}
 
 	// 2) Sign token transaction
-	leafRevocationKeyshares, _, err := SignTokenTransaction(
+	outputRevocationKeyshares, _, err := SignTokenTransaction(
 		ctx,
 		config,
 		startResp.FinalTokenTransaction,
 		finalTxHash,
-		leafToSpendPrivateKeys,
+		outputToSpendPrivateKeys,
 	)
 	if err != nil {
 		return nil, err
@@ -359,8 +359,8 @@ func BroadcastTokenTransaction(
 			ctx,
 			config,
 			startResp.FinalTokenTransaction,
-			leafRevocationKeyshares,
-			leafToSpendRevocationPublicKeys,
+			outputRevocationKeyshares,
+			outputToSpendRevocationPublicKeys,
 			startResp,
 		)
 		if err != nil {
@@ -475,7 +475,7 @@ func QueryTokenTransactions(
 	config *Config,
 	tokenPublicKeys [][]byte,
 	ownerPublicKeys [][]byte,
-	leafIDs []string,
+	outputIDs []string,
 	transactionHashes [][]byte,
 	offset int64,
 	limit int64,
@@ -497,7 +497,7 @@ func QueryTokenTransactions(
 	request := &pb.QueryTokenTransactionsRequest{
 		OwnerPublicKeys:        ownerPublicKeys,
 		TokenPublicKeys:        tokenPublicKeys,
-		LeafIds:                leafIDs,
+		OutputIds:              outputIDs,
 		TokenTransactionHashes: transactionHashes,
 		Limit:                  limit,
 		Offset:                 offset,

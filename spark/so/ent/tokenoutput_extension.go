@@ -16,7 +16,7 @@ import (
 // match the PrevTokenTransactionHash of each output, then loads the created outputs for those transactions,
 // and finally maps each input to the created output in the DB.
 // Return the outputs in the same order they were specified in the input object.
-func FetchTokenInputs(ctx context.Context, outputsToSpend []*pb.TokenLeafToSpend) ([]*TokenOutput, error) {
+func FetchTokenInputs(ctx context.Context, outputsToSpend []*pb.TokenOutputToSpend) ([]*TokenOutput, error) {
 	// Gather all distinct prev transaction hashes
 	var distinctTxHashes [][]byte
 	txHashMap := make(map[string]bool)
@@ -54,7 +54,7 @@ func FetchTokenInputs(ctx context.Context, outputsToSpend []*pb.TokenLeafToSpend
 
 		var foundOutput *TokenOutput
 		for _, createdOutput := range transaction.Edges.CreatedOutput {
-			if createdOutput.CreatedTransactionOutputVout == int32(output.PrevTokenTransactionLeafVout) {
+			if createdOutput.CreatedTransactionOutputVout == int32(output.PrevTokenTransactionVout) {
 				foundOutput = createdOutput
 				break
 			}
@@ -62,7 +62,7 @@ func FetchTokenInputs(ctx context.Context, outputsToSpend []*pb.TokenLeafToSpend
 		if foundOutput == nil {
 			return nil, fmt.Errorf("no created output found for prev tx hash %x and vout %d",
 				output.PrevTokenTransactionHash,
-				output.PrevTokenTransactionLeafVout)
+				output.PrevTokenTransactionVout)
 		}
 
 		outputToSpendEnts[i] = foundOutput

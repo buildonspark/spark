@@ -272,16 +272,16 @@ message StartDepositTreeCreationResponse {
 
 // This proto is constructed by the wallet to specify leaves it wants to spend as
 // part of the token transaction.
-message TokenLeafToSpend {
+message TokenOutputToSpend {
     bytes prev_token_transaction_hash = 1 [(validate.rules).bytes.len = 32];
-    uint32 prev_token_transaction_leaf_vout = 2; 
+    uint32 prev_token_transaction_vout = 2; 
 }
 
-message TransferInput {
-    repeated TokenLeafToSpend leaves_to_spend = 1;
+message TokenTransferInput {
+    repeated TokenOutputToSpend outputs_to_spend = 1;
 }
 
-message MintInput {
+message TokenMintInput {
     bytes issuer_public_key = 1 [(validate.rules).bytes.len = 33];
     // Issuer provided timestamp of when the transaction was signed/constructed. 
     // Helps provide idempotency and ensures that each mint input signature is unique 
@@ -293,13 +293,13 @@ message MintInput {
     uint64 issuer_provided_timestamp = 2;
 }
 
-// This proto is constructed by the wallet to specify leaves it wants to create
-// as part of a token transaction.  id and revocation public key should remain unfilled
+// This proto is constructed by the wallet to specify outputs it wants to create
+// as part of a token transaction. Output id and revocation public key should remain unfilled
 // so that the SE can fill them as part of the StartTokenTransaction() call.
-message TokenLeafOutput {
+message TokenOutput {
     optional string id = 1 [(validate.rules).string.uuid = true];
     bytes owner_public_key = 2 [(validate.rules).bytes.len = 33];
-    optional bytes revocation_public_key = 3 [(validate.rules).bytes.len = 33];
+    optional bytes revocation_commitment = 3 [(validate.rules).bytes.len = 33];
     optional uint64 withdraw_bond_sats = 4;
     optional uint64 withdraw_relative_block_locktime = 5;
     bytes token_public_key = 6 [(validate.rules).bytes.len = 33];
@@ -310,13 +310,13 @@ message TokenLeafOutput {
 // This proto is deterministically hashed to generate the token_transaction_hash that 
 // is cooperatively signed by the SO group to confirm a token transaction.
 message TokenTransaction {    
-    // For mint transactions issuer_public_key will be specified without any leaves_to_spend.
+    // For mint transactions issuer_public_key will be specified without any outputs_to_spend.
     // For transfer transactions the token amount in the input leaves must match the token amount in the output leaves.
-    oneof token_input {
-        MintInput mint_input = 1;
-        TransferInput transfer_input = 2;
+    oneof token_inputs {
+        TokenMintInput mint_input = 1;
+        TokenTransferInput transfer_input = 2;
     }
-    repeated TokenLeafOutput output_leaves = 3;
+    repeated TokenOutput token_outputs = 3;
     repeated bytes spark_operator_identity_public_keys = 4 [(validate.rules).repeated.items.bytes.len = 33];
     Network network = 10 [(validate.rules).enum = {not_in: [0]}];
 }
@@ -336,7 +336,7 @@ message TokenTransactionWithStatus {
 message TokenTransactionSignatures {
       // Filled by signing the partial token transaction hash with the owner/issuer private key.
       // For mint transactions this will be one signature for the input issuer_public_key
-      // For transfer transactions this will be one for each leaf for the leaf owner_public_key
+      // For transfer transactions this will be one for each output for the output owner_public_key
       // This is a Schnorr or ECDSA DER signature which can be between 64 and 73 bytes.
       repeated bytes owner_signatures = 1 [(validate.rules).repeated.items.bytes.min_len = 64, (validate.rules).repeated.items.bytes.max_len = 73];
 }
@@ -349,7 +349,7 @@ message StartTokenTransactionRequest {
 }
 
 message StartTokenTransactionResponse {
-    // This is the same token transaction sent by the wallet with leaf revocation public keys 
+    // This is the same token transaction sent by the wallet with output revocation public keys 
     // filled. This is the final transaction that is published and gossiped among LRC20 nodes.
     TokenTransaction final_token_transaction = 1;
     // Information for fetching and resolving the revocation keyshare on a transfer operation.
@@ -362,8 +362,8 @@ message OperatorSpecificTokenTransactionSignablePayload {
     bytes operator_identity_public_key = 2 [(validate.rules).bytes.len = 33];
 }
 
-// This message allows the sender of a leaf being spent to provide final evidence
-// that it owns a leaf to an SO when requesting signing and release of the  revocation keyshare.  
+// This message allows the sender of a output being spent to provide final evidence
+// that it owns a output to an SO when requesting signing and release of the  revocation keyshare.  
 message OperatorSpecificTokenTransactionSignature {
     bytes owner_public_key = 1 [(validate.rules).bytes.len = 33];
     // This is a Schnorr or ECDSA DER signature which can be between 64 and 73 bytes.
@@ -384,9 +384,9 @@ message SignTokenTransactionResponse {
 
 message FinalizeTokenTransactionRequest {
     TokenTransaction final_token_transaction = 1;
-    // List of ordered revocation keys that map 1:1 with leaves being spent in the
+    // List of ordered revocation secrets that map 1:1 with leaves being spent in the
     // token transaction.
-    repeated bytes leaf_to_spend_revocation_keys = 2 [(validate.rules).repeated.items.bytes.len = 32];
+    repeated bytes output_to_spend_revocation_secrets = 2 [(validate.rules).repeated.items.bytes.len = 32];
     bytes identity_public_key = 3 [(validate.rules).bytes.len = 33];
 }
 
@@ -406,7 +406,7 @@ message FreezeTokensRequest {
 }
 
 message FreezeTokensResponse {
-    repeated string impacted_leaf_ids = 1 [(validate.rules).repeated.items.string.uuid = true];
+    repeated string impacted_output_ids = 1 [(validate.rules).repeated.items.string.uuid = true];
     bytes impacted_token_amount = 2;  // Decoded uint128
 }
 
@@ -418,8 +418,8 @@ message QueryTokenOutputsRequest {
 
 // Request constraints are combined using an AND relation.
 message QueryTokenTransactionsRequest {
-    // Returns transactions that have one of these leaf ids in the input or output. 
-    repeated string leaf_ids = 1 [(validate.rules).repeated.items.string.uuid = true];
+    // Returns transactions that have one of these output ids in the input or output. 
+    repeated string output_ids = 1 [(validate.rules).repeated.items.string.uuid = true];
     // Returns transactions that have this owner public key as the sender or receiver in one or more of the input/output leaves.
     repeated bytes owner_public_keys = 2 [(validate.rules).repeated.items.bytes.len = 33];
     // Returns transactions that related to this token public key.
@@ -435,14 +435,14 @@ message QueryTokenTransactionsResponse {
     int64 offset = 2;
 }
 
-message LeafWithPreviousTransactionData {
-    TokenLeafOutput leaf = 1;
+message OutputWithPreviousTransactionData {
+    TokenOutput output = 1;
 	bytes previous_transaction_hash = 2 [(validate.rules).bytes.len = 32];
 	uint32 previous_transaction_vout = 3;
 }
 
 message QueryTokenOutputsResponse {
-    repeated LeafWithPreviousTransactionData leaves_with_previous_transaction_data = 1;
+    repeated OutputWithPreviousTransactionData outputs_with_previous_transaction_data = 1;
 }
 
 message CancelSignedTokenTransactionRequest {

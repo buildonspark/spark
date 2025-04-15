@@ -31,7 +31,7 @@ type SingleKeyWallet struct {
 	Config            *Config
 	SigningPrivateKey []byte
 	OwnedNodes        []*pb.TreeNode
-	OwnedTokenLeaves  []*pb.LeafWithPreviousTransactionData
+	OwnedTokenOutputs []*pb.OutputWithPreviousTransactionData
 }
 
 // NewSingleKeyWallet creates a new single key wallet.
@@ -635,13 +635,13 @@ func (w *SingleKeyWallet) MintTokens(ctx context.Context, amount uint64) error {
 
 	tokenIdentityPubKeyBytes := w.Config.IdentityPublicKey()
 	mintTransaction := &pb.TokenTransaction{
-		TokenInput: &pb.TokenTransaction_MintInput{
-			MintInput: &pb.MintInput{
+		TokenInputs: &pb.TokenTransaction_MintInput{
+			MintInput: &pb.TokenMintInput{
 				IssuerPublicKey:         tokenIdentityPubKeyBytes,
 				IssuerProvidedTimestamp: uint64(time.Now().UnixMilli()),
 			},
 		},
-		OutputLeaves: []*pb.TokenLeafOutput{
+		TokenOutputs: []*pb.TokenOutput{
 			{
 				OwnerPublicKey: tokenIdentityPubKeyBytes,
 				TokenPublicKey: tokenIdentityPubKeyBytes,       // Using user pubkey as token ID for this example
@@ -656,11 +656,11 @@ func (w *SingleKeyWallet) MintTokens(ctx context.Context, amount uint64) error {
 	if err != nil {
 		return fmt.Errorf("failed to broadcast mint transaction: %w", err)
 	}
-	newOwnedLeaves, err := GetOwnedTokenOutputsFromTokenTransaction(finalTokenTransaction, w.Config.IdentityPublicKey())
+	newOwnedOutputs, err := getOwnedOutputsFromTokenTransaction(finalTokenTransaction, w.Config.IdentityPublicKey())
 	if err != nil {
-		return fmt.Errorf("failed to add owned leaves: %w", err)
+		return fmt.Errorf("failed to add owned outputs: %w", err)
 	}
-	w.OwnedTokenLeaves = append(w.OwnedTokenLeaves, newOwnedLeaves...)
+	w.OwnedTokenOutputs = append(w.OwnedTokenOutputs, newOwnedOutputs...)
 	return nil
 }
 
@@ -683,31 +683,31 @@ func (w *SingleKeyWallet) TransferTokens(ctx context.Context, amount uint64, rec
 		tokenPublicKey = w.Config.IdentityPublicKey()
 	}
 
-	selectedLeavesWithPrevTxData, selectedLeavesAmount, err := selectTokenLeaves(ctx, w.Config, amount, tokenPublicKey, w.Config.IdentityPublicKey())
+	selectedOutputsWithPrevTxData, selectedOutputsAmount, err := selectTokenOutputs(ctx, w.Config, amount, tokenPublicKey, w.Config.IdentityPublicKey())
 	if err != nil {
-		return fmt.Errorf("failed to select token leaves: %w", err)
+		return fmt.Errorf("failed to select token outputs: %w", err)
 	}
 
-	leavesToSpend := make([]*pb.TokenLeafToSpend, len(selectedLeavesWithPrevTxData))
-	revocationPublicKeys := make([][]byte, len(selectedLeavesWithPrevTxData))
-	leavesToSpendPrivateKeys := make([]*secp256k1.PrivateKey, len(selectedLeavesWithPrevTxData))
-	for i, leaf := range selectedLeavesWithPrevTxData {
-		leavesToSpend[i] = &pb.TokenLeafToSpend{
-			PrevTokenTransactionHash:     leaf.GetPreviousTransactionHash(),
-			PrevTokenTransactionLeafVout: leaf.GetPreviousTransactionVout(),
+	outputsToSpend := make([]*pb.TokenOutputToSpend, len(selectedOutputsWithPrevTxData))
+	revocationPublicKeys := make([][]byte, len(selectedOutputsWithPrevTxData))
+	outputsToSpendPrivateKeys := make([]*secp256k1.PrivateKey, len(selectedOutputsWithPrevTxData))
+	for i, output := range selectedOutputsWithPrevTxData {
+		outputsToSpend[i] = &pb.TokenOutputToSpend{
+			PrevTokenTransactionHash: output.GetPreviousTransactionHash(),
+			PrevTokenTransactionVout: output.GetPreviousTransactionVout(),
 		}
-		revocationPublicKeys[i] = leaf.Leaf.RevocationPublicKey
-		// Assume all leaves to spend are owned by the wallet.
-		leavesToSpendPrivateKeys[i] = &w.Config.IdentityPrivateKey
+		revocationPublicKeys[i] = output.Output.RevocationCommitment
+		// Assume all outputs to spend are owned by the wallet.
+		outputsToSpendPrivateKeys[i] = &w.Config.IdentityPrivateKey
 	}
 
 	transferTransaction := &pb.TokenTransaction{
-		TokenInput: &pb.TokenTransaction_TransferInput{
-			TransferInput: &pb.TransferInput{
-				LeavesToSpend: leavesToSpend,
+		TokenInputs: &pb.TokenTransaction_TransferInput{
+			TransferInput: &pb.TokenTransferInput{
+				OutputsToSpend: outputsToSpend,
 			},
 		},
-		OutputLeaves: []*pb.TokenLeafOutput{
+		TokenOutputs: []*pb.TokenOutput{
 			{
 				OwnerPublicKey: receiverPubKey,
 				TokenPublicKey: tokenPublicKey,
@@ -717,49 +717,49 @@ func (w *SingleKeyWallet) TransferTokens(ctx context.Context, amount uint64, rec
 	}
 
 	// Send the remainder back to our wallet with an additional output if necessary.
-	if selectedLeavesAmount > amount {
-		remainder := selectedLeavesAmount - amount
-		changeOutput := &pb.TokenLeafOutput{
+	if selectedOutputsAmount > amount {
+		remainder := selectedOutputsAmount - amount
+		changeOutput := &pb.TokenOutput{
 			OwnerPublicKey: w.Config.IdentityPublicKey(),
 			TokenPublicKey: tokenPublicKey,
 			TokenAmount:    int64ToUint128Bytes(0, remainder),
 		}
-		transferTransaction.OutputLeaves = append(transferTransaction.OutputLeaves, changeOutput)
+		transferTransaction.TokenOutputs = append(transferTransaction.TokenOutputs, changeOutput)
 	}
 
-	finalTokenTransaction, err := BroadcastTokenTransaction(ctx, w.Config, transferTransaction, leavesToSpendPrivateKeys,
+	finalTokenTransaction, err := BroadcastTokenTransaction(ctx, w.Config, transferTransaction, outputsToSpendPrivateKeys,
 		revocationPublicKeys,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to broadcast transfer transaction: %w", err)
 	}
-	// Remove the spent leaves from the owned leaves list.
+	// Remove the spent outputs from the owned outputs list.
 	spentLeafMap := make(map[string]bool)
 	j := 0
-	for _, leaf := range selectedLeavesWithPrevTxData {
-		spentLeafMap[getLeafWithPrevTxKey(leaf)] = true
+	for _, output := range selectedOutputsWithPrevTxData {
+		spentLeafMap[getLeafWithPrevTxKey(output)] = true
 	}
-	for i := range w.OwnedTokenLeaves {
-		if !spentLeafMap[getLeafWithPrevTxKey(w.OwnedTokenLeaves[i])] {
-			w.OwnedTokenLeaves[j] = w.OwnedTokenLeaves[i]
+	for i := range w.OwnedTokenOutputs {
+		if !spentLeafMap[getLeafWithPrevTxKey(w.OwnedTokenOutputs[i])] {
+			w.OwnedTokenOutputs[j] = w.OwnedTokenOutputs[i]
 			j++
 		}
 	}
-	w.OwnedTokenLeaves = w.OwnedTokenLeaves[:j]
+	w.OwnedTokenOutputs = w.OwnedTokenOutputs[:j]
 
-	// Add the created leaves to the owned leaves list.
-	newOwnedLeaves, err := GetOwnedTokenOutputsFromTokenTransaction(finalTokenTransaction, w.Config.IdentityPublicKey())
+	// Add the created outputs to the owned outputs list.
+	newOwnedOutputs, err := getOwnedOutputsFromTokenTransaction(finalTokenTransaction, w.Config.IdentityPublicKey())
 	if err != nil {
-		return fmt.Errorf("failed to add owned leaves: %w", err)
+		return fmt.Errorf("failed to add owned outputs: %w", err)
 	}
-	w.OwnedTokenLeaves = append(w.OwnedTokenLeaves, newOwnedLeaves...)
+	w.OwnedTokenOutputs = append(w.OwnedTokenOutputs, newOwnedOutputs...)
 
 	return nil
 }
 
 // TokenBalance represents the balance for a specific token
 type TokenBalance struct {
-	NumLeaves   int
+	NumOutputs  int
 	TotalAmount uint64
 }
 
@@ -775,18 +775,18 @@ func (w *SingleKeyWallet) GetAllTokenBalances(ctx context.Context) (map[string]T
 		return nil, fmt.Errorf("failed to get token outputs: %w", err)
 	}
 
-	// Group leaves by token public key and calculate totals
+	// Group outputs by token public key and calculate totals
 	balances := make(map[string]TokenBalance)
-	for _, leaf := range response.LeavesWithPreviousTransactionData {
-		tokenPubKey := leaf.Leaf.TokenPublicKey
+	for _, output := range response.OutputsWithPreviousTransactionData {
+		tokenPubKey := output.Output.TokenPublicKey
 		balance := balances[hex.EncodeToString(tokenPubKey)]
 
-		_, amount, err := uint128BytesToInt64(leaf.Leaf.TokenAmount)
+		_, amount, err := uint128BytesToInt64(output.Output.TokenAmount)
 		if err != nil {
-			return nil, fmt.Errorf("invalid token amount in leaf: %w", err)
+			return nil, fmt.Errorf("invalid token amount in output: %w", err)
 		}
 
-		balance.NumLeaves++
+		balance.NumOutputs++
 		balance.TotalAmount += amount
 		balances[hex.EncodeToString(tokenPubKey)] = balance
 	}
@@ -809,60 +809,60 @@ func (w *SingleKeyWallet) GetTokenBalance(ctx context.Context, tokenPublicKey []
 		[][]byte{tokenPublicKey},
 	)
 	if err != nil {
-		return 0, 0, fmt.Errorf("failed to get token outputs: %w", err)
+		return 0, 0, fmt.Errorf("failed to get owned token outputs: %w", err)
 	}
 
-	// Calculate total amount across all leaves
+	// Calculate total amount across all outputs
 	totalAmount := uint64(0)
-	for _, leaf := range response.LeavesWithPreviousTransactionData {
-		_, amount, err := uint128BytesToInt64(leaf.Leaf.TokenAmount)
+	for _, output := range response.OutputsWithPreviousTransactionData {
+		_, amount, err := uint128BytesToInt64(output.Output.TokenAmount)
 		if err != nil {
-			return 0, 0, fmt.Errorf("invalid token amount in leaf: %w", err)
+			return 0, 0, fmt.Errorf("invalid token amount in output: %w", err)
 		}
 		totalAmount += amount
 	}
 
-	return len(response.LeavesWithPreviousTransactionData), totalAmount, nil
+	return len(response.OutputsWithPreviousTransactionData), totalAmount, nil
 }
 
-func selectTokenLeaves(ctx context.Context, config *Config, targetAmount uint64, tokenPublicKey []byte, ownerPublicKey []byte) ([]*pb.LeafWithPreviousTransactionData, uint64, error) {
+func selectTokenOutputs(ctx context.Context, config *Config, targetAmount uint64, tokenPublicKey []byte, ownerPublicKey []byte) ([]*pb.OutputWithPreviousTransactionData, uint64, error) {
 	// Fetch owned token leaves
-	ownedLeavesResponse, err := QueryTokenOutputs(ctx, config, [][]byte{ownerPublicKey}, [][]byte{tokenPublicKey})
+	ownedOutputsResponse, err := QueryTokenOutputs(ctx, config, [][]byte{ownerPublicKey}, [][]byte{tokenPublicKey})
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to get token outputs: %w", err)
+		return nil, 0, fmt.Errorf("failed to get owned token outputs: %w", err)
 	}
-	leavesWithPrevTxData := ownedLeavesResponse.LeavesWithPreviousTransactionData
+	outputsWithPrevTxData := ownedOutputsResponse.OutputsWithPreviousTransactionData
 
-	getTokenAmount := func(leaf *pb.LeafWithPreviousTransactionData) (uint64, error) {
-		_, amount, err := uint128BytesToInt64(leaf.Leaf.TokenAmount)
+	getTokenAmount := func(output *pb.OutputWithPreviousTransactionData) (uint64, error) {
+		_, amount, err := uint128BytesToInt64(output.Output.TokenAmount)
 		return amount, err
 	}
 
-	// Sort to spend smallest leaves first to proactively reduce withdrawal cost.
-	sort.Slice(leavesWithPrevTxData, func(i, j int) bool {
-		iAmount, _ := getTokenAmount(leavesWithPrevTxData[i])
-		jAmount, _ := getTokenAmount(leavesWithPrevTxData[j])
+	// Sort to spend smallest outputs first to proactively reduce withdrawal cost.
+	sort.Slice(outputsWithPrevTxData, func(i, j int) bool {
+		iAmount, _ := getTokenAmount(outputsWithPrevTxData[i])
+		jAmount, _ := getTokenAmount(outputsWithPrevTxData[j])
 		return iAmount < jAmount
 	})
 
-	selectedLeavesAmount := uint64(0)
-	selectedLeaves := make([]*pb.LeafWithPreviousTransactionData, 0)
-	for _, leaf := range leavesWithPrevTxData {
-		leafTokenAmount, err := getTokenAmount(leaf)
+	selectedOutputsAmount := uint64(0)
+	selectedOutputs := make([]*pb.OutputWithPreviousTransactionData, 0)
+	for _, output := range outputsWithPrevTxData {
+		outputTokenAmount, err := getTokenAmount(output)
 		if err != nil {
-			return nil, 0, fmt.Errorf("invalid token amount in leaf: %w", err)
+			return nil, 0, fmt.Errorf("invalid token amount in output: %w", err)
 		}
-		selectedLeavesAmount += uint64(leafTokenAmount)
-		selectedLeaves = append(selectedLeaves, leaf)
-		if selectedLeavesAmount >= targetAmount {
+		selectedOutputsAmount += uint64(outputTokenAmount)
+		selectedOutputs = append(selectedOutputs, output)
+		if selectedOutputsAmount >= targetAmount {
 			break
 		}
 	}
 
-	if selectedLeavesAmount < targetAmount {
-		return nil, 0, fmt.Errorf("insufficient tokens: have %d, need %d", selectedLeavesAmount, targetAmount)
+	if selectedOutputsAmount < targetAmount {
+		return nil, 0, fmt.Errorf("insufficient tokens: have %d, need %d", selectedOutputsAmount, targetAmount)
 	}
-	return selectedLeaves, selectedLeavesAmount, nil
+	return selectedOutputs, selectedOutputsAmount, nil
 }
 
 func uint128BytesToInt64(bytes []byte) (high uint64, low uint64, err error) {
@@ -881,33 +881,33 @@ func int64ToUint128Bytes(high, low uint64) []byte {
 	)
 }
 
-func GetOwnedTokenOutputsFromTokenTransaction(leaf *pb.TokenTransaction, walletPublicKey []byte) ([]*pb.LeafWithPreviousTransactionData, error) {
-	finalTokenTransactionHash, err := utils.HashTokenTransaction(leaf, false)
+func getOwnedOutputsFromTokenTransaction(output *pb.TokenTransaction, walletPublicKey []byte) ([]*pb.OutputWithPreviousTransactionData, error) {
+	finalTokenTransactionHash, err := utils.HashTokenTransaction(output, false)
 	if err != nil {
 		return nil, err
 	}
-	newLeavesToSpend := make([]*pb.LeafWithPreviousTransactionData, 0)
-	for i, leaf := range leaf.OutputLeaves {
-		if bytes.Equal(leaf.OwnerPublicKey, walletPublicKey) {
-			leafWithPrevTxData := &pb.LeafWithPreviousTransactionData{
-				Leaf: &pb.TokenLeafOutput{
-					OwnerPublicKey:      leaf.OwnerPublicKey,
-					RevocationPublicKey: leaf.RevocationPublicKey,
-					TokenPublicKey:      leaf.TokenPublicKey,
-					TokenAmount:         leaf.TokenAmount,
+	newOutputsToSpend := make([]*pb.OutputWithPreviousTransactionData, 0)
+	for i, output := range output.TokenOutputs {
+		if bytes.Equal(output.OwnerPublicKey, walletPublicKey) {
+			outputWithPrevTxData := &pb.OutputWithPreviousTransactionData{
+				Output: &pb.TokenOutput{
+					OwnerPublicKey:       output.OwnerPublicKey,
+					RevocationCommitment: output.RevocationCommitment,
+					TokenPublicKey:       output.TokenPublicKey,
+					TokenAmount:          output.TokenAmount,
 				},
 				PreviousTransactionHash: finalTokenTransactionHash,
 				PreviousTransactionVout: uint32(i),
 			}
-			newLeavesToSpend = append(newLeavesToSpend, leafWithPrevTxData)
+			newOutputsToSpend = append(newOutputsToSpend, outputWithPrevTxData)
 		}
 	}
-	return newLeavesToSpend, nil
+	return newOutputsToSpend, nil
 }
 
-func getLeafWithPrevTxKey(leaf *pb.LeafWithPreviousTransactionData) string {
-	txHashStr := hex.EncodeToString(leaf.GetPreviousTransactionHash())
-	return txHashStr + ":" + fmt.Sprintf("%d", leaf.GetPreviousTransactionVout())
+func getLeafWithPrevTxKey(output *pb.OutputWithPreviousTransactionData) string {
+	txHashStr := hex.EncodeToString(output.GetPreviousTransactionHash())
+	return txHashStr + ":" + fmt.Sprintf("%d", output.GetPreviousTransactionVout())
 }
 
 // FreezeTokens freezes all tokens owned by a specific owner public key.
@@ -925,7 +925,7 @@ func (w *SingleKeyWallet) FreezeTokens(ctx context.Context, ownerPublicKey []byt
 		return nil, 0, fmt.Errorf("failed to convert token amount: %w", err)
 	}
 
-	return response.ImpactedLeafIds, amount, nil
+	return response.ImpactedOutputIds, amount, nil
 }
 
 // UnfreezeTokens unfreezes all tokens owned by a specific owner public key.
@@ -943,7 +943,7 @@ func (w *SingleKeyWallet) UnfreezeTokens(ctx context.Context, ownerPublicKey []b
 		return nil, 0, fmt.Errorf("failed to convert token amount: %w", err)
 	}
 
-	return response.ImpactedLeafIds, amount, nil
+	return response.ImpactedOutputIds, amount, nil
 }
 
 func (w *SingleKeyWallet) SendToPhone(ctx context.Context, amount int64, phoneNumber string) (*pb.Transfer, error) {

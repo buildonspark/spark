@@ -21,13 +21,13 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	SparkService_SendSparkTx_FullMethodName         = "/rpc.v1.SparkService/SendSparkTx"
-	SparkService_SendSparkSignature_FullMethodName  = "/rpc.v1.SparkService/SendSparkSignature"
-	SparkService_ListSparkTxs_FullMethodName        = "/rpc.v1.SparkService/ListSparkTxs"
-	SparkService_GetSparkTx_FullMethodName          = "/rpc.v1.SparkService/GetSparkTx"
-	SparkService_VerifySparkTx_FullMethodName       = "/rpc.v1.SparkService/VerifySparkTx"
-	SparkService_FreezeTokens_FullMethodName        = "/rpc.v1.SparkService/FreezeTokens"
-	SparkService_ListWithdrawnLeaves_FullMethodName = "/rpc.v1.SparkService/ListWithdrawnLeaves"
+	SparkService_SendSparkTx_FullMethodName          = "/rpc.v1.SparkService/SendSparkTx"
+	SparkService_SendSparkSignature_FullMethodName   = "/rpc.v1.SparkService/SendSparkSignature"
+	SparkService_ListSparkTxs_FullMethodName         = "/rpc.v1.SparkService/ListSparkTxs"
+	SparkService_GetSparkTx_FullMethodName           = "/rpc.v1.SparkService/GetSparkTx"
+	SparkService_VerifySparkTx_FullMethodName        = "/rpc.v1.SparkService/VerifySparkTx"
+	SparkService_FreezeTokens_FullMethodName         = "/rpc.v1.SparkService/FreezeTokens"
+	SparkService_ListWithdrawnOutputs_FullMethodName = "/rpc.v1.SparkService/ListWithdrawnOutputs"
 )
 
 // SparkServiceClient is the client API for SparkService service.
@@ -40,7 +40,7 @@ type SparkServiceClient interface {
 	GetSparkTx(ctx context.Context, in *GetSparkTxRequest, opts ...grpc.CallOption) (*GetSparkTxResponse, error)
 	VerifySparkTx(ctx context.Context, in *VerifySparkTxRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	FreezeTokens(ctx context.Context, in *spark.FreezeTokensRequest, opts ...grpc.CallOption) (*spark.FreezeTokensResponse, error)
-	ListWithdrawnLeaves(ctx context.Context, in *ListWithdrawnLeavesRequest, opts ...grpc.CallOption) (*ListWithdrawnLeavesResponse, error)
+	ListWithdrawnOutputs(ctx context.Context, in *ListWithdrawnOutputsRequest, opts ...grpc.CallOption) (*ListWithdrawnOutputsResponse, error)
 }
 
 type sparkServiceClient struct {
@@ -111,10 +111,10 @@ func (c *sparkServiceClient) FreezeTokens(ctx context.Context, in *spark.FreezeT
 	return out, nil
 }
 
-func (c *sparkServiceClient) ListWithdrawnLeaves(ctx context.Context, in *ListWithdrawnLeavesRequest, opts ...grpc.CallOption) (*ListWithdrawnLeavesResponse, error) {
+func (c *sparkServiceClient) ListWithdrawnOutputs(ctx context.Context, in *ListWithdrawnOutputsRequest, opts ...grpc.CallOption) (*ListWithdrawnOutputsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ListWithdrawnLeavesResponse)
-	err := c.cc.Invoke(ctx, SparkService_ListWithdrawnLeaves_FullMethodName, in, out, cOpts...)
+	out := new(ListWithdrawnOutputsResponse)
+	err := c.cc.Invoke(ctx, SparkService_ListWithdrawnOutputs_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -131,7 +131,7 @@ type SparkServiceServer interface {
 	GetSparkTx(context.Context, *GetSparkTxRequest) (*GetSparkTxResponse, error)
 	VerifySparkTx(context.Context, *VerifySparkTxRequest) (*emptypb.Empty, error)
 	FreezeTokens(context.Context, *spark.FreezeTokensRequest) (*spark.FreezeTokensResponse, error)
-	ListWithdrawnLeaves(context.Context, *ListWithdrawnLeavesRequest) (*ListWithdrawnLeavesResponse, error)
+	ListWithdrawnOutputs(context.Context, *ListWithdrawnOutputsRequest) (*ListWithdrawnOutputsResponse, error)
 	mustEmbedUnimplementedSparkServiceServer()
 }
 
@@ -160,8 +160,8 @@ func (UnimplementedSparkServiceServer) VerifySparkTx(context.Context, *VerifySpa
 func (UnimplementedSparkServiceServer) FreezeTokens(context.Context, *spark.FreezeTokensRequest) (*spark.FreezeTokensResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method FreezeTokens not implemented")
 }
-func (UnimplementedSparkServiceServer) ListWithdrawnLeaves(context.Context, *ListWithdrawnLeavesRequest) (*ListWithdrawnLeavesResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ListWithdrawnLeaves not implemented")
+func (UnimplementedSparkServiceServer) ListWithdrawnOutputs(context.Context, *ListWithdrawnOutputsRequest) (*ListWithdrawnOutputsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListWithdrawnOutputs not implemented")
 }
 func (UnimplementedSparkServiceServer) mustEmbedUnimplementedSparkServiceServer() {}
 func (UnimplementedSparkServiceServer) testEmbeddedByValue()                      {}
@@ -292,20 +292,20 @@ func _SparkService_FreezeTokens_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
-func _SparkService_ListWithdrawnLeaves_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ListWithdrawnLeavesRequest)
+func _SparkService_ListWithdrawnOutputs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListWithdrawnOutputsRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(SparkServiceServer).ListWithdrawnLeaves(ctx, in)
+		return srv.(SparkServiceServer).ListWithdrawnOutputs(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: SparkService_ListWithdrawnLeaves_FullMethodName,
+		FullMethod: SparkService_ListWithdrawnOutputs_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SparkServiceServer).ListWithdrawnLeaves(ctx, req.(*ListWithdrawnLeavesRequest))
+		return srv.(SparkServiceServer).ListWithdrawnOutputs(ctx, req.(*ListWithdrawnOutputsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -342,8 +342,8 @@ var SparkService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _SparkService_FreezeTokens_Handler,
 		},
 		{
-			MethodName: "ListWithdrawnLeaves",
-			Handler:    _SparkService_ListWithdrawnLeaves_Handler,
+			MethodName: "ListWithdrawnOutputs",
+			Handler:    _SparkService_ListWithdrawnOutputs_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

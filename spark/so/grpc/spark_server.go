@@ -179,8 +179,7 @@ func (s *SparkServer) ReturnLightningPayment(ctx context.Context, req *pb.Return
 	return wrapWithGRPCError(lightningHandler.ReturnLightningPayment(ctx, req, false))
 }
 
-// StartTokenTransaction reserves revocation keyshares, fills the revocation public key to create the final token, and collects token transaction
-// signatures from each of the signing operators.
+// StartTokenTransaction reserves revocation keyshares, and fills the revocation commitment (and other SO-derived fields) to create the final token transaction.
 func (s *SparkServer) StartTokenTransaction(ctx context.Context, req *pb.StartTokenTransactionRequest) (*pb.StartTokenTransactionResponse, error) {
 	tokenTransactionHandler := handler.NewTokenTransactionHandler(s.config, s.db)
 	return wrapWithGRPCError(tokenTransactionHandler.StartTokenTransaction(ctx, s.config, req))
@@ -192,21 +191,21 @@ func (s *SparkServer) QueryNodes(ctx context.Context, req *pb.QueryNodesRequest)
 	return wrapWithGRPCError(treeQueryHandler.QueryNodes(ctx, req))
 }
 
-// GetTokenTransactionRevocationKeyshares allows the wallet to retrieve the revocation private key shares from each individual SO to
-// allow the wallet to combine these shares into the fully resolved revocation private key necessary for transaction finalization.
+// GetTokenTransactionRevocationKeyshares allows the wallet to retrieve the revocation keyshares from each individual SO to
+// allow the wallet to combine these shares into the fully resolved revocation secret necessary for transaction finalization.
 func (s *SparkServer) SignTokenTransaction(ctx context.Context, req *pb.SignTokenTransactionRequest) (*pb.SignTokenTransactionResponse, error) {
 	tokenTransactionHandler := handler.NewTokenTransactionHandler(s.config, s.db)
 	return wrapWithGRPCError(tokenTransactionHandler.SignTokenTransaction(ctx, s.config, req))
 }
 
-// FinalizeTokenTransaction verifies the revocation private keys constructed by the wallet and passes these keys to the LRC20 Node
-// to finalize the transaction. This operation irreversibly spends the input leaves associated with the transaction.
+// FinalizeTokenTransaction verifies the revocation secrets constructed by the wallet and passes these keys to the LRC20 Node
+// to finalize the transaction. This operation irreversibly spends the inputs associated with the transaction.
 func (s *SparkServer) FinalizeTokenTransaction(ctx context.Context, req *pb.FinalizeTokenTransactionRequest) (*emptypb.Empty, error) {
 	tokenTransactionHandler := handler.NewTokenTransactionHandler(s.config, s.db)
 	return wrapWithGRPCError(tokenTransactionHandler.FinalizeTokenTransaction(ctx, s.config, req))
 }
 
-// FreezeTokens prevents transfer of all leaves owned now and in the future by the provided owner public key.
+// FreezeTokens prevents transfer of all outputs owned now and in the future by the provided owner public key.
 // Unfreeze undos this operation and re-enables transfers.
 func (s *SparkServer) FreezeTokens(ctx context.Context, req *pb.FreezeTokensRequest) (*pb.FreezeTokensResponse, error) {
 	tokenTransactionHandler := handler.NewTokenTransactionHandler(s.config, s.db)

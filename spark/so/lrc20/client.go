@@ -14,7 +14,7 @@ import (
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/ent"
-	"github.com/lightsparkdev/spark-go/so/ent/tokenleaf"
+	"github.com/lightsparkdev/spark-go/so/ent/tokenoutput"
 	"google.golang.org/grpc"
 )
 
@@ -135,10 +135,10 @@ func (c *Client) connectToLrc20Node() (*grpc.ClientConn, error) {
 	return conn, nil
 }
 
-// MarkWithdrawnTokenLeaves gets a list of withdrawn token leaves from the LRC20 node.  This
-// marks these leaves as 'Withdrawn' and accordingly does not return them as 'owned leaves'
+// MarkWithdrawnTokenOutputs gets a list of withdrawn token outputs from the LRC20 node.  This
+// marks these outputs as 'Withdrawn' and accordingly does not return them as 'owned outputs'
 // when requested by wallets / external parties (which also allows for updating balance).
-func (c *Client) MarkWithdrawnTokenLeaves(
+func (c *Client) MarkWithdrawnTokenOutputs(
 	ctx context.Context,
 	_ common.Network,
 	dbTx *ent.Tx,
@@ -154,102 +154,102 @@ func (c *Client) MarkWithdrawnTokenLeaves(
 		return nil
 	}
 
-	allLeaves := []*pb.TokenLeafOutput{}
+	allOutputs := []*pb.TokenOutput{}
 
-	var pageResponse *pblrc20.ListWithdrawnLeavesResponse
+	var pageResponse *pblrc20.ListWithdrawnOutputsResponse
 	err := c.executeLrc20Call(func(client pblrc20.SparkServiceClient) error {
 		pageSize := uint32(DefaultPageSize)
 		var err error
-		pageResponse, err = client.ListWithdrawnLeaves(ctx, &pblrc20.ListWithdrawnLeavesRequest{
-			// TODO(DL-99): Fetch just for the latest blockhash instead of all withdrawn leaves.
+		pageResponse, err = client.ListWithdrawnOutputs(ctx, &pblrc20.ListWithdrawnOutputsRequest{
+			// TODO(DL-99): Fetch just for the latest blockhash instead of all withdrawn outputs.
 			// TODO(DL-98): Add support for pagination.
 			PageSize: &pageSize,
 		})
 		return err
 	})
 	if err != nil {
-		return fmt.Errorf("error fetching withdrawn leaves: %w", err)
+		return fmt.Errorf("error fetching withdrawn outputs: %w", err)
 	}
 
 	// Add the current page of results to our collection
-	allLeaves = append(allLeaves, pageResponse.Leaves...)
+	allOutputs = append(allOutputs, pageResponse.Outputs...)
 
-	slog.Info("Completed fetching all withdrawn leaves", "total", len(allLeaves))
+	slog.Info("Completed fetching all withdrawn outputs", "total", len(allOutputs))
 
-	// Mark each leaf as withdrawn in the database
-	if len(allLeaves) > 0 {
-		client := dbTx.TokenLeaf
-		var leafIDs []uuid.UUID
+	// Mark each output as withdrawn in the database
+	if len(allOutputs) > 0 {
+		client := dbTx.TokenOutput
+		var outputIDs []uuid.UUID
 
-		// First collect all valid leaf IDs
-		for _, leaf := range allLeaves {
-			leafUUID, err := uuid.Parse(*leaf.Id)
+		// First collect all valid output IDs
+		for _, output := range allOutputs {
+			outputUUID, err := uuid.Parse(*output.Id)
 			if err != nil {
-				slog.Warn("Failed to parse leaf ID as UUID",
-					"leaf_id", leaf.Id,
+				slog.Warn("Failed to parse output ID as UUID",
+					"output_id", output.Id,
 					"error", err)
 				continue
 			}
-			leafIDs = append(leafIDs, leafUUID)
+			outputIDs = append(outputIDs, outputUUID)
 		}
 
-		if len(leafIDs) > 0 {
+		if len(outputIDs) > 0 {
 			_, err := client.Update().
-				Where(tokenleaf.IDIn(leafIDs...)).
+				Where(tokenoutput.IDIn(outputIDs...)).
 				SetConfirmedWithdrawBlockHash(blockHash.CloneBytes()).
 				Save(ctx)
 			if err != nil {
-				return fmt.Errorf("failed to bulk update token leaves: %w", err)
+				return fmt.Errorf("failed to bulk update token outputs: %w", err)
 			}
 
-			slog.Debug("Successfully marked token leaves as withdrawn",
-				"count", len(leafIDs))
+			slog.Debug("Successfully marked token outputs as withdrawn",
+				"count", len(outputIDs))
 		}
 	}
 
 	return nil
 }
 
-// UnmarkWithdrawnTokenLeaves clears the withdrawn status for token leaves that were previously
+// UnmarkWithdrawnTokenOutputs clears the withdrawn status for token outputs that were previously
 // marked as withdrawn in a specific block. This is used during blockchain reorganizations to
-// restore token leaves that were withdrawn in blocks that are no longer part of the main chain.
-func (c *Client) UnmarkWithdrawnTokenLeaves(
+// restore token outputs that were withdrawn in blocks that are no longer part of the main chain.
+func (c *Client) UnmarkWithdrawnTokenOutputs(
 	ctx context.Context,
 	dbTx *ent.Tx,
 	blockHash *chainhash.Hash,
 ) error {
-	// Get all token leaves that were marked as withdrawn in this block
-	tokenLeaves, err := dbTx.TokenLeaf.Query().
-		Where(tokenleaf.ConfirmedWithdrawBlockHashEQ(blockHash.CloneBytes())).
+	// Get all token outputs that were marked as withdrawn in this block
+	tokenOutputs, err := dbTx.TokenOutput.Query().
+		Where(tokenoutput.ConfirmedWithdrawBlockHashEQ(blockHash.CloneBytes())).
 		All(ctx)
 	if err != nil {
-		return fmt.Errorf("error querying withdrawn leaves for block %s: %w", blockHash.String(), err)
+		return fmt.Errorf("error querying withdrawn outputs for block %s: %w", blockHash.String(), err)
 	}
 
-	count := len(tokenLeaves)
+	count := len(tokenOutputs)
 	if count == 0 {
-		slog.Info("No withdrawn token leaves found for block", "block_hash", blockHash.String())
+		slog.Info("No withdrawn token outputs found for block", "block_hash", blockHash.String())
 		return nil
 	}
 
-	slog.Info("Unmarking withdrawn token leaves due to reorg",
+	slog.Info("Unmarking withdrawn token outputs due to reorg",
 		"block_hash", blockHash.String(),
 		"count", count)
 
-	// Clear the confirmed_withdraw_block_hash field for all affected leaves
-	leafIDs := make([]uuid.UUID, len(tokenLeaves))
-	for i, leaf := range tokenLeaves {
-		leafIDs[i] = leaf.ID
+	// Clear the confirmed_withdraw_block_hash field for all affected outputs
+	outputIDs := make([]uuid.UUID, len(tokenOutputs))
+	for i, output := range tokenOutputs {
+		outputIDs[i] = output.ID
 	}
-	_, err = dbTx.TokenLeaf.Update().
-		Where(tokenleaf.IDIn(leafIDs...)).
+	_, err = dbTx.TokenOutput.Update().
+		Where(tokenoutput.IDIn(outputIDs...)).
 		ClearConfirmedWithdrawBlockHash().
 		Save(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to clear withdraw block hash for leaves: %w", err)
+		return fmt.Errorf("failed to clear withdraw block hash for outputs: %w", err)
 	}
 
-	slog.Info("Successfully unmarked token leaves",
+	slog.Info("Successfully unmarked token outputs",
 		"block_hash", blockHash.String(),
 		"count", count)
 

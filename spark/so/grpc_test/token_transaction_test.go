@@ -20,15 +20,15 @@ import (
 
 // Test token amounts for various operations
 const (
-	// The expected maximum number of leaves which can be created in a single transaction.
+	// The expected maximum number of outputs which can be created in a single transaction.
 	ManyLeavesCount = 100
-	// Amount for first output leaf in issuance transaction
+	// Amount for first created output in issuance transaction
 	TestIssueLeaf1Amount = 11111
-	// Amount for second output leaf in issuance transaction
+	// Amount for second created output in issuance transaction
 	TestIssueLeaf2Amount = 22222
-	// Amount for second output leaf in multiple leaf issuance transaction
+	// Amount for second created output in multiple output issuance transaction
 	TestIssueMultiplePerLeafAmount = 1000
-	// Amount for first (and only) output leaf in transfer transaction
+	// Amount for first (and only) created output in transfer transaction
 	TestTransferLeaf1Amount = 33333
 	// Configured at SO level. We validate in the tests to ensure these are populated correctly.
 	WithdrawalBondSatsInConfig              = 1000000
@@ -53,7 +53,7 @@ func getSigningOperatorPublicKeys(config *wallet.Config) [][]byte {
 func createTestTokenMintTransaction(config *wallet.Config,
 	tokenIdentityPubKeyBytes []byte,
 ) (*pb.TokenTransaction, *secp256k1.PrivateKey, *secp256k1.PrivateKey, error) {
-	// Generate two user leaf key pairs
+	// Generate two user output key pairs
 	userLeaf1PrivKey, err := secp256k1.GeneratePrivateKey()
 	if err != nil {
 		return nil, nil, nil, err
@@ -68,13 +68,13 @@ func createTestTokenMintTransaction(config *wallet.Config,
 
 	// Create the issuance transaction
 	issueTokenTransaction := &pb.TokenTransaction{
-		TokenInput: &pb.TokenTransaction_MintInput{
-			MintInput: &pb.MintInput{
+		TokenInputs: &pb.TokenTransaction_MintInput{
+			MintInput: &pb.TokenMintInput{
 				IssuerPublicKey:         tokenIdentityPubKeyBytes,
 				IssuerProvidedTimestamp: uint64(time.Now().UnixMilli()),
 			},
 		},
-		OutputLeaves: []*pb.TokenLeafOutput{
+		TokenOutputs: []*pb.TokenOutput{
 			{
 				OwnerPublicKey: userLeaf1PubKeyBytes,
 				TokenPublicKey: tokenIdentityPubKeyBytes,
@@ -105,21 +105,21 @@ func createTestTokenTransferTransaction(
 	userLeaf3PubKeyBytes := userLeaf3PrivKey.PubKey().SerializeCompressed()
 
 	transferTokenTransaction := &pb.TokenTransaction{
-		TokenInput: &pb.TokenTransaction_TransferInput{
-			TransferInput: &pb.TransferInput{
-				LeavesToSpend: []*pb.TokenLeafToSpend{
+		TokenInputs: &pb.TokenTransaction_TransferInput{
+			TransferInput: &pb.TokenTransferInput{
+				OutputsToSpend: []*pb.TokenOutputToSpend{
 					{
-						PrevTokenTransactionHash:     finalIssueTokenTransactionHash,
-						PrevTokenTransactionLeafVout: 0,
+						PrevTokenTransactionHash: finalIssueTokenTransactionHash,
+						PrevTokenTransactionVout: 0,
 					},
 					{
-						PrevTokenTransactionHash:     finalIssueTokenTransactionHash,
-						PrevTokenTransactionLeafVout: 1,
+						PrevTokenTransactionHash: finalIssueTokenTransactionHash,
+						PrevTokenTransactionVout: 1,
 					},
 				},
 			},
 		},
-		OutputLeaves: []*pb.TokenLeafOutput{
+		TokenOutputs: []*pb.TokenOutput{
 			{
 				OwnerPublicKey: userLeaf3PubKeyBytes,
 				TokenPublicKey: tokenIdentityPubKeyBytes,
@@ -133,11 +133,11 @@ func createTestTokenTransferTransaction(
 	return transferTokenTransaction, userLeaf3PrivKey, nil
 }
 
-func createTestTokenMintTransactionWithMultipleOutputLeaves(config *wallet.Config,
+func createTestTokenMintTransactionWithMultipleTokenOutputs(config *wallet.Config,
 	tokenIdentityPubKeyBytes []byte, numLeaves int,
 ) (*pb.TokenTransaction, []*secp256k1.PrivateKey, error) {
 	userLeafPrivKeys := make([]*secp256k1.PrivateKey, numLeaves)
-	outputLeaves := make([]*pb.TokenLeafOutput, numLeaves)
+	outputLeaves := make([]*pb.TokenOutput, numLeaves)
 
 	for i := 0; i < numLeaves; i++ {
 		privKey, err := secp256k1.GeneratePrivateKey()
@@ -147,7 +147,7 @@ func createTestTokenMintTransactionWithMultipleOutputLeaves(config *wallet.Confi
 		userLeafPrivKeys[i] = privKey
 		pubKeyBytes := privKey.PubKey().SerializeCompressed()
 
-		outputLeaves[i] = &pb.TokenLeafOutput{
+		outputLeaves[i] = &pb.TokenOutput{
 			OwnerPublicKey: pubKeyBytes,
 			TokenPublicKey: tokenIdentityPubKeyBytes,
 			TokenAmount:    int64ToUint128Bytes(0, TestIssueMultiplePerLeafAmount),
@@ -155,13 +155,13 @@ func createTestTokenMintTransactionWithMultipleOutputLeaves(config *wallet.Confi
 	}
 
 	issueTokenTransaction := &pb.TokenTransaction{
-		TokenInput: &pb.TokenTransaction_MintInput{
-			MintInput: &pb.MintInput{
+		TokenInputs: &pb.TokenTransaction_MintInput{
+			MintInput: &pb.TokenMintInput{
 				IssuerPublicKey:         tokenIdentityPubKeyBytes,
 				IssuerProvidedTimestamp: uint64(time.Now().UnixMilli()),
 			},
 		},
-		OutputLeaves:                    outputLeaves,
+		TokenOutputs:                    outputLeaves,
 		Network:                         config.ProtoNetwork(),
 		SparkOperatorIdentityPublicKeys: getSigningOperatorPublicKeys(config),
 	}
@@ -218,12 +218,12 @@ func TestBroadcastTokenTransactionMintAndTransferTokens(t *testing.T) {
 	log.Printf("issuance broadcast finalized token transaction: %v", finalIssueTokenTransaction)
 
 	// Validate withdrawal params match config
-	for i, leaf := range finalIssueTokenTransaction.OutputLeaves {
-		if leaf.GetWithdrawBondSats() != WithdrawalBondSatsInConfig {
-			t.Errorf("leaf %d: expected withdrawal bond sats 1000000, got %d", i, leaf.GetWithdrawBondSats())
+	for i, output := range finalIssueTokenTransaction.TokenOutputs {
+		if output.GetWithdrawBondSats() != WithdrawalBondSatsInConfig {
+			t.Errorf("output %d: expected withdrawal bond sats 1000000, got %d", i, output.GetWithdrawBondSats())
 		}
-		if leaf.GetWithdrawRelativeBlockLocktime() != uint64(WithdrawalRelativeBlockLocktimeInConfig) {
-			t.Errorf("leaf %d: expected withdrawal relative block locktime 1000, got %d", i, leaf.GetWithdrawRelativeBlockLocktime())
+		if output.GetWithdrawRelativeBlockLocktime() != uint64(WithdrawalRelativeBlockLocktimeInConfig) {
+			t.Errorf("output %d: expected withdrawal relative block locktime 1000, got %d", i, output.GetWithdrawRelativeBlockLocktime())
 		}
 	}
 
@@ -240,8 +240,8 @@ func TestBroadcastTokenTransactionMintAndTransferTokens(t *testing.T) {
 	}
 	userLeaf3PubKeyBytes := userLeaf3PrivKey.PubKey().SerializeCompressed()
 
-	revPubKey1 := finalIssueTokenTransaction.OutputLeaves[0].RevocationPublicKey
-	revPubKey2 := finalIssueTokenTransaction.OutputLeaves[1].RevocationPublicKey
+	revPubKey1 := finalIssueTokenTransaction.TokenOutputs[0].RevocationCommitment
+	revPubKey2 := finalIssueTokenTransaction.TokenOutputs[1].RevocationCommitment
 
 	transferTokenTransactionResponse, err := wallet.BroadcastTokenTransaction(
 		context.Background(), config, transferTokenTransaction,
@@ -259,7 +259,7 @@ func TestBroadcastTokenTransactionMintAndTransferTokens(t *testing.T) {
 		config,
 		[][]byte{tokenIdentityPubKeyBytes}, // token public key
 		nil,                                // owner public keys
-		nil,                                // leaf IDs
+		nil,                                // output IDs
 		nil,                                // transaction hashes
 		0,                                  // offset
 		1,                                  // limit - only get 1 transaction
@@ -290,7 +290,7 @@ func TestBroadcastTokenTransactionMintAndTransferTokens(t *testing.T) {
 		config,
 		[][]byte{tokenIdentityPubKeyBytes}, // token public key
 		nil,                                // owner public keys
-		nil,                                // leaf IDs
+		nil,                                // output IDs
 		nil,                                // transaction hashes
 		tokenTransactionsPage1.Offset,      // offset - use the offset from previous response (1)
 		1,                                  // limit - only get 1 transaction
@@ -324,7 +324,7 @@ func TestBroadcastTokenTransactionMintAndTransferTokens(t *testing.T) {
 		config,
 		[][]byte{tokenIdentityPubKeyBytes}, // token public key
 		nil,                                // owner public keys
-		nil,                                // leaf IDs
+		nil,                                // output IDs
 		nil,                                // transaction hashes
 		tokenTransactionsPage2.Offset,      // offset - use the offset from previous response
 		1,                                  // limit - only get 1 transaction
@@ -344,32 +344,32 @@ func TestBroadcastTokenTransactionMintAndTransferTokens(t *testing.T) {
 	}
 
 	// Now validate the transaction details from the paginated results
-	// Validate transfer output leaf
-	if len(transferTx.OutputLeaves) != 1 {
-		t.Fatalf("expected 1 output leaf in transfer transaction, got %d", len(transferTx.OutputLeaves))
+	// Validate transfer created output
+	if len(transferTx.TokenOutputs) != 1 {
+		t.Fatalf("expected 1 created output in transfer transaction, got %d", len(transferTx.TokenOutputs))
 	}
-	transferAmount := new(big.Int).SetBytes(transferTx.OutputLeaves[0].TokenAmount)
+	transferAmount := new(big.Int).SetBytes(transferTx.TokenOutputs[0].TokenAmount)
 	expectedTransferAmount := new(big.Int).SetBytes(int64ToUint128Bytes(0, TestTransferLeaf1Amount))
 	if transferAmount.Cmp(expectedTransferAmount) != 0 {
 		t.Fatalf("transfer amount %d does not match expected %d", transferAmount, expectedTransferAmount)
 	}
-	if !bytes.Equal(transferTx.OutputLeaves[0].OwnerPublicKey, userLeaf3PubKeyBytes) {
-		t.Fatal("transfer output leaf owner public key does not match expected")
+	if !bytes.Equal(transferTx.TokenOutputs[0].OwnerPublicKey, userLeaf3PubKeyBytes) {
+		t.Fatal("transfer created output owner public key does not match expected")
 	}
 
-	// Validate mint output leaves
-	if len(mintTx.OutputLeaves) != 2 {
-		t.Fatalf("expected 2 output leaves in mint transaction, got %d", len(mintTx.OutputLeaves))
+	// Validate mint created outputs
+	if len(mintTx.TokenOutputs) != 2 {
+		t.Fatalf("expected 2 created outputs in mint transaction, got %d", len(mintTx.TokenOutputs))
 	}
-	mintLeaf1Amount := new(big.Int).SetBytes(mintTx.OutputLeaves[0].TokenAmount)
-	mintLeaf2Amount := new(big.Int).SetBytes(mintTx.OutputLeaves[1].TokenAmount)
+	mintLeaf1Amount := new(big.Int).SetBytes(mintTx.TokenOutputs[0].TokenAmount)
+	mintLeaf2Amount := new(big.Int).SetBytes(mintTx.TokenOutputs[1].TokenAmount)
 	expectedLeaf1Amount := new(big.Int).SetBytes(int64ToUint128Bytes(0, TestIssueLeaf1Amount))
 	expectedLeaf2Amount := new(big.Int).SetBytes(int64ToUint128Bytes(0, TestIssueLeaf2Amount))
 	if mintLeaf1Amount.Cmp(expectedLeaf1Amount) != 0 {
-		t.Fatalf("mint leaf 1 amount %d does not match expected %d", mintLeaf1Amount, expectedLeaf1Amount)
+		t.Fatalf("mint output 1 amount %d does not match expected %d", mintLeaf1Amount, expectedLeaf1Amount)
 	}
 	if mintLeaf2Amount.Cmp(expectedLeaf2Amount) != 0 {
-		t.Fatalf("mint leaf 2 amount %d does not match expected %d", mintLeaf2Amount, expectedLeaf2Amount)
+		t.Fatalf("mint output 2 amount %d does not match expected %d", mintLeaf2Amount, expectedLeaf2Amount)
 	}
 }
 
@@ -380,20 +380,20 @@ func TestBroadcastTokenTransactionMintAndTransferTokensLotsOfLeaves(t *testing.T
 	tokenPrivKey := config.IdentityPrivateKey
 	tokenIdentityPubKeyBytes := tokenPrivKey.PubKey().SerializeCompressed()
 
-	// Try to create issuance transaction with 101 leaves (should fail)
-	tooBigIssuanceTransaction, _, err := createTestTokenMintTransactionWithMultipleOutputLeaves(config,
+	// Try to create issuance transaction with 101 outputs (should fail)
+	tooBigIssuanceTransaction, _, err := createTestTokenMintTransactionWithMultipleTokenOutputs(config,
 		tokenIdentityPubKeyBytes, 101)
 	require.NoError(t, err, "failed to create test token issuance transaction")
 
-	// Attempt to broadcast the issuance transaction with too many leaves
+	// Attempt to broadcast the issuance transaction with too many outputs
 	_, err = wallet.BroadcastTokenTransaction(
 		context.Background(), config, tooBigIssuanceTransaction,
 		[]*secp256k1.PrivateKey{&tokenPrivKey},
 		[][]byte{})
-	require.Error(t, err, "expected error when broadcasting issuance transaction with more than 100 output leaves")
+	require.Error(t, err, "expected error when broadcasting issuance transaction with more than 100 created outputs")
 
-	// Create issuance transaction with 100 leaves
-	issueTokenTransactionFirst100, userLeafPrivKeysFirst100, err := createTestTokenMintTransactionWithMultipleOutputLeaves(config,
+	// Create issuance transaction with 100 outputs
+	issueTokenTransactionFirst100, userLeafPrivKeysFirst100, err := createTestTokenMintTransactionWithMultipleTokenOutputs(config,
 		tokenIdentityPubKeyBytes, ManyLeavesCount)
 	require.NoError(t, err, "failed to create test token issuance transaction")
 
@@ -404,8 +404,8 @@ func TestBroadcastTokenTransactionMintAndTransferTokensLotsOfLeaves(t *testing.T
 		[][]byte{})
 	require.NoError(t, err, "failed to broadcast issuance token transaction")
 
-	// Create issuance transaction with 100 leaves
-	issueTokenTransactionSecond100, userLeafPrivKeysSecond100, err := createTestTokenMintTransactionWithMultipleOutputLeaves(config,
+	// Create issuance transaction with 100 outputs
+	issueTokenTransactionSecond100, userLeafPrivKeysSecond100, err := createTestTokenMintTransactionWithMultipleTokenOutputs(config,
 		tokenIdentityPubKeyBytes, ManyLeavesCount)
 	require.NoError(t, err, "failed to create test token issuance transaction")
 
@@ -428,28 +428,28 @@ func TestBroadcastTokenTransactionMintAndTransferTokensLotsOfLeaves(t *testing.T
 
 	consolidatedLeafPubKeyBytes := consolidatedLeafPrivKey.PubKey().SerializeCompressed()
 
-	// Create a transfer transaction that consolidates all leaves with too many inputs.
-	leavesToSpendTooMany := make([]*pb.TokenLeafToSpend, 200)
+	// Create a transfer transaction that consolidates all outputs with too many inputs.
+	outputsToSpendTooMany := make([]*pb.TokenOutputToSpend, 200)
 	for i := 0; i < 100; i++ {
-		leavesToSpendTooMany[i] = &pb.TokenLeafToSpend{
-			PrevTokenTransactionHash:     finalIssueTokenTransactionHashFirst100,
-			PrevTokenTransactionLeafVout: uint32(i),
+		outputsToSpendTooMany[i] = &pb.TokenOutputToSpend{
+			PrevTokenTransactionHash: finalIssueTokenTransactionHashFirst100,
+			PrevTokenTransactionVout: uint32(i),
 		}
 	}
 	for i := 0; i < 100; i++ {
-		leavesToSpendTooMany[100+i] = &pb.TokenLeafToSpend{
-			PrevTokenTransactionHash:     finalIssueTokenTransactionHashSecond100,
-			PrevTokenTransactionLeafVout: uint32(i),
+		outputsToSpendTooMany[100+i] = &pb.TokenOutputToSpend{
+			PrevTokenTransactionHash: finalIssueTokenTransactionHashSecond100,
+			PrevTokenTransactionVout: uint32(i),
 		}
 	}
 
 	tooManyTransaction := &pb.TokenTransaction{
-		TokenInput: &pb.TokenTransaction_TransferInput{
-			TransferInput: &pb.TransferInput{
-				LeavesToSpend: leavesToSpendTooMany,
+		TokenInputs: &pb.TokenTransaction_TransferInput{
+			TransferInput: &pb.TokenTransferInput{
+				OutputsToSpend: outputsToSpendTooMany,
 			},
 		},
-		OutputLeaves: []*pb.TokenLeafOutput{
+		TokenOutputs: []*pb.TokenOutput{
 			{
 				OwnerPublicKey: consolidatedLeafPubKeyBytes,
 				TokenPublicKey: tokenIdentityPubKeyBytes,
@@ -466,8 +466,8 @@ func TestBroadcastTokenTransactionMintAndTransferTokensLotsOfLeaves(t *testing.T
 	// Collect all revocation public keys from both transactions
 	allRevPubKeys := make([][]byte, 200)
 	for i := 0; i < 100; i++ {
-		allRevPubKeys[i] = finalIssueTokenTransactionFirst100.OutputLeaves[i].RevocationPublicKey
-		allRevPubKeys[i+100] = finalIssueTokenTransactionSecond100.OutputLeaves[i].RevocationPublicKey
+		allRevPubKeys[i] = finalIssueTokenTransactionFirst100.TokenOutputs[i].RevocationCommitment
+		allRevPubKeys[i+100] = finalIssueTokenTransactionSecond100.TokenOutputs[i].RevocationCommitment
 	}
 
 	// Broadcast the consolidation transaction
@@ -476,23 +476,23 @@ func TestBroadcastTokenTransactionMintAndTransferTokensLotsOfLeaves(t *testing.T
 		allUserLeafPrivKeys,
 		allRevPubKeys,
 	)
-	require.Error(t, err, "expected error when broadcasting issuance transaction with more than 100 input leaves")
+	require.Error(t, err, "expected error when broadcasting issuance transaction with more than 100 input outputs")
 
 	// Now try with just the first 100
-	leavesToSpend := make([]*pb.TokenLeafToSpend, 100)
+	outputsToSpend := make([]*pb.TokenOutputToSpend, 100)
 	for i := 0; i < 100; i++ {
-		leavesToSpend[i] = &pb.TokenLeafToSpend{
-			PrevTokenTransactionHash:     finalIssueTokenTransactionHashFirst100,
-			PrevTokenTransactionLeafVout: uint32(i),
+		outputsToSpend[i] = &pb.TokenOutputToSpend{
+			PrevTokenTransactionHash: finalIssueTokenTransactionHashFirst100,
+			PrevTokenTransactionVout: uint32(i),
 		}
 	}
 	consolidateTransaction := &pb.TokenTransaction{
-		TokenInput: &pb.TokenTransaction_TransferInput{
-			TransferInput: &pb.TransferInput{
-				LeavesToSpend: leavesToSpend,
+		TokenInputs: &pb.TokenTransaction_TransferInput{
+			TransferInput: &pb.TokenTransferInput{
+				OutputsToSpend: outputsToSpend,
 			},
 		},
-		OutputLeaves: []*pb.TokenLeafOutput{
+		TokenOutputs: []*pb.TokenOutput{
 			{
 				OwnerPublicKey: consolidatedLeafPubKeyBytes,
 				TokenPublicKey: tokenIdentityPubKeyBytes,
@@ -506,7 +506,7 @@ func TestBroadcastTokenTransactionMintAndTransferTokensLotsOfLeaves(t *testing.T
 	// Collect all revocation public keys
 	revPubKeys := make([][]byte, 100)
 	for i := 0; i < 100; i++ {
-		revPubKeys[i] = finalIssueTokenTransactionFirst100.OutputLeaves[i].RevocationPublicKey
+		revPubKeys[i] = finalIssueTokenTransactionFirst100.TokenOutputs[i].RevocationCommitment
 	}
 
 	// Broadcast the consolidation transaction
@@ -524,9 +524,9 @@ func TestBroadcastTokenTransactionMintAndTransferTokensLotsOfLeaves(t *testing.T
 		[][]byte{consolidatedLeafPubKeyBytes},
 		[][]byte{tokenIdentityPubKeyBytes},
 	)
-	require.NoError(t, err, "failed to get owned token leaves")
+	require.NoError(t, err, "failed to get owned token outputs")
 
-	require.Equal(t, 1, len(tokenOutputsResponse.LeavesWithPreviousTransactionData), "expected 1 consolidated leaf")
+	require.Equal(t, 1, len(tokenOutputsResponse.OutputsWithPreviousTransactionData), "expected 1 consolidated output")
 }
 
 func TestFreezeAndUnfreezeTokens(t *testing.T) {
@@ -547,18 +547,18 @@ func TestFreezeAndUnfreezeTokens(t *testing.T) {
 	log.Printf("issuance broadcast finalized token transaction: %v", finalIssueTokenTransaction)
 
 	// Validate withdrawal params match config
-	for i, leaf := range finalIssueTokenTransaction.OutputLeaves {
-		require.Equal(t, uint64(WithdrawalBondSatsInConfig), leaf.GetWithdrawBondSats(),
-			"leaf %d: expected withdrawal bond sats %d, got %d", i, uint64(WithdrawalBondSatsInConfig), leaf.GetWithdrawBondSats())
-		require.Equal(t, uint64(WithdrawalRelativeBlockLocktimeInConfig), leaf.GetWithdrawRelativeBlockLocktime(),
-			"leaf %d: expected withdrawal relative block locktime %d, got %d", i, uint64(WithdrawalRelativeBlockLocktimeInConfig), leaf.GetWithdrawRelativeBlockLocktime())
+	for i, output := range finalIssueTokenTransaction.TokenOutputs {
+		require.Equal(t, uint64(WithdrawalBondSatsInConfig), output.GetWithdrawBondSats(),
+			"output %d: expected withdrawal bond sats %d, got %d", i, uint64(WithdrawalBondSatsInConfig), output.GetWithdrawBondSats())
+		require.Equal(t, uint64(WithdrawalRelativeBlockLocktimeInConfig), output.GetWithdrawRelativeBlockLocktime(),
+			"output %d: expected withdrawal relative block locktime %d, got %d", i, uint64(WithdrawalRelativeBlockLocktimeInConfig), output.GetWithdrawRelativeBlockLocktime())
 	}
 
-	// Call FreezeTokens to freeze the output leaf
+	// Call FreezeTokens to freeze the created output
 	freezeResponse, err := wallet.FreezeTokens(
 		context.Background(),
 		config,
-		finalIssueTokenTransaction.OutputLeaves[0].OwnerPublicKey, // owner public key of the leaf to freeze
+		finalIssueTokenTransaction.TokenOutputs[0].OwnerPublicKey, // owner public key of the output to freeze
 		tokenIdentityPubKeyBytes,                                  // token public key
 		false,                                                     // unfreeze
 	)
@@ -567,15 +567,15 @@ func TestFreezeAndUnfreezeTokens(t *testing.T) {
 	// Convert frozen amount bytes to big.Int for comparison
 	frozenAmount := new(big.Int).SetBytes(freezeResponse.ImpactedTokenAmount)
 
-	// Calculate total amount from transaction output leaves
+	// Calculate total amount from transaction created outputs
 	expectedAmount := new(big.Int).SetBytes(int64ToUint128Bytes(0, TestIssueLeaf1Amount))
-	expectedLeafID := finalIssueTokenTransaction.OutputLeaves[0].Id
+	expectedLeafID := finalIssueTokenTransaction.TokenOutputs[0].Id
 
 	require.Equal(t, 0, frozenAmount.Cmp(expectedAmount),
 		"frozen amount %s does not match expected amount %s", frozenAmount.String(), expectedAmount.String())
-	require.Equal(t, 1, len(freezeResponse.ImpactedLeafIds), "expected 1 impacted leaf ID")
-	require.Equal(t, *expectedLeafID, freezeResponse.ImpactedLeafIds[0],
-		"frozen leaf ID %s does not match expected leaf ID %s", freezeResponse.ImpactedLeafIds[0], *expectedLeafID)
+	require.Equal(t, 1, len(freezeResponse.ImpactedOutputIds), "expected 1 impacted output ID")
+	require.Equal(t, *expectedLeafID, freezeResponse.ImpactedOutputIds[0],
+		"frozen output ID %s does not match expected output ID %s", freezeResponse.ImpactedOutputIds[0], *expectedLeafID)
 
 	finalIssueTokenTransactionHash, err := utils.HashTokenTransaction(finalIssueTokenTransaction, false)
 	require.NoError(t, err, "failed to hash final transfer token transaction")
@@ -587,8 +587,8 @@ func TestFreezeAndUnfreezeTokens(t *testing.T) {
 	)
 	require.NoError(t, err, "failed to create test token transfer transaction")
 
-	revPubKey1 := finalIssueTokenTransaction.OutputLeaves[0].RevocationPublicKey
-	revPubKey2 := finalIssueTokenTransaction.OutputLeaves[1].RevocationPublicKey
+	revPubKey1 := finalIssueTokenTransaction.TokenOutputs[0].RevocationCommitment
+	revPubKey2 := finalIssueTokenTransaction.TokenOutputs[1].RevocationCommitment
 
 	// Broadcast the token transaction
 	transferFrozenTokenTransactionResponse, err := wallet.BroadcastTokenTransaction(
@@ -600,11 +600,11 @@ func TestFreezeAndUnfreezeTokens(t *testing.T) {
 	require.Nil(t, transferFrozenTokenTransactionResponse, "expected nil response when transferring frozen tokens")
 	log.Printf("successfully froze tokens with response: %+v", freezeResponse)
 
-	// Call FreezeTokens to thaw the output leaf
+	// Call FreezeTokens to thaw the created output
 	unfreezeResponse, err := wallet.FreezeTokens(
 		context.Background(),
 		config,
-		finalIssueTokenTransaction.OutputLeaves[0].OwnerPublicKey, // owner public key of the leaf to freeze
+		finalIssueTokenTransaction.TokenOutputs[0].OwnerPublicKey, // owner public key of the output to freeze
 		tokenIdentityPubKeyBytes,
 		true, // unfreeze
 	)
@@ -615,9 +615,9 @@ func TestFreezeAndUnfreezeTokens(t *testing.T) {
 
 	require.Equal(t, 0, thawedAmount.Cmp(expectedAmount),
 		"thawed amount %s does not match expected amount %s", thawedAmount.String(), expectedAmount.String())
-	require.Equal(t, 1, len(unfreezeResponse.ImpactedLeafIds), "expected 1 impacted leaf ID")
-	require.Equal(t, *expectedLeafID, unfreezeResponse.ImpactedLeafIds[0],
-		"thawed leaf ID %s does not match expected leaf ID %s", unfreezeResponse.ImpactedLeafIds[0], *expectedLeafID)
+	require.Equal(t, 1, len(unfreezeResponse.ImpactedOutputIds), "expected 1 impacted output ID")
+	require.Equal(t, *expectedLeafID, unfreezeResponse.ImpactedOutputIds[0],
+		"thawed output ID %s does not match expected output ID %s", unfreezeResponse.ImpactedOutputIds[0], *expectedLeafID)
 
 	// Broadcast the token transaction
 	transferTokenTransactionResponse, err := wallet.BroadcastTokenTransaction(
@@ -640,8 +640,9 @@ func TestBroadcastTokenTransactionMintAndTransferTokensDoubleStart(t *testing.T)
 	require.NoError(t, err, "failed to create test token issuance transaction")
 
 	// Make a start token transaction that we will not continue.
-	_, _, _, _ = wallet.StartTokenTransaction(context.Background(), config, issueTokenTransaction, []*secp256k1.PrivateKey{&tokenPrivKey},
+	_, _, _, err = wallet.StartTokenTransaction(context.Background(), config, issueTokenTransaction, []*secp256k1.PrivateKey{&tokenPrivKey},
 		[][]byte{})
+	require.NoError(t, err, "failed to start token transaction that will not be continued")
 
 	// Create a new transaction which will change the issuer timestamp to avoid a DB unique key error.
 	issueTokenTransaction, userLeaf1PrivKey, userLeaf2PrivKey, err := createTestTokenMintTransaction(config, tokenIdentityPubKeyBytes)
@@ -656,11 +657,11 @@ func TestBroadcastTokenTransactionMintAndTransferTokensDoubleStart(t *testing.T)
 	log.Printf("issuance broadcast finalized token transaction: %v", finalIssueTokenTransaction)
 
 	// Validate withdrawal params match config
-	for i, leaf := range finalIssueTokenTransaction.OutputLeaves {
-		require.Equal(t, uint64(WithdrawalBondSatsInConfig), leaf.GetWithdrawBondSats(),
-			"leaf %d: expected withdrawal bond sats %d, got %d", i, uint64(WithdrawalBondSatsInConfig), leaf.GetWithdrawBondSats())
-		require.Equal(t, uint64(WithdrawalRelativeBlockLocktimeInConfig), leaf.GetWithdrawRelativeBlockLocktime(),
-			"leaf %d: expected withdrawal relative block locktime %d, got %d", i, uint64(WithdrawalRelativeBlockLocktimeInConfig), leaf.GetWithdrawRelativeBlockLocktime())
+	for i, output := range finalIssueTokenTransaction.TokenOutputs {
+		require.Equal(t, uint64(WithdrawalBondSatsInConfig), output.GetWithdrawBondSats(),
+			"output %d: expected withdrawal bond sats %d, got %d", i, uint64(WithdrawalBondSatsInConfig), output.GetWithdrawBondSats())
+		require.Equal(t, uint64(WithdrawalRelativeBlockLocktimeInConfig), output.GetWithdrawRelativeBlockLocktime(),
+			"output %d: expected withdrawal relative block locktime %d, got %d", i, uint64(WithdrawalRelativeBlockLocktimeInConfig), output.GetWithdrawRelativeBlockLocktime())
 	}
 
 	finalIssueTokenTransactionHash, err := utils.HashTokenTransaction(finalIssueTokenTransaction, false)
@@ -675,19 +676,20 @@ func TestBroadcastTokenTransactionMintAndTransferTokensDoubleStart(t *testing.T)
 	userLeaf3PubKeyBytes := userLeaf3PrivKey.PubKey().SerializeCompressed()
 
 	// Validate withdrawal params match config
-	for i, leaf := range finalIssueTokenTransaction.OutputLeaves {
-		require.Equal(t, uint64(WithdrawalBondSatsInConfig), leaf.GetWithdrawBondSats(),
-			"leaf %d: expected withdrawal bond sats %d, got %d", i, uint64(WithdrawalBondSatsInConfig), leaf.GetWithdrawBondSats())
-		require.Equal(t, uint64(WithdrawalRelativeBlockLocktimeInConfig), leaf.GetWithdrawRelativeBlockLocktime(),
-			"leaf %d: expected withdrawal relative block locktime %d, got %d", i, uint64(WithdrawalRelativeBlockLocktimeInConfig), leaf.GetWithdrawRelativeBlockLocktime())
+	for i, output := range finalIssueTokenTransaction.TokenOutputs {
+		require.Equal(t, uint64(WithdrawalBondSatsInConfig), output.GetWithdrawBondSats(),
+			"output %d: expected withdrawal bond sats %d, got %d", i, uint64(WithdrawalBondSatsInConfig), output.GetWithdrawBondSats())
+		require.Equal(t, uint64(WithdrawalRelativeBlockLocktimeInConfig), output.GetWithdrawRelativeBlockLocktime(),
+			"output %d: expected withdrawal relative block locktime %d, got %d", i, uint64(WithdrawalRelativeBlockLocktimeInConfig), output.GetWithdrawRelativeBlockLocktime())
 	}
 
-	revPubKey1 := finalIssueTokenTransaction.OutputLeaves[0].RevocationPublicKey
-	revPubKey2 := finalIssueTokenTransaction.OutputLeaves[1].RevocationPublicKey
+	revPubKey1 := finalIssueTokenTransaction.TokenOutputs[0].RevocationCommitment
+	revPubKey2 := finalIssueTokenTransaction.TokenOutputs[1].RevocationCommitment
 
 	// Make a start token transaction with identical params but dont continue.
-	_, _, _, _ = wallet.StartTokenTransaction(context.Background(), config, transferTokenTransaction, []*secp256k1.PrivateKey{userLeaf1PrivKey, userLeaf2PrivKey},
+	_, _, _, err = wallet.StartTokenTransaction(context.Background(), config, transferTokenTransaction, []*secp256k1.PrivateKey{userLeaf1PrivKey, userLeaf2PrivKey},
 		[][]byte{revPubKey1, revPubKey2})
+	require.NoError(t, err, "failed to start token transaction that will not be continued")
 
 	// Broadcast the transfer token transaction
 	transferTokenTransactionResponse, err := wallet.BroadcastTokenTransaction(
@@ -705,28 +707,28 @@ func TestBroadcastTokenTransactionMintAndTransferTokensDoubleStart(t *testing.T)
 		[][]byte{userLeaf3PubKeyBytes},
 		[][]byte{tokenIdentityPubKeyBytes},
 	)
-	require.NoError(t, err, "failed to get owned token leaves")
+	require.NoError(t, err, "failed to get owned token outputs")
 
 	// Validate the response
-	require.Equal(t, 1, len(tokenOutputsResponse.LeavesWithPreviousTransactionData), "expected 1 owned leaf")
+	require.Equal(t, 1, len(tokenOutputsResponse.OutputsWithPreviousTransactionData), "expected 1 owned output")
 
-	leaf := tokenOutputsResponse.LeavesWithPreviousTransactionData[0]
+	output := tokenOutputsResponse.OutputsWithPreviousTransactionData[0]
 
-	// Validate leaf details
-	require.True(t, bytes.Equal(leaf.Leaf.OwnerPublicKey, userLeaf3PubKeyBytes), "leaf owner public key does not match expected")
-	require.True(t, bytes.Equal(leaf.Leaf.TokenPublicKey, tokenIdentityPubKeyBytes), "leaf token public key does not match expected")
+	// Validate output details
+	require.True(t, bytes.Equal(output.Output.OwnerPublicKey, userLeaf3PubKeyBytes), "output owner public key does not match expected")
+	require.True(t, bytes.Equal(output.Output.TokenPublicKey, tokenIdentityPubKeyBytes), "output token public key does not match expected")
 
 	// Validate amount
 	expectedAmount := new(big.Int).SetBytes(int64ToUint128Bytes(0, TestTransferLeaf1Amount))
-	actualAmount := new(big.Int).SetBytes(leaf.Leaf.TokenAmount)
-	require.Equal(t, 0, actualAmount.Cmp(expectedAmount), "leaf token amount %d does not match expected %d", actualAmount, expectedAmount)
+	actualAmount := new(big.Int).SetBytes(output.Output.TokenAmount)
+	require.Equal(t, 0, actualAmount.Cmp(expectedAmount), "output token amount %d does not match expected %d", actualAmount, expectedAmount)
 
 	// Validate previous transaction data
 	transferTokenTransactionResponseHash, err := utils.HashTokenTransaction(transferTokenTransactionResponse, false)
 	require.NoError(t, err, "failed to hash final transfer token transaction")
 
-	require.True(t, bytes.Equal(leaf.PreviousTransactionHash, transferTokenTransactionResponseHash), "previous transaction hash does not match expected")
-	require.Equal(t, uint32(0), leaf.PreviousTransactionVout, "previous transaction vout expected 0, got %d", leaf.PreviousTransactionVout)
+	require.True(t, bytes.Equal(output.PreviousTransactionHash, transferTokenTransactionResponseHash), "previous transaction hash does not match expected")
+	require.Equal(t, uint32(0), output.PreviousTransactionVout, "previous transaction vout expected 0, got %d", output.PreviousTransactionVout)
 }
 
 // Helper function for testing token mint transaction with various signing scenarios
@@ -814,7 +816,7 @@ func testMintTransactionSigningScenarios(t *testing.T, config *wallet.Config,
 // - t: testing context
 // - config: wallet configuration
 // - finalIssueTokenTransaction: the finalized mint transaction
-// - userLeaf1PrivKey, userLeaf2PrivKey: private keys for the leaves
+// - userLeaf1PrivKey, userLeaf2PrivKey: private keys for the outputs
 // - testDoubleSign: whether to test double signing
 // - testDifferentTx: whether to test signing with a different transaction than was started
 // - expectedError: whether an error is expected during any of the signing operations
@@ -835,8 +837,8 @@ func testTransferTransactionSigningScenarios(t *testing.T, config *wallet.Config
 	)
 	require.NoError(t, err, "failed to create test token transfer transaction")
 
-	revPubKey1 := finalIssueTokenTransaction.OutputLeaves[0].RevocationPublicKey
-	revPubKey2 := finalIssueTokenTransaction.OutputLeaves[1].RevocationPublicKey
+	revPubKey1 := finalIssueTokenTransaction.TokenOutputs[0].RevocationCommitment
+	revPubKey2 := finalIssueTokenTransaction.TokenOutputs[1].RevocationCommitment
 
 	transferStartResp, _, transferFinalTxHash, err := wallet.StartTokenTransaction(
 		context.Background(),
@@ -1023,11 +1025,11 @@ func TestBroadcastTokenTransactionMintAndTransferTokensSchnorr(t *testing.T) {
 	log.Printf("issuance broadcast finalized token transaction: %v", finalIssueTokenTransaction)
 
 	// Validate withdrawal params match config
-	for i, leaf := range finalIssueTokenTransaction.OutputLeaves {
-		require.Equal(t, uint64(WithdrawalBondSatsInConfig), leaf.GetWithdrawBondSats(),
-			"leaf %d: expected withdrawal bond sats %d, got %d", i, uint64(WithdrawalBondSatsInConfig), leaf.GetWithdrawBondSats())
-		require.Equal(t, uint64(WithdrawalRelativeBlockLocktimeInConfig), leaf.GetWithdrawRelativeBlockLocktime(),
-			"leaf %d: expected withdrawal relative block locktime %d, got %d", i, uint64(WithdrawalRelativeBlockLocktimeInConfig), leaf.GetWithdrawRelativeBlockLocktime())
+	for i, output := range finalIssueTokenTransaction.TokenOutputs {
+		require.Equal(t, uint64(WithdrawalBondSatsInConfig), output.GetWithdrawBondSats(),
+			"output %d: expected withdrawal bond sats %d, got %d", i, uint64(WithdrawalBondSatsInConfig), output.GetWithdrawBondSats())
+		require.Equal(t, uint64(WithdrawalRelativeBlockLocktimeInConfig), output.GetWithdrawRelativeBlockLocktime(),
+			"output %d: expected withdrawal relative block locktime %d, got %d", i, uint64(WithdrawalRelativeBlockLocktimeInConfig), output.GetWithdrawRelativeBlockLocktime())
 	}
 
 	finalIssueTokenTransactionHash, err := utils.HashTokenTransaction(finalIssueTokenTransaction, false)
@@ -1039,8 +1041,8 @@ func TestBroadcastTokenTransactionMintAndTransferTokensSchnorr(t *testing.T) {
 	)
 	require.NoError(t, err, "failed to create test token transfer transaction")
 
-	revPubKey1 := finalIssueTokenTransaction.OutputLeaves[0].RevocationPublicKey
-	revPubKey2 := finalIssueTokenTransaction.OutputLeaves[1].RevocationPublicKey
+	revPubKey1 := finalIssueTokenTransaction.TokenOutputs[0].RevocationCommitment
+	revPubKey2 := finalIssueTokenTransaction.TokenOutputs[1].RevocationCommitment
 
 	transferTokenTransactionResponse, err := wallet.BroadcastTokenTransaction(
 		context.Background(), config, transferTokenTransaction,
@@ -1069,7 +1071,7 @@ func TestFreezeAndUnfreezeTokensSchnorr(t *testing.T) {
 	_, err = wallet.FreezeTokens(
 		context.Background(),
 		config,
-		finalIssueTokenTransaction.OutputLeaves[0].OwnerPublicKey,
+		finalIssueTokenTransaction.TokenOutputs[0].OwnerPublicKey,
 		tokenIdentityPubKeyBytes,
 		false,
 	)
@@ -1136,8 +1138,8 @@ func TestCancelTokenTransaction(t *testing.T) {
 	)
 	require.NoError(t, err, "failed to create test token transfer transaction")
 
-	revPubKey1 := finalIssueTokenTransaction.OutputLeaves[0].RevocationPublicKey
-	revPubKey2 := finalIssueTokenTransaction.OutputLeaves[1].RevocationPublicKey
+	revPubKey1 := finalIssueTokenTransaction.TokenOutputs[0].RevocationCommitment
+	revPubKey2 := finalIssueTokenTransaction.TokenOutputs[1].RevocationCommitment
 
 	transferStartResp, _, transferFinalTxHash, err := wallet.StartTokenTransaction(
 		context.Background(),
@@ -1215,21 +1217,21 @@ func TestBroadcastTokenTransactionWithInvalidPrevTxHash(t *testing.T) {
 
 	// Create transfer transaction with corrupted hash
 	transferTokenTransaction := &pb.TokenTransaction{
-		TokenInput: &pb.TokenTransaction_TransferInput{
-			TransferInput: &pb.TransferInput{
-				LeavesToSpend: []*pb.TokenLeafToSpend{
+		TokenInputs: &pb.TokenTransaction_TransferInput{
+			TransferInput: &pb.TokenTransferInput{
+				OutputsToSpend: []*pb.TokenOutputToSpend{
 					{
-						PrevTokenTransactionHash:     corruptedHash, // Corrupted hash
-						PrevTokenTransactionLeafVout: 0,
+						PrevTokenTransactionHash: corruptedHash, // Corrupted hash
+						PrevTokenTransactionVout: 0,
 					},
 					{
-						PrevTokenTransactionHash:     finalIssueTokenTransactionHash,
-						PrevTokenTransactionLeafVout: 1,
+						PrevTokenTransactionHash: finalIssueTokenTransactionHash,
+						PrevTokenTransactionVout: 1,
 					},
 				},
 			},
 		},
-		OutputLeaves: []*pb.TokenLeafOutput{
+		TokenOutputs: []*pb.TokenOutput{
 			{
 				OwnerPublicKey: userLeaf1PrivKey.PubKey().SerializeCompressed(),
 				TokenPublicKey: tokenIdentityPubKeyBytes,
@@ -1240,8 +1242,8 @@ func TestBroadcastTokenTransactionWithInvalidPrevTxHash(t *testing.T) {
 		SparkOperatorIdentityPublicKeys: getSigningOperatorPublicKeys(config),
 	}
 
-	revPubKey1 := finalIssueTokenTransaction.OutputLeaves[0].RevocationPublicKey
-	revPubKey2 := finalIssueTokenTransaction.OutputLeaves[1].RevocationPublicKey
+	revPubKey1 := finalIssueTokenTransaction.TokenOutputs[0].RevocationCommitment
+	revPubKey2 := finalIssueTokenTransaction.TokenOutputs[1].RevocationCommitment
 
 	// Attempt to broadcast the transfer transaction with corrupted hash
 	// This should fail validation
@@ -1256,21 +1258,21 @@ func TestBroadcastTokenTransactionWithInvalidPrevTxHash(t *testing.T) {
 
 	// Try with only the second hash corrupted
 	transferTokenTransaction2 := &pb.TokenTransaction{
-		TokenInput: &pb.TokenTransaction_TransferInput{
-			TransferInput: &pb.TransferInput{
-				LeavesToSpend: []*pb.TokenLeafToSpend{
+		TokenInputs: &pb.TokenTransaction_TransferInput{
+			TransferInput: &pb.TokenTransferInput{
+				OutputsToSpend: []*pb.TokenOutputToSpend{
 					{
-						PrevTokenTransactionHash:     finalIssueTokenTransactionHash,
-						PrevTokenTransactionLeafVout: 0,
+						PrevTokenTransactionHash: finalIssueTokenTransactionHash,
+						PrevTokenTransactionVout: 0,
 					},
 					{
-						PrevTokenTransactionHash:     append(finalIssueTokenTransactionHash, 0xAA), // Corrupted hash
-						PrevTokenTransactionLeafVout: 1,
+						PrevTokenTransactionHash: append(finalIssueTokenTransactionHash, 0xAA), // Corrupted hash
+						PrevTokenTransactionVout: 1,
 					},
 				},
 			},
 		},
-		OutputLeaves: []*pb.TokenLeafOutput{
+		TokenOutputs: []*pb.TokenOutput{
 			{
 				OwnerPublicKey: userLeaf1PrivKey.PubKey().SerializeCompressed(),
 				TokenPublicKey: tokenIdentityPubKeyBytes,
@@ -1312,14 +1314,14 @@ func TestBroadcastTokenTransactionUnspecifiedNetwork(t *testing.T) {
 }
 
 // cloneTransferTransactionWithDifferentOutputOwner creates a copy of a transfer transaction
-// with a modified owner public key in the first output leaf
+// with a modified owner public key in the first output
 func cloneTransferTransactionWithDifferentOutputOwner(
 	tx *pb.TokenTransaction,
 	newOwnerPubKey []byte,
 ) *pb.TokenTransaction {
 	clone := proto.Clone(tx).(*pb.TokenTransaction)
-	if len(clone.OutputLeaves) > 0 {
-		clone.OutputLeaves[0].OwnerPublicKey = newOwnerPubKey
+	if len(clone.TokenOutputs) > 0 {
+		clone.TokenOutputs[0].OwnerPublicKey = newOwnerPubKey
 	}
 	return clone
 }

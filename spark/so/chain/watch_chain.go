@@ -452,7 +452,7 @@ func handleBlock(ctx context.Context,
 
 	// Use the lrc20 client to sync withdrawn leaves - it will handle all the processing internally
 	lrc20Client := lrc20.NewClient(soConfig)
-	err = lrc20Client.MarkWithdrawnTokenLeaves(ctx, network, dbTx, blockHash)
+	err = lrc20Client.MarkWithdrawnTokenOutputs(ctx, network, dbTx, blockHash)
 	if err != nil {
 		logger.Error("Failed to sync withdrawn leaves", "error", err)
 		return err

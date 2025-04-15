@@ -54,7 +54,7 @@ func (o TokenTransactionHandler) StartTokenTransaction(ctx context.Context, conf
 	}
 
 	// Each created output requires a keyshare for revocation key generation.
-	numRevocationKeysharesNeeded := len(req.PartialTokenTransaction.OutputLeaves)
+	numRevocationKeysharesNeeded := len(req.PartialTokenTransaction.TokenOutputs)
 	keyshares, err := ent.GetUnusedSigningKeyshares(ctx, o.db, config, numRevocationKeysharesNeeded)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get unused signing keyshares: %w", err)
@@ -69,14 +69,14 @@ func (o TokenTransactionHandler) StartTokenTransaction(ctx context.Context, conf
 
 	// Fill revocation commitments and withdrawal bond/locktime for each output.
 	finalTokenTransaction := req.PartialTokenTransaction
-	for i, output := range finalTokenTransaction.OutputLeaves {
+	for i, output := range finalTokenTransaction.TokenOutputs {
 		id, err := uuid.NewV7()
 		if err != nil {
 			return nil, err
 		}
 		idStr := id.String()
 		output.Id = &idStr
-		output.RevocationPublicKey = keyshares[i].PublicKey
+		output.RevocationCommitment = keyshares[i].PublicKey
 	}
 
 	// Save the token transaction object to lock in the revocation commitments for each created output within this transaction.
@@ -99,11 +99,10 @@ func (o TokenTransactionHandler) StartTokenTransaction(ctx context.Context, conf
 
 		// Fill revocation commitments and withdrawal bond/locktime for each output.
 		finalTokenTransaction := req.PartialTokenTransaction
-		for i, output := range finalTokenTransaction.OutputLeaves {
+		for i, output := range finalTokenTransaction.TokenOutputs {
 			outputID := uuid.New().String()
 			output.Id = &outputID
-			output.RevocationPublicKey = keyshares[i].PublicKey
-			// TODO: Support non-regtest configs by providing network as a field in the transaction.
+			output.RevocationCommitment = keyshares[i].PublicKey
 			withdrawalBondSats := config.Lrc20Configs[network.String()].WithdrawBondSats
 			output.WithdrawBondSats = &withdrawalBondSats
 			withdrawRelativeBlockLocktime := config.Lrc20Configs[network.String()].WithdrawRelativeBlockLocktime
@@ -412,17 +411,17 @@ func (o TokenTransactionHandler) FinalizeTokenTransaction(
 
 	// Extract revocation commitments from spent outputs.
 	revocationPublicKeys := make([][]byte, len(tokenTransaction.Edges.SpentOutput))
-	if (len(tokenTransaction.Edges.SpentOutput)) != len(req.LeafToSpendRevocationKeys) {
+	if (len(tokenTransaction.Edges.SpentOutput)) != len(req.OutputToSpendRevocationSecrets) {
 		return nil, fmt.Errorf(
 			"number of revocation keys (%d) does not match number of spent outputs (%d)",
-			len(req.LeafToSpendRevocationKeys),
+			len(req.OutputToSpendRevocationSecrets),
 			len(tokenTransaction.Edges.SpentOutput),
 		)
 	}
 	for _, output := range tokenTransaction.Edges.SpentOutput {
 		revocationPublicKeys[output.SpentTransactionInputVout] = output.WithdrawRevocationCommitment
 	}
-	err = utils.ValidateRevocationKeys(req.LeafToSpendRevocationKeys, revocationPublicKeys)
+	err = utils.ValidateRevocationKeys(req.OutputToSpendRevocationSecrets, revocationPublicKeys)
 	if err != nil {
 		return nil, err
 	}
@@ -433,13 +432,13 @@ func (o TokenTransactionHandler) FinalizeTokenTransaction(
 		req.FinalTokenTransaction,
 		// TODO: Consider removing this because it was already provided in the Sign() step.
 		tokenTransaction.OperatorSignature,
-		req.LeafToSpendRevocationKeys)
+		req.OutputToSpendRevocationSecrets)
 	if err != nil {
 		logger.Info("Failed to send transaction to LRC20 node", "error", err)
 		return nil, err
 	}
 
-	err = ent.UpdateFinalizedTransaction(ctx, tokenTransaction, req.LeafToSpendRevocationKeys)
+	err = ent.UpdateFinalizedTransaction(ctx, tokenTransaction, req.OutputToSpendRevocationSecrets)
 	if err != nil {
 		logger.Info("Failed to update outputs after finalizing", "error", err)
 		return nil, err
@@ -456,10 +455,10 @@ func (o TokenTransactionHandler) SendTransactionToLRC20Node(
 	operatorSignature []byte,
 	revocationKeys [][]byte,
 ) error {
-	outputsToSpendData := make([]*pblrc20.SparkSignatureLeafData, len(revocationKeys))
+	outputsToSpendData := make([]*pblrc20.SparkSignatureOutputData, len(revocationKeys))
 	for i, revocationKey := range revocationKeys {
-		outputsToSpendData[i] = &pblrc20.SparkSignatureLeafData{
-			SpentLeafIndex: uint32(i),
+		outputsToSpendData[i] = &pblrc20.SparkSignatureOutputData{
+			SpentOutputIndex: uint32(i),
 			// Revocation will be nil if we are sending the transaction at the Sign() step.
 			// It will be filled when sending a transaction in the Finalize() step.
 			RevocationPrivateKey: revocationKey,
@@ -470,7 +469,7 @@ func (o TokenTransactionHandler) SendTransactionToLRC20Node(
 		SparkOperatorSignature:         operatorSignature,
 		SparkOperatorIdentityPublicKey: config.IdentityPublicKey(),
 		FinalTokenTransaction:          finalTokenTransaction,
-		LeavesToSpendData:              outputsToSpendData,
+		OutputsToSpendData:             outputsToSpendData,
 	}
 
 	lrc20Client := lrc20.NewClient(config)
@@ -550,7 +549,7 @@ func (o TokenTransactionHandler) FreezeTokens(
 	}
 
 	return &pb.FreezeTokensResponse{
-		ImpactedLeafIds:     outputIDs,
+		ImpactedOutputIds:   outputIDs,
 		ImpactedTokenAmount: totalAmount.Bytes(),
 	}, nil
 }
@@ -578,10 +577,10 @@ func (o TokenTransactionHandler) QueryTokenTransactions(ctx context.Context, con
 	baseQuery := db.TokenTransaction.Query()
 
 	// Apply filters based on request parameters
-	if len(req.LeafIds) > 0 {
+	if len(req.OutputIds) > 0 {
 		// Convert string IDs to UUIDs
-		outputUUIDs := make([]uuid.UUID, 0, len(req.LeafIds))
-		for _, idStr := range req.LeafIds {
+		outputUUIDs := make([]uuid.UUID, 0, len(req.OutputIds))
+		for _, idStr := range req.OutputIds {
 			id, err := uuid.Parse(idStr)
 			if err != nil {
 				return nil, fmt.Errorf("invalid output ID format: %v", err)
@@ -696,14 +695,14 @@ func (o TokenTransactionHandler) QueryTokenOutputs(
 		return nil, err
 	}
 
-	outputsWithPrevTxData := make([]*pb.LeafWithPreviousTransactionData, len(outputs))
+	outputsWithPrevTxData := make([]*pb.OutputWithPreviousTransactionData, len(outputs))
 	for i, output := range outputs {
 		idStr := output.ID.String()
-		outputsWithPrevTxData[i] = &pb.LeafWithPreviousTransactionData{
-			Leaf: &pb.TokenLeafOutput{
+		outputsWithPrevTxData[i] = &pb.OutputWithPreviousTransactionData{
+			Output: &pb.TokenOutput{
 				Id:                            &idStr,
 				OwnerPublicKey:                output.OwnerPublicKey,
-				RevocationPublicKey:           output.WithdrawRevocationCommitment,
+				RevocationCommitment:          output.WithdrawRevocationCommitment,
 				WithdrawBondSats:              &output.WithdrawBondSats,
 				WithdrawRelativeBlockLocktime: &output.WithdrawRelativeBlockLocktime,
 				TokenPublicKey:                output.TokenPublicKey,
@@ -715,7 +714,7 @@ func (o TokenTransactionHandler) QueryTokenOutputs(
 	}
 
 	return &pb.QueryTokenOutputsResponse{
-		LeavesWithPreviousTransactionData: outputsWithPrevTxData,
+		OutputsWithPreviousTransactionData: outputsWithPrevTxData,
 	}, nil
 }
 

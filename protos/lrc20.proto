@@ -13,7 +13,7 @@ service SparkService {
   rpc GetSparkTx(GetSparkTxRequest) returns (GetSparkTxResponse);
   rpc VerifySparkTx(VerifySparkTxRequest) returns (google.protobuf.Empty);
   rpc FreezeTokens(spark.FreezeTokensRequest) returns (spark.FreezeTokensResponse);
-  rpc ListWithdrawnLeaves(ListWithdrawnLeavesRequest) returns (ListWithdrawnLeavesResponse);  
+  rpc ListWithdrawnOutputs(ListWithdrawnOutputsRequest) returns (ListWithdrawnOutputsResponse);  
 }
 
 message SendSparkTxRequest {
@@ -28,13 +28,13 @@ message SendSparkSignatureRequest {
 message SparkSignatureData {
   bytes spark_operator_signature = 1;
   bytes spark_operator_identity_public_key = 2;
-  repeated SparkSignatureLeafData leaves_to_spend_data = 3;
+  repeated SparkSignatureOutputData outputs_to_spend_data = 3;
 
   spark.TokenTransaction final_token_transaction = 4;
 }
 
-message SparkSignatureLeafData {
-  uint32 spent_leaf_index = 1;
+message SparkSignatureOutputData {
+  uint32 spent_output_index = 1;
   optional bytes revocation_private_key = 2;
 }
 
@@ -65,13 +65,13 @@ message TokenTransactionResponse {
   spark.TokenTransaction final_token_transaction = 2;
 }
 
-message ListWithdrawnLeavesRequest {
+message ListWithdrawnOutputsRequest {
   optional bytes blockhash = 1;
   optional string page_token = 2;
   optional uint32 page_size = 3;
 }
 
-message ListWithdrawnLeavesResponse {
-  repeated spark.TokenLeafOutput leaves = 1;
+message ListWithdrawnOutputsResponse {
+  repeated spark.TokenOutput outputs = 1;
   optional string next_page_token = 2;
 }

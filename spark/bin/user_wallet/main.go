@@ -570,7 +570,7 @@ func main() {
 				}
 
 				fmt.Printf("Token Public Key: %s\n", args[0])
-				fmt.Printf("Number of leaves: %d\n", numLeaves)
+				fmt.Printf("Number of token outputs: %d\n", numLeaves)
 				fmt.Printf("Total amount: %d tokens\n", totalAmount)
 				return nil
 			}
@@ -588,7 +588,7 @@ func main() {
 
 			for tokenPubKey, balance := range balances {
 				fmt.Printf("\nToken Public Key: %s\n", tokenPubKey)
-				fmt.Printf("Number of leaves: %d\n", balance.NumLeaves)
+				fmt.Printf("Number of token outputs: %d\n", balance.NumOutputs)
 				fmt.Printf("Total amount: %d tokens\n", balance.TotalAmount)
 			}
 			return nil

@@ -26,19 +26,19 @@ func TestHashTokenTransaction(t *testing.T) {
 
 	// Create the token transaction matching the JavaScript object
 	partialTokenTransaction := &pb.TokenTransaction{
-		TokenInput: &pb.TokenTransaction_MintInput{
-			MintInput: &pb.MintInput{
+		TokenInputs: &pb.TokenTransaction_MintInput{
+			MintInput: &pb.TokenMintInput{
 				IssuerPublicKey:         tokenPublicKey,
 				IssuerProvidedTimestamp: 100,
 			},
 		},
-		OutputLeaves: []*pb.TokenLeafOutput{
+		TokenOutputs: []*pb.TokenOutput{
 			{
 				Id:                            &leafID,
 				OwnerPublicKey:                identityPubKey,
 				TokenPublicKey:                tokenPublicKey,
 				TokenAmount:                   []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 232}, // 1000n in BE format
-				RevocationPublicKey:           identityPubKey,
+				RevocationCommitment:          identityPubKey,
 				WithdrawBondSats:              &bondSats,
 				WithdrawRelativeBlockLocktime: &locktime,
 			},
@@ -72,7 +72,7 @@ func TestHashTokenTransactionNil(t *testing.T) {
 // TestHashTokenTransactionEmpty checks that hashing an empty transaction does not produce an error.
 func TestHashTokenTransactionEmpty(t *testing.T) {
 	tx := &pb.TokenTransaction{
-		OutputLeaves:                    []*pb.TokenLeafOutput{},
+		TokenOutputs:                    []*pb.TokenOutput{},
 		SparkOperatorIdentityPublicKeys: [][]byte{},
 	}
 	hash, err := HashTokenTransaction(tx, false)
@@ -93,12 +93,12 @@ func TestHashTokenTransactionUniqueHash(t *testing.T) {
 	}
 
 	partialMintTokenTransaction := &pb.TokenTransaction{
-		TokenInput: &pb.TokenTransaction_MintInput{
-			MintInput: &pb.MintInput{
+		TokenInputs: &pb.TokenTransaction_MintInput{
+			MintInput: &pb.TokenMintInput{
 				IssuerPublicKey: bytes.Repeat([]byte{0x01}, 32),
 			},
 		},
-		OutputLeaves: []*pb.TokenLeafOutput{
+		TokenOutputs: []*pb.TokenOutput{
 			{
 				OwnerPublicKey: bytes.Repeat([]byte{0x01}, 32),
 				TokenPublicKey: bytes.Repeat([]byte{0x02}, 32),
@@ -109,17 +109,17 @@ func TestHashTokenTransactionUniqueHash(t *testing.T) {
 	}
 
 	partialTransferTokenTransaction := &pb.TokenTransaction{
-		TokenInput: &pb.TokenTransaction_TransferInput{
-			TransferInput: &pb.TransferInput{
-				LeavesToSpend: []*pb.TokenLeafToSpend{
+		TokenInputs: &pb.TokenTransaction_TransferInput{
+			TransferInput: &pb.TokenTransferInput{
+				OutputsToSpend: []*pb.TokenOutputToSpend{
 					{
-						PrevTokenTransactionHash:     bytes.Repeat([]byte{0x01}, 32),
-						PrevTokenTransactionLeafVout: 1,
+						PrevTokenTransactionHash: bytes.Repeat([]byte{0x01}, 32),
+						PrevTokenTransactionVout: 1,
 					},
 				},
 			},
 		},
-		OutputLeaves: []*pb.TokenLeafOutput{
+		TokenOutputs: []*pb.TokenOutput{
 			{
 				OwnerPublicKey: bytes.Repeat([]byte{0x01}, 32),
 				TokenPublicKey: bytes.Repeat([]byte{0x02}, 32),
@@ -129,20 +129,20 @@ func TestHashTokenTransactionUniqueHash(t *testing.T) {
 		SparkOperatorIdentityPublicKeys: operatorKeys,
 	}
 
-	leafID := "test-leaf-1"
+	outputID := "test-output-1"
 	bondSats := uint64(1000000)
 	blockLocktime := uint64(1000)
 	finalMintTokenTransaction := proto.Clone(partialMintTokenTransaction).(*pb.TokenTransaction)
-	finalMintTokenTransaction.OutputLeaves[0].Id = &leafID
-	finalMintTokenTransaction.OutputLeaves[0].RevocationPublicKey = bytes.Repeat([]byte{0x03}, 32)
-	finalMintTokenTransaction.OutputLeaves[0].WithdrawBondSats = &bondSats
-	finalMintTokenTransaction.OutputLeaves[0].WithdrawRelativeBlockLocktime = &blockLocktime
+	finalMintTokenTransaction.TokenOutputs[0].Id = &outputID
+	finalMintTokenTransaction.TokenOutputs[0].RevocationCommitment = bytes.Repeat([]byte{0x03}, 32)
+	finalMintTokenTransaction.TokenOutputs[0].WithdrawBondSats = &bondSats
+	finalMintTokenTransaction.TokenOutputs[0].WithdrawRelativeBlockLocktime = &blockLocktime
 
 	finalTransferTokenTransaction := proto.Clone(partialTransferTokenTransaction).(*pb.TokenTransaction)
-	finalTransferTokenTransaction.OutputLeaves[0].Id = &leafID
-	finalTransferTokenTransaction.OutputLeaves[0].RevocationPublicKey = bytes.Repeat([]byte{0x03}, 32)
-	finalTransferTokenTransaction.OutputLeaves[0].WithdrawBondSats = &bondSats
-	finalTransferTokenTransaction.OutputLeaves[0].WithdrawRelativeBlockLocktime = &blockLocktime
+	finalTransferTokenTransaction.TokenOutputs[0].Id = &outputID
+	finalTransferTokenTransaction.TokenOutputs[0].RevocationCommitment = bytes.Repeat([]byte{0x03}, 32)
+	finalTransferTokenTransaction.TokenOutputs[0].WithdrawBondSats = &bondSats
+	finalTransferTokenTransaction.TokenOutputs[0].WithdrawRelativeBlockLocktime = &blockLocktime
 
 	// Hash all transactions
 	partialMintHash, err := HashTokenTransaction(partialMintTokenTransaction, true)
