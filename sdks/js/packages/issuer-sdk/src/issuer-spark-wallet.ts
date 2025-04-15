@@ -10,7 +10,7 @@ import {
 } from "@buildonspark/lrc20-sdk/proto/rpc/v1/types";
 import { SparkWallet, SparkWalletProps } from "@buildonspark/spark-sdk";
 import { encodeSparkAddress } from "@buildonspark/spark-sdk/address";
-import { LeafWithPreviousTransactionData } from "@buildonspark/spark-sdk/proto/spark";
+import { OutputWithPreviousTransactionData } from "@buildonspark/spark-sdk/proto/spark";
 import { ConfigOptions } from "@buildonspark/spark-sdk/services/wallet-config";
 import {
   getMasterHDKeyFromSeed,
@@ -128,7 +128,7 @@ export class IssuerSparkWallet
 
   public async burnTokens(
     tokenAmount: bigint,
-    selectedLeaves?: LeafWithPreviousTransactionData[],
+    selectedOutputs?: OutputWithPreviousTransactionData[],
   ): Promise<string> {
     const burnAddress = encodeSparkAddress({
       identityPublicKey: BURN_ADDRESS,
@@ -138,14 +138,14 @@ export class IssuerSparkWallet
       tokenPublicKey: await super.getIdentityPublicKey(),
       tokenAmount,
       receiverSparkAddress: burnAddress,
-      selectedLeaves,
+      selectedOutputs,
     });
   }
 
   public async freezeTokens(
     ownerPublicKey: string,
-  ): Promise<{ impactedLeafIds: string[]; impactedTokenAmount: bigint }> {
-    await this.syncTokenLeaves();
+  ): Promise<{ impactedOutputIds: string[]; impactedTokenAmount: bigint }> {
+    await this.syncTokenOutputs();
     const tokenPublicKey = await super.getIdentityPublicKey();
     const decodedOwnerPubkey = decodeSparkAddress(
       ownerPublicKey,
@@ -160,15 +160,15 @@ export class IssuerSparkWallet
     const tokenAmount = bytesToNumberBE(response.impactedTokenAmount);
 
     return {
-      impactedLeafIds: response.impactedLeafIds,
+      impactedOutputIds: response.impactedOutputIds,
       impactedTokenAmount: tokenAmount,
     };
   }
 
   public async unfreezeTokens(
     ownerPublicKey: string,
-  ): Promise<{ impactedLeafIds: string[]; impactedTokenAmount: bigint }> {
-    await this.syncTokenLeaves();
+  ): Promise<{ impactedOutputIds: string[]; impactedTokenAmount: bigint }> {
+    await this.syncTokenOutputs();
     const tokenPublicKey = await super.getIdentityPublicKey();
     const decodedOwnerPubkey = decodeSparkAddress(
       ownerPublicKey,
@@ -181,7 +181,7 @@ export class IssuerSparkWallet
     const tokenAmount = bytesToNumberBE(response.impactedTokenAmount);
 
     return {
-      impactedLeafIds: response.impactedLeafIds,
+      impactedOutputIds: response.impactedOutputIds,
       impactedTokenAmount: tokenAmount,
     };
   }

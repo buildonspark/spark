@@ -225,13 +225,13 @@ describe("token integration test", () => {
     expect(userBalanceAfterTransfer.balance).toEqual(tokenAmount);
     // Freeze tokens
     const freezeResponse = await issuerWallet.freezeTokens(userWalletPublicKey);
-    expect(freezeResponse.impactedLeafIds.length).toBeGreaterThan(0);
+    expect(freezeResponse.impactedOutputIds.length).toBeGreaterThan(0);
     expect(freezeResponse.impactedTokenAmount).toEqual(tokenAmount);
 
     // Unfreeze tokens
     const unfreezeResponse =
       await issuerWallet.unfreezeTokens(userWalletPublicKey);
-    expect(unfreezeResponse.impactedLeafIds.length).toBeGreaterThan(0);
+    expect(unfreezeResponse.impactedOutputIds.length).toBeGreaterThan(0);
     expect(unfreezeResponse.impactedTokenAmount).toEqual(tokenAmount);
   });
 
@@ -271,12 +271,12 @@ describe("token integration test", () => {
     expect(userBalanceAfterTransfer.balance).toEqual(tokenAmount);
 
     const freezeResult = await issuerWallet.freezeTokens(userWalletPublicKey);
-    expect(freezeResult.impactedLeafIds.length).toBe(1);
+    expect(freezeResult.impactedOutputIds.length).toBe(1);
     expect(freezeResult.impactedTokenAmount).toBe(1000n);
 
     const unfreezeResult =
       await issuerWallet.unfreezeTokens(userWalletPublicKey);
-    expect(unfreezeResult.impactedLeafIds.length).toBe(1);
+    expect(unfreezeResult.impactedOutputIds.length).toBe(1);
     expect(unfreezeResult.impactedTokenAmount).toBe(1000n);
   });
 

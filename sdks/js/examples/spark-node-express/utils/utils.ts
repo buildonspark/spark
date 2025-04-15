@@ -1,12 +1,5 @@
 import { promises as fs } from "fs";
-import { Lrc20Protos } from "@buildonspark/lrc20-sdk";
-import {
-  Transaction as IssuerTransaction,
-  ListAllTokenTransactionsCursor,
-  OnChainTransaction,
-  SparkTransaction,
-} from "@buildonspark/issuer-sdk/types";
-import { Transfer, TransferInput, TransferLeaf } from "@buildonspark/spark-sdk/proto/spark";
+import { Transfer, TransferLeaf } from "@buildonspark/spark-sdk/proto/spark";
 /**
  * Saves a mnemonic to a file
  * @param {string} path - The path to save the mnemonic

@@ -18,14 +18,14 @@ export class IssuerTokenTransactionService extends TokenTransactionService {
   ): Promise<TokenTransaction> {
     return {
       network: this.config.getNetworkProto(),
-      tokenInput: {
+      tokenInputs: {
         $case: "mintInput",
         mintInput: {
           issuerPublicKey: tokenPublicKey,
           issuerProvidedTimestamp: Date.now(),
         },
       },
-      outputLeaves: [
+      tokenOutputs: [
         {
           ownerPublicKey: tokenPublicKey,
           tokenPublicKey: tokenPublicKey,

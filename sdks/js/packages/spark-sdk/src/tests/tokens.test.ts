@@ -17,14 +17,14 @@ describe("hash token transaction", () => {
     ]);
 
     const tokenTransaction = {
-      tokenInput: {
+      tokenInputs: {
         $case: "mintInput" as const,
         mintInput: {
           issuerPublicKey: tokenPublicKey,
           issuerProvidedTimestamp: 100,
         },
       },
-      outputLeaves: [
+      tokenOutputs: [
         {
           id: "db1a4e48-0fc5-4f6c-8a80-d9d6c561a436",
           ownerPublicKey: identityPubKey,
@@ -32,7 +32,7 @@ describe("hash token transaction", () => {
           withdrawRelativeBlockLocktime: 100,
           tokenPublicKey: tokenPublicKey,
           tokenAmount: numberToBytesBE(tokenAmount, 16),
-          revocationPublicKey: identityPubKey,
+          revocationCommitment: identityPubKey,
         },
       ],
       sparkOperatorIdentityPublicKeys: [],

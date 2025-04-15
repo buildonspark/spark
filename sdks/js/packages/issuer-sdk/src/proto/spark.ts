@@ -438,16 +438,16 @@ export interface StartDepositTreeCreationResponse {
  * This proto is constructed by the wallet to specify leaves it wants to spend as
  * part of the token transaction.
  */
-export interface TokenLeafToSpend {
+export interface TokenOutputToSpend {
   prevTokenTransactionHash: Uint8Array;
-  prevTokenTransactionLeafVout: number;
+  prevTokenTransactionVout: number;
 }
 
-export interface TransferInput {
-  leavesToSpend: TokenLeafToSpend[];
+export interface TokenTransferInput {
+  outputsToSpend: TokenOutputToSpend[];
 }
 
-export interface MintInput {
+export interface TokenMintInput {
   issuerPublicKey: Uint8Array;
   /**
    * Issuer provided timestamp of when the transaction was signed/constructed.
@@ -462,14 +462,14 @@ export interface MintInput {
 }
 
 /**
- * This proto is constructed by the wallet to specify leaves it wants to create
- * as part of a token transaction.  id and revocation public key should remain unfilled
+ * This proto is constructed by the wallet to specify outputs it wants to create
+ * as part of a token transaction. Output id and revocation public key should remain unfilled
  * so that the SE can fill them as part of the StartTokenTransaction() call.
  */
-export interface TokenLeafOutput {
+export interface TokenOutput {
   id?: string | undefined;
   ownerPublicKey: Uint8Array;
-  revocationPublicKey?: Uint8Array | undefined;
+  revocationCommitment?: Uint8Array | undefined;
   withdrawBondSats?: number | undefined;
   withdrawRelativeBlockLocktime?: number | undefined;
   tokenPublicKey: Uint8Array;
@@ -484,14 +484,14 @@ export interface TokenLeafOutput {
  */
 export interface TokenTransaction {
   /**
-   * For mint transactions issuer_public_key will be specified without any leaves_to_spend.
+   * For mint transactions issuer_public_key will be specified without any outputs_to_spend.
    * For transfer transactions the token amount in the input leaves must match the token amount in the output leaves.
    */
-  tokenInput?:
-    | { $case: "mintInput"; mintInput: MintInput }
-    | { $case: "transferInput"; transferInput: TransferInput }
-    | undefined;
-  outputLeaves: TokenLeafOutput[];
+  tokenInputs?: { $case: "mintInput"; mintInput: TokenMintInput } | {
+    $case: "transferInput";
+    transferInput: TokenTransferInput;
+  } | undefined;
+  tokenOutputs: TokenOutput[];
   sparkOperatorIdentityPublicKeys: Uint8Array[];
   network: Network;
 }
@@ -505,7 +505,7 @@ export interface TokenTransactionSignatures {
   /**
    * Filled by signing the partial token transaction hash with the owner/issuer private key.
    * For mint transactions this will be one signature for the input issuer_public_key
-   * For transfer transactions this will be one for each leaf for the leaf owner_public_key
+   * For transfer transactions this will be one for each output for the output owner_public_key
    * This is a Schnorr or ECDSA DER signature which can be between 64 and 73 bytes.
    */
   ownerSignatures: Uint8Array[];
@@ -522,7 +522,7 @@ export interface StartTokenTransactionRequest {
 
 export interface StartTokenTransactionResponse {
   /**
-   * This is the same token transaction sent by the wallet with leaf revocation public keys
+   * This is the same token transaction sent by the wallet with output revocation public keys
    * filled. This is the final transaction that is published and gossiped among LRC20 nodes.
    */
   finalTokenTransaction:
@@ -541,8 +541,8 @@ export interface OperatorSpecificTokenTransactionSignablePayload {
 }
 
 /**
- * This message allows the sender of a leaf being spent to provide final evidence
- * that it owns a leaf to an SO when requesting signing and release of the  revocation keyshare.
+ * This message allows the sender of a output being spent to provide final evidence
+ * that it owns a output to an SO when requesting signing and release of the  revocation keyshare.
  */
 export interface OperatorSpecificTokenTransactionSignature {
   ownerPublicKey: Uint8Array;
@@ -567,10 +567,10 @@ export interface FinalizeTokenTransactionRequest {
     | TokenTransaction
     | undefined;
   /**
-   * List of ordered revocation keys that map 1:1 with leaves being spent in the
+   * List of ordered revocation secrets that map 1:1 with leaves being spent in the
    * token transaction.
    */
-  leafToSpendRevocationKeys: Uint8Array[];
+  outputToSpendRevocationSecrets: Uint8Array[];
   identityPublicKey: Uint8Array;
 }
 
@@ -592,7 +592,7 @@ export interface FreezeTokensRequest {
 }
 
 export interface FreezeTokensResponse {
-  impactedLeafIds: string[];
+  impactedOutputIds: string[];
   /** Decoded uint128 */
   impactedTokenAmount: Uint8Array;
 }
@@ -605,8 +605,8 @@ export interface QueryTokenOutputsRequest {
 
 /** Request constraints are combined using an AND relation. */
 export interface QueryTokenTransactionsRequest {
-  /** Returns transactions that have one of these leaf ids in the input or output. */
-  leafIds: string[];
+  /** Returns transactions that have one of these output ids in the input or output. */
+  outputIds: string[];
   /** Returns transactions that have this owner public key as the sender or receiver in one or more of the input/output leaves. */
   ownerPublicKeys: Uint8Array[];
   /** Returns transactions that related to this token public key. */
@@ -622,14 +622,14 @@ export interface QueryTokenTransactionsResponse {
   offset: number;
 }
 
-export interface LeafWithPreviousTransactionData {
-  leaf: TokenLeafOutput | undefined;
+export interface OutputWithPreviousTransactionData {
+  output: TokenOutput | undefined;
   previousTransactionHash: Uint8Array;
   previousTransactionVout: number;
 }
 
 export interface QueryTokenOutputsResponse {
-  leavesWithPreviousTransactionData: LeafWithPreviousTransactionData[];
+  outputsWithPreviousTransactionData: OutputWithPreviousTransactionData[];
 }
 
 export interface CancelSignedTokenTransactionRequest {
@@ -2991,25 +2991,25 @@ export const StartDepositTreeCreationResponse: MessageFns<StartDepositTreeCreati
   },
 };
 
-function createBaseTokenLeafToSpend(): TokenLeafToSpend {
-  return { prevTokenTransactionHash: new Uint8Array(0), prevTokenTransactionLeafVout: 0 };
+function createBaseTokenOutputToSpend(): TokenOutputToSpend {
+  return { prevTokenTransactionHash: new Uint8Array(0), prevTokenTransactionVout: 0 };
 }
 
-export const TokenLeafToSpend: MessageFns<TokenLeafToSpend> = {
-  encode(message: TokenLeafToSpend, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+export const TokenOutputToSpend: MessageFns<TokenOutputToSpend> = {
+  encode(message: TokenOutputToSpend, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.prevTokenTransactionHash.length !== 0) {
       writer.uint32(10).bytes(message.prevTokenTransactionHash);
     }
-    if (message.prevTokenTransactionLeafVout !== 0) {
-      writer.uint32(16).uint32(message.prevTokenTransactionLeafVout);
+    if (message.prevTokenTransactionVout !== 0) {
+      writer.uint32(16).uint32(message.prevTokenTransactionVout);
     }
     return writer;
   },
 
-  decode(input: BinaryReader | Uint8Array, length?: number): TokenLeafToSpend {
+  decode(input: BinaryReader | Uint8Array, length?: number): TokenOutputToSpend {
     const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseTokenLeafToSpend();
+    const message = createBaseTokenOutputToSpend();
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
@@ -3026,7 +3026,7 @@ export const TokenLeafToSpend: MessageFns<TokenLeafToSpend> = {
             break;
           }
 
-          message.prevTokenTransactionLeafVout = reader.uint32();
+          message.prevTokenTransactionVout = reader.uint32();
           continue;
         }
       }
@@ -3038,55 +3038,55 @@ export const TokenLeafToSpend: MessageFns<TokenLeafToSpend> = {
     return message;
   },
 
-  fromJSON(object: any): TokenLeafToSpend {
+  fromJSON(object: any): TokenOutputToSpend {
     return {
       prevTokenTransactionHash: isSet(object.prevTokenTransactionHash)
         ? bytesFromBase64(object.prevTokenTransactionHash)
         : new Uint8Array(0),
-      prevTokenTransactionLeafVout: isSet(object.prevTokenTransactionLeafVout)
-        ? globalThis.Number(object.prevTokenTransactionLeafVout)
+      prevTokenTransactionVout: isSet(object.prevTokenTransactionVout)
+        ? globalThis.Number(object.prevTokenTransactionVout)
         : 0,
     };
   },
 
-  toJSON(message: TokenLeafToSpend): unknown {
+  toJSON(message: TokenOutputToSpend): unknown {
     const obj: any = {};
     if (message.prevTokenTransactionHash.length !== 0) {
       obj.prevTokenTransactionHash = base64FromBytes(message.prevTokenTransactionHash);
     }
-    if (message.prevTokenTransactionLeafVout !== 0) {
-      obj.prevTokenTransactionLeafVout = Math.round(message.prevTokenTransactionLeafVout);
+    if (message.prevTokenTransactionVout !== 0) {
+      obj.prevTokenTransactionVout = Math.round(message.prevTokenTransactionVout);
     }
     return obj;
   },
 
-  create(base?: DeepPartial<TokenLeafToSpend>): TokenLeafToSpend {
-    return TokenLeafToSpend.fromPartial(base ?? {});
+  create(base?: DeepPartial<TokenOutputToSpend>): TokenOutputToSpend {
+    return TokenOutputToSpend.fromPartial(base ?? {});
   },
-  fromPartial(object: DeepPartial<TokenLeafToSpend>): TokenLeafToSpend {
-    const message = createBaseTokenLeafToSpend();
+  fromPartial(object: DeepPartial<TokenOutputToSpend>): TokenOutputToSpend {
+    const message = createBaseTokenOutputToSpend();
     message.prevTokenTransactionHash = object.prevTokenTransactionHash ?? new Uint8Array(0);
-    message.prevTokenTransactionLeafVout = object.prevTokenTransactionLeafVout ?? 0;
+    message.prevTokenTransactionVout = object.prevTokenTransactionVout ?? 0;
     return message;
   },
 };
 
-function createBaseTransferInput(): TransferInput {
-  return { leavesToSpend: [] };
+function createBaseTokenTransferInput(): TokenTransferInput {
+  return { outputsToSpend: [] };
 }
 
-export const TransferInput: MessageFns<TransferInput> = {
-  encode(message: TransferInput, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    for (const v of message.leavesToSpend) {
-      TokenLeafToSpend.encode(v!, writer.uint32(10).fork()).join();
+export const TokenTransferInput: MessageFns<TokenTransferInput> = {
+  encode(message: TokenTransferInput, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.outputsToSpend) {
+      TokenOutputToSpend.encode(v!, writer.uint32(10).fork()).join();
     }
     return writer;
   },
 
-  decode(input: BinaryReader | Uint8Array, length?: number): TransferInput {
+  decode(input: BinaryReader | Uint8Array, length?: number): TokenTransferInput {
     const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseTransferInput();
+    const message = createBaseTokenTransferInput();
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
@@ -3095,7 +3095,7 @@ export const TransferInput: MessageFns<TransferInput> = {
             break;
           }
 
-          message.leavesToSpend.push(TokenLeafToSpend.decode(reader, reader.uint32()));
+          message.outputsToSpend.push(TokenOutputToSpend.decode(reader, reader.uint32()));
           continue;
         }
       }
@@ -3107,38 +3107,38 @@ export const TransferInput: MessageFns<TransferInput> = {
     return message;
   },
 
-  fromJSON(object: any): TransferInput {
+  fromJSON(object: any): TokenTransferInput {
     return {
-      leavesToSpend: globalThis.Array.isArray(object?.leavesToSpend)
-        ? object.leavesToSpend.map((e: any) => TokenLeafToSpend.fromJSON(e))
+      outputsToSpend: globalThis.Array.isArray(object?.outputsToSpend)
+        ? object.outputsToSpend.map((e: any) => TokenOutputToSpend.fromJSON(e))
         : [],
     };
   },
 
-  toJSON(message: TransferInput): unknown {
+  toJSON(message: TokenTransferInput): unknown {
     const obj: any = {};
-    if (message.leavesToSpend?.length) {
-      obj.leavesToSpend = message.leavesToSpend.map((e) => TokenLeafToSpend.toJSON(e));
+    if (message.outputsToSpend?.length) {
+      obj.outputsToSpend = message.outputsToSpend.map((e) => TokenOutputToSpend.toJSON(e));
     }
     return obj;
   },
 
-  create(base?: DeepPartial<TransferInput>): TransferInput {
-    return TransferInput.fromPartial(base ?? {});
+  create(base?: DeepPartial<TokenTransferInput>): TokenTransferInput {
+    return TokenTransferInput.fromPartial(base ?? {});
   },
-  fromPartial(object: DeepPartial<TransferInput>): TransferInput {
-    const message = createBaseTransferInput();
-    message.leavesToSpend = object.leavesToSpend?.map((e) => TokenLeafToSpend.fromPartial(e)) || [];
+  fromPartial(object: DeepPartial<TokenTransferInput>): TokenTransferInput {
+    const message = createBaseTokenTransferInput();
+    message.outputsToSpend = object.outputsToSpend?.map((e) => TokenOutputToSpend.fromPartial(e)) || [];
     return message;
   },
 };
 
-function createBaseMintInput(): MintInput {
+function createBaseTokenMintInput(): TokenMintInput {
   return { issuerPublicKey: new Uint8Array(0), issuerProvidedTimestamp: 0 };
 }
 
-export const MintInput: MessageFns<MintInput> = {
-  encode(message: MintInput, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+export const TokenMintInput: MessageFns<TokenMintInput> = {
+  encode(message: TokenMintInput, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.issuerPublicKey.length !== 0) {
       writer.uint32(10).bytes(message.issuerPublicKey);
     }
@@ -3148,10 +3148,10 @@ export const MintInput: MessageFns<MintInput> = {
     return writer;
   },
 
-  decode(input: BinaryReader | Uint8Array, length?: number): MintInput {
+  decode(input: BinaryReader | Uint8Array, length?: number): TokenMintInput {
     const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseMintInput();
+    const message = createBaseTokenMintInput();
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
@@ -3180,7 +3180,7 @@ export const MintInput: MessageFns<MintInput> = {
     return message;
   },
 
-  fromJSON(object: any): MintInput {
+  fromJSON(object: any): TokenMintInput {
     return {
       issuerPublicKey: isSet(object.issuerPublicKey) ? bytesFromBase64(object.issuerPublicKey) : new Uint8Array(0),
       issuerProvidedTimestamp: isSet(object.issuerProvidedTimestamp)
@@ -3189,7 +3189,7 @@ export const MintInput: MessageFns<MintInput> = {
     };
   },
 
-  toJSON(message: MintInput): unknown {
+  toJSON(message: TokenMintInput): unknown {
     const obj: any = {};
     if (message.issuerPublicKey.length !== 0) {
       obj.issuerPublicKey = base64FromBytes(message.issuerPublicKey);
@@ -3200,22 +3200,22 @@ export const MintInput: MessageFns<MintInput> = {
     return obj;
   },
 
-  create(base?: DeepPartial<MintInput>): MintInput {
-    return MintInput.fromPartial(base ?? {});
+  create(base?: DeepPartial<TokenMintInput>): TokenMintInput {
+    return TokenMintInput.fromPartial(base ?? {});
   },
-  fromPartial(object: DeepPartial<MintInput>): MintInput {
-    const message = createBaseMintInput();
+  fromPartial(object: DeepPartial<TokenMintInput>): TokenMintInput {
+    const message = createBaseTokenMintInput();
     message.issuerPublicKey = object.issuerPublicKey ?? new Uint8Array(0);
     message.issuerProvidedTimestamp = object.issuerProvidedTimestamp ?? 0;
     return message;
   },
 };
 
-function createBaseTokenLeafOutput(): TokenLeafOutput {
+function createBaseTokenOutput(): TokenOutput {
   return {
     id: undefined,
     ownerPublicKey: new Uint8Array(0),
-    revocationPublicKey: undefined,
+    revocationCommitment: undefined,
     withdrawBondSats: undefined,
     withdrawRelativeBlockLocktime: undefined,
     tokenPublicKey: new Uint8Array(0),
@@ -3223,16 +3223,16 @@ function createBaseTokenLeafOutput(): TokenLeafOutput {
   };
 }
 
-export const TokenLeafOutput: MessageFns<TokenLeafOutput> = {
-  encode(message: TokenLeafOutput, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+export const TokenOutput: MessageFns<TokenOutput> = {
+  encode(message: TokenOutput, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.id !== undefined) {
       writer.uint32(10).string(message.id);
     }
     if (message.ownerPublicKey.length !== 0) {
       writer.uint32(18).bytes(message.ownerPublicKey);
     }
-    if (message.revocationPublicKey !== undefined) {
-      writer.uint32(26).bytes(message.revocationPublicKey);
+    if (message.revocationCommitment !== undefined) {
+      writer.uint32(26).bytes(message.revocationCommitment);
     }
     if (message.withdrawBondSats !== undefined) {
       writer.uint32(32).uint64(message.withdrawBondSats);
@@ -3249,10 +3249,10 @@ export const TokenLeafOutput: MessageFns<TokenLeafOutput> = {
     return writer;
   },
 
-  decode(input: BinaryReader | Uint8Array, length?: number): TokenLeafOutput {
+  decode(input: BinaryReader | Uint8Array, length?: number): TokenOutput {
     const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseTokenLeafOutput();
+    const message = createBaseTokenOutput();
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
@@ -3277,7 +3277,7 @@ export const TokenLeafOutput: MessageFns<TokenLeafOutput> = {
             break;
           }
 
-          message.revocationPublicKey = reader.bytes();
+          message.revocationCommitment = reader.bytes();
           continue;
         }
         case 4: {
@@ -3321,11 +3321,13 @@ export const TokenLeafOutput: MessageFns<TokenLeafOutput> = {
     return message;
   },
 
-  fromJSON(object: any): TokenLeafOutput {
+  fromJSON(object: any): TokenOutput {
     return {
       id: isSet(object.id) ? globalThis.String(object.id) : undefined,
       ownerPublicKey: isSet(object.ownerPublicKey) ? bytesFromBase64(object.ownerPublicKey) : new Uint8Array(0),
-      revocationPublicKey: isSet(object.revocationPublicKey) ? bytesFromBase64(object.revocationPublicKey) : undefined,
+      revocationCommitment: isSet(object.revocationCommitment)
+        ? bytesFromBase64(object.revocationCommitment)
+        : undefined,
       withdrawBondSats: isSet(object.withdrawBondSats) ? globalThis.Number(object.withdrawBondSats) : undefined,
       withdrawRelativeBlockLocktime: isSet(object.withdrawRelativeBlockLocktime)
         ? globalThis.Number(object.withdrawRelativeBlockLocktime)
@@ -3335,7 +3337,7 @@ export const TokenLeafOutput: MessageFns<TokenLeafOutput> = {
     };
   },
 
-  toJSON(message: TokenLeafOutput): unknown {
+  toJSON(message: TokenOutput): unknown {
     const obj: any = {};
     if (message.id !== undefined) {
       obj.id = message.id;
@@ -3343,8 +3345,8 @@ export const TokenLeafOutput: MessageFns<TokenLeafOutput> = {
     if (message.ownerPublicKey.length !== 0) {
       obj.ownerPublicKey = base64FromBytes(message.ownerPublicKey);
     }
-    if (message.revocationPublicKey !== undefined) {
-      obj.revocationPublicKey = base64FromBytes(message.revocationPublicKey);
+    if (message.revocationCommitment !== undefined) {
+      obj.revocationCommitment = base64FromBytes(message.revocationCommitment);
     }
     if (message.withdrawBondSats !== undefined) {
       obj.withdrawBondSats = Math.round(message.withdrawBondSats);
@@ -3361,14 +3363,14 @@ export const TokenLeafOutput: MessageFns<TokenLeafOutput> = {
     return obj;
   },
 
-  create(base?: DeepPartial<TokenLeafOutput>): TokenLeafOutput {
-    return TokenLeafOutput.fromPartial(base ?? {});
+  create(base?: DeepPartial<TokenOutput>): TokenOutput {
+    return TokenOutput.fromPartial(base ?? {});
   },
-  fromPartial(object: DeepPartial<TokenLeafOutput>): TokenLeafOutput {
-    const message = createBaseTokenLeafOutput();
+  fromPartial(object: DeepPartial<TokenOutput>): TokenOutput {
+    const message = createBaseTokenOutput();
     message.id = object.id ?? undefined;
     message.ownerPublicKey = object.ownerPublicKey ?? new Uint8Array(0);
-    message.revocationPublicKey = object.revocationPublicKey ?? undefined;
+    message.revocationCommitment = object.revocationCommitment ?? undefined;
     message.withdrawBondSats = object.withdrawBondSats ?? undefined;
     message.withdrawRelativeBlockLocktime = object.withdrawRelativeBlockLocktime ?? undefined;
     message.tokenPublicKey = object.tokenPublicKey ?? new Uint8Array(0);
@@ -3378,21 +3380,21 @@ export const TokenLeafOutput: MessageFns<TokenLeafOutput> = {
 };
 
 function createBaseTokenTransaction(): TokenTransaction {
-  return { tokenInput: undefined, outputLeaves: [], sparkOperatorIdentityPublicKeys: [], network: 0 };
+  return { tokenInputs: undefined, tokenOutputs: [], sparkOperatorIdentityPublicKeys: [], network: 0 };
 }
 
 export const TokenTransaction: MessageFns<TokenTransaction> = {
   encode(message: TokenTransaction, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    switch (message.tokenInput?.$case) {
+    switch (message.tokenInputs?.$case) {
       case "mintInput":
-        MintInput.encode(message.tokenInput.mintInput, writer.uint32(10).fork()).join();
+        TokenMintInput.encode(message.tokenInputs.mintInput, writer.uint32(10).fork()).join();
         break;
       case "transferInput":
-        TransferInput.encode(message.tokenInput.transferInput, writer.uint32(18).fork()).join();
+        TokenTransferInput.encode(message.tokenInputs.transferInput, writer.uint32(18).fork()).join();
         break;
     }
-    for (const v of message.outputLeaves) {
-      TokenLeafOutput.encode(v!, writer.uint32(26).fork()).join();
+    for (const v of message.tokenOutputs) {
+      TokenOutput.encode(v!, writer.uint32(26).fork()).join();
     }
     for (const v of message.sparkOperatorIdentityPublicKeys) {
       writer.uint32(34).bytes(v!);
@@ -3415,7 +3417,7 @@ export const TokenTransaction: MessageFns<TokenTransaction> = {
             break;
           }
 
-          message.tokenInput = { $case: "mintInput", mintInput: MintInput.decode(reader, reader.uint32()) };
+          message.tokenInputs = { $case: "mintInput", mintInput: TokenMintInput.decode(reader, reader.uint32()) };
           continue;
         }
         case 2: {
@@ -3423,7 +3425,10 @@ export const TokenTransaction: MessageFns<TokenTransaction> = {
             break;
           }
 
-          message.tokenInput = { $case: "transferInput", transferInput: TransferInput.decode(reader, reader.uint32()) };
+          message.tokenInputs = {
+            $case: "transferInput",
+            transferInput: TokenTransferInput.decode(reader, reader.uint32()),
+          };
           continue;
         }
         case 3: {
@@ -3431,7 +3436,7 @@ export const TokenTransaction: MessageFns<TokenTransaction> = {
             break;
           }
 
-          message.outputLeaves.push(TokenLeafOutput.decode(reader, reader.uint32()));
+          message.tokenOutputs.push(TokenOutput.decode(reader, reader.uint32()));
           continue;
         }
         case 4: {
@@ -3461,13 +3466,13 @@ export const TokenTransaction: MessageFns<TokenTransaction> = {
 
   fromJSON(object: any): TokenTransaction {
     return {
-      tokenInput: isSet(object.mintInput)
-        ? { $case: "mintInput", mintInput: MintInput.fromJSON(object.mintInput) }
+      tokenInputs: isSet(object.mintInput)
+        ? { $case: "mintInput", mintInput: TokenMintInput.fromJSON(object.mintInput) }
         : isSet(object.transferInput)
-        ? { $case: "transferInput", transferInput: TransferInput.fromJSON(object.transferInput) }
+        ? { $case: "transferInput", transferInput: TokenTransferInput.fromJSON(object.transferInput) }
         : undefined,
-      outputLeaves: globalThis.Array.isArray(object?.outputLeaves)
-        ? object.outputLeaves.map((e: any) => TokenLeafOutput.fromJSON(e))
+      tokenOutputs: globalThis.Array.isArray(object?.tokenOutputs)
+        ? object.tokenOutputs.map((e: any) => TokenOutput.fromJSON(e))
         : [],
       sparkOperatorIdentityPublicKeys: globalThis.Array.isArray(object?.sparkOperatorIdentityPublicKeys)
         ? object.sparkOperatorIdentityPublicKeys.map((e: any) => bytesFromBase64(e))
@@ -3478,13 +3483,13 @@ export const TokenTransaction: MessageFns<TokenTransaction> = {
 
   toJSON(message: TokenTransaction): unknown {
     const obj: any = {};
-    if (message.tokenInput?.$case === "mintInput") {
-      obj.mintInput = MintInput.toJSON(message.tokenInput.mintInput);
-    } else if (message.tokenInput?.$case === "transferInput") {
-      obj.transferInput = TransferInput.toJSON(message.tokenInput.transferInput);
+    if (message.tokenInputs?.$case === "mintInput") {
+      obj.mintInput = TokenMintInput.toJSON(message.tokenInputs.mintInput);
+    } else if (message.tokenInputs?.$case === "transferInput") {
+      obj.transferInput = TokenTransferInput.toJSON(message.tokenInputs.transferInput);
     }
-    if (message.outputLeaves?.length) {
-      obj.outputLeaves = message.outputLeaves.map((e) => TokenLeafOutput.toJSON(e));
+    if (message.tokenOutputs?.length) {
+      obj.tokenOutputs = message.tokenOutputs.map((e) => TokenOutput.toJSON(e));
     }
     if (message.sparkOperatorIdentityPublicKeys?.length) {
       obj.sparkOperatorIdentityPublicKeys = message.sparkOperatorIdentityPublicKeys.map((e) => base64FromBytes(e));
@@ -3500,24 +3505,27 @@ export const TokenTransaction: MessageFns<TokenTransaction> = {
   },
   fromPartial(object: DeepPartial<TokenTransaction>): TokenTransaction {
     const message = createBaseTokenTransaction();
-    switch (object.tokenInput?.$case) {
+    switch (object.tokenInputs?.$case) {
       case "mintInput": {
-        if (object.tokenInput?.mintInput !== undefined && object.tokenInput?.mintInput !== null) {
-          message.tokenInput = { $case: "mintInput", mintInput: MintInput.fromPartial(object.tokenInput.mintInput) };
+        if (object.tokenInputs?.mintInput !== undefined && object.tokenInputs?.mintInput !== null) {
+          message.tokenInputs = {
+            $case: "mintInput",
+            mintInput: TokenMintInput.fromPartial(object.tokenInputs.mintInput),
+          };
         }
         break;
       }
       case "transferInput": {
-        if (object.tokenInput?.transferInput !== undefined && object.tokenInput?.transferInput !== null) {
-          message.tokenInput = {
+        if (object.tokenInputs?.transferInput !== undefined && object.tokenInputs?.transferInput !== null) {
+          message.tokenInputs = {
             $case: "transferInput",
-            transferInput: TransferInput.fromPartial(object.tokenInput.transferInput),
+            transferInput: TokenTransferInput.fromPartial(object.tokenInputs.transferInput),
           };
         }
         break;
       }
     }
-    message.outputLeaves = object.outputLeaves?.map((e) => TokenLeafOutput.fromPartial(e)) || [];
+    message.tokenOutputs = object.tokenOutputs?.map((e) => TokenOutput.fromPartial(e)) || [];
     message.sparkOperatorIdentityPublicKeys = object.sparkOperatorIdentityPublicKeys?.map((e) => e) || [];
     message.network = object.network ?? 0;
     return message;
@@ -4231,7 +4239,7 @@ export const SignTokenTransactionResponse: MessageFns<SignTokenTransactionRespon
 };
 
 function createBaseFinalizeTokenTransactionRequest(): FinalizeTokenTransactionRequest {
-  return { finalTokenTransaction: undefined, leafToSpendRevocationKeys: [], identityPublicKey: new Uint8Array(0) };
+  return { finalTokenTransaction: undefined, outputToSpendRevocationSecrets: [], identityPublicKey: new Uint8Array(0) };
 }
 
 export const FinalizeTokenTransactionRequest: MessageFns<FinalizeTokenTransactionRequest> = {
@@ -4239,7 +4247,7 @@ export const FinalizeTokenTransactionRequest: MessageFns<FinalizeTokenTransactio
     if (message.finalTokenTransaction !== undefined) {
       TokenTransaction.encode(message.finalTokenTransaction, writer.uint32(10).fork()).join();
     }
-    for (const v of message.leafToSpendRevocationKeys) {
+    for (const v of message.outputToSpendRevocationSecrets) {
       writer.uint32(18).bytes(v!);
     }
     if (message.identityPublicKey.length !== 0) {
@@ -4268,7 +4276,7 @@ export const FinalizeTokenTransactionRequest: MessageFns<FinalizeTokenTransactio
             break;
           }
 
-          message.leafToSpendRevocationKeys.push(reader.bytes());
+          message.outputToSpendRevocationSecrets.push(reader.bytes());
           continue;
         }
         case 3: {
@@ -4293,8 +4301,8 @@ export const FinalizeTokenTransactionRequest: MessageFns<FinalizeTokenTransactio
       finalTokenTransaction: isSet(object.finalTokenTransaction)
         ? TokenTransaction.fromJSON(object.finalTokenTransaction)
         : undefined,
-      leafToSpendRevocationKeys: globalThis.Array.isArray(object?.leafToSpendRevocationKeys)
-        ? object.leafToSpendRevocationKeys.map((e: any) => bytesFromBase64(e))
+      outputToSpendRevocationSecrets: globalThis.Array.isArray(object?.outputToSpendRevocationSecrets)
+        ? object.outputToSpendRevocationSecrets.map((e: any) => bytesFromBase64(e))
         : [],
       identityPublicKey: isSet(object.identityPublicKey)
         ? bytesFromBase64(object.identityPublicKey)
@@ -4307,8 +4315,8 @@ export const FinalizeTokenTransactionRequest: MessageFns<FinalizeTokenTransactio
     if (message.finalTokenTransaction !== undefined) {
       obj.finalTokenTransaction = TokenTransaction.toJSON(message.finalTokenTransaction);
     }
-    if (message.leafToSpendRevocationKeys?.length) {
-      obj.leafToSpendRevocationKeys = message.leafToSpendRevocationKeys.map((e) => base64FromBytes(e));
+    if (message.outputToSpendRevocationSecrets?.length) {
+      obj.outputToSpendRevocationSecrets = message.outputToSpendRevocationSecrets.map((e) => base64FromBytes(e));
     }
     if (message.identityPublicKey.length !== 0) {
       obj.identityPublicKey = base64FromBytes(message.identityPublicKey);
@@ -4325,7 +4333,7 @@ export const FinalizeTokenTransactionRequest: MessageFns<FinalizeTokenTransactio
       (object.finalTokenTransaction !== undefined && object.finalTokenTransaction !== null)
         ? TokenTransaction.fromPartial(object.finalTokenTransaction)
         : undefined;
-    message.leafToSpendRevocationKeys = object.leafToSpendRevocationKeys?.map((e) => e) || [];
+    message.outputToSpendRevocationSecrets = object.outputToSpendRevocationSecrets?.map((e) => e) || [];
     message.identityPublicKey = object.identityPublicKey ?? new Uint8Array(0);
     return message;
   },
@@ -4546,12 +4554,12 @@ export const FreezeTokensRequest: MessageFns<FreezeTokensRequest> = {
 };
 
 function createBaseFreezeTokensResponse(): FreezeTokensResponse {
-  return { impactedLeafIds: [], impactedTokenAmount: new Uint8Array(0) };
+  return { impactedOutputIds: [], impactedTokenAmount: new Uint8Array(0) };
 }
 
 export const FreezeTokensResponse: MessageFns<FreezeTokensResponse> = {
   encode(message: FreezeTokensResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    for (const v of message.impactedLeafIds) {
+    for (const v of message.impactedOutputIds) {
       writer.uint32(10).string(v!);
     }
     if (message.impactedTokenAmount.length !== 0) {
@@ -4572,7 +4580,7 @@ export const FreezeTokensResponse: MessageFns<FreezeTokensResponse> = {
             break;
           }
 
-          message.impactedLeafIds.push(reader.string());
+          message.impactedOutputIds.push(reader.string());
           continue;
         }
         case 2: {
@@ -4594,8 +4602,8 @@ export const FreezeTokensResponse: MessageFns<FreezeTokensResponse> = {
 
   fromJSON(object: any): FreezeTokensResponse {
     return {
-      impactedLeafIds: globalThis.Array.isArray(object?.impactedLeafIds)
-        ? object.impactedLeafIds.map((e: any) => globalThis.String(e))
+      impactedOutputIds: globalThis.Array.isArray(object?.impactedOutputIds)
+        ? object.impactedOutputIds.map((e: any) => globalThis.String(e))
         : [],
       impactedTokenAmount: isSet(object.impactedTokenAmount)
         ? bytesFromBase64(object.impactedTokenAmount)
@@ -4605,8 +4613,8 @@ export const FreezeTokensResponse: MessageFns<FreezeTokensResponse> = {
 
   toJSON(message: FreezeTokensResponse): unknown {
     const obj: any = {};
-    if (message.impactedLeafIds?.length) {
-      obj.impactedLeafIds = message.impactedLeafIds;
+    if (message.impactedOutputIds?.length) {
+      obj.impactedOutputIds = message.impactedOutputIds;
     }
     if (message.impactedTokenAmount.length !== 0) {
       obj.impactedTokenAmount = base64FromBytes(message.impactedTokenAmount);
@@ -4619,7 +4627,7 @@ export const FreezeTokensResponse: MessageFns<FreezeTokensResponse> = {
   },
   fromPartial(object: DeepPartial<FreezeTokensResponse>): FreezeTokensResponse {
     const message = createBaseFreezeTokensResponse();
-    message.impactedLeafIds = object.impactedLeafIds?.map((e) => e) || [];
+    message.impactedOutputIds = object.impactedOutputIds?.map((e) => e) || [];
     message.impactedTokenAmount = object.impactedTokenAmount ?? new Uint8Array(0);
     return message;
   },
@@ -4706,12 +4714,12 @@ export const QueryTokenOutputsRequest: MessageFns<QueryTokenOutputsRequest> = {
 };
 
 function createBaseQueryTokenTransactionsRequest(): QueryTokenTransactionsRequest {
-  return { leafIds: [], ownerPublicKeys: [], tokenPublicKeys: [], tokenTransactionHashes: [], limit: 0, offset: 0 };
+  return { outputIds: [], ownerPublicKeys: [], tokenPublicKeys: [], tokenTransactionHashes: [], limit: 0, offset: 0 };
 }
 
 export const QueryTokenTransactionsRequest: MessageFns<QueryTokenTransactionsRequest> = {
   encode(message: QueryTokenTransactionsRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    for (const v of message.leafIds) {
+    for (const v of message.outputIds) {
       writer.uint32(10).string(v!);
     }
     for (const v of message.ownerPublicKeys) {
@@ -4744,7 +4752,7 @@ export const QueryTokenTransactionsRequest: MessageFns<QueryTokenTransactionsReq
             break;
           }
 
-          message.leafIds.push(reader.string());
+          message.outputIds.push(reader.string());
           continue;
         }
         case 2: {
@@ -4798,7 +4806,9 @@ export const QueryTokenTransactionsRequest: MessageFns<QueryTokenTransactionsReq
 
   fromJSON(object: any): QueryTokenTransactionsRequest {
     return {
-      leafIds: globalThis.Array.isArray(object?.leafIds) ? object.leafIds.map((e: any) => globalThis.String(e)) : [],
+      outputIds: globalThis.Array.isArray(object?.outputIds)
+        ? object.outputIds.map((e: any) => globalThis.String(e))
+        : [],
       ownerPublicKeys: globalThis.Array.isArray(object?.ownerPublicKeys)
         ? object.ownerPublicKeys.map((e: any) => bytesFromBase64(e))
         : [],
@@ -4815,8 +4825,8 @@ export const QueryTokenTransactionsRequest: MessageFns<QueryTokenTransactionsReq
 
   toJSON(message: QueryTokenTransactionsRequest): unknown {
     const obj: any = {};
-    if (message.leafIds?.length) {
-      obj.leafIds = message.leafIds;
+    if (message.outputIds?.length) {
+      obj.outputIds = message.outputIds;
     }
     if (message.ownerPublicKeys?.length) {
       obj.ownerPublicKeys = message.ownerPublicKeys.map((e) => base64FromBytes(e));
@@ -4841,7 +4851,7 @@ export const QueryTokenTransactionsRequest: MessageFns<QueryTokenTransactionsReq
   },
   fromPartial(object: DeepPartial<QueryTokenTransactionsRequest>): QueryTokenTransactionsRequest {
     const message = createBaseQueryTokenTransactionsRequest();
-    message.leafIds = object.leafIds?.map((e) => e) || [];
+    message.outputIds = object.outputIds?.map((e) => e) || [];
     message.ownerPublicKeys = object.ownerPublicKeys?.map((e) => e) || [];
     message.tokenPublicKeys = object.tokenPublicKeys?.map((e) => e) || [];
     message.tokenTransactionHashes = object.tokenTransactionHashes?.map((e) => e) || [];
@@ -4932,14 +4942,14 @@ export const QueryTokenTransactionsResponse: MessageFns<QueryTokenTransactionsRe
   },
 };
 
-function createBaseLeafWithPreviousTransactionData(): LeafWithPreviousTransactionData {
-  return { leaf: undefined, previousTransactionHash: new Uint8Array(0), previousTransactionVout: 0 };
+function createBaseOutputWithPreviousTransactionData(): OutputWithPreviousTransactionData {
+  return { output: undefined, previousTransactionHash: new Uint8Array(0), previousTransactionVout: 0 };
 }
 
-export const LeafWithPreviousTransactionData: MessageFns<LeafWithPreviousTransactionData> = {
-  encode(message: LeafWithPreviousTransactionData, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.leaf !== undefined) {
-      TokenLeafOutput.encode(message.leaf, writer.uint32(10).fork()).join();
+export const OutputWithPreviousTransactionData: MessageFns<OutputWithPreviousTransactionData> = {
+  encode(message: OutputWithPreviousTransactionData, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.output !== undefined) {
+      TokenOutput.encode(message.output, writer.uint32(10).fork()).join();
     }
     if (message.previousTransactionHash.length !== 0) {
       writer.uint32(18).bytes(message.previousTransactionHash);
@@ -4950,10 +4960,10 @@ export const LeafWithPreviousTransactionData: MessageFns<LeafWithPreviousTransac
     return writer;
   },
 
-  decode(input: BinaryReader | Uint8Array, length?: number): LeafWithPreviousTransactionData {
+  decode(input: BinaryReader | Uint8Array, length?: number): OutputWithPreviousTransactionData {
     const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseLeafWithPreviousTransactionData();
+    const message = createBaseOutputWithPreviousTransactionData();
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
@@ -4962,7 +4972,7 @@ export const LeafWithPreviousTransactionData: MessageFns<LeafWithPreviousTransac
             break;
           }
 
-          message.leaf = TokenLeafOutput.decode(reader, reader.uint32());
+          message.output = TokenOutput.decode(reader, reader.uint32());
           continue;
         }
         case 2: {
@@ -4990,9 +5000,9 @@ export const LeafWithPreviousTransactionData: MessageFns<LeafWithPreviousTransac
     return message;
   },
 
-  fromJSON(object: any): LeafWithPreviousTransactionData {
+  fromJSON(object: any): OutputWithPreviousTransactionData {
     return {
-      leaf: isSet(object.leaf) ? TokenLeafOutput.fromJSON(object.leaf) : undefined,
+      output: isSet(object.output) ? TokenOutput.fromJSON(object.output) : undefined,
       previousTransactionHash: isSet(object.previousTransactionHash)
         ? bytesFromBase64(object.previousTransactionHash)
         : new Uint8Array(0),
@@ -5002,10 +5012,10 @@ export const LeafWithPreviousTransactionData: MessageFns<LeafWithPreviousTransac
     };
   },
 
-  toJSON(message: LeafWithPreviousTransactionData): unknown {
+  toJSON(message: OutputWithPreviousTransactionData): unknown {
     const obj: any = {};
-    if (message.leaf !== undefined) {
-      obj.leaf = TokenLeafOutput.toJSON(message.leaf);
+    if (message.output !== undefined) {
+      obj.output = TokenOutput.toJSON(message.output);
     }
     if (message.previousTransactionHash.length !== 0) {
       obj.previousTransactionHash = base64FromBytes(message.previousTransactionHash);
@@ -5016,13 +5026,13 @@ export const LeafWithPreviousTransactionData: MessageFns<LeafWithPreviousTransac
     return obj;
   },
 
-  create(base?: DeepPartial<LeafWithPreviousTransactionData>): LeafWithPreviousTransactionData {
-    return LeafWithPreviousTransactionData.fromPartial(base ?? {});
+  create(base?: DeepPartial<OutputWithPreviousTransactionData>): OutputWithPreviousTransactionData {
+    return OutputWithPreviousTransactionData.fromPartial(base ?? {});
   },
-  fromPartial(object: DeepPartial<LeafWithPreviousTransactionData>): LeafWithPreviousTransactionData {
-    const message = createBaseLeafWithPreviousTransactionData();
-    message.leaf = (object.leaf !== undefined && object.leaf !== null)
-      ? TokenLeafOutput.fromPartial(object.leaf)
+  fromPartial(object: DeepPartial<OutputWithPreviousTransactionData>): OutputWithPreviousTransactionData {
+    const message = createBaseOutputWithPreviousTransactionData();
+    message.output = (object.output !== undefined && object.output !== null)
+      ? TokenOutput.fromPartial(object.output)
       : undefined;
     message.previousTransactionHash = object.previousTransactionHash ?? new Uint8Array(0);
     message.previousTransactionVout = object.previousTransactionVout ?? 0;
@@ -5031,13 +5041,13 @@ export const LeafWithPreviousTransactionData: MessageFns<LeafWithPreviousTransac
 };
 
 function createBaseQueryTokenOutputsResponse(): QueryTokenOutputsResponse {
-  return { leavesWithPreviousTransactionData: [] };
+  return { outputsWithPreviousTransactionData: [] };
 }
 
 export const QueryTokenOutputsResponse: MessageFns<QueryTokenOutputsResponse> = {
   encode(message: QueryTokenOutputsResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    for (const v of message.leavesWithPreviousTransactionData) {
-      LeafWithPreviousTransactionData.encode(v!, writer.uint32(10).fork()).join();
+    for (const v of message.outputsWithPreviousTransactionData) {
+      OutputWithPreviousTransactionData.encode(v!, writer.uint32(10).fork()).join();
     }
     return writer;
   },
@@ -5054,8 +5064,8 @@ export const QueryTokenOutputsResponse: MessageFns<QueryTokenOutputsResponse> = 
             break;
           }
 
-          message.leavesWithPreviousTransactionData.push(
-            LeafWithPreviousTransactionData.decode(reader, reader.uint32()),
+          message.outputsWithPreviousTransactionData.push(
+            OutputWithPreviousTransactionData.decode(reader, reader.uint32()),
           );
           continue;
         }
@@ -5070,17 +5080,17 @@ export const QueryTokenOutputsResponse: MessageFns<QueryTokenOutputsResponse> = 
 
   fromJSON(object: any): QueryTokenOutputsResponse {
     return {
-      leavesWithPreviousTransactionData: globalThis.Array.isArray(object?.leavesWithPreviousTransactionData)
-        ? object.leavesWithPreviousTransactionData.map((e: any) => LeafWithPreviousTransactionData.fromJSON(e))
+      outputsWithPreviousTransactionData: globalThis.Array.isArray(object?.outputsWithPreviousTransactionData)
+        ? object.outputsWithPreviousTransactionData.map((e: any) => OutputWithPreviousTransactionData.fromJSON(e))
         : [],
     };
   },
 
   toJSON(message: QueryTokenOutputsResponse): unknown {
     const obj: any = {};
-    if (message.leavesWithPreviousTransactionData?.length) {
-      obj.leavesWithPreviousTransactionData = message.leavesWithPreviousTransactionData.map((e) =>
-        LeafWithPreviousTransactionData.toJSON(e)
+    if (message.outputsWithPreviousTransactionData?.length) {
+      obj.outputsWithPreviousTransactionData = message.outputsWithPreviousTransactionData.map((e) =>
+        OutputWithPreviousTransactionData.toJSON(e)
       );
     }
     return obj;
@@ -5091,8 +5101,8 @@ export const QueryTokenOutputsResponse: MessageFns<QueryTokenOutputsResponse> = 
   },
   fromPartial(object: DeepPartial<QueryTokenOutputsResponse>): QueryTokenOutputsResponse {
     const message = createBaseQueryTokenOutputsResponse();
-    message.leavesWithPreviousTransactionData =
-      object.leavesWithPreviousTransactionData?.map((e) => LeafWithPreviousTransactionData.fromPartial(e)) || [];
+    message.outputsWithPreviousTransactionData =
+      object.outputsWithPreviousTransactionData?.map((e) => OutputWithPreviousTransactionData.fromPartial(e)) || [];
     return message;
   },
 };

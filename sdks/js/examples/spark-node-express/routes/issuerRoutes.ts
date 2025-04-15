@@ -255,7 +255,7 @@ router.post(
       const frozenTokens = await wallet!.freezeTokens(ownerPublicKey);
       res.json({
         data: {
-          impactedLeafIds: frozenTokens.impactedLeafIds,
+          impactedOutputIds: frozenTokens.impactedOutputIds,
           impactedTokenAmount: frozenTokens.impactedTokenAmount,
         },
       });
@@ -288,7 +288,7 @@ router.post(
       const thawedTokens = await wallet!.unfreezeTokens(ownerPublicKey);
       res.json({
         data: {
-          impactedLeafIds: thawedTokens.impactedLeafIds,
+          impactedOutputIds: thawedTokens.impactedOutputIds,
           impactedTokenAmount: thawedTokens.impactedTokenAmount,
         },
       });

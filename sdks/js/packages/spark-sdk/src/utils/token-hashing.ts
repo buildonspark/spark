@@ -14,38 +14,38 @@ export function hashTokenTransaction(
 
   let allHashes: Uint8Array[] = [];
 
-  // Hash input leaves if a transfer
-  if (tokenTransaction.tokenInput?.$case === "transferInput") {
-    if (!tokenTransaction.tokenInput.transferInput.leavesToSpend) {
-      throw new Error("leaves to spend cannot be null");
+  // Hash token inputs if a transfer
+  if (tokenTransaction.tokenInputs?.$case === "transferInput") {
+    if (!tokenTransaction.tokenInputs.transferInput.outputsToSpend) {
+      throw new Error("outputs to spend cannot be null");
     }
 
-    if (tokenTransaction.tokenInput.transferInput.leavesToSpend.length === 0) {
-      throw new Error("leaves to spend cannot be empty");
+    if (tokenTransaction.tokenInputs.transferInput.outputsToSpend.length === 0) {
+      throw new Error("outputs to spend cannot be empty");
     }
 
-    // Hash leaves_to_spend
-    for (const [i, leaf] of (tokenTransaction.tokenInput!.transferInput!
-      .leavesToSpend).entries()) {
+    // Hash outputs to spend
+    for (const [i, output] of (tokenTransaction.tokenInputs!.transferInput!
+      .outputsToSpend).entries()) {
 
-      if (!leaf) {
-        throw new Error(`leaf cannot be null at index ${i}`);
+      if (!output) {
+        throw new Error(`output cannot be null at index ${i}`);
       }
 
       const hashObj = sha256.create();
 
-      if (leaf.prevTokenTransactionHash) {
-        const prevHash = leaf.prevTokenTransactionHash;
-        if (leaf.prevTokenTransactionHash.length !== 32) {
+      if (output.prevTokenTransactionHash) {
+        const prevHash = output.prevTokenTransactionHash;
+        if (output.prevTokenTransactionHash.length !== 32) {
           throw new Error(`invalid previous transaction hash length at index ${i}: expected 32 bytes, got ${prevHash}`);
         }
-        hashObj.update(leaf.prevTokenTransactionHash);
+        hashObj.update(output.prevTokenTransactionHash);
       }
 
       const voutBytes = new Uint8Array(4);
       new DataView(voutBytes.buffer).setUint32(
         0,
-        leaf.prevTokenTransactionLeafVout,
+        output.prevTokenTransactionVout,
         false,
       ); // false for big-endian
       hashObj.update(voutBytes);
@@ -55,21 +55,21 @@ export function hashTokenTransaction(
   }
 
   // Hash input issuance if a mint
-  if (tokenTransaction.tokenInput?.$case === "mintInput") {
+  if (tokenTransaction.tokenInputs?.$case === "mintInput") {
     const hashObj = sha256.create();
 
-    if (tokenTransaction.tokenInput.mintInput!.issuerPublicKey) {
-        const issuerPubKey: Uint8Array = tokenTransaction.tokenInput.mintInput.issuerPublicKey;
+    if (tokenTransaction.tokenInputs.mintInput!.issuerPublicKey) {
+        const issuerPubKey: Uint8Array = tokenTransaction.tokenInputs.mintInput.issuerPublicKey;
         if (issuerPubKey.length === 0) {
           throw new Error("issuer public key cannot be empty");
         }
         hashObj.update(issuerPubKey);
 
-      if (tokenTransaction.tokenInput.mintInput!.issuerProvidedTimestamp != 0) {
+      if (tokenTransaction.tokenInputs.mintInput!.issuerProvidedTimestamp != 0) {
         const timestampBytes = new Uint8Array(8);
         new DataView(timestampBytes.buffer).setBigUint64(
           0,
-          BigInt(tokenTransaction.tokenInput.mintInput!.issuerProvidedTimestamp),
+          BigInt(tokenTransaction.tokenInputs.mintInput!.issuerProvidedTimestamp),
           true, // true for little-endian to match Go implementation
         );
         hashObj.update(timestampBytes);
@@ -78,41 +78,41 @@ export function hashTokenTransaction(
     }
   }
 
-  // Hash output leaves
-  if (!tokenTransaction.outputLeaves) {
-    throw new Error("output leaves cannot be null");
+  // Hash token outputs
+  if (!tokenTransaction.tokenOutputs) {
+    throw new Error("token outputs cannot be null");
   }
 
-  if (tokenTransaction.outputLeaves.length === 0) {
-    throw new Error("output leaves cannot be empty");
+  if (tokenTransaction.tokenOutputs.length === 0) {
+    throw new Error("token outputs cannot be empty");
   }
 
-  for (const [i, leaf] of (tokenTransaction.outputLeaves).entries()) {
-    if (!leaf) {
-      throw new Error("leaf cannot be null");
+  for (const [i, output] of (tokenTransaction.tokenOutputs).entries()) {
+    if (!output) {
+      throw new Error("output cannot be null");
     }
 
     const hashObj = sha256.create();
 
     // Only hash ID if it's not empty and not in partial hash mode
-    if (leaf.id && !partialHash) {
-      if (leaf.id.length === 0) {
-        throw new Error(`leaf ID at index ${i} cannot be empty`);
+    if (output.id && !partialHash) {
+      if (output.id.length === 0) {
+        throw new Error(`output ID at index ${i} cannot be empty`);
       }
-      hashObj.update(new TextEncoder().encode(leaf.id));
+      hashObj.update(new TextEncoder().encode(output.id));
     }
-    if (leaf.ownerPublicKey) {
-      if (leaf.ownerPublicKey.length === 0) {
+    if (output.ownerPublicKey) {
+      if (output.ownerPublicKey.length === 0) {
         throw new Error(`owner public key at index ${i} cannot be empty`);
       }
-      hashObj.update(leaf.ownerPublicKey);
+      hashObj.update(output.ownerPublicKey);
     }
 
     if (!partialHash) {
-      const revPubKey = leaf.revocationPublicKey!!;
+      const revPubKey = output.revocationCommitment!!;
       if (revPubKey) {
         if (revPubKey.length === 0) {
-          throw new Error(`revocation public key at index ${i} cannot be empty`);
+          throw new Error(`revocation commitmentat index ${i} cannot be empty`);
         }
         hashObj.update(revPubKey);
       }
@@ -120,7 +120,7 @@ export function hashTokenTransaction(
       const bondBytes = new Uint8Array(8);
       new DataView(bondBytes.buffer).setBigUint64(
         0,
-        BigInt(leaf.withdrawBondSats!),
+        BigInt(output.withdrawBondSats!),
         false,
       );
       hashObj.update(bondBytes);
@@ -128,26 +128,26 @@ export function hashTokenTransaction(
       const locktimeBytes = new Uint8Array(8);
       new DataView(locktimeBytes.buffer).setBigUint64(
         0,
-        BigInt(leaf.withdrawRelativeBlockLocktime!),
+        BigInt(output.withdrawRelativeBlockLocktime!),
         false,
       );
       hashObj.update(locktimeBytes);
     }
 
-    if (leaf.tokenPublicKey) {
-      if (leaf.tokenPublicKey.length === 0) {
+    if (output.tokenPublicKey) {
+      if (output.tokenPublicKey.length === 0) {
         throw new Error(`token public key at index ${i} cannot be empty`);
       }
-      hashObj.update(leaf.tokenPublicKey);
+      hashObj.update(output.tokenPublicKey);
     }
-    if (leaf.tokenAmount) {
-      if (leaf.tokenAmount.length === 0) {
+    if (output.tokenAmount) {
+      if (output.tokenAmount.length === 0) {
         throw new Error(`token amount at index ${i} cannot be empty`);
       }
-      if (leaf.tokenAmount.length > 16) {
-        throw new Error(`token amount at index ${i} exceeds maximum length; got ${leaf.tokenAmount.length} bytes, max 16`);
+      if (output.tokenAmount.length > 16) {
+        throw new Error(`token amount at index ${i} exceeds maximum length; got ${output.tokenAmount.length} bytes, max 16`);
       }
-      hashObj.update(leaf.tokenAmount);
+      hashObj.update(output.tokenAmount);
     }
 
     allHashes.push(hashObj.digest());

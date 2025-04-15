@@ -30,7 +30,7 @@ import {
 } from "./graphql/objects/index.js";
 import {
   DepositAddressQueryResult,
-  LeafWithPreviousTransactionData,
+  OutputWithPreviousTransactionData,
   QueryAllTransfersResponse,
   TokenTransactionWithStatus,
   Transfer,
@@ -73,7 +73,7 @@ import {
 } from "./utils/network.js";
 import {
   calculateAvailableTokenAmount,
-  checkIfSelectedLeavesAreAvailable,
+  checkIfSelectedOutputsAreAvailable,
 } from "./utils/token-transactions.js";
 import { getNextTransactionSequence } from "./utils/transaction.js";
 
@@ -158,12 +158,12 @@ export class SparkWallet {
 
   private mutexes: Map<string, Mutex> = new Map();
 
-  private pendingWithdrawnLeafIds: string[] = [];
+  private pendingWithdrawnOutputIds: string[] = [];
 
   private sparkAddress: SparkAddressFormat | undefined;
 
   protected leaves: TreeNode[] = [];
-  protected tokenLeaves: Map<string, LeafWithPreviousTransactionData[]> =
+  protected tokenOuputs: Map<string, OutputWithPreviousTransactionData[]> =
     new Map();
 
   protected constructor(options?: ConfigOptions, signer?: SparkSigner) {
@@ -338,7 +338,7 @@ export class SparkWallet {
   }
 
   private async syncWallet() {
-    await this.syncTokenLeaves();
+    await this.syncTokenOutputs();
     this.leaves = await this.getLeaves();
     await this.config.signer.restoreSigningKeysFromLeafs(this.leaves);
     await this.refreshTimelockNodes();
@@ -702,7 +702,7 @@ export class SparkWallet {
   }
 
   public async getTokenInfo(): Promise<TokenInfo[]> {
-    await this.syncTokenLeaves();
+    await this.syncTokenOutputs();
 
     const lrc20Client = await this.lrc20ConnectionManager.createLrc20Client();
     const { balance, tokenBalances } = await this.getBalance();
@@ -727,18 +727,18 @@ export class SparkWallet {
    *
    * @returns {Promise<Object>} Object containing:
    *   - balance: The wallet's current balance in satoshis
-   *   - tokenBalances: Map of token balances and leaf counts
+   *   - tokenBalances: Map of token public keys to token balances
    */
   public async getBalance(): Promise<{
     balance: bigint;
     tokenBalances: Map<string, { balance: bigint }>;
   }> {
     this.leaves = await this.getLeaves();
-    await this.syncTokenLeaves();
+    await this.syncTokenOutputs();
 
     const tokenBalances = new Map<string, { balance: bigint }>();
 
-    for (const [tokenPublicKey, leaves] of this.tokenLeaves.entries()) {
+    for (const [tokenPublicKey, leaves] of this.tokenOuputs.entries()) {
       tokenBalances.set(tokenPublicKey, {
         balance: calculateAvailableTokenAmount(leaves),
       });
@@ -1564,75 +1564,50 @@ export class SparkWallet {
   // ***** Token Flow *****
 
   /**
-   * Synchronizes token leaves for the wallet.
+   * Synchronizes token outputs for the wallet.
    *
    * @returns {Promise<void>}
    * @private
    */
-  protected async syncTokenLeaves() {
-    this.tokenLeaves.clear();
+  protected async syncTokenOutputs() {
+    this.tokenOuputs.clear();
 
     const trackedPublicKeys = await this.config.signer.getTrackedPublicKeys();
-    const unsortedTokenLeaves =
-      await this.tokenTransactionService.fetchOwnedTokenLeaves(
+    const unsortedTokenOutputs =
+      await this.tokenTransactionService.fetchOwnedTokenOutputs(
         [...trackedPublicKeys, await this.config.signer.getIdentityPublicKey()],
         [],
       );
 
-    const filteredTokenLeaves = unsortedTokenLeaves.filter(
-      (leaf) => !this.pendingWithdrawnLeafIds.includes(leaf.leaf?.id || ""),
+    const filteredTokenOutputs = unsortedTokenOutputs.filter(
+      (output) => !this.pendingWithdrawnOutputIds.includes(output.output?.id || ""),
     );
 
-    const fetchedLeafIds = new Set(
-      unsortedTokenLeaves.map((leaf) => leaf.leaf?.id).filter(Boolean),
+    const fetchedOutputIds = new Set(
+      unsortedTokenOutputs.map((output) => output.output?.id).filter(Boolean),
     );
-    this.pendingWithdrawnLeafIds = this.pendingWithdrawnLeafIds.filter((id) =>
-      fetchedLeafIds.has(id),
+    this.pendingWithdrawnOutputIds = this.pendingWithdrawnOutputIds.filter((id) =>
+      fetchedOutputIds.has(id),
     );
 
     // Group leaves by token key
-    const groupedLeaves = new Map<string, LeafWithPreviousTransactionData[]>();
+    const groupedOutputs = new Map<string, OutputWithPreviousTransactionData[]>();
 
-    filteredTokenLeaves.forEach((leaf) => {
-      const tokenKey = bytesToHex(leaf.leaf!.tokenPublicKey!);
-      const index = leaf.previousTransactionVout!;
+    filteredTokenOutputs.forEach((output) => {
+      const tokenKey = bytesToHex(output.output!.tokenPublicKey!);
+      const index = output.previousTransactionVout!;
 
-      if (!groupedLeaves.has(tokenKey)) {
-        groupedLeaves.set(tokenKey, []);
+      if (!groupedOutputs.has(tokenKey)) {
+        groupedOutputs.set(tokenKey, []);
       }
 
-      groupedLeaves.get(tokenKey)!.push({
-        ...leaf,
+      groupedOutputs.get(tokenKey)!.push({
+        ...output,
         previousTransactionVout: index,
       });
     });
 
-    this.tokenLeaves = groupedLeaves;
-  }
-
-  /**
-   * Gets all token balances.
-   *
-   * @returns {Promise<Map<string, { balance: bigint }>>} Map of token balances and leaf counts
-   * @private
-   */
-  private async getAllTokenBalances(): Promise<
-    Map<
-      string,
-      {
-        balance: bigint;
-      }
-    >
-  > {
-    await this.syncTokenLeaves();
-
-    const balances = new Map<string, { balance: bigint }>();
-    for (const [tokenPublicKey, leaves] of this.tokenLeaves.entries()) {
-      balances.set(tokenPublicKey, {
-        balance: calculateAvailableTokenAmount(leaves),
-      });
-    }
-    return balances;
+    this.tokenOuputs = groupedOutputs;
   }
 
   /**
@@ -1642,54 +1617,54 @@ export class SparkWallet {
    * @param {string} params.tokenPublicKey - The public key of the token to transfer
    * @param {bigint} params.tokenAmount - The amount of tokens to transfer
    * @param {string} params.receiverSparkAddress - The recipient's public key
-   * @param {LeafWithPreviousTransactionData[]} [params.selectedLeaves] - Optional specific leaves to use for the transfer
+   * @param {OutputWithPreviousTransactionData[]} [params.selectedOutputs] - Optional specific leaves to use for the transfer
    * @returns {Promise<string>} The transaction ID of the token transfer
    */
   public async transferTokens({
     tokenPublicKey,
     tokenAmount,
     receiverSparkAddress,
-    selectedLeaves,
+    selectedOutputs,
   }: {
     tokenPublicKey: string;
     tokenAmount: bigint;
     receiverSparkAddress: string;
-    selectedLeaves?: LeafWithPreviousTransactionData[];
+    selectedOutputs?: OutputWithPreviousTransactionData[];
   }): Promise<string> {
     const receiverAddress = decodeSparkAddress(
       receiverSparkAddress,
       this.config.getNetworkType(),
     );
 
-    await this.syncTokenLeaves();
-    if (!this.tokenLeaves.has(tokenPublicKey)) {
+    await this.syncTokenOutputs();
+    if (!this.tokenOuputs.has(tokenPublicKey)) {
       throw new Error("No token leaves with the given tokenPublicKey");
     }
 
     const tokenPublicKeyBytes = hexToBytes(tokenPublicKey);
     const receiverSparkAddressBytes = hexToBytes(receiverAddress);
 
-    if (selectedLeaves) {
+    if (selectedOutputs) {
       if (
-        !checkIfSelectedLeavesAreAvailable(
-          selectedLeaves,
-          this.tokenLeaves,
+        !checkIfSelectedOutputsAreAvailable(
+          selectedOutputs,
+          this.tokenOuputs,
           tokenPublicKeyBytes,
         )
       ) {
         throw new Error("One or more selected leaves are not available");
       }
     } else {
-      selectedLeaves = this.selectTokenLeaves(tokenPublicKey, tokenAmount);
+      selectedOutputs = this.selectTokenOutputs(tokenPublicKey, tokenAmount);
     }
 
-    if (selectedLeaves!.length > MAX_TOKEN_LEAVES) {
+    if (selectedOutputs!.length > MAX_TOKEN_LEAVES) {
       throw new Error("Too many leaves selected");
     }
 
     const tokenTransaction =
       await this.tokenTransactionService.constructTransferTokenTransaction(
-        selectedLeaves,
+        selectedOutputs,
         receiverSparkAddressBytes,
         tokenPublicKeyBytes,
         tokenAmount,
@@ -1697,8 +1672,8 @@ export class SparkWallet {
 
     return await this.tokenTransactionService.broadcastTokenTransaction(
       tokenTransaction,
-      selectedLeaves.map((leaf) => leaf.leaf!.ownerPublicKey),
-      selectedLeaves.map((leaf) => leaf.leaf!.revocationPublicKey!),
+      selectedOutputs.map((output) => output.output!.ownerPublicKey),
+      selectedOutputs.map((output) => output.output!.revocationCommitment!),
     );
   }
 
@@ -1740,15 +1715,15 @@ export class SparkWallet {
    *
    * @param {string} tokenPublicKey - The public key of the token
    * @param {bigint} tokenAmount - The amount of tokens to select leaves for
-   * @returns {LeafWithPreviousTransactionData[]} The selected leaves
+   * @returns {OutputWithPreviousTransactionData[]} The selected leaves
    * @private
    */
-  private selectTokenLeaves(
+  private selectTokenOutputs(
     tokenPublicKey: string,
     tokenAmount: bigint,
-  ): LeafWithPreviousTransactionData[] {
-    return this.tokenTransactionService.selectTokenLeaves(
-      this.tokenLeaves.get(tokenPublicKey)!,
+  ): OutputWithPreviousTransactionData[] {
+    return this.tokenTransactionService.selectTokenOutputs(
+      this.tokenOuputs.get(tokenPublicKey)!,
       tokenAmount,
     );
   }

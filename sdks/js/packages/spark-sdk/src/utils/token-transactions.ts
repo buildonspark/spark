@@ -1,69 +1,41 @@
 import { bytesToHex, bytesToNumberBE } from "@noble/curves/abstract/utils";
 import {
-  LeafWithPreviousTransactionData,
-  TokenTransaction,
+  OutputWithPreviousTransactionData,
 } from "../proto/spark.js";
-import { hashTokenTransaction } from "./token-hashing.js";
-import { type SparkWallet } from "../spark-wallet.js";
-
-export function getTokenLeavesSum(
-  leaves: LeafWithPreviousTransactionData[],
-): bigint {
-  return leaves.reduce(
-    (sum, leaf) => sum + BigInt(bytesToNumberBE(leaf.leaf!.tokenAmount!)),
-    BigInt(0),
-  );
-}
-
-export function extractOutputLeaves(
-  fullTokenTransaction: TokenTransaction,
-): LeafWithPreviousTransactionData[] {
-  const outputLeaves: LeafWithPreviousTransactionData[] = [];
-  const hash = hashTokenTransaction(fullTokenTransaction, true);
-
-  fullTokenTransaction.outputLeaves!.forEach((output, index) => {
-    outputLeaves.push({
-      leaf: output,
-      previousTransactionHash: hash!,
-      previousTransactionVout: index,
-    });
-  });
-  return outputLeaves;
-}
 
 export function calculateAvailableTokenAmount(
-  outputLeaves: LeafWithPreviousTransactionData[],
+  outputLeaves: OutputWithPreviousTransactionData[],
 ): bigint {
   return outputLeaves.reduce(
-    (sum, leaf) => sum + BigInt(bytesToNumberBE(leaf.leaf!.tokenAmount!)),
+    (sum, output) => sum + BigInt(bytesToNumberBE(output.output!.tokenAmount!)),
     BigInt(0),
   );
 }
 
-export function checkIfSelectedLeavesAreAvailable(
-  selectedLeaves: LeafWithPreviousTransactionData[],
-  tokenLeaves: Map<string, LeafWithPreviousTransactionData[]>,
+export function checkIfSelectedOutputsAreAvailable(
+  selectedOutputs: OutputWithPreviousTransactionData[],
+  tokenOutputs: Map<string, OutputWithPreviousTransactionData[]>,
   tokenPublicKey: Uint8Array,
 ) {
   const tokenPubKeyHex = bytesToHex(tokenPublicKey);
-  const tokenLeavesAvailable = tokenLeaves.get(tokenPubKeyHex);
-  if (!tokenLeavesAvailable) {
+  const tokenOutputsAvailable = tokenOutputs.get(tokenPubKeyHex);
+  if (!tokenOutputsAvailable) {
     return false;
   }
   if (
-    selectedLeaves.length === 0 ||
-    tokenLeavesAvailable.length < selectedLeaves.length
+    selectedOutputs.length === 0 ||
+    tokenOutputsAvailable.length < selectedOutputs.length
   ) {
     return false;
   }
 
-  // Create a Set of available leaf IDs for O(n + m) lookup
-  const availableLeafIds = new Set(
-    tokenLeavesAvailable.map((leaf) => leaf.leaf!.id),
+  // Create a Set of available token output IDs for O(n + m) lookup
+  const availableOutputIds = new Set(
+    tokenOutputsAvailable.map((output) => output.output!.id),
   );
 
-  for (const selectedLeaf of selectedLeaves) {
-    if (!selectedLeaf.leaf?.id || !availableLeafIds.has(selectedLeaf.leaf.id)) {
+  for (const selectedOutput of selectedOutputs) {
+    if (!selectedOutput.output?.id || !availableOutputIds.has(selectedOutput.output.id)) {
       return false;
     }
   }

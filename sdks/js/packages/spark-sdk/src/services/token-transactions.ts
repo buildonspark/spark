@@ -5,7 +5,7 @@ import {
 } from "@noble/curves/abstract/utils";
 import { secp256k1 } from "@noble/curves/secp256k1";
 import {
-  LeafWithPreviousTransactionData,
+  OutputWithPreviousTransactionData,
   OperatorSpecificTokenTransactionSignablePayload,
   OperatorSpecificTokenTransactionSignature,
   TokenTransaction,
@@ -37,26 +37,26 @@ export class TokenTransactionService {
   }
 
   public async constructTransferTokenTransaction(
-    selectedLeaves: LeafWithPreviousTransactionData[],
+    selectedOutputs: OutputWithPreviousTransactionData[],
     receiverSparkAddress: Uint8Array,
     tokenPublicKey: Uint8Array,
     tokenAmount: bigint,
   ): Promise<TokenTransaction> {
-    let availableTokenAmount = calculateAvailableTokenAmount(selectedLeaves);
+    let availableTokenAmount = calculateAvailableTokenAmount(selectedOutputs);
 
     if (availableTokenAmount === tokenAmount) {
       return {
         network: this.config.getNetworkProto(),
-        tokenInput: {
+        tokenInputs: {
           $case: "transferInput",
           transferInput: {
-            leavesToSpend: selectedLeaves.map((leaf) => ({
-              prevTokenTransactionHash: leaf.previousTransactionHash,
-              prevTokenTransactionLeafVout: leaf.previousTransactionVout,
+            outputsToSpend: selectedOutputs.map((output) => ({
+              prevTokenTransactionHash: output.previousTransactionHash,
+              prevTokenTransactionVout: output.previousTransactionVout,
             })),
           },
         },
-        outputLeaves: [
+        tokenOutputs: [
           {
             ownerPublicKey: receiverSparkAddress,
             tokenPublicKey: tokenPublicKey,
@@ -71,16 +71,16 @@ export class TokenTransactionService {
 
       return {
         network: this.config.getNetworkProto(),
-        tokenInput: {
+        tokenInputs: {
           $case: "transferInput",
           transferInput: {
-            leavesToSpend: selectedLeaves.map((leaf) => ({
-              prevTokenTransactionHash: leaf.previousTransactionHash,
-              prevTokenTransactionLeafVout: leaf.previousTransactionVout,
+            outputsToSpend: selectedOutputs.map((output) => ({
+              prevTokenTransactionHash: output.previousTransactionHash,
+              prevTokenTransactionVout: output.previousTransactionVout,
             })),
           },
         },
-        outputLeaves: [
+        tokenOutputs: [
           {
             ownerPublicKey: receiverSparkAddress,
             tokenPublicKey: tokenPublicKey,
@@ -111,8 +111,8 @@ export class TokenTransactionService {
 
   public async broadcastTokenTransaction(
     tokenTransaction: TokenTransaction,
-    leafToSpendSigningPublicKeys?: Uint8Array[],
-    leafToSpendRevocationPublicKeys?: Uint8Array[],
+    outputsToSpendSigningPublicKeys?: Uint8Array[],
+    outputsToSpendRevocationPublicKeys?: Uint8Array[],
   ): Promise<string> {
     const sparkClient = await this.connectionManager.createSparkClient(
       this.config.getCoordinatorAddress(),
@@ -126,9 +126,9 @@ export class TokenTransactionService {
     );
 
     const ownerSignatures: Uint8Array[] = [];
-    if (tokenTransaction.tokenInput!.$case === "mintInput") {
+    if (tokenTransaction.tokenInputs!.$case === "mintInput") {
       const issuerPublicKey =
-        tokenTransaction.tokenInput!.mintInput.issuerPublicKey;
+        tokenTransaction.tokenInputs!.mintInput.issuerPublicKey;
       if (!issuerPublicKey) {
         throw new Error("issuer public key cannot be nil");
       }
@@ -139,17 +139,17 @@ export class TokenTransactionService {
       );
 
       ownerSignatures.push(ownerSignature);
-    } else if (tokenTransaction.tokenInput!.$case === "transferInput") {
-      const transferInput = tokenTransaction.tokenInput!.transferInput;
+    } else if (tokenTransaction.tokenInputs!.$case === "transferInput") {
+      const transferInput = tokenTransaction.tokenInputs!.transferInput;
 
-      if (!leafToSpendSigningPublicKeys || !leafToSpendRevocationPublicKeys) {
+      if (!outputsToSpendSigningPublicKeys || !outputsToSpendRevocationPublicKeys) {
         throw new Error(
-          "leafToSpendSigningPublicKeys and leafToSpendRevocationPublicKeys are required",
+          "outputs to spend signing public keys and outputs to spend revocation public keys are required",
         );
       }
 
-      for (let i = 0; i < transferInput.leavesToSpend.length; i++) {
-        const key = leafToSpendSigningPublicKeys![i];
+      for (let i = 0; i < transferInput.outputsToSpend.length; i++) {
+        const key = outputsToSpendSigningPublicKeys![i];
         if (!key) {
           throw new Error("key not found");
         }
@@ -211,9 +211,9 @@ export class TokenTransactionService {
 
     const operatorSpecificSignatures: OperatorSpecificTokenTransactionSignature[] =
       [];
-    if (tokenTransaction.tokenInput!.$case === "mintInput") {
+    if (tokenTransaction.tokenInputs!.$case === "mintInput") {
       const issuerPublicKey =
-        tokenTransaction.tokenInput!.mintInput.issuerPublicKey;
+        tokenTransaction.tokenInputs!.mintInput.issuerPublicKey;
       if (!issuerPublicKey) {
         throw new Error("issuer public key cannot be nil");
       }
@@ -230,9 +230,9 @@ export class TokenTransactionService {
       });
     }
 
-    if (tokenTransaction.tokenInput!.$case === "transferInput") {
-      const transferInput = tokenTransaction.tokenInput!.transferInput;
-      for (let i = 0; i < transferInput.leavesToSpend.length; i++) {
+    if (tokenTransaction.tokenInputs!.$case === "transferInput") {
+      const transferInput = tokenTransaction.tokenInputs!.transferInput;
+      for (let i = 0; i < transferInput.outputsToSpend.length; i++) {
         let ownerSignature: Uint8Array;
         if (this.config.shouldSignTokenTransactionsWithSchnorr()) {
           ownerSignature =
@@ -283,40 +283,40 @@ export class TokenTransactionService {
     const threshold = startResponse.keyshareInfo.threshold;
     const successfulSignatures = validateResponses(soSignatures);
 
-    if (tokenTransaction.tokenInput!.$case === "transferInput") {
-      const leavesToSpend =
-        tokenTransaction.tokenInput!.transferInput.leavesToSpend;
+    if (tokenTransaction.tokenInputs!.$case === "transferInput") {
+      const outputsToSpend =
+        tokenTransaction.tokenInputs!.transferInput.outputsToSpend;
 
       let revocationKeys: Uint8Array[] = [];
 
-      for (let leafIndex = 0; leafIndex < leavesToSpend.length; leafIndex++) {
-        // For each leaf, collect keyshares from all SOs that responded successfully
-        const leafKeyshares = successfulSignatures.map(
+      for (let outputIndex = 0; outputIndex < outputsToSpend.length; outputIndex++) {
+        // For each output, collect keyshares from all SOs that responded successfully
+        const outputKeyshares = successfulSignatures.map(
           ({ identifier, response }) => ({
             index: parseInt(identifier, 16),
-            keyshare: response.tokenTransactionRevocationKeyshares[leafIndex],
+            keyshare: response.tokenTransactionRevocationKeyshares[outputIndex],
           }),
         );
 
-        if (leafKeyshares.length < threshold) {
+        if (outputKeyshares.length < threshold) {
           throw new Error(
-            `Insufficient keyshares for leaf ${leafIndex}: got ${leafKeyshares.length}, need ${threshold}`,
+            `Insufficient keyshares for output ${outputIndex}: got ${outputKeyshares.length}, needs ${threshold}`,
           );
         }
 
         // Check for duplicate operator indices
         const seenIndices = new Set<number>();
-        for (const { index } of leafKeyshares) {
+        for (const { index } of outputKeyshares) {
           if (seenIndices.has(index)) {
             throw new Error(
-              `Duplicate operator index ${index} for leaf ${leafIndex}`,
+              `Duplicate operator index ${index} for output ${outputIndex}`,
             );
           }
           seenIndices.add(index);
         }
 
         const recoveredPrivateKey = recoverPrivateKeyFromKeyshares(
-          leafKeyshares as KeyshareWithOperatorIndex[],
+          outputKeyshares as KeyshareWithOperatorIndex[],
           threshold,
         );
         const recoveredPublicKey = secp256k1.getPublicKey(
@@ -325,15 +325,15 @@ export class TokenTransactionService {
         );
 
         if (
-          !leafToSpendRevocationPublicKeys ||
-          !leafToSpendRevocationPublicKeys[leafIndex] ||
+          !outputsToSpendRevocationPublicKeys ||
+          !outputsToSpendRevocationPublicKeys[outputIndex] ||
           !recoveredPublicKey.every(
             (byte, i) =>
-              byte === leafToSpendRevocationPublicKeys[leafIndex]![i],
+              byte === outputsToSpendRevocationPublicKeys[outputIndex]![i],
           )
         ) {
           throw new Error(
-            `Recovered public key does not match expected revocation public key for leaf ${leafIndex}`,
+            `Recovered public key does not match expected revocation public key for output ${outputIndex}`,
           );
         }
 
@@ -355,7 +355,7 @@ export class TokenTransactionService {
 
   public async finalizeTokenTransaction(
     finalTokenTransaction: TokenTransaction,
-    leafToSpendRevocationKeys: Uint8Array[],
+    outputToSpendRevocationSecrets: Uint8Array[],
     threshold: number,
   ): Promise<TokenTransaction> {
     const signingOperators = this.config.getSigningOperators();
@@ -370,7 +370,7 @@ export class TokenTransactionService {
         const response = await internalSparkClient.finalize_token_transaction(
           {
             finalTokenTransaction,
-            leafToSpendRevocationKeys,
+            outputToSpendRevocationSecrets,
             identityPublicKey,
           },
           {
@@ -391,10 +391,10 @@ export class TokenTransactionService {
     return finalTokenTransaction;
   }
 
-  public async fetchOwnedTokenLeaves(
+  public async fetchOwnedTokenOutputs(
     ownerPublicKeys: Uint8Array[],
     tokenPublicKeys: Uint8Array[],
-  ): Promise<LeafWithPreviousTransactionData[]> {
+  ): Promise<OutputWithPreviousTransactionData[]> {
     const sparkClient = await this.connectionManager.createSparkClient(
       this.config.getCoordinatorAddress(),
     );
@@ -404,37 +404,37 @@ export class TokenTransactionService {
       tokenPublicKeys,
     });
 
-    return result.leavesWithPreviousTransactionData;
+    return result.outputsWithPreviousTransactionData;
   }
 
-  public async syncTokenLeaves(
-    tokenLeaves: Map<string, LeafWithPreviousTransactionData[]>,
+  public async syncTokenOutputs(
+    tokenOutputs: Map<string, OutputWithPreviousTransactionData[]>,
   ) {
-    const unsortedTokenLeaves = await this.fetchOwnedTokenLeaves(
+    const unsortedTokenOutputs = await this.fetchOwnedTokenOutputs(
       await this.config.signer.getTrackedPublicKeys(),
       [],
     );
 
-    unsortedTokenLeaves.forEach((leaf) => {
-      const tokenKey = bytesToHex(leaf.leaf!.tokenPublicKey!);
-      const index = leaf.previousTransactionVout!;
+    unsortedTokenOutputs.forEach((output) => {
+      const tokenKey = bytesToHex(output.output!.tokenPublicKey!);
+      const index = output.previousTransactionVout!;
 
-      tokenLeaves.set(tokenKey, [{ ...leaf, previousTransactionVout: index }]);
+      tokenOutputs.set(tokenKey, [{ ...output, previousTransactionVout: index }]);
     });
   }
 
-  public selectTokenLeaves(
-    tokenLeaves: LeafWithPreviousTransactionData[],
+  public selectTokenOutputs(
+    tokenOutputs: OutputWithPreviousTransactionData[],
     tokenAmount: bigint,
-  ): LeafWithPreviousTransactionData[] {
-    if (calculateAvailableTokenAmount(tokenLeaves) < tokenAmount) {
+  ): OutputWithPreviousTransactionData[] {
+    if (calculateAvailableTokenAmount(tokenOutputs) < tokenAmount) {
       throw new Error("Insufficient available token amount");
     }
 
     // First try to find an exact match
-    const exactMatch: LeafWithPreviousTransactionData | undefined =
-      tokenLeaves.find(
-        (item) => bytesToNumberBE(item.leaf!.tokenAmount!) === tokenAmount,
+    const exactMatch: OutputWithPreviousTransactionData | undefined =
+      tokenOutputs.find(
+        (item) => bytesToNumberBE(item.output!.tokenAmount!) === tokenAmount,
       );
 
     if (exactMatch) {
@@ -442,24 +442,24 @@ export class TokenTransactionService {
     }
 
     // Sort by amount ascending for optimal selection.
-    // It's in user's interest to hold as little leaves as possible,
+    // It's in user's interest to hold as little token outputs as possible,
     // so that in the event of a unilateral exit the fees are as low as possible
-    tokenLeaves.sort((a, b) =>
+    tokenOutputs.sort((a, b) =>
       Number(
-        bytesToNumberBE(a.leaf!.tokenAmount!) -
-          bytesToNumberBE(b.leaf!.tokenAmount!),
+        bytesToNumberBE(a.output!.tokenAmount!) -
+          bytesToNumberBE(b.output!.tokenAmount!),
       ),
     );
 
     let remainingAmount = tokenAmount;
-    const selectedLeaves: typeof tokenLeaves = [];
+    const selectedOutputs: typeof tokenOutputs = [];
 
-    // Select leaves using a greedy approach
-    for (const leafInfo of tokenLeaves) {
+    // Select outputs using a greedy approach
+    for (const outputWithPreviousTransactionData of tokenOutputs) {
       if (remainingAmount <= 0n) break;
 
-      selectedLeaves.push(leafInfo);
-      remainingAmount -= bytesToNumberBE(leafInfo.leaf!.tokenAmount!);
+      selectedOutputs.push(outputWithPreviousTransactionData);
+      remainingAmount -= bytesToNumberBE(outputWithPreviousTransactionData.output!.tokenAmount!);
     }
 
     if (remainingAmount > 0n) {
@@ -468,7 +468,7 @@ export class TokenTransactionService {
       );
     }
 
-    return selectedLeaves;
+    return selectedOutputs;
   }
 
   // Helper function for deciding if the signer public key is the identity public key
