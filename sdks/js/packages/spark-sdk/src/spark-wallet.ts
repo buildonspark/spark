@@ -30,8 +30,8 @@ import {
 } from "./graphql/objects/index.js";
 import {
   DepositAddressQueryResult,
-  QueryTransfersResponse,
   OutputWithPreviousTransactionData,
+  QueryTransfersResponse,
   TokenTransactionWithStatus,
   Transfer,
   TransferStatus,
@@ -83,7 +83,6 @@ import {
   encodeSparkAddress,
   SparkAddressFormat,
 } from "./address/index.js";
-import { broadcastL1Withdrawal } from "./services/lrc20.js";
 import { SparkSigner } from "./signer/signer.js";
 import { getCrypto } from "./utils/crypto.js";
 import { getMasterHDKeyFromSeed } from "./utils/index.js";
@@ -768,9 +767,13 @@ export class SparkWallet {
    * @private
    */
   private async generateDepositAddress(): Promise<string> {
-    const signingPubkey = await this.config.signer.getDepositSigningKey();
+    const leafId = crypto.randomUUID();
+    const signingPubkey = await this.config.signer.generatePublicKey(
+      sha256(leafId),
+    );
     const address = await this.depositService!.generateDepositAddress({
       signingPubkey,
+      leafId,
     });
     if (!address.depositAddress) {
       throw new Error("Failed to generate deposit address");
@@ -791,14 +794,14 @@ export class SparkWallet {
     depositTx,
     vout,
   }: DepositParams) {
-    const response = await this.depositService!.createTreeRoot({
+    const res = await this.depositService!.createTreeRoot({
       signingPubKey,
       verifyingKey,
       depositTx,
       vout,
     });
 
-    return await this.transferDepositToSelf(response.nodes, signingPubKey);
+    return res.nodes;
   }
 
   /**

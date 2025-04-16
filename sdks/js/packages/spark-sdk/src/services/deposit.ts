@@ -27,6 +27,7 @@ type ValidateDepositAddressParams = {
 
 export type GenerateDepositAddressParams = {
   signingPubkey: Uint8Array;
+  leafId: string;
 };
 
 export type CreateTreeRootParams = {
@@ -110,6 +111,7 @@ export class DepositService {
 
   async generateDepositAddress({
     signingPubkey,
+    leafId,
   }: GenerateDepositAddressParams): Promise<GenerateDepositAddressResponse> {
     const sparkClient = await this.connectionManager.createSparkClient(
       this.config.getCoordinatorAddress(),
@@ -121,6 +123,7 @@ export class DepositService {
         signingPublicKey: signingPubkey,
         identityPublicKey: await this.config.signer.getIdentityPublicKey(),
         network: this.config.getNetworkProto(),
+        leafId: leafId,
       });
     } catch (error) {
       throw new Error(`Error generating deposit address: ${error}`);

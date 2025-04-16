@@ -61,8 +61,10 @@ export async function createNewTree(
   const connectionManager = new ConnectionManager(configService);
   const depositService = new DepositService(configService, connectionManager);
 
+  const leafId = crypto.randomUUID();
   const depositResp = await depositService.generateDepositAddress({
     signingPubkey: pubKey,
+    leafId,
   });
 
   if (!depositResp.depositAddress) {
