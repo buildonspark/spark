@@ -801,6 +801,10 @@ export class SparkWallet {
       vout,
     });
 
+    for (const node of res.nodes) {
+      await this.transferService.extendTimelock(node, signingPubKey);
+    }
+
     return res.nodes;
   }
 
