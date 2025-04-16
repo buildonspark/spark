@@ -1,6 +1,5 @@
 import { getLatestDepositTxId, SparkWallet } from "@buildonspark/spark-sdk";
 import { ConfigOptions } from "@buildonspark/spark-sdk/services/wallet-config";
-import { BitcoinNetwork } from "@buildonspark/spark-sdk/types";
 import readline from "readline";
 
 // Initialize Spark Wallet
@@ -31,7 +30,7 @@ async function runCLI() {
   withdraw <amount> <onchainAddress>                                  - Withdraw funds to an L1 address
   coopfee <amount> <withdrawalAddress>                                - Get a fee estimate for a cooperative exit
   lightningsendfee <invoice>                                          - Get a fee estimate for a lightning send
-  lightningreceivefee <amount> <REGTEST | MAINNET | TESTNET | SIGNET> - Get a fee estimate for a lightning receive
+  lightningreceivefee <amount>                                        - Get a fee estimate for a lightning receive
   getlightningsendrequest <requestId>                                 - Get a lightning send request by ID
   getlightningreceiverequest <requestId>                              - Get a lightning receive request by ID
   getcoopexitrequest <requestId>                                      - Get a coop exit request by ID
@@ -267,10 +266,8 @@ async function runCLI() {
           console.log("Please initialize a wallet first");
           break;
         }
-        const network = args[1] as BitcoinNetwork;
         const fee = await wallet.getLightningReceiveFeeEstimate({
           amountSats: parseInt(args[0]),
-          network,
         });
         console.log(fee);
         break;

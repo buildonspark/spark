@@ -3,6 +3,7 @@ import {
   LRC20WalletApiConfig,
 } from "@buildonspark/lrc20-sdk";
 import { HasSspClientOptions, SspClientOptions } from "../graphql/client.js";
+import { BitcoinNetwork } from "../graphql/objects/BitcoinNetwork.js";
 import { DefaultSparkSigner, SparkSigner } from "../signer/signer.js";
 import { Network, NetworkToProto, NetworkType } from "../utils/network.js";
 import {
@@ -70,6 +71,19 @@ export class WalletConfigService
 
   public getCoordinatorIdentifier(): string {
     return this.config.coodinatorIdentifier;
+  }
+
+  public getSspNetwork(): BitcoinNetwork {
+    if (this.config.network === "MAINNET") {
+      return BitcoinNetwork.MAINNET;
+    } else if (this.config.network === "REGTEST") {
+      return BitcoinNetwork.REGTEST;
+    } else if (this.config.network === "TESTNET") {
+      return BitcoinNetwork.TESTNET;
+    } else if (this.config.network === "SIGNET") {
+      return BitcoinNetwork.SIGNET;
+    }
+    return BitcoinNetwork.FUTURE_VALUE;
   }
 
   public getNetwork(): Network {

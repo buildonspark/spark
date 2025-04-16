@@ -20,7 +20,6 @@ import {
   CoopExitRequest,
   LeavesSwapFeeEstimateOutput,
   LeavesSwapRequest,
-  LightningReceiveFeeEstimateInput,
   LightningReceiveFeeEstimateOutput,
   LightningReceiveRequest,
   LightningSendFeeEstimateInput,
@@ -1333,16 +1332,20 @@ export class SparkWallet {
   /**
    * Gets fee estimate for receiving Lightning payments.
    *
-   * @param {LightningReceiveFeeEstimateInput} params - Input parameters for fee estimation
+   * @param {Object} params - Input parameters for fee estimation
+   * @param {number} params.amountSats - Amount in satoshis
    * @returns {Promise<LightningReceiveFeeEstimateOutput | null>} Fee estimate for receiving Lightning payments
    */
   public async getLightningReceiveFeeEstimate({
     amountSats,
-    network,
-  }: LightningReceiveFeeEstimateInput): Promise<LightningReceiveFeeEstimateOutput | null> {
+  }: {
+    amountSats: number;
+  }): Promise<LightningReceiveFeeEstimateOutput | null> {
     if (!this.sspClient) {
       throw new Error("SSP client not initialized");
     }
+
+    const network = this.config.getSspNetwork();
 
     const feeEstimate = await this.sspClient.getLightningReceiveFeeEstimate(
       amountSats,

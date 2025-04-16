@@ -494,7 +494,6 @@ export const createSparkRouter = (
         const { amountSats } = req.query as { amountSats: string };
         const feeEstimate = await wallet!.getLightningReceiveFeeEstimate({
           amountSats: Number(amountSats),
-          network: BITCOIN_NETWORK,
         });
         res.json({
           data: { feeEstimate },
