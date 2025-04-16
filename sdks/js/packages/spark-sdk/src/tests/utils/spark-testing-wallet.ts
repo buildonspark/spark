@@ -1,10 +1,10 @@
-import { QueryPendingTransfersResponse, Transfer } from "../../proto/spark.js";
+import { QueryTransfersResponse, Transfer } from "../../proto/spark.js";
 import { SparkSigner } from "../../signer/signer.js";
 import { SparkWallet, SparkWalletProps } from "../../spark-wallet.js";
 
 interface ISparkWalletTesting extends SparkWallet {
   getSigner(): SparkSigner;
-  queryPendingTransfers(): Promise<QueryPendingTransfersResponse>;
+  queryPendingTransfers(): Promise<QueryTransfersResponse>;
   verifyPendingTransfer(transfer: Transfer): Promise<Map<string, Uint8Array>>;
 }
 
@@ -25,7 +25,7 @@ export class SparkWalletTesting
     return this.config.signer;
   }
 
-  public async queryPendingTransfers(): Promise<QueryPendingTransfersResponse> {
+  public async queryPendingTransfers(): Promise<QueryTransfersResponse> {
     return await this.transferService.queryPendingTransfers();
   }
 

@@ -30,8 +30,8 @@ import {
 } from "./graphql/objects/index.js";
 import {
   DepositAddressQueryResult,
+  QueryTransfersResponse,
   OutputWithPreviousTransactionData,
-  QueryAllTransfersResponse,
   TokenTransactionWithStatus,
   Transfer,
   TransferStatus,
@@ -692,12 +692,12 @@ export class SparkWallet {
    *
    * @param {number} [limit=20] - Maximum number of transfers to return
    * @param {number} [offset=0] - Offset for pagination
-   * @returns {Promise<QueryAllTransfersResponse>} Response containing the list of transfers
+   * @returns {Promise<QueryTransfersResponse>} Response containing the list of transfers
    */
   public async getTransfers(
     limit: number = 20,
     offset: number = 0,
-  ): Promise<QueryAllTransfersResponse> {
+  ): Promise<QueryTransfersResponse> {
     return await this.transferService.queryAllTransfers(limit, offset);
   }
 

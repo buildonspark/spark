@@ -658,7 +658,7 @@ public struct Spark_SendTransferResponse: Sendable {
   fileprivate var _transfer: Spark_Transfer? = nil
 }
 
-public struct Spark_QueryPendingTransfersRequest: @unchecked Sendable {
+public struct Spark_TransferFilter: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -670,7 +670,7 @@ public struct Spark_QueryPendingTransfersRequest: @unchecked Sendable {
   public init() {}
 }
 
-public struct Spark_QueryPendingTransfersResponse: Sendable {
+public struct Spark_QueryTransfersResponse: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2092,8 +2092,8 @@ extension Spark_SendTransferResponse: SwiftProtobuf.Message, SwiftProtobuf._Mess
   }
 }
 
-extension Spark_QueryPendingTransfersRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".QueryPendingTransfersRequest"
+extension Spark_TransferFilter: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".TransferFilter"
   public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
     1: .standard(proto: "receiver_identity_public_key"),
   ]
@@ -2117,15 +2117,15 @@ extension Spark_QueryPendingTransfersRequest: SwiftProtobuf.Message, SwiftProtob
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: Spark_QueryPendingTransfersRequest, rhs: Spark_QueryPendingTransfersRequest) -> Bool {
+  public static func ==(lhs: Spark_TransferFilter, rhs: Spark_TransferFilter) -> Bool {
     if lhs.receiverIdentityPublicKey != rhs.receiverIdentityPublicKey {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
-extension Spark_QueryPendingTransfersResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".QueryPendingTransfersResponse"
+extension Spark_QueryTransfersResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".QueryTransfersResponse"
   public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
     1: .same(proto: "transfers"),
   ]
@@ -2149,7 +2149,7 @@ extension Spark_QueryPendingTransfersResponse: SwiftProtobuf.Message, SwiftProto
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: Spark_QueryPendingTransfersResponse, rhs: Spark_QueryPendingTransfersResponse) -> Bool {
+  public static func ==(lhs: Spark_QueryTransfersResponse, rhs: Spark_QueryTransfersResponse) -> Bool {
     if lhs.transfers != rhs.transfers {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true

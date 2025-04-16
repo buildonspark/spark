@@ -47,9 +47,9 @@ public protocol Spark_SparkServiceClientProtocol: GRPCClient {
   ) -> UnaryCall<Spark_SendTransferRequest, Spark_SendTransferResponse>
 
   func query_pending_transfers(
-    _ request: Spark_QueryPendingTransfersRequest,
+    _ request: Spark_TransferFilter,
     callOptions: CallOptions?
-  ) -> UnaryCall<Spark_QueryPendingTransfersRequest, Spark_QueryPendingTransfersResponse>
+  ) -> UnaryCall<Spark_TransferFilter, Spark_QueryTransfersResponse>
 
   func claim_transfer_tweak_keys(
     _ request: Spark_ClaimTransferTweakKeysRequest,
@@ -187,9 +187,9 @@ extension Spark_SparkServiceClientProtocol {
   ///   - callOptions: Call options.
   /// - Returns: A `UnaryCall` with futures for the metadata, status and response.
   public func query_pending_transfers(
-    _ request: Spark_QueryPendingTransfersRequest,
+    _ request: Spark_TransferFilter,
     callOptions: CallOptions? = nil
-  ) -> UnaryCall<Spark_QueryPendingTransfersRequest, Spark_QueryPendingTransfersResponse> {
+  ) -> UnaryCall<Spark_TransferFilter, Spark_QueryTransfersResponse> {
     return self.makeUnaryCall(
       path: Spark_SparkServiceClientMetadata.Methods.query_pending_transfers.path,
       request: request,
@@ -346,9 +346,9 @@ public protocol Spark_SparkServiceAsyncClientProtocol: GRPCClient {
   ) -> GRPCAsyncUnaryCall<Spark_SendTransferRequest, Spark_SendTransferResponse>
 
   func makeQueryPendingTransfersCall(
-    _ request: Spark_QueryPendingTransfersRequest,
+    _ request: Spark_TransferFilter,
     callOptions: CallOptions?
-  ) -> GRPCAsyncUnaryCall<Spark_QueryPendingTransfersRequest, Spark_QueryPendingTransfersResponse>
+  ) -> GRPCAsyncUnaryCall<Spark_TransferFilter, Spark_QueryTransfersResponse>
 
   func makeClaimTransferTweakKeysCall(
     _ request: Spark_ClaimTransferTweakKeysRequest,
@@ -449,9 +449,9 @@ extension Spark_SparkServiceAsyncClientProtocol {
   }
 
   public func makeQueryPendingTransfersCall(
-    _ request: Spark_QueryPendingTransfersRequest,
+    _ request: Spark_TransferFilter,
     callOptions: CallOptions? = nil
-  ) -> GRPCAsyncUnaryCall<Spark_QueryPendingTransfersRequest, Spark_QueryPendingTransfersResponse> {
+  ) -> GRPCAsyncUnaryCall<Spark_TransferFilter, Spark_QueryTransfersResponse> {
     return self.makeAsyncUnaryCall(
       path: Spark_SparkServiceClientMetadata.Methods.query_pending_transfers.path,
       request: request,
@@ -572,9 +572,9 @@ extension Spark_SparkServiceAsyncClientProtocol {
   }
 
   public func query_pending_transfers(
-    _ request: Spark_QueryPendingTransfersRequest,
+    _ request: Spark_TransferFilter,
     callOptions: CallOptions? = nil
-  ) async throws -> Spark_QueryPendingTransfersResponse {
+  ) async throws -> Spark_QueryTransfersResponse {
     return try await self.performAsyncUnaryCall(
       path: Spark_SparkServiceClientMetadata.Methods.query_pending_transfers.path,
       request: request,
@@ -658,7 +658,7 @@ public protocol Spark_SparkServiceClientInterceptorFactoryProtocol: Sendable {
   func makesend_transferInterceptors() -> [ClientInterceptor<Spark_SendTransferRequest, Spark_SendTransferResponse>]
 
   /// - Returns: Interceptors to use when invoking 'query_pending_transfers'.
-  func makequery_pending_transfersInterceptors() -> [ClientInterceptor<Spark_QueryPendingTransfersRequest, Spark_QueryPendingTransfersResponse>]
+  func makequery_pending_transfersInterceptors() -> [ClientInterceptor<Spark_TransferFilter, Spark_QueryTransfersResponse>]
 
   /// - Returns: Interceptors to use when invoking 'claim_transfer_tweak_keys'.
   func makeclaim_transfer_tweak_keysInterceptors() -> [ClientInterceptor<Spark_ClaimTransferTweakKeysRequest, SwiftProtobuf.Google_Protobuf_Empty>]
@@ -767,7 +767,7 @@ public protocol Spark_SparkServiceProvider: CallHandlerProvider {
 
   func send_transfer(request: Spark_SendTransferRequest, context: StatusOnlyCallContext) -> EventLoopFuture<Spark_SendTransferResponse>
 
-  func query_pending_transfers(request: Spark_QueryPendingTransfersRequest, context: StatusOnlyCallContext) -> EventLoopFuture<Spark_QueryPendingTransfersResponse>
+  func query_pending_transfers(request: Spark_TransferFilter, context: StatusOnlyCallContext) -> EventLoopFuture<Spark_QueryTransfersResponse>
 
   func claim_transfer_tweak_keys(request: Spark_ClaimTransferTweakKeysRequest, context: StatusOnlyCallContext) -> EventLoopFuture<SwiftProtobuf.Google_Protobuf_Empty>
 
@@ -845,8 +845,8 @@ extension Spark_SparkServiceProvider {
     case "query_pending_transfers":
       return UnaryServerHandler(
         context: context,
-        requestDeserializer: ProtobufDeserializer<Spark_QueryPendingTransfersRequest>(),
-        responseSerializer: ProtobufSerializer<Spark_QueryPendingTransfersResponse>(),
+        requestDeserializer: ProtobufDeserializer<Spark_TransferFilter>(),
+        responseSerializer: ProtobufSerializer<Spark_QueryTransfersResponse>(),
         interceptors: self.interceptors?.makequery_pending_transfersInterceptors() ?? [],
         userFunction: self.query_pending_transfers(request:context:)
       )
@@ -921,9 +921,9 @@ public protocol Spark_SparkServiceAsyncProvider: CallHandlerProvider, Sendable {
   ) async throws -> Spark_SendTransferResponse
 
   func query_pending_transfers(
-    request: Spark_QueryPendingTransfersRequest,
+    request: Spark_TransferFilter,
     context: GRPCAsyncServerCallContext
-  ) async throws -> Spark_QueryPendingTransfersResponse
+  ) async throws -> Spark_QueryTransfersResponse
 
   func claim_transfer_tweak_keys(
     request: Spark_ClaimTransferTweakKeysRequest,
@@ -1017,8 +1017,8 @@ extension Spark_SparkServiceAsyncProvider {
     case "query_pending_transfers":
       return GRPCAsyncServerHandler(
         context: context,
-        requestDeserializer: ProtobufDeserializer<Spark_QueryPendingTransfersRequest>(),
-        responseSerializer: ProtobufSerializer<Spark_QueryPendingTransfersResponse>(),
+        requestDeserializer: ProtobufDeserializer<Spark_TransferFilter>(),
+        responseSerializer: ProtobufSerializer<Spark_QueryTransfersResponse>(),
         interceptors: self.interceptors?.makequery_pending_transfersInterceptors() ?? [],
         wrapping: { try await self.query_pending_transfers(request: $0, context: $1) }
       )
@@ -1084,7 +1084,7 @@ public protocol Spark_SparkServiceServerInterceptorFactoryProtocol: Sendable {
 
   /// - Returns: Interceptors to use when handling 'query_pending_transfers'.
   ///   Defaults to calling `self.makeInterceptors()`.
-  func makequery_pending_transfersInterceptors() -> [ServerInterceptor<Spark_QueryPendingTransfersRequest, Spark_QueryPendingTransfersResponse>]
+  func makequery_pending_transfersInterceptors() -> [ServerInterceptor<Spark_TransferFilter, Spark_QueryTransfersResponse>]
 
   /// - Returns: Interceptors to use when handling 'claim_transfer_tweak_keys'.
   ///   Defaults to calling `self.makeInterceptors()`.

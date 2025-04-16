@@ -121,7 +121,7 @@ public class Wallet {
     }
 
     public func queryPendingTransfers() async throws -> [Spark_Transfer] {
-        var request = Spark_QueryPendingTransfersRequest()
+        var request = Spark_TransferFilter()
         request.receiverIdentityPublicKey = self.identityPrivateKey.publicKey.dataRepresentation
         let response = try await self.coordinator.client.query_pending_transfers(request)
         return response.transfers

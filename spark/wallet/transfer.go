@@ -347,7 +347,7 @@ func findShare(shares []*secretsharing.VerifiableSecretShare, operatorID uint64)
 func QueryPendingTransfers(
 	ctx context.Context,
 	config *Config,
-) (*pb.QueryPendingTransfersResponse, error) {
+) (*pb.QueryTransfersResponse, error) {
 	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress(), nil)
 	if err != nil {
 		return nil, err
@@ -355,8 +355,8 @@ func QueryPendingTransfers(
 	defer sparkConn.Close()
 
 	sparkClient := pb.NewSparkServiceClient(sparkConn)
-	return sparkClient.QueryPendingTransfers(ctx, &pb.QueryPendingTransfersRequest{
-		Participant: &pb.QueryPendingTransfersRequest_ReceiverIdentityPublicKey{
+	return sparkClient.QueryPendingTransfers(ctx, &pb.TransferFilter{
+		Participant: &pb.TransferFilter_ReceiverIdentityPublicKey{
 			ReceiverIdentityPublicKey: config.IdentityPublicKey(),
 		},
 	})
@@ -365,7 +365,7 @@ func QueryPendingTransfers(
 func QueryPendingTransfersBySender(
 	ctx context.Context,
 	config *Config,
-) (*pb.QueryPendingTransfersResponse, error) {
+) (*pb.QueryTransfersResponse, error) {
 	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress(), nil)
 	if err != nil {
 		return nil, err
@@ -373,8 +373,8 @@ func QueryPendingTransfersBySender(
 	defer sparkConn.Close()
 
 	sparkClient := pb.NewSparkServiceClient(sparkConn)
-	return sparkClient.QueryPendingTransfers(ctx, &pb.QueryPendingTransfersRequest{
-		Participant: &pb.QueryPendingTransfersRequest_SenderIdentityPublicKey{
+	return sparkClient.QueryPendingTransfers(ctx, &pb.TransferFilter{
+		Participant: &pb.TransferFilter_SenderIdentityPublicKey{
 			SenderIdentityPublicKey: config.IdentityPublicKey(),
 		},
 	})
@@ -798,10 +798,12 @@ func QueryAllTransfers(ctx context.Context, config *Config, limit int64, offset 
 	defer sparkConn.Close()
 
 	sparkClient := pb.NewSparkServiceClient(sparkConn)
-	response, err := sparkClient.QueryAllTransfers(ctx, &pb.QueryAllTransfersRequest{
-		IdentityPublicKey: config.IdentityPublicKey(),
-		Limit:             limit,
-		Offset:            offset,
+	response, err := sparkClient.QueryAllTransfers(ctx, &pb.TransferFilter{
+		Participant: &pb.TransferFilter_ReceiverIdentityPublicKey{
+			ReceiverIdentityPublicKey: config.IdentityPublicKey(),
+		},
+		Limit:  limit,
+		Offset: offset,
 	})
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to call QueryAllTransfers: %v", err)

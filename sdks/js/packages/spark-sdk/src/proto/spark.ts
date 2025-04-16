@@ -784,7 +784,7 @@ export interface CompleteSendTransferResponse {
   transfer: Transfer | undefined;
 }
 
-export interface QueryPendingTransfersRequest {
+export interface TransferFilter {
   participant?: { $case: "receiverIdentityPublicKey"; receiverIdentityPublicKey: Uint8Array } | {
     $case: "senderIdentityPublicKey";
     senderIdentityPublicKey: Uint8Array;
@@ -794,7 +794,7 @@ export interface QueryPendingTransfersRequest {
   offset: number;
 }
 
-export interface QueryPendingTransfersResponse {
+export interface QueryTransfersResponse {
   transfers: Transfer[];
   offset: number;
 }
@@ -1147,16 +1147,6 @@ export interface CancelSendTransferResponse {
   transfer: Transfer | undefined;
 }
 
-export interface QueryAllTransfersRequest {
-  identityPublicKey: Uint8Array;
-  limit: number;
-  offset: number;
-}
-
-export interface QueryAllTransfersResponse {
-  transfers: Transfer[];
-  offset: number;
-}
 
 export interface QueryUnusedDepositAddressesRequest {
   identityPublicKey: Uint8Array;
@@ -6969,12 +6959,12 @@ export const CompleteSendTransferResponse: MessageFns<CompleteSendTransferRespon
   },
 };
 
-function createBaseQueryPendingTransfersRequest(): QueryPendingTransfersRequest {
+function createBaseTransferFilter(): TransferFilter {
   return { participant: undefined, transferIds: [], limit: 0, offset: 0 };
 }
 
-export const QueryPendingTransfersRequest: MessageFns<QueryPendingTransfersRequest> = {
-  encode(message: QueryPendingTransfersRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+export const TransferFilter: MessageFns<TransferFilter> = {
+  encode(message: TransferFilter, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     switch (message.participant?.$case) {
       case "receiverIdentityPublicKey":
         writer.uint32(10).bytes(message.participant.receiverIdentityPublicKey);
@@ -6995,10 +6985,10 @@ export const QueryPendingTransfersRequest: MessageFns<QueryPendingTransfersReque
     return writer;
   },
 
-  decode(input: BinaryReader | Uint8Array, length?: number): QueryPendingTransfersRequest {
+  decode(input: BinaryReader | Uint8Array, length?: number): TransferFilter {
     const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseQueryPendingTransfersRequest();
+    const message = createBaseTransferFilter();
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
@@ -7051,7 +7041,7 @@ export const QueryPendingTransfersRequest: MessageFns<QueryPendingTransfersReque
     return message;
   },
 
-  fromJSON(object: any): QueryPendingTransfersRequest {
+  fromJSON(object: any): TransferFilter {
     return {
       participant: isSet(object.receiverIdentityPublicKey)
         ? {
@@ -7069,7 +7059,7 @@ export const QueryPendingTransfersRequest: MessageFns<QueryPendingTransfersReque
     };
   },
 
-  toJSON(message: QueryPendingTransfersRequest): unknown {
+  toJSON(message: TransferFilter): unknown {
     const obj: any = {};
     if (message.participant?.$case === "receiverIdentityPublicKey") {
       obj.receiverIdentityPublicKey = base64FromBytes(message.participant.receiverIdentityPublicKey);
@@ -7088,11 +7078,11 @@ export const QueryPendingTransfersRequest: MessageFns<QueryPendingTransfersReque
     return obj;
   },
 
-  create(base?: DeepPartial<QueryPendingTransfersRequest>): QueryPendingTransfersRequest {
-    return QueryPendingTransfersRequest.fromPartial(base ?? {});
+  create(base?: DeepPartial<TransferFilter>): TransferFilter {
+    return TransferFilter.fromPartial(base ?? {});
   },
-  fromPartial(object: DeepPartial<QueryPendingTransfersRequest>): QueryPendingTransfersRequest {
-    const message = createBaseQueryPendingTransfersRequest();
+  fromPartial(object: DeepPartial<TransferFilter>): TransferFilter {
+    const message = createBaseTransferFilter();
     switch (object.participant?.$case) {
       case "receiverIdentityPublicKey": {
         if (
@@ -7126,12 +7116,12 @@ export const QueryPendingTransfersRequest: MessageFns<QueryPendingTransfersReque
   },
 };
 
-function createBaseQueryPendingTransfersResponse(): QueryPendingTransfersResponse {
+function createBaseQueryTransfersResponse(): QueryTransfersResponse {
   return { transfers: [], offset: 0 };
 }
 
-export const QueryPendingTransfersResponse: MessageFns<QueryPendingTransfersResponse> = {
-  encode(message: QueryPendingTransfersResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+export const QueryTransfersResponse: MessageFns<QueryTransfersResponse> = {
+  encode(message: QueryTransfersResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     for (const v of message.transfers) {
       Transfer.encode(v!, writer.uint32(10).fork()).join();
     }
@@ -7141,10 +7131,10 @@ export const QueryPendingTransfersResponse: MessageFns<QueryPendingTransfersResp
     return writer;
   },
 
-  decode(input: BinaryReader | Uint8Array, length?: number): QueryPendingTransfersResponse {
+  decode(input: BinaryReader | Uint8Array, length?: number): QueryTransfersResponse {
     const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseQueryPendingTransfersResponse();
+    const message = createBaseQueryTransfersResponse();
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
@@ -7173,7 +7163,7 @@ export const QueryPendingTransfersResponse: MessageFns<QueryPendingTransfersResp
     return message;
   },
 
-  fromJSON(object: any): QueryPendingTransfersResponse {
+  fromJSON(object: any): QueryTransfersResponse {
     return {
       transfers: globalThis.Array.isArray(object?.transfers)
         ? object.transfers.map((e: any) => Transfer.fromJSON(e))
@@ -7182,7 +7172,7 @@ export const QueryPendingTransfersResponse: MessageFns<QueryPendingTransfersResp
     };
   },
 
-  toJSON(message: QueryPendingTransfersResponse): unknown {
+  toJSON(message: QueryTransfersResponse): unknown {
     const obj: any = {};
     if (message.transfers?.length) {
       obj.transfers = message.transfers.map((e) => Transfer.toJSON(e));
@@ -7193,11 +7183,11 @@ export const QueryPendingTransfersResponse: MessageFns<QueryPendingTransfersResp
     return obj;
   },
 
-  create(base?: DeepPartial<QueryPendingTransfersResponse>): QueryPendingTransfersResponse {
-    return QueryPendingTransfersResponse.fromPartial(base ?? {});
+  create(base?: DeepPartial<QueryTransfersResponse>): QueryTransfersResponse {
+    return QueryTransfersResponse.fromPartial(base ?? {});
   },
-  fromPartial(object: DeepPartial<QueryPendingTransfersResponse>): QueryPendingTransfersResponse {
-    const message = createBaseQueryPendingTransfersResponse();
+  fromPartial(object: DeepPartial<QueryTransfersResponse>): QueryTransfersResponse {
+    const message = createBaseQueryTransfersResponse();
     message.transfers = object.transfers?.map((e) => Transfer.fromPartial(e)) || [];
     message.offset = object.offset ?? 0;
     return message;
@@ -11958,177 +11948,6 @@ export const CancelSendTransferResponse: MessageFns<CancelSendTransferResponse> 
   },
 };
 
-function createBaseQueryAllTransfersRequest(): QueryAllTransfersRequest {
-  return { identityPublicKey: new Uint8Array(0), limit: 0, offset: 0 };
-}
-
-export const QueryAllTransfersRequest: MessageFns<QueryAllTransfersRequest> = {
-  encode(message: QueryAllTransfersRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.identityPublicKey.length !== 0) {
-      writer.uint32(10).bytes(message.identityPublicKey);
-    }
-    if (message.limit !== 0) {
-      writer.uint32(16).int64(message.limit);
-    }
-    if (message.offset !== 0) {
-      writer.uint32(24).int64(message.offset);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): QueryAllTransfersRequest {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseQueryAllTransfersRequest();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.identityPublicKey = reader.bytes();
-          continue;
-        }
-        case 2: {
-          if (tag !== 16) {
-            break;
-          }
-
-          message.limit = longToNumber(reader.int64());
-          continue;
-        }
-        case 3: {
-          if (tag !== 24) {
-            break;
-          }
-
-          message.offset = longToNumber(reader.int64());
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): QueryAllTransfersRequest {
-    return {
-      identityPublicKey: isSet(object.identityPublicKey)
-        ? bytesFromBase64(object.identityPublicKey)
-        : new Uint8Array(0),
-      limit: isSet(object.limit) ? globalThis.Number(object.limit) : 0,
-      offset: isSet(object.offset) ? globalThis.Number(object.offset) : 0,
-    };
-  },
-
-  toJSON(message: QueryAllTransfersRequest): unknown {
-    const obj: any = {};
-    if (message.identityPublicKey.length !== 0) {
-      obj.identityPublicKey = base64FromBytes(message.identityPublicKey);
-    }
-    if (message.limit !== 0) {
-      obj.limit = Math.round(message.limit);
-    }
-    if (message.offset !== 0) {
-      obj.offset = Math.round(message.offset);
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<QueryAllTransfersRequest>): QueryAllTransfersRequest {
-    return QueryAllTransfersRequest.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<QueryAllTransfersRequest>): QueryAllTransfersRequest {
-    const message = createBaseQueryAllTransfersRequest();
-    message.identityPublicKey = object.identityPublicKey ?? new Uint8Array(0);
-    message.limit = object.limit ?? 0;
-    message.offset = object.offset ?? 0;
-    return message;
-  },
-};
-
-function createBaseQueryAllTransfersResponse(): QueryAllTransfersResponse {
-  return { transfers: [], offset: 0 };
-}
-
-export const QueryAllTransfersResponse: MessageFns<QueryAllTransfersResponse> = {
-  encode(message: QueryAllTransfersResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    for (const v of message.transfers) {
-      Transfer.encode(v!, writer.uint32(10).fork()).join();
-    }
-    if (message.offset !== 0) {
-      writer.uint32(16).int64(message.offset);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): QueryAllTransfersResponse {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseQueryAllTransfersResponse();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.transfers.push(Transfer.decode(reader, reader.uint32()));
-          continue;
-        }
-        case 2: {
-          if (tag !== 16) {
-            break;
-          }
-
-          message.offset = longToNumber(reader.int64());
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): QueryAllTransfersResponse {
-    return {
-      transfers: globalThis.Array.isArray(object?.transfers)
-        ? object.transfers.map((e: any) => Transfer.fromJSON(e))
-        : [],
-      offset: isSet(object.offset) ? globalThis.Number(object.offset) : 0,
-    };
-  },
-
-  toJSON(message: QueryAllTransfersResponse): unknown {
-    const obj: any = {};
-    if (message.transfers?.length) {
-      obj.transfers = message.transfers.map((e) => Transfer.toJSON(e));
-    }
-    if (message.offset !== 0) {
-      obj.offset = Math.round(message.offset);
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<QueryAllTransfersResponse>): QueryAllTransfersResponse {
-    return QueryAllTransfersResponse.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<QueryAllTransfersResponse>): QueryAllTransfersResponse {
-    const message = createBaseQueryAllTransfersResponse();
-    message.transfers = object.transfers?.map((e) => Transfer.fromPartial(e)) || [];
-    message.offset = object.offset ?? 0;
-    return message;
-  },
-};
 
 function createBaseQueryUnusedDepositAddressesRequest(): QueryUnusedDepositAddressesRequest {
   return { identityPublicKey: new Uint8Array(0) };
@@ -12708,17 +12527,17 @@ export const SparkServiceDefinition = {
     },
     query_pending_transfers: {
       name: "query_pending_transfers",
-      requestType: QueryPendingTransfersRequest,
+      requestType: TransferFilter,
       requestStream: false,
-      responseType: QueryPendingTransfersResponse,
+      responseType: QueryTransfersResponse,
       responseStream: false,
       options: {},
     },
     query_all_transfers: {
       name: "query_all_transfers",
-      requestType: QueryAllTransfersRequest,
+      requestType: TransferFilter,
       requestStream: false,
-      responseType: QueryAllTransfersResponse,
+      responseType: QueryTransfersResponse,
       responseStream: false,
       options: {},
     },
@@ -13002,13 +12821,13 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<CompleteSendTransferResponse>>;
   query_pending_transfers(
-    request: QueryPendingTransfersRequest,
+    request: TransferFilter,
     context: CallContext & CallContextExt,
-  ): Promise<DeepPartial<QueryPendingTransfersResponse>>;
+  ): Promise<DeepPartial<QueryTransfersResponse>>;
   query_all_transfers(
-    request: QueryAllTransfersRequest,
+    request: TransferFilter,
     context: CallContext & CallContextExt,
-  ): Promise<DeepPartial<QueryAllTransfersResponse>>;
+  ): Promise<DeepPartial<QueryTransfersResponse>>;
   claim_transfer_tweak_keys(
     request: ClaimTransferTweakKeysRequest,
     context: CallContext & CallContextExt,
@@ -13172,13 +12991,13 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
     options?: CallOptions & CallOptionsExt,
   ): Promise<CompleteSendTransferResponse>;
   query_pending_transfers(
-    request: DeepPartial<QueryPendingTransfersRequest>,
+    request: DeepPartial<TransferFilter>,
     options?: CallOptions & CallOptionsExt,
-  ): Promise<QueryPendingTransfersResponse>;
+  ): Promise<QueryTransfersResponse>;
   query_all_transfers(
-    request: DeepPartial<QueryAllTransfersRequest>,
+    request: DeepPartial<TransferFilter>,
     options?: CallOptions & CallOptionsExt,
-  ): Promise<QueryAllTransfersResponse>;
+  ): Promise<QueryTransfersResponse>;
   claim_transfer_tweak_keys(
     request: DeepPartial<ClaimTransferTweakKeysRequest>,
     options?: CallOptions & CallOptionsExt,

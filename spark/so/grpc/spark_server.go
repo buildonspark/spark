@@ -68,7 +68,7 @@ func (s *SparkServer) CancelSendTransfer(ctx context.Context, req *pb.CancelSend
 }
 
 // QueryPendingTransfers queries the pending transfers to claim.
-func (s *SparkServer) QueryPendingTransfers(ctx context.Context, req *pb.QueryPendingTransfersRequest) (*pb.QueryPendingTransfersResponse, error) {
+func (s *SparkServer) QueryPendingTransfers(ctx context.Context, req *pb.TransferFilter) (*pb.QueryTransfersResponse, error) {
 	transferHander := handler.NewTransferHandler(s.config)
 	return wrapWithGRPCError(transferHander.QueryPendingTransfers(ctx, req))
 }
@@ -224,7 +224,7 @@ func (s *SparkServer) QueryTokenOutputs(ctx context.Context, req *pb.QueryTokenO
 	return wrapWithGRPCError(tokenTransactionHandler.QueryTokenOutputs(ctx, req))
 }
 
-func (s *SparkServer) QueryAllTransfers(ctx context.Context, req *pb.QueryAllTransfersRequest) (*pb.QueryAllTransfersResponse, error) {
+func (s *SparkServer) QueryAllTransfers(ctx context.Context, req *pb.TransferFilter) (*pb.QueryTransfersResponse, error) {
 	transferHander := handler.NewTransferHandler(s.config)
 	return wrapWithGRPCError(transferHander.QueryAllTransfers(ctx, req))
 }

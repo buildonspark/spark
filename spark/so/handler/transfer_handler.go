@@ -360,38 +360,44 @@ func (h *TransferHandler) completeSendLeaf(ctx context.Context, transfer *ent.Tr
 	return nil
 }
 
-// QueryPendingTransfers queries the pending transfers to claim.
-func (h *TransferHandler) QueryPendingTransfers(ctx context.Context, req *pb.QueryPendingTransfersRequest) (*pb.QueryPendingTransfersResponse, error) {
+func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.TransferFilter, isPending bool) (*pb.QueryTransfersResponse, error) {
+	db := ent.GetDbFromContext(ctx)
 	var transferPredicate []predicate.Transfer
-	switch req.Participant.(type) {
-	case *pb.QueryPendingTransfersRequest_ReceiverIdentityPublicKey:
-		if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, req.GetReceiverIdentityPublicKey()); err != nil {
+
+	switch filter.Participant.(type) {
+	case *pb.TransferFilter_ReceiverIdentityPublicKey:
+		if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, filter.GetReceiverIdentityPublicKey()); err != nil {
 			return nil, err
 		}
-		transferPredicate = append(transferPredicate, enttransfer.ReceiverIdentityPubkeyEQ(req.GetReceiverIdentityPublicKey()))
-		transferPredicate = append(transferPredicate,
-			enttransfer.StatusIn(
-				schema.TransferStatusSenderKeyTweaked,
-				schema.TransferStatusReceiverKeyTweaked,
-				schema.TransferStatusReceiverRefundSigned,
-			),
-		)
-	case *pb.QueryPendingTransfersRequest_SenderIdentityPublicKey:
-		if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, req.GetSenderIdentityPublicKey()); err != nil {
+		transferPredicate = append(transferPredicate, enttransfer.ReceiverIdentityPubkeyEQ(filter.GetReceiverIdentityPublicKey()))
+		if isPending {
+			transferPredicate = append(transferPredicate,
+				enttransfer.StatusIn(
+					schema.TransferStatusSenderKeyTweaked,
+					schema.TransferStatusReceiverKeyTweaked,
+					schema.TransferStatusReceiverRefundSigned,
+				),
+			)
+		}
+	case *pb.TransferFilter_SenderIdentityPublicKey:
+		if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, filter.GetSenderIdentityPublicKey()); err != nil {
 			return nil, err
 		}
-		transferPredicate = append(transferPredicate, enttransfer.SenderIdentityPubkeyEQ(req.GetSenderIdentityPublicKey()))
-		transferPredicate = append(transferPredicate,
-			enttransfer.StatusIn(
-				schema.TransferStatusSenderKeyTweakPending,
-				schema.TransferStatusSenderInitiated,
-			),
-			enttransfer.ExpiryTimeLT(time.Now()),
-		)
+		transferPredicate = append(transferPredicate, enttransfer.SenderIdentityPubkeyEQ(filter.GetSenderIdentityPublicKey()))
+		if isPending {
+			transferPredicate = append(transferPredicate,
+				enttransfer.StatusIn(
+					schema.TransferStatusSenderKeyTweakPending,
+					schema.TransferStatusSenderInitiated,
+				),
+				enttransfer.ExpiryTimeLT(time.Now()),
+			)
+		}
 	}
-	if req.TransferIds != nil {
-		transferUUIDs := make([]uuid.UUID, len(req.TransferIds))
-		for _, transferID := range req.TransferIds {
+
+	if filter.TransferIds != nil {
+		transferUUIDs := make([]uuid.UUID, len(filter.TransferIds))
+		for _, transferID := range filter.TransferIds {
 			transferUUID, err := uuid.Parse(transferID)
 			if err != nil {
 				return nil, fmt.Errorf("unable to parse transfer id as a uuid %s: %v", transferID, err)
@@ -401,46 +407,25 @@ func (h *TransferHandler) QueryPendingTransfers(ctx context.Context, req *pb.Que
 		transferPredicate = append([]predicate.Transfer{enttransfer.IDIn(transferUUIDs...)}, transferPredicate...)
 	}
 
-	db := ent.GetDbFromContext(ctx)
-	transfers, err := db.Transfer.Query().Where(enttransfer.And(transferPredicate...)).All(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("unable to query pending transfers: %v", err)
+	baseQuery := db.Transfer.Query()
+	if len(transferPredicate) > 0 {
+		baseQuery = baseQuery.Where(enttransfer.And(transferPredicate...))
 	}
-
-	transferProtos := []*pb.Transfer{}
-	for _, transfer := range transfers {
-		transferProto, err := transfer.MarshalProto(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("unable to marshal transfer: %v", err)
-		}
-		transferProtos = append(transferProtos, transferProto)
-	}
-	return &pb.QueryPendingTransfersResponse{Transfers: transferProtos}, nil
-}
-
-func (h *TransferHandler) QueryAllTransfers(ctx context.Context, req *pb.QueryAllTransfersRequest) (*pb.QueryAllTransfersResponse, error) {
-	db := ent.GetDbFromContext(ctx)
-	baseQuery := db.Transfer.Query().Where(
-		enttransfer.Or(
-			enttransfer.SenderIdentityPubkeyEQ(req.IdentityPublicKey),
-			enttransfer.ReceiverIdentityPubkeyEQ(req.IdentityPublicKey),
-		),
-	)
 
 	query := baseQuery.Order(ent.Desc(enttransfer.FieldUpdateTime))
 
-	if req.Limit > 100 || req.Limit == 0 {
-		req.Limit = 100
+	if filter.Limit > 100 || filter.Limit == 0 {
+		filter.Limit = 100
 	}
-	query = query.Limit(int(req.Limit))
+	query = query.Limit(int(filter.Limit))
 
-	if req.Offset > 0 {
-		query = query.Offset(int(req.Offset))
+	if filter.Offset > 0 {
+		query = query.Offset(int(filter.Offset))
 	}
 
 	transfers, err := query.All(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("unable to query all transfers: %v", err)
+		return nil, fmt.Errorf("unable to query transfers: %v", err)
 	}
 
 	transferProtos := []*pb.Transfer{}
@@ -453,16 +438,24 @@ func (h *TransferHandler) QueryAllTransfers(ctx context.Context, req *pb.QueryAl
 	}
 
 	var nextOffset int64
-	if len(transfers) == int(req.Limit) {
-		nextOffset = req.Offset + int64(len(transfers))
+	if len(transfers) == int(filter.Limit) {
+		nextOffset = filter.Offset + int64(len(transfers))
 	} else {
 		nextOffset = -1
 	}
 
-	return &pb.QueryAllTransfersResponse{
+	return &pb.QueryTransfersResponse{
 		Transfers: transferProtos,
 		Offset:    nextOffset,
 	}, nil
+}
+
+func (h *TransferHandler) QueryPendingTransfers(ctx context.Context, filter *pb.TransferFilter) (*pb.QueryTransfersResponse, error) {
+	return h.queryTransfers(ctx, filter, true)
+}
+
+func (h *TransferHandler) QueryAllTransfers(ctx context.Context, filter *pb.TransferFilter) (*pb.QueryTransfersResponse, error) {
+	return h.queryTransfers(ctx, filter, false)
 }
 
 const CoopExitConfirmationThreshold = 6

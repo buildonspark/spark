@@ -18,8 +18,7 @@ import {
   LeafRefundTxSigningResult,
   CounterLeafSwapResponse,
   NodeSignatures,
-  QueryAllTransfersResponse,
-  QueryPendingTransfersResponse,
+  QueryTransfersResponse,
   SendLeafKeyTweak,
   SigningJob,
   StartSendTransferResponse,
@@ -389,11 +388,11 @@ export class TransferService extends BaseTransferService {
     return await this.finalizeTransfer(signatures);
   }
 
-  async queryPendingTransfers(): Promise<QueryPendingTransfersResponse> {
+  async queryPendingTransfers(): Promise<QueryTransfersResponse> {
     const sparkClient = await this.connectionManager.createSparkClient(
       this.config.getCoordinatorAddress(),
     );
-    let pendingTransfersResp: QueryPendingTransfersResponse;
+    let pendingTransfersResp: QueryTransfersResponse;
     try {
       pendingTransfersResp = await sparkClient.query_pending_transfers({
         participant: {
@@ -411,15 +410,19 @@ export class TransferService extends BaseTransferService {
   async queryAllTransfers(
     limit: number,
     offset: number,
-  ): Promise<QueryAllTransfersResponse> {
+  ): Promise<QueryTransfersResponse> {
     const sparkClient = await this.connectionManager.createSparkClient(
       this.config.getCoordinatorAddress(),
     );
 
-    let allTransfersResp: QueryAllTransfersResponse;
+    let allTransfersResp: QueryTransfersResponse;
     try {
       allTransfersResp = await sparkClient.query_all_transfers({
-        identityPublicKey: await this.config.signer.getIdentityPublicKey(),
+        participant: {
+          $case: "receiverIdentityPublicKey",
+          receiverIdentityPublicKey:
+            await this.config.signer.getIdentityPublicKey(),
+        },
         limit,
         offset,
       });
@@ -864,7 +867,7 @@ export class TransferService extends BaseTransferService {
 
   async queryPendingTransfersBySender(
     operatorAddress: string,
-  ): Promise<QueryPendingTransfersResponse> {
+  ): Promise<QueryTransfersResponse> {
     const sparkClient =
       await this.connectionManager.createSparkClient(operatorAddress);
     try {

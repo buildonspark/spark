@@ -71,8 +71,8 @@ type SparkServiceClient interface {
 	FinalizeNodeSignatures(ctx context.Context, in *FinalizeNodeSignaturesRequest, opts ...grpc.CallOption) (*FinalizeNodeSignaturesResponse, error)
 	StartSendTransfer(ctx context.Context, in *StartSendTransferRequest, opts ...grpc.CallOption) (*StartSendTransferResponse, error)
 	CompleteSendTransfer(ctx context.Context, in *CompleteSendTransferRequest, opts ...grpc.CallOption) (*CompleteSendTransferResponse, error)
-	QueryPendingTransfers(ctx context.Context, in *QueryPendingTransfersRequest, opts ...grpc.CallOption) (*QueryPendingTransfersResponse, error)
-	QueryAllTransfers(ctx context.Context, in *QueryAllTransfersRequest, opts ...grpc.CallOption) (*QueryAllTransfersResponse, error)
+	QueryPendingTransfers(ctx context.Context, in *TransferFilter, opts ...grpc.CallOption) (*QueryTransfersResponse, error)
+	QueryAllTransfers(ctx context.Context, in *TransferFilter, opts ...grpc.CallOption) (*QueryTransfersResponse, error)
 	ClaimTransferTweakKeys(ctx context.Context, in *ClaimTransferTweakKeysRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	ClaimTransferSignRefunds(ctx context.Context, in *ClaimTransferSignRefundsRequest, opts ...grpc.CallOption) (*ClaimTransferSignRefundsResponse, error)
 	AggregateNodes(ctx context.Context, in *AggregateNodesRequest, opts ...grpc.CallOption) (*AggregateNodesResponse, error)
@@ -180,9 +180,9 @@ func (c *sparkServiceClient) CompleteSendTransfer(ctx context.Context, in *Compl
 	return out, nil
 }
 
-func (c *sparkServiceClient) QueryPendingTransfers(ctx context.Context, in *QueryPendingTransfersRequest, opts ...grpc.CallOption) (*QueryPendingTransfersResponse, error) {
+func (c *sparkServiceClient) QueryPendingTransfers(ctx context.Context, in *TransferFilter, opts ...grpc.CallOption) (*QueryTransfersResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(QueryPendingTransfersResponse)
+	out := new(QueryTransfersResponse)
 	err := c.cc.Invoke(ctx, SparkService_QueryPendingTransfers_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -190,9 +190,9 @@ func (c *sparkServiceClient) QueryPendingTransfers(ctx context.Context, in *Quer
 	return out, nil
 }
 
-func (c *sparkServiceClient) QueryAllTransfers(ctx context.Context, in *QueryAllTransfersRequest, opts ...grpc.CallOption) (*QueryAllTransfersResponse, error) {
+func (c *sparkServiceClient) QueryAllTransfers(ctx context.Context, in *TransferFilter, opts ...grpc.CallOption) (*QueryTransfersResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(QueryAllTransfersResponse)
+	out := new(QueryTransfersResponse)
 	err := c.cc.Invoke(ctx, SparkService_QueryAllTransfers_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -503,8 +503,8 @@ type SparkServiceServer interface {
 	FinalizeNodeSignatures(context.Context, *FinalizeNodeSignaturesRequest) (*FinalizeNodeSignaturesResponse, error)
 	StartSendTransfer(context.Context, *StartSendTransferRequest) (*StartSendTransferResponse, error)
 	CompleteSendTransfer(context.Context, *CompleteSendTransferRequest) (*CompleteSendTransferResponse, error)
-	QueryPendingTransfers(context.Context, *QueryPendingTransfersRequest) (*QueryPendingTransfersResponse, error)
-	QueryAllTransfers(context.Context, *QueryAllTransfersRequest) (*QueryAllTransfersResponse, error)
+	QueryPendingTransfers(context.Context, *TransferFilter) (*QueryTransfersResponse, error)
+	QueryAllTransfers(context.Context, *TransferFilter) (*QueryTransfersResponse, error)
 	ClaimTransferTweakKeys(context.Context, *ClaimTransferTweakKeysRequest) (*emptypb.Empty, error)
 	ClaimTransferSignRefunds(context.Context, *ClaimTransferSignRefundsRequest) (*ClaimTransferSignRefundsResponse, error)
 	AggregateNodes(context.Context, *AggregateNodesRequest) (*AggregateNodesResponse, error)
@@ -569,10 +569,10 @@ func (UnimplementedSparkServiceServer) StartSendTransfer(context.Context, *Start
 func (UnimplementedSparkServiceServer) CompleteSendTransfer(context.Context, *CompleteSendTransferRequest) (*CompleteSendTransferResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CompleteSendTransfer not implemented")
 }
-func (UnimplementedSparkServiceServer) QueryPendingTransfers(context.Context, *QueryPendingTransfersRequest) (*QueryPendingTransfersResponse, error) {
+func (UnimplementedSparkServiceServer) QueryPendingTransfers(context.Context, *TransferFilter) (*QueryTransfersResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method QueryPendingTransfers not implemented")
 }
-func (UnimplementedSparkServiceServer) QueryAllTransfers(context.Context, *QueryAllTransfersRequest) (*QueryAllTransfersResponse, error) {
+func (UnimplementedSparkServiceServer) QueryAllTransfers(context.Context, *TransferFilter) (*QueryTransfersResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method QueryAllTransfers not implemented")
 }
 func (UnimplementedSparkServiceServer) ClaimTransferTweakKeys(context.Context, *ClaimTransferTweakKeysRequest) (*emptypb.Empty, error) {
@@ -792,7 +792,7 @@ func _SparkService_CompleteSendTransfer_Handler(srv interface{}, ctx context.Con
 }
 
 func _SparkService_QueryPendingTransfers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(QueryPendingTransfersRequest)
+	in := new(TransferFilter)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -804,13 +804,13 @@ func _SparkService_QueryPendingTransfers_Handler(srv interface{}, ctx context.Co
 		FullMethod: SparkService_QueryPendingTransfers_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SparkServiceServer).QueryPendingTransfers(ctx, req.(*QueryPendingTransfersRequest))
+		return srv.(SparkServiceServer).QueryPendingTransfers(ctx, req.(*TransferFilter))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _SparkService_QueryAllTransfers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(QueryAllTransfersRequest)
+	in := new(TransferFilter)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -822,7 +822,7 @@ func _SparkService_QueryAllTransfers_Handler(srv interface{}, ctx context.Contex
 		FullMethod: SparkService_QueryAllTransfers_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SparkServiceServer).QueryAllTransfers(ctx, req.(*QueryAllTransfersRequest))
+		return srv.(SparkServiceServer).QueryAllTransfers(ctx, req.(*TransferFilter))
 	}
 	return interceptor(ctx, in, info, handler)
 }

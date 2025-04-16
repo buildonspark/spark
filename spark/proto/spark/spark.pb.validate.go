@@ -7570,22 +7570,22 @@ var _ interface {
 	ErrorName() string
 } = CompleteSendTransferResponseValidationError{}
 
-// Validate checks the field values on QueryPendingTransfersRequest with the
-// rules defined in the proto definition for this message. If any rules are
-// violated, the first error encountered is returned, or nil if there are no violations.
-func (m *QueryPendingTransfersRequest) Validate() error {
+// Validate checks the field values on TransferFilter with the rules defined in
+// the proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *TransferFilter) Validate() error {
 	return m.validate(false)
 }
 
-// ValidateAll checks the field values on QueryPendingTransfersRequest with the
-// rules defined in the proto definition for this message. If any rules are
-// violated, the result is a list of violation errors wrapped in
-// QueryPendingTransfersRequestMultiError, or nil if none found.
-func (m *QueryPendingTransfersRequest) ValidateAll() error {
+// ValidateAll checks the field values on TransferFilter with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in TransferFilterMultiError,
+// or nil if none found.
+func (m *TransferFilter) ValidateAll() error {
 	return m.validate(true)
 }
 
-func (m *QueryPendingTransfersRequest) validate(all bool) error {
+func (m *TransferFilter) validate(all bool) error {
 	if m == nil {
 		return nil
 	}
@@ -7597,9 +7597,9 @@ func (m *QueryPendingTransfersRequest) validate(all bool) error {
 	// no validation rules for Offset
 
 	switch v := m.Participant.(type) {
-	case *QueryPendingTransfersRequest_ReceiverIdentityPublicKey:
+	case *TransferFilter_ReceiverIdentityPublicKey:
 		if v == nil {
-			err := QueryPendingTransfersRequestValidationError{
+			err := TransferFilterValidationError{
 				field:  "Participant",
 				reason: "oneof value cannot be a typed-nil",
 			}
@@ -7609,9 +7609,9 @@ func (m *QueryPendingTransfersRequest) validate(all bool) error {
 			errors = append(errors, err)
 		}
 		// no validation rules for ReceiverIdentityPublicKey
-	case *QueryPendingTransfersRequest_SenderIdentityPublicKey:
+	case *TransferFilter_SenderIdentityPublicKey:
 		if v == nil {
-			err := QueryPendingTransfersRequestValidationError{
+			err := TransferFilterValidationError{
 				field:  "Participant",
 				reason: "oneof value cannot be a typed-nil",
 			}
@@ -7626,19 +7626,19 @@ func (m *QueryPendingTransfersRequest) validate(all bool) error {
 	}
 
 	if len(errors) > 0 {
-		return QueryPendingTransfersRequestMultiError(errors)
+		return TransferFilterMultiError(errors)
 	}
 
 	return nil
 }
 
-// QueryPendingTransfersRequestMultiError is an error wrapping multiple
-// validation errors returned by QueryPendingTransfersRequest.ValidateAll() if
-// the designated constraints aren't met.
-type QueryPendingTransfersRequestMultiError []error
+// TransferFilterMultiError is an error wrapping multiple validation errors
+// returned by TransferFilter.ValidateAll() if the designated constraints
+// aren't met.
+type TransferFilterMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
-func (m QueryPendingTransfersRequestMultiError) Error() string {
+func (m TransferFilterMultiError) Error() string {
 	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
@@ -7647,12 +7647,11 @@ func (m QueryPendingTransfersRequestMultiError) Error() string {
 }
 
 // AllErrors returns a list of validation violation errors.
-func (m QueryPendingTransfersRequestMultiError) AllErrors() []error { return m }
+func (m TransferFilterMultiError) AllErrors() []error { return m }
 
-// QueryPendingTransfersRequestValidationError is the validation error returned
-// by QueryPendingTransfersRequest.Validate if the designated constraints
-// aren't met.
-type QueryPendingTransfersRequestValidationError struct {
+// TransferFilterValidationError is the validation error returned by
+// TransferFilter.Validate if the designated constraints aren't met.
+type TransferFilterValidationError struct {
 	field  string
 	reason string
 	cause  error
@@ -7660,24 +7659,22 @@ type QueryPendingTransfersRequestValidationError struct {
 }
 
 // Field function returns field value.
-func (e QueryPendingTransfersRequestValidationError) Field() string { return e.field }
+func (e TransferFilterValidationError) Field() string { return e.field }
 
 // Reason function returns reason value.
-func (e QueryPendingTransfersRequestValidationError) Reason() string { return e.reason }
+func (e TransferFilterValidationError) Reason() string { return e.reason }
 
 // Cause function returns cause value.
-func (e QueryPendingTransfersRequestValidationError) Cause() error { return e.cause }
+func (e TransferFilterValidationError) Cause() error { return e.cause }
 
 // Key function returns key value.
-func (e QueryPendingTransfersRequestValidationError) Key() bool { return e.key }
+func (e TransferFilterValidationError) Key() bool { return e.key }
 
 // ErrorName returns error name.
-func (e QueryPendingTransfersRequestValidationError) ErrorName() string {
-	return "QueryPendingTransfersRequestValidationError"
-}
+func (e TransferFilterValidationError) ErrorName() string { return "TransferFilterValidationError" }
 
 // Error satisfies the builtin error interface
-func (e QueryPendingTransfersRequestValidationError) Error() string {
+func (e TransferFilterValidationError) Error() string {
 	cause := ""
 	if e.cause != nil {
 		cause = fmt.Sprintf(" | caused by: %v", e.cause)
@@ -7689,14 +7686,14 @@ func (e QueryPendingTransfersRequestValidationError) Error() string {
 	}
 
 	return fmt.Sprintf(
-		"invalid %sQueryPendingTransfersRequest.%s: %s%s",
+		"invalid %sTransferFilter.%s: %s%s",
 		key,
 		e.field,
 		e.reason,
 		cause)
 }
 
-var _ error = QueryPendingTransfersRequestValidationError{}
+var _ error = TransferFilterValidationError{}
 
 var _ interface {
 	Field() string
@@ -7704,24 +7701,24 @@ var _ interface {
 	Key() bool
 	Cause() error
 	ErrorName() string
-} = QueryPendingTransfersRequestValidationError{}
+} = TransferFilterValidationError{}
 
-// Validate checks the field values on QueryPendingTransfersResponse with the
-// rules defined in the proto definition for this message. If any rules are
+// Validate checks the field values on QueryTransfersResponse with the rules
+// defined in the proto definition for this message. If any rules are
 // violated, the first error encountered is returned, or nil if there are no violations.
-func (m *QueryPendingTransfersResponse) Validate() error {
+func (m *QueryTransfersResponse) Validate() error {
 	return m.validate(false)
 }
 
-// ValidateAll checks the field values on QueryPendingTransfersResponse with
-// the rules defined in the proto definition for this message. If any rules
-// are violated, the result is a list of violation errors wrapped in
-// QueryPendingTransfersResponseMultiError, or nil if none found.
-func (m *QueryPendingTransfersResponse) ValidateAll() error {
+// ValidateAll checks the field values on QueryTransfersResponse with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// QueryTransfersResponseMultiError, or nil if none found.
+func (m *QueryTransfersResponse) ValidateAll() error {
 	return m.validate(true)
 }
 
-func (m *QueryPendingTransfersResponse) validate(all bool) error {
+func (m *QueryTransfersResponse) validate(all bool) error {
 	if m == nil {
 		return nil
 	}
@@ -7735,7 +7732,7 @@ func (m *QueryPendingTransfersResponse) validate(all bool) error {
 			switch v := interface{}(item).(type) {
 			case interface{ ValidateAll() error }:
 				if err := v.ValidateAll(); err != nil {
-					errors = append(errors, QueryPendingTransfersResponseValidationError{
+					errors = append(errors, QueryTransfersResponseValidationError{
 						field:  fmt.Sprintf("Transfers[%v]", idx),
 						reason: "embedded message failed validation",
 						cause:  err,
@@ -7743,7 +7740,7 @@ func (m *QueryPendingTransfersResponse) validate(all bool) error {
 				}
 			case interface{ Validate() error }:
 				if err := v.Validate(); err != nil {
-					errors = append(errors, QueryPendingTransfersResponseValidationError{
+					errors = append(errors, QueryTransfersResponseValidationError{
 						field:  fmt.Sprintf("Transfers[%v]", idx),
 						reason: "embedded message failed validation",
 						cause:  err,
@@ -7752,7 +7749,7 @@ func (m *QueryPendingTransfersResponse) validate(all bool) error {
 			}
 		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
 			if err := v.Validate(); err != nil {
-				return QueryPendingTransfersResponseValidationError{
+				return QueryTransfersResponseValidationError{
 					field:  fmt.Sprintf("Transfers[%v]", idx),
 					reason: "embedded message failed validation",
 					cause:  err,
@@ -7765,19 +7762,19 @@ func (m *QueryPendingTransfersResponse) validate(all bool) error {
 	// no validation rules for Offset
 
 	if len(errors) > 0 {
-		return QueryPendingTransfersResponseMultiError(errors)
+		return QueryTransfersResponseMultiError(errors)
 	}
 
 	return nil
 }
 
-// QueryPendingTransfersResponseMultiError is an error wrapping multiple
-// validation errors returned by QueryPendingTransfersResponse.ValidateAll()
-// if the designated constraints aren't met.
-type QueryPendingTransfersResponseMultiError []error
+// QueryTransfersResponseMultiError is an error wrapping multiple validation
+// errors returned by QueryTransfersResponse.ValidateAll() if the designated
+// constraints aren't met.
+type QueryTransfersResponseMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
-func (m QueryPendingTransfersResponseMultiError) Error() string {
+func (m QueryTransfersResponseMultiError) Error() string {
 	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
@@ -7786,12 +7783,11 @@ func (m QueryPendingTransfersResponseMultiError) Error() string {
 }
 
 // AllErrors returns a list of validation violation errors.
-func (m QueryPendingTransfersResponseMultiError) AllErrors() []error { return m }
+func (m QueryTransfersResponseMultiError) AllErrors() []error { return m }
 
-// QueryPendingTransfersResponseValidationError is the validation error
-// returned by QueryPendingTransfersResponse.Validate if the designated
-// constraints aren't met.
-type QueryPendingTransfersResponseValidationError struct {
+// QueryTransfersResponseValidationError is the validation error returned by
+// QueryTransfersResponse.Validate if the designated constraints aren't met.
+type QueryTransfersResponseValidationError struct {
 	field  string
 	reason string
 	cause  error
@@ -7799,24 +7795,24 @@ type QueryPendingTransfersResponseValidationError struct {
 }
 
 // Field function returns field value.
-func (e QueryPendingTransfersResponseValidationError) Field() string { return e.field }
+func (e QueryTransfersResponseValidationError) Field() string { return e.field }
 
 // Reason function returns reason value.
-func (e QueryPendingTransfersResponseValidationError) Reason() string { return e.reason }
+func (e QueryTransfersResponseValidationError) Reason() string { return e.reason }
 
 // Cause function returns cause value.
-func (e QueryPendingTransfersResponseValidationError) Cause() error { return e.cause }
+func (e QueryTransfersResponseValidationError) Cause() error { return e.cause }
 
 // Key function returns key value.
-func (e QueryPendingTransfersResponseValidationError) Key() bool { return e.key }
+func (e QueryTransfersResponseValidationError) Key() bool { return e.key }
 
 // ErrorName returns error name.
-func (e QueryPendingTransfersResponseValidationError) ErrorName() string {
-	return "QueryPendingTransfersResponseValidationError"
+func (e QueryTransfersResponseValidationError) ErrorName() string {
+	return "QueryTransfersResponseValidationError"
 }
 
 // Error satisfies the builtin error interface
-func (e QueryPendingTransfersResponseValidationError) Error() string {
+func (e QueryTransfersResponseValidationError) Error() string {
 	cause := ""
 	if e.cause != nil {
 		cause = fmt.Sprintf(" | caused by: %v", e.cause)
@@ -7828,14 +7824,14 @@ func (e QueryPendingTransfersResponseValidationError) Error() string {
 	}
 
 	return fmt.Sprintf(
-		"invalid %sQueryPendingTransfersResponse.%s: %s%s",
+		"invalid %sQueryTransfersResponse.%s: %s%s",
 		key,
 		e.field,
 		e.reason,
 		cause)
 }
 
-var _ error = QueryPendingTransfersResponseValidationError{}
+var _ error = QueryTransfersResponseValidationError{}
 
 var _ interface {
 	Field() string
@@ -7843,7 +7839,7 @@ var _ interface {
 	Key() bool
 	Cause() error
 	ErrorName() string
-} = QueryPendingTransfersResponseValidationError{}
+} = QueryTransfersResponseValidationError{}
 
 // Validate checks the field values on ClaimLeafKeyTweak with the rules defined
 // in the proto definition for this message. If any rules are violated, the
@@ -14599,252 +14595,6 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = CancelSendTransferResponseValidationError{}
-
-// Validate checks the field values on QueryAllTransfersRequest with the rules
-// defined in the proto definition for this message. If any rules are
-// violated, the first error encountered is returned, or nil if there are no violations.
-func (m *QueryAllTransfersRequest) Validate() error {
-	return m.validate(false)
-}
-
-// ValidateAll checks the field values on QueryAllTransfersRequest with the
-// rules defined in the proto definition for this message. If any rules are
-// violated, the result is a list of violation errors wrapped in
-// QueryAllTransfersRequestMultiError, or nil if none found.
-func (m *QueryAllTransfersRequest) ValidateAll() error {
-	return m.validate(true)
-}
-
-func (m *QueryAllTransfersRequest) validate(all bool) error {
-	if m == nil {
-		return nil
-	}
-
-	var errors []error
-
-	// no validation rules for IdentityPublicKey
-
-	// no validation rules for Limit
-
-	// no validation rules for Offset
-
-	if len(errors) > 0 {
-		return QueryAllTransfersRequestMultiError(errors)
-	}
-
-	return nil
-}
-
-// QueryAllTransfersRequestMultiError is an error wrapping multiple validation
-// errors returned by QueryAllTransfersRequest.ValidateAll() if the designated
-// constraints aren't met.
-type QueryAllTransfersRequestMultiError []error
-
-// Error returns a concatenation of all the error messages it wraps.
-func (m QueryAllTransfersRequestMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
-	for _, err := range m {
-		msgs = append(msgs, err.Error())
-	}
-	return strings.Join(msgs, "; ")
-}
-
-// AllErrors returns a list of validation violation errors.
-func (m QueryAllTransfersRequestMultiError) AllErrors() []error { return m }
-
-// QueryAllTransfersRequestValidationError is the validation error returned by
-// QueryAllTransfersRequest.Validate if the designated constraints aren't met.
-type QueryAllTransfersRequestValidationError struct {
-	field  string
-	reason string
-	cause  error
-	key    bool
-}
-
-// Field function returns field value.
-func (e QueryAllTransfersRequestValidationError) Field() string { return e.field }
-
-// Reason function returns reason value.
-func (e QueryAllTransfersRequestValidationError) Reason() string { return e.reason }
-
-// Cause function returns cause value.
-func (e QueryAllTransfersRequestValidationError) Cause() error { return e.cause }
-
-// Key function returns key value.
-func (e QueryAllTransfersRequestValidationError) Key() bool { return e.key }
-
-// ErrorName returns error name.
-func (e QueryAllTransfersRequestValidationError) ErrorName() string {
-	return "QueryAllTransfersRequestValidationError"
-}
-
-// Error satisfies the builtin error interface
-func (e QueryAllTransfersRequestValidationError) Error() string {
-	cause := ""
-	if e.cause != nil {
-		cause = fmt.Sprintf(" | caused by: %v", e.cause)
-	}
-
-	key := ""
-	if e.key {
-		key = "key for "
-	}
-
-	return fmt.Sprintf(
-		"invalid %sQueryAllTransfersRequest.%s: %s%s",
-		key,
-		e.field,
-		e.reason,
-		cause)
-}
-
-var _ error = QueryAllTransfersRequestValidationError{}
-
-var _ interface {
-	Field() string
-	Reason() string
-	Key() bool
-	Cause() error
-	ErrorName() string
-} = QueryAllTransfersRequestValidationError{}
-
-// Validate checks the field values on QueryAllTransfersResponse with the rules
-// defined in the proto definition for this message. If any rules are
-// violated, the first error encountered is returned, or nil if there are no violations.
-func (m *QueryAllTransfersResponse) Validate() error {
-	return m.validate(false)
-}
-
-// ValidateAll checks the field values on QueryAllTransfersResponse with the
-// rules defined in the proto definition for this message. If any rules are
-// violated, the result is a list of violation errors wrapped in
-// QueryAllTransfersResponseMultiError, or nil if none found.
-func (m *QueryAllTransfersResponse) ValidateAll() error {
-	return m.validate(true)
-}
-
-func (m *QueryAllTransfersResponse) validate(all bool) error {
-	if m == nil {
-		return nil
-	}
-
-	var errors []error
-
-	for idx, item := range m.GetTransfers() {
-		_, _ = idx, item
-
-		if all {
-			switch v := interface{}(item).(type) {
-			case interface{ ValidateAll() error }:
-				if err := v.ValidateAll(); err != nil {
-					errors = append(errors, QueryAllTransfersResponseValidationError{
-						field:  fmt.Sprintf("Transfers[%v]", idx),
-						reason: "embedded message failed validation",
-						cause:  err,
-					})
-				}
-			case interface{ Validate() error }:
-				if err := v.Validate(); err != nil {
-					errors = append(errors, QueryAllTransfersResponseValidationError{
-						field:  fmt.Sprintf("Transfers[%v]", idx),
-						reason: "embedded message failed validation",
-						cause:  err,
-					})
-				}
-			}
-		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
-			if err := v.Validate(); err != nil {
-				return QueryAllTransfersResponseValidationError{
-					field:  fmt.Sprintf("Transfers[%v]", idx),
-					reason: "embedded message failed validation",
-					cause:  err,
-				}
-			}
-		}
-
-	}
-
-	// no validation rules for Offset
-
-	if len(errors) > 0 {
-		return QueryAllTransfersResponseMultiError(errors)
-	}
-
-	return nil
-}
-
-// QueryAllTransfersResponseMultiError is an error wrapping multiple validation
-// errors returned by QueryAllTransfersResponse.ValidateAll() if the
-// designated constraints aren't met.
-type QueryAllTransfersResponseMultiError []error
-
-// Error returns a concatenation of all the error messages it wraps.
-func (m QueryAllTransfersResponseMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
-	for _, err := range m {
-		msgs = append(msgs, err.Error())
-	}
-	return strings.Join(msgs, "; ")
-}
-
-// AllErrors returns a list of validation violation errors.
-func (m QueryAllTransfersResponseMultiError) AllErrors() []error { return m }
-
-// QueryAllTransfersResponseValidationError is the validation error returned by
-// QueryAllTransfersResponse.Validate if the designated constraints aren't met.
-type QueryAllTransfersResponseValidationError struct {
-	field  string
-	reason string
-	cause  error
-	key    bool
-}
-
-// Field function returns field value.
-func (e QueryAllTransfersResponseValidationError) Field() string { return e.field }
-
-// Reason function returns reason value.
-func (e QueryAllTransfersResponseValidationError) Reason() string { return e.reason }
-
-// Cause function returns cause value.
-func (e QueryAllTransfersResponseValidationError) Cause() error { return e.cause }
-
-// Key function returns key value.
-func (e QueryAllTransfersResponseValidationError) Key() bool { return e.key }
-
-// ErrorName returns error name.
-func (e QueryAllTransfersResponseValidationError) ErrorName() string {
-	return "QueryAllTransfersResponseValidationError"
-}
-
-// Error satisfies the builtin error interface
-func (e QueryAllTransfersResponseValidationError) Error() string {
-	cause := ""
-	if e.cause != nil {
-		cause = fmt.Sprintf(" | caused by: %v", e.cause)
-	}
-
-	key := ""
-	if e.key {
-		key = "key for "
-	}
-
-	return fmt.Sprintf(
-		"invalid %sQueryAllTransfersResponse.%s: %s%s",
-		key,
-		e.field,
-		e.reason,
-		cause)
-}
-
-var _ error = QueryAllTransfersResponseValidationError{}
-
-var _ interface {
-	Field() string
-	Reason() string
-	Key() bool
-	Cause() error
-	ErrorName() string
-} = QueryAllTransfersResponseValidationError{}
 
 // Validate checks the field values on QueryUnusedDepositAddressesRequest with
 // the rules defined in the proto definition for this message. If any rules
