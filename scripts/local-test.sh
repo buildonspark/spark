@@ -149,6 +149,9 @@ touch "$HERMETIC_TEST_FILE"
 
 "$(dirname "$0")/run-local-signer-container.sh" &
 "$(dirname "$0")/export-minikube-ca.sh"
+echo "Waiting for 30 seconds for services to all stabilize before running development DKG..."
+sleep 30
+echo "Done!"
 "$(dirname "$0")/run-development-dkg.sh"
 
 echo "Run your tests now (go test ./so/grpc_test/... or gotestsum --format testname ./so/grpc_test/... ). Ctrl-C when done."
