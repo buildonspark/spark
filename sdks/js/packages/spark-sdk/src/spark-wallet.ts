@@ -415,6 +415,7 @@ export class SparkWallet {
       seed = mnemonicOrSeed;
     } else {
       if (validateMnemonic(mnemonicOrSeed, wordlist)) {
+        mnemonic = mnemonicOrSeed;
         seed = await this.config.signer.mnemonicToSeed(mnemonicOrSeed);
       } else {
         seed = hexToBytes(mnemonicOrSeed);
@@ -433,13 +434,9 @@ export class SparkWallet {
       this.config.lrc20ApiConfig,
     );
 
-    if (returnMnemonic) {
-      return {
-        mnemonic,
-      };
-    }
-
-    return;
+    return {
+      mnemonic,
+    };
   }
 
   /**
