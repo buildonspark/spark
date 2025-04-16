@@ -1,7 +1,5 @@
 import { bytesToHex, bytesToNumberBE } from "@noble/curves/abstract/utils";
-import {
-  OutputWithPreviousTransactionData,
-} from "../proto/spark.js";
+import { OutputWithPreviousTransactionData } from "../proto/spark.js";
 
 export function calculateAvailableTokenAmount(
   outputLeaves: OutputWithPreviousTransactionData[],
@@ -35,7 +33,10 @@ export function checkIfSelectedOutputsAreAvailable(
   );
 
   for (const selectedOutput of selectedOutputs) {
-    if (!selectedOutput.output?.id || !availableOutputIds.has(selectedOutput.output.id)) {
+    if (
+      !selectedOutput.output?.id ||
+      !availableOutputIds.has(selectedOutput.output.id)
+    ) {
       return false;
     }
   }

@@ -2,7 +2,7 @@ import { sha256 } from "@scure/btc-signer/utils";
 import { FreezeTokensPayload } from "@buildonspark/spark-sdk/proto/spark";
 
 export function hashFreezeTokensPayload(
-  payload: FreezeTokensPayload
+  payload: FreezeTokensPayload,
 ): Uint8Array {
   if (!payload) {
     throw new Error("freeze tokens payload cannot be nil");
@@ -36,7 +36,7 @@ export function hashFreezeTokensPayload(
     new DataView(timestampBytes.buffer).setBigUint64(
       0,
       BigInt(payload.issuerProvidedTimestamp),
-      true // true for little-endian
+      true, // true for little-endian
     );
     timestampHash.update(timestampBytes);
   }

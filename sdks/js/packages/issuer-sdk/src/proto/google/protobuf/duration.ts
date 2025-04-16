@@ -92,7 +92,10 @@ function createBaseDuration(): Duration {
 }
 
 export const Duration: MessageFns<Duration> = {
-  encode(message: Duration, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    message: Duration,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     if (message.seconds !== 0) {
       writer.uint32(8).int64(message.seconds);
     }
@@ -103,7 +106,8 @@ export const Duration: MessageFns<Duration> = {
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): Duration {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseDuration();
     while (reader.pos < end) {
@@ -163,14 +167,28 @@ export const Duration: MessageFns<Duration> = {
   },
 };
 
-type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
+type Builtin =
+  | Date
+  | Function
+  | Uint8Array
+  | string
+  | number
+  | boolean
+  | undefined;
 
-export type DeepPartial<T> = T extends Builtin ? T
-  : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>>
-  : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>>
-  : T extends { $case: string } ? { [K in keyof Omit<T, "$case">]?: DeepPartial<T[K]> } & { $case: T["$case"] }
-  : T extends {} ? { [K in keyof T]?: DeepPartial<T[K]> }
-  : Partial<T>;
+export type DeepPartial<T> = T extends Builtin
+  ? T
+  : T extends globalThis.Array<infer U>
+    ? globalThis.Array<DeepPartial<U>>
+    : T extends ReadonlyArray<infer U>
+      ? ReadonlyArray<DeepPartial<U>>
+      : T extends { $case: string }
+        ? { [K in keyof Omit<T, "$case">]?: DeepPartial<T[K]> } & {
+            $case: T["$case"];
+          }
+        : T extends {}
+          ? { [K in keyof T]?: DeepPartial<T[K]> }
+          : Partial<T>;
 
 function longToNumber(int64: { toString(): string }): number {
   const num = globalThis.Number(int64.toString());

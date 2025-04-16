@@ -1,8 +1,15 @@
 import { Lrc20Protos } from "@buildonspark/lrc20-sdk";
-import { OperationType, OnChainTransactionStatus, SparkTransactionStatus, LayerType } from "../types.js";
+import {
+  OperationType,
+  OnChainTransactionStatus,
+  SparkTransactionStatus,
+  LayerType,
+} from "../types.js";
 
 // Helper functions to map from numeric enums to string enums
-export function mapOperationType(type: Lrc20Protos.OperationType): OperationType {
+export function mapOperationType(
+  type: Lrc20Protos.OperationType,
+): OperationType {
   switch (type) {
     case Lrc20Protos.OperationType.USER_TRANSFER:
       return OperationType.USER_TRANSFER;
@@ -25,7 +32,9 @@ export function mapOperationType(type: Lrc20Protos.OperationType): OperationType
   }
 }
 
-export function mapOnChainTransactionStatus(status: Lrc20Protos.OnChainTransactionStatus): OnChainTransactionStatus {
+export function mapOnChainTransactionStatus(
+  status: Lrc20Protos.OnChainTransactionStatus,
+): OnChainTransactionStatus {
   switch (status) {
     case Lrc20Protos.OnChainTransactionStatus.PENDING:
       return OnChainTransactionStatus.PENDING;
@@ -44,7 +53,9 @@ export function mapOnChainTransactionStatus(status: Lrc20Protos.OnChainTransacti
   }
 }
 
-export function mapSparkTransactionStatus(status: Lrc20Protos.SparkTransactionStatus): SparkTransactionStatus {
+export function mapSparkTransactionStatus(
+  status: Lrc20Protos.SparkTransactionStatus,
+): SparkTransactionStatus {
   switch (status) {
     case Lrc20Protos.SparkTransactionStatus.STARTED:
       return SparkTransactionStatus.STARTED;
@@ -66,4 +77,4 @@ export function mapLayer(layer: number): LayerType {
     default:
       return LayerType.L1; // Default case
   }
-} 
+}

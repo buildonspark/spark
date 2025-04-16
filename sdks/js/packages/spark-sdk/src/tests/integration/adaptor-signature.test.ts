@@ -54,7 +54,5 @@ describe("adaptor signature", () => {
     }
 
     expect(failures).toBe(0);
-  },
-    30000,
-  );
+  }, 30000);
 });

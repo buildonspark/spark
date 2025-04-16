@@ -20,7 +20,7 @@ export default function WalletBalance({
     <div>
       <div className="flex max-w-[300px] flex-col justify-center">
         {usdBalance !== null ? (
-          <div className="font-inter flex">
+          <div className="flex font-inter">
             <div className="relative flex items-end justify-center text-white">
               <div className="flex items-center gap-2">
                 <div className="text-xl">$</div>
@@ -52,7 +52,7 @@ export default function WalletBalance({
         )}
       </div>
       {usdBalance && (
-        <div className="font-inter flex items-center justify-center text-[13px] opacity-40">
+        <div className="flex items-center justify-center font-inter text-[13px] opacity-40">
           {assetBalance} {asset?.code === "BTC" ? "SATs" : asset?.code}
         </div>
       )}

@@ -145,7 +145,7 @@ export default function AmountInput({
   return (
     <div className="flex w-full flex-col items-center gap-2">
       <div className="my-10">
-        <div className="font-inter flex justify-center text-[60px] leading-[60px]">
+        <div className="flex justify-center font-inter text-[60px] leading-[60px]">
           {activeInputCurrency.type === CurrencyType.FIAT ? (
             rawInputAmount ? (
               <FiatAmountPrimaryDisplay
@@ -164,7 +164,7 @@ export default function AmountInput({
         </div>
         <div className="flex items-center justify-center gap-2">
           <div
-            className="font-inter mb-8 mt-6 inline-flex items-center gap-2 rounded-lg bg-[#fafafa16] bg-opacity-20 px-2 py-1 text-center text-[13px] active:bg-opacity-40"
+            className="mb-8 mt-6 inline-flex items-center gap-2 rounded-lg bg-[#fafafa16] bg-opacity-20 px-2 py-1 text-center font-inter text-[13px] active:bg-opacity-40"
             onClick={() => {
               const { fiatAmountString, assetAmountString } =
                 resolveCurrencyDisplay();
@@ -192,7 +192,7 @@ export default function AmountInput({
         </div>
       </div>
       {isMobile && (
-        <div className="font-inter flex flex-col gap-2 text-[22px]">
+        <div className="flex flex-col gap-2 font-inter text-[22px]">
           <div className="flex gap-2">
             <AmountInputButton onClick={() => handleKey("1")}>
               1

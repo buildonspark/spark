@@ -280,7 +280,10 @@ export class BitcoinFaucet {
     if (changeAmount > 0) {
       const changeKey = secp256k1.utils.randomPrivateKey();
       const changePubKey = secp256k1.getPublicKey(changeKey);
-      const changeScript = getP2TRScriptFromPublicKey(changePubKey, Network.LOCAL);
+      const changeScript = getP2TRScriptFromPublicKey(
+        changePubKey,
+        Network.LOCAL,
+      );
       tx.addOutput({
         script: changeScript,
         amount: changeAmount,

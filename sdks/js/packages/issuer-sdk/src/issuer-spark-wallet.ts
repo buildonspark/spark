@@ -43,11 +43,9 @@ export type IssuerTokenInfo = {
   tokenDecimals: number;
   maxSupply: bigint;
   isFreezable: boolean;
-}
+};
 
-export class IssuerSparkWallet
-  extends SparkWallet
-{
+export class IssuerSparkWallet extends SparkWallet {
   private issuerTokenTransactionService: IssuerTokenTransactionService;
   private tokenFreezeService: TokenFreezeService;
   private tokenPublicKeyInfo?: TokenPubkeyInfo;
@@ -105,7 +103,7 @@ export class IssuerSparkWallet
       tokenDecimals: Number(bytesToNumberBE(info.announcement!.decimal)),
       isFreezable: info.announcement!.isFreezable,
       maxSupply: bytesToNumberBE(info.totalSupply),
-    }
+    };
   }
 
   public async getIssuerTokenPublicKey() {

@@ -1,7 +1,11 @@
 import * as bitcoin from "bitcoinjs-lib";
 import { LRCWallet } from "@buildonspark/lrc20-sdk";
 import { NetworkType } from "@buildonspark/lrc20-sdk";
-import { TokenPubkey, Lrc20TransactionDto, PubkeyFreezeAnnouncement } from "@buildonspark/lrc20-sdk";
+import {
+  TokenPubkey,
+  Lrc20TransactionDto,
+  PubkeyFreezeAnnouncement,
+} from "@buildonspark/lrc20-sdk";
 import { JSONStringify } from "@buildonspark/lrc20-sdk";
 
 let wallet = new LRCWallet(
@@ -14,10 +18,19 @@ async function main() {
   await wallet.syncWallet();
 
   let tokenPubkey = new TokenPubkey(
-    Buffer.from("03acc24e8b9519696109d81c5e2ae327547eef3ab4a1f7ce552c582bb170f76e47", "hex"),
+    Buffer.from(
+      "03acc24e8b9519696109d81c5e2ae327547eef3ab4a1f7ce552c582bb170f76e47",
+      "hex",
+    ),
   );
-  let ownerPubkey = Buffer.from("03acc24e8b9519696109d81c5e2ae327547eef3ab4a1f7ce552c582bb170f76e47", "hex");
-  let freezeAnnouncement = new PubkeyFreezeAnnouncement(tokenPubkey, ownerPubkey);
+  let ownerPubkey = Buffer.from(
+    "03acc24e8b9519696109d81c5e2ae327547eef3ab4a1f7ce552c582bb170f76e47",
+    "hex",
+  );
+  let freezeAnnouncement = new PubkeyFreezeAnnouncement(
+    tokenPubkey,
+    ownerPubkey,
+  );
 
   let freezeTx = await wallet.prepareFreeze(freezeAnnouncement, 1.0);
 

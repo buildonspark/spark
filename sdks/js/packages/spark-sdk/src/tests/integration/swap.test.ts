@@ -60,9 +60,7 @@ describe("swap", () => {
       receiverConnectionManager,
     );
 
-    const senderLeafPubKey = await senderWallet
-      .getSigner()
-      .generatePublicKey();
+    const senderLeafPubKey = await senderWallet.getSigner().generatePublicKey();
     const senderRootNode = await createNewTree(
       senderWallet,
       senderLeafPubKey,
@@ -174,10 +172,9 @@ describe("swap", () => {
     const receiverPendingTransfer = pendingTransfer.transfers[0];
     expect(receiverPendingTransfer!.id).toBe(senderTransferTweakKey.id);
 
-    const leafPrivKeyMap =
-      await receiverTransferService.verifyPendingTransfer(
-        receiverPendingTransfer!,
-      );
+    const leafPrivKeyMap = await receiverTransferService.verifyPendingTransfer(
+      receiverPendingTransfer!,
+    );
 
     expect(leafPrivKeyMap.size).toBe(1);
     expect(leafPrivKeyMap.get(senderRootNode.id)).toBeDefined();
@@ -213,9 +210,7 @@ describe("swap", () => {
     expect(senderPendingTransfer!.id).toBe(receiverTransfer.id);
 
     const senderLeafPrivKeyMap =
-      await senderTransferService.verifyPendingTransfer(
-        senderPendingTransfer!,
-      );
+      await senderTransferService.verifyPendingTransfer(senderPendingTransfer!);
     expect(senderLeafPrivKeyMap.size).toBe(1);
     expect(senderLeafPrivKeyMap.get(receiverRootNode.id)).toBeDefined();
     const bytesEqual_1 = equalBytes(
@@ -238,7 +233,5 @@ describe("swap", () => {
       senderPendingTransfer!,
       leavesToClaim_1,
     );
-  },
-    30000,
-  );
+  }, 30000);
 });

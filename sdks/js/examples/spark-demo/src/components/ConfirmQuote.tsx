@@ -44,7 +44,7 @@ export default function ConfirmQuote({
           border: "0.5px solid rgba(249, 249, 249, 0.1)",
         }}
       >
-        <div className="font-inter flex justify-center">
+        <div className="flex justify-center font-inter">
           <div className="self-center text-[24px]">$</div>
           <div className="text-[60px] leading-[60px]">
             {Number(sendFiatAmount.split(".")[0]).toLocaleString()}
@@ -56,7 +56,7 @@ export default function ConfirmQuote({
               </div>
             )}
         </div>
-        <div className="font-inter text-center text-[13px] opacity-40">
+        <div className="text-center font-inter text-[13px] opacity-40">
           {Number(sendAssetAmount).toLocaleString()}{" "}
           {activeAsset.code === "BTC" ? "SATs" : activeAsset.code}
         </div>

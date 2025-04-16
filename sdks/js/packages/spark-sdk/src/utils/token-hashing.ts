@@ -20,14 +20,17 @@ export function hashTokenTransaction(
       throw new Error("outputs to spend cannot be null");
     }
 
-    if (tokenTransaction.tokenInputs.transferInput.outputsToSpend.length === 0) {
+    if (
+      tokenTransaction.tokenInputs.transferInput.outputsToSpend.length === 0
+    ) {
       throw new Error("outputs to spend cannot be empty");
     }
 
     // Hash outputs to spend
-    for (const [i, output] of (tokenTransaction.tokenInputs!.transferInput!
-      .outputsToSpend).entries()) {
-
+    for (const [
+      i,
+      output,
+    ] of tokenTransaction.tokenInputs!.transferInput!.outputsToSpend.entries()) {
       if (!output) {
         throw new Error(`output cannot be null at index ${i}`);
       }
@@ -37,7 +40,9 @@ export function hashTokenTransaction(
       if (output.prevTokenTransactionHash) {
         const prevHash = output.prevTokenTransactionHash;
         if (output.prevTokenTransactionHash.length !== 32) {
-          throw new Error(`invalid previous transaction hash length at index ${i}: expected 32 bytes, got ${prevHash}`);
+          throw new Error(
+            `invalid previous transaction hash length at index ${i}: expected 32 bytes, got ${prevHash}`,
+          );
         }
         hashObj.update(output.prevTokenTransactionHash);
       }
@@ -59,17 +64,22 @@ export function hashTokenTransaction(
     const hashObj = sha256.create();
 
     if (tokenTransaction.tokenInputs.mintInput!.issuerPublicKey) {
-        const issuerPubKey: Uint8Array = tokenTransaction.tokenInputs.mintInput.issuerPublicKey;
-        if (issuerPubKey.length === 0) {
-          throw new Error("issuer public key cannot be empty");
-        }
-        hashObj.update(issuerPubKey);
+      const issuerPubKey: Uint8Array =
+        tokenTransaction.tokenInputs.mintInput.issuerPublicKey;
+      if (issuerPubKey.length === 0) {
+        throw new Error("issuer public key cannot be empty");
+      }
+      hashObj.update(issuerPubKey);
 
-      if (tokenTransaction.tokenInputs.mintInput!.issuerProvidedTimestamp != 0) {
+      if (
+        tokenTransaction.tokenInputs.mintInput!.issuerProvidedTimestamp != 0
+      ) {
         const timestampBytes = new Uint8Array(8);
         new DataView(timestampBytes.buffer).setBigUint64(
           0,
-          BigInt(tokenTransaction.tokenInputs.mintInput!.issuerProvidedTimestamp),
+          BigInt(
+            tokenTransaction.tokenInputs.mintInput!.issuerProvidedTimestamp,
+          ),
           true, // true for little-endian to match Go implementation
         );
         hashObj.update(timestampBytes);
@@ -87,7 +97,7 @@ export function hashTokenTransaction(
     throw new Error("token outputs cannot be empty");
   }
 
-  for (const [i, output] of (tokenTransaction.tokenOutputs).entries()) {
+  for (const [i, output] of tokenTransaction.tokenOutputs.entries()) {
     if (!output) {
       throw new Error("output cannot be null");
     }
@@ -145,7 +155,9 @@ export function hashTokenTransaction(
         throw new Error(`token amount at index ${i} cannot be empty`);
       }
       if (output.tokenAmount.length > 16) {
-        throw new Error(`token amount at index ${i} exceeds maximum length; got ${output.tokenAmount.length} bytes, max 16`);
+        throw new Error(
+          `token amount at index ${i} exceeds maximum length; got ${output.tokenAmount.length} bytes, max 16`,
+        );
       }
       hashObj.update(output.tokenAmount);
     }
@@ -210,7 +222,9 @@ export function hashOperatorSpecificTokenTransactionSignablePayload(
   payload: OperatorSpecificTokenTransactionSignablePayload,
 ): Uint8Array {
   if (!payload) {
-    throw new Error("operator specific token transaction signable payload cannot be null");
+    throw new Error(
+      "operator specific token transaction signable payload cannot be null",
+    );
   }
 
   let allHashes: Uint8Array[] = [];
@@ -219,7 +233,9 @@ export function hashOperatorSpecificTokenTransactionSignablePayload(
   if (payload.finalTokenTransactionHash) {
     const hashObj = sha256.create();
     if (payload.finalTokenTransactionHash.length !== 32) {
-      throw new Error(`invalid final token transaction hash length: expected 32 bytes, got ${payload.finalTokenTransactionHash.length}`);
+      throw new Error(
+        `invalid final token transaction hash length: expected 32 bytes, got ${payload.finalTokenTransactionHash.length}`,
+      );
     }
     hashObj.update(payload.finalTokenTransactionHash);
     allHashes.push(hashObj.digest());

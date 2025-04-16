@@ -76,15 +76,13 @@ export interface FieldRules {
     | { $case: "sfixed64"; sfixed64: SFixed64Rules }
     | { $case: "bool"; bool: BoolRules }
     | { $case: "string"; string: StringRules }
-    | { $case: "bytes"; bytes: BytesRules }
-    | //
+    | { $case: "bytes"; bytes: BytesRules } //
     /** Complex Field Types */
-    { $case: "enum"; enum: EnumRules }
+    | { $case: "enum"; enum: EnumRules }
     | { $case: "repeated"; repeated: RepeatedRules }
-    | { $case: "map"; map: MapRules }
-    | //
+    | { $case: "map"; map: MapRules } //
     /** Well-Known Field Types */
-    { $case: "any"; any: AnyRules }
+    | { $case: "any"; any: AnyRules }
     | { $case: "duration"; duration: DurationRules }
     | { $case: "timestamp"; timestamp: TimestampRules }
     | undefined;
@@ -93,39 +91,29 @@ export interface FieldRules {
 /** FloatRules describes the constraints applied to `float` values */
 export interface FloatRules {
   /** Const specifies that this field must be exactly the specified value */
-  const?:
-    | number
-    | undefined;
+  const?: number | undefined;
   /**
    * Lt specifies that this field must be less than the specified value,
    * exclusive
    */
-  lt?:
-    | number
-    | undefined;
+  lt?: number | undefined;
   /**
    * Lte specifies that this field must be less than or equal to the
    * specified value, inclusive
    */
-  lte?:
-    | number
-    | undefined;
+  lte?: number | undefined;
   /**
    * Gt specifies that this field must be greater than the specified value,
    * exclusive. If the value of Gt is larger than a specified Lt or Lte, the
    * range is reversed.
    */
-  gt?:
-    | number
-    | undefined;
+  gt?: number | undefined;
   /**
    * Gte specifies that this field must be greater than or equal to the
    * specified value, inclusive. If the value of Gte is larger than a
    * specified Lt or Lte, the range is reversed.
    */
-  gte?:
-    | number
-    | undefined;
+  gte?: number | undefined;
   /**
    * In specifies that this field must be equal to one of the specified
    * values
@@ -146,39 +134,29 @@ export interface FloatRules {
 /** DoubleRules describes the constraints applied to `double` values */
 export interface DoubleRules {
   /** Const specifies that this field must be exactly the specified value */
-  const?:
-    | number
-    | undefined;
+  const?: number | undefined;
   /**
    * Lt specifies that this field must be less than the specified value,
    * exclusive
    */
-  lt?:
-    | number
-    | undefined;
+  lt?: number | undefined;
   /**
    * Lte specifies that this field must be less than or equal to the
    * specified value, inclusive
    */
-  lte?:
-    | number
-    | undefined;
+  lte?: number | undefined;
   /**
    * Gt specifies that this field must be greater than the specified value,
    * exclusive. If the value of Gt is larger than a specified Lt or Lte, the
    * range is reversed.
    */
-  gt?:
-    | number
-    | undefined;
+  gt?: number | undefined;
   /**
    * Gte specifies that this field must be greater than or equal to the
    * specified value, inclusive. If the value of Gte is larger than a
    * specified Lt or Lte, the range is reversed.
    */
-  gte?:
-    | number
-    | undefined;
+  gte?: number | undefined;
   /**
    * In specifies that this field must be equal to one of the specified
    * values
@@ -199,39 +177,29 @@ export interface DoubleRules {
 /** Int32Rules describes the constraints applied to `int32` values */
 export interface Int32Rules {
   /** Const specifies that this field must be exactly the specified value */
-  const?:
-    | number
-    | undefined;
+  const?: number | undefined;
   /**
    * Lt specifies that this field must be less than the specified value,
    * exclusive
    */
-  lt?:
-    | number
-    | undefined;
+  lt?: number | undefined;
   /**
    * Lte specifies that this field must be less than or equal to the
    * specified value, inclusive
    */
-  lte?:
-    | number
-    | undefined;
+  lte?: number | undefined;
   /**
    * Gt specifies that this field must be greater than the specified value,
    * exclusive. If the value of Gt is larger than a specified Lt or Lte, the
    * range is reversed.
    */
-  gt?:
-    | number
-    | undefined;
+  gt?: number | undefined;
   /**
    * Gte specifies that this field must be greater than or equal to the
    * specified value, inclusive. If the value of Gte is larger than a
    * specified Lt or Lte, the range is reversed.
    */
-  gte?:
-    | number
-    | undefined;
+  gte?: number | undefined;
   /**
    * In specifies that this field must be equal to one of the specified
    * values
@@ -252,39 +220,29 @@ export interface Int32Rules {
 /** Int64Rules describes the constraints applied to `int64` values */
 export interface Int64Rules {
   /** Const specifies that this field must be exactly the specified value */
-  const?:
-    | number
-    | undefined;
+  const?: number | undefined;
   /**
    * Lt specifies that this field must be less than the specified value,
    * exclusive
    */
-  lt?:
-    | number
-    | undefined;
+  lt?: number | undefined;
   /**
    * Lte specifies that this field must be less than or equal to the
    * specified value, inclusive
    */
-  lte?:
-    | number
-    | undefined;
+  lte?: number | undefined;
   /**
    * Gt specifies that this field must be greater than the specified value,
    * exclusive. If the value of Gt is larger than a specified Lt or Lte, the
    * range is reversed.
    */
-  gt?:
-    | number
-    | undefined;
+  gt?: number | undefined;
   /**
    * Gte specifies that this field must be greater than or equal to the
    * specified value, inclusive. If the value of Gte is larger than a
    * specified Lt or Lte, the range is reversed.
    */
-  gte?:
-    | number
-    | undefined;
+  gte?: number | undefined;
   /**
    * In specifies that this field must be equal to one of the specified
    * values
@@ -305,39 +263,29 @@ export interface Int64Rules {
 /** UInt32Rules describes the constraints applied to `uint32` values */
 export interface UInt32Rules {
   /** Const specifies that this field must be exactly the specified value */
-  const?:
-    | number
-    | undefined;
+  const?: number | undefined;
   /**
    * Lt specifies that this field must be less than the specified value,
    * exclusive
    */
-  lt?:
-    | number
-    | undefined;
+  lt?: number | undefined;
   /**
    * Lte specifies that this field must be less than or equal to the
    * specified value, inclusive
    */
-  lte?:
-    | number
-    | undefined;
+  lte?: number | undefined;
   /**
    * Gt specifies that this field must be greater than the specified value,
    * exclusive. If the value of Gt is larger than a specified Lt or Lte, the
    * range is reversed.
    */
-  gt?:
-    | number
-    | undefined;
+  gt?: number | undefined;
   /**
    * Gte specifies that this field must be greater than or equal to the
    * specified value, inclusive. If the value of Gte is larger than a
    * specified Lt or Lte, the range is reversed.
    */
-  gte?:
-    | number
-    | undefined;
+  gte?: number | undefined;
   /**
    * In specifies that this field must be equal to one of the specified
    * values
@@ -358,39 +306,29 @@ export interface UInt32Rules {
 /** UInt64Rules describes the constraints applied to `uint64` values */
 export interface UInt64Rules {
   /** Const specifies that this field must be exactly the specified value */
-  const?:
-    | number
-    | undefined;
+  const?: number | undefined;
   /**
    * Lt specifies that this field must be less than the specified value,
    * exclusive
    */
-  lt?:
-    | number
-    | undefined;
+  lt?: number | undefined;
   /**
    * Lte specifies that this field must be less than or equal to the
    * specified value, inclusive
    */
-  lte?:
-    | number
-    | undefined;
+  lte?: number | undefined;
   /**
    * Gt specifies that this field must be greater than the specified value,
    * exclusive. If the value of Gt is larger than a specified Lt or Lte, the
    * range is reversed.
    */
-  gt?:
-    | number
-    | undefined;
+  gt?: number | undefined;
   /**
    * Gte specifies that this field must be greater than or equal to the
    * specified value, inclusive. If the value of Gte is larger than a
    * specified Lt or Lte, the range is reversed.
    */
-  gte?:
-    | number
-    | undefined;
+  gte?: number | undefined;
   /**
    * In specifies that this field must be equal to one of the specified
    * values
@@ -411,39 +349,29 @@ export interface UInt64Rules {
 /** SInt32Rules describes the constraints applied to `sint32` values */
 export interface SInt32Rules {
   /** Const specifies that this field must be exactly the specified value */
-  const?:
-    | number
-    | undefined;
+  const?: number | undefined;
   /**
    * Lt specifies that this field must be less than the specified value,
    * exclusive
    */
-  lt?:
-    | number
-    | undefined;
+  lt?: number | undefined;
   /**
    * Lte specifies that this field must be less than or equal to the
    * specified value, inclusive
    */
-  lte?:
-    | number
-    | undefined;
+  lte?: number | undefined;
   /**
    * Gt specifies that this field must be greater than the specified value,
    * exclusive. If the value of Gt is larger than a specified Lt or Lte, the
    * range is reversed.
    */
-  gt?:
-    | number
-    | undefined;
+  gt?: number | undefined;
   /**
    * Gte specifies that this field must be greater than or equal to the
    * specified value, inclusive. If the value of Gte is larger than a
    * specified Lt or Lte, the range is reversed.
    */
-  gte?:
-    | number
-    | undefined;
+  gte?: number | undefined;
   /**
    * In specifies that this field must be equal to one of the specified
    * values
@@ -464,39 +392,29 @@ export interface SInt32Rules {
 /** SInt64Rules describes the constraints applied to `sint64` values */
 export interface SInt64Rules {
   /** Const specifies that this field must be exactly the specified value */
-  const?:
-    | number
-    | undefined;
+  const?: number | undefined;
   /**
    * Lt specifies that this field must be less than the specified value,
    * exclusive
    */
-  lt?:
-    | number
-    | undefined;
+  lt?: number | undefined;
   /**
    * Lte specifies that this field must be less than or equal to the
    * specified value, inclusive
    */
-  lte?:
-    | number
-    | undefined;
+  lte?: number | undefined;
   /**
    * Gt specifies that this field must be greater than the specified value,
    * exclusive. If the value of Gt is larger than a specified Lt or Lte, the
    * range is reversed.
    */
-  gt?:
-    | number
-    | undefined;
+  gt?: number | undefined;
   /**
    * Gte specifies that this field must be greater than or equal to the
    * specified value, inclusive. If the value of Gte is larger than a
    * specified Lt or Lte, the range is reversed.
    */
-  gte?:
-    | number
-    | undefined;
+  gte?: number | undefined;
   /**
    * In specifies that this field must be equal to one of the specified
    * values
@@ -517,39 +435,29 @@ export interface SInt64Rules {
 /** Fixed32Rules describes the constraints applied to `fixed32` values */
 export interface Fixed32Rules {
   /** Const specifies that this field must be exactly the specified value */
-  const?:
-    | number
-    | undefined;
+  const?: number | undefined;
   /**
    * Lt specifies that this field must be less than the specified value,
    * exclusive
    */
-  lt?:
-    | number
-    | undefined;
+  lt?: number | undefined;
   /**
    * Lte specifies that this field must be less than or equal to the
    * specified value, inclusive
    */
-  lte?:
-    | number
-    | undefined;
+  lte?: number | undefined;
   /**
    * Gt specifies that this field must be greater than the specified value,
    * exclusive. If the value of Gt is larger than a specified Lt or Lte, the
    * range is reversed.
    */
-  gt?:
-    | number
-    | undefined;
+  gt?: number | undefined;
   /**
    * Gte specifies that this field must be greater than or equal to the
    * specified value, inclusive. If the value of Gte is larger than a
    * specified Lt or Lte, the range is reversed.
    */
-  gte?:
-    | number
-    | undefined;
+  gte?: number | undefined;
   /**
    * In specifies that this field must be equal to one of the specified
    * values
@@ -570,39 +478,29 @@ export interface Fixed32Rules {
 /** Fixed64Rules describes the constraints applied to `fixed64` values */
 export interface Fixed64Rules {
   /** Const specifies that this field must be exactly the specified value */
-  const?:
-    | number
-    | undefined;
+  const?: number | undefined;
   /**
    * Lt specifies that this field must be less than the specified value,
    * exclusive
    */
-  lt?:
-    | number
-    | undefined;
+  lt?: number | undefined;
   /**
    * Lte specifies that this field must be less than or equal to the
    * specified value, inclusive
    */
-  lte?:
-    | number
-    | undefined;
+  lte?: number | undefined;
   /**
    * Gt specifies that this field must be greater than the specified value,
    * exclusive. If the value of Gt is larger than a specified Lt or Lte, the
    * range is reversed.
    */
-  gt?:
-    | number
-    | undefined;
+  gt?: number | undefined;
   /**
    * Gte specifies that this field must be greater than or equal to the
    * specified value, inclusive. If the value of Gte is larger than a
    * specified Lt or Lte, the range is reversed.
    */
-  gte?:
-    | number
-    | undefined;
+  gte?: number | undefined;
   /**
    * In specifies that this field must be equal to one of the specified
    * values
@@ -623,39 +521,29 @@ export interface Fixed64Rules {
 /** SFixed32Rules describes the constraints applied to `sfixed32` values */
 export interface SFixed32Rules {
   /** Const specifies that this field must be exactly the specified value */
-  const?:
-    | number
-    | undefined;
+  const?: number | undefined;
   /**
    * Lt specifies that this field must be less than the specified value,
    * exclusive
    */
-  lt?:
-    | number
-    | undefined;
+  lt?: number | undefined;
   /**
    * Lte specifies that this field must be less than or equal to the
    * specified value, inclusive
    */
-  lte?:
-    | number
-    | undefined;
+  lte?: number | undefined;
   /**
    * Gt specifies that this field must be greater than the specified value,
    * exclusive. If the value of Gt is larger than a specified Lt or Lte, the
    * range is reversed.
    */
-  gt?:
-    | number
-    | undefined;
+  gt?: number | undefined;
   /**
    * Gte specifies that this field must be greater than or equal to the
    * specified value, inclusive. If the value of Gte is larger than a
    * specified Lt or Lte, the range is reversed.
    */
-  gte?:
-    | number
-    | undefined;
+  gte?: number | undefined;
   /**
    * In specifies that this field must be equal to one of the specified
    * values
@@ -676,39 +564,29 @@ export interface SFixed32Rules {
 /** SFixed64Rules describes the constraints applied to `sfixed64` values */
 export interface SFixed64Rules {
   /** Const specifies that this field must be exactly the specified value */
-  const?:
-    | number
-    | undefined;
+  const?: number | undefined;
   /**
    * Lt specifies that this field must be less than the specified value,
    * exclusive
    */
-  lt?:
-    | number
-    | undefined;
+  lt?: number | undefined;
   /**
    * Lte specifies that this field must be less than or equal to the
    * specified value, inclusive
    */
-  lte?:
-    | number
-    | undefined;
+  lte?: number | undefined;
   /**
    * Gt specifies that this field must be greater than the specified value,
    * exclusive. If the value of Gt is larger than a specified Lt or Lte, the
    * range is reversed.
    */
-  gt?:
-    | number
-    | undefined;
+  gt?: number | undefined;
   /**
    * Gte specifies that this field must be greater than or equal to the
    * specified value, inclusive. If the value of Gte is larger than a
    * specified Lt or Lte, the range is reversed.
    */
-  gte?:
-    | number
-    | undefined;
+  gte?: number | undefined;
   /**
    * In specifies that this field must be equal to one of the specified
    * values
@@ -735,87 +613,63 @@ export interface BoolRules {
 /** StringRules describe the constraints applied to `string` values */
 export interface StringRules {
   /** Const specifies that this field must be exactly the specified value */
-  const?:
-    | string
-    | undefined;
+  const?: string | undefined;
   /**
    * Len specifies that this field must be the specified number of
    * characters (Unicode code points). Note that the number of
    * characters may differ from the number of bytes in the string.
    */
-  len?:
-    | number
-    | undefined;
+  len?: number | undefined;
   /**
    * MinLen specifies that this field must be the specified number of
    * characters (Unicode code points) at a minimum. Note that the number of
    * characters may differ from the number of bytes in the string.
    */
-  minLen?:
-    | number
-    | undefined;
+  minLen?: number | undefined;
   /**
    * MaxLen specifies that this field must be the specified number of
    * characters (Unicode code points) at a maximum. Note that the number of
    * characters may differ from the number of bytes in the string.
    */
-  maxLen?:
-    | number
-    | undefined;
+  maxLen?: number | undefined;
   /** LenBytes specifies that this field must be the specified number of bytes */
-  lenBytes?:
-    | number
-    | undefined;
+  lenBytes?: number | undefined;
   /**
    * MinBytes specifies that this field must be the specified number of bytes
    * at a minimum
    */
-  minBytes?:
-    | number
-    | undefined;
+  minBytes?: number | undefined;
   /**
    * MaxBytes specifies that this field must be the specified number of bytes
    * at a maximum
    */
-  maxBytes?:
-    | number
-    | undefined;
+  maxBytes?: number | undefined;
   /**
    * Pattern specifes that this field must match against the specified
    * regular expression (RE2 syntax). The included expression should elide
    * any delimiters.
    */
-  pattern?:
-    | string
-    | undefined;
+  pattern?: string | undefined;
   /**
    * Prefix specifies that this field must have the specified substring at
    * the beginning of the string.
    */
-  prefix?:
-    | string
-    | undefined;
+  prefix?: string | undefined;
   /**
    * Suffix specifies that this field must have the specified substring at
    * the end of the string.
    */
-  suffix?:
-    | string
-    | undefined;
+  suffix?: string | undefined;
   /**
    * Contains specifies that this field must have the specified substring
    * anywhere in the string.
    */
-  contains?:
-    | string
-    | undefined;
+  contains?: string | undefined;
   /**
    * NotContains specifies that this field cannot have the specified substring
    * anywhere in the string.
    */
-  notContains?:
-    | string
-    | undefined;
+  notContains?: string | undefined;
   /**
    * In specifies that this field must be equal to one of the specified
    * values
@@ -836,57 +690,48 @@ export interface StringRules {
      * Email specifies that the field must be a valid email address as
      * defined by RFC 5322
      */
-    { $case: "email"; email: boolean }
-    | //
+    { $case: "email"; email: boolean } //
     /**
      * Hostname specifies that the field must be a valid hostname as
      * defined by RFC 1034. This constraint does not support
      * internationalized domain names (IDNs).
      */
-    { $case: "hostname"; hostname: boolean }
-    | //
+    | { $case: "hostname"; hostname: boolean } //
     /**
      * Ip specifies that the field must be a valid IP (v4 or v6) address.
      * Valid IPv6 addresses should not include surrounding square brackets.
      */
-    { $case: "ip"; ip: boolean }
-    | //
+    | { $case: "ip"; ip: boolean } //
     /** Ipv4 specifies that the field must be a valid IPv4 address. */
-    { $case: "ipv4"; ipv4: boolean }
-    | //
+    | { $case: "ipv4"; ipv4: boolean } //
     /**
      * Ipv6 specifies that the field must be a valid IPv6 address. Valid
      * IPv6 addresses should not include surrounding square brackets.
      */
-    { $case: "ipv6"; ipv6: boolean }
-    | //
+    | { $case: "ipv6"; ipv6: boolean } //
     /**
      * Uri specifies that the field must be a valid, absolute URI as defined
      * by RFC 3986
      */
-    { $case: "uri"; uri: boolean }
-    | //
+    | { $case: "uri"; uri: boolean } //
     /**
      * UriRef specifies that the field must be a valid URI as defined by RFC
      * 3986 and may be relative or absolute.
      */
-    { $case: "uriRef"; uriRef: boolean }
-    | //
+    | { $case: "uriRef"; uriRef: boolean } //
     /**
      * Address specifies that the field must be either a valid hostname as
      * defined by RFC 1034 (which does not support internationalized domain
      * names or IDNs), or it can be a valid IP (v4 or v6).
      */
-    { $case: "address"; address: boolean }
-    | //
+    | { $case: "address"; address: boolean } //
     /**
      * Uuid specifies that the field must be a valid UUID as defined by
      * RFC 4122
      */
-    { $case: "uuid"; uuid: boolean }
-    | //
+    | { $case: "uuid"; uuid: boolean } //
     /** WellKnownRegex specifies a common well known pattern defined as a regex. */
-    { $case: "wellKnownRegex"; wellKnownRegex: KnownRegex }
+    | { $case: "wellKnownRegex"; wellKnownRegex: KnownRegex }
     | undefined;
   /**
    * This applies to regexes HTTP_HEADER_NAME and HTTP_HEADER_VALUE to enable
@@ -895,9 +740,7 @@ export interface StringRules {
    * Setting to false will enable a looser validations that only disallows
    * \r\n\0 characters, which can be used to bypass header matching rules.
    */
-  strict?:
-    | boolean
-    | undefined;
+  strict?: boolean | undefined;
   /**
    * IgnoreEmpty specifies that the validation rules of this field should be
    * evaluated only if the field is not empty
@@ -908,56 +751,40 @@ export interface StringRules {
 /** BytesRules describe the constraints applied to `bytes` values */
 export interface BytesRules {
   /** Const specifies that this field must be exactly the specified value */
-  const?:
-    | Uint8Array
-    | undefined;
+  const?: Uint8Array | undefined;
   /** Len specifies that this field must be the specified number of bytes */
-  len?:
-    | number
-    | undefined;
+  len?: number | undefined;
   /**
    * MinLen specifies that this field must be the specified number of bytes
    * at a minimum
    */
-  minLen?:
-    | number
-    | undefined;
+  minLen?: number | undefined;
   /**
    * MaxLen specifies that this field must be the specified number of bytes
    * at a maximum
    */
-  maxLen?:
-    | number
-    | undefined;
+  maxLen?: number | undefined;
   /**
    * Pattern specifes that this field must match against the specified
    * regular expression (RE2 syntax). The included expression should elide
    * any delimiters.
    */
-  pattern?:
-    | string
-    | undefined;
+  pattern?: string | undefined;
   /**
    * Prefix specifies that this field must have the specified bytes at the
    * beginning of the string.
    */
-  prefix?:
-    | Uint8Array
-    | undefined;
+  prefix?: Uint8Array | undefined;
   /**
    * Suffix specifies that this field must have the specified bytes at the
    * end of the string.
    */
-  suffix?:
-    | Uint8Array
-    | undefined;
+  suffix?: Uint8Array | undefined;
   /**
    * Contains specifies that this field must have the specified bytes
    * anywhere in the string.
    */
-  contains?:
-    | Uint8Array
-    | undefined;
+  contains?: Uint8Array | undefined;
   /**
    * In specifies that this field must be equal to one of the specified
    * values
@@ -978,19 +805,17 @@ export interface BytesRules {
      * Ip specifies that the field must be a valid IP (v4 or v6) address in
      * byte format
      */
-    { $case: "ip"; ip: boolean }
-    | //
+    { $case: "ip"; ip: boolean } //
     /**
      * Ipv4 specifies that the field must be a valid IPv4 address in byte
      * format
      */
-    { $case: "ipv4"; ipv4: boolean }
-    | //
+    | { $case: "ipv4"; ipv4: boolean } //
     /**
      * Ipv6 specifies that the field must be a valid IPv6 address in byte
      * format
      */
-    { $case: "ipv6"; ipv6: boolean }
+    | { $case: "ipv6"; ipv6: boolean }
     | undefined;
   /**
    * IgnoreEmpty specifies that the validation rules of this field should be
@@ -1002,16 +827,12 @@ export interface BytesRules {
 /** EnumRules describe the constraints applied to enum values */
 export interface EnumRules {
   /** Const specifies that this field must be exactly the specified value */
-  const?:
-    | number
-    | undefined;
+  const?: number | undefined;
   /**
    * DefinedOnly specifies that this field must be only one of the defined
    * values for this enum, failing on any undefined value.
    */
-  definedOnly?:
-    | boolean
-    | undefined;
+  definedOnly?: boolean | undefined;
   /**
    * In specifies that this field must be equal to one of the specified
    * values
@@ -1033,9 +854,7 @@ export interface MessageRules {
    * Skip specifies that the validation rules of this field should not be
    * evaluated
    */
-  skip?:
-    | boolean
-    | undefined;
+  skip?: boolean | undefined;
   /** Required specifies that this field must be set */
   required?: boolean | undefined;
 }
@@ -1046,32 +865,24 @@ export interface RepeatedRules {
    * MinItems specifies that this field must have the specified number of
    * items at a minimum
    */
-  minItems?:
-    | number
-    | undefined;
+  minItems?: number | undefined;
   /**
    * MaxItems specifies that this field must have the specified number of
    * items at a maximum
    */
-  maxItems?:
-    | number
-    | undefined;
+  maxItems?: number | undefined;
   /**
    * Unique specifies that all elements in this field must be unique. This
    * contraint is only applicable to scalar and enum types (messages are not
    * supported).
    */
-  unique?:
-    | boolean
-    | undefined;
+  unique?: boolean | undefined;
   /**
    * Items specifies the contraints to be applied to each item in the field.
    * Repeated message fields will still execute validation against each item
    * unless skip is specified here.
    */
-  items?:
-    | FieldRules
-    | undefined;
+  items?: FieldRules | undefined;
   /**
    * IgnoreEmpty specifies that the validation rules of this field should be
    * evaluated only if the field is not empty
@@ -1085,35 +896,25 @@ export interface MapRules {
    * MinPairs specifies that this field must have the specified number of
    * KVs at a minimum
    */
-  minPairs?:
-    | number
-    | undefined;
+  minPairs?: number | undefined;
   /**
    * MaxPairs specifies that this field must have the specified number of
    * KVs at a maximum
    */
-  maxPairs?:
-    | number
-    | undefined;
+  maxPairs?: number | undefined;
   /**
    * NoSparse specifies values in this field cannot be unset. This only
    * applies to map's with message value types.
    */
-  noSparse?:
-    | boolean
-    | undefined;
+  noSparse?: boolean | undefined;
   /** Keys specifies the constraints to be applied to each key in the field. */
-  keys?:
-    | FieldRules
-    | undefined;
+  keys?: FieldRules | undefined;
   /**
    * Values specifies the constraints to be applied to the value of each key
    * in the field. Message values will still have their validations evaluated
    * unless skip is specified here.
    */
-  values?:
-    | FieldRules
-    | undefined;
+  values?: FieldRules | undefined;
   /**
    * IgnoreEmpty specifies that the validation rules of this field should be
    * evaluated only if the field is not empty
@@ -1127,9 +928,7 @@ export interface MapRules {
  */
 export interface AnyRules {
   /** Required specifies that this field must be set */
-  required?:
-    | boolean
-    | undefined;
+  required?: boolean | undefined;
   /**
    * In specifies that this field's `type_url` must be equal to one of the
    * specified values.
@@ -1148,41 +947,29 @@ export interface AnyRules {
  */
 export interface DurationRules {
   /** Required specifies that this field must be set */
-  required?:
-    | boolean
-    | undefined;
+  required?: boolean | undefined;
   /** Const specifies that this field must be exactly the specified value */
-  const?:
-    | Duration
-    | undefined;
+  const?: Duration | undefined;
   /**
    * Lt specifies that this field must be less than the specified value,
    * exclusive
    */
-  lt?:
-    | Duration
-    | undefined;
+  lt?: Duration | undefined;
   /**
    * Lt specifies that this field must be less than the specified value,
    * inclusive
    */
-  lte?:
-    | Duration
-    | undefined;
+  lte?: Duration | undefined;
   /**
    * Gt specifies that this field must be greater than the specified value,
    * exclusive
    */
-  gt?:
-    | Duration
-    | undefined;
+  gt?: Duration | undefined;
   /**
    * Gte specifies that this field must be greater than the specified value,
    * inclusive
    */
-  gte?:
-    | Duration
-    | undefined;
+  gte?: Duration | undefined;
   /**
    * In specifies that this field must be equal to one of the specified
    * values
@@ -1201,55 +988,39 @@ export interface DurationRules {
  */
 export interface TimestampRules {
   /** Required specifies that this field must be set */
-  required?:
-    | boolean
-    | undefined;
+  required?: boolean | undefined;
   /** Const specifies that this field must be exactly the specified value */
-  const?:
-    | Date
-    | undefined;
+  const?: Date | undefined;
   /**
    * Lt specifies that this field must be less than the specified value,
    * exclusive
    */
-  lt?:
-    | Date
-    | undefined;
+  lt?: Date | undefined;
   /**
    * Lte specifies that this field must be less than the specified value,
    * inclusive
    */
-  lte?:
-    | Date
-    | undefined;
+  lte?: Date | undefined;
   /**
    * Gt specifies that this field must be greater than the specified value,
    * exclusive
    */
-  gt?:
-    | Date
-    | undefined;
+  gt?: Date | undefined;
   /**
    * Gte specifies that this field must be greater than the specified value,
    * inclusive
    */
-  gte?:
-    | Date
-    | undefined;
+  gte?: Date | undefined;
   /**
    * LtNow specifies that this must be less than the current time. LtNow
    * can only be used with the Within rule.
    */
-  ltNow?:
-    | boolean
-    | undefined;
+  ltNow?: boolean | undefined;
   /**
    * GtNow specifies that this must be greater than the current time. GtNow
    * can only be used with the Within rule.
    */
-  gtNow?:
-    | boolean
-    | undefined;
+  gtNow?: boolean | undefined;
   /**
    * Within specifies that this field must be within this duration of the
    * current time. This constraint can be used alone or with the LtNow and
@@ -1263,7 +1034,10 @@ function createBaseFieldRules(): FieldRules {
 }
 
 export const FieldRules: MessageFns<FieldRules> = {
-  encode(message: FieldRules, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    message: FieldRules,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     if (message.message !== undefined) {
       MessageRules.encode(message.message, writer.uint32(138).fork()).join();
     }
@@ -1272,7 +1046,10 @@ export const FieldRules: MessageFns<FieldRules> = {
         FloatRules.encode(message.type.float, writer.uint32(10).fork()).join();
         break;
       case "double":
-        DoubleRules.encode(message.type.double, writer.uint32(18).fork()).join();
+        DoubleRules.encode(
+          message.type.double,
+          writer.uint32(18).fork(),
+        ).join();
         break;
       case "int32":
         Int32Rules.encode(message.type.int32, writer.uint32(26).fork()).join();
@@ -1281,34 +1058,61 @@ export const FieldRules: MessageFns<FieldRules> = {
         Int64Rules.encode(message.type.int64, writer.uint32(34).fork()).join();
         break;
       case "uint32":
-        UInt32Rules.encode(message.type.uint32, writer.uint32(42).fork()).join();
+        UInt32Rules.encode(
+          message.type.uint32,
+          writer.uint32(42).fork(),
+        ).join();
         break;
       case "uint64":
-        UInt64Rules.encode(message.type.uint64, writer.uint32(50).fork()).join();
+        UInt64Rules.encode(
+          message.type.uint64,
+          writer.uint32(50).fork(),
+        ).join();
         break;
       case "sint32":
-        SInt32Rules.encode(message.type.sint32, writer.uint32(58).fork()).join();
+        SInt32Rules.encode(
+          message.type.sint32,
+          writer.uint32(58).fork(),
+        ).join();
         break;
       case "sint64":
-        SInt64Rules.encode(message.type.sint64, writer.uint32(66).fork()).join();
+        SInt64Rules.encode(
+          message.type.sint64,
+          writer.uint32(66).fork(),
+        ).join();
         break;
       case "fixed32":
-        Fixed32Rules.encode(message.type.fixed32, writer.uint32(74).fork()).join();
+        Fixed32Rules.encode(
+          message.type.fixed32,
+          writer.uint32(74).fork(),
+        ).join();
         break;
       case "fixed64":
-        Fixed64Rules.encode(message.type.fixed64, writer.uint32(82).fork()).join();
+        Fixed64Rules.encode(
+          message.type.fixed64,
+          writer.uint32(82).fork(),
+        ).join();
         break;
       case "sfixed32":
-        SFixed32Rules.encode(message.type.sfixed32, writer.uint32(90).fork()).join();
+        SFixed32Rules.encode(
+          message.type.sfixed32,
+          writer.uint32(90).fork(),
+        ).join();
         break;
       case "sfixed64":
-        SFixed64Rules.encode(message.type.sfixed64, writer.uint32(98).fork()).join();
+        SFixed64Rules.encode(
+          message.type.sfixed64,
+          writer.uint32(98).fork(),
+        ).join();
         break;
       case "bool":
         BoolRules.encode(message.type.bool, writer.uint32(106).fork()).join();
         break;
       case "string":
-        StringRules.encode(message.type.string, writer.uint32(114).fork()).join();
+        StringRules.encode(
+          message.type.string,
+          writer.uint32(114).fork(),
+        ).join();
         break;
       case "bytes":
         BytesRules.encode(message.type.bytes, writer.uint32(122).fork()).join();
@@ -1317,7 +1121,10 @@ export const FieldRules: MessageFns<FieldRules> = {
         EnumRules.encode(message.type.enum, writer.uint32(130).fork()).join();
         break;
       case "repeated":
-        RepeatedRules.encode(message.type.repeated, writer.uint32(146).fork()).join();
+        RepeatedRules.encode(
+          message.type.repeated,
+          writer.uint32(146).fork(),
+        ).join();
         break;
       case "map":
         MapRules.encode(message.type.map, writer.uint32(154).fork()).join();
@@ -1326,17 +1133,24 @@ export const FieldRules: MessageFns<FieldRules> = {
         AnyRules.encode(message.type.any, writer.uint32(162).fork()).join();
         break;
       case "duration":
-        DurationRules.encode(message.type.duration, writer.uint32(170).fork()).join();
+        DurationRules.encode(
+          message.type.duration,
+          writer.uint32(170).fork(),
+        ).join();
         break;
       case "timestamp":
-        TimestampRules.encode(message.type.timestamp, writer.uint32(178).fork()).join();
+        TimestampRules.encode(
+          message.type.timestamp,
+          writer.uint32(178).fork(),
+        ).join();
         break;
     }
     return writer;
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): FieldRules {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseFieldRules();
     while (reader.pos < end) {
@@ -1355,7 +1169,10 @@ export const FieldRules: MessageFns<FieldRules> = {
             break;
           }
 
-          message.type = { $case: "float", float: FloatRules.decode(reader, reader.uint32()) };
+          message.type = {
+            $case: "float",
+            float: FloatRules.decode(reader, reader.uint32()),
+          };
           continue;
         }
         case 2: {
@@ -1363,7 +1180,10 @@ export const FieldRules: MessageFns<FieldRules> = {
             break;
           }
 
-          message.type = { $case: "double", double: DoubleRules.decode(reader, reader.uint32()) };
+          message.type = {
+            $case: "double",
+            double: DoubleRules.decode(reader, reader.uint32()),
+          };
           continue;
         }
         case 3: {
@@ -1371,7 +1191,10 @@ export const FieldRules: MessageFns<FieldRules> = {
             break;
           }
 
-          message.type = { $case: "int32", int32: Int32Rules.decode(reader, reader.uint32()) };
+          message.type = {
+            $case: "int32",
+            int32: Int32Rules.decode(reader, reader.uint32()),
+          };
           continue;
         }
         case 4: {
@@ -1379,7 +1202,10 @@ export const FieldRules: MessageFns<FieldRules> = {
             break;
           }
 
-          message.type = { $case: "int64", int64: Int64Rules.decode(reader, reader.uint32()) };
+          message.type = {
+            $case: "int64",
+            int64: Int64Rules.decode(reader, reader.uint32()),
+          };
           continue;
         }
         case 5: {
@@ -1387,7 +1213,10 @@ export const FieldRules: MessageFns<FieldRules> = {
             break;
           }
 
-          message.type = { $case: "uint32", uint32: UInt32Rules.decode(reader, reader.uint32()) };
+          message.type = {
+            $case: "uint32",
+            uint32: UInt32Rules.decode(reader, reader.uint32()),
+          };
           continue;
         }
         case 6: {
@@ -1395,7 +1224,10 @@ export const FieldRules: MessageFns<FieldRules> = {
             break;
           }
 
-          message.type = { $case: "uint64", uint64: UInt64Rules.decode(reader, reader.uint32()) };
+          message.type = {
+            $case: "uint64",
+            uint64: UInt64Rules.decode(reader, reader.uint32()),
+          };
           continue;
         }
         case 7: {
@@ -1403,7 +1235,10 @@ export const FieldRules: MessageFns<FieldRules> = {
             break;
           }
 
-          message.type = { $case: "sint32", sint32: SInt32Rules.decode(reader, reader.uint32()) };
+          message.type = {
+            $case: "sint32",
+            sint32: SInt32Rules.decode(reader, reader.uint32()),
+          };
           continue;
         }
         case 8: {
@@ -1411,7 +1246,10 @@ export const FieldRules: MessageFns<FieldRules> = {
             break;
           }
 
-          message.type = { $case: "sint64", sint64: SInt64Rules.decode(reader, reader.uint32()) };
+          message.type = {
+            $case: "sint64",
+            sint64: SInt64Rules.decode(reader, reader.uint32()),
+          };
           continue;
         }
         case 9: {
@@ -1419,7 +1257,10 @@ export const FieldRules: MessageFns<FieldRules> = {
             break;
           }
 
-          message.type = { $case: "fixed32", fixed32: Fixed32Rules.decode(reader, reader.uint32()) };
+          message.type = {
+            $case: "fixed32",
+            fixed32: Fixed32Rules.decode(reader, reader.uint32()),
+          };
           continue;
         }
         case 10: {
@@ -1427,7 +1268,10 @@ export const FieldRules: MessageFns<FieldRules> = {
             break;
           }
 
-          message.type = { $case: "fixed64", fixed64: Fixed64Rules.decode(reader, reader.uint32()) };
+          message.type = {
+            $case: "fixed64",
+            fixed64: Fixed64Rules.decode(reader, reader.uint32()),
+          };
           continue;
         }
         case 11: {
@@ -1435,7 +1279,10 @@ export const FieldRules: MessageFns<FieldRules> = {
             break;
           }
 
-          message.type = { $case: "sfixed32", sfixed32: SFixed32Rules.decode(reader, reader.uint32()) };
+          message.type = {
+            $case: "sfixed32",
+            sfixed32: SFixed32Rules.decode(reader, reader.uint32()),
+          };
           continue;
         }
         case 12: {
@@ -1443,7 +1290,10 @@ export const FieldRules: MessageFns<FieldRules> = {
             break;
           }
 
-          message.type = { $case: "sfixed64", sfixed64: SFixed64Rules.decode(reader, reader.uint32()) };
+          message.type = {
+            $case: "sfixed64",
+            sfixed64: SFixed64Rules.decode(reader, reader.uint32()),
+          };
           continue;
         }
         case 13: {
@@ -1451,7 +1301,10 @@ export const FieldRules: MessageFns<FieldRules> = {
             break;
           }
 
-          message.type = { $case: "bool", bool: BoolRules.decode(reader, reader.uint32()) };
+          message.type = {
+            $case: "bool",
+            bool: BoolRules.decode(reader, reader.uint32()),
+          };
           continue;
         }
         case 14: {
@@ -1459,7 +1312,10 @@ export const FieldRules: MessageFns<FieldRules> = {
             break;
           }
 
-          message.type = { $case: "string", string: StringRules.decode(reader, reader.uint32()) };
+          message.type = {
+            $case: "string",
+            string: StringRules.decode(reader, reader.uint32()),
+          };
           continue;
         }
         case 15: {
@@ -1467,7 +1323,10 @@ export const FieldRules: MessageFns<FieldRules> = {
             break;
           }
 
-          message.type = { $case: "bytes", bytes: BytesRules.decode(reader, reader.uint32()) };
+          message.type = {
+            $case: "bytes",
+            bytes: BytesRules.decode(reader, reader.uint32()),
+          };
           continue;
         }
         case 16: {
@@ -1475,7 +1334,10 @@ export const FieldRules: MessageFns<FieldRules> = {
             break;
           }
 
-          message.type = { $case: "enum", enum: EnumRules.decode(reader, reader.uint32()) };
+          message.type = {
+            $case: "enum",
+            enum: EnumRules.decode(reader, reader.uint32()),
+          };
           continue;
         }
         case 18: {
@@ -1483,7 +1345,10 @@ export const FieldRules: MessageFns<FieldRules> = {
             break;
           }
 
-          message.type = { $case: "repeated", repeated: RepeatedRules.decode(reader, reader.uint32()) };
+          message.type = {
+            $case: "repeated",
+            repeated: RepeatedRules.decode(reader, reader.uint32()),
+          };
           continue;
         }
         case 19: {
@@ -1491,7 +1356,10 @@ export const FieldRules: MessageFns<FieldRules> = {
             break;
           }
 
-          message.type = { $case: "map", map: MapRules.decode(reader, reader.uint32()) };
+          message.type = {
+            $case: "map",
+            map: MapRules.decode(reader, reader.uint32()),
+          };
           continue;
         }
         case 20: {
@@ -1499,7 +1367,10 @@ export const FieldRules: MessageFns<FieldRules> = {
             break;
           }
 
-          message.type = { $case: "any", any: AnyRules.decode(reader, reader.uint32()) };
+          message.type = {
+            $case: "any",
+            any: AnyRules.decode(reader, reader.uint32()),
+          };
           continue;
         }
         case 21: {
@@ -1507,7 +1378,10 @@ export const FieldRules: MessageFns<FieldRules> = {
             break;
           }
 
-          message.type = { $case: "duration", duration: DurationRules.decode(reader, reader.uint32()) };
+          message.type = {
+            $case: "duration",
+            duration: DurationRules.decode(reader, reader.uint32()),
+          };
           continue;
         }
         case 22: {
@@ -1515,7 +1389,10 @@ export const FieldRules: MessageFns<FieldRules> = {
             break;
           }
 
-          message.type = { $case: "timestamp", timestamp: TimestampRules.decode(reader, reader.uint32()) };
+          message.type = {
+            $case: "timestamp",
+            timestamp: TimestampRules.decode(reader, reader.uint32()),
+          };
           continue;
         }
       }
@@ -1529,50 +1406,123 @@ export const FieldRules: MessageFns<FieldRules> = {
 
   fromJSON(object: any): FieldRules {
     return {
-      message: isSet(object.message) ? MessageRules.fromJSON(object.message) : undefined,
+      message: isSet(object.message)
+        ? MessageRules.fromJSON(object.message)
+        : undefined,
       type: isSet(object.float)
         ? { $case: "float", float: FloatRules.fromJSON(object.float) }
         : isSet(object.double)
-        ? { $case: "double", double: DoubleRules.fromJSON(object.double) }
-        : isSet(object.int32)
-        ? { $case: "int32", int32: Int32Rules.fromJSON(object.int32) }
-        : isSet(object.int64)
-        ? { $case: "int64", int64: Int64Rules.fromJSON(object.int64) }
-        : isSet(object.uint32)
-        ? { $case: "uint32", uint32: UInt32Rules.fromJSON(object.uint32) }
-        : isSet(object.uint64)
-        ? { $case: "uint64", uint64: UInt64Rules.fromJSON(object.uint64) }
-        : isSet(object.sint32)
-        ? { $case: "sint32", sint32: SInt32Rules.fromJSON(object.sint32) }
-        : isSet(object.sint64)
-        ? { $case: "sint64", sint64: SInt64Rules.fromJSON(object.sint64) }
-        : isSet(object.fixed32)
-        ? { $case: "fixed32", fixed32: Fixed32Rules.fromJSON(object.fixed32) }
-        : isSet(object.fixed64)
-        ? { $case: "fixed64", fixed64: Fixed64Rules.fromJSON(object.fixed64) }
-        : isSet(object.sfixed32)
-        ? { $case: "sfixed32", sfixed32: SFixed32Rules.fromJSON(object.sfixed32) }
-        : isSet(object.sfixed64)
-        ? { $case: "sfixed64", sfixed64: SFixed64Rules.fromJSON(object.sfixed64) }
-        : isSet(object.bool)
-        ? { $case: "bool", bool: BoolRules.fromJSON(object.bool) }
-        : isSet(object.string)
-        ? { $case: "string", string: StringRules.fromJSON(object.string) }
-        : isSet(object.bytes)
-        ? { $case: "bytes", bytes: BytesRules.fromJSON(object.bytes) }
-        : isSet(object.enum)
-        ? { $case: "enum", enum: EnumRules.fromJSON(object.enum) }
-        : isSet(object.repeated)
-        ? { $case: "repeated", repeated: RepeatedRules.fromJSON(object.repeated) }
-        : isSet(object.map)
-        ? { $case: "map", map: MapRules.fromJSON(object.map) }
-        : isSet(object.any)
-        ? { $case: "any", any: AnyRules.fromJSON(object.any) }
-        : isSet(object.duration)
-        ? { $case: "duration", duration: DurationRules.fromJSON(object.duration) }
-        : isSet(object.timestamp)
-        ? { $case: "timestamp", timestamp: TimestampRules.fromJSON(object.timestamp) }
-        : undefined,
+          ? { $case: "double", double: DoubleRules.fromJSON(object.double) }
+          : isSet(object.int32)
+            ? { $case: "int32", int32: Int32Rules.fromJSON(object.int32) }
+            : isSet(object.int64)
+              ? { $case: "int64", int64: Int64Rules.fromJSON(object.int64) }
+              : isSet(object.uint32)
+                ? {
+                    $case: "uint32",
+                    uint32: UInt32Rules.fromJSON(object.uint32),
+                  }
+                : isSet(object.uint64)
+                  ? {
+                      $case: "uint64",
+                      uint64: UInt64Rules.fromJSON(object.uint64),
+                    }
+                  : isSet(object.sint32)
+                    ? {
+                        $case: "sint32",
+                        sint32: SInt32Rules.fromJSON(object.sint32),
+                      }
+                    : isSet(object.sint64)
+                      ? {
+                          $case: "sint64",
+                          sint64: SInt64Rules.fromJSON(object.sint64),
+                        }
+                      : isSet(object.fixed32)
+                        ? {
+                            $case: "fixed32",
+                            fixed32: Fixed32Rules.fromJSON(object.fixed32),
+                          }
+                        : isSet(object.fixed64)
+                          ? {
+                              $case: "fixed64",
+                              fixed64: Fixed64Rules.fromJSON(object.fixed64),
+                            }
+                          : isSet(object.sfixed32)
+                            ? {
+                                $case: "sfixed32",
+                                sfixed32: SFixed32Rules.fromJSON(
+                                  object.sfixed32,
+                                ),
+                              }
+                            : isSet(object.sfixed64)
+                              ? {
+                                  $case: "sfixed64",
+                                  sfixed64: SFixed64Rules.fromJSON(
+                                    object.sfixed64,
+                                  ),
+                                }
+                              : isSet(object.bool)
+                                ? {
+                                    $case: "bool",
+                                    bool: BoolRules.fromJSON(object.bool),
+                                  }
+                                : isSet(object.string)
+                                  ? {
+                                      $case: "string",
+                                      string: StringRules.fromJSON(
+                                        object.string,
+                                      ),
+                                    }
+                                  : isSet(object.bytes)
+                                    ? {
+                                        $case: "bytes",
+                                        bytes: BytesRules.fromJSON(
+                                          object.bytes,
+                                        ),
+                                      }
+                                    : isSet(object.enum)
+                                      ? {
+                                          $case: "enum",
+                                          enum: EnumRules.fromJSON(object.enum),
+                                        }
+                                      : isSet(object.repeated)
+                                        ? {
+                                            $case: "repeated",
+                                            repeated: RepeatedRules.fromJSON(
+                                              object.repeated,
+                                            ),
+                                          }
+                                        : isSet(object.map)
+                                          ? {
+                                              $case: "map",
+                                              map: MapRules.fromJSON(
+                                                object.map,
+                                              ),
+                                            }
+                                          : isSet(object.any)
+                                            ? {
+                                                $case: "any",
+                                                any: AnyRules.fromJSON(
+                                                  object.any,
+                                                ),
+                                              }
+                                            : isSet(object.duration)
+                                              ? {
+                                                  $case: "duration",
+                                                  duration:
+                                                    DurationRules.fromJSON(
+                                                      object.duration,
+                                                    ),
+                                                }
+                                              : isSet(object.timestamp)
+                                                ? {
+                                                    $case: "timestamp",
+                                                    timestamp:
+                                                      TimestampRules.fromJSON(
+                                                        object.timestamp,
+                                                      ),
+                                                  }
+                                                : undefined,
     };
   },
 
@@ -1632,133 +1582,218 @@ export const FieldRules: MessageFns<FieldRules> = {
   },
   fromPartial(object: DeepPartial<FieldRules>): FieldRules {
     const message = createBaseFieldRules();
-    message.message = (object.message !== undefined && object.message !== null)
-      ? MessageRules.fromPartial(object.message)
-      : undefined;
+    message.message =
+      object.message !== undefined && object.message !== null
+        ? MessageRules.fromPartial(object.message)
+        : undefined;
     switch (object.type?.$case) {
       case "float": {
         if (object.type?.float !== undefined && object.type?.float !== null) {
-          message.type = { $case: "float", float: FloatRules.fromPartial(object.type.float) };
+          message.type = {
+            $case: "float",
+            float: FloatRules.fromPartial(object.type.float),
+          };
         }
         break;
       }
       case "double": {
         if (object.type?.double !== undefined && object.type?.double !== null) {
-          message.type = { $case: "double", double: DoubleRules.fromPartial(object.type.double) };
+          message.type = {
+            $case: "double",
+            double: DoubleRules.fromPartial(object.type.double),
+          };
         }
         break;
       }
       case "int32": {
         if (object.type?.int32 !== undefined && object.type?.int32 !== null) {
-          message.type = { $case: "int32", int32: Int32Rules.fromPartial(object.type.int32) };
+          message.type = {
+            $case: "int32",
+            int32: Int32Rules.fromPartial(object.type.int32),
+          };
         }
         break;
       }
       case "int64": {
         if (object.type?.int64 !== undefined && object.type?.int64 !== null) {
-          message.type = { $case: "int64", int64: Int64Rules.fromPartial(object.type.int64) };
+          message.type = {
+            $case: "int64",
+            int64: Int64Rules.fromPartial(object.type.int64),
+          };
         }
         break;
       }
       case "uint32": {
         if (object.type?.uint32 !== undefined && object.type?.uint32 !== null) {
-          message.type = { $case: "uint32", uint32: UInt32Rules.fromPartial(object.type.uint32) };
+          message.type = {
+            $case: "uint32",
+            uint32: UInt32Rules.fromPartial(object.type.uint32),
+          };
         }
         break;
       }
       case "uint64": {
         if (object.type?.uint64 !== undefined && object.type?.uint64 !== null) {
-          message.type = { $case: "uint64", uint64: UInt64Rules.fromPartial(object.type.uint64) };
+          message.type = {
+            $case: "uint64",
+            uint64: UInt64Rules.fromPartial(object.type.uint64),
+          };
         }
         break;
       }
       case "sint32": {
         if (object.type?.sint32 !== undefined && object.type?.sint32 !== null) {
-          message.type = { $case: "sint32", sint32: SInt32Rules.fromPartial(object.type.sint32) };
+          message.type = {
+            $case: "sint32",
+            sint32: SInt32Rules.fromPartial(object.type.sint32),
+          };
         }
         break;
       }
       case "sint64": {
         if (object.type?.sint64 !== undefined && object.type?.sint64 !== null) {
-          message.type = { $case: "sint64", sint64: SInt64Rules.fromPartial(object.type.sint64) };
+          message.type = {
+            $case: "sint64",
+            sint64: SInt64Rules.fromPartial(object.type.sint64),
+          };
         }
         break;
       }
       case "fixed32": {
-        if (object.type?.fixed32 !== undefined && object.type?.fixed32 !== null) {
-          message.type = { $case: "fixed32", fixed32: Fixed32Rules.fromPartial(object.type.fixed32) };
+        if (
+          object.type?.fixed32 !== undefined &&
+          object.type?.fixed32 !== null
+        ) {
+          message.type = {
+            $case: "fixed32",
+            fixed32: Fixed32Rules.fromPartial(object.type.fixed32),
+          };
         }
         break;
       }
       case "fixed64": {
-        if (object.type?.fixed64 !== undefined && object.type?.fixed64 !== null) {
-          message.type = { $case: "fixed64", fixed64: Fixed64Rules.fromPartial(object.type.fixed64) };
+        if (
+          object.type?.fixed64 !== undefined &&
+          object.type?.fixed64 !== null
+        ) {
+          message.type = {
+            $case: "fixed64",
+            fixed64: Fixed64Rules.fromPartial(object.type.fixed64),
+          };
         }
         break;
       }
       case "sfixed32": {
-        if (object.type?.sfixed32 !== undefined && object.type?.sfixed32 !== null) {
-          message.type = { $case: "sfixed32", sfixed32: SFixed32Rules.fromPartial(object.type.sfixed32) };
+        if (
+          object.type?.sfixed32 !== undefined &&
+          object.type?.sfixed32 !== null
+        ) {
+          message.type = {
+            $case: "sfixed32",
+            sfixed32: SFixed32Rules.fromPartial(object.type.sfixed32),
+          };
         }
         break;
       }
       case "sfixed64": {
-        if (object.type?.sfixed64 !== undefined && object.type?.sfixed64 !== null) {
-          message.type = { $case: "sfixed64", sfixed64: SFixed64Rules.fromPartial(object.type.sfixed64) };
+        if (
+          object.type?.sfixed64 !== undefined &&
+          object.type?.sfixed64 !== null
+        ) {
+          message.type = {
+            $case: "sfixed64",
+            sfixed64: SFixed64Rules.fromPartial(object.type.sfixed64),
+          };
         }
         break;
       }
       case "bool": {
         if (object.type?.bool !== undefined && object.type?.bool !== null) {
-          message.type = { $case: "bool", bool: BoolRules.fromPartial(object.type.bool) };
+          message.type = {
+            $case: "bool",
+            bool: BoolRules.fromPartial(object.type.bool),
+          };
         }
         break;
       }
       case "string": {
         if (object.type?.string !== undefined && object.type?.string !== null) {
-          message.type = { $case: "string", string: StringRules.fromPartial(object.type.string) };
+          message.type = {
+            $case: "string",
+            string: StringRules.fromPartial(object.type.string),
+          };
         }
         break;
       }
       case "bytes": {
         if (object.type?.bytes !== undefined && object.type?.bytes !== null) {
-          message.type = { $case: "bytes", bytes: BytesRules.fromPartial(object.type.bytes) };
+          message.type = {
+            $case: "bytes",
+            bytes: BytesRules.fromPartial(object.type.bytes),
+          };
         }
         break;
       }
       case "enum": {
         if (object.type?.enum !== undefined && object.type?.enum !== null) {
-          message.type = { $case: "enum", enum: EnumRules.fromPartial(object.type.enum) };
+          message.type = {
+            $case: "enum",
+            enum: EnumRules.fromPartial(object.type.enum),
+          };
         }
         break;
       }
       case "repeated": {
-        if (object.type?.repeated !== undefined && object.type?.repeated !== null) {
-          message.type = { $case: "repeated", repeated: RepeatedRules.fromPartial(object.type.repeated) };
+        if (
+          object.type?.repeated !== undefined &&
+          object.type?.repeated !== null
+        ) {
+          message.type = {
+            $case: "repeated",
+            repeated: RepeatedRules.fromPartial(object.type.repeated),
+          };
         }
         break;
       }
       case "map": {
         if (object.type?.map !== undefined && object.type?.map !== null) {
-          message.type = { $case: "map", map: MapRules.fromPartial(object.type.map) };
+          message.type = {
+            $case: "map",
+            map: MapRules.fromPartial(object.type.map),
+          };
         }
         break;
       }
       case "any": {
         if (object.type?.any !== undefined && object.type?.any !== null) {
-          message.type = { $case: "any", any: AnyRules.fromPartial(object.type.any) };
+          message.type = {
+            $case: "any",
+            any: AnyRules.fromPartial(object.type.any),
+          };
         }
         break;
       }
       case "duration": {
-        if (object.type?.duration !== undefined && object.type?.duration !== null) {
-          message.type = { $case: "duration", duration: DurationRules.fromPartial(object.type.duration) };
+        if (
+          object.type?.duration !== undefined &&
+          object.type?.duration !== null
+        ) {
+          message.type = {
+            $case: "duration",
+            duration: DurationRules.fromPartial(object.type.duration),
+          };
         }
         break;
       }
       case "timestamp": {
-        if (object.type?.timestamp !== undefined && object.type?.timestamp !== null) {
-          message.type = { $case: "timestamp", timestamp: TimestampRules.fromPartial(object.type.timestamp) };
+        if (
+          object.type?.timestamp !== undefined &&
+          object.type?.timestamp !== null
+        ) {
+          message.type = {
+            $case: "timestamp",
+            timestamp: TimestampRules.fromPartial(object.type.timestamp),
+          };
         }
         break;
       }
@@ -1768,11 +1803,23 @@ export const FieldRules: MessageFns<FieldRules> = {
 };
 
 function createBaseFloatRules(): FloatRules {
-  return { const: 0, lt: 0, lte: 0, gt: 0, gte: 0, in: [], notIn: [], ignoreEmpty: false };
+  return {
+    const: 0,
+    lt: 0,
+    lte: 0,
+    gt: 0,
+    gte: 0,
+    in: [],
+    notIn: [],
+    ignoreEmpty: false,
+  };
 }
 
 export const FloatRules: MessageFns<FloatRules> = {
-  encode(message: FloatRules, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    message: FloatRules,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     if (message.const !== undefined && message.const !== 0) {
       writer.uint32(13).float(message.const);
     }
@@ -1805,7 +1852,8 @@ export const FloatRules: MessageFns<FloatRules> = {
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): FloatRules {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseFloatRules();
     while (reader.pos < end) {
@@ -1911,9 +1959,15 @@ export const FloatRules: MessageFns<FloatRules> = {
       lte: isSet(object.lte) ? globalThis.Number(object.lte) : 0,
       gt: isSet(object.gt) ? globalThis.Number(object.gt) : 0,
       gte: isSet(object.gte) ? globalThis.Number(object.gte) : 0,
-      in: globalThis.Array.isArray(object?.in) ? object.in.map((e: any) => globalThis.Number(e)) : [],
-      notIn: globalThis.Array.isArray(object?.notIn) ? object.notIn.map((e: any) => globalThis.Number(e)) : [],
-      ignoreEmpty: isSet(object.ignoreEmpty) ? globalThis.Boolean(object.ignoreEmpty) : false,
+      in: globalThis.Array.isArray(object?.in)
+        ? object.in.map((e: any) => globalThis.Number(e))
+        : [],
+      notIn: globalThis.Array.isArray(object?.notIn)
+        ? object.notIn.map((e: any) => globalThis.Number(e))
+        : [],
+      ignoreEmpty: isSet(object.ignoreEmpty)
+        ? globalThis.Boolean(object.ignoreEmpty)
+        : false,
     };
   },
 
@@ -1964,11 +2018,23 @@ export const FloatRules: MessageFns<FloatRules> = {
 };
 
 function createBaseDoubleRules(): DoubleRules {
-  return { const: 0, lt: 0, lte: 0, gt: 0, gte: 0, in: [], notIn: [], ignoreEmpty: false };
+  return {
+    const: 0,
+    lt: 0,
+    lte: 0,
+    gt: 0,
+    gte: 0,
+    in: [],
+    notIn: [],
+    ignoreEmpty: false,
+  };
 }
 
 export const DoubleRules: MessageFns<DoubleRules> = {
-  encode(message: DoubleRules, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    message: DoubleRules,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     if (message.const !== undefined && message.const !== 0) {
       writer.uint32(9).double(message.const);
     }
@@ -2001,7 +2067,8 @@ export const DoubleRules: MessageFns<DoubleRules> = {
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): DoubleRules {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseDoubleRules();
     while (reader.pos < end) {
@@ -2107,9 +2174,15 @@ export const DoubleRules: MessageFns<DoubleRules> = {
       lte: isSet(object.lte) ? globalThis.Number(object.lte) : 0,
       gt: isSet(object.gt) ? globalThis.Number(object.gt) : 0,
       gte: isSet(object.gte) ? globalThis.Number(object.gte) : 0,
-      in: globalThis.Array.isArray(object?.in) ? object.in.map((e: any) => globalThis.Number(e)) : [],
-      notIn: globalThis.Array.isArray(object?.notIn) ? object.notIn.map((e: any) => globalThis.Number(e)) : [],
-      ignoreEmpty: isSet(object.ignoreEmpty) ? globalThis.Boolean(object.ignoreEmpty) : false,
+      in: globalThis.Array.isArray(object?.in)
+        ? object.in.map((e: any) => globalThis.Number(e))
+        : [],
+      notIn: globalThis.Array.isArray(object?.notIn)
+        ? object.notIn.map((e: any) => globalThis.Number(e))
+        : [],
+      ignoreEmpty: isSet(object.ignoreEmpty)
+        ? globalThis.Boolean(object.ignoreEmpty)
+        : false,
     };
   },
 
@@ -2160,11 +2233,23 @@ export const DoubleRules: MessageFns<DoubleRules> = {
 };
 
 function createBaseInt32Rules(): Int32Rules {
-  return { const: 0, lt: 0, lte: 0, gt: 0, gte: 0, in: [], notIn: [], ignoreEmpty: false };
+  return {
+    const: 0,
+    lt: 0,
+    lte: 0,
+    gt: 0,
+    gte: 0,
+    in: [],
+    notIn: [],
+    ignoreEmpty: false,
+  };
 }
 
 export const Int32Rules: MessageFns<Int32Rules> = {
-  encode(message: Int32Rules, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    message: Int32Rules,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     if (message.const !== undefined && message.const !== 0) {
       writer.uint32(8).int32(message.const);
     }
@@ -2197,7 +2282,8 @@ export const Int32Rules: MessageFns<Int32Rules> = {
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): Int32Rules {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseInt32Rules();
     while (reader.pos < end) {
@@ -2303,9 +2389,15 @@ export const Int32Rules: MessageFns<Int32Rules> = {
       lte: isSet(object.lte) ? globalThis.Number(object.lte) : 0,
       gt: isSet(object.gt) ? globalThis.Number(object.gt) : 0,
       gte: isSet(object.gte) ? globalThis.Number(object.gte) : 0,
-      in: globalThis.Array.isArray(object?.in) ? object.in.map((e: any) => globalThis.Number(e)) : [],
-      notIn: globalThis.Array.isArray(object?.notIn) ? object.notIn.map((e: any) => globalThis.Number(e)) : [],
-      ignoreEmpty: isSet(object.ignoreEmpty) ? globalThis.Boolean(object.ignoreEmpty) : false,
+      in: globalThis.Array.isArray(object?.in)
+        ? object.in.map((e: any) => globalThis.Number(e))
+        : [],
+      notIn: globalThis.Array.isArray(object?.notIn)
+        ? object.notIn.map((e: any) => globalThis.Number(e))
+        : [],
+      ignoreEmpty: isSet(object.ignoreEmpty)
+        ? globalThis.Boolean(object.ignoreEmpty)
+        : false,
     };
   },
 
@@ -2356,11 +2448,23 @@ export const Int32Rules: MessageFns<Int32Rules> = {
 };
 
 function createBaseInt64Rules(): Int64Rules {
-  return { const: 0, lt: 0, lte: 0, gt: 0, gte: 0, in: [], notIn: [], ignoreEmpty: false };
+  return {
+    const: 0,
+    lt: 0,
+    lte: 0,
+    gt: 0,
+    gte: 0,
+    in: [],
+    notIn: [],
+    ignoreEmpty: false,
+  };
 }
 
 export const Int64Rules: MessageFns<Int64Rules> = {
-  encode(message: Int64Rules, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    message: Int64Rules,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     if (message.const !== undefined && message.const !== 0) {
       writer.uint32(8).int64(message.const);
     }
@@ -2393,7 +2497,8 @@ export const Int64Rules: MessageFns<Int64Rules> = {
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): Int64Rules {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseInt64Rules();
     while (reader.pos < end) {
@@ -2499,9 +2604,15 @@ export const Int64Rules: MessageFns<Int64Rules> = {
       lte: isSet(object.lte) ? globalThis.Number(object.lte) : 0,
       gt: isSet(object.gt) ? globalThis.Number(object.gt) : 0,
       gte: isSet(object.gte) ? globalThis.Number(object.gte) : 0,
-      in: globalThis.Array.isArray(object?.in) ? object.in.map((e: any) => globalThis.Number(e)) : [],
-      notIn: globalThis.Array.isArray(object?.notIn) ? object.notIn.map((e: any) => globalThis.Number(e)) : [],
-      ignoreEmpty: isSet(object.ignoreEmpty) ? globalThis.Boolean(object.ignoreEmpty) : false,
+      in: globalThis.Array.isArray(object?.in)
+        ? object.in.map((e: any) => globalThis.Number(e))
+        : [],
+      notIn: globalThis.Array.isArray(object?.notIn)
+        ? object.notIn.map((e: any) => globalThis.Number(e))
+        : [],
+      ignoreEmpty: isSet(object.ignoreEmpty)
+        ? globalThis.Boolean(object.ignoreEmpty)
+        : false,
     };
   },
 
@@ -2552,11 +2663,23 @@ export const Int64Rules: MessageFns<Int64Rules> = {
 };
 
 function createBaseUInt32Rules(): UInt32Rules {
-  return { const: 0, lt: 0, lte: 0, gt: 0, gte: 0, in: [], notIn: [], ignoreEmpty: false };
+  return {
+    const: 0,
+    lt: 0,
+    lte: 0,
+    gt: 0,
+    gte: 0,
+    in: [],
+    notIn: [],
+    ignoreEmpty: false,
+  };
 }
 
 export const UInt32Rules: MessageFns<UInt32Rules> = {
-  encode(message: UInt32Rules, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    message: UInt32Rules,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     if (message.const !== undefined && message.const !== 0) {
       writer.uint32(8).uint32(message.const);
     }
@@ -2589,7 +2712,8 @@ export const UInt32Rules: MessageFns<UInt32Rules> = {
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): UInt32Rules {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseUInt32Rules();
     while (reader.pos < end) {
@@ -2695,9 +2819,15 @@ export const UInt32Rules: MessageFns<UInt32Rules> = {
       lte: isSet(object.lte) ? globalThis.Number(object.lte) : 0,
       gt: isSet(object.gt) ? globalThis.Number(object.gt) : 0,
       gte: isSet(object.gte) ? globalThis.Number(object.gte) : 0,
-      in: globalThis.Array.isArray(object?.in) ? object.in.map((e: any) => globalThis.Number(e)) : [],
-      notIn: globalThis.Array.isArray(object?.notIn) ? object.notIn.map((e: any) => globalThis.Number(e)) : [],
-      ignoreEmpty: isSet(object.ignoreEmpty) ? globalThis.Boolean(object.ignoreEmpty) : false,
+      in: globalThis.Array.isArray(object?.in)
+        ? object.in.map((e: any) => globalThis.Number(e))
+        : [],
+      notIn: globalThis.Array.isArray(object?.notIn)
+        ? object.notIn.map((e: any) => globalThis.Number(e))
+        : [],
+      ignoreEmpty: isSet(object.ignoreEmpty)
+        ? globalThis.Boolean(object.ignoreEmpty)
+        : false,
     };
   },
 
@@ -2748,11 +2878,23 @@ export const UInt32Rules: MessageFns<UInt32Rules> = {
 };
 
 function createBaseUInt64Rules(): UInt64Rules {
-  return { const: 0, lt: 0, lte: 0, gt: 0, gte: 0, in: [], notIn: [], ignoreEmpty: false };
+  return {
+    const: 0,
+    lt: 0,
+    lte: 0,
+    gt: 0,
+    gte: 0,
+    in: [],
+    notIn: [],
+    ignoreEmpty: false,
+  };
 }
 
 export const UInt64Rules: MessageFns<UInt64Rules> = {
-  encode(message: UInt64Rules, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    message: UInt64Rules,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     if (message.const !== undefined && message.const !== 0) {
       writer.uint32(8).uint64(message.const);
     }
@@ -2785,7 +2927,8 @@ export const UInt64Rules: MessageFns<UInt64Rules> = {
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): UInt64Rules {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseUInt64Rules();
     while (reader.pos < end) {
@@ -2891,9 +3034,15 @@ export const UInt64Rules: MessageFns<UInt64Rules> = {
       lte: isSet(object.lte) ? globalThis.Number(object.lte) : 0,
       gt: isSet(object.gt) ? globalThis.Number(object.gt) : 0,
       gte: isSet(object.gte) ? globalThis.Number(object.gte) : 0,
-      in: globalThis.Array.isArray(object?.in) ? object.in.map((e: any) => globalThis.Number(e)) : [],
-      notIn: globalThis.Array.isArray(object?.notIn) ? object.notIn.map((e: any) => globalThis.Number(e)) : [],
-      ignoreEmpty: isSet(object.ignoreEmpty) ? globalThis.Boolean(object.ignoreEmpty) : false,
+      in: globalThis.Array.isArray(object?.in)
+        ? object.in.map((e: any) => globalThis.Number(e))
+        : [],
+      notIn: globalThis.Array.isArray(object?.notIn)
+        ? object.notIn.map((e: any) => globalThis.Number(e))
+        : [],
+      ignoreEmpty: isSet(object.ignoreEmpty)
+        ? globalThis.Boolean(object.ignoreEmpty)
+        : false,
     };
   },
 
@@ -2944,11 +3093,23 @@ export const UInt64Rules: MessageFns<UInt64Rules> = {
 };
 
 function createBaseSInt32Rules(): SInt32Rules {
-  return { const: 0, lt: 0, lte: 0, gt: 0, gte: 0, in: [], notIn: [], ignoreEmpty: false };
+  return {
+    const: 0,
+    lt: 0,
+    lte: 0,
+    gt: 0,
+    gte: 0,
+    in: [],
+    notIn: [],
+    ignoreEmpty: false,
+  };
 }
 
 export const SInt32Rules: MessageFns<SInt32Rules> = {
-  encode(message: SInt32Rules, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    message: SInt32Rules,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     if (message.const !== undefined && message.const !== 0) {
       writer.uint32(8).sint32(message.const);
     }
@@ -2981,7 +3142,8 @@ export const SInt32Rules: MessageFns<SInt32Rules> = {
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): SInt32Rules {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseSInt32Rules();
     while (reader.pos < end) {
@@ -3087,9 +3249,15 @@ export const SInt32Rules: MessageFns<SInt32Rules> = {
       lte: isSet(object.lte) ? globalThis.Number(object.lte) : 0,
       gt: isSet(object.gt) ? globalThis.Number(object.gt) : 0,
       gte: isSet(object.gte) ? globalThis.Number(object.gte) : 0,
-      in: globalThis.Array.isArray(object?.in) ? object.in.map((e: any) => globalThis.Number(e)) : [],
-      notIn: globalThis.Array.isArray(object?.notIn) ? object.notIn.map((e: any) => globalThis.Number(e)) : [],
-      ignoreEmpty: isSet(object.ignoreEmpty) ? globalThis.Boolean(object.ignoreEmpty) : false,
+      in: globalThis.Array.isArray(object?.in)
+        ? object.in.map((e: any) => globalThis.Number(e))
+        : [],
+      notIn: globalThis.Array.isArray(object?.notIn)
+        ? object.notIn.map((e: any) => globalThis.Number(e))
+        : [],
+      ignoreEmpty: isSet(object.ignoreEmpty)
+        ? globalThis.Boolean(object.ignoreEmpty)
+        : false,
     };
   },
 
@@ -3140,11 +3308,23 @@ export const SInt32Rules: MessageFns<SInt32Rules> = {
 };
 
 function createBaseSInt64Rules(): SInt64Rules {
-  return { const: 0, lt: 0, lte: 0, gt: 0, gte: 0, in: [], notIn: [], ignoreEmpty: false };
+  return {
+    const: 0,
+    lt: 0,
+    lte: 0,
+    gt: 0,
+    gte: 0,
+    in: [],
+    notIn: [],
+    ignoreEmpty: false,
+  };
 }
 
 export const SInt64Rules: MessageFns<SInt64Rules> = {
-  encode(message: SInt64Rules, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    message: SInt64Rules,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     if (message.const !== undefined && message.const !== 0) {
       writer.uint32(8).sint64(message.const);
     }
@@ -3177,7 +3357,8 @@ export const SInt64Rules: MessageFns<SInt64Rules> = {
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): SInt64Rules {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseSInt64Rules();
     while (reader.pos < end) {
@@ -3283,9 +3464,15 @@ export const SInt64Rules: MessageFns<SInt64Rules> = {
       lte: isSet(object.lte) ? globalThis.Number(object.lte) : 0,
       gt: isSet(object.gt) ? globalThis.Number(object.gt) : 0,
       gte: isSet(object.gte) ? globalThis.Number(object.gte) : 0,
-      in: globalThis.Array.isArray(object?.in) ? object.in.map((e: any) => globalThis.Number(e)) : [],
-      notIn: globalThis.Array.isArray(object?.notIn) ? object.notIn.map((e: any) => globalThis.Number(e)) : [],
-      ignoreEmpty: isSet(object.ignoreEmpty) ? globalThis.Boolean(object.ignoreEmpty) : false,
+      in: globalThis.Array.isArray(object?.in)
+        ? object.in.map((e: any) => globalThis.Number(e))
+        : [],
+      notIn: globalThis.Array.isArray(object?.notIn)
+        ? object.notIn.map((e: any) => globalThis.Number(e))
+        : [],
+      ignoreEmpty: isSet(object.ignoreEmpty)
+        ? globalThis.Boolean(object.ignoreEmpty)
+        : false,
     };
   },
 
@@ -3336,11 +3523,23 @@ export const SInt64Rules: MessageFns<SInt64Rules> = {
 };
 
 function createBaseFixed32Rules(): Fixed32Rules {
-  return { const: 0, lt: 0, lte: 0, gt: 0, gte: 0, in: [], notIn: [], ignoreEmpty: false };
+  return {
+    const: 0,
+    lt: 0,
+    lte: 0,
+    gt: 0,
+    gte: 0,
+    in: [],
+    notIn: [],
+    ignoreEmpty: false,
+  };
 }
 
 export const Fixed32Rules: MessageFns<Fixed32Rules> = {
-  encode(message: Fixed32Rules, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    message: Fixed32Rules,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     if (message.const !== undefined && message.const !== 0) {
       writer.uint32(13).fixed32(message.const);
     }
@@ -3373,7 +3572,8 @@ export const Fixed32Rules: MessageFns<Fixed32Rules> = {
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): Fixed32Rules {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseFixed32Rules();
     while (reader.pos < end) {
@@ -3479,9 +3679,15 @@ export const Fixed32Rules: MessageFns<Fixed32Rules> = {
       lte: isSet(object.lte) ? globalThis.Number(object.lte) : 0,
       gt: isSet(object.gt) ? globalThis.Number(object.gt) : 0,
       gte: isSet(object.gte) ? globalThis.Number(object.gte) : 0,
-      in: globalThis.Array.isArray(object?.in) ? object.in.map((e: any) => globalThis.Number(e)) : [],
-      notIn: globalThis.Array.isArray(object?.notIn) ? object.notIn.map((e: any) => globalThis.Number(e)) : [],
-      ignoreEmpty: isSet(object.ignoreEmpty) ? globalThis.Boolean(object.ignoreEmpty) : false,
+      in: globalThis.Array.isArray(object?.in)
+        ? object.in.map((e: any) => globalThis.Number(e))
+        : [],
+      notIn: globalThis.Array.isArray(object?.notIn)
+        ? object.notIn.map((e: any) => globalThis.Number(e))
+        : [],
+      ignoreEmpty: isSet(object.ignoreEmpty)
+        ? globalThis.Boolean(object.ignoreEmpty)
+        : false,
     };
   },
 
@@ -3532,11 +3738,23 @@ export const Fixed32Rules: MessageFns<Fixed32Rules> = {
 };
 
 function createBaseFixed64Rules(): Fixed64Rules {
-  return { const: 0, lt: 0, lte: 0, gt: 0, gte: 0, in: [], notIn: [], ignoreEmpty: false };
+  return {
+    const: 0,
+    lt: 0,
+    lte: 0,
+    gt: 0,
+    gte: 0,
+    in: [],
+    notIn: [],
+    ignoreEmpty: false,
+  };
 }
 
 export const Fixed64Rules: MessageFns<Fixed64Rules> = {
-  encode(message: Fixed64Rules, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    message: Fixed64Rules,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     if (message.const !== undefined && message.const !== 0) {
       writer.uint32(9).fixed64(message.const);
     }
@@ -3569,7 +3787,8 @@ export const Fixed64Rules: MessageFns<Fixed64Rules> = {
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): Fixed64Rules {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseFixed64Rules();
     while (reader.pos < end) {
@@ -3675,9 +3894,15 @@ export const Fixed64Rules: MessageFns<Fixed64Rules> = {
       lte: isSet(object.lte) ? globalThis.Number(object.lte) : 0,
       gt: isSet(object.gt) ? globalThis.Number(object.gt) : 0,
       gte: isSet(object.gte) ? globalThis.Number(object.gte) : 0,
-      in: globalThis.Array.isArray(object?.in) ? object.in.map((e: any) => globalThis.Number(e)) : [],
-      notIn: globalThis.Array.isArray(object?.notIn) ? object.notIn.map((e: any) => globalThis.Number(e)) : [],
-      ignoreEmpty: isSet(object.ignoreEmpty) ? globalThis.Boolean(object.ignoreEmpty) : false,
+      in: globalThis.Array.isArray(object?.in)
+        ? object.in.map((e: any) => globalThis.Number(e))
+        : [],
+      notIn: globalThis.Array.isArray(object?.notIn)
+        ? object.notIn.map((e: any) => globalThis.Number(e))
+        : [],
+      ignoreEmpty: isSet(object.ignoreEmpty)
+        ? globalThis.Boolean(object.ignoreEmpty)
+        : false,
     };
   },
 
@@ -3728,11 +3953,23 @@ export const Fixed64Rules: MessageFns<Fixed64Rules> = {
 };
 
 function createBaseSFixed32Rules(): SFixed32Rules {
-  return { const: 0, lt: 0, lte: 0, gt: 0, gte: 0, in: [], notIn: [], ignoreEmpty: false };
+  return {
+    const: 0,
+    lt: 0,
+    lte: 0,
+    gt: 0,
+    gte: 0,
+    in: [],
+    notIn: [],
+    ignoreEmpty: false,
+  };
 }
 
 export const SFixed32Rules: MessageFns<SFixed32Rules> = {
-  encode(message: SFixed32Rules, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    message: SFixed32Rules,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     if (message.const !== undefined && message.const !== 0) {
       writer.uint32(13).sfixed32(message.const);
     }
@@ -3765,7 +4002,8 @@ export const SFixed32Rules: MessageFns<SFixed32Rules> = {
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): SFixed32Rules {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseSFixed32Rules();
     while (reader.pos < end) {
@@ -3871,9 +4109,15 @@ export const SFixed32Rules: MessageFns<SFixed32Rules> = {
       lte: isSet(object.lte) ? globalThis.Number(object.lte) : 0,
       gt: isSet(object.gt) ? globalThis.Number(object.gt) : 0,
       gte: isSet(object.gte) ? globalThis.Number(object.gte) : 0,
-      in: globalThis.Array.isArray(object?.in) ? object.in.map((e: any) => globalThis.Number(e)) : [],
-      notIn: globalThis.Array.isArray(object?.notIn) ? object.notIn.map((e: any) => globalThis.Number(e)) : [],
-      ignoreEmpty: isSet(object.ignoreEmpty) ? globalThis.Boolean(object.ignoreEmpty) : false,
+      in: globalThis.Array.isArray(object?.in)
+        ? object.in.map((e: any) => globalThis.Number(e))
+        : [],
+      notIn: globalThis.Array.isArray(object?.notIn)
+        ? object.notIn.map((e: any) => globalThis.Number(e))
+        : [],
+      ignoreEmpty: isSet(object.ignoreEmpty)
+        ? globalThis.Boolean(object.ignoreEmpty)
+        : false,
     };
   },
 
@@ -3924,11 +4168,23 @@ export const SFixed32Rules: MessageFns<SFixed32Rules> = {
 };
 
 function createBaseSFixed64Rules(): SFixed64Rules {
-  return { const: 0, lt: 0, lte: 0, gt: 0, gte: 0, in: [], notIn: [], ignoreEmpty: false };
+  return {
+    const: 0,
+    lt: 0,
+    lte: 0,
+    gt: 0,
+    gte: 0,
+    in: [],
+    notIn: [],
+    ignoreEmpty: false,
+  };
 }
 
 export const SFixed64Rules: MessageFns<SFixed64Rules> = {
-  encode(message: SFixed64Rules, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    message: SFixed64Rules,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     if (message.const !== undefined && message.const !== 0) {
       writer.uint32(9).sfixed64(message.const);
     }
@@ -3961,7 +4217,8 @@ export const SFixed64Rules: MessageFns<SFixed64Rules> = {
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): SFixed64Rules {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseSFixed64Rules();
     while (reader.pos < end) {
@@ -4067,9 +4324,15 @@ export const SFixed64Rules: MessageFns<SFixed64Rules> = {
       lte: isSet(object.lte) ? globalThis.Number(object.lte) : 0,
       gt: isSet(object.gt) ? globalThis.Number(object.gt) : 0,
       gte: isSet(object.gte) ? globalThis.Number(object.gte) : 0,
-      in: globalThis.Array.isArray(object?.in) ? object.in.map((e: any) => globalThis.Number(e)) : [],
-      notIn: globalThis.Array.isArray(object?.notIn) ? object.notIn.map((e: any) => globalThis.Number(e)) : [],
-      ignoreEmpty: isSet(object.ignoreEmpty) ? globalThis.Boolean(object.ignoreEmpty) : false,
+      in: globalThis.Array.isArray(object?.in)
+        ? object.in.map((e: any) => globalThis.Number(e))
+        : [],
+      notIn: globalThis.Array.isArray(object?.notIn)
+        ? object.notIn.map((e: any) => globalThis.Number(e))
+        : [],
+      ignoreEmpty: isSet(object.ignoreEmpty)
+        ? globalThis.Boolean(object.ignoreEmpty)
+        : false,
     };
   },
 
@@ -4124,7 +4387,10 @@ function createBaseBoolRules(): BoolRules {
 }
 
 export const BoolRules: MessageFns<BoolRules> = {
-  encode(message: BoolRules, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    message: BoolRules,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     if (message.const !== undefined && message.const !== false) {
       writer.uint32(8).bool(message.const);
     }
@@ -4132,7 +4398,8 @@ export const BoolRules: MessageFns<BoolRules> = {
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): BoolRules {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseBoolRules();
     while (reader.pos < end) {
@@ -4156,7 +4423,9 @@ export const BoolRules: MessageFns<BoolRules> = {
   },
 
   fromJSON(object: any): BoolRules {
-    return { const: isSet(object.const) ? globalThis.Boolean(object.const) : false };
+    return {
+      const: isSet(object.const) ? globalThis.Boolean(object.const) : false,
+    };
   },
 
   toJSON(message: BoolRules): unknown {
@@ -4200,7 +4469,10 @@ function createBaseStringRules(): StringRules {
 }
 
 export const StringRules: MessageFns<StringRules> = {
-  encode(message: StringRules, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    message: StringRules,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     if (message.const !== undefined && message.const !== "") {
       writer.uint32(10).string(message.const);
     }
@@ -4285,7 +4557,8 @@ export const StringRules: MessageFns<StringRules> = {
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): StringRules {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseStringRules();
     while (reader.pos < end) {
@@ -4480,7 +4753,10 @@ export const StringRules: MessageFns<StringRules> = {
             break;
           }
 
-          message.wellKnown = { $case: "wellKnownRegex", wellKnownRegex: reader.int32() as any };
+          message.wellKnown = {
+            $case: "wellKnownRegex",
+            wellKnownRegex: reader.int32() as any,
+          };
           continue;
         }
         case 25: {
@@ -4520,33 +4796,57 @@ export const StringRules: MessageFns<StringRules> = {
       pattern: isSet(object.pattern) ? globalThis.String(object.pattern) : "",
       prefix: isSet(object.prefix) ? globalThis.String(object.prefix) : "",
       suffix: isSet(object.suffix) ? globalThis.String(object.suffix) : "",
-      contains: isSet(object.contains) ? globalThis.String(object.contains) : "",
-      notContains: isSet(object.notContains) ? globalThis.String(object.notContains) : "",
-      in: globalThis.Array.isArray(object?.in) ? object.in.map((e: any) => globalThis.String(e)) : [],
-      notIn: globalThis.Array.isArray(object?.notIn) ? object.notIn.map((e: any) => globalThis.String(e)) : [],
+      contains: isSet(object.contains)
+        ? globalThis.String(object.contains)
+        : "",
+      notContains: isSet(object.notContains)
+        ? globalThis.String(object.notContains)
+        : "",
+      in: globalThis.Array.isArray(object?.in)
+        ? object.in.map((e: any) => globalThis.String(e))
+        : [],
+      notIn: globalThis.Array.isArray(object?.notIn)
+        ? object.notIn.map((e: any) => globalThis.String(e))
+        : [],
       wellKnown: isSet(object.email)
         ? { $case: "email", email: globalThis.Boolean(object.email) }
         : isSet(object.hostname)
-        ? { $case: "hostname", hostname: globalThis.Boolean(object.hostname) }
-        : isSet(object.ip)
-        ? { $case: "ip", ip: globalThis.Boolean(object.ip) }
-        : isSet(object.ipv4)
-        ? { $case: "ipv4", ipv4: globalThis.Boolean(object.ipv4) }
-        : isSet(object.ipv6)
-        ? { $case: "ipv6", ipv6: globalThis.Boolean(object.ipv6) }
-        : isSet(object.uri)
-        ? { $case: "uri", uri: globalThis.Boolean(object.uri) }
-        : isSet(object.uriRef)
-        ? { $case: "uriRef", uriRef: globalThis.Boolean(object.uriRef) }
-        : isSet(object.address)
-        ? { $case: "address", address: globalThis.Boolean(object.address) }
-        : isSet(object.uuid)
-        ? { $case: "uuid", uuid: globalThis.Boolean(object.uuid) }
-        : isSet(object.wellKnownRegex)
-        ? { $case: "wellKnownRegex", wellKnownRegex: knownRegexFromJSON(object.wellKnownRegex) }
-        : undefined,
+          ? { $case: "hostname", hostname: globalThis.Boolean(object.hostname) }
+          : isSet(object.ip)
+            ? { $case: "ip", ip: globalThis.Boolean(object.ip) }
+            : isSet(object.ipv4)
+              ? { $case: "ipv4", ipv4: globalThis.Boolean(object.ipv4) }
+              : isSet(object.ipv6)
+                ? { $case: "ipv6", ipv6: globalThis.Boolean(object.ipv6) }
+                : isSet(object.uri)
+                  ? { $case: "uri", uri: globalThis.Boolean(object.uri) }
+                  : isSet(object.uriRef)
+                    ? {
+                        $case: "uriRef",
+                        uriRef: globalThis.Boolean(object.uriRef),
+                      }
+                    : isSet(object.address)
+                      ? {
+                          $case: "address",
+                          address: globalThis.Boolean(object.address),
+                        }
+                      : isSet(object.uuid)
+                        ? {
+                            $case: "uuid",
+                            uuid: globalThis.Boolean(object.uuid),
+                          }
+                        : isSet(object.wellKnownRegex)
+                          ? {
+                              $case: "wellKnownRegex",
+                              wellKnownRegex: knownRegexFromJSON(
+                                object.wellKnownRegex,
+                              ),
+                            }
+                          : undefined,
       strict: isSet(object.strict) ? globalThis.Boolean(object.strict) : true,
-      ignoreEmpty: isSet(object.ignoreEmpty) ? globalThis.Boolean(object.ignoreEmpty) : false,
+      ignoreEmpty: isSet(object.ignoreEmpty)
+        ? globalThis.Boolean(object.ignoreEmpty)
+        : false,
     };
   },
 
@@ -4645,62 +4945,104 @@ export const StringRules: MessageFns<StringRules> = {
     message.notIn = object.notIn?.map((e) => e) || [];
     switch (object.wellKnown?.$case) {
       case "email": {
-        if (object.wellKnown?.email !== undefined && object.wellKnown?.email !== null) {
+        if (
+          object.wellKnown?.email !== undefined &&
+          object.wellKnown?.email !== null
+        ) {
           message.wellKnown = { $case: "email", email: object.wellKnown.email };
         }
         break;
       }
       case "hostname": {
-        if (object.wellKnown?.hostname !== undefined && object.wellKnown?.hostname !== null) {
-          message.wellKnown = { $case: "hostname", hostname: object.wellKnown.hostname };
+        if (
+          object.wellKnown?.hostname !== undefined &&
+          object.wellKnown?.hostname !== null
+        ) {
+          message.wellKnown = {
+            $case: "hostname",
+            hostname: object.wellKnown.hostname,
+          };
         }
         break;
       }
       case "ip": {
-        if (object.wellKnown?.ip !== undefined && object.wellKnown?.ip !== null) {
+        if (
+          object.wellKnown?.ip !== undefined &&
+          object.wellKnown?.ip !== null
+        ) {
           message.wellKnown = { $case: "ip", ip: object.wellKnown.ip };
         }
         break;
       }
       case "ipv4": {
-        if (object.wellKnown?.ipv4 !== undefined && object.wellKnown?.ipv4 !== null) {
+        if (
+          object.wellKnown?.ipv4 !== undefined &&
+          object.wellKnown?.ipv4 !== null
+        ) {
           message.wellKnown = { $case: "ipv4", ipv4: object.wellKnown.ipv4 };
         }
         break;
       }
       case "ipv6": {
-        if (object.wellKnown?.ipv6 !== undefined && object.wellKnown?.ipv6 !== null) {
+        if (
+          object.wellKnown?.ipv6 !== undefined &&
+          object.wellKnown?.ipv6 !== null
+        ) {
           message.wellKnown = { $case: "ipv6", ipv6: object.wellKnown.ipv6 };
         }
         break;
       }
       case "uri": {
-        if (object.wellKnown?.uri !== undefined && object.wellKnown?.uri !== null) {
+        if (
+          object.wellKnown?.uri !== undefined &&
+          object.wellKnown?.uri !== null
+        ) {
           message.wellKnown = { $case: "uri", uri: object.wellKnown.uri };
         }
         break;
       }
       case "uriRef": {
-        if (object.wellKnown?.uriRef !== undefined && object.wellKnown?.uriRef !== null) {
-          message.wellKnown = { $case: "uriRef", uriRef: object.wellKnown.uriRef };
+        if (
+          object.wellKnown?.uriRef !== undefined &&
+          object.wellKnown?.uriRef !== null
+        ) {
+          message.wellKnown = {
+            $case: "uriRef",
+            uriRef: object.wellKnown.uriRef,
+          };
         }
         break;
       }
       case "address": {
-        if (object.wellKnown?.address !== undefined && object.wellKnown?.address !== null) {
-          message.wellKnown = { $case: "address", address: object.wellKnown.address };
+        if (
+          object.wellKnown?.address !== undefined &&
+          object.wellKnown?.address !== null
+        ) {
+          message.wellKnown = {
+            $case: "address",
+            address: object.wellKnown.address,
+          };
         }
         break;
       }
       case "uuid": {
-        if (object.wellKnown?.uuid !== undefined && object.wellKnown?.uuid !== null) {
+        if (
+          object.wellKnown?.uuid !== undefined &&
+          object.wellKnown?.uuid !== null
+        ) {
           message.wellKnown = { $case: "uuid", uuid: object.wellKnown.uuid };
         }
         break;
       }
       case "wellKnownRegex": {
-        if (object.wellKnown?.wellKnownRegex !== undefined && object.wellKnown?.wellKnownRegex !== null) {
-          message.wellKnown = { $case: "wellKnownRegex", wellKnownRegex: object.wellKnown.wellKnownRegex };
+        if (
+          object.wellKnown?.wellKnownRegex !== undefined &&
+          object.wellKnown?.wellKnownRegex !== null
+        ) {
+          message.wellKnown = {
+            $case: "wellKnownRegex",
+            wellKnownRegex: object.wellKnown.wellKnownRegex,
+          };
         }
         break;
       }
@@ -4729,7 +5071,10 @@ function createBaseBytesRules(): BytesRules {
 }
 
 export const BytesRules: MessageFns<BytesRules> = {
-  encode(message: BytesRules, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    message: BytesRules,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     if (message.const !== undefined && message.const.length !== 0) {
       writer.uint32(10).bytes(message.const);
     }
@@ -4778,7 +5123,8 @@ export const BytesRules: MessageFns<BytesRules> = {
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): BytesRules {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseBytesRules();
     while (reader.pos < end) {
@@ -4907,24 +5253,38 @@ export const BytesRules: MessageFns<BytesRules> = {
 
   fromJSON(object: any): BytesRules {
     return {
-      const: isSet(object.const) ? bytesFromBase64(object.const) : new Uint8Array(0),
+      const: isSet(object.const)
+        ? bytesFromBase64(object.const)
+        : new Uint8Array(0),
       len: isSet(object.len) ? globalThis.Number(object.len) : 0,
       minLen: isSet(object.minLen) ? globalThis.Number(object.minLen) : 0,
       maxLen: isSet(object.maxLen) ? globalThis.Number(object.maxLen) : 0,
       pattern: isSet(object.pattern) ? globalThis.String(object.pattern) : "",
-      prefix: isSet(object.prefix) ? bytesFromBase64(object.prefix) : new Uint8Array(0),
-      suffix: isSet(object.suffix) ? bytesFromBase64(object.suffix) : new Uint8Array(0),
-      contains: isSet(object.contains) ? bytesFromBase64(object.contains) : new Uint8Array(0),
-      in: globalThis.Array.isArray(object?.in) ? object.in.map((e: any) => bytesFromBase64(e)) : [],
-      notIn: globalThis.Array.isArray(object?.notIn) ? object.notIn.map((e: any) => bytesFromBase64(e)) : [],
+      prefix: isSet(object.prefix)
+        ? bytesFromBase64(object.prefix)
+        : new Uint8Array(0),
+      suffix: isSet(object.suffix)
+        ? bytesFromBase64(object.suffix)
+        : new Uint8Array(0),
+      contains: isSet(object.contains)
+        ? bytesFromBase64(object.contains)
+        : new Uint8Array(0),
+      in: globalThis.Array.isArray(object?.in)
+        ? object.in.map((e: any) => bytesFromBase64(e))
+        : [],
+      notIn: globalThis.Array.isArray(object?.notIn)
+        ? object.notIn.map((e: any) => bytesFromBase64(e))
+        : [],
       wellKnown: isSet(object.ip)
         ? { $case: "ip", ip: globalThis.Boolean(object.ip) }
         : isSet(object.ipv4)
-        ? { $case: "ipv4", ipv4: globalThis.Boolean(object.ipv4) }
-        : isSet(object.ipv6)
-        ? { $case: "ipv6", ipv6: globalThis.Boolean(object.ipv6) }
-        : undefined,
-      ignoreEmpty: isSet(object.ignoreEmpty) ? globalThis.Boolean(object.ignoreEmpty) : false,
+          ? { $case: "ipv4", ipv4: globalThis.Boolean(object.ipv4) }
+          : isSet(object.ipv6)
+            ? { $case: "ipv6", ipv6: globalThis.Boolean(object.ipv6) }
+            : undefined,
+      ignoreEmpty: isSet(object.ignoreEmpty)
+        ? globalThis.Boolean(object.ignoreEmpty)
+        : false,
     };
   },
 
@@ -4990,19 +5350,28 @@ export const BytesRules: MessageFns<BytesRules> = {
     message.notIn = object.notIn?.map((e) => e) || [];
     switch (object.wellKnown?.$case) {
       case "ip": {
-        if (object.wellKnown?.ip !== undefined && object.wellKnown?.ip !== null) {
+        if (
+          object.wellKnown?.ip !== undefined &&
+          object.wellKnown?.ip !== null
+        ) {
           message.wellKnown = { $case: "ip", ip: object.wellKnown.ip };
         }
         break;
       }
       case "ipv4": {
-        if (object.wellKnown?.ipv4 !== undefined && object.wellKnown?.ipv4 !== null) {
+        if (
+          object.wellKnown?.ipv4 !== undefined &&
+          object.wellKnown?.ipv4 !== null
+        ) {
           message.wellKnown = { $case: "ipv4", ipv4: object.wellKnown.ipv4 };
         }
         break;
       }
       case "ipv6": {
-        if (object.wellKnown?.ipv6 !== undefined && object.wellKnown?.ipv6 !== null) {
+        if (
+          object.wellKnown?.ipv6 !== undefined &&
+          object.wellKnown?.ipv6 !== null
+        ) {
           message.wellKnown = { $case: "ipv6", ipv6: object.wellKnown.ipv6 };
         }
         break;
@@ -5018,7 +5387,10 @@ function createBaseEnumRules(): EnumRules {
 }
 
 export const EnumRules: MessageFns<EnumRules> = {
-  encode(message: EnumRules, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    message: EnumRules,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     if (message.const !== undefined && message.const !== 0) {
       writer.uint32(8).int32(message.const);
     }
@@ -5039,7 +5411,8 @@ export const EnumRules: MessageFns<EnumRules> = {
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): EnumRules {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseEnumRules();
     while (reader.pos < end) {
@@ -5109,9 +5482,15 @@ export const EnumRules: MessageFns<EnumRules> = {
   fromJSON(object: any): EnumRules {
     return {
       const: isSet(object.const) ? globalThis.Number(object.const) : 0,
-      definedOnly: isSet(object.definedOnly) ? globalThis.Boolean(object.definedOnly) : false,
-      in: globalThis.Array.isArray(object?.in) ? object.in.map((e: any) => globalThis.Number(e)) : [],
-      notIn: globalThis.Array.isArray(object?.notIn) ? object.notIn.map((e: any) => globalThis.Number(e)) : [],
+      definedOnly: isSet(object.definedOnly)
+        ? globalThis.Boolean(object.definedOnly)
+        : false,
+      in: globalThis.Array.isArray(object?.in)
+        ? object.in.map((e: any) => globalThis.Number(e))
+        : [],
+      notIn: globalThis.Array.isArray(object?.notIn)
+        ? object.notIn.map((e: any) => globalThis.Number(e))
+        : [],
     };
   },
 
@@ -5150,7 +5529,10 @@ function createBaseMessageRules(): MessageRules {
 }
 
 export const MessageRules: MessageFns<MessageRules> = {
-  encode(message: MessageRules, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    message: MessageRules,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     if (message.skip !== undefined && message.skip !== false) {
       writer.uint32(8).bool(message.skip);
     }
@@ -5161,7 +5543,8 @@ export const MessageRules: MessageFns<MessageRules> = {
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): MessageRules {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseMessageRules();
     while (reader.pos < end) {
@@ -5195,7 +5578,9 @@ export const MessageRules: MessageFns<MessageRules> = {
   fromJSON(object: any): MessageRules {
     return {
       skip: isSet(object.skip) ? globalThis.Boolean(object.skip) : false,
-      required: isSet(object.required) ? globalThis.Boolean(object.required) : false,
+      required: isSet(object.required)
+        ? globalThis.Boolean(object.required)
+        : false,
     };
   },
 
@@ -5222,11 +5607,20 @@ export const MessageRules: MessageFns<MessageRules> = {
 };
 
 function createBaseRepeatedRules(): RepeatedRules {
-  return { minItems: 0, maxItems: 0, unique: false, items: undefined, ignoreEmpty: false };
+  return {
+    minItems: 0,
+    maxItems: 0,
+    unique: false,
+    items: undefined,
+    ignoreEmpty: false,
+  };
 }
 
 export const RepeatedRules: MessageFns<RepeatedRules> = {
-  encode(message: RepeatedRules, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    message: RepeatedRules,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     if (message.minItems !== undefined && message.minItems !== 0) {
       writer.uint32(8).uint64(message.minItems);
     }
@@ -5246,7 +5640,8 @@ export const RepeatedRules: MessageFns<RepeatedRules> = {
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): RepeatedRules {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseRepeatedRules();
     while (reader.pos < end) {
@@ -5306,8 +5701,12 @@ export const RepeatedRules: MessageFns<RepeatedRules> = {
       minItems: isSet(object.minItems) ? globalThis.Number(object.minItems) : 0,
       maxItems: isSet(object.maxItems) ? globalThis.Number(object.maxItems) : 0,
       unique: isSet(object.unique) ? globalThis.Boolean(object.unique) : false,
-      items: isSet(object.items) ? FieldRules.fromJSON(object.items) : undefined,
-      ignoreEmpty: isSet(object.ignoreEmpty) ? globalThis.Boolean(object.ignoreEmpty) : false,
+      items: isSet(object.items)
+        ? FieldRules.fromJSON(object.items)
+        : undefined,
+      ignoreEmpty: isSet(object.ignoreEmpty)
+        ? globalThis.Boolean(object.ignoreEmpty)
+        : false,
     };
   },
 
@@ -5339,20 +5738,31 @@ export const RepeatedRules: MessageFns<RepeatedRules> = {
     message.minItems = object.minItems ?? 0;
     message.maxItems = object.maxItems ?? 0;
     message.unique = object.unique ?? false;
-    message.items = (object.items !== undefined && object.items !== null)
-      ? FieldRules.fromPartial(object.items)
-      : undefined;
+    message.items =
+      object.items !== undefined && object.items !== null
+        ? FieldRules.fromPartial(object.items)
+        : undefined;
     message.ignoreEmpty = object.ignoreEmpty ?? false;
     return message;
   },
 };
 
 function createBaseMapRules(): MapRules {
-  return { minPairs: 0, maxPairs: 0, noSparse: false, keys: undefined, values: undefined, ignoreEmpty: false };
+  return {
+    minPairs: 0,
+    maxPairs: 0,
+    noSparse: false,
+    keys: undefined,
+    values: undefined,
+    ignoreEmpty: false,
+  };
 }
 
 export const MapRules: MessageFns<MapRules> = {
-  encode(message: MapRules, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    message: MapRules,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     if (message.minPairs !== undefined && message.minPairs !== 0) {
       writer.uint32(8).uint64(message.minPairs);
     }
@@ -5375,7 +5785,8 @@ export const MapRules: MessageFns<MapRules> = {
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): MapRules {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseMapRules();
     while (reader.pos < end) {
@@ -5442,10 +5853,16 @@ export const MapRules: MessageFns<MapRules> = {
     return {
       minPairs: isSet(object.minPairs) ? globalThis.Number(object.minPairs) : 0,
       maxPairs: isSet(object.maxPairs) ? globalThis.Number(object.maxPairs) : 0,
-      noSparse: isSet(object.noSparse) ? globalThis.Boolean(object.noSparse) : false,
+      noSparse: isSet(object.noSparse)
+        ? globalThis.Boolean(object.noSparse)
+        : false,
       keys: isSet(object.keys) ? FieldRules.fromJSON(object.keys) : undefined,
-      values: isSet(object.values) ? FieldRules.fromJSON(object.values) : undefined,
-      ignoreEmpty: isSet(object.ignoreEmpty) ? globalThis.Boolean(object.ignoreEmpty) : false,
+      values: isSet(object.values)
+        ? FieldRules.fromJSON(object.values)
+        : undefined,
+      ignoreEmpty: isSet(object.ignoreEmpty)
+        ? globalThis.Boolean(object.ignoreEmpty)
+        : false,
     };
   },
 
@@ -5480,12 +5897,14 @@ export const MapRules: MessageFns<MapRules> = {
     message.minPairs = object.minPairs ?? 0;
     message.maxPairs = object.maxPairs ?? 0;
     message.noSparse = object.noSparse ?? false;
-    message.keys = (object.keys !== undefined && object.keys !== null)
-      ? FieldRules.fromPartial(object.keys)
-      : undefined;
-    message.values = (object.values !== undefined && object.values !== null)
-      ? FieldRules.fromPartial(object.values)
-      : undefined;
+    message.keys =
+      object.keys !== undefined && object.keys !== null
+        ? FieldRules.fromPartial(object.keys)
+        : undefined;
+    message.values =
+      object.values !== undefined && object.values !== null
+        ? FieldRules.fromPartial(object.values)
+        : undefined;
     message.ignoreEmpty = object.ignoreEmpty ?? false;
     return message;
   },
@@ -5496,7 +5915,10 @@ function createBaseAnyRules(): AnyRules {
 }
 
 export const AnyRules: MessageFns<AnyRules> = {
-  encode(message: AnyRules, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    message: AnyRules,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     if (message.required !== undefined && message.required !== false) {
       writer.uint32(8).bool(message.required);
     }
@@ -5510,7 +5932,8 @@ export const AnyRules: MessageFns<AnyRules> = {
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): AnyRules {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseAnyRules();
     while (reader.pos < end) {
@@ -5551,9 +5974,15 @@ export const AnyRules: MessageFns<AnyRules> = {
 
   fromJSON(object: any): AnyRules {
     return {
-      required: isSet(object.required) ? globalThis.Boolean(object.required) : false,
-      in: globalThis.Array.isArray(object?.in) ? object.in.map((e: any) => globalThis.String(e)) : [],
-      notIn: globalThis.Array.isArray(object?.notIn) ? object.notIn.map((e: any) => globalThis.String(e)) : [],
+      required: isSet(object.required)
+        ? globalThis.Boolean(object.required)
+        : false,
+      in: globalThis.Array.isArray(object?.in)
+        ? object.in.map((e: any) => globalThis.String(e))
+        : [],
+      notIn: globalThis.Array.isArray(object?.notIn)
+        ? object.notIn.map((e: any) => globalThis.String(e))
+        : [],
     };
   },
 
@@ -5597,7 +6026,10 @@ function createBaseDurationRules(): DurationRules {
 }
 
 export const DurationRules: MessageFns<DurationRules> = {
-  encode(message: DurationRules, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    message: DurationRules,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     if (message.required !== undefined && message.required !== false) {
       writer.uint32(8).bool(message.required);
     }
@@ -5626,7 +6058,8 @@ export const DurationRules: MessageFns<DurationRules> = {
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): DurationRules {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseDurationRules();
     while (reader.pos < end) {
@@ -5707,14 +6140,20 @@ export const DurationRules: MessageFns<DurationRules> = {
 
   fromJSON(object: any): DurationRules {
     return {
-      required: isSet(object.required) ? globalThis.Boolean(object.required) : false,
+      required: isSet(object.required)
+        ? globalThis.Boolean(object.required)
+        : false,
       const: isSet(object.const) ? Duration.fromJSON(object.const) : undefined,
       lt: isSet(object.lt) ? Duration.fromJSON(object.lt) : undefined,
       lte: isSet(object.lte) ? Duration.fromJSON(object.lte) : undefined,
       gt: isSet(object.gt) ? Duration.fromJSON(object.gt) : undefined,
       gte: isSet(object.gte) ? Duration.fromJSON(object.gte) : undefined,
-      in: globalThis.Array.isArray(object?.in) ? object.in.map((e: any) => Duration.fromJSON(e)) : [],
-      notIn: globalThis.Array.isArray(object?.notIn) ? object.notIn.map((e: any) => Duration.fromJSON(e)) : [],
+      in: globalThis.Array.isArray(object?.in)
+        ? object.in.map((e: any) => Duration.fromJSON(e))
+        : [],
+      notIn: globalThis.Array.isArray(object?.notIn)
+        ? object.notIn.map((e: any) => Duration.fromJSON(e))
+        : [],
     };
   },
 
@@ -5753,13 +6192,26 @@ export const DurationRules: MessageFns<DurationRules> = {
   fromPartial(object: DeepPartial<DurationRules>): DurationRules {
     const message = createBaseDurationRules();
     message.required = object.required ?? false;
-    message.const = (object.const !== undefined && object.const !== null)
-      ? Duration.fromPartial(object.const)
-      : undefined;
-    message.lt = (object.lt !== undefined && object.lt !== null) ? Duration.fromPartial(object.lt) : undefined;
-    message.lte = (object.lte !== undefined && object.lte !== null) ? Duration.fromPartial(object.lte) : undefined;
-    message.gt = (object.gt !== undefined && object.gt !== null) ? Duration.fromPartial(object.gt) : undefined;
-    message.gte = (object.gte !== undefined && object.gte !== null) ? Duration.fromPartial(object.gte) : undefined;
+    message.const =
+      object.const !== undefined && object.const !== null
+        ? Duration.fromPartial(object.const)
+        : undefined;
+    message.lt =
+      object.lt !== undefined && object.lt !== null
+        ? Duration.fromPartial(object.lt)
+        : undefined;
+    message.lte =
+      object.lte !== undefined && object.lte !== null
+        ? Duration.fromPartial(object.lte)
+        : undefined;
+    message.gt =
+      object.gt !== undefined && object.gt !== null
+        ? Duration.fromPartial(object.gt)
+        : undefined;
+    message.gte =
+      object.gte !== undefined && object.gte !== null
+        ? Duration.fromPartial(object.gte)
+        : undefined;
     message.in = object.in?.map((e) => Duration.fromPartial(e)) || [];
     message.notIn = object.notIn?.map((e) => Duration.fromPartial(e)) || [];
     return message;
@@ -5781,24 +6233,42 @@ function createBaseTimestampRules(): TimestampRules {
 }
 
 export const TimestampRules: MessageFns<TimestampRules> = {
-  encode(message: TimestampRules, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    message: TimestampRules,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     if (message.required !== undefined && message.required !== false) {
       writer.uint32(8).bool(message.required);
     }
     if (message.const !== undefined) {
-      Timestamp.encode(toTimestamp(message.const), writer.uint32(18).fork()).join();
+      Timestamp.encode(
+        toTimestamp(message.const),
+        writer.uint32(18).fork(),
+      ).join();
     }
     if (message.lt !== undefined) {
-      Timestamp.encode(toTimestamp(message.lt), writer.uint32(26).fork()).join();
+      Timestamp.encode(
+        toTimestamp(message.lt),
+        writer.uint32(26).fork(),
+      ).join();
     }
     if (message.lte !== undefined) {
-      Timestamp.encode(toTimestamp(message.lte), writer.uint32(34).fork()).join();
+      Timestamp.encode(
+        toTimestamp(message.lte),
+        writer.uint32(34).fork(),
+      ).join();
     }
     if (message.gt !== undefined) {
-      Timestamp.encode(toTimestamp(message.gt), writer.uint32(42).fork()).join();
+      Timestamp.encode(
+        toTimestamp(message.gt),
+        writer.uint32(42).fork(),
+      ).join();
     }
     if (message.gte !== undefined) {
-      Timestamp.encode(toTimestamp(message.gte), writer.uint32(50).fork()).join();
+      Timestamp.encode(
+        toTimestamp(message.gte),
+        writer.uint32(50).fork(),
+      ).join();
     }
     if (message.ltNow !== undefined && message.ltNow !== false) {
       writer.uint32(56).bool(message.ltNow);
@@ -5813,7 +6283,8 @@ export const TimestampRules: MessageFns<TimestampRules> = {
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): TimestampRules {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseTimestampRules();
     while (reader.pos < end) {
@@ -5832,7 +6303,9 @@ export const TimestampRules: MessageFns<TimestampRules> = {
             break;
           }
 
-          message.const = fromTimestamp(Timestamp.decode(reader, reader.uint32()));
+          message.const = fromTimestamp(
+            Timestamp.decode(reader, reader.uint32()),
+          );
           continue;
         }
         case 3: {
@@ -5848,7 +6321,9 @@ export const TimestampRules: MessageFns<TimestampRules> = {
             break;
           }
 
-          message.lte = fromTimestamp(Timestamp.decode(reader, reader.uint32()));
+          message.lte = fromTimestamp(
+            Timestamp.decode(reader, reader.uint32()),
+          );
           continue;
         }
         case 5: {
@@ -5864,7 +6339,9 @@ export const TimestampRules: MessageFns<TimestampRules> = {
             break;
           }
 
-          message.gte = fromTimestamp(Timestamp.decode(reader, reader.uint32()));
+          message.gte = fromTimestamp(
+            Timestamp.decode(reader, reader.uint32()),
+          );
           continue;
         }
         case 7: {
@@ -5902,7 +6379,9 @@ export const TimestampRules: MessageFns<TimestampRules> = {
 
   fromJSON(object: any): TimestampRules {
     return {
-      required: isSet(object.required) ? globalThis.Boolean(object.required) : false,
+      required: isSet(object.required)
+        ? globalThis.Boolean(object.required)
+        : false,
       const: isSet(object.const) ? fromJsonTimestamp(object.const) : undefined,
       lt: isSet(object.lt) ? fromJsonTimestamp(object.lt) : undefined,
       lte: isSet(object.lte) ? fromJsonTimestamp(object.lte) : undefined,
@@ -5910,7 +6389,9 @@ export const TimestampRules: MessageFns<TimestampRules> = {
       gte: isSet(object.gte) ? fromJsonTimestamp(object.gte) : undefined,
       ltNow: isSet(object.ltNow) ? globalThis.Boolean(object.ltNow) : false,
       gtNow: isSet(object.gtNow) ? globalThis.Boolean(object.gtNow) : false,
-      within: isSet(object.within) ? Duration.fromJSON(object.within) : undefined,
+      within: isSet(object.within)
+        ? Duration.fromJSON(object.within)
+        : undefined,
     };
   },
 
@@ -5959,9 +6440,10 @@ export const TimestampRules: MessageFns<TimestampRules> = {
     message.gte = object.gte ?? undefined;
     message.ltNow = object.ltNow ?? false;
     message.gtNow = object.gtNow ?? false;
-    message.within = (object.within !== undefined && object.within !== null)
-      ? Duration.fromPartial(object.within)
-      : undefined;
+    message.within =
+      object.within !== undefined && object.within !== null
+        ? Duration.fromPartial(object.within)
+        : undefined;
     return message;
   },
 };
@@ -5991,14 +6473,28 @@ function base64FromBytes(arr: Uint8Array): string {
   }
 }
 
-type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
+type Builtin =
+  | Date
+  | Function
+  | Uint8Array
+  | string
+  | number
+  | boolean
+  | undefined;
 
-export type DeepPartial<T> = T extends Builtin ? T
-  : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>>
-  : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>>
-  : T extends { $case: string } ? { [K in keyof Omit<T, "$case">]?: DeepPartial<T[K]> } & { $case: T["$case"] }
-  : T extends {} ? { [K in keyof T]?: DeepPartial<T[K]> }
-  : Partial<T>;
+export type DeepPartial<T> = T extends Builtin
+  ? T
+  : T extends globalThis.Array<infer U>
+    ? globalThis.Array<DeepPartial<U>>
+    : T extends ReadonlyArray<infer U>
+      ? ReadonlyArray<DeepPartial<U>>
+      : T extends { $case: string }
+        ? { [K in keyof Omit<T, "$case">]?: DeepPartial<T[K]> } & {
+            $case: T["$case"];
+          }
+        : T extends {}
+          ? { [K in keyof T]?: DeepPartial<T[K]> }
+          : Partial<T>;
 
 function toTimestamp(date: Date): Timestamp {
   const seconds = Math.trunc(date.getTime() / 1_000);

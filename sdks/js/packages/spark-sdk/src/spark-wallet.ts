@@ -1580,18 +1580,22 @@ export class SparkWallet {
       );
 
     const filteredTokenOutputs = unsortedTokenOutputs.filter(
-      (output) => !this.pendingWithdrawnOutputIds.includes(output.output?.id || ""),
+      (output) =>
+        !this.pendingWithdrawnOutputIds.includes(output.output?.id || ""),
     );
 
     const fetchedOutputIds = new Set(
       unsortedTokenOutputs.map((output) => output.output?.id).filter(Boolean),
     );
-    this.pendingWithdrawnOutputIds = this.pendingWithdrawnOutputIds.filter((id) =>
-      fetchedOutputIds.has(id),
+    this.pendingWithdrawnOutputIds = this.pendingWithdrawnOutputIds.filter(
+      (id) => fetchedOutputIds.has(id),
     );
 
     // Group leaves by token key
-    const groupedOutputs = new Map<string, OutputWithPreviousTransactionData[]>();
+    const groupedOutputs = new Map<
+      string,
+      OutputWithPreviousTransactionData[]
+    >();
 
     filteredTokenOutputs.forEach((output) => {
       const tokenKey = bytesToHex(output.output!.tokenPublicKey!);

@@ -107,9 +107,7 @@ describe("coop exit", () => {
 
     let connectorP2trAddrs: string[] = [];
     for (let i = 0; i < leafCount + 1; i++) {
-      const connectorPubKey = await userWallet
-        .getSigner()
-        .generatePublicKey();
+      const connectorPubKey = await userWallet.getSigner().generatePublicKey();
       const connectorP2trAddr = getP2TRAddressFromPublicKey(
         connectorPubKey,
         Network.LOCAL,
@@ -146,14 +144,12 @@ describe("coop exit", () => {
       newSigningPubKey: newLeafPubKey,
     };
 
-    const senderTransfer = await coopExitService.getConnectorRefundSignatures(
-      {
-        leaves: [transferNode],
-        exitTxId: hexToBytes(getTxIdNoReverse(exitTx)),
-        connectorOutputs,
-        receiverPubKey: hexToBytes(sspPubkey),
-      },
-    );
+    const senderTransfer = await coopExitService.getConnectorRefundSignatures({
+      leaves: [transferNode],
+      exitTxId: hexToBytes(getTxIdNoReverse(exitTx)),
+      connectorOutputs,
+      receiverPubKey: hexToBytes(sspPubkey),
+    });
 
     const pendingTransfer = await sspWallet.queryPendingTransfers();
 
@@ -187,10 +183,7 @@ describe("coop exit", () => {
 
     let hasError = false;
     try {
-      await sspTransferService.claimTransfer(
-        receiverTransfer!,
-        leavesToClaim,
-      );
+      await sspTransferService.claimTransfer(receiverTransfer!, leavesToClaim);
     } catch (e) {
       hasError = true;
     }
@@ -218,7 +211,5 @@ describe("coop exit", () => {
 
     // Claim leaf
     await sspTransferService.claimTransfer(receiverTransfer!, leavesToClaim);
-  },
-    30000,
-  );
+  }, 30000);
 });

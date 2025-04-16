@@ -37,15 +37,8 @@ describe("Tree Creation", () => {
       depositTx,
     );
 
-    const treeNodes = await wallet.createTree(
-      vout,
-      treeResp,
-      true,
-      depositTx,
-    );
+    const treeNodes = await wallet.createTree(vout, treeResp, true, depositTx);
 
     console.log("tree nodes:", treeNodes);
-  },
-    30000,
-  );
+  }, 30000);
 });

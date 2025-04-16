@@ -142,7 +142,10 @@ export class TokenTransactionService {
     } else if (tokenTransaction.tokenInputs!.$case === "transferInput") {
       const transferInput = tokenTransaction.tokenInputs!.transferInput;
 
-      if (!outputsToSpendSigningPublicKeys || !outputsToSpendRevocationPublicKeys) {
+      if (
+        !outputsToSpendSigningPublicKeys ||
+        !outputsToSpendRevocationPublicKeys
+      ) {
         throw new Error(
           "outputs to spend signing public keys and outputs to spend revocation public keys are required",
         );
@@ -289,7 +292,11 @@ export class TokenTransactionService {
 
       let revocationKeys: Uint8Array[] = [];
 
-      for (let outputIndex = 0; outputIndex < outputsToSpend.length; outputIndex++) {
+      for (
+        let outputIndex = 0;
+        outputIndex < outputsToSpend.length;
+        outputIndex++
+      ) {
         // For each output, collect keyshares from all SOs that responded successfully
         const outputKeyshares = successfulSignatures.map(
           ({ identifier, response }) => ({
@@ -419,7 +426,9 @@ export class TokenTransactionService {
       const tokenKey = bytesToHex(output.output!.tokenPublicKey!);
       const index = output.previousTransactionVout!;
 
-      tokenOutputs.set(tokenKey, [{ ...output, previousTransactionVout: index }]);
+      tokenOutputs.set(tokenKey, [
+        { ...output, previousTransactionVout: index },
+      ]);
     });
   }
 
@@ -459,7 +468,9 @@ export class TokenTransactionService {
       if (remainingAmount <= 0n) break;
 
       selectedOutputs.push(outputWithPreviousTransactionData);
-      remainingAmount -= bytesToNumberBE(outputWithPreviousTransactionData.output!.tokenAmount!);
+      remainingAmount -= bytesToNumberBE(
+        outputWithPreviousTransactionData.output!.tokenAmount!,
+      );
     }
 
     if (remainingAmount > 0n) {

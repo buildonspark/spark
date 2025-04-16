@@ -1,4 +1,7 @@
-import { ELECTRS_CREDENTIALS, getElectrsUrl } from "../services/wallet-config.js";
+import {
+  ELECTRS_CREDENTIALS,
+  getElectrsUrl,
+} from "../services/wallet-config.js";
 import { BitcoinNetwork } from "../types/index.js";
 import { getNetworkFromAddress } from "./network.js";
 
@@ -15,7 +18,9 @@ export async function getLatestDepositTxId(
   };
 
   if (network === BitcoinNetwork.REGTEST) {
-    const auth = btoa(`${ELECTRS_CREDENTIALS.username}:${ELECTRS_CREDENTIALS.password}`);
+    const auth = btoa(
+      `${ELECTRS_CREDENTIALS.username}:${ELECTRS_CREDENTIALS.password}`,
+    );
     headers["Authorization"] = `Basic ${auth}`;
   }
   const response = await fetch(`${baseUrl}/address/${address}/txs`, {
