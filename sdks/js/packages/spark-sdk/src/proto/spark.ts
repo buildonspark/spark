@@ -259,6 +259,8 @@ export interface GenerateDepositAddressRequest {
   identityPublicKey: Uint8Array;
   /** The network of the bitcoin network. */
   network: Network;
+  /** The UUID to use for the created TreeNode */
+  leafId: string;
 }
 
 /** Address is the address of the user's public key + SE's public key. */
@@ -1147,7 +1149,6 @@ export interface CancelSendTransferResponse {
   transfer: Transfer | undefined;
 }
 
-
 export interface QueryUnusedDepositAddressesRequest {
   identityPublicKey: Uint8Array;
 }
@@ -1359,7 +1360,7 @@ export const DepositAddressProof_AddressSignaturesEntry: MessageFns<DepositAddre
 };
 
 function createBaseGenerateDepositAddressRequest(): GenerateDepositAddressRequest {
-  return { signingPublicKey: new Uint8Array(0), identityPublicKey: new Uint8Array(0), network: 0 };
+  return { signingPublicKey: new Uint8Array(0), identityPublicKey: new Uint8Array(0), network: 0, leafId: "" };
 }
 
 export const GenerateDepositAddressRequest: MessageFns<GenerateDepositAddressRequest> = {
@@ -1372,6 +1373,9 @@ export const GenerateDepositAddressRequest: MessageFns<GenerateDepositAddressReq
     }
     if (message.network !== 0) {
       writer.uint32(24).int32(message.network);
+    }
+    if (message.leafId !== "") {
+      writer.uint32(34).string(message.leafId);
     }
     return writer;
   },
@@ -1407,6 +1411,14 @@ export const GenerateDepositAddressRequest: MessageFns<GenerateDepositAddressReq
           message.network = reader.int32() as any;
           continue;
         }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.leafId = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1423,6 +1435,7 @@ export const GenerateDepositAddressRequest: MessageFns<GenerateDepositAddressReq
         ? bytesFromBase64(object.identityPublicKey)
         : new Uint8Array(0),
       network: isSet(object.network) ? networkFromJSON(object.network) : 0,
+      leafId: isSet(object.leafId) ? globalThis.String(object.leafId) : "",
     };
   },
 
@@ -1437,6 +1450,9 @@ export const GenerateDepositAddressRequest: MessageFns<GenerateDepositAddressReq
     if (message.network !== 0) {
       obj.network = networkToJSON(message.network);
     }
+    if (message.leafId !== "") {
+      obj.leafId = message.leafId;
+    }
     return obj;
   },
 
@@ -1448,6 +1464,7 @@ export const GenerateDepositAddressRequest: MessageFns<GenerateDepositAddressReq
     message.signingPublicKey = object.signingPublicKey ?? new Uint8Array(0);
     message.identityPublicKey = object.identityPublicKey ?? new Uint8Array(0);
     message.network = object.network ?? 0;
+    message.leafId = object.leafId ?? "";
     return message;
   },
 };
@@ -11947,7 +11964,6 @@ export const CancelSendTransferResponse: MessageFns<CancelSendTransferResponse> 
     return message;
   },
 };
-
 
 function createBaseQueryUnusedDepositAddressesRequest(): QueryUnusedDepositAddressesRequest {
   return { identityPublicKey: new Uint8Array(0) };

@@ -373,7 +373,9 @@ type GenerateDepositAddressRequest struct {
 	// The identity public key of the user.
 	IdentityPublicKey []byte `protobuf:"bytes,2,opt,name=identity_public_key,json=identityPublicKey,proto3" json:"identity_public_key,omitempty"`
 	// The network of the bitcoin network.
-	Network       Network `protobuf:"varint,3,opt,name=network,proto3,enum=spark.Network" json:"network,omitempty"`
+	Network Network `protobuf:"varint,3,opt,name=network,proto3,enum=spark.Network" json:"network,omitempty"`
+	// The UUID to use for the created TreeNode
+	LeafId        string `protobuf:"bytes,4,opt,name=leaf_id,json=leafId,proto3" json:"leaf_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -427,6 +429,13 @@ func (x *GenerateDepositAddressRequest) GetNetwork() Network {
 		return x.Network
 	}
 	return Network_UNSPECIFIED
+}
+
+func (x *GenerateDepositAddressRequest) GetLeafId() string {
+	if x != nil {
+		return x.LeafId
+	}
+	return ""
 }
 
 // *
@@ -6809,11 +6818,12 @@ const file_spark_proto_rawDesc = "" +
 	"\x1dproof_of_possession_signature\x18\x02 \x01(\fR\x1aproofOfPossessionSignature\x1aD\n" +
 	"\x16AddressSignaturesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\fR\x05value:\x028\x01\"\xb1\x01\n" +
+	"\x05value\x18\x02 \x01(\fR\x05value:\x028\x01\"\xca\x01\n" +
 	"\x1dGenerateDepositAddressRequest\x12,\n" +
 	"\x12signing_public_key\x18\x01 \x01(\fR\x10signingPublicKey\x12.\n" +
 	"\x13identity_public_key\x18\x02 \x01(\fR\x11identityPublicKey\x122\n" +
-	"\anetwork\x18\x03 \x01(\x0e2\x0e.spark.NetworkB\b\xfaB\x05\x82\x01\x02 \x00R\anetwork\"\x98\x01\n" +
+	"\anetwork\x18\x03 \x01(\x0e2\x0e.spark.NetworkB\b\xfaB\x05\x82\x01\x02 \x00R\anetwork\x12\x17\n" +
+	"\aleaf_id\x18\x04 \x01(\tR\x06leafId\"\x98\x01\n" +
 	"\aAddress\x12\x18\n" +
 	"\aaddress\x18\x01 \x01(\tR\aaddress\x12#\n" +
 	"\rverifying_key\x18\x02 \x01(\fR\fverifyingKey\x12N\n" +

@@ -449,6 +449,7 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 		SetNetwork(schemaNetwork).
 		SetBaseTxid(txid[:]).
 		SetVout(int16(req.OnChainUtxo.Vout))
+
 	if txConfirmed {
 		treeMutator.SetStatus(schema.TreeStatusAvailable)
 	} else {
@@ -458,7 +459,7 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 	if err != nil {
 		return nil, err
 	}
-	root, err := db.TreeNode.
+	treeNodeMutator := db.TreeNode.
 		Create().
 		SetTree(tree).
 		SetStatus(schema.TreeNodeStatusCreating).
@@ -469,8 +470,13 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 		SetSigningKeyshare(signingKeyShare).
 		SetRawTx(req.RootTxSigningJob.RawTx).
 		SetRawRefundTx(req.RefundTxSigningJob.RawTx).
-		SetVout(int16(req.OnChainUtxo.Vout)).
-		Save(ctx)
+		SetVout(int16(req.OnChainUtxo.Vout))
+
+	if depositAddress.NodeID != uuid.Nil {
+		treeNodeMutator.SetID(depositAddress.NodeID)
+	}
+
+	root, err := treeNodeMutator.Save(ctx)
 	if err != nil {
 		return nil, err
 	}

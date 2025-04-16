@@ -108,6 +108,8 @@ message GenerateDepositAddressRequest {
     bytes identity_public_key = 2;
     // The network of the bitcoin network.
     Network network = 3 [(validate.rules).enum = {not_in: [0]}];
+    // The UUID to use for the created TreeNode
+    string leaf_id = 4;
 }
 
 /**
