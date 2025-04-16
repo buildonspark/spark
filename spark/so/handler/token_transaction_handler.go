@@ -29,15 +29,17 @@ import (
 
 // The TokenTransactionHandler is responsible for handling token transaction requests to spend and create outputs.
 type TokenTransactionHandler struct {
-	config authz.Config
-	db     *ent.Client
+	config      authz.Config
+	db          *ent.Client
+	lrc20Client *lrc20.Client
 }
 
 // NewTokenTransactionHandler creates a new TokenTransactionHandler.
-func NewTokenTransactionHandler(config authz.Config, db *ent.Client) *TokenTransactionHandler {
+func NewTokenTransactionHandler(config authz.Config, db *ent.Client, lrc20Client *lrc20.Client) *TokenTransactionHandler {
 	return &TokenTransactionHandler{
-		config: config,
-		db:     db,
+		config:      config,
+		db:          db,
+		lrc20Client: lrc20Client,
 	}
 }
 
@@ -472,18 +474,12 @@ func (o TokenTransactionHandler) SendTransactionToLRC20Node(
 		OutputsToSpendData:             outputsToSpendData,
 	}
 
-	lrc20Client := lrc20.NewClient(config)
-	err := lrc20Client.SendSparkSignature(ctx, signatureData)
-	if err != nil {
-		return fmt.Errorf("failed to send spark signature to LRC20 node: %w", err)
-	}
-	return nil
+	return o.lrc20Client.SendSparkSignature(ctx, signatureData)
 }
 
 // FreezeTokens freezes or unfreezes tokens on the LRC20 node.
 func (o TokenTransactionHandler) FreezeTokens(
 	ctx context.Context,
-	config *so.Config,
 	req *pb.FreezeTokensRequest,
 ) (*pb.FreezeTokensResponse, error) {
 	logger := helper.GetLoggerFromContext(ctx)
@@ -542,7 +538,7 @@ func (o TokenTransactionHandler) FreezeTokens(
 		return nil, err
 	}
 
-	err = o.FreezeTokensOnLRC20Node(ctx, config, req)
+	err = o.FreezeTokensOnLRC20Node(ctx, req)
 	if err != nil {
 		logger.Info("Failed to freeze tokens on LRC20 node", "error", err)
 		return nil, fmt.Errorf("failed to freeze tokens on LRC20 node: %w", err)
@@ -557,11 +553,9 @@ func (o TokenTransactionHandler) FreezeTokens(
 // FreezeTokensOnLRC20Node freezes or unfreezes tokens on the LRC20 node.
 func (o TokenTransactionHandler) FreezeTokensOnLRC20Node(
 	ctx context.Context,
-	config *so.Config,
 	req *pb.FreezeTokensRequest,
 ) error {
-	lrc20Client := lrc20.NewClient(config)
-	return lrc20Client.FreezeTokens(ctx, req)
+	return o.lrc20Client.FreezeTokens(ctx, req)
 }
 
 // QueryTokenTransactions returns SO provided data about specific token transactions along with their status.

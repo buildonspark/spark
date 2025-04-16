@@ -12,6 +12,7 @@ import (
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/ent"
 	"github.com/lightsparkdev/spark-go/so/handler"
+	"github.com/lightsparkdev/spark-go/so/lrc20"
 	"github.com/lightsparkdev/spark-go/so/objects"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
@@ -20,12 +21,13 @@ import (
 // This server is only used by the operator.
 type SparkInternalServer struct {
 	pb.UnimplementedSparkInternalServiceServer
-	config *so.Config
+	config      *so.Config
+	lrc20Client *lrc20.Client
 }
 
 // NewSparkInternalServer creates a new SparkInternalServer.
-func NewSparkInternalServer(config *so.Config) *SparkInternalServer {
-	return &SparkInternalServer{config: config}
+func NewSparkInternalServer(config *so.Config, client *lrc20.Client) *SparkInternalServer {
+	return &SparkInternalServer{config: config, lrc20Client: client}
 }
 
 // MarkKeysharesAsUsed marks the keyshares as used.
@@ -281,7 +283,7 @@ func (s *SparkInternalServer) ReturnLightningPayment(ctx context.Context, req *p
 
 // StartTokenTransactionInternal validates a token transaction and saves it to the database.
 func (s *SparkInternalServer) StartTokenTransactionInternal(ctx context.Context, req *pb.StartTokenTransactionInternalRequest) (*emptypb.Empty, error) {
-	tokenTransactionHandler := handler.NewInternalTokenTransactionHandler(s.config)
+	tokenTransactionHandler := handler.NewInternalTokenTransactionHandler(s.config, s.lrc20Client)
 	return wrapWithGRPCError(tokenTransactionHandler.StartTokenTransactionInternal(ctx, s.config, req))
 }
 

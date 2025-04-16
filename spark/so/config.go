@@ -106,6 +106,8 @@ type Lrc20Config struct {
 	RelativeCertPath              string `yaml:"relativecertpath"`
 	WithdrawBondSats              uint64 `yaml:"withdrawbondsats"`
 	WithdrawRelativeBlockLocktime uint64 `yaml:"withdrawrelativeblocklocktime"`
+	GRPCPageSize                  uint64 `yaml:"grpcspagesize"`
+	GRPCPoolSize                  uint64 `yaml:"grpcpoolsize"`
 }
 
 // NewConfig creates a new config for the signing operator.

@@ -23,12 +23,13 @@ import (
 
 // InternalTokenTransactionHandler is the deposit handler for so internal
 type InternalTokenTransactionHandler struct {
-	config *so.Config
+	config      *so.Config
+	lrc20Client *lrc20.Client
 }
 
 // NewInternalTokenTransactionHandler creates a new InternalTokenTransactionHandler.
-func NewInternalTokenTransactionHandler(config *so.Config) *InternalTokenTransactionHandler {
-	return &InternalTokenTransactionHandler{config: config}
+func NewInternalTokenTransactionHandler(config *so.Config, client *lrc20.Client) *InternalTokenTransactionHandler {
+	return &InternalTokenTransactionHandler{config: config, lrc20Client: client}
 }
 
 func (h *InternalTokenTransactionHandler) StartTokenTransactionInternal(ctx context.Context, config *so.Config, req *pbinternal.StartTokenTransactionInternalRequest) (*emptypb.Empty, error) {
@@ -99,7 +100,7 @@ func (h *InternalTokenTransactionHandler) StartTokenTransactionInternal(ctx cont
 	logger.Info("Final token transaction validated")
 
 	logger.Info("Verifying token transaction with LRC20 node")
-	err = h.VerifyTokenTransactionWithLrc20Node(ctx, config, req.FinalTokenTransaction)
+	err = h.VerifyTokenTransactionWithLrc20Node(ctx, req.FinalTokenTransaction)
 	if err != nil {
 		return nil, err
 	}
@@ -113,9 +114,8 @@ func (h *InternalTokenTransactionHandler) StartTokenTransactionInternal(ctx cont
 	return &emptypb.Empty{}, nil
 }
 
-func (h *InternalTokenTransactionHandler) VerifyTokenTransactionWithLrc20Node(ctx context.Context, config *so.Config, tokenTransaction *pb.TokenTransaction) error {
-	client := lrc20.NewClient(config)
-	return client.VerifySparkTx(ctx, tokenTransaction)
+func (h *InternalTokenTransactionHandler) VerifyTokenTransactionWithLrc20Node(ctx context.Context, tokenTransaction *pb.TokenTransaction) error {
+	return h.lrc20Client.VerifySparkTx(ctx, tokenTransaction)
 }
 
 func ValidateMintSignature(

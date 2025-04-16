@@ -26,15 +26,15 @@ auth = { username = "testutil", password = "testutilpassword" }
 level = "TRACE"
 
 [indexer]
-polling_period = { secs = 0, nanos = 10000000 }
+polling_period = { secs = 100, nanos = 0 }
 max_confirmation_time = { secs = 86400, nanos = 0 }
 max_restart_attempts = 100
 restart_interval = { secs = 30, nanos = 0 }
 confirmations_number = 1
 
 [controller]
-max_inv_size = 3
-inv_sharing_interval = 10
+max_inv_size = 1000
+inv_sharing_interval = 1000
 
 [graph_builder]
 cleanup_period = { secs = 3600, nanos = 0 }

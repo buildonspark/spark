@@ -13,3 +13,5 @@ lrc20:
     host: 127.0.0.1:18530
     withdrawbondsats: 1000000 # 0.01 BTC
     withdrawrelativeblocklocktime: 1000
+    grpcpagesize: 200
+    grpcpoolsize: 10

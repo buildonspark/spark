@@ -16,7 +16,6 @@ import (
 	"time"
 
 	entsql "entgo.io/ent/dialect/sql"
-
 	"github.com/go-co-op/gocron/v2"
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
 	"github.com/improbable-eng/grpc-web/go/grpcweb"
@@ -36,6 +35,7 @@ import (
 	"github.com/lightsparkdev/spark-go/so/ent"
 	sparkgrpc "github.com/lightsparkdev/spark-go/so/grpc"
 	"github.com/lightsparkdev/spark-go/so/helper"
+	"github.com/lightsparkdev/spark-go/so/lrc20"
 	"github.com/lightsparkdev/spark-go/so/task"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -306,10 +306,15 @@ func main() {
 		pbdkg.RegisterDKGServiceServer(grpcServer, dkgServer)
 	}
 
-	sparkInternalServer := sparkgrpc.NewSparkInternalServer(config)
+	lrc20Client, err := lrc20.NewClient(config)
+	if err != nil {
+		log.Fatalf("Failed to create LRC20 client: %v", err)
+	}
+
+	sparkInternalServer := sparkgrpc.NewSparkInternalServer(config, lrc20Client)
 	pbinternal.RegisterSparkInternalServiceServer(grpcServer, sparkInternalServer)
 
-	sparkServer := sparkgrpc.NewSparkServer(config, dbClient)
+	sparkServer := sparkgrpc.NewSparkServer(config, dbClient, lrc20Client)
 	pbspark.RegisterSparkServiceServer(grpcServer, sparkServer)
 
 	treeServer := sparkgrpc.NewSparkTreeServer(config, dbClient)
