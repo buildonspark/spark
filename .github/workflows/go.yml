@@ -24,7 +24,7 @@ env:
   GO_VERSION: "1.23.2"
 
 jobs:
-  test:
+  unit-test:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -101,7 +101,7 @@ jobs:
           args: --timeout 5m
 
   build:
-    needs: ["test", "check"]
+    needs: ["unit-test", "check"]
     runs-on: "ubuntu-22.04-2-arm"
     outputs:
       spark_tag: ${{ steps.set-spark_tag.outputs.spark_tag }}
@@ -208,6 +208,20 @@ jobs:
               "spark_tag": "${{ needs.build.outputs.spark_tag }}",
               "spark_commit_ref": "${{ github.event.pull_request.head.sha }}"
             }
+
+  test:
+    needs: ["unit-test", "check"]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Check test results
+        run: |
+          if [[ ${{ needs.unit-test.result }} == "success" ]] && \
+             [[ ${{ needs.check.result }} == "success" ]]; then
+            exit 0
+          else
+            exit 1
+          fi
 
   deploy:
     needs: ["build"]

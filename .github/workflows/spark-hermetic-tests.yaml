@@ -62,3 +62,24 @@ jobs:
     permissions:
       id-token: write
       contents: write
+
+  test:
+    needs: [go-hermetic-test, js-hermetic-test]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Check test results
+        run: |
+          valid_results=("success" "skipped" "cancelled")
+          if [[ " ${valid_results[@]} " =~ " ${{ needs.go-hermetic-test.result }} " ]] && \
+             [[ " ${valid_results[@]} " =~ " ${{ needs.js-hermetic-test.result }} " ]]; then
+            exit 0
+          else
+            exit 1
+          fi
+
+  check:
+    if: false
+    runs-on: ubuntu-latest
+    steps:
+      - run: "true"

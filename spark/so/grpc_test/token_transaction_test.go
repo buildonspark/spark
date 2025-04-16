@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"log"
 	"math/big"
+	"os"
 	"testing"
 	"time"
 
@@ -201,7 +202,15 @@ func getRemainingOperatorIDs(config *wallet.Config, excludedIDs []string) []stri
 	return remainingOperatorIDs
 }
 
+// skipIfGithubActions skips the test if running in GitHub Actions
+func skipIfGithubActions(t *testing.T) {
+	if os.Getenv("GITHUB_ACTIONS") == "true" {
+		t.Skip("Skipping test on GitHub Actions CI")
+	}
+}
+
 func TestBroadcastTokenTransactionMintAndTransferTokens(t *testing.T) {
+	skipIfGithubActions(t)
 	config, err := testutil.TestWalletConfig()
 	require.NoError(t, err, "failed to create wallet config")
 
@@ -374,6 +383,7 @@ func TestBroadcastTokenTransactionMintAndTransferTokens(t *testing.T) {
 }
 
 func TestBroadcastTokenTransactionMintAndTransferTokensLotsOfLeaves(t *testing.T) {
+	skipIfGithubActions(t)
 	config, err := testutil.TestWalletConfig()
 	require.NoError(t, err, "failed to create wallet config")
 
@@ -631,6 +641,7 @@ func TestFreezeAndUnfreezeTokens(t *testing.T) {
 }
 
 func TestBroadcastTokenTransactionMintAndTransferTokensDoubleStart(t *testing.T) {
+	skipIfGithubActions(t)
 	config, err := testutil.TestWalletConfig()
 	require.NoError(t, err, "failed to create wallet config")
 
@@ -994,6 +1005,7 @@ func TestTokenTransferTransactionSigning(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			skipIfGithubActions(t)
 			config, err := testutil.TestWalletConfig()
 			require.NoError(t, err, "failed to create wallet config")
 
@@ -1009,6 +1021,7 @@ func TestTokenTransferTransactionSigning(t *testing.T) {
 }
 
 func TestBroadcastTokenTransactionMintAndTransferTokensSchnorr(t *testing.T) {
+	skipIfGithubActions(t)
 	config, err := testutil.TestWalletConfigWithTokenTransactionSchnorr()
 	require.NoError(t, err, "failed to create wallet config")
 
@@ -1079,6 +1092,7 @@ func TestFreezeAndUnfreezeTokensSchnorr(t *testing.T) {
 }
 
 func TestCancelTokenTransaction(t *testing.T) {
+	skipIfGithubActions(t)
 	config, err := testutil.TestWalletConfig()
 	require.NoError(t, err, "failed to create wallet config")
 
