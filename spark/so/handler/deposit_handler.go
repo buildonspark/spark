@@ -84,13 +84,22 @@ func (o *DepositHandler) GenerateDepositAddress(ctx context.Context, config *so.
 		return nil, err
 	}
 
-	_, err = ent.GetDbFromContext(ctx).DepositAddress.Create().
+	depositAddressMutator := ent.GetDbFromContext(ctx).DepositAddress.Create().
 		SetSigningKeyshareID(keyshare.ID).
 		SetOwnerIdentityPubkey(req.IdentityPublicKey).
 		SetOwnerSigningPubkey(req.SigningPublicKey).
-		SetAddress(*depositAddress).
-		// Confirmation height is not set since nothing has been confirmed yet.
-		Save(ctx)
+		SetAddress(*depositAddress)
+	// Confirmation height is not set since nothing has been confirmed yet.
+
+	if req.LeafId != "" {
+		leafID, err := uuid.Parse(req.LeafId)
+		if err != nil {
+			return nil, err
+		}
+		depositAddressMutator.SetNodeID(leafID)
+	}
+
+	_, err = depositAddressMutator.Save(ctx)
 	if err != nil {
 		return nil, err
 	}
