@@ -33,6 +33,8 @@ type DepositAddress struct {
 	ConfirmationHeight int64 `json:"confirmation_height,omitempty"`
 	// ConfirmationTxid holds the value of the "confirmation_txid" field.
 	ConfirmationTxid string `json:"confirmation_txid,omitempty"`
+	// NodeID holds the value of the "node_id" field.
+	NodeID uuid.UUID `json:"node_id,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the DepositAddressQuery when eager-loading is set.
 	Edges                            DepositAddressEdges `json:"edges"`
@@ -73,7 +75,7 @@ func (*DepositAddress) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullString)
 		case depositaddress.FieldCreateTime, depositaddress.FieldUpdateTime:
 			values[i] = new(sql.NullTime)
-		case depositaddress.FieldID:
+		case depositaddress.FieldID, depositaddress.FieldNodeID:
 			values[i] = new(uuid.UUID)
 		case depositaddress.ForeignKeys[0]: // deposit_address_signing_keyshare
 			values[i] = &sql.NullScanner{S: new(uuid.UUID)}
@@ -139,6 +141,12 @@ func (da *DepositAddress) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field confirmation_txid", values[i])
 			} else if value.Valid {
 				da.ConfirmationTxid = value.String
+			}
+		case depositaddress.FieldNodeID:
+			if value, ok := values[i].(*uuid.UUID); !ok {
+				return fmt.Errorf("unexpected type %T for field node_id", values[i])
+			} else if value != nil {
+				da.NodeID = *value
 			}
 		case depositaddress.ForeignKeys[0]:
 			if value, ok := values[i].(*sql.NullScanner); !ok {
@@ -208,6 +216,9 @@ func (da *DepositAddress) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("confirmation_txid=")
 	builder.WriteString(da.ConfirmationTxid)
+	builder.WriteString(", ")
+	builder.WriteString("node_id=")
+	builder.WriteString(fmt.Sprintf("%v", da.NodeID))
 	builder.WriteByte(')')
 	return builder.String()
 }

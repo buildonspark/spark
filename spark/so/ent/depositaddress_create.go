@@ -96,6 +96,20 @@ func (dac *DepositAddressCreate) SetNillableConfirmationTxid(s *string) *Deposit
 	return dac
 }
 
+// SetNodeID sets the "node_id" field.
+func (dac *DepositAddressCreate) SetNodeID(u uuid.UUID) *DepositAddressCreate {
+	dac.mutation.SetNodeID(u)
+	return dac
+}
+
+// SetNillableNodeID sets the "node_id" field if the given value is not nil.
+func (dac *DepositAddressCreate) SetNillableNodeID(u *uuid.UUID) *DepositAddressCreate {
+	if u != nil {
+		dac.SetNodeID(*u)
+	}
+	return dac
+}
+
 // SetID sets the "id" field.
 func (dac *DepositAddressCreate) SetID(u uuid.UUID) *DepositAddressCreate {
 	dac.mutation.SetID(u)
@@ -267,6 +281,10 @@ func (dac *DepositAddressCreate) createSpec() (*DepositAddress, *sqlgraph.Create
 	if value, ok := dac.mutation.ConfirmationTxid(); ok {
 		_spec.SetField(depositaddress.FieldConfirmationTxid, field.TypeString, value)
 		_node.ConfirmationTxid = value
+	}
+	if value, ok := dac.mutation.NodeID(); ok {
+		_spec.SetField(depositaddress.FieldNodeID, field.TypeUUID, value)
+		_node.NodeID = value
 	}
 	if nodes := dac.mutation.SigningKeyshareIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{

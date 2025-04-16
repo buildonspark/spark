@@ -5,6 +5,7 @@ import (
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
+	"github.com/google/uuid"
 )
 
 // DepositAddress is the schema for the deposit addresses table.
@@ -36,6 +37,7 @@ func (DepositAddress) Fields() []ent.Field {
 		field.Bytes("owner_signing_pubkey").NotEmpty().Immutable(),
 		field.Int64("confirmation_height").Optional(),
 		field.String("confirmation_txid").Optional(),
+		field.UUID("node_id", uuid.UUID{}).Optional(),
 	}
 }
 

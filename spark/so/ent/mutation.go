@@ -1227,6 +1227,7 @@ type DepositAddressMutation struct {
 	confirmation_height     *int64
 	addconfirmation_height  *int64
 	confirmation_txid       *string
+	node_id                 *uuid.UUID
 	clearedFields           map[string]struct{}
 	signing_keyshare        *uuid.UUID
 	clearedsigning_keyshare bool
@@ -1638,6 +1639,55 @@ func (m *DepositAddressMutation) ResetConfirmationTxid() {
 	delete(m.clearedFields, depositaddress.FieldConfirmationTxid)
 }
 
+// SetNodeID sets the "node_id" field.
+func (m *DepositAddressMutation) SetNodeID(u uuid.UUID) {
+	m.node_id = &u
+}
+
+// NodeID returns the value of the "node_id" field in the mutation.
+func (m *DepositAddressMutation) NodeID() (r uuid.UUID, exists bool) {
+	v := m.node_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldNodeID returns the old "node_id" field's value of the DepositAddress entity.
+// If the DepositAddress object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DepositAddressMutation) OldNodeID(ctx context.Context) (v uuid.UUID, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldNodeID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldNodeID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldNodeID: %w", err)
+	}
+	return oldValue.NodeID, nil
+}
+
+// ClearNodeID clears the value of the "node_id" field.
+func (m *DepositAddressMutation) ClearNodeID() {
+	m.node_id = nil
+	m.clearedFields[depositaddress.FieldNodeID] = struct{}{}
+}
+
+// NodeIDCleared returns if the "node_id" field was cleared in this mutation.
+func (m *DepositAddressMutation) NodeIDCleared() bool {
+	_, ok := m.clearedFields[depositaddress.FieldNodeID]
+	return ok
+}
+
+// ResetNodeID resets all changes to the "node_id" field.
+func (m *DepositAddressMutation) ResetNodeID() {
+	m.node_id = nil
+	delete(m.clearedFields, depositaddress.FieldNodeID)
+}
+
 // SetSigningKeyshareID sets the "signing_keyshare" edge to the SigningKeyshare entity by id.
 func (m *DepositAddressMutation) SetSigningKeyshareID(id uuid.UUID) {
 	m.signing_keyshare = &id
@@ -1711,7 +1761,7 @@ func (m *DepositAddressMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *DepositAddressMutation) Fields() []string {
-	fields := make([]string, 0, 7)
+	fields := make([]string, 0, 8)
 	if m.create_time != nil {
 		fields = append(fields, depositaddress.FieldCreateTime)
 	}
@@ -1732,6 +1782,9 @@ func (m *DepositAddressMutation) Fields() []string {
 	}
 	if m.confirmation_txid != nil {
 		fields = append(fields, depositaddress.FieldConfirmationTxid)
+	}
+	if m.node_id != nil {
+		fields = append(fields, depositaddress.FieldNodeID)
 	}
 	return fields
 }
@@ -1755,6 +1808,8 @@ func (m *DepositAddressMutation) Field(name string) (ent.Value, bool) {
 		return m.ConfirmationHeight()
 	case depositaddress.FieldConfirmationTxid:
 		return m.ConfirmationTxid()
+	case depositaddress.FieldNodeID:
+		return m.NodeID()
 	}
 	return nil, false
 }
@@ -1778,6 +1833,8 @@ func (m *DepositAddressMutation) OldField(ctx context.Context, name string) (ent
 		return m.OldConfirmationHeight(ctx)
 	case depositaddress.FieldConfirmationTxid:
 		return m.OldConfirmationTxid(ctx)
+	case depositaddress.FieldNodeID:
+		return m.OldNodeID(ctx)
 	}
 	return nil, fmt.Errorf("unknown DepositAddress field %s", name)
 }
@@ -1836,6 +1893,13 @@ func (m *DepositAddressMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetConfirmationTxid(v)
 		return nil
+	case depositaddress.FieldNodeID:
+		v, ok := value.(uuid.UUID)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetNodeID(v)
+		return nil
 	}
 	return fmt.Errorf("unknown DepositAddress field %s", name)
 }
@@ -1887,6 +1951,9 @@ func (m *DepositAddressMutation) ClearedFields() []string {
 	if m.FieldCleared(depositaddress.FieldConfirmationTxid) {
 		fields = append(fields, depositaddress.FieldConfirmationTxid)
 	}
+	if m.FieldCleared(depositaddress.FieldNodeID) {
+		fields = append(fields, depositaddress.FieldNodeID)
+	}
 	return fields
 }
 
@@ -1906,6 +1973,9 @@ func (m *DepositAddressMutation) ClearField(name string) error {
 		return nil
 	case depositaddress.FieldConfirmationTxid:
 		m.ClearConfirmationTxid()
+		return nil
+	case depositaddress.FieldNodeID:
+		m.ClearNodeID()
 		return nil
 	}
 	return fmt.Errorf("unknown DepositAddress nullable field %s", name)
@@ -1935,6 +2005,9 @@ func (m *DepositAddressMutation) ResetField(name string) error {
 		return nil
 	case depositaddress.FieldConfirmationTxid:
 		m.ResetConfirmationTxid()
+		return nil
+	case depositaddress.FieldNodeID:
+		m.ResetNodeID()
 		return nil
 	}
 	return fmt.Errorf("unknown DepositAddress field %s", name)

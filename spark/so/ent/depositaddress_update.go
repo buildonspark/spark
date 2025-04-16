@@ -11,6 +11,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/so/ent/depositaddress"
 	"github.com/lightsparkdev/spark-go/so/ent/predicate"
 )
@@ -78,6 +79,26 @@ func (dau *DepositAddressUpdate) SetNillableConfirmationTxid(s *string) *Deposit
 // ClearConfirmationTxid clears the value of the "confirmation_txid" field.
 func (dau *DepositAddressUpdate) ClearConfirmationTxid() *DepositAddressUpdate {
 	dau.mutation.ClearConfirmationTxid()
+	return dau
+}
+
+// SetNodeID sets the "node_id" field.
+func (dau *DepositAddressUpdate) SetNodeID(u uuid.UUID) *DepositAddressUpdate {
+	dau.mutation.SetNodeID(u)
+	return dau
+}
+
+// SetNillableNodeID sets the "node_id" field if the given value is not nil.
+func (dau *DepositAddressUpdate) SetNillableNodeID(u *uuid.UUID) *DepositAddressUpdate {
+	if u != nil {
+		dau.SetNodeID(*u)
+	}
+	return dau
+}
+
+// ClearNodeID clears the value of the "node_id" field.
+func (dau *DepositAddressUpdate) ClearNodeID() *DepositAddressUpdate {
+	dau.mutation.ClearNodeID()
 	return dau
 }
 
@@ -160,6 +181,12 @@ func (dau *DepositAddressUpdate) sqlSave(ctx context.Context) (n int, err error)
 	if dau.mutation.ConfirmationTxidCleared() {
 		_spec.ClearField(depositaddress.FieldConfirmationTxid, field.TypeString)
 	}
+	if value, ok := dau.mutation.NodeID(); ok {
+		_spec.SetField(depositaddress.FieldNodeID, field.TypeUUID, value)
+	}
+	if dau.mutation.NodeIDCleared() {
+		_spec.ClearField(depositaddress.FieldNodeID, field.TypeUUID)
+	}
 	if n, err = sqlgraph.UpdateNodes(ctx, dau.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{depositaddress.Label}
@@ -230,6 +257,26 @@ func (dauo *DepositAddressUpdateOne) SetNillableConfirmationTxid(s *string) *Dep
 // ClearConfirmationTxid clears the value of the "confirmation_txid" field.
 func (dauo *DepositAddressUpdateOne) ClearConfirmationTxid() *DepositAddressUpdateOne {
 	dauo.mutation.ClearConfirmationTxid()
+	return dauo
+}
+
+// SetNodeID sets the "node_id" field.
+func (dauo *DepositAddressUpdateOne) SetNodeID(u uuid.UUID) *DepositAddressUpdateOne {
+	dauo.mutation.SetNodeID(u)
+	return dauo
+}
+
+// SetNillableNodeID sets the "node_id" field if the given value is not nil.
+func (dauo *DepositAddressUpdateOne) SetNillableNodeID(u *uuid.UUID) *DepositAddressUpdateOne {
+	if u != nil {
+		dauo.SetNodeID(*u)
+	}
+	return dauo
+}
+
+// ClearNodeID clears the value of the "node_id" field.
+func (dauo *DepositAddressUpdateOne) ClearNodeID() *DepositAddressUpdateOne {
+	dauo.mutation.ClearNodeID()
 	return dauo
 }
 
@@ -341,6 +388,12 @@ func (dauo *DepositAddressUpdateOne) sqlSave(ctx context.Context) (_node *Deposi
 	}
 	if dauo.mutation.ConfirmationTxidCleared() {
 		_spec.ClearField(depositaddress.FieldConfirmationTxid, field.TypeString)
+	}
+	if value, ok := dauo.mutation.NodeID(); ok {
+		_spec.SetField(depositaddress.FieldNodeID, field.TypeUUID, value)
+	}
+	if dauo.mutation.NodeIDCleared() {
+		_spec.ClearField(depositaddress.FieldNodeID, field.TypeUUID)
 	}
 	_node = &DepositAddress{config: dauo.config}
 	_spec.Assign = _node.assignValues
