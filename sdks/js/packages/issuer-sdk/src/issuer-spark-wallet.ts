@@ -141,12 +141,12 @@ export class IssuerSparkWallet extends SparkWallet {
   }
 
   public async freezeTokens(
-    ownerPublicKey: string,
+    sparkAddress: string,
   ): Promise<{ impactedOutputIds: string[]; impactedTokenAmount: bigint }> {
     await this.syncTokenOutputs();
     const tokenPublicKey = await super.getIdentityPublicKey();
     const decodedOwnerPubkey = decodeSparkAddress(
-      ownerPublicKey,
+      sparkAddress,
       this.config.getNetworkType(),
     );
     const response = await this.tokenFreezeService!.freezeTokens(
@@ -164,12 +164,12 @@ export class IssuerSparkWallet extends SparkWallet {
   }
 
   public async unfreezeTokens(
-    ownerPublicKey: string,
+    sparkAddress: string,
   ): Promise<{ impactedOutputIds: string[]; impactedTokenAmount: bigint }> {
     await this.syncTokenOutputs();
     const tokenPublicKey = await super.getIdentityPublicKey();
     const decodedOwnerPubkey = decodeSparkAddress(
-      ownerPublicKey,
+      sparkAddress,
       this.config.getNetworkType(),
     );
     const response = await this.tokenFreezeService!.unfreezeTokens(
