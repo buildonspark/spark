@@ -28,7 +28,7 @@ async function runCLI() {
   createinvoice <amount> <memo>                                       - Create a new lightning invoice
   payinvoice <invoice>                                                - Pay a lightning invoice
   sendtransfer <amount> <receiverSparkAddress>                        - Send a spark transfer
-  withdraw <amount> <onchainAddress>                                   - Withdraw funds to an L1 address
+  withdraw <amount> <onchainAddress>                                  - Withdraw funds to an L1 address
   coopfee <amount> <withdrawalAddress>                                - Get a fee estimate for a cooperative exit
   lightningsendfee <invoice>                                          - Get a fee estimate for a lightning send
   lightningreceivefee <amount> <REGTEST | MAINNET | TESTNET | SIGNET> - Get a fee estimate for a lightning receive
@@ -37,10 +37,10 @@ async function runCLI() {
   getcoopexitrequest <requestId>                                      - Get a coop exit request by ID
   sendtokentransfer <tokenPubKey> <amount> <receiverSparkAddress>     - Transfer tokens
   help                                                                - Show this help message
-  exit/quit
+  exit/quit                                                           - Exit the program
 
   L1 commands:
-  tokenwithdraw <tokenPublicKey> [tokenAmount] - Unilaterally withdraw tokens to L1- Exit the program
+  tokenwithdraw <tokenPublicKey> [tokenAmount] - Unilaterally withdraw tokens to L1
 `;
   console.log(helpMessage);
 
@@ -87,7 +87,7 @@ async function runCLI() {
           break;
         }
         const lightningSendRequest = await wallet.getLightningSendRequest(
-          args[0]
+          args[0],
         );
         console.log(lightningSendRequest);
         break;
@@ -97,7 +97,7 @@ async function runCLI() {
           break;
         }
         const lightningReceiveRequest = await wallet.getLightningReceiveRequest(
-          args[0]
+          args[0],
         );
         console.log(lightningReceiveRequest);
         break;
@@ -203,7 +203,7 @@ async function runCLI() {
         }
         if (args.length < 3) {
           console.log(
-            "Usage: sendtokentransfer <tokenPubKey> <amount> <receiverPubKey>"
+            "Usage: sendtokentransfer <tokenPubKey> <amount> <receiverPubKey>",
           );
           break;
         }
