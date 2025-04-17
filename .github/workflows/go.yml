@@ -210,18 +210,29 @@ jobs:
             }
 
   test:
-    needs: ["unit-test", "check"]
+    needs: ["unit-test", "check", "trigger-hermetic"]
     runs-on: ubuntu-latest
     if: always()
     steps:
       - name: Check test results
         run: |
-          if [[ ${{ needs.unit-test.result }} == "success" ]] && \
-             [[ ${{ needs.check.result }} == "success" ]]; then
-            exit 0
-          else
+          if [[ ${{ needs.unit-test.result }} != "success" ]]; then
+            echo "Unit tests failed"
             exit 1
           fi
+
+          if [[ ${{ needs.check.result }} != "success" ]]; then
+            echo "Code checks (linting) failed"
+            exit 1
+          fi
+
+          if [[ ${{ needs.trigger-hermetic.result }} != "skipped" ]] && \
+             [[ ${{ needs.trigger-hermetic.result }} != "success" ]]; then
+            echo "Hermetic tests failed"
+            exit 1
+          fi
+
+          echo "All required tests passed successfully"
 
   deploy:
     needs: ["build"]

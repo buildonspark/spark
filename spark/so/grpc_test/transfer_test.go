@@ -287,6 +287,7 @@ func TestTransferWithSeparateSteps(t *testing.T) {
 }
 
 func TestCancelTransfer(t *testing.T) {
+	skipIfGithubActions(t)
 	// Sender initiates transfer
 	senderConfig, err := testutil.TestWalletConfig()
 	if err != nil {
@@ -406,6 +407,7 @@ func TestCancelTransfer(t *testing.T) {
 }
 
 func TestQueryTransfers(t *testing.T) {
+	skipIfGithubActions(t)
 	// Initiate sender
 	senderConfig, err := testutil.TestWalletConfig()
 	if err != nil {
