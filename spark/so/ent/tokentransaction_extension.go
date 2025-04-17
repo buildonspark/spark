@@ -45,6 +45,14 @@ func CreateStartedTransactionEntities(
 	}
 
 	db := GetDbFromContext(ctx)
+
+	var network schema.Network
+	err = network.UnmarshalProto(tokenTransaction.Network)
+	if err != nil {
+		log.Printf("Failed to unmarshal network: %v", err)
+		return nil, err
+	}
+
 	var tokenMintEnt *TokenMint
 	if tokenTransaction.GetMintInput() != nil {
 		tokenMintEnt, err = db.TokenMint.Create().
@@ -82,17 +90,11 @@ func CreateStartedTransactionEntities(
 		}
 
 		for outputIndex, outputToSpendEnt := range outputToSpendEnts {
-			var network schema.Network
-			err := network.UnmarshalProto(tokenTransaction.Network)
-			if err != nil {
-				return nil, err
-			}
 			_, err = db.TokenOutput.UpdateOne(outputToSpendEnt).
 				SetStatus(schema.TokenOutputStatusSpentStarted).
 				SetOutputSpentTokenTransactionID(tokenTransactionEnt.ID).
 				SetSpentOwnershipSignature(ownershipSignatures[outputIndex]).
 				SetSpentTransactionInputVout(int32(outputIndex)).
-				SetNetwork(network).
 				Save(ctx)
 			if err != nil {
 				log.Printf("Failed to update output to spend: %v", err)
@@ -124,6 +126,7 @@ func CreateStartedTransactionEntities(
 				SetWithdrawRevocationCommitment(output.RevocationCommitment).
 				SetTokenPublicKey(output.TokenPublicKey).
 				SetTokenAmount(output.TokenAmount).
+				SetNetwork(network).
 				SetCreatedTransactionOutputVout(int32(outputIndex)).
 				SetRevocationKeyshareID(revocationUUID).
 				SetOutputCreatedTokenTransactionID(tokenTransactionEnt.ID),
