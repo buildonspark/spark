@@ -1,5 +1,11 @@
 # @buildonspark/spark-sdk
 
+## 0.1.0
+
+### Minor Changes
+
+- - SparkServiceClient.query_all_transfers request format has changed to TransferFilter type
+
 ## 0.0.30
 
 ### Patch Changes
