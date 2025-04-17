@@ -37,12 +37,17 @@ func (h *InternalDepositHandler) MarkKeyshareForDepositAddress(ctx context.Conte
 		return nil, err
 	}
 
-	_, err = ent.GetDbFromContext(ctx).DepositAddress.Create().
+	depositAddressMutator := ent.GetDbFromContext(ctx).DepositAddress.Create().
 		SetSigningKeyshareID(keyshareID).
 		SetOwnerIdentityPubkey(req.OwnerIdentityPublicKey).
 		SetOwnerSigningPubkey(req.OwnerSigningPublicKey).
-		SetAddress(req.Address).
-		Save(ctx)
+		SetAddress(req.Address)
+
+	if req.IsStatic != nil && *req.IsStatic {
+		depositAddressMutator.SetIsStatic(true)
+	}
+
+	_, err = depositAddressMutator.Save(ctx)
 	if err != nil {
 		log.Printf("Failed to link keyshare to deposit address: %v", err)
 		return nil, err

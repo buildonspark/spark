@@ -172,6 +172,10 @@ func (m *MarkKeyshareForDepositAddressRequest) validate(all bool) error {
 
 	// no validation rules for OwnerSigningPublicKey
 
+	if m.IsStatic != nil {
+		// no validation rules for IsStatic
+	}
+
 	if len(errors) > 0 {
 		return MarkKeyshareForDepositAddressRequestMultiError(errors)
 	}

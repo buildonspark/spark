@@ -737,6 +737,10 @@ func (m *GenerateDepositAddressRequest) validate(all bool) error {
 
 	// no validation rules for LeafId
 
+	if m.IsStatic != nil {
+		// no validation rules for IsStatic
+	}
+
 	if len(errors) > 0 {
 		return GenerateDepositAddressRequestMultiError(errors)
 	}
@@ -875,6 +879,8 @@ func (m *Address) validate(all bool) error {
 			}
 		}
 	}
+
+	// no validation rules for IsStatic
 
 	if len(errors) > 0 {
 		return AddressMultiError(errors)

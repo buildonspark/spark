@@ -38,6 +38,7 @@ func (DepositAddress) Fields() []ent.Field {
 		field.Int64("confirmation_height").Optional(),
 		field.String("confirmation_txid").Optional(),
 		field.UUID("node_id", uuid.UUID{}).Optional(),
+		field.Bool("is_static").Default(false),
 	}
 }
 

@@ -31,6 +31,8 @@ const (
 	FieldConfirmationTxid = "confirmation_txid"
 	// FieldNodeID holds the string denoting the node_id field in the database.
 	FieldNodeID = "node_id"
+	// FieldIsStatic holds the string denoting the is_static field in the database.
+	FieldIsStatic = "is_static"
 	// EdgeSigningKeyshare holds the string denoting the signing_keyshare edge name in mutations.
 	EdgeSigningKeyshare = "signing_keyshare"
 	// Table holds the table name of the depositaddress in the database.
@@ -55,6 +57,7 @@ var Columns = []string{
 	FieldConfirmationHeight,
 	FieldConfirmationTxid,
 	FieldNodeID,
+	FieldIsStatic,
 }
 
 // ForeignKeys holds the SQL foreign-keys that are owned by the "deposit_addresses"
@@ -91,6 +94,8 @@ var (
 	OwnerIdentityPubkeyValidator func([]byte) error
 	// OwnerSigningPubkeyValidator is a validator for the "owner_signing_pubkey" field. It is called by the builders before save.
 	OwnerSigningPubkeyValidator func([]byte) error
+	// DefaultIsStatic holds the default value on creation for the "is_static" field.
+	DefaultIsStatic bool
 	// DefaultID holds the default value on creation for the "id" field.
 	DefaultID func() uuid.UUID
 )
@@ -131,6 +136,11 @@ func ByConfirmationTxid(opts ...sql.OrderTermOption) OrderOption {
 // ByNodeID orders the results by the node_id field.
 func ByNodeID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldNodeID, opts...).ToFunc()
+}
+
+// ByIsStatic orders the results by the is_static field.
+func ByIsStatic(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldIsStatic, opts...).ToFunc()
 }
 
 // BySigningKeyshareField orders the results by signing_keyshare field.

@@ -63,6 +63,7 @@ var (
 		{Name: "confirmation_height", Type: field.TypeInt64, Nullable: true},
 		{Name: "confirmation_txid", Type: field.TypeString, Nullable: true},
 		{Name: "node_id", Type: field.TypeUUID, Nullable: true},
+		{Name: "is_static", Type: field.TypeBool, Default: false},
 		{Name: "deposit_address_signing_keyshare", Type: field.TypeUUID},
 	}
 	// DepositAddressesTable holds the schema information for the "deposit_addresses" table.
@@ -73,7 +74,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "deposit_addresses_signing_keyshares_signing_keyshare",
-				Columns:    []*schema.Column{DepositAddressesColumns[9]},
+				Columns:    []*schema.Column{DepositAddressesColumns[10]},
 				RefColumns: []*schema.Column{SigningKeysharesColumns[0]},
 				OnDelete:   schema.NoAction,
 			},

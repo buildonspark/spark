@@ -96,6 +96,11 @@ func NodeID(v uuid.UUID) predicate.DepositAddress {
 	return predicate.DepositAddress(sql.FieldEQ(FieldNodeID, v))
 }
 
+// IsStatic applies equality check predicate on the "is_static" field. It's identical to IsStaticEQ.
+func IsStatic(v bool) predicate.DepositAddress {
+	return predicate.DepositAddress(sql.FieldEQ(FieldIsStatic, v))
+}
+
 // CreateTimeEQ applies the EQ predicate on the "create_time" field.
 func CreateTimeEQ(v time.Time) predicate.DepositAddress {
 	return predicate.DepositAddress(sql.FieldEQ(FieldCreateTime, v))
@@ -494,6 +499,16 @@ func NodeIDIsNil() predicate.DepositAddress {
 // NodeIDNotNil applies the NotNil predicate on the "node_id" field.
 func NodeIDNotNil() predicate.DepositAddress {
 	return predicate.DepositAddress(sql.FieldNotNull(FieldNodeID))
+}
+
+// IsStaticEQ applies the EQ predicate on the "is_static" field.
+func IsStaticEQ(v bool) predicate.DepositAddress {
+	return predicate.DepositAddress(sql.FieldEQ(FieldIsStatic, v))
+}
+
+// IsStaticNEQ applies the NEQ predicate on the "is_static" field.
+func IsStaticNEQ(v bool) predicate.DepositAddress {
+	return predicate.DepositAddress(sql.FieldNEQ(FieldIsStatic, v))
 }
 
 // HasSigningKeyshare applies the HasEdge predicate on the "signing_keyshare" edge.

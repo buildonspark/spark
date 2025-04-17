@@ -75,8 +75,10 @@ type MarkKeyshareForDepositAddressRequest struct {
 	Address                string                 `protobuf:"bytes,2,opt,name=address,proto3" json:"address,omitempty"`
 	OwnerIdentityPublicKey []byte                 `protobuf:"bytes,3,opt,name=owner_identity_public_key,json=ownerIdentityPublicKey,proto3" json:"owner_identity_public_key,omitempty"`
 	OwnerSigningPublicKey  []byte                 `protobuf:"bytes,4,opt,name=owner_signing_public_key,json=ownerSigningPublicKey,proto3" json:"owner_signing_public_key,omitempty"`
-	unknownFields          protoimpl.UnknownFields
-	sizeCache              protoimpl.SizeCache
+	// Static deposit address flag
+	IsStatic      *bool `protobuf:"varint,5,opt,name=is_static,json=isStatic,proto3,oneof" json:"is_static,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *MarkKeyshareForDepositAddressRequest) Reset() {
@@ -135,6 +137,13 @@ func (x *MarkKeyshareForDepositAddressRequest) GetOwnerSigningPublicKey() []byte
 		return x.OwnerSigningPublicKey
 	}
 	return nil
+}
+
+func (x *MarkKeyshareForDepositAddressRequest) GetIsStatic() bool {
+	if x != nil && x.IsStatic != nil {
+		return *x.IsStatic
+	}
+	return false
 }
 
 type MarkKeyshareForDepositAddressResponse struct {
@@ -1588,13 +1597,16 @@ const file_spark_internal_proto_rawDesc = "" +
 	"\x14spark_internal.proto\x12\x0espark_internal\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\fcommon.proto\x1a\vspark.proto\"=\n" +
 	"\x1aMarkKeysharesAsUsedRequest\x12\x1f\n" +
 	"\vkeyshare_id\x18\x01 \x03(\tR\n" +
-	"keyshareId\"\xd5\x01\n" +
+	"keyshareId\"\x85\x02\n" +
 	"$MarkKeyshareForDepositAddressRequest\x12\x1f\n" +
 	"\vkeyshare_id\x18\x01 \x01(\tR\n" +
 	"keyshareId\x12\x18\n" +
 	"\aaddress\x18\x02 \x01(\tR\aaddress\x129\n" +
 	"\x19owner_identity_public_key\x18\x03 \x01(\fR\x16ownerIdentityPublicKey\x127\n" +
-	"\x18owner_signing_public_key\x18\x04 \x01(\fR\x15ownerSigningPublicKey\"T\n" +
+	"\x18owner_signing_public_key\x18\x04 \x01(\fR\x15ownerSigningPublicKey\x12 \n" +
+	"\tis_static\x18\x05 \x01(\bH\x00R\bisStatic\x88\x01\x01B\f\n" +
+	"\n" +
+	"_is_static\"T\n" +
 	"%MarkKeyshareForDepositAddressResponse\x12+\n" +
 	"\x11address_signature\x18\x01 \x01(\fR\x10addressSignature\"7\n" +
 	"\x12FrostRound1Request\x12!\n" +
@@ -1882,6 +1894,7 @@ func file_spark_internal_proto_init() {
 	if File_spark_internal_proto != nil {
 		return
 	}
+	file_spark_internal_proto_msgTypes[1].OneofWrappers = []any{}
 	file_spark_internal_proto_msgTypes[14].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{

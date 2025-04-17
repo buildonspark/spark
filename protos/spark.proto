@@ -131,6 +131,8 @@ message GenerateDepositAddressRequest {
     Network network = 3 [(validate.rules).enum = {not_in: [0]}];
     // The UUID to use for the created TreeNode
     string leaf_id = 4;
+    // Generate static deposit address
+    optional bool is_static = 5;
 }
 
 /**
@@ -143,6 +145,8 @@ message Address {
     bytes verifying_key = 2;
     // The proof of possession of the address by the SE.
     DepositAddressProof deposit_address_proof = 3;
+    // Is it a static deposit address
+    bool is_static = 5;
 }
 
 /**
@@ -937,6 +941,10 @@ message CancelSendTransferResponse {
     Transfer transfer = 1;
 }
 
+/**
+ * Returns a list of addresses that can be used in express deposit flow.
+ * Excludes static deposit addresses.
+**/
 message QueryUnusedDepositAddressesRequest {
     bytes identity_public_key = 1;
 }

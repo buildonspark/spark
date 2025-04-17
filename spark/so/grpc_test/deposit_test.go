@@ -46,6 +46,8 @@ func TestGenerateDepositAddress(t *testing.T) {
 		t.Fatalf("deposit address is empty")
 	}
 
+	assert.False(t, resp.DepositAddress.IsStatic)
+
 	unusedDepositAddresses, err := wallet.QueryUnusedDepositAddresses(ctx, config)
 	if err != nil {
 		t.Fatalf("failed to query unused deposit addresses: %v", err)
@@ -121,6 +123,30 @@ func TestGenerateDepositAddressConcurrentRequests(t *testing.T) {
 			addresses[resp] = true
 		}
 	}
+}
+
+func TestGenerateStaticDepositAddress(t *testing.T) {
+	config, err := testutil.TestWalletConfig()
+	if err != nil {
+		t.Fatalf("failed to create wallet config: %v", err)
+	}
+
+	token, err := wallet.AuthenticateWithServer(context.Background(), config)
+	if err != nil {
+		t.Fatalf("failed to authenticate: %v", err)
+	}
+	ctx := wallet.ContextWithToken(context.Background(), token)
+
+	pubkey, err := hex.DecodeString("0330d50fd2e26d274e15f3dcea34a8bb611a9d0f14d1a9b1211f3608b3b7cd56c8")
+	assert.NoError(t, err)
+	resp, err := wallet.GenerateStaticDepositAddress(ctx, config, pubkey)
+	assert.NoError(t, err)
+	assert.True(t, resp.DepositAddress.IsStatic)
+
+	// Static deposit addresses should not be returned by QueryUnusedDepositAddresses
+	unusedDepositAddresses, err := wallet.QueryUnusedDepositAddresses(ctx, config)
+	assert.NoError(t, err)
+	assert.Equal(t, 0, len(unusedDepositAddresses.DepositAddresses))
 }
 
 func TestStartDepositTreeCreation(t *testing.T) {

@@ -110,6 +110,20 @@ func (dac *DepositAddressCreate) SetNillableNodeID(u *uuid.UUID) *DepositAddress
 	return dac
 }
 
+// SetIsStatic sets the "is_static" field.
+func (dac *DepositAddressCreate) SetIsStatic(b bool) *DepositAddressCreate {
+	dac.mutation.SetIsStatic(b)
+	return dac
+}
+
+// SetNillableIsStatic sets the "is_static" field if the given value is not nil.
+func (dac *DepositAddressCreate) SetNillableIsStatic(b *bool) *DepositAddressCreate {
+	if b != nil {
+		dac.SetIsStatic(*b)
+	}
+	return dac
+}
+
 // SetID sets the "id" field.
 func (dac *DepositAddressCreate) SetID(u uuid.UUID) *DepositAddressCreate {
 	dac.mutation.SetID(u)
@@ -178,6 +192,10 @@ func (dac *DepositAddressCreate) defaults() {
 		v := depositaddress.DefaultUpdateTime()
 		dac.mutation.SetUpdateTime(v)
 	}
+	if _, ok := dac.mutation.IsStatic(); !ok {
+		v := depositaddress.DefaultIsStatic
+		dac.mutation.SetIsStatic(v)
+	}
 	if _, ok := dac.mutation.ID(); !ok {
 		v := depositaddress.DefaultID()
 		dac.mutation.SetID(v)
@@ -215,6 +233,9 @@ func (dac *DepositAddressCreate) check() error {
 		if err := depositaddress.OwnerSigningPubkeyValidator(v); err != nil {
 			return &ValidationError{Name: "owner_signing_pubkey", err: fmt.Errorf(`ent: validator failed for field "DepositAddress.owner_signing_pubkey": %w`, err)}
 		}
+	}
+	if _, ok := dac.mutation.IsStatic(); !ok {
+		return &ValidationError{Name: "is_static", err: errors.New(`ent: missing required field "DepositAddress.is_static"`)}
 	}
 	if len(dac.mutation.SigningKeyshareIDs()) == 0 {
 		return &ValidationError{Name: "signing_keyshare", err: errors.New(`ent: missing required edge "DepositAddress.signing_keyshare"`)}
@@ -285,6 +306,10 @@ func (dac *DepositAddressCreate) createSpec() (*DepositAddress, *sqlgraph.Create
 	if value, ok := dac.mutation.NodeID(); ok {
 		_spec.SetField(depositaddress.FieldNodeID, field.TypeUUID, value)
 		_node.NodeID = value
+	}
+	if value, ok := dac.mutation.IsStatic(); ok {
+		_spec.SetField(depositaddress.FieldIsStatic, field.TypeBool, value)
+		_node.IsStatic = value
 	}
 	if nodes := dac.mutation.SigningKeyshareIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{

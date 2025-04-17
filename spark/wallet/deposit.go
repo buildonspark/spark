@@ -108,6 +108,34 @@ func GenerateDepositAddress(
 	return depositResp, nil
 }
 
+// GenerateStaticDepositAddress generates a static deposit address for a given identity and signing public key.
+func GenerateStaticDepositAddress(
+	ctx context.Context,
+	config *Config,
+	signingPubkey []byte,
+) (*pb.GenerateDepositAddressResponse, error) {
+	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress(), nil)
+	if err != nil {
+		return nil, err
+	}
+	defer sparkConn.Close()
+	sparkClient := pb.NewSparkServiceClient(sparkConn)
+	isStatic := true
+	depositResp, err := sparkClient.GenerateDepositAddress(ctx, &pb.GenerateDepositAddressRequest{
+		SigningPublicKey:  signingPubkey,
+		IdentityPublicKey: config.IdentityPublicKey(),
+		Network:           config.ProtoNetwork(),
+		IsStatic:          &isStatic,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if err := validateDepositAddress(config, depositResp.DepositAddress, signingPubkey); err != nil {
+		return nil, err
+	}
+	return depositResp, nil
+}
+
 func QueryUnusedDepositAddresses(
 	ctx context.Context,
 	config *Config,

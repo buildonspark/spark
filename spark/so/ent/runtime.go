@@ -96,6 +96,10 @@ func init() {
 	depositaddressDescOwnerSigningPubkey := depositaddressFields[2].Descriptor()
 	// depositaddress.OwnerSigningPubkeyValidator is a validator for the "owner_signing_pubkey" field. It is called by the builders before save.
 	depositaddress.OwnerSigningPubkeyValidator = depositaddressDescOwnerSigningPubkey.Validators[0].(func([]byte) error)
+	// depositaddressDescIsStatic is the schema descriptor for is_static field.
+	depositaddressDescIsStatic := depositaddressFields[6].Descriptor()
+	// depositaddress.DefaultIsStatic holds the default value on creation for the is_static field.
+	depositaddress.DefaultIsStatic = depositaddressDescIsStatic.Default.(bool)
 	// depositaddressDescID is the schema descriptor for id field.
 	depositaddressDescID := depositaddressMixinFields0[0].Descriptor()
 	// depositaddress.DefaultID holds the default value on creation for the id field.

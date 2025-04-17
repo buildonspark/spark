@@ -35,6 +35,8 @@ type DepositAddress struct {
 	ConfirmationTxid string `json:"confirmation_txid,omitempty"`
 	// NodeID holds the value of the "node_id" field.
 	NodeID uuid.UUID `json:"node_id,omitempty"`
+	// IsStatic holds the value of the "is_static" field.
+	IsStatic bool `json:"is_static,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the DepositAddressQuery when eager-loading is set.
 	Edges                            DepositAddressEdges `json:"edges"`
@@ -69,6 +71,8 @@ func (*DepositAddress) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case depositaddress.FieldOwnerIdentityPubkey, depositaddress.FieldOwnerSigningPubkey:
 			values[i] = new([]byte)
+		case depositaddress.FieldIsStatic:
+			values[i] = new(sql.NullBool)
 		case depositaddress.FieldConfirmationHeight:
 			values[i] = new(sql.NullInt64)
 		case depositaddress.FieldAddress, depositaddress.FieldConfirmationTxid:
@@ -148,6 +152,12 @@ func (da *DepositAddress) assignValues(columns []string, values []any) error {
 			} else if value != nil {
 				da.NodeID = *value
 			}
+		case depositaddress.FieldIsStatic:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field is_static", values[i])
+			} else if value.Valid {
+				da.IsStatic = value.Bool
+			}
 		case depositaddress.ForeignKeys[0]:
 			if value, ok := values[i].(*sql.NullScanner); !ok {
 				return fmt.Errorf("unexpected type %T for field deposit_address_signing_keyshare", values[i])
@@ -219,6 +229,9 @@ func (da *DepositAddress) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("node_id=")
 	builder.WriteString(fmt.Sprintf("%v", da.NodeID))
+	builder.WriteString(", ")
+	builder.WriteString("is_static=")
+	builder.WriteString(fmt.Sprintf("%v", da.IsStatic))
 	builder.WriteByte(')')
 	return builder.String()
 }

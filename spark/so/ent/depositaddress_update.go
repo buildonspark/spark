@@ -102,6 +102,20 @@ func (dau *DepositAddressUpdate) ClearNodeID() *DepositAddressUpdate {
 	return dau
 }
 
+// SetIsStatic sets the "is_static" field.
+func (dau *DepositAddressUpdate) SetIsStatic(b bool) *DepositAddressUpdate {
+	dau.mutation.SetIsStatic(b)
+	return dau
+}
+
+// SetNillableIsStatic sets the "is_static" field if the given value is not nil.
+func (dau *DepositAddressUpdate) SetNillableIsStatic(b *bool) *DepositAddressUpdate {
+	if b != nil {
+		dau.SetIsStatic(*b)
+	}
+	return dau
+}
+
 // Mutation returns the DepositAddressMutation object of the builder.
 func (dau *DepositAddressUpdate) Mutation() *DepositAddressMutation {
 	return dau.mutation
@@ -186,6 +200,9 @@ func (dau *DepositAddressUpdate) sqlSave(ctx context.Context) (n int, err error)
 	}
 	if dau.mutation.NodeIDCleared() {
 		_spec.ClearField(depositaddress.FieldNodeID, field.TypeUUID)
+	}
+	if value, ok := dau.mutation.IsStatic(); ok {
+		_spec.SetField(depositaddress.FieldIsStatic, field.TypeBool, value)
 	}
 	if n, err = sqlgraph.UpdateNodes(ctx, dau.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
@@ -277,6 +294,20 @@ func (dauo *DepositAddressUpdateOne) SetNillableNodeID(u *uuid.UUID) *DepositAdd
 // ClearNodeID clears the value of the "node_id" field.
 func (dauo *DepositAddressUpdateOne) ClearNodeID() *DepositAddressUpdateOne {
 	dauo.mutation.ClearNodeID()
+	return dauo
+}
+
+// SetIsStatic sets the "is_static" field.
+func (dauo *DepositAddressUpdateOne) SetIsStatic(b bool) *DepositAddressUpdateOne {
+	dauo.mutation.SetIsStatic(b)
+	return dauo
+}
+
+// SetNillableIsStatic sets the "is_static" field if the given value is not nil.
+func (dauo *DepositAddressUpdateOne) SetNillableIsStatic(b *bool) *DepositAddressUpdateOne {
+	if b != nil {
+		dauo.SetIsStatic(*b)
+	}
 	return dauo
 }
 
@@ -394,6 +425,9 @@ func (dauo *DepositAddressUpdateOne) sqlSave(ctx context.Context) (_node *Deposi
 	}
 	if dauo.mutation.NodeIDCleared() {
 		_spec.ClearField(depositaddress.FieldNodeID, field.TypeUUID)
+	}
+	if value, ok := dauo.mutation.IsStatic(); ok {
+		_spec.SetField(depositaddress.FieldIsStatic, field.TypeBool, value)
 	}
 	_node = &DepositAddress{config: dauo.config}
 	_spec.Assign = _node.assignValues

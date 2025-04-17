@@ -120,6 +120,9 @@ func (h *TreeQueryHandler) QueryUnusedDepositAddresses(ctx context.Context, req 
 	query := db.DepositAddress.Query()
 	query = query.
 		Where(depositaddress.OwnerIdentityPubkey(req.GetIdentityPublicKey())).
+		// Exclude static deposit addresses, because they always can be used,
+		// whereas express deposit addresses can be used only once
+		Where(depositaddress.IsStatic(false)).
 		Order(ent.Desc(depositaddress.FieldID)).
 		WithSigningKeyshare().
 		Limit(10)

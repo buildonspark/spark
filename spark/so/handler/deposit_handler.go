@@ -91,6 +91,10 @@ func (o *DepositHandler) GenerateDepositAddress(ctx context.Context, config *so.
 		SetAddress(*depositAddress)
 	// Confirmation height is not set since nothing has been confirmed yet.
 
+	if req.IsStatic != nil && *req.IsStatic {
+		depositAddressMutator.SetIsStatic(true)
+	}
+
 	if req.LeafId != "" {
 		leafID, err := uuid.Parse(req.LeafId)
 		if err != nil {
@@ -117,6 +121,7 @@ func (o *DepositHandler) GenerateDepositAddress(ctx context.Context, config *so.
 			Address:                *depositAddress,
 			OwnerIdentityPublicKey: req.IdentityPublicKey,
 			OwnerSigningPublicKey:  req.SigningPublicKey,
+			IsStatic:               req.IsStatic,
 		})
 		if err != nil {
 			return nil, err
@@ -145,6 +150,7 @@ func (o *DepositHandler) GenerateDepositAddress(ctx context.Context, config *so.
 				AddressSignatures:          response,
 				ProofOfPossessionSignature: proofOfPossessionSignature[0],
 			},
+			IsStatic: req.IsStatic != nil && *req.IsStatic,
 		},
 	}, nil
 }

@@ -56,6 +56,8 @@ message MarkKeyshareForDepositAddressRequest {
     string address = 2;
     bytes owner_identity_public_key = 3;
     bytes owner_signing_public_key = 4;
+    // Static deposit address flag
+    optional bool is_static = 5;
 }
 
 message MarkKeyshareForDepositAddressResponse {

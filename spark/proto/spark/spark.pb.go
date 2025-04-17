@@ -589,7 +589,9 @@ type GenerateDepositAddressRequest struct {
 	// The network of the bitcoin network.
 	Network Network `protobuf:"varint,3,opt,name=network,proto3,enum=spark.Network" json:"network,omitempty"`
 	// The UUID to use for the created TreeNode
-	LeafId        string `protobuf:"bytes,4,opt,name=leaf_id,json=leafId,proto3" json:"leaf_id,omitempty"`
+	LeafId string `protobuf:"bytes,4,opt,name=leaf_id,json=leafId,proto3" json:"leaf_id,omitempty"`
+	// Generate static deposit address
+	IsStatic      *bool `protobuf:"varint,5,opt,name=is_static,json=isStatic,proto3,oneof" json:"is_static,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -652,6 +654,13 @@ func (x *GenerateDepositAddressRequest) GetLeafId() string {
 	return ""
 }
 
+func (x *GenerateDepositAddressRequest) GetIsStatic() bool {
+	if x != nil && x.IsStatic != nil {
+		return *x.IsStatic
+	}
+	return false
+}
+
 // *
 // Address is the address of the user's public key + SE's public key.
 type Address struct {
@@ -662,8 +671,10 @@ type Address struct {
 	VerifyingKey []byte `protobuf:"bytes,2,opt,name=verifying_key,json=verifyingKey,proto3" json:"verifying_key,omitempty"`
 	// The proof of possession of the address by the SE.
 	DepositAddressProof *DepositAddressProof `protobuf:"bytes,3,opt,name=deposit_address_proof,json=depositAddressProof,proto3" json:"deposit_address_proof,omitempty"`
-	unknownFields       protoimpl.UnknownFields
-	sizeCache           protoimpl.SizeCache
+	// Is it a static deposit address
+	IsStatic      bool `protobuf:"varint,5,opt,name=is_static,json=isStatic,proto3" json:"is_static,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Address) Reset() {
@@ -715,6 +726,13 @@ func (x *Address) GetDepositAddressProof() *DepositAddressProof {
 		return x.DepositAddressProof
 	}
 	return nil
+}
+
+func (x *Address) GetIsStatic() bool {
+	if x != nil {
+		return x.IsStatic
+	}
+	return false
 }
 
 // *
@@ -6886,6 +6904,9 @@ func (x *CancelSendTransferResponse) GetTransfer() *Transfer {
 	return nil
 }
 
+// *
+// Returns a list of addresses that can be used in express deposit flow.
+// Excludes static deposit addresses.
 type QueryUnusedDepositAddressesRequest struct {
 	state             protoimpl.MessageState `protogen:"open.v1"`
 	IdentityPublicKey []byte                 `protobuf:"bytes,1,opt,name=identity_public_key,json=identityPublicKey,proto3" json:"identity_public_key,omitempty"`
@@ -7198,16 +7219,20 @@ const file_spark_proto_rawDesc = "" +
 	"\x1dproof_of_possession_signature\x18\x02 \x01(\fR\x1aproofOfPossessionSignature\x1aD\n" +
 	"\x16AddressSignaturesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\fR\x05value:\x028\x01\"\xca\x01\n" +
+	"\x05value\x18\x02 \x01(\fR\x05value:\x028\x01\"\xfa\x01\n" +
 	"\x1dGenerateDepositAddressRequest\x12,\n" +
 	"\x12signing_public_key\x18\x01 \x01(\fR\x10signingPublicKey\x12.\n" +
 	"\x13identity_public_key\x18\x02 \x01(\fR\x11identityPublicKey\x122\n" +
 	"\anetwork\x18\x03 \x01(\x0e2\x0e.spark.NetworkB\b\xfaB\x05\x82\x01\x02 \x00R\anetwork\x12\x17\n" +
-	"\aleaf_id\x18\x04 \x01(\tR\x06leafId\"\x98\x01\n" +
+	"\aleaf_id\x18\x04 \x01(\tR\x06leafId\x12 \n" +
+	"\tis_static\x18\x05 \x01(\bH\x00R\bisStatic\x88\x01\x01B\f\n" +
+	"\n" +
+	"_is_static\"\xb5\x01\n" +
 	"\aAddress\x12\x18\n" +
 	"\aaddress\x18\x01 \x01(\tR\aaddress\x12#\n" +
 	"\rverifying_key\x18\x02 \x01(\fR\fverifyingKey\x12N\n" +
-	"\x15deposit_address_proof\x18\x03 \x01(\v2\x1a.spark.DepositAddressProofR\x13depositAddressProof\"Y\n" +
+	"\x15deposit_address_proof\x18\x03 \x01(\v2\x1a.spark.DepositAddressProofR\x13depositAddressProof\x12\x1b\n" +
+	"\tis_static\x18\x05 \x01(\bR\bisStatic\"Y\n" +
 	"\x1eGenerateDepositAddressResponse\x127\n" +
 	"\x0fdeposit_address\x18\x01 \x01(\v2\x0e.spark.AddressR\x0edepositAddress\"e\n" +
 	"\x04UTXO\x12\x15\n" +
@@ -8134,6 +8159,7 @@ func file_spark_proto_init() {
 		(*SubscribeToEventsResponse_Transfer)(nil),
 		(*SubscribeToEventsResponse_Deposit)(nil),
 	}
+	file_spark_proto_msgTypes[5].OneofWrappers = []any{}
 	file_spark_proto_msgTypes[22].OneofWrappers = []any{}
 	file_spark_proto_msgTypes[23].OneofWrappers = []any{
 		(*TokenTransaction_MintInput)(nil),
