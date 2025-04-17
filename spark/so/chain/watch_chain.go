@@ -380,9 +380,12 @@ func handleBlock(ctx context.Context,
 		}
 		treeNode, err := dbTx.TreeNode.Query().
 			Where(treenode.HasSigningKeyshareWith(signingkeyshare.ID(signingKeyShare.ID))).
+			// FIXME(mhr): Unblocking deployment. Is this what we should do if we encounter a tree node that
+			// has already been marked available (e.g. through `FinalizeNodeSignatures`)?
+			Where(treenode.StatusEQ(schema.TreeNodeStatusCreating)).
 			Only(ctx)
 		if ent.IsNotFound(err) {
-			logger.Info("Deposit confirmed before tree creation", "address", deposit.Address)
+			logger.Info("Deposit confirmed before tree creation or tree already available", "address", deposit.Address)
 			continue
 		}
 		if err != nil {
