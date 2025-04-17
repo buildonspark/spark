@@ -797,8 +797,14 @@ func QueryAllTransfers(ctx context.Context, config *Config, limit int64, offset 
 	}
 	defer sparkConn.Close()
 
+	token, err := AuthenticateWithConnection(ctx, config, sparkConn)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to authenticate with server: %v", err)
+	}
+	authCtx := ContextWithToken(ctx, token)
+
 	sparkClient := pb.NewSparkServiceClient(sparkConn)
-	response, err := sparkClient.QueryAllTransfers(ctx, &pb.TransferFilter{
+	response, err := sparkClient.QueryAllTransfers(authCtx, &pb.TransferFilter{
 		Participant: &pb.TransferFilter_ReceiverIdentityPublicKey{
 			ReceiverIdentityPublicKey: config.IdentityPublicKey(),
 		},
