@@ -784,7 +784,7 @@ export class SparkWallet {
    * Finalizes a deposit to the wallet.
    *
    * @param {DepositParams} params - Parameters for finalizing the deposit
-   * @returns {Promise<TreeNode[] | undefined>} The nodes created from the deposit
+   * @returns {Promise<void>} The nodes created from the deposit
    * @private
    */
   private async finalizeDeposit({
@@ -801,10 +801,13 @@ export class SparkWallet {
     });
 
     for (const node of res.nodes) {
-      await this.transferService.extendTimelock(node, signingPubKey);
-    }
+      const { nodes } = await this.transferService.extendTimelock(
+        node,
+        signingPubKey,
+      );
 
-    return res.nodes;
+      await this.transferDepositToSelf(nodes, signingPubKey);
+    }
   }
 
   /**
@@ -995,10 +998,14 @@ export class SparkWallet {
     }
 
     for (const node of nodesToExtend) {
-      await this.transferService.extendTimelock(
-        node,
-        await this.config.signer.generatePublicKey(sha256(node.id)),
+      const signingPubKey = await this.config.signer.generatePublicKey(
+        sha256(node.id),
       );
+      const { nodes } = await this.transferService.extendTimelock(
+        node,
+        signingPubKey,
+      );
+      await this.transferDepositToSelf(nodes, signingPubKey);
     }
   }
 
