@@ -43,7 +43,7 @@ func TestTreeCreationAddressGeneration(t *testing.T) {
 	userPubKey := privKey.PubKey()
 	userPubKeyBytes := userPubKey.SerializeCompressed()
 
-	depositResp, err := wallet.GenerateDepositAddress(ctx, config, userPubKeyBytes)
+	depositResp, err := wallet.GenerateDepositAddress(ctx, config, userPubKeyBytes, "")
 	if err != nil {
 		t.Fatalf("failed to generate deposit address: %v", err)
 	}
@@ -109,7 +109,7 @@ func TestTreeCreationWithMultiLevels(t *testing.T) {
 	userPubKey := privKey.PubKey()
 	userPubKeyBytes := userPubKey.SerializeCompressed()
 
-	depositResp, err := wallet.GenerateDepositAddress(ctx, config, userPubKeyBytes)
+	depositResp, err := wallet.GenerateDepositAddress(ctx, config, userPubKeyBytes, "")
 	if err != nil {
 		t.Fatalf("failed to generate deposit address: %v", err)
 	}

@@ -83,6 +83,9 @@ func GenerateDepositAddress(
 	ctx context.Context,
 	config *Config,
 	signingPubkey []byte,
+	// Signing pub key should be generated in a deterministic way from this leaf ID.
+	// This will be used as the leaf ID for the leaf node.
+	customLeafID string,
 ) (*pb.GenerateDepositAddressResponse, error) {
 	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress(), nil)
 	if err != nil {
@@ -94,6 +97,7 @@ func GenerateDepositAddress(
 		SigningPublicKey:  signingPubkey,
 		IdentityPublicKey: config.IdentityPublicKey(),
 		Network:           config.ProtoNetwork(),
+		LeafId:            customLeafID,
 	})
 	if err != nil {
 		return nil, err

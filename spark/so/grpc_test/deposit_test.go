@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
+	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/common"
 	"github.com/lightsparkdev/spark-go/proto/spark"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
@@ -34,7 +35,7 @@ func TestGenerateDepositAddress(t *testing.T) {
 		t.Fatalf("failed to decode public key: %v", err)
 	}
 
-	resp, err := wallet.GenerateDepositAddress(ctx, config, pubkey)
+	resp, err := wallet.GenerateDepositAddress(ctx, config, pubkey, "")
 	if err != nil {
 		t.Fatalf("failed to generate deposit address: %v", err)
 	}
@@ -90,7 +91,8 @@ func TestStartDepositTreeCreation(t *testing.T) {
 	userPubKey := privKey.PubKey()
 	userPubKeyBytes := userPubKey.SerializeCompressed()
 
-	depositResp, err := wallet.GenerateDepositAddress(ctx, config, userPubKeyBytes)
+	leafID := uuid.New().String()
+	depositResp, err := wallet.GenerateDepositAddress(ctx, config, userPubKeyBytes, leafID)
 	if err != nil {
 		t.Fatalf("failed to generate deposit address: %v", err)
 	}
@@ -148,6 +150,9 @@ func TestStartDepositTreeCreation(t *testing.T) {
 		if node.Status == string(schema.TreeNodeStatusCreating) {
 			t.Fatalf("tree node is in status TreeNodeStatusCreating %s", node.Id)
 		}
+		if node.Id != leafID {
+			t.Fatalf("tree node id is not the expected leaf id %s", node.Id)
+		}
 	}
 
 	unusedDepositAddresses, err := wallet.QueryUnusedDepositAddresses(ctx, config)
@@ -188,7 +193,7 @@ func TestStartDepositTreeCreationConcurrentWithSameTx(t *testing.T) {
 	userPubKey := privKey.PubKey()
 	userPubKeyBytes := userPubKey.SerializeCompressed()
 
-	depositResp, err := wallet.GenerateDepositAddress(ctx, config, userPubKeyBytes)
+	depositResp, err := wallet.GenerateDepositAddress(ctx, config, userPubKeyBytes, "")
 	if err != nil {
 		t.Fatalf("failed to generate deposit address: %v", err)
 	}
@@ -318,7 +323,7 @@ func TestStartDepositTreeCreationOffchain(t *testing.T) {
 	userPubKey := privKey.PubKey()
 	userPubKeyBytes := userPubKey.SerializeCompressed()
 
-	depositResp, err := wallet.GenerateDepositAddress(ctx, config, userPubKeyBytes)
+	depositResp, err := wallet.GenerateDepositAddress(ctx, config, userPubKeyBytes, "")
 	if err != nil {
 		t.Fatalf("failed to generate deposit address: %v", err)
 	}
