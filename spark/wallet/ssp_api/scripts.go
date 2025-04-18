@@ -120,7 +120,7 @@ mutation RequestLightningReceive(
       created_at
       updated_at
       invoice {
-        encoded_envoice
+        encoded_invoice
       }
       fee {
         original_value
