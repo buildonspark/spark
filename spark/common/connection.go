@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
@@ -60,17 +61,20 @@ func NewGRPCConnection(address string, certPath *string, retryPolicy *RetryPolic
 
 // NewGRPCConnection creates a new gRPC connection to the given address.
 func NewGRPCConnectionWithCert(address string, certPath string, retryPolicy *RetryPolicyConfig) (*grpc.ClientConn, error) {
-	var serviceConfig string
-	if retryPolicy != nil {
-		serviceConfig = CreateRetryPolicy(*retryPolicy)
-	} else {
-		serviceConfig = CreateRetryPolicy(DefaultRetryPolicy)
-	}
-
-	var creds credentials.TransportCredentials
 	if len(certPath) == 0 {
 		return NewGRPCConnectionWithoutTLS(address, retryPolicy)
 	}
+
+	clientOpts := []grpc.DialOption{
+		grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
+	}
+
+	if retryPolicy != nil {
+		clientOpts = append(clientOpts, grpc.WithDefaultServiceConfig(CreateRetryPolicy(*retryPolicy)))
+	} else {
+		clientOpts = append(clientOpts, grpc.WithDefaultServiceConfig(CreateRetryPolicy(DefaultRetryPolicy)))
+	}
+
 	certPool := x509.NewCertPool()
 	serverCert, err := os.ReadFile(certPath)
 	if err != nil {
@@ -90,13 +94,16 @@ func NewGRPCConnectionWithCert(address string, certPath string, retryPolicy *Ret
 		host = "localhost"
 	}
 
-	creds = credentials.NewTLS(&tls.Config{
-		InsecureSkipVerify: host == "localhost",
-		RootCAs:            certPool,
-		ServerName:         host,
-	})
+	clientOpts = append(
+		clientOpts,
+		grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{
+			InsecureSkipVerify: host == "localhost",
+			RootCAs:            certPool,
+			ServerName:         host,
+		})),
+	)
 
-	conn, err := grpc.NewClient(address, grpc.WithTransportCredentials(creds), grpc.WithDefaultServiceConfig(serviceConfig))
+	conn, err := grpc.NewClient(address, clientOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -104,12 +111,18 @@ func NewGRPCConnectionWithCert(address string, certPath string, retryPolicy *Ret
 }
 
 func NewGRPCConnectionWithoutTLS(address string, retryPolicy *RetryPolicyConfig) (*grpc.ClientConn, error) {
-	serviceConfig := CreateRetryPolicy(DefaultRetryPolicy)
-	if retryPolicy != nil {
-		serviceConfig = CreateRetryPolicy(*retryPolicy)
+	clientOpts := []grpc.DialOption{
+		grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	}
 
-	conn, err := grpc.NewClient(address, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithDefaultServiceConfig(serviceConfig))
+	if retryPolicy != nil {
+		clientOpts = append(clientOpts, grpc.WithDefaultServiceConfig(CreateRetryPolicy(*retryPolicy)))
+	} else {
+		clientOpts = append(clientOpts, grpc.WithDefaultServiceConfig(CreateRetryPolicy(DefaultRetryPolicy)))
+	}
+
+	conn, err := grpc.NewClient(address, clientOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -117,15 +130,20 @@ func NewGRPCConnectionWithoutTLS(address string, retryPolicy *RetryPolicyConfig)
 }
 
 func NewGRPCConnectionWithTestTLS(address string, retryPolicy *RetryPolicyConfig) (*grpc.ClientConn, error) {
-	serviceConfig := CreateRetryPolicy(DefaultRetryPolicy)
-	if retryPolicy != nil {
-		serviceConfig = CreateRetryPolicy(*retryPolicy)
+	clientOpts := []grpc.DialOption{
+		grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
+		grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{
+			InsecureSkipVerify: true,
+		})),
 	}
 
-	tlsConfig := &tls.Config{
-		InsecureSkipVerify: true,
+	if retryPolicy != nil {
+		clientOpts = append(clientOpts, grpc.WithDefaultServiceConfig(CreateRetryPolicy(*retryPolicy)))
+	} else {
+		clientOpts = append(clientOpts, grpc.WithDefaultServiceConfig(CreateRetryPolicy(DefaultRetryPolicy)))
 	}
-	conn, err := grpc.NewClient(address, grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig)), grpc.WithDefaultServiceConfig(serviceConfig))
+
+	conn, err := grpc.NewClient(address, clientOpts...)
 	if err != nil {
 		return nil, err
 	}
