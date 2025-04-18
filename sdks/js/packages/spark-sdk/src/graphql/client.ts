@@ -105,8 +105,11 @@ export default class SspClient {
     );
   }
 
-  async executeRawQuery<T>(query: Query<T>): Promise<T | null> {
-    if (!(await this.authProvider.isAuthorized())) {
+  async executeRawQuery<T>(
+    query: Query<T>,
+    needsAuth: boolean = true,
+  ): Promise<T | null> {
+    if (needsAuth && !(await this.authProvider.isAuthorized())) {
       await this.authenticate();
     }
 
@@ -390,34 +393,40 @@ export default class SspClient {
   }
 
   async getChallenge(): Promise<GetChallengeOutput | null> {
-    return await this.executeRawQuery({
-      queryPayload: GetChallenge,
-      variables: {
-        public_key: bytesToHex(await this.signer.getIdentityPublicKey()),
+    return await this.executeRawQuery(
+      {
+        queryPayload: GetChallenge,
+        variables: {
+          public_key: bytesToHex(await this.signer.getIdentityPublicKey()),
+        },
+        constructObject: (response: { get_challenge: any }) => {
+          return GetChallengeOutputFromJson(response.get_challenge);
+        },
       },
-      constructObject: (response: { get_challenge: any }) => {
-        return GetChallengeOutputFromJson(response.get_challenge);
-      },
-    });
+      false,
+    );
   }
 
   async verifyChallenge(
     signature: string,
     protectedChallenge: string,
   ): Promise<VerifyChallengeOutput | null> {
-    return await this.executeRawQuery({
-      queryPayload: VerifyChallenge,
-      variables: {
-        protected_challenge: protectedChallenge,
-        signature: signature,
-        identity_public_key: bytesToHex(
-          await this.signer.getIdentityPublicKey(),
-        ),
+    return await this.executeRawQuery(
+      {
+        queryPayload: VerifyChallenge,
+        variables: {
+          protected_challenge: protectedChallenge,
+          signature: signature,
+          identity_public_key: bytesToHex(
+            await this.signer.getIdentityPublicKey(),
+          ),
+        },
+        constructObject: (response: any) => {
+          return VerifyChallengeOutputFromJson(response.verify_challenge);
+        },
       },
-      constructObject: (response: any) => {
-        return VerifyChallengeOutputFromJson(response.verify_challenge);
-      },
-    });
+      false,
+    );
   }
 
   async authenticate() {
