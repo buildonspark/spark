@@ -28,6 +28,7 @@ require (
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/pebbe/zmq4 v1.2.11
 	github.com/prometheus/client_golang v1.21.1
+	github.com/sethvargo/go-limiter v1.0.0
 	github.com/sirupsen/logrus v1.9.2
 	github.com/stretchr/testify v1.10.0
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.60.0

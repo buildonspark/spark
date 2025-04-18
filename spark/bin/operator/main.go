@@ -16,6 +16,7 @@ import (
 	"time"
 
 	entsql "entgo.io/ent/dialect/sql"
+
 	"github.com/go-co-op/gocron/v2"
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
 	"github.com/improbable-eng/grpc-web/go/grpcweb"
@@ -36,6 +37,7 @@ import (
 	sparkgrpc "github.com/lightsparkdev/spark-go/so/grpc"
 	"github.com/lightsparkdev/spark-go/so/helper"
 	"github.com/lightsparkdev/spark-go/so/lrc20"
+	"github.com/lightsparkdev/spark-go/so/middleware"
 	"github.com/lightsparkdev/spark-go/so/task"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -73,6 +75,11 @@ type args struct {
 	DKGLimitOverride           uint64
 	RunDirectory               string
 	ReturnDetailedPanicErrors  bool
+	RateLimiterEnabled         bool
+	RateLimiterMemcachedAddrs  string
+	RateLimiterWindow          time.Duration
+	RateLimiterMaxRequests     int
+	RateLimiterMethods         string
 }
 
 func (a *args) SupportedNetworksList() []common.Network {
@@ -120,6 +127,12 @@ func loadArgs() (*args, error) {
 	flag.StringVar(&args.RunDirectory, "run-dir", "", "Run directory for resolving relative paths")
 	// TODO(CNT-154): Consider setting to false by default before productionization.
 	flag.BoolVar(&args.ReturnDetailedPanicErrors, "return-detailed-panic-errors", true, "Return detailed panic errors to client")
+	flag.BoolVar(&args.RateLimiterEnabled, "rate-limiter-enabled", false, "Enable rate limiting")
+	flag.StringVar(&args.RateLimiterMemcachedAddrs, "rate-limiter-memcached-addrs", "", "Comma-separated list of Memcached addresses")
+	flag.DurationVar(&args.RateLimiterWindow, "rate-limiter-window", 60*time.Second, "Rate limiter time window")
+	flag.IntVar(&args.RateLimiterMaxRequests, "rate-limiter-max-requests", 100, "Maximum requests allowed in the time window")
+	flag.StringVar(&args.RateLimiterMethods, "rate-limiter-methods", "", "Comma-separated list of methods to rate limit")
+
 	// Parse flags
 	flag.Parse()
 
@@ -171,6 +184,14 @@ func loadArgs() (*args, error) {
 	return args, nil
 }
 
+func createRateLimiter(config *so.Config) (*middleware.RateLimiter, error) {
+	if !config.RateLimiter.Enabled {
+		return nil, nil
+	}
+
+	return middleware.NewRateLimiter(config)
+}
+
 func main() {
 	args, err := loadArgs()
 	if err != nil {
@@ -194,6 +215,12 @@ func main() {
 		args.DKGLimitOverride,
 		args.RunDirectory,
 		args.ReturnDetailedPanicErrors,
+		so.RateLimiterConfig{
+			Enabled:     args.RateLimiterEnabled,
+			Window:      args.RateLimiterWindow,
+			MaxRequests: args.RateLimiterMaxRequests,
+			Methods:     strings.Split(args.RateLimiterMethods, ","),
+		},
 	)
 	if err != nil {
 		log.Fatalf("Failed to create config: %v", err)
@@ -266,6 +293,15 @@ func main() {
 	meterProvider := metric.NewMeterProvider(metric.WithReader(promExporter))
 	otel.SetMeterProvider(meterProvider)
 
+	var rateLimiter *middleware.RateLimiter
+	if config.RateLimiter.Enabled {
+		var err error
+		rateLimiter, err = createRateLimiter(config)
+		if err != nil {
+			slog.Error("Failed to create rate limiter", "error", err)
+		}
+	}
+
 	serverOpts := []grpc.ServerOption{
 		grpc.StatsHandler(otelgrpc.NewServerHandler()),
 		grpc.UnaryInterceptor(grpc_middleware.ChainUnaryServer(
@@ -274,6 +310,14 @@ func main() {
 			ent.DbSessionMiddleware(dbClient),
 			authn.NewAuthnInterceptor(sessionTokenCreatorVerifier).AuthnInterceptor,
 			sparkgrpc.ValidationInterceptor(),
+			func() grpc.UnaryServerInterceptor {
+				if rateLimiter != nil {
+					return rateLimiter.UnaryServerInterceptor()
+				}
+				return func(ctx context.Context, req interface{}, _ *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+					return handler(ctx, req)
+				}
+			}(),
 		)),
 		grpc.StreamInterceptor(grpc_middleware.ChainStreamServer(
 			authn.NewAuthnInterceptor(sessionTokenCreatorVerifier).StreamAuthnInterceptor,
@@ -314,8 +358,8 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to create LRC20 client: %v", err)
 	}
-
 	sparkInternalServer := sparkgrpc.NewSparkInternalServer(config, lrc20Client)
+
 	pbinternal.RegisterSparkInternalServiceServer(grpcServer, sparkInternalServer)
 
 	sparkServer := sparkgrpc.NewSparkServer(config, dbClient, lrc20Client)

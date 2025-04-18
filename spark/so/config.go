@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -18,6 +19,7 @@ import (
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/lightsparkdev/spark-go/common"
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
+	"github.com/lightsparkdev/spark-go/so/middleware"
 	"github.com/lightsparkdev/spark-go/so/utils"
 	"gopkg.in/yaml.v3"
 )
@@ -62,6 +64,8 @@ type Config struct {
 	RunDirectory string
 	// If true, return the details of the panic to the client instead of just 'Internal Server Error'
 	ReturnDetailedPanicErrors bool
+	// RateLimiter is the configuration for the rate limiter
+	RateLimiter RateLimiterConfig
 }
 
 // DatabaseDriver returns the database driver based on the database path.
@@ -110,6 +114,20 @@ type Lrc20Config struct {
 	GRPCPoolSize                  uint64 `yaml:"grpcpoolsize"`
 }
 
+// RateLimiterConfig is the configuration for the rate limiter
+type RateLimiterConfig struct {
+	// Enabled determines if rate limiting is enabled
+	Enabled bool `yaml:"enabled"`
+	// Window is the time window for rate limiting
+	Window time.Duration `yaml:"window"`
+	// MaxRequests is the maximum number of requests allowed in the window
+	MaxRequests int `yaml:"max_requests"`
+	// Methods is a list of methods to rate limit
+	// Note: This does not set up rate limiting across methods by IP,
+	// nor does it provide configuration for custom per-method rate limiting.
+	Methods []string `yaml:"methods"`
+}
+
 // NewConfig creates a new config for the signing operator.
 func NewConfig(
 	configFilePath string,
@@ -128,6 +146,7 @@ func NewConfig(
 	dkgLimitOverride uint64,
 	runDirectory string,
 	returnDetailedPanicErrors bool,
+	rateLimiter RateLimiterConfig,
 ) (*Config, error) {
 	identityPrivateKeyHexStringBytes, err := os.ReadFile(identityPrivateKeyFilePath)
 	if err != nil {
@@ -178,6 +197,7 @@ func NewConfig(
 		DKGLimitOverride:          dkgLimitOverride,
 		RunDirectory:              runDirectory,
 		ReturnDetailedPanicErrors: returnDetailedPanicErrors,
+		RateLimiter:               rateLimiter,
 	}, nil
 }
 
@@ -316,4 +336,12 @@ func (c *Config) AuthzEnforced() bool {
 
 func (c *Config) IdentityPublicKey() []byte {
 	return c.SigningOperatorMap[c.Identifier].IdentityPublicKey
+}
+
+func (c *Config) GetRateLimiterConfig() *middleware.RateLimiterConfig {
+	return &middleware.RateLimiterConfig{
+		Window:      c.RateLimiter.Window,
+		MaxRequests: c.RateLimiter.MaxRequests,
+		Methods:     c.RateLimiter.Methods,
+	}
 }
