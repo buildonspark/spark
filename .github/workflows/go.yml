@@ -210,25 +210,44 @@ jobs:
             }
 
   test:
-    needs: ["unit-test", "check", "trigger-hermetic"]
+    needs: ["unit-test", "check", "trigger-hermetic", "trigger-ssp-hermetic"]
     runs-on: ubuntu-latest
     if: always()
     steps:
       - name: Check test results
         run: |
+          # Note: For hermetic tests (both regular and SSP), a "cancelled" status is considered OK
+          # as it indicates the test was pre-empted by a different run in the same PR which will also need to
+          # complete for the PR to be merged.
+          FAILED=0
+          FAILURES=""
+
           if [[ ${{ needs.unit-test.result }} != "success" ]]; then
-            echo "Unit tests failed"
-            exit 1
+            FAILURES+="- Unit tests failed\n"
+            FAILED=1
           fi
 
           if [[ ${{ needs.check.result }} != "success" ]]; then
-            echo "Code checks (linting) failed"
-            exit 1
+            FAILURES+="- Code checks (linting) failed\n"
+            FAILED=1
           fi
 
           if [[ ${{ needs.trigger-hermetic.result }} != "skipped" ]] && \
-             [[ ${{ needs.trigger-hermetic.result }} != "success" ]]; then
-            echo "Hermetic tests failed"
+             [[ ${{ needs.trigger-hermetic.result }} != "success" ]] && \
+             [[ ${{ needs.trigger-hermetic.result }} != "cancelled" ]]; then
+            FAILURES+="- Hermetic tests failed\n"
+            FAILED=1
+          fi
+
+          if [[ ${{ needs.trigger-ssp-hermetic.result }} != "skipped" ]] && \
+             [[ ${{ needs.trigger-ssp-hermetic.result }} != "success" ]] && \
+             [[ ${{ needs.trigger-ssp-hermetic.result }} != "cancelled" ]]; then
+            FAILURES+="- SSP Hermetic tests failed\n"
+            FAILED=1
+          fi
+
+          if [[ $FAILED -eq 1 ]]; then
+            echo -e "$FAILURES"
             exit 1
           fi
 
