@@ -226,7 +226,8 @@ func (w *SingleKeyWallet) grpcClient(ctx context.Context) (context.Context, *pb.
 
 	token, err := AuthenticateWithConnection(ctx, w.Config, conn)
 	if err != nil {
-		return nil, nil, conn, fmt.Errorf("failed to authenticate: %w", err)
+		conn.Close()
+		return nil, nil, nil, fmt.Errorf("failed to authenticate: %w", err)
 	}
 	ctx = ContextWithToken(ctx, token)
 
@@ -358,10 +359,10 @@ func (w *SingleKeyWallet) RequestLeavesSwap(ctx context.Context, targetAmount in
 	}
 
 	ctx, grpcClient, conn, err := w.grpcClient(ctx)
-	defer conn.Close()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create grpc client: %w", err)
 	}
+	defer conn.Close()
 
 	for _, leaf := range leaves {
 		response, err := (*grpcClient).QueryNodes(ctx, &pb.QueryNodesRequest{
