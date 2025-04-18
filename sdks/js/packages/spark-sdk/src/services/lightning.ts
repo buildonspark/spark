@@ -17,6 +17,8 @@ import {
   RequestedSigningCommitments,
   Transfer,
   UserSignedRefund,
+  StartUserSignedTransferRequest,
+  UserSignedTxSigningJob,
 } from "../proto/spark.js";
 import {
   getSigHashFromTx,
@@ -164,7 +166,7 @@ export class LightningService {
       throw new Error(`Error getting signing commitments: ${error}`);
     }
 
-    const userSignedRefunds = await this.signRefunds(
+    const leafSigningJobs = await this.signRefunds(
       leaves,
       signingCommitments.signingCommitments,
       receiverIdentityPubkey,
@@ -189,29 +191,28 @@ export class LightningService {
       bolt11String = invoiceString;
     }
 
-    const reason = isInboundPayment
-      ? InitiatePreimageSwapRequest_Reason.REASON_RECEIVE
-      : InitiatePreimageSwapRequest_Reason.REASON_SEND;
+    const transfer: StartUserSignedTransferRequest = {
+      transferId,
+      ownerIdentityPublicKey: await this.config.signer.getIdentityPublicKey(),
+      leavesToSend: leafSigningJobs,
+      receiverIdentityPublicKey: receiverIdentityPubkey,
+      expiryTime: new Date(Date.now() + 2 * 60 * 1000),
+    };
 
     let response: InitiatePreimageSwapResponse;
     try {
       response = await sparkClient.initiate_preimage_swap({
         paymentHash,
-        userSignedRefunds,
-        reason,
         invoiceAmount: {
           invoiceAmountProof: {
             bolt11Invoice: bolt11String,
           },
           valueSats: amountSats,
         },
-        transfer: {
-          transferId,
-          ownerIdentityPublicKey:
-            await this.config.signer.getIdentityPublicKey(),
-          receiverIdentityPublicKey: receiverIdentityPubkey,
-          expiryTime: new Date(Date.now() + 2 * 60 * 1000),
-        },
+        reason: isInboundPayment
+          ? InitiatePreimageSwapRequest_Reason.REASON_RECEIVE
+          : InitiatePreimageSwapRequest_Reason.REASON_SEND,
+        transfer,
         receiverIdentityPublicKey: receiverIdentityPubkey,
         feeSats: 0,
       });
@@ -274,8 +275,8 @@ export class LightningService {
     leaves: LeafKeyTweak[],
     signingCommitments: RequestedSigningCommitments[],
     receiverIdentityPubkey: Uint8Array,
-  ): Promise<UserSignedRefund[]> {
-    const userSignedRefunds: UserSignedRefund[] = [];
+  ): Promise<UserSignedTxSigningJob[]> {
+    const leafSigningJobs: UserSignedTxSigningJob[] = [];
     for (let i = 0; i < leaves.length; i++) {
       const leaf = leaves[i];
       if (!leaf?.leaf) {
@@ -325,18 +326,18 @@ export class LightningService {
         verifyingKey: leaf.leaf.verifyingPublicKey,
       });
 
-      userSignedRefunds.push({
-        nodeId: leaf.leaf.id,
-        refundTx: refundTx.toBytes(),
+      leafSigningJobs.push({
+        leafId: leaf.leaf.id,
+        signingPublicKey: leaf.signingPubKey,
+        rawTx: refundTx.toBytes(),
+        signingNonceCommitment: signingCommitment,
         userSignature: signingResult,
-        userSignatureCommitment: signingCommitment,
         signingCommitments: {
           signingCommitments: signingNonceCommitments,
         },
-        network: this.config.getNetworkProto(),
       });
     }
 
-    return userSignedRefunds;
+    return leafSigningJobs;
   }
 }

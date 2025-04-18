@@ -6827,6 +6827,174 @@ var _ interface {
 	ErrorName() string
 } = LeafRefundTxSigningJobValidationError{}
 
+// Validate checks the field values on UserSignedTxSigningJob with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *UserSignedTxSigningJob) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on UserSignedTxSigningJob with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// UserSignedTxSigningJobMultiError, or nil if none found.
+func (m *UserSignedTxSigningJob) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *UserSignedTxSigningJob) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for LeafId
+
+	// no validation rules for SigningPublicKey
+
+	// no validation rules for RawTx
+
+	if all {
+		switch v := interface{}(m.GetSigningNonceCommitment()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, UserSignedTxSigningJobValidationError{
+					field:  "SigningNonceCommitment",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, UserSignedTxSigningJobValidationError{
+					field:  "SigningNonceCommitment",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetSigningNonceCommitment()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return UserSignedTxSigningJobValidationError{
+				field:  "SigningNonceCommitment",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	// no validation rules for UserSignature
+
+	if all {
+		switch v := interface{}(m.GetSigningCommitments()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, UserSignedTxSigningJobValidationError{
+					field:  "SigningCommitments",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, UserSignedTxSigningJobValidationError{
+					field:  "SigningCommitments",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetSigningCommitments()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return UserSignedTxSigningJobValidationError{
+				field:  "SigningCommitments",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return UserSignedTxSigningJobMultiError(errors)
+	}
+
+	return nil
+}
+
+// UserSignedTxSigningJobMultiError is an error wrapping multiple validation
+// errors returned by UserSignedTxSigningJob.ValidateAll() if the designated
+// constraints aren't met.
+type UserSignedTxSigningJobMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m UserSignedTxSigningJobMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m UserSignedTxSigningJobMultiError) AllErrors() []error { return m }
+
+// UserSignedTxSigningJobValidationError is the validation error returned by
+// UserSignedTxSigningJob.Validate if the designated constraints aren't met.
+type UserSignedTxSigningJobValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e UserSignedTxSigningJobValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e UserSignedTxSigningJobValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e UserSignedTxSigningJobValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e UserSignedTxSigningJobValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e UserSignedTxSigningJobValidationError) ErrorName() string {
+	return "UserSignedTxSigningJobValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e UserSignedTxSigningJobValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sUserSignedTxSigningJob.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = UserSignedTxSigningJobValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = UserSignedTxSigningJobValidationError{}
+
 // Validate checks the field values on LeafRefundTxSigningResult with the rules
 // defined in the proto definition for this message. If any rules are
 // violated, the first error encountered is returned, or nil if there are no violations.
@@ -6961,6 +7129,178 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = LeafRefundTxSigningResultValidationError{}
+
+// Validate checks the field values on StartUserSignedTransferRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *StartUserSignedTransferRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on StartUserSignedTransferRequest with
+// the rules defined in the proto definition for this message. If any rules
+// are violated, the result is a list of violation errors wrapped in
+// StartUserSignedTransferRequestMultiError, or nil if none found.
+func (m *StartUserSignedTransferRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *StartUserSignedTransferRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for TransferId
+
+	// no validation rules for OwnerIdentityPublicKey
+
+	for idx, item := range m.GetLeavesToSend() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, StartUserSignedTransferRequestValidationError{
+						field:  fmt.Sprintf("LeavesToSend[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, StartUserSignedTransferRequestValidationError{
+						field:  fmt.Sprintf("LeavesToSend[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return StartUserSignedTransferRequestValidationError{
+					field:  fmt.Sprintf("LeavesToSend[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	// no validation rules for ReceiverIdentityPublicKey
+
+	if all {
+		switch v := interface{}(m.GetExpiryTime()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, StartUserSignedTransferRequestValidationError{
+					field:  "ExpiryTime",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, StartUserSignedTransferRequestValidationError{
+					field:  "ExpiryTime",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetExpiryTime()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return StartUserSignedTransferRequestValidationError{
+				field:  "ExpiryTime",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return StartUserSignedTransferRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// StartUserSignedTransferRequestMultiError is an error wrapping multiple
+// validation errors returned by StartUserSignedTransferRequest.ValidateAll()
+// if the designated constraints aren't met.
+type StartUserSignedTransferRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m StartUserSignedTransferRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m StartUserSignedTransferRequestMultiError) AllErrors() []error { return m }
+
+// StartUserSignedTransferRequestValidationError is the validation error
+// returned by StartUserSignedTransferRequest.Validate if the designated
+// constraints aren't met.
+type StartUserSignedTransferRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e StartUserSignedTransferRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e StartUserSignedTransferRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e StartUserSignedTransferRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e StartUserSignedTransferRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e StartUserSignedTransferRequestValidationError) ErrorName() string {
+	return "StartUserSignedTransferRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e StartUserSignedTransferRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sStartUserSignedTransferRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = StartUserSignedTransferRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = StartUserSignedTransferRequestValidationError{}
 
 // Validate checks the field values on StartSendTransferRequest with the rules
 // defined in the proto definition for this message. If any rules are
@@ -10378,40 +10718,6 @@ func (m *InitiatePreimageSwapRequest) validate(all bool) error {
 	var errors []error
 
 	// no validation rules for PaymentHash
-
-	for idx, item := range m.GetUserSignedRefunds() {
-		_, _ = idx, item
-
-		if all {
-			switch v := interface{}(item).(type) {
-			case interface{ ValidateAll() error }:
-				if err := v.ValidateAll(); err != nil {
-					errors = append(errors, InitiatePreimageSwapRequestValidationError{
-						field:  fmt.Sprintf("UserSignedRefunds[%v]", idx),
-						reason: "embedded message failed validation",
-						cause:  err,
-					})
-				}
-			case interface{ Validate() error }:
-				if err := v.Validate(); err != nil {
-					errors = append(errors, InitiatePreimageSwapRequestValidationError{
-						field:  fmt.Sprintf("UserSignedRefunds[%v]", idx),
-						reason: "embedded message failed validation",
-						cause:  err,
-					})
-				}
-			}
-		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
-			if err := v.Validate(); err != nil {
-				return InitiatePreimageSwapRequestValidationError{
-					field:  fmt.Sprintf("UserSignedRefunds[%v]", idx),
-					reason: "embedded message failed validation",
-					cause:  err,
-				}
-			}
-		}
-
-	}
 
 	if all {
 		switch v := interface{}(m.GetInvoiceAmount()).(type) {

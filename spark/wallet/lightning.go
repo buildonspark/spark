@@ -78,13 +78,12 @@ func SwapNodesForPreimage(
 		return nil, err
 	}
 
-	userSignedRefunds, err := prepareUserSignedRefunds(
+	leafSigningJobs, err := prepareLeafSigningJobs(
 		leaves,
 		refundTxs,
 		signingResults.Results,
 		userCommitments,
 		signingCommitments.SigningCommitments,
-		config.ProtoNetwork(),
 	)
 	if err != nil {
 		return nil, err
@@ -110,19 +109,19 @@ func SwapNodesForPreimage(
 		reason = pb.InitiatePreimageSwapRequest_REASON_RECEIVE
 	}
 	response, err := client.InitiatePreimageSwap(tmpCtx, &pb.InitiatePreimageSwapRequest{
-		PaymentHash:       paymentHash,
-		UserSignedRefunds: userSignedRefunds,
-		Reason:            reason,
+		PaymentHash: paymentHash,
+		Reason:      reason,
 		InvoiceAmount: &pb.InvoiceAmount{
 			InvoiceAmountProof: &pb.InvoiceAmountProof{
 				Bolt11Invoice: bolt11String,
 			},
 			ValueSats: amountSats,
 		},
-		Transfer: &pb.StartSendTransferRequest{
+		Transfer: &pb.StartUserSignedTransferRequest{
 			TransferId:                transferID.String(),
 			OwnerIdentityPublicKey:    config.IdentityPublicKey(),
 			ReceiverIdentityPublicKey: receiverIdentityPubkeyBytes,
+			LeavesToSend:              leafSigningJobs,
 		},
 		ReceiverIdentityPublicKey: receiverIdentityPubkeyBytes,
 		FeeSats:                   feeSats,
@@ -201,32 +200,31 @@ func prepareFrostSigningJobs(
 	return signingJobs, refundTxs, userCommitments, nil
 }
 
-func prepareUserSignedRefunds(
+func prepareLeafSigningJobs(
 	leaves []LeafKeyTweak,
 	refundTxs [][]byte,
 	signingResults map[string]*pbcommon.SigningResult,
 	userCommitments []*objects.SigningCommitment,
 	signingCommitments []*pb.RequestedSigningCommitments,
-	network pb.Network,
-) ([]*pb.UserSignedRefund, error) {
-	userSignedRefunds := []*pb.UserSignedRefund{}
+) ([]*pb.UserSignedTxSigningJob, error) {
+	leafSigningJobs := []*pb.UserSignedTxSigningJob{}
 	for i, leaf := range leaves {
 		userCommitmentProto, err := userCommitments[i].MarshalProto()
 		if err != nil {
 			return nil, err
 		}
-		userSignedRefunds = append(userSignedRefunds, &pb.UserSignedRefund{
-			NodeId:        leaf.Leaf.Id,
-			RefundTx:      refundTxs[i],
-			UserSignature: signingResults[leaf.Leaf.Id].SignatureShare,
+		leafSigningJobs = append(leafSigningJobs, &pb.UserSignedTxSigningJob{
+			LeafId:                 leaf.Leaf.Id,
+			SigningPublicKey:       leaf.SigningPrivKey,
+			RawTx:                  refundTxs[i],
+			SigningNonceCommitment: userCommitmentProto,
+			UserSignature:          signingResults[leaf.Leaf.Id].SignatureShare,
 			SigningCommitments: &pb.SigningCommitments{
 				SigningCommitments: signingCommitments[i].SigningNonceCommitments,
 			},
-			UserSignatureCommitment: userCommitmentProto,
-			Network:                 network,
 		})
 	}
-	return userSignedRefunds, nil
+	return leafSigningJobs, nil
 }
 
 func ReturnLightningPayment(

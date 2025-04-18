@@ -186,7 +186,7 @@ func (h *LightningHandler) GetSigningCommitments(ctx context.Context, req *pb.Ge
 func (h *LightningHandler) validateGetPreimageRequest(
 	ctx context.Context,
 	paymentHash []byte,
-	transactions []*pb.UserSignedRefund,
+	transactions []*pb.UserSignedTxSigningJob,
 	amount *pb.InvoiceAmount,
 	destinationPubkey []byte,
 	feeSats uint64,
@@ -216,7 +216,7 @@ func (h *LightningHandler) validateGetPreimageRequest(
 	client := pbfrost.NewFrostServiceClient(conn)
 	for _, transaction := range transactions {
 		// First fetch the node tx in order to calculate the sighash
-		nodeID, err := uuid.Parse(transaction.NodeId)
+		nodeID, err := uuid.Parse(transaction.LeafId)
 		if err != nil {
 			return fmt.Errorf("unable to parse node id: %v", err)
 		}
@@ -236,7 +236,7 @@ func (h *LightningHandler) validateGetPreimageRequest(
 			return fmt.Errorf("unable to get tx: %v", err)
 		}
 
-		refundTx, err := common.TxFromRawTxBytes(transaction.RefundTx)
+		refundTx, err := common.TxFromRawTxBytes(transaction.RawTx)
 		if err != nil {
 			return fmt.Errorf("unable to get refund tx: %v", err)
 		}
@@ -269,7 +269,7 @@ func (h *LightningHandler) validateGetPreimageRequest(
 			VerifyingKey:    node.VerifyingPubkey,
 			PublicShare:     node.OwnerSigningPubkey,
 			Commitments:     transaction.SigningCommitments.SigningCommitments,
-			UserCommitments: transaction.UserSignatureCommitment,
+			UserCommitments: transaction.SigningNonceCommitment,
 		})
 		if err != nil {
 			return fmt.Errorf("unable to validate signature share: %v, for sighash: %v, user pubkey: %v", err, hex.EncodeToString(sighash), hex.EncodeToString(node.OwnerSigningPubkey))
@@ -283,7 +283,7 @@ func (h *LightningHandler) validateGetPreimageRequest(
 	}
 	var totalAmount uint64
 	for _, transaction := range transactions {
-		refundTx, err := common.TxFromRawTxBytes(transaction.RefundTx)
+		refundTx, err := common.TxFromRawTxBytes(transaction.RawTx)
 		if err != nil {
 			return fmt.Errorf("unable to get refund tx: %v", err)
 		}
@@ -315,7 +315,7 @@ func (h *LightningHandler) storeUserSignedTransactions(
 	ctx context.Context,
 	paymentHash []byte,
 	preimageShare *ent.PreimageShare,
-	transactions []*pb.UserSignedRefund,
+	transactions []*pb.UserSignedTxSigningJob,
 	transfer *ent.Transfer,
 	status schema.PreimageRequestStatus,
 	receiverIdentityPubkey []byte,
@@ -339,16 +339,16 @@ func (h *LightningHandler) storeUserSignedTransactions(
 		if err != nil {
 			return nil, fmt.Errorf("unable to marshal signing commitments: %v", err)
 		}
-		nodeID, err := uuid.Parse(transaction.NodeId)
+		nodeID, err := uuid.Parse(transaction.LeafId)
 		if err != nil {
 			return nil, fmt.Errorf("unable to parse node id: %v", err)
 		}
-		userSignatureCommitmentBytes, err := proto.Marshal(transaction.UserSignatureCommitment)
+		userSignatureCommitmentBytes, err := proto.Marshal(transaction.SigningNonceCommitment)
 		if err != nil {
 			return nil, fmt.Errorf("unable to marshal user signature commitment: %v", err)
 		}
 		_, err = db.UserSignedTransaction.Create().
-			SetTransaction(transaction.RefundTx).
+			SetTransaction(transaction.RawTx).
 			SetUserSignature(transaction.UserSignature).
 			SetUserSignatureCommitment(userSignatureCommitmentBytes).
 			SetSigningCommitments(commitmentsBytes).
@@ -403,7 +403,7 @@ func (h *LightningHandler) GetPreimageShare(ctx context.Context, req *pb.Initiat
 	err := h.validateGetPreimageRequest(
 		ctx,
 		req.PaymentHash,
-		req.UserSignedRefunds,
+		req.Transfer.LeavesToSend,
 		invoiceAmount,
 		req.ReceiverIdentityPublicKey,
 		req.FeeSats,
@@ -414,8 +414,8 @@ func (h *LightningHandler) GetPreimageShare(ctx context.Context, req *pb.Initiat
 	}
 
 	leafRefundMap := make(map[string][]byte)
-	for _, transaction := range req.UserSignedRefunds {
-		leafRefundMap[transaction.NodeId] = transaction.RefundTx
+	for _, transaction := range req.Transfer.LeavesToSend {
+		leafRefundMap[transaction.LeafId] = transaction.RawTx
 	}
 
 	transferHandler := NewTransferHandler(h.config)
@@ -427,7 +427,7 @@ func (h *LightningHandler) GetPreimageShare(ctx context.Context, req *pb.Initiat
 		req.Transfer.OwnerIdentityPublicKey,
 		req.Transfer.ReceiverIdentityPublicKey,
 		leafRefundMap,
-		req.Transfer.KeyTweakProofs,
+		nil,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create transfer: %v", err)
@@ -439,7 +439,7 @@ func (h *LightningHandler) GetPreimageShare(ctx context.Context, req *pb.Initiat
 	} else {
 		status = schema.PreimageRequestStatusWaitingForPreimage
 	}
-	_, err = h.storeUserSignedTransactions(ctx, req.PaymentHash, preimageShare, req.UserSignedRefunds, transfer, status, req.ReceiverIdentityPublicKey)
+	_, err = h.storeUserSignedTransactions(ctx, req.PaymentHash, preimageShare, req.Transfer.LeavesToSend, transfer, status, req.ReceiverIdentityPublicKey)
 	if err != nil {
 		return nil, fmt.Errorf("unable to store user signed transactions: %v", err)
 	}
@@ -479,11 +479,10 @@ func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pb.Ini
 			},
 		}
 	}
-
 	err := h.validateGetPreimageRequest(
 		ctx,
 		req.PaymentHash,
-		req.UserSignedRefunds,
+		req.Transfer.LeavesToSend,
 		invoiceAmount,
 		req.ReceiverIdentityPublicKey,
 		req.FeeSats,
@@ -494,8 +493,8 @@ func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pb.Ini
 	}
 
 	leafRefundMap := make(map[string][]byte)
-	for _, transaction := range req.UserSignedRefunds {
-		leafRefundMap[transaction.NodeId] = transaction.RefundTx
+	for _, transaction := range req.Transfer.LeavesToSend {
+		leafRefundMap[transaction.LeafId] = transaction.RawTx
 	}
 
 	transferHandler := NewTransferHandler(h.config)
@@ -507,7 +506,7 @@ func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pb.Ini
 		req.Transfer.OwnerIdentityPublicKey,
 		req.Transfer.ReceiverIdentityPublicKey,
 		leafRefundMap,
-		req.Transfer.KeyTweakProofs,
+		nil,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create transfer: %v", err)
@@ -519,7 +518,7 @@ func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pb.Ini
 	} else {
 		status = schema.PreimageRequestStatusWaitingForPreimage
 	}
-	preimageRequest, err := h.storeUserSignedTransactions(ctx, req.PaymentHash, preimageShare, req.UserSignedRefunds, transfer, status, req.ReceiverIdentityPublicKey)
+	preimageRequest, err := h.storeUserSignedTransactions(ctx, req.PaymentHash, preimageShare, req.Transfer.LeavesToSend, transfer, status, req.ReceiverIdentityPublicKey)
 	if err != nil {
 		return nil, fmt.Errorf("unable to store user signed transactions: %v", err)
 	}

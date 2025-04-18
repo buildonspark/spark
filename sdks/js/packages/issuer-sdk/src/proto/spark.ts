@@ -894,7 +894,6 @@ export interface InvoiceAmount {
 
 export interface InitiatePreimageSwapRequest {
   paymentHash: Uint8Array;
-  userSignedRefunds: UserSignedRefund[];
   invoiceAmount: InvoiceAmount | undefined;
   reason: InitiatePreimageSwapRequest_Reason;
   transfer: StartSendTransferRequest | undefined;
@@ -10434,7 +10433,6 @@ export const InvoiceAmount: MessageFns<InvoiceAmount> = {
 function createBaseInitiatePreimageSwapRequest(): InitiatePreimageSwapRequest {
   return {
     paymentHash: new Uint8Array(0),
-    userSignedRefunds: [],
     invoiceAmount: undefined,
     reason: 0,
     transfer: undefined,
@@ -10451,9 +10449,6 @@ export const InitiatePreimageSwapRequest: MessageFns<InitiatePreimageSwapRequest
     ): BinaryWriter {
       if (message.paymentHash.length !== 0) {
         writer.uint32(10).bytes(message.paymentHash);
-      }
-      for (const v of message.userSignedRefunds) {
-        UserSignedRefund.encode(v!, writer.uint32(18).fork()).join();
       }
       if (message.invoiceAmount !== undefined) {
         InvoiceAmount.encode(
@@ -10503,9 +10498,6 @@ export const InitiatePreimageSwapRequest: MessageFns<InitiatePreimageSwapRequest
               break;
             }
 
-            message.userSignedRefunds.push(
-              UserSignedRefund.decode(reader, reader.uint32()),
-            );
             continue;
           }
           case 3: {
@@ -10568,11 +10560,6 @@ export const InitiatePreimageSwapRequest: MessageFns<InitiatePreimageSwapRequest
         paymentHash: isSet(object.paymentHash)
           ? bytesFromBase64(object.paymentHash)
           : new Uint8Array(0),
-        userSignedRefunds: globalThis.Array.isArray(object?.userSignedRefunds)
-          ? object.userSignedRefunds.map((e: any) =>
-              UserSignedRefund.fromJSON(e),
-            )
-          : [],
         invoiceAmount: isSet(object.invoiceAmount)
           ? InvoiceAmount.fromJSON(object.invoiceAmount)
           : undefined,
@@ -10593,11 +10580,6 @@ export const InitiatePreimageSwapRequest: MessageFns<InitiatePreimageSwapRequest
       const obj: any = {};
       if (message.paymentHash.length !== 0) {
         obj.paymentHash = base64FromBytes(message.paymentHash);
-      }
-      if (message.userSignedRefunds?.length) {
-        obj.userSignedRefunds = message.userSignedRefunds.map((e) =>
-          UserSignedRefund.toJSON(e),
-        );
       }
       if (message.invoiceAmount !== undefined) {
         obj.invoiceAmount = InvoiceAmount.toJSON(message.invoiceAmount);
@@ -10629,9 +10611,6 @@ export const InitiatePreimageSwapRequest: MessageFns<InitiatePreimageSwapRequest
     ): InitiatePreimageSwapRequest {
       const message = createBaseInitiatePreimageSwapRequest();
       message.paymentHash = object.paymentHash ?? new Uint8Array(0);
-      message.userSignedRefunds =
-        object.userSignedRefunds?.map((e) => UserSignedRefund.fromPartial(e)) ||
-        [];
       message.invoiceAmount =
         object.invoiceAmount !== undefined && object.invoiceAmount !== null
           ? InvoiceAmount.fromPartial(object.invoiceAmount)

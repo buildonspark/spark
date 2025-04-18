@@ -548,10 +548,27 @@ message LeafRefundTxSigningJob {
     SigningJob refund_tx_signing_job = 2;
 }
 
+message UserSignedTxSigningJob {
+    string leaf_id = 10;
+    bytes signing_public_key = 20;
+    bytes raw_tx = 30;
+    common.SigningCommitment signing_nonce_commitment = 40;
+    bytes user_signature = 50;
+    SigningCommitments signing_commitments = 60;
+}
+
 message LeafRefundTxSigningResult {
     string leaf_id = 1;
     SigningResult refund_tx_signing_result = 2;
     bytes verifying_key = 3;
+}
+
+message StartUserSignedTransferRequest {
+    string transfer_id = 10;
+    bytes owner_identity_public_key = 20;
+    repeated UserSignedTxSigningJob leaves_to_send = 30;
+    bytes receiver_identity_public_key = 40;
+    google.protobuf.Timestamp expiry_time = 50; 
 }
 
 message StartSendTransferRequest {
@@ -722,19 +739,18 @@ message InvoiceAmount {
 }
 
 message InitiatePreimageSwapRequest {
-    bytes payment_hash = 1;
-    repeated UserSignedRefund user_signed_refunds = 2;
-    InvoiceAmount invoice_amount = 3;
+    bytes payment_hash = 10;
+    InvoiceAmount invoice_amount = 20;
     enum Reason {
         // The associated lightning service is sending the payment.
         REASON_SEND = 0;
         // The associated lightning service is receiving the payment.
         REASON_RECEIVE = 1;
     }
-    Reason reason = 4;
-    StartSendTransferRequest transfer = 5;
-    bytes receiver_identity_public_key = 6;
-    uint64 fee_sats = 7;
+    Reason reason = 30;
+    StartUserSignedTransferRequest transfer = 40;
+    bytes receiver_identity_public_key = 50;
+    uint64 fee_sats = 60;
 }
 
 message InitiatePreimageSwapResponse {
