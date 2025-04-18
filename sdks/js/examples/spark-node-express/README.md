@@ -8,14 +8,14 @@ To get started:
 
 ```
 yarn
-yarn dev
+yarn start
 ```
 
 or if you'd like you can copy this directory as a starting template for your own project and use a different package manager like npm:
 
 ```
 npm install
-npm run dev
+npm run start
 ```
 
 To init a new wallet, make an empty POST request to either.

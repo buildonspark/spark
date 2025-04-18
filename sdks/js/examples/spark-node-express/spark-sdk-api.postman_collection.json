@@ -765,7 +765,7 @@
             "header": [],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"ownerPublicKey\": \"owner identity pubkey\"\n}",
+              "raw": "{\n    \"sparkAddress\": \"spark address\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -788,7 +788,7 @@
             "header": [],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"ownerPublicKey\": \"owner identity pubkey\"\n}",
+              "raw": "{\n    \"sparkAddress\": \"spark address\"\n}",
               "options": {
                 "raw": {
                   "language": "json"

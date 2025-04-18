@@ -192,9 +192,11 @@ router.post(
     const wallet = getWallet() as IssuerSparkWallet;
     try {
       const { tokenAmount } = req.body as { tokenAmount: number };
-      const tokensMinted = await wallet!.mintTokens(BigInt(tokenAmount));
+      const tokenTransactionHash = await wallet!.mintTokens(
+        BigInt(tokenAmount)
+      );
       res.json({
-        data: { tokensMinted },
+        data: { tokenTransactionHash },
       });
     } catch (error) {
       console.error(error);
@@ -236,7 +238,7 @@ router.post(
 /**
  * Freeze tokens
  * @route POST /issuer-wallet/tokens/spark/freeze-tokens
- * @param {string} ownerPublicKey - The public key of the owner
+ * @param {string} sparkAddress - The spark address of the owner
  * @returns {Promise<{
  *   data: {
  *     impactedLeafIds: string[],
@@ -251,8 +253,8 @@ router.post(
   async (req, res) => {
     const wallet = getWallet() as IssuerSparkWallet;
     try {
-      const { ownerPublicKey } = req.body as { ownerPublicKey: string };
-      const frozenTokens = await wallet!.freezeTokens(ownerPublicKey);
+      const { sparkAddress } = req.body as { sparkAddress: string };
+      const frozenTokens = await wallet!.freezeTokens(sparkAddress);
       res.json({
         data: {
           impactedOutputIds: frozenTokens.impactedOutputIds,
@@ -270,7 +272,7 @@ router.post(
 /**
  * Unfreeze tokens
  * @route POST /issuer-wallet/tokens/spark/unfreeze-tokens
- * @param {string} ownerPublicKey - The public key of the owner
+ * @param {string} sparkAddress - The spark address of the owner
  * @returns {Promise<{
  *   data: {
  *     impactedLeafIds: string[],
@@ -284,8 +286,8 @@ router.post(
   async (req, res) => {
     const wallet = getWallet() as IssuerSparkWallet;
     try {
-      const { ownerPublicKey } = req.body as { ownerPublicKey: string };
-      const thawedTokens = await wallet!.unfreezeTokens(ownerPublicKey);
+      const { sparkAddress } = req.body as { sparkAddress: string };
+      const thawedTokens = await wallet!.unfreezeTokens(sparkAddress);
       res.json({
         data: {
           impactedOutputIds: thawedTokens.impactedOutputIds,
