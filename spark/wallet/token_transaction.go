@@ -1,6 +1,7 @@
 package wallet
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"log"
@@ -27,6 +28,9 @@ type KeyshareWithOperatorIndex struct {
 // OperatorSignatures maps operator identifiers to their signatures returned as part of the SignTokenTransaction() call.
 type OperatorSignatures map[string][]byte
 
+// SerializedPublicKey is a byte slice representing a serialized public key.
+type SerializedPublicKey []byte
+
 // StartTokenTransaction requests the coordinator to build the final token transaction and
 // returns the StartTokenTransactionResponse. This includes filling the revocation public keys
 // for outputs, adding output ids and withdrawal params, and returning keyshare configuration.
@@ -34,8 +38,7 @@ func StartTokenTransaction(
 	ctx context.Context,
 	config *Config,
 	tokenTransaction *pb.TokenTransaction,
-	outputToSpendPrivateKeys []*secp256k1.PrivateKey,
-	_ [][]byte,
+	ownerPrivateKeys []*secp256k1.PrivateKey,
 ) (*pb.StartTokenTransactionResponse, []byte, []byte, error) {
 	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress(), nil)
 	if err != nil {
@@ -75,8 +78,8 @@ func StartTokenTransaction(
 		}
 		ownerSignatures = append(ownerSignatures, sig)
 	} else if tokenTransaction.GetTransferInput() != nil {
-		for i := range outputToSpendPrivateKeys {
-			sig, err := createTokenTransactionSignature(config, outputToSpendPrivateKeys[i], partialTokenTransactionHash)
+		for i := range ownerPrivateKeys {
+			sig, err := createTokenTransactionSignature(config, ownerPrivateKeys[i], partialTokenTransactionHash)
 			if err != nil {
 				return nil, nil, nil, fmt.Errorf("failed to create signature: %v", err)
 			}
@@ -120,84 +123,95 @@ func StartTokenTransaction(
 	return startResponse, partialTokenTransactionHash, finalTxHash, nil
 }
 
+// createOperatorSpecificSignature creates a signature for the operator-specific payload
+// using the provided private key and returns the OperatorSpecificTokenTransactionSignature.
+func createOperatorSpecificSignature(
+	config *Config,
+	operatorPublicKey SerializedPublicKey,
+	privKey *secp256k1.PrivateKey,
+	ownerPublicKey SerializedPublicKey,
+	finalTxHash []byte,
+) (*pb.OperatorSpecificTokenTransactionSignature, error) {
+	payload := &pb.OperatorSpecificTokenTransactionSignablePayload{
+		FinalTokenTransactionHash: finalTxHash,
+		OperatorIdentityPublicKey: operatorPublicKey,
+	}
+	payloadHash, err := utils.HashOperatorSpecificTokenTransactionSignablePayload(payload)
+	if err != nil {
+		return nil, fmt.Errorf("error while hashing operator-specific payload: %v", err)
+	}
+
+	sig, err := createTokenTransactionSignature(config, privKey, payloadHash)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create signature: %v", err)
+	}
+
+	return &pb.OperatorSpecificTokenTransactionSignature{
+		OwnerPublicKey: ownerPublicKey,
+		OwnerSignature: sig,
+		Payload:        payload,
+	}, nil
+}
+
+// getOperatorsToContact determines which operators to contact based on provided public keys.
+// If operatorIdentityPublicKeys is empty, all signing operators will be used.
+func getOperatorsToContact(
+	config *Config,
+	operatorIdentityPublicKeys []SerializedPublicKey,
+) ([]*so.SigningOperator, []SerializedPublicKey, error) {
+	var operatorsToContact []*so.SigningOperator
+	var selectedPubKeys []SerializedPublicKey
+
+	if len(operatorIdentityPublicKeys) > 0 {
+		for _, opPubKey := range operatorIdentityPublicKeys {
+			// Find the operator with this public key
+			found := false
+			for _, operator := range config.SigningOperators {
+				if bytes.Equal(operator.IdentityPublicKey, opPubKey) {
+					operatorsToContact = append(operatorsToContact, operator)
+					selectedPubKeys = append(selectedPubKeys, opPubKey)
+					found = true
+					break
+				}
+			}
+			if !found {
+				return nil, nil, fmt.Errorf("operator with public key %x not found in signing operators", opPubKey)
+			}
+		}
+	} else {
+		// Use all signing operators
+		for _, operator := range config.SigningOperators {
+			operatorsToContact = append(operatorsToContact, operator)
+			selectedPubKeys = append(selectedPubKeys, operator.IdentityPublicKey)
+		}
+	}
+
+	return operatorsToContact, selectedPubKeys, nil
+}
+
 // SignTokenTransaction calls each signing operator to sign the final token transaction and
 // optionally return keyshares (for transfer transactions). It returns a 2D slice of
 // KeyshareWithOperatorIndex for each output if transfer, or an empty structure if mint.
-// If specificOperatorIDs is provided and not empty, only those operators will be contacted.
+// If operatorIdentityPublicKeys is provided and not empty, only those operators will be contacted,
+// otherwise all operators will be used.
 func SignTokenTransaction(
 	ctx context.Context,
 	config *Config,
 	finalTx *pb.TokenTransaction,
 	finalTxHash []byte,
-	outputToSpendPrivateKeys []*secp256k1.PrivateKey,
-	specificOperatorIDs ...string,
+	operatorIdentityPublicKeys []SerializedPublicKey,
+	ownerPrivateKeys []*secp256k1.PrivateKey,
+	ownerPublicKeys []SerializedPublicKey,
 ) ([][]*KeyshareWithOperatorIndex, OperatorSignatures, error) {
-	// ---------------------------------------------------------------------
-	// (A) Build operator-specific signatures
-	// ---------------------------------------------------------------------
-	var operatorSpecificSignatures []*pb.OperatorSpecificTokenTransactionSignature
 	operatorSignaturesMap := make(OperatorSignatures)
+	outputRevocationKeyshares := make([][]*KeyshareWithOperatorIndex, len(finalTx.GetTransferInput().GetOutputsToSpend()))
 
-	payload := &pb.OperatorSpecificTokenTransactionSignablePayload{
-		FinalTokenTransactionHash: finalTxHash,
-		OperatorIdentityPublicKey: config.IdentityPublicKey(),
-	}
-	payloadHash, err := utils.HashOperatorSpecificTokenTransactionSignablePayload(payload)
+	operatorsToContact, selectedPubKeys, err := getOperatorsToContact(config, operatorIdentityPublicKeys)
 	if err != nil {
-		log.Printf("Error while hashing operator-specific payload: %v", err)
 		return nil, nil, err
 	}
 
-	// For mint transactions
-	if finalTx.GetMintInput() != nil {
-		privKey := secp256k1.PrivKeyFromBytes(config.IdentityPrivateKey.Serialize())
-		sig, err := createTokenTransactionSignature(config, privKey, payloadHash)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to create signature: %v", err)
-		}
-		operatorSpecificSignatures = append(operatorSpecificSignatures, &pb.OperatorSpecificTokenTransactionSignature{
-			OwnerPublicKey: config.IdentityPublicKey(),
-			OwnerSignature: sig,
-			Payload:        payload,
-		})
-	}
-
-	// For transfer transactions
-	if finalTx.GetTransferInput() != nil {
-		for i := range finalTx.GetTransferInput().GetOutputsToSpend() {
-			sig, err := createTokenTransactionSignature(config, outputToSpendPrivateKeys[i], payloadHash)
-			if err != nil {
-				return nil, nil, fmt.Errorf("failed to create signature: %v", err)
-			}
-			operatorSpecificSignatures = append(operatorSpecificSignatures, &pb.OperatorSpecificTokenTransactionSignature{
-				OwnerPublicKey: outputToSpendPrivateKeys[i].PubKey().SerializeCompressed(),
-				OwnerSignature: sig,
-				Payload:        payload,
-			})
-		}
-	}
-
-	// ---------------------------------------------------------------------
-	// (B) Contact each operator to sign
-	// ---------------------------------------------------------------------
-	outputRevocationKeyshares := make([][]*KeyshareWithOperatorIndex, len(finalTx.GetTransferInput().GetOutputsToSpend()))
-
-	// Determine which operators to contact
-	operatorsToContact := config.SigningOperators
-
-	// If specific operators are requested, filter the map
-	if len(specificOperatorIDs) > 0 {
-		operatorsToContact = make(map[string]*so.SigningOperator)
-		for _, opID := range specificOperatorIDs {
-			if operator, exists := config.SigningOperators[opID]; exists {
-				operatorsToContact[opID] = operator
-			} else {
-				return nil, nil, fmt.Errorf("specified operator ID %s not found in signing operators", opID)
-			}
-		}
-	}
-
-	for _, operator := range operatorsToContact {
+	for operatorIndex, operator := range operatorsToContact {
 		operatorConn, err := common.NewGRPCConnectionWithTestTLS(operator.Address, nil)
 		if err != nil {
 			log.Printf("Error while establishing gRPC connection to operator at %s: %v", operator.Address, err)
@@ -211,6 +225,22 @@ func SignTokenTransaction(
 		}
 		operatorCtx := ContextWithToken(ctx, operatorToken)
 		operatorClient := pb.NewSparkServiceClient(operatorConn)
+
+		var operatorSpecificSignatures []*pb.OperatorSpecificTokenTransactionSignature
+		for i := range ownerPublicKeys {
+			sig, err := createOperatorSpecificSignature(
+				config,
+				selectedPubKeys[operatorIndex],
+				ownerPrivateKeys[i],
+				ownerPublicKeys[i],
+				finalTxHash,
+			)
+			if err != nil {
+				return nil, nil, err
+			}
+			operatorSpecificSignatures = append(operatorSpecificSignatures, sig)
+		}
+
 		signTokenTransactionResponse, err := operatorClient.SignTokenTransaction(operatorCtx, &pb.SignTokenTransactionRequest{
 			FinalTokenTransaction:      finalTx,
 			OperatorSpecificSignatures: operatorSpecificSignatures,
@@ -249,7 +279,7 @@ func FinalizeTokenTransaction(
 	config *Config,
 	finalTx *pb.TokenTransaction,
 	outputRevocationKeyshares [][]*KeyshareWithOperatorIndex,
-	outputToSpendRevocationPublicKeys [][]byte,
+	outputToSpendRevocationCommitments []SerializedPublicKey,
 	startResponse *pb.StartTokenTransactionResponse,
 ) error {
 	// Recover secrets from keyshares
@@ -286,7 +316,7 @@ func FinalizeTokenTransaction(
 	}
 
 	// Validate revocation keys
-	if err := utils.ValidateRevocationKeys(outputRecoveredSecrets, outputToSpendRevocationPublicKeys); err != nil {
+	if err := utils.ValidateRevocationKeys(outputRecoveredSecrets, toByteSlices(outputToSpendRevocationCommitments)); err != nil {
 		return fmt.Errorf("invalid revocation keys: %w", err)
 	}
 
@@ -326,19 +356,23 @@ func BroadcastTokenTransaction(
 	ctx context.Context,
 	config *Config,
 	tokenTransaction *pb.TokenTransaction,
-	outputToSpendPrivateKeys []*secp256k1.PrivateKey,
-	outputToSpendRevocationPublicKeys [][]byte,
+	ownerPrivateKeys []*secp256k1.PrivateKey,
+	outputToSpendRevocationCommitments []SerializedPublicKey,
 ) (*pb.TokenTransaction, error) {
 	// 1) Start token transaction
 	startResp, _, finalTxHash, err := StartTokenTransaction(
 		ctx,
 		config,
 		tokenTransaction,
-		outputToSpendPrivateKeys,
-		outputToSpendRevocationPublicKeys,
+		ownerPrivateKeys,
 	)
 	if err != nil {
 		return nil, err
+	}
+	ownerPublicKeys := make([]SerializedPublicKey, len(ownerPrivateKeys))
+	for i, privKey := range ownerPrivateKeys {
+		pubKeyBytes := privKey.PubKey().SerializeCompressed()
+		ownerPublicKeys[i] = SerializedPublicKey(pubKeyBytes)
 	}
 
 	// 2) Sign token transaction
@@ -347,7 +381,9 @@ func BroadcastTokenTransaction(
 		config,
 		startResp.FinalTokenTransaction,
 		finalTxHash,
-		outputToSpendPrivateKeys,
+		nil, // Specify nil to designate that all operators should be contacted.
+		ownerPrivateKeys,
+		ownerPublicKeys,
 	)
 	if err != nil {
 		return nil, err
@@ -360,7 +396,7 @@ func BroadcastTokenTransaction(
 			config,
 			startResp.FinalTokenTransaction,
 			outputRevocationKeyshares,
-			outputToSpendRevocationPublicKeys,
+			outputToSpendRevocationCommitments,
 			startResp,
 		)
 		if err != nil {
@@ -375,8 +411,8 @@ func BroadcastTokenTransaction(
 func FreezeTokens(
 	ctx context.Context,
 	config *Config,
-	ownerPublicKey []byte,
-	tokenPublicKey []byte,
+	ownerPublicKey SerializedPublicKey,
+	tokenPublicKey SerializedPublicKey,
 	shouldUnfreeze bool,
 ) (*pb.FreezeTokensResponse, error) {
 	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress(), nil)
@@ -440,8 +476,8 @@ func FreezeTokens(
 func QueryTokenOutputs(
 	ctx context.Context,
 	config *Config,
-	ownerPublicKeys [][]byte,
-	tokenPublicKeys [][]byte,
+	ownerPublicKeys []SerializedPublicKey,
+	tokenPublicKeys []SerializedPublicKey,
 ) (*pb.QueryTokenOutputsResponse, error) {
 	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress(), nil)
 	if err != nil {
@@ -458,8 +494,8 @@ func QueryTokenOutputs(
 	sparkClient := pb.NewSparkServiceClient(sparkConn)
 
 	request := &pb.QueryTokenOutputsRequest{
-		OwnerPublicKeys: ownerPublicKeys,
-		TokenPublicKeys: tokenPublicKeys,
+		OwnerPublicKeys: toByteSlices(ownerPublicKeys),
+		TokenPublicKeys: toByteSlices(tokenPublicKeys),
 	}
 
 	response, err := sparkClient.QueryTokenOutputs(tmpCtx, request)
@@ -473,8 +509,8 @@ func QueryTokenOutputs(
 func QueryTokenTransactions(
 	ctx context.Context,
 	config *Config,
-	tokenPublicKeys [][]byte,
-	ownerPublicKeys [][]byte,
+	tokenPublicKeys []SerializedPublicKey,
+	ownerPublicKeys []SerializedPublicKey,
 	outputIDs []string,
 	transactionHashes [][]byte,
 	offset int64,
@@ -495,8 +531,8 @@ func QueryTokenTransactions(
 	sparkClient := pb.NewSparkServiceClient(sparkConn)
 
 	request := &pb.QueryTokenTransactionsRequest{
-		OwnerPublicKeys:        ownerPublicKeys,
-		TokenPublicKeys:        tokenPublicKeys,
+		OwnerPublicKeys:        toByteSlices(ownerPublicKeys),
+		TokenPublicKeys:        toByteSlices(tokenPublicKeys),
 		OutputIds:              outputIDs,
 		TokenTransactionHashes: transactionHashes,
 		Limit:                  limit,
@@ -513,26 +549,16 @@ func QueryTokenTransactions(
 
 // CancelTokenTransaction cancels a token transaction that has been signed but not yet finalized.
 // This is only possible if fewer than (total operators - threshold) operators have signed the transaction.
-// If specificOperatorIDs is provided and not empty, only those operators will be contacted.
+// If operatorIdentityPublicKeys is provided and not empty, only those operators will be contacted.
 func CancelTokenTransaction(
 	ctx context.Context,
 	config *Config,
 	finalTokenTransaction *pb.TokenTransaction,
-	specificOperatorIDs ...string,
+	operatorIdentityPublicKeys []SerializedPublicKey,
 ) error {
-	// Determine which operators to contact
-	operatorsToContact := config.SigningOperators
-
-	// If specific operators are requested, filter the map
-	if len(specificOperatorIDs) > 0 {
-		operatorsToContact = make(map[string]*so.SigningOperator)
-		for _, opID := range specificOperatorIDs {
-			if operator, exists := config.SigningOperators[opID]; exists {
-				operatorsToContact[opID] = operator
-			} else {
-				return fmt.Errorf("specified operator ID %s not found in signing operators", opID)
-			}
-		}
+	operatorsToContact, _, err := getOperatorsToContact(config, operatorIdentityPublicKeys)
+	if err != nil {
+		return err
 	}
 
 	// Now cancel with each operator
@@ -580,4 +606,12 @@ func createTokenTransactionSignature(config *Config, privKey *secp256k1.PrivateK
 
 	sig := ecdsa.Sign(privKey, hash)
 	return sig.Serialize(), nil
+}
+
+func toByteSlices(keys []SerializedPublicKey) [][]byte {
+	result := make([][]byte, len(keys))
+	for i, key := range keys {
+		result[i] = key
+	}
+	return result
 }
