@@ -170,25 +170,36 @@ func createTestTokenMintTransactionWithMultipleTokenOutputs(config *wallet.Confi
 	return issueTokenTransaction, userLeafPrivKeys, nil
 }
 
-// OperatorKeysSplit contains two groups of operator public keys
-type OperatorKeysSplit struct {
-	FirstHalf  []wallet.SerializedPublicKey
-	SecondHalf []wallet.SerializedPublicKey
+// getHalfOperatorIDs returns approximately half of the operator IDs from the config
+func getHalfOperatorIDs(config *wallet.Config) []string {
+	var halfOperatorIDs []string
+	halfOperatorCount := len(config.SigningOperators) / 2
+	for operatorID := range config.SigningOperators {
+		if len(halfOperatorIDs) < halfOperatorCount {
+			halfOperatorIDs = append(halfOperatorIDs, operatorID)
+		} else {
+			break
+		}
+	}
+	return halfOperatorIDs
 }
 
-// splitOperatorIdentityPublicKeys splits the operators from the config into two approximately equal groups
-func splitOperatorIdentityPublicKeys(config *wallet.Config) OperatorKeysSplit {
-	publicKeys := make([]wallet.SerializedPublicKey, 0, len(config.SigningOperators))
-	for _, operator := range config.SigningOperators {
-		publicKeys = append(publicKeys, wallet.SerializedPublicKey(operator.IdentityPublicKey))
+// getRemainingOperatorIDs returns the operator IDs not included in the provided list
+func getRemainingOperatorIDs(config *wallet.Config, excludedIDs []string) []string {
+	var remainingOperatorIDs []string
+	for operatorID := range config.SigningOperators {
+		found := false
+		for _, excludedID := range excludedIDs {
+			if operatorID == excludedID {
+				found = true
+				break
+			}
+		}
+		if !found {
+			remainingOperatorIDs = append(remainingOperatorIDs, operatorID)
+		}
 	}
-
-	halfOperatorCount := len(config.SigningOperators) / 2
-
-	return OperatorKeysSplit{
-		FirstHalf:  publicKeys[:halfOperatorCount],
-		SecondHalf: publicKeys[halfOperatorCount:],
-	}
+	return remainingOperatorIDs
 }
 
 // skipIfGithubActions skips the test if running in GitHub Actions
@@ -211,7 +222,7 @@ func TestBroadcastTokenTransactionMintAndTransferTokens(t *testing.T) {
 	finalIssueTokenTransaction, err := wallet.BroadcastTokenTransaction(
 		context.Background(), config, issueTokenTransaction,
 		[]*secp256k1.PrivateKey{&tokenPrivKey},
-		[]wallet.SerializedPublicKey{})
+		[][]byte{})
 	require.NoError(t, err, "failed to broadcast issuance token transaction")
 	log.Printf("issuance broadcast finalized token transaction: %v", finalIssueTokenTransaction)
 
@@ -244,7 +255,7 @@ func TestBroadcastTokenTransactionMintAndTransferTokens(t *testing.T) {
 	transferTokenTransactionResponse, err := wallet.BroadcastTokenTransaction(
 		context.Background(), config, transferTokenTransaction,
 		[]*secp256k1.PrivateKey{userLeaf1PrivKey, userLeaf2PrivKey},
-		[]wallet.SerializedPublicKey{revPubKey1, revPubKey2},
+		[][]byte{revPubKey1, revPubKey2},
 	)
 	if err != nil {
 		t.Fatalf("failed to broadcast transfer token transaction: %v", err)
@@ -255,12 +266,12 @@ func TestBroadcastTokenTransactionMintAndTransferTokens(t *testing.T) {
 	tokenTransactionsPage1, err := wallet.QueryTokenTransactions(
 		context.Background(),
 		config,
-		[]wallet.SerializedPublicKey{tokenIdentityPubKeyBytes}, // token public key
-		nil, // owner public keys
-		nil, // output IDs
-		nil, // transaction hashes
-		0,   // offset
-		1,   // limit - only get 1 transaction
+		[][]byte{tokenIdentityPubKeyBytes}, // token public key
+		nil,                                // owner public keys
+		nil,                                // output IDs
+		nil,                                // transaction hashes
+		0,                                  // offset
+		1,                                  // limit - only get 1 transaction
 	)
 	if err != nil {
 		t.Fatalf("failed to query token transactions page 1: %v", err)
@@ -286,12 +297,12 @@ func TestBroadcastTokenTransactionMintAndTransferTokens(t *testing.T) {
 	tokenTransactionsPage2, err := wallet.QueryTokenTransactions(
 		context.Background(),
 		config,
-		[]wallet.SerializedPublicKey{tokenIdentityPubKeyBytes}, // token public key
-		nil,                           // owner public keys
-		nil,                           // output IDs
-		nil,                           // transaction hashes
-		tokenTransactionsPage1.Offset, // offset - use the offset from previous response (1)
-		1,                             // limit - only get 1 transaction
+		[][]byte{tokenIdentityPubKeyBytes}, // token public key
+		nil,                                // owner public keys
+		nil,                                // output IDs
+		nil,                                // transaction hashes
+		tokenTransactionsPage1.Offset,      // offset - use the offset from previous response (1)
+		1,                                  // limit - only get 1 transaction
 	)
 	if err != nil {
 		t.Fatalf("failed to query token transactions page 2: %v", err)
@@ -320,12 +331,12 @@ func TestBroadcastTokenTransactionMintAndTransferTokens(t *testing.T) {
 	tokenTransactionsPage3, err := wallet.QueryTokenTransactions(
 		context.Background(),
 		config,
-		[]wallet.SerializedPublicKey{tokenIdentityPubKeyBytes}, // token public key
-		nil,                           // owner public keys
-		nil,                           // output IDs
-		nil,                           // transaction hashes
-		tokenTransactionsPage2.Offset, // offset - use the offset from previous response
-		1,                             // limit - only get 1 transaction
+		[][]byte{tokenIdentityPubKeyBytes}, // token public key
+		nil,                                // owner public keys
+		nil,                                // output IDs
+		nil,                                // transaction hashes
+		tokenTransactionsPage2.Offset,      // offset - use the offset from previous response
+		1,                                  // limit - only get 1 transaction
 	)
 	if err != nil {
 		t.Fatalf("failed to query token transactions page 3: %v", err)
@@ -388,7 +399,7 @@ func TestBroadcastTokenTransactionMintAndTransferTokensLotsOfLeaves(t *testing.T
 	_, err = wallet.BroadcastTokenTransaction(
 		context.Background(), config, tooBigIssuanceTransaction,
 		[]*secp256k1.PrivateKey{&tokenPrivKey},
-		[]wallet.SerializedPublicKey{})
+		[][]byte{})
 	require.Error(t, err, "expected error when broadcasting issuance transaction with more than 100 created outputs")
 
 	// Create issuance transaction with 100 outputs
@@ -400,7 +411,7 @@ func TestBroadcastTokenTransactionMintAndTransferTokensLotsOfLeaves(t *testing.T
 	finalIssueTokenTransactionFirst100, err := wallet.BroadcastTokenTransaction(
 		context.Background(), config, issueTokenTransactionFirst100,
 		[]*secp256k1.PrivateKey{&tokenPrivKey},
-		[]wallet.SerializedPublicKey{})
+		[][]byte{})
 	require.NoError(t, err, "failed to broadcast issuance token transaction")
 
 	// Create issuance transaction with 100 outputs
@@ -412,7 +423,7 @@ func TestBroadcastTokenTransactionMintAndTransferTokensLotsOfLeaves(t *testing.T
 	finalIssueTokenTransactionSecond100, err := wallet.BroadcastTokenTransaction(
 		context.Background(), config, issueTokenTransactionSecond100,
 		[]*secp256k1.PrivateKey{&tokenPrivKey},
-		[]wallet.SerializedPublicKey{})
+		[][]byte{})
 	require.NoError(t, err, "failed to broadcast issuance token transaction")
 
 	finalIssueTokenTransactionHashFirst100, err := utils.HashTokenTransaction(finalIssueTokenTransactionFirst100, false)
@@ -463,7 +474,7 @@ func TestBroadcastTokenTransactionMintAndTransferTokensLotsOfLeaves(t *testing.T
 	allUserLeafPrivKeys := append(userLeafPrivKeysFirst100, userLeafPrivKeysSecond100...)
 
 	// Collect all revocation public keys from both transactions
-	allRevPubKeys := make([]wallet.SerializedPublicKey, 200)
+	allRevPubKeys := make([][]byte, 200)
 	for i := 0; i < 100; i++ {
 		allRevPubKeys[i] = finalIssueTokenTransactionFirst100.TokenOutputs[i].RevocationCommitment
 		allRevPubKeys[i+100] = finalIssueTokenTransactionSecond100.TokenOutputs[i].RevocationCommitment
@@ -503,7 +514,7 @@ func TestBroadcastTokenTransactionMintAndTransferTokensLotsOfLeaves(t *testing.T
 	}
 
 	// Collect all revocation public keys
-	revPubKeys := make([]wallet.SerializedPublicKey, 100)
+	revPubKeys := make([][]byte, 100)
 	for i := 0; i < 100; i++ {
 		revPubKeys[i] = finalIssueTokenTransactionFirst100.TokenOutputs[i].RevocationCommitment
 	}
@@ -520,8 +531,8 @@ func TestBroadcastTokenTransactionMintAndTransferTokensLotsOfLeaves(t *testing.T
 	tokenOutputsResponse, err := wallet.QueryTokenOutputs(
 		context.Background(),
 		config,
-		[]wallet.SerializedPublicKey{consolidatedLeafPubKeyBytes},
-		[]wallet.SerializedPublicKey{tokenIdentityPubKeyBytes},
+		[][]byte{consolidatedLeafPubKeyBytes},
+		[][]byte{tokenIdentityPubKeyBytes},
 	)
 	require.NoError(t, err, "failed to get owned token outputs")
 
@@ -541,7 +552,7 @@ func TestFreezeAndUnfreezeTokens(t *testing.T) {
 	finalIssueTokenTransaction, err := wallet.BroadcastTokenTransaction(
 		context.Background(), config, issueTokenTransaction,
 		[]*secp256k1.PrivateKey{&tokenPrivKey},
-		[]wallet.SerializedPublicKey{})
+		[][]byte{})
 	require.NoError(t, err, "failed to broadcast issuance token transaction")
 	log.Printf("issuance broadcast finalized token transaction: %v", finalIssueTokenTransaction)
 
@@ -593,7 +604,7 @@ func TestFreezeAndUnfreezeTokens(t *testing.T) {
 	transferFrozenTokenTransactionResponse, err := wallet.BroadcastTokenTransaction(
 		context.Background(), config, transferTokenTransaction,
 		[]*secp256k1.PrivateKey{userLeaf1PrivKey, userLeaf2PrivKey},
-		[]wallet.SerializedPublicKey{revPubKey1, revPubKey2},
+		[][]byte{revPubKey1, revPubKey2},
 	)
 	require.Error(t, err, "expected error when transferring frozen tokens")
 	require.Nil(t, transferFrozenTokenTransactionResponse, "expected nil response when transferring frozen tokens")
@@ -622,7 +633,7 @@ func TestFreezeAndUnfreezeTokens(t *testing.T) {
 	transferTokenTransactionResponse, err := wallet.BroadcastTokenTransaction(
 		context.Background(), config, transferTokenTransaction,
 		[]*secp256k1.PrivateKey{userLeaf1PrivKey, userLeaf2PrivKey},
-		[]wallet.SerializedPublicKey{revPubKey1, revPubKey2},
+		[][]byte{revPubKey1, revPubKey2},
 	)
 	require.NoError(t, err, "failed to broadcast thawed token transaction")
 	require.NotNil(t, transferTokenTransactionResponse, "expected non-nil response when transferring thawed tokens")
@@ -640,8 +651,9 @@ func TestBroadcastTokenTransactionMintAndTransferTokensDoubleStart(t *testing.T)
 	require.NoError(t, err, "failed to create test token issuance transaction")
 
 	// Make a start token transaction that we will not continue.
-	_, _, _, err = wallet.StartTokenTransaction(context.Background(), config, issueTokenTransaction, []*secp256k1.PrivateKey{&tokenPrivKey})
-	require.NoError(t, err, "failed to start token transaction that we will not continue")
+	_, _, _, err = wallet.StartTokenTransaction(context.Background(), config, issueTokenTransaction, []*secp256k1.PrivateKey{&tokenPrivKey},
+		[][]byte{})
+	require.NoError(t, err, "failed to start token transaction that will not be continued")
 
 	// Create a new transaction which will change the issuer timestamp to avoid a DB unique key error.
 	issueTokenTransaction, userLeaf1PrivKey, userLeaf2PrivKey, err := createTestTokenMintTransaction(config, tokenIdentityPubKeyBytes)
@@ -651,7 +663,7 @@ func TestBroadcastTokenTransactionMintAndTransferTokensDoubleStart(t *testing.T)
 	finalIssueTokenTransaction, err := wallet.BroadcastTokenTransaction(
 		context.Background(), config, issueTokenTransaction,
 		[]*secp256k1.PrivateKey{&tokenPrivKey},
-		[]wallet.SerializedPublicKey{})
+		[][]byte{})
 	require.NoError(t, err, "failed to broadcast issuance token transaction")
 	log.Printf("issuance broadcast finalized token transaction: %v", finalIssueTokenTransaction)
 
@@ -686,14 +698,15 @@ func TestBroadcastTokenTransactionMintAndTransferTokensDoubleStart(t *testing.T)
 	revPubKey2 := finalIssueTokenTransaction.TokenOutputs[1].RevocationCommitment
 
 	// Make a start token transaction with identical params but dont continue.
-	_, _, _, err = wallet.StartTokenTransaction(context.Background(), config, transferTokenTransaction, []*secp256k1.PrivateKey{userLeaf1PrivKey, userLeaf2PrivKey})
-	require.NoError(t, err, "failed to start token transaction with identical params")
+	_, _, _, err = wallet.StartTokenTransaction(context.Background(), config, transferTokenTransaction, []*secp256k1.PrivateKey{userLeaf1PrivKey, userLeaf2PrivKey},
+		[][]byte{revPubKey1, revPubKey2})
+	require.NoError(t, err, "failed to start token transaction that will not be continued")
 
 	// Broadcast the transfer token transaction
 	transferTokenTransactionResponse, err := wallet.BroadcastTokenTransaction(
 		context.Background(), config, transferTokenTransaction,
 		[]*secp256k1.PrivateKey{userLeaf1PrivKey, userLeaf2PrivKey},
-		[]wallet.SerializedPublicKey{revPubKey1, revPubKey2},
+		[][]byte{revPubKey1, revPubKey2},
 	)
 	require.NoError(t, err, "failed to broadcast transfer token transaction")
 	log.Printf("transfer broadcast finalized token transaction: %v", transferTokenTransactionResponse)
@@ -702,8 +715,8 @@ func TestBroadcastTokenTransactionMintAndTransferTokensDoubleStart(t *testing.T)
 	tokenOutputsResponse, err := wallet.QueryTokenOutputs(
 		context.Background(),
 		config,
-		[]wallet.SerializedPublicKey{userLeaf3PubKeyBytes},
-		[]wallet.SerializedPublicKey{tokenIdentityPubKeyBytes},
+		[][]byte{userLeaf3PubKeyBytes},
+		[][]byte{tokenIdentityPubKeyBytes},
 	)
 	require.NoError(t, err, "failed to get owned token outputs")
 
@@ -735,65 +748,43 @@ func TestBroadcastTokenTransactionMintAndTransferTokensDoubleStart(t *testing.T)
 // - config: wallet configuration
 // - testDoubleSign: whether to test double signing
 // - testDifferentTx: whether to test signing with a different transaction than was started
-// - testInvalidSigningOperatorPublicKey: whether to test signing with an invalid operator public key in the payload
 // - expectedError: whether an error is expected during any of the signing operations
 func testMintTransactionSigningScenarios(t *testing.T, config *wallet.Config,
-	ownerPrivateKeys []*secp256k1.PrivateKey,
-	ownerPublicKeys []wallet.SerializedPublicKey,
-	testDoubleSign bool,
-	testDifferentTx bool,
-	testInvalidSigningOperatorPublicKey bool,
-	expectedError bool,
+	testDoubleSign bool, testDifferentTx bool, expectedError bool,
 ) (*pb.TokenTransaction, *secp256k1.PrivateKey, *secp256k1.PrivateKey) {
 	tokenPrivKey := config.IdentityPrivateKey
-	issuerPubKeyBytes := tokenPrivKey.PubKey().SerializeCompressed()
-	issueTokenTransaction, userLeaf1PrivKey, userLeaf2PrivKey, err := createTestTokenMintTransaction(config, issuerPubKeyBytes)
+	tokenIdentityPubKeyBytes := tokenPrivKey.PubKey().SerializeCompressed()
+	issueTokenTransaction, userLeaf1PrivKey, userLeaf2PrivKey, err := createTestTokenMintTransaction(config, tokenIdentityPubKeyBytes)
 	require.NoError(t, err, "failed to create test token mint transaction")
 
-	if ownerPrivateKeys == nil {
-		ownerPrivateKeys = []*secp256k1.PrivateKey{&tokenPrivKey}
-	}
-	if ownerPublicKeys == nil {
-		ownerPublicKeys = []wallet.SerializedPublicKey{issuerPubKeyBytes}
-	}
 	startResp, _, finalTxHash, err := wallet.StartTokenTransaction(
 		context.Background(),
 		config,
 		issueTokenTransaction,
 		[]*secp256k1.PrivateKey{&tokenPrivKey},
+		[][]byte{},
 	)
 	require.NoError(t, err, "failed to start token transaction")
 
 	txToSign := startResp.FinalTokenTransaction
 	if testDifferentTx {
-		differentIssueTokenTransaction, _, _, err := createTestTokenMintTransaction(config, issuerPubKeyBytes)
+		differentIssueTokenTransaction, _, _, err := createTestTokenMintTransaction(config, tokenIdentityPubKeyBytes)
 		require.NoError(t, err, "failed to create different test token issuance transaction")
 		txToSign = differentIssueTokenTransaction
-	}
-
-	if testInvalidSigningOperatorPublicKey {
-		// Generate a new random key to replace the valid one
-		randomKey, err := secp256k1.GeneratePrivateKey()
-		require.NoError(t, err, "failed to generate random key")
-		for operatorID := range config.SigningOperators {
-			config.SigningOperators[operatorID].IdentityPublicKey = randomKey.PubKey().SerializeCompressed()
-			break // Only modify the first operator
-		}
 	}
 
 	errorOccurred := false
 	var halfSignOperatorSignatures wallet.OperatorSignatures
 	if testDoubleSign {
-		operatorKeys := splitOperatorIdentityPublicKeys(config)
+		halfOperatorIDs := getHalfOperatorIDs(config)
 		// Sign with half the operators to get in a partial signed state
 		_, halfSignOperatorSignatures, err = wallet.SignTokenTransaction(
 			context.Background(),
 			config,
 			startResp.FinalTokenTransaction, // Always use the original transaction for first sign (if double signing)
 			finalTxHash,
-			operatorKeys.FirstHalf,
-			ownerPrivateKeys,
-			ownerPublicKeys,
+			[]*secp256k1.PrivateKey{&tokenPrivKey},
+			halfOperatorIDs...,
 		)
 		require.NoError(t, err, "unexpected error during mint half signing")
 	}
@@ -804,9 +795,7 @@ func testMintTransactionSigningScenarios(t *testing.T, config *wallet.Config,
 		config,
 		txToSign,
 		finalTxHash,
-		nil, // Default to contact all operators
-		ownerPrivateKeys,
-		ownerPublicKeys,
+		[]*secp256k1.PrivateKey{&tokenPrivKey},
 	)
 	if err != nil {
 		errorOccurred = true
@@ -833,133 +822,22 @@ func testMintTransactionSigningScenarios(t *testing.T, config *wallet.Config,
 	return finalIssueTokenTransaction, userLeaf1PrivKey, userLeaf2PrivKey
 }
 
-// TestTokenMintTransactionSigning tests various signing scenarios for token mint transactions
-func TestTokenMintTransactionSigning(t *testing.T) {
-	skipIfGithubActions(t)
-
-	config, err := testutil.TestWalletConfig()
-	require.NoError(t, err, "failed to create wallet config")
-
-	tokenPrivKey := config.IdentityPrivateKey
-	tokenIdentityPubKeyBytes := tokenPrivKey.PubKey().SerializeCompressed()
-
-	userLeafPrivKey, err := secp256k1.GeneratePrivateKey()
-	require.NoError(t, err, "failed to generate user leaf private key")
-	userLeafPubKeyBytes := userLeafPrivKey.PubKey().SerializeCompressed()
-
-	testCases := []struct {
-		name                            string
-		ownerPrivateKeys                []*secp256k1.PrivateKey
-		ownerPublicKeys                 []wallet.SerializedPublicKey
-		doubleMintSign                  bool
-		differentMintTx                 bool
-		invalidSigningOperatorPublicKey bool
-		expectedError                   bool
-	}{
-		{
-			name:            "single sign mint should succeed with the same transaction",
-			doubleMintSign:  false,
-			differentMintTx: false,
-			expectedError:   false,
-		},
-		{
-			name:            "single sign mint should fail with different transaction",
-			doubleMintSign:  false,
-			differentMintTx: true,
-			expectedError:   true,
-		},
-		{
-			name:            "double sign mint should fail with a different transaction",
-			doubleMintSign:  true,
-			differentMintTx: true,
-			expectedError:   true,
-		},
-		{
-			name:            "double sign mint should succeed with same transaction",
-			doubleMintSign:  true,
-			differentMintTx: false,
-			expectedError:   false,
-		},
-		{
-			name:             "mint should fail with too many issuer signing keys",
-			ownerPrivateKeys: []*secp256k1.PrivateKey{&tokenPrivKey, &tokenPrivKey},
-			ownerPublicKeys:  []wallet.SerializedPublicKey{tokenIdentityPubKeyBytes, tokenIdentityPubKeyBytes},
-			expectedError:    true,
-		},
-		{
-			name:                            "mint should fail with invalid signing operator public key",
-			invalidSigningOperatorPublicKey: true,
-			expectedError:                   true,
-		},
-		{
-			name:             "mint should fail with incorrect issuer private key",
-			ownerPrivateKeys: []*secp256k1.PrivateKey{userLeafPrivKey},
-			ownerPublicKeys:  []wallet.SerializedPublicKey{tokenIdentityPubKeyBytes},
-			expectedError:    true,
-		},
-		{
-			name:             "mint should fail with incorrect issuer public key",
-			ownerPrivateKeys: []*secp256k1.PrivateKey{&tokenPrivKey},
-			ownerPublicKeys:  []wallet.SerializedPublicKey{userLeafPubKeyBytes},
-			expectedError:    true,
-		},
-		{
-			name:             "mint should fail with incorrect issuer private and public key",
-			ownerPrivateKeys: []*secp256k1.PrivateKey{userLeafPrivKey},
-			ownerPublicKeys:  []wallet.SerializedPublicKey{userLeafPubKeyBytes},
-			expectedError:    true,
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			config, err := testutil.TestWalletConfig()
-			require.NoError(t, err, "failed to create wallet config")
-
-			testMintTransactionSigningScenarios(
-				t, config,
-				tc.ownerPrivateKeys,
-				tc.ownerPublicKeys,
-				tc.doubleMintSign,
-				tc.differentMintTx,
-				tc.invalidSigningOperatorPublicKey,
-				tc.expectedError)
-		})
-	}
-}
-
 // Helper function for testing token transfer transaction with various signing scenarios
 // Parameters:
 // - t: testing context
 // - config: wallet configuration
 // - finalIssueTokenTransaction: the finalized mint transaction
-// - startingOwnerPrivateKeys: private keys to use for starting the transaction
-// - startingOwnerPublicKeys: public keys to use for starting the transaction
-// - signingOwnerPrivateKeys: private keys to use for signing
-// - signingOwnerPublicKeys: public keys to use for signing
+// - userLeaf1PrivKey, userLeaf2PrivKey: private keys for the outputs
 // - testDoubleSign: whether to test double signing
 // - testDifferentTx: whether to test signing with a different transaction than was started
-// - testInvalidSigningOperatorPublicKey: whether to test signing with an invalid operator public key in the payload
 // - expectedError: whether an error is expected during any of the signing operations
 func testTransferTransactionSigningScenarios(t *testing.T, config *wallet.Config,
 	finalIssueTokenTransaction *pb.TokenTransaction,
-	startingOwnerPrivateKeys []*secp256k1.PrivateKey,
-	startingOwnerPublicKeys []wallet.SerializedPublicKey,
-	signingOwnerPrivateKeys []*secp256k1.PrivateKey,
-	signingOwnerPublicKeys []wallet.SerializedPublicKey,
-	testDoubleSign bool,
-	testDifferentTx bool,
-	testInvalidSigningOperatorPublicKey bool,
-	expectedError bool,
+	userLeaf1PrivKey, userLeaf2PrivKey *secp256k1.PrivateKey,
+	testDoubleSign bool, testDifferentTx bool, expectedError bool,
 ) {
 	tokenPrivKey := config.IdentityPrivateKey
 	tokenIdentityPubKeyBytes := tokenPrivKey.PubKey().SerializeCompressed()
-	if signingOwnerPrivateKeys == nil {
-		signingOwnerPrivateKeys = startingOwnerPrivateKeys
-	}
-	if signingOwnerPublicKeys == nil {
-		signingOwnerPublicKeys = startingOwnerPublicKeys
-	}
 
 	finalIssueTokenTransactionHash, err := utils.HashTokenTransaction(finalIssueTokenTransaction, false)
 	require.NoError(t, err, "failed to hash final issuance token transaction")
@@ -977,7 +855,8 @@ func testTransferTransactionSigningScenarios(t *testing.T, config *wallet.Config
 		context.Background(),
 		config,
 		transferTokenTransaction,
-		startingOwnerPrivateKeys,
+		[]*secp256k1.PrivateKey{userLeaf1PrivKey, userLeaf2PrivKey},
+		[][]byte{revPubKey1, revPubKey2},
 	)
 	require.NoError(t, err, "failed to start transfer transaction")
 
@@ -987,44 +866,32 @@ func testTransferTransactionSigningScenarios(t *testing.T, config *wallet.Config
 	if testDifferentTx {
 		txToSign = cloneTransferTransactionWithDifferentOutputOwner(
 			transferTokenTransaction,
-			signingOwnerPrivateKeys[0].PubKey().SerializeCompressed(),
+			userLeaf1PrivKey.PubKey().SerializeCompressed(),
 		)
-	}
-
-	if testInvalidSigningOperatorPublicKey {
-		// Generate a new random key to replace the valid one
-		randomKey, err := secp256k1.GeneratePrivateKey()
-		require.NoError(t, err, "failed to generate random key")
-		for operatorID := range config.SigningOperators {
-			config.SigningOperators[operatorID].IdentityPublicKey = randomKey.PubKey().SerializeCompressed()
-			break // Only modify the first operator
-		}
 	}
 
 	// If testing double signing, first sign with half the operators
 	var halfSignOperatorSignatures wallet.OperatorSignatures
 	if testDoubleSign {
-		operatorKeys := splitOperatorIdentityPublicKeys(config)
+		halfOperatorIDs := getHalfOperatorIDs(config)
 		_, halfSignOperatorSignatures, err = wallet.SignTokenTransaction(
 			context.Background(),
 			config,
 			transferStartResp.FinalTokenTransaction, // Always use original transaction for first sign
 			transferFinalTxHash,
-			operatorKeys.FirstHalf,
-			signingOwnerPrivateKeys,
-			signingOwnerPublicKeys,
+			[]*secp256k1.PrivateKey{userLeaf1PrivKey, userLeaf2PrivKey},
+			halfOperatorIDs...,
 		)
 		require.NoError(t, err, "unexpected error during transfer half signing")
 	}
+
 	// Complete the transaction signing with either the original or different transaction
 	signResponseTransferKeyshares, fullSignOperatorSignatures, err := wallet.SignTokenTransaction(
 		context.Background(),
 		config,
 		txToSign,
 		transferFinalTxHash,
-		nil, // Default to contact all operators
-		signingOwnerPrivateKeys,
-		signingOwnerPublicKeys,
+		[]*secp256k1.PrivateKey{userLeaf1PrivKey, userLeaf2PrivKey},
 	)
 	if err != nil {
 		errorOccurred = true
@@ -1050,32 +917,75 @@ func testTransferTransactionSigningScenarios(t *testing.T, config *wallet.Config
 		config,
 		transferStartResp.FinalTokenTransaction,
 		signResponseTransferKeyshares,
-		[]wallet.SerializedPublicKey{revPubKey1, revPubKey2},
+		[][]byte{revPubKey1, revPubKey2},
 		transferStartResp,
 	)
 	require.NoError(t, err, "failed to finalize the transfer transaction")
 	log.Printf("transfer transaction finalized: %v", transferStartResp.FinalTokenTransaction)
 }
 
-// TestTokenTransferTransactionSigning tests various signing scenarios for token transfer transactions
-func TestTokenTransferTransactionSigning(t *testing.T) {
-	skipIfGithubActions(t)
-
+// TestTokenMintTransactionSigning tests various signing scenarios for token mint transactions
+func TestTokenMintTransactionSigning(t *testing.T) {
 	testCases := []struct {
-		name                            string
-		doubleTransferSign              bool
-		differentTransferTx             bool
-		signingOwnerPrivateKeysModifier func(leaf1, leaf2 *secp256k1.PrivateKey) []*secp256k1.PrivateKey
-		signingOwnerPublicKeysModifier  func(leaf1, leaf2 []byte) []wallet.SerializedPublicKey
-		invalidSigningOperatorPublicKey bool
-		expectedError                   bool
+		name            string
+		doubleMintSign  bool
+		differentMintTx bool
+		expectedError   bool
 	}{
 		{
-			name:          "single sign transfer should succeed with the same transaction",
-			expectedError: false,
+			name:            "single sign mint should succeed with the same transaction",
+			doubleMintSign:  false,
+			differentMintTx: false,
+			expectedError:   false,
 		},
 		{
-			name:                "single sign transfer should fail with different transaction",
+			name:            "single sign mint should fail with different transaction",
+			doubleMintSign:  false,
+			differentMintTx: true,
+			expectedError:   true,
+		},
+		{
+			name:            "double sign mint should fail with a different transaction",
+			doubleMintSign:  true,
+			differentMintTx: true,
+			expectedError:   true,
+		},
+		{
+			name:            "double sign mint should succeed with same transaction",
+			doubleMintSign:  true,
+			differentMintTx: false,
+			expectedError:   false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			config, err := testutil.TestWalletConfig()
+			require.NoError(t, err, "failed to create wallet config")
+
+			testMintTransactionSigningScenarios(
+				t, config, tc.doubleMintSign, tc.differentMintTx, tc.expectedError)
+		})
+	}
+}
+
+// TestTokenTransferTransactionSigning tests various signing scenarios for token transfer transactions
+func TestTokenTransferTransactionSigning(t *testing.T) {
+	testCases := []struct {
+		name                string
+		doubleTransferSign  bool
+		differentTransferTx bool
+		expectedError       bool
+	}{
+		{
+			name:                "single sign transfer should succeed with the same transaction",
+			doubleTransferSign:  false,
+			differentTransferTx: false,
+			expectedError:       false,
+		},
+		{
+			name:                "single sign transfer  should fail with different transaction",
+			doubleTransferSign:  false,
 			differentTransferTx: true,
 			expectedError:       true,
 		},
@@ -1086,120 +996,26 @@ func TestTokenTransferTransactionSigning(t *testing.T) {
 			expectedError:       true,
 		},
 		{
-			name:               "double sign transfer should succeed with same transaction",
-			doubleTransferSign: true,
-			expectedError:      false,
-		},
-		{
-			name: "single sign transfer should fail with duplicate owner signing private keys",
-			signingOwnerPrivateKeysModifier: func(leaf1, _ *secp256k1.PrivateKey) []*secp256k1.PrivateKey {
-				return []*secp256k1.PrivateKey{leaf1, leaf1}
-			},
-			expectedError: true,
-		},
-		{
-			name: "single sign transfer should fail with duplicate owner signing private and public keys",
-			signingOwnerPrivateKeysModifier: func(leaf1, _ *secp256k1.PrivateKey) []*secp256k1.PrivateKey {
-				return []*secp256k1.PrivateKey{leaf1, leaf1}
-			},
-			signingOwnerPublicKeysModifier: func(leaf1, _ []byte) []wallet.SerializedPublicKey {
-				return []wallet.SerializedPublicKey{leaf1, leaf1}
-			},
-			expectedError: true,
-		},
-		{
-			name: "single sign transfer should fail with duplicate owner signing public keys",
-			signingOwnerPublicKeysModifier: func(leaf1, _ []byte) []wallet.SerializedPublicKey {
-				return []wallet.SerializedPublicKey{leaf1, leaf1}
-			},
-			expectedError: true,
-		},
-		{
-			name: "single sign transfer should fail with swapped owner signing private keys",
-			signingOwnerPrivateKeysModifier: func(leaf1, leaf2 *secp256k1.PrivateKey) []*secp256k1.PrivateKey {
-				return []*secp256k1.PrivateKey{leaf2, leaf1}
-			},
-			expectedError: true,
-		},
-		{
-			name: "single sign transfer should fail with swapped owner signing private and public keys",
-			signingOwnerPrivateKeysModifier: func(leaf1, leaf2 *secp256k1.PrivateKey) []*secp256k1.PrivateKey {
-				return []*secp256k1.PrivateKey{leaf2, leaf1}
-			},
-			signingOwnerPublicKeysModifier: func(leaf1, leaf2 []byte) []wallet.SerializedPublicKey {
-				return []wallet.SerializedPublicKey{leaf2, leaf1}
-			},
-			expectedError: true,
-		},
-		{
-			name: "single sign transfer should fail with swapped owner signing public keys",
-
-			signingOwnerPublicKeysModifier: func(leaf1, leaf2 []byte) []wallet.SerializedPublicKey {
-				return []wallet.SerializedPublicKey{leaf2, leaf1}
-			},
-			expectedError: true,
-		},
-		{
-			name: "transfer should fail with not enough owner signing keys",
-			signingOwnerPrivateKeysModifier: func(leaf1, _ *secp256k1.PrivateKey) []*secp256k1.PrivateKey {
-				return []*secp256k1.PrivateKey{leaf1}
-			},
-			signingOwnerPublicKeysModifier: func(leaf1, _ []byte) []wallet.SerializedPublicKey {
-				return []wallet.SerializedPublicKey{leaf1}
-			},
-			expectedError: true,
-		},
-		{
-			name: "transfer should fail with too many owner signing keys",
-			signingOwnerPrivateKeysModifier: func(leaf1, leaf2 *secp256k1.PrivateKey) []*secp256k1.PrivateKey {
-				return []*secp256k1.PrivateKey{leaf1, leaf2, leaf1}
-			},
-			signingOwnerPublicKeysModifier: func(leaf1, leaf2 []byte) []wallet.SerializedPublicKey {
-				return []wallet.SerializedPublicKey{leaf1, leaf2, leaf1}
-			},
-			expectedError: true,
-		},
-		{
-			name:                            "transfer should fail with invalid signing operator public key",
-			invalidSigningOperatorPublicKey: true,
-			expectedError:                   true,
+			name:                "double sign transfer should succeed with same transaction",
+			doubleTransferSign:  true,
+			differentTransferTx: false,
+			expectedError:       false,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			// Create a fresh config for each test case
+			skipIfGithubActions(t)
 			config, err := testutil.TestWalletConfig()
 			require.NoError(t, err, "failed to create wallet config")
 
-			// Create and finalize a mint transaction for this specific test case
+			// First create and finalize a mint transaction to use for the transfer tests
 			finalIssueTokenTransaction, userLeaf1PrivKey, userLeaf2PrivKey := testMintTransactionSigningScenarios(
-				t, config, nil, nil, false, false, false, false)
-
-			leaf1PubKey := userLeaf1PrivKey.PubKey().SerializeCompressed()
-			leaf2PubKey := userLeaf2PrivKey.PubKey().SerializeCompressed()
-
-			defaultStartingOwnerPrivateKeys := []*secp256k1.PrivateKey{userLeaf1PrivKey, userLeaf2PrivKey}
-			defaultStartingOwnerPublicKeys := []wallet.SerializedPublicKey{leaf1PubKey, leaf2PubKey}
-			var signingPrivKeys []*secp256k1.PrivateKey
-			var signingPubKeys []wallet.SerializedPublicKey
-			if tc.signingOwnerPrivateKeysModifier != nil {
-				signingPrivKeys = tc.signingOwnerPrivateKeysModifier(userLeaf1PrivKey, userLeaf2PrivKey)
-			}
-			if tc.signingOwnerPublicKeysModifier != nil {
-				signingPubKeys = tc.signingOwnerPublicKeysModifier(leaf1PubKey, leaf2PubKey)
-			}
+				t, config, false, false, false) // Simple mint with no errors expected
 
 			testTransferTransactionSigningScenarios(
-				t, config, finalIssueTokenTransaction,
-				defaultStartingOwnerPrivateKeys,
-				defaultStartingOwnerPublicKeys,
-				signingPrivKeys,
-				signingPubKeys,
-				tc.doubleTransferSign,
-				tc.differentTransferTx,
-				tc.invalidSigningOperatorPublicKey,
-				tc.expectedError)
+				t, config, finalIssueTokenTransaction, userLeaf1PrivKey, userLeaf2PrivKey,
+				tc.doubleTransferSign, tc.differentTransferTx, tc.expectedError)
 		})
 	}
 }
@@ -1207,7 +1023,6 @@ func TestTokenTransferTransactionSigning(t *testing.T) {
 func TestBroadcastTokenTransactionMintAndTransferTokensSchnorr(t *testing.T) {
 	skipIfGithubActions(t)
 	config, err := testutil.TestWalletConfigWithTokenTransactionSchnorr()
-
 	require.NoError(t, err, "failed to create wallet config")
 
 	tokenPrivKey := config.IdentityPrivateKey
@@ -1218,7 +1033,7 @@ func TestBroadcastTokenTransactionMintAndTransferTokensSchnorr(t *testing.T) {
 	finalIssueTokenTransaction, err := wallet.BroadcastTokenTransaction(
 		context.Background(), config, issueTokenTransaction,
 		[]*secp256k1.PrivateKey{&tokenPrivKey},
-		[]wallet.SerializedPublicKey{})
+		[][]byte{})
 	require.NoError(t, err, "failed to broadcast issuance token transaction")
 	log.Printf("issuance broadcast finalized token transaction: %v", finalIssueTokenTransaction)
 
@@ -1245,7 +1060,7 @@ func TestBroadcastTokenTransactionMintAndTransferTokensSchnorr(t *testing.T) {
 	transferTokenTransactionResponse, err := wallet.BroadcastTokenTransaction(
 		context.Background(), config, transferTokenTransaction,
 		[]*secp256k1.PrivateKey{userLeaf1PrivKey, userLeaf2PrivKey},
-		[]wallet.SerializedPublicKey{revPubKey1, revPubKey2},
+		[][]byte{revPubKey1, revPubKey2},
 	)
 	require.NoError(t, err, "failed to broadcast transfer token transaction")
 	log.Printf("transfer broadcast finalized token transaction: %v", transferTokenTransactionResponse)
@@ -1263,7 +1078,7 @@ func TestFreezeAndUnfreezeTokensSchnorr(t *testing.T) {
 	finalIssueTokenTransaction, err := wallet.BroadcastTokenTransaction(
 		context.Background(), config, issueTokenTransaction,
 		[]*secp256k1.PrivateKey{&tokenPrivKey},
-		[]wallet.SerializedPublicKey{})
+		[][]byte{})
 	require.NoError(t, err, "failed to broadcast issuance token transaction")
 
 	_, err = wallet.FreezeTokens(
@@ -1281,7 +1096,8 @@ func TestCancelTokenTransaction(t *testing.T) {
 	config, err := testutil.TestWalletConfig()
 	require.NoError(t, err, "failed to create wallet config")
 
-	operatorKeys := splitOperatorIdentityPublicKeys(config)
+	halfOperatorIDs := getHalfOperatorIDs(config)
+	remainingOperatorIDs := getRemainingOperatorIDs(config, halfOperatorIDs)
 
 	tokenPrivKey := config.IdentityPrivateKey
 	tokenIdentityPubKeyBytes := tokenPrivKey.PubKey().SerializeCompressed()
@@ -1293,6 +1109,7 @@ func TestCancelTokenTransaction(t *testing.T) {
 		config,
 		issueTokenTransaction,
 		[]*secp256k1.PrivateKey{&tokenPrivKey},
+		[][]byte{},
 	)
 	require.NoError(t, err, "failed to start token transaction")
 	finalIssueTokenTransaction := startResp.FinalTokenTransaction
@@ -1302,9 +1119,8 @@ func TestCancelTokenTransaction(t *testing.T) {
 		config,
 		startResp.FinalTokenTransaction,
 		finalTxHash,
-		operatorKeys.FirstHalf,
 		[]*secp256k1.PrivateKey{&tokenPrivKey},
-		[]wallet.SerializedPublicKey{tokenIdentityPubKeyBytes},
+		halfOperatorIDs..., // Only sign with half of the operators
 	)
 	require.NoError(t, err, "failed to sign the mint transaction with the first half of SOs")
 
@@ -1312,7 +1128,7 @@ func TestCancelTokenTransaction(t *testing.T) {
 		context.Background(),
 		config,
 		startResp.FinalTokenTransaction,
-		operatorKeys.FirstHalf,
+		halfOperatorIDs...,
 	)
 	require.Error(t, err, "expected cancel failure on mint transaction. Mint cancellation is not supported")
 
@@ -1321,9 +1137,8 @@ func TestCancelTokenTransaction(t *testing.T) {
 		config,
 		startResp.FinalTokenTransaction,
 		finalTxHash,
-		operatorKeys.SecondHalf,
 		[]*secp256k1.PrivateKey{&tokenPrivKey},
-		[]wallet.SerializedPublicKey{tokenIdentityPubKeyBytes},
+		remainingOperatorIDs...,
 	)
 	require.NoError(t, err, "failed to sign the mint transaction with the second half of SOs")
 
@@ -1345,6 +1160,7 @@ func TestCancelTokenTransaction(t *testing.T) {
 		config,
 		transferTokenTransaction,
 		[]*secp256k1.PrivateKey{userLeaf1PrivKey, userLeaf2PrivKey},
+		[][]byte{revPubKey1, revPubKey2},
 	)
 	require.NoError(t, err, "failed to start transfer transaction")
 
@@ -1356,9 +1172,8 @@ func TestCancelTokenTransaction(t *testing.T) {
 		config,
 		transferStartResp.FinalTokenTransaction,
 		transferFinalTxHash,
-		operatorKeys.FirstHalf,
 		[]*secp256k1.PrivateKey{userLeaf1PrivKey, userLeaf2PrivKey},
-		[]wallet.SerializedPublicKey{userLeaf1PrivKey.PubKey().SerializeCompressed(), userLeaf2PrivKey.PubKey().SerializeCompressed()},
+		halfOperatorIDs..., // Only sign with half of the operators
 	)
 	require.NoError(t, err, "failed partial signing")
 
@@ -1367,7 +1182,7 @@ func TestCancelTokenTransaction(t *testing.T) {
 		context.Background(),
 		config,
 		transferStartResp.FinalTokenTransaction,
-		operatorKeys.FirstHalf, // Cancel for the half of the operators that signed.
+		halfOperatorIDs..., // Cancel for the half of the operators that signed.
 	)
 	require.NoError(t, err, "failed to cancel partially signed transfer token transaction")
 
@@ -1376,7 +1191,7 @@ func TestCancelTokenTransaction(t *testing.T) {
 		context.Background(),
 		config,
 		transferStartResp.FinalTokenTransaction,
-		operatorKeys.SecondHalf,
+		remainingOperatorIDs..., // Only sign with half of the operators
 	)
 	require.Error(t, err, "expected error when trying to cancel transfer transaction with remaining operators")
 
@@ -1386,7 +1201,7 @@ func TestCancelTokenTransaction(t *testing.T) {
 		config,
 		transferTokenTransaction,
 		[]*secp256k1.PrivateKey{userLeaf1PrivKey, userLeaf2PrivKey},
-		[]wallet.SerializedPublicKey{revPubKey1, revPubKey2},
+		[][]byte{revPubKey1, revPubKey2},
 	)
 	require.NoError(t, err, "failed to broadcast transfer token transaction after cancellation")
 	log.Printf("successfully transferred tokens after cancellation: %v", transferTokenTransactionResponse)
@@ -1404,7 +1219,7 @@ func TestBroadcastTokenTransactionWithInvalidPrevTxHash(t *testing.T) {
 	finalIssueTokenTransaction, err := wallet.BroadcastTokenTransaction(
 		context.Background(), config, issueTokenTransaction,
 		[]*secp256k1.PrivateKey{&tokenPrivKey},
-		[]wallet.SerializedPublicKey{})
+		[][]byte{})
 	require.NoError(t, err, "failed to broadcast issuance token transaction")
 	log.Printf("issuance broadcast finalized token transaction: %v", finalIssueTokenTransaction)
 
@@ -1449,7 +1264,7 @@ func TestBroadcastTokenTransactionWithInvalidPrevTxHash(t *testing.T) {
 	_, err = wallet.BroadcastTokenTransaction(
 		context.Background(), config, transferTokenTransaction,
 		[]*secp256k1.PrivateKey{userLeaf1PrivKey, userLeaf2PrivKey},
-		[]wallet.SerializedPublicKey{revPubKey1, revPubKey2},
+		[][]byte{revPubKey1, revPubKey2},
 	)
 
 	require.Error(t, err, "expected transaction with invalid hash to be rejected")
@@ -1486,7 +1301,7 @@ func TestBroadcastTokenTransactionWithInvalidPrevTxHash(t *testing.T) {
 	_, err = wallet.BroadcastTokenTransaction(
 		context.Background(), config, transferTokenTransaction2,
 		[]*secp256k1.PrivateKey{userLeaf1PrivKey, userLeaf2PrivKey},
-		[]wallet.SerializedPublicKey{revPubKey1, revPubKey2},
+		[][]byte{revPubKey1, revPubKey2},
 	)
 
 	require.Error(t, err, "expected transaction with second invalid hash to be rejected")
@@ -1506,7 +1321,7 @@ func TestBroadcastTokenTransactionUnspecifiedNetwork(t *testing.T) {
 	_, err = wallet.BroadcastTokenTransaction(
 		context.Background(), config, issueTokenTransaction,
 		[]*secp256k1.PrivateKey{&tokenPrivKey},
-		[]wallet.SerializedPublicKey{})
+		[][]byte{})
 
 	require.Error(t, err, "expected transaction without a network to be rejected")
 	log.Printf("successfully detected unspecified network and rejected with error: %v", err)

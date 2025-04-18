@@ -689,7 +689,7 @@ func (w *SingleKeyWallet) TransferTokens(ctx context.Context, amount uint64, rec
 	}
 
 	outputsToSpend := make([]*pb.TokenOutputToSpend, len(selectedOutputsWithPrevTxData))
-	revocationPublicKeys := make([]SerializedPublicKey, len(selectedOutputsWithPrevTxData))
+	revocationPublicKeys := make([][]byte, len(selectedOutputsWithPrevTxData))
 	outputsToSpendPrivateKeys := make([]*secp256k1.PrivateKey, len(selectedOutputsWithPrevTxData))
 	for i, output := range selectedOutputsWithPrevTxData {
 		outputsToSpend[i] = &pb.TokenOutputToSpend{
@@ -768,7 +768,7 @@ func (w *SingleKeyWallet) GetAllTokenBalances(ctx context.Context) (map[string]T
 	response, err := QueryTokenOutputs(
 		ctx,
 		w.Config,
-		[]SerializedPublicKey{w.Config.IdentityPublicKey()},
+		[][]byte{w.Config.IdentityPublicKey()},
 		nil, // nil to get all tokens
 	)
 	if err != nil {
@@ -805,8 +805,8 @@ func (w *SingleKeyWallet) GetTokenBalance(ctx context.Context, tokenPublicKey []
 	response, err := QueryTokenOutputs(
 		ctx,
 		w.Config,
-		[]SerializedPublicKey{w.Config.IdentityPublicKey()},
-		[]SerializedPublicKey{tokenPublicKey},
+		[][]byte{w.Config.IdentityPublicKey()},
+		[][]byte{tokenPublicKey},
 	)
 	if err != nil {
 		return 0, 0, fmt.Errorf("failed to get owned token outputs: %w", err)
@@ -827,7 +827,7 @@ func (w *SingleKeyWallet) GetTokenBalance(ctx context.Context, tokenPublicKey []
 
 func selectTokenOutputs(ctx context.Context, config *Config, targetAmount uint64, tokenPublicKey []byte, ownerPublicKey []byte) ([]*pb.OutputWithPreviousTransactionData, uint64, error) {
 	// Fetch owned token leaves
-	ownedOutputsResponse, err := QueryTokenOutputs(ctx, config, []SerializedPublicKey{ownerPublicKey}, []SerializedPublicKey{tokenPublicKey})
+	ownedOutputsResponse, err := QueryTokenOutputs(ctx, config, [][]byte{ownerPublicKey}, [][]byte{tokenPublicKey})
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to get owned token outputs: %w", err)
 	}

@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log/slog"
-	"sort"
 	"strings"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
@@ -178,102 +177,6 @@ func validateInputs(outputs []*ent.TokenOutput, expectedStatus schema.TokenOutpu
 	return invalidOutputs
 }
 
-// validateOperatorSpecificSignatures validates the signatures in the request against the transaction hash
-// and verifies that the number of signatures matches the expected count based on transaction type
-func validateOperatorSpecificSignatures(identityPublicKey []byte, operatorSpecificSignatures []*pb.OperatorSpecificTokenTransactionSignature, tokenTransaction *ent.TokenTransaction) error {
-	if len(tokenTransaction.Edges.SpentOutput) > 0 {
-		return validateTransferOperatorSpecificSignatures(identityPublicKey, operatorSpecificSignatures, tokenTransaction)
-	}
-	return validateMintOperatorSpecificSignatures(identityPublicKey, operatorSpecificSignatures, tokenTransaction)
-}
-
-// validateTransferOperatorSpecificSignatures validates signatures for transfer transactions
-func validateTransferOperatorSpecificSignatures(identityPublicKey []byte, operatorSpecificSignatures []*pb.OperatorSpecificTokenTransactionSignature, tokenTransaction *ent.TokenTransaction) error {
-	if len(operatorSpecificSignatures) != len(tokenTransaction.Edges.SpentOutput) {
-		return fmt.Errorf("expected %d signatures for transfer (one per input), but got %d (transaction_uuid: %s, transaction_hash: %x)",
-			len(tokenTransaction.Edges.SpentOutput), len(operatorSpecificSignatures),
-			tokenTransaction.ID.String(), tokenTransaction.FinalizedTokenTransactionHash)
-	}
-
-	spentOutputs := make([]*ent.TokenOutput, len(tokenTransaction.Edges.SpentOutput))
-	copy(spentOutputs, tokenTransaction.Edges.SpentOutput)
-	sort.Slice(spentOutputs, func(i, j int) bool {
-		return spentOutputs[i].SpentTransactionInputVout < spentOutputs[j].SpentTransactionInputVout
-	})
-
-	for i, outputSig := range operatorSpecificSignatures {
-		spentOutput := spentOutputs[i]
-		if !bytes.Equal(outputSig.OwnerPublicKey, spentOutput.OwnerPublicKey) {
-			return fmt.Errorf("owner public key mismatch for input %d: signature has %x but database record has %x (transaction_uuid: %s, transaction_hash: %x)",
-				i, outputSig.OwnerPublicKey, spentOutput.OwnerPublicKey,
-				tokenTransaction.ID.String(), tokenTransaction.FinalizedTokenTransactionHash)
-		}
-
-		if err := validateSignaturePayload(identityPublicKey, outputSig, tokenTransaction); err != nil {
-			return fmt.Errorf("%w (transaction_uuid: %s, transaction_hash: %x)",
-				err, tokenTransaction.ID.String(), tokenTransaction.FinalizedTokenTransactionHash)
-		}
-	}
-
-	return nil
-}
-
-// validateMintOperatorSpecificSignatures validates signatures for mint transactions
-func validateMintOperatorSpecificSignatures(identityPublicKey []byte, operatorSpecificSignatures []*pb.OperatorSpecificTokenTransactionSignature, tokenTransaction *ent.TokenTransaction) error {
-	if len(operatorSpecificSignatures) != 1 {
-		return fmt.Errorf("expected exactly 1 signature for mint, but got %d (transaction_uuid: %s, transaction_hash: %x)",
-			len(operatorSpecificSignatures), tokenTransaction.ID.String(), tokenTransaction.FinalizedTokenTransactionHash)
-	}
-
-	if tokenTransaction.Edges.Mint == nil {
-		return fmt.Errorf("mint record not found in db, but expected a mint for this transaction (transaction_uuid: %s, transaction_hash: %x)",
-			tokenTransaction.ID.String(), tokenTransaction.FinalizedTokenTransactionHash)
-	}
-
-	if !bytes.Equal(operatorSpecificSignatures[0].OwnerPublicKey, tokenTransaction.Edges.Mint.IssuerPublicKey) {
-		return fmt.Errorf("owner public key in signature (%x) does not match issuer public key in mint (%x) (transaction_uuid: %s, transaction_hash: %x)",
-			operatorSpecificSignatures[0].OwnerPublicKey, tokenTransaction.Edges.Mint.IssuerPublicKey,
-			tokenTransaction.ID.String(), tokenTransaction.FinalizedTokenTransactionHash)
-	}
-
-	if err := validateSignaturePayload(identityPublicKey, operatorSpecificSignatures[0], tokenTransaction); err != nil {
-		return fmt.Errorf("%w (transaction_uuid: %s, transaction_hash: %x)",
-			err, tokenTransaction.ID.String(), tokenTransaction.FinalizedTokenTransactionHash)
-	}
-
-	return nil
-}
-
-// validateSignaturePayload validates the payload and signature of an operator-specific signature
-func validateSignaturePayload(identityPublicKey []byte, outputSig *pb.OperatorSpecificTokenTransactionSignature, tokenTransaction *ent.TokenTransaction) error {
-	payloadHash, err := utils.HashOperatorSpecificTokenTransactionSignablePayload(outputSig.Payload)
-	if err != nil {
-		return fmt.Errorf("failed to hash revocation keyshares payload: %w", err)
-	}
-
-	if !bytes.Equal(outputSig.Payload.FinalTokenTransactionHash, tokenTransaction.FinalizedTokenTransactionHash) {
-		return fmt.Errorf("transaction hash in payload (%x) does not match actual transaction hash (%x)",
-			outputSig.Payload.FinalTokenTransactionHash, tokenTransaction.FinalizedTokenTransactionHash)
-	}
-
-	if len(outputSig.Payload.OperatorIdentityPublicKey) > 0 {
-		if !bytes.Equal(outputSig.Payload.OperatorIdentityPublicKey, identityPublicKey) {
-			return fmt.Errorf("operator identity public key in payload (%x) does not match this SO's identity public key (%x) (transaction_uuid: %s)",
-				outputSig.Payload.OperatorIdentityPublicKey, identityPublicKey, tokenTransaction.ID.String())
-		}
-	}
-
-	if err := utils.ValidateOwnershipSignature(
-		outputSig.OwnerSignature,
-		payloadHash,
-		outputSig.OwnerPublicKey,
-	); err != nil {
-		return fmt.Errorf("invalid owner signature for output: %w", err)
-	}
-
-	return nil
-}
-
 // SignTokenTransaction signs the token transaction with the operators private key.
 // If it is a transfer it also fetches this operators keyshare for each spent output and
 // returns it to the wallet so it can finalize the transaction.
@@ -294,14 +197,35 @@ func (o TokenTransactionHandler) SignTokenTransaction(
 		return nil, fmt.Errorf("failed to hash final token transaction: %w", err)
 	}
 
+	// Validate each output signature in the request. Each signed payload consists of
+	//   payload.final_token_transaction_hash
+	//   payload.operator_identity_public_key
+	// This verifies that this request for this transaction (and release of the revocation
+	// keyshare) came from the output owner and was intended for this specific SO.
+	for _, outputSig := range req.OperatorSpecificSignatures {
+		payloadHash, err := utils.HashOperatorSpecificTokenTransactionSignablePayload(outputSig.Payload)
+		if err != nil {
+			return nil, fmt.Errorf("failed to hash revocation keyshares payload: %w", err)
+		}
+
+		// Validate that the transaction hash in the payload matches the actual transaction hash
+		if !bytes.Equal(outputSig.Payload.FinalTokenTransactionHash, finalTokenTransactionHash) {
+			return nil, fmt.Errorf("transaction hash in payload (%x) does not match actual transaction hash (%x)",
+				outputSig.Payload.FinalTokenTransactionHash, finalTokenTransactionHash)
+		}
+
+		if err := utils.ValidateOwnershipSignature(
+			outputSig.OwnerSignature,
+			payloadHash,
+			outputSig.OwnerPublicKey,
+		); err != nil {
+			return nil, fmt.Errorf("invalid owner signature for output: %w", err)
+		}
+	}
 	tokenTransaction, err := ent.FetchAndLockTokenTransactionData(ctx, req.FinalTokenTransaction)
 	if err != nil {
 		logger.Info("Sign request for token transaction did not map to a previously started transaction", "error", err)
 		return nil, fmt.Errorf("token transaction not found or could not be locked for signing: %w", err)
-	}
-
-	if err := validateOperatorSpecificSignatures(config.IdentityPublicKey(), req.OperatorSpecificSignatures, tokenTransaction); err != nil {
-		return nil, err
 	}
 
 	if tokenTransaction.Status == schema.TokenTransactionStatusSigned {
@@ -718,7 +642,7 @@ func (o TokenTransactionHandler) QueryTokenTransactions(ctx context.Context, con
 			// Verify that this spent output is actually associated with this transaction.
 			if output.Edges.OutputSpentTokenTransaction == nil ||
 				output.Edges.OutputSpentTokenTransaction.ID != transaction.ID {
-				logger.Info("Warning: Spent output not properly associated with transaction", "output_id", output.ID.String(), "transaction_uuid", transaction.ID.String())
+				logger.Info("Warning: Spent output not properly associated with transaction", "output_id", output.ID.String(), "transaction_id", transaction.ID.String())
 				continue
 			}
 			spentOutputStatuses[output.Status]++
