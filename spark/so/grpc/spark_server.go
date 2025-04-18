@@ -8,6 +8,7 @@ import (
 	"github.com/lightsparkdev/spark-go/so/ent"
 	"github.com/lightsparkdev/spark-go/so/handler"
 	"github.com/lightsparkdev/spark-go/so/lrc20"
+	events "github.com/lightsparkdev/spark-go/so/stream"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
@@ -247,4 +248,8 @@ func (s *SparkServer) CancelSignedTokenTransaction(ctx context.Context, req *pb.
 	tokenTransactionHandler := handler.NewTokenTransactionHandler(s.config, s.db, s.lrc20Client)
 	_, err := tokenTransactionHandler.CancelSignedTokenTransaction(ctx, s.config, req)
 	return wrapWithGRPCError(emptyResponse, err)
+}
+
+func (s *SparkServer) SubscribeToEvents(req *pb.SubscribeToEventsRequest, st pb.SparkService_SubscribeToEventsServer) error {
+	return events.SubscribeToEvents(req.IdentityPublicKey, st)
 }

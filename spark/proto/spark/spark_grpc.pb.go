@@ -57,6 +57,7 @@ const (
 	SparkService_ReturnLightningPayment_FullMethodName       = "/spark.SparkService/return_lightning_payment"
 	SparkService_CancelSendTransfer_FullMethodName           = "/spark.SparkService/cancel_send_transfer"
 	SparkService_QueryUnusedDepositAddresses_FullMethodName  = "/spark.SparkService/query_unused_deposit_addresses"
+	SparkService_SubscribeToEvents_FullMethodName            = "/spark.SparkService/subscribe_to_events"
 )
 
 // SparkServiceClient is the client API for SparkService service.
@@ -109,6 +110,7 @@ type SparkServiceClient interface {
 	ReturnLightningPayment(ctx context.Context, in *ReturnLightningPaymentRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	CancelSendTransfer(ctx context.Context, in *CancelSendTransferRequest, opts ...grpc.CallOption) (*CancelSendTransferResponse, error)
 	QueryUnusedDepositAddresses(ctx context.Context, in *QueryUnusedDepositAddressesRequest, opts ...grpc.CallOption) (*QueryUnusedDepositAddressesResponse, error)
+	SubscribeToEvents(ctx context.Context, in *SubscribeToEventsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[SubscribeToEventsResponse], error)
 }
 
 type sparkServiceClient struct {
@@ -491,6 +493,25 @@ func (c *sparkServiceClient) QueryUnusedDepositAddresses(ctx context.Context, in
 	return out, nil
 }
 
+func (c *sparkServiceClient) SubscribeToEvents(ctx context.Context, in *SubscribeToEventsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[SubscribeToEventsResponse], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &SparkService_ServiceDesc.Streams[0], SparkService_SubscribeToEvents_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[SubscribeToEventsRequest, SubscribeToEventsResponse]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type SparkService_SubscribeToEventsClient = grpc.ServerStreamingClient[SubscribeToEventsResponse]
+
 // SparkServiceServer is the server API for SparkService service.
 // All implementations must embed UnimplementedSparkServiceServer
 // for forward compatibility.
@@ -541,6 +562,7 @@ type SparkServiceServer interface {
 	ReturnLightningPayment(context.Context, *ReturnLightningPaymentRequest) (*emptypb.Empty, error)
 	CancelSendTransfer(context.Context, *CancelSendTransferRequest) (*CancelSendTransferResponse, error)
 	QueryUnusedDepositAddresses(context.Context, *QueryUnusedDepositAddressesRequest) (*QueryUnusedDepositAddressesResponse, error)
+	SubscribeToEvents(*SubscribeToEventsRequest, grpc.ServerStreamingServer[SubscribeToEventsResponse]) error
 	mustEmbedUnimplementedSparkServiceServer()
 }
 
@@ -661,6 +683,9 @@ func (UnimplementedSparkServiceServer) CancelSendTransfer(context.Context, *Canc
 }
 func (UnimplementedSparkServiceServer) QueryUnusedDepositAddresses(context.Context, *QueryUnusedDepositAddressesRequest) (*QueryUnusedDepositAddressesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method QueryUnusedDepositAddresses not implemented")
+}
+func (UnimplementedSparkServiceServer) SubscribeToEvents(*SubscribeToEventsRequest, grpc.ServerStreamingServer[SubscribeToEventsResponse]) error {
+	return status.Errorf(codes.Unimplemented, "method SubscribeToEvents not implemented")
 }
 func (UnimplementedSparkServiceServer) mustEmbedUnimplementedSparkServiceServer() {}
 func (UnimplementedSparkServiceServer) testEmbeddedByValue()                      {}
@@ -1349,6 +1374,17 @@ func _SparkService_QueryUnusedDepositAddresses_Handler(srv interface{}, ctx cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SparkService_SubscribeToEvents_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(SubscribeToEventsRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(SparkServiceServer).SubscribeToEvents(m, &grpc.GenericServerStream[SubscribeToEventsRequest, SubscribeToEventsResponse]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type SparkService_SubscribeToEventsServer = grpc.ServerStreamingServer[SubscribeToEventsResponse]
+
 // SparkService_ServiceDesc is the grpc.ServiceDesc for SparkService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -1505,6 +1541,12 @@ var SparkService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _SparkService_QueryUnusedDepositAddresses_Handler,
 		},
 	},
-	Streams:  []grpc.StreamDesc{},
+	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "subscribe_to_events",
+			Handler:       _SparkService_SubscribeToEvents_Handler,
+			ServerStreams: true,
+		},
+	},
 	Metadata: "spark.proto",
 }

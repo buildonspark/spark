@@ -128,3 +128,45 @@ func ValidationInterceptor() grpc.UnaryServerInterceptor {
 		return resp, nil
 	}
 }
+
+type validatingServerStream struct {
+	grpc.ServerStream
+	requestID string
+	method    string
+	logger    *slog.Logger
+}
+
+func StreamValidationInterceptor() grpc.StreamServerInterceptor {
+	return func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+		requestID := uuid.New().String()
+		logger := slog.Default().With(
+			"request_id", requestID,
+			"method", info.FullMethod,
+		)
+
+		// Create a wrapping ServerStream that intercepts SendMsg
+		wrappedStream := &validatingServerStream{
+			ServerStream: ss,
+			requestID:    requestID,
+			method:       info.FullMethod,
+			logger:       logger,
+		}
+
+		// Handle the stream
+		return handler(srv, wrappedStream)
+	}
+}
+
+func (s *validatingServerStream) SendMsg(m interface{}) error {
+	// Validate outgoing message if it implements Validate()
+	if m != nil {
+		if v, ok := m.(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				s.logger.Error("Stream response validation failed", "error", err)
+				return status.Errorf(codes.Internal, "invalid response: %v", err)
+			}
+		}
+	}
+
+	return s.ServerStream.SendMsg(m)
+}

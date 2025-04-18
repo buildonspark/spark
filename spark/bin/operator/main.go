@@ -275,6 +275,10 @@ func main() {
 			authn.NewAuthnInterceptor(sessionTokenCreatorVerifier).AuthnInterceptor,
 			sparkgrpc.ValidationInterceptor(),
 		)),
+		grpc.StreamInterceptor(grpc_middleware.ChainStreamServer(
+			authn.NewAuthnInterceptor(sessionTokenCreatorVerifier).StreamAuthnInterceptor,
+			sparkgrpc.StreamValidationInterceptor(),
+		)),
 	}
 
 	var grpcServer *grpc.Server

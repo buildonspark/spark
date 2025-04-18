@@ -42,6 +42,556 @@ var (
 // define the regex for a UUID once up-front
 var _spark_uuidPattern = regexp.MustCompile("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
 
+// Validate checks the field values on SubscribeToEventsRequest with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *SubscribeToEventsRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on SubscribeToEventsRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// SubscribeToEventsRequestMultiError, or nil if none found.
+func (m *SubscribeToEventsRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *SubscribeToEventsRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for IdentityPublicKey
+
+	if len(errors) > 0 {
+		return SubscribeToEventsRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// SubscribeToEventsRequestMultiError is an error wrapping multiple validation
+// errors returned by SubscribeToEventsRequest.ValidateAll() if the designated
+// constraints aren't met.
+type SubscribeToEventsRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m SubscribeToEventsRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m SubscribeToEventsRequestMultiError) AllErrors() []error { return m }
+
+// SubscribeToEventsRequestValidationError is the validation error returned by
+// SubscribeToEventsRequest.Validate if the designated constraints aren't met.
+type SubscribeToEventsRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e SubscribeToEventsRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e SubscribeToEventsRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e SubscribeToEventsRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e SubscribeToEventsRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e SubscribeToEventsRequestValidationError) ErrorName() string {
+	return "SubscribeToEventsRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e SubscribeToEventsRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sSubscribeToEventsRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = SubscribeToEventsRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = SubscribeToEventsRequestValidationError{}
+
+// Validate checks the field values on SubscribeToEventsResponse with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *SubscribeToEventsResponse) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on SubscribeToEventsResponse with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// SubscribeToEventsResponseMultiError, or nil if none found.
+func (m *SubscribeToEventsResponse) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *SubscribeToEventsResponse) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	switch v := m.Event.(type) {
+	case *SubscribeToEventsResponse_Transfer:
+		if v == nil {
+			err := SubscribeToEventsResponseValidationError{
+				field:  "Event",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetTransfer()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, SubscribeToEventsResponseValidationError{
+						field:  "Transfer",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, SubscribeToEventsResponseValidationError{
+						field:  "Transfer",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetTransfer()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return SubscribeToEventsResponseValidationError{
+					field:  "Transfer",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *SubscribeToEventsResponse_Deposit:
+		if v == nil {
+			err := SubscribeToEventsResponseValidationError{
+				field:  "Event",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetDeposit()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, SubscribeToEventsResponseValidationError{
+						field:  "Deposit",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, SubscribeToEventsResponseValidationError{
+						field:  "Deposit",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetDeposit()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return SubscribeToEventsResponseValidationError{
+					field:  "Deposit",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	default:
+		_ = v // ensures v is used
+	}
+
+	if len(errors) > 0 {
+		return SubscribeToEventsResponseMultiError(errors)
+	}
+
+	return nil
+}
+
+// SubscribeToEventsResponseMultiError is an error wrapping multiple validation
+// errors returned by SubscribeToEventsResponse.ValidateAll() if the
+// designated constraints aren't met.
+type SubscribeToEventsResponseMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m SubscribeToEventsResponseMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m SubscribeToEventsResponseMultiError) AllErrors() []error { return m }
+
+// SubscribeToEventsResponseValidationError is the validation error returned by
+// SubscribeToEventsResponse.Validate if the designated constraints aren't met.
+type SubscribeToEventsResponseValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e SubscribeToEventsResponseValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e SubscribeToEventsResponseValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e SubscribeToEventsResponseValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e SubscribeToEventsResponseValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e SubscribeToEventsResponseValidationError) ErrorName() string {
+	return "SubscribeToEventsResponseValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e SubscribeToEventsResponseValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sSubscribeToEventsResponse.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = SubscribeToEventsResponseValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = SubscribeToEventsResponseValidationError{}
+
+// Validate checks the field values on TransferEvent with the rules defined in
+// the proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *TransferEvent) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on TransferEvent with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in TransferEventMultiError, or
+// nil if none found.
+func (m *TransferEvent) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *TransferEvent) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if all {
+		switch v := interface{}(m.GetTransfer()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, TransferEventValidationError{
+					field:  "Transfer",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, TransferEventValidationError{
+					field:  "Transfer",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetTransfer()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return TransferEventValidationError{
+				field:  "Transfer",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return TransferEventMultiError(errors)
+	}
+
+	return nil
+}
+
+// TransferEventMultiError is an error wrapping multiple validation errors
+// returned by TransferEvent.ValidateAll() if the designated constraints
+// aren't met.
+type TransferEventMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m TransferEventMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m TransferEventMultiError) AllErrors() []error { return m }
+
+// TransferEventValidationError is the validation error returned by
+// TransferEvent.Validate if the designated constraints aren't met.
+type TransferEventValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e TransferEventValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e TransferEventValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e TransferEventValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e TransferEventValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e TransferEventValidationError) ErrorName() string { return "TransferEventValidationError" }
+
+// Error satisfies the builtin error interface
+func (e TransferEventValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sTransferEvent.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = TransferEventValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = TransferEventValidationError{}
+
+// Validate checks the field values on DepositEvent with the rules defined in
+// the proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *DepositEvent) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on DepositEvent with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in DepositEventMultiError, or
+// nil if none found.
+func (m *DepositEvent) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *DepositEvent) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if all {
+		switch v := interface{}(m.GetDeposit()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, DepositEventValidationError{
+					field:  "Deposit",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, DepositEventValidationError{
+					field:  "Deposit",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetDeposit()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return DepositEventValidationError{
+				field:  "Deposit",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return DepositEventMultiError(errors)
+	}
+
+	return nil
+}
+
+// DepositEventMultiError is an error wrapping multiple validation errors
+// returned by DepositEvent.ValidateAll() if the designated constraints aren't met.
+type DepositEventMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m DepositEventMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m DepositEventMultiError) AllErrors() []error { return m }
+
+// DepositEventValidationError is the validation error returned by
+// DepositEvent.Validate if the designated constraints aren't met.
+type DepositEventValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e DepositEventValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e DepositEventValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e DepositEventValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e DepositEventValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e DepositEventValidationError) ErrorName() string { return "DepositEventValidationError" }
+
+// Error satisfies the builtin error interface
+func (e DepositEventValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sDepositEvent.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = DepositEventValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = DepositEventValidationError{}
+
 // Validate checks the field values on DepositAddressProof with the rules
 // defined in the proto definition for this message. If any rules are
 // violated, the first error encountered is returned, or nil if there are no violations.

@@ -27,6 +27,7 @@ import (
 	"github.com/lightsparkdev/spark-go/so/ent/treenode"
 	"github.com/lightsparkdev/spark-go/so/helper"
 	"github.com/lightsparkdev/spark-go/so/lrc20"
+	events "github.com/lightsparkdev/spark-go/so/stream"
 	"github.com/pebbe/zmq4"
 	"google.golang.org/protobuf/proto"
 )
@@ -434,6 +435,19 @@ func handleBlock(ctx context.Context,
 				if err != nil {
 					return err
 				}
+				treeNodeProto, err := treeNode.MarshalSparkProto(ctx)
+				if err != nil {
+					return err
+				}
+
+				eventRouter := events.GetDefaultRouter()
+				eventRouter.NotifyUser(treeNode.OwnerIdentityPubkey, &pb.SubscribeToEventsResponse{
+					Event: &pb.SubscribeToEventsResponse_Deposit{
+						Deposit: &pb.DepositEvent{
+							Deposit: treeNodeProto,
+						},
+					},
+				})
 			} else {
 				_, err = dbTx.TreeNode.UpdateOne(treeNode).
 					SetStatus(schema.TreeNodeStatusSplitted).

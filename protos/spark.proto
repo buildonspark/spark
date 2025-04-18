@@ -65,6 +65,27 @@ service SparkService {
     rpc cancel_send_transfer(CancelSendTransferRequest) returns (CancelSendTransferResponse) {}
 
     rpc query_unused_deposit_addresses(QueryUnusedDepositAddressesRequest) returns (QueryUnusedDepositAddressesResponse) {}
+
+    rpc subscribe_to_events(SubscribeToEventsRequest) returns (stream SubscribeToEventsResponse) {} 
+}
+
+message SubscribeToEventsRequest {
+    bytes identity_public_key = 10;
+}
+
+message SubscribeToEventsResponse {
+    oneof event {
+        TransferEvent transfer = 10;
+        DepositEvent deposit = 20;
+    }
+}
+
+message TransferEvent {
+    Transfer transfer = 10;
+}
+
+message DepositEvent {
+    TreeNode deposit = 10;
 }
 
 /**

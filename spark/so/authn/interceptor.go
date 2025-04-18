@@ -61,28 +61,46 @@ func NewAuthnInterceptor(sessionTokenCreatorVerifier *authninternal.SessionToken
 	}
 }
 
+type wrappedServerStream struct {
+	grpc.ServerStream
+	ctx context.Context
+}
+
+func (w *wrappedServerStream) Context() context.Context {
+	return w.ctx
+}
+
 // AuthnInterceptor is an interceptor that validates session tokens and adds session info to the context.
 // If there is no session or it does not validate, it will log rather than error.
 func (i *AuthnInterceptor) AuthnInterceptor(ctx context.Context, req interface{}, _ *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+	ctx = i.authenticateContext(ctx)
+	return handler(ctx, req)
+}
+
+func (i *AuthnInterceptor) StreamAuthnInterceptor(srv interface{}, ss grpc.ServerStream, _ *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+	newCtx := i.authenticateContext(ss.Context())
+	return handler(srv, &wrappedServerStream{ServerStream: ss, ctx: newCtx})
+}
+
+func (i *AuthnInterceptor) authenticateContext(ctx context.Context) context.Context {
 	md, ok := metadata.FromIncomingContext(ctx)
 	logger := helper.GetLoggerFromContext(ctx)
 	if !ok {
 		err := fmt.Errorf("no metadata provided")
 		logger.Info("Authentication error", "error", err)
-		ctx = context.WithValue(ctx, authnContextKey, &AuthnContext{
+		return context.WithValue(ctx, authnContextKey, &AuthnContext{
 			Error: err,
 		})
-		return handler(ctx, req)
+
 	}
 
 	// Tokens are typically sent in "authorization" header
 	tokens := md.Get(authorizationHeader)
 	if len(tokens) == 0 {
 		err := fmt.Errorf("no authorization token provided")
-		ctx = context.WithValue(ctx, authnContextKey, &AuthnContext{
+		return context.WithValue(ctx, authnContextKey, &AuthnContext{
 			Error: err,
 		})
-		return handler(ctx, req)
 	}
 
 	// Usually follows "Bearer <token>" format
@@ -92,31 +110,27 @@ func (i *AuthnInterceptor) AuthnInterceptor(ctx context.Context, req interface{}
 	if err != nil {
 		wrappedErr := fmt.Errorf("failed to verify token: %w", err)
 		logger.Info("Authentication error", "error", wrappedErr)
-		ctx = context.WithValue(ctx, authnContextKey, &AuthnContext{
+		return context.WithValue(ctx, authnContextKey, &AuthnContext{
 			Error: wrappedErr,
 		})
-		return handler(ctx, req)
 	}
 
 	key, err := secp256k1.ParsePubKey(sessionInfo.PublicKey)
 	if err != nil {
 		wrappedErr := fmt.Errorf("failed to parse public key: %w", err)
 		logger.Info("Authentication error", "error", wrappedErr)
-		ctx = context.WithValue(ctx, authnContextKey, &AuthnContext{
+		return context.WithValue(ctx, authnContextKey, &AuthnContext{
 			Error: wrappedErr,
 		})
-		return handler(ctx, req)
 	}
 
-	ctx = context.WithValue(ctx, authnContextKey, &AuthnContext{
+	return context.WithValue(ctx, authnContextKey, &AuthnContext{
 		Session: &Session{
 			identityPublicKey:      key,
 			identityPublicKeyBytes: sessionInfo.PublicKey,
 			expirationTimestamp:    sessionInfo.ExpirationTimestamp,
 		},
 	})
-
-	return handler(ctx, req)
 }
 
 // GetSessionFromContext retrieves the session and any error from the context

@@ -26,6 +26,7 @@ import (
 	enttreenode "github.com/lightsparkdev/spark-go/so/ent/treenode"
 	"github.com/lightsparkdev/spark-go/so/helper"
 	"github.com/lightsparkdev/spark-go/so/objects"
+	events "github.com/lightsparkdev/spark-go/so/stream"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -245,6 +246,14 @@ func (h *TransferHandler) CompleteSendTransfer(ctx context.Context, req *pb.Comp
 	if err != nil {
 		return nil, fmt.Errorf("unable to marshal transfer: %v", err)
 	}
+	eventRouter := events.GetDefaultRouter()
+	eventRouter.NotifyUser(transfer.ReceiverIdentityPubkey, &pb.SubscribeToEventsResponse{
+		Event: &pb.SubscribeToEventsResponse_Transfer{
+			Transfer: &pb.TransferEvent{
+				Transfer: transferProto,
+			},
+		},
+	})
 	return &pb.CompleteSendTransferResponse{Transfer: transferProto}, nil
 }
 

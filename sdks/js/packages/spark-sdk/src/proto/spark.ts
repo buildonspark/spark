@@ -224,6 +224,22 @@ export function transferTypeToJSON(object: TransferType): string {
   }
 }
 
+export interface SubscribeToEventsRequest {
+  identityPublicKey: Uint8Array;
+}
+
+export interface SubscribeToEventsResponse {
+  event?: { $case: "transfer"; transfer: TransferEvent } | { $case: "deposit"; deposit: DepositEvent } | undefined;
+}
+
+export interface TransferEvent {
+  transfer: Transfer | undefined;
+}
+
+export interface DepositEvent {
+  deposit: TreeNode | undefined;
+}
+
 /**
  * DepositAddressProof is the proof of possession of the deposit address.
  * When a user wants to generate a deposit address, they are sending their public key to the SE,
@@ -1180,6 +1196,280 @@ export interface QueryBalanceResponse_NodeBalancesEntry {
 export interface SparkAddress {
   identityPublicKey: Uint8Array;
 }
+
+function createBaseSubscribeToEventsRequest(): SubscribeToEventsRequest {
+  return { identityPublicKey: new Uint8Array(0) };
+}
+
+export const SubscribeToEventsRequest: MessageFns<SubscribeToEventsRequest> = {
+  encode(message: SubscribeToEventsRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.identityPublicKey.length !== 0) {
+      writer.uint32(82).bytes(message.identityPublicKey);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): SubscribeToEventsRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseSubscribeToEventsRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 10: {
+          if (tag !== 82) {
+            break;
+          }
+
+          message.identityPublicKey = reader.bytes();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): SubscribeToEventsRequest {
+    return {
+      identityPublicKey: isSet(object.identityPublicKey)
+        ? bytesFromBase64(object.identityPublicKey)
+        : new Uint8Array(0),
+    };
+  },
+
+  toJSON(message: SubscribeToEventsRequest): unknown {
+    const obj: any = {};
+    if (message.identityPublicKey.length !== 0) {
+      obj.identityPublicKey = base64FromBytes(message.identityPublicKey);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<SubscribeToEventsRequest>): SubscribeToEventsRequest {
+    return SubscribeToEventsRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<SubscribeToEventsRequest>): SubscribeToEventsRequest {
+    const message = createBaseSubscribeToEventsRequest();
+    message.identityPublicKey = object.identityPublicKey ?? new Uint8Array(0);
+    return message;
+  },
+};
+
+function createBaseSubscribeToEventsResponse(): SubscribeToEventsResponse {
+  return { event: undefined };
+}
+
+export const SubscribeToEventsResponse: MessageFns<SubscribeToEventsResponse> = {
+  encode(message: SubscribeToEventsResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    switch (message.event?.$case) {
+      case "transfer":
+        TransferEvent.encode(message.event.transfer, writer.uint32(82).fork()).join();
+        break;
+      case "deposit":
+        DepositEvent.encode(message.event.deposit, writer.uint32(162).fork()).join();
+        break;
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): SubscribeToEventsResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseSubscribeToEventsResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 10: {
+          if (tag !== 82) {
+            break;
+          }
+
+          message.event = { $case: "transfer", transfer: TransferEvent.decode(reader, reader.uint32()) };
+          continue;
+        }
+        case 20: {
+          if (tag !== 162) {
+            break;
+          }
+
+          message.event = { $case: "deposit", deposit: DepositEvent.decode(reader, reader.uint32()) };
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): SubscribeToEventsResponse {
+    return {
+      event: isSet(object.transfer)
+        ? { $case: "transfer", transfer: TransferEvent.fromJSON(object.transfer) }
+        : isSet(object.deposit)
+        ? { $case: "deposit", deposit: DepositEvent.fromJSON(object.deposit) }
+        : undefined,
+    };
+  },
+
+  toJSON(message: SubscribeToEventsResponse): unknown {
+    const obj: any = {};
+    if (message.event?.$case === "transfer") {
+      obj.transfer = TransferEvent.toJSON(message.event.transfer);
+    } else if (message.event?.$case === "deposit") {
+      obj.deposit = DepositEvent.toJSON(message.event.deposit);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<SubscribeToEventsResponse>): SubscribeToEventsResponse {
+    return SubscribeToEventsResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<SubscribeToEventsResponse>): SubscribeToEventsResponse {
+    const message = createBaseSubscribeToEventsResponse();
+    switch (object.event?.$case) {
+      case "transfer": {
+        if (object.event?.transfer !== undefined && object.event?.transfer !== null) {
+          message.event = { $case: "transfer", transfer: TransferEvent.fromPartial(object.event.transfer) };
+        }
+        break;
+      }
+      case "deposit": {
+        if (object.event?.deposit !== undefined && object.event?.deposit !== null) {
+          message.event = { $case: "deposit", deposit: DepositEvent.fromPartial(object.event.deposit) };
+        }
+        break;
+      }
+    }
+    return message;
+  },
+};
+
+function createBaseTransferEvent(): TransferEvent {
+  return { transfer: undefined };
+}
+
+export const TransferEvent: MessageFns<TransferEvent> = {
+  encode(message: TransferEvent, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.transfer !== undefined) {
+      Transfer.encode(message.transfer, writer.uint32(82).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): TransferEvent {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseTransferEvent();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 10: {
+          if (tag !== 82) {
+            break;
+          }
+
+          message.transfer = Transfer.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): TransferEvent {
+    return { transfer: isSet(object.transfer) ? Transfer.fromJSON(object.transfer) : undefined };
+  },
+
+  toJSON(message: TransferEvent): unknown {
+    const obj: any = {};
+    if (message.transfer !== undefined) {
+      obj.transfer = Transfer.toJSON(message.transfer);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<TransferEvent>): TransferEvent {
+    return TransferEvent.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<TransferEvent>): TransferEvent {
+    const message = createBaseTransferEvent();
+    message.transfer = (object.transfer !== undefined && object.transfer !== null)
+      ? Transfer.fromPartial(object.transfer)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseDepositEvent(): DepositEvent {
+  return { deposit: undefined };
+}
+
+export const DepositEvent: MessageFns<DepositEvent> = {
+  encode(message: DepositEvent, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.deposit !== undefined) {
+      TreeNode.encode(message.deposit, writer.uint32(82).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): DepositEvent {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseDepositEvent();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 10: {
+          if (tag !== 82) {
+            break;
+          }
+
+          message.deposit = TreeNode.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): DepositEvent {
+    return { deposit: isSet(object.deposit) ? TreeNode.fromJSON(object.deposit) : undefined };
+  },
+
+  toJSON(message: DepositEvent): unknown {
+    const obj: any = {};
+    if (message.deposit !== undefined) {
+      obj.deposit = TreeNode.toJSON(message.deposit);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<DepositEvent>): DepositEvent {
+    return DepositEvent.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<DepositEvent>): DepositEvent {
+    const message = createBaseDepositEvent();
+    message.deposit = (object.deposit !== undefined && object.deposit !== null)
+      ? TreeNode.fromPartial(object.deposit)
+      : undefined;
+    return message;
+  },
+};
 
 function createBaseDepositAddressProof(): DepositAddressProof {
   return { addressSignatures: {}, proofOfPossessionSignature: new Uint8Array(0) };
@@ -12803,6 +13093,14 @@ export const SparkServiceDefinition = {
       responseStream: false,
       options: {},
     },
+    subscribe_to_events: {
+      name: "subscribe_to_events",
+      requestType: SubscribeToEventsRequest,
+      requestStream: false,
+      responseType: SubscribeToEventsResponse,
+      responseStream: true,
+      options: {},
+    },
   },
 } as const;
 
@@ -12974,6 +13272,10 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
     request: QueryUnusedDepositAddressesRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<QueryUnusedDepositAddressesResponse>>;
+  subscribe_to_events(
+    request: SubscribeToEventsRequest,
+    context: CallContext & CallContextExt,
+  ): ServerStreamingMethodResult<DeepPartial<SubscribeToEventsResponse>>;
 }
 
 export interface SparkServiceClient<CallOptionsExt = {}> {
@@ -13144,6 +13446,10 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
     request: DeepPartial<QueryUnusedDepositAddressesRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<QueryUnusedDepositAddressesResponse>;
+  subscribe_to_events(
+    request: DeepPartial<SubscribeToEventsRequest>,
+    options?: CallOptions & CallOptionsExt,
+  ): AsyncIterable<SubscribeToEventsResponse>;
 }
 
 function bytesFromBase64(b64: string): Uint8Array {
@@ -13220,6 +13526,8 @@ function isObject(value: any): boolean {
 function isSet(value: any): boolean {
   return value !== null && value !== undefined;
 }
+
+export type ServerStreamingMethodResult<Response> = { [Symbol.asyncIterator](): AsyncIterator<Response, void> };
 
 export interface MessageFns<T> {
   encode(message: T, writer?: BinaryWriter): BinaryWriter;
