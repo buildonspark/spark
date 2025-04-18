@@ -31,7 +31,7 @@ import {
   LeavesSwapFeeEstimateOutput,
   LightningSendRequest,
   RequestCoopExitInput,
-  RequestLeavesSwapInput,
+  RequestLeavesSwapInputRC,
   RequestLightningReceiveInput,
   RequestLightningSendInput,
 } from "./objects/index.js";
@@ -278,7 +278,7 @@ export default class SspClient {
     feeSats,
     userLeaves,
     idempotencyKey,
-  }: RequestLeavesSwapInput): Promise<LeavesSwapRequest | null> {
+  }: RequestLeavesSwapInputRC): Promise<LeavesSwapRequest | null> {
     const query = {
       queryPayload: RequestSwapLeaves,
       variables: {

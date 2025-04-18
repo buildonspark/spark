@@ -157,7 +157,7 @@ query FetchSparkWalletUserToUserRequestsConnection($entity_id: ID!, $first: Int,
                         lightning_receive_request_network: network
                         lightning_receive_request_invoice: invoice {
                             __typename
-                            invoice_encoded_envoice: encoded_envoice
+                            invoice_encoded_invoice: encoded_invoice
                             invoice_bitcoin_network: bitcoin_network
                             invoice_payment_hash: payment_hash
                             invoice_amount: amount {

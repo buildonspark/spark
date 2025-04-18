@@ -1,82 +1,94 @@
-
 // Copyright ©, 2023-present, Lightspark Group, Inc. - All Rights Reserved
 
-
-import PageInfo from './PageInfo.js';
-import {UserRequestFromJson} from './UserRequest.js';
-import {PageInfoToJson} from './PageInfo.js';
-import SparkWalletUserToUserRequestsConnection from './SparkWalletUserToUserRequestsConnection.js';
-import {PageInfoFromJson} from './PageInfo.js';
-import {UserRequestToJson} from './UserRequest.js';
-import SparkTransferToLeavesConnection from './SparkTransferToLeavesConnection.js';
-import {LeafToJson} from './Leaf.js';
-import { LightsparkException } from '@lightsparkdev/core';
-import {LeafFromJson} from './Leaf.js';
-
+import { LightsparkException } from "@lightsparkdev/core";
+import { LeafFromJson, LeafToJson } from "./Leaf.js";
+import PageInfo, { PageInfoFromJson, PageInfoToJson } from "./PageInfo.js";
+import SparkTransferToLeavesConnection from "./SparkTransferToLeavesConnection.js";
+import SparkWalletUserToUserRequestsConnection from "./SparkWalletUserToUserRequestsConnection.js";
+import { UserRequestFromJson, UserRequestToJson } from "./UserRequest.js";
 
 interface Connection {
+  /**
+   * The total count of objects in this connection, using the current filters. It is different from the
+   * number of objects returned in the current page (in the `entities` field).
+   **/
+  count: number;
 
+  /** An object that holds pagination information about the objects in this connection. **/
+  pageInfo: PageInfo;
 
-    /**
- * The total count of objects in this connection, using the current filters. It is different from the
- * number of objects returned in the current page (in the `entities` field).
-**/
-count: number;
-
-    /** An object that holds pagination information about the objects in this connection. **/
-pageInfo: PageInfo;
-
-    /** The typename of the object **/
-typename: string;
-
-
-
-
+  /** The typename of the object **/
+  typename: string;
 }
 
 export const ConnectionFromJson = (obj: any): Connection => {
-    if (obj["__typename"] == "SparkTransferToLeavesConnection") {
-        return {
-            count: obj["spark_transfer_to_leaves_connection_count"],
-            pageInfo: PageInfoFromJson(obj["spark_transfer_to_leaves_connection_page_info"]),
-            entities: obj["spark_transfer_to_leaves_connection_entities"].map((e) => LeafFromJson(e)),
-typename: "SparkTransferToLeavesConnection",
-        } as SparkTransferToLeavesConnection;
-
-}    if (obj["__typename"] == "SparkWalletUserToUserRequestsConnection") {
-        return {
-            count: obj["spark_wallet_user_to_user_requests_connection_count"],
-            pageInfo: PageInfoFromJson(obj["spark_wallet_user_to_user_requests_connection_page_info"]),
-            entities: obj["spark_wallet_user_to_user_requests_connection_entities"].map((e) => UserRequestFromJson(e)),
-typename: "SparkWalletUserToUserRequestsConnection",
-        } as SparkWalletUserToUserRequestsConnection;
-
-}    throw new LightsparkException("DeserializationError", `Couldn't find a concrete type for interface Connection corresponding to the typename=${obj["__typename"]}`)
-}
+  if (obj["__typename"] == "SparkTransferToLeavesConnection") {
+    return {
+      count: obj["spark_transfer_to_leaves_connection_count"],
+      pageInfo: PageInfoFromJson(
+        obj["spark_transfer_to_leaves_connection_page_info"],
+      ),
+      entities: obj["spark_transfer_to_leaves_connection_entities"].map((e) =>
+        LeafFromJson(e),
+      ),
+      typename: "SparkTransferToLeavesConnection",
+    } as SparkTransferToLeavesConnection;
+  }
+  if (obj["__typename"] == "SparkWalletUserToUserRequestsConnection") {
+    return {
+      count: obj["spark_wallet_user_to_user_requests_connection_count"],
+      pageInfo: PageInfoFromJson(
+        obj["spark_wallet_user_to_user_requests_connection_page_info"],
+      ),
+      entities: obj[
+        "spark_wallet_user_to_user_requests_connection_entities"
+      ].map((e) => UserRequestFromJson(e)),
+      typename: "SparkWalletUserToUserRequestsConnection",
+    } as SparkWalletUserToUserRequestsConnection;
+  }
+  throw new LightsparkException(
+    "DeserializationError",
+    `Couldn't find a concrete type for interface Connection corresponding to the typename=${obj["__typename"]}`,
+  );
+};
 export const ConnectionToJson = (obj: Connection): any => {
-    if (obj.typename == "SparkTransferToLeavesConnection") {
-       const sparkTransferToLeavesConnection = obj as SparkTransferToLeavesConnection;
-return {
-__typename: "SparkTransferToLeavesConnection",spark_transfer_to_leaves_connection_count: sparkTransferToLeavesConnection.count,
-spark_transfer_to_leaves_connection_page_info: PageInfoToJson(sparkTransferToLeavesConnection.pageInfo),
-spark_transfer_to_leaves_connection_entities: sparkTransferToLeavesConnection.entities.map((e) => LeafToJson(e)),
+  if (obj.typename == "SparkTransferToLeavesConnection") {
+    const sparkTransferToLeavesConnection =
+      obj as SparkTransferToLeavesConnection;
+    return {
+      __typename: "SparkTransferToLeavesConnection",
+      spark_transfer_to_leaves_connection_count:
+        sparkTransferToLeavesConnection.count,
+      spark_transfer_to_leaves_connection_page_info: PageInfoToJson(
+        sparkTransferToLeavesConnection.pageInfo,
+      ),
+      spark_transfer_to_leaves_connection_entities:
+        sparkTransferToLeavesConnection.entities.map((e) => LeafToJson(e)),
+    };
+  }
+  if (obj.typename == "SparkWalletUserToUserRequestsConnection") {
+    const sparkWalletUserToUserRequestsConnection =
+      obj as SparkWalletUserToUserRequestsConnection;
+    return {
+      __typename: "SparkWalletUserToUserRequestsConnection",
+      spark_wallet_user_to_user_requests_connection_count:
+        sparkWalletUserToUserRequestsConnection.count,
+      spark_wallet_user_to_user_requests_connection_page_info: PageInfoToJson(
+        sparkWalletUserToUserRequestsConnection.pageInfo,
+      ),
+      spark_wallet_user_to_user_requests_connection_entities:
+        sparkWalletUserToUserRequestsConnection.entities.map((e) =>
+          UserRequestToJson(e),
+        ),
+    };
+  }
+  throw new LightsparkException(
+    "DeserializationError",
+    `Couldn't find a concrete type for interface Connection corresponding to the typename=${obj.typename}`,
+  );
+};
 
-        }
-
-}    if (obj.typename == "SparkWalletUserToUserRequestsConnection") {
-       const sparkWalletUserToUserRequestsConnection = obj as SparkWalletUserToUserRequestsConnection;
-return {
-__typename: "SparkWalletUserToUserRequestsConnection",spark_wallet_user_to_user_requests_connection_count: sparkWalletUserToUserRequestsConnection.count,
-spark_wallet_user_to_user_requests_connection_page_info: PageInfoToJson(sparkWalletUserToUserRequestsConnection.pageInfo),
-spark_wallet_user_to_user_requests_connection_entities: sparkWalletUserToUserRequestsConnection.entities.map((e) => UserRequestToJson(e)),
-
-        }
-
-}    throw new LightsparkException("DeserializationError", `Couldn't find a concrete type for interface Connection corresponding to the typename=${obj.typename}`)
-}
-
-
-    export const FRAGMENT = `
+export const FRAGMENT = `
 fragment ConnectionFragment on Connection {
     __typename
     ... on SparkTransferToLeavesConnection {
@@ -117,8 +129,5 @@ fragment ConnectionFragment on Connection {
         }
     }
 }`;
-
-
-
 
 export default Connection;

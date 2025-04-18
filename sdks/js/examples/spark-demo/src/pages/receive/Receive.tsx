@@ -61,7 +61,7 @@ export default function Receive() {
         await delay(3000);
         setPrimaryButtonLoading(false);
 
-        setLightningInvoice(invoice.invoice.encodedEnvoice);
+        setLightningInvoice(invoice.invoice.encodedInvoice);
         setCurrentStep(ReceiveStep.ShareQuote);
         break;
       case ReceiveStep.ShareQuote:

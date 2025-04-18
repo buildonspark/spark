@@ -44,7 +44,7 @@ export { default as PageInfo } from "./PageInfo.js";
 export { default as Provider } from "./Provider.js";
 export { default as RequestCoopExitInput } from "./RequestCoopExitInput.js";
 export { default as RequestCoopExitOutput } from "./RequestCoopExitOutput.js";
-export { default as RequestLeavesSwapInput } from "./RequestLeavesSwapInput.js";
+export { default as RequestLeavesSwapInputRC } from "./RequestLeavesSwapInputRC.js";
 export { default as RequestLeavesSwapOutput } from "./RequestLeavesSwapOutput.js";
 export { default as RequestLightningReceiveInput } from "./RequestLightningReceiveInput.js";
 export { default as RequestLightningReceiveOutput } from "./RequestLightningReceiveOutput.js";

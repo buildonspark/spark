@@ -1,12 +1,12 @@
 import { describe, expect, it } from "@jest/globals";
 import { ConfigOptions } from "../../../services/wallet-config.js";
-import { NetworkType } from "../../../utils/network.js";
 import { SparkWallet } from "../../../spark-wallet.js";
 import {
   BitcoinNetwork,
   CurrencyUnit,
   LightningReceiveRequestStatus,
 } from "../../../types/index.js";
+import { NetworkType } from "../../../utils/network.js";
 
 const options: ConfigOptions = {
   network: "LOCAL",
@@ -39,7 +39,7 @@ describe("Lightning Network provider", () => {
           memo: "test",
         });
 
-        expect(invoice.invoice.encodedEnvoice).toMatch(
+        expect(invoice.invoice.encodedInvoice).toMatch(
           new RegExp(`^${invoicePrefix}[0-9]*[a-zA-Z0-9]{400}$`),
         );
         expect(invoice.invoice.paymentHash.length).toEqual(64);
@@ -77,7 +77,7 @@ describe("Lightning Network provider", () => {
 
         expect(invoice).toBeDefined();
         expect(invoice.invoice).toBeDefined();
-        expect(invoice.invoice.encodedEnvoice.length).toBeGreaterThanOrEqual(
+        expect(invoice.invoice.encodedInvoice.length).toBeGreaterThanOrEqual(
           401,
         );
         expect(invoice.invoice.paymentHash.length).toEqual(64);

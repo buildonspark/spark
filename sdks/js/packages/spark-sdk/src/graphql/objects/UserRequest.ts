@@ -4,22 +4,22 @@
 import Entity from './Entity.js';
 import {SwapLeafToJson} from './SwapLeaf.js';
 import SparkCoopExitRequestStatus from './SparkCoopExitRequestStatus.js';
-import {SwapLeafFromJson} from './SwapLeaf.js';
-import LightningReceiveRequest from './LightningReceiveRequest.js';
-import CoopExitRequest from './CoopExitRequest.js';
 import {TransferFromJson} from './Transfer.js';
-import {InvoiceFromJson} from './Invoice.js';
-import BitcoinNetwork from './BitcoinNetwork.js';
 import LeavesSwapRequest from './LeavesSwapRequest.js';
+import {SwapLeafFromJson} from './SwapLeaf.js';
 import LightningReceiveRequestStatus from './LightningReceiveRequestStatus.js';
 import LightningSendRequest from './LightningSendRequest.js';
-import {InvoiceToJson} from './Invoice.js';
-import LightningSendRequestStatus from './LightningSendRequestStatus.js';
-import { Query, isObject } from '@lightsparkdev/core';
 import {CurrencyAmountToJson} from './CurrencyAmount.js';
-import { LightsparkException } from '@lightsparkdev/core';
-import SparkLeavesSwapRequestStatus from './SparkLeavesSwapRequestStatus.js';
+import BitcoinNetwork from './BitcoinNetwork.js';
+import { Query, isObject } from '@lightsparkdev/core';
+import LightningReceiveRequest from './LightningReceiveRequest.js';
+import {InvoiceFromJson} from './Invoice.js';
+import {InvoiceToJson} from './Invoice.js';
 import {CurrencyAmountFromJson} from './CurrencyAmount.js';
+import SparkLeavesSwapRequestStatus from './SparkLeavesSwapRequestStatus.js';
+import { LightsparkException } from '@lightsparkdev/core';
+import LightningSendRequestStatus from './LightningSendRequestStatus.js';
+import CoopExitRequest from './CoopExitRequest.js';
 
 
 interface UserRequest {
@@ -283,7 +283,7 @@ fragment UserRequestFragment on UserRequest {
         lightning_receive_request_network: network
         lightning_receive_request_invoice: invoice {
             __typename
-            invoice_encoded_envoice: encoded_envoice
+            invoice_encoded_invoice: encoded_invoice
             invoice_bitcoin_network: bitcoin_network
             invoice_payment_hash: payment_hash
             invoice_amount: amount {

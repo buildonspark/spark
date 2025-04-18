@@ -125,7 +125,7 @@ export class LightningService {
               proofs: share.proofs,
             },
             threshold: this.config.getThreshold(),
-            invoiceString: invoice.invoice.encodedEnvoice,
+            invoiceString: invoice.invoice.encodedInvoice,
             userIdentityPublicKey:
               await this.config.signer.getIdentityPublicKey(),
           });

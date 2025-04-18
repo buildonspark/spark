@@ -3,17 +3,17 @@
 
 import UserRequest from './UserRequest.js';
 import Entity from './Entity.js';
-import CurrencyAmount from './CurrencyAmount.js';
 import Transfer from './Transfer.js';
-import Invoice from './Invoice.js';
-import {TransferFromJson} from './Transfer.js';
-import {InvoiceFromJson} from './Invoice.js';
-import BitcoinNetwork from './BitcoinNetwork.js';
 import LightningReceiveRequestStatus from './LightningReceiveRequestStatus.js';
-import {InvoiceToJson} from './Invoice.js';
+import {TransferFromJson} from './Transfer.js';
 import {CurrencyAmountToJson} from './CurrencyAmount.js';
 import { Query, isObject } from '@lightsparkdev/core';
+import BitcoinNetwork from './BitcoinNetwork.js';
+import {InvoiceFromJson} from './Invoice.js';
+import {InvoiceToJson} from './Invoice.js';
 import {CurrencyAmountFromJson} from './CurrencyAmount.js';
+import Invoice from './Invoice.js';
+import CurrencyAmount from './CurrencyAmount.js';
 
 
 interface LightningReceiveRequest {
@@ -93,7 +93,7 @@ fragment LightningReceiveRequestFragment on LightningReceiveRequest {
     lightning_receive_request_network: network
     lightning_receive_request_invoice: invoice {
         __typename
-        invoice_encoded_envoice: encoded_envoice
+        invoice_encoded_invoice: encoded_invoice
         invoice_bitcoin_network: bitcoin_network
         invoice_payment_hash: payment_hash
         invoice_amount: amount {

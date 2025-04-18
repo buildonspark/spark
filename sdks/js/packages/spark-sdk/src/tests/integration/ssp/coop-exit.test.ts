@@ -34,7 +34,9 @@ describe("SSP coop exit integration", () => {
     });
 
     expect(feeEstimate).toBeDefined();
-    expect(feeEstimate?.feeEstimate).toBeDefined();
-    expect(feeEstimate?.feeEstimate.originalValue).toBeGreaterThan(0);
+    expect(feeEstimate?.l1BroadcastFee).toBeDefined();
+    expect(feeEstimate?.l1BroadcastFee.originalValue).toBeGreaterThan(0);
+    expect(feeEstimate?.userFee).toBeDefined();
+    expect(feeEstimate?.userFee.originalValue).toBeGreaterThan(0);
   }, 60000);
 });

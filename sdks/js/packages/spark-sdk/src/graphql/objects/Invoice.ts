@@ -2,16 +2,16 @@
 // Copyright ©, 2023-present, Lightspark Group, Inc. - All Rights Reserved
 
 
-import {CurrencyAmountToJson} from './CurrencyAmount.js';
-import CurrencyAmount from './CurrencyAmount.js';
 import BitcoinNetwork from './BitcoinNetwork.js';
+import {CurrencyAmountToJson} from './CurrencyAmount.js';
 import {CurrencyAmountFromJson} from './CurrencyAmount.js';
+import CurrencyAmount from './CurrencyAmount.js';
 
 
 interface Invoice {
 
 
-    encodedEnvoice: string;
+    encodedInvoice: string;
 
     bitcoinNetwork: BitcoinNetwork;
 
@@ -32,7 +32,7 @@ interface Invoice {
 
 export const InvoiceFromJson = (obj: any): Invoice => {
     return {
-        encodedEnvoice: obj["invoice_encoded_envoice"],
+        encodedInvoice: obj["invoice_encoded_invoice"],
         bitcoinNetwork: BitcoinNetwork[obj["invoice_bitcoin_network"]] ?? BitcoinNetwork.FUTURE_VALUE,
         paymentHash: obj["invoice_payment_hash"],
         amount: CurrencyAmountFromJson(obj["invoice_amount"]),
@@ -45,7 +45,7 @@ export const InvoiceFromJson = (obj: any): Invoice => {
 }
 export const InvoiceToJson = (obj: Invoice): any => {
 return {
-invoice_encoded_envoice: obj.encodedEnvoice,
+invoice_encoded_invoice: obj.encodedInvoice,
 invoice_bitcoin_network: obj.bitcoinNetwork,
 invoice_payment_hash: obj.paymentHash,
 invoice_amount: CurrencyAmountToJson(obj.amount),
@@ -61,7 +61,7 @@ invoice_memo: obj.memo,
     export const FRAGMENT = `
 fragment InvoiceFragment on Invoice {
     __typename
-    invoice_encoded_envoice: encoded_envoice
+    invoice_encoded_invoice: encoded_invoice
     invoice_bitcoin_network: bitcoin_network
     invoice_payment_hash: payment_hash
     invoice_amount: amount {

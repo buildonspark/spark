@@ -18,7 +18,7 @@ describe("SSP Auth Test", () => {
       amountSats: 1000,
     });
 
-    expect(res.invoice.encodedEnvoice).toBeDefined();
+    expect(res.invoice.encodedInvoice).toBeDefined();
   });
 
   it("Should throw an error if the user is not authenticated", async () => {
@@ -56,6 +56,6 @@ describe("SSP Auth Test", () => {
       amountSats: 1000,
     });
 
-    expect(res.invoice.encodedEnvoice).toBeDefined();
+    expect(res.invoice.encodedInvoice).toBeDefined();
   });
 });

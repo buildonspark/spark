@@ -3,8 +3,8 @@
 
 
 import {CurrencyAmountToJson} from './CurrencyAmount.js';
-import CurrencyAmount from './CurrencyAmount.js';
 import {CurrencyAmountFromJson} from './CurrencyAmount.js';
+import CurrencyAmount from './CurrencyAmount.js';
 
 
 interface LeavesSwapFeeEstimateOutput {

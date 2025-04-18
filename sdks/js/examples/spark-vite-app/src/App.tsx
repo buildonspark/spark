@@ -28,7 +28,7 @@ function App() {
     const invoice = await sparkWallet.createLightningInvoice({
       amountSats: 100,
     });
-    setInvoice(invoice.invoice.encodedEnvoice);
+    setInvoice(invoice.invoice.encodedInvoice);
   };
 
   const getBalance = async () => {

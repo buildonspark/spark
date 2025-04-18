@@ -49,7 +49,7 @@ const fakeInvoiceCreator = async (): Promise<LightningReceiveRequest> => {
     status: LightningReceiveRequestStatus.INVOICE_CREATED,
     typename: "LightningReceiveRequest",
     invoice: {
-      encodedEnvoice:
+      encodedInvoice:
         "lnbcrt123450n1pnj6uf4pp5l26hsdxssmr52vd4xmn5xran7puzx34hpr6uevaq7ta0ayzrp8esdqqcqzpgxqyz5vqrzjqtr2vd60g57hu63rdqk87u3clac6jlfhej4kldrrjvfcw3mphcw8sqqqqzp3jlj6zyqqqqqqqqqqqqqq9qsp5w22fd8aqn7sdum7hxdf59ptgk322fkv589ejxjltngvgehlcqcyq9qxpqysgqvykwsxdx64qrj0s5pgcgygmrpj8w25jsjgltwn09yp24l9nvghe3dl3y0ycy70ksrlqmcn42hxn24e0ucuy3g9fjltudvhv4lrhhamgq3stqgp",
       bitcoinNetwork: BitcoinNetwork.REGTEST,
       paymentHash:
@@ -261,7 +261,7 @@ describe("LightningService", () => {
       receiverIdentityPubkey: await sspConfig.signer.getIdentityPublicKey(),
       paymentHash,
       isInboundPayment: false,
-      invoiceString: (await fakeInvoiceCreator()).invoice.encodedEnvoice,
+      invoiceString: (await fakeInvoiceCreator()).invoice.encodedInvoice,
     });
 
     expect(response.transfer).toBeDefined();
