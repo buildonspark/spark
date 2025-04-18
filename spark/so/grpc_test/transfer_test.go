@@ -17,6 +17,8 @@ import (
 	"github.com/lightsparkdev/spark-go/wallet"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func TestTransfer(t *testing.T) {
@@ -134,6 +136,9 @@ func TestTransferZeroLeaves(t *testing.T) {
 		time.Now().Add(10*time.Minute),
 	)
 	require.Error(t, err, "expected error when transferring zero leaves")
+	stat, ok := status.FromError(err)
+	require.True(t, ok)
+	require.Equal(t, stat.Code(), codes.InvalidArgument)
 }
 
 func TestTransferWithSeparateSteps(t *testing.T) {

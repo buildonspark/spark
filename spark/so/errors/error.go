@@ -1,8 +1,12 @@
-package grpc
+package errors
 
 import (
+	"errors"
+	"fmt"
+
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 )
 
 // Error represents an error that can be converted to a gRPC error
@@ -28,15 +32,22 @@ func newGRPCError(code codes.Code, cause error) *grpcError {
 }
 
 func (e *grpcError) Error() string {
-	return status.Error(e.Code, e.Cause.Error()).Error()
+	return e.Cause.Error()
 }
 
 func (e *grpcError) Unwrap() error {
 	return e.Cause
 }
 
+// This is important so that when we return a grpcError, the gRPC
+// server can infer the proper status from it.
+// Docs: https://pkg.go.dev/google.golang.org/grpc/status#FromError
+func (e *grpcError) GRPCStatus() *status.Status {
+	return status.New(e.Code, e.Cause.Error())
+}
+
 // wrapWithGRPCError wraps a response and an error into a gRPC error
-func wrapWithGRPCError[T any](resp T, err error) (T, error) {
+func WrapWithGRPCError[T proto.Message](resp T, err error) (T, error) {
 	if err != nil {
 		return resp, toGRPCError(err)
 	}
@@ -53,6 +64,15 @@ func toGRPCError(err error) error {
 		return grpcErr.ToGRPCError()
 	}
 
+	var grpcErr *grpcError
+	if errors.As(err, &grpcErr) {
+		return grpcErr
+	}
+
 	// Default to Internal error
 	return newGRPCError(codes.Internal, err)
+}
+
+func InvalidUserInputErrorf(format string, args ...any) error {
+	return newGRPCError(codes.InvalidArgument, fmt.Errorf(format, args...))
 }

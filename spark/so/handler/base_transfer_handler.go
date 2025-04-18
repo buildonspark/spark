@@ -20,6 +20,7 @@ import (
 	enttransfer "github.com/lightsparkdev/spark-go/so/ent/transfer"
 	enttransferleaf "github.com/lightsparkdev/spark-go/so/ent/transferleaf"
 	"github.com/lightsparkdev/spark-go/so/ent/treenode"
+	"github.com/lightsparkdev/spark-go/so/errors"
 	"github.com/lightsparkdev/spark-go/so/helper"
 	"google.golang.org/protobuf/proto"
 )
@@ -131,7 +132,7 @@ func (h *BaseTransferHandler) createTransfer(
 	}
 
 	if len(leafRefundMap) == 0 {
-		return nil, nil, fmt.Errorf("must provide at least one leaf for transfer")
+		return nil, nil, errors.InvalidUserInputErrorf("must provide at least one leaf for transfer")
 	}
 
 	leaves, err := loadLeaves(ctx, db, leafRefundMap)

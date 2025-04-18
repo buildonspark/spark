@@ -42,7 +42,7 @@ func SendTransfer(
 ) (*pb.Transfer, error) {
 	transfer, refundSignatureMap, _, err := SendTransferSignRefund(ctx, config, leaves, receiverIdentityPubkey, expiryTime)
 	if err != nil {
-		return nil, fmt.Errorf("failed to sign refund: %v", err)
+		return nil, fmt.Errorf("failed to sign refund: %w", err)
 	}
 	transfer, err = SendTransferTweakKey(ctx, config, transfer, leaves, refundSignatureMap)
 	if err != nil {
@@ -227,7 +227,7 @@ func sendTransferSignRefund(
 	} else {
 		response, err := sparkClient.StartSendTransfer(tmpCtx, startSendTransferRequest)
 		if err != nil {
-			return nil, nil, nil, nil, fmt.Errorf("failed to start send transfer: %v", err)
+			return nil, nil, nil, nil, fmt.Errorf("failed to start send transfer: %w", err)
 		}
 		transfer = response.Transfer
 		signingResults = response.SigningResults

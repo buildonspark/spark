@@ -11,6 +11,7 @@ import (
 	pb "github.com/lightsparkdev/spark-go/proto/spark_internal"
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/ent"
+	"github.com/lightsparkdev/spark-go/so/errors"
 	"github.com/lightsparkdev/spark-go/so/handler"
 	"github.com/lightsparkdev/spark-go/so/lrc20"
 	"github.com/lightsparkdev/spark-go/so/objects"
@@ -200,106 +201,106 @@ func (s *SparkInternalServer) FrostRound2(ctx context.Context, req *pb.FrostRoun
 // PrepareSplitKeyshares prepares the keyshares for a split.
 func (s *SparkInternalServer) PrepareSplitKeyshares(ctx context.Context, req *pb.PrepareSplitKeysharesRequest) (*emptypb.Empty, error) {
 	splitHandler := handler.NewInternalSplitHandler(s.config)
-	return wrapWithGRPCError(splitHandler.PrepareSplitKeyshares(ctx, req))
+	return errors.WrapWithGRPCError(splitHandler.PrepareSplitKeyshares(ctx, req))
 }
 
 // FinalizeTreeCreation syncs final tree creation.
 func (s *SparkInternalServer) FinalizeTreeCreation(ctx context.Context, req *pb.FinalizeTreeCreationRequest) (*emptypb.Empty, error) {
 	depositHandler := handler.NewInternalDepositHandler(s.config)
-	return wrapWithGRPCError(&emptypb.Empty{}, depositHandler.FinalizeTreeCreation(ctx, req))
+	return errors.WrapWithGRPCError(&emptypb.Empty{}, depositHandler.FinalizeTreeCreation(ctx, req))
 }
 
 // AggregateNodes aggregates the given nodes.
 func (s *SparkInternalServer) AggregateNodes(ctx context.Context, req *pbspark.AggregateNodesRequest) (*emptypb.Empty, error) {
 	aggregateHandler := handler.NewAggregateHandler(s.config)
-	return wrapWithGRPCError(aggregateHandler.InternalAggregateNodes(ctx, req))
+	return errors.WrapWithGRPCError(aggregateHandler.InternalAggregateNodes(ctx, req))
 }
 
 // FinalizeNodesAggregation finalizes nodes aggregation.
 func (s *SparkInternalServer) FinalizeNodesAggregation(ctx context.Context, req *pb.FinalizeNodesAggregationRequest) (*emptypb.Empty, error) {
 	aggregateHandler := handler.NewAggregateHandler(s.config)
-	return wrapWithGRPCError(&emptypb.Empty{}, aggregateHandler.InternalFinalizeNodesAggregation(ctx, req))
+	return errors.WrapWithGRPCError(&emptypb.Empty{}, aggregateHandler.InternalFinalizeNodesAggregation(ctx, req))
 }
 
 // FinalizeTransfer finalizes a transfer
 func (s *SparkInternalServer) FinalizeTransfer(ctx context.Context, req *pb.FinalizeTransferRequest) (*emptypb.Empty, error) {
 	transferHandler := handler.NewInternalTransferHandler(s.config)
-	return wrapWithGRPCError(&emptypb.Empty{}, transferHandler.FinalizeTransfer(ctx, req))
+	return errors.WrapWithGRPCError(&emptypb.Empty{}, transferHandler.FinalizeTransfer(ctx, req))
 }
 
 // FinalizeRefreshTimelock finalizes the refresh timelock.
 func (s *SparkInternalServer) FinalizeRefreshTimelock(ctx context.Context, req *pb.FinalizeRefreshTimelockRequest) (*emptypb.Empty, error) {
 	refreshTimelockHandler := handler.NewInternalRefreshTimelockHandler(s.config)
-	return wrapWithGRPCError(&emptypb.Empty{}, refreshTimelockHandler.FinalizeRefreshTimelock(ctx, req))
+	return errors.WrapWithGRPCError(&emptypb.Empty{}, refreshTimelockHandler.FinalizeRefreshTimelock(ctx, req))
 }
 
 func (s *SparkInternalServer) FinalizeExtendLeaf(ctx context.Context, req *pb.FinalizeExtendLeafRequest) (*emptypb.Empty, error) {
 	extendLeafHandler := handler.NewInternalExtendLeafHandler(s.config)
-	return wrapWithGRPCError(&emptypb.Empty{}, extendLeafHandler.FinalizeExtendLeaf(ctx, req))
+	return errors.WrapWithGRPCError(&emptypb.Empty{}, extendLeafHandler.FinalizeExtendLeaf(ctx, req))
 }
 
 // InitiatePreimageSwap initiates a preimage swap for the given payment hash.
 func (s *SparkInternalServer) InitiatePreimageSwap(ctx context.Context, req *pbspark.InitiatePreimageSwapRequest) (*pb.InitiatePreimageSwapResponse, error) {
 	lightningHandler := handler.NewLightningHandler(s.config)
 	preimageShare, err := lightningHandler.GetPreimageShare(ctx, req)
-	return wrapWithGRPCError(&pb.InitiatePreimageSwapResponse{PreimageShare: preimageShare}, err)
+	return errors.WrapWithGRPCError(&pb.InitiatePreimageSwapResponse{PreimageShare: preimageShare}, err)
 }
 
 // UpdatePreimageRequest updates the preimage request.
 func (s *SparkInternalServer) UpdatePreimageRequest(ctx context.Context, req *pb.UpdatePreimageRequestRequest) (*emptypb.Empty, error) {
 	lightningHandler := handler.NewLightningHandler(s.config)
-	return wrapWithGRPCError(&emptypb.Empty{}, lightningHandler.UpdatePreimageRequest(ctx, req))
+	return errors.WrapWithGRPCError(&emptypb.Empty{}, lightningHandler.UpdatePreimageRequest(ctx, req))
 }
 
 // PrepareTreeAddress prepares the tree address.
 func (s *SparkInternalServer) PrepareTreeAddress(ctx context.Context, req *pb.PrepareTreeAddressRequest) (*pb.PrepareTreeAddressResponse, error) {
 	treeCreationHandler := handler.NewInternalTreeCreationHandler(s.config)
-	return wrapWithGRPCError(treeCreationHandler.PrepareTreeAddress(ctx, req))
+	return errors.WrapWithGRPCError(treeCreationHandler.PrepareTreeAddress(ctx, req))
 }
 
 // InitiateTransfer initiates a transfer by creating transfer and transfer_leaf
 func (s *SparkInternalServer) InitiateTransfer(ctx context.Context, req *pb.InitiateTransferRequest) (*emptypb.Empty, error) {
 	transferHandler := handler.NewInternalTransferHandler(s.config)
-	return wrapWithGRPCError(&emptypb.Empty{}, transferHandler.InitiateTransfer(ctx, req))
+	return errors.WrapWithGRPCError(&emptypb.Empty{}, transferHandler.InitiateTransfer(ctx, req))
 }
 
 // InitiateCooperativeExit initiates a cooperative exit.
 func (s *SparkInternalServer) InitiateCooperativeExit(ctx context.Context, req *pb.InitiateCooperativeExitRequest) (*emptypb.Empty, error) {
 	transferHandler := handler.NewInternalTransferHandler(s.config)
-	return wrapWithGRPCError(&emptypb.Empty{}, transferHandler.InitiateCooperativeExit(ctx, req))
+	return errors.WrapWithGRPCError(&emptypb.Empty{}, transferHandler.InitiateCooperativeExit(ctx, req))
 }
 
 // ProvidePreimage provides the preimage for the given payment hash.
 func (s *SparkInternalServer) ProvidePreimage(ctx context.Context, req *pbspark.ProvidePreimageRequest) (*emptypb.Empty, error) {
 	lightningHandler := handler.NewLightningHandler(s.config)
 	_, err := lightningHandler.ProvidePreimageInternal(ctx, req)
-	return wrapWithGRPCError(&emptypb.Empty{}, err)
+	return errors.WrapWithGRPCError(&emptypb.Empty{}, err)
 }
 
 func (s *SparkInternalServer) ReturnLightningPayment(ctx context.Context, req *pbspark.ReturnLightningPaymentRequest) (*emptypb.Empty, error) {
 	lightningHandler := handler.NewLightningHandler(s.config)
-	return wrapWithGRPCError(lightningHandler.ReturnLightningPayment(ctx, req, true))
+	return errors.WrapWithGRPCError(lightningHandler.ReturnLightningPayment(ctx, req, true))
 }
 
 // StartTokenTransactionInternal validates a token transaction and saves it to the database.
 func (s *SparkInternalServer) StartTokenTransactionInternal(ctx context.Context, req *pb.StartTokenTransactionInternalRequest) (*emptypb.Empty, error) {
 	tokenTransactionHandler := handler.NewInternalTokenTransactionHandler(s.config, s.lrc20Client)
-	return wrapWithGRPCError(tokenTransactionHandler.StartTokenTransactionInternal(ctx, s.config, req))
+	return errors.WrapWithGRPCError(tokenTransactionHandler.StartTokenTransactionInternal(ctx, s.config, req))
 }
 
 // CancelSendTransfer cancels a transfer from sender before key is tweaked.
 func (s *SparkInternalServer) CancelSendTransfer(ctx context.Context, req *pbspark.CancelSendTransferRequest) (*emptypb.Empty, error) {
 	transferHandler := handler.NewInternalTransferHandler(s.config)
 	_, err := transferHandler.CancelSendTransfer(ctx, req, handler.CancelSendTransferIntentInternal)
-	return wrapWithGRPCError(&emptypb.Empty{}, err)
+	return errors.WrapWithGRPCError(&emptypb.Empty{}, err)
 }
 
 func (s *SparkInternalServer) InitiateSettleReceiverKeyTweak(ctx context.Context, req *pb.InitiateSettleReceiverKeyTweakRequest) (*emptypb.Empty, error) {
 	transferHandler := handler.NewTransferHandler(s.config)
-	return wrapWithGRPCError(&emptypb.Empty{}, transferHandler.InitiateSettleReceiverKeyTweak(ctx, req))
+	return errors.WrapWithGRPCError(&emptypb.Empty{}, transferHandler.InitiateSettleReceiverKeyTweak(ctx, req))
 }
 
 func (s *SparkInternalServer) SettleReceiverKeyTweak(ctx context.Context, req *pb.SettleReceiverKeyTweakRequest) (*emptypb.Empty, error) {
 	transferHandler := handler.NewTransferHandler(s.config)
-	return wrapWithGRPCError(&emptypb.Empty{}, transferHandler.SettleReceiverKeyTweak(ctx, req))
+	return errors.WrapWithGRPCError(&emptypb.Empty{}, transferHandler.SettleReceiverKeyTweak(ctx, req))
 }
