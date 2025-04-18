@@ -166,13 +166,19 @@ export class TokenTransactionService {
     }
 
     // Start the token transaction
-    const startResponse = await sparkClient.start_token_transaction({
-      identityPublicKey: await this.config.signer.getIdentityPublicKey(),
-      partialTokenTransaction: tokenTransaction,
-      tokenTransactionSignatures: {
-        ownerSignatures: ownerSignatures,
+    const startResponse = await sparkClient.start_token_transaction(
+      {
+        identityPublicKey: await this.config.signer.getIdentityPublicKey(),
+        partialTokenTransaction: tokenTransaction,
+        tokenTransactionSignatures: {
+          ownerSignatures: ownerSignatures,
+        },
       },
-    });
+      {
+        retry: true,
+        retryMaxAttempts: 3,
+      } as SparkCallOptions,
+    );
 
     // Validate keyshare configuration
     if (
@@ -270,7 +276,7 @@ export class TokenTransactionService {
             },
             {
               retry: true,
-              retryMaxAttempts: 5,
+              retryMaxAttempts: 3,
             } as SparkCallOptions,
           );
 
@@ -382,7 +388,7 @@ export class TokenTransactionService {
           },
           {
             retry: true,
-            retryMaxAttempts: 5,
+            retryMaxAttempts: 3,
           } as SparkCallOptions,
         );
 
