@@ -13,11 +13,14 @@ const patched = content
   .replace("require(`util`)", "globalThis")
   // handle class exports (https://bit.ly/421kbmk):
   .replace(/\nclass (.*?) \{/g, "\nclass $1Src {")
-  .replace(/\nmodule\.exports\.(.*?) = \1;/g, "\nexport const $1 = imports.$1 = $1Src ")
+  .replace(
+    /\nmodule\.exports\.(.*?) = \1;/g,
+    "\nexport const $1 = imports.$1 = $1Src ",
+  )
   // attach to `imports` instead of module.exports
   .replace("= module.exports", "= imports")
   .replace(/\nmodule\.exports\.(.*?)\s+/g, "\nexport const $1 = imports.$1 ")
-  .replace(/$/, 'export default imports')
+  .replace(/$/, "export default imports")
   // inline bytes Uint8Array
   .replace(
     /\nconst path.*\nconst bytes.*\n/,
@@ -39,10 +42,14 @@ var __toBinary = /* @__PURE__ */ (() => {
   };
 })();
 
-const bytes = __toBinary(${JSON.stringify(await readFile(`${generatedDir}/${name}_bg.wasm`, "base64"))
-    });
+const bytes = __toBinary(${JSON.stringify(
+      await readFile(`${generatedDir}/${name}_bg.wasm`, "base64"),
+    )});
 `,
   );
 
 await writeFile(`./src/wasm/spark_bindings.js`, patched);
-await writeFile(`./src/wasm/spark_bindings.d.ts`, await readFile(`${generatedDir}/${name}.d.ts`, "utf8"));
+await writeFile(
+  `./src/wasm/spark_bindings.d.ts`,
+  await readFile(`${generatedDir}/${name}.d.ts`, "utf8"),
+);
