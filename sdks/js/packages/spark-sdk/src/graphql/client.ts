@@ -103,10 +103,13 @@ export default class SspClient {
       undefined,
       fetchFunction,
     );
-    this.authenticate();
   }
 
   async executeRawQuery<T>(query: Query<T>): Promise<T | null> {
+    if (!(await this.authProvider.isAuthorized())) {
+      await this.authenticate();
+    }
+
     try {
       return await this.requester.executeQuery(query);
     } catch (error) {
