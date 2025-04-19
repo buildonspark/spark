@@ -6,15 +6,17 @@
 # including deploying necessary services and setting up port forwarding.
 #
 # Usage:
-#   ./scripts/local-test.sh [--dev-spark] [--keep-data]
+#   ./scripts/local-test.sh [--dev-spark] [--dev-lrc20] [--keep-data]
 #
 # Options:
 #   --dev-spark         - Sets USE_DEV_SPARK=true to use the locally built dev spark image
+#   --dev-lrc20         - Sets USE_DEV_LRC20=true to use the locally built dev lrc20 image
 #   --keep-data         - Sets RESET_DBS=false to preserve existing test data (databases and blockchain)
 #
 # Environment Variables:
 #   RESET_DBS           - Whether to reset operator databases and bitcoin blockchain (default: true)
 #   USE_DEV_SPARK       - Whether to use the dev spark image built into minikube (default: false)
+#   USE_DEV_LRC20       - Whether to use the dev lrc20 image built into minikube (default: false)
 #   SPARK_TAG           - Image tag to use for both Spark operator and signer (default: latest)
 #   LRC20_TAG           - Image tag to use for LRC20 (default: latest)
 #   USE_LIGHTSPARK_HELM_REPO - Whether to fetch helm charts from remote repo (default: false)
@@ -33,12 +35,17 @@
 set -e
 
 : "${USE_DEV_SPARK:=false}"
+: "${USE_DEV_LRC20:=false}"
 : "${RESET_DBS:=true}"
 
 while [[ $# -gt 0 ]]; do
     case $1 in
         --dev-spark)
             USE_DEV_SPARK=true
+            shift
+            ;;
+        --dev-lrc20)
+            USE_DEV_LRC20=true
             shift
             ;;
         --keep-data)

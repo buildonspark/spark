@@ -10,6 +10,8 @@ source "$(dirname "$0")/lightspark-helm.sh"
 : "${RESET_DBS:=true}"
 # Allow using dev spark image
 : "${USE_DEV_SPARK:=false}"
+# Allow using dev lrc20 image
+: "${USE_DEV_LRC20:=false}"
 : "${HELM_INSTALL_TIMEOUT:=2m0s}"
 : "${SPARK_TAG:=latest}"
 : "${LRC20_TAG:=latest}"
@@ -33,11 +35,12 @@ PUB_KEYS=(
 )
 
 # Use minikube's docker environment for local images
-if [ "$USE_DEV_SPARK" = "true" ]; then
+if [ "$USE_DEV_SPARK" = "true" ] || [ "$USE_DEV_LRC20" = "true" ]; then
     echo "Using minikube docker environment for dev builds..."
     eval "$(minikube docker-env)"
+fi
 
-    # Verify dev images exist
+if [ "$USE_DEV_SPARK" = "true" ]; then
     if ! docker image inspect spark:dev >/dev/null 2>&1; then
         echo "Error: spark:dev image not found. Please run build.sh first."
         exit 1
@@ -47,6 +50,18 @@ if [ "$USE_DEV_SPARK" = "true" ]; then
     SPARK_TAG="dev"
 else
     echo "Using remote spark image: ${SPARK_REPO:-ecr}:${SPARK_TAG:-latest}"
+fi
+
+if [ "$USE_DEV_LRC20" = "true" ]; then
+    if ! docker image inspect yuvd:dev >/dev/null 2>&1; then
+        echo "Error: yuvd:dev (lrc20) image not found. Please run build-to-minikube.sh first."
+        exit 1
+    fi
+    echo "Using local yuvd:dev (lrc20) image"
+    LRC20_REPO="yuvd"
+    LRC20_TAG="dev"
+else
+    echo "Using remote lrc20 image: ${LRC20_REPO:-ecr}:${LRC20_TAG:-latest}"
 fi
 
 for NAMESPACE in spark lrc20 bitcoin; do
