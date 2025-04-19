@@ -143,9 +143,9 @@ Please run: `ops/minikube/setup.sh`, then `./scripts/local-test.sh`. If want to 
 
 ```
 # 1. Build the image
-./scripts/build.sh  # from the repo root
+./scripts/build-to-minikube.sh
 # OR
-mise build-so-dev-image  # from any directory
+mise build-so-dev-image
 
 # 2. Run minikube with the local image
 ./scripts/local-test.sh --dev-spark
@@ -173,11 +173,13 @@ OR
 #
 # Options:
 #   --dev-spark         - Sets USE_DEV_SPARK=true to use the locally built dev spark image
+#   --dev-lrc20         - Sets USE_DEV_LRC20=true to use the locally built dev lrc20 image
 #   --keep-data         - Sets RESET_DBS=false to preserve existing test data (databases and blockchain)
 #
 # Environment Variables:
 #   RESET_DBS           - Whether to reset operator databases and bitcoin blockchain (default: true)
 #   USE_DEV_SPARK       - Whether to use the dev spark image built into minikube (default: false)
+#   USE_DEV_LRC20       - Whether to use the dev lrc20 image built into minikube (default: false)
 #   SPARK_TAG           - Image tag to use for both Spark operator and signer (default: latest)
 #   LRC20_TAG           - Image tag to use for LRC20 (default: latest)
 #   USE_LIGHTSPARK_HELM_REPO - Whether to fetch helm charts from remote repo (default: false)
@@ -212,7 +214,7 @@ yarn test:integration
 #### Troubleshooting
 
 1. For local testing, operator (go) and signer (rust) logs are found in `_data/run_X/logs`. For minikube, logs are found via kubernetes. [k9s](https://k9scli.io/) is a great tool to investigate your minikube k8 cluster.
-2. If you don't want to deal with `tmux` commands yourself, you can easily interact with tmux using the `iterm2` GUI and tmux control-center.
+2. If you don't want to deal with `tmux` commands yourself, you can easily interact with tmux using the `iterm2` GUI and tmux control mode.
 From within `iterm2`, you can run:
 
 ```tmux -CC attach -t operator```

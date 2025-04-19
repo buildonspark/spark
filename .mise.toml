@@ -14,7 +14,7 @@ rust = "1.85.0"
 MISE_NODE_COREPACK = true
 
 [tasks]
-build-so-dev-image = { dir = "{{config_root}}", run = 'spark/scripts/build.sh' }
+build-so-dev-image = 'spark/scripts/build-to-minikube.sh'
 spark-cli = { dir = "{{config_root}}/sdks/js", run = 'yarn install && yarn build && cd examples/spark-cli && yarn build && yarn run cli' }
 test-go = { dir = "{{config_root}}/spark", run = 'mise test' }
 test-grpc = { dir = "{{config_root}}/spark", run = 'mise test-grpc' }
