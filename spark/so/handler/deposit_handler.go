@@ -280,7 +280,8 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 	treeMutator := db.Tree.
 		Create().
 		SetOwnerIdentityPubkey(depositAddress.OwnerIdentityPubkey).
-		SetNetwork(schemaNetwork).SetBaseTxid(txid[:]).
+		SetNetwork(schemaNetwork).
+		SetBaseTxid(txid[:]).
 		SetVout(int16(req.OnChainUtxo.Vout))
 	if txConfirmed {
 		treeMutator.SetStatus(schema.TreeStatusAvailable)

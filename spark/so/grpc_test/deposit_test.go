@@ -166,9 +166,6 @@ func TestStartDepositTreeCreation(t *testing.T) {
 }
 
 func TestStartDepositTreeCreationConcurrentWithSameTx(t *testing.T) {
-	// FIXME(mhr): Skipping this test because we can't make base_txid unique yet...
-	t.SkipNow()
-
 	config, err := testutil.TestWalletConfig()
 	if err != nil {
 		t.Fatalf("failed to create wallet config: %v", err)
@@ -240,8 +237,8 @@ func TestStartDepositTreeCreationConcurrentWithSameTx(t *testing.T) {
 
 	time.Sleep(100 * time.Millisecond)
 
-	resultChannel := make(chan *spark.FinalizeNodeSignaturesResponse)
-	errChannel := make(chan error)
+	resultChannel := make(chan *spark.FinalizeNodeSignaturesResponse, 2)
+	errChannel := make(chan error, 2)
 
 	for range 2 {
 		go func() {
