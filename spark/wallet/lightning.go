@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/btcsuite/btcd/wire"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
@@ -15,6 +16,7 @@ import (
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
 	"github.com/lightsparkdev/spark-go/so/objects"
 	decodepay "github.com/nbd-wtf/ln-decodepay"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // SwapNodesForLightning swaps a node for a preimage of a Lightning invoice.
@@ -122,6 +124,7 @@ func SwapNodesForPreimage(
 			OwnerIdentityPublicKey:    config.IdentityPublicKey(),
 			ReceiverIdentityPublicKey: receiverIdentityPubkeyBytes,
 			LeavesToSend:              leafSigningJobs,
+			ExpiryTime:                timestamppb.New(time.Now().Add(2 * time.Minute)),
 		},
 		ReceiverIdentityPublicKey: receiverIdentityPubkeyBytes,
 		FeeSats:                   feeSats,
