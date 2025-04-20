@@ -36,6 +36,14 @@ const (
 	WithdrawalRelativeBlockLocktimeInConfig = 1000
 )
 
+func bytesToBigInt(value []byte) *big.Int {
+	return new(big.Int).SetBytes(value)
+}
+
+func uint64ToBigInt(value uint64) *big.Int {
+	return new(big.Int).SetBytes(int64ToUint128Bytes(0, value))
+}
+
 func int64ToUint128Bytes(high, low uint64) []byte {
 	return append(
 		binary.BigEndian.AppendUint64(make([]byte, 0), high),
@@ -370,15 +378,27 @@ func TestBroadcastTokenTransactionMintAndTransferTokens(t *testing.T) {
 	if len(mintTx.TokenOutputs) != 2 {
 		t.Fatalf("expected 2 created outputs in mint transaction, got %d", len(mintTx.TokenOutputs))
 	}
-	mintLeaf1Amount := new(big.Int).SetBytes(mintTx.TokenOutputs[0].TokenAmount)
-	mintLeaf2Amount := new(big.Int).SetBytes(mintTx.TokenOutputs[1].TokenAmount)
-	expectedLeaf1Amount := new(big.Int).SetBytes(int64ToUint128Bytes(0, TestIssueLeaf1Amount))
-	expectedLeaf2Amount := new(big.Int).SetBytes(int64ToUint128Bytes(0, TestIssueLeaf2Amount))
-	if mintLeaf1Amount.Cmp(expectedLeaf1Amount) != 0 {
-		t.Fatalf("mint output 1 amount %d does not match expected %d", mintLeaf1Amount, expectedLeaf1Amount)
-	}
-	if mintLeaf2Amount.Cmp(expectedLeaf2Amount) != 0 {
-		t.Fatalf("mint output 2 amount %d does not match expected %d", mintLeaf2Amount, expectedLeaf2Amount)
+
+	userLeaf1Pubkey := userLeaf1PrivKey.PubKey().SerializeCompressed()
+	userLeaf2Pubkey := userLeaf2PrivKey.PubKey().SerializeCompressed()
+
+	if bytes.Equal(mintTx.TokenOutputs[0].OwnerPublicKey, userLeaf1Pubkey) {
+		require.Equal(t, mintTx.TokenOutputs[1].OwnerPublicKey, userLeaf2Pubkey)
+
+		require.Equal(t, bytesToBigInt(mintTx.TokenOutputs[0].TokenAmount), uint64ToBigInt(TestIssueLeaf1Amount))
+		require.Equal(t, bytesToBigInt(mintTx.TokenOutputs[1].TokenAmount), uint64ToBigInt(TestIssueLeaf2Amount))
+	} else if bytes.Equal(mintTx.TokenOutputs[0].OwnerPublicKey, userLeaf2Pubkey) {
+		require.Equal(t, mintTx.TokenOutputs[1].OwnerPublicKey, userLeaf1Pubkey)
+
+		require.Equal(t, bytesToBigInt(mintTx.TokenOutputs[0].TokenAmount), uint64ToBigInt(TestIssueLeaf2Amount))
+		require.Equal(t, bytesToBigInt(mintTx.TokenOutputs[1].TokenAmount), uint64ToBigInt(TestIssueLeaf1Amount))
+	} else {
+		t.Fatalf("mint transaction output keys (%x, %x) do not match expected (%x, %x)",
+			mintTx.TokenOutputs[0].OwnerPublicKey,
+			mintTx.TokenOutputs[1].OwnerPublicKey,
+			userLeaf1Pubkey,
+			userLeaf1Pubkey,
+		)
 	}
 }
 
