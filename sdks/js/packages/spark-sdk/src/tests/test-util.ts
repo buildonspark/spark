@@ -11,9 +11,12 @@ import {
   LOCAL_WALLET_CONFIG,
 } from "../services/wallet-config.js";
 import { getP2TRAddressFromPublicKey } from "../utils/bitcoin.js";
+import { getCrypto } from "../utils/crypto.js";
 import { getNetwork, Network } from "../utils/network.js";
 import { SparkWalletTesting } from "./utils/spark-testing-wallet.js";
 import { BitcoinFaucet } from "./utils/test-faucet.js";
+
+const crypto = getCrypto();
 
 /**
  * Checks if the current environment is a hermetic test environment.

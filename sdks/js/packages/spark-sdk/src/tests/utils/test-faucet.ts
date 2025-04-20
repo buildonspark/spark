@@ -143,10 +143,10 @@ export class BitcoinFaucet {
     // Add the input
     sendToPubKeyTx.addInput(coinToSend.outpoint);
 
-    // Add the output using the address directly
+    // Add the output using the address directly, but subtract FEE_AMOUNT to ensure there's a fee
     sendToPubKeyTx.addOutputAddress(
       p2wpkhAddress,
-      COIN_AMOUNT,
+      COIN_AMOUNT - FEE_AMOUNT,
       getNetwork(Network.LOCAL),
     );
 

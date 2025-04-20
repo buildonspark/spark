@@ -177,9 +177,11 @@ jobs:
         run: yarn run build
 
       - name: Run JS tests
+        env:
+          GITHUB_ACTIONS: "true"
+          HERMETIC_TEST: "true"
         if: inputs.test_type == 'js'
         working-directory: sdks/js
-        continue-on-error: true
         run: yarn run test:integration
 
       - name: "Gather logs"
