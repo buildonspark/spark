@@ -1,0 +1,78 @@
+name: "Release"
+
+on:
+  release:
+    types: ["released"]
+
+jobs:
+  deploy:
+    runs-on: "self-hosted"
+    environment: prod
+    permissions:
+      id-token: write
+      contents: write
+    env:
+      XDG_RUNTIME_DIR: /tmp
+      KUBECONFIG: "/tmp/${{ github.run_id }}.kubeconfig"
+    steps:
+      - name: "Checkout"
+        uses: "actions/checkout@v4"
+        with:
+          fetch-depth: 0
+      - name: "Check that release commit is in main"
+        run: "git merge-base --is-ancestor HEAD origin/main"
+      - name: "Configure AWS credentials (dev)"
+        uses: "aws-actions/configure-aws-credentials@v4"
+        with:
+          role-to-assume: "arn:aws:iam::674966927423:role/github-actions-spark"
+          aws-region: "us-west-2"
+      - name: "Log into ECR (dev)"
+        id: ecr-dev
+        uses: "aws-actions/amazon-ecr-login@v2"
+      - name: "Configure AWS credentials (prod)"
+        uses: "aws-actions/configure-aws-credentials@v4"
+        with:
+          role-to-assume: "arn:aws:iam::405785876631:role/github-actions-spark"
+          aws-region: "us-west-2"
+      - name: "Log into ECR (prod)"
+        id: ecr-prod
+        uses: "aws-actions/amazon-ecr-login@v2"
+      - name: "Configure Kubernetes cluster" #TODO: Configure external kube clusters
+        run: "aws --region us-west-2 eks update-kubeconfig --name prod"
+      - name: "Copy spark image to prod ECR"
+        run: |
+          GIT_HASH="$(git log -1 --format='%H' main -- spark/)" # Go build only runs on spark/ dir changes
+          skopeo copy --all docker://${{ steps.ecr-dev.outputs.registry }}/spark-go:git_${GIT_HASH:0:8} docker://${{ steps.ecr-prod.outputs.registry }}/spark-go:git_${GIT_HASH:0:8}
+          skopeo copy --all docker://${{ steps.ecr-dev.outputs.registry }}/spark-go:git_${GIT_HASH:0:8} docker://${{ steps.ecr-prod.outputs.registry }}/spark-go:${{ github.ref_name }}
+          skopeo copy --all docker://${{ steps.ecr-dev.outputs.registry }}/spark-go:git_${GIT_HASH:0:8} docker://${{ steps.ecr-prod.outputs.registry }}/spark-go:latest
+#      - name: "Announce to Slack"
+#        continue-on-error: true
+#        run: |
+#          curl --data-binary @- --header "Content-Type: application/json" --silent "${{ secrets.SLACK_WEBHOOK_ENGINT }}" <<EOF
+#          {
+#            "text": ":arrow_forward: ${{ github.actor }} is <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id}}|releasing> <${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ github.ref_name }}|${{ github.ref_name }}> to production"
+#          }
+#          EOF
+      - name: "Restart pods" #TODO: External
+        run: |
+          kubectl -n spark rollout restart statefulset -l app.kubernetes.io/instance=spark
+      - name: "Update release branch"
+        run: "git push -f origin HEAD:prod"
+#      - name: "Check pod status"
+#        run: |
+#          for i in `seq 30`; do
+#            sleep 10s
+#            date
+#            kubectl -n sparkcore get pods -l 'app.kubernetes.io/instance=sparkcore' -o jsonpath='{range .items[*]}{.metadata.name} {.status.phase} {.status.conditions[?(@.type=="Ready")].status}{ "\n"}{end}' | grep -v ' Running True$' | grep -Ev '(alembic|discovery|geoip)' | tee /tmp/status
+#            kubectl -n paycore get pods -l 'app.kubernetes.io/instance=paycore' -o jsonpath='{range .items[*]}{.metadata.name} {.status.phase} {.status.conditions[?(@.type=="Ready")].status}{ "\n"}{end}' | grep -v ' Running True$' | grep -Ev 'alembic' | tee -a /tmp/status
+#            if [ ! -s /tmp/status ]; then break; fi
+#          done
+#          if [ -s /tmp/status ]; then exit 1; fi
+#      - name: "Notify failure on Slack"
+#        if: "failure()"
+#        run: |
+#          curl --data-binary @- --header "Content-Type: application/json" --silent "${{ secrets.SLACK_WEBHOOK_ENGINT }}" <<EOF
+#          {
+#            "text": ":x: ${{ github.workflow }} workflow by ${{ github.actor }} <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id}}|failed> in ${{ github.job }} on <${{ github.server_url }}/${{ github.repository }}/commit/$GITHUB_SHA|${{ github.ref_name }}>"
+#          }
+#          EOF
