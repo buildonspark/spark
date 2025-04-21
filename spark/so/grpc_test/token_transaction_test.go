@@ -15,6 +15,7 @@ import (
 	"github.com/lightsparkdev/spark-go/so/utils"
 	testutil "github.com/lightsparkdev/spark-go/test_util"
 	"github.com/lightsparkdev/spark-go/wallet"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 )
@@ -383,15 +384,15 @@ func TestBroadcastTokenTransactionMintAndTransferTokens(t *testing.T) {
 	userLeaf2Pubkey := userLeaf2PrivKey.PubKey().SerializeCompressed()
 
 	if bytes.Equal(mintTx.TokenOutputs[0].OwnerPublicKey, userLeaf1Pubkey) {
-		require.Equal(t, mintTx.TokenOutputs[1].OwnerPublicKey, userLeaf2Pubkey)
+		assert.Equal(t, mintTx.TokenOutputs[1].OwnerPublicKey, userLeaf2Pubkey)
 
-		require.Equal(t, bytesToBigInt(mintTx.TokenOutputs[0].TokenAmount), uint64ToBigInt(TestIssueLeaf1Amount))
-		require.Equal(t, bytesToBigInt(mintTx.TokenOutputs[1].TokenAmount), uint64ToBigInt(TestIssueLeaf2Amount))
+		assert.Equal(t, bytesToBigInt(mintTx.TokenOutputs[0].TokenAmount), uint64ToBigInt(TestIssueLeaf1Amount))
+		assert.Equal(t, bytesToBigInt(mintTx.TokenOutputs[1].TokenAmount), uint64ToBigInt(TestIssueLeaf2Amount))
 	} else if bytes.Equal(mintTx.TokenOutputs[0].OwnerPublicKey, userLeaf2Pubkey) {
-		require.Equal(t, mintTx.TokenOutputs[1].OwnerPublicKey, userLeaf1Pubkey)
+		assert.Equal(t, mintTx.TokenOutputs[1].OwnerPublicKey, userLeaf1Pubkey)
 
-		require.Equal(t, bytesToBigInt(mintTx.TokenOutputs[0].TokenAmount), uint64ToBigInt(TestIssueLeaf2Amount))
-		require.Equal(t, bytesToBigInt(mintTx.TokenOutputs[1].TokenAmount), uint64ToBigInt(TestIssueLeaf1Amount))
+		assert.Equal(t, bytesToBigInt(mintTx.TokenOutputs[0].TokenAmount), uint64ToBigInt(TestIssueLeaf2Amount))
+		assert.Equal(t, bytesToBigInt(mintTx.TokenOutputs[1].TokenAmount), uint64ToBigInt(TestIssueLeaf1Amount))
 	} else {
 		t.Fatalf("mint transaction output keys (%x, %x) do not match expected (%x, %x)",
 			mintTx.TokenOutputs[0].OwnerPublicKey,
