@@ -13,5 +13,5 @@ const { wallet, mnemonic: walletMnemonic } = await SparkWallet.initialize({
 console.log("wallet mnemonic phrase:", walletMnemonic);
 
 // Get a deposit address for Bitcoin
-const depositAddress = await wallet.getDepositAddress();
+const depositAddress = await wallet.getSingleUseDepositAddress();
 console.log("Deposit Address:", depositAddress);

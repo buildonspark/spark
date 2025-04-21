@@ -18,72 +18,189 @@ describe("deposit", () => {
       },
     });
 
-    const depositAddress = await sdk.getDepositAddress();
+    const depositAddress = await sdk.getSingleUseDepositAddress();
 
     expect(depositAddress).toBeDefined();
   }, 30000);
 
-  brokenTestFn(
-    "should create a tree root",
-    async () => {
-      const faucet = new BitcoinFaucet();
+  it("should create a tree root", async () => {
+    const faucet = new BitcoinFaucet();
 
-      const coin = await faucet.fund();
+    const coin = await faucet.fund();
 
-      const { wallet: sdk } = await SparkWalletTesting.initialize({
-        options: {
-          network: "LOCAL",
-        },
-      });
+    const { wallet: sdk } = await SparkWalletTesting.initialize({
+      options: {
+        network: "LOCAL",
+      },
+    });
 
-      // Generate private/public key pair
-      const pubKey = await sdk.getSigner().generatePublicKey();
+    // Generate private/public key pair
+    const pubKey = await sdk.getSigner().generatePublicKey();
 
-      // Generate deposit address
-      const depositResp = await sdk.getDepositAddress();
-      if (!depositResp) {
-        throw new Error("deposit address not found");
-      }
+    // Generate deposit address
+    const depositResp = await sdk.getSingleUseDepositAddress();
+    if (!depositResp) {
+      throw new Error("deposit address not found");
+    }
 
-      const addr = Address(getNetwork(Network.LOCAL)).decode(depositResp);
-      const script = OutScript.encode(addr);
+    const addr = Address(getNetwork(Network.LOCAL)).decode(depositResp);
+    const script = OutScript.encode(addr);
 
-      const depositTx = new Transaction();
-      depositTx.addInput(coin!.outpoint);
-      depositTx.addOutput({
-        script,
-        amount: 100_000n,
-      });
+    const depositTx = new Transaction();
+    depositTx.addInput(coin!.outpoint);
+    depositTx.addOutput({
+      script,
+      amount: 100_000n,
+    });
 
-      const vout = 0;
-      const txid = getTxId(depositTx);
-      if (!txid) {
-        throw new Error("txid not found");
-      }
+    const vout = 0;
+    const txid = getTxId(depositTx);
+    if (!txid) {
+      throw new Error("txid not found");
+    }
 
-      // Set mock transaction
-      const signedTx = await faucet.signFaucetCoin(
-        depositTx,
-        coin!.txout,
-        coin!.key,
-      );
+    // Set mock transaction
+    const signedTx = await faucet.signFaucetCoin(
+      depositTx,
+      coin!.txout,
+      coin!.key,
+    );
 
-      await faucet.broadcastTx(signedTx.hex);
+    await faucet.broadcastTx(signedTx.hex);
 
-      const randomPrivKey = secp256k1.utils.randomPrivateKey();
-      const randomPubKey = secp256k1.getPublicKey(randomPrivKey);
-      const randomAddr = getP2TRAddressFromPublicKey(
-        randomPubKey,
-        Network.LOCAL,
-      );
+    const randomPrivKey = secp256k1.utils.randomPrivateKey();
+    const randomPubKey = secp256k1.getPublicKey(randomPrivKey);
+    const randomAddr = getP2TRAddressFromPublicKey(randomPubKey, Network.LOCAL);
 
-      await faucet.generateToAddress(1, randomAddr);
+    await faucet.generateToAddress(1, randomAddr);
 
-      // Create tree root
-      const treeResp = await sdk.claimDeposit(signedTx.id);
+    // Create tree root
+    const treeResp = await sdk.claimDeposit(signedTx.id);
 
-      console.log("tree created:", treeResp);
-    },
-    30000,
-  );
+    console.log("tree created:", treeResp);
+  }, 30000);
+
+  it("should handle non-trusty deposit", async () => {
+    const faucet = new BitcoinFaucet();
+
+    const { wallet: sdk } = await SparkWalletTesting.initialize({
+      options: {
+        network: "LOCAL",
+      },
+    });
+
+    const coin = await faucet.fund();
+
+    const depositTx = new Transaction();
+    const sendAmount = 50_000n;
+
+    depositTx.addInput(coin!.outpoint);
+
+    const depositAddress = await sdk.getSingleUseDepositAddress();
+    if (!depositAddress) {
+      throw new Error("Failed to get deposit address");
+    }
+
+    const destinationAddress = Address(getNetwork(Network.LOCAL)).decode(
+      depositAddress,
+    );
+    const destinationScript = OutScript.encode(destinationAddress);
+    depositTx.addOutput({
+      script: destinationScript,
+      amount: sendAmount,
+    });
+
+    const unsignedTxHex = depositTx.hex;
+
+    const depositResult = await sdk.advancedDeposit(unsignedTxHex);
+    expect(depositResult).toBeDefined();
+
+    const signedTx = await faucet.signFaucetCoin(
+      depositTx,
+      coin!.txout,
+      coin!.key,
+    );
+
+    const broadcastResult = await faucet.broadcastTx(signedTx.hex);
+    expect(broadcastResult).toBeDefined();
+
+    await faucet.generateToAddress(1, depositAddress);
+
+    // Sleep to allow chain watcher to catch up
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+
+    const balance = await sdk.getBalance();
+    expect(balance.balance).toEqual(sendAmount);
+
+    await expect(sdk.advancedDeposit(unsignedTxHex)).rejects.toThrow(
+      `No unused deposit address found for tx: ${getTxId(depositTx)}`,
+    );
+  }, 30000);
+
+  it("should handle single tx with multiple outputs to unused deposit addresses", async () => {
+    const faucet = new BitcoinFaucet();
+
+    const { wallet: sdk } = await SparkWalletTesting.initialize({
+      options: {
+        network: "LOCAL",
+      },
+    });
+
+    const coin = await faucet.fund();
+
+    const depositTx = new Transaction();
+    const sendAmount = 50_000n;
+
+    depositTx.addInput(coin!.outpoint);
+
+    const depositAddress = await sdk.getSingleUseDepositAddress();
+    if (!depositAddress) {
+      throw new Error("Failed to get deposit address");
+    }
+
+    const depositAddress2 = await sdk.getSingleUseDepositAddress();
+    if (!depositAddress2) {
+      throw new Error("Failed to get deposit address");
+    }
+
+    const destinationAddress = Address(getNetwork(Network.LOCAL)).decode(
+      depositAddress,
+    );
+    const destinationScript = OutScript.encode(destinationAddress);
+    depositTx.addOutput({
+      script: destinationScript,
+      amount: sendAmount,
+    });
+
+    const destinationAddress2 = Address(getNetwork(Network.LOCAL)).decode(
+      depositAddress2,
+    );
+    const destinationScript2 = OutScript.encode(destinationAddress2);
+    depositTx.addOutput({
+      script: destinationScript2,
+      amount: sendAmount,
+    });
+
+    const unsignedTxHex = depositTx.hex;
+
+    const depositResult = await sdk.advancedDeposit(unsignedTxHex);
+    expect(depositResult).toBeDefined();
+
+    const signedTx = await faucet.signFaucetCoin(
+      depositTx,
+      coin!.txout,
+      coin!.key,
+    );
+
+    const broadcastResult = await faucet.broadcastTx(signedTx.hex);
+    expect(broadcastResult).toBeDefined();
+
+    await faucet.generateToAddress(1, depositAddress);
+
+    // Sleep to allow chain watcher to catch up
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+
+    const balance = await sdk.getBalance();
+    expect(balance.balance).toEqual(sendAmount * 2n);
+  }, 30000);
 });

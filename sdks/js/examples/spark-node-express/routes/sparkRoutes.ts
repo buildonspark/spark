@@ -618,7 +618,7 @@ export const createSparkRouter = (
     async (req, res) => {
       const wallet = getWallet();
       try {
-        const address = await wallet!.getDepositAddress();
+        const address = await wallet!.getSingleUseDepositAddress();
         res.json({
           data: { address },
         });

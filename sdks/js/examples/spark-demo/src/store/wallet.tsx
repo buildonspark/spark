@@ -189,7 +189,7 @@ const useWalletStore = create<WalletStore>((set, get) => ({
     if (!wallet) {
       throw new Error("Wallet not initialized");
     }
-    const btcDepositAddress = await wallet.getDepositAddress();
+    const btcDepositAddress = await wallet.getSingleUseDepositAddress();
     set({
       onchainDepositAddresses: new Set([
         btcDepositAddress,

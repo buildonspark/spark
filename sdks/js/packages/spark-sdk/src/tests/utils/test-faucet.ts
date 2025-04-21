@@ -1,6 +1,7 @@
 import { bytesToHex, hexToBytes } from "@noble/curves/abstract/utils";
 import { schnorr, secp256k1 } from "@noble/curves/secp256k1";
-import { Address, OutScript, SigHash, Transaction } from "@scure/btc-signer";
+import * as btc from "@scure/btc-signer";
+import { SigHash, Transaction } from "@scure/btc-signer";
 import { TransactionInput, TransactionOutput } from "@scure/btc-signer/psbt";
 import { taprootTweakPrivKey } from "@scure/btc-signer/utils";
 import {
@@ -8,10 +9,6 @@ import {
   getP2TRScriptFromPublicKey,
 } from "../../utils/bitcoin.js";
 import { getNetwork, Network } from "../../utils/network.js";
-import { SparkWallet } from "../../spark-wallet.js";
-import { sha256 } from "@noble/hashes/sha256";
-import * as btc from "@scure/btc-signer";
-import { ripemd160 } from "@noble/hashes/ripemd160";
 
 export type FaucetCoin = {
   key: Uint8Array;
@@ -123,6 +120,7 @@ export class BitcoinFaucet {
       });
     }
   }
+
   async sendFaucetCoinToP2WPKHAddress(pubKey: Uint8Array) {
     const sendToPubKeyTx = new Transaction();
 
@@ -295,5 +293,9 @@ export class BitcoinFaucet {
     await this.broadcastTx(txHex);
 
     return signedTx;
+  }
+
+  async getRawTransaction(txid: string) {
+    return await this.call("getrawtransaction", [txid, 2]);
   }
 }

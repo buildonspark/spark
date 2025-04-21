@@ -32,13 +32,13 @@ describe("address", () => {
           );
           expect(sparkAddress).toEqual(await wallet.getSparkAddress());
 
-          // Make multiple concurrent calls to getDepositAddress
+          // Make multiple concurrent calls to getSingleUseDepositAddress
           const depositAddresses = await Promise.all([
-            wallet.getDepositAddress(),
-            wallet.getDepositAddress(),
-            wallet.getDepositAddress(),
-            wallet.getDepositAddress(),
-            wallet.getDepositAddress(),
+            wallet.getSingleUseDepositAddress(),
+            wallet.getSingleUseDepositAddress(),
+            wallet.getSingleUseDepositAddress(),
+            wallet.getSingleUseDepositAddress(),
+            wallet.getSingleUseDepositAddress(),
           ]);
 
           // Verify each address is unique and valid
@@ -65,11 +65,11 @@ describe("address", () => {
 
           // New wallet should continue to generate unique addresses
           const depositAddresses2 = await Promise.all([
-            wallet2.getDepositAddress(),
-            wallet2.getDepositAddress(),
-            wallet2.getDepositAddress(),
-            wallet2.getDepositAddress(),
-            wallet2.getDepositAddress(),
+            wallet2.getSingleUseDepositAddress(),
+            wallet2.getSingleUseDepositAddress(),
+            wallet2.getSingleUseDepositAddress(),
+            wallet2.getSingleUseDepositAddress(),
+            wallet2.getSingleUseDepositAddress(),
           ]);
 
           // Verify each address is unique and valid

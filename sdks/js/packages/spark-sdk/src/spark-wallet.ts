@@ -83,6 +83,7 @@ import {
   SparkAddressFormat,
 } from "./address/index.js";
 import { SparkSigner } from "./signer/signer.js";
+import { BitcoinFaucet } from "./tests/utils/test-faucet.js";
 import { getCrypto } from "./utils/crypto.js";
 import { getMasterHDKeyFromSeed } from "./utils/index.js";
 const crypto = getCrypto();
@@ -749,13 +750,14 @@ export class SparkWallet {
 
   /**
    * Generates a new deposit address for receiving bitcoin funds.
-   * Note that this function returns a bitcoin address, not a spark address.
+   * Note that this function returns a bitcoin address, not a spark address, and this address is single use.
+   * Once you deposit funds to this address, it cannot be used again.
    * For Layer 1 Bitcoin deposits, Spark generates Pay to Taproot (P2TR) addresses.
    * These addresses start with "bc1p" and can be used to receive Bitcoin from any wallet.
    *
    * @returns {Promise<string>} A Bitcoin address for depositing funds
    */
-  public async getDepositAddress(): Promise<string> {
+  public async getSingleUseDepositAddress(): Promise<string> {
     return await this.generateDepositAddress();
   }
 
@@ -827,7 +829,7 @@ export class SparkWallet {
   }
   /**
    * Claims a deposit to the wallet.
-   *
+   * Note that if you used advancedDeposit, you don't need to call this function.
    * @param {string} txid - The transaction ID of the deposit
    * @returns {Promise<TreeNode[] | undefined>} The nodes resulting from the deposit
    */
@@ -844,20 +846,33 @@ export class SparkWallet {
         "Content-Type": "application/json",
       };
 
-      if (this.config.getNetwork() === Network.REGTEST) {
-        const auth = btoa(
-          `${ELECTRS_CREDENTIALS.username}:${ELECTRS_CREDENTIALS.password}`,
-        );
-        headers["Authorization"] = `Basic ${auth}`;
+      let txHex: string | undefined;
+
+      if (this.config.getNetwork() === Network.LOCAL) {
+        const localFaucet = new BitcoinFaucet();
+        const response = await localFaucet.getRawTransaction(txid);
+        txHex = response.hex;
+      } else {
+        if (this.config.getNetwork() === Network.REGTEST) {
+          const auth = btoa(
+            `${ELECTRS_CREDENTIALS.username}:${ELECTRS_CREDENTIALS.password}`,
+          );
+          headers["Authorization"] = `Basic ${auth}`;
+        }
+
+        const response = await fetch(`${baseUrl}/tx/${txid}/hex`, {
+          headers,
+        });
+
+        txHex = await response.text();
       }
 
-      const response = await fetch(`${baseUrl}/tx/${txid}/hex`, {
-        headers,
-      });
-
-      const txHex = await response.text();
-      if (!/^[0-9A-Fa-f]+$/.test(txHex)) {
+      if (!txHex) {
         throw new Error("Transaction not found");
+      }
+
+      if (!/^[0-9A-Fa-f]+$/.test(txHex)) {
+        throw new Error("Invalid transaction hex");
       }
       const depositTx = getTxFromRawTxHex(txHex);
 
@@ -912,6 +927,60 @@ export class SparkWallet {
   }
 
   /**
+   * Non-trusty flow for depositing funds to the wallet.
+   * Construct the tx spending from an L1 wallet to the Spark address.
+   * After calling this function, you must sign and broadcast the tx.
+   *
+   * @param {string} txHex - The hex string of the transaction to deposit
+   * @returns {Promise<TreeNode[] | undefined>} The nodes resulting from the deposit
+   */
+  public async advancedDeposit(txHex: string) {
+    const depositTx = getTxFromRawTxHex(txHex);
+    const sparkClient = await this.connectionManager.createSparkClient(
+      this.config.getCoordinatorAddress(),
+    );
+    const unusedDepositAddresses: Map<string, DepositAddressQueryResult> =
+      new Map(
+        (
+          await sparkClient.query_unused_deposit_addresses({
+            identityPublicKey: await this.config.signer.getIdentityPublicKey(),
+          })
+        ).depositAddresses.map((addr) => [addr.depositAddress, addr]),
+      );
+
+    let vout = 0;
+    const responses: TreeNode[] = [];
+    for (let i = 0; i < depositTx.outputsLength; i++) {
+      const output = depositTx.getOutput(i);
+      if (!output) {
+        continue;
+      }
+      const parsedScript = OutScript.decode(output.script!);
+      const address = Address(getNetwork(this.config.getNetwork())).encode(
+        parsedScript,
+      );
+      const unusedDepositAddress = unusedDepositAddresses.get(address);
+      if (unusedDepositAddress) {
+        vout = i;
+        const response = await this.depositService!.createTreeRoot({
+          signingPubKey: unusedDepositAddress.userSigningPublicKey,
+          verifyingKey: unusedDepositAddress.verifyingPublicKey,
+          depositTx,
+          vout,
+        });
+        responses.push(...response.nodes);
+      }
+    }
+    if (responses.length === 0) {
+      throw new Error(
+        `No unused deposit address found for tx: ${getTxId(depositTx)}`,
+      );
+    }
+
+    return responses;
+  }
+
+  /**
    * Transfers deposit to self to claim ownership.
    *
    * @param {TreeNode[]} leaves - The leaves to transfer
@@ -956,7 +1025,6 @@ export class SparkWallet {
 
     return await this.withLeaves(async () => {
       const leavesToSend = await this.selectLeaves(amountSats);
-
       await this.refreshTimelockNodes();
       await this.extendTimeLockNodes();
 

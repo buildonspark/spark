@@ -24,8 +24,10 @@ async function cleanUp() {
   );
   const paymentHash = sha256(preimage);
 
+  const configService = new WalletConfigService(config);
+  const connectionManager = new ConnectionManager(configService);
   for (const operator of Object.values(config.signingOperators!)) {
-    const client = await ConnectionManager.createMockClient(operator!.address);
+    const client = await connectionManager.createMockClient(operator!.address);
     await client.clean_up_preimage_share({
       paymentHash,
     });

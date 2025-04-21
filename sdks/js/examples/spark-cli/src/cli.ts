@@ -1,6 +1,15 @@
 import { getLatestDepositTxId } from "@buildonspark/spark-sdk";
 import { IssuerSparkWallet } from "@buildonspark/issuer-sdk";
 import { ConfigOptions } from "@buildonspark/spark-sdk/services/wallet-config";
+import {
+  getNetwork,
+  getP2TRScriptFromPublicKey,
+  Network,
+} from "@buildonspark/spark-sdk/utils";
+import { hexToBytes } from "@noble/curves/abstract/utils";
+import { schnorr, secp256k1 } from "@noble/curves/secp256k1";
+import { hex } from "@scure/base";
+import { Address, OutScript, Transaction } from "@scure/btc-signer";
 import readline from "readline";
 
 // Initialize Spark Wallet
@@ -69,6 +78,155 @@ async function runCLI() {
     switch (lowerCommand) {
       case "help":
         console.log(helpMessage);
+        break;
+      case "nontrustydeposit":
+        if (process.env.NODE_ENV === "production") {
+          console.log(
+            "This command is only available in the development environment",
+          );
+          break;
+        }
+        /**
+         * This is an example of how to create a non-trusty deposit. Real implementation may differ.
+         *
+         * 1. Get an address to deposit funds from L1 to Spark
+         * 2. Construct a tx spending from the L1 address to the Spark address
+         * 3. Call initalizeDeposit with the tx hex
+         * 4. Sign the tx
+         * 5. Broadcast the tx
+         */
+
+        if (!wallet) {
+          console.log("Please initialize a wallet first");
+          break;
+        }
+        if (args.length !== 1) {
+          console.log("Usage: nontrustydeposit <destinationBtcAddress>");
+          break;
+        }
+
+        const privateKey =
+          "9303c68c414a6208dbc0329181dd640b135e669647ad7dcb2f09870c54b26ed9";
+
+        // IMPORTANT: This address needs to be funded with regtest BTC before running this example
+        const sourceAddress =
+          "bcrt1pzrfhq4gm7kuww875lkj27cx005x08g2jp6qxexnu68gytn7sjqss3s6j2c";
+
+        try {
+          // Fetch transactions for the address
+          const response = await fetch(
+            `https://regtest-mempool.dev.dev.sparkinfra.net/api/address/${sourceAddress}/txs`,
+            {
+              headers: {
+                Authorization:
+                  "Basic " +
+                  Buffer.from("spark-sdk:mCMk1JqlBNtetUNy").toString("base64"),
+              },
+            },
+          );
+
+          const transactions: any = await response.json();
+
+          // Find unspent outputs
+          const utxos: { txid: string; vout: number; value: bigint }[] = [];
+          for (const tx of transactions) {
+            for (let voutIndex = 0; voutIndex < tx.vout.length; voutIndex++) {
+              const output = tx.vout[voutIndex];
+              if (output.scriptpubkey_address === sourceAddress) {
+                const isSpent = transactions.some((otherTx: any) =>
+                  otherTx.vin.some(
+                    (input: any) =>
+                      input.txid === tx.txid && input.vout === voutIndex,
+                  ),
+                );
+
+                if (!isSpent) {
+                  utxos.push({
+                    txid: tx.txid,
+                    vout: voutIndex,
+                    value: BigInt(output.value),
+                  });
+                }
+              }
+            }
+          }
+
+          if (utxos.length === 0) {
+            console.log(
+              `No unspent outputs found. Please fund the address ${sourceAddress} first`,
+            );
+            break;
+          }
+
+          // Create unsigned transaction
+          const tx = new Transaction();
+
+          const sendAmount = 10000n; // 10000 sats
+          const utxo = utxos[0];
+
+          // Add input without signing
+          tx.addInput({
+            txid: utxo.txid,
+            index: utxo.vout,
+            witnessUtxo: {
+              script: getP2TRScriptFromPublicKey(
+                secp256k1.getPublicKey(hexToBytes(privateKey)),
+                Network.REGTEST,
+              ),
+              amount: utxo.value,
+            },
+            tapInternalKey: schnorr.getPublicKey(hexToBytes(privateKey)),
+          });
+
+          // Add output for destination
+          const destinationAddress = Address(
+            getNetwork(Network.REGTEST),
+          ).decode(args[0]);
+          const desitnationScript = OutScript.encode(destinationAddress);
+          tx.addOutput({
+            script: desitnationScript,
+            amount: sendAmount,
+          });
+
+          // Get unsigned transaction hex
+          // Initialize deposit with unsigned transaction
+          console.log("Initializing deposit with unsigned transaction...");
+          const depositResult = await wallet.advancedDeposit(tx.hex);
+          console.log("Deposit initialization result:", depositResult);
+
+          // Now sign the transaction
+          console.log("Signing transaction...");
+          tx.sign(hexToBytes(privateKey));
+          tx.finalize();
+
+          const signedTxHex = hex.encode(tx.extract());
+
+          // Broadcast the signed transaction
+          const broadcastResponse = await fetch(
+            "https://regtest-mempool.dev.dev.sparkinfra.net/api/tx",
+            {
+              method: "POST",
+              headers: {
+                Authorization:
+                  "Basic " +
+                  Buffer.from("spark-sdk:mCMk1JqlBNtetUNy").toString("base64"),
+                "Content-Type": "text/plain",
+              },
+              body: signedTxHex,
+            },
+          );
+
+          if (!broadcastResponse.ok) {
+            const error = await broadcastResponse.text();
+            throw new Error(`Failed to broadcast transaction: ${error}`);
+          }
+
+          const txid = await broadcastResponse.text();
+          console.log("Transaction broadcast successful!", txid);
+        } catch (error: any) {
+          console.error("Error creating deposit:", error);
+          console.error("Error details:", error.message);
+        }
         break;
       case "getlatesttx":
         const latestTx = await getLatestDepositTxId(args[0]);
@@ -162,7 +320,7 @@ async function runCLI() {
           console.log("Please initialize a wallet first");
           break;
         }
-        const depositAddress = await wallet.getDepositAddress();
+        const depositAddress = await wallet.getSingleUseDepositAddress();
         console.log(depositAddress);
         break;
       case "getsparkaddress":

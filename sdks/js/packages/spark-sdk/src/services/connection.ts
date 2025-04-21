@@ -17,7 +17,9 @@ import {
   SparkAuthnServiceClient,
   SparkAuthnServiceDefinition,
 } from "../proto/spark_authn.js";
+import { isHermeticTest } from "../tests/test-util.js";
 import { SparkCallOptions } from "../types/grpc.js";
+import { Network } from "../utils/network.js";
 import { WalletConfigService } from "./config.js";
 
 // TODO: Some sort of client cleanup
@@ -44,7 +46,7 @@ export class ConnectionManager {
     );
   }
 
-  static async createMockClient(address: string): Promise<
+  async createMockClient(address: string): Promise<
     MockServiceClient & {
       close: () => void;
     }
@@ -55,14 +57,16 @@ export class ConnectionManager {
     return { ...client, close: () => channel.close() };
   }
 
-  // TODO: Web transport handles TLS differently, verify that we don't need to do anything
-  private static async createChannelWithTLS(
-    address: string,
-    certPath?: string,
-  ) {
+  private async createChannelWithTLS(address: string, certPath?: string) {
     try {
       if (isNode) {
         const { ChannelCredentials } = await import("nice-grpc");
+        const insecureCredentials =
+          this.config.getNetwork() === Network.LOCAL && !isHermeticTest()
+            ? ChannelCredentials.createInsecure()
+            : ChannelCredentials.createSsl(null, null, null, {
+                rejectUnauthorized: false,
+              });
         if (certPath) {
           try {
             // Dynamic import for Node.js only
@@ -72,21 +76,11 @@ export class ConnectionManager {
           } catch (error) {
             console.error("Error reading certificate:", error);
             // Fallback to insecure for development
-            return createChannel(
-              address,
-              ChannelCredentials.createSsl(null, null, null, {
-                rejectUnauthorized: false,
-              }),
-            );
+            return createChannel(address, insecureCredentials);
           }
         } else {
           // No cert provided, use insecure SSL for development
-          return createChannel(
-            address,
-            ChannelCredentials.createSsl(null, null, null, {
-              rejectUnauthorized: false,
-            }),
-          );
+          return createChannel(address, insecureCredentials);
         }
       } else {
         // Browser environment - nice-grpc-web handles TLS automatically
@@ -107,10 +101,7 @@ export class ConnectionManager {
     }
 
     const authToken = await this.authenticate(address);
-    const channel = await ConnectionManager.createChannelWithTLS(
-      address,
-      certPath,
-    );
+    const channel = await this.createChannelWithTLS(address, certPath);
 
     const authMiddleware = this.createAuthMiddleWare(address, authToken);
     const client = this.createGrpcClient<SparkServiceClient>(
@@ -165,10 +156,7 @@ export class ConnectionManager {
     address: string,
     certPath?: string,
   ): Promise<SparkAuthnServiceClient & { close?: () => void }> {
-    const channel = await ConnectionManager.createChannelWithTLS(
-      address,
-      certPath,
-    );
+    const channel = await this.createChannelWithTLS(address, certPath);
     return this.createGrpcClient<SparkAuthnServiceClient>(
       SparkAuthnServiceDefinition,
       channel,

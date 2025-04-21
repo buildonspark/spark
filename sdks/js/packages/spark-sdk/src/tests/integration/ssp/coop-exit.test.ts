@@ -14,7 +14,7 @@ describe("SSP coop exit integration", () => {
       },
     });
 
-    const depositAddress = await userWallet.getDepositAddress();
+    const depositAddress = await userWallet.getSingleUseDepositAddress();
     expect(depositAddress).toBeDefined();
 
     const signedTx = await faucet.sendToAddress(depositAddress, DEPOSIT_AMOUNT);
