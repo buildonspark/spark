@@ -1,5 +1,4 @@
 import {
-  LRCWallet,
   TokenPubkey,
   TokenPubkeyAnnouncement,
   TokenPubkeyInfo,
@@ -13,25 +12,14 @@ import { encodeSparkAddress } from "@buildonspark/spark-sdk/address";
 import { OutputWithPreviousTransactionData } from "@buildonspark/spark-sdk/proto/spark";
 import { ConfigOptions } from "@buildonspark/spark-sdk/services/wallet-config";
 import {
-  getMasterHDKeyFromSeed,
-  LRC_WALLET_NETWORK,
-  LRC_WALLET_NETWORK_TYPE,
-  Network,
-} from "@buildonspark/spark-sdk/utils";
-import {
   bytesToHex,
   bytesToNumberBE,
   hexToBytes,
 } from "@noble/curves/abstract/utils";
-import { validateMnemonic } from "@scure/bip39";
-import { wordlist } from "@scure/bip39/wordlists/english";
 import { TokenFreezeService } from "./services/freeze.js";
 import { IssuerTokenTransactionService } from "./services/token-transactions.js";
 import { GetTokenActivityResponse, TokenPubKeyInfoResponse } from "./types.js";
-import {
-  convertTokenActivityToHexEncoded,
-  convertToTokenPubKeyInfoResponse,
-} from "./utils/type-mappers.js";
+import { convertTokenActivityToHexEncoded } from "./utils/type-mappers.js";
 import { decodeSparkAddress } from "@buildonspark/spark-sdk/address";
 
 const BURN_ADDRESS = "02".repeat(33);
@@ -48,7 +36,6 @@ export type IssuerTokenInfo = {
 export class IssuerSparkWallet extends SparkWallet {
   private issuerTokenTransactionService: IssuerTokenTransactionService;
   private tokenFreezeService: TokenFreezeService;
-  private tokenPublicKeyInfo?: TokenPubkeyInfo;
 
   public static async initialize(options: SparkWalletProps) {
     const wallet = new IssuerSparkWallet(options.options);
@@ -256,16 +243,5 @@ export class IssuerSparkWallet extends SparkWallet {
     return await this.lrc20Wallet!.broadcastRawBtcTransaction(
       tx.bitcoin_tx.toHex(),
     );
-  }
-
-  public mintTokensL1(tokenAmount: bigint): Promise<string> {
-    throw new Error("Not implemented");
-  }
-
-  public transferTokensL1(
-    tokenAmount: bigint,
-    p2trAddress: string,
-  ): Promise<string> {
-    throw new Error("Not implemented");
   }
 }
