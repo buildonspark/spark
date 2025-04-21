@@ -1878,7 +1878,8 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@buildonspark/spark-cli@workspace:examples/spark-cli"
   dependencies:
-    "@buildonspark/spark-sdk": "npm:0.1.1"
+    "@buildonspark/issuer-sdk": "npm:^0.0.32"
+    "@buildonspark/spark-sdk": "npm:^0.1.1"
     "@types/node": "npm:^22.13.2"
     prettier: "npm:^3.5.1"
     tsx: "npm:^4.19.3"

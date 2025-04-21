@@ -1,4 +1,5 @@
-import { getLatestDepositTxId, SparkWallet } from "@buildonspark/spark-sdk";
+import { getLatestDepositTxId } from "@buildonspark/spark-sdk";
+import { IssuerSparkWallet } from "@buildonspark/issuer-sdk";
 import { ConfigOptions } from "@buildonspark/spark-sdk/services/wallet-config";
 import readline from "readline";
 
@@ -9,7 +10,7 @@ const walletMnemonic =
 async function runCLI() {
   // Get network from command line args
   const network = process.argv.includes("mainnet") ? "MAINNET" : "REGTEST";
-  let wallet: SparkWallet | undefined;
+  let wallet: IssuerSparkWallet | undefined;
 
   const rl = readline.createInterface({
     input: process.stdin,
@@ -35,11 +36,20 @@ async function runCLI() {
   getlightningreceiverequest <requestId>                              - Get a lightning receive request by ID
   getcoopexitrequest <requestId>                                      - Get a coop exit request by ID
   sendtokentransfer <tokenPubKey> <amount> <receiverSparkAddress>     - Transfer tokens
+
+  Token Issuer Commands:
+  getissuertokenbalance                                               - Get the issuer's token balance
+  getissuertokeninfo                                                  - Get the issuer's token information
+  getissuertokenpublickey                                             - Get the issuer's token public key
+  minttokens <amount>                                                 - Mint new tokens
+  burntokens <amount>                                                 - Burn tokens
+  freezetokens <sparkAddress>                                         - Freeze tokens for a specific address
+  unfreezetokens <sparkAddress>                                       - Unfreeze tokens for a specific address
+  getissuertokenactivity                                              - Get issuer's token activity
+  announcetoken <tokenName> <tokenTicker> <decimals> <maxSupply> <isFreezable> - Announce token on L1
+
   help                                                                - Show this help message
   exit/quit                                                           - Exit the program
-
-  L1 commands:
-  tokenwithdraw <tokenPublicKey> [tokenAmount] - Unilaterally withdraw tokens to L1
 `;
   console.log(helpMessage);
 
@@ -122,7 +132,7 @@ async function runCLI() {
           network: "REGTEST",
         };
         const { wallet: newWallet, mnemonic: newMnemonic } =
-          await SparkWallet.initialize({
+          await IssuerSparkWallet.initialize({
             mnemonicOrSeed,
             options,
           });
@@ -270,6 +280,120 @@ async function runCLI() {
           amountSats: parseInt(args[0]),
         });
         console.log(fee);
+        break;
+      }
+      case "getissuertokenbalance": {
+        if (!wallet) {
+          console.log("Please initialize a wallet first");
+          break;
+        }
+        const balance = await wallet.getIssuerTokenBalance();
+        console.log("Issuer Token Balance:", balance.balance.toString());
+        break;
+      }
+      case "getissuertokeninfo": {
+        if (!wallet) {
+          console.log("Please initialize a wallet first");
+          break;
+        }
+        const info = await wallet.getIssuerTokenInfo();
+        if (info) {
+          console.log("Token Info:", {
+            tokenPublicKey: info.tokenPublicKey,
+            tokenName: info.tokenName,
+            tokenSymbol: info.tokenSymbol,
+            tokenDecimals: info.tokenDecimals,
+            maxSupply: info.maxSupply.toString(),
+            isFreezable: info.isFreezable,
+          });
+        } else {
+          console.log("No token info found");
+        }
+        break;
+      }
+      case "getissuertokenpublickey": {
+        if (!wallet) {
+          console.log("Please initialize a wallet first");
+          break;
+        }
+        const pubKey = await wallet.getIssuerTokenPublicKey();
+        console.log("Issuer Token Public Key:", pubKey);
+        break;
+      }
+      case "minttokens": {
+        if (!wallet) {
+          console.log("Please initialize a wallet first");
+          break;
+        }
+        const amount = BigInt(parseInt(args[0]));
+        const result = await wallet.mintTokens(amount);
+        console.log("Mint Transaction ID:", result);
+        break;
+      }
+      case "burntokens": {
+        if (!wallet) {
+          console.log("Please initialize a wallet first");
+          break;
+        }
+        const amount = BigInt(parseInt(args[0]));
+        const result = await wallet.burnTokens(amount);
+        console.log("Burn Transaction ID:", result);
+        break;
+      }
+      case "freezetokens": {
+        if (!wallet) {
+          console.log("Please initialize a wallet first");
+          break;
+        }
+        const result = await wallet.freezeTokens(args[0]);
+        console.log("Freeze Result:", {
+          impactedOutputIds: result.impactedOutputIds,
+          impactedTokenAmount: result.impactedTokenAmount.toString(),
+        });
+        break;
+      }
+      case "unfreezetokens": {
+        if (!wallet) {
+          console.log("Please initialize a wallet first");
+          break;
+        }
+        const result = await wallet.unfreezeTokens(args[0]);
+        console.log("Unfreeze Result:", {
+          impactedOutputIds: result.impactedOutputIds,
+          impactedTokenAmount: result.impactedTokenAmount.toString(),
+        });
+        break;
+      }
+      case "getissuertokenactivity": {
+        if (!wallet) {
+          console.log("Please initialize a wallet first");
+          break;
+        }
+
+        const result = await wallet.getTokenActivity();
+        console.log("Token Activity:", result.transactions);
+        break;
+      }
+      case "announcetoken": {
+        if (!wallet) {
+          console.log("Please initialize a wallet first");
+          break;
+        }
+        if (args.length < 5) {
+          console.log(
+            "Usage: announcetoken <tokenName> <tokenTicker> <decimals> <maxSupply> <isFreezable>",
+          );
+          break;
+        }
+        const [tokenName, tokenTicker, decimals, maxSupply, isFreezable] = args;
+        const result = await wallet.announceTokenL1({
+          tokenName,
+          tokenTicker,
+          decimals: parseInt(decimals),
+          maxSupply: BigInt(maxSupply),
+          isFreezable: isFreezable.toLowerCase() === "true",
+        });
+        console.log("Token Announcement Transaction ID:", result);
         break;
       }
     }
