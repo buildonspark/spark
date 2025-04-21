@@ -436,7 +436,7 @@ func ClaimTransfer(
 		var err error
 		proofMap, err = ClaimTransferTweakKeys(ctx, transfer, config, leaves)
 		if err != nil {
-			return nil, fmt.Errorf("failed to tweak keys when claiming leaves: %v", err)
+			return nil, fmt.Errorf("failed to tweak keys when claiming leaves: %w", err)
 		}
 	}
 
@@ -485,7 +485,7 @@ func ClaimTransferTweakKeys(
 				LeavesToReceive:        (*leavesTweaksMap)[identifier],
 			})
 			if err != nil {
-				results <- fmt.Errorf("failed to call ClaimTransferTweakKeys: %v", err)
+				results <- fmt.Errorf("failed to call ClaimTransferTweakKeys: %w", err)
 			}
 		}(identifier, operator)
 	}

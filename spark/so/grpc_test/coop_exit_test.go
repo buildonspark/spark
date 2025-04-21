@@ -16,6 +16,8 @@ import (
 	"github.com/lightsparkdev/spark-go/wallet"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func setupUsers(t *testing.T, amountSats int64) (*wallet.Config, *wallet.Config, wallet.LeafKeyTweak) {
@@ -82,6 +84,25 @@ func createTestCoopExitAndConnectorOutputs(
 	return exitTx, connectorOutputs
 }
 
+func waitForPendingTransferToConfirm(
+	ctx context.Context,
+	t *testing.T,
+	config *wallet.Config,
+) *spark.Transfer {
+	pendingTransfer, err := wallet.QueryPendingTransfers(ctx, config)
+	assert.NoError(t, err)
+	startTime := time.Now()
+	for len(pendingTransfer.Transfers) == 0 {
+		if time.Since(startTime) > 10*time.Second {
+			t.Fatalf("timed out waiting for key to be tweaked from tx confirmation")
+		}
+		time.Sleep(100 * time.Millisecond)
+		pendingTransfer, err = wallet.QueryPendingTransfers(ctx, config)
+		assert.NoError(t, err)
+	}
+	return pendingTransfer.Transfers[0]
+}
+
 func TestCoopExitBasic(t *testing.T) {
 	client, err := testutil.NewRegtestClient()
 	assert.NoError(t, err)
@@ -137,18 +158,7 @@ func TestCoopExitBasic(t *testing.T) {
 	assert.NoError(t, err)
 	sspCtx := wallet.ContextWithToken(context.Background(), sspToken)
 
-	pendingTransfer, err := wallet.QueryPendingTransfers(sspCtx, sspConfig)
-	assert.NoError(t, err)
-	startTime := time.Now()
-	for len(pendingTransfer.Transfers) == 0 {
-		if time.Since(startTime) > 10*time.Second {
-			t.Fatalf("timed out waiting for key to be tweaked from tx confirmation")
-		}
-		time.Sleep(100 * time.Millisecond)
-		pendingTransfer, err = wallet.QueryPendingTransfers(sspCtx, sspConfig)
-		assert.NoError(t, err)
-	}
-	receiverTransfer := pendingTransfer.Transfers[0]
+	receiverTransfer := waitForPendingTransferToConfirm(sspCtx, t, sspConfig)
 	assert.Equal(t, receiverTransfer.Id, senderTransfer.Id)
 	assert.Equal(t, receiverTransfer.Status, spark.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED)
 	require.Equal(t, receiverTransfer.Type, spark.TransferType_COOPERATIVE_EXIT)
@@ -169,7 +179,7 @@ func TestCoopExitBasic(t *testing.T) {
 		NewSigningPrivKey: finalLeafPrivKey.Serialize(),
 	}
 	leavesToClaim := [1]wallet.LeafKeyTweak{claimingNode}
-	startTime = time.Now()
+	startTime := time.Now()
 	for {
 		_, err = wallet.ClaimTransfer(
 			sspCtx,
@@ -185,6 +195,81 @@ func TestCoopExitBasic(t *testing.T) {
 			t.Fatalf("timed out waiting for tx to confirm")
 		}
 	}
+}
+
+func TestCoopExitCannotClaimBeforeEnoughConfirmations(t *testing.T) {
+	client, err := testutil.NewRegtestClient()
+	assert.NoError(t, err)
+
+	coin, err := faucet.Fund()
+	assert.NoError(t, err)
+
+	amountSats := int64(100_000)
+	config, sspConfig, transferNode := setupUsers(t, amountSats)
+
+	// SSP creates transactions
+	withdrawPrivKey, err := secp256k1.GeneratePrivateKey()
+	assert.NoError(t, err)
+	exitTx, connectorOutputs := createTestCoopExitAndConnectorOutputs(
+		t, sspConfig, 1, coin.OutPoint, withdrawPrivKey.PubKey(), amountSats,
+	)
+
+	// User creates transfer to SSP on the condition that the tx is confirmed
+	exitTxID, err := hex.DecodeString(exitTx.TxID())
+	assert.NoError(t, err)
+	_, _, err = wallet.GetConnectorRefundSignatures(
+		context.Background(),
+		config,
+		[]wallet.LeafKeyTweak{transferNode},
+		exitTxID,
+		connectorOutputs,
+		sspConfig.IdentityPrivateKey.PubKey(),
+		time.Now().Add(24*time.Hour),
+	)
+	assert.NoError(t, err)
+
+	// SSP signs exit tx and broadcasts
+	signedExitTx, err := testutil.SignFaucetCoin(exitTx, coin.TxOut, coin.Key)
+	assert.NoError(t, err)
+
+	_, err = client.SendRawTransaction(signedExitTx, true)
+	assert.NoError(t, err)
+
+	randomKey, err := secp256k1.GeneratePrivateKey()
+	assert.NoError(t, err)
+	randomPubKey := randomKey.PubKey()
+	randomAddress, err := common.P2TRRawAddressFromPublicKey(randomPubKey.SerializeCompressed(), common.Regtest)
+	assert.NoError(t, err)
+	// Confirm half the threshold
+	_, err = client.GenerateToAddress(handler.CoopExitConfirmationThreshold/2, randomAddress, nil)
+	assert.NoError(t, err)
+
+	// Wait until tx is confirmed and picked up by SO
+	sspToken, err := wallet.AuthenticateWithServer(context.Background(), sspConfig)
+	assert.NoError(t, err)
+	sspCtx := wallet.ContextWithToken(context.Background(), sspToken)
+
+	receiverTransfer := waitForPendingTransferToConfirm(sspCtx, t, sspConfig)
+
+	// Try to claim leaf before exit tx confirms -> should fail
+	finalLeafPrivKey, err := secp256k1.GeneratePrivateKey()
+	assert.NoError(t, err)
+	claimingNode := wallet.LeafKeyTweak{
+		Leaf:              receiverTransfer.Leaves[0].Leaf,
+		SigningPrivKey:    sspConfig.IdentityPrivateKey.Serialize(),
+		NewSigningPrivKey: finalLeafPrivKey.Serialize(),
+	}
+	leavesToClaim := [1]wallet.LeafKeyTweak{claimingNode}
+	_, err = wallet.ClaimTransfer(
+		sspCtx,
+		receiverTransfer,
+		sspConfig,
+		leavesToClaim[:],
+	)
+	require.Error(t, err, "expected error claiming transfer before exit tx confirms")
+	stat, ok := status.FromError(err)
+	require.True(t, ok)
+	require.Equal(t, stat.Code(), codes.FailedPrecondition)
 }
 
 func TestCoopExitCannotClaimBeforeConfirm(t *testing.T) {
@@ -230,15 +315,16 @@ func TestCoopExitCannotClaimBeforeConfirm(t *testing.T) {
 	assert.NoError(t, err)
 	sspCtx := wallet.ContextWithToken(context.Background(), sspToken)
 	leavesToClaim := [1]wallet.LeafKeyTweak{claimingNode}
-	_, err = wallet.ClaimTransfer(
+	_, err = wallet.ClaimTransferTweakKeys(
 		sspCtx,
 		senderTransfer,
 		sspConfig,
 		leavesToClaim[:],
 	)
-	if err == nil {
-		t.Fatalf("expected error claiming transfer before exit tx confirms")
-	}
+	require.Error(t, err, "expected error claiming transfer before exit tx confirms")
+	stat, ok := status.FromError(err)
+	require.True(t, ok)
+	require.Equal(t, stat.Code(), codes.FailedPrecondition)
 }
 
 // Start coop exit, SSP doesn't broadcast, should be able to cancel after expiry

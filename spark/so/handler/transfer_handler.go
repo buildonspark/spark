@@ -24,6 +24,7 @@ import (
 	enttransfer "github.com/lightsparkdev/spark-go/so/ent/transfer"
 	enttransferleaf "github.com/lightsparkdev/spark-go/so/ent/transferleaf"
 	enttreenode "github.com/lightsparkdev/spark-go/so/ent/treenode"
+	"github.com/lightsparkdev/spark-go/so/errors"
 	"github.com/lightsparkdev/spark-go/so/helper"
 	"github.com/lightsparkdev/spark-go/so/objects"
 	events "github.com/lightsparkdev/spark-go/so/stream"
@@ -495,10 +496,10 @@ func checkCoopExitTxBroadcasted(ctx context.Context, db *ent.Tx, transfer *ent.T
 		return fmt.Errorf("failed to find block height: %v", err)
 	}
 	if coopExit.ConfirmationHeight == 0 {
-		return fmt.Errorf("coop exit tx hasn't been broadcasted")
+		return errors.FailedPreconditionErrorf("coop exit tx hasn't been broadcasted")
 	}
 	if coopExit.ConfirmationHeight+CoopExitConfirmationThreshold-1 > blockHeight.Height {
-		return fmt.Errorf("coop exit tx doesn't have enough confirmations: confirmation height: %d current block height: %d", coopExit.ConfirmationHeight, blockHeight.Height)
+		return errors.FailedPreconditionErrorf("coop exit tx doesn't have enough confirmations: confirmation height: %d current block height: %d", coopExit.ConfirmationHeight, blockHeight.Height)
 	}
 	return nil
 }
@@ -517,12 +518,12 @@ func (h *TransferHandler) ClaimTransferTweakKeys(ctx context.Context, req *pb.Cl
 		return fmt.Errorf("cannot claim transfer %s, receiver identity public key mismatch", req.TransferId)
 	}
 	if transfer.Status != schema.TransferStatusSenderKeyTweaked && transfer.Status != schema.TransferStatusReceiverKeyTweaked {
-		return fmt.Errorf("transfer cannot be claimed %s, status: %s", req.TransferId, transfer.Status)
+		return errors.FailedPreconditionErrorf("transfer cannot be claimed %s, status: %s", req.TransferId, transfer.Status)
 	}
 
 	db := ent.GetDbFromContext(ctx)
 	if err := checkCoopExitTxBroadcasted(ctx, db, transfer); err != nil {
-		return fmt.Errorf("failed to unlock transfer %s: %v", req.TransferId, err)
+		return fmt.Errorf("failed to unlock transfer %s: %w", req.TransferId, err)
 	}
 
 	// Validate leaves count

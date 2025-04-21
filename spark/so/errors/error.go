@@ -76,3 +76,7 @@ func toGRPCError(err error) error {
 func InvalidUserInputErrorf(format string, args ...any) error {
 	return newGRPCError(codes.InvalidArgument, fmt.Errorf(format, args...))
 }
+
+func FailedPreconditionErrorf(format string, args ...any) error {
+	return newGRPCError(codes.FailedPrecondition, fmt.Errorf(format, args...))
+}
