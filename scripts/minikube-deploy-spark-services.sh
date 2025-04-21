@@ -15,7 +15,7 @@ source "$(dirname "$0")/lightspark-helm.sh"
 : "${HELM_INSTALL_TIMEOUT:=2m0s}"
 : "${SPARK_TAG:=latest}"
 : "${LRC20_TAG:=latest}"
-: "${LRC20_REPLICAS:=3}"
+: "${LRC20_REPLICAS:=1}"
 # shellcheck disable=SC2119
 HELM_REPO_PREFIX=$(get_helm_prefix)
 
@@ -192,7 +192,7 @@ operator_cmd+=(
 helm install \
     --timeout "$HELM_INSTALL_TIMEOUT" \
     --namespace lrc20 \
-    --set replicas=$LRC20_REPLICAS \
+    --set replicas="$LRC20_REPLICAS" \
     --set config.network="regtest" \
     --set image.tag="$LRC20_TAG" \
     --set config.database_url="postgresql://postgres@postgres.default:5432/lrc20_\${INDEX}" \
