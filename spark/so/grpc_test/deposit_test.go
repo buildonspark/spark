@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
+	"fmt"
 	"log"
+	"sync"
 	"testing"
 	"time"
 
@@ -63,6 +65,61 @@ func TestGenerateDepositAddress(t *testing.T) {
 
 	if !bytes.Equal(unusedDepositAddresses.DepositAddresses[0].VerifyingPublicKey, resp.DepositAddress.VerifyingKey) {
 		t.Fatalf("expected verifying public key to be %s, got %s", hex.EncodeToString(resp.DepositAddress.VerifyingKey), hex.EncodeToString(unusedDepositAddresses.DepositAddresses[0].VerifyingPublicKey))
+	}
+}
+
+func TestGenerateDepositAddressConcurrentRequests(t *testing.T) {
+	config, err := testutil.TestWalletConfig()
+	if err != nil {
+		t.Fatalf("failed to create wallet config: %v", err)
+	}
+
+	token, err := wallet.AuthenticateWithServer(context.Background(), config)
+	if err != nil {
+		t.Fatalf("failed to authenticate: %v", err)
+	}
+	ctx := wallet.ContextWithToken(context.Background(), token)
+
+	pubkey, err := hex.DecodeString("0330d50fd2e26d274e15f3dcea34a8bb611a9d0f14d1a9b1211f3608b3b7cd56c7")
+	if err != nil {
+		t.Fatalf("failed to decode public key: %v", err)
+	}
+
+	wg := sync.WaitGroup{}
+	resultChannel := make(chan string, 5)
+	errChannel := make(chan error, 5)
+
+	for range 5 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			resp, err := wallet.GenerateDepositAddress(ctx, config, pubkey, "")
+			if err != nil {
+				errChannel <- err
+				return
+			}
+			if resp.DepositAddress.Address == "" {
+				errChannel <- fmt.Errorf("deposit address is empty")
+				return
+			}
+
+			resultChannel <- resp.DepositAddress.Address
+		}()
+	}
+
+	wg.Wait()
+
+	addresses := make(map[string]bool)
+	for range 5 {
+		select {
+		case err := <-errChannel:
+			t.Errorf("failed to generate deposit address: %v", err)
+		case resp := <-resultChannel:
+			if _, found := addresses[resp]; found {
+				t.Errorf("duplicate deposit address generated: %s", resp)
+			}
+			addresses[resp] = true
+		}
 	}
 }
 
