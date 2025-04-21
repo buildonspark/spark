@@ -1695,7 +1695,7 @@ export class SparkWallet {
     );
   }
 
-  public async getTokenTransactions(
+  public async queryTokenTransactions(
     tokenPublicKeys: string[],
     tokenTransactionHashes?: string[],
   ): Promise<TokenTransactionWithStatus[]> {

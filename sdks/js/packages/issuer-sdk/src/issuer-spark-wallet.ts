@@ -18,7 +18,7 @@ import {
 } from "@noble/curves/abstract/utils";
 import { TokenFreezeService } from "./services/freeze.js";
 import { IssuerTokenTransactionService } from "./services/token-transactions.js";
-import { GetTokenActivityResponse, TokenPubKeyInfoResponse } from "./types.js";
+import { GetTokenActivityResponse, TokenDistribution } from "./types.js";
 import { convertTokenActivityToHexEncoded } from "./utils/type-mappers.js";
 import { decodeSparkAddress } from "@buildonspark/spark-sdk/address";
 
@@ -91,10 +91,6 @@ export class IssuerSparkWallet extends SparkWallet {
       isFreezable: info.announcement!.isFreezable,
       maxSupply: bytesToNumberBE(info.totalSupply),
     };
-  }
-
-  public async getIssuerTokenPublicKey() {
-    return await super.getIdentityPublicKey();
   }
 
   public async mintTokens(tokenAmount: bigint): Promise<string> {
@@ -171,7 +167,7 @@ export class IssuerSparkWallet extends SparkWallet {
     };
   }
 
-  public async getTokenActivity(
+  public async getIssuerTokenActivity(
     pageSize: number = 100,
     cursor?: ListAllTokenTransactionsCursor,
     operationTypes?: OperationType[],
@@ -192,26 +188,8 @@ export class IssuerSparkWallet extends SparkWallet {
     return convertTokenActivityToHexEncoded(transactions);
   }
 
-  public async getIssuerTokenActivity(
-    pageSize: number = 100,
-    cursor?: ListAllTokenTransactionsCursor,
-    operationTypes?: OperationType[],
-    beforeTimestamp?: Date,
-    afterTimestamp?: Date,
-  ): Promise<GetTokenActivityResponse> {
-    const lrc20Client = await this.lrc20ConnectionManager.createLrc20Client();
-
-    const transactions = await lrc20Client.listTransactions({
-      tokenPublicKey: hexToBytes(await super.getIdentityPublicKey()),
-      ownerPublicKey: hexToBytes(await super.getIdentityPublicKey()),
-      cursor,
-      pageSize,
-      beforeTimestamp,
-      afterTimestamp,
-      operationTypes,
-    });
-
-    return convertTokenActivityToHexEncoded(transactions);
+  public async getIssuerTokenDistribution(): Promise<TokenDistribution> {
+    throw new Error("Not implemented");
   }
 
   public async announceTokenL1({

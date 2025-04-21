@@ -21,8 +21,8 @@ describe("token integration test", () => {
 
     await wallet.mintTokens(tokenAmount);
 
-    const tokenBalance = await wallet.getIssuerTokenBalance();
-    expect(tokenBalance.balance).toEqual(tokenAmount);
+    const tokenBalance = (await wallet.getIssuerTokenBalance()).balance;
+    expect(tokenBalance).toEqual(tokenAmount);
   });
 
   it("should issue a single token with Schnorr", async () => {
@@ -33,8 +33,8 @@ describe("token integration test", () => {
 
     await wallet.mintTokens(tokenAmount);
 
-    const tokenBalance = await wallet.getIssuerTokenBalance();
-    expect(tokenBalance.balance).toEqual(tokenAmount);
+    const tokenBalance = (await wallet.getIssuerTokenBalance()).balance;
+    expect(tokenBalance).toEqual(tokenAmount);
   });
 
   brokenTestFn("should announce and issue a single token", async () => {
@@ -86,8 +86,8 @@ describe("token integration test", () => {
 
     await wallet.mintTokens(tokenAmount);
 
-    const sourceBalance = await wallet.getIssuerTokenBalance();
-    expect(sourceBalance.balance).toEqual(tokenAmount);
+    const sourceBalance = (await wallet.getIssuerTokenBalance()).balance;
+    expect(sourceBalance).toEqual(tokenAmount);
 
     const tokenInfo = await wallet.getTokenInfo();
     expect(tokenInfo[0].tokenName).toEqual("TestToken1");
@@ -113,8 +113,8 @@ describe("token integration test", () => {
       tokenPublicKey: await issuerWallet.getIdentityPublicKey(),
       receiverSparkAddress: await destinationWallet.getSparkAddress(),
     });
-    const sourceBalance = await issuerWallet.getIssuerTokenBalance();
-    expect(sourceBalance.balance).toEqual(0n);
+    const sourceBalance = (await issuerWallet.getIssuerTokenBalance()).balance;
+    expect(sourceBalance).toEqual(0n);
 
     const tokenPublicKey = await issuerWallet.getIdentityPublicKey();
     const balanceObj = await destinationWallet.getBalance();
@@ -142,8 +142,8 @@ describe("token integration test", () => {
       tokenPublicKey: await issuerWallet.getIdentityPublicKey(),
       receiverSparkAddress: await destinationWallet.getSparkAddress(),
     });
-    const sourceBalance = await issuerWallet.getIssuerTokenBalance();
-    expect(sourceBalance.balance).toEqual(0n);
+    const sourceBalance = (await issuerWallet.getIssuerTokenBalance()).balance;
+    expect(sourceBalance).toEqual(0n);
 
     const tokenPublicKey = await issuerWallet.getIdentityPublicKey();
     const balanceObj = await destinationWallet.getBalance();
@@ -154,7 +154,7 @@ describe("token integration test", () => {
     expect(destinationBalance.balance).toEqual(tokenAmount);
 
     const issuerOperations = await issuerWallet.getIssuerTokenActivity();
-    expect(issuerOperations.transactions.length).toBe(1);
+    expect(issuerOperations.transactions.length).toBe(2);
     const issuerOperationTx = issuerOperations.transactions[0].transaction;
     expect(issuerOperationTx?.$case).toBe("spark");
     if (issuerOperationTx?.$case === "spark") {
@@ -179,8 +179,8 @@ describe("token integration test", () => {
       tokenAmount,
       receiverSparkAddress: await destinationWallet.getSparkAddress(),
     });
-    const sourceBalance = await issuerWallet.getIssuerTokenBalance();
-    expect(sourceBalance.balance).toEqual(0n);
+    const sourceBalance = (await issuerWallet.getIssuerTokenBalance()).balance;
+    expect(sourceBalance).toEqual(0n);
     const tokenPublicKey = await issuerWallet.getIdentityPublicKey();
     const balanceObj = await destinationWallet.getBalance();
     const destinationBalance = filterTokenBalanceForTokenPublicKey(
@@ -199,8 +199,9 @@ describe("token integration test", () => {
     await issuerWallet.mintTokens(tokenAmount);
 
     // Check issuer balance after minting
-    const issuerBalanceAfterMint = await issuerWallet.getIssuerTokenBalance();
-    expect(issuerBalanceAfterMint.balance).toEqual(tokenAmount);
+    const issuerBalanceAfterMint = (await issuerWallet.getIssuerTokenBalance())
+      .balance;
+    expect(issuerBalanceAfterMint).toEqual(tokenAmount);
 
     const { wallet: userWallet } = await SparkWallet.initialize({
       options: LOCAL_WALLET_CONFIG_ECDSA,
@@ -212,9 +213,10 @@ describe("token integration test", () => {
       tokenPublicKey: await issuerWallet.getIdentityPublicKey(),
       receiverSparkAddress: userWalletPublicKey,
     });
-    const issuerBalanceAfterTransfer =
-      await issuerWallet.getIssuerTokenBalance();
-    expect(issuerBalanceAfterTransfer.balance).toEqual(0n);
+    const issuerBalanceAfterTransfer = (
+      await issuerWallet.getIssuerTokenBalance()
+    ).balance;
+    expect(issuerBalanceAfterTransfer).toEqual(0n);
 
     const tokenPublicKey = await issuerWallet.getIdentityPublicKey();
     const userBalanceObj = await userWallet.getBalance();
@@ -244,8 +246,9 @@ describe("token integration test", () => {
     await issuerWallet.mintTokens(tokenAmount);
 
     // Check issuer balance after minting
-    const issuerBalanceAfterMint = await issuerWallet.getIssuerTokenBalance();
-    expect(issuerBalanceAfterMint.balance).toEqual(tokenAmount);
+    const issuerBalanceAfterMint = (await issuerWallet.getIssuerTokenBalance())
+      .balance;
+    expect(issuerBalanceAfterMint).toEqual(tokenAmount);
 
     const { wallet: userWallet } = await SparkWallet.initialize({
       options: LOCAL_WALLET_CONFIG_SCHNORR,
@@ -258,9 +261,10 @@ describe("token integration test", () => {
       receiverSparkAddress: userWalletPublicKey,
     });
 
-    const issuerBalanceAfterTransfer =
-      await issuerWallet.getIssuerTokenBalance();
-    expect(issuerBalanceAfterTransfer.balance).toEqual(0n);
+    const issuerBalanceAfterTransfer = (
+      await issuerWallet.getIssuerTokenBalance()
+    ).balance;
+    expect(issuerBalanceAfterTransfer).toEqual(0n);
 
     const tokenPublicKey = await issuerWallet.getIdentityPublicKey();
     const userBalanceObj = await userWallet.getBalance();
@@ -287,14 +291,16 @@ describe("token integration test", () => {
     });
     await issuerWallet.mintTokens(tokenAmount);
 
-    const issuerTokenBalance = await issuerWallet.getIssuerTokenBalance();
-    expect(issuerTokenBalance.balance).toEqual(tokenAmount);
+    const issuerTokenBalance = (await issuerWallet.getIssuerTokenBalance())
+      .balance;
+    expect(issuerTokenBalance).toEqual(tokenAmount);
 
     await issuerWallet.burnTokens(tokenAmount);
 
-    const issuerTokenBalanceAfterBurn =
-      await issuerWallet.getIssuerTokenBalance();
-    expect(issuerTokenBalanceAfterBurn.balance).toEqual(0n);
+    const issuerTokenBalanceAfterBurn = (
+      await issuerWallet.getIssuerTokenBalance()
+    ).balance;
+    expect(issuerTokenBalanceAfterBurn).toEqual(0n);
   });
 
   it("should burn tokens with Schnorr", async () => {
@@ -304,14 +310,16 @@ describe("token integration test", () => {
     });
     await issuerWallet.mintTokens(tokenAmount);
 
-    const issuerTokenBalance = await issuerWallet.getIssuerTokenBalance();
-    expect(issuerTokenBalance.balance).toEqual(tokenAmount);
+    const issuerTokenBalance = (await issuerWallet.getIssuerTokenBalance())
+      .balance;
+    expect(issuerTokenBalance).toEqual(tokenAmount);
 
     await issuerWallet.burnTokens(tokenAmount);
 
-    const issuerTokenBalanceAfterBurn =
-      await issuerWallet.getIssuerTokenBalance();
-    expect(issuerTokenBalanceAfterBurn.balance).toEqual(0n);
+    const issuerTokenBalanceAfterBurn = (
+      await issuerWallet.getIssuerTokenBalance()
+    ).balance;
+    expect(issuerTokenBalanceAfterBurn).toEqual(0n);
   });
 
   it("mint, transfer to user, user transfer to issuer, burn with ECDSA", async () => {
@@ -327,8 +335,9 @@ describe("token integration test", () => {
 
     await issuerWallet.mintTokens(tokenAmount);
 
-    const issuerBalanceAfterMint = await issuerWallet.getIssuerTokenBalance();
-    expect(issuerBalanceAfterMint.balance).toEqual(tokenAmount);
+    const issuerBalanceAfterMint = (await issuerWallet.getIssuerTokenBalance())
+      .balance;
+    expect(issuerBalanceAfterMint).toEqual(tokenAmount);
 
     const userWalletPublicKey = await userWallet.getSparkAddress();
 
@@ -338,9 +347,10 @@ describe("token integration test", () => {
       receiverSparkAddress: userWalletPublicKey,
     });
 
-    const issuerBalanceAfterTransfer =
-      await issuerWallet.getIssuerTokenBalance();
-    expect(issuerBalanceAfterTransfer.balance).toEqual(0n);
+    const issuerBalanceAfterTransfer = (
+      await issuerWallet.getIssuerTokenBalance()
+    ).balance;
+    expect(issuerBalanceAfterTransfer).toEqual(0n);
     const tokenPublicKeyHex = await issuerWallet.getIdentityPublicKey();
     const userWalletPublicKeyHex = await userWallet.getSparkAddress();
     const userBalanceObj = await userWallet.getBalance();
@@ -363,12 +373,14 @@ describe("token integration test", () => {
 
     expect(userBalanceAfterTransferBack.balance).toEqual(0n);
 
-    const issuerTokenBalance = await issuerWallet.getIssuerTokenBalance();
-    expect(issuerTokenBalance.balance).toEqual(tokenAmount);
+    const issuerTokenBalance = (await issuerWallet.getIssuerTokenBalance())
+      .balance;
+    expect(issuerTokenBalance).toEqual(tokenAmount);
     await issuerWallet.burnTokens(tokenAmount);
-    const issuerTokenBalanceAfterBurn =
-      await issuerWallet.getIssuerTokenBalance();
-    expect(issuerTokenBalanceAfterBurn.balance).toEqual(0n);
+    const issuerTokenBalanceAfterBurn = (
+      await issuerWallet.getIssuerTokenBalance()
+    ).balance;
+    expect(issuerTokenBalanceAfterBurn).toEqual(0n);
   });
 
   it("mint, transfer to user, user transfer to issuer, burn with Schnorr", async () => {
@@ -385,8 +397,9 @@ describe("token integration test", () => {
     const tokenPublicKey = await issuerWallet.getIdentityPublicKey();
     await issuerWallet.mintTokens(tokenAmount);
 
-    const issuerBalanceAfterMint = await issuerWallet.getIssuerTokenBalance();
-    expect(issuerBalanceAfterMint.balance).toEqual(tokenAmount);
+    const issuerBalanceAfterMint = (await issuerWallet.getIssuerTokenBalance())
+      .balance;
+    expect(issuerBalanceAfterMint).toEqual(tokenAmount);
 
     const userWalletPublicKey = await userWallet.getSparkAddress();
 
@@ -396,9 +409,10 @@ describe("token integration test", () => {
       receiverSparkAddress: userWalletPublicKey,
     });
 
-    const issuerBalanceAfterTransfer =
-      await issuerWallet.getIssuerTokenBalance();
-    expect(issuerBalanceAfterTransfer.balance).toEqual(0n);
+    const issuerBalanceAfterTransfer = (
+      await issuerWallet.getIssuerTokenBalance()
+    ).balance;
+    expect(issuerBalanceAfterTransfer).toEqual(0n);
 
     const tokenPublicKeyHex = await issuerWallet.getIdentityPublicKey();
     const userBalanceObj = await userWallet.getBalance();
@@ -421,13 +435,15 @@ describe("token integration test", () => {
     );
     expect(userBalanceAfterTransferBack.balance).toEqual(0n);
 
-    const issuerTokenBalance = await issuerWallet.getIssuerTokenBalance();
-    expect(issuerTokenBalance.balance).toEqual(tokenAmount);
+    const issuerTokenBalance = (await issuerWallet.getIssuerTokenBalance())
+      .balance;
+    expect(issuerTokenBalance).toEqual(tokenAmount);
 
     await issuerWallet.burnTokens(tokenAmount);
 
-    const issuerTokenBalanceAfterBurn =
-      await issuerWallet.getIssuerTokenBalance();
-    expect(issuerTokenBalanceAfterBurn.balance).toEqual(0n);
+    const issuerTokenBalanceAfterBurn = (
+      await issuerWallet.getIssuerTokenBalance()
+    ).balance;
+    expect(issuerTokenBalanceAfterBurn).toEqual(0n);
   });
 });

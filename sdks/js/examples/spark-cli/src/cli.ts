@@ -316,7 +316,7 @@ async function runCLI() {
           console.log("Please initialize a wallet first");
           break;
         }
-        const pubKey = await wallet.getIssuerTokenPublicKey();
+        const pubKey = await wallet.getIdentityPublicKey();
         console.log("Issuer Token Public Key:", pubKey);
         break;
       }
@@ -370,7 +370,7 @@ async function runCLI() {
           break;
         }
 
-        const result = await wallet.getTokenActivity();
+        const result = await wallet.getIssuerTokenActivity();
         console.log("Token Activity:", result.transactions);
         break;
       }

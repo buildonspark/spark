@@ -109,3 +109,11 @@ export interface ListAllTokenTransactionsCursor {
   lastTransactionHash: string;
   layer: LayerType;
 }
+
+export interface TokenDistribution {
+  totalCirculatingSupply: bigint;
+  totalIssued: bigint;
+  totalBurned: bigint;
+  numHoldingAddress: number;
+  numConfirmedTransactions: bigint;
+}

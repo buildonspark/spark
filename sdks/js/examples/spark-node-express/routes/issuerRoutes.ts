@@ -27,7 +27,7 @@ router.get(
     try {
       const balance = await wallet!.getIssuerTokenBalance();
       res.json({
-        data: { balance: balance.balance },
+        data: { balance: balance },
       });
     } catch (error) {
       console.error(error);
@@ -104,7 +104,7 @@ router.get(
           }
         : undefined;
     try {
-      const tokenActivity = await wallet!.getTokenActivity(
+      const tokenActivity = await wallet!.getIssuerTokenActivity(
         Number(pageSize),
         cursor ? cursor : undefined
       );
