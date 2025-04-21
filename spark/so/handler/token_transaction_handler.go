@@ -411,6 +411,16 @@ func (o TokenTransactionHandler) FinalizeTokenTransaction(
 		return nil, fmt.Errorf("found invalid outputs: %s", strings.Join(invalidOutputs, "; "))
 	}
 
+	revocationPrivateKeys := make([]*secp256k1.PrivateKey, len(req.OutputToSpendRevocationSecrets))
+	for i, revocationSecret := range req.OutputToSpendRevocationSecrets {
+		revocationPrivateKey, err := common.PrivateKeyFromBytes(revocationSecret)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse revocation private key: %w", err)
+		}
+
+		revocationPrivateKeys[i] = revocationPrivateKey
+	}
+
 	// Extract revocation commitments from spent outputs.
 	revocationPublicKeys := make([][]byte, len(tokenTransaction.Edges.SpentOutput))
 	if (len(tokenTransaction.Edges.SpentOutput)) != len(req.OutputToSpendRevocationSecrets) {
@@ -423,7 +433,7 @@ func (o TokenTransactionHandler) FinalizeTokenTransaction(
 	for _, output := range tokenTransaction.Edges.SpentOutput {
 		revocationPublicKeys[output.SpentTransactionInputVout] = output.WithdrawRevocationCommitment
 	}
-	err = utils.ValidateRevocationKeys(req.OutputToSpendRevocationSecrets, revocationPublicKeys)
+	err = utils.ValidateRevocationKeys(revocationPrivateKeys, revocationPublicKeys)
 	if err != nil {
 		return nil, err
 	}

@@ -477,7 +477,7 @@ func ValidateOwnershipSignature(ownershipSignature []byte, tokenTransactionHash 
 
 // ValidateRevocationKeys validates that the provided revocation private keys correspond to the expected public keys.
 // It ensures the private keys can correctly derive the expected public keys, preventing key mismatches.
-func ValidateRevocationKeys(revocationPrivateKeys [][]byte, expectedRevocationPublicKeys [][]byte) error {
+func ValidateRevocationKeys(revocationPrivateKeys []*secp256k1.PrivateKey, expectedRevocationPublicKeys [][]byte) error {
 	if revocationPrivateKeys == nil {
 		return fmt.Errorf("revocation private keys cannot be nil")
 	}
@@ -489,32 +489,13 @@ func ValidateRevocationKeys(revocationPrivateKeys [][]byte, expectedRevocationPu
 			len(revocationPrivateKeys), len(expectedRevocationPublicKeys))
 	}
 
-	for i, revocationPrivateKeyBytes := range revocationPrivateKeys {
-		if revocationPrivateKeyBytes == nil {
+	for i, revocationKey := range revocationPrivateKeys {
+		if revocationKey == nil {
 			return fmt.Errorf("revocation private key at index %d cannot be nil", i)
 		}
+
 		if expectedRevocationPublicKeys[i] == nil {
 			return fmt.Errorf("expected revocation public key at index %d cannot be nil", i)
-		}
-
-		// secp256k1 private keys must be 32 bytes
-		if len(revocationPrivateKeyBytes) != 32 {
-			return fmt.Errorf("invalid revocation private key length at index %d: expected 32 bytes, got %d",
-				i, len(revocationPrivateKeyBytes))
-		}
-
-		// Safely parse the private key
-		var revocationKey *secp256k1.PrivateKey
-		func() {
-			defer func() {
-				if r := recover(); r != nil {
-					revocationKey = nil
-				}
-			}()
-			revocationKey = secp256k1.PrivKeyFromBytes(revocationPrivateKeyBytes)
-		}()
-		if revocationKey == nil {
-			return fmt.Errorf("failed to parse revocation private key at index %d", i)
 		}
 
 		revocationPubKey := revocationKey.PubKey()

@@ -118,6 +118,27 @@ func SubtractPublicKeys(a, b []byte) ([]byte, error) {
 	return pubkeyA.SerializeCompressed(), nil
 }
 
+// PrivateKeyFromBytes creates a secp256k1 private key from a byte slice. The bytes slice must be
+// 32 bytes.
+func PrivateKeyFromBytes(privKeyBytes []byte) (*secp256k1.PrivateKey, error) {
+	if len(privKeyBytes) != 32 {
+		return nil, fmt.Errorf("private key must be 32 bytes")
+	}
+
+	return secp256k1.PrivKeyFromBytes(privKeyBytes), nil
+}
+
+// PrivateKeyFromBigInt creates a secp256k1 private key from a big integer.
+func PrivateKeyFromBigInt(privKeyInt *big.Int) (*secp256k1.PrivateKey, error) {
+	if privKeyInt.BitLen() > 256 {
+		return nil, fmt.Errorf("private key cannot be represented by an Int larger than 32 bytes")
+	}
+
+	bytes := make([]byte, 32)
+	privKeyInt.FillBytes(bytes)
+	return secp256k1.PrivKeyFromBytes(bytes), nil
+}
+
 // AddPrivateKeysRaw adds two secp256k1 private keys using field addition.
 func AddPrivateKeysRaw(a, b *secp256k1.PrivateKey) *secp256k1.PrivateKey {
 	curve := secp256k1.S256()

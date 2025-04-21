@@ -253,7 +253,7 @@ func FinalizeTokenTransaction(
 	startResponse *pb.StartTokenTransactionResponse,
 ) error {
 	// Recover secrets from keyshares
-	outputRecoveredSecrets := make([][]byte, len(finalTx.GetTransferInput().GetOutputsToSpend()))
+	outputRecoveredSecrets := make([]*secp256k1.PrivateKey, len(finalTx.GetTransferInput().GetOutputsToSpend()))
 	for i, outputKeyshares := range outputRevocationKeyshares {
 		// Ensure we have enough shares
 		if len(outputKeyshares) < int(startResponse.KeyshareInfo.Threshold) {
@@ -282,12 +282,23 @@ func FinalizeTokenTransaction(
 		if err != nil {
 			return fmt.Errorf("failed to recover keyshare for output %d: %w", i, err)
 		}
-		outputRecoveredSecrets[i] = recoveredKey.Bytes()
+
+		privKey, err := common.PrivateKeyFromBigInt(recoveredKey)
+		if err != nil {
+			return fmt.Errorf("failed to convert recovered keyshare to private key for output %d: %w", i, err)
+		}
+
+		outputRecoveredSecrets[i] = privKey
 	}
 
 	// Validate revocation keys
 	if err := utils.ValidateRevocationKeys(outputRecoveredSecrets, outputToSpendRevocationPublicKeys); err != nil {
 		return fmt.Errorf("invalid revocation keys: %w", err)
+	}
+
+	outputToSpendRevocationSecrets := make([][]byte, len(outputRecoveredSecrets))
+	for i, privKey := range outputRecoveredSecrets {
+		outputToSpendRevocationSecrets[i] = privKey.Serialize()
 	}
 
 	// For each operator, finalize the transaction
@@ -308,7 +319,7 @@ func FinalizeTokenTransaction(
 
 		_, err = operatorClient.FinalizeTokenTransaction(operatorCtx, &pb.FinalizeTokenTransactionRequest{
 			FinalTokenTransaction:          startResponse.FinalTokenTransaction,
-			OutputToSpendRevocationSecrets: outputRecoveredSecrets,
+			OutputToSpendRevocationSecrets: outputToSpendRevocationSecrets,
 			IdentityPublicKey:              config.IdentityPublicKey(),
 		})
 		if err != nil {
