@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"log/slog"
 
 	"github.com/decred/dcrd/dcrec/secp256k1"
 	"github.com/google/uuid"
@@ -77,7 +78,11 @@ func GetUnusedSigningKeyshares(ctx context.Context, dbClient *Client, config *so
 		ForUpdate().
 		All(ctx)
 	if err != nil {
-		return nil, tx.Rollback()
+		if rollbackErr := tx.Rollback(); rollbackErr != nil {
+			slog.Error("Failed to rollback transaction", "error", rollbackErr)
+		}
+
+		return nil, fmt.Errorf("failed to get signing keyshares: %w", err)
 	}
 
 	if len(signingKeyshares) < keyshareCount {
@@ -87,7 +92,11 @@ func GetUnusedSigningKeyshares(ctx context.Context, dbClient *Client, config *so
 				log.Printf("Error running DKG: %v", err)
 			}
 		}()
-		return nil, tx.Rollback()
+		if rollbackErr := tx.Rollback(); rollbackErr != nil {
+			slog.Error("Failed to rollback transaction", "error", rollbackErr)
+		}
+
+		return nil, fmt.Errorf("not enough signing keyshares available (needed %d, got %d)", keyshareCount, len(signingKeyshares))
 	}
 
 	for _, keyshare := range signingKeyshares {
@@ -95,7 +104,11 @@ func GetUnusedSigningKeyshares(ctx context.Context, dbClient *Client, config *so
 			SetStatus(schema.KeyshareStatusInUse).
 			Save(ctx)
 		if err != nil {
-			return nil, tx.Rollback()
+			if rollbackErr := tx.Rollback(); rollbackErr != nil {
+				slog.Error("Failed to rollback transaction", "error", rollbackErr)
+			}
+
+			return nil, fmt.Errorf("failed to update signing keyshare status: %w", err)
 		}
 	}
 

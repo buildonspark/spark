@@ -62,6 +62,10 @@ func (o TokenTransactionHandler) StartTokenTransaction(ctx context.Context, conf
 		return nil, fmt.Errorf("failed to get unused signing keyshares: %w", err)
 	}
 
+	if len(keyshares) < numRevocationKeysharesNeeded {
+		return nil, fmt.Errorf("not enough unused signing keyshares available: %d needed, %d available", numRevocationKeysharesNeeded, len(keyshares))
+	}
+
 	keyshareIDs := make([]uuid.UUID, len(keyshares))
 	keyshareIDStrings := make([]string, len(keyshares))
 	for i, keyshare := range keyshares {

@@ -317,6 +317,10 @@ func (h *TreeCreationHandler) PrepareTreeAddress(ctx context.Context, req *pb.Pr
 		return nil, err
 	}
 
+	if len(keyshares) < keyCount {
+		return nil, fmt.Errorf("not enough keyshares available, need: %d, available: %d", keyCount, len(keyshares))
+	}
+
 	addressNode, err := h.createPrepareTreeAddressNodeFromAddressNode(ctx, req.Node)
 	if err != nil {
 		return nil, err
