@@ -184,6 +184,7 @@ OR
 #   LRC20_TAG           - Image tag to use for LRC20 (default: latest)
 #   USE_LIGHTSPARK_HELM_REPO - Whether to fetch helm charts from remote repo (default: false)
 #   OPS_DIR             - Path to the Lightspark ops repository which contains helm charts (auto-detected if not set)
+#   LRC20_REPLICAS      - The number of LRC20 replicas to deploy (default: 3)
 
 ./scripts/local-test.sh
 

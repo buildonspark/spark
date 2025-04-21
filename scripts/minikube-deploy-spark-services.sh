@@ -15,6 +15,7 @@ source "$(dirname "$0")/lightspark-helm.sh"
 : "${HELM_INSTALL_TIMEOUT:=2m0s}"
 : "${SPARK_TAG:=latest}"
 : "${LRC20_TAG:=latest}"
+: "${LRC20_REPLICAS:=3}"
 # shellcheck disable=SC2119
 HELM_REPO_PREFIX=$(get_helm_prefix)
 
@@ -105,17 +106,29 @@ last_so_index=$((${#PRIV_KEYS[@]} - 1))
 
 if [ "$RESET_DBS" = "true" ]; then
     echo "Cleaning up databases..."
-    for i in $(seq 0 $last_so_index); do
-        echo "Dropping database sparkoperator_${i}..."
-        kubectl exec -n default postgres-0 -- psql -U postgres -c "DROP DATABASE IF EXISTS \"sparkoperator_${i}\";" || true
-        echo "Dropping database lrc20_${i}..."
-        kubectl exec -n default postgres-0 -- psql -U postgres -c "DROP DATABASE IF EXISTS \"lrc20_${i}\";" || true
+    spark_dbs=$(kubectl exec -n default postgres-0 -- psql -U postgres -t -c \
+        "SELECT datname FROM pg_database WHERE datistemplate = false AND datname LIKE 'sparkoperator_%';" | xargs)
+
+    for spark_db in $spark_dbs; do
+        echo "Dropping database ${spark_db}..."
+        kubectl exec -n default postgres-0 -- psql -U postgres -c "DROP DATABASE IF EXISTS \"${spark_db}\";" || true
+    done
+
+    lrc20_dbs=$(kubectl exec -n default postgres-0 -- psql -U postgres -t -c \
+        "SELECT datname FROM pg_database WHERE datistemplate = false AND datname LIKE 'lrc20_%';" | xargs)
+
+    for lrc20_db in $lrc20_dbs; do
+        echo "Dropping database ${lrc20_db}..."
+        kubectl exec -n default postgres-0 -- psql -U postgres -c "DROP DATABASE IF EXISTS \"${lrc20_db}\";" || true
     done
 fi
 
 for i in $(seq 0 $last_so_index); do
     echo "Creating database sparkoperator_${i}..."
     kubectl exec -n default postgres-0 -- psql -U postgres -c "CREATE DATABASE \"sparkoperator_${i}\";" || true
+done
+
+for i in $(seq 0 $((LRC20_REPLICAS - 1))); do
     echo "Creating database lrc20_${i}..."
     kubectl exec -n default postgres-0 -- psql -U postgres -c "CREATE DATABASE \"lrc20_${i}\";" || true
 done
@@ -176,11 +189,10 @@ operator_cmd+=(
 "${operator_cmd[@]}" &
 
 # Deploy LRC20 nodes
-lrc20_replicas=3
 helm install \
     --timeout "$HELM_INSTALL_TIMEOUT" \
     --namespace lrc20 \
-    --set replicas=$lrc20_replicas \
+    --set replicas=$LRC20_REPLICAS \
     --set config.network="regtest" \
     --set image.tag="$LRC20_TAG" \
     --set config.database_url="postgresql://postgres@postgres.default:5432/lrc20_\${INDEX}" \
@@ -284,7 +296,7 @@ for i in $(seq 0 $last_so_index); do
     setup_port_forward spark service/regtest-spark-"${i}" $((8535 + i)) 8000
 done
 
-for i in $(seq 0 $((lrc20_replicas - 1))); do
+for i in $(seq 0 $((LRC20_REPLICAS - 1))); do
     setup_port_forward lrc20 pod/regtest-yuvd-"${i}" $((18330 + i)) 8000
     setup_port_forward lrc20 pod/regtest-yuvd-"${i}" $((18530 + i)) 8002
 done
