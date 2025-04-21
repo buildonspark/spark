@@ -13,7 +13,7 @@ import (
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/common"
-	"github.com/lightsparkdev/spark-go/proto/spark"
+	pb "github.com/lightsparkdev/spark-go/proto/spark"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
 	testutil "github.com/lightsparkdev/spark-go/test_util"
 	"github.com/lightsparkdev/spark-go/wallet"
@@ -294,7 +294,7 @@ func TestStartDepositTreeCreationConcurrentWithSameTx(t *testing.T) {
 
 	time.Sleep(100 * time.Millisecond)
 
-	resultChannel := make(chan *spark.FinalizeNodeSignaturesResponse, 2)
+	resultChannel := make(chan *pb.FinalizeNodeSignaturesResponse, 2)
 	errChannel := make(chan error, 2)
 
 	for range 2 {
@@ -309,7 +309,7 @@ func TestStartDepositTreeCreationConcurrentWithSameTx(t *testing.T) {
 		}()
 	}
 
-	var resp *spark.FinalizeNodeSignaturesResponse
+	var resp *pb.FinalizeNodeSignaturesResponse
 	respCount, errCount := 0, 0
 
 	for range 2 {
@@ -453,7 +453,9 @@ func TestStartDepositTreeCreationOffchain(t *testing.T) {
 	_, err = client.GenerateToAddress(1, randomAddress, nil)
 	assert.NoError(t, err)
 
-	time.Sleep(100 * time.Millisecond)
+	sparkClient := pb.NewSparkServiceClient(conn)
+	_, err = testutil.WaitForPendingDepositNode(ctx, sparkClient, rootNode)
+	assert.NoError(t, err)
 
 	// After L1 tx confirms, user should be able to transfer funds
 	_, err = wallet.SendTransfer(

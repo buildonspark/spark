@@ -13,6 +13,32 @@ import (
 	"github.com/lightsparkdev/spark-go/wallet"
 )
 
+const (
+	DepositTimeout      = 10 * time.Second
+	DepositPollInterval = 100 * time.Millisecond
+)
+
+func WaitForPendingDepositNode(ctx context.Context, sparkClient pb.SparkServiceClient, node *pb.TreeNode) (*pb.TreeNode, error) {
+	startTime := time.Now()
+	for node.Status != string(schema.TreeNodeStatusAvailable) {
+		if time.Since(startTime) >= DepositTimeout {
+			return nil, fmt.Errorf("timed out waiting for node to be available")
+		}
+		time.Sleep(DepositPollInterval)
+		nodesResp, err := sparkClient.QueryNodes(ctx, &pb.QueryNodesRequest{
+			Source: &pb.QueryNodesRequest_NodeIds{NodeIds: &pb.TreeNodeIds{NodeIds: []string{node.Id}}},
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to query nodes: %v", err)
+		}
+		if len(nodesResp.Nodes) != 1 {
+			return nil, fmt.Errorf("expected 1 node, got %d", len(nodesResp.Nodes))
+		}
+		node = nodesResp.Nodes[node.Id]
+	}
+	return node, nil
+}
+
 // CreateNewTree creates a new Tree
 func CreateNewTree(config *wallet.Config, faucet *Faucet, privKey *secp256k1.PrivateKey, amountSats int64) (*pb.TreeNode, error) {
 	coin, err := faucet.Fund()
@@ -89,27 +115,7 @@ func CreateNewTree(config *wallet.Config, faucet *Faucet, privKey *secp256k1.Pri
 
 	// Wait until the deposited leaf is available
 	sparkClient := pb.NewSparkServiceClient(conn)
-	authCtx := wallet.ContextWithToken(ctx, token)
-	startTime := time.Now()
-	node := resp.Nodes[0]
-	for node.Status != string(schema.TreeNodeStatusAvailable) {
-		if time.Since(startTime) >= 10*time.Second {
-			return nil, fmt.Errorf("timed out waiting for node to be available")
-		}
-		time.Sleep(100 * time.Millisecond)
-		nodesResp, err := sparkClient.QueryNodes(authCtx, &pb.QueryNodesRequest{
-			Source: &pb.QueryNodesRequest_NodeIds{NodeIds: &pb.TreeNodeIds{NodeIds: []string{resp.Nodes[0].Id}}},
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to query nodes: %v", err)
-		}
-		if len(nodesResp.Nodes) != 1 {
-			return nil, fmt.Errorf("expected 1 node, got %d", len(nodesResp.Nodes))
-		}
-		node = nodesResp.Nodes[resp.Nodes[0].Id]
-	}
-
-	return node, nil
+	return WaitForPendingDepositNode(ctx, sparkClient, resp.Nodes[0])
 }
 
 // CreateNewTree creates a new Tree
@@ -188,7 +194,11 @@ func CreateNewTreeWithLevels(config *wallet.Config, faucet *Faucet, privKey *sec
 		return nil, nil, fmt.Errorf("failed to mine deposit tx: %v", err)
 	}
 
-	time.Sleep(100 * time.Millisecond)
+	leafNode := treeNodes.Nodes[len(treeNodes.Nodes)-1]
+	_, err = WaitForPendingDepositNode(ctx, pb.NewSparkServiceClient(conn), leafNode)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to wait for pending deposit node: %v", err)
+	}
 
 	return tree, treeNodes.Nodes, nil
 }
