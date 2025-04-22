@@ -92,6 +92,7 @@ func (TreeNode) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Edges("parent"),
 		index.Edges("tree"),
+		index.Edges("signing_keyshare"),
 		index.Fields("owner_identity_pubkey"),
 		index.Fields("owner_identity_pubkey", "status"),
 	}

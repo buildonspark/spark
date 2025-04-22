@@ -625,6 +625,11 @@ var (
 				Columns: []*schema.Column{TreeNodesColumns[11]},
 			},
 			{
+				Name:    "treenode_tree_node_signing_keyshare",
+				Unique:  false,
+				Columns: []*schema.Column{TreeNodesColumns[13]},
+			},
+			{
 				Name:    "treenode_owner_identity_pubkey",
 				Unique:  false,
 				Columns: []*schema.Column{TreeNodesColumns[6]},
