@@ -254,11 +254,17 @@ func main() {
 		log.Fatalf("Failed to create frost client: %v", err)
 	}
 
+	lrc20Client, err := lrc20.NewClient(config)
+	if err != nil {
+		log.Fatalf("Failed to create LRC20 client: %v", err)
+	}
+
 	for network, bitcoindConfig := range config.BitcoindConfigs {
 		go func() {
 			err := chain.WatchChain(dbClient,
-				*config,
-				bitcoindConfig)
+				lrc20Client,
+				bitcoindConfig,
+			)
 			if err != nil {
 				log.Fatalf("Failed to watch %s chain: %v", network, err)
 			}
@@ -354,10 +360,6 @@ func main() {
 		pbdkg.RegisterDKGServiceServer(grpcServer, dkgServer)
 	}
 
-	lrc20Client, err := lrc20.NewClient(config)
-	if err != nil {
-		log.Fatalf("Failed to create LRC20 client: %v", err)
-	}
 	sparkInternalServer := sparkgrpc.NewSparkInternalServer(config, lrc20Client)
 
 	pbinternal.RegisterSparkInternalServiceServer(grpcServer, sparkInternalServer)

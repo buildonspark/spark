@@ -139,16 +139,16 @@ func findDifference(currChainTip, newChainTip Tip, client *rpcclient.Client) (Di
 
 func scanChainUpdates(
 	dbClient *ent.Client,
-	soConfig so.Config,
-	client *rpcclient.Client,
+	bitcoinClient *rpcclient.Client,
+	lrc20Client *lrc20.Client,
 	network common.Network,
 ) error {
 	logger := slog.Default().With("method", "watch_chain.scanChainUpdates", "network", network.String())
-	latestBlockHeight, err := client.GetBlockCount()
+	latestBlockHeight, err := bitcoinClient.GetBlockCount()
 	if err != nil {
 		return fmt.Errorf("failed to get block count: %v", err)
 	}
-	latestBlockHash, err := client.GetBlockHash(latestBlockHeight)
+	latestBlockHash, err := bitcoinClient.GetBlockHash(latestBlockHeight)
 	if err != nil {
 		return fmt.Errorf("failed to get block hash: %v", err)
 	}
@@ -167,13 +167,13 @@ func scanChainUpdates(
 	if err != nil {
 		return fmt.Errorf("failed to query block height: %v", err)
 	}
-	dbBlockHash, err := client.GetBlockHash(dbBlockHeight.Height)
+	dbBlockHash, err := bitcoinClient.GetBlockHash(dbBlockHeight.Height)
 	if err != nil {
 		return fmt.Errorf("failed to get block hash: %v", err)
 	}
 
 	dbChainTip := NewTip(dbBlockHeight.Height, *dbBlockHash)
-	difference, err := findDifference(dbChainTip, latestChainTip, client)
+	difference, err := findDifference(dbChainTip, latestChainTip, bitcoinClient)
 	if err != nil {
 		return fmt.Errorf("failed to find difference: %v", err)
 	}
@@ -181,17 +181,23 @@ func scanChainUpdates(
 	if err != nil {
 		return fmt.Errorf("failed to disconnect blocks: %v", err)
 	}
-	err = connectBlocks(ctx,
-		&soConfig,
-		dbClient, client, difference.Connected, network)
+	err = connectBlocks(
+		ctx,
+		dbClient,
+		bitcoinClient,
+		lrc20Client,
+		difference.Connected,
+		network,
+	)
 	if err != nil {
 		return fmt.Errorf("failed to connect blocks: %v", err)
 	}
 	return nil
 }
 
-func WatchChain(dbClient *ent.Client,
-	soConfig so.Config,
+func WatchChain(
+	dbClient *ent.Client,
+	lrc20Client *lrc20.Client,
 	bitcoindConfig so.BitcoindConfig,
 ) error {
 	logger := slog.Default().With("method", "watch_chain.WatchChain")
@@ -200,12 +206,12 @@ func WatchChain(dbClient *ent.Client,
 		return err
 	}
 	connConfig := helper.RPCClientConfig(bitcoindConfig)
-	client, err := rpcclient.New(&connConfig, nil)
+	bitcoinClient, err := rpcclient.New(&connConfig, nil)
 	if err != nil {
 		return err
 	}
 
-	err = scanChainUpdates(dbClient, soConfig, client, network)
+	err = scanChainUpdates(dbClient, bitcoinClient, lrc20Client, network)
 	if err != nil {
 		return fmt.Errorf("failed to scan chain updates: %v", err)
 	}
@@ -248,7 +254,7 @@ func WatchChain(dbClient *ent.Client,
 		// we need to query bitcoind for the height anyway. We just
 		// treat it as a notification that a new block appeared.
 
-		err = scanChainUpdates(dbClient, soConfig, client, network)
+		err = scanChainUpdates(dbClient, bitcoinClient, lrc20Client, network)
 		if err != nil {
 			logger.Error("Failed to scan chain updates", "error", err)
 		}
@@ -260,14 +266,21 @@ func disconnectBlocks(_ context.Context, _ *ent.Client, _ []Tip, _ common.Networ
 	return nil
 }
 
-func connectBlocks(ctx context.Context, soConfig *so.Config, dbClient *ent.Client, client *rpcclient.Client, chainTips []Tip, network common.Network) error {
+func connectBlocks(
+	ctx context.Context,
+	dbClient *ent.Client,
+	bitcoinClient *rpcclient.Client,
+	lrc20Client *lrc20.Client,
+	chainTips []Tip,
+	network common.Network,
+) error {
 	logger := slog.Default().With("method", "watch_chain.connectBlocks").With("network", network.String())
 	for _, chainTip := range chainTips {
-		blockHash, err := client.GetBlockHash(chainTip.Height)
+		blockHash, err := bitcoinClient.GetBlockHash(chainTip.Height)
 		if err != nil {
 			return err
 		}
-		block, err := client.GetBlockVerboseTx(blockHash)
+		block, err := bitcoinClient.GetBlockVerboseTx(blockHash)
 		if err != nil {
 			return err
 		}
@@ -285,10 +298,13 @@ func connectBlocks(ctx context.Context, soConfig *so.Config, dbClient *ent.Clien
 			return err
 		}
 		err = handleBlock(ctx,
-			soConfig,
-			dbTx, txs, chainTip.Height,
+			lrc20Client,
+			dbTx,
+			txs,
+			chainTip.Height,
 			blockHash,
-			network)
+			network,
+		)
 		if err != nil {
 			logger.Error("Failed to handle block", "error", err)
 			rollbackErr := dbTx.Rollback()
@@ -319,9 +335,13 @@ func TxFromRPCTx(txs btcjson.TxRawResult) (wire.MsgTx, error) {
 	return tx, nil
 }
 
-func handleBlock(ctx context.Context,
-	soConfig *so.Config,
-	dbTx *ent.Tx, txs []wire.MsgTx, blockHeight int64, blockHash *chainhash.Hash,
+func handleBlock(
+	ctx context.Context,
+	lrc20Client *lrc20.Client,
+	dbTx *ent.Tx,
+	txs []wire.MsgTx,
+	blockHeight int64,
+	blockHash *chainhash.Hash,
 	network common.Network,
 ) error {
 	logger := slog.Default().With("method", "watch_chain.handleBlock")
@@ -468,13 +488,6 @@ func handleBlock(ctx context.Context,
 	logger.Info("Checking for withdrawn token leaves in block", "height", blockHeight)
 
 	// Use the lrc20 client to sync withdrawn leaves - it will handle all the processing internally
-	lrc20Client, err := lrc20.NewClient(soConfig)
-	if err != nil {
-		logger.Error("Failed to create lrc20 client", "error", err)
-		return err
-	}
-	defer lrc20Client.Close()
-
 	err = lrc20Client.MarkWithdrawnTokenOutputs(ctx, network, dbTx, blockHash)
 	if err != nil {
 		logger.Error("Failed to sync withdrawn leaves", "error", err)
