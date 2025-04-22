@@ -658,6 +658,7 @@ message TransferFilter {
     repeated string transfer_ids = 3;
     int64 limit = 40;
     int64 offset = 50;
+    repeated TransferType types = 70;
 }
 
 message QueryTransfersResponse {

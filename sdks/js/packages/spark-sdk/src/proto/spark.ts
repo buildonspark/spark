@@ -836,6 +836,7 @@ export interface TransferFilter {
   transferIds: string[];
   limit: number;
   offset: number;
+  types: TransferType[];
 }
 
 export interface QueryTransfersResponse {
@@ -7626,7 +7627,7 @@ export const CompleteSendTransferResponse: MessageFns<CompleteSendTransferRespon
 };
 
 function createBaseTransferFilter(): TransferFilter {
-  return { participant: undefined, transferIds: [], limit: 0, offset: 0 };
+  return { participant: undefined, transferIds: [], limit: 0, offset: 0, types: [] };
 }
 
 export const TransferFilter: MessageFns<TransferFilter> = {
@@ -7651,6 +7652,11 @@ export const TransferFilter: MessageFns<TransferFilter> = {
     if (message.offset !== 0) {
       writer.uint32(400).int64(message.offset);
     }
+    writer.uint32(562).fork();
+    for (const v of message.types) {
+      writer.int32(v);
+    }
+    writer.join();
     return writer;
   },
 
@@ -7712,6 +7718,24 @@ export const TransferFilter: MessageFns<TransferFilter> = {
           message.offset = longToNumber(reader.int64());
           continue;
         }
+        case 70: {
+          if (tag === 560) {
+            message.types.push(reader.int32() as any);
+
+            continue;
+          }
+
+          if (tag === 562) {
+            const end2 = reader.uint32() + reader.pos;
+            while (reader.pos < end2) {
+              message.types.push(reader.int32() as any);
+            }
+
+            continue;
+          }
+
+          break;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -7741,6 +7765,7 @@ export const TransferFilter: MessageFns<TransferFilter> = {
         : [],
       limit: isSet(object.limit) ? globalThis.Number(object.limit) : 0,
       offset: isSet(object.offset) ? globalThis.Number(object.offset) : 0,
+      types: globalThis.Array.isArray(object?.types) ? object.types.map((e: any) => transferTypeFromJSON(e)) : [],
     };
   },
 
@@ -7761,6 +7786,9 @@ export const TransferFilter: MessageFns<TransferFilter> = {
     }
     if (message.offset !== 0) {
       obj.offset = Math.round(message.offset);
+    }
+    if (message.types?.length) {
+      obj.types = message.types.map((e) => transferTypeToJSON(e));
     }
     return obj;
   },
@@ -7811,6 +7839,7 @@ export const TransferFilter: MessageFns<TransferFilter> = {
     message.transferIds = object.transferIds?.map((e) => e) || [];
     message.limit = object.limit ?? 0;
     message.offset = object.offset ?? 0;
+    message.types = object.types?.map((e) => e) || [];
     return message;
   },
 };

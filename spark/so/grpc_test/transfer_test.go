@@ -486,6 +486,25 @@ func TestQueryTransfers(t *testing.T) {
 	transfers, _, err = wallet.QueryAllTransfers(context.Background(), senderConfig, 100, 0)
 	require.NoError(t, err, "failed to QueryAllTransfers")
 	require.Equal(t, 2, len(transfers))
+
+	typeCounts := make(map[spark.TransferType]int)
+	for _, transfer := range transfers {
+		typeCounts[transfer.Type]++
+	}
+	assert.Equal(t, 1, typeCounts[spark.TransferType_TRANSFER], "expected 1 transfer")
+	assert.Equal(t, 1, typeCounts[spark.TransferType_COUNTER_SWAP], "expected 1 counter swap transfer")
+
+	transfers, _, err = wallet.QueryAllTransfersWithTypes(context.Background(), senderConfig, 2, 0, []spark.TransferType{spark.TransferType_TRANSFER})
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(transfers))
+
+	transfers, _, err = wallet.QueryAllTransfersWithTypes(context.Background(), senderConfig, 2, 0, []spark.TransferType{spark.TransferType_COUNTER_SWAP})
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(transfers))
+
+	transfers, _, err = wallet.QueryAllTransfersWithTypes(context.Background(), senderConfig, 3, 0, []spark.TransferType{spark.TransferType_TRANSFER, spark.TransferType_COUNTER_SWAP})
+	assert.NoError(t, err)
+	assert.Equal(t, 2, len(transfers))
 }
 
 func TestDoubleClaimTransfer(t *testing.T) {

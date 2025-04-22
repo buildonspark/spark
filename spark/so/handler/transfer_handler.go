@@ -443,6 +443,14 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 		transferPredicate = append([]predicate.Transfer{enttransfer.IDIn(transferUUIDs...)}, transferPredicate...)
 	}
 
+	if len(filter.Types) > 0 {
+		transferTypes := make([]schema.TransferType, len(filter.Types))
+		for i, transferType := range filter.Types {
+			transferTypes[i] = schema.TransferType(transferType.String())
+		}
+		transferPredicate = append(transferPredicate, enttransfer.TypeIn(transferTypes...))
+	}
+
 	baseQuery := db.Transfer.Query()
 	if len(transferPredicate) > 0 {
 		baseQuery = baseQuery.Where(enttransfer.And(transferPredicate...))

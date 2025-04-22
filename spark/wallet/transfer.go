@@ -791,6 +791,10 @@ func CancelSendTransfer(ctx context.Context, config *Config, transfer *pb.Transf
 }
 
 func QueryAllTransfers(ctx context.Context, config *Config, limit int64, offset int64) ([]*pb.Transfer, int64, error) {
+	return QueryAllTransfersWithTypes(ctx, config, limit, offset, []pb.TransferType{})
+}
+
+func QueryAllTransfersWithTypes(ctx context.Context, config *Config, limit int64, offset int64, types []pb.TransferType) ([]*pb.Transfer, int64, error) {
 	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress(), nil)
 	if err != nil {
 		return nil, 0, err
@@ -810,6 +814,7 @@ func QueryAllTransfers(ctx context.Context, config *Config, limit int64, offset 
 		},
 		Limit:  limit,
 		Offset: offset,
+		Types:  types,
 	})
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to call QueryAllTransfers: %v", err)
