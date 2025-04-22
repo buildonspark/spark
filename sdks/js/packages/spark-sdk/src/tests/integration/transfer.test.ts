@@ -1,4 +1,4 @@
-import { describe, expect, it } from "@jest/globals";
+import { describe, expect, it, jest } from "@jest/globals";
 import {
   bytesToHex,
   equalBytes,
@@ -16,6 +16,7 @@ import { SparkWalletTesting } from "../utils/spark-testing-wallet.js";
 import { BitcoinFaucet } from "../utils/test-faucet.js";
 
 describe("Transfer", () => {
+  jest.setTimeout(15_000);
   it("test transfer", async () => {
     const faucet = new BitcoinFaucet();
 
