@@ -44,7 +44,9 @@ async function runCLI() {
   getlightningsendrequest <requestId>                                 - Get a lightning send request by ID
   getlightningreceiverequest <requestId>                              - Get a lightning receive request by ID
   getcoopexitrequest <requestId>                                      - Get a coop exit request by ID
-  sendtokentransfer <tokenPubKey> <amount> <receiverSparkAddress>     - Transfer tokens
+
+  Token Holder Commands:
+  transfertokens <tokenPubKey> <amount> <receiverSparkAddress>        - Transfer tokens
 
   Token Issuer Commands:
   getissuertokenbalance                                               - Get the issuer's token balance
@@ -363,14 +365,14 @@ async function runCLI() {
         });
         console.log(transfer);
         break;
-      case "sendtokentransfer":
+      case "transfertokens":
         if (!wallet) {
           console.log("Please initialize a wallet first");
           break;
         }
         if (args.length < 3) {
           console.log(
-            "Usage: sendtokentransfer <tokenPubKey> <amount> <receiverPubKey>",
+            "Usage: transfertokens <tokenPubKey> <amount> <receiverPubKey>",
           );
           break;
         }
@@ -385,7 +387,7 @@ async function runCLI() {
             tokenAmount: tokenAmount,
             receiverSparkAddress: tokenReceiverPubKey,
           });
-          console.log(result);
+          console.log("Transfer Transaction ID:", result);
         } catch (error) {
           let errorMsg = "Unknown error";
           if (error instanceof Error) {
