@@ -374,6 +374,16 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 	db := ent.GetDbFromContext(ctx)
 	var transferPredicate []predicate.Transfer
 
+	receiverPendingStatuses := []schema.TransferStatus{
+		schema.TransferStatusSenderKeyTweaked,
+		schema.TransferStatusReceiverKeyTweaked,
+		schema.TransferStatusReceiverRefundSigned,
+	}
+	senderPendingStatuses := []schema.TransferStatus{
+		schema.TransferStatusSenderKeyTweakPending,
+		schema.TransferStatusSenderInitiated,
+	}
+
 	switch filter.Participant.(type) {
 	case *pb.TransferFilter_ReceiverIdentityPublicKey:
 		if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, filter.GetReceiverIdentityPublicKey()); err != nil {
@@ -382,11 +392,7 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 		transferPredicate = append(transferPredicate, enttransfer.ReceiverIdentityPubkeyEQ(filter.GetReceiverIdentityPublicKey()))
 		if isPending {
 			transferPredicate = append(transferPredicate,
-				enttransfer.StatusIn(
-					schema.TransferStatusSenderKeyTweaked,
-					schema.TransferStatusReceiverKeyTweaked,
-					schema.TransferStatusReceiverRefundSigned,
-				),
+				enttransfer.StatusIn(receiverPendingStatuses...),
 			)
 		}
 	case *pb.TransferFilter_SenderIdentityPublicKey:
@@ -396,12 +402,32 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 		transferPredicate = append(transferPredicate, enttransfer.SenderIdentityPubkeyEQ(filter.GetSenderIdentityPublicKey()))
 		if isPending {
 			transferPredicate = append(transferPredicate,
-				enttransfer.StatusIn(
-					schema.TransferStatusSenderKeyTweakPending,
-					schema.TransferStatusSenderInitiated,
-				),
+				enttransfer.StatusIn(senderPendingStatuses...),
 				enttransfer.ExpiryTimeLT(time.Now()),
 			)
+		}
+	case *pb.TransferFilter_SenderOrReceiverIdentityPublicKey:
+		identityPubkey := filter.GetSenderOrReceiverIdentityPublicKey()
+		if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, identityPubkey); err != nil {
+			return nil, err
+		}
+		if isPending {
+			transferPredicate = append(transferPredicate, enttransfer.Or(
+				enttransfer.And(
+					enttransfer.ReceiverIdentityPubkeyEQ(identityPubkey),
+					enttransfer.StatusIn(receiverPendingStatuses...),
+				),
+				enttransfer.And(
+					enttransfer.SenderIdentityPubkeyEQ(identityPubkey),
+					enttransfer.StatusIn(senderPendingStatuses...),
+					enttransfer.ExpiryTimeLT(time.Now()),
+				),
+			))
+		} else {
+			transferPredicate = append(transferPredicate, enttransfer.Or(
+				enttransfer.ReceiverIdentityPubkeyEQ(identityPubkey),
+				enttransfer.SenderIdentityPubkeyEQ(identityPubkey),
+			))
 		}
 	}
 

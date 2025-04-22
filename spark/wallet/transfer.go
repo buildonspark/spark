@@ -805,8 +805,8 @@ func QueryAllTransfers(ctx context.Context, config *Config, limit int64, offset 
 
 	sparkClient := pb.NewSparkServiceClient(sparkConn)
 	response, err := sparkClient.QueryAllTransfers(authCtx, &pb.TransferFilter{
-		Participant: &pb.TransferFilter_ReceiverIdentityPublicKey{
-			ReceiverIdentityPublicKey: config.IdentityPublicKey(),
+		Participant: &pb.TransferFilter_SenderOrReceiverIdentityPublicKey{
+			SenderOrReceiverIdentityPublicKey: config.IdentityPublicKey(),
 		},
 		Limit:  limit,
 		Offset: offset,

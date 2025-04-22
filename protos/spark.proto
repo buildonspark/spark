@@ -652,6 +652,8 @@ message TransferFilter {
     oneof participant {
         bytes receiver_identity_public_key = 1;
         bytes sender_identity_public_key = 2;
+        // This will include transfers where this public key is the sender or receiver.
+        bytes sender_or_receiver_identity_public_key = 60;
     }
     repeated string transfer_ids = 3;
     int64 limit = 40;

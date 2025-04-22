@@ -4050,6 +4050,7 @@ type TransferFilter struct {
 	//
 	//	*TransferFilter_ReceiverIdentityPublicKey
 	//	*TransferFilter_SenderIdentityPublicKey
+	//	*TransferFilter_SenderOrReceiverIdentityPublicKey
 	Participant   isTransferFilter_Participant `protobuf_oneof:"participant"`
 	TransferIds   []string                     `protobuf:"bytes,3,rep,name=transfer_ids,json=transferIds,proto3" json:"transfer_ids,omitempty"`
 	Limit         int64                        `protobuf:"varint,40,opt,name=limit,proto3" json:"limit,omitempty"`
@@ -4113,6 +4114,15 @@ func (x *TransferFilter) GetSenderIdentityPublicKey() []byte {
 	return nil
 }
 
+func (x *TransferFilter) GetSenderOrReceiverIdentityPublicKey() []byte {
+	if x != nil {
+		if x, ok := x.Participant.(*TransferFilter_SenderOrReceiverIdentityPublicKey); ok {
+			return x.SenderOrReceiverIdentityPublicKey
+		}
+	}
+	return nil
+}
+
 func (x *TransferFilter) GetTransferIds() []string {
 	if x != nil {
 		return x.TransferIds
@@ -4146,9 +4156,16 @@ type TransferFilter_SenderIdentityPublicKey struct {
 	SenderIdentityPublicKey []byte `protobuf:"bytes,2,opt,name=sender_identity_public_key,json=senderIdentityPublicKey,proto3,oneof"`
 }
 
+type TransferFilter_SenderOrReceiverIdentityPublicKey struct {
+	// This will include transfers where this public key is the sender or receiver.
+	SenderOrReceiverIdentityPublicKey []byte `protobuf:"bytes,60,opt,name=sender_or_receiver_identity_public_key,json=senderOrReceiverIdentityPublicKey,proto3,oneof"`
+}
+
 func (*TransferFilter_ReceiverIdentityPublicKey) isTransferFilter_Participant() {}
 
 func (*TransferFilter_SenderIdentityPublicKey) isTransferFilter_Participant() {}
+
+func (*TransferFilter_SenderOrReceiverIdentityPublicKey) isTransferFilter_Participant() {}
 
 type QueryTransfersResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -7486,10 +7503,11 @@ const file_spark_proto_rawDesc = "" +
 	"\tsignature\x18\x03 \x01(\fR\tsignature\x124\n" +
 	"\x16intermediate_refund_tx\x18\x04 \x01(\fR\x14intermediateRefundTx\"K\n" +
 	"\x1cCompleteSendTransferResponse\x12+\n" +
-	"\btransfer\x18\x01 \x01(\v2\x0f.spark.TransferR\btransfer\"\xf2\x01\n" +
+	"\btransfer\x18\x01 \x01(\v2\x0f.spark.TransferR\btransfer\"\xc7\x02\n" +
 	"\x0eTransferFilter\x12A\n" +
 	"\x1creceiver_identity_public_key\x18\x01 \x01(\fH\x00R\x19receiverIdentityPublicKey\x12=\n" +
-	"\x1asender_identity_public_key\x18\x02 \x01(\fH\x00R\x17senderIdentityPublicKey\x12!\n" +
+	"\x1asender_identity_public_key\x18\x02 \x01(\fH\x00R\x17senderIdentityPublicKey\x12S\n" +
+	"&sender_or_receiver_identity_public_key\x18< \x01(\fH\x00R!senderOrReceiverIdentityPublicKey\x12!\n" +
 	"\ftransfer_ids\x18\x03 \x03(\tR\vtransferIds\x12\x14\n" +
 	"\x05limit\x18( \x01(\x03R\x05limit\x12\x16\n" +
 	"\x06offset\x182 \x01(\x03R\x06offsetB\r\n" +
@@ -8169,6 +8187,7 @@ func file_spark_proto_init() {
 	file_spark_proto_msgTypes[58].OneofWrappers = []any{
 		(*TransferFilter_ReceiverIdentityPublicKey)(nil),
 		(*TransferFilter_SenderIdentityPublicKey)(nil),
+		(*TransferFilter_SenderOrReceiverIdentityPublicKey)(nil),
 	}
 	file_spark_proto_msgTypes[88].OneofWrappers = []any{
 		(*PrepareTreeAddressRequest_ParentNodeOutput)(nil),

@@ -277,6 +277,8 @@ export interface GenerateDepositAddressRequest {
   network: Network;
   /** The UUID to use for the created TreeNode */
   leafId: string;
+  /** Generate static deposit address */
+  isStatic?: boolean | undefined;
 }
 
 /** Address is the address of the user's public key + SE's public key. */
@@ -286,7 +288,11 @@ export interface Address {
   /** The verifying key of the address, which is user's public key + SE's public key. */
   verifyingKey: Uint8Array;
   /** The proof of possession of the address by the SE. */
-  depositAddressProof: DepositAddressProof | undefined;
+  depositAddressProof:
+    | DepositAddressProof
+    | undefined;
+  /** Is it a static deposit address */
+  isStatic: boolean;
 }
 
 /** GenerateDepositAddressResponse is the response to the request to generate a deposit address. */
@@ -823,7 +829,9 @@ export interface TransferFilter {
   participant?: { $case: "receiverIdentityPublicKey"; receiverIdentityPublicKey: Uint8Array } | {
     $case: "senderIdentityPublicKey";
     senderIdentityPublicKey: Uint8Array;
-  } | undefined;
+  } | //
+  /** This will include transfers where this public key is the sender or receiver. */
+  { $case: "senderOrReceiverIdentityPublicKey"; senderOrReceiverIdentityPublicKey: Uint8Array } | undefined;
   transferIds: string[];
   limit: number;
   offset: number;
@@ -1181,6 +1189,10 @@ export interface CancelSendTransferResponse {
   transfer: Transfer | undefined;
 }
 
+/**
+ * Returns a list of addresses that can be used in express deposit flow.
+ * Excludes static deposit addresses.
+ */
 export interface QueryUnusedDepositAddressesRequest {
   identityPublicKey: Uint8Array;
 }
@@ -1666,7 +1678,13 @@ export const DepositAddressProof_AddressSignaturesEntry: MessageFns<DepositAddre
 };
 
 function createBaseGenerateDepositAddressRequest(): GenerateDepositAddressRequest {
-  return { signingPublicKey: new Uint8Array(0), identityPublicKey: new Uint8Array(0), network: 0, leafId: "" };
+  return {
+    signingPublicKey: new Uint8Array(0),
+    identityPublicKey: new Uint8Array(0),
+    network: 0,
+    leafId: "",
+    isStatic: undefined,
+  };
 }
 
 export const GenerateDepositAddressRequest: MessageFns<GenerateDepositAddressRequest> = {
@@ -1682,6 +1700,9 @@ export const GenerateDepositAddressRequest: MessageFns<GenerateDepositAddressReq
     }
     if (message.leafId !== "") {
       writer.uint32(34).string(message.leafId);
+    }
+    if (message.isStatic !== undefined) {
+      writer.uint32(40).bool(message.isStatic);
     }
     return writer;
   },
@@ -1725,6 +1746,14 @@ export const GenerateDepositAddressRequest: MessageFns<GenerateDepositAddressReq
           message.leafId = reader.string();
           continue;
         }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.isStatic = reader.bool();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1742,6 +1771,7 @@ export const GenerateDepositAddressRequest: MessageFns<GenerateDepositAddressReq
         : new Uint8Array(0),
       network: isSet(object.network) ? networkFromJSON(object.network) : 0,
       leafId: isSet(object.leafId) ? globalThis.String(object.leafId) : "",
+      isStatic: isSet(object.isStatic) ? globalThis.Boolean(object.isStatic) : undefined,
     };
   },
 
@@ -1759,6 +1789,9 @@ export const GenerateDepositAddressRequest: MessageFns<GenerateDepositAddressReq
     if (message.leafId !== "") {
       obj.leafId = message.leafId;
     }
+    if (message.isStatic !== undefined) {
+      obj.isStatic = message.isStatic;
+    }
     return obj;
   },
 
@@ -1771,12 +1804,13 @@ export const GenerateDepositAddressRequest: MessageFns<GenerateDepositAddressReq
     message.identityPublicKey = object.identityPublicKey ?? new Uint8Array(0);
     message.network = object.network ?? 0;
     message.leafId = object.leafId ?? "";
+    message.isStatic = object.isStatic ?? undefined;
     return message;
   },
 };
 
 function createBaseAddress(): Address {
-  return { address: "", verifyingKey: new Uint8Array(0), depositAddressProof: undefined };
+  return { address: "", verifyingKey: new Uint8Array(0), depositAddressProof: undefined, isStatic: false };
 }
 
 export const Address: MessageFns<Address> = {
@@ -1789,6 +1823,9 @@ export const Address: MessageFns<Address> = {
     }
     if (message.depositAddressProof !== undefined) {
       DepositAddressProof.encode(message.depositAddressProof, writer.uint32(26).fork()).join();
+    }
+    if (message.isStatic !== false) {
+      writer.uint32(40).bool(message.isStatic);
     }
     return writer;
   },
@@ -1824,6 +1861,14 @@ export const Address: MessageFns<Address> = {
           message.depositAddressProof = DepositAddressProof.decode(reader, reader.uint32());
           continue;
         }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.isStatic = reader.bool();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1840,6 +1885,7 @@ export const Address: MessageFns<Address> = {
       depositAddressProof: isSet(object.depositAddressProof)
         ? DepositAddressProof.fromJSON(object.depositAddressProof)
         : undefined,
+      isStatic: isSet(object.isStatic) ? globalThis.Boolean(object.isStatic) : false,
     };
   },
 
@@ -1854,6 +1900,9 @@ export const Address: MessageFns<Address> = {
     if (message.depositAddressProof !== undefined) {
       obj.depositAddressProof = DepositAddressProof.toJSON(message.depositAddressProof);
     }
+    if (message.isStatic !== false) {
+      obj.isStatic = message.isStatic;
+    }
     return obj;
   },
 
@@ -1867,6 +1916,7 @@ export const Address: MessageFns<Address> = {
     message.depositAddressProof = (object.depositAddressProof !== undefined && object.depositAddressProof !== null)
       ? DepositAddressProof.fromPartial(object.depositAddressProof)
       : undefined;
+    message.isStatic = object.isStatic ?? false;
     return message;
   },
 };
@@ -7587,6 +7637,9 @@ export const TransferFilter: MessageFns<TransferFilter> = {
       case "senderIdentityPublicKey":
         writer.uint32(18).bytes(message.participant.senderIdentityPublicKey);
         break;
+      case "senderOrReceiverIdentityPublicKey":
+        writer.uint32(482).bytes(message.participant.senderOrReceiverIdentityPublicKey);
+        break;
     }
     for (const v of message.transferIds) {
       writer.uint32(26).string(v!);
@@ -7621,6 +7674,17 @@ export const TransferFilter: MessageFns<TransferFilter> = {
           }
 
           message.participant = { $case: "senderIdentityPublicKey", senderIdentityPublicKey: reader.bytes() };
+          continue;
+        }
+        case 60: {
+          if (tag !== 482) {
+            break;
+          }
+
+          message.participant = {
+            $case: "senderOrReceiverIdentityPublicKey",
+            senderOrReceiverIdentityPublicKey: reader.bytes(),
+          };
           continue;
         }
         case 3: {
@@ -7665,6 +7729,11 @@ export const TransferFilter: MessageFns<TransferFilter> = {
         }
         : isSet(object.senderIdentityPublicKey)
         ? { $case: "senderIdentityPublicKey", senderIdentityPublicKey: bytesFromBase64(object.senderIdentityPublicKey) }
+        : isSet(object.senderOrReceiverIdentityPublicKey)
+        ? {
+          $case: "senderOrReceiverIdentityPublicKey",
+          senderOrReceiverIdentityPublicKey: bytesFromBase64(object.senderOrReceiverIdentityPublicKey),
+        }
         : undefined,
       transferIds: globalThis.Array.isArray(object?.transferIds)
         ? object.transferIds.map((e: any) => globalThis.String(e))
@@ -7680,6 +7749,8 @@ export const TransferFilter: MessageFns<TransferFilter> = {
       obj.receiverIdentityPublicKey = base64FromBytes(message.participant.receiverIdentityPublicKey);
     } else if (message.participant?.$case === "senderIdentityPublicKey") {
       obj.senderIdentityPublicKey = base64FromBytes(message.participant.senderIdentityPublicKey);
+    } else if (message.participant?.$case === "senderOrReceiverIdentityPublicKey") {
+      obj.senderOrReceiverIdentityPublicKey = base64FromBytes(message.participant.senderOrReceiverIdentityPublicKey);
     }
     if (message.transferIds?.length) {
       obj.transferIds = message.transferIds;
@@ -7719,6 +7790,18 @@ export const TransferFilter: MessageFns<TransferFilter> = {
           message.participant = {
             $case: "senderIdentityPublicKey",
             senderIdentityPublicKey: object.participant.senderIdentityPublicKey,
+          };
+        }
+        break;
+      }
+      case "senderOrReceiverIdentityPublicKey": {
+        if (
+          object.participant?.senderOrReceiverIdentityPublicKey !== undefined &&
+          object.participant?.senderOrReceiverIdentityPublicKey !== null
+        ) {
+          message.participant = {
+            $case: "senderOrReceiverIdentityPublicKey",
+            senderOrReceiverIdentityPublicKey: object.participant.senderOrReceiverIdentityPublicKey,
           };
         }
         break;

@@ -418,8 +418,8 @@ export class TransferService extends BaseTransferService {
     try {
       allTransfersResp = await sparkClient.query_all_transfers({
         participant: {
-          $case: "receiverIdentityPublicKey",
-          receiverIdentityPublicKey:
+          $case: "senderOrReceiverIdentityPublicKey",
+          senderOrReceiverIdentityPublicKey:
             await this.config.signer.getIdentityPublicKey(),
         },
         limit,

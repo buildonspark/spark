@@ -203,7 +203,6 @@ func TestTransferWithSeparateSteps(t *testing.T) {
 }
 
 func TestCancelTransfer(t *testing.T) {
-	skipIfGithubActions(t)
 	// Sender initiates transfer
 	senderConfig, err := testutil.TestWalletConfig()
 	require.NoError(t, err, "failed to create sender wallet config")
@@ -285,7 +284,6 @@ func TestCancelTransfer(t *testing.T) {
 }
 
 func TestQueryTransfers(t *testing.T) {
-	skipIfGithubActions(t)
 	// Initiate sender
 	senderConfig, err := testutil.TestWalletConfig()
 	require.NoError(t, err, "failed to create sender wallet config")

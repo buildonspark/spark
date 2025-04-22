@@ -8519,6 +8519,18 @@ func (m *TransferFilter) validate(all bool) error {
 			errors = append(errors, err)
 		}
 		// no validation rules for SenderIdentityPublicKey
+	case *TransferFilter_SenderOrReceiverIdentityPublicKey:
+		if v == nil {
+			err := TransferFilterValidationError{
+				field:  "Participant",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		// no validation rules for SenderOrReceiverIdentityPublicKey
 	default:
 		_ = v // ensures v is used
 	}

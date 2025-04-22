@@ -267,7 +267,6 @@ func TestSendLightningPayment(t *testing.T) {
 }
 
 func TestSendLightningPaymentWithRejection(t *testing.T) {
-	skipIfGithubActions(t)
 	// Create user and ssp configs
 	userConfig, err := testutil.TestWalletConfig()
 	require.NoError(t, err)
@@ -353,7 +352,6 @@ func TestSendLightningPaymentWithRejection(t *testing.T) {
 }
 
 func TestReceiveLightningPaymentWithWrongPreimage(t *testing.T) {
-	skipIfGithubActions(t)
 	// Create user and ssp configs
 	userConfig, err := testutil.TestWalletConfig()
 	require.NoError(t, err)
