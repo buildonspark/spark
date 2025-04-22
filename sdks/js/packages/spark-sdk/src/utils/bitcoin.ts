@@ -9,13 +9,18 @@ import * as btc from "@scure/btc-signer";
 import { TransactionOutput } from "@scure/btc-signer/psbt";
 import { sha256 } from "@scure/btc-signer/utils";
 import { getNetwork, Network } from "./network.js";
+import { ValidationError } from "../errors/index.js";
 
 // const t = tapTweak(pubKey, h); // t = int_from_bytes(tagged_hash("TapTweak", pubkey + h)
 // const P = u.lift_x(u.bytesToNumberBE(pubKey)); // P = lift_x(int_from_bytes(pubkey))
 // const Q = P.add(Point.fromPrivateKey(t)); // Q = point_add(P, point_mul(G, t))
 export function computeTaprootKeyNoScript(pubkey: Uint8Array): Uint8Array {
   if (pubkey.length !== 32) {
-    throw new Error("Public key must be 32 bytes");
+    throw new ValidationError("Public key must be 32 bytes", {
+      field: "pubkey",
+      value: pubkey.length,
+      expected: 32,
+    });
   }
 
   const taggedHash = schnorr.utils.taggedHash("TapTweak", pubkey);
@@ -35,7 +40,11 @@ export function getP2TRScriptFromPublicKey(
   network: Network,
 ): Uint8Array {
   if (pubKey.length !== 33) {
-    throw new Error("Public key must be 33 bytes");
+    throw new ValidationError("Public key must be 33 bytes", {
+      field: "pubKey",
+      value: pubKey.length,
+      expected: 33,
+    });
   }
 
   const internalKey = secp256k1.ProjectivePoint.fromHex(pubKey);
@@ -45,7 +54,10 @@ export function getP2TRScriptFromPublicKey(
     getNetwork(network),
   ).script;
   if (!script) {
-    throw new Error("Failed to get P2TR address");
+    throw new ValidationError("Failed to get P2TR script", {
+      field: "script",
+      value: "null",
+    });
   }
   return script;
 }
@@ -55,7 +67,11 @@ export function getP2TRAddressFromPublicKey(
   network: Network,
 ): string {
   if (pubKey.length !== 33) {
-    throw new Error("Public key must be 33 bytes");
+    throw new ValidationError("Public key must be 33 bytes", {
+      field: "pubKey",
+      value: pubKey.length,
+      expected: 33,
+    });
   }
 
   const internalKey = secp256k1.ProjectivePoint.fromHex(pubKey);
@@ -65,7 +81,10 @@ export function getP2TRAddressFromPublicKey(
     getNetwork(network),
   ).address;
   if (!address) {
-    throw new Error("Failed to get P2TR address");
+    throw new ValidationError("Failed to get P2TR address", {
+      field: "address",
+      value: "null",
+    });
   }
   return address;
 }
@@ -75,7 +94,11 @@ export function getP2TRAddressFromPkScript(
   network: Network,
 ): string {
   if (pkScript.length !== 34 || pkScript[0] !== 0x51 || pkScript[1] !== 0x20) {
-    throw new Error("Invalid pkscript");
+    throw new ValidationError("Invalid pkscript", {
+      field: "pkScript",
+      value: bytesToHex(pkScript),
+      expected: "34 bytes starting with 0x51 0x20",
+    });
   }
 
   const parsedScript = btc.OutScript.decode(pkScript);
@@ -88,12 +111,19 @@ export function getP2WPKHAddressFromPublicKey(
   network: Network,
 ): string {
   if (pubKey.length !== 33) {
-    throw new Error("Public key must be 33 bytes");
+    throw new ValidationError("Public key must be 33 bytes", {
+      field: "pubKey",
+      value: pubKey.length,
+      expected: 33,
+    });
   }
 
   const address = btc.p2wpkh(pubKey, getNetwork(network)).address;
   if (!address) {
-    throw new Error("Failed to get P2WPKH address");
+    throw new ValidationError("Failed to get P2WPKH address", {
+      field: "address",
+      value: "null",
+    });
   }
   return address;
 }
@@ -105,7 +135,10 @@ export function getTxFromRawTxHex(rawTxHex: string): btc.Transaction {
   });
 
   if (!tx) {
-    throw new Error("Failed to parse transaction");
+    throw new ValidationError("Failed to parse transaction", {
+      field: "tx",
+      value: "null",
+    });
   }
   return tx;
 }
@@ -115,7 +148,10 @@ export function getTxFromRawTxBytes(rawTxBytes: Uint8Array): btc.Transaction {
     allowUnknownOutputs: true,
   });
   if (!tx) {
-    throw new Error("Failed to parse transaction");
+    throw new ValidationError("Failed to parse transaction", {
+      field: "tx",
+      value: "null",
+    });
   }
   return tx;
 }
@@ -128,12 +164,18 @@ export function getSigHashFromTx(
   // For Taproot, we use preimageWitnessV1 with SIGHASH_DEFAULT (0x00)
   const prevScript = prevOutput.script;
   if (!prevScript) {
-    throw new Error("No script found in prevOutput");
+    throw new ValidationError("No script found in prevOutput", {
+      field: "prevScript",
+      value: "null",
+    });
   }
 
   const amount = prevOutput.amount;
   if (!amount) {
-    throw new Error("No amount found in prevOutput");
+    throw new ValidationError("No amount found in prevOutput", {
+      field: "amount",
+      value: "null",
+    });
   }
 
   return tx.preimageWitnessV1(

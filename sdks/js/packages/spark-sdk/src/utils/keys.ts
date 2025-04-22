@@ -1,10 +1,15 @@
 import { numberToBytesBE } from "@noble/curves/abstract/utils";
 import { secp256k1 } from "@noble/curves/secp256k1";
 import { HDKey } from "@scure/bip32";
+import { ValidationError } from "../errors/index.js";
 
 export function addPublicKeys(a: Uint8Array, b: Uint8Array): Uint8Array {
   if (a.length !== 33 || b.length !== 33) {
-    throw new Error("Public keys must be 33 bytes");
+    throw new ValidationError("Public keys must be 33 bytes", {
+      field: "publicKeys",
+      value: `a: ${a.length}, b: ${b.length}`,
+      expected: 33,
+    });
   }
   const pubkeyA = secp256k1.ProjectivePoint.fromHex(a);
   const pubkeyB = secp256k1.ProjectivePoint.fromHex(b);
@@ -16,10 +21,18 @@ export function applyAdditiveTweakToPublicKey(
   tweak: Uint8Array,
 ) {
   if (pubkey.length !== 33) {
-    throw new Error("Public key must be 33 bytes");
+    throw new ValidationError("Public key must be 33 bytes", {
+      field: "pubkey",
+      value: pubkey.length,
+      expected: 33,
+    });
   }
   if (tweak.length !== 32) {
-    throw new Error("Tweak must be 32 bytes");
+    throw new ValidationError("Tweak must be 32 bytes", {
+      field: "tweak",
+      value: tweak.length,
+      expected: 32,
+    });
   }
   const pubkeyPoint = secp256k1.ProjectivePoint.fromHex(pubkey);
 
@@ -32,7 +45,11 @@ export function applyAdditiveTweakToPublicKey(
 
 export function subtractPublicKeys(a: Uint8Array, b: Uint8Array) {
   if (a.length !== 33 || b.length !== 33) {
-    throw new Error("Public keys must be 33 bytes");
+    throw new ValidationError("Public keys must be 33 bytes", {
+      field: "publicKeys",
+      value: `a: ${a.length}, b: ${b.length}`,
+      expected: 33,
+    });
   }
 
   const pubkeyA = secp256k1.ProjectivePoint.fromHex(a);
@@ -42,7 +59,11 @@ export function subtractPublicKeys(a: Uint8Array, b: Uint8Array) {
 
 export function addPrivateKeys(a: Uint8Array, b: Uint8Array) {
   if (a.length !== 32 || b.length !== 32) {
-    throw new Error("Private keys must be 32 bytes");
+    throw new ValidationError("Private keys must be 32 bytes", {
+      field: "privateKeys",
+      value: `a: ${a.length}, b: ${b.length}`,
+      expected: 32,
+    });
   }
 
   // Convert private keys to scalars (big integers)
@@ -58,7 +79,11 @@ export function addPrivateKeys(a: Uint8Array, b: Uint8Array) {
 
 export function subtractPrivateKeys(a: Uint8Array, b: Uint8Array) {
   if (a.length !== 32 || b.length !== 32) {
-    throw new Error("Private keys must be 32 bytes");
+    throw new ValidationError("Private keys must be 32 bytes", {
+      field: "privateKeys",
+      value: `a: ${a.length}, b: ${b.length}`,
+      expected: 32,
+    });
   }
 
   const privA = secp256k1.utils.normPrivateKeyToScalar(a);
@@ -71,7 +96,11 @@ export function subtractPrivateKeys(a: Uint8Array, b: Uint8Array) {
 export function sumOfPrivateKeys(keys: Uint8Array[]) {
   return keys.reduce((sum, key) => {
     if (key.length !== 32) {
-      throw new Error("Private keys must be 32 bytes");
+      throw new ValidationError("Private keys must be 32 bytes", {
+        field: "privateKey",
+        value: key.length,
+        expected: 32,
+      });
     }
     return addPrivateKeys(sum, key);
   });
@@ -79,7 +108,11 @@ export function sumOfPrivateKeys(keys: Uint8Array[]) {
 
 export function lastKeyWithTarget(target: Uint8Array, keys: Uint8Array[]) {
   if (target.length !== 32) {
-    throw new Error("Target must be 32 bytes");
+    throw new ValidationError("Target must be 32 bytes", {
+      field: "target",
+      value: target.length,
+      expected: 32,
+    });
   }
 
   const sum = sumOfPrivateKeys(keys);

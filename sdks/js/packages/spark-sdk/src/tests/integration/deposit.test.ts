@@ -5,6 +5,7 @@ import { getP2TRAddressFromPublicKey, getTxId } from "../../utils/bitcoin.js";
 import { getNetwork, Network } from "../../utils/network.js";
 import { SparkWalletTesting } from "../utils/spark-testing-wallet.js";
 import { BitcoinFaucet } from "../utils/test-faucet.js";
+import { ValidationError, RPCError } from "../../errors/types.js";
 
 const brokenTestFn = process.env.GITHUB_ACTIONS ? it.skip : it;
 
@@ -40,7 +41,9 @@ describe("deposit", () => {
     // Generate deposit address
     const depositResp = await sdk.getSingleUseDepositAddress();
     if (!depositResp) {
-      throw new Error("deposit address not found");
+      throw new RPCError("Deposit address not found", {
+        method: "getDepositAddress",
+      });
     }
 
     const addr = Address(getNetwork(Network.LOCAL)).decode(depositResp);
@@ -56,7 +59,10 @@ describe("deposit", () => {
     const vout = 0;
     const txid = getTxId(depositTx);
     if (!txid) {
-      throw new Error("txid not found");
+      throw new ValidationError("Transaction ID not found", {
+        field: "txid",
+        value: depositTx,
+      });
     }
 
     // Set mock transaction

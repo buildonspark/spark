@@ -25,6 +25,7 @@ import { getNetwork, Network } from "../utils/network.js";
 import { getEphemeralAnchorOutput } from "../utils/transaction.js";
 import { WalletConfigService } from "./config.js";
 import { ConnectionManager } from "./connection.js";
+import { NetworkError, ValidationError } from "../errors/index.js";
 
 export type DepositAddressTree = {
   address?: string | undefined;
@@ -210,8 +211,13 @@ export class TreeCreationService {
         nodeSignatures: nodeSignatures,
       });
     } catch (error) {
-      throw new Error(
-        `Error finalizing node signatures in tree creation: ${error}`,
+      throw new NetworkError(
+        "Failed to finalize node signatures",
+        {
+          operation: "finalize_node_signatures",
+          nodeSignaturesCount: nodeSignatures.length,
+        },
+        error instanceof Error ? error : undefined,
       );
     }
 
@@ -261,10 +267,16 @@ export class TreeCreationService {
   ) {
     for (let i = 0; i < tree.length; i++) {
       if (!tree[i]) {
-        throw new Error("Tree or address node is undefined");
+        throw new ValidationError("Tree node is undefined", {
+          index: i,
+          treeLength: tree.length,
+        });
       }
       if (!addressNodes[i]) {
-        throw new Error("Address node is undefined");
+        throw new ValidationError("Address node is undefined", {
+          index: i,
+          addressNodesLength: addressNodes.length,
+        });
       }
       // @ts-ignore
       tree[i].address = addressNodes[i].address?.address;

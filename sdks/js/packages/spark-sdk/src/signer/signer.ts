@@ -26,6 +26,7 @@ import {
 } from "../utils/signing.js";
 import { aggregateFrost, signFrost } from "../utils/wasm.js";
 import { KeyPackage } from "../wasm/spark_bindings.js";
+import { ValidationError, ConfigurationError } from "../errors/types.js";
 
 export type SigningNonce = {
   binding: Uint8Array;
@@ -139,7 +140,9 @@ class DefaultSparkSigner implements SparkSigner {
 
   private deriveSigningKey(hash: Uint8Array): Uint8Array {
     if (!this.masterKey) {
-      throw new Error("Private key is not set");
+      throw new ValidationError("Private key not initialized", {
+        field: "masterKey",
+      });
     }
 
     const view = new DataView(hash.buffer);
@@ -148,7 +151,9 @@ class DefaultSparkSigner implements SparkSigner {
     const newPrivateKey = this.signingKey?.deriveChild(amount).privateKey;
 
     if (!newPrivateKey) {
-      throw new Error("Failed to recover signing key");
+      throw new ValidationError("Failed to recover signing key", {
+        field: "privateKey",
+      });
     }
 
     return newPrivateKey;
@@ -156,7 +161,9 @@ class DefaultSparkSigner implements SparkSigner {
 
   async restoreSigningKeysFromLeafs(leafs: TreeNode[]) {
     if (!this.masterKey) {
-      throw new Error("Private key is not set");
+      throw new ValidationError("Master key is not set", {
+        field: "masterKey",
+      });
     }
 
     for (const leaf of leafs) {
@@ -174,7 +181,9 @@ class DefaultSparkSigner implements SparkSigner {
   async getSchnorrPublicKey(publicKey: Uint8Array): Promise<Uint8Array> {
     const privateKey = this.publicKeyToPrivateKeyMap.get(bytesToHex(publicKey));
     if (!privateKey) {
-      throw new Error("Private key is not set");
+      throw new ValidationError("Private key is not set", {
+        field: "privateKey",
+      });
     }
 
     return schnorr.getPublicKey(hexToBytes(privateKey));
@@ -186,7 +195,9 @@ class DefaultSparkSigner implements SparkSigner {
   ): Promise<Uint8Array> {
     const privateKey = this.publicKeyToPrivateKeyMap.get(bytesToHex(publicKey));
     if (!privateKey) {
-      throw new Error("Private key is not set");
+      throw new ValidationError("Private key is not set", {
+        field: "privateKey",
+      });
     }
 
     return schnorr.sign(message, hexToBytes(privateKey));
@@ -194,7 +205,9 @@ class DefaultSparkSigner implements SparkSigner {
 
   async signSchnorrWithIdentityKey(message: Uint8Array): Promise<Uint8Array> {
     if (!this.identityKey?.privateKey) {
-      throw new Error("Private key is not set");
+      throw new ValidationError("Private key not set", {
+        field: "identityKey",
+      });
     }
 
     const signature = schnorr.sign(message, this.identityKey.privateKey);
@@ -204,7 +217,9 @@ class DefaultSparkSigner implements SparkSigner {
 
   async getIdentityPublicKey(): Promise<Uint8Array> {
     if (!this.identityKey?.publicKey) {
-      throw new Error("Private key is not set");
+      throw new ValidationError("Private key is not set", {
+        field: "identityKey",
+      });
     }
 
     return this.identityKey.publicKey;
@@ -212,7 +227,9 @@ class DefaultSparkSigner implements SparkSigner {
 
   async getDepositSigningKey(): Promise<Uint8Array> {
     if (!this.depositKey?.publicKey) {
-      throw new Error("Deposit key is not set");
+      throw new ValidationError("Deposit key is not set", {
+        field: "depositKey",
+      });
     }
 
     return this.depositKey.publicKey;
@@ -232,7 +249,9 @@ class DefaultSparkSigner implements SparkSigner {
 
   async generatePublicKey(hash?: Uint8Array): Promise<Uint8Array> {
     if (!this.masterKey) {
-      throw new Error("Private key is not set");
+      throw new ValidationError("Private key is not set", {
+        field: "masterKey",
+      });
     }
 
     let newPrivateKey: Uint8Array | null = null;
@@ -243,7 +262,9 @@ class DefaultSparkSigner implements SparkSigner {
     }
 
     if (!newPrivateKey) {
-      throw new Error("Failed to generate new private key");
+      throw new ValidationError("Failed to generate new private key", {
+        field: "privateKey",
+      });
     }
 
     const publicKey = secp256k1.getPublicKey(newPrivateKey);
@@ -323,12 +344,16 @@ class DefaultSparkSigner implements SparkSigner {
       this.publicKeyToPrivateKeyMap.get(privateAsPubKeyHex);
 
     if (!signingPrivateKey) {
-      throw new Error("Private key is not set");
+      throw new ValidationError("Private key not found for public key", {
+        field: "privateKey",
+      });
     }
 
     const nonce = this.commitmentToNonceMap.get(selfCommitment);
     if (!nonce) {
-      throw new Error("Nonce is not set");
+      throw new ValidationError("Nonce not found for commitment", {
+        field: "nonce",
+      });
     }
 
     const keyPackage = new KeyPackage(
@@ -382,7 +407,10 @@ class DefaultSparkSigner implements SparkSigner {
     const hdkey = getMasterHDKeyFromSeed(seed);
 
     if (!hdkey.privateKey || !hdkey.publicKey) {
-      throw new Error("Could not derive private key from seed");
+      throw new ValidationError("Failed to derive keys from seed", {
+        field: "hdkey",
+        value: seed,
+      });
     }
 
     const accountType = network === Network.REGTEST ? 0 : 1;
@@ -398,7 +426,12 @@ class DefaultSparkSigner implements SparkSigner {
       !depositKey.publicKey ||
       !signingKey.publicKey
     ) {
-      throw new Error("Could not derive keys from seed");
+      throw new ValidationError(
+        "Failed to derive all required keys from seed",
+        {
+          field: "derivedKeys",
+        },
+      );
     }
 
     this.masterKey = hdkey;
@@ -425,9 +458,10 @@ class DefaultSparkSigner implements SparkSigner {
   ): Promise<Uint8Array> {
     const privateKey = this.publicKeyToPrivateKeyMap.get(bytesToHex(publicKey));
     if (!privateKey) {
-      throw new Error(
-        `No private key found for public key: ${bytesToHex(publicKey)}`,
-      );
+      throw new ValidationError("Private key not found for public key", {
+        field: "privateKey",
+        value: bytesToHex(publicKey),
+      });
     }
 
     const signature = secp256k1.sign(message, hexToBytes(privateKey));
@@ -444,7 +478,9 @@ class DefaultSparkSigner implements SparkSigner {
     compact?: boolean,
   ): Promise<Uint8Array> {
     if (!this.identityKey?.privateKey) {
-      throw new Error("Private key is not set");
+      throw new ConfigurationError("Identity key not initialized", {
+        configKey: "identityKey",
+      });
     }
 
     const signature = secp256k1.sign(message, this.identityKey.privateKey);
@@ -471,7 +507,9 @@ class DefaultSparkSigner implements SparkSigner {
 
   async decryptEcies(ciphertext: Uint8Array): Promise<Uint8Array> {
     if (!this.identityKey?.privateKey) {
-      throw new Error("Private key is not set");
+      throw new ConfigurationError("Identity key not initialized", {
+        configKey: "identityKey",
+      });
     }
     const receiverEciesPrivKey = ecies.PrivateKey.fromHex(
       bytesToHex(this.identityKey.privateKey),

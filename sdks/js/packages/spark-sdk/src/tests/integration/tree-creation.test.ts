@@ -5,6 +5,7 @@ import { getTxFromRawTxBytes, getTxId } from "../../utils/bitcoin.js";
 import { Network } from "../../utils/network.js";
 import { createDummyTx } from "../../utils/wasm.js";
 import { SparkWalletTesting } from "../utils/spark-testing-wallet.js";
+import { ValidationError } from "../../errors/types.js";
 
 describe("Tree Creation", () => {
   it.skip("test tree creation address generation", async () => {
@@ -28,7 +29,10 @@ describe("Tree Creation", () => {
     const vout = 0;
     const txid = getTxId(depositTx);
     if (!txid) {
-      throw new Error("txid not found");
+      throw new ValidationError("Transaction ID not found", {
+        field: "txid",
+        value: depositTx,
+      });
     }
 
     const treeResp = await wallet.generateDepositAddressForTree(

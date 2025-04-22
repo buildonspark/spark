@@ -16,6 +16,7 @@ import {
 import { createNewTree } from "../test-util.js";
 import { SparkWalletTesting } from "../utils/spark-testing-wallet.js";
 import { BitcoinFaucet } from "../utils/test-faucet.js";
+import { ValidationError } from "../../errors/types.js";
 
 describe("swap", () => {
   it("test swap", async () => {
@@ -134,7 +135,10 @@ describe("swap", () => {
     for (const [nodeId, signature] of receiverRefundSignatureMap.entries()) {
       const leafData = receiverLeafDataMap.get(nodeId);
       if (!leafData?.refundTx) {
-        throw new Error(`No refund tx for leaf ${nodeId}`);
+        throw new ValidationError("Refund transaction not found", {
+          field: "refundTx",
+          value: leafData,
+        });
       }
       const sighash = getSigHashFromTx(
         leafData.refundTx,

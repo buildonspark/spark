@@ -3,6 +3,7 @@ import { describe, expect, it, jest } from "@jest/globals";
 import SspClient from "../../../graphql/client.js";
 import { ConfigOptions } from "../../../services/wallet-config.js";
 import { SparkWalletTesting } from "../../utils/spark-testing-wallet.js";
+import { AuthenticationError } from "../../../errors/types.js";
 
 const options: ConfigOptions = {
   network: "LOCAL",
@@ -35,7 +36,15 @@ describe("SSP Auth Test", () => {
         wallet.createLightningInvoice({
           amountSats: 1000,
         }),
-      ).rejects.toThrow("Unauthorized");
+      ).rejects.toThrow(
+        new AuthenticationError(
+          "Failed to authenticate after unauthorized response",
+          {
+            endpoint: "graphql",
+            reason: "User is not authenticated",
+          },
+        ),
+      );
     } finally {
       SspClient.prototype.authenticate = originalAuthenticate;
     }

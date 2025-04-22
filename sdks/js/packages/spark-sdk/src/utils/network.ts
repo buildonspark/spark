@@ -3,6 +3,8 @@ import * as btc from "@scure/btc-signer";
 import * as bitcoin from "bitcoinjs-lib";
 import { Network as NetworkProto } from "../proto/spark.js";
 import { BitcoinNetwork } from "../types/index.js";
+import { ValidationError } from "../errors/index.js";
+
 export enum Network {
   MAINNET,
   TESTNET,
@@ -64,7 +66,15 @@ export function getNetworkFromAddress(address: string) {
       return BitcoinNetwork.REGTEST;
     }
   } catch (err) {
-    throw new Error("Invalid Bitcoin address");
+    throw new ValidationError(
+      "Invalid Bitcoin address",
+      {
+        field: "address",
+        value: address,
+        expected: "Valid Bech32 address with prefix 'bc' or 'bcrt'",
+      },
+      err instanceof Error ? err : undefined,
+    );
   }
   return null;
 }

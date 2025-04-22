@@ -3,13 +3,16 @@ import {
   OperatorSpecificTokenTransactionSignablePayload,
   TokenTransaction,
 } from "../proto/spark.js";
+import { ValidationError } from "../errors/types.js";
 
 export function hashTokenTransaction(
   tokenTransaction: TokenTransaction,
   partialHash: boolean = false,
 ): Uint8Array {
   if (!tokenTransaction) {
-    throw new Error("token transaction cannot be nil");
+    throw new ValidationError("token transaction cannot be nil", {
+      field: "tokenTransaction",
+    });
   }
 
   let allHashes: Uint8Array[] = [];
@@ -17,13 +20,17 @@ export function hashTokenTransaction(
   // Hash token inputs if a transfer
   if (tokenTransaction.tokenInputs?.$case === "transferInput") {
     if (!tokenTransaction.tokenInputs.transferInput.outputsToSpend) {
-      throw new Error("outputs to spend cannot be null");
+      throw new ValidationError("outputs to spend cannot be null", {
+        field: "tokenInputs.transferInput.outputsToSpend",
+      });
     }
 
     if (
       tokenTransaction.tokenInputs.transferInput.outputsToSpend.length === 0
     ) {
-      throw new Error("outputs to spend cannot be empty");
+      throw new ValidationError("outputs to spend cannot be empty", {
+        field: "tokenInputs.transferInput.outputsToSpend",
+      });
     }
 
     // Hash outputs to spend
@@ -32,7 +39,10 @@ export function hashTokenTransaction(
       output,
     ] of tokenTransaction.tokenInputs!.transferInput!.outputsToSpend.entries()) {
       if (!output) {
-        throw new Error(`output cannot be null at index ${i}`);
+        throw new ValidationError(`output cannot be null at index ${i}`, {
+          field: `tokenInputs.transferInput.outputsToSpend[${i}]`,
+          index: i,
+        });
       }
 
       const hashObj = sha256.create();
@@ -40,8 +50,15 @@ export function hashTokenTransaction(
       if (output.prevTokenTransactionHash) {
         const prevHash = output.prevTokenTransactionHash;
         if (output.prevTokenTransactionHash.length !== 32) {
-          throw new Error(
-            `invalid previous transaction hash length at index ${i}: expected 32 bytes, got ${prevHash}`,
+          throw new ValidationError(
+            `invalid previous transaction hash length at index ${i}`,
+            {
+              field: `tokenInputs.transferInput.outputsToSpend[${i}].prevTokenTransactionHash`,
+              value: prevHash,
+              expectedLength: 32,
+              actualLength: prevHash.length,
+              index: i,
+            },
           );
         }
         hashObj.update(output.prevTokenTransactionHash);
@@ -67,7 +84,12 @@ export function hashTokenTransaction(
       const issuerPubKey: Uint8Array =
         tokenTransaction.tokenInputs.mintInput.issuerPublicKey;
       if (issuerPubKey.length === 0) {
-        throw new Error("issuer public key cannot be empty");
+        throw new ValidationError("issuer public key cannot be empty", {
+          field: "tokenInputs.mintInput.issuerPublicKey",
+          value: issuerPubKey,
+          expectedLength: 1,
+          actualLength: 0,
+        });
       }
       hashObj.update(issuerPubKey);
 
@@ -90,16 +112,23 @@ export function hashTokenTransaction(
 
   // Hash token outputs
   if (!tokenTransaction.tokenOutputs) {
-    throw new Error("token outputs cannot be null");
+    throw new ValidationError("token outputs cannot be null", {
+      field: "tokenOutputs",
+    });
   }
 
   if (tokenTransaction.tokenOutputs.length === 0) {
-    throw new Error("token outputs cannot be empty");
+    throw new ValidationError("token outputs cannot be empty", {
+      field: "tokenOutputs",
+    });
   }
 
   for (const [i, output] of tokenTransaction.tokenOutputs.entries()) {
     if (!output) {
-      throw new Error("output cannot be null");
+      throw new ValidationError(`output cannot be null at index ${i}`, {
+        field: `tokenOutputs[${i}]`,
+        index: i,
+      });
     }
 
     const hashObj = sha256.create();
@@ -107,13 +136,22 @@ export function hashTokenTransaction(
     // Only hash ID if it's not empty and not in partial hash mode
     if (output.id && !partialHash) {
       if (output.id.length === 0) {
-        throw new Error(`output ID at index ${i} cannot be empty`);
+        throw new ValidationError(`output ID at index ${i} cannot be empty`, {
+          field: `tokenOutputs[${i}].id`,
+          index: i,
+        });
       }
       hashObj.update(new TextEncoder().encode(output.id));
     }
     if (output.ownerPublicKey) {
       if (output.ownerPublicKey.length === 0) {
-        throw new Error(`owner public key at index ${i} cannot be empty`);
+        throw new ValidationError(
+          `owner public key at index ${i} cannot be empty`,
+          {
+            field: `tokenOutputs[${i}].ownerPublicKey`,
+            index: i,
+          },
+        );
       }
       hashObj.update(output.ownerPublicKey);
     }
@@ -122,7 +160,13 @@ export function hashTokenTransaction(
       const revPubKey = output.revocationCommitment!!;
       if (revPubKey) {
         if (revPubKey.length === 0) {
-          throw new Error(`revocation commitmentat index ${i} cannot be empty`);
+          throw new ValidationError(
+            `revocation commitment at index ${i} cannot be empty`,
+            {
+              field: `tokenOutputs[${i}].revocationCommitment`,
+              index: i,
+            },
+          );
         }
         hashObj.update(revPubKey);
       }
@@ -146,17 +190,36 @@ export function hashTokenTransaction(
 
     if (output.tokenPublicKey) {
       if (output.tokenPublicKey.length === 0) {
-        throw new Error(`token public key at index ${i} cannot be empty`);
+        throw new ValidationError(
+          `token public key at index ${i} cannot be empty`,
+          {
+            field: `tokenOutputs[${i}].tokenPublicKey`,
+            index: i,
+          },
+        );
       }
       hashObj.update(output.tokenPublicKey);
     }
     if (output.tokenAmount) {
       if (output.tokenAmount.length === 0) {
-        throw new Error(`token amount at index ${i} cannot be empty`);
+        throw new ValidationError(
+          `token amount at index ${i} cannot be empty`,
+          {
+            field: `tokenOutputs[${i}].tokenAmount`,
+            index: i,
+          },
+        );
       }
       if (output.tokenAmount.length > 16) {
-        throw new Error(
-          `token amount at index ${i} exceeds maximum length; got ${output.tokenAmount.length} bytes, max 16`,
+        throw new ValidationError(
+          `token amount at index ${i} exceeds maximum length`,
+          {
+            field: `tokenOutputs[${i}].tokenAmount`,
+            value: output.tokenAmount,
+            expectedLength: 16,
+            actualLength: output.tokenAmount.length,
+            index: i,
+          },
         );
       }
       hashObj.update(output.tokenAmount);
@@ -166,7 +229,10 @@ export function hashTokenTransaction(
   }
 
   if (!tokenTransaction.sparkOperatorIdentityPublicKeys) {
-    throw new Error("spark operator identity public keys cannot be null");
+    throw new ValidationError(
+      "spark operator identity public keys cannot be null",
+      {},
+    );
   }
 
   // Sort operator public keys before hashing
@@ -183,10 +249,22 @@ export function hashTokenTransaction(
   // Hash spark operator identity public keys
   for (const [i, pubKey] of sortedPubKeys.entries()) {
     if (!pubKey) {
-      throw new Error(`operator public key at index ${i} cannot be null`);
+      throw new ValidationError(
+        `operator public key at index ${i} cannot be null`,
+        {
+          field: `sparkOperatorIdentityPublicKeys[${i}]`,
+          index: i,
+        },
+      );
     }
     if (pubKey.length === 0) {
-      throw new Error(`operator public key at index ${i} cannot be empty`);
+      throw new ValidationError(
+        `operator public key at index ${i} cannot be empty`,
+        {
+          field: `sparkOperatorIdentityPublicKeys[${i}]`,
+          index: i,
+        },
+      );
     }
     const hashObj = sha256.create();
     hashObj.update(pubKey);
@@ -222,8 +300,11 @@ export function hashOperatorSpecificTokenTransactionSignablePayload(
   payload: OperatorSpecificTokenTransactionSignablePayload,
 ): Uint8Array {
   if (!payload) {
-    throw new Error(
+    throw new ValidationError(
       "operator specific token transaction signable payload cannot be null",
+      {
+        field: "payload",
+      },
     );
   }
 
@@ -233,9 +314,12 @@ export function hashOperatorSpecificTokenTransactionSignablePayload(
   if (payload.finalTokenTransactionHash) {
     const hashObj = sha256.create();
     if (payload.finalTokenTransactionHash.length !== 32) {
-      throw new Error(
-        `invalid final token transaction hash length: expected 32 bytes, got ${payload.finalTokenTransactionHash.length}`,
-      );
+      throw new ValidationError(`invalid final token transaction hash length`, {
+        field: "finalTokenTransactionHash",
+        value: payload.finalTokenTransactionHash,
+        expectedLength: 32,
+        actualLength: payload.finalTokenTransactionHash.length,
+      });
     }
     hashObj.update(payload.finalTokenTransactionHash);
     allHashes.push(hashObj.digest());
@@ -243,11 +327,15 @@ export function hashOperatorSpecificTokenTransactionSignablePayload(
 
   // Hash operator identity public key
   if (!payload.operatorIdentityPublicKey) {
-    throw new Error("operator identity public key cannot be null");
+    throw new ValidationError("operator identity public key cannot be null", {
+      field: "operatorIdentityPublicKey",
+    });
   }
 
   if (payload.operatorIdentityPublicKey.length === 0) {
-    throw new Error("operator identity public key cannot be empty");
+    throw new ValidationError("operator identity public key cannot be empty", {
+      field: "operatorIdentityPublicKey",
+    });
   }
 
   const hashObj = sha256.create();

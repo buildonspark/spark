@@ -21,6 +21,11 @@ import { isHermeticTest } from "../tests/test-util.js";
 import { SparkCallOptions } from "../types/grpc.js";
 import { Network } from "../utils/network.js";
 import { WalletConfigService } from "./config.js";
+import {
+  NetworkError,
+  AuthenticationError,
+  ConfigurationError,
+} from "../errors/types.js";
 
 // TODO: Some sort of client cleanup
 export class ConnectionManager {
@@ -88,7 +93,16 @@ export class ConnectionManager {
       }
     } catch (error) {
       console.error("Channel creation error:", error);
-      throw new Error("Failed to create channel");
+      throw new NetworkError(
+        "Failed to create channel",
+        {
+          url: address,
+          operation: "createChannel",
+          errorCount: 1,
+          errors: error instanceof Error ? error.message : String(error),
+        },
+        error instanceof Error ? error : undefined,
+      );
     }
   }
 
@@ -127,7 +141,10 @@ export class ConnectionManager {
       });
 
       if (!challengeResp.protectedChallenge?.challenge) {
-        throw new Error("Invalid challenge response");
+        throw new AuthenticationError("Invalid challenge response", {
+          endpoint: "get_challenge",
+          reason: "Missing challenge in response",
+        });
       }
 
       const challengeBytes = Challenge.encode(
@@ -148,7 +165,14 @@ export class ConnectionManager {
       return verifyResp.sessionToken;
     } catch (error: any) {
       console.error("Authentication error:", error);
-      throw new Error(`Authentication failed: ${error.message}`);
+      throw new AuthenticationError(
+        "Authentication failed",
+        {
+          endpoint: "authenticate",
+          reason: error.message,
+        },
+        error,
+      );
     }
   }
 
@@ -200,7 +224,14 @@ export class ConnectionManager {
               .set("User-Agent", "spark-js-sdk"),
           });
         }
-        throw error;
+        throw new AuthenticationError(
+          "Middleware authentication failed",
+          {
+            endpoint: "nodeMiddleware",
+            reason: error.message,
+          },
+          error,
+        );
       }
     }.bind(this);
   }
@@ -240,7 +271,14 @@ export class ConnectionManager {
               .set("User-Agent", "spark-js-sdk"),
           });
         }
-        throw error;
+        throw new AuthenticationError(
+          "Middleware authentication failed",
+          {
+            endpoint: "browserMiddleware",
+            reason: error.message,
+          },
+          error,
+        );
       }
     }.bind(this);
   }

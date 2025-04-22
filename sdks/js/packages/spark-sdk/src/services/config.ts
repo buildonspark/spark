@@ -13,6 +13,7 @@ import {
   REGTEST_WALLET_CONFIG,
   SigningOperator,
 } from "./wallet-config.js";
+import { ConfigurationError } from "../errors/types.js";
 
 export class WalletConfigService
   implements HasLrc20WalletApiConfig, HasSspClientOptions
@@ -50,8 +51,11 @@ export class WalletConfigService
     const coordinator =
       this.config.signingOperators[this.config.coodinatorIdentifier];
     if (!coordinator) {
-      throw new Error(
-        `Coordinator ${this.config.coodinatorIdentifier} not found`,
+      throw new ConfigurationError(
+        "Coordinator not found in signing operators",
+        {
+          configKey: "signingOperators",
+        },
       );
     }
     return coordinator.address;

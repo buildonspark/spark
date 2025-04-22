@@ -1,3 +1,5 @@
+import { NetworkError } from "../errors/index.js";
+
 export function validateResponses<T>(
   responses: PromiseSettledResult<T>[],
 ): T[] {
@@ -19,7 +21,10 @@ export function validateResponses<T>(
       .map((result) => result.reason)
       .join("\n");
 
-    throw new Error(`All requests failed.\nErrors:\n${errors}`);
+    throw new NetworkError("All requests failed", {
+      errorCount: responses.length,
+      errors,
+    });
   }
 
   return successfulResponses;

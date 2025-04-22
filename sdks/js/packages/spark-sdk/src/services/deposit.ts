@@ -20,6 +20,12 @@ import { proofOfPossessionMessageHashForDepositAddress } from "../utils/proof.js
 import { createWasmSigningCommitment } from "../utils/signing.js";
 import { WalletConfigService } from "./config.js";
 import { ConnectionManager } from "./connection.js";
+import {
+  ValidationError,
+  NetworkError,
+  AuthenticationError,
+} from "../errors/types.js";
+
 type ValidateDepositAddressParams = {
   address: Address;
   userPubkey: Uint8Array;
@@ -60,8 +66,12 @@ export class DepositService {
       !address.depositAddressProof.proofOfPossessionSignature ||
       !address.depositAddressProof.addressSignatures
     ) {
-      throw new Error(
-        "proof of possession signature or address signatures is null",
+      throw new ValidationError(
+        "Proof of possession signature or address signatures is null",
+        {
+          field: "depositAddressProof",
+          value: address.depositAddressProof,
+        },
       );
     }
 
@@ -85,7 +95,13 @@ export class DepositService {
     );
 
     if (!isVerified) {
-      throw new Error("proof of possession signature verification failed");
+      throw new ValidationError(
+        "Proof of possession signature verification failed",
+        {
+          field: "proofOfPossessionSignature",
+          value: address.depositAddressProof.proofOfPossessionSignature,
+        },
+      );
     }
 
     const addrHash = sha256(address.address);
@@ -98,13 +114,19 @@ export class DepositService {
       const operatorSig =
         address.depositAddressProof.addressSignatures[operator.identifier];
       if (!operatorSig) {
-        throw new Error("operator signature not found");
+        throw new ValidationError("Operator signature not found", {
+          field: "addressSignatures",
+          value: operator.identifier,
+        });
       }
       const sig = secp256k1.Signature.fromDER(operatorSig);
 
       const isVerified = secp256k1.verify(sig, addrHash, operatorPubkey);
       if (!isVerified) {
-        throw new Error("signature verification failed");
+        throw new ValidationError("Operator signature verification failed", {
+          field: "operatorSignature",
+          value: operatorSig,
+        });
       }
     }
   }
@@ -126,11 +148,25 @@ export class DepositService {
         leafId: leafId,
       });
     } catch (error) {
-      throw new Error(`Error generating deposit address: ${error}`);
+      throw new NetworkError(
+        "Failed to generate deposit address",
+        {
+          operation: "generate_deposit_address",
+          errorCount: 1,
+          errors: error instanceof Error ? error.message : String(error),
+        },
+        error instanceof Error ? error : undefined,
+      );
     }
 
     if (!depositResp.depositAddress) {
-      throw new Error("No deposit address response from coordinator");
+      throw new ValidationError(
+        "No deposit address response from coordinator",
+        {
+          field: "depositAddress",
+          value: depositResp,
+        },
+      );
     }
 
     await this.validateDepositAddress({
@@ -151,12 +187,20 @@ export class DepositService {
     const rootTx = new Transaction();
     const output = depositTx.getOutput(vout);
     if (!output) {
-      throw new Error("No output found in deposit tx");
+      throw new ValidationError("Invalid deposit transaction output", {
+        field: "vout",
+        value: vout,
+        expected: "Valid output index",
+      });
     }
     const script = output.script;
     const amount = output.amount;
     if (!script || !amount) {
-      throw new Error("No script or amount found in deposit tx");
+      throw new ValidationError("No script or amount found in deposit tx", {
+        field: "output",
+        value: output,
+        expected: "Output with script and amount",
+      });
     }
 
     rootTx.addInput({
@@ -226,31 +270,59 @@ export class DepositService {
         },
       });
     } catch (error) {
-      throw new Error(`Error starting tree creation: ${error}`);
+      throw new NetworkError(
+        "Failed to start deposit tree creation",
+        {
+          operation: "start_deposit_tree_creation",
+          errorCount: 1,
+          errors: error instanceof Error ? error.message : String(error),
+        },
+        error instanceof Error ? error : undefined,
+      );
     }
 
     if (!treeResp.rootNodeSignatureShares?.verifyingKey) {
-      throw new Error("No verifying key found in tree response");
+      throw new ValidationError("No verifying key found in tree response", {
+        field: "verifyingKey",
+        value: treeResp.rootNodeSignatureShares,
+        expected: "Non-null verifying key",
+      });
     }
 
     if (
       !treeResp.rootNodeSignatureShares.nodeTxSigningResult
         ?.signingNonceCommitments
     ) {
-      throw new Error("No signing nonce commitments found in tree response");
+      throw new ValidationError(
+        "No signing nonce commitments found in tree response",
+        {
+          field: "nodeTxSigningResult.signingNonceCommitments",
+          value: treeResp.rootNodeSignatureShares.nodeTxSigningResult,
+          expected: "Non-null signing nonce commitments",
+        },
+      );
     }
 
     if (
       !treeResp.rootNodeSignatureShares.refundTxSigningResult
         ?.signingNonceCommitments
     ) {
-      throw new Error("No signing nonce commitments found in tree response");
+      throw new ValidationError(
+        "No signing nonce commitments found in tree response",
+        {
+          field: "refundTxSigningResult.signingNonceCommitments",
+        },
+      );
     }
 
     if (
       !equalBytes(treeResp.rootNodeSignatureShares.verifyingKey, verifyingKey)
     ) {
-      throw new Error("Verifying key does not match");
+      throw new ValidationError("Verifying key mismatch", {
+        field: "verifyingKey",
+        value: treeResp.rootNodeSignatureShares.verifyingKey,
+        expected: verifyingKey,
+      });
     }
 
     const rootSignature = await this.config.signer.signFrost({
@@ -322,7 +394,15 @@ export class DepositService {
         ],
       });
     } catch (error) {
-      throw new Error(`Error finalizing node signatures in deposit: ${error}`);
+      throw new NetworkError(
+        "Failed to finalize node signatures",
+        {
+          operation: "finalize_node_signatures",
+          errorCount: 1,
+          errors: error instanceof Error ? error.message : String(error),
+        },
+        error instanceof Error ? error : undefined,
+      );
     }
 
     return finalizeResp;

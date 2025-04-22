@@ -1,6 +1,7 @@
 import { mod } from "@noble/curves/abstract/modular";
 import { bytesToNumberBE, numberToBytesBE } from "@noble/curves/abstract/utils";
 import { schnorr, secp256k1 } from "@noble/curves/secp256k1";
+import { ValidationError } from "../errors/index.js";
 
 export function generateSignatureFromExistingAdaptor(
   signature: Uint8Array,
@@ -168,21 +169,33 @@ function parseSignature(signature: Uint8Array): {
   s: Uint8Array;
 } {
   if (signature.length < 64) {
-    throw new Error(`malformed signature: too short: ${signature.length} < 64`);
+    throw new ValidationError("Signature too short", {
+      expectedLength: 64,
+      actualLength: signature.length,
+    });
   }
   if (signature.length > 64) {
-    throw new Error(`malformed signature: too long: ${signature.length} > 64`);
+    throw new ValidationError("Signature too long", {
+      expectedLength: 64,
+      actualLength: signature.length,
+    });
   }
 
   const r = signature.slice(0, 32);
   const s = signature.slice(32, 64);
 
   if (bytesToNumberBE(r) >= secp256k1.CURVE.Fp.ORDER) {
-    throw new Error(`invalid signature: r >= field prime`);
+    throw new ValidationError("Invalid signature: r >= field prime", {
+      rValue: bytesToNumberBE(r),
+      fieldPrime: secp256k1.CURVE.Fp.ORDER,
+    });
   }
 
   if (bytesToNumberBE(s) >= secp256k1.CURVE.n) {
-    throw new Error(`invalid signature: s >= group order`);
+    throw new ValidationError("Invalid signature: s >= group order", {
+      sValue: bytesToNumberBE(s),
+      groupOrder: secp256k1.CURVE.n,
+    });
   }
 
   return { r, s };

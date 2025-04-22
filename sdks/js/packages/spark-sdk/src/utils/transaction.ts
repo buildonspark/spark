@@ -2,6 +2,7 @@ import { Transaction } from "@scure/btc-signer";
 import { TransactionInput, TransactionOutput } from "@scure/btc-signer/psbt";
 import { getP2TRScriptFromPublicKey } from "./bitcoin.js";
 import { Network } from "./network.js";
+import { ValidationError } from "../errors/types.js";
 
 const TIME_LOCK_INTERVAL = 100;
 
@@ -46,7 +47,10 @@ export function getNextTransactionSequence(
   }
 
   if (nextTimelock <= 0) {
-    throw new Error("timelock interval is less or equal to 0");
+    throw new ValidationError("timelock interval is less than or equal to 0", {
+      field: "nextTimelock",
+      value: nextTimelock,
+    });
   }
 
   return {

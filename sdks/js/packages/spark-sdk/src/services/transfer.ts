@@ -40,6 +40,11 @@ import {
 } from "../utils/transaction.js";
 import { WalletConfigService } from "./config.js";
 import { ConnectionManager } from "./connection.js";
+import {
+  NetworkError,
+  SparkSDKError,
+  ValidationError,
+} from "../errors/index.js";
 const INITIAL_TIME_LOCK = 2000;
 
 const DEFAULT_EXPIRY_TIME = 10 * 60 * 1000;
@@ -97,7 +102,7 @@ export class BaseTransferService {
     );
 
     let updatedTransfer: Transfer | undefined;
-    const errors: Error[] = [];
+    const errors: SparkSDKError[] = [];
     const promises = Object.entries(this.config.getSigningOperators()).map(
       async ([identifier, operator]) => {
         const sparkClient = await this.connectionManager.createSparkClient(
@@ -107,7 +112,10 @@ export class BaseTransferService {
         const leavesToSend = keyTweakInputMap.get(identifier);
         if (!leavesToSend) {
           errors.push(
-            new Error(`No leaves to send for operator ${identifier}`),
+            new ValidationError("No leaves to send for operator", {
+              field: "operator",
+              value: identifier,
+            }) as SparkSDKError,
           );
           return;
         }
@@ -120,7 +128,15 @@ export class BaseTransferService {
             leavesToSend,
           });
         } catch (error) {
-          errors.push(new Error(`Error completing send transfer: ${error}`));
+          errors.push(
+            new NetworkError(
+              "Failed to complete send transfer",
+              {
+                method: "POST",
+              },
+              error instanceof Error ? error : undefined,
+            ) as SparkSDKError,
+          );
           return;
         }
 
@@ -129,14 +145,23 @@ export class BaseTransferService {
         } else {
           if (!transferResp.transfer) {
             errors.push(
-              new Error(`No transfer response from operator ${identifier}`),
+              new ValidationError("No transfer response from operator", {
+                field: "operator",
+                value: identifier,
+              }) as SparkSDKError,
             );
             return;
           }
 
           if (!this.compareTransfers(updatedTransfer, transferResp.transfer)) {
             errors.push(
-              new Error(`Inconsistent transfer response from operators`),
+              new ValidationError(
+                "Inconsistent transfer response from operators",
+                {
+                  field: "transfer",
+                  value: transfer.id,
+                },
+              ) as SparkSDKError,
             );
           }
         }
@@ -146,11 +171,19 @@ export class BaseTransferService {
     await Promise.all(promises);
 
     if (errors.length > 0) {
-      throw new Error(`Error completing send transfer: ${errors[0]}`);
+      throw new NetworkError("Failed to complete send transfer", {
+        method: "POST",
+      });
     }
 
     if (!updatedTransfer) {
-      throw new Error("No updated transfer found");
+      throw new ValidationError(
+        "No transfer response received from any operator",
+        {
+          field: "operators",
+          value: Object.keys(this.config.getSigningOperators()).length,
+        },
+      );
     }
 
     return updatedTransfer;
@@ -699,7 +732,10 @@ export class TransferService extends BaseTransferService {
         const leavesToReceive = leavesTweaksMap.get(identifier);
         if (!leavesToReceive) {
           errors.push(
-            new Error(`No leaves to receive for operator ${identifier}`),
+            new ValidationError("No leaves to receive for operator", {
+              field: "operator",
+              value: identifier,
+            }) as SparkSDKError,
           );
           return;
         }
@@ -713,7 +749,13 @@ export class TransferService extends BaseTransferService {
           });
         } catch (error) {
           errors.push(
-            new Error(`Error claiming transfer tweak keys: ${error}`),
+            new NetworkError(
+              "Failed to claim transfer tweak keys",
+              {
+                method: "POST",
+              },
+              error instanceof Error ? error : undefined,
+            ) as SparkSDKError,
           );
           return;
         }
@@ -723,7 +765,9 @@ export class TransferService extends BaseTransferService {
     await Promise.all(promises);
 
     if (errors.length > 0) {
-      throw new Error(`Error claiming transfer tweak keys: ${errors[0]}`);
+      throw new NetworkError("Failed to claim transfer tweak keys", {
+        method: "POST",
+      });
     }
   }
 
@@ -860,7 +904,13 @@ export class TransferService extends BaseTransferService {
 
       return response.transfer;
     } catch (error) {
-      throw new Error(`Error canceling send transfer: ${error}`);
+      throw new NetworkError(
+        "Failed to cancel send transfer",
+        {
+          method: "POST",
+        },
+        error instanceof Error ? error : undefined,
+      );
     }
   }
 

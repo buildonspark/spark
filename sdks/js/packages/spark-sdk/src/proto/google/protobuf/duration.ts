@@ -6,6 +6,7 @@
 
 /* eslint-disable */
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
+import { ValidationError } from "../../../errors/index.js";
 
 export const protobufPackage = "google.protobuf";
 
@@ -175,10 +176,20 @@ export type DeepPartial<T> = T extends Builtin ? T
 function longToNumber(int64: { toString(): string }): number {
   const num = globalThis.Number(int64.toString());
   if (num > globalThis.Number.MAX_SAFE_INTEGER) {
-    throw new globalThis.Error("Value is larger than Number.MAX_SAFE_INTEGER");
+    throw new ValidationError(
+      "Number exceeds maximum safe integer",
+      {
+        value: int64.toString(),
+      }
+    );
   }
   if (num < globalThis.Number.MIN_SAFE_INTEGER) {
-    throw new globalThis.Error("Value is smaller than Number.MIN_SAFE_INTEGER");
+    throw new ValidationError(
+      "Number is below minimum safe integer",
+      {
+        value: int64.toString(),
+      }
+    );
   }
   return num;
 }

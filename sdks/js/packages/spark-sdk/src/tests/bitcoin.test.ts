@@ -10,6 +10,7 @@ import {
   getTxId,
 } from "../utils/bitcoin.js";
 import { Network } from "../utils/network.js";
+import { ValidationError } from "../errors/types.js";
 
 describe("bitcoin", () => {
   it("test p2tr address from public key", () => {
@@ -90,7 +91,10 @@ describe("bitcoin", () => {
     });
 
     const prevOutScript = prevTx.getOutput(0).script;
-    if (!prevOutScript) throw new Error("No script found in prevOut");
+    if (!prevOutScript)
+      throw new ValidationError("No script found in prevOut", {
+        field: "prevOutScript",
+      });
 
     tx.addOutput({
       script: prevOutScript,
@@ -98,7 +102,10 @@ describe("bitcoin", () => {
     });
 
     const prevOut = prevTx.getOutput(0);
-    if (!prevOut) throw new Error("No output found in prevTx");
+    if (!prevOut)
+      throw new ValidationError("No output found in prevTx", {
+        field: "prevOut",
+      });
 
     // Calculate sighash
     const sighash = getSigHashFromTx(tx, 0, prevOut);

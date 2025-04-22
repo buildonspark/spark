@@ -57,6 +57,7 @@ import { LeavesSwapFeeEstimate } from "./queries/LeavesSwapFeeEstimate.js";
 import { LightningReceiveFeeEstimate } from "./queries/LightningReceiveFeeEstimate.js";
 import { LightningSendFeeEstimate } from "./queries/LightningSendFeeEstimate.js";
 import { UserRequest } from "./queries/UserRequest.js";
+import { NetworkError, AuthenticationError } from "../errors/index.js";
 
 export interface SspClientOptions {
   baseUrl: string;
@@ -120,10 +121,27 @@ export default class SspClient {
         error instanceof Error &&
         error.message.toLowerCase().includes("unauthorized")
       ) {
-        await this.authenticate();
-        return await this.requester.executeQuery(query);
+        try {
+          await this.authenticate();
+          return await this.requester.executeQuery(query);
+        } catch (authError) {
+          throw new AuthenticationError(
+            "Failed to authenticate after unauthorized response",
+            {
+              endpoint: "graphql",
+              reason: error.message,
+            },
+            authError instanceof Error ? authError : undefined,
+          );
+        }
       }
-      throw error;
+      throw new NetworkError(
+        "Failed to execute GraphQL query",
+        {
+          method: "POST",
+        },
+        error instanceof Error ? error : undefined,
+      );
     }
   }
 

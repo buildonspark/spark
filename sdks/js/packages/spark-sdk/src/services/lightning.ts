@@ -33,6 +33,7 @@ import {
 import { WalletConfigService } from "./config.js";
 import { ConnectionManager } from "./connection.js";
 import { LeafKeyTweak } from "./transfer.js";
+import { ValidationError, NetworkError } from "../errors/types.js";
 
 const crypto = getCrypto();
 
@@ -97,7 +98,11 @@ export class LightningService {
     const paymentHash = sha256(preimage);
     const invoice = await invoiceCreator(amountSats, paymentHash, memo);
     if (!invoice) {
-      throw new Error("Error creating lightning invoice");
+      throw new ValidationError("Failed to create lightning invoice", {
+        field: "invoice",
+        value: null,
+        expected: "Non-null invoice",
+      });
     }
 
     const shares = await this.config.signer.splitSecretWithProofs({
@@ -112,7 +117,11 @@ export class LightningService {
       async ([_, operator]) => {
         const share = shares[operator.id];
         if (!share) {
-          throw new Error("Share not found");
+          throw new ValidationError("Share not found for operator", {
+            field: "share",
+            value: operator.id,
+            expected: "Non-null share",
+          });
         }
 
         const sparkClient = await this.connectionManager.createSparkClient(
@@ -140,7 +149,15 @@ export class LightningService {
     await Promise.all(promises);
 
     if (errors.length > 0) {
-      throw new Error(`Error creating lightning invoice: ${errors[0]}`);
+      throw new NetworkError(
+        "Failed to store preimage shares",
+        {
+          operation: "store_preimage_share",
+          errorCount: errors.length,
+          errors: errors.map((e) => e.message).join(", "),
+        },
+        errors[0],
+      );
     }
 
     return invoice;
@@ -163,7 +180,15 @@ export class LightningService {
         nodeIds: leaves.map((leaf) => leaf.leaf.id),
       });
     } catch (error) {
-      throw new Error(`Error getting signing commitments: ${error}`);
+      throw new NetworkError(
+        "Failed to get signing commitments",
+        {
+          operation: "get_signing_commitments",
+          errorCount: 1,
+          errors: error instanceof Error ? error.message : String(error),
+        },
+        error instanceof Error ? error : undefined,
+      );
     }
 
     const leafSigningJobs = await this.signRefunds(
@@ -217,7 +242,15 @@ export class LightningService {
         feeSats: 0,
       });
     } catch (error) {
-      throw new Error(`Error initiating preimage swap: ${error}`);
+      throw new NetworkError(
+        "Failed to initiate preimage swap",
+        {
+          operation: "initiate_preimage_swap",
+          errorCount: 1,
+          errors: error instanceof Error ? error.message : String(error),
+        },
+        error instanceof Error ? error : undefined,
+      );
     }
 
     return response;
@@ -236,7 +269,15 @@ export class LightningService {
         paymentHash,
       });
     } catch (error) {
-      throw new Error(`Error querying user signed refunds: ${error}`);
+      throw new NetworkError(
+        "Failed to query user signed refunds",
+        {
+          operation: "query_user_signed_refunds",
+          errorCount: 1,
+          errors: error instanceof Error ? error.message : String(error),
+        },
+        error instanceof Error ? error : undefined,
+      );
     }
 
     return response.userSignedRefunds;
@@ -261,11 +302,23 @@ export class LightningService {
         paymentHash,
       });
     } catch (error) {
-      throw new Error(`Error providing preimage: ${error}`);
+      throw new NetworkError(
+        "Failed to provide preimage",
+        {
+          operation: "provide_preimage",
+          errorCount: 1,
+          errors: error instanceof Error ? error.message : String(error),
+        },
+        error instanceof Error ? error : undefined,
+      );
     }
 
     if (!response.transfer) {
-      throw new Error("No transfer returned from coordinator");
+      throw new ValidationError("No transfer returned from coordinator", {
+        field: "transfer",
+        value: response,
+        expected: "Non-null transfer",
+      });
     }
 
     return response.transfer;
@@ -280,7 +333,11 @@ export class LightningService {
     for (let i = 0; i < leaves.length; i++) {
       const leaf = leaves[i];
       if (!leaf?.leaf) {
-        throw new Error("Leaf not found in signRefunds");
+        throw new ValidationError("Leaf not found in signRefunds", {
+          field: "leaf",
+          value: leaf,
+          expected: "Non-null leaf",
+        });
       }
 
       const nodeTx = getTxFromRawTxBytes(leaf.leaf.nodeTx);
@@ -295,7 +352,11 @@ export class LightningService {
       );
       const amountSats = currRefundTx.getOutput(0).amount;
       if (amountSats === undefined) {
-        throw new Error("Amount not found in signRefunds");
+        throw new ValidationError("Invalid refund transaction", {
+          field: "amount",
+          value: currRefundTx.getOutput(0),
+          expected: "Non-null amount",
+        });
       }
 
       const refundTx = createRefundTx(
@@ -314,7 +375,11 @@ export class LightningService {
       const signingNonceCommitments =
         signingCommitments[i]?.signingNonceCommitments;
       if (!signingNonceCommitments) {
-        throw new Error("Signing nonce commitments not found in signRefunds");
+        throw new ValidationError("Invalid signing commitments", {
+          field: "signingNonceCommitments",
+          value: signingCommitments[i],
+          expected: "Non-null signing nonce commitments",
+        });
       }
       const signingResult = await this.config.signer.signFrost({
         message: sighash,

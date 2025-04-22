@@ -18,6 +18,7 @@ import {
   LeafKeyTweak,
   LeafRefundSigningData,
 } from "./transfer.js";
+import { ValidationError, NetworkError } from "../errors/types.js";
 
 const crypto = getCrypto();
 
@@ -69,7 +70,11 @@ export class CoopExitService extends BaseTransferService {
   ): Transaction {
     const refundTx = new Transaction();
     if (!nodeOutPoint.txid || nodeOutPoint.index === undefined) {
-      throw new Error("Node outpoint txid or index is undefined");
+      throw new ValidationError("Invalid node outpoint", {
+        field: "nodeOutPoint",
+        value: { txid: nodeOutPoint.txid, index: nodeOutPoint.index },
+        expected: "Both txid and index must be defined",
+      });
     }
     refundTx.addInput({
       txid: nodeOutPoint.txid,
@@ -97,7 +102,17 @@ export class CoopExitService extends BaseTransferService {
     receiverPubKey: Uint8Array,
   ): Promise<{ transfer: Transfer; signaturesMap: Map<string, Uint8Array> }> {
     if (leaves.length !== connectorOutputs.length) {
-      throw new Error("Number of leaves and connector outputs must match");
+      throw new ValidationError(
+        "Mismatch between leaves and connector outputs",
+        {
+          field: "leaves/connectorOutputs",
+          value: {
+            leavesCount: leaves.length,
+            outputsCount: connectorOutputs.length,
+          },
+          expected: "Equal length",
+        },
+      );
     }
 
     const signingJobs: LeafRefundTxSigningJob[] = [];
@@ -105,12 +120,20 @@ export class CoopExitService extends BaseTransferService {
 
     for (let i = 0; i < leaves.length; i++) {
       const leaf = leaves[i];
-      const connectorOutput = connectorOutputs[i];
-      if (!leaf?.leaf) {
-        throw new Error("Leaf not found");
+      if (!leaf) {
+        throw new ValidationError("Missing leaf", {
+          field: "leaf",
+          value: leaf,
+          expected: "Valid leaf object",
+        });
       }
+      const connectorOutput = connectorOutputs[i];
       if (!connectorOutput) {
-        throw new Error("Connector output not found");
+        throw new ValidationError("Missing connector output", {
+          field: "connectorOutput",
+          value: connectorOutput,
+          expected: "Valid connector output",
+        });
       }
       const currentRefundTx = getTxFromRawTxBytes(leaf.leaf.refundTx);
 
@@ -167,12 +190,23 @@ export class CoopExitService extends BaseTransferService {
         exitId: crypto.randomUUID(),
         exitTxid: exitTxId,
       });
-    } catch (error) {
-      throw new Error(`Error initiating cooperative exit: ${error}`);
+    } catch (error: unknown) {
+      throw new NetworkError(
+        "Failed to initiate cooperative exit",
+        {
+          operation: "cooperative_exit",
+          errorCount: 1,
+          errors: error instanceof Error ? error.message : String(error),
+        },
+        error instanceof Error ? error : undefined,
+      );
     }
 
     if (!response.transfer) {
-      throw new Error("Failed to initiate cooperative exit");
+      throw new NetworkError("Failed to initiate cooperative exit", {
+        operation: "cooperative_exit",
+        errors: "No transfer in response",
+      });
     }
 
     const signatures = await this.signRefunds(

@@ -3,6 +3,7 @@ import { bytesToHex, hexToBytes } from "@noble/hashes/utils";
 import { bech32m } from "@scure/base";
 import { SparkAddress } from "../proto/spark.js";
 import { NetworkType } from "../utils/network.js";
+import { ValidationError } from "../errors/index.js";
 
 const AddressNetwork: Record<NetworkType, string> = {
   MAINNET: "sp",
@@ -23,43 +24,111 @@ export interface SparkAddressData {
 export function encodeSparkAddress(
   payload: SparkAddressData,
 ): SparkAddressFormat {
-  isValidPublicKey(payload.identityPublicKey);
+  try {
+    isValidPublicKey(payload.identityPublicKey);
 
-  const sparkAddressProto = SparkAddress.create({
-    identityPublicKey: hexToBytes(payload.identityPublicKey),
-  });
+    const sparkAddressProto = SparkAddress.create({
+      identityPublicKey: hexToBytes(payload.identityPublicKey),
+    });
 
-  const serializedPayload = SparkAddress.encode(sparkAddressProto).finish();
-  const words = bech32m.toWords(serializedPayload);
+    const serializedPayload = SparkAddress.encode(sparkAddressProto).finish();
+    const words = bech32m.toWords(serializedPayload);
 
-  return bech32m.encode(
-    AddressNetwork[payload.network],
-    words,
-    200,
-  ) as SparkAddressFormat;
+    return bech32m.encode(
+      AddressNetwork[payload.network],
+      words,
+      200,
+    ) as SparkAddressFormat;
+  } catch (error) {
+    throw new ValidationError(
+      "Failed to encode Spark address",
+      {
+        field: "publicKey",
+        value: payload.identityPublicKey,
+      },
+      error instanceof Error ? error : undefined,
+    );
+  }
 }
 
 export function decodeSparkAddress(
   address: string,
   network: NetworkType,
 ): string {
-  if (!address.startsWith(AddressNetwork[network])) {
-    throw new Error("Invalid Spark address");
+  try {
+    if (!address.startsWith(AddressNetwork[network])) {
+      throw new ValidationError("Invalid Spark address prefix", {
+        field: "address",
+        value: address,
+      });
+    }
+
+    const decoded = bech32m.decode(address as SparkAddressFormat, 200);
+    const payload = SparkAddress.decode(bech32m.fromWords(decoded.words));
+
+    const publicKey = bytesToHex(payload.identityPublicKey);
+
+    isValidPublicKey(publicKey);
+
+    return publicKey;
+  } catch (error) {
+    if (error instanceof ValidationError) {
+      throw error;
+    }
+    throw new ValidationError(
+      "Failed to decode Spark address",
+      {
+        field: "address",
+        value: address,
+      },
+      error instanceof Error ? error : undefined,
+    );
   }
-
-  const decoded = bech32m.decode(address as SparkAddressFormat, 200);
-  const payload = SparkAddress.decode(bech32m.fromWords(decoded.words));
-
-  const publicKey = bytesToHex(payload.identityPublicKey);
-
-  isValidPublicKey(publicKey);
-
-  return publicKey;
 }
 
-export function isValidSparkAddress(address: string) {}
+export function isValidSparkAddress(address: string) {
+  try {
+    const network = Object.entries(AddressNetwork).find(([_, prefix]) =>
+      address.startsWith(prefix),
+    )?.[0] as NetworkType | undefined;
+
+    if (!network) {
+      throw new ValidationError("Invalid Spark address network", {
+        field: "network",
+        value: address,
+        expected: Object.values(AddressNetwork),
+      });
+    }
+
+    decodeSparkAddress(address, network);
+    return true;
+  } catch (error) {
+    if (error instanceof ValidationError) {
+      throw error;
+    }
+    throw new ValidationError(
+      "Invalid Spark address",
+      {
+        field: "address",
+        value: address,
+      },
+      error instanceof Error ? error : undefined,
+    );
+  }
+}
 
 function isValidPublicKey(publicKey: string) {
-  const point = secp256k1.ProjectivePoint.fromHex(publicKey);
-  point.assertValidity();
+  try {
+    const point = secp256k1.ProjectivePoint.fromHex(publicKey);
+    point.assertValidity();
+  } catch (error) {
+    throw new ValidationError(
+      "Invalid public key",
+      {
+        field: "publicKey",
+        value: publicKey,
+      },
+      error instanceof Error ? error : undefined,
+    );
+  }
 }

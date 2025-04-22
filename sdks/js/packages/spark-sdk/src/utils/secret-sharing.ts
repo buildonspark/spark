@@ -1,6 +1,7 @@
 import { bytesToHex, equalBytes } from "@noble/curves/abstract/utils";
 import { secp256k1 } from "@noble/curves/secp256k1";
 import { getCrypto } from "./crypto.js";
+import { ValidationError } from "../errors/index.js";
 
 const crypto = getCrypto();
 
@@ -54,7 +55,11 @@ export function modInverse(a: bigint, m: bigint): bigint {
   }
 
   if (old_r !== 1n) {
-    throw new Error("Modular inverse does not exist");
+    throw new ValidationError("Modular inverse does not exist", {
+      field: "modInverse",
+      value: `a: ${a}, m: ${m}`,
+      expected: "a and m must be coprime",
+    });
   }
 
   return ((old_s % m) + m) % m;
@@ -66,7 +71,11 @@ export function evaluatePolynomial(polynomial: Polynomial, x: bigint): bigint {
   for (let i = 0; i < polynomial.coefficients.length; i++) {
     const coeff = polynomial.coefficients[i];
     if (!coeff) {
-      throw new Error("Coefficient is undefined");
+      throw new ValidationError("Coefficient is undefined", {
+        field: "coefficient",
+        value: "undefined",
+        expected: "A valid bigint coefficient",
+      });
     }
 
     const xPow = x ** BigInt(i) % polynomial.fieldModulus;
@@ -83,7 +92,11 @@ export function fieldDiv(
   fieldModulus: bigint,
 ): bigint {
   if (denominator === 0n) {
-    throw new Error("Division by zero");
+    throw new ValidationError("Division by zero", {
+      field: "denominator",
+      value: "0",
+      expected: "Non-zero value",
+    });
   }
 
   const inverse = modInverse(denominator, fieldModulus);
@@ -99,7 +112,11 @@ export function computerLagrangeCoefficients(
   let denominator = 1n;
   let fieldModulus = points[0]?.fieldModulus;
   if (!fieldModulus) {
-    throw new Error("Field modulus is undefined");
+    throw new ValidationError("Field modulus is undefined", {
+      field: "fieldModulus",
+      value: "undefined",
+      expected: "A valid field modulus",
+    });
   }
 
   for (const point of points) {
@@ -202,11 +219,19 @@ export function recoverSecret(shares: VerifiableSecretShare[]) {
   const fieldModulus = shares[0]?.fieldModulus;
 
   if (!threshold || !fieldModulus) {
-    throw new Error("Shares are not valid");
+    throw new ValidationError("Shares are not valid", {
+      field: "shares",
+      value: "Missing threshold or fieldModulus",
+      expected: "Valid shares with threshold and fieldModulus",
+    });
   }
 
   if (shares.length < threshold) {
-    throw new Error("Not enough shares to recover secret");
+    throw new ValidationError("Not enough shares to recover secret", {
+      field: "shares",
+      value: shares.length,
+      expected: `At least ${threshold} shares`,
+    });
   }
 
   let result = 0n;
@@ -228,13 +253,21 @@ export function validateShare(share: VerifiableSecretShare) {
 
   let resultPubkey = share.proofs[0];
   if (!resultPubkey) {
-    throw new Error("Result pubkey is not valid");
+    throw new ValidationError("Result pubkey is not valid", {
+      field: "resultPubkey",
+      value: "null",
+      expected: "Valid public key bytes",
+    });
   }
 
   for (let i = 1; i < share.proofs.length; i++) {
     const pubkey = share.proofs[i];
     if (!pubkey) {
-      throw new Error("Pubkey is not valid");
+      throw new ValidationError("Pubkey is not valid", {
+        field: "pubkey",
+        value: "null",
+        expected: "Valid public key bytes",
+      });
     }
     const value = share.index ** BigInt(i) % share.fieldModulus;
 
@@ -246,7 +279,11 @@ export function validateShare(share: VerifiableSecretShare) {
   }
 
   if (!equalBytes(resultPubkey, targetPubkey)) {
-    throw new Error("Share is not valid");
+    throw new ValidationError("Share is not valid", {
+      field: "share",
+      value: "Invalid proof",
+      expected: "Valid share with matching proofs",
+    });
   }
 }
 

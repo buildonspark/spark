@@ -23,6 +23,11 @@ import {
 import { calculateAvailableTokenAmount } from "../utils/token-transactions.js";
 import { WalletConfigService } from "./config.js";
 import { ConnectionManager } from "./connection.js";
+import {
+  ValidationError,
+  NetworkError,
+  AuthenticationError,
+} from "../errors/types.js";
 
 export class TokenTransactionService {
   protected readonly config: WalletConfigService;
@@ -130,7 +135,11 @@ export class TokenTransactionService {
       const issuerPublicKey =
         tokenTransaction.tokenInputs!.mintInput.issuerPublicKey;
       if (!issuerPublicKey) {
-        throw new Error("issuer public key cannot be nil");
+        throw new ValidationError("Invalid mint input", {
+          field: "issuerPublicKey",
+          value: null,
+          expected: "Non-null issuer public key",
+        });
       }
 
       const ownerSignature = await this.signMessageWithKey(
@@ -146,15 +155,24 @@ export class TokenTransactionService {
         !outputsToSpendSigningPublicKeys ||
         !outputsToSpendRevocationPublicKeys
       ) {
-        throw new Error(
-          "outputs to spend signing public keys and outputs to spend revocation public keys are required",
-        );
+        throw new ValidationError("Invalid transfer input", {
+          field: "outputsToSpend",
+          value: {
+            signingPublicKeys: outputsToSpendSigningPublicKeys,
+            revocationPublicKeys: outputsToSpendRevocationPublicKeys,
+          },
+          expected: "Non-null signing and revocation public keys",
+        });
       }
 
       for (let i = 0; i < transferInput.outputsToSpend.length; i++) {
         const key = outputsToSpendSigningPublicKeys![i];
         if (!key) {
-          throw new Error("key not found");
+          throw new ValidationError("Invalid signing key", {
+            field: "outputsToSpendSigningPublicKeys",
+            value: i,
+            expected: "Non-null signing key",
+          });
         }
         const ownerSignature = await this.signMessageWithKey(
           partialTokenTransactionHash,
@@ -185,21 +203,21 @@ export class TokenTransactionService {
       startResponse.keyshareInfo?.ownerIdentifiers.length !==
       Object.keys(signingOperators).length
     ) {
-      throw new Error(
-        `Keyshare operator count (${
-          startResponse.keyshareInfo?.ownerIdentifiers.length
-        }) does not match signing operator count (${
-          Object.keys(signingOperators).length
-        })`,
-      );
+      throw new ValidationError("Invalid keyshare configuration", {
+        field: "ownerIdentifiers",
+        value: startResponse.keyshareInfo?.ownerIdentifiers.length,
+        expected: Object.keys(signingOperators).length,
+      });
     }
 
     for (const identifier of startResponse.keyshareInfo?.ownerIdentifiers ||
       []) {
       if (!signingOperators[identifier]) {
-        throw new Error(
-          `Keyshare operator ${identifier} not found in signing operator list`,
-        );
+        throw new ValidationError("Invalid keyshare operator", {
+          field: "ownerIdentifiers",
+          value: identifier,
+          expected: "Valid operator identifier",
+        });
       }
     }
 
@@ -224,7 +242,11 @@ export class TokenTransactionService {
       const issuerPublicKey =
         tokenTransaction.tokenInputs!.mintInput.issuerPublicKey;
       if (!issuerPublicKey) {
-        throw new Error("issuer public key cannot be nil");
+        throw new ValidationError("Invalid mint input", {
+          field: "issuerPublicKey",
+          value: null,
+          expected: "Non-null issuer public key",
+        });
       }
 
       const ownerSignature = await this.signMessageWithKey(
@@ -268,23 +290,35 @@ export class TokenTransactionService {
           const identityPublicKey =
             await this.config.signer.getIdentityPublicKey();
 
-          const response = await internalSparkClient.sign_token_transaction(
-            {
-              finalTokenTransaction,
-              operatorSpecificSignatures,
-              identityPublicKey,
-            },
-            {
-              retry: true,
-              retryMaxAttempts: 3,
-            } as SparkCallOptions,
-          );
+          try {
+            const response = await internalSparkClient.sign_token_transaction(
+              {
+                finalTokenTransaction,
+                operatorSpecificSignatures,
+                identityPublicKey,
+              },
+              {
+                retry: true,
+                retryMaxAttempts: 3,
+              } as SparkCallOptions,
+            );
 
-          return {
-            index,
-            identifier,
-            response,
-          };
+            return {
+              index,
+              identifier,
+              response,
+            };
+          } catch (error) {
+            throw new NetworkError(
+              "Failed to sign token transaction",
+              {
+                operation: "sign_token_transaction",
+                errorCount: 1,
+                errors: error instanceof Error ? error.message : String(error),
+              },
+              error instanceof Error ? error : undefined,
+            );
+          }
         },
       ),
     );
@@ -312,18 +346,24 @@ export class TokenTransactionService {
         );
 
         if (outputKeyshares.length < threshold) {
-          throw new Error(
-            `Insufficient keyshares for output ${outputIndex}: got ${outputKeyshares.length}, needs ${threshold}`,
-          );
+          throw new ValidationError("Insufficient keyshares", {
+            field: "outputKeyshares",
+            value: outputKeyshares.length,
+            expected: threshold,
+            index: outputIndex,
+          });
         }
 
         // Check for duplicate operator indices
         const seenIndices = new Set<number>();
         for (const { index } of outputKeyshares) {
           if (seenIndices.has(index)) {
-            throw new Error(
-              `Duplicate operator index ${index} for output ${outputIndex}`,
-            );
+            throw new ValidationError("Duplicate operator index", {
+              field: "outputKeyshares",
+              value: index,
+              expected: "Unique operator index",
+              index: outputIndex,
+            });
           }
           seenIndices.add(index);
         }
@@ -345,9 +385,11 @@ export class TokenTransactionService {
               byte === outputsToSpendRevocationPublicKeys[outputIndex]![i],
           )
         ) {
-          throw new Error(
-            `Recovered public key does not match expected revocation public key for output ${outputIndex}`,
-          );
+          throw new ValidationError("Invalid revocation key", {
+            field: "recoveredPublicKey",
+            value: bytesToHex(recoveredPublicKey),
+            index: outputIndex,
+          });
         }
 
         revocationKeys.push(recoveredPrivateKey);
@@ -380,22 +422,34 @@ export class TokenTransactionService {
         const identityPublicKey =
           await this.config.signer.getIdentityPublicKey();
 
-        const response = await internalSparkClient.finalize_token_transaction(
-          {
-            finalTokenTransaction,
-            outputToSpendRevocationSecrets,
-            identityPublicKey,
-          },
-          {
-            retry: true,
-            retryMaxAttempts: 3,
-          } as SparkCallOptions,
-        );
+        try {
+          const response = await internalSparkClient.finalize_token_transaction(
+            {
+              finalTokenTransaction,
+              outputToSpendRevocationSecrets,
+              identityPublicKey,
+            },
+            {
+              retry: true,
+              retryMaxAttempts: 3,
+            } as SparkCallOptions,
+          );
 
-        return {
-          identifier,
-          response,
-        };
+          return {
+            identifier,
+            response,
+          };
+        } catch (error) {
+          throw new NetworkError(
+            "Failed to finalize token transaction",
+            {
+              operation: "finalize_token_transaction",
+              errorCount: 1,
+              errors: error instanceof Error ? error.message : String(error),
+            },
+            error instanceof Error ? error : undefined,
+          );
+        }
       }),
     );
 
@@ -412,12 +466,24 @@ export class TokenTransactionService {
       this.config.getCoordinatorAddress(),
     );
 
-    const result = await sparkClient.query_token_outputs({
-      ownerPublicKeys,
-      tokenPublicKeys,
-    });
+    try {
+      const result = await sparkClient.query_token_outputs({
+        ownerPublicKeys,
+        tokenPublicKeys,
+      });
 
-    return result.outputsWithPreviousTransactionData;
+      return result.outputsWithPreviousTransactionData;
+    } catch (error) {
+      throw new NetworkError(
+        "Failed to fetch owned token outputs",
+        {
+          operation: "query_token_outputs",
+          errorCount: 1,
+          errors: error instanceof Error ? error.message : String(error),
+        },
+        error instanceof Error ? error : undefined,
+      );
+    }
   }
 
   public async syncTokenOutputs(
@@ -443,7 +509,11 @@ export class TokenTransactionService {
     tokenAmount: bigint,
   ): OutputWithPreviousTransactionData[] {
     if (calculateAvailableTokenAmount(tokenOutputs) < tokenAmount) {
-      throw new Error("Insufficient available token amount");
+      throw new ValidationError("Insufficient token amount", {
+        field: "tokenAmount",
+        value: calculateAvailableTokenAmount(tokenOutputs),
+        expected: tokenAmount,
+      });
     }
 
     // First try to find an exact match
@@ -480,9 +550,10 @@ export class TokenTransactionService {
     }
 
     if (remainingAmount > 0n) {
-      throw new Error(
-        "You do not have enough funds to complete the specified operation",
-      );
+      throw new ValidationError("Insufficient funds", {
+        field: "remainingAmount",
+        value: remainingAmount,
+      });
     }
 
     return selectedOutputs;

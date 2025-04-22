@@ -9,6 +9,10 @@ import {
   getP2TRScriptFromPublicKey,
 } from "../../utils/bitcoin.js";
 import { getNetwork, Network } from "../../utils/network.js";
+import { SparkWallet } from "../../spark-wallet.js";
+import { sha256 } from "@noble/hashes/sha256";
+import { ripemd160 } from "@noble/hashes/ripemd160";
+import { RPCError } from "../../errors/index.js";
 
 export type FaucetCoin = {
   key: Uint8Array;
@@ -232,13 +236,26 @@ export class BitcoinFaucet {
       const data = await response.json();
       if (data.error) {
         console.error(`RPC Error for method ${method}:`, data.error);
-        throw new Error(`Bitcoin RPC error: ${data.error.message}`);
+        throw new RPCError(`Bitcoin RPC error: ${data.error.message}`, {
+          method,
+          params,
+          code: data.error.code,
+        });
       }
 
       return data.result;
     } catch (error) {
-      console.error("Error calling Bitcoin RPC:", error);
-      throw error;
+      if (error instanceof RPCError) {
+        throw error;
+      }
+      throw new RPCError(
+        "Failed to call Bitcoin RPC",
+        {
+          method,
+          params,
+        },
+        error instanceof Error ? error : undefined,
+      );
     }
   }
 

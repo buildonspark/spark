@@ -7,6 +7,7 @@ import {
   LightningReceiveRequestStatus,
 } from "../../../types/index.js";
 import { NetworkType } from "../../../utils/network.js";
+import { ValidationError } from "../../../errors/types.js";
 
 const options: ConfigOptions = {
   network: "LOCAL",
@@ -101,7 +102,13 @@ describe("Lightning Network provider", () => {
           amountSats: -1,
           memo: "test",
         }),
-      ).rejects.toThrow();
+      ).rejects.toThrow(
+        new ValidationError("Invalid amount", {
+          field: "amountSats",
+          value: -1,
+          expected: "Non-negative amount",
+        }),
+      );
     }, 30000);
 
     it(`should fail to create lightning invoice with invalid expiration time`, async () => {
@@ -111,7 +118,13 @@ describe("Lightning Network provider", () => {
           memo: "test",
           expirySeconds: -1,
         }),
-      ).rejects.toThrow();
+      ).rejects.toThrow(
+        new ValidationError("Invalid expiration time", {
+          field: "expirySeconds",
+          value: -1,
+          expected: "Non-negative expiration time",
+        }),
+      );
     }, 30000);
 
     it(`should fail to create lightning invoice with invalid memo size`, async () => {
@@ -120,7 +133,13 @@ describe("Lightning Network provider", () => {
           amountSats: 1000,
           memo: "test".repeat(1000),
         }),
-      ).rejects.toThrow();
+      ).rejects.toThrow(
+        new ValidationError("Invalid memo size", {
+          field: "memo",
+          value: "test".repeat(1000).length,
+          expected: "Memo size within limits",
+        }),
+      );
     }, 30000);
   });
 });

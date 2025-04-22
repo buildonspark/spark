@@ -15,6 +15,7 @@ import { getCrypto } from "../utils/crypto.js";
 import { getNetwork, Network } from "../utils/network.js";
 import { SparkWalletTesting } from "./utils/spark-testing-wallet.js";
 import { BitcoinFaucet } from "./utils/test-faucet.js";
+import { ValidationError, RPCError } from "../errors/types.js";
 
 const crypto = getCrypto();
 
@@ -71,7 +72,10 @@ export async function createNewTree(
   });
 
   if (!depositResp.depositAddress) {
-    throw new Error("deposit address not found");
+    throw new RPCError("Deposit address not found", {
+      method: "generateDepositAddress",
+      params: { signingPubkey: pubKey, leafId },
+    });
   }
 
   const depositTx = new Transaction();

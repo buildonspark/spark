@@ -75,6 +75,13 @@ import {
   checkIfSelectedOutputsAreAvailable,
 } from "./utils/token-transactions.js";
 import { getNextTransactionSequence } from "./utils/transaction.js";
+import {
+  ValidationError,
+  NetworkError,
+  AuthenticationError,
+  RPCError,
+  ConfigurationError,
+} from "./errors/types.js";
 
 import { LRCWallet } from "@buildonspark/lrc20-sdk";
 import {
@@ -235,12 +242,17 @@ export class SparkWallet {
 
   private async selectLeaves(targetAmount: number): Promise<TreeNode[]> {
     if (targetAmount <= 0) {
-      throw new Error("Target amount must be positive");
+      throw new ValidationError("Target amount must be positive", {
+        field: "targetAmount",
+        value: targetAmount,
+      });
     }
 
     const leaves = await this.getLeaves();
     if (leaves.length === 0) {
-      throw new Error("No owned leaves found");
+      throw new ValidationError("No owned leaves found", {
+        field: "leaves",
+      });
     }
 
     leaves.sort((a, b) => b.value - a.value);
@@ -471,7 +483,9 @@ export class SparkWallet {
     amountSats: number,
   ): Promise<LeavesSwapFeeEstimateOutput> {
     if (!this.sspClient) {
-      throw new Error("SSP client not initialized");
+      throw new ConfigurationError("SSP client not initialized", {
+        configKey: "sspClient",
+      });
     }
 
     const feeEstimate = await this.sspClient.getSwapFeeEstimate(amountSats);
@@ -777,7 +791,10 @@ export class SparkWallet {
       leafId,
     });
     if (!address.depositAddress) {
-      throw new Error("Failed to generate deposit address");
+      throw new RPCError("Failed to generate deposit address", {
+        method: "generateDepositAddress",
+        params: { signingPubkey, leafId },
+      });
     }
     return address.depositAddress.address;
   }
@@ -834,6 +851,12 @@ export class SparkWallet {
    * @returns {Promise<TreeNode[] | undefined>} The nodes resulting from the deposit
    */
   public async claimDeposit(txid: string) {
+    if (!txid) {
+      throw new ValidationError("Transaction ID cannot be empty", {
+        field: "txid",
+      });
+    }
+
     let mutex = this.mutexes.get(txid);
     if (!mutex) {
       mutex = new Mutex();
@@ -872,7 +895,10 @@ export class SparkWallet {
       }
 
       if (!/^[0-9A-Fa-f]+$/.test(txHex)) {
-        throw new Error("Invalid transaction hex");
+        throw new ValidationError("Invalid transaction hex", {
+          field: "txHex",
+          value: txHex,
+        });
       }
       const depositTx = getTxFromRawTxHex(txHex);
 
@@ -1018,6 +1044,19 @@ export class SparkWallet {
    * @returns {Promise<Transfer>} The completed transfer details
    */
   public async transfer({ amountSats, receiverSparkAddress }: TransferParams) {
+    if (!receiverSparkAddress) {
+      throw new ValidationError("Receiver Spark address cannot be empty", {
+        field: "receiverSparkAddress",
+      });
+    }
+
+    if (amountSats <= 0) {
+      throw new ValidationError("Amount must be greater than 0", {
+        field: "amountSats",
+        value: amountSats,
+      });
+    }
+
     const receiverAddress = decodeSparkAddress(
       receiverSparkAddress,
       this.config.getNetworkType(),
@@ -1283,7 +1322,33 @@ export class SparkWallet {
     expirySeconds = 60 * 60 * 24 * 30,
   }: CreateLightningInvoiceParams): Promise<LightningReceiveRequest> {
     if (!this.sspClient) {
-      throw new Error("SSP client not initialized");
+      throw new ConfigurationError("SSP client not initialized", {
+        configKey: "sspClient",
+      });
+    }
+
+    if (isNaN(amountSats) || amountSats < 0) {
+      throw new ValidationError("Invalid amount", {
+        field: "amountSats",
+        value: amountSats,
+        expected: "non-negative number",
+      });
+    }
+
+    if (expirySeconds < 0) {
+      throw new ValidationError("Invalid expiration time", {
+        field: "expirySeconds",
+        value: expirySeconds,
+        expected: "Non-negative expiration time",
+      });
+    }
+
+    if (memo && memo.length > 639) {
+      throw new ValidationError("Invalid memo size", {
+        field: "memo",
+        value: memo,
+        expected: "Memo size within limits",
+      });
     }
 
     const requestLightningInvoice = async (
@@ -1329,7 +1394,9 @@ export class SparkWallet {
   public async payLightningInvoice({ invoice }: PayLightningInvoiceParams) {
     return await this.withLeaves(async () => {
       if (!this.sspClient) {
-        throw new Error("SSP client not initialized");
+        throw new ConfigurationError("SSP client not initialized", {
+          configKey: "sspClient",
+        });
       }
 
       // TODO: Get fee
@@ -1342,7 +1409,11 @@ export class SparkWallet {
         ) / 1000;
 
       if (isNaN(amountSats) || amountSats <= 0) {
-        throw new Error("Invalid amount");
+        throw new ValidationError("Invalid amount", {
+          field: "amountSats",
+          value: amountSats,
+          expected: "positive number",
+        });
       }
 
       const paymentHash = decodedInvoice.sections.find(
@@ -1350,7 +1421,9 @@ export class SparkWallet {
       )?.value;
 
       if (!paymentHash) {
-        throw new Error("No payment hash found in invoice");
+        throw new ValidationError("No payment hash found in invoice", {
+          field: "paymentHash",
+        });
       }
 
       const leaves = await this.selectLeaves(amountSats);
@@ -1417,7 +1490,9 @@ export class SparkWallet {
     amountSats: number;
   }): Promise<LightningReceiveFeeEstimateOutput | null> {
     if (!this.sspClient) {
-      throw new Error("SSP client not initialized");
+      throw new ConfigurationError("SSP client not initialized", {
+        configKey: "sspClient",
+      });
     }
 
     const network = this.config.getSspNetwork();
@@ -1444,7 +1519,9 @@ export class SparkWallet {
     encodedInvoice,
   }: LightningSendFeeEstimateInput): Promise<LightningSendFeeEstimateOutput | null> {
     if (!this.sspClient) {
-      throw new Error("SSP client not initialized");
+      throw new ConfigurationError("SSP client not initialized", {
+        configKey: "sspClient",
+      });
     }
 
     const feeEstimate =
@@ -1527,7 +1604,14 @@ export class SparkWallet {
     amountSats?: number;
   }) {
     if (amountSats && amountSats < 10000) {
-      throw new Error("The minimum amount for a withdrawal is 10000 sats");
+      throw new ValidationError(
+        "The minimum amount for a withdrawal is 10000 sats",
+        {
+          field: "amountSats",
+          value: amountSats,
+          expected: ">= 10000",
+        },
+      );
     }
     return await this.withLeaves(async () => {
       return await this.coopExit(onchainAddress, amountSats);
@@ -1553,7 +1637,14 @@ export class SparkWallet {
     }
 
     if (leavesToSend.reduce((acc, leaf) => acc + leaf.value, 0) < 10000) {
-      throw new Error("The minimum amount for a withdrawal is 10000 sats");
+      throw new ValidationError(
+        "The minimum amount for a withdrawal is 10000 sats",
+        {
+          field: "totalAmount",
+          value: leavesToSend.reduce((acc, leaf) => acc + leaf.value, 0),
+          expected: ">= 10000",
+        },
+      );
     }
 
     const leafKeyTweaks = await Promise.all(
@@ -1628,11 +1719,20 @@ export class SparkWallet {
     withdrawalAddress: string;
   }): Promise<CoopExitFeeEstimateOutput | null> {
     if (!this.sspClient) {
-      throw new Error("SSP client not initialized");
+      throw new ConfigurationError("SSP client not initialized", {
+        configKey: "sspClient",
+      });
     }
 
     if (amountSats < 10000) {
-      throw new Error("The minimum amount for a withdrawal is 10000 sats");
+      throw new ValidationError(
+        "The minimum amount for a withdrawal is 10000 sats",
+        {
+          field: "amountSats",
+          value: amountSats,
+          expected: ">= 10000",
+        },
+      );
     }
 
     const leaves = await this.selectLeaves(amountSats);
@@ -1841,7 +1941,9 @@ export class SparkWallet {
     id: string,
   ): Promise<LightningReceiveRequest | null> {
     if (!this.sspClient) {
-      throw new Error("SSP client not initialized");
+      throw new ConfigurationError("SSP client not initialized", {
+        configKey: "sspClient",
+      });
     }
 
     return await this.sspClient.getLightningReceiveRequest(id);
@@ -1857,7 +1959,9 @@ export class SparkWallet {
     id: string,
   ): Promise<LightningSendRequest | null> {
     if (!this.sspClient) {
-      throw new Error("SSP client not initialized");
+      throw new ConfigurationError("SSP client not initialized", {
+        configKey: "sspClient",
+      });
     }
 
     return await this.sspClient.getLightningSendRequest(id);
@@ -1871,7 +1975,9 @@ export class SparkWallet {
    */
   public async getCoopExitRequest(id: string): Promise<CoopExitRequest | null> {
     if (!this.sspClient) {
-      throw new Error("SSP client not initialized");
+      throw new ConfigurationError("SSP client not initialized", {
+        configKey: "sspClient",
+      });
     }
 
     return await this.sspClient.getCoopExitRequest(id);

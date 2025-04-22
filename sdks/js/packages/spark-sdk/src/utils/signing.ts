@@ -4,6 +4,7 @@ import {
   SigningCommitment as WasmSigningCommitment,
   SigningNonce as WasmSigningNonce,
 } from "../wasm/spark_bindings.js";
+import { ValidationError } from "../errors/index.js";
 
 export function getRandomSigningNonce(): SigningNonce {
   const binding = secp256k1.utils.randomPrivateKey();
@@ -16,7 +17,11 @@ export function createSigningNonce(
   hiding: Uint8Array,
 ): SigningNonce {
   if (binding.length !== 32 || hiding.length !== 32) {
-    throw new Error("Invalid nonce length");
+    throw new ValidationError("Invalid nonce length", {
+      field: "nonce",
+      value: `binding: ${binding.length}, hiding: ${hiding.length}`,
+      expected: "Both binding and hiding should be 32 bytes",
+    });
   }
 
   return {
@@ -42,7 +47,11 @@ export function encodeSigningNonceToBytes(nonce: SigningNonce): Uint8Array {
 
 export function decodeBytesToSigningNonce(bytes: Uint8Array): SigningNonce {
   if (bytes.length !== 64) {
-    throw new Error("Invalid nonce length");
+    throw new ValidationError("Invalid nonce length", {
+      field: "bytes",
+      value: bytes.length,
+      expected: "64 bytes (32 bytes for binding + 32 bytes for hiding)",
+    });
   }
   return {
     binding: bytes.slice(32, 64),
@@ -55,7 +64,12 @@ export function createSigningCommitment(
   hiding: Uint8Array,
 ): SigningCommitment {
   if (binding.length !== 33 || hiding.length !== 33) {
-    throw new Error("Invalid nonce commitment length");
+    throw new ValidationError("Invalid nonce commitment length", {
+      field: "commitment",
+      value: `binding: ${binding.length}, hiding: ${hiding.length}`,
+      expected:
+        "Both binding and hiding should be 33 bytes (compressed public keys)",
+    });
   }
   return {
     binding,
@@ -67,7 +81,12 @@ export function encodeSigningCommitmentToBytes(
   commitment: SigningCommitment,
 ): Uint8Array {
   if (commitment.binding.length !== 33 || commitment.hiding.length !== 33) {
-    throw new Error("Invalid nonce commitment length");
+    throw new ValidationError("Invalid nonce commitment length", {
+      field: "commitment",
+      value: `binding: ${commitment.binding.length}, hiding: ${commitment.hiding.length}`,
+      expected:
+        "Both binding and hiding should be 33 bytes (compressed public keys)",
+    });
   }
 
   return new Uint8Array([...commitment.binding, ...commitment.hiding]);
@@ -77,7 +96,11 @@ export function decodeBytesToSigningCommitment(
   bytes: Uint8Array,
 ): SigningCommitment {
   if (bytes.length !== 66) {
-    throw new Error("Invalid nonce commitment length");
+    throw new ValidationError("Invalid nonce commitment length", {
+      field: "bytes",
+      value: bytes.length,
+      expected: "66 bytes (33 bytes for binding + 33 bytes for hiding)",
+    });
   }
   return {
     binding: bytes.slice(33, 66),
