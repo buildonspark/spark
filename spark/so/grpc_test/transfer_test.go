@@ -1,7 +1,6 @@
 package grpctest
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"sync"
@@ -24,28 +23,18 @@ import (
 func TestTransfer(t *testing.T) {
 	// Sender initiates transfer
 	senderConfig, err := testutil.TestWalletConfig()
-	if err != nil {
-		t.Fatalf("failed to create sender wallet config: %v", err)
-	}
+	require.NoError(t, err, "failed to create sender wallet config")
 
 	leafPrivKey, err := secp256k1.GeneratePrivateKey()
-	if err != nil {
-		t.Fatalf("failed to create node signing private key: %v", err)
-	}
+	require.NoError(t, err, "failed to create node signing private key")
 	rootNode, err := testutil.CreateNewTree(senderConfig, faucet, leafPrivKey, 100_000)
-	if err != nil {
-		t.Fatalf("failed to create new tree: %v", err)
-	}
+	require.NoError(t, err, "failed to create new tree")
 
 	newLeafPrivKey, err := secp256k1.GeneratePrivateKey()
-	if err != nil {
-		t.Fatalf("failed to create new node signing private key: %v", err)
-	}
+	require.NoError(t, err, "failed to create new node signing private key")
 
 	receiverPrivKey, err := secp256k1.GeneratePrivateKey()
-	if err != nil {
-		t.Fatalf("failed to create receiver private key: %v", err)
-	}
+	require.NoError(t, err, "failed to create receiver private key")
 
 	transferNode := wallet.LeafKeyTweak{
 		Leaf:              rootNode,
@@ -60,48 +49,26 @@ func TestTransfer(t *testing.T) {
 		receiverPrivKey.PubKey().SerializeCompressed(),
 		time.Now().Add(10*time.Minute),
 	)
-	if err != nil {
-		t.Fatalf("failed to transfer tree node: %v", err)
-	}
+	require.NoError(t, err, "failed to transfer tree node")
 
 	// Receiver queries pending transfer
 	receiverConfig, err := testutil.TestWalletConfigWithIdentityKey(*receiverPrivKey)
-	if err != nil {
-		t.Fatalf("failed to create wallet config: %v", err)
-	}
+	require.NoError(t, err, "failed to create wallet config")
 	receiverToken, err := wallet.AuthenticateWithServer(context.Background(), receiverConfig)
-	if err != nil {
-		t.Fatalf("failed to authenticate receiver: %v", err)
-	}
+	require.NoError(t, err, "failed to authenticate receiver")
 	receiverCtx := wallet.ContextWithToken(context.Background(), receiverToken)
 	pendingTransfer, err := wallet.QueryPendingTransfers(receiverCtx, receiverConfig)
-	if err != nil {
-		t.Fatalf("failed to query pending transfers: %v", err)
-	}
-	if len(pendingTransfer.Transfers) != 1 {
-		t.Fatalf("expected 1 pending transfer, got %d", len(pendingTransfer.Transfers))
-	}
+	require.NoError(t, err, "failed to query pending transfers")
+	require.Equal(t, 1, len(pendingTransfer.Transfers))
 	receiverTransfer := pendingTransfer.Transfers[0]
-	if receiverTransfer.Id != senderTransfer.Id {
-		t.Fatalf("expected transfer id %s, got %s", senderTransfer.Id, receiverTransfer.Id)
-	}
+	require.Equal(t, senderTransfer.Id, receiverTransfer.Id)
 	require.Equal(t, receiverTransfer.Type, spark.TransferType_TRANSFER)
 
 	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(context.Background(), receiverConfig, receiverTransfer)
-	if err != nil {
-		t.Fatalf("unable to verify pending transfer: %v", err)
-	}
-	if len(*leafPrivKeyMap) != 1 {
-		t.Fatalf("Expected 1 leaf to transfer, got %d", len(*leafPrivKeyMap))
-	}
-	if !bytes.Equal((*leafPrivKeyMap)[rootNode.Id], newLeafPrivKey.Serialize()) {
-		t.Fatalf("wrong leaf signing private key")
-	}
+	assertVerifiedPendingTransfer(t, err, leafPrivKeyMap, rootNode, newLeafPrivKey)
 
 	finalLeafPrivKey, err := secp256k1.GeneratePrivateKey()
-	if err != nil {
-		t.Fatalf("failed to create new node signing private key: %v", err)
-	}
+	require.NoError(t, err, "failed to create new node signing private key")
 	claimingNode := wallet.LeafKeyTweak{
 		Leaf:              receiverTransfer.Leaves[0].Leaf,
 		SigningPrivKey:    newLeafPrivKey.Serialize(),
@@ -114,10 +81,8 @@ func TestTransfer(t *testing.T) {
 		receiverConfig,
 		leavesToClaim[:],
 	)
-	if err != nil {
-		t.Fatalf("failed to ClaimTransfer: %v", err)
-	}
-	assert.Equal(t, res[0].Id, claimingNode.Leaf.Id)
+	require.NoError(t, err, "failed to ClaimTransfer")
+	require.Equal(t, res[0].Id, claimingNode.Leaf.Id)
 }
 
 func TestTransferZeroLeaves(t *testing.T) {
@@ -144,28 +109,18 @@ func TestTransferZeroLeaves(t *testing.T) {
 func TestTransferWithSeparateSteps(t *testing.T) {
 	// Sender initiates transfer
 	senderConfig, err := testutil.TestWalletConfig()
-	if err != nil {
-		t.Fatalf("failed to create sender wallet config: %v", err)
-	}
+	require.NoError(t, err, "failed to create sender wallet config")
 
 	leafPrivKey, err := secp256k1.GeneratePrivateKey()
-	if err != nil {
-		t.Fatalf("failed to create node signing private key: %v", err)
-	}
+	require.NoError(t, err, "failed to create node signing private key")
 	rootNode, err := testutil.CreateNewTree(senderConfig, faucet, leafPrivKey, 100_000)
-	if err != nil {
-		t.Fatalf("failed to create new tree: %v", err)
-	}
+	require.NoError(t, err, "failed to create new tree")
 
 	newLeafPrivKey, err := secp256k1.GeneratePrivateKey()
-	if err != nil {
-		t.Fatalf("failed to create new node signing private key: %v", err)
-	}
+	require.NoError(t, err, "failed to create new node signing private key")
 
 	receiverPrivKey, err := secp256k1.GeneratePrivateKey()
-	if err != nil {
-		t.Fatalf("failed to create receiver private key: %v", err)
-	}
+	require.NoError(t, err, "failed to create receiver private key")
 
 	transferNode := wallet.LeafKeyTweak{
 		Leaf:              rootNode,
@@ -180,42 +135,22 @@ func TestTransferWithSeparateSteps(t *testing.T) {
 		receiverPrivKey.PubKey().SerializeCompressed(),
 		time.Now().Add(10*time.Minute),
 	)
-	if err != nil {
-		t.Fatalf("failed to transfer tree node: %v", err)
-	}
+	require.NoError(t, err, "failed to transfer tree node")
 
 	// Receiver queries pending transfer
 	receiverConfig, err := testutil.TestWalletConfigWithIdentityKey(*receiverPrivKey)
-	if err != nil {
-		t.Fatalf("failed to create wallet config: %v", err)
-	}
+	require.NoError(t, err, "failed to create wallet config")
 	receiverToken, err := wallet.AuthenticateWithServer(context.Background(), receiverConfig)
-	if err != nil {
-		t.Fatalf("failed to authenticate receiver: %v", err)
-	}
+	require.NoError(t, err, "failed to authenticate receiver")
 	receiverCtx := wallet.ContextWithToken(context.Background(), receiverToken)
 	pendingTransfer, err := wallet.QueryPendingTransfers(receiverCtx, receiverConfig)
-	if err != nil {
-		t.Fatalf("failed to query pending transfers: %v", err)
-	}
-	if len(pendingTransfer.Transfers) != 1 {
-		t.Fatalf("expected 1 pending transfer, got %d", len(pendingTransfer.Transfers))
-	}
+	require.NoError(t, err, "failed to query pending transfers")
+	require.Equal(t, 1, len(pendingTransfer.Transfers))
 	receiverTransfer := pendingTransfer.Transfers[0]
-	if receiverTransfer.Id != senderTransfer.Id {
-		t.Fatalf("expected transfer id %s, got %s", senderTransfer.Id, receiverTransfer.Id)
-	}
+	require.Equal(t, senderTransfer.Id, receiverTransfer.Id)
 
 	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(context.Background(), receiverConfig, receiverTransfer)
-	if err != nil {
-		t.Fatalf("unable to verify pending transfer: %v", err)
-	}
-	if len(*leafPrivKeyMap) != 1 {
-		t.Fatalf("Expected 1 leaf to transfer, got %d", len(*leafPrivKeyMap))
-	}
-	if !bytes.Equal((*leafPrivKeyMap)[rootNode.Id], newLeafPrivKey.Serialize()) {
-		t.Fatalf("wrong leaf signing private key")
-	}
+	assertVerifiedPendingTransfer(t, err, leafPrivKeyMap, rootNode, newLeafPrivKey)
 
 	finalLeafPrivKey, err := secp256k1.GeneratePrivateKey()
 	if err != nil {
@@ -234,32 +169,16 @@ func TestTransferWithSeparateSteps(t *testing.T) {
 		receiverConfig,
 		leavesToClaim[:],
 	)
-	if err != nil {
-		t.Fatalf("failed to tweak keys when claiming leaves: %v", err)
-	}
+	require.NoError(t, err, "failed to ClaimTransferTweakKeys")
 
 	pendingTransfer, err = wallet.QueryPendingTransfers(receiverCtx, receiverConfig)
-	if err != nil {
-		t.Fatalf("failed to query pending transfers: %v", err)
-	}
-	if len(pendingTransfer.Transfers) != 1 {
-		t.Fatalf("expected 1 pending transfer, got %d", len(pendingTransfer.Transfers))
-	}
+	require.NoError(t, err, "failed to query pending transfers")
+	require.Equal(t, 1, len(pendingTransfer.Transfers))
 	receiverTransfer = pendingTransfer.Transfers[0]
-	if receiverTransfer.Id != senderTransfer.Id {
-		t.Fatalf("expected transfer id %s, got %s", senderTransfer.Id, receiverTransfer.Id)
-	}
+	require.Equal(t, senderTransfer.Id, receiverTransfer.Id)
 
 	leafPrivKeyMap, err = wallet.VerifyPendingTransfer(context.Background(), receiverConfig, receiverTransfer)
-	if err != nil {
-		t.Fatalf("unable to verify pending transfer: %v", err)
-	}
-	if len(*leafPrivKeyMap) != 1 {
-		t.Fatalf("Expected 1 leaf to transfer, got %d", len(*leafPrivKeyMap))
-	}
-	if !bytes.Equal((*leafPrivKeyMap)[rootNode.Id], newLeafPrivKey.Serialize()) {
-		t.Fatalf("wrong leaf signing private key")
-	}
+	assertVerifiedPendingTransfer(t, err, leafPrivKeyMap, rootNode, newLeafPrivKey)
 
 	_, err = wallet.ClaimTransferSignRefunds(
 		receiverCtx,
@@ -268,17 +187,11 @@ func TestTransferWithSeparateSteps(t *testing.T) {
 		leavesToClaim[:],
 		nil,
 	)
-	if err != nil {
-		t.Fatalf("failed to sign refunds when claiming leaves: %v", err)
-	}
+	require.NoError(t, err, "failed to ClaimTransferSignRefunds")
 
 	pendingTransfer, err = wallet.QueryPendingTransfers(receiverCtx, receiverConfig)
-	if err != nil {
-		t.Fatalf("failed to query pending transfers: %v", err)
-	}
-	if len(pendingTransfer.Transfers) != 1 {
-		t.Fatalf("expected 1 pending transfer, got %d", len(pendingTransfer.Transfers))
-	}
+	require.NoError(t, err, "failed to query pending transfers")
+	require.Equal(t, 1, len(pendingTransfer.Transfers))
 
 	_, err = wallet.ClaimTransfer(
 		receiverCtx,
@@ -286,37 +199,25 @@ func TestTransferWithSeparateSteps(t *testing.T) {
 		receiverConfig,
 		leavesToClaim[:],
 	)
-	if err != nil {
-		t.Fatalf("failed to ClaimTransfer: %v", err)
-	}
+	require.NoError(t, err, "failed to ClaimTransfer")
 }
 
 func TestCancelTransfer(t *testing.T) {
 	skipIfGithubActions(t)
 	// Sender initiates transfer
 	senderConfig, err := testutil.TestWalletConfig()
-	if err != nil {
-		t.Fatalf("failed to create sender wallet config: %v", err)
-	}
+	require.NoError(t, err, "failed to create sender wallet config")
 
 	leafPrivKey, err := secp256k1.GeneratePrivateKey()
-	if err != nil {
-		t.Fatalf("failed to create node signing private key: %v", err)
-	}
+	require.NoError(t, err, "failed to create node signing private key")
 	rootNode, err := testutil.CreateNewTree(senderConfig, faucet, leafPrivKey, 100_000)
-	if err != nil {
-		t.Fatalf("failed to create new tree: %v", err)
-	}
+	require.NoError(t, err, "failed to create new tree")
 
 	newLeafPrivKey, err := secp256k1.GeneratePrivateKey()
-	if err != nil {
-		t.Fatalf("failed to create new node signing private key: %v", err)
-	}
+	require.NoError(t, err, "failed to create new node signing private key")
 
 	receiverPrivKey, err := secp256k1.GeneratePrivateKey()
-	if err != nil {
-		t.Fatalf("failed to create receiver private key: %v", err)
-	}
+	require.NoError(t, err, "failed to create receiver private key")
 
 	transferNode := wallet.LeafKeyTweak{
 		Leaf:              rootNode,
@@ -332,16 +233,12 @@ func TestCancelTransfer(t *testing.T) {
 		receiverPrivKey.PubKey().SerializeCompressed(),
 		time.Now().Add(expiryDelta),
 	)
-	if err != nil {
-		t.Fatalf("failed to transfer tree node: %v", err)
-	}
+	require.NoError(t, err, "failed to transfer tree node")
 
 	// We don't need to wait for the expiry because we haven't
 	// tweaked our key yet.
 	_, err = wallet.CancelSendTransfer(context.Background(), senderConfig, senderTransfer)
-	if err != nil {
-		t.Fatalf("failed to cancel transfer: %v", err)
-	}
+	require.NoError(t, err, "failed to cancel transfer")
 
 	transfers, _, err := wallet.QueryAllTransfers(context.Background(), senderConfig, 1, 0)
 	require.NoError(t, err)
@@ -354,46 +251,24 @@ func TestCancelTransfer(t *testing.T) {
 		receiverPrivKey.PubKey().SerializeCompressed(),
 		time.Now().Add(10*time.Minute),
 	)
-	if err != nil {
-		t.Fatalf("failed to transfer tree node: %v", err)
-	}
+	require.NoError(t, err, "failed to transfer tree node")
 
 	receiverConfig, err := testutil.TestWalletConfigWithIdentityKey(*receiverPrivKey)
-	if err != nil {
-		t.Fatalf("failed to create wallet config: %v", err)
-	}
+	require.NoError(t, err, "failed to create wallet config")
 	receiverToken, err := wallet.AuthenticateWithServer(context.Background(), receiverConfig)
-	if err != nil {
-		t.Fatalf("failed to authenticate receiver: %v", err)
-	}
+	require.NoError(t, err, "failed to authenticate receiver")
 	receiverCtx := wallet.ContextWithToken(context.Background(), receiverToken)
 	pendingTransfer, err := wallet.QueryPendingTransfers(receiverCtx, receiverConfig)
-	if err != nil {
-		t.Fatalf("failed to query pending transfers: %v", err)
-	}
-	if len(pendingTransfer.Transfers) != 1 {
-		t.Fatalf("expected 1 pending transfer, got %d", len(pendingTransfer.Transfers))
-	}
+	require.NoError(t, err, "failed to query pending transfers")
+	require.Equal(t, 1, len(pendingTransfer.Transfers))
 	receiverTransfer := pendingTransfer.Transfers[0]
-	if receiverTransfer.Id != senderTransfer.Id {
-		t.Fatalf("expected transfer id %s, got %s", senderTransfer.Id, receiverTransfer.Id)
-	}
+	require.Equal(t, senderTransfer.Id, receiverTransfer.Id)
 
 	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(context.Background(), receiverConfig, receiverTransfer)
-	if err != nil {
-		t.Fatalf("unable to verify pending transfer: %v", err)
-	}
-	if len(*leafPrivKeyMap) != 1 {
-		t.Fatalf("Expected 1 leaf to transfer, got %d", len(*leafPrivKeyMap))
-	}
-	if !bytes.Equal((*leafPrivKeyMap)[rootNode.Id], newLeafPrivKey.Serialize()) {
-		t.Fatalf("wrong leaf signing private key")
-	}
+	assertVerifiedPendingTransfer(t, err, leafPrivKeyMap, rootNode, newLeafPrivKey)
 
 	finalLeafPrivKey, err := secp256k1.GeneratePrivateKey()
-	if err != nil {
-		t.Fatalf("failed to create new node signing private key: %v", err)
-	}
+	require.NoError(t, err, "failed to create new node signing private key")
 	claimingNode := wallet.LeafKeyTweak{
 		Leaf:              receiverTransfer.Leaves[0].Leaf,
 		SigningPrivKey:    newLeafPrivKey.Serialize(),
@@ -406,48 +281,32 @@ func TestCancelTransfer(t *testing.T) {
 		receiverConfig,
 		leavesToClaim[:],
 	)
-	if err != nil {
-		t.Fatalf("failed to ClaimTransfer: %v", err)
-	}
+	require.NoError(t, err, "failed to ClaimTransfer")
 }
 
 func TestQueryTransfers(t *testing.T) {
 	skipIfGithubActions(t)
 	// Initiate sender
 	senderConfig, err := testutil.TestWalletConfig()
-	if err != nil {
-		t.Fatalf("failed to create sender wallet config: %v", err)
-	}
+	require.NoError(t, err, "failed to create sender wallet config")
 
 	senderLeafPrivKey, err := secp256k1.GeneratePrivateKey()
-	if err != nil {
-		t.Fatalf("failed to create node signing private key: %v", err)
-	}
+	require.NoError(t, err, "failed to create node signing private key")
 	senderRootNode, err := testutil.CreateNewTree(senderConfig, faucet, senderLeafPrivKey, 100_000)
-	if err != nil {
-		t.Fatalf("failed to create new tree: %v", err)
-	}
+	require.NoError(t, err, "failed to create new tree")
 
 	// Initiate receiver
 	receiverConfig, err := testutil.TestWalletConfig()
-	if err != nil {
-		t.Fatalf("failed to create sender wallet config: %v", err)
-	}
+	require.NoError(t, err, "failed to create receiver wallet config")
 
 	receiverLeafPrivKey, err := secp256k1.GeneratePrivateKey()
-	if err != nil {
-		t.Fatalf("failed to create node signing private key: %v", err)
-	}
+	require.NoError(t, err, "failed to create node signing private key")
 	receiverRootNode, err := testutil.CreateNewTree(receiverConfig, faucet, receiverLeafPrivKey, 100_000)
-	if err != nil {
-		t.Fatalf("failed to create new tree: %v", err)
-	}
+	require.NoError(t, err, "failed to create new tree")
 
 	// Sender initiates transfer
 	senderNewLeafPrivKey, err := secp256k1.GeneratePrivateKey()
-	if err != nil {
-		t.Fatalf("failed to create new node signing private key: %v", err)
-	}
+	require.NoError(t, err, "failed to create new node signing private key")
 
 	senderTransferNode := wallet.LeafKeyTweak{
 		Leaf:              senderRootNode,
@@ -548,42 +407,22 @@ func TestQueryTransfers(t *testing.T) {
 		senderLeavesToTransfer[:],
 		senderRefundSignatureMap,
 	)
-	if err != nil {
-		t.Fatalf("failed to send transfer tweak key: %v", err)
-	}
+	require.NoError(t, err, "failed to send transfer tweak key")
 
 	receiverToken, err := wallet.AuthenticateWithServer(context.Background(), receiverConfig)
-	if err != nil {
-		t.Fatalf("failed to authenticate receiver: %v", err)
-	}
+	require.NoError(t, err, "failed to authenticate receiver")
 	receiverCtx := wallet.ContextWithToken(context.Background(), receiverToken)
 	pendingTransfer, err := wallet.QueryPendingTransfers(receiverCtx, receiverConfig)
-	if err != nil {
-		t.Fatalf("failed to query pending transfers: %v", err)
-	}
-	if len(pendingTransfer.Transfers) != 1 {
-		t.Fatalf("expected 1 pending transfer, got %d", len(pendingTransfer.Transfers))
-	}
+	require.NoError(t, err, "failed to query pending transfers")
+	require.Equal(t, 1, len(pendingTransfer.Transfers))
 	receiverPendingTransfer := pendingTransfer.Transfers[0]
-	if receiverPendingTransfer.Id != senderTransfer.Id {
-		t.Fatalf("expected transfer id %s, got %s", senderTransfer.Id, receiverPendingTransfer.Id)
-	}
+	require.Equal(t, senderTransfer.Id, receiverPendingTransfer.Id)
 
 	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(context.Background(), receiverConfig, receiverPendingTransfer)
-	if err != nil {
-		t.Fatalf("unable to verify pending transfer: %v", err)
-	}
-	if len(*leafPrivKeyMap) != 1 {
-		t.Fatalf("Expected 1 leaf to transfer, got %d", len(*leafPrivKeyMap))
-	}
-	if !bytes.Equal((*leafPrivKeyMap)[senderRootNode.Id], senderNewLeafPrivKey.Serialize()) {
-		t.Fatalf("wrong leaf signing private key")
-	}
+	assertVerifiedPendingTransfer(t, err, leafPrivKeyMap, senderRootNode, senderNewLeafPrivKey)
 
 	finalLeafPrivKey, err := secp256k1.GeneratePrivateKey()
-	if err != nil {
-		t.Fatalf("failed to create new node signing private key: %v", err)
-	}
+	require.NoError(t, err, "failed to create new node signing private key")
 	claimingNode := wallet.LeafKeyTweak{
 		Leaf:              receiverPendingTransfer.Leaves[0].Leaf,
 		SigningPrivKey:    senderNewLeafPrivKey.Serialize(),
@@ -596,9 +435,7 @@ func TestQueryTransfers(t *testing.T) {
 		receiverConfig,
 		leavesToClaim[:],
 	)
-	if err != nil {
-		t.Fatalf("failed to ClaimTransfer: %v", err)
-	}
+	require.NoError(t, err, "failed to ClaimTransfer")
 
 	// Bob provides key tweak, Alice claims bob's leaves
 	_, err = wallet.SendTransferTweakKey(
@@ -608,42 +445,22 @@ func TestQueryTransfers(t *testing.T) {
 		receiverLeavesToTransfer[:],
 		newReceiverRefundSignatureMap,
 	)
-	if err != nil {
-		t.Fatalf("failed to send transfer tweak key: %v", err)
-	}
+	require.NoError(t, err, "failed to send transfer tweak key")
 
 	senderToken, err := wallet.AuthenticateWithServer(context.Background(), senderConfig)
-	if err != nil {
-		t.Fatalf("failed to authenticate receiver: %v", err)
-	}
+	require.NoError(t, err, "failed to authenticate sender")
 	senderCtx := wallet.ContextWithToken(context.Background(), senderToken)
 	pendingTransfer, err = wallet.QueryPendingTransfers(senderCtx, senderConfig)
-	if err != nil {
-		t.Fatalf("failed to query pending transfers: %v", err)
-	}
-	if len(pendingTransfer.Transfers) != 1 {
-		t.Fatalf("expected 1 pending transfer, got %d", len(pendingTransfer.Transfers))
-	}
+	require.NoError(t, err, "failed to query pending transfers")
+	require.Equal(t, 1, len(pendingTransfer.Transfers))
 	senderPendingTransfer := pendingTransfer.Transfers[0]
-	if receiverPendingTransfer.Id != senderTransfer.Id {
-		t.Fatalf("expected transfer id %s, got %s", senderTransfer.Id, receiverPendingTransfer.Id)
-	}
+	require.Equal(t, senderTransfer.Id, receiverPendingTransfer.Id)
 
 	leafPrivKeyMap, err = wallet.VerifyPendingTransfer(context.Background(), senderConfig, senderPendingTransfer)
-	if err != nil {
-		t.Fatalf("unable to verify pending transfer: %v", err)
-	}
-	if len(*leafPrivKeyMap) != 1 {
-		t.Fatalf("Expected 1 leaf to transfer, got %d", len(*leafPrivKeyMap))
-	}
-	if !bytes.Equal((*leafPrivKeyMap)[receiverRootNode.Id], receiverNewLeafPrivKey.Serialize()) {
-		t.Fatalf("wrong leaf signing private key")
-	}
+	assertVerifiedPendingTransfer(t, err, leafPrivKeyMap, receiverRootNode, receiverNewLeafPrivKey)
 
 	finalLeafPrivKey, err = secp256k1.GeneratePrivateKey()
-	if err != nil {
-		t.Fatalf("failed to create new node signing private key: %v", err)
-	}
+	require.NoError(t, err, "failed to create new node signing private key")
 	claimingNode = wallet.LeafKeyTweak{
 		Leaf:              senderPendingTransfer.Leaves[0].Leaf,
 		SigningPrivKey:    receiverNewLeafPrivKey.Serialize(),
@@ -656,66 +473,38 @@ func TestQueryTransfers(t *testing.T) {
 		senderConfig,
 		leavesToClaim[:],
 	)
-	if err != nil {
-		t.Fatalf("failed to ClaimTransfer: %v", err)
-	}
+	require.NoError(t, err, "failed to ClaimTransfer")
 
 	transfers, offset, err := wallet.QueryAllTransfers(context.Background(), senderConfig, 1, 0)
-	if err != nil {
-		t.Fatalf("failed to QueryAllTransfers: %v", err)
-	}
-	if len(transfers) != 1 {
-		t.Fatalf("expected 1 transfer, got %d", len(transfers))
-	}
-	if offset != 1 {
-		t.Fatalf("expected offset 1, got %d", offset)
-	}
+	require.NoError(t, err, "failed to QueryAllTransfers")
+	require.Equal(t, 1, len(transfers))
+	require.Equal(t, int64(1), offset)
 
 	transfers, offset, err = wallet.QueryAllTransfers(context.Background(), senderConfig, 1, offset)
-	if err != nil {
-		t.Fatalf("failed to QueryAllTransfers: %v", err)
-	}
-	if len(transfers) != 1 {
-		t.Fatalf("expected 1 transfer, got %d", len(transfers))
-	}
-	if offset != 2 {
-		t.Fatalf("expected offset 2, got %d", offset)
-	}
+	require.NoError(t, err, "failed to QueryAllTransfers")
+	require.Equal(t, 1, len(transfers))
+	require.Equal(t, int64(2), offset)
 
 	transfers, _, err = wallet.QueryAllTransfers(context.Background(), senderConfig, 100, 0)
-	if err != nil {
-		t.Fatalf("failed to QueryAllTransfers: %v", err)
-	}
-	if len(transfers) != 2 {
-		t.Fatalf("expected 2 transfers, got %d", len(transfers))
-	}
+	require.NoError(t, err, "failed to QueryAllTransfers")
+	require.Equal(t, 2, len(transfers))
 }
 
 func TestDoubleClaimTransfer(t *testing.T) {
 	// Sender initiates transfer
 	senderConfig, err := testutil.TestWalletConfig()
-	if err != nil {
-		t.Fatalf("failed to create sender wallet config: %v", err)
-	}
+	require.NoError(t, err, "failed to create sender wallet config")
 
 	leafPrivKey, err := secp256k1.GeneratePrivateKey()
-	if err != nil {
-		t.Fatalf("failed to create node signing private key: %v", err)
-	}
+	require.NoError(t, err, "failed to create node signing private key")
 	rootNode, err := testutil.CreateNewTree(senderConfig, faucet, leafPrivKey, 100_000)
-	if err != nil {
-		t.Fatalf("failed to create new tree: %v", err)
-	}
+	require.NoError(t, err, "failed to create new tree")
 
 	newLeafPrivKey, err := secp256k1.GeneratePrivateKey()
-	if err != nil {
-		t.Fatalf("failed to create new node signing private key: %v", err)
-	}
+	require.NoError(t, err, "failed to create new node signing private key")
 
 	receiverPrivKey, err := secp256k1.GeneratePrivateKey()
-	if err != nil {
-		t.Fatalf("failed to create receiver private key: %v", err)
-	}
+	require.NoError(t, err, "failed to create receiver private key")
 
 	transferNode := wallet.LeafKeyTweak{
 		Leaf:              rootNode,
@@ -730,47 +519,25 @@ func TestDoubleClaimTransfer(t *testing.T) {
 		receiverPrivKey.PubKey().SerializeCompressed(),
 		time.Now().Add(10*time.Minute),
 	)
-	if err != nil {
-		t.Fatalf("failed to transfer tree node: %v", err)
-	}
+	require.NoError(t, err, "failed to transfer tree node")
 
 	// Receiver queries pending transfer
 	receiverConfig, err := testutil.TestWalletConfigWithIdentityKey(*receiverPrivKey)
-	if err != nil {
-		t.Fatalf("failed to create wallet config: %v", err)
-	}
+	require.NoError(t, err, "failed to create wallet config")
 	receiverToken, err := wallet.AuthenticateWithServer(context.Background(), receiverConfig)
-	if err != nil {
-		t.Fatalf("failed to authenticate receiver: %v", err)
-	}
+	require.NoError(t, err, "failed to authenticate receiver")
 	receiverCtx := wallet.ContextWithToken(context.Background(), receiverToken)
 	pendingTransfer, err := wallet.QueryPendingTransfers(receiverCtx, receiverConfig)
-	if err != nil {
-		t.Fatalf("failed to query pending transfers: %v", err)
-	}
-	if len(pendingTransfer.Transfers) != 1 {
-		t.Fatalf("expected 1 pending transfer, got %d", len(pendingTransfer.Transfers))
-	}
+	require.NoError(t, err, "failed to query pending transfers")
+	require.Equal(t, 1, len(pendingTransfer.Transfers))
 	receiverTransfer := pendingTransfer.Transfers[0]
-	if receiverTransfer.Id != senderTransfer.Id {
-		t.Fatalf("expected transfer id %s, got %s", senderTransfer.Id, receiverTransfer.Id)
-	}
+	require.Equal(t, senderTransfer.Id, receiverTransfer.Id)
 
 	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(context.Background(), receiverConfig, receiverTransfer)
-	if err != nil {
-		t.Fatalf("unable to verify pending transfer: %v", err)
-	}
-	if len(*leafPrivKeyMap) != 1 {
-		t.Fatalf("Expected 1 leaf to transfer, got %d", len(*leafPrivKeyMap))
-	}
-	if !bytes.Equal((*leafPrivKeyMap)[rootNode.Id], newLeafPrivKey.Serialize()) {
-		t.Fatalf("wrong leaf signing private key")
-	}
+	assertVerifiedPendingTransfer(t, err, leafPrivKeyMap, rootNode, newLeafPrivKey)
 
 	finalLeafPrivKey, err := secp256k1.GeneratePrivateKey()
-	if err != nil {
-		t.Fatalf("failed to create new node signing private key: %v", err)
-	}
+	require.NoError(t, err, "failed to create new node signing private key")
 	claimingNode := wallet.LeafKeyTweak{
 		Leaf:              receiverTransfer.Leaves[0].Leaf,
 		SigningPrivKey:    newLeafPrivKey.Serialize(),
@@ -780,7 +547,7 @@ func TestDoubleClaimTransfer(t *testing.T) {
 
 	errCount := 0
 	wg := sync.WaitGroup{}
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -806,9 +573,7 @@ func TestDoubleClaimTransfer(t *testing.T) {
 			receiverConfig,
 			leavesToClaim[:],
 		)
-		if err != nil {
-			t.Fatalf("failed to ClaimTransfer: %v", err)
-		}
-		assert.Equal(t, res[0].Id, claimingNode.Leaf.Id)
+		require.NoError(t, err, "failed to ClaimTransfer")
+		require.Equal(t, res[0].Id, claimingNode.Leaf.Id)
 	}
 }
