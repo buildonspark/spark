@@ -215,6 +215,15 @@ func (h *LightningHandler) validateGetPreimageRequest(
 
 	client := pbfrost.NewFrostServiceClient(conn)
 	for _, transaction := range transactions {
+		if transaction == nil {
+			return fmt.Errorf("transaction is nil")
+		}
+		if transaction.SigningCommitments == nil {
+			return fmt.Errorf("signing commitments is nil")
+		}
+		if transaction.SigningNonceCommitment == nil {
+			return fmt.Errorf("signing nonce commitment is nil")
+		}
 		// First fetch the node tx in order to calculate the sighash
 		nodeID, err := uuid.Parse(transaction.LeafId)
 		if err != nil {
@@ -453,6 +462,22 @@ func (h *LightningHandler) GetPreimageShare(ctx context.Context, req *pb.Initiat
 
 // InitiatePreimageSwap initiates a preimage swap for the given payment hash.
 func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pb.InitiatePreimageSwapRequest) (*pb.InitiatePreimageSwapResponse, error) {
+	if req.Transfer == nil {
+		return nil, fmt.Errorf("transfer is required")
+	}
+
+	if len(req.Transfer.LeavesToSend) == 0 {
+		return nil, fmt.Errorf("at least one leaf must be provided")
+	}
+
+	if req.Transfer.OwnerIdentityPublicKey == nil {
+		return nil, fmt.Errorf("owner identity public key is required")
+	}
+
+	if req.Transfer.ReceiverIdentityPublicKey == nil {
+		return nil, fmt.Errorf("receiver identity public key is required")
+	}
+
 	var preimageShare *ent.PreimageShare
 	if req.Reason == pb.InitiatePreimageSwapRequest_REASON_RECEIVE {
 		db := ent.GetDbFromContext(ctx)

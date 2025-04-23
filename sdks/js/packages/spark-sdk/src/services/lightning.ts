@@ -216,13 +216,9 @@ export class LightningService {
       bolt11String = invoiceString;
     }
 
-    const transfer: StartUserSignedTransferRequest = {
-      transferId,
-      ownerIdentityPublicKey: await this.config.signer.getIdentityPublicKey(),
-      leavesToSend: leafSigningJobs,
-      receiverIdentityPublicKey: receiverIdentityPubkey,
-      expiryTime: new Date(Date.now() + 2 * 60 * 1000),
-    };
+    const reason = isInboundPayment
+      ? InitiatePreimageSwapRequest_Reason.REASON_RECEIVE
+      : InitiatePreimageSwapRequest_Reason.REASON_SEND;
 
     let response: InitiatePreimageSwapResponse;
     try {
@@ -234,10 +230,15 @@ export class LightningService {
           },
           valueSats: amountSats,
         },
-        reason: isInboundPayment
-          ? InitiatePreimageSwapRequest_Reason.REASON_RECEIVE
-          : InitiatePreimageSwapRequest_Reason.REASON_SEND,
-        transfer,
+        reason,
+        transfer: {
+          transferId,
+          ownerIdentityPublicKey:
+            await this.config.signer.getIdentityPublicKey(),
+          leavesToSend: leafSigningJobs,
+          receiverIdentityPublicKey: receiverIdentityPubkey,
+          expiryTime: new Date(Date.now() + 2 * 60 * 1000),
+        },
         receiverIdentityPublicKey: receiverIdentityPubkey,
         feeSats: 0,
       });
