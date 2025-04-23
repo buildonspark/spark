@@ -41,7 +41,7 @@ jobs:
         run: "aws --region us-west-2 eks update-kubeconfig --name prod"
       - name: "Copy spark image to prod ECR"
         run: |
-          GIT_HASH="$(git log -1 --format='%H' main -- spark/)" # Go build only runs on spark/ dir changes
+          GIT_HASH="$(git log -1 --format='%H' -- spark/)" # Go build only runs on spark/ dir changes
           skopeo copy --all docker://${{ steps.ecr-dev.outputs.registry }}/spark-go:git_${GIT_HASH:0:8} docker://${{ steps.ecr-prod.outputs.registry }}/spark-go:git_${GIT_HASH:0:8}
           skopeo copy --all docker://${{ steps.ecr-dev.outputs.registry }}/spark-go:git_${GIT_HASH:0:8} docker://${{ steps.ecr-prod.outputs.registry }}/spark-go:${{ github.ref_name }}
           skopeo copy --all docker://${{ steps.ecr-dev.outputs.registry }}/spark-go:git_${GIT_HASH:0:8} docker://${{ steps.ecr-prod.outputs.registry }}/spark-go:latest
