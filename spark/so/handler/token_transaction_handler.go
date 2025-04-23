@@ -23,6 +23,7 @@ import (
 	"github.com/lightsparkdev/spark-go/so/ent/tokenoutput"
 	"github.com/lightsparkdev/spark-go/so/ent/tokentransaction"
 	"github.com/lightsparkdev/spark-go/so/helper"
+	"github.com/lightsparkdev/spark-go/so/logging"
 	"github.com/lightsparkdev/spark-go/so/lrc20"
 	"github.com/lightsparkdev/spark-go/so/utils"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -46,7 +47,7 @@ func NewTokenTransactionHandler(config authz.Config, db *ent.Client, lrc20Client
 
 // StartTokenTransaction verifies the token outputs, reserves the keyshares for the token transaction, and returns metadata about the operators that possess the keyshares.
 func (o TokenTransactionHandler) StartTokenTransaction(ctx context.Context, config *so.Config, req *pb.StartTokenTransactionRequest) (*pb.StartTokenTransactionResponse, error) {
-	logger := helper.GetLoggerFromContext(ctx)
+	logger := logging.GetLoggerFromContext(ctx)
 
 	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, o.config, req.IdentityPublicKey); err != nil {
 		return nil, fmt.Errorf("identity public key authentication failed: %w", err)
@@ -286,7 +287,7 @@ func (o TokenTransactionHandler) SignTokenTransaction(
 	config *so.Config,
 	req *pb.SignTokenTransactionRequest,
 ) (*pb.SignTokenTransactionResponse, error) {
-	logger := helper.GetLoggerFromContext(ctx)
+	logger := logging.GetLoggerFromContext(ctx)
 
 	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, o.config, req.IdentityPublicKey); err != nil {
 		return nil, err
@@ -464,7 +465,7 @@ func (o TokenTransactionHandler) FinalizeTokenTransaction(
 	config *so.Config,
 	req *pb.FinalizeTokenTransactionRequest,
 ) (*emptypb.Empty, error) {
-	logger := helper.GetLoggerFromContext(ctx)
+	logger := logging.GetLoggerFromContext(ctx)
 
 	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, o.config, req.IdentityPublicKey); err != nil {
 		return nil, err
@@ -572,7 +573,7 @@ func (o TokenTransactionHandler) FreezeTokens(
 	ctx context.Context,
 	req *pb.FreezeTokensRequest,
 ) (*pb.FreezeTokensResponse, error) {
-	logger := helper.GetLoggerFromContext(ctx)
+	logger := logging.GetLoggerFromContext(ctx)
 
 	freezePayloadHash, err := utils.HashFreezeTokensPayload(req.FreezeTokensPayload)
 	if err != nil {
@@ -654,7 +655,7 @@ func (o TokenTransactionHandler) FreezeTokensOnLRC20Node(
 // b) transactions associated with a particular set of transaction hashes
 // c) all transactions associated with a particular token public key
 func (o TokenTransactionHandler) QueryTokenTransactions(ctx context.Context, config *so.Config, req *pb.QueryTokenTransactionsRequest) (*pb.QueryTokenTransactionsResponse, error) {
-	logger := helper.GetLoggerFromContext(ctx)
+	logger := logging.GetLoggerFromContext(ctx)
 	db := ent.GetDbFromContext(ctx)
 
 	// Start with a base query for token transactions
@@ -771,7 +772,7 @@ func (o TokenTransactionHandler) QueryTokenOutputs(
 	ctx context.Context,
 	req *pb.QueryTokenOutputsRequest,
 ) (*pb.QueryTokenOutputsResponse, error) {
-	logger := helper.GetLoggerFromContext(ctx)
+	logger := logging.GetLoggerFromContext(ctx)
 
 	outputs, err := ent.GetOwnedTokenOutputs(ctx, req.OwnerPublicKeys, req.TokenPublicKeys)
 	if err != nil {
@@ -807,7 +808,7 @@ func (o TokenTransactionHandler) CancelSignedTokenTransaction(
 	config *so.Config,
 	req *pb.CancelSignedTokenTransactionRequest,
 ) (*emptypb.Empty, error) {
-	logger := helper.GetLoggerFromContext(ctx)
+	logger := logging.GetLoggerFromContext(ctx)
 
 	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, o.config, req.SenderIdentityPublicKey); err != nil {
 		return nil, err
@@ -892,7 +893,7 @@ func (o TokenTransactionHandler) CancelSignedTokenTransaction(
 }
 
 func (o TokenTransactionHandler) getRevocationKeysharesForTokenTransaction(ctx context.Context, tokenTransaction *ent.TokenTransaction) ([][]byte, error) {
-	logger := helper.GetLoggerFromContext(ctx)
+	logger := logging.GetLoggerFromContext(ctx)
 
 	keyshares := make([]*ent.SigningKeyshare, len(tokenTransaction.Edges.SpentOutput))
 	for _, output := range tokenTransaction.Edges.SpentOutput {

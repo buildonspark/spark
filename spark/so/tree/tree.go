@@ -10,7 +10,7 @@ import (
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
 	"github.com/lightsparkdev/spark-go/so/ent/tree"
 	"github.com/lightsparkdev/spark-go/so/ent/treenode"
-	"github.com/lightsparkdev/spark-go/so/helper"
+	"github.com/lightsparkdev/spark-go/so/logging"
 )
 
 // DenominationMaxPow is the maximum power of 2 for leaf denominations.
@@ -59,7 +59,7 @@ var DefaultDenominationsCounts = map[uint64]uint64{
 
 // GetLeafDenominationCounts returns the counts of each leaf denomination for a given owner.
 func GetLeafDenominationCounts(ctx context.Context, req *pb.GetLeafDenominationCountsRequest) (*pb.GetLeafDenominationCountsResponse, error) {
-	logger := helper.GetLoggerFromContext(ctx)
+	logger := logging.GetLoggerFromContext(ctx)
 
 	network := schema.Network(req.Network)
 	err := network.UnmarshalProto(req.Network)
@@ -99,7 +99,7 @@ func GetLeafDenominationCounts(ctx context.Context, req *pb.GetLeafDenominationC
 // ProposeTreeDenominations is called with the amount of sats we have available, the number of users we expect to need to support, and
 // returns the list of denominations we should use for the tree. The SSP is responsible for taking this and mapping it to a structure.
 func ProposeTreeDenominations(ctx context.Context, req *pb.ProposeTreeDenominationsRequest) (*pb.ProposeTreeDenominationsResponse, error) {
-	logger := helper.GetLoggerFromContext(ctx)
+	logger := logging.GetLoggerFromContext(ctx)
 
 	// Figure out how many leaves of each denomination we are missing.
 	leafDenominationCounts, err := GetLeafDenominationCounts(ctx, &pb.GetLeafDenominationCountsRequest{

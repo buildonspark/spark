@@ -17,6 +17,7 @@ import (
 	"github.com/lightsparkdev/spark-go/so/ent/depositaddress"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
 	"github.com/lightsparkdev/spark-go/so/helper"
+	"github.com/lightsparkdev/spark-go/so/logging"
 	"github.com/lightsparkdev/spark-go/so/objects"
 )
 
@@ -37,7 +38,7 @@ func NewDepositHandler(config *so.Config, db *ent.Client) *DepositHandler {
 // GenerateDepositAddress generates a deposit address for the given public key.
 func (o *DepositHandler) GenerateDepositAddress(ctx context.Context, config *so.Config, req *pb.GenerateDepositAddressRequest) (*pb.GenerateDepositAddressResponse, error) {
 	network, err := common.NetworkFromProtoNetwork(req.Network)
-	logger := helper.GetLoggerFromContext(ctx)
+	logger := logging.GetLoggerFromContext(ctx)
 	if err != nil {
 		return nil, err
 	}

@@ -9,6 +9,7 @@ import (
 	"github.com/lightsparkdev/spark-go/common"
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/ent"
+	"github.com/lightsparkdev/spark-go/so/logging"
 	"github.com/lightsparkdev/spark-go/so/objects"
 
 	pbcommon "github.com/lightsparkdev/spark-go/proto/common"
@@ -93,7 +94,7 @@ func frostRound2(
 	round1 map[string][]objects.SigningCommitment,
 	operatorSelection *OperatorSelection,
 ) (map[string]map[string][]byte, error) {
-	logger := GetLoggerFromContext(ctx)
+	logger := logging.GetLoggerFromContext(ctx)
 	for _, job := range jobs {
 		logger.Info("FrostRound2 signing job message", "message", hex.EncodeToString(job.Message))
 		logger.Info("FrostRound2 signing job verifying key", "verifyingKey", hex.EncodeToString(job.VerifyingKey))

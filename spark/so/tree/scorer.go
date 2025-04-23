@@ -10,7 +10,7 @@ import (
 	"github.com/lightsparkdev/spark-go/so/ent"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
 	"github.com/lightsparkdev/spark-go/so/ent/treenode"
-	"github.com/lightsparkdev/spark-go/so/helper"
+	"github.com/lightsparkdev/spark-go/so/logging"
 )
 
 // PolarityScoreDepth is the depth of the tree to consider for the polarity score.
@@ -163,7 +163,7 @@ func (s *PolarityScorer) Score(leafID uuid.UUID, sspPublicKey []byte, userPublic
 }
 
 func (s *PolarityScorer) FetchPolarityScores(req *pb.FetchPolarityScoreRequest, stream pb.SparkTreeService_FetchPolarityScoresServer) error {
-	logger := helper.GetLoggerFromContext(stream.Context()).With("method", "tree.FetchPolarityScores")
+	logger := logging.GetLoggerFromContext(stream.Context()).With("method", "tree.FetchPolarityScores")
 
 	targetPubKeys := make(map[string]bool)
 	for _, pubKey := range req.PublicKeys {

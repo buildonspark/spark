@@ -10,7 +10,7 @@ import (
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lightsparkdev/spark-go/so/authninternal"
-	"github.com/lightsparkdev/spark-go/so/helper"
+	"github.com/lightsparkdev/spark-go/so/logging"
 )
 
 // contextKey is a custom type for context keys to avoid collisions
@@ -84,7 +84,7 @@ func (i *AuthnInterceptor) StreamAuthnInterceptor(srv interface{}, ss grpc.Serve
 
 func (i *AuthnInterceptor) authenticateContext(ctx context.Context) context.Context {
 	md, ok := metadata.FromIncomingContext(ctx)
-	logger := helper.GetLoggerFromContext(ctx)
+	logger := logging.GetLoggerFromContext(ctx)
 	if !ok {
 		err := fmt.Errorf("no metadata provided")
 		logger.Info("Authentication error", "error", err)

@@ -6,15 +6,12 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark-go/so/logging"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/peer"
 	"google.golang.org/protobuf/proto"
 )
-
-type contextKey string
-
-const LoggerKey = contextKey("logger")
 
 func LogInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 	requestID := uuid.New().String()
@@ -38,7 +35,7 @@ func LogInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServer
 		"x_amzn_trace_id", traceID,
 	)
 
-	ctx = context.WithValue(ctx, LoggerKey, logger)
+	ctx = logging.Inject(ctx, logger)
 
 	reqProto, ok := req.(proto.Message)
 	if ok {
@@ -59,12 +56,4 @@ func LogInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServer
 	}
 
 	return response, err
-}
-
-func GetLoggerFromContext(ctx context.Context) *slog.Logger {
-	logger, ok := ctx.Value(LoggerKey).(*slog.Logger)
-	if !ok {
-		return slog.Default()
-	}
-	return logger
 }

@@ -22,6 +22,7 @@ import (
 	"github.com/lightsparkdev/spark-go/so/ent/treenode"
 	"github.com/lightsparkdev/spark-go/so/errors"
 	"github.com/lightsparkdev/spark-go/so/helper"
+	"github.com/lightsparkdev/spark-go/so/logging"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -385,7 +386,7 @@ func (h *BaseTransferHandler) CancelSendTransfer(
 			return nil, nil
 		})
 		if err != nil {
-			logger := helper.GetLoggerFromContext(ctx)
+			logger := logging.GetLoggerFromContext(ctx)
 			logger.Error("unable to execute task with all operators", "error", err)
 		}
 	}

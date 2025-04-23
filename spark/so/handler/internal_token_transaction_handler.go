@@ -15,7 +15,7 @@ import (
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/ent"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
-	"github.com/lightsparkdev/spark-go/so/helper"
+	"github.com/lightsparkdev/spark-go/so/logging"
 	"github.com/lightsparkdev/spark-go/so/lrc20"
 	"github.com/lightsparkdev/spark-go/so/utils"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -33,7 +33,7 @@ func NewInternalTokenTransactionHandler(config *so.Config, client *lrc20.Client)
 }
 
 func (h *InternalTokenTransactionHandler) StartTokenTransactionInternal(ctx context.Context, config *so.Config, req *pbinternal.StartTokenTransactionInternalRequest) (*emptypb.Empty, error) {
-	logger := helper.GetLoggerFromContext(ctx)
+	logger := logging.GetLoggerFromContext(ctx)
 	logger.Info("Starting token transaction", "key share ids", len(req.KeyshareIds))
 	keyshareUUIDs := make([]uuid.UUID, len(req.KeyshareIds))
 	// Ensure that the coordinator SO did not pass duplicate keyshare UUIDs for different outputs.
@@ -242,7 +242,7 @@ func validateFinalTokenTransaction(
 	tokenTransactionSignatures *pb.TokenTransactionSignatures,
 	expectedRevocationPublicKeys [][]byte,
 ) error {
-	logger := helper.GetLoggerFromContext(ctx)
+	logger := logging.GetLoggerFromContext(ctx)
 	network, err := common.NetworkFromProtoNetwork(tokenTransaction.Network)
 	if err != nil {
 		logger.Error("Failed to get network from proto network", "error", err)

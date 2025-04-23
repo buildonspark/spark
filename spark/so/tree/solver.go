@@ -6,7 +6,7 @@ import (
 	"math/bits"
 
 	pb "github.com/lightsparkdev/spark-go/proto/spark_tree"
-	"github.com/lightsparkdev/spark-go/so/helper"
+	"github.com/lightsparkdev/spark-go/so/logging"
 )
 
 // chunkIntoPowersOf2 splits a list of numbers into chunks of size at most maxChunkSize,
@@ -32,7 +32,7 @@ func chunkIntoPowersOf2(nums []uint64, minChunkSize int, maxChunkSize int) [][]u
 }
 
 func solveLeafDenominations(ctx context.Context, counts *pb.GetLeafDenominationCountsResponse, targetCounts map[uint64]uint64, maxAmountSats uint64, minTreeDepth uint64, maxTreeDepth uint64) (*pb.ProposeTreeDenominationsResponse, error) {
-	logger := helper.GetLoggerFromContext(ctx).With("method", "tree.solveLeafDenominations")
+	logger := logging.GetLoggerFromContext(ctx).With("method", "tree.solveLeafDenominations")
 
 	// Figure out how many leaves of each denomination we are missing.
 	missingCount := make([]uint64, DenominationMaxPow)
