@@ -1,8 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
-import { secp256k1 } from "@noble/curves/secp256k1";
 import { Address, OutScript, Transaction } from "@scure/btc-signer";
-import { RPCError, ValidationError } from "../../errors/types.js";
-import { getP2TRAddressFromPublicKey, getTxId } from "../../utils/bitcoin.js";
+import { RPCError } from "../../errors/types.js";
+import { getTxId } from "../../utils/bitcoin.js";
 import { getNetwork, Network } from "../../utils/network.js";
 import { SparkWalletTesting } from "../utils/spark-testing-wallet.js";
 import { BitcoinFaucet } from "../utils/test-faucet.js";
@@ -23,9 +22,28 @@ describe("deposit", () => {
   it("should create a tree root", async () => {
     const faucet = new BitcoinFaucet();
 
-    const coin = await faucet.fund();
-
     const { wallet: sdk } = await SparkWalletTesting.initialize({
+      options: {
+        network: "LOCAL",
+      },
+    });
+
+    const depositResp = await sdk.getSingleUseDepositAddress();
+    if (!depositResp) {
+      throw new RPCError("Deposit address not found", {
+        method: "getDepositAddress",
+      });
+    }
+
+    const signedTx = await faucet.sendToAddress(depositResp, 100_000n);
+
+    await sdk.claimDeposit(signedTx.id);
+  }, 30000);
+
+  it("should restart wallet and recover signing private key", async () => {
+    const faucet = new BitcoinFaucet();
+
+    const { wallet: sdk, mnemonic } = await SparkWalletTesting.initialize({
       options: {
         network: "LOCAL",
       },
@@ -39,43 +57,17 @@ describe("deposit", () => {
       });
     }
 
-    const addr = Address(getNetwork(Network.LOCAL)).decode(depositResp);
-    const script = OutScript.encode(addr);
+    const signedTx = await faucet.sendToAddress(depositResp, 100_000n);
+    await faucet.mineBlocks(6);
 
-    const depositTx = new Transaction();
-    depositTx.addInput(coin!.outpoint);
-    depositTx.addOutput({
-      script,
-      amount: 100_000n,
+    const { wallet: newSdk } = await SparkWalletTesting.initialize({
+      mnemonicOrSeed: mnemonic,
+      options: {
+        network: "LOCAL",
+      },
     });
 
-    const txid = getTxId(depositTx);
-    if (!txid) {
-      throw new ValidationError("Transaction ID not found", {
-        field: "txid",
-        value: depositTx,
-      });
-    }
-
-    // Set mock transaction
-    const signedTx = await faucet.signFaucetCoin(
-      depositTx,
-      coin!.txout,
-      coin!.key,
-    );
-
-    await faucet.broadcastTx(signedTx.hex);
-
-    const randomPrivKey = secp256k1.utils.randomPrivateKey();
-    const randomPubKey = secp256k1.getPublicKey(randomPrivKey);
-    const randomAddr = getP2TRAddressFromPublicKey(randomPubKey, Network.LOCAL);
-
-    await faucet.generateToAddress(1, randomAddr);
-
-    // Create tree root
-    const treeResp = await sdk.claimDeposit(signedTx.id);
-
-    console.log("tree created:", treeResp);
+    await newSdk.claimDeposit(signedTx.id);
   }, 30000);
 
   it("should handle non-trusty deposit", async () => {

@@ -13,6 +13,11 @@ import { TransactionInput } from "@scure/btc-signer/psbt";
 import { sha256 } from "@scure/btc-signer/utils";
 import { Mutex } from "async-mutex";
 import { decode } from "light-bolt11-decoder";
+import {
+  ConfigurationError,
+  RPCError,
+  ValidationError,
+} from "./errors/types.js";
 import SspClient from "./graphql/client.js";
 import {
   BitcoinNetwork,
@@ -75,13 +80,6 @@ import {
   checkIfSelectedOutputsAreAvailable,
 } from "./utils/token-transactions.js";
 import { getNextTransactionSequence } from "./utils/transaction.js";
-import {
-  ValidationError,
-  NetworkError,
-  AuthenticationError,
-  RPCError,
-  ConfigurationError,
-} from "./errors/types.js";
 
 import { LRCWallet } from "@buildonspark/lrc20-sdk";
 import {
@@ -937,8 +935,17 @@ export class SparkWallet {
         return [];
       }
 
+      let signingPubKey: Uint8Array;
+      if (!depositAddress.leafId) {
+        signingPubKey = depositAddress.userSigningPublicKey;
+      } else {
+        signingPubKey = await this.config.signer.generatePublicKey(
+          sha256(depositAddress.leafId),
+        );
+      }
+
       const nodes = await this.finalizeDeposit({
-        signingPubKey: depositAddress.userSigningPublicKey,
+        signingPubKey,
         verifyingKey: depositAddress.verifyingPublicKey,
         depositTx,
         vout,
