@@ -9,6 +9,11 @@ import { Transaction } from "@scure/btc-signer";
 import { TransactionInput } from "@scure/btc-signer/psbt";
 import { sha256 } from "@scure/btc-signer/utils";
 import * as ecies from "eciesjs";
+import {
+  NetworkError,
+  SparkSDKError,
+  ValidationError,
+} from "../errors/index.js";
 import { SignatureIntent } from "../proto/common.js";
 import {
   ClaimLeafKeyTweak,
@@ -23,6 +28,7 @@ import {
   SigningJob,
   Transfer,
   TransferStatus,
+  TransferType,
   TreeNode,
 } from "../proto/spark.js";
 import { SigningCommitment } from "../signer/signer.js";
@@ -40,11 +46,6 @@ import {
 } from "../utils/transaction.js";
 import { WalletConfigService } from "./config.js";
 import { ConnectionManager } from "./connection.js";
-import {
-  NetworkError,
-  SparkSDKError,
-  ValidationError,
-} from "../errors/index.js";
 const INITIAL_TIME_LOCK = 2000;
 
 const DEFAULT_EXPIRY_TIME = 10 * 60 * 1000;
@@ -457,6 +458,11 @@ export class TransferService extends BaseTransferService {
         },
         limit,
         offset,
+        types: [
+          TransferType.TRANSFER,
+          TransferType.PREIMAGE_SWAP,
+          TransferType.COOPERATIVE_EXIT,
+        ],
       });
     } catch (error) {
       throw new Error(`Error querying all transfers: ${error}`);

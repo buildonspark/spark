@@ -1,5 +1,5 @@
-import { getLatestDepositTxId } from "@buildonspark/spark-sdk";
 import { IssuerSparkWallet } from "@buildonspark/issuer-sdk";
+import { getLatestDepositTxId } from "@buildonspark/spark-sdk";
 import { ConfigOptions } from "@buildonspark/spark-sdk/services/wallet-config";
 import {
   getNetwork,
@@ -241,6 +241,14 @@ async function runCLI() {
         }
         const depositResult = await wallet.claimDeposit(args[0]);
         console.log(depositResult);
+        break;
+      case "gettransfers":
+        if (!wallet) {
+          console.log("Please initialize a wallet first");
+          break;
+        }
+        const transfers = await wallet.getTransfers();
+        console.log(transfers);
         break;
       case "pendingtransfers":
         if (!wallet) {
