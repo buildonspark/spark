@@ -735,7 +735,21 @@ func (m *GenerateDepositAddressRequest) validate(all bool) error {
 		errors = append(errors, err)
 	}
 
-	// no validation rules for LeafId
+	if m.LeafId != nil {
+
+		if err := m._validateUuid(m.GetLeafId()); err != nil {
+			err = GenerateDepositAddressRequestValidationError{
+				field:  "LeafId",
+				reason: "value must be a valid UUID",
+				cause:  err,
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+	}
 
 	if m.IsStatic != nil {
 		// no validation rules for IsStatic
@@ -743,6 +757,14 @@ func (m *GenerateDepositAddressRequest) validate(all bool) error {
 
 	if len(errors) > 0 {
 		return GenerateDepositAddressRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+func (m *GenerateDepositAddressRequest) _validateUuid(uuid string) error {
+	if matched := _spark_uuidPattern.MatchString(uuid); !matched {
+		return errors.New("invalid uuid format")
 	}
 
 	return nil
@@ -15607,8 +15629,32 @@ func (m *DepositAddressQueryResult) validate(all bool) error {
 
 	// no validation rules for VerifyingPublicKey
 
+	if m.LeafId != nil {
+
+		if err := m._validateUuid(m.GetLeafId()); err != nil {
+			err = DepositAddressQueryResultValidationError{
+				field:  "LeafId",
+				reason: "value must be a valid UUID",
+				cause:  err,
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+	}
+
 	if len(errors) > 0 {
 		return DepositAddressQueryResultMultiError(errors)
+	}
+
+	return nil
+}
+
+func (m *DepositAddressQueryResult) _validateUuid(uuid string) error {
+	if matched := _spark_uuidPattern.MatchString(uuid); !matched {
+		return errors.New("invalid uuid format")
 	}
 
 	return nil

@@ -130,7 +130,7 @@ message GenerateDepositAddressRequest {
     // The network of the bitcoin network.
     Network network = 3 [(validate.rules).enum = {not_in: [0]}];
     // The UUID to use for the created TreeNode
-    string leaf_id = 4;
+    optional string leaf_id = 4 [(validate.rules).string.uuid = true];
     // Generate static deposit address
     optional bool is_static = 5;
 }
@@ -956,6 +956,7 @@ message DepositAddressQueryResult {
     string deposit_address = 1;
     bytes user_signing_public_key = 2;
     bytes verifying_public_key = 3;
+    optional string leaf_id = 4 [(validate.rules).string.uuid = true];
 }
 
 message QueryUnusedDepositAddressesResponse {

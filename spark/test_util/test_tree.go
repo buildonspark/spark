@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
+	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/common"
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
@@ -61,7 +62,8 @@ func CreateNewTree(config *wallet.Config, faucet *Faucet, privKey *secp256k1.Pri
 	userPubKey := privKey.PubKey()
 	userPubKeyBytes := userPubKey.SerializeCompressed()
 
-	depositResp, err := wallet.GenerateDepositAddress(ctx, config, userPubKeyBytes, "")
+	leafID := uuid.New().String()
+	depositResp, err := wallet.GenerateDepositAddress(ctx, config, userPubKeyBytes, &leafID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate deposit address: %v", err)
 	}
@@ -140,7 +142,8 @@ func CreateNewTreeWithLevels(config *wallet.Config, faucet *Faucet, privKey *sec
 	userPubKey := privKey.PubKey()
 	userPubKeyBytes := userPubKey.SerializeCompressed()
 
-	depositResp, err := wallet.GenerateDepositAddress(ctx, config, userPubKeyBytes, "")
+	leafID := uuid.New().String()
+	depositResp, err := wallet.GenerateDepositAddress(ctx, config, userPubKeyBytes, &leafID)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to generate deposit address: %v", err)
 	}

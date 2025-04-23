@@ -140,10 +140,12 @@ func (h *TreeQueryHandler) QueryUnusedDepositAddresses(ctx context.Context, req 
 			if err != nil {
 				return nil, err
 			}
+			nodeIDStr := depositAddress.NodeID.String()
 			unusedDepositAddresses = append(unusedDepositAddresses, &pb.DepositAddressQueryResult{
 				DepositAddress:       depositAddress.Address,
 				UserSigningPublicKey: depositAddress.OwnerSigningPubkey,
 				VerifyingPublicKey:   verifyingPublicKey,
+				LeafId:               &nodeIDStr,
 			})
 		}
 	}

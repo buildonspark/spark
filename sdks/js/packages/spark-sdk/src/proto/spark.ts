@@ -10,7 +10,6 @@ import { type CallContext, type CallOptions } from "nice-grpc-common";
 import { SignatureIntent, signatureIntentFromJSON, signatureIntentToJSON, SigningCommitment } from "./common.js";
 import { Empty } from "./google/protobuf/empty.js";
 import { Timestamp } from "./google/protobuf/timestamp.js";
-import { ValidationError } from "../errors/index.js";
 
 export const protobufPackage = "spark";
 
@@ -277,7 +276,9 @@ export interface GenerateDepositAddressRequest {
   /** The network of the bitcoin network. */
   network: Network;
   /** The UUID to use for the created TreeNode */
-  leafId: string;
+  leafId?:
+    | string
+    | undefined;
   /** Generate static deposit address */
   isStatic?: boolean | undefined;
 }
@@ -1203,6 +1204,7 @@ export interface DepositAddressQueryResult {
   depositAddress: string;
   userSigningPublicKey: Uint8Array;
   verifyingPublicKey: Uint8Array;
+  leafId?: string | undefined;
 }
 
 export interface QueryUnusedDepositAddressesResponse {
@@ -1684,7 +1686,7 @@ function createBaseGenerateDepositAddressRequest(): GenerateDepositAddressReques
     signingPublicKey: new Uint8Array(0),
     identityPublicKey: new Uint8Array(0),
     network: 0,
-    leafId: "",
+    leafId: undefined,
     isStatic: undefined,
   };
 }
@@ -1700,7 +1702,7 @@ export const GenerateDepositAddressRequest: MessageFns<GenerateDepositAddressReq
     if (message.network !== 0) {
       writer.uint32(24).int32(message.network);
     }
-    if (message.leafId !== "") {
+    if (message.leafId !== undefined) {
       writer.uint32(34).string(message.leafId);
     }
     if (message.isStatic !== undefined) {
@@ -1772,7 +1774,7 @@ export const GenerateDepositAddressRequest: MessageFns<GenerateDepositAddressReq
         ? bytesFromBase64(object.identityPublicKey)
         : new Uint8Array(0),
       network: isSet(object.network) ? networkFromJSON(object.network) : 0,
-      leafId: isSet(object.leafId) ? globalThis.String(object.leafId) : "",
+      leafId: isSet(object.leafId) ? globalThis.String(object.leafId) : undefined,
       isStatic: isSet(object.isStatic) ? globalThis.Boolean(object.isStatic) : undefined,
     };
   },
@@ -1788,7 +1790,7 @@ export const GenerateDepositAddressRequest: MessageFns<GenerateDepositAddressReq
     if (message.network !== 0) {
       obj.network = networkToJSON(message.network);
     }
-    if (message.leafId !== "") {
+    if (message.leafId !== undefined) {
       obj.leafId = message.leafId;
     }
     if (message.isStatic !== undefined) {
@@ -1805,7 +1807,7 @@ export const GenerateDepositAddressRequest: MessageFns<GenerateDepositAddressReq
     message.signingPublicKey = object.signingPublicKey ?? new Uint8Array(0);
     message.identityPublicKey = object.identityPublicKey ?? new Uint8Array(0);
     message.network = object.network ?? 0;
-    message.leafId = object.leafId ?? "";
+    message.leafId = object.leafId ?? undefined;
     message.isStatic = object.isStatic ?? undefined;
     return message;
   },
@@ -12720,7 +12722,12 @@ export const QueryUnusedDepositAddressesRequest: MessageFns<QueryUnusedDepositAd
 };
 
 function createBaseDepositAddressQueryResult(): DepositAddressQueryResult {
-  return { depositAddress: "", userSigningPublicKey: new Uint8Array(0), verifyingPublicKey: new Uint8Array(0) };
+  return {
+    depositAddress: "",
+    userSigningPublicKey: new Uint8Array(0),
+    verifyingPublicKey: new Uint8Array(0),
+    leafId: undefined,
+  };
 }
 
 export const DepositAddressQueryResult: MessageFns<DepositAddressQueryResult> = {
@@ -12733,6 +12740,9 @@ export const DepositAddressQueryResult: MessageFns<DepositAddressQueryResult> = 
     }
     if (message.verifyingPublicKey.length !== 0) {
       writer.uint32(26).bytes(message.verifyingPublicKey);
+    }
+    if (message.leafId !== undefined) {
+      writer.uint32(34).string(message.leafId);
     }
     return writer;
   },
@@ -12768,6 +12778,14 @@ export const DepositAddressQueryResult: MessageFns<DepositAddressQueryResult> = 
           message.verifyingPublicKey = reader.bytes();
           continue;
         }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.leafId = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -12786,6 +12804,7 @@ export const DepositAddressQueryResult: MessageFns<DepositAddressQueryResult> = 
       verifyingPublicKey: isSet(object.verifyingPublicKey)
         ? bytesFromBase64(object.verifyingPublicKey)
         : new Uint8Array(0),
+      leafId: isSet(object.leafId) ? globalThis.String(object.leafId) : undefined,
     };
   },
 
@@ -12800,6 +12819,9 @@ export const DepositAddressQueryResult: MessageFns<DepositAddressQueryResult> = 
     if (message.verifyingPublicKey.length !== 0) {
       obj.verifyingPublicKey = base64FromBytes(message.verifyingPublicKey);
     }
+    if (message.leafId !== undefined) {
+      obj.leafId = message.leafId;
+    }
     return obj;
   },
 
@@ -12811,6 +12833,7 @@ export const DepositAddressQueryResult: MessageFns<DepositAddressQueryResult> = 
     message.depositAddress = object.depositAddress ?? "";
     message.userSigningPublicKey = object.userSigningPublicKey ?? new Uint8Array(0);
     message.verifyingPublicKey = object.verifyingPublicKey ?? new Uint8Array(0);
+    message.leafId = object.leafId ?? undefined;
     return message;
   },
 };
@@ -13913,20 +13936,10 @@ function fromJsonTimestamp(o: any): Date {
 function longToNumber(int64: { toString(): string }): number {
   const num = globalThis.Number(int64.toString());
   if (num > globalThis.Number.MAX_SAFE_INTEGER) {
-    throw new ValidationError(
-      "Number exceeds maximum safe integer",
-      {
-        value: int64.toString(),
-      }
-    );
+    throw new globalThis.Error("Value is larger than Number.MAX_SAFE_INTEGER");
   }
   if (num < globalThis.Number.MIN_SAFE_INTEGER) {
-    throw new ValidationError(
-      "Number is below minimum safe integer",
-      {
-        value: int64.toString(),
-      }
-    );
+    throw new globalThis.Error("Value is smaller than Number.MIN_SAFE_INTEGER");
   }
   return num;
 }

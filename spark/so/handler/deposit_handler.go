@@ -96,8 +96,8 @@ func (o *DepositHandler) GenerateDepositAddress(ctx context.Context, config *so.
 		depositAddressMutator.SetIsStatic(true)
 	}
 
-	if req.LeafId != "" {
-		leafID, err := uuid.Parse(req.LeafId)
+	if req.LeafId != nil {
+		leafID, err := uuid.Parse(*req.LeafId)
 		if err != nil {
 			return nil, err
 		}

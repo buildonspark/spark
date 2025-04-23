@@ -589,7 +589,7 @@ type GenerateDepositAddressRequest struct {
 	// The network of the bitcoin network.
 	Network Network `protobuf:"varint,3,opt,name=network,proto3,enum=spark.Network" json:"network,omitempty"`
 	// The UUID to use for the created TreeNode
-	LeafId string `protobuf:"bytes,4,opt,name=leaf_id,json=leafId,proto3" json:"leaf_id,omitempty"`
+	LeafId *string `protobuf:"bytes,4,opt,name=leaf_id,json=leafId,proto3,oneof" json:"leaf_id,omitempty"`
 	// Generate static deposit address
 	IsStatic      *bool `protobuf:"varint,5,opt,name=is_static,json=isStatic,proto3,oneof" json:"is_static,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -648,8 +648,8 @@ func (x *GenerateDepositAddressRequest) GetNetwork() Network {
 }
 
 func (x *GenerateDepositAddressRequest) GetLeafId() string {
-	if x != nil {
-		return x.LeafId
+	if x != nil && x.LeafId != nil {
+		return *x.LeafId
 	}
 	return ""
 }
@@ -6981,6 +6981,7 @@ type DepositAddressQueryResult struct {
 	DepositAddress       string                 `protobuf:"bytes,1,opt,name=deposit_address,json=depositAddress,proto3" json:"deposit_address,omitempty"`
 	UserSigningPublicKey []byte                 `protobuf:"bytes,2,opt,name=user_signing_public_key,json=userSigningPublicKey,proto3" json:"user_signing_public_key,omitempty"`
 	VerifyingPublicKey   []byte                 `protobuf:"bytes,3,opt,name=verifying_public_key,json=verifyingPublicKey,proto3" json:"verifying_public_key,omitempty"`
+	LeafId               *string                `protobuf:"bytes,4,opt,name=leaf_id,json=leafId,proto3,oneof" json:"leaf_id,omitempty"`
 	unknownFields        protoimpl.UnknownFields
 	sizeCache            protoimpl.SizeCache
 }
@@ -7034,6 +7035,13 @@ func (x *DepositAddressQueryResult) GetVerifyingPublicKey() []byte {
 		return x.VerifyingPublicKey
 	}
 	return nil
+}
+
+func (x *DepositAddressQueryResult) GetLeafId() string {
+	if x != nil && x.LeafId != nil {
+		return *x.LeafId
+	}
+	return ""
 }
 
 type QueryUnusedDepositAddressesResponse struct {
@@ -7244,13 +7252,15 @@ const file_spark_proto_rawDesc = "" +
 	"\x1dproof_of_possession_signature\x18\x02 \x01(\fR\x1aproofOfPossessionSignature\x1aD\n" +
 	"\x16AddressSignaturesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\fR\x05value:\x028\x01\"\xfa\x01\n" +
+	"\x05value\x18\x02 \x01(\fR\x05value:\x028\x01\"\x95\x02\n" +
 	"\x1dGenerateDepositAddressRequest\x12,\n" +
 	"\x12signing_public_key\x18\x01 \x01(\fR\x10signingPublicKey\x12.\n" +
 	"\x13identity_public_key\x18\x02 \x01(\fR\x11identityPublicKey\x122\n" +
-	"\anetwork\x18\x03 \x01(\x0e2\x0e.spark.NetworkB\b\xfaB\x05\x82\x01\x02 \x00R\anetwork\x12\x17\n" +
-	"\aleaf_id\x18\x04 \x01(\tR\x06leafId\x12 \n" +
-	"\tis_static\x18\x05 \x01(\bH\x00R\bisStatic\x88\x01\x01B\f\n" +
+	"\anetwork\x18\x03 \x01(\x0e2\x0e.spark.NetworkB\b\xfaB\x05\x82\x01\x02 \x00R\anetwork\x12&\n" +
+	"\aleaf_id\x18\x04 \x01(\tB\b\xfaB\x05r\x03\xb0\x01\x01H\x00R\x06leafId\x88\x01\x01\x12 \n" +
+	"\tis_static\x18\x05 \x01(\bH\x01R\bisStatic\x88\x01\x01B\n" +
+	"\n" +
+	"\b_leaf_idB\f\n" +
 	"\n" +
 	"_is_static\"\xb5\x01\n" +
 	"\aAddress\x12\x18\n" +
@@ -7720,11 +7730,14 @@ const file_spark_proto_rawDesc = "" +
 	"\x1aCancelSendTransferResponse\x12+\n" +
 	"\btransfer\x18\x01 \x01(\v2\x0f.spark.TransferR\btransfer\"T\n" +
 	"\"QueryUnusedDepositAddressesRequest\x12.\n" +
-	"\x13identity_public_key\x18\x01 \x01(\fR\x11identityPublicKey\"\xad\x01\n" +
+	"\x13identity_public_key\x18\x01 \x01(\fR\x11identityPublicKey\"\xe1\x01\n" +
 	"\x19DepositAddressQueryResult\x12'\n" +
 	"\x0fdeposit_address\x18\x01 \x01(\tR\x0edepositAddress\x125\n" +
 	"\x17user_signing_public_key\x18\x02 \x01(\fR\x14userSigningPublicKey\x120\n" +
-	"\x14verifying_public_key\x18\x03 \x01(\fR\x12verifyingPublicKey\"t\n" +
+	"\x14verifying_public_key\x18\x03 \x01(\fR\x12verifyingPublicKey\x12&\n" +
+	"\aleaf_id\x18\x04 \x01(\tB\b\xfaB\x05r\x03\xb0\x01\x01H\x00R\x06leafId\x88\x01\x01B\n" +
+	"\n" +
+	"\b_leaf_id\"t\n" +
 	"#QueryUnusedDepositAddressesResponse\x12M\n" +
 	"\x11deposit_addresses\x18\x01 \x03(\v2 .spark.DepositAddressQueryResultR\x10depositAddresses\"E\n" +
 	"\x13QueryBalanceRequest\x12.\n" +
@@ -8211,6 +8224,7 @@ func file_spark_proto_init() {
 		(*QueryNodesRequest_OwnerIdentityPubkey)(nil),
 		(*QueryNodesRequest_NodeIds)(nil),
 	}
+	file_spark_proto_msgTypes[108].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

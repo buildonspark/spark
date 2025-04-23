@@ -8,7 +8,6 @@
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import { Duration } from "../google/protobuf/duration.js";
 import { Timestamp } from "../google/protobuf/timestamp.js";
-import { ValidationError } from "../../errors/index.js";
 
 export const protobufPackage = "validate";
 
@@ -6026,20 +6025,10 @@ function fromJsonTimestamp(o: any): Date {
 function longToNumber(int64: { toString(): string }): number {
   const num = globalThis.Number(int64.toString());
   if (num > globalThis.Number.MAX_SAFE_INTEGER) {
-    throw new ValidationError(
-      "Number exceeds maximum safe integer",
-      {
-        value: int64.toString(),
-      }
-    );
+    throw new globalThis.Error("Value is larger than Number.MAX_SAFE_INTEGER");
   }
   if (num < globalThis.Number.MIN_SAFE_INTEGER) {
-    throw new ValidationError(
-      "Number is below minimum safe integer",
-      {
-        value: int64.toString(),
-      }
-    );
+    throw new globalThis.Error("Value is smaller than Number.MIN_SAFE_INTEGER");
   }
   return num;
 }

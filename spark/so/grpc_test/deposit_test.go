@@ -18,6 +18,7 @@ import (
 	testutil "github.com/lightsparkdev/spark-go/test_util"
 	"github.com/lightsparkdev/spark-go/wallet"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGenerateDepositAddress(t *testing.T) {
@@ -37,7 +38,8 @@ func TestGenerateDepositAddress(t *testing.T) {
 		t.Fatalf("failed to decode public key: %v", err)
 	}
 
-	resp, err := wallet.GenerateDepositAddress(ctx, config, pubkey, "")
+	leafID := uuid.New().String()
+	resp, err := wallet.GenerateDepositAddress(ctx, config, pubkey, &leafID)
 	if err != nil {
 		t.Fatalf("failed to generate deposit address: %v", err)
 	}
@@ -70,6 +72,29 @@ func TestGenerateDepositAddress(t *testing.T) {
 	}
 }
 
+func TestGenerateDepositAddressWithoutCustomLeafID(t *testing.T) {
+	config, err := testutil.TestWalletConfig()
+	if err != nil {
+		t.Fatalf("failed to create wallet config: %v", err)
+	}
+
+	token, err := wallet.AuthenticateWithServer(context.Background(), config)
+	if err != nil {
+		t.Fatalf("failed to authenticate: %v", err)
+	}
+	ctx := wallet.ContextWithToken(context.Background(), token)
+
+	pubkey, err := hex.DecodeString("0330d50fd2e26d274e15f3dcea34a8bb611a9d0f14d1a9b1211f3608b3b7cd56c7")
+	if err != nil {
+		t.Fatalf("failed to decode public key: %v", err)
+	}
+
+	invalidLeafID := "invalidLeafID"
+	_, err = wallet.GenerateDepositAddress(ctx, config, pubkey, &invalidLeafID)
+	require.Error(t, err, "expected error when generating deposit address with invalid leaf id")
+	require.Contains(t, err.Error(), "value must be a valid UUID")
+}
+
 func TestGenerateDepositAddressConcurrentRequests(t *testing.T) {
 	config, err := testutil.TestWalletConfig()
 	if err != nil {
@@ -95,7 +120,8 @@ func TestGenerateDepositAddressConcurrentRequests(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			resp, err := wallet.GenerateDepositAddress(ctx, config, pubkey, "")
+			leafID := uuid.New().String()
+			resp, err := wallet.GenerateDepositAddress(ctx, config, pubkey, &leafID)
 			if err != nil {
 				errChannel <- err
 				return
@@ -175,9 +201,22 @@ func TestStartDepositTreeCreation(t *testing.T) {
 	userPubKeyBytes := userPubKey.SerializeCompressed()
 
 	leafID := uuid.New().String()
-	depositResp, err := wallet.GenerateDepositAddress(ctx, config, userPubKeyBytes, leafID)
+	depositResp, err := wallet.GenerateDepositAddress(ctx, config, userPubKeyBytes, &leafID)
 	if err != nil {
 		t.Fatalf("failed to generate deposit address: %v", err)
+	}
+
+	unusedDepositAddresses, err := wallet.QueryUnusedDepositAddresses(ctx, config)
+	if err != nil {
+		t.Fatalf("failed to query unused deposit addresses: %v", err)
+	}
+
+	if len(unusedDepositAddresses.DepositAddresses) != 1 {
+		t.Fatalf("expected 1 unused deposit address, got %d", len(unusedDepositAddresses.DepositAddresses))
+	}
+
+	if *unusedDepositAddresses.DepositAddresses[0].LeafId != leafID {
+		t.Fatalf("expected leaf id to be %s, got %s", leafID, *unusedDepositAddresses.DepositAddresses[0].LeafId)
 	}
 
 	client, err := testutil.NewRegtestClient()
@@ -238,13 +277,96 @@ func TestStartDepositTreeCreation(t *testing.T) {
 		}
 	}
 
-	unusedDepositAddresses, err := wallet.QueryUnusedDepositAddresses(ctx, config)
+	unusedDepositAddresses, err = wallet.QueryUnusedDepositAddresses(ctx, config)
 	if err != nil {
 		t.Fatalf("failed to query unused deposit addresses: %v", err)
 	}
 
 	if len(unusedDepositAddresses.DepositAddresses) != 0 {
 		t.Fatalf("expected 0 unused deposit addresses, got %d", len(unusedDepositAddresses.DepositAddresses))
+	}
+}
+
+func TestStartDepositTreeCreationWithoutCustomLeafID(t *testing.T) {
+	config, err := testutil.TestWalletConfig()
+	if err != nil {
+		t.Fatalf("failed to create wallet config: %v", err)
+	}
+
+	conn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress(), nil)
+	if err != nil {
+		t.Fatalf("failed to connect to operator: %v", err)
+	}
+	defer conn.Close()
+
+	token, err := wallet.AuthenticateWithConnection(context.Background(), config, conn)
+	if err != nil {
+		t.Fatalf("failed to authenticate: %v", err)
+	}
+	ctx := wallet.ContextWithToken(context.Background(), token)
+
+	privKey, err := secp256k1.GeneratePrivateKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	userPubKey := privKey.PubKey()
+	userPubKeyBytes := userPubKey.SerializeCompressed()
+
+	depositResp, err := wallet.GenerateDepositAddress(ctx, config, userPubKeyBytes, nil)
+	if err != nil {
+		t.Fatalf("failed to generate deposit address: %v", err)
+	}
+
+	client, err := testutil.NewRegtestClient()
+	assert.NoError(t, err)
+
+	coin, err := faucet.Fund()
+	assert.NoError(t, err)
+
+	depositTx, err := testutil.CreateTestDepositTransaction(coin.OutPoint, depositResp.DepositAddress.Address, 100_000)
+	if err != nil {
+		t.Fatalf("failed to create deposit tx: %v", err)
+	}
+	vout := 0
+	var buf bytes.Buffer
+	err = depositTx.Serialize(&buf)
+	if err != nil {
+		t.Fatalf("failed to serialize deposit tx: %v", err)
+	}
+	depositTxHex := hex.EncodeToString(buf.Bytes())
+	decodedBytes, err := hex.DecodeString(depositTxHex)
+	if err != nil {
+		t.Fatalf("failed to decode deposit tx hex: %v", err)
+	}
+	depositTx, err = common.TxFromRawTxBytes(decodedBytes)
+	if err != nil {
+		t.Fatalf("failed to deserilize deposit tx: %v", err)
+	}
+
+	// Sign, broadcast, and mine deposit tx
+	signedDepositTx, err := testutil.SignFaucetCoin(depositTx, coin.TxOut, coin.Key)
+	assert.NoError(t, err)
+	_, err = client.SendRawTransaction(signedDepositTx, true)
+	assert.NoError(t, err)
+
+	randomKey, err := secp256k1.GeneratePrivateKey()
+	assert.NoError(t, err)
+	randomPubKey := randomKey.PubKey()
+	randomAddress, err := common.P2TRRawAddressFromPublicKey(randomPubKey.SerializeCompressed(), common.Regtest)
+	assert.NoError(t, err)
+	_, err = client.GenerateToAddress(1, randomAddress, nil)
+	assert.NoError(t, err)
+
+	time.Sleep(100 * time.Millisecond)
+
+	resp, err := wallet.CreateTreeRoot(ctx, config, privKey.Serialize(), depositResp.DepositAddress.VerifyingKey, depositTx, vout)
+	if err != nil {
+		t.Fatalf("failed to create tree: %v", err)
+	}
+
+	for _, node := range resp.Nodes {
+		_, err := uuid.Parse(node.Id)
+		require.NoError(t, err)
 	}
 }
 
@@ -273,7 +395,8 @@ func TestStartDepositTreeCreationConcurrentWithSameTx(t *testing.T) {
 	userPubKey := privKey.PubKey()
 	userPubKeyBytes := userPubKey.SerializeCompressed()
 
-	depositResp, err := wallet.GenerateDepositAddress(ctx, config, userPubKeyBytes, "")
+	leafID := uuid.New().String()
+	depositResp, err := wallet.GenerateDepositAddress(ctx, config, userPubKeyBytes, &leafID)
 	if err != nil {
 		t.Fatalf("failed to generate deposit address: %v", err)
 	}
@@ -403,7 +526,8 @@ func TestStartDepositTreeCreationOffchain(t *testing.T) {
 	userPubKey := privKey.PubKey()
 	userPubKeyBytes := userPubKey.SerializeCompressed()
 
-	depositResp, err := wallet.GenerateDepositAddress(ctx, config, userPubKeyBytes, "")
+	leafID := uuid.New().String()
+	depositResp, err := wallet.GenerateDepositAddress(ctx, config, userPubKeyBytes, &leafID)
 	if err != nil {
 		t.Fatalf("failed to generate deposit address: %v", err)
 	}
