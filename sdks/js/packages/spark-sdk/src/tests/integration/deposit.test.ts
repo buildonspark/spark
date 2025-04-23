@@ -1,18 +1,14 @@
 import { describe, expect, it } from "@jest/globals";
 import { secp256k1 } from "@noble/curves/secp256k1";
 import { Address, OutScript, Transaction } from "@scure/btc-signer";
+import { RPCError, ValidationError } from "../../errors/types.js";
 import { getP2TRAddressFromPublicKey, getTxId } from "../../utils/bitcoin.js";
 import { getNetwork, Network } from "../../utils/network.js";
 import { SparkWalletTesting } from "../utils/spark-testing-wallet.js";
 import { BitcoinFaucet } from "../utils/test-faucet.js";
-import { ValidationError, RPCError } from "../../errors/types.js";
-
-const brokenTestFn = process.env.GITHUB_ACTIONS ? it.skip : it;
 
 describe("deposit", () => {
   it("should generate a deposit address", async () => {
-    const mnemonic =
-      "raise benefit echo client clutch short pyramid grass fall core slogan boil device plastic drastic discover decide penalty middle appear medal elbow original income";
     const { wallet: sdk } = await SparkWalletTesting.initialize({
       options: {
         network: "LOCAL",
@@ -35,9 +31,6 @@ describe("deposit", () => {
       },
     });
 
-    // Generate private/public key pair
-    const pubKey = await sdk.getSigner().generatePublicKey();
-
     // Generate deposit address
     const depositResp = await sdk.getSingleUseDepositAddress();
     if (!depositResp) {
@@ -56,7 +49,6 @@ describe("deposit", () => {
       amount: 100_000n,
     });
 
-    const vout = 0;
     const txid = getTxId(depositTx);
     if (!txid) {
       throw new ValidationError("Transaction ID not found", {
