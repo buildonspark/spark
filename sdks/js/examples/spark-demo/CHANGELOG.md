@@ -1,5 +1,12 @@
 # spark-demo
 
+## 0.0.33
+
+### Patch Changes
+
+- Updated dependencies
+  - @buildonspark/spark-sdk@0.1.3
+
 ## 0.0.32
 
 ### Patch Changes
