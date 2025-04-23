@@ -223,6 +223,7 @@ query FetchSparkWalletUserToUserRequestsConnection($entity_id: ID!, $first: Int,
                             }
                             transfer_spark_id: spark_id
                         }
+                        lightning_send_request_payment_preimage: payment_preimage
                     }
                 }
             }

@@ -2,24 +2,24 @@
 // Copyright ©, 2023-present, Lightspark Group, Inc. - All Rights Reserved
 
 import Entity from './Entity.js';
-import {SwapLeafToJson} from './SwapLeaf.js';
 import SparkCoopExitRequestStatus from './SparkCoopExitRequestStatus.js';
-import {TransferFromJson} from './Transfer.js';
-import LeavesSwapRequest from './LeavesSwapRequest.js';
-import {SwapLeafFromJson} from './SwapLeaf.js';
-import LightningReceiveRequestStatus from './LightningReceiveRequestStatus.js';
-import LightningSendRequest from './LightningSendRequest.js';
-import {CurrencyAmountToJson} from './CurrencyAmount.js';
-import BitcoinNetwork from './BitcoinNetwork.js';
-import { Query, isObject } from '@lightsparkdev/core';
-import LightningReceiveRequest from './LightningReceiveRequest.js';
-import {InvoiceFromJson} from './Invoice.js';
-import {InvoiceToJson} from './Invoice.js';
 import {CurrencyAmountFromJson} from './CurrencyAmount.js';
-import SparkLeavesSwapRequestStatus from './SparkLeavesSwapRequestStatus.js';
-import { LightsparkException } from '@lightsparkdev/core';
-import LightningSendRequestStatus from './LightningSendRequestStatus.js';
+import LightningReceiveRequestStatus from './LightningReceiveRequestStatus.js';
+import {SwapLeafToJson} from './SwapLeaf.js';
+import {InvoiceFromJson} from './Invoice.js';
+import {SwapLeafFromJson} from './SwapLeaf.js';
 import CoopExitRequest from './CoopExitRequest.js';
+import LightningReceiveRequest from './LightningReceiveRequest.js';
+import SparkLeavesSwapRequestStatus from './SparkLeavesSwapRequestStatus.js';
+import LightningSendRequestStatus from './LightningSendRequestStatus.js';
+import {CurrencyAmountToJson} from './CurrencyAmount.js';
+import LeavesSwapRequest from './LeavesSwapRequest.js';
+import {InvoiceToJson} from './Invoice.js';
+import {TransferFromJson} from './Transfer.js';
+import BitcoinNetwork from './BitcoinNetwork.js';
+import { LightsparkException } from '@lightsparkdev/core';
+import LightningSendRequest from './LightningSendRequest.js';
+import { Query, isObject } from '@lightsparkdev/core';
 
 
 interface UserRequest {
@@ -105,6 +105,7 @@ typename: "LightningReceiveRequest",            transfer: (!!obj["lightning_rece
             idempotencyKey: obj["lightning_send_request_idempotency_key"],
             status: LightningSendRequestStatus[obj["lightning_send_request_status"]] ?? LightningSendRequestStatus.FUTURE_VALUE,
 typename: "LightningSendRequest",            transfer: (!!obj["lightning_send_request_transfer"] ? TransferFromJson(obj["lightning_send_request_transfer"]) : undefined),
+            paymentPreimage: obj["lightning_send_request_payment_preimage"],
 
         } as LightningSendRequest;
 
@@ -171,6 +172,7 @@ lightning_send_request_fee: CurrencyAmountToJson(lightningSendRequest.fee),
 lightning_send_request_idempotency_key: lightningSendRequest.idempotencyKey,
 lightning_send_request_status: lightningSendRequest.status,
 lightning_send_request_transfer: (lightningSendRequest.transfer ? lightningSendRequest.transfer.toJson() : undefined),
+lightning_send_request_payment_preimage: lightningSendRequest.paymentPreimage,
 
         }
 
@@ -349,6 +351,7 @@ fragment UserRequestFragment on UserRequest {
             }
             transfer_spark_id: spark_id
         }
+        lightning_send_request_payment_preimage: payment_preimage
     }
 }`;
 

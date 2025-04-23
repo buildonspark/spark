@@ -203,6 +203,7 @@ fragment EntityFragment on Entity {
             }
             transfer_spark_id: spark_id
         }
+        lightning_send_request_payment_preimage: payment_preimage
     }
     ... on SparkWalletUser {
         __typename
