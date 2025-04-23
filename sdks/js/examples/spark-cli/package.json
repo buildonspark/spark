@@ -6,6 +6,7 @@
   "main": "index.js",
   "scripts": {
     "cli": "NODE_ENV=development tsx src/cli.ts",
+    "cli:prod": "NODE_ENV=production tsx src/cli.ts",
     "clean": "rm -rf dist",
     "format:fix": "prettier src --write",
     "format": "prettier src --check",

@@ -50,6 +50,7 @@ async function runCLI() {
   transfertokens <tokenPubKey> <amount> <receiverSparkAddress>        - Transfer tokens
 
   Token Issuer Commands:
+  gettokenl1address                                                   - Get the L1 address for on-chain token operations
   getissuertokenbalance                                               - Get the issuer's token balance
   getissuertokeninfo                                                  - Get the issuer's token information
   getissuertokenpublickey                                             - Get the issuer's token public key
@@ -450,6 +451,15 @@ async function runCLI() {
           amountSats: parseInt(args[0]),
         });
         console.log(fee);
+        break;
+      }
+      case "gettokenl1address": {
+        if (!wallet) {
+          console.log("Please initialize a wallet first");
+          break;
+        }
+        const l1Address = await wallet.getTokenL1Address();
+        console.log(l1Address);
         break;
       }
       case "getissuertokenbalance": {
