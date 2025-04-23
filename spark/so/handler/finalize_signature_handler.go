@@ -12,7 +12,9 @@ import (
 	pbinternal "github.com/lightsparkdev/spark-go/proto/spark_internal"
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/ent"
+	"github.com/lightsparkdev/spark-go/so/ent/depositaddress"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
+	"github.com/lightsparkdev/spark-go/so/ent/signingkeyshare"
 	enttransfer "github.com/lightsparkdev/spark-go/so/ent/transfer"
 	"github.com/lightsparkdev/spark-go/so/ent/transferleaf"
 	"github.com/lightsparkdev/spark-go/so/ent/treenode"
@@ -74,16 +76,15 @@ func (o *FinalizeSignatureHandler) FinalizeNodeSignatures(ctx context.Context, r
 			if err != nil {
 				return nil, fmt.Errorf("failed to get node: %v", err)
 			}
-			nodeParent, err := node.QueryParent().Only(ctx)
-			if err == nil && nodeParent != nil {
-				continue
-			}
-			nodeTx, err := common.TxFromRawTxBytes(node.RawTx)
+			signingKeyshare, err := node.QuerySigningKeyshare().Only(ctx)
 			if err != nil {
-				return nil, fmt.Errorf("unable to deserialize node tx: %v", err)
+				return nil, fmt.Errorf("failed to get signing keyshare: %v", err)
 			}
-			txid := nodeTx.TxIn[0].PreviousOutPoint.Hash
-			if helper.CheckTxIDOnchain(o.config, txid[:], network) {
+			address, err := db.DepositAddress.Query().Where(depositaddress.HasSigningKeyshareWith(signingkeyshare.IDEQ(signingKeyshare.ID))).Only(ctx)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get deposit address: %v", err)
+			}
+			if address.ConfirmationHeight != 0 {
 				_, err = tree.Update().SetStatus(schema.TreeStatusAvailable).Save(ctx)
 				if err != nil {
 					return nil, fmt.Errorf("failed to update tree: %v", err)

@@ -175,7 +175,7 @@ func TestGenerateStaticDepositAddress(t *testing.T) {
 	assert.Equal(t, 0, len(unusedDepositAddresses.DepositAddresses))
 }
 
-func TestStartDepositTreeCreation(t *testing.T) {
+func TestStartDepositTreeCreationBasic(t *testing.T) {
 	config, err := testutil.TestWalletConfig()
 	if err != nil {
 		t.Fatalf("failed to create wallet config: %v", err)
@@ -265,17 +265,13 @@ func TestStartDepositTreeCreation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create tree: %v", err)
 	}
+	require.Equal(t, 1, len(resp.Nodes))
 
-	log.Printf("tree created: %v", resp)
-
-	for _, node := range resp.Nodes {
-		if node.Status == string(schema.TreeNodeStatusCreating) {
-			t.Fatalf("tree node is in status TreeNodeStatusCreating %s", node.Id)
-		}
-		if node.Id != leafID {
-			t.Fatalf("tree node id is not the expected leaf id %s", node.Id)
-		}
-	}
+	sparkClient := pb.NewSparkServiceClient(conn)
+	rootNode, err := testutil.WaitForPendingDepositNode(ctx, sparkClient, resp.Nodes[0])
+	assert.NoError(t, err)
+	assert.Equal(t, rootNode.Id, leafID)
+	assert.Equal(t, rootNode.Status, string(schema.TreeNodeStatusAvailable))
 
 	unusedDepositAddresses, err = wallet.QueryUnusedDepositAddresses(ctx, config)
 	if err != nil {

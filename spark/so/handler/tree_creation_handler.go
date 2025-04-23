@@ -382,7 +382,6 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 	var parentNode *ent.TreeNode
 	var vout uint32
 	var network common.Network
-	onchain := true
 	switch req.Source.(type) {
 	case *pb.CreateTreeRequest_ParentNodeOutput:
 		uuid, err := uuid.Parse(req.GetParentNodeOutput().NodeId)
@@ -409,9 +408,6 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 		if err != nil {
 			return nil, nil, err
 		}
-		if !helper.CheckUTXOOnchain(h.config, req.GetOnChainUtxo()) {
-			onchain = false
-		}
 	default:
 		return nil, nil, errors.New("invalid source")
 	}
@@ -425,10 +421,20 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 		vout          uint32
 	}
 
-	userPublicKey, keyshare, err := h.getSigningKeyshareFromOutput(ctx, network, parentOutput)
+	addressString, err := common.P2TRAddressFromPkScript(parentOutput.PkScript, network)
 	if err != nil {
 		return nil, nil, err
 	}
+	depositAddress, err := db.DepositAddress.Query().Where(depositaddress.Address(*addressString)).Only(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	keyshare, err := depositAddress.QuerySigningKeyshare().First(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	userPublicKey := depositAddress.OwnerSigningPubkey
+	onchain := depositAddress.ConfirmationHeight != 0
 
 	queue := []*element{}
 	queue = append(queue, &element{

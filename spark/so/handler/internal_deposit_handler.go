@@ -13,8 +13,9 @@ import (
 	pbinternal "github.com/lightsparkdev/spark-go/proto/spark_internal"
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/ent"
+	"github.com/lightsparkdev/spark-go/so/ent/depositaddress"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
-	"github.com/lightsparkdev/spark-go/so/helper"
+	"github.com/lightsparkdev/spark-go/so/ent/signingkeyshare"
 )
 
 // InternalDepositHandler is the deposit handler for so internal
@@ -81,7 +82,7 @@ func (h *InternalDepositHandler) FinalizeTreeCreation(ctx context.Context, req *
 	if selectedNode == nil {
 		return fmt.Errorf("no node in the request")
 	}
-	markNodeAsAvailalbe := false
+	markNodeAsAvailable := false
 	if selectedNode.ParentNodeId == nil {
 		treeID, err := uuid.Parse(selectedNode.TreeId)
 		if err != nil {
@@ -94,13 +95,21 @@ func (h *InternalDepositHandler) FinalizeTreeCreation(ctx context.Context, req *
 		if !h.config.IsNetworkSupported(network) {
 			return fmt.Errorf("network not supported")
 		}
+		signingKeyshareID, err := uuid.Parse(selectedNode.SigningKeyshareId)
+		if err != nil {
+			return err
+		}
+		address, err := db.DepositAddress.Query().Where(depositaddress.HasSigningKeyshareWith(signingkeyshare.IDEQ(signingKeyshareID))).Only(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to get deposit address: %v", err)
+		}
+		markNodeAsAvailable = address.ConfirmationHeight != 0
+		log.Printf("Marking node as available: %v", markNodeAsAvailable)
 		nodeTx, err := common.TxFromRawTxBytes(selectedNode.RawTx)
 		if err != nil {
 			return err
 		}
 		txid := nodeTx.TxIn[0].PreviousOutPoint.Hash
-		markNodeAsAvailalbe = helper.CheckTxIDOnchain(h.config, txid[:], network)
-		log.Printf("Marking node as available: %v", markNodeAsAvailalbe)
 
 		schemaNetwork, err := common.SchemaNetworkFromNetwork(network)
 		if err != nil {
@@ -115,7 +124,7 @@ func (h *InternalDepositHandler) FinalizeTreeCreation(ctx context.Context, req *
 			SetVout(int16(nodeTx.TxIn[0].PreviousOutPoint.Index)).
 			SetNetwork(schemaNetwork)
 
-		if markNodeAsAvailalbe {
+		if markNodeAsAvailable {
 			treeMutator.SetStatus(schema.TreeStatusAvailable)
 		} else {
 			treeMutator.SetStatus(schema.TreeStatusPending)
@@ -134,7 +143,7 @@ func (h *InternalDepositHandler) FinalizeTreeCreation(ctx context.Context, req *
 		if err != nil {
 			return err
 		}
-		markNodeAsAvailalbe = tree.Status == schema.TreeStatusAvailable
+		markNodeAsAvailable = tree.Status == schema.TreeStatusAvailable
 	}
 
 	for _, node := range req.Nodes {
@@ -167,7 +176,7 @@ func (h *InternalDepositHandler) FinalizeTreeCreation(ctx context.Context, req *
 			nodeMutator.SetParentID(parentID)
 		}
 
-		if markNodeAsAvailalbe {
+		if markNodeAsAvailable {
 			if len(node.RawRefundTx) > 0 {
 				nodeMutator.SetStatus(schema.TreeNodeStatusAvailable)
 			} else {

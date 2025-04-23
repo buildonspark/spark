@@ -195,6 +195,17 @@ func scanChainUpdates(
 	return nil
 }
 
+func RPCClientConfig(cfg so.BitcoindConfig) rpcclient.ConnConfig {
+	return rpcclient.ConnConfig{
+		Host:         cfg.Host,
+		User:         cfg.User,
+		Pass:         cfg.Password,
+		Params:       cfg.Network,
+		DisableTLS:   true, // TODO: PE help
+		HTTPPostMode: true,
+	}
+}
+
 func WatchChain(
 	dbClient *ent.Client,
 	lrc20Client *lrc20.Client,
@@ -205,7 +216,7 @@ func WatchChain(
 	if err != nil {
 		return err
 	}
-	connConfig := helper.RPCClientConfig(bitcoindConfig)
+	connConfig := RPCClientConfig(bitcoindConfig)
 	bitcoinClient, err := rpcclient.New(&connConfig, nil)
 	if err != nil {
 		return err
@@ -395,6 +406,12 @@ func handleBlock(
 	}
 	for _, deposit := range confirmedDeposits {
 		// TODO: only unlock if deposit reaches X confirmations
+		_, err = dbTx.DepositAddress.UpdateOne(deposit).
+			SetConfirmationHeight(blockHeight).
+			Save(ctx)
+		if err != nil {
+			return err
+		}
 		signingKeyShare, err := deposit.QuerySigningKeyshare().Only(ctx)
 		if err != nil {
 			return err
@@ -476,12 +493,6 @@ func handleBlock(
 					return err
 				}
 			}
-		}
-		_, err = dbTx.DepositAddress.UpdateOne(deposit).
-			SetConfirmationHeight(blockHeight).
-			Save(ctx)
-		if err != nil {
-			return err
 		}
 	}
 
