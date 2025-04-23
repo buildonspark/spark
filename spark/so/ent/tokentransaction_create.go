@@ -84,6 +84,12 @@ func (ttc *TokenTransactionCreate) SetNillableStatus(sts *schema.TokenTransactio
 	return ttc
 }
 
+// SetCoordinatorPublicKey sets the "coordinator_public_key" field.
+func (ttc *TokenTransactionCreate) SetCoordinatorPublicKey(b []byte) *TokenTransactionCreate {
+	ttc.mutation.SetCoordinatorPublicKey(b)
+	return ttc
+}
+
 // SetID sets the "id" field.
 func (ttc *TokenTransactionCreate) SetID(u uuid.UUID) *TokenTransactionCreate {
 	ttc.mutation.SetID(u)
@@ -283,6 +289,10 @@ func (ttc *TokenTransactionCreate) createSpec() (*TokenTransaction, *sqlgraph.Cr
 	if value, ok := ttc.mutation.Status(); ok {
 		_spec.SetField(tokentransaction.FieldStatus, field.TypeEnum, value)
 		_node.Status = value
+	}
+	if value, ok := ttc.mutation.CoordinatorPublicKey(); ok {
+		_spec.SetField(tokentransaction.FieldCoordinatorPublicKey, field.TypeBytes, value)
+		_node.CoordinatorPublicKey = value
 	}
 	if nodes := ttc.mutation.SpentOutputIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{

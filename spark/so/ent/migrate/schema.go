@@ -385,6 +385,7 @@ var (
 		{Name: "finalized_token_transaction_hash", Type: field.TypeBytes, Unique: true},
 		{Name: "operator_signature", Type: field.TypeBytes, Unique: true, Nullable: true},
 		{Name: "status", Type: field.TypeEnum, Nullable: true, Enums: []string{"STARTED", "SIGNED", "SIGNED_CANCELLED", "FINALIZED"}},
+		{Name: "coordinator_public_key", Type: field.TypeBytes, Nullable: true},
 		{Name: "token_transaction_mint", Type: field.TypeUUID, Nullable: true},
 	}
 	// TokenTransactionsTable holds the schema information for the "token_transactions" table.
@@ -395,7 +396,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "token_transactions_token_mints_mint",
-				Columns:    []*schema.Column{TokenTransactionsColumns[7]},
+				Columns:    []*schema.Column{TokenTransactionsColumns[8]},
 				RefColumns: []*schema.Column{TokenMintsColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
@@ -405,6 +406,11 @@ var (
 				Name:    "tokentransaction_finalized_token_transaction_hash",
 				Unique:  false,
 				Columns: []*schema.Column{TokenTransactionsColumns[4]},
+			},
+			{
+				Name:    "tokentransaction_partial_token_transaction_hash",
+				Unique:  false,
+				Columns: []*schema.Column{TokenTransactionsColumns[3]},
 			},
 		},
 	}

@@ -3151,6 +3151,8 @@ func (m *StartTokenTransactionInternalRequest) validate(all bool) error {
 		}
 	}
 
+	// no validation rules for CoordinatorPublicKey
+
 	if len(errors) > 0 {
 		return StartTokenTransactionInternalRequestMultiError(errors)
 	}

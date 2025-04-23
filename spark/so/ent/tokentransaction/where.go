@@ -82,6 +82,11 @@ func OperatorSignature(v []byte) predicate.TokenTransaction {
 	return predicate.TokenTransaction(sql.FieldEQ(FieldOperatorSignature, v))
 }
 
+// CoordinatorPublicKey applies equality check predicate on the "coordinator_public_key" field. It's identical to CoordinatorPublicKeyEQ.
+func CoordinatorPublicKey(v []byte) predicate.TokenTransaction {
+	return predicate.TokenTransaction(sql.FieldEQ(FieldCoordinatorPublicKey, v))
+}
+
 // CreateTimeEQ applies the EQ predicate on the "create_time" field.
 func CreateTimeEQ(v time.Time) predicate.TokenTransaction {
 	return predicate.TokenTransaction(sql.FieldEQ(FieldCreateTime, v))
@@ -330,6 +335,56 @@ func StatusIsNil() predicate.TokenTransaction {
 // StatusNotNil applies the NotNil predicate on the "status" field.
 func StatusNotNil() predicate.TokenTransaction {
 	return predicate.TokenTransaction(sql.FieldNotNull(FieldStatus))
+}
+
+// CoordinatorPublicKeyEQ applies the EQ predicate on the "coordinator_public_key" field.
+func CoordinatorPublicKeyEQ(v []byte) predicate.TokenTransaction {
+	return predicate.TokenTransaction(sql.FieldEQ(FieldCoordinatorPublicKey, v))
+}
+
+// CoordinatorPublicKeyNEQ applies the NEQ predicate on the "coordinator_public_key" field.
+func CoordinatorPublicKeyNEQ(v []byte) predicate.TokenTransaction {
+	return predicate.TokenTransaction(sql.FieldNEQ(FieldCoordinatorPublicKey, v))
+}
+
+// CoordinatorPublicKeyIn applies the In predicate on the "coordinator_public_key" field.
+func CoordinatorPublicKeyIn(vs ...[]byte) predicate.TokenTransaction {
+	return predicate.TokenTransaction(sql.FieldIn(FieldCoordinatorPublicKey, vs...))
+}
+
+// CoordinatorPublicKeyNotIn applies the NotIn predicate on the "coordinator_public_key" field.
+func CoordinatorPublicKeyNotIn(vs ...[]byte) predicate.TokenTransaction {
+	return predicate.TokenTransaction(sql.FieldNotIn(FieldCoordinatorPublicKey, vs...))
+}
+
+// CoordinatorPublicKeyGT applies the GT predicate on the "coordinator_public_key" field.
+func CoordinatorPublicKeyGT(v []byte) predicate.TokenTransaction {
+	return predicate.TokenTransaction(sql.FieldGT(FieldCoordinatorPublicKey, v))
+}
+
+// CoordinatorPublicKeyGTE applies the GTE predicate on the "coordinator_public_key" field.
+func CoordinatorPublicKeyGTE(v []byte) predicate.TokenTransaction {
+	return predicate.TokenTransaction(sql.FieldGTE(FieldCoordinatorPublicKey, v))
+}
+
+// CoordinatorPublicKeyLT applies the LT predicate on the "coordinator_public_key" field.
+func CoordinatorPublicKeyLT(v []byte) predicate.TokenTransaction {
+	return predicate.TokenTransaction(sql.FieldLT(FieldCoordinatorPublicKey, v))
+}
+
+// CoordinatorPublicKeyLTE applies the LTE predicate on the "coordinator_public_key" field.
+func CoordinatorPublicKeyLTE(v []byte) predicate.TokenTransaction {
+	return predicate.TokenTransaction(sql.FieldLTE(FieldCoordinatorPublicKey, v))
+}
+
+// CoordinatorPublicKeyIsNil applies the IsNil predicate on the "coordinator_public_key" field.
+func CoordinatorPublicKeyIsNil() predicate.TokenTransaction {
+	return predicate.TokenTransaction(sql.FieldIsNull(FieldCoordinatorPublicKey))
+}
+
+// CoordinatorPublicKeyNotNil applies the NotNil predicate on the "coordinator_public_key" field.
+func CoordinatorPublicKeyNotNil() predicate.TokenTransaction {
+	return predicate.TokenTransaction(sql.FieldNotNull(FieldCoordinatorPublicKey))
 }
 
 // HasSpentOutput applies the HasEdge predicate on the "spent_output" edge.

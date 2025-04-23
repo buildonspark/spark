@@ -9837,6 +9837,7 @@ type TokenTransactionMutation struct {
 	finalized_token_transaction_hash *[]byte
 	operator_signature               *[]byte
 	status                           *schema.TokenTransactionStatus
+	coordinator_public_key           *[]byte
 	clearedFields                    map[string]struct{}
 	spent_output                     map[uuid.UUID]struct{}
 	removedspent_output              map[uuid.UUID]struct{}
@@ -10197,6 +10198,55 @@ func (m *TokenTransactionMutation) ResetStatus() {
 	delete(m.clearedFields, tokentransaction.FieldStatus)
 }
 
+// SetCoordinatorPublicKey sets the "coordinator_public_key" field.
+func (m *TokenTransactionMutation) SetCoordinatorPublicKey(b []byte) {
+	m.coordinator_public_key = &b
+}
+
+// CoordinatorPublicKey returns the value of the "coordinator_public_key" field in the mutation.
+func (m *TokenTransactionMutation) CoordinatorPublicKey() (r []byte, exists bool) {
+	v := m.coordinator_public_key
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCoordinatorPublicKey returns the old "coordinator_public_key" field's value of the TokenTransaction entity.
+// If the TokenTransaction object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenTransactionMutation) OldCoordinatorPublicKey(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCoordinatorPublicKey is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCoordinatorPublicKey requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCoordinatorPublicKey: %w", err)
+	}
+	return oldValue.CoordinatorPublicKey, nil
+}
+
+// ClearCoordinatorPublicKey clears the value of the "coordinator_public_key" field.
+func (m *TokenTransactionMutation) ClearCoordinatorPublicKey() {
+	m.coordinator_public_key = nil
+	m.clearedFields[tokentransaction.FieldCoordinatorPublicKey] = struct{}{}
+}
+
+// CoordinatorPublicKeyCleared returns if the "coordinator_public_key" field was cleared in this mutation.
+func (m *TokenTransactionMutation) CoordinatorPublicKeyCleared() bool {
+	_, ok := m.clearedFields[tokentransaction.FieldCoordinatorPublicKey]
+	return ok
+}
+
+// ResetCoordinatorPublicKey resets all changes to the "coordinator_public_key" field.
+func (m *TokenTransactionMutation) ResetCoordinatorPublicKey() {
+	m.coordinator_public_key = nil
+	delete(m.clearedFields, tokentransaction.FieldCoordinatorPublicKey)
+}
+
 // AddSpentOutputIDs adds the "spent_output" edge to the TokenOutput entity by ids.
 func (m *TokenTransactionMutation) AddSpentOutputIDs(ids ...uuid.UUID) {
 	if m.spent_output == nil {
@@ -10378,7 +10428,7 @@ func (m *TokenTransactionMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *TokenTransactionMutation) Fields() []string {
-	fields := make([]string, 0, 6)
+	fields := make([]string, 0, 7)
 	if m.create_time != nil {
 		fields = append(fields, tokentransaction.FieldCreateTime)
 	}
@@ -10396,6 +10446,9 @@ func (m *TokenTransactionMutation) Fields() []string {
 	}
 	if m.status != nil {
 		fields = append(fields, tokentransaction.FieldStatus)
+	}
+	if m.coordinator_public_key != nil {
+		fields = append(fields, tokentransaction.FieldCoordinatorPublicKey)
 	}
 	return fields
 }
@@ -10417,6 +10470,8 @@ func (m *TokenTransactionMutation) Field(name string) (ent.Value, bool) {
 		return m.OperatorSignature()
 	case tokentransaction.FieldStatus:
 		return m.Status()
+	case tokentransaction.FieldCoordinatorPublicKey:
+		return m.CoordinatorPublicKey()
 	}
 	return nil, false
 }
@@ -10438,6 +10493,8 @@ func (m *TokenTransactionMutation) OldField(ctx context.Context, name string) (e
 		return m.OldOperatorSignature(ctx)
 	case tokentransaction.FieldStatus:
 		return m.OldStatus(ctx)
+	case tokentransaction.FieldCoordinatorPublicKey:
+		return m.OldCoordinatorPublicKey(ctx)
 	}
 	return nil, fmt.Errorf("unknown TokenTransaction field %s", name)
 }
@@ -10489,6 +10546,13 @@ func (m *TokenTransactionMutation) SetField(name string, value ent.Value) error 
 		}
 		m.SetStatus(v)
 		return nil
+	case tokentransaction.FieldCoordinatorPublicKey:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCoordinatorPublicKey(v)
+		return nil
 	}
 	return fmt.Errorf("unknown TokenTransaction field %s", name)
 }
@@ -10525,6 +10589,9 @@ func (m *TokenTransactionMutation) ClearedFields() []string {
 	if m.FieldCleared(tokentransaction.FieldStatus) {
 		fields = append(fields, tokentransaction.FieldStatus)
 	}
+	if m.FieldCleared(tokentransaction.FieldCoordinatorPublicKey) {
+		fields = append(fields, tokentransaction.FieldCoordinatorPublicKey)
+	}
 	return fields
 }
 
@@ -10544,6 +10611,9 @@ func (m *TokenTransactionMutation) ClearField(name string) error {
 		return nil
 	case tokentransaction.FieldStatus:
 		m.ClearStatus()
+		return nil
+	case tokentransaction.FieldCoordinatorPublicKey:
+		m.ClearCoordinatorPublicKey()
 		return nil
 	}
 	return fmt.Errorf("unknown TokenTransaction nullable field %s", name)
@@ -10570,6 +10640,9 @@ func (m *TokenTransactionMutation) ResetField(name string) error {
 		return nil
 	case tokentransaction.FieldStatus:
 		m.ResetStatus()
+		return nil
+	case tokentransaction.FieldCoordinatorPublicKey:
+		m.ResetCoordinatorPublicKey()
 		return nil
 	}
 	return fmt.Errorf("unknown TokenTransaction field %s", name)

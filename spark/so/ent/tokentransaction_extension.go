@@ -32,19 +32,18 @@ func CreateStartedTransactionEntities(
 	tokenTransactionSignatures *pb.TokenTransactionSignatures,
 	outputRevocationKeyshareIDs []string,
 	outputToSpendEnts []*TokenOutput,
+	coordinatorPublicKey []byte,
 ) (*TokenTransaction, error) {
+	db := GetDbFromContext(ctx)
+
 	partialTokenTransactionHash, err := utils.HashTokenTransaction(tokenTransaction, true)
 	if err != nil {
-		log.Printf("Failed to hash partial token transaction: %v", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to hash partial token transaction: %w", err)
 	}
 	finalTokenTransactionHash, err := utils.HashTokenTransaction(tokenTransaction, false)
 	if err != nil {
-		log.Printf("Failed to hash final token transaction: %v", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to hash final token transaction: %w", err)
 	}
-
-	db := GetDbFromContext(ctx)
 
 	var network schema.Network
 	err = network.UnmarshalProto(tokenTransaction.Network)
@@ -61,22 +60,21 @@ func CreateStartedTransactionEntities(
 			SetWalletProvidedTimestamp(tokenTransaction.GetMintInput().GetIssuerProvidedTimestamp()).
 			Save(ctx)
 		if err != nil {
-			log.Printf("Failed to create token mint ent: %v", err)
-			return nil, err
+			return nil, fmt.Errorf("failed to create token mint ent, likely due to attempting to restart a mint transaction with a different operator: %w", err)
 		}
 	}
 
 	txUpdate := db.TokenTransaction.Create().
 		SetPartialTokenTransactionHash(partialTokenTransactionHash).
 		SetFinalizedTokenTransactionHash(finalTokenTransactionHash).
-		SetStatus(schema.TokenTransactionStatusStarted)
+		SetStatus(schema.TokenTransactionStatusStarted).
+		SetCoordinatorPublicKey(coordinatorPublicKey)
 	if tokenMintEnt != nil {
 		txUpdate.SetMintID(tokenMintEnt.ID)
 	}
 	tokenTransactionEnt, err := txUpdate.Save(ctx)
 	if err != nil {
-		log.Printf("Failed to create token transaction: %v", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to create token transaction: %w", err)
 	}
 
 	if tokenTransaction.GetTransferInput() != nil {
@@ -97,8 +95,7 @@ func CreateStartedTransactionEntities(
 				SetSpentTransactionInputVout(int32(outputIndex)).
 				Save(ctx)
 			if err != nil {
-				log.Printf("Failed to update output to spend: %v", err)
-				return nil, err
+				return nil, fmt.Errorf("failed to update output to spend: %w", err)
 			}
 		}
 	}
@@ -129,13 +126,13 @@ func CreateStartedTransactionEntities(
 				SetNetwork(network).
 				SetCreatedTransactionOutputVout(int32(outputIndex)).
 				SetRevocationKeyshareID(revocationUUID).
-				SetOutputCreatedTokenTransactionID(tokenTransactionEnt.ID),
+				SetOutputCreatedTokenTransactionID(tokenTransactionEnt.ID).
+				SetNetwork(network),
 		)
 	}
 	_, err = db.TokenOutput.CreateBulk(outputEnts...).Save(ctx)
 	if err != nil {
-		log.Printf("Failed to create token outputs: %v", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to create token outputs: %w", err)
 	}
 	return tokenTransactionEnt, nil
 }
@@ -217,8 +214,7 @@ func UpdateSignedTransaction(
 		SetStatus(newOutputLeafStatus).
 		Save(ctx)
 	if err != nil {
-		log.Printf("Failed to bulk update output status to signed: %v", err)
-		return err
+		return fmt.Errorf("failed to bulk update output status to signed: %w", err)
 	}
 
 	return nil
@@ -271,8 +267,7 @@ func UpdateFinalizedTransaction(
 		SetStatus(schema.TokenOutputStatusCreatedFinalized).
 		Save(ctx)
 	if err != nil {
-		log.Printf("Failed to bulk update output status to signed: %v", err)
-		return err
+		return fmt.Errorf("failed to bulk update output status to finalized: %w", err)
 	}
 	return nil
 }
@@ -324,10 +319,25 @@ func UpdateCancelledTransaction(
 		SetStatus(schema.TokenOutputStatusCreatedSignedCancelled).
 		Save(ctx)
 	if err != nil {
-		log.Printf("Failed to bulk update output status to signed: %v", err)
-		return err
+		return fmt.Errorf("failed to bulk update output status to signed cancelled: %w", err)
 	}
 	return nil
+}
+
+func FetchPartialTokenTransactionData(ctx context.Context, partialTokenTransactionHash []byte) (*TokenTransaction, error) {
+	tokenTransaction, err := GetDbFromContext(ctx).TokenTransaction.Query().
+		Where(tokentransaction.PartialTokenTransactionHash(partialTokenTransactionHash)).
+		WithCreatedOutput().
+		WithSpentOutput(func(q *TokenOutputQuery) {
+			// Needed to enable marshalling of the token transaction proto.
+			q.WithOutputCreatedTokenTransaction()
+		}).
+		WithMint().
+		Only(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return tokenTransaction, nil
 }
 
 // FetchTokenTransactionData refetches the transaction with all its relations.
@@ -340,7 +350,10 @@ func FetchAndLockTokenTransactionData(ctx context.Context, finalTokenTransaction
 	tokenTransaction, err := GetDbFromContext(ctx).TokenTransaction.Query().
 		Where(tokentransaction.FinalizedTokenTransactionHash(finalTokenTransactionHash)).
 		WithCreatedOutput().
-		WithSpentOutput().
+		WithSpentOutput(func(q *TokenOutputQuery) {
+			// Needed to enable marshalling of the token transaction proto.
+			q.WithOutputCreatedTokenTransaction()
+		}).
 		WithMint().
 		ForUpdate().
 		Only(ctx)
@@ -356,7 +369,7 @@ func FetchAndLockTokenTransactionData(ctx context.Context, finalTokenTransaction
 	} else { // Transfer
 		if len(finalTokenTransaction.GetTransferInput().OutputsToSpend) != len(tokenTransaction.Edges.SpentOutput) {
 			return nil, fmt.Errorf(
-				"number of inputs in proto (%d) does not match number of spent outputs in database (%d)",
+				"number of inputs in proto (%d) does not match number of spent outputs started with this transaction in the database (%d)",
 				len(finalTokenTransaction.GetTransferInput().OutputsToSpend),
 				len(tokenTransaction.Edges.SpentOutput),
 			)
@@ -364,7 +377,7 @@ func FetchAndLockTokenTransactionData(ctx context.Context, finalTokenTransaction
 	}
 	if len(finalTokenTransaction.TokenOutputs) != len(tokenTransaction.Edges.CreatedOutput) {
 		return nil, fmt.Errorf(
-			"number of outputs in proto (%d) does not match number of created outputs in database (%d)",
+			"number of outputs in proto (%d) does not match number of created outputs started with this transaction in the database (%d)",
 			len(finalTokenTransaction.TokenOutputs),
 			len(tokenTransaction.Edges.CreatedOutput),
 		)
@@ -421,7 +434,7 @@ func (r *TokenTransaction) MarshalProto(config *so.Config) (*pb.TokenTransaction
 		for i, output := range r.Edges.SpentOutput {
 			// Since we assume all relationships are loaded, we can directly access the created transaction.
 			if output.Edges.OutputCreatedTokenTransaction == nil {
-				return nil, fmt.Errorf("output created transaction edge not loaded for output %s", output.ID)
+				return nil, fmt.Errorf("output spent transaction edge not loaded for output %s", output.ID)
 			}
 
 			transferInput.OutputsToSpend[i] = &pb.TokenOutputToSpend{

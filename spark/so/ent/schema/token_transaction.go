@@ -46,6 +46,7 @@ func (TokenTransaction) Fields() []ent.Field {
 		field.Bytes("finalized_token_transaction_hash").NotEmpty().Unique(),
 		field.Bytes("operator_signature").Optional().Unique(),
 		field.Enum("status").GoType(TokenTransactionStatus("")).Optional(),
+		field.Bytes("coordinator_public_key").Optional(),
 	}
 }
 
@@ -66,5 +67,6 @@ func (TokenTransaction) Edges() []ent.Edge {
 func (TokenTransaction) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("finalized_token_transaction_hash"),
+		index.Fields("partial_token_transaction_hash"),
 	}
 }

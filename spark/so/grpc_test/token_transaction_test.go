@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"fmt"
 	"log"
 	"math/big"
 	"os"
@@ -387,7 +388,7 @@ func TestBroadcastTokenTransactionMintAndTransferTokens(t *testing.T) {
 			mintTx.TokenOutputs[0].OwnerPublicKey,
 			mintTx.TokenOutputs[1].OwnerPublicKey,
 			userOutput1Pubkey,
-			userOutput1Pubkey,
+			userOutput2Pubkey,
 		)
 	}
 }
@@ -650,125 +651,29 @@ func TestFreezeAndUnfreezeTokens(t *testing.T) {
 	log.Printf("thawed token transfer broadcast finalized token transaction: %v", transferTokenTransactionResponse)
 }
 
-func TestBroadcastTokenTransactionMintAndTransferTokensDoubleStart(t *testing.T) {
-	skipIfGithubActions(t)
-	config, err := testutil.TestWalletConfig()
-	require.NoError(t, err, "failed to create wallet config")
-
-	tokenPrivKey := config.IdentityPrivateKey
-	tokenIdentityPubKeyBytes := tokenPrivKey.PubKey().SerializeCompressed()
-	issueTokenTransaction, _, _, err := createTestTokenMintTransaction(config, tokenIdentityPubKeyBytes)
-	require.NoError(t, err, "failed to create test token issuance transaction")
-
-	// Make a start token transaction that we will not continue.
-	_, _, _, err = wallet.StartTokenTransaction(context.Background(), config, issueTokenTransaction, []*secp256k1.PrivateKey{&tokenPrivKey})
-	require.NoError(t, err, "failed to start token transaction that we will not continue")
-
-	// Create a new transaction which will change the issuer timestamp to avoid a DB unique key error.
-	issueTokenTransaction, userOutput1PrivKey, userOutput2PrivKey, err := createTestTokenMintTransaction(config, tokenIdentityPubKeyBytes)
-	require.NoError(t, err, "failed to create test token issuance transaction")
-
-	// Go through the full flow (including start token transaction)
-	finalIssueTokenTransaction, err := wallet.BroadcastTokenTransaction(
-		context.Background(), config, issueTokenTransaction,
-		[]*secp256k1.PrivateKey{&tokenPrivKey},
-		[]wallet.SerializedPublicKey{})
-	require.NoError(t, err, "failed to broadcast issuance token transaction")
-	log.Printf("issuance broadcast finalized token transaction: %v", finalIssueTokenTransaction)
-
-	// Validate withdrawal params match config
-	for i, output := range finalIssueTokenTransaction.TokenOutputs {
-		require.Equal(t, uint64(WithdrawalBondSatsInConfig), output.GetWithdrawBondSats(),
-			"output %d: expected withdrawal bond sats %d, got %d", i, uint64(WithdrawalBondSatsInConfig), output.GetWithdrawBondSats())
-		require.Equal(t, uint64(WithdrawalRelativeBlockLocktimeInConfig), output.GetWithdrawRelativeBlockLocktime(),
-			"output %d: expected withdrawal relative block locktime %d, got %d", i, uint64(WithdrawalRelativeBlockLocktimeInConfig), output.GetWithdrawRelativeBlockLocktime())
-	}
-
-	finalIssueTokenTransactionHash, err := utils.HashTokenTransaction(finalIssueTokenTransaction, false)
-	require.NoError(t, err, "failed to hash final issuance token transaction")
-
-	transferTokenTransaction, userOutput3PrivKey, err := createTestTokenTransferTransaction(config,
-		finalIssueTokenTransactionHash,
-		tokenIdentityPubKeyBytes,
-	)
-	require.NoError(t, err, "failed to create test token transfer transaction")
-
-	userOutput3PubKeyBytes := userOutput3PrivKey.PubKey().SerializeCompressed()
-
-	// Validate withdrawal params match config
-	for i, output := range finalIssueTokenTransaction.TokenOutputs {
-		require.Equal(t, uint64(WithdrawalBondSatsInConfig), output.GetWithdrawBondSats(),
-			"output %d: expected withdrawal bond sats %d, got %d", i, uint64(WithdrawalBondSatsInConfig), output.GetWithdrawBondSats())
-		require.Equal(t, uint64(WithdrawalRelativeBlockLocktimeInConfig), output.GetWithdrawRelativeBlockLocktime(),
-			"output %d: expected withdrawal relative block locktime %d, got %d", i, uint64(WithdrawalRelativeBlockLocktimeInConfig), output.GetWithdrawRelativeBlockLocktime())
-	}
-
-	revPubKey1 := finalIssueTokenTransaction.TokenOutputs[0].RevocationCommitment
-	revPubKey2 := finalIssueTokenTransaction.TokenOutputs[1].RevocationCommitment
-
-	// Make a start token transaction with identical params but dont continue.
-	_, _, _, err = wallet.StartTokenTransaction(context.Background(), config, transferTokenTransaction, []*secp256k1.PrivateKey{userOutput1PrivKey, userOutput2PrivKey})
-	require.NoError(t, err, "failed to start token transaction with identical params")
-
-	// Broadcast the transfer token transaction
-	transferTokenTransactionResponse, err := wallet.BroadcastTokenTransaction(
-		context.Background(), config, transferTokenTransaction,
-		[]*secp256k1.PrivateKey{userOutput1PrivKey, userOutput2PrivKey},
-		[]wallet.SerializedPublicKey{revPubKey1, revPubKey2},
-	)
-	require.NoError(t, err, "failed to broadcast transfer token transaction")
-	log.Printf("transfer broadcast finalized token transaction: %v", transferTokenTransactionResponse)
-
-	// Test QueryTokenOutputs
-	tokenOutputsResponse, err := wallet.QueryTokenOutputs(
-		context.Background(),
-		config,
-		[]wallet.SerializedPublicKey{userOutput3PubKeyBytes},
-		[]wallet.SerializedPublicKey{tokenIdentityPubKeyBytes},
-	)
-	require.NoError(t, err, "failed to get owned token outputs")
-
-	// Validate the response
-	require.Equal(t, 1, len(tokenOutputsResponse.OutputsWithPreviousTransactionData), "expected 1 owned output")
-
-	output := tokenOutputsResponse.OutputsWithPreviousTransactionData[0]
-
-	// Validate output details
-	require.True(t, bytes.Equal(output.Output.OwnerPublicKey, userOutput3PubKeyBytes), "output owner public key does not match expected")
-	require.True(t, bytes.Equal(output.Output.TokenPublicKey, tokenIdentityPubKeyBytes), "output token public key does not match expected")
-
-	// Validate amount
-	expectedAmount := new(big.Int).SetBytes(int64ToUint128Bytes(0, TestTransferOutput1Amount))
-	actualAmount := new(big.Int).SetBytes(output.Output.TokenAmount)
-	require.Equal(t, 0, actualAmount.Cmp(expectedAmount), "output token amount %d does not match expected %d", actualAmount, expectedAmount)
-
-	// Validate previous transaction data
-	transferTokenTransactionResponseHash, err := utils.HashTokenTransaction(transferTokenTransactionResponse, false)
-	require.NoError(t, err, "failed to hash final transfer token transaction")
-
-	require.True(t, bytes.Equal(output.PreviousTransactionHash, transferTokenTransactionResponseHash), "previous transaction hash does not match expected")
-	require.Equal(t, uint32(0), output.PreviousTransactionVout, "previous transaction vout expected 0, got %d", output.PreviousTransactionVout)
-}
-
 // Helper function for testing token mint transaction with various signing scenarios
 // Parameters:
 // - t: testing context
 // - config: wallet configuration
+// - testDoubleStart: whether to test double start
+// - testDoubleStartDifferentOperator: whether to test double start with a different coordinator
 // - testDoubleSign: whether to test double signing
 // - testDifferentTx: whether to test signing with a different transaction than was started
 // - testInvalidSigningOperatorPublicKey: whether to test signing with an invalid operator public key in the payload
-// - expectedError: whether an error is expected during any of the signing operations
+// - expectedSigningError: whether an error is expected during any of the signing operations
 func testMintTransactionSigningScenarios(t *testing.T, config *wallet.Config,
 	ownerPrivateKeys []*secp256k1.PrivateKey,
 	ownerPublicKeys []wallet.SerializedPublicKey,
+	testDoubleStart bool,
+	testDoubleStartDifferentOperator bool,
 	testDoubleSign bool,
 	testDifferentTx bool,
 	testInvalidSigningOperatorPublicKey bool,
-	expectedError bool,
+	expectedSigningError bool,
 ) (*pb.TokenTransaction, *secp256k1.PrivateKey, *secp256k1.PrivateKey) {
 	tokenPrivKey := config.IdentityPrivateKey
 	issuerPubKeyBytes := tokenPrivKey.PubKey().SerializeCompressed()
-	issueTokenTransaction, userOutput1PrivKey, userOutput2PrivKey, err := createTestTokenMintTransaction(config, issuerPubKeyBytes)
+	tokenTransaction, userOutput1PrivKey, userOutput2PrivKey, err := createTestTokenMintTransaction(config, issuerPubKeyBytes)
 	require.NoError(t, err, "failed to create test token mint transaction")
 
 	if ownerPrivateKeys == nil {
@@ -777,13 +682,49 @@ func testMintTransactionSigningScenarios(t *testing.T, config *wallet.Config,
 	if ownerPublicKeys == nil {
 		ownerPublicKeys = []wallet.SerializedPublicKey{issuerPubKeyBytes}
 	}
-	startResp, _, finalTxHash, err := wallet.StartTokenTransaction(
-		context.Background(),
-		config,
-		issueTokenTransaction,
-		[]*secp256k1.PrivateKey{&tokenPrivKey},
-	)
-	require.NoError(t, err, "failed to start token transaction")
+	var startResp *pb.StartTokenTransactionResponse
+	var finalTxHash []byte
+	if testDoubleStart {
+		startResp, _, finalTxHash, err = wallet.StartTokenTransaction(
+			context.Background(), config, tokenTransaction, ownerPrivateKeys,
+		)
+		require.NoError(t, err, "failed to start token transaction first time")
+
+		startResp2, _, finalTxHash2, err := wallet.StartTokenTransaction(
+			context.Background(), config, tokenTransaction, ownerPrivateKeys,
+		)
+		require.NoError(t, err, "failed to start token transaction second time")
+
+		require.True(t, bytes.Equal(finalTxHash, finalTxHash2), "transaction hashes should be identical")
+
+		hash1, err := utils.HashTokenTransaction(startResp.FinalTokenTransaction, false)
+		require.NoError(t, err, "failed to hash first final token transaction")
+
+		hash2, err := utils.HashTokenTransaction(startResp2.FinalTokenTransaction, false)
+		require.NoError(t, err, "failed to hash second final token transaction")
+
+		require.True(t, bytes.Equal(hash1, hash2), "final transactions should hash to identical values")
+	} else if testDoubleStartDifferentOperator {
+		startResp, _, finalTxHash, err = wallet.StartTokenTransaction(
+			context.Background(), config, tokenTransaction, ownerPrivateKeys,
+		)
+		require.NoError(t, err, "failed to start token transaction first time")
+
+		modifiedConfig := *config
+		differentCoordinatorID, err := getNonCoordinatorOperator(config)
+		require.NoError(t, err, "failed to find a different coordinator identifier")
+		modifiedConfig.CoodinatorIdentifier = differentCoordinatorID
+
+		_, _, _, err = wallet.StartTokenTransaction(
+			context.Background(), &modifiedConfig, tokenTransaction, ownerPrivateKeys,
+		)
+		require.Error(t, err, "failed to start mint token transaction second time with different coordinator")
+	} else {
+		startResp, _, finalTxHash, err = wallet.StartTokenTransaction(
+			context.Background(), config, tokenTransaction, ownerPrivateKeys,
+		)
+		require.NoError(t, err, "failed to start token transaction")
+	}
 
 	txToSign := startResp.FinalTokenTransaction
 	if testDifferentTx {
@@ -834,7 +775,7 @@ func testMintTransactionSigningScenarios(t *testing.T, config *wallet.Config,
 		log.Printf("error when signing the mint transaction: %v", err)
 	}
 
-	if expectedError {
+	if expectedSigningError {
 		require.True(t, errorOccurred, "expected an error during mint signing operation but none occurred")
 		return nil, nil, nil
 	}
@@ -872,63 +813,74 @@ func TestTokenMintTransactionSigning(t *testing.T) {
 		name                            string
 		ownerPrivateKeys                []*secp256k1.PrivateKey
 		ownerPublicKeys                 []wallet.SerializedPublicKey
+		doubleMintStart                 bool
+		doubleMintStartWrongOperator    bool
 		doubleMintSign                  bool
 		differentMintTx                 bool
 		invalidSigningOperatorPublicKey bool
-		expectedError                   bool
+		expectedSigningError            bool
 	}{
 		{
-			name:            "single sign mint should succeed with the same transaction",
-			doubleMintSign:  false,
-			differentMintTx: false,
-			expectedError:   false,
+			name:            "double start mint should succeed",
+			doubleMintStart: true,
 		},
 		{
-			name:            "single sign mint should fail with different transaction",
-			doubleMintSign:  false,
-			differentMintTx: true,
-			expectedError:   true,
+			name:                         "double start mint should fail when starting with different operators but signing the first should succeed",
+			doubleMintStartWrongOperator: true,
+			expectedSigningError:         false,
 		},
 		{
-			name:            "double sign mint should fail with a different transaction",
-			doubleMintSign:  true,
-			differentMintTx: true,
-			expectedError:   true,
+			name:                 "single sign mint should succeed with the same transaction",
+			doubleMintSign:       false,
+			differentMintTx:      false,
+			expectedSigningError: false,
 		},
 		{
-			name:            "double sign mint should succeed with same transaction",
-			doubleMintSign:  true,
-			differentMintTx: false,
-			expectedError:   false,
+			name:                 "single sign mint should fail with different transaction",
+			doubleMintSign:       false,
+			differentMintTx:      true,
+			expectedSigningError: true,
 		},
 		{
-			name:             "mint should fail with too many issuer signing keys",
-			ownerPrivateKeys: []*secp256k1.PrivateKey{&tokenPrivKey, &tokenPrivKey},
-			ownerPublicKeys:  []wallet.SerializedPublicKey{tokenIdentityPubKeyBytes, tokenIdentityPubKeyBytes},
-			expectedError:    true,
+			name:                 "double sign mint should fail with a different transaction",
+			doubleMintSign:       true,
+			differentMintTx:      true,
+			expectedSigningError: true,
+		},
+		{
+			name:                 "double sign mint should succeed with same transaction",
+			doubleMintSign:       true,
+			differentMintTx:      false,
+			expectedSigningError: false,
+		},
+		{
+			name:                 "mint should fail with too many issuer signing keys",
+			ownerPrivateKeys:     []*secp256k1.PrivateKey{&tokenPrivKey, &tokenPrivKey},
+			ownerPublicKeys:      []wallet.SerializedPublicKey{tokenIdentityPubKeyBytes, tokenIdentityPubKeyBytes},
+			expectedSigningError: true,
 		},
 		{
 			name:                            "mint should fail with invalid signing operator public key",
 			invalidSigningOperatorPublicKey: true,
-			expectedError:                   true,
+			expectedSigningError:            true,
 		},
 		{
-			name:             "mint should fail with incorrect issuer private key",
-			ownerPrivateKeys: []*secp256k1.PrivateKey{userOutputPrivKey},
-			ownerPublicKeys:  []wallet.SerializedPublicKey{tokenIdentityPubKeyBytes},
-			expectedError:    true,
+			name:                 "mint should fail with incorrect issuer private key",
+			ownerPrivateKeys:     []*secp256k1.PrivateKey{userOutputPrivKey},
+			ownerPublicKeys:      []wallet.SerializedPublicKey{tokenIdentityPubKeyBytes},
+			expectedSigningError: true,
 		},
 		{
-			name:             "mint should fail with incorrect issuer public key",
-			ownerPrivateKeys: []*secp256k1.PrivateKey{&tokenPrivKey},
-			ownerPublicKeys:  []wallet.SerializedPublicKey{userOutputPubKeyBytes},
-			expectedError:    true,
+			name:                 "mint should fail with incorrect issuer public key",
+			ownerPrivateKeys:     []*secp256k1.PrivateKey{&tokenPrivKey},
+			ownerPublicKeys:      []wallet.SerializedPublicKey{userOutputPubKeyBytes},
+			expectedSigningError: true,
 		},
 		{
-			name:             "mint should fail with incorrect issuer private and public key",
-			ownerPrivateKeys: []*secp256k1.PrivateKey{userOutputPrivKey},
-			ownerPublicKeys:  []wallet.SerializedPublicKey{userOutputPubKeyBytes},
-			expectedError:    true,
+			name:                 "mint should fail with incorrect issuer private and public key",
+			ownerPrivateKeys:     []*secp256k1.PrivateKey{userOutputPrivKey},
+			ownerPublicKeys:      []wallet.SerializedPublicKey{userOutputPubKeyBytes},
+			expectedSigningError: true,
 		},
 	}
 
@@ -941,10 +893,12 @@ func TestTokenMintTransactionSigning(t *testing.T) {
 				t, config,
 				tc.ownerPrivateKeys,
 				tc.ownerPublicKeys,
+				tc.doubleMintStart,
+				tc.doubleMintStartWrongOperator,
 				tc.doubleMintSign,
 				tc.differentMintTx,
 				tc.invalidSigningOperatorPublicKey,
-				tc.expectedError)
+				tc.expectedSigningError)
 		})
 	}
 }
@@ -958,20 +912,24 @@ func TestTokenMintTransactionSigning(t *testing.T) {
 // - startingOwnerPublicKeys: public keys to use for starting the transaction
 // - signingOwnerPrivateKeys: private keys to use for signing
 // - signingOwnerPublicKeys: public keys to use for signing
+// - testDoubleStart: whether to test double start
+// - testDoubleStartDifferentOperator: whether to test double start with a different coordinator
 // - testDoubleSign: whether to test double signing
 // - testDifferentTx: whether to test signing with a different transaction than was started
 // - testInvalidSigningOperatorPublicKey: whether to test signing with an invalid operator public key in the payload
-// - expectedError: whether an error is expected during any of the signing operations
+// - expectedSigningError: whether an error is expected during any of the signing operations
 func testTransferTransactionSigningScenarios(t *testing.T, config *wallet.Config,
 	finalIssueTokenTransaction *pb.TokenTransaction,
 	startingOwnerPrivateKeys []*secp256k1.PrivateKey,
 	startingOwnerPublicKeys []wallet.SerializedPublicKey,
 	signingOwnerPrivateKeys []*secp256k1.PrivateKey,
 	signingOwnerPublicKeys []wallet.SerializedPublicKey,
+	testDoubleStart bool,
+	testDoubleStartDifferentOperator bool,
 	testDoubleSign bool,
 	testDifferentTx bool,
 	testInvalidSigningOperatorPublicKey bool,
-	expectedError bool,
+	expectedSigningError bool,
 ) {
 	tokenPrivKey := config.IdentityPrivateKey
 	tokenIdentityPubKeyBytes := tokenPrivKey.PubKey().SerializeCompressed()
@@ -994,13 +952,56 @@ func testTransferTransactionSigningScenarios(t *testing.T, config *wallet.Config
 	revPubKey1 := finalIssueTokenTransaction.TokenOutputs[0].RevocationCommitment
 	revPubKey2 := finalIssueTokenTransaction.TokenOutputs[1].RevocationCommitment
 
-	transferStartResp, _, transferFinalTxHash, err := wallet.StartTokenTransaction(
-		context.Background(),
-		config,
-		transferTokenTransaction,
-		startingOwnerPrivateKeys,
-	)
-	require.NoError(t, err, "failed to start transfer transaction")
+	var transferStartResp *pb.StartTokenTransactionResponse
+	var transferFinalTxHash []byte
+
+	if testDoubleStart {
+		transferStartResp, _, transferFinalTxHash, err = wallet.StartTokenTransaction(
+			context.Background(), config, transferTokenTransaction, startingOwnerPrivateKeys,
+		)
+		require.NoError(t, err, "failed to start token transaction first time")
+
+		transferStartResp2, _, transferFinalTxHash2, err := wallet.StartTokenTransaction(
+			context.Background(), config, transferTokenTransaction, startingOwnerPrivateKeys,
+		)
+		require.NoError(t, err, "failed to start token transaction second time")
+
+		require.True(t, bytes.Equal(transferFinalTxHash, transferFinalTxHash2), "transaction hashes should be identical")
+
+		hash1, err := utils.HashTokenTransaction(transferStartResp.FinalTokenTransaction, false)
+		require.NoError(t, err, "failed to hash first final token transaction")
+
+		hash2, err := utils.HashTokenTransaction(transferStartResp2.FinalTokenTransaction, false)
+		require.NoError(t, err, "failed to hash second final token transaction")
+
+		require.True(t, bytes.Equal(hash1, hash2), "final transactions should hash to identical values")
+	} else if testDoubleStartDifferentOperator {
+		transferStartRespInitial, _, _, err := wallet.StartTokenTransaction(
+			context.Background(), config, transferTokenTransaction, startingOwnerPrivateKeys,
+		)
+		require.NoError(t, err, "failed to start token transaction first time")
+
+		modifiedConfig := *config
+		differentCoordinatorID, err := getNonCoordinatorOperator(config)
+		require.NoError(t, err, "failed to find a different coordinator identifier")
+		modifiedConfig.CoodinatorIdentifier = differentCoordinatorID
+
+		// Use this for later signing because once executed, the outputs previously mapped to that transaction
+		// are remapped to the new transaction in the database.
+		transferStartResp, _, transferFinalTxHash, err = wallet.StartTokenTransaction(
+			context.Background(), &modifiedConfig, transferTokenTransaction, startingOwnerPrivateKeys,
+		)
+
+		require.NoError(t, err, "failed to start token transaction second time with different coordinator")
+		require.NotNil(t, transferStartResp, "expected non-nil response from second start")
+
+		verifyDifferentTransactionOutputs(t, transferStartRespInitial.FinalTokenTransaction, transferStartResp.FinalTokenTransaction)
+	} else {
+		transferStartResp, _, transferFinalTxHash, err = wallet.StartTokenTransaction(
+			context.Background(), config, transferTokenTransaction, startingOwnerPrivateKeys,
+		)
+		require.NoError(t, err, "failed to start token transaction")
+	}
 
 	errorOccurred := false
 	// Prepare transaction to sign - either the original or a modified one
@@ -1052,7 +1053,7 @@ func testTransferTransactionSigningScenarios(t *testing.T, config *wallet.Config
 		log.Printf("error when signing the transfer transaction: %v", err)
 	}
 
-	if expectedError {
+	if expectedSigningError {
 		require.True(t, errorOccurred, "expected an error during transfer signing operation but none occurred")
 		return // Don't proceed with finalization if we expected an error
 	}
@@ -1083,40 +1084,52 @@ func TestTokenTransferTransactionSigning(t *testing.T) {
 	skipIfGithubActions(t)
 
 	testCases := []struct {
-		name                            string
-		doubleTransferSign              bool
-		differentTransferTx             bool
-		signingOwnerPrivateKeysModifier func([]*secp256k1.PrivateKey) []*secp256k1.PrivateKey
-		signingOwnerPublicKeysModifier  func([]wallet.SerializedPublicKey) []wallet.SerializedPublicKey
-		invalidSigningOperatorPublicKey bool
-		expectedError                   bool
+		name                                 string
+		doubleTransferStart                  bool
+		doubleTransferStartDifferentOperator bool
+		doubleTransferSign                   bool
+		differentTransferTx                  bool
+		signingOwnerPrivateKeysModifier      func([]*secp256k1.PrivateKey) []*secp256k1.PrivateKey
+		signingOwnerPublicKeysModifier       func([]wallet.SerializedPublicKey) []wallet.SerializedPublicKey
+		invalidSigningOperatorPublicKey      bool
+		expectedSigningError                 bool
 	}{
 		{
-			name:          "single sign transfer should succeed with the same transaction",
-			expectedError: false,
+			name:                 "single sign transfer should succeed with the same transaction",
+			expectedSigningError: false,
 		},
 		{
-			name:                "single sign transfer should fail with different transaction",
-			differentTransferTx: true,
-			expectedError:       true,
+			name:                 "double start transfer should succeed",
+			doubleTransferStart:  true,
+			expectedSigningError: false,
 		},
 		{
-			name:                "double sign transfer should fail with a different transaction",
-			doubleTransferSign:  true,
-			differentTransferTx: true,
-			expectedError:       true,
+			name:                                 "double start transfer with a different operator should succeed with a different final transaction",
+			doubleTransferStartDifferentOperator: true,
+			expectedSigningError:                 false,
 		},
 		{
-			name:               "double sign transfer should succeed with same transaction",
-			doubleTransferSign: true,
-			expectedError:      false,
+			name:                 "single sign transfer should fail with different transaction",
+			differentTransferTx:  true,
+			expectedSigningError: true,
+		},
+		{
+			name:                 "double sign transfer should fail with a different transaction",
+			doubleTransferSign:   true,
+			differentTransferTx:  true,
+			expectedSigningError: true,
+		},
+		{
+			name:                 "double sign transfer should succeed with same transaction",
+			doubleTransferSign:   true,
+			expectedSigningError: false,
 		},
 		{
 			name: "single sign transfer should fail with duplicate owner signing private keys",
 			signingOwnerPrivateKeysModifier: func(tokenOutputs []*secp256k1.PrivateKey) []*secp256k1.PrivateKey {
 				return []*secp256k1.PrivateKey{tokenOutputs[0], tokenOutputs[0]}
 			},
-			expectedError: true,
+			expectedSigningError: true,
 		},
 		{
 			name: "single sign transfer should fail with duplicate owner signing private and public keys",
@@ -1126,21 +1139,21 @@ func TestTokenTransferTransactionSigning(t *testing.T) {
 			signingOwnerPublicKeysModifier: func(tokenOutputs []wallet.SerializedPublicKey) []wallet.SerializedPublicKey {
 				return []wallet.SerializedPublicKey{tokenOutputs[0], tokenOutputs[0]}
 			},
-			expectedError: true,
+			expectedSigningError: true,
 		},
 		{
 			name: "single sign transfer should fail with duplicate owner signing public keys",
 			signingOwnerPublicKeysModifier: func(tokenOutputs []wallet.SerializedPublicKey) []wallet.SerializedPublicKey {
 				return []wallet.SerializedPublicKey{tokenOutputs[0], tokenOutputs[0]}
 			},
-			expectedError: true,
+			expectedSigningError: true,
 		},
 		{
 			name: "single sign transfer should fail with swapped owner signing private keys",
 			signingOwnerPrivateKeysModifier: func(tokenOutputs []*secp256k1.PrivateKey) []*secp256k1.PrivateKey {
 				return []*secp256k1.PrivateKey{tokenOutputs[1], tokenOutputs[0]}
 			},
-			expectedError: true,
+			expectedSigningError: true,
 		},
 		{
 			name: "single sign transfer should fail with swapped owner signing private and public keys",
@@ -1150,14 +1163,14 @@ func TestTokenTransferTransactionSigning(t *testing.T) {
 			signingOwnerPublicKeysModifier: func(tokenOutputs []wallet.SerializedPublicKey) []wallet.SerializedPublicKey {
 				return []wallet.SerializedPublicKey{tokenOutputs[1], tokenOutputs[0]}
 			},
-			expectedError: true,
+			expectedSigningError: true,
 		},
 		{
 			name: "single sign transfer should fail with swapped owner signing public keys",
 			signingOwnerPublicKeysModifier: func(tokenOutputs []wallet.SerializedPublicKey) []wallet.SerializedPublicKey {
 				return []wallet.SerializedPublicKey{tokenOutputs[1], tokenOutputs[0]}
 			},
-			expectedError: true,
+			expectedSigningError: true,
 		},
 		{
 			name: "transfer should fail with not enough owner signing keys",
@@ -1167,7 +1180,7 @@ func TestTokenTransferTransactionSigning(t *testing.T) {
 			signingOwnerPublicKeysModifier: func(tokenOutputs []wallet.SerializedPublicKey) []wallet.SerializedPublicKey {
 				return []wallet.SerializedPublicKey{tokenOutputs[0]}
 			},
-			expectedError: true,
+			expectedSigningError: true,
 		},
 		{
 			name: "transfer should fail with too many owner signing keys",
@@ -1177,12 +1190,17 @@ func TestTokenTransferTransactionSigning(t *testing.T) {
 			signingOwnerPublicKeysModifier: func(tokenOutputs []wallet.SerializedPublicKey) []wallet.SerializedPublicKey {
 				return []wallet.SerializedPublicKey{tokenOutputs[0], tokenOutputs[1], tokenOutputs[0]}
 			},
-			expectedError: true,
+			expectedSigningError: true,
 		},
 		{
 			name:                            "transfer should fail with invalid signing operator public key",
 			invalidSigningOperatorPublicKey: true,
-			expectedError:                   true,
+			expectedSigningError:            true,
+		},
+		{
+			name:                                 "double start transfer with different operator should fail",
+			doubleTransferStartDifferentOperator: true,
+			expectedSigningError:                 true,
 		},
 	}
 
@@ -1194,7 +1212,7 @@ func TestTokenTransferTransactionSigning(t *testing.T) {
 
 			// Create and finalize a mint transaction for this specific test case
 			finalIssueTokenTransaction, userOutput1PrivKey, userOutput2PrivKey := testMintTransactionSigningScenarios(
-				t, config, nil, nil, false, false, false, false)
+				t, config, nil, nil, false, false, false, false, false, false)
 
 			output1PubKey := userOutput1PrivKey.PubKey().SerializeCompressed()
 			output2PubKey := userOutput2PrivKey.PubKey().SerializeCompressed()
@@ -1216,10 +1234,12 @@ func TestTokenTransferTransactionSigning(t *testing.T) {
 				defaultStartingOwnerPublicKeys,
 				signingPrivKeys,
 				signingPubKeys,
+				tc.doubleTransferStart,
+				tc.doubleTransferStartDifferentOperator,
 				tc.doubleTransferSign,
 				tc.differentTransferTx,
 				tc.invalidSigningOperatorPublicKey,
-				tc.expectedError)
+				tc.expectedSigningError)
 		})
 	}
 }
@@ -1543,4 +1563,35 @@ func cloneTransferTransactionWithDifferentOutputOwner(
 		clone.TokenOutputs[0].OwnerPublicKey = newOwnerPubKey
 	}
 	return clone
+}
+
+func verifyDifferentTransactionOutputs(t *testing.T, firstTx, secondTx *pb.TokenTransaction) {
+	for i, output := range firstTx.TokenOutputs {
+		secondOutput := secondTx.TokenOutputs[i]
+
+		require.NotEqual(t, output.Id, secondOutput.Id,
+			"expected different output IDs when starting with different coordinator")
+
+		// Revocation commitments should be different
+		require.False(t, bytes.Equal(output.RevocationCommitment, secondOutput.RevocationCommitment),
+			"expected different revocation commitments when starting with different coordinator")
+	}
+
+	hash1, err := utils.HashTokenTransaction(firstTx, false)
+	require.NoError(t, err, "failed to hash first final token transaction")
+
+	hash2, err := utils.HashTokenTransaction(secondTx, false)
+	require.NoError(t, err, "failed to hash second final token transaction")
+
+	require.False(t, bytes.Equal(hash1, hash2),
+		"transaction hashes should be different when double starting with different coordinator")
+}
+
+func getNonCoordinatorOperator(config *wallet.Config) (string, error) {
+	for id := range config.SigningOperators {
+		if id != config.CoodinatorIdentifier {
+			return id, nil
+		}
+	}
+	return "", fmt.Errorf("could not find a non-coordinator operator")
 }

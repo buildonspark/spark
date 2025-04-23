@@ -29,6 +29,8 @@ const (
 	FieldOperatorSignature = "operator_signature"
 	// FieldStatus holds the string denoting the status field in the database.
 	FieldStatus = "status"
+	// FieldCoordinatorPublicKey holds the string denoting the coordinator_public_key field in the database.
+	FieldCoordinatorPublicKey = "coordinator_public_key"
 	// EdgeSpentOutput holds the string denoting the spent_output edge name in mutations.
 	EdgeSpentOutput = "spent_output"
 	// EdgeCreatedOutput holds the string denoting the created_output edge name in mutations.
@@ -69,6 +71,7 @@ var Columns = []string{
 	FieldFinalizedTokenTransactionHash,
 	FieldOperatorSignature,
 	FieldStatus,
+	FieldCoordinatorPublicKey,
 }
 
 // ForeignKeys holds the SQL foreign-keys that are owned by the "token_transactions"

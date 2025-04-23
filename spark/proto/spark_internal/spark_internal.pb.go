@@ -1387,6 +1387,7 @@ type StartTokenTransactionInternalRequest struct {
 	FinalTokenTransaction      *spark.TokenTransaction           `protobuf:"bytes,1,opt,name=final_token_transaction,json=finalTokenTransaction,proto3" json:"final_token_transaction,omitempty"`
 	TokenTransactionSignatures *spark.TokenTransactionSignatures `protobuf:"bytes,2,opt,name=token_transaction_signatures,json=tokenTransactionSignatures,proto3" json:"token_transaction_signatures,omitempty"`
 	KeyshareIds                []string                          `protobuf:"bytes,3,rep,name=keyshare_ids,json=keyshareIds,proto3" json:"keyshare_ids,omitempty"`
+	CoordinatorPublicKey       []byte                            `protobuf:"bytes,10,opt,name=coordinator_public_key,json=coordinatorPublicKey,proto3" json:"coordinator_public_key,omitempty"`
 	unknownFields              protoimpl.UnknownFields
 	sizeCache                  protoimpl.SizeCache
 }
@@ -1438,6 +1439,13 @@ func (x *StartTokenTransactionInternalRequest) GetTokenTransactionSignatures() *
 func (x *StartTokenTransactionInternalRequest) GetKeyshareIds() []string {
 	if x != nil {
 		return x.KeyshareIds
+	}
+	return nil
+}
+
+func (x *StartTokenTransactionInternalRequest) GetCoordinatorPublicKey() []byte {
+	if x != nil {
+		return x.CoordinatorPublicKey
 	}
 	return nil
 }
@@ -1707,11 +1715,13 @@ const file_spark_internal_proto_rawDesc = "" +
 	"\x1cUpdatePreimageRequestRequest\x12.\n" +
 	"\x13preimage_request_id\x18\x01 \x01(\tR\x11preimageRequestId\x12\x1a\n" +
 	"\bpreimage\x18\x02 \x01(\fR\bpreimage\x12.\n" +
-	"\x13identity_public_key\x18\x03 \x01(\fR\x11identityPublicKey\"\xff\x01\n" +
+	"\x13identity_public_key\x18\x03 \x01(\fR\x11identityPublicKey\"\xb5\x02\n" +
 	"$StartTokenTransactionInternalRequest\x12O\n" +
 	"\x17final_token_transaction\x18\x01 \x01(\v2\x17.spark.TokenTransactionR\x15finalTokenTransaction\x12c\n" +
 	"\x1ctoken_transaction_signatures\x18\x02 \x01(\v2!.spark.TokenTransactionSignaturesR\x1atokenTransactionSignatures\x12!\n" +
-	"\fkeyshare_ids\x18\x03 \x03(\tR\vkeyshareIds\"x\n" +
+	"\fkeyshare_ids\x18\x03 \x03(\tR\vkeyshareIds\x124\n" +
+	"\x16coordinator_public_key\x18\n" +
+	" \x01(\fR\x14coordinatorPublicKey\"x\n" +
 	"%StartTokenTransactionInternalResponse\x12O\n" +
 	"\x17final_token_transaction\x18\x01 \x01(\v2\x17.spark.TokenTransactionR\x15finalTokenTransaction\"\x94\x02\n" +
 	"%InitiateSettleReceiverKeyTweakRequest\x12\x1f\n" +

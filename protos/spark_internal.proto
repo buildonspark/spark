@@ -202,6 +202,7 @@ message StartTokenTransactionInternalRequest {
     spark.TokenTransaction final_token_transaction = 1;
     spark.TokenTransactionSignatures token_transaction_signatures = 2;
     repeated string keyshare_ids = 3;
+    bytes coordinator_public_key = 10;
 }
 
 

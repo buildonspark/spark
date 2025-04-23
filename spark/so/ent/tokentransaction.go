@@ -32,6 +32,8 @@ type TokenTransaction struct {
 	OperatorSignature []byte `json:"operator_signature,omitempty"`
 	// Status holds the value of the "status" field.
 	Status schema.TokenTransactionStatus `json:"status,omitempty"`
+	// CoordinatorPublicKey holds the value of the "coordinator_public_key" field.
+	CoordinatorPublicKey []byte `json:"coordinator_public_key,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the TokenTransactionQuery when eager-loading is set.
 	Edges                  TokenTransactionEdges `json:"edges"`
@@ -86,7 +88,7 @@ func (*TokenTransaction) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case tokentransaction.FieldPartialTokenTransactionHash, tokentransaction.FieldFinalizedTokenTransactionHash, tokentransaction.FieldOperatorSignature:
+		case tokentransaction.FieldPartialTokenTransactionHash, tokentransaction.FieldFinalizedTokenTransactionHash, tokentransaction.FieldOperatorSignature, tokentransaction.FieldCoordinatorPublicKey:
 			values[i] = new([]byte)
 		case tokentransaction.FieldStatus:
 			values[i] = new(sql.NullString)
@@ -152,6 +154,12 @@ func (tt *TokenTransaction) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field status", values[i])
 			} else if value.Valid {
 				tt.Status = schema.TokenTransactionStatus(value.String)
+			}
+		case tokentransaction.FieldCoordinatorPublicKey:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field coordinator_public_key", values[i])
+			} else if value != nil {
+				tt.CoordinatorPublicKey = *value
 			}
 		case tokentransaction.ForeignKeys[0]:
 			if value, ok := values[i].(*sql.NullScanner); !ok {
@@ -228,6 +236,9 @@ func (tt *TokenTransaction) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("status=")
 	builder.WriteString(fmt.Sprintf("%v", tt.Status))
+	builder.WriteString(", ")
+	builder.WriteString("coordinator_public_key=")
+	builder.WriteString(fmt.Sprintf("%v", tt.CoordinatorPublicKey))
 	builder.WriteByte(')')
 	return builder.String()
 }

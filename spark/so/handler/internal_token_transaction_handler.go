@@ -106,7 +106,7 @@ func (h *InternalTokenTransactionHandler) StartTokenTransactionInternal(ctx cont
 	}
 	logger.Info("Token transaction verified with LRC20 node")
 	// Save the token transaction, created output ents, and update the outputs to spend.
-	_, err = ent.CreateStartedTransactionEntities(ctx, req.FinalTokenTransaction, req.TokenTransactionSignatures, req.KeyshareIds, outputToSpendEnts)
+	_, err = ent.CreateStartedTransactionEntities(ctx, req.FinalTokenTransaction, req.TokenTransactionSignatures, req.KeyshareIds, outputToSpendEnts, req.CoordinatorPublicKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to save token transaction and output ents: %w", err)
 	}

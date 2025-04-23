@@ -82,6 +82,18 @@ func (ttu *TokenTransactionUpdate) ClearStatus() *TokenTransactionUpdate {
 	return ttu
 }
 
+// SetCoordinatorPublicKey sets the "coordinator_public_key" field.
+func (ttu *TokenTransactionUpdate) SetCoordinatorPublicKey(b []byte) *TokenTransactionUpdate {
+	ttu.mutation.SetCoordinatorPublicKey(b)
+	return ttu
+}
+
+// ClearCoordinatorPublicKey clears the value of the "coordinator_public_key" field.
+func (ttu *TokenTransactionUpdate) ClearCoordinatorPublicKey() *TokenTransactionUpdate {
+	ttu.mutation.ClearCoordinatorPublicKey()
+	return ttu
+}
+
 // AddSpentOutputIDs adds the "spent_output" edge to the TokenOutput entity by IDs.
 func (ttu *TokenTransactionUpdate) AddSpentOutputIDs(ids ...uuid.UUID) *TokenTransactionUpdate {
 	ttu.mutation.AddSpentOutputIDs(ids...)
@@ -273,6 +285,12 @@ func (ttu *TokenTransactionUpdate) sqlSave(ctx context.Context) (n int, err erro
 	if ttu.mutation.StatusCleared() {
 		_spec.ClearField(tokentransaction.FieldStatus, field.TypeEnum)
 	}
+	if value, ok := ttu.mutation.CoordinatorPublicKey(); ok {
+		_spec.SetField(tokentransaction.FieldCoordinatorPublicKey, field.TypeBytes, value)
+	}
+	if ttu.mutation.CoordinatorPublicKeyCleared() {
+		_spec.ClearField(tokentransaction.FieldCoordinatorPublicKey, field.TypeBytes)
+	}
 	if ttu.mutation.SpentOutputCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.O2M,
@@ -459,6 +477,18 @@ func (ttuo *TokenTransactionUpdateOne) SetNillableStatus(sts *schema.TokenTransa
 // ClearStatus clears the value of the "status" field.
 func (ttuo *TokenTransactionUpdateOne) ClearStatus() *TokenTransactionUpdateOne {
 	ttuo.mutation.ClearStatus()
+	return ttuo
+}
+
+// SetCoordinatorPublicKey sets the "coordinator_public_key" field.
+func (ttuo *TokenTransactionUpdateOne) SetCoordinatorPublicKey(b []byte) *TokenTransactionUpdateOne {
+	ttuo.mutation.SetCoordinatorPublicKey(b)
+	return ttuo
+}
+
+// ClearCoordinatorPublicKey clears the value of the "coordinator_public_key" field.
+func (ttuo *TokenTransactionUpdateOne) ClearCoordinatorPublicKey() *TokenTransactionUpdateOne {
+	ttuo.mutation.ClearCoordinatorPublicKey()
 	return ttuo
 }
 
@@ -682,6 +712,12 @@ func (ttuo *TokenTransactionUpdateOne) sqlSave(ctx context.Context) (_node *Toke
 	}
 	if ttuo.mutation.StatusCleared() {
 		_spec.ClearField(tokentransaction.FieldStatus, field.TypeEnum)
+	}
+	if value, ok := ttuo.mutation.CoordinatorPublicKey(); ok {
+		_spec.SetField(tokentransaction.FieldCoordinatorPublicKey, field.TypeBytes, value)
+	}
+	if ttuo.mutation.CoordinatorPublicKeyCleared() {
+		_spec.ClearField(tokentransaction.FieldCoordinatorPublicKey, field.TypeBytes)
 	}
 	if ttuo.mutation.SpentOutputCleared() {
 		edge := &sqlgraph.EdgeSpec{
