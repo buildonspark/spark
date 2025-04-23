@@ -1,6 +1,7 @@
 import { IssuerSparkWallet } from "@buildonspark/issuer-sdk";
 import { getLatestDepositTxId } from "@buildonspark/spark-sdk";
 import { ConfigOptions } from "@buildonspark/spark-sdk/services/wallet-config";
+import { ExitSpeed } from "@buildonspark/spark-sdk/types";
 import {
   getNetwork,
   getP2TRScriptFromPublicKey,
@@ -412,6 +413,7 @@ async function runCLI() {
         const withdrawal = await wallet.withdraw({
           amountSats: parseInt(args[0]),
           onchainAddress: args[1],
+          exitSpeed: args[2] as ExitSpeed,
         });
         console.log(withdrawal);
         break;

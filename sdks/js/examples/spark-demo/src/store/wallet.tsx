@@ -1,6 +1,9 @@
 import { SparkWallet } from "@buildonspark/spark-sdk";
 import { QueryTransfersResponse } from "@buildonspark/spark-sdk/proto/spark";
-import { LightningReceiveRequest } from "@buildonspark/spark-sdk/types";
+import {
+  ExitSpeed,
+  LightningReceiveRequest,
+} from "@buildonspark/spark-sdk/types";
 import {
   getLatestDepositTxId,
   NetworkType,
@@ -240,6 +243,7 @@ const useWalletStore = create<WalletStore>((set, get) => ({
     await wallet.withdraw({
       onchainAddress: address,
       amountSats: amount,
+      exitSpeed: ExitSpeed.FAST,
     });
   },
   payLightningInvoice: async (invoice: string) => {

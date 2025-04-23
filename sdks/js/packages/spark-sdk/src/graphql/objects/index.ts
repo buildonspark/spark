@@ -6,8 +6,9 @@ export { default as CompleteLeavesSwapOutput } from "./CompleteLeavesSwapOutput.
 export { default as CompleteSeedReleaseInput } from "./CompleteSeedReleaseInput.js";
 export { default as CompleteSeedReleaseOutput } from "./CompleteSeedReleaseOutput.js";
 export { default as Connection } from "./Connection.js";
-export { default as CoopExitFeeEstimateInput } from "./CoopExitFeeEstimateInput.js";
-export { default as CoopExitFeeEstimateOutput } from "./CoopExitFeeEstimateOutput.js";
+export { default as CoopExitFeeEstimate } from "./CoopExitFeeEstimate.js";
+export { default as CoopExitFeeEstimatesInput } from "./CoopExitFeeEstimatesInput.js";
+export { default as CoopExitFeeEstimatesOutput } from "./CoopExitFeeEstimatesOutput.js";
 export {
   default as CoopExitRequest,
   getCoopExitRequestQuery,
@@ -15,6 +16,7 @@ export {
 export { default as CurrencyAmount } from "./CurrencyAmount.js";
 export { default as CurrencyUnit } from "./CurrencyUnit.js";
 export { default as Entity } from "./Entity.js";
+export { default as ExitSpeed } from "./ExitSpeed.js";
 export { default as GetChallengeInput } from "./GetChallengeInput.js";
 export { default as GetChallengeOutput } from "./GetChallengeOutput.js";
 export { default as Invoice } from "./Invoice.js";

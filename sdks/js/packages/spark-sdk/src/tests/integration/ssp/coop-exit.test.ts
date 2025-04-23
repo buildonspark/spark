@@ -34,9 +34,25 @@ describe("SSP coop exit integration", () => {
     });
 
     expect(feeEstimate).toBeDefined();
-    expect(feeEstimate?.l1BroadcastFee).toBeDefined();
-    expect(feeEstimate?.l1BroadcastFee.originalValue).toBeGreaterThan(0);
-    expect(feeEstimate?.userFee).toBeDefined();
-    expect(feeEstimate?.userFee.originalValue).toBeGreaterThan(0);
+    expect(feeEstimate?.speedFast?.l1BroadcastFee).toBeDefined();
+    expect(
+      feeEstimate?.speedFast?.l1BroadcastFee.originalValue,
+    ).toBeGreaterThan(0);
+    expect(feeEstimate?.speedFast?.userFee).toBeDefined();
+    expect(feeEstimate?.speedFast?.userFee.originalValue).toBeGreaterThan(0);
+
+    expect(feeEstimate?.speedMedium?.l1BroadcastFee).toBeDefined();
+    expect(
+      feeEstimate?.speedMedium?.l1BroadcastFee.originalValue,
+    ).toBeGreaterThan(0);
+    expect(feeEstimate?.speedMedium?.userFee).toBeDefined();
+    expect(feeEstimate?.speedMedium?.userFee.originalValue).toBeGreaterThan(0);
+
+    expect(feeEstimate?.speedSlow?.l1BroadcastFee).toBeDefined();
+    expect(
+      feeEstimate?.speedSlow?.l1BroadcastFee.originalValue,
+    ).toBeGreaterThan(0);
+    expect(feeEstimate?.speedSlow?.userFee).toBeDefined();
+    expect(feeEstimate?.speedSlow?.userFee.originalValue).toBeGreaterThan(0);
   }, 60000);
 });

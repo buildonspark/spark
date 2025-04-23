@@ -3,23 +3,23 @@
 
 import Entity from './Entity.js';
 import SparkCoopExitRequestStatus from './SparkCoopExitRequestStatus.js';
-import {CurrencyAmountFromJson} from './CurrencyAmount.js';
+import { LightsparkException } from '@lightsparkdev/core';
+import CoopExitRequest from './CoopExitRequest.js';
+import BitcoinNetwork from './BitcoinNetwork.js';
+import { Query, isObject } from '@lightsparkdev/core';
+import {InvoiceToJson} from './Invoice.js';
+import LeavesSwapRequest from './LeavesSwapRequest.js';
+import {InvoiceFromJson} from './Invoice.js';
+import {TransferFromJson} from './Transfer.js';
+import {SwapLeafFromJson} from './SwapLeaf.js';
+import SparkLeavesSwapRequestStatus from './SparkLeavesSwapRequestStatus.js';
+import {CurrencyAmountToJson} from './CurrencyAmount.js';
+import LightningReceiveRequest from './LightningReceiveRequest.js';
+import LightningSendRequest from './LightningSendRequest.js';
+import LightningSendRequestStatus from './LightningSendRequestStatus.js';
 import LightningReceiveRequestStatus from './LightningReceiveRequestStatus.js';
 import {SwapLeafToJson} from './SwapLeaf.js';
-import {InvoiceFromJson} from './Invoice.js';
-import {SwapLeafFromJson} from './SwapLeaf.js';
-import CoopExitRequest from './CoopExitRequest.js';
-import LightningReceiveRequest from './LightningReceiveRequest.js';
-import SparkLeavesSwapRequestStatus from './SparkLeavesSwapRequestStatus.js';
-import LightningSendRequestStatus from './LightningSendRequestStatus.js';
-import {CurrencyAmountToJson} from './CurrencyAmount.js';
-import LeavesSwapRequest from './LeavesSwapRequest.js';
-import {InvoiceToJson} from './Invoice.js';
-import {TransferFromJson} from './Transfer.js';
-import BitcoinNetwork from './BitcoinNetwork.js';
-import { LightsparkException } from '@lightsparkdev/core';
-import LightningSendRequest from './LightningSendRequest.js';
-import { Query, isObject } from '@lightsparkdev/core';
+import {CurrencyAmountFromJson} from './CurrencyAmount.js';
 
 
 interface UserRequest {

@@ -2,6 +2,7 @@ import { IssuerSparkWallet } from "@buildonspark/issuer-sdk";
 import { SparkWallet, type TokenInfo } from "@buildonspark/spark-sdk";
 import { Transfer } from "@buildonspark/spark-sdk/proto/spark";
 import {
+  ExitSpeed,
   type CoopExitRequest,
   type LightningReceiveRequest,
   type LightningSendRequest,
@@ -760,13 +761,15 @@ export const createSparkRouter = (
     async (req, res) => {
       const wallet = getWallet();
       try {
-        const { onchainAddress, amountSats } = req.body as {
+        const { onchainAddress, amountSats, exitSpeed } = req.body as {
           onchainAddress: string;
           amountSats: number | undefined;
+          exitSpeed: string;
         };
         const withdrawal = await wallet!.withdraw({
           onchainAddress,
           amountSats,
+          exitSpeed: exitSpeed as ExitSpeed,
         });
         res.json({
           data: { withdrawal },

@@ -3,11 +3,11 @@
 
 
 import CurrencyAmount from './CurrencyAmount.js';
-import {CurrencyAmountFromJson} from './CurrencyAmount.js';
 import {CurrencyAmountToJson} from './CurrencyAmount.js';
+import {CurrencyAmountFromJson} from './CurrencyAmount.js';
 
 
-interface CoopExitFeeEstimateOutput {
+interface CoopExitFeeEstimate {
 
 
     userFee: CurrencyAmount;
@@ -19,18 +19,18 @@ interface CoopExitFeeEstimateOutput {
 
 }
 
-export const CoopExitFeeEstimateOutputFromJson = (obj: any): CoopExitFeeEstimateOutput => {
+export const CoopExitFeeEstimateFromJson = (obj: any): CoopExitFeeEstimate => {
     return {
-        userFee: CurrencyAmountFromJson(obj["coop_exit_fee_estimate_output_user_fee"]),
-        l1BroadcastFee: CurrencyAmountFromJson(obj["coop_exit_fee_estimate_output_l1_broadcast_fee"]),
+        userFee: CurrencyAmountFromJson(obj["coop_exit_fee_estimate_user_fee"]),
+        l1BroadcastFee: CurrencyAmountFromJson(obj["coop_exit_fee_estimate_l1_broadcast_fee"]),
 
-        } as CoopExitFeeEstimateOutput;
+        } as CoopExitFeeEstimate;
 
 }
-export const CoopExitFeeEstimateOutputToJson = (obj: CoopExitFeeEstimateOutput): any => {
+export const CoopExitFeeEstimateToJson = (obj: CoopExitFeeEstimate): any => {
 return {
-coop_exit_fee_estimate_output_user_fee: CurrencyAmountToJson(obj.userFee),
-coop_exit_fee_estimate_output_l1_broadcast_fee: CurrencyAmountToJson(obj.l1BroadcastFee),
+coop_exit_fee_estimate_user_fee: CurrencyAmountToJson(obj.userFee),
+coop_exit_fee_estimate_l1_broadcast_fee: CurrencyAmountToJson(obj.l1BroadcastFee),
 
         }
 
@@ -38,9 +38,9 @@ coop_exit_fee_estimate_output_l1_broadcast_fee: CurrencyAmountToJson(obj.l1Broad
 
 
     export const FRAGMENT = `
-fragment CoopExitFeeEstimateOutputFragment on CoopExitFeeEstimateOutput {
+fragment CoopExitFeeEstimateFragment on CoopExitFeeEstimate {
     __typename
-    coop_exit_fee_estimate_output_user_fee: user_fee {
+    coop_exit_fee_estimate_user_fee: user_fee {
         __typename
         currency_amount_original_value: original_value
         currency_amount_original_unit: original_unit
@@ -48,7 +48,7 @@ fragment CoopExitFeeEstimateOutputFragment on CoopExitFeeEstimateOutput {
         currency_amount_preferred_currency_value_rounded: preferred_currency_value_rounded
         currency_amount_preferred_currency_value_approx: preferred_currency_value_approx
     }
-    coop_exit_fee_estimate_output_l1_broadcast_fee: l1_broadcast_fee {
+    coop_exit_fee_estimate_l1_broadcast_fee: l1_broadcast_fee {
         __typename
         currency_amount_original_value: original_value
         currency_amount_original_unit: original_unit
@@ -61,4 +61,4 @@ fragment CoopExitFeeEstimateOutputFragment on CoopExitFeeEstimateOutput {
 
 
 
-export default CoopExitFeeEstimateOutput;
+export default CoopExitFeeEstimate;

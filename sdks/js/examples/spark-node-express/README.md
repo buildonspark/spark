@@ -400,6 +400,7 @@ POST /issuer-wallet/on-chain/withdraw
 ```json
 {
   onchainAddress: string,
+  exitSpeed: "FAST" | "MEDIUM" | "SLOW",
   amountSats?: number | undefined
 }
 ```

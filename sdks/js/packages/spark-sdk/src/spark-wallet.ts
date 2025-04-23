@@ -21,8 +21,9 @@ import {
 import SspClient from "./graphql/client.js";
 import {
   BitcoinNetwork,
-  CoopExitFeeEstimateOutput,
+  CoopExitFeeEstimatesOutput,
   CoopExitRequest,
+  ExitSpeed,
   LeavesSwapFeeEstimateOutput,
   LeavesSwapRequest,
   LightningReceiveFeeEstimateOutput,
@@ -1605,9 +1606,11 @@ export class SparkWallet {
    */
   public async withdraw({
     onchainAddress,
+    exitSpeed,
     amountSats,
   }: {
     onchainAddress: string;
+    exitSpeed: ExitSpeed;
     amountSats?: number;
   }) {
     if (amountSats && amountSats < 10000) {
@@ -1621,7 +1624,7 @@ export class SparkWallet {
       );
     }
     return await this.withLeaves(async () => {
-      return await this.coopExit(onchainAddress, amountSats);
+      return await this.coopExit(onchainAddress, exitSpeed, amountSats);
     });
   }
 
@@ -1633,7 +1636,11 @@ export class SparkWallet {
    * @returns {Promise<Object | null | undefined>} The exit request details
    * @private
    */
-  private async coopExit(onchainAddress: string, targetAmountSats?: number) {
+  private async coopExit(
+    onchainAddress: string,
+    exitSpeed: ExitSpeed,
+    targetAmountSats?: number,
+  ) {
     let leavesToSend: TreeNode[] = [];
     if (targetAmountSats) {
       leavesToSend = await this.selectLeaves(targetAmountSats);
@@ -1668,6 +1675,7 @@ export class SparkWallet {
       leafExternalIds: leavesToSend.map((leaf) => leaf.id),
       withdrawalAddress: onchainAddress,
       idempotencyKey: crypto.randomUUID(),
+      exitSpeed,
     });
 
     if (!coopExitRequest?.rawConnectorTransaction) {
@@ -1716,7 +1724,7 @@ export class SparkWallet {
    * @param {Object} params - Input parameters for fee estimation
    * @param {number} params.amountSats - The amount in satoshis to withdraw
    * @param {string} params.withdrawalAddress - The Bitcoin address where the funds should be sent
-   * @returns {Promise<CoopExitFeeEstimateOutput | null>} Fee estimate for the withdrawal
+   * @returns {Promise<CoopExitFeeEstimatesOutput | null>} Fee estimate for the withdrawal
    */
   public async getCoopExitFeeEstimate({
     amountSats,
@@ -1724,7 +1732,7 @@ export class SparkWallet {
   }: {
     amountSats: number;
     withdrawalAddress: string;
-  }): Promise<CoopExitFeeEstimateOutput | null> {
+  }): Promise<CoopExitFeeEstimatesOutput | null> {
     if (!this.sspClient) {
       throw new ConfigurationError("SSP client not initialized", {
         configKey: "sspClient",

@@ -3,14 +3,14 @@
 
 import UserRequest from './UserRequest.js';
 import Entity from './Entity.js';
-import CurrencyAmount from './CurrencyAmount.js';
-import {CurrencyAmountFromJson} from './CurrencyAmount.js';
-import Transfer from './Transfer.js';
-import LightningSendRequestStatus from './LightningSendRequestStatus.js';
-import {TransferFromJson} from './Transfer.js';
-import BitcoinNetwork from './BitcoinNetwork.js';
-import {CurrencyAmountToJson} from './CurrencyAmount.js';
 import { Query, isObject } from '@lightsparkdev/core';
+import BitcoinNetwork from './BitcoinNetwork.js';
+import Transfer from './Transfer.js';
+import CurrencyAmount from './CurrencyAmount.js';
+import {TransferFromJson} from './Transfer.js';
+import {CurrencyAmountToJson} from './CurrencyAmount.js';
+import LightningSendRequestStatus from './LightningSendRequestStatus.js';
+import {CurrencyAmountFromJson} from './CurrencyAmount.js';
 
 
 interface LightningSendRequest {

@@ -7,6 +7,7 @@ import {
   Requester,
 } from "@lightsparkdev/core";
 import { sha256 } from "@noble/hashes/sha256";
+import { AuthenticationError, NetworkError } from "../errors/index.js";
 import { SparkSigner } from "../signer/signer.js";
 import { CompleteCoopExit } from "./mutations/CompleteCoopExit.js";
 import { CompleteLeavesSwap } from "./mutations/CompleteLeavesSwap.js";
@@ -16,7 +17,7 @@ import { RequestLightningReceive } from "./mutations/RequestLightningReceive.js"
 import { RequestLightningSend } from "./mutations/RequestLightningSend.js";
 import { RequestSwapLeaves } from "./mutations/RequestSwapLeaves.js";
 import { VerifyChallenge } from "./mutations/VerifyChallenge.js";
-import { CoopExitFeeEstimateOutputFromJson } from "./objects/CoopExitFeeEstimateOutput.js";
+import { CoopExitFeeEstimatesOutputFromJson } from "./objects/CoopExitFeeEstimatesOutput.js";
 import CoopExitRequest, {
   CoopExitRequestFromJson,
 } from "./objects/CoopExitRequest.js";
@@ -25,8 +26,8 @@ import {
   BitcoinNetwork,
   CompleteCoopExitInput,
   CompleteLeavesSwapInput,
-  CoopExitFeeEstimateInput,
-  CoopExitFeeEstimateOutput,
+  CoopExitFeeEstimatesInput,
+  CoopExitFeeEstimatesOutput,
   GetChallengeOutput,
   LeavesSwapFeeEstimateOutput,
   LightningSendRequest,
@@ -57,7 +58,6 @@ import { LeavesSwapFeeEstimate } from "./queries/LeavesSwapFeeEstimate.js";
 import { LightningReceiveFeeEstimate } from "./queries/LightningReceiveFeeEstimate.js";
 import { LightningSendFeeEstimate } from "./queries/LightningSendFeeEstimate.js";
 import { UserRequest } from "./queries/UserRequest.js";
-import { NetworkError, AuthenticationError } from "../errors/index.js";
 
 export interface SspClientOptions {
   baseUrl: string;
@@ -198,16 +198,16 @@ export default class SspClient {
   async getCoopExitFeeEstimate({
     leafExternalIds,
     withdrawalAddress,
-  }: CoopExitFeeEstimateInput): Promise<CoopExitFeeEstimateOutput | null> {
+  }: CoopExitFeeEstimatesInput): Promise<CoopExitFeeEstimatesOutput | null> {
     return await this.executeRawQuery({
       queryPayload: CoopExitFeeEstimate,
       variables: {
         leaf_external_ids: leafExternalIds,
         withdrawal_address: withdrawalAddress,
       },
-      constructObject: (response: { coop_exit_fee_estimate: any }) => {
-        return CoopExitFeeEstimateOutputFromJson(
-          response.coop_exit_fee_estimate,
+      constructObject: (response: { coop_exit_fee_estimates: any }) => {
+        return CoopExitFeeEstimatesOutputFromJson(
+          response.coop_exit_fee_estimates,
         );
       },
     });

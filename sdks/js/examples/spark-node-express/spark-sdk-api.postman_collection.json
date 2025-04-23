@@ -348,7 +348,7 @@
             "header": [],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"amountSats\": 10000,\n    \"withdrawalAddress\": \"string\"\n}",
+              "raw": "{\n    \"amountSats\": 10000,\n    \"withdrawalAddress\": \"string\",\n    \"exitSpeed\": \"FAST\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
