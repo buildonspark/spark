@@ -56,14 +56,15 @@ export function decodeSparkAddress(
   network: NetworkType,
 ): string {
   try {
-    if (!address.startsWith(AddressNetwork[network])) {
+    const decoded = bech32m.decode(address as SparkAddressFormat, 200);
+    if (decoded.prefix !== AddressNetwork[network]) {
       throw new ValidationError("Invalid Spark address prefix", {
         field: "address",
         value: address,
+        expected: `prefix='${AddressNetwork[network]}'`,
       });
     }
 
-    const decoded = bech32m.decode(address as SparkAddressFormat, 200);
     const payload = SparkAddress.decode(bech32m.fromWords(decoded.words));
 
     const publicKey = bytesToHex(payload.identityPublicKey);

@@ -7,6 +7,7 @@ import {
 import { generateMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english";
 import { sha256 } from "@scure/btc-signer/utils";
+import { ValidationError } from "../../errors/index.js";
 import { WalletConfigService } from "../../services/config.js";
 import { ConnectionManager } from "../../services/connection.js";
 import { LeafKeyTweak, TransferService } from "../../services/transfer.js";
@@ -14,6 +15,7 @@ import { ConfigOptions } from "../../services/wallet-config.js";
 import { createNewTree } from "../../tests/test-util.js";
 import { SparkWalletTesting } from "../utils/spark-testing-wallet.js";
 import { BitcoinFaucet } from "../utils/test-faucet.js";
+import { NetworkType } from "../../utils/network.js";
 
 describe("Transfer", () => {
   jest.setTimeout(15_000);
@@ -355,5 +357,99 @@ describe("Transfer", () => {
     await receiverTransferService.claimTransfer(receiverTransfer!, [
       claimingNode,
     ]);
+  });
+
+  function generateNetworkPairs(
+    networks: NetworkType[],
+  ): [NetworkType, NetworkType][] {
+    const pairs: [NetworkType, NetworkType][] = [];
+    for (const source of networks) {
+      for (const target of networks) {
+        if (source !== target) {
+          pairs.push([source, target]);
+        }
+      }
+    }
+    return pairs;
+  }
+
+  describe("address validation", () => {
+    const networkTypes: NetworkType[] = [
+      "MAINNET",
+      "TESTNET",
+      "REGTEST",
+      "SIGNET",
+      "LOCAL",
+    ];
+    const networkCombinations = generateNetworkPairs(networkTypes);
+
+    it.concurrent.each(networkCombinations)(
+      "should not allow transfer from %s to %s network due to address validation",
+      async (sourceNetwork, targetNetwork) => {
+        const sourceOptions: ConfigOptions = {
+          network: sourceNetwork,
+        };
+        const targetOptions: ConfigOptions = {
+          network: targetNetwork,
+        };
+
+        const { wallet: sourceWallet } = await SparkWalletTesting.initialize({
+          options: sourceOptions,
+        });
+
+        const { wallet: targetWallet } = await SparkWalletTesting.initialize({
+          options: targetOptions,
+        });
+
+        const targetAddress = await targetWallet.getSparkAddress();
+
+        await expect(
+          sourceWallet.transfer({
+            amountSats: 1000,
+            receiverSparkAddress: targetAddress,
+          }),
+        ).rejects.toThrow(
+          expect.objectContaining({
+            name: ValidationError.name,
+            message: expect.stringMatching(/Invalid Spark address prefix/),
+            context: expect.objectContaining({
+              field: "address",
+              value: targetAddress,
+            }),
+          }),
+        );
+      },
+    );
+
+    it.concurrent.each(networkTypes)(
+      "should fail transfer on same %s network due to no available leaves",
+      async (network) => {
+        const options: ConfigOptions = {
+          network,
+        };
+
+        const { wallet: wallet1 } = await SparkWalletTesting.initialize({
+          options,
+        });
+
+        const { wallet: wallet2 } = await SparkWalletTesting.initialize({
+          options,
+        });
+
+        const address2 = await wallet2.getSparkAddress();
+
+        await expect(
+          wallet1.transfer({
+            amountSats: 1000,
+            receiverSparkAddress: address2,
+          }),
+        ).rejects.toThrow(
+          expect.objectContaining({
+            name: ValidationError.name,
+            message: expect.stringMatching(/No owned leaves found/),
+          }),
+        );
+      },
+    );
   });
 });
