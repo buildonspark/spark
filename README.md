@@ -8,6 +8,8 @@ mise trust
 mise install
 ```
 
+**Recommended**: Add [mise shell integration](https://mise.jdx.dev/getting-started.html#activate-mise) so that the mise environment will automatically activate when you are this repo, giving you access to all executables and environment variables. Otherwise you will need will need to either manually `mise activate [SHELL]` or run all commands with the `mise exec` prefix.
+
 ## Generate proto files
 
 After modifying the proto files, you can generate the Go files with the following command:
