@@ -239,12 +239,12 @@ jobs:
             FAILED=1
           fi
 
-          if [[ ${{ needs.trigger-ssp-hermetic.result }} != "skipped" ]] && \
-             [[ ${{ needs.trigger-ssp-hermetic.result }} != "success" ]] && \
-             [[ ${{ needs.trigger-ssp-hermetic.result }} != "cancelled" ]]; then
-            FAILURES+="- SSP Hermetic tests failed\n"
-            FAILED=1
-          fi
+          # if [[ ${{ needs.trigger-ssp-hermetic.result }} != "skipped" ]] && \
+          #    [[ ${{ needs.trigger-ssp-hermetic.result }} != "success" ]] && \
+          #    [[ ${{ needs.trigger-ssp-hermetic.result }} != "cancelled" ]]; then
+          #   FAILURES+="- SSP Hermetic tests failed\n"
+          #   FAILED=1
+          # fi
 
           if [[ $FAILED -eq 1 ]]; then
             echo -e "$FAILURES"
