@@ -2,7 +2,7 @@
 set -e
 
 PGDATABASE="spark-0"
-PGUSER="postgres"
+PGUSER="sparkro"
 
 usage() {
 	echo "Usage: $0 <options> <dev|loadtest|prod>"
@@ -21,7 +21,7 @@ while getopts "ad:ew" OPTION; do
 	d)
 		PGDATABASE="$OPTARG";;
 	w)
-		PGUSER="engineer"
+		PGUSER="sparkrw"
 		;;
 	*)
 		usage;;
