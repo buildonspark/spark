@@ -267,6 +267,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to create LRC20 client: %v", err)
 	}
+	defer lrc20Client.Close() //nolint:errcheck
 
 	for network, bitcoindConfig := range config.BitcoindConfigs {
 		go func() {

@@ -6,22 +6,14 @@ linters:
     generated: lax
     presets:
       - comments
-      - common-false-positives
-      - legacy
-      - std-error-handling
-    paths:
-      - third_party$
-      - builtin$
-      - examples$
-issues:
-  new-from-rev: HEAD~1
-  new: true
+  settings:
+    errcheck:
+      exclude-functions:
+        - (*google.golang.org/grpc.ClientConn).Close
+        - (*database/sql.DB).Close
+        - (*github.com/lightsparkdev/spark-go/so/ent.Client).Close
 formatters:
   enable:
     - gofumpt
   exclusions:
     generated: lax
-    paths:
-      - third_party$
-      - builtin$
-      - examples$

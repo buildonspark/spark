@@ -160,7 +160,7 @@ func (r *Requester) ExecuteGraphqlWithContext(ctx context.Context, query string,
 	if err != nil {
 		return nil, err
 	}
-	defer response.Body.Close()
+	defer response.Body.Close() //nolint:errcheck
 	if response.StatusCode < 200 || response.StatusCode > 299 {
 		return nil, RequestError{Message: response.Status, StatusCode: response.StatusCode}
 	}
