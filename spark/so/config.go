@@ -16,6 +16,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
 	"github.com/aws/aws-sdk-go-v2/feature/rds/auth"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/lightsparkdev/spark-go/common"
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
@@ -253,12 +255,11 @@ func NewRDSAuthToken(ctx context.Context, uri *url.URL) (string, error) {
 	return token, nil
 }
 
-// DBConnector is a database connector that can be configured
-// to generate a new AWS RDS auth token for each connection.
 type DBConnector struct {
 	baseURI *url.URL
 	AWS     bool
 	driver  driver.Driver
+	pool    *pgxpool.Pool
 }
 
 func NewDBConnector(urlStr string, aws bool) (*DBConnector, error) {
@@ -266,11 +267,43 @@ func NewDBConnector(urlStr string, aws bool) (*DBConnector, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse database path: %w", err)
 	}
-	return &DBConnector{
+
+	connector := &DBConnector{
 		baseURI: uri,
 		AWS:     aws,
 		driver:  stdlib.GetDefaultDriver(),
-	}, nil
+	}
+
+	// Only create pool for PostgreSQL
+	if strings.HasPrefix(urlStr, "postgresql") {
+		config, err := pgxpool.ParseConfig(urlStr)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse pool config: %w", err)
+		}
+
+		// Add pool configuration
+		config.MaxConns = 50
+		config.MinConns = 10
+
+		if aws {
+			config.BeforeConnect = func(ctx context.Context, cfg *pgx.ConnConfig) error {
+				token, err := NewRDSAuthToken(ctx, uri)
+				if err != nil {
+					return fmt.Errorf("failed to get RDS auth token: %w", err)
+				}
+				cfg.Password = token
+				return nil
+			}
+		}
+
+		pool, err := pgxpool.NewWithConfig(context.Background(), config)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create connection pool: %w", err)
+		}
+		connector.pool = pool
+	}
+
+	return connector, nil
 }
 
 func (c *DBConnector) Connect(ctx context.Context) (driver.Conn, error) {
@@ -286,9 +319,18 @@ func (c *DBConnector) Connect(ctx context.Context) (driver.Conn, error) {
 	return c.driver.Open(uri.String())
 }
 
-// Driver returns the underlying driver.
 func (c *DBConnector) Driver() driver.Driver {
 	return c.driver
+}
+
+func (c *DBConnector) Pool() *pgxpool.Pool {
+	return c.pool
+}
+
+func (c *DBConnector) Close() {
+	if c.pool != nil {
+		c.pool.Close()
+	}
 }
 
 // LoadOperators loads the operators from the given file path.

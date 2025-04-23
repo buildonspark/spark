@@ -20,6 +20,7 @@ import (
 	"github.com/go-co-op/gocron/v2"
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
 	"github.com/improbable-eng/grpc-web/go/grpcweb"
+	"github.com/jackc/pgx/v5/stdlib"
 	_ "github.com/lib/pq"
 	"github.com/lightsparkdev/spark-go/common"
 	pbdkg "github.com/lightsparkdev/spark-go/proto/dkg"
@@ -233,7 +234,15 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to create db connector: %v", err)
 	}
-	db := sql.OpenDB(connector)
+	defer connector.Close()
+
+	var db entsql.ExecQuerier
+	if dbDriver == "postgres" {
+		db = stdlib.OpenDBFromPool(connector.Pool())
+	} else {
+		db = sql.OpenDB(connector)
+	}
+
 	dialectDriver := entsql.NewDriver(dbDriver, entsql.Conn{ExecQuerier: db})
 	dbClient := ent.NewClient(ent.Driver(dialectDriver))
 	defer dbClient.Close()
