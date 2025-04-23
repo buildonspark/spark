@@ -16,10 +16,10 @@ export const protobufPackage = "spark";
 /** Network is the network type of the bitcoin network. */
 export enum Network {
   UNSPECIFIED = 0,
-  MAINNET = 10,
-  REGTEST = 20,
-  TESTNET = 30,
-  SIGNET = 40,
+  MAINNET = 1,
+  REGTEST = 2,
+  TESTNET = 3,
+  SIGNET = 4,
   UNRECOGNIZED = -1,
 }
 
@@ -28,16 +28,16 @@ export function networkFromJSON(object: any): Network {
     case 0:
     case "UNSPECIFIED":
       return Network.UNSPECIFIED;
-    case 10:
+    case 1:
     case "MAINNET":
       return Network.MAINNET;
-    case 20:
+    case 2:
     case "REGTEST":
       return Network.REGTEST;
-    case 30:
+    case 3:
     case "TESTNET":
       return Network.TESTNET;
-    case 40:
+    case 4:
     case "SIGNET":
       return Network.SIGNET;
     case -1:
@@ -1299,10 +1299,10 @@ export const SubscribeToEventsResponse: MessageFns<SubscribeToEventsResponse> = 
   encode(message: SubscribeToEventsResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     switch (message.event?.$case) {
       case "transfer":
-        TransferEvent.encode(message.event.transfer, writer.uint32(82).fork()).join();
+        TransferEvent.encode(message.event.transfer, writer.uint32(10).fork()).join();
         break;
       case "deposit":
-        DepositEvent.encode(message.event.deposit, writer.uint32(162).fork()).join();
+        DepositEvent.encode(message.event.deposit, writer.uint32(18).fork()).join();
         break;
     }
     return writer;
@@ -1315,16 +1315,16 @@ export const SubscribeToEventsResponse: MessageFns<SubscribeToEventsResponse> = 
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
-        case 10: {
-          if (tag !== 82) {
+        case 1: {
+          if (tag !== 10) {
             break;
           }
 
           message.event = { $case: "transfer", transfer: TransferEvent.decode(reader, reader.uint32()) };
           continue;
         }
-        case 20: {
-          if (tag !== 162) {
+        case 2: {
+          if (tag !== 18) {
             break;
           }
 
@@ -6176,22 +6176,22 @@ function createBaseUserSignedTxSigningJob(): UserSignedTxSigningJob {
 export const UserSignedTxSigningJob: MessageFns<UserSignedTxSigningJob> = {
   encode(message: UserSignedTxSigningJob, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.leafId !== "") {
-      writer.uint32(82).string(message.leafId);
+      writer.uint32(10).string(message.leafId);
     }
     if (message.signingPublicKey.length !== 0) {
-      writer.uint32(162).bytes(message.signingPublicKey);
+      writer.uint32(18).bytes(message.signingPublicKey);
     }
     if (message.rawTx.length !== 0) {
-      writer.uint32(242).bytes(message.rawTx);
+      writer.uint32(26).bytes(message.rawTx);
     }
     if (message.signingNonceCommitment !== undefined) {
-      SigningCommitment.encode(message.signingNonceCommitment, writer.uint32(322).fork()).join();
+      SigningCommitment.encode(message.signingNonceCommitment, writer.uint32(34).fork()).join();
     }
     if (message.userSignature.length !== 0) {
-      writer.uint32(402).bytes(message.userSignature);
+      writer.uint32(42).bytes(message.userSignature);
     }
     if (message.signingCommitments !== undefined) {
-      SigningCommitments.encode(message.signingCommitments, writer.uint32(482).fork()).join();
+      SigningCommitments.encode(message.signingCommitments, writer.uint32(50).fork()).join();
     }
     return writer;
   },
@@ -6203,48 +6203,48 @@ export const UserSignedTxSigningJob: MessageFns<UserSignedTxSigningJob> = {
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
-        case 10: {
-          if (tag !== 82) {
+        case 1: {
+          if (tag !== 10) {
             break;
           }
 
           message.leafId = reader.string();
           continue;
         }
-        case 20: {
-          if (tag !== 162) {
+        case 2: {
+          if (tag !== 18) {
             break;
           }
 
           message.signingPublicKey = reader.bytes();
           continue;
         }
-        case 30: {
-          if (tag !== 242) {
+        case 3: {
+          if (tag !== 26) {
             break;
           }
 
           message.rawTx = reader.bytes();
           continue;
         }
-        case 40: {
-          if (tag !== 322) {
+        case 4: {
+          if (tag !== 34) {
             break;
           }
 
           message.signingNonceCommitment = SigningCommitment.decode(reader, reader.uint32());
           continue;
         }
-        case 50: {
-          if (tag !== 402) {
+        case 5: {
+          if (tag !== 42) {
             break;
           }
 
           message.userSignature = reader.bytes();
           continue;
         }
-        case 60: {
-          if (tag !== 482) {
+        case 6: {
+          if (tag !== 50) {
             break;
           }
 
@@ -6428,19 +6428,19 @@ function createBaseStartUserSignedTransferRequest(): StartUserSignedTransferRequ
 export const StartUserSignedTransferRequest: MessageFns<StartUserSignedTransferRequest> = {
   encode(message: StartUserSignedTransferRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.transferId !== "") {
-      writer.uint32(82).string(message.transferId);
+      writer.uint32(10).string(message.transferId);
     }
     if (message.ownerIdentityPublicKey.length !== 0) {
-      writer.uint32(162).bytes(message.ownerIdentityPublicKey);
+      writer.uint32(18).bytes(message.ownerIdentityPublicKey);
     }
     for (const v of message.leavesToSend) {
-      UserSignedTxSigningJob.encode(v!, writer.uint32(242).fork()).join();
+      UserSignedTxSigningJob.encode(v!, writer.uint32(26).fork()).join();
     }
     if (message.receiverIdentityPublicKey.length !== 0) {
-      writer.uint32(322).bytes(message.receiverIdentityPublicKey);
+      writer.uint32(34).bytes(message.receiverIdentityPublicKey);
     }
     if (message.expiryTime !== undefined) {
-      Timestamp.encode(toTimestamp(message.expiryTime), writer.uint32(402).fork()).join();
+      Timestamp.encode(toTimestamp(message.expiryTime), writer.uint32(42).fork()).join();
     }
     return writer;
   },
@@ -6452,40 +6452,40 @@ export const StartUserSignedTransferRequest: MessageFns<StartUserSignedTransferR
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
-        case 10: {
-          if (tag !== 82) {
+        case 1: {
+          if (tag !== 10) {
             break;
           }
 
           message.transferId = reader.string();
           continue;
         }
-        case 20: {
-          if (tag !== 162) {
+        case 2: {
+          if (tag !== 18) {
             break;
           }
 
           message.ownerIdentityPublicKey = reader.bytes();
           continue;
         }
-        case 30: {
-          if (tag !== 242) {
+        case 3: {
+          if (tag !== 26) {
             break;
           }
 
           message.leavesToSend.push(UserSignedTxSigningJob.decode(reader, reader.uint32()));
           continue;
         }
-        case 40: {
-          if (tag !== 322) {
+        case 4: {
+          if (tag !== 34) {
             break;
           }
 
           message.receiverIdentityPublicKey = reader.bytes();
           continue;
         }
-        case 50: {
-          if (tag !== 402) {
+        case 5: {
+          if (tag !== 42) {
             break;
           }
 
@@ -9612,22 +9612,22 @@ function createBaseInitiatePreimageSwapRequest(): InitiatePreimageSwapRequest {
 export const InitiatePreimageSwapRequest: MessageFns<InitiatePreimageSwapRequest> = {
   encode(message: InitiatePreimageSwapRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.paymentHash.length !== 0) {
-      writer.uint32(82).bytes(message.paymentHash);
+      writer.uint32(10).bytes(message.paymentHash);
     }
     if (message.invoiceAmount !== undefined) {
-      InvoiceAmount.encode(message.invoiceAmount, writer.uint32(162).fork()).join();
+      InvoiceAmount.encode(message.invoiceAmount, writer.uint32(18).fork()).join();
     }
     if (message.reason !== 0) {
-      writer.uint32(240).int32(message.reason);
+      writer.uint32(24).int32(message.reason);
     }
     if (message.transfer !== undefined) {
-      StartUserSignedTransferRequest.encode(message.transfer, writer.uint32(322).fork()).join();
+      StartUserSignedTransferRequest.encode(message.transfer, writer.uint32(34).fork()).join();
     }
     if (message.receiverIdentityPublicKey.length !== 0) {
-      writer.uint32(402).bytes(message.receiverIdentityPublicKey);
+      writer.uint32(42).bytes(message.receiverIdentityPublicKey);
     }
     if (message.feeSats !== 0) {
-      writer.uint32(480).uint64(message.feeSats);
+      writer.uint32(48).uint64(message.feeSats);
     }
     return writer;
   },
@@ -9639,48 +9639,48 @@ export const InitiatePreimageSwapRequest: MessageFns<InitiatePreimageSwapRequest
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
-        case 10: {
-          if (tag !== 82) {
+        case 1: {
+          if (tag !== 10) {
             break;
           }
 
           message.paymentHash = reader.bytes();
           continue;
         }
-        case 20: {
-          if (tag !== 162) {
+        case 2: {
+          if (tag !== 18) {
             break;
           }
 
           message.invoiceAmount = InvoiceAmount.decode(reader, reader.uint32());
           continue;
         }
-        case 30: {
-          if (tag !== 240) {
+        case 3: {
+          if (tag !== 24) {
             break;
           }
 
           message.reason = reader.int32() as any;
           continue;
         }
-        case 40: {
-          if (tag !== 322) {
+        case 4: {
+          if (tag !== 34) {
             break;
           }
 
           message.transfer = StartUserSignedTransferRequest.decode(reader, reader.uint32());
           continue;
         }
-        case 50: {
-          if (tag !== 402) {
+        case 5: {
+          if (tag !== 42) {
             break;
           }
 
           message.receiverIdentityPublicKey = reader.bytes();
           continue;
         }
-        case 60: {
-          if (tag !== 480) {
+        case 6: {
+          if (tag !== 48) {
             break;
           }
 

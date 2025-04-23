@@ -75,8 +75,8 @@ message SubscribeToEventsRequest {
 
 message SubscribeToEventsResponse {
     oneof event {
-        TransferEvent transfer = 10;
-        DepositEvent deposit = 20;
+        TransferEvent transfer = 1;
+        DepositEvent deposit = 2;
     }
 }
 
@@ -93,10 +93,10 @@ message DepositEvent {
  */
 enum Network {
     UNSPECIFIED = 0;
-    MAINNET = 10;
-    REGTEST = 20;
-    TESTNET = 30;
-    SIGNET = 40;
+    MAINNET = 1;
+    REGTEST = 2;
+    TESTNET = 3;
+    SIGNET = 4;
 }
 
 /**
@@ -553,12 +553,12 @@ message LeafRefundTxSigningJob {
 }
 
 message UserSignedTxSigningJob {
-    string leaf_id = 10;
-    bytes signing_public_key = 20;
-    bytes raw_tx = 30;
-    common.SigningCommitment signing_nonce_commitment = 40;
-    bytes user_signature = 50;
-    SigningCommitments signing_commitments = 60;
+    string leaf_id = 1;
+    bytes signing_public_key = 2;
+    bytes raw_tx = 3;
+    common.SigningCommitment signing_nonce_commitment = 4;
+    bytes user_signature = 5;
+    SigningCommitments signing_commitments = 6;
 }
 
 message LeafRefundTxSigningResult {
@@ -568,11 +568,11 @@ message LeafRefundTxSigningResult {
 }
 
 message StartUserSignedTransferRequest {
-    string transfer_id = 10;
-    bytes owner_identity_public_key = 20;
-    repeated UserSignedTxSigningJob leaves_to_send = 30;
-    bytes receiver_identity_public_key = 40;
-    google.protobuf.Timestamp expiry_time = 50; 
+    string transfer_id = 1;
+    bytes owner_identity_public_key = 2;
+    repeated UserSignedTxSigningJob leaves_to_send = 3;
+    bytes receiver_identity_public_key = 4;
+    google.protobuf.Timestamp expiry_time = 5;
 }
 
 message StartSendTransferRequest {
@@ -746,18 +746,18 @@ message InvoiceAmount {
 }
 
 message InitiatePreimageSwapRequest {
-    bytes payment_hash = 10;
-    InvoiceAmount invoice_amount = 20;
+    bytes payment_hash = 1;
+    InvoiceAmount invoice_amount = 2;
     enum Reason {
         // The associated lightning service is sending the payment.
         REASON_SEND = 0;
         // The associated lightning service is receiving the payment.
         REASON_RECEIVE = 1;
     }
-    Reason reason = 30;
-    StartUserSignedTransferRequest transfer = 40;
-    bytes receiver_identity_public_key = 50;
-    uint64 fee_sats = 60;
+    Reason reason = 3;
+    StartUserSignedTransferRequest transfer = 4;
+    bytes receiver_identity_public_key = 5;
+    uint64 fee_sats = 6;
 }
 
 message InitiatePreimageSwapResponse {
