@@ -1288,17 +1288,6 @@ export class SparkWallet {
    */
   private async claimTransfer(transfer: Transfer) {
     return await this.claimTransferMutex.runExclusive(async () => {
-      let alreadyClaimed = false;
-      await this.withLeaves(async () => {
-        if (
-          transfer.leaves.every((leaf) =>
-            this.leaves.find((l) => l.id === leaf.leaf?.id),
-          )
-        ) {
-          alreadyClaimed = true;
-        }
-      });
-
       const leafPubKeyMap =
         await this.transferService.verifyPendingTransfer(transfer);
 
