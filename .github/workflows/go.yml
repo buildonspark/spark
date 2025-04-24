@@ -91,6 +91,21 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
           cache-dependency-path: "spark/go.sum"
+      - uses: jdx/mise-action@v2
+        with:
+          install: false
+      - name: Install protoc
+        run: mise install protoc protoc-gen-go protoc-gen-go-grpc protoc-gen-validate
+      - name: Generate protos
+        run: make
+      - name: Check that protos are up to date
+        run: |
+          if [ "$(git status -s)" ]; then
+            echo 'Generated proto code is not up to date!'
+            echo 'Did you forget to run `make`?'
+            git diff
+            exit 1
+          fi
       - name: Install ZMQ dependencies
         run: sudo apt-get update && sudo apt-get install -y libzmq3-dev
       - name: golangci-lint
