@@ -70,7 +70,7 @@ func withClock(clock authninternal.Clock) func(*testServerConfig) {
 	}
 }
 
-func TestSparkAuthnServer_GetChallenge_InvalidPublicKey(t *testing.T) {
+func TestGetChallenge_InvalidPublicKey(t *testing.T) {
 	tests := []struct {
 		name   string
 		pubkey []byte
@@ -98,7 +98,7 @@ func TestSparkAuthnServer_GetChallenge_InvalidPublicKey(t *testing.T) {
 	}
 }
 
-func TestSparkAuthnServer_VerifyChallenge_ValidToken(t *testing.T) {
+func TestVerifyChallenge_ValidToken(t *testing.T) {
 	clock := authninternal.NewTestClock(time.Now())
 	server, tokenVerifier := newTestServerAndTokenVerifier(t, withClock(clock))
 	privKey, pubKey := createTestKeyPair()
@@ -128,7 +128,7 @@ func TestSparkAuthnServer_VerifyChallenge_ValidToken(t *testing.T) {
 	assert.Equal(t, session.ExpirationTimestamp(), clock.Now().Add(testSessionDuration).Unix())
 }
 
-func TestSparkAuthnServer_VerifyChallenge_InvalidSignature(t *testing.T) {
+func TestVerifyChallenge_InvalidSignature(t *testing.T) {
 	server, _ := newTestServerAndTokenVerifier(t)
 	privKey, pubKey := createTestKeyPair()
 
@@ -152,7 +152,7 @@ func TestSparkAuthnServer_VerifyChallenge_InvalidSignature(t *testing.T) {
 	assert.Nil(t, resp)
 }
 
-func TestSparkAuthnServer_VerifyChallenge_ExpiredSessionToken(t *testing.T) {
+func TestVerifyChallenge_ExpiredSessionToken(t *testing.T) {
 	clock := authninternal.NewTestClock(time.Now())
 	server, tokenVerifier := newTestServerAndTokenVerifier(t, withClock(clock))
 	privKey, pubKey := createTestKeyPair()
@@ -177,7 +177,7 @@ func TestSparkAuthnServer_VerifyChallenge_ExpiredSessionToken(t *testing.T) {
 	assert.Nil(t, noSession)
 }
 
-func TestSparkAuthnServer_VerifyChallenge_ExpiredChallenge(t *testing.T) {
+func TestVerifyChallenge_ExpiredChallenge(t *testing.T) {
 	clock := authninternal.NewTestClock(time.Now())
 	server, _ := newTestServerAndTokenVerifier(t, withClock(clock))
 	privKey, pubKey := createTestKeyPair()
@@ -199,7 +199,7 @@ func TestSparkAuthnServer_VerifyChallenge_ExpiredChallenge(t *testing.T) {
 	assert.Nil(t, resp)
 }
 
-func TestSparkAuthnServer_VerifyChallenge_TamperedToken(t *testing.T) {
+func TestVerifyChallenge_TamperedToken(t *testing.T) {
 	server, tokenVerifier := newTestServerAndTokenVerifier(t)
 	privKey, pubKey := createTestKeyPair()
 
@@ -262,7 +262,7 @@ func TestSparkAuthnServer_VerifyChallenge_TamperedToken(t *testing.T) {
 	}
 }
 
-func TestSparkAuthnServer_VerifyChallenge_ReusedChallenge(t *testing.T) {
+func TestVerifyChallenge_ReusedChallenge(t *testing.T) {
 	clock := authninternal.NewTestClock(time.Now())
 	server, _ := newTestServerAndTokenVerifier(t, withClock(clock))
 	privKey, pubKey := createTestKeyPair()
@@ -281,7 +281,7 @@ func TestSparkAuthnServer_VerifyChallenge_ReusedChallenge(t *testing.T) {
 	assert.ErrorIs(t, err, ErrChallengeReused)
 }
 
-func TestSparkAuthnServer_VerifyChallenge_CacheExpiration(t *testing.T) {
+func TestVerifyChallenge_CacheExpiration(t *testing.T) {
 	// Use a very short challenge timeout for testing cache expiration
 	shortTimeout := 1 * time.Second
 	config := AuthnServerConfig{
@@ -379,7 +379,7 @@ func newTestTokenVerifier(t *testing.T) *authninternal.SessionTokenCreatorVerifi
 	return tokenVerifier
 }
 
-func TestSparkAuthnServer_VerifyChallenge_InvalidAuth(t *testing.T) {
+func TestVerifyChallenge_InvalidAuth(t *testing.T) {
 	tests := []struct {
 		name string
 		ctx  context.Context

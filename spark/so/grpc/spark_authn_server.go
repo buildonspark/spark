@@ -14,6 +14,7 @@ import (
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 	pb "github.com/lightsparkdev/spark-go/proto/spark_authn"
 	"github.com/lightsparkdev/spark-go/so/authninternal"
+	"github.com/lightsparkdev/spark-go/so/logging"
 	"github.com/patrickmn/go-cache"
 	"google.golang.org/protobuf/proto"
 )
@@ -41,12 +42,21 @@ func newChallengeNonceCache(challengeTimeout time.Duration) *challengeNonceCache
 }
 
 // markNonceUsed marks a nonce as used. Returns ErrChallengeReused if the nonce was already used.
-func (cnc *challengeNonceCache) markNonceUsed(nonce []byte) error {
+func (cnc *challengeNonceCache) markNonceUsed(ctx context.Context, nonce []byte) error {
+	logger := logging.GetLoggerFromContext(ctx)
+	logger.Debug("attempting to mark nonce as used",
+		"nonce", fmt.Sprintf("%x", nonce))
+
 	// Add is atomic - returns nil only if the key didn't exist and was added
 	err := cnc.cache.Add(string(nonce), true, cache.DefaultExpiration)
 	if err != nil {
+		logger.Debug("nonce reuse detected",
+			"nonce", fmt.Sprintf("%x", nonce),
+			"error", err)
 		return ErrChallengeReused
 	}
+	logger.Debug("successfully marked nonce as used",
+		"nonce", fmt.Sprintf("%x", nonce))
 	return nil
 }
 
@@ -185,7 +195,7 @@ func (s *AuthnServer) GetChallenge(_ context.Context, req *pb.GetChallengeReques
 
 // VerifyChallenge verifies the client's signature on the challenge and returns a session token.
 // This is the second step of the authentication process.
-func (s *AuthnServer) VerifyChallenge(_ context.Context, req *pb.VerifyChallengeRequest) (*pb.VerifyChallengeResponse, error) {
+func (s *AuthnServer) VerifyChallenge(ctx context.Context, req *pb.VerifyChallengeRequest) (*pb.VerifyChallengeResponse, error) {
 	if req == nil {
 		return nil, fmt.Errorf("invalid request: request cannot be nil")
 	}
@@ -208,7 +218,7 @@ func (s *AuthnServer) VerifyChallenge(_ context.Context, req *pb.VerifyChallenge
 
 	challenge := req.ProtectedChallenge.Challenge
 
-	if err := s.validateChallenge(challenge, req); err != nil {
+	if err := s.validateChallenge(ctx, challenge, req); err != nil {
 		return nil, fmt.Errorf("challenge validation failed: %w", err)
 	}
 
@@ -242,7 +252,7 @@ func (s *AuthnServer) computeChallengeHmac(challengeBytes []byte) []byte {
 	return h.Sum(nil)
 }
 
-func (s *AuthnServer) validateChallenge(challenge *pb.Challenge, req *pb.VerifyChallengeRequest) error {
+func (s *AuthnServer) validateChallenge(ctx context.Context, challenge *pb.Challenge, req *pb.VerifyChallengeRequest) error {
 	if challenge.Version != currentChallengeVersion {
 		return fmt.Errorf("%w: got version %d, want version %d",
 			ErrUnsupportedChallengeVersion,
@@ -269,7 +279,7 @@ func (s *AuthnServer) validateChallenge(challenge *pb.Challenge, req *pb.VerifyC
 			ErrPublicKeyMismatch)
 	}
 
-	if err := s.nonceCache.markNonceUsed(challenge.Nonce); err != nil {
+	if err := s.nonceCache.markNonceUsed(ctx, challenge.Nonce); err != nil {
 		return fmt.Errorf("failed to mark nonce as used: %w", err)
 	}
 
