@@ -19,6 +19,7 @@ import {
   LeafRefundSigningData,
 } from "./transfer.js";
 import { ValidationError, NetworkError } from "../errors/types.js";
+import { Network } from "../utils/network.js";
 
 const crypto = getCrypto();
 
@@ -185,7 +186,10 @@ export class CoopExitService extends BaseTransferService {
           ownerIdentityPublicKey:
             await this.config.signer.getIdentityPublicKey(),
           receiverIdentityPublicKey: receiverPubKey,
-          expiryTime: new Date(Date.now() + 3 * 60 * 60 * 1000), // 3 hours
+          expiryTime:
+            this.config.getNetwork() == Network.MAINNET
+              ? new Date(Date.now() + 6 * 60 * 60 * 1000 + 5 * 60 * 1000)
+              : new Date(Date.now() + 5 * 60 * 1000), // 6 hours 5 min for mainnet, 5 min otherwise
         },
         exitId: crypto.randomUUID(),
         exitTxid: exitTxId,
