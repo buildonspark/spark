@@ -13,6 +13,43 @@ import { hex } from "@scure/base";
 import { Address, OutScript, Transaction } from "@scure/btc-signer";
 import readline from "readline";
 
+const commands = [
+  "initwallet",
+  "getbalance",
+  "getdepositaddress",
+  "getsparkaddress",
+  "getlatesttx",
+  "claimdeposit",
+  "claimtransfers",
+  "createinvoice",
+  "payinvoice",
+  "sendtransfer",
+  "withdraw",
+  "coopfee",
+  "lightningsendfee",
+  "lightningreceivefee",
+  "getlightningsendrequest",
+  "getlightningreceiverequest",
+  "getcoopexitrequest",
+  "gettransfers",
+  "pendingtransfers",
+  "transfertokens",
+  "gettokenl1address",
+  "getissuertokenbalance",
+  "getissuertokeninfo",
+  "getissuertokenpublickey",
+  "minttokens",
+  "burntokens",
+  "freezetokens",
+  "unfreezetokens",
+  "getissuertokenactivity",
+  "announcetoken",
+  "nontrustydeposit",
+  "help",
+  "exit",
+  "quit",
+];
+
 // Initialize Spark Wallet
 const walletMnemonic =
   "cctypical stereo dose party penalty decline neglect feel harvest abstract stage winter";
@@ -25,6 +62,10 @@ async function runCLI() {
   const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout,
+    completer: (line: string) => {
+      const completions = commands.filter((c) => c.startsWith(line));
+      return [completions.length ? completions : commands, line];
+    },
   });
   const helpMessage = `
   Available commands:
