@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
-	"log"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
@@ -16,6 +15,7 @@ import (
 	"github.com/lightsparkdev/spark-go/so/ent/depositaddress"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
 	"github.com/lightsparkdev/spark-go/so/ent/signingkeyshare"
+	"github.com/lightsparkdev/spark-go/so/logging"
 )
 
 // InternalDepositHandler is the deposit handler for so internal
@@ -30,11 +30,13 @@ func NewInternalDepositHandler(config *so.Config) *InternalDepositHandler {
 
 // MarkKeyshareForDepositAddress links the keyshare to a deposit address.
 func (h *InternalDepositHandler) MarkKeyshareForDepositAddress(ctx context.Context, req *pbinternal.MarkKeyshareForDepositAddressRequest) (*pbinternal.MarkKeyshareForDepositAddressResponse, error) {
-	log.Printf("Marking keyshare for deposit address: %v", req.KeyshareId)
+	logger := logging.GetLoggerFromContext(ctx)
+
+	logger.Info("Marking keyshare for deposit address", "keyshare_id", req.KeyshareId)
 
 	keyshareID, err := uuid.Parse(req.KeyshareId)
 	if err != nil {
-		log.Printf("Failed to parse keyshare ID: %v", err)
+		logger.Error("Failed to parse keyshare ID", "error", err)
 		return nil, err
 	}
 
@@ -50,11 +52,11 @@ func (h *InternalDepositHandler) MarkKeyshareForDepositAddress(ctx context.Conte
 
 	_, err = depositAddressMutator.Save(ctx)
 	if err != nil {
-		log.Printf("Failed to link keyshare to deposit address: %v", err)
+		logger.Error("Failed to link keyshare to deposit address", "error", err)
 		return nil, err
 	}
 
-	log.Printf("Marked keyshare for deposit address")
+	logger.Info("Marked keyshare for deposit address", "keyshare_id", req.KeyshareId)
 
 	signingKey := secp256k1.PrivKeyFromBytes(h.config.IdentityPrivateKey)
 	addrHash := sha256.Sum256([]byte(req.Address))
@@ -66,13 +68,21 @@ func (h *InternalDepositHandler) MarkKeyshareForDepositAddress(ctx context.Conte
 
 // FinalizeTreeCreation finalizes a tree creation during deposit
 func (h *InternalDepositHandler) FinalizeTreeCreation(ctx context.Context, req *pbinternal.FinalizeTreeCreationRequest) error {
-	log.Printf("Finalizing tree creation: %v", req.Nodes)
+	logger := logging.GetLoggerFromContext(ctx)
+
+	treeNodeIDs := make([]string, len(req.Nodes))
+	for i, node := range req.Nodes {
+		treeNodeIDs[i] = node.Id
+	}
+
+	logger.Info("Finalizing tree creation", "tree_node_ids", treeNodeIDs)
+
 	db := ent.GetDbFromContext(ctx)
 	var tree *ent.Tree
 	var selectedNode *pbinternal.TreeNode
 	for _, node := range req.Nodes {
 		if node.ParentNodeId == nil {
-			log.Printf("Selected node: %v", node)
+			logger.Info("Selected node", "tree_node_id", node.Id)
 			selectedNode = node
 			break
 		}
@@ -104,7 +114,7 @@ func (h *InternalDepositHandler) FinalizeTreeCreation(ctx context.Context, req *
 			return fmt.Errorf("failed to get deposit address: %v", err)
 		}
 		markNodeAsAvailable = address.ConfirmationHeight != 0
-		log.Printf("Marking node as available: %v", markNodeAsAvailable)
+		logger.Info(fmt.Sprintf("Marking node as available: %v", markNodeAsAvailable))
 		nodeTx, err := common.TxFromRawTxBytes(selectedNode.RawTx)
 		if err != nil {
 			return err

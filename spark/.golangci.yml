@@ -1,12 +1,25 @@
 version: "2"
 linters:
   enable:
+    - depguard
     - revive
   exclusions:
     generated: lax
     presets:
       - comments
   settings:
+    depguard:
+      rules:
+        logging:
+          list-mode: lax
+          files:
+            - "$all"
+            - "!$test"
+            - "!**/wallet/**.go"
+            - "!**/test_util/**.go"
+          deny:
+            - pkg: "log$"
+              desc: "use logging.GetLoggerFromContext() or slog.Default()"
     errcheck:
       exclude-functions:
         - (*google.golang.org/grpc.ClientConn).Close

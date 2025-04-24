@@ -3,7 +3,6 @@ package handler
 import (
 	"context"
 	"fmt"
-	"log"
 
 	"github.com/google/uuid"
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
@@ -13,6 +12,7 @@ import (
 	"github.com/lightsparkdev/spark-go/so/ent"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
 	"github.com/lightsparkdev/spark-go/so/helper"
+	"github.com/lightsparkdev/spark-go/so/logging"
 )
 
 // CooperativeExitHandler tracks transfers
@@ -122,9 +122,11 @@ func (h *TransferHandler) syncCoopExitInit(ctx context.Context, req *pb.Cooperat
 		Option: helper.OperatorSelectionOptionExcludeSelf,
 	}
 	_, err := helper.ExecuteTaskWithAllOperators(ctx, h.config, &selection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
+		logger := logging.GetLoggerFromContext(ctx)
+
 		conn, err := operator.NewGRPCConnection()
 		if err != nil {
-			log.Printf("Failed to connect to operator: %v", err)
+			logger.Error("Failed to connect to operator", "error", err)
 			return nil, err
 		}
 		defer conn.Close()

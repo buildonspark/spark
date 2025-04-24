@@ -5,8 +5,8 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
-	"log"
 	"log/slog"
+	"os"
 	"slices"
 	"time"
 
@@ -235,11 +235,11 @@ func WatchChain(
 	defer func() {
 		err := zmqCtx.Term()
 		if err != nil {
-			log.Fatalf("Failed to terminate ZMQ context: %v", err)
+			logger.Error("Failed to terminate ZMQ context", "error", err)
 		}
 		err = subscriber.Close()
 		if err != nil {
-			log.Fatalf("Failed to close ZMQ subscriber: %v", err)
+			logger.Error("Failed to close ZMQ subscriber", "error", err)
 		}
 	}()
 
@@ -250,7 +250,10 @@ func WatchChain(
 		for {
 			_, err := subscriber.RecvMessage(0)
 			if err != nil {
-				log.Fatalf("Failed to receive message: %v", err)
+				// TODO(mhr): Bubble this up through a channel so we can properly shut down the server rather
+				// than `os.Exit(1)`.
+				logger.Error("Failed to receive message", "error", err)
+				os.Exit(1)
 			}
 			newBlockNotification <- struct{}{}
 		}

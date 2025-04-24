@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"math/big"
 
 	"github.com/google/uuid"
@@ -34,14 +33,14 @@ func NewInternalTokenTransactionHandler(config *so.Config, client *lrc20.Client)
 
 func (h *InternalTokenTransactionHandler) StartTokenTransactionInternal(ctx context.Context, config *so.Config, req *pbinternal.StartTokenTransactionInternalRequest) (*emptypb.Empty, error) {
 	logger := logging.GetLoggerFromContext(ctx)
-	logger.Info("Starting token transaction", "key share ids", len(req.KeyshareIds))
+	logger.Info("Starting token transaction", "keyshare_ids", req.KeyshareIds)
 	keyshareUUIDs := make([]uuid.UUID, len(req.KeyshareIds))
 	// Ensure that the coordinator SO did not pass duplicate keyshare UUIDs for different outputs.
 	seenUUIDs := make(map[uuid.UUID]bool)
 	for i, id := range req.KeyshareIds {
 		uuid, err := uuid.Parse(id)
 		if err != nil {
-			log.Printf("Failed to parse keyshare ID: %v", err)
+			logger.Error("Failed to parse keyshare ID", "error", err)
 			return nil, err
 		}
 		if seenUUIDs[uuid] {
@@ -53,7 +52,7 @@ func (h *InternalTokenTransactionHandler) StartTokenTransactionInternal(ctx cont
 	logger.Info("Marking keyshares as used")
 	keysharesMap, err := ent.MarkSigningKeysharesAsUsed(ctx, config, keyshareUUIDs)
 	if err != nil {
-		log.Printf("Failed to mark keyshares as used: %v", err)
+		logger.Error("Failed to mark keyshares as used", "error", err)
 		return nil, err
 	}
 	logger.Info("Keyshares marked as used")

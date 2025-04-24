@@ -2,13 +2,13 @@ package handler
 
 import (
 	"context"
-	"log"
 
 	"github.com/google/uuid"
 	pbinternal "github.com/lightsparkdev/spark-go/proto/spark_internal"
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/ent"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
+	"github.com/lightsparkdev/spark-go/so/logging"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
@@ -24,20 +24,22 @@ func NewInternalSplitHandler(config *so.Config) *InternalSplitHandler {
 
 // PrepareSplitKeyshares prepares the keyshares for a split.
 func (h *InternalSplitHandler) PrepareSplitKeyshares(ctx context.Context, req *pbinternal.PrepareSplitKeysharesRequest) (*emptypb.Empty, error) {
+	logger := logging.GetLoggerFromContext(ctx)
+
 	nodeID, err := uuid.Parse(req.NodeId)
 	if err != nil {
-		log.Printf("Failed to parse node ID: %v", err)
+		logger.Error("Failed to parse node ID", "error", err)
 		return nil, err
 	}
 	err = ent.MarkNodeAsLocked(ctx, nodeID, schema.TreeNodeStatusSplitLocked)
 	if err != nil {
-		log.Printf("Failed to mark node as locked: %v", err)
+		logger.Error("Failed to mark node as locked", "error", err)
 		return nil, err
 	}
 	selectedKeyshares := make([]uuid.UUID, len(req.SelectedKeyshareIds)+1)
 	u, err := uuid.Parse(req.TargetKeyshareId)
 	if err != nil {
-		log.Printf("Failed to parse target keyshare ID: %v", err)
+		logger.Error("Failed to parse target keyshare ID", "error", err)
 		return nil, err
 	}
 	selectedKeyshares[0] = u
@@ -45,7 +47,7 @@ func (h *InternalSplitHandler) PrepareSplitKeyshares(ctx context.Context, req *p
 	for i, id := range req.SelectedKeyshareIds {
 		u, err := uuid.Parse(id)
 		if err != nil {
-			log.Printf("Failed to parse keyshare ID: %v", err)
+			logger.Error("Failed to parse keyshare ID", "error", err)
 			return nil, err
 		}
 		selectedKeyshares[i+1] = u
@@ -53,25 +55,25 @@ func (h *InternalSplitHandler) PrepareSplitKeyshares(ctx context.Context, req *p
 
 	_, err = ent.MarkSigningKeysharesAsUsed(ctx, h.config, selectedKeyshares)
 	if err != nil {
-		log.Printf("Failed to mark keyshares as used: %v", err)
+		logger.Error("Failed to mark keyshares as used", "error", err)
 		return nil, err
 	}
 
 	keyShares, err := ent.GetKeyPackagesArray(ctx, selectedKeyshares)
 	if err != nil {
-		log.Printf("Failed to get key shares: %v", err)
+		logger.Error("Failed to get key shares", "error", err)
 		return nil, err
 	}
 
 	lastKeyshareID, err := uuid.Parse(req.LastKeyshareId)
 	if err != nil {
-		log.Printf("Failed to parse last keyshare ID: %v", err)
+		logger.Error("Failed to parse last keyshare ID", "error", err)
 		return nil, err
 	}
 
 	_, err = ent.CalculateAndStoreLastKey(ctx, h.config, keyShares[0], keyShares[1:], lastKeyshareID)
 	if err != nil {
-		log.Printf("Failed to calculate and store last key share: %v", err)
+		logger.Error("Failed to calculate and store last key share", "error", err)
 		return nil, err
 	}
 

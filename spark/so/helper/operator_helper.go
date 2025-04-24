@@ -4,11 +4,11 @@ import (
 	"context"
 	"crypto/rand"
 	"errors"
-	"log"
 	"math/big"
 	"sync"
 
 	"github.com/lightsparkdev/spark-go/so"
+	"github.com/lightsparkdev/spark-go/so/logging"
 )
 
 // OperatorSelectionOption is the option for selecting operators.
@@ -115,6 +115,8 @@ type TaskResult[V any] struct {
 // This will run goroutines for each operator and wait for all of them to complete before returning.
 // It returns an error if any of the tasks fail.
 func ExecuteTaskWithAllOperators[V any](ctx context.Context, config *so.Config, selection *OperatorSelection, task func(ctx context.Context, operator *so.SigningOperator) (V, error)) (map[string]V, error) {
+	logger := logging.GetLoggerFromContext(ctx)
+
 	wg := sync.WaitGroup{}
 	results := make(chan TaskResult[V], selection.OperatorCount(config))
 
@@ -148,7 +150,7 @@ func ExecuteTaskWithAllOperators[V any](ctx context.Context, config *so.Config, 
 		resultsMap[result.OperatorIdentifier] = result.Result
 	}
 
-	log.Printf("Successfully executed task with all operators")
+	logger.Info("Successfully executed task with all operators")
 
 	return resultsMap, nil
 }

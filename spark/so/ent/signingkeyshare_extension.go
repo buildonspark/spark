@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"log"
 	"log/slog"
 
 	"github.com/decred/dcrd/dcrec/secp256k1"
@@ -126,8 +125,9 @@ func GetUnusedSigningKeyshares(ctx context.Context, dbClient *Client, config *so
 // MarkSigningKeysharesAsUsed marks the given keyshares as used. If any of the keyshares are not
 // found or not available, it returns an error.
 func MarkSigningKeysharesAsUsed(ctx context.Context, _ *so.Config, ids []uuid.UUID) (map[uuid.UUID]*SigningKeyshare, error) {
+	logger := logging.GetLoggerFromContext(ctx)
 	db := GetDbFromContext(ctx)
-	log.Printf("Marking keyshares as used: %v", ids)
+	logger.Info("Marking keyshares as used: %v", "keyshare_ids", ids)
 
 	keysharesMap, err := GetSigningKeysharesMap(ctx, ids)
 	if err != nil {
@@ -263,11 +263,18 @@ func sumOfSigningKeyshares(keyshares []*SigningKeyshare) (*SigningKeyshare, erro
 // CalculateAndStoreLastKey calculates the last key from the given keyshares and stores it in the database.
 // The target = sum(keyshares) + last_key
 func CalculateAndStoreLastKey(ctx context.Context, _ *so.Config, target *SigningKeyshare, keyshares []*SigningKeyshare, id uuid.UUID) (*SigningKeyshare, error) {
+	logger := logging.GetLoggerFromContext(ctx)
+
 	if len(keyshares) == 0 {
 		return target, nil
 	}
 
-	log.Printf("Calculating last key for keyshares: %v", keyshares)
+	keyshareIDs := make([]uuid.UUID, len(keyshares))
+	for i, keyshare := range keyshares {
+		keyshareIDs[i] = keyshare.ID
+	}
+
+	logger.Info("Calculating last key for keyshares", "keyshare_ids", keyshareIDs)
 	sumKeyshare, err := sumOfSigningKeyshares(keyshares)
 	if err != nil {
 		return nil, err
@@ -365,13 +372,15 @@ func RunDKGIfNeeded(db *Client, config *so.Config) error {
 }
 
 func RunDKG(ctx context.Context, config *so.Config) error {
+	logger := logging.GetLoggerFromContext(ctx)
+
 	connection, err := common.NewGRPCConnection(
 		config.DKGCoordinatorAddress,
 		config.SigningOperatorMap[config.Identifier].CertPath,
 		nil,
 	)
 	if err != nil {
-		log.Printf("Failed to create connection to DKG coordinator: %v, cert path: %v", err, config.SigningOperatorMap[config.Identifier].CertPath)
+		logger.Error("Failed to create connection to DKG coordinator", "error", err)
 		return err
 	}
 	defer connection.Close()
@@ -381,7 +390,7 @@ func RunDKG(ctx context.Context, config *so.Config) error {
 		Count: spark.DKGKeyCount,
 	})
 	if err != nil {
-		log.Printf("Failed to start DKG: %v", err)
+		logger.Error("Failed to start DKG", "error", err)
 		return err
 	}
 

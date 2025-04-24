@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
-	"log"
 
 	"github.com/google/uuid"
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
@@ -12,6 +11,7 @@ import (
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
 	"github.com/lightsparkdev/spark-go/so/ent/tokenoutput"
 	"github.com/lightsparkdev/spark-go/so/ent/tokentransaction"
+	"github.com/lightsparkdev/spark-go/so/logging"
 	"github.com/lightsparkdev/spark-go/so/utils"
 )
 
@@ -34,6 +34,7 @@ func CreateStartedTransactionEntities(
 	outputToSpendEnts []*TokenOutput,
 	coordinatorPublicKey []byte,
 ) (*TokenTransaction, error) {
+	logger := logging.GetLoggerFromContext(ctx)
 	db := GetDbFromContext(ctx)
 
 	partialTokenTransactionHash, err := utils.HashTokenTransaction(tokenTransaction, true)
@@ -48,7 +49,7 @@ func CreateStartedTransactionEntities(
 	var network schema.Network
 	err = network.UnmarshalProto(tokenTransaction.Network)
 	if err != nil {
-		log.Printf("Failed to unmarshal network: %v", err)
+		logger.Error("Failed to unmarshal network", "error", err)
 		return nil, err
 	}
 

@@ -107,7 +107,7 @@ func TestEventRouterConcurrency(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			msg := &pb.SubscribeToEventsResponse{}
-			router.NotifyUser(identityKey, msg) //nolint:errcheck
+			_ = router.NotifyUser(identityKey, msg)
 		}()
 	}
 
@@ -130,7 +130,7 @@ func TestEventRouterLastStreamWins(t *testing.T) {
 	require.NoError(t, err)
 
 	testMsg := &pb.SubscribeToEventsResponse{}
-	router.NotifyUser(identityKey, testMsg) //nolint:errcheck
+	_ = router.NotifyUser(identityKey, testMsg)
 
 	if len(stream1.messages) > 0 || len(stream2.messages) > 0 {
 		t.Error("Previous streams should not receive messages")

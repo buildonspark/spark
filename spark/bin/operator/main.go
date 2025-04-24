@@ -7,7 +7,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"log"
+	"log" //nolint:depguard
 	"log/slog"
 	"net"
 	"net/http"
@@ -180,8 +180,6 @@ func loadArgs() (*args, error) {
 		return nil, errors.New("database path is required")
 	}
 
-	log.Printf("args: %+v", args)
-
 	return args, nil
 }
 
@@ -279,11 +277,11 @@ func main() {
 				log.Fatalf("Failed to watch %s chain: %v", network, err)
 			}
 		}()
-		log.Printf("Watching %s chain\n", network)
+		slog.Info("Watching chain", "network", network)
 	}
 
 	if !args.RunningLocally {
-		log.Printf("Starting scheduler")
+		slog.Info("Starting scheduler")
 		s, err := gocron.NewScheduler()
 		if err != nil {
 			log.Fatalf("Failed to create scheduler: %v", err)
@@ -355,7 +353,7 @@ func main() {
 		})
 		serverOpts = append(serverOpts, grpc.Creds(creds))
 		grpcServer = grpc.NewServer(serverOpts...)
-		log.Printf("Server starting with TLS on: %v", args.ServerCertPath)
+		slog.Info(fmt.Sprintf("Server starting with TLS on: %v", args.ServerCertPath))
 		tlsConfig = &tls.Config{
 			Certificates: []tls.Certificate{cert},
 			MinVersion:   tls.VersionTLS12,
@@ -428,7 +426,7 @@ func main() {
 			TLSConfig: tlsConfig,
 		}
 
-		log.Printf("Serving on port %d (TLS)\n", args.Port)
+		slog.Info(fmt.Sprintf("Serving on port %d (TLS)", args.Port))
 		if err := server.ListenAndServeTLS(args.ServerCertPath, args.ServerKeyPath); err != nil {
 			log.Fatalf("Failed to serve: %v", err)
 		}
@@ -438,7 +436,7 @@ func main() {
 			log.Fatalf("Failed to listen: %v", err)
 		}
 
-		log.Printf("Serving on port %d (non-TLS)\n", args.Port)
+		slog.Info(fmt.Sprintf("Serving on port %d (non-TLS)", args.Port))
 		if err := grpcServer.Serve(lis); err != nil {
 			log.Fatalf("Failed to serve: %v", err)
 		}
@@ -449,6 +447,6 @@ func runDKGOnStartup(dbClient *ent.Client, config *so.Config) {
 	time.Sleep(5 * time.Second)
 	err := ent.RunDKGIfNeeded(dbClient, config)
 	if err != nil {
-		log.Printf("Failed to run DKG: %v", err)
+		slog.Error("Failed to run DKG", "error", err)
 	}
 }
