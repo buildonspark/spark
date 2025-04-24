@@ -29,13 +29,11 @@ require (
 	github.com/pebbe/zmq4 v1.2.11
 	github.com/prometheus/client_golang v1.21.1
 	github.com/sethvargo/go-limiter v1.0.0
-	github.com/sirupsen/logrus v1.9.2
 	github.com/stretchr/testify v1.10.0
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.60.0
 	go.opentelemetry.io/otel v1.35.0
 	go.opentelemetry.io/otel/exporters/prometheus v0.57.0
 	go.opentelemetry.io/otel/sdk/metric v1.35.0
-	golang.org/x/time v0.6.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -131,7 +129,7 @@ require (
 	go.opentelemetry.io/otel/metric v1.35.0 // indirect
 	go.opentelemetry.io/otel/sdk v1.35.0 // indirect
 	go.opentelemetry.io/otel/trace v1.35.0 // indirect
-	golang.org/x/crypto v0.33.0 // indirect
+	golang.org/x/crypto v0.35.0 // indirect
 	golang.org/x/exp v0.0.0-20250128182459-e0ece0dbea4c // indirect
 	golang.org/x/mod v0.23.0 // indirect
 	golang.org/x/sync v0.11.0 // indirect
