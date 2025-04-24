@@ -42,7 +42,7 @@ func GetSigningNonceFromCommitment(ctx context.Context, _ *so.Config, commitment
 }
 
 // GetSigningNonces returns the signing nonces associated with the given commitments.
-func GetSigningNonces(ctx context.Context, _ *so.Config, commitments []objects.SigningCommitment) (map[[66]byte]*objects.SigningNonce, error) {
+func GetSigningNonces(ctx context.Context, _ *so.Config, commitments []objects.SigningCommitment) (map[[66]byte]*SigningNonce, error) {
 	commitmentBytes := make([][]byte, len(commitments))
 	for i, commitment := range commitments {
 		commitmentBytes[i] = commitment.MarshalBinary()
@@ -52,14 +52,9 @@ func GetSigningNonces(ctx context.Context, _ *so.Config, commitments []objects.S
 		return nil, err
 	}
 
-	result := make(map[[66]byte]*objects.SigningNonce)
+	result := make(map[[66]byte]*SigningNonce)
 	for _, nonce := range noncesResult {
-		signingNonce := objects.SigningNonce{}
-		err = signingNonce.UnmarshalBinary(nonce.Nonce)
-		if err != nil {
-			return nil, err
-		}
-		result[[66]byte(nonce.NonceCommitment)] = &signingNonce
+		result[[66]byte(nonce.NonceCommitment)] = nonce
 	}
 	return result, nil
 }

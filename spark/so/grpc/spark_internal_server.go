@@ -1,7 +1,10 @@
 package grpc
 
 import (
+	"bytes"
 	"context"
+	"encoding/hex"
+	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark-go/common"
@@ -160,7 +163,24 @@ func (s *SparkInternalServer) FrostRound2(ctx context.Context, req *pb.FrostRoun
 		if err != nil {
 			return nil, err
 		}
-		nonceProto, err := nonces[commitment.Key()].MarshalProto()
+		nonceEnt := nonces[commitment.Key()]
+		// TODO(zhenlu): Add a test for this (LIG-7596).
+		if len(nonceEnt.Message) > 0 {
+			if !bytes.Equal(nonceEnt.Message, job.Message) {
+				return nil, fmt.Errorf("this signing nonce is already used for a different message %s, cannot use it for this message %s", hex.EncodeToString(nonceEnt.Message), hex.EncodeToString(job.Message))
+			}
+		} else {
+			_, err = nonceEnt.Update().SetMessage(job.Message).Save(ctx)
+			if err != nil {
+				return nil, err
+			}
+		}
+		nonceObject := objects.SigningNonce{}
+		err = nonceObject.UnmarshalBinary(nonceEnt.Nonce)
+		if err != nil {
+			return nil, err
+		}
+		nonceProto, err := nonceObject.MarshalProto()
 		if err != nil {
 			return nil, err
 		}
