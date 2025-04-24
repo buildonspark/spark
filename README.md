@@ -139,9 +139,9 @@ host    all       all   ::1/128      trust
 
 ##### minikube
 
-See: [ops/minikube/README.md](https://github.com/lightsparkdev/ops/blob/main/minikube/README.md)
+See: [spark/minikube/README.md](https://github.com/lightsparkdev/spark/blob/main/minikube/README.md)
 
-Please run: `ops/minikube/setup.sh`, then `./scripts/local-test.sh`. If want to make local code changes visible in minikube, you'll need to
+Please run: `spark/minikube/setup.sh`, then `./scripts/local-test.sh`. If want to make local code changes visible in minikube, you'll need to
 
 ```
 # 1. Build the image
