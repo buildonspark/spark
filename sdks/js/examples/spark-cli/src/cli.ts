@@ -387,9 +387,14 @@ async function runCLI() {
           console.log("Please initialize a wallet first");
           break;
         }
+        let maxFeeSats = parseInt(args[1]);
+        if (isNaN(maxFeeSats)) {
+          console.log("Invalid maxFeeSats value");
+          break;
+        }
         const payment = await wallet.payLightningInvoice({
           invoice: args[0],
-          maxFeeSats: parseInt(args[1]),
+          maxFeeSats: maxFeeSats,
         });
         console.log(payment);
         break;
