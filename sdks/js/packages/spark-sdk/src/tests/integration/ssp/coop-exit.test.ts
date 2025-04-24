@@ -6,7 +6,7 @@ const DEPOSIT_AMOUNT = 10_000n;
 
 describe("SSP coop exit integration", () => {
   it("should estimate coop exit fee", async () => {
-    const faucet = new BitcoinFaucet();
+    const faucet = BitcoinFaucet.getInstance();
 
     const { wallet: userWallet } = await SparkWalletTesting.initialize({
       options: {

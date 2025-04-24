@@ -20,7 +20,7 @@ import { NetworkType } from "../../utils/network.js";
 describe("Transfer", () => {
   jest.setTimeout(15_000);
   it("test transfer", async () => {
-    const faucet = new BitcoinFaucet();
+    const faucet = BitcoinFaucet.getInstance();
 
     const options: ConfigOptions = {
       network: "LOCAL",
@@ -130,7 +130,7 @@ describe("Transfer", () => {
   }, 30000);
 
   it("test transfer with separate", async () => {
-    const faucet = new BitcoinFaucet();
+    const faucet = BitcoinFaucet.getInstance();
 
     const options: ConfigOptions = {
       network: "LOCAL",
@@ -259,7 +259,7 @@ describe("Transfer", () => {
   });
 
   it("cancel transfer", async () => {
-    const faucet = new BitcoinFaucet();
+    const faucet = BitcoinFaucet.getInstance();
 
     const options: ConfigOptions = {
       network: "LOCAL",

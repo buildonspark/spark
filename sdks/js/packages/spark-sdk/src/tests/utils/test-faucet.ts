@@ -4,15 +4,24 @@ import * as btc from "@scure/btc-signer";
 import { SigHash, Transaction } from "@scure/btc-signer";
 import { TransactionInput, TransactionOutput } from "@scure/btc-signer/psbt";
 import { taprootTweakPrivKey } from "@scure/btc-signer/utils";
+import { RPCError } from "../../errors/index.js";
 import {
   getP2TRAddressFromPublicKey,
   getP2TRScriptFromPublicKey,
 } from "../../utils/bitcoin.js";
 import { getNetwork, Network } from "../../utils/network.js";
-import { SparkWallet } from "../../spark-wallet.js";
-import { sha256 } from "@noble/hashes/sha256";
-import { ripemd160 } from "@noble/hashes/ripemd160";
-import { RPCError } from "../../errors/index.js";
+
+// Static keys for deterministic testing
+// P2TRAddress: bcrt1p2uy9zw5ltayucsuzl4tet6ckelzawp08qrtunacscsszflye907q62uqhl
+const STATIC_FAUCET_KEY = hexToBytes(
+  "deadbeef1337cafe4242424242424242deadbeef1337cafe4242424242424242",
+);
+
+// P2TRAddress: bcrt1pwr5k38p68ceyrnm2tvrp50dvmg3grh6uvayjl3urwtxejhd3dw4swz6p58
+const STATIC_MINING_KEY = hexToBytes(
+  "1337cafe4242deadbeef4242424242421337cafe4242deadbeef424242424242",
+);
+const SATS_PER_BTC = 100_000_000;
 
 export type FaucetCoin = {
   key: Uint8Array;
@@ -23,99 +32,160 @@ export type FaucetCoin = {
 // The amount of satoshis to put in each faucet coin to be used in tests
 const COIN_AMOUNT = 10_000_000n;
 const FEE_AMOUNT = 1000n;
+const TARGET_NUM_COINS = 20;
 
 export class BitcoinFaucet {
   private coins: FaucetCoin[] = [];
   private static instance: BitcoinFaucet | null = null;
+  private miningAddress: string;
+  private lock: Promise<void> = Promise.resolve();
 
-  constructor(
+  private constructor(
     private url: string = "http://127.0.0.1:8332",
     private username: string = "testutil",
     private password: string = "testutilpassword",
   ) {
-    if (BitcoinFaucet.instance) {
-      return BitcoinFaucet.instance;
-    }
-
-    BitcoinFaucet.instance = this;
-  }
-
-  async fund() {
-    // If no coins available, refill the faucet
-    if (this.coins.length === 0) {
-      await this.refill();
-    }
-
-    // Take the first coin from the faucet
-    const coin = this.coins[0];
-    // Remove the used coin from the array
-    this.coins = this.coins.slice(1);
-
-    return coin;
-  }
-
-  async refill() {
-    // Generate key for initial block reward
-    const key = secp256k1.utils.randomPrivateKey();
-    const pubKey = secp256k1.getPublicKey(key);
-    const address = getP2TRAddressFromPublicKey(pubKey, Network.LOCAL);
-
-    // Mine a block to this address
-    const blockHash = await this.generateToAddress(1, address);
-
-    // Get block and funding transaction
-    const block = await this.getBlock(blockHash[0]);
-    const fundingTx = Transaction.fromRaw(hexToBytes(block.tx[0].hex), {
-      allowUnknownOutputs: true,
-    });
-
-    // Mine 100 blocks to make funds spendable
-    const randomKey = secp256k1.utils.randomPrivateKey();
-    const randomPubKey = secp256k1.getPublicKey(randomKey);
-    const randomAddress = getP2TRAddressFromPublicKey(
-      randomPubKey,
+    this.miningAddress = getP2TRAddressFromPublicKey(
+      secp256k1.getPublicKey(STATIC_MINING_KEY),
       Network.LOCAL,
     );
-    await this.generateToAddress(100, randomAddress);
+  }
 
-    const fundingTxId = block.tx[0].txid;
-    const fundingOutpoint: TransactionInput = {
-      txid: fundingTxId,
-      index: 0,
-    };
+  static getInstance(
+    url: string = "http://127.0.0.1:8332",
+    username: string = "testutil",
+    password: string = "testutilpassword",
+  ): BitcoinFaucet {
+    if (!BitcoinFaucet.instance) {
+      BitcoinFaucet.instance = new BitcoinFaucet(url, username, password);
+    }
+    return BitcoinFaucet.instance;
+  }
+
+  private async withLock<T>(operation: () => Promise<T>): Promise<T> {
+    const current = this.lock;
+    let resolve: () => void;
+    this.lock = new Promise<void>((r) => (resolve = r));
+    await current;
+    try {
+      return await operation();
+    } finally {
+      resolve!();
+    }
+  }
+
+  async fund(): Promise<FaucetCoin> {
+    return this.withLock(async () => {
+      if (this.coins.length === 0) {
+        await this.refill();
+      }
+
+      const coin = this.coins[0];
+      if (!coin) {
+        throw new Error("Failed to get coin from faucet");
+      }
+      this.coins = this.coins.slice(1);
+      return coin;
+    });
+  }
+
+  private async refill(): Promise<void> {
+    const minerPubKey = secp256k1.getPublicKey(STATIC_MINING_KEY);
+    const address = getP2TRAddressFromPublicKey(minerPubKey, Network.LOCAL);
+
+    // Use scantxoutset to find UTXOs
+    const scanResult = await this.call("scantxoutset", [
+      "start",
+      [`addr(${address})`],
+    ]);
+
+    let selectedUtxo;
+    let selectedUtxoAmountSats;
+    if (!scanResult.success || scanResult.unspents.length === 0) {
+      const blockHash = await this.generateToAddress(1, address);
+      const block = await this.getBlock(blockHash[0]);
+      const fundingTx = Transaction.fromRaw(hexToBytes(block.tx[0].hex), {
+        allowUnknownOutputs: true,
+      });
+
+      await this.generateToAddress(100, this.miningAddress);
+
+      selectedUtxo = {
+        txid: block.tx[0].txid,
+        vout: 0,
+        amount: fundingTx.getOutput(0)!.amount!, // Already in sats
+      };
+      selectedUtxoAmountSats = BigInt(selectedUtxo.amount);
+    } else {
+      selectedUtxo = scanResult.unspents.find((utxo) => {
+        const isValueEnough =
+          BigInt(Math.floor(utxo.amount * SATS_PER_BTC)) >=
+          COIN_AMOUNT + FEE_AMOUNT;
+        const isMature = scanResult.height - utxo.height >= 100;
+        return isValueEnough && isMature;
+      });
+
+      if (!selectedUtxo) {
+        throw new Error("No UTXO large enough to create even one faucet coin");
+      }
+      selectedUtxoAmountSats = BigInt(
+        Math.floor(selectedUtxo.amount * SATS_PER_BTC),
+      );
+    }
+
+    const maxPossibleCoins = Number(
+      (selectedUtxoAmountSats - FEE_AMOUNT) / COIN_AMOUNT,
+    );
+    const numCoinsToCreate = Math.min(maxPossibleCoins, TARGET_NUM_COINS);
+
+    if (numCoinsToCreate < 1) {
+      throw new Error(
+        `Selected UTXO (${selectedUtxoAmountSats} sats) is too small to create even one faucet coin of ${COIN_AMOUNT} sats`,
+      );
+    }
 
     const splitTx = new Transaction();
-    splitTx.addInput(fundingOutpoint);
-    let initialValue = fundingTx.getOutput(0)!.amount!;
-    const coinKeys: Uint8Array[] = [];
+    splitTx.addInput({
+      txid: selectedUtxo.txid,
+      index: selectedUtxo.vout,
+    });
 
-    while (initialValue > COIN_AMOUNT + 100_000n) {
-      const coinKey = secp256k1.utils.randomPrivateKey();
-      const coinPubKey = secp256k1.getPublicKey(coinKey);
-      coinKeys.push(coinKey);
-
-      const script = getP2TRScriptFromPublicKey(coinPubKey, Network.LOCAL);
+    const faucetPubKey = secp256k1.getPublicKey(STATIC_FAUCET_KEY);
+    const script = getP2TRScriptFromPublicKey(faucetPubKey, Network.LOCAL);
+    for (let i = 0; i < numCoinsToCreate; i++) {
       splitTx.addOutput({
         script,
         amount: COIN_AMOUNT,
       });
-      initialValue -= COIN_AMOUNT;
     }
-    // Sign and broadcast
+
+    const remainingValue =
+      selectedUtxoAmountSats -
+      COIN_AMOUNT * BigInt(numCoinsToCreate) -
+      FEE_AMOUNT;
+    const minerScript = getP2TRScriptFromPublicKey(minerPubKey, Network.LOCAL);
+    if (remainingValue > 0n) {
+      splitTx.addOutput({
+        script: minerScript,
+        amount: remainingValue,
+      });
+    }
+
     const signedSplitTx = await this.signFaucetCoin(
       splitTx,
-      fundingTx.getOutput(0)!,
-      key,
+      {
+        amount: selectedUtxoAmountSats,
+        script: minerScript,
+      },
+      STATIC_MINING_KEY,
     );
 
     await this.broadcastTx(bytesToHex(signedSplitTx.extract()));
 
-    // Create faucet coins
     const splitTxId = signedSplitTx.id;
-    for (let i = 0; i < signedSplitTx.outputsLength; i++) {
+    for (let i = 0; i < numCoinsToCreate; i++) {
       this.coins.push({
-        // @ts-ignore - It's a test file
-        key: coinKeys[i],
+        key: STATIC_FAUCET_KEY,
         outpoint: {
           txid: hexToBytes(splitTxId),
           index: i,
@@ -207,14 +277,7 @@ export class BitcoinFaucet {
   // MineBlocks mines the specified number of blocks to a random address
   // and returns the block hashes.
   async mineBlocks(numBlocks: number) {
-    // Mine 100 blocks to make funds spendable
-    const randomKey = secp256k1.utils.randomPrivateKey();
-    const randomPubKey = secp256k1.getPublicKey(randomKey);
-    const randomAddress = getP2TRAddressFromPublicKey(
-      randomPubKey,
-      Network.LOCAL,
-    );
-    return await this.generateToAddress(numBlocks, randomAddress);
+    return await this.generateToAddress(numBlocks, this.miningAddress);
   }
 
   private async call(method: string, params: any[]) {

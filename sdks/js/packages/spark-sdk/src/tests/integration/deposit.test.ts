@@ -5,7 +5,6 @@ import { getTxId } from "../../utils/bitcoin.js";
 import { getNetwork, Network } from "../../utils/network.js";
 import { SparkWalletTesting } from "../utils/spark-testing-wallet.js";
 import { BitcoinFaucet } from "../utils/test-faucet.js";
-
 describe("deposit", () => {
   it("should generate a deposit address", async () => {
     const { wallet: sdk } = await SparkWalletTesting.initialize({
@@ -20,7 +19,7 @@ describe("deposit", () => {
   }, 30000);
 
   it("should create a tree root", async () => {
-    const faucet = new BitcoinFaucet();
+    const faucet = BitcoinFaucet.getInstance();
 
     const { wallet: sdk } = await SparkWalletTesting.initialize({
       options: {
@@ -41,7 +40,7 @@ describe("deposit", () => {
   }, 30000);
 
   it("should restart wallet and recover signing private key", async () => {
-    const faucet = new BitcoinFaucet();
+    const faucet = BitcoinFaucet.getInstance();
 
     const { wallet: sdk, mnemonic } = await SparkWalletTesting.initialize({
       options: {
@@ -71,7 +70,7 @@ describe("deposit", () => {
   }, 30000);
 
   it("should handle non-trusty deposit", async () => {
-    const faucet = new BitcoinFaucet();
+    const faucet = BitcoinFaucet.getInstance();
 
     const { wallet: sdk } = await SparkWalletTesting.initialize({
       options: {
@@ -128,7 +127,7 @@ describe("deposit", () => {
   }, 30000);
 
   it("should handle single tx with multiple outputs to unused deposit addresses", async () => {
-    const faucet = new BitcoinFaucet();
+    const faucet = BitcoinFaucet.getInstance();
 
     const { wallet: sdk } = await SparkWalletTesting.initialize({
       options: {

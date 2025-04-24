@@ -141,7 +141,7 @@ describe("LightningService", () => {
   brokenTestFn(
     "test receive lightning payment",
     async () => {
-      const faucet = new BitcoinFaucet();
+      const faucet = BitcoinFaucet.getInstance();
 
       const preimage = hexToBytes(
         "2d059c3ede82a107aa1452c0bea47759be3c5c6e5342be6a310f6c3a907d9f4c",
@@ -239,7 +239,7 @@ describe("LightningService", () => {
   brokenTestFn(
     "test send lightning payment",
     async () => {
-      const faucet = new BitcoinFaucet();
+      const faucet = BitcoinFaucet.getInstance();
 
       const preimage = hexToBytes(
         "2d059c3ede82a107aa1452c0bea47759be3c5c6e5342be6a310f6c3a907d9f4c",

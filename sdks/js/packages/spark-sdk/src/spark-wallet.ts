@@ -871,7 +871,7 @@ export class SparkWallet {
       let txHex: string | undefined;
 
       if (this.config.getNetwork() === Network.LOCAL) {
-        const localFaucet = new BitcoinFaucet();
+        const localFaucet = BitcoinFaucet.getInstance();
         const response = await localFaucet.getRawTransaction(txid);
         txHex = response.hex;
       } else {

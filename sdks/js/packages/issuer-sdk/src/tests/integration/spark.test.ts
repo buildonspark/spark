@@ -45,7 +45,7 @@ describe("token integration test", () => {
 
     // Faucet funds to the Issuer wallet because announcing a token
     // requires ownership of an L1 UTXO.
-    const faucet = new BitcoinFaucet();
+    const faucet = BitcoinFaucet.getInstance();
     const l1WalletPubKey = await wallet.getIdentityPublicKey();
     await faucet.sendFaucetCoinToP2WPKHAddress(hexToBytes(l1WalletPubKey));
     await faucet.mineBlocks(6);

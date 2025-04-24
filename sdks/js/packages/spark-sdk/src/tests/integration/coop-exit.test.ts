@@ -25,7 +25,7 @@ describe("coop exit", () => {
   brokenTestFn(
     "test coop exit",
     async () => {
-      const faucet = new BitcoinFaucet();
+      const faucet = BitcoinFaucet.getInstance();
 
       const faucetCoin = await faucet.fund();
 
