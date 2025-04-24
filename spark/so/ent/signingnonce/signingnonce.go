@@ -22,6 +22,8 @@ const (
 	FieldNonce = "nonce"
 	// FieldNonceCommitment holds the string denoting the nonce_commitment field in the database.
 	FieldNonceCommitment = "nonce_commitment"
+	// FieldMessage holds the string denoting the message field in the database.
+	FieldMessage = "message"
 	// Table holds the table name of the signingnonce in the database.
 	Table = "signing_nonces"
 )
@@ -33,6 +35,7 @@ var Columns = []string{
 	FieldUpdateTime,
 	FieldNonce,
 	FieldNonceCommitment,
+	FieldMessage,
 }
 
 // ValidColumn reports if the column name is valid (part of the table columns).

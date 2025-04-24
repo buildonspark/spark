@@ -34,6 +34,18 @@ func (snu *SigningNonceUpdate) SetUpdateTime(t time.Time) *SigningNonceUpdate {
 	return snu
 }
 
+// SetMessage sets the "message" field.
+func (snu *SigningNonceUpdate) SetMessage(b []byte) *SigningNonceUpdate {
+	snu.mutation.SetMessage(b)
+	return snu
+}
+
+// ClearMessage clears the value of the "message" field.
+func (snu *SigningNonceUpdate) ClearMessage() *SigningNonceUpdate {
+	snu.mutation.ClearMessage()
+	return snu
+}
+
 // Mutation returns the SigningNonceMutation object of the builder.
 func (snu *SigningNonceUpdate) Mutation() *SigningNonceMutation {
 	return snu.mutation
@@ -87,6 +99,12 @@ func (snu *SigningNonceUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if value, ok := snu.mutation.UpdateTime(); ok {
 		_spec.SetField(signingnonce.FieldUpdateTime, field.TypeTime, value)
 	}
+	if value, ok := snu.mutation.Message(); ok {
+		_spec.SetField(signingnonce.FieldMessage, field.TypeBytes, value)
+	}
+	if snu.mutation.MessageCleared() {
+		_spec.ClearField(signingnonce.FieldMessage, field.TypeBytes)
+	}
 	if n, err = sqlgraph.UpdateNodes(ctx, snu.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{signingnonce.Label}
@@ -110,6 +128,18 @@ type SigningNonceUpdateOne struct {
 // SetUpdateTime sets the "update_time" field.
 func (snuo *SigningNonceUpdateOne) SetUpdateTime(t time.Time) *SigningNonceUpdateOne {
 	snuo.mutation.SetUpdateTime(t)
+	return snuo
+}
+
+// SetMessage sets the "message" field.
+func (snuo *SigningNonceUpdateOne) SetMessage(b []byte) *SigningNonceUpdateOne {
+	snuo.mutation.SetMessage(b)
+	return snuo
+}
+
+// ClearMessage clears the value of the "message" field.
+func (snuo *SigningNonceUpdateOne) ClearMessage() *SigningNonceUpdateOne {
+	snuo.mutation.ClearMessage()
 	return snuo
 }
 
@@ -195,6 +225,12 @@ func (snuo *SigningNonceUpdateOne) sqlSave(ctx context.Context) (_node *SigningN
 	}
 	if value, ok := snuo.mutation.UpdateTime(); ok {
 		_spec.SetField(signingnonce.FieldUpdateTime, field.TypeTime, value)
+	}
+	if value, ok := snuo.mutation.Message(); ok {
+		_spec.SetField(signingnonce.FieldMessage, field.TypeBytes, value)
+	}
+	if snuo.mutation.MessageCleared() {
+		_spec.ClearField(signingnonce.FieldMessage, field.TypeBytes)
 	}
 	_node = &SigningNonce{config: snuo.config}
 	_spec.Assign = _node.assignValues

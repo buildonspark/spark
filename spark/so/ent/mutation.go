@@ -4543,6 +4543,7 @@ type SigningNonceMutation struct {
 	update_time      *time.Time
 	nonce            *[]byte
 	nonce_commitment *[]byte
+	message          *[]byte
 	clearedFields    map[string]struct{}
 	done             bool
 	oldValue         func(context.Context) (*SigningNonce, error)
@@ -4797,6 +4798,55 @@ func (m *SigningNonceMutation) ResetNonceCommitment() {
 	m.nonce_commitment = nil
 }
 
+// SetMessage sets the "message" field.
+func (m *SigningNonceMutation) SetMessage(b []byte) {
+	m.message = &b
+}
+
+// Message returns the value of the "message" field in the mutation.
+func (m *SigningNonceMutation) Message() (r []byte, exists bool) {
+	v := m.message
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldMessage returns the old "message" field's value of the SigningNonce entity.
+// If the SigningNonce object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SigningNonceMutation) OldMessage(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldMessage is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldMessage requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldMessage: %w", err)
+	}
+	return oldValue.Message, nil
+}
+
+// ClearMessage clears the value of the "message" field.
+func (m *SigningNonceMutation) ClearMessage() {
+	m.message = nil
+	m.clearedFields[signingnonce.FieldMessage] = struct{}{}
+}
+
+// MessageCleared returns if the "message" field was cleared in this mutation.
+func (m *SigningNonceMutation) MessageCleared() bool {
+	_, ok := m.clearedFields[signingnonce.FieldMessage]
+	return ok
+}
+
+// ResetMessage resets all changes to the "message" field.
+func (m *SigningNonceMutation) ResetMessage() {
+	m.message = nil
+	delete(m.clearedFields, signingnonce.FieldMessage)
+}
+
 // Where appends a list predicates to the SigningNonceMutation builder.
 func (m *SigningNonceMutation) Where(ps ...predicate.SigningNonce) {
 	m.predicates = append(m.predicates, ps...)
@@ -4831,7 +4881,7 @@ func (m *SigningNonceMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *SigningNonceMutation) Fields() []string {
-	fields := make([]string, 0, 4)
+	fields := make([]string, 0, 5)
 	if m.create_time != nil {
 		fields = append(fields, signingnonce.FieldCreateTime)
 	}
@@ -4843,6 +4893,9 @@ func (m *SigningNonceMutation) Fields() []string {
 	}
 	if m.nonce_commitment != nil {
 		fields = append(fields, signingnonce.FieldNonceCommitment)
+	}
+	if m.message != nil {
+		fields = append(fields, signingnonce.FieldMessage)
 	}
 	return fields
 }
@@ -4860,6 +4913,8 @@ func (m *SigningNonceMutation) Field(name string) (ent.Value, bool) {
 		return m.Nonce()
 	case signingnonce.FieldNonceCommitment:
 		return m.NonceCommitment()
+	case signingnonce.FieldMessage:
+		return m.Message()
 	}
 	return nil, false
 }
@@ -4877,6 +4932,8 @@ func (m *SigningNonceMutation) OldField(ctx context.Context, name string) (ent.V
 		return m.OldNonce(ctx)
 	case signingnonce.FieldNonceCommitment:
 		return m.OldNonceCommitment(ctx)
+	case signingnonce.FieldMessage:
+		return m.OldMessage(ctx)
 	}
 	return nil, fmt.Errorf("unknown SigningNonce field %s", name)
 }
@@ -4914,6 +4971,13 @@ func (m *SigningNonceMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetNonceCommitment(v)
 		return nil
+	case signingnonce.FieldMessage:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetMessage(v)
+		return nil
 	}
 	return fmt.Errorf("unknown SigningNonce field %s", name)
 }
@@ -4943,7 +5007,11 @@ func (m *SigningNonceMutation) AddField(name string, value ent.Value) error {
 // ClearedFields returns all nullable fields that were cleared during this
 // mutation.
 func (m *SigningNonceMutation) ClearedFields() []string {
-	return nil
+	var fields []string
+	if m.FieldCleared(signingnonce.FieldMessage) {
+		fields = append(fields, signingnonce.FieldMessage)
+	}
+	return fields
 }
 
 // FieldCleared returns a boolean indicating if a field with the given name was
@@ -4956,6 +5024,11 @@ func (m *SigningNonceMutation) FieldCleared(name string) bool {
 // ClearField clears the value of the field with the given name. It returns an
 // error if the field is not defined in the schema.
 func (m *SigningNonceMutation) ClearField(name string) error {
+	switch name {
+	case signingnonce.FieldMessage:
+		m.ClearMessage()
+		return nil
+	}
 	return fmt.Errorf("unknown SigningNonce nullable field %s", name)
 }
 
@@ -4974,6 +5047,9 @@ func (m *SigningNonceMutation) ResetField(name string) error {
 		return nil
 	case signingnonce.FieldNonceCommitment:
 		m.ResetNonceCommitment()
+		return nil
+	case signingnonce.FieldMessage:
+		m.ResetMessage()
 		return nil
 	}
 	return fmt.Errorf("unknown SigningNonce field %s", name)

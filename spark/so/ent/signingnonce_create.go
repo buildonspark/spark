@@ -61,6 +61,12 @@ func (snc *SigningNonceCreate) SetNonceCommitment(b []byte) *SigningNonceCreate 
 	return snc
 }
 
+// SetMessage sets the "message" field.
+func (snc *SigningNonceCreate) SetMessage(b []byte) *SigningNonceCreate {
+	snc.mutation.SetMessage(b)
+	return snc
+}
+
 // SetID sets the "id" field.
 func (snc *SigningNonceCreate) SetID(u uuid.UUID) *SigningNonceCreate {
 	snc.mutation.SetID(u)
@@ -188,6 +194,10 @@ func (snc *SigningNonceCreate) createSpec() (*SigningNonce, *sqlgraph.CreateSpec
 	if value, ok := snc.mutation.NonceCommitment(); ok {
 		_spec.SetField(signingnonce.FieldNonceCommitment, field.TypeBytes, value)
 		_node.NonceCommitment = value
+	}
+	if value, ok := snc.mutation.Message(); ok {
+		_spec.SetField(signingnonce.FieldMessage, field.TypeBytes, value)
+		_node.Message = value
 	}
 	return _node, _spec
 }

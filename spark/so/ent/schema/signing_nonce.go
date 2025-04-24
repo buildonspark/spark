@@ -32,6 +32,8 @@ func (SigningNonce) Fields() []ent.Field {
 			Immutable(),
 		field.Bytes("nonce_commitment").
 			Immutable(),
+		field.Bytes("message").
+			Optional(),
 	}
 }
 

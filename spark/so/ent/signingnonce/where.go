@@ -75,6 +75,11 @@ func NonceCommitment(v []byte) predicate.SigningNonce {
 	return predicate.SigningNonce(sql.FieldEQ(FieldNonceCommitment, v))
 }
 
+// Message applies equality check predicate on the "message" field. It's identical to MessageEQ.
+func Message(v []byte) predicate.SigningNonce {
+	return predicate.SigningNonce(sql.FieldEQ(FieldMessage, v))
+}
+
 // CreateTimeEQ applies the EQ predicate on the "create_time" field.
 func CreateTimeEQ(v time.Time) predicate.SigningNonce {
 	return predicate.SigningNonce(sql.FieldEQ(FieldCreateTime, v))
@@ -233,6 +238,56 @@ func NonceCommitmentLT(v []byte) predicate.SigningNonce {
 // NonceCommitmentLTE applies the LTE predicate on the "nonce_commitment" field.
 func NonceCommitmentLTE(v []byte) predicate.SigningNonce {
 	return predicate.SigningNonce(sql.FieldLTE(FieldNonceCommitment, v))
+}
+
+// MessageEQ applies the EQ predicate on the "message" field.
+func MessageEQ(v []byte) predicate.SigningNonce {
+	return predicate.SigningNonce(sql.FieldEQ(FieldMessage, v))
+}
+
+// MessageNEQ applies the NEQ predicate on the "message" field.
+func MessageNEQ(v []byte) predicate.SigningNonce {
+	return predicate.SigningNonce(sql.FieldNEQ(FieldMessage, v))
+}
+
+// MessageIn applies the In predicate on the "message" field.
+func MessageIn(vs ...[]byte) predicate.SigningNonce {
+	return predicate.SigningNonce(sql.FieldIn(FieldMessage, vs...))
+}
+
+// MessageNotIn applies the NotIn predicate on the "message" field.
+func MessageNotIn(vs ...[]byte) predicate.SigningNonce {
+	return predicate.SigningNonce(sql.FieldNotIn(FieldMessage, vs...))
+}
+
+// MessageGT applies the GT predicate on the "message" field.
+func MessageGT(v []byte) predicate.SigningNonce {
+	return predicate.SigningNonce(sql.FieldGT(FieldMessage, v))
+}
+
+// MessageGTE applies the GTE predicate on the "message" field.
+func MessageGTE(v []byte) predicate.SigningNonce {
+	return predicate.SigningNonce(sql.FieldGTE(FieldMessage, v))
+}
+
+// MessageLT applies the LT predicate on the "message" field.
+func MessageLT(v []byte) predicate.SigningNonce {
+	return predicate.SigningNonce(sql.FieldLT(FieldMessage, v))
+}
+
+// MessageLTE applies the LTE predicate on the "message" field.
+func MessageLTE(v []byte) predicate.SigningNonce {
+	return predicate.SigningNonce(sql.FieldLTE(FieldMessage, v))
+}
+
+// MessageIsNil applies the IsNil predicate on the "message" field.
+func MessageIsNil() predicate.SigningNonce {
+	return predicate.SigningNonce(sql.FieldIsNull(FieldMessage))
+}
+
+// MessageNotNil applies the NotNil predicate on the "message" field.
+func MessageNotNil() predicate.SigningNonce {
+	return predicate.SigningNonce(sql.FieldNotNull(FieldMessage))
 }
 
 // And groups predicates with the AND operator between them.

@@ -26,7 +26,9 @@ type SigningNonce struct {
 	Nonce []byte `json:"nonce,omitempty"`
 	// NonceCommitment holds the value of the "nonce_commitment" field.
 	NonceCommitment []byte `json:"nonce_commitment,omitempty"`
-	selectValues    sql.SelectValues
+	// Message holds the value of the "message" field.
+	Message      []byte `json:"message,omitempty"`
+	selectValues sql.SelectValues
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -34,7 +36,7 @@ func (*SigningNonce) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case signingnonce.FieldNonce, signingnonce.FieldNonceCommitment:
+		case signingnonce.FieldNonce, signingnonce.FieldNonceCommitment, signingnonce.FieldMessage:
 			values[i] = new([]byte)
 		case signingnonce.FieldCreateTime, signingnonce.FieldUpdateTime:
 			values[i] = new(sql.NullTime)
@@ -85,6 +87,12 @@ func (sn *SigningNonce) assignValues(columns []string, values []any) error {
 			} else if value != nil {
 				sn.NonceCommitment = *value
 			}
+		case signingnonce.FieldMessage:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field message", values[i])
+			} else if value != nil {
+				sn.Message = *value
+			}
 		default:
 			sn.selectValues.Set(columns[i], values[i])
 		}
@@ -132,6 +140,9 @@ func (sn *SigningNonce) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("nonce_commitment=")
 	builder.WriteString(fmt.Sprintf("%v", sn.NonceCommitment))
+	builder.WriteString(", ")
+	builder.WriteString("message=")
+	builder.WriteString(fmt.Sprintf("%v", sn.Message))
 	builder.WriteByte(')')
 	return builder.String()
 }
