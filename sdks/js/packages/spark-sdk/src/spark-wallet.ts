@@ -106,6 +106,7 @@ export type CreateLightningInvoiceParams = {
 
 export type PayLightningInvoiceParams = {
   invoice: string;
+  maxFeeSats: number;
 };
 
 export type TransferParams = {
@@ -1472,15 +1473,16 @@ export class SparkWallet {
    * @param {string} params.invoice - The BOLT11-encoded Lightning invoice to pay
    * @returns {Promise<LightningSendRequest>} The Lightning payment request details
    */
-  public async payLightningInvoice({ invoice }: PayLightningInvoiceParams) {
+  public async payLightningInvoice({
+    invoice,
+    maxFeeSats,
+  }: PayLightningInvoiceParams) {
     return await this.withLeaves(async () => {
       if (!this.sspClient) {
         throw new ConfigurationError("SSP client not initialized", {
           configKey: "sspClient",
         });
       }
-
-      // TODO: Get fee
 
       const decodedInvoice = decode(invoice);
       const amountSats =
@@ -1507,7 +1509,54 @@ export class SparkWallet {
         });
       }
 
-      const leaves = await this.selectLeaves(amountSats);
+      const feeEstimate = await this.getLightningSendFeeEstimate({
+        encodedInvoice: invoice,
+      });
+
+      if (!feeEstimate) {
+        throw new ValidationError("Failed to get lightning send fee estimate", {
+          field: "feeEstimate",
+          value: feeEstimate,
+          expected: "non-null",
+        });
+      }
+
+      if (maxFeeSats * 1000 < feeEstimate.feeEstimate.originalValue) {
+        throw new ValidationError("maxFeeSats does not cover fee estimate", {
+          field: "maxFeeSats",
+          value: maxFeeSats,
+          expected: `${Math.ceil(feeEstimate.feeEstimate.originalValue / 1000)} sats`,
+        });
+      }
+
+      const totalAmount = amountSats + maxFeeSats;
+
+      if (
+        totalAmount > this.leaves.reduce((acc, leaf) => acc + leaf.value, 0)
+      ) {
+        throw new ValidationError("Insufficient balance", {
+          field: "balance",
+          value: this.leaves.reduce((acc, leaf) => acc + leaf.value, 0),
+          expected: `${totalAmount} sats`,
+        });
+      }
+
+      let leaves: TreeNode[] | undefined;
+      try {
+        leaves = await this.selectLeaves(totalAmount);
+      } catch (error) {
+        console.error(error);
+
+        const balance = this.leaves.reduce((acc, leaf) => acc + leaf.value, 0);
+        throw new ValidationError(
+          `Balance does not cover invoice amount and fee. Need ${amountSats + feeEstimate.feeEstimate.originalValue} sats, but only have ${balance} sats`,
+          {
+            field: "balance",
+            value: balance,
+            expected: `${amountSats + feeEstimate.feeEstimate.originalValue} sats`,
+          },
+        );
+      }
 
       await this.refreshTimelockNodes();
       await this.extendTimeLockNodes();
@@ -1530,6 +1579,7 @@ export class SparkWallet {
         paymentHash: hexToBytes(paymentHash),
         isInboundPayment: false,
         invoiceString: invoice,
+        feeSats: maxFeeSats,
       });
 
       if (!swapResponse.transfer) {

@@ -388,6 +388,7 @@ export const createSparkRouter = (
    * Pay lightning invoice
    * @route POST /lightning/pay-invoice
    * @param {string} invoice - The invoice to pay
+   * @param {number} [maxFeeSats] - The maximum fee to pay in satoshis
    * @returns {Promise<{
    *   data: {
    *     payment: LightningSendRequest
@@ -400,9 +401,12 @@ export const createSparkRouter = (
     async (req, res) => {
       const wallet = getWallet();
       try {
-        const { invoice } = req.body as { invoice: string };
+        const { invoice, maxFeeSats } = req.body as {
+          invoice: string;
+          maxFeeSats: number;
+        };
         const payment: LightningSendRequest | null =
-          await wallet!.payLightningInvoice({ invoice });
+          await wallet!.payLightningInvoice({ invoice, maxFeeSats });
         res.json({
           data: { payment },
         });

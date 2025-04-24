@@ -234,7 +234,7 @@
             "header": [],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"invoice\": \"lnbcrt...\"\n}",
+              "raw": "{\n    \"invoice\": \"lnbcrt...\",\n    \"maxFeeSats\": 100\n}",
               "options": {
                 "raw": {
                   "language": "json"

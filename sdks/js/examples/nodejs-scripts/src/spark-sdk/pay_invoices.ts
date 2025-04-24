@@ -13,5 +13,9 @@ console.log("wallet mnemonic:", walletMnemonic);
 
 // Get invoice from command line arguments
 const invoice = process.argv[3] || "your_invoice_here";
-const invoice_response = await wallet.payLightningInvoice({ invoice });
+const maxFeeSats = process.argv[4] || "0";
+const invoice_response = await wallet.payLightningInvoice({
+  invoice,
+  maxFeeSats: parseInt(maxFeeSats),
+});
 console.log("Invoice:", invoice_response);

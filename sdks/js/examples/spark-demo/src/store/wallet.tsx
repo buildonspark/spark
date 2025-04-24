@@ -251,8 +251,11 @@ const useWalletStore = create<WalletStore>((set, get) => ({
     if (!wallet) {
       throw new Error("Wallet not initialized");
     }
+
     await wallet.payLightningInvoice({
       invoice,
+      // Hard code this until we have time to revisit this demo
+      maxFeeSats: 100,
     });
   },
   onchainDepositAddresses: new Set(),

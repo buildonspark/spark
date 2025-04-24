@@ -7,6 +7,7 @@ import { secp256k1 } from "@noble/curves/secp256k1";
 import { TransactionInput } from "@scure/btc-signer/psbt";
 import { sha256 } from "@scure/btc-signer/utils";
 import { decode } from "light-bolt11-decoder";
+import { NetworkError, ValidationError } from "../errors/types.js";
 import LightningReceiveRequest from "../graphql/objects/LightningReceiveRequest.js";
 import {
   GetSigningCommitmentsResponse,
@@ -17,7 +18,6 @@ import {
   RequestedSigningCommitments,
   Transfer,
   UserSignedRefund,
-  StartUserSignedTransferRequest,
   UserSignedTxSigningJob,
 } from "../proto/spark.js";
 import {
@@ -33,7 +33,6 @@ import {
 import { WalletConfigService } from "./config.js";
 import { ConnectionManager } from "./connection.js";
 import { LeafKeyTweak } from "./transfer.js";
-import { ValidationError, NetworkError } from "../errors/types.js";
 
 const crypto = getCrypto();
 
@@ -57,6 +56,7 @@ export type SwapNodesForPreimageParams = {
   paymentHash: Uint8Array;
   invoiceString?: string;
   isInboundPayment: boolean;
+  feeSats?: number;
 };
 
 export class LightningService {
@@ -169,6 +169,7 @@ export class LightningService {
     paymentHash,
     invoiceString,
     isInboundPayment,
+    feeSats = 0,
   }: SwapNodesForPreimageParams): Promise<InitiatePreimageSwapResponse> {
     const sparkClient = await this.connectionManager.createSparkClient(
       this.config.getCoordinatorAddress(),
@@ -240,7 +241,7 @@ export class LightningService {
           expiryTime: new Date(Date.now() + 2 * 60 * 1000),
         },
         receiverIdentityPublicKey: receiverIdentityPubkey,
-        feeSats: 0,
+        feeSats,
       });
     } catch (error) {
       throw new NetworkError(
