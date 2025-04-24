@@ -1,15 +1,20 @@
 FROM --platform=$BUILDPLATFORM golang:1.23-bookworm AS builder-go
 
 ARG TARGETOS TARGETARCH
-ENV GOOS $TARGETOS
-ENV GOARCH $TARGETARCH
+ENV GOOS=$TARGETOS
+ENV GOARCH=$TARGETARCH
 
-RUN apt-get update && apt-get install -y libzmq3-dev && apt-get clean && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y libzmq3-dev wget && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 COPY spark spark
 
 RUN cd spark && go install -v bin/operator/main.go
 RUN if [ -e /go/bin/${TARGETOS}_${TARGETARCH} ]; then mv /go/bin/${TARGETOS}_${TARGETARCH}/* /go/bin/; fi
+
+# Healthcheck
+RUN GRPC_HEALTH_PROBE_VERSION=v0.4.13 && \
+    wget -qO/bin/grpc_health_probe https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/${GRPC_HEALTH_PROBE_VERSION}/grpc_health_probe-${TARGETOS}-${TARGETARCH} && \
+    chmod +x /bin/grpc_health_probe
 
 FROM --platform=$BUILDPLATFORM rust:1.84-slim-bookworm AS builder-rust
 
@@ -38,6 +43,7 @@ ENTRYPOINT ["spark-operator"]
 
 COPY --from=atlas /atlas /usr/local/bin/atlas
 COPY --from=builder-go /go/bin/main /usr/local/bin/spark-operator
+COPY --from=builder-go /bin/grpc_health_probe /usr/local/bin/grpc_health_probe
 COPY --from=builder-rust /signer/target/*/release/spark-frost-signer /usr/local/bin/spark-frost-signer
 COPY spark/so/ent/migrate/migrations /opt/spark/migrations
 
