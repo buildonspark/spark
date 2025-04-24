@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
-	"log"
 	"log/slog"
 	"sort"
 	"strings"
@@ -479,7 +478,7 @@ func (o TokenTransactionHandler) SignTokenTransaction(
 
 	err = o.lrc20Client.SendSparkSignature(ctx, sparkSigReq)
 	if err != nil {
-		log.Printf("Failed to send transaction to LRC20 node: %v", err)
+		logger.Error("Failed to send transaction to LRC20 node", "error", err)
 		return nil, err
 	}
 

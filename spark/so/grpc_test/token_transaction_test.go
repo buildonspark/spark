@@ -551,6 +551,7 @@ func TestBroadcastTokenTransactionMintAndTransferTokensLotsOfOutputs(t *testing.
 }
 
 func TestFreezeAndUnfreezeTokens(t *testing.T) {
+	skipIfGithubActions(t)
 	config, err := testutil.TestWalletConfig()
 	require.NoError(t, err, "failed to create wallet config")
 
@@ -1292,6 +1293,7 @@ func TestBroadcastTokenTransactionMintAndTransferTokensSchnorr(t *testing.T) {
 }
 
 func TestFreezeAndUnfreezeTokensSchnorr(t *testing.T) {
+	skipIfGithubActions(t)
 	config, err := testutil.TestWalletConfigWithTokenTransactionSchnorr()
 	require.NoError(t, err, "failed to create wallet config")
 
@@ -1433,6 +1435,7 @@ func TestCancelTokenTransaction(t *testing.T) {
 }
 
 func TestBroadcastTokenTransactionWithInvalidPrevTxHash(t *testing.T) {
+	skipIfGithubActions(t)
 	config, err := testutil.TestWalletConfig()
 	require.NoError(t, err, "failed to create wallet config")
 

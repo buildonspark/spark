@@ -131,7 +131,7 @@ jobs:
         run: |
           gotestsum \
           --format testname \
-          --rerun-fails \
+          --rerun-fails=3 \
           --rerun-fails-max-failures=1000 \
           --junitfile ../test_results/grpc-test.xml \
           --jsonfile ../test_results/grpc-test.json \
@@ -194,7 +194,7 @@ jobs:
           kubectl describe -A statefulset > logs/k8s/statefulset.txt
           source ./scripts/collect-container-logs.sh
           collect_logs "spark" "spark" "operator" "signer" "atlas"
-          collect_logs "lrc20" "yuvd" "yuvd" "sqlx"
+          collect_logs "lrc20" "yuvd" "yuvd" "sea"
           collect_logs "bitcoin" "bitcoind" "bitcoind"
           collect_logs "bitcoin" "electrs" "electrs"
           collect_logs "bitcoin" "mempool" "backend" "frontend"
