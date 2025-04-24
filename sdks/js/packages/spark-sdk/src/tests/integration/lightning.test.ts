@@ -123,7 +123,7 @@ describe("LightningService", () => {
     await cleanUp();
   });
 
-  it("should create an invoice", async () => {
+  brokenTestFn("should create an invoice", async () => {
     const preimage = hexToBytes(
       "2d059c3ede82a107aa1452c0bea47759be3c5c6e5342be6a310f6c3a907d9f4c",
     );

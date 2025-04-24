@@ -224,14 +224,7 @@ export class ConnectionManager {
               .set("User-Agent", "spark-js-sdk"),
           });
         }
-        throw new AuthenticationError(
-          "Middleware authentication failed",
-          {
-            endpoint: "nodeMiddleware",
-            reason: error.message,
-          },
-          error,
-        );
+        throw error;
       }
     }.bind(this);
   }
@@ -271,14 +264,7 @@ export class ConnectionManager {
               .set("User-Agent", "spark-js-sdk"),
           });
         }
-        throw new AuthenticationError(
-          "Middleware authentication failed",
-          {
-            endpoint: "browserMiddleware",
-            reason: error.message,
-          },
-          error,
-        );
+        throw error;
       }
     }.bind(this);
   }
