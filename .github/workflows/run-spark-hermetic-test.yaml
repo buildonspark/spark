@@ -8,6 +8,11 @@ on:
         required: false
         default: "latest"
         type: string
+      lrc20_tag:
+        description: "LRC20 image tag to use"
+        required: false
+        default: "latest"
+        type: string
       test_type:
         description: "Type of test to run. Options: 'go' (default), 'js'"
         required: false
@@ -20,6 +25,7 @@ on:
 env:
   GO_VERSION: "1.23.2"
   SPARK_TAG: ${{ inputs.spark_tag || 'latest' }}
+  LRC20_TAG: ${{ inputs.lrc20_tag || 'latest' }}
   USE_LIGHTSPARK_HELM_REPO: "true"
 
 jobs:

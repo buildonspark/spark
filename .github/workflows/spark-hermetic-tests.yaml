@@ -8,6 +8,11 @@ on:
         required: false
         default: "latest"
         type: string
+      lrc20_tag:
+        description: "LRC20 image tag to use"
+        required: false
+        default: "latest"
+        type: string
       test_type:
         description: "Type of tests to run. Options: 'go', 'js', 'all' (default)"
         required: false
@@ -17,6 +22,11 @@ on:
     inputs:
       spark_tag:
         description: "Spark image tag to use for both operator and signer"
+        required: false
+        default: "latest"
+        type: string
+      lrc20_tag:
+        description: "LRC20 image tag to use"
         required: false
         default: "latest"
         type: string
@@ -44,6 +54,7 @@ jobs:
     uses: ./.github/workflows/run-spark-hermetic-test.yaml
     with:
       spark_tag: ${{ inputs.spark_tag || 'latest' }}
+      lrc20_tag: ${{ inputs.lrc20_tag || 'latest' }}
       test_type: "go"
     secrets:
       HELM_PASSWORD: ${{ secrets.HELM_PASSWORD }}
@@ -56,6 +67,7 @@ jobs:
     uses: ./.github/workflows/run-spark-hermetic-test.yaml
     with:
       spark_tag: ${{ inputs.spark_tag || 'latest' }}
+      lrc20_tag: ${{ inputs.lrc20_tag || 'latest' }}
       test_type: "js"
     secrets:
       HELM_PASSWORD: ${{ secrets.HELM_PASSWORD }}
