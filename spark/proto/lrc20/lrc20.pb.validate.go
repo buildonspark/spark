@@ -35,139 +35,6 @@ var (
 	_ = sort.Sort
 )
 
-// Validate checks the field values on SendSparkTxRequest with the rules
-// defined in the proto definition for this message. If any rules are
-// violated, the first error encountered is returned, or nil if there are no violations.
-func (m *SendSparkTxRequest) Validate() error {
-	return m.validate(false)
-}
-
-// ValidateAll checks the field values on SendSparkTxRequest with the rules
-// defined in the proto definition for this message. If any rules are
-// violated, the result is a list of violation errors wrapped in
-// SendSparkTxRequestMultiError, or nil if none found.
-func (m *SendSparkTxRequest) ValidateAll() error {
-	return m.validate(true)
-}
-
-func (m *SendSparkTxRequest) validate(all bool) error {
-	if m == nil {
-		return nil
-	}
-
-	var errors []error
-
-	// no validation rules for IdentityPublicKey
-
-	if all {
-		switch v := interface{}(m.GetFinalTokenTransaction()).(type) {
-		case interface{ ValidateAll() error }:
-			if err := v.ValidateAll(); err != nil {
-				errors = append(errors, SendSparkTxRequestValidationError{
-					field:  "FinalTokenTransaction",
-					reason: "embedded message failed validation",
-					cause:  err,
-				})
-			}
-		case interface{ Validate() error }:
-			if err := v.Validate(); err != nil {
-				errors = append(errors, SendSparkTxRequestValidationError{
-					field:  "FinalTokenTransaction",
-					reason: "embedded message failed validation",
-					cause:  err,
-				})
-			}
-		}
-	} else if v, ok := interface{}(m.GetFinalTokenTransaction()).(interface{ Validate() error }); ok {
-		if err := v.Validate(); err != nil {
-			return SendSparkTxRequestValidationError{
-				field:  "FinalTokenTransaction",
-				reason: "embedded message failed validation",
-				cause:  err,
-			}
-		}
-	}
-
-	if len(errors) > 0 {
-		return SendSparkTxRequestMultiError(errors)
-	}
-
-	return nil
-}
-
-// SendSparkTxRequestMultiError is an error wrapping multiple validation errors
-// returned by SendSparkTxRequest.ValidateAll() if the designated constraints
-// aren't met.
-type SendSparkTxRequestMultiError []error
-
-// Error returns a concatenation of all the error messages it wraps.
-func (m SendSparkTxRequestMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
-	for _, err := range m {
-		msgs = append(msgs, err.Error())
-	}
-	return strings.Join(msgs, "; ")
-}
-
-// AllErrors returns a list of validation violation errors.
-func (m SendSparkTxRequestMultiError) AllErrors() []error { return m }
-
-// SendSparkTxRequestValidationError is the validation error returned by
-// SendSparkTxRequest.Validate if the designated constraints aren't met.
-type SendSparkTxRequestValidationError struct {
-	field  string
-	reason string
-	cause  error
-	key    bool
-}
-
-// Field function returns field value.
-func (e SendSparkTxRequestValidationError) Field() string { return e.field }
-
-// Reason function returns reason value.
-func (e SendSparkTxRequestValidationError) Reason() string { return e.reason }
-
-// Cause function returns cause value.
-func (e SendSparkTxRequestValidationError) Cause() error { return e.cause }
-
-// Key function returns key value.
-func (e SendSparkTxRequestValidationError) Key() bool { return e.key }
-
-// ErrorName returns error name.
-func (e SendSparkTxRequestValidationError) ErrorName() string {
-	return "SendSparkTxRequestValidationError"
-}
-
-// Error satisfies the builtin error interface
-func (e SendSparkTxRequestValidationError) Error() string {
-	cause := ""
-	if e.cause != nil {
-		cause = fmt.Sprintf(" | caused by: %v", e.cause)
-	}
-
-	key := ""
-	if e.key {
-		key = "key for "
-	}
-
-	return fmt.Sprintf(
-		"invalid %sSendSparkTxRequest.%s: %s%s",
-		key,
-		e.field,
-		e.reason,
-		cause)
-}
-
-var _ error = SendSparkTxRequestValidationError{}
-
-var _ interface {
-	Field() string
-	Reason() string
-	Key() bool
-	Cause() error
-	ErrorName() string
-} = SendSparkTxRequestValidationError{}
-
 // Validate checks the field values on SendSparkSignatureRequest with the rules
 // defined in the proto definition for this message. If any rules are
 // violated, the first error encountered is returned, or nil if there are no violations.
@@ -191,11 +58,11 @@ func (m *SendSparkSignatureRequest) validate(all bool) error {
 	var errors []error
 
 	if all {
-		switch v := interface{}(m.GetSignatureData()).(type) {
+		switch v := interface{}(m.GetFinalTokenTransaction()).(type) {
 		case interface{ ValidateAll() error }:
 			if err := v.ValidateAll(); err != nil {
 				errors = append(errors, SendSparkSignatureRequestValidationError{
-					field:  "SignatureData",
+					field:  "FinalTokenTransaction",
 					reason: "embedded message failed validation",
 					cause:  err,
 				})
@@ -203,20 +70,117 @@ func (m *SendSparkSignatureRequest) validate(all bool) error {
 		case interface{ Validate() error }:
 			if err := v.Validate(); err != nil {
 				errors = append(errors, SendSparkSignatureRequestValidationError{
-					field:  "SignatureData",
+					field:  "FinalTokenTransaction",
 					reason: "embedded message failed validation",
 					cause:  err,
 				})
 			}
 		}
-	} else if v, ok := interface{}(m.GetSignatureData()).(interface{ Validate() error }); ok {
+	} else if v, ok := interface{}(m.GetFinalTokenTransaction()).(interface{ Validate() error }); ok {
 		if err := v.Validate(); err != nil {
 			return SendSparkSignatureRequestValidationError{
-				field:  "SignatureData",
+				field:  "FinalTokenTransaction",
 				reason: "embedded message failed validation",
 				cause:  err,
 			}
 		}
+	}
+
+	for idx, item := range m.GetOperatorSpecificSignatures() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, SendSparkSignatureRequestValidationError{
+						field:  fmt.Sprintf("OperatorSpecificSignatures[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, SendSparkSignatureRequestValidationError{
+						field:  fmt.Sprintf("OperatorSpecificSignatures[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return SendSparkSignatureRequestValidationError{
+					field:  fmt.Sprintf("OperatorSpecificSignatures[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	if all {
+		switch v := interface{}(m.GetOperatorSignatureData()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, SendSparkSignatureRequestValidationError{
+					field:  "OperatorSignatureData",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, SendSparkSignatureRequestValidationError{
+					field:  "OperatorSignatureData",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetOperatorSignatureData()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return SendSparkSignatureRequestValidationError{
+				field:  "OperatorSignatureData",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	for idx, item := range m.GetRevocationSecrets() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, SendSparkSignatureRequestValidationError{
+						field:  fmt.Sprintf("RevocationSecrets[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, SendSparkSignatureRequestValidationError{
+						field:  fmt.Sprintf("RevocationSecrets[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return SendSparkSignatureRequestValidationError{
+					field:  fmt.Sprintf("RevocationSecrets[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
 	}
 
 	if len(errors) > 0 {
@@ -299,109 +263,55 @@ var _ interface {
 	ErrorName() string
 } = SendSparkSignatureRequestValidationError{}
 
-// Validate checks the field values on SparkSignatureData with the rules
+// Validate checks the field values on RevocationSecretWithIndex with the rules
 // defined in the proto definition for this message. If any rules are
 // violated, the first error encountered is returned, or nil if there are no violations.
-func (m *SparkSignatureData) Validate() error {
+func (m *RevocationSecretWithIndex) Validate() error {
 	return m.validate(false)
 }
 
-// ValidateAll checks the field values on SparkSignatureData with the rules
-// defined in the proto definition for this message. If any rules are
+// ValidateAll checks the field values on RevocationSecretWithIndex with the
+// rules defined in the proto definition for this message. If any rules are
 // violated, the result is a list of violation errors wrapped in
-// SparkSignatureDataMultiError, or nil if none found.
-func (m *SparkSignatureData) ValidateAll() error {
+// RevocationSecretWithIndexMultiError, or nil if none found.
+func (m *RevocationSecretWithIndex) ValidateAll() error {
 	return m.validate(true)
 }
 
-func (m *SparkSignatureData) validate(all bool) error {
+func (m *RevocationSecretWithIndex) validate(all bool) error {
 	if m == nil {
 		return nil
 	}
 
 	var errors []error
 
-	// no validation rules for SparkOperatorSignature
+	// no validation rules for InputIndex
 
-	// no validation rules for SparkOperatorIdentityPublicKey
-
-	for idx, item := range m.GetOutputsToSpendData() {
-		_, _ = idx, item
-
-		if all {
-			switch v := interface{}(item).(type) {
-			case interface{ ValidateAll() error }:
-				if err := v.ValidateAll(); err != nil {
-					errors = append(errors, SparkSignatureDataValidationError{
-						field:  fmt.Sprintf("OutputsToSpendData[%v]", idx),
-						reason: "embedded message failed validation",
-						cause:  err,
-					})
-				}
-			case interface{ Validate() error }:
-				if err := v.Validate(); err != nil {
-					errors = append(errors, SparkSignatureDataValidationError{
-						field:  fmt.Sprintf("OutputsToSpendData[%v]", idx),
-						reason: "embedded message failed validation",
-						cause:  err,
-					})
-				}
-			}
-		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
-			if err := v.Validate(); err != nil {
-				return SparkSignatureDataValidationError{
-					field:  fmt.Sprintf("OutputsToSpendData[%v]", idx),
-					reason: "embedded message failed validation",
-					cause:  err,
-				}
-			}
+	if len(m.GetRevocationSecret()) != 32 {
+		err := RevocationSecretWithIndexValidationError{
+			field:  "RevocationSecret",
+			reason: "value length must be 32 bytes",
 		}
-
-	}
-
-	if all {
-		switch v := interface{}(m.GetFinalTokenTransaction()).(type) {
-		case interface{ ValidateAll() error }:
-			if err := v.ValidateAll(); err != nil {
-				errors = append(errors, SparkSignatureDataValidationError{
-					field:  "FinalTokenTransaction",
-					reason: "embedded message failed validation",
-					cause:  err,
-				})
-			}
-		case interface{ Validate() error }:
-			if err := v.Validate(); err != nil {
-				errors = append(errors, SparkSignatureDataValidationError{
-					field:  "FinalTokenTransaction",
-					reason: "embedded message failed validation",
-					cause:  err,
-				})
-			}
+		if !all {
+			return err
 		}
-	} else if v, ok := interface{}(m.GetFinalTokenTransaction()).(interface{ Validate() error }); ok {
-		if err := v.Validate(); err != nil {
-			return SparkSignatureDataValidationError{
-				field:  "FinalTokenTransaction",
-				reason: "embedded message failed validation",
-				cause:  err,
-			}
-		}
+		errors = append(errors, err)
 	}
 
 	if len(errors) > 0 {
-		return SparkSignatureDataMultiError(errors)
+		return RevocationSecretWithIndexMultiError(errors)
 	}
 
 	return nil
 }
 
-// SparkSignatureDataMultiError is an error wrapping multiple validation errors
-// returned by SparkSignatureData.ValidateAll() if the designated constraints
-// aren't met.
-type SparkSignatureDataMultiError []error
+// RevocationSecretWithIndexMultiError is an error wrapping multiple validation
+// errors returned by RevocationSecretWithIndex.ValidateAll() if the
+// designated constraints aren't met.
+type RevocationSecretWithIndexMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
-func (m SparkSignatureDataMultiError) Error() string {
+func (m RevocationSecretWithIndexMultiError) Error() string {
 	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
@@ -410,11 +320,11 @@ func (m SparkSignatureDataMultiError) Error() string {
 }
 
 // AllErrors returns a list of validation violation errors.
-func (m SparkSignatureDataMultiError) AllErrors() []error { return m }
+func (m RevocationSecretWithIndexMultiError) AllErrors() []error { return m }
 
-// SparkSignatureDataValidationError is the validation error returned by
-// SparkSignatureData.Validate if the designated constraints aren't met.
-type SparkSignatureDataValidationError struct {
+// RevocationSecretWithIndexValidationError is the validation error returned by
+// RevocationSecretWithIndex.Validate if the designated constraints aren't met.
+type RevocationSecretWithIndexValidationError struct {
 	field  string
 	reason string
 	cause  error
@@ -422,24 +332,24 @@ type SparkSignatureDataValidationError struct {
 }
 
 // Field function returns field value.
-func (e SparkSignatureDataValidationError) Field() string { return e.field }
+func (e RevocationSecretWithIndexValidationError) Field() string { return e.field }
 
 // Reason function returns reason value.
-func (e SparkSignatureDataValidationError) Reason() string { return e.reason }
+func (e RevocationSecretWithIndexValidationError) Reason() string { return e.reason }
 
 // Cause function returns cause value.
-func (e SparkSignatureDataValidationError) Cause() error { return e.cause }
+func (e RevocationSecretWithIndexValidationError) Cause() error { return e.cause }
 
 // Key function returns key value.
-func (e SparkSignatureDataValidationError) Key() bool { return e.key }
+func (e RevocationSecretWithIndexValidationError) Key() bool { return e.key }
 
 // ErrorName returns error name.
-func (e SparkSignatureDataValidationError) ErrorName() string {
-	return "SparkSignatureDataValidationError"
+func (e RevocationSecretWithIndexValidationError) ErrorName() string {
+	return "RevocationSecretWithIndexValidationError"
 }
 
 // Error satisfies the builtin error interface
-func (e SparkSignatureDataValidationError) Error() string {
+func (e RevocationSecretWithIndexValidationError) Error() string {
 	cause := ""
 	if e.cause != nil {
 		cause = fmt.Sprintf(" | caused by: %v", e.cause)
@@ -451,14 +361,14 @@ func (e SparkSignatureDataValidationError) Error() string {
 	}
 
 	return fmt.Sprintf(
-		"invalid %sSparkSignatureData.%s: %s%s",
+		"invalid %sRevocationSecretWithIndex.%s: %s%s",
 		key,
 		e.field,
 		e.reason,
 		cause)
 }
 
-var _ error = SparkSignatureDataValidationError{}
+var _ error = RevocationSecretWithIndexValidationError{}
 
 var _ interface {
 	Field() string
@@ -466,7 +376,131 @@ var _ interface {
 	Key() bool
 	Cause() error
 	ErrorName() string
-} = SparkSignatureDataValidationError{}
+} = RevocationSecretWithIndexValidationError{}
+
+// Validate checks the field values on SparkOperatorSignatureData with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *SparkOperatorSignatureData) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on SparkOperatorSignatureData with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// SparkOperatorSignatureDataMultiError, or nil if none found.
+func (m *SparkOperatorSignatureData) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *SparkOperatorSignatureData) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if l := len(m.GetSparkOperatorSignature()); l < 64 || l > 73 {
+		err := SparkOperatorSignatureDataValidationError{
+			field:  "SparkOperatorSignature",
+			reason: "value length must be between 64 and 73 bytes, inclusive",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if len(m.GetOperatorIdentityPublicKey()) != 33 {
+		err := SparkOperatorSignatureDataValidationError{
+			field:  "OperatorIdentityPublicKey",
+			reason: "value length must be 33 bytes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if len(errors) > 0 {
+		return SparkOperatorSignatureDataMultiError(errors)
+	}
+
+	return nil
+}
+
+// SparkOperatorSignatureDataMultiError is an error wrapping multiple
+// validation errors returned by SparkOperatorSignatureData.ValidateAll() if
+// the designated constraints aren't met.
+type SparkOperatorSignatureDataMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m SparkOperatorSignatureDataMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m SparkOperatorSignatureDataMultiError) AllErrors() []error { return m }
+
+// SparkOperatorSignatureDataValidationError is the validation error returned
+// by SparkOperatorSignatureData.Validate if the designated constraints aren't met.
+type SparkOperatorSignatureDataValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e SparkOperatorSignatureDataValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e SparkOperatorSignatureDataValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e SparkOperatorSignatureDataValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e SparkOperatorSignatureDataValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e SparkOperatorSignatureDataValidationError) ErrorName() string {
+	return "SparkOperatorSignatureDataValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e SparkOperatorSignatureDataValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sSparkOperatorSignatureData.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = SparkOperatorSignatureDataValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = SparkOperatorSignatureDataValidationError{}
 
 // Validate checks the field values on SparkSignatureOutputData with the rules
 // defined in the proto definition for this message. If any rules are

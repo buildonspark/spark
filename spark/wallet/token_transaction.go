@@ -130,7 +130,7 @@ func createOperatorSpecificSignature(
 	privKey *secp256k1.PrivateKey,
 	ownerPublicKey SerializedPublicKey,
 	finalTxHash []byte,
-) (*pb.OperatorSpecificTokenTransactionSignature, error) {
+) (*pb.OperatorSpecificOwnerSignature, error) {
 	payload := &pb.OperatorSpecificTokenTransactionSignablePayload{
 		FinalTokenTransactionHash: finalTxHash,
 		OperatorIdentityPublicKey: operatorPublicKey,
@@ -145,7 +145,7 @@ func createOperatorSpecificSignature(
 		return nil, fmt.Errorf("failed to create signature: %v", err)
 	}
 
-	return &pb.OperatorSpecificTokenTransactionSignature{
+	return &pb.OperatorSpecificOwnerSignature{
 		OwnerPublicKey: ownerPublicKey,
 		OwnerSignature: sig,
 		Payload:        payload,
@@ -225,7 +225,7 @@ func SignTokenTransaction(
 		operatorCtx := ContextWithToken(ctx, operatorToken)
 		operatorClient := pb.NewSparkServiceClient(operatorConn)
 
-		var operatorSpecificSignatures []*pb.OperatorSpecificTokenTransactionSignature
+		var operatorSpecificSignatures []*pb.OperatorSpecificOwnerSignature
 		for i := range ownerPublicKeys {
 			sig, err := createOperatorSpecificSignature(
 				config,

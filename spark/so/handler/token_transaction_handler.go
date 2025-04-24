@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"log"
 	"log/slog"
 	"sort"
 	"strings"
@@ -262,7 +263,7 @@ func validateInputs(outputs []*ent.TokenOutput, expectedStatus schema.TokenOutpu
 
 // validateOperatorSpecificSignatures validates the signatures in the request against the transaction hash
 // and verifies that the number of signatures matches the expected count based on transaction type
-func validateOperatorSpecificSignatures(identityPublicKey []byte, operatorSpecificSignatures []*pb.OperatorSpecificTokenTransactionSignature, tokenTransaction *ent.TokenTransaction) error {
+func validateOperatorSpecificSignatures(identityPublicKey []byte, operatorSpecificSignatures []*pb.OperatorSpecificOwnerSignature, tokenTransaction *ent.TokenTransaction) error {
 	if len(tokenTransaction.Edges.SpentOutput) > 0 {
 		return validateTransferOperatorSpecificSignatures(identityPublicKey, operatorSpecificSignatures, tokenTransaction)
 	}
@@ -270,7 +271,7 @@ func validateOperatorSpecificSignatures(identityPublicKey []byte, operatorSpecif
 }
 
 // validateTransferOperatorSpecificSignatures validates signatures for transfer transactions
-func validateTransferOperatorSpecificSignatures(identityPublicKey []byte, operatorSpecificSignatures []*pb.OperatorSpecificTokenTransactionSignature, tokenTransaction *ent.TokenTransaction) error {
+func validateTransferOperatorSpecificSignatures(identityPublicKey []byte, operatorSpecificSignatures []*pb.OperatorSpecificOwnerSignature, tokenTransaction *ent.TokenTransaction) error {
 	if len(operatorSpecificSignatures) != len(tokenTransaction.Edges.SpentOutput) {
 		return formatErrorWithTransactionEnt(
 			fmt.Sprintf("expected %d signatures for transfer (one per input), but got %d",
@@ -302,7 +303,7 @@ func validateTransferOperatorSpecificSignatures(identityPublicKey []byte, operat
 }
 
 // validateMintOperatorSpecificSignatures validates signatures for mint transactions
-func validateMintOperatorSpecificSignatures(identityPublicKey []byte, operatorSpecificSignatures []*pb.OperatorSpecificTokenTransactionSignature, tokenTransaction *ent.TokenTransaction) error {
+func validateMintOperatorSpecificSignatures(identityPublicKey []byte, operatorSpecificSignatures []*pb.OperatorSpecificOwnerSignature, tokenTransaction *ent.TokenTransaction) error {
 	if len(operatorSpecificSignatures) != 1 {
 		return formatErrorWithTransactionEnt(
 			fmt.Sprintf("expected exactly 1 signature for mint, but got %d",
@@ -331,7 +332,7 @@ func validateMintOperatorSpecificSignatures(identityPublicKey []byte, operatorSp
 }
 
 // validateSignaturePayload validates the payload and signature of an operator-specific signature
-func validateSignaturePayload(identityPublicKey []byte, outputSig *pb.OperatorSpecificTokenTransactionSignature, tokenTransaction *ent.TokenTransaction) error {
+func validateSignaturePayload(identityPublicKey []byte, outputSig *pb.OperatorSpecificOwnerSignature, tokenTransaction *ent.TokenTransaction) error {
 	payloadHash, err := utils.HashOperatorSpecificTokenTransactionSignablePayload(outputSig.Payload)
 	if err != nil {
 		return fmt.Errorf("failed to hash revocation keyshares payload: %w", err)
@@ -428,7 +429,6 @@ func (o TokenTransactionHandler) SignTokenTransaction(
 		}
 	}
 
-	// Sign the token transaction hash with the operator identity private key.
 	identityPrivateKey := secp256k1.PrivKeyFromBytes(config.IdentityPrivateKey)
 	operatorSignature := ecdsa.Sign(identityPrivateKey, finalTokenTransactionHash)
 
@@ -441,15 +441,9 @@ func (o TokenTransactionHandler) SignTokenTransaction(
 		return nil, formatErrorWithTransactionEnt(fmt.Sprintf(errFailedToUpdateOutputs, "signing"), tokenTransaction, err)
 	}
 
-	err = o.SendTransactionToLRC20Node(
-		ctx,
-		config,
-		req.FinalTokenTransaction,
-		operatorSignature.Serialize(),
-		// Revocation keys not available until finalize step.
-		[][]byte{})
-	if err != nil {
-		return nil, formatErrorWithTransactionEnt(errFailedToSendToLRC20Node, tokenTransaction, err)
+	operatorSignatureData := &pblrc20.SparkOperatorSignatureData{
+		SparkOperatorSignature:    operatorSignature.Serialize(),
+		OperatorIdentityPublicKey: identityPrivateKey.PubKey().SerializeCompressed(),
 	}
 
 	keyshares := make([]*ent.SigningKeyshare, len(tokenTransaction.Edges.SpentOutput))
@@ -472,10 +466,23 @@ func (o TokenTransactionHandler) SignTokenTransaction(
 		}
 	}
 
-	revocationKeyshares, err := o.getRevocationKeysharesForTokenTransaction(ctx, tokenTransaction)
-	if err != nil {
-		return nil, formatErrorWithTransactionEnt(errFailedToGetRevocationKeyshares, tokenTransaction, err)
+	revocationKeyshares := make([][]byte, len(keyshares))
+	for i, keyshare := range keyshares {
+		revocationKeyshares[i] = keyshare.SecretShare
 	}
+
+	sparkSigReq := &pblrc20.SendSparkSignatureRequest{
+		FinalTokenTransaction:      req.FinalTokenTransaction,
+		OperatorSpecificSignatures: req.OperatorSpecificSignatures,
+		OperatorSignatureData:      operatorSignatureData,
+	}
+
+	err = o.lrc20Client.SendSparkSignature(ctx, sparkSigReq)
+	if err != nil {
+		log.Printf("Failed to send transaction to LRC20 node: %v", err)
+		return nil, err
+	}
+
 	return &pb.SignTokenTransactionResponse{
 		SparkOperatorSignature:              operatorSignature.Serialize(),
 		TokenTransactionRevocationKeyshares: revocationKeyshares,
@@ -639,13 +646,14 @@ func (o TokenTransactionHandler) FinalizeTokenTransaction(
 		return nil, formatErrorWithTransactionEnt(errFailedToValidateRevocationKeys, tokenTransaction, err)
 	}
 
-	err = o.SendTransactionToLRC20Node(
-		ctx,
-		config,
+	identityPrivateKey := secp256k1.PrivKeyFromBytes(config.IdentityPrivateKey)
+
+	err = o.lrc20Client.SendSparkSignature(ctx, o.buildLrc20SendSignaturesRequest(
 		req.FinalTokenTransaction,
-		// TODO: Consider removing this because it was already provided in the Sign() step.
 		tokenTransaction.OperatorSignature,
-		req.OutputToSpendRevocationSecrets)
+		identityPrivateKey,
+		req.OutputToSpendRevocationSecrets,
+	))
 	if err != nil {
 		return nil, formatErrorWithTransactionEnt(errFailedToSendToLRC20Node, tokenTransaction, err)
 	}
@@ -656,34 +664,6 @@ func (o TokenTransactionHandler) FinalizeTokenTransaction(
 	}
 
 	return &emptypb.Empty{}, nil
-}
-
-// SendTransactionToLRC20Node sends a token transaction to the LRC20 node.
-func (o TokenTransactionHandler) SendTransactionToLRC20Node(
-	ctx context.Context,
-	config *so.Config,
-	finalTokenTransaction *pb.TokenTransaction,
-	operatorSignature []byte,
-	revocationKeys [][]byte,
-) error {
-	outputsToSpendData := make([]*pblrc20.SparkSignatureOutputData, len(revocationKeys))
-	for i, revocationKey := range revocationKeys {
-		outputsToSpendData[i] = &pblrc20.SparkSignatureOutputData{
-			SpentOutputIndex: uint32(i),
-			// Revocation will be nil if we are sending the transaction at the Sign() step.
-			// It will be filled when sending a transaction in the Finalize() step.
-			RevocationPrivateKey: revocationKey,
-		}
-	}
-
-	signatureData := &pblrc20.SparkSignatureData{
-		SparkOperatorSignature:         operatorSignature,
-		SparkOperatorIdentityPublicKey: config.IdentityPublicKey(),
-		FinalTokenTransaction:          finalTokenTransaction,
-		OutputsToSpendData:             outputsToSpendData,
-	}
-
-	return o.lrc20Client.SendSparkSignature(ctx, signatureData)
 }
 
 // FreezeTokens freezes or unfreezes tokens on the LRC20 node.
@@ -1028,6 +1008,27 @@ func (o TokenTransactionHandler) getRevocationKeysharesForTokenTransaction(ctx c
 		revocationKeyshares[i] = keyshare.SecretShare
 	}
 	return revocationKeyshares, nil
+}
+
+func (o TokenTransactionHandler) buildLrc20SendSignaturesRequest(finalTokenTransaction *pb.TokenTransaction, operatorSignature []byte, identityPrivateKey *secp256k1.PrivateKey, outputToSpendRevocationSecrets [][]byte) *pblrc20.SendSparkSignatureRequest {
+	operatorSignatureData := &pblrc20.SparkOperatorSignatureData{
+		SparkOperatorSignature:    operatorSignature,
+		OperatorIdentityPublicKey: identityPrivateKey.PubKey().SerializeCompressed(),
+	}
+
+	var revocationSecrets []*pblrc20.RevocationSecretWithIndex
+	for i, revocationSecret := range outputToSpendRevocationSecrets {
+		revocationSecrets = append(revocationSecrets, &pblrc20.RevocationSecretWithIndex{
+			RevocationSecret: revocationSecret,
+			InputIndex:       uint32(i),
+		})
+	}
+
+	return &pblrc20.SendSparkSignatureRequest{
+		FinalTokenTransaction: finalTokenTransaction,
+		OperatorSignatureData: operatorSignatureData,
+		RevocationSecrets:     revocationSecrets,
+	}
 }
 
 func logWithTransactionEnt(ctx context.Context, msg string, tokenTransaction *ent.TokenTransaction, level slog.Level) {

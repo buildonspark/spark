@@ -2140,7 +2140,7 @@ func (x *OperatorSpecificTokenTransactionSignablePayload) GetOperatorIdentityPub
 
 // This message allows the sender of a output being spent to provide final evidence
 // that it owns a output to an SO when requesting signing and release of the  revocation keyshare.
-type OperatorSpecificTokenTransactionSignature struct {
+type OperatorSpecificOwnerSignature struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	OwnerPublicKey []byte                 `protobuf:"bytes,1,opt,name=owner_public_key,json=ownerPublicKey,proto3" json:"owner_public_key,omitempty"`
 	// This is a Schnorr or ECDSA DER signature which can be between 64 and 73 bytes.
@@ -2150,20 +2150,20 @@ type OperatorSpecificTokenTransactionSignature struct {
 	sizeCache      protoimpl.SizeCache
 }
 
-func (x *OperatorSpecificTokenTransactionSignature) Reset() {
-	*x = OperatorSpecificTokenTransactionSignature{}
+func (x *OperatorSpecificOwnerSignature) Reset() {
+	*x = OperatorSpecificOwnerSignature{}
 	mi := &file_spark_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *OperatorSpecificTokenTransactionSignature) String() string {
+func (x *OperatorSpecificOwnerSignature) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*OperatorSpecificTokenTransactionSignature) ProtoMessage() {}
+func (*OperatorSpecificOwnerSignature) ProtoMessage() {}
 
-func (x *OperatorSpecificTokenTransactionSignature) ProtoReflect() protoreflect.Message {
+func (x *OperatorSpecificOwnerSignature) ProtoReflect() protoreflect.Message {
 	mi := &file_spark_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -2175,26 +2175,26 @@ func (x *OperatorSpecificTokenTransactionSignature) ProtoReflect() protoreflect.
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use OperatorSpecificTokenTransactionSignature.ProtoReflect.Descriptor instead.
-func (*OperatorSpecificTokenTransactionSignature) Descriptor() ([]byte, []int) {
+// Deprecated: Use OperatorSpecificOwnerSignature.ProtoReflect.Descriptor instead.
+func (*OperatorSpecificOwnerSignature) Descriptor() ([]byte, []int) {
 	return file_spark_proto_rawDescGZIP(), []int{29}
 }
 
-func (x *OperatorSpecificTokenTransactionSignature) GetOwnerPublicKey() []byte {
+func (x *OperatorSpecificOwnerSignature) GetOwnerPublicKey() []byte {
 	if x != nil {
 		return x.OwnerPublicKey
 	}
 	return nil
 }
 
-func (x *OperatorSpecificTokenTransactionSignature) GetOwnerSignature() []byte {
+func (x *OperatorSpecificOwnerSignature) GetOwnerSignature() []byte {
 	if x != nil {
 		return x.OwnerSignature
 	}
 	return nil
 }
 
-func (x *OperatorSpecificTokenTransactionSignature) GetPayload() *OperatorSpecificTokenTransactionSignablePayload {
+func (x *OperatorSpecificOwnerSignature) GetPayload() *OperatorSpecificTokenTransactionSignablePayload {
 	if x != nil {
 		return x.Payload
 	}
@@ -2202,10 +2202,10 @@ func (x *OperatorSpecificTokenTransactionSignature) GetPayload() *OperatorSpecif
 }
 
 type SignTokenTransactionRequest struct {
-	state                      protoimpl.MessageState                       `protogen:"open.v1"`
-	FinalTokenTransaction      *TokenTransaction                            `protobuf:"bytes,1,opt,name=final_token_transaction,json=finalTokenTransaction,proto3" json:"final_token_transaction,omitempty"`
-	OperatorSpecificSignatures []*OperatorSpecificTokenTransactionSignature `protobuf:"bytes,2,rep,name=operator_specific_signatures,json=operatorSpecificSignatures,proto3" json:"operator_specific_signatures,omitempty"`
-	IdentityPublicKey          []byte                                       `protobuf:"bytes,3,opt,name=identity_public_key,json=identityPublicKey,proto3" json:"identity_public_key,omitempty"`
+	state                      protoimpl.MessageState            `protogen:"open.v1"`
+	FinalTokenTransaction      *TokenTransaction                 `protobuf:"bytes,1,opt,name=final_token_transaction,json=finalTokenTransaction,proto3" json:"final_token_transaction,omitempty"`
+	OperatorSpecificSignatures []*OperatorSpecificOwnerSignature `protobuf:"bytes,2,rep,name=operator_specific_signatures,json=operatorSpecificSignatures,proto3" json:"operator_specific_signatures,omitempty"`
+	IdentityPublicKey          []byte                            `protobuf:"bytes,3,opt,name=identity_public_key,json=identityPublicKey,proto3" json:"identity_public_key,omitempty"`
 	unknownFields              protoimpl.UnknownFields
 	sizeCache                  protoimpl.SizeCache
 }
@@ -2247,7 +2247,7 @@ func (x *SignTokenTransactionRequest) GetFinalTokenTransaction() *TokenTransacti
 	return nil
 }
 
-func (x *SignTokenTransactionRequest) GetOperatorSpecificSignatures() []*OperatorSpecificTokenTransactionSignature {
+func (x *SignTokenTransactionRequest) GetOperatorSpecificSignatures() []*OperatorSpecificOwnerSignature {
 	if x != nil {
 		return x.OperatorSpecificSignatures
 	}
@@ -7368,14 +7368,14 @@ const file_spark_proto_rawDesc = "" +
 	"\rkeyshare_info\x18\x02 \x01(\v2\x16.spark.SigningKeyshareR\fkeyshareInfo\"\xc5\x01\n" +
 	"/OperatorSpecificTokenTransactionSignablePayload\x12H\n" +
 	"\x1cfinal_token_transaction_hash\x18\x01 \x01(\fB\a\xfaB\x04z\x02h R\x19finalTokenTransactionHash\x12H\n" +
-	"\x1coperator_identity_public_key\x18\x02 \x01(\fB\a\xfaB\x04z\x02h!R\x19operatorIdentityPublicKey\"\xe4\x01\n" +
-	")OperatorSpecificTokenTransactionSignature\x121\n" +
+	"\x1coperator_identity_public_key\x18\x02 \x01(\fB\a\xfaB\x04z\x02h!R\x19operatorIdentityPublicKey\"\xd9\x01\n" +
+	"\x1eOperatorSpecificOwnerSignature\x121\n" +
 	"\x10owner_public_key\x18\x01 \x01(\fB\a\xfaB\x04z\x02h!R\x0eownerPublicKey\x122\n" +
 	"\x0fowner_signature\x18\x02 \x01(\fB\t\xfaB\x06z\x04\x10@\x18IR\x0eownerSignature\x12P\n" +
-	"\apayload\x18\x03 \x01(\v26.spark.OperatorSpecificTokenTransactionSignablePayloadR\apayload\"\x9b\x02\n" +
+	"\apayload\x18\x03 \x01(\v26.spark.OperatorSpecificTokenTransactionSignablePayloadR\apayload\"\x90\x02\n" +
 	"\x1bSignTokenTransactionRequest\x12O\n" +
-	"\x17final_token_transaction\x18\x01 \x01(\v2\x17.spark.TokenTransactionR\x15finalTokenTransaction\x12r\n" +
-	"\x1coperator_specific_signatures\x18\x02 \x03(\v20.spark.OperatorSpecificTokenTransactionSignatureR\x1aoperatorSpecificSignatures\x127\n" +
+	"\x17final_token_transaction\x18\x01 \x01(\v2\x17.spark.TokenTransactionR\x15finalTokenTransaction\x12g\n" +
+	"\x1coperator_specific_signatures\x18\x02 \x03(\v2%.spark.OperatorSpecificOwnerSignatureR\x1aoperatorSpecificSignatures\x127\n" +
 	"\x13identity_public_key\x18\x03 \x01(\fB\a\xfaB\x04z\x02h!R\x11identityPublicKey\"\xc6\x01\n" +
 	"\x1cSignTokenTransactionResponse\x12C\n" +
 	"\x18spark_operator_signature\x18\x01 \x01(\fB\t\xfaB\x06z\x04\x10@\x18IR\x16sparkOperatorSignature\x12a\n" +
@@ -7861,7 +7861,7 @@ var file_spark_proto_goTypes = []any{
 	(*StartTokenTransactionRequest)(nil),                    // 31: spark.StartTokenTransactionRequest
 	(*StartTokenTransactionResponse)(nil),                   // 32: spark.StartTokenTransactionResponse
 	(*OperatorSpecificTokenTransactionSignablePayload)(nil), // 33: spark.OperatorSpecificTokenTransactionSignablePayload
-	(*OperatorSpecificTokenTransactionSignature)(nil),       // 34: spark.OperatorSpecificTokenTransactionSignature
+	(*OperatorSpecificOwnerSignature)(nil),                  // 34: spark.OperatorSpecificOwnerSignature
 	(*SignTokenTransactionRequest)(nil),                     // 35: spark.SignTokenTransactionRequest
 	(*SignTokenTransactionResponse)(nil),                    // 36: spark.SignTokenTransactionResponse
 	(*FinalizeTokenTransactionRequest)(nil),                 // 37: spark.FinalizeTokenTransactionRequest
@@ -7999,9 +7999,9 @@ var file_spark_proto_depIdxs = []int32{
 	30,  // 32: spark.StartTokenTransactionRequest.token_transaction_signatures:type_name -> spark.TokenTransactionSignatures
 	28,  // 33: spark.StartTokenTransactionResponse.final_token_transaction:type_name -> spark.TokenTransaction
 	16,  // 34: spark.StartTokenTransactionResponse.keyshare_info:type_name -> spark.SigningKeyshare
-	33,  // 35: spark.OperatorSpecificTokenTransactionSignature.payload:type_name -> spark.OperatorSpecificTokenTransactionSignablePayload
+	33,  // 35: spark.OperatorSpecificOwnerSignature.payload:type_name -> spark.OperatorSpecificTokenTransactionSignablePayload
 	28,  // 36: spark.SignTokenTransactionRequest.final_token_transaction:type_name -> spark.TokenTransaction
-	34,  // 37: spark.SignTokenTransactionRequest.operator_specific_signatures:type_name -> spark.OperatorSpecificTokenTransactionSignature
+	34,  // 37: spark.SignTokenTransactionRequest.operator_specific_signatures:type_name -> spark.OperatorSpecificOwnerSignature
 	28,  // 38: spark.FinalizeTokenTransactionRequest.final_token_transaction:type_name -> spark.TokenTransaction
 	38,  // 39: spark.FreezeTokensRequest.freeze_tokens_payload:type_name -> spark.FreezeTokensPayload
 	29,  // 40: spark.QueryTokenTransactionsResponse.token_transactions_with_status:type_name -> spark.TokenTransactionWithStatus

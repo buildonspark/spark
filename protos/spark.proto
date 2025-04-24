@@ -391,7 +391,7 @@ message OperatorSpecificTokenTransactionSignablePayload {
 
 // This message allows the sender of a output being spent to provide final evidence
 // that it owns a output to an SO when requesting signing and release of the  revocation keyshare.  
-message OperatorSpecificTokenTransactionSignature {
+message OperatorSpecificOwnerSignature {
     bytes owner_public_key = 1 [(validate.rules).bytes.len = 33];
     // This is a Schnorr or ECDSA DER signature which can be between 64 and 73 bytes.
     bytes owner_signature = 2 [(validate.rules).bytes.min_len = 64, (validate.rules).bytes.max_len = 73];
@@ -400,7 +400,7 @@ message OperatorSpecificTokenTransactionSignature {
 
 message SignTokenTransactionRequest {
     TokenTransaction final_token_transaction = 1;
-    repeated OperatorSpecificTokenTransactionSignature operator_specific_signatures = 2;
+    repeated OperatorSpecificOwnerSignature operator_specific_signatures = 2;
     bytes identity_public_key = 3 [(validate.rules).bytes.len = 33];
 }
 

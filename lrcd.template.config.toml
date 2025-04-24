@@ -17,13 +17,14 @@ path = "{STORAGE_PATH}"
 create_if_missing = true
 tx_per_page = 100
 flush_period = 100
+database_url = "{POSTGRES}"
 
 [bnode]
 url = "http://127.0.0.1:8332"
 auth = { username = "testutil", password = "testutilpassword" }
 
 [logger]
-level = "TRACE"
+level = "DEBUG"
 
 [indexer]
 polling_period = { secs = 100, nanos = 0 }
@@ -33,8 +34,8 @@ restart_interval = { secs = 30, nanos = 0 }
 confirmations_number = 1
 
 [controller]
-max_inv_size = 1000
-inv_sharing_interval = 1000
+max_inv_size = 100
+inv_sharing_interval = 300
 
 [graph_builder]
 cleanup_period = { secs = 3600, nanos = 0 }

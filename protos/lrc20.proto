@@ -4,10 +4,10 @@ package rpc.v1;
 
 option go_package = "github.com/lightsparkdev/spark-go/proto/lrc20";
 import "google/protobuf/empty.proto";
+import "validate/validate.proto";
 import "spark.proto";
 
 service SparkService {
-  rpc SendSparkTx(SendSparkTxRequest) returns (google.protobuf.Empty);
   rpc SendSparkSignature(SendSparkSignatureRequest) returns (google.protobuf.Empty);
   rpc ListSparkTxs(ListSparkTxsRequest) returns (ListSparkTxsResponse);
   rpc GetSparkTx(GetSparkTxRequest) returns (GetSparkTxResponse);
@@ -16,21 +16,23 @@ service SparkService {
   rpc ListWithdrawnOutputs(ListWithdrawnOutputsRequest) returns (ListWithdrawnOutputsResponse);  
 }
 
-message SendSparkTxRequest {
-  bytes identity_public_key = 1;
-  spark.TokenTransaction final_token_transaction = 2;
-}
-
 message SendSparkSignatureRequest {
-  SparkSignatureData signature_data = 1;
+  spark.TokenTransaction final_token_transaction = 1;
+
+  repeated spark.OperatorSpecificOwnerSignature operator_specific_signatures = 2;
+  SparkOperatorSignatureData operator_signature_data = 3;
+
+  repeated RevocationSecretWithIndex revocation_secrets = 4;
 }
 
-message SparkSignatureData {
-  bytes spark_operator_signature = 1;
-  bytes spark_operator_identity_public_key = 2;
-  repeated SparkSignatureOutputData outputs_to_spend_data = 3;
+message RevocationSecretWithIndex {
+  uint32 input_index = 1;
+  bytes revocation_secret = 2  [(validate.rules).bytes.len = 32];
+}
 
-  spark.TokenTransaction final_token_transaction = 4;
+message SparkOperatorSignatureData {
+  bytes spark_operator_signature = 1 [(validate.rules).bytes.min_len = 64, (validate.rules).bytes.max_len = 73];
+  bytes operator_identity_public_key = 2 [(validate.rules).bytes.len = 33];
 }
 
 message SparkSignatureOutputData {

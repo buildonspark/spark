@@ -193,7 +193,7 @@ run_lrcd_tmux() {
         grpc_address="127.0.0.1:1853${i}"
         p2p_address="0.0.0.0:800${i}"
         storage_path="./lrc20/node_$i"
-        db="postgresql://127.0.0.1:5432/lrc20_${i}?sslmode=disable"
+        db="postgresql://127.0.0.1:5432/lrc20_${i}"
         bootnodes="$(generate_lrcd_bootnodes "800${i}")"
 
         # Create a temporary config file for this instance
@@ -202,13 +202,12 @@ run_lrcd_tmux() {
             -e "s|{GRPC_ADDRESS}|$grpc_address|g" \
             -e "s|{P2P_ADDRESS}|$p2p_address|g" \
             -e "s|{STORAGE_PATH}|$storage_path|g" \
-            -e "s|{POSTGRES}|$db|g" \
+            -e "s|{POSTGRES}|$db?sslmode=disable|g" \
             -e "s|{BOOTNODES}|$bootnodes|g" \
             lrcd.template.config.toml >"$temp_config_file"
         local log_file="${run_dir}/logs/lrcd_${i}.log"
 
-        local cmd="cd lrc20.dev && DATABASE_URL=$db sqlx migrate run --source ./crates/storage/src/migrations && cargo run -p lrc20d --release -- run --config ../$temp_config_file 2>&1 | tee '${log_file}'"
-
+        local cmd="cd lrc20.dev && sea-orm-cli migrate up -d ./crates/storage/src/migration --database-url $db && cargo run -p lrc20d --release -- run --config ../$temp_config_file 2>&1 | tee '${log_file}'"
         tmux send-keys -t "$session_name" "$cmd" C-m
     done
     

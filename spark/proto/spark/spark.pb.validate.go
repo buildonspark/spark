@@ -4180,24 +4180,22 @@ var _ interface {
 	ErrorName() string
 } = OperatorSpecificTokenTransactionSignablePayloadValidationError{}
 
-// Validate checks the field values on
-// OperatorSpecificTokenTransactionSignature with the rules defined in the
-// proto definition for this message. If any rules are violated, the first
-// error encountered is returned, or nil if there are no violations.
-func (m *OperatorSpecificTokenTransactionSignature) Validate() error {
+// Validate checks the field values on OperatorSpecificOwnerSignature with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *OperatorSpecificOwnerSignature) Validate() error {
 	return m.validate(false)
 }
 
-// ValidateAll checks the field values on
-// OperatorSpecificTokenTransactionSignature with the rules defined in the
-// proto definition for this message. If any rules are violated, the result is
-// a list of violation errors wrapped in
-// OperatorSpecificTokenTransactionSignatureMultiError, or nil if none found.
-func (m *OperatorSpecificTokenTransactionSignature) ValidateAll() error {
+// ValidateAll checks the field values on OperatorSpecificOwnerSignature with
+// the rules defined in the proto definition for this message. If any rules
+// are violated, the result is a list of violation errors wrapped in
+// OperatorSpecificOwnerSignatureMultiError, or nil if none found.
+func (m *OperatorSpecificOwnerSignature) ValidateAll() error {
 	return m.validate(true)
 }
 
-func (m *OperatorSpecificTokenTransactionSignature) validate(all bool) error {
+func (m *OperatorSpecificOwnerSignature) validate(all bool) error {
 	if m == nil {
 		return nil
 	}
@@ -4205,7 +4203,7 @@ func (m *OperatorSpecificTokenTransactionSignature) validate(all bool) error {
 	var errors []error
 
 	if len(m.GetOwnerPublicKey()) != 33 {
-		err := OperatorSpecificTokenTransactionSignatureValidationError{
+		err := OperatorSpecificOwnerSignatureValidationError{
 			field:  "OwnerPublicKey",
 			reason: "value length must be 33 bytes",
 		}
@@ -4216,7 +4214,7 @@ func (m *OperatorSpecificTokenTransactionSignature) validate(all bool) error {
 	}
 
 	if l := len(m.GetOwnerSignature()); l < 64 || l > 73 {
-		err := OperatorSpecificTokenTransactionSignatureValidationError{
+		err := OperatorSpecificOwnerSignatureValidationError{
 			field:  "OwnerSignature",
 			reason: "value length must be between 64 and 73 bytes, inclusive",
 		}
@@ -4230,7 +4228,7 @@ func (m *OperatorSpecificTokenTransactionSignature) validate(all bool) error {
 		switch v := interface{}(m.GetPayload()).(type) {
 		case interface{ ValidateAll() error }:
 			if err := v.ValidateAll(); err != nil {
-				errors = append(errors, OperatorSpecificTokenTransactionSignatureValidationError{
+				errors = append(errors, OperatorSpecificOwnerSignatureValidationError{
 					field:  "Payload",
 					reason: "embedded message failed validation",
 					cause:  err,
@@ -4238,7 +4236,7 @@ func (m *OperatorSpecificTokenTransactionSignature) validate(all bool) error {
 			}
 		case interface{ Validate() error }:
 			if err := v.Validate(); err != nil {
-				errors = append(errors, OperatorSpecificTokenTransactionSignatureValidationError{
+				errors = append(errors, OperatorSpecificOwnerSignatureValidationError{
 					field:  "Payload",
 					reason: "embedded message failed validation",
 					cause:  err,
@@ -4247,7 +4245,7 @@ func (m *OperatorSpecificTokenTransactionSignature) validate(all bool) error {
 		}
 	} else if v, ok := interface{}(m.GetPayload()).(interface{ Validate() error }); ok {
 		if err := v.Validate(); err != nil {
-			return OperatorSpecificTokenTransactionSignatureValidationError{
+			return OperatorSpecificOwnerSignatureValidationError{
 				field:  "Payload",
 				reason: "embedded message failed validation",
 				cause:  err,
@@ -4256,20 +4254,19 @@ func (m *OperatorSpecificTokenTransactionSignature) validate(all bool) error {
 	}
 
 	if len(errors) > 0 {
-		return OperatorSpecificTokenTransactionSignatureMultiError(errors)
+		return OperatorSpecificOwnerSignatureMultiError(errors)
 	}
 
 	return nil
 }
 
-// OperatorSpecificTokenTransactionSignatureMultiError is an error wrapping
-// multiple validation errors returned by
-// OperatorSpecificTokenTransactionSignature.ValidateAll() if the designated
-// constraints aren't met.
-type OperatorSpecificTokenTransactionSignatureMultiError []error
+// OperatorSpecificOwnerSignatureMultiError is an error wrapping multiple
+// validation errors returned by OperatorSpecificOwnerSignature.ValidateAll()
+// if the designated constraints aren't met.
+type OperatorSpecificOwnerSignatureMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
-func (m OperatorSpecificTokenTransactionSignatureMultiError) Error() string {
+func (m OperatorSpecificOwnerSignatureMultiError) Error() string {
 	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
@@ -4278,12 +4275,12 @@ func (m OperatorSpecificTokenTransactionSignatureMultiError) Error() string {
 }
 
 // AllErrors returns a list of validation violation errors.
-func (m OperatorSpecificTokenTransactionSignatureMultiError) AllErrors() []error { return m }
+func (m OperatorSpecificOwnerSignatureMultiError) AllErrors() []error { return m }
 
-// OperatorSpecificTokenTransactionSignatureValidationError is the validation
-// error returned by OperatorSpecificTokenTransactionSignature.Validate if the
-// designated constraints aren't met.
-type OperatorSpecificTokenTransactionSignatureValidationError struct {
+// OperatorSpecificOwnerSignatureValidationError is the validation error
+// returned by OperatorSpecificOwnerSignature.Validate if the designated
+// constraints aren't met.
+type OperatorSpecificOwnerSignatureValidationError struct {
 	field  string
 	reason string
 	cause  error
@@ -4291,24 +4288,24 @@ type OperatorSpecificTokenTransactionSignatureValidationError struct {
 }
 
 // Field function returns field value.
-func (e OperatorSpecificTokenTransactionSignatureValidationError) Field() string { return e.field }
+func (e OperatorSpecificOwnerSignatureValidationError) Field() string { return e.field }
 
 // Reason function returns reason value.
-func (e OperatorSpecificTokenTransactionSignatureValidationError) Reason() string { return e.reason }
+func (e OperatorSpecificOwnerSignatureValidationError) Reason() string { return e.reason }
 
 // Cause function returns cause value.
-func (e OperatorSpecificTokenTransactionSignatureValidationError) Cause() error { return e.cause }
+func (e OperatorSpecificOwnerSignatureValidationError) Cause() error { return e.cause }
 
 // Key function returns key value.
-func (e OperatorSpecificTokenTransactionSignatureValidationError) Key() bool { return e.key }
+func (e OperatorSpecificOwnerSignatureValidationError) Key() bool { return e.key }
 
 // ErrorName returns error name.
-func (e OperatorSpecificTokenTransactionSignatureValidationError) ErrorName() string {
-	return "OperatorSpecificTokenTransactionSignatureValidationError"
+func (e OperatorSpecificOwnerSignatureValidationError) ErrorName() string {
+	return "OperatorSpecificOwnerSignatureValidationError"
 }
 
 // Error satisfies the builtin error interface
-func (e OperatorSpecificTokenTransactionSignatureValidationError) Error() string {
+func (e OperatorSpecificOwnerSignatureValidationError) Error() string {
 	cause := ""
 	if e.cause != nil {
 		cause = fmt.Sprintf(" | caused by: %v", e.cause)
@@ -4320,14 +4317,14 @@ func (e OperatorSpecificTokenTransactionSignatureValidationError) Error() string
 	}
 
 	return fmt.Sprintf(
-		"invalid %sOperatorSpecificTokenTransactionSignature.%s: %s%s",
+		"invalid %sOperatorSpecificOwnerSignature.%s: %s%s",
 		key,
 		e.field,
 		e.reason,
 		cause)
 }
 
-var _ error = OperatorSpecificTokenTransactionSignatureValidationError{}
+var _ error = OperatorSpecificOwnerSignatureValidationError{}
 
 var _ interface {
 	Field() string
@@ -4335,7 +4332,7 @@ var _ interface {
 	Key() bool
 	Cause() error
 	ErrorName() string
-} = OperatorSpecificTokenTransactionSignatureValidationError{}
+} = OperatorSpecificOwnerSignatureValidationError{}
 
 // Validate checks the field values on SignTokenTransactionRequest with the
 // rules defined in the proto definition for this message. If any rules are

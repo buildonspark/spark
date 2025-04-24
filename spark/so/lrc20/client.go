@@ -358,12 +358,10 @@ func (c *Client) executeLrc20Call(ctx context.Context, operation func(client pbl
 // SendSparkSignature sends a token transaction signature to the LRC20 node
 func (c *Client) SendSparkSignature(
 	ctx context.Context,
-	signatureData *pblrc20.SparkSignatureData,
+	req *pblrc20.SendSparkSignatureRequest,
 ) error {
 	return c.executeLrc20Call(ctx, func(client pblrc20.SparkServiceClient) error {
-		_, err := client.SendSparkSignature(ctx, &pblrc20.SendSparkSignatureRequest{
-			SignatureData: signatureData,
-		})
+		_, err := client.SendSparkSignature(ctx, req)
 		return err
 	})
 }

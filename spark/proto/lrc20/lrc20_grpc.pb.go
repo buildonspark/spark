@@ -21,7 +21,6 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	SparkService_SendSparkTx_FullMethodName          = "/rpc.v1.SparkService/SendSparkTx"
 	SparkService_SendSparkSignature_FullMethodName   = "/rpc.v1.SparkService/SendSparkSignature"
 	SparkService_ListSparkTxs_FullMethodName         = "/rpc.v1.SparkService/ListSparkTxs"
 	SparkService_GetSparkTx_FullMethodName           = "/rpc.v1.SparkService/GetSparkTx"
@@ -34,7 +33,6 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type SparkServiceClient interface {
-	SendSparkTx(ctx context.Context, in *SendSparkTxRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	SendSparkSignature(ctx context.Context, in *SendSparkSignatureRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	ListSparkTxs(ctx context.Context, in *ListSparkTxsRequest, opts ...grpc.CallOption) (*ListSparkTxsResponse, error)
 	GetSparkTx(ctx context.Context, in *GetSparkTxRequest, opts ...grpc.CallOption) (*GetSparkTxResponse, error)
@@ -49,16 +47,6 @@ type sparkServiceClient struct {
 
 func NewSparkServiceClient(cc grpc.ClientConnInterface) SparkServiceClient {
 	return &sparkServiceClient{cc}
-}
-
-func (c *sparkServiceClient) SendSparkTx(ctx context.Context, in *SendSparkTxRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(emptypb.Empty)
-	err := c.cc.Invoke(ctx, SparkService_SendSparkTx_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
 }
 
 func (c *sparkServiceClient) SendSparkSignature(ctx context.Context, in *SendSparkSignatureRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
@@ -125,7 +113,6 @@ func (c *sparkServiceClient) ListWithdrawnOutputs(ctx context.Context, in *ListW
 // All implementations must embed UnimplementedSparkServiceServer
 // for forward compatibility.
 type SparkServiceServer interface {
-	SendSparkTx(context.Context, *SendSparkTxRequest) (*emptypb.Empty, error)
 	SendSparkSignature(context.Context, *SendSparkSignatureRequest) (*emptypb.Empty, error)
 	ListSparkTxs(context.Context, *ListSparkTxsRequest) (*ListSparkTxsResponse, error)
 	GetSparkTx(context.Context, *GetSparkTxRequest) (*GetSparkTxResponse, error)
@@ -142,9 +129,6 @@ type SparkServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedSparkServiceServer struct{}
 
-func (UnimplementedSparkServiceServer) SendSparkTx(context.Context, *SendSparkTxRequest) (*emptypb.Empty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method SendSparkTx not implemented")
-}
 func (UnimplementedSparkServiceServer) SendSparkSignature(context.Context, *SendSparkSignatureRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SendSparkSignature not implemented")
 }
@@ -182,24 +166,6 @@ func RegisterSparkServiceServer(s grpc.ServiceRegistrar, srv SparkServiceServer)
 		t.testEmbeddedByValue()
 	}
 	s.RegisterService(&SparkService_ServiceDesc, srv)
-}
-
-func _SparkService_SendSparkTx_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(SendSparkTxRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(SparkServiceServer).SendSparkTx(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: SparkService_SendSparkTx_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SparkServiceServer).SendSparkTx(ctx, req.(*SendSparkTxRequest))
-	}
-	return interceptor(ctx, in, info, handler)
 }
 
 func _SparkService_SendSparkSignature_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -317,10 +283,6 @@ var SparkService_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "rpc.v1.SparkService",
 	HandlerType: (*SparkServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
-		{
-			MethodName: "SendSparkTx",
-			Handler:    _SparkService_SendSparkTx_Handler,
-		},
 		{
 			MethodName: "SendSparkSignature",
 			Handler:    _SparkService_SendSparkSignature_Handler,
