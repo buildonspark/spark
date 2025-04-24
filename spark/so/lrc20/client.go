@@ -16,6 +16,7 @@ import (
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/ent"
 	"github.com/lightsparkdev/spark-go/so/ent/tokenoutput"
+	"github.com/lightsparkdev/spark-go/so/logging"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
 )
@@ -32,6 +33,7 @@ type connPool struct {
 	config   *so.Config
 	maxSize  int
 	network  string
+	logger   *slog.Logger
 
 	// Health check related fields
 	healthCheckInterval time.Duration
@@ -41,6 +43,7 @@ type connPool struct {
 
 // newConnPool creates a new connection pool with improved performance characteristics
 func newConnPool(config *so.Config) (*connPool, error) {
+	logger := slog.Default()
 	network := common.Regtest.String()
 
 	// Validate network support
@@ -59,6 +62,7 @@ func newConnPool(config *so.Config) (*connPool, error) {
 		config:              config,
 		maxSize:             size,
 		network:             network,
+		logger:              logger,
 		healthCheckInterval: 30 * time.Second, // Configurable health check interval
 		stopHealthCheck:     make(chan struct{}),
 	}
@@ -68,7 +72,7 @@ func newConnPool(config *so.Config) (*connPool, error) {
 		conn, err := createConnection(config)
 		if err != nil {
 			// Log the error but continue trying to create more connections
-			slog.Warn("failed to create initial connection", "error", err, "index", i)
+			logger.Warn("failed to create initial connection", "error", err, "index", i)
 			continue
 		}
 
@@ -117,7 +121,7 @@ func (p *connPool) performHealthCheck() {
 		return
 	}
 
-	slog.Debug("performing health check on idle connections", "count", checkCount)
+	p.logger.Debug("performing health check on idle connections", "count", checkCount)
 
 	for i := 0; i < checkCount; i++ {
 		// Get a connection from the pool
@@ -138,7 +142,7 @@ func (p *connPool) performHealthCheck() {
 				// Create a new connection to replace the bad one
 				newConn, err := createConnection(p.config)
 				if err != nil {
-					slog.Error("failed to create replacement connection", "error", err)
+					p.logger.Error("failed to create replacement connection", "error", err)
 				} else {
 					p.mu.Lock()
 					p.allConns[newConn] = struct{}{}
@@ -231,7 +235,7 @@ func (p *connPool) returnConn(conn *grpc.ClientConn) {
 		// Try to create a replacement
 		newConn, err := createConnection(p.config)
 		if err != nil {
-			slog.Error("failed to create replacement connection", "error", err)
+			p.logger.Error("failed to create replacement connection", "error", err)
 			return
 		}
 
@@ -272,7 +276,7 @@ func (p *connPool) Close() error {
 	for conn := range p.allConns {
 		if err := conn.Close(); err != nil {
 			lastErr = err
-			slog.Error("error closing connection", "error", err)
+			p.logger.Error("error closing connection", "error", err)
 		}
 		delete(p.allConns, conn)
 	}
@@ -282,7 +286,7 @@ func (p *connPool) Close() error {
 	for conn := range p.availableConns {
 		if err := conn.Close(); err != nil {
 			lastErr = err
-			slog.Error("error closing connection from channel", "error", err)
+			p.logger.Error("error closing connection from channel", "error", err)
 		}
 	}
 
@@ -334,7 +338,7 @@ func NewClient(config *so.Config) (*Client, error) {
 // executeLrc20Call handles common LRC20 RPC call pattern with proper connection management
 func (c *Client) executeLrc20Call(ctx context.Context, operation func(client pblrc20.SparkServiceClient) error) error {
 	network := common.Regtest.String()
-	if c.shouldSkipLrc20Call(network) {
+	if c.shouldSkipLrc20Call(ctx, network) {
 		return nil
 	}
 
@@ -393,9 +397,11 @@ func (c *Client) VerifySparkTx(
 }
 
 // shouldSkipLrc20Call checks if LRC20 RPCs are disabled for the given network
-func (c *Client) shouldSkipLrc20Call(network string) bool {
+func (c *Client) shouldSkipLrc20Call(ctx context.Context, network string) bool {
+	logger := logging.GetLoggerFromContext(ctx)
+
 	if lrc20Config, ok := c.config.Lrc20Configs[network]; ok && lrc20Config.DisableRpcs {
-		slog.Info("Skipping LRC20 node call due to DisableRpcs flag")
+		logger.Info("Skipping LRC20 node call due to DisableRpcs flag")
 		return true
 	}
 	return false
@@ -410,13 +416,14 @@ func (c *Client) MarkWithdrawnTokenOutputs(
 	dbTx *ent.Tx,
 	blockHash *chainhash.Hash,
 ) error {
+	logger := logging.GetLoggerFromContext(ctx)
 	network := common.Regtest.String()
 	if lrc20Config, ok := c.config.Lrc20Configs[network]; ok && lrc20Config.DisableRpcs {
-		slog.Info("Skipping LRC20 node call due to DisableRpcs flag")
+		logger.Info("Skipping LRC20 node call due to DisableRpcs flag")
 		return nil
 	}
 	if lrc20Config, ok := c.config.Lrc20Configs[network]; ok && lrc20Config.DisableL1 {
-		slog.Info("Skipping LRC20 node call due to DisableL1 flag")
+		logger.Info("Skipping LRC20 node call due to DisableL1 flag")
 		return nil
 	}
 
@@ -446,7 +453,7 @@ func (c *Client) MarkWithdrawnTokenOutputs(
 	// Add the current page of results to our collection
 	allOutputs = append(allOutputs, pageResponse.Outputs...)
 
-	slog.Info("Completed fetching all withdrawn outputs", "total", len(allOutputs))
+	logger.Info("Completed fetching all withdrawn outputs", "total", len(allOutputs))
 
 	// Mark each output as withdrawn in the database
 	if len(allOutputs) > 0 {
@@ -457,7 +464,7 @@ func (c *Client) MarkWithdrawnTokenOutputs(
 		for _, output := range allOutputs {
 			outputUUID, err := uuid.Parse(*output.Id)
 			if err != nil {
-				slog.Warn("Failed to parse output ID as UUID",
+				logger.Warn("Failed to parse output ID as UUID",
 					"output_id", output.Id,
 					"error", err)
 				continue
@@ -474,7 +481,7 @@ func (c *Client) MarkWithdrawnTokenOutputs(
 				return fmt.Errorf("failed to bulk update token outputs: %w", err)
 			}
 
-			slog.Debug("Successfully marked token outputs as withdrawn",
+			logger.Debug("Successfully marked token outputs as withdrawn",
 				"count", len(outputIDs))
 		}
 	}
@@ -490,6 +497,8 @@ func (c *Client) UnmarkWithdrawnTokenOutputs(
 	dbTx *ent.Tx,
 	blockHash *chainhash.Hash,
 ) error {
+	logger := logging.GetLoggerFromContext(ctx)
+
 	// Get all token outputs that were marked as withdrawn in this block
 	tokenOutputs, err := dbTx.TokenOutput.Query().
 		Where(tokenoutput.ConfirmedWithdrawBlockHashEQ(blockHash.CloneBytes())).
@@ -500,11 +509,11 @@ func (c *Client) UnmarkWithdrawnTokenOutputs(
 
 	count := len(tokenOutputs)
 	if count == 0 {
-		slog.Info("No withdrawn token outputs found for block", "block_hash", blockHash.String())
+		logger.Info("No withdrawn token outputs found for block", "block_hash", blockHash.String())
 		return nil
 	}
 
-	slog.Info("Unmarking withdrawn token outputs due to reorg",
+	logger.Info("Unmarking withdrawn token outputs due to reorg",
 		"block_hash", blockHash.String(),
 		"count", count)
 
@@ -521,7 +530,7 @@ func (c *Client) UnmarkWithdrawnTokenOutputs(
 		return fmt.Errorf("failed to clear withdraw block hash for outputs: %w", err)
 	}
 
-	slog.Info("Successfully unmarked token outputs",
+	logger.Info("Successfully unmarked token outputs",
 		"block_hash", blockHash.String(),
 		"count", count)
 

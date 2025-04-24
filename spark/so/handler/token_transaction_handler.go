@@ -94,8 +94,6 @@ func NewTokenTransactionHandler(config authz.Config, db *ent.Client, lrc20Client
 
 // StartTokenTransaction verifies the token outputs, reserves the keyshares for the token transaction, and returns metadata about the operators that possess the keyshares.
 func (o TokenTransactionHandler) StartTokenTransaction(ctx context.Context, config *so.Config, req *pb.StartTokenTransactionRequest) (*pb.StartTokenTransactionResponse, error) {
-	logger := logging.GetLoggerFromContext(ctx)
-
 	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, o.config, req.IdentityPublicKey); err != nil {
 		return nil, fmt.Errorf("%s: %w", errIdentityPublicKeyAuthFailed, err)
 	}
@@ -120,9 +118,9 @@ func (o TokenTransactionHandler) StartTokenTransaction(ctx context.Context, conf
 	if previouslyCreatedTokenTransaction != nil &&
 		previouslyCreatedTokenTransaction.Status == schema.TokenTransactionStatusStarted &&
 		bytes.Equal(previouslyCreatedTokenTransaction.CoordinatorPublicKey, config.IdentityPublicKey()) {
-		logWithTransactionEnt(ctx, logger, "Found existing token transaction in started state with matching coordinator",
+		logWithTransactionEnt(ctx, "Found existing token transaction in started state with matching coordinator",
 			previouslyCreatedTokenTransaction, slog.LevelInfo)
-		return o.regenerateStartResponseForDuplicateRequest(ctx, config, previouslyCreatedTokenTransaction, logger)
+		return o.regenerateStartResponseForDuplicateRequest(ctx, config, previouslyCreatedTokenTransaction)
 	}
 	// Each created output requires a keyshare for revocation key generation.
 	numRevocationKeysharesNeeded := len(req.PartialTokenTransaction.TokenOutputs)
@@ -391,7 +389,7 @@ func (o TokenTransactionHandler) SignTokenTransaction(
 	}
 
 	if tokenTransaction.Status == schema.TokenTransactionStatusSigned {
-		return o.regenerateSigningResponseForDuplicateRequest(ctx, logger, config, tokenTransaction, finalTokenTransactionHash)
+		return o.regenerateSigningResponseForDuplicateRequest(ctx, config, tokenTransaction, finalTokenTransactionHash)
 	}
 
 	invalidOutputs := validateOutputs(tokenTransaction.Edges.CreatedOutput, schema.TokenOutputStatusCreatedStarted)
@@ -495,9 +493,8 @@ func (o TokenTransactionHandler) regenerateStartResponseForDuplicateRequest(
 	ctx context.Context,
 	config *so.Config,
 	tokenTransaction *ent.TokenTransaction,
-	logger *slog.Logger,
 ) (*pb.StartTokenTransactionResponse, error) {
-	logWithTransactionEnt(ctx, logger, "Regenerating response for a duplicate StartTokenTransaction() Call", tokenTransaction, slog.LevelDebug)
+	logWithTransactionEnt(ctx, "Regenerating response for a duplicate StartTokenTransaction() Call", tokenTransaction, slog.LevelDebug)
 
 	var invalidOutputs []string
 	expectedCreatedOutputStatus := schema.TokenOutputStatusCreatedStarted
@@ -525,7 +522,7 @@ func (o TokenTransactionHandler) regenerateStartResponseForDuplicateRequest(
 		return nil, formatErrorWithTransactionEnt(errFailedToGetKeyshareInfo, tokenTransaction, err)
 	}
 
-	logWithTransactionEnt(ctx, logger, "Returning stored final token transaction in response to repeat start call",
+	logWithTransactionEnt(ctx, "Returning stored final token transaction in response to repeat start call",
 		tokenTransaction, slog.LevelDebug)
 	return &pb.StartTokenTransactionResponse{
 		FinalTokenTransaction: transaction,
@@ -538,12 +535,11 @@ func (o TokenTransactionHandler) regenerateStartResponseForDuplicateRequest(
 // the wallet SDK can retry with all SOs and get successful responses.
 func (o TokenTransactionHandler) regenerateSigningResponseForDuplicateRequest(
 	ctx context.Context,
-	logger *slog.Logger,
 	config *so.Config,
 	tokenTransaction *ent.TokenTransaction,
 	finalTokenTransactionHash []byte,
 ) (*pb.SignTokenTransactionResponse, error) {
-	logWithTransactionEnt(ctx, logger, "Regenerating response for a duplicate SignTokenTransaction() Call", tokenTransaction, slog.LevelDebug)
+	logWithTransactionEnt(ctx, "Regenerating response for a duplicate SignTokenTransaction() Call", tokenTransaction, slog.LevelDebug)
 
 	var invalidOutputs []string
 	isMint := tokenTransaction.Edges.Mint != nil
@@ -576,7 +572,7 @@ func (o TokenTransactionHandler) regenerateSigningResponseForDuplicateRequest(
 	if err != nil {
 		return nil, formatErrorWithTransactionEnt(errFailedToGetRevocationKeyshares, tokenTransaction, err)
 	}
-	logWithTransactionEnt(ctx, logger, "Returning stored signature in response to repeat Sign() call", tokenTransaction, slog.LevelDebug)
+	logWithTransactionEnt(ctx, "Returning stored signature in response to repeat Sign() call", tokenTransaction, slog.LevelDebug)
 	return &pb.SignTokenTransactionResponse{
 		SparkOperatorSignature:              tokenTransaction.OperatorSignature,
 		TokenTransactionRevocationKeyshares: revocationKeyshares,
@@ -770,7 +766,6 @@ func (o TokenTransactionHandler) FreezeTokensOnLRC20Node(
 // b) transactions associated with a particular set of transaction hashes
 // c) all transactions associated with a particular token public key
 func (o TokenTransactionHandler) QueryTokenTransactions(ctx context.Context, config *so.Config, req *pb.QueryTokenTransactionsRequest) (*pb.QueryTokenTransactionsResponse, error) {
-	logger := logging.GetLoggerFromContext(ctx)
 	db := ent.GetDbFromContext(ctx)
 
 	// Start with a base query for token transactions
@@ -848,7 +843,7 @@ func (o TokenTransactionHandler) QueryTokenTransactions(ctx context.Context, con
 			// Verify that this spent output is actually associated with this transaction.
 			if output.Edges.OutputSpentTokenTransaction == nil ||
 				output.Edges.OutputSpentTokenTransaction.ID != transaction.ID {
-				logWithTransactionEnt(ctx, logger, "Warning: Spent output not properly associated with transaction", transaction, slog.LevelInfo)
+				logWithTransactionEnt(ctx, "Warning: Spent output not properly associated with transaction", transaction, slog.LevelInfo)
 				continue
 			}
 			spentOutputStatuses[output.Status]++
@@ -1035,7 +1030,9 @@ func (o TokenTransactionHandler) getRevocationKeysharesForTokenTransaction(ctx c
 	return revocationKeyshares, nil
 }
 
-func logWithTransactionEnt(ctx context.Context, logger *slog.Logger, msg string, tokenTransaction *ent.TokenTransaction, level slog.Level) {
+func logWithTransactionEnt(ctx context.Context, msg string, tokenTransaction *ent.TokenTransaction, level slog.Level) {
+	logger := logging.GetLoggerFromContext(ctx)
+
 	attrs := []any{
 		"transaction_uuid", tokenTransaction.ID.String(),
 		"transaction_hash", hex.EncodeToString(tokenTransaction.FinalizedTokenTransactionHash),

@@ -26,6 +26,7 @@ import (
 	enttreenode "github.com/lightsparkdev/spark-go/so/ent/treenode"
 	"github.com/lightsparkdev/spark-go/so/errors"
 	"github.com/lightsparkdev/spark-go/so/helper"
+	"github.com/lightsparkdev/spark-go/so/logging"
 	"github.com/lightsparkdev/spark-go/so/objects"
 	events "github.com/lightsparkdev/spark-go/so/stream"
 	"google.golang.org/protobuf/proto"
@@ -201,6 +202,8 @@ func signRefunds(ctx context.Context, config *so.Config, requests []*pb.LeafRefu
 
 // CompleteSendTransfer completes a transfer from sender.
 func (h *TransferHandler) CompleteSendTransfer(ctx context.Context, req *pb.CompleteSendTransferRequest) (*pb.CompleteSendTransferResponse, error) {
+	logger := logging.GetLoggerFromContext(ctx)
+
 	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, req.OwnerIdentityPublicKey); err != nil {
 		return nil, err
 	}
@@ -248,13 +251,17 @@ func (h *TransferHandler) CompleteSendTransfer(ctx context.Context, req *pb.Comp
 		return nil, fmt.Errorf("unable to marshal transfer: %v", err)
 	}
 	eventRouter := events.GetDefaultRouter()
-	eventRouter.NotifyUser(transfer.ReceiverIdentityPubkey, &pb.SubscribeToEventsResponse{
+	err = eventRouter.NotifyUser(transfer.ReceiverIdentityPubkey, &pb.SubscribeToEventsResponse{
 		Event: &pb.SubscribeToEventsResponse_Transfer{
 			Transfer: &pb.TransferEvent{
 				Transfer: transferProto,
 			},
 		},
 	})
+	if err != nil {
+		logger.Error("failed to notify user about transfer event", "error", err, "identity_public_key", logging.Pubkey{Pubkey: transfer.ReceiverIdentityPubkey})
+	}
+
 	return &pb.CompleteSendTransferResponse{Transfer: transferProto}, nil
 }
 

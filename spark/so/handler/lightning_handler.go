@@ -6,7 +6,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"log/slog"
 	"math/big"
 	"strings"
 
@@ -27,6 +26,7 @@ import (
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
 	"github.com/lightsparkdev/spark-go/so/ent/treenode"
 	"github.com/lightsparkdev/spark-go/so/helper"
+	"github.com/lightsparkdev/spark-go/so/logging"
 	"github.com/lightsparkdev/spark-go/so/objects"
 	decodepay "github.com/nbd-wtf/ln-decodepay"
 	"google.golang.org/protobuf/proto"
@@ -192,6 +192,8 @@ func (h *LightningHandler) validateGetPreimageRequest(
 	feeSats uint64,
 	reason pb.InitiatePreimageSwapRequest_Reason,
 ) error {
+	logger := logging.GetLoggerFromContext(ctx)
+
 	// Step 0 Validate that there's no existing preimage request for this payment hash
 	db := ent.GetDbFromContext(ctx)
 	preimageRequests, err := db.PreimageRequest.Query().Where(
@@ -264,7 +266,7 @@ func (h *LightningHandler) validateGetPreimageRequest(
 		}
 
 		if !bytes.Equal(realUserPublicKey, node.OwnerSigningPubkey) {
-			slog.Debug("real user public key mismatch", "expected", hex.EncodeToString(node.OwnerSigningPubkey), "got", hex.EncodeToString(realUserPublicKey))
+			logger.Debug("real user public key mismatch", "expected", hex.EncodeToString(node.OwnerSigningPubkey), "got", hex.EncodeToString(realUserPublicKey))
 			node, err = node.Update().SetOwnerSigningPubkey(realUserPublicKey).Save(ctx)
 			if err != nil {
 				return fmt.Errorf("unable to update node: %v", err)
@@ -478,6 +480,8 @@ func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pb.Ini
 		return nil, fmt.Errorf("receiver identity public key is required")
 	}
 
+	logger := logging.GetLoggerFromContext(ctx)
+
 	var preimageShare *ent.PreimageShare
 	if req.Reason == pb.InitiatePreimageSwapRequest_REASON_RECEIVE {
 		db := ent.GetDbFromContext(ctx)
@@ -607,7 +611,7 @@ func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pb.Ini
 			SenderIdentityPublicKey: transfer.SenderIdentityPubkey,
 		}, CancelSendTransferIntentTask)
 		if err != nil {
-			slog.Error("InitiatePreimageSwap: unable to cancel own send transfer", "error", err)
+			logger.Error("InitiatePreimageSwap: unable to cancel own send transfer", "error", err)
 		}
 
 		selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
@@ -629,7 +633,7 @@ func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pb.Ini
 			return nil, nil
 		})
 		if err != nil {
-			slog.Error("InitiatePreimageSwap: unable to cancel send transfer", "error", err)
+			logger.Error("InitiatePreimageSwap: unable to cancel send transfer", "error", err)
 		}
 
 		return nil, fmt.Errorf("recovered preimage did not match payment hash: %w", ent.ErrNoRollback)
@@ -645,6 +649,7 @@ func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pb.Ini
 
 // UpdatePreimageRequest updates the preimage request.
 func (h *LightningHandler) UpdatePreimageRequest(ctx context.Context, req *pbinternal.UpdatePreimageRequestRequest) error {
+	logger := logging.GetLoggerFromContext(ctx)
 	db := ent.GetDbFromContext(ctx)
 
 	paymentHash := sha256.Sum256(req.Preimage)
@@ -656,7 +661,7 @@ func (h *LightningHandler) UpdatePreimageRequest(ctx context.Context, req *pbint
 		),
 	).First(ctx)
 	if err != nil {
-		slog.Error("UpdatePreimageRequest: unable to get preimage request", "error", err, "paymentHash", hex.EncodeToString(paymentHash[:]), "identityPublicKey", hex.EncodeToString(req.IdentityPublicKey))
+		logger.Error("UpdatePreimageRequest: unable to get preimage request", "error", err, "paymentHash", hex.EncodeToString(paymentHash[:]), "identityPublicKey", hex.EncodeToString(req.IdentityPublicKey))
 		return fmt.Errorf("UpdatePreimageRequest:unable to get preimage request: %v", err)
 	}
 
@@ -669,7 +674,9 @@ func (h *LightningHandler) UpdatePreimageRequest(ctx context.Context, req *pbint
 
 // QueryUserSignedRefunds queries the user signed refunds for the given payment hash.
 func (h *LightningHandler) QueryUserSignedRefunds(ctx context.Context, req *pb.QueryUserSignedRefundsRequest) (*pb.QueryUserSignedRefundsResponse, error) {
+	logger := logging.GetLoggerFromContext(ctx)
 	db := ent.GetDbFromContext(ctx)
+
 	preimageRequest, err := db.PreimageRequest.Query().Where(
 		preimagerequest.And(
 			preimagerequest.PaymentHashEQ(req.PaymentHash),
@@ -678,7 +685,7 @@ func (h *LightningHandler) QueryUserSignedRefunds(ctx context.Context, req *pb.Q
 		),
 	).First(ctx)
 	if err != nil {
-		slog.Error("QueryUserSignedRefunds: unable to get preimage request", "error", err, "paymentHash", hex.EncodeToString(req.PaymentHash), "identityPublicKey", hex.EncodeToString(req.IdentityPublicKey))
+		logger.Error("QueryUserSignedRefunds: unable to get preimage request", "error", err, "paymentHash", hex.EncodeToString(req.PaymentHash), "identityPublicKey", hex.EncodeToString(req.IdentityPublicKey))
 		return nil, fmt.Errorf("QueryUserSignedRefunds: unable to get preimage request: %v", err)
 	}
 
@@ -730,12 +737,14 @@ func (h *LightningHandler) QueryUserSignedRefunds(ctx context.Context, req *pb.Q
 }
 
 func (h *LightningHandler) ProvidePreimageInternal(ctx context.Context, req *pb.ProvidePreimageRequest) (*ent.Transfer, error) {
+	logger := logging.GetLoggerFromContext(ctx)
 	db := ent.GetDbFromContext(ctx)
+
 	calculatedPaymentHash := sha256.Sum256(req.Preimage)
 	if !bytes.Equal(calculatedPaymentHash[:], req.PaymentHash) {
 		return nil, fmt.Errorf("invalid preimage")
 	}
-	slog.Debug("ProvidePreimage: hash calculated")
+	logger.Debug("ProvidePreimage: hash calculated")
 
 	preimageRequest, err := db.PreimageRequest.Query().Where(
 		preimagerequest.And(
@@ -745,10 +754,10 @@ func (h *LightningHandler) ProvidePreimageInternal(ctx context.Context, req *pb.
 		),
 	).First(ctx)
 	if err != nil {
-		slog.Error("ProvidePreimage: unable to get preimage request", "error", err, "paymentHash", hex.EncodeToString(req.PaymentHash), "identityPublicKey", hex.EncodeToString(req.IdentityPublicKey))
+		logger.Error("ProvidePreimage: unable to get preimage request", "error", err, "paymentHash", hex.EncodeToString(req.PaymentHash), "identityPublicKey", hex.EncodeToString(req.IdentityPublicKey))
 		return nil, fmt.Errorf("ProvidePreimage: unable to get preimage request: %v", err)
 	}
-	slog.Debug("ProvidePreimage: preimage request found")
+	logger.Debug("ProvidePreimage: preimage request found")
 
 	preimageRequest, err = preimageRequest.Update().
 		SetStatus(schema.PreimageRequestStatusPreimageShared).
@@ -757,13 +766,13 @@ func (h *LightningHandler) ProvidePreimageInternal(ctx context.Context, req *pb.
 	if err != nil {
 		return nil, fmt.Errorf("unable to update preimage request status: %v", err)
 	}
-	slog.Debug("ProvidePreimage: preimage request status updated")
+	logger.Debug("ProvidePreimage: preimage request status updated")
 
 	transfer, err := preimageRequest.QueryTransfers().Only(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get transfer: %v", err)
 	}
-	slog.Debug("ProvidePreimage: transfer loaded")
+	logger.Debug("ProvidePreimage: transfer loaded")
 
 	// apply key tweaks for all transfer_leaves
 	transferLeaves, err := transfer.QueryTransferLeaves().All(ctx)
@@ -800,18 +809,20 @@ func (h *LightningHandler) ProvidePreimageInternal(ctx context.Context, req *pb.
 }
 
 func (h *LightningHandler) ProvidePreimage(ctx context.Context, req *pb.ProvidePreimageRequest) (*pb.ProvidePreimageResponse, error) {
-	slog.Debug("ProvidePreimage: request received")
+	logger := logging.GetLoggerFromContext(ctx)
+
+	logger.Debug("ProvidePreimage: request received")
 	transfer, err := h.ProvidePreimageInternal(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("unable to provide preimage: %v", err)
 	}
-	slog.Debug("ProvidePreimage: provided preimage internal completed")
+	logger.Debug("ProvidePreimage: provided preimage internal completed")
 
 	transferProto, err := transfer.MarshalProto(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to marshal transfer: %v", err)
 	}
-	slog.Debug("ProvidePreimage: transfer marshalled")
+	logger.Debug("ProvidePreimage: transfer marshalled")
 
 	operatorSelection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
 	_, err = helper.ExecuteTaskWithAllOperators(ctx, h.config, &operatorSelection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
@@ -831,12 +842,14 @@ func (h *LightningHandler) ProvidePreimage(ctx context.Context, req *pb.ProvideP
 	if err != nil {
 		return nil, fmt.Errorf("unable to execute task with all operators: %v", err)
 	}
-	slog.Debug("ProvidePreimage: SO synced")
+	logger.Debug("ProvidePreimage: SO synced")
 
 	return &pb.ProvidePreimageResponse{Transfer: transferProto}, nil
 }
 
 func (h *LightningHandler) ReturnLightningPayment(ctx context.Context, req *pb.ReturnLightningPaymentRequest, internal bool) (*emptypb.Empty, error) {
+	logger := logging.GetLoggerFromContext(ctx)
+
 	if !internal {
 		if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, req.UserIdentityPublicKey); err != nil {
 			return nil, err
@@ -852,7 +865,7 @@ func (h *LightningHandler) ReturnLightningPayment(ctx context.Context, req *pb.R
 		),
 	).First(ctx)
 	if err != nil {
-		slog.Error("ReturnLightningPayment: unable to get preimage request", "error", err, "paymentHash", hex.EncodeToString(req.PaymentHash), "identityPublicKey", hex.EncodeToString(req.UserIdentityPublicKey))
+		logger.Error("ReturnLightningPayment: unable to get preimage request", "error", err, "paymentHash", hex.EncodeToString(req.PaymentHash), "identityPublicKey", hex.EncodeToString(req.UserIdentityPublicKey))
 		return nil, fmt.Errorf("ReturnLightningPayment: unable to get preimage request: %v", err)
 	}
 

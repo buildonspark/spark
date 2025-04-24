@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark-go/so/logging"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -26,7 +26,6 @@ type ValidationError struct {
 	Value      interface{}
 	Constraint string
 	Message    string
-	RequestID  string
 	Method     string
 }
 
@@ -35,7 +34,7 @@ func (e *ValidationError) Error() string {
 }
 
 // validateRequestSize checks if the request size is within allowed limits
-func validateRequestSize(req interface{}, requestID string, method string) error {
+func validateRequestSize(req interface{}, method string) error {
 	if msg, ok := req.(proto.Message); ok {
 		size := proto.Size(msg)
 		if size > MaxRequestSize {
@@ -44,7 +43,6 @@ func validateRequestSize(req interface{}, requestID string, method string) error
 				Value:      size,
 				Constraint: fmt.Sprintf("must be <= %d bytes", MaxRequestSize),
 				Message:    "request too large",
-				RequestID:  requestID,
 				Method:     method,
 			}
 		}
@@ -53,7 +51,7 @@ func validateRequestSize(req interface{}, requestID string, method string) error
 }
 
 // validateArrayLengths recursively checks array lengths in the request
-func validateArrayLengths(req interface{}, requestID string, method string) error {
+func validateArrayLengths(req interface{}, method string) error {
 	if msg, ok := req.(proto.Message); ok {
 		// Use reflection to check array lengths
 		// This is a simplified version - in practice you'd want to recursively check all fields
@@ -65,7 +63,6 @@ func validateArrayLengths(req interface{}, requestID string, method string) erro
 						Value:      len(arr.([]interface{})),
 						Constraint: fmt.Sprintf("must be <= %d items", MaxArrayLength),
 						Message:    "array too long",
-						RequestID:  requestID,
 						Method:     method,
 					}
 				}
@@ -77,14 +74,10 @@ func validateArrayLengths(req interface{}, requestID string, method string) erro
 
 func ValidationInterceptor() grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
-		requestID := uuid.New().String()
-		logger := slog.Default().With(
-			"request_id", requestID,
-			"method", info.FullMethod,
-		)
+		logger := logging.GetLoggerFromContext(ctx)
 
 		// Check request size
-		if err := validateRequestSize(req, requestID, info.FullMethod); err != nil {
+		if err := validateRequestSize(req, info.FullMethod); err != nil {
 			logger.Warn("Request size validation failed",
 				"error", err,
 				"size", err.(*ValidationError).Value,
@@ -93,7 +86,7 @@ func ValidationInterceptor() grpc.UnaryServerInterceptor {
 		}
 
 		// Check array lengths
-		if err := validateArrayLengths(req, requestID, info.FullMethod); err != nil {
+		if err := validateArrayLengths(req, info.FullMethod); err != nil {
 			logger.Warn("Array length validation failed",
 				"error", err,
 				"length", err.(*ValidationError).Value,
@@ -131,23 +124,17 @@ func ValidationInterceptor() grpc.UnaryServerInterceptor {
 
 type validatingServerStream struct {
 	grpc.ServerStream
-	requestID string
-	method    string
-	logger    *slog.Logger
+	method string
+	logger *slog.Logger
 }
 
 func StreamValidationInterceptor() grpc.StreamServerInterceptor {
 	return func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
-		requestID := uuid.New().String()
-		logger := slog.Default().With(
-			"request_id", requestID,
-			"method", info.FullMethod,
-		)
+		logger := logging.GetLoggerFromContext(ss.Context())
 
 		// Create a wrapping ServerStream that intercepts SendMsg
 		wrappedStream := &validatingServerStream{
 			ServerStream: ss,
-			requestID:    requestID,
 			method:       info.FullMethod,
 			logger:       logger,
 		}

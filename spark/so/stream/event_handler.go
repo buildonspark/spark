@@ -2,7 +2,7 @@ package events
 
 import (
 	"encoding/hex"
-	"log/slog"
+	"fmt"
 	"sync"
 
 	pb "github.com/lightsparkdev/spark-go/proto/spark"
@@ -61,12 +61,12 @@ func (s *EventRouter) RegisterStream(identityPublicKey []byte, stream pb.SparkSe
 	return nil
 }
 
-func (s *EventRouter) NotifyUser(identityPublicKey []byte, message *pb.SubscribeToEventsResponse) {
+func (s *EventRouter) NotifyUser(identityPublicKey []byte, message *pb.SubscribeToEventsResponse) error {
 	identityPublicKeyHex := hex.EncodeToString(identityPublicKey)
 
 	mutex, _ := s.mutexes.Load(identityPublicKeyHex)
 	if mutex == nil {
-		return
+		return nil
 	}
 	mutex.(*sync.Mutex).Lock()
 	defer mutex.(*sync.Mutex).Unlock()
@@ -75,25 +75,23 @@ func (s *EventRouter) NotifyUser(identityPublicKey []byte, message *pb.Subscribe
 		if err := currentStream.(pb.SparkService_SubscribeToEventsServer).Send(message); err != nil {
 			peer, ok := peer.FromContext(currentStream.(pb.SparkService_SubscribeToEventsServer).Context())
 
-			network := "unknown"
-			address := "unknown"
-			if ok {
-				network = peer.Addr.Network()
-				address = peer.Addr.String()
-			}
-
-			if !isStreamClosedError(err) {
-				slog.Error("Unexpected error sending message to stream",
-					"error", err,
-					"identityPublicKey", identityPublicKeyHex,
-					"network", network,
-					"address", address,
-				)
-			}
 			s.streams.Delete(identityPublicKeyHex)
 			s.mutexes.Delete(identityPublicKeyHex)
+
+			if !isStreamClosedError(err) {
+				network := "unknown"
+				address := "unknown"
+				if ok {
+					network = peer.Addr.Network()
+					address = peer.Addr.String()
+				}
+
+				return fmt.Errorf("error sending message to stream for (network: %s, address: %s): %v", network, address, err)
+			}
 		}
 	}
+
+	return nil
 }
 
 func SubscribeToEvents(identityPublicKey []byte, st pb.SparkService_SubscribeToEventsServer) error {

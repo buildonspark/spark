@@ -314,15 +314,15 @@ func main() {
 		var err error
 		rateLimiter, err = createRateLimiter(config)
 		if err != nil {
-			slog.Error("Failed to create rate limiter", "error", err)
+			log.Fatalf("Failed to create rate limiter: %v", err)
 		}
 	}
 
 	serverOpts := []grpc.ServerOption{
 		grpc.StatsHandler(otelgrpc.NewServerHandler()),
 		grpc.UnaryInterceptor(grpc_middleware.ChainUnaryServer(
-			sparkgrpc.PanicRecoveryInterceptor(config.ReturnDetailedPanicErrors),
 			helper.LogInterceptor,
+			sparkgrpc.PanicRecoveryInterceptor(config.ReturnDetailedPanicErrors),
 			ent.DbSessionMiddleware(dbClient),
 			authn.NewAuthnInterceptor(sessionTokenCreatorVerifier).AuthnInterceptor,
 			sparkgrpc.ValidationInterceptor(),

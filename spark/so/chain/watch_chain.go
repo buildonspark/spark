@@ -26,6 +26,7 @@ import (
 	"github.com/lightsparkdev/spark-go/so/ent/signingkeyshare"
 	"github.com/lightsparkdev/spark-go/so/ent/treenode"
 	"github.com/lightsparkdev/spark-go/so/helper"
+	"github.com/lightsparkdev/spark-go/so/logging"
 	"github.com/lightsparkdev/spark-go/so/lrc20"
 	events "github.com/lightsparkdev/spark-go/so/stream"
 	"github.com/pebbe/zmq4"
@@ -478,13 +479,16 @@ func handleBlock(
 				}
 
 				eventRouter := events.GetDefaultRouter()
-				eventRouter.NotifyUser(treeNode.OwnerIdentityPubkey, &pb.SubscribeToEventsResponse{
+				err = eventRouter.NotifyUser(treeNode.OwnerIdentityPubkey, &pb.SubscribeToEventsResponse{
 					Event: &pb.SubscribeToEventsResponse_Deposit{
 						Deposit: &pb.DepositEvent{
 							Deposit: treeNodeProto,
 						},
 					},
 				})
+				if err != nil {
+					logger.Error("Failed to notify user of deposit event", "error", err, "identity_public_key", logging.Pubkey{Pubkey: treeNode.OwnerIdentityPubkey})
+				}
 			} else {
 				_, err = dbTx.TreeNode.UpdateOne(treeNode).
 					SetStatus(schema.TreeNodeStatusSplitted).

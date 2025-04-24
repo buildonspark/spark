@@ -3,10 +3,9 @@ package grpc
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"runtime/debug"
 
-	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark-go/so/logging"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -14,11 +13,7 @@ import (
 
 func PanicRecoveryInterceptor(returnDetailedPanicErrors bool) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
-		requestID := uuid.New().String()
-		logger := slog.Default().With(
-			"request_id", requestID,
-			"method", info.FullMethod,
-		)
+		logger := logging.GetLoggerFromContext(ctx)
 
 		// Wrap the entire handler in a recover block
 		defer func() {

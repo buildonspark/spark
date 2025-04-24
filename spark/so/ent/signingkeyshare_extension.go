@@ -17,6 +17,7 @@ import (
 	"github.com/lightsparkdev/spark-go/so"
 	"github.com/lightsparkdev/spark-go/so/ent/schema"
 	"github.com/lightsparkdev/spark-go/so/ent/signingkeyshare"
+	"github.com/lightsparkdev/spark-go/so/logging"
 )
 
 // TweakKeyShare tweaks the given keyshare with the given tweak, updates the keyshare in the database and returns the updated keyshare.
@@ -64,6 +65,8 @@ func (keyshare *SigningKeyshare) MarshalProto() *pb.SigningKeyshare {
 
 // GetUnusedSigningKeyshares returns the available keyshares for the given coordinator index.
 func GetUnusedSigningKeyshares(ctx context.Context, dbClient *Client, config *so.Config, keyshareCount int) ([]*SigningKeyshare, error) {
+	logger := logging.GetLoggerFromContext(ctx)
+
 	tx, err := dbClient.Tx(ctx)
 	if err != nil {
 		return nil, err
@@ -79,7 +82,7 @@ func GetUnusedSigningKeyshares(ctx context.Context, dbClient *Client, config *so
 		All(ctx)
 	if err != nil {
 		if rollbackErr := tx.Rollback(); rollbackErr != nil {
-			slog.Error("Failed to rollback transaction", "error", rollbackErr)
+			logger.Error("Failed to rollback transaction", "error", rollbackErr)
 		}
 
 		return nil, fmt.Errorf("failed to get signing keyshares: %w", err)
@@ -89,11 +92,11 @@ func GetUnusedSigningKeyshares(ctx context.Context, dbClient *Client, config *so
 		go func() {
 			err := RunDKG(context.Background(), config)
 			if err != nil {
-				log.Printf("Error running DKG: %v", err)
+				slog.Error("Error running DKG", "error", err)
 			}
 		}()
 		if rollbackErr := tx.Rollback(); rollbackErr != nil {
-			slog.Error("Failed to rollback transaction", "error", rollbackErr)
+			logger.Error("Failed to rollback transaction", "error", rollbackErr)
 		}
 
 		return nil, fmt.Errorf("not enough signing keyshares available (needed %d, got %d)", keyshareCount, len(signingKeyshares))
@@ -105,7 +108,7 @@ func GetUnusedSigningKeyshares(ctx context.Context, dbClient *Client, config *so
 			Save(ctx)
 		if err != nil {
 			if rollbackErr := tx.Rollback(); rollbackErr != nil {
-				slog.Error("Failed to rollback transaction", "error", rollbackErr)
+				logger.Error("Failed to rollback transaction", "error", rollbackErr)
 			}
 
 			return nil, fmt.Errorf("failed to update signing keyshare status: %w", err)

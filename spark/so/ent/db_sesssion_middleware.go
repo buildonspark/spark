@@ -3,8 +3,8 @@ package ent
 import (
 	"context"
 	"errors"
-	"log/slog"
 
+	"github.com/lightsparkdev/spark-go/so/logging"
 	"google.golang.org/grpc"
 )
 
@@ -19,7 +19,7 @@ var ErrNoRollback = errors.New("no rollback performed")
 
 // DbSessionMiddleware is a middleware to manage database sessions for each gRPC call.
 func DbSessionMiddleware(dbClient *Client) grpc.UnaryServerInterceptor {
-	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+	return func(ctx context.Context, req interface{}, _ *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 		// Start a transaction or session
 		tx, err := dbClient.Tx(ctx)
 		if err != nil {
@@ -36,7 +36,7 @@ func DbSessionMiddleware(dbClient *Client) grpc.UnaryServerInterceptor {
 			}
 		}()
 
-		logger := slog.Default().With("method", info.FullMethod)
+		logger := logging.GetLoggerFromContext(ctx)
 
 		// Call the handler (the actual RPC method)
 		resp, err := handler(ctx, req)
