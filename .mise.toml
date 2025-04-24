@@ -17,6 +17,7 @@ MISE_NODE_COREPACK = true
 build-to-minikube = { dir = "{{config_root}}", run = 'scripts/build-to-minikube.sh' }
 run-minikube = { dir = "{{config_root}}", run = 'scripts/local-test.sh' }
 spark-cli = { dir = "{{config_root}}/sdks/js", run = 'yarn install && yarn build && cd examples/spark-cli && yarn build && yarn run cli' }
+spark-cli-prod = { dir = "{{config_root}}/sdks/js", run = 'yarn install && yarn build && cd examples/spark-cli && yarn build && yarn run cli:prod' }
 test-go = { dir = "{{config_root}}/spark", run = 'mise test' }
 test-grpc = { dir = "{{config_root}}/spark", run = 'mise test-grpc' }
 test-js = { dir = "{{config_root}}/sdks/js", run = 'yarn install && yarn test' }
