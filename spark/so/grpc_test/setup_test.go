@@ -24,7 +24,7 @@ func TestMain(m *testing.M) {
 		log.Printf("Error creating regtest client: %v", err)
 		os.Exit(1)
 	}
-	faucet = testutil.NewFaucet(client)
+	faucet = testutil.GetFaucetInstance(client)
 
 	if shouldRunDKG() {
 		if err := setupDKG(); err != nil {

@@ -2,16 +2,62 @@ package testutil
 
 import (
 	"bytes"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
 	"log"
 	"sync"
 
+	"github.com/btcsuite/btcd/btcutil"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lightsparkdev/spark-go/common"
-	"github.com/lightsparkdev/spark-go/so/chain"
 )
+
+var (
+	// Static keys for deterministic testing
+	// P2TRAddress: bcrt1p2uy9zw5ltayucsuzl4tet6ckelzawp08qrtunacscsszflye907q62uqhl
+	staticFaucetKeyBytes, _ = hex.DecodeString("deadbeef1337cafe4242424242424242deadbeef1337cafe4242424242424242")
+	staticFaucetKey         = secp256k1.PrivKeyFromBytes(staticFaucetKeyBytes)
+
+	// P2TRAddress: bcrt1pwr5k38p68ceyrnm2tvrp50dvmg3grh6uvayjl3urwtxejhd3dw4swz6p58
+	staticMiningKeyBytes, _ = hex.DecodeString("1337cafe4242deadbeef4242424242421337cafe4242deadbeef424242424242")
+	staticMiningKey         = secp256k1.PrivKeyFromBytes(staticMiningKeyBytes)
+
+	// Constants for coin amounts
+	coinAmountSats int64 = 10_000_000
+	feeAmountSats  int64 = 1_000
+	targetNumCoins       = 20
+
+	// Singleton instance
+	instance *Faucet
+	once     sync.Once
+)
+
+// scanUnspent represents an unspent output found by scanning
+type scanUnspent struct {
+	TxID   string      `json:"txid"`
+	Vout   uint32      `json:"vout"`
+	Amount json.Number `json:"amount"`
+	Height int64       `json:"height"`
+}
+
+// scanTxOutSetResult represents the result of scanning the UTXO set
+type scanTxOutSetResult struct {
+	Success  bool          `json:"success"`
+	Height   int64         `json:"height"`
+	Unspents []scanUnspent `json:"unspents"`
+}
+
+type uTXO struct {
+	TxID   string
+	Vout   uint32
+	Amount int64
+	Height int64
+}
 
 // NewRegtestClient returns a new rpcclient.Client with a hard-coded
 // config for our integration tests.
@@ -42,12 +88,16 @@ type Faucet struct {
 	coins   []FaucetCoin
 }
 
-func NewFaucet(client *rpcclient.Client) *Faucet {
-	return &Faucet{
-		client:  client,
-		coinsMu: sync.Mutex{},
-		coins:   make([]FaucetCoin, 0),
-	}
+// GetFaucetInstance returns the singleton instance of the Faucet
+func GetFaucetInstance(client *rpcclient.Client) *Faucet {
+	once.Do(func() {
+		instance = &Faucet{
+			client:  client,
+			coinsMu: sync.Mutex{},
+			coins:   make([]FaucetCoin, 0),
+		}
+	})
+	return instance
 }
 
 // Fund returns a faucet coin, which is a UTXO that can be spent in a test.
@@ -65,80 +115,188 @@ func (f *Faucet) Fund() (FaucetCoin, error) {
 	return coin, nil
 }
 
-// Refill mines a block to the faucet, mines 100 blocks to make
-// that output spendable, then crafts a new transaction to split it
-// into a bunch outputs (coins), which are then freely given away for
-// various tests to use.
+// btcToSats converts a BTC amount (as a decimal string) to satoshis
+func btcToSats(btc json.Number) (int64, error) {
+	f, err := btc.Float64()
+	if err != nil {
+		return 0, err
+	}
+	amount, err := btcutil.NewAmount(f)
+	if err != nil {
+		return 0, err
+	}
+	return int64(amount), nil
+}
+
+// scanForSpendableUTXOs scans for any spendable UTXOs at the mining address
+func (f *Faucet) scanForSpendableUTXOs() ([]uTXO, int64, error) {
+	miningPubKey := staticMiningKey.PubKey()
+	miningAddress, err := common.P2TRRawAddressFromPublicKey(miningPubKey.SerializeCompressed(), common.Regtest)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	descriptor := fmt.Sprintf("addr(%s)", miningAddress)
+	params := []json.RawMessage{
+		json.RawMessage(`"start"`),
+		json.RawMessage(fmt.Sprintf(`["%s"]`, descriptor)),
+	}
+
+	result, err := f.client.RawRequest("scantxoutset", params)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	var scanResult scanTxOutSetResult
+	err = json.Unmarshal(result, &scanResult)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	if !scanResult.Success {
+		return nil, scanResult.Height, fmt.Errorf("scan failed")
+	}
+
+	var utxos []uTXO
+	for _, unspent := range scanResult.Unspents {
+		sats, err := btcToSats(unspent.Amount)
+		if err != nil {
+			continue
+		}
+		utxos = append(utxos, uTXO{
+			TxID:   unspent.TxID,
+			Vout:   unspent.Vout,
+			Amount: sats,
+			Height: unspent.Height,
+		})
+	}
+
+	return utxos, scanResult.Height, nil
+}
+
+// findSuitableUTXO finds a UTXO that is large enough and mature enough to use
+func (f *Faucet) findSuitableUTXO() (*uTXO, error) {
+	utxos, height, err := f.scanForSpendableUTXOs()
+	if err != nil {
+		return nil, err
+	}
+
+	minAmount := coinAmountSats + feeAmountSats
+	for _, utxo := range utxos {
+		isMature := height-utxo.Height >= 100
+		isValueEnough := utxo.Amount >= minAmount
+
+		if isMature && isValueEnough {
+			return &utxo, nil
+		}
+	}
+
+	return nil, nil
+}
+
+// Refill mines a block to the faucet if needed, then crafts a new transaction to split it
+// into a bunch outputs (coins), which are then freely given away for various tests to use.
 func (f *Faucet) Refill() error {
 	f.coinsMu.Lock()
 	defer f.coinsMu.Unlock()
-	// Mine a block sending some coins to an address
-	key, err := secp256k1.GeneratePrivateKey()
-	if err != nil {
-		return err
-	}
-	pubKey := key.PubKey()
-	address, err := common.P2TRRawAddressFromPublicKey(pubKey.SerializeCompressed(), common.Regtest)
-	if err != nil {
-		return err
-	}
-	blockHash, err := f.client.GenerateToAddress(1, address, nil)
+
+	selectedUTXO, err := f.findSuitableUTXO()
 	if err != nil {
 		return err
 	}
 
-	block, err := f.client.GetBlockVerboseTx(blockHash[0])
-	if err != nil {
-		return err
-	}
-	fundingTx, err := chain.TxFromRPCTx(block.Tx[0])
-	if err != nil {
-		return err
+	var fundingTx *wire.MsgTx
+	var fundingTxOut *wire.TxOut
+
+	if selectedUTXO != nil {
+		txHash, err := chainhash.NewHashFromStr(selectedUTXO.TxID)
+		if err != nil {
+			return err
+		}
+		tx, err := f.client.GetRawTransaction(txHash)
+		if err != nil {
+			return err
+		}
+		fundingTx = tx.MsgTx()
+		fundingTxOut = fundingTx.TxOut[selectedUTXO.Vout]
+	} else {
+		// No suitable UTXO found, need to mine a new block
+		miningPubKey := staticMiningKey.PubKey()
+		miningAddress, err := common.P2TRRawAddressFromPublicKey(miningPubKey.SerializeCompressed(), common.Regtest)
+		if err != nil {
+			return err
+		}
+
+		blockHash, err := f.client.GenerateToAddress(1, miningAddress, nil)
+		if err != nil {
+			return err
+		}
+
+		block, err := f.client.GetBlockVerboseTx(blockHash[0])
+		if err != nil {
+			return err
+		}
+		fundingTx = wire.NewMsgTx(2)
+		txBytes, err := hex.DecodeString(block.Tx[0].Hex)
+		if err != nil {
+			return err
+		}
+		err = fundingTx.Deserialize(bytes.NewReader(txBytes))
+		if err != nil {
+			return err
+		}
+		fundingTxOut = fundingTx.TxOut[0]
+
+		// Mine 100 blocks to make funds spendable
+		_, err = f.client.GenerateToAddress(100, miningAddress, nil)
+		if err != nil {
+			return err
+		}
 	}
 
-	// Mine 100 blocks to a random address to allow funds to be spendable.
-	// This is necessary because coinbase transactions require 100 confirmations
-	// to be spendable.
-	randomKey, err := secp256k1.GeneratePrivateKey()
-	if err != nil {
-		return err
-	}
-	randomPubKey := randomKey.PubKey()
-	randomAddress, err := common.P2TRRawAddressFromPublicKey(randomPubKey.SerializeCompressed(), common.Regtest)
-	if err != nil {
-		return err
-	}
-	_, err = f.client.GenerateToAddress(100, randomAddress, nil)
-	if err != nil {
-		return err
-	}
-
-	// Split the output into 1 BTC outputs
 	splitTx := wire.NewMsgTx(2)
-
-	fundingTxid := fundingTx.TxHash()
-	fundingOutPoint := wire.NewOutPoint(&fundingTxid, 0)
+	var fundingOutPoint *wire.OutPoint
+	if selectedUTXO != nil {
+		txHash, err := chainhash.NewHashFromStr(selectedUTXO.TxID)
+		if err != nil {
+			return err
+		}
+		fundingOutPoint = wire.NewOutPoint(txHash, selectedUTXO.Vout)
+	} else {
+		fundingTxid := fundingTx.TxHash()
+		fundingOutPoint = wire.NewOutPoint(&fundingTxid, 0)
+	}
 	splitTx.AddTxIn(wire.NewTxIn(fundingOutPoint, nil, nil))
 
-	initialValueSats := fundingTx.TxOut[0].Value
-	coinAmountSats := int64(10_000_000)
-	feeSats := int64(100_000) // Arbitrary large fee to ensure we have enough
-	coinKeys := make([]*secp256k1.PrivateKey, 0)
-	coinCount := (initialValueSats - feeSats) / coinAmountSats
-	for i := int64(0); i < coinCount; i++ {
-		coinKey, err := secp256k1.GeneratePrivateKey()
-		if err != nil {
-			return err
-		}
-		coinPubKey := coinKey.PubKey()
-		coinKeys = append(coinKeys, coinKey)
-		coinScript, err := common.P2TRScriptFromPubKey(coinPubKey)
-		if err != nil {
-			return err
-		}
-		splitTx.AddTxOut(wire.NewTxOut(coinAmountSats, coinScript))
+	initialValueSats := fundingTxOut.Value
+	maxPossibleCoins := (initialValueSats - feeAmountSats) / coinAmountSats
+	numCoinsToCreate := min(int64(targetNumCoins), maxPossibleCoins)
+
+	if numCoinsToCreate < 1 {
+		log.Printf("Selected UTXO (%d sats) is too small to create even one faucet coin of %d sats", initialValueSats, coinAmountSats)
+		return nil
 	}
-	signedSplitTx, err := SignFaucetCoin(splitTx, fundingTx.TxOut[0], key)
+
+	faucetPubKey := staticFaucetKey.PubKey()
+	faucetScript, err := common.P2TRScriptFromPubKey(faucetPubKey)
+	if err != nil {
+		return err
+	}
+
+	for i := int64(0); i < numCoinsToCreate; i++ {
+		splitTx.AddTxOut(wire.NewTxOut(coinAmountSats, faucetScript))
+	}
+
+	remainingValue := initialValueSats - (numCoinsToCreate * coinAmountSats) - feeAmountSats
+	if remainingValue > 0 {
+		miningScript, err := common.P2TRScriptFromPubKey(staticMiningKey.PubKey())
+		if err != nil {
+			return err
+		}
+		splitTx.AddTxOut(wire.NewTxOut(remainingValue, miningScript))
+	}
+
+	signedSplitTx, err := SignFaucetCoin(splitTx, fundingTxOut, staticMiningKey)
 	if err != nil {
 		return err
 	}
@@ -147,13 +305,12 @@ func (f *Faucet) Refill() error {
 		return err
 	}
 
-	// Add coins (outputs of the split tx) to the faucets bag
 	splitTxid := signedSplitTx.TxHash()
-	for i, txOut := range signedSplitTx.TxOut {
+	for i := 0; i < int(numCoinsToCreate); i++ {
 		faucetCoin := FaucetCoin{
-			Key:      coinKeys[i],
+			Key:      staticFaucetKey,
 			OutPoint: wire.NewOutPoint(&splitTxid, uint32(i)),
-			TxOut:    txOut,
+			TxOut:    signedSplitTx.TxOut[i],
 		}
 		f.coins = append(f.coins, faucetCoin)
 	}
