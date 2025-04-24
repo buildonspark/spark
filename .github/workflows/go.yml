@@ -93,9 +93,8 @@ jobs:
           cache-dependency-path: "spark/go.sum"
       - uses: jdx/mise-action@v2
         with:
-          install: false
-      - name: Install protoc
-        run: mise install protoc protoc-gen-go protoc-gen-go-grpc protoc-gen-validate
+          install: true
+          install_args: "golangci-lint protoc protoc-gen-go protoc-gen-go-grpc protoc-gen-validate"
       - name: Generate protos
         run: make
       - name: Check that protos are up to date
@@ -111,7 +110,7 @@ jobs:
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v7
         with:
-          version: v2.0.2
+          install-mode: none
           working-directory: ./spark
           args: --timeout 5m
 
