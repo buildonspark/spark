@@ -1,8 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
-import { NetworkType } from "../../utils/network.js";
-import { SparkWallet } from "../../spark-wallet.js";
 import { ConfigOptions } from "../../services/wallet-config.js";
-
+import { NetworkType } from "../../utils/network.js";
+import { SparkWalletTesting } from "../utils/spark-testing-wallet.js";
 describe("wallet", () => {
   it("should initialize a wallet", async () => {
     const seedOrMnemonics = [
@@ -18,7 +17,7 @@ describe("wallet", () => {
         const options: ConfigOptions = {
           network,
         };
-        const { wallet, ...rest } = await SparkWallet.initialize({
+        const { wallet, ...rest } = await SparkWalletTesting.initialize({
           mnemonicOrSeed: seedOrMnemonic,
           options,
         });
@@ -40,7 +39,7 @@ describe("wallet", () => {
         network: "LOCAL",
       };
       await expect(
-        SparkWallet.initialize({
+        SparkWalletTesting.initialize({
           mnemonicOrSeed: seedOrMnemonic,
           options,
         }),

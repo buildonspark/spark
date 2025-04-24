@@ -1,14 +1,13 @@
-import {
-  TokenPubkey,
-  TokenPubkeyAnnouncement,
-  TokenPubkeyInfo,
-} from "@buildonspark/lrc20-sdk";
+import { TokenPubkey, TokenPubkeyAnnouncement } from "@buildonspark/lrc20-sdk";
 import {
   ListAllTokenTransactionsCursor,
   OperationType,
 } from "@buildonspark/lrc20-sdk/proto/rpc/v1/types";
 import { SparkWallet, SparkWalletProps } from "@buildonspark/spark-sdk";
-import { encodeSparkAddress } from "@buildonspark/spark-sdk/address";
+import {
+  decodeSparkAddress,
+  encodeSparkAddress,
+} from "@buildonspark/spark-sdk/address";
 import { OutputWithPreviousTransactionData } from "@buildonspark/spark-sdk/proto/spark";
 import { ConfigOptions } from "@buildonspark/spark-sdk/services/wallet-config";
 import {
@@ -20,7 +19,6 @@ import { TokenFreezeService } from "./services/freeze.js";
 import { IssuerTokenTransactionService } from "./services/token-transactions.js";
 import { GetTokenActivityResponse, TokenDistribution } from "./types.js";
 import { convertTokenActivityToHexEncoded } from "./utils/type-mappers.js";
-import { decodeSparkAddress } from "@buildonspark/spark-sdk/address";
 
 const BURN_ADDRESS = "02".repeat(33);
 
@@ -47,7 +45,7 @@ export class IssuerSparkWallet extends SparkWallet {
     };
   }
 
-  private constructor(configOptions?: ConfigOptions) {
+  protected constructor(configOptions?: ConfigOptions) {
     super(configOptions);
     this.issuerTokenTransactionService = new IssuerTokenTransactionService(
       this.config,

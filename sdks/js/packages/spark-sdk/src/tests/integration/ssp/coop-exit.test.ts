@@ -8,11 +8,14 @@ describe("SSP coop exit integration", () => {
   it("should estimate coop exit fee", async () => {
     const faucet = BitcoinFaucet.getInstance();
 
-    const { wallet: userWallet } = await SparkWalletTesting.initialize({
-      options: {
-        network: "LOCAL",
+    const { wallet: userWallet } = await SparkWalletTesting.initialize(
+      {
+        options: {
+          network: "LOCAL",
+        },
       },
-    });
+      false,
+    );
 
     const depositAddress = await userWallet.getSingleUseDepositAddress();
     expect(depositAddress).toBeDefined();
@@ -22,6 +25,8 @@ describe("SSP coop exit integration", () => {
     await faucet.mineBlocks(6);
 
     await userWallet.claimDeposit(signedTx.id);
+
+    await new Promise((resolve) => setTimeout(resolve, 1000));
 
     const { balance } = await userWallet.getBalance();
     expect(balance).toBe(DEPOSIT_AMOUNT);

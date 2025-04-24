@@ -10,6 +10,7 @@ import {
 } from "nice-grpc";
 import { retryMiddleware } from "nice-grpc-client-middleware-retry";
 import { Metadata } from "nice-grpc-common";
+import { AuthenticationError, NetworkError } from "../errors/types.js";
 import { MockServiceClient, MockServiceDefinition } from "../proto/mock.js";
 import { SparkServiceClient, SparkServiceDefinition } from "../proto/spark.js";
 import {
@@ -21,11 +22,6 @@ import { isHermeticTest } from "../tests/test-util.js";
 import { SparkCallOptions } from "../types/grpc.js";
 import { Network } from "../utils/network.js";
 import { WalletConfigService } from "./config.js";
-import {
-  NetworkError,
-  AuthenticationError,
-  ConfigurationError,
-} from "../errors/types.js";
 
 // TODO: Some sort of client cleanup
 export class ConnectionManager {
@@ -48,6 +44,14 @@ export class ConnectionManager {
       Object.values(this.config.getSigningOperators()).map((operator) => {
         this.createSparkClient(operator.address);
       }),
+    );
+  }
+
+  public async closeConnections() {
+    await Promise.all(
+      Array.from(this.clients.values()).map((client) =>
+        client.client.close?.(),
+      ),
     );
   }
 
@@ -223,6 +227,15 @@ export class ConnectionManager {
               .set("Authorization", `Bearer ${newAuthToken}`)
               .set("User-Agent", "spark-js-sdk"),
           });
+        } else if (
+          error.message?.includes("The operation has been aborted") &&
+          error.name === "AbortError" &&
+          call.method.responseStream
+        ) {
+          // Silently handle stream aborts that were triggered by our AbortController
+          // Other types of stream interruptions (network, server-side, etc.) will still throw.
+          // We also only handle this for streaming calls, not unary calls.
+          return;
         }
         throw error;
       }
@@ -263,6 +276,15 @@ export class ConnectionManager {
               .set("Content-Type", "application/grpc-web+proto")
               .set("User-Agent", "spark-js-sdk"),
           });
+        } else if (
+          error.message?.includes("The operation has been aborted") &&
+          error.name === "AbortError" &&
+          call.method.responseStream
+        ) {
+          // Silently handle stream aborts that were triggered by our AbortController
+          // Other types of stream interruptions (network, server-side, etc.) will still throw.
+          // We also only handle this for streaming calls, not unary calls.
+          return;
         }
         throw error;
       }

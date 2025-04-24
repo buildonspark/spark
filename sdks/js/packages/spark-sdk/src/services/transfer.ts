@@ -46,6 +46,7 @@ import {
 } from "../utils/transaction.js";
 import { WalletConfigService } from "./config.js";
 import { ConnectionManager } from "./connection.js";
+import { SigningOperator } from "./wallet-config.js";
 const INITIAL_TIME_LOCK = 2000;
 
 const DEFAULT_EXPIRY_TIME = 10 * 60 * 1000;
@@ -103,79 +104,34 @@ export class BaseTransferService {
     );
 
     let updatedTransfer: Transfer | undefined;
-    const errors: SparkSDKError[] = [];
-    const promises = Object.entries(this.config.getSigningOperators()).map(
-      async ([identifier, operator]) => {
-        const sparkClient = await this.connectionManager.createSparkClient(
-          operator.address,
-        );
 
-        const leavesToSend = keyTweakInputMap.get(identifier);
-        if (!leavesToSend) {
-          errors.push(
-            new ValidationError("No leaves to send for operator", {
-              field: "operator",
-              value: identifier,
-            }) as SparkSDKError,
-          );
-          return;
-        }
-        let transferResp: CompleteSendTransferResponse;
-        try {
-          transferResp = await sparkClient.complete_send_transfer({
-            transferId: transfer.id,
-            ownerIdentityPublicKey:
-              await this.config.signer.getIdentityPublicKey(),
-            leavesToSend,
-          });
-        } catch (error) {
-          errors.push(
-            new NetworkError(
-              "Failed to complete send transfer",
-              {
-                method: "POST",
-              },
-              error instanceof Error ? error : undefined,
-            ) as SparkSDKError,
-          );
-          return;
-        }
-
-        if (!updatedTransfer) {
-          updatedTransfer = transferResp.transfer;
-        } else {
-          if (!transferResp.transfer) {
-            errors.push(
-              new ValidationError("No transfer response from operator", {
-                field: "operator",
-                value: identifier,
-              }) as SparkSDKError,
-            );
-            return;
-          }
-
-          if (!this.compareTransfers(updatedTransfer, transferResp.transfer)) {
-            errors.push(
-              new ValidationError(
-                "Inconsistent transfer response from operators",
-                {
-                  field: "transfer",
-                  value: transfer.id,
-                },
-              ) as SparkSDKError,
-            );
-          }
-        }
-      },
-    );
-
-    await Promise.all(promises);
-
-    if (errors.length > 0) {
-      throw new NetworkError("Failed to complete send transfer", {
-        method: "POST",
+    const coordinatorOperator =
+      this.config.getSigningOperators()[this.config.getCoordinatorIdentifier()];
+    if (!coordinatorOperator) {
+      throw new ValidationError("Coordinator operator not found", {
+        field: "coordinator",
       });
     }
+
+    for (const [identifier, operator] of Object.entries(
+      this.config.getSigningOperators(),
+    ).filter(([_, op]) => op.address !== this.config.getCoordinatorAddress())) {
+      updatedTransfer = await this.completeSendTransfer(
+        operator,
+        identifier,
+        keyTweakInputMap,
+        transfer,
+        updatedTransfer,
+      );
+    }
+
+    updatedTransfer = await this.completeSendTransfer(
+      coordinatorOperator,
+      this.config.getCoordinatorIdentifier(),
+      keyTweakInputMap,
+      transfer,
+      updatedTransfer,
+    );
 
     if (!updatedTransfer) {
       throw new ValidationError(
@@ -185,6 +141,61 @@ export class BaseTransferService {
           value: Object.keys(this.config.getSigningOperators()).length,
         },
       );
+    }
+
+    return updatedTransfer;
+  }
+
+  private async completeSendTransfer(
+    operator: SigningOperator,
+    identifier: string,
+    keyTweakInputMap: Map<string, SendLeafKeyTweak[]>,
+    transfer: Transfer,
+    updatedTransfer: Transfer | undefined,
+  ) {
+    const sparkClient = await this.connectionManager.createSparkClient(
+      operator.address,
+    );
+
+    const leavesToSend = keyTweakInputMap.get(identifier);
+    if (!leavesToSend) {
+      throw new ValidationError("No leaves to send for operator", {
+        field: "operator",
+        value: identifier,
+      });
+    }
+    let transferResp: CompleteSendTransferResponse;
+    try {
+      transferResp = await sparkClient.complete_send_transfer({
+        transferId: transfer.id,
+        ownerIdentityPublicKey: await this.config.signer.getIdentityPublicKey(),
+        leavesToSend,
+      });
+    } catch (error) {
+      throw new NetworkError("Failed to complete send transfer", {
+        method: "POST",
+      });
+    }
+
+    if (!updatedTransfer) {
+      updatedTransfer = transferResp.transfer;
+    } else {
+      if (!transferResp.transfer) {
+        throw new ValidationError("No transfer response from operator", {
+          field: "transfer",
+          value: transfer.id,
+        });
+      }
+
+      if (!this.compareTransfers(updatedTransfer, transferResp.transfer)) {
+        throw new ValidationError(
+          "Inconsistent transfer response from operators",
+          {
+            field: "transfer",
+            value: transfer.id,
+          },
+        );
+      }
     }
 
     return updatedTransfer;
@@ -754,6 +765,7 @@ export class TransferService extends BaseTransferService {
             leavesToReceive,
           });
         } catch (error) {
+          console.log(operator.address);
           errors.push(
             new NetworkError(
               "Failed to claim transfer tweak keys",

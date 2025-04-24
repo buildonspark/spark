@@ -1,7 +1,7 @@
 import { describe, expect } from "@jest/globals";
 import { ConfigOptions } from "../../services/wallet-config.js";
-import { SparkWallet } from "../../spark-wallet.js";
 import { NetworkType } from "../../utils/network.js";
+import { SparkWalletTesting } from "../utils/spark-testing-wallet.js";
 
 describe("address", () => {
   describe.each([
@@ -18,7 +18,7 @@ describe("address", () => {
           const options: ConfigOptions = {
             network: network as NetworkType,
           };
-          const { wallet, ...rest } = await SparkWallet.initialize({
+          const { wallet, ...rest } = await SparkWalletTesting.initialize({
             mnemonicOrSeed: seedOrMnemonic,
             options,
           });
@@ -52,10 +52,11 @@ describe("address", () => {
           expect(addressMap.size).toBe(5);
 
           // Create a new wallet with the same seed or mnemonic
-          const { wallet: wallet2, ...rest2 } = await SparkWallet.initialize({
-            mnemonicOrSeed: seedOrMnemonic,
-            options,
-          });
+          const { wallet: wallet2, ...rest2 } =
+            await SparkWalletTesting.initialize({
+              mnemonicOrSeed: seedOrMnemonic,
+              options,
+            });
 
           expect(await wallet2.getIdentityPublicKey()).toEqual(
             await wallet.getIdentityPublicKey(),

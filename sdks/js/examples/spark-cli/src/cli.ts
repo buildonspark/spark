@@ -75,7 +75,6 @@ async function runCLI() {
   getsparkaddress                                                     - Get the wallet's spark address
   getlatesttx <address>                                               - Get the latest deposit transaction id for an address
   claimdeposit <txid>                                                 - Claim any pending deposits to the wallet
-  claimtransfers                                                      - Claim any pending transfers to the wallet
   createinvoice <amount> <memo>                                       - Create a new lightning invoice
   payinvoice <invoice>                                                - Pay a lightning invoice
   sendtransfer <amount> <receiverSparkAddress>                        - Send a spark transfer
@@ -117,6 +116,7 @@ async function runCLI() {
 
     if (lowerCommand === "exit" || lowerCommand === "quit") {
       rl.close();
+      wallet?.cleanupConnections();
       break;
     }
 
@@ -283,6 +283,9 @@ async function runCLI() {
           break;
         }
         const depositResult = await wallet.claimDeposit(args[0]);
+
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+
         console.log(depositResult);
         break;
       case "gettransfers":
@@ -290,16 +293,8 @@ async function runCLI() {
           console.log("Please initialize a wallet first");
           break;
         }
-        const transfers = await wallet.getTransfers();
-        console.log(transfers);
-        break;
-      case "pendingtransfers":
-        if (!wallet) {
-          console.log("Please initialize a wallet first");
-          break;
-        }
-        const pendingTransfers = await wallet.getPendingTransfers();
-        console.log(pendingTransfers);
+        const allTransfers = await wallet.getTransfers();
+        console.log(allTransfers);
         break;
       case "getlightningsendrequest":
         if (!wallet) {
@@ -328,14 +323,6 @@ async function runCLI() {
         }
         const coopExitRequest = await wallet.getCoopExitRequest(args[0]);
         console.log(coopExitRequest);
-        break;
-      case "claimtransfers":
-        if (!wallet) {
-          console.log("Please initialize a wallet first");
-          break;
-        }
-        const transferResult = await wallet.claimTransfers();
-        console.log(transferResult);
         break;
       case "initwallet":
         const mnemonicOrSeed = args.join(" ");

@@ -1,7 +1,7 @@
 import { bytesToHex, hexToBytes } from "@noble/curves/abstract/utils";
 import { schnorr, secp256k1 } from "@noble/curves/secp256k1";
 import * as btc from "@scure/btc-signer";
-import { SigHash, Transaction } from "@scure/btc-signer";
+import { Address, OutScript, SigHash, Transaction } from "@scure/btc-signer";
 import { TransactionInput, TransactionOutput } from "@scure/btc-signer/psbt";
 import { taprootTweakPrivKey } from "@scure/btc-signer/utils";
 import { RPCError } from "../../errors/index.js";
@@ -352,7 +352,14 @@ export class BitcoinFaucet {
 
     const availableAmount = COIN_AMOUNT - FEE_AMOUNT;
 
-    tx.addOutputAddress(address, amount, getNetwork(Network.LOCAL));
+    const destinationAddress = Address(getNetwork(Network.LOCAL)).decode(
+      address,
+    );
+    const destinationScript = OutScript.encode(destinationAddress);
+    tx.addOutput({
+      script: destinationScript,
+      amount: amount,
+    });
 
     const changeAmount = availableAmount - amount;
     if (changeAmount > 0) {
@@ -371,6 +378,8 @@ export class BitcoinFaucet {
     const signedTx = await this.signFaucetCoin(tx, coin.txout, coin.key);
     const txHex = bytesToHex(signedTx.extract());
     await this.broadcastTx(txHex);
+
+    await this.generateToAddress(1, address);
 
     return signedTx;
   }

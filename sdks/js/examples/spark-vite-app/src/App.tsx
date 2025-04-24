@@ -40,16 +40,6 @@ function App() {
     setBalance(Number(balance.balance));
   };
 
-  const claimTransfers = async () => {
-    if (!sparkWallet) {
-      console.error("Spark client not initialized");
-      return;
-    }
-    const transfers = await sparkWallet.claimTransfers();
-    await getBalance();
-    console.log(transfers);
-  };
-
   const dummyTx = createDummyTx({
     address: "bcrt1qnuyejmm2l4kavspq0jqaw0fv07lg6zv3z9z3te",
     amountSats: 65536n,
@@ -69,7 +59,6 @@ function App() {
         </p>
         <button onClick={createInvoice}>Create Invoice</button>
         <p>Invoice: {invoice}</p>
-        <button onClick={claimTransfers}>Claim Transfers</button>
         <button onClick={getBalance}>Get Balance</button>
         <p>Balance: {balance}</p>
       </div>

@@ -1,7 +1,10 @@
-import { QueryTransfersResponse, Transfer } from "../../proto/spark.js";
-import { ConfigOptions } from "../../services/wallet-config.js";
-import { SparkSigner } from "../../signer/signer.js";
-import { SparkWallet, SparkWalletProps } from "../../spark-wallet.js";
+import { SparkWallet, SparkWalletProps } from "@buildonspark/spark-sdk";
+import {
+  QueryTransfersResponse,
+  Transfer,
+} from "@buildonspark/spark-sdk/proto/spark";
+import { ConfigOptions } from "@buildonspark/spark-sdk/services/wallet-config";
+import { SparkSigner } from "@buildonspark/spark-sdk/signer";
 
 interface ISparkWalletTesting extends SparkWallet {
   getSigner(): SparkSigner;

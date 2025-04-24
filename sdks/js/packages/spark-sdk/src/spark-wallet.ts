@@ -40,6 +40,7 @@ import {
   TokenTransactionWithStatus,
   Transfer,
   TransferStatus,
+  TransferType,
   TreeNode,
 } from "./proto/spark.js";
 import { WalletConfigService } from "./services/config.js";
@@ -167,6 +168,8 @@ export class SparkWallet {
 
   private sparkAddress: SparkAddressFormat | undefined;
 
+  private streamController: AbortController | null = null;
+
   protected leaves: TreeNode[] = [];
   protected tokenOuputs: Map<string, OutputWithPreviousTransactionData[]> =
     new Map();
@@ -220,7 +223,63 @@ export class SparkWallet {
     this.sspClient = new SspClient(this.config);
     await this.connectionManager.createClients();
 
+    await this.setupBackgroundStream();
+    // We can do this in the background
+    this.claimTransfers();
+
     await this.syncWallet();
+  }
+
+  protected async setupBackgroundStream() {
+    const sparkClient = await this.connectionManager.createSparkClient(
+      this.config.getCoordinatorAddress(),
+    );
+
+    this.streamController = new AbortController();
+    const stream = sparkClient.subscribe_to_events(
+      {
+        identityPublicKey: await this.config.signer.getIdentityPublicKey(),
+      },
+      {
+        signal: this.streamController.signal,
+      },
+    );
+
+    (async () => {
+      try {
+        for await (const data of stream) {
+          try {
+            if (
+              data.event?.$case === "transfer" &&
+              data.event.transfer.transfer &&
+              // Let requestLeavesSwap handle claiming counter swap transfers
+              data.event.transfer.transfer.type !== TransferType.COUNTER_SWAP
+            ) {
+              await this.claimTransfer(data.event.transfer.transfer);
+            } else if (
+              data.event?.$case === "deposit" &&
+              data.event.deposit.deposit
+            ) {
+              const deposit = data.event.deposit.deposit;
+              if (deposit.status === "AVAILABLE") {
+                const signingKey = await this.config.signer.generatePublicKey(
+                  sha256(hexToBytes(deposit.id)),
+                );
+                const newLeaf = await this.transferService.extendTimelock(
+                  deposit[0],
+                  signingKey,
+                );
+                await this.transferDepositToSelf(newLeaf.nodes, signingKey);
+              }
+            }
+          } catch (error) {
+            console.error("Error processing event", error);
+          }
+        }
+      } catch (error) {
+        console.error("Event stream closed", error);
+      }
+    })();
   }
 
   private async getLeaves(): Promise<TreeNode[]> {
@@ -234,6 +293,7 @@ export class SparkWallet {
       },
       includeParents: false,
     });
+
     return Object.entries(leaves.nodes)
       .filter(([_, node]) => node.status === "AVAILABLE")
       .map(([_, node]) => node);
@@ -278,6 +338,12 @@ export class SparkWallet {
           nodes.push(leaf);
         }
       }
+    }
+
+    if (nodes.reduce((acc, leaf) => acc + leaf.value, 0) !== targetAmount) {
+      throw new Error(
+        `Failed to select leaves for target amount ${targetAmount}`,
+      );
     }
 
     return nodes;
@@ -687,7 +753,7 @@ export class SparkWallet {
         throw new Error("Failed to complete leaves swap");
       }
 
-      await this.claimTransfers();
+      await this.claimTransfers(TransferType.COUNTER_SWAP);
 
       return completeResponse;
     } catch (e) {
@@ -819,12 +885,14 @@ export class SparkWallet {
     });
 
     for (const node of res.nodes) {
-      const { nodes } = await this.transferService.extendTimelock(
-        node,
-        signingPubKey,
-      );
+      if (node.status === "AVAILABLE") {
+        const { nodes } = await this.transferService.extendTimelock(
+          node,
+          signingPubKey,
+        );
 
-      await this.transferDepositToSelf(nodes, signingPubKey);
+        await this.transferDepositToSelf(nodes, signingPubKey);
+      }
     }
   }
 
@@ -1025,7 +1093,7 @@ export class SparkWallet {
   private async transferDepositToSelf(
     leaves: TreeNode[],
     signingPubKey: Uint8Array,
-  ): Promise<TreeNode[] | undefined> {
+  ): Promise<void | undefined> {
     const leafKeyTweaks = await Promise.all(
       leaves.map(async (leaf) => ({
         leaf,
@@ -1034,12 +1102,10 @@ export class SparkWallet {
       })),
     );
 
-    const transfer = await this.transferService.sendTransfer(
+    await this.transferService.sendTransfer(
       leafKeyTweaks,
       await this.config.signer.getIdentityPublicKey(),
     );
-
-    return await this.claimTransfer(transfer);
   }
   // ***** Transfer Flow *****
 
@@ -1103,10 +1169,10 @@ export class SparkWallet {
 
     for (const node of this.leaves) {
       const nodeTx = getTxFromRawTxBytes(node.nodeTx);
-      const { nextSequence } = getNextTransactionSequence(
+      const { needRefresh } = getNextTransactionSequence(
         nodeTx.getInput(0).sequence,
       );
-      if (nextSequence <= 0) {
+      if (needRefresh) {
         nodesToExtend.push(node);
         nodeIds.push(node.id);
       }
@@ -1214,22 +1280,24 @@ export class SparkWallet {
   }
 
   /**
-   * Gets all pending transfers.
-   *
-   * @returns {Promise<Transfer[]>} The pending transfers
-   */
-  public async getPendingTransfers() {
-    return (await this.transferService.queryPendingTransfers()).transfers;
-  }
-
-  /**
    * Claims a specific transfer.
    *
    * @param {Transfer} transfer - The transfer to claim
    * @returns {Promise<Object>} The claim result
    */
-  public async claimTransfer(transfer: Transfer) {
+  private async claimTransfer(transfer: Transfer) {
     return await this.claimTransferMutex.runExclusive(async () => {
+      let alreadyClaimed = false;
+      await this.withLeaves(async () => {
+        if (
+          transfer.leaves.every((leaf) =>
+            this.leaves.find((l) => l.id === leaf.leaf?.id),
+          )
+        ) {
+          alreadyClaimed = true;
+        }
+      });
+
       const leafPubKeyMap =
         await this.transferService.verifyPendingTransfer(transfer);
 
@@ -1267,11 +1335,16 @@ export class SparkWallet {
    * Claims all pending transfers.
    *
    * @returns {Promise<boolean>} True if any transfers were claimed
+   * @private
    */
-  public async claimTransfers(): Promise<boolean> {
+  private async claimTransfers(type?: TransferType): Promise<boolean> {
     const transfers = await this.transferService.queryPendingTransfers();
     let claimed = false;
     for (const transfer of transfers.transfers) {
+      if (type && transfer.type !== type) {
+        continue;
+      }
+
       if (
         transfer.status !== TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAKED &&
         transfer.status !==
@@ -1996,5 +2069,11 @@ export class SparkWallet {
     }
 
     return await this.sspClient.getCoopExitRequest(id);
+  }
+
+  public async cleanupConnections() {
+    this.streamController?.abort();
+    this.streamController = null;
+    await this.connectionManager.closeConnections();
   }
 }

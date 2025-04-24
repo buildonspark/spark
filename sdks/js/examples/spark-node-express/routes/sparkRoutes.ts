@@ -266,62 +266,6 @@ export const createSparkRouter = (
   });
 
   /**
-   * Get pending transfers
-   * @route GET /wallet/pending-transfers
-   * @returns {Promise<{
-   *   data: {
-   *     pendingTransfers: Transfer[]
-   *   }
-   * }>}
-   */
-  router.get(
-    "/wallet/pending-transfers",
-    checkWalletInitialized,
-    async (req, res) => {
-      const wallet = getWallet();
-      try {
-        const pendingTransfers = await wallet!.getPendingTransfers();
-        const transferResponse = pendingTransfers.map((transfer: Transfer) =>
-          formatTransferResponse(transfer)
-        );
-        res.json({
-          data: { pendingTransfers: transferResponse },
-        });
-      } catch (error) {
-        console.error(error);
-        const errorMsg = isError(error) ? error.message : "Unknown error";
-        res.status(500).json({ error: errorMsg });
-      }
-    }
-  );
-
-  /**
-   * Claim all pending transfers
-   * @route POST /wallet/claim-transfers
-   * @returns {Promise<{
-   *   data: {
-   *     message: boolean
-   * }>}
-   */
-  router.post(
-    "/wallet/claim-transfers",
-    checkWalletInitialized,
-    async (req, res) => {
-      const wallet = getWallet();
-      try {
-        const message = await wallet!.claimTransfers();
-        res.json({
-          data: { message },
-        });
-      } catch (error) {
-        console.error(error);
-        const errorMsg = isError(error) ? error.message : "Unknown error";
-        res.status(500).json({ error: errorMsg });
-      }
-    }
-  );
-
-  /**
    * Signs a message with the identity key.
    * This method can be useful if you have your own auth model for other APIs.
    *
