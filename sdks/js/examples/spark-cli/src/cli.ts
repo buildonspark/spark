@@ -20,7 +20,6 @@ const commands = [
   "getsparkaddress",
   "getlatesttx",
   "claimdeposit",
-  "claimtransfers",
   "createinvoice",
   "payinvoice",
   "sendtransfer",
@@ -32,7 +31,6 @@ const commands = [
   "getlightningreceiverequest",
   "getcoopexitrequest",
   "gettransfers",
-  "pendingtransfers",
   "transfertokens",
   "gettokenl1address",
   "getissuertokenbalance",
@@ -75,6 +73,7 @@ async function runCLI() {
   getsparkaddress                                                     - Get the wallet's spark address
   getlatesttx <address>                                               - Get the latest deposit transaction id for an address
   claimdeposit <txid>                                                 - Claim any pending deposits to the wallet
+  gettransfers [limit] [offset]                                       - Get a list of transfers
   createinvoice <amount> <memo>                                       - Create a new lightning invoice
   payinvoice <invoice> <maxFeeSats>                                   - Pay a lightning invoice
   sendtransfer <amount> <receiverSparkAddress>                        - Send a spark transfer
@@ -293,8 +292,18 @@ async function runCLI() {
           console.log("Please initialize a wallet first");
           break;
         }
-        const allTransfers = await wallet.getTransfers();
-        console.log(allTransfers);
+        const limit = args[0] ? parseInt(args[0]) : 10;
+        const offset = args[1] ? parseInt(args[1]) : 0;
+        if (isNaN(limit) || isNaN(offset)) {
+          console.log("Invalid limit or offset");
+          break;
+        }
+        if (limit < 0 || offset < 0) {
+          console.log("Limit and offset must be non-negative");
+          break;
+        }
+        const transfers = await wallet.getTransfers(limit, offset);
+        console.log(transfers);
         break;
       case "getlightningsendrequest":
         if (!wallet) {
