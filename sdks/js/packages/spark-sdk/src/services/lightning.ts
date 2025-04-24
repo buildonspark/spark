@@ -268,6 +268,7 @@ export class LightningService {
     try {
       response = await sparkClient.query_user_signed_refunds({
         paymentHash,
+        identityPublicKey: await this.config.signer.getIdentityPublicKey(),
       });
     } catch (error) {
       throw new NetworkError(
@@ -301,6 +302,7 @@ export class LightningService {
       response = await sparkClient.provide_preimage({
         preimage,
         paymentHash,
+        identityPublicKey: await this.config.signer.getIdentityPublicKey(),
       });
     } catch (error) {
       throw new NetworkError(
