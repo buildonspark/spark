@@ -46,8 +46,8 @@ describe("token integration test", () => {
     // Faucet funds to the Issuer wallet because announcing a token
     // requires ownership of an L1 UTXO.
     const faucet = BitcoinFaucet.getInstance();
-    const l1WalletPubKey = await wallet.getIdentityPublicKey();
-    await faucet.sendFaucetCoinToP2WPKHAddress(hexToBytes(l1WalletPubKey));
+    const l1WalletPubKey = await wallet.getTokenL1Address();
+    await faucet.sendToAddress(l1WalletPubKey, 100_000n);
     await faucet.mineBlocks(6);
 
     await new Promise((resolve) => setTimeout(resolve, 5000));
@@ -57,7 +57,7 @@ describe("token integration test", () => {
         tokenName: "TestToken1",
         tokenTicker: "TT1",
         decimals: 0,
-        maxSupply: 0,
+        maxSupply: 0n,
         isFreezable: false,
       });
       console.log("Announce token response:", response);
