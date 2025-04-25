@@ -334,6 +334,9 @@ async function runCLI() {
         console.log(coopExitRequest);
         break;
       case "initwallet":
+        if (wallet) {
+          wallet.cleanupConnections();
+        }
         const mnemonicOrSeed = args.join(" ");
         const options: ConfigOptions = {
           network: "REGTEST",
@@ -382,6 +385,14 @@ async function runCLI() {
         }
         const depositAddress = await wallet.getSingleUseDepositAddress();
         console.log(depositAddress);
+        break;
+      case "identity":
+        if (!wallet) {
+          console.log("Please initialize a wallet first");
+          break;
+        }
+        const identity = await wallet.getIdentityPublicKey();
+        console.log(identity);
         break;
       case "getsparkaddress":
         if (!wallet) {

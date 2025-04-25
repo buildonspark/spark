@@ -267,19 +267,17 @@ export class SparkWallet extends EventEmitter {
               // Let requestLeavesSwap handle claiming counter swap transfers
               data.event.transfer.transfer.type !== TransferType.COUNTER_SWAP
             ) {
-              const transfer = await this.claimTransfer(
-                data.event.transfer.transfer,
-              );
-
-              const { senderIdentityPublicKey, receiverIdentityPublicKey } =
-                data.event.transfer.transfer;
-
-              // Lets not emit if this is a self transfer. Most likely a self transfer from extending nodes
+              const transfer = data.event.transfer.transfer;
+              // Lets not claim if this is a self transfer. Most likely a self transfer from extending nodes
               // Once we fix where this flow isn't necessary, we can remove this check
               if (
-                transfer &&
-                !equalBytes(senderIdentityPublicKey, receiverIdentityPublicKey)
+                !equalBytes(
+                  transfer.senderIdentityPublicKey,
+                  transfer.receiverIdentityPublicKey,
+                )
               ) {
+                await this.claimTransfer(transfer);
+
                 this.emit(
                   "transfer:claimed",
                   data.event.transfer.transfer.id,
@@ -303,7 +301,7 @@ export class SparkWallet extends EventEmitter {
               this.emit(
                 "deposit:updated",
                 deposit.id,
-                (await this.getBalance()).balance + BigInt(deposit.value),
+                this.getInternalBalance(),
               );
             }
           } catch (error) {
@@ -407,7 +405,7 @@ export class SparkWallet extends EventEmitter {
   }
 
   private areLeavesInefficient() {
-    const totalAmount = this.leaves.reduce((acc, leaf) => acc + leaf.value, 0);
+    const totalAmount = this.getInternalBalance();
 
     if (this.leaves.length <= 1) {
       return false;
@@ -451,8 +449,8 @@ export class SparkWallet extends EventEmitter {
     await this.syncTokenOutputs();
     this.leaves = await this.getLeaves();
     await this.config.signer.restoreSigningKeysFromLeafs(this.leaves);
-    await this.refreshTimelockNodes();
-    await this.extendTimeLockNodes();
+    await this.checkRefreshTimelockNodes();
+    await this.checkExtendTimeLockNodes();
     this.optimizeLeaves().catch((e) => {
       console.error("Failed to optimize leaves", e);
     });
@@ -854,9 +852,13 @@ export class SparkWallet extends EventEmitter {
     }
 
     return {
-      balance: this.leaves.reduce((acc, leaf) => acc + BigInt(leaf.value), 0n),
+      balance: BigInt(this.getInternalBalance()),
       tokenBalances,
     };
+  }
+
+  private getInternalBalance(): number {
+    return this.leaves.reduce((acc, leaf) => acc + leaf.value, 0);
   }
 
   // ***** Deposit Flow *****
@@ -927,7 +929,10 @@ export class SparkWallet extends EventEmitter {
 
         for (const n of nodes) {
           if (n.status === "AVAILABLE") {
-            await this.transferDepositToSelf([n], signingPubKey);
+            const transfer = await this.transferDepositToSelf(
+              [n],
+              signingPubKey,
+            );
           }
         }
       }
@@ -1131,7 +1136,7 @@ export class SparkWallet extends EventEmitter {
   private async transferDepositToSelf(
     leaves: TreeNode[],
     signingPubKey: Uint8Array,
-  ): Promise<void | undefined> {
+  ): Promise<TreeNode[]> {
     const leafKeyTweaks = await Promise.all(
       leaves.map(async (leaf) => ({
         leaf,
@@ -1140,10 +1145,20 @@ export class SparkWallet extends EventEmitter {
       })),
     );
 
-    await this.transferService.sendTransfer(
+    const transfer = await this.transferService.sendTransfer(
       leafKeyTweaks,
       await this.config.signer.getIdentityPublicKey(),
     );
+
+    const resultNodes = await this.claimTransfer(transfer);
+
+    const leavesToRemove = new Set(leaves.map((leaf) => leaf.id));
+    this.leaves = [
+      ...this.leaves.filter((leaf) => !leavesToRemove.has(leaf.id)),
+      ...resultNodes,
+    ];
+
+    return resultNodes;
   }
   // ***** Transfer Flow *****
 
@@ -1174,10 +1189,16 @@ export class SparkWallet extends EventEmitter {
       this.config.getNetworkType(),
     );
 
+    const isSelfTransfer = equalBytes(
+      await this.config.signer.getIdentityPublicKey(),
+      hexToBytes(receiverAddress),
+    );
+
     return await this.withLeaves(async () => {
-      const leavesToSend = await this.selectLeaves(amountSats);
-      await this.refreshTimelockNodes();
-      await this.extendTimeLockNodes();
+      let leavesToSend = await this.selectLeaves(amountSats);
+
+      await this.checkRefreshTimelockNodes(leavesToSend);
+      leavesToSend = await this.checkExtendTimeLockNodes(leavesToSend);
 
       const leafKeyTweaks = await Promise.all(
         leavesToSend.map(async (leaf) => ({
@@ -1197,15 +1218,23 @@ export class SparkWallet extends EventEmitter {
       const leavesToRemove = new Set(leavesToSend.map((leaf) => leaf.id));
       this.leaves = this.leaves.filter((leaf) => !leavesToRemove.has(leaf.id));
 
+      // If this is a self-transfer, lets claim it immediately
+      if (isSelfTransfer) {
+        await this.claimTransfer(transfer);
+      }
       return transfer;
     });
   }
 
-  private async extendTimeLockNodes() {
+  private async checkExtendTimeLockNodes(
+    nodes?: TreeNode[],
+  ): Promise<TreeNode[]> {
+    const nodesToCheck = nodes ?? this.leaves;
     const nodesToExtend: TreeNode[] = [];
     const nodeIds: string[] = [];
+    let resultNodes = [...nodesToCheck];
 
-    for (const node of this.leaves) {
+    for (const node of nodesToCheck) {
       const nodeTx = getTxFromRawTxBytes(node.nodeTx);
       const { needRefresh } = getNextTransactionSequence(
         nodeTx.getInput(0).sequence,
@@ -1216,6 +1245,8 @@ export class SparkWallet extends EventEmitter {
       }
     }
 
+    resultNodes = resultNodes.filter((node) => !nodesToExtend.includes(node));
+
     for (const node of nodesToExtend) {
       const signingPubKey = await this.config.signer.generatePublicKey(
         sha256(node.id),
@@ -1224,8 +1255,12 @@ export class SparkWallet extends EventEmitter {
         node,
         signingPubKey,
       );
-      await this.transferDepositToSelf(nodes, signingPubKey);
+      this.leaves = this.leaves.filter((leaf) => leaf.id !== node.id);
+      const newNodes = await this.transferDepositToSelf(nodes, signingPubKey);
+      resultNodes.push(...newNodes);
     }
+
+    return resultNodes;
   }
 
   /**
@@ -1235,32 +1270,19 @@ export class SparkWallet extends EventEmitter {
    * @returns {Promise<void>}
    * @private
    */
-  private async refreshTimelockNodes(nodeId?: string) {
+  private async checkRefreshTimelockNodes(nodes?: TreeNode[]) {
     const nodesToRefresh: TreeNode[] = [];
     const nodeIds: string[] = [];
 
-    if (nodeId) {
-      for (const node of this.leaves) {
-        if (node.id === nodeId) {
-          nodesToRefresh.push(node);
-          nodeIds.push(node.id);
-          break;
-        }
-      }
-      if (nodesToRefresh.length === 0) {
-        throw new Error(`node ${nodeId} not found`);
-      }
-    } else {
-      for (const node of this.leaves) {
-        const refundTx = getTxFromRawTxBytes(node.refundTx);
-        const { needRefresh } = getNextTransactionSequence(
-          refundTx.getInput(0).sequence,
-          true,
-        );
-        if (needRefresh) {
-          nodesToRefresh.push(node);
-          nodeIds.push(node.id);
-        }
+    for (const node of nodes ?? this.leaves) {
+      const refundTx = getTxFromRawTxBytes(node.refundTx);
+      const { needRefresh } = getNextTransactionSequence(
+        refundTx.getInput(0).sequence,
+        true,
+      );
+      if (needRefresh) {
+        nodesToRefresh.push(node);
+        nodeIds.push(node.id);
       }
     }
 
@@ -1324,7 +1346,7 @@ export class SparkWallet extends EventEmitter {
    * @returns {Promise<Object>} The claim result
    */
   private async claimTransfer(transfer: Transfer) {
-    return await this.claimTransferMutex.runExclusive(async () => {
+    let result = await this.claimTransferMutex.runExclusive(async () => {
       const leafPubKeyMap =
         await this.transferService.verifyPendingTransfer(transfer);
 
@@ -1351,11 +1373,14 @@ export class SparkWallet extends EventEmitter {
       );
 
       this.leaves.push(...response.nodes);
-      await this.refreshTimelockNodes();
-      await this.extendTimeLockNodes();
 
       return response.nodes;
     });
+
+    await this.checkRefreshTimelockNodes(result);
+    result = await this.checkExtendTimeLockNodes(result);
+
+    return result;
   }
 
   /**
@@ -1554,35 +1579,19 @@ export class SparkWallet extends EventEmitter {
 
       const totalAmount = amountSats + maxFeeSats;
 
-      if (
-        totalAmount > this.leaves.reduce((acc, leaf) => acc + leaf.value, 0)
-      ) {
+      const internalBalance = this.getInternalBalance();
+      if (totalAmount > internalBalance) {
         throw new ValidationError("Insufficient balance", {
           field: "balance",
-          value: this.leaves.reduce((acc, leaf) => acc + leaf.value, 0),
+          value: internalBalance,
           expected: `${totalAmount} sats`,
         });
       }
 
-      let leaves: TreeNode[] | undefined;
-      try {
-        leaves = await this.selectLeaves(totalAmount);
-      } catch (error) {
-        console.error(error);
+      let leaves = await this.selectLeaves(totalAmount);
 
-        const balance = this.leaves.reduce((acc, leaf) => acc + leaf.value, 0);
-        throw new ValidationError(
-          `Balance does not cover invoice amount and fee. Need ${amountSats + feeEstimate.feeEstimate.originalValue} sats, but only have ${balance} sats`,
-          {
-            field: "balance",
-            value: balance,
-            expected: `${amountSats + feeEstimate.feeEstimate.originalValue} sats`,
-          },
-        );
-      }
-
-      await this.refreshTimelockNodes();
-      await this.extendTimeLockNodes();
+      await this.checkRefreshTimelockNodes(leaves);
+      leaves = await this.checkExtendTimeLockNodes(leaves);
 
       const leavesToSend = await Promise.all(
         leaves.map(async (leaf) => ({
@@ -1769,6 +1778,7 @@ export class SparkWallet extends EventEmitter {
         },
       );
     }
+
     return await this.withLeaves(async () => {
       return await this.coopExit(onchainAddress, exitSpeed, amountSats);
     });
@@ -1795,6 +1805,9 @@ export class SparkWallet extends EventEmitter {
         ...leaf,
       }));
     }
+
+    await this.checkRefreshTimelockNodes(leavesToSend);
+    leavesToSend = await this.checkExtendTimeLockNodes(leavesToSend);
 
     if (leavesToSend.reduce((acc, leaf) => acc + leaf.value, 0) < 10000) {
       throw new ValidationError(
@@ -1896,7 +1909,10 @@ export class SparkWallet extends EventEmitter {
       );
     }
 
-    const leaves = await this.selectLeaves(amountSats);
+    let leaves = await this.selectLeaves(amountSats);
+
+    await this.checkRefreshTimelockNodes(leaves);
+    leaves = await this.checkExtendTimeLockNodes(leaves);
 
     return await this.sspClient.getCoopExitFeeEstimate({
       leafExternalIds: leaves.map((leaf) => leaf.id),
