@@ -2,24 +2,24 @@
 // Copyright ©, 2023-present, Lightspark Group, Inc. - All Rights Reserved
 
 import Entity from './Entity.js';
-import SparkCoopExitRequestStatus from './SparkCoopExitRequestStatus.js';
-import { LightsparkException } from '@lightsparkdev/core';
-import CoopExitRequest from './CoopExitRequest.js';
-import BitcoinNetwork from './BitcoinNetwork.js';
-import { Query, isObject } from '@lightsparkdev/core';
-import {InvoiceToJson} from './Invoice.js';
-import LeavesSwapRequest from './LeavesSwapRequest.js';
-import {InvoiceFromJson} from './Invoice.js';
-import {TransferFromJson} from './Transfer.js';
 import {SwapLeafFromJson} from './SwapLeaf.js';
-import SparkLeavesSwapRequestStatus from './SparkLeavesSwapRequestStatus.js';
-import {CurrencyAmountToJson} from './CurrencyAmount.js';
-import LightningReceiveRequest from './LightningReceiveRequest.js';
-import LightningSendRequest from './LightningSendRequest.js';
-import LightningSendRequestStatus from './LightningSendRequestStatus.js';
-import LightningReceiveRequestStatus from './LightningReceiveRequestStatus.js';
-import {SwapLeafToJson} from './SwapLeaf.js';
 import {CurrencyAmountFromJson} from './CurrencyAmount.js';
+import LightningSendRequestStatus from './LightningSendRequestStatus.js';
+import LightningSendRequest from './LightningSendRequest.js';
+import LightningReceiveRequest from './LightningReceiveRequest.js';
+import LightningReceiveRequestStatus from './LightningReceiveRequestStatus.js';
+import {CurrencyAmountToJson} from './CurrencyAmount.js';
+import BitcoinNetwork from './BitcoinNetwork.js';
+import LeavesSwapRequest from './LeavesSwapRequest.js';
+import {InvoiceToJson} from './Invoice.js';
+import { LightsparkException } from '@lightsparkdev/core';
+import SparkLeavesSwapRequestStatus from './SparkLeavesSwapRequestStatus.js';
+import CoopExitRequest from './CoopExitRequest.js';
+import {TransferFromJson} from './Transfer.js';
+import {InvoiceFromJson} from './Invoice.js';
+import { Query, isObject } from '@lightsparkdev/core';
+import SparkCoopExitRequestStatus from './SparkCoopExitRequestStatus.js';
+import {SwapLeafToJson} from './SwapLeaf.js';
 
 
 interface UserRequest {

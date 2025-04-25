@@ -3,11 +3,11 @@
 
 import Connection from './Connection.js';
 import {PageInfoFromJson} from './PageInfo.js';
-import PageInfo from './PageInfo.js';
-import {UserRequestToJson} from './UserRequest.js';
-import {UserRequestFromJson} from './UserRequest.js';
-import UserRequest from './UserRequest.js';
 import {PageInfoToJson} from './PageInfo.js';
+import {UserRequestFromJson} from './UserRequest.js';
+import {UserRequestToJson} from './UserRequest.js';
+import UserRequest from './UserRequest.js';
+import PageInfo from './PageInfo.js';
 
 
 interface SparkWalletUserToUserRequestsConnection {

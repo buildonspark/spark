@@ -32,7 +32,7 @@ import {
   LeavesSwapFeeEstimateOutput,
   LightningSendRequest,
   RequestCoopExitInput,
-  RequestLeavesSwapInputRC,
+  RequestLeavesSwapInput,
   RequestLightningReceiveInput,
   RequestLightningSendInput,
 } from "./objects/index.js";
@@ -238,6 +238,7 @@ export default class SspClient {
     leafExternalIds,
     withdrawalAddress,
     idempotencyKey,
+    exitSpeed,
   }: RequestCoopExitInput): Promise<CoopExitRequest | null> {
     return await this.executeRawQuery({
       queryPayload: RequestCoopExit,
@@ -245,6 +246,7 @@ export default class SspClient {
         leaf_external_ids: leafExternalIds,
         withdrawal_address: withdrawalAddress,
         idempotency_key: idempotencyKey,
+        exit_speed: exitSpeed,
       },
       constructObject: (response: { request_coop_exit: any }) => {
         return CoopExitRequestFromJson(response.request_coop_exit.request);
@@ -302,7 +304,7 @@ export default class SspClient {
     feeSats,
     userLeaves,
     idempotencyKey,
-  }: RequestLeavesSwapInputRC): Promise<LeavesSwapRequest | null> {
+  }: RequestLeavesSwapInput): Promise<LeavesSwapRequest | null> {
     const query = {
       queryPayload: RequestSwapLeaves,
       variables: {
