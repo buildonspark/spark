@@ -85,7 +85,7 @@ import {
 import { getNextTransactionSequence } from "./utils/transaction.js";
 
 import { LRCWallet } from "@buildonspark/lrc20-sdk";
-import EventEmitter from "events";
+import { EventEmitter } from "eventemitter3";
 import {
   decodeSparkAddress,
   encodeSparkAddress,
@@ -2164,27 +2164,5 @@ export class SparkWallet extends EventEmitter {
     this.streamController?.abort();
     this.streamController = null;
     await this.connectionManager.closeConnections();
-  }
-
-  // Events
-  public on<K extends keyof SparkWalletEvents>(
-    event: K,
-    listener: SparkWalletEvents[K],
-  ): this {
-    return super.on(event, listener);
-  }
-
-  public once<K extends keyof SparkWalletEvents>(
-    event: K,
-    listener: SparkWalletEvents[K],
-  ): this {
-    return super.once(event, listener);
-  }
-
-  public off<K extends keyof SparkWalletEvents>(
-    event: K,
-    listener: SparkWalletEvents[K],
-  ): this {
-    return super.off(event, listener);
   }
 }

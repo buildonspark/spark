@@ -122,6 +122,7 @@
     "bitcoinjs-lib": "^6.1.5",
     "buffer": "^6.0.3",
     "eciesjs": "^0.4.13",
+    "eventemitter3": "^5.0.1",
     "light-bolt11-decoder": "^3.2.0",
     "nice-grpc": "^2.1.10",
     "nice-grpc-client-middleware-retry": "^3.1.10",
