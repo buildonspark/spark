@@ -236,7 +236,7 @@ func TestCancelTransfer(t *testing.T) {
 
 	// We don't need to wait for the expiry because we haven't
 	// tweaked our key yet.
-	_, err = wallet.CancelSendTransfer(context.Background(), senderConfig, senderTransfer)
+	_, err = wallet.CancelTransfer(context.Background(), senderConfig, senderTransfer)
 	require.NoError(t, err, "failed to cancel transfer")
 
 	transfers, _, err := wallet.QueryAllTransfers(context.Background(), senderConfig, 1, 0)

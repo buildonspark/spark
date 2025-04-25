@@ -570,7 +570,7 @@ export interface OperatorSpecificTokenTransactionSignablePayload {
  * This message allows the sender of a output being spent to provide final evidence
  * that it owns a output to an SO when requesting signing and release of the  revocation keyshare.
  */
-export interface OperatorSpecificTokenTransactionSignature {
+export interface OperatorSpecificOwnerSignature {
   ownerPublicKey: Uint8Array;
   /** This is a Schnorr or ECDSA DER signature which can be between 64 and 73 bytes. */
   ownerSignature: Uint8Array;
@@ -579,7 +579,7 @@ export interface OperatorSpecificTokenTransactionSignature {
 
 export interface SignTokenTransactionRequest {
   finalTokenTransaction: TokenTransaction | undefined;
-  operatorSpecificSignatures: OperatorSpecificTokenTransactionSignature[];
+  operatorSpecificSignatures: OperatorSpecificOwnerSignature[];
   identityPublicKey: Uint8Array;
 }
 
@@ -763,7 +763,7 @@ export interface StartUserSignedTransferRequest {
   expiryTime: Date | undefined;
 }
 
-export interface StartSendTransferRequest {
+export interface StartTransferRequest {
   transferId: string;
   ownerIdentityPublicKey: Uint8Array;
   leavesToSend: LeafRefundTxSigningJob[];
@@ -772,12 +772,12 @@ export interface StartSendTransferRequest {
   keyTweakProofs: { [key: string]: SecretProof };
 }
 
-export interface StartSendTransferRequest_KeyTweakProofsEntry {
+export interface StartTransferRequest_KeyTweakProofsEntry {
   key: string;
   value: SecretProof | undefined;
 }
 
-export interface StartSendTransferResponse {
+export interface StartTransferResponse {
   transfer: Transfer | undefined;
   signingResults: LeafRefundTxSigningResult[];
 }
@@ -797,10 +797,14 @@ export interface SendLeafKeyTweak_PubkeySharesTweakEntry {
   value: Uint8Array;
 }
 
-export interface CompleteSendTransferRequest {
+export interface FinalizeTransferRequest {
   transferId: string;
   ownerIdentityPublicKey: Uint8Array;
   leavesToSend: SendLeafKeyTweak[];
+}
+
+export interface FinalizeTransferResponse {
+  transfer: Transfer | undefined;
 }
 
 export interface Transfer {
@@ -821,10 +825,6 @@ export interface TransferLeaf {
   secretCipher: Uint8Array;
   signature: Uint8Array;
   intermediateRefundTx: Uint8Array;
-}
-
-export interface CompleteSendTransferResponse {
-  transfer: Transfer | undefined;
 }
 
 export interface TransferFilter {
@@ -1001,7 +1001,7 @@ export interface OutPoint {
 }
 
 export interface CooperativeExitRequest {
-  transfer: StartSendTransferRequest | undefined;
+  transfer: StartTransferRequest | undefined;
   exitId: string;
   exitTxid: Uint8Array;
 }
@@ -1012,7 +1012,7 @@ export interface CooperativeExitResponse {
 }
 
 export interface CounterLeafSwapRequest {
-  transfer: StartSendTransferRequest | undefined;
+  transfer: StartTransferRequest | undefined;
   swapId: string;
   adaptorPublicKey: Uint8Array;
 }
@@ -1183,12 +1183,12 @@ export interface QueryNodesResponse_NodesEntry {
   value: TreeNode | undefined;
 }
 
-export interface CancelSendTransferRequest {
+export interface CancelTransferRequest {
   transferId: string;
   senderIdentityPublicKey: Uint8Array;
 }
 
-export interface CancelSendTransferResponse {
+export interface CancelTransferResponse {
   transfer: Transfer | undefined;
 }
 
@@ -4319,12 +4319,12 @@ export const OperatorSpecificTokenTransactionSignablePayload: MessageFns<
   },
 };
 
-function createBaseOperatorSpecificTokenTransactionSignature(): OperatorSpecificTokenTransactionSignature {
+function createBaseOperatorSpecificOwnerSignature(): OperatorSpecificOwnerSignature {
   return { ownerPublicKey: new Uint8Array(0), ownerSignature: new Uint8Array(0), payload: undefined };
 }
 
-export const OperatorSpecificTokenTransactionSignature: MessageFns<OperatorSpecificTokenTransactionSignature> = {
-  encode(message: OperatorSpecificTokenTransactionSignature, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+export const OperatorSpecificOwnerSignature: MessageFns<OperatorSpecificOwnerSignature> = {
+  encode(message: OperatorSpecificOwnerSignature, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.ownerPublicKey.length !== 0) {
       writer.uint32(10).bytes(message.ownerPublicKey);
     }
@@ -4337,10 +4337,10 @@ export const OperatorSpecificTokenTransactionSignature: MessageFns<OperatorSpeci
     return writer;
   },
 
-  decode(input: BinaryReader | Uint8Array, length?: number): OperatorSpecificTokenTransactionSignature {
+  decode(input: BinaryReader | Uint8Array, length?: number): OperatorSpecificOwnerSignature {
     const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseOperatorSpecificTokenTransactionSignature();
+    const message = createBaseOperatorSpecificOwnerSignature();
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
@@ -4377,7 +4377,7 @@ export const OperatorSpecificTokenTransactionSignature: MessageFns<OperatorSpeci
     return message;
   },
 
-  fromJSON(object: any): OperatorSpecificTokenTransactionSignature {
+  fromJSON(object: any): OperatorSpecificOwnerSignature {
     return {
       ownerPublicKey: isSet(object.ownerPublicKey) ? bytesFromBase64(object.ownerPublicKey) : new Uint8Array(0),
       ownerSignature: isSet(object.ownerSignature) ? bytesFromBase64(object.ownerSignature) : new Uint8Array(0),
@@ -4387,7 +4387,7 @@ export const OperatorSpecificTokenTransactionSignature: MessageFns<OperatorSpeci
     };
   },
 
-  toJSON(message: OperatorSpecificTokenTransactionSignature): unknown {
+  toJSON(message: OperatorSpecificOwnerSignature): unknown {
     const obj: any = {};
     if (message.ownerPublicKey.length !== 0) {
       obj.ownerPublicKey = base64FromBytes(message.ownerPublicKey);
@@ -4401,13 +4401,11 @@ export const OperatorSpecificTokenTransactionSignature: MessageFns<OperatorSpeci
     return obj;
   },
 
-  create(base?: DeepPartial<OperatorSpecificTokenTransactionSignature>): OperatorSpecificTokenTransactionSignature {
-    return OperatorSpecificTokenTransactionSignature.fromPartial(base ?? {});
+  create(base?: DeepPartial<OperatorSpecificOwnerSignature>): OperatorSpecificOwnerSignature {
+    return OperatorSpecificOwnerSignature.fromPartial(base ?? {});
   },
-  fromPartial(
-    object: DeepPartial<OperatorSpecificTokenTransactionSignature>,
-  ): OperatorSpecificTokenTransactionSignature {
-    const message = createBaseOperatorSpecificTokenTransactionSignature();
+  fromPartial(object: DeepPartial<OperatorSpecificOwnerSignature>): OperatorSpecificOwnerSignature {
+    const message = createBaseOperatorSpecificOwnerSignature();
     message.ownerPublicKey = object.ownerPublicKey ?? new Uint8Array(0);
     message.ownerSignature = object.ownerSignature ?? new Uint8Array(0);
     message.payload = (object.payload !== undefined && object.payload !== null)
@@ -4427,7 +4425,7 @@ export const SignTokenTransactionRequest: MessageFns<SignTokenTransactionRequest
       TokenTransaction.encode(message.finalTokenTransaction, writer.uint32(10).fork()).join();
     }
     for (const v of message.operatorSpecificSignatures) {
-      OperatorSpecificTokenTransactionSignature.encode(v!, writer.uint32(18).fork()).join();
+      OperatorSpecificOwnerSignature.encode(v!, writer.uint32(18).fork()).join();
     }
     if (message.identityPublicKey.length !== 0) {
       writer.uint32(26).bytes(message.identityPublicKey);
@@ -4455,9 +4453,7 @@ export const SignTokenTransactionRequest: MessageFns<SignTokenTransactionRequest
             break;
           }
 
-          message.operatorSpecificSignatures.push(
-            OperatorSpecificTokenTransactionSignature.decode(reader, reader.uint32()),
-          );
+          message.operatorSpecificSignatures.push(OperatorSpecificOwnerSignature.decode(reader, reader.uint32()));
           continue;
         }
         case 3: {
@@ -4483,7 +4479,7 @@ export const SignTokenTransactionRequest: MessageFns<SignTokenTransactionRequest
         ? TokenTransaction.fromJSON(object.finalTokenTransaction)
         : undefined,
       operatorSpecificSignatures: globalThis.Array.isArray(object?.operatorSpecificSignatures)
-        ? object.operatorSpecificSignatures.map((e: any) => OperatorSpecificTokenTransactionSignature.fromJSON(e))
+        ? object.operatorSpecificSignatures.map((e: any) => OperatorSpecificOwnerSignature.fromJSON(e))
         : [],
       identityPublicKey: isSet(object.identityPublicKey)
         ? bytesFromBase64(object.identityPublicKey)
@@ -4498,7 +4494,7 @@ export const SignTokenTransactionRequest: MessageFns<SignTokenTransactionRequest
     }
     if (message.operatorSpecificSignatures?.length) {
       obj.operatorSpecificSignatures = message.operatorSpecificSignatures.map((e) =>
-        OperatorSpecificTokenTransactionSignature.toJSON(e)
+        OperatorSpecificOwnerSignature.toJSON(e)
       );
     }
     if (message.identityPublicKey.length !== 0) {
@@ -4517,7 +4513,7 @@ export const SignTokenTransactionRequest: MessageFns<SignTokenTransactionRequest
         ? TokenTransaction.fromPartial(object.finalTokenTransaction)
         : undefined;
     message.operatorSpecificSignatures =
-      object.operatorSpecificSignatures?.map((e) => OperatorSpecificTokenTransactionSignature.fromPartial(e)) || [];
+      object.operatorSpecificSignatures?.map((e) => OperatorSpecificOwnerSignature.fromPartial(e)) || [];
     message.identityPublicKey = object.identityPublicKey ?? new Uint8Array(0);
     return message;
   },
@@ -6551,7 +6547,7 @@ export const StartUserSignedTransferRequest: MessageFns<StartUserSignedTransferR
   },
 };
 
-function createBaseStartSendTransferRequest(): StartSendTransferRequest {
+function createBaseStartTransferRequest(): StartTransferRequest {
   return {
     transferId: "",
     ownerIdentityPublicKey: new Uint8Array(0),
@@ -6562,8 +6558,8 @@ function createBaseStartSendTransferRequest(): StartSendTransferRequest {
   };
 }
 
-export const StartSendTransferRequest: MessageFns<StartSendTransferRequest> = {
-  encode(message: StartSendTransferRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+export const StartTransferRequest: MessageFns<StartTransferRequest> = {
+  encode(message: StartTransferRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.transferId !== "") {
       writer.uint32(10).string(message.transferId);
     }
@@ -6580,15 +6576,15 @@ export const StartSendTransferRequest: MessageFns<StartSendTransferRequest> = {
       Timestamp.encode(toTimestamp(message.expiryTime), writer.uint32(42).fork()).join();
     }
     Object.entries(message.keyTweakProofs).forEach(([key, value]) => {
-      StartSendTransferRequest_KeyTweakProofsEntry.encode({ key: key as any, value }, writer.uint32(50).fork()).join();
+      StartTransferRequest_KeyTweakProofsEntry.encode({ key: key as any, value }, writer.uint32(50).fork()).join();
     });
     return writer;
   },
 
-  decode(input: BinaryReader | Uint8Array, length?: number): StartSendTransferRequest {
+  decode(input: BinaryReader | Uint8Array, length?: number): StartTransferRequest {
     const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseStartSendTransferRequest();
+    const message = createBaseStartTransferRequest();
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
@@ -6637,7 +6633,7 @@ export const StartSendTransferRequest: MessageFns<StartSendTransferRequest> = {
             break;
           }
 
-          const entry6 = StartSendTransferRequest_KeyTweakProofsEntry.decode(reader, reader.uint32());
+          const entry6 = StartTransferRequest_KeyTweakProofsEntry.decode(reader, reader.uint32());
           if (entry6.value !== undefined) {
             message.keyTweakProofs[entry6.key] = entry6.value;
           }
@@ -6652,7 +6648,7 @@ export const StartSendTransferRequest: MessageFns<StartSendTransferRequest> = {
     return message;
   },
 
-  fromJSON(object: any): StartSendTransferRequest {
+  fromJSON(object: any): StartTransferRequest {
     return {
       transferId: isSet(object.transferId) ? globalThis.String(object.transferId) : "",
       ownerIdentityPublicKey: isSet(object.ownerIdentityPublicKey)
@@ -6674,7 +6670,7 @@ export const StartSendTransferRequest: MessageFns<StartSendTransferRequest> = {
     };
   },
 
-  toJSON(message: StartSendTransferRequest): unknown {
+  toJSON(message: StartTransferRequest): unknown {
     const obj: any = {};
     if (message.transferId !== "") {
       obj.transferId = message.transferId;
@@ -6703,11 +6699,11 @@ export const StartSendTransferRequest: MessageFns<StartSendTransferRequest> = {
     return obj;
   },
 
-  create(base?: DeepPartial<StartSendTransferRequest>): StartSendTransferRequest {
-    return StartSendTransferRequest.fromPartial(base ?? {});
+  create(base?: DeepPartial<StartTransferRequest>): StartTransferRequest {
+    return StartTransferRequest.fromPartial(base ?? {});
   },
-  fromPartial(object: DeepPartial<StartSendTransferRequest>): StartSendTransferRequest {
-    const message = createBaseStartSendTransferRequest();
+  fromPartial(object: DeepPartial<StartTransferRequest>): StartTransferRequest {
+    const message = createBaseStartTransferRequest();
     message.transferId = object.transferId ?? "";
     message.ownerIdentityPublicKey = object.ownerIdentityPublicKey ?? new Uint8Array(0);
     message.leavesToSend = object.leavesToSend?.map((e) => LeafRefundTxSigningJob.fromPartial(e)) || [];
@@ -6726,15 +6722,12 @@ export const StartSendTransferRequest: MessageFns<StartSendTransferRequest> = {
   },
 };
 
-function createBaseStartSendTransferRequest_KeyTweakProofsEntry(): StartSendTransferRequest_KeyTweakProofsEntry {
+function createBaseStartTransferRequest_KeyTweakProofsEntry(): StartTransferRequest_KeyTweakProofsEntry {
   return { key: "", value: undefined };
 }
 
-export const StartSendTransferRequest_KeyTweakProofsEntry: MessageFns<StartSendTransferRequest_KeyTweakProofsEntry> = {
-  encode(
-    message: StartSendTransferRequest_KeyTweakProofsEntry,
-    writer: BinaryWriter = new BinaryWriter(),
-  ): BinaryWriter {
+export const StartTransferRequest_KeyTweakProofsEntry: MessageFns<StartTransferRequest_KeyTweakProofsEntry> = {
+  encode(message: StartTransferRequest_KeyTweakProofsEntry, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.key !== "") {
       writer.uint32(10).string(message.key);
     }
@@ -6744,10 +6737,10 @@ export const StartSendTransferRequest_KeyTweakProofsEntry: MessageFns<StartSendT
     return writer;
   },
 
-  decode(input: BinaryReader | Uint8Array, length?: number): StartSendTransferRequest_KeyTweakProofsEntry {
+  decode(input: BinaryReader | Uint8Array, length?: number): StartTransferRequest_KeyTweakProofsEntry {
     const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseStartSendTransferRequest_KeyTweakProofsEntry();
+    const message = createBaseStartTransferRequest_KeyTweakProofsEntry();
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
@@ -6776,14 +6769,14 @@ export const StartSendTransferRequest_KeyTweakProofsEntry: MessageFns<StartSendT
     return message;
   },
 
-  fromJSON(object: any): StartSendTransferRequest_KeyTweakProofsEntry {
+  fromJSON(object: any): StartTransferRequest_KeyTweakProofsEntry {
     return {
       key: isSet(object.key) ? globalThis.String(object.key) : "",
       value: isSet(object.value) ? SecretProof.fromJSON(object.value) : undefined,
     };
   },
 
-  toJSON(message: StartSendTransferRequest_KeyTweakProofsEntry): unknown {
+  toJSON(message: StartTransferRequest_KeyTweakProofsEntry): unknown {
     const obj: any = {};
     if (message.key !== "") {
       obj.key = message.key;
@@ -6794,15 +6787,11 @@ export const StartSendTransferRequest_KeyTweakProofsEntry: MessageFns<StartSendT
     return obj;
   },
 
-  create(
-    base?: DeepPartial<StartSendTransferRequest_KeyTweakProofsEntry>,
-  ): StartSendTransferRequest_KeyTweakProofsEntry {
-    return StartSendTransferRequest_KeyTweakProofsEntry.fromPartial(base ?? {});
+  create(base?: DeepPartial<StartTransferRequest_KeyTweakProofsEntry>): StartTransferRequest_KeyTweakProofsEntry {
+    return StartTransferRequest_KeyTweakProofsEntry.fromPartial(base ?? {});
   },
-  fromPartial(
-    object: DeepPartial<StartSendTransferRequest_KeyTweakProofsEntry>,
-  ): StartSendTransferRequest_KeyTweakProofsEntry {
-    const message = createBaseStartSendTransferRequest_KeyTweakProofsEntry();
+  fromPartial(object: DeepPartial<StartTransferRequest_KeyTweakProofsEntry>): StartTransferRequest_KeyTweakProofsEntry {
+    const message = createBaseStartTransferRequest_KeyTweakProofsEntry();
     message.key = object.key ?? "";
     message.value = (object.value !== undefined && object.value !== null)
       ? SecretProof.fromPartial(object.value)
@@ -6811,12 +6800,12 @@ export const StartSendTransferRequest_KeyTweakProofsEntry: MessageFns<StartSendT
   },
 };
 
-function createBaseStartSendTransferResponse(): StartSendTransferResponse {
+function createBaseStartTransferResponse(): StartTransferResponse {
   return { transfer: undefined, signingResults: [] };
 }
 
-export const StartSendTransferResponse: MessageFns<StartSendTransferResponse> = {
-  encode(message: StartSendTransferResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+export const StartTransferResponse: MessageFns<StartTransferResponse> = {
+  encode(message: StartTransferResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.transfer !== undefined) {
       Transfer.encode(message.transfer, writer.uint32(10).fork()).join();
     }
@@ -6826,10 +6815,10 @@ export const StartSendTransferResponse: MessageFns<StartSendTransferResponse> = 
     return writer;
   },
 
-  decode(input: BinaryReader | Uint8Array, length?: number): StartSendTransferResponse {
+  decode(input: BinaryReader | Uint8Array, length?: number): StartTransferResponse {
     const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseStartSendTransferResponse();
+    const message = createBaseStartTransferResponse();
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
@@ -6858,7 +6847,7 @@ export const StartSendTransferResponse: MessageFns<StartSendTransferResponse> = 
     return message;
   },
 
-  fromJSON(object: any): StartSendTransferResponse {
+  fromJSON(object: any): StartTransferResponse {
     return {
       transfer: isSet(object.transfer) ? Transfer.fromJSON(object.transfer) : undefined,
       signingResults: globalThis.Array.isArray(object?.signingResults)
@@ -6867,7 +6856,7 @@ export const StartSendTransferResponse: MessageFns<StartSendTransferResponse> = 
     };
   },
 
-  toJSON(message: StartSendTransferResponse): unknown {
+  toJSON(message: StartTransferResponse): unknown {
     const obj: any = {};
     if (message.transfer !== undefined) {
       obj.transfer = Transfer.toJSON(message.transfer);
@@ -6878,11 +6867,11 @@ export const StartSendTransferResponse: MessageFns<StartSendTransferResponse> = 
     return obj;
   },
 
-  create(base?: DeepPartial<StartSendTransferResponse>): StartSendTransferResponse {
-    return StartSendTransferResponse.fromPartial(base ?? {});
+  create(base?: DeepPartial<StartTransferResponse>): StartTransferResponse {
+    return StartTransferResponse.fromPartial(base ?? {});
   },
-  fromPartial(object: DeepPartial<StartSendTransferResponse>): StartSendTransferResponse {
-    const message = createBaseStartSendTransferResponse();
+  fromPartial(object: DeepPartial<StartTransferResponse>): StartTransferResponse {
+    const message = createBaseStartTransferResponse();
     message.transfer = (object.transfer !== undefined && object.transfer !== null)
       ? Transfer.fromPartial(object.transfer)
       : undefined;
@@ -7138,12 +7127,12 @@ export const SendLeafKeyTweak_PubkeySharesTweakEntry: MessageFns<SendLeafKeyTwea
   },
 };
 
-function createBaseCompleteSendTransferRequest(): CompleteSendTransferRequest {
+function createBaseFinalizeTransferRequest(): FinalizeTransferRequest {
   return { transferId: "", ownerIdentityPublicKey: new Uint8Array(0), leavesToSend: [] };
 }
 
-export const CompleteSendTransferRequest: MessageFns<CompleteSendTransferRequest> = {
-  encode(message: CompleteSendTransferRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+export const FinalizeTransferRequest: MessageFns<FinalizeTransferRequest> = {
+  encode(message: FinalizeTransferRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.transferId !== "") {
       writer.uint32(10).string(message.transferId);
     }
@@ -7156,10 +7145,10 @@ export const CompleteSendTransferRequest: MessageFns<CompleteSendTransferRequest
     return writer;
   },
 
-  decode(input: BinaryReader | Uint8Array, length?: number): CompleteSendTransferRequest {
+  decode(input: BinaryReader | Uint8Array, length?: number): FinalizeTransferRequest {
     const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseCompleteSendTransferRequest();
+    const message = createBaseFinalizeTransferRequest();
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
@@ -7196,7 +7185,7 @@ export const CompleteSendTransferRequest: MessageFns<CompleteSendTransferRequest
     return message;
   },
 
-  fromJSON(object: any): CompleteSendTransferRequest {
+  fromJSON(object: any): FinalizeTransferRequest {
     return {
       transferId: isSet(object.transferId) ? globalThis.String(object.transferId) : "",
       ownerIdentityPublicKey: isSet(object.ownerIdentityPublicKey)
@@ -7208,7 +7197,7 @@ export const CompleteSendTransferRequest: MessageFns<CompleteSendTransferRequest
     };
   },
 
-  toJSON(message: CompleteSendTransferRequest): unknown {
+  toJSON(message: FinalizeTransferRequest): unknown {
     const obj: any = {};
     if (message.transferId !== "") {
       obj.transferId = message.transferId;
@@ -7222,14 +7211,74 @@ export const CompleteSendTransferRequest: MessageFns<CompleteSendTransferRequest
     return obj;
   },
 
-  create(base?: DeepPartial<CompleteSendTransferRequest>): CompleteSendTransferRequest {
-    return CompleteSendTransferRequest.fromPartial(base ?? {});
+  create(base?: DeepPartial<FinalizeTransferRequest>): FinalizeTransferRequest {
+    return FinalizeTransferRequest.fromPartial(base ?? {});
   },
-  fromPartial(object: DeepPartial<CompleteSendTransferRequest>): CompleteSendTransferRequest {
-    const message = createBaseCompleteSendTransferRequest();
+  fromPartial(object: DeepPartial<FinalizeTransferRequest>): FinalizeTransferRequest {
+    const message = createBaseFinalizeTransferRequest();
     message.transferId = object.transferId ?? "";
     message.ownerIdentityPublicKey = object.ownerIdentityPublicKey ?? new Uint8Array(0);
     message.leavesToSend = object.leavesToSend?.map((e) => SendLeafKeyTweak.fromPartial(e)) || [];
+    return message;
+  },
+};
+
+function createBaseFinalizeTransferResponse(): FinalizeTransferResponse {
+  return { transfer: undefined };
+}
+
+export const FinalizeTransferResponse: MessageFns<FinalizeTransferResponse> = {
+  encode(message: FinalizeTransferResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.transfer !== undefined) {
+      Transfer.encode(message.transfer, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): FinalizeTransferResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseFinalizeTransferResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.transfer = Transfer.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): FinalizeTransferResponse {
+    return { transfer: isSet(object.transfer) ? Transfer.fromJSON(object.transfer) : undefined };
+  },
+
+  toJSON(message: FinalizeTransferResponse): unknown {
+    const obj: any = {};
+    if (message.transfer !== undefined) {
+      obj.transfer = Transfer.toJSON(message.transfer);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<FinalizeTransferResponse>): FinalizeTransferResponse {
+    return FinalizeTransferResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<FinalizeTransferResponse>): FinalizeTransferResponse {
+    const message = createBaseFinalizeTransferResponse();
+    message.transfer = (object.transfer !== undefined && object.transfer !== null)
+      ? Transfer.fromPartial(object.transfer)
+      : undefined;
     return message;
   },
 };
@@ -7564,66 +7613,6 @@ export const TransferLeaf: MessageFns<TransferLeaf> = {
     message.secretCipher = object.secretCipher ?? new Uint8Array(0);
     message.signature = object.signature ?? new Uint8Array(0);
     message.intermediateRefundTx = object.intermediateRefundTx ?? new Uint8Array(0);
-    return message;
-  },
-};
-
-function createBaseCompleteSendTransferResponse(): CompleteSendTransferResponse {
-  return { transfer: undefined };
-}
-
-export const CompleteSendTransferResponse: MessageFns<CompleteSendTransferResponse> = {
-  encode(message: CompleteSendTransferResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.transfer !== undefined) {
-      Transfer.encode(message.transfer, writer.uint32(10).fork()).join();
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): CompleteSendTransferResponse {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseCompleteSendTransferResponse();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.transfer = Transfer.decode(reader, reader.uint32());
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): CompleteSendTransferResponse {
-    return { transfer: isSet(object.transfer) ? Transfer.fromJSON(object.transfer) : undefined };
-  },
-
-  toJSON(message: CompleteSendTransferResponse): unknown {
-    const obj: any = {};
-    if (message.transfer !== undefined) {
-      obj.transfer = Transfer.toJSON(message.transfer);
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<CompleteSendTransferResponse>): CompleteSendTransferResponse {
-    return CompleteSendTransferResponse.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<CompleteSendTransferResponse>): CompleteSendTransferResponse {
-    const message = createBaseCompleteSendTransferResponse();
-    message.transfer = (object.transfer !== undefined && object.transfer !== null)
-      ? Transfer.fromPartial(object.transfer)
-      : undefined;
     return message;
   },
 };
@@ -9912,7 +9901,7 @@ function createBaseCooperativeExitRequest(): CooperativeExitRequest {
 export const CooperativeExitRequest: MessageFns<CooperativeExitRequest> = {
   encode(message: CooperativeExitRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.transfer !== undefined) {
-      StartSendTransferRequest.encode(message.transfer, writer.uint32(10).fork()).join();
+      StartTransferRequest.encode(message.transfer, writer.uint32(10).fork()).join();
     }
     if (message.exitId !== "") {
       writer.uint32(18).string(message.exitId);
@@ -9935,7 +9924,7 @@ export const CooperativeExitRequest: MessageFns<CooperativeExitRequest> = {
             break;
           }
 
-          message.transfer = StartSendTransferRequest.decode(reader, reader.uint32());
+          message.transfer = StartTransferRequest.decode(reader, reader.uint32());
           continue;
         }
         case 2: {
@@ -9965,7 +9954,7 @@ export const CooperativeExitRequest: MessageFns<CooperativeExitRequest> = {
 
   fromJSON(object: any): CooperativeExitRequest {
     return {
-      transfer: isSet(object.transfer) ? StartSendTransferRequest.fromJSON(object.transfer) : undefined,
+      transfer: isSet(object.transfer) ? StartTransferRequest.fromJSON(object.transfer) : undefined,
       exitId: isSet(object.exitId) ? globalThis.String(object.exitId) : "",
       exitTxid: isSet(object.exitTxid) ? bytesFromBase64(object.exitTxid) : new Uint8Array(0),
     };
@@ -9974,7 +9963,7 @@ export const CooperativeExitRequest: MessageFns<CooperativeExitRequest> = {
   toJSON(message: CooperativeExitRequest): unknown {
     const obj: any = {};
     if (message.transfer !== undefined) {
-      obj.transfer = StartSendTransferRequest.toJSON(message.transfer);
+      obj.transfer = StartTransferRequest.toJSON(message.transfer);
     }
     if (message.exitId !== "") {
       obj.exitId = message.exitId;
@@ -9991,7 +9980,7 @@ export const CooperativeExitRequest: MessageFns<CooperativeExitRequest> = {
   fromPartial(object: DeepPartial<CooperativeExitRequest>): CooperativeExitRequest {
     const message = createBaseCooperativeExitRequest();
     message.transfer = (object.transfer !== undefined && object.transfer !== null)
-      ? StartSendTransferRequest.fromPartial(object.transfer)
+      ? StartTransferRequest.fromPartial(object.transfer)
       : undefined;
     message.exitId = object.exitId ?? "";
     message.exitTxid = object.exitTxid ?? new Uint8Array(0);
@@ -10086,7 +10075,7 @@ function createBaseCounterLeafSwapRequest(): CounterLeafSwapRequest {
 export const CounterLeafSwapRequest: MessageFns<CounterLeafSwapRequest> = {
   encode(message: CounterLeafSwapRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.transfer !== undefined) {
-      StartSendTransferRequest.encode(message.transfer, writer.uint32(10).fork()).join();
+      StartTransferRequest.encode(message.transfer, writer.uint32(10).fork()).join();
     }
     if (message.swapId !== "") {
       writer.uint32(18).string(message.swapId);
@@ -10109,7 +10098,7 @@ export const CounterLeafSwapRequest: MessageFns<CounterLeafSwapRequest> = {
             break;
           }
 
-          message.transfer = StartSendTransferRequest.decode(reader, reader.uint32());
+          message.transfer = StartTransferRequest.decode(reader, reader.uint32());
           continue;
         }
         case 2: {
@@ -10139,7 +10128,7 @@ export const CounterLeafSwapRequest: MessageFns<CounterLeafSwapRequest> = {
 
   fromJSON(object: any): CounterLeafSwapRequest {
     return {
-      transfer: isSet(object.transfer) ? StartSendTransferRequest.fromJSON(object.transfer) : undefined,
+      transfer: isSet(object.transfer) ? StartTransferRequest.fromJSON(object.transfer) : undefined,
       swapId: isSet(object.swapId) ? globalThis.String(object.swapId) : "",
       adaptorPublicKey: isSet(object.adaptorPublicKey) ? bytesFromBase64(object.adaptorPublicKey) : new Uint8Array(0),
     };
@@ -10148,7 +10137,7 @@ export const CounterLeafSwapRequest: MessageFns<CounterLeafSwapRequest> = {
   toJSON(message: CounterLeafSwapRequest): unknown {
     const obj: any = {};
     if (message.transfer !== undefined) {
-      obj.transfer = StartSendTransferRequest.toJSON(message.transfer);
+      obj.transfer = StartTransferRequest.toJSON(message.transfer);
     }
     if (message.swapId !== "") {
       obj.swapId = message.swapId;
@@ -10165,7 +10154,7 @@ export const CounterLeafSwapRequest: MessageFns<CounterLeafSwapRequest> = {
   fromPartial(object: DeepPartial<CounterLeafSwapRequest>): CounterLeafSwapRequest {
     const message = createBaseCounterLeafSwapRequest();
     message.transfer = (object.transfer !== undefined && object.transfer !== null)
-      ? StartSendTransferRequest.fromPartial(object.transfer)
+      ? StartTransferRequest.fromPartial(object.transfer)
       : undefined;
     message.swapId = object.swapId ?? "";
     message.adaptorPublicKey = object.adaptorPublicKey ?? new Uint8Array(0);
@@ -12521,12 +12510,12 @@ export const QueryNodesResponse_NodesEntry: MessageFns<QueryNodesResponse_NodesE
   },
 };
 
-function createBaseCancelSendTransferRequest(): CancelSendTransferRequest {
+function createBaseCancelTransferRequest(): CancelTransferRequest {
   return { transferId: "", senderIdentityPublicKey: new Uint8Array(0) };
 }
 
-export const CancelSendTransferRequest: MessageFns<CancelSendTransferRequest> = {
-  encode(message: CancelSendTransferRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+export const CancelTransferRequest: MessageFns<CancelTransferRequest> = {
+  encode(message: CancelTransferRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.transferId !== "") {
       writer.uint32(10).string(message.transferId);
     }
@@ -12536,10 +12525,10 @@ export const CancelSendTransferRequest: MessageFns<CancelSendTransferRequest> = 
     return writer;
   },
 
-  decode(input: BinaryReader | Uint8Array, length?: number): CancelSendTransferRequest {
+  decode(input: BinaryReader | Uint8Array, length?: number): CancelTransferRequest {
     const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseCancelSendTransferRequest();
+    const message = createBaseCancelTransferRequest();
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
@@ -12568,7 +12557,7 @@ export const CancelSendTransferRequest: MessageFns<CancelSendTransferRequest> = 
     return message;
   },
 
-  fromJSON(object: any): CancelSendTransferRequest {
+  fromJSON(object: any): CancelTransferRequest {
     return {
       transferId: isSet(object.transferId) ? globalThis.String(object.transferId) : "",
       senderIdentityPublicKey: isSet(object.senderIdentityPublicKey)
@@ -12577,7 +12566,7 @@ export const CancelSendTransferRequest: MessageFns<CancelSendTransferRequest> = 
     };
   },
 
-  toJSON(message: CancelSendTransferRequest): unknown {
+  toJSON(message: CancelTransferRequest): unknown {
     const obj: any = {};
     if (message.transferId !== "") {
       obj.transferId = message.transferId;
@@ -12588,33 +12577,33 @@ export const CancelSendTransferRequest: MessageFns<CancelSendTransferRequest> = 
     return obj;
   },
 
-  create(base?: DeepPartial<CancelSendTransferRequest>): CancelSendTransferRequest {
-    return CancelSendTransferRequest.fromPartial(base ?? {});
+  create(base?: DeepPartial<CancelTransferRequest>): CancelTransferRequest {
+    return CancelTransferRequest.fromPartial(base ?? {});
   },
-  fromPartial(object: DeepPartial<CancelSendTransferRequest>): CancelSendTransferRequest {
-    const message = createBaseCancelSendTransferRequest();
+  fromPartial(object: DeepPartial<CancelTransferRequest>): CancelTransferRequest {
+    const message = createBaseCancelTransferRequest();
     message.transferId = object.transferId ?? "";
     message.senderIdentityPublicKey = object.senderIdentityPublicKey ?? new Uint8Array(0);
     return message;
   },
 };
 
-function createBaseCancelSendTransferResponse(): CancelSendTransferResponse {
+function createBaseCancelTransferResponse(): CancelTransferResponse {
   return { transfer: undefined };
 }
 
-export const CancelSendTransferResponse: MessageFns<CancelSendTransferResponse> = {
-  encode(message: CancelSendTransferResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+export const CancelTransferResponse: MessageFns<CancelTransferResponse> = {
+  encode(message: CancelTransferResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.transfer !== undefined) {
       Transfer.encode(message.transfer, writer.uint32(10).fork()).join();
     }
     return writer;
   },
 
-  decode(input: BinaryReader | Uint8Array, length?: number): CancelSendTransferResponse {
+  decode(input: BinaryReader | Uint8Array, length?: number): CancelTransferResponse {
     const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseCancelSendTransferResponse();
+    const message = createBaseCancelTransferResponse();
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
@@ -12635,11 +12624,11 @@ export const CancelSendTransferResponse: MessageFns<CancelSendTransferResponse> 
     return message;
   },
 
-  fromJSON(object: any): CancelSendTransferResponse {
+  fromJSON(object: any): CancelTransferResponse {
     return { transfer: isSet(object.transfer) ? Transfer.fromJSON(object.transfer) : undefined };
   },
 
-  toJSON(message: CancelSendTransferResponse): unknown {
+  toJSON(message: CancelTransferResponse): unknown {
     const obj: any = {};
     if (message.transfer !== undefined) {
       obj.transfer = Transfer.toJSON(message.transfer);
@@ -12647,11 +12636,11 @@ export const CancelSendTransferResponse: MessageFns<CancelSendTransferResponse> 
     return obj;
   },
 
-  create(base?: DeepPartial<CancelSendTransferResponse>): CancelSendTransferResponse {
-    return CancelSendTransferResponse.fromPartial(base ?? {});
+  create(base?: DeepPartial<CancelTransferResponse>): CancelTransferResponse {
+    return CancelTransferResponse.fromPartial(base ?? {});
   },
-  fromPartial(object: DeepPartial<CancelSendTransferResponse>): CancelSendTransferResponse {
-    const message = createBaseCancelSendTransferResponse();
+  fromPartial(object: DeepPartial<CancelTransferResponse>): CancelTransferResponse {
+    const message = createBaseCancelTransferResponse();
     message.transfer = (object.transfer !== undefined && object.transfer !== null)
       ? Transfer.fromPartial(object.transfer)
       : undefined;
@@ -13240,19 +13229,27 @@ export const SparkServiceDefinition = {
       responseStream: false,
       options: {},
     },
-    start_send_transfer: {
-      name: "start_send_transfer",
-      requestType: StartSendTransferRequest,
+    start_transfer: {
+      name: "start_transfer",
+      requestType: StartTransferRequest,
       requestStream: false,
-      responseType: StartSendTransferResponse,
+      responseType: StartTransferResponse,
       responseStream: false,
       options: {},
     },
-    complete_send_transfer: {
-      name: "complete_send_transfer",
-      requestType: CompleteSendTransferRequest,
+    finalize_transfer: {
+      name: "finalize_transfer",
+      requestType: FinalizeTransferRequest,
       requestStream: false,
-      responseType: CompleteSendTransferResponse,
+      responseType: FinalizeTransferResponse,
+      responseStream: false,
+      options: {},
+    },
+    cancel_transfer: {
+      name: "cancel_transfer",
+      requestType: CancelTransferRequest,
+      requestStream: false,
+      responseType: CancelTransferResponse,
       responseStream: false,
       options: {},
     },
@@ -13337,14 +13334,14 @@ export const SparkServiceDefinition = {
       options: {},
     },
     /**
-     * This is the exact same as start_send_transfer, but expresses to the SO
+     * This is the exact same as start_transfer, but expresses to the SO
      * this transfer is specifically for a leaf swap.
      */
     start_leaf_swap: {
       name: "start_leaf_swap",
-      requestType: StartSendTransferRequest,
+      requestType: StartTransferRequest,
       requestStream: false,
-      responseType: StartSendTransferResponse,
+      responseType: StartTransferResponse,
       responseStream: false,
       options: {},
     },
@@ -13502,14 +13499,6 @@ export const SparkServiceDefinition = {
       responseStream: false,
       options: {},
     },
-    cancel_send_transfer: {
-      name: "cancel_send_transfer",
-      requestType: CancelSendTransferRequest,
-      requestStream: false,
-      responseType: CancelSendTransferResponse,
-      responseStream: false,
-      options: {},
-    },
     query_unused_deposit_addresses: {
       name: "query_unused_deposit_addresses",
       requestType: QueryUnusedDepositAddressesRequest,
@@ -13551,14 +13540,18 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
     request: FinalizeNodeSignaturesRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<FinalizeNodeSignaturesResponse>>;
-  start_send_transfer(
-    request: StartSendTransferRequest,
+  start_transfer(
+    request: StartTransferRequest,
     context: CallContext & CallContextExt,
-  ): Promise<DeepPartial<StartSendTransferResponse>>;
-  complete_send_transfer(
-    request: CompleteSendTransferRequest,
+  ): Promise<DeepPartial<StartTransferResponse>>;
+  finalize_transfer(
+    request: FinalizeTransferRequest,
     context: CallContext & CallContextExt,
-  ): Promise<DeepPartial<CompleteSendTransferResponse>>;
+  ): Promise<DeepPartial<FinalizeTransferResponse>>;
+  cancel_transfer(
+    request: CancelTransferRequest,
+    context: CallContext & CallContextExt,
+  ): Promise<DeepPartial<CancelTransferResponse>>;
   query_pending_transfers(
     request: TransferFilter,
     context: CallContext & CallContextExt,
@@ -13600,13 +13593,13 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<ProvidePreimageResponse>>;
   /**
-   * This is the exact same as start_send_transfer, but expresses to the SO
+   * This is the exact same as start_transfer, but expresses to the SO
    * this transfer is specifically for a leaf swap.
    */
   start_leaf_swap(
-    request: StartSendTransferRequest,
+    request: StartTransferRequest,
     context: CallContext & CallContextExt,
-  ): Promise<DeepPartial<StartSendTransferResponse>>;
+  ): Promise<DeepPartial<StartTransferResponse>>;
   /**
    * This is deprecated, please use counter_leaf_swap instead.
    *
@@ -13689,10 +13682,6 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
     request: ReturnLightningPaymentRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<Empty>>;
-  cancel_send_transfer(
-    request: CancelSendTransferRequest,
-    context: CallContext & CallContextExt,
-  ): Promise<DeepPartial<CancelSendTransferResponse>>;
   query_unused_deposit_addresses(
     request: QueryUnusedDepositAddressesRequest,
     context: CallContext & CallContextExt,
@@ -13725,14 +13714,18 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
     request: DeepPartial<FinalizeNodeSignaturesRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<FinalizeNodeSignaturesResponse>;
-  start_send_transfer(
-    request: DeepPartial<StartSendTransferRequest>,
+  start_transfer(
+    request: DeepPartial<StartTransferRequest>,
     options?: CallOptions & CallOptionsExt,
-  ): Promise<StartSendTransferResponse>;
-  complete_send_transfer(
-    request: DeepPartial<CompleteSendTransferRequest>,
+  ): Promise<StartTransferResponse>;
+  finalize_transfer(
+    request: DeepPartial<FinalizeTransferRequest>,
     options?: CallOptions & CallOptionsExt,
-  ): Promise<CompleteSendTransferResponse>;
+  ): Promise<FinalizeTransferResponse>;
+  cancel_transfer(
+    request: DeepPartial<CancelTransferRequest>,
+    options?: CallOptions & CallOptionsExt,
+  ): Promise<CancelTransferResponse>;
   query_pending_transfers(
     request: DeepPartial<TransferFilter>,
     options?: CallOptions & CallOptionsExt,
@@ -13774,13 +13767,13 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
     options?: CallOptions & CallOptionsExt,
   ): Promise<ProvidePreimageResponse>;
   /**
-   * This is the exact same as start_send_transfer, but expresses to the SO
+   * This is the exact same as start_transfer, but expresses to the SO
    * this transfer is specifically for a leaf swap.
    */
   start_leaf_swap(
-    request: DeepPartial<StartSendTransferRequest>,
+    request: DeepPartial<StartTransferRequest>,
     options?: CallOptions & CallOptionsExt,
-  ): Promise<StartSendTransferResponse>;
+  ): Promise<StartTransferResponse>;
   /**
    * This is deprecated, please use counter_leaf_swap instead.
    *
@@ -13863,10 +13856,6 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
     request: DeepPartial<ReturnLightningPaymentRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<Empty>;
-  cancel_send_transfer(
-    request: DeepPartial<CancelSendTransferRequest>,
-    options?: CallOptions & CallOptionsExt,
-  ): Promise<CancelSendTransferResponse>;
   query_unused_deposit_addresses(
     request: DeepPartial<QueryUnusedDepositAddressesRequest>,
     options?: CallOptions & CallOptionsExt,

@@ -318,7 +318,7 @@ describe("Transfer", () => {
       new Date(Date.now() + 10 * 60 * 1000),
     );
 
-    await senderTransferService.cancelSendTransfer(
+    await senderTransferService.cancelTransfer(
       senderTransfer.transfer,
       senderConfigService.getCoordinatorAddress(),
     );

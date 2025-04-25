@@ -43,9 +43,9 @@ func NewTransferHandler(config *so.Config) *TransferHandler {
 	return &TransferHandler{BaseTransferHandler: NewBaseTransferHandler(config), config: config}
 }
 
-// startSendTransferInternal starts a transfer, signing refunds, and saving the transfer to the DB
+// startTransferInternal starts a transfer, signing refunds, and saving the transfer to the DB
 // for the first time. This optionally takes an adaptorPubKey to modify the refund signatures.
-func (h *TransferHandler) startSendTransferInternal(ctx context.Context, req *pb.StartSendTransferRequest, transferType schema.TransferType, adaptorPubKey []byte) (*pb.StartSendTransferResponse, error) {
+func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.StartTransferRequest, transferType schema.TransferType, adaptorPubKey []byte) (*pb.StartTransferResponse, error) {
 	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, req.OwnerIdentityPublicKey); err != nil {
 		return nil, err
 	}
@@ -83,28 +83,28 @@ func (h *TransferHandler) startSendTransferInternal(ctx context.Context, req *pb
 		return nil, err
 	}
 
-	return &pb.StartSendTransferResponse{Transfer: transferProto, SigningResults: signingResults}, nil
+	return &pb.StartTransferResponse{Transfer: transferProto, SigningResults: signingResults}, nil
 }
 
-// StartSendTransfer initiates a transfer from sender.
-func (h *TransferHandler) StartSendTransfer(ctx context.Context, req *pb.StartSendTransferRequest) (*pb.StartSendTransferResponse, error) {
-	return h.startSendTransferInternal(ctx, req, schema.TransferTypeTransfer, nil)
+// StartTransfer initiates a transfer from sender.
+func (h *TransferHandler) StartTransfer(ctx context.Context, req *pb.StartTransferRequest) (*pb.StartTransferResponse, error) {
+	return h.startTransferInternal(ctx, req, schema.TransferTypeTransfer, nil)
 }
 
-func (h *TransferHandler) StartLeafSwap(ctx context.Context, req *pb.StartSendTransferRequest) (*pb.StartSendTransferResponse, error) {
-	return h.startSendTransferInternal(ctx, req, schema.TransferTypeSwap, nil)
+func (h *TransferHandler) StartLeafSwap(ctx context.Context, req *pb.StartTransferRequest) (*pb.StartTransferResponse, error) {
+	return h.startTransferInternal(ctx, req, schema.TransferTypeSwap, nil)
 }
 
 // CounterLeafSwap initiates a leaf swap for the other side, signing refunds with an adaptor public key.
 func (h *TransferHandler) CounterLeafSwap(ctx context.Context, req *pb.CounterLeafSwapRequest) (*pb.CounterLeafSwapResponse, error) {
-	startSendResponse, err := h.startSendTransferInternal(ctx, req.Transfer, schema.TransferTypeCounterSwap, req.AdaptorPublicKey)
+	startTransferResponse, err := h.startTransferInternal(ctx, req.Transfer, schema.TransferTypeCounterSwap, req.AdaptorPublicKey)
 	if err != nil {
 		return nil, err
 	}
-	return &pb.CounterLeafSwapResponse{Transfer: startSendResponse.Transfer, SigningResults: startSendResponse.SigningResults}, nil
+	return &pb.CounterLeafSwapResponse{Transfer: startTransferResponse.Transfer, SigningResults: startTransferResponse.SigningResults}, nil
 }
 
-func (h *TransferHandler) syncTransferInit(ctx context.Context, req *pb.StartSendTransferRequest) error {
+func (h *TransferHandler) syncTransferInit(ctx context.Context, req *pb.StartTransferRequest) error {
 	leaves := make([]*pbinternal.InitiateTransferLeaf, 0)
 	for _, leaf := range req.LeavesToSend {
 		leaves = append(leaves, &pbinternal.InitiateTransferLeaf{
@@ -200,8 +200,8 @@ func signRefunds(ctx context.Context, config *so.Config, requests []*pb.LeafRefu
 	return pbSigningResults, nil
 }
 
-// CompleteSendTransfer completes a transfer from sender.
-func (h *TransferHandler) CompleteSendTransfer(ctx context.Context, req *pb.CompleteSendTransferRequest) (*pb.CompleteSendTransferResponse, error) {
+// FinalizeTransfer completes a transfer from sender.
+func (h *TransferHandler) FinalizeTransfer(ctx context.Context, req *pb.FinalizeTransferRequest) (*pb.FinalizeTransferResponse, error) {
 	logger := logging.GetLoggerFromContext(ctx)
 
 	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, req.OwnerIdentityPublicKey); err != nil {
@@ -262,7 +262,7 @@ func (h *TransferHandler) CompleteSendTransfer(ctx context.Context, req *pb.Comp
 		logger.Error("failed to notify user about transfer event", "error", err, "identity_public_key", logging.Pubkey{Pubkey: transfer.ReceiverIdentityPubkey})
 	}
 
-	return &pb.CompleteSendTransferResponse{Transfer: transferProto}, nil
+	return &pb.FinalizeTransferResponse{Transfer: transferProto}, nil
 }
 
 func (h *TransferHandler) completeSendLeaf(ctx context.Context, transfer *ent.Transfer, req *pb.SendLeafKeyTweak, shouldTweakKey bool) error {

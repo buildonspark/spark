@@ -83,7 +83,7 @@ func SendTransferTweakKey(
 				return
 			}
 			tmpCtx := ContextWithToken(ctx, token)
-			transferResp, err := sparkClient.CompleteSendTransfer(tmpCtx, &pb.CompleteSendTransferRequest{
+			transferResp, err := sparkClient.FinalizeTransfer(tmpCtx, &pb.FinalizeTransferRequest{
 				TransferId:             transfer.Id,
 				OwnerIdentityPublicKey: config.IdentityPublicKey(),
 				LeavesToSend:           (*keyTweakInputMap)[identifier],
@@ -191,7 +191,7 @@ func sendTransferSignRefund(
 	tmpCtx := ContextWithToken(ctx, token)
 
 	sparkClient := pb.NewSparkServiceClient(sparkConn)
-	startSendTransferRequest := &pb.StartSendTransferRequest{
+	startTransferRequest := &pb.StartTransferRequest{
 		TransferId:                transferID.String(),
 		LeavesToSend:              signingJobs,
 		OwnerIdentityPublicKey:    config.IdentityPublicKey(),
@@ -208,26 +208,26 @@ func sendTransferSignRefund(
 			return nil, nil, nil, nil, fmt.Errorf("failed to generate swap id: %v", err)
 		}
 		response, err := sparkClient.CounterLeafSwap(tmpCtx, &pb.CounterLeafSwapRequest{
-			Transfer:         startSendTransferRequest,
+			Transfer:         startTransferRequest,
 			SwapId:           swapID.String(),
 			AdaptorPublicKey: adaptorPublicKey.SerializeCompressed(),
 		})
 		if err != nil {
-			return nil, nil, nil, nil, fmt.Errorf("failed to start send transfer: %v", err)
+			return nil, nil, nil, nil, fmt.Errorf("failed to start transfer: %v", err)
 		}
 		transfer = response.Transfer
 		signingResults = response.SigningResults
 	} else if forSwap {
-		response, err := sparkClient.StartLeafSwap(tmpCtx, startSendTransferRequest)
+		response, err := sparkClient.StartLeafSwap(tmpCtx, startTransferRequest)
 		if err != nil {
-			return nil, nil, nil, nil, fmt.Errorf("failed to start send transfer: %v", err)
+			return nil, nil, nil, nil, fmt.Errorf("failed to start transfer: %v", err)
 		}
 		transfer = response.Transfer
 		signingResults = response.SigningResults
 	} else {
-		response, err := sparkClient.StartSendTransfer(tmpCtx, startSendTransferRequest)
+		response, err := sparkClient.StartTransfer(tmpCtx, startTransferRequest)
 		if err != nil {
-			return nil, nil, nil, nil, fmt.Errorf("failed to start send transfer: %w", err)
+			return nil, nil, nil, nil, fmt.Errorf("failed to start transfer: %w", err)
 		}
 		transfer = response.Transfer
 		signingResults = response.SigningResults
@@ -766,7 +766,7 @@ func prepareRefundSoSigningJobs(
 	return signingJobs, nil
 }
 
-func CancelSendTransfer(ctx context.Context, config *Config, transfer *pb.Transfer) (*pb.Transfer, error) {
+func CancelTransfer(ctx context.Context, config *Config, transfer *pb.Transfer) (*pb.Transfer, error) {
 	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress(), nil)
 	if err != nil {
 		return nil, err
@@ -780,12 +780,12 @@ func CancelSendTransfer(ctx context.Context, config *Config, transfer *pb.Transf
 	authCtx := ContextWithToken(ctx, token)
 
 	sparkClient := pb.NewSparkServiceClient(sparkConn)
-	response, err := sparkClient.CancelSendTransfer(authCtx, &pb.CancelSendTransferRequest{
+	response, err := sparkClient.CancelTransfer(authCtx, &pb.CancelTransferRequest{
 		TransferId:              transfer.Id,
 		SenderIdentityPublicKey: config.IdentityPublicKey(),
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to call CancelSendTransfer: %v", err)
+		return nil, fmt.Errorf("failed to call CancelTransfer: %v", err)
 	}
 	return response.Transfer, nil
 }

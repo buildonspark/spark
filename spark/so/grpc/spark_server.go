@@ -53,22 +53,22 @@ func (s *SparkServer) FinalizeNodeSignatures(ctx context.Context, req *pb.Finali
 	return errors.WrapWithGRPCError(finalizeSignatureHandler.FinalizeNodeSignatures(ctx, req))
 }
 
-// StartSendTransfer initiates a transfer from sender.
-func (s *SparkServer) StartSendTransfer(ctx context.Context, req *pb.StartSendTransferRequest) (*pb.StartSendTransferResponse, error) {
+// StartTransfer initiates a transfer from sender.
+func (s *SparkServer) StartTransfer(ctx context.Context, req *pb.StartTransferRequest) (*pb.StartTransferResponse, error) {
 	transferHander := handler.NewTransferHandler(s.config)
-	return errors.WrapWithGRPCError(transferHander.StartSendTransfer(ctx, req))
+	return errors.WrapWithGRPCError(transferHander.StartTransfer(ctx, req))
 }
 
-// CompleteSendTransfer completes a transfer from sender.
-func (s *SparkServer) CompleteSendTransfer(ctx context.Context, req *pb.CompleteSendTransferRequest) (*pb.CompleteSendTransferResponse, error) {
+// FinalizeTransfer completes a transfer from sender.
+func (s *SparkServer) FinalizeTransfer(ctx context.Context, req *pb.FinalizeTransferRequest) (*pb.FinalizeTransferResponse, error) {
 	transferHander := handler.NewTransferHandler(s.config)
-	return errors.WrapWithGRPCError(transferHander.CompleteSendTransfer(ctx, req))
+	return errors.WrapWithGRPCError(transferHander.FinalizeTransfer(ctx, req))
 }
 
-// CancelSendTransfer cancels a transfer from sender before key is tweaked.
-func (s *SparkServer) CancelSendTransfer(ctx context.Context, req *pb.CancelSendTransferRequest) (*pb.CancelSendTransferResponse, error) {
+// CancelTransfer cancels a transfer from sender before key is tweaked.
+func (s *SparkServer) CancelTransfer(ctx context.Context, req *pb.CancelTransferRequest) (*pb.CancelTransferResponse, error) {
 	transferHander := handler.NewTransferHandler(s.config)
-	return errors.WrapWithGRPCError(transferHander.CancelSendTransfer(ctx, req, handler.CancelSendTransferIntentExternal))
+	return errors.WrapWithGRPCError(transferHander.CancelTransfer(ctx, req, handler.CancelTransferIntentExternal))
 }
 
 // QueryPendingTransfers queries the pending transfers to claim.
@@ -121,7 +121,7 @@ func (s *SparkServer) CooperativeExit(ctx context.Context, req *pb.CooperativeEx
 }
 
 // StartLeafSwap initiates a swap of leaves between two users.
-func (s *SparkServer) StartLeafSwap(ctx context.Context, req *pb.StartSendTransferRequest) (*pb.StartSendTransferResponse, error) {
+func (s *SparkServer) StartLeafSwap(ctx context.Context, req *pb.StartTransferRequest) (*pb.StartTransferResponse, error) {
 	transferHander := handler.NewTransferHandler(s.config)
 	return errors.WrapWithGRPCError(transferHander.StartLeafSwap(ctx, req))
 }

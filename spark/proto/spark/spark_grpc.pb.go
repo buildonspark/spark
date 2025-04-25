@@ -24,8 +24,9 @@ const (
 	SparkService_StartDepositTreeCreation_FullMethodName     = "/spark.SparkService/start_deposit_tree_creation"
 	SparkService_StartTreeCreation_FullMethodName            = "/spark.SparkService/start_tree_creation"
 	SparkService_FinalizeNodeSignatures_FullMethodName       = "/spark.SparkService/finalize_node_signatures"
-	SparkService_StartSendTransfer_FullMethodName            = "/spark.SparkService/start_send_transfer"
-	SparkService_CompleteSendTransfer_FullMethodName         = "/spark.SparkService/complete_send_transfer"
+	SparkService_StartTransfer_FullMethodName                = "/spark.SparkService/start_transfer"
+	SparkService_FinalizeTransfer_FullMethodName             = "/spark.SparkService/finalize_transfer"
+	SparkService_CancelTransfer_FullMethodName               = "/spark.SparkService/cancel_transfer"
 	SparkService_QueryPendingTransfers_FullMethodName        = "/spark.SparkService/query_pending_transfers"
 	SparkService_QueryAllTransfers_FullMethodName            = "/spark.SparkService/query_all_transfers"
 	SparkService_ClaimTransferTweakKeys_FullMethodName       = "/spark.SparkService/claim_transfer_tweak_keys"
@@ -55,7 +56,6 @@ const (
 	SparkService_QueryTokenTransactions_FullMethodName       = "/spark.SparkService/query_token_transactions"
 	SparkService_CancelSignedTokenTransaction_FullMethodName = "/spark.SparkService/cancel_signed_token_transaction"
 	SparkService_ReturnLightningPayment_FullMethodName       = "/spark.SparkService/return_lightning_payment"
-	SparkService_CancelSendTransfer_FullMethodName           = "/spark.SparkService/cancel_send_transfer"
 	SparkService_QueryUnusedDepositAddresses_FullMethodName  = "/spark.SparkService/query_unused_deposit_addresses"
 	SparkService_SubscribeToEvents_FullMethodName            = "/spark.SparkService/subscribe_to_events"
 )
@@ -70,8 +70,9 @@ type SparkServiceClient interface {
 	// This is deprecated, please use start_deposit_tree_creation instead.
 	StartTreeCreation(ctx context.Context, in *StartTreeCreationRequest, opts ...grpc.CallOption) (*StartTreeCreationResponse, error)
 	FinalizeNodeSignatures(ctx context.Context, in *FinalizeNodeSignaturesRequest, opts ...grpc.CallOption) (*FinalizeNodeSignaturesResponse, error)
-	StartSendTransfer(ctx context.Context, in *StartSendTransferRequest, opts ...grpc.CallOption) (*StartSendTransferResponse, error)
-	CompleteSendTransfer(ctx context.Context, in *CompleteSendTransferRequest, opts ...grpc.CallOption) (*CompleteSendTransferResponse, error)
+	StartTransfer(ctx context.Context, in *StartTransferRequest, opts ...grpc.CallOption) (*StartTransferResponse, error)
+	FinalizeTransfer(ctx context.Context, in *FinalizeTransferRequest, opts ...grpc.CallOption) (*FinalizeTransferResponse, error)
+	CancelTransfer(ctx context.Context, in *CancelTransferRequest, opts ...grpc.CallOption) (*CancelTransferResponse, error)
 	QueryPendingTransfers(ctx context.Context, in *TransferFilter, opts ...grpc.CallOption) (*QueryTransfersResponse, error)
 	QueryAllTransfers(ctx context.Context, in *TransferFilter, opts ...grpc.CallOption) (*QueryTransfersResponse, error)
 	ClaimTransferTweakKeys(ctx context.Context, in *ClaimTransferTweakKeysRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
@@ -82,9 +83,9 @@ type SparkServiceClient interface {
 	CooperativeExit(ctx context.Context, in *CooperativeExitRequest, opts ...grpc.CallOption) (*CooperativeExitResponse, error)
 	InitiatePreimageSwap(ctx context.Context, in *InitiatePreimageSwapRequest, opts ...grpc.CallOption) (*InitiatePreimageSwapResponse, error)
 	ProvidePreimage(ctx context.Context, in *ProvidePreimageRequest, opts ...grpc.CallOption) (*ProvidePreimageResponse, error)
-	// This is the exact same as start_send_transfer, but expresses to the SO
+	// This is the exact same as start_transfer, but expresses to the SO
 	// this transfer is specifically for a leaf swap.
-	StartLeafSwap(ctx context.Context, in *StartSendTransferRequest, opts ...grpc.CallOption) (*StartSendTransferResponse, error)
+	StartLeafSwap(ctx context.Context, in *StartTransferRequest, opts ...grpc.CallOption) (*StartTransferResponse, error)
 	// Deprecated: Do not use.
 	// This is deprecated, please use counter_leaf_swap instead.
 	LeafSwap(ctx context.Context, in *CounterLeafSwapRequest, opts ...grpc.CallOption) (*CounterLeafSwapResponse, error)
@@ -108,7 +109,6 @@ type SparkServiceClient interface {
 	QueryTokenTransactions(ctx context.Context, in *QueryTokenTransactionsRequest, opts ...grpc.CallOption) (*QueryTokenTransactionsResponse, error)
 	CancelSignedTokenTransaction(ctx context.Context, in *CancelSignedTokenTransactionRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	ReturnLightningPayment(ctx context.Context, in *ReturnLightningPaymentRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
-	CancelSendTransfer(ctx context.Context, in *CancelSendTransferRequest, opts ...grpc.CallOption) (*CancelSendTransferResponse, error)
 	QueryUnusedDepositAddresses(ctx context.Context, in *QueryUnusedDepositAddressesRequest, opts ...grpc.CallOption) (*QueryUnusedDepositAddressesResponse, error)
 	SubscribeToEvents(ctx context.Context, in *SubscribeToEventsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[SubscribeToEventsResponse], error)
 }
@@ -162,20 +162,30 @@ func (c *sparkServiceClient) FinalizeNodeSignatures(ctx context.Context, in *Fin
 	return out, nil
 }
 
-func (c *sparkServiceClient) StartSendTransfer(ctx context.Context, in *StartSendTransferRequest, opts ...grpc.CallOption) (*StartSendTransferResponse, error) {
+func (c *sparkServiceClient) StartTransfer(ctx context.Context, in *StartTransferRequest, opts ...grpc.CallOption) (*StartTransferResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(StartSendTransferResponse)
-	err := c.cc.Invoke(ctx, SparkService_StartSendTransfer_FullMethodName, in, out, cOpts...)
+	out := new(StartTransferResponse)
+	err := c.cc.Invoke(ctx, SparkService_StartTransfer_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *sparkServiceClient) CompleteSendTransfer(ctx context.Context, in *CompleteSendTransferRequest, opts ...grpc.CallOption) (*CompleteSendTransferResponse, error) {
+func (c *sparkServiceClient) FinalizeTransfer(ctx context.Context, in *FinalizeTransferRequest, opts ...grpc.CallOption) (*FinalizeTransferResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(CompleteSendTransferResponse)
-	err := c.cc.Invoke(ctx, SparkService_CompleteSendTransfer_FullMethodName, in, out, cOpts...)
+	out := new(FinalizeTransferResponse)
+	err := c.cc.Invoke(ctx, SparkService_FinalizeTransfer_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *sparkServiceClient) CancelTransfer(ctx context.Context, in *CancelTransferRequest, opts ...grpc.CallOption) (*CancelTransferResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CancelTransferResponse)
+	err := c.cc.Invoke(ctx, SparkService_CancelTransfer_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -282,9 +292,9 @@ func (c *sparkServiceClient) ProvidePreimage(ctx context.Context, in *ProvidePre
 	return out, nil
 }
 
-func (c *sparkServiceClient) StartLeafSwap(ctx context.Context, in *StartSendTransferRequest, opts ...grpc.CallOption) (*StartSendTransferResponse, error) {
+func (c *sparkServiceClient) StartLeafSwap(ctx context.Context, in *StartTransferRequest, opts ...grpc.CallOption) (*StartTransferResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(StartSendTransferResponse)
+	out := new(StartTransferResponse)
 	err := c.cc.Invoke(ctx, SparkService_StartLeafSwap_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -473,16 +483,6 @@ func (c *sparkServiceClient) ReturnLightningPayment(ctx context.Context, in *Ret
 	return out, nil
 }
 
-func (c *sparkServiceClient) CancelSendTransfer(ctx context.Context, in *CancelSendTransferRequest, opts ...grpc.CallOption) (*CancelSendTransferResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(CancelSendTransferResponse)
-	err := c.cc.Invoke(ctx, SparkService_CancelSendTransfer_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 func (c *sparkServiceClient) QueryUnusedDepositAddresses(ctx context.Context, in *QueryUnusedDepositAddressesRequest, opts ...grpc.CallOption) (*QueryUnusedDepositAddressesResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(QueryUnusedDepositAddressesResponse)
@@ -522,8 +522,9 @@ type SparkServiceServer interface {
 	// This is deprecated, please use start_deposit_tree_creation instead.
 	StartTreeCreation(context.Context, *StartTreeCreationRequest) (*StartTreeCreationResponse, error)
 	FinalizeNodeSignatures(context.Context, *FinalizeNodeSignaturesRequest) (*FinalizeNodeSignaturesResponse, error)
-	StartSendTransfer(context.Context, *StartSendTransferRequest) (*StartSendTransferResponse, error)
-	CompleteSendTransfer(context.Context, *CompleteSendTransferRequest) (*CompleteSendTransferResponse, error)
+	StartTransfer(context.Context, *StartTransferRequest) (*StartTransferResponse, error)
+	FinalizeTransfer(context.Context, *FinalizeTransferRequest) (*FinalizeTransferResponse, error)
+	CancelTransfer(context.Context, *CancelTransferRequest) (*CancelTransferResponse, error)
 	QueryPendingTransfers(context.Context, *TransferFilter) (*QueryTransfersResponse, error)
 	QueryAllTransfers(context.Context, *TransferFilter) (*QueryTransfersResponse, error)
 	ClaimTransferTweakKeys(context.Context, *ClaimTransferTweakKeysRequest) (*emptypb.Empty, error)
@@ -534,9 +535,9 @@ type SparkServiceServer interface {
 	CooperativeExit(context.Context, *CooperativeExitRequest) (*CooperativeExitResponse, error)
 	InitiatePreimageSwap(context.Context, *InitiatePreimageSwapRequest) (*InitiatePreimageSwapResponse, error)
 	ProvidePreimage(context.Context, *ProvidePreimageRequest) (*ProvidePreimageResponse, error)
-	// This is the exact same as start_send_transfer, but expresses to the SO
+	// This is the exact same as start_transfer, but expresses to the SO
 	// this transfer is specifically for a leaf swap.
-	StartLeafSwap(context.Context, *StartSendTransferRequest) (*StartSendTransferResponse, error)
+	StartLeafSwap(context.Context, *StartTransferRequest) (*StartTransferResponse, error)
 	// Deprecated: Do not use.
 	// This is deprecated, please use counter_leaf_swap instead.
 	LeafSwap(context.Context, *CounterLeafSwapRequest) (*CounterLeafSwapResponse, error)
@@ -560,7 +561,6 @@ type SparkServiceServer interface {
 	QueryTokenTransactions(context.Context, *QueryTokenTransactionsRequest) (*QueryTokenTransactionsResponse, error)
 	CancelSignedTokenTransaction(context.Context, *CancelSignedTokenTransactionRequest) (*emptypb.Empty, error)
 	ReturnLightningPayment(context.Context, *ReturnLightningPaymentRequest) (*emptypb.Empty, error)
-	CancelSendTransfer(context.Context, *CancelSendTransferRequest) (*CancelSendTransferResponse, error)
 	QueryUnusedDepositAddresses(context.Context, *QueryUnusedDepositAddressesRequest) (*QueryUnusedDepositAddressesResponse, error)
 	SubscribeToEvents(*SubscribeToEventsRequest, grpc.ServerStreamingServer[SubscribeToEventsResponse]) error
 	mustEmbedUnimplementedSparkServiceServer()
@@ -585,11 +585,14 @@ func (UnimplementedSparkServiceServer) StartTreeCreation(context.Context, *Start
 func (UnimplementedSparkServiceServer) FinalizeNodeSignatures(context.Context, *FinalizeNodeSignaturesRequest) (*FinalizeNodeSignaturesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method FinalizeNodeSignatures not implemented")
 }
-func (UnimplementedSparkServiceServer) StartSendTransfer(context.Context, *StartSendTransferRequest) (*StartSendTransferResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method StartSendTransfer not implemented")
+func (UnimplementedSparkServiceServer) StartTransfer(context.Context, *StartTransferRequest) (*StartTransferResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method StartTransfer not implemented")
 }
-func (UnimplementedSparkServiceServer) CompleteSendTransfer(context.Context, *CompleteSendTransferRequest) (*CompleteSendTransferResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method CompleteSendTransfer not implemented")
+func (UnimplementedSparkServiceServer) FinalizeTransfer(context.Context, *FinalizeTransferRequest) (*FinalizeTransferResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method FinalizeTransfer not implemented")
+}
+func (UnimplementedSparkServiceServer) CancelTransfer(context.Context, *CancelTransferRequest) (*CancelTransferResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CancelTransfer not implemented")
 }
 func (UnimplementedSparkServiceServer) QueryPendingTransfers(context.Context, *TransferFilter) (*QueryTransfersResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method QueryPendingTransfers not implemented")
@@ -621,7 +624,7 @@ func (UnimplementedSparkServiceServer) InitiatePreimageSwap(context.Context, *In
 func (UnimplementedSparkServiceServer) ProvidePreimage(context.Context, *ProvidePreimageRequest) (*ProvidePreimageResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ProvidePreimage not implemented")
 }
-func (UnimplementedSparkServiceServer) StartLeafSwap(context.Context, *StartSendTransferRequest) (*StartSendTransferResponse, error) {
+func (UnimplementedSparkServiceServer) StartLeafSwap(context.Context, *StartTransferRequest) (*StartTransferResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method StartLeafSwap not implemented")
 }
 func (UnimplementedSparkServiceServer) LeafSwap(context.Context, *CounterLeafSwapRequest) (*CounterLeafSwapResponse, error) {
@@ -677,9 +680,6 @@ func (UnimplementedSparkServiceServer) CancelSignedTokenTransaction(context.Cont
 }
 func (UnimplementedSparkServiceServer) ReturnLightningPayment(context.Context, *ReturnLightningPaymentRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ReturnLightningPayment not implemented")
-}
-func (UnimplementedSparkServiceServer) CancelSendTransfer(context.Context, *CancelSendTransferRequest) (*CancelSendTransferResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method CancelSendTransfer not implemented")
 }
 func (UnimplementedSparkServiceServer) QueryUnusedDepositAddresses(context.Context, *QueryUnusedDepositAddressesRequest) (*QueryUnusedDepositAddressesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method QueryUnusedDepositAddresses not implemented")
@@ -780,38 +780,56 @@ func _SparkService_FinalizeNodeSignatures_Handler(srv interface{}, ctx context.C
 	return interceptor(ctx, in, info, handler)
 }
 
-func _SparkService_StartSendTransfer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(StartSendTransferRequest)
+func _SparkService_StartTransfer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StartTransferRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(SparkServiceServer).StartSendTransfer(ctx, in)
+		return srv.(SparkServiceServer).StartTransfer(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: SparkService_StartSendTransfer_FullMethodName,
+		FullMethod: SparkService_StartTransfer_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SparkServiceServer).StartSendTransfer(ctx, req.(*StartSendTransferRequest))
+		return srv.(SparkServiceServer).StartTransfer(ctx, req.(*StartTransferRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _SparkService_CompleteSendTransfer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(CompleteSendTransferRequest)
+func _SparkService_FinalizeTransfer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(FinalizeTransferRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(SparkServiceServer).CompleteSendTransfer(ctx, in)
+		return srv.(SparkServiceServer).FinalizeTransfer(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: SparkService_CompleteSendTransfer_FullMethodName,
+		FullMethod: SparkService_FinalizeTransfer_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SparkServiceServer).CompleteSendTransfer(ctx, req.(*CompleteSendTransferRequest))
+		return srv.(SparkServiceServer).FinalizeTransfer(ctx, req.(*FinalizeTransferRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SparkService_CancelTransfer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CancelTransferRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkServiceServer).CancelTransfer(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkService_CancelTransfer_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkServiceServer).CancelTransfer(ctx, req.(*CancelTransferRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -997,7 +1015,7 @@ func _SparkService_ProvidePreimage_Handler(srv interface{}, ctx context.Context,
 }
 
 func _SparkService_StartLeafSwap_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(StartSendTransferRequest)
+	in := new(StartTransferRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -1009,7 +1027,7 @@ func _SparkService_StartLeafSwap_Handler(srv interface{}, ctx context.Context, d
 		FullMethod: SparkService_StartLeafSwap_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SparkServiceServer).StartLeafSwap(ctx, req.(*StartSendTransferRequest))
+		return srv.(SparkServiceServer).StartLeafSwap(ctx, req.(*StartTransferRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1338,24 +1356,6 @@ func _SparkService_ReturnLightningPayment_Handler(srv interface{}, ctx context.C
 	return interceptor(ctx, in, info, handler)
 }
 
-func _SparkService_CancelSendTransfer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(CancelSendTransferRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(SparkServiceServer).CancelSendTransfer(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: SparkService_CancelSendTransfer_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SparkServiceServer).CancelSendTransfer(ctx, req.(*CancelSendTransferRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _SparkService_QueryUnusedDepositAddresses_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(QueryUnusedDepositAddressesRequest)
 	if err := dec(in); err != nil {
@@ -1409,12 +1409,16 @@ var SparkService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _SparkService_FinalizeNodeSignatures_Handler,
 		},
 		{
-			MethodName: "start_send_transfer",
-			Handler:    _SparkService_StartSendTransfer_Handler,
+			MethodName: "start_transfer",
+			Handler:    _SparkService_StartTransfer_Handler,
 		},
 		{
-			MethodName: "complete_send_transfer",
-			Handler:    _SparkService_CompleteSendTransfer_Handler,
+			MethodName: "finalize_transfer",
+			Handler:    _SparkService_FinalizeTransfer_Handler,
+		},
+		{
+			MethodName: "cancel_transfer",
+			Handler:    _SparkService_CancelTransfer_Handler,
 		},
 		{
 			MethodName: "query_pending_transfers",
@@ -1531,10 +1535,6 @@ var SparkService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "return_lightning_payment",
 			Handler:    _SparkService_ReturnLightningPayment_Handler,
-		},
-		{
-			MethodName: "cancel_send_transfer",
-			Handler:    _SparkService_CancelSendTransfer_Handler,
 		},
 		{
 			MethodName: "query_unused_deposit_addresses",

@@ -350,11 +350,11 @@ func (w *SingleKeyWallet) RequestLeavesSwap(ctx context.Context, targetAmount in
 
 	requestID, leaves, err := api.RequestLeavesSwap(hex.EncodeToString(adaptorPubKey.SerializeCompressed()), uint64(totalAmount), uint64(targetAmount), 0, userLeaves)
 	if err != nil {
-		_, cancelErr := CancelSendTransfer(ctx, w.Config, transfer)
+		_, cancelErr := CancelTransfer(ctx, w.Config, transfer)
 		if cancelErr != nil {
-			return nil, fmt.Errorf("failed to cancel send transfer: %w", cancelErr)
+			return nil, fmt.Errorf("failed to cancel transfer: %w", cancelErr)
 		}
-		fmt.Printf("cancelled send transfer %s\n", transfer.Id)
+		fmt.Printf("cancelled transfer %s\n", transfer.Id)
 		return nil, fmt.Errorf("failed to request leaves swap: %w", err)
 	}
 
@@ -1007,9 +1007,9 @@ func (w *SingleKeyWallet) CancelAllSenderInitiatedTransfers(ctx context.Context)
 	}
 	for _, transfer := range transfers.Transfers {
 		if transfer.Status == pb.TransferStatus_TRANSFER_STATUS_SENDER_INITIATED {
-			_, err = CancelSendTransfer(ctx, w.Config, transfer)
+			_, err = CancelTransfer(ctx, w.Config, transfer)
 			if err != nil {
-				return fmt.Errorf("failed to cancel send transfer: %w", err)
+				return fmt.Errorf("failed to cancel transfer: %w", err)
 			}
 		}
 	}

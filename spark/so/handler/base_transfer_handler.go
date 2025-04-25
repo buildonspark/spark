@@ -243,10 +243,10 @@ func (h *BaseTransferHandler) leafAvailableToTransfer(ctx context.Context, leaf 
 			now := time.Now()
 			for _, transferLeaf := range transferLeaves {
 				if transferLeaf.Edges.Transfer.Status == schema.TransferStatusSenderInitiated && transferLeaf.Edges.Transfer.ExpiryTime.Before(now) {
-					_, err := h.CancelSendTransfer(ctx, &pbspark.CancelSendTransferRequest{
+					_, err := h.CancelTransfer(ctx, &pbspark.CancelTransferRequest{
 						TransferId:              transfer.ID.String(),
 						SenderIdentityPublicKey: transfer.SenderIdentityPubkey,
-					}, CancelSendTransferIntentTask)
+					}, CancelTransferIntentTask)
 					if err != nil {
 						return fmt.Errorf("unable to cancel transfer: %v", err)
 					}
@@ -317,20 +317,20 @@ func lockLeaves(ctx context.Context, db *ent.Tx, leaves []*ent.TreeNode) ([]*ent
 	return lockedLeaves, nil
 }
 
-type CancelSendTransferIntent int
+type CancelTransferIntent int
 
 const (
-	CancelSendTransferIntentInternal CancelSendTransferIntent = iota
-	CancelSendTransferIntentExternal
-	CancelSendTransferIntentTask
+	CancelTransferIntentInternal CancelTransferIntent = iota
+	CancelTransferIntentExternal
+	CancelTransferIntentTask
 )
 
-func (h *BaseTransferHandler) CancelSendTransfer(
+func (h *BaseTransferHandler) CancelTransfer(
 	ctx context.Context,
-	req *pbspark.CancelSendTransferRequest,
-	intent CancelSendTransferIntent,
-) (*pbspark.CancelSendTransferResponse, error) {
-	if intent == CancelSendTransferIntentExternal {
+	req *pbspark.CancelTransferRequest,
+	intent CancelTransferIntent,
+) (*pbspark.CancelTransferResponse, error) {
+	if intent == CancelTransferIntentExternal {
 		if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, req.SenderIdentityPublicKey); err != nil {
 			return nil, err
 		}
@@ -345,12 +345,12 @@ func (h *BaseTransferHandler) CancelSendTransfer(
 	}
 	// Don't error if the transfer is already returned.
 	if transfer.Status == schema.TransferStatusReturned {
-		return &pbspark.CancelSendTransferResponse{}, nil
+		return &pbspark.CancelTransferResponse{}, nil
 	}
 	if transfer.Status != schema.TransferStatusSenderInitiated && transfer.Status != schema.TransferStatusSenderKeyTweakPending {
 		return nil, fmt.Errorf("transfer %s is expected to be at status TransferStatusSenderInitiated or TransferStatusSenderKeyTweakPending but %s found", req.TransferId, transfer.Status)
 	}
-	if intent == CancelSendTransferIntentExternal && transfer.Status != schema.TransferStatusSenderInitiated && transfer.ExpiryTime.After(time.Now()) {
+	if intent == CancelTransferIntentExternal && transfer.Status != schema.TransferStatusSenderInitiated && transfer.ExpiryTime.After(time.Now()) {
 		return nil, fmt.Errorf("transfer %s has not expired, expires at %s", req.TransferId, transfer.ExpiryTime.String())
 	}
 
@@ -369,7 +369,7 @@ func (h *BaseTransferHandler) CancelSendTransfer(
 		return nil, fmt.Errorf("unable to cancel associated request: %v", err)
 	}
 
-	if intent != CancelSendTransferIntentInternal {
+	if intent != CancelTransferIntentInternal {
 		operatorSelection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
 		_, err = helper.ExecuteTaskWithAllOperators(ctx, h.config, &operatorSelection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
 			conn, err := operator.NewGRPCConnection()
@@ -379,7 +379,7 @@ func (h *BaseTransferHandler) CancelSendTransfer(
 			defer conn.Close()
 
 			client := pbinternal.NewSparkInternalServiceClient(conn)
-			_, err = client.CancelSendTransfer(ctx, req)
+			_, err = client.CancelTransfer(ctx, req)
 			if err != nil {
 				return nil, fmt.Errorf("unable to cancel transfer: %v", err)
 			}
@@ -391,7 +391,7 @@ func (h *BaseTransferHandler) CancelSendTransfer(
 		}
 	}
 
-	return &pbspark.CancelSendTransferResponse{}, nil
+	return &pbspark.CancelTransferResponse{}, nil
 }
 
 func (h *BaseTransferHandler) cancelTransferUnlockLeaves(ctx context.Context, transfer *ent.Transfer) error {

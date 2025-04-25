@@ -308,10 +308,10 @@ func (s *SparkInternalServer) StartTokenTransactionInternal(ctx context.Context,
 	return errors.WrapWithGRPCError(tokenTransactionHandler.StartTokenTransactionInternal(ctx, s.config, req))
 }
 
-// CancelSendTransfer cancels a transfer from sender before key is tweaked.
-func (s *SparkInternalServer) CancelSendTransfer(ctx context.Context, req *pbspark.CancelSendTransferRequest) (*emptypb.Empty, error) {
+// CancelTransfer cancels a transfer from sender before key is tweaked.
+func (s *SparkInternalServer) CancelTransfer(ctx context.Context, req *pbspark.CancelTransferRequest) (*emptypb.Empty, error) {
 	transferHandler := handler.NewInternalTransferHandler(s.config)
-	_, err := transferHandler.CancelSendTransfer(ctx, req, handler.CancelSendTransferIntentInternal)
+	_, err := transferHandler.CancelTransfer(ctx, req, handler.CancelTransferIntentInternal)
 	return errors.WrapWithGRPCError(&emptypb.Empty{}, err)
 }
 

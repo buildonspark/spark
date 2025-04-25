@@ -357,7 +357,7 @@ func TestCoopExitCancelNoBroadcast(t *testing.T) {
 
 	time.Sleep(expiryDelta)
 
-	_, err = wallet.CancelSendTransfer(context.Background(), config, senderTransfer)
+	_, err = wallet.CancelTransfer(context.Background(), config, senderTransfer)
 	assert.NoError(t, err)
 }
 
@@ -436,7 +436,7 @@ func TestCoopExitCannotCancelAfterBroadcast(t *testing.T) {
 	assert.True(t, bytes.Equal((*leafPrivKeyMap)[transferNode.Leaf.Id], sspConfig.IdentityPrivateKey.Serialize()))
 
 	// Fail to cancel
-	_, err = wallet.CancelSendTransfer(context.Background(), config, senderTransfer)
+	_, err = wallet.CancelTransfer(context.Background(), config, senderTransfer)
 	assert.Error(t, err, "expected error cancelling transfer after exit tx confirmed")
 
 	// Succeed in claiming

@@ -606,10 +606,10 @@ func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pb.Ini
 	hash := sha256.Sum256(secret.Bytes())
 	if !bytes.Equal(hash[:], req.PaymentHash) {
 		baseHandler := NewBaseTransferHandler(h.config)
-		_, err := baseHandler.CancelSendTransfer(ctx, &pb.CancelSendTransferRequest{
+		_, err := baseHandler.CancelTransfer(ctx, &pb.CancelTransferRequest{
 			TransferId:              transfer.ID.String(),
 			SenderIdentityPublicKey: transfer.SenderIdentityPubkey,
-		}, CancelSendTransferIntentTask)
+		}, CancelTransferIntentTask)
 		if err != nil {
 			logger.Error("InitiatePreimageSwap: unable to cancel own send transfer", "error", err)
 		}
@@ -623,7 +623,7 @@ func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pb.Ini
 			defer conn.Close()
 
 			client := pbinternal.NewSparkInternalServiceClient(conn)
-			_, err = client.CancelSendTransfer(ctx, &pb.CancelSendTransferRequest{
+			_, err = client.CancelTransfer(ctx, &pb.CancelTransferRequest{
 				TransferId:              req.Transfer.TransferId,
 				SenderIdentityPublicKey: req.Transfer.OwnerIdentityPublicKey,
 			})
@@ -633,7 +633,7 @@ func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pb.Ini
 			return nil, nil
 		})
 		if err != nil {
-			logger.Error("InitiatePreimageSwap: unable to cancel send transfer", "error", err)
+			logger.Error("InitiatePreimageSwap: unable to cancel transfer", "error", err)
 		}
 
 		return nil, fmt.Errorf("recovered preimage did not match payment hash: %w", ent.ErrNoRollback)

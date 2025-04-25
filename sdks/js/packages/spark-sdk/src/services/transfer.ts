@@ -18,7 +18,7 @@ import { SignatureIntent } from "../proto/common.js";
 import {
   ClaimLeafKeyTweak,
   ClaimTransferSignRefundsResponse,
-  CompleteSendTransferResponse,
+  FinalizeTransferResponse,
   CounterLeafSwapResponse,
   LeafRefundTxSigningJob,
   LeafRefundTxSigningResult,
@@ -116,7 +116,7 @@ export class BaseTransferService {
     for (const [identifier, operator] of Object.entries(
       this.config.getSigningOperators(),
     ).filter(([_, op]) => op.address !== this.config.getCoordinatorAddress())) {
-      updatedTransfer = await this.completeSendTransfer(
+      updatedTransfer = await this.finalizeTransfer(
         operator,
         identifier,
         keyTweakInputMap,
@@ -125,7 +125,7 @@ export class BaseTransferService {
       );
     }
 
-    updatedTransfer = await this.completeSendTransfer(
+    updatedTransfer = await this.finalizeTransfer(
       coordinatorOperator,
       this.config.getCoordinatorIdentifier(),
       keyTweakInputMap,
@@ -146,7 +146,7 @@ export class BaseTransferService {
     return updatedTransfer;
   }
 
-  private async completeSendTransfer(
+  private async finalizeTransfer(
     operator: SigningOperator,
     identifier: string,
     keyTweakInputMap: Map<string, SendLeafKeyTweak[]>,
@@ -164,15 +164,15 @@ export class BaseTransferService {
         value: identifier,
       });
     }
-    let transferResp: CompleteSendTransferResponse;
+    let transferResp: FinalizeTransferResponse;
     try {
-      transferResp = await sparkClient.complete_send_transfer({
+      transferResp = await sparkClient.finalize_transfer({
         transferId: transfer.id,
         ownerIdentityPublicKey: await this.config.signer.getIdentityPublicKey(),
         leavesToSend,
       });
     } catch (error) {
-      throw new NetworkError("Failed to complete send transfer", {
+      throw new NetworkError("Failed to finalize transfer", {
         method: "POST",
       });
     }
@@ -429,7 +429,7 @@ export class TransferService extends BaseTransferService {
     }
     const signatures = await this.claimTransferSignRefunds(transfer, leaves);
 
-    return await this.finalizeTransfer(signatures);
+    return await this.finalizeNodeSignatures(signatures);
   }
 
   async queryPendingTransfers(): Promise<QueryTransfersResponse> {
@@ -647,7 +647,7 @@ export class TransferService extends BaseTransferService {
           expiryTime: expiryTime,
         });
       } else {
-        response = await sparkClient.start_send_transfer({
+        response = await sparkClient.start_transfer({
           transferId,
           leavesToSend: signingJobs,
           ownerIdentityPublicKey:
@@ -892,7 +892,7 @@ export class TransferService extends BaseTransferService {
     return this.signRefunds(leafDataMap, resp.signingResults);
   }
 
-  private async finalizeTransfer(nodeSignatures: NodeSignatures[]) {
+  private async finalizeNodeSignatures(nodeSignatures: NodeSignatures[]) {
     const sparkClient = await this.connectionManager.createSparkClient(
       this.config.getCoordinatorAddress(),
     );
@@ -906,7 +906,7 @@ export class TransferService extends BaseTransferService {
     }
   }
 
-  async cancelSendTransfer(
+  async cancelTransfer(
     transfer: Transfer,
     operatorAddress: string,
   ): Promise<Transfer | undefined> {
@@ -914,7 +914,7 @@ export class TransferService extends BaseTransferService {
       await this.connectionManager.createSparkClient(operatorAddress);
 
     try {
-      const response = await sparkClient.cancel_send_transfer({
+      const response = await sparkClient.cancel_transfer({
         transferId: transfer.id,
         senderIdentityPublicKey:
           await this.config.signer.getIdentityPublicKey(),
@@ -923,7 +923,7 @@ export class TransferService extends BaseTransferService {
       return response.transfer;
     } catch (error) {
       throw new NetworkError(
-        "Failed to cancel send transfer",
+        "Failed to cancel transfer",
         {
           method: "POST",
         },

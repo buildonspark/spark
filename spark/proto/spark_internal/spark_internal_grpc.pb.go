@@ -40,7 +40,7 @@ const (
 	SparkInternalService_InitiateCooperativeExit_FullMethodName        = "/spark_internal.SparkInternalService/initiate_cooperative_exit"
 	SparkInternalService_ReturnLightningPayment_FullMethodName         = "/spark_internal.SparkInternalService/return_lightning_payment"
 	SparkInternalService_StartTokenTransactionInternal_FullMethodName  = "/spark_internal.SparkInternalService/start_token_transaction_internal"
-	SparkInternalService_CancelSendTransfer_FullMethodName             = "/spark_internal.SparkInternalService/cancel_send_transfer"
+	SparkInternalService_CancelTransfer_FullMethodName                 = "/spark_internal.SparkInternalService/cancel_transfer"
 	SparkInternalService_InitiateSettleReceiverKeyTweak_FullMethodName = "/spark_internal.SparkInternalService/initiate_settle_receiver_key_tweak"
 	SparkInternalService_SettleReceiverKeyTweak_FullMethodName         = "/spark_internal.SparkInternalService/settle_receiver_key_tweak"
 )
@@ -68,7 +68,7 @@ type SparkInternalServiceClient interface {
 	InitiateCooperativeExit(ctx context.Context, in *InitiateCooperativeExitRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	ReturnLightningPayment(ctx context.Context, in *spark.ReturnLightningPaymentRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	StartTokenTransactionInternal(ctx context.Context, in *StartTokenTransactionInternalRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
-	CancelSendTransfer(ctx context.Context, in *spark.CancelSendTransferRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	CancelTransfer(ctx context.Context, in *spark.CancelTransferRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	InitiateSettleReceiverKeyTweak(ctx context.Context, in *InitiateSettleReceiverKeyTweakRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	SettleReceiverKeyTweak(ctx context.Context, in *SettleReceiverKeyTweakRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
@@ -271,10 +271,10 @@ func (c *sparkInternalServiceClient) StartTokenTransactionInternal(ctx context.C
 	return out, nil
 }
 
-func (c *sparkInternalServiceClient) CancelSendTransfer(ctx context.Context, in *spark.CancelSendTransferRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+func (c *sparkInternalServiceClient) CancelTransfer(ctx context.Context, in *spark.CancelTransferRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(emptypb.Empty)
-	err := c.cc.Invoke(ctx, SparkInternalService_CancelSendTransfer_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, SparkInternalService_CancelTransfer_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -324,7 +324,7 @@ type SparkInternalServiceServer interface {
 	InitiateCooperativeExit(context.Context, *InitiateCooperativeExitRequest) (*emptypb.Empty, error)
 	ReturnLightningPayment(context.Context, *spark.ReturnLightningPaymentRequest) (*emptypb.Empty, error)
 	StartTokenTransactionInternal(context.Context, *StartTokenTransactionInternalRequest) (*emptypb.Empty, error)
-	CancelSendTransfer(context.Context, *spark.CancelSendTransferRequest) (*emptypb.Empty, error)
+	CancelTransfer(context.Context, *spark.CancelTransferRequest) (*emptypb.Empty, error)
 	InitiateSettleReceiverKeyTweak(context.Context, *InitiateSettleReceiverKeyTweakRequest) (*emptypb.Empty, error)
 	SettleReceiverKeyTweak(context.Context, *SettleReceiverKeyTweakRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedSparkInternalServiceServer()
@@ -394,8 +394,8 @@ func (UnimplementedSparkInternalServiceServer) ReturnLightningPayment(context.Co
 func (UnimplementedSparkInternalServiceServer) StartTokenTransactionInternal(context.Context, *StartTokenTransactionInternalRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method StartTokenTransactionInternal not implemented")
 }
-func (UnimplementedSparkInternalServiceServer) CancelSendTransfer(context.Context, *spark.CancelSendTransferRequest) (*emptypb.Empty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method CancelSendTransfer not implemented")
+func (UnimplementedSparkInternalServiceServer) CancelTransfer(context.Context, *spark.CancelTransferRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CancelTransfer not implemented")
 }
 func (UnimplementedSparkInternalServiceServer) InitiateSettleReceiverKeyTweak(context.Context, *InitiateSettleReceiverKeyTweakRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method InitiateSettleReceiverKeyTweak not implemented")
@@ -766,20 +766,20 @@ func _SparkInternalService_StartTokenTransactionInternal_Handler(srv interface{}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _SparkInternalService_CancelSendTransfer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(spark.CancelSendTransferRequest)
+func _SparkInternalService_CancelTransfer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(spark.CancelTransferRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(SparkInternalServiceServer).CancelSendTransfer(ctx, in)
+		return srv.(SparkInternalServiceServer).CancelTransfer(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: SparkInternalService_CancelSendTransfer_FullMethodName,
+		FullMethod: SparkInternalService_CancelTransfer_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SparkInternalServiceServer).CancelSendTransfer(ctx, req.(*spark.CancelSendTransferRequest))
+		return srv.(SparkInternalServiceServer).CancelTransfer(ctx, req.(*spark.CancelTransferRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -904,8 +904,8 @@ var SparkInternalService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _SparkInternalService_StartTokenTransactionInternal_Handler,
 		},
 		{
-			MethodName: "cancel_send_transfer",
-			Handler:    _SparkInternalService_CancelSendTransfer_Handler,
+			MethodName: "cancel_transfer",
+			Handler:    _SparkInternalService_CancelTransfer_Handler,
 		},
 		{
 			MethodName: "initiate_settle_receiver_key_tweak",

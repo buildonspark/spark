@@ -7,7 +7,7 @@ import { secp256k1 } from "@noble/curves/secp256k1";
 import {
   OutputWithPreviousTransactionData,
   OperatorSpecificTokenTransactionSignablePayload,
-  OperatorSpecificTokenTransactionSignature,
+  OperatorSpecificOwnerSignature,
   TokenTransaction,
 } from "../proto/spark.js";
 import { SparkCallOptions } from "../types/grpc.js";
@@ -245,7 +245,7 @@ export class TokenTransactionService {
           const payloadHash =
             await hashOperatorSpecificTokenTransactionSignablePayload(payload);
 
-          const operatorSpecificSignatures: OperatorSpecificTokenTransactionSignature[] =
+          const operatorSpecificSignatures: OperatorSpecificOwnerSignature[] =
             [];
 
           if (tokenTransaction.tokenInputs!.$case === "mintInput") {

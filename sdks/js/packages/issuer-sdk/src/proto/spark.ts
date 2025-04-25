@@ -21,10 +21,10 @@ export const protobufPackage = "spark";
 /** Network is the network type of the bitcoin network. */
 export enum Network {
   UNSPECIFIED = 0,
-  MAINNET = 10,
-  REGTEST = 20,
-  TESTNET = 30,
-  SIGNET = 40,
+  MAINNET = 1,
+  REGTEST = 2,
+  TESTNET = 3,
+  SIGNET = 4,
   UNRECOGNIZED = -1,
 }
 
@@ -33,16 +33,16 @@ export function networkFromJSON(object: any): Network {
     case 0:
     case "UNSPECIFIED":
       return Network.UNSPECIFIED;
-    case 10:
+    case 1:
     case "MAINNET":
       return Network.MAINNET;
-    case 20:
+    case 2:
     case "REGTEST":
       return Network.REGTEST;
-    case 30:
+    case 3:
     case "TESTNET":
       return Network.TESTNET;
-    case 40:
+    case 4:
     case "SIGNET":
       return Network.SIGNET;
     case -1:
@@ -233,6 +233,25 @@ export function transferTypeToJSON(object: TransferType): string {
   }
 }
 
+export interface SubscribeToEventsRequest {
+  identityPublicKey: Uint8Array;
+}
+
+export interface SubscribeToEventsResponse {
+  event?:
+    | { $case: "transfer"; transfer: TransferEvent }
+    | { $case: "deposit"; deposit: DepositEvent }
+    | undefined;
+}
+
+export interface TransferEvent {
+  transfer: Transfer | undefined;
+}
+
+export interface DepositEvent {
+  deposit: TreeNode | undefined;
+}
+
 /**
  * DepositAddressProof is the proof of possession of the deposit address.
  * When a user wants to generate a deposit address, they are sending their public key to the SE,
@@ -268,6 +287,10 @@ export interface GenerateDepositAddressRequest {
   identityPublicKey: Uint8Array;
   /** The network of the bitcoin network. */
   network: Network;
+  /** The UUID to use for the created TreeNode */
+  leafId?: string | undefined;
+  /** Generate static deposit address */
+  isStatic?: boolean | undefined;
 }
 
 /** Address is the address of the user's public key + SE's public key. */
@@ -278,6 +301,8 @@ export interface Address {
   verifyingKey: Uint8Array;
   /** The proof of possession of the address by the SE. */
   depositAddressProof: DepositAddressProof | undefined;
+  /** Is it a static deposit address */
+  isStatic: boolean;
 }
 
 /** GenerateDepositAddressResponse is the response to the request to generate a deposit address. */
@@ -540,7 +565,7 @@ export interface OperatorSpecificTokenTransactionSignablePayload {
  * This message allows the sender of a output being spent to provide final evidence
  * that it owns a output to an SO when requesting signing and release of the  revocation keyshare.
  */
-export interface OperatorSpecificTokenTransactionSignature {
+export interface OperatorSpecificOwnerSignature {
   ownerPublicKey: Uint8Array;
   /** This is a Schnorr or ECDSA DER signature which can be between 64 and 73 bytes. */
   ownerSignature: Uint8Array;
@@ -549,7 +574,7 @@ export interface OperatorSpecificTokenTransactionSignature {
 
 export interface SignTokenTransactionRequest {
   finalTokenTransaction: TokenTransaction | undefined;
-  operatorSpecificSignatures: OperatorSpecificTokenTransactionSignature[];
+  operatorSpecificSignatures: OperatorSpecificOwnerSignature[];
   identityPublicKey: Uint8Array;
 }
 
@@ -702,13 +727,30 @@ export interface LeafRefundTxSigningJob {
   refundTxSigningJob: SigningJob | undefined;
 }
 
+export interface UserSignedTxSigningJob {
+  leafId: string;
+  signingPublicKey: Uint8Array;
+  rawTx: Uint8Array;
+  signingNonceCommitment: SigningCommitment | undefined;
+  userSignature: Uint8Array;
+  signingCommitments: SigningCommitments | undefined;
+}
+
 export interface LeafRefundTxSigningResult {
   leafId: string;
   refundTxSigningResult: SigningResult | undefined;
   verifyingKey: Uint8Array;
 }
 
-export interface StartSendTransferRequest {
+export interface StartUserSignedTransferRequest {
+  transferId: string;
+  ownerIdentityPublicKey: Uint8Array;
+  leavesToSend: UserSignedTxSigningJob[];
+  receiverIdentityPublicKey: Uint8Array;
+  expiryTime: Date | undefined;
+}
+
+export interface StartTransferRequest {
   transferId: string;
   ownerIdentityPublicKey: Uint8Array;
   leavesToSend: LeafRefundTxSigningJob[];
@@ -717,12 +759,12 @@ export interface StartSendTransferRequest {
   keyTweakProofs: { [key: string]: SecretProof };
 }
 
-export interface StartSendTransferRequest_KeyTweakProofsEntry {
+export interface StartTransferRequest_KeyTweakProofsEntry {
   key: string;
   value: SecretProof | undefined;
 }
 
-export interface StartSendTransferResponse {
+export interface StartTransferResponse {
   transfer: Transfer | undefined;
   signingResults: LeafRefundTxSigningResult[];
 }
@@ -742,10 +784,14 @@ export interface SendLeafKeyTweak_PubkeySharesTweakEntry {
   value: Uint8Array;
 }
 
-export interface CompleteSendTransferRequest {
+export interface FinalizeTransferRequest {
   transferId: string;
   ownerIdentityPublicKey: Uint8Array;
   leavesToSend: SendLeafKeyTweak[];
+}
+
+export interface FinalizeTransferResponse {
+  transfer: Transfer | undefined;
 }
 
 export interface Transfer {
@@ -768,10 +814,6 @@ export interface TransferLeaf {
   intermediateRefundTx: Uint8Array;
 }
 
-export interface CompleteSendTransferResponse {
-  transfer: Transfer | undefined;
-}
-
 export interface TransferFilter {
   participant?:
     | {
@@ -781,11 +823,17 @@ export interface TransferFilter {
     | {
         $case: "senderIdentityPublicKey";
         senderIdentityPublicKey: Uint8Array;
+      } //
+    /** This will include transfers where this public key is the sender or receiver. */
+    | {
+        $case: "senderOrReceiverIdentityPublicKey";
+        senderOrReceiverIdentityPublicKey: Uint8Array;
       }
     | undefined;
   transferIds: string[];
   limit: number;
   offset: number;
+  types: TransferType[];
 }
 
 export interface QueryTransfersResponse {
@@ -896,7 +944,7 @@ export interface InitiatePreimageSwapRequest {
   paymentHash: Uint8Array;
   invoiceAmount: InvoiceAmount | undefined;
   reason: InitiatePreimageSwapRequest_Reason;
-  transfer: StartSendTransferRequest | undefined;
+  transfer: StartUserSignedTransferRequest | undefined;
   receiverIdentityPublicKey: Uint8Array;
   feeSats: number;
 }
@@ -951,7 +999,7 @@ export interface OutPoint {
 }
 
 export interface CooperativeExitRequest {
-  transfer: StartSendTransferRequest | undefined;
+  transfer: StartTransferRequest | undefined;
   exitId: string;
   exitTxid: Uint8Array;
 }
@@ -962,7 +1010,7 @@ export interface CooperativeExitResponse {
 }
 
 export interface CounterLeafSwapRequest {
-  transfer: StartSendTransferRequest | undefined;
+  transfer: StartTransferRequest | undefined;
   swapId: string;
   adaptorPublicKey: Uint8Array;
 }
@@ -1128,15 +1176,19 @@ export interface QueryNodesResponse_NodesEntry {
   value: TreeNode | undefined;
 }
 
-export interface CancelSendTransferRequest {
+export interface CancelTransferRequest {
   transferId: string;
   senderIdentityPublicKey: Uint8Array;
 }
 
-export interface CancelSendTransferResponse {
+export interface CancelTransferResponse {
   transfer: Transfer | undefined;
 }
 
+/**
+ * Returns a list of addresses that can be used in express deposit flow.
+ * Excludes static deposit addresses.
+ */
 export interface QueryUnusedDepositAddressesRequest {
   identityPublicKey: Uint8Array;
 }
@@ -1145,6 +1197,7 @@ export interface DepositAddressQueryResult {
   depositAddress: string;
   userSigningPublicKey: Uint8Array;
   verifyingPublicKey: Uint8Array;
+  leafId?: string | undefined;
 }
 
 export interface QueryUnusedDepositAddressesResponse {
@@ -1168,6 +1221,351 @@ export interface QueryBalanceResponse_NodeBalancesEntry {
 export interface SparkAddress {
   identityPublicKey: Uint8Array;
 }
+
+function createBaseSubscribeToEventsRequest(): SubscribeToEventsRequest {
+  return { identityPublicKey: new Uint8Array(0) };
+}
+
+export const SubscribeToEventsRequest: MessageFns<SubscribeToEventsRequest> = {
+  encode(
+    message: SubscribeToEventsRequest,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
+    if (message.identityPublicKey.length !== 0) {
+      writer.uint32(82).bytes(message.identityPublicKey);
+    }
+    return writer;
+  },
+
+  decode(
+    input: BinaryReader | Uint8Array,
+    length?: number,
+  ): SubscribeToEventsRequest {
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseSubscribeToEventsRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 10: {
+          if (tag !== 82) {
+            break;
+          }
+
+          message.identityPublicKey = reader.bytes();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): SubscribeToEventsRequest {
+    return {
+      identityPublicKey: isSet(object.identityPublicKey)
+        ? bytesFromBase64(object.identityPublicKey)
+        : new Uint8Array(0),
+    };
+  },
+
+  toJSON(message: SubscribeToEventsRequest): unknown {
+    const obj: any = {};
+    if (message.identityPublicKey.length !== 0) {
+      obj.identityPublicKey = base64FromBytes(message.identityPublicKey);
+    }
+    return obj;
+  },
+
+  create(
+    base?: DeepPartial<SubscribeToEventsRequest>,
+  ): SubscribeToEventsRequest {
+    return SubscribeToEventsRequest.fromPartial(base ?? {});
+  },
+  fromPartial(
+    object: DeepPartial<SubscribeToEventsRequest>,
+  ): SubscribeToEventsRequest {
+    const message = createBaseSubscribeToEventsRequest();
+    message.identityPublicKey = object.identityPublicKey ?? new Uint8Array(0);
+    return message;
+  },
+};
+
+function createBaseSubscribeToEventsResponse(): SubscribeToEventsResponse {
+  return { event: undefined };
+}
+
+export const SubscribeToEventsResponse: MessageFns<SubscribeToEventsResponse> =
+  {
+    encode(
+      message: SubscribeToEventsResponse,
+      writer: BinaryWriter = new BinaryWriter(),
+    ): BinaryWriter {
+      switch (message.event?.$case) {
+        case "transfer":
+          TransferEvent.encode(
+            message.event.transfer,
+            writer.uint32(10).fork(),
+          ).join();
+          break;
+        case "deposit":
+          DepositEvent.encode(
+            message.event.deposit,
+            writer.uint32(18).fork(),
+          ).join();
+          break;
+      }
+      return writer;
+    },
+
+    decode(
+      input: BinaryReader | Uint8Array,
+      length?: number,
+    ): SubscribeToEventsResponse {
+      const reader =
+        input instanceof BinaryReader ? input : new BinaryReader(input);
+      let end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseSubscribeToEventsResponse();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.event = {
+              $case: "transfer",
+              transfer: TransferEvent.decode(reader, reader.uint32()),
+            };
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.event = {
+              $case: "deposit",
+              deposit: DepositEvent.decode(reader, reader.uint32()),
+            };
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    },
+
+    fromJSON(object: any): SubscribeToEventsResponse {
+      return {
+        event: isSet(object.transfer)
+          ? {
+              $case: "transfer",
+              transfer: TransferEvent.fromJSON(object.transfer),
+            }
+          : isSet(object.deposit)
+            ? {
+                $case: "deposit",
+                deposit: DepositEvent.fromJSON(object.deposit),
+              }
+            : undefined,
+      };
+    },
+
+    toJSON(message: SubscribeToEventsResponse): unknown {
+      const obj: any = {};
+      if (message.event?.$case === "transfer") {
+        obj.transfer = TransferEvent.toJSON(message.event.transfer);
+      } else if (message.event?.$case === "deposit") {
+        obj.deposit = DepositEvent.toJSON(message.event.deposit);
+      }
+      return obj;
+    },
+
+    create(
+      base?: DeepPartial<SubscribeToEventsResponse>,
+    ): SubscribeToEventsResponse {
+      return SubscribeToEventsResponse.fromPartial(base ?? {});
+    },
+    fromPartial(
+      object: DeepPartial<SubscribeToEventsResponse>,
+    ): SubscribeToEventsResponse {
+      const message = createBaseSubscribeToEventsResponse();
+      switch (object.event?.$case) {
+        case "transfer": {
+          if (
+            object.event?.transfer !== undefined &&
+            object.event?.transfer !== null
+          ) {
+            message.event = {
+              $case: "transfer",
+              transfer: TransferEvent.fromPartial(object.event.transfer),
+            };
+          }
+          break;
+        }
+        case "deposit": {
+          if (
+            object.event?.deposit !== undefined &&
+            object.event?.deposit !== null
+          ) {
+            message.event = {
+              $case: "deposit",
+              deposit: DepositEvent.fromPartial(object.event.deposit),
+            };
+          }
+          break;
+        }
+      }
+      return message;
+    },
+  };
+
+function createBaseTransferEvent(): TransferEvent {
+  return { transfer: undefined };
+}
+
+export const TransferEvent: MessageFns<TransferEvent> = {
+  encode(
+    message: TransferEvent,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
+    if (message.transfer !== undefined) {
+      Transfer.encode(message.transfer, writer.uint32(82).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): TransferEvent {
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseTransferEvent();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 10: {
+          if (tag !== 82) {
+            break;
+          }
+
+          message.transfer = Transfer.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): TransferEvent {
+    return {
+      transfer: isSet(object.transfer)
+        ? Transfer.fromJSON(object.transfer)
+        : undefined,
+    };
+  },
+
+  toJSON(message: TransferEvent): unknown {
+    const obj: any = {};
+    if (message.transfer !== undefined) {
+      obj.transfer = Transfer.toJSON(message.transfer);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<TransferEvent>): TransferEvent {
+    return TransferEvent.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<TransferEvent>): TransferEvent {
+    const message = createBaseTransferEvent();
+    message.transfer =
+      object.transfer !== undefined && object.transfer !== null
+        ? Transfer.fromPartial(object.transfer)
+        : undefined;
+    return message;
+  },
+};
+
+function createBaseDepositEvent(): DepositEvent {
+  return { deposit: undefined };
+}
+
+export const DepositEvent: MessageFns<DepositEvent> = {
+  encode(
+    message: DepositEvent,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
+    if (message.deposit !== undefined) {
+      TreeNode.encode(message.deposit, writer.uint32(82).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): DepositEvent {
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseDepositEvent();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 10: {
+          if (tag !== 82) {
+            break;
+          }
+
+          message.deposit = TreeNode.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): DepositEvent {
+    return {
+      deposit: isSet(object.deposit)
+        ? TreeNode.fromJSON(object.deposit)
+        : undefined,
+    };
+  },
+
+  toJSON(message: DepositEvent): unknown {
+    const obj: any = {};
+    if (message.deposit !== undefined) {
+      obj.deposit = TreeNode.toJSON(message.deposit);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<DepositEvent>): DepositEvent {
+    return DepositEvent.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<DepositEvent>): DepositEvent {
+    const message = createBaseDepositEvent();
+    message.deposit =
+      object.deposit !== undefined && object.deposit !== null
+        ? TreeNode.fromPartial(object.deposit)
+        : undefined;
+    return message;
+  },
+};
 
 function createBaseDepositAddressProof(): DepositAddressProof {
   return {
@@ -1384,6 +1782,8 @@ function createBaseGenerateDepositAddressRequest(): GenerateDepositAddressReques
     signingPublicKey: new Uint8Array(0),
     identityPublicKey: new Uint8Array(0),
     network: 0,
+    leafId: undefined,
+    isStatic: undefined,
   };
 }
 
@@ -1401,6 +1801,12 @@ export const GenerateDepositAddressRequest: MessageFns<GenerateDepositAddressReq
       }
       if (message.network !== 0) {
         writer.uint32(24).int32(message.network);
+      }
+      if (message.leafId !== undefined) {
+        writer.uint32(34).string(message.leafId);
+      }
+      if (message.isStatic !== undefined) {
+        writer.uint32(40).bool(message.isStatic);
       }
       return writer;
     },
@@ -1440,6 +1846,22 @@ export const GenerateDepositAddressRequest: MessageFns<GenerateDepositAddressReq
             message.network = reader.int32() as any;
             continue;
           }
+          case 4: {
+            if (tag !== 34) {
+              break;
+            }
+
+            message.leafId = reader.string();
+            continue;
+          }
+          case 5: {
+            if (tag !== 40) {
+              break;
+            }
+
+            message.isStatic = reader.bool();
+            continue;
+          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -1458,6 +1880,12 @@ export const GenerateDepositAddressRequest: MessageFns<GenerateDepositAddressReq
           ? bytesFromBase64(object.identityPublicKey)
           : new Uint8Array(0),
         network: isSet(object.network) ? networkFromJSON(object.network) : 0,
+        leafId: isSet(object.leafId)
+          ? globalThis.String(object.leafId)
+          : undefined,
+        isStatic: isSet(object.isStatic)
+          ? globalThis.Boolean(object.isStatic)
+          : undefined,
       };
     },
 
@@ -1471,6 +1899,12 @@ export const GenerateDepositAddressRequest: MessageFns<GenerateDepositAddressReq
       }
       if (message.network !== 0) {
         obj.network = networkToJSON(message.network);
+      }
+      if (message.leafId !== undefined) {
+        obj.leafId = message.leafId;
+      }
+      if (message.isStatic !== undefined) {
+        obj.isStatic = message.isStatic;
       }
       return obj;
     },
@@ -1487,6 +1921,8 @@ export const GenerateDepositAddressRequest: MessageFns<GenerateDepositAddressReq
       message.signingPublicKey = object.signingPublicKey ?? new Uint8Array(0);
       message.identityPublicKey = object.identityPublicKey ?? new Uint8Array(0);
       message.network = object.network ?? 0;
+      message.leafId = object.leafId ?? undefined;
+      message.isStatic = object.isStatic ?? undefined;
       return message;
     },
   };
@@ -1496,6 +1932,7 @@ function createBaseAddress(): Address {
     address: "",
     verifyingKey: new Uint8Array(0),
     depositAddressProof: undefined,
+    isStatic: false,
   };
 }
 
@@ -1515,6 +1952,9 @@ export const Address: MessageFns<Address> = {
         message.depositAddressProof,
         writer.uint32(26).fork(),
       ).join();
+    }
+    if (message.isStatic !== false) {
+      writer.uint32(40).bool(message.isStatic);
     }
     return writer;
   },
@@ -1554,6 +1994,14 @@ export const Address: MessageFns<Address> = {
           );
           continue;
         }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.isStatic = reader.bool();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1572,6 +2020,9 @@ export const Address: MessageFns<Address> = {
       depositAddressProof: isSet(object.depositAddressProof)
         ? DepositAddressProof.fromJSON(object.depositAddressProof)
         : undefined,
+      isStatic: isSet(object.isStatic)
+        ? globalThis.Boolean(object.isStatic)
+        : false,
     };
   },
 
@@ -1588,6 +2039,9 @@ export const Address: MessageFns<Address> = {
         message.depositAddressProof,
       );
     }
+    if (message.isStatic !== false) {
+      obj.isStatic = message.isStatic;
+    }
     return obj;
   },
 
@@ -1603,6 +2057,7 @@ export const Address: MessageFns<Address> = {
       object.depositAddressProof !== null
         ? DepositAddressProof.fromPartial(object.depositAddressProof)
         : undefined;
+    message.isStatic = object.isStatic ?? false;
     return message;
   },
 };
@@ -4491,7 +4946,7 @@ export const OperatorSpecificTokenTransactionSignablePayload: MessageFns<Operato
     },
   };
 
-function createBaseOperatorSpecificTokenTransactionSignature(): OperatorSpecificTokenTransactionSignature {
+function createBaseOperatorSpecificOwnerSignature(): OperatorSpecificOwnerSignature {
   return {
     ownerPublicKey: new Uint8Array(0),
     ownerSignature: new Uint8Array(0),
@@ -4499,10 +4954,10 @@ function createBaseOperatorSpecificTokenTransactionSignature(): OperatorSpecific
   };
 }
 
-export const OperatorSpecificTokenTransactionSignature: MessageFns<OperatorSpecificTokenTransactionSignature> =
+export const OperatorSpecificOwnerSignature: MessageFns<OperatorSpecificOwnerSignature> =
   {
     encode(
-      message: OperatorSpecificTokenTransactionSignature,
+      message: OperatorSpecificOwnerSignature,
       writer: BinaryWriter = new BinaryWriter(),
     ): BinaryWriter {
       if (message.ownerPublicKey.length !== 0) {
@@ -4523,11 +4978,11 @@ export const OperatorSpecificTokenTransactionSignature: MessageFns<OperatorSpeci
     decode(
       input: BinaryReader | Uint8Array,
       length?: number,
-    ): OperatorSpecificTokenTransactionSignature {
+    ): OperatorSpecificOwnerSignature {
       const reader =
         input instanceof BinaryReader ? input : new BinaryReader(input);
       let end = length === undefined ? reader.len : reader.pos + length;
-      const message = createBaseOperatorSpecificTokenTransactionSignature();
+      const message = createBaseOperatorSpecificOwnerSignature();
       while (reader.pos < end) {
         const tag = reader.uint32();
         switch (tag >>> 3) {
@@ -4568,7 +5023,7 @@ export const OperatorSpecificTokenTransactionSignature: MessageFns<OperatorSpeci
       return message;
     },
 
-    fromJSON(object: any): OperatorSpecificTokenTransactionSignature {
+    fromJSON(object: any): OperatorSpecificOwnerSignature {
       return {
         ownerPublicKey: isSet(object.ownerPublicKey)
           ? bytesFromBase64(object.ownerPublicKey)
@@ -4584,7 +5039,7 @@ export const OperatorSpecificTokenTransactionSignature: MessageFns<OperatorSpeci
       };
     },
 
-    toJSON(message: OperatorSpecificTokenTransactionSignature): unknown {
+    toJSON(message: OperatorSpecificOwnerSignature): unknown {
       const obj: any = {};
       if (message.ownerPublicKey.length !== 0) {
         obj.ownerPublicKey = base64FromBytes(message.ownerPublicKey);
@@ -4601,14 +5056,14 @@ export const OperatorSpecificTokenTransactionSignature: MessageFns<OperatorSpeci
     },
 
     create(
-      base?: DeepPartial<OperatorSpecificTokenTransactionSignature>,
-    ): OperatorSpecificTokenTransactionSignature {
-      return OperatorSpecificTokenTransactionSignature.fromPartial(base ?? {});
+      base?: DeepPartial<OperatorSpecificOwnerSignature>,
+    ): OperatorSpecificOwnerSignature {
+      return OperatorSpecificOwnerSignature.fromPartial(base ?? {});
     },
     fromPartial(
-      object: DeepPartial<OperatorSpecificTokenTransactionSignature>,
-    ): OperatorSpecificTokenTransactionSignature {
-      const message = createBaseOperatorSpecificTokenTransactionSignature();
+      object: DeepPartial<OperatorSpecificOwnerSignature>,
+    ): OperatorSpecificOwnerSignature {
+      const message = createBaseOperatorSpecificOwnerSignature();
       message.ownerPublicKey = object.ownerPublicKey ?? new Uint8Array(0);
       message.ownerSignature = object.ownerSignature ?? new Uint8Array(0);
       message.payload =
@@ -4642,7 +5097,7 @@ export const SignTokenTransactionRequest: MessageFns<SignTokenTransactionRequest
         ).join();
       }
       for (const v of message.operatorSpecificSignatures) {
-        OperatorSpecificTokenTransactionSignature.encode(
+        OperatorSpecificOwnerSignature.encode(
           v!,
           writer.uint32(18).fork(),
         ).join();
@@ -4681,10 +5136,7 @@ export const SignTokenTransactionRequest: MessageFns<SignTokenTransactionRequest
             }
 
             message.operatorSpecificSignatures.push(
-              OperatorSpecificTokenTransactionSignature.decode(
-                reader,
-                reader.uint32(),
-              ),
+              OperatorSpecificOwnerSignature.decode(reader, reader.uint32()),
             );
             continue;
           }
@@ -4714,7 +5166,7 @@ export const SignTokenTransactionRequest: MessageFns<SignTokenTransactionRequest
           object?.operatorSpecificSignatures,
         )
           ? object.operatorSpecificSignatures.map((e: any) =>
-              OperatorSpecificTokenTransactionSignature.fromJSON(e),
+              OperatorSpecificOwnerSignature.fromJSON(e),
             )
           : [],
         identityPublicKey: isSet(object.identityPublicKey)
@@ -4732,7 +5184,7 @@ export const SignTokenTransactionRequest: MessageFns<SignTokenTransactionRequest
       }
       if (message.operatorSpecificSignatures?.length) {
         obj.operatorSpecificSignatures = message.operatorSpecificSignatures.map(
-          (e) => OperatorSpecificTokenTransactionSignature.toJSON(e),
+          (e) => OperatorSpecificOwnerSignature.toJSON(e),
         );
       }
       if (message.identityPublicKey.length !== 0) {
@@ -4757,7 +5209,7 @@ export const SignTokenTransactionRequest: MessageFns<SignTokenTransactionRequest
           : undefined;
       message.operatorSpecificSignatures =
         object.operatorSpecificSignatures?.map((e) =>
-          OperatorSpecificTokenTransactionSignature.fromPartial(e),
+          OperatorSpecificOwnerSignature.fromPartial(e),
         ) || [];
       message.identityPublicKey = object.identityPublicKey ?? new Uint8Array(0);
       return message;
@@ -6728,6 +7180,196 @@ export const LeafRefundTxSigningJob: MessageFns<LeafRefundTxSigningJob> = {
   },
 };
 
+function createBaseUserSignedTxSigningJob(): UserSignedTxSigningJob {
+  return {
+    leafId: "",
+    signingPublicKey: new Uint8Array(0),
+    rawTx: new Uint8Array(0),
+    signingNonceCommitment: undefined,
+    userSignature: new Uint8Array(0),
+    signingCommitments: undefined,
+  };
+}
+
+export const UserSignedTxSigningJob: MessageFns<UserSignedTxSigningJob> = {
+  encode(
+    message: UserSignedTxSigningJob,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
+    if (message.leafId !== "") {
+      writer.uint32(10).string(message.leafId);
+    }
+    if (message.signingPublicKey.length !== 0) {
+      writer.uint32(18).bytes(message.signingPublicKey);
+    }
+    if (message.rawTx.length !== 0) {
+      writer.uint32(26).bytes(message.rawTx);
+    }
+    if (message.signingNonceCommitment !== undefined) {
+      SigningCommitment.encode(
+        message.signingNonceCommitment,
+        writer.uint32(34).fork(),
+      ).join();
+    }
+    if (message.userSignature.length !== 0) {
+      writer.uint32(42).bytes(message.userSignature);
+    }
+    if (message.signingCommitments !== undefined) {
+      SigningCommitments.encode(
+        message.signingCommitments,
+        writer.uint32(50).fork(),
+      ).join();
+    }
+    return writer;
+  },
+
+  decode(
+    input: BinaryReader | Uint8Array,
+    length?: number,
+  ): UserSignedTxSigningJob {
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseUserSignedTxSigningJob();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.leafId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.signingPublicKey = reader.bytes();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.rawTx = reader.bytes();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.signingNonceCommitment = SigningCommitment.decode(
+            reader,
+            reader.uint32(),
+          );
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.userSignature = reader.bytes();
+          continue;
+        }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.signingCommitments = SigningCommitments.decode(
+            reader,
+            reader.uint32(),
+          );
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): UserSignedTxSigningJob {
+    return {
+      leafId: isSet(object.leafId) ? globalThis.String(object.leafId) : "",
+      signingPublicKey: isSet(object.signingPublicKey)
+        ? bytesFromBase64(object.signingPublicKey)
+        : new Uint8Array(0),
+      rawTx: isSet(object.rawTx)
+        ? bytesFromBase64(object.rawTx)
+        : new Uint8Array(0),
+      signingNonceCommitment: isSet(object.signingNonceCommitment)
+        ? SigningCommitment.fromJSON(object.signingNonceCommitment)
+        : undefined,
+      userSignature: isSet(object.userSignature)
+        ? bytesFromBase64(object.userSignature)
+        : new Uint8Array(0),
+      signingCommitments: isSet(object.signingCommitments)
+        ? SigningCommitments.fromJSON(object.signingCommitments)
+        : undefined,
+    };
+  },
+
+  toJSON(message: UserSignedTxSigningJob): unknown {
+    const obj: any = {};
+    if (message.leafId !== "") {
+      obj.leafId = message.leafId;
+    }
+    if (message.signingPublicKey.length !== 0) {
+      obj.signingPublicKey = base64FromBytes(message.signingPublicKey);
+    }
+    if (message.rawTx.length !== 0) {
+      obj.rawTx = base64FromBytes(message.rawTx);
+    }
+    if (message.signingNonceCommitment !== undefined) {
+      obj.signingNonceCommitment = SigningCommitment.toJSON(
+        message.signingNonceCommitment,
+      );
+    }
+    if (message.userSignature.length !== 0) {
+      obj.userSignature = base64FromBytes(message.userSignature);
+    }
+    if (message.signingCommitments !== undefined) {
+      obj.signingCommitments = SigningCommitments.toJSON(
+        message.signingCommitments,
+      );
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<UserSignedTxSigningJob>): UserSignedTxSigningJob {
+    return UserSignedTxSigningJob.fromPartial(base ?? {});
+  },
+  fromPartial(
+    object: DeepPartial<UserSignedTxSigningJob>,
+  ): UserSignedTxSigningJob {
+    const message = createBaseUserSignedTxSigningJob();
+    message.leafId = object.leafId ?? "";
+    message.signingPublicKey = object.signingPublicKey ?? new Uint8Array(0);
+    message.rawTx = object.rawTx ?? new Uint8Array(0);
+    message.signingNonceCommitment =
+      object.signingNonceCommitment !== undefined &&
+      object.signingNonceCommitment !== null
+        ? SigningCommitment.fromPartial(object.signingNonceCommitment)
+        : undefined;
+    message.userSignature = object.userSignature ?? new Uint8Array(0);
+    message.signingCommitments =
+      object.signingCommitments !== undefined &&
+      object.signingCommitments !== null
+        ? SigningCommitments.fromPartial(object.signingCommitments)
+        : undefined;
+    return message;
+  },
+};
+
 function createBaseLeafRefundTxSigningResult(): LeafRefundTxSigningResult {
   return {
     leafId: "",
@@ -6852,7 +7494,179 @@ export const LeafRefundTxSigningResult: MessageFns<LeafRefundTxSigningResult> =
     },
   };
 
-function createBaseStartSendTransferRequest(): StartSendTransferRequest {
+function createBaseStartUserSignedTransferRequest(): StartUserSignedTransferRequest {
+  return {
+    transferId: "",
+    ownerIdentityPublicKey: new Uint8Array(0),
+    leavesToSend: [],
+    receiverIdentityPublicKey: new Uint8Array(0),
+    expiryTime: undefined,
+  };
+}
+
+export const StartUserSignedTransferRequest: MessageFns<StartUserSignedTransferRequest> =
+  {
+    encode(
+      message: StartUserSignedTransferRequest,
+      writer: BinaryWriter = new BinaryWriter(),
+    ): BinaryWriter {
+      if (message.transferId !== "") {
+        writer.uint32(10).string(message.transferId);
+      }
+      if (message.ownerIdentityPublicKey.length !== 0) {
+        writer.uint32(18).bytes(message.ownerIdentityPublicKey);
+      }
+      for (const v of message.leavesToSend) {
+        UserSignedTxSigningJob.encode(v!, writer.uint32(26).fork()).join();
+      }
+      if (message.receiverIdentityPublicKey.length !== 0) {
+        writer.uint32(34).bytes(message.receiverIdentityPublicKey);
+      }
+      if (message.expiryTime !== undefined) {
+        Timestamp.encode(
+          toTimestamp(message.expiryTime),
+          writer.uint32(42).fork(),
+        ).join();
+      }
+      return writer;
+    },
+
+    decode(
+      input: BinaryReader | Uint8Array,
+      length?: number,
+    ): StartUserSignedTransferRequest {
+      const reader =
+        input instanceof BinaryReader ? input : new BinaryReader(input);
+      let end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseStartUserSignedTransferRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.transferId = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.ownerIdentityPublicKey = reader.bytes();
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.leavesToSend.push(
+              UserSignedTxSigningJob.decode(reader, reader.uint32()),
+            );
+            continue;
+          }
+          case 4: {
+            if (tag !== 34) {
+              break;
+            }
+
+            message.receiverIdentityPublicKey = reader.bytes();
+            continue;
+          }
+          case 5: {
+            if (tag !== 42) {
+              break;
+            }
+
+            message.expiryTime = fromTimestamp(
+              Timestamp.decode(reader, reader.uint32()),
+            );
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    },
+
+    fromJSON(object: any): StartUserSignedTransferRequest {
+      return {
+        transferId: isSet(object.transferId)
+          ? globalThis.String(object.transferId)
+          : "",
+        ownerIdentityPublicKey: isSet(object.ownerIdentityPublicKey)
+          ? bytesFromBase64(object.ownerIdentityPublicKey)
+          : new Uint8Array(0),
+        leavesToSend: globalThis.Array.isArray(object?.leavesToSend)
+          ? object.leavesToSend.map((e: any) =>
+              UserSignedTxSigningJob.fromJSON(e),
+            )
+          : [],
+        receiverIdentityPublicKey: isSet(object.receiverIdentityPublicKey)
+          ? bytesFromBase64(object.receiverIdentityPublicKey)
+          : new Uint8Array(0),
+        expiryTime: isSet(object.expiryTime)
+          ? fromJsonTimestamp(object.expiryTime)
+          : undefined,
+      };
+    },
+
+    toJSON(message: StartUserSignedTransferRequest): unknown {
+      const obj: any = {};
+      if (message.transferId !== "") {
+        obj.transferId = message.transferId;
+      }
+      if (message.ownerIdentityPublicKey.length !== 0) {
+        obj.ownerIdentityPublicKey = base64FromBytes(
+          message.ownerIdentityPublicKey,
+        );
+      }
+      if (message.leavesToSend?.length) {
+        obj.leavesToSend = message.leavesToSend.map((e) =>
+          UserSignedTxSigningJob.toJSON(e),
+        );
+      }
+      if (message.receiverIdentityPublicKey.length !== 0) {
+        obj.receiverIdentityPublicKey = base64FromBytes(
+          message.receiverIdentityPublicKey,
+        );
+      }
+      if (message.expiryTime !== undefined) {
+        obj.expiryTime = message.expiryTime.toISOString();
+      }
+      return obj;
+    },
+
+    create(
+      base?: DeepPartial<StartUserSignedTransferRequest>,
+    ): StartUserSignedTransferRequest {
+      return StartUserSignedTransferRequest.fromPartial(base ?? {});
+    },
+    fromPartial(
+      object: DeepPartial<StartUserSignedTransferRequest>,
+    ): StartUserSignedTransferRequest {
+      const message = createBaseStartUserSignedTransferRequest();
+      message.transferId = object.transferId ?? "";
+      message.ownerIdentityPublicKey =
+        object.ownerIdentityPublicKey ?? new Uint8Array(0);
+      message.leavesToSend =
+        object.leavesToSend?.map((e) =>
+          UserSignedTxSigningJob.fromPartial(e),
+        ) || [];
+      message.receiverIdentityPublicKey =
+        object.receiverIdentityPublicKey ?? new Uint8Array(0);
+      message.expiryTime = object.expiryTime ?? undefined;
+      return message;
+    },
+  };
+
+function createBaseStartTransferRequest(): StartTransferRequest {
   return {
     transferId: "",
     ownerIdentityPublicKey: new Uint8Array(0),
@@ -6863,9 +7677,9 @@ function createBaseStartSendTransferRequest(): StartSendTransferRequest {
   };
 }
 
-export const StartSendTransferRequest: MessageFns<StartSendTransferRequest> = {
+export const StartTransferRequest: MessageFns<StartTransferRequest> = {
   encode(
-    message: StartSendTransferRequest,
+    message: StartTransferRequest,
     writer: BinaryWriter = new BinaryWriter(),
   ): BinaryWriter {
     if (message.transferId !== "") {
@@ -6887,7 +7701,7 @@ export const StartSendTransferRequest: MessageFns<StartSendTransferRequest> = {
       ).join();
     }
     Object.entries(message.keyTweakProofs).forEach(([key, value]) => {
-      StartSendTransferRequest_KeyTweakProofsEntry.encode(
+      StartTransferRequest_KeyTweakProofsEntry.encode(
         { key: key as any, value },
         writer.uint32(50).fork(),
       ).join();
@@ -6898,11 +7712,11 @@ export const StartSendTransferRequest: MessageFns<StartSendTransferRequest> = {
   decode(
     input: BinaryReader | Uint8Array,
     length?: number,
-  ): StartSendTransferRequest {
+  ): StartTransferRequest {
     const reader =
       input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseStartSendTransferRequest();
+    const message = createBaseStartTransferRequest();
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
@@ -6955,7 +7769,7 @@ export const StartSendTransferRequest: MessageFns<StartSendTransferRequest> = {
             break;
           }
 
-          const entry6 = StartSendTransferRequest_KeyTweakProofsEntry.decode(
+          const entry6 = StartTransferRequest_KeyTweakProofsEntry.decode(
             reader,
             reader.uint32(),
           );
@@ -6973,7 +7787,7 @@ export const StartSendTransferRequest: MessageFns<StartSendTransferRequest> = {
     return message;
   },
 
-  fromJSON(object: any): StartSendTransferRequest {
+  fromJSON(object: any): StartTransferRequest {
     return {
       transferId: isSet(object.transferId)
         ? globalThis.String(object.transferId)
@@ -7003,7 +7817,7 @@ export const StartSendTransferRequest: MessageFns<StartSendTransferRequest> = {
     };
   },
 
-  toJSON(message: StartSendTransferRequest): unknown {
+  toJSON(message: StartTransferRequest): unknown {
     const obj: any = {};
     if (message.transferId !== "") {
       obj.transferId = message.transferId;
@@ -7038,15 +7852,11 @@ export const StartSendTransferRequest: MessageFns<StartSendTransferRequest> = {
     return obj;
   },
 
-  create(
-    base?: DeepPartial<StartSendTransferRequest>,
-  ): StartSendTransferRequest {
-    return StartSendTransferRequest.fromPartial(base ?? {});
+  create(base?: DeepPartial<StartTransferRequest>): StartTransferRequest {
+    return StartTransferRequest.fromPartial(base ?? {});
   },
-  fromPartial(
-    object: DeepPartial<StartSendTransferRequest>,
-  ): StartSendTransferRequest {
-    const message = createBaseStartSendTransferRequest();
+  fromPartial(object: DeepPartial<StartTransferRequest>): StartTransferRequest {
+    const message = createBaseStartTransferRequest();
     message.transferId = object.transferId ?? "";
     message.ownerIdentityPublicKey =
       object.ownerIdentityPublicKey ?? new Uint8Array(0);
@@ -7068,14 +7878,14 @@ export const StartSendTransferRequest: MessageFns<StartSendTransferRequest> = {
   },
 };
 
-function createBaseStartSendTransferRequest_KeyTweakProofsEntry(): StartSendTransferRequest_KeyTweakProofsEntry {
+function createBaseStartTransferRequest_KeyTweakProofsEntry(): StartTransferRequest_KeyTweakProofsEntry {
   return { key: "", value: undefined };
 }
 
-export const StartSendTransferRequest_KeyTweakProofsEntry: MessageFns<StartSendTransferRequest_KeyTweakProofsEntry> =
+export const StartTransferRequest_KeyTweakProofsEntry: MessageFns<StartTransferRequest_KeyTweakProofsEntry> =
   {
     encode(
-      message: StartSendTransferRequest_KeyTweakProofsEntry,
+      message: StartTransferRequest_KeyTweakProofsEntry,
       writer: BinaryWriter = new BinaryWriter(),
     ): BinaryWriter {
       if (message.key !== "") {
@@ -7090,11 +7900,11 @@ export const StartSendTransferRequest_KeyTweakProofsEntry: MessageFns<StartSendT
     decode(
       input: BinaryReader | Uint8Array,
       length?: number,
-    ): StartSendTransferRequest_KeyTweakProofsEntry {
+    ): StartTransferRequest_KeyTweakProofsEntry {
       const reader =
         input instanceof BinaryReader ? input : new BinaryReader(input);
       let end = length === undefined ? reader.len : reader.pos + length;
-      const message = createBaseStartSendTransferRequest_KeyTweakProofsEntry();
+      const message = createBaseStartTransferRequest_KeyTweakProofsEntry();
       while (reader.pos < end) {
         const tag = reader.uint32();
         switch (tag >>> 3) {
@@ -7123,7 +7933,7 @@ export const StartSendTransferRequest_KeyTweakProofsEntry: MessageFns<StartSendT
       return message;
     },
 
-    fromJSON(object: any): StartSendTransferRequest_KeyTweakProofsEntry {
+    fromJSON(object: any): StartTransferRequest_KeyTweakProofsEntry {
       return {
         key: isSet(object.key) ? globalThis.String(object.key) : "",
         value: isSet(object.value)
@@ -7132,7 +7942,7 @@ export const StartSendTransferRequest_KeyTweakProofsEntry: MessageFns<StartSendT
       };
     },
 
-    toJSON(message: StartSendTransferRequest_KeyTweakProofsEntry): unknown {
+    toJSON(message: StartTransferRequest_KeyTweakProofsEntry): unknown {
       const obj: any = {};
       if (message.key !== "") {
         obj.key = message.key;
@@ -7144,16 +7954,14 @@ export const StartSendTransferRequest_KeyTweakProofsEntry: MessageFns<StartSendT
     },
 
     create(
-      base?: DeepPartial<StartSendTransferRequest_KeyTweakProofsEntry>,
-    ): StartSendTransferRequest_KeyTweakProofsEntry {
-      return StartSendTransferRequest_KeyTweakProofsEntry.fromPartial(
-        base ?? {},
-      );
+      base?: DeepPartial<StartTransferRequest_KeyTweakProofsEntry>,
+    ): StartTransferRequest_KeyTweakProofsEntry {
+      return StartTransferRequest_KeyTweakProofsEntry.fromPartial(base ?? {});
     },
     fromPartial(
-      object: DeepPartial<StartSendTransferRequest_KeyTweakProofsEntry>,
-    ): StartSendTransferRequest_KeyTweakProofsEntry {
-      const message = createBaseStartSendTransferRequest_KeyTweakProofsEntry();
+      object: DeepPartial<StartTransferRequest_KeyTweakProofsEntry>,
+    ): StartTransferRequest_KeyTweakProofsEntry {
+      const message = createBaseStartTransferRequest_KeyTweakProofsEntry();
       message.key = object.key ?? "";
       message.value =
         object.value !== undefined && object.value !== null
@@ -7163,109 +7971,106 @@ export const StartSendTransferRequest_KeyTweakProofsEntry: MessageFns<StartSendT
     },
   };
 
-function createBaseStartSendTransferResponse(): StartSendTransferResponse {
+function createBaseStartTransferResponse(): StartTransferResponse {
   return { transfer: undefined, signingResults: [] };
 }
 
-export const StartSendTransferResponse: MessageFns<StartSendTransferResponse> =
-  {
-    encode(
-      message: StartSendTransferResponse,
-      writer: BinaryWriter = new BinaryWriter(),
-    ): BinaryWriter {
-      if (message.transfer !== undefined) {
-        Transfer.encode(message.transfer, writer.uint32(10).fork()).join();
-      }
-      for (const v of message.signingResults) {
-        LeafRefundTxSigningResult.encode(v!, writer.uint32(18).fork()).join();
-      }
-      return writer;
-    },
+export const StartTransferResponse: MessageFns<StartTransferResponse> = {
+  encode(
+    message: StartTransferResponse,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
+    if (message.transfer !== undefined) {
+      Transfer.encode(message.transfer, writer.uint32(10).fork()).join();
+    }
+    for (const v of message.signingResults) {
+      LeafRefundTxSigningResult.encode(v!, writer.uint32(18).fork()).join();
+    }
+    return writer;
+  },
 
-    decode(
-      input: BinaryReader | Uint8Array,
-      length?: number,
-    ): StartSendTransferResponse {
-      const reader =
-        input instanceof BinaryReader ? input : new BinaryReader(input);
-      let end = length === undefined ? reader.len : reader.pos + length;
-      const message = createBaseStartSendTransferResponse();
-      while (reader.pos < end) {
-        const tag = reader.uint32();
-        switch (tag >>> 3) {
-          case 1: {
-            if (tag !== 10) {
-              break;
-            }
-
-            message.transfer = Transfer.decode(reader, reader.uint32());
-            continue;
+  decode(
+    input: BinaryReader | Uint8Array,
+    length?: number,
+  ): StartTransferResponse {
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseStartTransferResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
           }
-          case 2: {
-            if (tag !== 18) {
-              break;
-            }
 
-            message.signingResults.push(
-              LeafRefundTxSigningResult.decode(reader, reader.uint32()),
-            );
-            continue;
+          message.transfer = Transfer.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
           }
+
+          message.signingResults.push(
+            LeafRefundTxSigningResult.decode(reader, reader.uint32()),
+          );
+          continue;
         }
-        if ((tag & 7) === 4 || tag === 0) {
-          break;
-        }
-        reader.skip(tag & 7);
       }
-      return message;
-    },
-
-    fromJSON(object: any): StartSendTransferResponse {
-      return {
-        transfer: isSet(object.transfer)
-          ? Transfer.fromJSON(object.transfer)
-          : undefined,
-        signingResults: globalThis.Array.isArray(object?.signingResults)
-          ? object.signingResults.map((e: any) =>
-              LeafRefundTxSigningResult.fromJSON(e),
-            )
-          : [],
-      };
-    },
-
-    toJSON(message: StartSendTransferResponse): unknown {
-      const obj: any = {};
-      if (message.transfer !== undefined) {
-        obj.transfer = Transfer.toJSON(message.transfer);
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
       }
-      if (message.signingResults?.length) {
-        obj.signingResults = message.signingResults.map((e) =>
-          LeafRefundTxSigningResult.toJSON(e),
-        );
-      }
-      return obj;
-    },
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
 
-    create(
-      base?: DeepPartial<StartSendTransferResponse>,
-    ): StartSendTransferResponse {
-      return StartSendTransferResponse.fromPartial(base ?? {});
-    },
-    fromPartial(
-      object: DeepPartial<StartSendTransferResponse>,
-    ): StartSendTransferResponse {
-      const message = createBaseStartSendTransferResponse();
-      message.transfer =
-        object.transfer !== undefined && object.transfer !== null
-          ? Transfer.fromPartial(object.transfer)
-          : undefined;
-      message.signingResults =
-        object.signingResults?.map((e) =>
-          LeafRefundTxSigningResult.fromPartial(e),
-        ) || [];
-      return message;
-    },
-  };
+  fromJSON(object: any): StartTransferResponse {
+    return {
+      transfer: isSet(object.transfer)
+        ? Transfer.fromJSON(object.transfer)
+        : undefined,
+      signingResults: globalThis.Array.isArray(object?.signingResults)
+        ? object.signingResults.map((e: any) =>
+            LeafRefundTxSigningResult.fromJSON(e),
+          )
+        : [],
+    };
+  },
+
+  toJSON(message: StartTransferResponse): unknown {
+    const obj: any = {};
+    if (message.transfer !== undefined) {
+      obj.transfer = Transfer.toJSON(message.transfer);
+    }
+    if (message.signingResults?.length) {
+      obj.signingResults = message.signingResults.map((e) =>
+        LeafRefundTxSigningResult.toJSON(e),
+      );
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<StartTransferResponse>): StartTransferResponse {
+    return StartTransferResponse.fromPartial(base ?? {});
+  },
+  fromPartial(
+    object: DeepPartial<StartTransferResponse>,
+  ): StartTransferResponse {
+    const message = createBaseStartTransferResponse();
+    message.transfer =
+      object.transfer !== undefined && object.transfer !== null
+        ? Transfer.fromPartial(object.transfer)
+        : undefined;
+    message.signingResults =
+      object.signingResults?.map((e) =>
+        LeafRefundTxSigningResult.fromPartial(e),
+      ) || [];
+    return message;
+  },
+};
 
 function createBaseSendLeafKeyTweak(): SendLeafKeyTweak {
   return {
@@ -7554,7 +8359,7 @@ export const SendLeafKeyTweak_PubkeySharesTweakEntry: MessageFns<SendLeafKeyTwea
     },
   };
 
-function createBaseCompleteSendTransferRequest(): CompleteSendTransferRequest {
+function createBaseFinalizeTransferRequest(): FinalizeTransferRequest {
   return {
     transferId: "",
     ownerIdentityPublicKey: new Uint8Array(0),
@@ -7562,119 +8367,192 @@ function createBaseCompleteSendTransferRequest(): CompleteSendTransferRequest {
   };
 }
 
-export const CompleteSendTransferRequest: MessageFns<CompleteSendTransferRequest> =
-  {
-    encode(
-      message: CompleteSendTransferRequest,
-      writer: BinaryWriter = new BinaryWriter(),
-    ): BinaryWriter {
-      if (message.transferId !== "") {
-        writer.uint32(10).string(message.transferId);
-      }
-      if (message.ownerIdentityPublicKey.length !== 0) {
-        writer.uint32(18).bytes(message.ownerIdentityPublicKey);
-      }
-      for (const v of message.leavesToSend) {
-        SendLeafKeyTweak.encode(v!, writer.uint32(26).fork()).join();
-      }
-      return writer;
-    },
+export const FinalizeTransferRequest: MessageFns<FinalizeTransferRequest> = {
+  encode(
+    message: FinalizeTransferRequest,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
+    if (message.transferId !== "") {
+      writer.uint32(10).string(message.transferId);
+    }
+    if (message.ownerIdentityPublicKey.length !== 0) {
+      writer.uint32(18).bytes(message.ownerIdentityPublicKey);
+    }
+    for (const v of message.leavesToSend) {
+      SendLeafKeyTweak.encode(v!, writer.uint32(26).fork()).join();
+    }
+    return writer;
+  },
 
-    decode(
-      input: BinaryReader | Uint8Array,
-      length?: number,
-    ): CompleteSendTransferRequest {
-      const reader =
-        input instanceof BinaryReader ? input : new BinaryReader(input);
-      let end = length === undefined ? reader.len : reader.pos + length;
-      const message = createBaseCompleteSendTransferRequest();
-      while (reader.pos < end) {
-        const tag = reader.uint32();
-        switch (tag >>> 3) {
-          case 1: {
-            if (tag !== 10) {
-              break;
-            }
-
-            message.transferId = reader.string();
-            continue;
+  decode(
+    input: BinaryReader | Uint8Array,
+    length?: number,
+  ): FinalizeTransferRequest {
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseFinalizeTransferRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
           }
-          case 2: {
-            if (tag !== 18) {
-              break;
-            }
 
-            message.ownerIdentityPublicKey = reader.bytes();
-            continue;
-          }
-          case 3: {
-            if (tag !== 26) {
-              break;
-            }
-
-            message.leavesToSend.push(
-              SendLeafKeyTweak.decode(reader, reader.uint32()),
-            );
-            continue;
-          }
+          message.transferId = reader.string();
+          continue;
         }
-        if ((tag & 7) === 4 || tag === 0) {
-          break;
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.ownerIdentityPublicKey = reader.bytes();
+          continue;
         }
-        reader.skip(tag & 7);
-      }
-      return message;
-    },
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
 
-    fromJSON(object: any): CompleteSendTransferRequest {
-      return {
-        transferId: isSet(object.transferId)
-          ? globalThis.String(object.transferId)
-          : "",
-        ownerIdentityPublicKey: isSet(object.ownerIdentityPublicKey)
-          ? bytesFromBase64(object.ownerIdentityPublicKey)
-          : new Uint8Array(0),
-        leavesToSend: globalThis.Array.isArray(object?.leavesToSend)
-          ? object.leavesToSend.map((e: any) => SendLeafKeyTweak.fromJSON(e))
-          : [],
-      };
-    },
+          message.leavesToSend.push(
+            SendLeafKeyTweak.decode(reader, reader.uint32()),
+          );
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
 
-    toJSON(message: CompleteSendTransferRequest): unknown {
-      const obj: any = {};
-      if (message.transferId !== "") {
-        obj.transferId = message.transferId;
-      }
-      if (message.ownerIdentityPublicKey.length !== 0) {
-        obj.ownerIdentityPublicKey = base64FromBytes(
-          message.ownerIdentityPublicKey,
-        );
-      }
-      if (message.leavesToSend?.length) {
-        obj.leavesToSend = message.leavesToSend.map((e) =>
-          SendLeafKeyTweak.toJSON(e),
-        );
-      }
-      return obj;
-    },
+  fromJSON(object: any): FinalizeTransferRequest {
+    return {
+      transferId: isSet(object.transferId)
+        ? globalThis.String(object.transferId)
+        : "",
+      ownerIdentityPublicKey: isSet(object.ownerIdentityPublicKey)
+        ? bytesFromBase64(object.ownerIdentityPublicKey)
+        : new Uint8Array(0),
+      leavesToSend: globalThis.Array.isArray(object?.leavesToSend)
+        ? object.leavesToSend.map((e: any) => SendLeafKeyTweak.fromJSON(e))
+        : [],
+    };
+  },
 
-    create(
-      base?: DeepPartial<CompleteSendTransferRequest>,
-    ): CompleteSendTransferRequest {
-      return CompleteSendTransferRequest.fromPartial(base ?? {});
-    },
-    fromPartial(
-      object: DeepPartial<CompleteSendTransferRequest>,
-    ): CompleteSendTransferRequest {
-      const message = createBaseCompleteSendTransferRequest();
-      message.transferId = object.transferId ?? "";
-      message.ownerIdentityPublicKey =
-        object.ownerIdentityPublicKey ?? new Uint8Array(0);
-      message.leavesToSend =
-        object.leavesToSend?.map((e) => SendLeafKeyTweak.fromPartial(e)) || [];
-      return message;
-    },
-  };
+  toJSON(message: FinalizeTransferRequest): unknown {
+    const obj: any = {};
+    if (message.transferId !== "") {
+      obj.transferId = message.transferId;
+    }
+    if (message.ownerIdentityPublicKey.length !== 0) {
+      obj.ownerIdentityPublicKey = base64FromBytes(
+        message.ownerIdentityPublicKey,
+      );
+    }
+    if (message.leavesToSend?.length) {
+      obj.leavesToSend = message.leavesToSend.map((e) =>
+        SendLeafKeyTweak.toJSON(e),
+      );
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<FinalizeTransferRequest>): FinalizeTransferRequest {
+    return FinalizeTransferRequest.fromPartial(base ?? {});
+  },
+  fromPartial(
+    object: DeepPartial<FinalizeTransferRequest>,
+  ): FinalizeTransferRequest {
+    const message = createBaseFinalizeTransferRequest();
+    message.transferId = object.transferId ?? "";
+    message.ownerIdentityPublicKey =
+      object.ownerIdentityPublicKey ?? new Uint8Array(0);
+    message.leavesToSend =
+      object.leavesToSend?.map((e) => SendLeafKeyTweak.fromPartial(e)) || [];
+    return message;
+  },
+};
+
+function createBaseFinalizeTransferResponse(): FinalizeTransferResponse {
+  return { transfer: undefined };
+}
+
+export const FinalizeTransferResponse: MessageFns<FinalizeTransferResponse> = {
+  encode(
+    message: FinalizeTransferResponse,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
+    if (message.transfer !== undefined) {
+      Transfer.encode(message.transfer, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(
+    input: BinaryReader | Uint8Array,
+    length?: number,
+  ): FinalizeTransferResponse {
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseFinalizeTransferResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.transfer = Transfer.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): FinalizeTransferResponse {
+    return {
+      transfer: isSet(object.transfer)
+        ? Transfer.fromJSON(object.transfer)
+        : undefined,
+    };
+  },
+
+  toJSON(message: FinalizeTransferResponse): unknown {
+    const obj: any = {};
+    if (message.transfer !== undefined) {
+      obj.transfer = Transfer.toJSON(message.transfer);
+    }
+    return obj;
+  },
+
+  create(
+    base?: DeepPartial<FinalizeTransferResponse>,
+  ): FinalizeTransferResponse {
+    return FinalizeTransferResponse.fromPartial(base ?? {});
+  },
+  fromPartial(
+    object: DeepPartial<FinalizeTransferResponse>,
+  ): FinalizeTransferResponse {
+    const message = createBaseFinalizeTransferResponse();
+    message.transfer =
+      object.transfer !== undefined && object.transfer !== null
+        ? Transfer.fromPartial(object.transfer)
+        : undefined;
+    return message;
+  },
+};
 
 function createBaseTransfer(): Transfer {
   return {
@@ -8058,85 +8936,14 @@ export const TransferLeaf: MessageFns<TransferLeaf> = {
   },
 };
 
-function createBaseCompleteSendTransferResponse(): CompleteSendTransferResponse {
-  return { transfer: undefined };
-}
-
-export const CompleteSendTransferResponse: MessageFns<CompleteSendTransferResponse> =
-  {
-    encode(
-      message: CompleteSendTransferResponse,
-      writer: BinaryWriter = new BinaryWriter(),
-    ): BinaryWriter {
-      if (message.transfer !== undefined) {
-        Transfer.encode(message.transfer, writer.uint32(10).fork()).join();
-      }
-      return writer;
-    },
-
-    decode(
-      input: BinaryReader | Uint8Array,
-      length?: number,
-    ): CompleteSendTransferResponse {
-      const reader =
-        input instanceof BinaryReader ? input : new BinaryReader(input);
-      let end = length === undefined ? reader.len : reader.pos + length;
-      const message = createBaseCompleteSendTransferResponse();
-      while (reader.pos < end) {
-        const tag = reader.uint32();
-        switch (tag >>> 3) {
-          case 1: {
-            if (tag !== 10) {
-              break;
-            }
-
-            message.transfer = Transfer.decode(reader, reader.uint32());
-            continue;
-          }
-        }
-        if ((tag & 7) === 4 || tag === 0) {
-          break;
-        }
-        reader.skip(tag & 7);
-      }
-      return message;
-    },
-
-    fromJSON(object: any): CompleteSendTransferResponse {
-      return {
-        transfer: isSet(object.transfer)
-          ? Transfer.fromJSON(object.transfer)
-          : undefined,
-      };
-    },
-
-    toJSON(message: CompleteSendTransferResponse): unknown {
-      const obj: any = {};
-      if (message.transfer !== undefined) {
-        obj.transfer = Transfer.toJSON(message.transfer);
-      }
-      return obj;
-    },
-
-    create(
-      base?: DeepPartial<CompleteSendTransferResponse>,
-    ): CompleteSendTransferResponse {
-      return CompleteSendTransferResponse.fromPartial(base ?? {});
-    },
-    fromPartial(
-      object: DeepPartial<CompleteSendTransferResponse>,
-    ): CompleteSendTransferResponse {
-      const message = createBaseCompleteSendTransferResponse();
-      message.transfer =
-        object.transfer !== undefined && object.transfer !== null
-          ? Transfer.fromPartial(object.transfer)
-          : undefined;
-      return message;
-    },
-  };
-
 function createBaseTransferFilter(): TransferFilter {
-  return { participant: undefined, transferIds: [], limit: 0, offset: 0 };
+  return {
+    participant: undefined,
+    transferIds: [],
+    limit: 0,
+    offset: 0,
+    types: [],
+  };
 }
 
 export const TransferFilter: MessageFns<TransferFilter> = {
@@ -8151,6 +8958,11 @@ export const TransferFilter: MessageFns<TransferFilter> = {
       case "senderIdentityPublicKey":
         writer.uint32(18).bytes(message.participant.senderIdentityPublicKey);
         break;
+      case "senderOrReceiverIdentityPublicKey":
+        writer
+          .uint32(482)
+          .bytes(message.participant.senderOrReceiverIdentityPublicKey);
+        break;
     }
     for (const v of message.transferIds) {
       writer.uint32(26).string(v!);
@@ -8161,6 +8973,11 @@ export const TransferFilter: MessageFns<TransferFilter> = {
     if (message.offset !== 0) {
       writer.uint32(400).int64(message.offset);
     }
+    writer.uint32(562).fork();
+    for (const v of message.types) {
+      writer.int32(v);
+    }
+    writer.join();
     return writer;
   },
 
@@ -8194,6 +9011,17 @@ export const TransferFilter: MessageFns<TransferFilter> = {
           };
           continue;
         }
+        case 60: {
+          if (tag !== 482) {
+            break;
+          }
+
+          message.participant = {
+            $case: "senderOrReceiverIdentityPublicKey",
+            senderOrReceiverIdentityPublicKey: reader.bytes(),
+          };
+          continue;
+        }
         case 3: {
           if (tag !== 26) {
             break;
@@ -8217,6 +9045,24 @@ export const TransferFilter: MessageFns<TransferFilter> = {
 
           message.offset = longToNumber(reader.int64());
           continue;
+        }
+        case 70: {
+          if (tag === 560) {
+            message.types.push(reader.int32() as any);
+
+            continue;
+          }
+
+          if (tag === 562) {
+            const end2 = reader.uint32() + reader.pos;
+            while (reader.pos < end2) {
+              message.types.push(reader.int32() as any);
+            }
+
+            continue;
+          }
+
+          break;
         }
       }
       if ((tag & 7) === 4 || tag === 0) {
@@ -8243,12 +9089,22 @@ export const TransferFilter: MessageFns<TransferFilter> = {
                 object.senderIdentityPublicKey,
               ),
             }
-          : undefined,
+          : isSet(object.senderOrReceiverIdentityPublicKey)
+            ? {
+                $case: "senderOrReceiverIdentityPublicKey",
+                senderOrReceiverIdentityPublicKey: bytesFromBase64(
+                  object.senderOrReceiverIdentityPublicKey,
+                ),
+              }
+            : undefined,
       transferIds: globalThis.Array.isArray(object?.transferIds)
         ? object.transferIds.map((e: any) => globalThis.String(e))
         : [],
       limit: isSet(object.limit) ? globalThis.Number(object.limit) : 0,
       offset: isSet(object.offset) ? globalThis.Number(object.offset) : 0,
+      types: globalThis.Array.isArray(object?.types)
+        ? object.types.map((e: any) => transferTypeFromJSON(e))
+        : [],
     };
   },
 
@@ -8262,6 +9118,12 @@ export const TransferFilter: MessageFns<TransferFilter> = {
       obj.senderIdentityPublicKey = base64FromBytes(
         message.participant.senderIdentityPublicKey,
       );
+    } else if (
+      message.participant?.$case === "senderOrReceiverIdentityPublicKey"
+    ) {
+      obj.senderOrReceiverIdentityPublicKey = base64FromBytes(
+        message.participant.senderOrReceiverIdentityPublicKey,
+      );
     }
     if (message.transferIds?.length) {
       obj.transferIds = message.transferIds;
@@ -8271,6 +9133,9 @@ export const TransferFilter: MessageFns<TransferFilter> = {
     }
     if (message.offset !== 0) {
       obj.offset = Math.round(message.offset);
+    }
+    if (message.types?.length) {
+      obj.types = message.types.map((e) => transferTypeToJSON(e));
     }
     return obj;
   },
@@ -8306,10 +9171,24 @@ export const TransferFilter: MessageFns<TransferFilter> = {
         }
         break;
       }
+      case "senderOrReceiverIdentityPublicKey": {
+        if (
+          object.participant?.senderOrReceiverIdentityPublicKey !== undefined &&
+          object.participant?.senderOrReceiverIdentityPublicKey !== null
+        ) {
+          message.participant = {
+            $case: "senderOrReceiverIdentityPublicKey",
+            senderOrReceiverIdentityPublicKey:
+              object.participant.senderOrReceiverIdentityPublicKey,
+          };
+        }
+        break;
+      }
     }
     message.transferIds = object.transferIds?.map((e) => e) || [];
     message.limit = object.limit ?? 0;
     message.offset = object.offset ?? 0;
+    message.types = object.types?.map((e) => e) || [];
     return message;
   },
 };
@@ -10453,23 +11332,23 @@ export const InitiatePreimageSwapRequest: MessageFns<InitiatePreimageSwapRequest
       if (message.invoiceAmount !== undefined) {
         InvoiceAmount.encode(
           message.invoiceAmount,
-          writer.uint32(26).fork(),
+          writer.uint32(18).fork(),
         ).join();
       }
       if (message.reason !== 0) {
-        writer.uint32(32).int32(message.reason);
+        writer.uint32(24).int32(message.reason);
       }
       if (message.transfer !== undefined) {
-        StartSendTransferRequest.encode(
+        StartUserSignedTransferRequest.encode(
           message.transfer,
-          writer.uint32(42).fork(),
+          writer.uint32(34).fork(),
         ).join();
       }
       if (message.receiverIdentityPublicKey.length !== 0) {
-        writer.uint32(50).bytes(message.receiverIdentityPublicKey);
+        writer.uint32(42).bytes(message.receiverIdentityPublicKey);
       }
       if (message.feeSats !== 0) {
-        writer.uint32(56).uint64(message.feeSats);
+        writer.uint32(48).uint64(message.feeSats);
       }
       return writer;
     },
@@ -10498,25 +11377,29 @@ export const InitiatePreimageSwapRequest: MessageFns<InitiatePreimageSwapRequest
               break;
             }
 
-            continue;
-          }
-          case 3: {
-            if (tag !== 26) {
-              break;
-            }
-
             message.invoiceAmount = InvoiceAmount.decode(
               reader,
               reader.uint32(),
             );
             continue;
           }
-          case 4: {
-            if (tag !== 32) {
+          case 3: {
+            if (tag !== 24) {
               break;
             }
 
             message.reason = reader.int32() as any;
+            continue;
+          }
+          case 4: {
+            if (tag !== 34) {
+              break;
+            }
+
+            message.transfer = StartUserSignedTransferRequest.decode(
+              reader,
+              reader.uint32(),
+            );
             continue;
           }
           case 5: {
@@ -10524,22 +11407,11 @@ export const InitiatePreimageSwapRequest: MessageFns<InitiatePreimageSwapRequest
               break;
             }
 
-            message.transfer = StartSendTransferRequest.decode(
-              reader,
-              reader.uint32(),
-            );
-            continue;
-          }
-          case 6: {
-            if (tag !== 50) {
-              break;
-            }
-
             message.receiverIdentityPublicKey = reader.bytes();
             continue;
           }
-          case 7: {
-            if (tag !== 56) {
+          case 6: {
+            if (tag !== 48) {
               break;
             }
 
@@ -10567,7 +11439,7 @@ export const InitiatePreimageSwapRequest: MessageFns<InitiatePreimageSwapRequest
           ? initiatePreimageSwapRequest_ReasonFromJSON(object.reason)
           : 0,
         transfer: isSet(object.transfer)
-          ? StartSendTransferRequest.fromJSON(object.transfer)
+          ? StartUserSignedTransferRequest.fromJSON(object.transfer)
           : undefined,
         receiverIdentityPublicKey: isSet(object.receiverIdentityPublicKey)
           ? bytesFromBase64(object.receiverIdentityPublicKey)
@@ -10588,7 +11460,7 @@ export const InitiatePreimageSwapRequest: MessageFns<InitiatePreimageSwapRequest
         obj.reason = initiatePreimageSwapRequest_ReasonToJSON(message.reason);
       }
       if (message.transfer !== undefined) {
-        obj.transfer = StartSendTransferRequest.toJSON(message.transfer);
+        obj.transfer = StartUserSignedTransferRequest.toJSON(message.transfer);
       }
       if (message.receiverIdentityPublicKey.length !== 0) {
         obj.receiverIdentityPublicKey = base64FromBytes(
@@ -10618,7 +11490,7 @@ export const InitiatePreimageSwapRequest: MessageFns<InitiatePreimageSwapRequest
       message.reason = object.reason ?? 0;
       message.transfer =
         object.transfer !== undefined && object.transfer !== null
-          ? StartSendTransferRequest.fromPartial(object.transfer)
+          ? StartUserSignedTransferRequest.fromPartial(object.transfer)
           : undefined;
       message.receiverIdentityPublicKey =
         object.receiverIdentityPublicKey ?? new Uint8Array(0);
@@ -10814,7 +11686,7 @@ export const CooperativeExitRequest: MessageFns<CooperativeExitRequest> = {
     writer: BinaryWriter = new BinaryWriter(),
   ): BinaryWriter {
     if (message.transfer !== undefined) {
-      StartSendTransferRequest.encode(
+      StartTransferRequest.encode(
         message.transfer,
         writer.uint32(10).fork(),
       ).join();
@@ -10844,7 +11716,7 @@ export const CooperativeExitRequest: MessageFns<CooperativeExitRequest> = {
             break;
           }
 
-          message.transfer = StartSendTransferRequest.decode(
+          message.transfer = StartTransferRequest.decode(
             reader,
             reader.uint32(),
           );
@@ -10878,7 +11750,7 @@ export const CooperativeExitRequest: MessageFns<CooperativeExitRequest> = {
   fromJSON(object: any): CooperativeExitRequest {
     return {
       transfer: isSet(object.transfer)
-        ? StartSendTransferRequest.fromJSON(object.transfer)
+        ? StartTransferRequest.fromJSON(object.transfer)
         : undefined,
       exitId: isSet(object.exitId) ? globalThis.String(object.exitId) : "",
       exitTxid: isSet(object.exitTxid)
@@ -10890,7 +11762,7 @@ export const CooperativeExitRequest: MessageFns<CooperativeExitRequest> = {
   toJSON(message: CooperativeExitRequest): unknown {
     const obj: any = {};
     if (message.transfer !== undefined) {
-      obj.transfer = StartSendTransferRequest.toJSON(message.transfer);
+      obj.transfer = StartTransferRequest.toJSON(message.transfer);
     }
     if (message.exitId !== "") {
       obj.exitId = message.exitId;
@@ -10910,7 +11782,7 @@ export const CooperativeExitRequest: MessageFns<CooperativeExitRequest> = {
     const message = createBaseCooperativeExitRequest();
     message.transfer =
       object.transfer !== undefined && object.transfer !== null
-        ? StartSendTransferRequest.fromPartial(object.transfer)
+        ? StartTransferRequest.fromPartial(object.transfer)
         : undefined;
     message.exitId = object.exitId ?? "";
     message.exitTxid = object.exitTxid ?? new Uint8Array(0);
@@ -11033,7 +11905,7 @@ export const CounterLeafSwapRequest: MessageFns<CounterLeafSwapRequest> = {
     writer: BinaryWriter = new BinaryWriter(),
   ): BinaryWriter {
     if (message.transfer !== undefined) {
-      StartSendTransferRequest.encode(
+      StartTransferRequest.encode(
         message.transfer,
         writer.uint32(10).fork(),
       ).join();
@@ -11063,7 +11935,7 @@ export const CounterLeafSwapRequest: MessageFns<CounterLeafSwapRequest> = {
             break;
           }
 
-          message.transfer = StartSendTransferRequest.decode(
+          message.transfer = StartTransferRequest.decode(
             reader,
             reader.uint32(),
           );
@@ -11097,7 +11969,7 @@ export const CounterLeafSwapRequest: MessageFns<CounterLeafSwapRequest> = {
   fromJSON(object: any): CounterLeafSwapRequest {
     return {
       transfer: isSet(object.transfer)
-        ? StartSendTransferRequest.fromJSON(object.transfer)
+        ? StartTransferRequest.fromJSON(object.transfer)
         : undefined,
       swapId: isSet(object.swapId) ? globalThis.String(object.swapId) : "",
       adaptorPublicKey: isSet(object.adaptorPublicKey)
@@ -11109,7 +11981,7 @@ export const CounterLeafSwapRequest: MessageFns<CounterLeafSwapRequest> = {
   toJSON(message: CounterLeafSwapRequest): unknown {
     const obj: any = {};
     if (message.transfer !== undefined) {
-      obj.transfer = StartSendTransferRequest.toJSON(message.transfer);
+      obj.transfer = StartTransferRequest.toJSON(message.transfer);
     }
     if (message.swapId !== "") {
       obj.swapId = message.swapId;
@@ -11129,7 +12001,7 @@ export const CounterLeafSwapRequest: MessageFns<CounterLeafSwapRequest> = {
     const message = createBaseCounterLeafSwapRequest();
     message.transfer =
       object.transfer !== undefined && object.transfer !== null
-        ? StartSendTransferRequest.fromPartial(object.transfer)
+        ? StartTransferRequest.fromPartial(object.transfer)
         : undefined;
     message.swapId = object.swapId ?? "";
     message.adaptorPublicKey = object.adaptorPublicKey ?? new Uint8Array(0);
@@ -14053,177 +14925,171 @@ export const QueryNodesResponse_NodesEntry: MessageFns<QueryNodesResponse_NodesE
     },
   };
 
-function createBaseCancelSendTransferRequest(): CancelSendTransferRequest {
+function createBaseCancelTransferRequest(): CancelTransferRequest {
   return { transferId: "", senderIdentityPublicKey: new Uint8Array(0) };
 }
 
-export const CancelSendTransferRequest: MessageFns<CancelSendTransferRequest> =
-  {
-    encode(
-      message: CancelSendTransferRequest,
-      writer: BinaryWriter = new BinaryWriter(),
-    ): BinaryWriter {
-      if (message.transferId !== "") {
-        writer.uint32(10).string(message.transferId);
-      }
-      if (message.senderIdentityPublicKey.length !== 0) {
-        writer.uint32(18).bytes(message.senderIdentityPublicKey);
-      }
-      return writer;
-    },
+export const CancelTransferRequest: MessageFns<CancelTransferRequest> = {
+  encode(
+    message: CancelTransferRequest,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
+    if (message.transferId !== "") {
+      writer.uint32(10).string(message.transferId);
+    }
+    if (message.senderIdentityPublicKey.length !== 0) {
+      writer.uint32(18).bytes(message.senderIdentityPublicKey);
+    }
+    return writer;
+  },
 
-    decode(
-      input: BinaryReader | Uint8Array,
-      length?: number,
-    ): CancelSendTransferRequest {
-      const reader =
-        input instanceof BinaryReader ? input : new BinaryReader(input);
-      let end = length === undefined ? reader.len : reader.pos + length;
-      const message = createBaseCancelSendTransferRequest();
-      while (reader.pos < end) {
-        const tag = reader.uint32();
-        switch (tag >>> 3) {
-          case 1: {
-            if (tag !== 10) {
-              break;
-            }
-
-            message.transferId = reader.string();
-            continue;
+  decode(
+    input: BinaryReader | Uint8Array,
+    length?: number,
+  ): CancelTransferRequest {
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseCancelTransferRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
           }
-          case 2: {
-            if (tag !== 18) {
-              break;
-            }
 
-            message.senderIdentityPublicKey = reader.bytes();
-            continue;
+          message.transferId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
           }
+
+          message.senderIdentityPublicKey = reader.bytes();
+          continue;
         }
-        if ((tag & 7) === 4 || tag === 0) {
-          break;
-        }
-        reader.skip(tag & 7);
       }
-      return message;
-    },
-
-    fromJSON(object: any): CancelSendTransferRequest {
-      return {
-        transferId: isSet(object.transferId)
-          ? globalThis.String(object.transferId)
-          : "",
-        senderIdentityPublicKey: isSet(object.senderIdentityPublicKey)
-          ? bytesFromBase64(object.senderIdentityPublicKey)
-          : new Uint8Array(0),
-      };
-    },
-
-    toJSON(message: CancelSendTransferRequest): unknown {
-      const obj: any = {};
-      if (message.transferId !== "") {
-        obj.transferId = message.transferId;
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
       }
-      if (message.senderIdentityPublicKey.length !== 0) {
-        obj.senderIdentityPublicKey = base64FromBytes(
-          message.senderIdentityPublicKey,
-        );
-      }
-      return obj;
-    },
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
 
-    create(
-      base?: DeepPartial<CancelSendTransferRequest>,
-    ): CancelSendTransferRequest {
-      return CancelSendTransferRequest.fromPartial(base ?? {});
-    },
-    fromPartial(
-      object: DeepPartial<CancelSendTransferRequest>,
-    ): CancelSendTransferRequest {
-      const message = createBaseCancelSendTransferRequest();
-      message.transferId = object.transferId ?? "";
-      message.senderIdentityPublicKey =
-        object.senderIdentityPublicKey ?? new Uint8Array(0);
-      return message;
-    },
-  };
+  fromJSON(object: any): CancelTransferRequest {
+    return {
+      transferId: isSet(object.transferId)
+        ? globalThis.String(object.transferId)
+        : "",
+      senderIdentityPublicKey: isSet(object.senderIdentityPublicKey)
+        ? bytesFromBase64(object.senderIdentityPublicKey)
+        : new Uint8Array(0),
+    };
+  },
 
-function createBaseCancelSendTransferResponse(): CancelSendTransferResponse {
+  toJSON(message: CancelTransferRequest): unknown {
+    const obj: any = {};
+    if (message.transferId !== "") {
+      obj.transferId = message.transferId;
+    }
+    if (message.senderIdentityPublicKey.length !== 0) {
+      obj.senderIdentityPublicKey = base64FromBytes(
+        message.senderIdentityPublicKey,
+      );
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<CancelTransferRequest>): CancelTransferRequest {
+    return CancelTransferRequest.fromPartial(base ?? {});
+  },
+  fromPartial(
+    object: DeepPartial<CancelTransferRequest>,
+  ): CancelTransferRequest {
+    const message = createBaseCancelTransferRequest();
+    message.transferId = object.transferId ?? "";
+    message.senderIdentityPublicKey =
+      object.senderIdentityPublicKey ?? new Uint8Array(0);
+    return message;
+  },
+};
+
+function createBaseCancelTransferResponse(): CancelTransferResponse {
   return { transfer: undefined };
 }
 
-export const CancelSendTransferResponse: MessageFns<CancelSendTransferResponse> =
-  {
-    encode(
-      message: CancelSendTransferResponse,
-      writer: BinaryWriter = new BinaryWriter(),
-    ): BinaryWriter {
-      if (message.transfer !== undefined) {
-        Transfer.encode(message.transfer, writer.uint32(10).fork()).join();
-      }
-      return writer;
-    },
+export const CancelTransferResponse: MessageFns<CancelTransferResponse> = {
+  encode(
+    message: CancelTransferResponse,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
+    if (message.transfer !== undefined) {
+      Transfer.encode(message.transfer, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
 
-    decode(
-      input: BinaryReader | Uint8Array,
-      length?: number,
-    ): CancelSendTransferResponse {
-      const reader =
-        input instanceof BinaryReader ? input : new BinaryReader(input);
-      let end = length === undefined ? reader.len : reader.pos + length;
-      const message = createBaseCancelSendTransferResponse();
-      while (reader.pos < end) {
-        const tag = reader.uint32();
-        switch (tag >>> 3) {
-          case 1: {
-            if (tag !== 10) {
-              break;
-            }
-
-            message.transfer = Transfer.decode(reader, reader.uint32());
-            continue;
+  decode(
+    input: BinaryReader | Uint8Array,
+    length?: number,
+  ): CancelTransferResponse {
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseCancelTransferResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
           }
+
+          message.transfer = Transfer.decode(reader, reader.uint32());
+          continue;
         }
-        if ((tag & 7) === 4 || tag === 0) {
-          break;
-        }
-        reader.skip(tag & 7);
       }
-      return message;
-    },
-
-    fromJSON(object: any): CancelSendTransferResponse {
-      return {
-        transfer: isSet(object.transfer)
-          ? Transfer.fromJSON(object.transfer)
-          : undefined,
-      };
-    },
-
-    toJSON(message: CancelSendTransferResponse): unknown {
-      const obj: any = {};
-      if (message.transfer !== undefined) {
-        obj.transfer = Transfer.toJSON(message.transfer);
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
       }
-      return obj;
-    },
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
 
-    create(
-      base?: DeepPartial<CancelSendTransferResponse>,
-    ): CancelSendTransferResponse {
-      return CancelSendTransferResponse.fromPartial(base ?? {});
-    },
-    fromPartial(
-      object: DeepPartial<CancelSendTransferResponse>,
-    ): CancelSendTransferResponse {
-      const message = createBaseCancelSendTransferResponse();
-      message.transfer =
-        object.transfer !== undefined && object.transfer !== null
-          ? Transfer.fromPartial(object.transfer)
-          : undefined;
-      return message;
-    },
-  };
+  fromJSON(object: any): CancelTransferResponse {
+    return {
+      transfer: isSet(object.transfer)
+        ? Transfer.fromJSON(object.transfer)
+        : undefined,
+    };
+  },
+
+  toJSON(message: CancelTransferResponse): unknown {
+    const obj: any = {};
+    if (message.transfer !== undefined) {
+      obj.transfer = Transfer.toJSON(message.transfer);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<CancelTransferResponse>): CancelTransferResponse {
+    return CancelTransferResponse.fromPartial(base ?? {});
+  },
+  fromPartial(
+    object: DeepPartial<CancelTransferResponse>,
+  ): CancelTransferResponse {
+    const message = createBaseCancelTransferResponse();
+    message.transfer =
+      object.transfer !== undefined && object.transfer !== null
+        ? Transfer.fromPartial(object.transfer)
+        : undefined;
+    return message;
+  },
+};
 
 function createBaseQueryUnusedDepositAddressesRequest(): QueryUnusedDepositAddressesRequest {
   return { identityPublicKey: new Uint8Array(0) };
@@ -14304,6 +15170,7 @@ function createBaseDepositAddressQueryResult(): DepositAddressQueryResult {
     depositAddress: "",
     userSigningPublicKey: new Uint8Array(0),
     verifyingPublicKey: new Uint8Array(0),
+    leafId: undefined,
   };
 }
 
@@ -14321,6 +15188,9 @@ export const DepositAddressQueryResult: MessageFns<DepositAddressQueryResult> =
       }
       if (message.verifyingPublicKey.length !== 0) {
         writer.uint32(26).bytes(message.verifyingPublicKey);
+      }
+      if (message.leafId !== undefined) {
+        writer.uint32(34).string(message.leafId);
       }
       return writer;
     },
@@ -14360,6 +15230,14 @@ export const DepositAddressQueryResult: MessageFns<DepositAddressQueryResult> =
             message.verifyingPublicKey = reader.bytes();
             continue;
           }
+          case 4: {
+            if (tag !== 34) {
+              break;
+            }
+
+            message.leafId = reader.string();
+            continue;
+          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -14380,6 +15258,9 @@ export const DepositAddressQueryResult: MessageFns<DepositAddressQueryResult> =
         verifyingPublicKey: isSet(object.verifyingPublicKey)
           ? bytesFromBase64(object.verifyingPublicKey)
           : new Uint8Array(0),
+        leafId: isSet(object.leafId)
+          ? globalThis.String(object.leafId)
+          : undefined,
       };
     },
 
@@ -14395,6 +15276,9 @@ export const DepositAddressQueryResult: MessageFns<DepositAddressQueryResult> =
       }
       if (message.verifyingPublicKey.length !== 0) {
         obj.verifyingPublicKey = base64FromBytes(message.verifyingPublicKey);
+      }
+      if (message.leafId !== undefined) {
+        obj.leafId = message.leafId;
       }
       return obj;
     },
@@ -14413,6 +15297,7 @@ export const DepositAddressQueryResult: MessageFns<DepositAddressQueryResult> =
         object.userSigningPublicKey ?? new Uint8Array(0);
       message.verifyingPublicKey =
         object.verifyingPublicKey ?? new Uint8Array(0);
+      message.leafId = object.leafId ?? undefined;
       return message;
     },
   };
@@ -14878,19 +15763,27 @@ export const SparkServiceDefinition = {
       responseStream: false,
       options: {},
     },
-    start_send_transfer: {
-      name: "start_send_transfer",
-      requestType: StartSendTransferRequest,
+    start_transfer: {
+      name: "start_transfer",
+      requestType: StartTransferRequest,
       requestStream: false,
-      responseType: StartSendTransferResponse,
+      responseType: StartTransferResponse,
       responseStream: false,
       options: {},
     },
-    complete_send_transfer: {
-      name: "complete_send_transfer",
-      requestType: CompleteSendTransferRequest,
+    finalize_transfer: {
+      name: "finalize_transfer",
+      requestType: FinalizeTransferRequest,
       requestStream: false,
-      responseType: CompleteSendTransferResponse,
+      responseType: FinalizeTransferResponse,
+      responseStream: false,
+      options: {},
+    },
+    cancel_transfer: {
+      name: "cancel_transfer",
+      requestType: CancelTransferRequest,
+      requestStream: false,
+      responseType: CancelTransferResponse,
       responseStream: false,
       options: {},
     },
@@ -14975,14 +15868,14 @@ export const SparkServiceDefinition = {
       options: {},
     },
     /**
-     * This is the exact same as start_send_transfer, but expresses to the SO
+     * This is the exact same as start_transfer, but expresses to the SO
      * this transfer is specifically for a leaf swap.
      */
     start_leaf_swap: {
       name: "start_leaf_swap",
-      requestType: StartSendTransferRequest,
+      requestType: StartTransferRequest,
       requestStream: false,
-      responseType: StartSendTransferResponse,
+      responseType: StartTransferResponse,
       responseStream: false,
       options: {},
     },
@@ -15140,20 +16033,20 @@ export const SparkServiceDefinition = {
       responseStream: false,
       options: {},
     },
-    cancel_send_transfer: {
-      name: "cancel_send_transfer",
-      requestType: CancelSendTransferRequest,
-      requestStream: false,
-      responseType: CancelSendTransferResponse,
-      responseStream: false,
-      options: {},
-    },
     query_unused_deposit_addresses: {
       name: "query_unused_deposit_addresses",
       requestType: QueryUnusedDepositAddressesRequest,
       requestStream: false,
       responseType: QueryUnusedDepositAddressesResponse,
       responseStream: false,
+      options: {},
+    },
+    subscribe_to_events: {
+      name: "subscribe_to_events",
+      requestType: SubscribeToEventsRequest,
+      requestStream: false,
+      responseType: SubscribeToEventsResponse,
+      responseStream: true,
       options: {},
     },
   },
@@ -15181,14 +16074,18 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
     request: FinalizeNodeSignaturesRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<FinalizeNodeSignaturesResponse>>;
-  start_send_transfer(
-    request: StartSendTransferRequest,
+  start_transfer(
+    request: StartTransferRequest,
     context: CallContext & CallContextExt,
-  ): Promise<DeepPartial<StartSendTransferResponse>>;
-  complete_send_transfer(
-    request: CompleteSendTransferRequest,
+  ): Promise<DeepPartial<StartTransferResponse>>;
+  finalize_transfer(
+    request: FinalizeTransferRequest,
     context: CallContext & CallContextExt,
-  ): Promise<DeepPartial<CompleteSendTransferResponse>>;
+  ): Promise<DeepPartial<FinalizeTransferResponse>>;
+  cancel_transfer(
+    request: CancelTransferRequest,
+    context: CallContext & CallContextExt,
+  ): Promise<DeepPartial<CancelTransferResponse>>;
   query_pending_transfers(
     request: TransferFilter,
     context: CallContext & CallContextExt,
@@ -15230,13 +16127,13 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<ProvidePreimageResponse>>;
   /**
-   * This is the exact same as start_send_transfer, but expresses to the SO
+   * This is the exact same as start_transfer, but expresses to the SO
    * this transfer is specifically for a leaf swap.
    */
   start_leaf_swap(
-    request: StartSendTransferRequest,
+    request: StartTransferRequest,
     context: CallContext & CallContextExt,
-  ): Promise<DeepPartial<StartSendTransferResponse>>;
+  ): Promise<DeepPartial<StartTransferResponse>>;
   /**
    * This is deprecated, please use counter_leaf_swap instead.
    *
@@ -15319,14 +16216,14 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
     request: ReturnLightningPaymentRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<Empty>>;
-  cancel_send_transfer(
-    request: CancelSendTransferRequest,
-    context: CallContext & CallContextExt,
-  ): Promise<DeepPartial<CancelSendTransferResponse>>;
   query_unused_deposit_addresses(
     request: QueryUnusedDepositAddressesRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<QueryUnusedDepositAddressesResponse>>;
+  subscribe_to_events(
+    request: SubscribeToEventsRequest,
+    context: CallContext & CallContextExt,
+  ): ServerStreamingMethodResult<DeepPartial<SubscribeToEventsResponse>>;
 }
 
 export interface SparkServiceClient<CallOptionsExt = {}> {
@@ -15351,14 +16248,18 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
     request: DeepPartial<FinalizeNodeSignaturesRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<FinalizeNodeSignaturesResponse>;
-  start_send_transfer(
-    request: DeepPartial<StartSendTransferRequest>,
+  start_transfer(
+    request: DeepPartial<StartTransferRequest>,
     options?: CallOptions & CallOptionsExt,
-  ): Promise<StartSendTransferResponse>;
-  complete_send_transfer(
-    request: DeepPartial<CompleteSendTransferRequest>,
+  ): Promise<StartTransferResponse>;
+  finalize_transfer(
+    request: DeepPartial<FinalizeTransferRequest>,
     options?: CallOptions & CallOptionsExt,
-  ): Promise<CompleteSendTransferResponse>;
+  ): Promise<FinalizeTransferResponse>;
+  cancel_transfer(
+    request: DeepPartial<CancelTransferRequest>,
+    options?: CallOptions & CallOptionsExt,
+  ): Promise<CancelTransferResponse>;
   query_pending_transfers(
     request: DeepPartial<TransferFilter>,
     options?: CallOptions & CallOptionsExt,
@@ -15400,13 +16301,13 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
     options?: CallOptions & CallOptionsExt,
   ): Promise<ProvidePreimageResponse>;
   /**
-   * This is the exact same as start_send_transfer, but expresses to the SO
+   * This is the exact same as start_transfer, but expresses to the SO
    * this transfer is specifically for a leaf swap.
    */
   start_leaf_swap(
-    request: DeepPartial<StartSendTransferRequest>,
+    request: DeepPartial<StartTransferRequest>,
     options?: CallOptions & CallOptionsExt,
-  ): Promise<StartSendTransferResponse>;
+  ): Promise<StartTransferResponse>;
   /**
    * This is deprecated, please use counter_leaf_swap instead.
    *
@@ -15489,14 +16390,14 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
     request: DeepPartial<ReturnLightningPaymentRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<Empty>;
-  cancel_send_transfer(
-    request: DeepPartial<CancelSendTransferRequest>,
-    options?: CallOptions & CallOptionsExt,
-  ): Promise<CancelSendTransferResponse>;
   query_unused_deposit_addresses(
     request: DeepPartial<QueryUnusedDepositAddressesRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<QueryUnusedDepositAddressesResponse>;
+  subscribe_to_events(
+    request: DeepPartial<SubscribeToEventsRequest>,
+    options?: CallOptions & CallOptionsExt,
+  ): AsyncIterable<SubscribeToEventsResponse>;
 }
 
 function bytesFromBase64(b64: string): Uint8Array {
@@ -15587,6 +16488,10 @@ function isObject(value: any): boolean {
 function isSet(value: any): boolean {
   return value !== null && value !== undefined;
 }
+
+export type ServerStreamingMethodResult<Response> = {
+  [Symbol.asyncIterator](): AsyncIterator<Response, void>;
+};
 
 export interface MessageFns<T> {
   encode(message: T, writer?: BinaryWriter): BinaryWriter;

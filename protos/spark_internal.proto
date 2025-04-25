@@ -41,7 +41,7 @@ service SparkInternalService {
 
     rpc start_token_transaction_internal(StartTokenTransactionInternalRequest) returns (google.protobuf.Empty) {}
 
-    rpc cancel_send_transfer(spark.CancelSendTransferRequest) returns (google.protobuf.Empty) {}
+    rpc cancel_transfer(spark.CancelTransferRequest) returns (google.protobuf.Empty) {}
 
     rpc initiate_settle_receiver_key_tweak(InitiateSettleReceiverKeyTweakRequest) returns (google.protobuf.Empty) {}
     rpc settle_receiver_key_tweak(SettleReceiverKeyTweakRequest) returns (google.protobuf.Empty) {}

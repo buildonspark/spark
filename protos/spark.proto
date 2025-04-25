@@ -16,8 +16,11 @@ service SparkService {
         option deprecated = true;
     }
     rpc finalize_node_signatures(FinalizeNodeSignaturesRequest) returns (FinalizeNodeSignaturesResponse) {}
-    rpc start_send_transfer(StartSendTransferRequest) returns (StartSendTransferResponse) {}
-    rpc complete_send_transfer(CompleteSendTransferRequest) returns (CompleteSendTransferResponse) {}
+
+    rpc start_transfer(StartTransferRequest) returns (StartTransferResponse) {}
+    rpc finalize_transfer(FinalizeTransferRequest) returns (FinalizeTransferResponse) {}
+    rpc cancel_transfer(CancelTransferRequest) returns (CancelTransferResponse) {}
+
     rpc query_pending_transfers(TransferFilter) returns (QueryTransfersResponse) {}
     rpc query_all_transfers(TransferFilter) returns (QueryTransfersResponse) {}
     rpc claim_transfer_tweak_keys(ClaimTransferTweakKeysRequest) returns (google.protobuf.Empty) {}
@@ -28,9 +31,9 @@ service SparkService {
     rpc cooperative_exit(CooperativeExitRequest) returns (CooperativeExitResponse) {}
     rpc initiate_preimage_swap(InitiatePreimageSwapRequest) returns (InitiatePreimageSwapResponse) {}
     rpc provide_preimage(ProvidePreimageRequest) returns (ProvidePreimageResponse) {}
-    // This is the exact same as start_send_transfer, but expresses to the SO
+    // This is the exact same as start_transfer, but expresses to the SO
     // this transfer is specifically for a leaf swap.
-    rpc start_leaf_swap(StartSendTransferRequest) returns (StartSendTransferResponse) {}
+    rpc start_leaf_swap(StartTransferRequest) returns (StartTransferResponse) {}
     // This is deprecated, please use counter_leaf_swap instead.
     rpc leaf_swap(CounterLeafSwapRequest) returns (CounterLeafSwapResponse) {
         option deprecated = true;
@@ -62,7 +65,6 @@ service SparkService {
 
     rpc return_lightning_payment(ReturnLightningPaymentRequest) returns (google.protobuf.Empty) {}
 
-    rpc cancel_send_transfer(CancelSendTransferRequest) returns (CancelSendTransferResponse) {}
 
     rpc query_unused_deposit_addresses(QueryUnusedDepositAddressesRequest) returns (QueryUnusedDepositAddressesResponse) {}
 
@@ -575,7 +577,8 @@ message StartUserSignedTransferRequest {
     google.protobuf.Timestamp expiry_time = 5;
 }
 
-message StartSendTransferRequest {
+
+message StartTransferRequest {
     string transfer_id = 1;
     bytes owner_identity_public_key = 2;
     repeated LeafRefundTxSigningJob leaves_to_send = 3;
@@ -583,8 +586,7 @@ message StartSendTransferRequest {
     google.protobuf.Timestamp expiry_time = 5;
     map<string, SecretProof> key_tweak_proofs = 6;
 }
-
-message StartSendTransferResponse {
+message StartTransferResponse {
     Transfer transfer = 1;
     repeated LeafRefundTxSigningResult signing_results = 2;
 }
@@ -599,10 +601,14 @@ message SendLeafKeyTweak {
     bytes refund_signature = 6;
 }
 
-message CompleteSendTransferRequest {
+message FinalizeTransferRequest {
     string transfer_id = 1;
     bytes owner_identity_public_key = 2;
     repeated SendLeafKeyTweak leaves_to_send = 3;
+}
+
+message FinalizeTransferResponse {
+    Transfer transfer = 1;
 }
 
 enum TransferStatus {
@@ -644,9 +650,6 @@ message TransferLeaf {
     bytes intermediate_refund_tx = 4;
 }
 
-message CompleteSendTransferResponse {
-    Transfer transfer = 1;
-}
 
 message TransferFilter {
     oneof participant {
@@ -771,7 +774,7 @@ message OutPoint {
 }
 
 message CooperativeExitRequest {
-    StartSendTransferRequest transfer = 1;
+    StartTransferRequest transfer = 1;
     string exit_id = 2;
     bytes exit_txid = 3;
 }
@@ -782,7 +785,7 @@ message CooperativeExitResponse {
 }
 
 message CounterLeafSwapRequest {
-    StartSendTransferRequest transfer = 1;
+    StartTransferRequest transfer = 1;
     string swap_id = 2;
     bytes adaptor_public_key = 3;
 }
@@ -935,12 +938,12 @@ message QueryNodesResponse {
     map<string, TreeNode> nodes = 1;
 }
 
-message CancelSendTransferRequest {
+message CancelTransferRequest {
     string transfer_id = 1;
     bytes sender_identity_public_key = 2;
 }
 
-message CancelSendTransferResponse {
+message CancelTransferResponse {
     Transfer transfer = 1;
 }
 

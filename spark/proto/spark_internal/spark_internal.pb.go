@@ -1734,7 +1734,7 @@ const file_spark_internal_proto_rawDesc = "" +
 	"\x1dSettleReceiverKeyTweakRequest\x12\x1f\n" +
 	"\vtransfer_id\x18\x01 \x01(\tR\n" +
 	"transferId\x12\x1b\n" +
-	"\ttweak_key\x18\x02 \x01(\bR\btweakKey2\xa4\x11\n" +
+	"\ttweak_key\x18\x02 \x01(\bR\btweakKey2\x9b\x11\n" +
 	"\x14SparkInternalService\x12^\n" +
 	"\x16mark_keyshares_as_used\x12*.spark_internal.MarkKeysharesAsUsedRequest\x1a\x16.google.protobuf.Empty\"\x00\x12\x92\x01\n" +
 	"!mark_keyshare_for_deposit_address\x124.spark_internal.MarkKeyshareForDepositAddressRequest\x1a5.spark_internal.MarkKeyshareForDepositAddressResponse\"\x00\x12_\n" +
@@ -1754,8 +1754,8 @@ const file_spark_internal_proto_rawDesc = "" +
 	"\x11initiate_transfer\x12'.spark_internal.InitiateTransferRequest\x1a\x16.google.protobuf.Empty\"\x00\x12e\n" +
 	"\x19initiate_cooperative_exit\x12..spark_internal.InitiateCooperativeExitRequest\x1a\x16.google.protobuf.Empty\"\x00\x12Z\n" +
 	"\x18return_lightning_payment\x12$.spark.ReturnLightningPaymentRequest\x1a\x16.google.protobuf.Empty\"\x00\x12r\n" +
-	" start_token_transaction_internal\x124.spark_internal.StartTokenTransactionInternalRequest\x1a\x16.google.protobuf.Empty\"\x00\x12R\n" +
-	"\x14cancel_send_transfer\x12 .spark.CancelSendTransferRequest\x1a\x16.google.protobuf.Empty\"\x00\x12u\n" +
+	" start_token_transaction_internal\x124.spark_internal.StartTokenTransactionInternalRequest\x1a\x16.google.protobuf.Empty\"\x00\x12I\n" +
+	"\x0fcancel_transfer\x12\x1c.spark.CancelTransferRequest\x1a\x16.google.protobuf.Empty\"\x00\x12u\n" +
 	"\"initiate_settle_receiver_key_tweak\x125.spark_internal.InitiateSettleReceiverKeyTweakRequest\x1a\x16.google.protobuf.Empty\"\x00\x12d\n" +
 	"\x19settle_receiver_key_tweak\x12-.spark_internal.SettleReceiverKeyTweakRequest\x1a\x16.google.protobuf.Empty\"\x00B8Z6github.com/lightsparkdev/spark-go/proto/spark_internalb\x06proto3"
 
@@ -1816,7 +1816,7 @@ var file_spark_internal_proto_goTypes = []any{
 	(*spark.InitiatePreimageSwapRequest)(nil),     // 40: spark.InitiatePreimageSwapRequest
 	(*spark.ProvidePreimageRequest)(nil),          // 41: spark.ProvidePreimageRequest
 	(*spark.ReturnLightningPaymentRequest)(nil),   // 42: spark.ReturnLightningPaymentRequest
-	(*spark.CancelSendTransferRequest)(nil),       // 43: spark.CancelSendTransferRequest
+	(*spark.CancelTransferRequest)(nil),           // 43: spark.CancelTransferRequest
 	(*emptypb.Empty)(nil),                         // 44: google.protobuf.Empty
 }
 var file_spark_internal_proto_depIdxs = []int32{
@@ -1867,7 +1867,7 @@ var file_spark_internal_proto_depIdxs = []int32{
 	21, // 44: spark_internal.SparkInternalService.initiate_cooperative_exit:input_type -> spark_internal.InitiateCooperativeExitRequest
 	42, // 45: spark_internal.SparkInternalService.return_lightning_payment:input_type -> spark.ReturnLightningPaymentRequest
 	23, // 46: spark_internal.SparkInternalService.start_token_transaction_internal:input_type -> spark_internal.StartTokenTransactionInternalRequest
-	43, // 47: spark_internal.SparkInternalService.cancel_send_transfer:input_type -> spark.CancelSendTransferRequest
+	43, // 47: spark_internal.SparkInternalService.cancel_transfer:input_type -> spark.CancelTransferRequest
 	25, // 48: spark_internal.SparkInternalService.initiate_settle_receiver_key_tweak:input_type -> spark_internal.InitiateSettleReceiverKeyTweakRequest
 	26, // 49: spark_internal.SparkInternalService.settle_receiver_key_tweak:input_type -> spark_internal.SettleReceiverKeyTweakRequest
 	44, // 50: spark_internal.SparkInternalService.mark_keyshares_as_used:output_type -> google.protobuf.Empty
@@ -1889,7 +1889,7 @@ var file_spark_internal_proto_depIdxs = []int32{
 	44, // 66: spark_internal.SparkInternalService.initiate_cooperative_exit:output_type -> google.protobuf.Empty
 	44, // 67: spark_internal.SparkInternalService.return_lightning_payment:output_type -> google.protobuf.Empty
 	44, // 68: spark_internal.SparkInternalService.start_token_transaction_internal:output_type -> google.protobuf.Empty
-	44, // 69: spark_internal.SparkInternalService.cancel_send_transfer:output_type -> google.protobuf.Empty
+	44, // 69: spark_internal.SparkInternalService.cancel_transfer:output_type -> google.protobuf.Empty
 	44, // 70: spark_internal.SparkInternalService.initiate_settle_receiver_key_tweak:output_type -> google.protobuf.Empty
 	44, // 71: spark_internal.SparkInternalService.settle_receiver_key_tweak:output_type -> google.protobuf.Empty
 	50, // [50:72] is the sub-list for method output_type

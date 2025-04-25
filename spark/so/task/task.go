@@ -49,10 +49,10 @@ func AllTasks() []Task {
 					}
 
 					for _, transfer := range transfers {
-						_, err := h.CancelSendTransfer(ctx, &pbspark.CancelSendTransferRequest{
+						_, err := h.CancelTransfer(ctx, &pbspark.CancelTransferRequest{
 							SenderIdentityPublicKey: transfer.SenderIdentityPubkey,
 							TransferId:              transfer.ID.String(),
-						}, handler.CancelSendTransferIntentTask)
+						}, handler.CancelTransferIntentTask)
 						if err != nil {
 							return err
 						}

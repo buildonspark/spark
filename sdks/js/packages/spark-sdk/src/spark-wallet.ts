@@ -1367,10 +1367,7 @@ export class SparkWallet {
         if (
           transfer.status === TransferStatus.TRANSFER_STATUS_SENDER_INITIATED
         ) {
-          await this.transferService.cancelSendTransfer(
-            transfer,
-            operator.address,
-          );
+          await this.transferService.cancelTransfer(transfer, operator.address);
         }
       }
     }

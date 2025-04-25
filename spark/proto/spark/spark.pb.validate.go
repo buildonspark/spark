@@ -7327,22 +7327,22 @@ var _ interface {
 	ErrorName() string
 } = StartUserSignedTransferRequestValidationError{}
 
-// Validate checks the field values on StartSendTransferRequest with the rules
+// Validate checks the field values on StartTransferRequest with the rules
 // defined in the proto definition for this message. If any rules are
 // violated, the first error encountered is returned, or nil if there are no violations.
-func (m *StartSendTransferRequest) Validate() error {
+func (m *StartTransferRequest) Validate() error {
 	return m.validate(false)
 }
 
-// ValidateAll checks the field values on StartSendTransferRequest with the
-// rules defined in the proto definition for this message. If any rules are
+// ValidateAll checks the field values on StartTransferRequest with the rules
+// defined in the proto definition for this message. If any rules are
 // violated, the result is a list of violation errors wrapped in
-// StartSendTransferRequestMultiError, or nil if none found.
-func (m *StartSendTransferRequest) ValidateAll() error {
+// StartTransferRequestMultiError, or nil if none found.
+func (m *StartTransferRequest) ValidateAll() error {
 	return m.validate(true)
 }
 
-func (m *StartSendTransferRequest) validate(all bool) error {
+func (m *StartTransferRequest) validate(all bool) error {
 	if m == nil {
 		return nil
 	}
@@ -7360,7 +7360,7 @@ func (m *StartSendTransferRequest) validate(all bool) error {
 			switch v := interface{}(item).(type) {
 			case interface{ ValidateAll() error }:
 				if err := v.ValidateAll(); err != nil {
-					errors = append(errors, StartSendTransferRequestValidationError{
+					errors = append(errors, StartTransferRequestValidationError{
 						field:  fmt.Sprintf("LeavesToSend[%v]", idx),
 						reason: "embedded message failed validation",
 						cause:  err,
@@ -7368,7 +7368,7 @@ func (m *StartSendTransferRequest) validate(all bool) error {
 				}
 			case interface{ Validate() error }:
 				if err := v.Validate(); err != nil {
-					errors = append(errors, StartSendTransferRequestValidationError{
+					errors = append(errors, StartTransferRequestValidationError{
 						field:  fmt.Sprintf("LeavesToSend[%v]", idx),
 						reason: "embedded message failed validation",
 						cause:  err,
@@ -7377,7 +7377,7 @@ func (m *StartSendTransferRequest) validate(all bool) error {
 			}
 		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
 			if err := v.Validate(); err != nil {
-				return StartSendTransferRequestValidationError{
+				return StartTransferRequestValidationError{
 					field:  fmt.Sprintf("LeavesToSend[%v]", idx),
 					reason: "embedded message failed validation",
 					cause:  err,
@@ -7393,7 +7393,7 @@ func (m *StartSendTransferRequest) validate(all bool) error {
 		switch v := interface{}(m.GetExpiryTime()).(type) {
 		case interface{ ValidateAll() error }:
 			if err := v.ValidateAll(); err != nil {
-				errors = append(errors, StartSendTransferRequestValidationError{
+				errors = append(errors, StartTransferRequestValidationError{
 					field:  "ExpiryTime",
 					reason: "embedded message failed validation",
 					cause:  err,
@@ -7401,7 +7401,7 @@ func (m *StartSendTransferRequest) validate(all bool) error {
 			}
 		case interface{ Validate() error }:
 			if err := v.Validate(); err != nil {
-				errors = append(errors, StartSendTransferRequestValidationError{
+				errors = append(errors, StartTransferRequestValidationError{
 					field:  "ExpiryTime",
 					reason: "embedded message failed validation",
 					cause:  err,
@@ -7410,7 +7410,7 @@ func (m *StartSendTransferRequest) validate(all bool) error {
 		}
 	} else if v, ok := interface{}(m.GetExpiryTime()).(interface{ Validate() error }); ok {
 		if err := v.Validate(); err != nil {
-			return StartSendTransferRequestValidationError{
+			return StartTransferRequestValidationError{
 				field:  "ExpiryTime",
 				reason: "embedded message failed validation",
 				cause:  err,
@@ -7436,7 +7436,7 @@ func (m *StartSendTransferRequest) validate(all bool) error {
 				switch v := interface{}(val).(type) {
 				case interface{ ValidateAll() error }:
 					if err := v.ValidateAll(); err != nil {
-						errors = append(errors, StartSendTransferRequestValidationError{
+						errors = append(errors, StartTransferRequestValidationError{
 							field:  fmt.Sprintf("KeyTweakProofs[%v]", key),
 							reason: "embedded message failed validation",
 							cause:  err,
@@ -7444,7 +7444,7 @@ func (m *StartSendTransferRequest) validate(all bool) error {
 					}
 				case interface{ Validate() error }:
 					if err := v.Validate(); err != nil {
-						errors = append(errors, StartSendTransferRequestValidationError{
+						errors = append(errors, StartTransferRequestValidationError{
 							field:  fmt.Sprintf("KeyTweakProofs[%v]", key),
 							reason: "embedded message failed validation",
 							cause:  err,
@@ -7453,7 +7453,7 @@ func (m *StartSendTransferRequest) validate(all bool) error {
 				}
 			} else if v, ok := interface{}(val).(interface{ Validate() error }); ok {
 				if err := v.Validate(); err != nil {
-					return StartSendTransferRequestValidationError{
+					return StartTransferRequestValidationError{
 						field:  fmt.Sprintf("KeyTweakProofs[%v]", key),
 						reason: "embedded message failed validation",
 						cause:  err,
@@ -7465,19 +7465,19 @@ func (m *StartSendTransferRequest) validate(all bool) error {
 	}
 
 	if len(errors) > 0 {
-		return StartSendTransferRequestMultiError(errors)
+		return StartTransferRequestMultiError(errors)
 	}
 
 	return nil
 }
 
-// StartSendTransferRequestMultiError is an error wrapping multiple validation
-// errors returned by StartSendTransferRequest.ValidateAll() if the designated
+// StartTransferRequestMultiError is an error wrapping multiple validation
+// errors returned by StartTransferRequest.ValidateAll() if the designated
 // constraints aren't met.
-type StartSendTransferRequestMultiError []error
+type StartTransferRequestMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
-func (m StartSendTransferRequestMultiError) Error() string {
+func (m StartTransferRequestMultiError) Error() string {
 	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
@@ -7486,11 +7486,11 @@ func (m StartSendTransferRequestMultiError) Error() string {
 }
 
 // AllErrors returns a list of validation violation errors.
-func (m StartSendTransferRequestMultiError) AllErrors() []error { return m }
+func (m StartTransferRequestMultiError) AllErrors() []error { return m }
 
-// StartSendTransferRequestValidationError is the validation error returned by
-// StartSendTransferRequest.Validate if the designated constraints aren't met.
-type StartSendTransferRequestValidationError struct {
+// StartTransferRequestValidationError is the validation error returned by
+// StartTransferRequest.Validate if the designated constraints aren't met.
+type StartTransferRequestValidationError struct {
 	field  string
 	reason string
 	cause  error
@@ -7498,24 +7498,24 @@ type StartSendTransferRequestValidationError struct {
 }
 
 // Field function returns field value.
-func (e StartSendTransferRequestValidationError) Field() string { return e.field }
+func (e StartTransferRequestValidationError) Field() string { return e.field }
 
 // Reason function returns reason value.
-func (e StartSendTransferRequestValidationError) Reason() string { return e.reason }
+func (e StartTransferRequestValidationError) Reason() string { return e.reason }
 
 // Cause function returns cause value.
-func (e StartSendTransferRequestValidationError) Cause() error { return e.cause }
+func (e StartTransferRequestValidationError) Cause() error { return e.cause }
 
 // Key function returns key value.
-func (e StartSendTransferRequestValidationError) Key() bool { return e.key }
+func (e StartTransferRequestValidationError) Key() bool { return e.key }
 
 // ErrorName returns error name.
-func (e StartSendTransferRequestValidationError) ErrorName() string {
-	return "StartSendTransferRequestValidationError"
+func (e StartTransferRequestValidationError) ErrorName() string {
+	return "StartTransferRequestValidationError"
 }
 
 // Error satisfies the builtin error interface
-func (e StartSendTransferRequestValidationError) Error() string {
+func (e StartTransferRequestValidationError) Error() string {
 	cause := ""
 	if e.cause != nil {
 		cause = fmt.Sprintf(" | caused by: %v", e.cause)
@@ -7527,14 +7527,14 @@ func (e StartSendTransferRequestValidationError) Error() string {
 	}
 
 	return fmt.Sprintf(
-		"invalid %sStartSendTransferRequest.%s: %s%s",
+		"invalid %sStartTransferRequest.%s: %s%s",
 		key,
 		e.field,
 		e.reason,
 		cause)
 }
 
-var _ error = StartSendTransferRequestValidationError{}
+var _ error = StartTransferRequestValidationError{}
 
 var _ interface {
 	Field() string
@@ -7542,24 +7542,24 @@ var _ interface {
 	Key() bool
 	Cause() error
 	ErrorName() string
-} = StartSendTransferRequestValidationError{}
+} = StartTransferRequestValidationError{}
 
-// Validate checks the field values on StartSendTransferResponse with the rules
+// Validate checks the field values on StartTransferResponse with the rules
 // defined in the proto definition for this message. If any rules are
 // violated, the first error encountered is returned, or nil if there are no violations.
-func (m *StartSendTransferResponse) Validate() error {
+func (m *StartTransferResponse) Validate() error {
 	return m.validate(false)
 }
 
-// ValidateAll checks the field values on StartSendTransferResponse with the
-// rules defined in the proto definition for this message. If any rules are
+// ValidateAll checks the field values on StartTransferResponse with the rules
+// defined in the proto definition for this message. If any rules are
 // violated, the result is a list of violation errors wrapped in
-// StartSendTransferResponseMultiError, or nil if none found.
-func (m *StartSendTransferResponse) ValidateAll() error {
+// StartTransferResponseMultiError, or nil if none found.
+func (m *StartTransferResponse) ValidateAll() error {
 	return m.validate(true)
 }
 
-func (m *StartSendTransferResponse) validate(all bool) error {
+func (m *StartTransferResponse) validate(all bool) error {
 	if m == nil {
 		return nil
 	}
@@ -7570,7 +7570,7 @@ func (m *StartSendTransferResponse) validate(all bool) error {
 		switch v := interface{}(m.GetTransfer()).(type) {
 		case interface{ ValidateAll() error }:
 			if err := v.ValidateAll(); err != nil {
-				errors = append(errors, StartSendTransferResponseValidationError{
+				errors = append(errors, StartTransferResponseValidationError{
 					field:  "Transfer",
 					reason: "embedded message failed validation",
 					cause:  err,
@@ -7578,7 +7578,7 @@ func (m *StartSendTransferResponse) validate(all bool) error {
 			}
 		case interface{ Validate() error }:
 			if err := v.Validate(); err != nil {
-				errors = append(errors, StartSendTransferResponseValidationError{
+				errors = append(errors, StartTransferResponseValidationError{
 					field:  "Transfer",
 					reason: "embedded message failed validation",
 					cause:  err,
@@ -7587,7 +7587,7 @@ func (m *StartSendTransferResponse) validate(all bool) error {
 		}
 	} else if v, ok := interface{}(m.GetTransfer()).(interface{ Validate() error }); ok {
 		if err := v.Validate(); err != nil {
-			return StartSendTransferResponseValidationError{
+			return StartTransferResponseValidationError{
 				field:  "Transfer",
 				reason: "embedded message failed validation",
 				cause:  err,
@@ -7602,7 +7602,7 @@ func (m *StartSendTransferResponse) validate(all bool) error {
 			switch v := interface{}(item).(type) {
 			case interface{ ValidateAll() error }:
 				if err := v.ValidateAll(); err != nil {
-					errors = append(errors, StartSendTransferResponseValidationError{
+					errors = append(errors, StartTransferResponseValidationError{
 						field:  fmt.Sprintf("SigningResults[%v]", idx),
 						reason: "embedded message failed validation",
 						cause:  err,
@@ -7610,7 +7610,7 @@ func (m *StartSendTransferResponse) validate(all bool) error {
 				}
 			case interface{ Validate() error }:
 				if err := v.Validate(); err != nil {
-					errors = append(errors, StartSendTransferResponseValidationError{
+					errors = append(errors, StartTransferResponseValidationError{
 						field:  fmt.Sprintf("SigningResults[%v]", idx),
 						reason: "embedded message failed validation",
 						cause:  err,
@@ -7619,7 +7619,7 @@ func (m *StartSendTransferResponse) validate(all bool) error {
 			}
 		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
 			if err := v.Validate(); err != nil {
-				return StartSendTransferResponseValidationError{
+				return StartTransferResponseValidationError{
 					field:  fmt.Sprintf("SigningResults[%v]", idx),
 					reason: "embedded message failed validation",
 					cause:  err,
@@ -7630,19 +7630,19 @@ func (m *StartSendTransferResponse) validate(all bool) error {
 	}
 
 	if len(errors) > 0 {
-		return StartSendTransferResponseMultiError(errors)
+		return StartTransferResponseMultiError(errors)
 	}
 
 	return nil
 }
 
-// StartSendTransferResponseMultiError is an error wrapping multiple validation
-// errors returned by StartSendTransferResponse.ValidateAll() if the
-// designated constraints aren't met.
-type StartSendTransferResponseMultiError []error
+// StartTransferResponseMultiError is an error wrapping multiple validation
+// errors returned by StartTransferResponse.ValidateAll() if the designated
+// constraints aren't met.
+type StartTransferResponseMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
-func (m StartSendTransferResponseMultiError) Error() string {
+func (m StartTransferResponseMultiError) Error() string {
 	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
@@ -7651,11 +7651,11 @@ func (m StartSendTransferResponseMultiError) Error() string {
 }
 
 // AllErrors returns a list of validation violation errors.
-func (m StartSendTransferResponseMultiError) AllErrors() []error { return m }
+func (m StartTransferResponseMultiError) AllErrors() []error { return m }
 
-// StartSendTransferResponseValidationError is the validation error returned by
-// StartSendTransferResponse.Validate if the designated constraints aren't met.
-type StartSendTransferResponseValidationError struct {
+// StartTransferResponseValidationError is the validation error returned by
+// StartTransferResponse.Validate if the designated constraints aren't met.
+type StartTransferResponseValidationError struct {
 	field  string
 	reason string
 	cause  error
@@ -7663,24 +7663,24 @@ type StartSendTransferResponseValidationError struct {
 }
 
 // Field function returns field value.
-func (e StartSendTransferResponseValidationError) Field() string { return e.field }
+func (e StartTransferResponseValidationError) Field() string { return e.field }
 
 // Reason function returns reason value.
-func (e StartSendTransferResponseValidationError) Reason() string { return e.reason }
+func (e StartTransferResponseValidationError) Reason() string { return e.reason }
 
 // Cause function returns cause value.
-func (e StartSendTransferResponseValidationError) Cause() error { return e.cause }
+func (e StartTransferResponseValidationError) Cause() error { return e.cause }
 
 // Key function returns key value.
-func (e StartSendTransferResponseValidationError) Key() bool { return e.key }
+func (e StartTransferResponseValidationError) Key() bool { return e.key }
 
 // ErrorName returns error name.
-func (e StartSendTransferResponseValidationError) ErrorName() string {
-	return "StartSendTransferResponseValidationError"
+func (e StartTransferResponseValidationError) ErrorName() string {
+	return "StartTransferResponseValidationError"
 }
 
 // Error satisfies the builtin error interface
-func (e StartSendTransferResponseValidationError) Error() string {
+func (e StartTransferResponseValidationError) Error() string {
 	cause := ""
 	if e.cause != nil {
 		cause = fmt.Sprintf(" | caused by: %v", e.cause)
@@ -7692,14 +7692,14 @@ func (e StartSendTransferResponseValidationError) Error() string {
 	}
 
 	return fmt.Sprintf(
-		"invalid %sStartSendTransferResponse.%s: %s%s",
+		"invalid %sStartTransferResponse.%s: %s%s",
 		key,
 		e.field,
 		e.reason,
 		cause)
 }
 
-var _ error = StartSendTransferResponseValidationError{}
+var _ error = StartTransferResponseValidationError{}
 
 var _ interface {
 	Field() string
@@ -7707,7 +7707,7 @@ var _ interface {
 	Key() bool
 	Cause() error
 	ErrorName() string
-} = StartSendTransferResponseValidationError{}
+} = StartTransferResponseValidationError{}
 
 // Validate checks the field values on SendLeafKeyTweak with the rules defined
 // in the proto definition for this message. If any rules are violated, the
@@ -7848,22 +7848,22 @@ var _ interface {
 	ErrorName() string
 } = SendLeafKeyTweakValidationError{}
 
-// Validate checks the field values on CompleteSendTransferRequest with the
-// rules defined in the proto definition for this message. If any rules are
+// Validate checks the field values on FinalizeTransferRequest with the rules
+// defined in the proto definition for this message. If any rules are
 // violated, the first error encountered is returned, or nil if there are no violations.
-func (m *CompleteSendTransferRequest) Validate() error {
+func (m *FinalizeTransferRequest) Validate() error {
 	return m.validate(false)
 }
 
-// ValidateAll checks the field values on CompleteSendTransferRequest with the
+// ValidateAll checks the field values on FinalizeTransferRequest with the
 // rules defined in the proto definition for this message. If any rules are
 // violated, the result is a list of violation errors wrapped in
-// CompleteSendTransferRequestMultiError, or nil if none found.
-func (m *CompleteSendTransferRequest) ValidateAll() error {
+// FinalizeTransferRequestMultiError, or nil if none found.
+func (m *FinalizeTransferRequest) ValidateAll() error {
 	return m.validate(true)
 }
 
-func (m *CompleteSendTransferRequest) validate(all bool) error {
+func (m *FinalizeTransferRequest) validate(all bool) error {
 	if m == nil {
 		return nil
 	}
@@ -7881,7 +7881,7 @@ func (m *CompleteSendTransferRequest) validate(all bool) error {
 			switch v := interface{}(item).(type) {
 			case interface{ ValidateAll() error }:
 				if err := v.ValidateAll(); err != nil {
-					errors = append(errors, CompleteSendTransferRequestValidationError{
+					errors = append(errors, FinalizeTransferRequestValidationError{
 						field:  fmt.Sprintf("LeavesToSend[%v]", idx),
 						reason: "embedded message failed validation",
 						cause:  err,
@@ -7889,7 +7889,7 @@ func (m *CompleteSendTransferRequest) validate(all bool) error {
 				}
 			case interface{ Validate() error }:
 				if err := v.Validate(); err != nil {
-					errors = append(errors, CompleteSendTransferRequestValidationError{
+					errors = append(errors, FinalizeTransferRequestValidationError{
 						field:  fmt.Sprintf("LeavesToSend[%v]", idx),
 						reason: "embedded message failed validation",
 						cause:  err,
@@ -7898,7 +7898,7 @@ func (m *CompleteSendTransferRequest) validate(all bool) error {
 			}
 		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
 			if err := v.Validate(); err != nil {
-				return CompleteSendTransferRequestValidationError{
+				return FinalizeTransferRequestValidationError{
 					field:  fmt.Sprintf("LeavesToSend[%v]", idx),
 					reason: "embedded message failed validation",
 					cause:  err,
@@ -7909,19 +7909,19 @@ func (m *CompleteSendTransferRequest) validate(all bool) error {
 	}
 
 	if len(errors) > 0 {
-		return CompleteSendTransferRequestMultiError(errors)
+		return FinalizeTransferRequestMultiError(errors)
 	}
 
 	return nil
 }
 
-// CompleteSendTransferRequestMultiError is an error wrapping multiple
-// validation errors returned by CompleteSendTransferRequest.ValidateAll() if
-// the designated constraints aren't met.
-type CompleteSendTransferRequestMultiError []error
+// FinalizeTransferRequestMultiError is an error wrapping multiple validation
+// errors returned by FinalizeTransferRequest.ValidateAll() if the designated
+// constraints aren't met.
+type FinalizeTransferRequestMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
-func (m CompleteSendTransferRequestMultiError) Error() string {
+func (m FinalizeTransferRequestMultiError) Error() string {
 	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
@@ -7930,12 +7930,11 @@ func (m CompleteSendTransferRequestMultiError) Error() string {
 }
 
 // AllErrors returns a list of validation violation errors.
-func (m CompleteSendTransferRequestMultiError) AllErrors() []error { return m }
+func (m FinalizeTransferRequestMultiError) AllErrors() []error { return m }
 
-// CompleteSendTransferRequestValidationError is the validation error returned
-// by CompleteSendTransferRequest.Validate if the designated constraints
-// aren't met.
-type CompleteSendTransferRequestValidationError struct {
+// FinalizeTransferRequestValidationError is the validation error returned by
+// FinalizeTransferRequest.Validate if the designated constraints aren't met.
+type FinalizeTransferRequestValidationError struct {
 	field  string
 	reason string
 	cause  error
@@ -7943,24 +7942,24 @@ type CompleteSendTransferRequestValidationError struct {
 }
 
 // Field function returns field value.
-func (e CompleteSendTransferRequestValidationError) Field() string { return e.field }
+func (e FinalizeTransferRequestValidationError) Field() string { return e.field }
 
 // Reason function returns reason value.
-func (e CompleteSendTransferRequestValidationError) Reason() string { return e.reason }
+func (e FinalizeTransferRequestValidationError) Reason() string { return e.reason }
 
 // Cause function returns cause value.
-func (e CompleteSendTransferRequestValidationError) Cause() error { return e.cause }
+func (e FinalizeTransferRequestValidationError) Cause() error { return e.cause }
 
 // Key function returns key value.
-func (e CompleteSendTransferRequestValidationError) Key() bool { return e.key }
+func (e FinalizeTransferRequestValidationError) Key() bool { return e.key }
 
 // ErrorName returns error name.
-func (e CompleteSendTransferRequestValidationError) ErrorName() string {
-	return "CompleteSendTransferRequestValidationError"
+func (e FinalizeTransferRequestValidationError) ErrorName() string {
+	return "FinalizeTransferRequestValidationError"
 }
 
 // Error satisfies the builtin error interface
-func (e CompleteSendTransferRequestValidationError) Error() string {
+func (e FinalizeTransferRequestValidationError) Error() string {
 	cause := ""
 	if e.cause != nil {
 		cause = fmt.Sprintf(" | caused by: %v", e.cause)
@@ -7972,14 +7971,14 @@ func (e CompleteSendTransferRequestValidationError) Error() string {
 	}
 
 	return fmt.Sprintf(
-		"invalid %sCompleteSendTransferRequest.%s: %s%s",
+		"invalid %sFinalizeTransferRequest.%s: %s%s",
 		key,
 		e.field,
 		e.reason,
 		cause)
 }
 
-var _ error = CompleteSendTransferRequestValidationError{}
+var _ error = FinalizeTransferRequestValidationError{}
 
 var _ interface {
 	Field() string
@@ -7987,7 +7986,138 @@ var _ interface {
 	Key() bool
 	Cause() error
 	ErrorName() string
-} = CompleteSendTransferRequestValidationError{}
+} = FinalizeTransferRequestValidationError{}
+
+// Validate checks the field values on FinalizeTransferResponse with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *FinalizeTransferResponse) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on FinalizeTransferResponse with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// FinalizeTransferResponseMultiError, or nil if none found.
+func (m *FinalizeTransferResponse) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *FinalizeTransferResponse) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if all {
+		switch v := interface{}(m.GetTransfer()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, FinalizeTransferResponseValidationError{
+					field:  "Transfer",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, FinalizeTransferResponseValidationError{
+					field:  "Transfer",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetTransfer()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return FinalizeTransferResponseValidationError{
+				field:  "Transfer",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return FinalizeTransferResponseMultiError(errors)
+	}
+
+	return nil
+}
+
+// FinalizeTransferResponseMultiError is an error wrapping multiple validation
+// errors returned by FinalizeTransferResponse.ValidateAll() if the designated
+// constraints aren't met.
+type FinalizeTransferResponseMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m FinalizeTransferResponseMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m FinalizeTransferResponseMultiError) AllErrors() []error { return m }
+
+// FinalizeTransferResponseValidationError is the validation error returned by
+// FinalizeTransferResponse.Validate if the designated constraints aren't met.
+type FinalizeTransferResponseValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e FinalizeTransferResponseValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e FinalizeTransferResponseValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e FinalizeTransferResponseValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e FinalizeTransferResponseValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e FinalizeTransferResponseValidationError) ErrorName() string {
+	return "FinalizeTransferResponseValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e FinalizeTransferResponseValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sFinalizeTransferResponse.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = FinalizeTransferResponseValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = FinalizeTransferResponseValidationError{}
 
 // Validate checks the field values on Transfer with the rules defined in the
 // proto definition for this message. If any rules are violated, the first
@@ -8354,138 +8484,6 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = TransferLeafValidationError{}
-
-// Validate checks the field values on CompleteSendTransferResponse with the
-// rules defined in the proto definition for this message. If any rules are
-// violated, the first error encountered is returned, or nil if there are no violations.
-func (m *CompleteSendTransferResponse) Validate() error {
-	return m.validate(false)
-}
-
-// ValidateAll checks the field values on CompleteSendTransferResponse with the
-// rules defined in the proto definition for this message. If any rules are
-// violated, the result is a list of violation errors wrapped in
-// CompleteSendTransferResponseMultiError, or nil if none found.
-func (m *CompleteSendTransferResponse) ValidateAll() error {
-	return m.validate(true)
-}
-
-func (m *CompleteSendTransferResponse) validate(all bool) error {
-	if m == nil {
-		return nil
-	}
-
-	var errors []error
-
-	if all {
-		switch v := interface{}(m.GetTransfer()).(type) {
-		case interface{ ValidateAll() error }:
-			if err := v.ValidateAll(); err != nil {
-				errors = append(errors, CompleteSendTransferResponseValidationError{
-					field:  "Transfer",
-					reason: "embedded message failed validation",
-					cause:  err,
-				})
-			}
-		case interface{ Validate() error }:
-			if err := v.Validate(); err != nil {
-				errors = append(errors, CompleteSendTransferResponseValidationError{
-					field:  "Transfer",
-					reason: "embedded message failed validation",
-					cause:  err,
-				})
-			}
-		}
-	} else if v, ok := interface{}(m.GetTransfer()).(interface{ Validate() error }); ok {
-		if err := v.Validate(); err != nil {
-			return CompleteSendTransferResponseValidationError{
-				field:  "Transfer",
-				reason: "embedded message failed validation",
-				cause:  err,
-			}
-		}
-	}
-
-	if len(errors) > 0 {
-		return CompleteSendTransferResponseMultiError(errors)
-	}
-
-	return nil
-}
-
-// CompleteSendTransferResponseMultiError is an error wrapping multiple
-// validation errors returned by CompleteSendTransferResponse.ValidateAll() if
-// the designated constraints aren't met.
-type CompleteSendTransferResponseMultiError []error
-
-// Error returns a concatenation of all the error messages it wraps.
-func (m CompleteSendTransferResponseMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
-	for _, err := range m {
-		msgs = append(msgs, err.Error())
-	}
-	return strings.Join(msgs, "; ")
-}
-
-// AllErrors returns a list of validation violation errors.
-func (m CompleteSendTransferResponseMultiError) AllErrors() []error { return m }
-
-// CompleteSendTransferResponseValidationError is the validation error returned
-// by CompleteSendTransferResponse.Validate if the designated constraints
-// aren't met.
-type CompleteSendTransferResponseValidationError struct {
-	field  string
-	reason string
-	cause  error
-	key    bool
-}
-
-// Field function returns field value.
-func (e CompleteSendTransferResponseValidationError) Field() string { return e.field }
-
-// Reason function returns reason value.
-func (e CompleteSendTransferResponseValidationError) Reason() string { return e.reason }
-
-// Cause function returns cause value.
-func (e CompleteSendTransferResponseValidationError) Cause() error { return e.cause }
-
-// Key function returns key value.
-func (e CompleteSendTransferResponseValidationError) Key() bool { return e.key }
-
-// ErrorName returns error name.
-func (e CompleteSendTransferResponseValidationError) ErrorName() string {
-	return "CompleteSendTransferResponseValidationError"
-}
-
-// Error satisfies the builtin error interface
-func (e CompleteSendTransferResponseValidationError) Error() string {
-	cause := ""
-	if e.cause != nil {
-		cause = fmt.Sprintf(" | caused by: %v", e.cause)
-	}
-
-	key := ""
-	if e.key {
-		key = "key for "
-	}
-
-	return fmt.Sprintf(
-		"invalid %sCompleteSendTransferResponse.%s: %s%s",
-		key,
-		e.field,
-		e.reason,
-		cause)
-}
-
-var _ error = CompleteSendTransferResponseValidationError{}
-
-var _ interface {
-	Field() string
-	Reason() string
-	Key() bool
-	Cause() error
-	ErrorName() string
-} = CompleteSendTransferResponseValidationError{}
 
 // Validate checks the field values on TransferFilter with the rules defined in
 // the proto definition for this message. If any rules are violated, the first
@@ -15254,22 +15252,22 @@ var _ interface {
 	ErrorName() string
 } = QueryNodesResponseValidationError{}
 
-// Validate checks the field values on CancelSendTransferRequest with the rules
+// Validate checks the field values on CancelTransferRequest with the rules
 // defined in the proto definition for this message. If any rules are
 // violated, the first error encountered is returned, or nil if there are no violations.
-func (m *CancelSendTransferRequest) Validate() error {
+func (m *CancelTransferRequest) Validate() error {
 	return m.validate(false)
 }
 
-// ValidateAll checks the field values on CancelSendTransferRequest with the
-// rules defined in the proto definition for this message. If any rules are
+// ValidateAll checks the field values on CancelTransferRequest with the rules
+// defined in the proto definition for this message. If any rules are
 // violated, the result is a list of violation errors wrapped in
-// CancelSendTransferRequestMultiError, or nil if none found.
-func (m *CancelSendTransferRequest) ValidateAll() error {
+// CancelTransferRequestMultiError, or nil if none found.
+func (m *CancelTransferRequest) ValidateAll() error {
 	return m.validate(true)
 }
 
-func (m *CancelSendTransferRequest) validate(all bool) error {
+func (m *CancelTransferRequest) validate(all bool) error {
 	if m == nil {
 		return nil
 	}
@@ -15281,19 +15279,19 @@ func (m *CancelSendTransferRequest) validate(all bool) error {
 	// no validation rules for SenderIdentityPublicKey
 
 	if len(errors) > 0 {
-		return CancelSendTransferRequestMultiError(errors)
+		return CancelTransferRequestMultiError(errors)
 	}
 
 	return nil
 }
 
-// CancelSendTransferRequestMultiError is an error wrapping multiple validation
-// errors returned by CancelSendTransferRequest.ValidateAll() if the
-// designated constraints aren't met.
-type CancelSendTransferRequestMultiError []error
+// CancelTransferRequestMultiError is an error wrapping multiple validation
+// errors returned by CancelTransferRequest.ValidateAll() if the designated
+// constraints aren't met.
+type CancelTransferRequestMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
-func (m CancelSendTransferRequestMultiError) Error() string {
+func (m CancelTransferRequestMultiError) Error() string {
 	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
@@ -15302,11 +15300,11 @@ func (m CancelSendTransferRequestMultiError) Error() string {
 }
 
 // AllErrors returns a list of validation violation errors.
-func (m CancelSendTransferRequestMultiError) AllErrors() []error { return m }
+func (m CancelTransferRequestMultiError) AllErrors() []error { return m }
 
-// CancelSendTransferRequestValidationError is the validation error returned by
-// CancelSendTransferRequest.Validate if the designated constraints aren't met.
-type CancelSendTransferRequestValidationError struct {
+// CancelTransferRequestValidationError is the validation error returned by
+// CancelTransferRequest.Validate if the designated constraints aren't met.
+type CancelTransferRequestValidationError struct {
 	field  string
 	reason string
 	cause  error
@@ -15314,24 +15312,24 @@ type CancelSendTransferRequestValidationError struct {
 }
 
 // Field function returns field value.
-func (e CancelSendTransferRequestValidationError) Field() string { return e.field }
+func (e CancelTransferRequestValidationError) Field() string { return e.field }
 
 // Reason function returns reason value.
-func (e CancelSendTransferRequestValidationError) Reason() string { return e.reason }
+func (e CancelTransferRequestValidationError) Reason() string { return e.reason }
 
 // Cause function returns cause value.
-func (e CancelSendTransferRequestValidationError) Cause() error { return e.cause }
+func (e CancelTransferRequestValidationError) Cause() error { return e.cause }
 
 // Key function returns key value.
-func (e CancelSendTransferRequestValidationError) Key() bool { return e.key }
+func (e CancelTransferRequestValidationError) Key() bool { return e.key }
 
 // ErrorName returns error name.
-func (e CancelSendTransferRequestValidationError) ErrorName() string {
-	return "CancelSendTransferRequestValidationError"
+func (e CancelTransferRequestValidationError) ErrorName() string {
+	return "CancelTransferRequestValidationError"
 }
 
 // Error satisfies the builtin error interface
-func (e CancelSendTransferRequestValidationError) Error() string {
+func (e CancelTransferRequestValidationError) Error() string {
 	cause := ""
 	if e.cause != nil {
 		cause = fmt.Sprintf(" | caused by: %v", e.cause)
@@ -15343,14 +15341,14 @@ func (e CancelSendTransferRequestValidationError) Error() string {
 	}
 
 	return fmt.Sprintf(
-		"invalid %sCancelSendTransferRequest.%s: %s%s",
+		"invalid %sCancelTransferRequest.%s: %s%s",
 		key,
 		e.field,
 		e.reason,
 		cause)
 }
 
-var _ error = CancelSendTransferRequestValidationError{}
+var _ error = CancelTransferRequestValidationError{}
 
 var _ interface {
 	Field() string
@@ -15358,24 +15356,24 @@ var _ interface {
 	Key() bool
 	Cause() error
 	ErrorName() string
-} = CancelSendTransferRequestValidationError{}
+} = CancelTransferRequestValidationError{}
 
-// Validate checks the field values on CancelSendTransferResponse with the
-// rules defined in the proto definition for this message. If any rules are
+// Validate checks the field values on CancelTransferResponse with the rules
+// defined in the proto definition for this message. If any rules are
 // violated, the first error encountered is returned, or nil if there are no violations.
-func (m *CancelSendTransferResponse) Validate() error {
+func (m *CancelTransferResponse) Validate() error {
 	return m.validate(false)
 }
 
-// ValidateAll checks the field values on CancelSendTransferResponse with the
-// rules defined in the proto definition for this message. If any rules are
+// ValidateAll checks the field values on CancelTransferResponse with the rules
+// defined in the proto definition for this message. If any rules are
 // violated, the result is a list of violation errors wrapped in
-// CancelSendTransferResponseMultiError, or nil if none found.
-func (m *CancelSendTransferResponse) ValidateAll() error {
+// CancelTransferResponseMultiError, or nil if none found.
+func (m *CancelTransferResponse) ValidateAll() error {
 	return m.validate(true)
 }
 
-func (m *CancelSendTransferResponse) validate(all bool) error {
+func (m *CancelTransferResponse) validate(all bool) error {
 	if m == nil {
 		return nil
 	}
@@ -15386,7 +15384,7 @@ func (m *CancelSendTransferResponse) validate(all bool) error {
 		switch v := interface{}(m.GetTransfer()).(type) {
 		case interface{ ValidateAll() error }:
 			if err := v.ValidateAll(); err != nil {
-				errors = append(errors, CancelSendTransferResponseValidationError{
+				errors = append(errors, CancelTransferResponseValidationError{
 					field:  "Transfer",
 					reason: "embedded message failed validation",
 					cause:  err,
@@ -15394,7 +15392,7 @@ func (m *CancelSendTransferResponse) validate(all bool) error {
 			}
 		case interface{ Validate() error }:
 			if err := v.Validate(); err != nil {
-				errors = append(errors, CancelSendTransferResponseValidationError{
+				errors = append(errors, CancelTransferResponseValidationError{
 					field:  "Transfer",
 					reason: "embedded message failed validation",
 					cause:  err,
@@ -15403,7 +15401,7 @@ func (m *CancelSendTransferResponse) validate(all bool) error {
 		}
 	} else if v, ok := interface{}(m.GetTransfer()).(interface{ Validate() error }); ok {
 		if err := v.Validate(); err != nil {
-			return CancelSendTransferResponseValidationError{
+			return CancelTransferResponseValidationError{
 				field:  "Transfer",
 				reason: "embedded message failed validation",
 				cause:  err,
@@ -15412,19 +15410,19 @@ func (m *CancelSendTransferResponse) validate(all bool) error {
 	}
 
 	if len(errors) > 0 {
-		return CancelSendTransferResponseMultiError(errors)
+		return CancelTransferResponseMultiError(errors)
 	}
 
 	return nil
 }
 
-// CancelSendTransferResponseMultiError is an error wrapping multiple
-// validation errors returned by CancelSendTransferResponse.ValidateAll() if
-// the designated constraints aren't met.
-type CancelSendTransferResponseMultiError []error
+// CancelTransferResponseMultiError is an error wrapping multiple validation
+// errors returned by CancelTransferResponse.ValidateAll() if the designated
+// constraints aren't met.
+type CancelTransferResponseMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
-func (m CancelSendTransferResponseMultiError) Error() string {
+func (m CancelTransferResponseMultiError) Error() string {
 	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
@@ -15433,11 +15431,11 @@ func (m CancelSendTransferResponseMultiError) Error() string {
 }
 
 // AllErrors returns a list of validation violation errors.
-func (m CancelSendTransferResponseMultiError) AllErrors() []error { return m }
+func (m CancelTransferResponseMultiError) AllErrors() []error { return m }
 
-// CancelSendTransferResponseValidationError is the validation error returned
-// by CancelSendTransferResponse.Validate if the designated constraints aren't met.
-type CancelSendTransferResponseValidationError struct {
+// CancelTransferResponseValidationError is the validation error returned by
+// CancelTransferResponse.Validate if the designated constraints aren't met.
+type CancelTransferResponseValidationError struct {
 	field  string
 	reason string
 	cause  error
@@ -15445,24 +15443,24 @@ type CancelSendTransferResponseValidationError struct {
 }
 
 // Field function returns field value.
-func (e CancelSendTransferResponseValidationError) Field() string { return e.field }
+func (e CancelTransferResponseValidationError) Field() string { return e.field }
 
 // Reason function returns reason value.
-func (e CancelSendTransferResponseValidationError) Reason() string { return e.reason }
+func (e CancelTransferResponseValidationError) Reason() string { return e.reason }
 
 // Cause function returns cause value.
-func (e CancelSendTransferResponseValidationError) Cause() error { return e.cause }
+func (e CancelTransferResponseValidationError) Cause() error { return e.cause }
 
 // Key function returns key value.
-func (e CancelSendTransferResponseValidationError) Key() bool { return e.key }
+func (e CancelTransferResponseValidationError) Key() bool { return e.key }
 
 // ErrorName returns error name.
-func (e CancelSendTransferResponseValidationError) ErrorName() string {
-	return "CancelSendTransferResponseValidationError"
+func (e CancelTransferResponseValidationError) ErrorName() string {
+	return "CancelTransferResponseValidationError"
 }
 
 // Error satisfies the builtin error interface
-func (e CancelSendTransferResponseValidationError) Error() string {
+func (e CancelTransferResponseValidationError) Error() string {
 	cause := ""
 	if e.cause != nil {
 		cause = fmt.Sprintf(" | caused by: %v", e.cause)
@@ -15474,14 +15472,14 @@ func (e CancelSendTransferResponseValidationError) Error() string {
 	}
 
 	return fmt.Sprintf(
-		"invalid %sCancelSendTransferResponse.%s: %s%s",
+		"invalid %sCancelTransferResponse.%s: %s%s",
 		key,
 		e.field,
 		e.reason,
 		cause)
 }
 
-var _ error = CancelSendTransferResponseValidationError{}
+var _ error = CancelTransferResponseValidationError{}
 
 var _ interface {
 	Field() string
@@ -15489,7 +15487,7 @@ var _ interface {
 	Key() bool
 	Cause() error
 	ErrorName() string
-} = CancelSendTransferResponseValidationError{}
+} = CancelTransferResponseValidationError{}
 
 // Validate checks the field values on QueryUnusedDepositAddressesRequest with
 // the rules defined in the proto definition for this message. If any rules

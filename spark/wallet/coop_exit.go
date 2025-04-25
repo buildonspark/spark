@@ -160,7 +160,7 @@ func signCoopExitRefunds(
 		return nil, nil, fmt.Errorf("failed to generate exit id: %v", err)
 	}
 	response, err := sparkClient.CooperativeExit(tmpCtx, &pb.CooperativeExitRequest{
-		Transfer: &pb.StartSendTransferRequest{
+		Transfer: &pb.StartTransferRequest{
 			TransferId:                transferID.String(),
 			LeavesToSend:              signingJobs,
 			OwnerIdentityPublicKey:    config.IdentityPublicKey(),
